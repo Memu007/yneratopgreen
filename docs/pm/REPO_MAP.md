@@ -74,9 +74,17 @@ Otros: `core/` (config y seguridad), `db/`, `schemas/`,
 
 ### Migraciones
 
-`backend/alembic/versions/` — 10 archivos. Las de Fase II relevantes:
-004 `publication_type`, 006 `subcategories`, 007 `form_options`,
-009 FK `product.subcategory_id`, 010 `ratings`, 011 geo (`lat`, `lng`).
+`backend/alembic/versions/` — 10 archivos, de `001` a `010`. Las de
+Fase II relevantes: 004 `publication_type`, 005 `category_service`,
+006 `subcategories`, 007 `form_options`, 009 FK
+`product.subcategory_id`, 010 `ratings`.
+
+**No existe la migración `011`.** `docs/PROJECT_STATUS.md` la declara
+("migración 011 agrega `lat`, `lng` y un índice geo") pero el archivo no
+está en el repositorio, no hay ninguna migración que mencione `lat`,
+`lng` ni índices espaciales, y `backend/app/models/product.py` no tiene
+coordenadas. Verificado el 2026-07-24. No hay geolocalización de ningún
+tipo en el código.
 
 ## Documentación de entrega — `docs/`
 

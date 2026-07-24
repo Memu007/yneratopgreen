@@ -4,50 +4,61 @@ Actualizado: 2026-07-24
 
 ## Objetivo activo
 
-Publicar un MVP navegable del marketplace agropecuario.
+**Cerrar la Fase 0 del roadmap v3: línea base reproducible y verificada.**
+
+No se toca lógica de negocio, no se migra a PostgreSQL y no se agregan
+pantallas hasta que la línea base esté aprobada.
 
 ## Estado
 
-- Repositorio conectado. **No es un proyecto vacío**: contiene la entrega
-  Fase I de TopGreen / AgroMarket (versión `1.0.1`), correspondiente a lo
-  publicado en `topgreen.com.ar`.
-- Inventario de pantallas completado (ver `REPO_MAP.md`).
-- El recorrido comprador catálogo → producto ya existe y funciona.
-- El recorrido no es enlazable: la navegación es por estado en `App.tsx`,
-  no hay router ni URL por producto.
+- Repositorio conectado y con commit base. La fuente de verdad es este
+  FastAPI + React; el Django queda congelado como referencia.
+- **Nadie ejecutó este código todavía.** No hay evidencia de que levante,
+  migre, siembre ni pase un smoke test.
+- La documentación de entrega **no es confiable**: declara una migración
+  `011` con geolocalización que no existe. Verificado. Mientras no haya
+  smoke tests, todo lo marcado como "✅ completo" en
+  `docs/PROJECT_STATUS.md` es una afirmación, no un hecho.
+- El alcance vinculante es `docs/PM_ROADMAP.md` v3, no la documentación
+  de entrega. Estimación: 9–11 semanas desde la línea base aprobada.
 
 ## Próximas tareas
 
-1. **Decidir el alcance del MVP navegable frente a Fase II parcial.**
-   Hay módulos a medio integrar (ratings, servicios, subcategorías,
-   form options, geo) que no se apagan con un flag. Definir para cada uno:
-   completar, ocultar del frontend, o remover.
-   - Criterio de aceptación: cada módulo de Fase II tiene una decisión
-     escrita en `DECISIONS.md`.
+1. **Levantar y verificar la línea base** (dev).
+   Docker compose, `alembic upgrade head`, seed, `npm run build`, y smoke
+   tests de: health, registro, login, catálogo, carrito, checkout/orden,
+   productos del vendedor, compras, ventas y admin.
+   - Criterio de aceptación: instalación reproducible desde cero; build
+     verde; última migración aplicada informada con su número real;
+     cada smoke test con caso, resultado HTTP/UI y observación; errores
+     exactos con causa y solución propuesta. Sin credenciales reales de
+     Mercado Pago.
 
-2. **Definir si el MVP requiere URLs por producto.**
-   Hoy no las hay. Sin router no se puede compartir un enlace a una
-   publicación ni indexarla en buscadores.
-   - Criterio de aceptación: decisión registrada; si es "sí", queda
-     estimado el trabajo de introducir routing.
+2. **Auditar la documentación de entrega contra el código** (dev).
+   El caso `011` ya está confirmado como falso. Hay que saber cuántos
+   más hay antes de planificar sobre esa base.
+   - Criterio de aceptación: lista de afirmaciones de
+     `PROJECT_STATUS.md` que no se sostienen contra el código, con
+     archivo y línea. Sin corregir nada todavía.
 
-3. **Definir el paso "contacto" del recorrido comprador.**
-   Existe `ContactPage` (formulario general de la empresa) y existe
-   checkout con Mercado Pago desvinculado. No existe mensajería
-   comprador ↔ vendedor.
-   - Criterio de aceptación: está escrito qué significa "contactar al
-     vendedor" en el MVP y con qué pieza se resuelve.
+3. **Matriz requisito contractual → evidencia → estado** (PM, con el
+   resultado de 1 y 2).
+   - Criterio de aceptación: cada requisito del roadmap v3 tiene estado
+     verificado, no declarado.
 
 ## Bloqueos
 
-- **Mercado Pago entregado desvinculado.** Todas las variables `MP_*`
-  vienen vacías. Si el MVP incluye compra real, hay que crear una
-  aplicación propia de Mercado Pago antes (ver `docs/SETUP_PAYMENTS.md`).
-- **Sin URLs por producto.** Bloquea compartir y indexar publicaciones.
-- **Imágenes en filesystem local** (`/data/uploads`), no apto para
-  producción según la propia documentación de entrega.
+- **Todo el roadmap está bloqueado por la tarea 1.** Planificar fases 1 a
+  6 sobre un código que nadie ejecutó es especular.
+- **Decisión contractual pendiente: PostgreSQL + PostGIS.** El contrato
+  lo exige, el código usa SQL Server. Migrar es Fase 2 y es caro. Si hay
+  margen para negociar el cambio por escrito, hay que saberlo antes de
+  la Fase 2, no durante.
+- **Mercado Pago desvinculado** y con un bug de sandbox conocido. No se
+  configuran credenciales reales hasta la Fase 5.
 
 ## Último resultado validado
 
-Inventario de pantallas y módulos backend, hecho leyendo el repositorio.
-Resultado en `REPO_MAP.md`. Nada ejecutado ni desplegado todavía.
+Inventario del repositorio y verificación de la migración `011`
+(no existe; no hay columnas geo). Resultado en `REPO_MAP.md`.
+Nada ejecutado todavía.

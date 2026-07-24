@@ -13,12 +13,14 @@ plataforma cobra una comisión sobre cada venta.
 
 | Actor | Puede |
 |-------|-------|
-| Comprador | Buscar y filtrar catálogo, ver detalle, carrito, comprar, ver sus órdenes, calificar vendedores |
-| Vendedor | Publicar y administrar sus productos, ver sus ventas, vincular su cuenta de cobro |
-| Admin | Gestionar usuarios, productos, órdenes y categorías; ver estadísticas |
+| Comprador | Buscar por texto, categoría y ubicación; ver detalle; carrito; comprar o pedir cotización; seguir sus órdenes |
+| Vendedor / prestador | Publicar y administrar publicaciones, cotizar consultas, ver sus ventas, cobrar |
+| Transportista | Ofrecer cobertura logística, ser seleccionado o cotizar un envío |
+| Admin | Gestionar usuarios, publicaciones, órdenes y categorías; validar cuentas; ver estadísticas |
 
-Los roles en base son `admin` y `user`. Vendedor y comprador no son roles
-distintos: cualquier usuario puede publicar y comprar.
+**Brecha:** el código sólo distingue `admin` y `user`. Comprador y
+vendedor están unificados y **el transportista no existe**. Los cuatro
+perfiles son requisito contractual.
 
 ## Modelo de negocio
 
@@ -52,14 +54,42 @@ apagan con un feature flag. Cada uno necesita una decisión explícita:
 | Productos vs servicios | Campos en base y UI parcial; `ServicesPage` es estática |
 | Subcategorías | Tabla y endpoint listos; sin CRUD en admin ni datos de seed |
 | Form options dinámicos | Tabla y endpoint listos; el frontend usa listas hardcoded |
-| Filtros geográficos | Columnas e índice listos; sin búsqueda por proximidad en UI |
+| Filtros geográficos | **No existen.** La documentación de entrega los declara, pero no hay migración, ni columnas, ni código |
+
+## MVP contractual — lo que falta
+
+El alcance vinculante está en `docs/PM_ROADMAP.md` (versión 3, auditada
+el 20-07-2026), no en la documentación de entrega. Brechas mayores:
+
+| Brecha | Estado |
+|--------|--------|
+| PostgreSQL + PostGIS | El contrato lo define; el código usa SQL Server |
+| Geolocalización y búsqueda por radio | No existe nada |
+| Transportistas y logística de cercanía | No existe la entidad ni el flujo |
+| Transferencia bancaria con comprobante | No existe CBU/alias, carga ni aprobación |
+| Roles separados (4 perfiles) | Sólo `admin` y `user` |
+| Validación real de cuentas | Hay campo `is_verified`, sin flujo |
+| Modos `compra_directa` / `consulta_cotizacion` | No implementados |
+| Categorías Bienes/Ganado y Tecnología de Cultivo | Incompletas |
+| Seguridad: rate limiting, JWT en `localStorage` | Sin resolver |
+
+Estimación del roadmap: **9–11 semanas** desde que se apruebe la línea
+base. El producto es un prototipo funcional, no un MVP contractual.
+
+## Benchmark
+
+Agrofy se usa como referencia de navegación y fichas técnicas, nunca
+como código, diseño, marca ni alcance a replicar. La logística
+geográfica es el diferencial propio de TopGreen.
 
 ## Fuera de alcance
 
-Almacenamiento externo de imágenes, búsqueda full-text, email
-transaccional, recuperación de contraseña, mensajería comprador ↔
-vendedor, reviews de productos, favoritos, cupones, multi-moneda,
-multi-idioma, tests E2E, CI/CD, telemetría.
+Publicidad y posiciones patrocinadas, financiación y canje, portal
+editorial y SEO masivo, suscripciones para vendedores, recomendaciones
+con IA, multi-país y multi-idioma, paridad con Agrofy.
+
+Tampoco entran: mensajería comprador ↔ vendedor, reviews de productos,
+favoritos, cupones.
 
 ## Restricciones heredadas de la entrega
 
