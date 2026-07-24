@@ -1,0 +1,36 @@
+# FastAPI y servidor
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Base de datos
+sqlalchemy==2.0.25
+alembic==1.13.1
+pyodbc==5.0.1
+pymssql==2.2.11
+
+# Autenticación
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+pydantic[email]==2.5.3
+
+# Utilidades
+python-dotenv==1.0.0
+pydantic-settings==2.1.0
+
+# CORS y middleware
+fastapi-cors==0.0.6
+
+# Logging
+structlog==24.1.0
+
+# Mercado Pago
+mercadopago==2.2.1
+
+# Validación de imágenes
+pillow==10.2.0
+
+# Testing (opcional)
+pytest==7.4.4
+pytest-asyncio==0.23.3
+httpx==0.26.0

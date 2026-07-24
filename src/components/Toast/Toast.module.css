@@ -1,0 +1,246 @@
+/* Toast Container - esquina superior derecha */
+.toastContainer {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 400px;
+}
+
+/* Individual Toast */
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  animation: slideIn 0.3s ease-out;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast.success {
+  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+  border-left: 4px solid #28a745;
+  color: #155724;
+}
+
+.toast.error {
+  background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+  border-left: 4px solid #dc3545;
+  color: #721c24;
+}
+
+.toast.warning {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
+  border-left: 4px solid #ffc107;
+  color: #856404;
+}
+
+.toast.info {
+  background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+  border-left: 4px solid #17a2b8;
+  color: #0c5460;
+}
+
+.icon {
+  font-size: 1.3rem;
+}
+
+.message {
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  color: inherit;
+  padding: 0;
+  line-height: 1;
+}
+
+.closeBtn:hover {
+  opacity: 1;
+}
+
+/* Confirm Modal Overlay */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Confirm Modal */
+.confirmModal {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  max-width: 420px;
+  width: 90%;
+  overflow: hidden;
+  animation: scaleIn 0.2s ease-out;
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.confirmHeader {
+  padding: 20px 24px;
+  color: white;
+}
+
+.confirmHeader.danger {
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+}
+
+.confirmHeader.warning {
+  background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+  color: #212529;
+}
+
+.confirmHeader.info {
+  background: linear-gradient(135deg, #2d6a4f 0%, #1b4332 100%);
+}
+
+.confirmHeader h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.confirmBody {
+  padding: 24px;
+}
+
+.confirmBody p {
+  margin: 0;
+  color: #495057;
+  font-size: 1rem;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px 24px;
+  justify-content: flex-end;
+}
+
+.cancelButton {
+  padding: 10px 20px;
+  border: 2px solid #dee2e6;
+  background: white;
+  color: #495057;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancelButton:hover {
+  background: #f8f9fa;
+  border-color: #adb5bd;
+}
+
+.confirmButton {
+  padding: 10px 24px;
+  border: none;
+  color: white;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirmButton.danger {
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+}
+
+.confirmButton.danger:hover {
+  background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
+  transform: translateY(-1px);
+}
+
+.confirmButton.warning {
+  background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+  color: #212529;
+}
+
+.confirmButton.warning:hover {
+  background: linear-gradient(135deg, #e0a800 0%, #d39e00 100%);
+  transform: translateY(-1px);
+}
+
+.confirmButton.info {
+  background: linear-gradient(135deg, #2d6a4f 0%, #1b4332 100%);
+}
+
+.confirmButton.info:hover {
+  background: linear-gradient(135deg, #1b4332 0%, #143528 100%);
+  transform: translateY(-1px);
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .toastContainer {
+    left: 10px;
+    right: 10px;
+    max-width: none;
+  }
+  
+  .confirmActions {
+    flex-direction: column-reverse;
+  }
+  
+  .cancelButton,
+  .confirmButton {
+    width: 100%;
+  }
+}

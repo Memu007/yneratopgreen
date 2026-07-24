@@ -1,0 +1,78 @@
+services:
+  # Base de datos MSSQL Server
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: topgreen-db
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD no está definido en .env}"
+      MSSQL_PID: "Developer"
+    volumes:
+      - db_data:/var/opt/mssql
+    ports:
+      - "1433:1433"  # Puerto estándar de SQL Server
+    networks:
+      - topgreen-network
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' -C || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # Backend FastAPI
+  topgreen-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: topgreen-api
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app  # Hot reload en desarrollo
+      - uploads_data:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - topgreen-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Nginx (OPCIONAL - Reverse Proxy + Frontend buildado)
+  # Sólo necesario si querés servir el frontend buildado en :80 a través de nginx.
+  # Para desarrollo, usá `npm run dev` (Vite en :5173) — no necesitás este servicio.
+  # Antes de levantarlo: ejecutá `npm run build` para generar ./dist
+  # Activarlo con: `docker compose --profile fullstack up -d`
+  nginx:
+    image: nginx:alpine
+    container_name: topgreen-nginx
+    profiles: ["fullstack"]
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./dist:/usr/share/nginx/html:ro  # Requiere `npm run build` previo
+      - uploads_data:/usr/share/nginx/html/uploads:ro
+    depends_on:
+      - topgreen-api
+    networks:
+      - topgreen-network
+    restart: unless-stopped
+
+networks:
+  topgreen-network:
+    driver: bridge
+
+volumes:
+  db_data:
+    driver: local
+  uploads_data:
+    driver: local

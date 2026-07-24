@@ -1,0 +1,31 @@
+# Archivos y directorios de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Base de datos
+*.db
+*.sqlite3
+
+# Logs
+*.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Alembic
+alembic/versions/*.pyc

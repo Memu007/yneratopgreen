@@ -1,0 +1,107 @@
+# TopGreen / AgroMarket — Fase I
+
+> **Marketplace agropecuario** con catálogo de productos, carrito, checkout e
+> integración de Mercado Pago Split Payments (5% comisión marketplace / 95%
+> vendedor).
+
+Este repositorio es la **entrega de Fase I** preparada para que un nuevo
+equipo técnico levante el proyecto en local desde cero, sin dependencias
+del equipo original (sin servidor de Peakflow, sin túnel ngrok obligatorio,
+sin credenciales del equipo anterior).
+
+**Correspondencia con producción**: el código fuente de este paquete
+coincide con la versión actualmente publicada en `topgreen.com.ar`.
+Reproducción bit-a-bit del bundle JS verificada — ver
+[DELIVERY_CHECKLIST.md](DELIVERY_CHECKLIST.md). La configuración de
+despliegue (URLs, nginx, CORS) está sanitizada para entorno local.
+
+---
+
+## Independencia de infraestructura — qué NO requiere este paquete
+
+Este paquete está preparado para **levantamiento 100 % local** y **NO** queda
+apuntando ni depende de ninguno de los siguientes elementos del equipo
+anterior:
+
+- ❌ Servidor anterior del equipo desarrollador previo (Peakflow).
+- ❌ Túnel ngrok anterior.
+- ❌ URL `peakflow-topgreen.ngrok.app` (eliminada del código y configuración).
+- ❌ Hosting / Ferozo usado anteriormente.
+- ❌ Dominio `topgreen.com.ar` como dependencia obligatoria (puede usarse, pero no es requerido para correr o desplegar).
+- ❌ Credenciales FTP / SSH del equipo anterior.
+- ❌ Credenciales de Mercado Pago del equipo anterior (todas las variables `MP_*` se entregan vacías).
+- ❌ Base de datos productiva anterior (se entrega esquema vía migraciones Alembic + datos demo vía seed).
+- ❌ Variables de entorno reales del equipo anterior (sólo `.env*.example` con valores locales o placeholders `CAMBIAR_*`).
+
+El nuevo equipo crea sus propias credenciales, su propia base de datos local,
+su propia aplicación de Mercado Pago y su propia infraestructura de
+despliegue. Más detalles en [DELIVERY_CHECKLIST.md](DELIVERY_CHECKLIST.md) y
+[docs/SETUP_PAYMENTS.md](docs/SETUP_PAYMENTS.md).
+
+---
+
+## Stack
+
+| Capa | Tecnología | Puerto local |
+|------|-----------|--------------|
+| Frontend | React 18 + TypeScript + Vite | `5173` |
+| Backend | FastAPI + Python 3.11 | `8000` |
+| Base de datos | SQL Server 2022 (Developer) | `1433` |
+| Pagos | Mercado Pago Marketplace (Split) | — (requiere reactivar) |
+
+---
+
+## Documentación incluida
+
+Antes de hacer cualquier cosa, leé en este orden:
+
+1. **[README_LOCAL_SETUP.md](README_LOCAL_SETUP.md)** — Cómo levantar el proyecto localmente (paso a paso, Docker o nativo).
+2. **[docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)** — Qué está implementado, qué está parcial, qué falta.
+3. **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — Diagrama, flujos, decisiones técnicas.
+4. **[docs/DATABASE.md](docs/DATABASE.md)** — Esquema, migraciones, seed.
+5. **[docs/API_ENDPOINTS.md](docs/API_ENDPOINTS.md)** — Endpoints principales.
+6. **[docs/SETUP_PAYMENTS.md](docs/SETUP_PAYMENTS.md)** — Cómo reactivar Mercado Pago.
+7. **[docs/USER_MANUAL.md](docs/USER_MANUAL.md)** — Manual operativo (admin / vendedor / comprador).
+8. **[docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)** — Bugs y limitaciones conocidos.
+9. **[docs/RECOMMENDATIONS.md](docs/RECOMMENDATIONS.md)** — Recomendaciones para continuar.
+10. **[DELIVERY_CHECKLIST.md](DELIVERY_CHECKLIST.md)** — Checklist de qué incluye la entrega.
+
+---
+
+## Levantar el proyecto en 3 comandos (Docker)
+
+```powershell
+# 1. Variables de entorno (defaults locales)
+copy .env.example .env
+copy backend\.env.example backend\.env
+
+# 2. Levantar DB + API
+docker compose up -d
+
+# 3. Migraciones + seed + frontend dev
+docker exec topgreen-api alembic upgrade head
+docker exec topgreen-api python -m app.seed
+npm install
+npm run dev
+```
+
+Detalles, alternativa nativa y troubleshooting en
+[README_LOCAL_SETUP.md](README_LOCAL_SETUP.md).
+
+---
+
+## Credenciales demo (creadas por el seed)
+
+| Rol | Email | Password |
+|-----|-------|----------|
+| Admin | `admin@topgreen.com` | `admin123` |
+| Vendedor | `vendedor@ejemplo.com` | `vendedor123` |
+| Cliente | `cliente@ejemplo.com` | `cliente123` |
+
+**⚠️ Cambiar antes de producción.**
+
+---
+
+## Versión
+
+`1.0.1` (último build deployado a producción durante el handover).

@@ -1,0 +1,119 @@
+.footer {
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+  color: #ffffff;
+  margin-top: auto;
+}
+
+.footerContent {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 48px 24px 32px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 32px;
+}
+
+.footerSection h3 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: 16px;
+  color: #ffffff;
+}
+
+.footerSection ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.footerSection ul li {
+  margin-bottom: 10px;
+}
+
+.footerSection ul li a,
+.footerSection ul li button {
+  color: rgba(255, 255, 255, 0.8);
+  text-decoration: none;
+  font-size: var(--font-size-base);
+  transition: color var(--transition-fast);
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-family);
+  cursor: pointer;
+  text-align: left;
+}
+
+.footerSection ul li a:hover,
+.footerSection ul li button:hover {
+  color: white;
+  text-decoration: underline;
+}
+
+.socialLinks {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.socialLinks a {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  color: white;
+  transition: all var(--transition-normal);
+}
+
+.socialLinks a:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.socialLinks svg {
+  width: 20px;
+  height: 20px;
+}
+
+.footerBottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 20px 24px;
+  text-align: center;
+}
+
+.footerBottom p {
+  margin: 0;
+  font-size: var(--font-size-base);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+@media (max-width: 968px) {
+  .footerContent {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 32px;
+    padding: 40px 24px 32px;
+  }
+}
+
+@media (max-width: 640px) {
+  .footerContent {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding: 32px 20px 24px;
+  }
+
+  .footerSection {
+    text-align: center;
+  }
+
+  .socialLinks {
+    justify-content: center;
+  }
+
+  .footerBottom {
+    padding: 16px 20px;
+  }
+}

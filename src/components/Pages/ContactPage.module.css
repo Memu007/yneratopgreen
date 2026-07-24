@@ -1,0 +1,315 @@
+.contactPage {
+  min-height: 100vh;
+}
+
+.hero {
+  background: linear-gradient(135deg, #2d5016 0%, #7fb069 100%);
+  color: white;
+  padding: 80px 24px 60px;
+  text-align: center;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.hero h1 {
+  font-size: 48px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.subtitle {
+  font-size: 20px;
+  opacity: 0.95;
+}
+
+/* Contact Section */
+.contactSection {
+  padding: 64px 24px;
+  background: white;
+}
+
+.contactGrid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 48px;
+}
+
+.formContainer h2,
+.infoContainer h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #2d5016;
+  margin-bottom: 24px;
+}
+
+/* Form Styles */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.formGroup label {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.formGroup input,
+.formGroup textarea,
+.formGroup select {
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 15px;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.formGroup input:focus,
+.formGroup textarea:focus,
+.formGroup select:focus {
+  outline: none;
+  border-color: #7fb069;
+  box-shadow: 0 0 0 3px rgba(127, 176, 105, 0.1);
+}
+
+.submitButton {
+  background-color: #2d5016;
+  color: white;
+  border: none;
+  padding: 14px 28px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s;
+  flex: 1;
+}
+
+.submitButton:hover:not(:disabled) {
+  background-color: #1e3510;
+  transform: translateY(-2px);
+}
+
+.submitButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Button Group */
+.buttonGroup {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.whatsappButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: #25D366;
+  color: white;
+  border: none;
+  padding: 14px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s;
+  flex: 1;
+}
+
+.whatsappButton:hover {
+  background-color: #128C7E;
+  transform: translateY(-2px);
+}
+
+.whatsappButton svg {
+  flex-shrink: 0;
+}
+
+/* Success/Error Messages */
+.successMessage {
+  background-color: #d4edda;
+  color: #155724;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-weight: 500;
+  border: 1px solid #c3e6cb;
+}
+
+.errorMessage {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-weight: 500;
+  border: 1px solid #f5c6cb;
+}
+
+/* Info Cards */
+.infoContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.infoCard {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  transition: transform 0.3s;
+}
+
+.infoCard:hover {
+  transform: translateX(4px);
+}
+
+.infoIcon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.infoCard h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d5016;
+  margin-bottom: 6px;
+}
+
+.infoCard a {
+  color: #7fb069;
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.infoCard a:hover {
+  text-decoration: underline;
+}
+
+.infoCard p {
+  margin: 4px 0;
+  color: #555;
+  font-size: 15px;
+}
+
+.muted {
+  color: #999 !important;
+  font-size: 14px !important;
+}
+
+/* Social Section */
+.socialSection {
+  margin-top: 8px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f0f4ed 0%, #e8f0e1 100%);
+  border-radius: 8px;
+}
+
+.socialSection h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d5016;
+  margin-bottom: 12px;
+}
+
+.socialLinks {
+  display: flex;
+  gap: 12px;
+}
+
+.socialLinks a {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #2d5016;
+  border-radius: 50%;
+  color: white;
+  transition: all 0.3s;
+}
+
+.socialLinks a:hover {
+  background-color: #7fb069;
+  transform: translateY(-2px);
+}
+
+/* FAQ Section */
+.faqSection {
+  padding: 64px 24px;
+  background: #f8f9fa;
+}
+
+.faqSection h2 {
+  font-size: 32px;
+  font-weight: 700;
+  text-align: center;
+  color: #2d5016;
+  margin-bottom: 40px;
+}
+
+.faqGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.faqCard {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.faqCard h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #2d5016;
+  margin-bottom: 12px;
+}
+
+.faqCard p {
+  font-size: 15px;
+  color: #555;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 968px) {
+  .contactGrid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero h1 {
+    font-size: 36px;
+  }
+
+  .formContainer h2,
+  .infoContainer h2 {
+    font-size: 24px;
+  }
+
+  .faqGrid {
+    grid-template-columns: 1fr;
+  }
+}

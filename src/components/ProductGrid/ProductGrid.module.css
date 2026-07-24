@@ -1,0 +1,148 @@
+.grid {
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--border-primary);
+}
+
+.resultsCount {
+  font-size: var(--font-size-lg);
+  color: var(--text-secondary);
+}
+
+.resultsNumber {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary-600);
+}
+
+[data-theme="dark"] .resultsNumber {
+  color: var(--color-primary-400);
+}
+
+.sortSelect {
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  cursor: pointer;
+  min-width: 200px;
+}
+
+.sortSelect:focus {
+  outline: none;
+  border-color: var(--input-border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.sortSelect option {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.productsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 4rem 2rem;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-lg);
+  grid-column: 1 / -1;
+}
+
+.emptyIcon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.loadingSpinner {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.emptyTitle {
+  font-size: var(--font-size-2xl);
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.emptyText {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-md);
+}
+
+@media (max-width: 1200px) {
+  .productsGrid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1.25rem;
+  }
+}
+
+@media (max-width: 968px) {
+  .header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .resultsCount {
+    font-size: 1rem;
+  }
+
+  .sortSelect {
+    width: 100%;
+    min-width: auto;
+  }
+
+  .productsGrid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .productsGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .productsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .emptyState {
+    padding: 3rem 1rem;
+  }
+
+  .emptyIcon {
+    font-size: 3rem;
+  }
+
+  .emptyTitle {
+    font-size: 1.25rem;
+  }
+}

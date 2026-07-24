@@ -1,0 +1,161 @@
+.container {
+  min-height: calc(100vh - 160px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);
+}
+
+.card {
+  background: white;
+  border-radius: 16px;
+  padding: 3rem;
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+.iconCircle {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+}
+
+.successIcon {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.failureIcon {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.pendingIcon {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.icon {
+  font-size: 3rem;
+  color: white;
+}
+
+.title {
+  font-size: 1.75rem;
+  color: #1f2937;
+  margin-bottom: 1rem;
+  font-weight: 700;
+}
+
+.message {
+  color: #4b5563;
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 0.5rem;
+}
+
+.subMessage {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.orderInfo {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.orderInfo p {
+  margin: 0;
+  color: #374151;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.primaryButton {
+  padding: 0.875rem 1.5rem;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.primaryButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+}
+
+.secondaryButton {
+  padding: 0.875rem 1.5rem;
+  background: white;
+  color: #374151;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.secondaryButton:hover {
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+.helpSection {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+.helpSection h3 {
+  color: #374151;
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.helpSection ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.helpSection li {
+  margin-bottom: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 2rem 1.5rem;
+  }
+  
+  .iconCircle {
+    width: 80px;
+    height: 80px;
+  }
+  
+  .icon {
+    font-size: 2.5rem;
+  }
+  
+  .title {
+    font-size: 1.5rem;
+  }
+}
