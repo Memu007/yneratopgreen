@@ -1,78 +1,110 @@
 # Dev → PM
 
-## Estado: bloqueada antes de implementar
+Fecha: 2026-07-25
 
-Leí el onboarding completo, actualicé `main` y revisé la Tarea 1 contra
-`backend/app/seed.py`. La carga de una o dos publicaciones de Acopio es
-técnicamente directa y no requiere tocar modelos, esquema ni migraciones.
+## Estado: bloqueada después de implementar Tarea 1 parcialmente
 
-No modifiqué código de producto porque este entorno no tiene Docker ni una
-instalación nativa de PostgreSQL/PostGIS. Sin base y API no puedo producir la
-evidencia obligatoria ni validar el cambio antes de subirlo.
+Implementé dos publicaciones de servicio para **Acopio** en
+`backend/app/seed.py`:
 
-## Evidencia del bloqueo
+- `Recepción, Secado y Acopio de Granos` — Rosario, Santa Fe
+- `Guarda de Granos en Silo Bolsa` — Pergamino, Buenos Aires
 
-```text
-$ docker version
-/bin/bash: line 1: docker: command not found
-```
-
-También comprobé las alternativas disponibles:
-
-```text
-$ command -v podman nerdctl psql postgres pg_ctl initdb
-(sin salida)
-
-$ node --version
-v24.14.0
-
-$ npm --version
-11.9.0
-
-$ python3 --version
-Python 3.12.13
-```
-
-Node y Python están presentes, pero no hay motor de contenedores ni servidor
-PostgreSQL. Esto es un bloqueo del entorno, no un fallo observado en TopGreen.
+Ambas usan la categoría `acopio`, se incorporaron a los mapas explícitos
+de taxonomía y localidad, tienen slugs propios y quedan cubiertas por la
+idempotencia existente del seed (búsqueda por `Product.slug`). No toqué
+esquema, modelos ni migraciones. El commit de implementación ya está
+subido: `814f66b seed: agregar publicaciones de acopio`.
 
 ## Qué corrí
 
+### Chequeo estático del seed
+
 ```text
-$ git pull origin main
-From https://github.com/Memu007/yneratopgreen
- * branch            main       -> FETCH_HEAD
-Already up to date.
+$ python3 -c "import ast, pathlib; ast.parse(pathlib.Path('backend/app/seed.py').read_text()); print('seed.py: sintaxis Python válida')"
+seed.py: sintaxis Python válida
 ```
 
-Revisé:
+### Instalación de dependencias frontend
 
-- La definición de las 12 categorías en el seed.
-- El mapa `product_taxonomy`.
-- El mapa `product_localities`.
-- La idempotencia por `Product.slug`.
-- Los modelos `Product` y `Category`.
+```text
+$ npm install
+added 205 packages in 4s
+42 packages are looking for funding
+npm warn deprecated inflight@1.0.6
+npm warn deprecated rimraf@3.0.2
+npm warn deprecated glob@7.2.3
+npm warn deprecated eslint@8.57.1
+```
+
+### `npm run smoke`
+
+La suite llegó a compilar el frontend correctamente y falló antes de
+migraciones, seed o tests por un contenedor ya existente:
+
+```text
+$ npm run smoke
+===> Preparando variables locales
+===> Compilando frontend
+> tsc && vite build
+vite v5.4.21 building for production...
+transforming...
+✓ 78 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.97 kB │ gzip:   0.51 kB
+dist/assets/index-DgJ3Nz_2.css  129.06 kB │ gzip:  23.24 kB
+dist/assets/index-t25D7gNu.js   348.87 kB │ gzip: 103.67 kB
+✓ built in 1.93s
+===> Verificando Chromium de Playwright
+===> Eliminando contenedores y volúmenes locales
+===> Inicializando DB, migraciones, seed y API
+===> Verificando .env
+===> Levantando contenedores (db + api)
+...
+Container topgreen-db  Creating
+Error response from daemon: Conflict. The container name "/topgreen-db" is already in use by container "d5265fe6c4f9ff3a757ec0587ef24343c38311c98d649ee3ff5b91342ac9cf95". You have to remove (or rename) that container to be able to reuse that name.
+```
 
 ## Qué no corrí
 
-- No corrí el seed, ni una ni dos veces.
-- No corrí las consultas SQL.
-- No levanté API ni interfaz.
-- No verifiqué el filtro de categorías en navegador.
-- No corrí `npm run smoke`.
-- No inicié la Tarea 2 responsive.
-- No inicié la Tarea 3 del puerto estricto.
+Por ese bloqueo, no pude correr ni obtener evidencia de:
 
-## Qué encontré que no esperaba
+1. El seed dos veces seguidas y la salida de la segunda ejecución.
+2. Las tres consultas SQL pedidas: subcategorías por categoría,
+   publicaciones por categoría y publicaciones sin categoría.
+3. Los 12 smoke tests en verde: la suite no alcanzó `alembic`, el seed ni
+   los casos de Playwright.
+4. La comprobación en interfaz de que el filtro muestra la taxonomía
+   nueva.
+5. La Tarea 2 (vista móvil) ni la Tarea 3 (puerto estricto). La PM pidió
+   frenar si la evidencia de Tarea 1 fallaba, por lo que no avancé.
 
-`docs/pm/REPO_MAP.md` todavía afirma que no hay geolocalización y habla de diez
-smoke tests, mientras el código, `NOW.md` y el onboarding documentan
-geolocalización ya implementada y doce casos. No toqué ese documento porque no
-forma parte de la tarea; para esta revisión tomé el código como fuente de
-verdad.
+## Hallazgo inesperado
 
-## Qué necesito para seguir
+Docker Desktop **sí está encendido**. El contenedor que bloquea el smoke
+está saludable y pertenece al mismo proyecto, pero a otro checkout de
+Codex:
 
-Que el entorno exponga Docker Desktop/Engine con Compose v2. Apenas esté
-disponible retomo desde Tarea 1, y no la declararé cerrada sin pegar la salida
-del segundo seed, las consultas SQL y el smoke.
+```text
+ID: d5265fe6c4f9
+Nombre: topgreen-db
+Estado: Up (healthy)
+Proyecto Compose: yneratopgreen
+Working dir: /Users/Emi/.codex/.chatgpt-projects/g-p-6a5c0432126c8191875cf0ffeeed7118/yneratopgreen
+```
+
+El `docker compose down -v` de este checkout no lo administra. No lo
+detuve ni eliminé: hacerlo podría borrar la base de otro trabajo activo.
+
+Además, `docs/pm/REPO_MAP.md` afirma que no hay geolocalización, pero el
+código actual sí tiene `products.locality_id` y el onboarding describe el
+padrón oficial. No lo edité porque no es parte de esta tarea.
+
+## Necesito de la PM / dueño
+
+Confirmación sobre el contenedor `topgreen-db` del otro checkout: que se
+detenga/elimine allí o autorización explícita para hacerlo. Con el nombre
+liberado vuelvo a correr el smoke desde cero, ejecuto el seed una segunda
+vez, tomo las consultas SQL y verifico el filtro antes de continuar con
+la Tarea 2.
