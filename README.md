@@ -46,7 +46,7 @@ despliegue. Más detalles en [DELIVERY_CHECKLIST.md](DELIVERY_CHECKLIST.md) y
 |------|-----------|--------------|
 | Frontend | React 18 + TypeScript + Vite | `5173` |
 | Backend | FastAPI + Python 3.11 | `8000` |
-| Base de datos | SQL Server 2022 (Developer) | `1433` |
+| Base de datos | PostgreSQL 16 + PostGIS 3.4 | `5433` (host) / `5432` (Docker) |
 | Pagos | Mercado Pago Marketplace (Split) | — (requiere reactivar) |
 
 ---
@@ -70,17 +70,15 @@ Antes de hacer cualquier cosa, leé en este orden:
 
 ## Levantar el proyecto en 3 comandos (Docker)
 
-```powershell
+```bash
 # 1. Variables de entorno (defaults locales)
-copy .env.example .env
-copy backend\.env.example backend\.env
+cp .env.example .env
+cp backend/.env.example backend/.env
 
-# 2. Levantar DB + API
-docker compose up -d
+# 2. Levantar DB + API + migraciones + seed
+./scripts/init_local_db.sh
 
-# 3. Migraciones + seed + frontend dev
-docker exec topgreen-api alembic upgrade head
-docker exec topgreen-api python -m app.seed
+# 3. Frontend dev
 npm install
 npm run dev
 ```
