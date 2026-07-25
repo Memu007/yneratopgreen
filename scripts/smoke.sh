@@ -60,6 +60,7 @@ npx playwright install chromium
 
 echo "===> Eliminando contenedores y volúmenes locales"
 docker compose down -v --remove-orphans
+docker rm -f topgreen-db topgreen-api >/dev/null 2>&1 || true
 
 echo "===> Inicializando DB, migraciones, seed y API"
 ./scripts/init_local_db.sh

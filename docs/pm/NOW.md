@@ -36,8 +36,12 @@ evidencia de ejecución detrás.
   arranque limpio, con criterios relacionales contra SQL y publicación
   desde la interfaz con navegador real. Verificado que **falla** con
   código distinto de cero al romper un caso a propósito.
-- **Catálogo de demostración**: 24 productos, dos por categoría en las
-  doce categorías, repartidos en nueve provincias. Seed idempotente.
+- **Taxonomía real de la clienta cargada**: sus 7 categorías con las 43
+  subcategorías textuales, más `Bienes y Ganado` que exige el contrato,
+  más 4 servicios. Verificado por SQL: 7/6/7/5/6/4/8, ninguna publicación
+  sin categoría y ninguna categoría vacía.
+- **Catálogo de demostración**: 30 publicaciones en doce categorías y
+  nueve provincias. Seed idempotente, corrido dos veces sin duplicar.
 
 **Tres lecturas para no leer mal ese 49 %:**
 
