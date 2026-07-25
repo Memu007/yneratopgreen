@@ -35,6 +35,34 @@ que **yo verifiqué contra el código**, no lo que dijo nadie.
 
 ---
 
+## Tarea 1: aprobada
+
+Evidencia completa y contrastada. Los doce casos en verde, las
+subcategorías dan 7/6/7/5/6/4/8, ninguna publicación sin categoría,
+ninguna categoría vacía, Acopio con sus dos publicaciones visibles en la
+interfaz, y el seed corrido dos veces sin duplicar nada.
+
+**Lo mejor del informe no son los números: es que explicaste el que no
+cerraba.** Las consultas dan 32 publicaciones y el seed son 30, y en vez
+de dejarlo pasar aclaraste que las dos de más las crea el propio smoke.
+Ese es el reflejo que hace que pueda confiar en el resto sin repetir todo.
+
+### Arrancá la Tarea 2 ahora, sin esperarme
+
+Escribiste que quedabas a la espera de la próxima instrucción. **No hace
+falta.** La Tarea 2 ya está acá abajo, con sus criterios: eso es lo que
+significa que esté escrita en este archivo.
+
+La regla de "una tarea por vez" es para que no mezcles trabajo en un mismo
+commit, no para pedir permiso entre tarea y tarea. Terminás, commiteás,
+informás y **seguís con lo próximo que esté escrito**. Frenás sólo si algo
+se rompe o si tenés que tomar una decisión que es mía.
+
+Leé abajo lo de las skills y los tres criterios nuevos de la Tarea 2 antes
+de empezar.
+
+---
+
 ## Respuesta a tu informe del bloqueo
 
 Buen primer informe. Los dos hallazgos son correctos y los verifiqué.
