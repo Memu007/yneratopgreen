@@ -32,65 +32,13 @@ hace que confíe en tus informes.
 
 ---
 
-## Tarea: verificar y arreglar la vista en celular
+## Tarea 1: cargar la taxonomía de la clienta
 
-El 30 de julio hay demostración con el cliente. Es del sector agro: **va a
-abrir el sitio en el teléfono**, en la reunión o apenas salga.
-
-El contrato pide "plataforma web responsive" y "diseño optimizado para
-dispositivos móviles". Nadie lo verificó nunca en una pantalla chica.
-
-**Lo que más me preocupa:** los selectores de provincia y localidad que
-acabás de construir son el centro de la demostración, y un desplegable con
-miles de localidades en un celular es justo lo que se rompe.
-
-### Qué verificar
-
-Con Playwright emulando un teléfono, y si podés también en uno real.
-Tamaños: 390×844 (iPhone), 360×800 (Android) y una tableta.
-
-Recorrido completo en cada tamaño:
-
-1. Pantalla inicial y navegación al catálogo.
-2. **El panel de filtros**: ¿se ve? ¿se puede abrir y cerrar? ¿los
-   selectores de provincia y localidad son usables con el dedo?
-3. Catálogo: ¿las tarjetas se acomodan o se desbordan?
-4. Detalle de una publicación.
-5. Carrito y checkout hasta la pantalla de pago.
-6. Formulario de publicación, que es largo.
-7. Panel de vendedor y panel de administración.
-
-En cada uno mirá: desbordes horizontales, texto cortado, botones
-superpuestos o demasiado chicos para el dedo, y elementos que tapen otros.
-
-### Qué arreglar
-
-**Sólo lo que esté roto o inutilizable.** No rediseñes nada, no cambies
-colores ni espaciados por gusto. El criterio es: ¿un usuario puede
-completar el recorrido en un teléfono sin frustrarse?
-
-Si algo está feo pero funciona, anotalo y no lo toques.
-
-### Criterio de aceptación
-
-1. El recorrido completo se puede hacer en 390×844 sin quedarse trabado.
-2. **Ningún desborde horizontal** en ninguna pantalla.
-3. Los filtros de provincia y localidad se pueden usar con el dedo.
-4. Capturas de las siete pantallas en el tamaño más chico.
-5. Lista de lo que estaba roto, lo que arreglaste y lo que dejaste feo a
-   propósito.
-6. `npm run smoke` sigue en verde.
-
-### Si encontrás mucho roto
-
-Frená y reportá antes de arreglar. Si son tres detalles, arreglalos. Si es
-un rediseño, esa decisión es mía y la tomo con lo que me cuentes.
-
----
-
-## Tarea 2: cargar la taxonomía de la clienta
-
-Hacela **después** de la verificación en celular.
+**Es lo primero que hacés.** Cambié el orden: la verificación en celular
+pasó a ser la Tarea 2. Motivo: la taxonomía cambia las categorías, que se
+ven en el filtro del catálogo, en el formulario de publicación y en las
+tarjetas. Verificar en pantalla chica lo que está por cambiar es trabajo
+que se tira.
 
 La clienta mandó su taxonomía real. Está analizada en
 `docs/pm/TAXONOMIA-CLIENTE.md`, leelo antes de empezar. Reemplaza a las
@@ -181,6 +129,67 @@ las preguntas del lunes.
 Vale lo mismo para las subcategorías: si alguna no sabés dónde va,
 dejala fuera y anotala. Una lista corta de pendientes explícitos vale más
 que un mapeo completo con decisiones inventadas.
+
+---
+
+## Tarea 2: verificar y arreglar la vista en celular
+
+**Después de la taxonomía**, y sobre la taxonomía ya cargada.
+
+El 30 de julio hay demostración con el cliente. Es del sector agro: **va a
+abrir el sitio en el teléfono**, en la reunión o apenas salga.
+
+El contrato pide "plataforma web responsive" y "diseño optimizado para
+dispositivos móviles". Nadie lo verificó nunca en una pantalla chica.
+
+**Lo que más me preocupa:** los selectores de provincia y localidad que
+acabás de construir son el centro de la demostración, y un desplegable con
+miles de localidades en un celular es justo lo que se rompe. Ahora se suma
+el filtro de categorías, que pasa de 5 a 12 opciones con subcategorías
+abajo: en pantalla chica eso puede volverse una lista impracticable.
+
+### Qué verificar
+
+Con Playwright emulando un teléfono, y si podés también en uno real.
+Tamaños: 390×844 (iPhone), 360×800 (Android) y una tableta.
+
+Recorrido completo en cada tamaño:
+
+1. Pantalla inicial y navegación al catálogo.
+2. **El panel de filtros**: ¿se ve? ¿se puede abrir y cerrar? ¿los
+   selectores de provincia, localidad y categoría son usables con el dedo?
+3. Catálogo: ¿las tarjetas se acomodan o se desbordan?
+4. Detalle de una publicación.
+5. Carrito y checkout hasta la pantalla de pago.
+6. Formulario de publicación, que es largo.
+7. Panel de vendedor y panel de administración.
+
+En cada uno mirá: desbordes horizontales, texto cortado, botones
+superpuestos o demasiado chicos para el dedo, y elementos que tapen otros.
+
+### Qué arreglar
+
+**Sólo lo que esté roto o inutilizable.** No rediseñes nada, no cambies
+colores ni espaciados por gusto. El criterio es: ¿un usuario puede
+completar el recorrido en un teléfono sin frustrarse?
+
+Si algo está feo pero funciona, anotalo y no lo toques.
+
+### Criterio de aceptación
+
+1. El recorrido completo se puede hacer en 390×844 sin quedarse trabado.
+2. **Ningún desborde horizontal** en ninguna pantalla.
+3. Los filtros de provincia, localidad y categoría se pueden usar con el
+   dedo.
+4. Capturas de las siete pantallas en el tamaño más chico.
+5. Lista de lo que estaba roto, lo que arreglaste y lo que dejaste feo a
+   propósito.
+6. `npm run smoke` sigue en verde.
+
+### Si encontrás mucho roto
+
+Frená y reportá antes de arreglar. Si son tres detalles, arreglalos. Si es
+un rediseño, esa decisión es mía y la tomo con lo que me cuentes.
 
 ---
 
