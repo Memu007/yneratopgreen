@@ -29,7 +29,7 @@ if [ ! -f backend/.env ]; then
 fi
 
 echo "===> Levantando contenedores (db + api)"
-docker compose up -d
+docker compose up -d --build
 
 echo "===> Esperando healthcheck de la DB (puede tardar ~30s)"
 ok=false
@@ -46,6 +46,25 @@ done
 if [ "$ok" != "true" ]; then
   echo "ERROR: topgreen-db no llegó a healthy en 60s" >&2
   exit 1
+fi
+
+db_name=$(sed -n 's/^DB_NAME=//p' backend/.env | tail -n 1)
+db_user=$(sed -n 's/^DB_USER=//p' backend/.env | tail -n 1)
+
+if [ -z "$db_name" ] || [ -z "$db_user" ]; then
+  echo "ERROR: DB_NAME y DB_USER deben estar definidos en backend/.env" >&2
+  exit 1
+fi
+
+if ! [[ "$db_name" =~ ^[A-Za-z0-9_]+$ ]] || ! [[ "$db_user" =~ ^[A-Za-z0-9_]+$ ]]; then
+  echo "ERROR: DB_NAME o DB_USER contienen caracteres no permitidos" >&2
+  exit 1
+fi
+
+echo "===> Creando la base $db_name si no existe"
+db_exists=$(docker exec topgreen-db psql -U "$db_user" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$db_name'")
+if [ "$db_exists" != "1" ]; then
+  docker exec topgreen-db createdb -U "$db_user" "$db_name"
 fi
 
 echo "===> Aplicando migraciones (alembic upgrade head)"

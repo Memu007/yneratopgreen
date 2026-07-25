@@ -4,7 +4,6 @@ API Router para calificaciones de usuarios
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel, Field
 from typing import Optional

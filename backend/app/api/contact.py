@@ -4,7 +4,6 @@ API Router para mensajes de contacto
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from uuid import UUID
 from datetime import datetime
 
 from app.db.base import get_db
@@ -98,7 +97,7 @@ def get_contact_messages(
 
 @router.get("/{message_id}", response_model=ContactMessageResponse)
 def get_contact_message_detail(
-    message_id: UUID,
+    message_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -132,7 +131,7 @@ def get_contact_message_detail(
 
 @router.patch("/{message_id}/mark-replied")
 def mark_message_as_replied(
-    message_id: UUID,
+    message_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -165,7 +164,7 @@ def mark_message_as_replied(
 
 @router.delete("/{message_id}")
 def delete_contact_message(
-    message_id: UUID,
+    message_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):

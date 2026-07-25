@@ -26,8 +26,8 @@ if (-not (Test-Path backend\.env)) {
 }
 
 Write-Host "===> Levantando contenedores (db + api)" -ForegroundColor Cyan
-docker compose up -d
-if ($LASTEXITCODE -ne 0) { throw "docker compose up -d falló" }
+docker compose up -d --build
+if ($LASTEXITCODE -ne 0) { throw "docker compose up -d --build falló" }
 
 Write-Host "===> Esperando healthcheck de la DB (puede tardar ~30s)" -ForegroundColor Cyan
 $retries = 30
@@ -39,6 +39,26 @@ for ($i = 1; $i -le $retries; $i++) {
   Write-Host "    intento $i/$retries - estado: $status"
 }
 if (-not $ok) { throw "topgreen-db no llegó a healthy en $($retries*2)s" }
+
+$dbName = ((Get-Content backend\.env | Where-Object { $_ -match '^DB_NAME=' } | Select-Object -Last 1) -replace '^DB_NAME=', '').Trim()
+$dbUser = ((Get-Content backend\.env | Where-Object { $_ -match '^DB_USER=' } | Select-Object -Last 1) -replace '^DB_USER=', '').Trim()
+
+if ([string]::IsNullOrWhiteSpace($dbName) -or [string]::IsNullOrWhiteSpace($dbUser)) {
+  throw "DB_NAME y DB_USER deben estar definidos en backend/.env"
+}
+
+if ($dbName -notmatch '^[A-Za-z0-9_]+$' -or $dbUser -notmatch '^[A-Za-z0-9_]+$') {
+  throw "DB_NAME o DB_USER contienen caracteres no permitidos"
+}
+
+Write-Host "===> Creando la base $dbName si no existe" -ForegroundColor Cyan
+$databaseExistsQuery = "SELECT 1 FROM pg_database WHERE datname = '$dbName'"
+$databaseExists = (docker exec topgreen-db psql -U $dbUser -d postgres -tAc $databaseExistsQuery | Out-String).Trim()
+if ($LASTEXITCODE -ne 0) { throw "verificación de base de datos falló" }
+if ($databaseExists -ne "1") {
+  docker exec topgreen-db createdb -U $dbUser $dbName
+  if ($LASTEXITCODE -ne 0) { throw "creación de base de datos falló" }
+}
 
 Write-Host "===> Aplicando migraciones (alembic upgrade head)" -ForegroundColor Cyan
 docker exec topgreen-api alembic upgrade head

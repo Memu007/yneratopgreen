@@ -13,6 +13,8 @@ from app.models.audit import AuditLog
 from app.models.contact import ContactMessage
 from app.models.payment import Payment, PaymentStatus
 from app.models.form_option import FormOption, OptionType
+from app.models.rating import Rating
+from app.models.notification import Notification, NotificationType
 
 __all__ = [
     "User",
@@ -34,5 +36,8 @@ __all__ = [
     "PaymentStatus",
     "FormOption",
     "OptionType",
+    "Rating",
+    "Notification",
+    "NotificationType",
 ]
 

@@ -123,7 +123,7 @@ docker compose --profile fullstack up -d
 
 1. **Crear DB en SQL Server**:
    ```sql
-   CREATE DATABASE topgreen_local;
+   CREATE DATABASE topgreen;
    ```
 
 2. **Backend**:

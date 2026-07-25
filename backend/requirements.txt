@@ -6,8 +6,7 @@ python-multipart==0.0.6
 # Base de datos
 sqlalchemy==2.0.25
 alembic==1.13.1
-pyodbc==5.0.1
-pymssql==2.2.11
+psycopg[binary]==3.1.18
 
 # Autenticación
 python-jose[cryptography]==3.3.0

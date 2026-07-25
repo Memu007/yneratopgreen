@@ -5,7 +5,6 @@ Requiere autenticación
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from uuid import UUID
 import uuid
 import os
 from io import BytesIO
@@ -218,7 +217,7 @@ async def upload_product_images(
 
 @router.patch("/{product_id}", response_model=ProductResponse)
 async def update_product(
-    product_id: UUID,
+    product_id: str,
     product_data: ProductUpdateRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -277,7 +276,7 @@ async def update_product(
 
 @router.delete("/{product_id}")
 async def delete_product(
-    product_id: UUID,
+    product_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):

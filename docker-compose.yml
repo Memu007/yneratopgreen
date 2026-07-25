@@ -1,24 +1,25 @@
 services:
-  # Base de datos MSSQL Server
+  # Base de datos PostgreSQL con PostGIS
   db:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: postgis/postgis:16-3.4
     container_name: topgreen-db
     environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD no está definido en .env}"
-      MSSQL_PID: "Developer"
+      POSTGRES_DB: "${DB_NAME:?DB_NAME no está definido en .env}"
+      POSTGRES_USER: "${DB_USER:?DB_USER no está definido en .env}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD no está definido en .env}"
     volumes:
-      - db_data:/var/opt/mssql
+      - db_data:/var/lib/postgresql/data
+      - ./infra/postgres/init/99_topgreen_postgis_only.sh:/docker-entrypoint-initdb.d/99_topgreen_postgis_only.sh:ro
     ports:
-      - "1433:1433"  # Puerto estándar de SQL Server
+      - "${DB_EXPOSED_PORT:-5433}:5432"
     networks:
       - topgreen-network
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' -C || exit 1"]
-      interval: 15s
-      timeout: 10s
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 10s
     restart: unless-stopped
 
   # Backend FastAPI
@@ -33,6 +34,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend/app:/app/app  # Hot reload en desarrollo
+      - ./backend/alembic:/app/alembic
       - uploads_data:/data/uploads
     depends_on:
       db:

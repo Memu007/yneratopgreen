@@ -3,7 +3,7 @@ API Router para carrito de compras
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from uuid import UUID
+from decimal import Decimal
 
 from app.db.base import get_db
 from app.models.cart import Cart, CartItem, CartStatus
@@ -48,7 +48,7 @@ def get_cart(
     
     # Calcular totales
     items_response = []
-    total_amount = 0.0
+    total_amount = Decimal("0")
     
     for item in cart.items:
         # Obtener imagen primaria del producto
@@ -156,7 +156,7 @@ def add_to_cart(
 
 @router.put("/items/{product_id}", response_model=CartItemResponse)
 def update_cart_item_by_product(
-    product_id: UUID,
+    product_id: str,
     item_data: CartItemUpdateRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -205,7 +205,7 @@ def update_cart_item_by_product(
 
 @router.patch("/items/{item_id}", response_model=CartItemResponse)
 def update_cart_item(
-    item_id: UUID,
+    item_id: str,
     item_data: CartItemUpdateRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -251,7 +251,7 @@ def update_cart_item(
 
 @router.delete("/items/{item_id}")
 def remove_from_cart(
-    item_id: UUID,
+    item_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
