@@ -5,6 +5,25 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-07-25 — El camino Docker del README nunca funcionó
+
+Primer intento real de levantar la línea base: `alembic upgrade head`
+falla con error 4060, la base `topgreen` no existe. Verificado que nada
+en el repositorio la crea, incluido `scripts/init_local_db.sh`.
+
+Segundo hallazgo confirmado contra la documentación de entrega, más grave
+que el de la migración `011`: el quickstart de 3 comandos del README es
+inejecutable. Falla el criterio de aceptación "instalación reproducible
+desde cero".
+
+Se aprueba el arreglo mínimo: creación idempotente de la base en los
+scripts de init, antes de las migraciones. No se toca esquema ni modelos.
+
+Pendiente menor: `.env.example` usa `topgreen` y
+`README_LOCAL_SETUP.md:126` usa `topgreen_local`. Unificar en `topgreen`.
+
+---
+
 ## 2026-07-24 — Agrofy es referencia interna, no requisito
 
 El cliente no pidió Agrofy y no lo conoce. Es un marco de referencia del

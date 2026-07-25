@@ -46,7 +46,32 @@ pantallas hasta que la línea base esté aprobada.
    - Criterio de aceptación: cada requisito del roadmap v3 tiene estado
      verificado, no declarado.
 
-## Bloqueos
+## Bloqueo activo — Fase 0 detenida en la migración
+
+`alembic upgrade head` falla con:
+
+```
+Cannot open database "topgreen" requested by the login. The login failed. (4060)
+```
+
+**Nada en el repositorio crea la base `topgreen`.** Verificado: no está en
+`docker-compose.yml`, no hay entrypoint en `backend/Dockerfile`, ninguna
+migración la crea, y `scripts/init_local_db.sh` va directo de
+`docker compose up -d` a `alembic upgrade head`.
+
+El único `CREATE DATABASE` del repo es `README_LOCAL_SETUP.md:126`, en el
+Camino B (nativo), y usa otro nombre: `topgreen_local`, mientras
+`.env.example` apunta a `topgreen`.
+
+Conclusión: **el Camino A (Docker) del README nunca pudo funcionar.**
+Falla el criterio "instalación reproducible desde cero".
+
+Arreglo aprobado (mínimo): crear la base de forma idempotente en
+`scripts/init_local_db.sh` (y su par `.ps1`) antes de las migraciones,
+con `sqlcmd`, que ya está en la imagen de SQL Server. No cambia el
+esquema ni el modelo.
+
+## Otros bloqueos
 
 - **Todo el roadmap está bloqueado por la tarea 1.** Planificar fases 1 a
   6 sobre un código que nadie ejecutó es especular.
