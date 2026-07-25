@@ -56,6 +56,66 @@ apagan con un feature flag. Cada uno necesita una decisión explícita:
 | Form options dinámicos | Tabla y endpoint listos; el frontend usa listas hardcoded |
 | Filtros geográficos | **No existen.** La documentación de entrega los declara, pero no hay migración, ni columnas, ni código |
 
+## Geolocalización y logística — alcance definido
+
+Definido el 2026-07-25. Cumple secciones 3.1 y 3.2 sin servicios de
+geocoding pagos ni dependencias externas en runtime.
+
+### Origen de las coordenadas
+
+Una tabla de **localidades sembrada una sola vez** con provincia,
+nombre y coordenadas, desde datos geográficos abiertos de Argentina
+(fuente exacta a verificar; si no sirve, un CSV de las localidades
+agropecuarias principales alcanza para el MVP).
+
+Vendedores, compradores y transportistas **eligen su localidad de una
+lista**. Nadie escribe direcciones libres. Las distancias las calcula
+PostGIS localmente.
+
+Costo recurrente: cero. Dependencia externa en runtime: ninguna.
+
+### Comprador — búsqueda por zona (3.1)
+
+Filtro de ubicación en el catálogo, combinable con categoría. Mínimo:
+provincia y localidad. Deseable, y casi gratis porque la consulta es la
+misma: "hasta X km" alrededor de la localidad elegida.
+
+### Transportista — directorio (3.2)
+
+Se registra como **tipo especial de proveedor**, no como rol nuevo.
+Declara: localidad base, radio de cobertura en km, capacidad de carga,
+tipo de carga, transporte habilitado certificado y contacto.
+
+### Regla de coincidencia
+
+En el momento de la compra se listan los transportistas cuyo radio
+declarado **alcanza las dos puntas**: la localidad del vendedor (origen) y
+la del comprador (destino).
+
+Decidido así porque un transportista que sólo cubre el destino no puede
+levantar la carga. Es más restrictivo que "en la zona", y sólo muestra
+opciones viables.
+
+El comprador puede **seleccionarlo e incluirlo en la transacción** o
+**contactarlo directo** con los datos provistos. Sin flujo de cotización.
+
+### Fuera de alcance en geolocalización
+
+Sin costo contractual, recortado explícitamente:
+
+- Geocoding de direcciones libres.
+- Mapas y selección visual con pin. El contrato no los menciona.
+- Distancia por ruta real. El contrato **rechaza** los algoritmos de
+  ruteo (3.2). Distancia en línea recta alcanza.
+- Radio definido por el comprador. El radio lo declara el transportista.
+
+### Pendiente de definir
+
+Cómo se cumple *"que coincidan con los requerimientos del producto"*
+(3.2). Filtrar por capacidad exige que la publicación declare peso o tipo
+de carga, y hoy no lo hace. Opciones: agregar esos campos y filtrar, o
+mostrar la capacidad como información y filtrar sólo por geografía.
+
 ## Brechas contra el contrato
 
 Alcance vinculante: `CONTRATO.md`. Verificado contra el código el

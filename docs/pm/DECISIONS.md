@@ -5,6 +5,37 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-07-25 — Geolocalización con localidades sembradas, sin API paga
+
+Se evaluó dejar la geolocalización como extra por el costo de las APIs de
+geocoding. **Rechazado.** Está en las cinco secciones del contrato, y la
+sección 4 elige PostGIS específicamente para resolverla; sin geo el
+diferencial del producto desaparece. Además el segundo hito de cobro se
+paga contra demostrarla funcionando, así que recortarla bloquea el pago.
+
+La preocupación por el costo era válida pero mal dirigida: **el contrato
+no pide geocoding**. Se resuelve con una tabla de localidades sembrada una
+vez y selección desde lista. PostGIS calcula distancias localmente. Costo
+recurrente cero, sin dependencias externas en runtime.
+
+Recortado dentro de la geo, sin costo contractual: geocoding de
+direcciones libres, mapas y selección con pin, distancia por ruta real
+—el contrato rechaza el ruteo— y radio elegido por el comprador.
+
+---
+
+## 2026-07-25 — El radio del transportista debe cubrir origen y destino
+
+El contrato dice que el sistema detecta la ubicación del comprador y del
+vendedor y lista transportistas "disponibles en la zona" (3.2), sin
+precisar contra qué punto se mide.
+
+Definido: **las dos puntas dentro del radio declarado**. Un transportista
+que sólo cubre el destino no puede levantar la carga. Es más restrictivo,
+y sólo muestra opciones viables.
+
+---
+
 ## 2026-07-25 — Se abandona SQL Server y el esquema se genera desde los modelos
 
 Se activó el tope de una sola pasada. El autogenerate de reconciliación
