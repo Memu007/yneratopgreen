@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from app.db.base import SessionLocal
 from app.models.user import User, UserRole
 from app.models.category import Category
+from app.models.subcategory import Subcategory
 from app.models.form_option import FormOption
 from app.core.security import hash_password
 from app.seed_localities import seed_localities
@@ -93,105 +94,194 @@ def create_seed_data():
         
         categories_data = [
             {
-                "name": "Semillas",
-                "slug": "semillas",
-                "description": "Semillas de alta calidad para todo tipo de cultivos",
-                "icon": "🌱",
-                "display_order": "1"
-            },
-            {
-                "name": "Fertilizantes",
-                "slug": "fertilizantes",
-                "description": "Fertilizantes orgánicos e inorgánicos para mejorar el rendimiento",
-                "icon": "🧪",
-                "display_order": "2"
-            },
-            {
-                "name": "Herramientas",
-                "slug": "herramientas",
-                "description": "Herramientas manuales y eléctricas para el trabajo agrícola",
-                "icon": "🔨",
-                "display_order": "3"
-            },
-            {
-                "name": "Maquinaria",
-                "slug": "maquinaria",
-                "description": "Tractores, cosechadoras y maquinaria pesada",
+                "name": "Maquinaria agrícola",
+                "slug": "maquinaria-agricola",
+                "description": "Maquinaria para preparación, siembra, protección, cosecha y postcosecha",
                 "icon": "🚜",
-                "display_order": "4"
+                "display_order": "01",
+                "subcategories": [
+                    ("tractores", "Tractores"),
+                    ("preparacion-suelo", "Preparación del suelo"),
+                    ("siembra-plantacion", "Siembra y plantación"),
+                    ("fertilizacion-proteccion", "Fertilización y protección"),
+                    ("cosecha", "Cosecha"),
+                    ("postcosecha", "Postcosecha"),
+                    ("forrajes-ganaderia", "Forrajes y ganadería"),
+                ],
             },
             {
-                "name": "Agroquímicos",
-                "slug": "agroquimicos",
-                "description": "Productos para protección de cultivos",
-                "icon": "🧫",
-                "display_order": "5"
+                "name": "Riego y drenaje",
+                "slug": "riego-drenaje",
+                "description": "Equipos y accesorios para riego, drenaje y control hídrico",
+                "icon": "💧",
+                "display_order": "02",
+                "subcategories": [
+                    ("riego-aspersion", "Riego por aspersión"),
+                    ("riego-localizado", "Riego localizado"),
+                    ("riego-superficial-subterraneo", "Riego superficial y subterráneo"),
+                    ("bombas-motobombas-accesorios", "Bombas, motobombas y accesorios hidráulicos"),
+                    ("drenaje-control-hidrico", "Drenaje y control hídrico"),
+                    ("otros", "Otros"),
+                ],
+            },
+            {
+                "name": "Insumos agrícolas",
+                "slug": "insumos-agricolas",
+                "description": "Semillas, fertilizantes, correctivos y productos para el cultivo",
+                "icon": "🌱",
+                "display_order": "03",
+                "subcategories": [
+                    ("semillas-plantulas", "Semillas y plántulas"),
+                    ("fertilizantes", "Fertilizantes"),
+                    ("correctivos", "Correctivos"),
+                    ("agroinsumos-biologicos", "Agroinsumos biológicos"),
+                    ("agroquimicos", "Agroquímicos"),
+                    ("sustratos-coberturas", "Sustratos y coberturas"),
+                    ("otros", "Otros"),
+                ],
+            },
+            {
+                "name": "Ganadería y forrajes",
+                "slug": "ganaderia-forrajes",
+                "description": "Equipamiento para manejo, sanidad y suplementación animal",
+                "icon": "🐄",
+                "display_order": "04",
+                "subcategories": [
+                    ("cercas-bebederos", "Cercas y bebederos"),
+                    ("manejo-animal", "Manejo animal"),
+                    ("ordeno-sanidad", "Ordeño y sanidad"),
+                    ("suplementacion", "Suplementación"),
+                    ("otros", "Otros"),
+                ],
+            },
+            {
+                "name": "Repuestos y mantenimiento",
+                "slug": "repuestos-mantenimiento",
+                "description": "Repuestos, consumibles y componentes para maquinaria agrícola",
+                "icon": "🔧",
+                "display_order": "05",
+                "subcategories": [
+                    ("neumaticos-camaras", "Neumáticos y cámaras"),
+                    ("filtros-correas-cuchillas-cadenas", "Filtros, correas, cuchillas, cadenas"),
+                    ("sistemas-hidraulicos", "Sistemas hidráulicos"),
+                    ("sistemas-electronicos-sensores", "Sistemas electrónicos y sensores"),
+                    ("lubricantes-baterias", "Lubricantes y baterías"),
+                    ("otros", "Otros"),
+                ],
+            },
+            {
+                "name": "Agricultura de precisión y tecnología",
+                "slug": "agricultura-precision-tecnologia",
+                "description": "Tecnología de guiado, sensores, drones y software agrícola",
+                "icon": "🛰️",
+                "display_order": "06",
+                "subcategories": [
+                    ("sistemas-guiado-gnss", "Sistemas de guiado y GNSS"),
+                    ("sensores-cultivo", "Sensores de cultivo"),
+                    ("drones-vants", "Drones y VANTs"),
+                    ("software-plataformas", "Software y plataformas"),
+                ],
+            },
+            {
+                "name": "Tierras y parcelas",
+                "slug": "tierras-parcelas",
+                "description": "Ofertas de compra, alquiler y leasing de tierras rurales",
+                "icon": "🌾",
+                "display_order": "07",
+                "subcategories": [
+                    ("compra-venta-definitiva", "Compra-venta definitiva"),
+                    ("mejoras-infraestructura-compra", "Mejoras de infraestructura (compra)"),
+                    ("alquiler-campana", "Alquiler por campaña (1-12 meses)"),
+                    ("mejoras-infraestructura-alquiler", "Mejoras infraestructura (alquiler)"),
+                    ("alquiler-uso-transitorio", "Alquiler por uso transitorio"),
+                    ("mejoras-alquiler-transitorio", "Mejoras (alquiler transitorio)"),
+                    ("alquiler-opcion-compra", "Alquiler con opción a compra"),
+                    ("mejoras-leasing", "Mejoras (leasing)"),
+                ],
             },
             {
                 "name": "Bienes y Ganado",
                 "slug": "bienes-ganado",
-                "description": "Animales de cría y comerciales: bovinos, porcinos, ovinos y más",
-                "icon": "🐄",
-                "display_order": "6"
-            },
-            {
-                "name": "Tecnología para el Cultivo",
-                "slug": "tecnologia-cultivo",
-                "description": "Drones, sensores IoT, software de gestión de campo y tecnología agrícola",
-                "icon": "🛰️",
-                "display_order": "7"
-            },
-            # Categorías de Servicios
-            {
-                "name": "Laboreo",
-                "slug": "laboreo",
-                "description": "Servicios de siembra, cosecha, fumigación y trabajo de campo",
-                "icon": "🚜",
-                "display_order": "10",
-                "is_service": True
-            },
-            {
-                "name": "Transporte y Logística",
-                "slug": "transporte-logistica",
-                "description": "Servicios de transporte de granos, insumos y maquinaria",
-                "icon": "🚚",
-                "display_order": "11",
-                "is_service": True
+                "description": "Animales de cría y comerciales, según el alcance contractual",
+                "icon": "🐂",
+                "display_order": "08",
+                "subcategories": [("bovinos", "Bovinos")],
             },
             {
                 "name": "Asesoramiento",
                 "slug": "asesoramiento",
-                "description": "Asesoramiento agronómico, técnico y financiero",
+                "description": "Asesoramiento agronómico y técnico",
                 "icon": "📋",
-                "display_order": "12",
-                "is_service": True
+                "display_order": "20",
+                "is_service": True,
+                "subcategories": [],
             },
             {
-                "name": "Mantenimiento",
-                "slug": "mantenimiento",
-                "description": "Reparación y mantenimiento de maquinaria agrícola",
-                "icon": "🔧",
-                "display_order": "13",
-                "is_service": True
+                "name": "Contratistas",
+                "slug": "contratistas",
+                "description": "Labores y mantenimiento agrícola a cargo de contratistas",
+                "icon": "🧑‍🌾",
+                "display_order": "21",
+                "is_service": True,
+                "subcategories": [],
             },
             {
-                "name": "Otros Servicios",
-                "slug": "otros-servicios",
-                "description": "Otros servicios agrícolas",
-                "icon": "⚙️",
-                "display_order": "14",
-                "is_service": True
-            }
+                "name": "Logística",
+                "slug": "logistica",
+                "description": "Transporte de granos, insumos y maquinaria",
+                "icon": "🚚",
+                "display_order": "22",
+                "is_service": True,
+                "subcategories": [],
+            },
+            {
+                "name": "Acopio",
+                "slug": "acopio",
+                "description": "Servicios de recepción, guarda y acondicionamiento de granos",
+                "icon": "🏭",
+                "display_order": "23",
+                "is_service": True,
+                "subcategories": [],
+            },
         ]
-        
+
         for cat_data in categories_data:
-            existing_cat = db.query(Category).filter(Category.slug == cat_data["slug"]).first()
+            category_values = cat_data.copy()
+            subcategories = category_values.pop("subcategories")
+            existing_cat = db.query(Category).filter(
+                Category.slug == category_values["slug"]
+            ).first()
             if not existing_cat:
-                category = Category(**cat_data)
-                db.add(category)
-                print(f"  ✅ Categoría creada: {cat_data['name']}")
+                existing_cat = Category(**category_values)
+                db.add(existing_cat)
+                db.flush()
+                print(f"  ✅ Categoría creada: {category_values['name']}")
             else:
-                print(f"  ⏭️  Categoría '{cat_data['name']}' ya existe")
+                for field, value in category_values.items():
+                    setattr(existing_cat, field, value)
+                existing_cat.is_active = True
+                print(f"  ⏭️  Categoría '{category_values['name']}' ya existe")
+
+            for display_order, (subcategory_slug, subcategory_name) in enumerate(
+                subcategories,
+                start=1,
+            ):
+                existing_subcategory = db.query(Subcategory).filter(
+                    Subcategory.category_id == existing_cat.id,
+                    Subcategory.slug == subcategory_slug,
+                ).first()
+                if not existing_subcategory:
+                    db.add(Subcategory(
+                        name=subcategory_name,
+                        slug=subcategory_slug,
+                        category_id=existing_cat.id,
+                        display_order=display_order,
+                        is_active=True,
+                    ))
+                else:
+                    existing_subcategory.name = subcategory_name
+                    existing_subcategory.display_order = display_order
+                    existing_subcategory.is_active = True
         
         db.commit()
 
@@ -253,18 +343,36 @@ def create_seed_data():
         from app.models.product_image import ProductImage
         
         # Obtener categorías y usuarios
-        cat_semillas = db.query(Category).filter(Category.slug == "semillas").first()
-        cat_fertilizantes = db.query(Category).filter(Category.slug == "fertilizantes").first()
-        cat_herramientas = db.query(Category).filter(Category.slug == "herramientas").first()
-        cat_maquinaria = db.query(Category).filter(Category.slug == "maquinaria").first()
-        cat_laboreo = db.query(Category).filter(Category.slug == "laboreo").first()
-        cat_transporte = db.query(Category).filter(Category.slug == "transporte-logistica").first()
-        cat_asesoramiento = db.query(Category).filter(Category.slug == "asesoramiento").first()
-        cat_mantenimiento = db.query(Category).filter(Category.slug == "mantenimiento").first()
-        cat_otros_servicios = db.query(Category).filter(Category.slug == "otros-servicios").first()
-        cat_agroquimicos = db.query(Category).filter(Category.slug == "agroquimicos").first()
-        cat_bienes_ganado = db.query(Category).filter(Category.slug == "bienes-ganado").first()
-        cat_tecnologia = db.query(Category).filter(Category.slug == "tecnologia-cultivo").first()
+        categories_by_slug = {
+            category.slug: category
+            for category in db.query(Category).filter(
+                Category.slug.in_([item["slug"] for item in categories_data])
+            ).all()
+        }
+
+        def category(slug):
+            return categories_by_slug[slug]
+
+        def subcategory(category_slug, subcategory_slug):
+            return db.query(Subcategory).filter(
+                Subcategory.category_id == category(category_slug).id,
+                Subcategory.slug == subcategory_slug,
+            ).one()
+
+        # Alias usados en las definiciones existentes. El mapa explícito de
+        # product_taxonomy de abajo fija la categoría y subcategoría finales.
+        cat_semillas = category("insumos-agricolas")
+        cat_fertilizantes = category("insumos-agricolas")
+        cat_herramientas = category("maquinaria-agricola")
+        cat_maquinaria = category("maquinaria-agricola")
+        cat_laboreo = category("contratistas")
+        cat_transporte = category("logistica")
+        cat_asesoramiento = category("asesoramiento")
+        cat_mantenimiento = category("contratistas")
+        cat_otros_servicios = category("contratistas")
+        cat_agroquimicos = category("insumos-agricolas")
+        cat_bienes_ganado = category("bienes-ganado")
+        cat_tecnologia = category("agricultura-precision-tecnologia")
         
         admin = db.query(User).filter(User.email == "admin@topgreen.com").first()
         seller = db.query(User).filter(User.email == "vendedor@ejemplo.com").first()
@@ -704,8 +812,108 @@ def create_seed_data():
                 "images": [
                     {"url": "https://picsum.photos/seed/alambrados1/800/600", "filename": "alambrados1.jpg", "display_order": 1, "is_primary": True}
                 ]
+            },
+            {
+                "name": "Equipo de Riego por Goteo para 10 Hectáreas",
+                "slug": "equipo-riego-goteo-10-hectareas",
+                "description": "Kit completo para riego por goteo de hasta 10 hectáreas, con cabezal de filtrado, cañería principal, cintas y accesorios de conexión.",
+                "category_id": category("riego-drenaje").id,
+                "price": 4800000.0,
+                "currency": "ARS",
+                "stock": 6,
+                "unit": "kit",
+                "seller_id": seller.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/riego-goteo1/800/600", "filename": "riego-goteo1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Manga Ganadera con Balanza Electrónica",
+                "slug": "manga-ganadera-balanza-electronica",
+                "description": "Manga reforzada para manejo bovino con cepo, puertas laterales y balanza electrónica de hasta 1.500 kg. Lista para instalar.",
+                "category_id": category("ganaderia-forrajes").id,
+                "price": 7600000.0,
+                "currency": "ARS",
+                "stock": 2,
+                "unit": "unidad",
+                "seller_id": admin.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/manga-ganadera1/800/600", "filename": "manga-ganadera1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Kit de Filtros y Correas para Cosechadora",
+                "slug": "kit-filtros-correas-cosechadora",
+                "description": "Juego de filtros de aire, combustible y aceite con correas de mando para mantenimiento preventivo de cosechadoras de granos.",
+                "category_id": category("repuestos-mantenimiento").id,
+                "price": 540000.0,
+                "currency": "ARS",
+                "stock": 18,
+                "unit": "kit",
+                "seller_id": seller.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/repuestos-cosechadora1/800/600", "filename": "repuestos-cosechadora1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Campo Agrícola de 120 Hectáreas",
+                "slug": "campo-agricola-120-hectareas",
+                "description": "Campo agrícola de 120 hectáreas con aptitud para soja, maíz y trigo, acceso consolidado, energía rural y mejoras de trabajo.",
+                "category_id": category("tierras-parcelas").id,
+                "price": 950000000.0,
+                "currency": "ARS",
+                "stock": 1,
+                "unit": "campo",
+                "seller_id": admin.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/campo-agricola1/800/600", "filename": "campo-agricola1.jpg", "display_order": 1, "is_primary": True}
+                ]
             }
         ]
+
+        product_taxonomy = {
+            "semillas-maiz-dk-premium": ("insumos-agricolas", "semillas-plantulas"),
+            "fertilizante-triple-15": ("insumos-agricolas", "fertilizantes"),
+            "pulverizadora-jacto-600": ("maquinaria-agricola", "fertilizacion-proteccion"),
+            "semillas-soja-rr-intacta": ("insumos-agricolas", "semillas-plantulas"),
+            "cosechadora-john-deere-9750": ("maquinaria-agricola", "cosecha"),
+            "herbicida-glifosato-20l": ("insumos-agricolas", "agroquimicos"),
+            "servicio-siembra-gps": ("contratistas", None),
+            "rastra-discos-24-platos": ("maquinaria-agricola", "preparacion-suelo"),
+            "terneros-angus-lote-20": ("bienes-ganado", "bovinos"),
+            "vaquillonas-braford-prenadas": ("bienes-ganado", "bovinos"),
+            "dron-pulverizador-agricola-20l": (
+                "agricultura-precision-tecnologia",
+                "drones-vants",
+            ),
+            "sensores-humedad-suelo-iot": (
+                "agricultura-precision-tecnologia",
+                "sensores-cultivo",
+            ),
+            "urea-granulada-46-nitrogeno": ("insumos-agricolas", "fertilizantes"),
+            "tractor-pauny-280a-doble-traccion": ("maquinaria-agricola", "tractores"),
+            "insecticida-lambda-cihalotrina-1l": ("insumos-agricolas", "agroquimicos"),
+            "servicio-cosecha-monitor-rendimiento": ("contratistas", None),
+            "transporte-granos-a-puerto": ("logistica", None),
+            "flete-maquinaria-agricola-carreton": ("logistica", None),
+            "asesoramiento-manejo-integrado-cultivos": ("asesoramiento", None),
+            "planificacion-riego-fertirriego": ("asesoramiento", None),
+            "mantenimiento-preventivo-cosechadoras": ("contratistas", None),
+            "reparacion-hidraulica-maquinaria-agricola": ("contratistas", None),
+            "muestreo-suelo-recomendacion-fertilizacion": ("asesoramiento", None),
+            "instalacion-reparacion-alambrados-rurales": ("contratistas", None),
+            "equipo-riego-goteo-10-hectareas": ("riego-drenaje", "riego-localizado"),
+            "manga-ganadera-balanza-electronica": ("ganaderia-forrajes", "manejo-animal"),
+            "kit-filtros-correas-cosechadora": (
+                "repuestos-mantenimiento",
+                "filtros-correas-cuchillas-cadenas",
+            ),
+            "campo-agricola-120-hectareas": ("tierras-parcelas", "compra-venta-definitiva"),
+        }
 
         product_localities = {
             "semillas-maiz-dk-premium": ("14014010", "Córdoba, Córdoba"),
@@ -732,12 +940,23 @@ def create_seed_data():
             "reparacion-hidraulica-maquinaria-agricola": ("22140060", "Resistencia, Chaco"),
             "muestreo-suelo-recomendacion-fertilizacion": ("90084010", "San Miguel de Tucumán, Tucumán"),
             "instalacion-reparacion-alambrados-rurales": ("66028050", "Salta, Salta"),
+            "equipo-riego-goteo-10-hectareas": ("50007010", "Mendoza, Mendoza"),
+            "manga-ganadera-balanza-electronica": ("22140060", "Resistencia, Chaco"),
+            "kit-filtros-correas-cosechadora": ("42105030", "General Pico, La Pampa"),
+            "campo-agricola-120-hectareas": ("06623100", "Pergamino, Buenos Aires"),
         }
         
         for prod_data in productos:
             product_values = prod_data.copy()
             images_data = product_values.pop("images", [])
             locality_id, location = product_localities[product_values["slug"]]
+            category_slug, subcategory_slug = product_taxonomy[product_values["slug"]]
+            product_values["category_id"] = category(category_slug).id
+            product_values["subcategory_id"] = (
+                subcategory(category_slug, subcategory_slug).id
+                if subcategory_slug
+                else None
+            )
             product_values["locality_id"] = locality_id
             product_values["location"] = location
 
@@ -762,6 +981,8 @@ def create_seed_data():
                 
                 print(f"  ✅ Producto creado: {product.name}")
             else:
+                existing_prod.category_id = product_values["category_id"]
+                existing_prod.subcategory_id = product_values["subcategory_id"]
                 existing_prod.locality_id = locality_id
                 existing_prod.location = location
                 print(f"  ⏭️  Producto '{product_values['name']}' ya existe")
