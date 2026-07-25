@@ -144,6 +144,12 @@ Lo que sí cuesta es el tiempo: a tres días de la demostración, cada hora
 va a la vista en celular, que es lo que el cliente **sí** va a tocar el
 jueves.
 
+Y hay una razón mejor que la del calendario: **auditar ahora sería
+certificar la mitad del sistema.** Faltan transportistas, transferencia
+bancaria y la puesta en marcha de los pagos, que son exactamente los
+bloques que tocan datos personales y dinero. Revisar antes de que existan
+obliga a revisar dos veces.
+
 ### Por qué igual va, y en serio
 
 El contrato incluye **90 días de garantía**. Un problema de seguridad que
@@ -151,9 +157,21 @@ se despliegue se arregla gratis y con urgencia, en el peor momento
 posible. O sea que la revisión no es opcional: es la forma más barata de
 no trabajar de más después.
 
-**Queda agendada como condición para desplegar.** La fase 5 no arranca sin
-eso. Está anotado en `NOW.md` para que no dependa de que alguno se
-acuerde.
+**Queda agendada como condición para desplegar**, al final. La fase 5 no
+arranca sin eso. Está anotado en `NOW.md` para que no dependa de que
+alguno se acuerde.
+
+### La única excepción, y no es una auditoría
+
+Cuando arranque el módulo de transportistas, **antes de la primera línea**
+hay que responder quién puede ver los datos de contacto de quién. Ese
+módulo muestra teléfonos, direcciones y ubicaciones de personas reales.
+
+Definido al empezar, es un parámetro. Definido al auditar, es reescribir
+el módulo. Está en `NOW.md` con las tres preguntas concretas.
+
+No te toca resolverlo a vos y no es para ahora: es para que cuando te
+llegue esa tarea, la pregunta ya venga contestada en el enunciado.
 
 ### Lo que ya verifiqué yo, hoy
 
