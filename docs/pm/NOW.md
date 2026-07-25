@@ -80,9 +80,25 @@ capacidad. Consecuencias para la conducción:
    - Criterio de aceptación: un comando corre los once casos contra un
      arranque limpio y devuelve código distinto de cero si alguno falla.
 
-4. **Módulo de transportistas**. El bloque grande que falta del
+4. **Actualizar la documentación heredada al stack real** (dev, corto).
+   `README.md:49` declara "SQL Server 2022, puerto 1433" y
+   `README_LOCAL_SETUP.md` lo menciona nueve veces, cuando
+   `docker-compose.yml` usa `postgis/postgis:16-3.4`. Ya hizo perder un
+   round a la dev nueva, que concluyó que el proyecto corría en SQL
+   Server.
+   - Criterio de aceptación: ninguna mención a SQL Server que describa el
+     stack actual; el quickstart del `README.md` refleja
+     `./scripts/init_local_db.sh`.
+
+5. **Módulo de transportistas**. El bloque grande que falta del
    diferencial. **No arranca** hasta que el cliente defina si la
    coincidencia va por zonas declaradas o por radio en km.
+
+## Nota de acceso a este contexto
+
+`docs/pm/` vive en la rama `claude/acceso-carpeta-proyecto-s4q5j7`, no en
+`main`. Cualquier dev que trabaje desde `main` **no ve estos documentos**.
+Decirle explícitamente que los lea desde esa rama, o mergearla.
 
 ## Bloqueos
 
