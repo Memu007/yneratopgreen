@@ -12,6 +12,7 @@ interface ProductCardProps {
 export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { addItem } = useCart();
   const [showDetail, setShowDetail] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const isService = product.isService || false;
   const hasStock = isService || product.stock > 0;
 
@@ -26,12 +27,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     <>
     <div className={styles.card} onClick={() => setShowDetail(true)}>
       <div className={styles.imageContainer}>
-        <img 
-          src={product.image} 
-          alt={product.name} 
-          className={styles.image}
-          loading="lazy"
-        />
+        {imageError ? (
+          <div className={styles.imageFallback}>
+            <span>{product.name}</span>
+          </div>
+        ) : (
+          <img 
+            src={product.image} 
+            alt={product.name} 
+            className={styles.image}
+            loading="lazy"
+            onError={() => setImageError(true)}
+          />
+        )}
         {!isService && (
           <span className={`${styles.stockBadge} ${!hasStock ? styles.outOfStock : ''}`}>
             {hasStock ? `Stock: ${product.stock}` : 'Sin stock'}
