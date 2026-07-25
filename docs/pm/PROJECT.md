@@ -76,11 +76,30 @@ el 20-07-2026), no en la documentación de entrega. Brechas mayores:
 Estimación del roadmap: **9–11 semanas** desde que se apruebe la línea
 base. El producto es un prototipo funcional, no un MVP contractual.
 
-## Benchmark
+## Benchmark — Agrofy
 
-Agrofy se usa como referencia de navegación y fichas técnicas, nunca
-como código, diseño, marca ni alcance a replicar. La logística
-geográfica es el diferencial propio de TopGreen.
+El cliente pidió "algo similar a Agrofy". Se usa como referencia de
+producto, no como fuente de código ni como alcance.
+
+**Se toma:** estructura del buscador (texto + categoría + ubicación),
+taxonomía agropecuaria y subcategorías, qué filtros aplican por
+categoría, qué campos lleva cada ficha técnica según tipo de
+publicación, perfil público de vendedor tipo sucursal, y la separación
+entre compra directa y consulta/cotización.
+
+**No se toma:** HTML, CSS ni JS del sitio, textos literales, marca,
+logotipos, imágenes, ni el diseño visual distintivo. Los patrones se
+reimplementan desde cero con identidad propia de TopGreen.
+
+**Riesgo de alcance:** "similar a Agrofy" no es un requisito acotado.
+Agrofy tiene años de producto. Sin una lista cerrada y aprobada de
+pantallas y patrones, cada revisión con el cliente puede reabrir el
+alcance. La Fase 1 del roadmap existe para cerrar eso: cada pantalla del
+MVP vinculada a un requisito contractual, y todo lo demás al backlog
+post-MVP.
+
+La logística geográfica es el diferencial propio de TopGreen y no sale
+del benchmark.
 
 ## Fuera de alcance
 
