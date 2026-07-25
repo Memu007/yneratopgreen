@@ -59,391 +59,284 @@ documentación que miente. Si no hay, ponelo.
 
 ## Tu informe
 
-### Tarea
+---
 
-Tres bugs visibles en la interfaz (contador de ventas, badge del carrito, imágenes rotas) + corrección de slug con ñ.
+### Tarea 1: Verificación en navegador de bugs (b) y (c)
 
 ### Archivos tocados
 
-- `backend/app/api/auth.py` — +58, -5
-- `backend/app/api/ratings.py` — +12, -2
-- `backend/app/seed.py` — +2, -2
-- `src/components/ProductCard/ProductCard.tsx` — +14, -6
-- `src/components/ProductCard/ProductCard.module.css` — +20, -0
-- `src/contexts/AuthContext.tsx` — +1, -0
-- `src/contexts/CartContext.tsx` — +10, -0
+Ninguno. No se cambió código.
 
 ### Qué hice
 
-**a) Contador de ventas muestra 0:** `UserResponse` se construye con `model_validate(user)` que lee `user.sales_count` (contador guardado que nunca se actualiza). Cambié los cuatro endpoints que devuelven `UserResponse` (`/login`, `/refresh`, `GET /me`, `PATCH /me`) para calcular `sales_count` y `purchases_count` con `COUNT(Order.id)` filtrando por `seller_id` / `buyer_id`. También actualicé `/ratings/user/{user_id}` que tenía el mismo problema. No se borra la columna ni se migra.
+Verifiqué los bugs (b) y (c) en navegador real (Brave vía Playwright), siguiendo los pasos exactos del `PARA-DEV.md`.
 
-**b) Badge del carrito persiste al cerrar sesión:** `AuthContext.logout` ya limpiaba `localStorage` pero no avisaba al `CartContext`, que mantiene el estado en memoria. Agregué `window.dispatchEvent(new CustomEvent('user-logout'))` en `logout` y un listener en `CartContext` que llama `setItems([])` y limpia `localStorage`.
+### Cómo lo verifiqué
 
-**c) Imágenes rotas:** Agregué estado `imageError` en `ProductCard`. Cuando el `<img>` dispara `onError`, se reemplaza por un `<div>` con el nombre del producto y fondo gradiente verde. Agregué `.imageFallback` al CSS con soporte dark mode.
+**Bug (b) — Carrito al cambiar de usuario:**
 
-**Adicional:** Corregí el slug `vaquillonas-braford-preñadas` → `vaquillonas-braford-prenadas` en `seed.py` (dos ocurrencias: definición del producto y diccionario `product_localities`).
+Script: `verify_bug_b_v2.mjs` (Playwright + Brave, headless: false).
+
+Pasos ejecutados:
+1. Navegué a `http://localhost:5173`.
+2. Click en "Ingresar" del header → modal de login.
+3. Login como `cliente@ejemplo.com` / `cliente123`.
+4. Navegué a AgroMarket.
+5. Agregué 2 productos al carrito (click en botones "🛒 Agregar").
+6. Verifiqué badge del carrito.
+7. Logout.
+8. Verifiqué badge sin recargar.
+9. Login como `vendedor@ejemplo.com` / `vendedor123`.
+10. Verifiqué badge sin recargar.
+11. Verifiqué `localStorage`.
+
+Salida exacta:
+
+```
+=== BUG (b): Carrito se limpia al cambiar de usuario ===
+
+Paso 1: Página cargada
+Paso 2: Click en Ingresar (header)
+Paso 3: Login como cliente (screenshot: /tmp/bug_b_01_after_login.png)
+  - Texto "Salir" presente: true
+  - Texto "cliente" presente: false
+Paso 4: Navegado a AgroMarket (screenshot: /tmp/bug_b_02_marketplace.png)
+Paso 5: Encontrados 11 botones de "Agregar"
+Paso 5: 2 productos agregados al carrito
+Paso 6: Badge después de agregar: ["2"]
+Paso 7: Logout
+Paso 8: Badge después de logout (sin recargar): []
+Paso 9: Login como vendedor@ejemplo.com
+Paso 10: Badge después de cambiar usuario (sin recargar): []
+Paso 11: localStorage agromarket_cart = []
+
+=== RESULTADO ===
+✅ BUG (b) VERIFICADO: El carrito se limpia correctamente al cambiar de usuario
+
+=== CONSOLE LOGS ===
+  [debug] [vite] connecting...
+  [info] %cDownload the React DevTools for a better development experience
+  [debug] [vite] connected.
+  [log] 🔄 Intentando login con: cliente@ejemplo.com
+  [log] ✅ Respuesta del backend: {user: Object, access_token: eyJ..., message: Inicio de sesión exitoso}
+  [log] ✅ Usuario transformado: {id: a4bdfe04..., email: cliente@ejemplo.com, name: María Cliente}
+  [log] ✅ Login exitoso
+  [log] 🔄 Intentando login con: vendedor@ejemplo.com
+  [log] ✅ Respuesta del backend: {user: Object, access_token: eyJ..., message: Inicio de sesión exitoso}
+  [log] ✅ Usuario transformado: {id: 6ee80695..., email: vendedor@ejemplo.com, name: Juan Vendedor}
+  [log] ✅ Login exitoso
+```
+
+Resumen paso a paso:
+- **Qué hice:** login como cliente → agregué 2 productos → badge mostró "2" → logout → badge vacío (sin recargar) → login como vendedor → badge vacío (sin recargar).
+- **Qué esperaba:** badge vacío después del cambio de usuario, sin recargar la página.
+- **Qué vi:** badge vacío. `localStorage` también vacío (`[]`).
+
+Errores de consola: ninguno.
+
+**Bug (c) — Respaldo de imágenes:**
+
+Script: `verify_bug_c_v2.mjs` (Playwright + Brave, headless: false, con `page.route()` interceptando la URL de la imagen de "Terneros Angus" y abortando la request para forzar `onError`).
+
+Pasos ejecutados:
+1. Navegué a `http://localhost:5173`.
+2. Fui a AgroMarket.
+3. Verifiqué imágenes normales cargando.
+4. Playwright intercepta `**/terneros1**` y aborta la request → `onError` se dispara.
+5. Verifiqué aparición de elemento con clase `imageFallback`.
+6. Verifiqué que no hay `<img>` rota visible.
+7. Forcé dark mode via `data-theme="dark"` y tomé screenshot.
+
+Salida exacta:
+
+```
+=== BUG (c): Fallback de imágenes rotas ===
+
+Paso 1: Página cargada
+Paso 2: Navegado a AgroMarket
+Paso 3: 11 imágenes en el catálogo
+Paso 3: Screenshot -> /tmp/bug_c_01_normal_images.png
+Paso 4: 1 elementos con clase imageFallback
+Paso 4: Texto del fallback: "Terneros Angus - Lote 20 cabezas"
+Paso 4: 0 imágenes con URL bloqueada todavía como <img>
+Paso 4: Screenshot light -> /tmp/bug_c_02_fallback_light.png
+Paso 5: Screenshot dark -> /tmp/bug_c_03_fallback_dark.png
+
+=== RESULTADO ===
+✅ BUG (c) VERIFICADO: El fallback aparece cuando la imagen no carga
+
+Errores de consola:
+  - Failed to load resource: net::ERR_FAILED
+```
+
+Resumen paso a paso:
+- **Qué hice:** catálogo normal con imágenes cargando → bloqueé una imagen (Terneros Angus) → vi el fallback.
+- **Qué esperaba:** bloque con nombre del producto sobre fondo degradado verde, no ícono de imagen rota.
+- **Qué vi:** elemento `div` con clase `imageFallback` y texto "Terneros Angus - Lote 20 cabezas". 0 elementos `<img>` con la URL bloqueada. En dark mode, el fondo cambió al degradado verde oscuro.
+
+Error de consola: `Failed to load resource: net::ERR_FAILED` (esperado — es la imagen bloqueada).
+
+### Qué NO corrí
+
+- No probé dark mode con el toggle real de la UI (no encontré botón de toggle con los selectores que probé). Lo forcé via `document.documentElement.setAttribute('data-theme', 'dark')` y verifiqué visualmente.
+- No rompí la imagen cambiando la URL en la DB (picsum.photos responde a cualquier path). En su lugar usé `page.route()` de Playwright para abortar la request y forzar el `onError`.
+
+### Errores encontrados
+
+Durante la verificación del bug (b), el primer intento falló porque el frontend corrió en puerto 5175 (5173 y 5174 estaban ocupados por procesos node zombies). El puerto 5175 no está en la lista de CORS del backend (`backend/app/main.py:25-33`), causando que el login fallara con error de CORS. Solución: maté los procesos en los puertos 5173-5175 y reinicié el frontend para que use 5173.
+
+### Commit
+
+No hay commit nuevo — esta tarea era sólo verificación, no se cambió código.
+
+### Observaciones adversariales
+
+1. **La lista de orígenes CORS en `main.py` es frágil.** Sólo incluye los puertos 5173 y 5174. Si Vite cae a otro puerto (como pasó acá), el frontend no puede hablar con el backend. Considerá agregar un wildcard para `localhost:*` o al menos más puertos.
+
+2. **No hay botón visible de toggle de dark mode.** Busqué con varios selectores (`aria-label`, clases) y no lo encontré. El dark mode existe (los estilos `[data-theme="dark"]` están en el CSS) pero no encontré cómo activarlo desde la UI. Lo forcé via JS para la verificación.
+
+---
+
+### Tarea 2: Corregir documentación heredada (SQL Server → PostgreSQL)
+
+### Archivos tocados
+
+- `README.md` — +7, -9
+- `README_LOCAL_SETUP.md` — +19, -18
+
+### Qué hice
+
+Reemplacé todas las menciones de SQL Server 2022 / puerto 1433 por PostgreSQL 16 + PostGIS 3.4 / puerto 5433 (host) en ambos archivos. Actualicé el instructivo de instalación nativa (DATABASE_URL, requisitos, pasos). Cambié los comandos de levantamiento del README principal para usar `./scripts/init_local_db.sh` en lugar de pasos manuales con `powershell` y `copy`.
 
 ### Diff
 
 ```diff
-diff --git a/backend/app/api/auth.py b/backend/app/api/auth.py
-index 2e1f3a4..a1b2c3d 100644
---- a/backend/app/api/auth.py
-+++ b/backend/app/api/auth.py
-@@ -22,6 +22,8 @@ from app.core.security import (
-     decode_token
- )
--from app.core.dependencies import get_current_user
-+from sqlalchemy import func
-+from app.core.dependencies import get_current_user
- from app.core.config import settings
- from app.api.notifications import notify_welcome
-+from app.models.order import Order
- 
- 
- router = APIRouter(prefix="/auth", tags=["autenticación"])
-@@ -170,7 +172,18 @@ def login_user(
-     )
-     
--    return AuthResponse(
--        user=UserResponse.model_validate(user),
-+    # Calcular ventas y compras reales
-+    sales_count = db.query(func.count(Order.id)).filter(
-+        Order.seller_id == user.id
-+    ).scalar() or 0
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -46,7 +46,7 @@
+ | Frontend | React 18 + TypeScript + Vite | `5173` |
+ | Backend | FastAPI + Python 3.11 | `8000` |
+-| Base de datos | SQL Server 2022 (Developer) | `1433` |
++| Base de datos | PostgreSQL 16 + PostGIS 3.4 | `5433` (host) / `5432` (Docker) |
+ | Pagos | Mercado Pago Marketplace (Split) | — (requiere reactivar) |
+@@ -71,17 +71,16 @@
+-```powershell
+-# 1. Variables de entorno (defaults locales)
+-copy .env.example .env
+-copy backend\.env.example backend\.env
+-
+-# 2. Levantar DB + API
+-docker compose up -d
+-
+-# 3. Migraciones + seed + frontend dev
+-docker exec topgreen-api alembic upgrade head
+-docker exec topgreen-api python -m app.seed
+-npm install
+-npm run dev
++```bash
++# 1. Variables de entorno (defaults locales)
++cp .env.example .env
++cp backend/.env.example backend/.env
 +
-+    purchases_count = db.query(func.count(Order.id)).filter(
-+        Order.buyer_id == user.id
-+    ).scalar() or 0
++# 2. Levantar DB + API + migraciones + seed
++./scripts/init_local_db.sh
 +
-+    user_data = UserResponse.model_validate(user)
-+    user_data.sales_count = sales_count
-+    user_data.purchases_count = purchases_count
-+
-+    return AuthResponse(
-+        user=user_data,
-         access_token=access_token,
-         refresh_token=refresh_token,
-         message="Inicio de sesión exitoso"
-     )
-@@ -262,7 +275,18 @@ def refresh_access_token(
-     )
-     
--    return AuthResponse(
--        user=UserResponse.model_validate(user),
-+    # Calcular ventas y compras reales
-+    sales_count = db.query(func.count(Order.id)).filter(
-+        Order.seller_id == user.id
-+    ).scalar() or 0
-+
-+    purchases_count = db.query(func.count(Order.id)).filter(
-+        Order.buyer_id == user.id
-+    ).scalar() or 0
-+
-+    user_data = UserResponse.model_validate(user)
-+    user_data.sales_count = sales_count
-+    user_data.purchases_count = purchases_count
-+
-+    return AuthResponse(
-+        user=user_data,
-         access_token=access_token,
-         refresh_token=new_refresh_token,
-         message="Token renovado exitosamente"
-     )
-@@ -268,8 +292,12 @@ def refresh_access_token(
- @router.get("/me", response_model=UserResponse)
- def get_current_user_info(
--    current_user: User = Depends(get_current_user)
-+    current_user: User = Depends(get_current_user),
-+    db: Session = Depends(get_db)
- ):
-     """
-     Obtener información del usuario actual
-     
-     - Requiere autenticación (token JWT)
-     """
--    return UserResponse.model_validate(current_user)
-+    # Calcular ventas y compras reales en lugar del contador guardado
-+    sales_count = db.query(func.count(Order.id)).filter(
-+        Order.seller_id == current_user.id
-+    ).scalar() or 0
-+
-+    purchases_count = db.query(func.count(Order.id)).filter(
-+        Order.buyer_id == current_user.id
-+    ).scalar() or 0
-+
-+    user_data = UserResponse.model_validate(current_user)
-+    user_data.sales_count = sales_count
-+    user_data.purchases_count = purchases_count
-+    return user_data
-@@ -328,7 +366,18 @@ def update_current_user(
-     db.commit()
-     db.refresh(current_user)
-     
--    return UserResponse.model_validate(current_user)
-+    # Calcular ventas y compras reales
-+    sales_count = db.query(func.count(Order.id)).filter(
-+        Order.seller_id == current_user.id
-+    ).scalar() or 0
-+
-+    purchases_count = db.query(func.count(Order.id)).filter(
-+        Order.buyer_id == current_user.id
-+    ).scalar() or 0
-+
-+    user_data = UserResponse.model_validate(current_user)
-+    user_data.sales_count = sales_count
-+    user_data.purchases_count = purchases_count
-+    return user_data
++# 3. Frontend dev
++npm install
++npm run dev
+ ```
 
-diff --git a/backend/app/api/ratings.py b/backend/app/api/ratings.py
-index c741ea9..b0bb65a 100644
---- a/backend/app/api/ratings.py
-+++ b/backend/app/api/ratings.py
-@@ -143,13 +143,23 @@ def get_user_reputation(
-     if not user:
-         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-     
-+    # Contar ventas reales en lugar del contador guardado
-+    sales_count = db.query(func.count(Order.id)).filter(
-+        Order.seller_id == user.id
-+    ).scalar() or 0
-+
-+    # Contar compras reales
-+    purchases_count = db.query(func.count(Order.id)).filter(
-+        Order.buyer_id == user.id
-+    ).scalar() or 0
-+
-     return UserReputationResponse(
-         user_id=user.id,
-         user_name=user.full_name,
-         rating_average=float(user.rating_average),
-         rating_count=user.rating_count,
--        sales_count=user.sales_count,
--        purchases_count=user.purchases_count
-+        sales_count=sales_count,
-+        purchases_count=purchases_count
-     )
-
-diff --git a/backend/app/seed.py b/backend/app/seed.py
-index 1330d0b..3a2e4af 100644
---- a/backend/app/seed.py
-+++ b/backend/app/seed.py
-@@ -408,7 +408,7 @@ def create_seed_data():
-             {
-                 "name": "Vaquillonas Braford Preñadas",
--                "slug": "vaquillonas-braford-preñadas",
-+                "slug": "vaquillonas-braford-prenadas",
-                 "description": "Vaquillonas Braford preñadas de 18 meses, inseminadas con toro Angus. 5 meses de gestación. Lote de 10 cabezas. Sanidad completa, trazabilidad SIRA al día.",
-@@ -463,7 +463,7 @@ def create_seed_data():
-             "terneros-angus-lote-20": ("82084270", "Rosario, Santa Fe"),
--            "vaquillonas-braford-preñadas": ("14098230", "Río Cuarto, Córdoba"),
-+            "vaquillonas-braford-prenadas": ("14098230", "Río Cuarto, Córdoba"),
-
-diff --git a/src/components/ProductCard/ProductCard.tsx b/src/components/ProductCard/ProductCard.tsx
-index 20853d9..a878acd 100644
---- a/src/components/ProductCard/ProductCard.tsx
-+++ b/src/components/ProductCard/ProductCard.tsx
-@@ -12,6 +12,7 @@ interface ProductCardProps {
- export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
-   const { addItem } = useCart();
-   const [showDetail, setShowDetail] = useState(false);
-+  const [imageError, setImageError] = useState(false);
-   const isService = product.isService || false;
-   const hasStock = isService || product.stock > 0;
-@@ -26,12 +27,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
-     <>
-     <div className={styles.card} onClick={() => setShowDetail(true)}>
-       <div className={styles.imageContainer}>
--        <img 
--          src={product.image} 
--          alt={product.name} 
--          className={styles.image}
--          loading="lazy"
--        />
-+        {imageError ? (
-+          <div className={styles.imageFallback}>
-+            <span>{product.name}</span>
-+          </div>
-+        ) : (
-+          <img 
-+            src={product.image} 
-+            alt={product.name} 
-+            className={styles.image}
-+            loading="lazy"
-+            onError={() => setImageError(true)}
-+          />
-+        )}
-
-diff --git a/src/components/ProductCard/ProductCard.module.css b/src/components/ProductCard/ProductCard.module.css
-index c0ac18f..c9dc430 100644
---- a/src/components/ProductCard/ProductCard.module.css
-+++ b/src/components/ProductCard/ProductCard.module.css
-@@ -31,6 +31,26 @@
-   object-fit: cover;
- }
- 
-+.imageFallback {
-+  width: 100%;
-+  height: 100%;
-+  display: flex;
-+  align-items: center;
-+  justify-content: center;
-+  padding: 1rem;
-+  text-align: center;
-+  background: linear-gradient(135deg, var(--color-primary-50) 0%, var(--color-primary-100) 100%);
-+  color: var(--color-primary-700);
-+  font-size: var(--font-size-sm);
-+  font-weight: var(--font-weight-semibold);
-+  line-height: 1.4;
-+}
-+
-+[data-theme="dark"] .imageFallback {
-+  background: linear-gradient(135deg, rgba(5, 150, 105, 0.1) 0%, rgba(5, 150, 105, 0.15) 100%);
-+  color: var(--color-primary-400);
-+}
-+
- .stockBadge {
-
-diff --git a/src/contexts/AuthContext.tsx b/src/contexts/AuthContext.tsx
-index 96f5aee..c135973 100644
---- a/src/contexts/AuthContext.tsx
-+++ b/src/contexts/AuthContext.tsx
-@@ -178,6 +178,7 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
-       tokenStorage.clearTokens();
-       setUser(null);
-       localStorage.removeItem('agromarket_cart');
-+      window.dispatchEvent(new CustomEvent('user-logout'));
-     }
-
-diff --git a/src/contexts/CartContext.tsx b/src/contexts/CartContext.tsx
-index 95ee966..60311f9 100644
---- a/src/contexts/CartContext.tsx
-+++ b/src/contexts/CartContext.tsx
-@@ -28,6 +28,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
-     }
-   }, []);
- 
-+  // Limpiar carrito cuando el usuario cierra sesión
-+  useEffect(() => {
-+    const handleLogout = () => {
-+      setItems([]);
-+      localStorage.removeItem('agromarket_cart');
-+    };
-+    window.addEventListener('user-logout', handleLogout);
-+    return () => window.removeEventListener('user-logout', handleLogout);
-+  }, []);
-+
-   // Guardar carrito en localStorage cuando cambie
-   useEffect(() => {
-     localStorage.setItem('agromarket_cart', JSON.stringify(items));
+diff --git a/README_LOCAL_SETUP.md b/README_LOCAL_SETUP.md
+--- a/README_LOCAL_SETUP.md
++++ b/README_LOCAL_SETUP.md
+@@ -6,7 +6,7 @@
+- **Camino B: Nativo** (Python, Node y SQL Server instalados directamente).
++ **Camino B: Nativo** (Python, Node y PostgreSQL instalados directamente).
+@@ -20,7 +20,7 @@
+-| Base de datos (SQL Server) | `localhost:1433` (usuario: `sa`) |
++| Base de datos (PostgreSQL) | `localhost:5433` (usuario: `topgreen`) |
+@@ -34,7 +34,7 @@
+-| Espacio libre en disco | ~6 GB (imagen MSSQL ocupa ~2.5 GB) |
++| Espacio libre en disco | ~2 GB (imagen PostgreSQL+PostGIS) |
+@@ -49,9 +49,8 @@
+-   > **Importante**: SQL Server exige password fuerte (≥ 8 chars con
+-   > mayúscula, minúscula, número y símbolo). Si el container no levanta,
+-   > revisá el password.
++   > **Importante**: Los valores por default ya funcionan para desarrollo
++   > local. Si cambiás el password en `.env`, actualizá también
++   > `DATABASE_URL` en `backend/.env`.
+@@ -57,7 +57,7 @@
+-   En el primer arranque la imagen de SQL Server tarda ~30 s en estar healthy.
++   En el primer arranque PostgreSQL tarda ~10 s en estar healthy.
+@@ -68,7 +68,7 @@
+-   Esto debe pasar de `001_initial_mssql_migration` hasta la última (`011`).
++   Esto debe correr todas las migraciones disponibles.
+@@ -74,7 +74,7 @@
+-   productos con imágenes externas.
++   productos con imágenes externas (picsum.photos).
+@@ -118,8 +118,8 @@
+-| SQL Server 2022 (Developer / Express) | 2019+ |
+-| ODBC Driver 18 for SQL Server | Última |
++| PostgreSQL | 16+ (con extensión PostGIS 3.4) |
++| PostGIS | 3.4+ |
+@@ -124,7 +124,8 @@
+-1. **Crear DB en SQL Server**:
++1. **Crear DB en PostgreSQL**:
+    ```sql
+    CREATE DATABASE topgreen;
++   CREATE EXTENSION postgis;
+    ```
+@@ -137,7 +138,7 @@
+-   Editar `backend\.env` y poner `DATABASE_URL` con tu instancia local:
+-   DATABASE_URL=mssql+pyodbc://sa:TuPass@localhost:1433/topgreen_local?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
++   Editar `backend/.env` y poner `DATABASE_URL` con tu instancia local:
++   DATABASE_URL=postgresql+psycopg://topgreen:TuPass@localhost:5433/topgreen
+@@ -170,7 +170,7 @@
+-| `DB_PASSWORD` | Password del usuario `sa` de SQL Server (lo lee `docker-compose.yml`) | `CAMBIAR_PASSWORD_LOCAL_SEGURO_2026!` |
++| `DB_PASSWORD` | Password del usuario `topgreen` de PostgreSQL (lo lee `docker-compose.yml`) | `CAMBIAR_PASSWORD_LOCAL_SEGURO_2026!` |
+@@ -196,7 +196,7 @@
+-externas (Unsplash). Es **idempotente**: podés re-correrlo sin duplicar.
++externas (picsum.photos). Es **idempotente**: podés re-correrlo sin duplicar.
+@@ -228,8 +228,8 @@
+-### `topgreen-db` no llega a healthy
+-- SQL Server exige password fuerte. Cambiar `DB_PASSWORD` en `.env`.
+-- En Windows, asignarle ≥ 4 GB de RAM a Docker Desktop.
++### `topgreen-db` no llega a healthy
++- Verificar que el puerto 5433 no esté en uso por otro proceso.
++- En Windows, asignarle ≥ 2 GB de RAM a Docker Desktop.
 ```
 
 ### Cómo lo verifiqué
 
-**Levantamiento desde cero:**
+Criterio de aceptación: `grep -rin "sql server\|1433" README.md README_LOCAL_SETUP.md` no debe devolver nada.
 
 ```
-$ docker compose down -v 2>&1 | tail -5 && ./scripts/init_local_db.sh 2>&1 | tail -20
- Volume yneratopgreen_uploads_data  Removing
- Volume yneratopgreen_db_data  Removing
- Volume yneratopgreen_db_data  Removed
- Volume yneratopgreen_uploads_data  Removed
-  ✅ Producto creado: Vaquillonas Braford Preñadas
-  ✅ Producto creado: Dron Pulverizador Agrícola 20L
-  ✅ Producto creado: Sensores de Humedad de Suelo IoT
-
-✨ Seed completado exitosamente!
-📦 12 productos de ejemplo disponibles
+$ grep -rin "sql server\|1433" README.md README_LOCAL_SETUP.md
+$ echo $?
+1
 ```
 
-**Bug a — Contador de ventas (sin órdenes):**
-
-```
-$ curl -s -X POST http://localhost:8000/api/auth/login -H 'Content-Type: application/json' -d '{"email":"vendedor@ejemplo.com","password":"vendedor123"}' | python3 -c "import sys,json; d=json.load(sys.stdin); u=d.get('user',{}); print(f'sales_count={u.get(\"sales_count\")}  purchases_count={u.get(\"purchases_count\")}')"
-sales_count=0  purchases_count=0
-```
-
-**Creo una orden de prueba manualmente:**
-
-```
-$ docker exec topgreen-db psql -U topgreen -d topgreen -c "INSERT INTO orders (id, order_number, buyer_id, seller_id, status, subtotal, shipping_cost, total_amount, currency, created_at, updated_at) SELECT gen_random_uuid()::text, 'TEST-001', (SELECT id FROM users WHERE email='cliente@ejemplo.com'), (SELECT id FROM users WHERE email='vendedor@ejemplo.com'), 'PLACED', 100.00, 0, 100.00, 'ARS', NOW(), NOW();"
-INSERT 0 1
-```
-
-**Bug a — Login vendedor (con 1 orden):**
-
-```
-$ curl -s -X POST http://localhost:8000/api/auth/login -H 'Content-Type: application/json' -d '{"email":"vendedor@ejemplo.com","password":"vendedor123"}' | python3 -c "import sys,json; d=json.load(sys.stdin); u=d.get('user',{}); print(f'sales_count={u.get(\"sales_count\")}  purchases_count={u.get(\"purchases_count\")}')"
-sales_count=1  purchases_count=0
-```
-
-**Bug a — GET /auth/me:**
-
-```
-$ TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login -H 'Content-Type: application/json' -d '{"email":"vendedor@ejemplo.com","password":"vendedor123"}' | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))") && curl -s http://localhost:8000/api/auth/me -H "Authorization: Bearer $TOKEN" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'sales_count={d.get(\"sales_count\")}  purchases_count={d.get(\"purchases_count\")}')"
-sales_count=1  purchases_count=0
-```
-
-**Bug a — Login cliente (1 compra):**
-
-```
-$ curl -s -X POST http://localhost:8000/api/auth/login -H 'Content-Type: application/json' -d '{"email":"cliente@ejemplo.com","password":"cliente123"}' | python3 -c "import sys,json; d=json.load(sys.stdin); u=d.get('user',{}); print(f'sales_count={u.get(\"sales_count\")}  purchases_count={u.get(\"purchases_count\")}')"
-sales_count=0  purchases_count=1
-```
-
-**Slug corregido:**
-
-```
-$ docker exec topgreen-db psql -U topgreen -d topgreen -c "SELECT slug FROM products WHERE slug LIKE 'vaquillonas%';"
-             slug             
-------------------------------
- vaquillonas-braford-prenadas
-(1 row)
-```
-
-**Build del frontend:**
-
-```
-$ npx vite build 2>&1 | tail -10
-vite v5.4.21 building for production...
-transforming...
-✓ 79 modules transformed.
-rendering chunks...
-computing gzip size...
-dist/index.html                   0.97 kB │ gzip:   0.51 kB
-dist/assets/index-DgJ3Nz_2.css  129.06 kB │ gzip:  23.24 kB
-dist/assets/index-B22wcmFC.js   345.22 kB │ gzip: 102.57 kB
-✓ built in 1.84s
-```
+Salida vacía, exit code 1 (grep no encontró nada). **Criterio cumplido.**
 
 ### Qué NO corrí
 
-- **No probé los bugs b y c en el navegador.** No levanté el frontend con `npm run dev`. El build de Vite compila sin errores, pero no abrí el navegador para verificar visualmente el badge del carrito al cerrar sesión ni el fallback de imagen.
-- **No probé el evento `user-logout` manualmente** en el navegador. La lógica es: `AuthContext.logout` dispatcha `CustomEvent('user-logout')`, `CartContext` lo escucha y llama `setItems([])`. El código compila pero no lo vi ejecutarse.
-- **No probé el fallback de imagen** con una URL inválida en el navegador. El `onError` está wired correctamente según el código, pero no lo verifiqué visualmente.
-- **No corrí tests** (no hay suite de tests en el proyecto).
+- No verifiqué que los comandos de instalación nativa (Camino B) funcionen paso a paso. Sólo corregí la documentación.
+- No toqué `docs/PROJECT_STATUS.md` (prohibido por las reglas).
 
 ### Errores encontrados
 
-Al insertar la orden de prueba, el primer intento falló:
-
-```
-ERROR:  invalid input value for enum orderstatus: "placed"
-```
-
-El enum espera valores en mayúsculas (`PLACED`, no `placed`). Corregí a `'PLACED'` y funcionó. No es un bug del código, es un detalle del enum de PostgreSQL.
+Ninguno.
 
 ### Commit
 
 ```
-83c2752  fix: tres bugs visibles + corrección de slug
-main: b1577d0 → 83c2752  ✓ pushed
+c9aa2ea  docs: corregir README y README_LOCAL_SETUP — SQL Server → PostgreSQL 16 + PostGIS 3.4
+main: 55adb3a → c9aa2ea  ✓ pushed
 ```
 
 ### Observaciones adversariales
 
-1. **`ratings.py` ya tenía el fix parcial.** Cuando abrí el archivo, `get_user_reputation` ya calculaba `sales_count` con `COUNT(Order.id)`. Pero seguía leyendo `user.sales_count` y `user.purchases_count` en el `return`. Mi edición reemplazó eso por las variables calculadas. Parece que alguien había empezado el arreglo y no lo terminó.
+1. **El Camino A del README_LOCAL_SETUP sigue con `powershell` y `copy`.** Los comandos son específicos de Windows PowerShell (`copy`, `\.venv\Scripts\Activate.ps1`). En macOS/Linux no funcionan. No los cambié porque la PM pidió corregir SQL Server → PostgreSQL, no los comandos de shell. Pero vale la nota.
 
-2. **El bug b no es exactamente "al cambiar de rol".** El `PARA-DEV.md` dice "cuando el usuario pasa de comprador a vendedor". En el código no hay cambio de rol: el rol se asigna en el login y no cambia hasta cerrar sesión. Lo que sí pasa es que al cerrar sesión y volver a loguearse con otro usuario, el carrito del anterior seguía visible. Mi fix limpia el carrito en `logout`, que es el único momento donde el estado cambia de usuario. Si el "cambio de rol" es otra cosa que no vi, avisame.
-
-3. **`package-lock.json` cambió** por el `npm install` que corrí para el build. No es un cambio funcional, pero figura en el diff. Lo incluí en el commit.
+2. **El `vite.config.ts` tiene `target: 'http://localhost'` (sin puerto) en el proxy.** Como el `.env` tiene `VITE_API_URL=http://localhost:8000/api`, el proxy de Vite no se usa — el frontend va directo al backend. Pero si alguien borra el `.env`, el proxy apunta al puerto 80 y nada funciona. No lo toqué porque está fuera de scope.
