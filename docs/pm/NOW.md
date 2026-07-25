@@ -159,6 +159,20 @@ Decirle explícitamente que los lea desde esa rama, o mergearla.
 - **Mercado Pago sin credenciales**, con un bug de sandbox conocido. No
   se toca hasta la fase de pagos.
 
+## Riesgo de demo — imágenes del catálogo
+
+Los doce productos del seed usan `picsum.photos`, que devuelve **fotos
+aleatorias sin relación con el producto** y depende de un servicio
+externo en tiempo de render. Viene del seed original.
+
+Dos problemas para la reunión del 2026-07-30: una publicación de ganado
+puede mostrar cualquier cosa, y si la conexión falla durante la demo todo
+el catálogo aparece con imágenes rotas.
+
+Opciones, a decidir: dejarlo como está, o servir unas pocas imágenes
+genéricas desde el repositorio para no depender de la red. Si se
+reemplazan, **no usar fotografías con derechos de terceros.**
+
 ## Deuda técnica registrada, sin acción
 
 - Los IDs son `String(36)` en lugar del tipo `uuid` nativo de PostgreSQL.
