@@ -17,69 +17,52 @@ Hacelo siempre, porque puede haber cambiado.
 
 ---
 
-## Estado: todo aprobado y cerrado
+## Estado: todo aprobado
 
-Commits `83c2752`, `c9aa2ea`, `ff096e0`. Muy buena vuelta.
-
-**Verificación en navegador (b) y (c): aprobada.** Usaste Playwright con
-navegador real, interceptaste la request de la imagen para forzar el
-`onError` en lugar de esperar que fallara sola, y probaste el modo oscuro.
-Eso es más de lo que te pedí y está bien hecho. Los dos bugs quedan
-cerrados.
-
-**Documentación heredada: aprobada.** Verifiqué tu criterio y da vacío, sin
-menciones a SQL Server, 1433, mssql ni pyodbc. Además corregiste el
-instructivo de instalación nativa y el `DATABASE_URL`, que no te lo había
-pedido explícitamente y hacía falta.
-
-### Tus dos observaciones adversariales: las dos ciertas
-
-**CORS frágil.** Confirmado, `main.py` sólo cubre 5173 y 5174. Tu
-diagnóstico es correcto y es la última tarea de abajo.
-
-**No hay toggle de modo oscuro.** Confirmado y es peor de lo que viste:
-busqué `toggleTheme` y `useTheme` en todo el frontend y **no los usa ningún
-componente**. El modo oscuro existe entero —contexto y estilos— pero no
-hay forma de activarlo desde la interfaz. Es funcionalidad construida e
-inalcanzable, y la documentación heredada la declara como terminada.
-Queda registrado. **No lo construyas**: no es requisito del contrato y no
-gastamos ahí.
+Buen trabajo en la vuelta anterior. La verificación con Playwright y la
+corrección de la documentación quedaron cerradas.
 
 ---
 
-## Tarea: fijar el puerto del frontend
+## Tarea: ampliar el catálogo de demostración
 
-Tu hallazgo de CORS. Elijo arreglarlo por el lado del puerto y no
-ampliando la lista de orígenes permitidos, porque esa lista también se usa
-en producción y no la quiero más laxa.
+Hay una demostración con el cliente el 30 de julio. Hoy el catálogo tiene
+12 productos repartidos en **sólo tres provincias**, y en paralelo se está
+construyendo el filtro por ubicación. Un filtro con tres provincias se
+luce poco.
 
-En `package.json`, el script `dev` es `vite` a secas. Si el 5173 está
-ocupado, Vite se corre solo a otro puerto y el backend lo rechaza por
-CORS, que es exactamente lo que te pasó.
+Todo en `backend/app/seed.py`, siguiendo la estructura que ya usaste.
 
-**Cambialo a que falle fuerte en vez de moverse en silencio:**
+### Qué agregar
 
-```json
-"dev": "vite --port 5173 --strictPort"
-```
+**Llevá el catálogo a unos 25 productos**, con estos criterios:
 
-Con `--strictPort`, si el 5173 está ocupado Vite corta con un error claro
-en lugar de arrancar en un puerto que no funciona.
+1. **Al menos dos productos en cada categoría que hoy tenga menos de dos.**
+   Revisá cuáles son antes de empezar; incluye las de servicios
+   (`Laboreo`, `Transporte y Logística`, `Asesoramiento`, `Mantenimiento`,
+   `Otros Servicios`), que están casi vacías.
+2. **Repartidos en al menos ocho provincias distintas.** Hoy hay tres.
+   Elegí localidades reales de zona agropecuaria del padrón: Córdoba,
+   Santa Fe, Buenos Aires, Entre Ríos, La Pampa, Tucumán, Salta, Chaco.
+   Buscá los `id` reales en la tabla `localities`, no los inventes.
+3. **Cada producto necesita su `locality_id`**, igual que los que ya están.
+4. Nombres, precios y descripciones **verosímiles del rubro**. Nada de
+   "Producto de prueba 1". Esto lo va a ver el cliente.
 
 ### Criterio de aceptación
 
-1. `npm run dev` levanta en 5173 y la aplicación funciona.
-2. Con el 5173 ocupado por otro proceso, `npm run dev` **falla con un
-   mensaje explícito** en vez de arrancar en otro puerto. Pegame la salida
-   de ese caso.
+1. `docker compose down -v && ./scripts/init_local_db.sh` desde cero.
+2. Correr el seed **una segunda vez**: no se duplica nada.
+3. `GET /api/catalog/products` devuelve unos 25.
+4. Una consulta SQL que muestre **cuántos productos hay por provincia** y
+   **por categoría**. Pegame las dos tablas.
+5. Ninguna categoría con menos de dos productos.
+6. Al menos ocho provincias representadas.
 
-No toques `main.py` ni la configuración de CORS.
+### Qué no tocar
 
-### Cuando termines
-
-Es la última tarea mecánica que tengo para vos. **Cuando la cierres, pará
-y avisá.** Lo que sigue —el filtro de ubicación en el frontend y la suite
-de tests— lo hace la otra dev.
+- Nada de `src/`. Otra dev está trabajando en el frontend en paralelo.
+- Modelos, migraciones y endpoints. Esto es sólo datos de ejemplo.
 
 ---
 
