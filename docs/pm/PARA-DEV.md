@@ -35,6 +35,68 @@ que **yo verifiqué contra el código**, no lo que dijo nadie.
 
 ---
 
+## Respuesta a tu informe del bloqueo
+
+Buen primer informe. Los dos hallazgos son correctos y los verifiqué.
+
+### El contenedor: destruilo, tenés autorización
+
+`topgreen-db` pertenece a un checkout viejo de Codex que **ya no está en
+uso**: esa dev perdió el contexto y por eso entraste vos. No hay trabajo
+activo ahí.
+
+**Que no lo borraras por tu cuenta fue lo correcto.** Ante la duda de
+destruir datos de otro, frenar y preguntar es exactamente lo que quiero.
+Pero en este caso no se pierde nada, y por diseño:
+
+Esa base **no contiene nada que exista sólo ahí**. Se reconstruye entera
+con `alembic upgrade head` más `python -m app.seed`, que es idempotente y
+está verificado. Que la base sea desechable fue una decisión explícita del
+proyecto, justamente para que nadie quede rehén de un contenedor.
+
+Adelante:
+
+```bash
+docker rm -f topgreen-db topgreen-api
+```
+
+Y si quedan volúmenes colgados, `docker volume ls` y borrá los de
+`topgreen`. Después corré el smoke desde cero.
+
+### Tenías razón sobre `REPO_MAP.md`
+
+Decía "no hay geolocalización todavía, ninguna tabla tiene coordenadas".
+Es falso: `localities` tiene `Geography(POINT, 4326)` con índice GIST y
+4.028 registros del padrón, y `products.locality_id` referencia ese
+padrón. **Ya lo corregí**, con el detalle de cómo está implementado.
+
+Hiciste bien en no editarlo: `docs/pm/` es mío. Reportarlo es lo que
+correspondía, y es la regla 6 funcionando —cuando el código y la
+documentación se contradicen, gana el código y hay un documento que
+arreglar—.
+
+### Sobre la Tarea 1
+
+Revisé tus dos publicaciones de Acopio contra el código: están completas.
+Ambas figuran en `product_taxonomy` y en `product_localities`, con slugs
+propios y localidades del padrón. Bien resuelto.
+
+Y valoro que declararas que el chequeo de sintaxis con `ast.parse` es
+sólo eso, en vez de venderlo como prueba de que funciona. Todavía falta
+la evidencia real; ahora la vas a poder generar.
+
+### Tarea 1.3, nueva y chica
+
+El smoke se rompió por un conflicto de nombre de contenedor y no te dio
+un mensaje útil. Va a volver a pasar.
+
+En `scripts/smoke.sh`, donde hace la limpieza previa, agregá un
+`docker rm -f topgreen-db topgreen-api` tolerante a fallo antes de
+levantar. Que la suite se limpie sola en vez de morir con un error de
+Docker. **No cambies nada más del script.**
+
+---
+
 ## Estado de la taxonomía
 
 Se cargó la taxonomía real de la clienta en `backend/app/seed.py`, commit
