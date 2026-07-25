@@ -80,8 +80,8 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 
 | Requisito | Estado |
 |-----------|--------|
-| Pruebas integrales | ❌ Diez smoke tests manuales; sin suite automática |
-| Carga inicial de datos | ⚪ Seed repetible con 12 productos demo y 4.028 localidades |
+| Pruebas integrales | ✅ Suite de once casos con un comando contra arranque limpio, criterios relacionales contra SQL, publicación desde la interfaz con Chromium real. Verificado que **falla** con código distinto de cero al romper un caso a propósito |
+| Carga inicial de datos | ⚪ Seed repetible con 12 productos demo y 4.028 localidades. Ampliación a 25 en curso |
 | Despliegue en producción | ❌ |
 | Capacitación del panel de administración | ❌ |
 | Documentación técnica del despliegue | ⚪ `README.md` y `README_LOCAL_SETUP.md` corregidos al stack real. `PROJECT_STATUS.md` sigue con ocho afirmaciones verificadas como falsas |
@@ -120,4 +120,5 @@ Dos observaciones que el porcentaje no muestra:
 | Carrito persiste al cambiar de usuario | Baja, cosmética | ✅ Resuelto y verificado en navegador con Playwright |
 | Imágenes rotas mostraban el ícono del navegador | Alta para la demo | ✅ Resuelto. Respaldo con el nombre del producto, verificado en claro y oscuro |
 | **Modo oscuro inalcanzable** | Media | **Abierto, sin acción.** `toggleTheme` y `useTheme` no los usa ningún componente. Existe el contexto y los estilos, pero no hay forma de activarlo. No es contractual |
-| Vite se corre de puerto y el backend lo rechaza por CORS | Media | Arreglo asignado: fijar el puerto con `--strictPort` |
+| Vite se corre de puerto y el backend lo rechaza por CORS | Media | Abierto. Arreglo propuesto: fijar el puerto con `--strictPort` |
+| **Subida de imágenes falla en silencio** | Media | Arreglo asignado. `AddProductModal.tsx:506` no chequea `response.ok`: si la imagen no sube, igual avisa "publicado exitosamente" |

@@ -15,96 +15,98 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
-## Estado: filtro por ubicación aprobado e integrado
+## Estado: suite de smoke tests aprobada
 
-Rama `dev/filtro-ubicacion-frontend`, ya mergeada a `main`.
+La mejor entrega hasta ahora. Revisado contra el código, no sólo el informe.
 
-Revisado contra el código, no sólo contra el informe. Está bien resuelto:
+**Lo que más valoro:**
 
-- El filtrado ocurre **en el servidor** — se envían `province` y
-  `locality_id` a la API en lugar de filtrar en el navegador.
-- Resolviste bien la trampa del identificador: el **id** de dos
-  caracteres para pedir localidades, el **nombre** para filtrar productos.
-- El cambio de provincia limpia la localidad seleccionada.
-- El estado en la URL con `replaceState`, sin necesidad de router.
+- **La demostración de fallo.** `--force-failure=health` devuelve `exit 1`,
+  y la suite **no se detiene en el primer error**: deja el mapa completo de
+  qué pasó y qué falló. Eso era el criterio que más me importaba. Una
+  suite que nunca falla da confianza falsa y es peor que no tener nada.
+- **Aplicaste los criterios relacionales** apenas los establecí:
+  `API=6, SQL=6`, `API=SQL=13`. La suite sobrevive a que cambien los datos
+  de ejemplo.
+- **El caso 9 valida en tres capas**: interacción, API y base. Tenías razón
+  en no conformarte con el aviso en pantalla.
+- Respaldar y restaurar los `.env` con `trap` no te lo pedí y hacía falta.
 
-### Sobre los números: tenías razón vos
+El mecanismo de fallo forzado es seguro: sólo se activa con un parámetro
+explícito y no puede dispararse por accidente.
 
-Te pasé Buenos Aires 4, Córdoba 2, Santa Fe 2. **Los reales son 6, 3 y 3.**
-Verifiqué el seed y son los tuyos.
+### Tu observación 4 es un bug real. Verificado
 
-El error fue mío: te di los números de cuando había 8 productos, sin
-tener en cuenta que se habían agregado 4 más. Que hayas reportado los
-reales en lugar de acomodarte a los míos es exactamente lo que espero.
+`AddProductModal.tsx:506` hace `await fetch(...)` para subir la imagen y
+**nunca chequea `response.ok`**. Si la subida falla —archivo muy grande,
+token vencido, error del servidor—, el código sigue de largo y muestra
+"publicado exitosamente". El vendedor cree que subió la foto y no subió
+nada.
 
-**Y cambio una regla por esto:** de ahora en más los criterios de
-aceptación van a ser **relacionales, no absolutos**. En vez de "tiene que
-dar 4", va a decir "el resultado de la API tiene que coincidir con el de
-la consulta SQL". Los datos de ejemplo cambian y los números fijos
-envejecen mal.
-
----
-
-## Nota de organización
-
-Hasta ahora había dos devs y dos canales. **Queda uno solo**, que es este.
-`PARA-DEV-2.md` se eliminó y tu informe anterior quedó en `PARA-PM.md`.
-
-De acá en adelante trabajás directo sobre `main`, sin ramas, salvo que te
-indique lo contrario.
+Afecta un requisito contractual: la publicación con imágenes. Es la
+primera tarea de abajo.
 
 ---
 
-## Tarea: suite automatizada de smoke tests
+## Tarea 1: que la subida de imágenes falle a la vista
 
-Es lo más importante que falta y no es trabajo extra: la fase 5 del
-contrato pide "pruebas integrales".
+En `AddProductModal.tsx`, alrededor de la línea 506.
 
-Hoy cada entrega se verifica a mano. Ya se arreglaron cosas que **nunca
-habían funcionado** en este código, y no hay nada que detecte si algo se
-rompe de nuevo.
+Hoy el `fetch` que sube cada imagen no verifica el resultado. Que lo
+verifique:
 
-### Qué construir
+- Si alguna imagen falla, el producto **igual se publica** —ya está creado
+  a esa altura— pero el aviso tiene que decir que la publicación salió y
+  que **la imagen no se pudo subir**, con el motivo si lo hay.
+- Si todas suben bien, el aviso queda como está.
 
-Un comando que corra los casos de punta a punta contra un arranque
-limpio y **devuelva código distinto de cero si alguno falla**.
-
-Casos mínimos:
-
-1. Salud del servicio.
-2. Registro de usuario.
-3. Ingreso y obtención del token.
-4. Catálogo con filtros de categoría y precio.
-5. **Catálogo con filtro de provincia y de localidad.**
-6. Detalle de producto.
-7. Agregar al carrito y verlo.
-8. Crear una orden desde el carrito, sin pagar.
-9. Publicar un producto como vendedor, desde la interfaz.
-10. Ver "mis compras" y "mis ventas".
-11. Administración: usuarios, productos y órdenes.
-
-### Decisiones que tomo yo, para que no las tengas que tomar vos
-
-- **Elegí vos la herramienta.** Ya usaste Playwright y funcionó bien; si
-  te sirve, seguí con eso.
-- **No quiero cobertura ni un framework elaborado.** Quiero una red que
-  avise cuando algo se rompe.
-- **Los casos de API pueden ser peticiones directas.** Sólo el caso 9
-  necesita navegador de verdad.
-- **Los criterios son relacionales.** Nada de esperar "4 productos":
-  compará el resultado de la API contra la consulta SQL equivalente. Así
-  la suite sobrevive a que cambien los datos de ejemplo.
+No cambies el orden de las operaciones ni el backend.
 
 ### Criterio de aceptación
 
-1. Un solo comando corre todo contra `docker compose down -v` y arranque
-   limpio.
-2. Los once casos pasan, y la salida dice cuál pasó y cuál no.
-3. **Rompé algo a propósito** —por ejemplo, cambiá un endpoint para que
-   devuelva error— y mostrame que la suite falla con código distinto de
-   cero y señala el caso. Esto es tan importante como que pase en verde:
-   una suite que nunca falla no sirve de nada.
-4. Documentá en el `README.md` cómo se corre, en dos líneas.
+Provocá una falla real de subida —por ejemplo interceptando esa petición
+con Playwright y devolviendo un error, como hiciste con la imagen rota— y
+mostrame que:
+
+1. El producto aparece igual en el catálogo.
+2. El aviso dice que la imagen falló, no "publicado exitosamente" a secas.
+3. Con la subida funcionando, el comportamiento no cambió.
+
+---
+
+## Tarea 2: ampliar el catálogo de demostración
+
+Hay demostración con el cliente el 30 de julio. Hoy son 12 productos en
+**tres provincias**, y acabás de construir el filtro por ubicación: con
+tres provincias se luce poco.
+
+Todo en `backend/app/seed.py`.
+
+**Llevalo a unos 25 productos:**
+
+1. **Al menos dos por categoría.** Revisá cuáles tienen menos, incluidas
+   las de servicios (`Laboreo`, `Transporte y Logística`, `Asesoramiento`,
+   `Mantenimiento`, `Otros Servicios`), que están casi vacías.
+2. **Al menos ocho provincias distintas.** Buscá `id` reales en la tabla
+   `localities`, no los inventes.
+3. Cada producto con su `locality_id`.
+4. Nombres, precios y descripciones **verosímiles del rubro**. Esto lo va
+   a ver el cliente; nada de "Producto de prueba 1".
+
+### Criterio de aceptación
+
+1. Arranque limpio y seed corrido **dos veces**: no se duplica nada.
+2. Consulta SQL con el conteo **por provincia** y **por categoría**.
+   Pegame las dos tablas.
+3. Ninguna categoría con menos de dos productos, ocho provincias o más.
+4. **`npm run smoke` sigue en verde.** Ahora que existe la red, usala.
+
+---
+
+## Podés encadenar las dos
+
+Están escritas y aprobadas. Hacé la 1, commit y push, después la 2. Una
+sección por tarea en el informe.
 
 ---
 
