@@ -121,6 +121,17 @@ del cliente en lugar del nuestro.
 
 ---
 
+## Solapamiento interno
+
+Los **drones** aparecen en dos lugares de la misma taxonomía:
+
+- Maquinaria agrícola → Fertilización y protección → "drones"
+- Agricultura de precisión → Drones y VANTs → multiespectrales, térmicos,
+  aplicadores
+
+Hay que preguntarle cuál corresponde, o si son usos distintos que quiere
+separar a propósito.
+
 ## Observación aparte
 
 El prototipo trae al final una integración contra

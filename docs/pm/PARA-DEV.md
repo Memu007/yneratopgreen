@@ -88,11 +88,98 @@ un rediseño, esa decisión es mía y la tomo con lo que me cuentes.
 
 ---
 
-## Después, si te queda tiempo
+## Tarea 2: cargar la taxonomía de la clienta
 
-Arreglo chico que quedó pendiente: en `package.json`, el script `dev` es
-`vite` a secas, así que si el puerto 5173 está ocupado Vite se corre a otro
-y el backend lo rechaza por CORS. Ya te pasó una vez.
+Hacela **después** de la verificación en celular.
+
+La clienta mandó su taxonomía real. Está analizada en
+`docs/pm/TAXONOMIA-CLIENTE.md`, leelo antes de empezar. Reemplaza a las
+categorías que veníamos improvisando nosotros.
+
+Todo en `backend/app/seed.py`. **No toques modelos ni migraciones**: la
+tabla de subcategorías ya existe.
+
+### Qué cargar
+
+**Las 7 categorías de productos** con sus 43 subcategorías, tal como
+figuran en el análisis:
+
+1. Maquinaria agrícola (7 subcategorías)
+2. Riego y drenaje (6)
+3. Insumos agrícolas (7)
+4. Ganadería y forrajes (5)
+5. Repuestos y mantenimiento (6)
+6. Agricultura de precisión y tecnología (4)
+7. Tierras y parcelas (8)
+
+**Más una octava que se conserva:** `Bienes y Ganado`, para vender
+animales. La taxonomía de la clienta no tiene dónde poner hacienda, pero
+el contrato la exige explícitamente. Hasta que ella lo aclare, manda el
+contrato.
+
+**Servicios: cargá sólo cuatro.** Asesoramiento, Contratistas, Logística y
+Acopio. **No cargues "Inversores"**: es intermediación financiera, otro
+negocio, y no está en el contrato. Si lo cargamos, creamos una expectativa
+que no vamos a construir.
+
+### Qué NO cargar
+
+**El tercer nivel.** La taxonomía trae unos 200 ítems bajo las
+subcategorías. No los cargues: mezclan tipos de producto con
+especificaciones —en Tractores son rangos de potencia, en Preparación del
+suelo son arados y rastras— y eso se modela como atributo, no como nivel
+de navegación. Es una decisión pendiente.
+
+**Las marcas.** Las 48 tienen duplicados por resolver con la clienta y
+además hoy se ofrecen todas para cualquier categoría, lo que produce
+combinaciones sin sentido. Queda fuera hasta que se limpie.
+
+### Reasignar los 24 productos existentes
+
+Al cambiar las categorías, los productos actuales quedan huérfanos. Este
+es el mapeo, ya resuelto:
+
+| Producto actual | Categoría nueva | Subcategoría |
+|---|---|---|
+| Semillas de maíz y de soja | Insumos agrícolas | Semillas y plántulas |
+| Fertilizante Triple 15 | Insumos agrícolas | Fertilizantes |
+| Herbicida Glifosato | Insumos agrícolas | Agroquímicos |
+| Pulverizadora Jacto | Maquinaria agrícola | Fertilización y protección |
+| Cosechadora John Deere | Maquinaria agrícola | Cosecha |
+| Rastra de discos | Maquinaria agrícola | Preparación del suelo |
+| Dron pulverizador | Agricultura de precisión | Drones y VANTs |
+| Sensores de humedad IoT | Agricultura de precisión | Sensores de cultivo |
+| Terneros y vaquillonas | Bienes y Ganado | la que corresponda |
+
+Los demás ubicalos donde mejor encajen. **Cada categoría tiene que quedar
+con al menos un producto**, y si alguna queda vacía, agregá una
+publicación verosímil del rubro.
+
+### Criterio de aceptación
+
+1. Arranque limpio y seed corrido **dos veces**: no se duplica nada.
+2. Consulta SQL con el conteo **por categoría** y otra **por provincia**.
+   Pegame las dos.
+3. Las 8 categorías de productos y las 4 de servicios existen, con sus
+   subcategorías.
+4. **Ningún producto sin categoría**, verificado por SQL.
+5. Ninguna categoría de producto vacía.
+6. `npm run smoke` en verde.
+7. En la interfaz, el filtro de categoría muestra la taxonomía nueva.
+
+### Si algo no encaja
+
+Si al mapear encontrás un producto que no entra en ninguna categoría, o
+una subcategoría que no sabés dónde poner, **frená y contame**. No lo
+fuerces a "Otros" para salir del paso.
+
+---
+
+## Después de las dos, si te queda tiempo
+
+Arreglo chico pendiente: en `package.json`, el script `dev` es `vite` a
+secas, así que si el puerto 5173 está ocupado Vite se corre a otro y el
+backend lo rechaza por CORS. Ya te pasó una vez.
 
 Cambialo a `vite --port 5173 --strictPort`, para que falle con un mensaje
 claro en vez de arrancar en un puerto que no funciona. No toques la
