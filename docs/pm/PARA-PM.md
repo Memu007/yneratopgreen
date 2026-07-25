@@ -1,303 +1,254 @@
 # Dev → PM
 
-## Tarea
-
-Suite automatizada de smoke tests integral, ejecutable con un solo comando
-contra un arranque limpio.
-
 ## Estado
 
-**Terminada y publicada en `main`.**
+**Las dos tareas están terminadas, verificadas y publicadas en `main`.**
 
-- Commit de código:
-  `32f1eace7d8050ae85121fb01ae323bc75f52abf`
-- Push confirmado:
+- Tarea 1: `29eb6fb` — `fix: mostrar fallos al subir imagenes`
+- Tarea 2: `17d18c1` — `feat: ampliar catalogo demo`
+
+Pushes confirmados:
 
 ```text
 To https://github.com/Memu007/yneratopgreen
-   5f6f1fc..32f1eac  main -> main
+   ec781c7..29eb6fb  main -> main
+ok main
+
+To https://github.com/Memu007/yneratopgreen
+   29eb6fb..17d18c1  main -> main
 ok main
 ```
 
-## Archivos
+## Tarea 1 — fallo visible al subir imágenes
+
+### Qué cambié
+
+`AddProductModal.tsx` ahora revisa `response.ok` en cada subida.
+
+- El producto se crea antes, sin cambiar el orden existente.
+- Si una imagen falla, se intentan las demás.
+- Se toma `detail` de la respuesta JSON; si no existe, se usa el cuerpo o el
+  estado HTTP.
+- Si hubo fallos, el toast es `warning`: informa que la publicación salió,
+  cuántas imágenes fallaron y el motivo.
+- Si todas suben, conserva el toast de éxito anterior.
+- Un fallo de red también queda informado y no convierte en fallida la
+  creación ya confirmada.
+
+Agregué a `npm run smoke` un caso permanente de regresión. Playwright
+intercepta `POST **/api/products/*/images` y responde:
+
+```json
+{"detail":"Archivo demasiado grande (prueba controlada)"}
+```
+
+El caso exige las tres cosas:
+
+1. Toast visible con “publicado, pero no se pudo subir la imagen” y el motivo.
+2. Producto visible en el catálogo.
+3. Producto presente en DB con cero imágenes.
+
+El caso normal previo sigue exigiendo publicación por UI, presencia en API/DB
+y una imagen guardada.
+
+### Primera corrida: fallo del test, no del flujo
+
+La primera corrida completa devolvió `exit 1`:
 
 ```text
-32f1eac test: automatizar smoke tests integrales
- README.md         |  24 ++-
- package-lock.json |  48 +++++
- package.json      |  10 +-
- scripts/smoke.mjs | 509 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
- scripts/smoke.sh  |  99 +++++++++++
- 5 files changed, 680 insertions(+), 10 deletions(-)
- create mode 100644 scripts/smoke.mjs
- create mode 100755 scripts/smoke.sh
+[PASS] 09 Publicar producto como vendedor desde la interfaz — UI + API + DB, product_id=6a783e38-7890-4723-af31-6fa36b8e170f, imágenes=1 (2385 ms)
+[FAIL] 10 Fallo de imagen visible sin perder la publicación — locator.waitFor: Timeout 20000ms exceeded.
+Call log:
+  - waiting for getByText(/publicado, pero no se pudo subir la imagen.*Archivo demasiado grande (prueba controlada)/i) to be visible
+[PASS] 11 Ver mis compras y mis ventas — compras HTTP 200 (1), ventas HTTP 200 (1) (42 ms)
+[PASS] 12 Administración: usuarios, productos y órdenes — usuarios HTTP 200, API=SQL=4; productos HTTP 200, API=SQL=14; órdenes HTTP 200, API=SQL=1 (895 ms)
+11/12 pasaron; 1 fallaron
 ```
 
-## Qué hace
+Causa: el regex del test interpretaba los paréntesis del motivo como un grupo,
+por lo que no coincidía con los paréntesis literales del toast. El total de
+productos ya había subido a 14, confirmando que la publicación sí se creó.
 
-`npm run smoke`:
+Corrección: localizar el comienzo estable del aviso y comprobar el motivo
+literal con `textContent().includes(...)`. También actualicé el rótulo fijo del
+runner de 11 a 12 casos.
 
-1. Guarda temporalmente `.env` y `backend/.env`, si existen.
-2. Usa los `.env.example` sanitizados durante la suite.
-3. Compila el frontend.
-4. Verifica/instala Chromium de Playwright.
-5. Ejecuta `docker compose down -v --remove-orphans`.
-6. Ejecuta `scripts/init_local_db.sh`: DB, API, migraciones y seed.
-7. Levanta Vite temporalmente.
-8. Ejecuta los once casos en orden.
-9. Devuelve `1` si falla uno o más casos.
-10. Detiene Vite y restaura exactamente los `.env` originales, también ante
-    un fallo.
+### Verificación verde de la tarea 1
 
-Los casos 1–8 y 10–11 usan requests directos. El caso 9 usa Chromium real,
-completa el modal, adjunta una imagen y publica desde la interfaz.
+Segunda corrida limpia: `npm run smoke`, **exit 0**.
 
-Los filtros de catálogo y las tres vistas de administración se contrastan con
-consultas SQL. No hay cantidades fijas de productos, usuarios u órdenes.
-
-## Cómo se corre
-
-Quedó documentado en dos líneas en `README.md`:
-
-```bash
-npm install
-npm run smoke
+```text
+[PASS] 09 Publicar producto como vendedor desde la interfaz — UI + API + DB, product_id=4c237a1e-ef23-4b3c-b6fc-0785b2a8db61, imágenes=1 (1872 ms)
+[PASS] 10 Fallo de imagen visible sin perder la publicación — UI + DB, producto visible, aviso="Archivo demasiado grande (prueba controlada)", imágenes=0 (1837 ms)
+12/12 pasaron; 0 fallaron
 ```
 
-El README avisa antes que el segundo comando borra los volúmenes Docker
-locales.
+## Tarea 2 — catálogo de demostración
 
-## Evidencia verde final
+### Qué cambié
+
+Todo quedó en `backend/app/seed.py`; no toqué modelos, migraciones ni esquema.
+
+- Pasé de 12 a **24 productos**.
+- Las 12 categorías quedaron con **dos productos cada una**.
+- Las cinco categorías de servicios tienen publicaciones verosímiles y con
+  sus campos de servicio.
+- Cada publicación tiene `locality_id`.
+- Pasé de tres a **nueve provincias**.
+
+Las nuevas localidades se buscaron en la copia versionada de Georef y usé
+estos IDs reales:
+
+| Localidad | Provincia | ID Georef |
+|---|---|---:|
+| Paraná | Entre Ríos | `30084160` |
+| General Pico | La Pampa | `42105030` |
+| Resistencia | Chaco | `22140060` |
+| Salta | Salta | `66028050` |
+| Mendoza | Mendoza | `50007010` |
+| San Miguel de Tucumán | Tucumán | `90084010` |
+
+### Arranque limpio y primer seed
+
+Comandos:
+
+```text
+docker compose down -v
+./scripts/init_local_db.sh
+```
+
+Resultado relevante:
+
+```text
+Volume yneratopgreen_uploads_data  Removed
+Volume yneratopgreen_db_data  Removed
+Network yneratopgreen_topgreen-network  Removed
+
+Container topgreen-db  Healthy
+Container topgreen-api  Started
+INFO  [alembic.runtime.migration] Running upgrade  -> 766eee72137f, esquema inicial postgresql
+INFO  [alembic.runtime.migration] Running upgrade 766eee72137f -> 06e1be636327, agregar localidades y ubicación de publicaciones
+✅ 4028 localidades Georef sembradas (sha256: 7743fd6a6af96fce138696680afe297e71fc41f37f8d1986b3763913d0c86197)
+✅ Producto creado: Instalación y Reparación de Alambrados Rurales
+✨ Seed completado exitosamente!
+📦 24 productos de ejemplo disponibles
+```
+
+### Segundo seed: idempotencia
 
 Comando:
 
 ```text
-npm run smoke
+docker exec topgreen-api python -m app.seed
 ```
 
-Resultado del proceso: **exit 0**.
-
-Build ejecutado por el propio comando:
-
-```text
-> tsc && vite build
-vite v5.4.21 building for production...
-transforming...
-✓ 78 modules transformed.
-rendering chunks...
-computing gzip size...
-dist/index.html                   0.97 kB │ gzip:   0.51 kB
-dist/assets/index-DgJ3Nz_2.css  129.06 kB │ gzip:  23.24 kB
-dist/assets/index-D7-7yRLC.js   348.42 kB │ gzip: 103.46 kB
-✓ built in 1.99s
-```
-
-Arranque limpio:
+Resultado: **exit 0**. Las 12 categorías y los 24 productos informaron
+`ya existe`; no se creó ninguno.
 
 ```text
-===> Eliminando contenedores y volúmenes locales
-===> Inicializando DB, migraciones, seed y API
-===> Verificando .env
-===> Levantando contenedores (db + api)
-===> Esperando healthcheck de la DB (puede tardar ~30s)
-===> Creando la base topgreen si no existe
-===> Aplicando migraciones (alembic upgrade head)
-===> Cargando datos demo (seed)
-  ✅ 4028 localidades Georef sembradas (sha256: 7743fd6a6af96fce138696680afe297e71fc41f37f8d1986b3763913d0c86197)
+⏭️  Categoría 'Otros Servicios' ya existe
+...
+⏭️  Producto 'Semillas de Maíz DK Premium' ya existe
+...
+⏭️  Producto 'Instalación y Reparación de Alambrados Rurales' ya existe
 ✨ Seed completado exitosamente!
-📦 12 productos de ejemplo disponibles
+📦 24 productos de ejemplo disponibles
 ```
 
-Migraciones del arranque:
+Confirmación SQL posterior:
 
 ```text
-INFO  [alembic.runtime.migration] Running upgrade  -> 766eee72137f, esquema inicial postgresql
-INFO  [alembic.runtime.migration] Running upgrade 766eee72137f -> 06e1be636327, agregar localidades y ubicación de publicaciones
+ productos | slugs_unicos | provincias
+-----------+--------------+------------
+        24 |           24 |          9
+(1 row)
 ```
 
-Salida exacta de los once casos de la última pasada:
+### Conteo por provincia
 
 ```text
-[PASS] 01 Salud del servicio — HTTP 200, status=ok (57 ms)
-[PASS] 02 Registro de usuario — HTTP 201, user_id=6242fdb2-c9ca-477c-85a5-46600c31de4d (540 ms)
-[PASS] 03 Ingreso y obtención del token — HTTP 200, JWT recibido (355 ms)
-[PASS] 04 Catálogo con categoría y precio — HTTP 200, API=1, SQL=1, max_price=1850000.00 (364 ms)
-[PASS] 05 Catálogo con provincia y localidad — provincia HTTP 200, API=6, SQL=6; localidad HTTP 200, API=2, SQL=2 (366 ms)
-[PASS] 06 Detalle de producto — HTTP 200, product_id=818a8677-d3c0-4623-8d54-a1515624df13, "Dron Pulverizador Agrícola 20L" (357 ms)
-[PASS] 07 Agregar al carrito y verlo — POST 200, GET 200, total_items=1 (63 ms)
-[PASS] 08 Crear orden desde el carrito — HTTP 200, order_id=f15dd157-6a58-43c6-932c-8fc14364d013, status=placed (62 ms)
-[PASS] 09 Publicar producto como vendedor desde la interfaz — UI + API + DB, product_id=e9090deb-8a14-4452-8c46-0a58ea26caa4, imágenes=1 (2313 ms)
-[PASS] 10 Ver mis compras y mis ventas — compras HTTP 200 (1), ventas HTTP 200 (1) (35 ms)
-[PASS] 11 Administración: usuarios, productos y órdenes — usuarios HTTP 200, API=SQL=4; productos HTTP 200, API=SQL=13; órdenes HTTP 200, API=SQL=1 (813 ms)
-
-Resumen smoke tests
--------------------
-PASS 01 Salud del servicio
-PASS 02 Registro de usuario
-PASS 03 Ingreso y obtención del token
-PASS 04 Catálogo con categoría y precio
-PASS 05 Catálogo con provincia y localidad
-PASS 06 Detalle de producto
-PASS 07 Agregar al carrito y verlo
-PASS 08 Crear orden desde el carrito
-PASS 09 Publicar producto como vendedor desde la interfaz
-PASS 10 Ver mis compras y mis ventas
-PASS 11 Administración: usuarios, productos y órdenes
--------------------
-11/11 pasaron; 0 fallaron
+  provincia   | productos
+--------------+-----------
+ Buenos Aires |         7
+ Chaco        |         2
+ Córdoba      |         3
+ Entre Ríos   |         1
+ La Pampa     |         2
+ Mendoza      |         2
+ Salta        |         2
+ Santa Fe     |         4
+ Tucumán      |         1
+(9 rows)
 ```
 
-## Qué verifica cada caso
-
-| Caso | Evidencia |
-|---:|---|
-| 1 | `GET /api/health`, HTTP 200 y `status=ok`. |
-| 2 | Registro HTTP 201, usuario y JWT recibidos. |
-| 3 | Login HTTP 200, access y refresh token presentes. |
-| 4 | Categoría + rango de precio; `total` de API igual a SQL y cada ítem dentro del filtro. |
-| 5 | Provincia y localidad elegidas desde datos existentes; ambos totales API iguales a SQL. |
-| 6 | Producto activo del vendedor demo con stock; detalle e ID coinciden. |
-| 7 | POST al carrito y GET posterior; producto y cantidad coinciden. |
-| 8 | Orden real desde el carrito, sin llamar pagos ni Mercado Pago. |
-| 9 | Playwright abre la UI autenticada, completa formulario, adjunta PNG, selecciona provincia/localidad y publica. Después valida el producto por API y por DB, incluida una imagen persistida. |
-| 10 | La orden creada aparece tanto en “mis compras” como en “mis ventas”. |
-| 11 | Admin lista usuarios, productos y órdenes; los tres totales coinciden con SQL. |
-
-## Evidencia de que la suite falla
-
-El runner acepta una falla controlada sólo para esta demostración:
+### Conteo por categoría
 
 ```text
-npm run smoke -- --force-failure=health
+         categoria          | productos
+----------------------------+-----------
+ Agroquímicos               |         2
+ Asesoramiento              |         2
+ Bienes y Ganado            |         2
+ Fertilizantes              |         2
+ Herramientas               |         2
+ Laboreo                    |         2
+ Mantenimiento              |         2
+ Maquinaria                 |         2
+ Otros Servicios            |         2
+ Semillas                   |         2
+ Tecnología para el Cultivo |         2
+ Transporte y Logística     |         2
+(12 rows)
 ```
 
-La ejecución volvió a hacer `down -v`, init, migraciones, seed, build y los
-once casos.
+### Suite final contra el seed ampliado
 
-Resultado del proceso: **exit 1**.
-
-Salida exacta relevante:
+Comando: `npm run smoke`. Resultado: **exit 0**.
 
 ```text
-[FAIL] 01 Salud del servicio — GET /health__forced_failure respondió HTTP 404: Not Found (40 ms)
-[PASS] 02 Registro de usuario — HTTP 201, user_id=aba50746-d46f-4f05-9663-44c7d1437227 (561 ms)
-[PASS] 03 Ingreso y obtención del token — HTTP 200, JWT recibido (348 ms)
-[PASS] 04 Catálogo con categoría y precio — HTTP 200, API=1, SQL=1, max_price=1850000.00 (394 ms)
-[PASS] 05 Catálogo con provincia y localidad — provincia HTTP 200, API=6, SQL=6; localidad HTTP 200, API=2, SQL=2 (396 ms)
-[PASS] 06 Detalle de producto — HTTP 200, product_id=dc478ce6-a2c6-4df6-af15-230e87912ed4, "Dron Pulverizador Agrícola 20L" (370 ms)
-[PASS] 07 Agregar al carrito y verlo — POST 200, GET 200, total_items=1 (60 ms)
-[PASS] 08 Crear orden desde el carrito — HTTP 200, order_id=60c1ee41-d16a-4f93-96b3-f5e4c2ac2abc, status=placed (46 ms)
-[PASS] 09 Publicar producto como vendedor desde la interfaz — UI + API + DB, product_id=36ae41ec-198f-441d-b93c-a76667ba9ddc, imágenes=1 (2418 ms)
-[PASS] 10 Ver mis compras y mis ventas — compras HTTP 200 (1), ventas HTTP 200 (1) (35 ms)
-[PASS] 11 Administración: usuarios, productos y órdenes — usuarios HTTP 200, API=SQL=4; productos HTTP 200, API=SQL=13; órdenes HTTP 200, API=SQL=1 (861 ms)
-
-Resumen smoke tests
--------------------
-FAIL 01 Salud del servicio
-PASS 02 Registro de usuario
-PASS 03 Ingreso y obtención del token
-PASS 04 Catálogo con categoría y precio
-PASS 05 Catálogo con provincia y localidad
-PASS 06 Detalle de producto
-PASS 07 Agregar al carrito y verlo
-PASS 08 Crear orden desde el carrito
-PASS 09 Publicar producto como vendedor desde la interfaz
-PASS 10 Ver mis compras y mis ventas
-PASS 11 Administración: usuarios, productos y órdenes
--------------------
-10/11 pasaron; 1 fallaron
+[PASS] 01 Salud del servicio — HTTP 200, status=ok (65 ms)
+[PASS] 02 Registro de usuario — HTTP 201, user_id=4915713e-8748-4e2e-826a-dfcc981dac4c (562 ms)
+[PASS] 03 Ingreso y obtención del token — HTTP 200, JWT recibido (365 ms)
+[PASS] 04 Catálogo con categoría y precio — HTTP 200, API=1, SQL=1, max_price=45000.00 (392 ms)
+[PASS] 05 Catálogo con provincia y localidad — provincia HTTP 200, API=7, SQL=7; localidad HTTP 200, API=3, SQL=3 (498 ms)
+[PASS] 06 Detalle de producto — HTTP 200, product_id=6eb5d70b-1e0f-412a-8131-f32e4b32810c, "Insecticida Lambda Cihalotrina 1L" (414 ms)
+[PASS] 07 Agregar al carrito y verlo — POST 200, GET 200, total_items=1 (69 ms)
+[PASS] 08 Crear orden desde el carrito — HTTP 200, order_id=27eeafee-8acc-4b64-aa4e-6a973cb481ca, status=placed (53 ms)
+[PASS] 09 Publicar producto como vendedor desde la interfaz — UI + API + DB, product_id=37efae98-ed3e-4598-9023-f5d314869989, imágenes=1 (2563 ms)
+[PASS] 10 Fallo de imagen visible sin perder la publicación — UI + DB, producto visible, aviso="Archivo demasiado grande (prueba controlada)", imágenes=0 (2031 ms)
+[PASS] 11 Ver mis compras y mis ventas — compras HTTP 200 (1), ventas HTTP 200 (1) (42 ms)
+[PASS] 12 Administración: usuarios, productos y órdenes — usuarios HTTP 200, API=SQL=4; productos HTTP 200, API=SQL=26; órdenes HTTP 200, API=SQL=1 (1051 ms)
+12/12 pasaron; 0 fallaron
 ```
 
-La suite no se detuvo al primer fallo: dejó el mapa completo y devolvió código
-distinto de cero.
+El total admin es 26 porque la suite parte de los 24 del seed y publica dos
+productos por UI: uno con imagen exitosa y uno con subida interceptada.
 
-## Fallos encontrados durante la construcción
+## Otros errores observados
 
-### 1. Compose necesitaba `.env` antes del init
-
-Primer intento:
+Antes de la prueba manual de idempotencia:
 
 ```text
 error while interpolating services.db.environment.POSTGRES_DB: required variable DB_NAME is missing a value: DB_NAME no está definido en .env
 ```
 
-Causa: `docker compose down -v` interpola variables antes de que
-`init_local_db.sh` cree los archivos. Además, un `.env` existente pero parcial
-no se corrige con “copiar sólo si falta”.
+No se eliminó nada en ese intento: Compose falló durante la interpolación.
+El `.env` local conservaba sólo las variables de Vite. Para la prueba usé
+temporalmente `.env.example`, igual que `scripts/smoke.sh`, y restauré el
+archivo original antes de la suite. No cambié ni publiqué `.env`.
 
-Solución: la suite respalda ambos `.env`, instala temporalmente los ejemplos y
-restaura los originales mediante `trap`.
-
-### 2. Email reservado en el usuario de prueba
-
-Primer payload usaba `smoke.comprador@topgreen.test`.
-
-Respuesta exacta:
-
-```json
-{"detail":[{"type":"value_error","loc":["body","email"],"msg":"value is not a valid email address: The part after the @-sign is a special-use or reserved name that cannot be used with email.","input":"smoke.comprador@topgreen.test","ctx":{"reason":"The part after the @-sign is a special-use or reserved name that cannot be used with email."}}]}
-```
-
-Solución: `smoke.comprador@example.com`. La DB se recrea en cada pasada, por
-lo que el email fijo no colisiona.
-
-### 3. Selector ambiguo en publicación
-
-Mensaje exacto:
+Advertencia preexistente, sin efecto en el build:
 
 ```text
-strict mode violation: getByRole('button', { name: /Publicar Producto/i }) resolved to 2 elements
+FromPlatformFlagConstDisallowed: FROM --platform flag should not use constant value "linux/amd64"
 ```
 
-Había un botón de acceso “Publicar Producto” y el submit del modal. Solución:
-seleccionar `form button[type="submit"]`.
+No la corregí porque está fuera de estas tareas.
 
-### 4. Forma real de `/products/my`
+## Qué no hice
 
-Primer error:
-
-```text
-myProducts.data.find is not a function
-```
-
-El código devuelve `{ products, total }`, no un array plano. Ajusté el test al
-contrato real y mantuve la segunda validación directa en DB.
-
-## Validaciones estáticas
-
-```text
-$ bash -n scripts/smoke.sh
-(sin salida; exit 0)
-
-$ node --check scripts/smoke.mjs
-(sin salida; exit 0)
-
-$ git -c core.whitespace=blank-at-eof,space-before-tab,cr-at-eol diff --cached --check
-(sin salida; exit 0)
-```
-
-## Qué no corrí
-
-- No corrí `npm run lint`. No se tocó TypeScript de la aplicación y el lint
-  global ya tiene 25 hallazgos preexistentes registrados. El build TypeScript
-  sí corrió dentro de cada pasada completa.
-- No ejecuté pagos ni configuré `MP_*`; la orden se crea sin pagar, como pidió
-  el criterio.
-- No probé Firefox ni WebKit. El caso UI corre con Chromium.
-- No agregué cobertura, unit tests ni CI.
-
-## Observaciones adversariales
-
-1. El comando es deliberadamente destructivo para la DB local. Está advertido
-   en README y sólo toca los volúmenes del compose de este proyecto.
-2. La primera ejecución puede necesitar red para descargar Chromium. Las
-   siguientes reutilizan el caché de Playwright.
-3. Las credenciales demo siguen acopladas al seed. Si se cambian, la suite
-   falla con el caso exacto; no las copia a otra fuente para evitar duplicar
-   configuración sensible.
-4. La publicación UI se comprueba en tres capas: interacción, API y DB. No
-   considero suficiente que aparezca sólo el toast porque el frontend no
-   valida explícitamente `response.ok` al subir la imagen.
-5. En Docker aparece la advertencia preexistente:
-   `FromPlatformFlagConstDisallowed: FROM --platform flag should not use constant value "linux/amd64"`.
-   No la corregí: está fuera de la tarea y el build termina bien.
+- No configuré ni probé Mercado Pago.
+- No toqué esquema, modelos ni migraciones.
+- No ejecuté Firefox ni WebKit; la prueba UI usa Chromium.
+- No corrí `npm run lint`; el TypeScript y el build de producción sí corrieron
+  dentro de cada pasada de `npm run smoke`.

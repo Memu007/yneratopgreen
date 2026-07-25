@@ -257,7 +257,11 @@ def create_seed_data():
         cat_fertilizantes = db.query(Category).filter(Category.slug == "fertilizantes").first()
         cat_herramientas = db.query(Category).filter(Category.slug == "herramientas").first()
         cat_maquinaria = db.query(Category).filter(Category.slug == "maquinaria").first()
-        cat_servicios = db.query(Category).filter(Category.slug == "laboreo").first()
+        cat_laboreo = db.query(Category).filter(Category.slug == "laboreo").first()
+        cat_transporte = db.query(Category).filter(Category.slug == "transporte-logistica").first()
+        cat_asesoramiento = db.query(Category).filter(Category.slug == "asesoramiento").first()
+        cat_mantenimiento = db.query(Category).filter(Category.slug == "mantenimiento").first()
+        cat_otros_servicios = db.query(Category).filter(Category.slug == "otros-servicios").first()
         cat_agroquimicos = db.query(Category).filter(Category.slug == "agroquimicos").first()
         cat_bienes_ganado = db.query(Category).filter(Category.slug == "bienes-ganado").first()
         cat_tecnologia = db.query(Category).filter(Category.slug == "tecnologia-cultivo").first()
@@ -364,11 +368,18 @@ def create_seed_data():
                 "name": "Servicio de Siembra con GPS",
                 "slug": "servicio-siembra-gps",
                 "description": "Servicio profesional de siembra de precisión con tecnología GPS RTK. Sembradoras de última generación. Incluye monitoreo y mapeo de superficie. Precio por hectárea.",
-                "category_id": cat_servicios.id,
+                "category_id": cat_laboreo.id,
                 "price": 8500.0,
                 "currency": "ARS",
                 "stock": 10000,
                 "unit": "hectárea",
+                "publication_type": "servicio",
+                "pricing_type": "por_hectarea",
+                "availability": "programar",
+                "response_time": "24hs",
+                "experience_years": 12,
+                "has_equipment": True,
+                "coverage_zones": ["Buenos Aires"],
                 "seller_id": admin.id,
                 "status": ProductStatus.ACTIVE,
                 "images": [
@@ -450,6 +461,249 @@ def create_seed_data():
                 "images": [
                     {"url": "https://picsum.photos/seed/sensores1/800/600", "filename": "sensores1.jpg", "display_order": 1, "is_primary": True}
                 ]
+            },
+            {
+                "name": "Urea Granulada 46% Nitrógeno",
+                "slug": "urea-granulada-46-nitrogeno",
+                "description": "Urea granulada de uso agrícola con 46% de nitrógeno. Presentación en bolsa de 50 kg, apta para aplicaciones de base y cobertura.",
+                "category_id": cat_fertilizantes.id,
+                "price": 39000.0,
+                "currency": "ARS",
+                "stock": 900,
+                "unit": "bolsa 50kg",
+                "seller_id": seller.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/urea1/800/600", "filename": "urea1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Tractor Pauny 280A Doble Tracción",
+                "slug": "tractor-pauny-280a-doble-traccion",
+                "description": "Tractor Pauny 280A de 180 HP, doble tracción, año 2019 y 3.400 horas. Cubiertas al 70%, hidráulico y toma de fuerza operativos.",
+                "category_id": cat_maquinaria.id,
+                "price": 98000000.0,
+                "currency": "ARS",
+                "stock": 1,
+                "unit": "unidad",
+                "seller_id": admin.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/tractor-pauny1/800/600", "filename": "tractor-pauny1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Insecticida Lambda Cihalotrina 1L",
+                "slug": "insecticida-lambda-cihalotrina-1l",
+                "description": "Insecticida piretroide de amplio espectro para soja, maíz y girasol. Envase de un litro, lote trazable y registro SENASA vigente.",
+                "category_id": cat_agroquimicos.id,
+                "price": 18500.0,
+                "currency": "ARS",
+                "stock": 240,
+                "unit": "litro",
+                "seller_id": seller.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/insecticida1/800/600", "filename": "insecticida1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Servicio de Cosecha con Monitor de Rendimiento",
+                "slug": "servicio-cosecha-monitor-rendimiento",
+                "description": "Cosecha de soja, maíz y trigo con monitor de rendimiento y entrega de mapa por lote. Equipo propio y operador especializado.",
+                "category_id": cat_laboreo.id,
+                "price": 95000.0,
+                "currency": "ARS",
+                "stock": 5000,
+                "unit": "hectárea",
+                "publication_type": "servicio",
+                "pricing_type": "por_hectarea",
+                "availability": "temporada",
+                "response_time": "24hs",
+                "experience_years": 15,
+                "has_equipment": True,
+                "coverage_zones": ["Salta", "Jujuy", "Tucumán"],
+                "seller_id": admin.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/cosecha-servicio1/800/600", "filename": "cosecha-servicio1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Transporte de Granos a Puerto",
+                "slug": "transporte-granos-a-puerto",
+                "description": "Flete de soja, maíz y trigo en equipos batea habilitados. Retiro en campo, seguimiento del viaje y entrega en terminal portuaria.",
+                "category_id": cat_transporte.id,
+                "price": 1800.0,
+                "currency": "ARS",
+                "stock": 10000,
+                "unit": "tonelada",
+                "publication_type": "servicio",
+                "pricing_type": "por_trabajo",
+                "availability": "programar",
+                "response_time": "24hs",
+                "experience_years": 9,
+                "has_equipment": True,
+                "coverage_zones": ["Santa Fe", "Entre Ríos", "Buenos Aires"],
+                "seller_id": seller.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/transporte-granos1/800/600", "filename": "transporte-granos1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Flete de Maquinaria Agrícola con Carretón",
+                "slug": "flete-maquinaria-agricola-carreton",
+                "description": "Traslado de tractores, sembradoras y cosechadoras en carretón de cama baja. Permisos, seguro de carga y coordinación de ruta incluidos.",
+                "category_id": cat_transporte.id,
+                "price": 0.0,
+                "currency": "ARS",
+                "stock": 1000,
+                "unit": "viaje",
+                "publication_type": "servicio",
+                "pricing_type": "a_convenir",
+                "availability": "programar",
+                "response_time": "48hs",
+                "experience_years": 11,
+                "has_equipment": True,
+                "coverage_zones": ["Mendoza", "San Juan", "San Luis"],
+                "seller_id": admin.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/carreton1/800/600", "filename": "carreton1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Asesoramiento en Manejo Integrado de Cultivos",
+                "slug": "asesoramiento-manejo-integrado-cultivos",
+                "description": "Seguimiento agronómico por ambiente, monitoreo de plagas y planificación de aplicaciones para cultivos extensivos.",
+                "category_id": cat_asesoramiento.id,
+                "price": 12000.0,
+                "currency": "ARS",
+                "stock": 5000,
+                "unit": "hectárea",
+                "publication_type": "servicio",
+                "pricing_type": "por_hectarea",
+                "availability": "programar",
+                "response_time": "24hs",
+                "experience_years": 8,
+                "has_equipment": True,
+                "coverage_zones": ["Buenos Aires", "Santa Fe"],
+                "seller_id": seller.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/asesoramiento-cultivos1/800/600", "filename": "asesoramiento-cultivos1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Planificación de Riego y Fertirriego",
+                "slug": "planificacion-riego-fertirriego",
+                "description": "Diseño y ajuste de riego presurizado para viñedos, frutales y horticultura. Incluye balance hídrico y plan de fertirriego.",
+                "category_id": cat_asesoramiento.id,
+                "price": 280000.0,
+                "currency": "ARS",
+                "stock": 50,
+                "unit": "proyecto",
+                "publication_type": "servicio",
+                "pricing_type": "por_trabajo",
+                "availability": "programar",
+                "response_time": "48hs",
+                "experience_years": 10,
+                "has_equipment": False,
+                "coverage_zones": ["Mendoza", "San Juan"],
+                "seller_id": admin.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/riego1/800/600", "filename": "riego1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Mantenimiento Preventivo de Cosechadoras",
+                "slug": "mantenimiento-preventivo-cosechadoras",
+                "description": "Revisión de motor, transmisión, sistema de trilla, correas y electrónica antes de campaña. Informe de estado y repuestos sugeridos.",
+                "category_id": cat_mantenimiento.id,
+                "price": 650000.0,
+                "currency": "ARS",
+                "stock": 30,
+                "unit": "equipo",
+                "publication_type": "servicio",
+                "pricing_type": "por_trabajo",
+                "availability": "programar",
+                "response_time": "48hs",
+                "experience_years": 14,
+                "has_equipment": True,
+                "coverage_zones": ["La Pampa", "Córdoba"],
+                "seller_id": seller.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/mantenimiento-cosechadora1/800/600", "filename": "mantenimiento-cosechadora1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Reparación Hidráulica de Maquinaria Agrícola",
+                "slug": "reparacion-hidraulica-maquinaria-agricola",
+                "description": "Diagnóstico y reparación de bombas, cilindros, válvulas y mangueras hidráulicas. Servicio en taller o a campo.",
+                "category_id": cat_mantenimiento.id,
+                "price": 0.0,
+                "currency": "ARS",
+                "stock": 100,
+                "unit": "servicio",
+                "publication_type": "servicio",
+                "pricing_type": "a_convenir",
+                "availability": "inmediata",
+                "response_time": "inmediato",
+                "experience_years": 16,
+                "has_equipment": True,
+                "coverage_zones": ["Chaco", "Corrientes"],
+                "seller_id": admin.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/hidraulica1/800/600", "filename": "hidraulica1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Muestreo de Suelo y Recomendación de Fertilización",
+                "slug": "muestreo-suelo-recomendacion-fertilizacion",
+                "description": "Muestreo georreferenciado por ambientes, envío a laboratorio e interpretación agronómica con recomendación de fertilización.",
+                "category_id": cat_otros_servicios.id,
+                "price": 7500.0,
+                "currency": "ARS",
+                "stock": 3000,
+                "unit": "hectárea",
+                "publication_type": "servicio",
+                "pricing_type": "por_hectarea",
+                "availability": "programar",
+                "response_time": "24hs",
+                "experience_years": 7,
+                "has_equipment": True,
+                "coverage_zones": ["Tucumán", "Santiago del Estero"],
+                "seller_id": seller.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/muestreo-suelo1/800/600", "filename": "muestreo-suelo1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Instalación y Reparación de Alambrados Rurales",
+                "slug": "instalacion-reparacion-alambrados-rurales",
+                "description": "Construcción de alambrados tradicionales y eléctricos, reparación de líneas y colocación de tranqueras para establecimientos ganaderos.",
+                "category_id": cat_otros_servicios.id,
+                "price": 0.0,
+                "currency": "ARS",
+                "stock": 10000,
+                "unit": "metro",
+                "publication_type": "servicio",
+                "pricing_type": "a_convenir",
+                "availability": "programar",
+                "response_time": "48hs",
+                "experience_years": 13,
+                "has_equipment": True,
+                "coverage_zones": ["Salta", "Jujuy"],
+                "seller_id": admin.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/alambrados1/800/600", "filename": "alambrados1.jpg", "display_order": 1, "is_primary": True}
+                ]
             }
         ]
 
@@ -466,6 +720,18 @@ def create_seed_data():
             "vaquillonas-braford-prenadas": ("14098230", "Río Cuarto, Córdoba"),
             "dron-pulverizador-agricola-20l": ("06623100", "Pergamino, Buenos Aires"),
             "sensores-humedad-suelo-iot": ("06791050", "Tandil, Buenos Aires"),
+            "urea-granulada-46-nitrogeno": ("30084160", "Paraná, Entre Ríos"),
+            "tractor-pauny-280a-doble-traccion": ("42105030", "General Pico, La Pampa"),
+            "insecticida-lambda-cihalotrina-1l": ("22140060", "Resistencia, Chaco"),
+            "servicio-cosecha-monitor-rendimiento": ("66028050", "Salta, Salta"),
+            "transporte-granos-a-puerto": ("82084270", "Rosario, Santa Fe"),
+            "flete-maquinaria-agricola-carreton": ("50007010", "Mendoza, Mendoza"),
+            "asesoramiento-manejo-integrado-cultivos": ("06623100", "Pergamino, Buenos Aires"),
+            "planificacion-riego-fertirriego": ("50007010", "Mendoza, Mendoza"),
+            "mantenimiento-preventivo-cosechadoras": ("42105030", "General Pico, La Pampa"),
+            "reparacion-hidraulica-maquinaria-agricola": ("22140060", "Resistencia, Chaco"),
+            "muestreo-suelo-recomendacion-fertilizacion": ("90084010", "San Miguel de Tucumán, Tucumán"),
+            "instalacion-reparacion-alambrados-rurales": ("66028050", "Salta, Salta"),
         }
         
         for prod_data in productos:

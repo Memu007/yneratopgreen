@@ -489,6 +489,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
       const productId = productResponse.id;
 
       // 2. Subir imágenes
+      const imageUploadErrors: string[] = [];
       for (let i = 0; i < images.length; i++) {
         const image = images[i];
         if (image.file) {
@@ -503,17 +504,47 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
             headers['Authorization'] = `Bearer ${token}`;
           }
 
-          await fetch(`${API_BASE_URL}/products/${productId}/images`, {
-            method: 'POST',
-            body: imageFormData,
-            credentials: 'include',
-            headers,
-          });
+          try {
+            const imageResponse = await fetch(`${API_BASE_URL}/products/${productId}/images`, {
+              method: 'POST',
+              body: imageFormData,
+              credentials: 'include',
+              headers,
+            });
+
+            if (!imageResponse.ok) {
+              let reason = `HTTP ${imageResponse.status}`;
+              const responseBody = await imageResponse.text();
+
+              if (responseBody) {
+                try {
+                  const parsedBody = JSON.parse(responseBody) as { detail?: unknown };
+                  if (typeof parsedBody.detail === 'string') {
+                    reason = parsedBody.detail;
+                  }
+                } catch {
+                  reason = responseBody;
+                }
+              }
+
+              imageUploadErrors.push(`${image.file.name}: ${reason}`);
+            }
+          } catch (error) {
+            const reason = error instanceof Error ? error.message : 'error de red';
+            imageUploadErrors.push(`${image.file.name}: ${reason}`);
+          }
         }
       }
 
       const tipoMsg = publicationType === 'producto' ? 'Producto' : 'Servicio';
-      showToast(`${tipoMsg} "${formData.name}" publicado exitosamente!`, 'success');
+      if (imageUploadErrors.length > 0) {
+        showToast(
+          `${tipoMsg} "${formData.name}" publicado, pero no se pudo subir ${imageUploadErrors.length === 1 ? 'la imagen' : `${imageUploadErrors.length} imágenes`}: ${imageUploadErrors.join('; ')}`,
+          'warning',
+        );
+      } else {
+        showToast(`${tipoMsg} "${formData.name}" publicado exitosamente!`, 'success');
+      }
       
       // Llamar al onSubmit del padre para recargar productos
       onSubmit(formData);

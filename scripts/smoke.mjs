@@ -440,7 +440,117 @@ await runCase(9, 'Publicar producto como vendedor desde la interfaz', async () =
   }
 });
 
-await runCase(10, 'Ver mis compras y mis ventas', async () => {
+await runCase(10, 'Fallo de imagen visible sin perder la publicación', async () => {
+  assert(state.sellerToken, 'caso 6 no dejó token de vendedor');
+  assert(state.product?.category_name, 'no hay categoría para completar el formulario');
+  assert(state.location, 'caso 5 no dejó provincia/localidad');
+
+  const productName = `Producto Smoke Imagen Fallida ${Date.now()}`;
+  const failureReason = 'Archivo demasiado grande (prueba controlada)';
+  const browser = await chromium.launch({ headless: true });
+  const pageErrors = [];
+  const applicationConsoleErrors = [];
+  let uploadIntercepted = false;
+
+  try {
+    const context = await browser.newContext();
+    await context.addInitScript(
+      ({ accessToken, refreshToken }) => {
+        window.localStorage.setItem('access_token', accessToken);
+        window.localStorage.setItem('refresh_token', refreshToken);
+      },
+      {
+        accessToken: state.sellerToken,
+        refreshToken: state.sellerRefreshToken,
+      },
+    );
+
+    const page = await context.newPage();
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+    page.on('console', (message) => {
+      if (
+        message.type() === 'error'
+        && /Error al|Uncaught|TypeError|ReferenceError/i.test(message.text())
+      ) {
+        applicationConsoleErrors.push(message.text());
+      }
+    });
+    await page.route('**/api/products/*/images', async (route) => {
+      uploadIntercepted = true;
+      await route.fulfill({
+        status: 413,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: failureReason }),
+      });
+    });
+
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    const sellButton = page.getByRole('button', { name: /Vender/i }).first();
+    await sellButton.waitFor({ state: 'visible', timeout: 15_000 });
+    await sellButton.click();
+
+    await page
+      .getByRole('heading', { name: /Agregar Nuevo Producto/i })
+      .waitFor({ state: 'visible' });
+    await page.locator('#name').fill(productName);
+    await page.locator('#category').selectOption({ label: state.product.category_name });
+    await page
+      .locator('#description')
+      .fill('Producto publicado aunque falle la carga de su imagen.');
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'smoke-upload-failure.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    });
+    await page.locator('#price').fill('23456');
+    await page.locator('#stock').fill('2');
+    await page.locator('#province').selectOption(state.location.provinceId);
+    await page.locator('#locality').selectOption(state.location.localityId);
+    await page.locator('form button[type="submit"]').click();
+
+    const warning = page.getByText(/publicado, pero no se pudo subir la imagen/i);
+    await warning.waitFor({ state: 'visible', timeout: 20_000 });
+    const warningText = await warning.textContent();
+    assert(
+      warningText?.includes(failureReason),
+      `el aviso no incluye el motivo: ${warningText}`,
+    );
+    await page.getByText(productName, { exact: true }).first().waitFor({
+      state: 'visible',
+      timeout: 20_000,
+    });
+
+    assert(uploadIntercepted, 'Playwright no interceptó la petición de imagen');
+    assert(pageErrors.length === 0, `errores JS: ${pageErrors.join(' | ')}`);
+    assert(
+      applicationConsoleErrors.length === 0,
+      `errores de consola: ${applicationConsoleErrors.join(' | ')}`,
+    );
+
+    const [databaseProduct] = queryRows(`
+      SELECT p.id::text, COUNT(pi.id)::text
+      FROM products p
+      LEFT JOIN product_images pi ON pi.product_id = p.id
+      WHERE p.name = ${sqlLiteral(productName)}
+        AND p.seller_id = ${sqlLiteral(state.sellerId)}
+      GROUP BY p.id
+    `);
+    assert(databaseProduct, 'el producto sin imagen no quedó en la base');
+    assert(
+      Number(databaseProduct[1]) === 0,
+      `la subida interceptada dejó ${databaseProduct[1]} imágenes`,
+    );
+
+    return `UI + DB, producto visible, aviso="${failureReason}", imágenes=0`;
+  } finally {
+    await browser.close();
+  }
+});
+
+await runCase(11, 'Ver mis compras y mis ventas', async () => {
   assert(state.orderId, 'caso 8 no dejó una orden');
   const purchases = await apiRequest('/orders/my?as_role=buyer', {
     token: state.buyerToken,
@@ -460,7 +570,7 @@ await runCase(10, 'Ver mis compras y mis ventas', async () => {
   return `compras HTTP ${purchases.status} (${purchases.data.length}), ventas HTTP ${sales.status} (${sales.data.length})`;
 });
 
-await runCase(11, 'Administración: usuarios, productos y órdenes', async () => {
+await runCase(12, 'Administración: usuarios, productos y órdenes', async () => {
   const adminLogin = await apiRequest('/auth/login', {
     method: 'POST',
     body: {
