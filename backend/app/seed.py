@@ -186,7 +186,7 @@ def create_seed_data():
         cat_fertilizantes = db.query(Category).filter(Category.slug == "fertilizantes").first()
         cat_herramientas = db.query(Category).filter(Category.slug == "herramientas").first()
         cat_maquinaria = db.query(Category).filter(Category.slug == "maquinaria").first()
-        cat_servicios = db.query(Category).filter(Category.slug == "servicios").first()
+        cat_servicios = db.query(Category).filter(Category.slug == "laboreo").first()
         cat_agroquimicos = db.query(Category).filter(Category.slug == "agroquimicos").first()
         
         admin = db.query(User).filter(User.email == "admin@topgreen.com").first()

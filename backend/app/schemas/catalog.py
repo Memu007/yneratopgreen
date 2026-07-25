@@ -4,7 +4,6 @@ Schemas para el catálogo público de productos
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
-from uuid import UUID
 
 
 # ============= Category Schemas =============
@@ -126,11 +125,11 @@ class ProductListResponse(BaseModel):
 class ProductFilters(BaseModel):
     """Query parameters para filtrar productos"""
     search: Optional[str] = None
-    category: Optional[UUID] = None
+    category: Optional[str] = None
     min_price: Optional[float] = None
     max_price: Optional[float] = None
     in_stock: Optional[bool] = None
-    seller_id: Optional[UUID] = None
+    seller_id: Optional[str] = None
     sort_by: str = "created_at"  # created_at, price, sales, views
     sort_order: str = "desc"  # asc, desc
     page: int = 1

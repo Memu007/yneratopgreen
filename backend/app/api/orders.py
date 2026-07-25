@@ -4,7 +4,6 @@ API Router para órdenes de compra
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from typing import Optional
-from uuid import UUID
 from datetime import datetime
 import secrets
 
@@ -264,7 +263,7 @@ def get_my_orders(
 
 @router.get("/{order_id}", response_model=OrderResponse)
 def get_order_detail(
-    order_id: UUID,
+    order_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):

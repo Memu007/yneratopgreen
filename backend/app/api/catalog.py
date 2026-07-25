@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_, and_
 from typing import List, Optional
-from uuid import UUID
 from pydantic import BaseModel
 
 from app.db.base import get_db
@@ -311,7 +310,7 @@ def get_products(
 
 @router.get("/products/{product_id}", response_model=ProductDetailResponse)
 def get_product_detail(
-    product_id: UUID,
+    product_id: str,
     db: Session = Depends(get_db)
 ):
     """

@@ -3,7 +3,6 @@ Model para opciones configurables de formularios.
 Almacena valores dinámicos para dropdowns y selectores.
 """
 from sqlalchemy import Column, String, Boolean, Integer, Enum
-from sqlalchemy.dialects.mssql import UNIQUEIDENTIFIER
 import uuid
 import enum
 
@@ -26,7 +25,7 @@ class FormOption(Base):
     """
     __tablename__ = "form_options"
 
-    id = Column(UNIQUEIDENTIFIER, primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     option_type = Column(String(50), nullable=False, index=True)  # province, unit, pricing_type, etc.
     value = Column(String(100), nullable=False)  # Valor interno (ej: 'por_hora')
     label = Column(String(200), nullable=False)  # Etiqueta visible (ej: 'Por hora')
