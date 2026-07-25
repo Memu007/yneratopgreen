@@ -2,6 +2,25 @@
 
 Actualizado: 2026-07-25
 
+## Cierre de jornada
+
+Se pasó de un repositorio donde la base de datos no se podía crear a un
+sistema que levanta desde cero con un comando, con el recorrido de compra
+verificado y el cimiento geográfico funcionando. Avance: **~46%**.
+
+Tres lecturas para no engañarse con ese número:
+
+1. **Buena parte del día fue arqueología, no construcción.** Encontrar la
+   cadena de migraciones rota, las 20 columnas faltantes y la ausencia de
+   `create_all` sacó obstáculos, no sumó producto.
+2. **El mayor salto lo dio el recorte de alcance**, no el código. Esa
+   palanca ya se usó y no vuelve a estar disponible.
+3. **La velocidad no se repite.** Hoy fue arreglar cosas rotas más un
+   cimiento. Lo que queda es construcción nueva con incógnitas.
+
+Lo que sí es permanente: todo lo declarado tiene evidencia de ejecución
+detrás. Ver `MATRIZ.md`.
+
 ## Objetivo activo
 
 **Filtro por ubicación en el catálogo**, que cierra el requisito 3.1, y
