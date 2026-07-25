@@ -367,6 +367,7 @@ def create_seed_data():
         cat_maquinaria = category("maquinaria-agricola")
         cat_laboreo = category("contratistas")
         cat_transporte = category("logistica")
+        cat_acopio = category("acopio")
         cat_asesoramiento = category("asesoramiento")
         cat_mantenimiento = category("contratistas")
         cat_otros_servicios = category("contratistas")
@@ -682,6 +683,50 @@ def create_seed_data():
                 ]
             },
             {
+                "name": "Recepción, Secado y Acopio de Granos",
+                "slug": "recepcion-secado-acopio-granos",
+                "description": "Recepción de soja, maíz y trigo con análisis de calidad, secado controlado y guarda en planta. Emisión de comprobantes y coordinación de entrega.",
+                "category_id": cat_acopio.id,
+                "price": 1850.0,
+                "currency": "ARS",
+                "stock": 25000,
+                "unit": "tonelada",
+                "publication_type": "servicio",
+                "pricing_type": "por_trabajo",
+                "availability": "inmediata",
+                "response_time": "24hs",
+                "experience_years": 18,
+                "has_equipment": True,
+                "coverage_zones": ["Santa Fe", "Buenos Aires", "Córdoba"],
+                "seller_id": seller.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/acopio-granos1/800/600", "filename": "acopio-granos1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Guarda de Granos en Silo Bolsa",
+                "slug": "guarda-granos-silo-bolsa",
+                "description": "Provisión, llenado y monitoreo de silo bolsa para guarda temporal de granos en el establecimiento. Incluye control periódico de humedad y condición del almacenamiento.",
+                "category_id": cat_acopio.id,
+                "price": 95000.0,
+                "currency": "ARS",
+                "stock": 120,
+                "unit": "servicio",
+                "publication_type": "servicio",
+                "pricing_type": "por_trabajo",
+                "availability": "programar",
+                "response_time": "48hs",
+                "experience_years": 12,
+                "has_equipment": True,
+                "coverage_zones": ["Buenos Aires", "La Pampa"],
+                "seller_id": admin.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/silo-bolsa1/800/600", "filename": "silo-bolsa1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
                 "name": "Asesoramiento en Manejo Integrado de Cultivos",
                 "slug": "asesoramiento-manejo-integrado-cultivos",
                 "description": "Seguimiento agronómico por ambiente, monitoreo de plagas y planificación de aplicaciones para cultivos extensivos.",
@@ -900,6 +945,8 @@ def create_seed_data():
             "servicio-cosecha-monitor-rendimiento": ("contratistas", None),
             "transporte-granos-a-puerto": ("logistica", None),
             "flete-maquinaria-agricola-carreton": ("logistica", None),
+            "recepcion-secado-acopio-granos": ("acopio", None),
+            "guarda-granos-silo-bolsa": ("acopio", None),
             "asesoramiento-manejo-integrado-cultivos": ("asesoramiento", None),
             "planificacion-riego-fertirriego": ("asesoramiento", None),
             "mantenimiento-preventivo-cosechadoras": ("contratistas", None),
@@ -934,6 +981,8 @@ def create_seed_data():
             "servicio-cosecha-monitor-rendimiento": ("66028050", "Salta, Salta"),
             "transporte-granos-a-puerto": ("82084270", "Rosario, Santa Fe"),
             "flete-maquinaria-agricola-carreton": ("50007010", "Mendoza, Mendoza"),
+            "recepcion-secado-acopio-granos": ("82084270", "Rosario, Santa Fe"),
+            "guarda-granos-silo-bolsa": ("06623100", "Pergamino, Buenos Aires"),
             "asesoramiento-manejo-integrado-cultivos": ("06623100", "Pergamino, Buenos Aires"),
             "planificacion-riego-fertirriego": ("50007010", "Mendoza, Mendoza"),
             "mantenimiento-preventivo-cosechadoras": ("42105030", "General Pico, La Pampa"),
