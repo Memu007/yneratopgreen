@@ -155,6 +155,18 @@ El ciclo por cada uno es el mismo de siempre: lo hacés, lo verificás
 contra su criterio, **commit y push**, agregás su sección en
 `PARA-PM.md`, y seguís con el que sigue.
 
+### Empezar nunca necesita permiso
+
+Lo que está escrito en este archivo **ya está aprobado**. No preguntes si
+arrancás: arrancá. Si te lo escribí acá, es porque quiero que lo hagas.
+
+Las condiciones de corte de abajo son para **cuando algo sale mal en el
+medio**, no para pedir permiso antes de empezar. Frenar tarde cuesta caro,
+pero preguntar de más también: cada consulta innecesaria es una vuelta
+perdida.
+
+La regla corta: **empezá sin preguntar, frená si algo se rompe.**
+
 ### Cuándo PARÁS y me esperás
 
 Cortá enseguida, sin arrancar el siguiente, si pasa cualquiera de estas:
