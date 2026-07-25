@@ -42,6 +42,20 @@ export interface CategoryResponse {
   created_at: string;
 }
 
+export interface ProvinceResponse {
+  id: string;
+  name: string;
+}
+
+export interface LocalityResponse {
+  id: string;
+  name: string;
+  province_id: string;
+  province_name: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface ProductImage {
   id: string;
   url: string;
@@ -112,12 +126,24 @@ export const getCategories = async (): Promise<CategoryResponse[]> => {
   return apiGet<CategoryResponse[]>('/catalog/categories?include_empty=true');
 };
 
+export const getProvinces = async (): Promise<ProvinceResponse[]> => {
+  return apiGet<ProvinceResponse[]>('/catalog/localities/provinces');
+};
+
+export const getLocalities = async (provinceId: string): Promise<LocalityResponse[]> => {
+  return apiGet<LocalityResponse[]>(
+    `/catalog/localities?province_id=${encodeURIComponent(provinceId)}`
+  );
+};
+
 /**
  * Obtener listado de productos con filtros
  */
 export const getProducts = async (params: {
   search?: string;
   category?: string;
+  province?: string;
+  locality_id?: string;
   min_price?: number;
   max_price?: number;
   in_stock?: boolean;
