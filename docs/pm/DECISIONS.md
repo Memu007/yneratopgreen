@@ -5,6 +5,34 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-07-25 — No se instalan skills de agente antes de la demostración
+
+Evaluado `addyosmani/agent-skills`: 24 skills en markdown con soporte
+nativo para Codex y Windsurf, así que técnicamente la dev podría usarlas.
+
+**Decisión: ninguna antes del 30-07.** Faltan tres días para la
+demostración y la firma. Cambiar el comportamiento de la dev y terminar
+las tareas pendientes al mismo tiempo es mover dos variables a la vez
+justo cuando menos margen hay para depurar.
+
+**Después de la demostración, sólo dos:**
+
+- `browser-testing-with-devtools`, que es lo único que se superpone con
+  trabajo real pendiente.
+- `security-and-hardening`, antes del despliegue.
+
+**Descartadas de forma permanente** las de definición, planificación y
+documentación —`spec-driven-development`, `planning-and-task-breakdown`,
+`documentation-and-adrs` y similares—. Hacen exactamente lo que hace
+`docs/pm/`: especificar, priorizar y registrar decisiones. Instalarlas
+crearía una segunda fuente de verdad manejada por la dev, en paralelo a
+la del PM y sin la clienta ni el contrato a la vista.
+
+El valor de ese repositorio es más alto para un equipo sin PM. Acá el
+cuello de botella nunca fue que la dev no supiera cómo trabajar.
+
+---
+
 ## 2026-07-25 — Línea base aprobada. Empieza la construcción
 
 PostgreSQL 16 + PostGIS 3.4.3, una migración generada desde los modelos
