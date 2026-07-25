@@ -35,6 +35,119 @@ las dos cosas.
 
 ---
 
+## Las 43 subcategorías, enumeradas
+
+**Esta es la fuente para el seed.** Transcripción literal del prototipo
+que mandó la clienta. El archivo original no está en el repositorio y no
+va a estar: tomamos los datos, no el código ni el diseño.
+
+El tercer nivel se registra **sólo para no perderlo**. No se carga: la
+decisión de tratarlo como atributo en vez de nivel navegable sigue en pie.
+
+### 1. Maquinaria agrícola (7)
+
+| Subcategoría | Tercer nivel (no se carga) |
+|---|---|
+| Tractores | compacto (<60 HP), estándar (60-120 HP), alta (>120 HP) |
+| Preparación del suelo | arados, rastras, cultivadores, subsoladores, otros |
+| Siembra y plantación | sembradoras de precisión, neumáticas, hortalizas, granos gruesos/finos, otros |
+| Fertilización y protección | pulverizadoras autopropulsadas, de arrastre, fertilizadoras centrífugas, de disco, aviones, drones, otros |
+| Cosecha | cosechadoras de granos, forrajes, algodón, caña, café, frutales, hortalizas, otros |
+| Postcosecha | limpiadoras, secadoras, ensacadoras, silos, otros |
+| Forrajes y ganadería | picadoras, embolsadoras, enfardadoras, mezcladoras, otros |
+
+### 2. Riego y drenaje (6)
+
+| Subcategoría | Tercer nivel (no se carga) |
+|---|---|
+| Riego por aspersión | pivotes, cañones, laterales |
+| Riego localizado | goteo, microaspersión, cintas |
+| Riego superficial y subterráneo | superficial, subterráneo |
+| Bombas, motobombas y accesorios hidráulicos | bombas centrífugas, motobombas, accesorios hidráulicos |
+| Drenaje y control hídrico | drenaje subsuperficial, canales, control de nivel |
+| Otros | accesorios para riego |
+
+### 3. Insumos agrícolas (7)
+
+| Subcategoría | Tercer nivel (no se carga) |
+|---|---|
+| Semillas y plántulas | cultivos extensivos, hortícolas, forrajeras, forestales |
+| Fertilizantes | orgánicos, minerales, líquidos, liberación controlada |
+| Correctivos | cal, yeso, enmiendas |
+| Agroinsumos biológicos | biofertilizantes, biocontroladores, microorganismos |
+| Agroquímicos | herbicidas, insecticidas, fungicidas, acaricidas |
+| Sustratos y coberturas | mulch, mallas, films |
+| Otros | otros insumos |
+
+### 4. Ganadería y forrajes (5)
+
+| Subcategoría | Tercer nivel (no se carga) |
+|---|---|
+| Cercas y bebederos | eléctricas, portátiles, hidrantes |
+| Manejo animal | corrales, mangas, balanzas, caravanas |
+| Ordeño y sanidad | ordeñadoras mecánicas, tanques de leche, equipos de baño |
+| Suplementación | comederos, tolvas, silos de grano |
+| Otros | equipos varios |
+
+### 5. Repuestos y mantenimiento (6)
+
+| Subcategoría | Tercer nivel (no se carga) |
+|---|---|
+| Neumáticos y cámaras | neumáticos agrícolas, cámaras |
+| Filtros, correas, cuchillas, cadenas | filtros, correas, cuchillas, cadenas |
+| Sistemas hidráulicos | mangueras, racores, bombas hidráulicas |
+| Sistemas electrónicos y sensores | monitores, GPS, piloto automático |
+| Lubricantes y baterías | lubricantes, baterías |
+| Otros | accesorios generales |
+
+### 6. Agricultura de precisión y tecnología (4)
+
+| Subcategoría | Tercer nivel (no se carga) |
+|---|---|
+| Sistemas de guiado y GNSS | antenas, pantallas, corrección por señal |
+| Sensores de cultivo | clorofila, humedad, temperatura |
+| Drones y VANTs | multiespectrales, térmicos, aplicadores |
+| Software y plataformas | gestión de flota, prescripción variable, rendimiento |
+
+### 7. Tierras y parcelas (8)
+
+| Subcategoría | Tercer nivel (no se carga) |
+|---|---|
+| Compra-venta definitiva | campo agrícola (secano/riego), campo ganadero (pasturas naturales/mejoradas), parcela hortícola/frutícola, campo mixto, otros |
+| Mejoras de infraestructura (compra) | alambrados, aguadas, electrificación, molinos, monte, galpones, silos, caminos internos, otros |
+| Alquiler por campaña (1-12 meses) | siembra directa, siembra convencional, con/sin mejora de suelos, otros |
+| Mejoras infraestructura (alquiler) | agua instalada, energía, infraestructura operativa, otros |
+| Alquiler por uso transitorio | pastoreo rotativo, ensayos agrícolas, producción estacional, agricultura regenerativa, agricultura experimental, otros |
+| Mejoras (alquiler transitorio) | corrales temporales, bebederos, accesos operativos, otros |
+| Alquiler con opción a compra | leasing de tierra |
+| Mejoras (leasing) | alambrados, aguadas, electrificación, molinos, monte, galpones, silos, caminos internos, otros |
+
+### Dos cosas que salen de enumerarlas
+
+**Hay cuatro subcategorías llamadas "Otros"**, en Riego, Insumos,
+Ganadería y Repuestos. Son cuatro registros distintos, cada uno colgando
+de su categoría. Si el seed las trata por nombre en vez de por categoría,
+se pisan entre sí.
+
+**En Tierras y parcelas, la mitad no son subcategorías.** Las cuatro que
+empiezan con "Mejoras" no son cosas que se vendan: son características
+del campo que se ofrece. Alambrados y aguadas no se compran en el
+catálogo, describen el lote. La categoría tiene en realidad cuatro tipos
+de operación —venta, alquiler por campaña, alquiler transitorio,
+leasing— y cuatro listas de mejoras que le corresponden a cada una.
+
+Es un argumento más de que Tierras no entra en el flujo de catálogo, y
+conviene tenerlo a mano el lunes.
+
+### 5 servicios
+
+Asesoramiento, Contratistas, Logística, Acopio, Inversores.
+
+**Se cargan los primeros cuatro.** "Inversores" queda afuera hasta que la
+clienta explique qué significa.
+
+---
+
 ## Cotejo contra el contrato
 
 `CONTRATO.md` sección 2 define **cinco** categorías. Así mapean:
@@ -181,7 +294,10 @@ Todas salen del análisis de arriba y conviene llevarlas juntas.
 2. **¿Los drones van en Maquinaria o en Agricultura de precisión?**
    Aparecen en las dos.
 3. **¿Tierras y parcelas entra en esta etapa?** No tiene stock, ni
-   carrito, ni envío: se consulta y se negocia. Es otro producto.
+   carrito, ni envío: se consulta y se negocia. Es otro producto. Y de
+   sus 8 subcategorías, **4 no son cosas que se vendan**: alambrados,
+   aguadas y molinos describen el campo, no se compran sueltos. Lo que
+   ahí hay son cuatro tipos de operación con sus mejoras asociadas.
 4. **¿"Inversores" qué significa exactamente?** Si es conectar productores
    con financiación, es otro negocio y no está contratado.
 
