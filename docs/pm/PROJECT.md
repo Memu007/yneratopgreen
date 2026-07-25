@@ -80,24 +80,56 @@ Filtro de ubicación en el catálogo, combinable con categoría. Mínimo:
 provincia y localidad. Deseable, y casi gratis porque la consulta es la
 misma: "hasta X km" alrededor de la localidad elegida.
 
-### Transportista — directorio (3.2)
+### Transportista — directorio por zonas declaradas (3.2)
 
 Se registra como **tipo especial de proveedor**, no como rol nuevo.
-Declara: localidad base, radio de cobertura en km, capacidad de carga,
-tipo de carga, transporte habilitado certificado y contacto.
 
-### Regla de coincidencia
+Distinción central: hay **datos que se muestran** y **datos que se
+consultan**, y no son los mismos campos.
 
-En el momento de la compra se listan los transportistas cuyo radio
-declarado **alcanza las dos puntas**: la localidad del vendedor (origen) y
-la del comprador (destino).
+| Para mostrar y contactar | Para buscar |
+|--------------------------|-------------|
+| Dirección en texto libre | Provincia y localidad base, de una lista |
+| Teléfono, correo, nombre comercial | **Zonas que atiende**, de una lista (selección múltiple) |
+| Transporte habilitado certificado | Capacidad de carga y tipo de carga |
 
-Decidido así porque un transportista que sólo cubre el destino no puede
-levantar la carga. Es más restrictivo que "en la zona", y sólo muestra
-opciones viables.
+Una dirección escrita a mano —"Ruta 8 km 340, cerca de Pergamino"— no la
+encuentra ninguna consulta. Los campos de búsqueda tienen que ser
+estructurados.
+
+### Regla de coincidencia — zonas, no radio
+
+El comprador **elige una zona** y se listan los transportistas que la
+declararon entre las que atienden. Consulta simple, sin cálculo de
+radios.
+
+El selector **viene precargado con la localidad del comprador** y él
+puede cambiarla. Así se cumple que *"el sistema detecta la ubicación"*
+(3.2) y además el comprador elige.
+
+Los resultados se **ordenan por cercanía** a la localidad del comprador,
+con PostGIS sobre las coordenadas de la tabla de localidades.
 
 El comprador puede **seleccionarlo e incluirlo en la transacción** o
 **contactarlo directo** con los datos provistos. Sin flujo de cotización.
+
+**Por qué zonas y no el radio en km del contrato:** la sección 3.2 se
+titula *"Sugerencia de Implementación Ágil"* y dice *"se propone"*, así
+que el radio es un mecanismo sugerido, no un requisito. Lo vinculante es
+la sección 2: *"transportistas vinculados por proximidad geográfica"*, y
+una zona es proximidad geográfica. Además las zonas declaradas reflejan
+mejor cómo trabaja un fletero real, que piensa en provincias que atiende
+y no en un radio desde su base.
+
+### Por qué se mantienen las coordenadas
+
+Aunque el filtro sea por zona y no necesite distancias:
+
+1. Ordenar los resultados por cercanía, que con las coordenadas ya
+   sembradas sale casi gratis y es mejor que un orden alfabético.
+2. La sección 4 elige PostGIS *"para resolver las consultas de ubicación
+   y cercanía de fletes"*. Entregar cero uso de PostGIS sería no
+   implementar lo especificado.
 
 ### Fuera de alcance en geolocalización
 

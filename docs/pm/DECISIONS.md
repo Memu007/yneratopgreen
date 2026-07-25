@@ -64,15 +64,37 @@ direcciones libres, mapas y selección con pin, distancia por ruta real
 
 ---
 
-## 2026-07-25 — El radio del transportista debe cubrir origen y destino
+## 2026-07-25 — El directorio funciona por zonas declaradas, no por radio
 
-El contrato dice que el sistema detecta la ubicación del comprador y del
-vendedor y lista transportistas "disponibles en la zona" (3.2), sin
-precisar contra qué punto se mide.
+Reemplaza la decisión de la misma fecha que definía coincidencia por
+radio cubriendo origen y destino.
 
-Definido: **las dos puntas dentro del radio declarado**. Un transportista
-que sólo cubre el destino no puede levantar la carga. Es más restrictivo,
-y sólo muestra opciones viables.
+El transportista declara **las zonas que atiende**, de una lista. El
+comprador elige una zona y se listan los que la declararon. Sin cálculo
+de radios.
+
+Cobertura contractual: la sección 3.2 se titula *"Sugerencia de
+Implementación Ágil"* y dice *"se propone"*, así que el radio en km es un
+mecanismo sugerido, no un requisito. Lo vinculante es la sección 2,
+*"transportistas vinculados por proximidad geográfica"*, y una zona es
+proximidad geográfica.
+
+Motivos, además de que es más simple: las zonas declaradas reflejan cómo
+trabaja un fletero real —piensa en provincias que atiende, no en un radio
+desde su base— y el ahorro estimado es de 3 a 4 días.
+
+Dos condiciones que se mantienen:
+
+1. **Los campos de búsqueda son estructurados.** La dirección en texto
+   libre sirve para mostrar y contactar, nunca para buscar. Provincia,
+   localidad y zonas atendidas salen de listas.
+2. **Las coordenadas se mantienen**, para ordenar resultados por cercanía
+   y porque la sección 4 elige PostGIS para las consultas de cercanía de
+   fletes. Entregar cero uso de PostGIS sería no implementar lo
+   especificado.
+
+El selector de zona del comprador viene precargado con su localidad, con
+lo que se cumple que "el sistema detecta la ubicación" y además él elige.
 
 ---
 
