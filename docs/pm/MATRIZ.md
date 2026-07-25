@@ -16,7 +16,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | …con validación | ❌ | Campo `is_verified` en el modelo, sin flujo de validación |
 | Perfil | ✅ | `GET /auth/me` y `PATCH /auth/me` responden `200` |
 | Buscador con filtro por **categoría** | ✅ | Smoke test `200`, filtros de categoría, precio y stock aplicados |
-| Buscador con filtro por **ubicación** | ⚪ | Backend listo y verificado: `province` y `locality_id` en `GET /catalog/products`, contrastado contra SQL. Falta exponerlo en la interfaz |
+| Buscador con filtro por **ubicación** | ✅ | Selectores encadenados de provincia y localidad, filtrado en el servidor, estado en la URL. Verificado en navegador y contrastado contra SQL |
 | Carrito de compras | ✅ | Smoke test: agregar y ver, `200` + `200`, total $45.000 |
 | Historial de pedidos | ✅ | Smoke test "mis compras": `200`, 3 compras |
 

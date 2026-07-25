@@ -4,8 +4,8 @@ Actualizado: 2026-07-25, cierre de jornada.
 
 ## Objetivo activo
 
-**Filtro por ubicación en el frontend** y **suite de smoke tests**, antes
-de encarar el módulo de transportistas.
+**Suite automatizada de smoke tests**, antes de encarar el módulo de
+transportistas.
 
 ## Dónde estamos
 
@@ -28,7 +28,9 @@ evidencia de ejecución detrás.
   validación de hash, `Geography(POINT,4326)` con índice GIST,
   `products.locality_id` obligatorio contra el padrón. `ST_Distance`
   contrastado de forma independiente.
-- Filtro por provincia y localidad en la API, contrastado contra SQL.
+- Filtro por provincia y localidad, **de punta a punta**: selectores
+  encadenados en la interfaz, filtrado en el servidor y estado en la URL.
+  Cierra el requisito 3.1.
 - Las cinco categorías del contrato con productos y localidad.
 
 **Tres lecturas para no leer mal ese 46 %:**
@@ -41,36 +43,36 @@ evidencia de ejecución detrás.
 
 ## Próximas tareas
 
-1. **Filtro por ubicación en el frontend** (dev de mayor capacidad).
-   Dos selectores encadenados, provincia y localidad, contra los
-   parámetros que ya existen en la API. El estado se guarda en la URL.
-   Es la pieza que demuestra geolocalización en la reunión del 30-07.
-   - Criterio: se filtra desde la interfaz, el resultado coincide con la
-     base, y al recargar se mantiene el filtro.
+1. **Suite automatizada de smoke tests.** Requisito contractual de la
+   fase 5. Once casos, un solo comando, código de salida distinto de cero
+   si algo falla. Incluye probar que la suite **efectivamente falla**
+   cuando se rompe algo a propósito.
+   - Habilita trabajar encadenando tareas con una compuerta automática en
+     lugar de revisión manual de cada entrega.
 
-2. **Automatizar los smoke tests** (dev de mayor capacidad).
-   Requisito contractual de la fase 5. Se perdieron una vez sin subir y
-   hay que rehacerlos.
-   - Criterio: un comando corre los once casos contra un arranque limpio
-     y devuelve código distinto de cero si alguno falla.
-   - Habilita que la dev de menor capacidad trabaje encadenando tareas
-     con una compuerta automática en lugar de revisión manual.
+2. **Ampliar el catálogo de demostración** a unos 25 productos repartidos
+   en ocho provincias o más, con al menos dos por categoría. Hoy hay 12 en
+   tres provincias, lo que luce poco el filtro por ubicación recién
+   terminado.
 
-3. **Módulo de transportistas** (dev de mayor capacidad). El bloque
-   grande que falta del diferencial. **No arranca** hasta que el cliente
-   defina si la coincidencia va por zonas declaradas o por radio en km.
+3. **Módulo de transportistas.** El bloque grande que falta del
+   diferencial. **No arranca** hasta que el cliente defina si la
+   coincidencia va por zonas declaradas o por radio en km.
 
-## Reparto por capacidad
+## Equipo
 
-**Menor capacidad:** tareas mecánicas, sin decisiones de diseño.
-Instrucciones prescriptivas, criterios comprobables por ella misma, y
-revisión de código además del informe.
+Una sola dev, sobre `main`, con canal único en `PARA-DEV.md` y
+`PARA-PM.md`. El estimado de trabajo restante vuelve a **7 a 9 semanas**.
 
-**Mayor capacidad:** lo que exige criterio, tiene riesgo o define
-arquitectura.
+## Cómo se escriben los criterios de aceptación
 
-**Regla dura:** la dev de menor capacidad no escribe la suite de tests.
-Tests mal escritos son peores que no tenerlos, porque dan confianza falsa.
+**Relacionales, no absolutos.** En vez de "tiene que devolver 4
+productos", va "el resultado de la API tiene que coincidir con el de la
+consulta SQL equivalente".
+
+Motivo: se le pasaron a la dev números fijos que habían quedado viejos
+cuando el seed creció. Ella reportó los reales en lugar de acomodarse, y
+así se detectó. Los números fijos envejecen mal.
 
 ## Bloqueos y pendientes
 

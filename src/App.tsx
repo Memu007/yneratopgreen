@@ -17,9 +17,19 @@ import { ServicesPage } from './components/Pages/ServicesPage';
 import { ContactPage } from './components/Pages/ContactPage';
 import { PaymentResultPage } from './components/Pages/PaymentResultPage';
 import { useProductFilters } from './hooks/useProductFilters';
-import { getProducts, getCategories, convertBackendProductToFrontend } from './utils/catalogService';
+import {
+  getProducts,
+  getCategories,
+  getLocalities,
+  getProvinces,
+  convertBackendProductToFrontend,
+} from './utils/catalogService';
 import type { NewProductData, Product } from './types';
-import type { CategoryResponse } from './utils/catalogService';
+import type {
+  CategoryResponse,
+  LocalityResponse,
+  ProvinceResponse,
+} from './utils/catalogService';
 
 type AuthModalType = 'login' | 'register' | null;
 type PageSection = 'home' | 'marketplace' | 'about' | 'services' | 'contact' | 'payment-success' | 'payment-failure' | 'payment-pending';
@@ -28,7 +38,11 @@ function App() {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
+  const [provinces, setProvinces] = useState<ProvinceResponse[]>([]);
+  const [localities, setLocalities] = useState<LocalityResponse[]>([]);
+  const [isLoadingLocalities, setIsLoadingLocalities] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productsRevision, setProductsRevision] = useState(0);
   
   const {
     searchQuery,
@@ -36,6 +50,7 @@ function App() {
     selectedCategory,
     selectedSubcategory,
     selectedProvince,
+    selectedLocalityId,
     priceMin,
     priceMax,
     inStockOnly,
@@ -45,6 +60,7 @@ function App() {
     setSelectedCategory,
     setSelectedSubcategory,
     setSelectedProvince,
+    setSelectedLocalityId,
     setPriceMin,
     setPriceMax,
     setInStockOnly,
@@ -64,47 +80,124 @@ function App() {
     if (path === '/payment/success') return 'payment-success';
     if (path === '/payment/failure') return 'payment-failure';
     if (path === '/payment/pending') return 'payment-pending';
+    if (new URLSearchParams(window.location.search).get('section') === 'marketplace') {
+      return 'marketplace';
+    }
     return 'home';
   });
 
-  // Cargar productos y categorías desde la API cuando se navega al marketplace
+  const selectedProvinceId =
+    provinces.find((province) => province.name === selectedProvince)?.id || '';
+
+  // Cargar catálogos auxiliares al entrar al marketplace.
   useEffect(() => {
-    if (currentSection === 'marketplace') {
-      loadProductsFromAPI();
-      loadCategoriesFromAPI();
-    }
+    if (currentSection !== 'marketplace') return;
+
+    let cancelled = false;
+    Promise.all([getCategories(), getProvinces()])
+      .then(([categoryData, provinceData]) => {
+        if (cancelled) return;
+        setCategories(categoryData);
+        setProvinces(provinceData);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error('Error al cargar filtros del catálogo:', error);
+        setCategories([]);
+        setProvinces([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentSection]);
 
-  const loadCategoriesFromAPI = async () => {
-    try {
-      const data = await getCategories();
-      setCategories(data);
-    } catch (error) {
-      console.error('Error al cargar categorías:', error);
-      setCategories([]);
+  // Cargar las localidades con el ID corto de provincia.
+  useEffect(() => {
+    if (currentSection !== 'marketplace' || !selectedProvinceId) {
+      setLocalities([]);
+      setIsLoadingLocalities(false);
+      return;
     }
-  };
 
-  const loadProductsFromAPI = async () => {
+    let cancelled = false;
+    setLocalities([]);
+    setIsLoadingLocalities(true);
+    getLocalities(selectedProvinceId)
+      .then((data) => {
+        if (!cancelled) setLocalities(data);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error('Error al cargar localidades:', error);
+        setLocalities([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingLocalities(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSection, selectedProvinceId]);
+
+  // Filtrar en la API para usar la ubicación real de la publicación.
+  useEffect(() => {
+    if (currentSection !== 'marketplace') return;
+    if (selectedProvince !== 'Todas las provincias' && !selectedProvinceId) return;
+    if (
+      selectedCategory !== 'Todas las categorías'
+      && !categories.some((category) => category.name === selectedCategory)
+    ) {
+      return;
+    }
+
+    let cancelled = false;
     setLoadingProducts(true);
-    try {
-      const response = await getProducts({
+    getProducts({
+        search: searchQuery || undefined,
+        category: categories.find((category) => category.name === selectedCategory)?.id,
+        province:
+          selectedProvince === 'Todas las provincias' ? undefined : selectedProvince,
+        locality_id: selectedLocalityId || undefined,
+        min_price: priceMin > 0 ? priceMin : undefined,
+        max_price:
+          priceMax === Number.MAX_SAFE_INTEGER ? undefined : priceMax,
+        in_stock: inStockOnly || undefined,
         page: 1,
         page_size: 100,
         sort_by: 'created_at',
         sort_order: 'desc',
+      })
+      .then((response) => {
+        if (cancelled) return;
+        setProducts(response.items.map(convertBackendProductToFrontend));
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error('Error al cargar productos:', error);
+        setProducts([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingProducts(false);
       });
-      
-      const frontendProducts = response.items.map(convertBackendProductToFrontend);
-      setProducts(frontendProducts);
-    } catch (error) {
-      console.error('Error al cargar productos:', error);
-      // En caso de error, mantener array vacío
-      setProducts([]);
-    } finally {
-      setLoadingProducts(false);
-    }
-  };
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    currentSection,
+    searchQuery,
+    selectedCategory,
+    selectedProvince,
+    selectedProvinceId,
+    selectedLocalityId,
+    priceMin,
+    priceMax,
+    inStockOnly,
+    categories,
+    productsRevision,
+  ]);
 
   const handleSearchSubmit = () => {
     console.log('Búsqueda realizada:', searchQuery);
@@ -119,15 +212,27 @@ function App() {
     console.log('Nuevo producto agregado:', productData);
     // Navegar al marketplace y recargar productos
     setCurrentSection('marketplace');
-    // Esperar un momento para que el useEffect se ejecute
-    setTimeout(() => {
-      loadProductsFromAPI();
-    }, 100);
+    setProductsRevision((revision) => revision + 1);
   };
 
   const handleNavigate = (section: PageSection) => {
+    const params = new URLSearchParams(window.location.search);
+    if (section === 'marketplace') params.set('section', 'marketplace');
+    else params.delete('section');
+    const query = params.toString();
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
+    );
     setCurrentSection(section);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleProvinceChange = (provinceId: string) => {
+    const province = provinces.find((item) => item.id === provinceId);
+    setSelectedProvince(province?.name || 'Todas las provincias');
+    setSelectedLocalityId('');
   };
 
   const renderContent = () => {
@@ -146,10 +251,14 @@ function App() {
             <div className={styles.contentWrapper}>
               <FilterSidebar
                 categories={categories}
+                provinces={provinces}
+                localities={localities}
+                isLoadingLocalities={isLoadingLocalities}
                 selectedType={selectedType}
                 selectedCategory={selectedCategory}
                 selectedSubcategory={selectedSubcategory}
-                selectedProvince={selectedProvince}
+                selectedProvinceId={selectedProvinceId}
+                selectedLocalityId={selectedLocalityId}
                 priceMin={priceMin}
                 priceMax={priceMax}
                 inStockOnly={inStockOnly}
@@ -157,7 +266,8 @@ function App() {
                 onTypeChange={setSelectedType}
                 onCategoryChange={setSelectedCategory}
                 onSubcategoryChange={setSelectedSubcategory}
-                onProvinceChange={setSelectedProvince}
+                onProvinceChange={handleProvinceChange}
+                onLocalityChange={setSelectedLocalityId}
                 onPriceMinChange={setPriceMin}
                 onPriceMaxChange={setPriceMax}
                 onInStockChange={setInStockOnly}

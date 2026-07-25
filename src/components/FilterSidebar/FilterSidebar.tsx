@@ -1,14 +1,21 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import styles from './FilterSidebar.module.css';
-import { provinces } from '../../data/mockData';
-import type { CategoryResponse } from '../../utils/catalogService';
+import type {
+  CategoryResponse,
+  LocalityResponse,
+  ProvinceResponse,
+} from '../../utils/catalogService';
 
 interface FilterSidebarProps {
   categories: CategoryResponse[];
+  provinces: ProvinceResponse[];
+  localities: LocalityResponse[];
+  isLoadingLocalities: boolean;
   selectedType: 'todos' | 'productos' | 'servicios';
   selectedCategory: string;
   selectedSubcategory: string;
-  selectedProvince: string;
+  selectedProvinceId: string;
+  selectedLocalityId: string;
   priceMin: number;
   priceMax: number;
   inStockOnly: boolean;
@@ -16,7 +23,8 @@ interface FilterSidebarProps {
   onTypeChange: (type: 'todos' | 'productos' | 'servicios') => void;
   onCategoryChange: (category: string) => void;
   onSubcategoryChange: (subcategory: string) => void;
-  onProvinceChange: (province: string) => void;
+  onProvinceChange: (provinceId: string) => void;
+  onLocalityChange: (localityId: string) => void;
   onPriceMinChange: (price: number) => void;
   onPriceMaxChange: (price: number) => void;
   onInStockChange: (inStock: boolean) => void;
@@ -26,10 +34,14 @@ interface FilterSidebarProps {
 
 export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   categories,
+  provinces,
+  localities,
+  isLoadingLocalities,
   selectedType,
   selectedCategory,
   selectedSubcategory,
-  selectedProvince,
+  selectedProvinceId,
+  selectedLocalityId,
   priceMin,
   priceMax,
   inStockOnly,
@@ -38,6 +50,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   onCategoryChange,
   onSubcategoryChange,
   onProvinceChange,
+  onLocalityChange,
   onPriceMinChange,
   onPriceMaxChange,
   onInStockChange,
@@ -58,17 +71,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     return category?.subcategories?.filter(s => s.is_active) || [];
   }, [categories, selectedCategory]);
 
-  // Resetear categoría cuando cambia el tipo
-  useEffect(() => {
-    onCategoryChange('Todas las categorías');
-    onSubcategoryChange('Todas');
-  }, [selectedType]);
-
-  // Resetear subcategoría cuando cambia la categoría
-  useEffect(() => {
-    onSubcategoryChange('Todas');
-  }, [selectedCategory]);
-
   const handleRatingClick = (rating: number) => {
     onMinRatingChange(rating === minRating ? 0 : rating);
   };
@@ -79,11 +81,16 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
       {/* Tipo: Producto/Servicio */}
       <div className={styles.filterSection}>
-        <label className={styles.filterLabel}>Tipo</label>
+        <label className={styles.filterLabel} htmlFor="catalog-type">Tipo</label>
         <select
+          id="catalog-type"
           className={styles.select}
           value={selectedType}
-          onChange={(e) => onTypeChange(e.target.value as 'todos' | 'productos' | 'servicios')}
+          onChange={(e) => {
+            onTypeChange(e.target.value as 'todos' | 'productos' | 'servicios');
+            onCategoryChange('Todas las categorías');
+            onSubcategoryChange('Todas');
+          }}
         >
           <option value="todos">Todos</option>
           <option value="productos">Productos</option>
@@ -93,11 +100,15 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
       {/* Categoría */}
       <div className={styles.filterSection}>
-        <label className={styles.filterLabel}>Categoría</label>
+        <label className={styles.filterLabel} htmlFor="catalog-category">Categoría</label>
         <select
+          id="catalog-category"
           className={styles.select}
           value={selectedCategory}
-          onChange={(e) => onCategoryChange(e.target.value)}
+          onChange={(e) => {
+            onCategoryChange(e.target.value);
+            onSubcategoryChange('Todas');
+          }}
         >
           <option value="Todas las categorías">Todas las categorías</option>
           {filteredCategories.map((category) => (
@@ -127,17 +138,39 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
         </div>
       )}
 
-      {/* Ubicación */}
+      {/* Ubicación oficial de la publicación */}
       <div className={styles.filterSection}>
-        <label className={styles.filterLabel}>Ubicación</label>
+        <label className={styles.filterLabel} htmlFor="catalog-province">Provincia</label>
         <select
+          id="catalog-province"
           className={styles.select}
-          value={selectedProvince}
+          value={selectedProvinceId}
           onChange={(e) => onProvinceChange(e.target.value)}
         >
+          <option value="">Todas las provincias</option>
           {provinces.map((province) => (
-            <option key={province} value={province}>
-              {province}
+            <option key={province.id} value={province.id}>
+              {province.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className={styles.filterSection}>
+        <label className={styles.filterLabel} htmlFor="catalog-locality">Localidad</label>
+        <select
+          id="catalog-locality"
+          className={styles.select}
+          value={selectedLocalityId}
+          onChange={(e) => onLocalityChange(e.target.value)}
+          disabled={!selectedProvinceId || isLoadingLocalities}
+        >
+          <option value="">
+            {isLoadingLocalities ? 'Cargando localidades...' : 'Todas las localidades'}
+          </option>
+          {localities.map((locality) => (
+            <option key={locality.id} value={locality.id}>
+              {locality.name}
             </option>
           ))}
         </select>
@@ -145,17 +178,21 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
       {/* Precio */}
       <div className={styles.filterSection}>
-        <label className={styles.filterLabel}>Precio</label>
+        <label className={styles.filterLabel} htmlFor="catalog-price-min">Precio</label>
         <div className={styles.priceInputs}>
           <input
+            id="catalog-price-min"
             type="number"
+            aria-label="Precio mínimo"
             className={styles.priceInput}
             placeholder="Mínimo"
             value={priceMin || ''}
             onChange={(e) => onPriceMinChange(Number(e.target.value) || 0)}
           />
           <input
+            id="catalog-price-max"
             type="number"
+            aria-label="Precio máximo"
             className={styles.priceInput}
             placeholder="Máximo"
             value={priceMax === Number.MAX_SAFE_INTEGER ? '' : priceMax}
