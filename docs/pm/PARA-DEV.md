@@ -167,11 +167,20 @@ publicación verosímil del rubro.
 6. `npm run smoke` en verde.
 7. En la interfaz, el filtro de categoría muestra la taxonomía nueva.
 
-### Si algo no encaja
+### Lo que no encaje: se aparca, no se fuerza
 
-Si al mapear encontrás un producto que no entra en ninguna categoría, o
-una subcategoría que no sabés dónde poner, **frená y contame**. No lo
-fuerces a "Otros" para salir del paso.
+Hay preguntas abiertas con la clienta que se responden el lunes. Así que
+si al mapear encontrás algo que no entra claro en ninguna categoría:
+
+**No lo fuerces a "Otros" ni inventes una categoría para que entre.**
+
+Dejalo **donde está hoy**, que la aplicación siga funcionando, y anotalo
+en tu informe en una lista aparte: "pendiente de definición". Yo la sumo a
+las preguntas del lunes.
+
+Vale lo mismo para las subcategorías: si alguna no sabés dónde va,
+dejala fuera y anotala. Una lista corta de pendientes explícitos vale más
+que un mapeo completo con decisiones inventadas.
 
 ---
 
