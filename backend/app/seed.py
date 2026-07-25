@@ -127,6 +127,20 @@ def create_seed_data():
                 "icon": "🧫",
                 "display_order": "5"
             },
+            {
+                "name": "Bienes y Ganado",
+                "slug": "bienes-ganado",
+                "description": "Animales de cría y comerciales: bovinos, porcinos, ovinos y más",
+                "icon": "🐄",
+                "display_order": "6"
+            },
+            {
+                "name": "Tecnología para el Cultivo",
+                "slug": "tecnologia-cultivo",
+                "description": "Drones, sensores IoT, software de gestión de campo y tecnología agrícola",
+                "icon": "🛰️",
+                "display_order": "7"
+            },
             # Categorías de Servicios
             {
                 "name": "Laboreo",
@@ -245,6 +259,8 @@ def create_seed_data():
         cat_maquinaria = db.query(Category).filter(Category.slug == "maquinaria").first()
         cat_servicios = db.query(Category).filter(Category.slug == "laboreo").first()
         cat_agroquimicos = db.query(Category).filter(Category.slug == "agroquimicos").first()
+        cat_bienes_ganado = db.query(Category).filter(Category.slug == "bienes-ganado").first()
+        cat_tecnologia = db.query(Category).filter(Category.slug == "tecnologia-cultivo").first()
         
         admin = db.query(User).filter(User.email == "admin@topgreen.com").first()
         seller = db.query(User).filter(User.email == "vendedor@ejemplo.com").first()
@@ -374,6 +390,66 @@ def create_seed_data():
                     {"url": "https://picsum.photos/seed/rastra1/800/600", "filename": "rastra1.jpg", "display_order": 1, "is_primary": True},
                     {"url": "https://picsum.photos/seed/rastra2/800/600", "filename": "rastra2.jpg", "display_order": 2, "is_primary": False}
                 ]
+            },
+            {
+                "name": "Terneros Angus - Lote 20 cabezas",
+                "slug": "terneros-angus-lote-20",
+                "description": "Lote de 20 terneros Angus destetados, 7-8 meses, peso promedio 180kg. Sanidad al día: vacunación Aftosa, Brucelosis y Carbunclo. Genética verificada, padre registrado. Entrega inmediata.",
+                "category_id": cat_bienes_ganado.id,
+                "price": 3200000.0,
+                "currency": "ARS",
+                "stock": 1,
+                "unit": "lote 20 cabezas",
+                "seller_id": seller.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/terneros1/800/600", "filename": "terneros1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Vaquillonas Braford Preñadas",
+                "slug": "vaquillonas-braford-preñadas",
+                "description": "Vaquillonas Braford preñadas de 18 meses, inseminadas con toro Angus. 5 meses de gestación. Lote de 10 cabezas. Sanidad completa, trazabilidad SIRA al día.",
+                "category_id": cat_bienes_ganado.id,
+                "price": 5800000.0,
+                "currency": "ARS",
+                "stock": 1,
+                "unit": "lote 10 cabezas",
+                "seller_id": admin.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/vaquillonas1/800/600", "filename": "vaquillonas1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Dron Pulverizador Agrícola 20L",
+                "slug": "dron-pulverizador-agricola-20l",
+                "description": "Dron agrícola pulverizador con tanque de 20 litros. Autonomía 15 minutos por batería. Cobertura 10 ha/hora. Incluye 2 baterías, control remoto y software de mapeo. Compatible con APP de vuelo autónomo.",
+                "category_id": cat_tecnologia.id,
+                "price": 8500000.0,
+                "currency": "ARS",
+                "stock": 4,
+                "unit": "unidad",
+                "seller_id": seller.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/dron1/800/600", "filename": "dron1.jpg", "display_order": 1, "is_primary": True}
+                ]
+            },
+            {
+                "name": "Sensores de Humedad de Suelo IoT",
+                "slug": "sensores-humedad-suelo-iot",
+                "description": "Kit de 5 sensores de humedad de suelo con conectividad IoT LoRaWAN. Medición de humedad, temperatura y conductividad a 30cm de profundidad. Batería solar, autonomía 3 años. Dashboard web incluido.",
+                "category_id": cat_tecnologia.id,
+                "price": 920000.0,
+                "currency": "ARS",
+                "stock": 15,
+                "unit": "kit 5 sensores",
+                "seller_id": admin.id,
+                "status": ProductStatus.ACTIVE,
+                "images": [
+                    {"url": "https://picsum.photos/seed/sensores1/800/600", "filename": "sensores1.jpg", "display_order": 1, "is_primary": True}
+                ]
             }
         ]
 
@@ -386,6 +462,10 @@ def create_seed_data():
             "herbicida-glifosato-20l": ("82042290", "Venado Tuerto, Santa Fe"),
             "servicio-siembra-gps": ("06791050", "Tandil, Buenos Aires"),
             "rastra-discos-24-platos": ("06063010", "Balcarce, Buenos Aires"),
+            "terneros-angus-lote-20": ("82084270", "Rosario, Santa Fe"),
+            "vaquillonas-braford-preñadas": ("14098230", "Río Cuarto, Córdoba"),
+            "dron-pulverizador-agricola-20l": ("06623100", "Pergamino, Buenos Aires"),
+            "sensores-humedad-suelo-iot": ("06791050", "Tandil, Buenos Aires"),
         }
         
         for prod_data in productos:

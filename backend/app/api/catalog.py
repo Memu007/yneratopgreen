@@ -209,6 +209,8 @@ def get_products(
     max_price: Optional[float] = Query(None, ge=0, description="Precio máximo"),
     in_stock: Optional[bool] = Query(None, description="Solo productos con stock"),
     seller_id: Optional[str] = Query(None, description="Filtrar por vendedor"),
+    province: Optional[str] = Query(None, description="Filtrar por provincia (nombre canónico del padrón Georef)"),
+    locality_id: Optional[str] = Query(None, description="Filtrar por localidad (ID del padrón Georef)"),
     sort_by: str = Query("created_at", regex="^(created_at|price|sales|views)$"),
     sort_order: str = Query("desc", regex="^(asc|desc)$"),
     page: int = Query(1, ge=1),
@@ -223,6 +225,8 @@ def get_products(
     - min_price/max_price: Rango de precios
     - in_stock: Solo con stock disponible
     - seller_id: Productos de un vendedor específico
+    - province: Nombre canónico de la provincia (ej: "Buenos Aires")
+    - locality_id: ID de localidad del padrón Georef (ej: "06063010")
     
     **Ordenamiento:**
     - sort_by: created_at (recientes), price (precio), sales (más vendidos), views (más vistos)
@@ -277,6 +281,20 @@ def get_products(
     
     if seller_id:
         query = query.filter(Product.seller_id == seller_id)
+    
+    # Filtro por provincia — subconsulta sobre localities, match exacto
+    if province:
+        query = query.filter(
+            Product.locality_id.in_(
+                db.query(Locality.id).filter(
+                    Locality.province_name == province
+                )
+            )
+        )
+    
+    # Filtro por localidad — directo sobre la FK
+    if locality_id:
+        query = query.filter(Product.locality_id == locality_id)
     
     # Contar total antes de paginar
     total = query.count()

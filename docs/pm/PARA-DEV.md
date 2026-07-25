@@ -3,17 +3,17 @@
 Este archivo es el canal de la PM hacia la dev. **Sólo lo escribe la PM.**
 Vos leelo, no lo edites.
 
-Para responder, escribí en `docs/pm/PARA-PM.md` sobre `main` y pusheá. Ese
-archivo es tuyo y la PM no lo toca. Así ninguna pisa el trabajo de la otra.
+Para responder, escribí en `docs/pm/PARA-PM.md` y pusheá. Ese archivo es
+tuyo y la PM no lo toca. Así ninguna pisa el trabajo de la otra.
 
-**Cómo leer este archivo** (vive en la rama de contexto, no en `main`):
+**Antes de cada tarea:**
 
 ```bash
-git fetch origin claude/acceso-carpeta-proyecto-s4q5j7
-git show origin/claude/acceso-carpeta-proyecto-s4q5j7:docs/pm/PARA-DEV.md
+git pull origin main
+cat docs/pm/PARA-DEV.md
 ```
 
-Hacelo **antes de cada tarea**, porque puede haber cambiado.
+Hacelo siempre, porque puede haber cambiado.
 
 ---
 
@@ -59,10 +59,29 @@ los productos del carrito. Hoy sólo se corrige recargando la página.
 
 **Arreglo:** que el estado del carrito se limpie al cambiar de rol.
 
+### c) Las imágenes rotas se ven como imágenes rotas
+
+`src/components/ProductCard/ProductCard.tsx:29` tiene un `<img>` sin
+manejo de error. Las imágenes vienen de un servicio externo; si falla o
+no hay conexión, cada tarjeta muestra el ícono de imagen rota del
+navegador. En una demo con el cliente eso se lee como producto sin
+terminar.
+
+**Arreglo:** que cuando la imagen no cargue, aparezca en su lugar un
+bloque limpio con el nombre del producto. Usá el evento `onError` del
+`<img>`.
+
+No busques ni agregues fotos nuevas. No cambies las URLs del seed. Es
+sólo el respaldo para cuando no cargan.
+
 ### Criterio de aceptación
 
-Los dos verificados **en el navegador y sin recargar la página**. El
+Los tres verificados **en el navegador y sin recargar la página**. El
 contador tiene que coincidir con la cantidad de ventas listadas abajo.
+
+Para el punto (c), probalo de verdad: cortá la conexión o cambiá una URL
+de imagen por una inválida y confirmá que se ve el bloque de respaldo y
+no el ícono roto.
 
 ### Qué mandar en `PARA-PM.md`
 
@@ -99,7 +118,7 @@ Estas no cambian. Si alguna vez cambian, te aviso acá.
 
 ## Dónde está el contexto
 
-Todo en `docs/pm/` de la rama de contexto:
+Todo en `docs/pm/`, en `main`:
 
 - `NOW.md` — estado y tareas. **Leé sólo esto primero.**
 - `CONTRATO.md` — el alcance. Si algo no está ahí, no es requisito.
