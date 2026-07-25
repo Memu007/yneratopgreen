@@ -5,6 +5,35 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-07-25 — Una pasada de reconciliación de esquema, con tope
+
+El seed falla por `users.whatsapp`: la columna está en el modelo y en dos
+módulos de la API, pero ninguna migración la crea. Medido el desfasaje
+completo, **faltan unas 20 columnas en 6 tablas** (`orders` 10 de 27,
+`payments` 3, `users` 2, `audit_logs` 2, `contact_messages` 2, `carts` 1).
+
+Las migraciones no describen los modelos. Arreglar columna por columna
+son días de ida y vuelta.
+
+Decisión: **una** migración de reconciliación autogenerada sobre SQL
+Server. Si esa única pasada no deja la línea base verde, se abandona SQL
+Server y se pasa directo a PostgreSQL + PostGIS generando el esquema
+inicial desde los modelos.
+
+Motivo de no saltar ya a PostgreSQL, aunque el trabajo sobre SQL Server
+se descarte igual: cambiar motor, driver y esquema a la vez sobre una
+aplicación que nadie vio funcionar mezcla demasiadas variables. Un round
+acotado de verificación vale más que ahorrarlo.
+
+Restricción: la migración sólo puede agregar. Cualquier `DROP` o cambio
+de tipo propuesto por el autogenerate detiene la tarea.
+
+Consecuencia sobre el diagnóstico general: los modelos son la fuente de
+verdad del esquema, no las migraciones. Cuando se genere el esquema de
+PostgreSQL, se genera desde los modelos.
+
+---
+
 ## 2026-07-25 — `alembic upgrade head` nunca pudo ejecutarse
 
 `010_add_ratings_table.py` declara `down_revision = '009'`, pero la

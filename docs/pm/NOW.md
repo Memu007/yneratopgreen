@@ -67,34 +67,56 @@ Los puntos 2 y 3 son los que habilitan el segundo hito de cobro.
      verificado, no declarado. Se hace contra `CONTRATO.md`, no contra el
      roadmap interno.
 
-## Bloqueo activo — cadena de migraciones rota
+## Bloqueo activo — los modelos y las migraciones no coinciden
 
-La creación de la base ya está resuelta. El bloqueo ahora es:
+El seed falla con `Invalid column name 'whatsapp'. (207)`. La columna
+está en `models/user.py:27` y se usa en `api/auth.py` y `api/orders.py`,
+pero ninguna migración la crea.
 
-```
-KeyError: '009'
-```
+No es un caso aislado. Comparadas todas las columnas declaradas en los
+modelos contra el texto de las migraciones, **faltan 20 columnas en 6
+tablas**:
 
-`010_add_ratings_table.py` declara `down_revision = '009'`, pero la
-revisión 009 se identifica como `'009_add_product_subcategory'`. Alembic
-no encuentra el padre y **no aplica ninguna migración**.
+| Tabla | Faltan | Ejemplos |
+|-------|--------|----------|
+| `orders` | 10 de 27 | `shipped_at`, `delivered_at`, snapshots de producto |
+| `payments` | 3 | `refund_id`, `refunded_at`, `refund_amount` |
+| `users` | 2 | `whatsapp`, `purchases_count` |
+| `audit_logs` | 2 | `entity`, `metadata_json` |
+| `contact_messages` | 2 | `is_replied`, `replied_at` |
+| `carts` | 1 | `unit_price_snapshot` |
 
-Verificado en la cadena completa: las revisiones 001 a 009 usan el
-formato `'0NN_nombre'`; sólo la 010 usa `'010'` y `'009'`.
+Medición aproximada (búsqueda textual), a confirmar con
+`alembic revision --autogenerate`. El orden de magnitud es el que
+importa: arreglar columna por columna son días de ida y vuelta.
 
-Conclusión, y es la más fuerte hasta ahora: **`alembic upgrade head`
-nunca pudo ejecutarse en este repositorio.** No es que nadie lo corriera.
-La tabla `ratings` nunca se creó por migración, y la afirmación de que
-Fase I funciona end-to-end es imposible sobre una instalación limpia.
+### Decisión: una sola pasada de reconciliación, con tope
 
-Arreglo aprobado (mínimo): corregir `down_revision` de la 010 a
-`'009_add_product_subcategory'`. No se toca el esquema.
+Se aprueba **una** migración de reconciliación autogenerada sobre SQL
+Server, no un arreglo por columna.
 
-### Bloqueo anterior, resuelto
+**Tope explícito:** si esa única pasada no deja la línea base verde, se
+abandona SQL Server y se pasa directamente a PostgreSQL + PostGIS
+generando el esquema inicial desde los modelos.
 
-La base `topgreen` no se creaba en ninguna parte del repositorio; el
-camino Docker del README era inejecutable. Arreglado con creación
-idempotente en los scripts de init.
+Motivo de no saltar ya a PostgreSQL: cambiar motor, driver y esquema a la
+vez, sobre una aplicación que todavía no se vio funcionar, mezcla
+demasiadas variables. Un round acotado para verificar la aplicación
+heredada vale más que ahorrarlo, y el trabajo sobre SQL Server se
+descarta igual.
+
+**Regla dura:** la migración autogenerada sólo puede **agregar**. Si
+Alembic propone un `DROP` o un `ALTER` de tipo, se detiene y se consulta.
+
+### Bloqueos anteriores, resueltos
+
+1. La base `topgreen` no se creaba en ninguna parte del repositorio.
+   Resuelto con creación idempotente en los scripts de init.
+2. Cadena de migraciones rota: la 010 declaraba
+   `down_revision = '009'` y la 009 se identifica como
+   `'009_add_product_subcategory'`. Alembic cortaba con `KeyError` sin
+   aplicar nada, lo que probó que `alembic upgrade head` **nunca** pudo
+   ejecutarse en este repositorio. Resuelto; llega a `010 (head)`.
 
 ## Otros bloqueos
 
