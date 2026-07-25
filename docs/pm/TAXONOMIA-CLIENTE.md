@@ -132,6 +132,73 @@ Los **drones** aparecen en dos lugares de la misma taxonomía:
 Hay que preguntarle cuál corresponde, o si son usos distintos que quiere
 separar a propósito.
 
+## Marcas — lista limpia y qué preguntar
+
+### Corregido sin consultar
+
+| Original | Queda | Motivo |
+|----------|-------|--------|
+| `Jhon Deere` | **eliminada** | Está mal escrita. Ya existe `John Deere` en la misma lista |
+| `Roland H` | `Roland` | La `H` suelta parece un error de tipeo |
+
+### A confirmar con la clienta
+
+Cinco grupos que parecen la misma marca repetida:
+
+| Entradas | Recomendación |
+|----------|---------------|
+| `Case`, `Case IH` | Dejar sólo `Case IH`. "Case" a secas es ambiguo: existe Case Construction |
+| `Fiat`, `Fiat Someca`, `Someca` | Consolidar. Es el mismo linaje histórico, Fiat Trattori y Someca terminaron siendo la misma línea |
+| `Deutz`, `Deutz-Fahr` | Dejar `Deutz-Fahr`, que es la marca de tractores. Deutz a secas es el fabricante de motores. **Puede ser a propósito si venden motores aparte** |
+| `Chery`, `Chery Bylion` | Consolidar salvo que sean líneas distintas que quiera separar |
+
+Y dos que no parecen del rubro:
+
+| Marca | Por qué |
+|-------|---------|
+| `Husqvarna` | Jardinería y forestal, no maquinaria agrícola |
+| `Yard Machines` | Jardinería |
+
+Puede ser deliberado si piensa vender equipamiento de parque y jardín.
+Conviene preguntarlo.
+
+### Resultado
+
+De **48** originales quedan **47** con las correcciones seguras. Si se
+confirman las consolidaciones, la lista final ronda las **42**.
+
+---
+
+## Preguntas para la clienta — lunes 27-07
+
+Todas salen del análisis de arriba y conviene llevarlas juntas.
+
+**Sobre categorías**
+
+1. **¿"Ganadería" es vender animales o equipamiento?** El contrato dice
+   "animales de cría y comerciales". Su taxonomía sólo tiene cercas,
+   bebederos, mangas y ordeñadoras. Son negocios distintos.
+2. **¿Los drones van en Maquinaria o en Agricultura de precisión?**
+   Aparecen en las dos.
+3. **¿Tierras y parcelas entra en esta etapa?** No tiene stock, ni
+   carrito, ni envío: se consulta y se negocia. Es otro producto.
+4. **¿"Inversores" qué significa exactamente?** Si es conectar productores
+   con financiación, es otro negocio y no está contratado.
+
+**Sobre marcas**
+
+5. Los cinco grupos de duplicados de arriba.
+6. ¿Husqvarna y Yard Machines son a propósito?
+7. **¿Las marcas aplican a todas las categorías o a algunas?** Hoy el
+   prototipo ofrece las 48 para cualquier producto, así que al elegir un
+   fertilizante propone "John Deere" como marca.
+
+**Sobre el prototipo**
+
+8. **¿Hay otro sistema o desarrollo en paralelo?** El buscador que mandó
+   apunta a una API con campos que no existen acá: `codigo_lote`,
+   `productor_nombre`, `certificaciones`, `unidad_medida`.
+
 ## Observación aparte
 
 El prototipo trae al final una integración contra
