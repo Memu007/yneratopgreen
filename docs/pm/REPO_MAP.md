@@ -91,8 +91,24 @@ git.
 Los modelos son la fuente de verdad del esquema. Cualquier cambio de
 esquema se hace en el modelo y se genera la migración.
 
-**No hay geolocalización todavía.** Ninguna tabla tiene coordenadas.
-PostGIS está instalado y disponible, sin usar.
+### Geolocalización
+
+**PostGIS está en uso real.** Corregido el 2026-07-25: este archivo decía
+que no había geolocalización, y quedó viejo.
+
+- `localities` guarda el padrón oficial de Georef: 4.028 localidades con
+  `latitude`, `longitude` y una columna `coordinates` de tipo
+  `Geography(POINT, 4326)`, con índice GIST
+  (`ix_localities_coordinates`).
+- `products.locality_id` apunta al padrón. La columna admite nulo para no
+  romper filas viejas, pero **al publicar es obligatorio**: el esquema lo
+  exige y `api/products.py` valida que la localidad exista antes de
+  guardar.
+- `ST_Distance` contrastado de forma independiente: Balcarce–Tandil da
+  96,75 km contra 96,67 km calculados por haversine. La diferencia es la
+  esperable entre elipsoide y esfera.
+
+Sobre esto se construye después la logística por cercanía.
 
 ## Documentación de entrega — `docs/`
 

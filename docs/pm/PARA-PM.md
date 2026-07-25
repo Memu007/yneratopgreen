@@ -1,84 +1,110 @@
 # Dev → PM
 
-## Estado: bloqueada antes de implementar
+Fecha: 2026-07-25
 
-No modifiqué `backend/app/seed.py`.
+## Estado: bloqueada después de implementar Tarea 1 parcialmente
 
-La tarea pide cargar las 43 subcategorías “tal como figuran en el análisis”,
-pero `docs/pm/TAXONOMIA-CLIENTE.md` no enumera sus nombres. El archivo sólo
-contiene esta tabla:
+Implementé dos publicaciones de servicio para **Acopio** en
+`backend/app/seed.py`:
 
-```text
-Maquinaria agrícola                         7
-Riego y drenaje                             6
-Insumos agrícolas                           7
-Ganadería y forrajes                        5
-Repuestos y mantenimiento                   6
-Agricultura de precisión y tecnología       4
-Tierras y parcelas                          8
-```
+- `Recepción, Secado y Acopio de Granos` — Rosario, Santa Fe
+- `Guarda de Granos en Silo Bolsa` — Pergamino, Buenos Aires
 
-Los únicos nombres de subcategoría recuperables del material versionado son
-los mencionados incidentalmente en el mapeo:
+Ambas usan la categoría `acopio`, se incorporaron a los mapas explícitos
+de taxonomía y localidad, tienen slugs propios y quedan cubiertas por la
+idempotencia existente del seed (búsqueda por `Product.slug`). No toqué
+esquema, modelos ni migraciones. El commit de implementación ya está
+subido: `814f66b seed: agregar publicaciones de acopio`.
 
-```text
-Semillas y plántulas
-Fertilizantes
-Agroquímicos
-Fertilización y protección
-Cosecha
-Preparación del suelo
-Drones y VANTs
-Sensores de cultivo
-```
+## Qué corrí
 
-Eso no alcanza para reconstruir las 43 sin inventar datos.
-
-## Búsqueda realizada
-
-Busqué archivos de taxonomía, prototipo, HTML, JSON y CSV dentro de `docs/` y
-`backend/`. No está versionado el prototipo original ni otra fuente con la
-lista.
-
-También busqué los nombres conocidos y las expresiones “43 subcategorías” y
-“Maquinaria agrícola” en todo el repositorio. Los únicos resultados
-pertinentes están en:
+### Chequeo estático del seed
 
 ```text
-docs/pm/PARA-DEV.md
-docs/pm/TAXONOMIA-CLIENTE.md
+$ python3 -c "import ast, pathlib; ast.parse(pathlib.Path('backend/app/seed.py').read_text()); print('seed.py: sintaxis Python válida')"
+seed.py: sintaxis Python válida
 ```
 
-`backend/app/data/georef_localidades.csv` es el único CSV del repositorio y
-contiene localidades, no taxonomía.
+### Instalación de dependencias frontend
 
-## Por qué frené
+```text
+$ npm install
+added 205 packages in 4s
+42 packages are looking for funding
+npm warn deprecated inflight@1.0.6
+npm warn deprecated rimraf@3.0.2
+npm warn deprecated glob@7.2.3
+npm warn deprecated eslint@8.57.1
+```
 
-Hay dos instrucciones incompatibles con el material disponible:
+### `npm run smoke`
 
-1. Cargar exactamente las 43 subcategorías enviadas por la clienta.
-2. No inventar ni forzar lo que no encaje.
+La suite llegó a compilar el frontend correctamente y falló antes de
+migraciones, seed o tests por un contenedor ya existente:
 
-Además, el criterio de aceptación exige que las categorías existan “con sus
-subcategorías”. Cargar sólo las ocho conocidas daría una entrega
-deliberadamente incompleta; completar las demás por criterio propio cambiaría
-la taxonomía de la clienta.
-
-## Qué necesito para continuar
-
-Una de estas dos cosas:
-
-- El prototipo HTML original que recibió la PM.
-- Una lista `categoría → subcategorías` con los 43 nombres.
-
-Con cualquiera de las dos puedo continuar de forma mecánica con el seed, el
-mapeo de los 24 productos, la doble ejecución, las consultas SQL, la
-verificación de interfaz y `npm run smoke`.
+```text
+$ npm run smoke
+===> Preparando variables locales
+===> Compilando frontend
+> tsc && vite build
+vite v5.4.21 building for production...
+transforming...
+✓ 78 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.97 kB │ gzip:   0.51 kB
+dist/assets/index-DgJ3Nz_2.css  129.06 kB │ gzip:  23.24 kB
+dist/assets/index-t25D7gNu.js   348.87 kB │ gzip: 103.67 kB
+✓ built in 1.93s
+===> Verificando Chromium de Playwright
+===> Eliminando contenedores y volúmenes locales
+===> Inicializando DB, migraciones, seed y API
+===> Verificando .env
+===> Levantando contenedores (db + api)
+...
+Container topgreen-db  Creating
+Error response from daemon: Conflict. The container name "/topgreen-db" is already in use by container "d5265fe6c4f9ff3a757ec0587ef24343c38311c98d649ee3ff5b91342ac9cf95". You have to remove (or rename) that container to be able to reuse that name.
+```
 
 ## Qué no corrí
 
-- No corrí el seed ni pruebas de esta tarea porque no hubo una implementación
-  válida que verificar.
-- No inicié la tarea responsive: la PM indicó expresamente que va después de
-  la taxonomía.
-- No toqué modelos, migraciones, esquema ni credenciales.
+Por ese bloqueo, no pude correr ni obtener evidencia de:
+
+1. El seed dos veces seguidas y la salida de la segunda ejecución.
+2. Las tres consultas SQL pedidas: subcategorías por categoría,
+   publicaciones por categoría y publicaciones sin categoría.
+3. Los 12 smoke tests en verde: la suite no alcanzó `alembic`, el seed ni
+   los casos de Playwright.
+4. La comprobación en interfaz de que el filtro muestra la taxonomía
+   nueva.
+5. La Tarea 2 (vista móvil) ni la Tarea 3 (puerto estricto). La PM pidió
+   frenar si la evidencia de Tarea 1 fallaba, por lo que no avancé.
+
+## Hallazgo inesperado
+
+Docker Desktop **sí está encendido**. El contenedor que bloquea el smoke
+está saludable y pertenece al mismo proyecto, pero a otro checkout de
+Codex:
+
+```text
+ID: d5265fe6c4f9
+Nombre: topgreen-db
+Estado: Up (healthy)
+Proyecto Compose: yneratopgreen
+Working dir: /Users/Emi/.codex/.chatgpt-projects/g-p-6a5c0432126c8191875cf0ffeeed7118/yneratopgreen
+```
+
+El `docker compose down -v` de este checkout no lo administra. No lo
+detuve ni eliminé: hacerlo podría borrar la base de otro trabajo activo.
+
+Además, `docs/pm/REPO_MAP.md` afirma que no hay geolocalización, pero el
+código actual sí tiene `products.locality_id` y el onboarding describe el
+padrón oficial. No lo edité porque no es parte de esta tarea.
+
+## Necesito de la PM / dueño
+
+Confirmación sobre el contenedor `topgreen-db` del otro checkout: que se
+detenga/elimine allí o autorización explícita para hacerlo. Con el nombre
+liberado vuelvo a correr el smoke desde cero, ejecuto el seed una segunda
+vez, tomo las consultas SQL y verifico el filtro antes de continuar con
+la Tarea 2.
