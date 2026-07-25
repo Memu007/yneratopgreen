@@ -59,6 +59,26 @@ capacidad. Consecuencias para la conducción:
 - **El estimado de trabajo restante vuelve a 8–10 semanas.** Las 7–9 se
   midieron con la dev anterior y no se sostienen con otra herramienta.
 
+## Reparto por capacidad de la dev
+
+Criterio: **la demo con el cliente es el 2026-07-30.** Se prioriza lo que
+hace ver bien el producto, y se asigna según cuánto criterio técnico
+exige cada tarea.
+
+**Dev de menor capacidad — mecánico, sin decisiones de diseño:**
+filtro de ubicación en el backend, actualización de la documentación
+heredada, siembra de las categorías faltantes con productos de ejemplo, y
+los dos bugs cosméticos del panel de vendedor.
+
+**Dev de mayor capacidad — criterio, riesgo o diseño:**
+filtro de ubicación en el frontend (es lo que se muestra en la demo),
+automatización de los smoke tests, módulo de transportistas,
+transferencia bancaria, validación de cuentas y despliegue.
+
+**Regla dura: la dev de menor capacidad no escribe la suite de tests.**
+Tests mal escritos son peores que no tener tests, porque dan confianza
+falsa sobre lo único que nos protege de regresiones.
+
 ## Próximas tareas
 
 1. **Filtro por ubicación, sólo backend** (dev). Requisito 3.1.
@@ -68,19 +88,33 @@ capacidad. Consecuencias para la conducción:
      productos de esa provincia, verificado contra la base. Commit y push
      al terminar, antes de escribir el informe.
 
-2. **Filtro por ubicación, frontend** (dev).
-   Dos selectores encadenados en el panel de filtros, provincia y
-   localidad, que llamen a los parámetros de la tarea 1. El estado se
-   guarda en la URL.
-   - Criterio de aceptación: se filtra desde la interfaz, el resultado
-     coincide con la base, y al recargar la página el filtro se mantiene.
+2. **Sembrar las categorías faltantes** (dev menor). Alto valor de demo:
+   el cliente ve sus cinco categorías del contrato con productos adentro.
+   Faltan Bienes y Ganado, Tecnología para el Cultivo y Logística.
+   - Criterio de aceptación: las cinco categorías del contrato existen
+     con al menos dos productos de ejemplo cada una, todos con localidad.
 
-3. **Automatizar los smoke tests** (dev). Requisito contractual de la
-   fase 5, "pruebas integrales". No es trabajo extra.
+3. **Corregir dos bugs visibles del panel de vendedor** (dev menor).
+   El contador de ventas muestra 0 con ventas reales, y el badge del
+   carrito persiste al cambiar de rol. Eran cosméticos y sin acción,
+   pero se ven en la demo.
+   - Criterio de aceptación: el contador coincide con la cantidad de
+     ventas listadas, y el badge se limpia al cambiar de rol sin recargar.
+
+4. **Filtro por ubicación, frontend** (dev mayor).
+   Dos selectores encadenados, provincia y localidad, contra los
+   parámetros de la tarea 1. El estado se guarda en la URL. Es la pieza
+   que demuestra geolocalización en la reunión, así que tiene que verse
+   bien.
+   - Criterio de aceptación: se filtra desde la interfaz, el resultado
+     coincide con la base, y al recargar se mantiene el filtro.
+
+5. **Automatizar los smoke tests** (dev mayor). Requisito contractual de
+   la fase 5, "pruebas integrales". No es trabajo extra.
    - Criterio de aceptación: un comando corre los once casos contra un
      arranque limpio y devuelve código distinto de cero si alguno falla.
 
-4. **Actualizar la documentación heredada al stack real** (dev, corto).
+6. **Actualizar la documentación heredada al stack real** (dev menor).
    `README.md:49` declara "SQL Server 2022, puerto 1433" y
    `README_LOCAL_SETUP.md` lo menciona nueve veces, cuando
    `docker-compose.yml` usa `postgis/postgis:16-3.4`. Ya hizo perder un
@@ -90,7 +124,7 @@ capacidad. Consecuencias para la conducción:
      stack actual; el quickstart del `README.md` refleja
      `./scripts/init_local_db.sh`.
 
-5. **Módulo de transportistas**. El bloque grande que falta del
+7. **Módulo de transportistas** (dev mayor). El bloque grande que falta del
    diferencial. **No arranca** hasta que el cliente defina si la
    coincidencia va por zonas declaradas o por radio en km.
 
@@ -102,13 +136,10 @@ Decirle explícitamente que los lea desde esa rama, o mergearla.
 
 ## Bloqueos
 
-- **El repositorio es público.** Contiene el proyecto de un cliente, su
-  documentación y notas internas de PM. Nadie lo decidió de forma
-  explícita. Definir si pasa a privado.
 - **EL CONTRATO NO ESTÁ FIRMADO.** Firma prevista el 2026-07-30. El plazo
   de 12 a 14 semanas arranca ahí, así que el 44 % construido es previo al
-  reloj y el proyecto **empieza adelantado**, no atrasado. Con 7 a 9
-  semanas de trabajo restante, entra cómodo.
+  reloj y el proyecto **empieza adelantado**, no atrasado. Con 8 a 10
+  semanas de trabajo restante, entra igual.
 - **Quedan pocos días para corregir la propuesta.** Es la única ventana
   para tocar precio, plazo o definiciones ambiguas; después queda cerrado.
   Ver `PRE_FIRMA.md`.
