@@ -88,6 +88,19 @@ así se detectó. Los números fijos envejecen mal.
   no verificado históricamente escondió sorpresas.
 - **Sin despliegue.** Nadie levantó esto en un servidor real. La fase 5
   está en cero salvo las pruebas.
+- **Revisión de seguridad: condición para desplegar.** La fase 5 no
+  arranca sin ella. Motivo económico antes que técnico: el contrato da 90
+  días de garantía, así que todo lo que se despliegue con un agujero se
+  arregla gratis y con urgencia. Hoy la superficie de ataque es cero
+  —sin URL pública, sin usuarios ni datos reales, sin credenciales de
+  pago—, por eso puede esperar a después de la demostración, pero no al
+  despliegue.
+
+  Ya verificado el 2026-07-25, y estaba bien: sin secretos en los 115
+  commits del historial, `.gitignore` cubriendo `.env`, `*.pem` y `*.key`,
+  contraseñas con bcrypt y CORS sin comodín. Falta el resto: autorización
+  por endpoint, cabeceras, límite de intentos de ingreso, auditoría de
+  dependencias y la subida de archivos.
 
 ## Deuda técnica registrada, sin acción
 

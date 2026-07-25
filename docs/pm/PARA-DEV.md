@@ -128,6 +128,68 @@ tolerante a fallo, en el lugar correcto y sin tocar nada más. Así.
 
 ---
 
+## Tu recomendación de seguridad: aceptada, con fecha
+
+Recomendaste el material de seguridad. **Tenés razón en el fondo y te lo
+acepto. La discusión es cuándo, y ahí te la discuto.**
+
+### Por qué no ahora
+
+**Hoy la superficie de ataque es cero.** No hay despliegue, no hay URL
+pública, no hay usuarios reales, no hay datos reales y no hay credenciales
+de Mercado Pago. Una vulnerabilidad que nadie puede alcanzar no cuesta
+nada durante una semana más.
+
+Lo que sí cuesta es el tiempo: a tres días de la demostración, cada hora
+va a la vista en celular, que es lo que el cliente **sí** va a tocar el
+jueves.
+
+### Por qué igual va, y en serio
+
+El contrato incluye **90 días de garantía**. Un problema de seguridad que
+se despliegue se arregla gratis y con urgencia, en el peor momento
+posible. O sea que la revisión no es opcional: es la forma más barata de
+no trabajar de más después.
+
+**Queda agendada como condición para desplegar.** La fase 5 no arranca sin
+eso. Está anotado en `NOW.md` para que no dependa de que alguno se
+acuerde.
+
+### Lo que ya verifiqué yo, hoy
+
+Hice la parte urgente, que es la única que no puede esperar porque el
+repositorio se entrega al cliente y ya lo clonó gente:
+
+- **No hay secretos en el repositorio ni en el historial.** Revisé los
+  115 commits: lo único que aparece son marcadores `APP_USR-xxxx` en la
+  documentación de pagos.
+- `.gitignore` cubre `.env`, `.env.*`, `*.pem` y `*.key`. Sólo están
+  versionados los `.example`, con valores `CAMBIAR_*`.
+- Las contraseñas se guardan con **bcrypt** y sal por contraseña.
+- **CORS no tiene comodín**: es una lista explícita de orígenes.
+
+Nada de esto estaba roto. Bien, pero había que mirarlo.
+
+### Lo que sí adopto desde ahora, porque es gratis
+
+No es trabajo, es una regla. **Estas cosas se preguntan antes de
+tocarlas**, aunque parezcan parte de la tarea:
+
+- Flujos de autenticación o cambios en la lógica de sesión.
+- Configuración de CORS.
+- Manejadores de subida de archivos.
+- Permisos, roles y quién puede ver qué.
+- Integraciones con servicios externos.
+- Nuevas dependencias.
+
+Se suma a la lista de "qué no tocar" del final.
+
+Y tres que ya valen como prohibición permanente: **nunca** un comodín `*`
+en CORS, **nunca** un secreto en el código, y **nunca** una traza de error
+interna devuelta al usuario.
+
+---
+
 ## Sobre instalar skills de agente: no, y qué tomamos igual
 
 Se evaluó instalarte un paquete de skills de agente. **Decisión: ninguna
