@@ -17,131 +17,69 @@ Hacelo siempre, porque puede haber cambiado.
 
 ---
 
-## Estado: bugs (a) y slug aprobados. (b) y (c) pendientes de verificación
+## Estado: todo aprobado y cerrado
 
-Commit `83c2752`. Buen trabajo, con una corrección de proceso al final.
+Commits `83c2752`, `c9aa2ea`, `ff096e0`. Muy buena vuelta.
 
-**Aprobado y cerrado:**
+**Verificación en navegador (b) y (c): aprobada.** Usaste Playwright con
+navegador real, interceptaste la request de la imagen para forzar el
+`onError` en lugar de esperar que fallara sola, y probaste el modo oscuro.
+Eso es más de lo que te pedí y está bien hecho. Los dos bugs quedan
+cerrados.
 
-- **Bug (a), contador de ventas.** Verifiqué la cadena entera que vos no
-  pudiste probar: la API devuelve `sales_count`, se mapea a `salesCount`
-  en `AuthContext.tsx:76` y se muestra en `UserDashboard.tsx:1157`. El
-  perfil público lee de `/ratings/user/{id}`, que también arreglaste.
-  Llega bien a la interfaz por los dos caminos.
-- **El slug**, verificado en base.
-- El cambio de `package-lock.json` es sólo sincronizar la versión con
-  `package.json`. Inofensivo, de hecho corrige una inconsistencia.
+**Documentación heredada: aprobada.** Verifiqué tu criterio y da vacío, sin
+menciones a SQL Server, 1433, mssql ni pyodbc. Además corregiste el
+instructivo de instalación nativa y el `DATABASE_URL`, que no te lo había
+pedido explícitamente y hacía falta.
 
-**Pendientes:** los bugs (b) y (c) quedaron sin verificar en navegador. El
-código se ve correcto y lo revisé, pero sin verlo funcionar no los doy por
-cerrados. **Los verificás vos**, es la tarea 1 de abajo.
+### Tus dos observaciones adversariales: las dos ciertas
 
-### Tus dos observaciones adversariales
+**CORS frágil.** Confirmado, `main.py` sólo cubre 5173 y 5174. Tu
+diagnóstico es correcto y es la última tarea de abajo.
 
-**La #2 es muy buena.** Tenés razón: en el código no existe el cambio de
-rol, el rol se fija en el login. Yo repetí el síntoma tal como me lo
-describieron sin comprobarlo contra el código. Tu lectura es la correcta y
-tu arreglo apunta al momento real en que cambia el usuario.
-
-**La #1 también sirve**, y confirma algo que ya sabíamos del código
-heredado: hay arreglos empezados y nunca terminados. Bien visto.
-
-### Corrección de proceso — importante
-
-El criterio de aceptación pedía los tres verificados **en navegador**. No
-lo hiciste, y en vez de frenar, completaste y entregaste.
-
-Esa es la condición de corte número 1: *"un criterio de aceptación no se
-cumple"*. Lo correcto era commitear lo hecho, escribirlo y parar ahí.
-
-Que lo declararas con claridad en "Qué NO corrí" está muy bien y no es
-poca cosa. Pero declararlo no reemplaza frenar. **Si no podés cumplir un
-criterio, no completes la tarea: avisá.**
-
-**Y navegador tenés**: estás trabajando en Windsurf, que trae uno
-integrado. Así que de ahora en más, cuando un criterio pida verificación
-visual, se hace. No es opcional ni delegable.
+**No hay toggle de modo oscuro.** Confirmado y es peor de lo que viste:
+busqué `toggleTheme` y `useTheme` en todo el frontend y **no los usa ningún
+componente**. El modo oscuro existe entero —contexto y estilos— pero no
+hay forma de activarlo desde la interfaz. Es funcionalidad construida e
+inalcanzable, y la documentación heredada la declara como terminada.
+Queda registrado. **No lo construyas**: no es requisito del contrato y no
+gastamos ahí.
 
 ---
 
-## Tarea 1: verificar en navegador los bugs (b) y (c)
+## Tarea: fijar el puerto del frontend
 
-No cambies código salvo que encuentres algo roto. Esto es mirar que
-funcione lo que ya escribiste.
+Tu hallazgo de CORS. Elijo arreglarlo por el lado del puerto y no
+ampliando la lista de orígenes permitidos, porque esa lista también se usa
+en producción y no la quiero más laxa.
 
-Levantá el entorno y abrí la aplicación en el navegador de Windsurf.
+En `package.json`, el script `dev` es `vite` a secas. Si el 5173 está
+ocupado, Vite se corre solo a otro puerto y el backend lo rechaza por
+CORS, que es exactamente lo que te pasó.
 
-### (b) El carrito al cambiar de usuario
+**Cambialo a que falle fuerte en vez de moverse en silencio:**
 
-1. Entrá como `cliente@ejemplo.com` / `cliente123`.
-2. Agregá dos productos al carrito. Confirmá que el badge muestre 2.
-3. Cerrá sesión.
-4. Entrá como `vendedor@ejemplo.com` / `vendedor123`.
-5. **Sin recargar la página**, mirá el badge del carrito.
-
-Tiene que estar vacío. Si muestra los productos del usuario anterior, tu
-arreglo no funcionó y quiero saberlo.
-
-### (c) El respaldo de imágenes
-
-1. En el catálogo, con las imágenes cargando bien, confirmá que se ven
-   las fotos normales.
-2. Rompé una imagen a propósito: cortá la red y recargá, o cambiá en la
-   base la URL de un producto por una inválida.
-3. Mirá las tarjetas del catálogo.
-
-Tiene que aparecer el bloque con el nombre del producto sobre el fondo
-degradado, **no** el ícono de imagen rota del navegador.
-
-4. Probalo también en modo oscuro. Agregaste estilos específicos para eso
-   y nunca los viste funcionar.
-
-### Criterio de aceptación
-
-Los dos comportamientos vistos con tus propios ojos, contados paso por
-paso: qué hiciste, qué esperabas y qué viste. Más los errores de consola
-del navegador, aunque estén vacíos.
-
-Si algo no funciona: **no lo arregles todavía.** Reportalo y esperá.
-
----
-
-## Tarea 2: corregir la documentación heredada
-
-Es la que vos misma detectaste el primer día.
-
-`README.md` línea 49 dice "SQL Server 2022 (Developer) | 1433" y
-`README_LOCAL_SETUP.md` lo menciona nueve veces. El proyecto corre sobre
-PostgreSQL 16 con PostGIS 3.4 desde hace varios commits.
-
-**Qué corregir en los dos archivos:**
-
-- Base de datos: PostgreSQL 16 + PostGIS 3.4.
-- Puertos: `5433` en el host, `5432` dentro de Docker.
-- El instructivo de instalación, que hoy describe el flujo viejo de SQL
-  Server, por el real:
-
-  ```bash
-  ./scripts/init_local_db.sh
-  npm install && npm run dev
-  ```
-
-**No toques `docs/PROJECT_STATUS.md`.** Tiene errores conocidos y se
-reescribe entero más adelante.
-
-### Criterio de aceptación
-
-No queda ninguna mención a SQL Server que describa el stack actual.
-Comprobalo así, y pegame la salida:
-
-```bash
-grep -rin "sql server\|1433" README.md README_LOCAL_SETUP.md
+```json
+"dev": "vite --port 5173 --strictPort"
 ```
 
-Si el instructivo del README menciona comandos que ya no existen,
-corregilos también.
+Con `--strictPort`, si el 5173 está ocupado Vite corta con un error claro
+en lugar de arrancar en un puerto que no funciona.
 
-Esta tarea no necesita navegador ni levantar nada.
+### Criterio de aceptación
+
+1. `npm run dev` levanta en 5173 y la aplicación funciona.
+2. Con el 5173 ocupado por otro proceso, `npm run dev` **falla con un
+   mensaje explícito** en vez de arrancar en otro puerto. Pegame la salida
+   de ese caso.
+
+No toques `main.py` ni la configuración de CORS.
+
+### Cuando termines
+
+Es la última tarea mecánica que tengo para vos. **Cuando la cierres, pará
+y avisá.** Lo que sigue —el filtro de ubicación en el frontend y la suite
+de tests— lo hace la otra dev.
 
 ---
 

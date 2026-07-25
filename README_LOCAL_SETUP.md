@@ -3,7 +3,7 @@
 Esta guía describe dos caminos para levantar el proyecto en una máquina nueva:
 
 - **Camino A: Docker Compose** (recomendado, todo en contenedores).
-- **Camino B: Nativo** (Python, Node y SQL Server instalados directamente).
+- **Camino B: Nativo** (Python, Node y PostgreSQL instalados directamente).
 
 Las URLs y puertos son idénticos en ambos casos.
 
@@ -17,7 +17,7 @@ Las URLs y puertos son idénticos en ambos casos.
 | Backend (FastAPI) | http://localhost:8000/api |
 | API Docs (Swagger) | http://localhost:8000/api/docs |
 | API Docs (ReDoc) | http://localhost:8000/api/redoc |
-| Base de datos (SQL Server) | `localhost:1433` (usuario: `sa`) |
+| Base de datos (PostgreSQL) | `localhost:5433` (usuario: `topgreen`) |
 
 ---
 
@@ -31,7 +31,7 @@ Las URLs y puertos son idénticos en ambos casos.
 | Node.js | 20 LTS |
 | npm | ≥ 10 (viene con Node 20) |
 | Git | ≥ 2.40 |
-| Espacio libre en disco | ~6 GB (imagen MSSQL ocupa ~2.5 GB) |
+| Espacio libre en disco | ~2 GB (imagen PostgreSQL+PostGIS) |
 | RAM disponible para Docker | ≥ 4 GB |
 
 ### Pasos
@@ -46,15 +46,15 @@ Las URLs y puertos son idénticos en ambos casos.
    Editar `.env` y `backend\.env` reemplazando los placeholders
    `CAMBIAR_*`. Los valores por default ya apuntan a `localhost`.
 
-   > **Importante**: SQL Server exige password fuerte (≥ 8 chars con
-   > mayúscula, minúscula, número y símbolo). Si el container no levanta,
-   > revisá el password.
+   > **Importante**: Los valores por default ya funcionan para desarrollo
+   > local. Si cambiás el password en `.env`, actualizá también
+   > `DATABASE_URL` en `backend/.env`.
 
 3. **Levantar contenedores DB + API**:
    ```powershell
    docker compose up -d
    ```
-   En el primer arranque la imagen de SQL Server tarda ~30 s en estar healthy.
+   En el primer arranque PostgreSQL tarda ~10 s en estar healthy.
    Verificar:
    ```powershell
    docker compose ps
@@ -65,7 +65,7 @@ Las URLs y puertos son idénticos en ambos casos.
    ```powershell
    docker exec topgreen-api alembic upgrade head
    ```
-   Esto debe pasar de `001_initial_mssql_migration` hasta la última (`011`).
+   Esto debe correr todas las migraciones disponibles.
 
 5. **Cargar datos de prueba (seed)**:
    ```powershell
@@ -115,15 +115,16 @@ docker compose --profile fullstack up -d
 |-------------|---------|
 | Python | 3.11.x (3.12 también funciona) |
 | Node.js | 20 LTS |
-| SQL Server 2022 (Developer / Express) | 2019+ |
-| ODBC Driver 18 for SQL Server | Última |
+| PostgreSQL | 16+ (con extensión PostGIS 3.4) |
+| PostGIS | 3.4+ |
 | Git | ≥ 2.40 |
 
 ### Pasos
 
-1. **Crear DB en SQL Server**:
+1. **Crear DB en PostgreSQL**:
    ```sql
    CREATE DATABASE topgreen;
+   CREATE EXTENSION postgis;
    ```
 
 2. **Backend**:
@@ -134,9 +135,9 @@ docker compose --profile fullstack up -d
    pip install -r requirements.txt
    copy .env.example .env
    ```
-   Editar `backend\.env` y poner `DATABASE_URL` con tu instancia local:
+   Editar `backend/.env` y poner `DATABASE_URL` con tu instancia local:
    ```
-   DATABASE_URL=mssql+pyodbc://sa:TuPass@localhost:1433/topgreen_local?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+   DATABASE_URL=postgresql+psycopg://topgreen:TuPass@localhost:5433/topgreen
    ```
 
 3. **Migraciones + seed**:
@@ -167,7 +168,7 @@ docker compose --profile fullstack up -d
 |----------|----------|---------|
 | `VITE_API_URL` | URL que el frontend usa para llamar al backend | `http://localhost:8000/api` |
 | `VITE_IMAGES_URL` | Base URL para servir imágenes de uploads | `http://localhost:8000` |
-| `DB_PASSWORD` | Password del usuario `sa` de SQL Server (lo lee `docker-compose.yml`) | `CAMBIAR_PASSWORD_LOCAL_SEGURO_2026!` |
+| `DB_PASSWORD` | Password del usuario `topgreen` de PostgreSQL (lo lee `docker-compose.yml`) | `CAMBIAR_PASSWORD_LOCAL_SEGURO_2026!` |
 
 ### Backend (`backend/.env`)
 
@@ -193,7 +194,7 @@ Las variables críticas son:
 
 El seed también crea ~8 categorías (Semillas, Fertilizantes, Herramientas,
 Maquinaria, Agroquímicos, etc.) y productos demo con URLs de imágenes
-externas (Unsplash). Es **idempotente**: podés re-correrlo sin duplicar.
+externas (picsum.photos). Es **idempotente**: podés re-correrlo sin duplicar.
 
 Para resetear datos:
 ```powershell
@@ -225,8 +226,8 @@ Los tres deben devolver JSON 200 OK.
 ## Troubleshooting
 
 ### `topgreen-db` no llega a healthy
-- SQL Server exige password fuerte. Cambiar `DB_PASSWORD` en `.env`.
-- En Windows, asignarle ≥ 4 GB de RAM a Docker Desktop.
+- Verificar que el puerto 5433 no esté en uso por otro proceso.
+- En Windows, asignarle ≥ 2 GB de RAM a Docker Desktop.
 
 ### `topgreen-api` reinicia en loop
 - Ver `docker logs topgreen-api`.
