@@ -15,20 +15,66 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
-## Estado: las dos tareas aprobadas
+## Revisión de la taxonomía (`43911d7`)
 
-Verificadas contra el código. La subida de imágenes ahora comprueba el
-resultado y avisa el motivo, y el catálogo quedó en 24 productos, dos por
-categoría, en nueve provincias.
+Verifiqué el seed contra la transcripción, nombre por nombre.
 
-**Lo que más valoro de esta vuelta:** no arreglaste el bug y listo, le
-agregaste un caso permanente a la suite que fuerza el error y exige tres
-cosas a la vez. Ese bug ya no puede volver en silencio. No te lo había
-pedido.
+**La carga está bien hecha.** Los conteos dan exacto: 7 / 6 / 7 / 5 / 6 /
+4 / 8 = 43. Los nombres son literales. Las cuatro "Otros" quedaron con
+clave compuesta `category_id + slug`, que era el bug que te había
+señalado, y confirmé que `Subcategory.slug` no tiene índice único global,
+así que no se pisan. Los 28 productos tienen categoría y ninguno quedó
+huérfano.
 
-Y que informaras que tu primera corrida falló por tu propia expresión
-regular, en lugar de corregirlo callado, es exactamente la conducta que
-hace que confíe en tus informes.
+Dos cosas antes de darla por cerrada.
+
+### 1. Acopio quedó vacío
+
+De las cuatro categorías de servicio, cargaste Asesoramiento (3),
+Contratistas (5) y Logística (2). **Acopio tiene cero publicaciones.**
+
+En la demostración el cliente va a hacer clic ahí, porque acopio es un
+servicio central del negocio agrícola. Agregá **una o dos publicaciones
+verosímiles**: recepción y acondicionamiento de granos, guarda en silo
+bolsa, secado. Con localidad como todas las demás.
+
+### 2. El informe dice lo contrario que el código
+
+`PARA-PM.md` sigue diciendo "**bloqueada antes de implementar. No
+modifiqué `backend/app/seed.py`**". El commit modifica seed.py con 349
+líneas nuevas.
+
+No es un reproche por el orden —commitear antes de informar es lo que te
+pedí—, pero el archivo quedó mintiendo y ese canal es el registro del
+proyecto. Reescribilo cuando cierres la tarea.
+
+Y me dijiste que la taxonomía está "**probada**". En el repositorio no hay
+evidencia de eso. Para darla por cerrada necesito lo que pedía el criterio
+de aceptación:
+
+- El seed corrido **dos veces**, con la salida de la segunda.
+- Las **dos consultas SQL**: subcategorías por categoría —tiene que dar
+  7/6/7/5/6/4/8— y productos por categoría.
+- `npm run smoke` en verde.
+
+Si eso no se corrió todavía, decilo y listo. **Un "probada" sin salida
+pegada cuenta como no probado**, y hasta ahora tus informes fueron
+confiables justamente porque no hacías esto.
+
+### Lo que hiciste bien y no te pedí
+
+Frenar por las subcategorías faltantes fue correcto, y el informe del
+bloqueo estaba bien armado: qué buscaste, dónde, y por qué las dos
+instrucciones eran incompatibles. El error era mío y lo pude corregir en
+minutos porque lo documentaste así.
+
+### El campo de 120 hectáreas: dejalo como está
+
+Cargaste una publicación en Tierras y parcelas por mi criterio de "ninguna
+categoría vacía". Está bien ejecutado. Que un campo de $950.000.000 tenga
+botón de agregar al carrito es un problema **de alcance, no tuyo**: yo
+decido qué hacemos con eso en la demostración. No lo toques ni lo
+arregles.
 
 ---
 

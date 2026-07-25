@@ -32,12 +32,39 @@ Datos de acceso:
 
 ### 1. El catálogo (2 min)
 
-Abrí el marketplace. **24 publicaciones, doce categorías, nueve
-provincias.** Mostrá las cinco categorías del pliego: insumos, ganado,
-maquinaria, tecnología de cultivo y logística.
+Abrí el marketplace. **28 publicaciones, doce categorías, nueve
+provincias**, con la taxonomía que mandó ella: sus 7 categorías y 43
+subcategorías, más Bienes y Ganado, más los servicios.
 
-> "Estas son las cinco categorías de su documento, con publicaciones
-> reales cargadas."
+> "Esto ya no son las categorías que inventamos nosotros: es la
+> clasificación que usted nos mandó, cargada tal cual, con sus 43
+> subcategorías."
+
+Es el mejor momento de toda la demostración para construir confianza,
+porque le devolvés su propio trabajo hecho realidad en tres días.
+
+### 1b. Tierras y parcelas — abrilo vos, antes que ella (1 min)
+
+**Abrí la categoría y mostrá el campo de 120 hectáreas con el botón de
+agregar al carrito.** Después decí:
+
+> "Fíjese en esto: un campo de 950 millones con un botón de 'agregar al
+> carrito'. No tiene sentido, y por eso se lo traigo yo antes de que lo
+> encuentre usted. Un campo no se compra en línea: se consulta, se visita
+> y se negocia. Necesita superficie, régimen de tenencia, mejoras y
+> documentación. Es un producto distinto dentro de la misma plataforma."
+
+**Por qué conviene mostrarlo en vez de esconderlo.** Si lo tapás y ella lo
+descubre después, parece que se lo ocultaste. Si lo mostrás vos, tres
+cosas quedan claras de una: que cargaste su taxonomía completa, que
+entendés su negocio mejor que el documento, y que hay un desarrollo
+adicional que **no está incluido** en lo firmado.
+
+Es la misma jugada que el `Jhon Deere` mal escrito. Señalar el problema
+antes que el cliente es lo que separa a un proveedor de un vendedor.
+
+**No cierres un número en la reunión.** Alcanza con: *"lo cotizamos
+aparte, cuando definamos si va en esta etapa o en la siguiente"*.
 
 ### 2. La búsqueda por ubicación (2 min) — **el momento fuerte**
 
