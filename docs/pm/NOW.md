@@ -28,6 +28,28 @@ El cimiento geográfico está puesto y verificado.
   mano. Es el próximo riesgo: ya arreglamos cosas que "nunca
   funcionaron" y no hay red que detecte una regresión.
 
+## Punto de retome — 2026-07-25, fin de jornada
+
+**Hay trabajo terminado sin subir.** El filtro por ubicación y el script
+de smoke tests están hechos en la máquina de la dev, sin commit ni push.
+La sesión se cortó por límites de uso de las herramientas, no por un
+problema del proyecto.
+
+Reportado como terminado y pendiente de subir:
+
+- Filtro por provincia y localidad, backend y frontend, combinable con
+  categoría y precio, con el estado conservado en la URL.
+- Build en verde y arranque limpio en verde.
+- Smoke automático **11/11**, incluida la publicación real desde UI con
+  consola sin errores. Comando: `npm run smoke:clean`.
+
+**Lo primero al retomar es commitear y pushear**, antes que cualquier otra
+cosa. Nada de eso está verificado por PM todavía porque no está en el
+repositorio.
+
+Queda pendiente de evidencia, y puede esperar: la verificación visual del
+filtro y la prueba de que el script devuelve código 1 cuando algo falla.
+
 ## Próximas tareas
 
 1. **Filtro por ubicación en el catálogo** (dev). Cierra el requisito 3.1.
