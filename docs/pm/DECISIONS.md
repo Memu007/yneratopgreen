@@ -5,6 +5,46 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-07-25 — Línea base aprobada. Empieza la construcción
+
+PostgreSQL 16 + PostGIS 3.4.3, una migración generada desde los modelos
+(15 tablas, 40 índices, sin `DROP`), seed repetible, build en verde y los
+diez smoke tests en `200`. Commit `de98fae`.
+
+Aprobados los tres arreglos de código que hicieron falta, todos mínimos y
+sin tocar el esquema: `UUID` → `str` en parámetros y schemas de request
+(las columnas son `String(36)`), acumulador `Decimal` en el total del
+carrito, y corrección del slug inexistente en el seed.
+
+Ese segundo arreglo confirma el diagnóstico anterior: un
+`float += Decimal` en el total del carrito significa que **nadie sumó
+nunca dos ítems a un carrito** en el código heredado.
+
+Verificado además que el frontend no tiene llamadas huérfanas: los 23
+endpoints que invoca existen en el backend. Era el mayor riesgo pendiente
+y queda descartado.
+
+Se cierra la fase de auditoría. El avance medido contra el contrato es
+~40%, con la matriz de evidencia en `MATRIZ.md`.
+
+---
+
+## 2026-07-25 — No se cambian los IDs a `uuid` nativo
+
+Los modelos usan `String(36)` para los identificadores. En PostgreSQL el
+tipo `uuid` nativo sería mejor: índices más chicos y validación de tipo. Y
+este es el momento más barato para cambiarlo, con la base vacía y el
+esquema recién generado.
+
+**No se hace.** No afecta ningún requisito contractual, el presupuesto es
+cerrado y a la escala de este MVP `String(36)` funciona. Aplicar acá el
+mismo criterio que se le exige al alcance: no se construye lo que no está
+pedido.
+
+Queda registrado porque la ventana barata se cierra cuando haya datos.
+
+---
+
 ## 2026-07-25 — Geolocalización con localidades sembradas, sin API paga
 
 Se evaluó dejar la geolocalización como extra por el costo de las APIs de

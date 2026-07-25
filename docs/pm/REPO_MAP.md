@@ -8,8 +8,13 @@ Referencia para ubicar código sin recorrer el repositorio.
 |------|-----------|--------------|
 | Frontend | React 18 + TypeScript + Vite | `5173` |
 | Backend | FastAPI + Python 3.11 | `8000` |
-| Base de datos | SQL Server 2022 | `1433` |
+| Base de datos | PostgreSQL 16 + PostGIS 3.4 | `5433` en el host, `5432` dentro de Docker |
 | Pagos | Mercado Pago Marketplace (Split) | desvinculado |
+
+Sólo está habilitada la extensión `postgis`. `postgis_tiger_geocoder`,
+`postgis_topology` y `fuzzystrmatch` se eliminan en el arranque vía
+`infra/postgres/init/99_topgreen_postgis_only.sh`, que corre después del
+init de la imagen y sobrevive a `docker compose down -v`.
 
 ## Frontend — `src/`
 
@@ -74,17 +79,20 @@ Otros: `core/` (config y seguridad), `db/`, `schemas/`,
 
 ### Migraciones
 
-`backend/alembic/versions/` — 10 archivos, de `001` a `010`. Las de
-Fase II relevantes: 004 `publication_type`, 005 `category_service`,
-006 `subcategories`, 007 `form_options`, 009 FK
-`product.subcategory_id`, 010 `ratings`.
+**Una sola migración**: `766eee72137f_esquema_inicial_postgresql`,
+generada desde los modelos. 15 tablas, 40 índices, sin `DROP` ni `ALTER`.
+`alembic upgrade head` verificado, y un autogenerate posterior no detecta
+diferencias.
 
-**No existe la migración `011`.** `docs/PROJECT_STATUS.md` la declara
-("migración 011 agrega `lat`, `lng` y un índice geo") pero el archivo no
-está en el repositorio, no hay ninguna migración que mencione `lat`,
-`lng` ni índices espaciales, y `backend/app/models/product.py` no tiene
-coordenadas. Verificado el 2026-07-24. No hay geolocalización de ningún
-tipo en el código.
+Las 10 migraciones heredadas de SQL Server se eliminaron: describían un
+esquema anterior al rediseño de los modelos. Quedan en el historial de
+git.
+
+Los modelos son la fuente de verdad del esquema. Cualquier cambio de
+esquema se hace en el modelo y se genera la migración.
+
+**No hay geolocalización todavía.** Ninguna tabla tiene coordenadas.
+PostGIS está instalado y disponible, sin usar.
 
 ## Documentación de entrega — `docs/`
 
@@ -98,14 +106,17 @@ Raíz: `README.md`, `README_LOCAL_SETUP.md`, `DELIVERY_CHECKLIST.md`,
 
 ## Levantar en local
 
-```powershell
-copy .env.example .env
-copy backend\.env.example backend\.env
-docker compose up -d
-docker exec topgreen-api alembic upgrade head
-docker exec topgreen-api python -m app.seed
-npm install
-npm run dev
+```bash
+./scripts/init_local_db.sh   # crea la base, migra y siembra
+npm install && npm run dev
 ```
 
-Detalle y alternativa nativa en `README_LOCAL_SETUP.md`.
+El script es idempotente y reproducible desde cero
+(`docker compose down -v` y volver a correrlo). El seed también es
+repetible: reconoce los registros existentes.
+
+El equivalente en Windows es `scripts/init_local_db.ps1`.
+
+Verificado el 2026-07-25 con los diez smoke tests en verde. El
+quickstart de tres comandos del `README.md` describe el flujo anterior de
+SQL Server y **no es válido**.
