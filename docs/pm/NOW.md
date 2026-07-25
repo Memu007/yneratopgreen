@@ -88,19 +88,48 @@ así se detectó. Los números fijos envejecen mal.
   no verificado históricamente escondió sorpresas.
 - **Sin despliegue.** Nadie levantó esto en un servidor real. La fase 5
   está en cero salvo las pruebas.
-- **Revisión de seguridad: condición para desplegar.** La fase 5 no
-  arranca sin ella. Motivo económico antes que técnico: el contrato da 90
-  días de garantía, así que todo lo que se despliegue con un agujero se
-  arregla gratis y con urgencia. Hoy la superficie de ataque es cero
-  —sin URL pública, sin usuarios ni datos reales, sin credenciales de
-  pago—, por eso puede esperar a después de la demostración, pero no al
-  despliegue.
+- **Revisión de seguridad: al final, como condición para desplegar.** La
+  fase 5 no arranca sin ella, y **no se adelanta**.
 
-  Ya verificado el 2026-07-25, y estaba bien: sin secretos en los 115
-  commits del historial, `.gitignore` cubriendo `.env`, `*.pem` y `*.key`,
-  contraseñas con bcrypt y CORS sin comodín. Falta el resto: autorización
-  por endpoint, cabeceras, límite de intentos de ingreso, auditoría de
-  dependencias y la subida de archivos.
+  Motivo de la fecha: auditar ahora sería certificar la mitad del
+  sistema. Faltan por construir transportistas, transferencia bancaria y
+  la puesta en marcha de los pagos, que son justamente los bloques que
+  tocan datos sensibles y dinero. Revisar antes obliga a revisar dos
+  veces.
+
+  Motivo de que igual se haga, y es económico: el contrato da **90 días
+  de garantía**. Todo lo que se despliegue con un agujero se arregla
+  gratis, con urgencia y en el peor momento.
+
+  Ya verificado el 2026-07-25 lo único que no podía esperar, porque el
+  repositorio se entrega y se clona: sin secretos en los 115 commits del
+  historial, `.gitignore` cubriendo `.env`, `*.pem` y `*.key`,
+  contraseñas con bcrypt y CORS sin comodín. Se repite antes de entregar.
+
+  **La excepción, y no es una auditoría:** el módulo de transportistas
+  arranca con una decisión de diseño que no se puede posponer. Ver abajo.
+
+## La pregunta que abre el módulo de transportistas
+
+Antes de escribir la primera línea de ese módulo hay que responder **quién
+puede ver los datos de contacto de quién**.
+
+El contrato pide que el comprador pueda "contactar directo con los datos
+provistos" por el transportista. Eso significa que la plataforma va a
+mostrar teléfonos, direcciones y ubicaciones base de personas reales:
+productores y transportistas argentinos.
+
+No es un tema de auditoría posterior, es la forma del módulo:
+
+- ¿El teléfono del transportista se ve antes de contratarlo o después?
+- ¿El comprador ve la dirección exacta del vendedor o sólo la localidad?
+- ¿El transportista ve el detalle de la compra o sólo origen y destino?
+
+Si esto se define al empezar, es un parámetro. Si se define al auditar, es
+reescribir el módulo entero, y ahí sí se paga dos veces.
+
+**Va a la lista de preguntas para la clienta**, junto con la de zonas
+declaradas contra radio en km. Son la misma conversación.
 
 ## Deuda técnica registrada, sin acción
 
