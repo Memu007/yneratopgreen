@@ -2,83 +2,77 @@
 
 ## Estado: bloqueada antes de implementar
 
-No modifiqué `backend/app/seed.py`.
+Leí el onboarding completo, actualicé `main` y revisé la Tarea 1 contra
+`backend/app/seed.py`. La carga de una o dos publicaciones de Acopio es
+técnicamente directa y no requiere tocar modelos, esquema ni migraciones.
 
-La tarea pide cargar las 43 subcategorías “tal como figuran en el análisis”,
-pero `docs/pm/TAXONOMIA-CLIENTE.md` no enumera sus nombres. El archivo sólo
-contiene esta tabla:
+No modifiqué código de producto porque este entorno no tiene Docker ni una
+instalación nativa de PostgreSQL/PostGIS. Sin base y API no puedo producir la
+evidencia obligatoria ni validar el cambio antes de subirlo.
 
-```text
-Maquinaria agrícola                         7
-Riego y drenaje                             6
-Insumos agrícolas                           7
-Ganadería y forrajes                        5
-Repuestos y mantenimiento                   6
-Agricultura de precisión y tecnología       4
-Tierras y parcelas                          8
-```
-
-Los únicos nombres de subcategoría recuperables del material versionado son
-los mencionados incidentalmente en el mapeo:
+## Evidencia del bloqueo
 
 ```text
-Semillas y plántulas
-Fertilizantes
-Agroquímicos
-Fertilización y protección
-Cosecha
-Preparación del suelo
-Drones y VANTs
-Sensores de cultivo
+$ docker version
+/bin/bash: line 1: docker: command not found
 ```
 
-Eso no alcanza para reconstruir las 43 sin inventar datos.
-
-## Búsqueda realizada
-
-Busqué archivos de taxonomía, prototipo, HTML, JSON y CSV dentro de `docs/` y
-`backend/`. No está versionado el prototipo original ni otra fuente con la
-lista.
-
-También busqué los nombres conocidos y las expresiones “43 subcategorías” y
-“Maquinaria agrícola” en todo el repositorio. Los únicos resultados
-pertinentes están en:
+También comprobé las alternativas disponibles:
 
 ```text
-docs/pm/PARA-DEV.md
-docs/pm/TAXONOMIA-CLIENTE.md
+$ command -v podman nerdctl psql postgres pg_ctl initdb
+(sin salida)
+
+$ node --version
+v24.14.0
+
+$ npm --version
+11.9.0
+
+$ python3 --version
+Python 3.12.13
 ```
 
-`backend/app/data/georef_localidades.csv` es el único CSV del repositorio y
-contiene localidades, no taxonomía.
+Node y Python están presentes, pero no hay motor de contenedores ni servidor
+PostgreSQL. Esto es un bloqueo del entorno, no un fallo observado en TopGreen.
 
-## Por qué frené
+## Qué corrí
 
-Hay dos instrucciones incompatibles con el material disponible:
+```text
+$ git pull origin main
+From https://github.com/Memu007/yneratopgreen
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+```
 
-1. Cargar exactamente las 43 subcategorías enviadas por la clienta.
-2. No inventar ni forzar lo que no encaje.
+Revisé:
 
-Además, el criterio de aceptación exige que las categorías existan “con sus
-subcategorías”. Cargar sólo las ocho conocidas daría una entrega
-deliberadamente incompleta; completar las demás por criterio propio cambiaría
-la taxonomía de la clienta.
-
-## Qué necesito para continuar
-
-Una de estas dos cosas:
-
-- El prototipo HTML original que recibió la PM.
-- Una lista `categoría → subcategorías` con los 43 nombres.
-
-Con cualquiera de las dos puedo continuar de forma mecánica con el seed, el
-mapeo de los 24 productos, la doble ejecución, las consultas SQL, la
-verificación de interfaz y `npm run smoke`.
+- La definición de las 12 categorías en el seed.
+- El mapa `product_taxonomy`.
+- El mapa `product_localities`.
+- La idempotencia por `Product.slug`.
+- Los modelos `Product` y `Category`.
 
 ## Qué no corrí
 
-- No corrí el seed ni pruebas de esta tarea porque no hubo una implementación
-  válida que verificar.
-- No inicié la tarea responsive: la PM indicó expresamente que va después de
-  la taxonomía.
-- No toqué modelos, migraciones, esquema ni credenciales.
+- No corrí el seed, ni una ni dos veces.
+- No corrí las consultas SQL.
+- No levanté API ni interfaz.
+- No verifiqué el filtro de categorías en navegador.
+- No corrí `npm run smoke`.
+- No inicié la Tarea 2 responsive.
+- No inicié la Tarea 3 del puerto estricto.
+
+## Qué encontré que no esperaba
+
+`docs/pm/REPO_MAP.md` todavía afirma que no hay geolocalización y habla de diez
+smoke tests, mientras el código, `NOW.md` y el onboarding documentan
+geolocalización ya implementada y doce casos. No toqué ese documento porque no
+forma parte de la tarea; para esta revisión tomé el código como fuente de
+verdad.
+
+## Qué necesito para seguir
+
+Que el entorno exponga Docker Desktop/Engine con Compose v2. Apenas esté
+disponible retomo desde Tarea 1, y no la declararé cerrada sin pegar la salida
+del segundo seed, las consultas SQL y el smoke.
