@@ -4,11 +4,11 @@ Actualizado: 2026-07-25
 
 ## Objetivo activo
 
-**Geolocalización: tabla de localidades y ubicación en las
-publicaciones.** Primer bloque del diferencial contractual.
+**Filtro por ubicación en el catálogo**, que cierra el requisito 3.1, y
+**automatizar los smoke tests** antes de encarar el módulo de
+transportistas.
 
-La línea base está cerrada y aprobada. Se pasa de arqueología a
-construcción.
+El cimiento geográfico está puesto y verificado.
 
 ## Estado
 
@@ -16,38 +16,40 @@ construcción.
   PostGIS 3.4.3, una migración generada desde los modelos (15 tablas, 40
   índices, sin `DROP`), seed repetible, build de frontend en verde y los
   diez smoke tests en `200`. Commit `de98fae` en `main`.
-- Avance medido contra el contrato: **~38%**. Detalle y bugs abiertos en
-  `MATRIZ.md`.
-- El frontend **no tiene llamadas huérfanas**: los 23 endpoints que
-  invoca existen en el backend. Era el mayor riesgo pendiente y quedó
-  descartado.
-- **UI recorrida.** Funciona registro, login con tres roles, catálogo con
-  filtros combinados, detalle, carrito, checkout hasta el botón de pago,
-  dashboard de vendedor y admin. **Publicar está roto y nunca funcionó**:
-  la app se desmonta completa al elegir una categoría.
+- Avance medido contra el contrato: **~44%**. Detalle en `MATRIZ.md`.
+- **UI verificada de punta a punta**, publicación incluida. Se arregló el
+  crash que la rompía desde siempre.
+- **Geolocalización con cimiento real**: 4.028 localidades oficiales de
+  Georef con copia versionada y validación de hash,
+  `Geography(POINT,4326)` con índice GIST, y `products.locality_id`
+  obligatorio contra el padrón. `ST_Distance` verificado de forma
+  independiente.
+- **No hay suite automatizada.** Cada vuelta se repiten los smoke tests a
+  mano. Es el próximo riesgo: ya arreglamos cosas que "nunca
+  funcionaron" y no hay red que detecte una regresión.
 
 ## Próximas tareas
 
-1. **Desbloquear la publicación** (dev). Requisito contractual 3.1.
-   Fusionar la respuesta de `form_options` con el estado inicial en lugar
-   de reemplazarlo, sembrar los tipos de opción faltantes salvo
-   provincias, y agregar un error boundary de nivel superior.
-   - Criterio de aceptación: se publica un producto entero desde la UI,
-     sin errores de consola, y con la tabla `form_options` vacía el
-     formulario carga igual en vez de romperse.
-
-2. **Tabla de localidades y ubicación en publicaciones** (dev).
-   Georef v2, 4.028 localidades con copia versionada. Selección desde
-   lista. Alcance en `PROJECT.md`.
-   - Criterio de aceptación: seed de localidades reproducible y sin
-     internet; una publicación guarda su localidad; una consulta PostGIS
-     devuelve distancia entre dos localidades con datos reales.
-
-3. **Filtro por ubicación en el catálogo** (dev).
-   Cierra el requisito 3.1 del contrato.
+1. **Filtro por ubicación en el catálogo** (dev). Cierra el requisito 3.1.
    - Criterio de aceptación: el catálogo filtra por provincia y
-     localidad, combinable con categoría, y el filtro se conserva al
-     navegar.
+     localidad, combinable con categoría y precio, y el filtro se
+     conserva al navegar.
+
+2. **Automatizar los smoke tests** (dev, ~medio día).
+   Convertir en script los diez casos que hoy se corren a mano, más la
+   publicación desde la UI. Es requisito contractual de la fase 5
+   ("pruebas integrales"), no trabajo extra.
+   - Criterio de aceptación: un comando los corre todos contra un
+     arranque limpio y falla con código distinto de cero si alguno se
+     rompe.
+   - Motivo de hacerlo ahora y no al final: cada vuelta encontramos algo
+     que nunca funcionó, y no hay nada que detecte una regresión sobre lo
+     ya arreglado. Además se deja de repetir trabajo manual en cada
+     entrega.
+
+3. **Módulo de transportistas** (dev). El bloque grande que falta del
+   diferencial. Antes de arrancar hay que resolver la definición
+   pendiente: zonas declaradas o radio en km.
 
 ## Bloqueos
 
@@ -55,9 +57,10 @@ construcción.
   documentación y notas internas de PM. Nadie lo decidió de forma
   explícita. Definir si pasa a privado.
 - **Plazo y presupuesto.** El contrato son 12 a 14 semanas a precio
-  cerrado y falta el diferencial completo. Estimado de trabajo restante:
-  8 a 10 semanas. Falta la fecha de firma para saber cuánto se consumió.
-  Conversación comercial pendiente antes de comprometer fechas.
+  cerrado. Estimado de trabajo restante revisado a **7 a 9 semanas** tras
+  el primer dato de velocidad real. Falta la fecha de firma para saber
+  cuánto se consumió. Conversación comercial pendiente antes de
+  comprometer fechas.
 - **Mercado Pago sin credenciales**, con un bug de sandbox conocido. No
   se toca hasta la fase de pagos.
 
@@ -73,7 +76,14 @@ construcción.
 
 ## Último resultado validado
 
-Línea base PostgreSQL + PostGIS con los diez smoke tests en `200`, seed
-repetible y build en verde. Revisados y aprobados los tres arreglos de
-código que hicieron falta: `UUID` → `str` en parámetros y schemas,
-acumulador `Decimal` en el total del carrito, y el slug del seed.
+Localidades y publicación con ubicación estructurada, commit `190525b`.
+
+Verificado de forma independiente contra el repositorio: el SHA-256 del
+CSV coincide, los 4.028 registros están, la localidad guardada en el
+producto (`06063010`, Balcarce) corresponde al padrón oficial, y la
+distancia Balcarce–Tandil de `ST_Distance` (96,75 km sobre elipsoide) es
+consistente con 96,67 km calculados por haversine sobre esfera. La
+diferencia es la esperada entre los dos modelos.
+
+Confirmado también que `locality_id` es obligatorio en el schema, que la
+API valida contra el padrón, y que el seed aborta si el hash no coincide.

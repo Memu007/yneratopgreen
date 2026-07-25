@@ -64,6 +64,41 @@ direcciones libres, mapas y selección con pin, distancia por ruta real
 
 ---
 
+## 2026-07-25 — Primer bloque contractual entregado y verificado
+
+Publicación desbloqueada y geolocalización con cimiento real, commit
+`190525b`. Primera funcionalidad del contrato construida por este equipo,
+no heredada.
+
+Verificado de forma independiente: hash del CSV, cantidad de registros,
+correspondencia de la localidad guardada con el padrón, y la distancia de
+`ST_Distance` contrastada contra un cálculo propio por haversine. La
+diferencia de 80 metros es la esperada entre elipsoide y esfera, lo que
+confirma que PostGIS está bien configurado y en uso real.
+
+Confirmado además que el fallback de categorías hardcodeadas **sí estaba
+activo** mientras cargaba la API, ofreciendo categorías inexistentes como
+"Ganadería". Eliminado.
+
+Primer dato de velocidad: el cimiento geográfico estaba estimado en unas
+dos semanas y salió en una sesión. El estimado de trabajo restante baja de
+8–10 a **7–9 semanas**. Es un solo dato y lo que queda tiene más
+incógnitas, así que se firmará después del módulo de transportistas.
+
+---
+
+## 2026-07-25 — Automatizar los smoke tests antes de transportistas
+
+Hoy los diez casos se repiten a mano en cada entrega y no existe nada que
+detecte una regresión.
+
+Se aprueba automatizarlos, alrededor de medio día. No es trabajo extra: la
+fase 5 del contrato pide "pruebas integrales". Y se hace ahora en lugar de
+al final porque en cada vuelta apareció algo que nunca había funcionado, y
+todo lo ya arreglado está sin protección.
+
+---
+
 ## 2026-07-25 — Fuente de localidades: Georef v2 del Estado argentino
 
 Aprobada. Descarga completa de `localidades.csv`: 4.028 registros con ID

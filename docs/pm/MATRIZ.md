@@ -16,7 +16,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | …con validación | ❌ | Campo `is_verified` en el modelo, sin flujo de validación |
 | Perfil | ✅ | `GET /auth/me` y `PATCH /auth/me` responden `200` |
 | Buscador con filtro por **categoría** | ✅ | Smoke test `200`, filtros de categoría, precio y stock aplicados |
-| Buscador con filtro por **ubicación** | ❌ | No hay coordenadas ni localidad en ninguna tabla |
+| Buscador con filtro por **ubicación** | ⚪ | Los datos ya existen: 4.028 localidades con coordenadas y `products.locality_id`. Falta exponer el filtro en el catálogo |
 | Carrito de compras | ✅ | Smoke test: agregar y ver, `200` + `200`, total $45.000 |
 | Historial de pedidos | ✅ | Smoke test "mis compras": `200`, 3 compras |
 
@@ -26,20 +26,10 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 |-----------|--------|-----------|
 | Registro con validación | ❌ | Igual que comprador |
 | Panel de control básico | ⚪ | Carga perfil, ventas y productos en UI. El contador de ventas muestra 0 con 2 ventas reales |
-| Publicación desde la UI | ❌ | **Rota.** Al elegir categoría, `TypeError` en `AddProductModal` y la aplicación se desmonta completa |
-| Publicación por API | ✅ | Smoke test: `POST /products` `200` |
-| Publicación con **ubicación** | ❌ | Provincia y ciudad en texto libre, sin estructura |
+| Publicación desde la UI | ✅ | Producto completo publicado con imagen, sin errores de consola, visible en catálogo |
+| Publicación con **ubicación** | ✅ | `locality_id` obligatorio contra el padrón oficial. Verificado: Balcarce `06063010` guardado en base |
 | Gestión de stock | ✅ | Filtro de stock aplicado en catálogo, verificado en UI |
 | Gestión de ventas recibidas | ✅ | "Mis Ventas" lista 2 pedidos en UI |
-
-**Causa raíz de la publicación rota:** `/catalog/form-options` arma la
-respuesta dinámicamente y omite la clave de todo tipo de opción sin filas
-activas. El frontend hace `setFormOptions(data)`, que reemplaza el estado
-entero, así que las claves ausentes quedan `undefined` y revientan en
-`.length`. La tabla `form_options` está vacía o incompleta.
-
-Nunca funcionó para nadie. La verificación por API no lo detectó porque el
-endpoint responde `200` con un objeto incompleto.
 
 ## 3.2 Módulo de Logística
 
@@ -82,7 +72,7 @@ endpoint responde `200` con un objeto incompleto.
 |-----------|--------|-----------|
 | React / Next.js | ✅ | React 18 + Vite, `npm run build` en 2,05 s, 78 módulos |
 | Python FastAPI / Django o Node | ✅ | FastAPI operativo, `/api/health` `200` |
-| **PostgreSQL + PostGIS** | ✅ | PostGIS 3.4.3 sobre PostgreSQL 16, migración aplicada, 15 tablas |
+| **PostgreSQL + PostGIS** | ✅ | PostGIS 3.4.3 sobre PostgreSQL 16, 16 tablas. **PostGIS en uso real**: `Geography(POINT,4326)` con índice GIST; `ST_Distance` Balcarce–Tandil = 96,75 km, contrastado de forma independiente contra 96,67 km por haversine |
 | Responsive móvil y escritorio | 🟡 | Está construido; sin verificar en dispositivos |
 | AWS / Supabase / Render | ❌ | Sin despliegue propio |
 
@@ -122,9 +112,9 @@ Dos observaciones que el porcentaje no muestra:
 
 | Bug | Severidad | Estado |
 |-----|-----------|--------|
-| Publicación rota: `TypeError` al elegir categoría, desmonta la app | **Bloqueante.** Requisito contractual 3.1 | Arreglo aprobado |
-| Sin error boundary: cualquier error de JS deja pantalla en blanco | Alta para demos | Arreglo aprobado |
-| `form_options` sin datos, formularios sin opciones | Alta | Se siembra, menos provincias |
-| Categorías hardcodeadas como fallback, desalineadas con la base | Media, latente | A verificar si está activo |
-| Contador de ventas del vendedor en 0 con 2 ventas reales | Baja, cosmética | Registrado, sin acción |
-| Badge del carrito persiste al cambiar de rol | Baja, cosmética | Registrado, sin acción |
+| Publicación rota: `TypeError` al elegir categoría, desmonta la app | **Bloqueante.** Requisito contractual 3.1 | ✅ Resuelto. `form_options` se fusiona con el estado inicial; probado con la tabla vacía |
+| Sin error boundary: cualquier error de JS deja pantalla en blanco | Alta para demos | ✅ Resuelto |
+| `form_options` sin datos | Alta | ✅ Seed idempotente de 18 opciones. Provincias salen de `localities` |
+| Categorías hardcodeadas como fallback | Media | ✅ **Estaba activo** mientras cargaba la API y ofrecía categorías inexistentes. Eliminado; la API es la única fuente |
+| Contador de ventas del vendedor en 0 con 2 ventas reales | Baja, cosmética | Abierto, sin acción |
+| Badge del carrito persiste al cambiar de rol | Baja, cosmética | Abierto, sin acción |
