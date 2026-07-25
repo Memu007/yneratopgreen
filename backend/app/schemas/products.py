@@ -14,7 +14,7 @@ class ProductCreateRequest(BaseModel):
     price: float = Field(..., ge=0)  # ge=0 para permitir servicios "a convenir"
     stock: Optional[int] = Field(None, ge=0)  # Opcional para servicios
     unit: Optional[str] = Field(None, max_length=50)
-    location: Optional[str] = Field(None, max_length=255)
+    locality_id: str = Field(..., max_length=20)
     
     # Tipo de publicación
     publication_type: Literal["producto", "servicio"] = "producto"
@@ -36,7 +36,7 @@ class ProductUpdateRequest(BaseModel):
     price: Optional[float] = Field(None, ge=0)
     stock: Optional[int] = Field(None, ge=0)
     unit: Optional[str] = Field(None, max_length=50)
-    location: Optional[str] = None
+    locality_id: Optional[str] = Field(None, max_length=20)
     status: Optional[Literal["active", "paused"]] = None  # Para pausar/activar producto
     
     # Campos específicos para servicios

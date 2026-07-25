@@ -17,32 +17,7 @@ interface ImageFile {
   file?: File;
 }
 
-const CATEGORIES = [
-  { value: 'Semillas', subcategories: ['Maíz', 'Soja', 'Trigo', 'Girasol', 'Sorgo'] },
-  { value: 'Fertilizantes', subcategories: ['Nitrogenados', 'Fosforados', 'Potásicos', 'Compuestos'] },
-  { value: 'Agroquímicos', subcategories: ['Herbicidas', 'Insecticidas', 'Fungicidas', 'Acaricidas'] },
-  { value: 'Maquinaria', subcategories: ['Tractores', 'Cosechadoras', 'Sembradoras', 'Pulverizadoras'] },
-  { value: 'Ganadería', subcategories: ['Alimento Balanceado', 'Sanidad', 'Infraestructura', 'Genética'] },
-];
-
-const PROVINCES = [
-  'Buenos Aires', 'CABA', 'Córdoba', 'Santa Fe', 'Entre Ríos', 'Corrientes',
-  'Mendoza', 'San Juan', 'San Luis', 'La Pampa', 'Neuquén',
-  'Río Negro', 'Chubut', 'Santa Cruz', 'Tierra del Fuego',
-  'Salta', 'Jujuy', 'Tucumán', 'Catamarca', 'La Rioja',
-  'Santiago del Estero', 'Chaco', 'Formosa', 'Misiones'
-];
-
 const UNITS = ['kg', 'ton', 'litros', 'unidad', 'bolsa', 'pack', 'ha'];
-
-// Categorías de servicios
-const SERVICE_CATEGORIES = [
-  { value: 'Laboreo', subcategories: ['Siembra', 'Cosecha', 'Fumigación', 'Fertilización', 'Labranza'] },
-  { value: 'Transporte', subcategories: ['Carga general', 'Granos', 'Hacienda', 'Maquinaria'] },
-  { value: 'Asesoramiento', subcategories: ['Agronómico', 'Veterinario', 'Comercial', 'Legal'] },
-  { value: 'Mantenimiento', subcategories: ['Maquinaria', 'Instalaciones', 'Riego', 'Alambrados'] },
-  { value: 'Otros Servicios', subcategories: ['Drones', 'Análisis de suelo', 'Certificaciones', 'Seguros'] },
-];
 
 const SERVICE_PRICING_TYPES = [
   { value: 'por_hora', label: 'Por hora' },
@@ -78,11 +53,24 @@ interface FormOptionItem {
 }
 
 interface FormOptionsData {
-  province: FormOptionItem[];
   unit: FormOptionItem[];
   pricing_type: FormOptionItem[];
   availability: FormOptionItem[];
   response_time: FormOptionItem[];
+}
+
+interface ProvinceOption {
+  id: string;
+  name: string;
+}
+
+interface LocalityOption {
+  id: string;
+  name: string;
+  province_id: string;
+  province_name: string;
+  latitude: number;
+  longitude: number;
 }
 
 export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSubmit }) => {
@@ -93,8 +81,12 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [categories, setCategories] = useState<CategoryFromBackend[]>([]);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+  const [provinces, setProvinces] = useState<ProvinceOption[]>([]);
+  const [localities, setLocalities] = useState<LocalityOption[]>([]);
+  const [selectedProvinceId, setSelectedProvinceId] = useState('');
+  const [localitiesLoading, setLocalitiesLoading] = useState(false);
   const [formOptions, setFormOptions] = useState<FormOptionsData>({
-    province: [],
     unit: [],
     pricing_type: [],
     availability: [],
@@ -108,6 +100,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     name: '',
     category: '',
     subcategory: '',
+    localityId: '',
     price: 0,
     description: '',
     image: '',
@@ -142,12 +135,17 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
       // Cargar categorías
       apiGet<CategoryFromBackend[]>('/catalog/categories?include_empty=true')
         .then(data => setCategories(data))
-        .catch(err => console.error('Error cargando categorías:', err));
+        .catch(err => console.error('Error cargando categorías:', err))
+        .finally(() => setCategoriesLoaded(true));
       
       // Cargar opciones de formulario
-      apiGet<FormOptionsData>('/catalog/form-options')
-        .then((data) => setFormOptions(data))
+      apiGet<Partial<FormOptionsData>>('/catalog/form-options')
+        .then((data) => setFormOptions(prev => ({ ...prev, ...data })))
         .catch(err => console.error('Error cargando opciones:', err));
+
+      apiGet<ProvinceOption[]>('/catalog/localities/provinces')
+        .then(data => setProvinces(data))
+        .catch(err => console.error('Error cargando provincias:', err));
     }
   }, [isOpen]);
 
@@ -167,14 +165,12 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     publicationType === 'servicio' ? cat.is_service : !cat.is_service
   );
   
-  // Para el selector, usar las categorías del backend con sus subcategorías
-  // Si no hay categorías del backend, usar las hardcodeadas como fallback
-  const currentCategories = backendCategories.length > 0 
-    ? backendCategories.map(cat => ({
-        value: cat.name,
-        subcategories: cat.subcategories?.map((s: Subcategory) => s.name) || []
-      }))
-    : (publicationType === 'producto' ? CATEGORIES : SERVICE_CATEGORIES);
+  // La API es la única fuente de categorías. No usar fallbacks que puedan
+  // publicar IDs inexistentes mientras la carga todavía está en curso.
+  const currentCategories = backendCategories.map(cat => ({
+    value: cat.name,
+    subcategories: cat.subcategories?.map((s: Subcategory) => s.name) || []
+  }));
   
   // Obtener subcategorías de la categoría seleccionada
   const selectedCategory = currentCategories.find(cat => cat.value === formData.category);
@@ -232,6 +228,48 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
       ...prev,
       category: e.target.value,
       subcategory: ''
+    }));
+  };
+
+  const handleProvinceChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const provinceId = e.target.value;
+    const province = provinces.find(item => item.id === provinceId);
+    setSelectedProvinceId(provinceId);
+    setLocalities([]);
+    setFormData(prev => ({
+      ...prev,
+      localityId: '',
+      location: {
+        province: province?.name || '',
+        city: '',
+      },
+    }));
+
+    if (!provinceId) return;
+
+    setLocalitiesLoading(true);
+    try {
+      const data = await apiGet<LocalityOption[]>(
+        `/catalog/localities?province_id=${encodeURIComponent(provinceId)}`
+      );
+      setLocalities(data);
+    } catch (error) {
+      console.error('Error cargando localidades:', error);
+    } finally {
+      setLocalitiesLoading(false);
+    }
+  };
+
+  const handleLocalityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const localityId = e.target.value;
+    const locality = localities.find(item => item.id === localityId);
+    setFormData(prev => ({
+      ...prev,
+      localityId,
+      location: {
+        province: locality?.province_name || prev.location.province,
+        city: locality?.name || '',
+      },
     }));
   };
 
@@ -390,6 +428,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
       return;
     }
 
+    if (!formData.localityId) {
+      showToast('Seleccioná una provincia y una localidad', 'warning');
+      return;
+    }
+
     if (images.length === 0) {
       showToast(`Por favor agrega al menos una imagen del ${publicationType}`, 'warning');
       return;
@@ -424,7 +467,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
         price: formData.price || 0,
         category_id: selectedCat.id,
         subcategory_id: subcategoryId,  // Agregar subcategory_id
-        location: `${formData.location.city}, ${formData.location.province}`.trim(),
+        locality_id: formData.localityId,
         publication_type: publicationType,
       };
 
@@ -483,6 +526,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
         name: '',
         category: '',
         subcategory: '',
+        localityId: '',
         price: 0,
         description: '',
         image: '',
@@ -495,6 +539,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
         features: {},
         tags: [],
       });
+      setSelectedProvinceId('');
+      setLocalities([]);
       setImages([]);
       setServiceData({
         pricingType: 'por_hora',
@@ -571,7 +617,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                   onChange={handleCategoryChange}
                   required
                 >
-                  <option value="">Seleccionar...</option>
+                  <option value="">
+                    {categoriesLoaded ? 'Seleccionar...' : 'Cargando categorías...'}
+                  </option>
                   {currentCategories.map(cat => (
                     <option key={cat.value} value={cat.value}>{cat.value}</option>
                   ))}
@@ -919,37 +967,36 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
             
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
-                <label htmlFor="location.province">Provincia *</label>
+                <label htmlFor="province">Provincia *</label>
                 <select
-                  id="location.province"
-                  name="location.province"
-                  value={formData.location.province}
-                  onChange={handleInputChange}
+                  id="province"
+                  value={selectedProvinceId}
+                  onChange={handleProvinceChange}
                   required
                 >
                   <option value="">Seleccionar...</option>
-                  {formOptions.province.length > 0 
-                    ? formOptions.province.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))
-                    : PROVINCES.map(prov => (
-                        <option key={prov} value={prov}>{prov}</option>
-                      ))
-                  }
+                  {provinces.map(province => (
+                    <option key={province.id} value={province.id}>{province.name}</option>
+                  ))}
                 </select>
               </div>
 
               <div className={styles.formGroup}>
-                <label htmlFor="location.city">Ciudad *</label>
-                <input
-                  type="text"
-                  id="location.city"
-                  name="location.city"
-                  value={formData.location.city}
-                  onChange={handleInputChange}
-                  placeholder="Ej: Rosario"
+                <label htmlFor="locality">Localidad *</label>
+                <select
+                  id="locality"
+                  value={formData.localityId}
+                  onChange={handleLocalityChange}
+                  disabled={!selectedProvinceId || localitiesLoading}
                   required
-                />
+                >
+                  <option value="">
+                    {localitiesLoading ? 'Cargando localidades...' : 'Seleccionar...'}
+                  </option>
+                  {localities.map(locality => (
+                    <option key={locality.id} value={locality.id}>{locality.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>

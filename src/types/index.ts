@@ -139,6 +139,7 @@ export interface NewProductData {
   name: string;
   category: string;
   subcategory: string;
+  localityId: string;
   price: number;
   description: string;
   image: string;
