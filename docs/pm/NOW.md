@@ -4,12 +4,12 @@ Actualizado: 2026-07-25, cierre de jornada.
 
 ## Objetivo activo
 
-**Suite automatizada de smoke tests**, antes de encarar el módulo de
+**Preparar la demostración del 30 de julio** y desbloquear el módulo de
 transportistas.
 
 ## Dónde estamos
 
-Avance contra el contrato: **~46%**. Evidencia requisito por requisito en
+Avance contra el contrato: **~48%**. Evidencia requisito por requisito en
 `MATRIZ.md`.
 
 Se pasó de un repositorio donde la base de datos no se podía crear a un
@@ -32,6 +32,10 @@ evidencia de ejecución detrás.
   encadenados en la interfaz, filtrado en el servidor y estado en la URL.
   Cierra el requisito 3.1.
 - Las cinco categorías del contrato con productos y localidad.
+- **Suite automatizada de once smoke tests**, un solo comando contra
+  arranque limpio, con criterios relacionales contra SQL y publicación
+  desde la interfaz con navegador real. Verificado que **falla** con
+  código distinto de cero al romper un caso a propósito.
 
 **Tres lecturas para no leer mal ese 46 %:**
 
@@ -43,12 +47,10 @@ evidencia de ejecución detrás.
 
 ## Próximas tareas
 
-1. **Suite automatizada de smoke tests.** Requisito contractual de la
-   fase 5. Once casos, un solo comando, código de salida distinto de cero
-   si algo falla. Incluye probar que la suite **efectivamente falla**
-   cuando se rompe algo a propósito.
-   - Habilita trabajar encadenando tareas con una compuerta automática en
-     lugar de revisión manual de cada entrega.
+1. **Que la subida de imágenes falle a la vista.**
+   `AddProductModal.tsx:506` no chequea `response.ok`: si la imagen no
+   sube, igual avisa "publicado exitosamente". Afecta la publicación con
+   imágenes, que es contractual.
 
 2. **Ampliar el catálogo de demostración** a unos 25 productos repartidos
    en ocho provincias o más, con al menos dos por categoría. Hoy hay 12 en
@@ -85,8 +87,8 @@ así se detectó. Los números fijos envejecen mal.
   se pudo probar, y en este código eso históricamente escondió sorpresas.
 - **Sin despliegue.** Nadie levantó esto en un servidor real. La fase 5
   está en cero.
-- **Sin suite automatizada.** Todo lo verificado se hizo a mano o leyendo
-  código. Es la mayor fragilidad actual.
+- **Mercado Pago sigue sin cobertura.** La suite no lo toca porque no hay
+  credenciales. Es el único bloque grande sin verificar.
 
 ## Deuda técnica registrada, sin acción
 
