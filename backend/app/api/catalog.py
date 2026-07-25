@@ -13,6 +13,7 @@ from app.models.category import Category
 from app.models.subcategory import Subcategory
 from app.models.product import Product, ProductStatus
 from app.models.product_image import ProductImage
+from app.models.locality import Locality
 from app.models.user import User
 from app.schemas.catalog import (
     CategoryResponse,
@@ -25,6 +26,20 @@ from app.schemas.catalog import (
 )
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
+
+
+class ProvinceResponse(BaseModel):
+    id: str
+    name: str
+
+
+class LocalityResponse(BaseModel):
+    id: str
+    name: str
+    province_id: str
+    province_name: str
+    latitude: float
+    longitude: float
 
 
 # ============= Categories =============
@@ -147,6 +162,40 @@ def get_form_options(
         grouped[opt.option_type].append({"value": opt.value, "label": opt.label})
     
     return grouped
+
+
+# ============= Localities =============
+
+@router.get("/localities/provinces", response_model=List[ProvinceResponse])
+def get_locality_provinces(db: Session = Depends(get_db)):
+    """Provincias presentes en la copia versionada de Georef."""
+    rows = db.query(
+        Locality.province_id,
+        Locality.province_name,
+    ).distinct().order_by(Locality.province_name).all()
+    return [{"id": row.province_id, "name": row.province_name} for row in rows]
+
+
+@router.get("/localities", response_model=List[LocalityResponse])
+def get_localities(
+    province_id: str = Query(..., min_length=2, max_length=2),
+    db: Session = Depends(get_db),
+):
+    """Localidades de una provincia, ordenadas por nombre."""
+    rows = db.query(Locality).filter(
+        Locality.province_id == province_id
+    ).order_by(Locality.name).all()
+    return [
+        {
+            "id": row.id,
+            "name": row.name,
+            "province_id": row.province_id,
+            "province_name": row.province_name,
+            "latitude": float(row.latitude),
+            "longitude": float(row.longitude),
+        }
+        for row in rows
+    ]
 
 
 # ============= Products =============

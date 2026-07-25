@@ -5,6 +5,7 @@ Importar todos los modelos aquí para que Alembic los detecte
 from app.models.user import User, UserRole
 from app.models.category import Category
 from app.models.subcategory import Subcategory
+from app.models.locality import Locality
 from app.models.product import Product, ProductStatus
 from app.models.product_image import ProductImage
 from app.models.cart import Cart, CartItem, CartStatus
@@ -21,6 +22,7 @@ __all__ = [
     "UserRole",
     "Category",
     "Subcategory",
+    "Locality",
     "Product",
     "ProductStatus",
     "ProductImage",

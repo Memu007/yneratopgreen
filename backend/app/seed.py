@@ -11,7 +11,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from app.db.base import SessionLocal
 from app.models.user import User, UserRole
 from app.models.category import Category
+from app.models.form_option import FormOption
 from app.core.security import hash_password
+from app.seed_localities import seed_localities
 from datetime import datetime
 
 
@@ -22,6 +24,10 @@ def create_seed_data():
     
     try:
         print("🌱 Iniciando seed de datos...")
+
+        # === LOCALIDADES === #
+        print("\n📍 Sembrando localidades oficiales...")
+        seed_localities(db)
         
         # === USUARIOS === #
         print("\n👤 Creando usuarios...")
@@ -174,6 +180,57 @@ def create_seed_data():
                 print(f"  ⏭️  Categoría '{cat_data['name']}' ya existe")
         
         db.commit()
+
+        # === OPCIONES DE FORMULARIO === #
+        # Las provincias/localidades se siembran desde Georef, no se duplican aquí.
+        print("\n⚙️  Creando opciones de formulario...")
+
+        form_options_data = {
+            "unit": [
+                ("kg", "Kilogramo"),
+                ("ton", "Tonelada"),
+                ("litros", "Litros"),
+                ("unidad", "Unidad"),
+                ("bolsa", "Bolsa"),
+                ("pack", "Pack"),
+                ("ha", "Hectárea"),
+            ],
+            "pricing_type": [
+                ("por_hora", "Por hora"),
+                ("por_hectarea", "Por hectárea"),
+                ("por_trabajo", "Por trabajo/servicio"),
+                ("a_convenir", "A convenir"),
+            ],
+            "availability": [
+                ("inmediata", "Disponibilidad inmediata"),
+                ("programar", "A programar"),
+                ("temporada", "Solo en temporada"),
+            ],
+            "response_time": [
+                ("inmediato", "Inmediato"),
+                ("24hs", "Dentro de 24hs"),
+                ("48hs", "Dentro de 48hs"),
+                ("1_semana", "Dentro de 1 semana"),
+            ],
+        }
+
+        for option_type, options in form_options_data.items():
+            for display_order, (value, label) in enumerate(options):
+                existing_option = db.query(FormOption).filter(
+                    FormOption.option_type == option_type,
+                    FormOption.value == value,
+                ).first()
+                if not existing_option:
+                    db.add(FormOption(
+                        option_type=option_type,
+                        value=value,
+                        label=label,
+                        display_order=display_order,
+                        is_active=True,
+                    ))
+
+        db.commit()
+        print("  ✅ Opciones creadas/actualizadas (sin provincias)")
         
         # === PRODUCTOS === #
         print("\n📦 Creando productos de ejemplo...")
@@ -319,15 +376,32 @@ def create_seed_data():
                 ]
             }
         ]
+
+        product_localities = {
+            "semillas-maiz-dk-premium": ("14014010", "Córdoba, Córdoba"),
+            "fertilizante-triple-15": ("06623100", "Pergamino, Buenos Aires"),
+            "pulverizadora-jacto-600": ("14098230", "Río Cuarto, Córdoba"),
+            "semillas-soja-rr-intacta": ("82084270", "Rosario, Santa Fe"),
+            "cosechadora-john-deere-9750": ("06063010", "Balcarce, Buenos Aires"),
+            "herbicida-glifosato-20l": ("82042290", "Venado Tuerto, Santa Fe"),
+            "servicio-siembra-gps": ("06791050", "Tandil, Buenos Aires"),
+            "rastra-discos-24-platos": ("06063010", "Balcarce, Buenos Aires"),
+        }
         
         for prod_data in productos:
+            product_values = prod_data.copy()
+            images_data = product_values.pop("images", [])
+            locality_id, location = product_localities[product_values["slug"]]
+            product_values["locality_id"] = locality_id
+            product_values["location"] = location
+
             # Verificar si el producto ya existe
-            existing_prod = db.query(Product).filter(Product.slug == prod_data["slug"]).first()
+            existing_prod = db.query(Product).filter(
+                Product.slug == product_values["slug"]
+            ).first()
             if not existing_prod:
-                images_data = prod_data.pop("images", [])
-                
                 # Crear producto
-                product = Product(**prod_data)
+                product = Product(**product_values)
                 product.published_at = datetime.utcnow()
                 db.add(product)
                 db.flush()  # Para obtener el ID del producto
@@ -342,7 +416,9 @@ def create_seed_data():
                 
                 print(f"  ✅ Producto creado: {product.name}")
             else:
-                print(f"  ⏭️  Producto '{prod_data['name']}' ya existe")
+                existing_prod.locality_id = locality_id
+                existing_prod.location = location
+                print(f"  ⏭️  Producto '{product_values['name']}' ya existe")
         
         db.commit()
         

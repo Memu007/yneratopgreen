@@ -13,6 +13,7 @@ from app.db.base import get_db
 from app.models.product import Product, ProductStatus
 from app.models.product_image import ProductImage
 from app.models.category import Category
+from app.models.locality import Locality
 from app.core.dependencies import get_current_user
 from app.models.user import User, UserRole
 from app.schemas.products import ProductCreateRequest, ProductUpdateRequest, ProductResponse
@@ -52,6 +53,10 @@ async def create_product(
     category = db.query(Category).filter(Category.id == product_data.category_id).first()
     if not category:
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
+
+    locality = db.query(Locality).filter(Locality.id == product_data.locality_id).first()
+    if not locality:
+        raise HTTPException(status_code=404, detail="Localidad no encontrada")
     
     # Generar slug único
     base_slug = slugify(product_data.name)
@@ -75,7 +80,8 @@ async def create_product(
         price=product_data.price,
         stock=product_data.stock if not is_service else None,
         unit=product_data.unit,
-        location=product_data.location,
+        locality_id=locality.id,
+        location=f"{locality.name}, {locality.province_name}",
         seller_id=current_user.id,
         status=ProductStatus.ACTIVE,
         publication_type=pub_type,
@@ -259,6 +265,12 @@ async def update_product(
             update_data["status"] = ProductStatus(update_data["status"])
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Estado inválido: {update_data['status']}")
+
+    if "locality_id" in update_data:
+        locality = db.query(Locality).filter(Locality.id == update_data["locality_id"]).first()
+        if not locality:
+            raise HTTPException(status_code=404, detail="Localidad no encontrada")
+        update_data["location"] = f"{locality.name}, {locality.province_name}"
     
     for field, value in update_data.items():
         setattr(product, field, value)

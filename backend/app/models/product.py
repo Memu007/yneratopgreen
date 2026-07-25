@@ -62,7 +62,9 @@ class Product(Base):
     # Vendedor
     seller_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     
-    # Ubicación (opcional)
+    # Ubicación seleccionada desde el padrón oficial.
+    locality_id = Column(String(20), ForeignKey("localities.id"), nullable=True, index=True)
+    # Texto derivado para compatibilidad con las respuestas actuales.
     location = Column(String(255), nullable=True)
     
     # Timestamps
@@ -73,6 +75,7 @@ class Product(Base):
     # Relaciones
     category = relationship("Category", back_populates="products")
     subcategory = relationship("Subcategory", backref="products")
+    locality = relationship("Locality", back_populates="products")
     seller = relationship("User", back_populates="products")
     images = relationship("ProductImage", back_populates="product", cascade="all, delete-orphan")
     cart_items = relationship("CartItem", back_populates="product")
