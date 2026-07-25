@@ -84,7 +84,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Carga inicial de datos | ⚪ Seed repetible con 8 productos demo |
 | Despliegue en producción | ❌ |
 | Capacitación del panel de administración | ❌ |
-| Documentación técnica del despliegue | ⚪ Existe, con siete afirmaciones verificadas como falsas |
+| Documentación técnica del despliegue | ⚪ `README.md` y `README_LOCAL_SETUP.md` corregidos al stack real. `PROJECT_STATUS.md` sigue con ocho afirmaciones verificadas como falsas |
 | Garantía de 90 días | No aplica hasta el lanzamiento |
 
 ---
@@ -116,5 +116,8 @@ Dos observaciones que el porcentaje no muestra:
 | Sin error boundary: cualquier error de JS deja pantalla en blanco | Alta para demos | ✅ Resuelto |
 | `form_options` sin datos | Alta | ✅ Seed idempotente de 18 opciones. Provincias salen de `localities` |
 | Categorías hardcodeadas como fallback | Media | ✅ **Estaba activo** mientras cargaba la API y ofrecía categorías inexistentes. Eliminado; la API es la única fuente |
-| Contador de ventas del vendedor en 0 con 2 ventas reales | Baja, cosmética | Abierto, sin acción |
-| Badge del carrito persiste al cambiar de rol | Baja, cosmética | Abierto, sin acción |
+| Contador de ventas del vendedor en 0 con ventas reales | Baja, cosmética | ✅ Resuelto. Se calcula contando órdenes reales; verificada la cadena hasta la interfaz |
+| Carrito persiste al cambiar de usuario | Baja, cosmética | ✅ Resuelto y verificado en navegador con Playwright |
+| Imágenes rotas mostraban el ícono del navegador | Alta para la demo | ✅ Resuelto. Respaldo con el nombre del producto, verificado en claro y oscuro |
+| **Modo oscuro inalcanzable** | Media | **Abierto, sin acción.** `toggleTheme` y `useTheme` no los usa ningún componente. Existe el contexto y los estilos, pero no hay forma de activarlo. No es contractual |
+| Vite se corre de puerto y el backend lo rechaza por CORS | Media | Arreglo asignado: fijar el puerto con `--strictPort` |
