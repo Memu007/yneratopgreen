@@ -4,11 +4,14 @@ Actualizado: 2026-07-25
 
 ## Objetivo activo
 
-**Cerrar la línea base reproducible y verificada.** Bloqueada hoy (ver
-abajo).
+**Línea base sobre PostgreSQL, con el esquema generado desde los
+modelos.**
 
-No se toca lógica de negocio, no se migra a PostgreSQL y no se agregan
-pantallas hasta que esté aprobada.
+Se abandonó SQL Server. Las migraciones heredadas describen un esquema
+anterior al rediseño de los modelos y no existe forma de obtener un
+esquema correcto con lo que trae el repositorio.
+
+No se agregan features ni pantallas hasta que la línea base esté verde.
 
 ## Estado
 
@@ -67,7 +70,51 @@ Los puntos 2 y 3 son los que habilitan el segundo hito de cobro.
      verificado, no declarado. Se hace contra `CONTRATO.md`, no contra el
      roadmap interno.
 
-## Bloqueo activo — los modelos y las migraciones no coinciden
+## Resuelto — se abandona SQL Server
+
+El autogenerate de reconciliación propuso borrar tablas y columnas y
+cambiar tipos, así que se aplicó el corte previsto. Al investigarlo,
+apareció la causa de fondo.
+
+**Las migraciones describen un esquema anterior al rediseño de los
+modelos.** No es drift aleatorio, son renombres y cambios de tipo:
+
+| Migración `001` | Modelo actual |
+|-----------------|---------------|
+| `orders.total` `Numeric(12,2)` | `total_amount` `Numeric(10,2)` |
+| `orders.shipping_address` `Text` | `shipping_address_json` `JSON` |
+| `orders.notes` `Text` | `buyer_notes` + `seller_notes` |
+| `orders.tax` | eliminada del modelo |
+| `order_items.unit_price` | `unit_price_snapshot` |
+
+Y no existe ningún camino alternativo: **no hay `create_all` en el
+código.** Ni migraciones correctas ni bootstrap desde metadata. Lo que
+corrió en producción fue construido por algo que no está en el paquete
+entregado.
+
+Dos falsos positivos del autogenerate, confirmados: propuso borrar
+`notifications` y `ratings` porque `app/models/__init__.py` **no importa**
+`rating` ni `notification`, y `Base.metadata` no los ve. Hay que
+corregirlo antes de generar cualquier esquema, o el nuevo saldría sin esas
+dos tablas.
+
+### Camino aprobado
+
+1. Agregar `Rating` y `Notification` a `app/models/__init__.py`.
+2. Pasar a PostgreSQL con imagen PostGIS disponible. Sin columnas geo
+   todavía.
+3. Borrar las 10 migraciones heredadas. Describen un esquema que ya no
+   existe y que nada puede usar. Quedan en el historial de git.
+4. Generar **una** migración inicial desde los modelos, contra una base
+   vacía: sólo `CREATE`, ningún `DROP`.
+5. Seed, build, y los diez smoke tests.
+
+Ya no se aplica el argumento de aislar variables que motivó el intento
+anterior: no existe una verificación más barata sobre SQL Server, porque
+no hay esquema correcto que levantar. Y este trabajo no se descarta —
+PostgreSQL + PostGIS es el destino contractual.
+
+## Bloqueo anterior — los modelos y las migraciones no coinciden
 
 El seed falla con `Invalid column name 'whatsapp'. (207)`. La columna
 está en `models/user.py:27` y se usa en `api/auth.py` y `api/orders.py`,

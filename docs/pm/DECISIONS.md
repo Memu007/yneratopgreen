@@ -5,6 +5,39 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-07-25 — Se abandona SQL Server y el esquema se genera desde los modelos
+
+Se activó el tope de una sola pasada. El autogenerate de reconciliación
+propuso borrar tablas y columnas y cambiar tipos, no sólo agregar.
+
+Causa de fondo, verificada: las migraciones heredadas describen un
+esquema **anterior** al rediseño de los modelos. Son renombres y cambios
+de tipo, no drift: `orders.total` → `total_amount`,
+`orders.shipping_address` (Text) → `shipping_address_json` (JSON),
+`orders.notes` → `buyer_notes` + `seller_notes`, `orders.tax` eliminada,
+`order_items.unit_price` → `unit_price_snapshot`.
+
+Y no hay camino alternativo: **no existe `create_all` en el código**. Por
+ningún medio disponible en el repositorio se puede obtener un esquema que
+coincida con los modelos. Lo que corrió en producción fue construido por
+algo que no vino en el paquete.
+
+Decisión: PostgreSQL con PostGIS disponible, borrar las 10 migraciones
+heredadas —quedan en el historial de git— y generar una migración inicial
+desde los modelos contra una base vacía.
+
+Motivo del cambio respecto de la decisión anterior: el argumento de
+aislar variables ya no aplica, porque no existe una verificación más
+barata sobre SQL Server. Y este trabajo no es descartable: PostgreSQL +
+PostGIS es el destino contractual (sección 4).
+
+Prerrequisito detectado: `app/models/__init__.py` no importa `rating` ni
+`notification`, así que `Base.metadata` no las ve. Eso produjo dos falsos
+`DROP` en el autogenerate y, sin corregirlo, generaría un esquema sin esas
+dos tablas.
+
+---
+
 ## 2026-07-25 — Una pasada de reconciliación de esquema, con tope
 
 El seed falla por `users.whatsapp`: la columna está en el modelo y en dos
