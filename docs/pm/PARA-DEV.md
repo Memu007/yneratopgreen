@@ -95,6 +95,29 @@ En `scripts/smoke.sh`, donde hace la limpieza previa, agregá un
 levantar. Que la suite se limpie sola en vez de morir con un error de
 Docker. **No cambies nada más del script.**
 
+**Ya la hiciste** mientras yo escribía esto, commit `ddde564`. Una línea,
+tolerante a fallo, en el lugar correcto y sin tocar nada más. Así.
+
+---
+
+## Sobre instalar skills de agente: no, y qué tomamos igual
+
+Se evaluó instalarte un paquete de skills de agente. **Decisión: ninguna
+antes del jueves.**
+
+Motivo: faltan tres días para la demostración y la firma. Cambiar cómo
+trabajás y cerrar las tareas pendientes al mismo tiempo es mover dos
+variables a la vez, justo cuando menos margen hay para depurar si algo
+sale raro. No es un juicio sobre tu forma de trabajar: estás yendo bien.
+
+Y hay una familia que queda descartada siempre: las de especificación,
+planificación y registro de decisiones. Eso es literalmente lo que hace
+`docs/pm/`. Instalarlas crearía una segunda fuente de verdad, manejada
+desde el lado del código y sin el contrato ni la clienta a la vista.
+
+**Pero sí adopto tres cosas concretas**, y valen para la Tarea 2. Están
+más abajo, integradas en los criterios.
+
 ---
 
 ## Estado de la taxonomía
@@ -202,16 +225,60 @@ completar el recorrido en un teléfono sin frustrarse?
 
 Si algo está feo pero funciona, anotalo y no lo toques.
 
+### Las tres cosas que adopto del material de skills
+
+Son las únicas que se pisan con trabajo real pendiente. No hace falta
+instalar nada: van acá como criterio.
+
+**1. La consola tiene que quedar limpia.** En cada pantalla que visites,
+mirá la consola del navegador y anotá errores **y advertencias**. Hoy no
+tenemos ni idea de qué tira la aplicación en ejecución, porque nadie
+miró nunca.
+
+No arregles las advertencias en esta tarea: **anotalas**. Yo decido qué
+se toca. Pero un error de consola en el recorrido de la demostración sí
+se arregla, porque es lo que deja pantalla en blanco.
+
+La razón de fondo, que es la historia de este repositorio: *"analizar el
+código no reemplaza abrirlo en un navegador"*. Acá se documentó durante
+meses funcionalidad que nunca había corrido.
+
+**2. Las peticiones de red también se miran.** Mientras recorrés, mirá
+los códigos de estado. Cualquier `4xx` o `5xx` que aparezca sin que la
+interfaz avise, anotalo: es un fallo silencioso. Ya tuvimos uno —la
+subida de imágenes fallaba sin decir nada— y apareció así.
+
+Cuidado especial con CORS: si ves fallos de origen cruzado, lo más
+probable es que Vite se haya corrido de puerto. Es el problema de la
+Tarea 3, no un bug nuevo.
+
+**3. Capturas de antes y después, no sólo del resultado.** De cada cosa
+que arregles, quiero el par. Sirve para dos cosas: que yo pueda juzgar si
+valió la pena tocarlo, y tener material de la reunión del jueves.
+
+### Lo que NO adoptamos, para que quede claro
+
+**Nada de métricas de rendimiento.** LCP, CLS, INP, trazas: fuera de
+alcance. No están en el contrato, no se ven en una demostración y abren
+un pozo sin fondo a tres días de la firma.
+
+Si notás algo groseramente lento, decilo en una línea y seguí.
+
 ### Criterio de aceptación
 
 1. El recorrido completo se puede hacer en 390×844 sin quedarse trabado.
 2. **Ningún desborde horizontal** en ninguna pantalla.
 3. Los filtros de provincia, localidad y categoría se pueden usar con el
    dedo.
-4. Capturas de las siete pantallas en el tamaño más chico.
-5. Lista de lo que estaba roto, lo que arreglaste y lo que dejaste feo a
+4. Capturas de las siete pantallas en el tamaño más chico, más los pares
+   antes/después de cada arreglo.
+5. **Inventario de consola**: errores y advertencias por pantalla. Los
+   errores del recorrido de la demostración, resueltos.
+6. **Inventario de red**: cualquier `4xx` o `5xx` que la interfaz no
+   avise.
+7. Lista de lo que estaba roto, lo que arreglaste y lo que dejaste feo a
    propósito.
-6. `npm run smoke` sigue en verde.
+8. `npm run smoke` sigue en verde.
 
 ### Si encontrás mucho roto
 
