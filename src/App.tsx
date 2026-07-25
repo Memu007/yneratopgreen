@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './App.module.css';
 import { Header } from './components/Header/Header';
 import { Footer } from './components/Footer/Footer';
@@ -29,6 +29,7 @@ function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const productsRequestId = useRef(0);
   
   const {
     searchQuery,
@@ -36,6 +37,7 @@ function App() {
     selectedCategory,
     selectedSubcategory,
     selectedProvince,
+    selectedLocality,
     priceMin,
     priceMax,
     inStockOnly,
@@ -45,6 +47,7 @@ function App() {
     setSelectedCategory,
     setSelectedSubcategory,
     setSelectedProvince,
+    setSelectedLocality,
     setPriceMin,
     setPriceMax,
     setInStockOnly,
@@ -64,18 +67,17 @@ function App() {
     if (path === '/payment/success') return 'payment-success';
     if (path === '/payment/failure') return 'payment-failure';
     if (path === '/payment/pending') return 'payment-pending';
+
+    // Un enlace compartido con filtros debe abrir directamente el catálogo.
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.has('province') || searchParams.has('locality_id')) {
+      return 'marketplace';
+    }
+
     return 'home';
   });
 
-  // Cargar productos y categorías desde la API cuando se navega al marketplace
-  useEffect(() => {
-    if (currentSection === 'marketplace') {
-      loadProductsFromAPI();
-      loadCategoriesFromAPI();
-    }
-  }, [currentSection]);
-
-  const loadCategoriesFromAPI = async () => {
+  const loadCategoriesFromAPI = useCallback(async () => {
     try {
       const data = await getCategories();
       setCategories(data);
@@ -83,28 +85,52 @@ function App() {
       console.error('Error al cargar categorías:', error);
       setCategories([]);
     }
-  };
+  }, []);
 
-  const loadProductsFromAPI = async () => {
+  const loadProductsFromAPI = useCallback(async () => {
+    const requestId = ++productsRequestId.current;
     setLoadingProducts(true);
+
     try {
       const response = await getProducts({
+        province: selectedProvince || undefined,
+        locality_id: selectedLocality || undefined,
         page: 1,
         page_size: 100,
         sort_by: 'created_at',
         sort_order: 'desc',
       });
       
-      const frontendProducts = response.items.map(convertBackendProductToFrontend);
-      setProducts(frontendProducts);
+      if (requestId === productsRequestId.current) {
+        const frontendProducts = response.items.map(convertBackendProductToFrontend);
+        setProducts(frontendProducts);
+      }
     } catch (error) {
-      console.error('Error al cargar productos:', error);
-      // En caso de error, mantener array vacío
-      setProducts([]);
+      if (requestId === productsRequestId.current) {
+        console.error('Error al cargar productos:', error);
+        // En caso de error, mantener array vacío
+        setProducts([]);
+      }
     } finally {
-      setLoadingProducts(false);
+      if (requestId === productsRequestId.current) {
+        setLoadingProducts(false);
+      }
     }
-  };
+  }, [selectedLocality, selectedProvince]);
+
+  // Cargar categorías cuando se navega al marketplace.
+  useEffect(() => {
+    if (currentSection === 'marketplace') {
+      void loadCategoriesFromAPI();
+    }
+  }, [currentSection, loadCategoriesFromAPI]);
+
+  // La ubicación se filtra en la API; el resto de los filtros se combina localmente.
+  useEffect(() => {
+    if (currentSection === 'marketplace') {
+      void loadProductsFromAPI();
+    }
+  }, [currentSection, loadProductsFromAPI]);
 
   const handleSearchSubmit = () => {
     console.log('Búsqueda realizada:', searchQuery);
@@ -121,7 +147,7 @@ function App() {
     setCurrentSection('marketplace');
     // Esperar un momento para que el useEffect se ejecute
     setTimeout(() => {
-      loadProductsFromAPI();
+      void loadProductsFromAPI();
     }, 100);
   };
 
@@ -150,6 +176,7 @@ function App() {
                 selectedCategory={selectedCategory}
                 selectedSubcategory={selectedSubcategory}
                 selectedProvince={selectedProvince}
+                selectedLocality={selectedLocality}
                 priceMin={priceMin}
                 priceMax={priceMax}
                 inStockOnly={inStockOnly}
@@ -158,6 +185,7 @@ function App() {
                 onCategoryChange={setSelectedCategory}
                 onSubcategoryChange={setSelectedSubcategory}
                 onProvinceChange={setSelectedProvince}
+                onLocalityChange={setSelectedLocality}
                 onPriceMinChange={setPriceMin}
                 onPriceMaxChange={setPriceMax}
                 onInStockChange={setInStockOnly}
