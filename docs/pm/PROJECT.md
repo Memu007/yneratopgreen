@@ -80,7 +80,12 @@ Filtro de ubicación en el catálogo, combinable con categoría. Mínimo:
 provincia y localidad. Deseable, y casi gratis porque la consulta es la
 misma: "hasta X km" alrededor de la localidad elegida.
 
-### Transportista — directorio por zonas declaradas (3.2)
+### Transportista — directorio (3.2)
+
+> **Sin definir todavía cómo se hace la coincidencia.** Hay dos
+> candidatos: radio en km, que es lo que el contrato sugiere al pie, o
+> zonas declaradas, que es más simple. Se decide al llegar al módulo. Lo
+> de abajo aplica a los dos, salvo la sección marcada.
 
 Se registra como **tipo especial de proveedor**, no como rol nuevo.
 
@@ -97,7 +102,10 @@ Una dirección escrita a mano —"Ruta 8 km 340, cerca de Pergamino"— no la
 encuentra ninguna consulta. Los campos de búsqueda tienen que ser
 estructurados.
 
-### Regla de coincidencia — zonas, no radio
+### Regla de coincidencia — PROPUESTA, a decidir al llegar
+
+Candidato preferido, no confirmado. El alternativo es el radio en km del
+contrato.
 
 El comprador **elige una zona** y se listan los transportistas que la
 declararon entre las que atienden. Consulta simple, sin cálculo de

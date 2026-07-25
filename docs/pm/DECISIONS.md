@@ -64,10 +64,13 @@ direcciones libres, mapas y selección con pin, distancia por ruta real
 
 ---
 
-## 2026-07-25 — El directorio funciona por zonas declaradas, no por radio
+## 2026-07-25 — PROPUESTA GUARDADA: directorio por zonas en lugar de radio
 
-Reemplaza la decisión de la misma fecha que definía coincidencia por
-radio cubriendo origen y destino.
+**No es una decisión.** Es una idea a evaluar cuando se llegue al módulo
+de transportistas. Hasta entonces sigue vigente el radio en km, que es lo
+que dice el contrato al pie.
+
+Se guarda con el análisis hecho para no volver a razonarlo desde cero.
 
 El transportista declara **las zonas que atiende**, de una lista. El
 comprador elige una zona y se listan los que la declararon. Sin cálculo
@@ -95,6 +98,25 @@ Dos condiciones que se mantienen:
 
 El selector de zona del comprador viene precargado con su localidad, con
 lo que se cumple que "el sistema detecta la ubicación" y además él elige.
+
+**A resolver cuando se llegue:** zonas declaradas o radio en km. La
+propuesta de zonas es más simple y más fiel al negocio; el radio es lo que
+el contrato sugiere textualmente. Las coordenadas se siembran igual en los
+dos casos, así que la tarea de localidades no depende de esta definición y
+puede avanzar.
+
+---
+
+## 2026-07-25 — El radio del transportista cubre origen y destino
+
+Vigente mientras no se resuelva la propuesta de zonas.
+
+El contrato dice que el sistema detecta la ubicación del comprador y del
+vendedor y lista transportistas "disponibles en la zona" (3.2), sin
+precisar contra qué punto se mide.
+
+Definido: **las dos puntas dentro del radio declarado**. Un transportista
+que sólo cubre el destino no puede levantar la carga.
 
 ---
 
