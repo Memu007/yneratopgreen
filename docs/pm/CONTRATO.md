@@ -3,6 +3,14 @@
 Fuente: *Documento de Especificación Funcional y Propuesta Comercial —
 Marketplace del Sector Agropecuario (Fase Nacional)*, Ynera.
 
+> ⚠️ **Sin firmar al 2026-07-25.** Es una propuesta comercial, no un
+> contrato vigente. Firma prevista para el 2026-07-30. El plazo de 12 a 14
+> semanas **empieza a correr en la firma**, así que todo el trabajo hecho
+> hasta ahí es previo al reloj.
+>
+> Mientras no se firme, cualquier cosa de este documento **todavía se
+> puede negociar**. Después queda cerrado.
+
 Transcripción de las secciones **funcionales** (1 a 5). Las secciones
 comerciales (costos, forma de pago) **no se versionan acá** — están en el
 PDF original, fuera del repositorio, porque este repositorio es público.

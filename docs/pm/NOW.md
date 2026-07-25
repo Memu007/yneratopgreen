@@ -78,11 +78,13 @@ filtro y la prueba de que el script devuelve código 1 cuando algo falla.
 - **El repositorio es público.** Contiene el proyecto de un cliente, su
   documentación y notas internas de PM. Nadie lo decidió de forma
   explícita. Definir si pasa a privado.
-- **Plazo y presupuesto.** El contrato son 12 a 14 semanas a precio
-  cerrado. Estimado de trabajo restante revisado a **7 a 9 semanas** tras
-  el primer dato de velocidad real. Falta la fecha de firma para saber
-  cuánto se consumió. Conversación comercial pendiente antes de
-  comprometer fechas.
+- **EL CONTRATO NO ESTÁ FIRMADO.** Firma prevista el 2026-07-30. El plazo
+  de 12 a 14 semanas arranca ahí, así que el 44 % construido es previo al
+  reloj y el proyecto **empieza adelantado**, no atrasado. Con 7 a 9
+  semanas de trabajo restante, entra cómodo.
+- **Quedan pocos días para corregir la propuesta.** Es la única ventana
+  para tocar precio, plazo o definiciones ambiguas; después queda cerrado.
+  Ver `PRE_FIRMA.md`.
 - **Mercado Pago sin credenciales**, con un bug de sandbox conocido. No
   se toca hasta la fase de pagos.
 
