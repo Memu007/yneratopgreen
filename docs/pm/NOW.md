@@ -1,26 +1,46 @@
 # Estado actual
 
-Actualizado: 2026-07-24
+Actualizado: 2026-07-25
 
 ## Objetivo activo
 
-**Cerrar la Fase 0 del roadmap v3: línea base reproducible y verificada.**
+**Cerrar la línea base reproducible y verificada.** Bloqueada hoy (ver
+abajo).
 
 No se toca lógica de negocio, no se migra a PostgreSQL y no se agregan
-pantallas hasta que la línea base esté aprobada.
+pantallas hasta que esté aprobada.
 
 ## Estado
 
-- Repositorio conectado y con commit base. La fuente de verdad es este
-  FastAPI + React; el Django queda congelado como referencia.
-- **Nadie ejecutó este código todavía.** No hay evidencia de que levante,
-  migre, siembre ni pase un smoke test.
-- La documentación de entrega **no es confiable**: declara una migración
-  `011` con geolocalización que no existe. Verificado. Mientras no haya
-  smoke tests, todo lo marcado como "✅ completo" en
-  `docs/PROJECT_STATUS.md` es una afirmación, no un hecho.
-- El alcance vinculante es `docs/PM_ROADMAP.md` v3, no la documentación
-  de entrega. Estimación: 9–11 semanas desde la línea base aprobada.
+- El contrato entró al repositorio: `CONTRATO.md`. Es la **única** fuente
+  de alcance. `PM_ROADMAP.md` pasa a ser plan interno y **sobrepasa el
+  contrato** en varios puntos; ese exceso queda fuera del MVP.
+- **Nadie logró ejecutar este código todavía.** El primer intento se
+  detuvo en las migraciones.
+- La documentación de entrega **no es confiable**: dos afirmaciones
+  verificadas como falsas (migración `011`, instalación por Docker).
+- El repositorio es **público**. Ver bloqueos.
+
+## Secuencia propuesta después de la línea base
+
+Derivada del contrato, no del roadmap interno. Mucho más corta que las
+9–11 semanas del roadmap v3, porque se recorta el alcance inventado.
+
+1. **PostgreSQL + PostGIS.** Contractual y sin alternativa (sección 4).
+   Además es el cimiento de todo lo que sigue.
+2. **Geolocalización**: coordenadas en publicaciones y filtro por
+   ubicación en el buscador (3.1).
+3. **Directorio de transportistas** (3.2): tipo especial de proveedor con
+   ubicación base, certificación, radio y capacidad. Listado por zona en
+   la compra. Seleccionar o contactar directo. Sin motor de cotización.
+4. **Transferencia bancaria** (3.3): CBU/alias, comprobante, validación
+   manual del vendedor.
+5. **Categorías faltantes**: Bienes y Ganado, Tecnología para el Cultivo,
+   Logística.
+6. **Registro con validación** real de ambos roles (3.1).
+7. QA, carga inicial y despliegue.
+
+Los puntos 2 y 3 son los que habilitan el segundo hito de cobro.
 
 ## Próximas tareas
 
@@ -41,10 +61,11 @@ pantallas hasta que la línea base esté aprobada.
      `PROJECT_STATUS.md` que no se sostienen contra el código, con
      archivo y línea. Sin corregir nada todavía.
 
-3. **Matriz requisito contractual → evidencia → estado** (PM, con el
+3. **Matriz requisito de `CONTRATO.md` → evidencia → estado** (PM, con el
    resultado de 1 y 2).
-   - Criterio de aceptación: cada requisito del roadmap v3 tiene estado
-     verificado, no declarado.
+   - Criterio de aceptación: cada requisito del contrato tiene estado
+     verificado, no declarado. Se hace contra `CONTRATO.md`, no contra el
+     roadmap interno.
 
 ## Bloqueo activo — Fase 0 detenida en la migración
 
@@ -73,17 +94,22 @@ esquema ni el modelo.
 
 ## Otros bloqueos
 
-- **Todo el roadmap está bloqueado por la tarea 1.** Planificar fases 1 a
-  6 sobre un código que nadie ejecutó es especular.
-- **Decisión contractual pendiente: PostgreSQL + PostGIS.** El contrato
-  lo exige, el código usa SQL Server. Migrar es Fase 2 y es caro. Si hay
-  margen para negociar el cambio por escrito, hay que saberlo antes de
-  la Fase 2, no durante.
+- **El repositorio es público.** Contiene el proyecto de un cliente, su
+  documentación de entrega, credenciales demo del seed y notas internas
+  de PM que señalan fallas del equipo anterior. Nadie decidió esto de
+  forma explícita. Definir si pasa a privado.
+- **Relación esfuerzo / presupuesto.** El contrato es a precio cerrado y
+  el trabajo pendiente es el núcleo del MVP. Requiere conversación
+  comercial antes de comprometer fechas. Números en el PDF, fuera del
+  repositorio.
+- **PostgreSQL + PostGIS es obligatorio.** La sección 4 del contrato no
+  ofrece alternativa. El código usa SQL Server. Es la primera tarea
+  después de la línea base y es cimiento de la geolocalización.
 - **Mercado Pago desvinculado** y con un bug de sandbox conocido. No se
-  configuran credenciales reales hasta la Fase 5.
+  configuran credenciales reales hasta la fase de pagos.
 
 ## Último resultado validado
 
-Inventario del repositorio y verificación de la migración `011`
-(no existe; no hay columnas geo). Resultado en `REPO_MAP.md`.
-Nada ejecutado todavía.
+Contrato incorporado y contrastado contra el código: `CONTRATO.md` y las
+tablas de brechas en `PROJECT.md`. Verificado también que nada en el
+repositorio crea la base de datos. Nada ejecutado todavía.

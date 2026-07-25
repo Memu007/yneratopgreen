@@ -56,25 +56,56 @@ apagan con un feature flag. Cada uno necesita una decisión explícita:
 | Form options dinámicos | Tabla y endpoint listos; el frontend usa listas hardcoded |
 | Filtros geográficos | **No existen.** La documentación de entrega los declara, pero no hay migración, ni columnas, ni código |
 
-## MVP contractual — lo que falta
+## Brechas contra el contrato
 
-El alcance vinculante está en `docs/PM_ROADMAP.md` (versión 3, auditada
-el 20-07-2026), no en la documentación de entrega. Brechas mayores:
+Alcance vinculante: `CONTRATO.md`. Verificado contra el código el
+2026-07-25.
 
-| Brecha | Estado |
-|--------|--------|
-| PostgreSQL + PostGIS | El contrato lo define; el código usa SQL Server |
-| Geolocalización y búsqueda por radio | No existe nada |
-| Transportistas y logística de cercanía | No existe la entidad ni el flujo |
-| Transferencia bancaria con comprobante | No existe CBU/alias, carga ni aprobación |
-| Roles separados (4 perfiles) | Sólo `admin` y `user` |
-| Validación real de cuentas | Hay campo `is_verified`, sin flujo |
-| Modos `compra_directa` / `consulta_cotizacion` | No implementados |
-| Categorías Bienes/Ganado y Tecnología de Cultivo | Incompletas |
-| Seguridad: rate limiting, JWT en `localStorage` | Sin resolver |
+| Brecha contractual | Estado en el código |
+|--------------------|---------------------|
+| PostgreSQL + PostGIS (sección 4, sin alternativa) | Usa SQL Server |
+| Búsqueda con filtro por **ubicación** (3.1) | No existe |
+| Directorio de transportistas por geolocalización (3.2) | No existe la entidad ni el flujo |
+| Transferencia bancaria: CBU/alias, comprobante, validación manual (3.3) | No existe nada |
+| Registro **con validación** de ambos roles (3.1) | Hay campo `is_verified`, sin flujo |
+| Categoría Bienes y Ganado (2) | Incompleta |
+| Categoría Tecnología para el Cultivo (2) | Incompleta |
+| Categoría Módulo de Logística Integrada (2) | No existe |
 
-Estimación del roadmap: **9–11 semanas** desde que se apruebe la línea
-base. El producto es un prototipo funcional, no un MVP contractual.
+## Construido por encima del contrato
+
+Trabajo ya hecho que el contrato **no pide**. No se le suma esfuerzo, y
+cada ítem necesita decisión de mantener u ocultar:
+
+| Ítem | Qué pide el contrato |
+|------|----------------------|
+| Split payments, OAuth de vendedores, comisión 5 % | *"Checkout básico"* de Mercado Pago (3.3). No menciona split ni comisión de marketplace |
+| Ratings de vendedores | No lo menciona |
+| Notificaciones in-app | No lo menciona |
+| `form_options` dinámicos | No lo menciona |
+
+## Alcance inventado por el roadmap interno
+
+`PM_ROADMAP.md` v3 agrega requisitos que **no están en el contrato**. La
+mayoría viene del benchmark de Agrofy, que es referencia interna y no
+justifica alcance. **No entran al MVP:**
+
+| Ítem del roadmap | Qué dice el contrato |
+|------------------|----------------------|
+| Cuatro perfiles de usuario | Dos roles; el transportista es *"un tipo especial de proveedor"* (3.2) |
+| Modo `consulta_cotizacion` | No existe. Habla de carrito e historial de pedidos (3.1) |
+| Cotización al transportista y estados logísticos | Seleccionarlo o contactarlo directo (3.2) |
+| Perfil público de vendedor tipo sucursal | *"Panel de control básico"* (3.1) |
+| Filtros de atributos por categoría (marca/año, cultivo/uso) | Filtros *"por categoría y ubicación"* (3.1) |
+| Subcategorías navegables | Cinco categorías, sin subcategorías |
+| Badges (verificado, entrega inmediata, acepta cotización) | No los menciona |
+
+## Estado real
+
+El producto es un prototipo funcional del recorrido de compra, con la
+mitad del MVP contractual sin construir. Lo que falta no es cosmético:
+**geolocalización, logística, transferencia bancaria y PostGIS son el
+núcleo del contrato y hoy están en cero.**
 
 ## Benchmark — Agrofy
 
@@ -104,13 +135,16 @@ del benchmark.
 
 ## Fuente de verdad del alcance
 
-El alcance vinculante es el **PDF del contrato**. `PM_ROADMAP.md` v3 es
-un resumen de ese PDF hecho en la auditoría del 20-07-2026, no el
-contrato en sí.
+`CONTRATO.md` — transcripción funcional del PDF, incorporada el
+2026-07-25.
 
-**El PDF no está en el repositorio.** Mientras no esté, toda decisión de
-alcance se está tomando sobre un resumen de segunda mano. Conseguirlo o
-transcribir sus requisitos es prioritario.
+Orden de precedencia, de mayor a menor:
+
+1. `CONTRATO.md` — lo único vinculante.
+2. `PM_ROADMAP.md` — plan interno. Útil como secuencia, pero **sobrepasa
+   el contrato** en varios puntos (ver arriba). No es alcance.
+3. `docs/PROJECT_STATUS.md` y el resto de la documentación de entrega —
+   no confiable. Dos afirmaciones ya verificadas como falsas.
 
 ## Fuera de alcance
 

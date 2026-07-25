@@ -5,6 +5,67 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-07-25 — El contrato entra al repositorio y define el alcance
+
+Se incorpora `CONTRATO.md` con la transcripción funcional del PDF
+(secciones 1 a 5). Pasa a ser la única fuente de alcance. Las secciones
+comerciales no se versionan porque el repositorio es público.
+
+Consecuencia: `PM_ROADMAP.md` baja de rango. Sirve como plan interno,
+pero **sobrepasa el contrato** y no es alcance.
+
+---
+
+## 2026-07-25 — Se recorta el alcance que el roadmap inventó
+
+Contrastado el roadmap v3 contra el contrato, queda **fuera del MVP**:
+
+- Cuatro perfiles de usuario. El contrato define dos roles; el
+  transportista es "un tipo especial de proveedor" (3.2), no un rol.
+- Modo `consulta_cotizacion`. No existe en el contrato.
+- Cotización al transportista y estados logísticos. El contrato pide
+  seleccionarlo o contactarlo con los datos provistos (3.2).
+- Perfil público de vendedor tipo sucursal. El contrato dice "panel de
+  control básico" (3.1).
+- Filtros de atributos por categoría. El contrato pide filtros por
+  categoría y ubicación (3.1).
+- Subcategorías navegables y badges.
+
+Motivo: casi todo eso viene del benchmark de Agrofy, que es referencia
+interna y no justifica alcance. El contrato es a precio cerrado; construir
+lo no pedido sale del margen.
+
+---
+
+## 2026-07-25 — La logística es un directorio, no un motor de ruteo
+
+El contrato lo dice explícitamente en 3.2: *"en lugar de un complejo
+algoritmo automatizado de ruteo, se propone un modelo de Directorio de
+Logística por Geolocalización"*.
+
+Alcance: transportista con ubicación base, certificación, radio de
+cobertura y capacidad de carga; listado por zona al momento de la compra;
+selección o contacto directo. Nada más.
+
+---
+
+## 2026-07-25 — El split payment está por encima del contrato
+
+El contrato pide "checkout básico" de Mercado Pago (3.3) y no menciona
+split payments, OAuth de vendedores ni comisión de marketplace. El código
+ya lo tiene implementado.
+
+Queda como está — ya está construido y desarmarlo cuesta más que
+dejarlo — pero **no se le suma esfuerzo**. Lo que sí falta y es
+contractual es la transferencia bancaria con comprobante, que hoy está en
+cero.
+
+Pendiente de confirmar con el cliente: si la comisión del 5 % del
+marketplace es parte del modelo de negocio acordado, porque en este
+documento no aparece.
+
+---
+
 ## 2026-07-25 — El camino Docker del README nunca funcionó
 
 Primer intento real de levantar la línea base: `alembic upgrade head`

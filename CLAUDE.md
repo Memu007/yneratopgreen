@@ -4,9 +4,14 @@ Marketplace agropecuario. El repositorio es la fuente de verdad.
 
 Contexto:
 - Estado actual y próximo trabajo: `docs/pm/NOW.md`
-- Alcance estable del producto: `docs/pm/PROJECT.md`
+- Alcance contractual, única fuente de verdad: `docs/pm/CONTRATO.md`
+- Alcance estable y brechas: `docs/pm/PROJECT.md`
 - Mapa técnico resumido: `docs/pm/REPO_MAP.md`
 - Decisiones anteriores: `docs/pm/DECISIONS.md`
+
+Nada es requisito si no está en `CONTRATO.md`. `docs/PM_ROADMAP.md` es
+plan interno y lo sobrepasa. La documentación de entrega en `docs/` no es
+confiable: tiene afirmaciones verificadas como falsas.
 
 Reglas de contexto:
 1. Leer primero solamente `docs/pm/NOW.md`.
