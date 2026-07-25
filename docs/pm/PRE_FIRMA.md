@@ -2,13 +2,29 @@
 
 Última ventana para corregir la propuesta. Después queda cerrado.
 
-## 1. El precio, contra el trabajo real
+## 1. El precio se mantiene. Lo que hay que blindar es el alcance
 
-Ahora sabemos lo que no se sabía al cotizar: quedan **7 a 9 semanas** de
-trabajo para completar el MVP, y eso ya con el alcance recortado y con el
-44 % construido de arranque.
+El precio es deliberadamente accesible: el cliente viene de que le
+cobraron mucho por muy poco, y este es el primer proyecto de la
+consultora. Vale como reconstrucción de confianza y como caso de éxito,
+más que la diferencia de honorarios. La propuesta ya lo dice: "primer
+cliente estratégico", "caso de éxito conjunto".
 
-Es el único punto que no se puede arreglar después. Revisarlo ahora.
+Con el precio bajo a propósito, **el riesgo se muda al alcance**. Quedan 7
+a 9 semanas de trabajo; cada pedido fuera de alcance duele el triple.
+
+Tres cosas que tienen que estar en el papel que se firma:
+
+1. **La lista de lo que NO incluye**, explícita. Está en `PROJECT.md`:
+   publicidad, financiación, portal editorial, suscripciones,
+   recomendaciones con IA, multi-país, multi-idioma, mensajería
+   comprador–vendedor, reviews de productos, favoritos y cupones.
+2. **Cláusula de cambios**: todo pedido fuera del alcance firmado se
+   cotiza aparte. A un cliente que ya fue maltratado, la claridad le
+   suma.
+3. **Límite de la garantía de 90 días**: cubre errores del software, no
+   funcionalidad nueva. Sin eso escrito, son tres meses de desarrollo
+   gratis.
 
 ## 2. Definir lo ambiguo
 
