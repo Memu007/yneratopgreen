@@ -47,10 +47,24 @@ categorías que veníamos improvisando nosotros.
 Todo en `backend/app/seed.py`. **No toques modelos ni migraciones**: la
 tabla de subcategorías ya existe.
 
+### Corrección: la lista completa ya está escrita
+
+Tenías razón y el error era mío. La primera versión de este archivo te
+mandaba a cargar "las 43 subcategorías tal como figuran en el análisis",
+y el análisis sólo tenía las cantidades. Frenar en vez de inventarlas fue
+exactamente lo correcto.
+
+Y no las ibas a encontrar buscando en el repositorio: **el prototipo de
+la clienta nunca estuvo acá**, llegó por fuera. Dejá de buscar.
+
+Ya están transcriptas, con nombre exacto, en `TAXONOMIA-CLIENTE.md`,
+sección **"Las 43 subcategorías, enumeradas"**. Esa es la fuente. Si algo
+no está ahí, no lo inventes: preguntá.
+
 ### Qué cargar
 
-**Las 7 categorías de productos** con sus 43 subcategorías, tal como
-figuran en el análisis:
+**Las 7 categorías de productos** con sus 43 subcategorías, copiadas de
+esa sección:
 
 1. Maquinaria agrícola (7 subcategorías)
 2. Riego y drenaje (6)
@@ -59,6 +73,15 @@ figuran en el análisis:
 5. Repuestos y mantenimiento (6)
 6. Agricultura de precisión y tecnología (4)
 7. Tierras y parcelas (8)
+
+**Dos cosas que aparecieron al enumerarlas:**
+
+- Hay **cuatro subcategorías llamadas "Otros"**, en Riego, Insumos,
+  Ganadería y Repuestos. Son cuatro registros distintos, cada uno bajo su
+  categoría. Si la idempotencia del seed busca sólo por nombre, se pisan:
+  la clave tiene que ser categoría + nombre.
+- El tercer nivel quedó transcripto en la columna derecha de esas tablas.
+  Está ahí **para no perderlo, no para cargarlo.** Sigue fuera de alcance.
 
 **Más una octava que se conserva:** `Bienes y Ganado`, para vender
 animales. La taxonomía de la clienta no tiene dónde poner hacienda, pero
@@ -110,6 +133,10 @@ publicación verosímil del rubro.
    Pegame las dos.
 3. Las 8 categorías de productos y las 4 de servicios existen, con sus
    subcategorías.
+4. **Consulta SQL con el conteo de subcategorías por categoría**, que
+   tiene que dar 7 / 6 / 7 / 5 / 6 / 4 / 8 en las siete de la clienta.
+   Acá el número fijo vale, porque es la especificación y no un dato que
+   crece con el seed. Si te da distinto, es que se pisó algo.
 4. **Ningún producto sin categoría**, verificado por SQL.
 5. Ninguna categoría de producto vacía.
 6. `npm run smoke` en verde.
@@ -145,8 +172,9 @@ dispositivos móviles". Nadie lo verificó nunca en una pantalla chica.
 **Lo que más me preocupa:** los selectores de provincia y localidad que
 acabás de construir son el centro de la demostración, y un desplegable con
 miles de localidades en un celular es justo lo que se rompe. Ahora se suma
-el filtro de categorías, que pasa de 5 a 12 opciones con subcategorías
-abajo: en pantalla chica eso puede volverse una lista impracticable.
+el filtro de categorías: 12 categorías con más de 43 subcategorías colgando
+abajo. En pantalla chica eso puede volverse una lista impracticable, y hasta
+que no cargues la taxonomía no se ve el problema real.
 
 ### Qué verificar
 
