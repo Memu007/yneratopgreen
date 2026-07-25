@@ -143,13 +143,23 @@ def get_user_reputation(
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
+    # Contar ventas reales en lugar del contador guardado
+    sales_count = db.query(func.count(Order.id)).filter(
+        Order.seller_id == user.id
+    ).scalar() or 0
+
+    # Contar compras reales
+    purchases_count = db.query(func.count(Order.id)).filter(
+        Order.buyer_id == user.id
+    ).scalar() or 0
+
     return UserReputationResponse(
         user_id=user.id,
         user_name=user.full_name,
         rating_average=float(user.rating_average),
         rating_count=user.rating_count,
-        sales_count=user.sales_count,
-        purchases_count=user.purchases_count
+        sales_count=sales_count,
+        purchases_count=purchases_count
     )
 
 

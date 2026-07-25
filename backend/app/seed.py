@@ -408,7 +408,7 @@ def create_seed_data():
             },
             {
                 "name": "Vaquillonas Braford Preñadas",
-                "slug": "vaquillonas-braford-preñadas",
+                "slug": "vaquillonas-braford-prenadas",
                 "description": "Vaquillonas Braford preñadas de 18 meses, inseminadas con toro Angus. 5 meses de gestación. Lote de 10 cabezas. Sanidad completa, trazabilidad SIRA al día.",
                 "category_id": cat_bienes_ganado.id,
                 "price": 5800000.0,
@@ -463,7 +463,7 @@ def create_seed_data():
             "servicio-siembra-gps": ("06791050", "Tandil, Buenos Aires"),
             "rastra-discos-24-platos": ("06063010", "Balcarce, Buenos Aires"),
             "terneros-angus-lote-20": ("82084270", "Rosario, Santa Fe"),
-            "vaquillonas-braford-preñadas": ("14098230", "Río Cuarto, Córdoba"),
+            "vaquillonas-braford-prenadas": ("14098230", "Río Cuarto, Córdoba"),
             "dron-pulverizador-agricola-20l": ("06623100", "Pergamino, Buenos Aires"),
             "sensores-humedad-suelo-iot": ("06791050", "Tandil, Buenos Aires"),
         }

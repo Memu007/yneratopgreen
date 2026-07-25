@@ -22,9 +22,11 @@ from app.core.security import (
     create_refresh_token,
     decode_token
 )
+from sqlalchemy import func
 from app.core.dependencies import get_current_user
 from app.core.config import settings
 from app.api.notifications import notify_welcome
+from app.models.order import Order
 
 
 router = APIRouter(prefix="/auth", tags=["autenticación"])
@@ -168,8 +170,21 @@ def login_user(
         secure=True
     )
     
+    # Calcular ventas y compras reales
+    sales_count = db.query(func.count(Order.id)).filter(
+        Order.seller_id == user.id
+    ).scalar() or 0
+
+    purchases_count = db.query(func.count(Order.id)).filter(
+        Order.buyer_id == user.id
+    ).scalar() or 0
+
+    user_data = UserResponse.model_validate(user)
+    user_data.sales_count = sales_count
+    user_data.purchases_count = purchases_count
+
     return AuthResponse(
-        user=UserResponse.model_validate(user),
+        user=user_data,
         access_token=access_token,
         refresh_token=refresh_token,
         message="Inicio de sesión exitoso"
@@ -257,8 +272,21 @@ def refresh_access_token(
         secure=True
     )
     
+    # Calcular ventas y compras reales
+    sales_count = db.query(func.count(Order.id)).filter(
+        Order.seller_id == user.id
+    ).scalar() or 0
+
+    purchases_count = db.query(func.count(Order.id)).filter(
+        Order.buyer_id == user.id
+    ).scalar() or 0
+
+    user_data = UserResponse.model_validate(user)
+    user_data.sales_count = sales_count
+    user_data.purchases_count = purchases_count
+
     return AuthResponse(
-        user=UserResponse.model_validate(user),
+        user=user_data,
         access_token=access_token,
         refresh_token=new_refresh_token,
         message="Token renovado exitosamente"
@@ -267,14 +295,27 @@ def refresh_access_token(
 
 @router.get("/me", response_model=UserResponse)
 def get_current_user_info(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Obtener información del usuario actual
     
     - Requiere autenticación (token JWT)
     """
-    return UserResponse.model_validate(current_user)
+    # Calcular ventas y compras reales en lugar del contador guardado
+    sales_count = db.query(func.count(Order.id)).filter(
+        Order.seller_id == current_user.id
+    ).scalar() or 0
+
+    purchases_count = db.query(func.count(Order.id)).filter(
+        Order.buyer_id == current_user.id
+    ).scalar() or 0
+
+    user_data = UserResponse.model_validate(current_user)
+    user_data.sales_count = sales_count
+    user_data.purchases_count = purchases_count
+    return user_data
 
 
 @router.patch("/me", response_model=UserResponse)
@@ -310,7 +351,19 @@ def update_current_user(
     db.commit()
     db.refresh(current_user)
     
-    return UserResponse.model_validate(current_user)
+    # Calcular ventas y compras reales
+    sales_count = db.query(func.count(Order.id)).filter(
+        Order.seller_id == current_user.id
+    ).scalar() or 0
+
+    purchases_count = db.query(func.count(Order.id)).filter(
+        Order.buyer_id == current_user.id
+    ).scalar() or 0
+
+    user_data = UserResponse.model_validate(current_user)
+    user_data.sales_count = sales_count
+    user_data.purchases_count = purchases_count
+    return user_data
 
 
 @router.post("/change-password")

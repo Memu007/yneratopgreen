@@ -178,6 +178,7 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
       tokenStorage.clearTokens();
       setUser(null);
       localStorage.removeItem('agromarket_cart');
+      window.dispatchEvent(new CustomEvent('user-logout'));
     }
   };
 

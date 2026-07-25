@@ -17,78 +17,127 @@ Hacelo siempre, porque puede haber cambiado.
 
 ---
 
-## Estado: tarea 2 aprobada
+## Estado: bugs (a) y slug aprobados. (b) y (c) pendientes de verificación
 
-Verificada en `a5dd60e`. Doce productos, dos por categoría nueva,
-contraste SQL coincidente y seed idempotente. Bien hecho.
+Commit `83c2752`. Buen trabajo, con una corrección de proceso al final.
 
-Dos observaciones, ninguna bloqueante:
+**Aprobado y cerrado:**
 
-1. **El slug `vaquillonas-braford-preñadas` tiene `ñ`.** Es el único no
-   ASCII de los diecisiete del seed. Los slugs existen para ir en URLs.
-   Hoy no rompe nada porque el frontend no rutea por slug, pero
-   corregilo a `vaquillonas-braford-prenadas` y metelo en el próximo
-   commit. No hagas un commit sólo para esto.
-2. Las imágenes usan `picsum.photos`, que devuelve fotos aleatorias. Eso
-   ya venía del seed original, **no lo tocás vos**. Está registrado y lo
-   resuelve otra persona.
+- **Bug (a), contador de ventas.** Verifiqué la cadena entera que vos no
+  pudiste probar: la API devuelve `sales_count`, se mapea a `salesCount`
+  en `AuthContext.tsx:76` y se muestra en `UserDashboard.tsx:1157`. El
+  perfil público lee de `/ratings/user/{id}`, que también arreglaste.
+  Llega bien a la interfaz por los dos caminos.
+- **El slug**, verificado en base.
+- El cambio de `package-lock.json` es sólo sincronizar la versión con
+  `package.json`. Inofensivo, de hecho corrige una inconsistencia.
+
+**Pendientes, no los rehagas:** los bugs (b) y (c) quedaron sin verificar
+en navegador. El código se ve correcto y lo revisé, pero sin ejecutar no
+los doy por cerrados. Los va a verificar la otra dev mañana, que ya va a
+estar trabajando en el frontend. **No los toques.**
+
+### Tus dos observaciones adversariales
+
+**La #2 es muy buena.** Tenés razón: en el código no existe el cambio de
+rol, el rol se fija en el login. Yo repetí el síntoma tal como me lo
+describieron sin comprobarlo contra el código. Tu lectura es la correcta y
+tu arreglo apunta al momento real en que cambia el usuario.
+
+**La #1 también sirve**, y confirma algo que ya sabíamos del código
+heredado: hay arreglos empezados y nunca terminados. Bien visto.
+
+### Corrección de proceso — importante
+
+El criterio de aceptación pedía los tres verificados **en navegador**. No
+pudiste hacerlo, y en vez de frenar seguiste y entregaste.
+
+Esa es exactamente la condición de corte número 1: *"un criterio de
+aceptación no se cumple"*. Lo correcto era commitear lo hecho, escribir
+"no puedo abrir un navegador en este entorno" y parar ahí.
+
+Que lo hayas declarado con claridad en "Qué NO corrí" está muy bien y no
+es poca cosa. Pero declararlo no reemplaza frenar. **Si no podés cumplir
+un criterio, no completes la tarea: avisá.**
+
+Y decime, para saberlo de ahora en más: ¿podés abrir un navegador en tu
+entorno, sí o no? Si no podés, dejo de pedirte verificación visual y te
+armo criterios que sí puedas comprobar.
 
 ---
 
-## Tarea actual: dos bugs visibles en la interfaz
+## Tarea actual: corregir la documentación heredada
 
-Se ven en la demo con el cliente, por eso pasaron a tener prioridad.
-Hacelos de a uno.
+Es la que vos misma detectaste el primer día.
 
-### a) El contador de ventas del vendedor muestra 0
+`README.md` línea 49 dice "SQL Server 2022 (Developer) | 1433" y
+`README_LOCAL_SETUP.md` lo menciona nueve veces. El proyecto corre sobre
+PostgreSQL 16 con PostGIS 3.4 desde hace varios commits.
 
-El perfil del vendedor muestra "0 ventas" mientras "Mis Ventas" lista 2
-pedidos. Hay un contador guardado en la tabla `users` que nunca se
-actualiza.
+**Qué corregir en los dos archivos:**
 
-**Arreglo:** que ese número se calcule contando las ventas reales en el
-momento de pedirlo, en lugar de leer el contador guardado.
+- Base de datos: PostgreSQL 16 + PostGIS 3.4.
+- Puertos: `5433` en el host, `5432` dentro de Docker.
+- El instructivo de instalación, que hoy describe el flujo viejo de SQL
+  Server, por el real:
 
-**No borres la columna** de la tabla ni escribas una migración. Sólo dejá
-de usarla para mostrar el número.
+  ```bash
+  ./scripts/init_local_db.sh
+  npm install && npm run dev
+  ```
 
-### b) El badge del carrito persiste al cambiar de rol
-
-Cuando el usuario pasa de comprador a vendedor, el badge sigue mostrando
-los productos del carrito. Hoy sólo se corrige recargando la página.
-
-**Arreglo:** que el estado del carrito se limpie al cambiar de rol.
-
-### c) Las imágenes rotas se ven como imágenes rotas
-
-`src/components/ProductCard/ProductCard.tsx:29` tiene un `<img>` sin
-manejo de error. Las imágenes vienen de un servicio externo; si falla o
-no hay conexión, cada tarjeta muestra el ícono de imagen rota del
-navegador. En una demo con el cliente eso se lee como producto sin
-terminar.
-
-**Arreglo:** que cuando la imagen no cargue, aparezca en su lugar un
-bloque limpio con el nombre del producto. Usá el evento `onError` del
-`<img>`.
-
-No busques ni agregues fotos nuevas. No cambies las URLs del seed. Es
-sólo el respaldo para cuando no cargan.
+**No toques `docs/PROJECT_STATUS.md`.** Tiene errores conocidos y se
+reescribe entero más adelante.
 
 ### Criterio de aceptación
 
-Los tres verificados **en el navegador y sin recargar la página**. El
-contador tiene que coincidir con la cantidad de ventas listadas abajo.
+No queda ninguna mención a SQL Server que describa el stack actual.
+Comprobalo así, y pegame la salida:
 
-Para el punto (c), probalo de verdad: cortá la conexión o cambiá una URL
-de imagen por una inválida y confirmá que se ve el bloque de respaldo y
-no el ícono roto.
+```bash
+grep -rin "sql server\|1433" README.md README_LOCAL_SETUP.md
+```
 
-### Qué mandar en `PARA-PM.md`
+Si el instructivo del README menciona comandos que ya no existen,
+corregilos también.
 
-- El diff de cada arreglo.
-- Los comandos que corriste y su salida textual, sin resumir.
-- Qué viste en el navegador, pantalla por pantalla.
-- El hash del commit. **Commit y push antes de escribir el informe.**
+Esta tarea no necesita navegador ni levantar nada.
+
+---
+
+## Cómo encadenar tareas sin esperarme
+
+Cuando arriba haya **varias tareas o varios puntos**, podés hacerlos
+**uno tras otro sin pedirme permiso entre cada uno**. Ya tienen criterio
+de aceptación y los verifiqué antes de dártelos.
+
+El ciclo por cada uno es el mismo de siempre: lo hacés, lo verificás
+contra su criterio, **commit y push**, agregás su sección en
+`PARA-PM.md`, y seguís con el que sigue.
+
+### Cuándo PARÁS y me esperás
+
+Cortá enseguida, sin arrancar el siguiente, si pasa cualquiera de estas:
+
+1. **Un criterio de aceptación no se cumple** y no sabés por qué.
+2. **Aparece un error que no entendés**, o que te obliga a cambiar algo
+   que no estaba en la tarea.
+3. **Tendrías que tomar una decisión de diseño.** Si te encontrás
+   eligiendo entre dos formas de hacer algo, esa elección es mía.
+4. **Tendrías que tocar algo de la lista de "qué no tocar".**
+5. **Algo que ya funcionaba dejó de funcionar.**
+6. **Una tarea contradice a otra** o contradice algo del contexto.
+
+En cualquiera de esos casos: commit de lo que tengas, escribilo en
+`PARA-PM.md` y frená. **No improvises para destrabarte.** Un corte
+temprano cuesta una vuelta; una tarea mal hecha encima de otra mal hecha
+cuesta tres.
+
+### Lo que no se encadena nunca
+
+Tareas que no estén escritas en este archivo. Si terminás todo lo de acá,
+**pará y avisame**. No busques trabajo por tu cuenta ni deduzcas cuál
+sería el paso siguiente, aunque te parezca evidente.
 
 ---
 

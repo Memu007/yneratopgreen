@@ -28,6 +28,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     }
   }, []);
 
+  // Limpiar carrito cuando el usuario cierra sesión
+  useEffect(() => {
+    const handleLogout = () => {
+      setItems([]);
+      localStorage.removeItem('agromarket_cart');
+    };
+    window.addEventListener('user-logout', handleLogout);
+    return () => window.removeEventListener('user-logout', handleLogout);
+  }, []);
+
   // Guardar carrito en localStorage cuando cambie
   useEffect(() => {
     localStorage.setItem('agromarket_cart', JSON.stringify(items));
