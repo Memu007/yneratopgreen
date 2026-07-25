@@ -88,6 +88,18 @@ Detalles, alternativa nativa y troubleshooting en
 
 ---
 
+## Smoke tests integrales
+
+El segundo comando elimina los volúmenes Docker locales, reinicializa la
+aplicación y ejecuta los once casos:
+
+```bash
+npm install
+npm run smoke
+```
+
+---
+
 ## Credenciales demo (creadas por el seed)
 
 | Rol | Email | Password |
