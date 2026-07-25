@@ -141,42 +141,6 @@ sería el paso siguiente, aunque te parezca evidente.
 
 ---
 
-## Cómo encadenar tareas sin esperarme
-
-Los tres arreglos de arriba, (a), (b) y (c), ya tienen criterio de
-aceptación y los verifiqué antes de dártelos. Podés hacerlos **uno tras
-otro sin pedirme permiso entre cada uno**.
-
-El ciclo por arreglo es el mismo de siempre: lo hacés, lo verificás contra
-su criterio, **commit y push**, agregás su sección en `PARA-PM.md`, y
-seguís con el que sigue.
-
-### Cuándo PARÁS y me esperás
-
-Cortá enseguida, sin arrancar el siguiente, si pasa cualquiera de estas:
-
-1. **Un criterio de aceptación no se cumple** y no sabés por qué.
-2. **Aparece un error que no entendés**, o que te obliga a cambiar algo
-   que no estaba en la tarea.
-3. **Tendrías que tomar una decisión de diseño.** Si te encontrás
-   eligiendo entre dos formas de hacer algo, esa elección es mía.
-4. **Tendrías que tocar algo de la lista de "qué no tocar".**
-5. **Algo que ya funcionaba dejó de funcionar.**
-6. **Una tarea contradice a otra** o contradice algo del contexto.
-
-En cualquiera de esos casos: commit de lo que tengas, escribilo en
-`PARA-PM.md` y frená. **No improvises para destrabarte.** Un corte
-temprano cuesta una vuelta; una tarea mal hecha encima de otra mal hecha
-cuesta tres.
-
-### Lo que no se encadena nunca
-
-Tareas que no estén escritas en este archivo. Si terminás todo lo de acá,
-**pará y avisame**. No busques trabajo por tu cuenta ni deduzcas cuál
-sería el paso siguiente, aunque te parezca evidente.
-
----
-
 ## Reglas permanentes
 
 Estas no cambian. Si alguna vez cambian, te aviso acá.
