@@ -11,7 +11,7 @@ const IMAGES_BASE_URL = import.meta.env.VITE_IMAGES_URL || '';
  * Construye la URL completa para una imagen
  */
 // Placeholder SVG como data URI (no requiere conexión externa)
-const PLACEHOLDER_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmNGVkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzJkNTAxNiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuKaoiBTaW4gSW1hZ2VuPC90ZXh0Pjwvc3ZnPg==';
+const PLACEHOLDER_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1zbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmNGVkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzJkNTAxNiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuKaoiBTaW4gSW1hZ2VuPC90ZXh0Pjwvc3ZnPg==';
 
 function getImageUrl(url: string | undefined): string {
   if (!url) return PLACEHOLDER_IMAGE;
@@ -40,6 +40,20 @@ export interface CategoryResponse {
   is_service: boolean;
   subcategories: SubcategoryResponse[];
   created_at: string;
+}
+
+export interface ProvinceResponse {
+  id: string;
+  name: string;
+}
+
+export interface LocalityResponse {
+  id: string;
+  name: string;
+  province_id: string;
+  province_name: string;
+  latitude: number;
+  longitude: number;
 }
 
 export interface ProductImage {
@@ -113,6 +127,21 @@ export const getCategories = async (): Promise<CategoryResponse[]> => {
 };
 
 /**
+ * Obtener provincias disponibles en el padrón de localidades
+ */
+export const getProvinces = async (): Promise<ProvinceResponse[]> => {
+  return apiGet<ProvinceResponse[]>('/catalog/localities/provinces');
+};
+
+/**
+ * Obtener localidades de una provincia por su código de dos caracteres
+ */
+export const getLocalities = async (provinceId: string): Promise<LocalityResponse[]> => {
+  const queryParams = new URLSearchParams({ province_id: provinceId });
+  return apiGet<LocalityResponse[]>(`/catalog/localities?${queryParams.toString()}`);
+};
+
+/**
  * Obtener listado de productos con filtros
  */
 export const getProducts = async (params: {
@@ -122,6 +151,8 @@ export const getProducts = async (params: {
   max_price?: number;
   in_stock?: boolean;
   seller_id?: string;
+  province?: string;
+  locality_id?: string;
   sort_by?: 'created_at' | 'price' | 'sales' | 'views';
   sort_order?: 'asc' | 'desc';
   page?: number;
