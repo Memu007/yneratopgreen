@@ -1,7 +1,12 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import styles from './FilterSidebar.module.css';
-import { provinces } from '../../data/mockData';
-import type { CategoryResponse } from '../../utils/catalogService';
+import {
+  getLocalities,
+  getProvinces,
+  type CategoryResponse,
+  type LocalityResponse,
+  type ProvinceResponse,
+} from '../../utils/catalogService';
 
 interface FilterSidebarProps {
   categories: CategoryResponse[];
@@ -9,6 +14,7 @@ interface FilterSidebarProps {
   selectedCategory: string;
   selectedSubcategory: string;
   selectedProvince: string;
+  selectedLocality: string;
   priceMin: number;
   priceMax: number;
   inStockOnly: boolean;
@@ -17,6 +23,7 @@ interface FilterSidebarProps {
   onCategoryChange: (category: string) => void;
   onSubcategoryChange: (subcategory: string) => void;
   onProvinceChange: (province: string) => void;
+  onLocalityChange: (localityId: string) => void;
   onPriceMinChange: (price: number) => void;
   onPriceMaxChange: (price: number) => void;
   onInStockChange: (inStock: boolean) => void;
@@ -30,6 +37,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   selectedCategory,
   selectedSubcategory,
   selectedProvince,
+  selectedLocality,
   priceMin,
   priceMax,
   inStockOnly,
@@ -38,12 +46,18 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   onCategoryChange,
   onSubcategoryChange,
   onProvinceChange,
+  onLocalityChange,
   onPriceMinChange,
   onPriceMaxChange,
   onInStockChange,
   onMinRatingChange,
   onResetFilters,
 }) => {
+  const [provinceOptions, setProvinceOptions] = useState<ProvinceResponse[]>([]);
+  const [localityOptions, setLocalityOptions] = useState<LocalityResponse[]>([]);
+  const [loadingProvinces, setLoadingProvinces] = useState(true);
+  const [loadingLocalities, setLoadingLocalities] = useState(false);
+
   // Filtrar categorías según el tipo seleccionado
   const filteredCategories = useMemo(() => {
     if (selectedType === 'todos') return categories;
@@ -58,16 +72,84 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     return category?.subcategories?.filter(s => s.is_active) || [];
   }, [categories, selectedCategory]);
 
+  const selectedProvinceId = useMemo(() => {
+    return provinceOptions.find(province => province.name === selectedProvince)?.id || '';
+  }, [provinceOptions, selectedProvince]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadProvinces = async () => {
+      setLoadingProvinces(true);
+      try {
+        const data = await getProvinces();
+        if (!cancelled) {
+          setProvinceOptions(data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Error al cargar provincias:', error);
+          setProvinceOptions([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingProvinces(false);
+        }
+      }
+    };
+
+    void loadProvinces();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedProvinceId) {
+      setLocalityOptions([]);
+      setLoadingLocalities(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadLocalities = async () => {
+      setLoadingLocalities(true);
+      try {
+        const data = await getLocalities(selectedProvinceId);
+        if (!cancelled) {
+          setLocalityOptions(data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Error al cargar localidades:', error);
+          setLocalityOptions([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingLocalities(false);
+        }
+      }
+    };
+
+    void loadLocalities();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProvinceId]);
+
   // Resetear categoría cuando cambia el tipo
   useEffect(() => {
     onCategoryChange('Todas las categorías');
     onSubcategoryChange('Todas');
-  }, [selectedType]);
+  }, [onCategoryChange, onSubcategoryChange, selectedType]);
 
   // Resetear subcategoría cuando cambia la categoría
   useEffect(() => {
     onSubcategoryChange('Todas');
-  }, [selectedCategory]);
+  }, [onSubcategoryChange, selectedCategory]);
 
   const handleRatingClick = (rating: number) => {
     onMinRatingChange(rating === minRating ? 0 : rating);
@@ -127,17 +209,41 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
         </div>
       )}
 
-      {/* Ubicación */}
+      {/* Provincia */}
       <div className={styles.filterSection}>
-        <label className={styles.filterLabel}>Ubicación</label>
+        <label className={styles.filterLabel}>Provincia</label>
         <select
           className={styles.select}
           value={selectedProvince}
           onChange={(e) => onProvinceChange(e.target.value)}
+          disabled={loadingProvinces}
         >
-          {provinces.map((province) => (
-            <option key={province} value={province}>
-              {province}
+          <option value="">
+            {loadingProvinces ? 'Cargando provincias...' : 'Todas las provincias'}
+          </option>
+          {provinceOptions.map((province) => (
+            <option key={province.id} value={province.name}>
+              {province.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Localidad */}
+      <div className={styles.filterSection}>
+        <label className={styles.filterLabel}>Localidad</label>
+        <select
+          className={styles.select}
+          value={selectedLocality}
+          onChange={(e) => onLocalityChange(e.target.value)}
+          disabled={!selectedProvinceId || loadingLocalities}
+        >
+          <option value="">
+            {loadingLocalities ? 'Cargando localidades...' : 'Todas las localidades'}
+          </option>
+          {localityOptions.map((locality) => (
+            <option key={locality.id} value={locality.id}>
+              {locality.name}
             </option>
           ))}
         </select>
