@@ -9,7 +9,7 @@ transportistas.
 
 ## Dónde estamos
 
-Avance contra el contrato: **~48%**. Evidencia requisito por requisito en
+Avance contra el contrato: **~49%**. Evidencia requisito por requisito en
 `MATRIZ.md`.
 
 Se pasó de un repositorio donde la base de datos no se podía crear a un
@@ -32,12 +32,14 @@ evidencia de ejecución detrás.
   encadenados en la interfaz, filtrado en el servidor y estado en la URL.
   Cierra el requisito 3.1.
 - Las cinco categorías del contrato con productos y localidad.
-- **Suite automatizada de once smoke tests**, un solo comando contra
+- **Suite automatizada de doce smoke tests**, un solo comando contra
   arranque limpio, con criterios relacionales contra SQL y publicación
   desde la interfaz con navegador real. Verificado que **falla** con
   código distinto de cero al romper un caso a propósito.
+- **Catálogo de demostración**: 24 productos, dos por categoría en las
+  doce categorías, repartidos en nueve provincias. Seed idempotente.
 
-**Tres lecturas para no leer mal ese 48 %:**
+**Tres lecturas para no leer mal ese 49 %:**
 
 1. Buena parte de la jornada fue arqueología, no construcción.
 2. El mayor salto lo dio el recorte de alcance, no el código. Esa palanca
@@ -47,17 +49,11 @@ evidencia de ejecución detrás.
 
 ## Próximas tareas
 
-1. **Que la subida de imágenes falle a la vista.**
-   `AddProductModal.tsx:506` no chequea `response.ok`: si la imagen no
-   sube, igual avisa "publicado exitosamente". Afecta la publicación con
-   imágenes, que es contractual.
+1. **Ensayo de la demostración del 30-07.** Recorrer el camino exacto que
+   se va a mostrar, sobre instalación limpia y cronometrado. Guión en
+   `DEMO.md`.
 
-2. **Ampliar el catálogo de demostración** a unos 25 productos repartidos
-   en ocho provincias o más, con al menos dos por categoría. Hoy hay 12 en
-   tres provincias, lo que luce poco el filtro por ubicación recién
-   terminado.
-
-3. **Módulo de transportistas.** El bloque grande que falta del
+2. **Módulo de transportistas.** El bloque grande que falta del
    diferencial. **No arranca** hasta que el cliente defina si la
    coincidencia va por zonas declaradas o por radio en km.
 

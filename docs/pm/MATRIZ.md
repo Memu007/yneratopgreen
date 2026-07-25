@@ -26,7 +26,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 |-----------|--------|-----------|
 | Registro con validación | ❌ | Igual que comprador |
 | Panel de control básico | ✅ | Carga perfil, ventas y productos en UI, con el contador de ventas ya corregido |
-| Publicación desde la UI | ✅ | Producto completo publicado con imagen, sin errores de consola, visible en catálogo |
+| Publicación desde la UI | ✅ | Producto completo publicado con imagen, verificado en la suite en interfaz, API y base. Cubre también el caso de imagen fallida |
 | Publicación con **ubicación** | ✅ | `locality_id` obligatorio contra el padrón oficial. Verificado: Balcarce `06063010` guardado en base |
 | Gestión de stock | ✅ | Filtro de stock aplicado en catálogo, verificado en UI |
 | Gestión de ventas recibidas | ✅ | "Mis Ventas" lista 2 pedidos en UI |
@@ -80,8 +80,8 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 
 | Requisito | Estado |
 |-----------|--------|
-| Pruebas integrales | ✅ Suite de once casos con un comando contra arranque limpio, criterios relacionales contra SQL, publicación desde la interfaz con Chromium real. Verificado que **falla** con código distinto de cero al romper un caso a propósito |
-| Carga inicial de datos | ⚪ Seed repetible con 12 productos demo y 4.028 localidades. Ampliación a 25 en curso |
+| Pruebas integrales | ✅ Suite de doce casos con un comando contra arranque limpio, criterios relacionales contra SQL, publicación desde la interfaz con Chromium real. Verificado que **falla** con código distinto de cero al romper un caso a propósito |
+| Carga inicial de datos | ✅ Seed idempotente con 24 productos en 12 categorías y 9 provincias, más 4.028 localidades. Verificado corriéndolo dos veces sin duplicar |
 | Despliegue en producción | ❌ |
 | Capacitación del panel de administración | ❌ |
 | Documentación técnica del despliegue | ⚪ `README.md` y `README_LOCAL_SETUP.md` corregidos al stack real. `PROJECT_STATUS.md` sigue con ocho afirmaciones verificadas como falsas |
@@ -121,4 +121,4 @@ Dos observaciones que el porcentaje no muestra:
 | Imágenes rotas mostraban el ícono del navegador | Alta para la demo | ✅ Resuelto. Respaldo con el nombre del producto, verificado en claro y oscuro |
 | **Modo oscuro inalcanzable** | Media | **Abierto, sin acción.** `toggleTheme` y `useTheme` no los usa ningún componente. Existe el contexto y los estilos, pero no hay forma de activarlo. No es contractual |
 | Vite se corre de puerto y el backend lo rechaza por CORS | Media | Abierto. Arreglo propuesto: fijar el puerto con `--strictPort` |
-| **Subida de imágenes falla en silencio** | Media | Arreglo asignado. `AddProductModal.tsx:506` no chequea `response.ok`: si la imagen no sube, igual avisa "publicado exitosamente" |
+| Subida de imágenes fallaba en silencio | Media | ✅ Resuelto. Verifica `response.ok`, muestra el motivo y avisa que la publicación salió sin la imagen. **Con caso permanente en la suite** que fuerza el error |
