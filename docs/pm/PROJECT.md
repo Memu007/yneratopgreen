@@ -78,28 +78,39 @@ base. El producto es un prototipo funcional, no un MVP contractual.
 
 ## Benchmark — Agrofy
 
-El cliente pidió "algo similar a Agrofy". Se usa como referencia de
-producto, no como fuente de código ni como alcance.
+**El cliente no pidió Agrofy y no lo conoce.** Es una referencia interna
+del equipo, adoptada por decisión de PM el 20-07-2026, para tener un
+modelo mental de cómo se ordena un marketplace agropecuario.
 
-**Se toma:** estructura del buscador (texto + categoría + ubicación),
-taxonomía agropecuaria y subcategorías, qué filtros aplican por
-categoría, qué campos lleva cada ficha técnica según tipo de
-publicación, perfil público de vendedor tipo sucursal, y la separación
-entre compra directa y consulta/cotización.
+Consecuencia: **Agrofy no justifica alcance.** No es requisito de nada.
+Sirve para resolver *cómo* implementar algo que el contrato ya pide
+(cómo agrupar filtros, qué campos lleva una ficha de maquinaria), nunca
+para decidir *qué* construir. Si un patrón de Agrofy no se puede trazar
+a un requisito del PDF, no entra: es alcance que nos inventamos y no está
+pagado.
+
+**Se usa como referencia para:** estructura del buscador (texto +
+categoría + ubicación), taxonomía agropecuaria y subcategorías, qué
+filtros aplican por categoría, qué campos lleva cada ficha técnica según
+tipo de publicación, perfil público de vendedor tipo sucursal, y la
+separación entre compra directa y consulta/cotización.
 
 **No se toma:** HTML, CSS ni JS del sitio, textos literales, marca,
 logotipos, imágenes, ni el diseño visual distintivo. Los patrones se
 reimplementan desde cero con identidad propia de TopGreen.
 
-**Riesgo de alcance:** "similar a Agrofy" no es un requisito acotado.
-Agrofy tiene años de producto. Sin una lista cerrada y aprobada de
-pantallas y patrones, cada revisión con el cliente puede reabrir el
-alcance. La Fase 1 del roadmap existe para cerrar eso: cada pantalla del
-MVP vinculada a un requisito contractual, y todo lo demás al backlog
-post-MVP.
-
 La logística geográfica es el diferencial propio de TopGreen y no sale
 del benchmark.
+
+## Fuente de verdad del alcance
+
+El alcance vinculante es el **PDF del contrato**. `PM_ROADMAP.md` v3 es
+un resumen de ese PDF hecho en la auditoría del 20-07-2026, no el
+contrato en sí.
+
+**El PDF no está en el repositorio.** Mientras no esté, toda decisión de
+alcance se está tomando sobre un resumen de segunda mano. Conseguirlo o
+transcribir sus requisitos es prioritario.
 
 ## Fuera de alcance
 

@@ -5,6 +5,32 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-07-24 — Agrofy es referencia interna, no requisito
+
+El cliente no pidió Agrofy y no lo conoce. Es un marco de referencia del
+equipo (decisión de PM del 20-07-2026).
+
+Consecuencia: Agrofy no justifica alcance. Resuelve *cómo* implementar
+algo que el contrato ya pide, nunca *qué* construir. Un patrón que no se
+trace a un requisito del PDF no entra al MVP.
+
+Corrige una afirmación errónea que este documento y `PROJECT.md` tenían
+antes ("el cliente pidió algo similar a Agrofy").
+
+---
+
+## 2026-07-24 — El PDF del contrato no está en el repositorio
+
+`PM_ROADMAP.md` v3 es un resumen del PDF hecho en la auditoría del
+20-07-2026, no el contrato. El PDF no está versionado en ningún lado.
+
+Consecuencia: las decisiones de alcance se están tomando sobre una
+fuente de segunda mano. Conseguir el PDF o transcribir sus requisitos al
+repositorio es prioritario, y hasta entonces cualquier "requisito
+contractual" que citemos es una cita indirecta.
+
+---
+
 ## 2026-07-24 — La documentación de entrega no es fuente de verdad
 
 La migración `011` con `lat`, `lng` e índice geo, declarada en
