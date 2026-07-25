@@ -15,98 +15,88 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
-## Estado: suite de smoke tests aprobada
+## Estado: las dos tareas aprobadas
 
-La mejor entrega hasta ahora. Revisado contra el código, no sólo el informe.
+Verificadas contra el código. La subida de imágenes ahora comprueba el
+resultado y avisa el motivo, y el catálogo quedó en 24 productos, dos por
+categoría, en nueve provincias.
 
-**Lo que más valoro:**
+**Lo que más valoro de esta vuelta:** no arreglaste el bug y listo, le
+agregaste un caso permanente a la suite que fuerza el error y exige tres
+cosas a la vez. Ese bug ya no puede volver en silencio. No te lo había
+pedido.
 
-- **La demostración de fallo.** `--force-failure=health` devuelve `exit 1`,
-  y la suite **no se detiene en el primer error**: deja el mapa completo de
-  qué pasó y qué falló. Eso era el criterio que más me importaba. Una
-  suite que nunca falla da confianza falsa y es peor que no tener nada.
-- **Aplicaste los criterios relacionales** apenas los establecí:
-  `API=6, SQL=6`, `API=SQL=13`. La suite sobrevive a que cambien los datos
-  de ejemplo.
-- **El caso 9 valida en tres capas**: interacción, API y base. Tenías razón
-  en no conformarte con el aviso en pantalla.
-- Respaldar y restaurar los `.env` con `trap` no te lo pedí y hacía falta.
-
-El mecanismo de fallo forzado es seguro: sólo se activa con un parámetro
-explícito y no puede dispararse por accidente.
-
-### Tu observación 4 es un bug real. Verificado
-
-`AddProductModal.tsx:506` hace `await fetch(...)` para subir la imagen y
-**nunca chequea `response.ok`**. Si la subida falla —archivo muy grande,
-token vencido, error del servidor—, el código sigue de largo y muestra
-"publicado exitosamente". El vendedor cree que subió la foto y no subió
-nada.
-
-Afecta un requisito contractual: la publicación con imágenes. Es la
-primera tarea de abajo.
+Y que informaras que tu primera corrida falló por tu propia expresión
+regular, en lugar de corregirlo callado, es exactamente la conducta que
+hace que confíe en tus informes.
 
 ---
 
-## Tarea 1: que la subida de imágenes falle a la vista
+## Tarea: verificar y arreglar la vista en celular
 
-En `AddProductModal.tsx`, alrededor de la línea 506.
+El 30 de julio hay demostración con el cliente. Es del sector agro: **va a
+abrir el sitio en el teléfono**, en la reunión o apenas salga.
 
-Hoy el `fetch` que sube cada imagen no verifica el resultado. Que lo
-verifique:
+El contrato pide "plataforma web responsive" y "diseño optimizado para
+dispositivos móviles". Nadie lo verificó nunca en una pantalla chica.
 
-- Si alguna imagen falla, el producto **igual se publica** —ya está creado
-  a esa altura— pero el aviso tiene que decir que la publicación salió y
-  que **la imagen no se pudo subir**, con el motivo si lo hay.
-- Si todas suben bien, el aviso queda como está.
+**Lo que más me preocupa:** los selectores de provincia y localidad que
+acabás de construir son el centro de la demostración, y un desplegable con
+miles de localidades en un celular es justo lo que se rompe.
 
-No cambies el orden de las operaciones ni el backend.
+### Qué verificar
+
+Con Playwright emulando un teléfono, y si podés también en uno real.
+Tamaños: 390×844 (iPhone), 360×800 (Android) y una tableta.
+
+Recorrido completo en cada tamaño:
+
+1. Pantalla inicial y navegación al catálogo.
+2. **El panel de filtros**: ¿se ve? ¿se puede abrir y cerrar? ¿los
+   selectores de provincia y localidad son usables con el dedo?
+3. Catálogo: ¿las tarjetas se acomodan o se desbordan?
+4. Detalle de una publicación.
+5. Carrito y checkout hasta la pantalla de pago.
+6. Formulario de publicación, que es largo.
+7. Panel de vendedor y panel de administración.
+
+En cada uno mirá: desbordes horizontales, texto cortado, botones
+superpuestos o demasiado chicos para el dedo, y elementos que tapen otros.
+
+### Qué arreglar
+
+**Sólo lo que esté roto o inutilizable.** No rediseñes nada, no cambies
+colores ni espaciados por gusto. El criterio es: ¿un usuario puede
+completar el recorrido en un teléfono sin frustrarse?
+
+Si algo está feo pero funciona, anotalo y no lo toques.
 
 ### Criterio de aceptación
 
-Provocá una falla real de subida —por ejemplo interceptando esa petición
-con Playwright y devolviendo un error, como hiciste con la imagen rota— y
-mostrame que:
+1. El recorrido completo se puede hacer en 390×844 sin quedarse trabado.
+2. **Ningún desborde horizontal** en ninguna pantalla.
+3. Los filtros de provincia y localidad se pueden usar con el dedo.
+4. Capturas de las siete pantallas en el tamaño más chico.
+5. Lista de lo que estaba roto, lo que arreglaste y lo que dejaste feo a
+   propósito.
+6. `npm run smoke` sigue en verde.
 
-1. El producto aparece igual en el catálogo.
-2. El aviso dice que la imagen falló, no "publicado exitosamente" a secas.
-3. Con la subida funcionando, el comportamiento no cambió.
+### Si encontrás mucho roto
 
----
-
-## Tarea 2: ampliar el catálogo de demostración
-
-Hay demostración con el cliente el 30 de julio. Hoy son 12 productos en
-**tres provincias**, y acabás de construir el filtro por ubicación: con
-tres provincias se luce poco.
-
-Todo en `backend/app/seed.py`.
-
-**Llevalo a unos 25 productos:**
-
-1. **Al menos dos por categoría.** Revisá cuáles tienen menos, incluidas
-   las de servicios (`Laboreo`, `Transporte y Logística`, `Asesoramiento`,
-   `Mantenimiento`, `Otros Servicios`), que están casi vacías.
-2. **Al menos ocho provincias distintas.** Buscá `id` reales en la tabla
-   `localities`, no los inventes.
-3. Cada producto con su `locality_id`.
-4. Nombres, precios y descripciones **verosímiles del rubro**. Esto lo va
-   a ver el cliente; nada de "Producto de prueba 1".
-
-### Criterio de aceptación
-
-1. Arranque limpio y seed corrido **dos veces**: no se duplica nada.
-2. Consulta SQL con el conteo **por provincia** y **por categoría**.
-   Pegame las dos tablas.
-3. Ninguna categoría con menos de dos productos, ocho provincias o más.
-4. **`npm run smoke` sigue en verde.** Ahora que existe la red, usala.
+Frená y reportá antes de arreglar. Si son tres detalles, arreglalos. Si es
+un rediseño, esa decisión es mía y la tomo con lo que me cuentes.
 
 ---
 
-## Podés encadenar las dos
+## Después, si te queda tiempo
 
-Están escritas y aprobadas. Hacé la 1, commit y push, después la 2. Una
-sección por tarea en el informe.
+Arreglo chico que quedó pendiente: en `package.json`, el script `dev` es
+`vite` a secas, así que si el puerto 5173 está ocupado Vite se corre a otro
+y el backend lo rechaza por CORS. Ya te pasó una vez.
+
+Cambialo a `vite --port 5173 --strictPort`, para que falle con un mensaje
+claro en vez de arrancar en un puerto que no funciona. No toques la
+configuración de CORS del backend.
 
 ---
 
