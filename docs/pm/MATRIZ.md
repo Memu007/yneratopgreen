@@ -16,7 +16,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | …con validación | ❌ | Campo `is_verified` en el modelo, sin flujo de validación |
 | Perfil | ✅ | `GET /auth/me` y `PATCH /auth/me` responden `200` |
 | Buscador con filtro por **categoría** | ✅ | Smoke test `200`, filtros de categoría, precio y stock aplicados |
-| Buscador con filtro por **ubicación** | ⚪ | Los datos ya existen: 4.028 localidades con coordenadas y `products.locality_id`. Falta exponer el filtro en el catálogo |
+| Buscador con filtro por **ubicación** | ⚪ | Backend listo y verificado: `province` y `locality_id` en `GET /catalog/products`, contrastado contra SQL. Falta exponerlo en la interfaz |
 | Carrito de compras | ✅ | Smoke test: agregar y ver, `200` + `200`, total $45.000 |
 | Historial de pedidos | ✅ | Smoke test "mis compras": `200`, 3 compras |
 
@@ -25,7 +25,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Requisito | Estado | Evidencia |
 |-----------|--------|-----------|
 | Registro con validación | ❌ | Igual que comprador |
-| Panel de control básico | ⚪ | Carga perfil, ventas y productos en UI. El contador de ventas muestra 0 con 2 ventas reales |
+| Panel de control básico | ✅ | Carga perfil, ventas y productos en UI, con el contador de ventas ya corregido |
 | Publicación desde la UI | ✅ | Producto completo publicado con imagen, sin errores de consola, visible en catálogo |
 | Publicación con **ubicación** | ✅ | `locality_id` obligatorio contra el padrón oficial. Verificado: Balcarce `06063010` guardado en base |
 | Gestión de stock | ✅ | Filtro de stock aplicado en catálogo, verificado en UI |
@@ -60,11 +60,11 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 
 | Categoría | Estado |
 |-----------|--------|
-| Insumos y Materia Prima | ⚪ Categorías base sembradas, 8 productos demo |
-| Bienes y Ganado | ❌ |
-| Maquinaria y Servicios | ⚪ Campos de servicio existen y llegan a la API |
-| Tecnología para el Cultivo | ❌ |
-| Módulo de Logística Integrada | ❌ |
+| Insumos y Materia Prima | ✅ Semillas, Fertilizantes y Agroquímicos con productos |
+| Bienes y Ganado | ✅ Categoría sembrada con dos productos, cada uno con localidad |
+| Maquinaria y Servicios | ✅ Maquinaria, Herramientas y Laboreo con productos |
+| Tecnología para el Cultivo | ✅ Categoría sembrada con dos productos, cada uno con localidad |
+| Módulo de Logística Integrada | ⚪ Existe la categoría de servicio Transporte y Logística. El directorio de transportistas no está construido |
 
 ## 4. Tecnologías
 
@@ -73,7 +73,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | React / Next.js | ✅ | React 18 + Vite, `npm run build` en 2,05 s, 78 módulos |
 | Python FastAPI / Django o Node | ✅ | FastAPI operativo, `/api/health` `200` |
 | **PostgreSQL + PostGIS** | ✅ | PostGIS 3.4.3 sobre PostgreSQL 16, 16 tablas. **PostGIS en uso real**: `Geography(POINT,4326)` con índice GIST; `ST_Distance` Balcarce–Tandil = 96,75 km, contrastado de forma independiente contra 96,67 km por haversine |
-| Responsive móvil y escritorio | 🟡 | Está construido; sin verificar en dispositivos |
+| Responsive móvil y escritorio | 🟡 | Está construido; sin verificar en dispositivos reales |
 | AWS / Supabase / Render | ❌ | Sin despliegue propio |
 
 ## 5. Cierre y entrega
@@ -81,7 +81,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Requisito | Estado |
 |-----------|--------|
 | Pruebas integrales | ❌ Diez smoke tests manuales; sin suite automática |
-| Carga inicial de datos | ⚪ Seed repetible con 8 productos demo |
+| Carga inicial de datos | ⚪ Seed repetible con 12 productos demo y 4.028 localidades |
 | Despliegue en producción | ❌ |
 | Capacitación del panel de administración | ❌ |
 | Documentación técnica del despliegue | ⚪ `README.md` y `README_LOCAL_SETUP.md` corregidos al stack real. `PROJECT_STATUS.md` sigue con ocho afirmaciones verificadas como falsas |
@@ -103,8 +103,8 @@ Dos observaciones que el porcentaje no muestra:
 1. El frontend no tiene llamadas huérfanas. Los 23 endpoints que invoca
    existen en el backend. El riesgo de desajuste frontend/backend, que
    era el mayor pendiente, está descartado.
-2. **La UI se recorrió el 2026-07-25 y encontró publicación rota.** El
-   resto del recorrido funciona: registro, login con tres roles, catálogo
+2. **La UI se recorrió el 2026-07-25.** Encontró la publicación rota, ya
+   arreglada y verificada. El resto del recorrido funciona: registro, login con tres roles, catálogo
    con filtros combinados, detalle, carrito, checkout hasta el botón de
    pago, dashboard de vendedor y las cuatro vistas de admin.
 
