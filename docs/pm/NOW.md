@@ -67,30 +67,34 @@ Los puntos 2 y 3 son los que habilitan el segundo hito de cobro.
      verificado, no declarado. Se hace contra `CONTRATO.md`, no contra el
      roadmap interno.
 
-## Bloqueo activo — Fase 0 detenida en la migración
+## Bloqueo activo — cadena de migraciones rota
 
-`alembic upgrade head` falla con:
+La creación de la base ya está resuelta. El bloqueo ahora es:
 
 ```
-Cannot open database "topgreen" requested by the login. The login failed. (4060)
+KeyError: '009'
 ```
 
-**Nada en el repositorio crea la base `topgreen`.** Verificado: no está en
-`docker-compose.yml`, no hay entrypoint en `backend/Dockerfile`, ninguna
-migración la crea, y `scripts/init_local_db.sh` va directo de
-`docker compose up -d` a `alembic upgrade head`.
+`010_add_ratings_table.py` declara `down_revision = '009'`, pero la
+revisión 009 se identifica como `'009_add_product_subcategory'`. Alembic
+no encuentra el padre y **no aplica ninguna migración**.
 
-El único `CREATE DATABASE` del repo es `README_LOCAL_SETUP.md:126`, en el
-Camino B (nativo), y usa otro nombre: `topgreen_local`, mientras
-`.env.example` apunta a `topgreen`.
+Verificado en la cadena completa: las revisiones 001 a 009 usan el
+formato `'0NN_nombre'`; sólo la 010 usa `'010'` y `'009'`.
 
-Conclusión: **el Camino A (Docker) del README nunca pudo funcionar.**
-Falla el criterio "instalación reproducible desde cero".
+Conclusión, y es la más fuerte hasta ahora: **`alembic upgrade head`
+nunca pudo ejecutarse en este repositorio.** No es que nadie lo corriera.
+La tabla `ratings` nunca se creó por migración, y la afirmación de que
+Fase I funciona end-to-end es imposible sobre una instalación limpia.
 
-Arreglo aprobado (mínimo): crear la base de forma idempotente en
-`scripts/init_local_db.sh` (y su par `.ps1`) antes de las migraciones,
-con `sqlcmd`, que ya está en la imagen de SQL Server. No cambia el
-esquema ni el modelo.
+Arreglo aprobado (mínimo): corregir `down_revision` de la 010 a
+`'009_add_product_subcategory'`. No se toca el esquema.
+
+### Bloqueo anterior, resuelto
+
+La base `topgreen` no se creaba en ninguna parte del repositorio; el
+camino Docker del README era inejecutable. Arreglado con creación
+idempotente en los scripts de init.
 
 ## Otros bloqueos
 

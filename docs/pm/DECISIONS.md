@@ -5,6 +5,51 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-07-25 — `alembic upgrade head` nunca pudo ejecutarse
+
+`010_add_ratings_table.py` declara `down_revision = '009'`, pero la
+revisión 009 se llama `'009_add_product_subcategory'`. Alembic corta con
+`KeyError: '009'` y no aplica ninguna migración. Verificado en la cadena
+completa: sólo la 010 rompe el formato `'0NN_nombre'`.
+
+Tercera falsedad confirmada en la documentación de entrega, y la
+definitiva: **una instalación limpia nunca pudo crear el esquema.** La
+tabla `ratings` no existe por migración y "Fase I funciona end-to-end"
+es imposible sobre una base nueva.
+
+Se aprueba el arreglo mínimo: corregir `down_revision`. Sin tocar
+esquema.
+
+Consecuencia sobre `docs/PROJECT_STATUS.md`: siete afirmaciones falsas
+verificadas. El documento se trata como no fiable en su totalidad.
+Notablemente, tres errores son en contra del proyecto — el admin **sí**
+tiene CRUD de subcategorías, el frontend **sí** usa `form_options`, y los
+campos de servicio **sí** llegan a la API. La documentación subestima lo
+construido tanto como lo sobreestima.
+
+---
+
+## 2026-07-25 — Fuera del contrato no implica remover
+
+Al inventariar lo construido por encima del contrato, se distinguen tres
+tratamientos en lugar de uno:
+
+1. **Se queda y no recibe esfuerzo**: split payments, notificaciones,
+   `form_options`, CRUD de subcategorías, tema claro/oscuro, About y
+   Contact, mensajes de contacto. Desarmar código que funciona cuesta
+   igual que escribirlo.
+2. **Se oculta del frontend porque induce a error**: ratings y reputación
+   de vendedor, badges y tags, `ServicesPage` estática.
+3. **Riesgo a resolver antes de producción**: el endpoint de simulación
+   de pagos (`payments.py:547`), declarado de desarrollo, no puede quedar
+   alcanzable en producción.
+
+Motivo: el criterio de recorte es económico, no doctrinario. Se recorta
+lo que cuesta construir o lo que engaña al usuario, no lo que ya está
+hecho y es inofensivo.
+
+---
+
 ## 2026-07-25 — El contrato entra al repositorio y define el alcance
 
 Se incorpora `CONTRATO.md` con la transcripción funcional del PDF

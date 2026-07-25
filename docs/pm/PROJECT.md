@@ -74,15 +74,41 @@ Alcance vinculante: `CONTRATO.md`. Verificado contra el código el
 
 ## Construido por encima del contrato
 
-Trabajo ya hecho que el contrato **no pide**. No se le suma esfuerzo, y
-cada ítem necesita decisión de mantener u ocultar:
+Inventario verificado el 2026-07-25. **"No está en el contrato" no
+significa "hay que borrarlo".** Desarmar código que funciona cuesta
+dinero igual que escribirlo. Tres tratamientos distintos:
+
+### Se queda como está — no recibe más esfuerzo
+
+Funciona, no molesta, y removerlo costaría más que dejarlo.
 
 | Ítem | Qué pide el contrato |
 |------|----------------------|
-| Split payments, OAuth de vendedores, comisión 5 % | *"Checkout básico"* de Mercado Pago (3.3). No menciona split ni comisión de marketplace |
-| Ratings de vendedores | No lo menciona |
+| Split payments, OAuth de vendedores, comisión 5 % | *"Checkout básico"* de Mercado Pago (3.3) |
 | Notificaciones in-app | No lo menciona |
-| `form_options` dinámicos | No lo menciona |
+| `form_options` dinámicos (sí usados por el frontend) | No lo menciona |
+| CRUD de subcategorías en admin (existe y funciona) | Define cinco categorías |
+| Tema claro/oscuro | No lo menciona. Es UI ya hecha, sin costo de mantenimiento |
+| Páginas About y Contact | No las menciona. Inocuas |
+| Centro de mensajes de contacto | No lo menciona. Ya funciona |
+
+### Se oculta del frontend — induce a error
+
+| Ítem | Problema |
+|------|----------|
+| Ratings, reputación y reseñas de vendedor | El contrato pide *"panel de control básico"* (3.1). Muestra reputación sobre datos que no existen |
+| Badges y tags de producto | Prometen atributos que el catálogo no garantiza |
+| `ServicesPage` estática | Ofrece servicios de TopGreen como empresa, no publicaciones de proveedores. En un marketplace, confunde |
+
+### Riesgo, no alcance — resolver antes de producción
+
+| Ítem | Por qué |
+|------|---------|
+| Endpoint de simulación de pagos (`payments.py:547`) | Declarado de desarrollo. Alcanzable en producción sería grave. Hay que cerrarlo por entorno o eliminarlo |
+| Reembolsos | Estructura sin probar, sobre una integración que el contrato no pidió |
+
+El modelo `audit.py` existe pero ninguna ruta lo expone. No cuenta como
+funcionalidad entregada.
 
 ## Alcance inventado por el roadmap interno
 
