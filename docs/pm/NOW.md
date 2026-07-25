@@ -16,29 +16,32 @@ construcción.
   PostGIS 3.4.3, una migración generada desde los modelos (15 tablas, 40
   índices, sin `DROP`), seed repetible, build de frontend en verde y los
   diez smoke tests en `200`. Commit `de98fae` en `main`.
-- Avance medido contra el contrato: **~40%**. Detalle en `MATRIZ.md`.
+- Avance medido contra el contrato: **~38%**. Detalle y bugs abiertos en
+  `MATRIZ.md`.
 - El frontend **no tiene llamadas huérfanas**: los 23 endpoints que
   invoca existen en el backend. Era el mayor riesgo pendiente y quedó
   descartado.
-- Sigue sin verificarse la **UI**. Todo lo probado es a nivel HTTP.
+- **UI recorrida.** Funciona registro, login con tres roles, catálogo con
+  filtros combinados, detalle, carrito, checkout hasta el botón de pago,
+  dashboard de vendedor y admin. **Publicar está roto y nunca funcionó**:
+  la app se desmonta completa al elegir una categoría.
 
 ## Próximas tareas
 
-1. **Cerrar la verificación de UI** (dev, media hora).
-   Recorrer el navegador: registro, login, catálogo con filtros, detalle,
-   carrito, checkout hasta el punto donde pide pagar, publicación,
-   dashboard y admin.
-   - Criterio de aceptación: cada pantalla con captura o descripción de
-     qué se vio, y los errores de consola. Es precondición de la tarea 2:
-     no se construye geo encima de una UI sin verificar.
+1. **Desbloquear la publicación** (dev). Requisito contractual 3.1.
+   Fusionar la respuesta de `form_options` con el estado inicial en lugar
+   de reemplazarlo, sembrar los tipos de opción faltantes salvo
+   provincias, y agregar un error boundary de nivel superior.
+   - Criterio de aceptación: se publica un producto entero desde la UI,
+     sin errores de consola, y con la tabla `form_options` vacía el
+     formulario carga igual en vez de romperse.
 
 2. **Tabla de localidades y ubicación en publicaciones** (dev).
-   Localidades con provincia, nombre y coordenadas, sembradas desde datos
-   abiertos de Argentina. Selección desde lista en la publicación.
-   Alcance definido en `PROJECT.md`.
-   - Criterio de aceptación: seed de localidades reproducible; una
-     publicación guarda su localidad; una consulta PostGIS calcula
-     distancia entre dos localidades con datos reales.
+   Georef v2, 4.028 localidades con copia versionada. Selección desde
+   lista. Alcance en `PROJECT.md`.
+   - Criterio de aceptación: seed de localidades reproducible y sin
+     internet; una publicación guarda su localidad; una consulta PostGIS
+     devuelve distancia entre dos localidades con datos reales.
 
 3. **Filtro por ubicación en el catálogo** (dev).
    Cierra el requisito 3.1 del contrato.

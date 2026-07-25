@@ -64,6 +64,54 @@ direcciones libres, mapas y selección con pin, distancia por ruta real
 
 ---
 
+## 2026-07-25 — Fuente de localidades: Georef v2 del Estado argentino
+
+Aprobada. Descarga completa de `localidades.csv`: 4.028 registros con ID
+oficial, provincia, nombre, latitud y longitud. Oficial, abierta y
+descargable entera.
+
+Se versiona una copia en el repositorio para que el seed sea reproducible
+y no dependa de internet en runtime. Costo recurrente cero, como exigía la
+decisión de geolocalización.
+
+**Las provincias salen de esta tabla, no de `form_options`.** Sembrar
+provincias a mano en `form_options` sería trabajo descartable.
+
+---
+
+## 2026-07-25 — Publicación rota en la UI. Arreglo aprobado
+
+El recorrido de UI encontró que **publicar no funciona y nunca funcionó**:
+al elegir una categoría, `TypeError: Cannot read properties of undefined
+(reading 'length')` en `AddProductModal`, y React desmonta la aplicación
+entera.
+
+Causa raíz: `/catalog/form-options` arma la respuesta dinámicamente y omite
+la clave de cualquier tipo de opción que no tenga filas activas. El
+frontend hace `setFormOptions(data)`, que reemplaza el estado completo, así
+que las claves ausentes quedan `undefined` y revientan al leer `.length`.
+La tabla `form_options` está vacía.
+
+La verificación por API no lo detectó: el endpoint responde `200` con un
+objeto incompleto.
+
+Aprobado, porque bloquea el requisito contractual 3.1 de gestión de
+catálogo:
+
+1. Fusionar la respuesta con el estado inicial en lugar de reemplazarlo.
+   Una línea, y protege para siempre contra cualquier tipo de opción
+   ausente.
+2. Sembrar los tipos de opción que faltan, **excepto provincias**.
+3. Un error boundary de nivel superior. No es contractual, pero una
+   pantalla en blanco en una demo con el cliente es catastrófica y cuesta
+   veinte líneas.
+
+Registrados sin acción, por cosméticos: el contador de ventas del vendedor
+en 0 con 2 ventas reales, y el badge del carrito que persiste al cambiar de
+rol.
+
+---
+
 ## 2026-07-25 — PROPUESTA GUARDADA: directorio por zonas en lugar de radio
 
 **No es una decisión.** Es una idea a evaluar cuando se llegue al módulo

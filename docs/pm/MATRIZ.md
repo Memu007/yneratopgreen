@@ -25,11 +25,21 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Requisito | Estado | Evidencia |
 |-----------|--------|-----------|
 | Registro con validación | ❌ | Igual que comprador |
-| Panel de control básico | 🟡 | `UserDashboard` existe; verificado a nivel API, no de UI |
-| Publicación con imágenes, descripción y precio | ✅ | Smoke test: publicar como vendedor, `200` |
-| Publicación con **ubicación** | ❌ | No hay campo de localidad estructurado |
-| Gestión de stock | ✅ | Filtro de stock aplicado en catálogo |
-| Gestión de ventas recibidas | ✅ | Smoke test "mis ventas": `200`, 2 ventas |
+| Panel de control básico | ⚪ | Carga perfil, ventas y productos en UI. El contador de ventas muestra 0 con 2 ventas reales |
+| Publicación desde la UI | ❌ | **Rota.** Al elegir categoría, `TypeError` en `AddProductModal` y la aplicación se desmonta completa |
+| Publicación por API | ✅ | Smoke test: `POST /products` `200` |
+| Publicación con **ubicación** | ❌ | Provincia y ciudad en texto libre, sin estructura |
+| Gestión de stock | ✅ | Filtro de stock aplicado en catálogo, verificado en UI |
+| Gestión de ventas recibidas | ✅ | "Mis Ventas" lista 2 pedidos en UI |
+
+**Causa raíz de la publicación rota:** `/catalog/form-options` arma la
+respuesta dinámicamente y omite la clave de todo tipo de opción sin filas
+activas. El frontend hace `setFormOptions(data)`, que reemplaza el estado
+entero, así que las claves ausentes quedan `undefined` y revientan en
+`.length`. La tabla `form_options` está vacía o incompleta.
+
+Nunca funcionó para nadie. La verificación por API no lo detectó porque el
+endpoint responde `200` con un objeto incompleto.
 
 ## 3.2 Módulo de Logística
 
@@ -103,5 +113,18 @@ Dos observaciones que el porcentaje no muestra:
 1. El frontend no tiene llamadas huérfanas. Los 23 endpoints que invoca
    existen en el backend. El riesgo de desajuste frontend/backend, que
    era el mayor pendiente, está descartado.
-2. Nadie recorrió la UI todavía. Todo lo verificado es a nivel HTTP. Es
-   la última brecha de verificación y es barata de cerrar.
+2. **La UI se recorrió el 2026-07-25 y encontró publicación rota.** El
+   resto del recorrido funciona: registro, login con tres roles, catálogo
+   con filtros combinados, detalle, carrito, checkout hasta el botón de
+   pago, dashboard de vendedor y las cuatro vistas de admin.
+
+## Bugs abiertos, detectados en el recorrido de UI
+
+| Bug | Severidad | Estado |
+|-----|-----------|--------|
+| Publicación rota: `TypeError` al elegir categoría, desmonta la app | **Bloqueante.** Requisito contractual 3.1 | Arreglo aprobado |
+| Sin error boundary: cualquier error de JS deja pantalla en blanco | Alta para demos | Arreglo aprobado |
+| `form_options` sin datos, formularios sin opciones | Alta | Se siembra, menos provincias |
+| Categorías hardcodeadas como fallback, desalineadas con la base | Media, latente | A verificar si está activo |
+| Contador de ventas del vendedor en 0 con 2 ventas reales | Baja, cosmética | Registrado, sin acción |
+| Badge del carrito persiste al cambiar de rol | Baja, cosmética | Registrado, sin acción |
