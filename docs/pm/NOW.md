@@ -88,11 +88,24 @@ falsa sobre lo único que nos protege de regresiones.
      productos de esa provincia, verificado contra la base. Commit y push
      al terminar, antes de escribir el informe.
 
-2. **Sembrar las categorías faltantes** (dev menor). Alto valor de demo:
-   el cliente ve sus cinco categorías del contrato con productos adentro.
-   Faltan Bienes y Ganado, Tecnología para el Cultivo y Logística.
-   - Criterio de aceptación: las cinco categorías del contrato existen
-     con al menos dos productos de ejemplo cada una, todos con localidad.
+2. **Sembrar las dos categorías faltantes** (dev menor). Alto valor de
+   demo: el cliente ve sus cinco grupos del contrato representados.
+
+   Cotejado el seed contra el contrato, la taxonomía existente ya cubre
+   tres de los cinco grupos y es una versión más detallada de ellos, lo
+   cual está bien: **no hay que reestructurar nada.**
+
+   | Grupo del contrato | Cubierto por |
+   |--------------------|--------------|
+   | Insumos y Materia Prima | Semillas, Fertilizantes, Agroquímicos |
+   | Maquinaria y Servicios | Maquinaria, Herramientas, Laboreo |
+   | Logística | Transporte y Logística (servicio) |
+   | **Bienes y Ganado** | **nada** |
+   | **Tecnología para el Cultivo** | **nada** |
+
+   - Criterio de aceptación: las dos categorías faltantes existen con dos
+     productos de ejemplo cada una, todos con `locality_id` válido, y el
+     seed sigue siendo repetible.
 
 3. **Corregir dos bugs visibles del panel de vendedor** (dev menor).
    El contador de ventas muestra 0 con ventas reales, y el badge del
