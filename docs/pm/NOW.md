@@ -28,50 +28,61 @@ El cimiento geográfico está puesto y verificado.
   mano. Es el próximo riesgo: ya arreglamos cosas que "nunca
   funcionaron" y no hay red que detecte una regresión.
 
-## Punto de retome — 2026-07-25, fin de jornada
+## Trabajo perdido — rehacer
 
-**Hay trabajo terminado sin subir.** El filtro por ubicación y el script
-de smoke tests están hechos en la máquina de la dev, sin commit ni push.
-La sesión se cortó por límites de uso de las herramientas, no por un
-problema del proyecto.
+El filtro por ubicación y el script de smoke tests se completaron el
+2026-07-25 pero **nunca se subieron**: la sesión de la dev se cortó por
+límite de uso antes del commit. Verificado que `main` está en `190525b`,
+sin ese trabajo. **Hay que rehacerlo.**
 
-Reportado como terminado y pendiente de subir:
+Se sabe que funcionó, así que el camino está probado:
 
 - Filtro por provincia y localidad, backend y frontend, combinable con
-  categoría y precio, con el estado conservado en la URL.
-- Build en verde y arranque limpio en verde.
-- Smoke automático **11/11**, incluida la publicación real desde UI con
-  consola sin errores. Comando: `npm run smoke:clean`.
+  categoría y precio, con el estado en la URL.
+- Smoke automático de 11 casos, incluida la publicación real desde UI.
 
-**Lo primero al retomar es commitear y pushear**, antes que cualquier otra
-cosa. Nada de eso está verificado por PM todavía porque no está en el
-repositorio.
+**Lección, aplicable de acá en adelante: se commitea y se pushea al
+terminar cada pieza, antes de producir evidencia.** El código en el
+repositorio vale más que el informe completo.
 
-Queda pendiente de evidencia, y puede esperar: la verificación visual del
-filtro y la prueba de que el script devuelve código 1 cuando algo falla.
+## Cambio de dev
+
+A partir del 2026-07-25 el rol de desarrollo pasa a un modelo con menos
+capacidad. Consecuencias para la conducción:
+
+- Las tareas se parten en piezas más chicas.
+- Las instrucciones son prescriptivas: qué hacer, no qué lograr.
+- No se le delega criterio técnico. Las decisiones de diseño las toma PM
+  por adelantado.
+- La verificación deja de ser control de calidad y pasa a ser búsqueda de
+  errores: se revisa el código, no sólo el reporte.
+- **El estimado de trabajo restante vuelve a 8–10 semanas.** Las 7–9 se
+  midieron con la dev anterior y no se sostienen con otra herramienta.
 
 ## Próximas tareas
 
-1. **Filtro por ubicación en el catálogo** (dev). Cierra el requisito 3.1.
-   - Criterio de aceptación: el catálogo filtra por provincia y
-     localidad, combinable con categoría y precio, y el filtro se
-     conserva al navegar.
+1. **Filtro por ubicación, sólo backend** (dev). Requisito 3.1.
+   Agregar parámetros `province` y `locality_id` a `GET /catalog/products`,
+   que ya filtra por categoría y precio. Nada de frontend en esta tarea.
+   - Criterio de aceptación: la consulta con `province` devuelve sólo
+     productos de esa provincia, verificado contra la base. Commit y push
+     al terminar, antes de escribir el informe.
 
-2. **Automatizar los smoke tests** (dev, ~medio día).
-   Convertir en script los diez casos que hoy se corren a mano, más la
-   publicación desde la UI. Es requisito contractual de la fase 5
-   ("pruebas integrales"), no trabajo extra.
-   - Criterio de aceptación: un comando los corre todos contra un
-     arranque limpio y falla con código distinto de cero si alguno se
-     rompe.
-   - Motivo de hacerlo ahora y no al final: cada vuelta encontramos algo
-     que nunca funcionó, y no hay nada que detecte una regresión sobre lo
-     ya arreglado. Además se deja de repetir trabajo manual en cada
-     entrega.
+2. **Filtro por ubicación, frontend** (dev).
+   Dos selectores encadenados en el panel de filtros, provincia y
+   localidad, que llamen a los parámetros de la tarea 1. El estado se
+   guarda en la URL.
+   - Criterio de aceptación: se filtra desde la interfaz, el resultado
+     coincide con la base, y al recargar la página el filtro se mantiene.
 
-3. **Módulo de transportistas** (dev). El bloque grande que falta del
-   diferencial. Antes de arrancar hay que resolver la definición
-   pendiente: zonas declaradas o radio en km.
+3. **Automatizar los smoke tests** (dev). Requisito contractual de la
+   fase 5, "pruebas integrales". No es trabajo extra.
+   - Criterio de aceptación: un comando corre los once casos contra un
+     arranque limpio y devuelve código distinto de cero si alguno falla.
+
+4. **Módulo de transportistas**. El bloque grande que falta del
+   diferencial. **No arranca** hasta que el cliente defina si la
+   coincidencia va por zonas declaradas o por radio en km.
 
 ## Bloqueos
 
