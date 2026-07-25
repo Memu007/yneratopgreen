@@ -37,7 +37,7 @@ evidencia de ejecución detrás.
   desde la interfaz con navegador real. Verificado que **falla** con
   código distinto de cero al romper un caso a propósito.
 
-**Tres lecturas para no leer mal ese 46 %:**
+**Tres lecturas para no leer mal ese 48 %:**
 
 1. Buena parte de la jornada fue arqueología, no construcción.
 2. El mayor salto lo dio el recorte de alcance, no el código. Esa palanca
@@ -80,15 +80,14 @@ así se detectó. Los números fijos envejecen mal.
 
 - **El contrato no está firmado.** Firma prevista el 2026-07-30. El plazo
   de 12 a 14 semanas arranca ahí, así que lo construido es previo al
-  reloj. Con 8 a 10 semanas de trabajo restante, entra.
+  reloj. Con 7 a 9 semanas de trabajo restante, entra.
 - **Definición pendiente del cliente:** cobertura del transportista por
   zonas declaradas o por radio en km. Sin eso no arranca el bloque grande.
 - **Mercado Pago sin credenciales.** Es el único bloque grande que nunca
-  se pudo probar, y en este código eso históricamente escondió sorpresas.
+  se pudo probar, y la suite tampoco lo cubre por eso. En este código, lo
+  no verificado históricamente escondió sorpresas.
 - **Sin despliegue.** Nadie levantó esto en un servidor real. La fase 5
-  está en cero.
-- **Mercado Pago sigue sin cobertura.** La suite no lo toca porque no hay
-  credenciales. Es el único bloque grande sin verificar.
+  está en cero salvo las pruebas.
 
 ## Deuda técnica registrada, sin acción
 
