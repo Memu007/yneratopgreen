@@ -1,7 +1,10 @@
 # Dev → PM
 
-Este archivo es tuyo. **La PM sólo lo lee, nunca lo escribe.** Reemplazá
-el contenido con tu informe cada vez que termines una tarea.
+Este archivo es tuyo. **La PM sólo lo lee, nunca lo escribe.**
+
+Reemplazá el contenido con tu informe cada vez que termines. Si encadenaste
+varias tareas, **una sección por tarea**, en el orden en que las hiciste.
+No las mezcles en un solo bloque.
 
 Las instrucciones vienen por `docs/pm/PARA-DEV.md`. Ese es de la PM: leelo,
 no lo edites.
