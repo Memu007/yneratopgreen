@@ -32,10 +32,9 @@ Commit `83c2752`. Buen trabajo, con una corrección de proceso al final.
 - El cambio de `package-lock.json` es sólo sincronizar la versión con
   `package.json`. Inofensivo, de hecho corrige una inconsistencia.
 
-**Pendientes, no los rehagas:** los bugs (b) y (c) quedaron sin verificar
-en navegador. El código se ve correcto y lo revisé, pero sin ejecutar no
-los doy por cerrados. Los va a verificar la otra dev mañana, que ya va a
-estar trabajando en el frontend. **No los toques.**
+**Pendientes:** los bugs (b) y (c) quedaron sin verificar en navegador. El
+código se ve correcto y lo revisé, pero sin verlo funcionar no los doy por
+cerrados. **Los verificás vos**, es la tarea 1 de abajo.
 
 ### Tus dos observaciones adversariales
 
@@ -50,23 +49,64 @@ heredado: hay arreglos empezados y nunca terminados. Bien visto.
 ### Corrección de proceso — importante
 
 El criterio de aceptación pedía los tres verificados **en navegador**. No
-pudiste hacerlo, y en vez de frenar seguiste y entregaste.
+lo hiciste, y en vez de frenar, completaste y entregaste.
 
-Esa es exactamente la condición de corte número 1: *"un criterio de
-aceptación no se cumple"*. Lo correcto era commitear lo hecho, escribir
-"no puedo abrir un navegador en este entorno" y parar ahí.
+Esa es la condición de corte número 1: *"un criterio de aceptación no se
+cumple"*. Lo correcto era commitear lo hecho, escribirlo y parar ahí.
 
-Que lo hayas declarado con claridad en "Qué NO corrí" está muy bien y no
-es poca cosa. Pero declararlo no reemplaza frenar. **Si no podés cumplir
-un criterio, no completes la tarea: avisá.**
+Que lo declararas con claridad en "Qué NO corrí" está muy bien y no es
+poca cosa. Pero declararlo no reemplaza frenar. **Si no podés cumplir un
+criterio, no completes la tarea: avisá.**
 
-Y decime, para saberlo de ahora en más: ¿podés abrir un navegador en tu
-entorno, sí o no? Si no podés, dejo de pedirte verificación visual y te
-armo criterios que sí puedas comprobar.
+**Y navegador tenés**: estás trabajando en Windsurf, que trae uno
+integrado. Así que de ahora en más, cuando un criterio pida verificación
+visual, se hace. No es opcional ni delegable.
 
 ---
 
-## Tarea actual: corregir la documentación heredada
+## Tarea 1: verificar en navegador los bugs (b) y (c)
+
+No cambies código salvo que encuentres algo roto. Esto es mirar que
+funcione lo que ya escribiste.
+
+Levantá el entorno y abrí la aplicación en el navegador de Windsurf.
+
+### (b) El carrito al cambiar de usuario
+
+1. Entrá como `cliente@ejemplo.com` / `cliente123`.
+2. Agregá dos productos al carrito. Confirmá que el badge muestre 2.
+3. Cerrá sesión.
+4. Entrá como `vendedor@ejemplo.com` / `vendedor123`.
+5. **Sin recargar la página**, mirá el badge del carrito.
+
+Tiene que estar vacío. Si muestra los productos del usuario anterior, tu
+arreglo no funcionó y quiero saberlo.
+
+### (c) El respaldo de imágenes
+
+1. En el catálogo, con las imágenes cargando bien, confirmá que se ven
+   las fotos normales.
+2. Rompé una imagen a propósito: cortá la red y recargá, o cambiá en la
+   base la URL de un producto por una inválida.
+3. Mirá las tarjetas del catálogo.
+
+Tiene que aparecer el bloque con el nombre del producto sobre el fondo
+degradado, **no** el ícono de imagen rota del navegador.
+
+4. Probalo también en modo oscuro. Agregaste estilos específicos para eso
+   y nunca los viste funcionar.
+
+### Criterio de aceptación
+
+Los dos comportamientos vistos con tus propios ojos, contados paso por
+paso: qué hiciste, qué esperabas y qué viste. Más los errores de consola
+del navegador, aunque estén vacíos.
+
+Si algo no funciona: **no lo arregles todavía.** Reportalo y esperá.
+
+---
+
+## Tarea 2: corregir la documentación heredada
 
 Es la que vos misma detectaste el primer día.
 
