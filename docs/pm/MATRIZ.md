@@ -51,7 +51,8 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 
 | Requisito | Estado | Evidencia |
 |-----------|--------|-----------|
-| Mercado Pago, checkout básico | 🟡 | Código completo y de más (split + OAuth). Sin credenciales, no verificable |
+| Mercado Pago, checkout básico | ❌ | **Corregido el 2026-07-26.** Lo heredado no era el requisito: es split con comisión de marketplace y OAuth de vendedores, no el "checkout básico" del contrato. Se desmonta por decisión de producto —la plataforma no maneja fondos de terceros— y se reconstruye sin split cuando haya credenciales |
+| — Agujero encontrado y cerrado | ✅ | `POST /payments/simulate-payment/{order_id}` permitía a un comprador autenticado pasar su propia orden a `PAID` sin pagar. Estaba montado y en el OpenAPI. Eliminado |
 | Transferencia: mostrar CBU/Alias del vendedor | ✅ | Smoke 13 y 14: sin datos bancarios la API rechaza con `400`; con datos, el CBU devuelto coincide con la consulta SQL |
 | Transferencia: adjuntar comprobante | ✅ | Smoke 15: archivo inválido `400` sin cambiar estado; válido `200` con la URL contrastada contra SQL. Sólo el comprador, `403` para el resto |
 | Transferencia: validación manual del vendedor | ✅ | Smoke 16 y 17: **vendedor ajeno `403`**; el correcto deja API=`paid` y SQL=`PAID`; el rechazo exige motivo y lo persiste |

@@ -77,7 +77,73 @@ pantallas— y confirma que aparcarlo fue la decisión correcta.
 
 ---
 
-## Para discutir, antes de las tareas: ¿la plataforma toca la plata?
+## Ganaste la discusión. Tenías razón y yo estaba equivocada
+
+Verifiqué el simulador con mis propios ojos. Está montado, y su
+docstring dice literalmente *"Eliminar este endpoint en producción"*.
+Nadie lo eliminó nunca.
+
+**Mi afirmación era falsa** y casi entra a un contrato. La diferencia
+entre "no toca fondos" y "no toca fondos porque las credenciales están
+vacías" es exactamente la que importa, y yo la había pasado por alto.
+Que hayas frenado las dos tareas para devolver esto primero fue la
+decisión correcta.
+
+### Lo que decido, y arranca ahora
+
+**Prioridad máxima. Antes que la Tarea 5 y la 5 bis.**
+
+**1. `simulate-payment` se elimina.** No se esconde, no se desmonta: se
+borra. Un comprador autenticado puede pasar su propia orden a `PAID` sin
+pagar. Es un agujero vivo, no una deuda técnica.
+
+**2. Los routers `payments` y `mp_oauth` se dejan de montar.** Adopto tu
+recomendación completa, incluido el punto de que un feature flag no
+alcanza. Si la afirmación es una condición del producto, tiene que ser
+una propiedad del código, no de la configuración.
+
+Quitá también la opción de Mercado Pago del checkout y la sección de
+vinculación del panel.
+
+**3. El código queda en git, no se borra el historial.** Salvo
+`simulate-payment`, que se va del todo.
+
+**4. Un caso en la suite que confirme que esas rutas ya no existen.** Que
+responda `404`, no `503`. Es la prueba de que la propiedad se sostiene, y
+tiene que fallar si alguien vuelve a montarlas.
+
+**Sobre el contrato**: sí pide Mercado Pago, y se va a construir. Pero lo
+que hay hoy no es lo que pide —el contrato dice "checkout básico" y esto
+es split con comisión de marketplace—, así que no estamos removiendo un
+requisito: estamos removiendo algo que nunca fue el requisito. El checkout
+se hace de nuevo, sin split y sin comisión, cuando haya credenciales.
+
+### 5. El snapshot bancario en la orden: aprobado
+
+Tenías razón y es más grave de lo que parece. Que el comprador vea un CBU
+distinto del que se le mostró al comprar no es sólo inconsistencia: es
+justamente el dato que alguien podría discutir después.
+
+**Te autorizo a ampliar el esquema**: CBU, alias y titular guardados en la
+orden al crearla, y que la orden lea ese snapshot, no el perfil. Migración
+aditiva como la anterior.
+
+### Lo que acepto sin cambios de tu análisis
+
+- **CBU y alias en base, sin cifrado propio.** De acuerdo, y por tu
+  motivo: sin política de claves sería seguridad aparente. Tu lista de
+  cuidados —fuera de logs, fuera de analítica, acceso acotado— queda como
+  la regla.
+- **El comprobante no se puede validar.** Coincidimos. OCR y QR también se
+  falsifican.
+- **Transferencia insuficiente**: no inventes nada. Va a las preguntas
+  para la clienta, con tus tres opciones tal como las escribiste. Mientras
+  tanto, sumá al texto de la Tarea 5 bis que **no apruebe si el importe
+  acreditado no coincide con el total**.
+
+---
+
+## La discusión original, para contexto: ¿la plataforma toca la plata?
 
 Esto es una discusión, no una instrucción. **Quiero que me contradigas si
 ves algo distinto**, porque de acá sale una definición que va al contrato
