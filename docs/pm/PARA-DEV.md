@@ -77,6 +77,46 @@ pantallas— y confirma que aparcarlo fue la decisión correcta.
 
 ---
 
+## Tarea 5 bis: dejar claro que el comprobante no verifica nada
+
+Chica, va junto con la anterior. Es una decisión de producto, no un
+arreglo.
+
+**El problema:** el comprobante que sube el comprador es una imagen. No
+prueba absolutamente nada: se falsifica en dos minutos con cualquier
+editor. Si un vendedor aprueba mirando el archivo, le pueden robar la
+mercadería con un PNG.
+
+El diseño ya es el correcto —decide el vendedor, no el sistema—, pero **la
+pantalla no se lo dice**, y eso es lo que hay que arreglar.
+
+### Qué hacer
+
+En la pantalla donde el vendedor aprueba o rechaza, un texto visible antes
+de los botones. Con este sentido, y podés ajustar la redacción:
+
+> **Verificá el dinero en tu cuenta bancaria antes de aprobar.** Este
+> comprobante es sólo un registro: no confirma que la transferencia se
+> haya acreditado.
+
+Y en la pantalla del comprador, cuando ve el CBU, algo que deje claro que
+la plataforma no participa del pago:
+
+> El pago es una transferencia directa a la cuenta del vendedor. TopGreen
+> no recibe ni retiene el dinero.
+
+### Criterio de aceptación
+
+1. Los dos textos aparecen en sus pantallas, verificado en navegador.
+2. El del vendedor está **antes** de los botones de aprobar y rechazar,
+   no debajo ni en letra chica.
+3. `npm run smoke` en verde.
+
+**No cambies la lógica.** El flujo está bien, falta que la pantalla lo
+explique.
+
+---
+
 ## Tarea 5: el respaldo de imágenes, en todas partes
 
 Sale de tu propio relevamiento, pero **no es un arreglo de celular**: pasa
