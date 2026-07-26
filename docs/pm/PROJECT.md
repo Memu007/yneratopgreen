@@ -152,21 +152,15 @@ Sin costo contractual, recortado explícitamente:
 
 ### Documentación de transporte: fuera de alcance, pero hay que saber contestarlo
 
-Evaluado el 2026-07-26 a partir de dos manuales que acercó el dueño del
-proyecto: el de **PreDespacho** del Centro Despachantes de Aduana y el de
-**Courier** de AFIP.
+Definido el 2026-07-26.
 
-**Ninguno de los dos aplica.** Los dos son de aduana —importación,
-exportación y envíos internacionales—, y TopGreen es un marketplace
-doméstico. No hay operación de comercio exterior en ningún requisito del
-contrato.
+**La Carta de Porte Electrónica** es obligatoria para el transporte
+automotor y ferroviario de granos a cualquier destino del país, con
+validez de cinco días para el automotor. Se tramita ante ARCA con clave
+fiscal. Es el documento que un cliente del agro va a nombrar tarde o
+temprano.
 
-**Lo que sí existe en ese terreno y es real:** la **Carta de Porte
-Electrónica**, obligatoria para el transporte automotor y ferroviario de
-granos a cualquier destino del país, con validez de cinco días para el
-automotor. Se tramita ante ARCA con clave fiscal.
-
-**Y aun así queda fuera de alcance**, por dos motivos:
+**Queda fuera de alcance**, por dos motivos:
 
 1. **No es una obligación de la plataforma.** La carta de porte la emite
    quien traslada, con su propia clave fiscal. TopGreen es un directorio
