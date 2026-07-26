@@ -27,6 +27,7 @@ from app.core.dependencies import get_current_user
 from app.core.config import settings
 from app.api.notifications import notify_welcome
 from app.models.order import Order
+from app.models.locality import Locality
 
 
 router = APIRouter(prefix="/auth", tags=["autenticación"])
@@ -53,6 +54,16 @@ def register_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El email ya está registrado"
         )
+
+    if user_data.is_carrier:
+        locality_exists = db.query(Locality.id).filter(
+            Locality.id == user_data.carrier_base_locality_id
+        ).first()
+        if not locality_exists:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La localidad base no pertenece al padrón",
+            )
     
     # Crear nuevo usuario
     new_user = User(
@@ -62,7 +73,25 @@ def register_user(
         phone=user_data.phone,
         role=user_data.role,
         is_active=True,
-        is_verified=False
+        is_verified=False,
+        is_carrier=user_data.is_carrier,
+        carrier_base_locality_id=(
+            user_data.carrier_base_locality_id if user_data.is_carrier else None
+        ),
+        carrier_transport=(
+            user_data.carrier_transport.strip() if user_data.is_carrier else None
+        ),
+        carrier_transport_certified=(
+            user_data.carrier_transport_certified if user_data.is_carrier else False
+        ),
+        carrier_coverage_radius_km=(
+            user_data.carrier_coverage_radius_km if user_data.is_carrier else None
+        ),
+        carrier_capacity=(
+            (user_data.carrier_capacity or "").strip() or None
+            if user_data.is_carrier
+            else None
+        ),
     )
     
     db.add(new_user)

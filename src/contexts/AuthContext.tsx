@@ -29,6 +29,12 @@ interface BackendUser {
   bio?: string;
   cbu?: string;
   alias_bancario?: string;
+  is_carrier?: boolean;
+  carrier_base_locality_id?: string;
+  carrier_transport?: string;
+  carrier_transport_certified?: boolean;
+  carrier_coverage_radius_km?: number;
+  carrier_capacity?: string;
   rating_average?: number;
   rating_count?: number;
   sales_count?: number;
@@ -75,6 +81,12 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
     bio: backendUser.bio,
     cbu: backendUser.cbu,
     bankAlias: backendUser.alias_bancario,
+    isCarrier: backendUser.is_carrier,
+    carrierBaseLocalityId: backendUser.carrier_base_locality_id,
+    carrierTransport: backendUser.carrier_transport,
+    carrierTransportCertified: backendUser.carrier_transport_certified,
+    carrierCoverageRadiusKm: backendUser.carrier_coverage_radius_km,
+    carrierCapacity: backendUser.carrier_capacity,
     ratingAverage: backendUser.rating_average ?? 0,
     ratingCount: backendUser.rating_count ?? 0,
     salesCount: backendUser.sales_count ?? 0,
@@ -156,7 +168,12 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
         full_name: userData.name,
         phone: userData.phone,
         role: 'user',
-        location: userData.location,
+        is_carrier: userData.isCarrier,
+        carrier_base_locality_id: userData.carrierBaseLocalityId,
+        carrier_transport: userData.carrierTransport,
+        carrier_transport_certified: userData.carrierTransportCertified,
+        carrier_coverage_radius_km: userData.carrierCoverageRadiusKm,
+        carrier_capacity: userData.carrierCapacity,
       });
 
       // Guardar tokens en localStorage

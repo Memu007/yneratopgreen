@@ -1100,6 +1100,90 @@ await runCase(20, 'Respaldo de imágenes en el recorrido de demostración', asyn
   }
 });
 
+await runCase(21, 'Registro de transportista desde la interfaz', async () => {
+  assert(state.location, 'caso 5 no dejó provincia/localidad');
+  await expectApiError(422, () => apiRequest('/auth/register', {
+    method: 'POST',
+    body: {
+      email: 'transportista.incompleto@example.com',
+      password: 'smoke123',
+      full_name: 'Transportista Incompleto',
+      is_carrier: true,
+    },
+  }));
+
+  const email = 'transportista.smoke@example.com';
+  const password = 'smoke123';
+  const transport = 'Camión habilitado dominio SM0 KE21';
+  const capacity = 'Hasta 40 toneladas de semillas';
+  const radius = 125.5;
+  const browser = await chromium.launch({ headless: true });
+
+  try {
+    const page = await browser.newPage();
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await page.getByText('Regístrate aquí').click();
+    await page.getByRole('heading', { name: 'Crear Cuenta' }).waitFor();
+
+    await page.locator('input[name="name"]').fill('Transportista Smoke');
+    await page.locator('input[name="email"]').fill(email);
+    await page.locator('input[name="phone"]').fill('+54 11 5555 2121');
+    await page.getByLabel('Quiero registrarme como transportista').check();
+    await page.getByLabel('Provincia base').selectOption(state.location.provinceId);
+    await page.getByLabel('Localidad base').selectOption(state.location.localityId);
+    await page.locator('input[name="carrierTransport"]').fill(transport);
+    await page.getByLabel('Declaro que el transporte está habilitado').check();
+    await page.locator('input[name="carrierCoverageRadiusKm"]').fill(String(radius));
+    await page.locator('input[name="carrierCapacity"]').fill(capacity);
+    await page.locator('input[name="password"]').fill(password);
+    await page.locator('form input[type="password"]').nth(1).fill(password);
+    await page.getByRole('button', { name: 'Crear cuenta' }).click();
+    await page.getByText(/Transportista Smoke.*cuenta fue creada exitosamente/).waitFor({
+      state: 'visible',
+      timeout: 15_000,
+    });
+
+    const login = await apiRequest('/auth/login', {
+      method: 'POST',
+      body: { email, password },
+    });
+    assert(login.data.user.role === 'user', 'el transportista recibió un rol nuevo');
+    assert(login.data.user.is_carrier === true, 'la API no marca al transportista');
+    assert(
+      login.data.user.carrier_base_locality_id === state.location.localityId,
+      'la API no conserva la localidad base',
+    );
+
+    const [databaseCarrier] = queryRows(`
+      SELECT
+        u.role::text,
+        u.is_carrier::text,
+        u.carrier_base_locality_id,
+        u.carrier_transport,
+        u.carrier_transport_certified::text,
+        u.carrier_coverage_radius_km::text,
+        COALESCE(u.carrier_capacity, ''),
+        l.name
+      FROM users u
+      JOIN localities l ON l.id = u.carrier_base_locality_id
+      WHERE u.email = ${sqlLiteral(email)}
+    `);
+    assert(databaseCarrier, 'el transportista registrado por UI no quedó en la base');
+    assert(databaseCarrier[0] === 'USER', `rol SQL inesperado: ${databaseCarrier[0]}`);
+    assert(databaseCarrier[1] === 'true', 'is_carrier SQL no quedó activo');
+    assert(databaseCarrier[2] === state.location.localityId, 'localidad base SQL incorrecta');
+    assert(databaseCarrier[3] === transport, 'transporte SQL incorrecto');
+    assert(databaseCarrier[4] === 'true', 'habilitación SQL no quedó activa');
+    assert(Number(databaseCarrier[5]) === radius, `radio SQL inesperado: ${databaseCarrier[5]}`);
+    assert(databaseCarrier[6] === capacity, 'capacidad SQL incorrecta');
+
+    return `UI + API + DB, localidad=${databaseCarrier[7]}, radio=${databaseCarrier[5]} km`;
+  } finally {
+    await browser.close();
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 
