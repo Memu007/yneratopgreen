@@ -1453,6 +1453,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               <div className={styles.orderActions}>
                 {order.status === 'transfer-receipt-submitted' && (
                   <>
+                    <p>
+                      <strong>Verificá el dinero en tu cuenta bancaria antes de aprobar.</strong>{' '}
+                      Este comprobante es sólo un registro: no confirma que la transferencia
+                      se haya acreditado. No apruebes si el importe acreditado no coincide con
+                      el total de la orden.
+                    </p>
                     <button
                       className={styles.confirmButton}
                       onClick={() => handleTransferDecision(order.id, 'approve')}

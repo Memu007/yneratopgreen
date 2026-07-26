@@ -880,6 +880,9 @@ await runCase(18, 'Transferencia completa desde la interfaz', async () => {
 
     await page.getByRole('heading', { name: /Método de Pago/ }).waitFor();
     await page.locator('input[value="bank_transfer"]').check();
+    await page
+      .getByText(/TopGreen no recibe ni retiene el dinero/)
+      .waitFor({ state: 'visible' });
     await page.getByText(new RegExp(databaseBank[1])).waitFor({ state: 'visible' });
     const bankDetails = await page.locator('form:has(h2)').textContent();
     assert(bankDetails?.includes(databaseBank[0]), 'la UI no muestra el CBU guardado en SQL');
@@ -902,7 +905,7 @@ await runCase(18, 'Transferencia completa desde la interfaz', async () => {
 
     assert(pageErrors.length === 0, `errores JS: ${pageErrors.join(' | ')}`);
     const [databaseOrder] = queryRows(`
-      SELECT status::text, transfer_receipt_url
+      SELECT status::text, transfer_receipt_url, order_number
       FROM orders
       WHERE buyer_id = ${sqlLiteral(state.buyerId)}
         AND seller_id = ${sqlLiteral(state.sellerId)}
@@ -911,7 +914,51 @@ await runCase(18, 'Transferencia completa desde la interfaz', async () => {
     `);
     assert(databaseOrder[0] === 'TRANSFER_RECEIPT_SUBMITTED', `estado SQL: ${databaseOrder[0]}`);
     assert(databaseOrder[1], 'la orden creada por UI no guardó el comprobante');
-    return 'UI + API + DB, CBU y alias de SQL visibles, comprobante asociado';
+
+    const sellerContext = await browser.newContext();
+    try {
+      await sellerContext.addInitScript(
+        ({ accessToken, refreshToken }) => {
+          window.localStorage.setItem('access_token', accessToken);
+          window.localStorage.setItem('refresh_token', refreshToken);
+        },
+        {
+          accessToken: state.sellerToken,
+          refreshToken: state.sellerRefreshToken,
+        },
+      );
+      const sellerPage = await sellerContext.newPage();
+      await sellerPage.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await sellerPage.locator('button').filter({ hasText: '👤' }).first().click();
+      await sellerPage.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
+      await sellerPage.getByRole('button', { name: 'Mis Ventas' }).click();
+      const saleHeading = sellerPage.getByRole('heading', {
+        name: `Venta #${databaseOrder[2]}`,
+      });
+      await saleHeading.waitFor({ state: 'visible' });
+      const saleCard = saleHeading.locator('xpath=../../..');
+      const warning = saleCard.getByText(/Verificá el dinero en tu cuenta bancaria/);
+      await warning.waitFor({ state: 'visible' });
+      const warningPrecedesButtons = await saleCard.evaluate((card) => {
+        const warningElement = [...card.querySelectorAll('p')].find((element) =>
+          element.textContent?.includes('Verificá el dinero en tu cuenta bancaria')
+        );
+        const approveButton = [...card.querySelectorAll('button')].find((element) =>
+          element.textContent?.includes('Aprobar comprobante')
+        );
+        return Boolean(
+          warningElement
+          && approveButton
+          && warningElement.compareDocumentPosition(approveButton)
+            & Node.DOCUMENT_POSITION_FOLLOWING
+        );
+      });
+      assert(warningPrecedesButtons, 'el aviso del vendedor no está antes de aprobar/rechazar');
+    } finally {
+      await sellerContext.close();
+    }
+
+    return 'UI + API + DB, avisos visibles al comprador y vendedor antes de aprobar';
   } finally {
     await browser.close();
   }

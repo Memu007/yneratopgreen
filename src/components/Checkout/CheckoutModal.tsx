@@ -318,6 +318,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
       </div>
 
       <div className={styles.confirmationInfo}>
+        <p>
+          El pago es una transferencia directa a la cuenta del vendedor.
+          TopGreen no recibe ni retiene el dinero.
+        </p>
         {loadingTransferOptions ? (
           <p>Cargando datos bancarios...</p>
         ) : transferOptions.map(option => (
@@ -345,6 +349,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     <div className={styles.confirmation}>
       <h2>🏦 Transferencia bancaria</h2>
       <p>Adjuntá un comprobante por vendedor. La orden queda pendiente hasta su validación.</p>
+      <p>
+        El pago es una transferencia directa a la cuenta del vendedor.
+        TopGreen no recibe ni retiene el dinero.
+      </p>
       {transferOrders.map(order => (
         <div key={order.order_id} className={styles.infoCard}>
           <h3>{order.seller_name}</h3>
