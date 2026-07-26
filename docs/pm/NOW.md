@@ -9,8 +9,26 @@ transportistas.
 
 ## Dónde estamos
 
-Avance contra el contrato: **~49%**. Evidencia requisito por requisito en
+Avance contra el contrato: **~53%**. Evidencia requisito por requisito en
 `MATRIZ.md`.
+
+Ponderado por esfuerzo, no por cantidad de renglones. Los nueve
+requisitos de logística son un módulo entero, no nueve tareas chicas.
+
+| Bloque | Peso | Avance |
+|---|---|---|
+| Comprador y vendedor | 30 % | 90 % |
+| **Logística y transportistas** | **25 %** | **0 %** |
+| Pagos | 15 % | 50 % |
+| Catálogo y categorías | 8 % | 90 % |
+| Stack y responsive | 10 % | 70 % |
+| Cierre, despliegue y entrega | 12 % | 35 % |
+
+**Subió sólo 4 puntos aunque se construyó mucho**, y el motivo importa:
+la transferencia bancaria sumó, pero Mercado Pago **restó**. Estaba
+contado como medio hecho y pasó a cero al desmontarlo. Fue la decisión
+correcta y aun así el número la castiga; así tiene que ser un porcentaje
+honesto.
 
 Se pasó de un repositorio donde la base de datos no se podía crear a un
 sistema que levanta desde cero con un comando. Todo lo declarado tiene
@@ -43,7 +61,7 @@ evidencia de ejecución detrás.
 - **Catálogo de demostración**: 30 publicaciones en doce categorías y
   nueve provincias. Seed idempotente, corrido dos veces sin duplicar.
 
-**Tres lecturas para no leer mal ese 49 %:**
+**Tres lecturas para no leer mal ese 53 %:**
 
 1. Buena parte de la jornada fue arqueología, no construcción.
 2. El mayor salto lo dio el recorte de alcance, no el código. Esa palanca
