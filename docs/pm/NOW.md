@@ -51,6 +51,21 @@ evidencia de ejecución detrás.
 3. La velocidad no se repite: lo que queda es construcción nueva con
    incógnitas.
 
+## Orden de trabajo, decidido el 2026-07-26
+
+1. **Pago por transferencia bancaria.** Único bloque contractual grande
+   sin dependencias externas. En cero: no existe ni un campo de CBU.
+2. **Transportistas.** No arranca hasta que la clienta defina cobertura
+   por zonas o por radio, y quién ve los datos de contacto de quién.
+3. **Mercado Pago.** Trabado sin credenciales.
+4. **Al final, antes de desplegar:** correcciones de la vista en celular,
+   revisión de seguridad y despliegue.
+
+**Las correcciones de celular se aparcan.** Se hace sólo el relevamiento
+—capturas e inventarios de consola y red— para saber cuánto trabajo es.
+Arreglar hoy pantallas que van a cambiar cuando entren transferencia y
+transportistas es pagar dos veces. Mismo criterio que con la seguridad.
+
 ## Próximas tareas
 
 1. **Ensayo de la demostración del 30-07.** Recorrer el camino exacto que
