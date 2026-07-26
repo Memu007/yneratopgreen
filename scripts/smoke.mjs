@@ -891,6 +891,18 @@ await runCase(18, 'Transferencia completa desde la interfaz', async () => {
   }
 });
 
+await runCase(19, 'Las rutas financieras heredadas no están expuestas', async () => {
+  await expectApiError(404, () => apiRequest('/payments/public-key'));
+  await expectApiError(404, () => apiRequest('/mp-oauth/status', {
+    token: state.sellerToken,
+  }));
+  await expectApiError(404, () => apiRequest('/payments/simulate-payment/inexistente', {
+    method: 'POST',
+    token: state.buyerToken,
+  }));
+  return 'payments, mp-oauth y simulate-payment respondieron HTTP 404';
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 
