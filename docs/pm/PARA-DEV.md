@@ -77,6 +77,62 @@ pantallas— y confirma que aparcarlo fue la decisión correcta.
 
 ---
 
+## Para discutir, antes de las tareas: ¿la plataforma toca la plata?
+
+Esto es una discusión, no una instrucción. **Quiero que me contradigas si
+ves algo distinto**, porque de acá sale una definición que va al contrato
+que se firma el jueves.
+
+### La afirmación que quiero sostener
+
+*"TopGreen no participa de los pagos. El dinero va directo de la cuenta
+del comprador a la del vendedor. La plataforma nunca recibe ni retiene
+fondos."*
+
+Eso importa mucho más de lo que parece: una plataforma que cobra, retiene
+comisión y le gira el resto al vendedor está manejando **fondos de
+terceros**, y en la Argentina eso entra en el régimen de proveedores de
+servicios de pago, con registro ante el Banco Central. Es otro negocio y
+otro riesgo. El contrato pide "checkout básico" y nada más.
+
+### Lo que necesito que verifiques, y es lo importante
+
+El código heredado trae **split payments y OAuth de vendedores** de
+Mercado Pago: exactamente el esquema en el que la plataforma sí cobra.
+
+**Si ese código es alcanzable desde la interfaz, la afirmación de arriba
+es falsa** y no la podemos poner en un contrato.
+
+Decime, con evidencia:
+
+1. ¿Hay algún camino desde la interfaz que llegue al split o al OAuth de
+   vendedores? ¿Botón, ruta, o una respuesta de la API que lo habilite?
+2. ¿Los endpoints existen y responden, aunque nadie los llame desde el
+   frontend?
+3. Si están activos, ¿alcanza con no mostrarlos, o hay que desactivarlos
+   en el backend?
+
+**No los borres todavía.** Sólo quiero saber el estado real. La decisión
+de qué hacer con ese código es mía, pero no la puedo tomar sin esto.
+
+### Y decime si ves algo que se me escapa
+
+Tres cosas donde tu criterio vale más que el mío:
+
+- **Guardar el CBU en nuestra base.** ¿Te parece bien, o hay una forma
+  más prudente? Es dato bancario de gente real.
+- **El comprobante como imagen.** Mi lectura es que no prueba nada y que
+  por eso está bien que decida el vendedor. ¿Coincidís, o hay algo que se
+  pueda validar de verdad sin integrar con un banco?
+- **La transferencia insuficiente**, que vos misma marcaste. ¿Se te
+  ocurre alguna forma en que el sistema hoy quede en un estado
+  inconsistente si eso pasa?
+
+Si algo de esto te parece que estoy exagerando, decilo. Prefiero
+discutirlo hoy que descubrirlo con un contrato firmado.
+
+---
+
 ## Tarea 5 bis: dejar claro que el comprobante no verifica nada
 
 Chica, va junto con la anterior. Es una decisión de producto, no un
