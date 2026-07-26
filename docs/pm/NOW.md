@@ -53,18 +53,30 @@ evidencia de ejecución detrás.
 
 ## Orden de trabajo, decidido el 2026-07-26
 
-1. **Pago por transferencia bancaria.** Único bloque contractual grande
-   sin dependencias externas. En cero: no existe ni un campo de CBU.
+1. ~~**Pago por transferencia bancaria.**~~ **Terminado y verificado el
+   2026-07-26.** Los tres requisitos contractuales de la sección 3.3
+   cerrados, con seis casos nuevos en la suite —18/18— incluido el que
+   confirma que un vendedor ajeno recibe `403` al intentar validar un
+   comprobante que no es suyo.
 2. **Transportistas.** No arranca hasta que la clienta defina cobertura
    por zonas o por radio, y quién ve los datos de contacto de quién.
 3. **Mercado Pago.** Trabado sin credenciales.
 4. **Al final, antes de desplegar:** correcciones de la vista en celular,
    revisión de seguridad y despliegue.
 
-**Las correcciones de celular se aparcan.** Se hace sólo el relevamiento
+**Las correcciones de celular se aparcan.** Se hizo sólo el relevamiento
 —capturas e inventarios de consola y red— para saber cuánto trabajo es.
-Arreglar hoy pantallas que van a cambiar cuando entren transferencia y
-transportistas es pagar dos veces. Mismo criterio que con la seguridad.
+Arreglar hoy pantallas que van a cambiar cuando entren transportistas es
+pagar dos veces. Mismo criterio que con la seguridad.
+
+**Resultado del relevamiento, 2026-07-26:** 36 pantallas en tres medidas,
+**cero desbordes horizontales, cero errores de consola y cero respuestas
+fallidas**. Nada impide completar ningún recorrido. Lo que queda son
+controles táctiles por debajo de 44 px y dos barras de pestañas que piden
+desplazamiento horizontal. Es media jornada al final, no un rediseño.
+
+La decisión de aparcarlo quedó respaldada por los datos: no había
+incendio.
 
 ## Próximas tareas
 

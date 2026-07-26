@@ -85,10 +85,39 @@ Es lo que diferencia el producto y es lo que habilita el segundo cobro.
 Entrá a una publicación, agregá al carrito, mostrá el carrito, avanzá al
 checkout **hasta la pantalla de pago**.
 
-**Ahí frenás.** No intentes pagar.
+Con Mercado Pago **ahí frenás.** No intentes pagar.
 
-> "El cobro está implementado y esperando la cuenta de Mercado Pago de
-> ustedes, que es lo que figura como responsabilidad del cliente."
+> "El cobro con tarjeta está implementado y esperando la cuenta de
+> Mercado Pago de ustedes, que es lo que figura como responsabilidad del
+> cliente."
+
+### 3b. La transferencia bancaria, completa (3 min) — **el segundo momento fuerte**
+
+Esto sí funciona de punta a punta y conviene mostrarlo entero, porque en
+el campo es como se paga de verdad.
+
+- En el checkout elegí **Transferencia bancaria**. Aparecen el CBU, el
+  alias y el titular **del vendedor de esa publicación**.
+- Adjuntá un comprobante.
+- **Cambiá a la cuenta del vendedor**, entrá a "Mis ventas" y mostrá que
+  ahí está el comprobante esperando.
+- Aprobalo. La orden pasa a pagada.
+- Volvé atrás y mostrá también el rechazo, que exige escribir un motivo.
+
+> "Nadie compra una cosechadora con tarjeta. Por eso la transferencia está
+> completa: el comprador ve el CBU del vendedor, sube el comprobante, y el
+> vendedor lo aprueba o lo rechaza con un motivo. La plataforma no toca la
+> plata en ningún momento."
+
+**Si pregunta por la seguridad**, tenés una respuesta concreta y probada:
+
+> "Un vendedor no puede aprobar el comprobante de una venta que no es
+> suya. Está verificado con una prueba automática que lo intenta y
+> confirma que el sistema lo rechaza."
+
+**Lo que no hay que prometer**: conciliación bancaria automática, avisos
+por correo, ni qué pasa si el comprador transfiere de menos. Eso último es
+una pregunta abierta para ella, no una función faltante.
 
 ### 4. Publicar como vendedor (2 min)
 
@@ -108,8 +137,8 @@ estadísticas.
 ### 6. Cierre (1 min)
 
 > "Todo esto corre sobre PostgreSQL con PostGIS, que es la base que pide
-> el documento, y hay doce pruebas automáticas que verifican este mismo
-> recorrido con un solo comando."
+> el documento, y hay **dieciocho pruebas automáticas** que verifican este
+> mismo recorrido con un solo comando."
 
 ---
 

@@ -52,9 +52,10 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Requisito | Estado | Evidencia |
 |-----------|--------|-----------|
 | Mercado Pago, checkout básico | 🟡 | Código completo y de más (split + OAuth). Sin credenciales, no verificable |
-| Transferencia: mostrar CBU/Alias del vendedor | ❌ | Sólo texto de UI mencionando transferencias |
-| Transferencia: adjuntar comprobante | ❌ | — |
-| Transferencia: validación manual del vendedor | ❌ | — |
+| Transferencia: mostrar CBU/Alias del vendedor | ✅ | Smoke 13 y 14: sin datos bancarios la API rechaza con `400`; con datos, el CBU devuelto coincide con la consulta SQL |
+| Transferencia: adjuntar comprobante | ✅ | Smoke 15: archivo inválido `400` sin cambiar estado; válido `200` con la URL contrastada contra SQL. Sólo el comprador, `403` para el resto |
+| Transferencia: validación manual del vendedor | ✅ | Smoke 16 y 17: **vendedor ajeno `403`**; el correcto deja API=`paid` y SQL=`PAID`; el rechazo exige motivo y lo persiste |
+| Transferencia, recorrido completo en navegador | ✅ | Smoke 18: Chromium real, catálogo → carrito → checkout → transferencia → comprobante, verificado en base |
 
 ## 2. Categorías del catálogo
 
@@ -73,7 +74,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | React / Next.js | ✅ | React 18 + Vite, `npm run build` en 2,05 s, 78 módulos |
 | Python FastAPI / Django o Node | ✅ | FastAPI operativo, `/api/health` `200` |
 | **PostgreSQL + PostGIS** | ✅ | PostGIS 3.4.3 sobre PostgreSQL 16, 16 tablas. **PostGIS en uso real**: `Geography(POINT,4326)` con índice GIST; `ST_Distance` Balcarce–Tandil = 96,75 km, contrastado de forma independiente contra 96,67 km por haversine |
-| Responsive móvil y escritorio | 🟡 | Está construido; sin verificar en dispositivos reales |
+| Responsive móvil y escritorio | ⚪ | **Relevado el 2026-07-26** con `scripts/mobile-audit.mjs`: 36 pantallas en 360×800, 390×844 y 768×1024. **Cero desbordes horizontales, cero errores de consola, cero respuestas 4xx/5xx.** Nada impide completar los recorridos. Quedan pendientes de corregir, al final: controles táctiles por debajo de 44 px y barras de pestañas que requieren desplazamiento horizontal |
 | AWS / Supabase / Render | ❌ | Sin despliegue propio |
 
 ## 5. Cierre y entrega
