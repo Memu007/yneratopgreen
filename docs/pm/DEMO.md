@@ -124,6 +124,25 @@ el campo es como se paga de verdad.
 por correo, ni qué pasa si el comprador transfiere de menos. Eso último es
 una pregunta abierta para ella, no una función faltante.
 
+**Si pregunta "¿el sistema confirma que la plata entró?"** — y es la
+pregunta más probable de toda la reunión— la respuesta es no, y decila
+completa vos antes de que te la saque:
+
+> "No, y ningún sistema puede sin conectarse al banco. Un comprobante es
+> una imagen y una imagen se falsifica. Por eso quien confirma es el
+> vendedor mirando su cuenta, y la pantalla se lo pide expresamente antes
+> de aprobar. Lo dejamos así a propósito: es más honesto que dar una
+> confirmación que no podemos garantizar.
+>
+> Si más adelante el volumen lo justifica, se puede conectar con un
+> proveedor de pagos para que la verificación sea automática. Es un
+> desarrollo aparte."
+
+**No uses la palabra "completo" para la transferencia.** El circuito está
+construido y probado; la verificación del dinero es humana y siempre lo va
+a ser en este alcance. Prometer de más acá es lo único que puede
+convertir una función que funciona en un reclamo.
+
 ### 4. Publicar como vendedor (2 min)
 
 Cambiá a la cuenta de vendedor. Publicá algo en vivo: nombre, precio,
