@@ -85,11 +85,16 @@ Es lo que diferencia el producto y es lo que habilita el segundo cobro.
 Entrá a una publicación, agregá al carrito, mostrá el carrito, avanzá al
 checkout **hasta la pantalla de pago**.
 
-Con Mercado Pago **ahí frenás.** No intentes pagar.
+**Mercado Pago ya no aparece en el checkout**, y es a propósito. Si
+pregunta:
 
-> "El cobro con tarjeta está implementado y esperando la cuenta de
-> Mercado Pago de ustedes, que es lo que figura como responsabilidad del
-> cliente."
+> "El cobro con tarjeta lo vamos a integrar cuando tengamos la cuenta de
+> ustedes. Encontramos que lo que había heredado no era un checkout
+> simple: era un esquema donde la plataforma cobraba y retenía comisión,
+> y eso la obligaría a registrarse como proveedor de pagos. Lo sacamos y
+> lo vamos a hacer como pide su documento."
+
+Eso es una ventaja para contar, no una carencia que esconder.
 
 ### 3b. La transferencia bancaria, completa (3 min) — **el segundo momento fuerte**
 
