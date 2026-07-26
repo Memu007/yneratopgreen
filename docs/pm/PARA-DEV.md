@@ -77,6 +77,62 @@ pantallas— y confirma que aparcarlo fue la decisión correcta.
 
 ---
 
+## Antes de seguir: hay órdenes que quedan muertas
+
+**Leé `docs/pm/PAGOS-TRANSFERENCIA.md`.** Sale de una duda del dueño del
+proyecto sobre si la transferencia era demasiado frágil. Tenía razón, y el
+problema es más concreto de lo que él sospechaba.
+
+Lo verifiqué en el código:
+
+- El vendedor **no puede decidir** si no hay comprobante: el estado
+  requerido es *comprobante enviado*.
+- La cancelación **no acepta** los dos estados nuevos de transferencia.
+  Sólo `PLACED`, `CONFIRMED` y `PAID`.
+
+Entonces si el comprador transfiere y no sube el comprobante, **nadie
+puede hacer nada con esa orden nunca más.** Queda colgada en su lista de
+compras y en la de ventas del vendedor, sin salida.
+
+No te lo cuento como reproche: la cancelación se escribió antes de que
+existieran esos estados. Es la clase de agujero que aparece al agregar
+estados a una máquina que ya existía, y por eso conviene revisarla cada
+vez.
+
+### Las cuatro tareas, en este orden
+
+Están detalladas en el análisis. Resumidas:
+
+1. **Cancelación válida en los dos estados nuevos**, para comprador y
+   vendedor.
+2. **Referencia de pago visible** en la pantalla de transferencia, con la
+   instrucción de usarla como concepto. Esta es la más valiosa de las
+   cuatro y es casi un texto: hoy un vendedor con diez ventas abiertas
+   mira su resumen bancario y **no tiene cómo saber qué transferencia
+   corresponde a qué orden.**
+3. **El vendedor puede confirmar o rechazar sin comprobante.** El
+   comprobante no verifica nada, así que exigirlo es fricción sin
+   beneficio. Pasa a ser opcional; la posibilidad de adjuntar sigue
+   existiendo y el requisito contractual también.
+4. **Vencimiento** con liberación de stock. Los días los define la
+   clienta; hacela configurable y dejá siete por defecto.
+
+**El criterio que más me importa:** el caso de la suite que cubre la orden
+colgada tiene que **fallar contra el código de hoy** antes de que lo
+arregles. Si pasa en verde desde el principio, el caso está mal escrito y
+no está probando nada.
+
+### Prioridad
+
+**Esto va antes de las Piezas B y C de transportistas.** Es un error en
+algo que ya entregamos y que se muestra el jueves, contra una función que
+todavía no existe.
+
+Las cuatro preguntas de diseño del transportista siguen pendientes y las
+podés contestar mientras, porque son escribir, no construir.
+
+---
+
 ## Pieza A: aprobada con dos objeciones, y una disculpa mía
 
 El modelado está bien y es consistente: columnas planas en `users` con
