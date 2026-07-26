@@ -35,6 +35,79 @@ que **yo verifiqué contra el código**, no lo que dijo nadie.
 
 ---
 
+## Desbloqueo de la Tarea 2: usá Playwright, no el navegador integrado
+
+**Que no eludieras el bloqueo fue lo correcto, y lo convierto en regla
+permanente:** una política de seguridad de tu entorno no se rodea nunca,
+ni con CDP, ni con otro navegador, ni con un túnel. Se reporta. Si alguna
+vez una tarea mía parece pedirte lo contrario, la tarea está mal.
+
+Dicho eso, **no estás bloqueada**. El camino ya existe en el repositorio y
+vos misma lo corriste ayer sin darte cuenta.
+
+### La prueba
+
+Tu propia corrida del smoke dio 12/12, y los casos 09 y 10 son esto:
+
+```
+[PASS] 09 Publicar producto como vendedor desde la interfaz — UI + API + DB
+[PASS] 10 Fallo de imagen visible sin perder la publicación — UI + DB
+```
+
+Esos dos casos **abren Chromium de verdad contra
+`http://localhost:5173`**, hacen clic, completan un formulario y suben una
+imagen. Mirá `scripts/smoke.mjs`: `chromium.launch()` en la línea 344 y
+`page.goto(FRONTEND_URL)` en la 372.
+
+O sea: Playwright llega a localhost en tu entorno. Lo que está restringido
+es la herramienta de navegación interactiva, que es otra superficie. **No
+la necesitás.**
+
+### Qué hacer
+
+Escribí un script nuevo, `scripts/mobile-audit.mjs`, con el mismo patrón
+que `smoke.mjs`. **No lo metas dentro del smoke**: la suite es la red de
+seguridad de la demostración y no la quiero tocando a tres días.
+
+Lo que ya está resuelto ahí y podés copiar:
+
+- `chromium.launch({ headless: true })` y `browser.newContext(...)`. Para
+  emular teléfono, el contexto acepta `viewport`, `isMobile`, `hasTouch` y
+  `deviceScaleFactor`; también podés importar `devices` de `playwright`.
+- **El inventario de consola ya tiene patrón**: `page.on('pageerror')` y
+  `page.on('console')` están usados en `smoke.mjs` desde la línea 362.
+  Copialo, pero **sin filtrar**: yo quiero todo, errores y advertencias.
+- Para el inventario de red, `page.on('response')` y anotá las que no
+  sean `2xx` o `3xx`.
+- Las capturas con `page.screenshot({ path })`, a
+  `docs/pm/evidence/mobile-2026-07-26/`.
+
+La captura que dejaste ya está en el lugar correcto. Seguí esa
+convención.
+
+### Cambio de orden: hacé la Tarea 3 primero
+
+Reportaste esto:
+
+```
+Port 5173 is in use, trying another one...
+Port 5174 is in use, trying another one...
+Local: http://127.0.0.1:5175/
+```
+
+Ese es exactamente el problema que la Tarea 3 resuelve, y te acaba de
+costar tiempo dentro de otra tarea. **Hacela ahora, antes de la
+auditoría**: una línea en `package.json`, `vite --port 5173
+--strictPort`.
+
+Con eso, si el puerto está ocupado Vite falla con un mensaje claro en vez
+de arrancar en un puerto que el backend rechaza. Matá los procesos viejos
+y arrancá limpio.
+
+Orden nuevo: **Tarea 3, después Tarea 2.**
+
+---
+
 ## Tarea 1: aprobada
 
 Evidencia completa y contrastada. Los doce casos en verde, las
@@ -308,8 +381,11 @@ volverse una lista impracticable.
 
 ### Qué verificar
 
-Con Playwright emulando un teléfono, y si podés también en uno real.
-Tamaños: 390×844 (iPhone), 360×800 (Android) y una tableta.
+Con Playwright, desde `scripts/mobile-audit.mjs`. Tamaños: 390×844
+(iPhone), 360×800 (Android) y una tableta.
+
+**No uses el navegador integrado**: está restringido por política y ya
+sabemos que no llega a localhost. El script sí.
 
 Recorrido completo en cada tamaño:
 
