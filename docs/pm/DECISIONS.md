@@ -5,6 +5,33 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-07-26 — La plataforma no toca el dinero, y es a propósito
+
+En el pago por transferencia, los fondos van **directo de la cuenta del
+comprador a la del vendedor**. TopGreen muestra el CBU y guarda una
+imagen del comprobante. Nunca recibe ni retiene dinero.
+
+No es una limitación: es la decisión. Una plataforma que cobra, retiene
+comisión y gira el resto está manejando fondos de terceros, y eso en la
+Argentina toca el régimen de proveedores de servicios de pago, con
+registro ante el Banco Central. **El contrato pide "checkout básico" y
+nada más.**
+
+Consecuencias que se derivan y quedan fijadas:
+
+1. **El split payment heredado sigue apagado.** Ya estaba marcado como
+   construido por encima del alcance; esta es la razón más fuerte.
+2. **Quien valida el pago es el vendedor, mirando su cuenta bancaria.**
+   El comprobante subido es una imagen falsificable: sirve como registro
+   de la conversación, no como verificación. La pantalla tiene que
+   decirlo, porque si no un vendedor puede entregar mercadería contra un
+   PNG.
+3. **Los términos y condiciones del sitio no están en el alcance.** Quién
+   responde si una operación entre usuarios sale mal es una definición
+   legal del cliente, no una función a construir.
+
+---
+
 ## 2026-07-25 — No se instalan skills de agente antes de la demostración
 
 Evaluado `addyosmani/agent-skills`: 24 skills en markdown con soporte
