@@ -77,6 +77,65 @@ pantallas— y confirma que aparcarlo fue la decisión correcta.
 
 ---
 
+## Cómo trabajamos la Tarea 6: la diseñamos entre las dos
+
+Este módulo es 25 % del contrato y es el diferencial del producto. Es
+demasiado grande para que yo baje una especificación y vos la ejecutes.
+
+Así que va distinto:
+
+- **La Pieza A arrancala ya**, sin esperarme. No tiene nada discutible.
+- **Las Piezas B y C no las escribas todavía.** Abajo está mi propuesta.
+  Quiero que la leas, la discutas, y me contestes en `PARA-PM.md` antes de
+  escribir código. Después arrancás.
+
+No es burocracia: es que en las últimas dos vueltas encontraste dos cosas
+que yo no había visto —los pagos alcanzables y que la orden no guardaba
+los datos bancarios—, y las dos eran de diseño. Prefiero gastar una vuelta
+en discutirlo que tres en rehacerlo.
+
+### Lo que necesito que audites primero
+
+Ya encontré una: **`OrderResponse` devuelve `buyer_phone` y
+`buyer_address`**, y `GET /orders/{id}` los entrega a quien sea comprador o
+vendedor de esa orden.
+
+Cuando el transportista quede asociado a una orden, si puede leerla **se
+saltea el candado de suscripción sin proponérselo**. El candado en un
+endpoint nuevo no sirve de nada si el teléfono sale por otro lado.
+
+**Mapeame por dónde sale hoy el contacto del comprador**: qué endpoints lo
+devuelven, con qué permiso, y qué pasaría si el transportista tuviera
+acceso a la orden. Con eso decidimos dónde va el control, y quiero tu
+recomendación, no sólo el mapa.
+
+### Las cuatro cosas que quiero discutir con vos
+
+**1. La semántica de la coincidencia.** Mi propuesta está abajo: el
+transportista sirve si **origen y destino** caen dentro de su radio. Es la
+lectura estricta. ¿Te cierra? ¿O tiene más sentido medir contra el origen
+solamente, o contra el punto medio? Si el radio es chico y el viaje largo,
+mi versión puede no devolver a nadie nunca.
+
+**2. Dónde vive el transportista.** ¿Una marca en `users` más una tabla de
+perfil? ¿Otra cosa? El contrato dice "tipo especial de proveedor", no un
+rol nuevo, pero la forma concreta es tu decisión.
+
+**3. Dónde se aplica el candado.** ¿Una dependencia única que envuelva
+todo lo que devuelva contacto? ¿Un armado de respuesta que quite los
+campos? Quiero **un solo lugar donde se decida**, no una condición
+repetida en cada endpoint. Cómo lograrlo es tu terreno.
+
+**4. Qué ve el transportista de la orden.** Mi instinto es que **no**
+debería leer la orden completa: no necesita el total, ni los precios, ni
+el comprobante de transferencia. Necesita origen, destino, y el contacto
+si pagó. ¿Coincidís en armarle una vista propia en vez de darle acceso a
+`OrderResponse`?
+
+Si en algo de esto te parece que estoy complicando algo simple, decilo.
+
+---
+
 ## Tarea 6: el módulo de transportistas. Arranca ahora
 
 **Es el bloque grande que falta: 25 % del contrato, hoy en cero.** Y es el
