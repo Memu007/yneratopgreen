@@ -4,7 +4,7 @@ Actualizado: 2026-07-26.
 
 ## Objetivo activo
 
-**Preparar la demostración del 30 de julio** y desbloquear el módulo de
+**Preparar la demostración del 30 de julio** y construir el módulo de
 transportistas.
 
 ## Dónde estamos
@@ -75,8 +75,17 @@ evidencia de ejecución detrás.
    2026-07-26.** Los tres requisitos contractuales de la sección 3.3
    cerrados, con copia de los datos bancarios guardada en la orden y
    avisos en pantalla para comprador y vendedor. **Suite en 20/20.**
-2. **Transportistas.** No arranca hasta que la clienta defina cobertura
-   por zonas o por radio, y quién ve los datos de contacto de quién.
+2. **Transportistas: arranca ya.** Estaba trabado por error mío. El
+   contrato **ya define** la cobertura: *"zona de cobertura (radio en
+   km)"*. Las zonas declaradas eran una propuesta mía, no lo contratado;
+   si la clienta las quiere, es un cambio a cotizar.
+
+   Y también aclara que es un **directorio, no un motor de ruteo**: se
+   filtra por distancia y se lista, sin calcular rutas ni tiempos.
+
+   Se hace en tres piezas: el transportista como tipo especial de
+   proveedor, la coincidencia por `ST_DWithin`, y la selección con los
+   datos de contacto **recién después de elegirlo**.
 3. **Mercado Pago: se reconstruye desde cero, sin split.** Lo heredado se
    desmontó el 2026-07-26. Ver el bloqueo de abajo.
 4. **Al final, antes de desplegar:** correcciones de la vista en celular,
@@ -102,9 +111,9 @@ incendio.
    se va a mostrar, sobre instalación limpia y cronometrado. Guión en
    `DEMO.md`.
 
-2. **Módulo de transportistas.** El bloque grande que falta del
-   diferencial. **No arranca** hasta que el cliente defina si la
-   coincidencia va por zonas declaradas o por radio en km.
+2. **Módulo de transportistas, en curso.** El bloque grande del
+   diferencial, 25 % del contrato. Radio en km por contrato, directorio y
+   no ruteo, en tres piezas con informe entre cada una.
 
 ## Equipo
 
@@ -126,8 +135,10 @@ así se detectó. Los números fijos envejecen mal.
 - **El contrato no está firmado.** Firma prevista el 2026-07-30. El plazo
   de 12 a 14 semanas arranca ahí, así que lo construido es previo al
   reloj. Con 7 a 9 semanas de trabajo restante, entra.
-- **Definición pendiente del cliente:** cobertura del transportista por
-  zonas declaradas o por radio en km. Sin eso no arranca el bloque grande.
+- ~~**Definición pendiente del cliente:** cobertura del transportista.~~
+  **Resuelto el 2026-07-26 leyendo el contrato**, que dice "zona de
+  cobertura (radio en km)". No era una pregunta abierta: era yo que no
+  había leído bien mi propia transcripción. El bloque grande arranca.
 - **Mercado Pago: desmontado el 2026-07-26, se rehace desde cero.** La
   auditoría de la dev demostró que lo heredado no era el "checkout
   básico" del contrato: era split con comisión de marketplace y OAuth de
