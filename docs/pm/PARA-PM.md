@@ -2,126 +2,90 @@
 
 ## Estado
 
-- **Tarea 3 terminada y subida:** `5620c06`.
-- **Tarea 2, relevamiento móvil, terminada y subida:** `3a14e12`.
-- No hice correcciones de interfaz móvil. Respeté el cambio de prioridad de
-  `PARA-DEV.md`.
+**Tarea 4 terminada, verificada y subida.**
 
-## Tarea 3 — puerto fijo de Vite
+Commits:
 
-`package.json` quedó con:
+- `409e8b7` — implementación del pago por transferencia bancaria.
+- `4e9b4fc` — recorrido Playwright completo desde el checkout.
 
-```json
-"dev": "vite --port 5173 --strictPort"
-```
+No cambié `/orders/checkout`, el flujo ni la integración de Mercado Pago.
+La transferencia usa una ruta separada y reutiliza el almacenamiento que ya
+existía.
 
-Lo verifiqué con dos instancias. La primera levantó en `5173`; la segunda
-falló, sin moverse a otro puerto:
+## Recorrido implementado
+
+1. El vendedor puede guardar CBU y alias bancario en su perfil. Ambos son
+   opcionales; sin los dos, la API rechaza ofrecer transferencia.
+2. El comprador elige `Transferencia bancaria` en el checkout y ve los datos
+   del vendedor, titular y monto.
+3. Se crea una orden por vendedor con estado
+   `awaiting_transfer_receipt`. Esto conserva correctamente los datos si el
+   carrito tiene publicaciones de más de un vendedor.
+4. El comprador adjunta JPG, PNG, WEBP o PDF, hasta 5 MB. El fallo devuelve un
+   motivo visible y deja la orden esperando comprobante.
+5. El vendedor ve el comprobante en `Mis ventas` y puede aprobarlo o
+   rechazarlo. El rechazo exige motivo.
+6. La aprobación pasa la orden a `paid`; el rechazo, a `rejected`, conservando
+   el motivo y el comprobante.
+7. La API compara siempre `order.seller_id` con el usuario autenticado antes
+   de permitir la decisión.
+
+## Esquema y migración
+
+Migración: `20260726_0024_cfff8c361c11_agregar_transferencias_bancarias.py`.
+
+Cambios dentro de lo autorizado:
+
+- `users.cbu`
+- `users.alias_bancario`
+- `orders.transfer_receipt_url`
+- estados agregados al enum: `AWAITING_TRANSFER_RECEIPT` y
+  `TRANSFER_RECEIPT_SUBMITTED`
+
+No renombré ni eliminé estados existentes.
+
+La migración se generó desde los modelos. Se aplicó desde una base vacía
+dentro del smoke y después ejecuté:
 
 ```text
-> vite --port 5173 --strictPort
-error when starting dev server:
-Error: Port 5173 is already in use
+$ alembic check
+No new upgrade operations detected.
 ```
 
-## Tarea 2 — cómo se relevó
+## Evidencia de aceptación
 
-Agregué `scripts/mobile-audit.mjs`, separado de `smoke.mjs`. Usa Chromium
-headless y recorre:
-
-1. Home y entrada a AgroMarket.
-2. Filtros de categoría, provincia y localidad.
-3. Catálogo y tarjetas.
-4. Detalle.
-5. Carrito y checkout hasta el paso de pago.
-6. Formulario de publicación, arriba y abajo.
-7. Panel del vendedor, sus productos, administración y tabla de productos.
-
-Tamaños ejecutados:
-
-- `360×800`: 12 estados.
-- `390×844`: 12 estados.
-- `768×1024`: 12 estados.
-
-Salida final:
+Los casos nuevos son:
 
 ```text
-Pantallas verificadas: 36
-Desbordes horizontales: 0
-Errores/advertencias de consola: 0
-Respuestas 4xx/5xx: 0
-Resultado: docs/pm/evidence/mobile-2026-07-26/audit-results.json
+PASS 13 Transferencia exige CBU o alias del vendedor
+  HTTP 400 con motivo visible; no se creó ninguna orden
+
+PASS 14 Datos bancarios correctos y orden esperando comprobante
+  HTTP 200; CBU devuelto por API igual al consultado en SQL
+
+PASS 15 Comprobante fallido visible y comprobante válido asociado
+  archivo inválido HTTP 400 sin cambiar estado ni referencia;
+  archivo válido HTTP 200 y URL de API igual a SQL
+
+PASS 16 Sólo el vendedor correcto valida el comprobante
+  vendedor ajeno HTTP 403; vendedor correcto dejó API=paid y SQL=PAID
+
+PASS 17 Rechazo de comprobante guarda el motivo
+  API=rejected, SQL=REJECTED y motivo persistido
+
+PASS 18 Transferencia completa desde la interfaz
+  Chromium real: catálogo → carrito → checkout → transferencia → comprobante;
+  CBU y alias de SQL visibles; orden y archivo verificados en base
 ```
 
-Los filtros nativos se seleccionaron realmente en las tres medidas. También
-se navegó a pestañas que empiezan fuera de pantalla: `Mis Productos` del
-vendedor y `Productos` de administración.
-
-## Inventario de lo roto
-
-### Impide usar
-
-Nada encontrado. Los recorridos completos llegaron a su estado final en las
-tres medidas.
-
-### Molesta
-
-1. **Panel del vendedor, 360×800 y 390×844:** la barra de pestañas requiere
-   desplazamiento horizontal para llegar a `Mis Productos`. El scroll está
-   contenido en la barra; no desborda la página.
-2. **Administración, 360×800 y 390×844:** las pestañas y la tabla de productos
-   requieren desplazamiento horizontal. El scroll está contenido; la página
-   no crece fuera del viewport.
-3. **Filtros, 360×800 / 390×844 / 768×1024:** los `select` de categoría,
-   provincia y localidad miden respectivamente `302×36`, `332×36` y
-   `686×42` CSS px. Funcionaron con contexto táctil, pero quedan por debajo
-   de 44 px de alto.
-
-### Feo
-
-1. **Administración, tabla de productos, 360×800 y 390×844:** varias imágenes
-   demo no cargan y el navegador muestra el ícono roto con el texto
-   alternativo. El catálogo público sí reemplaza esas imágenes por
-   `Sin Imagen`.
-2. Hay controles secundarios debajo de 44 px: cierre del formulario
-   (`32×32`), botones de autenticación del header (`34–37` px de alto) y
-   enlaces del footer. Ninguno trabó el recorrido.
-
-No corregí estos puntos: la PM anuló expresamente las correcciones móviles.
-El detalle completo por pantalla, incluido cada target táctil medido, está en
-`audit-results.json`.
-
-## Consola
-
-Inventario final: **0 errores y 0 advertencias** en los 36 estados.
-
-El script registra sin filtrar:
-
-- `pageerror`;
-- mensajes `warning`, `warn` y `error` de consola;
-- pantalla y viewport donde ocurre cada evento.
-
-## Red
-
-Inventario final: **0 respuestas fuera de `2xx`/`3xx`** en los 36 estados.
-
-El script registra método, estado, URL, pantalla y viewport de cada respuesta
-fallida.
-
-## Evidencia
-
-Directorio: `docs/pm/evidence/mobile-2026-07-26/`
-
-- 12 capturas en `360×800`.
-- 12 capturas en `390×844`.
-- `audit-results.json` con las 36 observaciones, consola y red.
-
-Hay más capturas que las siete mínimas porque separé carrito/pago,
-formulario arriba/abajo y vistas iniciales/de productos de ambos paneles.
+El caso 18 no simula la UI con llamadas directas: abre Chromium headless,
+hace clic, completa envío, selecciona transferencia y sube el archivo desde
+el formulario.
 
 ## Smoke final
 
-Ejecutado después de cerrar el script y las capturas:
+Ejecutado desde cero después del último cambio:
 
 ```text
 Resumen smoke tests
@@ -138,14 +102,30 @@ PASS 09 Publicar producto como vendedor desde la interfaz
 PASS 10 Fallo de imagen visible sin perder la publicación
 PASS 11 Ver mis compras y mis ventas
 PASS 12 Administración: usuarios, productos y órdenes
+PASS 13 Transferencia exige CBU o alias del vendedor
+PASS 14 Datos bancarios correctos y orden esperando comprobante
+PASS 15 Comprobante fallido visible y comprobante válido asociado
+PASS 16 Sólo el vendedor correcto valida el comprobante
+PASS 17 Rechazo de comprobante guarda el motivo
+PASS 18 Transferencia completa desde la interfaz
 -------------------
-12/12 pasaron; 0 fallaron
+18/18 pasaron; 0 fallaron
 ```
 
-También pasó el build de frontend dentro del smoke.
+El smoke también compiló el frontend con `tsc && vite build` y aplicó todas
+las migraciones desde cero.
 
-## No ejecutado
+Hubo una corrida previa `17/18`: el caso 18 usó inicialmente `form`, que era
+ambiguo entre la búsqueda y el checkout. Corregí el selector a
+`form:has(h2)` y repetí la suite completa; la salida final de arriba es la
+segunda corrida.
 
-- No corrí métricas de rendimiento: están fuera de alcance.
-- No hice correcciones móviles ni pruebas de “antes/después”, porque no hubo
-  ningún fix de interfaz.
+## Decisiones no inventadas
+
+- No implementé conciliación bancaria.
+- No definí qué ocurre con una transferencia insuficiente.
+- No agregué avisos por correo.
+- No agregué dependencias.
+- No toqué Mercado Pago.
+- No usé ni levanté infraestructura externa: todo se verificó con Docker,
+  PostgreSQL, Vite y Playwright locales.
