@@ -257,6 +257,9 @@ def checkout_bank_transfer(
             subtotal=subtotal,
             shipping_cost=0,
             total_amount=subtotal,
+            transfer_cbu=seller.cbu,
+            transfer_alias_bancario=seller.alias_bancario,
+            transfer_account_holder=seller.full_name,
             shipping_address_json={
                 "address": checkout_data.shipping_address,
                 "city": checkout_data.shipping_city,
@@ -310,9 +313,9 @@ def checkout_bank_transfer(
             order_number=order.order_number,
             status=order.status.value,
             seller_id=seller.id,
-            seller_name=seller.full_name,
-            cbu=seller.cbu,
-            alias_bancario=seller.alias_bancario,
+            seller_name=order.transfer_account_holder,
+            cbu=order.transfer_cbu,
+            alias_bancario=order.transfer_alias_bancario,
             amount=float(order.total_amount),
         )
         for order, seller in created
@@ -365,9 +368,9 @@ async def upload_transfer_receipt(
         order_number=order.order_number,
         status=order.status.value,
         seller_id=order.seller.id,
-        seller_name=order.seller.full_name,
-        cbu=order.seller.cbu,
-        alias_bancario=order.seller.alias_bancario,
+        seller_name=order.transfer_account_holder,
+        cbu=order.transfer_cbu,
+        alias_bancario=order.transfer_alias_bancario,
         amount=float(order.total_amount),
         transfer_receipt_url=order.transfer_receipt_url,
     )
@@ -419,9 +422,9 @@ def decide_transfer_receipt(
         order_number=order.order_number,
         status=order.status.value,
         seller_id=order.seller.id,
-        seller_name=order.seller.full_name,
-        cbu=order.seller.cbu,
-        alias_bancario=order.seller.alias_bancario,
+        seller_name=order.transfer_account_holder,
+        cbu=order.transfer_cbu,
+        alias_bancario=order.transfer_alias_bancario,
         amount=float(order.total_amount),
         transfer_receipt_url=order.transfer_receipt_url,
     )
@@ -499,20 +502,9 @@ def get_my_orders(
             seller_name=seller_name,
             seller_phone=seller_phone,
             seller_whatsapp=seller_whatsapp,
-            seller_cbu=order.seller.cbu if order.seller and (
-                order.transfer_receipt_url
-                or order.status in [
-                    OrderStatus.AWAITING_TRANSFER_RECEIPT,
-                    OrderStatus.TRANSFER_RECEIPT_SUBMITTED,
-                ]
-            ) else None,
-            seller_alias_bancario=order.seller.alias_bancario if order.seller and (
-                order.transfer_receipt_url
-                or order.status in [
-                    OrderStatus.AWAITING_TRANSFER_RECEIPT,
-                    OrderStatus.TRANSFER_RECEIPT_SUBMITTED,
-                ]
-            ) else None,
+            seller_cbu=order.transfer_cbu,
+            seller_alias_bancario=order.transfer_alias_bancario,
+            seller_bank_holder=order.transfer_account_holder,
             transfer_receipt_url=order.transfer_receipt_url,
             rejection_reason=order.cancellation_reason,
         ))
@@ -555,7 +547,12 @@ def get_order_detail(
         shipping_cost=float(order.shipping_cost),
         total_amount=float(order.total_amount),
         items=items_response,
-        created_at=order.created_at
+        created_at=order.created_at,
+        seller_cbu=order.transfer_cbu,
+        seller_alias_bancario=order.transfer_alias_bancario,
+        seller_bank_holder=order.transfer_account_holder,
+        transfer_receipt_url=order.transfer_receipt_url,
+        rejection_reason=order.cancellation_reason,
     )
 
 

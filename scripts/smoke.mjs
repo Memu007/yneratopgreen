@@ -683,7 +683,33 @@ await runCase(14, 'Datos bancarios correctos y orden esperando comprobante', asy
   assert(order?.status === 'awaiting_transfer_receipt', `estado inesperado: ${order?.status}`);
   assert(order.cbu === databaseBank[0], 'la orden no devolvió el CBU correcto');
   state.transferOrderId = order.order_id;
-  return `HTTP ${checkout.status}, order_id=${order.order_id}, CBU API=SQL`;
+
+  await apiRequest('/auth/me', {
+    method: 'PATCH',
+    token: state.sellerToken,
+    body: {
+      cbu: '0000003100098765432101',
+      alias_bancario: 'topgreen.cambio',
+    },
+  });
+  const buyerOrders = await apiRequest('/orders/my?as_role=buyer', {
+    token: state.buyerToken,
+  });
+  const savedOrder = buyerOrders.data.find((candidate) => candidate.id === order.order_id);
+  const [databaseSnapshot] = queryRows(`
+    SELECT transfer_cbu, transfer_alias_bancario, transfer_account_holder
+    FROM orders
+    WHERE id = ${sqlLiteral(order.order_id)}
+  `);
+  assert(savedOrder?.seller_cbu === bankData.cbu, 'la orden cambió su CBU junto con el perfil');
+  assert(
+    savedOrder?.seller_alias_bancario === bankData.alias_bancario,
+    'la orden cambió su alias junto con el perfil',
+  );
+  assert(databaseSnapshot[0] === bankData.cbu, 'SQL no conservó el CBU original');
+  assert(databaseSnapshot[1] === bankData.alias_bancario, 'SQL no conservó el alias original');
+  assert(databaseSnapshot[2] === order.seller_name, 'SQL no conservó el titular original');
+  return `HTTP ${checkout.status}, order_id=${order.order_id}, snapshot API=SQL intacto tras cambiar el perfil`;
 });
 
 await runCase(15, 'Comprobante fallido visible y comprobante válido asociado', async () => {
