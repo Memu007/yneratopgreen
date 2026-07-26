@@ -3,6 +3,7 @@ import styles from './CheckoutModal.module.css';
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_BASE_URL, apiFetch, apiGet, tokenStorage } from '../../utils/api';
+import { ProductImage } from '../ProductImage/ProductImage';
 
 interface CheckoutModalProps {
   onClose: () => void;
@@ -399,7 +400,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         {items.map((item) => (
           <div key={item.product.id} className={styles.summaryItem}>
             <div className={styles.summaryItemImage}>
-              <img src={item.product.image} alt={item.product.name} />
+              <ProductImage src={item.product.image} alt={item.product.name} />
             </div>
             <div className={styles.summaryItemInfo}>
               <div className={styles.summaryItemName}>{item.product.name}</div>

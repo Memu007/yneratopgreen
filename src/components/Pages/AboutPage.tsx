@@ -1,5 +1,6 @@
 import React from 'react';
 import styles from './AboutPage.module.css';
+import { ProductImage } from '../ProductImage/ProductImage';
 
 interface AboutPageProps {
   onNavigateToMarketplace?: () => void;
@@ -107,8 +108,8 @@ export const AboutPage: React.FC<AboutPageProps> = ({
           {/* Mercedes Raiz */}
           <div className={styles.teamMember}>
             <div className={styles.memberPhoto}>
-              <img 
-                src="/MercedesRaiz.jpg" 
+              <ProductImage
+                src="/MercedesRaiz.jpg"
                 alt="Ingeniera Mercedes Raiz"
                 className={styles.memberImage}
               />

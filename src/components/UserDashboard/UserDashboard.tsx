@@ -3,6 +3,7 @@ import styles from './UserDashboard.module.css';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Toast/Toast';
 import { apiGet, apiPatch, apiDelete, apiPost, tokenStorage, API_BASE_URL } from '../../utils/api';
+import { ProductImage } from '../ProductImage/ProductImage';
 
 type TabType = 'profile' | 'notifications' | 'purchases' | 'sales' | 'products';
 
@@ -1543,7 +1544,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           {userProducts.map((product) => (
             <div key={product.id} className={styles.productCard}>
               <div className={styles.productImage}>
-                <img src={product.image} alt={product.name} />
+                <ProductImage src={product.image} alt={product.name} />
                 <div className={`${styles.productStatusBadge} ${styles[`status-${product.status}`]}`}>
                   {product.status === 'active' && '✅ Activo'}
                   {product.status === 'paused' && '⏸️ Pausado'}
@@ -2033,7 +2034,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   {/* Imágenes existentes */}
                   {editingProduct.existingImages.map((img, index) => (
                     <div key={`existing-${index}`} className={styles.editImageItem}>
-                      <img src={getImageUrl(img.url)} alt={`Imagen ${index + 1}`} />
+                      <ProductImage src={getImageUrl(img.url)} alt={`Imagen ${index + 1}`} />
                       <button
                         type="button"
                         className={styles.removeImageBtn}
@@ -2049,7 +2050,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   {/* Imágenes nuevas */}
                   {editingProduct.newImages.map((img, index) => (
                     <div key={`new-${index}`} className={styles.editImageItem}>
-                      <img src={img.preview} alt={`Nueva imagen ${index + 1}`} />
+                      <ProductImage src={img.preview} alt={`Nueva imagen ${index + 1}`} />
                       <button
                         type="button"
                         className={styles.removeImageBtn}

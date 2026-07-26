@@ -1,5 +1,6 @@
 import React from 'react';
 import styles from './CartModal.module.css';
+import { ProductImage } from '../ProductImage/ProductImage';
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Toast/Toast';
@@ -71,7 +72,7 @@ export const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckou
             <div className={styles.cartItems}>
               {items.map((item) => (
                 <div key={item.product.id} className={styles.cartItem}>
-                  <img
+                  <ProductImage
                     src={item.product.image}
                     alt={item.product.name}
                     className={styles.itemImage}

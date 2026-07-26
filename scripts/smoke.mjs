@@ -976,6 +976,130 @@ await runCase(19, 'Las rutas financieras heredadas no están expuestas', async (
   return 'payments, mp-oauth y simulate-payment respondieron HTTP 404';
 });
 
+await runCase(20, 'Respaldo de imágenes en el recorrido de demostración', async () => {
+  const browser = await chromium.launch({ headless: true });
+  let blockedSeedImages = 0;
+  const blockSeedImages = (page) =>
+    page.route('https://picsum.photos/**', (route) => {
+      blockedSeedImages += 1;
+      return route.fulfill({ status: 404, body: 'imagen rota por smoke' });
+    });
+
+  try {
+    const buyerContext = await browser.newContext();
+    await buyerContext.addInitScript(
+      ({ accessToken, refreshToken }) => {
+        window.localStorage.setItem('access_token', accessToken);
+        window.localStorage.setItem('refresh_token', refreshToken);
+      },
+      {
+        accessToken: state.buyerToken,
+        refreshToken: state.buyerRefreshToken,
+      },
+    );
+    const buyerPage = await buyerContext.newPage();
+    await blockSeedImages(buyerPage);
+    await buyerPage.goto(`${FRONTEND_URL}/?section=marketplace`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await buyerPage.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+    await buyerPage.waitForFunction(
+      () => document.querySelectorAll('#catalog-category option').length > 1,
+    );
+    await buyerPage.locator('#catalog-type').selectOption('productos');
+    const productName = state.product.name;
+    await buyerPage
+      .getByPlaceholder('Buscar productos, semillas, maquinaria...')
+      .fill(productName);
+    await buyerPage
+      .getByPlaceholder('Buscar productos, semillas, maquinaria...')
+      .press('Enter');
+    const productHeading = buyerPage.getByRole('heading', {
+      name: productName,
+      exact: true,
+      level: 3,
+    });
+    await productHeading.waitFor({ state: 'visible' });
+    const productCard = productHeading.locator('xpath=ancestor::div[contains(@class,\"card\")]');
+    const addButton = productCard.getByRole('button', { name: /Agregar/ });
+
+    await productHeading.click();
+    const detailHeading = buyerPage.getByRole('heading', {
+      name: productName,
+      exact: true,
+      level: 2,
+    });
+    await detailHeading.waitFor({ state: 'visible' });
+    const detailModal = detailHeading.locator('xpath=ancestor::div[contains(@class,\"modal\")]');
+    await detailModal.getByRole('img', { name: productName, exact: true }).first().waitFor();
+    await detailModal.getByRole('button', { name: '✕' }).click();
+
+    await addButton.click();
+    await buyerPage.getByRole('button', { name: /Carrito/ }).click();
+    const cartHeading = buyerPage.getByRole('heading', { name: /Mi Carrito/ });
+    await cartHeading.waitFor();
+    const cartModal = cartHeading.locator('xpath=ancestor::div[contains(@class,\"modal\")]');
+    await cartModal.getByRole('img', { name: productName, exact: true }).waitFor();
+    await cartModal.getByRole('button', { name: 'Continuar compra' }).click();
+    const shippingHeading = buyerPage.getByRole('heading', { name: /Datos de Envío/ });
+    const checkoutModal = shippingHeading.locator('xpath=ancestor::div[contains(@class,\"modal\")]');
+    await checkoutModal.getByRole('img', { name: productName, exact: true }).waitFor();
+    await buyerContext.close();
+
+    const sellerContext = await browser.newContext();
+    await sellerContext.addInitScript(
+      ({ accessToken, refreshToken }) => {
+        window.localStorage.setItem('access_token', accessToken);
+        window.localStorage.setItem('refresh_token', refreshToken);
+      },
+      {
+        accessToken: state.sellerToken,
+        refreshToken: state.sellerRefreshToken,
+      },
+    );
+    const sellerPage = await sellerContext.newPage();
+    await blockSeedImages(sellerPage);
+    await sellerPage.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await sellerPage.locator('button').filter({ hasText: '👤' }).first().click();
+    await sellerPage.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
+    await sellerPage.getByRole('button', { name: 'Mis Productos' }).click();
+    await sellerPage.getByRole('heading', { name: 'Mis Productos' }).waitFor();
+    await sellerPage.getByRole('img').first().waitFor();
+    await sellerContext.close();
+
+    const adminLogin = await apiRequest('/auth/login', {
+      method: 'POST',
+      body: { email: 'admin@topgreen.com', password: 'admin123' },
+    });
+    const adminContext = await browser.newContext();
+    await adminContext.addInitScript(
+      ({ accessToken, refreshToken }) => {
+        window.localStorage.setItem('access_token', accessToken);
+        window.localStorage.setItem('refresh_token', refreshToken);
+      },
+      {
+        accessToken: adminLogin.data.access_token,
+        refreshToken: adminLogin.data.refresh_token,
+      },
+    );
+    const adminPage = await adminContext.newPage();
+    await blockSeedImages(adminPage);
+    await adminPage.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await adminPage.getByRole('button', { name: '⚙️ Admin' }).click();
+    await adminPage.getByRole('heading', { name: 'Panel de Administración' }).waitFor();
+    await adminPage.getByRole('button', { name: '📦 Productos' }).click();
+    const table = adminPage.locator('table');
+    await table.waitFor();
+    await table.getByRole('img').first().waitFor();
+    await adminContext.close();
+
+    assert(blockedSeedImages > 0, 'Playwright no forzó ninguna URL de picsum.photos a HTTP 404');
+    return 'URLs rotas reemplazadas en detalle, carrito, checkout, vendedor y administración';
+  } finally {
+    await browser.close();
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 
