@@ -1,7 +1,7 @@
 """
 Schemas de Autenticación - Validación de requests y responses
 """
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 from typing import Optional
 from datetime import datetime
 
@@ -17,6 +17,26 @@ class UserRegisterRequest(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=255)
     phone: Optional[str] = Field(None, max_length=50)
     role: UserRole = UserRole.USER  # Por defecto usuario normal
+    is_carrier: bool = False
+    carrier_base_locality_id: Optional[str] = Field(None, max_length=20)
+    carrier_transport: Optional[str] = Field(None, max_length=255)
+    carrier_transport_certified: bool = False
+    carrier_coverage_radius_km: Optional[float] = Field(None, gt=0)
+    carrier_capacity: Optional[str] = Field(None, max_length=255)
+
+    @model_validator(mode="after")
+    def validate_carrier_profile(self):
+        if not self.is_carrier:
+            return self
+        if not self.carrier_base_locality_id:
+            raise ValueError("La localidad base es obligatoria para transportistas")
+        if not self.carrier_transport or not self.carrier_transport.strip():
+            raise ValueError("El transporte es obligatorio para transportistas")
+        if not self.carrier_transport_certified:
+            raise ValueError("El transporte debe estar habilitado")
+        if self.carrier_coverage_radius_km is None:
+            raise ValueError("El radio de cobertura es obligatorio para transportistas")
+        return self
     
     class Config:
         json_schema_extra = {
@@ -63,6 +83,12 @@ class UserResponse(BaseModel):
     location: Optional[str]
     cbu: Optional[str]
     alias_bancario: Optional[str]
+    is_carrier: bool
+    carrier_base_locality_id: Optional[str]
+    carrier_transport: Optional[str]
+    carrier_transport_certified: bool
+    carrier_coverage_radius_km: Optional[float]
+    carrier_capacity: Optional[str]
     rating_average: float = 5.0
     rating_count: int = 0
     sales_count: int = 0

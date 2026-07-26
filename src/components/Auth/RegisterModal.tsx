@@ -1,8 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import styles from './AuthModal.module.css';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Toast/Toast';
 import { RegisterData } from '../../types';
+import {
+  getLocalities,
+  getProvinces,
+  LocalityResponse,
+  ProvinceResponse,
+} from '../../utils/catalogService';
 
 interface RegisterModalProps {
   onClose: () => void;
@@ -21,11 +27,38 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     name: '',
     phone: '',
     role: 'user',
+    isCarrier: false,
+    carrierBaseLocalityId: '',
+    carrierTransport: '',
+    carrierTransportCertified: false,
+    carrierCoverageRadiusKm: undefined,
+    carrierCapacity: '',
   });
+  const [provinces, setProvinces] = useState<ProvinceResponse[]>([]);
+  const [localities, setLocalities] = useState<LocalityResponse[]>([]);
+  const [provinceId, setProvinceId] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (formData.isCarrier && provinces.length === 0) {
+      void getProvinces().then(setProvinces).catch(() => {
+        setError('No se pudo cargar el padrón de localidades.');
+      });
+    }
+  }, [formData.isCarrier, provinces.length]);
+
+  useEffect(() => {
+    if (!provinceId) {
+      setLocalities([]);
+      return;
+    }
+    void getLocalities(provinceId).then(setLocalities).catch(() => {
+      setError('No se pudieron cargar las localidades.');
+    });
+  }, [provinceId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,6 +159,129 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               onChange={handleChange}
             />
           </div>
+
+          <label className={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={formData.isCarrier}
+              onChange={(e) => setFormData((current) => ({
+                ...current,
+                isCarrier: e.target.checked,
+              }))}
+            />
+            Quiero registrarme como transportista
+          </label>
+
+          {formData.isCarrier && (
+            <>
+              <div className={styles.formGroup}>
+                <label className={styles.label}>
+                  Provincia base <span className={styles.required}>*</span>
+                </label>
+                <select
+                  aria-label="Provincia base"
+                  className={styles.select}
+                  value={provinceId}
+                  onChange={(e) => {
+                    setProvinceId(e.target.value);
+                    setFormData((current) => ({
+                      ...current,
+                      carrierBaseLocalityId: '',
+                    }));
+                  }}
+                  required
+                >
+                  <option value="">Seleccionar provincia</option>
+                  {provinces.map((province) => (
+                    <option key={province.id} value={province.id}>{province.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label className={styles.label}>
+                  Localidad base <span className={styles.required}>*</span>
+                </label>
+                <select
+                  aria-label="Localidad base"
+                  className={styles.select}
+                  value={formData.carrierBaseLocalityId}
+                  onChange={(e) => setFormData((current) => ({
+                    ...current,
+                    carrierBaseLocalityId: e.target.value,
+                  }))}
+                  required
+                  disabled={!provinceId}
+                >
+                  <option value="">Seleccionar localidad</option>
+                  {localities.map((locality) => (
+                    <option key={locality.id} value={locality.id}>{locality.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label className={styles.label}>
+                  Transporte habilitado <span className={styles.required}>*</span>
+                </label>
+                <input
+                  type="text"
+                  name="carrierTransport"
+                  className={styles.input}
+                  placeholder="Camión con acoplado, dominio AB 123 CD"
+                  value={formData.carrierTransport}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={formData.carrierTransportCertified}
+                  onChange={(e) => setFormData((current) => ({
+                    ...current,
+                    carrierTransportCertified: e.target.checked,
+                  }))}
+                  required
+                />
+                Declaro que el transporte está habilitado
+              </label>
+
+              <div className={styles.formGroup}>
+                <label className={styles.label}>
+                  Radio de cobertura (km) <span className={styles.required}>*</span>
+                </label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  name="carrierCoverageRadiusKm"
+                  className={styles.input}
+                  value={formData.carrierCoverageRadiusKm ?? ''}
+                  onChange={(e) => setFormData((current) => ({
+                    ...current,
+                    carrierCoverageRadiusKm: e.target.value
+                      ? Number(e.target.value)
+                      : undefined,
+                  }))}
+                  required
+                />
+              </div>
+
+              <div className={styles.formGroup}>
+                <label className={styles.label}>Capacidad de carga (opcional)</label>
+                <input
+                  type="text"
+                  name="carrierCapacity"
+                  className={styles.input}
+                  placeholder="Hasta 40 toneladas de semillas"
+                  value={formData.carrierCapacity}
+                  onChange={handleChange}
+                />
+              </div>
+            </>
+          )}
 
           <div className={styles.formGroup}>
             <label className={styles.label}>

@@ -1,7 +1,7 @@
 """
 Modelo de Usuario - Sistema de autenticación y perfiles
 """
-from sqlalchemy import Column, String, Boolean, DateTime, Enum as SQLEnum, Integer, Numeric
+from sqlalchemy import Boolean, Column, DateTime, Enum as SQLEnum, ForeignKey, Integer, Numeric, String, false
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -38,6 +38,24 @@ class User(Base):
     location = Column(String(255), nullable=True)
     cbu = Column(String(64), nullable=True)
     alias_bancario = Column(String(100), nullable=True)
+
+    # Perfil de transportista (un tipo especial de proveedor, no un rol).
+    is_carrier = Column(Boolean, default=False, server_default=false(), nullable=False)
+    carrier_base_locality_id = Column(
+        String(20),
+        ForeignKey("localities.id"),
+        nullable=True,
+        index=True,
+    )
+    carrier_transport = Column(String(255), nullable=True)
+    carrier_transport_certified = Column(
+        Boolean,
+        default=False,
+        server_default=false(),
+        nullable=False,
+    )
+    carrier_coverage_radius_km = Column(Numeric(10, 2), nullable=True)
+    carrier_capacity = Column(String(255), nullable=True)
     
     # Reputación y estadísticas
     rating_average = Column(Numeric(3, 2), default=0.0, nullable=False)  # Promedio de calificaciones (0 = sin calificaciones)
@@ -63,6 +81,7 @@ class User(Base):
     orders_as_buyer = relationship("Order", foreign_keys="Order.buyer_id", back_populates="buyer")
     orders_as_seller = relationship("Order", foreign_keys="Order.seller_id", back_populates="seller")
     audit_logs = relationship("AuditLog", back_populates="user")
+    carrier_base_locality = relationship("Locality")
 
     def __repr__(self):
         return f"<User {self.email} ({self.role})>"

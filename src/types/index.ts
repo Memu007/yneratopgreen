@@ -67,6 +67,12 @@ export interface User {
   bio?: string;
   cbu?: string;
   bankAlias?: string;
+  isCarrier?: boolean;
+  carrierBaseLocalityId?: string;
+  carrierTransport?: string;
+  carrierTransportCertified?: boolean;
+  carrierCoverageRadiusKm?: number;
+  carrierCapacity?: string;
   role: 'user' | 'admin' | 'seller' | 'buyer' | 'both';
   avatar?: string;
   avatarUrl?: string;
@@ -94,6 +100,12 @@ export interface RegisterData {
   phone?: string;
   location?: string;
   role: 'user' | 'admin';
+  isCarrier?: boolean;
+  carrierBaseLocalityId?: string;
+  carrierTransport?: string;
+  carrierTransportCertified?: boolean;
+  carrierCoverageRadiusKm?: number;
+  carrierCapacity?: string;
 }
 
 // Cart Types
