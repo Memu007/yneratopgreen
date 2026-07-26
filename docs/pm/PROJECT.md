@@ -148,6 +148,35 @@ Sin costo contractual, recortado explícitamente:
 - Distancia por ruta real. El contrato **rechaza** los algoritmos de
   ruteo (3.2). Distancia en línea recta alcanza.
 - Radio definido por el comprador. El radio lo declara el transportista.
+- **Documentación de transporte.** Ver abajo.
+
+### Documentación de transporte: fuera de alcance, pero hay que saber contestarlo
+
+Evaluado el 2026-07-26 a partir de dos manuales que acercó el dueño del
+proyecto: el de **PreDespacho** del Centro Despachantes de Aduana y el de
+**Courier** de AFIP.
+
+**Ninguno de los dos aplica.** Los dos son de aduana —importación,
+exportación y envíos internacionales—, y TopGreen es un marketplace
+doméstico. No hay operación de comercio exterior en ningún requisito del
+contrato.
+
+**Lo que sí existe en ese terreno y es real:** la **Carta de Porte
+Electrónica**, obligatoria para el transporte automotor y ferroviario de
+granos a cualquier destino del país, con validez de cinco días para el
+automotor. Se tramita ante ARCA con clave fiscal.
+
+**Y aun así queda fuera de alcance**, por dos motivos:
+
+1. **No es una obligación de la plataforma.** La carta de porte la emite
+   quien traslada, con su propia clave fiscal. TopGreen es un directorio
+   que conecta: no organiza el flete ni figura en la operación.
+2. **Integrarla es un módulo entero.** Autenticación con clave fiscal
+   contra ARCA, servicios web, ciclo de vida del documento. No está en el
+   contrato, no está en el precio y no está en el plazo.
+
+Si la clienta lo pide, se cotiza aparte. Respuesta preparada en
+`DEMO.md`.
 
 ### Pendiente de definir
 

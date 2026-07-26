@@ -159,7 +159,7 @@ estadísticas.
 
 ---
 
-## Las tres preguntas que va a hacer, con la respuesta pensada
+## Las preguntas que va a hacer, con la respuesta pensada
 
 ### "¿Y los fletes? ¿Los transportistas?"
 
@@ -193,6 +193,26 @@ sacaste:
 
 Es probablemente lo más valioso que le podés decir en toda la reunión, y
 no tiene nada que ver con pantallas.
+
+### "¿Emite la carta de porte?" — la cuarta, y es probable
+
+Un cliente del agro la va a preguntar tarde o temprano, porque **la carta
+de porte electrónica es obligatoria** para mover granos por camión a
+cualquier destino del país.
+
+> "No, y a propósito. La carta de porte la emite quien transporta, con su
+> propia clave fiscal ante ARCA. La plataforma conecta al transportista
+> con el productor; no organiza el flete ni figura en la operación, así
+> que emitirla desde acá sería meternos en una responsabilidad que no es
+> nuestra ni suya.
+>
+> Si más adelante quieren que la plataforma integre con ARCA para
+> generarla, se puede, pero es un desarrollo aparte con su propio
+> presupuesto."
+
+**No la ofrezcas vos.** Es un módulo entero: autenticación con clave
+fiscal, servicios web de ARCA, ciclo de vida del documento. Si ella no
+pregunta, no lo menciones.
 
 ### "¿Cuándo está listo?"
 
