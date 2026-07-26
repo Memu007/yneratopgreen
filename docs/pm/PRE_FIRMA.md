@@ -109,6 +109,57 @@ excusa: como cuidado hacia ella.
 Eso te posiciona como alguien que le está cuidando el negocio, que es
 justo lo que necesita después de que la hayan estafado.
 
+## 2 ter. La suscripción es alcance nuevo, y es la palanca más fuerte que tenés
+
+Se definió que **el teléfono del comprador se ve sólo con suscripción
+paga**. Eso no estaba: la propuesta lista "suscripciones para vendedores"
+como fuera de alcance.
+
+**Se partió en dos a propósito**, y esa división es la que hay que llevar
+a la reunión:
+
+| Pieza | Estado | Por qué |
+|---|---|---|
+| **El candado** de acceso a contactos | **Se incluye sin cargo** | Son horas y es estructural. Después cuesta diez veces más |
+| **El sistema de suscripciones**: cobro, renovación, planes, vencimientos | **Se cotiza aparte** | Módulo entero |
+
+### Por qué esto es lo más importante de la reunión
+
+El candado es **el mecanismo de ingresos de ella**. Sin eso, la plataforma
+no tiene cómo cobrarle a nadie: el transportista entra, ve todos los
+teléfonos y no paga nunca.
+
+Eso te da dos cosas.
+
+**Primero, un regalo que se siente enorme y cuesta poco.** Decir *"esto lo
+incluimos sin cargo porque sin eso su negocio no cobra"* vale muchísimo
+más que la hora que lleva. Es el tipo de gesto que un cliente recién
+estafado no espera.
+
+**Segundo, y más importante: es la puerta natural a la conversación de
+participación.** Vos ya querés arreglar una parte de los ingresos de la
+web. El momento para plantearlo es exactamente este, cuando estás
+entregando el mecanismo que los genera:
+
+> "El candado que habilita el cobro lo incluimos. El sistema de
+> suscripciones completo —cobro automático, renovaciones, vencimientos— es
+> un desarrollo aparte. Y ahí tenemos una propuesta: en vez de cobrárselo,
+> lo hacemos a cambio de un porcentaje de lo que la plataforma recaude.
+> Nos alinea: si a usted le va bien, a nosotros también."
+
+Eso es mucho mejor que pedir un porcentaje en abstracto. Estás pidiendo
+participación **sobre el módulo que vos construís y que produce el
+ingreso**, no sobre el trabajo ya pactado.
+
+### Definiciones que faltan y son de ella
+
+- **¿Quién paga la suscripción?** Lo natural es el transportista, que es
+  quien recibe los contactos. ¿También los vendedores?
+- **¿Cuánto y cada cuánto?** No hace falta para construir el candado, sí
+  para cotizar el sistema.
+- **¿Hay período de prueba?** Si lo hay, el candado tiene que
+  contemplarlo, y es mejor saberlo ahora.
+
 ## 3. Aprovechar la ventaja
 
 - El **segundo hito de cobro** se paga contra demostrar catálogo,
