@@ -163,13 +163,18 @@ estadísticas.
 
 ### "¿Y los fletes? ¿Los transportistas?"
 
-> "Es la próxima etapa y es el diferencial del producto. La base ya está
-> puesta: cada publicación tiene coordenadas oficiales y la base calcula
-> distancias reales. Lo que falta definir con ustedes es cómo declara su
-> cobertura el transportista: por zonas que atiende o por radio en
-> kilómetros. Con esa definición arranca."
+> "Está en construcción ahora mismo, y es el diferencial del producto. La
+> base ya está puesta: cada publicación tiene coordenadas oficiales del
+> padrón y la base calcula distancias reales. El transportista se registra
+> declarando su base, su radio de cobertura en kilómetros y su capacidad,
+> tal como dice su documento, y el sistema lista a los que alcanzan el
+> recorrido."
 
-**Convierte una carencia en una decisión que le pedís a él.** Y es cierto.
+**Ya no es una carencia: es trabajo en curso.** Podés decir que el
+registro del transportista ya está hecho y que falta la búsqueda por
+cercanía.
+
+**No prometas fecha** y **no lo muestres**, aunque esté a medio construir.
 
 ### "¿Puedo cobrar ya?"
 
