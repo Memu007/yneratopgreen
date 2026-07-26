@@ -1,131 +1,191 @@
 # Dev → PM
 
-## Estado
+## Debate: hoy no podemos afirmar que la plataforma nunca toca fondos
 
-**Tarea 4 terminada, verificada y subida.**
+La afirmación es correcta como decisión de producto, pero **no describe una
+propiedad actual del código**.
 
-Commits:
+Hoy no se mueve dinero porque las credenciales están vacías. Eso es un apagado
+por configuración, no una desactivación por diseño. El frontend llega a
+Mercado Pago y al OAuth; los routers están montados; y la propia interfaz
+explica qué variables completar para reactivarlos.
 
-- `409e8b7` — implementación del pago por transferencia bancaria.
-- `4e9b4fc` — recorrido Playwright completo desde el checkout.
+Si alguien configura esas variables:
 
-No cambié `/orders/checkout`, el flujo ni la integración de Mercado Pago.
-La transferencia usa una ruta separada y reutiliza el almacenamiento que ya
-existía.
+- con vendedor vinculado, se crea una preferencia con el token del vendedor y
+  `marketplace_fee` para TopGreen;
+- sin vendedor vinculado, el código crea la preferencia con el token de
+  TopGreen y documenta que el 100% del pago va a TopGreen para liquidación
+  manual.
 
-## Recorrido implementado
+Por lo tanto, **la frase contractual sería falsa apenas se habilite la
+integración heredada**. No hago una conclusión jurídica sobre PSP; mi
+conclusión es técnica sobre el flujo real de fondos que implementa el código.
 
-1. El vendedor puede guardar CBU y alias bancario en su perfil. Ambos son
-   opcionales; sin los dos, la API rechaza ofrecer transferencia.
-2. El comprador elige `Transferencia bancaria` en el checkout y ve los datos
-   del vendedor, titular y monto.
-3. Se crea una orden por vendedor con estado
-   `awaiting_transfer_receipt`. Esto conserva correctamente los datos si el
-   carrito tiene publicaciones de más de un vendedor.
-4. El comprador adjunta JPG, PNG, WEBP o PDF, hasta 5 MB. El fallo devuelve un
-   motivo visible y deja la orden esperando comprobante.
-5. El vendedor ve el comprobante en `Mis ventas` y puede aprobarlo o
-   rechazarlo. El rechazo exige motivo.
-6. La aprobación pasa la orden a `paid`; el rechazo, a `rejected`, conservando
-   el motivo y el comprobante.
-7. La API compara siempre `order.seller_id` con el usuario autenticado antes
-   de permitir la decisión.
+No modifiqué ni desactivé nada en esta vuelta.
 
-## Esquema y migración
+## 1. Caminos alcanzables desde la interfaz
 
-Migración: `20260726_0024_cfff8c361c11_agregar_transferencias_bancarias.py`.
+### Checkout de Mercado Pago: sí
 
-Cambios dentro de lo autorizado:
+`CheckoutModal.tsx`:
 
-- `users.cbu`
-- `users.alias_bancario`
-- `orders.transfer_receipt_url`
-- estados agregados al enum: `AWAITING_TRANSFER_RECEIPT` y
-  `TRANSFER_RECEIPT_SUBMITTED`
+1. ofrece Mercado Pago y lo deja seleccionado por defecto;
+2. crea una orden por `/orders/checkout`;
+3. llama a `/payments/create-preference`;
+4. redirige al `init_point` devuelto.
 
-No renombré ni eliminé estados existentes.
+Sin credenciales, el último llamado termina en `503`, pero la orden ya quedó
+creada. Con credenciales, el camino continúa.
 
-La migración se generó desde los modelos. Se aplicó desde una base vacía
-dentro del smoke y después ejecuté:
+### OAuth de vendedores: sí
 
-```text
-$ alembic check
-No new upgrade operations detected.
-```
+`UserDashboard.tsx`:
 
-## Evidencia de aceptación
+- consulta `/mp-oauth/status` al montar;
+- muestra `Vincular MercadoPago`;
+- el botón llama `/mp-oauth/auth-url`;
+- el callback procesa `mp_linked=success`;
+- también hay botón para desvincular.
 
-Los casos nuevos son:
+Hay además un detalle: `/mp-oauth/status` devuelve `200` aunque la aplicación
+no esté configurada. Entonces el frontend interpreta que Mercado Pago está
+disponible pero la cuenta no está vinculada, y muestra el botón activo. Recién
+al pulsarlo, `/auth-url` responde `503`.
 
-```text
-PASS 13 Transferencia exige CBU o alias del vendedor
-  HTTP 400 con motivo visible; no se creó ninguna orden
+### Sincronización posterior: sí
 
-PASS 14 Datos bancarios correctos y orden esperando comprobante
-  HTTP 200; CBU devuelto por API igual al consultado en SQL
+`PaymentResultPage.tsx` llama a
+`/payments/sync-status/{order_id}` cuando se abre la pantalla de pago exitoso.
 
-PASS 15 Comprobante fallido visible y comprobante válido asociado
-  archivo inválido HTTP 400 sin cambiar estado ni referencia;
-  archivo válido HTTP 200 y URL de API igual a SQL
+## 2. Endpoints montados
 
-PASS 16 Sólo el vendedor correcto valida el comprobante
-  vendedor ajeno HTTP 403; vendedor correcto dejó API=paid y SQL=PAID
-
-PASS 17 Rechazo de comprobante guarda el motivo
-  API=rejected, SQL=REJECTED y motivo persistido
-
-PASS 18 Transferencia completa desde la interfaz
-  Chromium real: catálogo → carrito → checkout → transferencia → comprobante;
-  CBU y alias de SQL visibles; orden y archivo verificados en base
-```
-
-El caso 18 no simula la UI con llamadas directas: abre Chromium headless,
-hace clic, completa envío, selecciona transferencia y sube el archivo desde
-el formulario.
-
-## Smoke final
-
-Ejecutado desde cero después del último cambio:
+El OpenAPI local muestra **13 rutas activas**:
 
 ```text
-Resumen smoke tests
--------------------
-PASS 01 Salud del servicio
-PASS 02 Registro de usuario
-PASS 03 Ingreso y obtención del token
-PASS 04 Catálogo con categoría y precio
-PASS 05 Catálogo con provincia y localidad
-PASS 06 Detalle de producto
-PASS 07 Agregar al carrito y verlo
-PASS 08 Crear orden desde el carrito
-PASS 09 Publicar producto como vendedor desde la interfaz
-PASS 10 Fallo de imagen visible sin perder la publicación
-PASS 11 Ver mis compras y mis ventas
-PASS 12 Administración: usuarios, productos y órdenes
-PASS 13 Transferencia exige CBU o alias del vendedor
-PASS 14 Datos bancarios correctos y orden esperando comprobante
-PASS 15 Comprobante fallido visible y comprobante válido asociado
-PASS 16 Sólo el vendedor correcto valida el comprobante
-PASS 17 Rechazo de comprobante guarda el motivo
-PASS 18 Transferencia completa desde la interfaz
--------------------
-18/18 pasaron; 0 fallaron
+/api/payments/create-preference [POST]
+/api/payments/webhook [POST]
+/api/payments/order/{order_id}/status [GET]
+/api/payments/simulate-payment/{order_id} [POST]
+/api/payments/public-key [GET]
+/api/payments/sync-status/{order_id} [POST]
+/api/payments/refund/{order_id} [POST]
+/api/mp-oauth/manual-link [POST]
+/api/mp-oauth/auth-url [GET]
+/api/mp-oauth/callback [GET]
+/api/mp-oauth/status [GET]
+/api/mp-oauth/unlink [POST]
+/api/mp-oauth/refresh-token [POST]
 ```
 
-El smoke también compiló el frontend con `tsc && vite build` y aplicó todas
-las migraciones desde cero.
+Verificación HTTP de sólo lectura contra el backend local:
 
-Hubo una corrida previa `17/18`: el caso 18 usó inicialmente `form`, que era
-ambiguo entre la búsqueda y el checkout. Corregí el selector a
-`form:has(h2)` y repetí la suite completa; la salida final de arriba es la
-segunda corrida.
+```text
+GET /mp-oauth/status   -> 200, is_linked=false
+GET /mp-oauth/auth-url -> 503, integración no configurada
+GET /payments/public-key -> 200, configured=false
+```
 
-## Decisiones no inventadas
+No ejecuté `create-preference`, `manual-link`, reembolsos ni ningún endpoint
+que pudiera contactar Mercado Pago o mutar una orden.
 
-- No implementé conciliación bancaria.
-- No definí qué ocurre con una transferencia insuficiente.
-- No agregué avisos por correo.
-- No agregué dependencias.
-- No toqué Mercado Pago.
-- No usé ni levanté infraestructura externa: todo se verificó con Docker,
-  PostgreSQL, Vite y Playwright locales.
+## Hallazgo crítico adicional: el simulador está activo
+
+`POST /payments/simulate-payment/{order_id}` no comprueba entorno ni
+credenciales de Mercado Pago.
+
+Un comprador autenticado puede llamar el endpoint sobre una orden propia en
+estado `PLACED` y pasarla a `PAID` sin pagar. También crea un registro de pago
+simulado e incrementa contadores. No descuenta stock en el camino aprobado, de
+modo que además deja datos inconsistentes.
+
+No hay llamada desde el frontend, pero esconderlo no lo protege: está montado
+y figura en OpenAPI.
+
+`manual-link` también está montado y permite guardar un access token de un
+usuario de Mercado Pago sin requerir que la aplicación marketplace esté
+configurada. `refund` puede contactar Mercado Pago usando el token del
+vendedor. Ambos son argumentos adicionales para no tratar el problema como
+sólo visual.
+
+## 3. ¿Alcanza con ocultarlos?
+
+**No.** Ocultar botones sólo cambia la interfaz; cualquier cliente HTTP puede
+llamar las rutas.
+
+Mi recomendación, si la definición contractual es permanente, es:
+
+1. quitar Mercado Pago como opción del checkout y quitar la sección OAuth del
+   panel;
+2. dejar de montar en el backend los routers `payments` y `mp_oauth`;
+3. conservar el código en Git mientras se decide si se elimina, pero hacerlo
+   inalcanzable en runtime;
+4. agregar un smoke que confirme que las rutas financieras ya no están
+   expuestas.
+
+Un feature flag apagado por defecto sería mejor que las credenciales vacías,
+pero sigue permitiendo convertir en falsa la afirmación contractual con una
+configuración. Si “TopGreen nunca toca fondos” es una condición del producto,
+prefiero routers no montados.
+
+## CBU y alias en nuestra base
+
+Me parece razonable guardarlos para este contrato: son las instrucciones que
+el comprador necesita para transferir y no son una credencial con la que pueda
+debitar la cuenta. Igual los trataría como dato personal financiero:
+
+- acceso sólo del titular y de compradores con una operación;
+- nunca en logs;
+- backups y base cifrados por infraestructura;
+- sin copiarlos a analítica ni notificaciones;
+- borrado cuando el vendedor cierre su cuenta, sujeto a la política legal que
+  defina la clienta.
+
+No agregaría cifrado casero a nivel aplicación ahora: sin una política de
+claves sería seguridad aparente y complicaría búsquedas, backups y rotación.
+
+Sí encontré una inconsistencia: la orden **no guarda una foto de los datos
+bancarios usados al crearla**. `/orders/my` lee el CBU y alias actuales del
+perfil. Si el vendedor los cambia con una orden pendiente, el comprador pasa a
+ver otros datos y no queda registro de cuáles se mostraron en checkout.
+
+La solución limpia sería guardar CBU, alias y titular como snapshot de la
+orden. Eso requiere ampliar el esquema y no lo hago sin aprobación.
+
+## El comprobante
+
+Coincido: el archivo no prueba el pago.
+
+Podemos validar extensión, tamaño y que el almacenamiento haya funcionado.
+OCR, QR, importe escrito, nombre del banco o metadatos pueden ayudar a leerlo,
+pero todo eso también se falsifica. Sin consultar al banco o a un proveedor de
+pago no existe validación confiable de acreditación.
+
+La decisión correcta es la actual: el vendedor verifica su cuenta bancaria.
+El texto de la Tarea 5 bis es necesario.
+
+## Transferencia insuficiente
+
+No rompe una restricción de base ni descuenta stock antes de tiempo. Pero hay
+dos estados de negocio que el modelo actual no puede representar:
+
+1. Si el vendedor aprueba un pago parcial, la orden queda `PAID` por el total.
+   No guardamos importe recibido, saldo ni aprobación parcial.
+2. Si lo rechaza, la orden queda terminalmente `REJECTED`. El comprador no
+   puede adjuntar un segundo comprobante ni completar el saldo sobre la misma
+   orden; además, su carrito ya fue convertido.
+
+No inventaría una solución. La clienta tiene que elegir entre:
+
+- rechazo y creación de una orden nueva;
+- permitir reintento/comprobante adicional;
+- registrar pago parcial y saldo pendiente.
+
+Hasta esa definición, el vendedor no debería aprobar si el importe acreditado
+no coincide con el total mostrado.
+
+## Estado de las tareas
+
+No empecé Tarea 5 bis ni Tarea 5. La discusión figura antes de las tareas y
+preferí devolver primero el estado real, especialmente por el simulador de
+pago alcanzable.
