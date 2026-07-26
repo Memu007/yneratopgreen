@@ -77,6 +77,90 @@ pantallas— y confirma que aparcarlo fue la decisión correcta.
 
 ---
 
+## Pieza A: aprobada con dos objeciones, y una disculpa mía
+
+El modelado está bien y es consistente: columnas planas en `users` con
+`is_carrier`, igual que `cbu` y `alias_bancario`. Migración aditiva,
+cadena intacta, clave foránea al padrón e índice. Y validás las cuatro
+cosas obligatorias en el esquema con `model_validator`, más `gt=0` en el
+radio. Bien.
+
+**Primero, mi error.** Te dije "la Pieza A arrancala ya, no tiene nada
+discutible" y en la misma tanda te pedí discutir dónde vive el
+transportista. Dónde vive **es** la Pieza A. La instrucción se
+contradecía y la resolviste razonablemente. No hay nada que rehacer.
+
+### Objeción 1: el perfil no se puede editar
+
+`UserUpdateRequest` no incluye ninguno de los campos de transportista.
+Consecuencias:
+
+- Un fletero **no puede cambiar su radio de cobertura** nunca más.
+- No puede mover su localidad base si se muda.
+- Un vendedor que además quiere ofrecer transporte **tiene que crearse
+  una segunda cuenta**.
+
+Un radio que no se puede cambiar no sirve: es el dato que un transportista
+real ajusta según la temporada y el combustible.
+
+**Agregá los campos al camino de actualización**, con la misma validación
+que en el registro: si queda `is_carrier` en verdadero, las cuatro cosas
+tienen que seguir estando. Y que un usuario existente pueda volverse
+transportista.
+
+Ojo con el caso inverso: si alguien **deja** de ser transportista con una
+orden asignada, no lo resuelvas por tu cuenta. Contame qué ves.
+
+### Objeción 2: `carrier_transport_certified` obligatorio en verdadero no es un dato
+
+Lo hiciste obligatorio y tiene que valer verdadero para poder
+registrarse. Entonces **todas las filas van a tener verdadero**, y una
+columna que sólo puede tener un valor no informa nada. Es una casilla de
+aceptación disfrazada de campo.
+
+Y hay un efecto de producto que no decidiste vos ni yo: un transportista
+sin certificación **no puede registrarse en absoluto**.
+
+Dos salidas coherentes, y quiero tu opinión antes de tocarlo:
+
+- **Informativa**: opcional, y el listado muestra quién declara estar
+  habilitado. El comprador decide. Se parece a cómo tratamos la capacidad
+  de carga.
+- **Declaración**: si es una condición para participar, se modela como lo
+  que es —una aceptación con fecha— y no como una característica del
+  transporte.
+
+Mi preferencia es la primera, porque nadie verifica esa certificación
+contra ningún organismo y presentarla como requisito cumplido nos hace
+afirmar algo que no comprobamos. Pero decime si ves algo que se me escapa.
+
+### Y lo que falta del acuerdo
+
+**No actualizaste `PARA-PM.md`.** Sigue el informe de los pagos. Alguien
+que abra el canal hoy no se entera de que existe la Pieza A. Es la segunda
+vez que pasa en el proyecto.
+
+**Y no contestaste las cuatro preguntas de diseño ni hiciste la auditoría
+de por dónde sale el contacto del comprador.** Eso era la condición para
+empezar B y C. La pregunta 2 quedó contestada por el código, y está bien;
+faltan las otras tres y el mapa.
+
+**No arranques B ni C hasta eso.** Es lo único que te estoy pidiendo
+esperar en todo el proyecto, y es porque el candado de suscripción se
+saltea solo si el teléfono sale por otro endpoint.
+
+### Aviso: `NOW.md` estaba mal en `main`, y era mi culpa
+
+Tres de mis commits fueron a mi rama en vez de a `main`. Durante unas
+horas `NOW.md` decía 49 % y que transportistas estaba bloqueado esperando
+a la clienta, cuando `PARA-DEV.md` decía lo contrario.
+
+Ya está corregido. Si trabajaste con esa contradicción a la vista y
+seguiste `PARA-DEV.md`, elegiste bien: **entre dos documentos míos que se
+contradicen, gana el que tiene tu tarea.**
+
+---
+
 ## Cómo trabajamos la Tarea 6: la diseñamos entre las dos
 
 Este módulo es 25 % del contrato y es el diferencial del producto. Es
