@@ -141,15 +141,65 @@ decide. El contrato dice "que coincidan con los requerimientos del
 producto", pero no hay campo de peso en las publicaciones y no lo vamos a
 agregar.
 
-**Pieza C — elegirlo e incluirlo.**
+**Pieza C — elegirlo, incluirlo, y el candado de contacto.**
 
 El contrato da dos caminos y hay que ofrecer los dos: *"seleccionar el
 transportista e incluirlo en la transacción"*, o *"coordinar el envío
 directo con los datos de contacto provistos"*.
 
 **Los datos de contacto se muestran recién después de seleccionarlo**, no
-en el listado. Es la opción conservadora: si la clienta prefiere lo
-contrario, se cambia en una línea. Al revés no.
+en el listado.
+
+### El candado por suscripción
+
+Definición nueva del dueño del proyecto: **el teléfono del comprador se ve
+sólo si hay suscripción paga.** Es el modelo de negocio de la clienta —
+el transportista paga para recibir contactos.
+
+**Construí el candado, no el sistema de suscripciones.** La diferencia es
+todo:
+
+**Lo que sí:**
+
+- Un campo en el usuario que indique si su suscripción está activa, con
+  fecha de vencimiento anulable.
+- Que el administrador lo pueda activar y desactivar a mano, igual que el
+  vendedor valida un comprobante de transferencia. Ya tenemos ese patrón.
+- **La verificación en el backend**, en el endpoint que devuelve datos de
+  contacto. Sin suscripción activa, la respuesta **no trae el teléfono**.
+  No lo mandes y lo tapes en la interfaz: no lo mandes.
+
+**Lo que no, y es importante que no lo hagas:**
+
+- Nada de cobro, renovación automática, avisos de vencimiento, planes,
+  niveles ni prorrateo.
+- Nada de integrar un medio de pago para la suscripción.
+
+Eso es un módulo entero, no está en el contrato y se cotiza aparte. El
+candado son horas; el sistema son semanas.
+
+### Por qué el candado va ahora y no después
+
+Es el mismo argumento que usamos con la privacidad de los datos de
+contacto: **quién puede ver qué es la forma del módulo, no una capa que se
+agrega arriba.** Si los endpoints se construyen devolviendo el teléfono
+siempre, ponerle el candado después es tocar todos.
+
+Definido de entrada es un `if` en un lugar.
+
+### Criterio de aceptación del candado
+
+1. Sin suscripción activa, la respuesta de la API **no contiene** el
+   teléfono. Verificado contra el JSON, no contra la pantalla.
+2. Con suscripción activa, sí.
+3. Con suscripción **vencida por fecha**, no. Ese es el caso que se
+   olvida.
+4. La interfaz explica por qué no lo ve, en vez de mostrar un campo vacío.
+5. Casos en la suite para los tres estados: sin suscripción, activa y
+   vencida.
+
+El punto 3 es el que más me importa. Una suscripción que no vence no es
+una suscripción.
 
 ### Criterios de aceptación
 

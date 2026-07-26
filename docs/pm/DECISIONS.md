@@ -5,6 +5,36 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-07-26 — El candado de suscripción entra; el cobro de suscripción, no
+
+Definición del dueño del proyecto: **el teléfono del comprador se ve sólo
+con suscripción paga.** Es el mecanismo de ingresos de la clienta — el
+transportista paga por acceder a contactos.
+
+Suscripciones estaba listado como fuera de alcance. Se separa en dos:
+
+- **Dentro: el candado.** Un estado de suscripción en el usuario, activado
+  a mano por el administrador, y la verificación en el backend. El
+  endpoint no devuelve el teléfono sin suscripción activa. Incluye el caso
+  de suscripción vencida por fecha.
+- **Fuera: el sistema.** Cobro, renovación, planes, niveles, avisos de
+  vencimiento. Módulo entero, se cotiza aparte.
+
+Motivo de incluir el candado ahora, aunque no esté contratado: **el
+control de acceso es la forma de los endpoints, no una capa posterior.**
+Construirlos devolviendo el teléfono siempre obliga a tocarlos todos
+después. Definido de entrada es una condición en un lugar.
+
+Es el mismo criterio que se aplicó a la privacidad de los datos de
+contacto y a la revisión de seguridad: la auditoría se posterga, las
+decisiones estructurales no.
+
+**Queda por confirmar con la clienta quién paga** —lo natural es el
+transportista— y si los vendedores también. El mecanismo es idéntico en
+cualquier caso, así que no bloquea la construcción.
+
+---
+
 ## 2026-07-26 — La plataforma no toca el dinero, y es a propósito
 
 En el pago por transferencia, los fondos van **directo de la cuenta del
