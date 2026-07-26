@@ -115,6 +115,33 @@ async function apiRequest(path, { method = 'GET', token, body } = {}) {
   return { status: response.status, data };
 }
 
+async function apiUpload(path, { token, filename, content, contentType }) {
+  const form = new FormData();
+  form.append('file', new Blob([content], { type: contentType }), filename);
+  const response = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  const rawBody = await response.text();
+  const data = rawBody ? JSON.parse(rawBody) : null;
+  if (!response.ok) {
+    throw new Error(`POST ${path} respondió HTTP ${response.status}: ${data?.detail || rawBody}`);
+  }
+  return { status: response.status, data };
+}
+
+async function expectApiError(expectedStatus, callback) {
+  try {
+    await callback();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    assert(message.includes(`HTTP ${expectedStatus}`), `error inesperado: ${message}`);
+    return message;
+  }
+  throw new Error(`la API no respondió HTTP ${expectedStatus}`);
+}
+
 async function runCase(number, name, callback) {
   const startedAt = Date.now();
 
@@ -600,6 +627,183 @@ await runCase(12, 'Administración: usuarios, productos y órdenes', async () =>
     `productos HTTP ${products.status}, API=SQL=${sqlProducts}`,
     `órdenes HTTP ${orders.status}, API=SQL=${sqlOrders}`,
   ].join('; ');
+});
+
+await runCase(13, 'Transferencia exige CBU o alias del vendedor', async () => {
+  await apiRequest('/cart/items', {
+    method: 'POST',
+    token: state.buyerToken,
+    body: { product_id: state.product.id, quantity: 1 },
+  });
+  const error = await expectApiError(400, () =>
+    apiRequest('/orders/transfer-options', { token: state.buyerToken }),
+  );
+  assert(/no configuró CBU ni alias/i.test(error), `motivo inesperado: ${error}`);
+  return 'HTTP 400 con motivo visible; no se creó ninguna orden';
+});
+
+await runCase(14, 'Datos bancarios correctos y orden esperando comprobante', async () => {
+  const bankData = {
+    cbu: '2850590940090418135201',
+    alias_bancario: 'topgreen.smoke',
+  };
+  await apiRequest('/auth/me', {
+    method: 'PATCH',
+    token: state.sellerToken,
+    body: bankData,
+  });
+  const options = await apiRequest('/orders/transfer-options', {
+    token: state.buyerToken,
+  });
+  const [databaseBank] = queryRows(`
+    SELECT cbu, alias_bancario
+    FROM users
+    WHERE id = ${sqlLiteral(state.sellerId)}
+  `);
+  const sellerOption = options.data.find((option) => option.seller_id === state.sellerId);
+  assert(sellerOption, 'la API no devolvió el vendedor del carrito');
+  assert(sellerOption.cbu === databaseBank[0], 'el CBU de API no coincide con SQL');
+  assert(
+    sellerOption.alias_bancario === databaseBank[1],
+    'el alias de API no coincide con SQL',
+  );
+
+  const checkout = await apiRequest('/orders/checkout/transfer', {
+    method: 'POST',
+    token: state.buyerToken,
+    body: {
+      shipping_address: 'Av. Transferencia 123',
+      shipping_city: 'Rosario',
+      shipping_province: 'Santa Fe',
+      shipping_postal_code: '2000',
+      notes: 'Orden smoke por transferencia',
+    },
+  });
+  const [order] = checkout.data.orders;
+  assert(order?.status === 'awaiting_transfer_receipt', `estado inesperado: ${order?.status}`);
+  assert(order.cbu === databaseBank[0], 'la orden no devolvió el CBU correcto');
+  state.transferOrderId = order.order_id;
+  return `HTTP ${checkout.status}, order_id=${order.order_id}, CBU API=SQL`;
+});
+
+await runCase(15, 'Comprobante fallido visible y comprobante válido asociado', async () => {
+  const failure = await expectApiError(400, () =>
+    apiUpload(`/orders/${state.transferOrderId}/transfer-receipt`, {
+      token: state.buyerToken,
+      filename: 'comprobante.txt',
+      content: 'archivo inválido',
+      contentType: 'text/plain',
+    }),
+  );
+  assert(/Formato de archivo no permitido/i.test(failure), `motivo inesperado: ${failure}`);
+
+  const statusAfterFailure = querySql(`
+    SELECT status::text
+    FROM orders
+    WHERE id = ${sqlLiteral(state.transferOrderId)}
+  `);
+  const receiptsAfterFailure = queryCount(`
+    SELECT COUNT(*)
+    FROM orders
+    WHERE id = ${sqlLiteral(state.transferOrderId)}
+      AND transfer_receipt_url IS NOT NULL
+  `);
+  assert(statusAfterFailure === 'AWAITING_TRANSFER_RECEIPT', `estado tras fallo: ${statusAfterFailure}`);
+  assert(receiptsAfterFailure === 0, 'el fallo dejó un comprobante asociado');
+
+  const uploaded = await apiUpload(`/orders/${state.transferOrderId}/transfer-receipt`, {
+    token: state.buyerToken,
+    filename: 'comprobante.png',
+    content: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    ),
+    contentType: 'image/png',
+  });
+  const [databaseReceipt] = queryRows(`
+    SELECT status::text, transfer_receipt_url
+    FROM orders
+    WHERE id = ${sqlLiteral(state.transferOrderId)}
+  `);
+  assert(databaseReceipt[0] === 'TRANSFER_RECEIPT_SUBMITTED', `estado: ${databaseReceipt[0]}`);
+  assert(databaseReceipt[1] === uploaded.data.transfer_receipt_url, 'URL API y SQL no coinciden');
+  const stored = await fetch(`${new URL(API_URL).origin}${databaseReceipt[1]}`);
+  assert(stored.status === 200, `el archivo guardado respondió HTTP ${stored.status}`);
+  return `fallo HTTP 400 sin cambiar orden; archivo HTTP 200; URL API=SQL`;
+});
+
+await runCase(16, 'Sólo el vendedor correcto valida el comprobante', async () => {
+  const otherSeller = await apiRequest('/auth/register', {
+    method: 'POST',
+    body: {
+      email: 'otro.vendedor.smoke@example.com',
+      password: 'smoke123',
+      full_name: 'Otro Vendedor Smoke',
+      role: 'user',
+    },
+  });
+  await expectApiError(403, () =>
+    apiRequest(`/orders/${state.transferOrderId}/transfer-receipt`, {
+      method: 'PATCH',
+      token: otherSeller.data.access_token,
+      body: { decision: 'approve' },
+    }),
+  );
+  const approved = await apiRequest(`/orders/${state.transferOrderId}/transfer-receipt`, {
+    method: 'PATCH',
+    token: state.sellerToken,
+    body: { decision: 'approve' },
+  });
+  assert(approved.data.status === 'paid', `estado tras aprobar: ${approved.data.status}`);
+  const databaseStatus = querySql(`
+    SELECT status::text FROM orders WHERE id = ${sqlLiteral(state.transferOrderId)}
+  `);
+  assert(databaseStatus === 'PAID', `estado SQL tras aprobar: ${databaseStatus}`);
+  state.otherSellerToken = otherSeller.data.access_token;
+  return 'otro vendedor HTTP 403; vendedor correcto dejó API=paid y SQL=PAID';
+});
+
+await runCase(17, 'Rechazo de comprobante guarda el motivo', async () => {
+  await apiRequest('/cart/items', {
+    method: 'POST',
+    token: state.buyerToken,
+    body: { product_id: state.product.id, quantity: 1 },
+  });
+  const checkout = await apiRequest('/orders/checkout/transfer', {
+    method: 'POST',
+    token: state.buyerToken,
+    body: {
+      shipping_address: 'Av. Rechazo 456',
+      shipping_city: 'Rosario',
+      shipping_province: 'Santa Fe',
+      shipping_postal_code: '2000',
+    },
+  });
+  const rejectedOrder = checkout.data.orders[0];
+  await apiUpload(`/orders/${rejectedOrder.order_id}/transfer-receipt`, {
+    token: state.buyerToken,
+    filename: 'comprobante-rechazo.png',
+    content: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    ),
+    contentType: 'image/png',
+  });
+  const reason = 'El monto del comprobante no coincide';
+  const rejected = await apiRequest(`/orders/${rejectedOrder.order_id}/transfer-receipt`, {
+    method: 'PATCH',
+    token: state.sellerToken,
+    body: { decision: 'reject', reason },
+  });
+  assert(rejected.data.status === 'rejected', `estado API: ${rejected.data.status}`);
+  const [databaseRejection] = queryRows(`
+    SELECT status::text, cancellation_reason
+    FROM orders
+    WHERE id = ${sqlLiteral(rejectedOrder.order_id)}
+  `);
+  assert(databaseRejection[0] === 'REJECTED', `estado SQL: ${databaseRejection[0]}`);
+  assert(databaseRejection[1] === reason, 'el motivo API no quedó guardado');
+  return `API=rejected, SQL=REJECTED, motivo guardado="${reason}"`;
 });
 
 const passed = results.filter((result) => result.passed).length;

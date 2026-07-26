@@ -61,6 +61,8 @@ class UserResponse(BaseModel):
     avatar_url: Optional[str]
     bio: Optional[str]
     location: Optional[str]
+    cbu: Optional[str]
+    alias_bancario: Optional[str]
     rating_average: float = 5.0
     rating_count: int = 0
     sales_count: int = 0
@@ -107,6 +109,8 @@ class UserUpdateRequest(BaseModel):
     bio: Optional[str] = Field(None, max_length=500)
     location: Optional[str] = Field(None, max_length=255)
     avatar_url: Optional[str] = Field(None, max_length=500)
+    cbu: Optional[str] = Field(None, max_length=64)
+    alias_bancario: Optional[str] = Field(None, max_length=100)
 
 
 class ChangePasswordRequest(BaseModel):

@@ -345,6 +345,12 @@ def update_current_user(
     
     if update_data.avatar_url is not None:
         current_user.avatar_url = update_data.avatar_url
+
+    if update_data.cbu is not None:
+        current_user.cbu = update_data.cbu.strip() or None
+
+    if update_data.alias_bancario is not None:
+        current_user.alias_bancario = update_data.alias_bancario.strip() or None
     
     current_user.updated_at = datetime.utcnow()
     

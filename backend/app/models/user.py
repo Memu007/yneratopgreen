@@ -36,6 +36,8 @@ class User(Base):
     avatar_url = Column(String(500), nullable=True)
     bio = Column(String(500), nullable=True)
     location = Column(String(255), nullable=True)
+    cbu = Column(String(64), nullable=True)
+    alias_bancario = Column(String(100), nullable=True)
     
     # Reputación y estadísticas
     rating_average = Column(Numeric(3, 2), default=0.0, nullable=False)  # Promedio de calificaciones (0 = sin calificaciones)

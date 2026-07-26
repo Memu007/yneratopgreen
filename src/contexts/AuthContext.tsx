@@ -27,6 +27,8 @@ interface BackendUser {
   whatsapp?: string;
   location?: string;
   bio?: string;
+  cbu?: string;
+  alias_bancario?: string;
   rating_average?: number;
   rating_count?: number;
   sales_count?: number;
@@ -71,6 +73,8 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
     avatarUrl: backendUser.avatar_url,
     location: backendUser.location,
     bio: backendUser.bio,
+    cbu: backendUser.cbu,
+    bankAlias: backendUser.alias_bancario,
     ratingAverage: backendUser.rating_average ?? 0,
     ratingCount: backendUser.rating_count ?? 0,
     salesCount: backendUser.sales_count ?? 0,
@@ -191,7 +195,9 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
         phone: userData.phone,
         whatsapp: userData.whatsapp,
         location: userData.location,
-        bio: userData.bio,
+      bio: userData.bio,
+      cbu: userData.cbu,
+      alias_bancario: userData.bankAlias,
       });
 
       setUser(mapBackendUserToFrontend(response));
