@@ -35,6 +35,29 @@ que **yo verifiqué contra el código**, no lo que dijo nadie.
 
 ---
 
+## Cambio de prioridad: la vista en celular se aparca
+
+**Terminá la vuelta que estás haciendo, pero cambia qué entregás.**
+
+**No arregles nada de celular.** Sólo entregá el inventario: las capturas,
+la lista de lo que está roto, el inventario de consola y el de red. La
+información sirve; las correcciones son gasto ahora.
+
+Motivo: el mismo que aplicamos a la seguridad. Faltan por construir
+transportistas y el pago por transferencia, que traen pantallas nuevas.
+Ajustar hoy lo que va a cambiar es pagar dos veces por lo mismo.
+
+**Las correcciones de celular se hacen al final**, junto con la revisión
+de seguridad y antes de desplegar. Están en `NOW.md`.
+
+Si ya arreglaste algo en esta vuelta, dejalo, no lo revirtás. Pero no
+sigas.
+
+**Lo que sigue después es la Tarea 4, pago por transferencia bancaria.**
+Está más abajo, es contractual y no depende de nadie.
+
+---
+
 ## Desbloqueo de la Tarea 2: usá Playwright, no el navegador integrado
 
 **Que no eludieras el bloqueo fue lo correcto, y lo convierto en regla
@@ -401,13 +424,17 @@ Recorrido completo en cada tamaño:
 En cada uno mirá: desbordes horizontales, texto cortado, botones
 superpuestos o demasiado chicos para el dedo, y elementos que tapen otros.
 
-### Qué arreglar
+### Qué arreglar: nada. Anulado
 
-**Sólo lo que esté roto o inutilizable.** No rediseñes nada, no cambies
-colores ni espaciados por gusto. El criterio es: ¿un usuario puede
-completar el recorrido en un teléfono sin frustrarse?
+Esta sección quedó sin efecto por el cambio de prioridad de arriba.
 
-Si algo está feo pero funciona, anotalo y no lo toques.
+**No corrijas nada de celular.** Ni lo roto. Documentalo y seguí. Las
+correcciones se hacen al final, cuando estén todas las pantallas que
+faltan y se toquen una sola vez.
+
+Lo que sí quiero de esta vuelta: el inventario completo, con el detalle
+de qué está roto y cuán roto. Con eso decido cuánto trabajo es, y si algo
+resulta tan grave que el jueves se nota, lo reevalúo yo.
 
 ### Las tres cosas que adopto del material de skills
 
@@ -448,26 +475,21 @@ un pozo sin fondo a tres días de la firma.
 
 Si notás algo groseramente lento, decilo en una línea y seguí.
 
-### Criterio de aceptación
+### Criterio de aceptación, recortado
 
-1. El recorrido completo se puede hacer en 390×844 sin quedarse trabado.
-2. **Ningún desborde horizontal** en ninguna pantalla.
-3. Los filtros de provincia, localidad y categoría se pueden usar con el
-   dedo.
-4. Capturas de las siete pantallas en el tamaño más chico, más los pares
-   antes/después de cada arreglo.
-5. **Inventario de consola**: errores y advertencias por pantalla. Los
-   errores del recorrido de la demostración, resueltos.
-6. **Inventario de red**: cualquier `4xx` o `5xx` que la interfaz no
-   avise.
-7. Lista de lo que estaba roto, lo que arreglaste y lo que dejaste feo a
-   propósito.
-8. `npm run smoke` sigue en verde.
+Es un relevamiento, no un arreglo. Alcanza con:
 
-### Si encontrás mucho roto
+1. Capturas de las siete pantallas en 390×844 y en 360×800.
+2. **Lista de lo roto**, cada cosa con su pantalla y su tamaño, y una
+   marca de gravedad: *impide usar* / *molesta* / *feo*.
+3. **Inventario de consola**: errores y advertencias, por pantalla, sin
+   filtrar.
+4. **Inventario de red**: cualquier respuesta que no sea `2xx` ni `3xx`,
+   con la pantalla donde apareció.
+5. `npm run smoke` sigue en verde, porque no cambiaste código de producto.
 
-**Frená y reportá antes de arreglar.** Si son tres detalles, arreglalos.
-Si es un rediseño, esa decisión es mía y la tomo con lo que me cuentes.
+Los tres inventarios son lo que más me sirve. Las capturas son para poder
+juzgar sin volver a levantarlo.
 
 ---
 
@@ -480,6 +502,98 @@ con errores que no dicen nada. Ya nos pasó.
 Cambialo a `vite --port 5173 --strictPort`, para que falle con un mensaje
 claro en vez de arrancar en un puerto que no funciona. **No toques la
 configuración de CORS del backend.**
+
+---
+
+## Tarea 4: pago por transferencia bancaria
+
+**Es lo próximo grande, y arrancás con esto cuando cierres el
+relevamiento de celular.**
+
+Verifiqué que está en cero: no existe ni un campo de CBU ni de alias en
+los modelos ni en los esquemas. Lo único que hay es una mención en
+`ContactPage.tsx`.
+
+### Por qué esta y no otra cosa
+
+Es el único bloque contractual grande que **no depende de nadie**.
+Transportistas está trabado hasta que la clienta defina zonas o radio;
+Mercado Pago está trabado sin credenciales. Este no.
+
+Y en el campo argentino es el que más se va a usar de verdad: nadie
+compra una cosechadora con tarjeta.
+
+### Qué pide el contrato, textual
+
+> *"Transferencia bancaria directa: el sistema muestra el CBU/Alias del
+> vendedor, el comprador adjunta el comprobante, y el vendedor lo valida
+> manualmente."*
+
+Tres cosas. **Ni una más.** Sin conciliación automática, sin avisos por
+correo, sin integración bancaria, sin verificar el CBU contra nada.
+
+### El recorrido, mínimo
+
+1. **El vendedor carga su CBU y su alias** en su perfil. Los dos
+   opcionales, pero si no tiene ninguno no puede ofrecer transferencia.
+2. **En el checkout aparece "Transferencia bancaria"** como medio de
+   pago. Al elegirlo se muestran CBU, alias, titular y el monto.
+3. **La orden queda esperando comprobante.**
+4. **El comprador adjunta el comprobante.** Reutilizá el mecanismo de
+   subida que ya existe y ya arreglamos: valida el resultado y avisa el
+   motivo si falla.
+5. **El vendedor ve las órdenes con comprobante** en su panel y las
+   aprueba o rechaza, con un motivo si rechaza.
+6. **La orden cambia de estado** según lo que decida.
+
+### Aprobación explícita para tocar el esquema
+
+**Te autorizo a modificar modelos y generar una migración**, sólo para
+esto:
+
+- `users`: `cbu` y `alias_bancario`.
+- `orders`: referencia al comprobante y los estados nuevos del flujo.
+
+Los estados nuevos se agregan al enum existente, **sin renombrar ni
+eliminar los que ya están**. La migración se genera desde los modelos,
+como la anterior, y se verifica que un autogenerate posterior no detecte
+diferencias.
+
+Todo lo demás del esquema sigue congelado.
+
+### Criterio de aceptación
+
+1. Un vendedor sin CBU ni alias **no puede** ofrecer transferencia.
+   Verificado por API.
+2. El comprador ve el CBU del vendedor correcto: contrastado contra la
+   consulta SQL equivalente, no contra un valor fijo.
+3. El comprobante queda guardado y asociado a la orden. Verificado en
+   base.
+4. Un comprobante fallido **avisa el motivo** y no rompe la orden. Es el
+   mismo caso que ya resolviste con las imágenes.
+5. Aprobar y rechazar cambian el estado, y el rechazo guarda el motivo.
+6. **Un vendedor no puede validar el comprobante de otro.** Verificado
+   con dos vendedores distintos.
+7. Casos nuevos en la suite de humo que cubran el camino completo y el
+   punto 6.
+8. `npm run smoke` en verde.
+
+El punto 6 es el que más me importa. Es plata.
+
+### Frená y preguntá si
+
+- Tenés que cambiar cómo funciona el checkout que ya existe.
+- El flujo te obliga a tocar Mercado Pago.
+- Aparece la duda de qué pasa si el comprador transfiere de menos.
+  **Esa la contesta la clienta**, no la inventes.
+
+### Sobre el jueves
+
+**No la apures para que entre en la demostración.** Si queda completa y
+verificada, la mostramos y suma mucho. Si queda a medias, no se muestra y
+no pasa nada.
+
+Media función en una demostración de firma es peor que ninguna.
 
 ---
 
