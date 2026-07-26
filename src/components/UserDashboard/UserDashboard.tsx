@@ -42,12 +42,14 @@ interface BackendOrder {
   seller_name?: string;
   seller_phone?: string;
   seller_whatsapp?: string;
+  transfer_receipt_url?: string;
+  rejection_reason?: string;
 }
 
 interface Order {
   id: string;
   date: string;
-  status: 'pending' | 'paid' | 'confirmed' | 'in-transit' | 'delivered' | 'cancelled' | 'rejected';
+  status: 'pending' | 'awaiting-transfer-receipt' | 'transfer-receipt-submitted' | 'paid' | 'confirmed' | 'in-transit' | 'delivered' | 'cancelled' | 'rejected';
   total: number;
   items: Array<{
     productName: string;
@@ -64,6 +66,8 @@ interface Order {
     phone: string;
     whatsapp: string;
   };
+  transferReceiptUrl?: string;
+  rejectionReason?: string;
 }
 
 interface UserProduct {
@@ -224,6 +228,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   const mapBackendStatus = (status: string): Order['status'] => {
     const statusMap: Record<string, Order['status']> = {
       'placed': 'pending',
+      'awaiting_transfer_receipt': 'awaiting-transfer-receipt',
+      'transfer_receipt_submitted': 'transfer-receipt-submitted',
       'paid': 'paid',
       'confirmed': 'confirmed',
       'shipped': 'in-transit',
@@ -257,7 +263,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               name: o.seller_name,
               phone: o.seller_phone || '',
               whatsapp: o.seller_whatsapp || o.seller_phone || ''
-            } : undefined
+            } : undefined,
+            transferReceiptUrl: o.transfer_receipt_url,
+            rejectionReason: o.rejection_reason,
           }));
           setPurchases(mappedOrders);
         } else if (activeTab === 'sales') {
@@ -276,7 +284,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               name: o.buyer_name,
               phone: o.buyer_phone || '',
               address: o.buyer_address || ''
-            } : undefined
+            } : undefined,
+            transferReceiptUrl: o.transfer_receipt_url,
+            rejectionReason: o.rejection_reason,
           }));
           setSales(mappedOrders);
         }
@@ -493,6 +503,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     province: 'Buenos Aires',
     city: 'CABA',
     address: 'Av. Corrientes 1234',
+    cbu: user?.cbu || '',
+    bankAlias: user?.bankAlias || '',
   });
 
   // Los productos se cargan desde el backend en userProducts (ver useEffect arriba)
@@ -507,6 +519,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         name: editForm.name,
         phone: editForm.phone,
         location: `${editForm.address}, ${editForm.city}, ${editForm.province}`,
+        cbu: editForm.cbu,
+        bankAlias: editForm.bankAlias,
       });
       showToast('Perfil actualizado exitosamente', 'success');
       setIsEditing(false);
@@ -541,7 +555,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           name: o.seller_name,
           phone: o.seller_phone || '',
           whatsapp: o.seller_whatsapp || o.seller_phone || ''
-        } : undefined
+        } : undefined,
+        transferReceiptUrl: o.transfer_receipt_url,
+        rejectionReason: o.rejection_reason,
       }));
       
       if (role === 'buyer') {
@@ -608,6 +624,21 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     } catch (error) {
       console.error('Error:', error);
       showToast('Error al marcar como enviado', 'error');
+    }
+  };
+
+  const handleTransferDecision = async (orderId: string, decision: 'approve' | 'reject') => {
+    const reason = decision === 'reject' ? window.prompt('Motivo del rechazo:')?.trim() : undefined;
+    if (decision === 'reject' && !reason) return;
+    try {
+      await apiPatch(`/orders/${orderId}/transfer-receipt`, { decision, reason });
+      showToast(
+        decision === 'approve' ? 'Comprobante aprobado' : 'Comprobante rechazado',
+        decision === 'approve' ? 'success' : 'warning',
+      );
+      await reloadOrders('seller');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'No se pudo validar el comprobante', 'error');
     }
   };
 
@@ -1067,6 +1098,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   const getStatusBadge = (status: Order['status']) => {
     const statusConfig = {
       pending: { label: 'Pendiente de Pago', color: '#f59e0b' },
+      'awaiting-transfer-receipt': { label: 'Esperando Comprobante', color: '#f59e0b' },
+      'transfer-receipt-submitted': { label: 'Comprobante a Revisar', color: '#0ea5e9' },
       paid: { label: 'Pagado', color: '#10b981' },
       confirmed: { label: 'Confirmado', color: '#7fb069' },
       'in-transit': { label: 'En Tránsito', color: '#52b788' },
@@ -1291,6 +1324,35 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             )}
           </div>
 
+          <div className={styles.formRow}>
+            <div className={styles.formGroup}>
+              <label>CBU para transferencias</label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={editForm.cbu}
+                  onChange={(e) => setEditForm({ ...editForm, cbu: e.target.value })}
+                  placeholder="CBU"
+                />
+              ) : (
+                <p>{editForm.cbu || 'No configurado'}</p>
+              )}
+            </div>
+            <div className={styles.formGroup}>
+              <label>Alias bancario</label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={editForm.bankAlias}
+                  onChange={(e) => setEditForm({ ...editForm, bankAlias: e.target.value })}
+                  placeholder="Alias"
+                />
+              ) : (
+                <p>{editForm.bankAlias || 'No configurado'}</p>
+              )}
+            </div>
+          </div>
+
           <div className={styles.privacyNote}>
             🔒 Tu información de contacto solo se comparte con los compradores después de que confirmen la compra
           </div>
@@ -1454,6 +1516,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   <strong>Total:</strong> ${order.total.toLocaleString('es-AR')}
                 </div>
 
+                {order.rejectionReason && (
+                  <div className={styles.contactInfo}>
+                    <strong>Motivo del rechazo:</strong> {order.rejectionReason}
+                  </div>
+                )}
+
                 {order.seller && (order.status === 'confirmed' || order.status === 'in-transit' || order.status === 'delivered') && (
                   <div className={styles.contactInfo}>
                     <div className={styles.unlocked}>🔓 Información de Contacto del Vendedor</div>
@@ -1561,7 +1629,36 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 </div>
               )}
 
+              {order.transferReceiptUrl && (
+                <div className={styles.contactInfo}>
+                  <div className={styles.unlocked}>🏦 Comprobante de transferencia</div>
+                  <a
+                    href={getImageUrl(order.transferReceiptUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Ver comprobante
+                  </a>
+                </div>
+              )}
+
               <div className={styles.orderActions}>
+                {order.status === 'transfer-receipt-submitted' && (
+                  <>
+                    <button
+                      className={styles.confirmButton}
+                      onClick={() => handleTransferDecision(order.id, 'approve')}
+                    >
+                      ✅ Aprobar comprobante
+                    </button>
+                    <button
+                      className={styles.rejectButton}
+                      onClick={() => handleTransferDecision(order.id, 'reject')}
+                    >
+                      ❌ Rechazar comprobante
+                    </button>
+                  </>
+                )}
                 {(order.status === 'pending' || order.status === 'paid') && (
                   <>
                     {order.status === 'paid' && (

@@ -1,10 +1,12 @@
 """
 API Router para órdenes de compra
 """
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, File, UploadFile
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime
+from io import BytesIO
+import os
 import secrets
 
 from app.db.base import get_db
@@ -13,7 +15,16 @@ from app.models.cart import Cart, CartStatus
 from app.models.product import Product
 from app.core.dependencies import get_current_user
 from app.models.user import User
-from app.schemas.orders import OrderResponse, OrderItemResponse, CheckoutRequest
+from app.schemas.orders import (
+    BankTransferCheckoutResponse,
+    BankTransferDecisionRequest,
+    BankTransferOption,
+    BankTransferOrderResponse,
+    CheckoutRequest,
+    OrderItemResponse,
+    OrderResponse,
+)
+from app.services.storage import get_storage
 from app.api.notifications import (
     notify_order_placed, notify_order_received, notify_order_confirmed,
     notify_order_shipped, notify_order_delivered, notify_order_cancelled
@@ -184,6 +195,238 @@ def checkout(
     return order_responses[0] if order_responses else None
 
 
+def _get_transfer_groups(db: Session, current_user: User):
+    cart = db.query(Cart).filter(
+        Cart.user_id == current_user.id,
+        Cart.status == CartStatus.ACTIVE,
+    ).first()
+    if not cart or not cart.items:
+        raise HTTPException(status_code=400, detail="El carrito está vacío")
+
+    groups = {}
+    for item in cart.items:
+        seller = item.product.seller
+        if not seller.cbu and not seller.alias_bancario:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{seller.full_name} no configuró CBU ni alias bancario",
+            )
+        groups.setdefault(seller.id, {"seller": seller, "items": []})["items"].append(item)
+
+    return cart, list(groups.values())
+
+
+@router.get("/transfer-options", response_model=list[BankTransferOption])
+def get_transfer_options(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Datos bancarios y monto por vendedor para el carrito activo."""
+    _, groups = _get_transfer_groups(db, current_user)
+    return [
+        BankTransferOption(
+            seller_id=group["seller"].id,
+            seller_name=group["seller"].full_name,
+            cbu=group["seller"].cbu,
+            alias_bancario=group["seller"].alias_bancario,
+            amount=sum(float(item.product.price) * item.quantity for item in group["items"]),
+        )
+        for group in groups
+    ]
+
+
+@router.post("/checkout/transfer", response_model=BankTransferCheckoutResponse)
+def checkout_bank_transfer(
+    checkout_data: CheckoutRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Crear una orden por vendedor, sin modificar el checkout de Mercado Pago."""
+    cart, groups = _get_transfer_groups(db, current_user)
+    created = []
+
+    for group in groups:
+        seller = group["seller"]
+        items = group["items"]
+        subtotal = sum(float(item.product.price) * item.quantity for item in items)
+        order = Order(
+            order_number=generate_order_number(),
+            buyer_id=current_user.id,
+            seller_id=seller.id,
+            status=OrderStatus.AWAITING_TRANSFER_RECEIPT,
+            subtotal=subtotal,
+            shipping_cost=0,
+            total_amount=subtotal,
+            shipping_address_json={
+                "address": checkout_data.shipping_address,
+                "city": checkout_data.shipping_city,
+                "province": checkout_data.shipping_province,
+                "postal_code": checkout_data.shipping_postal_code,
+            },
+            buyer_notes=checkout_data.notes,
+        )
+        db.add(order)
+        db.flush()
+
+        for cart_item in items:
+            product = cart_item.product
+            is_service = product.category.is_service if product.category else False
+            if not is_service and (product.stock or 0) < cart_item.quantity:
+                db.rollback()
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Stock insuficiente para {product.name}",
+                )
+            primary_image = next(
+                (image.url for image in product.images if image.is_primary),
+                None,
+            )
+            db.add(OrderItem(
+                order_id=order.id,
+                product_id=product.id,
+                product_name_snapshot=product.name,
+                product_image_snapshot=primary_image,
+                unit_price_snapshot=float(product.price),
+                quantity=cart_item.quantity,
+                total_price=float(product.price) * cart_item.quantity,
+            ))
+
+        created.append((order, seller))
+
+    cart.status = CartStatus.CONVERTED
+    db.commit()
+
+    for order, _ in created:
+        db.refresh(order)
+        try:
+            notify_order_placed(db, order)
+            notify_order_received(db, order)
+        except Exception as error:
+            print(f"Error enviando notificación: {error}")
+
+    return BankTransferCheckoutResponse(orders=[
+        BankTransferOrderResponse(
+            order_id=order.id,
+            order_number=order.order_number,
+            status=order.status.value,
+            seller_id=seller.id,
+            seller_name=seller.full_name,
+            cbu=seller.cbu,
+            alias_bancario=seller.alias_bancario,
+            amount=float(order.total_amount),
+        )
+        for order, seller in created
+    ])
+
+
+@router.post("/{order_id}/transfer-receipt", response_model=BankTransferOrderResponse)
+async def upload_transfer_receipt(
+    order_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    order = db.query(Order).filter(
+        (Order.id == order_id) | (Order.order_number == order_id)
+    ).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+    if order.buyer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No tienes permiso para adjuntar este comprobante")
+    if order.status != OrderStatus.AWAITING_TRANSFER_RECEIPT:
+        raise HTTPException(status_code=400, detail="La orden no está esperando comprobante")
+
+    extension = os.path.splitext(file.filename or "")[1].lower()
+    allowed_extensions = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
+    if extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Formato de archivo no permitido: {extension}. Use: {', '.join(sorted(allowed_extensions))}",
+        )
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="El comprobante está vacío")
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail=f"Archivo {file.filename} excede el tamaño máximo de 5MB")
+
+    order.transfer_receipt_url = await get_storage().upload(
+        file=BytesIO(content),
+        filename=file.filename,
+        folder="transfer_receipts",
+        content_type=file.content_type,
+    )
+    order.status = OrderStatus.TRANSFER_RECEIPT_SUBMITTED
+    order.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(order)
+
+    return BankTransferOrderResponse(
+        order_id=order.id,
+        order_number=order.order_number,
+        status=order.status.value,
+        seller_id=order.seller.id,
+        seller_name=order.seller.full_name,
+        cbu=order.seller.cbu,
+        alias_bancario=order.seller.alias_bancario,
+        amount=float(order.total_amount),
+        transfer_receipt_url=order.transfer_receipt_url,
+    )
+
+
+@router.patch("/{order_id}/transfer-receipt", response_model=BankTransferOrderResponse)
+def decide_transfer_receipt(
+    order_id: str,
+    decision_data: BankTransferDecisionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    order = db.query(Order).filter(
+        (Order.id == order_id) | (Order.order_number == order_id)
+    ).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+    if order.seller_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No tienes permiso para validar este comprobante")
+    if order.status != OrderStatus.TRANSFER_RECEIPT_SUBMITTED:
+        raise HTTPException(status_code=400, detail="La orden no tiene un comprobante pendiente")
+
+    if decision_data.decision == "reject":
+        reason = (decision_data.reason or "").strip()
+        if not reason:
+            raise HTTPException(status_code=400, detail="El motivo de rechazo es obligatorio")
+        order.status = OrderStatus.REJECTED
+        order.cancellation_reason = reason
+    else:
+        for item in order.items:
+            product = item.product
+            is_service = product.category.is_service if product and product.category else False
+            if product and not is_service and (product.stock or 0) < item.quantity:
+                raise HTTPException(status_code=400, detail=f"Stock insuficiente para {product.name}")
+        for item in order.items:
+            product = item.product
+            is_service = product.category.is_service if product and product.category else False
+            if product and not is_service:
+                product.stock = (product.stock or 0) - item.quantity
+                product.sales_count = (product.sales_count or 0) + item.quantity
+        order.status = OrderStatus.PAID
+        order.cancellation_reason = None
+
+    order.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(order)
+    return BankTransferOrderResponse(
+        order_id=order.id,
+        order_number=order.order_number,
+        status=order.status.value,
+        seller_id=order.seller.id,
+        seller_name=order.seller.full_name,
+        cbu=order.seller.cbu,
+        alias_bancario=order.seller.alias_bancario,
+        amount=float(order.total_amount),
+        transfer_receipt_url=order.transfer_receipt_url,
+    )
+
+
 @router.get("/my", response_model=list[OrderResponse])
 def get_my_orders(
     as_role: str = "buyer",  # "buyer" o "seller"
@@ -255,7 +498,23 @@ def get_my_orders(
             buyer_address=buyer_address,
             seller_name=seller_name,
             seller_phone=seller_phone,
-            seller_whatsapp=seller_whatsapp
+            seller_whatsapp=seller_whatsapp,
+            seller_cbu=order.seller.cbu if order.seller and (
+                order.transfer_receipt_url
+                or order.status in [
+                    OrderStatus.AWAITING_TRANSFER_RECEIPT,
+                    OrderStatus.TRANSFER_RECEIPT_SUBMITTED,
+                ]
+            ) else None,
+            seller_alias_bancario=order.seller.alias_bancario if order.seller and (
+                order.transfer_receipt_url
+                or order.status in [
+                    OrderStatus.AWAITING_TRANSFER_RECEIPT,
+                    OrderStatus.TRANSFER_RECEIPT_SUBMITTED,
+                ]
+            ) else None,
+            transfer_receipt_url=order.transfer_receipt_url,
+            rejection_reason=order.cancellation_reason,
         ))
     
     return result

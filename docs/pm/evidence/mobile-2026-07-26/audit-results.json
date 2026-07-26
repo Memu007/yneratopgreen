@@ -1,0 +1,8600 @@
+{
+  "generatedAt": "2026-07-26T00:18:04.196Z",
+  "viewports": [
+    {
+      "viewport": "360x800",
+      "screen": "01-home",
+      "bodyScrollWidth": 360,
+      "documentScrollWidth": 360,
+      "viewportWidth": 360,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 82,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Ingresar",
+          "width": 84,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 115,
+          "height": 37
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 38,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 59,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 99,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 59,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 208,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 185,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 110,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 144,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 134,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 67,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "360x800",
+      "screen": "02-filters",
+      "bodyScrollWidth": 360,
+      "documentScrollWidth": 360,
+      "viewportWidth": 360,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 82,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 226,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Buscar",
+          "width": 78,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Ingresar",
+          "width": 84,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 91,
+          "height": 28
+        },
+        {
+          "tag": "select",
+          "label": "TodosProductosServicios",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las categoríasMaquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "TodasTractoresPreparación del sueloSiembra y plantaciónFertilización y protecciónCosechaPostcosechaF",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las provinciasBuenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientes",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las localidades11 de Septiembre12 de Octubre16 de Julio17 de Agosto20 de Junio25 de Mayo30 de ",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "input",
+          "label": "Precio mínimo",
+          "width": 147,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "Precio máximo",
+          "width": 147,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "tag": "button",
+          "label": "Limpiar filtros",
+          "width": 302,
+          "height": 43
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "360x800",
+      "screen": "03-catalog",
+      "bodyScrollWidth": 360,
+      "documentScrollWidth": 360,
+      "viewportWidth": 360,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 82,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 226,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Buscar",
+          "width": 78,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Ingresar",
+          "width": 84,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 91,
+          "height": 28
+        },
+        {
+          "tag": "select",
+          "label": "TodosProductosServicios",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las categoríasMaquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las provinciasBuenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientes",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las localidades",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "input",
+          "label": "Precio mínimo",
+          "width": 147,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "Precio máximo",
+          "width": 147,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "tag": "button",
+          "label": "Limpiar filtros",
+          "width": 302,
+          "height": 43
+        },
+        {
+          "tag": "select",
+          "label": "Más relevantesMenor precioMayor precioMás recientesMejor calificados",
+          "width": 336,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "360x800",
+      "screen": "04-detail",
+      "bodyScrollWidth": 360,
+      "documentScrollWidth": 360,
+      "viewportWidth": 360,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 82,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 226,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Buscar",
+          "width": 78,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Ingresar",
+          "width": 84,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 91,
+          "height": 28
+        },
+        {
+          "tag": "select",
+          "label": "TodosProductosServicios",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las categoríasMaquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las provinciasBuenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientes",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las localidades",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "input",
+          "label": "Precio mínimo",
+          "width": 147,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "Precio máximo",
+          "width": 147,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "tag": "button",
+          "label": "Limpiar filtros",
+          "width": 302,
+          "height": 43
+        },
+        {
+          "tag": "select",
+          "label": "Más relevantesMenor precioMayor precioMás recientesMejor calificados",
+          "width": 336,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "✕",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar al Carrito",
+          "width": 272,
+          "height": 26
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "360x800",
+      "screen": "05-cart",
+      "bodyScrollWidth": 360,
+      "documentScrollWidth": 360,
+      "viewportWidth": 360,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 82,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 226,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Buscar",
+          "width": 78,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 91,
+          "height": 28
+        },
+        {
+          "tag": "button",
+          "label": "👤 María Cliente",
+          "width": 140,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "select",
+          "label": "TodosProductosServicios",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las categoríasMaquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las provinciasBuenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientes",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las localidades",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "input",
+          "label": "Precio mínimo",
+          "width": 147,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "Precio máximo",
+          "width": 147,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "tag": "button",
+          "label": "Limpiar filtros",
+          "width": 302,
+          "height": 43
+        },
+        {
+          "tag": "select",
+          "label": "Más relevantesMenor precioMayor precioMás recientesMejor calificados",
+          "width": 336,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "360x800",
+      "screen": "05-checkout-payment",
+      "bodyScrollWidth": 360,
+      "documentScrollWidth": 360,
+      "viewportWidth": 360,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 82,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 226,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Buscar",
+          "width": 78,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 91,
+          "height": 28
+        },
+        {
+          "tag": "button",
+          "label": "👤 María Cliente",
+          "width": 140,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "select",
+          "label": "TodosProductosServicios",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las categoríasMaquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las provinciasBuenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientes",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las localidades",
+          "width": 302,
+          "height": 36
+        },
+        {
+          "tag": "input",
+          "label": "Precio mínimo",
+          "width": 147,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "Precio máximo",
+          "width": 147,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "tag": "button",
+          "label": "Limpiar filtros",
+          "width": 302,
+          "height": 43
+        },
+        {
+          "tag": "select",
+          "label": "Más relevantesMenor precioMayor precioMás recientesMejor calificados",
+          "width": 336,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "360x800",
+      "screen": "06-publication",
+      "bodyScrollWidth": 360,
+      "documentScrollWidth": 360,
+      "viewportWidth": 360,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 82,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Juan Vendedor",
+          "width": 153,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "✕",
+          "width": 25,
+          "height": 32
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 272,
+          "height": 39
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...Maquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos y man",
+          "width": 272,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...TractoresPreparación del sueloSiembra y plantaciónFertilización y protecciónCosechaPos",
+          "width": 272,
+          "height": 41
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 272,
+          "height": 39
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 272,
+          "height": 39
+        },
+        {
+          "tag": "select",
+          "label": "KilogramoToneladaLitrosUnidadBolsaPackHectárea",
+          "width": 272,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...Buenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientesEntre ",
+          "width": 272,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...11 de Septiembre12 de Octubre16 de Julio17 de Agosto20 de Junio25 de Mayo30 de Agosto9",
+          "width": 272,
+          "height": 41
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 272,
+          "height": 39
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 272,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "label": "+ Agregar",
+          "width": 272,
+          "height": 37
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 272,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "label": "+ Agregar",
+          "width": 272,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Cancelar",
+          "width": 272,
+          "height": 43
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "360x800",
+      "screen": "06-publication-bottom",
+      "bodyScrollWidth": 360,
+      "documentScrollWidth": 360,
+      "viewportWidth": 360,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 82,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Juan Vendedor",
+          "width": 153,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "✕",
+          "width": 25,
+          "height": 32
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 272,
+          "height": 39
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...Maquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos y man",
+          "width": 272,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...TractoresPreparación del sueloSiembra y plantaciónFertilización y protecciónCosechaPos",
+          "width": 272,
+          "height": 41
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 272,
+          "height": 39
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 272,
+          "height": 39
+        },
+        {
+          "tag": "select",
+          "label": "KilogramoToneladaLitrosUnidadBolsaPackHectárea",
+          "width": 272,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...Buenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientesEntre ",
+          "width": 272,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...11 de Septiembre12 de Octubre16 de Julio17 de Agosto20 de Junio25 de Mayo30 de Agosto9",
+          "width": 272,
+          "height": 41
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 272,
+          "height": 39
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 272,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "label": "+ Agregar",
+          "width": 272,
+          "height": 37
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 272,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "label": "+ Agregar",
+          "width": 272,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Cancelar",
+          "width": 272,
+          "height": 43
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "360x800",
+      "screen": "07-seller-panel",
+      "bodyScrollWidth": 360,
+      "documentScrollWidth": 360,
+      "viewportWidth": 360,
+      "horizontalOverflow": false,
+      "overflowElements": [
+        {
+          "tag": "button",
+          "label": "Mis Compras",
+          "left": 312,
+          "right": 452
+        },
+        {
+          "tag": "button",
+          "label": "Mis Ventas",
+          "left": 452,
+          "right": 578
+        },
+        {
+          "tag": "svg",
+          "label": "svg",
+          "left": 468,
+          "right": 486
+        },
+        {
+          "tag": "path",
+          "label": "path",
+          "left": 472,
+          "right": 481
+        },
+        {
+          "tag": "button",
+          "label": "Mis Productos",
+          "left": 578,
+          "right": 725
+        },
+        {
+          "tag": "svg",
+          "label": "svg",
+          "left": 594,
+          "right": 612
+        },
+        {
+          "tag": "path",
+          "label": "path",
+          "left": 596,
+          "right": 610
+        }
+      ],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 82,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Juan Vendedor",
+          "width": 153,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "×",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "Editar",
+          "width": 102,
+          "height": 39
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "360x800",
+      "screen": "07-seller-products",
+      "bodyScrollWidth": 360,
+      "documentScrollWidth": 360,
+      "viewportWidth": 360,
+      "horizontalOverflow": false,
+      "overflowElements": [
+        {
+          "tag": "button",
+          "label": "Mi Perfil",
+          "left": -365,
+          "right": -256
+        },
+        {
+          "tag": "svg",
+          "label": "svg",
+          "left": -349,
+          "right": -331
+        },
+        {
+          "tag": "path",
+          "label": "path",
+          "left": -346,
+          "right": -334
+        },
+        {
+          "tag": "circle",
+          "label": "circle",
+          "left": -343,
+          "right": -337
+        },
+        {
+          "tag": "button",
+          "label": "Notificaciones1",
+          "left": -256,
+          "right": -74
+        },
+        {
+          "tag": "svg",
+          "label": "svg",
+          "left": -240,
+          "right": -222
+        },
+        {
+          "tag": "path",
+          "label": "path",
+          "left": -237,
+          "right": -224
+        },
+        {
+          "tag": "path",
+          "label": "path",
+          "left": -232,
+          "right": -229
+        },
+        {
+          "tag": "span",
+          "label": "1",
+          "left": -108,
+          "right": -90
+        },
+        {
+          "tag": "button",
+          "label": "Mis Compras",
+          "left": -74,
+          "right": 66
+        },
+        {
+          "tag": "svg",
+          "label": "svg",
+          "left": -58,
+          "right": -40
+        },
+        {
+          "tag": "circle",
+          "label": "circle",
+          "left": -52,
+          "right": -50
+        },
+        {
+          "tag": "circle",
+          "label": "circle",
+          "left": -44,
+          "right": -42
+        },
+        {
+          "tag": "path",
+          "label": "path",
+          "left": -57,
+          "right": -41
+        }
+      ],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 82,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Juan Vendedor",
+          "width": 153,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "×",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "360x800",
+      "screen": "07-admin-panel",
+      "bodyScrollWidth": 360,
+      "documentScrollWidth": 360,
+      "viewportWidth": 360,
+      "horizontalOverflow": false,
+      "overflowElements": [
+        {
+          "tag": "button",
+          "label": "🛒 Órdenes",
+          "left": 304,
+          "right": 395
+        },
+        {
+          "tag": "button",
+          "label": "📁 Categorías",
+          "left": 395,
+          "right": 499
+        },
+        {
+          "tag": "button",
+          "label": "⚙️ Configuración",
+          "left": 499,
+          "right": 623
+        }
+      ],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 82,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Administrador TopGreen",
+          "width": 214,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "×",
+          "width": 35,
+          "height": 35
+        },
+        {
+          "tag": "button",
+          "label": "📊 Dashboard",
+          "width": 105,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "👥 Usuarios",
+          "width": 93,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📦 Productos",
+          "width": 101,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Órdenes",
+          "width": 91,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📁 Categorías",
+          "width": 105,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "⚙️ Configuración",
+          "width": 124,
+          "height": 43
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "360x800",
+      "screen": "07-admin-products",
+      "bodyScrollWidth": 360,
+      "documentScrollWidth": 360,
+      "viewportWidth": 360,
+      "horizontalOverflow": false,
+      "overflowElements": [
+        {
+          "tag": "button",
+          "label": "🛒 Órdenes",
+          "left": 304,
+          "right": 395
+        },
+        {
+          "tag": "button",
+          "label": "📁 Categorías",
+          "left": 395,
+          "right": 499
+        },
+        {
+          "tag": "button",
+          "label": "⚙️ Configuración",
+          "left": 499,
+          "right": 623
+        },
+        {
+          "tag": "thead",
+          "label": "ImagenNombrePrecioStockVendedorEstadoAcciones",
+          "left": 10,
+          "right": 855
+        },
+        {
+          "tag": "tr",
+          "label": "ImagenNombrePrecioStockVendedorEstadoAcciones",
+          "left": 10,
+          "right": 855
+        },
+        {
+          "tag": "th",
+          "label": "Precio",
+          "left": 289,
+          "right": 420
+        },
+        {
+          "tag": "th",
+          "label": "Stock",
+          "left": 420,
+          "right": 500
+        },
+        {
+          "tag": "th",
+          "label": "Vendedor",
+          "left": 500,
+          "right": 626
+        },
+        {
+          "tag": "th",
+          "label": "Estado",
+          "left": 626,
+          "right": 720
+        },
+        {
+          "tag": "th",
+          "label": "Acciones",
+          "left": 720,
+          "right": 855
+        },
+        {
+          "tag": "tbody",
+          "label": "Producto Smoke Imagen Fallida 1785025000415$ 23.4562Juan VendedoractiveActivoPausadoBorradorEliminad",
+          "left": 10,
+          "right": 855
+        },
+        {
+          "tag": "tr",
+          "label": "Producto Smoke Imagen Fallida 1785025000415$ 23.4562Juan VendedoractiveActivoPausadoBorradorEliminad",
+          "left": 10,
+          "right": 855
+        },
+        {
+          "tag": "td",
+          "label": "$ 23.456",
+          "left": 289,
+          "right": 420
+        },
+        {
+          "tag": "td",
+          "label": "2",
+          "left": 420,
+          "right": 500
+        },
+        {
+          "tag": "td",
+          "label": "Juan Vendedor",
+          "left": 500,
+          "right": 626
+        },
+        {
+          "tag": "td",
+          "label": "active",
+          "left": 626,
+          "right": 720
+        },
+        {
+          "tag": "span",
+          "label": "active",
+          "left": 641,
+          "right": 705
+        },
+        {
+          "tag": "td",
+          "label": "ActivoPausadoBorradorEliminado",
+          "left": 720,
+          "right": 855
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "left": 735,
+          "right": 840
+        },
+        {
+          "tag": "tr",
+          "label": "Producto Smoke UI 1785024998341$ 12.3453Juan VendedoractiveActivoPausadoBorradorEliminado",
+          "left": 10,
+          "right": 855
+        }
+      ],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 82,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Administrador TopGreen",
+          "width": 214,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "×",
+          "width": 35,
+          "height": 35
+        },
+        {
+          "tag": "button",
+          "label": "📊 Dashboard",
+          "width": 105,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "👥 Usuarios",
+          "width": 93,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📦 Productos",
+          "width": 101,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Órdenes",
+          "width": 91,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📁 Categorías",
+          "width": 105,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "⚙️ Configuración",
+          "width": 124,
+          "height": 43
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "390x844",
+      "screen": "01-home",
+      "bodyScrollWidth": 390,
+      "documentScrollWidth": 390,
+      "viewportWidth": 390,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 112,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Ingresar",
+          "width": 84,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 115,
+          "height": 37
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 38,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 59,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 99,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 59,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 208,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 185,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 110,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 144,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 134,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 67,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "390x844",
+      "screen": "02-filters",
+      "bodyScrollWidth": 390,
+      "documentScrollWidth": 390,
+      "viewportWidth": 390,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 112,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 256,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Buscar",
+          "width": 78,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Ingresar",
+          "width": 84,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 91,
+          "height": 28
+        },
+        {
+          "tag": "select",
+          "label": "TodosProductosServicios",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las categoríasMaquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "TodasTractoresPreparación del sueloSiembra y plantaciónFertilización y protecciónCosechaPostcosechaF",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las provinciasBuenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientes",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las localidades11 de Septiembre12 de Octubre16 de Julio17 de Agosto20 de Junio25 de Mayo30 de ",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "input",
+          "label": "Precio mínimo",
+          "width": 162,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "Precio máximo",
+          "width": 162,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "tag": "button",
+          "label": "Limpiar filtros",
+          "width": 332,
+          "height": 43
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "390x844",
+      "screen": "03-catalog",
+      "bodyScrollWidth": 390,
+      "documentScrollWidth": 390,
+      "viewportWidth": 390,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 112,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 256,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Buscar",
+          "width": 78,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Ingresar",
+          "width": 84,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 91,
+          "height": 28
+        },
+        {
+          "tag": "select",
+          "label": "TodosProductosServicios",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las categoríasMaquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las provinciasBuenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientes",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las localidades",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "input",
+          "label": "Precio mínimo",
+          "width": 162,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "Precio máximo",
+          "width": 162,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "tag": "button",
+          "label": "Limpiar filtros",
+          "width": 332,
+          "height": 43
+        },
+        {
+          "tag": "select",
+          "label": "Más relevantesMenor precioMayor precioMás recientesMejor calificados",
+          "width": 366,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "390x844",
+      "screen": "04-detail",
+      "bodyScrollWidth": 390,
+      "documentScrollWidth": 390,
+      "viewportWidth": 390,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 112,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 256,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Buscar",
+          "width": 78,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Ingresar",
+          "width": 84,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 91,
+          "height": 28
+        },
+        {
+          "tag": "select",
+          "label": "TodosProductosServicios",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las categoríasMaquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las provinciasBuenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientes",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las localidades",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "input",
+          "label": "Precio mínimo",
+          "width": 162,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "Precio máximo",
+          "width": 162,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "tag": "button",
+          "label": "Limpiar filtros",
+          "width": 332,
+          "height": 43
+        },
+        {
+          "tag": "select",
+          "label": "Más relevantesMenor precioMayor precioMás recientesMejor calificados",
+          "width": 366,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "✕",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar al Carrito",
+          "width": 302,
+          "height": 26
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "390x844",
+      "screen": "05-cart",
+      "bodyScrollWidth": 390,
+      "documentScrollWidth": 390,
+      "viewportWidth": 390,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 112,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 256,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Buscar",
+          "width": 78,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 91,
+          "height": 28
+        },
+        {
+          "tag": "button",
+          "label": "👤 María Cliente",
+          "width": 140,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "select",
+          "label": "TodosProductosServicios",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las categoríasMaquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las provinciasBuenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientes",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las localidades",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "input",
+          "label": "Precio mínimo",
+          "width": 162,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "Precio máximo",
+          "width": 162,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "tag": "button",
+          "label": "Limpiar filtros",
+          "width": 332,
+          "height": 43
+        },
+        {
+          "tag": "select",
+          "label": "Más relevantesMenor precioMayor precioMás recientesMejor calificados",
+          "width": 366,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "390x844",
+      "screen": "05-checkout-payment",
+      "bodyScrollWidth": 390,
+      "documentScrollWidth": 390,
+      "viewportWidth": 390,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 112,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 256,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Buscar",
+          "width": 78,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 91,
+          "height": 28
+        },
+        {
+          "tag": "button",
+          "label": "👤 María Cliente",
+          "width": 140,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "select",
+          "label": "TodosProductosServicios",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las categoríasMaquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las provinciasBuenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientes",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "select",
+          "label": "Todas las localidades",
+          "width": 332,
+          "height": 36
+        },
+        {
+          "tag": "input",
+          "label": "Precio mínimo",
+          "width": 162,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "Precio máximo",
+          "width": 162,
+          "height": 34
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "tag": "button",
+          "label": "Limpiar filtros",
+          "width": 332,
+          "height": 43
+        },
+        {
+          "tag": "select",
+          "label": "Más relevantesMenor precioMayor precioMás recientesMejor calificados",
+          "width": 366,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "390x844",
+      "screen": "06-publication",
+      "bodyScrollWidth": 390,
+      "documentScrollWidth": 390,
+      "viewportWidth": 390,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 112,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Juan Vendedor",
+          "width": 153,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "✕",
+          "width": 28,
+          "height": 32
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 302,
+          "height": 39
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...Maquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos y man",
+          "width": 302,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...TractoresPreparación del sueloSiembra y plantaciónFertilización y protecciónCosechaPos",
+          "width": 302,
+          "height": 41
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 302,
+          "height": 39
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 302,
+          "height": 39
+        },
+        {
+          "tag": "select",
+          "label": "KilogramoToneladaLitrosUnidadBolsaPackHectárea",
+          "width": 302,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...Buenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientesEntre ",
+          "width": 302,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...11 de Septiembre12 de Octubre16 de Julio17 de Agosto20 de Junio25 de Mayo30 de Agosto9",
+          "width": 302,
+          "height": 41
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 302,
+          "height": 39
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 302,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "label": "+ Agregar",
+          "width": 302,
+          "height": 37
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 302,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "label": "+ Agregar",
+          "width": 302,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Cancelar",
+          "width": 302,
+          "height": 43
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "390x844",
+      "screen": "06-publication-bottom",
+      "bodyScrollWidth": 390,
+      "documentScrollWidth": 390,
+      "viewportWidth": 390,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 112,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Juan Vendedor",
+          "width": 153,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "✕",
+          "width": 28,
+          "height": 32
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 302,
+          "height": 39
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...Maquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos y man",
+          "width": 302,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...TractoresPreparación del sueloSiembra y plantaciónFertilización y protecciónCosechaPos",
+          "width": 302,
+          "height": 41
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 302,
+          "height": 39
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 302,
+          "height": 39
+        },
+        {
+          "tag": "select",
+          "label": "KilogramoToneladaLitrosUnidadBolsaPackHectárea",
+          "width": 302,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...Buenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientesEntre ",
+          "width": 302,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...11 de Septiembre12 de Octubre16 de Julio17 de Agosto20 de Junio25 de Mayo30 de Agosto9",
+          "width": 302,
+          "height": 41
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 302,
+          "height": 39
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 302,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "label": "+ Agregar",
+          "width": 302,
+          "height": 37
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 302,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "label": "+ Agregar",
+          "width": 302,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Cancelar",
+          "width": 302,
+          "height": 43
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "390x844",
+      "screen": "07-seller-panel",
+      "bodyScrollWidth": 390,
+      "documentScrollWidth": 390,
+      "viewportWidth": 390,
+      "horizontalOverflow": false,
+      "overflowElements": [
+        {
+          "tag": "button",
+          "label": "Mis Compras",
+          "left": 312,
+          "right": 452
+        },
+        {
+          "tag": "button",
+          "label": "Mis Ventas",
+          "left": 452,
+          "right": 578
+        },
+        {
+          "tag": "svg",
+          "label": "svg",
+          "left": 468,
+          "right": 486
+        },
+        {
+          "tag": "path",
+          "label": "path",
+          "left": 472,
+          "right": 481
+        },
+        {
+          "tag": "button",
+          "label": "Mis Productos",
+          "left": 578,
+          "right": 725
+        },
+        {
+          "tag": "svg",
+          "label": "svg",
+          "left": 594,
+          "right": 612
+        },
+        {
+          "tag": "path",
+          "label": "path",
+          "left": 596,
+          "right": 610
+        }
+      ],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 112,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Juan Vendedor",
+          "width": 153,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "×",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "Editar",
+          "width": 102,
+          "height": 39
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "390x844",
+      "screen": "07-seller-products",
+      "bodyScrollWidth": 390,
+      "documentScrollWidth": 390,
+      "viewportWidth": 390,
+      "horizontalOverflow": false,
+      "overflowElements": [
+        {
+          "tag": "button",
+          "label": "Mi Perfil",
+          "left": -335,
+          "right": -226
+        },
+        {
+          "tag": "svg",
+          "label": "svg",
+          "left": -319,
+          "right": -301
+        },
+        {
+          "tag": "path",
+          "label": "path",
+          "left": -316,
+          "right": -304
+        },
+        {
+          "tag": "circle",
+          "label": "circle",
+          "left": -313,
+          "right": -307
+        },
+        {
+          "tag": "button",
+          "label": "Notificaciones1",
+          "left": -226,
+          "right": -44
+        },
+        {
+          "tag": "svg",
+          "label": "svg",
+          "left": -210,
+          "right": -192
+        },
+        {
+          "tag": "path",
+          "label": "path",
+          "left": -207,
+          "right": -194
+        },
+        {
+          "tag": "path",
+          "label": "path",
+          "left": -202,
+          "right": -199
+        },
+        {
+          "tag": "span",
+          "label": "1",
+          "left": -78,
+          "right": -60
+        },
+        {
+          "tag": "button",
+          "label": "Mis Compras",
+          "left": -44,
+          "right": 96
+        },
+        {
+          "tag": "svg",
+          "label": "svg",
+          "left": -28,
+          "right": -10
+        },
+        {
+          "tag": "circle",
+          "label": "circle",
+          "left": -22,
+          "right": -20
+        },
+        {
+          "tag": "circle",
+          "label": "circle",
+          "left": -14,
+          "right": -12
+        },
+        {
+          "tag": "path",
+          "label": "path",
+          "left": -27,
+          "right": -11
+        }
+      ],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 112,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Juan Vendedor",
+          "width": 153,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "×",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "390x844",
+      "screen": "07-admin-panel",
+      "bodyScrollWidth": 390,
+      "documentScrollWidth": 390,
+      "viewportWidth": 390,
+      "horizontalOverflow": false,
+      "overflowElements": [
+        {
+          "tag": "button",
+          "label": "🛒 Órdenes",
+          "left": 304,
+          "right": 395
+        },
+        {
+          "tag": "button",
+          "label": "📁 Categorías",
+          "left": 395,
+          "right": 499
+        },
+        {
+          "tag": "button",
+          "label": "⚙️ Configuración",
+          "left": 499,
+          "right": 623
+        }
+      ],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 112,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Administrador TopGreen",
+          "width": 214,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "×",
+          "width": 35,
+          "height": 35
+        },
+        {
+          "tag": "button",
+          "label": "📊 Dashboard",
+          "width": 105,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "👥 Usuarios",
+          "width": 93,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📦 Productos",
+          "width": 101,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Órdenes",
+          "width": 91,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📁 Categorías",
+          "width": 105,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "⚙️ Configuración",
+          "width": 124,
+          "height": 43
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "390x844",
+      "screen": "07-admin-products",
+      "bodyScrollWidth": 390,
+      "documentScrollWidth": 390,
+      "viewportWidth": 390,
+      "horizontalOverflow": false,
+      "overflowElements": [
+        {
+          "tag": "button",
+          "label": "🛒 Órdenes",
+          "left": 304,
+          "right": 395
+        },
+        {
+          "tag": "button",
+          "label": "📁 Categorías",
+          "left": 395,
+          "right": 499
+        },
+        {
+          "tag": "button",
+          "label": "⚙️ Configuración",
+          "left": 499,
+          "right": 623
+        },
+        {
+          "tag": "thead",
+          "label": "ImagenNombrePrecioStockVendedorEstadoAcciones",
+          "left": 10,
+          "right": 855
+        },
+        {
+          "tag": "tr",
+          "label": "ImagenNombrePrecioStockVendedorEstadoAcciones",
+          "left": 10,
+          "right": 855
+        },
+        {
+          "tag": "th",
+          "label": "Precio",
+          "left": 289,
+          "right": 420
+        },
+        {
+          "tag": "th",
+          "label": "Stock",
+          "left": 420,
+          "right": 500
+        },
+        {
+          "tag": "th",
+          "label": "Vendedor",
+          "left": 500,
+          "right": 626
+        },
+        {
+          "tag": "th",
+          "label": "Estado",
+          "left": 626,
+          "right": 720
+        },
+        {
+          "tag": "th",
+          "label": "Acciones",
+          "left": 720,
+          "right": 855
+        },
+        {
+          "tag": "tbody",
+          "label": "Producto Smoke Imagen Fallida 1785025000415$ 23.4562Juan VendedoractiveActivoPausadoBorradorEliminad",
+          "left": 10,
+          "right": 855
+        },
+        {
+          "tag": "tr",
+          "label": "Producto Smoke Imagen Fallida 1785025000415$ 23.4562Juan VendedoractiveActivoPausadoBorradorEliminad",
+          "left": 10,
+          "right": 855
+        },
+        {
+          "tag": "td",
+          "label": "$ 23.456",
+          "left": 289,
+          "right": 420
+        },
+        {
+          "tag": "td",
+          "label": "2",
+          "left": 420,
+          "right": 500
+        },
+        {
+          "tag": "td",
+          "label": "Juan Vendedor",
+          "left": 500,
+          "right": 626
+        },
+        {
+          "tag": "td",
+          "label": "active",
+          "left": 626,
+          "right": 720
+        },
+        {
+          "tag": "span",
+          "label": "active",
+          "left": 641,
+          "right": 705
+        },
+        {
+          "tag": "td",
+          "label": "ActivoPausadoBorradorEliminado",
+          "left": 720,
+          "right": 855
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "left": 735,
+          "right": 840
+        },
+        {
+          "tag": "tr",
+          "label": "Producto Smoke UI 1785024998341$ 12.3453Juan VendedoractiveActivoPausadoBorradorEliminado",
+          "left": 10,
+          "right": 855
+        }
+      ],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 55,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 112,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 76,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 75,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Administrador TopGreen",
+          "width": 214,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "×",
+          "width": 35,
+          "height": 35
+        },
+        {
+          "tag": "button",
+          "label": "📊 Dashboard",
+          "width": 105,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "👥 Usuarios",
+          "width": 93,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📦 Productos",
+          "width": 101,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Órdenes",
+          "width": 91,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "📁 Categorías",
+          "width": 105,
+          "height": 43
+        },
+        {
+          "tag": "button",
+          "label": "⚙️ Configuración",
+          "width": 124,
+          "height": 43
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "768x1024",
+      "screen": "01-home",
+      "bodyScrollWidth": 768,
+      "documentScrollWidth": 768,
+      "viewportWidth": 768,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 62,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 124,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 83,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 83,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Ingresar",
+          "width": 84,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 115,
+          "height": 37
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 38,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 59,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 99,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 59,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 208,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 185,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 110,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 144,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 134,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 67,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "768x1024",
+      "screen": "02-filters",
+      "bodyScrollWidth": 768,
+      "documentScrollWidth": 768,
+      "viewportWidth": 768,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 62,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 126,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 84,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 83,
+          "height": 32
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 631,
+          "height": 35
+        },
+        {
+          "tag": "button",
+          "label": "Buscar",
+          "width": 81,
+          "height": 35
+        },
+        {
+          "tag": "button",
+          "label": "Ingresar",
+          "width": 84,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 101,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "TodosProductosServicios",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "select",
+          "label": "Todas las categoríasMaquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "select",
+          "label": "TodasTractoresPreparación del sueloSiembra y plantaciónFertilización y protecciónCosechaPostcosechaF",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "select",
+          "label": "Todas las provinciasBuenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientes",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "select",
+          "label": "Todas las localidades11 de Septiembre12 de Octubre16 de Julio17 de Agosto20 de Junio25 de Mayo30 de ",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "input",
+          "label": "Precio mínimo",
+          "width": 339,
+          "height": 40
+        },
+        {
+          "tag": "input",
+          "label": "Precio máximo",
+          "width": 339,
+          "height": 40
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "tag": "button",
+          "label": "Limpiar filtros",
+          "width": 686,
+          "height": 43
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "768x1024",
+      "screen": "03-catalog",
+      "bodyScrollWidth": 768,
+      "documentScrollWidth": 768,
+      "viewportWidth": 768,
+      "horizontalOverflow": false,
+      "overflowElements": [
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 723,
+          "right": 839
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 692,
+          "right": 808
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "left": 647,
+          "right": 775
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 668,
+          "right": 784
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 692,
+          "right": 808
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 686,
+          "right": 802
+        }
+      ],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 62,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 126,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 84,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 83,
+          "height": 32
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 631,
+          "height": 35
+        },
+        {
+          "tag": "button",
+          "label": "Buscar",
+          "width": 81,
+          "height": 35
+        },
+        {
+          "tag": "button",
+          "label": "Ingresar",
+          "width": 84,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 101,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "TodosProductosServicios",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "select",
+          "label": "Todas las categoríasMaquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "select",
+          "label": "Todas las provinciasBuenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientes",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "select",
+          "label": "Todas las localidades",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "input",
+          "label": "Precio mínimo",
+          "width": 339,
+          "height": 40
+        },
+        {
+          "tag": "input",
+          "label": "Precio máximo",
+          "width": 339,
+          "height": 40
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "tag": "button",
+          "label": "Limpiar filtros",
+          "width": 686,
+          "height": 43
+        },
+        {
+          "tag": "select",
+          "label": "Más relevantesMenor precioMayor precioMás recientesMejor calificados",
+          "width": 736,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "768x1024",
+      "screen": "04-detail",
+      "bodyScrollWidth": 768,
+      "documentScrollWidth": 768,
+      "viewportWidth": 768,
+      "horizontalOverflow": false,
+      "overflowElements": [
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 723,
+          "right": 839
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 692,
+          "right": 808
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "left": 647,
+          "right": 775
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 668,
+          "right": 784
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 692,
+          "right": 808
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 686,
+          "right": 802
+        }
+      ],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 62,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 126,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 84,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 83,
+          "height": 32
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 631,
+          "height": 35
+        },
+        {
+          "tag": "button",
+          "label": "Buscar",
+          "width": 81,
+          "height": 35
+        },
+        {
+          "tag": "button",
+          "label": "Ingresar",
+          "width": 84,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 101,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "TodosProductosServicios",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "select",
+          "label": "Todas las categoríasMaquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "select",
+          "label": "Todas las provinciasBuenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientes",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "select",
+          "label": "Todas las localidades",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "input",
+          "label": "Precio mínimo",
+          "width": 339,
+          "height": 40
+        },
+        {
+          "tag": "input",
+          "label": "Precio máximo",
+          "width": 339,
+          "height": 40
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "tag": "button",
+          "label": "Limpiar filtros",
+          "width": 686,
+          "height": 43
+        },
+        {
+          "tag": "select",
+          "label": "Más relevantesMenor precioMayor precioMás recientesMejor calificados",
+          "width": 736,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "✕",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar al Carrito",
+          "width": 680,
+          "height": 26
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "📋 Consultar",
+          "width": 128,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "768x1024",
+      "screen": "05-cart",
+      "bodyScrollWidth": 768,
+      "documentScrollWidth": 768,
+      "viewportWidth": 768,
+      "horizontalOverflow": false,
+      "overflowElements": [
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 723,
+          "right": 839
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 692,
+          "right": 808
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 691,
+          "right": 807
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 686,
+          "right": 802
+        }
+      ],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 62,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 126,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 84,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 83,
+          "height": 32
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 631,
+          "height": 35
+        },
+        {
+          "tag": "button",
+          "label": "Buscar",
+          "width": 81,
+          "height": 35
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 101,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "👤 María Cliente",
+          "width": 140,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "select",
+          "label": "TodosProductosServicios",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "select",
+          "label": "Todas las categoríasMaquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "select",
+          "label": "Todas las provinciasBuenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientes",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "select",
+          "label": "Todas las localidades",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "input",
+          "label": "Precio mínimo",
+          "width": 339,
+          "height": 40
+        },
+        {
+          "tag": "input",
+          "label": "Precio máximo",
+          "width": 339,
+          "height": 40
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "tag": "button",
+          "label": "Limpiar filtros",
+          "width": 686,
+          "height": 43
+        },
+        {
+          "tag": "select",
+          "label": "Más relevantesMenor precioMayor precioMás recientesMejor calificados",
+          "width": 736,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "768x1024",
+      "screen": "05-checkout-payment",
+      "bodyScrollWidth": 768,
+      "documentScrollWidth": 768,
+      "viewportWidth": 768,
+      "horizontalOverflow": false,
+      "overflowElements": [
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 723,
+          "right": 839
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 692,
+          "right": 808
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 691,
+          "right": 807
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "left": 686,
+          "right": 802
+        }
+      ],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 62,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 126,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 84,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 83,
+          "height": 32
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 631,
+          "height": 35
+        },
+        {
+          "tag": "button",
+          "label": "Buscar",
+          "width": 81,
+          "height": 35
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 101,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "👤 María Cliente",
+          "width": 140,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "select",
+          "label": "TodosProductosServicios",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "select",
+          "label": "Todas las categoríasMaquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "select",
+          "label": "Todas las provinciasBuenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientes",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "select",
+          "label": "Todas las localidades",
+          "width": 686,
+          "height": 42
+        },
+        {
+          "tag": "input",
+          "label": "Precio mínimo",
+          "width": 339,
+          "height": 40
+        },
+        {
+          "tag": "input",
+          "label": "Precio máximo",
+          "width": 339,
+          "height": 40
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "tag": "button",
+          "label": "Limpiar filtros",
+          "width": 686,
+          "height": 43
+        },
+        {
+          "tag": "select",
+          "label": "Más relevantesMenor precioMayor precioMás recientesMejor calificados",
+          "width": 736,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "label": "🛒 Agregar",
+          "width": 116,
+          "height": 44
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "768x1024",
+      "screen": "06-publication",
+      "bodyScrollWidth": 768,
+      "documentScrollWidth": 768,
+      "viewportWidth": 768,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 62,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 126,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 84,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 83,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Juan Vendedor",
+          "width": 153,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "✕",
+          "width": 32,
+          "height": 32
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 680,
+          "height": 39
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...Maquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos y man",
+          "width": 680,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...TractoresPreparación del sueloSiembra y plantaciónFertilización y protecciónCosechaPos",
+          "width": 680,
+          "height": 41
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 680,
+          "height": 39
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 680,
+          "height": 39
+        },
+        {
+          "tag": "select",
+          "label": "KilogramoToneladaLitrosUnidadBolsaPackHectárea",
+          "width": 680,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...Buenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientesEntre ",
+          "width": 680,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...11 de Septiembre12 de Octubre16 de Julio17 de Agosto20 de Junio25 de Mayo30 de Agosto9",
+          "width": 680,
+          "height": 41
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 680,
+          "height": 39
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 680,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "label": "+ Agregar",
+          "width": 680,
+          "height": 37
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 680,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "label": "+ Agregar",
+          "width": 680,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Cancelar",
+          "width": 680,
+          "height": 43
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "768x1024",
+      "screen": "06-publication-bottom",
+      "bodyScrollWidth": 768,
+      "documentScrollWidth": 768,
+      "viewportWidth": 768,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 62,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 126,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 84,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 83,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Juan Vendedor",
+          "width": 153,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "✕",
+          "width": 32,
+          "height": 32
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 680,
+          "height": 39
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...Maquinaria agrícolaRiego y drenajeInsumos agrícolasGanadería y forrajesRepuestos y man",
+          "width": 680,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...TractoresPreparación del sueloSiembra y plantaciónFertilización y protecciónCosechaPos",
+          "width": 680,
+          "height": 41
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 680,
+          "height": 39
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 680,
+          "height": 39
+        },
+        {
+          "tag": "select",
+          "label": "KilogramoToneladaLitrosUnidadBolsaPackHectárea",
+          "width": 680,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...Buenos AiresCatamarcaChacoChubutCiudad Autónoma de Buenos AiresCórdobaCorrientesEntre ",
+          "width": 680,
+          "height": 41
+        },
+        {
+          "tag": "select",
+          "label": "Seleccionar...11 de Septiembre12 de Octubre16 de Julio17 de Agosto20 de Junio25 de Mayo30 de Agosto9",
+          "width": 680,
+          "height": 41
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 680,
+          "height": 39
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 680,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "label": "+ Agregar",
+          "width": 680,
+          "height": 37
+        },
+        {
+          "tag": "input",
+          "label": "INPUT",
+          "width": 680,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "label": "+ Agregar",
+          "width": 680,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "Cancelar",
+          "width": 680,
+          "height": 43
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "768x1024",
+      "screen": "07-seller-panel",
+      "bodyScrollWidth": 768,
+      "documentScrollWidth": 768,
+      "viewportWidth": 768,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 62,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 126,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 84,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 83,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Juan Vendedor",
+          "width": 153,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "×",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "Editar",
+          "width": 102,
+          "height": 39
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "768x1024",
+      "screen": "07-seller-products",
+      "bodyScrollWidth": 768,
+      "documentScrollWidth": 768,
+      "viewportWidth": 768,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 62,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 126,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 84,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 83,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Juan Vendedor",
+          "width": 153,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "label": "×",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "+ Publicar Producto",
+          "width": 174,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "button",
+          "label": "BUTTON",
+          "width": 40,
+          "height": 45
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "768x1024",
+      "screen": "07-admin-panel",
+      "bodyScrollWidth": 768,
+      "documentScrollWidth": 768,
+      "viewportWidth": 768,
+      "horizontalOverflow": false,
+      "overflowElements": [],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 62,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 126,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 84,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 83,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Administrador TopGreen",
+          "width": 214,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "×",
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "clippedText": []
+    },
+    {
+      "viewport": "768x1024",
+      "screen": "07-admin-products",
+      "bodyScrollWidth": 768,
+      "documentScrollWidth": 768,
+      "viewportWidth": 768,
+      "horizontalOverflow": false,
+      "overflowElements": [
+        {
+          "tag": "thead",
+          "label": "ImagenNombrePrecioStockVendedorEstadoAcciones",
+          "left": 15,
+          "right": 860
+        },
+        {
+          "tag": "tr",
+          "label": "ImagenNombrePrecioStockVendedorEstadoAcciones",
+          "left": 15,
+          "right": 860
+        },
+        {
+          "tag": "th",
+          "label": "Acciones",
+          "left": 725,
+          "right": 860
+        },
+        {
+          "tag": "tbody",
+          "label": "Producto Smoke Imagen Fallida 1785025000415$ 23.4562Juan VendedoractiveActivoPausadoBorradorEliminad",
+          "left": 15,
+          "right": 860
+        },
+        {
+          "tag": "tr",
+          "label": "Producto Smoke Imagen Fallida 1785025000415$ 23.4562Juan VendedoractiveActivoPausadoBorradorEliminad",
+          "left": 15,
+          "right": 860
+        },
+        {
+          "tag": "td",
+          "label": "ActivoPausadoBorradorEliminado",
+          "left": 725,
+          "right": 860
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "left": 740,
+          "right": 845
+        },
+        {
+          "tag": "tr",
+          "label": "Producto Smoke UI 1785024998341$ 12.3453Juan VendedoractiveActivoPausadoBorradorEliminado",
+          "left": 15,
+          "right": 860
+        },
+        {
+          "tag": "td",
+          "label": "ActivoPausadoBorradorEliminado",
+          "left": 725,
+          "right": 860
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "left": 740,
+          "right": 845
+        },
+        {
+          "tag": "tr",
+          "label": "Campo Agrícola de 120 Hectáreas$ 950.000.0001Administrador TopGreenactiveActivoPausadoBorradorElimin",
+          "left": 15,
+          "right": 860
+        },
+        {
+          "tag": "td",
+          "label": "ActivoPausadoBorradorEliminado",
+          "left": 725,
+          "right": 860
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "left": 740,
+          "right": 845
+        },
+        {
+          "tag": "tr",
+          "label": "Kit de Filtros y Correas para Cosechadora$ 540.00018Juan VendedoractiveActivoPausadoBorradorEliminad",
+          "left": 15,
+          "right": 860
+        },
+        {
+          "tag": "td",
+          "label": "ActivoPausadoBorradorEliminado",
+          "left": 725,
+          "right": 860
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "left": 740,
+          "right": 845
+        },
+        {
+          "tag": "tr",
+          "label": "Manga Ganadera con Balanza Electrónica$ 7.600.0002Administrador TopGreenactiveActivoPausadoBorradorE",
+          "left": 15,
+          "right": 860
+        },
+        {
+          "tag": "td",
+          "label": "ActivoPausadoBorradorEliminado",
+          "left": 725,
+          "right": 860
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "left": 740,
+          "right": 845
+        },
+        {
+          "tag": "tr",
+          "label": "Equipo de Riego por Goteo para 10 Hectáreas$ 4.800.0006Juan VendedoractiveActivoPausadoBorradorElimi",
+          "left": 15,
+          "right": 860
+        }
+      ],
+      "smallTouchTargets": [
+        {
+          "tag": "button",
+          "label": "Home",
+          "width": 62,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Quienes Somos",
+          "width": 126,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Servicios",
+          "width": 84,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "Contacto",
+          "width": 83,
+          "height": 32
+        },
+        {
+          "tag": "button",
+          "label": "📦 Vender",
+          "width": 97,
+          "height": 38
+        },
+        {
+          "tag": "button",
+          "label": "AgroMarket",
+          "width": 117,
+          "height": 37
+        },
+        {
+          "tag": "button",
+          "label": "👤 Administrador TopGreen",
+          "width": 214,
+          "height": 42
+        },
+        {
+          "tag": "button",
+          "label": "Salir",
+          "width": 59,
+          "height": 34
+        },
+        {
+          "tag": "a",
+          "label": "Home",
+          "width": 39,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Servicios",
+          "width": 61,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Quienes somos",
+          "width": 102,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Contacto",
+          "width": 60,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Asesoramiento en Mecanización",
+          "width": 215,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Análisis Ambiental y Satelital",
+          "width": 189,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Monitoreo con IA",
+          "width": 113,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "info@topgreen.com.ar",
+          "width": 148,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "+54 9 223 348 5801",
+          "width": 135,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "WhatsApp",
+          "width": 69,
+          "height": 17
+        },
+        {
+          "tag": "a",
+          "label": "Twitter",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "LinkedIn",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "a",
+          "label": "Instagram",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "label": "×",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        },
+        {
+          "tag": "select",
+          "label": "ActivoPausadoBorradorEliminado",
+          "width": 105,
+          "height": 32
+        }
+      ],
+      "clippedText": []
+    }
+  ],
+  "console": [],
+  "network": []
+}

@@ -65,6 +65,8 @@ export interface User {
   whatsapp?: string;
   location?: string;
   bio?: string;
+  cbu?: string;
+  bankAlias?: string;
   role: 'user' | 'admin' | 'seller' | 'buyer' | 'both';
   avatar?: string;
   avatarUrl?: string;
@@ -129,7 +131,7 @@ export interface Order {
   totalAmount: number;
   shippingAddress: ShippingAddress;
   paymentMethod: 'transfer' | 'mercadopago' | 'cash';
-  status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'awaiting-transfer-receipt' | 'transfer-receipt-submitted' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
   createdAt: string;
   updatedAt: string;
 }

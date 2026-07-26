@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import styles from './CheckoutModal.module.css';
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { apiFetch } from '../../utils/api';
+import { API_BASE_URL, apiFetch, apiGet, tokenStorage } from '../../utils/api';
 
 interface CheckoutModalProps {
   onClose: () => void;
 }
 
-type CheckoutStep = 'shipping' | 'payment' | 'confirmation' | 'processing';
-type PaymentMethod = 'mercadopago';
+type CheckoutStep = 'shipping' | 'payment' | 'transfer' | 'confirmation' | 'processing';
+type PaymentMethod = 'mercadopago' | 'bank_transfer';
 
 interface OrderResponse {
   id: string;
@@ -24,6 +24,21 @@ interface PaymentPreferenceResponse {
   sandbox_init_point: string;
 }
 
+interface BankTransferOption {
+  seller_id: string;
+  seller_name: string;
+  cbu?: string;
+  alias_bancario?: string;
+  amount: number;
+}
+
+interface BankTransferOrder extends BankTransferOption {
+  order_id: string;
+  order_number: string;
+  status: string;
+  transfer_receipt_url?: string;
+}
+
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
   const { items, totalAmount, clearCart } = useCart();
   const { user } = useAuth();
@@ -35,6 +50,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [returnedFromMP, setReturnedFromMP] = useState(false);
+  const [transferOptions, setTransferOptions] = useState<BankTransferOption[]>([]);
+  const [transferOrders, setTransferOrders] = useState<BankTransferOrder[]>([]);
+  const [transferFiles, setTransferFiles] = useState<Record<string, File>>({});
+  const [transferMessages, setTransferMessages] = useState<Record<string, string>>({});
+  const [loadingTransferOptions, setLoadingTransferOptions] = useState(false);
   
   const [shippingData, setShippingData] = useState({
     fullName: user?.name || '',
@@ -81,46 +101,86 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     setCurrentStep('payment');
   };
 
+  const syncBackendCart = async () => {
+    const cartItems = items.map(item => ({
+      product_id: item.product.id,
+      quantity: item.quantity
+    }));
+    try {
+      await apiFetch('/cart/sync', {
+        method: 'POST',
+        body: JSON.stringify({ items: cartItems })
+      });
+    } catch (syncError) {
+      console.error('Error sincronizando carrito:', syncError);
+      for (const item of items) {
+        try {
+          await apiFetch('/cart/items', {
+            method: 'POST',
+            body: JSON.stringify({ product_id: item.product.id, quantity: item.quantity })
+          });
+        } catch {
+          await apiFetch(`/cart/items/${item.product.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ quantity: item.quantity })
+          });
+        }
+      }
+    }
+  };
+
+  const selectBankTransfer = async () => {
+    setPaymentMethod('bank_transfer');
+    setError('');
+    setLoadingTransferOptions(true);
+    try {
+      await syncBackendCart();
+      setTransferOptions(await apiGet<BankTransferOption[]>('/orders/transfer-options'));
+    } catch (err) {
+      setTransferOptions([]);
+      setError(err instanceof Error ? err.message : 'No se pudo ofrecer transferencia');
+    } finally {
+      setLoadingTransferOptions(false);
+    }
+  };
+
+  const uploadTransferReceipt = async (orderId: string) => {
+    const file = transferFiles[orderId];
+    if (!file) {
+      setTransferMessages(current => ({ ...current, [orderId]: 'Seleccioná un comprobante' }));
+      return;
+    }
+    const body = new FormData();
+    body.append('file', file);
+    const token = tokenStorage.getAccessToken();
+    try {
+      const response = await fetch(`${API_BASE_URL}/orders/${orderId}/transfer-receipt`, {
+        method: 'POST',
+        body,
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+      setTransferOrders(current => current.map(order =>
+        order.order_id === orderId ? { ...order, ...data } : order
+      ));
+      setTransferMessages(current => ({ ...current, [orderId]: 'Comprobante enviado' }));
+    } catch (err) {
+      setTransferMessages(current => ({
+        ...current,
+        [orderId]: err instanceof Error ? err.message : 'No se pudo subir el comprobante',
+      }));
+    }
+  };
+
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
     try {
-      // 1. Primero, sincronizar el carrito local con el backend
-      // Limpiar carrito del backend y agregar items locales
-      try {
-        const cartItems = items.map(item => ({
-          product_id: item.product.id,
-          quantity: item.quantity
-        }));
-        
-        // Sincronizar carrito
-        await apiFetch('/cart/sync', {
-          method: 'POST',
-          body: JSON.stringify({ items: cartItems })
-        });
-      } catch (syncError) {
-        console.error('Error sincronizando carrito:', syncError);
-        // Intentar agregar items uno por uno
-        for (const item of items) {
-          try {
-            await apiFetch('/cart/items', {
-              method: 'POST',
-              body: JSON.stringify({
-                product_id: item.product.id,
-                quantity: item.quantity
-              })
-            });
-          } catch (e) {
-            // Si el item ya existe, intentar actualizar
-            await apiFetch(`/cart/items/${item.product.id}`, {
-              method: 'PUT',
-              body: JSON.stringify({ quantity: item.quantity })
-            });
-          }
-        }
-      }
+      await syncBackendCart();
 
       // 2. Crear la orden con los datos de envío
       const checkoutData = {
@@ -130,6 +190,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         shipping_postal_code: shippingData.postalCode,
         notes: shippingData.notes || `Tel: ${shippingData.phone}`
       };
+
+      if (paymentMethod === 'bank_transfer') {
+        const response = await apiFetch<{ orders: BankTransferOrder[] }>('/orders/checkout/transfer', {
+          method: 'POST',
+          body: JSON.stringify(checkoutData)
+        });
+        setTransferOrders(response.orders);
+        clearCart();
+        setCurrentStep('transfer');
+        return;
+      }
 
       const orderResponse = await apiFetch<OrderResponse>('/orders/checkout', {
         method: 'POST',
@@ -349,18 +420,96 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
           </div>
         </label>
 
-
+        <label className={`${styles.paymentOption} ${paymentMethod === 'bank_transfer' ? styles.paymentOptionActive : ''}`}>
+          <input
+            type="radio"
+            name="payment"
+            value="bank_transfer"
+            checked={paymentMethod === 'bank_transfer'}
+            onChange={() => void selectBankTransfer()}
+          />
+          <div className={styles.paymentContent}>
+            <div className={styles.paymentIcon}>🏦</div>
+            <div>
+              <div className={styles.paymentTitle}>Transferencia bancaria</div>
+              <div className={styles.paymentDescription}>
+                Transferí directamente al vendedor y adjuntá el comprobante
+              </div>
+            </div>
+          </div>
+        </label>
       </div>
+
+      {paymentMethod === 'bank_transfer' && (
+        <div className={styles.confirmationInfo}>
+          {loadingTransferOptions ? (
+            <p>Cargando datos bancarios...</p>
+          ) : transferOptions.map(option => (
+            <div key={option.seller_id} className={styles.infoCard}>
+              <h3>{option.seller_name}</h3>
+              {option.cbu && <p><strong>CBU:</strong> {option.cbu}</p>}
+              {option.alias_bancario && <p><strong>Alias:</strong> {option.alias_bancario}</p>}
+              <p><strong>Monto:</strong> {formatPrice(option.amount)}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className={styles.formActions}>
         <button type="button" className={styles.backButton} onClick={() => setCurrentStep('shipping')} disabled={isLoading}>
           ← Volver
         </button>
         <button type="submit" className={styles.nextButton} disabled={isLoading}>
-          {isLoading ? 'Procesando...' : 'Pagar con MercadoPago'}
+          {isLoading
+            ? 'Procesando...'
+            : paymentMethod === 'bank_transfer'
+              ? 'Crear orden y adjuntar comprobante'
+              : 'Pagar con MercadoPago'}
         </button>
       </div>
     </form>
+  );
+
+  const renderTransferStep = () => (
+    <div className={styles.confirmation}>
+      <h2>🏦 Transferencia bancaria</h2>
+      <p>Adjuntá un comprobante por vendedor. La orden queda pendiente hasta su validación.</p>
+      {transferOrders.map(order => (
+        <div key={order.order_id} className={styles.infoCard}>
+          <h3>{order.seller_name}</h3>
+          <p>Orden: <strong>{order.order_number}</strong></p>
+          {order.cbu && <p><strong>CBU:</strong> {order.cbu}</p>}
+          {order.alias_bancario && <p><strong>Alias:</strong> {order.alias_bancario}</p>}
+          <p><strong>Titular:</strong> {order.seller_name}</p>
+          <p><strong>Monto:</strong> {formatPrice(order.amount)}</p>
+          {order.status === 'transfer_receipt_submitted' ? (
+            <p>✅ Comprobante enviado. Esperando validación del vendedor.</p>
+          ) : (
+            <>
+              <input
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp,.pdf"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) setTransferFiles(current => ({ ...current, [order.order_id]: file }));
+                }}
+              />
+              <button
+                type="button"
+                className={styles.nextButton}
+                onClick={() => void uploadTransferReceipt(order.order_id)}
+              >
+                Adjuntar comprobante
+              </button>
+            </>
+          )}
+          {transferMessages[order.order_id] && <p>{transferMessages[order.order_id]}</p>}
+        </div>
+      ))}
+      <button type="button" className={styles.finishButton} onClick={onClose}>
+        Finalizar
+      </button>
+    </div>
   );
 
   const renderConfirmation = () => {
@@ -576,10 +725,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
             {currentStep === 'shipping' && renderShippingStep()}
             {currentStep === 'payment' && renderPaymentStep()}
             {currentStep === 'processing' && renderProcessing()}
+            {currentStep === 'transfer' && renderTransferStep()}
             {currentStep === 'confirmation' && renderConfirmation()}
           </div>
 
-          {currentStep !== 'confirmation' && currentStep !== 'processing' && renderOrderSummary()}
+          {currentStep !== 'confirmation' && currentStep !== 'processing' && currentStep !== 'transfer' && renderOrderSummary()}
         </div>
       </div>
     </div>

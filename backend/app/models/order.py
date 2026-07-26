@@ -20,6 +20,8 @@ class OrderStatus(str, enum.Enum):
     DELIVERED = "delivered"  # Entregado
     CANCELLED = "cancelled"  # Cancelado
     REJECTED = "rejected"  # Rechazado por vendedor
+    AWAITING_TRANSFER_RECEIPT = "awaiting_transfer_receipt"
+    TRANSFER_RECEIPT_SUBMITTED = "transfer_receipt_submitted"
 
 
 class Order(Base):
@@ -49,6 +51,7 @@ class Order(Base):
     buyer_notes = Column(String(500), nullable=True)
     seller_notes = Column(String(500), nullable=True)
     cancellation_reason = Column(String(500), nullable=True)
+    transfer_receipt_url = Column(String(500), nullable=True)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

@@ -35,6 +35,88 @@ que **yo verifiqué contra el código**, no lo que dijo nadie.
 
 ---
 
+## Tareas 2, 3 y 4: aprobadas las tres
+
+Revisé el código, no sólo el informe. La transferencia bancaria es la
+mejor entrega del proyecto hasta ahora.
+
+**Lo que verifiqué de la transferencia:**
+
+- La cadena de migraciones quedó intacta y la nueva es aditiva: valores de
+  enum con `IF NOT EXISTS`, columnas anulables, ningún renombre. Y el
+  `downgrade` resuelve bien que PostgreSQL no sepa quitar valores de un
+  enum, recreando el tipo. Eso no te lo pedí.
+- **La autorización está donde tiene que estar.** Adjuntar comprobante:
+  sólo el comprador, `403` para cualquier otro. Validar: sólo el vendedor
+  dueño, `403` para cualquier otro. Rechazo sin motivo: `400`. Y el
+  estado se verifica antes de cada transición.
+- El caso 16 hace exactamente lo que pedí: registra un segundo vendedor,
+  confirma el `403`, y recién después aprueba con el correcto
+  contrastando contra SQL.
+- 18/18 en verde, con el caso 18 manejando Chromium de verdad por todo el
+  recorrido.
+
+**Dos cosas que resolviste sin que te las pidiera** y que valen más que
+el resto:
+
+1. **Una orden por vendedor** cuando el carrito mezcla publicaciones de
+   varios. Eso no estaba en el enunciado y sin eso el flujo se rompía en
+   silencio con dos vendedores.
+2. Reportaste la corrida previa en 17/18 y el selector ambiguo que la
+   causó, en vez de mostrar sólo la buena.
+
+Y la lista de "decisiones no inventadas" —sin conciliación bancaria, sin
+definir la transferencia insuficiente, sin avisos por correo— es
+exactamente el reflejo correcto. Lo de la transferencia insuficiente va a
+las preguntas para la clienta.
+
+**Del relevamiento móvil:** respetaste el cambio de prioridad y no
+corregiste nada. El resultado es mejor de lo que esperaba —cero
+desbordes, cero errores de consola, cero respuestas fallidas en 36
+pantallas— y confirma que aparcarlo fue la decisión correcta.
+
+---
+
+## Tarea 5: el respaldo de imágenes, en todas partes
+
+Sale de tu propio relevamiento, pero **no es un arreglo de celular**: pasa
+igual en una pantalla grande.
+
+Encontraste que en la tabla de administración las imágenes que no cargan
+muestran el ícono roto del navegador. Fui a mirar y es peor de lo que
+reportaste: **`ProductCard.tsx` es el único componente con `onError`.**
+
+Sin respaldo están el detalle de la publicación, el carrito, el checkout,
+el panel del vendedor y el de administración. Todos usan `<img>` pelado.
+
+Eso importa ahora porque **el recorrido de la demostración del jueves pasa
+por los cinco**, y las imágenes del seed vienen de `picsum.photos`, que
+falla cuando se le antoja. Un ícono roto en la pantalla de checkout
+delante de la clienta es exactamente el tipo de detalle que arruina una
+reunión buena.
+
+### Qué hacer
+
+Aplicá **el mismo respaldo que ya existe** en `ProductCard.tsx` a los
+demás. No inventes uno nuevo ni rediseñes: el que hay ya está aprobado y
+verificado en claro y oscuro.
+
+### Criterio de aceptación
+
+1. Ningún `<img>` del recorrido de la demostración queda sin `onError`.
+2. Con una URL de imagen rota a propósito, cada una de esas pantallas
+   muestra el respaldo y no el ícono del navegador.
+3. Un caso en la suite que fuerce el fallo en al menos una pantalla
+   distinta del catálogo.
+4. `npm run smoke` en verde.
+
+### Lo que NO es esta tarea
+
+No toques el tamaño de los controles ni las pestañas que necesitan
+desplazamiento. Eso es de la lista de celular y va al final.
+
+---
+
 ## Cambio de prioridad: la vista en celular se aparca
 
 **Terminá la vuelta que estás haciendo, pero cambia qué entregás.**

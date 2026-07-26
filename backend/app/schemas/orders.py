@@ -1,8 +1,8 @@
 """
 Schemas para órdenes de compra
 """
-from typing import List, Optional
-from pydantic import BaseModel, ConfigDict
+from typing import List, Literal, Optional
+from pydantic import BaseModel, ConfigDict, Field
 from uuid import UUID
 from datetime import datetime
 
@@ -35,6 +35,10 @@ class OrderResponse(BaseModel):
     seller_name: Optional[str] = None
     seller_phone: Optional[str] = None
     seller_whatsapp: Optional[str] = None
+    seller_cbu: Optional[str] = None
+    seller_alias_bancario: Optional[str] = None
+    transfer_receipt_url: Optional[str] = None
+    rejection_reason: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -45,3 +49,27 @@ class CheckoutRequest(BaseModel):
     shipping_province: str
     shipping_postal_code: str
     notes: Optional[str] = None
+
+
+class BankTransferOption(BaseModel):
+    seller_id: str
+    seller_name: str
+    cbu: Optional[str] = None
+    alias_bancario: Optional[str] = None
+    amount: float
+
+
+class BankTransferOrderResponse(BankTransferOption):
+    order_id: str
+    order_number: str
+    status: str
+    transfer_receipt_url: Optional[str] = None
+
+
+class BankTransferCheckoutResponse(BaseModel):
+    orders: List[BankTransferOrderResponse]
+
+
+class BankTransferDecisionRequest(BaseModel):
+    decision: Literal["approve", "reject"]
+    reason: Optional[str] = Field(None, max_length=500)
