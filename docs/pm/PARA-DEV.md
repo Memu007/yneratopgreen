@@ -77,6 +77,230 @@ pantallas— y confirma que aparcarlo fue la decisión correcta.
 
 ---
 
+## Cómo trabajamos la Tarea 6: la diseñamos entre las dos
+
+Este módulo es 25 % del contrato y es el diferencial del producto. Es
+demasiado grande para que yo baje una especificación y vos la ejecutes.
+
+Así que va distinto:
+
+- **La Pieza A arrancala ya**, sin esperarme. No tiene nada discutible.
+- **Las Piezas B y C no las escribas todavía.** Abajo está mi propuesta.
+  Quiero que la leas, la discutas, y me contestes en `PARA-PM.md` antes de
+  escribir código. Después arrancás.
+
+No es burocracia: es que en las últimas dos vueltas encontraste dos cosas
+que yo no había visto —los pagos alcanzables y que la orden no guardaba
+los datos bancarios—, y las dos eran de diseño. Prefiero gastar una vuelta
+en discutirlo que tres en rehacerlo.
+
+### Lo que necesito que audites primero
+
+Ya encontré una: **`OrderResponse` devuelve `buyer_phone` y
+`buyer_address`**, y `GET /orders/{id}` los entrega a quien sea comprador o
+vendedor de esa orden.
+
+Cuando el transportista quede asociado a una orden, si puede leerla **se
+saltea el candado de suscripción sin proponérselo**. El candado en un
+endpoint nuevo no sirve de nada si el teléfono sale por otro lado.
+
+**Mapeame por dónde sale hoy el contacto del comprador**: qué endpoints lo
+devuelven, con qué permiso, y qué pasaría si el transportista tuviera
+acceso a la orden. Con eso decidimos dónde va el control, y quiero tu
+recomendación, no sólo el mapa.
+
+### Las cuatro cosas que quiero discutir con vos
+
+**1. La semántica de la coincidencia.** Mi propuesta está abajo: el
+transportista sirve si **origen y destino** caen dentro de su radio. Es la
+lectura estricta. ¿Te cierra? ¿O tiene más sentido medir contra el origen
+solamente, o contra el punto medio? Si el radio es chico y el viaje largo,
+mi versión puede no devolver a nadie nunca.
+
+**2. Dónde vive el transportista.** ¿Una marca en `users` más una tabla de
+perfil? ¿Otra cosa? El contrato dice "tipo especial de proveedor", no un
+rol nuevo, pero la forma concreta es tu decisión.
+
+**3. Dónde se aplica el candado.** ¿Una dependencia única que envuelva
+todo lo que devuelva contacto? ¿Un armado de respuesta que quite los
+campos? Quiero **un solo lugar donde se decida**, no una condición
+repetida en cada endpoint. Cómo lograrlo es tu terreno.
+
+**4. Qué ve el transportista de la orden.** Mi instinto es que **no**
+debería leer la orden completa: no necesita el total, ni los precios, ni
+el comprobante de transferencia. Necesita origen, destino, y el contacto
+si pagó. ¿Coincidís en armarle una vista propia en vez de darle acceso a
+`OrderResponse`?
+
+Si en algo de esto te parece que estoy complicando algo simple, decilo.
+
+---
+
+## Tarea 6: el módulo de transportistas. Arranca ahora
+
+**Es el bloque grande que falta: 25 % del contrato, hoy en cero.** Y es el
+diferencial del producto.
+
+### Estaba mal trabado, y el error era mío
+
+Yo venía diciendo que no arrancaba hasta que la clienta definiera si la
+cobertura iba por zonas declaradas o por radio en kilómetros. **Fui a leer
+el contrato y ya está definido:**
+
+> *"El transportista se registra detallando: ubicación base, transporte
+> habilitado certificado, **zona de cobertura (radio en km)** y capacidad
+> de carga."*
+
+Radio en kilómetros. Las zonas declaradas eran una idea mía, mejor en
+algunos casos, pero **no es lo contratado**. Si la clienta las quiere
+después, es un cambio que se cotiza.
+
+Otra cosa que el contrato deja clara y conviene tener presente:
+
+> *"En lugar de un complejo algoritmo automatizado de ruteo, se propone un
+> modelo de **Directorio** de Logística por Geolocalización."*
+
+**Es un directorio, no un motor de ruteo.** No calcules rutas, no estimes
+tiempos, no optimices nada. Filtrás por distancia y listás.
+
+### Hacelo en tres piezas, con commit e informe entre cada una
+
+**Pieza A — el transportista existe.**
+
+No es un rol nuevo: el contrato dice *"un tipo especial de proveedor"*.
+Extendé lo que ya hay en vez de inventar una jerarquía nueva.
+
+Declara cuatro cosas:
+
+1. **Ubicación base.** Del padrón, igual que las publicaciones. Ya tenés
+   el mecanismo hecho.
+2. **Transporte habilitado certificado.** Un texto y una marca de
+   habilitación. **No construyas verificación de certificados**: el
+   contrato no la pide y no la vamos a validar contra ningún organismo.
+3. **Radio de cobertura en km.** Un número.
+4. **Capacidad de carga.** Texto libre, como el ejemplo del contrato:
+   *"hasta 40 toneladas de semillas"*.
+
+**Pieza B — la coincidencia por distancia.**
+
+Dada una compra, listar transportistas cuya cobertura alcance el
+recorrido.
+
+**Mi interpretación, y quiero que la discutas si no te cierra:** el
+transportista cubre un círculo de radio R alrededor de su base, y sirve
+para un viaje si **tanto el origen como el destino** caen dentro de ese
+círculo. Es la lectura estricta: prefiero no ofrecer un transportista que
+después no pueda hacer el viaje.
+
+Usá `ST_DWithin` sobre `localities.coordinates`, que ya tiene índice GIST.
+No calcules distancias en Python.
+
+**La capacidad de carga no filtra**: se muestra como dato y el comprador
+decide. El contrato dice "que coincidan con los requerimientos del
+producto", pero no hay campo de peso en las publicaciones y no lo vamos a
+agregar.
+
+**Pieza C — elegirlo, incluirlo, y el candado de contacto.**
+
+El contrato da dos caminos y hay que ofrecer los dos: *"seleccionar el
+transportista e incluirlo en la transacción"*, o *"coordinar el envío
+directo con los datos de contacto provistos"*.
+
+**Los datos de contacto se muestran recién después de seleccionarlo**, no
+en el listado.
+
+### El candado por suscripción
+
+Definición nueva del dueño del proyecto: **el teléfono del comprador se ve
+sólo si hay suscripción paga.** Es el modelo de negocio de la clienta —
+el transportista paga para recibir contactos.
+
+**Construí el candado, no el sistema de suscripciones.** La diferencia es
+todo:
+
+**Lo que sí:**
+
+- Un campo en el usuario que indique si su suscripción está activa, con
+  fecha de vencimiento anulable.
+- Que el administrador lo pueda activar y desactivar a mano, igual que el
+  vendedor valida un comprobante de transferencia. Ya tenemos ese patrón.
+- **La verificación en el backend**, en el endpoint que devuelve datos de
+  contacto. Sin suscripción activa, la respuesta **no trae el teléfono**.
+  No lo mandes y lo tapes en la interfaz: no lo mandes.
+
+**Lo que no, y es importante que no lo hagas:**
+
+- Nada de cobro, renovación automática, avisos de vencimiento, planes,
+  niveles ni prorrateo.
+- Nada de integrar un medio de pago para la suscripción.
+
+Eso es un módulo entero, no está en el contrato y se cotiza aparte. El
+candado son horas; el sistema son semanas.
+
+### Por qué el candado va ahora y no después
+
+Es el mismo argumento que usamos con la privacidad de los datos de
+contacto: **quién puede ver qué es la forma del módulo, no una capa que se
+agrega arriba.** Si los endpoints se construyen devolviendo el teléfono
+siempre, ponerle el candado después es tocar todos.
+
+Definido de entrada es un `if` en un lugar.
+
+### Criterio de aceptación del candado
+
+1. Sin suscripción activa, la respuesta de la API **no contiene** el
+   teléfono. Verificado contra el JSON, no contra la pantalla.
+2. Con suscripción activa, sí.
+3. Con suscripción **vencida por fecha**, no. Ese es el caso que se
+   olvida.
+4. La interfaz explica por qué no lo ve, en vez de mostrar un campo vacío.
+5. Casos en la suite para los tres estados: sin suscripción, activa y
+   vencida.
+
+El punto 3 es el que más me importa. Una suscripción que no vence no es
+una suscripción.
+
+### Criterios de aceptación
+
+Por pieza, y relacionales:
+
+1. Un transportista se registra con las cuatro cosas y aparece en la
+   base. Ninguna es opcional salvo el texto de capacidad.
+2. **El listado de compatibles coincide con la consulta SQL equivalente**
+   usando `ST_DWithin`. Ese es el criterio, no una cantidad fija.
+3. Un caso donde un transportista queda **fuera** por poco y otro
+   **dentro** por poco. Los bordes son donde esto se rompe.
+4. Los datos de contacto **no** aparecen en el listado, verificado por
+   API: que la respuesta del listado no los traiga, no que el frontend no
+   los muestre.
+5. Casos nuevos en la suite para las tres piezas.
+6. `npm run smoke` en verde.
+
+El punto 4 es de privacidad: son teléfonos y direcciones de gente real.
+
+### Aprobación de esquema
+
+**Autorizada** para las cuatro cosas del transportista y para asociar un
+transportista a una orden. Migración aditiva, generada desde los modelos,
+con `alembic check` limpio después.
+
+### Frená y preguntá si
+
+- La distancia entre localidades da resultados que no tienen sentido.
+- Tenés que agregar peso o volumen a las publicaciones.
+- El flujo te obliga a cambiar el checkout de transferencia que acabás de
+  terminar.
+
+### Sobre el jueves
+
+**No apuntes a mostrarlo.** Faltan cuatro días y esto es un módulo entero.
+La Pieza A sola no se muestra: un formulario de registro sin el listado no
+dice nada. Si llegan las tres, lo reevalúo.
+
+Lo que se muestra el jueves ya está decidido y está en `DEMO.md`.
+
+---
+
 ## Las cuatro piezas: aprobadas. Verificadas contra el código
 
 No leí sólo tu informe. Lo que confirmé por mi cuenta:
