@@ -275,8 +275,25 @@ Orden de precedencia, de mayor a menor:
 ## Fuera de alcance
 
 Publicidad y posiciones patrocinadas, financiación y canje, portal
-editorial y SEO masivo, suscripciones para vendedores, recomendaciones
-con IA, multi-país y multi-idioma, paridad con Agrofy.
+editorial y SEO masivo, **el sistema de cobro de suscripciones**,
+recomendaciones con IA, multi-país y multi-idioma, paridad con Agrofy.
+
+### Matiz sobre suscripciones, 2026-07-26
+
+Se distinguen dos cosas que antes estaban juntas:
+
+| Pieza | Alcance |
+|---|---|
+| **El candado**: los datos de contacto se ven sólo con suscripción activa, marcada a mano por el administrador | **Dentro.** Definición del dueño del proyecto. Son horas y es estructural: define qué devuelven los endpoints |
+| **El sistema de suscripciones**: cobro, renovación, planes, niveles, avisos de vencimiento, prorrateo | **Fuera.** Módulo entero, se cotiza aparte |
+
+Motivo de incluir el candado: quién puede ver qué es la forma del módulo,
+no una capa que se agrega después. Construir los endpoints devolviendo el
+teléfono siempre y ponerle el control de acceso más adelante significa
+tocarlos todos.
+
+Es el mismo criterio que se aplicó a la privacidad de los datos de
+contacto del transportista.
 
 Tampoco entran: mensajería comprador ↔ vendedor, reviews de productos,
 favoritos, cupones.

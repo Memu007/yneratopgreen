@@ -4,13 +4,31 @@ Actualizado: 2026-07-26.
 
 ## Objetivo activo
 
-**Preparar la demostración del 30 de julio** y desbloquear el módulo de
+**Preparar la demostración del 30 de julio** y construir el módulo de
 transportistas.
 
 ## Dónde estamos
 
-Avance contra el contrato: **~49%**. Evidencia requisito por requisito en
+Avance contra el contrato: **~53%**. Evidencia requisito por requisito en
 `MATRIZ.md`.
+
+Ponderado por esfuerzo, no por cantidad de renglones. Los nueve
+requisitos de logística son un módulo entero, no nueve tareas chicas.
+
+| Bloque | Peso | Avance |
+|---|---|---|
+| Comprador y vendedor | 30 % | 90 % |
+| **Logística y transportistas** | **25 %** | **0 %** |
+| Pagos | 15 % | 50 % |
+| Catálogo y categorías | 8 % | 90 % |
+| Stack y responsive | 10 % | 70 % |
+| Cierre, despliegue y entrega | 12 % | 35 % |
+
+**Subió sólo 4 puntos aunque se construyó mucho**, y el motivo importa:
+la transferencia bancaria sumó, pero Mercado Pago **restó**. Estaba
+contado como medio hecho y pasó a cero al desmontarlo. Fue la decisión
+correcta y aun así el número la castiga; así tiene que ser un porcentaje
+honesto.
 
 Se pasó de un repositorio donde la base de datos no se podía crear a un
 sistema que levanta desde cero con un comando. Todo lo declarado tiene
@@ -43,7 +61,7 @@ evidencia de ejecución detrás.
 - **Catálogo de demostración**: 30 publicaciones en doce categorías y
   nueve provincias. Seed idempotente, corrido dos veces sin duplicar.
 
-**Tres lecturas para no leer mal ese 49 %:**
+**Tres lecturas para no leer mal ese 53 %:**
 
 1. Buena parte de la jornada fue arqueología, no construcción.
 2. El mayor salto lo dio el recorte de alcance, no el código. Esa palanca
@@ -57,8 +75,17 @@ evidencia de ejecución detrás.
    2026-07-26.** Los tres requisitos contractuales de la sección 3.3
    cerrados, con copia de los datos bancarios guardada en la orden y
    avisos en pantalla para comprador y vendedor. **Suite en 20/20.**
-2. **Transportistas.** No arranca hasta que la clienta defina cobertura
-   por zonas o por radio, y quién ve los datos de contacto de quién.
+2. **Transportistas: arranca ya.** Estaba trabado por error mío. El
+   contrato **ya define** la cobertura: *"zona de cobertura (radio en
+   km)"*. Las zonas declaradas eran una propuesta mía, no lo contratado;
+   si la clienta las quiere, es un cambio a cotizar.
+
+   Y también aclara que es un **directorio, no un motor de ruteo**: se
+   filtra por distancia y se lista, sin calcular rutas ni tiempos.
+
+   Se hace en tres piezas: el transportista como tipo especial de
+   proveedor, la coincidencia por `ST_DWithin`, y la selección con los
+   datos de contacto **recién después de elegirlo**.
 3. **Mercado Pago: se reconstruye desde cero, sin split.** Lo heredado se
    desmontó el 2026-07-26. Ver el bloqueo de abajo.
 4. **Al final, antes de desplegar:** correcciones de la vista en celular,
@@ -84,9 +111,9 @@ incendio.
    se va a mostrar, sobre instalación limpia y cronometrado. Guión en
    `DEMO.md`.
 
-2. **Módulo de transportistas.** El bloque grande que falta del
-   diferencial. **No arranca** hasta que el cliente defina si la
-   coincidencia va por zonas declaradas o por radio en km.
+2. **Módulo de transportistas, en curso.** El bloque grande del
+   diferencial, 25 % del contrato. Radio en km por contrato, directorio y
+   no ruteo, en tres piezas con informe entre cada una.
 
 ## Equipo
 
@@ -108,8 +135,10 @@ así se detectó. Los números fijos envejecen mal.
 - **El contrato no está firmado.** Firma prevista el 2026-07-30. El plazo
   de 12 a 14 semanas arranca ahí, así que lo construido es previo al
   reloj. Con 7 a 9 semanas de trabajo restante, entra.
-- **Definición pendiente del cliente:** cobertura del transportista por
-  zonas declaradas o por radio en km. Sin eso no arranca el bloque grande.
+- ~~**Definición pendiente del cliente:** cobertura del transportista.~~
+  **Resuelto el 2026-07-26 leyendo el contrato**, que dice "zona de
+  cobertura (radio en km)". No era una pregunta abierta: era yo que no
+  había leído bien mi propia transcripción. El bloque grande arranca.
 - **Mercado Pago: desmontado el 2026-07-26, se rehace desde cero.** La
   auditoría de la dev demostró que lo heredado no era el "checkout
   básico" del contrato: era split con comisión de marketplace y OAuth de
