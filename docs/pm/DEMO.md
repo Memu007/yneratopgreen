@@ -10,7 +10,7 @@ recorrido terminado y no lo que está a medio hacer.
 
 ## Antes de entrar a la reunión
 
-1. **Correr `npm run smoke`.** Doce casos, arranque limpio. Si da verde,
+1. **Correr `npm run smoke`.** Veinte casos, arranque limpio. Si da verde,
    nada te va a sorprender en vivo. Si da rojo, no entres a demostrar
    hasta resolverlo.
 2. **Dejar la aplicación ya levantada**, con sesión iniciada en una
@@ -32,7 +32,7 @@ Datos de acceso:
 
 ### 1. El catálogo (2 min)
 
-Abrí el marketplace. **28 publicaciones, doce categorías, nueve
+Abrí el marketplace. **30 publicaciones, doce categorías, nueve
 provincias**, con la taxonomía que mandó ella: sus 7 categorías y 43
 subcategorías, más Bienes y Ganado, más los servicios.
 
@@ -142,7 +142,7 @@ estadísticas.
 ### 6. Cierre (1 min)
 
 > "Todo esto corre sobre PostgreSQL con PostGIS, que es la base que pide
-> el documento, y hay **dieciocho pruebas automáticas** que verifican este
+> el documento, y hay **veinte pruebas automáticas** que verifican este
 > mismo recorrido con un solo comando."
 
 ---
@@ -152,7 +152,7 @@ estadísticas.
 | No mostrar | Por qué |
 |------------|---------|
 | La página de Servicios | Es institucional estática, no publicaciones. Confunde en un marketplace |
-| Intentar pagar | No hay credenciales de Mercado Pago |
+| Intentar pagar con tarjeta | Mercado Pago está desmontado a propósito. La transferencia sí se muestra entera |
 | Cualquier cosa de transportistas | No está construido |
 | Modo oscuro | Existe pero no hay forma de activarlo desde la interfaz |
 | El repositorio o la documentación heredada | No aporta y abre preguntas sobre el equipo anterior |
@@ -173,10 +173,26 @@ estadísticas.
 
 ### "¿Puedo cobrar ya?"
 
-> "El cobro con Mercado Pago está implementado. Necesita la cuenta de
-> ustedes para activarse; es la parte que figura como responsabilidad del
-> cliente. La transferencia bancaria con comprobante entra en la etapa de
-> pagos."
+> "Por transferencia bancaria, sí, y lo acaba de ver funcionando. El
+> vendedor carga su CBU, el comprador transfiere y sube el comprobante, y
+> el vendedor lo aprueba mirando su cuenta. La plataforma no toca la
+> plata.
+>
+> Con tarjeta todavía no: necesitamos la cuenta de Mercado Pago de
+> ustedes, que es lo que figura como responsabilidad del cliente."
+
+**Si insiste con la tarjeta**, esa es la puerta para contar lo que
+sacaste:
+
+> "Y hay algo que quiero que sepa. Lo que venía del desarrollo anterior no
+> era un cobro simple: era un esquema donde la plataforma cobraba todo y
+> retenía una comisión. Eso la obliga a registrarse ante el Banco Central
+> como proveedor de servicios de pago. Lo desactivamos, y cuando hagamos
+> la integración va a ser como pide su documento: el pago va directo a
+> cada vendedor."
+
+Es probablemente lo más valioso que le podés decir en toda la reunión, y
+no tiene nada que ver con pantallas.
 
 ### "¿Cuándo está listo?"
 

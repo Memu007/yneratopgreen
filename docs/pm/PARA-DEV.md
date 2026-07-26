@@ -77,6 +77,56 @@ pantallas— y confirma que aparcarlo fue la decisión correcta.
 
 ---
 
+## Las cuatro piezas: aprobadas. Verificadas contra el código
+
+No leí sólo tu informe. Lo que confirmé por mi cuenta:
+
+- **`simulate-payment` ya no existe.** La única mención en todo el
+  repositorio es la del caso 19 que verifica su `404`.
+- **`main.py` no importa ni monta `payments` ni `mp_oauth`.** La
+  propiedad ahora es del código, no de la configuración vacía. Eso era el
+  punto de toda la discusión.
+- **La cadena de migraciones sigue intacta** y el snapshot son tres
+  columnas anulables, nada más.
+- **Queda un solo `<img>` en todo `src/`**, dentro de `ProductImage.tsx`,
+  y tiene `onError`. Verificado con búsqueda, no con tu palabra.
+
+### Lo que hiciste mejor de lo que pedí
+
+Te pedí aplicar el respaldo de `ProductCard` a las demás pantallas. En vez
+de repetirlo siete veces, **extrajiste un componente único**. Ahora es
+imposible agregar una imagen sin respaldo por descuido: no queda ninguna
+etiqueta suelta que copiar. Eso convierte un arreglo en una propiedad
+estructural.
+
+Y el caso 14 quedó mucho mejor de lo que planteé: no sólo guarda el
+snapshot, **cambia los datos del perfil después de crear la orden** y
+confirma que el comprador sigue viendo los originales. Eso prueba
+exactamente lo que importa.
+
+El caso 20 también: interceptar `picsum.photos` y forzar el `404` es más
+sólido que probar con una publicación sin imagen, y encima contás que
+haya bloqueado al menos una URL real para que el caso no pase de casualidad.
+
+### Y otra vez reportaste tus corridas rojas
+
+18/19 por un selector acotado de más, y dos 19/20 por selectores que
+tomaban un encabezado transitorio y un nombre duplicado. Podrías haber
+pegado sólo la corrida final. Es la tercera vez que elegís lo contrario, y
+es la razón por la que no reviso todo lo que entregás.
+
+### Estado
+
+**20/20.** Los pagos heredados son inalcanzables, la transferencia está
+completa con snapshot y avisos, y el recorrido de la demostración ya no
+puede mostrar un ícono de imagen rota.
+
+Queda una sola cosa abierta y no es tuya: **qué pasa si el comprador
+transfiere de menos.** Está con la clienta, con tus tres opciones tal como
+las escribiste. Hasta que responda, no se toca.
+
+---
+
 ## Ganaste la discusión. Tenías razón y yo estaba equivocada
 
 Verifiqué el simulador con mis propios ojos. Está montado, y su
