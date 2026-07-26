@@ -6,6 +6,7 @@ import { useToast } from '../Toast/Toast';
 import { formatPrice } from '../../utils/formatters';
 import { SellerProfileModal } from '../SellerProfile/SellerProfileModal';
 import styles from './ProductDetailModal.module.css';
+import { ProductImage } from '../ProductImage/ProductImage';
 
 interface ProductDetailModalProps {
   product: Product;
@@ -50,7 +51,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
           {/* Galería de Imágenes */}
           <div className={styles.imageSection}>
             <div className={styles.mainImage}>
-              <img src={images[selectedImage]} alt={product.name} />
+              <ProductImage src={images[selectedImage]} alt={product.name} />
             </div>
             <div className={styles.thumbnails}>
               {images.map((img, idx) => (
@@ -59,7 +60,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                   className={`${styles.thumbnail} ${selectedImage === idx ? styles.thumbnailActive : ''}`}
                   onClick={() => setSelectedImage(idx)}
                 >
-                  <img src={img} alt={`${product.name} ${idx + 1}`} />
+                  <ProductImage src={img} alt={`${product.name} ${idx + 1}`} />
                 </div>
               ))}
             </div>

@@ -3,6 +3,7 @@ import styles from './UserDashboard.module.css';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Toast/Toast';
 import { apiGet, apiPatch, apiDelete, apiPost, tokenStorage, API_BASE_URL } from '../../utils/api';
+import { ProductImage } from '../ProductImage/ProductImage';
 
 type TabType = 'profile' | 'notifications' | 'purchases' | 'sales' | 'products';
 
@@ -188,16 +189,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   const [editingProduct, setEditingProduct] = useState<EditFormData | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   
-  // Estado para MercadoPago
-  const [mpLinked, setMpLinked] = useState(false);
-  const [mpUserId, setMpUserId] = useState<string | null>(null);
-  const [loadingMpStatus, setLoadingMpStatus] = useState(false);
-  const [linkingMp, setLinkingMp] = useState(false);
-  // La integración con Mercado Pago se entrega desvinculada. Si el backend
-  // responde 503 ("no está configurada"), mostramos un banner explicativo
-  // en lugar del flujo de vinculación. Ver docs/SETUP_PAYMENTS.md.
-  const [mpNotConfigured, setMpNotConfigured] = useState(false);
-  
   // Estado para notificaciones
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -377,62 +368,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     loadNotifications();
   }, [activeTab]);
 
-  // Manejar callback de OAuth de MercadoPago
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const mpLinked = urlParams.get('mp_linked');
-    const mpError = urlParams.get('mp_error');
-    
-    if (mpLinked === 'success') {
-      showToast('¡Cuenta de MercadoPago vinculada exitosamente! Ahora recibirás el 100% de cada venta.', 'success');
-      setMpLinked(true);
-      // Recargar el estado de MP
-      apiGet<{ is_linked: boolean; mp_user_id?: string }>('/mp-oauth/status')
-        .then(response => {
-          setMpLinked(response.is_linked);
-          setMpUserId(response.mp_user_id || null);
-        })
-        .catch(console.error);
-      // Limpiar los parámetros de la URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (mpError) {
-      const errorMessages: Record<string, string> = {
-        'token_exchange_failed': 'Error al procesar la autorización. Intentá de nuevo.',
-        'user_not_found': 'Error de sesión. Por favor, iniciá sesión nuevamente.',
-        'missing_params': 'Error en la respuesta de MercadoPago. Intentá de nuevo.',
-        'invalid_state': 'El enlace de autorización expiró. Intentá vincular nuevamente.',
-        'exception': 'Error inesperado. Intentá de nuevo más tarde.'
-      };
-      showToast(errorMessages[mpError] || `Error: ${mpError}`, 'error');
-      // Limpiar los parámetros de la URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, []);
-
-  // Cargar estado de MercadoPago al montar el componente
-  useEffect(() => {
-    const loadMpStatus = async () => {
-      setLoadingMpStatus(true);
-      try {
-        const response = await apiGet<{ is_linked: boolean; mp_user_id?: string }>('/mp-oauth/status');
-        setMpLinked(response.is_linked);
-        setMpUserId(response.mp_user_id || null);
-        setMpNotConfigured(false);
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        if (/no est[áa] configurada|mp_not_configured|503/i.test(msg)) {
-          setMpNotConfigured(true);
-        } else {
-          console.error('Error al cargar estado MercadoPago:', error);
-        }
-      } finally {
-        setLoadingMpStatus(false);
-      }
-    };
-
-    loadMpStatus();
-  }, []);
-
   // Cargar categorías cuando se abre el modal de edición
   useEffect(() => {
     if (editingProduct) {
@@ -441,58 +376,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         .catch(err => console.error('Error cargando categorías:', err));
     }
   }, [editingProduct !== null]);
-
-  // Función para vincular cuenta de MercadoPago via OAuth
-  const handleLinkMercadoPago = async () => {
-    setLinkingMp(true);
-    try {
-      // Obtener la URL de autorización OAuth de MercadoPago
-      const response = await apiGet<{ auth_url: string }>('/mp-oauth/auth-url');
-      
-      if (response.auth_url) {
-        // Redirigir al usuario a MercadoPago para autorizar
-        window.location.href = response.auth_url;
-      } else {
-        showToast('Error al obtener la URL de autorización', 'error');
-        setLinkingMp(false);
-      }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      if (/no est[áa] configurada|mp_not_configured|503/i.test(msg)) {
-        setMpNotConfigured(true);
-        showToast(
-          'La integración con Mercado Pago está desvinculada. El nuevo equipo técnico debe configurarla.',
-          'error'
-        );
-      } else {
-        console.error('Error al vincular MercadoPago:', error);
-        showToast('Error al iniciar vinculación con MercadoPago', 'error');
-      }
-      setLinkingMp(false);
-    }
-    // No desactivamos linkingMp aquí porque la página va a redirigir
-  };
-
-  // Función para desvincular cuenta de MercadoPago
-  const handleUnlinkMercadoPago = async () => {
-    const confirmed = await showConfirm({
-      title: 'Desvincular MercadoPago',
-      message: '¿Estás seguro de desvincular tu cuenta de MercadoPago?\n\nLos pagos de tus ventas irán a TopGreen hasta que vuelvas a vincular.',
-      confirmText: 'Desvincular',
-      type: 'warning'
-    });
-    if (!confirmed) return;
-    
-    try {
-      await apiPost('/mp-oauth/unlink', {});
-      setMpLinked(false);
-      setMpUserId(null);
-      showToast('Cuenta de MercadoPago desvinculada', 'success');
-    } catch (error) {
-      console.error('Error al desvincular:', error);
-      showToast('Error al desvincular la cuenta', 'error');
-    }
-  };
 
   // Estado temporal para edición de perfil
   const [editForm, setEditForm] = useState({
@@ -1359,80 +1242,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         </div>
       </div>
 
-      {/* Sección MercadoPago para Vendedores */}
-      <div className={styles.mpSection}>
-        <div className={styles.sectionHeader}>
-          <h2>💳 MercadoPago - Recibe tus Pagos</h2>
-        </div>
-        <div className={styles.mpContent}>
-          {loadingMpStatus ? (
-            <p>Cargando estado...</p>
-          ) : mpNotConfigured ? (
-            <div className={styles.mpUnlinked}>
-              <div className={styles.mpWarning}>
-                ⚠️ <strong>Integración de Mercado Pago desvinculada</strong>
-              </div>
-              <p>
-                La integración con Mercado Pago fue desvinculada antes de la entrega
-                del proyecto. Los pagos online están temporalmente deshabilitados.
-              </p>
-              <p>
-                El nuevo equipo técnico debe completar las credenciales
-                (<code>MP_APP_ID</code>, <code>MP_CLIENT_SECRET</code>,
-                <code>MP_ACCESS_TOKEN</code>, <code>MP_PUBLIC_KEY</code>,
-                <code>MP_REDIRECT_URI</code>) en <code>backend/.env</code> y
-                reiniciar el contenedor para reactivar Mercado Pago.
-                Ver <code>docs/SETUP_PAYMENTS.md</code>.
-              </p>
-            </div>
-          ) : mpLinked ? (
-            <>
-              <div className={styles.mpLinked}>
-                <span className={styles.mpStatus}>✅ Cuenta Vinculada</span>
-                <p>ID de MercadoPago: <strong>{mpUserId}</strong></p>
-                <p className={styles.mpInfo}>
-                  Recibirás el <strong>100%</strong> del precio de tus productos directamente en tu cuenta de MercadoPago.
-                  TopGreen cobra un 5% adicional al comprador como comisión del marketplace.
-                </p>
-                <button 
-                  className={styles.mpUnlinkButton}
-                  onClick={handleUnlinkMercadoPago}
-                >
-                  Desvincular cuenta
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className={styles.mpUnlinked}>
-              <div className={styles.mpWarning}>
-                ⚠️ <strong>Cuenta no vinculada</strong>
-              </div>
-              <p>
-                Para recibir pagos directamente en tu cuenta de MercadoPago, necesitas vincularla.
-                Sin vincular, los pagos de tus ventas se procesarán a través de TopGreen.
-              </p>
-              <div className={styles.mpBenefits}>
-                <h4>Beneficios de vincular tu cuenta:</h4>
-                <ul>
-                  <li>✅ Recibe el 100% del precio de tus productos</li>
-                  <li>✅ Pagos automáticos sin intermediarios</li>
-                  <li>✅ Mayor transparencia en tus transacciones</li>
-                </ul>
-              </div>
-              <button 
-                className={styles.mpLinkButton}
-                onClick={handleLinkMercadoPago}
-                disabled={linkingMp}
-              >
-                {linkingMp ? 'Vinculando...' : '🔗 Vincular MercadoPago'}
-              </button>
-              <p className={styles.mpHelp}>
-                Al hacer clic, serás redirigido a MercadoPago para autorizar la conexión.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 
@@ -1645,6 +1454,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               <div className={styles.orderActions}>
                 {order.status === 'transfer-receipt-submitted' && (
                   <>
+                    <p>
+                      <strong>Verificá el dinero en tu cuenta bancaria antes de aprobar.</strong>{' '}
+                      Este comprobante es sólo un registro: no confirma que la transferencia
+                      se haya acreditado. No apruebes si el importe acreditado no coincide con
+                      el total de la orden.
+                    </p>
                     <button
                       className={styles.confirmButton}
                       onClick={() => handleTransferDecision(order.id, 'approve')}
@@ -1729,7 +1544,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           {userProducts.map((product) => (
             <div key={product.id} className={styles.productCard}>
               <div className={styles.productImage}>
-                <img src={product.image} alt={product.name} />
+                <ProductImage src={product.image} alt={product.name} />
                 <div className={`${styles.productStatusBadge} ${styles[`status-${product.status}`]}`}>
                   {product.status === 'active' && '✅ Activo'}
                   {product.status === 'paused' && '⏸️ Pausado'}
@@ -2219,7 +2034,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   {/* Imágenes existentes */}
                   {editingProduct.existingImages.map((img, index) => (
                     <div key={`existing-${index}`} className={styles.editImageItem}>
-                      <img src={getImageUrl(img.url)} alt={`Imagen ${index + 1}`} />
+                      <ProductImage src={getImageUrl(img.url)} alt={`Imagen ${index + 1}`} />
                       <button
                         type="button"
                         className={styles.removeImageBtn}
@@ -2235,7 +2050,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   {/* Imágenes nuevas */}
                   {editingProduct.newImages.map((img, index) => (
                     <div key={`new-${index}`} className={styles.editImageItem}>
-                      <img src={img.preview} alt={`Nueva imagen ${index + 1}`} />
+                      <ProductImage src={img.preview} alt={`Nueva imagen ${index + 1}`} />
                       <button
                         type="button"
                         className={styles.removeImageBtn}

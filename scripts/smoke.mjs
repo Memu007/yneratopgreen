@@ -683,7 +683,33 @@ await runCase(14, 'Datos bancarios correctos y orden esperando comprobante', asy
   assert(order?.status === 'awaiting_transfer_receipt', `estado inesperado: ${order?.status}`);
   assert(order.cbu === databaseBank[0], 'la orden no devolvió el CBU correcto');
   state.transferOrderId = order.order_id;
-  return `HTTP ${checkout.status}, order_id=${order.order_id}, CBU API=SQL`;
+
+  await apiRequest('/auth/me', {
+    method: 'PATCH',
+    token: state.sellerToken,
+    body: {
+      cbu: '0000003100098765432101',
+      alias_bancario: 'topgreen.cambio',
+    },
+  });
+  const buyerOrders = await apiRequest('/orders/my?as_role=buyer', {
+    token: state.buyerToken,
+  });
+  const savedOrder = buyerOrders.data.find((candidate) => candidate.id === order.order_id);
+  const [databaseSnapshot] = queryRows(`
+    SELECT transfer_cbu, transfer_alias_bancario, transfer_account_holder
+    FROM orders
+    WHERE id = ${sqlLiteral(order.order_id)}
+  `);
+  assert(savedOrder?.seller_cbu === bankData.cbu, 'la orden cambió su CBU junto con el perfil');
+  assert(
+    savedOrder?.seller_alias_bancario === bankData.alias_bancario,
+    'la orden cambió su alias junto con el perfil',
+  );
+  assert(databaseSnapshot[0] === bankData.cbu, 'SQL no conservó el CBU original');
+  assert(databaseSnapshot[1] === bankData.alias_bancario, 'SQL no conservó el alias original');
+  assert(databaseSnapshot[2] === order.seller_name, 'SQL no conservó el titular original');
+  return `HTTP ${checkout.status}, order_id=${order.order_id}, snapshot API=SQL intacto tras cambiar el perfil`;
 });
 
 await runCase(15, 'Comprobante fallido visible y comprobante válido asociado', async () => {
@@ -854,6 +880,9 @@ await runCase(18, 'Transferencia completa desde la interfaz', async () => {
 
     await page.getByRole('heading', { name: /Método de Pago/ }).waitFor();
     await page.locator('input[value="bank_transfer"]').check();
+    await page
+      .getByText(/TopGreen no recibe ni retiene el dinero/)
+      .waitFor({ state: 'visible' });
     await page.getByText(new RegExp(databaseBank[1])).waitFor({ state: 'visible' });
     const bankDetails = await page.locator('form:has(h2)').textContent();
     assert(bankDetails?.includes(databaseBank[0]), 'la UI no muestra el CBU guardado en SQL');
@@ -876,7 +905,7 @@ await runCase(18, 'Transferencia completa desde la interfaz', async () => {
 
     assert(pageErrors.length === 0, `errores JS: ${pageErrors.join(' | ')}`);
     const [databaseOrder] = queryRows(`
-      SELECT status::text, transfer_receipt_url
+      SELECT status::text, transfer_receipt_url, order_number
       FROM orders
       WHERE buyer_id = ${sqlLiteral(state.buyerId)}
         AND seller_id = ${sqlLiteral(state.sellerId)}
@@ -885,7 +914,187 @@ await runCase(18, 'Transferencia completa desde la interfaz', async () => {
     `);
     assert(databaseOrder[0] === 'TRANSFER_RECEIPT_SUBMITTED', `estado SQL: ${databaseOrder[0]}`);
     assert(databaseOrder[1], 'la orden creada por UI no guardó el comprobante');
-    return 'UI + API + DB, CBU y alias de SQL visibles, comprobante asociado';
+
+    const sellerContext = await browser.newContext();
+    try {
+      await sellerContext.addInitScript(
+        ({ accessToken, refreshToken }) => {
+          window.localStorage.setItem('access_token', accessToken);
+          window.localStorage.setItem('refresh_token', refreshToken);
+        },
+        {
+          accessToken: state.sellerToken,
+          refreshToken: state.sellerRefreshToken,
+        },
+      );
+      const sellerPage = await sellerContext.newPage();
+      await sellerPage.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await sellerPage.locator('button').filter({ hasText: '👤' }).first().click();
+      await sellerPage.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
+      await sellerPage.getByRole('button', { name: 'Mis Ventas' }).click();
+      const saleHeading = sellerPage.getByRole('heading', {
+        name: `Venta #${databaseOrder[2]}`,
+      });
+      await saleHeading.waitFor({ state: 'visible' });
+      const saleCard = saleHeading.locator('xpath=../../..');
+      const warning = saleCard.getByText(/Verificá el dinero en tu cuenta bancaria/);
+      await warning.waitFor({ state: 'visible' });
+      const warningPrecedesButtons = await saleCard.evaluate((card) => {
+        const warningElement = [...card.querySelectorAll('p')].find((element) =>
+          element.textContent?.includes('Verificá el dinero en tu cuenta bancaria')
+        );
+        const approveButton = [...card.querySelectorAll('button')].find((element) =>
+          element.textContent?.includes('Aprobar comprobante')
+        );
+        return Boolean(
+          warningElement
+          && approveButton
+          && warningElement.compareDocumentPosition(approveButton)
+            & Node.DOCUMENT_POSITION_FOLLOWING
+        );
+      });
+      assert(warningPrecedesButtons, 'el aviso del vendedor no está antes de aprobar/rechazar');
+    } finally {
+      await sellerContext.close();
+    }
+
+    return 'UI + API + DB, avisos visibles al comprador y vendedor antes de aprobar';
+  } finally {
+    await browser.close();
+  }
+});
+
+await runCase(19, 'Las rutas financieras heredadas no están expuestas', async () => {
+  await expectApiError(404, () => apiRequest('/payments/public-key'));
+  await expectApiError(404, () => apiRequest('/mp-oauth/status', {
+    token: state.sellerToken,
+  }));
+  await expectApiError(404, () => apiRequest('/payments/simulate-payment/inexistente', {
+    method: 'POST',
+    token: state.buyerToken,
+  }));
+  return 'payments, mp-oauth y simulate-payment respondieron HTTP 404';
+});
+
+await runCase(20, 'Respaldo de imágenes en el recorrido de demostración', async () => {
+  const browser = await chromium.launch({ headless: true });
+  let blockedSeedImages = 0;
+  const blockSeedImages = (page) =>
+    page.route('https://picsum.photos/**', (route) => {
+      blockedSeedImages += 1;
+      return route.fulfill({ status: 404, body: 'imagen rota por smoke' });
+    });
+
+  try {
+    const buyerContext = await browser.newContext();
+    await buyerContext.addInitScript(
+      ({ accessToken, refreshToken }) => {
+        window.localStorage.setItem('access_token', accessToken);
+        window.localStorage.setItem('refresh_token', refreshToken);
+      },
+      {
+        accessToken: state.buyerToken,
+        refreshToken: state.buyerRefreshToken,
+      },
+    );
+    const buyerPage = await buyerContext.newPage();
+    await blockSeedImages(buyerPage);
+    await buyerPage.goto(`${FRONTEND_URL}/?section=marketplace`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await buyerPage.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+    await buyerPage.waitForFunction(
+      () => document.querySelectorAll('#catalog-category option').length > 1,
+    );
+    await buyerPage.locator('#catalog-type').selectOption('productos');
+    const productName = state.product.name;
+    await buyerPage
+      .getByPlaceholder('Buscar productos, semillas, maquinaria...')
+      .fill(productName);
+    await buyerPage
+      .getByPlaceholder('Buscar productos, semillas, maquinaria...')
+      .press('Enter');
+    const productHeading = buyerPage.getByRole('heading', {
+      name: productName,
+      exact: true,
+      level: 3,
+    });
+    await productHeading.waitFor({ state: 'visible' });
+    const productCard = productHeading.locator('xpath=ancestor::div[contains(@class,\"card\")]');
+    const addButton = productCard.getByRole('button', { name: /Agregar/ });
+
+    await productHeading.click();
+    const detailHeading = buyerPage.getByRole('heading', {
+      name: productName,
+      exact: true,
+      level: 2,
+    });
+    await detailHeading.waitFor({ state: 'visible' });
+    const detailModal = detailHeading.locator('xpath=ancestor::div[contains(@class,\"modal\")]');
+    await detailModal.getByRole('img', { name: productName, exact: true }).first().waitFor();
+    await detailModal.getByRole('button', { name: '✕' }).click();
+
+    await addButton.click();
+    await buyerPage.getByRole('button', { name: /Carrito/ }).click();
+    const cartHeading = buyerPage.getByRole('heading', { name: /Mi Carrito/ });
+    await cartHeading.waitFor();
+    const cartModal = cartHeading.locator('xpath=ancestor::div[contains(@class,\"modal\")]');
+    await cartModal.getByRole('img', { name: productName, exact: true }).waitFor();
+    await cartModal.getByRole('button', { name: 'Continuar compra' }).click();
+    const shippingHeading = buyerPage.getByRole('heading', { name: /Datos de Envío/ });
+    const checkoutModal = shippingHeading.locator('xpath=ancestor::div[contains(@class,\"modal\")]');
+    await checkoutModal.getByRole('img', { name: productName, exact: true }).waitFor();
+    await buyerContext.close();
+
+    const sellerContext = await browser.newContext();
+    await sellerContext.addInitScript(
+      ({ accessToken, refreshToken }) => {
+        window.localStorage.setItem('access_token', accessToken);
+        window.localStorage.setItem('refresh_token', refreshToken);
+      },
+      {
+        accessToken: state.sellerToken,
+        refreshToken: state.sellerRefreshToken,
+      },
+    );
+    const sellerPage = await sellerContext.newPage();
+    await blockSeedImages(sellerPage);
+    await sellerPage.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await sellerPage.locator('button').filter({ hasText: '👤' }).first().click();
+    await sellerPage.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
+    await sellerPage.getByRole('button', { name: 'Mis Productos' }).click();
+    await sellerPage.getByRole('heading', { name: 'Mis Productos' }).waitFor();
+    await sellerPage.getByRole('img').first().waitFor();
+    await sellerContext.close();
+
+    const adminLogin = await apiRequest('/auth/login', {
+      method: 'POST',
+      body: { email: 'admin@topgreen.com', password: 'admin123' },
+    });
+    const adminContext = await browser.newContext();
+    await adminContext.addInitScript(
+      ({ accessToken, refreshToken }) => {
+        window.localStorage.setItem('access_token', accessToken);
+        window.localStorage.setItem('refresh_token', refreshToken);
+      },
+      {
+        accessToken: adminLogin.data.access_token,
+        refreshToken: adminLogin.data.refresh_token,
+      },
+    );
+    const adminPage = await adminContext.newPage();
+    await blockSeedImages(adminPage);
+    await adminPage.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await adminPage.getByRole('button', { name: '⚙️ Admin' }).click();
+    await adminPage.getByRole('heading', { name: 'Panel de Administración' }).waitFor();
+    await adminPage.getByRole('button', { name: '📦 Productos' }).click();
+    const table = adminPage.locator('table');
+    await table.waitFor();
+    await table.getByRole('img').first().waitFor();
+    await adminContext.close();
+
+    assert(blockedSeedImages > 0, 'Playwright no forzó ninguna URL de picsum.photos a HTTP 404');
+    return 'URLs rotas reemplazadas en detalle, carrito, checkout, vendedor y administración';
   } finally {
     await browser.close();
   }

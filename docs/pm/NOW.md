@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-07-25, cierre de jornada.
+Actualizado: 2026-07-26.
 
 ## Objetivo activo
 
@@ -32,7 +32,7 @@ evidencia de ejecución detrás.
   encadenados en la interfaz, filtrado en el servidor y estado en la URL.
   Cierra el requisito 3.1.
 - Las cinco categorías del contrato con productos y localidad.
-- **Suite automatizada de doce smoke tests**, un solo comando contra
+- **Suite automatizada de veinte smoke tests**, un solo comando contra
   arranque limpio, con criterios relacionales contra SQL y publicación
   desde la interfaz con navegador real. Verificado que **falla** con
   código distinto de cero al romper un caso a propósito.
@@ -55,12 +55,12 @@ evidencia de ejecución detrás.
 
 1. ~~**Pago por transferencia bancaria.**~~ **Terminado y verificado el
    2026-07-26.** Los tres requisitos contractuales de la sección 3.3
-   cerrados, con seis casos nuevos en la suite —18/18— incluido el que
-   confirma que un vendedor ajeno recibe `403` al intentar validar un
-   comprobante que no es suyo.
+   cerrados, con copia de los datos bancarios guardada en la orden y
+   avisos en pantalla para comprador y vendedor. **Suite en 20/20.**
 2. **Transportistas.** No arranca hasta que la clienta defina cobertura
    por zonas o por radio, y quién ve los datos de contacto de quién.
-3. **Mercado Pago.** Trabado sin credenciales.
+3. **Mercado Pago: se reconstruye desde cero, sin split.** Lo heredado se
+   desmontó el 2026-07-26. Ver el bloqueo de abajo.
 4. **Al final, antes de desplegar:** correcciones de la vista en celular,
    revisión de seguridad y despliegue.
 
@@ -110,19 +110,35 @@ así se detectó. Los números fijos envejecen mal.
   reloj. Con 7 a 9 semanas de trabajo restante, entra.
 - **Definición pendiente del cliente:** cobertura del transportista por
   zonas declaradas o por radio en km. Sin eso no arranca el bloque grande.
-- **Mercado Pago sin credenciales.** Es el único bloque grande que nunca
-  se pudo probar, y la suite tampoco lo cubre por eso. En este código, lo
-  no verificado históricamente escondió sorpresas.
+- **Mercado Pago: desmontado el 2026-07-26, se rehace desde cero.** La
+  auditoría de la dev demostró que lo heredado no era el "checkout
+  básico" del contrato: era split con comisión de marketplace y OAuth de
+  vendedores, o sea la plataforma cobrando y girando. Sólo estaba apagado
+  porque las credenciales estaban vacías, no por diseño.
+
+  Además apareció un agujero vivo: `POST
+  /payments/simulate-payment/{order_id}` dejaba a un comprador
+  autenticado pasar su propia orden a `PAID` sin pagar. **Eliminado.**
+
+  Los routers `payments` y `mp_oauth` ya no se montan, y el caso 19 de la
+  suite verifica que responden `404` —no `503`—, así que la propiedad es
+  del código y no de la configuración. Se reconstruye sin split cuando
+  haya credenciales.
 - **Sin despliegue.** Nadie levantó esto en un servidor real. La fase 5
   está en cero salvo las pruebas.
 - **Revisión de seguridad: al final, como condición para desplegar.** La
   fase 5 no arranca sin ella, y **no se adelanta**.
 
   Motivo de la fecha: auditar ahora sería certificar la mitad del
-  sistema. Faltan por construir transportistas, transferencia bancaria y
-  la puesta en marcha de los pagos, que son justamente los bloques que
-  tocan datos sensibles y dinero. Revisar antes obliga a revisar dos
-  veces.
+  sistema. Faltan por construir transportistas y el Mercado Pago nuevo,
+  que son justamente los bloques que tocan datos sensibles y dinero.
+  Revisar antes obliga a revisar dos veces.
+
+  **Matiz aprendido el 2026-07-26:** posponer la auditoría no significa
+  posponer un agujero encontrado. El simulador de pagos apareció en una
+  revisión de alcance, no de seguridad, y se cerró el mismo día. La regla
+  es: la auditoría completa va al final, lo que aparece se arregla cuando
+  aparece.
 
   Motivo de que igual se haga, y es económico: el contrato da **90 días
   de garantía**. Todo lo que se despliegue con un agujero se arregla

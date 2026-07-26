@@ -292,7 +292,7 @@ export const ContactPage: React.FC = () => {
             </div>
             <div className={styles.faqCard}>
               <h3>¿Cuáles son las formas de pago?</h3>
-              <p>Aceptamos transferencias bancarias, MercadoPago y pagos en efectivo contra entrega.</p>
+              <p>Aceptamos transferencias bancarias directas al vendedor.</p>
             </div>
             <div className={styles.faqCard}>
               <h3>¿Realizan envíos a todo el país?</h3>

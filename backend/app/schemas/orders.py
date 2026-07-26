@@ -37,6 +37,7 @@ class OrderResponse(BaseModel):
     seller_whatsapp: Optional[str] = None
     seller_cbu: Optional[str] = None
     seller_alias_bancario: Optional[str] = None
+    seller_bank_holder: Optional[str] = None
     transfer_receipt_url: Optional[str] = None
     rejection_reason: Optional[str] = None
     

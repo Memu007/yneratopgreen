@@ -52,6 +52,9 @@ class Order(Base):
     seller_notes = Column(String(500), nullable=True)
     cancellation_reason = Column(String(500), nullable=True)
     transfer_receipt_url = Column(String(500), nullable=True)
+    transfer_cbu = Column(String(64), nullable=True)
+    transfer_alias_bancario = Column(String(100), nullable=True)
+    transfer_account_holder = Column(String(255), nullable=True)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

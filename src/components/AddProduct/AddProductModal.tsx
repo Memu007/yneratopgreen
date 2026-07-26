@@ -4,6 +4,7 @@ import { useToast } from '../Toast/Toast';
 import { NewProductData } from '../../types';
 import { apiPost, apiGet, API_BASE_URL, tokenStorage } from '../../utils/api';
 import styles from './AddProductModal.module.css';
+import { ProductImage } from '../ProductImage/ProductImage';
 
 interface AddProductModalProps {
   isOpen: boolean;
@@ -734,7 +735,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                       key={image.id} 
                       className={`${styles.imagePreview} ${formData.image === image.url ? styles.mainImage : ''}`}
                     >
-                      <img src={image.url} alt={`Preview ${index + 1}`} />
+                      <ProductImage src={image.url} alt={`Preview ${index + 1}`} />
                       {formData.image === image.url && (
                         <div className={styles.mainImageBadge}>
                           ⭐ Principal

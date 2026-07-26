@@ -1,191 +1,187 @@
 # Dev → PM
 
-## Debate: hoy no podemos afirmar que la plataforma nunca toca fondos
+## Estado
 
-La afirmación es correcta como decisión de producto, pero **no describe una
-propiedad actual del código**.
+Terminé y subí, en piezas separadas:
 
-Hoy no se mueve dinero porque las credenciales están vacías. Eso es un apagado
-por configuración, no una desactivación por diseño. El frontend llega a
-Mercado Pago y al OAuth; los routers están montados; y la propia interfaz
-explica qué variables completar para reactivarlos.
+- `2c5a589` — cierre de los pagos heredados.
+- `d8420e9` — snapshot bancario en la orden.
+- `61eeb96` — avisos de transferencia para comprador y vendedor.
+- `f470b71` — respaldo compartido para imágenes rotas.
 
-Si alguien configura esas variables:
+## Pagos heredados: inalcanzables
 
-- con vendedor vinculado, se crea una preferencia con el token del vendedor y
-  `marketplace_fee` para TopGreen;
-- sin vendedor vinculado, el código crea la preferencia con el token de
-  TopGreen y documenta que el 100% del pago va a TopGreen para liquidación
-  manual.
+- Eliminé `simulate-payment` de `payments.py`.
+- `main.py` ya no importa ni monta `payments.router` ni `mp_oauth.router`.
+- Quité Mercado Pago del checkout.
+- Quité OAuth y vinculación de Mercado Pago del panel.
+- Contacto ya no dice que se acepta Mercado Pago ni efectivo.
+- El código heredado restante sigue en Git, como pediste.
 
-Por lo tanto, **la frase contractual sería falsa apenas se habilite la
-integración heredada**. No hago una conclusión jurídica sobre PSP; mi
-conclusión es técnica sobre el flujo real de fondos que implementa el código.
-
-No modifiqué ni desactivé nada en esta vuelta.
-
-## 1. Caminos alcanzables desde la interfaz
-
-### Checkout de Mercado Pago: sí
-
-`CheckoutModal.tsx`:
-
-1. ofrece Mercado Pago y lo deja seleccionado por defecto;
-2. crea una orden por `/orders/checkout`;
-3. llama a `/payments/create-preference`;
-4. redirige al `init_point` devuelto.
-
-Sin credenciales, el último llamado termina en `503`, pero la orden ya quedó
-creada. Con credenciales, el camino continúa.
-
-### OAuth de vendedores: sí
-
-`UserDashboard.tsx`:
-
-- consulta `/mp-oauth/status` al montar;
-- muestra `Vincular MercadoPago`;
-- el botón llama `/mp-oauth/auth-url`;
-- el callback procesa `mp_linked=success`;
-- también hay botón para desvincular.
-
-Hay además un detalle: `/mp-oauth/status` devuelve `200` aunque la aplicación
-no esté configurada. Entonces el frontend interpreta que Mercado Pago está
-disponible pero la cuenta no está vinculada, y muestra el botón activo. Recién
-al pulsarlo, `/auth-url` responde `503`.
-
-### Sincronización posterior: sí
-
-`PaymentResultPage.tsx` llama a
-`/payments/sync-status/{order_id}` cuando se abre la pantalla de pago exitoso.
-
-## 2. Endpoints montados
-
-El OpenAPI local muestra **13 rutas activas**:
+Caso nuevo:
 
 ```text
-/api/payments/create-preference [POST]
-/api/payments/webhook [POST]
-/api/payments/order/{order_id}/status [GET]
-/api/payments/simulate-payment/{order_id} [POST]
-/api/payments/public-key [GET]
-/api/payments/sync-status/{order_id} [POST]
-/api/payments/refund/{order_id} [POST]
-/api/mp-oauth/manual-link [POST]
-/api/mp-oauth/auth-url [GET]
-/api/mp-oauth/callback [GET]
-/api/mp-oauth/status [GET]
-/api/mp-oauth/unlink [POST]
-/api/mp-oauth/refresh-token [POST]
+PASS 19 Las rutas financieras heredadas no están expuestas
+  payments, mp-oauth y simulate-payment respondieron HTTP 404
 ```
 
-Verificación HTTP de sólo lectura contra el backend local:
+La prueba cubre:
 
 ```text
-GET /mp-oauth/status   -> 200, is_linked=false
-GET /mp-oauth/auth-url -> 503, integración no configurada
-GET /payments/public-key -> 200, configured=false
+GET  /api/payments/public-key                       -> 404
+GET  /api/mp-oauth/status                           -> 404
+POST /api/payments/simulate-payment/inexistente     -> 404
 ```
 
-No ejecuté `create-preference`, `manual-link`, reembolsos ni ningún endpoint
-que pudiera contactar Mercado Pago o mutar una orden.
+No depende de que falten credenciales: los routers no existen en runtime.
 
-## Hallazgo crítico adicional: el simulador está activo
+## Snapshot bancario
 
-`POST /payments/simulate-payment/{order_id}` no comprueba entorno ni
-credenciales de Mercado Pago.
+Migración autogenerada:
 
-Un comprador autenticado puede llamar el endpoint sobre una orden propia en
-estado `PLACED` y pasarla a `PAID` sin pagar. También crea un registro de pago
-simulado e incrementa contadores. No descuenta stock en el camino aprobado, de
-modo que además deja datos inconsistentes.
+`20260726_0104_63c3ab99fea0_guardar_snapshot_bancario_en_orden.py`
 
-No hay llamada desde el frontend, pero esconderlo no lo protege: está montado
-y figura en OpenAPI.
+Detectó únicamente:
 
-`manual-link` también está montado y permite guardar un access token de un
-usuario de Mercado Pago sin requerir que la aplicación marketplace esté
-configurada. `refund` puede contactar Mercado Pago usando el token del
-vendedor. Ambos son argumentos adicionales para no tratar el problema como
-sólo visual.
+```text
+orders.transfer_cbu
+orders.transfer_alias_bancario
+orders.transfer_account_holder
+```
 
-## 3. ¿Alcanza con ocultarlos?
+Las tres columnas son anulables. Al crear la orden se copian CBU, alias y
+titular; las respuestas posteriores leen la orden y no el perfil.
 
-**No.** Ocultar botones sólo cambia la interfaz; cualquier cliente HTTP puede
-llamar las rutas.
+El caso 14 ahora:
 
-Mi recomendación, si la definición contractual es permanente, es:
+1. configura CBU y alias;
+2. crea la orden;
+3. cambia ambos datos en el perfil del vendedor;
+4. consulta la orden como comprador;
+5. contrasta API y SQL.
 
-1. quitar Mercado Pago como opción del checkout y quitar la sección OAuth del
-   panel;
-2. dejar de montar en el backend los routers `payments` y `mp_oauth`;
-3. conservar el código en Git mientras se decide si se elimina, pero hacerlo
-   inalcanzable en runtime;
-4. agregar un smoke que confirme que las rutas financieras ya no están
-   expuestas.
+Resultado:
 
-Un feature flag apagado por defecto sería mejor que las credenciales vacías,
-pero sigue permitiendo convertir en falsa la afirmación contractual con una
-configuración. Si “TopGreen nunca toca fondos” es una condición del producto,
-prefiero routers no montados.
+```text
+PASS 14 Datos bancarios correctos y orden esperando comprobante
+  snapshot API=SQL intacto tras cambiar el perfil
+```
 
-## CBU y alias en nuestra base
+La migración aplicó desde una base vacía dentro del smoke. Chequeo posterior:
 
-Me parece razonable guardarlos para este contrato: son las instrucciones que
-el comprador necesita para transferir y no son una credencial con la que pueda
-debitar la cuenta. Igual los trataría como dato personal financiero:
+```text
+$ alembic check
+No new upgrade operations detected.
+```
 
-- acceso sólo del titular y de compradores con una operación;
-- nunca en logs;
-- backups y base cifrados por infraestructura;
-- sin copiarlos a analítica ni notificaciones;
-- borrado cuando el vendedor cierre su cuenta, sujeto a la política legal que
-  defina la clienta.
+## Tarea 5 bis
 
-No agregaría cifrado casero a nivel aplicación ahora: sin una política de
-claves sería seguridad aparente y complicaría búsquedas, backups y rotación.
+Comprador, antes y después de crear la orden:
 
-Sí encontré una inconsistencia: la orden **no guarda una foto de los datos
-bancarios usados al crearla**. `/orders/my` lee el CBU y alias actuales del
-perfil. Si el vendedor los cambia con una orden pendiente, el comprador pasa a
-ver otros datos y no queda registro de cuáles se mostraron en checkout.
+> El pago es una transferencia directa a la cuenta del vendedor. TopGreen no
+> recibe ni retiene el dinero.
 
-La solución limpia sería guardar CBU, alias y titular como snapshot de la
-orden. Eso requiere ampliar el esquema y no lo hago sin aprobación.
+Vendedor, antes de los botones:
 
-## El comprobante
+> **Verificá el dinero en tu cuenta bancaria antes de aprobar.** Este
+> comprobante es sólo un registro: no confirma que la transferencia se haya
+> acreditado. No apruebes si el importe acreditado no coincide con el total de
+> la orden.
 
-Coincido: el archivo no prueba el pago.
+El caso 18 abre una sesión de comprador y otra de vendedor. Comprueba que
+ambos textos sean visibles y que el aviso del vendedor preceda en el DOM a
+`Aprobar comprobante`.
 
-Podemos validar extensión, tamaño y que el almacenamiento haya funcionado.
-OCR, QR, importe escrito, nombre del banco o metadatos pueden ayudar a leerlo,
-pero todo eso también se falsifica. Sin consultar al banco o a un proveedor de
-pago no existe validación confiable de acreditación.
+Primera corrida de esta pieza:
 
-La decisión correcta es la actual: el vendedor verifica su cuenta bancaria.
-El texto de la Tarea 5 bis es necesario.
+```text
+18/19 pasaron
+```
 
-## Transferencia insuficiente
+El test había acotado la búsqueda al encabezado de la tarjeta (`../..`) y no a
+la tarjeta completa. Corregí el selector a `../../..` y repetí la suite:
 
-No rompe una restricción de base ni descuenta stock antes de tiempo. Pero hay
-dos estados de negocio que el modelo actual no puede representar:
+```text
+19/19 pasaron; 0 fallaron
+```
 
-1. Si el vendedor aprueba un pago parcial, la orden queda `PAID` por el total.
-   No guardamos importe recibido, saldo ni aprobación parcial.
-2. Si lo rechaza, la orden queda terminalmente `REJECTED`. El comprador no
-   puede adjuntar un segundo comprobante ni completar el saldo sobre la misma
-   orden; además, su carrito ya fue convertido.
+## Tarea 5: respaldo de imágenes
 
-No inventaría una solución. La clienta tiene que elegir entre:
+Extraje el comportamiento aprobado de `ProductCard` a un único
+`ProductImage`: ante `onError`, reemplaza la imagen por el nombre sobre el
+mismo fondo verde, incluido el tema oscuro.
 
-- rechazo y creación de una orden nueva;
-- permitir reintento/comprobante adicional;
-- registrar pago parcial y saldo pendiente.
+Se usa en:
 
-Hasta esa definición, el vendedor no debería aprobar si el importe acreditado
-no coincide con el total mostrado.
+- tarjetas del catálogo;
+- detalle y miniaturas;
+- carrito;
+- checkout;
+- publicaciones del vendedor y editor;
+- administración;
+- formulario de publicación;
+- imágenes institucionales de Nosotros y Servicios.
 
-## Estado de las tareas
+La única etiqueta `<img>` que queda en `src/` está dentro de
+`ProductImage.tsx` y tiene `onError`.
 
-No empecé Tarea 5 bis ni Tarea 5. La discusión figura antes de las tareas y
-preferí devolver primero el estado real, especialmente por el simulador de
-pago alcanzable.
+El caso 20 intercepta `https://picsum.photos/**`, responde `404`
+intencionalmente y verifica el reemplazo en:
+
+1. detalle;
+2. carrito;
+3. checkout;
+4. panel del vendedor;
+5. administración.
+
+También cuenta que Playwright haya bloqueado al menos una URL real de
+`picsum.photos`, para que el caso no pase sólo por una publicación sin imagen.
+
+Hubo dos corridas previas `19/20`, ambas por selectores del test:
+
+1. tomó el encabezado transitorio `Cargando productos...`;
+2. el nombre de la publicación aparecía a la vez en el `h3` de la tarjeta y el
+   `h2` del detalle.
+
+La prueba final busca un producto seed conocido por nombre y nivel de
+encabezado.
+
+## Smoke final
+
+Ejecutado desde cero después del último cambio:
+
+```text
+PASS 01 Salud del servicio
+PASS 02 Registro de usuario
+PASS 03 Ingreso y obtención del token
+PASS 04 Catálogo con categoría y precio
+PASS 05 Catálogo con provincia y localidad
+PASS 06 Detalle de producto
+PASS 07 Agregar al carrito y verlo
+PASS 08 Crear orden desde el carrito
+PASS 09 Publicar producto como vendedor desde la interfaz
+PASS 10 Fallo de imagen visible sin perder la publicación
+PASS 11 Ver mis compras y mis ventas
+PASS 12 Administración: usuarios, productos y órdenes
+PASS 13 Transferencia exige CBU o alias del vendedor
+PASS 14 Datos bancarios correctos y orden esperando comprobante
+PASS 15 Comprobante fallido visible y comprobante válido asociado
+PASS 16 Sólo el vendedor correcto valida el comprobante
+PASS 17 Rechazo de comprobante guarda el motivo
+PASS 18 Transferencia completa desde la interfaz
+PASS 19 Las rutas financieras heredadas no están expuestas
+PASS 20 Respaldo de imágenes en el recorrido de demostración
+-------------------
+20/20 pasaron; 0 fallaron
+```
+
+El mismo smoke compiló el frontend, aplicó las cuatro migraciones desde una
+base vacía, sembró datos y recorrió Chromium.
+
+## No cambiado
+
+- No implementé Mercado Pago nuevo.
+- No definí el flujo de transferencia insuficiente.
+- No cambié la lógica de aprobación/rechazo.
+- No agregué dependencias.
+- No hice cambios de interfaz móvil.

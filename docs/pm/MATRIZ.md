@@ -52,7 +52,8 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Requisito | Estado | Evidencia |
 |-----------|--------|-----------|
 | Mercado Pago, checkout básico | ❌ | **Corregido el 2026-07-26.** Lo heredado no era el requisito: es split con comisión de marketplace y OAuth de vendedores, no el "checkout básico" del contrato. Se desmonta por decisión de producto —la plataforma no maneja fondos de terceros— y se reconstruye sin split cuando haya credenciales |
-| — Agujero encontrado y cerrado | ✅ | `POST /payments/simulate-payment/{order_id}` permitía a un comprador autenticado pasar su propia orden a `PAID` sin pagar. Estaba montado y en el OpenAPI. Eliminado |
+| — Agujero encontrado y cerrado | ✅ | `POST /payments/simulate-payment/{order_id}` permitía a un comprador autenticado pasar su propia orden a `PAID` sin pagar. Eliminado. Smoke 19: `payments`, `mp-oauth` y `simulate-payment` responden `404` porque los routers no se montan, no porque falten credenciales |
+| Transferencia: los datos bancarios no cambian bajo el comprador | ✅ | Smoke 14: se crea la orden, se cambian CBU y alias en el perfil del vendedor, y el comprador sigue viendo los originales. API contrastada contra SQL |
 | Transferencia: mostrar CBU/Alias del vendedor | ✅ | Smoke 13 y 14: sin datos bancarios la API rechaza con `400`; con datos, el CBU devuelto coincide con la consulta SQL |
 | Transferencia: adjuntar comprobante | ✅ | Smoke 15: archivo inválido `400` sin cambiar estado; válido `200` con la URL contrastada contra SQL. Sólo el comprador, `403` para el resto |
 | Transferencia: validación manual del vendedor | ✅ | Smoke 16 y 17: **vendedor ajeno `403`**; el correcto deja API=`paid` y SQL=`PAID`; el rechazo exige motivo y lo persiste |
@@ -120,7 +121,7 @@ Dos observaciones que el porcentaje no muestra:
 | Categorías hardcodeadas como fallback | Media | ✅ **Estaba activo** mientras cargaba la API y ofrecía categorías inexistentes. Eliminado; la API es la única fuente |
 | Contador de ventas del vendedor en 0 con ventas reales | Baja, cosmética | ✅ Resuelto. Se calcula contando órdenes reales; verificada la cadena hasta la interfaz |
 | Carrito persiste al cambiar de usuario | Baja, cosmética | ✅ Resuelto y verificado en navegador con Playwright |
-| Imágenes rotas mostraban el ícono del navegador | Alta para la demo | ✅ Resuelto. Respaldo con el nombre del producto, verificado en claro y oscuro |
+| Imágenes rotas mostraban el ícono del navegador | Alta para la demo | ✅ Resuelto **en toda la interfaz** el 2026-07-26. Extraído a un `ProductImage` único: queda una sola etiqueta `<img>` en `src/`, con `onError`. Smoke 20 intercepta `picsum.photos`, fuerza `404` y verifica el reemplazo en detalle, carrito, checkout, panel de vendedor y administración |
 | **Modo oscuro inalcanzable** | Media | **Abierto, sin acción.** `toggleTheme` y `useTheme` no los usa ningún componente. Existe el contexto y los estilos, pero no hay forma de activarlo. No es contractual |
 | Vite se corre de puerto y el backend lo rechaza por CORS | Media | Abierto. Arreglo propuesto: fijar el puerto con `--strictPort` |
 | Subida de imágenes fallaba en silencio | Media | ✅ Resuelto. Verifica `response.ok`, muestra el motivo y avisa que la publicación salió sin la imagen. **Con caso permanente en la suite** que fuerza el error |

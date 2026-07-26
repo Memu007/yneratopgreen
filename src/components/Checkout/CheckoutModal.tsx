@@ -1,28 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import styles from './CheckoutModal.module.css';
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_BASE_URL, apiFetch, apiGet, tokenStorage } from '../../utils/api';
+import { ProductImage } from '../ProductImage/ProductImage';
 
 interface CheckoutModalProps {
   onClose: () => void;
 }
 
-type CheckoutStep = 'shipping' | 'payment' | 'transfer' | 'confirmation' | 'processing';
-type PaymentMethod = 'mercadopago' | 'bank_transfer';
-
-interface OrderResponse {
-  id: string;
-  order_number: string;
-  status: string;
-  total_amount: number;
-}
-
-interface PaymentPreferenceResponse {
-  preference_id: string;
-  init_point: string;
-  sandbox_init_point: string;
-}
+type CheckoutStep = 'shipping' | 'payment' | 'transfer';
 
 interface BankTransferOption {
   seller_id: string;
@@ -42,14 +29,10 @@ interface BankTransferOrder extends BankTransferOption {
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
   const { items, totalAmount, clearCart } = useCart();
   const { user } = useAuth();
-  
+
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('shipping');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('mercadopago');
-  const [orderNumber, setOrderNumber] = useState('');
-  const [, setOrderId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [returnedFromMP, setReturnedFromMP] = useState(false);
   const [transferOptions, setTransferOptions] = useState<BankTransferOption[]>([]);
   const [transferOrders, setTransferOrders] = useState<BankTransferOrder[]>([]);
   const [transferFiles, setTransferFiles] = useState<Record<string, File>>({});
@@ -66,39 +49,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     notes: '',
   });
 
-  // Detectar cuando el usuario vuelve con el botón atrás del navegador
-  useEffect(() => {
-    const handlePageShow = (event: PageTransitionEvent) => {
-      // persisted = true significa que la página viene del bfcache (back/forward)
-      if (event.persisted && currentStep === 'processing') {
-        setReturnedFromMP(true);
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      // Si la página se vuelve visible y estábamos en processing
-      if (document.visibilityState === 'visible' && currentStep === 'processing') {
-        // Pequeño delay para asegurar que es un regreso y no un cambio de pestaña
-        setTimeout(() => {
-          if (currentStep === 'processing') {
-            setReturnedFromMP(true);
-          }
-        }, 1000);
-      }
-    };
-
-    window.addEventListener('pageshow', handlePageShow);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener('pageshow', handlePageShow);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [currentStep]);
-
   const handleShippingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setCurrentStep('payment');
+    void selectBankTransfer();
   };
 
   const syncBackendCart = async () => {
@@ -130,7 +84,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
   };
 
   const selectBankTransfer = async () => {
-    setPaymentMethod('bank_transfer');
     setError('');
     setLoadingTransferOptions(true);
     try {
@@ -191,63 +144,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         notes: shippingData.notes || `Tel: ${shippingData.phone}`
       };
 
-      if (paymentMethod === 'bank_transfer') {
-        const response = await apiFetch<{ orders: BankTransferOrder[] }>('/orders/checkout/transfer', {
-          method: 'POST',
-          body: JSON.stringify(checkoutData)
-        });
-        setTransferOrders(response.orders);
-        clearCart();
-        setCurrentStep('transfer');
-        return;
-      }
-
-      const orderResponse = await apiFetch<OrderResponse>('/orders/checkout', {
+      const response = await apiFetch<{ orders: BankTransferOrder[] }>('/orders/checkout/transfer', {
         method: 'POST',
         body: JSON.stringify(checkoutData)
       });
-
-      setOrderNumber(orderResponse.order_number);
-      setOrderId(orderResponse.id);
-
-      // 3. Si es MercadoPago, crear preferencia y redirigir
-      if (paymentMethod === 'mercadopago') {
-        setCurrentStep('processing');
-
-        try {
-          const preferenceResponse = await apiFetch<PaymentPreferenceResponse>('/payments/create-preference', {
-            method: 'POST',
-            body: JSON.stringify({ order_id: orderResponse.id })
-          });
-
-          // Limpiar carrito antes de redirigir
-          clearCart();
-
-          // Redirigir al checkout de Mercado Pago
-          // Usar init_point - funciona con tokens OAuth (APP_USR)
-          window.location.href = preferenceResponse.init_point;
-          return;
-        } catch (mpErr) {
-          // La integración de Mercado Pago se entrega desvinculada.
-          // Si el backend responde 503 ("no está configurada"), mostramos
-          // un banner explicativo en lugar de un error genérico.
-          const msg = mpErr instanceof Error ? mpErr.message : String(mpErr);
-          if (/no est[áa] configurada|mp_not_configured|503/i.test(msg)) {
-            setError(
-              'La integración de pago con Mercado Pago no está configurada. ' +
-              'El nuevo equipo técnico debe completar las credenciales antes ' +
-              'de habilitar los pagos online. Tu pedido quedó registrado como pendiente.'
-            );
-            setCurrentStep('payment');
-            return;
-          }
-          throw mpErr;
-        }
-      }
-
-      // 4. Para otros métodos de pago, mostrar confirmación
+      setTransferOrders(response.orders);
       clearCart();
-      setCurrentStep('confirmation');
+      setCurrentStep('transfer');
 
     } catch (err) {
       console.error('Error en checkout:', err);
@@ -256,11 +159,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleFinish = () => {
-    clearCart();
-    onClose();
   };
 
   const formatPrice = (price: number) => {
@@ -400,33 +298,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
       )}
 
       <div className={styles.paymentMethods}>
-        <label className={`${styles.paymentOption} ${paymentMethod === 'mercadopago' ? styles.paymentOptionActive : ''}`}>
-          <input
-            type="radio"
-            name="payment"
-            value="mercadopago"
-            checked={paymentMethod === 'mercadopago'}
-            onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-          />
-          <div className={styles.paymentContent}>
-            <div className={styles.paymentIcon}>💰</div>
-            <div>
-              <div className={styles.paymentTitle}>MercadoPago</div>
-              <div className={styles.paymentDescription}>
-                Paga de forma segura con tarjeta de crédito, débito o dinero en cuenta
-              </div>
-              <div className={styles.paymentBadge}>✓ Recomendado</div>
-            </div>
-          </div>
-        </label>
-
-        <label className={`${styles.paymentOption} ${paymentMethod === 'bank_transfer' ? styles.paymentOptionActive : ''}`}>
+        <label className={`${styles.paymentOption} ${styles.paymentOptionActive}`}>
           <input
             type="radio"
             name="payment"
             value="bank_transfer"
-            checked={paymentMethod === 'bank_transfer'}
-            onChange={() => void selectBankTransfer()}
+            checked
+            readOnly
           />
           <div className={styles.paymentContent}>
             <div className={styles.paymentIcon}>🏦</div>
@@ -440,31 +318,29 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         </label>
       </div>
 
-      {paymentMethod === 'bank_transfer' && (
-        <div className={styles.confirmationInfo}>
-          {loadingTransferOptions ? (
-            <p>Cargando datos bancarios...</p>
-          ) : transferOptions.map(option => (
-            <div key={option.seller_id} className={styles.infoCard}>
-              <h3>{option.seller_name}</h3>
-              {option.cbu && <p><strong>CBU:</strong> {option.cbu}</p>}
-              {option.alias_bancario && <p><strong>Alias:</strong> {option.alias_bancario}</p>}
-              <p><strong>Monto:</strong> {formatPrice(option.amount)}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className={styles.confirmationInfo}>
+        <p>
+          El pago es una transferencia directa a la cuenta del vendedor.
+          TopGreen no recibe ni retiene el dinero.
+        </p>
+        {loadingTransferOptions ? (
+          <p>Cargando datos bancarios...</p>
+        ) : transferOptions.map(option => (
+          <div key={option.seller_id} className={styles.infoCard}>
+            <h3>{option.seller_name}</h3>
+            {option.cbu && <p><strong>CBU:</strong> {option.cbu}</p>}
+            {option.alias_bancario && <p><strong>Alias:</strong> {option.alias_bancario}</p>}
+            <p><strong>Monto:</strong> {formatPrice(option.amount)}</p>
+          </div>
+        ))}
+      </div>
 
       <div className={styles.formActions}>
         <button type="button" className={styles.backButton} onClick={() => setCurrentStep('shipping')} disabled={isLoading}>
           ← Volver
         </button>
         <button type="submit" className={styles.nextButton} disabled={isLoading}>
-          {isLoading
-            ? 'Procesando...'
-            : paymentMethod === 'bank_transfer'
-              ? 'Crear orden y adjuntar comprobante'
-              : 'Pagar con MercadoPago'}
+          {isLoading ? 'Procesando...' : 'Crear orden y adjuntar comprobante'}
         </button>
       </div>
     </form>
@@ -474,6 +350,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     <div className={styles.confirmation}>
       <h2>🏦 Transferencia bancaria</h2>
       <p>Adjuntá un comprobante por vendedor. La orden queda pendiente hasta su validación.</p>
+      <p>
+        El pago es una transferencia directa a la cuenta del vendedor.
+        TopGreen no recibe ni retiene el dinero.
+      </p>
       {transferOrders.map(order => (
         <div key={order.order_id} className={styles.infoCard}>
           <h3>{order.seller_name}</h3>
@@ -512,114 +392,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     </div>
   );
 
-  const renderConfirmation = () => {
-    // Agrupar productos por vendedor
-    const itemsBySeller = items.reduce((acc, item) => {
-      const sellerName = item.product.seller.name;
-      if (!acc[sellerName]) {
-        acc[sellerName] = {
-          seller: item.product.seller,
-          items: [],
-          total: 0,
-        };
-      }
-      acc[sellerName].items.push(item);
-      acc[sellerName].total += item.product.price * item.quantity;
-      return acc;
-    }, {} as Record<string, any>);
-
-    return (
-      <div className={styles.confirmation}>
-        <div className={styles.successIcon}>✅</div>
-        <h2>¡Pedido Confirmado!</h2>
-        <p className={styles.orderNumber}>Número de Pedido: <strong>{orderNumber}</strong></p>
-
-        <div className={styles.confirmationInfo}>
-          <div className={styles.infoCard}>
-            <h3>📦 Datos de Envío</h3>
-            <p><strong>{shippingData.fullName}</strong></p>
-            <p>📞 {shippingData.phone}</p>
-            <p>📍 {shippingData.address}</p>
-            <p>{shippingData.city}, {shippingData.province} - CP: {shippingData.postalCode}</p>
-            {shippingData.notes && (
-              <p className={styles.notes}>Nota: {shippingData.notes}</p>
-            )}
-          </div>
-
-          <div className={styles.infoCard}>
-            <h3>💳 Método de Pago</h3>
-            <p>💰 MercadoPago</p>
-          </div>
-        </div>
-
-        <div className={styles.sellerContacts}>
-          <div className={styles.unlocked}>
-            🔓 <strong>Información Desbloqueada</strong> - Los vendedores ya tienen tus datos
-          </div>
-
-          {Object.values(itemsBySeller).map((sellerGroup: any, index) => (
-            <div key={index} className={styles.sellerContactCard}>
-              <h3>Vendedor: {sellerGroup.seller.name}</h3>
-              
-              <div className={styles.sellerProducts}>
-                <h4>Productos:</h4>
-                {sellerGroup.items.map((item: any, idx: number) => (
-                  <div key={idx} className={styles.productLine}>
-                    <span>{item.product.name} x{item.quantity}</span>
-                    <span>{formatPrice(item.product.price * item.quantity)}</span>
-                  </div>
-                ))}
-                <div className={styles.sellerTotal}>
-                  <strong>Subtotal: {formatPrice(sellerGroup.total)}</strong>
-                </div>
-              </div>
-
-              <div className={styles.contactDetails}>
-                <p><strong>Contacto:</strong></p>
-                <p>📞 {sellerGroup.seller.phone || '+54 9 11 1234-5678'}</p>
-                <p>📧 {sellerGroup.seller.email || 'contacto@vendedor.com'}</p>
-                {sellerGroup.seller.whatsapp && (
-                  <a 
-                    href={`https://wa.me/${sellerGroup.seller.whatsapp.replace(/[^0-9]/g, '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.whatsappButton}
-                  >
-                    💬 Contactar por WhatsApp
-                  </a>
-                )}
-              </div>
-
-              <div className={styles.addressInfo}>
-                <p><strong>Dirección:</strong></p>
-                <p>📍 {sellerGroup.seller.address?.street || 'Calle Principal 123'}</p>
-                <p>{sellerGroup.seller.address?.city || 'Rosario'}, {sellerGroup.seller.address?.province || 'Santa Fe'}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className={styles.totalSection}>
-          <h3>Total del Pedido: {formatPrice(totalAmount)}</h3>
-        </div>
-
-        <div className={styles.nextSteps}>
-          <h3>📋 Próximos Pasos:</h3>
-          <ol>
-            <li>Los vendedores revisarán tu pedido y lo confirmarán</li>
-            <li>Recibirás un correo con los detalles de pago</li>
-            <li>Una vez confirmado el pago, se coordinará el envío</li>
-            <li>Podrás seguir el estado en "Mis Compras"</li>
-          </ol>
-        </div>
-
-        <button className={styles.finishButton} onClick={handleFinish}>
-          Ir a Mis Compras
-        </button>
-      </div>
-    );
-  };
-
   const renderOrderSummary = () => (
     <div className={styles.sidebar}>
       <h3>Resumen del Pedido</h3>
@@ -628,7 +400,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         {items.map((item) => (
           <div key={item.product.id} className={styles.summaryItem}>
             <div className={styles.summaryItemImage}>
-              <img src={item.product.image} alt={item.product.name} />
+              <ProductImage src={item.product.image} alt={item.product.name} />
             </div>
             <div className={styles.summaryItemInfo}>
               <div className={styles.summaryItemName}>{item.product.name}</div>
@@ -656,46 +428,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     </div>
   );
 
-  const renderProcessing = () => (
-    <div className={styles.confirmation}>
-      {returnedFromMP ? (
-        <>
-          <h2>⚠️ ¿No completaste el pago?</h2>
-          <p>Parece que volviste sin finalizar el pago en MercadoPago.</p>
-          <p className={styles.orderNumber}>Tu orden <strong>{orderNumber}</strong> sigue activa.</p>
-          <p>Podés ver tus órdenes pendientes en tu panel de usuario.</p>
-          <div className={styles.formActions}>
-            <button 
-              className={styles.nextButton}
-              onClick={onClose}
-            >
-              Ver mis órdenes
-            </button>
-            <button 
-              className={styles.backButton}
-              onClick={() => {
-                setReturnedFromMP(false);
-                setCurrentStep('payment');
-              }}
-            >
-              Volver al checkout
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className={styles.processingSpinner}>
-            <div className={styles.spinner}></div>
-          </div>
-          <h2>Redirigiendo a MercadoPago...</h2>
-          <p>Por favor espera mientras te redirigimos al sistema de pagos seguro.</p>
-          <p className={styles.orderNumber}>Orden: <strong>{orderNumber}</strong></p>
-          <p>Total: <strong>{formatPrice(totalAmount)}</strong></p>
-        </>
-      )}
-    </div>
-  );
-
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
@@ -704,19 +436,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         </button>
 
         <div className={styles.progressBar}>
-          <div className={`${styles.progressStep} ${currentStep === 'shipping' ? styles.progressStepActive : currentStep === 'payment' || currentStep === 'confirmation' ? styles.progressStepComplete : ''}`}>
+          <div className={`${styles.progressStep} ${currentStep === 'shipping' ? styles.progressStepActive : styles.progressStepComplete}`}>
             <div className={styles.progressCircle}>1</div>
             <span>Envío</span>
           </div>
           <div className={styles.progressLine}></div>
-          <div className={`${styles.progressStep} ${currentStep === 'payment' ? styles.progressStepActive : currentStep === 'confirmation' ? styles.progressStepComplete : ''}`}>
+          <div className={`${styles.progressStep} ${currentStep === 'payment' ? styles.progressStepActive : currentStep === 'transfer' ? styles.progressStepComplete : ''}`}>
             <div className={styles.progressCircle}>2</div>
             <span>Pago</span>
           </div>
           <div className={styles.progressLine}></div>
-          <div className={`${styles.progressStep} ${currentStep === 'confirmation' ? styles.progressStepActive : ''}`}>
+          <div className={`${styles.progressStep} ${currentStep === 'transfer' ? styles.progressStepActive : ''}`}>
             <div className={styles.progressCircle}>3</div>
-            <span>Confirmación</span>
+            <span>Comprobante</span>
           </div>
         </div>
 
@@ -724,12 +456,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
           <div className={styles.main}>
             {currentStep === 'shipping' && renderShippingStep()}
             {currentStep === 'payment' && renderPaymentStep()}
-            {currentStep === 'processing' && renderProcessing()}
             {currentStep === 'transfer' && renderTransferStep()}
-            {currentStep === 'confirmation' && renderConfirmation()}
           </div>
 
-          {currentStep !== 'confirmation' && currentStep !== 'processing' && currentStep !== 'transfer' && renderOrderSummary()}
+          {currentStep !== 'transfer' && renderOrderSummary()}
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import styles from './ServicesPage.module.css';
+import { ProductImage } from '../ProductImage/ProductImage';
 
 interface ServicesPageProps {
   onNavigateToContact?: () => void;
@@ -114,8 +115,8 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({ onNavigateToContact 
                 </div>
               </div>
               <div className={styles.serviceImageWrapper}>
-                <img 
-                  src={service.image} 
+                <ProductImage
+                  src={service.image}
                   alt={service.title}
                   className={styles.serviceImage}
                 />
