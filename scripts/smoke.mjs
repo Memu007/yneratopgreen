@@ -806,6 +806,91 @@ await runCase(17, 'Rechazo de comprobante guarda el motivo', async () => {
   return `API=rejected, SQL=REJECTED, motivo guardado="${reason}"`;
 });
 
+await runCase(18, 'Transferencia completa desde la interfaz', async () => {
+  const [databaseBank] = queryRows(`
+    SELECT cbu, alias_bancario
+    FROM users
+    WHERE id = ${sqlLiteral(state.sellerId)}
+  `);
+  const browser = await chromium.launch({ headless: true });
+  const pageErrors = [];
+
+  try {
+    const context = await browser.newContext();
+    await context.addInitScript(
+      ({ accessToken, refreshToken }) => {
+        window.localStorage.setItem('access_token', accessToken);
+        window.localStorage.setItem('refresh_token', refreshToken);
+      },
+      {
+        accessToken: state.buyerToken,
+        refreshToken: state.buyerRefreshToken,
+      },
+    );
+    const page = await context.newPage();
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+    await page.waitForFunction(
+      () => document.querySelectorAll('#catalog-category option').length > 1,
+    );
+    await page.locator('#catalog-type').selectOption('productos');
+    await page.getByRole('button', { name: /Agregar/ }).first().click();
+    await page.getByRole('button', { name: /Carrito/ }).click();
+    await page.getByRole('button', { name: 'Continuar compra' }).click();
+
+    await page.getByRole('heading', { name: /Datos de Envío/ }).waitFor();
+    await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
+    await page.locator('form select').selectOption('Buenos Aires');
+    await page.getByPlaceholder('Rosario').fill('Rosario');
+    await page
+      .getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B')
+      .fill('Av. Transferencia UI 789');
+    await page.getByPlaceholder('2000').fill('2000');
+    await page.locator('form:has(h2) button[type="submit"]').click();
+
+    await page.getByRole('heading', { name: /Método de Pago/ }).waitFor();
+    await page.locator('input[value="bank_transfer"]').check();
+    await page.getByText(new RegExp(databaseBank[1])).waitFor({ state: 'visible' });
+    const bankDetails = await page.locator('form:has(h2)').textContent();
+    assert(bankDetails?.includes(databaseBank[0]), 'la UI no muestra el CBU guardado en SQL');
+    assert(bankDetails?.includes(databaseBank[1]), 'la UI no muestra el alias guardado en SQL');
+    await page.getByRole('button', { name: /Crear orden y adjuntar comprobante/ }).click();
+
+    await page.getByRole('heading', { name: /Transferencia bancaria/ }).waitFor();
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'comprobante-ui.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    });
+    await page.getByRole('button', { name: 'Adjuntar comprobante' }).click();
+    await page
+      .getByText(/Comprobante enviado\. Esperando validación del vendedor/)
+      .waitFor({ state: 'visible', timeout: 15_000 });
+
+    assert(pageErrors.length === 0, `errores JS: ${pageErrors.join(' | ')}`);
+    const [databaseOrder] = queryRows(`
+      SELECT status::text, transfer_receipt_url
+      FROM orders
+      WHERE buyer_id = ${sqlLiteral(state.buyerId)}
+        AND seller_id = ${sqlLiteral(state.sellerId)}
+      ORDER BY created_at DESC
+      LIMIT 1
+    `);
+    assert(databaseOrder[0] === 'TRANSFER_RECEIPT_SUBMITTED', `estado SQL: ${databaseOrder[0]}`);
+    assert(databaseOrder[1], 'la orden creada por UI no guardó el comprobante');
+    return 'UI + API + DB, CBU y alias de SQL visibles, comprobante asociado';
+  } finally {
+    await browser.close();
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 
