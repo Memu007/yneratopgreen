@@ -301,22 +301,46 @@ Publicidad y posiciones patrocinadas, financiación y canje, portal
 editorial y SEO masivo, **el sistema de cobro de suscripciones**,
 recomendaciones con IA, multi-país y multi-idioma, paridad con Agrofy.
 
-### Matiz sobre suscripciones, 2026-07-26
+### Suscripciones, definición final del 2026-07-26
 
-Se distinguen dos cosas que antes estaban juntas:
+Reemplaza al matiz anterior, que dejaba el cobro afuera. **El cobro
+recurrente entra.**
 
 | Pieza | Alcance |
 |---|---|
-| **El candado**: los datos de contacto se ven sólo con suscripción activa, marcada a mano por el administrador | **Dentro.** Definición del dueño del proyecto. Son horas y es estructural: define qué devuelven los endpoints |
-| **El sistema de suscripciones**: cobro, renovación, planes, niveles, avisos de vencimiento, prorrateo | **Fuera.** Módulo entero, se cotiza aparte |
+| **El candado**: los datos de contacto se ven sólo con suscripción vigente | **Dentro.** Es estructural: define qué devuelven los endpoints |
+| **Cobro recurrente con Mercado Pago** | **Dentro.** Decisión del dueño: sin eso la clienta no tiene con qué financiarse |
+| **Dos planes, básico y premium**, con distinto nivel de acceso | **Dentro** |
+| **Mensajería interna**, exclusiva del plan premium | **Dentro** |
+| Prorrateo, cupones, planes anuales, reintentos de cobro fallido | **Fuera** |
 
 Motivo de incluir el candado: quién puede ver qué es la forma del módulo,
 no una capa que se agrega después. Construir los endpoints devolviendo el
 teléfono siempre y ponerle el control de acceso más adelante significa
 tocarlos todos.
 
-Es el mismo criterio que se aplicó a la privacidad de los datos de
-contacto del transportista.
+**Por qué la mensajería va sólo en el plan premium.** Si cualquiera puede
+escribirle a cualquiera dentro de la plataforma, se pasan el teléfono en
+el primer mensaje y la suscripción deja de tener sentido. Reservada al
+plan caro, deja de competir con el modelo de ingresos y pasa a
+justificarlo.
+
+**Cobrar suscripción no contradice** la decisión de no tocar fondos de
+terceros: una comisión sobre ventas ajenas es administrar plata de otros,
+una suscripción es facturarle a un cliente propio por un servicio propio.
+
+### Tierras y parcelas: entra como aviso de consulta
+
+Decidido el 2026-07-26. Una publicación de campo **no usa carrito ni
+stock**: muestra fotos y datos, y el interesado contacta. La operación se
+cierra entre las partes, fuera de la plataforma.
+
+Es barato porque la categoría ya está cargada y el contacto ya queda
+detrás del candado de suscripción. Lo único nuevo es marcar la publicación
+como *consulta* en lugar de *compra*, y cambiar el botón.
+
+Suma además un tipo de suscriptor que no estaba previsto: las
+inmobiliarias rurales.
 
 Tampoco entran: mensajería comprador ↔ vendedor, reviews de productos,
 favoritos, cupones.

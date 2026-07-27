@@ -35,6 +35,58 @@ cualquier caso, así que no bloquea la construcción.
 
 ---
 
+## 2026-07-26 — Suscripciones con Mercado Pago, dos planes, y mensajería en el premium
+
+Decisión del dueño del proyecto, tomada después de que la PM recomendara
+lo contrario. Queda registrada como suya y se ejecuta completa.
+
+**Entra:**
+
+- **Cobro de suscripciones por Mercado Pago**, recurrente. *"Es la base de
+  todo"*: sin eso la clienta no tiene con qué financiarse.
+- **Dos planes, básico y premium**, que habilitan distinto nivel de acceso
+  a los datos de contacto.
+- **Mensajería interna, sólo en el plan premium.** Resuelve la objeción
+  que había planteado la PM: si cualquiera puede chatear, se pasan el
+  teléfono en el primer mensaje y nadie paga. Reservada al plan caro, deja
+  de canibalizar y pasa a justificar el precio del plan.
+
+**Queda afuera:**
+
+- **Verificación automática de pagos.** El dueño la descarta: la operación
+  es entre empresas y ya se cobra una suscripción.
+- **Carta de porte electrónica.** Descartada, ni siquiera por hora.
+
+### Una aclaración que evita confundir esto con lo anterior
+
+Cobrar una suscripción **no contradice** la decisión de que la plataforma
+no toque fondos de terceros. Son cosas distintas:
+
+- Cobrar una comisión de cada venta es administrar plata ajena. Eso quedó
+  descartado.
+- Cobrar una suscripción es **facturarle a un cliente propio por un
+  servicio propio**. Eso es una venta común y no tiene implicancia
+  regulatoria.
+
+### Lo que esto cuesta, y hay que resolverlo antes de firmar
+
+| Pieza | Estimado |
+|---|---|
+| Suscripción recurrente con Mercado Pago | 1,5 a 2 semanas |
+| Dos planes aplicados a lo que se ve | 1 semana |
+| Mensajería con hilos, no leídos y candado por plan | 2 a 3 semanas |
+| **Total agregado** | **4,5 a 6 semanas** |
+
+El trabajo restante era de 7 a 9 semanas. Con esto pasa a **11,5 a 15**,
+contra un plazo contractual de 12 a 14 semanas y un precio cerrado. Entra
+raspando en el mejor caso y se pasa en el peor, sin margen para
+imprevistos.
+
+**No es una objeción al alcance: es una advertencia de plazo y precio.**
+El tratamiento comercial está en el documento de prefirma.
+
+---
+
 ## 2026-07-26 — La plataforma no toca el dinero, y es a propósito
 
 En el pago por transferencia, los fondos van **directo de la cuenta del
