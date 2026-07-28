@@ -77,6 +77,50 @@ pantallas— y confirma que aparcarlo fue la decisión correcta.
 
 ---
 
+## El camino de instalación sin Docker está roto
+
+Levanté el proyecto entero en una máquina limpia **sin Docker**, siguiendo
+el "Camino B" de `README_LOCAL_SETUP.md`. Funciona, pero no como está
+documentado: hay dos cosas que lo frenan y las dos son de configuración.
+
+**1. `backend/.env.example` no se puede usar tal cual.** Tiene claves que
+`Settings` rechaza, porque el modelo no admite campos extra:
+
+```
+DB_HOST · DB_PORT · DB_NAME · DB_USER · DB_PASSWORD · BASE_URL
+```
+
+Copiar el ejemplo y completarlo, que es lo que dice la guía, termina en un
+error de validación de Pydantic antes de que arranque nada. Hay que
+borrar esas seis líneas a mano para que levante.
+
+**2. El proxy de Vite apunta a un puerto que sólo existe con nginx.** En
+`vite.config.ts` el destino es `http://localhost`, o sea el puerto 80. Eso
+es el nginx del perfil `fullstack` de Docker. Sin ese contenedor, **todas
+las llamadas a la API fallan** con `ECONNREFUSED 127.0.0.1:80` y la
+aplicación queda vacía, sin decir por qué.
+
+Lo resolví con un `.env.local` con `VITE_API_URL=http://localhost:8000/api`,
+que el código ya soporta.
+
+### Qué te pido
+
+- Que `backend/.env.example` levante **sin editarlo**, salvo las
+  contraseñas.
+- Que el camino sin Docker funcione siguiendo la guía al pie, sin trucos.
+  Elegí vos cómo: cambiar el destino del proxy, documentar el
+  `VITE_API_URL`, o las dos.
+- Corregí `README_LOCAL_SETUP.md` con lo que quede.
+
+**Por qué me importa más de lo que parece.** Es exactamente la clase de
+problema que encontramos al recibir este proyecto: una guía de
+instalación que no instala. Cuando esto se entregue, alguien va a seguir
+ese documento sin nosotros al lado.
+
+Es chico y va junto con lo de las órdenes colgadas.
+
+---
+
 ## Antes de seguir: hay órdenes que quedan muertas
 
 **Leé `docs/pm/PAGOS-TRANSFERENCIA.md`.** Sale de una duda del dueño del
