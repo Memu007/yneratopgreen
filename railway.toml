@@ -1,0 +1,23 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.railway"
+watchPatterns = [
+  "/src/**",
+  "/public/**",
+  "/index.html",
+  "/package.json",
+  "/package-lock.json",
+  "/tsconfig.json",
+  "/tsconfig.node.json",
+  "/vite.config.ts",
+  "/Dockerfile.railway",
+  "/Dockerfile.railway.dockerignore",
+  "/infra/railway/**",
+  "/railway.toml",
+]
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
