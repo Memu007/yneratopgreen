@@ -1,11 +1,24 @@
 # Estado actual
 
-Actualizado: 2026-07-26.
+Actualizado: 2026-07-28.
+
+## El proyecto fue aprobado
+
+La clienta dio el visto bueno. **Se terminó la etapa de conseguir el
+trabajo y empieza la de entregarlo**, con el reloj corriendo.
+
+Cambia el criterio de fondo: hasta ahora se decidía pensando en la
+demostración —qué mostrar, qué no—. Desde acá se decide pensando en la
+entrega, y todo lo que se construya se va a usar en producción con datos
+de gente real.
+
+**Pendiente de confirmar: la fecha exacta de inicio del plazo**, porque de
+ahí salen las doce semanas y las fechas de cada hito de cobro.
 
 ## Objetivo activo
 
-**Preparar la demostración del 30 de julio** y construir el módulo de
-transportistas.
+**Cerrar lo que quedó roto de lo ya entregado** y arrancar los dos módulos
+grandes: transportistas y suscripciones.
 
 ## Dónde estamos
 
@@ -69,27 +82,39 @@ evidencia de ejecución detrás.
 3. La velocidad no se repite: lo que queda es construcción nueva con
    incógnitas.
 
-## Orden de trabajo, decidido el 2026-07-26
+## Orden de trabajo, revisado el 2026-07-28
 
-1. ~~**Pago por transferencia bancaria.**~~ **Terminado y verificado el
-   2026-07-26.** Los tres requisitos contractuales de la sección 3.3
-   cerrados, con copia de los datos bancarios guardada en la orden y
-   avisos en pantalla para comprador y vendedor. **Suite en 20/20.**
-2. **Transportistas: arranca ya.** Estaba trabado por error mío. El
-   contrato **ya define** la cobertura: *"zona de cobertura (radio en
-   km)"*. Las zonas declaradas eran una propuesta mía, no lo contratado;
-   si la clienta las quiere, es un cambio a cotizar.
+**Primero se cierra lo roto de lo ya entregado.** No se abren módulos
+nuevos con deuda encima.
 
-   Y también aclara que es un **directorio, no un motor de ruteo**: se
-   filtra por distancia y se lista, sin calcular rutas ni tiempos.
+1. **Órdenes de transferencia que quedan colgadas.** Si el comprador no
+   sube el comprobante, nadie puede aprobar, rechazar ni cancelar esa
+   orden nunca más. Cuatro arreglos chicos, detallados en
+   `PAGOS-TRANSFERENCIA.md`.
+2. **El seed no carga CBU ni alias**, así que sobre una instalación limpia
+   la transferencia no se puede usar. Y la pantalla de pago muestra un
+   error que no corresponde.
+3. **El camino de instalación sin Docker no funciona** siguiendo la guía:
+   el archivo de configuración de ejemplo tiene claves que el sistema
+   rechaza, y el proxy del frontend apunta a un puerto que sólo existe con
+   nginx.
+4. **Transportistas.** La Pieza A está hecha con dos objeciones abiertas
+   —el perfil no se puede editar y el campo de certificación obligatorio
+   no informa nada—. Las Piezas B y C esperan a que la dev conteste las
+   cuatro preguntas de diseño y haga el mapa de por dónde sale hoy el
+   contacto del comprador.
+5. **Suscripciones con Mercado Pago, dos planes y mensajería premium.**
+   Alcance nuevo confirmado. **Falta escribir la tarea**; el análisis está
+   en `DECISIONS.md` y `PROJECT.md`.
+6. **Tierras y parcelas como aviso de consulta**, sin carrito. Chico:
+   la categoría ya existe y el candado de contacto ya se construye.
+7. **Mercado Pago para las compras**, reconstruido sin split.
+8. **Al final:** correcciones de la vista en celular, revisión de
+   seguridad y despliegue en producción.
 
-   Se hace en tres piezas: el transportista como tipo especial de
-   proveedor, la coincidencia por `ST_DWithin`, y la selección con los
-   datos de contacto **recién después de elegirlo**.
-3. **Mercado Pago: se reconstruye desde cero, sin split.** Lo heredado se
-   desmontó el 2026-07-26. Ver el bloqueo de abajo.
-4. **Al final, antes de desplegar:** correcciones de la vista en celular,
-   revisión de seguridad y despliegue.
+**Despliegue:** la dev subió la preparación para Railway en `382bcbe`
+—`Dockerfile.railway`, `railway.toml` y `RAILWAY.md`— sin informe. Falta
+revisarlo, y **no se publica nada sin la revisión de seguridad**.
 
 **Las correcciones de celular se aparcan.** Se hizo sólo el relevamiento
 —capturas e inventarios de consola y red— para saber cuánto trabajo es.
@@ -105,20 +130,14 @@ desplazamiento horizontal. Es media jornada al final, no un rediseño.
 La decisión de aparcarlo quedó respaldada por los datos: no había
 incendio.
 
-## Próximas tareas
-
-1. **Ensayo de la demostración del 30-07.** Recorrer el camino exacto que
-   se va a mostrar, sobre instalación limpia y cronometrado. Guión en
-   `DEMO.md`.
-
-2. **Módulo de transportistas, en curso.** El bloque grande del
-   diferencial, 25 % del contrato. Radio en km por contrato, directorio y
-   no ruteo, en tres piezas con informe entre cada una.
-
 ## Equipo
 
 Una sola dev, sobre `main`, con canal único en `PARA-DEV.md` y
-`PARA-PM.md`. El estimado de trabajo restante vuelve a **7 a 9 semanas**.
+`PARA-PM.md`.
+
+**`PARA-DEV.md` pasó las 1.300 líneas** y acumula el historial de todo el
+proyecto. Conviene archivar lo cerrado y dejar arriba sólo lo vigente,
+antes de que la dev empiece a saltear secciones.
 
 ## Cómo se escriben los criterios de aceptación
 
@@ -132,9 +151,15 @@ así se detectó. Los números fijos envejecen mal.
 
 ## Bloqueos y pendientes
 
-- **El contrato no está firmado.** Firma prevista el 2026-07-30. El plazo
-  de 12 a 14 semanas arranca ahí, así que lo construido es previo al
-  reloj. Con 7 a 9 semanas de trabajo restante, entra.
+- ~~**El contrato no está firmado.**~~ **Proyecto aprobado el
+  2026-07-28.** Falta confirmar la fecha exacta de inicio del plazo, que
+  define las doce semanas y las fechas de los tres pagos.
+
+  **El estimado ya no cierra igual.** Eran 7 a 9 semanas de trabajo
+  restante; el alcance nuevo —suscripciones con cobro recurrente, dos
+  planes y mensajería— suma entre 4,5 y 6. Contra un plazo de doce
+  semanas, entra raspando en el mejor caso. Conviene revisarlo con datos
+  reales después de cerrar los arreglos pendientes.
 - ~~**Definición pendiente del cliente:** cobertura del transportista.~~
   **Resuelto el 2026-07-26 leyendo el contrato**, que dice "zona de
   cobertura (radio en km)". No era una pregunta abierta: era yo que no
