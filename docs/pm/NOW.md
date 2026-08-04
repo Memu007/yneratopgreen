@@ -1,19 +1,54 @@
 # Estado actual
 
-Actualizado: 2026-07-28.
+Actualizado: 2026-08-04.
+
+## Cambio de roles, hoy
+
+**La PM ahora es Sol. La dev ahora soy yo.** El intercambio es completo:
+Sol define, prioriza, escribe criterios y revisa; yo escribo el código y
+le informo. Seguimos siendo adversariales en las dos direcciones.
+
+Sol arranca por **`ONBOARDING-PM.md`** y después por este archivo.
+
+Lo que cambia en la práctica:
+
+- `PARA-DEV.md` lo escribe Sol. Lo archivé de 1.378 a 494 líneas; el
+  historial completo quedó verbatim en `archivo/PARA-DEV-historico.md`.
+- `PARA-PM.md` lo escribo yo, y lo pisé con el informe de hoy.
+- El plan con fechas reales quedó en **`CRONOGRAMA.md`**, nuevo.
 
 ## El proyecto fue aprobado
 
-La clienta dio el visto bueno. **Se terminó la etapa de conseguir el
-trabajo y empieza la de entregarlo**, con el reloj corriendo.
+La clienta dio el visto bueno el **martes 2026-07-28**. Se terminó la
+etapa de conseguir el trabajo y empieza la de entregarlo, con el reloj
+corriendo.
 
 Cambia el criterio de fondo: hasta ahora se decidía pensando en la
 demostración —qué mostrar, qué no—. Desde acá se decide pensando en la
 entrega, y todo lo que se construya se va a usar en producción con datos
 de gente real.
 
-**Pendiente de confirmar: la fecha exacta de inicio del plazo**, porque de
-ahí salen las doce semanas y las fechas de cada hito de cobro.
+## El calendario manda, y sale del PDF del socio
+
+Las fases y las semanas del *Documento de Especificación Funcional* son
+el compromiso escrito con la clienta. Están ancladas a fechas reales en
+**`CRONOGRAMA.md`**.
+
+| Fase | Semanas | Desde | Hasta |
+|---|---|---|---|
+| 1 — Diseño y UX/UI | 1–2 | 27/07 | 09/08 |
+| 2 — Desarrollo base | 3–5 | 10/08 | 30/08 |
+| 3 — Buscador y catálogo | 6–8 | 31/08 | 20/09 |
+| 4 — Pagos y checkout | 9–10 | 21/09 | 04/10 |
+| 5 — QA y lanzamiento | 11–12 | 05/10 | 18/10 |
+
+**Hoy es martes 2026-08-04: semana 2, fase 1.** El plazo es de 12 a 14
+semanas; las doce cierran el **2026-10-18** y el colchón llega al
+**2026-11-01**.
+
+**El ancla al lunes 2026-07-27 todavía no está confirmada con la
+clienta.** Si ella entiende otra fecha de inicio, las cinco fases se
+corren en bloque. Conviene resolverlo ahora y no en la semana 10.
 
 ## Objetivo activo
 
@@ -82,7 +117,7 @@ evidencia de ejecución detrás.
 3. La velocidad no se repite: lo que queda es construcción nueva con
    incógnitas.
 
-## Orden de trabajo, revisado el 2026-07-28
+## Orden de trabajo, revisado el 2026-08-04
 
 **Primero se cierra lo roto de lo ya entregado.** No se abren módulos
 nuevos con deuda encima.
@@ -132,12 +167,12 @@ incendio.
 
 ## Equipo
 
-Una sola dev, sobre `main`, con canal único en `PARA-DEV.md` y
-`PARA-PM.md`.
+**Sol, PM. Una sola dev.** Todo sobre `main`, con canal único en
+`PARA-DEV.md` —escribe Sol— y `PARA-PM.md` —escribe la dev—.
 
-**`PARA-DEV.md` pasó las 1.300 líneas** y acumula el historial de todo el
-proyecto. Conviene archivar lo cerrado y dejar arriba sólo lo vigente,
-antes de que la dev empiece a saltear secciones.
+`PARA-DEV.md` quedó archivado el 2026-08-04: pasó de 1.378 a 494 líneas.
+El historial completo está verbatim en
+`docs/pm/archivo/PARA-DEV-historico.md` y no se edita.
 
 ## Cómo se escriben los criterios de aceptación
 
@@ -152,14 +187,19 @@ así se detectó. Los números fijos envejecen mal.
 ## Bloqueos y pendientes
 
 - ~~**El contrato no está firmado.**~~ **Proyecto aprobado el
-  2026-07-28.** Falta confirmar la fecha exacta de inicio del plazo, que
-  define las doce semanas y las fechas de los tres pagos.
+  2026-07-28.** Queda confirmar con la clienta la fecha de inicio del
+  plazo. Trabajamos sobre el ancla del lunes 2026-07-27; ver
+  `CRONOGRAMA.md`.
 
   **El estimado ya no cierra igual.** Eran 7 a 9 semanas de trabajo
   restante; el alcance nuevo —suscripciones con cobro recurrente, dos
-  planes y mensajería— suma entre 4,5 y 6. Contra un plazo de doce
-  semanas, entra raspando en el mejor caso. Conviene revisarlo con datos
-  reales después de cerrar los arreglos pendientes.
+  planes y mensajería— suma entre 4,5 y 6. Total 11,5 a 15 contra un
+  plazo de 12, o 14 con el colchón. **Entra raspando en el mejor caso.**
+
+  Y las suscripciones **no están en el PDF**: son alcance agregado después
+  de la propuesta, sobre un precio cerrado. Las tres salidas posibles
+  —addendum, absorberlo, o correrlo a una fase 6— están en `CRONOGRAMA.md`
+  sección 5. **No decidir es elegir absorberlo sin haberlo acordado.**
 - ~~**Definición pendiente del cliente:** cobertura del transportista.~~
   **Resuelto el 2026-07-26 leyendo el contrato**, que dice "zona de
   cobertura (radio en km)". No era una pregunta abierta: era yo que no

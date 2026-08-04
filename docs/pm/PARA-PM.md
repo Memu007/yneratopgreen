@@ -1,187 +1,145 @@
 # Dev → PM
 
-## Estado
+Sol: este archivo es mío y vos no lo tocás. Acá te informo.
 
-Terminé y subí, en piezas separadas:
+Fecha: 2026-08-04. **Primer informe con los roles cambiados.**
 
-- `2c5a589` — cierre de los pagos heredados.
-- `d8420e9` — snapshot bancario en la orden.
-- `61eeb96` — avisos de transferencia para comprador y vendedor.
-- `f470b71` — respaldo compartido para imágenes rotas.
+---
 
-## Pagos heredados: inalcanzables
+## Qué hice hoy, y es trabajo de traspaso, no de producto
 
-- Eliminé `simulate-payment` de `payments.py`.
-- `main.py` ya no importa ni monta `payments.router` ni `mp_oauth.router`.
-- Quité Mercado Pago del checkout.
-- Quité OAuth y vinculación de Mercado Pago del panel.
-- Contacto ya no dice que se acepta Mercado Pago ni efectivo.
-- El código heredado restante sigue en Git, como pediste.
+Hasta hoy yo era la PM. Antes de soltar ese rol dejé el repositorio en
+condiciones de que lo agarres sin arqueología:
 
-Caso nuevo:
+- **`ONBOARDING-PM.md`**, nuevo. Tu arranque. Incluye la lista de mis
+  errores como PM, porque heredás las consecuencias.
+- **`CRONOGRAMA.md`**, nuevo. Las cinco fases del PDF que aprobó la
+  clienta, ancladas a fechas reales, con el contraste contra lo que está
+  realmente hecho.
+- **`PARA-DEV.md`** archivado: de 1.378 líneas a 494. El historial completo
+  quedó verbatim en `archivo/PARA-DEV-historico.md`. No se borró nada.
+- **`NOW.md`**, `CONTRATO.md` y `ONBOARDING-DEV.md` actualizados al
+  2026-08-04.
 
-```text
-PASS 19 Las rutas financieras heredadas no están expuestas
-  payments, mp-oauth y simulate-payment respondieron HTTP 404
+**No toqué una sola línea de código de producto.** El árbol de trabajo
+tiene sólo cambios en `docs/pm/`.
+
+---
+
+## Lo que verifiqué contra el código, hoy, para pasártelo confirmado
+
+No te lo paso porque lo diga un informe viejo. Estos son los cuatro
+hallazgos abiertos, cada uno con dónde mirarlo:
+
+### 1. Las órdenes de transferencia quedan colgadas
+
+`backend/app/api/orders.py:709`:
+
+```python
+if order.status not in [OrderStatus.PLACED, OrderStatus.CONFIRMED, OrderStatus.PAID]:
+    raise HTTPException(status_code=400, detail="Solo se pueden cancelar órdenes pendientes, pagadas o confirmadas")
 ```
 
-La prueba cubre:
+Los dos estados de transferencia —`AWAITING_TRANSFER_RECEIPT` y
+`TRANSFER_RECEIPT_SUBMITTED`, declarados en `backend/app/models/order.py:23-24`—
+**no están en esa lista**. Si el comprador no sube el comprobante, esa
+orden no se puede cancelar nunca más, ni por el comprador ni por el
+vendedor. Queda con el stock comprometido para siempre.
 
-```text
-GET  /api/payments/public-key                       -> 404
-GET  /api/mp-oauth/status                           -> 404
-POST /api/payments/simulate-payment/inexistente     -> 404
-```
+El análisis completo y los cuatro arreglos están en
+`PAGOS-TRANSFERENCIA.md`.
 
-No depende de que falten credenciales: los routers no existen en runtime.
+### 2. El seed no carga datos bancarios de nadie
 
-## Snapshot bancario
+Buscando `cbu` y `alias_bancario` en todo el seed: **cero resultados.**
 
-Migración autogenerada:
+Consecuencia: sobre una instalación limpia, el pago por transferencia
+—que es la única vía de pago que existe hoy— no se puede usar. Ningún
+vendedor tiene CBU.
 
-`20260726_0104_63c3ab99fea0_guardar_snapshot_bancario_en_orden.py`
+**La suite no lo detecta** porque el caso 13 configura los datos bancarios
+él mismo antes de probar. Prueba la regla, y nadie prueba cómo queda el
+sistema recién instalado.
 
-Detectó únicamente:
+### 3. El camino de instalación sin Docker no arranca
 
-```text
-orders.transfer_cbu
-orders.transfer_alias_bancario
-orders.transfer_account_holder
-```
+`backend/.env.example` declara seis claves que `Settings` no acepta:
+`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` y `BASE_URL`.
+`backend/app/core/config.py:75` usa `class Config` sin declarar `extra`,
+y el valor por defecto rechaza claves desconocidas. Copiar el ejemplo tal
+cual y levantar el backend falla.
 
-Las tres columnas son anulables. Al crear la orden se copian CBU, alias y
-titular; las respuestas posteriores leen la orden y no el perfil.
+Y `vite.config.ts` proxea `/api` a `http://localhost` —puerto 80, que sólo
+existe con nginx—. Sin Docker el frontend no ve la API.
 
-El caso 14 ahora:
+### 4. La pantalla de pago muestra un error que no corresponde
 
-1. configura CBU y alias;
-2. crea la orden;
-3. cambia ambos datos en el perfil del vendedor;
-4. consulta la orden como comprador;
-5. contrasta API y SQL.
+Cuando la API devuelve *"Administrador TopGreen no configuró CBU ni alias
+bancario"*, la interfaz muestra **"⚠️ Producto no encontrado en el
+carrito"**. Manda a mirar al lugar equivocado.
 
-Resultado:
+---
 
-```text
-PASS 14 Datos bancarios correctos y orden esperando comprobante
-  snapshot API=SQL intacto tras cambiar el perfil
-```
+## Lo que la dev anterior dejó sin informar
 
-La migración aplicó desde una base vacía dentro del smoke. Chequeo posterior:
+Subió `382bcbe chore: preparar despliegue en Railway` —`Dockerfile.railway`,
+`railway.toml`, `RAILWAY.md`, `backend/railway-entrypoint.sh` y
+`infra/railway/nginx.conf.template`— **sin escribir informe**.
 
-```text
-$ alembic check
-No new upgrade operations detected.
-```
+**No lo revisé.** No sé si funciona, y no se despliega nada antes de la
+revisión de seguridad. Te lo dejo señalado para que decidas si lo audito o
+lo dejamos para la fase 5.
 
-## Tarea 5 bis
+---
 
-Comprador, antes y después de crear la orden:
+## Lo que no corrí
 
-> El pago es una transferencia directa a la cuenta del vendedor. TopGreen no
-> recibe ni retiene el dinero.
+Digo lo que no hice, explícitamente:
 
-Vendedor, antes de los botones:
+- **No corrí la suite de humo hoy.** El último resultado registrado es
+  20/20, del 2026-07-26, y es anterior al commit de Railway.
+- **No levanté el entorno hoy.** Los hallazgos 1, 2 y 3 salen de leer el
+  código; el hallazgo 4 salió de correr la aplicación el 2026-07-28.
+- **No revisé el commit de Railway.**
+- **No toqué nada de producto.**
 
-> **Verificá el dinero en tu cuenta bancaria antes de aprobar.** Este
-> comprobante es sólo un registro: no confirma que la transferencia se haya
-> acreditado. No apruebes si el importe acreditado no coincide con el total de
-> la orden.
+---
 
-El caso 18 abre una sesión de comprador y otra de vendedor. Comprueba que
-ambos textos sean visibles y que el aviso del vendedor preceda en el DOM a
-`Aprobar comprobante`.
+## Lo que necesito de vos para arrancar
 
-Primera corrida de esta pieza:
+1. **Decime qué hago primero.** Escribilo en `PARA-DEV.md` y pusheá.
 
-```text
-18/19 pasaron
-```
+   Mi propuesta es cerrar los cuatro arreglos de la transferencia antes de
+   abrir cualquier módulo nuevo, porque hoy hay órdenes que se pueden
+   dejar muertas en producción. Pero es tu decisión y la vas a discutir.
 
-El test había acotado la búsqueda al encabezado de la tarjeta (`../..`) y no a
-la tarjeta completa. Corregí el selector a `../../..` y repetí la suite:
+2. **Para los arreglos de transferencia pido un criterio explícito:** el
+   caso nuevo de la suite tiene que **fallar contra el código de hoy**
+   antes del arreglo. Si pasa antes, el caso no prueba nada. Lo voy a
+   pegar en el informe, la corrida en rojo y la corrida en verde.
 
-```text
-19/19 pasaron; 0 fallaron
-```
+3. **Suscripciones: no puedo empezar.** El alcance está decidido en
+   `DECISIONS.md` y `PROJECT.md` —Mercado Pago recurrente, dos planes,
+   mensajería sólo en el premium— pero **no hay enunciado con criterios**.
+   Sin eso tendría que inventar decisiones de diseño, y no lo voy a hacer.
 
-## Tarea 5: respaldo de imágenes
+4. **Las cuatro preguntas de diseño de transportistas** siguen abiertas y
+   bloquean las Piezas B y C. Definen quién ve los datos de contacto de
+   quién. Si se definen al empezar son un parámetro; si se definen después,
+   es reescribir el módulo.
 
-Extraje el comportamiento aprobado de `ProductCard` a un único
-`ProductImage`: ante `onError`, reemplaza la imagen por el nombre sobre el
-mismo fondo verde, incluido el tema oscuro.
+---
 
-Se usa en:
+## Una cosa que te discuto de entrada
 
-- tarjetas del catálogo;
-- detalle y miniaturas;
-- carrito;
-- checkout;
-- publicaciones del vendedor y editor;
-- administración;
-- formulario de publicación;
-- imágenes institucionales de Nosotros y Servicios.
+En `CRONOGRAMA.md` vas a ver que el **hito intermedio** se dispara *"contra
+entrega y demostración del módulo de catálogo, búsquedas y geolocalización
+funcional"*, y que catálogo, búsquedas y geolocalización de productos ya se
+demuestran hoy, en la semana 2.
 
-La única etiqueta `<img>` que queda en `src/` está dentro de
-`ProductImage.tsx` y tiene `onError`.
+**No lo reclames todavía.** Esa frase incluye la geolocalización de
+**fletes**, y ese módulo está en cero. Reclamar el hito ahora es cobrar por
+algo que no se puede mostrar completo, y en un proyecto que arrancó con una
+clienta quemada por otro estudio, eso cuesta más que lo que entra.
 
-El caso 20 intercepta `https://picsum.photos/**`, responde `404`
-intencionalmente y verifica el reemplazo en:
-
-1. detalle;
-2. carrito;
-3. checkout;
-4. panel del vendedor;
-5. administración.
-
-También cuenta que Playwright haya bloqueado al menos una URL real de
-`picsum.photos`, para que el caso no pase sólo por una publicación sin imagen.
-
-Hubo dos corridas previas `19/20`, ambas por selectores del test:
-
-1. tomó el encabezado transitorio `Cargando productos...`;
-2. el nombre de la publicación aparecía a la vez en el `h3` de la tarjeta y el
-   `h2` del detalle.
-
-La prueba final busca un producto seed conocido por nombre y nivel de
-encabezado.
-
-## Smoke final
-
-Ejecutado desde cero después del último cambio:
-
-```text
-PASS 01 Salud del servicio
-PASS 02 Registro de usuario
-PASS 03 Ingreso y obtención del token
-PASS 04 Catálogo con categoría y precio
-PASS 05 Catálogo con provincia y localidad
-PASS 06 Detalle de producto
-PASS 07 Agregar al carrito y verlo
-PASS 08 Crear orden desde el carrito
-PASS 09 Publicar producto como vendedor desde la interfaz
-PASS 10 Fallo de imagen visible sin perder la publicación
-PASS 11 Ver mis compras y mis ventas
-PASS 12 Administración: usuarios, productos y órdenes
-PASS 13 Transferencia exige CBU o alias del vendedor
-PASS 14 Datos bancarios correctos y orden esperando comprobante
-PASS 15 Comprobante fallido visible y comprobante válido asociado
-PASS 16 Sólo el vendedor correcto valida el comprobante
-PASS 17 Rechazo de comprobante guarda el motivo
-PASS 18 Transferencia completa desde la interfaz
-PASS 19 Las rutas financieras heredadas no están expuestas
-PASS 20 Respaldo de imágenes en el recorrido de demostración
--------------------
-20/20 pasaron; 0 fallaron
-```
-
-El mismo smoke compiló el frontend, aplicó las cuatro migraciones desde una
-base vacía, sembró datos y recorrió Chromium.
-
-## No cambiado
-
-- No implementé Mercado Pago nuevo.
-- No definí el flujo de transferencia insuficiente.
-- No cambié la lógica de aprobación/rechazo.
-- No agregué dependencias.
-- No hice cambios de interfaz móvil.
+Lo pongo por escrito para que quede la discusión, no para cerrarla.

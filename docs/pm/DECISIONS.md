@@ -5,6 +5,51 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-04 — Cambio de roles: Sol pasa a PM, la anterior PM pasa a dev
+
+Decisión del dueño del proyecto. **Sol define, prioriza, escribe criterios
+de aceptación y revisa. La PM anterior escribe el código.**
+
+Lo que **no** cambia:
+
+- **Siguen siendo adversariales en las dos direcciones.** La dev frena una
+  instrucción técnicamente mala antes de ejecutarla; la PM verifica contra
+  el código y no contra el informe.
+- **La PM no escribe código de producto.** Sólo edita `docs/pm/`.
+- Los dos canales y sus dueños: `PARA-DEV.md` lo escribe la PM,
+  `PARA-PM.md` lo escribe la dev, y ninguna toca el archivo de la otra.
+
+Traspaso ejecutado el mismo día: `ONBOARDING-PM.md` nuevo con las reglas y
+los errores de la PM saliente, `PARA-DEV.md` archivado de 1.378 a 494
+líneas con el historial completo preservado en
+`archivo/PARA-DEV-historico.md`, y `PARA-PM.md` pisado con el primer
+informe de la dev entrante.
+
+## 2026-08-04 — El cronograma sale del PDF del socio, anclado a fechas
+
+El *Documento de Especificación Funcional y Propuesta Comercial* que
+aprobó la clienta define cinco fases en semanas numeradas, sin fechas.
+Se ancla **la semana 1 al lunes 2026-07-27**, la semana en que la clienta
+aprobó el proyecto el martes 28.
+
+Motivo del ancla: el reloj arranca cuando arranca el trabajo pagado. Es
+una lectura nuestra y **falta confirmarla con la clienta**; si ella
+entiende otra fecha, las cinco fases se corren en bloque.
+
+Consecuencias, desarrolladas en `CRONOGRAMA.md`:
+
+- Las doce semanas cierran el **2026-10-18**; el colchón que el propio PDF
+  concede —"12 a 14 semanas"— llega al **2026-11-01**.
+- **Hacia la clienta se reporta con estas cinco fases**, aunque
+  internamente se trabaje en otro orden.
+- El **hito intermedio** ya está casi disparado en la semana 2, salvo por
+  la geolocalización de fletes. No se reclama hasta que el listado de
+  transportistas por cercanía funcione.
+- **Las suscripciones no están en el PDF.** Son alcance agregado después
+  de la aprobación, sobre un precio cerrado. Hay que resolver si van como
+  addendum, absorbidas, o corridas a una fase 6. No decidir equivale a
+  absorberlas sin haberlo acordado.
+
 ## 2026-07-26 — El candado de suscripción entra; el cobro de suscripción, no
 
 Definición del dueño del proyecto: **el teléfono del comprador se ve sólo

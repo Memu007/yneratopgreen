@@ -9,9 +9,10 @@ día a día pasa por `NOW.md` y `PARA-DEV.md`.
 
 **Vos sos la dev.** Escribís todo el código del producto.
 
-**Yo soy la PM.** Defino qué se construye y por qué, escribo los criterios
-de aceptación y reviso lo que entregás. **No escribo código de producto**:
-sólo edito archivos dentro de `docs/pm/`.
+**La PM es Sol.** Define qué se construye y por qué, escribe los criterios
+de aceptación y revisa lo que entregás. **No escribe código de producto**:
+sólo edita archivos dentro de `docs/pm/`. Su arranque está en
+`ONBOARDING-PM.md`, por si querés saber con qué reglas te lee.
 
 **Emi es el dueño del proyecto.** Es quien habla con la clienta y quien
 toma las decisiones comerciales. Cuando algo depende de la clienta, va por
@@ -48,11 +49,14 @@ zona.
 
 **Fechas que importan:**
 
-- **Jueves 30 de julio de 2026: demostración con la clienta y firma del
-  contrato.** El plazo contractual arranca ahí.
-- Trabajo restante estimado: 7 a 9 semanas.
+- **Martes 28 de julio de 2026: la clienta aprobó el proyecto.** El plazo
+  arranca en la semana del lunes 27/07.
+- **Plazo: 12 a 14 semanas.** Las doce cierran el **18 de octubre**.
+- **Hoy estamos en la semana 2.**
 
-Todo lo que hacemos esta semana apunta a esa reunión.
+Las cinco fases con sus fechas están en **`CRONOGRAMA.md`**. Salen del PDF
+que aprobó la clienta, así que no son negociables por conveniencia
+nuestra.
 
 ---
 
@@ -93,9 +97,9 @@ lo podés resolver sola: si está apagado, avisale a Emi.
 npm run smoke
 ```
 
-Doce casos contra arranque limpio: API, base de datos y navegador real con
-Chromium. **Es la red de seguridad del proyecto.** Verificamos que falla
-de verdad rompiendo un caso a propósito.
+Veinte casos contra arranque limpio: API, base de datos y navegador real
+con Chromium. **Es la red de seguridad del proyecto.** Verificamos que
+falla de verdad rompiendo un caso a propósito.
 
 Regla: **si tocaste algo y no corriste el smoke, no terminaste.**
 
@@ -148,9 +152,9 @@ cat docs/pm/PARA-DEV.md
 
 **Al terminar**: commit, push, y escribís tu informe en `PARA-PM.md`.
 
-`PARA-PM.md` es tuyo: podés reescribirlo entero cada vez. De hecho quedó
-desactualizado —dice que la taxonomía está bloqueada cuando ya se cargó—,
-así que **pisalo con tu primer informe**.
+`PARA-PM.md` es tuyo: podés reescribirlo entero cada vez. Ya pasó dos
+veces que quedó desactualizado y la PM se enteró leyendo el código en vez
+de tu informe. **Pisalo apenas termines una pieza.**
 
 ### Qué tiene que decir un informe
 
@@ -218,12 +222,13 @@ va fijo, y lo aclaro.
 
 Estado honesto. El detalle requisito por requisito está en `MATRIZ.md`.
 
-**Avance contra el contrato: cerca del 50%.**
+**Avance contra el contrato: ~53%**, ponderado por esfuerzo. El desglose
+por bloque está en `NOW.md`.
 
 **Funciona y está verificado:**
 
-- Arranque desde cero con un comando: PostgreSQL + PostGIS, migraciones,
-  seed idempotente.
+- Arranque desde cero con un comando: PostgreSQL 16 + PostGIS 3.4.3,
+  migraciones, seed idempotente, build en verde.
 - Recorrido de compra completo probado en navegador: registro, ingreso
   con tres perfiles, catálogo con filtros, detalle, carrito, checkout
   hasta el botón de pago, publicación, panel de vendedor y las cuatro
@@ -232,20 +237,36 @@ Estado honesto. El detalle requisito por requisito está en `MATRIZ.md`.
   `Geography(POINT,4326)` con índice GIST.
 - Filtro por provincia y localidad de punta a punta, con estado en la URL.
 - Taxonomía de la clienta cargada: 7 categorías con 43 subcategorías, más
-  Bienes y Ganado, más 4 servicios. 28 publicaciones en 9 provincias.
-- Suite de doce casos de humo.
+  Bienes y Ganado, más 4 servicios. 30 publicaciones en 12 categorías y
+  9 provincias.
+- **Pago por transferencia bancaria**: CBU y alias del vendedor con
+  snapshot en la orden, comprobante adjunto, validación manual del
+  vendedor. Autorización verificada con `403` cruzado.
+- **Suite de veinte casos de humo**, con navegador real.
+
+**Roto de lo ya entregado, y va primero:**
+
+- **Órdenes que quedan colgadas**: si el comprador no sube el comprobante,
+  nadie puede aprobar, rechazar ni cancelar esa orden nunca más.
+- **El seed no carga CBU ni alias de nadie**, así que sobre instalación
+  limpia la transferencia no se puede usar. La suite no lo detecta porque
+  el caso 13 configura los datos bancarios él mismo.
+- **El camino de instalación sin Docker no funciona** siguiendo la guía.
 
 **Falta, y es lo grande:**
 
-- **Módulo de transportistas: en cero.** Es el diferencial del producto.
-  No arranca hasta que la clienta defina si la cobertura va por zonas
-  declaradas o por radio en kilómetros.
-- **Pago por transferencia**: mostrar CBU del vendedor, adjuntar
-  comprobante, validación manual. En cero.
-- **Mercado Pago**: el código existe pero nunca se pudo probar porque no
-  hay credenciales.
-- **Despliegue**: nadie levantó esto en un servidor real.
-- **Vista en celular**: nunca se verificó en serio.
+- **Módulo de transportistas.** Es el diferencial del producto. La Pieza A
+  —registro y campos— está hecha con dos objeciones abiertas; las Piezas B
+  y C, en cero.
+- **Suscripciones con Mercado Pago**, dos planes y mensajería premium.
+  Alcance nuevo. La tarea todavía no está escrita.
+- **Mercado Pago para compras**: el código heredado está desmontado
+  —tenía split con comisión de marketplace, que el contrato no pide— y se
+  reconstruye sin split cuando haya credenciales.
+- **Despliegue**: hay preparación de Railway subida, nadie lo levantó en
+  un servidor real.
+- **Vista en celular**: relevada en 36 pantallas, sin corregir. Aparcada a
+  propósito.
 
 ---
 
@@ -257,7 +278,10 @@ Todo en `docs/pm/`. **No los leas todos ahora.**
 |---|---|
 | `NOW.md` | **Siempre primero.** Estado y prioridades |
 | `PARA-DEV.md` | Tu tarea actual |
+| `CRONOGRAMA.md` | Las fases y fechas comprometidas con la clienta |
 | `CONTRATO.md` | El alcance. Si algo no está ahí, no es requisito |
+| `PAGOS-TRANSFERENCIA.md` | La transferencia y sus cuatro arreglos |
+| `archivo/PARA-DEV-historico.md` | Por qué se decidió algo de julio |
 | `MATRIZ.md` | Qué está verificado y con qué evidencia |
 | `REPO_MAP.md` | Dónde está cada cosa en el código |
 | `TAXONOMIA-CLIENTE.md` | Las categorías y subcategorías, con sus nombres |

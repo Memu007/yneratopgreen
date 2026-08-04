@@ -3,13 +3,17 @@
 Fuente: *Documento de Especificación Funcional y Propuesta Comercial —
 Marketplace del Sector Agropecuario (Fase Nacional)*, Ynera.
 
-> ⚠️ **Sin firmar al 2026-07-25.** Es una propuesta comercial, no un
-> contrato vigente. Firma prevista para el 2026-07-30. El plazo de 12 a 14
-> semanas **empieza a correr en la firma**, así que todo el trabajo hecho
-> hasta ahí es previo al reloj.
+> ✅ **Aprobado por la clienta el martes 2026-07-28.** Desde esa fecha el
+> alcance de abajo **queda cerrado**: lo que no está acá no es requisito,
+> y lo que se construya de más lo pagamos nosotros.
 >
-> Mientras no se firme, cualquier cosa de este documento **todavía se
-> puede negociar**. Después queda cerrado.
+> El plazo de 12 a 14 semanas está anclado a fechas reales en
+> **`CRONOGRAMA.md`**. Ese archivo es la referencia para cualquier
+> conversación de plazos.
+>
+> Alcance agregado después de la aprobación —hoy, las suscripciones con
+> cobro recurrente— **no está cubierto por este documento**. Ver
+> `CRONOGRAMA.md` sección 5.
 
 Transcripción de las secciones **funcionales** (1 a 5). Las secciones
 comerciales (costos, forma de pago) **no se versionan acá** — están en el
@@ -106,8 +110,13 @@ Plazo total estimado: **12 a 14 semanas**.
 | 4 — Pagos y checkout | Mercado Pago y **validación de transferencias** | 9–10 |
 | 5 — QA y lanzamiento | Pruebas, usabilidad, carga inicial, despliegue | 11–12 |
 
+Ancladas a fechas reales en **`CRONOGRAMA.md`**, junto con el contraste
+fase por fase contra lo que está realmente hecho.
+
 Ojo: estas fases **no** son las mismas que las del roadmap interno
-`PM_ROADMAP.md`. No confundirlas al reportar avance al cliente.
+`PM_ROADMAP.md`. No confundirlas al reportar avance al cliente. **Hacia
+afuera se reporta con estas cinco fases**, aunque internamente se trabaje
+en otro orden.
 
 ## Incluido en la propuesta
 
