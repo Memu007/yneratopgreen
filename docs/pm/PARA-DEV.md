@@ -77,6 +77,51 @@ pantallas— y confirma que aparcarlo fue la decisión correcta.
 
 ---
 
+## Dos cosas que encontré corriendo la aplicación de verdad
+
+Levanté el proyecto entero y recorrí el camino de compra. Estas dos no las
+detecta la suite, y una es grave para una demostración.
+
+### 1. Ningún usuario del seed tiene CBU ni alias
+
+Verificado por consulta:
+
+```
+admin@topgreen.com     · sin CBU · sin alias
+vendedor@ejemplo.com   · sin CBU · sin alias
+cliente@ejemplo.com    · sin CBU · sin alias
+```
+
+Consecuencia: **sobre una instalación limpia, el pago por transferencia no
+se puede usar.** La API responde, correctamente,
+`"Administrador TopGreen no configuró CBU ni alias bancario"`.
+
+La suite no lo detecta porque el caso 13 configura los datos bancarios él
+mismo antes de probar. Está bien que lo haga —prueba la regla—, pero deja
+un hueco: **nadie prueba el estado en que queda el sistema recién
+instalado.**
+
+**Cargá CBU y alias en el seed** para el vendedor y para el administrador,
+con valores de ejemplo evidentes. Y agregá un caso que verifique que,
+después de sembrar, el recorrido de transferencia se puede completar sin
+tocar nada a mano.
+
+### 2. La pantalla muestra un error que no es el que ocurrió
+
+En esa misma situación, la API devuelve el motivo correcto, pero la
+pantalla de pago muestra:
+
+> ⚠️ Producto no encontrado en el carrito
+
+El producto estaba en el carrito. El problema era el CBU faltante. El
+mensaje manda a buscar el problema al lugar equivocado.
+
+Revisá el manejo de errores de esa pantalla: **que muestre el motivo que
+devuelve la API**, no un mensaje genérico propio. Si la API ya explica qué
+pasó, taparlo es perder información.
+
+---
+
 ## El camino de instalación sin Docker está roto
 
 Levanté el proyecto entero en una máquina limpia **sin Docker**, siguiendo
