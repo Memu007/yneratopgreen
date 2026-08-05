@@ -62,6 +62,8 @@
 
     <div class="pedidos" id="checkout-pedidos"></div>
 
+    <div id="aviso-checkout" aria-live="assertive"></div>
+
     <div class="acciones">
       <button type="button" class="btn btn--fantasma" data-ir="c-checkout">← Volver al carrito</button>
       <button type="button" class="btn btn--primario" id="ir-a-resumen">Continuar</button>
@@ -164,7 +166,7 @@
 
       <div class="campo">
         <label class="etiqueta" for="t-radio">Radio de cobertura (km)</label>
-        <input id="t-radio" class="control control--ancho" type="number" min="1" value="220" inputmode="numeric">
+        <input id="t-radio" class="control control--ancho" type="number" min="1" value="240" inputmode="numeric">
         <p class="ayuda">Tenés que cubrir el origen <em>y</em> el destino del viaje.</p>
       </div>
 
@@ -217,14 +219,19 @@
       <hr class="separador">
 
       <p class="etiqueta">Qué hay que mover</p>
-      <p>Granos a granel, aproximadamente 2.000 kg.</p>
-      <p class="ayuda">Lo declara el vendedor. El sistema no lo calcula ni lo verifica.</p>
+      <ul class="lista">
+        <li>Semilla de soja RR — 40 bolsas de 50 kg</li>
+        <li>Inoculante — 4 unidades</li>
+      </ul>
+      <p class="ayuda">
+        Son los artículos y las cantidades de la orden. El sistema no calcula
+        peso ni volumen.
+      </p>
 
       <hr class="separador">
 
-      <p class="etiqueta">Con quién coordinás</p>
-      <p>Rocío Fernández — comprador</p>
-      <p>+54 9 3462 55-0101 · rocio.fernandez@ejemplo.test</p>
+      <p class="etiqueta">Coordinación</p>
+      <p>El comprador recibió tus datos y te contactará para coordinar.</p>
 
       <p class="nota-legal">
         La coordinación y el precio del flete se acuerdan directamente.
@@ -237,6 +244,7 @@
         <li>Precio de los productos y total de la orden.</li>
         <li>Comprobante de transferencia.</li>
         <li>CBU, alias y cualquier dato bancario.</li>
+        <li>Teléfono y correo del comprador: te contacta él.</li>
       </ul>
       <p class="ayuda">Tu tarea es el traslado, no la operación comercial.</p>
     </div>
@@ -255,10 +263,10 @@
 
       <hr class="separador">
 
-      <p class="etiqueta">Transporte elegido por el comprador</p>
-      <p><strong>Transportes La Carreta</strong> — Rafaela, Santa Fe</p>
+      <p class="etiqueta">Transportista elegido por el comprador</p>
+      <p><strong>Sebastián Duarte</strong> — Rafaela, Santa Fe</p>
       <p>Camión con acoplado granelero · Hasta 30 toneladas de granos</p>
-      <p>+54 9 3492 55-0110 · contacto@lacarreta.test</p>
+      <p>+54 9 3492 55-0110 · sebastian.duarte@ejemplo.test</p>
       <p class="nota-legal">
         Declarado por el transportista el 12/06/2026. TopGreen no verifica esta habilitación.
       </p>

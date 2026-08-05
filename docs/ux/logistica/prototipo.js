@@ -12,42 +12,50 @@ const LOCALIDADES = [
   'Río Cuarto, Córdoba',
 ];
 
+/* Los nombres son los que hoy puede devolver `full_name`: no existe un campo
+   de nombre comercial y el prototipo no lo promete.
+   Las dos distancias son en línea recta desde la base del transportista, una
+   al origen y otra al destino, y las dos tienen que caer dentro del radio
+   declarado. Los números son ficticios pero coherentes entre sí. */
 const TRANSPORTISTAS = {
-  carreta: {
-    id: 'carreta',
-    nombre: 'Transportes La Carreta',
+  duarte: {
+    id: 'duarte',
+    nombre: 'Sebastián Duarte',
     base: 'Rafaela, Santa Fe',
-    radio: 220,
+    radio: 240,
     transporte: 'Camión con acoplado granelero',
     capacidad: 'Hasta 30 toneladas de granos',
     habilitadoEl: '12/06/2026',
-    distancia: 'aprox. 180 km',
+    aOrigen: 228,
+    aDestino: 196,
     telefono: '+54 9 3492 55-0110',
-    correo: 'contacto@lacarreta.test',
+    correo: 'sebastian.duarte@ejemplo.test',
   },
-  ramon: {
-    id: 'ramon',
-    nombre: 'Fletes Don Ramón',
-    base: 'Venado Tuerto, Santa Fe',
-    radio: 150,
+  ledesma: {
+    id: 'ledesma',
+    nombre: 'Ramón Ledesma',
+    base: 'Reconquista, Santa Fe',
+    radio: 400,
     transporte: 'Chasis con caja cerrada',
     capacidad: 'Hasta 12 toneladas',
     habilitadoEl: '03/07/2026',
-    distancia: 'aprox. 145 km',
-    telefono: '+54 9 3462 55-0144',
-    correo: 'ramon@fletesdonramon.test',
+    aOrigen: 0,
+    aDestino: 388,
+    telefono: '+54 9 3482 55-0144',
+    correo: 'ramon.ledesma@ejemplo.test',
   },
-  sur: {
-    id: 'sur',
-    nombre: 'Logística del Sur SRL',
+  ibarra: {
+    id: 'ibarra',
+    nombre: 'Marcela Ibarra',
     base: 'Pergamino, Buenos Aires',
     radio: 300,
     transporte: 'Carretón para maquinaria',
     capacidad: 'Hasta 40 toneladas, carga sobredimensionada',
     habilitadoEl: '28/05/2026',
-    distancia: 'aprox. 210 km',
+    aOrigen: 0,
+    aDestino: 176,
     telefono: '+54 9 2477 55-0188',
-    correo: 'operaciones@logisticadelsur.test',
+    correo: 'marcela.ibarra@ejemplo.test',
   },
 };
 
@@ -63,7 +71,7 @@ function pedidosIniciales() {
       necesitaFlete: null,
       destino: DESTINO_DEL_COMPRADOR,
       elegido: null,
-      candidatos: ['carreta', 'ramon'],
+      candidatos: ['duarte', 'ledesma'],
     },
     {
       id: 'B',
@@ -73,7 +81,7 @@ function pedidosIniciales() {
       necesitaFlete: null,
       destino: DESTINO_DEL_COMPRADOR,
       elegido: null,
-      candidatos: ['sur'],
+      candidatos: ['ibarra'],
     },
   ];
 }
@@ -108,6 +116,14 @@ function perfilDeVista(vista) {
 
 function pedidoPorId(id) {
   return pedidos.find((pedido) => pedido.id === id);
+}
+
+/* Un pedido está resuelto de dos formas, y sólo de esas dos:
+   el comprador coordina por su cuenta, o eligió un transportista.
+   "Necesito flete" sin transportista es una operación ambigua. */
+function pedidoResuelto(pedido) {
+  if (pedido.necesitaFlete === false) return true;
+  return pedido.necesitaFlete === true && Boolean(pedido.elegido);
 }
 
 function opcionesDeLocalidad(seleccionada) {
@@ -147,11 +163,14 @@ function ir(vista) {
 // ------------------------------------------------------------ checkout
 
 function pintarCheckout() {
+  // El aviso de "falta resolver" se borra en cuanto el comprador hace algo.
+  $('#aviso-checkout').innerHTML = '';
   $('#checkout-pedidos').innerHTML = pedidos
     .map((pedido) => {
       const elegido = pedido.elegido ? TRANSPORTISTAS[pedido.elegido] : null;
       return `
-      <article class="pedido">
+      <article class="pedido${pedidoResuelto(pedido) ? '' : ' es-incompleto'}"
+               id="pedido-${pedido.id}" tabindex="-1">
         <div class="pedido__cabecera">
           <h2>Pedido ${pedido.id} — ${pedido.vendedor}</h2>
           <span class="pedido__origen">Sale de ${pedido.origen}</span>
@@ -205,23 +224,40 @@ function pintarCheckout() {
 
 // ------------------------------------------------------------ búsqueda
 
+function distanciaTexto(km) {
+  return km === 0 ? 'misma localidad' : `${km} km`;
+}
+
 function tarjetaTransportista(transportista, pedido) {
   const esElegido = pedido.elegido === transportista.id;
   return `
     <article class="transportista${esElegido ? ' es-elegido' : ''}">
       <div class="transportista__cabecera">
         <h2>${transportista.nombre}</h2>
-        <span class="transportista__distancia">${transportista.distancia} en línea recta</span>
+        <span class="transportista__distancia">Transportista</span>
       </div>
 
       <div class="datos">
         <div><span class="etiqueta">Localidad base</span><p>${transportista.base}</p></div>
-        <div><span class="etiqueta">Cobertura</span><p>Radio de ${transportista.radio} km</p></div>
+        <div><span class="etiqueta">Cobertura declarada</span><p>Radio de ${transportista.radio} km</p></div>
         <div><span class="etiqueta">Transporte declarado</span><p>${transportista.transporte}</p></div>
         <div><span class="etiqueta">Capacidad</span><p>${transportista.capacidad}</p></div>
       </div>
 
-      <p class="ayuda">Su cobertura alcanza el origen y el destino de este tramo.</p>
+      <div class="datos">
+        <div>
+          <span class="etiqueta">De su base al origen</span>
+          <p>${distanciaTexto(transportista.aOrigen)} <span class="ayuda">en línea recta, hasta ${pedido.origen}</span></p>
+        </div>
+        <div>
+          <span class="etiqueta">De su base al destino</span>
+          <p>${distanciaTexto(transportista.aDestino)} <span class="ayuda">en línea recta, hasta ${pedido.destino}</span></p>
+        </div>
+      </div>
+
+      <p class="ayuda">
+        Las dos puntas del viaje caen dentro de su radio de ${transportista.radio} km.
+      </p>
       <p class="nota-legal">
         Declarado por el transportista el ${transportista.habilitadoEl}.
         TopGreen no verifica esta habilitación.
@@ -267,16 +303,18 @@ function pintarBusqueda() {
     return;
   }
 
+  // "Coordino por mi cuenta" desde acá resuelve el pedido, no sólo cambia de
+  // pantalla: deja necesitaFlete en false.
+  const salidaPropia = `<button type="button" class="btn btn--fantasma" data-propio="${pedido.id}">
+      Coordino por mi cuenta
+    </button>`;
+
   if (estado === 'vacio') {
     caja.innerHTML = `
       <div class="estado">
         <h2>Ningún transportista cubre este tramo</h2>
         <p>Probá con otro destino, o coordiná el traslado por tu cuenta.</p>
-        <div class="acciones" style="justify-content:center">
-          <button type="button" class="btn btn--fantasma" data-ir="c-checkout">
-            Coordino por mi cuenta
-          </button>
-        </div>
+        <div class="acciones" style="justify-content:center">${salidaPropia}</div>
       </div>`;
     return;
   }
@@ -288,9 +326,7 @@ function pintarBusqueda() {
         <p>Fue un problema nuestro, no tuyo. Tu pedido quedó intacto.</p>
         <div class="acciones" style="justify-content:center">
           <button type="button" class="btn btn--primario" id="reintentar">Reintentar</button>
-          <button type="button" class="btn btn--fantasma" data-ir="c-checkout">
-            Coordino por mi cuenta
-          </button>
+          ${salidaPropia}
         </div>
       </div>`;
     return;
@@ -360,22 +396,27 @@ function pintarCompras() {
   $('#compras-pedidos').innerHTML = pedidos
     .map((pedido) => {
       const elegido = pedido.elegido ? TRANSPORTISTAS[pedido.elegido] : null;
+      let logistica;
+      if (elegido) {
+        logistica = `<p class="etiqueta">Transportista</p>
+          <p><strong>${elegido.nombre}</strong></p>
+          <p>${elegido.telefono} · ${elegido.correo}</p>
+          <p class="nota-legal">
+            La coordinación y el precio del flete se acuerdan directamente.
+          </p>`;
+      } else if (pedido.necesitaFlete === false) {
+        logistica = '<p class="ayuda">Coordinás el traslado por tu cuenta.</p>';
+      } else {
+        // No se afirma que coordina solo cuando nunca lo decidió.
+        logistica = '<p class="ayuda">Este pedido quedó sin resolver el traslado.</p>';
+      }
       return `
       <article class="pedido">
         <div class="pedido__cabecera">
           <h2>Pedido ${pedido.id} — ${pedido.vendedor}</h2>
           <span class="pedido__origen">${pedido.origen} → ${pedido.destino}</span>
         </div>
-        ${
-          elegido
-            ? `<p class="etiqueta">Transporte</p>
-               <p><strong>${elegido.nombre}</strong></p>
-               <p>${elegido.telefono} · ${elegido.correo}</p>
-               <p class="nota-legal">
-                 La coordinación y el precio del flete se acuerdan directamente.
-               </p>`
-            : '<p class="ayuda">Coordinás el traslado por tu cuenta.</p>'
-        }
+        ${logistica}
       </article>`;
     })
     .join('');
@@ -420,7 +461,26 @@ document.addEventListener('click', (evento) => {
     pintar();
     return;
   }
+  if (boton.dataset.propio) {
+    const pedido = pedidoPorId(boton.dataset.propio);
+    pedido.necesitaFlete = false;
+    pedido.elegido = null;
+    ir('c-checkout');
+    return;
+  }
   if (boton.id === 'ir-a-resumen') {
+    const faltan = pedidos.filter((pedido) => !pedidoResuelto(pedido));
+    if (faltan.length > 0) {
+      const nombres = faltan.map((pedido) => `pedido ${pedido.id}`).join(' y el ');
+      $('#aviso-checkout').innerHTML = `
+        <div class="aviso-falta" role="alert">
+          Antes de seguir, decidí el traslado del ${nombres}:
+          elegí un transportista o marcá que lo coordinás por tu cuenta.
+        </div>`;
+      $(`#pedido-${faltan[0].id}`).focus();
+      return;
+    }
+    $('#aviso-checkout').innerHTML = '';
     ir('c-resumen');
     return;
   }

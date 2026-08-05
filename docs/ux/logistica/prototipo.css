@@ -29,7 +29,10 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
   --shadow-focus: 0 0 0 3px rgba(5, 150, 105, 0.2);
 
-  --gradient-primary: linear-gradient(135deg, #059669 0%, #047857 100%);
+  /* El gradiente arranca en primary-700 y no en primary-600: blanco sobre
+     #059669 da 3,77:1 y no llega al 4,5:1 que pide texto normal.
+     #047857 da 5,48:1 y #065f46 da 7,68:1. Son tonos que ya existen. */
+  --gradient-primary: linear-gradient(135deg, #047857 0%, #065f46 100%);
 
   --spacing-xs: 4px;
   --spacing-sm: 8px;
@@ -202,10 +205,12 @@ p { margin: 0 0 var(--spacing-sm); }
   margin-bottom: var(--spacing-lg);
 }
 
+/* Mismo motivo que .contacto__oculto: text-tertiary sobre bg-tertiary
+   da 4,34:1 y no llega. */
 .paso {
   background: var(--bg-tertiary);
   border-radius: var(--radius-full);
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-size: 0.8125rem;
   padding: var(--spacing-xs) var(--spacing-md);
 }
@@ -343,10 +348,12 @@ p { margin: 0 0 var(--spacing-sm); }
   padding: var(--spacing-md);
 }
 
+/* text-tertiary sobre bg-tertiary da 4,34:1 y no alcanza. text-secondary
+   sobre el mismo fondo da 6,92:1. */
 .contacto__oculto {
   background: var(--bg-tertiary);
   border-radius: var(--radius-md);
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-size: 0.8125rem;
   margin-top: var(--spacing-md);
   padding: var(--spacing-md);
@@ -362,6 +369,18 @@ p { margin: 0 0 var(--spacing-sm); }
   padding: var(--spacing-xl);
   text-align: center;
 }
+
+.aviso-falta {
+  background: #fffbeb;
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  color: #7c2d12;
+  margin-top: var(--spacing-lg);
+  padding: var(--spacing-md);
+}
+
+.pedido.es-incompleto { border-color: var(--color-warning); }
+.pedido:focus-visible { outline: 3px solid var(--color-warning); }
 
 .estado--error { border-color: var(--color-error); border-style: solid; }
 .estado h2 { color: var(--text-primary); }
@@ -417,7 +436,7 @@ p { margin: 0 0 var(--spacing-sm); }
 }
 
 .btn--primario { background: var(--gradient-primary); color: var(--text-inverse); }
-.btn--primario:hover { background: var(--color-primary-700); }
+.btn--primario:hover { background: var(--color-primary-800); }
 
 .btn--fantasma {
   background: var(--bg-primary);

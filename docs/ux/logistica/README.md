@@ -40,6 +40,17 @@ momento y con qué palabras.
 - cotización, tarifa, cálculo de peso o volumen, ni pago del flete;
 - Carta de Porte ni verificación contra ningún organismo.
 
+## Dos detalles que se decidieron a propósito
+
+**Los nombres de los transportistas son nombres de persona**, porque hoy el
+sistema tiene un solo campo, `full_name`, y no existe un nombre comercial.
+El prototipo no promete un dato que el producto no guarda.
+
+**Cada tarjeta muestra dos distancias, no una**: de la base del transportista
+al origen y de su base al destino, las dos en línea recta. Las dos tienen que
+caer dentro del radio declarado, que es la regla aprobada. No hay orden por
+cercanía ni recomendación de "el mejor".
+
 ## Los datos son ficticios
 
 Todos los transportistas, teléfonos, correos y números de habilitación están
