@@ -2,533 +2,316 @@
 
 Sol: este archivo es mío y vos no lo tocás. Acá te informo.
 
-Fecha: 2026-08-04. Informe pedido antes de programar. **No toqué
-`PARA-DEV.md` ni empecé las Piezas B/C.**
+Fecha: 2026-08-05. Entrega de la tarea única: **la orden de transferencia
+inmortal quedó cerrada**. Commit de producto `0039e00`, pusheado a `main`.
 
 ---
 
-## 1. Base de trabajo — confirmado, con una corrección
+## 1. Archivos cambiados
 
-| Qué | Valor |
+| Archivo | Qué |
 |---|---|
-| Repositorio | `Memu007/yneratopgreen` ✅ |
-| Rama | `main` ✅ |
-| Último commit que toca **código de producto** | `382bcbe` ✅ |
-| `HEAD` real hoy | **`4e34d42`** |
+| `backend/app/api/orders.py` | +40 −14. Reglas de estado, bloqueo de fila y el reembolso |
+| `scripts/smoke.mjs` | +223. Casos 22 a 25 y una verificación nueva dentro del 18 |
+| `scripts/smoke.sh` | +1 −1. El cartel decía 21 casos |
+| `src/components/Checkout/CheckoutModal.tsx` | +6 −1. Referencia de pago |
+| `src/components/UserDashboard/UserDashboard.tsx` | +26 −7. Botones en los dos estados |
 
-**La corrección:** `382bcbe` no es `HEAD`. Arriba hay tres commits míos que
-son **sólo documentación** —`f5f20da`, `f7696e0`, `4e34d42`—. Sobre código
-de producto, `382bcbe` es la punta, así que tu premisa es correcta; te lo
-aclaro para que no te sorprenda el SHA cuando mires el log.
+**Una sola pieza, un solo commit de producto.** Sin migración, sin
+dependencias nuevas.
 
-**Sobre `ynerafinal/`: no existe.** No hay carpeta ni referencia con ese
-nombre en el repositorio. Verificado sobre el árbol de trabajo y sobre
-`git ls-tree -r main`. No hay nada que ignorar.
+### Aviso sobre el diff, para que no te asuste
 
-Lo que sí existe con nombre parecido es `ynerafinal-production.up.railway.app`,
-que es **el sitio de Ynera**, ajeno a este proyecto. No lo toqué.
+El primer diff daba **602 líneas cambiadas en `orders.py` para un cambio de
+40**. `orders.py`, `CheckoutModal.tsx` y `UserDashboard.tsx` tienen finales
+de línea mezclados —481 de 758 líneas con CRLF en el primero— y mi editor
+los normalizó enteros.
 
----
-
-## 2. Transferencias: confirmado, y hay una cuarta puerta
-
-Tu lectura de la máquina de estados es correcta:
-
-| Afirmación | Dónde | Verificado |
-|---|---|---|
-| Nace en `AWAITING_TRANSFER_RECEIPT` | `backend/app/api/orders.py:256` | ✅ |
-| Vendedor sólo decide en `TRANSFER_RECEIPT_SUBMITTED` | `orders.py:393` | ✅ |
-| Cancelar sólo admite `PLACED`, `CONFIRMED`, `PAID` | `orders.py:709` | ✅ |
-
-**Falta una cuarta puerta que no mencionaste, y también está cerrada:**
-`PATCH /orders/{id}/status` (`orders.py:559`). Sus dos tablas de
-transiciones —`seller_transitions` en la línea 600 y `buyer_transitions` en
-la 607— **no contienen ninguno de los dos estados de transferencia**, así
-que `allowed_transitions` queda vacía y siempre responde `400`.
-
-### El caso que falla contra el código actual
-
-Corrido hoy contra la API levantada, base limpia. No toqué el repositorio:
-el script vive fuera, en mi scratchpad.
-
-```text
---- 3. Checkout por transferencia: la orden nace AWAITING_TRANSFER_RECEIPT ---
-POST /orders/checkout/transfer -> 200
-orden: ORD-20260804-30C8CA14 | estado: awaiting_transfer_receipt
-
---- 4. El comprador NUNCA sube el comprobante. Intenta cancelar ---
-POST /orders/{id}/cancel (comprador) -> 400
-  {"detail":"Solo se pueden cancelar órdenes pendientes, pagadas o confirmadas"}
-
---- 5. El vendedor intenta cancelar ---
-POST /orders/{id}/cancel (vendedor) -> 400
-  {"detail":"Solo se pueden cancelar órdenes pendientes, pagadas o confirmadas"}
-
---- 6. El vendedor intenta rechazar el comprobante que no existe ---
-PATCH /orders/{id}/transfer-receipt -> 400
-  {"detail":"La orden no tiene un comprobante pendiente"}
-
---- 7. El vendedor intenta mover el estado a mano ---
-PATCH /orders/{id}/status -> 400
-  {"detail":"No puedes cambiar de awaiting_transfer_receipt a cancelled"}
-
---- 8. Estado final de la orden ---
-estado final: awaiting_transfer_receipt
-
->>> ORDEN COLGADA: ninguna de las cuatro puertas la mueve.
-```
-
-**Cuatro caminos, cuatro `400`.** La orden queda inmortal.
-
-### Un matiz que cambia la prioridad
-
-Los dos estados **no están igual de muertos**:
-
-- `AWAITING_TRANSFER_RECEIPT` — **muerto de verdad.** Ninguna salida.
-- `TRANSFER_RECEIPT_SUBMITTED` — tiene una salida: el vendedor rechaza y
-  la orden va a `REJECTED`. Lo que falta ahí es menor: el comprador no
-  puede retirarse después de haber subido el comprobante.
-
-O sea, el incendio es el primero.
-
-### La transición mínima que propongo
-
-**Un solo cambio**, en la lista de `cancel_order`:
-
-```python
-CANCELABLES = [
-    OrderStatus.PLACED, OrderStatus.CONFIRMED, OrderStatus.PAID,
-    OrderStatus.AWAITING_TRANSFER_RECEIPT,      # nuevo
-    OrderStatus.TRANSFER_RECEIPT_SUBMITTED,     # nuevo, sólo vendedor
-]
-```
-
-Con un reparto asimétrico, y te digo por qué:
-
-| Estado | Comprador | Vendedor |
-|---|---|---|
-| `AWAITING_TRANSFER_RECEIPT` | ✅ cancela | ✅ cancela |
-| `TRANSFER_RECEIPT_SUBMITTED` | ❌ | ✅ cancela |
-
-**Motivo de la asimetría:** si el comprador puede cancelar después de subir
-el comprobante, existe la carrera en que cancela justo mientras el vendedor
-aprueba, y el vendedor ya vio la plata en su cuenta. Dejarle esa puerta al
-comprador crea un problema de dinero real donde hoy no lo hay. El vendedor
-sí puede, porque es quien sabe si la plata llegó.
-
-**Sobre el stock, y es la parte linda:** no hace falta tocar nada. El
-descuento ocurre recién al aprobar (`orders.py:408-413`), y la restauración
-en `cancel_order` ya está condicionada a `PAID`/`CONFIRMED`. En los dos
-estados nuevos el stock nunca se descontó, así que la condición existente
-hace lo correcto sin cambiarla.
-
-**Lo que NO propongo:** dejar que el vendedor "rechace" una orden sin
-comprobante por `PATCH /transfer-receipt`. Rechazar es un juicio sobre un
-comprobante; cancelar es un juicio sobre la orden. Mezclarlos ensucia la
-semántica y el rechazo ya guarda motivo obligatorio.
-
-**Los otros tres arreglos** —referencia de pago, comprobante opcional,
-vencimiento con liberación de stock— siguen como están en
-`PAGOS-TRANSFERENCIA.md`. Este es sólo el que desbloquea.
+Lo revertí antes de commitear: reconstruí cada archivo conservando el final
+de línea original de cada línea que no toqué. El diff pasó de 953
+inserciones a 294. **Después de eso volví a compilar y a correr la suite
+completa**, porque reescribir archivos con un script y no verificar sería
+exactamente el tipo de cosa que después aparece rota.
 
 ---
 
-## 3. Sí, corrí los 21 casos. Hoy, desde base limpia
+## 2. Corrida roja, contra el código anterior
 
-Tenías razón en el señalamiento. Aclaro el origen del `20/20` y después te
-paso lo de hoy.
-
-**De dónde venía el `20/20`:** era el informe de la dev anterior, del
-2026-07-26. El caso 21 entró después, en `aa0ebd1 feat: registrar perfiles
-de transportista`. En mi informe de ayer declaré explícitamente *"No corrí
-la suite de humo hoy"*, así que no estaba dando ese número como propio,
-pero era el último registrado y quedó viejo. Queda reemplazado.
-
-**Corrida de hoy**, sobre `4e34d42`:
+Base recreada desde cero. Los cuatro casos nuevos fallan, cada uno por el
+motivo que tenía que fallar:
 
 ```text
-[PASS] 18 Transferencia completa desde la interfaz — UI + API + DB, avisos
-       visibles al comprador y vendedor antes de aprobar (29309 ms)
-[PASS] 19 Las rutas financieras heredadas no están expuestas — payments,
-       mp-oauth y simulate-payment respondieron HTTP 404 (8 ms)
-[PASS] 20 Respaldo de imágenes en el recorrido de demostración (42793 ms)
-[PASS] 21 Registro de transportista desde la interfaz — UI + API + DB,
-       localidad=Pergamino, radio=125.50 km (15231 ms)
+[FAIL] 22 Sin comprobante, comprador y vendedor pueden cancelar —
+  POST /orders/96198e76-.../cancel respondió HTTP 400:
+  Solo se pueden cancelar órdenes pendientes, pagadas o confirmadas (176 ms)
 
-Resumen smoke tests
+[FAIL] 23 Sin comprobante, el vendedor igual aprueba o rechaza —
+  PATCH /orders/a6536afd-.../transfer-receipt respondió HTTP 400:
+  La orden no tiene un comprobante pendiente (115 ms)
+
+[FAIL] 24 Con comprobante enviado, sólo el vendedor puede cancelar —
+  el motivo no explica quién puede cancelar: POST /orders/e3429d1c-.../cancel
+  respondió HTTP 400: Solo se pueden cancelar órdenes pendientes, pagadas
+  o confirmadas (175 ms)
+
+[FAIL] 25 Dos aprobaciones simultáneas descuentan stock una sola vez —
+  aprobaciones aceptadas: 2 (se esperaba exactamente 1) (193 ms)
+
 -------------------
-21/21 pasaron; 0 fallaron
+21/25 pasaron; 4 fallaron
 ```
 
-Base limpia de verdad: `DROP DATABASE` + `CREATE` + `CREATE EXTENSION
-postgis`, y desde ahí las cinco migraciones:
+Tu criterio 1 pedía reproducir al menos el `400` del comprador y del
+vendedor contra `AWAITING_TRANSFER_RECEIPT`. El caso 22 crea dos órdenes
+justamente para eso: una la intenta cancelar el comprador, la otra el
+vendedor. Las dos daban `400`.
 
-```text
-Running upgrade  -> 766eee72137f, esquema inicial postgresql
-Running upgrade 766eee72137f -> 06e1be636327, agregar localidades y ubicación
-Running upgrade 06e1be636327 -> cfff8c361c11, agregar transferencias bancarias
-Running upgrade cfff8c361c11 -> 63c3ab99fea0, guardar snapshot bancario en orden
-Running upgrade 63c3ab99fea0 -> 23ff06b57d6d, agregar perfil de transportista
-```
+### El caso 25 encontró algo que yo daba por teórico
 
-**Fallas previas: ninguna.** Verde a la primera.
+**Las dos aprobaciones simultáneas pasaban.** No una y un error: las dos.
+Contra el código anterior, dos clics del vendedor sobre "Aprobar" al mismo
+tiempo descontaban el stock dos veces por una sola venta.
 
-### Cómo tuve que correrlo, porque importa
-
-`npm run smoke` **no se puede ejecutar acá**: `scripts/smoke.sh` exige
-Docker (`docker compose down -v`, `./scripts/init_local_db.sh`) y en mi
-entorno el demonio no está disponible. Levanté el stack nativo y corrí
-`node scripts/smoke.mjs` directo. Para que `querySql` funcionara
-—shellea `docker exec topgreen-db psql`— puse un shim de `docker` en el
-`PATH` que traduce esa invocación a `psql` local.
-
-**El shim vive en mi scratchpad, fuera del repositorio.** No cambié
-`smoke.mjs` ni `smoke.sh`. También tuve que enlazar Chromium 1194 al nombre
-de build 1234 que espera Playwright 1.62.
-
-Te lo digo porque **corrí la misma suite, no el mismo runner.** Si querés
-la corrida por el camino oficial, hace falta un entorno con Docker.
-
-### Y lo más importante de esta sección
-
-**El verde no cubre la orden colgada.** Los 21 casos pasan y el bug del
-punto 2 está vivo. Ningún caso llega a un final donde el comprador
-simplemente no sube nada: el 14 deja la orden esperando y no intenta
-cancelarla; el 15 prueba un archivo inválido pero después sube uno bueno.
-
-Por eso, cuando me habilites el arreglo, **el caso nuevo tiene que fallar
-contra el código de hoy antes de tocarlo**. Te voy a pegar la corrida en
-rojo y la corrida en verde. Un caso que pasa antes del arreglo no prueba
-nada.
+Yo te lo había planteado como un riesgo de concurrencia a cubrir. Era un
+defecto activo. Fue el mejor hallazgo de la pieza y salió de un criterio
+tuyo, no mío.
 
 ---
 
-## 4. Perfil de transportista editable, sin duplicar la validación
+## 3. Corrida verde, después del arreglo
 
-**Confirmado el hueco:** `UserUpdateRequest` (`schemas/auth.py:130-139`)
-tiene ocho campos y **ninguno es de transportista**. En el frontend, los
-cinco campos existen sólo en `RegisterModal.tsx`; `UserDashboard.tsx` no
-los conoce. Hoy, si te registraste sin marcar la casilla, no hay forma de
-volverte transportista, y si cambiaste de camión no podés decirlo.
-
-### La propuesta: el perfil de transportista es un recurso aparte
-
-**No agregar los cinco campos a `PATCH /auth/me`.** El motivo es la
-semántica: `PATCH` es parcial, y con campos parciales se puede llegar a un
-transportista con radio pero sin localidad. La validación de registro es
-*todo o nada*, y esa invariante es la correcta.
+Misma base recreada desde cero, mismas cinco migraciones, mismo seed:
 
 ```text
-PUT    /auth/me/carrier    → alta o reemplazo completo del perfil
-DELETE /auth/me/carrier    → deja de ser transportista
+PASS 01 Salud del servicio
+PASS 02 Registro de usuario
+PASS 03 Ingreso y obtención del token
+PASS 04 Catálogo con categoría y precio
+PASS 05 Catálogo con provincia y localidad
+PASS 06 Detalle de producto
+PASS 07 Agregar al carrito y verlo
+PASS 08 Crear orden desde el carrito
+PASS 09 Publicar producto como vendedor desde la interfaz
+PASS 10 Fallo de imagen visible sin perder la publicación
+PASS 11 Ver mis compras y mis ventas
+PASS 12 Administración: usuarios, productos y órdenes
+PASS 13 Transferencia exige CBU o alias del vendedor
+PASS 14 Datos bancarios correctos y orden esperando comprobante
+PASS 15 Comprobante fallido visible y comprobante válido asociado
+PASS 16 Sólo el vendedor correcto valida el comprobante
+PASS 17 Rechazo de comprobante guarda el motivo
+PASS 18 Transferencia completa desde la interfaz
+PASS 19 Las rutas financieras heredadas no están expuestas
+PASS 20 Respaldo de imágenes en el recorrido de demostración
+PASS 21 Registro de transportista desde la interfaz
+PASS 22 Sin comprobante, comprador y vendedor pueden cancelar
+PASS 23 Sin comprobante, el vendedor igual aprueba o rechaza
+PASS 24 Con comprobante enviado, sólo el vendedor puede cancelar
+PASS 25 Dos aprobaciones simultáneas descuentan stock una sola vez
+-------------------
+25/25 pasaron; 0 fallaron
 ```
 
-**`PUT` con carga completa tiene exactamente la misma invariante que el
-registro**, y por eso puede reusar **el mismo validador sin copiarlo**:
+Observaciones de los casos nuevos:
+
+```text
+[PASS] 22 — ajeno 403; comprador=CANCELLED, vendedor=REJECTED, stock intacto en 17
+[PASS] 23 — rechazo sin motivo HTTP 400; rechazo con motivo=REJECTED;
+            aprobación sin comprobante=PAID, stock 17 -> 16
+[PASS] 24 — comprador HTTP 400 con motivo; vendedor dejó REJECTED; stock intacto en 16
+[PASS] 25 — 1 de 2 aceptada, la otra HTTP 400; stock 16 -> 15
+```
+
+**El caso 19 sigue verde**: `payments`, `mp-oauth` y `simulate-payment`
+siguen en `404`. Tu criterio 6, cumplido.
+
+### El runner, con la precisión que pediste
+
+**Corrí la misma suite, no el runner oficial.** `npm run smoke` ejecuta
+`scripts/smoke.sh`, que hace `docker compose down -v` y llama a
+`init_local_db.sh`; **en mi entorno el demonio de Docker no está
+disponible**. Levanté PostgreSQL 16 + PostGIS 3.4 nativo, recreé la base con
+`DROP DATABASE ... WITH (FORCE)`, apliqué las cinco migraciones y el seed, y
+corrí `node scripts/smoke.mjs` directo. Para que `querySql` funcionara puse
+un shim de `docker` en el `PATH` que traduce `docker exec topgreen-db psql`
+a un `psql` local.
+
+**Los dos resultados no son equivalentes y no los presento como tales.** Lo
+que verifiqué es el mismo archivo de casos contra el mismo esquema y el
+mismo seed. Lo que **no** verifiqué es el `Dockerfile`, el `docker-compose`
+ni el arranque del contenedor. El shim vive en mi scratchpad; no toqué
+`smoke.sh` salvo el número de casos del cartel.
+
+### Una corrida intermedia que fallé por mi culpa
+
+Entre la roja y la verde hubo un `24/25`: el caso 23 falló por un error
+mío, no del producto. Comparaba `transfer_receipt_url` como último campo de
+una fila SQL, y `querySql` hace `.trim()` sobre toda la salida, así que un
+`NULL` final desaparecía y me llegaba `undefined` en vez de cadena vacía. Lo
+reescribí con el patrón que ya usaba el caso 15, una consulta `COUNT` aparte.
+
+Te lo cuento porque el número honesto de corridas es tres, no dos.
+
+---
+
+## 4. Verificación SQL de estado y stock
+
+Estados finales al terminar la suite:
+
+```text
+           estado           | ordenes | con_comprobante | con_motivo
+----------------------------+---------+-----------------+------------
+ CANCELLED                  |       1 |               0 |          1
+ PAID                       |       3 |               2 |          0
+ PLACED                     |       1 |               0 |          0
+ REJECTED                   |       4 |               2 |          4
+ TRANSFER_RECEIPT_SUBMITTED |       1 |               1 |          0
+```
+
+Las cuatro `REJECTED` tienen motivo guardado, las cuatro. Las dos `PAID` sin
+comprobante son las aprobadas por cuenta bancaria, que es exactamente lo que
+autorizaste en el punto 4 de tu alcance.
+
+La única `TRANSFER_RECEIPT_SUBMITTED` es la que deja abierta el caso 18, y
+ya no está atrapada: el caso 24 demuestra que desde ahí el vendedor sale.
+
+**Stock, que es tu criterio 4:**
+
+```text
+                   name                    | stock | sales_count | ordenes_pagadas
+-------------------------------------------+-------+-------------+-----------------
+ Kit de Filtros y Correas para Cosechadora |    15 |           3 |               3
+```
+
+El seed crea ese producto con **18**. Tres órdenes pagadas, stock 15,
+`sales_count` 3. **Un descuento por orden aprobada, ni uno más.** Y las seis
+canceladas o rechazadas antes de aprobar no lo movieron.
+
+**Ninguna cancelación tocó fondos ni stock que no correspondía:**
+
+```text
+$ grep -c "Procesando reembolso|Buscando pago para orden" uvicorn.log
+0
+$ grep -c "Stock restaurado" uvicorn.log
+0
+```
+
+---
+
+## 5. Lo que encontré y no esperaba: la cancelación llamaba a Mercado Pago
+
+Esto es lo que más quiero que leas.
+
+`cancel_order` terminaba llamando a `get_refund_processor()`
+(`orders.py:33`), que hace:
 
 ```python
-class CarrierProfilePayload(BaseModel):
-    carrier_base_locality_id: Optional[str] = Field(None, max_length=20)
-    carrier_transport: Optional[str] = Field(None, max_length=255)
-    carrier_transport_certified: bool = False
-    carrier_coverage_radius_km: Optional[float] = Field(None, gt=0)
-    carrier_capacity: Optional[str] = Field(None, max_length=255)
-
-    @model_validator(mode="after")
-    def validate_carrier_profile(self): ...   # la de hoy, movida acá
-
-class UserRegisterRequest(CarrierProfilePayload):   # hereda validador
-    ...
-class CarrierProfileRequest(CarrierProfilePayload): # mismo validador
-    ...
+from app.api.payments import process_refund
 ```
 
-Un solo validador, dos puertas de entrada. Si mañana cambia la regla, se
-cambia en un lugar y el registro y la edición se mueven juntos —que es
-justamente lo que hoy no pasaría si copio y pego.
+**El módulo desmontado.** Y `process_refund` no es un envoltorio inocente:
+busca el `Payment` de la orden, arma un SDK de Mercado Pago con el token del
+vendedor —o con el del marketplace como respaldo— y emite un reembolso. O
+sea, **mueve plata de terceros**.
 
-**`DELETE` en vez de `is_carrier: false` por `PATCH`**, porque bajarse de
-transportista tiene que limpiar los cinco campos a la vez, y un `PATCH`
-parcial dejaría restos.
+Hoy no llega a hacerlo porque el checkout ya no crea filas en `payments` y
+la función corta antes. Pero el camino estaba vivo, y tu condición de freno
+decía textual *"una cancelación intenta procesar fondos de terceros"*.
 
-**Lo que esto no resuelve y te lo marco:** si un transportista con
-publicaciones activas cambia su localidad base o achica el radio, los
-resultados de búsqueda cambian solos. No es un problema hoy porque no
-existe el listado, pero cuando entre la Pieza B hay que decidir si eso
-afecta órdenes ya coordinadas. Es una de las cuatro preguntas de diseño.
+**No frené porque tu punto 7 ya lo autorizaba**: "cancelar una transferencia
+no invoca un reembolso de Mercado Pago". Así que lo implementé y seguí.
 
----
+La guarda que puse identifica la orden por sus datos bancarios, no por su
+estado:
 
-## 5. `carrier_transport_certified`: declaración fechada
-
-**El diagnóstico es correcto y es peor de lo que decís.** El validador de
-registro (`schemas/auth.py:35-36`) rechaza el alta si el campo no viene en
-`true`. Entonces **el 100 % de los transportistas tiene `true` por
-construcción**. Un campo con un solo valor posible tiene cero información:
-no se puede filtrar por él, no se puede ordenar, y no distingue a nadie.
-
-### Recomiendo declaración fechada. Con una condición
-
-No por completitud de datos, sino por responsabilidad. Hoy el campo dice
-"habilitado" sin que nadie haya verificado nada, y eso le da al comprador
-una impresión de control que no existe. Si un transportista sin
-habilitación real tiene un accidente con carga de un cliente, la plataforma
-afirmó algo que no comprobó.
-
-**La forma que propongo** (sin tocar el esquema todavía, como pediste):
-
-- Reemplazar el booleano por **una declaración con fecha y texto**: qué
-  declara —tipo de habilitación y número—, cuándo lo declaró, y opcional
-  cuándo vence.
-- **Mostrarlo siempre con la atribución explícita**: *"Declarado por el
-  transportista el 04/08/2026. TopGreen no verifica habilitaciones."*
-- La fecha sí informa: un transportista que declaró hace tres años y no
-  actualizó es distinto de uno que declaró la semana pasada, y eso el
-  comprador lo puede evaluar solo.
-
-**La condición, y es un límite de alcance:** **no propongo verificar contra
-ningún registro oficial.** Cruzar contra RUTA o RENATRE no está en el
-contrato, agrega una dependencia externa y es un módulo entero. Precio
-cerrado: lo que construyamos de más lo pagamos nosotros.
-
-**Por qué no la opción B** —dejarlo informativo sin fecha—: es lo que ya
-tenemos, y ya sabemos que no informa.
-
-**Esto es una decisión tuya y toca el esquema.** No la ejecuto hasta que la
-apruebes, y cuando la apruebes va con migración aditiva.
-
----
-
-## 6. Mapa de teléfono y dirección
-
-Barrido sobre `backend/app/schemas` y `backend/app/api`. Todo verificado
-con llamadas reales, no leyendo nada más que el código.
-
-| Endpoint | Devuelve | Quién puede | Puerta |
-|---|---|---|---|
-| `GET /orders/my?as_role=seller` | `buyer_phone`, `buyer_address` | El vendedor de esas órdenes | Filtro SQL `seller_id` |
-| `GET /orders/my?as_role=buyer` | `seller_phone`, `seller_whatsapp` | El comprador de esas órdenes | Filtro SQL `buyer_id` |
-| `GET /auth/me` | `phone`, `whatsapp` propios | El dueño | Token |
-| `GET /admin/users`, `/admin/users/{id}` | `phone`, `whatsapp` de todos | Admin | `require_admin` |
-| `GET /contact`, `/contact/{id}` | `phone` del remitente | Admin | Chequeo en línea 67 |
-
-Salida real de hoy:
-
-```text
-GET /orders/my?as_role=seller -> 200 | ordenes: 5
-  buyer_name: María Cliente
-  buyer_phone: +54 11 9876-5432
-  buyer_address: Ruta 8 km 220, Pergamino, Buenos Aires
-GET /orders/{id} -> 200 | buyer_phone: null | buyer_address: null
-GET /orders/my?as_role=buyer -> 200 | seller_phone: +54 11 1234-5678
+```python
+es_transferencia = bool(order.transfer_cbu or order.transfer_alias_bancario)
 ```
 
-### Dos precisiones sobre tu punto
+**Por qué así y no por estado:** una orden de transferencia aprobada queda
+en `PAID`, y cancelar desde `PAID` habría vuelto a caer en el reembolso. Los
+datos bancarios acompañan a la orden toda su vida; el estado no.
 
-**No existe `GET /orders`.** Las rutas son `GET /orders/my` y
-`GET /orders/{order_id}`.
+**Lo que esto revela sobre el caso 19, y te lo marco:** ese caso verifica
+que las *rutas* de `payments` respondan `404`, y lo hacen. Pero el *módulo*
+sigue siendo importable y `orders.py` lo importa. "Desmontado" es cierto a
+nivel HTTP y más débil de lo que suena a nivel código.
 
-**Y `GET /orders/{order_id}` hoy NO devuelve teléfono ni dirección**, aunque
-el schema `OrderResponse` tenga los campos: `get_order_detail`
-(`orders.py:542-556`) simplemente no los llena y quedan en `null`. Sólo el
-listado los completa, en `orders.py:475-488`.
-
-Eso importa para tu pregunta, porque **la ruta que un transportista va a
-necesitar es justamente la del detalle**, que es la que hoy está limpia.
-
-**El catálogo no filtra contacto**: `SellerInfo` y `SellerBasicInfo`
-(`schemas/catalog.py:47-66`) exponen `location`, que es texto libre de
-perfil, nunca `phone`.
-
-### Cómo evitar que el transportista saltee el candado
-
-El riesgo no es el código de hoy: es el cambio de mañana. Cuando el
-transportista se enganche a la orden, lo natural es agregar
-`or order.carrier_id == current_user.id` al permiso de `get_order_detail`
-y darlo por hecho. **Ese día el transportista hereda `OrderResponse`
-entero**, y cuando alguien complete el detalle con los datos del comprador
-—que es lo que falta para que el schema sea coherente— el candado queda
-salteado sin que nadie haya escrito la línea que lo saltea.
-
-Cuatro recomendaciones, en orden de importancia:
-
-**1. El transportista nunca recibe `OrderResponse`.** Schema propio,
-`CarrierOrderView`, construido desde cero con lo que necesita para decidir
-un flete: número de orden, localidad de origen, localidad de destino, peso
-o volumen, y estado. Sin teléfono, sin calle, sin monto, sin ítems. Un
-schema separado no se puede ampliar por accidente.
-
-**2. Una sola función decide sobre contacto.** Hoy la decisión está
-escrita en línea dentro de `get_my_orders`. Propongo
-`contact_visible_for(viewer, target, order) -> bool`, y que **ningún
-endpoint pueda devolver un teléfono sin pasar por ahí**. El candado de
-suscripción vive adentro de esa función. Un solo lugar para auditar, un
-solo lugar para probar.
-
-**3. Partir la dirección en dos.** Hoy `buyer_address` concatena calle +
-ciudad + provincia (`orders.py:482`). Para rutear, el transportista
-necesita la localidad; la calle es lo sensible. Con el campo partido, el
-transportista ve la localidad siempre y la calle sólo cuando corresponde,
-sin ninguna condición nueva.
-
-**4. Sacar `as_role` de la mano de quien llama.** Hoy es un query param
-que el cliente declara. **No es un agujero** —el filtro SQL es sobre
-`seller_id`/`buyer_id`, así que declarar `seller` sin serlo devuelve tus
-propias órdenes de vendedor y nada más—, pero el rol debería derivarse de
-la relación con la orden, no del pedido. Es el patrón que hace que el
-error del punto anterior sea fácil de cometer.
+**No lo arreglé** porque sacar el reembolso entero toca el camino de las
+órdenes que no son transferencia, y Mercado Pago para compras está fuera de
+alcance. **Te lo dejo como pieza aparte**, y es chica.
 
 ---
 
-## 7. Suscripciones: inventario, sin implementar
+## 6. Decisiones que no tomé
 
-**Punto de partida: no existe nada.** Cero coincidencias de
-`subscription`, `suscrip`, `premium` o `plan_` en `backend/app` y `src`,
-salvo el nombre de un producto del seed —"Semillas de Maíz DK Premium"—.
-Se construye entero.
-
-### Modelos nuevos
-
-| Modelo | Para qué | Nota |
-|---|---|---|
-| `SubscriptionPlan` | Básico y Premium: precio, período, qué habilita | Sembrado, no editable por usuario |
-| `Subscription` | Vínculo usuario ↔ plan: estado, vigencia, `mp_preapproval_id` | Es lo que lee el candado |
-| `SubscriptionCharge` | Cada cobro recurrente y su resultado | Necesario para reclamos |
-| `Conversation` + `Message` | Mensajería premium | Dos tablas, no una |
-
-**Hallazgo que ahorra una discusión:** el modelo `Payment` que quedó del
-Mercado Pago viejo **no se puede reusar**. Su `order_id` es
-`nullable=False` (`models/payment.py:28`) y una suscripción no tiene
-orden. Tabla nueva, sí o sí.
-
-### Endpoints nuevos
-
-```text
-GET    /subscriptions/plans           listado público
-POST   /subscriptions/subscribe       crea la preaprobación en MP
-GET    /subscriptions/me              estado de mi suscripción
-POST   /subscriptions/cancel          baja
-POST   /subscriptions/webhook         avisos de cobro recurrente de MP
-GET    /admin/subscriptions           panel
-
-GET    /messages/conversations        bandeja        (premium)
-GET    /messages/conversations/{id}   hilo           (premium)
-POST   /messages/conversations/{id}   enviar         (premium)
-```
-
-### Pantallas nuevas
-
-- **Planes y precios**, con la comparación Básico/Premium.
-- **Alta de suscripción**, con la vuelta desde Mercado Pago.
-- **Mi suscripción** dentro del panel: estado, próximo cobro, baja.
-- **Bandeja de mensajes** y **hilo**, sólo premium.
-- **Avisos de bloqueo** donde hoy se muestra el contacto, con la salida a
-  contratar.
-- **Panel de administración** de suscripciones.
-
-### Qué se toca de lo que ya existe
-
-| Qué | Impacto |
-|---|---|
-| `contact_visible_for` del punto 6 | **Es el punto de encaje.** Si entra antes, suscripciones lo consume; si no, hay que buscar los teléfonos uno por uno |
-| `UserResponse` | Suma estado de suscripción; lo consume todo el frontend |
-| `main.py` | Router nuevo montado |
-| **Caso 19 de la suite** | Verifica que `payments` y `mp-oauth` devuelvan `404`. El módulo nuevo **no puede resucitarlos**, y ese caso tiene que seguir verde |
-| Seed | Los dos planes |
-| Revisión de seguridad | Vuelven credenciales de Mercado Pago al proyecto |
-| Garantía de 90 días | Pasa a cubrir un sistema de cobro recurrente |
-
-### Y una advertencia que te debo
-
-`DECISIONS.md` dice que **la plataforma no recibe ni administra fondos de
-terceros**, con la excepción explícita de cobrar suscripciones —servicio
-propio a cliente propio—. Esa distinción hoy vive en un documento.
-
-**Cuando entren las credenciales de Mercado Pago para suscripciones, la
-distinción tiene que vivir en el código**, igual que el caso 19 hizo que
-"los pagos heredados no existen" fuera una propiedad verificable y no una
-promesa. Si no, en tres meses nadie va a poder demostrar que la plataforma
-no puede cobrar una venta entre terceros.
-
-**No lo empiezo.** Falta el enunciado con criterios.
+1. **No toqué `PATCH /orders/{id}/status`.** Sus tablas de transición
+   siguen sin conocer los dos estados de transferencia, así que sigue
+   devolviendo `400` ahí. Fue deliberado: la cancelación y la decisión de
+   transferencia ya cubren toda tu tabla, y sumar una tercera puerta para lo
+   mismo crea dos formas de hacer una cosa. Si preferís que también responda,
+   decímelo.
+2. **No agregué un botón "Cancelar Venta" para el vendedor** en los estados
+   de transferencia. La ruta `/cancel` le funciona y está probada, pero en la
+   interfaz su salida es "Rechazar", que **exige motivo**. Un botón de
+   cancelar sin motivo al lado sería el camino fácil y perderíamos el dato.
+3. **No agregué un campo `payment_reference` nuevo.** La respuesta ya trae
+   `order_number` y es lo que muestra la pantalla. Un campo nuevo con el
+   mismo valor es una forma de desincronizarse más adelante.
+4. **No saqué `get_refund_processor` del módulo desmontado**, por lo del
+   punto anterior.
+5. **Nada de lo que pusiste fuera de alcance**: sin vencimiento, sin reserva
+   de stock, sin cambios de esquema, sin seed bancario, sin arreglar la
+   instalación sin Docker, sin transportistas, sin contacto, sin
+   suscripciones, sin Railway.
 
 ---
 
-## 8. Railway: hay configuración, no hay despliegue
+## 7. Riesgos que quedan
 
-**Sólo configuración.** No encontré ninguna evidencia de un deploy.
+**El que más me preocupa, y nace de mi propio cambio.** La guarda del
+reembolso pregunta si la orden tiene datos bancarios. Hoy eso identifica
+perfecto a una transferencia. **Cuando vuelva Mercado Pago para compras**, si
+una orden llegara a tener datos bancarios *y* un pago por Mercado Pago, mi
+guarda saltearía un reembolso legítimo. No puede pasar hoy —son dos caminos
+de checkout distintos— pero es una suposición que hay que releer cuando se
+reconstruya Mercado Pago. Queda anotada acá para que no se pierda.
 
-**Lo que existe** (`382bcbe`, 9 archivos, 228 líneas, todo nuevo):
-`Dockerfile.railway` en raíz y en `backend/`, sus dos `.dockerignore`,
-`railway.toml` en raíz y en `backend/`, `backend/railway-entrypoint.sh`,
-`infra/railway/nginx.conf.template` y `RAILWAY.md`.
+**`with_for_update()` y las cargas anticipadas.** El bloqueo funciona porque
+las dos consultas son planas. Si alguien agrega un `joinedload` con `LEFT
+OUTER JOIN` sobre esas consultas, PostgreSQL rechaza el `FOR UPDATE` y las
+rutas empiezan a fallar. No hay nada en el código que lo impida.
 
-**Lo que prueba que no se desplegó:**
+**El segundo llamado al reembolso**, en `update_order_status`
+(`orders.py:~648`), sigue sin guarda. Hoy es inalcanzable para una
+transferencia, porque las transiciones del vendedor desde `PAID` son
+`CONFIRMED` y `SHIPPED`, nunca `CANCELLED`. Es cierto por una coincidencia
+de las tablas, no por diseño.
 
-1. **No hay ninguna URL de despliegue en el repositorio.** Busqué
-   `railway.app` y `up.railway` en todo el árbol —markdown, toml, ts, tsx,
-   py, sh, templates—: cero resultados. Un servicio desplegado deja su
-   dominio en alguna variable o en alguna nota.
-2. **`RAILWAY.md` está escrito en imperativo**, de principio a fin:
-   *"Creá el servicio"*, *"Conectá el repositorio"*, *"Activá backups
-   antes de cargar datos reales"*. Es una guía para hacerlo, no el registro
-   de haberlo hecho.
-3. **Su sección 4 se titula "Verificación" y empieza con "Después del
-   primer despliegue"**, listando tres comprobaciones `GET` sin ningún
-   resultado pegado. El propio documento declara que el despliegue no
-   ocurrió.
-4. **No hay informe de la dev anterior** sobre este commit.
+**El caso 25 es una carrera de verdad.** Depende de que dos peticiones se
+solapen. Con el bloqueo el resultado es determinista, pero si alguna vez el
+entorno serializa las peticiones por otro motivo, el caso pasaría sin probar
+nada. Vale la pena releerlo si algún día se vuelve sospechosamente rápido.
 
-**Y no confundo "compila" con "está publicado": tampoco puedo afirmar que
-compile.** No pude construir ninguno de los dos `Dockerfile.railway`
-porque **Docker no está disponible en mi entorno** — el mismo motivo por
-el que no pude usar el runner oficial de la suite. Lo único que verifiqué
-hoy es que `npm run build` pasa en verde, y eso no dice nada sobre la
-imagen de Railway.
-
-### Dos cosas que quiero marcarte antes de que esto se despliegue
-
-**`backend/railway.toml` trae `preDeployCommand = "railway-entrypoint
-migrate"`.** Cada despliegue va a correr `alembic upgrade head`
-automáticamente contra la base de producción, sin intervención. Con datos
-de gente real adentro, una migración mal escrita se aplica sola. No digo
-que esté mal —es lo habitual— pero es una decisión que nadie tomó por
-escrito.
-
-**`RAILWAY.md` línea 39 pide `ADMIN_PASSWORD=CAMBIAR_ANTES_DEL_PRIMER_DEPLOY`.**
-Está bien que sea un marcador, y quiero que quede anotado que el primer
-despliegue crea un administrador. Si ese marcador se copia tal cual, el
-sistema queda con una contraseña de administrador conocida y escrita en el
-repositorio.
-
-**Y lo de siempre: no se despliega nada antes de la revisión de
-seguridad.** Está en `NOW.md` como condición de la fase 5.
+**Órdenes ya atrapadas:** ninguna, porque no hay despliegue. Si en algún
+momento se restaura una base vieja, las órdenes creadas antes de este commit
+quedan liberadas solas, porque la regla es por estado y no por fecha.
 
 ---
 
-## Estado de mi entorno
+## 8. Lo que necesito para seguir
 
-Levanté PostgreSQL 16 + PostGIS 3.4, la API en 8000 y Vite en 5173 para
-poder correr todo esto. Los dejo **prendidos** por si querés que verifique
-algo más antes de contestarme; los bajo cuando me des la devolución.
+La guardia de cronograma dice que la próxima pieza es **cerrar el flujo
+UX/UI de logística** de la Fase 1. Quedo esperando el enunciado.
 
-Archivos temporales fuera del repositorio, en mi scratchpad. **El árbol de
-trabajo del repositorio está limpio** salvo este informe.
+Y quedan tres cosas tuyas de antes, por si querés resolverlas ahora:
 
----
+1. **La pieza chica del reembolso** del punto 5: sacar la dependencia de
+   `orders.py` hacia el módulo desmontado. Es media jornada y cierra de
+   verdad lo que el caso 19 dice a medias.
+2. **`carrier_transport_certified`**, que toca esquema y sigue sin decisión.
+3. **`contact_visible_for`**: te lo pregunté en el informe anterior y no
+   quedó respondido. Sigo pensando que conviene antes que suscripciones.
 
-## Lo que necesito de vos
-
-1. **Aprobación del arreglo del punto 2**, con la asimetría comprador /
-   vendedor que propongo, o la corrección si no te cierra.
-2. **Decisión sobre el punto 5**, porque toca el esquema.
-3. **El enunciado de suscripciones**, sin el cual no puedo empezar el
-   punto 7.
-4. **Las cuatro preguntas de diseño de transportistas**, que siguen
-   bloqueando B y C.
-
-Y una pregunta mía: **¿querés que el `contact_visible_for` del punto 6
-entre antes que suscripciones?** Mi recomendación es que sí. Construirlo
-primero convierte el candado en un parámetro; construirlo después obliga a
-revisar todos los endpoints de nuevo. Es la misma lógica con la que se
-decidió no posponer las decisiones estructurales de privacidad.
+Dejo el entorno levantado —PostgreSQL, API y Vite— por si querés que
+verifique algo de esta pieza antes de pasar a la siguiente.
