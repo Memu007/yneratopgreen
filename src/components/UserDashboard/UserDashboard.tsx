@@ -1349,8 +1349,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 
                 {/* Acciones del comprador */}
                 <div className={styles.orderActions}>
-                  {(order.status === 'pending' || order.status === 'paid' || order.status === 'confirmed') && (
-                    <button 
+                  {(order.status === 'pending' || order.status === 'paid'
+                    || order.status === 'confirmed'
+                    || order.status === 'awaiting-transfer-receipt') && (
+                    <button
                       className={styles.rejectButton}
                       onClick={() => handleCancelPurchase(order.id)}
                     >
@@ -1452,25 +1454,40 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               )}
 
               <div className={styles.orderActions}>
-                {order.status === 'transfer-receipt-submitted' && (
+                {(order.status === 'transfer-receipt-submitted'
+                  || order.status === 'awaiting-transfer-receipt') && (
                   <>
                     <p>
                       <strong>Verificá el dinero en tu cuenta bancaria antes de aprobar.</strong>{' '}
-                      Este comprobante es sólo un registro: no confirma que la transferencia
-                      se haya acreditado. No apruebes si el importe acreditado no coincide con
-                      el total de la orden.
+                      {order.status === 'transfer-receipt-submitted' ? (
+                        <>
+                          Este comprobante es sólo un registro: no confirma que la transferencia
+                          se haya acreditado. No apruebes si el importe acreditado no coincide con
+                          el total de la orden.
+                        </>
+                      ) : (
+                        <>
+                          El comprador todavía no adjuntó comprobante. Si ya viste la
+                          acreditación en tu cuenta, aprobá igual; si no llegó, rechazá la orden
+                          indicando el motivo.
+                        </>
+                      )}
                     </p>
                     <button
                       className={styles.confirmButton}
                       onClick={() => handleTransferDecision(order.id, 'approve')}
                     >
-                      ✅ Aprobar comprobante
+                      {order.status === 'transfer-receipt-submitted'
+                        ? '✅ Aprobar comprobante'
+                        : '✅ Aprobar transferencia'}
                     </button>
                     <button
                       className={styles.rejectButton}
                       onClick={() => handleTransferDecision(order.id, 'reject')}
                     >
-                      ❌ Rechazar comprobante
+                      {order.status === 'transfer-receipt-submitted'
+                        ? '❌ Rechazar comprobante'
+                        : '❌ Rechazar transferencia'}
                     </button>
                   </>
                 )}

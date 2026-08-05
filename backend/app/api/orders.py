@@ -383,15 +383,22 @@ def decide_transfer_receipt(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Bloqueo de fila: dos decisiones simultáneas sobre la misma orden se
+    # serializan, así el stock nunca se descuenta dos veces.
     order = db.query(Order).filter(
         (Order.id == order_id) | (Order.order_number == order_id)
-    ).first()
+    ).with_for_update().first()
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
     if order.seller_id != current_user.id:
         raise HTTPException(status_code=403, detail="No tienes permiso para validar este comprobante")
-    if order.status != OrderStatus.TRANSFER_RECEIPT_SUBMITTED:
-        raise HTTPException(status_code=400, detail="La orden no tiene un comprobante pendiente")
+    # El vendedor decide aunque el comprador no haya adjuntado nada: es él quien
+    # ve la acreditación en su cuenta bancaria.
+    if order.status not in (
+        OrderStatus.AWAITING_TRANSFER_RECEIPT,
+        OrderStatus.TRANSFER_RECEIPT_SUBMITTED,
+    ):
+        raise HTTPException(status_code=400, detail="La orden no tiene una transferencia pendiente de decisión")
 
     if decision_data.decision == "reject":
         reason = (decision_data.reason or "").strip()
@@ -692,27 +699,40 @@ def cancel_order(
     current_user: User = Depends(get_current_user)
 ):
     """Cancelar una orden (comprador o vendedor según el estado)"""
-    # Buscar por UUID o por order_number
+    # Buscar por UUID o por order_number, con bloqueo de fila para que dos
+    # cancelaciones simultáneas no dejen estados incompatibles.
     order = db.query(Order).filter(
         (Order.id == order_id) | (Order.order_number == order_id)
-    ).first()
-    
+    ).with_for_update().first()
+
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
-    
+
     is_seller = order.seller_id == current_user.id
     is_buyer = order.buyer_id == current_user.id
-    
+
     if not is_seller and not is_buyer:
         raise HTTPException(status_code=403, detail="No tienes permiso")
-    
-    # Solo se puede cancelar si está en PLACED o CONFIRMED
-    if order.status not in [OrderStatus.PLACED, OrderStatus.CONFIRMED, OrderStatus.PAID]:
+
+    if order.status in (OrderStatus.PLACED, OrderStatus.CONFIRMED, OrderStatus.PAID):
+        pass
+    elif order.status == OrderStatus.AWAITING_TRANSFER_RECEIPT:
+        # Nadie transfirió todavía: cualquiera de los dos puede abandonar.
+        pass
+    elif order.status == OrderStatus.TRANSFER_RECEIPT_SUBMITTED:
+        # El comprador ya declaró haber pagado. Sólo el vendedor, que es quien
+        # ve su cuenta bancaria, decide si esa orden se cae.
+        if not is_seller:
+            raise HTTPException(
+                status_code=400,
+                detail="El comprobante ya fue enviado: sólo el vendedor puede cancelar esta orden",
+            )
+    else:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail="Solo se pueden cancelar órdenes pendientes, pagadas o confirmadas"
         )
-    
+
     # Restaurar stock SOLO si la orden ya fue pagada (el stock se descontó al aprobar el pago)
     # Solo para productos, no servicios
     if order.status in [OrderStatus.PAID, OrderStatus.CONFIRMED]:
@@ -732,9 +752,13 @@ def cancel_order(
     
     db.commit()
     
-    # Procesar reembolso si la orden estaba pagada
+    # Procesar reembolso si la orden estaba pagada.
+    # Las órdenes por transferencia bancaria quedan afuera: el dinero fue de
+    # cuenta a cuenta y TopGreen no lo administra, así que no hay nada que
+    # devolver desde acá. Cualquier reintegro lo arreglan comprador y vendedor.
+    es_transferencia = bool(order.transfer_cbu or order.transfer_alias_bancario)
     refund_result = None
-    if order.status in [OrderStatus.CANCELLED, OrderStatus.REJECTED]:
+    if not es_transferencia and order.status in [OrderStatus.CANCELLED, OrderStatus.REJECTED]:
         try:
             process_refund = get_refund_processor()
             # Siempre reembolso TOTAL (100%) sin importar quién cancela

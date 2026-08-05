@@ -357,11 +357,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
       {transferOrders.map(order => (
         <div key={order.order_id} className={styles.infoCard}>
           <h3>{order.seller_name}</h3>
-          <p>Orden: <strong>{order.order_number}</strong></p>
+          <p><strong>Referencia de pago:</strong> {order.order_number}</p>
           {order.cbu && <p><strong>CBU:</strong> {order.cbu}</p>}
           {order.alias_bancario && <p><strong>Alias:</strong> {order.alias_bancario}</p>}
           <p><strong>Titular:</strong> {order.seller_name}</p>
           <p><strong>Monto:</strong> {formatPrice(order.amount)}</p>
+          <p>
+            Usá <strong>{order.order_number}</strong> como concepto de la
+            transferencia. Es lo que le permite al vendedor reconocer tu pago
+            en su resumen bancario.
+          </p>
           {order.status === 'transfer_receipt_submitted' ? (
             <p>✅ Comprobante enviado. Esperando validación del vendedor.</p>
           ) : (

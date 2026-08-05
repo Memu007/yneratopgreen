@@ -915,6 +915,16 @@ await runCase(18, 'Transferencia completa desde la interfaz', async () => {
     assert(databaseOrder[0] === 'TRANSFER_RECEIPT_SUBMITTED', `estado SQL: ${databaseOrder[0]}`);
     assert(databaseOrder[1], 'la orden creada por UI no guardó el comprobante');
 
+    const transferPanel = (await page.locator('body').textContent()) || '';
+    assert(
+      transferPanel.includes(databaseOrder[2]),
+      `la UI no muestra ${databaseOrder[2]} como referencia de pago`,
+    );
+    assert(
+      /como concepto de la transferencia/i.test(transferPanel),
+      'la UI no instruye a usar la referencia como concepto del pago',
+    );
+
     const sellerContext = await browser.newContext();
     try {
       await sellerContext.addInitScript(
@@ -1182,6 +1192,219 @@ await runCase(21, 'Registro de transportista desde la interfaz', async () => {
   } finally {
     await browser.close();
   }
+});
+
+// --- Órdenes de transferencia que no se pueden abandonar -------------------
+
+async function crearOrdenTransferencia(calle) {
+  await apiRequest('/cart/items', {
+    method: 'POST',
+    token: state.buyerToken,
+    body: { product_id: state.product.id, quantity: 1 },
+  });
+  const checkout = await apiRequest('/orders/checkout/transfer', {
+    method: 'POST',
+    token: state.buyerToken,
+    body: {
+      shipping_address: calle,
+      shipping_city: 'Rosario',
+      shipping_province: 'Santa Fe',
+      shipping_postal_code: '2000',
+    },
+  });
+  const [order] = checkout.data.orders;
+  assert(order?.status === 'awaiting_transfer_receipt', `estado inicial: ${order?.status}`);
+  return order;
+}
+
+function estadoDeOrden(orderId) {
+  return querySql(`SELECT status::text FROM orders WHERE id = ${sqlLiteral(orderId)}`);
+}
+
+function stockDeProducto(productId) {
+  return queryCount(`SELECT stock FROM products WHERE id = ${sqlLiteral(productId)}`);
+}
+
+const RECIBO_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
+
+async function adjuntarComprobante(orderId, nombre) {
+  await apiUpload(`/orders/${orderId}/transfer-receipt`, {
+    token: state.buyerToken,
+    filename: nombre,
+    content: RECIBO_PNG,
+    contentType: 'image/png',
+  });
+  const estado = estadoDeOrden(orderId);
+  assert(estado === 'TRANSFER_RECEIPT_SUBMITTED', `estado tras adjuntar: ${estado}`);
+}
+
+await runCase(22, 'Sin comprobante, comprador y vendedor pueden cancelar', async () => {
+  const stockInicial = stockDeProducto(state.product.id);
+
+  const ordenComprador = await crearOrdenTransferencia('Av. Abandono 100');
+  await expectApiError(403, () =>
+    apiRequest(`/orders/${ordenComprador.order_id}/cancel`, {
+      method: 'POST',
+      token: state.otherSellerToken,
+      body: { reason: 'no es mi orden' },
+    }),
+  );
+  assert(
+    estadoDeOrden(ordenComprador.order_id) === 'AWAITING_TRANSFER_RECEIPT',
+    'un usuario ajeno movió la orden',
+  );
+
+  await apiRequest(`/orders/${ordenComprador.order_id}/cancel`, {
+    method: 'POST',
+    token: state.buyerToken,
+    body: { reason: 'me arrepentí antes de transferir' },
+  });
+  const estadoComprador = estadoDeOrden(ordenComprador.order_id);
+  assert(estadoComprador === 'CANCELLED', `el comprador dejó la orden en ${estadoComprador}`);
+
+  const ordenVendedor = await crearOrdenTransferencia('Av. Abandono 200');
+  await apiRequest(`/orders/${ordenVendedor.order_id}/cancel`, {
+    method: 'POST',
+    token: state.sellerToken,
+    body: { reason: 'nunca llegó la transferencia' },
+  });
+  const estadoVendedor = estadoDeOrden(ordenVendedor.order_id);
+  assert(estadoVendedor === 'REJECTED', `el vendedor dejó la orden en ${estadoVendedor}`);
+
+  const stockFinal = stockDeProducto(state.product.id);
+  assert(
+    stockFinal === stockInicial,
+    `cancelar sin aprobar movió el stock: ${stockInicial} -> ${stockFinal}`,
+  );
+
+  return `ajeno 403; comprador=CANCELLED, vendedor=REJECTED, stock intacto en ${stockFinal}`;
+});
+
+await runCase(23, 'Sin comprobante, el vendedor igual aprueba o rechaza', async () => {
+  const stockInicial = stockDeProducto(state.product.id);
+
+  const ordenRechazo = await crearOrdenTransferencia('Av. Sin Comprobante 300');
+  await expectApiError(400, () =>
+    apiRequest(`/orders/${ordenRechazo.order_id}/transfer-receipt`, {
+      method: 'PATCH',
+      token: state.sellerToken,
+      body: { decision: 'reject' },
+    }),
+  );
+  const motivo = 'No veo la transferencia en mi cuenta';
+  await apiRequest(`/orders/${ordenRechazo.order_id}/transfer-receipt`, {
+    method: 'PATCH',
+    token: state.sellerToken,
+    body: { decision: 'reject', reason: motivo },
+  });
+  const [rechazada] = queryRows(`
+    SELECT status::text, cancellation_reason
+    FROM orders
+    WHERE id = ${sqlLiteral(ordenRechazo.order_id)}
+  `);
+  assert(rechazada[0] === 'REJECTED', `estado SQL: ${rechazada[0]}`);
+  assert(rechazada[1] === motivo, 'no se guardó el motivo del rechazo');
+  // Se cuenta en una consulta aparte: querySql recorta el resultado y un
+  // último campo NULL desaparecería de la fila.
+  const comprobantesRechazo = queryCount(`
+    SELECT COUNT(*)
+    FROM orders
+    WHERE id = ${sqlLiteral(ordenRechazo.order_id)}
+      AND transfer_receipt_url IS NOT NULL
+  `);
+  assert(comprobantesRechazo === 0, 'quedó un comprobante donde nunca se adjuntó uno');
+
+  const ordenAprobada = await crearOrdenTransferencia('Av. Sin Comprobante 400');
+  const aprobada = await apiRequest(`/orders/${ordenAprobada.order_id}/transfer-receipt`, {
+    method: 'PATCH',
+    token: state.sellerToken,
+    body: { decision: 'approve' },
+  });
+  assert(aprobada.data.status === 'paid', `estado API: ${aprobada.data.status}`);
+  assert(
+    estadoDeOrden(ordenAprobada.order_id) === 'PAID',
+    'la aprobación sin comprobante no llegó a la base',
+  );
+
+  const stockFinal = stockDeProducto(state.product.id);
+  assert(
+    stockFinal === stockInicial - 1,
+    `stock esperado ${stockInicial - 1}, obtenido ${stockFinal}`,
+  );
+
+  return `rechazo sin motivo HTTP 400; rechazo con motivo=REJECTED; aprobación sin comprobante=PAID, stock ${stockInicial} -> ${stockFinal}`;
+});
+
+await runCase(24, 'Con comprobante enviado, sólo el vendedor puede cancelar', async () => {
+  const stockInicial = stockDeProducto(state.product.id);
+  const orden = await crearOrdenTransferencia('Av. Comprobante Enviado 500');
+  await adjuntarComprobante(orden.order_id, 'comprobante-cancelacion.png');
+
+  const bloqueo = await expectApiError(400, () =>
+    apiRequest(`/orders/${orden.order_id}/cancel`, {
+      method: 'POST',
+      token: state.buyerToken,
+      body: { reason: 'quiero retirarme igual' },
+    }),
+  );
+  assert(/vendedor/i.test(bloqueo), `el motivo no explica quién puede cancelar: ${bloqueo}`);
+  assert(
+    estadoDeOrden(orden.order_id) === 'TRANSFER_RECEIPT_SUBMITTED',
+    'el intento del comprador movió la orden',
+  );
+
+  await apiRequest(`/orders/${orden.order_id}/cancel`, {
+    method: 'POST',
+    token: state.sellerToken,
+    body: { reason: 'el comprobante no corresponde a esta operación' },
+  });
+  const estadoFinal = estadoDeOrden(orden.order_id);
+  assert(estadoFinal === 'REJECTED', `estado tras cancelar el vendedor: ${estadoFinal}`);
+
+  const stockFinal = stockDeProducto(state.product.id);
+  assert(stockFinal === stockInicial, `el stock cambió: ${stockInicial} -> ${stockFinal}`);
+
+  return `comprador HTTP 400 con motivo; vendedor dejó REJECTED; stock intacto en ${stockFinal}`;
+});
+
+await runCase(25, 'Dos aprobaciones simultáneas descuentan stock una sola vez', async () => {
+  const stockInicial = stockDeProducto(state.product.id);
+  const orden = await crearOrdenTransferencia('Av. Concurrencia 600');
+  await adjuntarComprobante(orden.order_id, 'comprobante-concurrente.png');
+
+  const aprobar = () =>
+    apiRequest(`/orders/${orden.order_id}/transfer-receipt`, {
+      method: 'PATCH',
+      token: state.sellerToken,
+      body: { decision: 'approve' },
+    }).then(
+      () => ({ ok: true }),
+      (error) => ({ ok: false, message: String(error.message) }),
+    );
+
+  const [primera, segunda] = await Promise.all([aprobar(), aprobar()]);
+  const exitosas = [primera, segunda].filter((resultado) => resultado.ok).length;
+  assert(exitosas === 1, `aprobaciones aceptadas: ${exitosas} (se esperaba exactamente 1)`);
+
+  const rechazada = [primera, segunda].find((resultado) => !resultado.ok);
+  assert(
+    /HTTP 400/.test(rechazada.message),
+    `la segunda no fue rechazada con 400: ${rechazada.message}`,
+  );
+
+  const estadoFinal = estadoDeOrden(orden.order_id);
+  assert(estadoFinal === 'PAID', `estado final: ${estadoFinal}`);
+
+  const stockFinal = stockDeProducto(state.product.id);
+  assert(
+    stockFinal === stockInicial - 1,
+    `descuento doble: ${stockInicial} -> ${stockFinal}, se esperaba ${stockInicial - 1}`,
+  );
+
+  return `1 de 2 aceptada, la otra HTTP 400; stock ${stockInicial} -> ${stockFinal}`;
 });
 
 const passed = results.filter((result) => result.passed).length;
