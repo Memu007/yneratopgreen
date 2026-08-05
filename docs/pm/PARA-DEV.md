@@ -12,138 +12,138 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
-## Entrega `d105849`: aceptada
+## Entrega `8d74054`: vuelve con correcciones chicas
 
-Queda aceptado el commit de producto `0039e00`, que cierra la orden de
-transferencia inmortal.
+La arquitectura de la entrega es correcta: prototipo aislado, sin cambios de
+producto ni dependencias, con los recorridos y estados pedidos. La PM reviso
+las capturas, el HTML/JS/CSS, `node --check`, `git diff --check` y
+`npm run build`.
 
-La PM verifico directamente:
-
-- las reglas asimetricas de cancelacion y decision aprobadas;
-- el bloqueo de fila que evita descontar stock dos veces;
-- que las transferencias no llamen al reembolso de Mercado Pago;
-- la referencia de pago y las acciones nuevas en la interfaz;
-- `npm run build` en verde y el backend compilando.
-
-La dev aporto rojo previo y **25/25** en verde desde base limpia con la misma
-suite, ejecutada sin el runner oficial. Docker tampoco esta disponible en el
-entorno de la PM. Repetir el runner oficial queda como puerta de Fase 5, no
-bloquea esta aceptacion.
-
-La dependencia residual de `orders.py` con el modulo heredado de reembolsos se
-registra para la reconstruccion de pagos en Fase 4. **No se abre ahora.**
+No queda aceptada todavia porque hay comportamientos y promesas que contradicen
+el alcance o el sistema real. **No reescribas el prototipo:** corrige solamente
+los puntos de abajo.
 
 ---
 
-## Tarea activa unica: cerrar el flujo UX/UI de logistica
+## Tarea activa unica: cerrar los huecos del prototipo logistico
 
-### Objetivo
+### 1. Cada pedido exige una decision explicita
 
-Cerrar la puerta de **Diseño y UX/UI de la Fase 1 antes del 20/08** con un
-prototipo web navegable del recorrido logistico. Esta pieza define pantallas,
-estados, informacion y navegacion. La busqueda real con PostGIS y la inclusion
-del transportista en la orden pertenecen a la Fase 3.
+El flete sigue siendo opcional, pero la decision no puede quedar vacia. Para
+cada pedido, antes de pasar al pago, el comprador debe haber elegido una de
+estas dos salidas:
 
-### Forma de entrega
+- `Necesito flete` **con un transportista seleccionado**; o
+- `Coordino el traslado por mi cuenta`.
 
-Construir un prototipo web aislado de la aplicacion productiva, versionado en
-`docs/ux/logistica/`. Debe abrirse localmente sin API ni base de datos y usar
-datos ficticios claramente identificados.
+Hoy `Continuar` permite llegar al pago con `necesitaFlete = null` o con
+`necesitaFlete = true` sin transportista. Eso deja una operacion ambigua.
 
-- Reusar la identidad visual, componentes y lenguaje de TopGreen.
-- No redisenar la marca ni el resto del marketplace.
-- No agregar dependencias si HTML, CSS y JavaScript alcanzan.
-- No tocar `backend/`, migraciones, modelos, endpoints ni el flujo productivo
-  de `src/` en esta pieza.
+Corregir:
 
-### Recorrido que debe quedar navegable
+- bloquear el avance y explicar que pedido falta resolver;
+- llevar el foco al primer pedido incompleto;
+- en vacio/error, “Coordino por mi cuenta” debe guardar `false` para ese pedido,
+  no solo volver de pantalla;
+- “Mis compras” no puede afirmar que el comprador coordina solo cuando el
+  estado seguia nulo o incompleto.
 
-#### Comprador
+### 2. No se agrega nombre comercial al MVP
 
-1. En el checkout elige entre **“Necesito flete”** y **“Coordino el traslado
-   por mi cuenta”**.
-2. La seleccion de flete es **por vendedor/orden**, no por carrito completo.
-   El prototipo debe dejar claro que un carrito con dos vendedores puede
-   requerir dos elecciones distintas.
-3. El origen viene de la localidad de la publicacion/vendedor. El destino se
-   precarga con la localidad del comprador y puede cambiarse desde una lista
-   estructurada.
-4. La busqueda muestra estados de carga, resultados, vacio y error.
-5. Antes de seleccionar, cada tarjeta muestra nombre comercial, localidad
-   base, cobertura, transporte declarado, capacidad y declaracion de
-   habilitacion. **No muestra telefono, correo ni direccion exacta.**
-6. La tarjeta explica que cubre origen y destino y que la distancia es en
-   linea recta. No muestra rutas, mapas, tarifa ni tiempo estimado.
-7. Al seleccionar un transportista aparece el contacto declarado y se lo
-   incorpora al resumen de esa orden. El comprador puede cambiarlo o quitarlo.
-8. El flujo vuelve al checkout y continua al pago sin convertir el flete en
-   un producto ni agregar un precio automatico.
-9. En “Mis compras” se ve el transportista elegido y su contacto.
+El contrato no exige otro campo y el modelo ya tiene `full_name`. No agregamos
+esquema ni prometemos razon social o nombre comercial verificado.
 
-#### Transportista
+En el prototipo usa nombres que puedan venir de `full_name` y llama al dato
+**“Nombre del perfil”** o simplemente **“Transportista”**. No hace falta tocar
+el perfil productivo.
 
-10. Perfil de alta/edicion con localidad base, transporte, capacidad, radio y
-    declaracion de habilitacion con detalle y fecha.
-11. Vista de una operacion en la que fue seleccionado: origen, destino y
-    necesidad logistica. No expone precios de productos, comprobantes, CBU,
-    alias ni datos financieros.
+### 3. La distancia tiene que decir que mide
 
-#### Vendedor
+Un unico “aprox. 180 km” cambia segun el transportista pero no indica entre que
+puntos se calculo. La regla aprobada exige comprobar las dos puntas dentro del
+radio.
 
-12. Resumen de venta con el transportista seleccionado y el tramo a coordinar,
-    sin nuevas acciones logisticas ni estados de cotizacion.
+Cada tarjeta debe mostrar, en linea recta:
 
-### Textos que no pueden inducir a error
+- base del transportista → origen; y
+- base del transportista → destino.
 
-- “Declarado por el transportista el [fecha]. TopGreen no verifica esta
-  habilitacion.”
-- “Distancias estimadas en linea recta.”
-- “La coordinacion y el precio del flete se acuerdan directamente.”
+Mantener tambien el radio declarado y la frase de que ambas puntas quedan
+cubiertas. No ordenar ni recomendar “el mejor”.
 
-No usar “certificado por TopGreen”, “tarifa calculada”, “ruta optima” ni
-“entrega garantizada”.
+### 4. No inventar peso ni exponer contacto del comprador
 
-### Criterios de aceptacion
+La orden actual guarda nombre del producto y cantidad, pero no un peso
+logistico estructurado. Reemplaza “aproximadamente 2.000 kg” por los articulos
+y cantidades que ya existen en la orden.
 
-1. Se puede recorrer con clics todo el camino comprador → seleccion → resumen
-   → pago, y volver para cambiar o quitar la seleccion.
-2. Se pueden abrir tambien las vistas de transportista y vendedor sin editar
-   la URL manualmente.
-3. Los cuatro estados de busqueda —carga, resultados, vacio y error— son
-   visibles mediante controles del prototipo.
-4. Los datos de contacto permanecen ocultos antes de seleccionar y aparecen
-   despues.
-5. El prototipo representa una compra con dos vendedores y deja la seleccion
-   asociada a cada orden.
-6. Escritorio 1440×900 y movil 390×844 sin desborde horizontal, con controles
-   tactiles de al menos 44 px.
-7. Navegacion por teclado, foco visible, etiquetas y contraste legible.
-8. `npm run build` sigue verde y `git diff --check` no agrega ruido de formato.
-9. La entrega incluye capturas de ambos tamanos y un informe en
-   `PARA-PM.md` con decisiones no tomadas y puntos que la PM deba revisar.
+La vista del transportista recibe tramo y necesidad logistica. Para el MVP no
+necesita el telefono ni el correo del comprador: el comprador ya obtiene el
+contacto del transportista despues de seleccionarlo. Mostrar en su lugar:
+**“El comprador recibio tus datos y te contactara para coordinar.”**
 
-### Fuera de alcance
+Esto reduce exposicion de datos y cumple el contacto directo del contrato.
 
-- consultas PostGIS, endpoints, persistencia o migraciones;
-- mapas, ruteo, GPS, distancia por caminos o seguimiento;
-- cotizacion, tarifa, peso/volumen automatico o pago del flete;
-- Carta de Porte, ARCA o verificacion contra organismos;
-- mensajeria, suscripciones, planes o candados premium;
-- Mercado Pago, transferencia bancaria y Railway;
-- cambios visuales generales del marketplace.
+### 5. Contraste medido, no heredado
+
+El criterio no quedo demostrado. Blanco sobre `#059669`, usado al inicio del
+gradiente principal, da aproximadamente **3,77:1** y no alcanza 4,5:1 para
+texto normal.
+
+Ajustar los botones con texto blanco a un verde que alcance **4,5:1** en todo
+el fondo. No hace falta redisenar la paleta; alcanza con usar el tono oscuro ya
+existente. Reportar el valor medido.
+
+---
+
+## Decisiones de PM sobre tus preguntas
+
+- El traslado puede ser propio: aprobado. Lo obligatorio es elegir una salida
+  por pedido.
+- Boton explicito para iniciar la busqueda: aprobado.
+- Destino desde lista cerrada de localidades: aprobado.
+- Sin ranking ni recomendacion automatica: aprobado, con las dos distancias
+  claramente rotuladas.
+- Bloque informativo del vendedor cuando el comprador coordina solo: aprobado.
+- Contacto del transportista visible despues de seleccionarlo: aprobado para
+  el MVP contractual. Cualquier candado por plan se define recien en Fase 6.
+- Declaracion de habilitacion con detalle y fecha: aprobada para Fase 2, siempre
+  atribuida al transportista y sin verificacion de TopGreen.
+- Nombre comercial nuevo: rechazado para el MVP; usar `full_name`.
+
+### Hueco detectado por la PM para la siguiente fase
+
+La lista de destino del prototipo es correcta, pero hoy el usuario y la orden
+guardan ubicacion/destino como texto libre; no existe un `locality_id` de
+destino. **No lo implementes en esta correccion.** Queda como cimiento de datos
+estructurados de la Fase 2 para que PostGIS pueda resolver la Fase 3.
+
+---
+
+## Criterios de aceptacion de la correccion
+
+1. No se llega al resumen/pago con ningun pedido sin resolver.
+2. Vacio y error permiten marcar correctamente “coordino por mi cuenta”.
+3. No aparece un peso inventado ni contacto del comprador en su vista de
+   transportista.
+4. Cada tarjeta muestra las dos distancias con sus extremos.
+5. Los nombres no prometen un campo comercial inexistente.
+6. Todo texto normal queda en 4,5:1 o mas; controles y foco siguen visibles.
+7. Actualiza solamente las capturas afectadas en escritorio y movil.
+8. `node --check`, `npm run build` y `git diff --check` quedan verdes.
+
+No repitas los 25 casos de producto: `src/` y `backend/` no cambian.
 
 ### Frena y responde si
 
-- el prototipo exige cambiar el esquema o la API actual;
-- no se puede representar un transportista por orden sin inventar una regla
-  comercial nueva;
-- una pantalla necesita revelar contacto antes de la seleccion;
-- aparece una dependencia nueva o una reescritura del frontend productivo.
+- alguno de estos arreglos exige tocar codigo productivo;
+- para completar el flujo hace falta inventar otro dato de negocio;
+- la correccion deja de estar acotada a `docs/ux/logistica/`.
 
 ---
 
 ## Guardia de cronograma
 
-La semana 1 comienza el **viernes 07/08** y la Fase 1 termina el **jueves
-20/08**. Esta es la unica pieza activa. No abras la implementacion real de
-Piezas B/C, validacion por correo, pagos, suscripciones ni despliegue.
+Seguimos a tiempo: la semana 1 comienza el **07/08** y la Fase 1 cierra el
+**20/08**. Esta correccion corta cierra el prototipo; no abras Fase 2 hasta que
+la PM la acepte.

@@ -5,6 +5,27 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-05 — Definiciones del prototipo logistico
+
+- El flete no es obligatorio, pero cada pedido exige una eleccion explicita:
+  transportista seleccionado o traslado por cuenta propia.
+- El MVP usa `full_name`; no agrega nombre comercial fuera del contrato.
+- La compatibilidad muestra dos distancias en linea recta: base a origen y
+  base a destino. No recomienda ni ordena “el mejor”.
+- El comprador ve el contacto del transportista despues de seleccionarlo. El
+  transportista no recibe el contacto del comprador en el MVP; el comprador
+  inicia la coordinacion.
+- La operacion muestra articulos y cantidades existentes, sin inventar peso.
+- La declaracion de habilitacion con detalle y fecha entra en Fase 2. TopGreen
+  no la verifica.
+- Los candados de contacto por plan siguen en Fase 6.
+- El destino estructurado por `locality_id` queda como cimiento de Fase 2; el
+  prototipo no habilita a implementarlo antes.
+
+El prototipo `778f6ab` vuelve una vez por estas correcciones y por contraste
+insuficiente en el verde principal. No se repite la suite de producto porque
+la pieza sigue aislada en `docs/ux/`.
+
 ## 2026-08-05 — Transferencia aceptada; sigue UX/UI de logistica
 
 La PM acepta `0039e00`: cierra las salidas de los dos estados de
