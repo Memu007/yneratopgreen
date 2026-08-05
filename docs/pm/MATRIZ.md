@@ -35,11 +35,11 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 
 | Requisito | Estado | Evidencia |
 |-----------|--------|-----------|
-| Transportista como tipo especial de proveedor | ❌ | No existe el tipo ni la entidad |
-| Declara ubicación base | ❌ | — |
-| Declara transporte habilitado certificado | ❌ | — |
-| Declara zona de cobertura en km | ❌ | — |
-| Declara capacidad de carga | ❌ | — |
+| Transportista como tipo especial de proveedor | ⚪ | Pieza A: `is_carrier` sobre `users`, sin rol nuevo. Smoke 21 UI + API + DB |
+| Declara ubicación base | ✅ | Smoke 21: localidad del padrón persistida y contrastada con SQL |
+| Declara transporte habilitado certificado | ⚪ | Texto + booleano obligatorios; falta convertirlo en declaración atribuida con detalle y fecha |
+| Declara zona de cobertura en km | ✅ | Smoke 21: radio 125,50 km persistido y contrastado con SQL |
+| Declara capacidad de carga | ✅ | Smoke 21: capacidad persistida y contrastada con SQL |
 | Sistema detecta ubicación de comprador y vendedor | ❌ | — |
 | Lista transportistas compatibles en la zona | ❌ | — |
 | Seleccionar e incluir en la transacción | ❌ | — |
@@ -77,14 +77,14 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Python FastAPI / Django o Node | ✅ | FastAPI operativo, `/api/health` `200` |
 | **PostgreSQL + PostGIS** | ✅ | PostGIS 3.4.3 sobre PostgreSQL 16, 16 tablas. **PostGIS en uso real**: `Geography(POINT,4326)` con índice GIST; `ST_Distance` Balcarce–Tandil = 96,75 km, contrastado de forma independiente contra 96,67 km por haversine |
 | Responsive móvil y escritorio | ⚪ | **Relevado el 2026-07-26** con `scripts/mobile-audit.mjs`: 36 pantallas en 360×800, 390×844 y 768×1024. **Cero desbordes horizontales, cero errores de consola, cero respuestas 4xx/5xx.** Nada impide completar los recorridos. Quedan pendientes de corregir, al final: controles táctiles por debajo de 44 px y barras de pestañas que requieren desplazamiento horizontal |
-| AWS / Supabase / Render | ❌ | Sin despliegue propio |
+| AWS / Supabase / Render | ⚪ | Railway preparado, sin despliegue. Proveedor alternativo pendiente de aprobación |
 
 ## 5. Cierre y entrega
 
 | Requisito | Estado |
 |-----------|--------|
-| Pruebas integrales | ✅ Suite de doce casos con un comando contra arranque limpio, criterios relacionales contra SQL, publicación desde la interfaz con Chromium real. Verificado que **falla** con código distinto de cero al romper un caso a propósito |
-| Carga inicial de datos | ✅ Seed idempotente con 24 productos en 12 categorías y 9 provincias, más 4.028 localidades. Verificado corriéndolo dos veces sin duplicar |
+| Pruebas integrales | ✅ Suite de 21 casos ejecutada desde base limpia el 2026-08-04; misma suite, runner nativo por falta de Docker. Pendiente repetir por el camino oficial antes del lanzamiento |
+| Carga inicial de datos | ✅ Seed idempotente con 30 publicaciones en 12 categorías y 9 provincias, más 4.028 localidades. Verificado corriéndolo dos veces sin duplicar |
 | Despliegue en producción | ❌ |
 | Capacitación del panel de administración | ❌ |
 | Documentación técnica del despliegue | ⚪ `README.md` y `README_LOCAL_SETUP.md` corregidos al stack real. `PROJECT_STATUS.md` sigue con ocho afirmaciones verificadas como falsas |

@@ -222,8 +222,9 @@ va fijo, y lo aclaro.
 
 Estado honesto. El detalle requisito por requisito está en `MATRIZ.md`.
 
-**Avance contra el contrato: ~53%**, ponderado por esfuerzo. El desglose
-por bloque está en `NOW.md`.
+La ultima medicion heredada fue **~53%**, pero ya no se usa como control.
+Las puertas contractuales vigentes estan en `CRONOGRAMA.md` y el desglose
+por requisito en `MATRIZ.md`.
 
 **Funciona y está verificado:**
 
@@ -242,7 +243,7 @@ por bloque está en `NOW.md`.
 - **Pago por transferencia bancaria**: CBU y alias del vendedor con
   snapshot en la orden, comprobante adjunto, validación manual del
   vendedor. Autorización verificada con `403` cruzado.
-- **Suite de veinte casos de humo**, con navegador real.
+- **Suite de 21 casos de humo**, con navegador real.
 
 **Roto de lo ya entregado, y va primero:**
 

@@ -5,6 +5,42 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-05 — El PDF gobierna fases, hitos y limites
+
+Se revisaron visualmente las cinco paginas del documento aprobado y se
+convirtieron sus fases en puertas verificables dentro de `CRONOGRAMA.md`.
+
+- La Fase 1 no estaba cerrada: falta el flujo UX/UI de logistica.
+- La Fase 2 no estaba cerrada: falta resolver "registro con validacion" y
+  la edicion del perfil transportista.
+- Las semanas 13 y 14 son contingencia, no una fase nueva.
+- El hito intermedio exige demostrar tambien la geolocalizacion de fletes.
+- Suscripciones, planes, mensajeria y tierras no aparecen en el PDF; no se
+  asignan al cronograma contractual sin addendum, absorcion expresa o fase
+  posterior.
+- Railway no se trata como destino aprobado hasta confirmar la alternativa
+  de proveedor y su costo.
+
+Los limites operativos por bloque quedaron en `ALCANCE-Y-LIMITES.md`.
+
+## 2026-08-05 — Primero se desbloquea la transferencia; stock va aparte
+
+Se acepta la propuesta asimetrica de la dev:
+
+- en `AWAITING_TRANSFER_RECEIPT`, comprador y vendedor pueden cancelar;
+- en `TRANSFER_RECEIPT_SUBMITTED`, solo el vendedor puede cancelar o
+  decidir;
+- el vendedor puede aprobar o rechazar sin comprobante si verifico su
+  cuenta;
+- la referencia visible es el numero de orden;
+- cancelar una transferencia no dispara un reembolso de Mercado Pago.
+
+Vencimiento y reserva de stock se separan. Hoy el sistema verifica stock al
+crear la orden pero no lo reserva; pedir "liberacion" sin decidir primero
+la reserva seria especificar un comportamiento inexistente.
+
+---
+
 ## 2026-08-04 — Cambio de roles: Sol pasa a PM, la anterior PM pasa a dev
 
 Decisión del dueño del proyecto. **Sol define, prioriza, escribe criterios

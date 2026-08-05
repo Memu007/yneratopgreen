@@ -13,7 +13,7 @@ Marketplace del Sector Agropecuario (Fase Nacional)*, Ynera.
 >
 > Alcance agregado después de la aprobación —hoy, las suscripciones con
 > cobro recurrente— **no está cubierto por este documento**. Ver
-> `CRONOGRAMA.md` sección 5.
+> `CRONOGRAMA.md` sección 6.
 
 Transcripción de las secciones **funcionales** (1 a 5). Las secciones
 comerciales (costos, forma de pago) **no se versionan acá** — están en el

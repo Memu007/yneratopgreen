@@ -161,7 +161,7 @@ estadísticas.
 ### 6. Cierre (1 min)
 
 > "Todo esto corre sobre PostgreSQL con PostGIS, que es la base que pide
-> el documento, y hay **veinte pruebas automáticas** que verifican este
+> el documento, y hay **21 pruebas automáticas** que verifican este
 > mismo recorrido con un solo comando."
 
 ---

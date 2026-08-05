@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-08-04.
+Actualizado: 2026-08-05.
 
 ## Cambio de roles, hoy
 
@@ -42,7 +42,7 @@ el compromiso escrito con la clienta. Están ancladas a fechas reales en
 | 4 — Pagos y checkout | 9–10 | 21/09 | 04/10 |
 | 5 — QA y lanzamiento | 11–12 | 05/10 | 18/10 |
 
-**Hoy es martes 2026-08-04: semana 2, fase 1.** El plazo es de 12 a 14
+**Hoy es miercoles 2026-08-05: semana 2, fase 1.** El plazo es de 12 a 14
 semanas; las doce cierran el **2026-10-18** y el colchón llega al
 **2026-11-01**.
 
@@ -52,13 +52,21 @@ corren en bloque. Conviene resolverlo ahora y no en la semana 10.
 
 ## Objetivo activo
 
-**Cerrar lo que quedó roto de lo ya entregado** y arrancar los dos módulos
-grandes: transportistas y suscripciones.
+**Cerrar la orden de transferencia inmortal y la puerta contractual de la
+Fase 1 antes del 09/08.** Despues se cierra Desarrollo Base y recien
+entonces se abre la geolocalizacion de fletes.
+
+El cronograma y los limites del PDF quedaron operativizados en
+`CRONOGRAMA.md` y `ALCANCE-Y-LIMITES.md`. Las suscripciones no forman parte
+de las cinco fases contractuales hasta que se decida addendum, absorcion o
+fase 6.
 
 ## Dónde estamos
 
-Avance contra el contrato: **~53%**. Evidencia requisito por requisito en
-`MATRIZ.md`.
+La ultima medicion heredada fue **~53%**, pero ya no es una cifra vigente:
+no incorporaba la Pieza A de transportistas y mezclaba alcance contractual
+con alcance nuevo. Hasta reponderar `MATRIZ.md`, el control se hace por las
+puertas de `CRONOGRAMA.md`, no por un porcentaje unico.
 
 Ponderado por esfuerzo, no por cantidad de renglones. Los nueve
 requisitos de logística son un módulo entero, no nueve tareas chicas.
@@ -66,7 +74,7 @@ requisitos de logística son un módulo entero, no nueve tareas chicas.
 | Bloque | Peso | Avance |
 |---|---|---|
 | Comprador y vendedor | 30 % | 90 % |
-| **Logística y transportistas** | **25 %** | **0 %** |
+| **Logística y transportistas** | **25 %** | **Pieza A parcial; B/C en 0** |
 | Pagos | 15 % | 50 % |
 | Catálogo y categorías | 8 % | 90 % |
 | Stack y responsive | 10 % | 70 % |
@@ -98,10 +106,10 @@ evidencia de ejecución detrás.
   encadenados en la interfaz, filtrado en el servidor y estado en la URL.
   Cierra el requisito 3.1.
 - Las cinco categorías del contrato con productos y localidad.
-- **Suite automatizada de veinte smoke tests**, un solo comando contra
-  arranque limpio, con criterios relacionales contra SQL y publicación
-  desde la interfaz con navegador real. Verificado que **falla** con
-  código distinto de cero al romper un caso a propósito.
+- **Suite automatizada de 21 smoke tests**, ejecutada el 2026-08-04 desde
+  base limpia con el mismo cuerpo de pruebas pero sin el runner oficial de
+  Docker. Mantiene criterios relacionales contra SQL y navegador real.
+  Antes del lanzamiento se repite por el camino oficial.
 - **Taxonomía real de la clienta cargada**: sus 7 categorías con las 43
   subcategorías textuales, más `Bienes y Ganado` que exige el contrato,
   más 4 servicios. Verificado por SQL: 7/6/7/5/6/4/8, ninguna publicación
@@ -117,34 +125,36 @@ evidencia de ejecución detrás.
 3. La velocidad no se repite: lo que queda es construcción nueva con
    incógnitas.
 
-## Orden de trabajo, revisado el 2026-08-04
+## Orden de trabajo, revisado el 2026-08-05
 
 **Primero se cierra lo roto de lo ya entregado.** No se abren módulos
 nuevos con deuda encima.
 
-1. **Órdenes de transferencia que quedan colgadas.** Si el comprador no
-   sube el comprobante, nadie puede aprobar, rechazar ni cancelar esa
-   orden nunca más. Cuatro arreglos chicos, detallados en
-   `PAGOS-TRANSFERENCIA.md`.
-2. **El seed no carga CBU ni alias**, así que sobre una instalación limpia
+1. **Orden de transferencia inmortal.** Se corrige primero la cancelacion,
+   decision sin comprobante y referencia. El vencimiento y la reserva de
+   stock quedan separados porque hoy el sistema no reserva inventario.
+2. **Cerrar Fase 1 antes del 09/08:** dejar completo el flujo UX/UI de
+   logistica aunque su implementacion corresponda a Fase 3.
+3. **El seed no carga CBU ni alias**, así que sobre una instalación limpia
    la transferencia no se puede usar. Y la pantalla de pago muestra un
    error que no corresponde.
-3. **El camino de instalación sin Docker no funciona** siguiendo la guía:
+4. **El camino de instalación sin Docker no funciona** siguiendo la guía:
    el archivo de configuración de ejemplo tiene claves que el sistema
    rechaza, y el proxy del frontend apunta a un puerto que sólo existe con
    nginx.
-4. **Transportistas.** La Pieza A está hecha con dos objeciones abiertas
+5. **Transportistas.** La Pieza A está hecha con dos objeciones abiertas
    —el perfil no se puede editar y el campo de certificación obligatorio
    no informa nada—. Las Piezas B y C esperan a que la dev conteste las
    cuatro preguntas de diseño y haga el mapa de por dónde sale hoy el
    contacto del comprador.
-5. **Suscripciones con Mercado Pago, dos planes y mensajería premium.**
-   Alcance nuevo confirmado. **Falta escribir la tarea**; el análisis está
-   en `DECISIONS.md` y `PROJECT.md`.
-6. **Tierras y parcelas como aviso de consulta**, sin carrito. Chico:
-   la categoría ya existe y el candado de contacto ya se construye.
-7. **Mercado Pago para las compras**, reconstruido sin split.
-8. **Al final:** correcciones de la vista en celular, revisión de
+6. **Mercado Pago para las compras**, reconstruido sin split, dentro de la
+   Fase 4 contractual.
+7. **Suscripciones, planes y mensajeria premium.** Alcance de producto
+   decidido, pero fuera del PDF y sin asignacion al cronograma contractual.
+   No empieza hasta resolver addendum, absorcion o fase 6.
+8. **Tierras y parcelas como aviso de consulta**, sin carrito. Tambien es
+   alcance posterior al PDF.
+9. **Al final:** correcciones de la vista en celular, revisión de
    seguridad y despliegue en producción.
 
 **Despliegue:** la dev subió la preparación para Railway en `382bcbe`
@@ -199,7 +209,7 @@ así se detectó. Los números fijos envejecen mal.
   Y las suscripciones **no están en el PDF**: son alcance agregado después
   de la propuesta, sobre un precio cerrado. Las tres salidas posibles
   —addendum, absorberlo, o correrlo a una fase 6— están en `CRONOGRAMA.md`
-  sección 5. **No decidir es elegir absorberlo sin haberlo acordado.**
+  sección 6. **No decidir es elegir absorberlo sin haberlo acordado.**
 - ~~**Definición pendiente del cliente:** cobertura del transportista.~~
   **Resuelto el 2026-07-26 leyendo el contrato**, que dice "zona de
   cobertura (radio en km)". No era una pregunta abierta: era yo que no

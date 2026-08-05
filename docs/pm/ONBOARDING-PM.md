@@ -97,7 +97,7 @@ El resumen que necesitás tener en la cabeza:
   alcance nuevo de suscripciones **no está en el PDF**.
 
 Ese último punto es la primera decisión grande que heredás. Está
-desarrollada en la sección 5 del cronograma con las tres salidas posibles.
+desarrollada en la sección 6 del cronograma con las tres salidas posibles.
 
 ---
 
@@ -192,6 +192,7 @@ pero cambiarlas es una decisión de Emi, no tuya ni mía.
 | `PARA-DEV.md` | Lo que dejaste escrito para mí |
 | `PARA-PM.md` | Mis informes |
 | `CONTRATO.md` | El alcance. Si algo no está ahí, no es requisito |
+| `ALCANCE-Y-LIMITES.md` | Guardas operativas por bloque y fuera de alcance |
 | `MATRIZ.md` | Qué está verificado y con qué evidencia |
 | `PROJECT.md` | Qué se construye y qué queda afuera |
 | `DECISIONS.md` | Por qué se decidió cada cosa |
@@ -232,13 +233,15 @@ No están acá por confesión. Están porque cada uno dejó una regla.
 
 ## 9. El estado real, sin maquillar
 
-**Avance contra el contrato: ~53%**, ponderado por esfuerzo. El detalle
-requisito por requisito está en `MATRIZ.md`.
+La ultima medicion heredada fue **~53%**, ponderada por esfuerzo. Quedo
+desactualizada despues de la Pieza A y del alcance nuevo; el control actual
+se hace por puertas de fase en `CRONOGRAMA.md`. El detalle requisito por
+requisito esta en `MATRIZ.md`.
 
 | Bloque | Peso | Avance |
 |---|---|---|
 | Comprador y vendedor | 30 % | 90 % |
-| **Logística y transportistas** | **25 %** | **0 %** |
+| **Logística y transportistas** | **25 %** | **Pieza A parcial; B/C en 0** |
 | Pagos | 15 % | 50 % |
 | Catálogo y categorías | 8 % | 90 % |
 | Stack y responsive | 10 % | 70 % |
@@ -266,7 +269,7 @@ requisito por requisito está en `MATRIZ.md`.
 - Filtro por provincia y localidad de punta a punta, con estado en la URL.
 - Taxonomía real de la clienta: 7 categorías, 43 subcategorías, verificado
   por SQL 7/6/7/5/6/4/8.
-- **Suite de 20 casos de humo** contra arranque limpio, con criterios
+- **Suite de 21 casos de humo** contra arranque limpio, con criterios
   relacionales y navegador real. Verificada rompiendo un caso a propósito.
 - Pago por transferencia bancaria, con autorización correcta y snapshot de
   los datos bancarios en la orden.
@@ -292,17 +295,14 @@ requisito por requisito está en `MATRIZ.md`.
 
 Cuatro cosas, en orden de urgencia:
 
-1. **Escribir la tarea de suscripciones.** Es lo único que me bloquea hoy
-   del alcance nuevo. Está decidido qué se construye —Mercado Pago
-   recurrente, dos planes, mensajería sólo en el premium— y documentado en
-   `DECISIONS.md` y `PROJECT.md`. Falta el enunciado con criterios.
-2. **Resolver cómo entra ese alcance en el plazo y en el precio**:
-   addendum, absorbido, o fase 6. Ver `CRONOGRAMA.md` sección 5. Es una
+1. **Resolver cómo entra suscripciones en el plazo y en el precio**:
+   addendum, absorbido, o fase 6. Ver `CRONOGRAMA.md` sección 6. Es una
    conversación con Emi.
-3. **Las cuatro preguntas de diseño del módulo de transportistas**, que
-   definen quién ve los datos de contacto de quién. Si se define al
-   empezar, es un parámetro; si se define al auditar, es reescribir el
-   módulo.
+2. **Escribir la tarea de suscripciones solo despues de esa decision.**
+   Esta decidido el producto —Mercado Pago recurrente, dos planes y
+   mensajeria solo Premium—, pero no pertenece automaticamente al PDF.
+3. **Cerrar el flujo UX/UI de logistica antes del 09/08**, usando las
+   decisiones de `ALCANCE-Y-LIMITES.md`.
 4. **Las preguntas abiertas para la clienta**, que están en `PROJECT.md` y
    `DEMO.md` y llevan semanas sin respuesta.
 
