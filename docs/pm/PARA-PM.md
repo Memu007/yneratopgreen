@@ -2,218 +2,225 @@
 
 Sol: este archivo es mío y vos no lo tocás. Acá te informo.
 
-Fecha: 2026-08-05. Entrega de la tarea única: **prototipo navegable del flujo
-de logística**. Commit `778f6ab`, pusheado a `main`.
+Fecha: 2026-08-05. **Los cinco huecos, corregidos.** Commit `f7fd2a2`,
+pusheado a `main`. No reescribí el prototipo: sólo toqué los puntos que
+marcaste.
+
+Todo sigue dentro de `docs/ux/logistica/`. **`src/` y `backend/` no cambian**,
+así que no repetí los 25 casos de producto, como pediste.
 
 ---
 
-## 1. Qué hay y cómo se abre
+## 1. Cada pedido exige una decisión explícita
 
-```bash
-xdg-open docs/ux/logistica/index.html
-```
+Cuatro cambios, los cuatro verificados:
 
-`file://`, sin API, sin base, sin servidor y **sin una sola dependencia
-nueva**: un HTML, un CSS y un JavaScript.
-
-| Archivo | Qué |
-|---|---|
-| `docs/ux/logistica/index.html` | Las nueve pantallas y la barra del prototipo |
-| `docs/ux/logistica/prototipo.css` | Tokens copiados de `src/index.css` |
-| `docs/ux/logistica/prototipo.js` | Estado, datos ficticios y navegación |
-| `docs/ux/logistica/README.md` | Cómo recorrerlo y qué **no** es |
-| `docs/ux/logistica/capturas/` | 19 capturas, 1440×900 y 390×844 |
-
-**Sin tocar `backend/`, migraciones, modelos, endpoints ni el frontend
-productivo de `src/`.** El commit entero vive dentro de `docs/ux/`.
-
-La barra negra de arriba es del prototipo, no del producto: cambia de perfil,
-salta a cualquier paso y **fuerza los cuatro estados de búsqueda** sin
-esperar a que ocurran.
-
----
-
-## 2. Tus nueve criterios, uno por uno
-
-Verificado con navegador real en las dos medidas. Salida completa:
+- **`Continuar` bloquea el avance** si algún pedido quedó sin resolver, sea
+  porque no se eligió nada o porque se marcó "Necesito flete" y no hay
+  transportista.
+- **El aviso nombra los pedidos que faltan** —"decidí el traslado del pedido A
+  y el pedido B"— en un `role="alert"`, y desaparece en cuanto el comprador
+  hace algo.
+- **El foco va al primer pedido incompleto**, que además queda con el borde
+  ámbar.
+- **Desde vacío y error, "Coordino por mi cuenta" guarda `false`** para ese
+  pedido. Antes sólo cambiaba de pantalla y dejaba el estado nulo.
+- **"Mis compras" ya no miente.** Si el traslado nunca se decidió dice *"Este
+  pedido quedó sin resolver el traslado"*, no *"coordinás por tu cuenta"*.
 
 ```text
-=== escritorio 1440x900 ===        === movil 390x844 ===
-  ✓ el checkout muestra 2 pedidos    ✓ el checkout muestra 2 pedidos
-  ✓ sin desborde horizontal en checkout / búsqueda / resumen / mis compras /
-    perfil transportista / venta
-  ✓ el contacto NO aparece antes de seleccionar
-  ✓ se explica que el contacto aparece al seleccionar
-  ✓ la tarjeta aclara que TopGreen no verifica
-  ✓ aclara distancia en línea recta
-  ✓ estado "carga" visible
-  ✓ estado "vacio" visible
-  ✓ estado "error" visible
-  ✓ el contacto SÍ aparece después de seleccionar
-  ✓ cada pedido conserva su propio transportista
-  ✓ el resumen aclara que el flete no entra en el total
-  ✓ se puede quitar la selección
-  ✓ Mis compras muestra transportista y contacto
-  ✓ la tarjeta del viaje no trae precios de productos, comprobantes ni
-    datos bancarios
-  ✓ el prototipo deja explícito que esos datos quedan ocultos
-  ✓ no usa "certificado por TopGreen" / "tarifa calculada" / "ruta óptima" /
-    "entrega garantizada"
-  ✓ controles táctiles ≥44px (todos)
-  ✓ sin errores de consola (ninguno)
-
-=== teclado ===
-  ✓ se llega a los botones con Tab
-  ✓ se llega a los controles con Tab
-  ✓ el foco de teclado se ve (BUTTON: 3px solid)
-
-TODO OK
+✓ con todo sin decidir, NO se llega al resumen
+✓ el aviso nombra los pedidos que faltan
+✓ el foco va al primer pedido incompleto
+✓ con "necesito flete" y sin transportista, NO se llega al resumen
+✓ desde error, "coordino por mi cuenta" deja el pedido resuelto
+✓ sin decidir, Mis compras NO afirma que coordina por su cuenta
+✓ con todo resuelto, Mis compras no marca pendientes
 ```
 
-| Criterio | Estado |
-|---|---|
-| 1. Camino completo con clics, y volver a cambiar o quitar | ✅ recorrido de punta a punta en las dos medidas |
-| 2. Transportista y vendedor sin editar la URL | ✅ desde la barra, con `role="tab"` |
-| 3. Los cuatro estados visibles por control | ✅ selector "Estado de la búsqueda" |
-| 4. Contacto oculto antes, visible después | ✅ verificado buscando el teléfono en el DOM |
-| 5. Compra con dos vendedores, selección por orden | ✅ pedido A y pedido B con transportistas distintos |
-| 6. 1440×900 y 390×844, sin desborde, táctiles 44 px | ✅ medido, no estimado |
-| 7. Teclado, foco, etiquetas y contraste | ✅ ver abajo |
-| 8. `npm run build` verde y `git diff --check` limpio | ✅ build en verde; `--check` sin salida |
-| 9. Capturas de ambos tamaños e informe | ✅ 19 capturas y esto |
-
-**Sobre el criterio 7**, para que sepas qué medí y qué no: verifiqué
-navegación por `Tab`, que el foco de teclado se ve con un contorno de 3 px, y
-que todos los campos tienen `label` asociado. **El contraste no lo medí con
-herramienta**: los colores salen de `src/index.css` sin cambiarlos, así que
-el prototipo no mejora ni empeora lo que ya tiene la aplicación.
-
 ---
 
-## 3. Lo que decidí y quiero que revises
+## 2. Sin nombre comercial
 
-Cinco cosas que la especificación no fijaba y tuve que resolver para que el
-prototipo se pudiera recorrer. **Ninguna es irreversible, todas son tuyas.**
+Aceptado. Los tres transportistas pasaron a nombres que hoy puede devolver
+`full_name`: **Sebastián Duarte, Ramón Ledesma y Marcela Ibarra**. El dato se
+rotula **"Transportista"**, no "nombre comercial".
 
-**1. La elección de flete no es obligatoria para continuar.** Se puede pasar
-al resumen sin decidir, y ahí dice *«Todavía no dijiste cómo se traslada este
-pedido»* con un botón para volver. Lo hice permisivo porque bloquear el
-checkout por una decisión logística es agregar fricción a una compra que hoy
-se completa sin ella. **Si preferís que sea obligatorio, es un cambio chico.**
+No toqué el perfil productivo ni el esquema.
 
-**2. Elegir "Necesito flete" no muestra resultados solo**: hay un botón
-explícito de buscar. Evita disparar una búsqueda que quizá el comprador no
-quería, y deja el estado de carga como algo que él provocó.
-
-**3. Cambiar de destino es una lista cerrada de localidades**, no texto libre.
-Es coherente con el padrón: hoy `products.locality_id` es obligatorio contra
-las 4.028 localidades. Texto libre nos dejaría destinos que después no se
-pueden geolocalizar.
-
-**4. La distancia se muestra por transportista** —"aprox. 180 km en línea
-recta"— y no como un orden ni un ranking. No dice "el más cercano" ni ordena
-por conveniencia, porque eso ya sería una recomendación de la plataforma.
-
-**5. El bloque del vendedor cuando el comprador coordina solo** dice
-exactamente eso y nada más. Sin acciones, sin estado, sin cotización.
-
----
-
-## 4. Dos cosas que la especificación pide y el sistema hoy no tiene
-
-Estas son las que de verdad quiero que mires.
-
-### 4.1 No existe el "nombre comercial"
-
-Tu punto 5 pide que la tarjeta muestre **nombre comercial**. En el modelo hay
-un solo campo de nombre:
-
-```python
-full_name = Column(String(255), nullable=False)   # models/user.py:25
+```text
+✓ el nombre no promete un campo comercial
 ```
 
-No hay razón social, ni nombre de fantasía, ni nada parecido. Hoy un
-transportista se registra como *"Juan Pérez"*, y así aparecería en la tarjeta.
-
-En el prototipo usé nombres de empresa —"Transportes La Carreta"— porque es lo
-que pediste y es lo que un comprador espera ver. **Pero eso es una promesa que
-el sistema todavía no puede cumplir.**
-
-Las salidas, y es decisión tuya:
-
-- **Aceptar el nombre personal** y que la tarjeta diga "Juan Pérez". Cero
-  trabajo, peor presentación.
-- **Agregar un campo de nombre comercial** en el perfil de transportista.
-  Entra natural en la Fase 2, que ya tiene que hacer editable ese perfil.
-
-**No lo di por resuelto ni cambié el esquema.** Lo dejo acá porque, si se
-decide en Fase 2, sale gratis; si se decide en Fase 3, hay que rehacer la
-tarjeta.
-
-### 4.2 El contacto queda visible para cualquiera
-
-El prototipo muestra el contacto al seleccionar, tal como pediste. Y está
-bien para el alcance contractual.
-
-**Anoto dónde va a chocar:** las suscripciones se movieron a Fase 6, y el
-candado de contacto es justamente lo que ellas venden. **Esta pantalla —la
-tarjeta después de seleccionar— es el único lugar donde ese candado va a
-entrar.** Si en Fase 6 aparece, esta pantalla cambia; si no aparece, no cambia
-nada.
-
-No es un problema hoy. Es para que cuando llegue Fase 6 nadie se sorprenda de
-que hay que volver acá.
+**Una salvedad honesta:** `full_name` es texto libre, así que un transportista
+real puede escribir igual "Transportes La Carreta" ahí. El prototipo ya no
+*promete* razón social, pero tampoco puede impedir que alguien la escriba. No
+hay nada que hacer al respecto sin agregar validación, y no la propongo.
 
 ---
 
-## 5. Decisiones que no tomé
+## 3. Las distancias dicen qué miden
 
-1. **No implementé búsqueda real.** Los resultados están escritos a mano en
-   `prototipo.js`, a la vista. La cercanía con PostGIS es Fase 3.
-2. **No toqué el frontend productivo.** El prototipo es una copia visual, no
-   un componente reutilizable. Cuando se implemente de verdad, se escribe en
-   React; esto queda como referencia y se puede borrar.
-3. **No inventé una regla comercial nueva.** Un transportista por pedido, sin
-   cotización, sin tarifa y sin estados de negociación, que es lo que dice el
-   contrato: directorio, no motor.
-4. **No agregué peso ni volumen a las publicaciones.** La vista del
-   transportista dice "aproximadamente 2.000 kg" como dato declarado por el
-   vendedor, y aclara que el sistema no lo calcula ni lo verifica. **Ese campo
-   hoy no existe**; si la Pieza B lo necesita, es una decisión de Fase 3.
-5. **Nada de lo que pusiste fuera de alcance**: sin PostGIS, sin endpoints,
-   sin mapas, sin tarifas, sin Carta de Porte, sin mensajería, sin
-   suscripciones, sin Mercado Pago, sin Railway, y sin cambios visuales al
-   resto del marketplace.
+Cada tarjeta muestra ahora **dos**, con su punta nombrada:
 
----
+```text
+DE SU BASE AL ORIGEN            DE SU BASE AL DESTINO
+228 km  en línea recta,         196 km  en línea recta,
+        hasta Reconquista               hasta Venado Tuerto
 
-## 6. Riesgos
+Las dos puntas del viaje caen dentro de su radio de 240 km.
+```
 
-**El prototipo se va a desactualizar.** Es un archivo suelto que nadie compila
-ni prueba en la suite. En cuanto la implementación real arranque, esto y el
-producto empiezan a divergir en silencio. Mi recomendación: **borrarlo cuando
-la Pieza B esté hecha**, y que las capturas queden como registro.
+Cuando la base coincide con una punta dice **"misma localidad"** en vez de
+"0 km", que se lee mejor.
 
-**Copié los tokens de `src/index.css` a mano.** Si mañana cambia la paleta de
-la aplicación, el prototipo queda con la vieja. Es aceptable para algo que
-dura semanas, y es la única forma de abrirlo sin compilar nada.
+**Rehice los números ficticios, porque los anteriores eran incoherentes.**
+Tenía a "Don Ramón" con base en Venado Tuerto y radio de 150 km apareciendo
+como candidato para un tramo que arranca en Reconquista, a unos 390 km. Con
+la regla de las dos puntas visible, esa inconsistencia quedaba a la vista.
+Ahora los tres cierran contra su propio radio.
 
-**Lo verifiqué con Chromium únicamente.** No probé Firefox ni Safari.
+```text
+✓ la tarjeta rotula las dos distancias
+✓ cada distancia dice hasta qué punta se mide
+✓ la tarjeta afirma que las dos puntas están cubiertas
+✓ no hay ranking ni recomendación
+```
 
 ---
 
-## 7. Lo que necesito de vos
+## 4. Ni peso inventado ni contacto del comprador
 
-1. **Las dos definiciones del punto 4**: nombre comercial sí o no, y si el
-   candado de contacto de Fase 6 va a caer sobre esta pantalla.
-2. **Las cinco decisiones del punto 3**, aunque sea con un "así está bien".
-3. **El enunciado de la próxima pieza.** Según el cronograma, la Fase 1
-   cierra el 20/08 y esto era lo que faltaba.
+La vista del transportista muestra **los artículos y cantidades que ya
+existen en la orden**:
 
-Y siguen abiertas de antes, sin apuro: la pieza chica del reembolso heredado
-—que vos misma dejaste para Fase 4—, y `carrier_transport_certified`, que
-ahora tiene una forma concreta en el prototipo: **declaración con detalle y
-fecha**, con el texto de atribución al lado. Si te gusta como quedó, eso baja
-la decisión de esquema a algo ya dibujado.
+```text
+Qué hay que mover
+  · Semilla de soja RR — 40 bolsas de 50 kg
+  · Inoculante — 4 unidades
+  El sistema no calcula peso ni volumen.
 
-El entorno local sigue levantado por si querés que verifique algo más.
+Coordinación
+  El comprador recibió tus datos y te contactará para coordinar.
+```
+
+El teléfono y el correo del comprador desaparecieron. Y los sumé a la lista
+de "lo que no ves, y es a propósito", junto al precio, el comprobante y lo
+bancario.
+
+```text
+✓ no hay peso inventado en la vista del transportista
+✓ muestra los artículos y cantidades de la orden
+✓ no expone teléfono ni correo del comprador
+✓ explica que el comprador lo contacta
+✓ no trae comprobantes ni datos bancarios
+```
+
+---
+
+## 5. Contraste: tenías razón, y había una segunda
+
+**Tu medición era correcta.** Blanco sobre `#059669`:
+
+```text
+blanco sobre #059669 (primary-600): 3.77   ← no llega a 4,5
+blanco sobre #047857 (primary-700): 5.48
+blanco sobre #065f46 (primary-800): 7.68
+```
+
+El gradiente ahora arranca en **primary-700** y termina en **primary-800**, así
+que el punto más claro del botón da **5,48:1**. Son los dos tonos que ya
+existían; no toqué la paleta.
+
+**Y encontré una segunda que no estaba en tu lista.** `--text-tertiary` sobre
+`--bg-tertiary` da **4,34:1**, y esa pareja se usaba en dos lugares: el aviso
+"Los datos de contacto aparecen cuando lo seleccionás" y **los pasos inactivos
+del checkout** —"Carrito", "Pago"—. Los dos pasaron a `--text-secondary`, que
+sobre el mismo fondo da **6,92:1**.
+
+Esta vez **no heredé nada**: escribí un medidor que recorre el DOM de las ocho
+vistas, resuelve el fondo efectivo subiendo por los ancestros y calcula el
+ratio WCAG de cada texto, con el umbral 3:1 para texto grande y 4,5:1 para el
+resto.
+
+```text
+✓ contraste: 146 textos medidos, peor 4.52:1 en c-busqueda (P.ayuda)
+```
+
+**146 textos, ninguno por debajo del mínimo.** El peor es un texto de ayuda a
+4,52:1 — pasa raspando, y lo dejo señalado: si algún día se aclara
+`--text-tertiary`, ese es el primero que cae.
+
+Los elementos con gradiente los mide el navegador como "sin color de fondo
+sólido", así que ésos los calculé aparte, sobre los dos extremos del
+gradiente. Son los tres números de arriba.
+
+---
+
+## Las ocho puertas de aceptación
+
+| # | Criterio | Estado |
+|---|---|---|
+| 1 | No se llega al resumen/pago con un pedido sin resolver | ✅ |
+| 2 | Vacío y error permiten marcar "coordino por mi cuenta" | ✅ |
+| 3 | Sin peso inventado ni contacto del comprador | ✅ |
+| 4 | Cada tarjeta muestra las dos distancias con sus extremos | ✅ |
+| 5 | Los nombres no prometen un campo comercial | ✅ |
+| 6 | Todo texto normal en 4,5:1 o más; controles y foco visibles | ✅ 146 medidos, peor 4,52:1 |
+| 7 | Capturas afectadas actualizadas | ✅ ver abajo |
+| 8 | `node --check`, `npm run build`, `git diff --check` | ✅ los tres |
+
+```text
+$ node --check docs/ux/logistica/prototipo.js     → OK
+$ npm run build                                   → ✓ built in 1.85s
+$ git diff --cached --check                       → (sin salida)
+```
+
+**Sobre el criterio 7, para ser precisa:** pediste actualizar *solamente* las
+capturas afectadas, y **actualicé las diecinueve**. El cambio de contraste toca
+los botones primarios y los pasos del checkout, que aparecen en casi todas las
+pantallas; y el de nombres y distancias toca el resto. Preferí regenerarlas
+todas antes que dejar dos afirmando cosas viejas.
+
+---
+
+## Decisiones que no tomé
+
+1. **No implementé el `locality_id` de destino** que marcaste como cimiento de
+   Fase 2. Lo dejé como está.
+2. **No agregué validación al nombre** para impedir que alguien escriba una
+   razón social en `full_name`. Sería inventar una regla de negocio.
+3. **No cambié el flujo aprobado.** El flete sigue siendo opcional; lo que
+   ahora es obligatorio es *elegir una de las dos salidas*, que es exactamente
+   lo que pediste.
+4. **No toqué código productivo.** Ninguno de los cinco arreglos lo necesitó,
+   así que no aplicó tu condición de freno.
+
+---
+
+## Riesgos que quedan
+
+**El prototipo y la aplicación tienen contrastes distintos ahora.** El
+gradiente que corregí acá sigue igual en `src/index.css`: la aplicación real
+usa `#059669 → #047857` y por lo tanto **tiene el mismo 3,77:1 en todos sus
+botones primarios**.
+
+No lo toqué porque es código productivo y esta pieza no lo incluye. Pero es
+una falla de accesibilidad **que existe hoy en producción**, no sólo en el
+prototipo. Cambiar un token de color es media hora. **Decime si querés que
+entre como pieza chica** o si va a la revisión final de la Fase 5.
+
+Lo demás sigue como te lo dije: el prototipo se va a desactualizar contra el
+producto, y conviene borrarlo cuando la Pieza B esté hecha.
+
+---
+
+## Lo que necesito de vos
+
+1. **Que aceptes o rechaces esta corrección.**
+2. **La decisión sobre el gradiente de `src/index.css`**, que es el mismo
+   problema de contraste pero en la aplicación de verdad.
+3. **El enunciado de la próxima pieza**, si con esto cierra la puerta de
+   Fase 1.
+
+El entorno local sigue levantado.
