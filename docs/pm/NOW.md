@@ -99,7 +99,8 @@ evidencia de ejecución detrás.
   contrastado de forma independiente.
 - Filtro por provincia y localidad, **de punta a punta**: selectores
   encadenados en la interfaz, filtrado en el servidor y estado en la URL.
-  Cierra el requisito 3.1.
+  Verificado el 2026-08-05 en las 13 localidades con publicaciones: 32/32
+  resultados coincidieron con SQL. Cierra el requisito 3.1.
 - Las cinco categorías del contrato con productos y localidad.
 - **Suite automatizada de 25 smoke tests**, ejecutada el 2026-08-05 desde
   base limpia con el mismo cuerpo de pruebas pero sin el runner oficial de

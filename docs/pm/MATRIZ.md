@@ -16,7 +16,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | …con validación | ❌ | Validación por correo definida el 2026-08-05; campo `is_verified` existe, flujo todavía sin implementar |
 | Perfil | ✅ | `GET /auth/me` y `PATCH /auth/me` responden `200` |
 | Buscador con filtro por **categoría** | ✅ | Smoke test `200`, filtros de categoría, precio y stock aplicados |
-| Buscador con filtro por **ubicación** | ✅ | Selectores encadenados de provincia y localidad, filtrado en el servidor, estado en la URL. Verificado en navegador y contrastado contra SQL |
+| Buscador con filtro por **ubicación** | ✅ | Verificacion completa del 2026-08-05: 13/13 localidades y 32/32 publicaciones coincidieron entre interfaz y SQL; selectores encadenados y `locality_id` en URL. Ver `EVIDENCIA-FILTROS-UBICACION.md` |
 | Carrito de compras | ✅ | Smoke test: agregar y ver, `200` + `200`, total $45.000 |
 | Historial de pedidos | ✅ | Smoke test "mis compras": `200`, 3 compras |
 
