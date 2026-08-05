@@ -48,9 +48,9 @@ cierran el **2026-10-29** y el colchon llega al **2026-11-12**.
 
 ## Objetivo activo
 
-**Cerrar la orden de transferencia inmortal antes del inicio contractual y
-la puerta de la Fase 1 antes del 20/08.** Despues se cierra Desarrollo Base
-y recien entonces se abre la geolocalizacion de fletes.
+**Cerrar el flujo UX/UI de logistica y la puerta de la Fase 1 antes del
+20/08.** La orden de transferencia inmortal se cerro antes del inicio
+contractual en `0039e00` y fue aceptada por la PM el 2026-08-05.
 
 El cronograma y los limites del PDF quedaron operativizados en
 `CRONOGRAMA.md` y `ALCANCE-Y-LIMITES.md`. Suscripciones, planes, mensajeria
@@ -101,10 +101,14 @@ evidencia de ejecución detrás.
   encadenados en la interfaz, filtrado en el servidor y estado en la URL.
   Cierra el requisito 3.1.
 - Las cinco categorías del contrato con productos y localidad.
-- **Suite automatizada de 21 smoke tests**, ejecutada el 2026-08-04 desde
+- **Suite automatizada de 25 smoke tests**, ejecutada el 2026-08-05 desde
   base limpia con el mismo cuerpo de pruebas pero sin el runner oficial de
-  Docker. Mantiene criterios relacionales contra SQL y navegador real.
-  Antes del lanzamiento se repite por el camino oficial.
+  Docker. Los cuatro casos nuevos fallaron antes del arreglo y quedaron
+  verdes despues. Antes del lanzamiento se repite por el camino oficial.
+- **Transferencia sin ordenes inmortales:** comprador y vendedor cancelan
+  antes del comprobante; despues decide el vendedor; se puede decidir sin
+  archivo, la referencia es visible y dos aprobaciones simultaneas descuentan
+  stock una sola vez.
 - **Taxonomía real de la clienta cargada**: sus 7 categorías con las 43
   subcategorías textuales, más `Bienes y Ganado` que exige el contrato,
   más 4 servicios. Verificado por SQL: 7/6/7/5/6/4/8, ninguna publicación
@@ -125,11 +129,11 @@ evidencia de ejecución detrás.
 **Primero se cierra lo roto de lo ya entregado.** No se abren módulos
 nuevos con deuda encima.
 
-1. **Orden de transferencia inmortal.** Se corrige primero la cancelacion,
-   decision sin comprobante y referencia. El vencimiento y la reserva de
-   stock quedan separados porque hoy el sistema no reserva inventario.
+1. ~~**Orden de transferencia inmortal.**~~ **Cerrada y aceptada el
+   2026-08-05** en `0039e00`; 25/25 en la misma suite y compilacion
+   independiente en verde.
 2. **Cerrar Fase 1 antes del 20/08:** dejar completo el flujo UX/UI de
-   logistica aunque su implementacion corresponda a Fase 3.
+   logistica aunque su implementacion corresponda a Fase 3. Tarea activa.
 3. **El seed no carga CBU ni alias**, así que sobre una instalación limpia
    la transferencia no se puede usar. Y la pantalla de pago muestra un
    error que no corresponde.

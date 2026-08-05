@@ -5,6 +5,18 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-05 — Transferencia aceptada; sigue UX/UI de logistica
+
+La PM acepta `0039e00`: cierra las salidas de los dos estados de
+transferencia, permite decidir sin comprobante, evita el doble descuento de
+stock, muestra la referencia y no intenta reembolsar transferencias mediante
+Mercado Pago. La misma suite quedo 25/25; el runner oficial de Docker se
+repite en Fase 5.
+
+La dependencia residual con el modulo heredado de reembolsos no se abre ahora:
+queda para la reconstruccion de pagos en Fase 4. La siguiente pieza es el
+prototipo navegable del flujo logistico que cierra la puerta de Fase 1.
+
 ## 2026-08-05 — Inicio, correo, Railway y Fase 6 quedan cerrados
 
 Decisiones de Emi:

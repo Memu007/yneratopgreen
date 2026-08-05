@@ -56,8 +56,9 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Transferencia: los datos bancarios no cambian bajo el comprador | ✅ | Smoke 14: se crea la orden, se cambian CBU y alias en el perfil del vendedor, y el comprador sigue viendo los originales. API contrastada contra SQL |
 | Transferencia: mostrar CBU/Alias del vendedor | ✅ | Smoke 13 y 14: sin datos bancarios la API rechaza con `400`; con datos, el CBU devuelto coincide con la consulta SQL |
 | Transferencia: adjuntar comprobante | ✅ | Smoke 15: archivo inválido `400` sin cambiar estado; válido `200` con la URL contrastada contra SQL. Sólo el comprador, `403` para el resto |
-| Transferencia: validación manual del vendedor | ✅ | Smoke 16 y 17: **vendedor ajeno `403`**; el correcto deja API=`paid` y SQL=`PAID`; el rechazo exige motivo y lo persiste |
-| Transferencia, recorrido completo en navegador | ✅ | Smoke 18: Chromium real, catálogo → carrito → checkout → transferencia → comprobante, verificado en base |
+| Transferencia: validación manual del vendedor | ✅ | Smoke 16, 17, 23 y 25: **vendedor ajeno `403`**; puede decidir con o sin comprobante; el rechazo exige motivo; dos aprobaciones simultaneas descuentan una sola vez |
+| Transferencia: cancelacion y salida de estados | ✅ | Smoke 22 y 24: comprador y vendedor cancelan antes del comprobante; despues de enviarlo solo el vendedor cancela; usuario ajeno `403`; stock intacto |
+| Transferencia, recorrido completo en navegador | ✅ | Smoke 18: Chromium real, catálogo → carrito → checkout → transferencia → comprobante; muestra el numero de orden y explica usarlo como concepto |
 
 ## 2. Categorías del catálogo
 
@@ -83,7 +84,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 
 | Requisito | Estado |
 |-----------|--------|
-| Pruebas integrales | ✅ Suite de 21 casos ejecutada desde base limpia el 2026-08-04; misma suite, runner nativo por falta de Docker. Pendiente repetir por el camino oficial antes del lanzamiento |
+| Pruebas integrales | ✅ Suite de 25 casos ejecutada desde base limpia el 2026-08-05; misma suite, runner nativo por falta de Docker. Los casos 22–25 tienen rojo previo. Pendiente repetir por el camino oficial antes del lanzamiento |
 | Carga inicial de datos | ✅ Seed idempotente con 30 publicaciones en 12 categorías y 9 provincias, más 4.028 localidades. Verificado corriéndolo dos veces sin duplicar |
 | Despliegue en producción | ❌ |
 | Capacitación del panel de administración | ❌ |

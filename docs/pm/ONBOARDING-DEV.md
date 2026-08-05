@@ -241,15 +241,13 @@ por requisito en `MATRIZ.md`.
 - Taxonomía de la clienta cargada: 7 categorías con 43 subcategorías, más
   Bienes y Ganado, más 4 servicios. 30 publicaciones en 12 categorías y
   9 provincias.
-- **Pago por transferencia bancaria**: CBU y alias del vendedor con
-  snapshot en la orden, comprobante adjunto, validación manual del
-  vendedor. Autorización verificada con `403` cruzado.
-- **Suite de 21 casos de humo**, con navegador real.
+- **Pago por transferencia bancaria**: CBU y alias con snapshot, comprobante
+  opcional, referencia, cancelacion/decision completa y atomicidad.
+- **Suite de 25 casos de humo**, con navegador real y rojo previo para los
+  cuatro casos que cerraron la orden inmortal.
 
-**Roto de lo ya entregado, y va primero:**
+**Pendientes operativos de lo ya entregado:**
 
-- **Órdenes que quedan colgadas**: si el comprador no sube el comprobante,
-  nadie puede aprobar, rechazar ni cancelar esa orden nunca más.
 - **El seed no carga CBU ni alias de nadie**, así que sobre instalación
   limpia la transferencia no se puede usar. La suite no lo detecta porque
   el caso 13 configura los datos bancarios él mismo.
@@ -261,7 +259,7 @@ por requisito en `MATRIZ.md`.
   —registro y campos— está hecha con dos objeciones abiertas; las Piezas B
   y C, en cero.
 - **Suscripciones con Mercado Pago**, dos planes y mensajería premium.
-  Alcance nuevo. La tarea todavía no está escrita.
+  Alcance nuevo de Fase 6; no compite con el MVP contractual.
 - **Mercado Pago para compras**: el código heredado está desmontado
   —tenía split con comisión de marketplace, que el contrato no pide— y se
   reconstruye sin split cuando haya credenciales.

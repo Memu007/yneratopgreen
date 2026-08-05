@@ -12,115 +12,138 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
-## Devolucion del informe `64aa62b`
+## Entrega `d105849`: aceptada
 
-Informe aceptado. Quedan registradas estas correcciones de la dev:
+Queda aceptado el commit de producto `0039e00`, que cierra la orden de
+transferencia inmortal.
 
-- la maquina de estados tiene cuatro puertas cerradas, no tres;
-- la suite vigente tiene 21 casos y paso desde base limpia, aunque sin el
-  runner oficial de Docker;
-- el contacto sensible sale por `/orders/my`, no por el detalle;
-- Railway es configuracion, no despliegue;
-- el perfil de transportista necesita una puerta de alta/edicion propia;
-- `Payment` no sirve para suscripciones porque exige `order_id`.
+La PM verifico directamente:
 
-No empieces suscripciones, Transportistas B/C ni cambios de certificacion
-en esta pieza.
+- las reglas asimetricas de cancelacion y decision aprobadas;
+- el bloqueo de fila que evita descontar stock dos veces;
+- que las transferencias no llamen al reembolso de Mercado Pago;
+- la referencia de pago y las acciones nuevas en la interfaz;
+- `npm run build` en verde y el backend compilando.
+
+La dev aporto rojo previo y **25/25** en verde desde base limpia con la misma
+suite, ejecutada sin el runner oficial. Docker tampoco esta disponible en el
+entorno de la PM. Repetir el runner oficial queda como puerta de Fase 5, no
+bloquea esta aceptacion.
+
+La dependencia residual de `orders.py` con el modulo heredado de reembolsos se
+registra para la reconstruccion de pagos en Fase 4. **No se abre ahora.**
 
 ---
 
-## Tarea activa unica: cerrar la orden de transferencia inmortal
+## Tarea activa unica: cerrar el flujo UX/UI de logistica
 
-### Problema
+### Objetivo
 
-Una orden en `AWAITING_TRANSFER_RECEIPT` no puede cancelarse, decidirse ni
-moverse por ninguna de las cuatro puertas actuales. Es un defecto de algo
-ya entregado y va antes que los modulos nuevos.
+Cerrar la puerta de **Diseño y UX/UI de la Fase 1 antes del 20/08** con un
+prototipo web navegable del recorrido logistico. Esta pieza define pantallas,
+estados, informacion y navegacion. La busqueda real con PostGIS y la inclusion
+del transportista en la orden pertenecen a la Fase 3.
 
-### Alcance aprobado
+### Forma de entrega
 
-1. Agrega primero un caso permanente que falle contra el codigo actual.
-   El informe debe incluir la corrida roja previa y la verde posterior.
-2. En `AWAITING_TRANSFER_RECEIPT`, comprador y vendedor pueden cancelar.
-3. En `TRANSFER_RECEIPT_SUBMITTED`, el comprador no cancela de forma
-   unilateral; el vendedor puede cancelar/rechazar o aprobar.
-4. El vendedor puede aprobar o rechazar una transferencia observada en su
-   cuenta aunque el comprador no haya adjuntado comprobante. El motivo de
-   rechazo sigue siendo obligatorio.
-5. La pantalla de transferencia muestra el numero de orden como referencia
-   e instruye al comprador a usarlo como concepto del pago.
-6. Las transiciones de decision/cancelacion son atomicas: dos solicitudes
-   concurrentes no pueden dejar un estado final incompatible ni descontar
-   stock dos veces.
-7. Cancelar una transferencia no invoca un reembolso de Mercado Pago.
-   TopGreen no administra esos fondos; cualquier devolucion se coordina
-   entre comprador y vendedor.
+Construir un prototipo web aislado de la aplicacion productiva, versionado en
+`docs/ux/logistica/`. Debe abrirse localmente sin API ni base de datos y usar
+datos ficticios claramente identificados.
 
-### Reglas de estado aprobadas
+- Reusar la identidad visual, componentes y lenguaje de TopGreen.
+- No redisenar la marca ni el resto del marketplace.
+- No agregar dependencias si HTML, CSS y JavaScript alcanzan.
+- No tocar `backend/`, migraciones, modelos, endpoints ni el flujo productivo
+  de `src/` en esta pieza.
 
-| Estado | Comprador | Vendedor |
-|---|---|---|
-| `AWAITING_TRANSFER_RECEIPT` | Cancela | Cancela, aprueba o rechaza |
-| `TRANSFER_RECEIPT_SUBMITTED` | No cancela | Cancela, aprueba o rechaza |
+### Recorrido que debe quedar navegable
 
-La asimetria evita que el comprador cancele mientras el vendedor esta
-validando dinero ya acreditado.
+#### Comprador
+
+1. En el checkout elige entre **“Necesito flete”** y **“Coordino el traslado
+   por mi cuenta”**.
+2. La seleccion de flete es **por vendedor/orden**, no por carrito completo.
+   El prototipo debe dejar claro que un carrito con dos vendedores puede
+   requerir dos elecciones distintas.
+3. El origen viene de la localidad de la publicacion/vendedor. El destino se
+   precarga con la localidad del comprador y puede cambiarse desde una lista
+   estructurada.
+4. La busqueda muestra estados de carga, resultados, vacio y error.
+5. Antes de seleccionar, cada tarjeta muestra nombre comercial, localidad
+   base, cobertura, transporte declarado, capacidad y declaracion de
+   habilitacion. **No muestra telefono, correo ni direccion exacta.**
+6. La tarjeta explica que cubre origen y destino y que la distancia es en
+   linea recta. No muestra rutas, mapas, tarifa ni tiempo estimado.
+7. Al seleccionar un transportista aparece el contacto declarado y se lo
+   incorpora al resumen de esa orden. El comprador puede cambiarlo o quitarlo.
+8. El flujo vuelve al checkout y continua al pago sin convertir el flete en
+   un producto ni agregar un precio automatico.
+9. En “Mis compras” se ve el transportista elegido y su contacto.
+
+#### Transportista
+
+10. Perfil de alta/edicion con localidad base, transporte, capacidad, radio y
+    declaracion de habilitacion con detalle y fecha.
+11. Vista de una operacion en la que fue seleccionado: origen, destino y
+    necesidad logistica. No expone precios de productos, comprobantes, CBU,
+    alias ni datos financieros.
+
+#### Vendedor
+
+12. Resumen de venta con el transportista seleccionado y el tramo a coordinar,
+    sin nuevas acciones logisticas ni estados de cotizacion.
+
+### Textos que no pueden inducir a error
+
+- “Declarado por el transportista el [fecha]. TopGreen no verifica esta
+  habilitacion.”
+- “Distancias estimadas en linea recta.”
+- “La coordinacion y el precio del flete se acuerdan directamente.”
+
+No usar “certificado por TopGreen”, “tarifa calculada”, “ruta optima” ni
+“entrega garantizada”.
 
 ### Criterios de aceptacion
 
-1. El nuevo caso reproduce al menos el `400` del comprador y del vendedor
-   contra `AWAITING_TRANSFER_RECEIPT` antes del arreglo.
-2. Despues del arreglo, API y base coinciden para cada transicion de la
-   tabla anterior.
-3. Un usuario ajeno recibe `403` y no cambia la orden.
-4. Aprobar desde cualquiera de los dos estados descuenta stock exactamente
-   una vez; rechazar o cancelar antes de aprobar no lo modifica.
-5. La respuesta y la interfaz muestran la misma referencia de orden.
-6. Las rutas heredadas de pagos y OAuth siguen en `404`.
-7. Los 21 casos existentes y los nuevos quedan verdes. Si no hay Docker,
-   declara con precision que se corrio la misma suite y no el runner
-   oficial; no uses ambos resultados como equivalentes sin la aclaracion.
+1. Se puede recorrer con clics todo el camino comprador → seleccion → resumen
+   → pago, y volver para cambiar o quitar la seleccion.
+2. Se pueden abrir tambien las vistas de transportista y vendedor sin editar
+   la URL manualmente.
+3. Los cuatro estados de busqueda —carga, resultados, vacio y error— son
+   visibles mediante controles del prototipo.
+4. Los datos de contacto permanecen ocultos antes de seleccionar y aparecen
+   despues.
+5. El prototipo representa una compra con dos vendedores y deja la seleccion
+   asociada a cada orden.
+6. Escritorio 1440×900 y movil 390×844 sin desborde horizontal, con controles
+   tactiles de al menos 44 px.
+7. Navegacion por teclado, foco visible, etiquetas y contraste legible.
+8. `npm run build` sigue verde y `git diff --check` no agrega ruido de formato.
+9. La entrega incluye capturas de ambos tamanos y un informe en
+   `PARA-PM.md` con decisiones no tomadas y puntos que la PM deba revisar.
 
-### Fuera de alcance de esta pieza
+### Fuera de alcance
 
-- vencimiento automatico;
-- reserva de stock;
-- cambios de esquema;
-- seed bancario y arreglo de instalacion sin Docker;
-- transportistas, contacto y suscripciones;
-- Mercado Pago para compras;
-- Railway o despliegue.
-
-Vencimiento y reserva se diseñan juntos despues: hoy el checkout verifica
-stock pero no lo reserva, por lo que hablar de "liberarlo" seria falso.
+- consultas PostGIS, endpoints, persistencia o migraciones;
+- mapas, ruteo, GPS, distancia por caminos o seguimiento;
+- cotizacion, tarifa, peso/volumen automatico o pago del flete;
+- Carta de Porte, ARCA o verificacion contra organismos;
+- mensajeria, suscripciones, planes o candados premium;
+- Mercado Pago, transferencia bancaria y Railway;
+- cambios visuales generales del marketplace.
 
 ### Frena y responde si
 
-- la atomicidad exige una migracion o una reescritura amplia;
-- el flujo obliga a reactivar `payments` o `mp_oauth`;
-- una cancelacion intenta procesar fondos de terceros;
-- un caso anterior deja de pasar.
-
-### Entrega
-
-Una sola pieza, un commit de producto y un informe en `PARA-PM.md` con:
-
-- archivos cambiados;
-- corrida roja anterior;
-- corrida verde posterior;
-- salida completa de la suite;
-- verificacion SQL de estado y stock;
-- decisiones no tomadas;
-- riesgos restantes.
+- el prototipo exige cambiar el esquema o la API actual;
+- no se puede representar un transportista por orden sin inventar una regla
+  comercial nueva;
+- una pantalla necesita revelar contacto antes de la seleccion;
+- aparece una dependencia nueva o una reescritura del frontend productivo.
 
 ---
 
 ## Guardia de cronograma
 
-Estamos dos dias antes del inicio contractual. Esta tarea debe cerrarse sin
-mover la semana 1, que comienza el 07/08. La Fase 1 termina el 20/08 y la
-siguiente pieza sera cerrar el flujo UX/UI de logistica.
-
-Las puertas por fase estan en `CRONOGRAMA.md` y los limites funcionales en
-`ALCANCE-Y-LIMITES.md`. Si una solucion excede esos limites, frena antes de
-construirla.
+La semana 1 comienza el **viernes 07/08** y la Fase 1 termina el **jueves
+20/08**. Esta es la unica pieza activa. No abras la implementacion real de
+Piezas B/C, validacion por correo, pagos, suscripciones ni despliegue.

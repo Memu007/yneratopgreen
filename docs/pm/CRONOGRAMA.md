@@ -83,8 +83,8 @@ Contraste fase por fase, contra lo verificado en `MATRIZ.md`:
 | 1 — Diseño y UX/UI | 1–2 | **Trabajo previo parcial.** Comprador y vendedor se recorren. Falta cerrar el flujo de logistica antes del 20/08. |
 | 2 — Desarrollo base | 3–5 | **Trabajo previo avanzado, no cerrado.** Arquitectura, PostgreSQL + PostGIS y perfiles base existen. La validacion sera por correo; falta implementarla y hacer editable el perfil transportista. |
 | 3 — Buscador y catálogo | 6–8 | **A medias.** Buscador, catálogo y geolocalización de **productos**: hechos. Geolocalización de **fletes**: en cero. |
-| 4 — Pagos y checkout | 9–10 | **A medias.** Transferencia bancaria: hecha, con cuatro arreglos pendientes. Mercado Pago: desmontado, se rehace. |
-| 5 — QA y lanzamiento | 11–12 | **Empezada fuera de orden.** Hay 21 casos de humo ejecutados desde base limpia y preparacion de Railway, sin despliegue ni revision de seguridad. |
+| 4 — Pagos y checkout | 9–10 | **A medias.** Transferencia bancaria cerrada con 25 casos; Mercado Pago esta desmontado y se rehace. |
+| 5 — QA y lanzamiento | 11–12 | **Empezada fuera de orden.** Hay 25 casos de humo ejecutados desde base limpia y preparacion de Railway, sin despliegue ni revision de seguridad. |
 
 **Tres consecuencias, y son de la PM:**
 
@@ -168,8 +168,8 @@ usen Mercado Pago.
 
 ### Control inmediato
 
-- 05-06/08, antes del reloj: cerrar la orden de transferencia inmortal sin
-  mezclar vencimiento ni reserva de stock.
+- 05/08, antes del reloj: orden de transferencia inmortal cerrada en
+  `0039e00`, sin mezclar vencimiento ni reserva de stock.
 - 07-20/08, Fase 1: cerrar el flujo UX/UI de logistica y registrar su
   evidencia.
 - 21/08: entrar a Fase 2 con la puerta de Fase 1 cerrada o con desvio

@@ -269,14 +269,13 @@ requisito esta en `MATRIZ.md`.
 - Filtro por provincia y localidad de punta a punta, con estado en la URL.
 - Taxonomía real de la clienta: 7 categorías, 43 subcategorías, verificado
   por SQL 7/6/7/5/6/4/8.
-- **Suite de 21 casos de humo** contra arranque limpio, con criterios
-  relacionales y navegador real. Verificada rompiendo un caso a propósito.
-- Pago por transferencia bancaria, con autorización correcta y snapshot de
-  los datos bancarios en la orden.
+- **Suite de 25 casos de humo** contra arranque limpio, con criterios
+  relacionales y navegador real. Los cuatro casos nuevos tienen rojo previo.
+- Pago por transferencia bancaria cerrado: autorizacion, snapshot, salidas de
+  cancelacion/decision y atomicidad verificadas.
 
 **Roto o sin empezar:**
 
-- Órdenes de transferencia que quedan colgadas si no se sube comprobante.
 - El seed no carga CBU ni alias, así que en instalación limpia la
   transferencia no se puede usar.
 - El camino de instalación sin Docker no funciona siguiendo la guía.
@@ -293,20 +292,16 @@ requisito esta en `MATRIZ.md`.
 
 ## 10. Lo que te espera decidir
 
-1. Revisar la entrega de la orden de transferencia inmortal.
-2. Cerrar el flujo UX/UI de logistica antes del 20/08.
+1. Cerrar el flujo UX/UI de logistica antes del 20/08.
+2. Especificar y cerrar Desarrollo Base durante la Fase 2.
 3. Especificar la validacion por correo dentro de Fase 2.
 4. Mantener suscripciones, planes, mensajeria y tierras fuera del camino
    critico hasta Fase 6.
 
 ---
 
-## 11. Tu primera tarea
+## 11. Tarea actual
 
-Leé `NOW.md` y `CRONOGRAMA.md`, en ese orden. Después decidime qué hago
-primero, escribilo en `PARA-DEV.md` y pusheá.
-
-Mi propuesta —y la vas a discutir, para eso estás— es que arranque por lo
-roto de lo ya entregado antes de abrir un módulo nuevo. El argumento y el
-orden están en `NOW.md`. Si preferís otro orden, decilo con el motivo y
-lo hago.
+La transferencia ya fue aceptada. El foco es revisar el prototipo navegable
+de logistica y cerrar la puerta de Fase 1 sin adelantar la implementacion de
+Fase 3. El enunciado vigente esta en `PARA-DEV.md`.
