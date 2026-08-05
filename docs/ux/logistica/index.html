@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TopGreen — Prototipo del flujo de logística</title>
+<link rel="stylesheet" href="prototipo.css">
+</head>
+<body>
+
+<div class="aviso-prototipo" role="note">
+  <strong>Prototipo de diseño.</strong> Datos ficticios, sin conexión a la
+  aplicación ni a la base. Sirve para acordar pantallas, estados y textos.
+</div>
+
+<header class="barra" aria-label="Controles del prototipo">
+  <div class="barra__grupo">
+    <span class="barra__titulo">Vista</span>
+    <div class="barra__botones" role="tablist" aria-label="Perfil">
+      <button type="button" class="chip" data-ir="c-checkout" data-perfil="comprador" role="tab" aria-selected="true">Comprador</button>
+      <button type="button" class="chip" data-ir="t-perfil" data-perfil="transportista" role="tab" aria-selected="false">Transportista</button>
+      <button type="button" class="chip" data-ir="v-venta" data-perfil="vendedor" role="tab" aria-selected="false">Vendedor</button>
+    </div>
+  </div>
+
+  <div class="barra__grupo" id="grupo-pasos">
+    <span class="barra__titulo">Paso</span>
+    <div class="barra__botones" id="pasos"></div>
+  </div>
+
+  <div class="barra__grupo">
+    <label class="barra__titulo" for="estado-busqueda">Estado de la búsqueda</label>
+    <select id="estado-busqueda" class="control">
+      <option value="resultados">Resultados</option>
+      <option value="carga">Cargando</option>
+      <option value="vacio">Sin resultados</option>
+      <option value="error">Error</option>
+    </select>
+  </div>
+
+  <div class="barra__grupo">
+    <button type="button" class="chip chip--neutro" id="reiniciar">Reiniciar prototipo</button>
+  </div>
+</header>
+
+<main id="lienzo">
+
+<!-- ================= COMPRADOR — CHECKOUT ================= -->
+<section class="vista" id="c-checkout" hidden>
+  <div class="marco">
+    <nav class="pasos-compra" aria-label="Progreso de la compra">
+      <span class="paso paso--hecho">Carrito</span>
+      <span class="paso paso--activo" aria-current="step">Envío</span>
+      <span class="paso">Pago</span>
+    </nav>
+
+    <h1>¿Cómo querés mover cada pedido?</h1>
+    <p class="sub">
+      Tu carrito tiene productos de <strong>dos vendedores</strong>. Cada uno sale
+      de un lugar distinto, así que <strong>la decisión de flete es por pedido</strong>.
+    </p>
+
+    <div class="pedidos" id="checkout-pedidos"></div>
+
+    <div class="acciones">
+      <button type="button" class="btn btn--fantasma" data-ir="c-checkout">← Volver al carrito</button>
+      <button type="button" class="btn btn--primario" id="ir-a-resumen">Continuar</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= COMPRADOR — BÚSQUEDA ================= -->
+<section class="vista" id="c-busqueda" hidden>
+  <div class="marco">
+    <button type="button" class="volver" data-ir="c-checkout">← Volver a envío</button>
+    <h1>Transportistas para <span id="busqueda-pedido">tu pedido</span></h1>
+
+    <div class="tramo">
+      <div class="tramo__campo">
+        <span class="etiqueta">Origen</span>
+        <p class="tramo__valor" id="busqueda-origen">—</p>
+        <p class="ayuda">Sale de la localidad de la publicación.</p>
+      </div>
+      <div class="tramo__flecha" aria-hidden="true">→</div>
+      <div class="tramo__campo">
+        <label class="etiqueta" for="busqueda-destino">Destino</label>
+        <select id="busqueda-destino" class="control control--ancho"></select>
+        <p class="ayuda">Precargado con tu localidad. Podés cambiarlo.</p>
+      </div>
+    </div>
+
+    <p class="nota-legal">Distancias estimadas en línea recta.</p>
+
+    <div id="resultados" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ================= COMPRADOR — RESUMEN ================= -->
+<section class="vista" id="c-resumen" hidden>
+  <div class="marco">
+    <nav class="pasos-compra" aria-label="Progreso de la compra">
+      <span class="paso paso--hecho">Carrito</span>
+      <span class="paso paso--hecho">Envío</span>
+      <span class="paso paso--activo" aria-current="step">Pago</span>
+    </nav>
+
+    <h1>Revisá antes de pagar</h1>
+    <div class="pedidos" id="resumen-pedidos"></div>
+
+    <p class="nota-legal">
+      La coordinación y el precio del flete se acuerdan directamente con el
+      transportista. TopGreen no cobra el flete ni lo suma a este total.
+    </p>
+
+    <div class="acciones">
+      <button type="button" class="btn btn--fantasma" data-ir="c-checkout">← Cambiar el envío</button>
+      <button type="button" class="btn btn--primario" data-ir="c-pago">Continuar al pago</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= COMPRADOR — PAGO ================= -->
+<section class="vista" id="c-pago" hidden>
+  <div class="marco marco--angosto">
+    <h1>Método de pago</h1>
+    <p class="sub">
+      Esta pantalla ya existe en la aplicación y <strong>no cambia con esta
+      pieza</strong>. Se muestra sólo para dejar ver que el flujo de flete
+      devuelve al pago sin agregar productos ni importes.
+    </p>
+    <div class="tarjeta tarjeta--tenue">
+      <p><strong>Total de productos:</strong> ficticio, sin el flete.</p>
+      <p class="nota-legal">El flete se paga por fuera, directo al transportista.</p>
+    </div>
+    <div class="acciones">
+      <button type="button" class="btn btn--fantasma" data-ir="c-resumen">← Volver al resumen</button>
+      <button type="button" class="btn btn--primario" data-ir="c-compras">Ver mis compras</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= COMPRADOR — MIS COMPRAS ================= -->
+<section class="vista" id="c-compras" hidden>
+  <div class="marco">
+    <h1>Mis compras</h1>
+    <div class="pedidos" id="compras-pedidos"></div>
+  </div>
+</section>
+
+<!-- ================= TRANSPORTISTA — PERFIL ================= -->
+<section class="vista" id="t-perfil" hidden>
+  <div class="marco marco--angosto">
+    <h1>Mi perfil de transportista</h1>
+    <p class="sub">
+      Así te ven los compradores cuando buscan flete. Todo lo de acá lo declarás vos.
+    </p>
+
+    <form class="formulario" id="form-transportista">
+      <div class="campo">
+        <label class="etiqueta" for="t-localidad">Localidad base</label>
+        <select id="t-localidad" class="control control--ancho"></select>
+        <p class="ayuda">Desde acá se mide tu cobertura.</p>
+      </div>
+
+      <div class="campo">
+        <label class="etiqueta" for="t-radio">Radio de cobertura (km)</label>
+        <input id="t-radio" class="control control--ancho" type="number" min="1" value="220" inputmode="numeric">
+        <p class="ayuda">Tenés que cubrir el origen <em>y</em> el destino del viaje.</p>
+      </div>
+
+      <div class="campo">
+        <label class="etiqueta" for="t-transporte">Transporte</label>
+        <input id="t-transporte" class="control control--ancho" type="text" value="Camión con acoplado granelero">
+      </div>
+
+      <div class="campo">
+        <label class="etiqueta" for="t-capacidad">Capacidad de carga</label>
+        <input id="t-capacidad" class="control control--ancho" type="text" value="Hasta 30 toneladas de granos">
+        <p class="ayuda">Texto libre: el comprador lo lee, el sistema no lo calcula.</p>
+      </div>
+
+      <fieldset class="campo campo--caja">
+        <legend class="etiqueta">Habilitación del transporte</legend>
+        <div class="campo">
+          <label class="etiqueta etiqueta--suave" for="t-hab-detalle">Qué declarás</label>
+          <input id="t-hab-detalle" class="control control--ancho" type="text" value="RUTA N.º 00-000000 (ficticio)">
+        </div>
+        <div class="campo">
+          <label class="etiqueta etiqueta--suave" for="t-hab-fecha">Fecha de la declaración</label>
+          <input id="t-hab-fecha" class="control" type="date" value="2026-06-12">
+        </div>
+        <p class="nota-legal" id="t-hab-vista">
+          Declarado por el transportista el 12/06/2026. TopGreen no verifica esta habilitación.
+        </p>
+      </fieldset>
+
+      <div class="acciones">
+        <button type="button" class="btn btn--fantasma" data-ir="t-operacion">Ver una operación mía</button>
+        <button type="submit" class="btn btn--primario">Guardar perfil</button>
+      </div>
+      <p class="ayuda" id="t-guardado" role="status"></p>
+    </form>
+  </div>
+</section>
+
+<!-- ================= TRANSPORTISTA — OPERACIÓN ================= -->
+<section class="vista" id="t-operacion" hidden>
+  <div class="marco marco--angosto">
+    <button type="button" class="volver" data-ir="t-perfil">← Volver a mi perfil</button>
+    <h1>Viaje en el que te eligieron</h1>
+
+    <div class="tarjeta">
+      <p class="etiqueta">Tramo</p>
+      <p class="tramo__valor">Reconquista, Santa Fe → Venado Tuerto, Santa Fe</p>
+      <p class="nota-legal">Distancias estimadas en línea recta.</p>
+
+      <hr class="separador">
+
+      <p class="etiqueta">Qué hay que mover</p>
+      <p>Granos a granel, aproximadamente 2.000 kg.</p>
+      <p class="ayuda">Lo declara el vendedor. El sistema no lo calcula ni lo verifica.</p>
+
+      <hr class="separador">
+
+      <p class="etiqueta">Con quién coordinás</p>
+      <p>Rocío Fernández — comprador</p>
+      <p>+54 9 3462 55-0101 · rocio.fernandez@ejemplo.test</p>
+
+      <p class="nota-legal">
+        La coordinación y el precio del flete se acuerdan directamente.
+      </p>
+    </div>
+
+    <div class="tarjeta tarjeta--tenue">
+      <p class="etiqueta">Lo que no ves, y es a propósito</p>
+      <ul class="lista">
+        <li>Precio de los productos y total de la orden.</li>
+        <li>Comprobante de transferencia.</li>
+        <li>CBU, alias y cualquier dato bancario.</li>
+      </ul>
+      <p class="ayuda">Tu tarea es el traslado, no la operación comercial.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= VENDEDOR — VENTA ================= -->
+<section class="vista" id="v-venta" hidden>
+  <div class="marco marco--angosto">
+    <h1>Venta #ORD-0000-DEMO</h1>
+    <p class="sub">Vista del vendedor. Sólo informa; no agrega acciones nuevas.</p>
+
+    <div class="tarjeta">
+      <p class="etiqueta">Comprador</p>
+      <p>Rocío Fernández — Venado Tuerto, Santa Fe</p>
+
+      <hr class="separador">
+
+      <p class="etiqueta">Transporte elegido por el comprador</p>
+      <p><strong>Transportes La Carreta</strong> — Rafaela, Santa Fe</p>
+      <p>Camión con acoplado granelero · Hasta 30 toneladas de granos</p>
+      <p>+54 9 3492 55-0110 · contacto@lacarreta.test</p>
+      <p class="nota-legal">
+        Declarado por el transportista el 12/06/2026. TopGreen no verifica esta habilitación.
+      </p>
+
+      <hr class="separador">
+
+      <p class="etiqueta">Tramo a coordinar</p>
+      <p class="tramo__valor">Reconquista, Santa Fe → Venado Tuerto, Santa Fe</p>
+      <p class="nota-legal">
+        La coordinación y el precio del flete se acuerdan directamente.
+      </p>
+    </div>
+
+    <div class="tarjeta tarjeta--tenue">
+      <p class="etiqueta">Si el comprador coordina por su cuenta</p>
+      <p>Este bloque dice <em>«El comprador coordina el traslado por su cuenta»</em> y nada más.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script src="prototipo.js"></script>
+</body>
+</html>
