@@ -61,16 +61,17 @@ posicionamiento pago, portal editorial, SEO masivo ni paridad con Agrofy.
 
 ### Comprador
 
-**Incluido:** registro con validacion, perfil, busqueda por categoria y
-ubicacion, carrito e historial de pedidos.
+**Incluido:** registro con validacion por correo electronico, perfil,
+busqueda por categoria y ubicacion, carrito e historial de pedidos.
 
 **Limite:** el PDF no define favoritos, cupones, financiacion, canje,
 reseñas ni recomendaciones con IA.
 
 ### Vendedor o prestador
 
-**Incluido:** registro con validacion, perfil, panel basico, publicacion y
-edicion del catalogo y stock, y gestion de ventas recibidas.
+**Incluido:** registro con validacion por correo electronico, perfil, panel
+basico, publicacion y edicion del catalogo y stock, y gestion de ventas
+recibidas.
 
 **Limite:** no se prometio una sucursal digital completa, analitica
 avanzada, reputacion verificada ni automatizacion comercial.
@@ -128,10 +129,9 @@ pago.
 **Incluido:** React o Next; FastAPI, Django o Node; PostgreSQL con PostGIS;
 hosting inicial de bajo costo y HTTPS.
 
-**Limite:** PostgreSQL con PostGIS no es intercambiable. El PDF nombra AWS,
-Supabase o Render. Railway puede ser equivalente tecnicamente, pero necesita
-confirmacion de Emi/clienta y una verificacion de costo antes de tratarlo
-como destino contractual.
+**Limite:** PostgreSQL con PostGIS no es intercambiable. Emi aprobo Railway
+como destino el 2026-08-05. Sigue siendo obligatorio verificar costo,
+persistencia, backups y salud real antes de tratarlo como desplegado.
 
 Las imagenes persistentes, backups, secretos rotados y HTTPS son condiciones
 del despliegue; una configuracion en el repositorio no cuenta como sitio
@@ -160,20 +160,37 @@ Estas decisiones pueden ser valiosas, pero son alcance posterior al PDF:
 - tierras y parcelas como aviso de consulta;
 - chatbot o funciones de inteligencia artificial.
 
-No se asignan a las fases 1 a 5 ni consumen automaticamente las semanas 13
-y 14. Requieren addendum, absorcion comercial explicita o fase 6.
+No se asignan a las fases 1 a 5 ni consumen las semanas 13 y 14. Emi decidio
+el 2026-08-05 que se construyen en una Fase 6 posterior al lanzamiento del
+MVP contractual.
 
 ---
 
-## 4. Ambiguedades que no debe resolver la dev sola
+## 4. Decisiones cerradas por Emi el 2026-08-05
 
-1. Fecha exacta desde la cual corre la semana 1.
-2. Que mecanismo satisface "registro con validacion": validacion de datos,
-   correo, aprobacion administrativa u otro.
-3. Aprobacion de Railway como alternativa a los proveedores nombrados.
-4. Tratamiento comercial y temporal de suscripciones, planes, mensajeria y
-   tierras.
+### Inicio contractual
 
-Hasta que Emi cierre cada punto, la dev no inventa una solucion que amplie
-el alcance.
+La semana 1 comienza el viernes 2026-08-07.
 
+### Registro con validacion
+
+La validacion es por correo electronico:
+
+- al registrarse, la cuenta queda sin verificar;
+- se envia un enlace de un solo uso con vencimiento de 24 horas;
+- hasta verificar, el usuario no puede iniciar sesion;
+- existe reenvio del correo sin crear otra cuenta;
+- en pruebas se usa un transporte de correo falso y verificable; las
+  credenciales reales se configuran recien en produccion;
+- recuperacion de contraseña no entra en esta definicion.
+
+### Hosting
+
+Railway es el destino aprobado. Configuracion no equivale a despliegue: la
+aceptacion sigue exigiendo URL publica, HTTPS, base persistente, backups,
+volumen de imagenes, migraciones y health checks comprobados.
+
+### Alcance posterior
+
+Suscripciones, planes, mensajeria y tierras van a Fase 6. Primero se entrega
+todo el PDF y se cierra la Fase 5.

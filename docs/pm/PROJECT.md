@@ -190,7 +190,7 @@ Alcance vinculante: `CONTRATO.md`. Verificado contra el código el
 | Búsqueda con filtro por **ubicación** (3.1) | No existe |
 | Directorio de transportistas por geolocalización (3.2) | No existe la entidad ni el flujo |
 | Transferencia bancaria: CBU/alias, comprobante, validación manual (3.3) | No existe nada |
-| Registro **con validación** de ambos roles (3.1) | Hay campo `is_verified`, sin flujo |
+| Registro **con validación** de ambos roles (3.1) | Validación por correo definida el 2026-08-05; hay `is_verified`, sin flujo implementado |
 | Categoría Bienes y Ganado (2) | Incompleta |
 | Categoría Tecnología para el Cultivo (2) | Incompleta |
 | Categoría Módulo de Logística Integrada (2) | No existe |
@@ -306,6 +306,10 @@ recomendaciones con IA, multi-país y multi-idioma, paridad con Agrofy.
 Reemplaza al matiz anterior, que dejaba el cobro afuera. **El cobro
 recurrente entra.**
 
+**Ubicacion temporal decidida el 2026-08-05:** entra al producto en Fase 6,
+despues de completar y lanzar las cinco fases del PDF. No consume el
+cronograma ni el colchon del MVP contractual.
+
 | Pieza | Alcance |
 |---|---|
 | **El candado**: los datos de contacto se ven sólo con suscripción vigente | **Dentro.** Es estructural: define qué devuelven los endpoints |
@@ -334,6 +338,8 @@ una suscripción es facturarle a un cliente propio por un servicio propio.
 Decidido el 2026-07-26. Una publicación de campo **no usa carrito ni
 stock**: muestra fotos y datos, y el interesado contacta. La operación se
 cierra entre las partes, fuera de la plataforma.
+
+Se construye tambien en Fase 6, no antes del lanzamiento contractual.
 
 Es barato porque la categoría ya está cargada y el contacto ya queda
 detrás del candado de suscripción. Lo único nuevo es marcar la publicación

@@ -36,30 +36,25 @@ el compromiso escrito con la clienta. Están ancladas a fechas reales en
 
 | Fase | Semanas | Desde | Hasta |
 |---|---|---|---|
-| 1 — Diseño y UX/UI | 1–2 | 27/07 | 09/08 |
-| 2 — Desarrollo base | 3–5 | 10/08 | 30/08 |
-| 3 — Buscador y catálogo | 6–8 | 31/08 | 20/09 |
-| 4 — Pagos y checkout | 9–10 | 21/09 | 04/10 |
-| 5 — QA y lanzamiento | 11–12 | 05/10 | 18/10 |
+| 1 — Diseño y UX/UI | 1–2 | 07/08 | 20/08 |
+| 2 — Desarrollo base | 3–5 | 21/08 | 10/09 |
+| 3 — Buscador y catálogo | 6–8 | 11/09 | 01/10 |
+| 4 — Pagos y checkout | 9–10 | 02/10 | 15/10 |
+| 5 — QA y lanzamiento | 11–12 | 16/10 | 29/10 |
 
-**Hoy es miercoles 2026-08-05: semana 2, fase 1.** El plazo es de 12 a 14
-semanas; las doce cierran el **2026-10-18** y el colchón llega al
-**2026-11-01**.
-
-**El ancla al lunes 2026-07-27 todavía no está confirmada con la
-clienta.** Si ella entiende otra fecha de inicio, las cinco fases se
-corren en bloque. Conviene resolverlo ahora y no en la semana 10.
+**Hoy es miercoles 2026-08-05: el reloj todavia no empezo.** Emi confirmo
+que la semana 1 comienza el **viernes 2026-08-07**. Las doce semanas
+cierran el **2026-10-29** y el colchon llega al **2026-11-12**.
 
 ## Objetivo activo
 
-**Cerrar la orden de transferencia inmortal y la puerta contractual de la
-Fase 1 antes del 09/08.** Despues se cierra Desarrollo Base y recien
-entonces se abre la geolocalizacion de fletes.
+**Cerrar la orden de transferencia inmortal antes del inicio contractual y
+la puerta de la Fase 1 antes del 20/08.** Despues se cierra Desarrollo Base
+y recien entonces se abre la geolocalizacion de fletes.
 
 El cronograma y los limites del PDF quedaron operativizados en
-`CRONOGRAMA.md` y `ALCANCE-Y-LIMITES.md`. Las suscripciones no forman parte
-de las cinco fases contractuales hasta que se decida addendum, absorcion o
-fase 6.
+`CRONOGRAMA.md` y `ALCANCE-Y-LIMITES.md`. Suscripciones, planes, mensajeria
+y tierras quedaron decididos para una Fase 6 posterior al MVP contractual.
 
 ## Dónde estamos
 
@@ -133,7 +128,7 @@ nuevos con deuda encima.
 1. **Orden de transferencia inmortal.** Se corrige primero la cancelacion,
    decision sin comprobante y referencia. El vencimiento y la reserva de
    stock quedan separados porque hoy el sistema no reserva inventario.
-2. **Cerrar Fase 1 antes del 09/08:** dejar completo el flujo UX/UI de
+2. **Cerrar Fase 1 antes del 20/08:** dejar completo el flujo UX/UI de
    logistica aunque su implementacion corresponda a Fase 3.
 3. **El seed no carga CBU ni alias**, así que sobre una instalación limpia
    la transferencia no se puede usar. Y la pantalla de pago muestra un
@@ -144,22 +139,19 @@ nuevos con deuda encima.
    nginx.
 5. **Transportistas.** La Pieza A está hecha con dos objeciones abiertas
    —el perfil no se puede editar y el campo de certificación obligatorio
-   no informa nada—. Las Piezas B y C esperan a que la dev conteste las
-   cuatro preguntas de diseño y haga el mapa de por dónde sale hoy el
-   contacto del comprador.
+   no informa nada—. Las decisiones de B/C y el mapa de contacto quedaron
+   cerrados el 2026-08-05; su implementacion corresponde a Fase 3.
 6. **Mercado Pago para las compras**, reconstruido sin split, dentro de la
    Fase 4 contractual.
-7. **Suscripciones, planes y mensajeria premium.** Alcance de producto
-   decidido, pero fuera del PDF y sin asignacion al cronograma contractual.
-   No empieza hasta resolver addendum, absorcion o fase 6.
-8. **Tierras y parcelas como aviso de consulta**, sin carrito. Tambien es
-   alcance posterior al PDF.
-9. **Al final:** correcciones de la vista en celular, revisión de
+7. **Fase 6, despues del lanzamiento:** suscripciones, planes, mensajeria
+   premium y tierras. No compite por tiempo con las fases 1 a 5.
+8. **Al final:** correcciones de la vista en celular, revisión de
    seguridad y despliegue en producción.
 
-**Despliegue:** la dev subió la preparación para Railway en `382bcbe`
-—`Dockerfile.railway`, `railway.toml` y `RAILWAY.md`— sin informe. Falta
-revisarlo, y **no se publica nada sin la revisión de seguridad**.
+**Despliegue:** Railway fue aprobado como destino el 2026-08-05. La dev
+subio la preparacion en `382bcbe` —`Dockerfile.railway`, `railway.toml` y
+`RAILWAY.md`— sin desplegarla. Falta revisarla, y **no se publica nada sin
+la revision de seguridad**.
 
 **Las correcciones de celular se aparcan.** Se hizo sólo el relevamiento
 —capturas e inventarios de consola y red— para saber cuánto trabajo es.
@@ -196,20 +188,11 @@ así se detectó. Los números fijos envejecen mal.
 
 ## Bloqueos y pendientes
 
-- ~~**El contrato no está firmado.**~~ **Proyecto aprobado el
-  2026-07-28.** Queda confirmar con la clienta la fecha de inicio del
-  plazo. Trabajamos sobre el ancla del lunes 2026-07-27; ver
-  `CRONOGRAMA.md`.
-
-  **El estimado ya no cierra igual.** Eran 7 a 9 semanas de trabajo
-  restante; el alcance nuevo —suscripciones con cobro recurrente, dos
-  planes y mensajería— suma entre 4,5 y 6. Total 11,5 a 15 contra un
-  plazo de 12, o 14 con el colchón. **Entra raspando en el mejor caso.**
-
-  Y las suscripciones **no están en el PDF**: son alcance agregado después
-  de la propuesta, sobre un precio cerrado. Las tres salidas posibles
-  —addendum, absorberlo, o correrlo a una fase 6— están en `CRONOGRAMA.md`
-  sección 6. **No decidir es elegir absorberlo sin haberlo acordado.**
+- ~~**Fecha de inicio pendiente.**~~ **Resuelto el 2026-08-05:** semana 1
+  comienza el viernes 2026-08-07.
+- ~~**Tratamiento de suscripciones pendiente.**~~ **Resuelto el
+  2026-08-05:** suscripciones, planes, mensajeria y tierras van a Fase 6,
+  despues del MVP contractual.
 - ~~**Definición pendiente del cliente:** cobertura del transportista.~~
   **Resuelto el 2026-07-26 leyendo el contrato**, que dice "zona de
   cobertura (radio en km)". No era una pregunta abierta: era yo que no

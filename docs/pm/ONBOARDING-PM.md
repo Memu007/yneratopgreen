@@ -89,15 +89,15 @@ lo segundo que tenés que leer.
 
 El resumen que necesitás tener en la cabeza:
 
-- Cinco fases, **semana 1 anclada al lunes 2026-07-27**.
-- Plazo **12 a 14 semanas**. Las doce cierran el **2026-10-18**.
-- **Hoy es semana 2.**
+- Cinco fases, **semana 1 desde el viernes 2026-08-07**.
+- Plazo **12 a 14 semanas**. Las doce cierran el **2026-10-29**.
+- **Hoy es la preparacion anterior al inicio contractual.**
 - Tres hitos de cobro atados a **entregables**, no a fechas.
-- El trabajo restante estimado **no entra cómodo** en el plazo, y el
-  alcance nuevo de suscripciones **no está en el PDF**.
+- El trabajo contractual restante entra en el plazo estimado. El alcance
+  nuevo de suscripciones **no esta en el PDF y va a Fase 6**.
 
-Ese último punto es la primera decisión grande que heredás. Está
-desarrollada en la sección 6 del cronograma con las tres salidas posibles.
+La decision quedo cerrada por Emi el 2026-08-05 y esta desarrollada en la
+seccion 6 del cronograma.
 
 ---
 
@@ -293,18 +293,11 @@ requisito esta en `MATRIZ.md`.
 
 ## 10. Lo que te espera decidir
 
-Cuatro cosas, en orden de urgencia:
-
-1. **Resolver cómo entra suscripciones en el plazo y en el precio**:
-   addendum, absorbido, o fase 6. Ver `CRONOGRAMA.md` sección 6. Es una
-   conversación con Emi.
-2. **Escribir la tarea de suscripciones solo despues de esa decision.**
-   Esta decidido el producto —Mercado Pago recurrente, dos planes y
-   mensajeria solo Premium—, pero no pertenece automaticamente al PDF.
-3. **Cerrar el flujo UX/UI de logistica antes del 09/08**, usando las
-   decisiones de `ALCANCE-Y-LIMITES.md`.
-4. **Las preguntas abiertas para la clienta**, que están en `PROJECT.md` y
-   `DEMO.md` y llevan semanas sin respuesta.
+1. Revisar la entrega de la orden de transferencia inmortal.
+2. Cerrar el flujo UX/UI de logistica antes del 20/08.
+3. Especificar la validacion por correo dentro de Fase 2.
+4. Mantener suscripciones, planes, mensajeria y tierras fuera del camino
+   critico hasta Fase 6.
 
 ---
 

@@ -49,10 +49,11 @@ zona.
 
 **Fechas que importan:**
 
-- **Martes 28 de julio de 2026: la clienta aprobó el proyecto.** El plazo
-  arranca en la semana del lunes 27/07.
-- **Plazo: 12 a 14 semanas.** Las doce cierran el **18 de octubre**.
-- **Hoy estamos en la semana 2.**
+- **Martes 28 de julio de 2026: la clienta aprobó el proyecto.**
+- **Viernes 7 de agosto de 2026: comienza la semana 1 contractual.**
+- **Plazo: 12 a 14 semanas.** Las doce cierran el **29 de octubre** y el
+  colchon llega al **12 de noviembre**.
+- **Hoy estamos antes del inicio contractual.**
 
 Las cinco fases con sus fechas están en **`CRONOGRAMA.md`**. Salen del PDF
 que aprobó la clienta, así que no son negociables por conveniencia

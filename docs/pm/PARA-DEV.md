@@ -117,10 +117,10 @@ Una sola pieza, un commit de producto y un informe en `PARA-PM.md` con:
 
 ## Guardia de cronograma
 
-Estamos en semana 2. Esta tarea no cambia el cierre contractual de la Fase
-1 el 09/08. La siguiente pieza sera cerrar el flujo UX/UI de logistica.
+Estamos dos dias antes del inicio contractual. Esta tarea debe cerrarse sin
+mover la semana 1, que comienza el 07/08. La Fase 1 termina el 20/08 y la
+siguiente pieza sera cerrar el flujo UX/UI de logistica.
 
 Las puertas por fase estan en `CRONOGRAMA.md` y los limites funcionales en
 `ALCANCE-Y-LIMITES.md`. Si una solucion excede esos limites, frena antes de
 construirla.
-

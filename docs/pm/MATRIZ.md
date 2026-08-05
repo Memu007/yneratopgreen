@@ -13,7 +13,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Requisito | Estado | Evidencia |
 |-----------|--------|-----------|
 | Registro | ✅ | Smoke test: `201`, usuario creado |
-| …con validación | ❌ | Campo `is_verified` en el modelo, sin flujo de validación |
+| …con validación | ❌ | Validación por correo definida el 2026-08-05; campo `is_verified` existe, flujo todavía sin implementar |
 | Perfil | ✅ | `GET /auth/me` y `PATCH /auth/me` responden `200` |
 | Buscador con filtro por **categoría** | ✅ | Smoke test `200`, filtros de categoría, precio y stock aplicados |
 | Buscador con filtro por **ubicación** | ✅ | Selectores encadenados de provincia y localidad, filtrado en el servidor, estado en la URL. Verificado en navegador y contrastado contra SQL |
@@ -24,7 +24,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 
 | Requisito | Estado | Evidencia |
 |-----------|--------|-----------|
-| Registro con validación | ❌ | Igual que comprador |
+| Registro con validación | ❌ | Validación por correo definida; flujo todavía sin implementar |
 | Panel de control básico | ✅ | Carga perfil, ventas y productos en UI, con el contador de ventas ya corregido |
 | Publicación desde la UI | ✅ | Producto completo publicado con imagen, verificado en la suite en interfaz, API y base. Cubre también el caso de imagen fallida |
 | Publicación con **ubicación** | ✅ | `locality_id` obligatorio contra el padrón oficial. Verificado: Balcarce `06063010` guardado en base |
@@ -77,7 +77,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Python FastAPI / Django o Node | ✅ | FastAPI operativo, `/api/health` `200` |
 | **PostgreSQL + PostGIS** | ✅ | PostGIS 3.4.3 sobre PostgreSQL 16, 16 tablas. **PostGIS en uso real**: `Geography(POINT,4326)` con índice GIST; `ST_Distance` Balcarce–Tandil = 96,75 km, contrastado de forma independiente contra 96,67 km por haversine |
 | Responsive móvil y escritorio | ⚪ | **Relevado el 2026-07-26** con `scripts/mobile-audit.mjs`: 36 pantallas en 360×800, 390×844 y 768×1024. **Cero desbordes horizontales, cero errores de consola, cero respuestas 4xx/5xx.** Nada impide completar los recorridos. Quedan pendientes de corregir, al final: controles táctiles por debajo de 44 px y barras de pestañas que requieren desplazamiento horizontal |
-| AWS / Supabase / Render | ⚪ | Railway preparado, sin despliegue. Proveedor alternativo pendiente de aprobación |
+| AWS / Supabase / Render | ⚪ | Railway aprobado y preparado, sin despliegue real ni verificación de producción |
 
 ## 5. Cierre y entrega
 

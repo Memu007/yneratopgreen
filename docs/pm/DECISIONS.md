@@ -5,21 +5,39 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-05 — Inicio, correo, Railway y Fase 6 quedan cerrados
+
+Decisiones de Emi:
+
+1. La semana 1 comienza el viernes 2026-08-07. Las doce semanas terminan
+   el 2026-10-29 y el colchon de catorce llega al 2026-11-12.
+2. "Registro con validacion" se implementa por correo electronico: enlace
+   de un solo uso, 24 horas de vigencia, reenvio y login bloqueado hasta
+   verificar.
+3. Railway es el hosting aprobado. Configuracion no cuenta como despliegue;
+   produccion exige HTTPS, persistencia, backups, migraciones y salud
+   comprobados.
+4. Primero se cumple el cronograma completo del PDF. Suscripciones, planes,
+   mensajeria y tierras pasan a Fase 6 posterior al lanzamiento.
+
+Esta decision reemplaza las alternativas y el ancla provisoria registradas
+el 2026-08-04.
+
+---
+
 ## 2026-08-05 — El PDF gobierna fases, hitos y limites
 
 Se revisaron visualmente las cinco paginas del documento aprobado y se
 convirtieron sus fases en puertas verificables dentro de `CRONOGRAMA.md`.
 
 - La Fase 1 no estaba cerrada: falta el flujo UX/UI de logistica.
-- La Fase 2 no estaba cerrada: falta resolver "registro con validacion" y
+- La Fase 2 no estaba cerrada: falta implementar la validacion por correo y
   la edicion del perfil transportista.
 - Las semanas 13 y 14 son contingencia, no una fase nueva.
 - El hito intermedio exige demostrar tambien la geolocalizacion de fletes.
-- Suscripciones, planes, mensajeria y tierras no aparecen en el PDF; no se
-  asignan al cronograma contractual sin addendum, absorcion expresa o fase
-  posterior.
-- Railway no se trata como destino aprobado hasta confirmar la alternativa
-  de proveedor y su costo.
+- Suscripciones, planes, mensajeria y tierras no aparecen en el PDF y se
+  asignaron a Fase 6.
+- Railway fue aprobado como destino; falta demostrar el despliegue.
 
 Los limites operativos por bloque quedaron en `ALCANCE-Y-LIMITES.md`.
 
@@ -62,6 +80,9 @@ líneas con el historial completo preservado en
 informe de la dev entrante.
 
 ## 2026-08-04 — El cronograma sale del PDF del socio, anclado a fechas
+
+**Decision provisoria, reemplazada el 2026-08-05 por el inicio en viernes
+2026-08-07.** Se conserva para no borrar la historia de la planificacion.
 
 El *Documento de Especificación Funcional y Propuesta Comercial* que
 aprobó la clienta define cinco fases en semanas numeradas, sin fechas.
