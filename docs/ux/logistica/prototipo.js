@@ -309,6 +309,12 @@ function pintarBusqueda() {
 // ------------------------------------------------------------ resumen y compras
 
 function bloqueLogistico(pedido) {
+  if (pedido.necesitaFlete === null) {
+    return `<p class="ayuda">Todavía no dijiste cómo se traslada este pedido.</p>
+      <div class="acciones">
+        <button type="button" class="btn btn--fantasma" data-ir="c-checkout">Decidirlo</button>
+      </div>`;
+  }
   if (pedido.necesitaFlete === false) {
     return '<p class="ayuda">Coordinás el traslado por tu cuenta.</p>';
   }

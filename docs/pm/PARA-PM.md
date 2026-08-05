@@ -2,316 +2,218 @@
 
 Sol: este archivo es mío y vos no lo tocás. Acá te informo.
 
-Fecha: 2026-08-05. Entrega de la tarea única: **la orden de transferencia
-inmortal quedó cerrada**. Commit de producto `0039e00`, pusheado a `main`.
+Fecha: 2026-08-05. Entrega de la tarea única: **prototipo navegable del flujo
+de logística**. Commit `778f6ab`, pusheado a `main`.
 
 ---
 
-## 1. Archivos cambiados
+## 1. Qué hay y cómo se abre
+
+```bash
+xdg-open docs/ux/logistica/index.html
+```
+
+`file://`, sin API, sin base, sin servidor y **sin una sola dependencia
+nueva**: un HTML, un CSS y un JavaScript.
 
 | Archivo | Qué |
 |---|---|
-| `backend/app/api/orders.py` | +40 −14. Reglas de estado, bloqueo de fila y el reembolso |
-| `scripts/smoke.mjs` | +223. Casos 22 a 25 y una verificación nueva dentro del 18 |
-| `scripts/smoke.sh` | +1 −1. El cartel decía 21 casos |
-| `src/components/Checkout/CheckoutModal.tsx` | +6 −1. Referencia de pago |
-| `src/components/UserDashboard/UserDashboard.tsx` | +26 −7. Botones en los dos estados |
+| `docs/ux/logistica/index.html` | Las nueve pantallas y la barra del prototipo |
+| `docs/ux/logistica/prototipo.css` | Tokens copiados de `src/index.css` |
+| `docs/ux/logistica/prototipo.js` | Estado, datos ficticios y navegación |
+| `docs/ux/logistica/README.md` | Cómo recorrerlo y qué **no** es |
+| `docs/ux/logistica/capturas/` | 19 capturas, 1440×900 y 390×844 |
 
-**Una sola pieza, un solo commit de producto.** Sin migración, sin
-dependencias nuevas.
+**Sin tocar `backend/`, migraciones, modelos, endpoints ni el frontend
+productivo de `src/`.** El commit entero vive dentro de `docs/ux/`.
 
-### Aviso sobre el diff, para que no te asuste
-
-El primer diff daba **602 líneas cambiadas en `orders.py` para un cambio de
-40**. `orders.py`, `CheckoutModal.tsx` y `UserDashboard.tsx` tienen finales
-de línea mezclados —481 de 758 líneas con CRLF en el primero— y mi editor
-los normalizó enteros.
-
-Lo revertí antes de commitear: reconstruí cada archivo conservando el final
-de línea original de cada línea que no toqué. El diff pasó de 953
-inserciones a 294. **Después de eso volví a compilar y a correr la suite
-completa**, porque reescribir archivos con un script y no verificar sería
-exactamente el tipo de cosa que después aparece rota.
+La barra negra de arriba es del prototipo, no del producto: cambia de perfil,
+salta a cualquier paso y **fuerza los cuatro estados de búsqueda** sin
+esperar a que ocurran.
 
 ---
 
-## 2. Corrida roja, contra el código anterior
+## 2. Tus nueve criterios, uno por uno
 
-Base recreada desde cero. Los cuatro casos nuevos fallan, cada uno por el
-motivo que tenía que fallar:
+Verificado con navegador real en las dos medidas. Salida completa:
 
 ```text
-[FAIL] 22 Sin comprobante, comprador y vendedor pueden cancelar —
-  POST /orders/96198e76-.../cancel respondió HTTP 400:
-  Solo se pueden cancelar órdenes pendientes, pagadas o confirmadas (176 ms)
+=== escritorio 1440x900 ===        === movil 390x844 ===
+  ✓ el checkout muestra 2 pedidos    ✓ el checkout muestra 2 pedidos
+  ✓ sin desborde horizontal en checkout / búsqueda / resumen / mis compras /
+    perfil transportista / venta
+  ✓ el contacto NO aparece antes de seleccionar
+  ✓ se explica que el contacto aparece al seleccionar
+  ✓ la tarjeta aclara que TopGreen no verifica
+  ✓ aclara distancia en línea recta
+  ✓ estado "carga" visible
+  ✓ estado "vacio" visible
+  ✓ estado "error" visible
+  ✓ el contacto SÍ aparece después de seleccionar
+  ✓ cada pedido conserva su propio transportista
+  ✓ el resumen aclara que el flete no entra en el total
+  ✓ se puede quitar la selección
+  ✓ Mis compras muestra transportista y contacto
+  ✓ la tarjeta del viaje no trae precios de productos, comprobantes ni
+    datos bancarios
+  ✓ el prototipo deja explícito que esos datos quedan ocultos
+  ✓ no usa "certificado por TopGreen" / "tarifa calculada" / "ruta óptima" /
+    "entrega garantizada"
+  ✓ controles táctiles ≥44px (todos)
+  ✓ sin errores de consola (ninguno)
 
-[FAIL] 23 Sin comprobante, el vendedor igual aprueba o rechaza —
-  PATCH /orders/a6536afd-.../transfer-receipt respondió HTTP 400:
-  La orden no tiene un comprobante pendiente (115 ms)
+=== teclado ===
+  ✓ se llega a los botones con Tab
+  ✓ se llega a los controles con Tab
+  ✓ el foco de teclado se ve (BUTTON: 3px solid)
 
-[FAIL] 24 Con comprobante enviado, sólo el vendedor puede cancelar —
-  el motivo no explica quién puede cancelar: POST /orders/e3429d1c-.../cancel
-  respondió HTTP 400: Solo se pueden cancelar órdenes pendientes, pagadas
-  o confirmadas (175 ms)
-
-[FAIL] 25 Dos aprobaciones simultáneas descuentan stock una sola vez —
-  aprobaciones aceptadas: 2 (se esperaba exactamente 1) (193 ms)
-
--------------------
-21/25 pasaron; 4 fallaron
+TODO OK
 ```
 
-Tu criterio 1 pedía reproducir al menos el `400` del comprador y del
-vendedor contra `AWAITING_TRANSFER_RECEIPT`. El caso 22 crea dos órdenes
-justamente para eso: una la intenta cancelar el comprador, la otra el
-vendedor. Las dos daban `400`.
+| Criterio | Estado |
+|---|---|
+| 1. Camino completo con clics, y volver a cambiar o quitar | ✅ recorrido de punta a punta en las dos medidas |
+| 2. Transportista y vendedor sin editar la URL | ✅ desde la barra, con `role="tab"` |
+| 3. Los cuatro estados visibles por control | ✅ selector "Estado de la búsqueda" |
+| 4. Contacto oculto antes, visible después | ✅ verificado buscando el teléfono en el DOM |
+| 5. Compra con dos vendedores, selección por orden | ✅ pedido A y pedido B con transportistas distintos |
+| 6. 1440×900 y 390×844, sin desborde, táctiles 44 px | ✅ medido, no estimado |
+| 7. Teclado, foco, etiquetas y contraste | ✅ ver abajo |
+| 8. `npm run build` verde y `git diff --check` limpio | ✅ build en verde; `--check` sin salida |
+| 9. Capturas de ambos tamaños e informe | ✅ 19 capturas y esto |
 
-### El caso 25 encontró algo que yo daba por teórico
-
-**Las dos aprobaciones simultáneas pasaban.** No una y un error: las dos.
-Contra el código anterior, dos clics del vendedor sobre "Aprobar" al mismo
-tiempo descontaban el stock dos veces por una sola venta.
-
-Yo te lo había planteado como un riesgo de concurrencia a cubrir. Era un
-defecto activo. Fue el mejor hallazgo de la pieza y salió de un criterio
-tuyo, no mío.
+**Sobre el criterio 7**, para que sepas qué medí y qué no: verifiqué
+navegación por `Tab`, que el foco de teclado se ve con un contorno de 3 px, y
+que todos los campos tienen `label` asociado. **El contraste no lo medí con
+herramienta**: los colores salen de `src/index.css` sin cambiarlos, así que
+el prototipo no mejora ni empeora lo que ya tiene la aplicación.
 
 ---
 
-## 3. Corrida verde, después del arreglo
+## 3. Lo que decidí y quiero que revises
 
-Misma base recreada desde cero, mismas cinco migraciones, mismo seed:
+Cinco cosas que la especificación no fijaba y tuve que resolver para que el
+prototipo se pudiera recorrer. **Ninguna es irreversible, todas son tuyas.**
 
-```text
-PASS 01 Salud del servicio
-PASS 02 Registro de usuario
-PASS 03 Ingreso y obtención del token
-PASS 04 Catálogo con categoría y precio
-PASS 05 Catálogo con provincia y localidad
-PASS 06 Detalle de producto
-PASS 07 Agregar al carrito y verlo
-PASS 08 Crear orden desde el carrito
-PASS 09 Publicar producto como vendedor desde la interfaz
-PASS 10 Fallo de imagen visible sin perder la publicación
-PASS 11 Ver mis compras y mis ventas
-PASS 12 Administración: usuarios, productos y órdenes
-PASS 13 Transferencia exige CBU o alias del vendedor
-PASS 14 Datos bancarios correctos y orden esperando comprobante
-PASS 15 Comprobante fallido visible y comprobante válido asociado
-PASS 16 Sólo el vendedor correcto valida el comprobante
-PASS 17 Rechazo de comprobante guarda el motivo
-PASS 18 Transferencia completa desde la interfaz
-PASS 19 Las rutas financieras heredadas no están expuestas
-PASS 20 Respaldo de imágenes en el recorrido de demostración
-PASS 21 Registro de transportista desde la interfaz
-PASS 22 Sin comprobante, comprador y vendedor pueden cancelar
-PASS 23 Sin comprobante, el vendedor igual aprueba o rechaza
-PASS 24 Con comprobante enviado, sólo el vendedor puede cancelar
-PASS 25 Dos aprobaciones simultáneas descuentan stock una sola vez
--------------------
-25/25 pasaron; 0 fallaron
-```
+**1. La elección de flete no es obligatoria para continuar.** Se puede pasar
+al resumen sin decidir, y ahí dice *«Todavía no dijiste cómo se traslada este
+pedido»* con un botón para volver. Lo hice permisivo porque bloquear el
+checkout por una decisión logística es agregar fricción a una compra que hoy
+se completa sin ella. **Si preferís que sea obligatorio, es un cambio chico.**
 
-Observaciones de los casos nuevos:
+**2. Elegir "Necesito flete" no muestra resultados solo**: hay un botón
+explícito de buscar. Evita disparar una búsqueda que quizá el comprador no
+quería, y deja el estado de carga como algo que él provocó.
 
-```text
-[PASS] 22 — ajeno 403; comprador=CANCELLED, vendedor=REJECTED, stock intacto en 17
-[PASS] 23 — rechazo sin motivo HTTP 400; rechazo con motivo=REJECTED;
-            aprobación sin comprobante=PAID, stock 17 -> 16
-[PASS] 24 — comprador HTTP 400 con motivo; vendedor dejó REJECTED; stock intacto en 16
-[PASS] 25 — 1 de 2 aceptada, la otra HTTP 400; stock 16 -> 15
-```
+**3. Cambiar de destino es una lista cerrada de localidades**, no texto libre.
+Es coherente con el padrón: hoy `products.locality_id` es obligatorio contra
+las 4.028 localidades. Texto libre nos dejaría destinos que después no se
+pueden geolocalizar.
 
-**El caso 19 sigue verde**: `payments`, `mp-oauth` y `simulate-payment`
-siguen en `404`. Tu criterio 6, cumplido.
+**4. La distancia se muestra por transportista** —"aprox. 180 km en línea
+recta"— y no como un orden ni un ranking. No dice "el más cercano" ni ordena
+por conveniencia, porque eso ya sería una recomendación de la plataforma.
 
-### El runner, con la precisión que pediste
-
-**Corrí la misma suite, no el runner oficial.** `npm run smoke` ejecuta
-`scripts/smoke.sh`, que hace `docker compose down -v` y llama a
-`init_local_db.sh`; **en mi entorno el demonio de Docker no está
-disponible**. Levanté PostgreSQL 16 + PostGIS 3.4 nativo, recreé la base con
-`DROP DATABASE ... WITH (FORCE)`, apliqué las cinco migraciones y el seed, y
-corrí `node scripts/smoke.mjs` directo. Para que `querySql` funcionara puse
-un shim de `docker` en el `PATH` que traduce `docker exec topgreen-db psql`
-a un `psql` local.
-
-**Los dos resultados no son equivalentes y no los presento como tales.** Lo
-que verifiqué es el mismo archivo de casos contra el mismo esquema y el
-mismo seed. Lo que **no** verifiqué es el `Dockerfile`, el `docker-compose`
-ni el arranque del contenedor. El shim vive en mi scratchpad; no toqué
-`smoke.sh` salvo el número de casos del cartel.
-
-### Una corrida intermedia que fallé por mi culpa
-
-Entre la roja y la verde hubo un `24/25`: el caso 23 falló por un error
-mío, no del producto. Comparaba `transfer_receipt_url` como último campo de
-una fila SQL, y `querySql` hace `.trim()` sobre toda la salida, así que un
-`NULL` final desaparecía y me llegaba `undefined` en vez de cadena vacía. Lo
-reescribí con el patrón que ya usaba el caso 15, una consulta `COUNT` aparte.
-
-Te lo cuento porque el número honesto de corridas es tres, no dos.
+**5. El bloque del vendedor cuando el comprador coordina solo** dice
+exactamente eso y nada más. Sin acciones, sin estado, sin cotización.
 
 ---
 
-## 4. Verificación SQL de estado y stock
+## 4. Dos cosas que la especificación pide y el sistema hoy no tiene
 
-Estados finales al terminar la suite:
+Estas son las que de verdad quiero que mires.
 
-```text
-           estado           | ordenes | con_comprobante | con_motivo
-----------------------------+---------+-----------------+------------
- CANCELLED                  |       1 |               0 |          1
- PAID                       |       3 |               2 |          0
- PLACED                     |       1 |               0 |          0
- REJECTED                   |       4 |               2 |          4
- TRANSFER_RECEIPT_SUBMITTED |       1 |               1 |          0
-```
+### 4.1 No existe el "nombre comercial"
 
-Las cuatro `REJECTED` tienen motivo guardado, las cuatro. Las dos `PAID` sin
-comprobante son las aprobadas por cuenta bancaria, que es exactamente lo que
-autorizaste en el punto 4 de tu alcance.
-
-La única `TRANSFER_RECEIPT_SUBMITTED` es la que deja abierta el caso 18, y
-ya no está atrapada: el caso 24 demuestra que desde ahí el vendedor sale.
-
-**Stock, que es tu criterio 4:**
-
-```text
-                   name                    | stock | sales_count | ordenes_pagadas
--------------------------------------------+-------+-------------+-----------------
- Kit de Filtros y Correas para Cosechadora |    15 |           3 |               3
-```
-
-El seed crea ese producto con **18**. Tres órdenes pagadas, stock 15,
-`sales_count` 3. **Un descuento por orden aprobada, ni uno más.** Y las seis
-canceladas o rechazadas antes de aprobar no lo movieron.
-
-**Ninguna cancelación tocó fondos ni stock que no correspondía:**
-
-```text
-$ grep -c "Procesando reembolso|Buscando pago para orden" uvicorn.log
-0
-$ grep -c "Stock restaurado" uvicorn.log
-0
-```
-
----
-
-## 5. Lo que encontré y no esperaba: la cancelación llamaba a Mercado Pago
-
-Esto es lo que más quiero que leas.
-
-`cancel_order` terminaba llamando a `get_refund_processor()`
-(`orders.py:33`), que hace:
+Tu punto 5 pide que la tarjeta muestre **nombre comercial**. En el modelo hay
+un solo campo de nombre:
 
 ```python
-from app.api.payments import process_refund
+full_name = Column(String(255), nullable=False)   # models/user.py:25
 ```
 
-**El módulo desmontado.** Y `process_refund` no es un envoltorio inocente:
-busca el `Payment` de la orden, arma un SDK de Mercado Pago con el token del
-vendedor —o con el del marketplace como respaldo— y emite un reembolso. O
-sea, **mueve plata de terceros**.
+No hay razón social, ni nombre de fantasía, ni nada parecido. Hoy un
+transportista se registra como *"Juan Pérez"*, y así aparecería en la tarjeta.
 
-Hoy no llega a hacerlo porque el checkout ya no crea filas en `payments` y
-la función corta antes. Pero el camino estaba vivo, y tu condición de freno
-decía textual *"una cancelación intenta procesar fondos de terceros"*.
+En el prototipo usé nombres de empresa —"Transportes La Carreta"— porque es lo
+que pediste y es lo que un comprador espera ver. **Pero eso es una promesa que
+el sistema todavía no puede cumplir.**
 
-**No frené porque tu punto 7 ya lo autorizaba**: "cancelar una transferencia
-no invoca un reembolso de Mercado Pago". Así que lo implementé y seguí.
+Las salidas, y es decisión tuya:
 
-La guarda que puse identifica la orden por sus datos bancarios, no por su
-estado:
+- **Aceptar el nombre personal** y que la tarjeta diga "Juan Pérez". Cero
+  trabajo, peor presentación.
+- **Agregar un campo de nombre comercial** en el perfil de transportista.
+  Entra natural en la Fase 2, que ya tiene que hacer editable ese perfil.
 
-```python
-es_transferencia = bool(order.transfer_cbu or order.transfer_alias_bancario)
-```
+**No lo di por resuelto ni cambié el esquema.** Lo dejo acá porque, si se
+decide en Fase 2, sale gratis; si se decide en Fase 3, hay que rehacer la
+tarjeta.
 
-**Por qué así y no por estado:** una orden de transferencia aprobada queda
-en `PAID`, y cancelar desde `PAID` habría vuelto a caer en el reembolso. Los
-datos bancarios acompañan a la orden toda su vida; el estado no.
+### 4.2 El contacto queda visible para cualquiera
 
-**Lo que esto revela sobre el caso 19, y te lo marco:** ese caso verifica
-que las *rutas* de `payments` respondan `404`, y lo hacen. Pero el *módulo*
-sigue siendo importable y `orders.py` lo importa. "Desmontado" es cierto a
-nivel HTTP y más débil de lo que suena a nivel código.
+El prototipo muestra el contacto al seleccionar, tal como pediste. Y está
+bien para el alcance contractual.
 
-**No lo arreglé** porque sacar el reembolso entero toca el camino de las
-órdenes que no son transferencia, y Mercado Pago para compras está fuera de
-alcance. **Te lo dejo como pieza aparte**, y es chica.
+**Anoto dónde va a chocar:** las suscripciones se movieron a Fase 6, y el
+candado de contacto es justamente lo que ellas venden. **Esta pantalla —la
+tarjeta después de seleccionar— es el único lugar donde ese candado va a
+entrar.** Si en Fase 6 aparece, esta pantalla cambia; si no aparece, no cambia
+nada.
 
----
-
-## 6. Decisiones que no tomé
-
-1. **No toqué `PATCH /orders/{id}/status`.** Sus tablas de transición
-   siguen sin conocer los dos estados de transferencia, así que sigue
-   devolviendo `400` ahí. Fue deliberado: la cancelación y la decisión de
-   transferencia ya cubren toda tu tabla, y sumar una tercera puerta para lo
-   mismo crea dos formas de hacer una cosa. Si preferís que también responda,
-   decímelo.
-2. **No agregué un botón "Cancelar Venta" para el vendedor** en los estados
-   de transferencia. La ruta `/cancel` le funciona y está probada, pero en la
-   interfaz su salida es "Rechazar", que **exige motivo**. Un botón de
-   cancelar sin motivo al lado sería el camino fácil y perderíamos el dato.
-3. **No agregué un campo `payment_reference` nuevo.** La respuesta ya trae
-   `order_number` y es lo que muestra la pantalla. Un campo nuevo con el
-   mismo valor es una forma de desincronizarse más adelante.
-4. **No saqué `get_refund_processor` del módulo desmontado**, por lo del
-   punto anterior.
-5. **Nada de lo que pusiste fuera de alcance**: sin vencimiento, sin reserva
-   de stock, sin cambios de esquema, sin seed bancario, sin arreglar la
-   instalación sin Docker, sin transportistas, sin contacto, sin
-   suscripciones, sin Railway.
+No es un problema hoy. Es para que cuando llegue Fase 6 nadie se sorprenda de
+que hay que volver acá.
 
 ---
 
-## 7. Riesgos que quedan
+## 5. Decisiones que no tomé
 
-**El que más me preocupa, y nace de mi propio cambio.** La guarda del
-reembolso pregunta si la orden tiene datos bancarios. Hoy eso identifica
-perfecto a una transferencia. **Cuando vuelva Mercado Pago para compras**, si
-una orden llegara a tener datos bancarios *y* un pago por Mercado Pago, mi
-guarda saltearía un reembolso legítimo. No puede pasar hoy —son dos caminos
-de checkout distintos— pero es una suposición que hay que releer cuando se
-reconstruya Mercado Pago. Queda anotada acá para que no se pierda.
-
-**`with_for_update()` y las cargas anticipadas.** El bloqueo funciona porque
-las dos consultas son planas. Si alguien agrega un `joinedload` con `LEFT
-OUTER JOIN` sobre esas consultas, PostgreSQL rechaza el `FOR UPDATE` y las
-rutas empiezan a fallar. No hay nada en el código que lo impida.
-
-**El segundo llamado al reembolso**, en `update_order_status`
-(`orders.py:~648`), sigue sin guarda. Hoy es inalcanzable para una
-transferencia, porque las transiciones del vendedor desde `PAID` son
-`CONFIRMED` y `SHIPPED`, nunca `CANCELLED`. Es cierto por una coincidencia
-de las tablas, no por diseño.
-
-**El caso 25 es una carrera de verdad.** Depende de que dos peticiones se
-solapen. Con el bloqueo el resultado es determinista, pero si alguna vez el
-entorno serializa las peticiones por otro motivo, el caso pasaría sin probar
-nada. Vale la pena releerlo si algún día se vuelve sospechosamente rápido.
-
-**Órdenes ya atrapadas:** ninguna, porque no hay despliegue. Si en algún
-momento se restaura una base vieja, las órdenes creadas antes de este commit
-quedan liberadas solas, porque la regla es por estado y no por fecha.
+1. **No implementé búsqueda real.** Los resultados están escritos a mano en
+   `prototipo.js`, a la vista. La cercanía con PostGIS es Fase 3.
+2. **No toqué el frontend productivo.** El prototipo es una copia visual, no
+   un componente reutilizable. Cuando se implemente de verdad, se escribe en
+   React; esto queda como referencia y se puede borrar.
+3. **No inventé una regla comercial nueva.** Un transportista por pedido, sin
+   cotización, sin tarifa y sin estados de negociación, que es lo que dice el
+   contrato: directorio, no motor.
+4. **No agregué peso ni volumen a las publicaciones.** La vista del
+   transportista dice "aproximadamente 2.000 kg" como dato declarado por el
+   vendedor, y aclara que el sistema no lo calcula ni lo verifica. **Ese campo
+   hoy no existe**; si la Pieza B lo necesita, es una decisión de Fase 3.
+5. **Nada de lo que pusiste fuera de alcance**: sin PostGIS, sin endpoints,
+   sin mapas, sin tarifas, sin Carta de Porte, sin mensajería, sin
+   suscripciones, sin Mercado Pago, sin Railway, y sin cambios visuales al
+   resto del marketplace.
 
 ---
 
-## 8. Lo que necesito para seguir
+## 6. Riesgos
 
-La guardia de cronograma dice que la próxima pieza es **cerrar el flujo
-UX/UI de logística** de la Fase 1. Quedo esperando el enunciado.
+**El prototipo se va a desactualizar.** Es un archivo suelto que nadie compila
+ni prueba en la suite. En cuanto la implementación real arranque, esto y el
+producto empiezan a divergir en silencio. Mi recomendación: **borrarlo cuando
+la Pieza B esté hecha**, y que las capturas queden como registro.
 
-Y quedan tres cosas tuyas de antes, por si querés resolverlas ahora:
+**Copié los tokens de `src/index.css` a mano.** Si mañana cambia la paleta de
+la aplicación, el prototipo queda con la vieja. Es aceptable para algo que
+dura semanas, y es la única forma de abrirlo sin compilar nada.
 
-1. **La pieza chica del reembolso** del punto 5: sacar la dependencia de
-   `orders.py` hacia el módulo desmontado. Es media jornada y cierra de
-   verdad lo que el caso 19 dice a medias.
-2. **`carrier_transport_certified`**, que toca esquema y sigue sin decisión.
-3. **`contact_visible_for`**: te lo pregunté en el informe anterior y no
-   quedó respondido. Sigo pensando que conviene antes que suscripciones.
+**Lo verifiqué con Chromium únicamente.** No probé Firefox ni Safari.
 
-Dejo el entorno levantado —PostgreSQL, API y Vite— por si querés que
-verifique algo de esta pieza antes de pasar a la siguiente.
+---
+
+## 7. Lo que necesito de vos
+
+1. **Las dos definiciones del punto 4**: nombre comercial sí o no, y si el
+   candado de contacto de Fase 6 va a caer sobre esta pantalla.
+2. **Las cinco decisiones del punto 3**, aunque sea con un "así está bien".
+3. **El enunciado de la próxima pieza.** Según el cronograma, la Fase 1
+   cierra el 20/08 y esto era lo que faltaba.
+
+Y siguen abiertas de antes, sin apuro: la pieza chica del reembolso heredado
+—que vos misma dejaste para Fase 4—, y `carrier_transport_certified`, que
+ahora tiene una forma concreta en el prototipo: **declaración con detalle y
+fecha**, con el texto de atribución al lado. Si te gusta como quedó, eso baja
+la decisión de esquema a algo ya dibujado.
+
+El entorno local sigue levantado por si querés que verifique algo más.
