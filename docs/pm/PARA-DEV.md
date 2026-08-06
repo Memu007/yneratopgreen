@@ -12,109 +12,71 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
-## 2026-08-06 — Entrega `f7fd2a2`: rechazada por un único hueco
+## 2026-08-06 — Corrección logística `823c3fe`: aceptada
 
-Las cinco correcciones pedidas por Sol están bien resueltas. No se reabre
-ninguna.
+La puerta de UX/UI de logística de Fase 1 queda cerrada con `823c3fe` y su
+informe `a2e5abb`.
 
-La entrega todavía no cierra la puerta de Fase 1 porque el destino es editable
-pero la búsqueda no depende de él. Verificado en
-`docs/ux/logistica/prototipo.js`:
+Verificación independiente de PM:
 
-- al cambiar `busqueda-destino` solo cambia `pedido.destino`;
-- `pedido.candidatos` sigue fijo;
-- `aOrigen` y `aDestino` viven fijos en cada transportista;
-- una selección previa queda elegida aunque cambie el tramo.
+- el conjunto visible sale del origen y destino actuales;
+- las 12 combinaciones de pedido y destino producen 22 tarjetas coherentes;
+- ninguna distancia a origen ni a destino supera el radio;
+- cambiar destino fuerza `elegido = null` y `necesitaFlete = true`;
+- por eso desaparece el contacto y el checkout vuelve a bloquear.
 
-Así la interfaz puede afirmar que un transportista cubre ambas puntas usando
-distancias de otro destino. También puede conservar y mostrar su contacto para
-un viaje que el comprador ya cambió.
+La frase del informe que dice que el pedido B no muestra a Ledesma es
+incorrecta: la tabla sí lo muestra en cinco destinos. Es un error narrativo
+menor, no del prototipo, y no reabre la entrega.
+
+No vuelvas a tocar el prototipo salvo una devolución nueva. Cuando la Pieza B
+productiva lo reemplace, se decidirá si se conserva como evidencia o se elimina.
 
 ---
 
-## Tarea activa única: hacer coherente el destino editable
+## Tarea activa única: contraste del frontend productivo
 
-Corregí solamente el prototipo aislado de `docs/ux/logistica/`.
+Corregí la deuda de contraste ya observada en la aplicación real. Es una pieza
+chica de Fase 1 y no habilita adelantar Fase 2 o 3.
 
-### Comportamiento obligatorio
+### Alcance
 
-1. **La búsqueda usa el tramo actual.** Los candidatos visibles y las dos
-   distancias mostradas tienen que corresponder al origen del pedido y al
-   destino seleccionado en ese momento.
-2. **La regla de elegibilidad se cumple en los datos del prototipo.** Un
-   transportista aparece solo si la distancia de su base al origen y la
-   distancia de su base al destino son ambas menores o iguales a su radio
-   declarado.
-3. **Cambiar el destino invalida siempre la selección previa de ese pedido.**
-   Después del cambio queda `necesitaFlete = true` y `elegido = null`, aunque
-   el mismo transportista pudiera cubrir el nuevo tramo. El comprador tiene
-   que volver a seleccionarlo de forma explícita.
-4. **No queda contacto viejo visible.** Al cambiar el destino desaparecen el
-   contacto, el estado de elegido y cualquier resumen asociado a la selección
-   anterior.
-5. **El checkout vuelve a considerar incompleto ese pedido** hasta que el
-   comprador elija un transportista para el nuevo tramo o marque “Coordino por
-   mi cuenta”.
-6. El contador de resultados, las tarjetas, la frase de cobertura y el estado
-   vacío tienen que salir del mismo conjunto coherente; no se admiten
-   candidatos o kilómetros escritos para un destino distinto.
+- Frontend productivo actual, principalmente el sistema global de estilos en
+  `src/index.css` y sólo los componentes estrictamente necesarios.
+- Tema claro, que es el único tema alcanzable hoy.
+- Sin rediseño, sin cambio de layout, sin dependencias nuevas y sin tocar
+  `backend/`, migraciones, API, seed ni el prototipo de logística.
 
-La implementación interna es decisión tuya. Puede ser una matriz de datos
-ficticios por tramo o coordenadas ficticias con cálculo local, siempre que sea
-pequeña, legible y verificable. No agregues dependencias.
+### No alcanza con cambiar el gradiente
 
-### Escenario mínimo que tiene que quedar demostrado
+La falla confirmada es texto blanco sobre el inicio `#059669` del gradiente
+primario: **3,77:1**. Pero el mismo color también aparece como texto en
+`.btn-outlined`, `.btn-text` y el hover global de enlaces. No corrijas una
+sola variable y declares resuelto el conjunto.
 
-1. Abrir el pedido A con destino Venado Tuerto.
-2. Seleccionar un transportista y comprobar que aparece su contacto.
-3. Cambiar el destino a otra localidad.
-4. Comprobar que la selección y el contacto desaparecen.
-5. Volver al checkout y comprobar que `Continuar` bloquea el avance por ese
-   pedido.
-6. Volver a buscar y comprobar que candidatos y ambas distancias corresponden
-   al nuevo destino.
-
-Además, recorré **todos los destinos disponibles para los pedidos A y B**.
-Para cada combinación reportá una tabla con origen, destino, candidatos
-visibles, distancia a origen, distancia a destino y radio. La propia tabla
-debe permitir comprobar que ninguna distancia visible supera el radio.
+Hacé un inventario corto de los usos reales de color como texto en las
+pantallas alcanzables. Medí la pareja efectiva texto/fondo. Bordes, foco,
+fondos decorativos y controles deshabilitados no se evalúan como texto normal.
 
 ### Criterios de aceptación
 
-1. Ningún destino disponible muestra una tarjeta incompatible con la regla de
-   las dos puntas.
-2. Las etiquetas de destino y las distancias cambian juntas; no queda ningún
-   valor del tramo anterior.
-3. Cambiar destino invalida siempre la selección y oculta el contacto.
-4. El pedido queda incompleto y el bloqueo del checkout sigue funcionando.
-5. Vacío, error y “Coordino por mi cuenta” conservan el comportamiento ya
-   aceptado.
-6. Se mantienen las cinco correcciones de `f7fd2a2`, incluido contraste:
-   4,5:1 mínimo para texto normal, foco visible y controles de 44 px.
-7. Verificación real en 1440×900 y 390×844 de las vistas afectadas, sin
-   desborde horizontal ni errores de consola.
-8. `node --check docs/ux/logistica/prototipo.js`, `npm run build` y
-   `git diff --check` en verde.
+1. Todo texto normal visible medido alcanza **4,5:1**; texto grande, **3:1**.
+2. El gradiente primario con texto inverso cumple en todo su recorrido, no sólo
+   en un extremo.
+3. Botones primarios, outlined, de texto y enlaces en hover cumplen sobre sus
+   fondos reales.
+4. Estados semánticos que usan color como texto —por ejemplo éxito o error—
+   se miden y se corrigen sólo si aparecen por debajo del mínimo.
+5. Se preservan jerarquía visual, foco visible, estados hover/active y lectura
+   de botones deshabilitados. No oscurezcas todos los verdes a ciegas.
+6. Verificación real del recorrido principal en **1440×900 y 390×844**, sin
+   desborde nuevo ni errores de consola.
+7. Reportá una tabla breve con selector/uso, color de texto, fondo, ratio antes
+   y ratio después. No hace falta listar cada nodo repetido.
+8. `npm run build` y `git diff --check` en verde.
 
-### Fuera de alcance
+### Entrega
 
-- No tocar `src/`, `backend/`, migraciones, API ni base de datos.
-- No implementar PostGIS, `locality_id` de destino ni las Piezas B/C.
-- No iniciar Fase 2 ni Fase 3.
-- No agregar dependencias.
-- No corregir todavía el gradiente de `src/index.css`: queda como pieza
-  chica separada después de aceptar este prototipo.
-- No tocar el reembolso heredado: sigue reservado para Fase 4.
-
-Si para cumplir necesitás salir de esos límites, frená y explicalo en
-`PARA-PM.md`. Si no, corregí, verificá, subí el commit de código y después
-un commit separado con el informe.
-
----
-
-## Orden después de esta entrega
-
-1. La PM revisa y acepta o rechaza la corrección.
-2. Si pasa, se registra el cierre de la puerta de Fase 1.
-3. Recién después se abre la pieza chica del contraste productivo.
-4. Hasta el 20/08 no se adelanta implementación de Fase 2 o 3.
+Un commit de código y un commit separado con el informe en `PARA-PM.md`.
+Si la medición demuestra que el problema exige tocar muchos componentes o
+abrir un rediseño, frená antes de ampliar el alcance y reportalo.
