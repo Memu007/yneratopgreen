@@ -200,7 +200,31 @@ una semana del colchon requiere registrar motivo, impacto y nueva fecha.
 
 ---
 
-## 8. Cómo se mantiene este archivo
+## 8. Aceleradores técnicos reservados por fase
+
+Estos recursos externos quedan anotados para usarlos cuando corresponda. Son
+referencias de implementación, no autorización para cambiar arquitectura,
+agregar alcance ni adelantar fases.
+
+| Momento | Recurso | Parte que se reutiliza | Límite |
+|---|---|---|---|
+| Después de la corrección de contraste | [axe-core-npm](https://github.com/dequelabs/axe-core-npm) | `@axe-core/playwright` como control automático de accesibilidad sobre el Playwright existente. | Pieza mínima separada; no reemplaza la revisión visual ni se instala durante la corrección activa. |
+| Fase 2 | [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) | Patrones y pruebas de verificación de correo, recuperación de contraseña, Docker y CI. | No copiar el proyecto ni migrar a SQLModel, Tailwind u otra arquitectura. |
+| Fase 3 | [GeoAlchemy2](https://github.com/geoalchemy/geoalchemy2) | Consultas PostGIS por radio y distancia con la dependencia que TopGreen ya tiene. | Directorio por origen, destino y radio; sin ruteo ni motor por peso. |
+| Fase 3 | [Georef Argentina](https://github.com/datosgobar/georef-ar-api) | API oficial para normalizar localidades y guardar sus coordenadas. | Consumir la API; no levantar ni copiar el repositorio completo. |
+| Fase 4 | [SDK oficial de Mercado Pago](https://github.com/mercadopago/sdk-python) | Ejemplos oficiales de idempotencia, pagos y pruebas; actualización aislada del SDK si corresponde. | Sin split, OAuth de vendedores ni suscripciones; la versión se decide y prueba en esa pieza. |
+
+**No usar:** FastAPI Users mientras siga en mantenimiento; `fastapi-mail`
+si no es compatible con las versiones fijadas; otro marketplace completo;
+React Leaflet, mapas o motores de ruteo antes de que el contrato los exija.
+
+**Ahorro orientativo total:** 6 a 10 días hábiles de desarrollo y prueba,
+principalmente en correo, consultas geográficas, regresión de accesibilidad y
+Mercado Pago. Es margen interno: no modifica fechas ni amplía el MVP.
+
+---
+
+## 9. Cómo se mantiene este archivo
 
 - Se actualiza **cuando cambia una fecha**, no semanalmente por rutina.
 - Cada corrimiento se anota con **motivo y semana**, en la tabla de abajo.
