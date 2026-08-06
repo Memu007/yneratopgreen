@@ -12,138 +12,109 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
-## Entrega `8d74054`: vuelve con correcciones chicas
+## 2026-08-06 — Entrega `f7fd2a2`: rechazada por un único hueco
 
-La arquitectura de la entrega es correcta: prototipo aislado, sin cambios de
-producto ni dependencias, con los recorridos y estados pedidos. La PM reviso
-las capturas, el HTML/JS/CSS, `node --check`, `git diff --check` y
-`npm run build`.
+Las cinco correcciones pedidas por Sol están bien resueltas. No se reabre
+ninguna.
 
-No queda aceptada todavia porque hay comportamientos y promesas que contradicen
-el alcance o el sistema real. **No reescribas el prototipo:** corrige solamente
-los puntos de abajo.
+La entrega todavía no cierra la puerta de Fase 1 porque el destino es editable
+pero la búsqueda no depende de él. Verificado en
+`docs/ux/logistica/prototipo.js`:
 
----
+- al cambiar `busqueda-destino` solo cambia `pedido.destino`;
+- `pedido.candidatos` sigue fijo;
+- `aOrigen` y `aDestino` viven fijos en cada transportista;
+- una selección previa queda elegida aunque cambie el tramo.
 
-## Tarea activa unica: cerrar los huecos del prototipo logistico
-
-### 1. Cada pedido exige una decision explicita
-
-El flete sigue siendo opcional, pero la decision no puede quedar vacia. Para
-cada pedido, antes de pasar al pago, el comprador debe haber elegido una de
-estas dos salidas:
-
-- `Necesito flete` **con un transportista seleccionado**; o
-- `Coordino el traslado por mi cuenta`.
-
-Hoy `Continuar` permite llegar al pago con `necesitaFlete = null` o con
-`necesitaFlete = true` sin transportista. Eso deja una operacion ambigua.
-
-Corregir:
-
-- bloquear el avance y explicar que pedido falta resolver;
-- llevar el foco al primer pedido incompleto;
-- en vacio/error, “Coordino por mi cuenta” debe guardar `false` para ese pedido,
-  no solo volver de pantalla;
-- “Mis compras” no puede afirmar que el comprador coordina solo cuando el
-  estado seguia nulo o incompleto.
-
-### 2. No se agrega nombre comercial al MVP
-
-El contrato no exige otro campo y el modelo ya tiene `full_name`. No agregamos
-esquema ni prometemos razon social o nombre comercial verificado.
-
-En el prototipo usa nombres que puedan venir de `full_name` y llama al dato
-**“Nombre del perfil”** o simplemente **“Transportista”**. No hace falta tocar
-el perfil productivo.
-
-### 3. La distancia tiene que decir que mide
-
-Un unico “aprox. 180 km” cambia segun el transportista pero no indica entre que
-puntos se calculo. La regla aprobada exige comprobar las dos puntas dentro del
-radio.
-
-Cada tarjeta debe mostrar, en linea recta:
-
-- base del transportista → origen; y
-- base del transportista → destino.
-
-Mantener tambien el radio declarado y la frase de que ambas puntas quedan
-cubiertas. No ordenar ni recomendar “el mejor”.
-
-### 4. No inventar peso ni exponer contacto del comprador
-
-La orden actual guarda nombre del producto y cantidad, pero no un peso
-logistico estructurado. Reemplaza “aproximadamente 2.000 kg” por los articulos
-y cantidades que ya existen en la orden.
-
-La vista del transportista recibe tramo y necesidad logistica. Para el MVP no
-necesita el telefono ni el correo del comprador: el comprador ya obtiene el
-contacto del transportista despues de seleccionarlo. Mostrar en su lugar:
-**“El comprador recibio tus datos y te contactara para coordinar.”**
-
-Esto reduce exposicion de datos y cumple el contacto directo del contrato.
-
-### 5. Contraste medido, no heredado
-
-El criterio no quedo demostrado. Blanco sobre `#059669`, usado al inicio del
-gradiente principal, da aproximadamente **3,77:1** y no alcanza 4,5:1 para
-texto normal.
-
-Ajustar los botones con texto blanco a un verde que alcance **4,5:1** en todo
-el fondo. No hace falta redisenar la paleta; alcanza con usar el tono oscuro ya
-existente. Reportar el valor medido.
+Así la interfaz puede afirmar que un transportista cubre ambas puntas usando
+distancias de otro destino. También puede conservar y mostrar su contacto para
+un viaje que el comprador ya cambió.
 
 ---
 
-## Decisiones de PM sobre tus preguntas
+## Tarea activa única: hacer coherente el destino editable
 
-- El traslado puede ser propio: aprobado. Lo obligatorio es elegir una salida
-  por pedido.
-- Boton explicito para iniciar la busqueda: aprobado.
-- Destino desde lista cerrada de localidades: aprobado.
-- Sin ranking ni recomendacion automatica: aprobado, con las dos distancias
-  claramente rotuladas.
-- Bloque informativo del vendedor cuando el comprador coordina solo: aprobado.
-- Contacto del transportista visible despues de seleccionarlo: aprobado para
-  el MVP contractual. Cualquier candado por plan se define recien en Fase 6.
-- Declaracion de habilitacion con detalle y fecha: aprobada para Fase 2, siempre
-  atribuida al transportista y sin verificacion de TopGreen.
-- Nombre comercial nuevo: rechazado para el MVP; usar `full_name`.
+Corregí solamente el prototipo aislado de `docs/ux/logistica/`.
 
-### Hueco detectado por la PM para la siguiente fase
+### Comportamiento obligatorio
 
-La lista de destino del prototipo es correcta, pero hoy el usuario y la orden
-guardan ubicacion/destino como texto libre; no existe un `locality_id` de
-destino. **No lo implementes en esta correccion.** Queda como cimiento de datos
-estructurados de la Fase 2 para que PostGIS pueda resolver la Fase 3.
+1. **La búsqueda usa el tramo actual.** Los candidatos visibles y las dos
+   distancias mostradas tienen que corresponder al origen del pedido y al
+   destino seleccionado en ese momento.
+2. **La regla de elegibilidad se cumple en los datos del prototipo.** Un
+   transportista aparece solo si la distancia de su base al origen y la
+   distancia de su base al destino son ambas menores o iguales a su radio
+   declarado.
+3. **Cambiar el destino invalida siempre la selección previa de ese pedido.**
+   Después del cambio queda `necesitaFlete = true` y `elegido = null`, aunque
+   el mismo transportista pudiera cubrir el nuevo tramo. El comprador tiene
+   que volver a seleccionarlo de forma explícita.
+4. **No queda contacto viejo visible.** Al cambiar el destino desaparecen el
+   contacto, el estado de elegido y cualquier resumen asociado a la selección
+   anterior.
+5. **El checkout vuelve a considerar incompleto ese pedido** hasta que el
+   comprador elija un transportista para el nuevo tramo o marque “Coordino por
+   mi cuenta”.
+6. El contador de resultados, las tarjetas, la frase de cobertura y el estado
+   vacío tienen que salir del mismo conjunto coherente; no se admiten
+   candidatos o kilómetros escritos para un destino distinto.
+
+La implementación interna es decisión tuya. Puede ser una matriz de datos
+ficticios por tramo o coordenadas ficticias con cálculo local, siempre que sea
+pequeña, legible y verificable. No agregues dependencias.
+
+### Escenario mínimo que tiene que quedar demostrado
+
+1. Abrir el pedido A con destino Venado Tuerto.
+2. Seleccionar un transportista y comprobar que aparece su contacto.
+3. Cambiar el destino a otra localidad.
+4. Comprobar que la selección y el contacto desaparecen.
+5. Volver al checkout y comprobar que `Continuar` bloquea el avance por ese
+   pedido.
+6. Volver a buscar y comprobar que candidatos y ambas distancias corresponden
+   al nuevo destino.
+
+Además, recorré **todos los destinos disponibles para los pedidos A y B**.
+Para cada combinación reportá una tabla con origen, destino, candidatos
+visibles, distancia a origen, distancia a destino y radio. La propia tabla
+debe permitir comprobar que ninguna distancia visible supera el radio.
+
+### Criterios de aceptación
+
+1. Ningún destino disponible muestra una tarjeta incompatible con la regla de
+   las dos puntas.
+2. Las etiquetas de destino y las distancias cambian juntas; no queda ningún
+   valor del tramo anterior.
+3. Cambiar destino invalida siempre la selección y oculta el contacto.
+4. El pedido queda incompleto y el bloqueo del checkout sigue funcionando.
+5. Vacío, error y “Coordino por mi cuenta” conservan el comportamiento ya
+   aceptado.
+6. Se mantienen las cinco correcciones de `f7fd2a2`, incluido contraste:
+   4,5:1 mínimo para texto normal, foco visible y controles de 44 px.
+7. Verificación real en 1440×900 y 390×844 de las vistas afectadas, sin
+   desborde horizontal ni errores de consola.
+8. `node --check docs/ux/logistica/prototipo.js`, `npm run build` y
+   `git diff --check` en verde.
+
+### Fuera de alcance
+
+- No tocar `src/`, `backend/`, migraciones, API ni base de datos.
+- No implementar PostGIS, `locality_id` de destino ni las Piezas B/C.
+- No iniciar Fase 2 ni Fase 3.
+- No agregar dependencias.
+- No corregir todavía el gradiente de `src/index.css`: queda como pieza
+  chica separada después de aceptar este prototipo.
+- No tocar el reembolso heredado: sigue reservado para Fase 4.
+
+Si para cumplir necesitás salir de esos límites, frená y explicalo en
+`PARA-PM.md`. Si no, corregí, verificá, subí el commit de código y después
+un commit separado con el informe.
 
 ---
 
-## Criterios de aceptacion de la correccion
+## Orden después de esta entrega
 
-1. No se llega al resumen/pago con ningun pedido sin resolver.
-2. Vacio y error permiten marcar correctamente “coordino por mi cuenta”.
-3. No aparece un peso inventado ni contacto del comprador en su vista de
-   transportista.
-4. Cada tarjeta muestra las dos distancias con sus extremos.
-5. Los nombres no prometen un campo comercial inexistente.
-6. Todo texto normal queda en 4,5:1 o mas; controles y foco siguen visibles.
-7. Actualiza solamente las capturas afectadas en escritorio y movil.
-8. `node --check`, `npm run build` y `git diff --check` quedan verdes.
-
-No repitas los 25 casos de producto: `src/` y `backend/` no cambian.
-
-### Frena y responde si
-
-- alguno de estos arreglos exige tocar codigo productivo;
-- para completar el flujo hace falta inventar otro dato de negocio;
-- la correccion deja de estar acotada a `docs/ux/logistica/`.
-
----
-
-## Guardia de cronograma
-
-Seguimos a tiempo: la semana 1 comienza el **07/08** y la Fase 1 cierra el
-**20/08**. Esta correccion corta cierra el prototipo; no abras Fase 2 hasta que
-la PM la acepte.
+1. La PM revisa y acepta o rechaza la corrección.
+2. Si pasa, se registra el cierre de la puerta de Fase 1.
+3. Recién después se abre la pieza chica del contraste productivo.
+4. Hasta el 20/08 no se adelanta implementación de Fase 2 o 3.
