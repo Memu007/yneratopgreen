@@ -25,8 +25,10 @@ Lo que no cambia con el relevo, y es lo importante:
 informe `a2e5abb`. El destino editable ya controla candidatos, distancias y
 selección; cambiarlo invalida el contacto y vuelve a bloquear el checkout. La
 puerta UX/UI de logística de Fase 1 quedó cerrada antes del inicio contractual.
-La tarea activa en `PARA-DEV.md` es la corrección chica de contraste del
-frontend productivo; no se adelanta Fase 2 o 3.
+La primera corrección de contraste quedó en `10b830f`: se aceptó como base,
+pero el barrido encontró unos treinta selectores adicionales por debajo del
+mínimo. La tarea activa en `PARA-DEV.md` es corregir sólo esas parejas sin
+unificar las dos paletas ni rediseñar; no se adelanta Fase 2 o 3.
 
 ## El proyecto fue aprobado
 
@@ -64,8 +66,10 @@ transcripcion funcional en `CONTRATO.md` y el anclaje en `CRONOGRAMA.md`.
 
 ## Objetivo activo
 
-**Mantener cerrada la puerta de Fase 1 y corregir el contraste del frontend
-productivo sin ampliar alcance.** El flujo UX/UI de logística fue aceptado en
+**Mantener cerrada la puerta de Fase 1 y terminar el contraste del tema claro
+sin rediseñar ni unificar paletas.** `10b830f` corrigió el sistema global y 12
+usos, pero la pieza sigue abierta por unos treinta selectores medidos. El flujo
+UX/UI de logística fue aceptado en
 `823c3fe` antes del inicio contractual. La orden de transferencia inmortal se
 cerró en `0039e00` y fue aceptada por la PM el 2026-08-05.
 
@@ -153,8 +157,10 @@ nuevos con deuda encima.
 2. ~~**Cerrar Fase 1 antes del 20/08:** dejar completo el flujo UX/UI de
    logística aunque su implementación corresponda a Fase 3.~~ **Cerrada el
    2026-08-06** con `823c3fe`, antes del inicio contractual.
-3. **Contraste productivo:** corregir la deuda global de texto y controles
-   detectada durante la revisión del prototipo, sin rediseño. Tarea activa.
+3. **Contraste productivo:** `10b830f` aceptado como base; quedan unos treinta
+   selectores fallidos en ocho componentes. Corregir sólo las parejas
+   texto/fondo, conservando las paletas emerald y oliva, sin rediseño. Tarea
+   activa. Después, pieza separada con `@axe-core/playwright`.
 4. **El seed no carga CBU ni alias**, así que sobre una instalación limpia
    la transferencia no se puede usar. Y la pantalla de pago muestra un
    error que no corresponde.
