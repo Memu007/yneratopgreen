@@ -61,7 +61,7 @@
 
 .navLink:hover {
   background-color: var(--bg-hover);
-  color: var(--color-primary-600);
+  color: var(--color-primary-text);
 }
 
 .navLinkActive {
@@ -215,7 +215,7 @@
 .actionButton {
   padding: 0.5rem 1rem;
   background-color: transparent;
-  color: var(--color-primary-600);
+  color: var(--color-primary-text);
   border: 1.5px solid var(--color-primary-600);
   border-radius: var(--radius-md);
   font-size: 0.9rem;

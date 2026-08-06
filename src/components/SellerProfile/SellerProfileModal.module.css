@@ -74,7 +74,7 @@
   height: 80px;
   border-radius: 50%;
   background: white;
-  color: var(--color-primary-600);
+  color: var(--color-primary-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -120,7 +120,7 @@
 .error {
   padding: 40px 20px;
   text-align: center;
-  color: var(--color-error);
+  color: var(--color-error-text);
 }
 
 .reputationSection {
@@ -145,7 +145,7 @@
 .ratingNumber {
   font-size: 3rem;
   font-weight: 700;
-  color: var(--color-warning);
+  color: var(--color-warning-text);
   line-height: 1;
 }
 
@@ -183,7 +183,7 @@
 .statNumber {
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--color-primary-600);
+  color: var(--color-primary-text);
 }
 
 .statLabel {

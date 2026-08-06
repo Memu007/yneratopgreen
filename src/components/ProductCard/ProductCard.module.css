@@ -136,7 +136,7 @@
 .price {
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
-  color: var(--color-primary-600);
+  color: var(--color-primary-text);
 }
 
 [data-theme="dark"] .price {
@@ -215,7 +215,7 @@
 
 .rating {
   font-size: var(--font-size-xs);
-  color: var(--color-warning);
+  color: var(--color-warning-text);
   font-weight: var(--font-weight-semibold);
   display: flex;
   align-items: center;
