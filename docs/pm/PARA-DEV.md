@@ -34,49 +34,62 @@ productiva lo reemplace, se decidirá si se conserva como evidencia o se elimina
 
 ---
 
-## Tarea activa única: contraste del frontend productivo
+## 2026-08-06 — Contraste `10b830f`: base aceptada, pieza abierta
 
-Corregí la deuda de contraste ya observada en la aplicación real. Es una pieza
-chica de Fase 1 y no habilita adelantar Fase 2 o 3.
+La dev hizo bien en frenar y reportar: la orden decía explícitamente no ampliar
+el alcance si la medición encontraba una deuda mayor. Se aceptan los cambios de
+`10b830f` como base correcta —tokens de texto, gradiente primario y 12 usos—,
+pero **la tarea no queda cerrada** porque el criterio 1 sigue incumplido.
+
+Decisión de PM sobre las dos paletas: **opción 2**. No se unifican ni se
+rediseña la marca, y tampoco se difiere la deuda visible a Fase 5. Se corrigen
+sólo las parejas texto/fondo que fallan, conservando la paleta emerald global y
+la paleta oliva de los componentes.
+
+---
+
+## Tarea activa única: cerrar el contraste del tema claro
+
+Continuá sobre `10b830f` y corregí los aproximadamente treinta selectores
+fallidos que ya identificaste en los ocho componentes.
 
 ### Alcance
 
-- Frontend productivo actual, principalmente el sistema global de estilos en
-  `src/index.css` y sólo los componentes estrictamente necesarios.
-- Tema claro, que es el único tema alcanzable hoy.
-- Sin rediseño, sin cambio de layout, sin dependencias nuevas y sin tocar
-  `backend/`, migraciones, API, seed ni el prototipo de logística.
+- Sólo los selectores visibles que el barrido confirmó por debajo de **4,5:1**
+  para texto normal o **3:1** para texto grande e iconos informativos.
+- Conservá las dos familias cromáticas. Elegí, para cada caso, el tono más
+  cercano de la misma familia que cumpla; en gradientes podés oscurecer el
+  extremo claro o reforzar el overlay sin cambiar layout ni composición.
+- Las estrellas que comunican calificación deben alcanzar 3:1 contra el fondo.
+  Si alguna marca es puramente decorativa, documentala como tal y no la cuentes
+  como información.
+- Para texto sobre foto, medí el overlay efectivo y verificá visualmente los
+  extremos claros y oscuros de la imagen; no declares aprobado un caso que el
+  medidor no puede resolver.
+- Reutilizá los tokens creados donde corresponda. No hace falta convertir toda
+  la paleta oliva en tokens para cerrar esta pieza.
 
-### No alcanza con cambiar el gradiente
+### Fuera de alcance
 
-La falla confirmada es texto blanco sobre el inicio `#059669` del gradiente
-primario: **3,77:1**. Pero el mismo color también aparece como texto en
-`.btn-outlined`, `.btn-text` y el hover global de enlaces. No corrijas una
-sola variable y declares resuelto el conjunto.
-
-Hacé un inventario corto de los usos reales de color como texto en las
-pantallas alcanzables. Medí la pareja efectiva texto/fondo. Bordes, foco,
-fondos decorativos y controles deshabilitados no se evalúan como texto normal.
+- Sin rediseño, unificación de paletas, cambio de layout ni tema oscuro.
+- Sin backend, seed, API, logística, dependencias nuevas ni `axe` todavía.
+- No normalices CRLF ni abras un diff masivo de higiene.
+- No corrijas colores de bordes o decoración si no fallan como texto o control.
 
 ### Criterios de aceptación
 
-1. Todo texto normal visible medido alcanza **4,5:1**; texto grande, **3:1**.
-2. El gradiente primario con texto inverso cumple en todo su recorrido, no sólo
-   en un extremo.
-3. Botones primarios, outlined, de texto y enlaces en hover cumplen sobre sus
-   fondos reales.
-4. Estados semánticos que usan color como texto —por ejemplo éxito o error—
-   se miden y se corrigen sólo si aparecen por debajo del mínimo.
-5. Se preservan jerarquía visual, foco visible, estados hover/active y lectura
-   de botones deshabilitados. No oscurezcas todos los verdes a ciegas.
-6. Verificación real del recorrido principal en **1440×900 y 390×844**, sin
-   desborde nuevo ni errores de consola.
-7. Reportá una tabla breve con selector/uso, color de texto, fondo, ratio antes
-   y ratio después. No hace falta listar cada nodo repetido.
-8. `npm run build` y `git diff --check` en verde.
+1. El mismo recorrido principal medido en **1440×900 y 390×844** termina con
+   cero textos visibles por debajo del mínimo. Los casos sobre imagen que no
+   puedan automatizarse quedan verificados y explicados uno por uno.
+2. Gradientes y overlays cumplen en todo su recorrido, no sólo en un extremo.
+3. No aparecen desbordes nuevos, pérdida de foco, errores de consola ni cambios
+   de jerarquía visual.
+4. El informe trae cantidad de selectores fallidos antes/después y una tabla
+   breve por selector/uso con texto, fondo y ratio final.
+5. `npm run build`, la suite **25/25** y
+   `git -c core.whitespace=cr-at-eol diff --check` quedan en verde.
+6. Un commit de código y otro separado con el informe en `PARA-PM.md`.
 
-### Entrega
-
-Un commit de código y un commit separado con el informe en `PARA-PM.md`.
-Si la medición demuestra que el problema exige tocar muchos componentes o
-abrir un rediseño, frená antes de ampliar el alcance y reportalo.
+Cuando esto quede aceptado, la pieza siguiente será incorporar
+`@axe-core/playwright` como control automático separado, tal como quedó
+registrado en `CRONOGRAMA.md`.
