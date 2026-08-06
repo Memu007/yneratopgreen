@@ -21,10 +21,11 @@ Lo que no cambia con el relevo, y es lo importante:
   lo escribe la dev, y ninguna toca el archivo de la otra.
 - Seguimos adversariales en las dos direcciones.
 
-**Lo que quedó a medio camino en el relevo**, y está detallado en la
-sección 10 de `ONBOARDING-PM.md`: la corrección del prototipo de logística
-(`f7fd2a2`) espera aceptación, y de eso depende que la Fase 1 cierre en
-fecha.
+**La corrección `f7fd2a2` fue revisada el 2026-08-06.** Las cinco
+devoluciones de Sol están bien, pero apareció un hueco adicional: cambiar el
+destino deja candidatos, distancias y selección del tramo anterior. La entrega
+sigue rechazada por ese único punto. La corrección activa está especificada en
+`PARA-DEV.md`; de ella depende cerrar la Fase 1 en fecha.
 
 ## El proyecto fue aprobado
 
