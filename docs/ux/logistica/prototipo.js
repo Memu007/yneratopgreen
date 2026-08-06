@@ -1,33 +1,60 @@
 /* Prototipo de UX de logística — TopGreen.
    Sin API, sin base y sin dependencias. Todos los datos son ficticios y están
-   acá abajo, a la vista. La búsqueda real por cercanía es de la Fase 3: acá
-   los resultados están escritos a mano para poder acordar las pantallas. */
+   acá abajo, a la vista.
+   Los candidatos y los kilómetros NO están escritos a mano: salen de aplicar
+   la regla de las dos puntas sobre coordenadas ficticias, así cambiar el
+   destino cambia de verdad lo que se ve. La búsqueda real, con PostGIS sobre
+   el padrón, es de la Fase 3. */
 
-const LOCALIDADES = [
-  'Reconquista, Santa Fe',
-  'Rafaela, Santa Fe',
-  'Venado Tuerto, Santa Fe',
-  'Rosario, Santa Fe',
-  'Pergamino, Buenos Aires',
-  'Río Cuarto, Córdoba',
-];
+/* Coordenadas ficticias, redondeadas, sólo para que el prototipo calcule
+   distancias en vez de tenerlas escritas a mano. No son un padrón: el real
+   son las 4.028 localidades de Georef que ya usa la aplicación. */
+const LOCALIDADES = {
+  'Reconquista, Santa Fe': [-29.15, -59.65],
+  'Rafaela, Santa Fe': [-31.25, -61.49],
+  'Venado Tuerto, Santa Fe': [-33.75, -61.97],
+  'Rosario, Santa Fe': [-32.95, -60.65],
+  'Pergamino, Buenos Aires': [-33.89, -60.57],
+  'Río Cuarto, Córdoba': [-33.13, -64.35],
+};
+
+/* Distancia en línea recta. Es lo único que el prototipo "calcula", y existe
+   para que cambiar el destino cambie de verdad los candidatos y los
+   kilómetros. En la aplicación esto lo va a resolver PostGIS. */
+function distanciaKm(desde, hasta) {
+  const R = 6371;
+  const [la1, lo1] = LOCALIDADES[desde].map((g) => (g * Math.PI) / 180);
+  const [la2, lo2] = LOCALIDADES[hasta].map((g) => (g * Math.PI) / 180);
+  const h = Math.sin((la2 - la1) / 2) ** 2
+    + Math.cos(la1) * Math.cos(la2) * Math.sin((lo2 - lo1) / 2) ** 2;
+  return Math.round(2 * R * Math.asin(Math.sqrt(h)));
+}
+
+/* La regla aprobada: el radio declarado tiene que cubrir las dos puntas. */
+function cubreElTramo(transportista, origen, destino) {
+  return distanciaKm(transportista.base, origen) <= transportista.radio
+    && distanciaKm(transportista.base, destino) <= transportista.radio;
+}
+
+function candidatosPara(pedido) {
+  return Object.values(TRANSPORTISTAS)
+    .filter((t) => cubreElTramo(t, pedido.origen, pedido.destino));
+}
 
 /* Los nombres son los que hoy puede devolver `full_name`: no existe un campo
    de nombre comercial y el prototipo no lo promete.
-   Las dos distancias son en línea recta desde la base del transportista, una
-   al origen y otra al destino, y las dos tienen que caer dentro del radio
-   declarado. Los números son ficticios pero coherentes entre sí. */
+   Cada transportista declara sólo su localidad base y su radio. Las
+   distancias que se muestran se calculan contra el tramo del momento; acá no
+   hay ningún kilómetro escrito a mano. */
 const TRANSPORTISTAS = {
   duarte: {
     id: 'duarte',
     nombre: 'Sebastián Duarte',
     base: 'Rafaela, Santa Fe',
-    radio: 240,
+    radio: 300,
     transporte: 'Camión con acoplado granelero',
     capacidad: 'Hasta 30 toneladas de granos',
     habilitadoEl: '12/06/2026',
-    aOrigen: 228,
-    aDestino: 196,
     telefono: '+54 9 3492 55-0110',
     correo: 'sebastian.duarte@ejemplo.test',
   },
@@ -35,12 +62,10 @@ const TRANSPORTISTAS = {
     id: 'ledesma',
     nombre: 'Ramón Ledesma',
     base: 'Reconquista, Santa Fe',
-    radio: 400,
+    radio: 600,
     transporte: 'Chasis con caja cerrada',
     capacidad: 'Hasta 12 toneladas',
     habilitadoEl: '03/07/2026',
-    aOrigen: 0,
-    aDestino: 388,
     telefono: '+54 9 3482 55-0144',
     correo: 'ramon.ledesma@ejemplo.test',
   },
@@ -52,10 +77,19 @@ const TRANSPORTISTAS = {
     transporte: 'Carretón para maquinaria',
     capacidad: 'Hasta 40 toneladas, carga sobredimensionada',
     habilitadoEl: '28/05/2026',
-    aOrigen: 0,
-    aDestino: 176,
     telefono: '+54 9 2477 55-0188',
     correo: 'marcela.ibarra@ejemplo.test',
+  },
+  ferrari: {
+    id: 'ferrari',
+    nombre: 'Luciana Ferrari',
+    base: 'Rosario, Santa Fe',
+    radio: 400,
+    transporte: 'Semirremolque con lona',
+    capacidad: 'Hasta 28 toneladas paletizadas',
+    habilitadoEl: '19/06/2026',
+    telefono: '+54 9 341 55-0177',
+    correo: 'luciana.ferrari@ejemplo.test',
   },
 };
 
@@ -71,7 +105,6 @@ function pedidosIniciales() {
       necesitaFlete: null,
       destino: DESTINO_DEL_COMPRADOR,
       elegido: null,
-      candidatos: ['duarte', 'ledesma'],
     },
     {
       id: 'B',
@@ -81,7 +114,6 @@ function pedidosIniciales() {
       necesitaFlete: null,
       destino: DESTINO_DEL_COMPRADOR,
       elegido: null,
-      candidatos: ['ibarra'],
     },
   ];
 }
@@ -127,7 +159,7 @@ function pedidoResuelto(pedido) {
 }
 
 function opcionesDeLocalidad(seleccionada) {
-  return LOCALIDADES.map(
+  return Object.keys(LOCALIDADES).map(
     (localidad) =>
       `<option value="${localidad}"${localidad === seleccionada ? ' selected' : ''}>${localidad}</option>`,
   ).join('');
@@ -247,11 +279,11 @@ function tarjetaTransportista(transportista, pedido) {
       <div class="datos">
         <div>
           <span class="etiqueta">De su base al origen</span>
-          <p>${distanciaTexto(transportista.aOrigen)} <span class="ayuda">en línea recta, hasta ${pedido.origen}</span></p>
+          <p>${distanciaTexto(distanciaKm(transportista.base, pedido.origen))} <span class="ayuda">en línea recta, hasta ${pedido.origen}</span></p>
         </div>
         <div>
           <span class="etiqueta">De su base al destino</span>
-          <p>${distanciaTexto(transportista.aDestino)} <span class="ayuda">en línea recta, hasta ${pedido.destino}</span></p>
+          <p>${distanciaTexto(distanciaKm(transportista.base, pedido.destino))} <span class="ayuda">en línea recta, hasta ${pedido.destino}</span></p>
         </div>
       </div>
 
@@ -309,13 +341,17 @@ function pintarBusqueda() {
       Coordino por mi cuenta
     </button>`;
 
-  if (estado === 'vacio') {
+  const vacio = () => {
     caja.innerHTML = `
       <div class="estado">
         <h2>Ningún transportista cubre este tramo</h2>
         <p>Probá con otro destino, o coordiná el traslado por tu cuenta.</p>
         <div class="acciones" style="justify-content:center">${salidaPropia}</div>
       </div>`;
+  };
+
+  if (estado === 'vacio') {
+    vacio();
     return;
   }
 
@@ -332,7 +368,15 @@ function pintarBusqueda() {
     return;
   }
 
-  const encontrados = pedido.candidatos.map((id) => TRANSPORTISTAS[id]);
+  const encontrados = candidatosPara(pedido);
+
+  // El vacío también ocurre solo: hay destinos que ningún radio alcanza.
+  // El control de la barra lo fuerza; la regla lo produce.
+  if (encontrados.length === 0) {
+    vacio();
+    return;
+  }
+
   caja.innerHTML = `
     <h2 class="resultados__titulo">
       ${encontrados.length} transportista${encontrados.length === 1 ? '' : 's'} para este tramo
@@ -504,7 +548,13 @@ document.addEventListener('change', (evento) => {
   }
 
   if (campo.id === 'busqueda-destino') {
-    pedidoPorId(pedidoEnBusqueda).destino = campo.value;
+    const pedido = pedidoPorId(pedidoEnBusqueda);
+    pedido.destino = campo.value;
+    // Cambiar el tramo invalida la selección anterior, siempre, aunque el
+    // mismo transportista cubra el destino nuevo. Lo que se eligió fue para
+    // otro viaje, y su contacto no puede quedar colgado de éste.
+    pedido.elegido = null;
+    pedido.necesitaFlete = true;
     pintar();
     return;
   }
