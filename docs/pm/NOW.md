@@ -21,11 +21,12 @@ Lo que no cambia con el relevo, y es lo importante:
   lo escribe la dev, y ninguna toca el archivo de la otra.
 - Seguimos adversariales en las dos direcciones.
 
-**La corrección `f7fd2a2` fue revisada el 2026-08-06.** Las cinco
-devoluciones de Sol están bien, pero apareció un hueco adicional: cambiar el
-destino deja candidatos, distancias y selección del tramo anterior. La entrega
-sigue rechazada por ese único punto. La corrección activa está especificada en
-`PARA-DEV.md`; de ella depende cerrar la Fase 1 en fecha.
+**La corrección logística `823c3fe` fue aceptada el 2026-08-06**, con
+informe `a2e5abb`. El destino editable ya controla candidatos, distancias y
+selección; cambiarlo invalida el contacto y vuelve a bloquear el checkout. La
+puerta UX/UI de logística de Fase 1 quedó cerrada antes del inicio contractual.
+La tarea activa en `PARA-DEV.md` es la corrección chica de contraste del
+frontend productivo; no se adelanta Fase 2 o 3.
 
 ## El proyecto fue aprobado
 
@@ -63,9 +64,10 @@ transcripcion funcional en `CONTRATO.md` y el anclaje en `CRONOGRAMA.md`.
 
 ## Objetivo activo
 
-**Cerrar el flujo UX/UI de logistica y la puerta de la Fase 1 antes del
-20/08.** La orden de transferencia inmortal se cerro antes del inicio
-contractual en `0039e00` y fue aceptada por la PM el 2026-08-05.
+**Mantener cerrada la puerta de Fase 1 y corregir el contraste del frontend
+productivo sin ampliar alcance.** El flujo UX/UI de logística fue aceptado en
+`823c3fe` antes del inicio contractual. La orden de transferencia inmortal se
+cerró en `0039e00` y fue aceptada por la PM el 2026-08-05.
 
 El cronograma y los limites del PDF quedaron operativizados en
 `CRONOGRAMA.md` y `ALCANCE-Y-LIMITES.md`. Suscripciones, planes, mensajeria
@@ -148,24 +150,27 @@ nuevos con deuda encima.
 1. ~~**Orden de transferencia inmortal.**~~ **Cerrada y aceptada el
    2026-08-05** en `0039e00`; 25/25 en la misma suite y compilacion
    independiente en verde.
-2. **Cerrar Fase 1 antes del 20/08:** dejar completo el flujo UX/UI de
-   logistica aunque su implementacion corresponda a Fase 3. Tarea activa.
-3. **El seed no carga CBU ni alias**, así que sobre una instalación limpia
+2. ~~**Cerrar Fase 1 antes del 20/08:** dejar completo el flujo UX/UI de
+   logística aunque su implementación corresponda a Fase 3.~~ **Cerrada el
+   2026-08-06** con `823c3fe`, antes del inicio contractual.
+3. **Contraste productivo:** corregir la deuda global de texto y controles
+   detectada durante la revisión del prototipo, sin rediseño. Tarea activa.
+4. **El seed no carga CBU ni alias**, así que sobre una instalación limpia
    la transferencia no se puede usar. Y la pantalla de pago muestra un
    error que no corresponde.
-4. **El camino de instalación sin Docker no funciona** siguiendo la guía:
+5. **El camino de instalación sin Docker no funciona** siguiendo la guía:
    el archivo de configuración de ejemplo tiene claves que el sistema
    rechaza, y el proxy del frontend apunta a un puerto que sólo existe con
    nginx.
-5. **Transportistas.** La Pieza A está hecha con dos objeciones abiertas
+6. **Transportistas.** La Pieza A está hecha con dos objeciones abiertas
    —el perfil no se puede editar y el campo de certificación obligatorio
    no informa nada—. Las decisiones de B/C y el mapa de contacto quedaron
    cerrados el 2026-08-05; su implementacion corresponde a Fase 3.
-6. **Mercado Pago para las compras**, reconstruido sin split, dentro de la
+7. **Mercado Pago para las compras**, reconstruido sin split, dentro de la
    Fase 4 contractual.
-7. **Fase 6, despues del lanzamiento:** suscripciones, planes, mensajeria
+8. **Fase 6, despues del lanzamiento:** suscripciones, planes, mensajeria
    premium y tierras. No compite por tiempo con las fases 1 a 5.
-8. **Al final:** correcciones de la vista en celular, revisión de
+9. **Al final:** correcciones de la vista en celular, revisión de
    seguridad y despliegue en producción.
 
 **Despliegue:** Railway fue aprobado como destino el 2026-08-05. La dev
