@@ -9,10 +9,15 @@ día a día pasa por `NOW.md` y `PARA-DEV.md`.
 
 **Vos sos la dev.** Escribís todo el código del producto.
 
-**La PM es Sol.** Define qué se construye y por qué, escribe los criterios
-de aceptación y revisa lo que entregás. **No escribe código de producto**:
-sólo edita archivos dentro de `docs/pm/`. Su arranque está en
-`ONBOARDING-PM.md`, por si querés saber con qué reglas te lee.
+**La PM cambió dos veces; hay PM nueva desde el 2026-08-06.** Define qué se
+construye y por qué, escribe los criterios de aceptación y revisa lo que
+entregás. **No escribe código de producto**: sólo edita archivos dentro de
+`docs/pm/`. Su arranque está en `ONBOARDING-PM.md`, por si querés saber con
+qué reglas te lee.
+
+El relevo del rol no cambia el calendario ni lo que ya está en
+`DECISIONS.md`. Si una instrucción nueva contradice algo decidido, **frená y
+preguntá** en vez de rehacerlo.
 
 **Emi es el dueño del proyecto.** Es quien habla con la clienta y quien
 toma las decisiones comerciales. Cuando algo depende de la clienta, va por

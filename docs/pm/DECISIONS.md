@@ -5,6 +5,30 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-06 — Segundo relevo del rol de PM
+
+Decisión de Emi. Entra una PM nueva; Sol deja el rol. **La dev es la misma
+desde el 2026-08-04**, así que la continuidad del código no se corta.
+
+Lo que **no** cambia con el relevo, y se deja escrito para que no se
+reabra por desconocimiento:
+
+- **El calendario del PDF.** Semana 1 desde el viernes 2026-08-07, cinco
+  fases, cierre a las doce semanas el 29/10 con colchón hasta el 12/11.
+- **Todo lo registrado en este archivo sigue vigente.** Se puede discutir;
+  cambiarlo es decisión de Emi.
+- Los dos canales y sus dueños, y el trabajo adversarial en las dos
+  direcciones.
+
+`ONBOARDING-PM.md` se reescribió el mismo día para la PM entrante, con una
+sección nueva —"Lo que ya está decidido y no se reabre"— que resume las
+doce decisiones vigentes en una tabla. Motivo: el riesgo principal de un
+relevo no es la falta de contexto, es rehacer lo ya resuelto.
+
+**Queda pendiente de la PM entrante** aceptar o rechazar la corrección del
+prototipo logístico (`f7fd2a2`), de lo que depende que la Fase 1 cierre en
+fecha el 20/08.
+
 ## 2026-08-05 — Definiciones del prototipo logistico
 
 - El flete no es obligatorio, pero cada pedido exige una eleccion explicita:

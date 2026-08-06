@@ -1,21 +1,30 @@
 # Estado actual
 
-Actualizado: 2026-08-05.
+Actualizado: 2026-08-06.
 
-## Cambio de roles, hoy
+## Cambio de PM, hoy
 
-**La PM ahora es Sol. La dev ahora soy yo.** El intercambio es completo:
-Sol define, prioriza, escribe criterios y revisa; yo escribo el código y
-le informo. Seguimos siendo adversariales en las dos direcciones.
+**Hay PM nueva desde el 2026-08-06.** Es el segundo relevo del rol: la
+primera PM es hoy la dev, la segunda fue Sol, y ahora entra la tercera. La
+dev no cambia.
 
-Sol arranca por **`ONBOARDING-PM.md`** y después por este archivo.
+**Arranca por `ONBOARDING-PM.md`**, que se reescribió hoy para ella, y
+después por este archivo.
 
-Lo que cambia en la práctica:
+Lo que no cambia con el relevo, y es lo importante:
 
-- `PARA-DEV.md` lo escribe Sol. Lo archivé de 1.378 a 494 líneas; el
-  historial completo quedó verbatim en `archivo/PARA-DEV-historico.md`.
-- `PARA-PM.md` lo escribo yo, y lo pisé con el informe de hoy.
-- El plan con fechas reales quedó en **`CRONOGRAMA.md`**, nuevo.
+- **El calendario del PDF, que arranca mañana viernes 07/08.** Ver
+  `CRONOGRAMA.md`.
+- **Todo lo que está en `DECISIONS.md` sigue decidido.** Discutirlo se
+  puede; cambiarlo es decisión de Emi.
+- Los dos canales y sus dueños: `PARA-DEV.md` lo escribe la PM, `PARA-PM.md`
+  lo escribe la dev, y ninguna toca el archivo de la otra.
+- Seguimos adversariales en las dos direcciones.
+
+**Lo que quedó a medio camino en el relevo**, y está detallado en la
+sección 10 de `ONBOARDING-PM.md`: la corrección del prototipo de logística
+(`f7fd2a2`) espera aceptación, y de eso depende que la Fase 1 cierre en
+fecha.
 
 ## El proyecto fue aprobado
 
@@ -42,9 +51,14 @@ el compromiso escrito con la clienta. Están ancladas a fechas reales en
 | 4 — Pagos y checkout | 9–10 | 02/10 | 15/10 |
 | 5 — QA y lanzamiento | 11–12 | 16/10 | 29/10 |
 
-**Hoy es miercoles 2026-08-05: el reloj todavia no empezo.** Emi confirmo
-que la semana 1 comienza el **viernes 2026-08-07**. Las doce semanas
-cierran el **2026-10-29** y el colchon llega al **2026-11-12**.
+**Hoy es jueves 2026-08-06: el reloj arranca mañana.** Emi confirmo que la
+semana 1 comienza el **viernes 2026-08-07** y que cada semana corre de
+viernes a jueves. Las doce semanas cierran el **2026-10-29** y el colchon
+llega al **2026-11-12**.
+
+**El PDF original lo tiene Emi, fuera del repositorio**, porque incluye
+montos y forma de pago. Lo versionado y suficiente para trabajar son la
+transcripcion funcional en `CONTRATO.md` y el anclaje en `CRONOGRAMA.md`.
 
 ## Objetivo activo
 
@@ -174,8 +188,12 @@ incendio.
 
 ## Equipo
 
-**Sol, PM. Una sola dev.** Todo sobre `main`, con canal único en
-`PARA-DEV.md` —escribe Sol— y `PARA-PM.md` —escribe la dev—.
+**Una PM y una dev.** Todo sobre `main`, con canal único en `PARA-DEV.md`
+—escribe la PM— y `PARA-PM.md` —escribe la dev—.
+
+El rol de PM cambió dos veces: la primera PM pasó a dev el 2026-08-04, Sol
+la sucedió, y hay PM nueva desde el 2026-08-06. **La dev es la misma desde
+el 04/08**, así que la continuidad del código no se cortó.
 
 `PARA-DEV.md` quedó archivado el 2026-08-04: pasó de 1.378 a 494 líneas.
 El historial completo está verbatim en

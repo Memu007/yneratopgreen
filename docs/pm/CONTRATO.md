@@ -17,7 +17,14 @@ Marketplace del Sector Agropecuario (Fase Nacional)*, Ynera.
 
 Transcripción de las secciones **funcionales** (1 a 5). Las secciones
 comerciales (costos, forma de pago) **no se versionan acá** — están en el
-PDF original, fuera del repositorio, porque este repositorio es público.
+PDF original, fuera del repositorio, porque este repositorio se le entrega
+a la clienta.
+
+**Dónde está el PDF:** el original lo tiene Emi. Si necesitás leerlo
+entero, pedíselo a él. Lo que hace falta para trabajar está acá: la
+**sección 5, Cronograma y Tiempos Estimados**, está transcripta más abajo
+tal cual figura en el documento, y anclada a fechas reales en
+`CRONOGRAMA.md`.
 
 Este documento es la única fuente de verdad del alcance. Si algo no está
 acá, no es requisito.

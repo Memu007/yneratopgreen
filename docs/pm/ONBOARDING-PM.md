@@ -1,9 +1,31 @@
 # Arranque para la PM
 
-Sol: leé este archivo entero **una vez**. Después no vuelve a hacer falta.
-Tu día a día pasa por `NOW.md`, `CRONOGRAMA.md` y los dos canales.
+Leé este archivo entero **una vez**, hoy. Después tu día a día pasa por
+`NOW.md`, `CRONOGRAMA.md` y los dos canales.
 
-Escrito el 2026-08-04 por la PM saliente, que a partir de hoy es la dev.
+Escrito el **2026-08-06** por la dev, para la PM entrante. Es el segundo
+cambio de PM del proyecto: la primera fue quien hoy escribe el código, la
+segunda fue Sol, y ahora sos vos.
+
+---
+
+## 0. Lo primero, porque es lo que más cuesta caro
+
+Este proyecto ya lleva **tres semanas de decisiones tomadas y registradas**.
+La forma más rápida de perder tiempo acá es reabrirlas.
+
+**Tres cosas no se mueven, y ninguna es opinión mía:**
+
+1. **El calendario sale del PDF que la clienta aprobó.** No es una
+   estimación interna. Ver sección 4.
+2. **El alcance está cerrado y es a precio fijo.** Lo que se construya de
+   más lo pagamos nosotros. `CONTRATO.md` es la única fuente: si algo no
+   está ahí, no es requisito.
+3. **Lo que figura en `DECISIONS.md` está decidido.** Podés discutirlo —te
+   invito a hacerlo— pero cambiarlo es una decisión de Emi, no tuya ni mía.
+
+**El reloj arranca mañana, viernes 07/08.** Hoy es jueves 06/08: es el
+último día de preparación.
 
 ---
 
@@ -13,23 +35,13 @@ Escrito el 2026-08-04 por la PM saliente, que a partir de hoy es la dev.
 criterios de aceptación, priorizás y revisás lo que se entrega.
 
 **No escribís código de producto.** Sólo editás archivos dentro de
-`docs/pm/`. Esto no es una formalidad: si la PM toca el código, se pierde
-la única revisión independiente que tiene el proyecto.
+`docs/pm/`. Si la PM toca el código, el proyecto pierde la única revisión
+independiente que tiene.
 
 **Yo soy la dev.** Escribo el código, corro las pruebas y te informo.
 
-**Emi es el dueño del proyecto.** Habla con la clienta y toma las
-decisiones comerciales. Todo lo que dependa de la clienta va por él.
-
-### El cambio de roles es de hoy
-
-Hasta el 2026-08-04 yo era la PM. Todo lo que está escrito en `PARA-DEV.md`,
-`DECISIONS.md`, `NOW.md` y el archivo histórico lo escribí yo desde ese
-lugar. **Ahora eso es tuyo y podés revisarlo entero**, incluido lo que
-decidí mal.
-
-Te dejo la lista de mis errores en la sección 8, porque heredás las
-consecuencias.
+**Emi es el dueño del proyecto.** Habla con la clienta y toma las decisiones
+comerciales. Todo lo que dependa de la clienta va por él.
 
 ---
 
@@ -40,68 +52,132 @@ Esto es cómo trabajamos, no una advertencia.
 **Si me pedís algo técnicamente mal, te lo voy a decir antes de hacerlo.**
 No lo voy a implementar porque lo pidió la PM. Y espero lo mismo al revés.
 
-Ya pasó varias veces, en las dos direcciones:
+Pasó en las dos direcciones, y por eso funciona:
 
-- La PM mandó a cargar *"las 43 subcategorías tal como figuran en el
+- Una PM mandó a cargar *"las 43 subcategorías tal como figuran en el
   análisis"* cuando el análisis sólo tenía las cantidades. La dev frenó en
   vez de inventarlas. **Tenía razón y el error era de la PM.**
-- La PM afirmó en un borrador de contrato que *"la plataforma no toca
-  fondos"*. La dev demostró que era falso: el código heredado tenía split
-  payments con comisión de marketplace y OAuth de vendedores, apagado sólo
-  porque faltaban credenciales. **Ganó la dev**, y por eso hoy esos routers
+- Una PM afirmó por escrito que *"la plataforma no toca fondos"*. La dev
+  demostró que era falso. **Ganó la dev**, y por eso hoy los pagos heredados
   están desmontados.
-- La dev dejó la categoría Acopio con cero publicaciones y dejó su informe
-  desactualizado dos veces. **Lo encontró la PM revisando el código.**
+- **Sol rechazó una entrega mía por contraste** y midió el número que yo no
+  había medido: 3,77:1 donde hacían falta 4,5:1. **Tenía razón.** Ese
+  rechazo mejoró el producto.
+- La dev dejó su informe desactualizado dos veces y la PM se enteró leyendo
+  el código.
 
 **La regla operativa: se verifica contra el código, no contra el informe.**
-No por desconfianza. Este repositorio llegó con ocho afirmaciones falsas en
-su propia documentación —`docs/PROJECT_STATUS.md`— y aprendimos por las
-malas.
-
-Si te digo que algo funciona y no pegué la salida, tratalo como no hecho.
+Este repositorio llegó con ocho afirmaciones falsas en su propia
+documentación. Si te digo que algo funciona y no pegué la salida del
+comando, **tratalo como no hecho**.
 
 ---
 
 ## 3. El proyecto, en un minuto
 
-**TopGreen** es un marketplace agrícola argentino, para una clienta real,
-a **precio cerrado**. Junta productores, proveedores y transportistas.
+**TopGreen** es un marketplace agrícola argentino, para una clienta real, a
+**precio cerrado**. Junta productores, proveedores y transportistas.
 
 La diferencia con un marketplace común son dos cosas: **filtrado por
-ubicación real** —con el padrón oficial de localidades del Estado
-argentino, 4.028 cargadas— y un **módulo de logística** que conecta
-compradores y vendedores con transportistas de la zona.
+ubicación real** —con el padrón oficial del Estado argentino, 4.028
+localidades cargadas— y un **módulo de logística** que conecta compradores y
+vendedores con transportistas de la zona.
 
-El proyecto **fue aprobado el martes 2026-07-28**. Se terminó la etapa de
-conseguir el trabajo; ahora se entrega, con el reloj corriendo.
-
-**Precio cerrado significa que lo que se construya de más lo pagamos
-nosotros.** Es tu palanca principal y tu principal riesgo a la vez.
-
----
-
-## 4. Las fechas mandan, y están en `CRONOGRAMA.md`
-
-**Guiate por las fases y semanas del PDF del socio** —el documento de
-especificación funcional que la clienta aprobó—. Están transcriptas y
-ancladas a fechas reales en **`docs/pm/CRONOGRAMA.md`**. Abrilo ahora, es
-lo segundo que tenés que leer.
-
-El resumen que necesitás tener en la cabeza:
-
-- Cinco fases, **semana 1 desde el viernes 2026-08-07**.
-- Plazo **12 a 14 semanas**. Las doce cierran el **2026-10-29**.
-- **Hoy es la preparacion anterior al inicio contractual.**
-- Tres hitos de cobro atados a **entregables**, no a fechas.
-- El trabajo contractual restante entra en el plazo estimado. El alcance
-  nuevo de suscripciones **no esta en el PDF y va a Fase 6**.
-
-La decision quedo cerrada por Emi el 2026-08-05 y esta desarrollada en la
-seccion 6 del cronograma.
+La clienta aprobó el proyecto el **martes 2026-07-28**. Viene de una
+experiencia mala con otro estudio: heredamos un repositorio donde la base de
+datos no se podía crear y cuya documentación afirmaba cosas falsas. Eso
+explica por qué acá todo se verifica.
 
 ---
 
-## 5. Cómo nos comunicamos
+## 4. El calendario manda, y sale del PDF
+
+**Fuente: la sección 5 del PDF** *Documento de Especificación Funcional y
+Propuesta Comercial*, el que armó el socio de Emi y que **la clienta
+aprobó**. Las fases y las semanas de abajo **no son una estimación nuestra:
+son lo que se prometió por escrito**.
+
+**Dónde está el PDF:** el original lo tiene Emi, **fuera del repositorio**,
+porque incluye montos y forma de pago y este repositorio se le entrega a la
+clienta al final. Pedíselo a él si querés leerlo entero.
+
+**Lo que sí está versionado, y te alcanza para trabajar:**
+
+- **`CONTRATO.md`** — transcripción de las secciones funcionales 1 a 5,
+  incluida la tabla de fases tal cual figura en el PDF.
+- **`CRONOGRAMA.md`** — esa misma tabla anclada a fechas reales, más las
+  puertas de cierre de cada fase y los tres hitos de cobro con su
+  disparador textual.
+
+**Si el plan interno y `CRONOGRAMA.md` se contradicen, gana
+`CRONOGRAMA.md`**, y hay que corregir el plan interno.
+
+### Las cinco fases, con fechas
+
+| Fase | Contenido según el PDF | Semanas | Desde | Hasta |
+|---|---|---|---|---|
+| 1 — Diseño y UX/UI | Pantallas y flujos de comprador, vendedor y logística | 1–2 | **07/08** | **20/08** |
+| 2 — Desarrollo base | Arquitectura, base, registro de roles y perfiles | 3–5 | 21/08 | 10/09 |
+| 3 — Buscador y catálogo | Motor de búsqueda y **geolocalización de fletes** | 6–8 | 11/09 | 01/10 |
+| 4 — Pagos y checkout | Mercado Pago y validación de transferencias | 9–10 | 02/10 | 15/10 |
+| 5 — QA y lanzamiento | Pruebas, carga inicial y **despliegue en producción** | 11–12 | 16/10 | 29/10 |
+
+**Ancla:** Emi confirmó el 2026-08-05 que la **semana 1 empieza el viernes
+2026-08-07**. Cada semana corre de viernes a jueves.
+
+**Plazo: 12 a 14 semanas.** Las doce cierran el **29/10**; el colchón que el
+propio PDF concede llega al **12/11**. Ese colchón es la única holgura que
+existe: **gastarlo es una decisión, no un accidente**, y cada corrimiento se
+anota en `CRONOGRAMA.md` con su motivo.
+
+**Garantía:** 90 días desde el lanzamiento. Sobre la fecha de doce semanas,
+hasta el **2027-01-27**.
+
+### Los tres hitos de cobro
+
+No están atados a fechas: **están atados a entregables**, con el texto
+literal del PDF en `CRONOGRAMA.md`. El intermedio exige demostrar catálogo,
+búsquedas **y geolocalización de fletes** funcionando juntas. Los montos no
+se versionan.
+
+### Dos cosas del calendario que vas a querer saber ya
+
+**El PDF supone que se arranca de cero, y no se arrancó de cero.** Se heredó
+un repositorio a medias y se trabajó tres semanas antes de la aprobación.
+Por eso el estado real no sigue el orden de las fases. El contraste fase por
+fase está en la sección 4 de `CRONOGRAMA.md`.
+
+**Hacia afuera se reporta con estas cinco fases**, aunque internamente se
+trabaje en otro orden. Eso no es cosmético: es lo que la clienta firmó.
+
+---
+
+## 5. Lo que ya está decidido y no se reabre
+
+Esta sección existe para que no derives. Todo esto está en `DECISIONS.md`
+con su fecha y su motivo.
+
+| Decisión | Cuándo | En una línea |
+|---|---|---|
+| Inicio del plazo | 05/08 | Semana 1 desde el viernes 07/08 |
+| Suscripciones, planes, mensajería y tierras | 05/08 | **Van a Fase 6, después del lanzamiento.** No compiten con las fases 1 a 5 |
+| "Registro con validación" | 05/08 | Es **por correo**: enlace de un solo uso, 24 h, reenvío, login bloqueado hasta verificar |
+| Hosting | 05/08 | **Railway**, aprobado. Configuración no cuenta como despliegue |
+| Logística | 07/25 | **Directorio por geolocalización, no motor de ruteo.** Lo dice el contrato |
+| Cobertura del transportista | 07/26 | **Radio en km**, no zonas declaradas. Lo dice el contrato |
+| La plataforma y el dinero | 07/26 | **No recibe, retiene ni administra fondos de terceros** |
+| Mercado Pago heredado | 07/26 | **Desmontado.** Era split con comisión y OAuth, no el "checkout básico" del contrato. Se rehace sin split en Fase 4 |
+| Transferencia bancaria | 05/08 | Cerrada y aceptada. Sin órdenes inmortales |
+| Nombre comercial del transportista | 05/08 | **Rechazado para el MVP.** Se usa `full_name` |
+| Revisión de seguridad | 07/25 | **Al final, como condición para desplegar.** No se adelanta y no se saltea |
+| Vista en celular | 07/26 | **Aparcada** hasta el final, con relevamiento hecho |
+
+**Si querés cambiar alguna, el camino es Emi.** Lo que no sirve es
+empezar a trabajar como si no estuviera decidida.
+
+---
+
+## 6. Cómo nos comunicamos
 
 **No hay chat entre vos y yo. Hablamos por archivos, en el repositorio.**
 
@@ -111,7 +187,7 @@ seccion 6 del cronograma.
 | `docs/pm/PARA-PM.md` | **Sólo yo** | Mis informes |
 
 Ninguna de las dos edita el archivo de la otra. `PARA-DEV.md` es tuyo:
-podés reescribirlo entero cuando quieras.
+reescribilo entero cuando quieras.
 
 **Antes de escribirme:**
 
@@ -122,186 +198,145 @@ cat docs/pm/PARA-PM.md
 
 ### Qué tiene que tener una tarea que me escribas
 
-1. **Qué problema resuelve.** Sin esto no puedo decidir nada cuando la
-   especificación no alcanza.
+1. **Qué problema resuelve.**
 2. **Los criterios de aceptación**, escritos como abajo.
 3. **Qué está explícitamente fuera de alcance.** Con precio cerrado, esto
    vale tanto como lo que está dentro.
-4. **Qué pasa si un criterio no se cumple**: freno y te escribo, o
-   improviso. Por defecto, freno.
+4. **Cuándo freno y te escribo** en vez de improvisar. Por defecto, freno.
 
-### Cómo se escriben los criterios de aceptación acá
+### Cómo se escriben los criterios acá
 
-**Relacionales, no absolutos.** En vez de *"tiene que devolver 4
-productos"*, va *"el resultado de la API tiene que coincidir con el de la
-consulta SQL equivalente"*.
+**Relacionales, no absolutos.** En vez de *"tiene que devolver 4 productos"*,
+va *"el resultado de la API tiene que coincidir con el de la consulta SQL
+equivalente"*. Los números fijos envejecen mal: ya se le pasaron a una dev
+números viejos y ella reportó los reales en lugar de acomodarse.
 
-El motivo: se le pasaron a una dev números fijos que habían quedado viejos
-cuando el seed creció. Ella reportó los reales en lugar de acomodarse, y
-así se detectó. **Los números fijos envejecen mal.**
+Cuando el número **es** la especificación —como *"43 subcategorías"*— va
+fijo, y se aclara que es fijo.
 
-Cuando el número **es** la especificación —como *"43 subcategorías"*— ahí
-sí va fijo, y se aclara que es fijo.
+**Un criterio que sólo se puede verificar leyendo código no es un criterio.**
+Tiene que haber un comando que corra y una salida que se pegue.
 
-**Un criterio que sólo se puede verificar leyendo código no es un
-criterio.** Tiene que haber un comando que corra y una salida que se pegue.
+Sol subió la vara acá y conviene mantenerla: pedía **la corrida en rojo antes
+del arreglo y la verde después**. Un caso que pasa antes de la corrección no
+prueba nada.
 
 ---
 
-## 6. Las reglas que no se negocian
+## 7. Las reglas que no se negocian
 
-Estas están decididas y documentadas en `DECISIONS.md`. Podés discutirlas,
-pero cambiarlas es una decisión de Emi, no tuya ni mía.
-
-1. **La plataforma no recibe, retiene ni administra fondos de terceros.**
-   Por eso el pago heredado de Mercado Pago está desmontado y el caso 19 de
-   la suite verifica que esas rutas devuelvan `404`. Es una propiedad del
-   código, no de la configuración.
-
-   El cobro de **suscripciones** queda afuera de esta restricción: es
-   servicio propio a cliente propio.
+1. **La plataforma no recibe, retiene ni administra fondos de terceros.** El
+   caso 19 de la suite verifica que las rutas de pago heredadas devuelvan
+   `404`: es una propiedad del código, no de la configuración.
 2. **Nunca se configuran credenciales reales de Mercado Pago** ni se sube
-   ningún secreto al repositorio. Para local, valores inventados.
-3. **Nada copiado de Agrofy ni de ningún otro sitio**: ni código, ni
-   textos, ni diseño, ni marcas.
+   ningún secreto. Para local, valores inventados.
+3. **Nada copiado de Agrofy ni de ningún otro sitio**: ni código, ni textos,
+   ni diseño, ni marcas.
 4. **La revisión de seguridad completa va al final, como condición para
    desplegar.** No se adelanta y no se saltea.
 
-   **Matiz importante:** posponer la auditoría no es posponer un agujero
-   encontrado. Apareció un `POST /payments/simulate-payment/{order_id}` que
-   dejaba a un comprador pasar su propia orden a `PAID` sin pagar; se
-   encontró en una revisión de alcance y se eliminó el mismo día.
-5. **Una política de seguridad del entorno de la dev no se rodea nunca** —
-   ni con CDP, ni con otro navegador, ni con un túnel. Se reporta.
-6. **Los datos de contacto son de personas reales.** La API no devuelve el
-   teléfono del comprador sin suscripción activa. Se hace en el backend, no
-   escondiéndolo en la interfaz.
+   **Matiz:** posponer la auditoría no es posponer un agujero encontrado.
+   Apareció un endpoint que dejaba a un comprador marcar su propia orden
+   como pagada sin pagar; se encontró en una revisión de alcance y se
+   eliminó el mismo día.
+5. **Una política de seguridad del entorno de la dev no se rodea nunca.** Se
+   reporta.
+6. **Los datos de contacto son de personas reales.** Cualquier candado se
+   hace en el backend, no escondiendo cosas en la interfaz.
 7. **`docs/PROJECT_STATUS.md` no se lee ni se edita.** Ocho afirmaciones
-   verificadas como falsas. Se reescribe entero más adelante.
+   verificadas como falsas.
 8. **Los términos comerciales no se versionan** —montos, porcentajes,
    participación—. Este repositorio se le entrega a la clienta.
 
 ---
 
-## 7. Dónde está todo
+## 8. Dónde está todo
 
 | Archivo | Cuándo abrirlo |
 |---|---|
 | `NOW.md` | **Siempre primero.** Estado y prioridades |
-| `CRONOGRAMA.md` | **Segundo.** Las fases y fechas del PDF |
-| `PARA-DEV.md` | Lo que dejaste escrito para mí |
+| `CRONOGRAMA.md` | **Segundo.** Fases, fechas, puertas e hitos |
+| `ALCANCE-Y-LIMITES.md` | Los límites operativos por bloque |
+| `PARA-DEV.md` | Lo que le dejás escrito a la dev |
 | `PARA-PM.md` | Mis informes |
 | `CONTRATO.md` | El alcance. Si algo no está ahí, no es requisito |
-| `ALCANCE-Y-LIMITES.md` | Guardas operativas por bloque y fuera de alcance |
+| `DECISIONS.md` | Por qué se decidió cada cosa |
 | `MATRIZ.md` | Qué está verificado y con qué evidencia |
 | `PROJECT.md` | Qué se construye y qué queda afuera |
-| `DECISIONS.md` | Por qué se decidió cada cosa |
-| `TAXONOMIA-CLIENTE.md` | Las 7 categorías y las 43 subcategorías, con nombres |
-| `PAGOS-TRANSFERENCIA.md` | El análisis de la transferencia y los cuatro arreglos |
+| `TAXONOMIA-CLIENTE.md` | Las 7 categorías y las 43 subcategorías |
+| `PAGOS-TRANSFERENCIA.md` | El análisis de la transferencia |
 | `REPO_MAP.md` | Dónde está cada cosa en el código |
-| `DEMO.md` | El guion de demostración |
-| `ONBOARDING-DEV.md` | Lo que lee la dev el primer día |
+| `ONBOARDING-DEV.md` | Lo que leo yo el primer día |
+| `docs/ux/logistica/` | El prototipo navegable de logística |
 | `archivo/PARA-DEV-historico.md` | Todo el canal de julio, verbatim |
-
----
-
-## 8. Los errores de la PM anterior, porque heredás las consecuencias
-
-No están acá por confesión. Están porque cada uno dejó una regla.
-
-1. **Mandé a inventar datos que no existían** (las 43 subcategorías).
-   Regla: si un criterio mío no cierra con lo que ve la dev, **el
-   sospechoso soy yo**.
-2. **Bloqueé el módulo de transportistas esperando una definición de la
-   clienta que ya estaba en el contrato** —*"zona de cobertura (radio en
-   km)"*—. Perdí días por no leer bien mi propia transcripción. Regla:
-   antes de declarar un bloqueo, releer `CONTRATO.md`.
-3. **Dije que una pieza "no tenía nada discutible" mientras yo misma pedía
-   discutir su contenido.** Regla: si mando a arrancar, arranca; si mando a
-   discutir, no arranca.
-4. **Afirmé una propiedad del sistema que era falsa** ("no toca fondos").
-   Regla: las propiedades del sistema se afirman contra el código.
-5. **Tres commits me quedaron en la rama equivocada** porque corrí
-   `git commit && git push origin main` estando en otra rama y un `| tail -1`
-   me tapó el error. `NOW.md` estuvo horas desactualizado en `main`. Regla:
-   **verificar el push explícitamente**, no encadenarlo.
-6. **Dejé crecer `PARA-DEV.md` a 1.378 líneas** hasta que se volvió
-   inservible. Hoy quedó archivado y el canal arranca en 494 líneas. Regla:
-   archivar lo cerrado antes de que la dev empiece a saltear secciones.
 
 ---
 
 ## 9. El estado real, sin maquillar
 
-La ultima medicion heredada fue **~53%**, ponderada por esfuerzo. Quedo
-desactualizada despues de la Pieza A y del alcance nuevo; el control actual
-se hace por puertas de fase en `CRONOGRAMA.md`. El detalle requisito por
-requisito esta en `MATRIZ.md`.
+**No hay un porcentaje único vigente.** La última medición heredada fue
+~53 %, pero mezclaba alcance contractual con alcance nuevo y no incluía la
+Pieza A de transportistas. **El control se hace por las puertas de
+`CRONOGRAMA.md`**, no por un número.
 
-| Bloque | Peso | Avance |
-|---|---|---|
-| Comprador y vendedor | 30 % | 90 % |
-| **Logística y transportistas** | **25 %** | **Pieza A parcial; B/C en 0** |
-| Pagos | 15 % | 50 % |
-| Catálogo y categorías | 8 % | 90 % |
-| Stack y responsive | 10 % | 70 % |
-| Cierre, despliegue y entrega | 12 % | 35 % |
-
-**Cómo leer ese número sin engañarte:**
-
-- El mayor salto lo dio el **recorte de alcance**, no el código. Esa
-  palanca ya se usó.
-- Buena parte del trabajo hecho fue **arqueología** sobre un repositorio
-  heredado a medias, no construcción.
-- **Lo que queda es construcción nueva con incógnitas.** La velocidad de
-  julio no se repite.
-- El número **bajó** cuando se desmontó Mercado Pago, que estaba contado
-  como medio hecho. Fue la decisión correcta y aun así el porcentaje la
-  castiga. Así tiene que ser un porcentaje honesto.
-
-**Funciona y está verificado con evidencia de ejecución:**
+**Funciona y tiene evidencia de ejecución:**
 
 - Arranque desde cero: PostgreSQL 16 + PostGIS 3.4.3, migraciones, seed
   idempotente, build en verde.
 - Recorrido de compra completo en navegador real, con tres perfiles.
-- Geolocalización con 4.028 localidades de Georef, `Geography(POINT,4326)`
-  con índice GIST, `ST_Distance` contrastado de forma independiente.
+- Geolocalización con 4.028 localidades, `Geography(POINT,4326)` con índice
+  GIST y `ST_Distance` contrastado.
 - Filtro por provincia y localidad de punta a punta, con estado en la URL.
-- Taxonomía real de la clienta: 7 categorías, 43 subcategorías, verificado
-  por SQL 7/6/7/5/6/4/8.
-- **Suite de 25 casos de humo** contra arranque limpio, con criterios
-  relacionales y navegador real. Los cuatro casos nuevos tienen rojo previo.
-- Pago por transferencia bancaria cerrado: autorizacion, snapshot, salidas de
-  cancelacion/decision y atomicidad verificadas.
+- Taxonomía de la clienta cargada y verificada por SQL: 7/6/7/5/6/4/8.
+- **Suite de 25 casos de humo**, corrida desde base limpia el 05/08.
+- **Transferencia bancaria sin órdenes inmortales**, aceptada el 05/08.
+- **Prototipo navegable del flujo de logística**, en `docs/ux/logistica/`,
+  con la corrección de Sol aplicada.
 
-**Roto o sin empezar:**
+**Falta, y es lo grande:**
+
+- **Transportistas, Piezas B y C**: el listado por cercanía y la inclusión en
+  la operación. Es Fase 3 y es el diferencial del producto.
+- **Validación por correo** — Fase 2.
+- **Perfil de transportista editable** — Fase 2, con dos objeciones abiertas.
+- **Mercado Pago para compras**, sin split — Fase 4.
+- **Despliegue real**, revisión de seguridad y correcciones de celular —
+  Fase 5.
+
+**Roto de lo ya entregado, sin arreglar:**
 
 - El seed no carga CBU ni alias, así que en instalación limpia la
   transferencia no se puede usar.
 - El camino de instalación sin Docker no funciona siguiendo la guía.
-- Perfil del transportista no editable.
-- Transportistas: Piezas B y C en cero.
-- Suscripciones: **la tarea ni siquiera está escrita**.
-- Tierras y parcelas como aviso de consulta.
-- Mercado Pago para compras, sin split.
-- Vista en celular: relevada, no corregida.
-- Despliegue: preparación de Railway subida, sin desplegar.
-- Revisión de seguridad final.
 
 ---
 
-## 10. Lo que te espera decidir
+## 10. Lo que está en el aire ahora mismo
 
-1. Cerrar el flujo UX/UI de logistica antes del 20/08.
-2. Especificar y cerrar Desarrollo Base durante la Fase 2.
-3. Especificar la validacion por correo dentro de Fase 2.
-4. Mantener suscripciones, planes, mensajeria y tierras fuera del camino
-   critico hasta Fase 6.
+Tres cosas esperan respuesta de la PM. Las dejo tal cual se las dejé a Sol:
+
+1. **¿Aceptás la corrección del prototipo?** Está en `PARA-PM.md`, commit
+   `f7fd2a2`. Si la aceptás, **cierra la puerta de la Fase 1**.
+2. **El contraste de `src/index.css`.** Corregí el gradiente en el
+   prototipo, pero **la aplicación real sigue con el mismo 3,77:1 en todos
+   sus botones primarios**. Es una falla de accesibilidad que existe hoy, no
+   sólo en el prototipo. Media hora de trabajo. Decidí si entra como pieza
+   chica o va a la revisión de Fase 5.
+3. **La pieza chica del reembolso heredado.** `orders.py` importa
+   `process_refund` desde el módulo de pagos desmontado. Hoy no llega a
+   ejecutarse, pero el camino está vivo. Sol lo dejó para Fase 4; si querés
+   adelantarlo, es chico.
 
 ---
 
-## 11. Tarea actual
+## 11. Tu primera tarea
 
-La transferencia ya fue aceptada. El foco es revisar el prototipo navegable
-de logistica y cerrar la puerta de Fase 1 sin adelantar la implementacion de
-Fase 3. El enunciado vigente esta en `PARA-DEV.md`.
+1. Leé `NOW.md` y `CRONOGRAMA.md`, en ese orden.
+2. Leé mi último informe en `PARA-PM.md`.
+3. Contestá el punto 1 de la sección anterior: **aceptar o rechazar la
+   corrección del prototipo**, porque de eso depende que la Fase 1 cierre en
+   fecha.
+4. Escribime la tarea siguiente en `PARA-DEV.md` y pusheá.
+
+**Empezar no necesita permiso de mi parte.** Lo que esté en `PARA-DEV.md` lo
+tomo como aprobado y arranco.
