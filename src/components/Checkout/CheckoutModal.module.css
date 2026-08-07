@@ -81,7 +81,7 @@
   height: 45px;
   border-radius: 50%;
   background: #e0e0e0;
-  color: #999;
+  color: #595959;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -97,7 +97,7 @@
 }
 
 .progressStepComplete .progressCircle {
-  background: #7fb069;
+  background: #4a7c29;
   color: white;
 }
 
@@ -406,7 +406,7 @@
 }
 
 .summaryRow .free {
-  color: #7fb069;
+  color: #2d5016;
   font-size: 13px;
   font-weight: 600;
 }
@@ -581,7 +581,7 @@
   display: inline-block;
   margin-top: 12px;
   padding: 10px 20px;
-  background: #25d366;
+  background: #075e54;
   color: white;
   text-decoration: none;
   border-radius: 8px;
@@ -590,7 +590,7 @@
 }
 
 .whatsappButton:hover {
-  background: #1fb855;
+  background: #054a41;
   transform: translateY(-2px);
 }
 

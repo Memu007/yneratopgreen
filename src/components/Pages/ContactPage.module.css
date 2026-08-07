@@ -3,7 +3,7 @@
 }
 
 .hero {
-  background: linear-gradient(135deg, #2d5016 0%, #7fb069 100%);
+  background: linear-gradient(135deg, #2d5016 0%, #4a7c29 100%);
   color: white;
   padding: 80px 24px 60px;
   text-align: center;
@@ -22,7 +22,6 @@
 
 .subtitle {
   font-size: 20px;
-  opacity: 0.95;
 }
 
 /* Contact Section */
@@ -118,7 +117,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background-color: #25D366;
+  background-color: #075e54;
   color: white;
   border: none;
   padding: 14px 20px;
@@ -131,7 +130,7 @@
 }
 
 .whatsappButton:hover {
-  background-color: #128C7E;
+  background-color: #054a41;
   transform: translateY(-2px);
 }
 
@@ -193,7 +192,7 @@
 }
 
 .infoCard a {
-  color: #7fb069;
+  color: #2d5016;
   text-decoration: none;
   font-size: 15px;
 }
@@ -209,7 +208,7 @@
 }
 
 .muted {
-  color: #999 !important;
+  color: #5c636a !important;
   font-size: 14px !important;
 }
 
@@ -246,7 +245,7 @@
 }
 
 .socialLinks a:hover {
-  background-color: #7fb069;
+  background-color: #4a7c29;
   transform: translateY(-2px);
 }
 

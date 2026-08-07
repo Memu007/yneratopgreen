@@ -192,7 +192,7 @@
 
 .itemUnit {
   font-size: 0.85rem;
-  color: #6c757d;
+  color: #5c636a;
 }
 
 .quantityControls {
@@ -231,7 +231,7 @@
 .removeButton {
   background: none;
   border: none;
-  color: #dc3545;
+  color: var(--color-error-text);
   cursor: pointer;
   font-size: 1.2rem;
   padding: 0.25rem;
@@ -253,7 +253,7 @@
 
 .subtotalLabel {
   font-size: 0.9rem;
-  color: #6c757d;
+  color: #5c636a;
 }
 
 .subtotalValue {

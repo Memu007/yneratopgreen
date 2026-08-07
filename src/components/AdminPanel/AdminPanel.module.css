@@ -26,7 +26,7 @@
 }
 
 .header {
-  background: linear-gradient(135deg, #2d5016 0%, #7fb069 100%);
+  background: linear-gradient(135deg, #2d5016 0%, #4a7c29 100%);
   color: white;
   padding: 20px 30px;
   display: flex;
@@ -182,7 +182,7 @@
 }
 
 .addButton {
-  background: linear-gradient(135deg, #7fb069 0%, #2d5016 100%);
+  background: linear-gradient(135deg, #4a7c29 0%, #2d5016 100%);
   color: white;
   border: none;
   padding: 10px 20px;
@@ -242,7 +242,7 @@
 }
 
 .saveBtn {
-  background: linear-gradient(135deg, #7fb069 0%, #2d5016 100%);
+  background: linear-gradient(135deg, #4a7c29 0%, #2d5016 100%);
   color: white;
   border: none;
   padding: 12px 25px;
@@ -524,7 +524,7 @@
 /* View Button */
 .viewBtn {
   padding: 6px 12px;
-  background: #3b82f6;
+  background: #1d4ed8;
   color: white;
   border: none;
   border-radius: 6px;
@@ -569,7 +569,7 @@
 }
 
 .orderDetailHeader {
-  background: linear-gradient(135deg, #2d5016 0%, #7fb069 100%);
+  background: linear-gradient(135deg, #2d5016 0%, #4a7c29 100%);
   color: white;
   padding: 20px;
   display: flex;
@@ -712,7 +712,7 @@
 }
 
 .addButton {
-  background: linear-gradient(135deg, #2d5016 0%, #7fb069 100%);
+  background: linear-gradient(135deg, #2d5016 0%, #4a7c29 100%);
   color: white;
   border: none;
   padding: 10px 20px;
@@ -868,7 +868,7 @@
 }
 
 .inactiveTag {
-  color: #dc2626;
+  color: #b91c1c;
   font-weight: 600;
 }
 
@@ -916,7 +916,7 @@
 
 .editBtn {
   background: #eff6ff;
-  color: #3b82f6;
+  color: #1d4ed8;
 }
 
 .editBtn:hover {
@@ -926,7 +926,7 @@
 
 .deleteBtn {
   background: #fef2f2;
-  color: #ef4444;
+  color: #b91c1c;
 }
 
 .deleteBtn:hover:not(:disabled) {
@@ -971,7 +971,7 @@
 
 .subcategoryItem.inactive {
   background: #f0f0f0;
-  color: #999;
+  color: #595959;
 }
 
 .deleteSubBtn {
@@ -1019,7 +1019,7 @@
 
 .addSubcategoryForm button:last-child {
   background: #fee2e2;
-  color: #dc2626;
+  color: #b91c1c;
 }
 
 .addSubBtn {
@@ -1203,7 +1203,7 @@
 }
 
 .optionValue {
-  color: #9ca3af;
+  color: #4b5563;
   font-size: 0.8rem;
   font-family: 'Monaco', 'Consolas', monospace;
   background: #f3f4f6;
@@ -1213,7 +1213,7 @@
 
 .inactiveTag {
   background: #fef2f2;
-  color: #dc2626;
+  color: #b91c1c;
   font-size: 0.75rem;
   padding: 2px 8px;
   border-radius: 10px;
@@ -1227,7 +1227,7 @@
 }
 
 .optionOrder {
-  color: #9ca3af;
+  color: #4b5563;
   font-size: 0.75rem;
   font-family: monospace;
   background: #f3f4f6;
@@ -1290,7 +1290,7 @@
 
 .optionEditForm .cancelBtn {
   background: #fee2e2;
-  color: #dc2626;
+  color: #b91c1c;
 }
 
 .resultCount {
@@ -1302,7 +1302,7 @@
 .noData {
   text-align: center;
   padding: 40px;
-  color: #9ca3af;
+  color: #4b5563;
   font-size: 0.95rem;
   background: #fafafa;
   border-radius: 12px;

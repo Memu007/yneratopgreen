@@ -36,7 +36,7 @@
 }
 
 .brandName {
-  color: #7fb069;
+  color: #2d5016;
 }
 
 .infoDescription {
@@ -47,7 +47,7 @@
 }
 
 .contactButton {
-  background: #7fb069;
+  background: #4a7c29;
   color: white;
   border: none;
   padding: 16px 40px;
@@ -59,7 +59,7 @@
 }
 
 .contactButton:hover {
-  background: #6a9a56;
+  background: #2d5016;
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(127, 176, 105, 0.3);
 }
@@ -186,7 +186,7 @@
 .teamTitle {
   font-size: 36px;
   font-weight: 400;
-  color: #a8b4c0;
+  color: #64748b;
   text-align: center;
   margin-bottom: 60px;
   font-style: italic;
@@ -276,7 +276,7 @@
 
 /* ==================== CTA SECTION ==================== */
 .ctaSection {
-  background: linear-gradient(135deg, #2d5016 0%, #7fb069 100%);
+  background: linear-gradient(135deg, #2d5016 0%, #4a7c29 100%);
   padding: 80px 24px;
   text-align: center;
   color: white;
@@ -291,7 +291,6 @@
 .ctaSection p {
   font-size: 18px;
   margin-bottom: 32px;
-  opacity: 0.9;
 }
 
 .ctaButtons {

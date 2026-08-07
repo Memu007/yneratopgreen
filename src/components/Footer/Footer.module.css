@@ -87,7 +87,7 @@
 .footerBottom p {
   margin: 0;
   font-size: var(--font-size-base);
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 @media (max-width: 968px) {

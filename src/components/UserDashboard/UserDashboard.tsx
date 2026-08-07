@@ -980,12 +980,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
 
   const getStatusBadge = (status: Order['status']) => {
     const statusConfig = {
-      pending: { label: 'Pendiente de Pago', color: '#f59e0b' },
-      'awaiting-transfer-receipt': { label: 'Esperando Comprobante', color: '#f59e0b' },
-      'transfer-receipt-submitted': { label: 'Comprobante a Revisar', color: '#0ea5e9' },
-      paid: { label: 'Pagado', color: '#10b981' },
-      confirmed: { label: 'Confirmado', color: '#7fb069' },
-      'in-transit': { label: 'En Tránsito', color: '#52b788' },
+      pending: { label: 'Pendiente de Pago', color: '#b45309' },
+      'awaiting-transfer-receipt': { label: 'Esperando Comprobante', color: '#b45309' },
+      'transfer-receipt-submitted': { label: 'Comprobante a Revisar', color: '#0369a1' },
+      paid: { label: 'Pagado', color: '#047857' },
+      confirmed: { label: 'Confirmado', color: '#4a7c29' },
+      'in-transit': { label: 'En Tránsito', color: '#0f766e' },
       delivered: { label: 'Entregado', color: '#2d5016' },
       cancelled: { label: 'Cancelado', color: '#d32f2f' },
       rejected: { label: 'Rechazado', color: '#dc2626' },
@@ -1034,7 +1034,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       {/* Estadísticas del usuario */}
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
-          <div className={styles.statIcon} style={{background: 'linear-gradient(135deg, #7fb069 0%, #2d5016 100%)'}}>
+          <div className={styles.statIcon} style={{background: 'linear-gradient(135deg, #4a7c29 0%, #2d5016 100%)'}}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               <circle cx="12" cy="7" r="4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -2168,7 +2168,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                       setRatingScore(star);
                     }}
                     style={{ 
-                      color: star <= ratingScore ? '#f59e0b' : '#d1d5db',
+                      color: star <= ratingScore ? '#b45309' : '#5c636a',
                       cursor: 'pointer',
                       transition: 'transform 0.2s, color 0.2s',
                       userSelect: 'none'
@@ -2176,7 +2176,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                     onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.2)'}
                     onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                   >
-                    ★
+                    {star <= ratingScore ? '★' : '☆'}
                   </span>
                 ))}
               </div>

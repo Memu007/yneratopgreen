@@ -64,14 +64,14 @@
 }
 
 .stockBadge.outOfStock {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
 }
 
 .serviceBadge {
   position: absolute;
   top: 0.75rem;
   right: 0.75rem;
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
   color: var(--text-inverse);
   padding: 0.35rem 0.75rem;
   border-radius: var(--radius-full);
@@ -229,7 +229,7 @@
 }
 
 .noRating {
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-weight: var(--font-weight-normal);
   font-style: italic;
   font-size: 0.7rem;

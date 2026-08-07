@@ -227,7 +227,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               className={`${styles.star} ${star <= minRating ? styles.active : ''}`}
               onClick={() => handleRatingClick(star)}
             >
-              ★
+              {star <= minRating ? '★' : '☆'}
             </span>
           ))}
         </div>

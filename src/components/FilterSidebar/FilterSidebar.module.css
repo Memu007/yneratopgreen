@@ -130,16 +130,16 @@
 .star {
   font-size: 1.5rem;
   cursor: pointer;
-  color: #dee2e6;
+  color: #5c636a;
   transition: color 0.2s;
 }
 
 .star.active {
-  color: #ffc107;
+  color: var(--color-warning-text);
 }
 
 .star:hover {
-  color: #ffcd39;
+  color: #92400e;
 }
 
 .resetButton {

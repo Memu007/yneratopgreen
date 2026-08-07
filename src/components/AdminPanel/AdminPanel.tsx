@@ -621,11 +621,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                     <span className={styles.statLabel}>Completadas</span>
                   </div>
                 </div>
-                <div className={styles.statCard} style={{ gridColumn: 'span 2', background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}>
+                <div className={styles.statCard} style={{ gridColumn: 'span 2', background: 'var(--gradient-primary)' }}>
                   <div className={styles.statIcon} style={{ color: 'white' }}>💰</div>
                   <div className={styles.statInfo}>
                     <span className={styles.statValue} style={{ color: 'white' }}>{formatCurrency(stats.total_revenue)}</span>
-                    <span className={styles.statLabel} style={{ color: 'rgba(255,255,255,0.8)' }}>Ingresos</span>
+                    <span className={styles.statLabel} style={{ color: '#ffffff' }}>Ingresos</span>
                   </div>
                 </div>
               </div>

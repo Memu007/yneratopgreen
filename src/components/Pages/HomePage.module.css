@@ -24,7 +24,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, rgba(45, 80, 22, 0.85) 0%, rgba(127, 176, 105, 0.75) 100%);
+  background: linear-gradient(135deg, rgba(45, 80, 22, 0.88) 0%, rgba(61, 107, 30, 0.94) 100%);
   z-index: 1;
 }
 
@@ -273,7 +273,7 @@
 
 /* CTA Section */
 .ctaSection {
-  background: linear-gradient(135deg, #7fb069 0%, #2d5016 100%);
+  background: linear-gradient(135deg, #4a7c29 0%, #2d5016 100%);
   color: white;
   padding: 64px 24px;
   text-align: center;
@@ -288,7 +288,6 @@
 .ctaSection p {
   font-size: 18px;
   margin-bottom: 32px;
-  opacity: 0.95;
 }
 
 .secondaryButton {

@@ -402,7 +402,7 @@
 
 .addButton {
   padding: 10px 20px;
-  background-color: #7fb069;
+  background-color: #4a7c29;
   color: white;
   border: none;
   border-radius: 6px;
@@ -454,7 +454,7 @@
 }
 
 .removeButton:hover {
-  background-color: #e74c3c;
+  background-color: #b91c1c;
   color: white;
 }
 
@@ -469,7 +469,7 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background-color: #7fb069;
+  background-color: #4a7c29;
   color: white;
   border-radius: 20px;
   font-size: 13px;
