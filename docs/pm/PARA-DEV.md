@@ -190,3 +190,69 @@ Desde ahora, al revisar una pantalla podés proponer mejoras de este tipo en
 cinco líneas: problema observado, beneficio para el usuario, reutilización o
 cambio necesario, esfuerzo estimado y fase recomendada. PM decide si entra, se
 posterga o se rechaza; no se arma una lista de ideas sin evidencia.
+
+---
+
+## 2026-08-09 — `83c4b59`: producto aceptado, puerta todavía abierta
+
+Se aceptan la corrección visible `AgroMarket` → `TopGreen`, los nombres
+accesibles, los cambios semánticos de autenticación, los colores del panel y el
+ajuste legítimo del caso 20. PM reprodujo `npm run a11y -- --todas`: 40
+pantallas, cero violaciones de cualquier impacto. La compilación también queda
+verde y el diff funcional está acotado.
+
+Decisiones solicitadas:
+
+- **conservar** `npm run contraste`; la evidencia debe quedar reproducible;
+- **conservar** quienes somos, servicios y contacto en la puerta;
+- **postergar Escape** para los modales a Fase 5: es una mejora válida, pero no
+  bloquea esta puerta y cambia comportamiento en varios componentes;
+- llevar la deuda previa de `npm run lint` a Fase 5, antes de seguridad y
+  despliegue; no mezclarla con esta pieza;
+- después de cerrar esta corrección, la siguiente pieza será el seed con datos
+  bancarios demo, no la instalación sin Docker.
+
+La tarea no se acepta completa todavía porque los dos guiones pueden declarar
+una pantalla revisada aunque no hayan logrado llegar a ella. Ejemplos concretos:
+`detalle`, `Agregar`, `Mis Compras` y `Mis Productos` silencian el error con
+`.catch(() => {})`; administración omite el recorrido con `return` o `if` si no
+encuentra el botón o una pestaña. Hoy las rutas existen y la corrida da verde,
+pero una regresión futura podría reducir o falsear la cobertura sin hacer fallar
+la puerta. Para un control permanente, eso es un falso verde.
+
+## Tarea activa única: hacer que las puertas verifiquen su propio recorrido
+
+Corregí únicamente `scripts/a11y.mjs` y `scripts/contraste.mjs` para que una
+pantalla esperada que no se abrió sea un fallo, no una omisión silenciosa.
+
+### Alcance
+
+- Quitá los `catch` vacíos y los `if/return` que ocultan la ausencia de una
+  navegación requerida.
+- Antes de medir cada pantalla, esperá y comprobá un marcador propio de esa
+  pantalla: encabezado, diálogo, pestaña activa o control inequívoco.
+- La ejecución debe exigir el inventario completo actual: **40 pantallas** en
+  `a11y` y **34 mediciones** en `contraste`, además de los nombres esperados.
+  Estos números son parte de la especificación de esta puerta, no datos del
+  seed.
+- Si una acción opcional no forma parte de una pantalla medida, eliminála del
+  recorrido en vez de silenciar su error.
+
+### Fuera de alcance
+
+- Sin cambios en `src/`, backend, estilos, dependencias o suite funcional.
+- Sin Escape, lint, seed, instalación, nuevas rutas ni nuevas reglas.
+- No rehagas los medidores ni cambies sus umbrales.
+
+### Criterios de aceptación
+
+1. Una navegación requerida rota hace fallar el comando antes de informar
+   éxito. Mostrá un rojo controlado alterando temporalmente un selector y luego
+   restaurándolo; no se versiona la rotura.
+2. Con la aplicación correcta: `npm run a11y -- --todas` informa 40 pantallas y
+   cero violaciones; `npm run contraste` informa 34 mediciones y cero textos
+   fuera de umbral.
+3. `npm run build`, la suite 25/25 y
+   `git -c core.whitespace=cr-at-eol diff --check` quedan verdes.
+4. Un commit de código y otro separado con el informe actualizado en
+   `PARA-PM.md`.
