@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-08-06.
+Actualizado: 2026-08-09.
 
 ## Cambio de PM, hoy
 
@@ -25,10 +25,11 @@ Lo que no cambia con el relevo, y es lo importante:
 informe `a2e5abb`. El destino editable ya controla candidatos, distancias y
 selección; cambiarlo invalida el contacto y vuelve a bloquear el checkout. La
 puerta UX/UI de logística de Fase 1 quedó cerrada antes del inicio contractual.
-La primera corrección de contraste quedó en `10b830f`: se aceptó como base,
-pero el barrido encontró unos treinta selectores adicionales por debajo del
-mínimo. La tarea activa en `PARA-DEV.md` es corregir sólo esas parejas sin
-unificar las dos paletas ni rediseñar; no se adelanta Fase 2 o 3.
+El contraste productivo quedó cerrado el 2026-08-09 con `918c4b9` y su informe
+`0d1f1b5`. La PM reprodujo la compilación y la suite oficial 25/25 desde una
+base local limpia. La tarea activa en `PARA-DEV.md` es la puerta automática
+con `@axe-core/playwright` y la corrección acotada del nombre visible
+`AgroMarket` a `TopGreen`; no se adelanta Fase 2 o 3.
 
 ## El proyecto fue aprobado
 
@@ -66,10 +67,10 @@ transcripcion funcional en `CONTRATO.md` y el anclaje en `CRONOGRAMA.md`.
 
 ## Objetivo activo
 
-**Mantener cerrada la puerta de Fase 1 y terminar el contraste del tema claro
-sin rediseñar ni unificar paletas.** `10b830f` corrigió el sistema global y 12
-usos, pero la pieza sigue abierta por unos treinta selectores medidos. El flujo
-UX/UI de logística fue aceptado en
+**Mantener cerrada la puerta de Fase 1 incorporando el control automático de
+accesibilidad y corrigiendo únicamente la identidad visible pendiente.** El
+contraste del tema claro fue aceptado en `918c4b9`, sin rediseño ni unificación
+de paletas. El flujo UX/UI de logística fue aceptado en
 `823c3fe` antes del inicio contractual. La orden de transferencia inmortal se
 cerró en `0039e00` y fue aceptada por la PM el 2026-08-05.
 
@@ -157,10 +158,10 @@ nuevos con deuda encima.
 2. ~~**Cerrar Fase 1 antes del 20/08:** dejar completo el flujo UX/UI de
    logística aunque su implementación corresponda a Fase 3.~~ **Cerrada el
    2026-08-06** con `823c3fe`, antes del inicio contractual.
-3. **Contraste productivo:** `10b830f` aceptado como base; quedan unos treinta
-   selectores fallidos en ocho componentes. Corregir sólo las parejas
-   texto/fondo, conservando las paletas emerald y oliva, sin rediseño. Tarea
-   activa. Después, pieza separada con `@axe-core/playwright`.
+3. ~~**Contraste productivo.**~~ **Cerrado y aceptado el 2026-08-09** en
+   `918c4b9`, con compilación y suite oficial 25/25 reproducidas por PM. Tarea
+   activa: pieza mínima con `@axe-core/playwright` y corrección de las cuatro
+   copias visibles `AgroMarket` a `TopGreen`, sin rediseño.
 4. **El seed no carga CBU ni alias**, así que sobre una instalación limpia
    la transferencia no se puede usar. Y la pantalla de pago muestra un
    error que no corresponde.
