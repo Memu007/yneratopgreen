@@ -5,6 +5,23 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-09 — Navegación contextual sin ampliar el MVP
+
+Emi aprobó para Fase 3 que la ubicación del detalle de una publicación sea una
+acción: abre el catálogo filtrado por su provincia y, cuando exista, por su
+localidad oficial. Se reutilizan filtros y URL existentes; no agrega mapa,
+ruteo, GPS ni recomendaciones.
+
+La implementación no puede usar `seller.location`: hoy el detalle muestra ese
+texto libre, incluso con ciudad/provincia invertidas, mientras que el filtro
+real trabaja con la localidad oficial del producto. La respuesta pública del
+catálogo deberá exponer los datos oficiales necesarios.
+
+La dev puede detectar y proponer mejoras equivalentes, con problema, beneficio,
+cambio, esfuerzo y fase recomendada. No las implementa sin aprobación de PM.
+PM también puede proponerlas y aplica el mismo filtro: impacto verificable,
+reutilización de lo existente y nada fuera del cronograma contractual.
+
 ## 2026-08-06 — Segundo relevo del rol de PM
 
 Decisión de Emi. Entra una PM nueva; Sol deja el rol. **La dev es la misma

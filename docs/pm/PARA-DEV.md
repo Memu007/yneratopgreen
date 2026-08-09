@@ -157,3 +157,36 @@ semánticos pequeños y evidentes. Sin dependencias adicionales, salvo
 4. Un commit de código y otro separado con el informe en `PARA-PM.md`. El
    informe lista rutas/medidas, resultado antes/después y cualquier regla menor
    que se haya decidido no bloquear.
+
+---
+
+## Nota de PM — mejora aprobada para Fase 3, no es la tarea activa
+
+No la implementes durante la pieza de accesibilidad. Cuando corresponda cerrar
+buscador y catálogo en Fase 3, la ubicación del detalle deja de ser texto
+muerto:
+
+- si la publicación tiene sólo provincia, hacer clic lleva al marketplace con
+  esa provincia aplicada;
+- si tiene localidad oficial, aplica provincia y localidad;
+- el modal se cierra, la URL refleja los filtros y recargar conserva el mismo
+  resultado;
+- el conjunto mostrado debe coincidir con la consulta equivalente de la API y
+  SQL, como en la evidencia actual de filtros.
+
+La fuente debe ser la ubicación oficial de la **publicación**, no el texto libre
+del perfil del vendedor. Hoy el detalle toma `seller.location`, invierte sus
+partes y por eso puede mostrar `Argentina, Córdoba`; no construyas navegación
+sobre ese dato incorrecto. Esto probablemente exige exponer provincia y
+localidad en las respuestas públicas del catálogo.
+
+Límite: reutilizar filtros existentes. Sin mapa, GPS, distancias, ranking ni
+recomendaciones. Como mejora hermana, evaluá si el breadcrumb de categoría y
+subcategoría del mismo detalle puede llevar al catálogo filtrado reutilizando
+el mismo patrón; proponelo antes de implementarlo.
+
+Desde ahora, al revisar una pantalla podés proponer mejoras de este tipo en
+`PARA-PM.md`, pero no ejecutarlas sin aprobación. Cada propuesta debe traer en
+cinco líneas: problema observado, beneficio para el usuario, reutilización o
+cambio necesario, esfuerzo estimado y fase recomendada. PM decide si entra, se
+posterga o se rechaza; no se arma una lista de ideas sin evidencia.
