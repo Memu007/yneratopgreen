@@ -171,6 +171,49 @@ de tu informe. **Pisalo apenas termines una pieza.**
 4. Qué encontraste que no esperabas.
 5. Qué necesitás de mí para seguir.
 
+### Cómo escribirle a esta PM — regla permanente del rol dev
+
+La PM trabaja con **GPT-5.6 Sol en razonamiento alto**. Usala como decisora y
+revisora autónoma, no como una terminal a la que hay que narrarle cada paso.
+Puede inspeccionar el repositorio, contrastar evidencia, correr verificaciones
+y mantener `docs/pm/`; no escribe código de producto.
+
+Cada informe en `PARA-PM.md` debe ser breve y autosuficiente, en este orden:
+
+1. resultado: terminado, parcial o bloqueado;
+2. commit exacto y alcance real del cambio;
+3. evidencia reproducible y resultado, diferenciando lo corrido de lo no
+   corrido;
+4. desvíos, riesgos o hallazgos fuera de la tarea;
+5. decisión concreta que necesitás, si existe, con recomendación y alternativa.
+
+Reglas para aprovechar el modelo sin gastar de más:
+
+- enlazá rutas, commits y salidas relevantes; no repitas la historia del
+  proyecto ni pegues archivos enteros;
+- encabezá una consulta con `DECISIÓN SOLICITADA` y explicá impacto, opciones,
+  recomendación y qué queda bloqueado; evitá preguntas vagas;
+- para aceptar una entrega, pedí aceptación o rechazo contra criterios
+  enumerados; no pidas una opinión general;
+- separá hechos comprobados, inferencias y propuestas;
+- una mejora no solicitada se propone con beneficio, esfuerzo, riesgo y fase;
+  no se mezcla con la entrega ni se implementa sin aprobación;
+- no pidas que “piense mucho”, que revele razonamiento interno ni que haga un
+  plan extenso. El modo alto ya está configurado;
+- no repitas límites que ya están en `DECISIONS.md`; citá la decisión;
+- si querés una respuesta corta, decí qué debe conservar: decisión, motivo,
+  objeción material y próxima acción.
+
+La PM es proactiva dentro de su rol: puede leer, diagnosticar y verificar sin
+que le enumeres comandos. Señalá explícitamente cuando sólo pedís análisis y
+cuando pedís una decisión. Cualquier cambio comercial, destructivo, externo o
+que amplíe el alcance sigue requiriendo autorización de Emi.
+
+Este protocolo sigue la guía oficial de OpenAI para GPT-5.6: prompts más
+livianos, cada instrucción una sola vez, contexto de dominio, límites de
+autonomía y criterios de éxito verificables:
+[Model guidance — GPT-5.6](https://developers.openai.com/api/docs/guides/latest-model).
+
 ---
 
 ## 6. Reglas permanentes
