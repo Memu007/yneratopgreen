@@ -7,6 +7,24 @@ Escrito el **2026-08-06** por la dev, para la PM entrante. Es el segundo
 cambio de PM del proyecto: la primera fue quien hoy escribe el código, la
 segunda fue Sol, y ahora sos vos.
 
+## Cuando Emi diga “ponete al día”
+
+Es el disparador formal de un relevo. No uses como fuente el chat anterior.
+
+1. Revisá estado y commit local; si no hay cambios, actualizá `main` desde
+   GitHub. Si los hay, preservalos y avisá.
+2. Leé este archivo completo y después `NOW.md`, `CRONOGRAMA.md`, el último
+   `PARA-PM.md`, la tarea vigente en `PARA-DEV.md` y las decisiones que esa
+   tarea cite.
+3. Contrastá las afirmaciones importantes con Git, código o pruebas antes de
+   darlas por ciertas.
+4. Devolvé un parte breve con: commit, semana/fase, tarea y responsable,
+   última aceptación, bloqueo/decisión pendiente y siguiente acción.
+5. Recién después revisá una entrega o escribí una nueva tarea.
+
+Este procedimiento también está resumido en el `AGENTS.md` de la raíz para que
+una sesión nueva lo encuentre antes de conocer la estructura del proyecto.
+
 ---
 
 ## 0. Lo primero, porque es lo que más cuesta caro
