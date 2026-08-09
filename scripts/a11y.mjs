@@ -6,6 +6,11 @@
  * celular, y corre axe sobre cada una. Falla ante cualquier violación
  * `serious` o `critical` y muestra regla, ruta y elemento.
  *
+ * La puerta verifica su propio recorrido: antes de medir exige un marcador
+ * propio de cada pantalla, y al terminar exige el inventario completo. Una
+ * navegación rota hace fallar el comando; nunca reduce la cobertura en
+ * silencio.
+ *
  * NO reemplaza a `npm run contraste` ni a `npm run smoke`:
  *   - `contraste` mide parejas texto/fondo que axe deja en "incompleto",
  *     porque axe no resuelve gradientes, texto sobre foto ni opacidad heredada;
@@ -29,9 +34,35 @@ const MEDIDAS = [
   { nombre: 'celular', width: 390, height: 844 },
 ];
 
+/* Inventario exigido, parte de la especificación de esta puerta y no del seed.
+   Si falta una, sobra una o se repite, el comando falla. */
+const ESPERADAS = [
+  'inicio',
+  'ingreso',
+  'registro',
+  'quienes somos',
+  'servicios',
+  'contacto',
+  'catálogo',
+  'detalle de producto',
+  'carrito',
+  'checkout: envío',
+  'checkout: pago',
+  'panel del comprador',
+  'panel: mis compras',
+  'panel del vendedor',
+  'panel: mis ventas',
+  'panel: mis productos',
+  'administración',
+  'administración: usuarios',
+  'administración: productos',
+  'administración: órdenes',
+];
+
+const ESPERA = 20000;
 const hallazgos = [];
 const informativos = [];
-let rutasRevisadas = 0;
+const revisadas = [];
 
 async function ingresar(email, password) {
   const r = await fetch(`${API}/auth/login`, {
@@ -55,11 +86,24 @@ async function contexto(navegador, viewport, tokens) {
   return ctx;
 }
 
-async function revisar(page, ruta, medida) {
+/**
+ * Mide una pantalla. `marcador` es un localizador inequívoco de esa pantalla:
+ * si no aparece, no llegamos, y eso es un fallo del comando —no una pantalla
+ * que se omite—.
+ */
+async function revisar(page, ruta, medida, marcador) {
+  try {
+    await marcador.first().waitFor({ state: 'visible', timeout: ESPERA });
+  } catch (e) {
+    throw new Error(`No llegué a «${ruta}» en ${medida.nombre}: el marcador de la pantalla `
+      + `no apareció. La puerta no puede medir lo que no abrió.\n  ${e.message.split('\n')[0]}`);
+  }
+  await page.waitForTimeout(400);
+
   const resultado = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
     .analyze();
-  rutasRevisadas += 1;
+  revisadas.push(`${medida.nombre}/${ruta}`);
 
   let bloqueantes = 0;
   for (const v of resultado.violations) {
@@ -80,114 +124,120 @@ async function revisar(page, ruta, medida) {
     + (extra ? `, ${extra} menores` : ''));
 }
 
+/* Pestaña activa del panel de administración: prueba que el clic entró. */
+const pestaniaActiva = (page, nombre) => page
+  .locator('[class*="_tabs_"] button[class*="_active_"]')
+  .filter({ hasText: nombre });
+
 /* --- recorridos ---------------------------------------------------------- */
 
 async function publicas(page, medida) {
   await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(1800);
-  await revisar(page, 'inicio', medida);
+  await revisar(page, 'inicio', medida,
+    page.getByRole('heading', { name: /Bienvenido a/ }));
 
   await page.getByRole('button', { name: 'Ingresar' }).first().click();
-  await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 15000 });
-  await page.waitForTimeout(400);
-  await revisar(page, 'ingreso', medida);
+  await revisar(page, 'ingreso', medida,
+    page.getByRole('heading', { name: 'Iniciar Sesión' }));
 
   await page.getByRole('button', { name: /Reg[íi]strate aqu[íi]/i }).first().click();
-  await page.getByRole('heading', { name: 'Crear Cuenta' }).waitFor({ timeout: 15000 });
-  await page.waitForTimeout(400);
-  await revisar(page, 'registro', medida);
+  await revisar(page, 'registro', medida,
+    page.getByRole('heading', { name: 'Crear Cuenta' }));
+
   // los modales de autenticación no cierran con Escape: se cierra con el botón
   await page.getByRole('button', { name: 'Cerrar' }).first().click();
-  await page.waitForTimeout(600);
+  await page.getByRole('heading', { name: 'Crear Cuenta' }).waitFor({ state: 'hidden', timeout: ESPERA });
 
   // las otras tres públicas están a un clic del encabezado y el barrido de
   // contraste ya las cubre; sin ellas las dos puertas medirían distinto
-  for (const [boton, ruta] of [['Quienes Somos', 'quienes somos'], ['Servicios', 'servicios'], ['Contacto', 'contacto']]) {
-    await page.getByRole('button', { name: boton, exact: true }).first().click();
-    await page.waitForTimeout(1300);
-    await revisar(page, ruta, medida);
-  }
+  await page.getByRole('button', { name: 'Quienes Somos', exact: true }).first().click();
+  await revisar(page, 'quienes somos', medida,
+    page.getByRole('heading', { name: 'Nuestro equipo' }));
+
+  await page.getByRole('button', { name: 'Servicios', exact: true }).first().click();
+  await revisar(page, 'servicios', medida,
+    page.getByRole('heading', { name: 'Servicios', level: 1 }));
+
+  await page.getByRole('button', { name: 'Contacto', exact: true }).first().click();
+  await revisar(page, 'contacto', medida,
+    page.getByRole('heading', { name: 'Contacto', level: 1 }));
 }
 
 async function comprador(page, medida) {
   await page.goto(`${WEB}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
-  await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 20000 });
-  await page.waitForTimeout(1500);
-  await revisar(page, 'catálogo', medida);
+  await revisar(page, 'catálogo', medida, page.locator('#catalog-category'));
 
-  await page.getByRole('button', { name: /Ver detalle|Detalle/ }).first().click().catch(() => {});
-  await page.waitForTimeout(1200);
-  await revisar(page, 'detalle de producto', medida);
-  await page.keyboard.press('Escape').catch(() => {});
-  await page.waitForTimeout(400);
+  // el detalle se abre haciendo clic en la tarjeta, no en un boton: no existe
+  // ningun "Ver detalle". Antes esto lo tapaba un catch vacio y esta pantalla
+  // se declaraba medida sin haberse abierto nunca.
+  await page.locator('[class*="_card_"]').first().click();
+  await revisar(page, 'detalle de producto', medida,
+    page.getByRole('heading', { name: 'Vendido por' }));
 
-  await page.getByRole('button', { name: /Agregar/ }).first().click().catch(() => {});
-  await page.waitForTimeout(600);
+  // cerrar de verdad y comprobarlo: si el detalle queda abierto, el "Agregar"
+  // siguiente sería el del modal y no el de la grilla
+  await page.getByRole('button', { name: 'Cerrar' }).first().click();
+  await page.getByRole('heading', { name: 'Vendido por' }).waitFor({ state: 'hidden', timeout: ESPERA });
+
+  await page.getByRole('button', { name: /Agregar/ }).first().click();
   await page.getByRole('button', { name: /Carrito/ }).click();
-  await page.waitForTimeout(1000);
-  await revisar(page, 'carrito', medida);
+  await revisar(page, 'carrito', medida,
+    page.getByRole('heading', { name: /Mi Carrito/ }));
 
   await page.getByRole('button', { name: 'Continuar compra' }).click();
-  await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15000 });
-  await page.waitForTimeout(400);
-  await revisar(page, 'checkout: envío', medida);
+  await revisar(page, 'checkout: envío', medida,
+    page.getByRole('heading', { name: /Datos de Env/ }));
 
   await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
-  await page.locator('form select').selectOption('Buenos Aires').catch(() => {});
+  await page.locator('#checkout-provincia').selectOption('Buenos Aires');
   await page.getByPlaceholder('Rosario').fill('Pergamino');
   await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
   await page.getByPlaceholder('2000').fill('2700');
   await page.locator('form:has(h2) button[type="submit"]').click();
-  await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: 15000 });
-  await page.waitForTimeout(400);
-  await revisar(page, 'checkout: pago', medida);
-  await page.keyboard.press('Escape').catch(() => {});
-  await page.waitForTimeout(500);
+  await revisar(page, 'checkout: pago', medida,
+    page.getByRole('heading', { name: /M.todo de Pago/ }));
 
   await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(1200);
   await page.locator('button').filter({ hasText: '👤' }).first().click();
-  await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor({ timeout: 15000 });
-  await page.waitForTimeout(700);
-  await revisar(page, 'panel del comprador', medida);
-  await page.getByRole('button', { name: 'Mis Compras' }).click().catch(() => {});
-  await page.waitForTimeout(1200);
-  await revisar(page, 'panel: mis compras', medida);
+  await revisar(page, 'panel del comprador', medida,
+    page.getByRole('heading', { name: 'Mi Perfil' }));
+
+  await page.getByRole('button', { name: 'Mis Compras' }).click();
+  await revisar(page, 'panel: mis compras', medida,
+    page.getByRole('heading', { name: 'Mis Compras' }));
 }
 
 async function vendedor(page, medida) {
   await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(1200);
   await page.locator('button').filter({ hasText: '👤' }).first().click();
-  await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor({ timeout: 15000 });
-  await page.waitForTimeout(700);
-  await revisar(page, 'panel del vendedor', medida);
+  await revisar(page, 'panel del vendedor', medida,
+    page.getByRole('heading', { name: 'Mi Perfil' }));
+
   await page.getByRole('button', { name: 'Mis Ventas' }).click();
-  await page.waitForTimeout(1200);
-  await revisar(page, 'panel: mis ventas', medida);
-  await page.getByRole('button', { name: 'Mis Productos' }).click().catch(() => {});
-  await page.waitForTimeout(1200);
-  await revisar(page, 'panel: mis productos', medida);
+  await revisar(page, 'panel: mis ventas', medida,
+    page.getByRole('heading', { name: 'Mis Ventas' }));
+
+  await page.getByRole('button', { name: 'Mis Productos' }).click();
+  await revisar(page, 'panel: mis productos', medida,
+    page.getByRole('heading', { name: 'Mis Productos' }));
 }
 
 async function administracion(page, medida) {
   await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(1200);
-  const boton = page.getByRole('button', { name: /Admin/i }).first();
-  if (!(await boton.count())) return;
-  await boton.click();
-  await page.waitForTimeout(2000);
-  await revisar(page, 'administración', medida);
-  // acotado a la barra de pestañas del panel: fuera de ella hay botones con
-  // el mismo texto en la página que queda detrás del modal
-  const pestanias = page.locator('[class*="_tabs_"]').first();
-  for (const nombre of ['Usuarios', 'Productos', 'Órdenes']) {
-    const b = pestanias.getByRole('button', { name: new RegExp(nombre, 'i') }).first();
-    if (await b.count()) {
-      await b.click();
-      await page.waitForTimeout(1400);
-      await revisar(page, `administración: ${nombre.toLowerCase()}`, medida);
-    }
+  await page.getByRole('button', { name: /Admin/i }).first().click();
+  await revisar(page, 'administración', medida,
+    page.getByRole('heading', { name: 'Panel de Administración' }));
+
+  for (const [pestania, ruta] of [
+    ['Usuarios', 'administración: usuarios'],
+    ['Productos', 'administración: productos'],
+    ['Órdenes', 'administración: órdenes'],
+  ]) {
+    // acotado a la barra de pestañas: fuera de ella hay botones con el mismo
+    // texto en la página que queda detrás del modal
+    await page.locator('[class*="_tabs_"]').first()
+      .getByRole('button', { name: new RegExp(pestania, 'i') }).first().click();
+    await revisar(page, ruta, medida, pestaniaActiva(page, pestania));
   }
 }
 
@@ -221,6 +271,16 @@ try {
   await navegador.close();
 }
 
+/* --- cobertura ----------------------------------------------------------- */
+
+const esperadas = MEDIDAS.flatMap((m) => ESPERADAS.map((r) => `${m.nombre}/${r}`));
+const vistas = new Set(revisadas);
+const faltan = esperadas.filter((e) => !vistas.has(e));
+const sobran = [...vistas].filter((v) => !esperadas.includes(v));
+const repetidas = revisadas.filter((v, i) => revisadas.indexOf(v) !== i);
+const cobertura = faltan.length === 0 && sobran.length === 0
+  && repetidas.length === 0 && revisadas.length === esperadas.length;
+
 /* --- informe ------------------------------------------------------------- */
 
 const porRegla = new Map();
@@ -233,9 +293,16 @@ for (const h of hallazgos) {
 }
 
 console.log(`\n=== resumen ===`);
-console.log(`  ${rutasRevisadas} pantallas revisadas`);
+console.log(`  ${revisadas.length} de ${esperadas.length} pantallas exigidas`);
 console.log(`  ${hallazgos.length} violaciones serious o critical (${porRegla.size} reglas distintas)`);
 console.log(`  ${informativos.length} violaciones minor o moderate, no bloquean`);
+
+if (!cobertura) {
+  console.log(`\n=== cobertura incompleta ===`);
+  faltan.forEach((f) => console.log(`  falta     ${f}`));
+  sobran.forEach((s) => console.log(`  sobra     ${s}`));
+  repetidas.forEach((r) => console.log(`  repetida  ${r}`));
+}
 
 if (porRegla.size) {
   console.log(`\n=== bloqueantes ===`);
@@ -260,5 +327,7 @@ if (VERTODAS && informativos.length) {
   }
 }
 
-console.log(`\n${hallazgos.length === 0 ? 'SIN VIOLACIONES BLOQUEANTES' : `${hallazgos.length} VIOLACIONES BLOQUEANTES`}`);
-process.exit(hallazgos.length === 0 ? 0 : 1);
+const ok = cobertura && hallazgos.length === 0;
+console.log(`\n${ok ? 'SIN VIOLACIONES BLOQUEANTES, COBERTURA COMPLETA'
+  : `${hallazgos.length} VIOLACIONES BLOQUEANTES` + (cobertura ? '' : ', COBERTURA INCOMPLETA')}`);
+process.exit(ok ? 0 : 1);

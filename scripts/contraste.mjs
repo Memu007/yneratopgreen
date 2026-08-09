@@ -25,6 +25,34 @@ import { chromium } from 'playwright';
 const API = process.env.A11Y_API_URL || 'http://127.0.0.1:8000/api';
 const WEB = process.env.A11Y_WEB_URL || 'http://localhost:5173';
 
+/* Inventario exigido, parte de la especificación de esta puerta y no del seed.
+   Si falta una medición, sobra o se repite, el comando falla. */
+const ESPERADAS = [
+  'portada',
+  'portada (foto blanca)',
+  'portada (foto negra)',
+  'about',
+  'services',
+  'contact',
+  'about (foto blanca)',
+  'about (foto negra)',
+  'catálogo',
+  'catálogo (hover)',
+  'detalle',
+  'carrito',
+  'checkout envío',
+  'checkout pago',
+  'perfil vendedor',
+  'mis ventas',
+  'administración',
+];
+const ESPERA = 20000;
+const MEDIDAS = [
+  { n: 'escritorio', width: 1440, height: 900 },
+  { n: 'movil', width: 390, height: 844 },
+];
+const MEDIDAS_NOMBRES = MEDIDAS.map((m) => m.n);
+
 const fallos = [];
 const ok = (c, m) => { console.log(c ? '  ✓' : '  ✗', m); if (!c) fallos.push(m); };
 
@@ -123,7 +151,7 @@ const MEDIR = () => {
     return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
   };
 
-  const malos = []; let medidos = 0; let sinMedir = 0; let tapados = 0;
+  const malos = []; let medidos = 0; let sinMedir = 0; let tapados = 0; let deshabilitados = 0;
   for (const el of document.querySelectorAll('body *')) {
     const texto = [...el.childNodes].filter((n) => n.nodeType === 3)
       .map((n) => n.textContent.trim()).filter(Boolean).join(' ');
@@ -133,6 +161,10 @@ const MEDIR = () => {
     if (!enPantalla(caja)) continue;
     const estilo = getComputedStyle(el);
     if (estilo.visibility === 'hidden' || estilo.opacity === '0') continue;
+    /* Controles deshabilitados: exentos por la norma y por decisión de PM del
+       2026-08-09 —oscurecerlos los haría parecer disponibles—. Se cuentan
+       aparte para que la exención nunca quede invisible. */
+    if (el.closest(':disabled, [aria-disabled="true"]')) { deshabilitados += 1; continue; }
     const color = rgbDe(estilo.color);
     if (!color) continue;
     const { tonos, origen, tapado } = fondos(el);
@@ -170,7 +202,7 @@ const MEDIR = () => {
       });
     }
   }
-  return { malos, medidos, sinMedir, tapados };
+  return { malos, medidos, sinMedir, tapados, deshabilitados };
 };
 
 const navegador = await chromium.launch({ headless: true });
@@ -205,8 +237,18 @@ async function sesion(ctxOpts, tokens) {
    crece con cada canal, asi que ninguna imagen puede dar peor que el peor de los
    dos. Se sustituye por un gradiente de color plano y no por una imagen, para que
    el medidor lo pueda leer. */
-async function extremosDeFoto(page, etiqueta, volverA) {
+async function extremosDeFoto(page, etiqueta, volverA, marcador) {
   for (const [nombre, px] of [['foto blanca', '#ffffff'], ['foto negra', '#000000']]) {
+    // recargar primero, para partir siempre del inicio y de la foto original,
+    // y recien despues navegar a la pantalla que toca. Antes se sustituia sobre
+    // la pantalla en la que hubiera quedado el recorrido, y las mediciones de
+    // "about" se hacian en realidad sobre contacto.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    if (volverA) {
+      await page.getByRole('button', { name: volverA, exact: true }).first().click();
+    }
+    await marcador.first().waitFor({ state: 'visible', timeout: ESPERA });
+
     await page.evaluate((color) => {
       const plano = `linear-gradient(${color} 0%, ${color} 100%)`;
       for (const el of document.querySelectorAll('*')) {
@@ -217,19 +259,16 @@ async function extremosDeFoto(page, etiqueta, volverA) {
       }
     }, px);
     await page.waitForTimeout(300);
-    await revisar(page, `${etiqueta} (${nombre})`);
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(1500);
-    if (volverA) {
-      await page.getByRole('button', { name: volverA, exact: true }).first().click();
-      await page.waitForTimeout(1200);
-    }
+    await revisar(page, `${etiqueta} (${nombre})`, marcador);
   }
+  await page.reload({ waitUntil: 'domcontentloaded' });
 }
 
 let totalMedidos = 0;
 let sinMedirTotal = 0;
+let deshabilitadosTotal = 0;
 const todos = [];
+const medidas = [];
 
 /* Devuelve los contenedores con scroll propio, además del documento. Los
    modales scrollean por dentro: sin esto sólo se mide su primera pantalla. */
@@ -246,8 +285,17 @@ const SCROLLERS = () => {
   return lista;
 };
 
-async function revisar(page, pantalla) {
+async function revisar(page, pantalla, marcador) {
+  // el marcador prueba que llegamos: si no aparece, no se mide y el comando
+  // falla. Una pantalla que no se abrió no puede declararse revisada.
+  try {
+    await marcador.first().waitFor({ state: 'visible', timeout: ESPERA });
+  } catch (e) {
+    throw new Error(`No llegué a «${pantalla}»: el marcador de la pantalla no `
+      + `apareció.\n  ${e.message.split('\n')[0]}`);
+  }
   const vistos = new Set();
+  const incumple = new Set();
   let medidos = 0; let sinMedir = 0; let tapados = 0;
   const scrollers = await page.evaluate(SCROLLERS);
   for (const sc of scrollers) {
@@ -261,10 +309,12 @@ async function revisar(page, pantalla) {
       await page.waitForTimeout(150);
       const res = await page.evaluate(MEDIR);
       medidos += res.medidos; sinMedir += res.sinMedir; tapados += res.tapados;
+      deshabilitadosTotal += res.deshabilitados;
       for (const m of res.malos) {
         const clave = `${m.clase}|${m.color}|${m.fondo}|${m.texto}`;
         if (vistos.has(clave)) continue;
         vistos.add(clave);
+        if (!m.sobreImagen) incumple.add(clave);
         todos.push({ pantalla, ...m });
       }
       if (llego < y - 2) break;   // ya está abajo de todo
@@ -277,11 +327,12 @@ async function revisar(page, pantalla) {
   totalMedidos += medidos; sinMedirTotal += sinMedir;
   const desborda = await page.evaluate(() =>
     document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+  medidas.push(pantalla);
   ok(!desborda, `${pantalla}: sin desborde horizontal`);
-  console.log(`      ${medidos} medidos, ${tapados} tapados, ${vistos.size} por debajo del mínimo`);
+  console.log(`      ${medidos} medidos, ${tapados} tapados, ${incumple.size} por debajo del mínimo`);
 }
 
-for (const medida of [{ n: 'escritorio', width: 1440, height: 900 }, { n: 'movil', width: 390, height: 844 }]) {
+for (const medida of MEDIDAS) {
   console.log(`\n=== ${medida.n} ${medida.width}x${medida.height} ===`);
   const viewport = { width: medida.width, height: medida.height };
 
@@ -289,55 +340,58 @@ for (const medida of [{ n: 'escritorio', width: 1440, height: 900 }, { n: 'movil
     const ctx = await sesion({ viewport }, comprador);
     const page = await ctx.newPage();
 
+    const portada = page.getByRole('heading', { name: /Bienvenido a/ });
     await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(1800);
-    await revisar(page, `${medida.n} portada`);
+    await revisar(page, `${medida.n} portada`, portada);
 
-    await extremosDeFoto(page, `${medida.n} portada`, null);
+    await extremosDeFoto(page, `${medida.n} portada`, null, portada);
 
-    for (const [seccion, titulo] of [['Quienes Somos', 'about'], ['Servicios', 'services'], ['Contacto', 'contact']]) {
+    const equipo = page.getByRole('heading', { name: 'Nuestro equipo' });
+    for (const [seccion, titulo, marca] of [
+      ['Quienes Somos', 'about', equipo],
+      ['Servicios', 'services', page.getByRole('heading', { name: 'Servicios', level: 1 })],
+      ['Contacto', 'contact', page.getByRole('heading', { name: 'Contacto', level: 1 })],
+    ]) {
       await page.getByRole('button', { name: seccion, exact: true }).first().click();
-      await page.waitForTimeout(1200);
-      await revisar(page, `${medida.n} ${titulo}`);
+      await revisar(page, `${medida.n} ${titulo}`, marca);
     }
-    await extremosDeFoto(page, `${medida.n} about`, 'Quienes Somos');
-    await page.getByRole('button', { name: 'Home', exact: true }).first().click();
-    await page.waitForTimeout(800);
+    await extremosDeFoto(page, `${medida.n} about`, 'Quienes Somos', equipo);
 
     await page.goto(`${WEB}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
-    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 20000 });
-    await page.waitForTimeout(1500);
-    await revisar(page, `${medida.n} catálogo`);
+    await revisar(page, `${medida.n} catálogo`, page.locator('#catalog-category'));
 
+    // hover sobre un enlace, para medir tambien ese estado
     const enlace = page.locator('a').first();
-    if (await enlace.count()) { await enlace.hover(); await page.waitForTimeout(200); }
-    await revisar(page, `${medida.n} catálogo (hover)`);
+    await enlace.waitFor({ state: 'visible', timeout: ESPERA });
+    await enlace.hover();
+    await revisar(page, `${medida.n} catálogo (hover)`, page.locator('#catalog-category'));
 
-    await page.getByRole('button', { name: /Ver detalle|Detalle/ }).first().click().catch(() => {});
-    await page.waitForTimeout(1200);
-    await revisar(page, `${medida.n} detalle`);
-    await page.keyboard.press('Escape').catch(() => {});
+    // el detalle se abre haciendo clic en la tarjeta, no en un boton: no existe
+    // ningun "Ver detalle". Antes esto lo tapaba un catch vacio y esta pantalla
+    // se declaraba medida sin haberse abierto nunca.
+    const vendidoPor = page.getByRole('heading', { name: 'Vendido por' });
+    await page.locator('[class*="_card_"]').first().click();
+    await revisar(page, `${medida.n} detalle`, vendidoPor);
 
-    await page.getByRole('button', { name: /Agregar/ }).first().click().catch(() => {});
-    await page.waitForTimeout(600);
+    await page.getByRole('button', { name: 'Cerrar' }).first().click();
+    await vendidoPor.waitFor({ state: 'hidden', timeout: ESPERA });
+
+    await page.getByRole('button', { name: /Agregar/ }).first().click();
     await page.getByRole('button', { name: /Carrito/ }).click();
-    await page.waitForTimeout(1000);
-    await revisar(page, `${medida.n} carrito`);
+    await revisar(page, `${medida.n} carrito`, page.getByRole('heading', { name: /Mi Carrito/ }));
 
     await page.getByRole('button', { name: 'Continuar compra' }).click();
-    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15000 });
-    await page.waitForTimeout(400);
-    await revisar(page, `${medida.n} checkout envío`);
+    await revisar(page, `${medida.n} checkout envío`,
+      page.getByRole('heading', { name: /Datos de Env/ }));
 
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
-    await page.locator('form select').selectOption('Buenos Aires').catch(() => {});
+    await page.locator('#checkout-provincia').selectOption('Buenos Aires');
     await page.getByPlaceholder('Rosario').fill('Pergamino');
     await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
     await page.getByPlaceholder('2000').fill('2700');
     await page.locator('form:has(h2) button[type="submit"]').click();
-    await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: 15000 });
-    await page.waitForTimeout(400);
-    await revisar(page, `${medida.n} checkout pago`);
+    await revisar(page, `${medida.n} checkout pago`,
+      page.getByRole('heading', { name: /M.todo de Pago/ }));
 
     await ctx.close();
   }
@@ -346,14 +400,12 @@ for (const medida of [{ n: 'escritorio', width: 1440, height: 900 }, { n: 'movil
     const ctx = await sesion({ viewport }, vendedor);
     const page = await ctx.newPage();
     await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(1200);
     await page.locator('button').filter({ hasText: '👤' }).first().click();
-    await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor({ timeout: 15000 });
-    await page.waitForTimeout(600);
-    await revisar(page, `${medida.n} perfil vendedor`);
+    await revisar(page, `${medida.n} perfil vendedor`,
+      page.getByRole('heading', { name: 'Mi Perfil' }));
     await page.getByRole('button', { name: 'Mis Ventas' }).click();
-    await page.waitForTimeout(1200);
-    await revisar(page, `${medida.n} mis ventas`);
+    await revisar(page, `${medida.n} mis ventas`,
+      page.getByRole('heading', { name: 'Mis Ventas' }));
     await ctx.close();
   }
 
@@ -361,13 +413,9 @@ for (const medida of [{ n: 'escritorio', width: 1440, height: 900 }, { n: 'movil
     const ctx = await sesion({ viewport }, admin);
     const page = await ctx.newPage();
     await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(1200);
-    const btn = page.getByRole('button', { name: /Admin/i }).first();
-    if (await btn.count()) {
-      await btn.click();
-      await page.waitForTimeout(1800);
-      await revisar(page, `${medida.n} administración`);
-    }
+    await page.getByRole('button', { name: /Admin/i }).first().click();
+    await revisar(page, `${medida.n} administración`,
+      page.getByRole('heading', { name: 'Panel de Administración' }));
     await ctx.close();
   }
 }
@@ -376,7 +424,9 @@ await navegador.close();
 
 
 console.log(`\n=== resumen ===`);
+console.log(`  ${medidas.length} de ${MEDIDAS_NOMBRES.length * ESPERADAS.length} mediciones exigidas`);
 console.log(`  ${totalMedidos} textos medidos; ${sinMedirTotal} sobre imagen (no medibles por color)`);
+console.log(`  ${deshabilitadosTotal} en controles deshabilitados, exentos por decisión de PM`);
 
 // agrupar por clase+color+fondo
 const grupos = new Map();
@@ -394,6 +444,22 @@ console.log(`  ${cuantos} incumplimientos, ${grupos.size} parejas distintas\n`);
   console.log(`      texto ${g.color} sobre ${g.fondo} [${g.origen}] ${g.px}px/${g.peso}  ×${g.veces}  "${g.texto}"`);
 });
 
+/* --- cobertura ----------------------------------------------------------- */
+
+const esperadas = MEDIDAS_NOMBRES.flatMap((n) => ESPERADAS.map((r) => `${n} ${r}`));
+const vistas = new Set(medidas);
+const faltan = esperadas.filter((e) => !vistas.has(e));
+const sobran = [...vistas].filter((v) => !esperadas.includes(v));
+const repetidas = medidas.filter((v, i) => medidas.indexOf(v) !== i);
+const cobertura = faltan.length === 0 && sobran.length === 0
+  && repetidas.length === 0 && medidas.length === esperadas.length;
+if (!cobertura) {
+  console.log('\n=== cobertura incompleta ===');
+  faltan.forEach((f) => console.log(`  falta     ${f}`));
+  sobran.forEach((x) => console.log(`  sobra     ${x}`));
+  repetidas.forEach((r) => console.log(`  repetida  ${r}`));
+}
+
 const sobreImagen = todos.filter((m) => m.sobreImagen);
 const reales = todos.filter((m) => !m.sobreImagen);
 console.log(`\n=== textos sobre imagen, no resolubles por color (${sobreImagen.length}) ===`);
@@ -404,5 +470,7 @@ for (const m of sobreImagen) {
   console.log(`  ${m.pantalla}  ${m.clase.split(' ')[0] || m.tag}  ${m.color} ${m.px}px/${m.peso}  "${m.texto}"`);
 }
 ok(reales.length === 0, `ningún texto por debajo del mínimo (${reales.length})`);
-console.log(`\n${fallos.length === 0 ? 'TODO OK' : `${fallos.length} FALLOS`}`);
-process.exit(reales.length === 0 ? 0 : 1);
+ok(cobertura, `las ${esperadas.length} mediciones exigidas se hicieron`);
+const todoBien = reales.length === 0 && cobertura;
+console.log(`\n${todoBien ? 'TODO OK, COBERTURA COMPLETA' : `${fallos.length} FALLOS`}`);
+process.exit(todoBien ? 0 : 1);

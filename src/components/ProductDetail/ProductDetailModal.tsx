@@ -182,6 +182,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
             <div className={styles.actions}>
               <div className={styles.quantitySelector}>
                 <button
+                  aria-label="Quitar una unidad"
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
                   disabled={quantity <= 1}
                 >
@@ -189,6 +190,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                 </button>
                 <input
                   type="number"
+                  aria-label="Cantidad"
                   value={quantity}
                   onChange={(e) => {
                     const val = parseInt(e.target.value) || 1;
@@ -199,6 +201,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                   max={isService ? 999 : product.stock}
                 />
                 <button
+                  aria-label="Agregar una unidad"
                   onClick={() => setQuantity(quantity + 1)}
                   disabled={!isService && quantity >= product.stock}
                 >
