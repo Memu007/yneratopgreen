@@ -27,11 +27,12 @@ selección; cambiarlo invalida el contacto y vuelve a bloquear el checkout. La
 puerta UX/UI de logística de Fase 1 quedó cerrada antes del inicio contractual.
 El contraste productivo quedó cerrado el 2026-08-09 con `918c4b9` y su informe
 `0d1f1b5`. La PM reprodujo la compilación y la suite oficial 25/25 desde una
-base local limpia. `83c4b59` corrigió la identidad visible y dejó la puerta
-automática en cero; PM reprodujo 40 pantallas sin violaciones. La tarea activa
-en `PARA-DEV.md` es cerrar un falso verde posible: los guiones silencian algunas
-navegaciones fallidas. No se adelanta Fase 2 o 3 hasta que la puerta compruebe
-su cobertura.
+base local limpia. `83c4b59` corrigió la identidad visible y `d2063c9` cerró
+dos falsos verdes del recorrido: el detalle no se abría y las fotos de about se
+medían sobre contacto. La cobertura 40/40 y 34/34 queda aceptada. La tarea
+activa en `PARA-DEV.md` es una corrección de una línea: el barrido todavía
+ignora los desbordes acumulados al decidir su código de salida. Después sigue
+el seed bancario demo.
 
 ## El proyecto fue aprobado
 
@@ -69,11 +70,12 @@ transcripcion funcional en `CONTRATO.md` y el anclaje en `CRONOGRAMA.md`.
 
 ## Objetivo activo
 
-**Mantener cerrada la puerta de Fase 1 haciendo que los controles automáticos
-verifiquen también que llegaron a cada pantalla declarada.** La identidad
-visible y las correcciones de accesibilidad de `83c4b59` están aceptadas; falta
-eliminar omisiones silenciosas de los dos guiones. El contraste del tema claro
-fue aceptado en `918c4b9` y el flujo UX/UI de logística fue aceptado en
+**Mantener cerrada la puerta de Fase 1 terminando el código de salida del
+barrido de contraste.** `d2063c9` ya exige cada pantalla y destapó el detalle
+que antes no se abría; falta hacer que un desborde acumulado impida el éxito.
+La identidad visible y las correcciones de accesibilidad están aceptadas. El
+contraste del tema claro fue aceptado en `918c4b9` y el flujo UX/UI de logística
+fue aceptado en
 `823c3fe` antes del inicio contractual. La orden de transferencia inmortal se
 cerró en `0039e00` y fue aceptada por la PM el 2026-08-05.
 
@@ -163,9 +165,9 @@ nuevos con deuda encima.
    2026-08-06** con `823c3fe`, antes del inicio contractual.
 3. ~~**Contraste productivo.**~~ **Cerrado y aceptado el 2026-08-09** en
    `918c4b9`, con compilación y suite oficial 25/25 reproducidas por PM. Tarea
-   `83c4b59` agregó `@axe-core/playwright`, corrigió las cuatro copias visibles
-   y dejó 40 pantallas en cero. Tarea activa: hacer fallar los dos guiones si
-   no alcanzan una pantalla esperada; hoy algunos errores se silencian.
+   `83c4b59` agregó `@axe-core/playwright` y `d2063c9` dejó la cobertura real en
+   40/40 y 34/34. Tarea activa: incluir `fallos.length` en el éxito final del
+   barrido; hoy un desborde puede registrarse y aun así devolver código 0.
 4. **El seed no carga CBU ni alias**, así que sobre una instalación limpia
    la transferencia no se puede usar. Y la pantalla de pago muestra un
    error que no corresponde.

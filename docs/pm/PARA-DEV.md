@@ -256,3 +256,35 @@ pantalla esperada que no se abrió sea un fallo, no una omisión silenciosa.
    `git -c core.whitespace=cr-at-eol diff --check` quedan verdes.
 4. Un commit de código y otro separado con el informe actualizado en
    `PARA-PM.md`.
+
+---
+
+## 2026-08-09 — `d2063c9`: cobertura aceptada, queda una salida falsa
+
+Se acepta la corrección de los dos falsos verdes, el inventario exigido, los
+marcadores por pantalla y las tres líneas de nombres accesibles en el detalle.
+Ese desvío de `src/` era necesario: apareció sólo al abrir la pantalla real y
+cierra una violación crítica. También se acepta excluir controles
+deshabilitados del contraste; coincide con la decisión anterior y ahora la
+cantidad excluida queda visible.
+
+PM revisó el recorrido nuevo y reprodujo compilación y sintaxis de ambos
+guiones en verde. La cobertura ya no puede disminuir, repetirse o cambiar de
+nombre silenciosamente.
+
+Queda un solo falso verde, distinto y concreto, en `scripts/contraste.mjs`:
+`ok(!desborda, ...)` agrega un desborde horizontal a `fallos`, pero
+`todoBien` sólo consulta `reales.length` y `cobertura`. Por eso el comando puede
+registrar un desborde, imprimir `TODO OK` y salir con código 0.
+
+## Tarea activa única: cerrar la salida del barrido de contraste
+
+- Tocá sólo `scripts/contraste.mjs`.
+- El éxito final y el código de salida deben depender también de que
+  `fallos.length === 0`.
+- Demostrá un rojo temporal forzando un desborde y restaurá el guion; después
+  dejá `npm run contraste` verde con 34/34.
+- Corré `npm run a11y -- --todas`, `npm run build` y `git diff --check`.
+- Sin `src/`, backend, dependencias, lint, Escape, seed ni instalación.
+- Un commit de código y otro con el informe. Después de aceptar esto, la tarea
+  siguiente es el seed con datos bancarios demo.
