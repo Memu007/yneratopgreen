@@ -100,7 +100,7 @@ export const Header: React.FC<HeaderProps> = ({
                   className={currentSection === 'marketplace' ? styles.navLinkActive : styles.marketplaceButton}
                   onClick={() => onNavigate('marketplace')}
                 >
-                  AgroMarket
+                  TopGreen
                 </button>
                 <CartButton onClick={onCartClick} />
                 <div className={styles.userMenu}>
@@ -121,7 +121,7 @@ export const Header: React.FC<HeaderProps> = ({
                   className={currentSection === 'marketplace' ? styles.navLinkActive : styles.marketplaceButton}
                   onClick={() => onNavigate('marketplace')}
                 >
-                  AgroMarket
+                  TopGreen
                 </button>
               </>
             )}

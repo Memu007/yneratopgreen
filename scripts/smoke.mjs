@@ -1042,7 +1042,7 @@ await runCase(20, 'Respaldo de imágenes en el recorrido de demostración', asyn
     await detailHeading.waitFor({ state: 'visible' });
     const detailModal = detailHeading.locator('xpath=ancestor::div[contains(@class,\"modal\")]');
     await detailModal.getByRole('img', { name: productName, exact: true }).first().waitFor();
-    await detailModal.getByRole('button', { name: '✕' }).click();
+    await detailModal.getByRole('button', { name: 'Cerrar' }).click();
 
     await addButton.click();
     await buyerPage.getByRole('button', { name: /Carrito/ }).click();

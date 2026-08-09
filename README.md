@@ -91,12 +91,32 @@ Detalles, alternativa nativa y troubleshooting en
 ## Smoke tests integrales
 
 El segundo comando elimina los volúmenes Docker locales, reinicializa la
-aplicación y ejecuta los once casos:
+aplicación y ejecuta los 25 casos:
 
 ```bash
 npm install
 npm run smoke
 ```
+
+---
+
+## Accesibilidad
+
+Dos puertas distintas y complementarias. Las dos necesitan la API en `:8000`
+y el frontend en `:5173`, con el seed cargado, y miden en **1440x900 y
+390x844**.
+
+```bash
+npm run a11y         # axe: falla ante violaciones serious o critical
+npm run a11y -- --todas   # ademas lista las minor y moderate
+npm run contraste    # parejas texto/fondo: 4,5:1 normal, 3:1 grande
+```
+
+**Ninguna reemplaza a la otra.** `a11y` cubre nombres accesibles, roles,
+rotulos y estructura, que el barrido de contraste no mira. `contraste` cubre
+lo que axe deja en "incompleto": gradientes, texto sobre foto, capas
+translucidas y opacidad heredada. Detalle de cada una en la cabecera de
+`scripts/a11y.mjs` y `scripts/contraste.mjs`.
 
 ---
 

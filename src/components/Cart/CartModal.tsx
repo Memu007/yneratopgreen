@@ -54,7 +54,7 @@ export const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckou
           <h2 className={styles.modalTitle}>
             🛒 Mi Carrito ({itemCount})
           </h2>
-          <button className={styles.closeButton} onClick={onClose}>
+          <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
             ×
           </button>
         </div>

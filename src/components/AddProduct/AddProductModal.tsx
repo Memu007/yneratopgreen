@@ -597,7 +597,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <h2>{publicationType === 'producto' ? '🌾 Agregar Nuevo Producto' : '🔧 Ofrecer Nuevo Servicio'}</h2>
-          <button className={styles.closeButton} onClick={onClose}>✕</button>
+          <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>✕</button>
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>

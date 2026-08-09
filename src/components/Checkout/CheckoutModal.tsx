@@ -200,8 +200,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         </div>
 
         <div className={styles.formGroup}>
-          <label>Provincia *</label>
-          <select
+          <label htmlFor="checkout-provincia">Provincia *</label>
+          <select id="checkout-provincia"
             required
             value={shippingData.province}
             onChange={(e) => setShippingData({ ...shippingData, province: e.target.value })}
@@ -436,7 +436,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <button className={styles.closeButton} onClick={onClose}>
+        <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
           ×
         </button>
 

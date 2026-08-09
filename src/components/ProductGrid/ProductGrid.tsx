@@ -64,7 +64,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, isLoading = 
           <span className={styles.resultsNumber}>{products.length}</span> productos encontrados
         </div>
 
-        <select 
+        <select aria-label="Ordenar resultados"
           className={styles.sortSelect}
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortOption)}

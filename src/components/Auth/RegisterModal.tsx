@@ -110,7 +110,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       <div className={styles.modal}>
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>Crear Cuenta</h2>
-          <button className={styles.closeButton} onClick={onClose}>
+          <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
             ×
           </button>
         </div>
@@ -328,9 +328,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
 
         <div className={styles.switchText}>
           ¿Ya tienes cuenta?{' '}
-          <span className={styles.switchLink} onClick={onSwitchToLogin}>
+          <button type="button" className={styles.switchLink} onClick={onSwitchToLogin}>
             Inicia sesión aquí
-          </span>
+          </button>
         </div>
       </div>
     </div>

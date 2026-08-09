@@ -106,7 +106,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigateToMarketplace, onN
       <section className={styles.ctaSection}>
         <div className={styles.container}>
           <h2>¿Sos productor o comerciante?</h2>
-          <p>Comenzá a vender tus productos en AgroMarket</p>
+          <p>Comenzá a vender tus productos en TopGreen</p>
           <button className={styles.secondaryButton} onClick={handlePublishClick}>
             Publicar Producto
           </button>

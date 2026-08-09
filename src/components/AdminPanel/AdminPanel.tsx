@@ -501,14 +501,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      active: '#22c55e',
-      paused: '#f59e0b',
+      active: '#15803d',
+      paused: '#b45309',
       draft: '#6b7280',
       deleted: '#dc2626',
-      placed: '#3b82f6',
-      confirmed: '#8b5cf6',
-      shipped: '#f59e0b',
-      delivered: '#22c55e',
+      placed: '#1d4ed8',
+      confirmed: '#6d28d9',
+      shipped: '#b45309',
+      delivered: '#15803d',
       cancelled: '#dc2626'
     };
     return (
@@ -523,7 +523,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       <div className={styles.panel}>
         <div className={styles.header}>
           <h1>Panel de Administración</h1>
-          <button className={styles.closeButton} onClick={onClose}>×</button>
+          <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>×</button>
         </div>
 
         <div className={styles.tabs}>
@@ -636,7 +636,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {activeTab === 'users' && (
             <div className={styles.usersSection}>
               <div className={styles.toolbar}>
-                <select 
+                <select aria-label="Filtrar usuarios por rol"
                   value={userRoleFilter} 
                   onChange={(e) => setUserRoleFilter(e.target.value)}
                   className={styles.filterSelect}
@@ -681,7 +681,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                       value={newUser.phone}
                       onChange={(e) => setNewUser({...newUser, phone: e.target.value})}
                     />
-                    <select
+                    <select aria-label="Rol del nuevo usuario"
                       value={newUser.role}
                       onChange={(e) => setNewUser({...newUser, role: e.target.value as any})}
                     >
@@ -717,7 +717,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                       <td>{user.full_name}</td>
                       <td>{user.email}</td>
                       <td>
-                        <select
+                        <select aria-label="Rol del usuario"
                           value={user.role}
                           onChange={(e) => handleChangeUserRole(user.id, e.target.value)}
                           className={styles.roleSelect}
@@ -781,7 +781,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                       <td>{product.seller_name || '-'}</td>
                       <td>{getStatusBadge(product.status)}</td>
                       <td>
-                        <select
+                        <select aria-label="Estado del producto"
                           value={product.status}
                           onChange={(e) => handleChangeProductStatus(product.id, e.target.value)}
                           className={styles.statusSelect}
@@ -853,7 +853,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           <div className={styles.orderDetailModal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.orderDetailHeader}>
               <h2>📋 Orden {selectedOrder.order_number}</h2>
-              <button className={styles.closeButton} onClick={() => setSelectedOrder(null)}>×</button>
+              <button className={styles.closeButton} aria-label="Cerrar" onClick={() => setSelectedOrder(null)}>×</button>
             </div>
             
             <div className={styles.orderDetailContent}>
@@ -930,7 +930,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           <div className={styles.sectionHeader}>
             <h2>Gestión de Categorías y Subcategorías</h2>
             <div className={styles.sectionActions}>
-              <select 
+              <select aria-label="Filtrar categorias"
                 value={categoryFilter} 
                 onChange={(e) => setCategoryFilter(e.target.value as 'all' | 'products' | 'services')}
                 className={styles.filterSelect}
@@ -973,8 +973,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   />
                 </div>
                 <div className={styles.formGroup}>
-                  <label>Tipo</label>
-                  <select
+                  <label htmlFor="categoria-nueva-tipo">Tipo</label>
+                  <select id="categoria-nueva-tipo"
                     value={newCategory.is_service ? 'service' : 'product'}
                     onChange={(e) => setNewCategory({...newCategory, is_service: e.target.value === 'service'})}
                   >
@@ -1123,8 +1123,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                           />
                         </div>
                         <div className={styles.formGroup}>
-                          <label>Tipo</label>
-                          <select
+                          <label htmlFor="categoria-edita-tipo">Tipo</label>
+                          <select id="categoria-edita-tipo"
                             value={editingCategory.is_service ? 'service' : 'product'}
                             onChange={(e) => setEditingCategory({...editingCategory, is_service: e.target.value === 'service'})}
                           >
@@ -1133,8 +1133,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                           </select>
                         </div>
                         <div className={styles.formGroup}>
-                          <label>Estado</label>
-                          <select
+                          <label htmlFor="categoria-edita-estado">Estado</label>
+                          <select id="categoria-edita-estado"
                             value={editingCategory.is_active ? 'active' : 'inactive'}
                             onChange={(e) => setEditingCategory({...editingCategory, is_active: e.target.value === 'active'})}
                           >
@@ -1275,7 +1275,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         onChange={(e) => setEditingOption({...editingOption, display_order: parseInt(e.target.value) || 0})}
                         style={{ width: '60px' }}
                       />
-                      <select
+                      <select aria-label="Estado de la opcion"
                         value={editingOption.is_active ? 'active' : 'inactive'}
                         onChange={(e) => setEditingOption({...editingOption, is_active: e.target.value === 'active'})}
                       >

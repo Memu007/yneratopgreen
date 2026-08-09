@@ -1621,6 +1621,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
 
                   <button 
                     className={styles.deleteBtn}
+                    aria-label={`Eliminar ${product.name}`}
                     onClick={() => handleDeleteProduct(product.id, product.name)}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -1636,7 +1637,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}>📦</div>
           <h3>Aún no tienes productos publicados</h3>
-          <p>Comienza a vender tus productos agrícolas en AgroMarket</p>
+          <p>Comienza a vender tus productos agrícolas en TopGreen</p>
           <button 
             className={styles.primaryButton}
             onClick={onPublishClick}
@@ -1713,7 +1714,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <button className={styles.closeButton} onClick={onClose}>
+        <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
           ×
         </button>
 

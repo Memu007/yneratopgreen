@@ -46,7 +46,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSwitchToRegis
       <div className={styles.modal}>
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>Iniciar Sesión</h2>
-          <button className={styles.closeButton} onClick={onClose}>
+          <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
             ×
           </button>
         </div>
@@ -98,9 +98,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSwitchToRegis
 
         <div className={styles.switchText}>
           ¿No tienes cuenta?{' '}
-          <span className={styles.switchLink} onClick={onSwitchToRegister}>
+          <button type="button" className={styles.switchLink} onClick={onSwitchToRegister}>
             Regístrate aquí
-          </span>
+          </button>
         </div>
       </div>
     </div>
