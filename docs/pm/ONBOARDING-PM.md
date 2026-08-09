@@ -221,6 +221,48 @@ Sol subió la vara acá y conviene mantenerla: pedía **la corrida en rojo antes
 del arreglo y la verde después**. Un caso que pasa antes de la corrección no
 prueba nada.
 
+### Cómo escribirle a esta dev — regla permanente del rol PM
+
+La dev trabaja con **Opus 5 en razonamiento alto**. Tratala como una ingeniera
+senior con autonomía de implementación: la PM decide **qué problema**, **por
+qué ahora**, **qué límites** y **cómo se demuestra**; la dev decide el cómo
+técnico. No le dictes una solución salvo que sea una restricción ya decidida.
+
+Cada encargo en `PARA-DEV.md` debe ser corto, autosuficiente y tener, en este
+orden:
+
+1. resultado esperado y motivo de prioridad;
+2. archivos, evidencia o decisiones que debe leer antes de tocar código;
+3. alcance y fuera de alcance;
+4. criterios de aceptación ejecutables;
+5. condición concreta para frenar y consultar;
+6. formato mínimo del informe: cambio, evidencia, riesgos y commit.
+
+Reglas para aprovechar el modelo sin gastar de más:
+
+- una sola tarea activa; no mezclar piezas independientes;
+- contexto relevante por ruta o commit, sin repetir todo el proyecto;
+- pedir que inspeccione el flujo real antes de editar y que verifique después;
+- pedir evidencia reproducible, no una declaración de que funciona;
+- no pedir planes extensos, razonamiento transcripto ni multiagente por defecto;
+- reservar una revisión independiente para dinero, seguridad, datos o cambios
+  transversales; la PM sigue siendo la revisión adversarial final;
+- si detecta una mejora no solicitada, la propone con beneficio, esfuerzo,
+  riesgo y fase, pero no la implementa;
+- si contradice a PM con evidencia, se evalúa la evidencia: no se fuerza la
+  orden original por jerarquía.
+
+No usar elogios, personajes ni frases vagas como “mejoralo”, “pensalo bien” o
+“hacelo completo”. Opus responde mejor a una tarea específica con contexto y
+criterios verificables. El razonamiento alto ya está habilitado; no hace falta
+consumir mensajes pidiéndoselo otra vez.
+
+Este protocolo se basa en las recomendaciones oficiales de Anthropic sobre
+instrucciones específicas, contexto enfocado, exploración antes de implementar,
+verificación y corrección temprana:
+[Claude Code: best practices](https://www.anthropic.com/engineering/claude-code-best-practices)
+y [Agentic coding and persistent returns to expertise](https://www.anthropic.com/research/claude-code-expertise).
+
 ---
 
 ## 7. Las reglas que no se negocian

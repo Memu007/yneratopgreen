@@ -204,6 +204,11 @@ incendio.
 **Una PM y una dev.** Todo sobre `main`, con canal único en `PARA-DEV.md`
 —escribe la PM— y `PARA-PM.md` —escribe la dev—.
 
+La dev ejecuta con **Opus 5 en razonamiento alto**. La regla permanente para
+escribirle —una tarea, contexto concreto, límites, evidencia y condición de
+freno; sin dictarle el cómo ni pedir razonamiento extenso— está en la sección
+6 de `ONBOARDING-PM.md`.
+
 El rol de PM cambió dos veces: la primera PM pasó a dev el 2026-08-04, Sol
 la sucedió, y hay PM nueva desde el 2026-08-06. **La dev es la misma desde
 el 04/08**, así que la continuidad del código no se cortó.
