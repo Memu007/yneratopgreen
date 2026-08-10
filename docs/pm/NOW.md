@@ -75,12 +75,12 @@ transcripcion funcional en `CONTRATO.md` y el anclaje en `CRONOGRAMA.md`.
 
 ## Objetivo activo
 
-**Preparar y, con autorización externa, ejecutar un ensayo descartable de
-Railway.** Correo quedó aceptado en `ccc0794` antes del 18/08, por lo que entra
-la ventana acordada de una jornada y cierre antes del 20/08. Primero se corrige
-y prueba localmente la configuración Railway. La ejecución externa espera que
-Emi inicie sesión y confirme Trial o Hobby; `railway whoami` responde hoy
-`Unauthorized`. La instalación nativa
+**Preparar y ejecutar un ensayo descartable de Railway.** Correo quedó aceptado
+en `ccc0794` antes del 18/08, por lo que entra la ventana acordada de una jornada
+y cierre antes del 20/08. Primero se corrige y prueba localmente la configuración
+Railway. Emi autenticó la CLI el 10/08, confirmó que la cuenta está en Hobby y
+autorizó reutilizar el proyecto de prueba `strong-playfulness`; no es producción
+ni un proyecto que haya que preservar. La instalación nativa
 y Docker quedaron cerrados con `82c1df8` y `896386a`. El checkout muestra el
 motivo real desde `e915d6a`. La
 puerta de accesibilidad de Fase 1 quedó cerrada en
@@ -203,16 +203,15 @@ nuevos con deuda encima.
 14. **Al final:** correcciones de la vista en celular, revisión de
    seguridad y despliegue en producción.
 
-**Despliegue:** Railway fue aprobado como destino el 2026-08-05. La dev
-subio la preparacion en `382bcbe` —`Dockerfile.railway`, `railway.toml` y
-`RAILWAY.md`— sin desplegarla. Falta revisarla, y **no se publica nada sin
-la revision de seguridad**.
-
-**Bloqueo externo del ensayo:** la CLI está instalada pero no autenticada. La
-arquitectura requiere Frontend, Backend y PostGIS, más un volumen de base y otro
-en `/data`. El Trial vigente admite ese ensayo; el Free normal limita a un solo
-volumen y no alcanza. Hobby cuesta USD 5 mensuales e incluye USD 5 de uso. No se
-crean recursos ni se acepta gasto hasta que Emi elija y autentique la cuenta.
+**Despliegue:** Railway fue aprobado como destino el 2026-08-05. El proyecto de
+prueba `strong-playfulness` está en Hobby y tiene auto-deploy de `main`. El
+10/08 desplegó `46109ba` con éxito aparente en `ynerav.up.railway.app`, pero sólo
+existe el servicio raíz `yneratopgreen`, sin volúmenes: `/health` responde `ok`
+y tanto `/api/health` como `/api/catalog/categories` devuelven el HTML del SPA.
+Por lo tanto **no es un despliegue funcional** de la aplicación ni cuenta como
+producción. Emi autorizó reutilizar ese proyecto para el ensayo descartable.
+Gate B debe agregar Backend, PostGIS y los dos volúmenes sólo después de cerrar
+Gate A. No se elimina nada al terminar sin una nueva autorización explícita.
 
 **Las correcciones de celular se aparcan.** Se hizo sólo el relevamiento
 —capturas e inventarios de consola y red— para saber cuánto trabajo es.

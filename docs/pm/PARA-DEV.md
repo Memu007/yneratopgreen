@@ -962,19 +962,23 @@ de Fase 2. Tope total: una jornada y cierre antes del 20/08.
 - Si Gate A descubre un defecto imprescindible, corregí sólo configuración,
   entrypoint o documentación. Un cambio de producto frena y vuelve a PM.
 
-### Gate B — sólo después de autorización de Emi
+### Gate B — autorizado por Emi el 2026-08-10, después de cerrar Gate A
 
-La arquitectura necesita tres servicios —Frontend, Backend y PostGIS— y dos
-volúmenes —base y `/data`—. La documentación oficial vigente indica que Trial
-admite 5 servicios y 3 volúmenes; Free normal, 3 servicios pero un solo volumen;
-Hobby cuesta USD 5/mes e incluye USD 5 de uso. Emi debe iniciar sesión y elegir
-Trial o Hobby antes de crear nada.
+La CLI ya está autenticada como Emiliano Sejumil y la cuenta usa Hobby. Emi
+confirmó que `strong-playfulness` es un proyecto de prueba, no final ni
+importante, y autorizó reutilizarlo. No crees otro proyecto. Hoy contiene sólo
+el servicio raíz `yneratopgreen`, con auto-deploy de `main`, ningún volumen y el
+dominio `ynerav.up.railway.app`. El último deploy (`46109ba`) figura `SUCCESS`,
+pero la PM comprobó que sólo sirve el frontend: `/health` da texto `ok` y las
+rutas `/api/health` y `/api/catalog/categories` devuelven `text/html` del SPA.
+Ese verde no satisface Gate B.
 
 Con autorización:
 
-- Creá un proyecto inequívocamente descartable con datos demo, secreto JWT
-  aleatorio sólo en Railway, `EMAIL_TRANSPORT=outbox`, PostGIS privado y volumen
-  Backend en `/data`. No uses SMTP, Mercado Pago ni datos reales.
+- Reutilizá `strong-playfulness` como proyecto inequívocamente descartable con
+  datos demo, secreto JWT aleatorio sólo en Railway,
+  `EMAIL_TRANSPORT=outbox`, PostGIS privado y volumen Backend en `/data`. No uses
+  SMTP, Mercado Pago ni datos reales.
 - Desplegá desde `main` los tres servicios. Verificá HTTPS y dominios, health de
   ambos servicios, migraciones, PostGIS, seed idempotente, catálogo, CORS,
   registro y enlace leído desde `/data/outbox`, ruta directa de confirmación y
