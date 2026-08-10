@@ -639,3 +639,57 @@ debe preservar Docker y Railway, no intercambiar un camino roto por otro.
 - Un commit de código/configuración/documentación y otro con `PARA-PM.md`.
   Informá comandos exactos, entorno limpio utilizado, resultado nativo, prueba
   Docker/Railway y cualquier desvío.
+
+---
+
+## 2026-08-10 — `82c1df8`: camino nativo probado, entrega devuelta
+
+No aceptado todavía. Se acepta provisionalmente la separación raíz/backend, la
+ruta nativa de uploads, la creación previa al montaje, el proxy `:8000`, las
+`VITE_*` comentadas y la guía reescrita. La prueba nativa fue completa. Quedan
+dos incumplimientos concretos.
+
+### Hallazgo 1 — el template productivo quedó inválido
+
+`backend/.env.production.example` ahora contiene `DATABASE_URL` **dos veces** y
+todavía conserva `DB_PASSWORD` y `BASE_URL`. Esas dos claves no existen en
+`Settings`, por lo que copiar el template a un archivo leído por Pydantic vuelve
+a producir el mismo `extra_forbidden` que esta pieza debía eliminar. El informe
+dice que las seis claves se corrigieron, pero el archivo no coincide.
+
+Además, el encabezado dice “copiar como `.env.production`”, aunque `Settings`
+sólo carga automáticamente `backend/.env`. La instrucción debe decir cómo se
+usa realmente en ejecución nativa y cómo se traslada a Railway.
+
+### Hallazgo 2 — Docker no fue ejecutado
+
+El criterio pedía inicialización Docker, no sólo `docker compose config`. La PM
+confirmó que el demonio está disponible mediante `rtk proxy docker info`
+(servidor 28.1.1). Ya existen `topgreen-db` y `topgreen-api` saludables: no los
+detengas, recrees ni uses para una prueba destructiva.
+
+## Corrección activa única
+
+- Dejá `backend/.env.production.example` con una sola `DATABASE_URL` y sólo
+  claves declaradas por `Settings`. Corregí su instrucción de uso: FastAPI lee
+  automáticamente `backend/.env`; en Railway las variables se cargan en el
+  entorno, no renombrando el template.
+- Eliminá `ADMIN_EMAIL`, `ADMIN_PASSWORD` y `ADMIN_NAME` de `Settings` y de los
+  dos templates: están muertas, el seed no las usa y mantenerlas promete una
+  configuración inexistente. Actualizá la mención correspondiente de la guía;
+  no cambies el seed en esta pieza.
+- Agregá una comprobación que cargue ambos templates —sustituyendo sólo los
+  placeholders documentados— y falle ante duplicados o claves extra. Puede ser
+  una prueba liviana existente; no armes el instalador nativo automatizado que
+  propusiste. Esa automatización se posterga a Fase 5.
+- Ejecutá Docker en un proyecto **descartable y aislado**, con nombres,
+  puertos, red y volúmenes distintos mediante un override temporal. No toques
+  los contenedores ni volúmenes `topgreen-*` existentes. Comprobá migraciones,
+  seed, health y persistencia/servicio de uploads; eliminá sólo los recursos
+  temporales identificados al terminar.
+- Conservá las `VITE_*` comentadas: se aprueba el default por mismo origen.
+- Repetí `docker compose config`, build, 31/31 y `diff --check`. Sin cambios de
+  producto ni más archivos de configuración fuera de lo indicado.
+- Commit de corrección e informe separado con nombres del proyecto Docker
+  temporal, puertos usados, comandos y prueba de que los contenedores existentes
+  siguieron saludables.
