@@ -32,8 +32,10 @@ falsos verdes del recorrido y `5924fbb` hizo que cualquier fallo acumulado
 impida el éxito final. La cobertura 40/40 y 34/34 y la puerta de accesibilidad
 quedan cerradas. `652bc34` dejó el seed bancario demo utilizable desde la
 primera instalación y subió la suite a 26/26. La tarea activa en
-`PARA-DEV.md` es corregir la incompatibilidad de montos que hace fallar el
-carrito con publicaciones de más de $99.999.999,99.
+`PARA-DEV.md` sigue siendo corregir la incompatibilidad de montos. `61624ce`
+amplió correctamente el esquema y ya compra el campo de $950.000.000, pero la
+revisión PM devolvió la pieza: las mutaciones del carrito persisten totales
+fuera de contrato y la edición de producto salta el límite unitario.
 
 ## El proyecto fue aprobado
 
@@ -169,9 +171,10 @@ nuevos con deuda encima.
    40/40 y 34/34, y `5924fbb` cerró el último falso verde del código de salida.
 4. ~~**Seed bancario demo.**~~ **Cerrado y aceptado el 2026-08-09** en
    `652bc34`: primera corrida utilizable, repetición idempotente y suite 26/26.
-5. **Tarea activa: precios altos rompen el carrito.** Dos publicaciones válidas
-   del seed superan el rango de los snapshots y devuelven 500. Se corrige con
-   migración, contrato monetario coherente y rechazo 4xx fuera del límite.
+5. **Tarea activa: cerrar todos los caminos del contrato monetario.** `61624ce`
+   ya amplió las columnas y permite comprar los dos productos caros, pero no
+   quedó aceptado: POST/PUT/PATCH del carrito deben rechazar el total imposible
+   antes de persistir y PATCH de producto debe aplicar el mismo límite del alta.
    Después se corrige, en otra pieza, el mensaje erróneo de la pantalla de pago.
 6. **El camino de instalación sin Docker no funciona** siguiendo la guía:
    el archivo de configuración de ejemplo tiene claves que el sistema

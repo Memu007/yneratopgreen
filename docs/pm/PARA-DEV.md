@@ -420,3 +420,47 @@ máximo admitido para un total, la API debe rechazarla antes de escribir y con u
 6. Un commit de código y otro con `PARA-PM.md`. El informe debe enumerar tipos
    antes/después, prueba de migración limpia y existente, respuestas del caso
    caro y del caso fuera de rango, y cualquier desvío.
+
+---
+
+## 2026-08-09 — `61624ce`: migración correcta, tarea devuelta
+
+No aceptado todavía. La ampliación de las once columnas, el contrato central,
+la compra de $950.000.000 y la prevalidación de ambos checkouts están bien. Pero
+dos criterios de la tarea no se cumplen en todos los caminos públicos.
+
+### Hallazgo 1 — el carrito persiste un total que el contrato rechaza
+
+`cart.py` importa `validar_total` pero nunca lo usa. `POST /cart/items` guarda
+el producto máximo con cantidad 200 y devuelve éxito; recién el checkout lo
+rechaza. Los dos `PUT/PATCH` de cantidad hacen lo mismo. El caso 28 sólo compara
+`orders` y `order_items`, no el carrito, y luego lo limpia en el `finally`.
+
+La aceptación pedía validar el máximo calculado de **carrito/orden antes del
+commit** y no dejar escrituras parciales. El checkout debe conservar su defensa,
+pero el estado imposible no puede entrar al carrito.
+
+### Hallazgo 2 — editar el precio salta el contrato
+
+`POST /products` llama a `validar_precio_unitario`, pero
+`PATCH /products/{product_id}` asigna `price` y hace `commit` sin validarlo. Un
+precio superior a `NUMERIC(12,2)` todavía puede terminar en un 500 de base por
+la ruta de edición.
+
+## Corrección activa única
+
+- En alta y en las dos rutas de actualización del carrito, calculá antes del
+  `commit` el total prospectivo por vendedor —incluyendo los demás ítems de ese
+  vendedor— y pasalo por `validar_total`. Si no entra, devolvé 400 y preservá
+  exactamente el carrito anterior.
+- Conservá la validación previa en ambos checkouts como defensa en profundidad.
+- En edición de producto, si viene `price`, validalo antes de modificar el
+  modelo.
+- Extendé el caso fuera de rango para comprobar POST, PUT y PATCH del carrito:
+  400, techo visible y contenido/conteo anterior de `cart_items` intacto.
+- Agregá una comprobación de edición de producto fuera de rango: 400 y precio
+  anterior intacto en SQL.
+- No cambies migración, precisiones, interfaz ni el resto del alcance. No abras
+  todavía el refactor de `float` ni el mensaje del frontend.
+- Suite completa, compilación, `alembic check` y `diff --check` verdes. Un
+  commit de corrección y otro con el informe actualizado.
