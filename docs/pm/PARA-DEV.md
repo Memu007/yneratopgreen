@@ -693,3 +693,101 @@ detengas, recrees ni uses para una prueba destructiva.
 - Commit de corrección e informe separado con nombres del proyecto Docker
   temporal, puertos usados, comandos y prueba de que los contenedores existentes
   siguieron saludables.
+
+---
+
+## 2026-08-10 — `896386a`: instalación aceptada
+
+Aceptado. Las dos plantillas cargan con el `Settings` real, sin duplicados ni
+claves muertas; el caso 32 deja la regresión versionada. La instalación nativa
+ya había quedado probada en `82c1df8`.
+
+La PM completó la evidencia Docker que la dev no podía ejecutar por política de
+egreso. Proyecto aislado `tgpmcheck`, puertos `55443/58010`, imágenes locales:
+seis migraciones hasta `a1c4f7e9b2d3`, seed dos veces, conteos
+`3/30/12/4028`, health 200 y upload servido antes y después de reiniciar la API.
+Se eliminaron sólo sus contenedores, red y volúmenes. `topgreen-db` y
+`topgreen-api` originales siguieron saludables. Suite informada: 32/32.
+
+Decisiones solicitadas: se conservan las `VITE_*` comentadas; no se versiona un
+instalador nativo adicional ahora —queda para Fase 5—; las claves `ADMIN_*`
+muertas quedan correctamente eliminadas.
+
+## Tarea activa única: validación de registro por correo
+
+Es la primera deuda contractual de Fase 2. Al registrarse, comprador, vendedor
+o transportista debe quedar sin verificar, recibir un enlace de un solo uso con
+24 horas de vigencia y no poder iniciar sesión hasta usarlo. Debe existir
+reenvío sin crear otra cuenta. Recuperación de contraseña no entra.
+
+### Contrato backend
+
+- Agregá una migración nueva y un modelo específico para tokens de verificación
+  con usuario, **hash** del token, creación, vencimiento y consumo/invalidez. No
+  guardes el token crudo en base ni uses el JWT de sesión como verificación.
+- Generá tokens criptográficamente aleatorios. Vencen exactamente a las 24 h,
+  son de un solo uso y la verificación concurrente no puede aceptar dos veces el
+  mismo token.
+- `POST /auth/register` crea `is_verified=false`, envía el correo y devuelve una
+  respuesta pendiente **sin access token, refresh token ni cookies de sesión**.
+- Agregá endpoints para verificar el token y reenviar por email. El reenvío
+  invalida todos los tokens anteriores no usados y no duplica al usuario.
+- La respuesta de reenvío debe ser genérica para email inexistente, ya
+  verificado o pendiente; no reveles qué cuentas existen.
+- `login`, `refresh`, `get_current_user` y el acceso opcional deben impedir que
+  un usuario no verificado use tokens viejos o consiga sesión. Seed y usuarios
+  creados por administración siguen verificados.
+- Normalizá los errores: pendiente, vencido, ya usado/inválido y correo no
+  enviado deben ser controlados; ningún caso termina en 500 ni deja una sesión.
+
+### Transporte de correo
+
+- Definí una interfaz mínima con dos transportes: `outbox` local/pruebas y SMTP
+  productivo. Preferí biblioteca estándar; no agregues una dependencia si no es
+  necesaria.
+- El outbox guarda el mensaje verificable en una carpeta no pública e ignorada
+  por Git. La suite debe poder leer el enlace real sin un endpoint de prueba.
+- Sumá sólo las variables necesarias a `Settings` y a ambas plantillas:
+  transporte, remitente, host/puerto/credenciales/TLS, outbox y URL del frontend.
+  No commitees credenciales ni el contenido del outbox.
+- El enlace apunta al frontend y contiene el token sólo en la URL que recibe el
+  usuario. No lo imprimas en logs normales ni lo devuelvas en la API.
+
+### Interfaz
+
+- Registro exitoso deja de dar la bienvenida/iniciar sesión. Muestra “revisá tu
+  correo”, el email usado y una acción de reenvío; no guarda tokens locales.
+- El enlace abre una vista mínima que verifica una vez y ofrece ir a iniciar
+  sesión. Muestra estados claro de éxito, vencido/inválido y reenvío.
+- Login bloqueado muestra el motivo real y permite pedir reenvío. No agregues
+  recuperación de contraseña, magic link ni rediseño general de autenticación.
+- Los mensajes de estado/error deben ser accesibles y no revelar información
+  adicional sobre cuentas ajenas.
+
+### Pruebas obligatorias
+
+1. Registro API: usuario `false`, sin JWT/cookies; outbox contiene enlace y la
+   base sólo el hash. Login y endpoint protegido quedan bloqueados.
+2. Enlace vigente: verifica, marca consumo, permite login y falla al reutilizar
+   el mismo token. Dos verificaciones simultáneas aceptan exactamente una.
+3. Vencimiento forzado: rechaza; reenvío conserva un usuario, invalida el token
+   anterior, emite otro y el nuevo verifica. Reenvío de desconocido/verificado
+   responde igual sin enviar correo.
+4. Tokens de sesión anteriores de un usuario no verificado fallan también en
+   refresh y rutas protegidas.
+5. Navegador real: registro → aviso pendiente → enlace del outbox → éxito →
+   login. Cubrí también login pendiente + reenvío y un enlace vencido.
+6. Adaptá los primeros casos de la suite: ya no es válido esperar JWT al
+   registrar ni login antes de verificar. Seed, admin y recorrido completo deben
+   seguir verdes.
+
+### Límites y entrega
+
+- Sin recuperación de contraseña, cambio de email, OAuth, captcha, campañas,
+  proveedor transaccional pago ni diseño de plantillas comerciales.
+- Sin cambios en perfiles, transportistas B/C, pagos, catálogo o despliegue.
+- Migración limpia y sobre base existente, `alembic check`, suite completa,
+  build, accesibilidad de las vistas nuevas y `diff --check` verdes.
+- Un commit de código y otro con `PARA-PM.md`. Informá modelo de amenaza,
+  contrato de cada endpoint, mensajes del outbox, pruebas de 24 h/un solo uso,
+  total final de la suite y cualquier desvío.
