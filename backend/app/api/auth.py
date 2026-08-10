@@ -35,7 +35,10 @@ from app.models.locality import Locality
 from app.services.correo import ErrorDeCorreo
 from app.services import verificacion
 from app.services.verificacion import ResultadoDeVerificacion
+import structlog
 
+
+logger = structlog.get_logger()
 
 router = APIRouter(prefix="/auth", tags=["autenticación"])
 
@@ -304,14 +307,17 @@ def resend_verification(
         # Invalida los pendientes y emite uno solo. No crea otra cuenta ni
         # duplica la que ya está.
         verificacion.emitir_y_enviar(db, usuario)
+        db.commit()
     except ErrorDeCorreo:
+        # El fallo del transporte NO puede salir al llamador. Si acá
+        # devolviéramos 503 y en los otros dos casos 200, el código de estado
+        # diría «esta cuenta existe y está pendiente» cada vez que el correo
+        # esté caído o mal configurado, que es justo lo que la respuesta
+        # genérica quiere evitar. Queda registrado adentro, sin la dirección ni
+        # el token.
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="No pudimos enviar el correo. Probá de nuevo en un rato.",
-        )
+        logger.error("reenvio_de_verificacion_sin_enviar")
 
-    db.commit()
     return MensajeResponse(message=RESPUESTA_GENERICA_DE_REENVIO)
 
 

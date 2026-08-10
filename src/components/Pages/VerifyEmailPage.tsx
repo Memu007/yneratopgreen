@@ -12,6 +12,9 @@ interface VerifyEmailPageProps {
 
 type Estado = 'verificando' | 'ok' | 'error';
 
+// La ruta sin query: es donde queda la barra apenas se lee el token.
+const RUTA_LIMPIA = '/verificar-correo';
+
 export function VerifyEmailPage({ onGoToLogin, onGoHome }: VerifyEmailPageProps) {
   const { verificarCorreo, reenviarVerificacion } = useAuth();
   const [estado, setEstado] = useState<Estado>('verificando');
@@ -30,6 +33,15 @@ export function VerifyEmailPage({ onGoToLogin, onGoHome }: VerifyEmailPageProps)
     yaIntentado.current = true;
 
     const token = new URLSearchParams(window.location.search).get('token');
+
+    // El token sale de la barra ANTES de cualquier llamada. Mientras esté en
+    // la URL, toda petición del mismo origen —incluida la de verificación— lo
+    // manda en el encabezado Referer, y recargar la página reintentaría un
+    // enlace ya usado. Se queda en memoria y nada más.
+    if (window.location.search) {
+      window.history.replaceState(null, '', RUTA_LIMPIA);
+    }
+
     if (!token) {
       setEstado('error');
       setMensaje('El enlace está incompleto. Pedí uno nuevo desde el ingreso.');
@@ -64,6 +76,13 @@ export function VerifyEmailPage({ onGoToLogin, onGoHome }: VerifyEmailPageProps)
     } finally {
       setReenviando(false);
     }
+  };
+
+  // Al salir de esta pantalla la barra vuelve a la raíz: si quedara
+  // /verificar-correo, recargar volvería a abrir la confirmación.
+  const salirA = (accion: () => void) => () => {
+    window.history.replaceState(null, '', '/');
+    accion();
   };
 
   return (
@@ -106,10 +125,10 @@ export function VerifyEmailPage({ onGoToLogin, onGoHome }: VerifyEmailPageProps)
         )}
 
         <div className={styles.actions}>
-          <button type="button" className={styles.primaryButton} onClick={onGoToLogin}>
+          <button type="button" className={styles.primaryButton} onClick={salirA(onGoToLogin)}>
             Iniciar sesión
           </button>
-          <button type="button" className={styles.secondaryButton} onClick={onGoHome}>
+          <button type="button" className={styles.secondaryButton} onClick={salirA(onGoHome)}>
             Volver al inicio
           </button>
         </div>

@@ -156,6 +156,41 @@ async function registrarYVerificar(body) {
   return alta;
 }
 
+// Llama al endpoint real de reenvío con el transporte de correo roto, en el
+// mismo proceso de la aplicación. Se hace así y no rompiendo la carpeta del
+// outbox porque bajo Docker esa carpeta es un montaje del host y cambiarla
+// afuera no rompe nada adentro. Tampoco se agrega ningún interruptor de fallo
+// al producto: eso sería una puerta trasera permanente.
+function reenviosConTransporteRoto(correos) {
+  const script = `
+import json, sys
+from fastapi.testclient import TestClient
+from app.services.correo import ErrorDeCorreo
+import app.services.verificacion as verificacion
+
+class TransporteRoto:
+    def enviar(self, **kwargs):
+        raise ErrorDeCorreo("transporte caido a proposito")
+
+verificacion.obtener_transporte = lambda: TransporteRoto()
+
+from app.main import app as aplicacion
+cliente = TestClient(aplicacion)
+salida = []
+for correo in json.loads(sys.stdin.read()):
+    r = cliente.post("/api/auth/resend-verification", json={"email": correo})
+    salida.append({"status": r.status_code, "cuerpo": r.text})
+print(json.dumps(salida))
+`;
+  const crudo = execFileSync(
+    'docker',
+    ['exec', '-i', 'topgreen-api', 'python', '-c', script],
+    { encoding: 'utf8', input: JSON.stringify(correos), stdio: ['pipe', 'pipe', 'pipe'] },
+  );
+  const ultima = crudo.trim().split(/\r?\n/).at(-1);
+  return JSON.parse(ultima);
+}
+
 // Ejecuta un script de Python donde vive la aplicación, para poder emitir un
 // token de sesión a mano. Es el único modo de reproducir "un token emitido
 // antes de confirmar": por la API ya no se consigue ninguno.
@@ -2404,8 +2439,33 @@ await runCase(35, 'Vencido a las 24 h, y el reenvío invalida el anterior', asyn
     'se envió correo a una cuenta inexistente o ya verificada',
   );
 
+  // Y con el transporte caído tampoco puede cambiar: si el reenvío diera 503
+  // sólo cuando la cuenta existe y está pendiente, el código de estado sería
+  // un delator de cuentas cada vez que el correo se cae.
+  const pendiente = `pendiente.roto.${Date.now()}@example.com`;
+  await apiRequest('/auth/register', {
+    method: 'POST',
+    body: { email: pendiente, password: 'smoke123', full_name: 'Pendiente Roto', role: 'user' },
+  });
+  const [inexistente, sinConfirmar, confirmado] = reenviosConTransporteRoto([
+    `no.existe.roto.${Date.now()}@example.com`,
+    pendiente,
+    email,
+  ]);
+  assert(
+    inexistente.status === sinConfirmar.status && sinConfirmar.status === confirmado.status,
+    `con el transporte caído los estados difieren: ${inexistente.status}, `
+      + `${sinConfirmar.status}, ${confirmado.status}`,
+  );
+  assert(
+    inexistente.cuerpo === sinConfirmar.cuerpo && sinConfirmar.cuerpo === confirmado.cuerpo,
+    'con el transporte caído los cuerpos difieren y delatan qué cuenta existe',
+  );
+  assert(sinConfirmar.status === 200, `el reenvío con transporte caído dio ${sinConfirmar.status}`);
+
   return `vencido HTTP 400; reenvío con 1 usuario, token viejo HTTP 400 y nuevo HTTP 200; `
-    + `respuesta idéntica para desconocido y verificado, sin correos de más`;
+    + `respuesta idéntica para desconocido y verificado; con el transporte caído los tres `
+    + `siguen en HTTP ${inexistente.status} con el mismo cuerpo`;
 });
 
 await runCase(36, 'Un token de sesión anterior no sirve sin confirmar', async () => {
@@ -2449,6 +2509,26 @@ await runCase(37, 'Registro, correo y confirmación desde el navegador', async (
 
   try {
     const page = await browser.newPage();
+
+    // Toda petición que lleve el token, sea en la URL o en Referer, queda
+    // anotada. El enlace en sí lo lleva por definición; lo que no puede
+    // llevarlo es ninguna llamada a la API.
+    const fugas = [];
+    let tokenVigilado = null;
+    page.on('request', (peticion) => {
+      if (!tokenVigilado) return;
+      const enUrl = peticion.url().includes(tokenVigilado);
+      const enReferer = (peticion.headers().referer || '').includes(tokenVigilado);
+      if (enUrl || enReferer) {
+        fugas.push({
+          url: peticion.url(),
+          enUrl,
+          enReferer,
+          esApi: peticion.url().includes('/api/'),
+        });
+      }
+    });
+
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Ingresar' }).click();
     await page.getByText('Regístrate aquí').click();
@@ -2507,15 +2587,69 @@ await runCase(37, 'Registro, correo y confirmación desde el navegador', async (
       `el enlace invalidado no fue rechazado: "${textoViejo}"`,
     );
 
+    // Un token vencido, abierto en el navegador: el estado tiene que decirlo y
+    // ofrecer el reenvío. Es distinto del invalidado de arriba.
+    await apiRequest('/auth/resend-verification', { method: 'POST', body: { email } });
+    const enlaceVencido = enlaceDeVerificacion();
+    querySql(`
+      UPDATE email_verification_tokens
+      SET created_at = created_at - interval '24 hours 1 second',
+          expires_at = expires_at - interval '24 hours 1 second'
+      WHERE user_id = (SELECT id FROM users WHERE email = ${sqlLiteral(email)})
+        AND consumed_at IS NULL AND invalidated_at IS NULL
+    `);
+    await page.goto(enlaceVencido, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(
+      () => !/Estamos confirmando/.test(
+        document.querySelector('[role="status"]')?.textContent || '',
+      ),
+      null,
+      { timeout: 15_000 },
+    );
+    const textoVencido = (await page.locator('[role="status"]').first().textContent()) || '';
+    assert(/venció/i.test(textoVencido), `el vencido no se anuncia como tal: "${textoVencido}"`);
+    assert(
+      await page.getByRole('button', { name: 'Reenviar el enlace' }).count() > 0,
+      'la vista del vencido no ofrece reenviar',
+    );
+
     // El nuevo confirma, y recién ahí hay sesión.
-    await page.goto(enlaceSegundo, { waitUntil: 'domcontentloaded' });
+    await apiRequest('/auth/resend-verification', { method: 'POST', body: { email } });
+    const enlaceTercero = enlaceDeVerificacion();
+    tokenVigilado = enlaceTercero.split('token=')[1];
+    await page.goto(enlaceTercero, { waitUntil: 'domcontentloaded' });
     await page.getByRole('heading', { name: 'Correo confirmado' }).waitFor({ timeout: 15_000 });
+
+    // El token no puede quedar en la barra ni viajar a la API.
+    const fugasApi = fugas.filter((f) => f.esApi);
+    assert(
+      fugasApi.length === 0,
+      `${fugasApi.length} llamadas a la API llevaron el token: `
+        + fugasApi.map((f) => `${f.url}${f.enReferer ? ' [en Referer]' : ''}`).join(', '),
+    );
+    assert(
+      !page.url().includes(tokenVigilado),
+      `el token quedó en la barra: ${page.url()}`,
+    );
+
+    // Recargar no puede reintentar el enlace ya usado.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    assert(
+      !page.url().includes(tokenVigilado),
+      `tras recargar, el token volvió a la barra: ${page.url()}`,
+    );
+
     const [verificado] = queryRows(`
       SELECT is_verified::text FROM users WHERE email = ${sqlLiteral(email)}
     `);
     assert(verificado[0] === 'true', 'la base no marcó la cuenta como verificada');
 
+    await page.goto(enlaceTercero.split('?')[0], { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+    assert(
+      new URL(page.url()).pathname === '/',
+      `al ir al login la URL no volvió a la raíz: ${page.url()}`,
+    );
     await page.getByPlaceholder('tu@email.com').fill(email);
     await page.getByPlaceholder('••••••••').fill(password);
     await page.locator('[class*="_submitButton_"][type="submit"]').click();
@@ -2524,7 +2658,8 @@ await runCase(37, 'Registro, correo y confirmación desde el navegador', async (
     });
 
     return `aviso con el correo y sin sesión local; login HTTP 403 con motivo y reenvío; `
-      + `enlace viejo rechazado, nuevo confirmado y sesión recién después`;
+      + `enlace invalidado y vencido rechazados con su motivo; 0 llamadas a la API con el `
+      + `token; barra limpia tras confirmar, recargar y salir al login`;
   } finally {
     await browser.close();
   }
