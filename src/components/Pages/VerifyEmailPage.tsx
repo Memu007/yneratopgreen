@@ -12,8 +12,17 @@ interface VerifyEmailPageProps {
 
 type Estado = 'verificando' | 'ok' | 'error';
 
-// La ruta sin query: es donde queda la barra apenas se lee el token.
+// La ruta pelada, sin fragmento: es donde queda la barra apenas se lee el
+// token.
 const RUTA_LIMPIA = '/verificar-correo';
+
+// El token llega en el fragmento del enlace, que el navegador nunca manda al
+// servidor. De ahí sale a memoria y la barra se limpia en el acto.
+function leerTokenDelFragmento(): string | null {
+  const fragmento = window.location.hash.replace(/^#/, '');
+  if (!fragmento) return null;
+  return new URLSearchParams(fragmento).get('token');
+}
 
 export function VerifyEmailPage({ onGoToLogin, onGoHome }: VerifyEmailPageProps) {
   const { verificarCorreo, reenviarVerificacion } = useAuth();
@@ -23,44 +32,63 @@ export function VerifyEmailPage({ onGoToLogin, onGoHome }: VerifyEmailPageProps)
   const [avisoDeReenvio, setAvisoDeReenvio] = useState('');
   const [reenviando, setReenviando] = useState(false);
 
-  // El enlace se consume UNA sola vez. Sin este guardia, el doble montaje que
-  // hace React en desarrollo gastaría el token y la segunda respuesta —"este
-  // enlace ya se usó"— pisaría el éxito de la primera.
-  const yaIntentado = useRef(false);
+  // Cada enlace se consume UNA sola vez: acá queda el último token procesado.
+  // Sin esto, el doble montaje que hace React en desarrollo gastaría el token
+  // y la segunda respuesta —"este enlace ya se usó"— pisaría el éxito de la
+  // primera.
+  const yaProcesado = useRef<string | null>(null);
 
   useEffect(() => {
-    if (yaIntentado.current) return;
-    yaIntentado.current = true;
+    const procesar = () => {
+      const token = leerTokenDelFragmento();
 
-    const token = new URLSearchParams(window.location.search).get('token');
+      // El token sale de la barra ANTES de cualquier llamada. En el fragmento
+      // no llega al servidor, pero sí queda a la vista en la barra y en el
+      // historial, y recargar reintentaría un enlace ya usado. Se queda en
+      // memoria y nada más.
+      if (window.location.hash || window.location.search) {
+        window.history.replaceState(null, '', RUTA_LIMPIA);
+      }
 
-    // El token sale de la barra ANTES de cualquier llamada. Mientras esté en
-    // la URL, toda petición del mismo origen —incluida la de verificación— lo
-    // manda en el encabezado Referer, y recargar la página reintentaría un
-    // enlace ya usado. Se queda en memoria y nada más.
-    if (window.location.search) {
-      window.history.replaceState(null, '', RUTA_LIMPIA);
-    }
+      if (!token) {
+        // Sin token: o el enlace vino incompleto, o es el segundo montaje de
+        // React, que ya no lo ve porque la barra quedó limpia. Sólo el primer
+        // caso es un error para mostrar.
+        if (yaProcesado.current === null) {
+          setEstado('error');
+          setMensaje('El enlace está incompleto. Pedí uno nuevo desde el ingreso.');
+        }
+        return;
+      }
 
-    if (!token) {
-      setEstado('error');
-      setMensaje('El enlace está incompleto. Pedí uno nuevo desde el ingreso.');
-      return;
-    }
+      if (token === yaProcesado.current) return;
+      yaProcesado.current = token;
 
-    verificarCorreo(token)
-      .then((texto) => {
-        setEstado('ok');
-        setMensaje(texto);
-      })
-      .catch((error: unknown) => {
-        setEstado('error');
-        setMensaje(
-          error instanceof Error
-            ? error.message
-            : 'No pudimos confirmar tu correo. Pedí un enlace nuevo.',
-        );
-      });
+      setEstado('verificando');
+      setMensaje('Estamos confirmando tu correo…');
+
+      verificarCorreo(token)
+        .then((texto) => {
+          setEstado('ok');
+          setMensaje(texto);
+        })
+        .catch((error: unknown) => {
+          setEstado('error');
+          setMensaje(
+            error instanceof Error
+              ? error.message
+              : 'No pudimos confirmar tu correo. Pedí un enlace nuevo.',
+          );
+        });
+    };
+
+    procesar();
+
+    // Abrir un segundo enlace cuando ya estamos en esta pantalla sólo cambia
+    // el fragmento, y eso NO recarga la página: sin escuchar el cambio, la
+    // vista seguiría mostrando el resultado del enlace anterior.
+    window.addEventListener('hashchange', procesar);
+    return () => window.removeEventListener('hashchange', procesar);
   }, [verificarCorreo]);
 
   const handleReenviar = async (evento: React.FormEvent) => {

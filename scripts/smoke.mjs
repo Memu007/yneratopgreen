@@ -128,7 +128,7 @@ function ultimoCorreo() {
 
 function enlaceDeVerificacion() {
   const cuerpo = ultimoCorreo();
-  const enlace = cuerpo.match(/https?:\/\/\S*verificar-correo\?token=[A-Za-z0-9_-]+/);
+  const enlace = cuerpo.match(/https?:\/\/\S*verificar-correo#token=[A-Za-z0-9_-]+/);
   assert(enlace, `el último correo no trae enlace:\n${cuerpo.slice(0, 400)}`);
   return enlace[0];
 }
@@ -2511,8 +2511,8 @@ await runCase(37, 'Registro, correo y confirmación desde el navegador', async (
     const page = await browser.newPage();
 
     // Toda petición que lleve el token, sea en la URL o en Referer, queda
-    // anotada. El enlace en sí lo lleva por definición; lo que no puede
-    // llevarlo es ninguna llamada a la API.
+    // anotada. Con el token en el fragmento no puede llevarlo NINGUNA, ni
+    // siquiera la del propio documento: el navegador no manda el fragmento.
     const fugas = [];
     let tokenVigilado = null;
     page.on('request', (peticion) => {
@@ -2520,12 +2520,7 @@ await runCase(37, 'Registro, correo y confirmación desde el navegador', async (
       const enUrl = peticion.url().includes(tokenVigilado);
       const enReferer = (peticion.headers().referer || '').includes(tokenVigilado);
       if (enUrl || enReferer) {
-        fugas.push({
-          url: peticion.url(),
-          enUrl,
-          enReferer,
-          esApi: peticion.url().includes('/api/'),
-        });
+        fugas.push({ url: peticion.url(), enReferer });
       }
     });
 
@@ -2620,12 +2615,11 @@ await runCase(37, 'Registro, correo y confirmación desde el navegador', async (
     await page.goto(enlaceTercero, { waitUntil: 'domcontentloaded' });
     await page.getByRole('heading', { name: 'Correo confirmado' }).waitFor({ timeout: 15_000 });
 
-    // El token no puede quedar en la barra ni viajar a la API.
-    const fugasApi = fugas.filter((f) => f.esApi);
+    // Ni una sola petición puede llevar el token, ni en la URL ni en Referer.
     assert(
-      fugasApi.length === 0,
-      `${fugasApi.length} llamadas a la API llevaron el token: `
-        + fugasApi.map((f) => `${f.url}${f.enReferer ? ' [en Referer]' : ''}`).join(', '),
+      fugas.length === 0,
+      `${fugas.length} peticiones llevaron el token: `
+        + fugas.map((f) => `${f.url}${f.enReferer ? ' [en Referer]' : ''}`).join(', '),
     );
     assert(
       !page.url().includes(tokenVigilado),
@@ -2658,8 +2652,8 @@ await runCase(37, 'Registro, correo y confirmación desde el navegador', async (
     });
 
     return `aviso con el correo y sin sesión local; login HTTP 403 con motivo y reenvío; `
-      + `enlace invalidado y vencido rechazados con su motivo; 0 llamadas a la API con el `
-      + `token; barra limpia tras confirmar, recargar y salir al login`;
+      + `enlace invalidado y vencido rechazados con su motivo; 0 peticiones con el `
+      + `token, ni la del documento; barra limpia tras confirmar, recargar y salir al login`;
   } finally {
     await browser.close();
   }

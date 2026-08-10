@@ -39,8 +39,14 @@ def _hashear(token: str) -> str:
 
 
 def _armar_enlace(token: str) -> str:
+    """El token va en el FRAGMENTO, no en el query.
+
+    El navegador nunca manda el fragmento al servidor, asi que el token no
+    aparece en el registro de acceso de quien sirva el frontend. Con `?token=`
+    quedaba escrito ahi por meses, que es un lugar donde nadie lo va a buscar.
+    """
     base = (settings.FRONTEND_URL or "").rstrip("/")
-    return f"{base}/verificar-correo?token={quote(token)}"
+    return f"{base}/verificar-correo#token={quote(token)}"
 
 
 def _cuerpo_del_mensaje(nombre: str, enlace: str) -> str:
