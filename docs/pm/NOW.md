@@ -32,10 +32,10 @@ falsos verdes del recorrido y `5924fbb` hizo que cualquier fallo acumulado
 impida el éxito final. La cobertura 40/40 y 34/34 y la puerta de accesibilidad
 quedan cerradas. `652bc34` dejó el seed bancario demo utilizable desde la
 primera instalación y subió la suite a 26/26. La tarea activa en
-`PARA-DEV.md` es evitar que el checkout oculte errores reales. El contrato
-monetario quedó aceptado con `61624ce`, `b2f2e89` y `5616aec`: amplía el esquema,
-compra el campo de $950.000.000 y valida los cinco caminos del carrito antes de
-escribir. La suite queda en 28/28.
+`PARA-DEV.md` es reparar el Camino B de instalación nativa. Los errores reales
+de sincronización y pago quedaron aceptados en `e915d6a`; la suite subió a
+31/31 y accesibilidad quedó 40/40. El contrato monetario ya estaba aceptado con
+`61624ce`, `b2f2e89` y `5616aec`.
 
 ## El proyecto fue aprobado
 
@@ -73,13 +73,12 @@ transcripcion funcional en `CONTRATO.md` y el anclaje en `CRONOGRAMA.md`.
 
 ## Objetivo activo
 
-**Mostrar el motivo real cuando el carrito no puede sincronizarse o pagarse.**
-El contrato monetario quedó cerrado en `5616aec`, pero el checkout todavía
-captura cualquier error de `sync` y lo sustituye con un fallback POST/PUT; el
-backend, además, puede descartar o recortar ítems en silencio. La puerta de
-accesibilidad de Fase 1 quedó cerrada en `5924fbb`; las corridas quedaron 40/40
-y 34/34. El contraste del tema claro fue aceptado en `918c4b9` y el flujo UX/UI
-de logística fue aceptado en
+**Hacer reproducible la instalación nativa siguiendo la guía.** El checkout ya
+muestra el motivo real y no descarta ítems en `e915d6a`. El Camino B sigue roto:
+el ejemplo del backend contiene claves que `Settings` rechaza y el proxy de Vite
+apunta al nginx de `:80`. La puerta de accesibilidad de Fase 1 quedó cerrada en
+`5924fbb`; las corridas quedaron 40/40 y 34/34. El contraste del tema claro fue
+aceptado en `918c4b9` y el flujo UX/UI de logística fue aceptado en
 `823c3fe` antes del inicio contractual. La orden de transferencia inmortal se
 cerró en `0039e00` y fue aceptada por la PM el 2026-08-05.
 
@@ -174,13 +173,11 @@ nuevos con deuda encima.
    `652bc34`: primera corrida utilizable, repetición idempotente y suite 26/26.
 5. ~~**Contrato monetario y precios altos.**~~ **Cerrado y aceptado el
    2026-08-10** con `61624ce`, `b2f2e89` y `5616aec`; suite 28/28.
-6. **Tarea activa: errores reales de sincronización y pago.** Quitar el fallback
-   que tapa el motivo, rechazar atómicamente productos inválidos o sin stock y
-   mostrar el detalle al usuario sin crear una orden incompleta.
-7. **El camino de instalación sin Docker no funciona** siguiendo la guía:
-   el archivo de configuración de ejemplo tiene claves que el sistema
-   rechaza, y el proxy del frontend apunta a un puerto que sólo existe con
-   nginx.
+6. ~~**Errores reales de sincronización y pago.**~~ **Cerrados y aceptados el
+   2026-08-10** en `e915d6a`; suite 31/31 y cobertura accesible 40/40.
+7. **Tarea activa: instalación nativa sin Docker.** El archivo de configuración
+   de ejemplo tiene claves que el sistema rechaza, el proxy apunta a un puerto
+   que sólo existe con nginx y la ruta de uploads debe ser escribible en local.
 8. **Transportistas.** La Pieza A está hecha con dos objeciones abiertas
    —el perfil no se puede editar y el campo de certificación obligatorio
    no informa nada—. Las decisiones de B/C y el mapa de contacto quedaron

@@ -570,3 +570,72 @@ avisar; la interfaz puede crear una orden con menos de lo que el usuario cree.
   accesibilidad de las pantallas tocadas y `diff --check` verdes.
 - Un commit de código y otro con `PARA-PM.md`; detallá rutas, mensajes visibles,
   preservación del carrito y cualquier desvío.
+
+---
+
+## 2026-08-10 — `e915d6a`: errores de checkout aceptados
+
+Aceptado. `sync` dejó de descartar o recortar ítems, valida duplicados sobre la
+suma y preserva el carrito previo; el checkout ya no reemplaza el motivo real
+con POST/PUT de respaldo. Los casos 29–31 prueban API, navegador, cero órdenes,
+cero fallback y restauración bancaria. La suite queda 31/31 y accesibilidad
+40/40. PM revisó los recorridos, compiló backend y guion y confirmó
+`diff --check`.
+
+Se mantiene fuera del MVP inmediato el botón “quitar” dentro del aviso. El
+usuario ya puede cerrar el checkout y corregir el carrito; no corresponde abrir
+otra interacción sin un bloqueo contractual. El refactor `float` → `Decimal`
+sigue reservado obligatoriamente para antes de Fase 4.
+
+## Tarea activa única: instalación nativa que funcione siguiendo la guía
+
+El Camino B de `README_LOCAL_SETUP.md` no es reproducible en una máquina limpia:
+`backend/.env.example` contiene seis claves que `Settings` rechaza
+(`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `BASE_URL`) y el
+proxy de Vite apunta a `localhost:80`, que sólo existe con nginx. La solución
+debe preservar Docker y Railway, no intercambiar un camino roto por otro.
+
+### Alcance
+
+- Separá con claridad qué configuración consume Docker y cuál consume FastAPI.
+  `backend/.env.example`, copiado como indica la guía, debe ser aceptado por
+  `Settings` sin borrar líneas manualmente. No debilites `Settings` permitiendo
+  extras: eliminá la duplicación o mové esas variables al dueño correcto.
+- El script Docker debe leer `DB_NAME`/`DB_USER` de la configuración raíz, no
+  depender de claves inválidas dentro del `.env` del backend.
+- Hacé coherentes `DATABASE_URL`, puerto de PostgreSQL y `UPLOAD_DIR` para el
+  camino nativo. Una persona sin permisos sobre `/data` debe poder iniciar la
+  API y servir uploads desde una carpeta del proyecto. Docker debe conservar su
+  volumen persistente.
+- Corregí el proxy de Vite para que, aun sin `.env`, `/api` apunte al backend
+  nativo en `localhost:8000`. Si existe `VITE_API_URL`, debe seguir mandando.
+- Reescribí sólo las secciones necesarias de `README_LOCAL_SETUP.md`: comandos
+  POSIX y PowerShell, conexión a la base correcta antes de crear PostGIS,
+  variables que realmente hay que cambiar y URLs finales.
+- No commitees `.env`, secretos, entornos virtuales, dependencias ni bases.
+
+### Verificación obligatoria
+
+1. Desde una copia limpia sin `.env` y **sin usar Docker**, seguí literalmente
+   el Camino B: entorno Python nuevo, dependencias, PostgreSQL/PostGIS,
+   migraciones, seed dos veces, API `:8000` y Vite `:5173`.
+2. Comprobá health, login demo, catálogo y una imagen/upload desde el navegador;
+   ninguna llamada puede intentar `localhost:80` ni fallar por CORS.
+3. Demostrá que copiar `backend/.env.example` y sustituir sólo los placeholders
+   documentados carga `Settings` sin claves extra.
+4. Verificá que `docker compose config` y la inicialización Docker sigan
+   recibiendo DB, API y volumen de uploads correctos. No destruyas una base del
+   usuario para probar: usá un entorno descartable.
+5. Verificá que Railway no cambió de contrato o documentá y justificá cualquier
+   ajuste imprescindible.
+6. Suite 31/31, build y `diff --check` verdes. Si la suite oficial exige Docker,
+   separá claramente esa evidencia de la prueba nativa.
+
+### Fuera de alcance y entrega
+
+- Sin cambios de producto, checkout, pagos, logística, interfaz ni esquema de
+  datos. Sin instaladores nuevos ni soporte para motores distintos de
+  PostgreSQL 16 + PostGIS.
+- Un commit de código/configuración/documentación y otro con `PARA-PM.md`.
+  Informá comandos exactos, entorno limpio utilizado, resultado nativo, prueba
+  Docker/Railway y cualquier desvío.
