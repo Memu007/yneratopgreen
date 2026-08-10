@@ -821,3 +821,68 @@ transportistas ni documentación de estado en paralelo.
 
 No hay corrimiento contractual ni consumo del colchón. La próxima entrega que
 PM espera es el commit de validación de correo y su informe separado.
+
+---
+
+## 2026-08-10 — `cb6d888`: correo devuelto una vez
+
+No aceptado todavía. Se acepta provisionalmente el modelo con hash, 24 horas,
+consumo condicional, bloqueo de `login`/`refresh`/rutas, alta sin sesión, los dos
+transportes y el flujo visual. La compilación independiente quedó verde y el
+diff está limpio. No repitas trabajo ya cerrado. Corregí estas tres puertas.
+
+### Hallazgo 1 — el token sí entra en registros normales
+
+`VerifyEmailPage` lee el token pero conserva `?token=...` en la barra mientras
+hace `POST /auth/verify-email`. La PM lo reprodujo con navegador: esa llamada
+llevó el encabezado
+`Referer: http://127.0.0.1:5173/verificar-correo?token=abcdefghijklmnop`.
+Además, los botones cambian el estado de React pero conservan la ruta y el
+query; al recargar reaparece la verificación con un token usado.
+
+- Capturá el token en memoria y quitá inmediatamente el query con
+  `history.replaceState`, **antes** de llamar a la API.
+- Al ir al inicio o al login, la URL debe quedar en `/`, sin conservar
+  `/verificar-correo` ni el token.
+- En el caso de navegador, interceptá la petición de verificación y exigí que
+  ni su URL ni `Referer` contengan el token. Exigí también URL limpia después de
+  abrir el login y después de recargar.
+
+### Hallazgo 2 — el fallo del transporte enumera cuentas
+
+`POST /auth/resend-verification` devuelve 200 con texto genérico para cuenta
+inexistente o verificada, pero devuelve 503 sólo cuando la cuenta pendiente
+existe y el transporte falla. Durante una caída o mala configuración SMTP, el
+código HTTP revela qué cuenta está pendiente y contradice el contrato genérico.
+
+- Para reenvío, estado y cuerpo externos deben seguir siendo idénticos para
+  inexistente, verificada y pendiente aunque el transporte falle. Hacé rollback
+  y registrá internamente el fallo sin email ni token; no lo expongas al caller.
+- Forzá un transporte fallido en una prueba mínima y compará código y cuerpo
+  con los otros dos estados. El alta inicial sí puede conservar su 503 y
+  rollback: ahí todavía no existe una cuenta que enumerar y la persona necesita
+  saber que debe reintentar.
+
+### Hallazgo 3 — falta el vencimiento en navegador
+
+El caso 35 prueba vencimiento por API. El caso 37 abre en navegador un token
+**invalidado por reenvío**, no uno vencido. La tarea pedía expresamente el
+estado vencido en interfaz.
+
+- Dentro del recorrido de navegador, emití otro token, vencelo por SQL, abrí su
+  enlace y comprobá el mensaje de vencimiento y el formulario de reenvío.
+- No hace falta crear otro caso si ampliar el 37 deja la regresión clara.
+
+### Decisiones solicitadas
+
+- `PaymentResultPage`: esperar a Fase 4 y sumar esa pantalla al barrido cuando
+  se reconstruya Mercado Pago; hoy esas rutas están fuera del flujo habilitado.
+- Ensayo Railway: usa `outbox` y sólo datos demo. No se piden credenciales SMTP
+  para una prueba descartable. Producción sí exige `EMAIL_TRANSPORT=smtp` y
+  credenciales reales; el ensayo no cuenta como producción.
+
+Límites: no refactorices autenticación, no agregues rate limiting, colas ni
+proveedores, y no toques pagos. Conservá el resto de los 37 casos, build,
+accesibilidad, contraste, migración y `diff --check` verdes. Un commit de
+corrección y el informe separado; informá la evidencia exacta de los tres
+hallazgos.

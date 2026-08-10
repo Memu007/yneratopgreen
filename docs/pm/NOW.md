@@ -35,7 +35,10 @@ primera instalación y subió la suite a 26/26. La tarea activa en
 `PARA-DEV.md` abre la validación de registro por correo, primera deuda de Fase
 2. La instalación quedó aceptada con `82c1df8` y `896386a`; la PM completó en
 Docker aislado migraciones, seed idempotente, health y persistencia de uploads.
-La suite queda en 32/32.
+La suite anterior queda en 32/32. La entrega de correo `cb6d888` informa
+37/37, build y puertas visuales verdes, pero fue devuelta una vez: el navegador
+manda el token en `Referer`, el fallo del transporte permite enumerar cuentas
+por código HTTP y falta reproducir un enlace vencido en la interfaz.
 
 ## El proyecto fue aprobado
 
@@ -73,10 +76,13 @@ transcripcion funcional en `CONTRATO.md` y el anclaje en `CRONOGRAMA.md`.
 
 ## Objetivo activo
 
-**Implementar registro con validación por correo.** La instalación nativa y
-Docker quedaron cerrados con `82c1df8` y `896386a`. La puerta siguiente del
-cronograma es Fase 2: cuenta sin verificar, enlace único por 24 horas, login
-bloqueado y reenvío. El checkout muestra el motivo real desde `e915d6a`. La
+**Corregir y aceptar el registro con validación por correo.** `cb6d888` ya
+implementa cuenta sin verificar, enlace de 24 horas, consumo único, bloqueo de
+sesión y reenvío, pero no está aceptado. Debe quitar el token de la URL antes de
+llamar a la API, mantener idéntica la respuesta de reenvío incluso cuando falla
+el transporte y probar en navegador el vencimiento real. La instalación nativa
+y Docker quedaron cerrados con `82c1df8` y `896386a`. El checkout muestra el
+motivo real desde `e915d6a`. La
 puerta de accesibilidad de Fase 1 quedó cerrada en
 `5924fbb`; las corridas quedaron 40/40 y 34/34. El contraste del tema claro fue
 aceptado en `918c4b9` y el flujo UX/UI de logística fue aceptado en
@@ -179,9 +185,9 @@ nuevos con deuda encima.
 7. ~~**Instalación nativa y regresión Docker.**~~ **Cerradas y aceptadas el
    2026-08-10** en `82c1df8` y `896386a`; suite 32/32 y prueba Docker aislada
    completada por PM.
-8. **Tarea activa — Fase 2: validación de correo.** Enlace de un solo uso por
-   24 horas, login bloqueado hasta verificar, reenvío y transporte falso
-   comprobable; sin recuperación de contraseña.
+8. **Tarea activa — corrección de validación de correo.** Quitar el token del
+   `Referer` antes de la llamada, cerrar enumeración por fallo del transporte y
+   cubrir el enlace vencido en navegador. `cb6d888` todavía no se acepta.
 9. **Ensayo Railway condicionado.** Sólo después de aceptar correo y sólo si
    puede terminar antes del 20/08, con tope de una jornada, proyecto
    descartable, datos demo y sin tratarlo como producción. Si correo no queda
