@@ -288,3 +288,62 @@ registrar un desborde, imprimir `TODO OK` y salir con código 0.
 - Sin `src/`, backend, dependencias, lint, Escape, seed ni instalación.
 - Un commit de código y otro con el informe. Después de aceptar esto, la tarea
   siguiente es el seed con datos bancarios demo.
+
+---
+
+## 2026-08-09 — `5924fbb`: puerta de accesibilidad cerrada
+
+Aceptado. La salida final de `scripts/contraste.mjs` ahora depende de
+`fallos.length === 0`; el rojo controlado por desborde salió con código 1 y la
+corrida restaurada quedó 34/34. La cobertura accesible quedó 40/40 y la
+compilación verde. No hacía falta repetir la suite funcional 25/25 para este
+cambio aislado del guion: la última corrida sobre el mismo producto sigue
+vigente.
+
+## Tarea activa única: seed bancario demo utilizable desde cero
+
+La instalación limpia crea publicaciones de demostración de dos vendedores
+—administrador y vendedor—, pero ninguno recibe CBU ni alias. Por eso el flujo
+de transferencia exige una configuración manual que una demo recién instalada
+no debería necesitar.
+
+### Alcance
+
+- Agregá al seed un CBU sintético de 22 dígitos y un alias inequívocamente demo
+  para `admin@topgreen.com` y `vendedor@ejemplo.com`. No uses datos reales.
+- Ambos usuarios deben quedar listos porque los dos son dueños de publicaciones
+  del catálogo demo. El comprador no necesita datos bancarios.
+- Al volver a correr el seed, completá únicamente campos bancarios vacíos. No
+  sobrescribas un CBU o alias no vacío que alguien haya personalizado y no
+  dupliques registros.
+- Agregá un caso automatizado que parta del seed limpio y compruebe que una
+  publicación de cada vendedor ofrece las opciones de transferencia sin hacer
+  antes un `PATCH` manual. Contrastá también CBU y alias entre API y base.
+- Conservá el caso negativo de vendedor sin datos bancarios. Aislalo creando el
+  estado faltante dentro de la prueba y restaurándolo, para que no dependa de
+  que el seed venga incompleto.
+
+### Fuera de alcance
+
+- Sin cambios de esquema, migraciones, modelos, endpoints, interfaz ni reglas
+  de checkout.
+- Sin integración bancaria, validación externa de CBU, Mercado Pago, cifrado ni
+  datos productivos.
+- No corrijas todavía el mensaje genérico que la interfaz muestra cuando la API
+  rechaza el pago; será la pieza siguiente y separada.
+
+### Criterios de aceptación
+
+1. Desde base limpia, el seed deja CBU y alias demo en los dos usuarios que
+   publican; una segunda ejecución no duplica ni cambia los valores.
+2. Si antes de repetir el seed se reemplazan esos campos por valores no vacíos,
+   el seed los conserva.
+3. Sin configuración manual, las publicaciones de ambos vendedores permiten
+   obtener opciones de transferencia y los datos devueltos coinciden con SQL.
+4. El rechazo a un vendedor sin datos bancarios sigue cubierto por una prueba
+   aislada y verde.
+5. Quedan verdes la suite oficial completa —informá su nuevo total si agregás un
+   caso—, `npm run build` y
+   `git -c core.whitespace=cr-at-eol diff --check`.
+6. Un commit de código y otro separado con el informe en `PARA-PM.md`, indicando
+   archivos, pruebas, resultado de dos corridas del seed y cualquier desvío.

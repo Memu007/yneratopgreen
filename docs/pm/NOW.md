@@ -27,12 +27,11 @@ selección; cambiarlo invalida el contacto y vuelve a bloquear el checkout. La
 puerta UX/UI de logística de Fase 1 quedó cerrada antes del inicio contractual.
 El contraste productivo quedó cerrado el 2026-08-09 con `918c4b9` y su informe
 `0d1f1b5`. La PM reprodujo la compilación y la suite oficial 25/25 desde una
-base local limpia. `83c4b59` corrigió la identidad visible y `d2063c9` cerró
-dos falsos verdes del recorrido: el detalle no se abría y las fotos de about se
-medían sobre contacto. La cobertura 40/40 y 34/34 queda aceptada. La tarea
-activa en `PARA-DEV.md` es una corrección de una línea: el barrido todavía
-ignora los desbordes acumulados al decidir su código de salida. Después sigue
-el seed bancario demo.
+base local limpia. `83c4b59` corrigió la identidad visible, `d2063c9` cerró dos
+falsos verdes del recorrido y `5924fbb` hizo que cualquier fallo acumulado
+impida el éxito final. La cobertura 40/40 y 34/34 y la puerta de accesibilidad
+quedan cerradas. La tarea activa en `PARA-DEV.md` es el seed bancario demo
+utilizable desde una instalación limpia.
 
 ## El proyecto fue aprobado
 
@@ -70,12 +69,11 @@ transcripcion funcional en `CONTRATO.md` y el anclaje en `CRONOGRAMA.md`.
 
 ## Objetivo activo
 
-**Mantener cerrada la puerta de Fase 1 terminando el código de salida del
-barrido de contraste.** `d2063c9` ya exige cada pantalla y destapó el detalle
-que antes no se abría; falta hacer que un desborde acumulado impida el éxito.
-La identidad visible y las correcciones de accesibilidad están aceptadas. El
-contraste del tema claro fue aceptado en `918c4b9` y el flujo UX/UI de logística
-fue aceptado en
+**Dejar utilizable la transferencia desde una instalación limpia.** La puerta
+de accesibilidad de Fase 1 quedó cerrada en `5924fbb`: cualquier fallo acumulado
+impide el éxito y las corridas quedaron 40/40 y 34/34. La identidad visible y
+las correcciones de accesibilidad están aceptadas. El contraste del tema claro
+fue aceptado en `918c4b9` y el flujo UX/UI de logística fue aceptado en
 `823c3fe` antes del inicio contractual. La orden de transferencia inmortal se
 cerró en `0039e00` y fue aceptada por la PM el 2026-08-05.
 
@@ -163,14 +161,13 @@ nuevos con deuda encima.
 2. ~~**Cerrar Fase 1 antes del 20/08:** dejar completo el flujo UX/UI de
    logística aunque su implementación corresponda a Fase 3.~~ **Cerrada el
    2026-08-06** con `823c3fe`, antes del inicio contractual.
-3. ~~**Contraste productivo.**~~ **Cerrado y aceptado el 2026-08-09** en
-   `918c4b9`, con compilación y suite oficial 25/25 reproducidas por PM. Tarea
-   `83c4b59` agregó `@axe-core/playwright` y `d2063c9` dejó la cobertura real en
-   40/40 y 34/34. Tarea activa: incluir `fallos.length` en el éxito final del
-   barrido; hoy un desborde puede registrarse y aun así devolver código 0.
-4. **El seed no carga CBU ni alias**, así que sobre una instalación limpia
-   la transferencia no se puede usar. Y la pantalla de pago muestra un
-   error que no corresponde.
+3. ~~**Contraste productivo y puerta accesible.**~~ **Cerrados y aceptados el
+   2026-08-09.** `83c4b59` agregó el barrido, `d2063c9` dejó la cobertura real en
+   40/40 y 34/34, y `5924fbb` cerró el último falso verde del código de salida.
+4. **Tarea activa: el seed no carga CBU ni alias**, así que sobre una
+   instalación limpia la transferencia no se puede usar. Primero se cargan
+   datos bancarios demo idempotentes; después, en otra pieza, se corrige el
+   mensaje erróneo de la pantalla de pago.
 5. **El camino de instalación sin Docker no funciona** siguiendo la guía:
    el archivo de configuración de ejemplo tiene claves que el sistema
    rechaza, y el proxy del frontend apunta a un puerto que sólo existe con
