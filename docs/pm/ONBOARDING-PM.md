@@ -259,6 +259,18 @@ orden:
 Reglas para aprovechar el modelo sin gastar de más:
 
 - una sola tarea activa; no mezclar piezas independientes;
+- por defecto, esa tarea es un **bloque vertical de 1–2 días de trabajo** con
+  un resultado funcional demostrable de punta a punta. No mandar microtareas
+  por mensaje ni una semana entera sin control;
+- el bloque puede incluir backend, frontend, migración y pruebas cuando todos
+  son necesarios para el mismo resultado. Pagos, seguridad, datos y otra área
+  de riesgo independiente se separan;
+- la dev ejecuta e integra el bloque completo. La PM revisa al cierre y sólo
+  profundiza antes si aparece un freno, una decisión de alcance o riesgo para
+  dinero, seguridad, datos, cronograma o un hito;
+- se pueden dejar bosquejados los 2–3 bloques siguientes en `NOW.md`, pero en
+  `PARA-DEV.md` hay uno solo activo. Un bloque semanal sólo se autoriza si tiene
+  cortes demostrables y bajo riesgo; en caso contrario se divide;
 - contexto relevante por ruta o commit, sin repetir todo el proyecto;
 - pedir que inspeccione el flujo real antes de editar y que verifique después;
 - pedir evidencia reproducible, no una declaración de que funciona;
