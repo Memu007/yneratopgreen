@@ -886,3 +886,38 @@ proveedores, y no toques pagos. Conservá el resto de los 37 casos, build,
 accesibilidad, contraste, migración y `diff --check` verdes. Un commit de
 corrección y el informe separado; informá la evidencia exacta de los tres
 hallazgos.
+
+---
+
+## 2026-08-10 — `7262955`: tres hallazgos cerrados; fragmento aprobado
+
+Aceptadas las tres correcciones: la URL se limpia antes del `POST`, salir vuelve
+a `/`, el fallo del transporte mantiene 200 y cuerpo genérico con rollback y
+registro interno, y el caso 37 distingue un token vencido de uno invalidado.
+La compilación independiente y `diff --check` quedaron verdes. No rehagas esas
+soluciones.
+
+Se aprueba tu recomendación de eliminar la última aparición del token en el
+access log. Es parte de la misma puerta —no dejar tokens en registros normales—
+y se cierra ahora, no en Railway ni en Fase 5.
+
+### Corrección final única
+
+- Armá el enlace como `/verificar-correo#token=...`, no con query. Leé el token
+  desde `window.location.hash`, guardalo sólo en memoria y limpiá el fragmento
+  antes de llamar a la API. El servidor debe recibir únicamente
+  `GET /verificar-correo`.
+- Retirá el `<meta name="referrer" content="strict-origin">`: con fragmento ya
+  no protege ningún token y dejar una política global redundante agrega un
+  efecto lateral innecesario.
+- Adaptá el lector del correo y el caso 37. Con el token vigilado, exigí **cero
+  peticiones totales** cuya URL o `Referer` lo contengan —incluido el documento,
+  no sólo la API—, barra limpia, recarga sin reconsumo y salida a `/`.
+- Conservá el cuerpo del `POST /auth/verify-email`; el token no pasa a query de
+  API ni se devuelve en respuestas o logs.
+
+Sin caso nuevo, proveedor, refactor ni cambios fuera de esos cuatro archivos y
+el informe. Repetí 37/37 porque el parser del enlace alimenta toda la suite,
+además de build y `diff --check`; no hace falta repetir accesibilidad ni
+contraste si el DOM y los estilos no cambian. Un commit mínimo y el informe
+separado.
