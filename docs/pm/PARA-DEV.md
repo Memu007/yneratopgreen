@@ -1010,7 +1010,7 @@ Con autorización:
   commit sólo si el despliegue exige un ajuste versionable. Informe separado en
   `PARA-PM.md` con una tabla Gate A/Gate B y cada criterio.
 
-## Tarea activa única: error de validación legible, sin `[object Object]`
+## Tarea cerrada y aceptada: error de validación legible
 
 Gate B quedó cerrado por PM en el proyecto descartable de Railway. No tenés que
 entrar a Railway, repetir el despliegue ni tocar su configuración.
@@ -1044,3 +1044,49 @@ rompe un mensaje de negocio existente, frená e informá.
 
 Entregá un solo commit y un informe mínimo en `PARA-PM.md`: causa, archivos,
 pruebas exactas y cualquier riesgo. Ahí termina la tarea; no abras otra mejora.
+
+**Aceptada por PM el 2026-08-10:** `ca23451`, informe `085f2b5`. Build
+independiente y los dos mensajes reproducidos en Railway. No la reabras.
+
+## Tarea activa única: perfil transportista editable de Fase 2
+
+### Situación comprobada
+
+El alta ya guarda `is_carrier`, localidad base, transporte, declaración de
+certificación, radio y capacidad. `/auth/me` los devuelve. Pero
+`UserUpdateRequest`, `PATCH /auth/me`, `AuthContext.updateProfile` y el panel de
+perfil no permiten editarlos. Por eso la puerta contractual de Fase 2 sigue
+abierta aunque el registro inicial funcione.
+
+### Resultado exigido
+
+- Un usuario que ya es transportista puede ver y editar desde su perfil:
+  localidad base del padrón oficial, transporte habilitado, declaración de
+  certificación, radio de cobertura positivo y capacidad.
+- La actualización se valida también en backend: localidad existente y perfil
+  transportista completo/coherente. Un payload parcial no puede dejarlo en un
+  estado inválido.
+- Guardar, recargar la página y volver a iniciar sesión conserva los cambios.
+  `GET /auth/me` y la interfaz muestran lo mismo.
+- La edición general de comprador/vendedor y sus mensajes actuales no cambia.
+- Agregá la regresión integral mínima: alta y confirmación de un transportista,
+  edición de los cinco datos, recarga/GET, rechazo de localidad inexistente y
+  radio no positivo. Actualizá el conteo documentado sólo si el caso entra en
+  la suite oficial.
+- Corré la regresión nueva, build, pruebas proporcionales y `git diff --check`.
+
+### Alcance y freno
+
+No conviertas al transportista en un rol nuevo y no permitas crear un perfil
+incompleto. No implementes todavía listado compatible, PostGIS por radio,
+selección/contacto, estados logísticos, tarifa, ruteo, GPS, documentos ni
+verificación oficial. No toques Railway.
+
+Usá los campos y el padrón existentes; una migración sólo se justifica si es
+imprescindible para cumplir un dato contractual ya documentado, no para prever
+funciones futuras. Si aparece una ambigüedad que cambie quién puede convertirse
+en transportista o abandonar esa condición, frená: esa política no está
+decidida y es de PM/Emi.
+
+Entregá un commit de producto y el informe mínimo separado en `PARA-PM.md` con
+causa, archivos, pruebas exactas y riesgos. Ahí termina la tarea.

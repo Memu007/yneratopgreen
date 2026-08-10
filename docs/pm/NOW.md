@@ -2,6 +2,18 @@
 
 Actualizado: 2026-08-10.
 
+## Entrega aceptada y tarea actual
+
+La corrección `ca23451` quedó aceptada el 2026-08-10; el informe es `085f2b5`.
+La PM reprodujo en Railway el correo inválido con mensaje legible y el login de
+una cuenta pendiente con su texto de negocio intacto. `npm run build` y
+`git diff --check` están verdes. No se reabre esta corrección.
+
+**Tarea activa única de la dev:** cerrar el perfil transportista editable de
+Fase 2. Es la pieza que falta antes del directorio geográfico de Fase 3. No
+incluye coincidencia por radio, contactos, orden, tarifa ni pagos; el detalle y
+los frenos están al final de `PARA-DEV.md`.
+
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
 **Cerrado por PM el 2026-08-10.** Emi declaró descartable el proyecto Railway
