@@ -943,6 +943,13 @@ Objetivo: descubrir ahora los defectos de despliegue que no aparecen en Docker
 local, sin llamar producción a este entorno ni consumir la puerta de perfiles
 de Fase 2. Tope total: una jornada y cierre antes del 20/08.
 
+**Relevo PM 2026-08-10:** Gate A quedó cerrado por la PM porque tu bloqueo de
+egreso no se reproduce en su entorno. Tu commit `0cf960b` queda aceptado junto
+con la construcción y el ensayo Docker completo documentados en `NOW.md`. Gate
+B está parcialmente creado en Railway y queda en manos de la próxima PM porque
+tu sesión no tiene acceso; no hagas más cambios ni abras otra tarea hasta que
+la PM entrante termine el contraste del estado externo.
+
 ### Gate A — hacelo ahora, sin cuenta Railway
 
 - `railway whoami` responde hoy `Unauthorized`. No intentes login interactivo,
