@@ -2,49 +2,56 @@
 
 Actualizado: 2026-08-10.
 
-## Relevo urgente de PM — ensayo Railway en curso
+## Ensayo Railway descartable — Gate A y Gate B cerrados
 
-**Frenado a pedido de Emi el 2026-08-10 para que continúe otra PM.** No hay que
-reiniciar el trabajo ni pedir otra autorización. Emi declaró descartable el
-proyecto Railway `strong-playfulness` y autorizó usarlo; no se elimina nada sin
-una autorización nueva.
+**Cerrado por PM el 2026-08-10.** Emi declaró descartable el proyecto Railway
+`strong-playfulness` y autorizó usarlo. Queda encendido para inspección y no se
+elimina nada sin una autorización nueva. No es producción ni habilita el hito
+final.
 
-Estado comprobado al frenar:
+Evidencia comprobada, no inferida del estado verde de Railway:
 
-- Git limpio en `92a19c8`. La entrega documental de la dev `0cf960b` queda
-  aceptada.
-- **Gate A cerrado por PM:** se construyeron las dos imágenes Railway; en
-  Docker aislado `tgpmrail-*` pasaron PostGIS 3.4.3, siete migraciones, seed dos
-  veces sin duplicar, API/frontend, `/verificar-correo`, catálogo, CORS, outbox,
-  upload y persistencia de base y `/data` tras reiniciar. Se eliminaron sólo los
-  contenedores, red y volúmenes temporales; `topgreen-*` no se tocó.
-- Railway CLI autenticada como Emiliano Sejumil; plan Hobby. Proyecto
-  `049653ee-c04f-46e7-9a58-dde7ff926915`.
-- Frontend existente `yneratopgreen`
-  (`abd6574b-a1f6-405b-95ca-bd08591f3dd7`) sigue en
-  `https://ynerav.up.railway.app` y todavía apunta al estado frontend-only.
-- PostGIS `5a767df1-98ab-4161-8ea9-d35505154321`: `SUCCESS`, imagen
-  `postgis/postgis:16-3.4`, volumen
-  `df2140cc-047a-4723-ae9d-211947261939` en
-  `/var/lib/postgresql/data` y URL privada definida.
-- Backend `fde7b182-9846-4dc4-ac2f-7dafd4107574`: volumen
-  `5c0e4c3f-5bea-4d36-b1b3-0085db688006` en `/data`, dominio
-  `https://backend-production-ba84.up.railway.app`, variables demo/outbox y JWT
-  aleatorio cargado directamente en Railway, nunca guardado localmente.
-- Al frenar hay dos deploys Backend en `BUILDING`:
-  `af1e2a5a-cfb9-448e-a748-8a0c4b3afe15` y el más nuevo
-  `3c6bf683-81df-4ecf-9b2c-39f70c5fb8e0`. Ambos ya muestran
-  `Dockerfile.railway`, pre-deploy `railway-entrypoint migrate`, health
-  `/api/health` y volumen `/data`. Un intento de `railway down` respondió
-  `No deployments found` y no cambió nada.
+- Git estaba limpio en `df6c8d3`; Gate A ya estaba cerrado en Docker aislado.
+- Proyecto `049653ee-c04f-46e7-9a58-dde7ff926915`, plan Hobby, con tres
+  servicios `SUCCESS`: Frontend `yneratopgreen`, Backend y PostGIS 16 + 3.4.
+- Frontend: `https://ynerav.up.railway.app`. Backend:
+  `https://backend-production-ba84.up.railway.app`; `/api/health` devuelve JSON
+  de producción, no el HTML del SPA.
+- El PostGIS inicialmente no arrancaba aunque Railway había marcado el servicio
+  anterior como exitoso: el volumen aportaba `lost+found`. Se corrigió sólo en
+  Railway con `PGDATA=/var/lib/postgresql/data/pgdata`; los registros confirman
+  inicialización de PostGIS y base lista para conexiones.
+- Migraciones de pre-deploy y backend quedaron operativos. El seed corrió dos
+  veces: la primera creó 4.028 localidades y 30 publicaciones; la segunda
+  reconoció todos los datos existentes y no duplicó.
+- El frontend se recompiló con la API y las imágenes del Backend. En la web
+  pública cargaron 30 publicaciones; el filtro Córdoba devolvió 3 y habilitó
+  sus localidades; el cruce Córdoba + Riego devolvió correctamente cero.
+- CORS aceptó `https://ynerav.up.railway.app` y rechazó un origen ajeno.
+- Registro real con correo demo: se generó el `.eml` en `/data/outbox`, se leyó
+  el enlace sin imprimir ni guardar el token, la confirmación respondió 200 y
+  el login posterior funcionó. `/verificar-correo` directo tampoco da 404.
+- Se subió `topG.png` al volumen Backend. Después de reiniciar el servicio,
+  health, la misma imagen, los 30 productos y el login de la cuenta creada
+  siguieron respondiendo 200: persisten `/data` y PostGIS.
+- Uso medido al cierre: ~1 MB en `/data` y ~112 MB en PostGIS. Son 2 volúmenes
+  de 5 GB, dentro del máximo de 10 volúmenes por proyecto Hobby. A los precios
+  vigentes, ese almacenamiento ronda USD 0,02/mes; CPU y RAM se cobran por uso
+  real y el panel de Railway es la fuente de facturación. Hobby incluye USD 5
+  mensuales de uso.
+- Backups manuales y programados están disponibles para ambos volúmenes, pero
+  no se activó ninguno. Railway los cobra por tamaño incremental como volumen;
+  tampoco se habilitó PITR ni se probó una restauración.
 
-Próxima acción, en este orden: esperar el resultado de esos builds sin lanzar
-otro; revisar logs y health del Backend; correr el seed dos veces; cargar en el
-Frontend `VITE_API_URL=https://backend-production-ba84.up.railway.app/api` y
-`VITE_IMAGES_URL=https://backend-production-ba84.up.railway.app`, y recién ahí
-redesplegarlo. Después completar Gate B: HTTPS, PostGIS, catálogo, CORS, registro
-con enlace desde `/data/outbox`, login, upload y persistencia tras reinicio.
-No mostrar secretos ni tokens y no borrar el proyecto al terminar.
+Fuentes de límites y costos consultadas el 2026-08-10: documentación oficial de
+[precios](https://docs.railway.com/pricing),
+[volúmenes](https://docs.railway.com/volumes/reference) y
+[backups](https://docs.railway.com/volumes/backups) de Railway.
+
+Hallazgo de producto separado del despliegue: el registro con un dominio de
+correo deliberadamente inválido recibe el detalle estructurado de FastAPI pero
+la interfaz lo muestra como `[object Object]`. Un correo válido completa el
+flujo. Es la tarea activa única para la dev; Gate B no se reabre.
 
 ## Cambio de PM, hoy
 

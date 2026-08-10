@@ -1,6 +1,6 @@
 # Cronograma — el plan, con fechas reales
 
-Actualizado: 2026-08-06.
+Actualizado: 2026-08-10.
 
 **Fuente única: la sección 5 del PDF** *Documento de Especificación
 Funcional y Propuesta Comercial*, el que armó el socio y que la clienta
@@ -33,7 +33,9 @@ trabajo previo y no consumen el plazo contractual.
 | 4 — Pagos y checkout | Mercado Pago y validación de transferencias | 9–10 | 02/10 | 15/10 |
 | 5 — QA y lanzamiento | Pruebas, usabilidad, carga inicial, **despliegue en producción** | 11–12 | 16/10 | 29/10 |
 
-**Hoy es miercoles 2026-08-05: faltan dos dias para la semana 1.**
+**Hoy es lunes 2026-08-10: semana 1, día 4.** La puerta de Fase 1 se cerró de
+forma anticipada; el ensayo Railway es evidencia temprana de Fase 5, no un
+despliegue productivo ni un adelanto del hito final.
 
 ### El colchón de dos semanas
 

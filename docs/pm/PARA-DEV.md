@@ -1009,3 +1009,38 @@ Con autorización:
 - Un commit de Gate A/configuración y documentación; si Gate B se habilita, otro
   commit sólo si el despliegue exige un ajuste versionable. Informe separado en
   `PARA-PM.md` con una tabla Gate A/Gate B y cada criterio.
+
+## Tarea activa única: error de validación legible, sin `[object Object]`
+
+Gate B quedó cerrado por PM en el proyecto descartable de Railway. No tenés que
+entrar a Railway, repetir el despliegue ni tocar su configuración.
+
+### Evidencia que dispara esta tarea
+
+En `https://ynerav.up.railway.app`, el alta con un dominio de correo que
+`EmailStr` rechaza devuelve el detalle estructurado normal de FastAPI y el modal
+muestra literalmente `[object Object]`. Con un correo válido, el registro,
+outbox, confirmación y login funcionan. La causa está acotada al manejo común de
+errores HTTP en `src/utils/api.ts`: hoy entrega `errorData.detail` directamente
+a `new Error(...)`, aunque FastAPI puede devolver una lista de objetos.
+
+### Resultado exigido
+
+- Convertí cualquier `detail` de FastAPI en un mensaje humano estable: cadena,
+  lista de errores de validación u otra forma inesperada. Nunca debe llegar
+  `[object Object]` a la interfaz.
+- Conservá sin cambios los mensajes de negocio que ya son cadenas, en especial
+  registro pendiente, correo no enviado, login sin verificar y confirmación.
+- Agregá una regresión ejecutable para el `422` estructurado y una para un
+  `detail` de texto. Comprobá además el modal de registro con correo inválido.
+- Corré sólo esas regresiones, el build y `git diff --check`.
+
+### Límites y freno
+
+No cambies validación de correo, backend, Railway, perfiles, catálogo ni textos
+comerciales. No diseñes una jerarquía nueva de excepciones si una normalización
+pequeña en el cliente alcanza. Si la corrección obliga a tocar el backend o
+rompe un mensaje de negocio existente, frená e informá.
+
+Entregá un solo commit y un informe mínimo en `PARA-PM.md`: causa, archivos,
+pruebas exactas y cualquier riesgo. Ahí termina la tarea; no abras otra mejora.
