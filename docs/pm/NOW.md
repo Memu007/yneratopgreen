@@ -34,8 +34,9 @@ quedan cerradas. `652bc34` dejó el seed bancario demo utilizable desde la
 primera instalación y subió la suite a 26/26. La tarea activa en
 `PARA-DEV.md` sigue siendo corregir la incompatibilidad de montos. `61624ce`
 amplió correctamente el esquema y ya compra el campo de $950.000.000, pero la
-revisión PM devolvió la pieza: las mutaciones del carrito persisten totales
-fuera de contrato y la edición de producto salta el límite unitario.
+revisión PM devolvió la pieza. `b2f2e89` ya cerró alta y actualización del
+carrito y edición de producto, pero `/cart/sync` todavía valida cada línea
+aislada y puede persistir un agregado por vendedor fuera de contrato.
 
 ## El proyecto fue aprobado
 
@@ -171,11 +172,11 @@ nuevos con deuda encima.
    40/40 y 34/34, y `5924fbb` cerró el último falso verde del código de salida.
 4. ~~**Seed bancario demo.**~~ **Cerrado y aceptado el 2026-08-09** en
    `652bc34`: primera corrida utilizable, repetición idempotente y suite 26/26.
-5. **Tarea activa: cerrar todos los caminos del contrato monetario.** `61624ce`
-   ya amplió las columnas y permite comprar los dos productos caros, pero no
-   quedó aceptado: POST/PUT/PATCH del carrito deben rechazar el total imposible
-   antes de persistir y PATCH de producto debe aplicar el mismo límite del alta.
-   Después se corrige, en otra pieza, el mensaje erróneo de la pantalla de pago.
+5. **Tarea activa: cerrar `/cart/sync` en el contrato monetario.** `61624ce`
+   amplió las columnas y `b2f2e89` cerró cuatro rutas, pero el reemplazo completo
+   del carrito no agrega correctamente varias líneas del mismo vendedor al
+   validar. Después se corrige, en otra pieza, el mensaje erróneo de la pantalla
+   de pago.
 6. **El camino de instalación sin Docker no funciona** siguiendo la guía:
    el archivo de configuración de ejemplo tiene claves que el sistema
    rechaza, y el proxy del frontend apunta a un puerto que sólo existe con

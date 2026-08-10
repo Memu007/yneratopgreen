@@ -464,3 +464,44 @@ la ruta de edición.
   todavía el refactor de `float` ni el mensaje del frontend.
 - Suite completa, compilación, `alembic check` y `diff --check` verdes. Un
   commit de corrección y otro con el informe actualizado.
+
+---
+
+## 2026-08-09 — `b2f2e89`: cuatro caminos cerrados, `sync` sigue abierto
+
+No aceptado todavía. POST/PUT/PATCH del carrito y PATCH de producto quedaron
+corregidos como se pidió. La mutación por `sync`, que la dev encontró y agregó
+al alcance, no queda protegida para el total agregado y tampoco fue incorporada
+al caso 28.
+
+### Evidencia
+
+`POST /cart/sync` borra los ítems y luego llama
+`validar_total_prospectivo(cart, product, quantity)` dentro del mismo bucle que
+va creando los nuevos. El helper suma `cart.items`, pero esa colección se carga
+vacía después del borrado y los `CartItem` nuevos se crean sólo con `cart_id`,
+sin agregarse a la relación ya cargada. Así, cada línea puede validarse sola y
+dos líneas del mismo vendedor que juntas exceden el techo entran igualmente.
+
+Además, el caso 28 prueba POST/PUT/PATCH y checkout, pero no `/cart/sync`; por
+eso el 28/28 no demuestra la quinta ruta declarada en el informe.
+
+## Corrección activa única
+
+- En `/cart/sync`, hacé una primera pasada sin escribir: resolvé productos,
+  aplicá la regla de stock, agrupá el payload efectivo por vendedor y validá
+  cada línea y el total agregado del vendedor.
+- Esa validación completa debe ocurrir antes de borrar el carrito anterior y
+  antes de cualquier `add/flush`. Recién después persistí el reemplazo.
+- Si el payload repite un `product_id`, normalizalo a una sola línea sumando las
+  cantidades o rechazalo de forma explícita; no permitas dos filas duplicadas
+  que vuelvan ambiguo el cálculo.
+- Ajustá el helper de las otras mutaciones para que, al reemplazar una fila,
+  omita sólo esa fila concreta y no todas las filas con el mismo `product_id`;
+  así tampoco subestima carritos heredados con duplicados.
+- Extendé el caso 28 con dos líneas individualmente válidas del mismo vendedor
+  cuyo total conjunto exceda el techo. `/cart/sync` debe responder 400 con el
+  máximo visible y preservar exactamente las filas, productos y cantidades del
+  carrito previo.
+- Sin otros cambios. Suite 28/28, compilación, `alembic check` y `diff --check`
+  verdes; commit de corrección e informe separado.
