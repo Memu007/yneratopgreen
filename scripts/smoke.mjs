@@ -2734,6 +2734,190 @@ await runCase(38, 'Un error de validación se lee, no dice [object Object]', asy
   }
 });
 
+await runCase(39, 'El transportista edita su perfil y los cambios quedan', async () => {
+  assert(state.location, 'caso 5 no dejó provincia/localidad');
+  const { provinceId } = state.location;
+  const padron = (await apiRequest(
+    `/catalog/localities?province_id=${encodeURIComponent(provinceId)}`,
+  )).data;
+  const inicial = padron.find((l) => l.id === state.location.localityId) || padron[0];
+  const destino = padron.find((l) => l.id !== inicial.id);
+  assert(destino, `la provincia ${provinceId} tiene una sola localidad`);
+
+  const email = `transportista.perfil.${Date.now()}@example.com`;
+  const password = 'smoke123';
+  const transporteNuevo = 'Camión con acoplado dominio PE 0R21';
+  const capacidadNueva = 'Hasta 40 toneladas de semillas';
+  const radioNuevo = 320.5;
+
+  await registrarYVerificar({
+    email,
+    password,
+    full_name: 'Transportista Editable',
+    is_carrier: true,
+    carrier_base_locality_id: inicial.id,
+    carrier_transport: 'Camión chico original',
+    carrier_transport_certified: true,
+    carrier_coverage_radius_km: 40,
+    carrier_capacity: 'Hasta 8 toneladas',
+  });
+  const primerIngreso = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email, password },
+  });
+  const token = primerIngreso.data.access_token;
+
+  // La API tiene que resolver el padrón: con el identificador solo no hay
+  // nada que mostrar en pantalla ni con qué abrir el selector.
+  const antes = (await apiRequest('/auth/me', { token })).data;
+  assert(antes.carrier_base_locality_name === inicial.name,
+    `/auth/me no resuelve la localidad: ${JSON.stringify(antes.carrier_base_locality_name)}`);
+  assert(antes.carrier_base_province_id === provinceId, 'la provincia base no coincide');
+
+  // --- los cinco datos se editan desde el panel, no sólo por API
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext();
+    await context.addInitScript(
+      ({ accessToken, refreshToken }) => {
+        window.localStorage.setItem('access_token', accessToken);
+        window.localStorage.setItem('refresh_token', refreshToken);
+      },
+      {
+        accessToken: token,
+        refreshToken: primerIngreso.data.refresh_token,
+      },
+    );
+    const page = await context.newPage();
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.locator('button').filter({ hasText: '👤' }).first().click();
+    await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
+    await page.getByRole('heading', { name: 'Datos de transportista' }).waitFor();
+
+    const perfil = page.locator('[class*="_profileForm_"]');
+    const lectura = (await perfil.textContent()) || '';
+    assert(lectura.includes(inicial.name),
+      `el panel no muestra la localidad base: "${lectura.replace(/\s+/g, ' ').slice(-200)}"`);
+
+    await page.getByRole('button', { name: 'Editar' }).click();
+    await page.getByLabel('Provincia base').selectOption(provinceId);
+    await page.getByLabel('Localidad base').selectOption(destino.id);
+    await page.getByLabel('Transporte habilitado').fill(transporteNuevo);
+    await page.getByLabel('Radio de cobertura (km)').fill(String(radioNuevo));
+    await page.getByLabel('Capacidad de carga').fill(capacidadNueva);
+    // La declaración se destilda y se vuelve a tildar: es uno de los cinco
+    // datos editables y tiene que poder tocarse sin romper el perfil.
+    const declaracion = page.getByLabel('Declaro que el transporte está habilitado');
+    await declaracion.uncheck();
+    await declaracion.check();
+    await page.getByRole('button', { name: 'Guardar' }).click();
+    await page.getByText('Perfil actualizado exitosamente').waitFor({ timeout: 15_000 });
+
+    // Recargar tiene que mostrar lo guardado, no lo que quedó en memoria.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.locator('button').filter({ hasText: '👤' }).first().click();
+    await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
+    const recargado = ((await perfil.textContent()) || '').replace(/\s+/g, ' ');
+    for (const esperado of [destino.name, transporteNuevo, `${radioNuevo} km`, capacidadNueva]) {
+      assert(recargado.includes(esperado),
+        `tras recargar falta "${esperado}" en "${recargado.slice(-260)}"`);
+    }
+  } finally {
+    await browser.close();
+  }
+
+  // --- volver a entrar devuelve lo mismo que la base
+  const segundoIngreso = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email, password },
+  });
+  const tokenNuevo = segundoIngreso.data.access_token;
+  const despues = (await apiRequest('/auth/me', { token: tokenNuevo })).data;
+  assert(despues.carrier_base_locality_id === destino.id, 'la localidad base no se guardó');
+  assert(despues.carrier_base_locality_name === destino.name, 'el nombre de localidad no coincide');
+  assert(despues.carrier_transport === transporteNuevo, 'el transporte no se guardó');
+  assert(despues.carrier_transport_certified === true, 'la habilitación no quedó declarada');
+  assert(Number(despues.carrier_coverage_radius_km) === radioNuevo, 'el radio no se guardó');
+  assert(despues.carrier_capacity === capacidadNueva, 'la capacidad no se guardó');
+  assert(despues.is_carrier === true, 'la edición cambió la condición de transportista');
+
+  const [enBase] = queryRows(`
+    SELECT
+      u.carrier_base_locality_id,
+      u.carrier_transport,
+      u.carrier_transport_certified::text,
+      u.carrier_coverage_radius_km::text,
+      COALESCE(u.carrier_capacity, ''),
+      l.name
+    FROM users u
+    JOIN localities l ON l.id = u.carrier_base_locality_id
+    WHERE u.email = ${sqlLiteral(email)}
+  `);
+  assert(enBase, 'el transportista editado no quedó en la base');
+  assert(enBase[0] === destino.id, `localidad SQL inesperada: ${enBase[0]}`);
+  assert(enBase[1] === transporteNuevo, 'transporte SQL incorrecto');
+  assert(enBase[2] === 'true', 'habilitación SQL no quedó declarada');
+  assert(Number(enBase[3]) === radioNuevo, `radio SQL inesperado: ${enBase[3]}`);
+  assert(enBase[4] === capacidadNueva, 'capacidad SQL incorrecta');
+
+  // --- lo que el perfil no puede aceptar
+  const localidadInexistente = await expectApiError(400, () => apiRequest('/auth/me', {
+    method: 'PATCH',
+    token: tokenNuevo,
+    body: { carrier_base_locality_id: '00000000' },
+  }));
+  assert(/padr/i.test(localidadInexistente),
+    `el rechazo de localidad no explica el motivo: ${localidadInexistente}`);
+
+  // El radio no positivo lo corta el esquema, igual que en el alta.
+  await expectApiError(422, () => apiRequest('/auth/me', {
+    method: 'PATCH',
+    token: tokenNuevo,
+    body: { carrier_coverage_radius_km: 0 },
+  }));
+  await expectApiError(422, () => apiRequest('/auth/me', {
+    method: 'PATCH',
+    token: tokenNuevo,
+    body: { carrier_coverage_radius_km: -15 },
+  }));
+
+  // Un envío parcial tampoco puede dejar el perfil en un estado que el alta
+  // habría rechazado.
+  await expectApiError(400, () => apiRequest('/auth/me', {
+    method: 'PATCH',
+    token: tokenNuevo,
+    body: { carrier_transport: '   ' },
+  }));
+  await expectApiError(400, () => apiRequest('/auth/me', {
+    method: 'PATCH',
+    token: tokenNuevo,
+    body: { carrier_transport_certified: false },
+  }));
+
+  // Quien no es transportista no edita datos de transporte: volverse uno no
+  // es una decisión que este endpoint pueda tomar.
+  await expectApiError(400, () => apiRequest('/auth/me', {
+    method: 'PATCH',
+    token: state.buyerToken,
+    body: { carrier_transport: 'Camioneta prestada' },
+  }));
+  const comprador = (await apiRequest('/auth/me', { token: state.buyerToken })).data;
+  assert(comprador.is_carrier === false, 'el comprador quedó marcado como transportista');
+  assert(comprador.carrier_transport === null, 'el comprador quedó con transporte');
+
+  // Ninguno de los rechazos pudo escribir.
+  const [intacto] = queryRows(`
+    SELECT u.carrier_base_locality_id, u.carrier_transport, u.carrier_coverage_radius_km::text
+    FROM users u WHERE u.email = ${sqlLiteral(email)}
+  `);
+  assert(intacto[0] === destino.id, 'un rechazo cambió la localidad base');
+  assert(intacto[1] === transporteNuevo, 'un rechazo cambió el transporte');
+  assert(Number(intacto[2]) === radioNuevo, 'un rechazo cambió el radio');
+
+  return `panel + API + SQL: ${inicial.name} → ${destino.name}, ${radioNuevo} km; `
+    + '6 rechazos sin escritura';
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

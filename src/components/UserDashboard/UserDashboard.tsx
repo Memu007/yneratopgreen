@@ -4,6 +4,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Toast/Toast';
 import { apiGet, apiPatch, apiDelete, apiPost, tokenStorage, API_BASE_URL } from '../../utils/api';
 import { ProductImage } from '../ProductImage/ProductImage';
+import {
+  getLocalities,
+  getProvinces,
+  LocalityResponse,
+  ProvinceResponse,
+} from '../../utils/catalogService';
 
 type TabType = 'profile' | 'notifications' | 'purchases' | 'sales' | 'products';
 
@@ -388,6 +394,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     address: 'Av. Corrientes 1234',
     cbu: user?.cbu || '',
     bankAlias: user?.bankAlias || '',
+    carrierBaseLocalityId: user?.carrierBaseLocalityId || '',
+    carrierTransport: user?.carrierTransport || '',
+    carrierTransportCertified: user?.carrierTransportCertified ?? false,
+    // El radio viaja como texto mientras se edita y se convierte al guardar:
+    // así el campo puede quedar vacío sin volverse NaN.
+    carrierCoverageRadiusKm:
+      user?.carrierCoverageRadiusKm != null ? String(user.carrierCoverageRadiusKm) : '',
+    carrierCapacity: user?.carrierCapacity || '',
   });
 
   // Los productos se cargan desde el backend en userProducts (ver useEffect arriba)
@@ -395,7 +409,73 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
 
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
+  // --- Perfil de transportista ---------------------------------------------
+  // Sólo lo ve y lo edita quien ya es transportista. Convertirse en uno, o
+  // dejar de serlo, no se hace desde acá.
+  const esTransportista = Boolean(user?.isCarrier);
+  const [carrierProvinces, setCarrierProvinces] = useState<ProvinceResponse[]>([]);
+  const [carrierLocalities, setCarrierLocalities] = useState<LocalityResponse[]>([]);
+  const [carrierProvinceId, setCarrierProvinceId] = useState(user?.carrierBaseProvinceId || '');
+  const [carrierPadronError, setCarrierPadronError] = useState('');
+
+  // El padrón se pide recién al entrar en edición: en modo lectura alcanza con
+  // el nombre de la localidad que ya viene en /auth/me.
+  useEffect(() => {
+    if (!isEditing || !esTransportista || carrierProvinces.length > 0) return;
+    void getProvinces()
+      .then((data) => {
+        setCarrierProvinces(data);
+        setCarrierPadronError('');
+      })
+      .catch(() => setCarrierPadronError('No se pudo cargar el padrón de provincias.'));
+  }, [isEditing, esTransportista, carrierProvinces.length]);
+
+  useEffect(() => {
+    if (!isEditing || !esTransportista || !carrierProvinceId) return;
+    // Si se cambia de provincia con una consulta en vuelo, la respuesta vieja
+    // no puede pisar a la nueva.
+    let vigente = true;
+    void getLocalities(carrierProvinceId)
+      .then((data) => {
+        if (!vigente) return;
+        setCarrierLocalities(data);
+        setCarrierPadronError('');
+      })
+      .catch(() => {
+        if (vigente) setCarrierPadronError('No se pudieron cargar las localidades.');
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [isEditing, esTransportista, carrierProvinceId]);
+
+  // Cancelar devuelve los datos de transporte a lo guardado; si no, una edición
+  // abandonada volvería a enviarse en el guardado siguiente.
+  const handleCancelEdit = () => {
+    setEditForm((current) => ({
+      ...current,
+      carrierBaseLocalityId: user?.carrierBaseLocalityId || '',
+      carrierTransport: user?.carrierTransport || '',
+      carrierTransportCertified: user?.carrierTransportCertified ?? false,
+      carrierCoverageRadiusKm:
+        user?.carrierCoverageRadiusKm != null ? String(user.carrierCoverageRadiusKm) : '',
+      carrierCapacity: user?.carrierCapacity || '',
+    }));
+    setCarrierProvinceId(user?.carrierBaseProvinceId || '');
+    setCarrierPadronError('');
+    setIsEditing(false);
+  };
+
   const handleSaveProfile = async () => {
+    const radio = Number(editForm.carrierCoverageRadiusKm);
+    if (esTransportista && (!editForm.carrierCoverageRadiusKm.trim() || !(radio > 0))) {
+      // El formulario no está dentro de un <form>, así que no hay validación
+      // nativa: sin este freno el envío saldría sin radio y el backend
+      // conservaría el anterior sin que nadie se entere.
+      showToast('El radio de cobertura tiene que ser mayor que cero', 'error');
+      return;
+    }
+
     setIsSavingProfile(true);
     try {
       await updateProfile({
@@ -404,12 +484,28 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         location: `${editForm.address}, ${editForm.city}, ${editForm.province}`,
         cbu: editForm.cbu,
         bankAlias: editForm.bankAlias,
+        // Los datos de transporte sólo salen si la cuenta es transportista;
+        // para cualquier otra el cuerpo enviado es el mismo de antes.
+        ...(esTransportista
+          ? {
+              carrierBaseLocalityId: editForm.carrierBaseLocalityId,
+              carrierTransport: editForm.carrierTransport,
+              carrierTransportCertified: editForm.carrierTransportCertified,
+              carrierCoverageRadiusKm: radio,
+              carrierCapacity: editForm.carrierCapacity,
+            }
+          : {}),
       });
       showToast('Perfil actualizado exitosamente', 'success');
       setIsEditing(false);
     } catch (error) {
       console.error('Error al guardar perfil:', error);
-      showToast('Error al guardar el perfil', 'error');
+      // El motivo real de la API dice qué corregir; el texto genérico queda
+      // sólo para un fallo que no traiga mensaje.
+      const motivo = error instanceof Error && error.message.trim()
+        ? error.message
+        : 'Error al guardar el perfil';
+      showToast(motivo, 'error');
     } finally {
       setIsSavingProfile(false);
     }
@@ -999,6 +1095,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     );
   };
 
+  // Fuera de la edición no hay control que etiquetar: el `for` apuntaría a un
+  // id inexistente.
+  const paraCampo = (id: string) => (isEditing ? id : undefined);
+
   const renderProfile = () => (
     <div className={styles.section}>
       <div className={styles.sectionHeader}>
@@ -1020,9 +1120,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             >
               {isSavingProfile ? 'Guardando...' : 'Guardar'}
             </button>
-            <button 
-              className={styles.cancelButton} 
-              onClick={() => setIsEditing(false)}
+            <button
+              className={styles.cancelButton}
+              onClick={handleCancelEdit}
               disabled={isSavingProfile}
             >
               Cancelar
@@ -1235,6 +1335,147 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               )}
             </div>
           </div>
+
+          {esTransportista && (
+            <>
+              <h3 className={styles.carrierHeading}>Datos de transportista</h3>
+
+              {carrierPadronError && (
+                <p className={styles.carrierError} role="alert">{carrierPadronError}</p>
+              )}
+
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label htmlFor={paraCampo('perfil-provincia-base')}>Provincia base</label>
+                  {isEditing ? (
+                    <select
+                      id="perfil-provincia-base"
+                      value={carrierProvinceId}
+                      onChange={(e) => {
+                        // Elegir la misma provincia no es un cambio: vaciar la
+                        // lista sin recargarla dejaría el selector de localidad
+                        // en blanco para siempre.
+                        if (e.target.value === carrierProvinceId) return;
+                        setCarrierProvinceId(e.target.value);
+                        setCarrierLocalities([]);
+                        setEditForm({ ...editForm, carrierBaseLocalityId: '' });
+                      }}
+                    >
+                      <option value="">Seleccionar provincia</option>
+                      {carrierProvinces.map((province) => (
+                        <option key={province.id} value={province.id}>{province.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p>{user?.carrierBaseProvinceName || 'No especificada'}</p>
+                  )}
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor={paraCampo('perfil-localidad-base')}>Localidad base</label>
+                  {isEditing ? (
+                    <select
+                      id="perfil-localidad-base"
+                      value={editForm.carrierBaseLocalityId}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        carrierBaseLocalityId: e.target.value,
+                      })}
+                      disabled={!carrierProvinceId}
+                    >
+                      <option value="">Seleccionar localidad</option>
+                      {carrierLocalities.map((locality) => (
+                        <option key={locality.id} value={locality.id}>{locality.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p>{user?.carrierBaseLocalityName || 'No especificada'}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label htmlFor={paraCampo('perfil-transporte')}>Transporte habilitado</label>
+                {isEditing ? (
+                  <input
+                    id="perfil-transporte"
+                    type="text"
+                    value={editForm.carrierTransport}
+                    onChange={(e) => setEditForm({ ...editForm, carrierTransport: e.target.value })}
+                    placeholder="Camión con acoplado, dominio AB 123 CD"
+                  />
+                ) : (
+                  <p>{user?.carrierTransport || 'No especificado'}</p>
+                )}
+              </div>
+
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label htmlFor={paraCampo('perfil-radio')}>Radio de cobertura (km)</label>
+                  {isEditing ? (
+                    <input
+                      id="perfil-radio"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={editForm.carrierCoverageRadiusKm}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        carrierCoverageRadiusKm: e.target.value,
+                      })}
+                    />
+                  ) : (
+                    <p>
+                      {user?.carrierCoverageRadiusKm != null
+                        ? `${user.carrierCoverageRadiusKm} km`
+                        : 'No especificado'}
+                    </p>
+                  )}
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor={paraCampo('perfil-capacidad')}>Capacidad de carga</label>
+                  {isEditing ? (
+                    <input
+                      id="perfil-capacidad"
+                      type="text"
+                      value={editForm.carrierCapacity}
+                      onChange={(e) => setEditForm({ ...editForm, carrierCapacity: e.target.value })}
+                      placeholder="Hasta 40 toneladas de semillas"
+                    />
+                  ) : (
+                    <p>{user?.carrierCapacity || 'No especificada'}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className={styles.formGroup}>
+                {isEditing ? (
+                  <label className={styles.carrierCheckbox} htmlFor="perfil-habilitacion">
+                    <input
+                      id="perfil-habilitacion"
+                      type="checkbox"
+                      checked={editForm.carrierTransportCertified}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        carrierTransportCertified: e.target.checked,
+                      })}
+                    />
+                    Declaro que el transporte está habilitado
+                  </label>
+                ) : (
+                  <>
+                    <label>Declaración de habilitación</label>
+                    <p>
+                      {user?.carrierTransportCertified
+                        ? 'Declarada por el titular'
+                        : 'Sin declarar'}
+                    </p>
+                  </>
+                )}
+              </div>
+            </>
+          )}
 
           <div className={styles.privacyNote}>
             🔒 Tu información de contacto solo se comparte con los compradores después de que confirmen la compra

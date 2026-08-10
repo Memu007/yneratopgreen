@@ -31,6 +31,9 @@ interface BackendUser {
   alias_bancario?: string;
   is_carrier?: boolean;
   carrier_base_locality_id?: string;
+  carrier_base_locality_name?: string;
+  carrier_base_province_id?: string;
+  carrier_base_province_name?: string;
   carrier_transport?: string;
   carrier_transport_certified?: boolean;
   carrier_coverage_radius_km?: number;
@@ -83,6 +86,9 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
     bankAlias: backendUser.alias_bancario,
     isCarrier: backendUser.is_carrier,
     carrierBaseLocalityId: backendUser.carrier_base_locality_id,
+    carrierBaseLocalityName: backendUser.carrier_base_locality_name,
+    carrierBaseProvinceId: backendUser.carrier_base_province_id,
+    carrierBaseProvinceName: backendUser.carrier_base_province_name,
     carrierTransport: backendUser.carrier_transport,
     carrierTransportCertified: backendUser.carrier_transport_certified,
     carrierCoverageRadiusKm: backendUser.carrier_coverage_radius_km,
@@ -227,6 +233,14 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
       bio: userData.bio,
       cbu: userData.cbu,
       alias_bancario: userData.bankAlias,
+      // Los datos de transportista viajan sólo cuando quien edita los manda:
+      // `JSON.stringify` descarta las claves sin valor, así que un perfil
+      // común sigue enviando exactamente el mismo cuerpo que antes.
+      carrier_base_locality_id: userData.carrierBaseLocalityId,
+      carrier_transport: userData.carrierTransport,
+      carrier_transport_certified: userData.carrierTransportCertified,
+      carrier_coverage_radius_km: userData.carrierCoverageRadiusKm,
+      carrier_capacity: userData.carrierCapacity,
       });
 
       setUser(mapBackendUserToFrontend(response));

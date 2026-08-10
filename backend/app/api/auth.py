@@ -456,6 +456,87 @@ def get_current_user_info(
     return user_data
 
 
+CAMPOS_DE_TRANSPORTISTA = (
+    "carrier_base_locality_id",
+    "carrier_transport",
+    "carrier_transport_certified",
+    "carrier_coverage_radius_km",
+    "carrier_capacity",
+)
+
+
+def _aplicar_perfil_de_transportista(
+    update_data: UserUpdateRequest,
+    current_user: User,
+    db: Session,
+) -> None:
+    """Valida y aplica los datos de transportista de una edición de perfil.
+
+    Trabaja sobre el estado *prospectivo* —lo enviado sobre lo guardado— y
+    recién asigna cuando el conjunto entero es válido. Así una edición parcial,
+    por ejemplo vaciar el transporte, no puede dejar un perfil que el alta
+    habría rechazado. No devuelve nada: modifica el usuario en memoria y la
+    escritura la hace el commit del endpoint.
+    """
+    enviados = update_data.model_dump(exclude_unset=True)
+    cambios = {campo: enviados[campo] for campo in CAMPOS_DE_TRANSPORTISTA if campo in enviados}
+    if not cambios:
+        return
+
+    if not current_user.is_carrier:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Tu cuenta no tiene perfil de transportista, así que no hay "
+                "datos de transporte para editar."
+            ),
+        )
+
+    prospectivo = {
+        campo: cambios.get(campo, getattr(current_user, campo))
+        for campo in CAMPOS_DE_TRANSPORTISTA
+    }
+    localidad = (prospectivo["carrier_base_locality_id"] or "").strip() or None
+    transporte = (prospectivo["carrier_transport"] or "").strip() or None
+    habilitado = bool(prospectivo["carrier_transport_certified"])
+    radio = prospectivo["carrier_coverage_radius_km"]
+    capacidad = (prospectivo["carrier_capacity"] or "").strip() or None
+
+    if not localidad:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La localidad base es obligatoria para transportistas",
+        )
+    if not db.query(Locality.id).filter(Locality.id == localidad).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La localidad base no pertenece al padrón",
+        )
+    if not transporte:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El transporte es obligatorio para transportistas",
+        )
+    if not habilitado:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El transporte debe estar habilitado",
+        )
+    # El esquema ya rechaza un radio no positivo que venga en el envío; esto
+    # cubre además un valor guardado que hubiera quedado fuera de contrato.
+    if radio is None or float(radio) <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El radio de cobertura tiene que ser mayor que cero",
+        )
+
+    current_user.carrier_base_locality_id = localidad
+    current_user.carrier_transport = transporte
+    current_user.carrier_transport_certified = habilitado
+    current_user.carrier_coverage_radius_km = radio
+    current_user.carrier_capacity = capacidad
+
+
 @router.patch("/me", response_model=UserResponse)
 def update_current_user(
     update_data: UserUpdateRequest,
@@ -465,6 +546,10 @@ def update_current_user(
     """
     Actualizar perfil del usuario actual
     """
+    # El perfil de transportista se valida entero y ANTES de tocar el modelo:
+    # un envío parcial no puede dejarlo en un estado que el alta rechazaría.
+    _aplicar_perfil_de_transportista(update_data, current_user, db)
+
     # Actualizar campos si vienen en el request
     if update_data.full_name is not None:
         current_user.full_name = update_data.full_name

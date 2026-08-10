@@ -83,5 +83,20 @@ class User(Base):
     audit_logs = relationship("AuditLog", back_populates="user")
     carrier_base_locality = relationship("Locality")
 
+    # La API devuelve el identificador de la localidad base, que no se puede
+    # mostrar en pantalla. Estos tres derivados vienen del padrón por la
+    # relación de arriba: son de sólo lectura y no agregan columnas.
+    @property
+    def carrier_base_locality_name(self):
+        return self.carrier_base_locality.name if self.carrier_base_locality else None
+
+    @property
+    def carrier_base_province_id(self):
+        return self.carrier_base_locality.province_id if self.carrier_base_locality else None
+
+    @property
+    def carrier_base_province_name(self):
+        return self.carrier_base_locality.province_name if self.carrier_base_locality else None
+
     def __repr__(self):
         return f"<User {self.email} ({self.role})>"

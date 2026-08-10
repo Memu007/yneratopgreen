@@ -85,6 +85,11 @@ class UserResponse(BaseModel):
     alias_bancario: Optional[str]
     is_carrier: bool
     carrier_base_locality_id: Optional[str]
+    # Derivados del padrón: la interfaz necesita el nombre para mostrarlo y la
+    # provincia para poder abrir el selector en la localidad guardada.
+    carrier_base_locality_name: Optional[str] = None
+    carrier_base_province_id: Optional[str] = None
+    carrier_base_province_name: Optional[str] = None
     carrier_transport: Optional[str]
     carrier_transport_certified: bool
     carrier_coverage_radius_km: Optional[float]
@@ -137,6 +142,15 @@ class UserUpdateRequest(BaseModel):
     avatar_url: Optional[str] = Field(None, max_length=500)
     cbu: Optional[str] = Field(None, max_length=64)
     alias_bancario: Optional[str] = Field(None, max_length=100)
+    # Perfil de transportista. `is_carrier` no entra acá a propósito: quién
+    # puede volverse transportista, o dejar de serlo, es una política que
+    # todavía no está decidida. Desde el perfil sólo se editan los datos de
+    # quien ya lo es.
+    carrier_base_locality_id: Optional[str] = Field(None, max_length=20)
+    carrier_transport: Optional[str] = Field(None, max_length=255)
+    carrier_transport_certified: Optional[bool] = None
+    carrier_coverage_radius_km: Optional[float] = Field(None, gt=0)
+    carrier_capacity: Optional[str] = Field(None, max_length=255)
 
 
 class ChangePasswordRequest(BaseModel):

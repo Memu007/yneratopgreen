@@ -69,6 +69,11 @@ export interface User {
   bankAlias?: string;
   isCarrier?: boolean;
   carrierBaseLocalityId?: string;
+  // Derivados del padrón, de sólo lectura: sirven para mostrar la localidad
+  // base y para abrir el selector en la provincia que ya está guardada.
+  carrierBaseLocalityName?: string;
+  carrierBaseProvinceId?: string;
+  carrierBaseProvinceName?: string;
   carrierTransport?: string;
   carrierTransportCertified?: boolean;
   carrierCoverageRadiusKm?: number;
