@@ -248,6 +248,11 @@ async def update_product(
     
     # Actualizar campos
     update_data = product_data.model_dump(exclude_unset=True)
+
+    # El precio se valida ANTES de tocar el modelo: por la ruta de edicion,
+    # un valor fuera de NUMERIC(12,2) terminaba en un 500 de base.
+    if update_data.get("price") is not None:
+        validar_precio_unitario(update_data["price"])
     
     # Si cambia el nombre, regenerar slug
     if "name" in update_data:

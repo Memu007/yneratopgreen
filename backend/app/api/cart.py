@@ -11,6 +11,7 @@ from app.models.product import Product, ProductStatus
 from app.models.product_image import ProductImage
 from app.models.category import Category
 from app.core.dependencies import get_current_user
+from decimal import Decimal
 from app.core.montos import validar_precio_unitario, validar_total
 from app.models.user import User
 from app.schemas.cart import (
@@ -37,6 +38,29 @@ def get_or_create_cart(db: Session, user_id: str) -> Cart:
         db.refresh(cart)
     
     return cart
+
+
+def validar_total_prospectivo(cart: Cart, producto, cantidad_final: int) -> None:
+    """Total que tendria el vendedor del producto si el item quedara en
+    `cantidad_final`.
+
+    Se calcula ANTES de tocar el modelo y antes del commit: si no entra en el
+    contrato monetario se responde 400 y el carrito queda exactamente como
+    estaba. Sin esto, el carrito aceptaba guardar un estado que el checkout
+    despues rechazaba.
+    """
+    unitario = Decimal(str(producto.price))
+    linea = unitario * cantidad_final
+    validar_total(linea, f"El importe de «{producto.name}»")
+
+    total = linea
+    for otro in cart.items:
+        if otro.product_id == producto.id:
+            continue  # ya contado con la cantidad nueva
+        if otro.product is None or otro.product.seller_id != producto.seller_id:
+            continue  # cada vendedor es una orden distinta
+        total += Decimal(str(otro.product.price)) * otro.quantity
+    validar_total(total, "El total del carrito para este vendedor")
 
 
 @router.get("", response_model=CartResponse)
@@ -124,6 +148,7 @@ def add_to_cart(
                 status_code=400,
                 detail=f"Stock insuficiente. Disponible: {product.stock}"
             )
+        validar_total_prospectivo(cart, product, new_quantity)
         existing_item.quantity = new_quantity
         existing_item.unit_price_snapshot = product.price
         db.commit()
@@ -131,6 +156,7 @@ def add_to_cart(
         cart_item = existing_item
     else:
         # Crear nuevo item
+        validar_total_prospectivo(cart, product, item_data.quantity)
         cart_item = CartItem(
             cart_id=cart.id,
             product_id=item_data.product_id,
@@ -186,6 +212,7 @@ def update_cart_item_by_product(
             detail=f"Stock insuficiente. Disponible: {cart_item.product.stock}"
         )
     
+    validar_total_prospectivo(cart_item.cart, cart_item.product, item_data.quantity)
     cart_item.quantity = item_data.quantity
     db.commit()
     db.refresh(cart_item)
@@ -232,6 +259,7 @@ def update_cart_item(
             detail=f"Stock insuficiente. Disponible: {cart_item.product.stock}"
         )
     
+    validar_total_prospectivo(cart_item.cart, cart_item.product, item_data.quantity)
     cart_item.quantity = item_data.quantity
     db.commit()
     db.refresh(cart_item)
@@ -349,6 +377,8 @@ def sync_cart(
                 continue
         
         # Crear item de carrito
+        # el sync tambien puede armar un total imposible
+        validar_total_prospectivo(cart, product, quantity)
         cart_item = CartItem(
             cart_id=cart.id,
             product_id=product.id,

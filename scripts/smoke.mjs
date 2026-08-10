@@ -1555,17 +1555,23 @@ await runCase(27, 'Una orden por transferencia de más de cien millones', async 
 });
 
 await runCase(28, 'Un total fuera del contrato se rechaza sin escribir nada', async () => {
-  // Techo declarado: NUMERIC(14,2), 999.999.999.999,99.
+  // Techo declarado: NUMERIC(14,2), 999.999.999.999,99. Se comprueban TODOS los
+  // caminos publicos que pueden meter un monto imposible, no solo el checkout.
   assert(state.sellerToken, 'no hay token de vendedor');
-  assert(state.product?.category_id || state.product?.category_name, 'no hay categoría de referencia');
+  assert(state.buyerId, 'no hay id de comprador');
   assert(state.location, 'caso 5 no dejó localidad');
 
   const [categoria] = queryRows(`
     SELECT id FROM categories WHERE is_active = true ORDER BY name LIMIT 1
   `);
+  const contarCarrito = () => queryCount(`
+    SELECT COUNT(*) FROM cart_items ci
+    JOIN carts c ON c.id = ci.cart_id
+    WHERE c.user_id = ${sqlLiteral(state.buyerId)}
+  `);
 
-  // 1. el maximo publicable se respeta: por encima de NUMERIC(12,2), 4xx
-  const excesivo = await expectApiError(400, () =>
+  // 1. publicar por encima del maximo unitario: 400
+  const alPublicar = await expectApiError(400, () =>
     apiRequest('/products', {
       method: 'POST',
       token: state.sellerToken,
@@ -1581,10 +1587,10 @@ await runCase(28, 'Un total fuera del contrato se rechaza sin escribir nada', as
       },
     }),
   );
-  assert(/supera el máximo admitido/i.test(excesivo), `motivo inesperado: ${excesivo}`);
+  assert(/supera el máximo admitido/i.test(alPublicar), `publicar: motivo inesperado: ${alPublicar}`);
 
-  // 2. un producto al maximo publicable, con stock suficiente para pasarse en
-  //    el TOTAL: 9.999.999.999,99 x 200 = 1.999.999.999.998
+  // 2. un producto al maximo publicable, con stock para pasarse en el TOTAL:
+  //    9.999.999.999,99 x 200 = 1.999.999.999.998
   const creado = await apiRequest('/products', {
     method: 'POST',
     token: state.sellerToken,
@@ -1604,13 +1610,83 @@ await runCase(28, 'Un total fuera del contrato se rechaza sin escribir nada', as
   const ordenesAntes = queryCount('SELECT COUNT(*) FROM orders');
   const itemsAntes = queryCount('SELECT COUNT(*) FROM order_items');
   try {
+    // 3. editar el precio tampoco puede saltear el contrato
+    const precioAntes = queryRows(`
+      SELECT price FROM products WHERE id = ${sqlLiteral(topeId)}
+    `)[0][0];
+    const alEditar = await expectApiError(400, () =>
+      apiRequest(`/products/${topeId}`, {
+        method: 'PATCH',
+        token: state.sellerToken,
+        body: { price: 99999999999.99 },
+      }),
+    );
+    assert(/supera el máximo admitido/i.test(alEditar), `editar: motivo inesperado: ${alEditar}`);
+    const precioDespues = queryRows(`
+      SELECT price FROM products WHERE id = ${sqlLiteral(topeId)}
+    `)[0][0];
+    assert(precioDespues === precioAntes, `el precio cambió: ${precioAntes} → ${precioDespues}`);
+
     await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
-    await apiRequest('/cart/items', {
+
+    // 4. el carrito no puede guardar un estado que el checkout va a rechazar
+    const carritoAntes = contarCarrito();
+    const alAgregar = await expectApiError(400, () =>
+      apiRequest('/cart/items', {
+        method: 'POST',
+        token: state.buyerToken,
+        body: { product_id: topeId, quantity: 200 },
+      }),
+    );
+    assert(/supera el máximo admitido/i.test(alAgregar), `POST: motivo inesperado: ${alAgregar}`);
+    assert(/999\.999\.999\.999,99/.test(alAgregar), `POST: falta el techo: ${alAgregar}`);
+    assert(contarCarrito() === carritoAntes, 'POST rechazado igual escribió en el carrito');
+
+    // 5. con una cantidad que si entra, subirla por PUT y por PATCH tampoco
+    const agregado = await apiRequest('/cart/items', {
       method: 'POST',
       token: state.buyerToken,
-      body: { product_id: topeId, quantity: 200 },
+      body: { product_id: topeId, quantity: 1 },
     });
-    const error = await expectApiError(400, () =>
+    const itemId = agregado.data.id;
+    const cantidadAntes = queryRows(`
+      SELECT quantity FROM cart_items WHERE id = ${sqlLiteral(itemId)}
+    `)[0][0];
+    const itemsCarritoAntes = contarCarrito();
+
+    const alPut = await expectApiError(400, () =>
+      apiRequest(`/cart/items/${topeId}`, {
+        method: 'PUT',
+        token: state.buyerToken,
+        body: { quantity: 200 },
+      }),
+    );
+    assert(/supera el máximo admitido/i.test(alPut), `PUT: motivo inesperado: ${alPut}`);
+    assert(/999\.999\.999\.999,99/.test(alPut), `PUT: falta el techo: ${alPut}`);
+
+    const alPatch = await expectApiError(400, () =>
+      apiRequest(`/cart/items/${itemId}`, {
+        method: 'PATCH',
+        token: state.buyerToken,
+        body: { quantity: 200 },
+      }),
+    );
+    assert(/supera el máximo admitido/i.test(alPatch), `PATCH: motivo inesperado: ${alPatch}`);
+    assert(/999\.999\.999\.999,99/.test(alPatch), `PATCH: falta el techo: ${alPatch}`);
+
+    const cantidadDespues = queryRows(`
+      SELECT quantity FROM cart_items WHERE id = ${sqlLiteral(itemId)}
+    `)[0][0];
+    assert(
+      cantidadDespues === cantidadAntes,
+      `la cantidad cambió pese al rechazo: ${cantidadAntes} → ${cantidadDespues}`,
+    );
+    assert(contarCarrito() === itemsCarritoAntes, 'el carrito cambió de tamaño tras los rechazos');
+
+    // 6. el checkout conserva su defensa. Ya no se puede llegar por la API, asi
+    //    que el estado imposible se fuerza por SQL: es el unico camino que queda.
+    querySql(`UPDATE cart_items SET quantity = 200 WHERE id = ${sqlLiteral(itemId)}`);
+    const alCerrar = await expectApiError(400, () =>
       apiRequest('/orders/checkout/transfer', {
         method: 'POST',
         token: state.buyerToken,
@@ -1623,15 +1699,15 @@ await runCase(28, 'Un total fuera del contrato se rechaza sin escribir nada', as
         },
       }),
     );
-    assert(/supera el máximo admitido/i.test(error), `motivo inesperado: ${error}`);
-    assert(/999\.999\.999\.999,99/.test(error), `el mensaje no dice el techo: ${error}`);
+    assert(/supera el máximo admitido/i.test(alCerrar), `checkout: motivo inesperado: ${alCerrar}`);
 
     const ordenesDespues = queryCount('SELECT COUNT(*) FROM orders');
     const itemsDespues = queryCount('SELECT COUNT(*) FROM order_items');
     assert(ordenesDespues === ordenesAntes, `se escribieron ${ordenesDespues - ordenesAntes} órdenes`);
     assert(itemsDespues === itemsAntes, `se escribieron ${itemsDespues - itemsAntes} ítems`);
-    return `publicar $99.999.999.999,99 HTTP 400; total de $1.999.999.999.998,00 HTTP 400 `
-      + `con el techo en el mensaje; órdenes ${ordenesAntes}→${ordenesDespues} sin escritura parcial`;
+    return 'publicar y editar a $99.999.999.999,99 HTTP 400 con precio intacto; '
+      + 'carrito POST/PUT/PATCH HTTP 400 con el techo en el mensaje y sin cambiar el carrito; '
+      + `checkout HTTP 400; órdenes ${ordenesAntes}→${ordenesDespues} sin escritura parcial`;
   } finally {
     await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
     await apiRequest(`/products/${topeId}`, { method: 'DELETE', token: state.sellerToken });
