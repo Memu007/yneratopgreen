@@ -69,6 +69,40 @@ function querySql(sql) {
   ).trim();
 }
 
+// Carga un contenido de .env con el MISMO Settings de la aplicación. Corre
+// donde vive Settings, igual que querySql corre donde vive la base. El archivo
+// se escribe adentro a propósito: una clave de más sólo se rechaza cuando
+// viene de un archivo, no cuando llega como variable de entorno.
+const CARGAR_CON_SETTINGS = `
+import os, sys, tempfile
+from app.core.config import Settings
+ruta = os.path.join(tempfile.mkdtemp(), "plantilla.env")
+with open(ruta, "w", encoding="utf-8") as archivo:
+    archivo.write(sys.stdin.read())
+Settings(_env_file=ruta)
+print("CARGA_OK")
+`;
+
+function cargarConSettings(contenido) {
+  try {
+    return execFileSync(
+      'docker',
+      ['exec', '-i', 'topgreen-api', 'python', '-c', CARGAR_CON_SETTINGS],
+      { encoding: 'utf8', input: contenido, stdio: ['pipe', 'pipe', 'pipe'] },
+    );
+  } catch (error) {
+    // Del traceback interesa el motivo y la clave culpable, no las capas de
+    // Pydantic: si el fallo no dice qué clave sobra, la prueba no sirve.
+    const salida = `${error.stdout ?? ''}${error.stderr ?? ''}`;
+    const motivo = salida
+      .split(/\r?\n/)
+      .map((linea) => linea.trim())
+      .filter((linea) => /validation error|Extra inputs|Field required|^[A-Z][A-Z0-9_]*$/.test(linea))
+      .join(' | ');
+    return motivo || salida;
+  }
+}
+
 function queryRows(sql) {
   const output = querySql(sql);
   if (!output) return [];
@@ -2053,6 +2087,60 @@ await runCase(31, 'Sin datos bancarios, el comprador ve el motivo del vendedor',
     });
     await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
   }
+});
+
+await runCase(32, 'Las plantillas de configuración cargan sin retoques', async () => {
+  // Settings rechaza toda clave que no declara. Una plantilla con claves de
+  // más obliga a borrar líneas a mano antes de poder arrancar, que es lo que
+  // pasaba con las seis claves de Docker en backend/.env.example. Acá se
+  // comprueba que copiar la plantilla y cambiar sólo sus placeholders alcanza.
+  const plantillas = ['backend/.env.example', 'backend/.env.production.example'];
+  const PLACEHOLDER = /\b(?:CAMBIAR|GENERAR)_[A-Z0-9_]+/g;
+  const resumen = [];
+
+  for (const plantilla of plantillas) {
+    const original = readFileSync(plantilla, 'utf8');
+
+    const claves = [];
+    for (const rawLine of original.split(/\r?\n/)) {
+      const linea = rawLine.trim();
+      if (!linea || linea.startsWith('#')) continue;
+      const corte = linea.indexOf('=');
+      assert(corte > 0, `${plantilla}: línea que no es clave=valor: "${linea}"`);
+      claves.push(linea.slice(0, corte));
+    }
+    assert(claves.length > 0, `${plantilla}: no declara ninguna clave`);
+
+    const repetidas = [...new Set(claves.filter((clave, i) => claves.indexOf(clave) !== i))];
+    assert(
+      repetidas.length === 0,
+      `${plantilla}: claves duplicadas, la última gana en silencio: ${repetidas.join(', ')}`,
+    );
+
+    // se sustituyen SÓLO los placeholders documentados; ninguna línea se borra
+    const placeholders = original.match(PLACEHOLDER) ?? [];
+    assert(
+      placeholders.length > 0,
+      `${plantilla}: no tiene placeholders con la convención CAMBIAR_/GENERAR_`,
+    );
+    const sustituida = original.replace(PLACEHOLDER, 'valor_de_prueba_de_mas_de_32_caracteres');
+    assert(
+      sustituida.split(/\r?\n/).length === original.split(/\r?\n/).length,
+      `${plantilla}: la sustitución cambió la cantidad de líneas`,
+    );
+
+    const salida = cargarConSettings(sustituida);
+    assert(
+      salida.trim().endsWith('CARGA_OK'),
+      `${plantilla}: Settings no la aceptó tal cual: ${salida.trim().slice(-400)}`,
+    );
+
+    resumen.push(
+      `${plantilla}: ${claves.length} claves, ${new Set(placeholders).size} placeholders, sin duplicados`,
+    );
+  }
+
+  return resumen.join('; ');
 });
 
 const passed = results.filter((result) => result.passed).length;

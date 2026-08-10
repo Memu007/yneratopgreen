@@ -91,7 +91,7 @@ Detalles, alternativa nativa y troubleshooting en
 ## Smoke tests integrales
 
 El segundo comando elimina los volúmenes Docker locales, reinicializa la
-aplicación y ejecuta los 31 casos:
+aplicación y ejecuta los 32 casos:
 
 ```bash
 npm install

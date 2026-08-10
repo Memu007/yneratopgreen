@@ -244,9 +244,8 @@ críticas son:
   resuelve contra `backend/`. En Docker lo pisa `docker-compose.yml` con
   `/data/uploads`, que es el volumen persistente.
 - `CORS_ORIGINS` — sólo importa si el navegador llama a otro origen.
-- `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_NAME` — **hoy no las lee nadie.**
-  El seed crea el admin con `admin@topgreen.com` / `admin123` escritos en el
-  código, así que cambiarlas acá no cambia con qué se entra.
+- Las credenciales del admin del seed **no son configurables**: son
+  `admin@topgreen.com` / `admin123` y están escritas en `app/seed.py`.
 - `MP_*` — credenciales de Mercado Pago (vacías por default; ver
   [docs/SETUP_PAYMENTS.md](docs/SETUP_PAYMENTS.md)).
 - `NGROK_URL` — opcional, sólo si querés exponer webhooks de MP en local.
@@ -335,6 +334,9 @@ Los tres deben devolver JSON 200 OK.
   `DB_NAME`, `DB_USER` y `DB_PASSWORD` van en el `.env` de la raíz, que lo
   lee `docker-compose.yml`; en `backend/.env` la conexión es una sola
   variable, `DATABASE_URL`.
+- Si venís de una copia anterior, borrá también `ADMIN_EMAIL`,
+  `ADMIN_PASSWORD` y `ADMIN_NAME`: se quitaron porque no las leía nadie, y
+  un `.env` viejo que las conserve ahora impide arrancar.
 
 ### CORS error en navegador
 - El backend permite `http://localhost:5173` y `http://localhost:5174` por

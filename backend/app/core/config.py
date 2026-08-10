@@ -59,11 +59,6 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str = ""
     CLOUDINARY_API_SECRET: str = ""
     
-    # Admin inicial
-    ADMIN_EMAIL: str = "admin@topgreen.com"
-    ADMIN_PASSWORD: str = "admin123"
-    ADMIN_NAME: str = "Administrador TopGreen"
-    
     # Mercado Pago - Credenciales del Marketplace (recibe comisión)
     MP_PUBLIC_KEY: str = ""
     MP_ACCESS_TOKEN: str = ""
