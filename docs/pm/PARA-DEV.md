@@ -505,3 +505,68 @@ eso el 28/28 no demuestra la quinta ruta declarada en el informe.
   carrito previo.
 - Sin otros cambios. Suite 28/28, compilación, `alembic check` y `diff --check`
   verdes; commit de corrección e informe separado.
+
+---
+
+## 2026-08-10 — `5616aec`: contrato monetario aceptado
+
+Aceptado. `sync` ahora resuelve, normaliza y valida el reemplazo completo antes
+de borrar o escribir; el total se agrega por vendedor y el carrito previo queda
+intacto ante el 400. El helper omite sólo la fila reemplazada y el caso 28 cubre
+el agregado de dos líneas, no sólo cada línea. Se conserva la decisión de sumar
+duplicados del mismo producto: para una sincronización desde `localStorage` es
+la interpretación más útil y evita filas ambiguas.
+
+Con esto quedan aceptados `61624ce`, `b2f2e89` y `5616aec`: migración, productos
+caros, límites previos a escritura y los cinco caminos del carrito. Suite
+28/28. PM revisó el diff, compiló el backend y confirmó `diff --check` en verde;
+no repitió la misma suite completa ya informada.
+
+## Tarea activa única: no ocultar errores al sincronizar y pagar
+
+Hoy `CheckoutModal.syncBackendCart` captura **cualquier** error de `/cart/sync`
+y prueba POST/PUT por producto. Ese fallback puede sustituir el motivo real por
+“Producto no encontrado en el carrito”. Además, el backend de `sync` todavía
+salta productos inexistentes/inactivos y recorta cantidades al stock sin
+avisar; la interfaz puede crear una orden con menos de lo que el usuario cree.
+
+### Alcance
+
+- Eliminá el fallback POST/PUT del checkout. `/cart/sync` es el único camino de
+  sincronización; su error debe propagarse sin reemplazar el mensaje original.
+- Hacé atómico el contrato de `sync`: antes de borrar el carrito, rechazá con
+  400 y motivo claro si un producto no existe, está inactivo, no tiene stock o
+  la cantidad pedida supera el disponible. No saltees ni recortes en silencio.
+- Validá que cada cantidad sea positiva en el esquema de entrada. Conservá la
+  normalización de duplicados ya aceptada y aplicá stock sobre la suma.
+- Ante cualquier rechazo, preservá exactamente el carrito backend anterior. El
+  carrito local del navegador tampoco se vacía ni se reemplaza.
+- Mostrá en el cuadro de pago el `detail` real entregado por la API, tanto al
+  cargar opciones de transferencia como al crear la orden. El usuario debe
+  poder corregir el carrito o volver; no cierres el modal ni generes una orden.
+- Si el texto visible de error no tiene semántica accesible, agregá `role="alert"`
+  o equivalente usando el estilo existente; sin rediseñar el checkout.
+
+### Pruebas obligatorias
+
+1. API: `sync` con producto inexistente, inactivo, sin stock y cantidad superior
+   al stock devuelve 400 con motivo específico y deja filas/cantidades previas
+   idénticas. Incluí duplicado cuya suma supera el stock.
+2. Navegador: forzá un error real de `sync`, avanzá al pago y verificá que se ve
+   exactamente ese motivo; comprobá que no se hicieron los POST/PUT de fallback
+   y que no se creó ninguna orden.
+3. Navegador: vendedor sin CBU/alias muestra el motivo real de
+   `/orders/transfer-options`, no un mensaje del carrito; restaurá los datos en
+   `finally`.
+4. El flujo válido de transferencia sigue completándose.
+
+### Fuera de alcance y entrega
+
+- Sin migraciones, nuevas pantallas, cambios de diseño, Mercado Pago, logística
+  ni instalación.
+- No abras aún el refactor monetario de `float` a `Decimal`; queda obligatorio
+  antes de Fase 4.
+- Suite completa —informá el nuevo total si agregás un caso—, build,
+  accesibilidad de las pantallas tocadas y `diff --check` verdes.
+- Un commit de código y otro con `PARA-PM.md`; detallá rutas, mensajes visibles,
+  preservación del carrito y cualquier desvío.
