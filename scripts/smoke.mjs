@@ -1562,12 +1562,14 @@ await runCase(28, 'Un total fuera del contrato se rechaza sin escribir nada', as
   assert(state.location, 'caso 5 no dejó localidad');
 
   const [categoria] = queryRows(`
-    SELECT id FROM categories WHERE is_active = true ORDER BY name LIMIT 1
+    SELECT id FROM categories
+    WHERE is_active = true AND is_service = false
+    ORDER BY name LIMIT 1
   `);
   const contarCarrito = () => queryCount(`
     SELECT COUNT(*) FROM cart_items ci
     JOIN carts c ON c.id = ci.cart_id
-    WHERE c.user_id = ${sqlLiteral(state.buyerId)}
+    WHERE c.user_id = ${sqlLiteral(state.buyerId)} AND c.status = 'ACTIVE'
   `);
 
   // 1. publicar por encima del maximo unitario: 400
@@ -1707,7 +1709,7 @@ await runCase(28, 'Un total fuera del contrato se rechaza sin escribir nada', as
       const filasAntes = queryRows(`
         SELECT ci.product_id, ci.quantity
         FROM cart_items ci JOIN carts c ON c.id = ci.cart_id
-        WHERE c.user_id = ${sqlLiteral(state.buyerId)}
+        WHERE c.user_id = ${sqlLiteral(state.buyerId)} AND c.status = 'ACTIVE'
         ORDER BY ci.product_id
       `);
       const alSincronizar = await expectApiError(400, () =>
@@ -1727,7 +1729,7 @@ await runCase(28, 'Un total fuera del contrato se rechaza sin escribir nada', as
       const filasDespues = queryRows(`
         SELECT ci.product_id, ci.quantity
         FROM cart_items ci JOIN carts c ON c.id = ci.cart_id
-        WHERE c.user_id = ${sqlLiteral(state.buyerId)}
+        WHERE c.user_id = ${sqlLiteral(state.buyerId)} AND c.status = 'ACTIVE'
         ORDER BY ci.product_id
       `);
       assert(
@@ -1786,6 +1788,270 @@ await runCase(28, 'Un total fuera del contrato se rechaza sin escribir nada', as
   } finally {
     await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
     await apiRequest(`/products/${topeId}`, { method: 'DELETE', token: state.sellerToken });
+  }
+});
+
+await runCase(29, 'Sincronizar no descarta ni recorta en silencio', async () => {
+  // Antes, /cart/sync salteaba productos inexistentes o inactivos y recortaba
+  // la cantidad al stock. El comprador podia terminar con una orden mas chica
+  // que su carrito sin enterarse. Ahora cada caso es un 400 con motivo propio.
+  assert(state.sellerToken && state.buyerToken, 'faltan tokens');
+  const [categoria] = queryRows(`
+    SELECT id FROM categories
+    WHERE is_active = true AND is_service = false
+    ORDER BY name LIMIT 1
+  `);
+  const filas = () => queryRows(`
+    SELECT ci.product_id, ci.quantity
+    FROM cart_items ci JOIN carts c ON c.id = ci.cart_id
+    WHERE c.user_id = ${sqlLiteral(state.buyerId)} AND c.status = 'ACTIVE'
+    ORDER BY ci.product_id
+  `);
+  const publicar = async (nombre, stock) => {
+    const r = await apiRequest('/products', {
+      method: 'POST',
+      token: state.sellerToken,
+      body: {
+        name: `Smoke sync ${nombre} ${Date.now()}`,
+        description: 'Publicación de prueba para el contrato de sincronización.',
+        category_id: categoria[0],
+        price: 1000,
+        stock,
+        unit: 'unidad',
+        locality_id: state.location.localityId,
+        publication_type: 'producto',
+      },
+    });
+    return r.data.id;
+  };
+
+  const sano = await publicar('sano', 10);
+  const inactivo = await publicar('inactivo', 10);
+  const sinStock = await publicar('sin stock', 5);
+  try {
+    await apiRequest(`/products/${inactivo}`, {
+      method: 'PATCH', token: state.sellerToken, body: { status: 'paused' },
+    });
+    querySql(`UPDATE products SET stock = 0 WHERE id = ${sqlLiteral(sinStock)}`);
+
+    // carrito previo con una sola fila: es lo que tiene que quedar intacto
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    await apiRequest('/cart/items', {
+      method: 'POST', token: state.buyerToken, body: { product_id: sano, quantity: 2 },
+    });
+    const antes = filas();
+    assert(antes.length === 1 && antes[0][1] === '2', `carrito previo inesperado: ${JSON.stringify(antes)}`);
+
+    const escenarios = [
+      ['inexistente', [{ product_id: '00000000-0000-0000-0000-000000000000', quantity: 1 }], /ya no existe/i],
+      ['inactivo', [{ product_id: inactivo, quantity: 1 }], /ya no está disponible/i],
+      ['sin stock', [{ product_id: sinStock, quantity: 1 }], /sin stock/i],
+      ['cantidad mayor al stock', [{ product_id: sano, quantity: 99 }], /pediste 99 y quedan 10/i],
+      // duplicado: 6 + 6 = 12 sobre un stock de 10. Cada linea entraria sola.
+      ['duplicado que suma de más',
+       [{ product_id: sano, quantity: 6 }, { product_id: sano, quantity: 6 }],
+       /pediste 12 y quedan 10/i],
+    ];
+    const vistos = [];
+    for (const [etiqueta, items, esperado] of escenarios) {
+      const error = await expectApiError(400, () =>
+        apiRequest('/cart/sync', { method: 'POST', token: state.buyerToken, body: { items } }),
+      );
+      assert(esperado.test(error), `${etiqueta}: motivo inesperado: ${error}`);
+      const despues = filas();
+      assert(
+        JSON.stringify(despues) === JSON.stringify(antes),
+        `${etiqueta}: el carrito previo cambió: ${JSON.stringify(antes)} → ${JSON.stringify(despues)}`,
+      );
+      vistos.push(etiqueta);
+    }
+
+    // cantidad no positiva: la rechaza el esquema de entrada
+    await expectApiError(422, () =>
+      apiRequest('/cart/sync', {
+        method: 'POST', token: state.buyerToken,
+        body: { items: [{ product_id: sano, quantity: 0 }] },
+      }),
+    );
+    assert(
+      JSON.stringify(filas()) === JSON.stringify(antes),
+      'la cantidad cero igual tocó el carrito',
+    );
+
+    // y el caso valido sigue funcionando
+    const valido = await apiRequest('/cart/sync', {
+      method: 'POST', token: state.buyerToken,
+      body: { items: [{ product_id: sano, quantity: 3 }] },
+    });
+    assert(valido.data.total_items === 1, 'el sync válido no dejó una sola línea');
+    return `${vistos.length} motivos distintos con HTTP 400 (${vistos.join(', ')}), `
+      + 'cantidad 0 con HTTP 422, carrito previo intacto en todos, y el sync válido en 200';
+  } finally {
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    for (const id of [sano, inactivo, sinStock]) {
+      await apiRequest(`/products/${id}`, { method: 'DELETE', token: state.sellerToken });
+    }
+  }
+});
+
+await runCase(30, 'El motivo real de la sincronización llega al comprador', async () => {
+  // El checkout tenia un respaldo que, ante un fallo de /cart/sync, reintentaba
+  // POST y PUT por producto y podia terminar mostrando "Producto no encontrado
+  // en el carrito" en vez del motivo verdadero.
+  const [categoria] = queryRows(`
+    SELECT id FROM categories
+    WHERE is_active = true AND is_service = false
+    ORDER BY name LIMIT 1
+  `);
+  const creado = await apiRequest('/products', {
+    method: 'POST',
+    token: state.sellerToken,
+    body: {
+      name: `Smoke motivo real ${Date.now()}`,
+      description: 'Publicación que se desactiva con el producto ya en el carrito.',
+      category_id: categoria[0],
+      price: 1500,
+      stock: 5,
+      unit: 'unidad',
+      locality_id: state.location.localityId,
+      publication_type: 'producto',
+    },
+  });
+  const productoId = creado.data.id;
+  const nombre = creado.data.name;
+  const ordenesAntes = queryCount('SELECT COUNT(*) FROM orders');
+  const browser = await chromium.launch({ headless: true });
+  const respaldo = [];
+
+  try {
+    const context = await browser.newContext();
+    await context.addInitScript(
+      ({ accessToken, refreshToken }) => {
+        window.localStorage.setItem('access_token', accessToken);
+        window.localStorage.setItem('refresh_token', refreshToken);
+      },
+      { accessToken: state.buyerToken, refreshToken: state.buyerRefreshToken },
+    );
+    const page = await context.newPage();
+    // cualquier intento del respaldo viejo queda registrado
+    page.on('request', (request) => {
+      const url = request.url();
+      const metodo = request.method();
+      if (url.includes('/cart/items') && (metodo === 'POST' || metodo === 'PUT')) {
+        respaldo.push(`${metodo} ${url}`);
+      }
+    });
+
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+    await page.getByPlaceholder('Buscar productos, semillas, maquinaria...').fill(nombre);
+    await page.getByPlaceholder('Buscar productos, semillas, maquinaria...').press('Enter');
+    const tarjeta = page.getByRole('heading', { name: nombre, exact: true, level: 3 });
+    await tarjeta.waitFor({ state: 'visible', timeout: 15_000 });
+    await page.getByRole('button', { name: /Agregar/ }).first().click();
+
+    // recién ahora se desactiva: el carrito local ya lo tiene
+    await apiRequest(`/products/${productoId}`, {
+      method: 'PATCH', token: state.sellerToken, body: { status: 'paused' },
+    });
+
+    await page.getByRole('button', { name: /Carrito/ }).click();
+    await page.getByRole('button', { name: 'Continuar compra' }).click();
+    await page.getByRole('heading', { name: /Datos de Envío/ }).waitFor();
+    await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
+    await page.locator('form select').selectOption('Buenos Aires');
+    await page.getByPlaceholder('Rosario').fill('Pergamino');
+    await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
+    await page.getByPlaceholder('2000').fill('2700');
+    await page.locator('form:has(h2) button[type="submit"]').click();
+
+    await page.getByRole('heading', { name: /Método de Pago/ }).waitFor();
+    await page.locator('input[value="bank_transfer"]').check();
+
+    const aviso = page.locator('[role="alert"]');
+    await aviso.waitFor({ state: 'visible', timeout: 15_000 });
+    const texto = (await aviso.textContent()) || '';
+    assert(
+      /ya no está disponible/i.test(texto),
+      `no se ve el motivo real de la API, se ve: "${texto.trim()}"`,
+    );
+    assert(texto.includes(nombre), `el aviso no nombra la publicación: "${texto.trim()}"`);
+    assert(
+      !/Producto no encontrado en el carrito/i.test(texto),
+      'sigue apareciendo el mensaje del respaldo viejo',
+    );
+    assert(respaldo.length === 0, `el checkout usó el respaldo: ${respaldo.join(', ')}`);
+
+    // el modal sigue abierto y no se creó ninguna orden
+    await page.getByRole('heading', { name: /Método de Pago/ }).waitFor({ state: 'visible' });
+    const ordenesDespues = queryCount('SELECT COUNT(*) FROM orders');
+    assert(ordenesDespues === ordenesAntes, `se creó una orden pese al error`);
+    return `aviso visible con role="alert": "${texto.trim().slice(0, 80)}"; `
+      + `0 llamadas de respaldo; órdenes ${ordenesAntes}→${ordenesDespues}`;
+  } finally {
+    await browser.close();
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    await apiRequest(`/products/${productoId}`, { method: 'DELETE', token: state.sellerToken });
+  }
+});
+
+await runCase(31, 'Sin datos bancarios, el comprador ve el motivo del vendedor', async () => {
+  // El motivo tiene que venir de /orders/transfer-options y no del carrito.
+  const [previo] = queryRows(`
+    SELECT coalesce(cbu, ''), coalesce(alias_bancario, '')
+    FROM users WHERE id = ${sqlLiteral(state.sellerId)}
+  `);
+  assert(previo[0] || previo[1], 'el vendedor ya venía sin datos bancarios');
+  const browser = await chromium.launch({ headless: true });
+  try {
+    await apiRequest('/auth/me', {
+      method: 'PATCH', token: state.sellerToken, body: { cbu: '', alias_bancario: '' },
+    });
+
+    const context = await browser.newContext();
+    await context.addInitScript(
+      ({ accessToken, refreshToken }) => {
+        window.localStorage.setItem('access_token', accessToken);
+        window.localStorage.setItem('refresh_token', refreshToken);
+      },
+      { accessToken: state.buyerToken, refreshToken: state.buyerRefreshToken },
+    );
+    const page = await context.newPage();
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+    await page.getByPlaceholder('Buscar productos, semillas, maquinaria...').fill(state.product.name);
+    await page.getByPlaceholder('Buscar productos, semillas, maquinaria...').press('Enter');
+    await page
+      .getByRole('heading', { name: state.product.name, exact: true, level: 3 })
+      .waitFor({ state: 'visible', timeout: 15_000 });
+    await page.getByRole('button', { name: /Agregar/ }).first().click();
+    await page.getByRole('button', { name: /Carrito/ }).click();
+    await page.getByRole('button', { name: 'Continuar compra' }).click();
+    await page.getByRole('heading', { name: /Datos de Envío/ }).waitFor();
+    await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
+    await page.locator('form select').selectOption('Buenos Aires');
+    await page.getByPlaceholder('Rosario').fill('Pergamino');
+    await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
+    await page.getByPlaceholder('2000').fill('2700');
+    await page.locator('form:has(h2) button[type="submit"]').click();
+
+    await page.getByRole('heading', { name: /Método de Pago/ }).waitFor();
+    await page.locator('input[value="bank_transfer"]').check();
+    const aviso = page.locator('[role="alert"]');
+    await aviso.waitFor({ state: 'visible', timeout: 15_000 });
+    const texto = (await aviso.textContent()) || '';
+    assert(
+      /no configuró CBU ni alias/i.test(texto),
+      `no se ve el motivo de transfer-options, se ve: "${texto.trim()}"`,
+    );
+    return `aviso visible: "${texto.trim().slice(0, 90)}"`;
+  } finally {
+    await browser.close();
+    await apiRequest('/auth/me', {
+      method: 'PATCH', token: state.sellerToken,
+      body: { cbu: previo[0], alias_bancario: previo[1] },
+    });
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
   }
 });
 

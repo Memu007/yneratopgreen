@@ -60,27 +60,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
       product_id: item.product.id,
       quantity: item.quantity
     }));
-    try {
-      await apiFetch('/cart/sync', {
-        method: 'POST',
-        body: JSON.stringify({ items: cartItems })
-      });
-    } catch (syncError) {
-      console.error('Error sincronizando carrito:', syncError);
-      for (const item of items) {
-        try {
-          await apiFetch('/cart/items', {
-            method: 'POST',
-            body: JSON.stringify({ product_id: item.product.id, quantity: item.quantity })
-          });
-        } catch {
-          await apiFetch(`/cart/items/${item.product.id}`, {
-            method: 'PUT',
-            body: JSON.stringify({ quantity: item.quantity })
-          });
-        }
-      }
-    }
+    // Sin respaldo por producto: si la sincronización falla, el motivo real
+    // sube tal cual. El respaldo anterior reintentaba con POST y PUT, y podía
+    // reemplazar el motivo verdadero por «Producto no encontrado en el
+    // carrito», que no le dice nada a quien está comprando.
+    await apiFetch('/cart/sync', {
+      method: 'POST',
+      body: JSON.stringify({ items: cartItems })
+    });
   };
 
   const selectBankTransfer = async () => {
@@ -292,7 +279,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
       </div>
 
       {error && (
-        <div className={styles.errorMessage}>
+        <div className={styles.errorMessage} role="alert">
           ⚠️ {error}
         </div>
       )}

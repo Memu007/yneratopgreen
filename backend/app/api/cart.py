@@ -330,12 +330,14 @@ def clear_cart(
     return {"message": "Carrito vaciado"}
 
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
 
 class SyncItemRequest(BaseModel):
     product_id: str
-    quantity: int
+    # una cantidad no positiva no es un carrito valido: se rechaza en la
+    # entrada y no se corrige en silencio
+    quantity: int = Field(..., gt=0)
 
 class SyncCartRequest(BaseModel):
     items: List[SyncItemRequest]
@@ -366,14 +368,23 @@ def sync_cart(
     orden: list = []       # conserva el orden de llegada del payload
 
     for item_data in sync_data.items:
-        # Verificar que el producto exista y esté activo
-        product = db.query(Product).filter(
-            Product.id == item_data.product_id,
-            Product.status == ProductStatus.ACTIVE
-        ).first()
+        product = db.query(Product).filter(Product.id == item_data.product_id).first()
 
+        # Nada se saltea en silencio: si el carrito local trae algo que ya no se
+        # puede comprar, el usuario tiene que enterarse y decidir. Antes esto se
+        # descartaba y la orden salia con menos de lo que la persona creia.
         if not product:
-            continue  # Saltear productos no encontrados
+            raise HTTPException(
+                status_code=400,
+                detail="Una de las publicaciones de tu carrito ya no existe. "
+                       "Quitala del carrito para continuar.",
+            )
+        if product.status != ProductStatus.ACTIVE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"«{product.name}» ya no está disponible. "
+                       "Quitala del carrito para continuar.",
+            )
 
         # Un mismo product_id repetido se normaliza a UNA sola linea sumando
         # cantidades: dos filas del mismo producto dejarian el calculo ambiguo.
@@ -383,16 +394,27 @@ def sync_cart(
             efectivos[product.id] = {"producto": product, "cantidad": item_data.quantity}
             orden.append(product.id)
 
-    # La regla de stock se aplica sobre la cantidad YA acumulada.
-    for product_id in list(orden):
+    # La regla de stock se aplica sobre la cantidad YA acumulada, y tampoco
+    # recorta: si no alcanza, se rechaza diciendo cuanto hay.
+    for product_id in orden:
         entrada = efectivos[product_id]
         product = entrada["producto"]
         is_service = product.category.is_service if product.category else False
-        if not is_service:
-            entrada["cantidad"] = min(entrada["cantidad"], product.stock or 0)
-            if entrada["cantidad"] <= 0:
-                del efectivos[product_id]
-                orden.remove(product_id)
+        if is_service:
+            continue
+        disponible = product.stock or 0
+        if disponible <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"«{product.name}» se quedó sin stock. "
+                       "Quitala del carrito para continuar.",
+            )
+        if entrada["cantidad"] > disponible:
+            raise HTTPException(
+                status_code=400,
+                detail=f"«{product.name}»: pediste {entrada['cantidad']} y "
+                       f"quedan {disponible}. Ajustá la cantidad para continuar.",
+            )
 
     # Contrato monetario: cada linea y el TOTAL AGREGADO de cada vendedor.
     por_vendedor: dict = {}
