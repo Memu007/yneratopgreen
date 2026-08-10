@@ -182,17 +182,21 @@ nuevos con deuda encima.
 8. **Tarea activa — Fase 2: validación de correo.** Enlace de un solo uso por
    24 horas, login bloqueado hasta verificar, reenvío y transporte falso
    comprobable; sin recuperación de contraseña.
-9. **Transportistas.** La Pieza A está hecha con dos objeciones abiertas
+9. **Ensayo Railway condicionado.** Sólo después de aceptar correo y sólo si
+   puede terminar antes del 20/08, con tope de una jornada, proyecto
+   descartable, datos demo y sin tratarlo como producción. Si correo no queda
+   aceptado antes del 18/08, se posterga a Fase 5 para no consumir Fase 2.
+10. **Transportistas.** La Pieza A está hecha con dos objeciones abiertas
    —el perfil no se puede editar y el campo de certificación obligatorio
    no informa nada—. Las decisiones de B/C y el mapa de contacto quedaron
    cerrados el 2026-08-05; su implementacion corresponde a Fase 3.
-10. **Antes de Fase 4:** reemplazar cálculos monetarios `float` por `Decimal` en
+11. **Antes de Fase 4:** reemplazar cálculos monetarios `float` por `Decimal` en
    ambos checkouts y probar centavos en el rango alto ya admitido.
-11. **Mercado Pago para las compras**, reconstruido sin split, dentro de la
+12. **Mercado Pago para las compras**, reconstruido sin split, dentro de la
    Fase 4 contractual.
-12. **Fase 6, despues del lanzamiento:** suscripciones, planes, mensajeria
+13. **Fase 6, despues del lanzamiento:** suscripciones, planes, mensajeria
    premium y tierras. No compite por tiempo con las fases 1 a 5.
-13. **Al final:** correcciones de la vista en celular, revisión de
+14. **Al final:** correcciones de la vista en celular, revisión de
    seguridad y despliegue en producción.
 
 **Despliegue:** Railway fue aprobado como destino el 2026-08-05. La dev
@@ -300,27 +304,14 @@ así se detectó. Los números fijos envejecen mal.
   **La excepción, y no es una auditoría:** el módulo de transportistas
   arranca con una decisión de diseño que no se puede posponer. Ver abajo.
 
-## La pregunta que abre el módulo de transportistas
+## Privacidad y radio de transportistas: decisión cerrada
 
-Antes de escribir la primera línea de ese módulo hay que responder **quién
-puede ver los datos de contacto de quién**.
-
-El contrato pide que el comprador pueda "contactar directo con los datos
-provistos" por el transportista. Eso significa que la plataforma va a
-mostrar teléfonos, direcciones y ubicaciones base de personas reales:
-productores y transportistas argentinos.
-
-No es un tema de auditoría posterior, es la forma del módulo:
-
-- ¿El teléfono del transportista se ve antes de contratarlo o después?
-- ¿El comprador ve la dirección exacta del vendedor o sólo la localidad?
-- ¿El transportista ve el detalle de la compra o sólo origen y destino?
-
-Si esto se define al empezar, es un parámetro. Si se define al auditar, es
-reescribir el módulo entero, y ahí sí se paga dos veces.
-
-**Va a la lista de preguntas para la clienta**, junto con la de zonas
-declaradas contra radio en km. Son la misma conversación.
+No se vuelve a preguntar a la clienta. Desde el 2026-08-05 rige el radio en
+kilómetros sobre origen y destino, el listado no expone contacto y el comprador
+ve el contacto del transportista sólo después de seleccionarlo. El
+transportista recibe origen, destino y necesidad logística, sin precios,
+comprobantes ni detalle financiero. Las ubicaciones del MVP son las
+localidades oficiales; no se agrega exposición de domicilios exactos.
 
 ## Deuda técnica registrada, sin acción
 

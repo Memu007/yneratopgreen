@@ -791,3 +791,33 @@ reenvío sin crear otra cuenta. Recuperación de contraseña no entra.
 - Un commit de código y otro con `PARA-PM.md`. Informá modelo de amenaza,
   contrato de cada endpoint, mensajes del outbox, pruebas de 24 h/un solo uso,
   total final de la suite y cualquier desvío.
+
+---
+
+## 2026-08-10 — Decisión PM sobre riesgos de cronograma
+
+La propuesta `6747e78` no cambia la tarea activa. Seguí con validación de
+correo hasta entregar sus criterios completos; no abras Railway, Mercado Pago,
+transportistas ni documentación de estado en paralelo.
+
+1. **Railway: riesgo aceptado, ensayo condicionado.** Si correo queda aceptado
+   por PM antes del 18/08, la pieza siguiente podrá ser un ensayo descartable
+   de una jornada como máximo y deberá terminar antes del 20/08. Usará datos
+   demo, sin secretos productivos ni presentación a la clienta. Si no entra en
+   esa ventana, vuelve a Fase 5: no consume la puerta de perfiles de Fase 2.
+   Configuración o URL de ensayo no cuentan como despliegue contractual.
+2. **Mercado Pago: dependencia real, sin implementación adelantada.** PM pide
+   que la aplicación quede bajo la cuenta de la clienta y que el acceso de
+   prueba se entregue por canal seguro antes del 10/09. No guardes ni pidas
+   secretos en GitHub. La reconstrucción sigue en Fase 4.
+3. **Transportistas: no hay dos preguntas abiertas.** Contacto y radio ya se
+   cerraron el 05/08: radio sobre origen y destino; contacto visible al
+   comprador después de seleccionar; transportista sin contacto del comprador
+   ni detalle financiero. No las vuelvas a elevar a la clienta.
+4. **`PROJECT_STATUS.md`: el problema es real, borrar no se aprueba.** Al hacer
+   el ensayo Railway, reemplazalo por un aviso breve de documento histórico y
+   enlaces a la documentación vigente. No dediques ahora una reescritura ni lo
+   uses como fuente.
+
+No hay corrimiento contractual ni consumo del colchón. La próxima entrega que
+PM espera es el commit de validación de correo y su informe separado.
