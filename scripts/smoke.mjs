@@ -629,20 +629,119 @@ await runCase(12, 'Administración: usuarios, productos y órdenes', async () =>
   ].join('; ');
 });
 
-await runCase(13, 'Transferencia exige CBU o alias del vendedor', async () => {
-  await apiRequest('/cart/items', {
+await runCase(13, 'Desde el seed, los dos vendedores ya cobran por transferencia', async () => {
+  // Parte del seed limpio: no hay ningun PATCH previo de datos bancarios en la
+  // suite. Si el seed no los cargara, este caso falla y esa es su razon de ser.
+  assert(state.buyerToken, 'caso 3 no dejó token de comprador');
+  const adminLogin = await apiRequest('/auth/login', {
     method: 'POST',
-    token: state.buyerToken,
-    body: { product_id: state.product.id, quantity: 1 },
+    body: { email: 'admin@topgreen.com', password: 'admin123' },
   });
-  const error = await expectApiError(400, () =>
-    apiRequest('/orders/transfer-options', { token: state.buyerToken }),
-  );
-  assert(/no configuró CBU ni alias/i.test(error), `motivo inesperado: ${error}`);
-  return 'HTTP 400 con motivo visible; no se creó ninguna orden';
+  const adminId = adminLogin.data.user.id;
+  assert(adminId !== state.sellerId, 'el admin y el vendedor demo son el mismo usuario');
+
+  // Una publicacion activa y con stock de cada vendedor del catalogo demo.
+  // Se elige la mas barata, y no la primera, por dos razones: es determinista, y
+  // el carrito no admite precios de 100 millones o mas. Ese limite es un defecto
+  // real del producto, reportado aparte: products.price es NUMERIC(12,2) pero
+  // cart_items.unit_price_snapshot es NUMERIC(10,2), y el seed publica dos
+  // articulos por encima de ese techo.
+  const publicacionDe = async (sellerId) => {
+    const params = new URLSearchParams({
+      seller_id: sellerId,
+      in_stock: 'true',
+      page_size: '100',
+    });
+    const catalogo = await apiRequest(`/catalog/products?${params}`);
+    const item = catalogo.data.items
+      .filter((candidate) => !candidate.is_service && Number(candidate.stock) > 0)
+      .filter((candidate) => Number(candidate.price) > 0)
+      .sort((a, b) => Number(a.price) - Number(b.price))[0];
+    assert(item, `el vendedor ${sellerId} no tiene publicacion activa con stock`);
+    return item;
+  };
+  const delVendedor = await publicacionDe(state.sellerId);
+  const delAdmin = await publicacionDe(adminId);
+
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  for (const producto of [delVendedor, delAdmin]) {
+    await apiRequest('/cart/items', {
+      method: 'POST',
+      token: state.buyerToken,
+      body: { product_id: producto.id, quantity: 1 },
+    });
+  }
+
+  const opciones = await apiRequest('/orders/transfer-options', { token: state.buyerToken });
+  const detalles = [];
+  for (const [etiqueta, sellerId] of [['vendedor', state.sellerId], ['admin', adminId]]) {
+    const opcion = opciones.data.find((candidate) => candidate.seller_id === sellerId);
+    assert(opcion, `la API no ofrecio transferencia para el ${etiqueta}`);
+    assert(opcion.cbu, `el ${etiqueta} salio del seed sin CBU`);
+    assert(opcion.alias_bancario, `el ${etiqueta} salio del seed sin alias`);
+
+    const [banco] = queryRows(`
+      SELECT cbu, alias_bancario
+      FROM users
+      WHERE id = ${sqlLiteral(sellerId)}
+    `);
+    assert(opcion.cbu === banco[0], `${etiqueta}: CBU de API distinto del de SQL`);
+    assert(
+      opcion.alias_bancario === banco[1],
+      `${etiqueta}: alias de API distinto del de SQL`,
+    );
+    detalles.push(`${etiqueta} CBU=${opcion.cbu} alias=${opcion.alias_bancario} API=SQL`);
+  }
+
+  // el carrito queda vacio para que los casos siguientes armen el suyo
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  return `HTTP ${opciones.status}, sin PATCH previo; ${detalles.join('; ')}`;
 });
 
-await runCase(14, 'Datos bancarios correctos y orden esperando comprobante', async () => {
+await runCase(14, 'Transferencia exige CBU o alias del vendedor', async () => {
+  // El caso crea su propio estado faltante y lo restaura: ya no depende de que
+  // el seed venga incompleto, porque desde el caso 13 el seed viene completo.
+  const [previo] = queryRows(`
+    SELECT coalesce(cbu, ''), coalesce(alias_bancario, '')
+    FROM users
+    WHERE id = ${sqlLiteral(state.sellerId)}
+  `);
+  assert(previo[0] || previo[1], 'el vendedor ya venía sin datos bancarios: el seed no cargó');
+
+  await apiRequest('/auth/me', {
+    method: 'PATCH',
+    token: state.sellerToken,
+    body: { cbu: '', alias_bancario: '' },
+  });
+  try {
+    await apiRequest('/cart/items', {
+      method: 'POST',
+      token: state.buyerToken,
+      body: { product_id: state.product.id, quantity: 1 },
+    });
+    const error = await expectApiError(400, () =>
+      apiRequest('/orders/transfer-options', { token: state.buyerToken }),
+    );
+    assert(/no configuró CBU ni alias/i.test(error), `motivo inesperado: ${error}`);
+  } finally {
+    // se restaura pase lo que pase, para no dejar la base peor que como estaba
+    await apiRequest('/auth/me', {
+      method: 'PATCH',
+      token: state.sellerToken,
+      body: { cbu: previo[0], alias_bancario: previo[1] },
+    });
+  }
+  const [restaurado] = queryRows(`
+    SELECT coalesce(cbu, ''), coalesce(alias_bancario, '')
+    FROM users
+    WHERE id = ${sqlLiteral(state.sellerId)}
+  `);
+  assert(restaurado[0] === previo[0], 'no se restauró el CBU del vendedor');
+  assert(restaurado[1] === previo[1], 'no se restauró el alias del vendedor');
+  return 'HTTP 400 con motivo visible; estado bancario vaciado y restaurado por la prueba';
+});
+
+await runCase(15, 'Datos bancarios correctos y orden esperando comprobante', async () => {
   const bankData = {
     cbu: '2850590940090418135201',
     alias_bancario: 'topgreen.smoke',
@@ -712,7 +811,7 @@ await runCase(14, 'Datos bancarios correctos y orden esperando comprobante', asy
   return `HTTP ${checkout.status}, order_id=${order.order_id}, snapshot API=SQL intacto tras cambiar el perfil`;
 });
 
-await runCase(15, 'Comprobante fallido visible y comprobante válido asociado', async () => {
+await runCase(16, 'Comprobante fallido visible y comprobante válido asociado', async () => {
   const failure = await expectApiError(400, () =>
     apiUpload(`/orders/${state.transferOrderId}/transfer-receipt`, {
       token: state.buyerToken,
@@ -758,7 +857,7 @@ await runCase(15, 'Comprobante fallido visible y comprobante válido asociado', 
   return `fallo HTTP 400 sin cambiar orden; archivo HTTP 200; URL API=SQL`;
 });
 
-await runCase(16, 'Sólo el vendedor correcto valida el comprobante', async () => {
+await runCase(17, 'Sólo el vendedor correcto valida el comprobante', async () => {
   const otherSeller = await apiRequest('/auth/register', {
     method: 'POST',
     body: {
@@ -789,7 +888,7 @@ await runCase(16, 'Sólo el vendedor correcto valida el comprobante', async () =
   return 'otro vendedor HTTP 403; vendedor correcto dejó API=paid y SQL=PAID';
 });
 
-await runCase(17, 'Rechazo de comprobante guarda el motivo', async () => {
+await runCase(18, 'Rechazo de comprobante guarda el motivo', async () => {
   await apiRequest('/cart/items', {
     method: 'POST',
     token: state.buyerToken,
@@ -832,7 +931,7 @@ await runCase(17, 'Rechazo de comprobante guarda el motivo', async () => {
   return `API=rejected, SQL=REJECTED, motivo guardado="${reason}"`;
 });
 
-await runCase(18, 'Transferencia completa desde la interfaz', async () => {
+await runCase(19, 'Transferencia completa desde la interfaz', async () => {
   const [databaseBank] = queryRows(`
     SELECT cbu, alias_bancario
     FROM users
@@ -974,7 +1073,7 @@ await runCase(18, 'Transferencia completa desde la interfaz', async () => {
   }
 });
 
-await runCase(19, 'Las rutas financieras heredadas no están expuestas', async () => {
+await runCase(20, 'Las rutas financieras heredadas no están expuestas', async () => {
   await expectApiError(404, () => apiRequest('/payments/public-key'));
   await expectApiError(404, () => apiRequest('/mp-oauth/status', {
     token: state.sellerToken,
@@ -986,7 +1085,7 @@ await runCase(19, 'Las rutas financieras heredadas no están expuestas', async (
   return 'payments, mp-oauth y simulate-payment respondieron HTTP 404';
 });
 
-await runCase(20, 'Respaldo de imágenes en el recorrido de demostración', async () => {
+await runCase(21, 'Respaldo de imágenes en el recorrido de demostración', async () => {
   const browser = await chromium.launch({ headless: true });
   let blockedSeedImages = 0;
   const blockSeedImages = (page) =>
@@ -1110,7 +1209,7 @@ await runCase(20, 'Respaldo de imágenes en el recorrido de demostración', asyn
   }
 });
 
-await runCase(21, 'Registro de transportista desde la interfaz', async () => {
+await runCase(22, 'Registro de transportista desde la interfaz', async () => {
   assert(state.location, 'caso 5 no dejó provincia/localidad');
   await expectApiError(422, () => apiRequest('/auth/register', {
     method: 'POST',
@@ -1241,7 +1340,7 @@ async function adjuntarComprobante(orderId, nombre) {
   assert(estado === 'TRANSFER_RECEIPT_SUBMITTED', `estado tras adjuntar: ${estado}`);
 }
 
-await runCase(22, 'Sin comprobante, comprador y vendedor pueden cancelar', async () => {
+await runCase(23, 'Sin comprobante, comprador y vendedor pueden cancelar', async () => {
   const stockInicial = stockDeProducto(state.product.id);
 
   const ordenComprador = await crearOrdenTransferencia('Av. Abandono 100');
@@ -1283,7 +1382,7 @@ await runCase(22, 'Sin comprobante, comprador y vendedor pueden cancelar', async
   return `ajeno 403; comprador=CANCELLED, vendedor=REJECTED, stock intacto en ${stockFinal}`;
 });
 
-await runCase(23, 'Sin comprobante, el vendedor igual aprueba o rechaza', async () => {
+await runCase(24, 'Sin comprobante, el vendedor igual aprueba o rechaza', async () => {
   const stockInicial = stockDeProducto(state.product.id);
 
   const ordenRechazo = await crearOrdenTransferencia('Av. Sin Comprobante 300');
@@ -1338,7 +1437,7 @@ await runCase(23, 'Sin comprobante, el vendedor igual aprueba o rechaza', async 
   return `rechazo sin motivo HTTP 400; rechazo con motivo=REJECTED; aprobación sin comprobante=PAID, stock ${stockInicial} -> ${stockFinal}`;
 });
 
-await runCase(24, 'Con comprobante enviado, sólo el vendedor puede cancelar', async () => {
+await runCase(25, 'Con comprobante enviado, sólo el vendedor puede cancelar', async () => {
   const stockInicial = stockDeProducto(state.product.id);
   const orden = await crearOrdenTransferencia('Av. Comprobante Enviado 500');
   await adjuntarComprobante(orden.order_id, 'comprobante-cancelacion.png');
@@ -1370,7 +1469,7 @@ await runCase(24, 'Con comprobante enviado, sólo el vendedor puede cancelar', a
   return `comprador HTTP 400 con motivo; vendedor dejó REJECTED; stock intacto en ${stockFinal}`;
 });
 
-await runCase(25, 'Dos aprobaciones simultáneas descuentan stock una sola vez', async () => {
+await runCase(26, 'Dos aprobaciones simultáneas descuentan stock una sola vez', async () => {
   const stockInicial = stockDeProducto(state.product.id);
   const orden = await crearOrdenTransferencia('Av. Concurrencia 600');
   await adjuntarComprobante(orden.order_id, 'comprobante-concurrente.png');

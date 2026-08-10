@@ -87,6 +87,39 @@ def create_seed_data():
         else:
             print("  ⏭️  Cliente ya existe")
         
+
+        # === DATOS BANCARIOS DEMO === #
+        # Sin CBU ni alias, una instalacion limpia no puede usar la
+        # transferencia: los dos usuarios que publican en el catalogo demo
+        # tienen que quedar utilizables sin configuracion manual.
+        #
+        # Son valores SINTETICOS, no corresponden a ninguna cuenta real: el
+        # prefijo 000 no es un codigo de banco existente y el alias dice
+        # "demo". Solo se completan si el campo esta vacio, asi repetir el
+        # seed nunca pisa un dato que alguien haya personalizado.
+        bancarios_demo = {
+            "admin@topgreen.com": ("0000009000000000000017", "demo.topgreen.admin"),
+            "vendedor@ejemplo.com": ("0000009000000000000024", "demo.topgreen.juanv"),
+        }
+        for usuario in (admin, seller):
+            # se usan los objetos que ya estan en memoria y no una consulta:
+            # en una base recien creada todavia estan pendientes de volcado
+            # -la sesion no tiene autoflush- y una consulta no los encuentra.
+            # Ese error dejaba el PRIMER seed sin datos bancarios.
+            email = usuario.email
+            cbu_demo, alias_demo = bancarios_demo[email]
+            completados = []
+            if not (usuario.cbu or "").strip():
+                usuario.cbu = cbu_demo
+                completados.append("CBU")
+            if not (usuario.alias_bancario or "").strip():
+                usuario.alias_bancario = alias_demo
+                completados.append("alias")
+            if completados:
+                print(f"  \U0001F3E6 {email}: {' y '.join(completados)} demo")
+            else:
+                print(f"  \u23ED\uFE0F  {email}: ya tenia datos bancarios, no se tocan")
+
         db.commit()
         
         # === CATEGORÍAS === #
