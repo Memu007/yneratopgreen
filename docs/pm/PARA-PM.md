@@ -6,103 +6,198 @@ Fecha: 2026-08-10.
 
 ## 1. Resultado
 
-**Terminado.** El token ya no aparece en **ninguna** petición: ni en la del
-documento. El caso 37 lo exige sobre el total, no sólo sobre la API.
+**Gate A entregado en parte, y con un hallazgo que valía el ensayo.**
 
-El cambio destapó un defecto de producto que sólo se ve en el navegador. Está
-abajo, en desvíos.
+Lo que no pude: **construir las dos imágenes ni levantarlas**. La política de
+egreso de mi entorno sigue bloqueando la descarga de imágenes de Docker Hub.
+Es el mismo bloqueo de la vez pasada, con el mismo registro del proxy.
 
-## 2. Commit y alcance real
+**Gate B tampoco lo puedo ejecutar, y ahora sé por qué con precisión.** Vi tu
+autorización de `b99c9f8` mientras terminaba. Acá no hay CLI de Railway, no hay
+ninguna credencial en el entorno y —esto es lo decisivo— **la política de
+egreso también bloquea `ynerav.up.railway.app`**, así que ni siquiera puedo
+mirar el despliegue que ya existe. No intenté iniciar sesión ni pedí ningún
+token.
 
-`ccc0794`, este informe aparte. Cuatro archivos, los que indicaste.
+Lo que sí puedo aportar es el diagnóstico de por qué ese `SUCCESS` sirve sólo
+el frontend, y está abajo.
 
-| Archivo | Qué |
+## 2. Tabla por criterio
+
+| Gate A | Estado | Cómo |
+|---|---|---|
+| Sin login, sin recursos, sin tokens | **cumplido** | la CLI ni siquiera está instalada |
+| `RAILWAY.md`: fuera las `ADMIN_*` | **cumplido** | y quedó dicho por qué no rompen pero tampoco sirven |
+| `RAILWAY.md`: variables de correo | **cumplido** | `outbox`, `/data/outbox`, demo; SMTP para producción |
+| Contradicciones entre guía, `railway.toml`, Dockerfiles y entrypoints | **cumplido** | detalle abajo |
+| Monorepo conservado | **cumplido** | Frontend `/`, Backend `/backend`, config absoluta por servicio |
+| Construir las dos imágenes | **no ejecutado** | egreso bloqueado |
+| Docker aislado: PostGIS, migraciones, seed ×2, health, `/verificar-correo`, catálogo, outbox, upload, persistencia | **no ejecutado** | depende de lo anterior |
+| `PROJECT_STATUS.md` reemplazado por aviso | **cumplido** | 149 → 29 líneas, historia intacta en Git |
+| Sólo configuración, entrypoint o documentación | **cumplido** | cuatro archivos, todos documentación |
+
+| Gate B | Estado |
 |---|---|
-| `backend/app/services/verificacion.py` | el enlace pasa a `/verificar-correo#token=…` |
-| `src/components/Pages/VerifyEmailPage.tsx` | lee el fragmento, lo limpia antes de llamar, y atiende el cambio de fragmento |
-| `index.html` | fuera el `meta referrer`; el archivo quedó igual a como estaba en `cb6d888` |
-| `scripts/smoke.mjs` | lector del correo y vigilancia total del token |
+| Todo | **no ejecutable desde acá**: sin CLI, sin credenciales y con el dominio bloqueado por la política de egreso |
 
-El cuerpo del `POST /auth/verify-email` no cambió: el token sigue viajando ahí
-y no aparece en respuestas ni en registros.
+## 3. El hallazgo que sí encontró el ensayo
 
-## 3. Evidencia
+`RAILWAY.md` mandaba:
 
-### Antes y después, medido
-
-Con el token vigilado en el caso 37:
-
-```text
-CON QUERY (la pieza anterior, revertida a propósito):
-  [FAIL] 37 — 4 peticiones llevaron el token:
-    http://localhost:5173/verificar-correo?token=c3QGbHcnloGcuDRQQakqqE_…
-    http://localhost:5173/@vite/client              [en Referer]
-    http://localhost:5173/src/main.tsx?t=…          [en Referer]
-    http://localhost:5173/@react-refresh            [en Referer]
-
-CON FRAGMENTO:
-  [PASS] 37 — … 0 peticiones con el token, ni la del documento; barra limpia
-    tras confirmar, recargar y salir al login
+```dotenv
+PUBLIC_UPLOAD_BASE=https://${{Backend.RAILWAY_PUBLIC_DOMAIN}}/uploads
+VITE_IMAGES_URL=https://${{Backend.RAILWAY_PUBLIC_DOMAIN}}
 ```
 
-Las cuatro desaparecen. Para aislar la comprobación tuve que revertir la pieza
-entera al query —enlace, lector y expresión del correo—, porque revirtiendo
-sólo el enlace el caso fallaba antes, al no encontrar token en el fragmento.
+`PUBLIC_UPLOAD_BASE` es el prefijo que **se guarda en la base** junto a cada
+imagen. Con ese valor la base guarda una URL absoluta, y el panel de
+administración vuelve a anteponerle `VITE_IMAGES_URL` porque ese lugar
+—a diferencia del catálogo y del panel del usuario— no comprueba si la URL ya
+es absoluta.
 
-El correo sale así: `http://localhost:5173/verificar-correo#token=LsZecbGn…`
-
-### El `meta referrer`
-
-Retirado. `index.html` quedó **idéntico** a como estaba antes de que yo lo
-tocara. Tenías razón: con el token fuera del query no protegía ningún token, y
-una política global redundante es efecto lateral sin beneficio.
-
-## 4. Desvío — un defecto que el fragmento introduce
-
-**Abrir un segundo enlace estando ya en esa pantalla no recarga la página.**
-Cambia sólo el fragmento, así que React no vuelve a montar, el efecto no
-corre y la vista sigue mostrando **el resultado del enlace anterior**.
-
-No es un problema de la prueba: le pasa a cualquiera que abra un enlace, se
-quede en la pantalla y abra después el que le llegó por el reenvío. Vería el
-rechazo del primero y creería que el segundo tampoco sirve.
-
-El caso 37 lo agarró apenas cambié el formato:
+**No lo razoné: lo reproduje.** Puse esa configuración en local, subí una
+imagen y miré el panel. Las dos filas conviven en la misma pantalla:
 
 ```text
-[FAIL] 37 — el vencido no se anuncia como tal:
-  "El enlace no es válido. Pedí uno nuevo desde el ingreso."
+URL guardada con base absoluta : http://127.0.0.1:8000/uploads/products/…png
+  src en el panel : http://127.0.0.1:8000http://127.0.0.1:8000/uploads/…png
+  ancho : 0   (ROTA)
+
+Imagen guardada con base relativa
+  src en el panel : http://127.0.0.1:8000/uploads/products/…png
+  ancho : 1   (se ve)
 ```
 
-Ese texto era la respuesta del enlace **anterior**. Lo cerré escuchando
-`hashchange` y llevando el control de un solo uso a «último token procesado»
-en vez de un booleano, así que un token distinto se procesa y el mismo no se
-gasta dos veces. Está dentro de los cuatro archivos.
+La guía pasa a documentar `PUBLIC_UPLOAD_BASE=/uploads`, que es el valor que ya
+traen las dos plantillas y con el que las tres pantallas coinciden. **Es
+corrección de configuración, no de producto:** el código no se tocó.
 
-## 5. Estado final
+Que el panel de administración concatene sin comprobar sigue siendo una
+fragilidad; con el valor relativo no se manifiesta. Queda anotado, no abierto.
+
+## 4. Lo demás que corregí en la guía
+
+- **Faltaban todas las variables de correo.** Sin `EMAIL_OUTBOX_DIR` apuntando
+  al volumen, los mensajes se escriben en una carpeta efímera y **se pierden en
+  cada despliegue**: en el ensayo no habría enlace que leer. Quedan
+  documentadas, con la advertencia de que producción exige SMTP y que esas
+  credenciales no van al repositorio.
+- **Las `ADMIN_*` afuera.** Aclaro que no tumban el arranque —llegan por
+  entorno y `Settings` sólo rechaza extras cuando los lee de un archivo— pero
+  que no hacen nada, y de dónde sale realmente la contraseña del admin.
+- **El seed no tenía comando.** Ahora está, con la aclaración de que es
+  idempotente.
+- **Sin volumen se pierde `/data`**: dicho explícitamente.
+- **La verificación** pasa a incluir la ruta directa `/verificar-correo`, las
+  imágenes del panel de administración, el `.eml` en `/data/outbox` y la
+  persistencia de la base.
+- **El healthcheck** de Railway actúa al desplegar y no es monitoreo continuo.
+  Lo dejé escrito para que nadie lo confunda con una alarma.
+
+## 5. Por qué el despliegue actual sirve sólo el frontend
+
+Tu observación encaja con la configuración, y la causa es de una sola línea.
+
+`strong-playfulness` tiene **un** servicio, `yneratopgreen`, con raíz `/`. Con
+esa raíz, Railway toma el `railway.toml` de la raíz, que apunta a
+`Dockerfile.railway` **del frontend**: build de Vite y nginx. Ese nginx sirve
+estáticos y tiene
+
+```nginx
+location / { try_files $uri $uri/ /index.html; }
+```
+
+que es lo que hace funcionar `/verificar-correo`… y lo que se traga `/api/*`.
+No hay backend en ese servicio: `/api/health` devuelve el `index.html` con
+`text/html`, que es exactamente lo que viste. El `SUCCESS` es honesto —el
+healthcheck del frontend es `/health` y nginx lo responde—, pero mide sólo el
+frontend.
+
+**No falta código ni configuración en el repositorio: falta el despliegue que
+`RAILWAY.md` describe.** Hacen falta tres servicios, y el actual sirve como el
+`Frontend`:
+
+| Servicio | Root Directory | Config File | Falta |
+|---|---|---|---|
+| `Frontend` | `/` | `/railway.toml` | ya existe; revisar que `VITE_API_URL` apunte al dominio del backend nuevo |
+| `Backend` | `/backend` | `/backend/railway.toml` | crear, con volumen en `/data` |
+| `PostGIS` | plantilla del marketplace | — | crear, privado |
+
+Con los tres, `/api/*` deja de pasar por nginx porque el navegador llama al
+dominio del backend directamente, que es para lo que están `VITE_API_URL` y
+`CORS_ORIGINS`.
+
+Dos cosas para mirar cuando alguien pueda ejecutarlo: que el `Frontend` se
+redespliegue **después** de que exista el dominio del backend —las dos `VITE_*`
+se hornean en el bundle— y que el volumen esté montado antes del primer
+registro, o el `.eml` se pierde.
+
+## 6. Lo que sí pude verificar sin Docker
 
 | Comprobación | Resultado |
 |---|---|
-| Suite oficial, base recreada desde cero | **37/37** |
-| `npm run build` | verde |
-| `git -c core.whitespace=cr-at-eol diff --cached --check` | sin avisos |
-| `npm run a11y -- --todas` | **44 de 44**, 0 de cualquier impacto |
-| `npm run contraste` | **36 de 36**, 0 fuera de umbral |
+| Los dos `railway.toml` parsean, con el Dockerfile, health y pre-deploy esperados | OK |
+| `railway-entrypoint.sh`: sintaxis y reescritura de `postgres://`, `postgresql://` y `postgresql+psycopg://` | las tres terminan en `postgresql+psycopg://` |
+| Plantilla de nginx renderizada con `PORT`: `try_files … /index.html` | **`/verificar-correo` no daría 404** |
+| Build del frontend con las dos variables de Railway | verde, y las dos URLs quedan incrustadas en el bundle |
+| `Settings` con exactamente el conjunto de variables de la guía, sin archivo `.env`, como en Railway | carga; `UPLOAD_DIR=/data/uploads`, `EMAIL_OUTBOX_DIR=/data/outbox`, imagen guardada como `/uploads/products/…` |
+| `npm run build`, caso 32 de plantillas, `diff --check` | verdes |
 
-Las dos últimas no hacían falta según tu nota, pero el texto de esa pantalla
-cambia según el estado y preferí no declararlas verdes de memoria.
+No repetí 37/37: no toqué producto, correo ni seed.
 
-## 6. Un detalle menor que dejo señalado
+## 7. Los bloqueos, con su registro
 
-`a11y.mjs` y `contraste.mjs` abren esa vista con `?token=enlace-invalido-…`.
-Con el lector nuevo eso ya no es un token inválido sino un **enlace sin
-token**, así que las dos puertas miden el estado «incompleto» en vez del
-«inválido». Las dos siguen verdes porque el marcador y los colores son los
-mismos, pero dejaron de ejercitar el estado que decían ejercitar.
+```text
+$ docker pull python:3.11-slim
+failed to copy: … Get "https://production.cloudfront.docker.com/…": Forbidden
+proxy: connect_rejected  production.cloudfront.docker.com:443
 
-Son dos líneas —cambiar `?` por `#`—, y quedan fuera de los cuatro archivos que
-autorizaste. **No las toqué.** Decime si las alineo ahora o si va con la
-próxima pieza que toque esos guiones.
+$ curl https://ynerav.up.railway.app/health
+curl: (56) CONNECT tunnel failed, response 403
+proxy: connect_rejected  ynerav.up.railway.app:443
+```
+
+El demonio sale por el proxy autorizado. El instructivo del proxy dice que un
+403 se reporta y no se reintenta ni se rodea: **no probé espejos, ni túneles,
+ni bajar la verificación de TLS.** Sin `python:3.11-slim`, `node:20-alpine`,
+`nginx:alpine` ni `postgis/postgis:16-3.4`, y sin caché local, no hay imagen
+que construir.
+
+## 8. Desvío
+
+**Dos archivos fuera de tu lista.** `DELIVERY_CHECKLIST.md` y
+`docs/SETUP_PAYMENTS.md` mandaban rotar `ADMIN_PASSWORD` antes de producción,
+una clave que **yo mismo eliminé** hace dos piezas. Dejar una instrucción falsa
+en una lista de entrega me pareció peor que el desvío: ahora nombran las
+credenciales SMTP y aclaran de dónde sale la contraseña del admin. Si preferís
+que vuelvan como estaban, lo revierto.
+
+**Anotado para la auditoría, no tocado:** `backend/Dockerfile.railway` corre
+como **root**; el Dockerfile local crea `appuser` y lo usa. Cambiarlo sin poder
+probar el volumen sería a ciegas.
+
+## 9. DECISIÓN SOLICITADA
+
+**Cómo cerramos la parte Docker de Gate A.** Tres caminos.
+
+**a) La corrés vos**, como la vez pasada, con las comprobaciones de tu lista.
+Te paso el override temporal ya armado. **Es lo que recomiendo:** el bloqueo es
+de mi entorno, no del producto, y ya demostró que sabés ejecutarlo.
+
+**b) Se habilita el egreso a Docker Hub para mi sesión** —al menos
+`production.cloudfront.docker.com`, `registry-1.docker.io` y `auth.docker.io`—
+y la corro completa dentro de la jornada.
+
+**c) Se da por suficiente la verificación estática** y la parte Docker se
+absorbe en Gate B, donde Railway construye las imágenes de todos modos.
+
+**Y una segunda, ahora que Gate B está autorizado: quién lo ejecuta.** Yo no
+puedo: sin CLI, sin credenciales y con el dominio bloqueado, cualquier cosa que
+informara sería inventada. O lo corrés vos con la sesión ya autenticada, o hay
+que habilitar el egreso a Railway y darme una forma de autenticación que no
+pase por GitHub. **Recomiendo lo primero**, y que yo quede para diagnosticar lo
+que aparezca: el paso siguiente concreto es crear los servicios `Backend` y
+`PostGIS` con las raíces de la tabla del punto 5.
 
 **Sigue abierto el `float` del checkout**, obligatorio antes de Fase 4.
 
