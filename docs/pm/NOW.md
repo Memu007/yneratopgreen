@@ -31,15 +31,13 @@ base local limpia. `83c4b59` corrigió la identidad visible, `d2063c9` cerró do
 falsos verdes del recorrido y `5924fbb` hizo que cualquier fallo acumulado
 impida el éxito final. La cobertura 40/40 y 34/34 y la puerta de accesibilidad
 quedan cerradas. `652bc34` dejó el seed bancario demo utilizable desde la
-primera instalación y subió la suite a 26/26. La tarea activa en
-`PARA-DEV.md` abre la validación de registro por correo, primera deuda de Fase
-2. La instalación quedó aceptada con `82c1df8` y `896386a`; la PM completó en
+primera instalación y subió la suite a 26/26. La validación de correo quedó
+aceptada en `ccc0794`; la tarea activa pasa al ensayo temprano de Railway. La
+instalación quedó aceptada con `82c1df8` y `896386a`; la PM completó en
 Docker aislado migraciones, seed idempotente, health y persistencia de uploads.
-La suite anterior queda en 32/32. La entrega de correo `cb6d888` fue devuelta
-una vez y `7262955` corrigió sus tres hallazgos con 37/37: `Referer`, enumeración
-por fallo del transporte y vencimiento en navegador. Falta una corrección final
-aprobada por PM: mover el token de `?token=` a `#token=` para que tampoco entre
-en el `GET` inicial del servidor. Todavía no se acepta la pieza.
+Correo informa 37/37, build y puertas visuales verdes: enlace de 24 horas y un
+solo uso, reenvío no enumerable y cero peticiones con el token gracias al
+fragmento.
 
 ## El proyecto fue aprobado
 
@@ -77,11 +75,12 @@ transcripcion funcional en `CONTRATO.md` y el anclaje en `CRONOGRAMA.md`.
 
 ## Objetivo activo
 
-**Corregir y aceptar el registro con validación por correo.** `7262955` cerró
-las tres devoluciones sobre `cb6d888`, pero detectó que el `GET` inicial todavía
-deja el token en el access log por usar query. PM aprobó terminar la pieza con
-un fragmento `#token=`, que el navegador no envía al servidor, y retirar el
-`meta referrer` que queda redundante. La instalación nativa
+**Preparar y, con autorización externa, ejecutar un ensayo descartable de
+Railway.** Correo quedó aceptado en `ccc0794` antes del 18/08, por lo que entra
+la ventana acordada de una jornada y cierre antes del 20/08. Primero se corrige
+y prueba localmente la configuración Railway. La ejecución externa espera que
+Emi inicie sesión y confirme Trial o Hobby; `railway whoami` responde hoy
+`Unauthorized`. La instalación nativa
 y Docker quedaron cerrados con `82c1df8` y `896386a`. El checkout muestra el
 motivo real desde `e915d6a`. La
 puerta de accesibilidad de Fase 1 quedó cerrada en
@@ -186,13 +185,11 @@ nuevos con deuda encima.
 7. ~~**Instalación nativa y regresión Docker.**~~ **Cerradas y aceptadas el
    2026-08-10** en `82c1df8` y `896386a`; suite 32/32 y prueba Docker aislada
    completada por PM.
-8. **Tarea activa — corrección final de validación de correo.** Cambiar el
-   enlace a fragmento `#token=`, leerlo y limpiarlo antes de llamar a la API, y
-   demostrar cero peticiones con el token. `7262955` todavía no se acepta.
-9. **Ensayo Railway condicionado.** Sólo después de aceptar correo y sólo si
-   puede terminar antes del 20/08, con tope de una jornada, proyecto
-   descartable, datos demo y sin tratarlo como producción. Si correo no queda
-   aceptado antes del 18/08, se posterga a Fase 5 para no consumir Fase 2.
+8. ~~**Validación de correo.**~~ **Aceptada el 10/08** en `ccc0794`; 37/37 y
+   token ausente incluso del access log del frontend.
+9. **Tarea activa — ensayo Railway condicionado.** Gate local inmediato. Gate
+   externo sólo después de login y confirmación de Trial/Hobby por Emi; tope de
+   una jornada, datos demo y cierre antes del 20/08. No cuenta como producción.
 10. **Transportistas.** La Pieza A está hecha con dos objeciones abiertas
    —el perfil no se puede editar y el campo de certificación obligatorio
    no informa nada—. Las decisiones de B/C y el mapa de contacto quedaron
@@ -210,6 +207,12 @@ nuevos con deuda encima.
 subio la preparacion en `382bcbe` —`Dockerfile.railway`, `railway.toml` y
 `RAILWAY.md`— sin desplegarla. Falta revisarla, y **no se publica nada sin
 la revision de seguridad**.
+
+**Bloqueo externo del ensayo:** la CLI está instalada pero no autenticada. La
+arquitectura requiere Frontend, Backend y PostGIS, más un volumen de base y otro
+en `/data`. El Trial vigente admite ese ensayo; el Free normal limita a un solo
+volumen y no alcanza. Hobby cuesta USD 5 mensuales e incluye USD 5 de uso. No se
+crean recursos ni se acepta gasto hasta que Emi elija y autentique la cuenta.
 
 **Las correcciones de celular se aparcan.** Se hizo sólo el relevamiento
 —capturas e inventarios de consola y red— para saber cuánto trabajo es.

@@ -921,3 +921,80 @@ el informe. Repetí 37/37 porque el parser del enlace alimenta toda la suite,
 además de build y `diff --check`; no hace falta repetir accesibilidad ni
 contraste si el DOM y los estilos no cambian. Un commit mínimo y el informe
 separado.
+
+---
+
+## 2026-08-10 — `ccc0794`: correo aceptado
+
+Aceptado. El enlace usa fragmento, el servidor recibe sólo
+`GET /verificar-correo`, el token se limpia antes del `POST`, el cambio de hash
+procesa un enlace nuevo sin gastar dos veces el mismo, el `meta referrer`
+redundante salió y la vigilancia exige cero peticiones con el token. Build
+independiente y `diff --check` verdes; suite informada 37/37.
+
+Los dos marcadores `?token=` que quedaron en `a11y.mjs` y `contraste.mjs` miden
+el estado incompleto con el mismo DOM y estilos que el inválido. No bloquean la
+aceptación. Alinealos cuando esos guiones vuelvan a tocarse; no abras otra
+corrección de correo por eso.
+
+## Tarea activa única: ensayo descartable de Railway
+
+Objetivo: descubrir ahora los defectos de despliegue que no aparecen en Docker
+local, sin llamar producción a este entorno ni consumir la puerta de perfiles
+de Fase 2. Tope total: una jornada y cierre antes del 20/08.
+
+### Gate A — hacelo ahora, sin cuenta Railway
+
+- `railway whoami` responde hoy `Unauthorized`. No intentes login interactivo,
+  no crees recursos y no pidas ni guardes tokens en GitHub.
+- Corregí `RAILWAY.md`: elimina las `ADMIN_*` que `Settings` ya no acepta;
+  documentá las variables reales de correo. Para el ensayo se usa `outbox`,
+  `EMAIL_OUTBOX_DIR=/data/outbox` y sólo datos demo. Producción exigirá SMTP.
+- Ajustá cualquier contradicción entre la guía, los dos `railway.toml`, los dos
+  Dockerfiles y los entrypoints. Conservá el monorepo actual: Frontend raíz
+  `/`, Backend raíz `/backend`, archivo de configuración absoluto por servicio.
+- Construí las dos imágenes Railway localmente. En recursos Docker aislados,
+  comprobá: PostGIS, pre-deploy de migraciones, seed dos veces, API y frontend
+  saludables, `/verificar-correo` directo sin 404, catálogo, outbox, upload y
+  persistencia de `/data` tras reiniciar. No toques `topgreen-*`.
+- Reemplazá `docs/PROJECT_STATUS.md` por un aviso breve de documento histórico
+  y enlaces a las fuentes vigentes; no lo reescribas entero ni borres historia.
+- Si Gate A descubre un defecto imprescindible, corregí sólo configuración,
+  entrypoint o documentación. Un cambio de producto frena y vuelve a PM.
+
+### Gate B — sólo después de autorización de Emi
+
+La arquitectura necesita tres servicios —Frontend, Backend y PostGIS— y dos
+volúmenes —base y `/data`—. La documentación oficial vigente indica que Trial
+admite 5 servicios y 3 volúmenes; Free normal, 3 servicios pero un solo volumen;
+Hobby cuesta USD 5/mes e incluye USD 5 de uso. Emi debe iniciar sesión y elegir
+Trial o Hobby antes de crear nada.
+
+Con autorización:
+
+- Creá un proyecto inequívocamente descartable con datos demo, secreto JWT
+  aleatorio sólo en Railway, `EMAIL_TRANSPORT=outbox`, PostGIS privado y volumen
+  Backend en `/data`. No uses SMTP, Mercado Pago ni datos reales.
+- Desplegá desde `main` los tres servicios. Verificá HTTPS y dominios, health de
+  ambos servicios, migraciones, PostGIS, seed idempotente, catálogo, CORS,
+  registro y enlace leído desde `/data/outbox`, ruta directa de confirmación y
+  login posterior.
+- Subí una imagen demo, redesplegá o reiniciá Backend y comprobá que sigue
+  servida. Comprobá que la base conserva usuarios y catálogo. Railway sólo usa
+  el healthcheck al desplegar; no lo presentes como monitoreo continuo.
+- Registrá uso estimado, límites y disponibilidad de backups, pero no actives
+  backups pagos ni restaures nada en este ensayo. No elimines el proyecto al
+  terminar: reportá el resultado y esperá autorización de PM para limpiarlo.
+
+### Evidencia y freno
+
+- Si Emi todavía no autenticó Railway al cerrar Gate A, entregá Gate A y
+  reportá el bloqueo; no abras otra pieza ni excedas la jornada.
+- Sin secretos, contenido de outbox ni tokens en commits o informe. Sí se pueden
+  informar dominios demo, IDs no sensibles, estados, tiempos y costo estimado.
+- Corré sólo las pruebas proporcionales a los archivos tocados, build,
+  validación de plantillas y `diff --check`. No repitas 37/37 salvo que cambies
+  producto, correo o seed.
+- Un commit de Gate A/configuración y documentación; si Gate B se habilita, otro
+  commit sólo si el despliegue exige un ajuste versionable. Informe separado en
+  `PARA-PM.md` con una tabla Gate A/Gate B y cada criterio.
