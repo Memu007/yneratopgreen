@@ -640,12 +640,9 @@ await runCase(13, 'Desde el seed, los dos vendedores ya cobran por transferencia
   const adminId = adminLogin.data.user.id;
   assert(adminId !== state.sellerId, 'el admin y el vendedor demo son el mismo usuario');
 
-  // Una publicacion activa y con stock de cada vendedor del catalogo demo.
-  // Se elige la mas barata, y no la primera, por dos razones: es determinista, y
-  // el carrito no admite precios de 100 millones o mas. Ese limite es un defecto
-  // real del producto, reportado aparte: products.price es NUMERIC(12,2) pero
-  // cart_items.unit_price_snapshot es NUMERIC(10,2), y el seed publica dos
-  // articulos por encima de ese techo.
+  // La publicacion MAS CARA de cada vendedor, a proposito: la del admin es el
+  // campo de $950.000.000 y antes hacia estallar el carrito con un 500. Elegir
+  // la mas cara es lo que prueba que el techo de cien millones ya no existe.
   const publicacionDe = async (sellerId) => {
     const params = new URLSearchParams({
       seller_id: sellerId,
@@ -655,13 +652,17 @@ await runCase(13, 'Desde el seed, los dos vendedores ya cobran por transferencia
     const catalogo = await apiRequest(`/catalog/products?${params}`);
     const item = catalogo.data.items
       .filter((candidate) => !candidate.is_service && Number(candidate.stock) > 0)
-      .filter((candidate) => Number(candidate.price) > 0)
-      .sort((a, b) => Number(a.price) - Number(b.price))[0];
+      .sort((a, b) => Number(b.price) - Number(a.price))[0];
     assert(item, `el vendedor ${sellerId} no tiene publicacion activa con stock`);
     return item;
   };
   const delVendedor = await publicacionDe(state.sellerId);
   const delAdmin = await publicacionDe(adminId);
+  assert(
+    Number(delAdmin.price) > 100000000,
+    `la publicacion mas cara del admin deberia superar los cien millones, es ${delAdmin.price}`,
+  );
+  state.publicacionCara = delAdmin;
 
   await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
   for (const producto of [delVendedor, delAdmin]) {
@@ -695,7 +696,9 @@ await runCase(13, 'Desde el seed, los dos vendedores ya cobran por transferencia
 
   // el carrito queda vacio para que los casos siguientes armen el suyo
   await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
-  return `HTTP ${opciones.status}, sin PATCH previo; ${detalles.join('; ')}`;
+  return `HTTP ${opciones.status}, sin PATCH previo; `
+    + `la mas cara del admin es "${delAdmin.name}" a $${delAdmin.price} y entra al carrito; `
+    + detalles.join('; ');
 });
 
 await runCase(14, 'Transferencia exige CBU o alias del vendedor', async () => {
@@ -1504,6 +1507,135 @@ await runCase(26, 'Dos aprobaciones simultáneas descuentan stock una sola vez',
   );
 
   return `1 de 2 aceptada, la otra HTTP 400; stock ${stockInicial} -> ${stockFinal}`;
+});
+await runCase(27, 'Una orden por transferencia de más de cien millones', async () => {
+  // El caso que antes era imposible: el campo de $950.000.000 devolvia 500 al
+  // entrar al carrito porque el snapshot era NUMERIC(10,2).
+  assert(state.publicacionCara, 'el caso 13 no dejó la publicación cara');
+  const caro = state.publicacionCara;
+  assert(Number(caro.price) > 100000000, `esperaba más de cien millones, es ${caro.price}`);
+
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  await apiRequest('/cart/items', {
+    method: 'POST',
+    token: state.buyerToken,
+    body: { product_id: caro.id, quantity: 1 },
+  });
+
+  const checkout = await apiRequest('/orders/checkout/transfer', {
+    method: 'POST',
+    token: state.buyerToken,
+    body: {
+      shipping_address: 'Ruta 8 km 220',
+      shipping_city: 'Pergamino',
+      shipping_province: 'Buenos Aires',
+      shipping_postal_code: '2700',
+      notes: 'Orden cara por transferencia',
+    },
+  });
+  const [orden] = checkout.data.orders;
+  assert(orden?.status === 'awaiting_transfer_receipt', `estado inesperado: ${orden?.status}`);
+
+  const [fila] = queryRows(`
+    SELECT o.subtotal, o.total_amount, oi.unit_price_snapshot, oi.total_price
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.id
+    WHERE o.id = ${sqlLiteral(orden.order_id)}
+  `);
+  const esperado = Number(caro.price).toFixed(2);
+  assert(fila[0] === esperado, `subtotal SQL=${fila[0]}, esperaba ${esperado}`);
+  assert(fila[1] === esperado, `total SQL=${fila[1]}, esperaba ${esperado}`);
+  assert(fila[2] === esperado, `snapshot unitario SQL=${fila[2]}, esperaba ${esperado}`);
+  assert(fila[3] === esperado, `total del ítem SQL=${fila[3]}, esperaba ${esperado}`);
+  assert(
+    Number(orden.total_amount ?? orden.total ?? esperado).toFixed(2) === esperado,
+    'el total de la API no coincide con SQL',
+  );
+  return `HTTP ${checkout.status}, "${caro.name}" a $${esperado}, API=SQL en subtotal, total y snapshots`;
+});
+
+await runCase(28, 'Un total fuera del contrato se rechaza sin escribir nada', async () => {
+  // Techo declarado: NUMERIC(14,2), 999.999.999.999,99.
+  assert(state.sellerToken, 'no hay token de vendedor');
+  assert(state.product?.category_id || state.product?.category_name, 'no hay categoría de referencia');
+  assert(state.location, 'caso 5 no dejó localidad');
+
+  const [categoria] = queryRows(`
+    SELECT id FROM categories WHERE is_active = true ORDER BY name LIMIT 1
+  `);
+
+  // 1. el maximo publicable se respeta: por encima de NUMERIC(12,2), 4xx
+  const excesivo = await expectApiError(400, () =>
+    apiRequest('/products', {
+      method: 'POST',
+      token: state.sellerToken,
+      body: {
+        name: `Smoke precio imposible ${Date.now()}`,
+        description: 'Publicación de prueba con un precio fuera del contrato monetario.',
+        category_id: categoria[0],
+        price: 99999999999.99,
+        stock: 1,
+        unit: 'unidad',
+        locality_id: state.location.localityId,
+        publication_type: 'producto',
+      },
+    }),
+  );
+  assert(/supera el máximo admitido/i.test(excesivo), `motivo inesperado: ${excesivo}`);
+
+  // 2. un producto al maximo publicable, con stock suficiente para pasarse en
+  //    el TOTAL: 9.999.999.999,99 x 200 = 1.999.999.999.998
+  const creado = await apiRequest('/products', {
+    method: 'POST',
+    token: state.sellerToken,
+    body: {
+      name: `Smoke tope monetario ${Date.now()}`,
+      description: 'Publicación de prueba al máximo precio unitario admitido.',
+      category_id: categoria[0],
+      price: 9999999999.99,
+      stock: 200,
+      unit: 'unidad',
+      locality_id: state.location.localityId,
+      publication_type: 'producto',
+    },
+  });
+  const topeId = creado.data.id;
+
+  const ordenesAntes = queryCount('SELECT COUNT(*) FROM orders');
+  const itemsAntes = queryCount('SELECT COUNT(*) FROM order_items');
+  try {
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    await apiRequest('/cart/items', {
+      method: 'POST',
+      token: state.buyerToken,
+      body: { product_id: topeId, quantity: 200 },
+    });
+    const error = await expectApiError(400, () =>
+      apiRequest('/orders/checkout/transfer', {
+        method: 'POST',
+        token: state.buyerToken,
+        body: {
+          shipping_address: 'Ruta 8 km 220',
+          shipping_city: 'Pergamino',
+          shipping_province: 'Buenos Aires',
+          shipping_postal_code: '2700',
+          notes: 'Orden que se pasa del contrato',
+        },
+      }),
+    );
+    assert(/supera el máximo admitido/i.test(error), `motivo inesperado: ${error}`);
+    assert(/999\.999\.999\.999,99/.test(error), `el mensaje no dice el techo: ${error}`);
+
+    const ordenesDespues = queryCount('SELECT COUNT(*) FROM orders');
+    const itemsDespues = queryCount('SELECT COUNT(*) FROM order_items');
+    assert(ordenesDespues === ordenesAntes, `se escribieron ${ordenesDespues - ordenesAntes} órdenes`);
+    assert(itemsDespues === itemsAntes, `se escribieron ${itemsDespues - itemsAntes} ítems`);
+    return `publicar $99.999.999.999,99 HTTP 400; total de $1.999.999.999.998,00 HTTP 400 `
+      + `con el techo en el mensaje; órdenes ${ordenesAntes}→${ordenesDespues} sin escritura parcial`;
+  } finally {
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    await apiRequest(`/products/${topeId}`, { method: 'DELETE', token: state.sellerToken });
+  }
 });
 
 const passed = results.filter((result) => result.passed).length;

@@ -11,6 +11,7 @@ from app.models.product import Product, ProductStatus
 from app.models.product_image import ProductImage
 from app.models.category import Category
 from app.core.dependencies import get_current_user
+from app.core.montos import validar_precio_unitario, validar_total
 from app.models.user import User
 from app.schemas.cart import (
     CartItemCreateRequest,
@@ -103,6 +104,9 @@ def add_to_cart(
             detail=f"Stock insuficiente. Disponible: {product.stock}"
         )
     
+    # el precio unitario tiene que entrar en el snapshot del carrito
+    validar_precio_unitario(product.price)
+
     # Obtener o crear carrito
     cart = get_or_create_cart(db, current_user.id)
     

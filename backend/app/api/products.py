@@ -15,6 +15,7 @@ from app.models.product_image import ProductImage
 from app.models.category import Category
 from app.models.locality import Locality
 from app.core.dependencies import get_current_user
+from app.core.montos import validar_precio_unitario
 from app.models.user import User, UserRole
 from app.schemas.products import ProductCreateRequest, ProductUpdateRequest, ProductResponse
 from app.core.config import settings
@@ -67,6 +68,8 @@ async def create_product(
         counter += 1
     
     # Determinar tipo de publicación
+    validar_precio_unitario(product_data.price)
+
     pub_type = product_data.publication_type  # "producto" o "servicio"
     is_service = pub_type == "servicio"
     

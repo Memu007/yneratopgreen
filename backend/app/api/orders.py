@@ -8,12 +8,14 @@ from datetime import datetime
 from io import BytesIO
 import os
 import secrets
+from decimal import Decimal
 
 from app.db.base import get_db
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.cart import Cart, CartStatus
 from app.models.product import Product
 from app.core.dependencies import get_current_user
+from app.core.montos import validar_total
 from app.models.user import User
 from app.schemas.orders import (
     BankTransferCheckoutResponse,
@@ -71,6 +73,19 @@ def checkout(
             items_by_seller[seller_id] = []
         items_by_seller[seller_id].append(item)
     
+    # Validar TODOS los totales antes de escribir: si alguno no entra en el
+    # contrato monetario, la respuesta es 4xx y no queda una orden a medias.
+    for _seller_id, _items in items_by_seller.items():
+        for _item in _items:
+            validar_total(
+                Decimal(str(_item.product.price)) * _item.quantity,
+                f"El importe de «{_item.product.name}»",
+            )
+        validar_total(
+            sum((Decimal(str(x.product.price)) * x.quantity for x in _items), Decimal(0)),
+            "El total de la orden",
+        )
+
     created_orders = []
     
     # Crear una orden por cada vendedor
@@ -243,6 +258,21 @@ def checkout_bank_transfer(
 ):
     """Crear una orden por vendedor, sin modificar el checkout de Mercado Pago."""
     cart, groups = _get_transfer_groups(db, current_user)
+
+    # Mismo control que el checkout comun, y por el mismo motivo: antes de
+    # que exista una sola fila.
+    for group in groups:
+        for item in group["items"]:
+            validar_total(
+                Decimal(str(item.product.price)) * item.quantity,
+                f"El importe de «{item.product.name}»",
+            )
+        validar_total(
+            sum((Decimal(str(i.product.price)) * i.quantity
+                 for i in group["items"]), Decimal(0)),
+            "El total de la orden",
+        )
+
     created = []
 
     for group in groups:

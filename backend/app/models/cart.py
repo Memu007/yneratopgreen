@@ -49,7 +49,7 @@ class CartItem(Base):
     
     # Cantidad y precio snapshot
     quantity = Column(Integer, nullable=False, default=1)
-    unit_price_snapshot = Column(Numeric(10, 2), nullable=False)  # Precio al momento de agregar
+    unit_price_snapshot = Column(Numeric(12, 2), nullable=False)  # Precio al momento de agregar
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

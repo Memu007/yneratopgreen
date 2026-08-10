@@ -37,10 +37,10 @@ class Payment(Base):
     status = Column(SQLEnum(PaymentStatus), default=PaymentStatus.PENDING, nullable=False)
     
     # Montos
-    total_amount = Column(Numeric(12, 2), nullable=False)  # Monto total pagado
-    commission_amount = Column(Numeric(12, 2), nullable=False)  # Comisión TopGreen
+    total_amount = Column(Numeric(14, 2), nullable=False)  # Monto total pagado
+    commission_amount = Column(Numeric(14, 2), nullable=False)  # Comisión TopGreen
     commission_percent = Column(Numeric(5, 2), nullable=False)  # Porcentaje aplicado
-    seller_amount = Column(Numeric(12, 2), nullable=False)  # Monto para el vendedor
+    seller_amount = Column(Numeric(14, 2), nullable=False)  # Monto para el vendedor
     
     # Datos del pagador (snapshot de MP)
     payer_email = Column(String(255), nullable=True)
@@ -64,7 +64,7 @@ class Payment(Base):
     # Datos de reembolso
     refund_id = Column(String(100), nullable=True)  # ID del reembolso en MP
     refunded_at = Column(DateTime, nullable=True)  # Cuando se hizo el reembolso
-    refund_amount = Column(Numeric(12, 2), nullable=True)  # Monto reembolsado
+    refund_amount = Column(Numeric(14, 2), nullable=True)  # Monto reembolsado
     
     # Relaciones
     order = relationship("Order", back_populates="payment")

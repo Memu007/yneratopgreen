@@ -39,9 +39,9 @@ class Order(Base):
     status = Column(SQLEnum(OrderStatus), default=OrderStatus.PLACED, nullable=False, index=True)
     
     # Montos
-    subtotal = Column(Numeric(10, 2), nullable=False)
-    shipping_cost = Column(Numeric(10, 2), default=0, nullable=False)
-    total_amount = Column(Numeric(10, 2), nullable=False)
+    subtotal = Column(Numeric(14, 2), nullable=False)
+    shipping_cost = Column(Numeric(14, 2), default=0, nullable=False)
+    total_amount = Column(Numeric(14, 2), nullable=False)
     currency = Column(String(3), default="ARS", nullable=False)
     
     # Dirección de envío (JSON para flexibilidad)
@@ -84,11 +84,11 @@ class OrderItem(Base):
     # Snapshot de datos (por si el producto cambia después)
     product_name_snapshot = Column(String(255), nullable=False)
     product_image_snapshot = Column(String(500), nullable=True)
-    unit_price_snapshot = Column(Numeric(10, 2), nullable=False)
+    unit_price_snapshot = Column(Numeric(12, 2), nullable=False)
     
     # Cantidad y total
     quantity = Column(Integer, nullable=False)
-    total_price = Column(Numeric(10, 2), nullable=False)  # unit_price * quantity
+    total_price = Column(Numeric(14, 2), nullable=False)  # unit_price * quantity
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
