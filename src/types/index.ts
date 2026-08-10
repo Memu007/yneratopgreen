@@ -84,11 +84,19 @@ export interface User {
   createdAt: string;
 }
 
+// El alta ya no abre sesión: devuelve a qué correo se mandó el enlace.
+export interface RegistroPendiente {
+  email: string;
+  message: string;
+}
+
 export interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (userData: RegisterData) => Promise<void>;
+  register: (userData: RegisterData) => Promise<RegistroPendiente>;
+  reenviarVerificacion: (email: string) => Promise<string>;
+  verificarCorreo: (token: string) => Promise<string>;
   logout: () => void;
   updateProfile: (userData: Partial<User>) => Promise<void>;
 }

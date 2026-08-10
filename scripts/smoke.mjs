@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const API_URL = process.env.SMOKE_API_URL || 'http://localhost:8000/api';
@@ -101,6 +101,85 @@ function cargarConSettings(contenido) {
       .join(' | ');
     return motivo || salida;
   }
+}
+
+// El transporte de correo de desarrollo escribe cada mensaje como un .eml en
+// backend/outbox. La suite lee de ahí el mismo enlace que recibiría la
+// persona, en vez de pedirle al backend un endpoint que devuelva el token: ese
+// endpoint sería un agujero permanente para no tener que leer un archivo.
+const CARPETA_OUTBOX = 'backend/outbox';
+
+function ultimoCorreo() {
+  let archivos = [];
+  try {
+    archivos = readdirSync(CARPETA_OUTBOX).filter((nombre) => nombre.endsWith('.eml'));
+  } catch {
+    throw new Error(`no existe la carpeta de outbox (${CARPETA_OUTBOX})`);
+  }
+  assert(archivos.length > 0, 'el outbox no tiene ningún mensaje');
+  // Por fecha de modificación y no por nombre: dos mensajes del mismo segundo
+  // se ordenarían por el sufijo al azar y el "último" sería cualquiera.
+  const reciente = archivos
+    .map((nombre) => ({ nombre, cuando: statSync(`${CARPETA_OUTBOX}/${nombre}`).mtimeMs }))
+    .sort((a, b) => a.cuando - b.cuando)
+    .at(-1);
+  return readFileSync(`${CARPETA_OUTBOX}/${reciente.nombre}`, 'utf8');
+}
+
+function enlaceDeVerificacion() {
+  const cuerpo = ultimoCorreo();
+  const enlace = cuerpo.match(/https?:\/\/\S*verificar-correo\?token=[A-Za-z0-9_-]+/);
+  assert(enlace, `el último correo no trae enlace:\n${cuerpo.slice(0, 400)}`);
+  return enlace[0];
+}
+
+function tokenDeVerificacion() {
+  return enlaceDeVerificacion().split('token=')[1];
+}
+
+function contarCorreos() {
+  try {
+    return readdirSync(CARPETA_OUTBOX).filter((nombre) => nombre.endsWith('.eml')).length;
+  } catch {
+    return 0;
+  }
+}
+
+// El alta ya no abre sesión, así que casi todos los casos necesitan además
+// confirmar el correo antes de poder ingresar.
+async function registrarYVerificar(body) {
+  const alta = await apiRequest('/auth/register', { method: 'POST', body });
+  await apiRequest('/auth/verify-email', {
+    method: 'POST',
+    body: { token: tokenDeVerificacion() },
+  });
+  return alta;
+}
+
+// Ejecuta un script de Python donde vive la aplicación, para poder emitir un
+// token de sesión a mano. Es el único modo de reproducir "un token emitido
+// antes de confirmar": por la API ya no se consigue ninguno.
+function emitirTokensDeSesion(email) {
+  const script = `
+import sys
+from app.db.base import SessionLocal
+from app.models.user import User
+from app.core.security import create_access_token, create_refresh_token
+correo = sys.stdin.read().strip()
+db = SessionLocal()
+u = db.query(User).filter(User.email == correo).first()
+if u is None:
+    raise SystemExit("no existe " + correo)
+print(create_access_token(data={"sub": u.id}))
+print(create_refresh_token(data={"sub": u.id}))
+`;
+  const salida = execFileSync(
+    'docker',
+    ['exec', '-i', 'topgreen-api', 'python', '-c', script],
+    { encoding: 'utf8', input: email, stdio: ['pipe', 'pipe', 'pipe'] },
+  ).trim().split(/\r?\n/);
+  assert(salida.length === 2, `no se pudieron emitir tokens para ${email}: ${salida.join(' ')}`);
+  return { acceso: salida[0], refresco: salida[1] };
 }
 
 function queryRows(sql) {
@@ -212,11 +291,25 @@ await runCase(2, 'Registro de usuario', async () => {
     body: credentials,
   });
 
-  assert(data?.user?.email === credentials.email, 'el usuario registrado no coincide');
-  assert(data?.access_token, 'el registro no devolvió access_token');
+  // El alta ya no devuelve sesión: deja la cuenta pendiente de confirmación.
+  assert(data?.email === credentials.email, 'el alta no confirma a qué correo escribió');
+  assert(data?.verification_required === true, 'el alta no se declara pendiente');
+  assert(!data?.access_token && !data?.refresh_token, 'el alta devolvió tokens de sesión');
+
+  await apiRequest('/auth/verify-email', {
+    method: 'POST',
+    body: { token: tokenDeVerificacion() },
+  });
+
+  const [fila] = queryRows(`
+    SELECT id, is_verified::text FROM users WHERE email = ${sqlLiteral(credentials.email)}
+  `);
+  assert(fila, 'el usuario no quedó en la base');
+  assert(fila[1] === 'true', 'el usuario no quedó verificado después de confirmar');
+
   state.buyerCredentials = credentials;
-  state.buyerId = data.user.id;
-  return `HTTP ${status}, user_id=${data.user.id}`;
+  state.buyerId = fila[0];
+  return `HTTP ${status} sin sesión, confirmado por enlace, user_id=${fila[0]}`;
 });
 
 await runCase(3, 'Ingreso y obtención del token', async () => {
@@ -895,14 +988,15 @@ await runCase(16, 'Comprobante fallido visible y comprobante válido asociado', 
 });
 
 await runCase(17, 'Sólo el vendedor correcto valida el comprobante', async () => {
-  const otherSeller = await apiRequest('/auth/register', {
+  await registrarYVerificar({
+    email: 'otro.vendedor.smoke@example.com',
+    password: 'smoke123',
+    full_name: 'Otro Vendedor Smoke',
+    role: 'user',
+  });
+  const otherSeller = await apiRequest('/auth/login', {
     method: 'POST',
-    body: {
-      email: 'otro.vendedor.smoke@example.com',
-      password: 'smoke123',
-      full_name: 'Otro Vendedor Smoke',
-      role: 'user',
-    },
+    body: { email: 'otro.vendedor.smoke@example.com', password: 'smoke123' },
   });
   await expectApiError(403, () =>
     apiRequest(`/orders/${state.transferOrderId}/transfer-receipt`, {
@@ -1285,9 +1379,18 @@ await runCase(22, 'Registro de transportista desde la interfaz', async () => {
     await page.locator('input[name="password"]').fill(password);
     await page.locator('form input[type="password"]').nth(1).fill(password);
     await page.getByRole('button', { name: 'Crear cuenta' }).click();
-    await page.getByText(/Transportista Smoke.*cuenta fue creada exitosamente/).waitFor({
-      state: 'visible',
-      timeout: 15_000,
+    // El alta ya no da la bienvenida: deja el aviso de correo pendiente.
+    const avisoPendiente = page.locator('[role="status"]').first();
+    await avisoPendiente.waitFor({ state: 'visible', timeout: 15_000 });
+    const textoPendiente = (await avisoPendiente.textContent()) || '';
+    assert(
+      textoPendiente.includes(email),
+      `el aviso de registro no nombra el correo: "${textoPendiente}"`,
+    );
+
+    await apiRequest('/auth/verify-email', {
+      method: 'POST',
+      body: { token: tokenDeVerificacion() },
     });
 
     const login = await apiRequest('/auth/login', {
@@ -2141,6 +2244,290 @@ await runCase(32, 'Las plantillas de configuración cargan sin retoques', async 
   }
 
   return resumen.join('; ');
+});
+
+await runCase(33, 'El alta deja la cuenta pendiente y sin sesión', async () => {
+  const email = `pendiente.smoke.${Date.now()}@example.com`;
+  const password = 'smoke123';
+  const correosAntes = contarCorreos();
+
+  const alta = await apiRequest('/auth/register', {
+    method: 'POST',
+    body: { email, password, full_name: 'Pendiente Smoke', role: 'user' },
+  });
+
+  assert(alta.status === 201, `alta HTTP ${alta.status}`);
+  assert(!alta.data.access_token && !alta.data.refresh_token, 'el alta devolvió tokens');
+  assert(alta.data.verification_required === true, 'el alta no se declara pendiente');
+  assert(contarCorreos() === correosAntes + 1, 'el alta no dejó un correo en el outbox');
+
+  const [fila] = queryRows(`
+    SELECT u.is_verified::text, t.token_hash, length(t.token_hash)::text,
+           (t.expires_at - t.created_at)::text, t.consumed_at IS NULL
+    FROM users u
+    JOIN email_verification_tokens t ON t.user_id = u.id
+    WHERE u.email = ${sqlLiteral(email)}
+  `);
+  assert(fila, 'no quedó token en la base');
+  assert(fila[0] === 'false', 'el usuario nació verificado');
+  assert(fila[2] === '64', `el hash no mide 64 caracteres: ${fila[2]}`);
+  assert(fila[3] === '1 day', `la vigencia no es de 24 horas: ${fila[3]}`);
+
+  // Lo importante: el token del enlace NO está guardado en ninguna parte.
+  const token = tokenDeVerificacion();
+  assert(fila[1] !== token, 'la base guardó el token en claro');
+  const enBase = queryCount(`
+    SELECT COUNT(*) FROM email_verification_tokens WHERE token_hash = ${sqlLiteral(token)}
+  `);
+  assert(enBase === 0, 'el token en claro aparece en la base');
+
+  const alIngresar = await expectApiError(403, () =>
+    apiRequest('/auth/login', { method: 'POST', body: { email, password } }),
+  );
+  assert(/no está confirmada/i.test(alIngresar), `motivo inesperado: ${alIngresar}`);
+
+  state.pendienteEmail = email;
+  state.pendientePassword = password;
+  return `HTTP 201 sin tokens, hash de 64 y vigencia de 1 day en base, `
+    + `token en claro ausente, login HTTP 403 con el motivo`;
+});
+
+await runCase(34, 'El enlace verifica una sola vez, aun con dos intentos a la vez', async () => {
+  assert(state.pendienteEmail, 'caso 33 no dejó una cuenta pendiente');
+  const email = state.pendienteEmail;
+  const token = tokenDeVerificacion();
+
+  // Dos verificaciones en paralelo con el MISMO token: exactamente una gana.
+  const [una, otra] = await Promise.all([
+    apiRequest('/auth/verify-email', { method: 'POST', body: { token } }).then(
+      (r) => ({ ok: true, r }),
+      (e) => ({ ok: false, e }),
+    ),
+    apiRequest('/auth/verify-email', { method: 'POST', body: { token } }).then(
+      (r) => ({ ok: true, r }),
+      (e) => ({ ok: false, e }),
+    ),
+  ]);
+  const aceptadas = [una, otra].filter((x) => x.ok).length;
+  assert(aceptadas === 1, `${aceptadas} verificaciones aceptadas en paralelo, debía ser 1`);
+
+  const consumos = queryCount(`
+    SELECT COUNT(*) FROM email_verification_tokens t
+    JOIN users u ON u.id = t.user_id
+    WHERE u.email = ${sqlLiteral(email)} AND t.consumed_at IS NOT NULL
+  `);
+  assert(consumos === 1, `${consumos} tokens consumidos, debía ser 1`);
+
+  const [verificado] = queryRows(`
+    SELECT is_verified::text FROM users WHERE email = ${sqlLiteral(email)}
+  `);
+  assert(verificado[0] === 'true', 'el usuario no quedó verificado');
+
+  const ingreso = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email, password: state.pendientePassword },
+  });
+  assert(ingreso.data.access_token, 'después de confirmar, el login no dio token');
+
+  const alRepetir = await expectApiError(400, () =>
+    apiRequest('/auth/verify-email', { method: 'POST', body: { token } }),
+  );
+  assert(/ya se usó/i.test(alRepetir), `reutilización: motivo inesperado: ${alRepetir}`);
+
+  return `1 de 2 verificaciones simultáneas aceptada, 1 consumo en base, `
+    + `login HTTP 200 y reutilización HTTP 400`;
+});
+
+await runCase(35, 'Vencido a las 24 h, y el reenvío invalida el anterior', async () => {
+  const email = `vencido.smoke.${Date.now()}@example.com`;
+  const password = 'smoke123';
+  await apiRequest('/auth/register', {
+    method: 'POST',
+    body: { email, password, full_name: 'Vencido Smoke', role: 'user' },
+  });
+  const tokenViejo = tokenDeVerificacion();
+
+  // Se envejece el token un segundo más allá de su vigencia.
+  querySql(`
+    UPDATE email_verification_tokens
+    SET created_at = created_at - interval '24 hours 1 second',
+        expires_at = expires_at - interval '24 hours 1 second'
+    WHERE user_id = (SELECT id FROM users WHERE email = ${sqlLiteral(email)})
+  `);
+  const alVencer = await expectApiError(400, () =>
+    apiRequest('/auth/verify-email', { method: 'POST', body: { token: tokenViejo } }),
+  );
+  assert(/venció/i.test(alVencer), `vencido: motivo inesperado: ${alVencer}`);
+
+  const usuariosAntes = queryCount(
+    `SELECT COUNT(*) FROM users WHERE email = ${sqlLiteral(email)}`,
+  );
+  const reenvio = await apiRequest('/auth/resend-verification', {
+    method: 'POST',
+    body: { email },
+  });
+  const tokenNuevo = tokenDeVerificacion();
+  assert(tokenNuevo !== tokenViejo, 'el reenvío mandó el mismo token');
+  assert(
+    queryCount(`SELECT COUNT(*) FROM users WHERE email = ${sqlLiteral(email)}`) === usuariosAntes,
+    'el reenvío duplicó el usuario',
+  );
+
+  const alUsarElViejo = await expectApiError(400, () =>
+    apiRequest('/auth/verify-email', { method: 'POST', body: { token: tokenViejo } }),
+  );
+  assert(/no es válido/i.test(alUsarElViejo), `el viejo: motivo inesperado: ${alUsarElViejo}`);
+
+  const conElNuevo = await apiRequest('/auth/verify-email', {
+    method: 'POST',
+    body: { token: tokenNuevo },
+  });
+  assert(conElNuevo.status === 200, `el token nuevo no verificó: HTTP ${conElNuevo.status}`);
+
+  // La respuesta del reenvío no puede delatar qué cuentas existen.
+  const correosAntes = contarCorreos();
+  const desconocido = await apiRequest('/auth/resend-verification', {
+    method: 'POST',
+    body: { email: `no.existe.${Date.now()}@example.com` },
+  });
+  const yaVerificado = await apiRequest('/auth/resend-verification', {
+    method: 'POST',
+    body: { email },
+  });
+  assert(
+    desconocido.data.message === reenvio.data.message
+      && yaVerificado.data.message === reenvio.data.message,
+    'la respuesta del reenvío cambia según la cuenta y delata cuáles existen',
+  );
+  assert(
+    contarCorreos() === correosAntes,
+    'se envió correo a una cuenta inexistente o ya verificada',
+  );
+
+  return `vencido HTTP 400; reenvío con 1 usuario, token viejo HTTP 400 y nuevo HTTP 200; `
+    + `respuesta idéntica para desconocido y verificado, sin correos de más`;
+});
+
+await runCase(36, 'Un token de sesión anterior no sirve sin confirmar', async () => {
+  const email = `tokenviejo.smoke.${Date.now()}@example.com`;
+  await apiRequest('/auth/register', {
+    method: 'POST',
+    body: { email, password: 'smoke123', full_name: 'Token Viejo Smoke', role: 'user' },
+  });
+
+  const { acceso, refresco } = emitirTokensDeSesion(email);
+
+  const enMe = await expectApiError(403, () => apiRequest('/auth/me', { token: acceso }));
+  assert(/no está confirmada/i.test(enMe), `/auth/me: motivo inesperado: ${enMe}`);
+
+  const enProtegida = await expectApiError(403, () =>
+    apiRequest('/products/my', { token: acceso }),
+  );
+  assert(/no está confirmada/i.test(enProtegida), `/products/my: motivo inesperado: ${enProtegida}`);
+
+  const enRefresh = await expectApiError(403, () =>
+    apiRequest('/auth/refresh', { method: 'POST', token: refresco }),
+  );
+  assert(/no está confirmada/i.test(enRefresh), `/auth/refresh: motivo inesperado: ${enRefresh}`);
+
+  // Y después de confirmar, el mismo token de acceso ya sirve.
+  await apiRequest('/auth/verify-email', {
+    method: 'POST',
+    body: { token: tokenDeVerificacion() },
+  });
+  const despues = await apiRequest('/auth/me', { token: acceso });
+  assert(despues.data.email === email, 'tras confirmar, el token anterior sigue sin servir');
+
+  return `/auth/me, /products/my y /auth/refresh en HTTP 403 con el motivo; `
+    + `el mismo token funciona una vez confirmada la cuenta`;
+});
+
+await runCase(37, 'Registro, correo y confirmación desde el navegador', async () => {
+  const email = `nav.smoke.${Date.now()}@example.com`;
+  const password = 'smoke123';
+  const browser = await chromium.launch({ headless: true });
+
+  try {
+    const page = await browser.newPage();
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await page.getByText('Regístrate aquí').click();
+    await page.getByRole('heading', { name: 'Crear Cuenta' }).waitFor();
+    await page.locator('input[name="name"]').fill('Nav Smoke');
+    await page.locator('input[name="email"]').fill(email);
+    await page.locator('input[name="password"]').fill(password);
+    await page.locator('form input[type="password"]').nth(1).fill(password);
+    await page.getByRole('button', { name: 'Crear cuenta' }).click();
+
+    const aviso = page.locator('[role="status"]').first();
+    await aviso.waitFor({ state: 'visible', timeout: 15_000 });
+    const textoAviso = (await aviso.textContent()) || '';
+    assert(textoAviso.includes(email), `el aviso no nombra el correo: "${textoAviso}"`);
+
+    // El alta no puede dejar sesión guardada en el navegador.
+    const guardado = await page.evaluate(() => ({
+      acceso: localStorage.getItem('access_token'),
+      refresco: localStorage.getItem('refresh_token'),
+    }));
+    assert(
+      !guardado.acceso && !guardado.refresco,
+      `el registro guardó sesión local: ${JSON.stringify(guardado)}`,
+    );
+
+    const enlacePrimero = enlaceDeVerificacion();
+
+    // Login bloqueado, con el motivo real y la salida a mano.
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await page.getByPlaceholder('tu@email.com').fill(email);
+    await page.getByPlaceholder('••••••••').fill(password);
+    await page.locator('[class*="_submitButton_"][type="submit"]').click();
+    const error = page.locator('[role="alert"]');
+    await error.waitFor({ state: 'visible', timeout: 15_000 });
+    const textoError = (await error.textContent()) || '';
+    assert(/no está confirmada/i.test(textoError), `login: motivo inesperado: "${textoError}"`);
+
+    await page.getByRole('button', { name: /Reenviame el correo/ }).click();
+    await page.locator('[role="status"]').first().waitFor({ state: 'visible', timeout: 15_000 });
+    const enlaceSegundo = enlaceDeVerificacion();
+    assert(enlaceSegundo !== enlacePrimero, 'el reenvío desde el login no cambió el enlace');
+
+    // El enlace viejo quedó invalidado por el reenvío.
+    await page.goto(enlacePrimero, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(
+      () => !/Estamos confirmando/.test(
+        document.querySelector('[role="status"]')?.textContent || '',
+      ),
+      null,
+      { timeout: 15_000 },
+    );
+    const textoViejo = (await page.locator('[role="status"]').first().textContent()) || '';
+    assert(
+      /no es válido|venció|ya se usó/i.test(textoViejo),
+      `el enlace invalidado no fue rechazado: "${textoViejo}"`,
+    );
+
+    // El nuevo confirma, y recién ahí hay sesión.
+    await page.goto(enlaceSegundo, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('heading', { name: 'Correo confirmado' }).waitFor({ timeout: 15_000 });
+    const [verificado] = queryRows(`
+      SELECT is_verified::text FROM users WHERE email = ${sqlLiteral(email)}
+    `);
+    assert(verificado[0] === 'true', 'la base no marcó la cuenta como verificada');
+
+    await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+    await page.getByPlaceholder('tu@email.com').fill(email);
+    await page.getByPlaceholder('••••••••').fill(password);
+    await page.locator('[class*="_submitButton_"][type="submit"]').click();
+    await page.waitForFunction(() => Boolean(localStorage.getItem('access_token')), null, {
+      timeout: 15_000,
+    });
+
+    return `aviso con el correo y sin sesión local; login HTTP 403 con motivo y reenvío; `
+      + `enlace viejo rechazado, nuevo confirmado y sesión recién después`;
+  } finally {
+    await browser.close();
+  }
 });
 
 const passed = results.filter((result) => result.passed).length;

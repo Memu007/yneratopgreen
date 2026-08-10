@@ -9,17 +9,23 @@ interface LoginModalProps {
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSwitchToRegister }) => {
-  const { login } = useAuth();
+  const { login, reenviarVerificacion } = useAuth();
   const { showToast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // Cuando el motivo del rechazo es la falta de confirmación, el aviso ofrece
+  // el reenvío: sin eso la persona queda sin salida.
+  const [faltaConfirmar, setFaltaConfirmar] = useState(false);
+  const [avisoDeReenvio, setAvisoDeReenvio] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setFaltaConfirmar(false);
+    setAvisoDeReenvio('');
     setIsLoading(true);
 
     try {
@@ -30,6 +36,21 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSwitchToRegis
       console.error('❌ Error en login modal:', err);
       const errorMessage = err instanceof Error ? err.message : 'Email o contraseña incorrectos';
       setError(errorMessage);
+      setFaltaConfirmar(/no está confirmada/i.test(errorMessage));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReenviar = async () => {
+    setAvisoDeReenvio('');
+    setIsLoading(true);
+    try {
+      setAvisoDeReenvio(await reenviarVerificacion(email));
+    } catch (err) {
+      setAvisoDeReenvio(
+        err instanceof Error ? err.message : 'No se pudo reenviar el correo.',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -52,7 +73,22 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSwitchToRegis
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
-          {error && <div className={styles.error}>{error}</div>}
+          {error && <div className={styles.error} role="alert">{error}</div>}
+          {faltaConfirmar && (
+            <button
+              type="button"
+              className={styles.switchLink}
+              onClick={handleReenviar}
+              disabled={isLoading}
+            >
+              Reenviame el correo de confirmación
+            </button>
+          )}
+          {avisoDeReenvio && (
+            <div className={styles.success} role="status">
+              {avisoDeReenvio}
+            </div>
+          )}
 
           <div className={styles.formGroup}>
             <label className={styles.label}>

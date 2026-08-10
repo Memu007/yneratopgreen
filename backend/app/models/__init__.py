@@ -3,6 +3,7 @@ Modelos de base de datos - TopGreen Marketplace
 Importar todos los modelos aquí para que Alembic los detecte
 """
 from app.models.user import User, UserRole
+from app.models.email_verification import EmailVerificationToken
 from app.models.category import Category
 from app.models.subcategory import Subcategory
 from app.models.locality import Locality
@@ -20,6 +21,7 @@ from app.models.notification import Notification, NotificationType
 __all__ = [
     "User",
     "UserRole",
+    "EmailVerificationToken",
     "Category",
     "Subcategory",
     "Locality",

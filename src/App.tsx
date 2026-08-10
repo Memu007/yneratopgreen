@@ -16,6 +16,7 @@ import { AboutPage } from './components/Pages/AboutPage';
 import { ServicesPage } from './components/Pages/ServicesPage';
 import { ContactPage } from './components/Pages/ContactPage';
 import { PaymentResultPage } from './components/Pages/PaymentResultPage';
+import { VerifyEmailPage } from './components/Pages/VerifyEmailPage';
 import { useProductFilters } from './hooks/useProductFilters';
 import {
   getProducts,
@@ -32,7 +33,7 @@ import type {
 } from './utils/catalogService';
 
 type AuthModalType = 'login' | 'register' | null;
-type PageSection = 'home' | 'marketplace' | 'about' | 'services' | 'contact' | 'payment-success' | 'payment-failure' | 'payment-pending';
+type PageSection = 'home' | 'marketplace' | 'about' | 'services' | 'contact' | 'payment-success' | 'payment-failure' | 'payment-pending' | 'verificar-correo';
 
 function App() {
   const { user } = useAuth();
@@ -77,6 +78,8 @@ function App() {
   const [currentSection, setCurrentSection] = useState<PageSection>(() => {
     // Detectar rutas de pago desde URL al cargar
     const path = window.location.pathname;
+    // El enlace del correo de confirmación entra por acá.
+    if (path === '/verificar-correo') return 'verificar-correo';
     if (path === '/payment/success') return 'payment-success';
     if (path === '/payment/failure') return 'payment-failure';
     if (path === '/payment/pending') return 'payment-pending';
@@ -245,6 +248,16 @@ function App() {
           onPublishClick={() => setIsAddProductOpen(true)}
           onLoginClick={() => setAuthModal('login')}
         />;
+      case 'verificar-correo':
+        return (
+          <VerifyEmailPage
+            onGoToLogin={() => {
+              handleNavigate('home');
+              setAuthModal('login');
+            }}
+            onGoHome={() => handleNavigate('home')}
+          />
+        );
       case 'marketplace':
         return (
           <main className={styles.mainContent}>

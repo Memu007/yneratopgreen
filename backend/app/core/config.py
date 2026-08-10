@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:5174", "http://localhost", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]
     
+    # Correo saliente. "outbox" escribe el mensaje en una carpeta local y es lo
+    # que usan desarrollo y la suite; "smtp" es el productivo.
+    EMAIL_TRANSPORT: str = "outbox"
+    EMAIL_FROM: str = "TopGreen <no-responder@topgreen.local>"
+    EMAIL_OUTBOX_DIR: str = "outbox"
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_TLS: bool = True
+
     # Uploads - Almacenamiento de archivos
     UPLOAD_DIR: str = "/data/uploads"
     PUBLIC_UPLOAD_BASE: str = "/uploads"
@@ -75,10 +86,10 @@ class Settings(BaseSettings):
     # URLs Frontend (para callbacks de pago)
     FRONTEND_URL: str = "http://localhost:5173"
     
-    @field_validator("UPLOAD_DIR")
+    @field_validator("UPLOAD_DIR", "EMAIL_OUTBOX_DIR")
     @classmethod
-    def _resolver_directorio_de_subidas(cls, valor: str) -> str:
-        """Un UPLOAD_DIR relativo se resuelve contra backend/, no contra el
+    def _resolver_carpeta(cls, valor: str) -> str:
+        """Una carpeta relativa se resuelve contra backend/, no contra el
         directorio de trabajo. Así `UPLOAD_DIR=uploads` es siempre
         backend/uploads, y una instalación nativa no necesita permisos sobre
         /data. Docker sigue pasando la ruta absoluta /data/uploads."""

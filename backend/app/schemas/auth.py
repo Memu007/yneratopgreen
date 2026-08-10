@@ -143,3 +143,27 @@ class ChangePasswordRequest(BaseModel):
     """Request para cambiar contraseña"""
     current_password: str
     new_password: str = Field(..., min_length=6, max_length=100)
+
+
+# === VERIFICACIÓN DE CORREO === #
+
+class RegistroPendienteResponse(BaseModel):
+    """Respuesta del alta. No lleva tokens: la cuenta no tiene sesión hasta
+    que se confirma el correo."""
+    email: EmailStr
+    verification_required: bool = True
+    message: str
+
+
+class VerificarCorreoRequest(BaseModel):
+    """El token viaja en el cuerpo y no en la URL de la API: así no queda en
+    los registros de acceso del servidor ni en el encabezado Referer."""
+    token: str = Field(..., min_length=16, max_length=512)
+
+
+class ReenviarVerificacionRequest(BaseModel):
+    email: EmailStr
+
+
+class MensajeResponse(BaseModel):
+    message: str

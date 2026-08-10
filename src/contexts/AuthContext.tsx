@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, AuthContextType, RegisterData } from '../types';
+import { User, AuthContextType, RegisterData, RegistroPendiente } from '../types';
 import { apiGet, apiPost, apiPatch, tokenStorage } from '../utils/api';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -162,7 +162,7 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
         throw new Error('Todos los campos son requeridos');
       }
 
-      const response = await apiPost<AuthResponse>('/auth/register', {
+      const response = await apiPost<RegistroPendiente>('/auth/register', {
         email: userData.email,
         password: userData.password,
         full_name: userData.name,
@@ -176,18 +176,30 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
         carrier_capacity: userData.carrierCapacity,
       });
 
-      // Guardar tokens en localStorage
-      if (response.access_token) {
-        tokenStorage.setTokens(response.access_token, response.refresh_token);
-      }
-
-      setUser(mapBackendUserToFrontend(response.user));
+      // El alta no abre sesión: no hay tokens que guardar ni usuario que
+      // poner en el contexto hasta que se confirme el correo.
+      return response;
     } catch (error) {
       if (error instanceof Error) {
         throw error;
       }
       throw new Error('Error al registrar usuario');
     }
+  };
+
+  const reenviarVerificacion = async (email: string): Promise<string> => {
+    const respuesta = await apiPost<{ message: string }>(
+      '/auth/resend-verification',
+      { email },
+    );
+    return respuesta.message;
+  };
+
+  const verificarCorreo = async (token: string): Promise<string> => {
+    const respuesta = await apiPost<{ message: string }>('/auth/verify-email', {
+      token,
+    });
+    return respuesta.message;
   };
 
   const logout = async () => {
@@ -231,6 +243,8 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
     isAuthenticated: !!user,
     login,
     register,
+    reenviarVerificacion,
+    verificarCorreo,
     logout,
     updateProfile,
   };

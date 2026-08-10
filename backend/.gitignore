@@ -33,3 +33,7 @@ alembic/versions/*.pyc
 # Imágenes subidas en una instalación nativa (UPLOAD_DIR=uploads).
 # Con Docker viven en el volumen uploads_data, fuera del repositorio.
 uploads/
+
+# Correos del transporte outbox. Llevan enlaces de verificación con su token:
+# no se versionan ni se publican.
+outbox/

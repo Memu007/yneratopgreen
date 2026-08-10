@@ -84,7 +84,19 @@ def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuario inactivo",
         )
-    
+
+    # Sin correo confirmado no se accede a nada protegido, aunque el token sea
+    # válido y esté vigente. Es el cierre que impide que un token emitido antes
+    # de confirmar siga sirviendo.
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Tu cuenta todavía no está confirmada. Buscá el correo que te "
+                "enviamos o pedí un enlace nuevo."
+            ),
+        )
+
     return user
 
 
@@ -163,7 +175,13 @@ def get_current_user_optional(
         if not user_id:
             return None
         
-        user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+        # También acá: una cuenta sin confirmar es, para el resto del sistema,
+        # como no estar autenticado.
+        user = db.query(User).filter(
+            User.id == user_id,
+            User.is_active == True,
+            User.is_verified == True,
+        ).first()
         return user
     except:
         return None

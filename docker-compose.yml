@@ -41,6 +41,9 @@ services:
       - ./backend/app:/app/app  # Hot reload en desarrollo
       - ./backend/alembic:/app/alembic
       - uploads_data:/data/uploads
+      # El outbox de correo se comparte con el host para que la suite lea
+      # el enlace de confirmacion sin ningun endpoint de prueba.
+      - ./backend/outbox:/app/outbox
     depends_on:
       db:
         condition: service_healthy

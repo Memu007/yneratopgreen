@@ -36,6 +36,7 @@ const ESPERADAS = [
   'contact',
   'about (foto blanca)',
   'about (foto negra)',
+  'verificación de correo',
   'catálogo',
   'catálogo (hover)',
   'detalle',
@@ -356,6 +357,15 @@ for (const medida of MEDIDAS) {
       await revisar(page, `${medida.n} ${titulo}`, marca);
     }
     await extremosDeFoto(page, `${medida.n} about`, 'Quienes Somos', equipo);
+
+    // La vista del enlace de confirmación, en su estado de rechazo: es el que
+    // trae el texto de error y el formulario de reenvío. El de éxito consume
+    // un token y no se puede repetir en cada corrida.
+    await page.goto(`${WEB}/verificar-correo?token=enlace-invalido-de-contraste`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await revisar(page, `${medida.n} verificación de correo`,
+      page.getByRole('button', { name: 'Reenviar el enlace' }));
 
     await page.goto(`${WEB}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await revisar(page, `${medida.n} catálogo`, page.locator('#catalog-category'));

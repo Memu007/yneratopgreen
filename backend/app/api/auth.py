@@ -13,7 +13,11 @@ from app.schemas.auth import (
     UserResponse,
     AuthResponse,
     UserUpdateRequest,
-    ChangePasswordRequest
+    ChangePasswordRequest,
+    RegistroPendienteResponse,
+    VerificarCorreoRequest,
+    ReenviarVerificacionRequest,
+    MensajeResponse,
 )
 from app.core.security import (
     hash_password,
@@ -28,24 +32,44 @@ from app.core.config import settings
 from app.api.notifications import notify_welcome
 from app.models.order import Order
 from app.models.locality import Locality
+from app.services.correo import ErrorDeCorreo
+from app.services import verificacion
+from app.services.verificacion import ResultadoDeVerificacion
 
 
 router = APIRouter(prefix="/auth", tags=["autenticación"])
 
+# Un mismo texto para toda respuesta de reenvío. Si dijéramos «esa cuenta no
+# existe» o «ya está verificada», cualquiera podría averiguar qué correos están
+# registrados probando de a uno.
+RESPUESTA_GENERICA_DE_REENVIO = (
+    "Si el correo corresponde a una cuenta sin confirmar, te enviamos un enlace "
+    "nuevo. Revisá tu casilla."
+)
 
-@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+MOTIVO_PENDIENTE = (
+    "Tu cuenta todavía no está confirmada. Buscá el correo que te enviamos o "
+    "pedí un enlace nuevo."
+)
+
+
+@router.post(
+    "/register",
+    response_model=RegistroPendienteResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def register_user(
     user_data: UserRegisterRequest,
-    response: Response,
     db: Session = Depends(get_db)
 ):
     """
     Registrar nuevo usuario
-    
+
     - Verifica que el email no esté en uso
     - Hashea la contraseña
-    - Crea el usuario en la DB
-    - Retorna tokens JWT en cookies HttpOnly
+    - Crea el usuario SIN verificar
+    - Manda el enlace de confirmación y NO devuelve sesión: ni tokens ni
+      cookies. La cuenta no sirve hasta confirmar el correo.
     """
     # Verificar si el email ya existe
     existing_user = db.query(User).filter(User.email == user_data.email).first()
@@ -95,44 +119,38 @@ def register_user(
     )
     
     db.add(new_user)
+    db.flush()
+
+    # El alta y el envío van juntos: si el correo no sale, no queda una cuenta
+    # a la que nadie pueda entrar nunca.
+    try:
+        verificacion.emitir_y_enviar(db, new_user)
+    except ErrorDeCorreo as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "No pudimos enviarte el correo de confirmación, así que no "
+                "creamos la cuenta. Probá de nuevo en un rato."
+            ),
+        ) from error
+
     db.commit()
     db.refresh(new_user)
-    
-    # Crear tokens
-    access_token = create_access_token(data={"sub": new_user.id})
-    refresh_token = create_refresh_token(data={"sub": new_user.id})
-    
-    # Setear cookies HttpOnly
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        max_age=settings.ACCESS_TOKEN_MINUTES * 60,
-        samesite="none",
-        secure=True
-    )
-    
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        max_age=settings.REFRESH_TOKEN_DAYS * 24 * 60 * 60,
-        samesite="none",
-        secure=True
-    )
-    
+
     # Enviar notificación de bienvenida
     try:
         notify_welcome(db, new_user.id, new_user.full_name)
     except Exception as e:
         # No fallar si la notificación falla
         pass
-    
-    return AuthResponse(
-        user=UserResponse.model_validate(new_user),
-        access_token=access_token,
-        refresh_token=refresh_token,
-        message="Usuario registrado exitosamente"
+
+    return RegistroPendienteResponse(
+        email=new_user.email,
+        message=(
+            f"Te mandamos un correo a {new_user.email}. Confirmalo para poder "
+            "ingresar; el enlace vence en 24 horas."
+        ),
     )
 
 
@@ -171,7 +189,16 @@ def login_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuario inactivo. Contacte al administrador."
         )
-    
+
+    # Sin correo confirmado no hay sesión. El motivo es explícito a propósito:
+    # acá ya se probó la contraseña, así que decirlo no revela nada que quien
+    # pregunta no sepa, y sin el motivo real la persona no sabe qué hacer.
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=MOTIVO_PENDIENTE,
+        )
+
     # Actualizar last_login
     user.last_login = datetime.utcnow()
     db.commit()
@@ -218,6 +245,74 @@ def login_user(
         refresh_token=refresh_token,
         message="Inicio de sesión exitoso"
     )
+
+
+@router.post("/verify-email", response_model=MensajeResponse)
+def verify_email(
+    datos: VerificarCorreoRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Confirmar el correo con el token del enlace.
+
+    No devuelve sesión: confirma y la persona entra por el login normal.
+    """
+    resultado, usuario = verificacion.consumir(db, datos.token)
+
+    if resultado == ResultadoDeVerificacion.OK:
+        db.commit()
+        return MensajeResponse(
+            message=f"Listo, {usuario.full_name}. Ya podés iniciar sesión."
+        )
+
+    db.rollback()
+
+    motivos = {
+        ResultadoDeVerificacion.VENCIDO: (
+            "El enlace venció. Pedí uno nuevo desde el ingreso."
+        ),
+        ResultadoDeVerificacion.YA_USADO: (
+            "Este enlace ya se usó. Si todavía no podés entrar, pedí uno nuevo."
+        ),
+        ResultadoDeVerificacion.INVALIDO: (
+            "El enlace no es válido. Pedí uno nuevo desde el ingreso."
+        ),
+    }
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=motivos[resultado],
+    )
+
+
+@router.post("/resend-verification", response_model=MensajeResponse)
+def resend_verification(
+    datos: ReenviarVerificacionRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Reenviar el enlace de confirmación.
+
+    Responde lo mismo exista o no la cuenta, esté o no verificada: si el texto
+    cambiara, esto sería un buscador de correos registrados.
+    """
+    usuario = db.query(User).filter(User.email == datos.email).first()
+
+    if usuario is None or usuario.is_verified or not usuario.is_active:
+        return MensajeResponse(message=RESPUESTA_GENERICA_DE_REENVIO)
+
+    try:
+        # Invalida los pendientes y emite uno solo. No crea otra cuenta ni
+        # duplica la que ya está.
+        verificacion.emitir_y_enviar(db, usuario)
+    except ErrorDeCorreo:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No pudimos enviar el correo. Probá de nuevo en un rato.",
+        )
+
+    db.commit()
+    return MensajeResponse(message=RESPUESTA_GENERICA_DE_REENVIO)
 
 
 @router.post("/logout")
@@ -277,7 +372,15 @@ def refresh_access_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario no válido"
         )
-    
+
+    # Un refresh token emitido antes de esta pieza no puede servir para saltear
+    # la confirmación.
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=MOTIVO_PENDIENTE,
+        )
+
     # Crear nuevos tokens
     access_token = create_access_token(data={"sub": user.id})
     new_refresh_token = create_refresh_token(data={"sub": user.id})

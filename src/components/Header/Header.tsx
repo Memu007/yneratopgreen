@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { CartButton } from '../Cart/CartModal';
 import { UserDashboard } from '../UserDashboard/UserDashboard';
 
-type PageSection = 'home' | 'marketplace' | 'about' | 'services' | 'contact' | 'payment-success' | 'payment-failure' | 'payment-pending';
+type PageSection = 'home' | 'marketplace' | 'about' | 'services' | 'contact' | 'payment-success' | 'payment-failure' | 'payment-pending' | 'verificar-correo';
 
 interface HeaderProps {
   searchQuery: string;

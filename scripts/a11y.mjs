@@ -40,6 +40,8 @@ const ESPERADAS = [
   'inicio',
   'ingreso',
   'registro',
+  'registro: correo pendiente',
+  'verificación de correo',
   'quienes somos',
   'servicios',
   'contacto',
@@ -144,9 +146,31 @@ async function publicas(page, medida) {
   await revisar(page, 'registro', medida,
     page.getByRole('heading', { name: 'Crear Cuenta' }));
 
+  // El aviso de "revisá tu correo" es una pantalla propia, no un estado
+  // decorativo: se llega dando de alta una cuenta de verdad. El correo lleva
+  // la medida para que las dos corridas no choquen entre sí.
+  const correoDePrueba = `a11y.${medida.nombre}.${Date.now()}@example.com`;
+  await page.locator('input[name="name"]').fill('Accesibilidad Pendiente');
+  await page.locator('input[name="email"]').fill(correoDePrueba);
+  await page.locator('input[name="password"]').fill('a11y123456');
+  await page.locator('form input[type="password"]').nth(1).fill('a11y123456');
+  await page.getByRole('button', { name: 'Crear cuenta' }).click();
+  await revisar(page, 'registro: correo pendiente', medida,
+    page.getByRole('button', { name: 'Reenviar el correo' }));
+
   // los modales de autenticación no cierran con Escape: se cierra con el botón
   await page.getByRole('button', { name: 'Cerrar' }).first().click();
   await page.getByRole('heading', { name: 'Crear Cuenta' }).waitFor({ state: 'hidden', timeout: ESPERA });
+
+  // La vista del enlace, en su estado de rechazo, que es el que trae además el
+  // formulario de reenvío. El estado de éxito consume un token y no puede
+  // repetirse en cada corrida.
+  await page.goto(`${WEB}/verificar-correo?token=enlace-invalido-de-accesibilidad`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await revisar(page, 'verificación de correo', medida,
+    page.getByRole('button', { name: 'Reenviar el enlace' }));
+  await page.goto(WEB, { waitUntil: 'domcontentloaded' });
 
   // las otras tres públicas están a un clic del encabezado y el barrido de
   // contraste ya las cubre; sin ellas las dos puertas medirían distinto

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import styles from './AuthModal.module.css';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Toast/Toast';
-import { RegisterData } from '../../types';
+import { RegisterData, RegistroPendiente } from '../../types';
 import {
   getLocalities,
   getProvinces,
@@ -19,7 +19,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   onClose, 
   onSwitchToLogin 
 }) => {
-  const { register } = useAuth();
+  const { register, reenviarVerificacion } = useAuth();
   const { showToast } = useToast();
   const [formData, setFormData] = useState<RegisterData>({
     email: '',
@@ -41,6 +41,10 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // Mientras haya un registro pendiente, el formulario deja lugar al aviso de
+  // "revisá tu correo": el alta ya no inicia sesión.
+  const [pendiente, setPendiente] = useState<RegistroPendiente | null>(null);
+  const [avisoDeReenvio, setAvisoDeReenvio] = useState('');
 
   useEffect(() => {
     if (formData.isCarrier && provinces.length === 0) {
@@ -77,16 +81,30 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     setIsLoading(true);
 
     try {
-      await register(formData);
-      showToast(`¡Bienvenido/a ${formData.name}! Tu cuenta fue creada exitosamente.`, 'success');
-      onClose();
+      const respuesta = await register(formData);
+      setPendiente(respuesta);
+      showToast(`Te mandamos un correo a ${respuesta.email}.`, 'success');
     } catch (err: unknown) {
+      // El motivo real sube tal cual. Antes cualquier fallo se convertía en
+      // "Error al crear la cuenta", y ahora el alta puede fallar porque el
+      // correo no salió, que es algo distinto y se resuelve reintentando.
       const errorMessage = err instanceof Error ? err.message : '';
-      if (errorMessage.includes('ya está registrado') || errorMessage.includes('email')) {
-        setError('Este email ya está registrado. Si olvidaste tu contraseña, podés recuperarla desde "Iniciar sesión".');
-      } else {
-        setError('Error al crear la cuenta. Intenta nuevamente.');
-      }
+      setError(errorMessage || 'Error al crear la cuenta. Intenta nuevamente.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReenviar = async () => {
+    if (!pendiente) return;
+    setAvisoDeReenvio('');
+    setIsLoading(true);
+    try {
+      setAvisoDeReenvio(await reenviarVerificacion(pendiente.email));
+    } catch (err: unknown) {
+      setAvisoDeReenvio(
+        err instanceof Error ? err.message : 'No se pudo reenviar el correo.',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -115,6 +133,33 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           </button>
         </div>
 
+        {pendiente ? (
+          <div className={styles.form}>
+            <div className={styles.success} role="status">
+              {pendiente.message}
+            </div>
+            <p className={styles.helpText}>
+              Sin confirmar el correo no vas a poder ingresar. Si no te llega,
+              revisá el correo no deseado o pedí otro enlace.
+            </p>
+            {avisoDeReenvio && (
+              <div className={styles.success} role="status">
+                {avisoDeReenvio}
+              </div>
+            )}
+            <button
+              type="button"
+              className={styles.submitButton}
+              onClick={handleReenviar}
+              disabled={isLoading}
+            >
+              {isLoading ? 'Reenviando...' : 'Reenviar el correo'}
+            </button>
+            <button type="button" className={styles.switchLink} onClick={onSwitchToLogin}>
+              Ir a iniciar sesión
+            </button>
+          </div>
+        ) : (
         <form className={styles.form} onSubmit={handleSubmit}>
           {error && <div className={styles.error}>{error}</div>}
 
@@ -325,13 +370,16 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
             {isLoading ? 'Creando cuenta...' : 'Crear cuenta'}
           </button>
         </form>
+        )}
 
+        {!pendiente && (
         <div className={styles.switchText}>
           ¿Ya tienes cuenta?{' '}
           <button type="button" className={styles.switchLink} onClick={onSwitchToLogin}>
             Inicia sesión aquí
           </button>
         </div>
+        )}
       </div>
     </div>
   );
