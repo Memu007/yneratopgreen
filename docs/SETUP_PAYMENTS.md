@@ -123,7 +123,7 @@ Plantillas vacías:
 > - `MP_ACCESS_TOKEN`, `MP_CLIENT_SECRET` y `MP_PUBLIC_KEY` (panel Mercado Pago).
 > - `NGROK_AUTHTOKEN` (dashboard de ngrok).
 > - Password de SQL Server (`DB_PASSWORD` en `.env`).
-> - `JWT_SECRET` y `ADMIN_PASSWORD` del backend.
+> - `JWT_SECRET` y las credenciales `SMTP_*` del backend.
 >
 > Hasta que esa rotación ocurra, los secretos viejos siguen siendo válidos
 > aunque ya no figuren en el árbol de archivos.

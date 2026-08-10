@@ -33,19 +33,58 @@ API_PREFIX=/api
 CORS_ORIGINS=["https://${{Frontend.RAILWAY_PUBLIC_DOMAIN}}"]
 FRONTEND_URL=https://${{Frontend.RAILWAY_PUBLIC_DOMAIN}}
 UPLOAD_DIR=/data/uploads
-PUBLIC_UPLOAD_BASE=https://${{Backend.RAILWAY_PUBLIC_DOMAIN}}/uploads
+PUBLIC_UPLOAD_BASE=/uploads
 STORAGE_BACKEND=local
-ADMIN_EMAIL=admin@topgreen.com
-ADMIN_PASSWORD=CAMBIAR_ANTES_DEL_PRIMER_DEPLOY
-ADMIN_NAME=Administrador TopGreen
+EMAIL_TRANSPORT=outbox
+EMAIL_OUTBOX_DIR=/data/outbox
+EMAIL_FROM=TopGreen <no-responder@topgreen.local>
 ```
+
+Tres advertencias sobre esa lista.
+
+**`PUBLIC_UPLOAD_BASE` va relativo, no como URL completa.** Es el prefijo que
+se guarda en la base junto a cada imagen. Si fuera
+`https://<backend>/uploads`, el panel de administración compondría
+`https://<backend>https://<backend>/uploads/...` y mostraría las imágenes
+rotas: ese lugar concatena `VITE_IMAGES_URL` sin comprobar si la URL ya es
+absoluta. Con el valor relativo, el frontend arma la URL completa y las tres
+pantallas que muestran imágenes coinciden.
+
+**`FRONTEND_URL` arma el enlace de confirmación de correo.** Si apunta al
+dominio equivocado, el enlace que recibe la gente no lleva a ninguna parte.
+
+**El correo sale por `outbox`, que no envía nada.** Escribe cada mensaje como
+un `.eml` dentro del volumen. Sirve para un ensayo con datos de demostración,
+donde el enlace se lee del archivo. **Para producción con gente real hay que
+poner `EMAIL_TRANSPORT=smtp`** y sus credenciales —`SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USER`, `SMTP_PASSWORD`, `SMTP_TLS`—, que son secretos y van en el
+entorno del servicio, nunca en el repositorio. Ver
+`backend/.env.production.example`.
+
+`Settings` **rechaza toda clave que no declara** cuando la lee de un archivo.
+Las variables de Railway llegan por entorno, así que una clave de más no
+tumba el arranque, pero tampoco hace nada: no agregues `ADMIN_EMAIL`,
+`ADMIN_PASSWORD` ni `ADMIN_NAME`, que ya no existen. Las credenciales del
+administrador del seed son `admin@topgreen.com` / `admin123` y están escritas
+en `backend/app/seed.py`.
 
 El entrypoint acepta tanto `postgresql://` como `postgres://` de Railway y los
 adapta al driver `psycopg` instalado. Antes de cada despliegue Railway ejecuta
 `alembic upgrade head`; el seed no se ejecuta automáticamente.
 
-Para conservar publicaciones y comprobantes entre despliegues, agregá un
-volumen al servicio `Backend` montado en `/data`.
+Para conservar publicaciones, comprobantes y la carpeta de correo entre
+despliegues, agregá un volumen al servicio `Backend` montado en `/data`. Sin
+ese volumen, cada despliegue empieza con `/data` vacío: se pierden las
+imágenes subidas y los mensajes del outbox.
+
+El seed no corre solo. Para cargar el catálogo de demostración, una vez y
+desde la consola del servicio `Backend`:
+
+```bash
+python -m app.seed
+```
+
+Es idempotente: repetirlo no duplica nada.
 
 ## 3. Frontend
 
@@ -75,6 +114,17 @@ GET https://<frontend>/health     -> ok
 GET https://<frontend>/           -> aplicación React
 ```
 
-Revisá además que una recarga directa del frontend no devuelva `404`, que el
-catálogo cargue y que una imagen subida siga disponible después de redesplegar
-el backend.
+Revisá además:
+
+- que una ruta directa del frontend no devuelva `404` —probá
+  `https://<frontend>/verificar-correo`, que es la del enlace de correo—;
+- que el catálogo cargue y las imágenes se vean, **incluidas las del panel de
+  administración**;
+- que una imagen subida siga disponible después de redesplegar el backend;
+- que un registro deje su `.eml` en `/data/outbox` y que el enlace de ese
+  archivo confirme la cuenta;
+- que la base conserve usuarios y catálogo entre despliegues.
+
+El healthcheck de Railway se usa **al desplegar**, para decidir si la versión
+nueva reemplaza a la anterior. No es monitoreo continuo: no avisa si el
+servicio se cae más tarde.

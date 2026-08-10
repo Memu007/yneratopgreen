@@ -140,7 +140,7 @@ Ver pasos exactos en [README_LOCAL_SETUP.md](README_LOCAL_SETUP.md) y
 
 ## Recordatorios para el nuevo equipo
 
-1. **Antes de producción**: rotar `JWT_SECRET`, `ADMIN_PASSWORD`, `DB_PASSWORD` y todos los secretos de Mercado Pago. Ver [docs/SETUP_PAYMENTS.md § 6](docs/SETUP_PAYMENTS.md).
+1. **Antes de producción**: rotar `JWT_SECRET`, `DB_PASSWORD`, las credenciales SMTP y todos los secretos de Mercado Pago. Ver [docs/SETUP_PAYMENTS.md § 6](docs/SETUP_PAYMENTS.md). La contraseña del administrador del seed no es una variable: está escrita en `backend/app/seed.py` y hay que cambiarla desde la aplicación.
 2. **Mercado Pago**: la integración está **desvinculada**. El nuevo equipo debe crear su propia app marketplace y reactivar. Ver [docs/SETUP_PAYMENTS.md](docs/SETUP_PAYMENTS.md).
 3. **Storage de imágenes**: en local usa filesystem (`/data/uploads`). Para producción, configurar S3 / Cloudinary (placeholders en `backend/app/core/config.py`).
 4. **Fase II parcialmente integrada**: hay módulos (ratings, services, subcategorías) parcialmente implementados pero no completos. Ver [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) y [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
