@@ -40,11 +40,14 @@ for ($i = 1; $i -le $retries; $i++) {
 }
 if (-not $ok) { throw "topgreen-db no llegó a healthy en $($retries*2)s" }
 
-$dbName = ((Get-Content backend\.env | Where-Object { $_ -match '^DB_NAME=' } | Select-Object -Last 1) -replace '^DB_NAME=', '').Trim()
-$dbUser = ((Get-Content backend\.env | Where-Object { $_ -match '^DB_USER=' } | Select-Object -Last 1) -replace '^DB_USER=', '').Trim()
+# DB_NAME y DB_USER son del .env de la raíz, que es el que lee
+# docker-compose.yml para crear la base. En backend\.env no existen: ese
+# archivo lo lee Settings, que rechaza claves que no declara.
+$dbName = ((Get-Content .env | Where-Object { $_ -match '^DB_NAME=' } | Select-Object -Last 1) -replace '^DB_NAME=', '').Trim()
+$dbUser = ((Get-Content .env | Where-Object { $_ -match '^DB_USER=' } | Select-Object -Last 1) -replace '^DB_USER=', '').Trim()
 
 if ([string]::IsNullOrWhiteSpace($dbName) -or [string]::IsNullOrWhiteSpace($dbUser)) {
-  throw "DB_NAME y DB_USER deben estar definidos en backend/.env"
+  throw "DB_NAME y DB_USER deben estar definidos en .env"
 }
 
 if ($dbName -notmatch '^[A-Za-z0-9_]+$' -or $dbUser -notmatch '^[A-Za-z0-9_]+$') {

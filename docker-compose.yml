@@ -29,7 +29,12 @@ services:
       dockerfile: Dockerfile
     container_name: topgreen-api
     env_file:
+      # Configuración de la aplicación. Las claves de abajo la pisan, para
+      # que el contenedor no dependa de cómo quedó el .env del backend.
       - ./backend/.env
+    environment:
+      DATABASE_URL: "postgresql+psycopg://${DB_USER:?DB_USER no está definido en .env}:${DB_PASSWORD:?DB_PASSWORD no está definido en .env}@db:5432/${DB_NAME:?DB_NAME no está definido en .env}"
+      UPLOAD_DIR: /data/uploads
     ports:
       - "8000:8000"
     volumes:

@@ -48,11 +48,14 @@ if [ "$ok" != "true" ]; then
   exit 1
 fi
 
-db_name=$(sed -n 's/^DB_NAME=//p' backend/.env | tail -n 1)
-db_user=$(sed -n 's/^DB_USER=//p' backend/.env | tail -n 1)
+# DB_NAME y DB_USER son del .env de la raíz, que es el que lee
+# docker-compose.yml para crear la base. En backend/.env no existen: ese
+# archivo lo lee Settings, que rechaza claves que no declara.
+db_name=$(sed -n 's/^DB_NAME=//p' .env | tail -n 1)
+db_user=$(sed -n 's/^DB_USER=//p' .env | tail -n 1)
 
 if [ -z "$db_name" ] || [ -z "$db_user" ]; then
-  echo "ERROR: DB_NAME y DB_USER deben estar definidos en backend/.env" >&2
+  echo "ERROR: DB_NAME y DB_USER deben estar definidos en .env" >&2
   exit 1
 fi
 

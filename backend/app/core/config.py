@@ -1,10 +1,18 @@
 """
 Configuración de la aplicación usando Pydantic Settings.
-Lee variables de entorno desde .env
+Lee variables de entorno desde backend/.env
 """
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
+from pathlib import Path
 from typing import List
 import os
+
+# Raíz del backend, o sea la carpeta que contiene app/. El .env se busca
+# siempre acá y no en el directorio desde el que se ejecuta el proceso: antes
+# era una ruta relativa, así que levantar la API desde la raíz del repositorio
+# leía el .env del frontend y fallaba con claves que Settings no declara.
+DIRECTORIO_BACKEND = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
@@ -72,8 +80,20 @@ class Settings(BaseSettings):
     # URLs Frontend (para callbacks de pago)
     FRONTEND_URL: str = "http://localhost:5173"
     
+    @field_validator("UPLOAD_DIR")
+    @classmethod
+    def _resolver_directorio_de_subidas(cls, valor: str) -> str:
+        """Un UPLOAD_DIR relativo se resuelve contra backend/, no contra el
+        directorio de trabajo. Así `UPLOAD_DIR=uploads` es siempre
+        backend/uploads, y una instalación nativa no necesita permisos sobre
+        /data. Docker sigue pasando la ruta absoluta /data/uploads."""
+        ruta = Path(valor).expanduser()
+        if not ruta.is_absolute():
+            ruta = DIRECTORIO_BACKEND / ruta
+        return str(ruta)
+
     class Config:
-        env_file = ".env"
+        env_file = str(DIRECTORIO_BACKEND / ".env")
         case_sensitive = True
 
 

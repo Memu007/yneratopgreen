@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
+from pathlib import Path
 import structlog
 
 # Configurar logger
@@ -45,8 +46,21 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-# Montar directorio de uploads (para servir imágenes)
-app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+# Montar directorio de uploads (para servir imágenes).
+# StaticFiles exige que la carpeta ya exista, así que se crea antes. En una
+# instalación nativa recién clonada no hay ninguna, y el error de origen
+# —"Directory '/data/uploads' does not exist"— no decía qué había que cambiar.
+directorio_de_subidas = Path(settings.UPLOAD_DIR)
+try:
+    directorio_de_subidas.mkdir(parents=True, exist_ok=True)
+except OSError as error:
+    raise RuntimeError(
+        f"No se pudo crear UPLOAD_DIR ({directorio_de_subidas}): {error}. "
+        "En una instalación nativa poné una carpeta del proyecto, por ejemplo "
+        "UPLOAD_DIR=uploads en backend/.env."
+    ) from error
+
+app.mount("/uploads", StaticFiles(directory=str(directorio_de_subidas)), name="uploads")
 
 
 # Health check endpoint

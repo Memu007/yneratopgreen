@@ -29,3 +29,7 @@ htmlcov/
 
 # Alembic
 alembic/versions/*.pyc
+
+# Imágenes subidas en una instalación nativa (UPLOAD_DIR=uploads).
+# Con Docker viven en el volumen uploads_data, fuera del repositorio.
+uploads/
