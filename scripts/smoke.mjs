@@ -1683,9 +1683,83 @@ await runCase(28, 'Un total fuera del contrato se rechaza sin escribir nada', as
     );
     assert(contarCarrito() === itemsCarritoAntes, 'el carrito cambió de tamaño tras los rechazos');
 
-    // 6. el checkout conserva su defensa. Ya no se puede llegar por la API, asi
+    // 6. /cart/sync reemplaza el carrito entero. Dos lineas del MISMO vendedor,
+    //    cada una dentro del techo, que juntas se pasan: 60 + 60 = 120 unidades
+    //    a 9.999.999.999,99 son 1.199.999.999.998,80, por encima del maximo.
+    //    Antes esto entraba, porque sync borraba el carrito y validaba cada
+    //    linea contra una coleccion ya vacia.
+    const segundo = await apiRequest('/products', {
+      method: 'POST',
+      token: state.sellerToken,
+      body: {
+        name: `Smoke tope monetario B ${Date.now()}`,
+        description: 'Segunda publicación del mismo vendedor, para el total agregado.',
+        category_id: categoria[0],
+        price: 9999999999.99,
+        stock: 200,
+        unit: 'unidad',
+        locality_id: state.location.localityId,
+        publication_type: 'producto',
+      },
+    });
+    const segundoId = segundo.data.id;
+    try {
+      const filasAntes = queryRows(`
+        SELECT ci.product_id, ci.quantity
+        FROM cart_items ci JOIN carts c ON c.id = ci.cart_id
+        WHERE c.user_id = ${sqlLiteral(state.buyerId)}
+        ORDER BY ci.product_id
+      `);
+      const alSincronizar = await expectApiError(400, () =>
+        apiRequest('/cart/sync', {
+          method: 'POST',
+          token: state.buyerToken,
+          body: {
+            items: [
+              { product_id: topeId, quantity: 60 },
+              { product_id: segundoId, quantity: 60 },
+            ],
+          },
+        }),
+      );
+      assert(/supera el máximo admitido/i.test(alSincronizar), `sync: motivo inesperado: ${alSincronizar}`);
+      assert(/999\.999\.999\.999,99/.test(alSincronizar), `sync: falta el techo: ${alSincronizar}`);
+      const filasDespues = queryRows(`
+        SELECT ci.product_id, ci.quantity
+        FROM cart_items ci JOIN carts c ON c.id = ci.cart_id
+        WHERE c.user_id = ${sqlLiteral(state.buyerId)}
+        ORDER BY ci.product_id
+      `);
+      assert(
+        JSON.stringify(filasDespues) === JSON.stringify(filasAntes),
+        `sync rechazado igual cambió el carrito: ${JSON.stringify(filasAntes)} → ${JSON.stringify(filasDespues)}`,
+      );
+
+      // y cada linea por separado si entra, para que el rechazo anterior sea
+      // por el total agregado y no por la linea
+      const valido = await apiRequest('/cart/sync', {
+        method: 'POST',
+        token: state.buyerToken,
+        body: { items: [{ product_id: topeId, quantity: 60 }] },
+      });
+      assert(valido.data.total_items === 1, 'el sync válido no dejó una sola línea');
+    } finally {
+      await apiRequest(`/products/${segundoId}`, { method: 'DELETE', token: state.sellerToken });
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+      await apiRequest('/cart/items', {
+        method: 'POST',
+        token: state.buyerToken,
+        body: { product_id: topeId, quantity: 1 },
+      });
+    }
+
+    // 7. el checkout conserva su defensa. Ya no se puede llegar por la API, asi
     //    que el estado imposible se fuerza por SQL: es el unico camino que queda.
-    querySql(`UPDATE cart_items SET quantity = 200 WHERE id = ${sqlLiteral(itemId)}`);
+    // por producto y comprador, no por el id de la fila: el paso 6 reemplaza
+    // el carrito entero y aquel id ya no existe
+    querySql(`UPDATE cart_items ci SET quantity = 200 FROM carts c
+      WHERE c.id = ci.cart_id AND c.user_id = ${sqlLiteral(state.buyerId)}
+        AND ci.product_id = ${sqlLiteral(topeId)}`);
     const alCerrar = await expectApiError(400, () =>
       apiRequest('/orders/checkout/transfer', {
         method: 'POST',
@@ -1707,6 +1781,7 @@ await runCase(28, 'Un total fuera del contrato se rechaza sin escribir nada', as
     assert(itemsDespues === itemsAntes, `se escribieron ${itemsDespues - itemsAntes} ítems`);
     return 'publicar y editar a $99.999.999.999,99 HTTP 400 con precio intacto; '
       + 'carrito POST/PUT/PATCH HTTP 400 con el techo en el mensaje y sin cambiar el carrito; '
+      + 'sync con dos lineas del mismo vendedor HTTP 400 sin tocar el carrito previo; '
       + `checkout HTTP 400; órdenes ${ordenesAntes}→${ordenesDespues} sin escritura parcial`;
   } finally {
     await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });

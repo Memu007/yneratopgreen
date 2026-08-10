@@ -40,14 +40,19 @@ def get_or_create_cart(db: Session, user_id: str) -> Cart:
     return cart
 
 
-def validar_total_prospectivo(cart: Cart, producto, cantidad_final: int) -> None:
-    """Total que tendria el vendedor del producto si el item quedara en
+def validar_total_prospectivo(cart: Cart, producto, cantidad_final: int,
+                              fila_reemplazada=None) -> None:
+    """Total que tendria el vendedor del producto si la fila quedara en
     `cantidad_final`.
 
     Se calcula ANTES de tocar el modelo y antes del commit: si no entra en el
     contrato monetario se responde 400 y el carrito queda exactamente como
     estaba. Sin esto, el carrito aceptaba guardar un estado que el checkout
     despues rechazaba.
+
+    `fila_reemplazada` es la fila concreta cuya cantidad se esta cambiando; se
+    omite por identidad y no por product_id, porque un carrito heredado puede
+    tener dos filas del mismo producto y las otras siguen sumando.
     """
     unitario = Decimal(str(producto.price))
     linea = unitario * cantidad_final
@@ -55,8 +60,10 @@ def validar_total_prospectivo(cart: Cart, producto, cantidad_final: int) -> None
 
     total = linea
     for otro in cart.items:
-        if otro.product_id == producto.id:
-            continue  # ya contado con la cantidad nueva
+        if fila_reemplazada is not None and otro is fila_reemplazada:
+            continue  # ya contada con la cantidad nueva
+        if fila_reemplazada is None and otro.product_id == producto.id:
+            continue  # alta de un producto que ya estaba: idem
         if otro.product is None or otro.product.seller_id != producto.seller_id:
             continue  # cada vendedor es una orden distinta
         total += Decimal(str(otro.product.price)) * otro.quantity
@@ -148,7 +155,7 @@ def add_to_cart(
                 status_code=400,
                 detail=f"Stock insuficiente. Disponible: {product.stock}"
             )
-        validar_total_prospectivo(cart, product, new_quantity)
+        validar_total_prospectivo(cart, product, new_quantity, existing_item)
         existing_item.quantity = new_quantity
         existing_item.unit_price_snapshot = product.price
         db.commit()
@@ -212,7 +219,8 @@ def update_cart_item_by_product(
             detail=f"Stock insuficiente. Disponible: {cart_item.product.stock}"
         )
     
-    validar_total_prospectivo(cart_item.cart, cart_item.product, item_data.quantity)
+    validar_total_prospectivo(cart_item.cart, cart_item.product,
+                              item_data.quantity, cart_item)
     cart_item.quantity = item_data.quantity
     db.commit()
     db.refresh(cart_item)
@@ -259,7 +267,8 @@ def update_cart_item(
             detail=f"Stock insuficiente. Disponible: {cart_item.product.stock}"
         )
     
-    validar_total_prospectivo(cart_item.cart, cart_item.product, item_data.quantity)
+    validar_total_prospectivo(cart_item.cart, cart_item.product,
+                              item_data.quantity, cart_item)
     cart_item.quantity = item_data.quantity
     db.commit()
     db.refresh(cart_item)
@@ -340,45 +349,72 @@ def sync_cart(
 ):
     """
     Sincronizar carrito local con el backend.
-    
+
     Reemplaza completamente el carrito del backend con los items proporcionados.
     Útil cuando el frontend maneja el carrito en localStorage y necesita
     sincronizarlo antes del checkout.
     """
     # Obtener o crear carrito
     cart = get_or_create_cart(db, current_user.id)
-    
-    # Limpiar items existentes
-    db.query(CartItem).filter(CartItem.cart_id == cart.id).delete()
-    
-    # Agregar nuevos items
-    items_response = []
-    total_amount = 0.0
-    
+
+    # === PRIMERA PASADA: resolver y validar SIN ESCRIBIR ================== #
+    # El carrito viejo no se toca hasta que el reemplazo entero esté validado.
+    # Antes se borraba primero y se validaba linea por linea contra un carrito
+    # ya vacio, asi que dos lineas del mismo vendedor que juntas se pasaban del
+    # techo entraban igual.
+    efectivos: dict = {}   # product_id -> {"producto", "cantidad"}
+    orden: list = []       # conserva el orden de llegada del payload
+
     for item_data in sync_data.items:
         # Verificar que el producto exista y esté activo
         product = db.query(Product).filter(
             Product.id == item_data.product_id,
             Product.status == ProductStatus.ACTIVE
         ).first()
-        
+
         if not product:
             continue  # Saltear productos no encontrados
-        
-        # Verificar si es servicio (los servicios no tienen límite de stock)
-        is_service = product.category.is_service if product.category else False
-        
-        # Ajustar cantidad al stock disponible (solo para productos, no servicios)
-        if is_service:
-            quantity = item_data.quantity
+
+        # Un mismo product_id repetido se normaliza a UNA sola linea sumando
+        # cantidades: dos filas del mismo producto dejarian el calculo ambiguo.
+        if product.id in efectivos:
+            efectivos[product.id]["cantidad"] += item_data.quantity
         else:
-            quantity = min(item_data.quantity, product.stock)
-            if quantity <= 0:
-                continue
-        
-        # Crear item de carrito
-        # el sync tambien puede armar un total imposible
-        validar_total_prospectivo(cart, product, quantity)
+            efectivos[product.id] = {"producto": product, "cantidad": item_data.quantity}
+            orden.append(product.id)
+
+    # La regla de stock se aplica sobre la cantidad YA acumulada.
+    for product_id in list(orden):
+        entrada = efectivos[product_id]
+        product = entrada["producto"]
+        is_service = product.category.is_service if product.category else False
+        if not is_service:
+            entrada["cantidad"] = min(entrada["cantidad"], product.stock or 0)
+            if entrada["cantidad"] <= 0:
+                del efectivos[product_id]
+                orden.remove(product_id)
+
+    # Contrato monetario: cada linea y el TOTAL AGREGADO de cada vendedor.
+    por_vendedor: dict = {}
+    for product_id in orden:
+        product = efectivos[product_id]["producto"]
+        cantidad = efectivos[product_id]["cantidad"]
+        linea = Decimal(str(product.price)) * cantidad
+        validar_total(linea, f"El importe de «{product.name}»")
+        por_vendedor[product.seller_id] = por_vendedor.get(product.seller_id, Decimal(0)) + linea
+    for total_vendedor in por_vendedor.values():
+        validar_total(total_vendedor, "El total del carrito para este vendedor")
+
+    # === SEGUNDA PASADA: recién ahora se reemplaza ======================== #
+    db.query(CartItem).filter(CartItem.cart_id == cart.id).delete()
+
+    items_response = []
+    total_amount = 0.0
+
+    for product_id in orden:
+        product = efectivos[product_id]["producto"]
+        quantity = efectivos[product_id]["cantidad"]
+
         cart_item = CartItem(
             cart_id=cart.id,
             product_id=product.id,
@@ -387,16 +423,16 @@ def sync_cart(
         )
         db.add(cart_item)
         db.flush()
-        
+
         # Obtener imagen primaria
         primary_image = db.query(ProductImage.url).filter(
             ProductImage.product_id == product.id,
             ProductImage.is_primary == True
         ).first()
-        
+
         subtotal = float(product.price) * quantity
         total_amount += subtotal
-        
+
         items_response.append(CartItemResponse(
             id=cart_item.id,
             product_id=product.id,
@@ -406,9 +442,9 @@ def sync_cart(
             quantity=quantity,
             subtotal=subtotal
         ))
-    
+
     db.commit()
-    
+
     return CartResponse(
         id=cart.id,
         items=items_response,
