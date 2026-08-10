@@ -30,8 +30,10 @@ El contraste productivo quedó cerrado el 2026-08-09 con `918c4b9` y su informe
 base local limpia. `83c4b59` corrigió la identidad visible, `d2063c9` cerró dos
 falsos verdes del recorrido y `5924fbb` hizo que cualquier fallo acumulado
 impida el éxito final. La cobertura 40/40 y 34/34 y la puerta de accesibilidad
-quedan cerradas. La tarea activa en `PARA-DEV.md` es el seed bancario demo
-utilizable desde una instalación limpia.
+quedan cerradas. `652bc34` dejó el seed bancario demo utilizable desde la
+primera instalación y subió la suite a 26/26. La tarea activa en
+`PARA-DEV.md` es corregir la incompatibilidad de montos que hace fallar el
+carrito con publicaciones de más de $99.999.999,99.
 
 ## El proyecto fue aprobado
 
@@ -69,11 +71,12 @@ transcripcion funcional en `CONTRATO.md` y el anclaje en `CRONOGRAMA.md`.
 
 ## Objetivo activo
 
-**Dejar utilizable la transferencia desde una instalación limpia.** La puerta
-de accesibilidad de Fase 1 quedó cerrada en `5924fbb`: cualquier fallo acumulado
-impide el éxito y las corridas quedaron 40/40 y 34/34. La identidad visible y
-las correcciones de accesibilidad están aceptadas. El contraste del tema claro
-fue aceptado en `918c4b9` y el flujo UX/UI de logística fue aceptado en
+**Eliminar el techo oculto del carrito para publicaciones agro de precio alto.**
+El seed bancario quedó aceptado en `652bc34`, pero su nuevo caso reprodujo un
+500: `products.price` admite más que los snapshots y totales de carrito y orden.
+La puerta de accesibilidad de Fase 1 quedó cerrada en `5924fbb`; las corridas
+quedaron 40/40 y 34/34. El contraste del tema claro fue aceptado en `918c4b9` y
+el flujo UX/UI de logística fue aceptado en
 `823c3fe` antes del inicio contractual. La orden de transferencia inmortal se
 cerró en `0039e00` y fue aceptada por la PM el 2026-08-05.
 
@@ -164,23 +167,25 @@ nuevos con deuda encima.
 3. ~~**Contraste productivo y puerta accesible.**~~ **Cerrados y aceptados el
    2026-08-09.** `83c4b59` agregó el barrido, `d2063c9` dejó la cobertura real en
    40/40 y 34/34, y `5924fbb` cerró el último falso verde del código de salida.
-4. **Tarea activa: el seed no carga CBU ni alias**, así que sobre una
-   instalación limpia la transferencia no se puede usar. Primero se cargan
-   datos bancarios demo idempotentes; después, en otra pieza, se corrige el
-   mensaje erróneo de la pantalla de pago.
-5. **El camino de instalación sin Docker no funciona** siguiendo la guía:
+4. ~~**Seed bancario demo.**~~ **Cerrado y aceptado el 2026-08-09** en
+   `652bc34`: primera corrida utilizable, repetición idempotente y suite 26/26.
+5. **Tarea activa: precios altos rompen el carrito.** Dos publicaciones válidas
+   del seed superan el rango de los snapshots y devuelven 500. Se corrige con
+   migración, contrato monetario coherente y rechazo 4xx fuera del límite.
+   Después se corrige, en otra pieza, el mensaje erróneo de la pantalla de pago.
+6. **El camino de instalación sin Docker no funciona** siguiendo la guía:
    el archivo de configuración de ejemplo tiene claves que el sistema
    rechaza, y el proxy del frontend apunta a un puerto que sólo existe con
    nginx.
-6. **Transportistas.** La Pieza A está hecha con dos objeciones abiertas
+7. **Transportistas.** La Pieza A está hecha con dos objeciones abiertas
    —el perfil no se puede editar y el campo de certificación obligatorio
    no informa nada—. Las decisiones de B/C y el mapa de contacto quedaron
    cerrados el 2026-08-05; su implementacion corresponde a Fase 3.
-7. **Mercado Pago para las compras**, reconstruido sin split, dentro de la
+8. **Mercado Pago para las compras**, reconstruido sin split, dentro de la
    Fase 4 contractual.
-8. **Fase 6, despues del lanzamiento:** suscripciones, planes, mensajeria
+9. **Fase 6, despues del lanzamiento:** suscripciones, planes, mensajeria
    premium y tierras. No compite por tiempo con las fases 1 a 5.
-9. **Al final:** correcciones de la vista en celular, revisión de
+10. **Al final:** correcciones de la vista en celular, revisión de
    seguridad y despliegue en producción.
 
 **Despliegue:** Railway fue aprobado como destino el 2026-08-05. La dev

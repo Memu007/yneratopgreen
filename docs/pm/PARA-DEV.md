@@ -347,3 +347,76 @@ no debería necesitar.
    `git -c core.whitespace=cr-at-eol diff --check`.
 6. Un commit de código y otro separado con el informe en `PARA-PM.md`, indicando
    archivos, pruebas, resultado de dos corridas del seed y cualquier desvío.
+
+---
+
+## 2026-08-09 — `652bc34`: seed bancario aceptado
+
+Aceptado. Los dos vendedores demo quedan bancarizados desde la primera corrida,
+la actualización es idempotente campo por campo y no pisa valores propios. El
+caso positivo nace sin `PATCH`, el negativo crea y restaura su propio estado, y
+la suite sube legítimamente a 26/26. PM revisó el diff y reprodujo compilación y
+sintaxis del guion en verde.
+
+También se acepta el hallazgo informado: no se acepta esconderlo bajando
+precios del seed. Hoy dos publicaciones válidas para el catálogo provocan un
+500 al entrar al carrito porque los snapshots y totales admiten menos que
+`products.price`.
+
+## Tarea activa única: eliminar el techo oculto de precios del carrito
+
+Corregí el contrato monetario para que cualquier precio unitario que el sistema
+acepta en una publicación pueda pasar al carrito y a una orden con cantidad 1,
+incluidos los dos productos caros del seed. Si una cantidad hace superar el
+máximo admitido para un total, la API debe rechazarla antes de escribir y con un
+4xx entendible; nunca debe llegar como error 500 de PostgreSQL.
+
+### Alcance
+
+- Agregá una migración nueva desde la cabeza actual; no reescribas la migración
+  inicial.
+- Conservá `products.price` y los precios unitarios/snapshots con capacidad al
+  menos equivalente a `NUMERIC(12,2)`.
+- Unificá subtotales, totales, envío y montos derivados en una capacidad
+  explícita que cubra holgadamente el catálogo actual. `NUMERIC(14,2)` es el
+  piso aceptable para totales; incluí también las columnas monetarias de
+  `payments` para no trasladar la misma incompatibilidad a Fase 4.
+- Actualizá modelos y migración juntos. Auditá todas las columnas monetarias
+  alcanzables; no tomes como suficiente la lista de cinco del informe porque
+  `shipping_cost` y los montos de pago también forman parte del contrato.
+- Validá en la API el máximo publicable y el máximo calculado de carrito/orden
+  antes del `commit`. Una publicación o total fuera del contrato devuelve 4xx
+  claro y no deja escrituras parciales.
+- Cambiá el caso 13 para que deje de esquivar el problema eligiendo siempre la
+  publicación más barata: al menos el producto de $950.000.000 debe entrar al
+  carrito y ofrecer transferencia.
+- Agregá una prueba que complete una orden de transferencia con un producto por
+  encima de $100.000.000 y la contraste con SQL. Agregá además un caso de total
+  deliberadamente fuera del nuevo rango y verificá 4xx, mensaje y ausencia de
+  escritura parcial.
+
+### Fuera de alcance
+
+- No bajes precios ni elimines publicaciones para hacer verde la prueba.
+- Sin cambios visuales, Mercado Pago, comisiones nuevas, monedas, conversión,
+  cuotas ni refactor general de `float` a `Decimal`.
+- No arregles todavía el mensaje genérico del frontend; es la pieza siguiente.
+- Sin cambios en accesibilidad, seed bancario, logística o instalación.
+
+### Criterios de aceptación
+
+1. La migración se aplica sobre una base con los datos actuales y también desde
+   una base limpia; el esquema final coincide con los modelos.
+2. El campo de $950.000.000 y la cosechadora de $125.000.000 pueden agregarse al
+   carrito sin 500. Al menos uno completa una transferencia y sus importes API
+   coinciden con SQL.
+3. Todo precio unitario admitido por `products.price` cabe en los snapshots. Un
+   total superior al límite documentado devuelve 4xx antes de persistir.
+4. No queda ninguna columna monetaria del flujo carrito → orden → pago con un
+   rango menor e incompatible con la etapa anterior.
+5. Suite oficial completa, `npm run build` y
+   `git -c core.whitespace=cr-at-eol diff --check` verdes; informá el total nuevo
+   si agregás casos.
+6. Un commit de código y otro con `PARA-PM.md`. El informe debe enumerar tipos
+   antes/después, prueba de migración limpia y existente, respuestas del caso
+   caro y del caso fuera de rango, y cualquier desvío.
