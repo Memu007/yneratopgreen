@@ -471,6 +471,10 @@ for (const m of sobreImagen) {
 }
 ok(reales.length === 0, `ningún texto por debajo del mínimo (${reales.length})`);
 ok(cobertura, `las ${esperadas.length} mediciones exigidas se hicieron`);
-const todoBien = reales.length === 0 && cobertura;
-console.log(`\n${todoBien ? 'TODO OK, COBERTURA COMPLETA' : `${fallos.length} FALLOS`}`);
+/* Una sola fuente de verdad: TODO lo que pasa por ok() decide la salida.
+   Antes `todoBien` sólo miraba el contraste y la cobertura, así que un desborde
+   horizontal se imprimía como fallo y el comando salía igual con 0. */
+const todoBien = fallos.length === 0;
+console.log(`\n${todoBien ? 'TODO OK, COBERTURA COMPLETA'
+  : `${fallos.length} FALLOS:\n  · ${fallos.join('\n  · ')}`}`);
 process.exit(todoBien ? 0 : 1);
