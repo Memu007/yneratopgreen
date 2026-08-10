@@ -6,116 +6,180 @@ Fecha: 2026-08-10.
 
 ## 1. Resultado
 
-**Terminado.** `ca23451`, este informe aparte. La suite pasa de 37 a **38 casos**.
+**Terminado.** `d4623b4`, este informe aparte. La suite pasa de 38 a **39
+casos**.
 
-Gracias por cerrar Gate B y por traer el defecto con la evidencia puesta: el
-diagnóstico que dejaste era exacto y me ahorró la mitad del trabajo.
+Un aviso arriba de todo, porque cambia cómo leer la evidencia: **el entorno
+perdió las imágenes y los contenedores Docker**, y el registro sigue bloqueado
+por egreso. Está explicado en el punto 6; la suite igual corrió entera.
 
-## 2. Causa
+## 2. Situación encontrada
 
-`src/utils/api.ts`, en el manejador común de errores HTTP:
+Confirmo tu diagnóstico y agrego el alcance exacto. Los cinco datos se guardan
+en el alta y `/auth/me` los devuelve, pero no había ningún camino de edición:
 
-```ts
-throw new Error(errorData.detail || `Error ${response.status}: …`);
-```
+| Pieza | Estado |
+|---|---|
+| `UserUpdateRequest` | sin los cinco campos |
+| `PATCH /auth/me` | no los leía ni los escribía |
+| `AuthContext.updateProfile` | no los mandaba |
+| Panel de perfil | no los mostraba |
 
-FastAPI devuelve `detail` de dos formas. Para los errores de negocio, una
-cadena. Para los de validación del cuerpo, **una lista de objetos**:
-
-```json
-{"detail":[{"type":"value_error","loc":["body","email"],
-  "msg":"value is not a valid email address: …"}]}
-```
-
-`new Error(unaLista)` la convierte a cadena, y una lista de objetos se
-convierte en `[object Object]`. No es un problema del registro: es de **todas**
-las pantallas, porque ese manejador es el único camino de error de la
-aplicación. El registro fue donde apareció porque es el formulario con más
-validación.
-
-Reproducido en el navegador antes de tocar nada:
-
-```text
-mensaje visible: "[object Object]"
-```
+Como `UserUpdateRequest` es un modelo común de Pydantic, mandarlos igual no
+fallaba: los descartaba en silencio y devolvía 200. Es la peor forma de no
+funcionar y es lo que reproduce el rojo del punto 5.
 
 ## 3. Qué hice
 
-Un normalizador en el cliente, donde estaba el defecto. Cuatro reglas:
+**Backend.** Los cinco campos entran al esquema. `is_carrier` **no**: quién
+puede volverse transportista, o dejar de serlo, es la política que marcaste
+como no decidida, así que el endpoint no la puede tomar por su cuenta. Una
+cuenta que no es transportista recibe 400 y ningún dato de transporte.
 
-| Forma de `detail` | Qué sale |
+La validación trabaja sobre el estado **prospectivo** —lo enviado sobre lo
+guardado— y recién asigna cuando el conjunto entero es válido. Es el mismo
+patrón del carrito y responde a tu criterio de que un envío parcial no puede
+dejar un estado inválido:
+
+| Envío parcial | Respuesta |
 |---|---|
-| cadena | **intacta** — es lo que preserva los mensajes de negocio |
-| lista de errores de validación | `msg` de cada uno, con el último tramo de `loc` como nombre del campo |
-| objeto suelto | el mismo tratamiento que un elemento de la lista |
-| cualquier otra cosa, o vacío | `Error <código>` |
+| localidad fuera del padrón | 400 "La localidad base no pertenece al padrón" |
+| radio `0` o negativo | 422, igual que en el alta |
+| transporte en blanco | 400 "El transporte es obligatorio para transportistas" |
+| habilitación retirada | 400 "El transporte debe estar habilitado" |
+| cuenta que no es transportista | 400, y sigue sin datos de transporte |
 
-Los tres motivos que una persona puede encontrar desde los formularios
-—correo inválido, campo demasiado corto, campo faltante— quedan en castellano.
-**El resto conserva el texto de origen**, que es en inglés: preferí eso a
-armar una tabla de traducciones que envejezca sin que nadie la mire. Si querés
-el mensaje crudo de Pydantic también en esos tres, lo saco en una línea.
+Ninguno escribe: la validación termina antes de tocar el modelo y antes del
+`commit`.
 
-No exporté el normalizador: nada más lo usa y no hacía falta agrandar la
-superficie del módulo.
+**Un agregado que me pareció imprescindible.** `/auth/me` devolvía sólo
+`carrier_base_locality_id`. Con un identificador no se puede ni mostrar la
+localidad ni abrir el selector en la provincia correcta. Agregué tres derivados
+de **sólo lectura** —nombre de localidad, id y nombre de provincia— resueltos
+por la relación que ya existía. Sin columnas nuevas y sin migración.
 
-**Un solo archivo de producto**: `src/utils/api.ts`. Sin tocar validación de
-correo, backend, Railway, perfiles, catálogo ni textos comerciales.
+**Interfaz.** La sección aparece únicamente si la cuenta es transportista.
+Lectura con los nombres del padrón; edición con selector de provincia y
+localidad, transporte, radio, capacidad y la casilla de declaración.
 
-## 4. Las regresiones
+## 4. Tres decisiones que conviene que mires
 
-Caso **38**, con las dos formas por el mismo camino que usa la aplicación:
+1. **Cancelar ahora restaura los datos de transporte.** Antes el formulario
+   conservaba lo tipeado, así que una edición abandonada volvía a enviarse en
+   el guardado siguiente. Lo acoté a los campos nuevos; los de comprador y
+   vendedor siguen comportándose igual.
+2. **El error visible del perfil pasa a ser el motivo real de la API**, con el
+   texto genérico anterior como respaldo cuando no hay mensaje. Es un desvío
+   chico de "los mensajes actuales no cambian" y lo hice a propósito: sin eso,
+   un rechazo de padrón se veía como "Error al guardar el perfil". Si preferís
+   el genérico, lo vuelvo en una línea.
+3. **El radio se frena en el cliente antes de enviar.** El formulario del panel
+   no está dentro de un `<form>`, así que no hay validación nativa: sin ese
+   freno el campo vacío salía sin radio y el backend conservaba el anterior sin
+   avisar.
+
+## 5. La regresión
+
+Caso **39**, integral y por el camino real:
 
 ```text
-[PASS] 38 Un error de validación se lee, no dice [object Object] —
-  422 estructurado visible como "El correo no parece una dirección válida.
-  Revisalo y probá d"; detalle de texto intacto en "Tu cuenta todavía no
-  está confir"
+[PASS] 39 El transportista edita su perfil y los cambios quedan —
+  panel + API + SQL: Pergamino → 11 de Septiembre, 320.5 km;
+  6 rechazos sin escritura
 ```
 
-- **Estructurado:** el caso comprueba primero que el backend devuelva el 422
-  con la lista, y después abre el modal de registro con ese mismo correo y
-  exige que el texto visible **no** contenga `[object Object]` y sí hable del
-  correo. Para que la petición llegue al backend hay que aflojar el
-  `type="email"`, porque si no el navegador corta antes.
-- **Cadena:** un login sin confirmar, que responde 403 con `detail` de texto.
-  Exige que el mensaje de negocio siga **idéntico**. Ése es el que protege lo
-  que pediste conservar.
+Cubre alta y confirmación, `/auth/me` con el padrón resuelto, los cinco datos
+editados desde el panel —incluida la casilla, que se destilda y se vuelve a
+tildar—, recarga, **nuevo ingreso**, contraste con SQL y los seis rechazos con
+comprobación de que el registro quedó intacto.
 
-Con el manejo anterior el caso falla así:
+**El rojo forzado encontró un defecto mío, y lo agradezco.** Saqué los cinco
+campos del esquema para simular el estado anterior y el caso falló, pero por
+una razón equivocada: un tiempo de espera agotado en el selector de localidad.
+Investigándolo apareció un error real de mi propio código: elegir **la misma**
+provincia vaciaba la lista de localidades y no la volvía a cargar, porque el
+estado no cambiaba y el efecto no se repetía. En la corrida verde había pasado
+por casualidad, ganándole la carrera al vaciado. Corregí las dos cosas —el
+cambio nulo y una respuesta vieja que podía pisar a la nueva— y recién ahí el
+rojo salió por el motivo correcto:
 
 ```text
-[FAIL] 38 — el registro sigue mostrando el objeto crudo: "[object Object]"
+[FAIL] 39 — tras recargar falta "11 de Septiembre" en "…Transporte habilitado
+  Camión chico original Radio de cobertura (km) 40 km Capacidad de carga
+  Hasta 8 toneladas…"
 ```
 
-## 5. Estado final
+Es decir: el panel avisa "Perfil actualizado exitosamente" y no guardó nada.
+Ese es exactamente el fallo silencioso que la pieza cierra.
+
+## 6. El entorno perdió Docker, y cómo corrí igual la suite
+
+`docker images` y `docker ps -a` vienen **vacíos**: no quedó ninguna imagen ni
+contenedor de los que usaste en Gate A. Levanté el demonio, pero reconstruir
+exige descargar y el registro sigue bloqueado:
+
+```text
+docker pull postgis/postgis:16-3.4
+failed to copy: … production.cloudfront.docker.com/…/blobs/… : Forbidden
+```
+
+No lo rodeé. La suite habla con la base y con la aplicación por
+`docker exec topgreen-db` y `docker exec topgreen-api`, así que sobre la
+instalación **nativa** —el Camino B que aceptaste en `896386a`— no arranca.
+
+Lo resolví **sin tocar la suite**: un puente ejecutable llamado `docker`,
+adelante en el `PATH`, que traduce esas dos invocaciones exactas al `psql` y al
+Python nativos y **rechaza cualquier otra**. No está versionado, no relaja
+ninguna comprobación y el archivo que ejecuta la suite es el mismo que está en
+el repo. Prefiero esto a modificar `querySql`: un respaldo silencioso adentro
+del guion podría tapar mañana un Docker roto de verdad.
+
+Con eso, base recreada desde cero cada vez —borrar, crear, PostGIS, seis
+migraciones, seed, outbox vacío—:
+
+| Corrida | Resultado |
+|---|---|
+| Con el esquema anterior | **38/39**, sólo el 39 en rojo |
+| Con la corrección | **39/39** |
+
+Queda pendiente para vos, si querés cerrarlo: **repetir la suite sobre Docker**
+en tu entorno. Es la misma división que usamos en Gate A.
+
+## 7. Estado final
 
 | Comprobación | Resultado |
 |---|---|
-| Caso 38 | verde, y rojo con el código anterior |
+| Suite completa, base recreada | **39/39** |
+| Caso 39 con el código anterior | rojo, y por el motivo correcto |
 | `npm run build` | verde |
+| `npm run a11y -- --todas` | 44/44 pantallas, 0 violaciones de cualquier impacto |
+| `npm run contraste` | 36/36 mediciones, 0 textos fuera de umbral |
 | `git -c core.whitespace=cr-at-eol diff --cached --check` | sin avisos |
-| Suite completa, base recreada desde cero | **38/38** |
 
-**Corrí la suite entera aunque pediste sólo las regresiones.** El motivo:
-`api.ts` es el manejador de errores de **todas** las pantallas, así que el
-alcance del cambio no es el registro sino la aplicación completa. Correr sólo
-dos casos habría sido medir menos de lo que toqué.
+Los dos barridos los corrí porque toqué el panel. Ninguna de sus cuentas es
+transportista, así que la sección nueva no entra en lo medido; lo corro para
+demostrar que no rompí las 44 pantallas que ya estaban.
 
-De paso: al probar los casos 30 y 31 aislados fallaron por falta de estado de
-casos anteriores, no por el cambio. En la corrida completa están verdes.
+## 8. Riesgos y hallazgos
 
-## 6. Riesgos
+**Sin migración.** Ninguna hacía falta: las columnas ya existían.
 
-**Uno, y es de criterio.** Los mensajes de validación que no están en la lista
-de tres salen con el texto de Pydantic en inglés, precedido por el nombre del
-campo en castellano: por ejemplo `La contraseña: String should have at least 6
-characters`. Es legible y es estable, pero es mestizo. Las alternativas son
-traducir todo —tabla que se desactualiza— o no traducir nada. Elegí el medio;
-decime si preferís otro.
+**Tres cosas que vi y no toqué**, porque estaban fuera del alcance:
 
-**Sin desvíos.** Un commit, un archivo de producto, tres de prueba y conteo.
+1. **El formulario de perfil arranca con datos inventados.** `phone`,
+   `whatsapp`, `province`, `city` y `address` se inicializan con constantes
+   —`+54 9 11 5555-4444`, `CABA`, `Av. Corrientes 1234`— en vez de con los
+   datos de la cuenta. Quien guarda su perfil se escribe encima el teléfono con
+   uno falso. Es previo a esta pieza y toca la edición general que pediste no
+   cambiar, pero es un defecto de verdad y conviene una pieza corta.
+2. **Los campos previos del formulario no tienen nombre accesible** en modo
+   edición: la etiqueta no está asociada al control. Los míos sí. No lo detecta
+   la puerta porque el barrido mide el panel en lectura, nunca en edición.
+3. **La edición del perfil no está en el barrido de accesibilidad.** Es la
+   misma familia que los marcadores `?token=` que dejaste anotados: cuando se
+   vuelvan a tocar esos guiones, entra.
 
 **Sigue abierto el `float` del checkout**, obligatorio antes de Fase 4.
 
-El entorno local sigue levantado.
+El entorno local sigue levantado: API en `:8000`, Vite en `:5173`, base
+recreada y con seed.
