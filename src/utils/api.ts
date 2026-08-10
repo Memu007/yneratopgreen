@@ -84,6 +84,69 @@ async function refreshAccessToken(): Promise<boolean> {
 }
 
 /**
+ * FastAPI devuelve `detail` de más de una forma: una cadena para los errores
+ * de negocio, y una LISTA de objetos para los de validación del cuerpo.
+ * Pasarla tal cual a `new Error(...)` convierte la lista en la cadena
+ * "[object Object]", que es lo que veía quien se registraba con un correo mal
+ * escrito. Acá se normaliza a un texto, cualquiera sea la forma que llegue.
+ */
+const CAMPOS: Record<string, string> = {
+  email: 'El correo',
+  password: 'La contraseña',
+  full_name: 'El nombre',
+  phone: 'El teléfono',
+  quantity: 'La cantidad',
+};
+
+function textoDeUnError(item: unknown): string | null {
+  if (typeof item === 'string') return item.trim() || null;
+  if (!item || typeof item !== 'object') return null;
+
+  const { msg, loc, type } = item as { msg?: unknown; loc?: unknown; type?: unknown };
+  if (typeof msg !== 'string' || !msg.trim()) return null;
+
+  // `loc` es la ruta del campo: ["body", "email"]. Interesa el último tramo.
+  const campo = Array.isArray(loc)
+    ? [...loc].reverse().find((parte) => typeof parte === 'string' && parte !== 'body')
+    : undefined;
+  const nombre = typeof campo === 'string' ? (CAMPOS[campo] ?? campo) : null;
+
+  // Los dos motivos que una persona puede encontrar desde los formularios
+  // valen la pena en castellano; el resto conserva el texto de origen, que es
+  // preferible a inventarle una traducción que envejezca mal.
+  if (type === 'value_error' && campo === 'email') {
+    return 'El correo no parece una dirección válida. Revisalo y probá de nuevo.';
+  }
+  if (type === 'string_too_short' && nombre) {
+    return `${nombre} es demasiado corto.`;
+  }
+  if (type === 'missing' && nombre) {
+    return `${nombre} es obligatorio.`;
+  }
+
+  return nombre ? `${nombre}: ${msg}` : msg;
+}
+
+function mensajeDeError(detail: unknown, response: { status: number; statusText?: string }): string {
+  if (typeof detail === 'string' && detail.trim()) return detail;
+
+  if (Array.isArray(detail)) {
+    const textos = detail
+      .map(textoDeUnError)
+      .filter((texto): texto is string => Boolean(texto));
+    if (textos.length) return textos.join(' ');
+  }
+
+  if (detail && typeof detail === 'object') {
+    const texto = textoDeUnError(detail);
+    if (texto) return texto;
+  }
+
+  const cola = response.statusText ? `: ${response.statusText}` : '';
+  return `Error ${response.status}${cola}`;
+}
+
+/**
  * Fetch wrapper con manejo de errores, cookies y refresh automático
  */
 export async function apiFetch<T = any>(
@@ -129,7 +192,7 @@ export async function apiFetch<T = any>(
     // Manejar errores HTTP
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ detail: response.statusText }));
-      throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
+      throw new Error(mensajeDeError(errorData?.detail, response));
     }
 
     // Si no hay contenido (204 No Content), retornar undefined

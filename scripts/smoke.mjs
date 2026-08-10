@@ -2659,6 +2659,81 @@ await runCase(37, 'Registro, correo y confirmación desde el navegador', async (
   }
 });
 
+await runCase(38, 'Un error de validación se lee, no dice [object Object]', async () => {
+  // FastAPI devuelve `detail` como cadena para los errores de negocio y como
+  // LISTA de objetos para los de validación. El cliente pasaba esa lista tal
+  // cual a new Error(...), así que la persona veía "[object Object]".
+  // Se comprueban las dos formas por el mismo camino que usa la aplicación.
+  const invalido = `prueba.${Date.now()}@dominio-invalido`;
+
+  // La forma estructurada, tal como la devuelve el backend
+  const crudo = await expectApiError(422, () =>
+    apiRequest('/auth/register', {
+      method: 'POST',
+      body: { email: invalido, password: 'smoke123', full_name: 'Detalle Estructurado' },
+    }),
+  );
+  assert(/value is not a valid email address/i.test(crudo),
+    `el backend no devolvió el 422 esperado: ${crudo}`);
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+
+    // --- 1. detalle ESTRUCTURADO: registro con un correo que el backend rechaza
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await page.getByText('Regístrate aquí').click();
+    await page.getByRole('heading', { name: 'Crear Cuenta' }).waitFor();
+    await page.locator('input[name="name"]').fill('Detalle Estructurado');
+    await page.locator('input[name="email"]').fill(invalido);
+    await page.locator('input[name="password"]').fill('smoke123');
+    await page.locator('form input[type="password"]').nth(1).fill('smoke123');
+    // el navegador corta un type=email mal formado antes de enviarlo; se
+    // afloja para que la petición llegue al backend, que es donde nace el 422
+    await page.evaluate(() => {
+      document.querySelector('input[name="email"]')?.setAttribute('type', 'text');
+    });
+    await page.getByRole('button', { name: 'Crear cuenta' }).click();
+
+    const errorRegistro = page.locator('[class*="_error_"]');
+    await errorRegistro.waitFor({ state: 'visible', timeout: 15_000 });
+    const textoRegistro = (await errorRegistro.textContent()) || '';
+    assert(!/\[object Object\]/.test(textoRegistro),
+      `el registro sigue mostrando el objeto crudo: "${textoRegistro}"`);
+    assert(/correo/i.test(textoRegistro) && textoRegistro.trim().length > 10,
+      `el mensaje de validación no se entiende: "${textoRegistro}"`);
+
+    // --- 2. detalle de TEXTO: no puede haber cambiado
+    // Una cuenta sin confirmar da 403 con `detail` en cadena. Ese mensaje ya
+    // estaba bien y la normalización tiene que dejarlo intacto.
+    const pendiente = `texto.plano.${Date.now()}@example.com`;
+    await apiRequest('/auth/register', {
+      method: 'POST',
+      body: { email: pendiente, password: 'smoke123', full_name: 'Detalle Texto' },
+    });
+
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await page.getByPlaceholder('tu@email.com').fill(pendiente);
+    await page.getByPlaceholder('••••••••').fill('smoke123');
+    await page.locator('[class*="_submitButton_"][type="submit"]').click();
+
+    const errorLogin = page.locator('[role="alert"]');
+    await errorLogin.waitFor({ state: 'visible', timeout: 15_000 });
+    const textoLogin = (await errorLogin.textContent()) || '';
+    assert(!/\[object Object\]/.test(textoLogin),
+      `el login muestra el objeto crudo: "${textoLogin}"`);
+    assert(/no está confirmada/i.test(textoLogin),
+      `el mensaje de negocio cambió: "${textoLogin}"`);
+
+    return `422 estructurado visible como "${textoRegistro.trim().slice(0, 60)}"; `
+      + `detalle de texto intacto en "${textoLogin.trim().slice(0, 45)}"`;
+  } finally {
+    await browser.close();
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 
