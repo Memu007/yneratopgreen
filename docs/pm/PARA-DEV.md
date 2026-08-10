@@ -1048,7 +1048,7 @@ pruebas exactas y cualquier riesgo. Ahí termina la tarea; no abras otra mejora.
 **Aceptada por PM el 2026-08-10:** `ca23451`, informe `085f2b5`. Build
 independiente y los dos mensajes reproducidos en Railway. No la reabras.
 
-## Tarea activa única: perfil transportista editable de Fase 2
+## Tarea cerrada y aceptada: perfil transportista editable de Fase 2
 
 ### Situación comprobada
 
@@ -1090,3 +1090,60 @@ decidida y es de PM/Emi.
 
 Entregá un commit de producto y el informe mínimo separado en `PARA-PM.md` con
 causa, archivos, pruebas exactas y riesgos. Ahí termina la tarea.
+
+**Aceptada por PM el 2026-08-10:** producto `c484513`, informe `b753b17`. El
+hash `d4623b4` escrito en el informe no corresponde al historial publicado; el
+commit de producto real es `c484513`. Build independiente verde. En Railway la
+PM reprodujo alta y confirmación, actualización de los cinco campos, lectura
+posterior con localidad/provincia derivadas y rechazo atómico de una localidad
+inexistente. No reabras esta pieza.
+
+## Tarea activa única: integridad y accesibilidad de la edición del perfil
+
+### Situación comprobada
+
+`UserDashboard` inicializa teléfono, WhatsApp, provincia, ciudad y dirección
+con constantes demo. Abrir edición y guardar puede escribir esos datos falsos
+sobre una cuenta real. También muestra un email editable que el guardado no
+envía. Los controles generales anteriores no tienen etiquetas asociadas y los
+barridos miden el panel sólo en lectura, por lo que hoy pueden quedar verdes sin
+abrir el modo edición.
+
+### Resultado exigido
+
+- El formulario se hidrata únicamente con datos reales de `/auth/me`; si un
+  dato no existe, empieza vacío. No inventa teléfono ni ubicación.
+- Definí una sola representación reversible para la ubicación disponible hoy.
+  Abrir y guardar sin cambios debe conservar exactamente el valor persistido,
+  incluso si está vacío o no tiene las tres partes esperadas. No agregues un
+  padrón nuevo ni una migración para resolverlo.
+- El email se muestra como dato de sólo lectura, salvo que exista un camino
+  real y ya probado para actualizarlo. No dejes un control que aparenta guardar
+  y luego se ignora.
+- Cancelar restaura todos los campos generales y de transportista al último
+  estado guardado. Una edición abandonada no puede reaparecer en el guardado
+  siguiente.
+- Cada control del modo edición tiene nombre accesible mediante `label`/`id` o
+  un equivalente semántico. Incorporá el modo edición del perfil al barrido de
+  accesibilidad en escritorio y celular; una falla al abrirlo no puede omitirse
+  silenciosamente.
+- Agregá una regresión de integridad mínima: cuenta con datos reales y cuenta
+  sin datos, abrir/cancelar/guardar sin cambios y cambiar un dato explícito.
+  Contrastá el resultado con `GET /auth/me` o SQL, no con constantes.
+
+### Alcance y freno
+
+Es una corrección del perfil existente. No cambies el modelo de usuario, no
+agregues campos de provincia/ciudad/dirección, no conviertas la ubicación libre
+en padrón, no abras directorio de transportistas, pagos, catálogo ni Railway.
+No rediseñes el panel y no hagas retoques cosméticos.
+
+Si conservar una ubicación libre sin pérdida exige decidir un modelo nuevo,
+frená y traé el caso exacto: no adivines una estructura. Si el barrido descubre
+una familia distinta de accesibilidad fuera del modo edición, reportala y no la
+mezcles con esta pieza.
+
+Entregá un commit de producto y otro separado con el informe en `PARA-PM.md`.
+Corré la regresión nueva, el barrido de accesibilidad en sus dos medidas, build
+y `git diff --check`; no repitas pruebas de pagos, catálogo o Railway si estos
+archivos no los afectan. Ahí termina la tarea.

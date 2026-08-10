@@ -4,15 +4,28 @@ Actualizado: 2026-08-10.
 
 ## Entrega aceptada y tarea actual
 
-La corrección `ca23451` quedó aceptada el 2026-08-10; el informe es `085f2b5`.
-La PM reprodujo en Railway el correo inválido con mensaje legible y el login de
-una cuenta pendiente con su texto de negocio intacto. `npm run build` y
-`git diff --check` están verdes. No se reabre esta corrección.
+El perfil transportista editable quedó aceptado el 2026-08-10 en el commit real
+`c484513`; el informe es `b753b17`. El informe llama por error `d4623b4` al
+commit de producto: es una inconsistencia narrativa menor y no otro cambio.
 
-**Tarea activa única de la dev:** cerrar el perfil transportista editable de
-Fase 2. Es la pieza que falta antes del directorio geográfico de Fase 3. No
-incluye coincidencia por radio, contactos, orden, tarifa ni pagos; el detalle y
-los frenos están al final de `PARA-DEV.md`.
+La PM compiló el frontend y desplegó ese backend en el Railway descartable. En
+el servicio público reprodujo alta y confirmación de un transportista, edición
+de los cinco datos, lectura posterior con localidad y provincia derivadas y
+rechazo de una localidad inexistente sin alterar el perfil válido. Todo quedó
+verde. No se repitió la suite completa: la dev informó 39/39 y la PM cubrió de
+forma independiente el camino nuevo y de mayor riesgo.
+
+**Hallazgo operativo:** el frontend se desplegó automáticamente desde `main`,
+pero Backend siguió sirviendo el commit anterior. Para probar esta entrega la
+PM tuvo que desplegar Backend manualmente. El entorno sigue siendo descartable;
+no se puede usar su estado verde como prueba de que los próximos cambios de
+backend se publicaron.
+
+**Tarea activa única de la dev:** cerrar la integridad y accesibilidad de la
+edición del perfil general. Hoy el formulario arranca con teléfono y ubicación
+inventados y puede sobrescribir datos reales al guardar; además, sus controles
+anteriores no tienen nombre accesible y el modo edición no entra en el barrido.
+El alcance y los frenos están al final de `PARA-DEV.md`.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
@@ -138,19 +151,12 @@ transcripcion funcional en `CONTRATO.md` y el anclaje en `CRONOGRAMA.md`.
 
 ## Objetivo activo
 
-**Preparar y ejecutar un ensayo descartable de Railway.** Correo quedó aceptado
-en `ccc0794` antes del 18/08, por lo que entra la ventana acordada de una jornada
-y cierre antes del 20/08. Primero se corrige y prueba localmente la configuración
-Railway. Emi autenticó la CLI el 10/08, confirmó que la cuenta está en Hobby y
-autorizó reutilizar el proyecto de prueba `strong-playfulness`; no es producción
-ni un proyecto que haya que preservar. La instalación nativa
-y Docker quedaron cerrados con `82c1df8` y `896386a`. El checkout muestra el
-motivo real desde `e915d6a`. La
-puerta de accesibilidad de Fase 1 quedó cerrada en
-`5924fbb`; las corridas quedaron 40/40 y 34/34. El contraste del tema claro fue
-aceptado en `918c4b9` y el flujo UX/UI de logística fue aceptado en
-`823c3fe` antes del inicio contractual. La orden de transferencia inmortal se
-cerró en `0039e00` y fue aceptada por la PM el 2026-08-05.
+**Cerrar la edición general del perfil sin sobrescribir datos reales y hacerla
+parte de la puerta accesible.** Es una pieza de integridad de Fase 2, previa al
+directorio geográfico de transportistas de Fase 3. El perfil transportista ya
+quedó aceptado en `c484513`; Railway descartable conserva la evidencia externa,
+pero su Backend no se actualiza automáticamente y debe comprobarse por commit
+en cada ensayo hasta corregir esa configuración.
 
 El cronograma y los limites del PDF quedaron operativizados en
 `CRONOGRAMA.md` y `ALCANCE-Y-LIMITES.md`. Suscripciones, planes, mensajeria
