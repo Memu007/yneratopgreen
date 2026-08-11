@@ -6,146 +6,161 @@ Fecha: 2026-08-11.
 
 ## 1. Resultado
 
-**Terminado.** El commit de producto es **`6fd060d`**, ya rebasado sobre tu
-`1fb915b`; este informe va aparte y encima de él.
+**Terminado.** El commit de producto es **`e3fe9cb`**, sobre tu `0578500`; este
+informe va aparte y encima.
 
-La suite pasa de 40 a **41 casos**. El barrido de accesibilidad pasa de 46 a
-**50 pantallas**, no a 48: la aritmética está en el punto 5 y conviene que la
-mires, porque el número que pediste no cierra con la forma en que la puerta
-cuenta.
+| Puerta | Antes | Ahora |
+|---|---|---|
+| Suite | 41 | **44 casos** |
+| Accesibilidad | 50 | **52 pantallas** |
+| Contraste | 36 | 36 mediciones |
 
-## 2. El rojo de las tablas: reproducido
+Las 52 son 26 rutas × 2 medidas: agregué **una** ruta permanente, `checkout:
+fletes compatibles`, y son 2 mediciones. Con la cuenta correcta esta vez.
 
-Se reproduce, pero **no con el seed cargado**. La regla
-`scrollable-region-focusable` sólo salta cuando la región desplazable **no
-tiene nada enfocable adentro**. Con filas, cada fila trae su botón de acción y
-la regla pasa **por accidente**: no porque la región sea alcanzable, sino
-porque adentro hay botones. Por eso mi barrido daba verde y el tuyo no.
+## 2. La declaración de habilitación
 
-Vacié productos y órdenes —que es como estaban en tu despliegue— y aparecieron
-las dos, idénticas a las tuyas, en 390×844:
+Era un booleano. Ahora es una declaración con **detalle** y **fecha del
+servidor**, como pide el contrato.
 
-```text
-=== Productos (0 filas) ===
-  scrollable-region-focusable: serious en table
-=== Órdenes (0 filas) ===
-  scrollable-region-focusable: serious en table
-```
-
-El defecto de fondo es más grande que la regla: **aun con filas, un usuario de
-teclado no puede desplazar la tabla**. Llega a los botones de cada fila, pero
-no puede mover la región para leer las últimas columnas.
-
-## 3. Qué hice con las tablas
-
-El desplazamiento estaba sobre el `<table>`. Lo moví a un contenedor propio y
-la tabla vuelve a ser una tabla:
-
-| Antes | Ahora |
+| Situación | Qué pasa |
 |---|---|
-| `.table { display: block; overflow-x: auto }` en celular | `.tableScroll { overflow-x: auto }` |
-| la tabla perdía su semántica de tabla por el `display: block` | la conserva |
-| nada enfocable si no hay filas | la región recibe el foco |
+| Alta de transportista sin detalle | 422, con el motivo |
+| Alta con detalle | se guarda, y la fecha la pone el servidor |
+| Mandar la fecha en el pedido | se ignora; no se puede retrodatar |
+| Guardar sin cambiar el detalle | la fecha **no** se mueve |
+| Cambiar el detalle | es una declaración nueva y la fecha se renueva |
+| Vaciar el detalle | 400: dejaría el perfil incompleto |
 
-**El `tabIndex` se agrega sólo cuando la región desborda de verdad**, y eso se
-mide, no se supone: pediste expresamente que no lo pusiera sin comprobar el
-recorrido. En escritorio la tabla entra entera, así que una parada de
-tabulación ahí no llevaría a ninguna parte.
+En pantalla dice siempre **«TopGreen no verifica esta habilitación»**, en el
+alta, en el perfil y en cada tarjeta del listado.
 
-Recorrido real, medido con tabulaciones y flechas de verdad:
+**No inventé detalle para los perfiles que ya existían.** Quedan sin
+declaración, y por eso no aparecen como compatibles hasta que su titular la
+complete. El transportista demo del seed sí queda completo, y sigue siendo
+idempotente: el caso 41 lo comprueba con la fecha incluida.
 
-| Medida | `tabindex` | Llega tabulando | Foco visible | Flechas |
-|---|---|---|---|---|
-| celular 390×844 | `0` | sí, en 4 tabulaciones | `solid 3px rgb(45,80,22)` | `scrollLeft 0 → 80` |
-| escritorio 1440×900 | ninguno | no, y está bien: no desborda | — | — |
+## 3. El destino, del padrón
 
-La región lleva `role="region"` y nombre propio —"Usuarios registrados",
-"Publicaciones del catálogo", "Órdenes de compra"—, que es lo que se anuncia al
-entrar. No toqué el diseño de las tablas ni el panel.
+El checkout tenía una lista fija de 24 provincias escritas a mano y una ciudad
+de texto libre. Ahora son los dos selectores encadenados del padrón, los mismos
+del catálogo y de los perfiles. La dirección exacta sigue siendo texto libre y
+no entra al cálculo.
 
-## 4. Transportista demo en el seed
+- Los **dos** checkouts validan `shipping_locality_id` **antes de escribir**;
+  un destino que no está en el padrón devuelve 400 y no crea ninguna orden.
+- Cada orden nueva guarda el destino con FK a `localities`. La ciudad y la
+  provincia que se muestran se derivan del padrón, **no** del texto del
+  cliente: eso también quedó en `shipping_address_json`.
+- Las órdenes anteriores quedan con destino `NULL` y **siguen legibles**, en el
+  detalle y en el listado. El caso 44 lo prueba borrando el destino de una
+  orden y volviéndola a leer.
 
-Cuarto usuario, `transportista@ejemplo.com / transportista123`, con los cinco
-datos completos y localidad del padrón oficial: **Pergamino, Buenos Aires**,
-camión con acoplado, habilitación declarada, radio 250 km y capacidad.
+La migración es reversible; probé `downgrade` y `upgrade` seguidos, y
+`alembic check` no detecta diferencias con los modelos.
 
-Si el padrón no tuviera esa localidad, **el seed corta con un mensaje claro**
-en vez de crear la cuenta. Un transportista sin localidad es un perfil que la
-propia API rechaza al editarlo; prefiero que falle el seed antes que dejar una
-cuenta rota.
+## 4. La compatibilidad
 
-No publica, no compra y no tiene datos bancarios ni privilegios nuevos.
+Los grupos salen del **carrito del servidor**, una futura orden por vendedor.
+El cliente elige el destino y nada más: no puede dictar vendedor, origen ni
+radio.
 
-## 5. El inventario da 50, no 48
+Un transportista entra sólo si su base está dentro de **su propio radio**
+respecto del destino **y de cada localidad de origen distinta** del grupo.
+Alcanza con fallar en un origen para quedar afuera. Todo eso ocurre en una
+consulta de PostGIS con `ST_DWithin`; las distancias visibles salen de
+`ST_Distance`. No se trae ningún transportista para descartarlo en Python.
 
-La puerta cuenta **ruta por medida**. Estaba en 46 = 23 rutas × 2 medidas.
-Pediste el perfil transportista "en lectura y edición, en escritorio y
-celular": son 2 rutas × 2 medidas = **4 mediciones nuevas**, no 2. 46 + 4 = 50.
+Además del filtro geográfico, sólo entran cuentas activas, verificadas,
+transportistas, con transporte, con declaración completa, base válida y radio
+positivo. **La capacidad se muestra y no filtra.** No hay orden por «mejor»: el
+listado sale por nombre.
 
-Para que diera 48 tendría que medir el transportista en una sola medida, que es
-justo lo contrario de lo que pediste. Dejé 50 y te lo marco en vez de acomodar
-el número.
+La respuesta lleva nombre, base, vehículo, declaración, fecha, radio, capacidad
+y las distancias a destino y a cada origen. **No lleva email, teléfono,
+WhatsApp, domicilio, CBU ni alias**, y esa ausencia está escrita en el esquema
+de salida, no en el criterio de quien arme la pantalla.
 
-Las dos rutas nuevas son `panel del transportista` y
-`panel: edición de transportista`, con marcadores que sólo existen para una
-cuenta transportista: el encabezado "Datos de transportista" y el selector
-`#perfil-localidad-base`. Si esa cuenta dejara de ser transportista, o la
-sección no abriera, la puerta falla en vez de medir un perfil común.
+En la interfaz se distinguen cuatro estados: cargando, sin coincidencias, grupo
+sin origen oficial y error real. **Cambiar el destino reemplaza el listado en el
+acto** y cada consulta lleva número, así que una respuesta tardía de un destino
+anterior no puede pisar el actual.
 
-## 6. La regresión del seed
+## 5. La evidencia
 
-La suite no corría el seed, así que la idempotencia no estaba demostrada por
-ninguna prueba. Caso **41**:
-
-```text
-[PASS] 41 Repetir el seed no duplica ni altera las cuentas demo —
-  4 cuentas demo idénticas tras repetir el seed;
-  transportista en Pergamino, Buenos Aires, radio 250.00 km
-```
-
-Saca un retrato de las cuatro cuentas demo —incluidos hash de contraseña, datos
-bancarios y los cinco campos de transporte—, corre el seed otra vez y exige que
-las cuatro filas queden **carácter por carácter iguales**, sin duplicados.
-
-**Rojo forzado**: hice que el seed reescribiera el transporte en cada corrida y
-el caso falló mostrando las dos versiones enfrentadas.
+Caso **43**, con dos vendedores y orígenes distintos:
 
 ```text
-[FAIL] 41 — repetir el seed cambió una cuenta demo:
-  antes:  …Camión con acoplado, dominio DEMO 01…
-  después: …Camión reescrito por el seed…
+[PASS] 43 Fletes compatibles por futura orden, con PostGIS y sin contacto —
+  2 grupos, 3 y 1 candidatos propios; límite en 104.8 km respetado;
+  API = PostGIS; sin contacto en JSON ni DOM
 ```
 
-## 7. Estado final
+Los radios de los candidatos se calculan **desde las distancias reales del
+padrón**, no con números fijos: Pergamino–Rosario da 104,8 km y
+Pergamino–Córdoba 435,8 km, y sobre eso se arman uno que cubre todo, uno que
+cubre un solo origen, uno justo en el límite, uno un kilómetro afuera y uno con
+el perfil incompleto. La comparación es contra la consulta PostGIS equivalente,
+grupo por grupo; no se comparan cantidades del seed.
 
 | Comprobación | Resultado |
 |---|---|
-| Suite completa, base recreada | **41/41** |
-| Caso 41 con el seed no idempotente | rojo, mostrando el campo cambiado |
-| Rojo de las tablas, reproducido con tablas vacías | 2 `serious`, como el tuyo |
-| Recorrido de teclado sobre la región | llega, se ve y desplaza |
-| `npm run a11y -- --todas` | **50/50** pantallas, 0 violaciones de cualquier impacto |
-| `npm run contraste` | 36/36 mediciones, 0 textos fuera de umbral |
-| `npm run build` | verde |
-| `git -c core.whitespace=cr-at-eol diff --cached --check` | sin avisos |
+| Falla en un solo origen | queda afuera del grupo lejano y adentro del cercano |
+| Justo en el límite del radio | adentro; un kilómetro menos, afuera |
+| Perfil sin declaración | no aparece en ningún grupo |
+| Grupo con un producto sin localidad | `origin_missing`, cero candidatos |
+| Cambio de destino | cambia la compatibilidad |
+| Contacto en JSON y en el DOM del checkout | ninguno |
 
-**Sobre el diff de `AdminPanel.tsx`:** son 168 líneas agregadas, pero el cambio
-real son **49**. El resto es sangría: al envolver las tres tablas, su contenido
-quedó un nivel adentro. Leelo con `git diff -w` y vas a ver sólo lo que
-importa. Preferí dejar la sangría correcta antes que un archivo desprolijo.
+**Rojo forzado sobre la regla central.** Saqué la exigencia de cubrir cada
+origen y el caso falló exactamente ahí:
+
+```text
+[FAIL] 43 — un candidato que falla en un solo origen quedó adentro
+```
+
+Casos **42** (la declaración) y **44** (el destino) tienen su propia evidencia,
+resumida en los puntos 2 y 3.
+
+## 6. Estado final
+
+| Comprobación | Resultado |
+|---|---|
+| Suite completa, base recreada | **44/44** |
+| Caso 43 sin la regla por origen | rojo, nombrando la causa |
+| `npm run a11y -- --todas` | **52/52**, 0 violaciones de cualquier impacto |
+| `npm run contraste` | 36/36, 0 textos fuera de umbral |
+| `npm run build` | verde |
+| `alembic check` y `downgrade`/`upgrade` | sin diferencias, reversible |
+| `git -c core.whitespace=cr-at-eol diff --cached --check` | sin avisos |
 
 **Sigue el bloqueo de Docker**: no hay imágenes en el entorno y el registro
 devuelve `Forbidden`. La suite corrió sobre la instalación nativa con el mismo
 puente en el `PATH`, sin modificar `smoke.mjs`.
 
-## 8. Riesgos
+## 7. Riesgos y desvíos
 
-**Uno solo, y es de alcance.** Arreglé las tres tablas de administración, no
-las dos que señalaste. La de usuarios tiene el mismo defecto y hoy pasa por la
-misma casualidad —tiene botones adentro—; separarla habría dejado media
-corrección esperando el día que esa tabla quede vacía.
+**Un desvío necesario, y es grande: cambiar el destino rompía cuatro guiones.**
+`smoke.mjs`, `a11y.mjs`, `contraste.mjs` y `mobile-audit.mjs` llenaban el
+checkout con la provincia por nombre y la ciudad por texto. Los actualicé a los
+selectores encadenados. No es alcance nuevo: es el costo de haber sacado el
+texto libre, y sin eso ninguna puerta corría.
 
-**No apareció ninguna familia nueva** de violaciones en las 50 pantallas.
+**Una decisión de criterio.** El listado aparece en el paso de envío, apenas se
+elige la localidad, y no en un paso propio. Preferí eso a agregar un paso al
+checkout: la persona ve los fletes mientras completa el destino y no queda una
+pantalla más entre el carrito y el pago. Si preferís un paso separado, se mueve.
+
+**Lo que la pieza no hace, a propósito:** no se elige transportista, no se
+revela contacto, no se asigna a la orden, no hay tarifa, ruteo, mapa ni
+capacidad automática. Las distancias son **en línea recta**, y la pantalla lo
+dice.
+
+**Una deuda que veo y no toqué:** los productos del seed no tienen localidad
+oficial uniforme, así que en una demo recién instalada muchos grupos van a
+mostrar «sin origen oficial». No lo arreglé porque tocar las localidades del
+catálogo demo es dato de producto y cambia lo que se ve en el buscador. Decime
+si querés que el seed les cargue localidad.
 
 **Sigue abierto el `float` del checkout**, obligatorio antes de Fase 4.
 
