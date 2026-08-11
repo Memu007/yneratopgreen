@@ -56,6 +56,8 @@ const ESPERADAS = [
   'panel del vendedor',
   'panel: mis ventas',
   'panel: mis productos',
+  'panel del transportista',
+  'panel: edición de transportista',
   'administración',
   'administración: usuarios',
   'administración: productos',
@@ -258,6 +260,27 @@ async function vendedor(page, medida) {
     page.getByRole('heading', { name: 'Mis Productos' }));
 }
 
+/**
+ * Perfil de transportista. Es media pantalla que sólo existe para una cuenta
+ * transportista: sin el usuario demo del seed, ninguna puerta la abría. Los
+ * marcadores son suyos —el encabezado de la sección y el selector de localidad
+ * base—, así que si la cuenta dejara de ser transportista, la puerta falla en
+ * vez de medir un perfil común.
+ */
+async function transportista(page, medida) {
+  await page.goto(WEB, { waitUntil: 'domcontentloaded' });
+  await page.locator('button').filter({ hasText: '👤' }).first().click();
+  await revisar(page, 'panel del transportista', medida,
+    page.getByRole('heading', { name: 'Datos de transportista' }));
+
+  await page.getByRole('button', { name: 'Editar' }).click();
+  await revisar(page, 'panel: edición de transportista', medida,
+    page.locator('#perfil-localidad-base'));
+
+  await page.getByRole('button', { name: 'Cancelar' }).click();
+  await page.locator('#perfil-localidad-base').waitFor({ state: 'detached', timeout: ESPERA });
+}
+
 async function administracion(page, medida) {
   await page.goto(WEB, { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: /Admin/i }).first().click();
@@ -284,6 +307,7 @@ try {
   const cuentas = {
     comprador: await ingresar('cliente@ejemplo.com', 'cliente123'),
     vendedor: await ingresar('vendedor@ejemplo.com', 'vendedor123'),
+    transportista: await ingresar('transportista@ejemplo.com', 'transportista123'),
     admin: await ingresar('admin@topgreen.com', 'admin123'),
   };
 
@@ -295,6 +319,7 @@ try {
       [null, publicas],
       [cuentas.comprador, comprador],
       [cuentas.vendedor, vendedor],
+      [cuentas.transportista, transportista],
       [cuentas.admin, administracion],
     ]) {
       const ctx = await contexto(navegador, viewport, tokens);

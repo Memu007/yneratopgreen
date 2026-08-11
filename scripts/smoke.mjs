@@ -103,6 +103,20 @@ function cargarConSettings(contenido) {
   }
 }
 
+// Corre el seed donde vive la aplicación, igual que `cargarConSettings` corre
+// Settings ahí y `querySql` habla con la base ahí.
+function correrSeed() {
+  try {
+    return execFileSync(
+      'docker',
+      ['exec', '-i', 'topgreen-api', 'python', '-m', 'app.seed'],
+      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
+    );
+  } catch (error) {
+    return `${error.stdout ?? ''}${error.stderr ?? ''}`;
+  }
+}
+
 // El transporte de correo de desarrollo escribe cada mensaje como un .eml en
 // backend/outbox. La suite lee de ahí el mismo enlace que recibiría la
 // persona, en vez de pedirle al backend un endpoint que devuelva el token: ese
@@ -3086,6 +3100,91 @@ await runCase(40, 'El perfil no inventa datos y guardar sin cambios no pisa nada
 
   return `sin constantes de ejemplo; "${conDatos.location}" intacta al guardar sin cambios; `
     + 'cuenta vacía sigue nula en API y SQL; cancelar no reaparece';
+});
+
+await runCase(41, 'Repetir el seed no duplica ni altera las cuentas demo', async () => {
+  // El seed agrega un transportista demo para que su media pantalla de perfil
+  // pueda medirse en una instalación limpia. Volver a correrlo tiene que dejar
+  // exactamente una cuenta de cada una y no tocar las tres anteriores.
+  const DEMO = [
+    'admin@topgreen.com',
+    'vendedor@ejemplo.com',
+    'cliente@ejemplo.com',
+    'transportista@ejemplo.com',
+  ];
+
+  const retrato = () => queryRows(`
+    SELECT
+      u.email,
+      u.id,
+      u.full_name,
+      u.password_hash,
+      u.role::text,
+      COALESCE(u.phone, ''),
+      COALESCE(u.location, ''),
+      COALESCE(u.cbu, ''),
+      COALESCE(u.alias_bancario, ''),
+      u.is_carrier::text,
+      COALESCE(u.carrier_base_locality_id, ''),
+      COALESCE(u.carrier_transport, ''),
+      u.carrier_transport_certified::text,
+      COALESCE(u.carrier_coverage_radius_km::text, ''),
+      COALESCE(u.carrier_capacity, '')
+    FROM users u
+    WHERE u.email IN (${DEMO.map(sqlLiteral).join(', ')})
+    ORDER BY u.email
+  `).map((fila) => fila.join('\u0001'));
+
+  const antes = retrato();
+  assert(antes.length === DEMO.length,
+    `el seed no dejó las ${DEMO.length} cuentas demo, sino ${antes.length}`);
+
+  // El transportista demo tiene que estar completo: un perfil incompleto es
+  // uno que la propia API rechaza al editarlo.
+  const [transportista] = queryRows(`
+    SELECT
+      u.is_carrier::text,
+      l.name,
+      l.province_name,
+      u.carrier_transport,
+      u.carrier_transport_certified::text,
+      u.carrier_coverage_radius_km::text,
+      COALESCE(u.carrier_capacity, ''),
+      u.is_verified::text
+    FROM users u
+    JOIN localities l ON l.id = u.carrier_base_locality_id
+    WHERE u.email = 'transportista@ejemplo.com'
+  `);
+  assert(transportista, 'el transportista demo no tiene una localidad del padrón');
+  assert(transportista[0] === 'true', 'el transportista demo no está marcado como tal');
+  assert(transportista[3].trim().length > 0, 'el transportista demo no declara transporte');
+  assert(transportista[4] === 'true', 'el transportista demo no declara habilitación');
+  assert(Number(transportista[5]) > 0, `radio no positivo: ${transportista[5]}`);
+  assert(transportista[6].trim().length > 0, 'el transportista demo no declara capacidad');
+  assert(transportista[7] === 'true', 'el transportista demo no quedó verificado');
+
+  const salida = correrSeed();
+  assert(/Seed completado/i.test(salida), `el seed no terminó bien: ${salida.slice(-200)}`);
+
+  const despues = retrato();
+  assert(despues.length === DEMO.length,
+    `repetir el seed dejó ${despues.length} cuentas demo en vez de ${DEMO.length}`);
+  for (let i = 0; i < antes.length; i += 1) {
+    assert(antes[i] === despues[i],
+      `repetir el seed cambió una cuenta demo:\n  antes:  ${antes[i]}\n  después: ${despues[i]}`);
+  }
+
+  const duplicados = queryCount(`
+    SELECT COUNT(*) FROM (
+      SELECT email FROM users
+      WHERE email IN (${DEMO.map(sqlLiteral).join(', ')})
+      GROUP BY email HAVING COUNT(*) > 1
+    ) AS repetidos
+  `);
+  assert(duplicados === 0, `hay ${duplicados} correos demo duplicados`);
+
+  return `${DEMO.length} cuentas demo idénticas tras repetir el seed; `
+    + `transportista en ${transportista[1]}, ${transportista[2]}, radio ${transportista[5]} km`;
 });
 
 const passed = results.filter((result) => result.passed).length;

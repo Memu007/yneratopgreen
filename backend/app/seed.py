@@ -13,6 +13,7 @@ from app.models.user import User, UserRole
 from app.models.category import Category
 from app.models.subcategory import Subcategory
 from app.models.form_option import FormOption
+from app.models.locality import Locality
 from app.core.security import hash_password
 from app.seed_localities import seed_localities
 from datetime import datetime
@@ -86,7 +87,47 @@ def create_seed_data():
             print("  ✅ Cliente creado: cliente@ejemplo.com / cliente123")
         else:
             print("  ⏭️  Cliente ya existe")
-        
+
+        # Transportista demo. Existe para que el perfil de transportista se
+        # pueda abrir y medir en una instalación limpia: sin una cuenta así, esa
+        # media pantalla no la ve ninguna puerta automática.
+        #
+        # La localidad base sale del padrón oficial que se acaba de sembrar. Si
+        # no estuviera, se corta acá: un transportista sin localidad es un
+        # perfil incompleto que la API rechaza al editarlo, y prefiero que falle
+        # el seed antes que dejar una cuenta rota.
+        carrier = db.query(User).filter(User.email == "transportista@ejemplo.com").first()
+        if not carrier:
+            base = db.query(Locality).filter(
+                Locality.name == "Pergamino",
+                Locality.province_name == "Buenos Aires",
+            ).first()
+            if not base:
+                raise RuntimeError(
+                    "El padrón no tiene Pergamino (Buenos Aires): no se puede "
+                    "crear el transportista demo con una localidad oficial."
+                )
+            carrier = User(
+                email="transportista@ejemplo.com",
+                password_hash=hash_password("transportista123"),
+                full_name="Carlos Transportista",
+                phone="+54 2477 55-0101",
+                role=UserRole.USER,
+                is_active=True,
+                is_verified=True,
+                location="Ruta 8 km 220, Pergamino, Buenos Aires",
+                is_carrier=True,
+                carrier_base_locality_id=base.id,
+                carrier_transport="Camión con acoplado, dominio DEMO 01",
+                carrier_transport_certified=True,
+                carrier_coverage_radius_km=250,
+                carrier_capacity="Hasta 30 toneladas de granos",
+            )
+            db.add(carrier)
+            print("  ✅ Transportista creado: transportista@ejemplo.com / transportista123")
+        else:
+            print("  ⏭️  Transportista ya existe")
+
 
         # === DATOS BANCARIOS DEMO === #
         # Sin CBU ni alias, una instalacion limpia no puede usar la

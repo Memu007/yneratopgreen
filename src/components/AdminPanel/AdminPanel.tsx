@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './AdminPanel.module.css';
 import { useToast } from '../Toast/Toast';
 import { apiGet, apiPost, apiPatch, apiDelete } from '../../utils/api';
@@ -101,6 +101,48 @@ interface OptionTypeInfo {
 interface AdminPanelProps {
   onClose: () => void;
 }
+
+/**
+ * Contenedor de una tabla que en pantallas chicas no entra y se desplaza en
+ * horizontal. Una región que se desplaza tiene que poder recorrerse con el
+ * teclado: hasta ahora las últimas columnas sólo se alcanzaban arrastrando con
+ * el dedo o el mouse.
+ *
+ * El `tabIndex` se agrega SÓLO cuando la región desborda de verdad, y eso se
+ * mide en vez de suponerse: en escritorio la tabla entra entera y una parada de
+ * tabulación que no lleva a ninguna parte sería un estorbo. Se observan el
+ * contenedor y la tabla porque las filas llegan después del primer dibujo.
+ */
+const TablaDesplazable: React.FC<{ etiqueta: string; children: React.ReactNode }> = ({
+  etiqueta,
+  children,
+}) => {
+  const contenedor = useRef<HTMLDivElement>(null);
+  const [desplazable, setDesplazable] = useState(false);
+
+  useEffect(() => {
+    const nodo = contenedor.current;
+    if (!nodo) return;
+
+    const medir = () => setDesplazable(nodo.scrollWidth > nodo.clientWidth + 1);
+    medir();
+
+    const observador = new ResizeObserver(medir);
+    observador.observe(nodo);
+    if (nodo.firstElementChild) observador.observe(nodo.firstElementChild);
+    return () => observador.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={contenedor}
+      className={styles.tableScroll}
+      {...(desplazable ? { tabIndex: 0, role: 'region', 'aria-label': etiqueta } : {})}
+    >
+      {children}
+    </div>
+  );
+};
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const { showToast } = useToast();
@@ -700,50 +742,52 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 </div>
               )}
 
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Nombre</th>
-                    <th>Email</th>
-                    <th>Rol</th>
-                    <th>Estado</th>
-                    <th>Registrado</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map(user => (
-                    <tr key={user.id}>
-                      <td>{user.full_name}</td>
-                      <td>{user.email}</td>
-                      <td>
-                        <select aria-label="Rol del usuario"
-                          value={user.role}
-                          onChange={(e) => handleChangeUserRole(user.id, e.target.value)}
-                          className={styles.roleSelect}
-                        >
-                          <option value="user">Usuario</option>
-                          <option value="admin">Admin</option>
-                        </select>
-                      </td>
-                      <td>
-                        <span className={`${styles.statusDot} ${user.is_active ? styles.active : styles.inactive}`}>
-                          {user.is_active ? 'Activo' : 'Inactivo'}
-                        </span>
-                      </td>
-                      <td>{formatDate(user.created_at)}</td>
-                      <td>
-                        <button
-                          className={`${styles.actionBtn} ${user.is_active ? styles.deactivate : styles.activate}`}
-                          onClick={() => handleToggleUserActive(user.id)}
-                        >
-                          {user.is_active ? 'Desactivar' : 'Activar'}
-                        </button>
-                      </td>
+              <TablaDesplazable etiqueta="Usuarios registrados">
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Nombre</th>
+                      <th>Email</th>
+                      <th>Rol</th>
+                      <th>Estado</th>
+                      <th>Registrado</th>
+                      <th>Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {users.map(user => (
+                      <tr key={user.id}>
+                        <td>{user.full_name}</td>
+                        <td>{user.email}</td>
+                        <td>
+                          <select aria-label="Rol del usuario"
+                            value={user.role}
+                            onChange={(e) => handleChangeUserRole(user.id, e.target.value)}
+                            className={styles.roleSelect}
+                          >
+                            <option value="user">Usuario</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        </td>
+                        <td>
+                          <span className={`${styles.statusDot} ${user.is_active ? styles.active : styles.inactive}`}>
+                            {user.is_active ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </td>
+                        <td>{formatDate(user.created_at)}</td>
+                        <td>
+                          <button
+                            className={`${styles.actionBtn} ${user.is_active ? styles.deactivate : styles.activate}`}
+                            onClick={() => handleToggleUserActive(user.id)}
+                          >
+                            {user.is_active ? 'Desactivar' : 'Activar'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TablaDesplazable>
               <div className={styles.pagination}>
                 Total: {usersTotal} usuarios
               </div>
@@ -753,49 +797,51 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {/* PRODUCTS */}
           {activeTab === 'products' && (
             <div className={styles.productsSection}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Imagen</th>
-                    <th>Nombre</th>
-                    <th>Precio</th>
-                    <th>Stock</th>
-                    <th>Vendedor</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map(product => (
-                    <tr key={product.id}>
-                      <td>
-                        <ProductImage
-                          src={product.image ? `${import.meta.env.VITE_IMAGES_URL || ''}${product.image}` : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iI2YwZjRlZCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiMyZDUwMTYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj7imqI8L3RleHQ+PC9zdmc+'}
-                          alt={product.name}
-                          className={styles.productThumb}
-                        />
-                      </td>
-                      <td>{product.name}</td>
-                      <td>{formatCurrency(product.price)}</td>
-                      <td>{product.stock}</td>
-                      <td>{product.seller_name || '-'}</td>
-                      <td>{getStatusBadge(product.status)}</td>
-                      <td>
-                        <select aria-label="Estado del producto"
-                          value={product.status}
-                          onChange={(e) => handleChangeProductStatus(product.id, e.target.value)}
-                          className={styles.statusSelect}
-                        >
-                          <option value="active">Activo</option>
-                          <option value="paused">Pausado</option>
-                          <option value="draft">Borrador</option>
-                          <option value="deleted">Eliminado</option>
-                        </select>
-                      </td>
+              <TablaDesplazable etiqueta="Publicaciones del catálogo">
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Imagen</th>
+                      <th>Nombre</th>
+                      <th>Precio</th>
+                      <th>Stock</th>
+                      <th>Vendedor</th>
+                      <th>Estado</th>
+                      <th>Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {products.map(product => (
+                      <tr key={product.id}>
+                        <td>
+                          <ProductImage
+                            src={product.image ? `${import.meta.env.VITE_IMAGES_URL || ''}${product.image}` : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iI2YwZjRlZCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiMyZDUwMTYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj7imqI8L3RleHQ+PC9zdmc+'}
+                            alt={product.name}
+                            className={styles.productThumb}
+                          />
+                        </td>
+                        <td>{product.name}</td>
+                        <td>{formatCurrency(product.price)}</td>
+                        <td>{product.stock}</td>
+                        <td>{product.seller_name || '-'}</td>
+                        <td>{getStatusBadge(product.status)}</td>
+                        <td>
+                          <select aria-label="Estado del producto"
+                            value={product.status}
+                            onChange={(e) => handleChangeProductStatus(product.id, e.target.value)}
+                            className={styles.statusSelect}
+                          >
+                            <option value="active">Activo</option>
+                            <option value="paused">Pausado</option>
+                            <option value="draft">Borrador</option>
+                            <option value="deleted">Eliminado</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TablaDesplazable>
               <div className={styles.pagination}>
                 Total: {productsTotal} productos
               </div>
@@ -805,41 +851,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {/* ORDERS */}
           {activeTab === 'orders' && (
             <div className={styles.ordersSection}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Orden</th>
-                    <th>Comprador</th>
-                    <th>Vendedor</th>
-                    <th>Items</th>
-                    <th>Total</th>
-                    <th>Estado</th>
-                    <th>Fecha</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map(order => (
-                    <tr key={order.id}>
-                      <td><strong>{order.order_number}</strong></td>
-                      <td>{order.buyer_name || '-'}</td>
-                      <td>{order.seller_name || '-'}</td>
-                      <td>{order.items_count}</td>
-                      <td>{formatCurrency(order.total_amount)}</td>
-                      <td>{getStatusBadge(order.status)}</td>
-                      <td>{formatDate(order.created_at)}</td>
-                      <td>
-                        <button
-                          className={styles.viewBtn}
-                          onClick={() => setSelectedOrder(order)}
-                        >
-                          👁️ Ver
-                        </button>
-                      </td>
+              <TablaDesplazable etiqueta="Órdenes de compra">
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Orden</th>
+                      <th>Comprador</th>
+                      <th>Vendedor</th>
+                      <th>Items</th>
+                      <th>Total</th>
+                      <th>Estado</th>
+                      <th>Fecha</th>
+                      <th>Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {orders.map(order => (
+                      <tr key={order.id}>
+                        <td><strong>{order.order_number}</strong></td>
+                        <td>{order.buyer_name || '-'}</td>
+                        <td>{order.seller_name || '-'}</td>
+                        <td>{order.items_count}</td>
+                        <td>{formatCurrency(order.total_amount)}</td>
+                        <td>{getStatusBadge(order.status)}</td>
+                        <td>{formatDate(order.created_at)}</td>
+                        <td>
+                          <button
+                            className={styles.viewBtn}
+                            onClick={() => setSelectedOrder(order)}
+                          >
+                            👁️ Ver
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TablaDesplazable>
               <div className={styles.pagination}>
                 Total: {ordersTotal} órdenes
               </div>

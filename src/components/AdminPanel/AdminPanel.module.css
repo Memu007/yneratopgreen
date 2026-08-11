@@ -302,6 +302,18 @@
 }
 
 /* Tables */
+
+/* Contenedor de desplazamiento de las tablas. En escritorio la tabla entra
+   entera y esto no hace nada; en celular desborda y el desplazamiento ocurre
+   acá, no en la tabla, para que la región pueda recibir el foco sin perder la
+   semántica de tabla. El foco sólo llega cuando desborda de verdad: lo decide
+   el componente, que lo mide. */
+.tableScroll:focus-visible {
+  outline: 3px solid #2d5016;
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+
 .table {
   width: 100%;
   background: white;
@@ -470,9 +482,16 @@
     font-size: 1.4rem;
   }
   
-  .table {
-    display: block;
+  .tableScroll {
     overflow-x: auto;
+  }
+
+  .table {
+    /* El ancho natural de las columnas, desbordando el contenedor que se
+       desplaza. Antes esto se lograba con `display: block` sobre la tabla, que
+       además le quitaba su semántica de tabla. */
+    width: max-content;
+    min-width: 100%;
   }
 }
 
