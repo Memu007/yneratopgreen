@@ -1,19 +1,22 @@
 # Estado actual
 
-Actualizado: 2026-08-10.
+Actualizado: 2026-08-11.
 
 ## Entrega aceptada y tarea actual
 
-El perfil transportista editable quedó aceptado el 2026-08-10 en el commit real
-`c484513`; el informe es `b753b17`. El informe llama por error `d4623b4` al
-commit de producto: es una inconsistencia narrativa menor y no otro cambio.
+La integridad y accesibilidad de la edición general del perfil quedó aceptada
+el 2026-08-11: producto `c5d2caa`, informe `6dfff09`. Build y `diff --check`
+independientes quedaron verdes. La PM desplegó ese Backend en Railway y
+reprodujo con una cuenta nueva que teléfono, WhatsApp y ubicación ausentes
+siguen siendo `null` después de guardar los tres campos vacíos. La dev informa
+40/40 y demostró el rojo del formulario anterior.
 
-La PM compiló el frontend y desplegó ese backend en el Railway descartable. En
-el servicio público reprodujo alta y confirmación de un transportista, edición
-de los cinco datos, lectura posterior con localidad y provincia derivadas y
-rechazo de una localidad inexistente sin alterar el perfil válido. Todo quedó
-verde. No se repitió la suite completa: la dev informó 39/39 y la PM cubrió de
-forma independiente el camino nuevo y de mayor riesgo.
+La PM también ejecutó el barrido completo contra Railway: las 46 pantallas se
+abrieron, y la edición de perfil pasó en escritorio y celular. El resultado
+global no fue verde: `scrollable-region-focusable` encontró dos violaciones
+serias preexistentes en las tablas móviles de productos y órdenes de
+administración. Son ajenas al diff aceptado; se cierran como tarea separada y
+no se ocultan ni se cargan retroactivamente a esta entrega.
 
 **Hallazgo operativo:** el frontend se desplegó automáticamente desde `main`,
 pero Backend siguió sirviendo el commit anterior. Para probar esta entrega la
@@ -21,11 +24,10 @@ PM tuvo que desplegar Backend manualmente. El entorno sigue siendo descartable;
 no se puede usar su estado verde como prueba de que los próximos cambios de
 backend se publicaron.
 
-**Tarea activa única de la dev:** cerrar la integridad y accesibilidad de la
-edición del perfil general. Hoy el formulario arranca con teléfono y ubicación
-inventados y puede sobrescribir datos reales al guardar; además, sus controles
-anteriores no tienen nombre accesible y el modo edición no entra en el barrido.
-El alcance y los frenos están al final de `PARA-DEV.md`.
+**Tarea activa única de la dev:** volver a cerrar la puerta accesible: corregir
+las dos regiones desplazables móviles y sumar un transportista demo completo
+para que sus controles de perfil entren en el barrido permanente. El alcance y
+los frenos están al final de `PARA-DEV.md`.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 

@@ -1098,7 +1098,7 @@ PM reprodujo alta y confirmación, actualización de los cinco campos, lectura
 posterior con localidad/provincia derivadas y rechazo atómico de una localidad
 inexistente. No reabras esta pieza.
 
-## Tarea activa única: integridad y accesibilidad de la edición del perfil
+## Tarea cerrada y aceptada: integridad y accesibilidad de la edición del perfil
 
 ### Situación comprobada
 
@@ -1147,3 +1147,52 @@ Entregá un commit de producto y otro separado con el informe en `PARA-PM.md`.
 Corré la regresión nueva, el barrido de accesibilidad en sus dos medidas, build
 y `git diff --check`; no repitas pruebas de pagos, catálogo o Railway si estos
 archivos no los afectan. Ahí termina la tarea.
+
+**Aceptada por PM el 2026-08-11:** producto `c5d2caa`, informe `6dfff09`. Build
+y `diff --check` independientes verdes. La PM desplegó el Backend nuevo en el
+Railway descartable y comprobó que una cuenta con teléfono, WhatsApp y ubicación
+ausentes sigue con los tres valores `null` después de guardar campos vacíos.
+La edición del perfil abrió y pasó axe en escritorio y celular.
+
+El barrido externo completo sí encontró un rojo ajeno a esta pieza: dos
+`scrollable-region-focusable` serios en las tablas móviles de productos y
+órdenes de administración. No invalida el arreglo de perfil, pero reabre la
+puerta global y dispara la tarea siguiente.
+
+## Tarea activa única: cerrar cobertura accesible de perfiles y administración
+
+### Evidencia y resultado exigido
+
+1. Reproducí en 390×844 las dos violaciones `scrollable-region-focusable` de
+   `administración: productos` y `administración: órdenes`. Hacé que esas
+   regiones desplazables sean alcanzables y utilizables por teclado, con foco
+   visible y nombre comprensible. No suprimas la regla, no bajes el umbral y no
+   agregues `tabIndex` sin comprobar el recorrido real.
+2. Se aprueba agregar **un cuarto usuario demo transportista** al seed. Debe
+   usar una localidad oficial y tener completos los cinco datos existentes:
+   localidad base, transporte, declaración de habilitación, radio positivo y
+   capacidad. Seed inicial y repetido deben dejar exactamente una cuenta, sin
+   duplicar ni alterar las tres cuentas demo actuales.
+3. Usá esa cuenta en `a11y.mjs` para abrir el perfil transportista en lectura y
+   edición en escritorio y celular. Exigí un marcador propio de sus controles;
+   si la cuenta no es transportista o la sección no abre, la puerta falla. El
+   inventario pasa de 46 a **48 pantallas**.
+4. El comando completo termina 48/48, con cero violaciones `serious` o
+   `critical`. Conservá además build, contraste y `diff --check` verdes. Agregá
+   sólo la regresión mínima de idempotencia del seed si la suite actual no lo
+   demuestra.
+
+### Alcance y freno
+
+Esta pieza cierra una puerta existente; no rediseñes las tablas ni el panel.
+No abras directorio o matching de transportistas, contactos, tarifas, estados
+logísticos, pagos, catálogo ni Railway. El usuario demo no publica, compra ni
+recibe privilegios nuevos.
+
+Si el rojo de las tablas no se reproduce localmente, no declares verde: traé
+la diferencia de navegador/DOM y verificá la semántica del elemento desplazable
+con la evidencia externa indicada arriba. Si aparece otra familia distinta de
+violaciones, frená y reportala antes de ampliar.
+
+Entregá un commit de producto y otro separado con el informe en `PARA-PM.md`.
+Ahí termina la tarea.
