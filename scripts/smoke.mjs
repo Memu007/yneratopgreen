@@ -3660,6 +3660,208 @@ await runCase(44, 'El destino de la orden sale del padrón y las órdenes viejas
     + 'padrón; orden sin destino sigue legible en detalle y listado';
 });
 
+await runCase(45, 'Una sincronización vieja no puede quedar última ni alimentar la consulta', async () => {
+  // Dos escrituras del carrito en vuelo a la vez: la vieja, retenida a
+  // propósito, y la nueva. Si la vieja termina última, el carrito del servidor
+  // queda con el snapshot anterior y todo lo que se calcule después —fletes y
+  // opciones de pago— describe un carrito que la persona ya no tiene.
+  // Los tiempos no se dejan al azar: la vieja se libera cuando la prueba
+  // quiere.
+  const publicaciones = queryRows(`
+    SELECT p.id, p.seller_id, p.name FROM products p
+    WHERE p.status = 'ACTIVE' AND p.stock > 0
+    ORDER BY p.seller_id, p.id
+  `);
+  const primeraDeCada = new Map();
+  for (const [id, vendedor, nombre] of publicaciones) {
+    if (!primeraDeCada.has(vendedor)) primeraDeCada.set(vendedor, { id, nombre });
+  }
+  const [[vendedorViejo, viejo], [, nuevo]] = [...primeraDeCada.entries()].slice(0, 2);
+  assert(nuevo, 'hacen falta dos vendedores con publicaciones activas');
+  const nombreDelVendedorViejo = queryRows(
+    `SELECT full_name FROM users WHERE id = ${sqlLiteral(vendedorViejo)}`)[0][0];
+
+  const carritoDelServidor = () => queryRows(`
+    SELECT ci.product_id FROM cart_items ci
+    JOIN carts c ON c.id = ci.cart_id
+    WHERE c.user_id = ${sqlLiteral(state.buyerId)} AND c.status = 'ACTIVE'
+    ORDER BY ci.product_id
+  `).map((fila) => fila[0]);
+
+  // El servidor arranca con el producto viejo; la persona va a armar otro.
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  await apiRequest('/cart/items', {
+    method: 'POST', token: state.buyerToken, body: { product_id: viejo.id, quantity: 1 },
+  });
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext();
+    await context.addInitScript(
+      ({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+        window.localStorage.removeItem('agromarket_cart');
+      },
+      { a: state.buyerToken, r: state.buyerRefreshToken },
+    );
+    const page = await context.newPage();
+
+    // La PRIMERA escritura del carrito queda retenida a voluntad. Con ella en
+    // vuelo se mira que nadie escriba ni lea por encima.
+    let liberar = () => {};
+    const retenida = new Promise((listo) => { liberar = listo; });
+    let sincronizaciones = 0;
+    let consultasDeFletes = 0;
+    let consultasDePago = 0;
+    await page.route('**/api/cart/sync', async (ruta) => {
+      sincronizaciones += 1;
+      if (sincronizaciones === 1) await retenida;
+      await ruta.continue();
+    });
+    await page.route('**/api/logistics/compatible-carriers*', async (ruta) => {
+      consultasDeFletes += 1;
+      await ruta.continue();
+    });
+    await page.route('**/api/orders/transfer-options*', async (ruta) => {
+      consultasDePago += 1;
+      await ruta.continue();
+    });
+
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+    const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+    await buscador.fill(nuevo.nombre);
+    await buscador.press('Enter');
+    await page.getByRole('heading', { name: nuevo.nombre, exact: true, level: 3 })
+      .waitFor({ state: 'visible', timeout: 15_000 });
+    await page.getByRole('button', { name: /Agregar/ }).first().click();
+
+    await page.getByRole('button', { name: /Carrito/ }).click();
+    await page.getByRole('button', { name: 'Continuar compra' }).click();
+    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor();
+
+    // El resto del formulario, que es obligatorio para poder avanzar.
+    await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
+    await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
+    await page.getByPlaceholder('2000').fill('2700');
+
+    // Destino elegido: sale la primera sincronización y queda retenida.
+    await elegirDestino(page, 'Pergamino');
+    await page.waitForFunction(() => true);
+    await page.waitForTimeout(1200);
+    assert(sincronizaciones === 1, `esperaba 1 sincronización en vuelo, hubo ${sincronizaciones}`);
+    // Con la escritura del carrito sin confirmar, no se puede haber consultado:
+    // leería el carrito anterior.
+    assert(consultasDeFletes === 0,
+      'se consultó compatibilidad con la sincronización todavía en vuelo');
+
+    // Con la escritura retenida, la persona avanza al pago. El paso de pago
+    // también sincroniza: si lo hiciera por su cuenta, habría dos escrituras
+    // en vuelo y la vieja podría terminar última. Tiene que esperar.
+    await page.getByRole('button', { name: /Continuar al Pago/ }).click();
+    await page.waitForTimeout(2000);
+    assert(sincronizaciones === 1,
+      `el pago escribió el carrito por encima de una escritura en vuelo `
+      + `(${sincronizaciones} en total)`);
+    assert(consultasDePago === 0,
+      'el pago pidió las opciones con la escritura del carrito sin confirmar');
+    assert(consultasDeFletes === 0,
+      'se consultó compatibilidad con la escritura del carrito sin confirmar');
+
+    // Recién ahora se libera. Todo lo que sigue tiene que leer el carrito
+    // nuevo, nunca el que el servidor tenía antes.
+    liberar();
+    await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: 15_000 });
+    await page.waitForFunction(
+      () => !document.body.textContent?.includes('Cargando opciones'),
+      null,
+      { timeout: 15_000 },
+    ).catch(() => {});
+    await page.waitForTimeout(2500);
+
+    const enServidor = carritoDelServidor();
+    assert(enServidor.length === 1 && enServidor[0] === nuevo.id,
+      `el carrito del servidor no quedó igual al visible: ${JSON.stringify(enServidor)}`);
+
+    const pago = ((await page.locator('[class*="_modal_"]').textContent()) || '')
+      .replace(/\s+/g, ' ');
+    assert(!pago.includes(nombreDelVendedorViejo),
+      `el paso de pago describe el carrito viejo (${nombreDelVendedorViejo})`);
+    assert(consultasDePago > 0, 'el pago nunca llegó a pedir las opciones');
+
+    return `con una escritura en vuelo: 0 escrituras encima, 0 consultas de fletes y `
+      + `0 de pago; liberada, el servidor queda con el carrito visible y el pago `
+      + 'describe al vendedor correcto';
+  } finally {
+    await browser.close();
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  }
+});
+
+await runCase(46, 'Vaciar el destino descarta la respuesta que venía en camino', async () => {
+  // Cambiar de provincia vacía la localidad. Una respuesta del destino
+  // anterior, liberada después, no puede volver a poner un listado.
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  await apiRequest('/cart/items', {
+    method: 'POST', token: state.buyerToken,
+    body: { product_id: state.product.id, quantity: 1 },
+  });
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext();
+    await context.addInitScript(
+      ({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+      },
+      { a: state.buyerToken, r: state.buyerRefreshToken },
+    );
+    const page = await context.newPage();
+
+    let liberar = () => {};
+    const retenida = new Promise((listo) => { liberar = listo; });
+    let consultas = 0;
+    await page.route('**/api/logistics/compatible-carriers*', async (ruta) => {
+      consultas += 1;
+      if (consultas === 1) await retenida;
+      await ruta.continue();
+    });
+
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+    await page.getByRole('button', { name: /Agregar/ }).first().click();
+    await page.getByRole('button', { name: /Carrito/ }).click();
+    await page.getByRole('button', { name: 'Continuar compra' }).click();
+    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor();
+
+    await elegirDestino(page, 'Pergamino');
+    await page.waitForTimeout(1000);
+    assert(consultas === 1, `esperaba 1 consulta retenida, hubo ${consultas}`);
+
+    // Cambiar de provincia vacía la localidad: el destino deja de existir.
+    await page.locator('#checkout-provincia').selectOption('14');
+    await page.waitForTimeout(600);
+    assert(await page.locator('#checkout-localidad').inputValue() === '',
+      'cambiar de provincia no vació la localidad');
+
+    liberar();
+    await page.waitForTimeout(2500);
+
+    const seccion = page.locator('[class*="_fletes_"]');
+    const cuantas = await seccion.count();
+    const texto = cuantas ? ((await seccion.first().textContent()) || '').slice(0, 160) : '';
+    assert(cuantas === 0, `sin destino reapareció un listado: "${texto}"`);
+
+    return 'respuesta del destino anterior liberada tras vaciar la localidad: '
+      + 'no reapareció ningún listado';
+  } finally {
+    await browser.close();
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

@@ -107,7 +107,29 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     .map((item) => `${item.product.id}x${item.quantity}`)
     .sort()
     .join('|');
-  const carritoSincronizado = useRef('');
+  // Último retrato PUESTO EN LA COLA, no el último terminado: si hay una
+  // sincronización en vuelo, el servidor todavía no representa lo que se ve.
+  const retratoEncolado = useRef('');
+  // Las sincronizaciones se encadenan una detrás de otra. Cancelar del lado
+  // del cliente no alcanza: el POST viejo ya viajó y, si termina último, deja
+  // el carrito de antes como estado final del servidor y la consulta vigente
+  // lee ese snapshot. Encadenarlas garantiza que la última en salir es la
+  // última en escribir.
+  const colaDeSincronizacion = useRef<Promise<void>>(Promise.resolve());
+
+  const asegurarCarritoEnServidor = (retrato: string) => {
+    if (retratoEncolado.current !== retrato) {
+      retratoEncolado.current = retrato;
+      const turno = colaDeSincronizacion.current
+        .catch(() => undefined)
+        .then(() => syncBackendCart());
+      colaDeSincronizacion.current = turno;
+    }
+    // Se espera la cola entera, aunque esta corrida no haya encolado nada:
+    // consultar con una sincronización vieja en vuelo sería leer el carrito
+    // anterior.
+    return colaDeSincronizacion.current;
+  };
 
   useEffect(() => {
     void getProvinces()
@@ -137,6 +159,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
 
   useEffect(() => {
     const destino = shippingData.localityId;
+    // El número se incrementa SIEMPRE, incluso cuando no hay destino: cambiar
+    // de provincia vacía la localidad, y una respuesta en vuelo de la anterior
+    // seguiría pasando por vigente si la generación no se hubiera movido.
+    const consulta = consultaDeFletes.current + 1;
+    consultaDeFletes.current = consulta;
+    const vigente = () => consultaDeFletes.current === consulta;
+
     // Cambiar de destino, o de carrito, invalida el listado anterior en el
     // acto: mostrar fletes de otro viaje sería peor que no mostrar ninguno.
     setFletes(null);
@@ -146,23 +175,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
       return;
     }
 
-    const consulta = consultaDeFletes.current + 1;
-    consultaDeFletes.current = consulta;
     setFletesCargando(true);
-    const vigente = () => consultaDeFletes.current === consulta;
 
     void (async () => {
       try {
         // El carrito que ve la persona vive en el navegador y el servidor
         // arma los grupos con el suyo. Sin sincronizar primero, el listado
-        // podría describir un carrito que ya no existe —o uno vacío—. La
-        // sincronización se reutiliza sólo mientras el carrito visible sea
-        // exactamente el mismo que se mandó.
-        if (carritoSincronizado.current !== retratoDelCarrito) {
-          await syncBackendCart();
-          if (!vigente()) return;
-          carritoSincronizado.current = retratoDelCarrito;
-        }
+        // podría describir un carrito que ya no existe —o uno vacío—.
+        await asegurarCarritoEnServidor(retratoDelCarrito);
+        if (!vigente()) return;
 
         const data = await apiGet<FletesCompatibles>(
           `/logistics/compatible-carriers?destination_locality_id=${encodeURIComponent(destino)}`,
@@ -170,10 +191,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         if (!vigente()) return;
         setFletes(data);
       } catch (err) {
+        // Una sincronización fallida no dejó el carrito del servidor donde
+        // debía, así que el intento siguiente tiene que volver a mandarlo:
+        // esto se limpia haya quedado vigente o no.
+        retratoEncolado.current = '';
         if (!vigente()) return;
         // Si la sincronización falla, no se consulta compatibilidad y se
         // muestra el motivo real, no un listado que no representa nada.
-        carritoSincronizado.current = '';
         setFletesError(err instanceof Error ? err.message : 'No se pudieron buscar fletes');
       } finally {
         if (vigente()) setFletesCargando(false);
@@ -206,7 +230,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     setError('');
     setLoadingTransferOptions(true);
     try {
-      await syncBackendCart();
+      // Por la misma cola que la búsqueda de fletes: si una sincronización
+      // anterior sigue en vuelo, ésta no puede adelantarla y terminar
+      // escribiendo última sobre el carrito del servidor.
+      await asegurarCarritoEnServidor(retratoDelCarrito);
       setTransferOptions(await apiGet<BankTransferOption[]>('/orders/transfer-options'));
     } catch (err) {
       setTransferOptions([]);
@@ -252,7 +279,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     setIsLoading(true);
 
     try {
-      await syncBackendCart();
+      await asegurarCarritoEnServidor(retratoDelCarrito);
 
       // 2. Crear la orden con los datos de envío
       const checkoutData = {
