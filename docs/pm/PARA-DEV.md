@@ -1360,3 +1360,40 @@ dependiente de tiempos naturales de red.
 No reescribas el caso A/B que ya sirve ni amplíes el módulo. Corré los casos
 enfocados, suite y puertas proporcionales, build y `diff --check`; entregá nuevo
 commit de producto e informe separado. Ahí vuelve a PM.
+
+### Tercera revisión PM de `db85ff4`: todavía no aceptada
+
+La cola es correcta dentro de una instancia y la generación ahora se mueve
+antes del retorno. Acepto que el caso 46 no discrimina el arreglo sin volver
+observable estado interno: no cambies la interfaz para fabricar esa prueba.
+
+El caso 45, en cambio, no cumple la regresión pedida. No cambia el carrito
+mientras la primera sincronización está retenida: el destino dispara B y el
+pago intenta sincronizar el mismo B. Que haya una sola escritura demuestra la
+deduplicación del mismo retrato, no que A y B se serialicen ni cuál queda al
+final.
+
+Hay además un recorrido normal que conserva la carrera: la cola y el retrato
+son `useRef` del `CheckoutModal`. Si la persona elige destino con el snapshot A,
+cierra el modal mientras el POST está en vuelo, modifica el carrito y reabre
+checkout con B, la instancia nueva crea otra cola. El POST B puede terminar
+primero y el POST A de la instancia desmontada puede terminar último,
+sobrescribiendo el carrito vigente.
+
+Corregí la coordinación en el dueño mínimo que sobreviva al desmontaje del
+modal y cubra todas las sincronizaciones de este carrito. No agregues una
+segunda solución ni una dependencia. La regresión determinista debe:
+
+1. armar A sólo desde la interfaz, abrir checkout, elegir destino y retener su
+   `/cart/sync`;
+2. cerrar checkout, cambiar el carrito visible de A a B desde la interfaz y
+   reabrirlo;
+3. elegir destino, dejar terminar la sincronización B y recién después liberar
+   A;
+4. comprobar que servidor, listado y paso de pago representan sólo B;
+5. ponerse rojo con la cola local actual y verde con la coordinación corregida.
+
+No hace falta otra prueba para el caso 46 ni tocar su corrección. No reabras
+PostGIS, migraciones, declaración, órdenes, Railway o la Pieza C. Corré el caso
+enfocado, suite y puertas proporcionales, build y `diff --check`; entregá nuevo
+commit de producto e informe separado. Ahí vuelve a PM.

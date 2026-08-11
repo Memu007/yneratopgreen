@@ -29,17 +29,19 @@ antes de sincronizar con el servidor el carrito local que la persona está
 viendo. La prueba lo oculta porque prepara previamente el carrito por API; en
 uso normal puede responder “carrito vacío” o usar una compra anterior.
 
-La primera corrección llegó en producto `1ec7082` e informe `2fdbd60`. El caso
-A/B ya demuestra que el carrito visible reemplaza al viejo del servidor, pero
-**todavía no está aceptada**: dos sincronizaciones pueden terminar fuera de
-orden y la vieja todavía puede sobrescribir la nueva en el servidor. Además,
-vaciar el destino no incrementa la generación de consulta, por lo que una
-respuesta anterior sigue considerándose vigente.
+La segunda corrección llegó en producto `db85ff4` e informe `864699c`. La
+generación del destino quedó corregida y la cola ordena las escrituras mientras
+vive una misma instancia del checkout, pero **todavía no está aceptada**. El
+caso 45 no usa dos snapshots: retiene B y vuelve a pedir B, por lo que prueba
+deduplicación y no el orden A/B exigido. La cola además vive dentro del modal;
+cerrar el checkout con A en vuelo y reabrirlo con B crea otra cola, que puede
+dejar terminar A después y sobrescribir B.
 
-**Tarea activa única de la dev:** cerrar esas dos carreras dentro de la misma
-Pieza B y dejar una regresión determinista que fuerce el orden inverso. No se
-reabren PostGIS, la migración, la declaración, la persistencia del destino ni
-el alcance de la Pieza C. El criterio exacto está al final de `PARA-DEV.md`.
+**Tarea activa única de la dev:** hacer que la coordinación sobreviva al cierre
+y reapertura del checkout y probar determinísticamente dos snapshots distintos.
+La corrección de destino no necesita una ampliación visual. No se reabren
+PostGIS, la migración, la declaración, la persistencia del destino ni el
+alcance de la Pieza C. El criterio exacto está al final de `PARA-DEV.md`.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
