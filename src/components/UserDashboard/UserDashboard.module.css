@@ -349,7 +349,10 @@
 
 .cancelButton {
   background: #f0f0f0;
-  color: #666;
+  /* #666 cumplía en reposo (5,04:1) pero no sobre el fondo del hover
+     (#e0e0e0, 4,34:1), y el puntero queda encima del botón apenas se entra en
+     edición. #555 cumple en los dos estados: 6,54:1 y 5,65:1. */
+  color: #555;
 }
 
 .cancelButton:hover {

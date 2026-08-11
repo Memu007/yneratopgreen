@@ -51,6 +51,7 @@ const ESPERADAS = [
   'checkout: envío',
   'checkout: pago',
   'panel del comprador',
+  'panel: edición de perfil',
   'panel: mis compras',
   'panel del vendedor',
   'panel: mis ventas',
@@ -165,7 +166,7 @@ async function publicas(page, medida) {
   // La vista del enlace, en su estado de rechazo, que es el que trae además el
   // formulario de reenvío. El estado de éxito consume un token y no puede
   // repetirse en cada corrida.
-  await page.goto(`${WEB}/verificar-correo?token=enlace-invalido-de-accesibilidad`, {
+  await page.goto(`${WEB}/verificar-correo#token=enlace-invalido-de-accesibilidad`, {
     waitUntil: 'domcontentloaded',
   });
   await revisar(page, 'verificación de correo', medida,
@@ -225,6 +226,17 @@ async function comprador(page, medida) {
   await page.locator('button').filter({ hasText: '👤' }).first().click();
   await revisar(page, 'panel del comprador', medida,
     page.getByRole('heading', { name: 'Mi Perfil' }));
+
+  // El modo edición es otra pantalla: sus controles sólo existen ahí. Medir
+  // sólo la lectura dejaba sin cubrir todos los campos del formulario.
+  await page.getByRole('button', { name: 'Editar' }).click();
+  await revisar(page, 'panel: edición de perfil', medida,
+    page.locator('#perfil-nombre'));
+
+  // Volver a lectura y comprobarlo: si el formulario queda abierto, la
+  // pantalla siguiente se mediría en un estado que no le corresponde.
+  await page.getByRole('button', { name: 'Cancelar' }).click();
+  await page.locator('#perfil-nombre').waitFor({ state: 'detached', timeout: ESPERA });
 
   await page.getByRole('button', { name: 'Mis Compras' }).click();
   await revisar(page, 'panel: mis compras', medida,

@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Toast/Toast';
 import { apiGet, apiPatch, apiDelete, apiPost, tokenStorage, API_BASE_URL } from '../../utils/api';
 import { ProductImage } from '../ProductImage/ProductImage';
+import { User } from '../../types';
 import {
   getLocalities,
   getProvinces,
@@ -168,6 +169,29 @@ const getImageUrl = (url: string | undefined): string => {
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
   return `${IMAGES_BASE_URL}${url}`;
 };
+
+// Único armador del formulario de perfil. Sale de la cuenta y de nada más: lo
+// que no está guardado empieza vacío, nunca con un dato de ejemplo. Hidratar y
+// cancelar usan esta misma función, así no pueden divergir.
+const formularioDesde = (cuenta: User | null) => ({
+  name: cuenta?.name || '',
+  phone: cuenta?.phone || '',
+  whatsapp: cuenta?.whatsapp || '',
+  // La ubicación es un texto libre y se conserva tal cual está guardado.
+  // Partirla en provincia/ciudad/dirección y volver a unirla no es reversible:
+  // "Rosario, Santa Fe" no tiene tres partes y una dirección puede traer comas.
+  location: cuenta?.location || '',
+  cbu: cuenta?.cbu || '',
+  bankAlias: cuenta?.bankAlias || '',
+  carrierBaseLocalityId: cuenta?.carrierBaseLocalityId || '',
+  carrierTransport: cuenta?.carrierTransport || '',
+  carrierTransportCertified: cuenta?.carrierTransportCertified ?? false,
+  // El radio viaja como texto mientras se edita y se convierte al guardar: así
+  // el campo puede quedar vacío sin volverse NaN.
+  carrierCoverageRadiusKm:
+    cuenta?.carrierCoverageRadiusKm != null ? String(cuenta.carrierCoverageRadiusKm) : '',
+  carrierCapacity: cuenta?.carrierCapacity || '',
+});
 
 interface UserDashboardProps {
   onClose: () => void;
@@ -384,25 +408,15 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   }, [editingProduct !== null]);
 
   // Estado temporal para edición de perfil
-  const [editForm, setEditForm] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    phone: '+54 9 11 5555-4444',
-    whatsapp: '+54 9 11 5555-4444',
-    province: 'Buenos Aires',
-    city: 'CABA',
-    address: 'Av. Corrientes 1234',
-    cbu: user?.cbu || '',
-    bankAlias: user?.bankAlias || '',
-    carrierBaseLocalityId: user?.carrierBaseLocalityId || '',
-    carrierTransport: user?.carrierTransport || '',
-    carrierTransportCertified: user?.carrierTransportCertified ?? false,
-    // El radio viaja como texto mientras se edita y se convierte al guardar:
-    // así el campo puede quedar vacío sin volverse NaN.
-    carrierCoverageRadiusKm:
-      user?.carrierCoverageRadiusKm != null ? String(user.carrierCoverageRadiusKm) : '',
-    carrierCapacity: user?.carrierCapacity || '',
-  });
+  const [editForm, setEditForm] = useState(() => formularioDesde(user));
+
+  // La cuenta llega después del primer render y vuelve a llegar tras guardar.
+  // Mientras no se esté editando, el formulario se rehidrata desde ella: es lo
+  // que hace que cancelar devuelva TODO —generales y transporte— al último
+  // estado guardado, sin una segunda copia del mismo mapeo.
+  useEffect(() => {
+    if (!isEditing) setEditForm(formularioDesde(user));
+  }, [user, isEditing]);
 
   // Los productos se cargan desde el backend en userProducts (ver useEffect arriba)
   // Las órdenes se cargan desde el backend en purchases y sales (ver useEffect arriba)
@@ -449,18 +463,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     };
   }, [isEditing, esTransportista, carrierProvinceId]);
 
-  // Cancelar devuelve los datos de transporte a lo guardado; si no, una edición
-  // abandonada volvería a enviarse en el guardado siguiente.
+  // Cancelar sale de la edición; la rehidratación de arriba devuelve todos los
+  // campos al último estado guardado. Una edición abandonada no puede
+  // reaparecer en el guardado siguiente.
   const handleCancelEdit = () => {
-    setEditForm((current) => ({
-      ...current,
-      carrierBaseLocalityId: user?.carrierBaseLocalityId || '',
-      carrierTransport: user?.carrierTransport || '',
-      carrierTransportCertified: user?.carrierTransportCertified ?? false,
-      carrierCoverageRadiusKm:
-        user?.carrierCoverageRadiusKm != null ? String(user.carrierCoverageRadiusKm) : '',
-      carrierCapacity: user?.carrierCapacity || '',
-    }));
+    setEditForm(formularioDesde(user));
     setCarrierProvinceId(user?.carrierBaseProvinceId || '');
     setCarrierPadronError('');
     setIsEditing(false);
@@ -481,7 +488,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       await updateProfile({
         name: editForm.name,
         phone: editForm.phone,
-        location: `${editForm.address}, ${editForm.city}, ${editForm.province}`,
+        whatsapp: editForm.whatsapp,
+        // Tal cual se editó: abrir y guardar sin tocar nada tiene que dejar el
+        // mismo texto que había.
+        location: editForm.location,
         cbu: editForm.cbu,
         bankAlias: editForm.bankAlias,
         // Los datos de transporte sólo salen si la cuenta es transportista;
@@ -1209,9 +1219,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         <div className={styles.profileForm}>
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
-              <label>Nombre Completo</label>
+              <label htmlFor={paraCampo('perfil-nombre')}>Nombre Completo</label>
               {isEditing ? (
                 <input
+                  id="perfil-nombre"
                   type="text"
                   value={editForm.name}
                   onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
@@ -1222,116 +1233,89 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             </div>
 
             <div className={styles.formGroup}>
+              {/* El email no se edita: no hay endpoint que lo cambie, y un
+                  campo que aparenta guardar y se ignora es peor que un dato
+                  fijo. Cambiar el correo exige reconfirmarlo, y eso es una
+                  pieza propia. */}
               <label>Email</label>
-              {isEditing ? (
-                <input
-                  type="email"
-                  value={editForm.email}
-                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                />
-              ) : (
-                <p>{user?.email}</p>
-              )}
+              <p>{user?.email}</p>
             </div>
           </div>
 
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
-              <label>Teléfono</label>
+              <label htmlFor={paraCampo('perfil-telefono')}>Teléfono</label>
               {isEditing ? (
                 <input
+                  id="perfil-telefono"
                   type="tel"
                   value={editForm.phone}
                   onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                   placeholder="+54 9 11 1234-5678"
                 />
               ) : (
-                <p>{editForm.phone || 'No especificado'}</p>
+                <p>{user?.phone || 'No especificado'}</p>
               )}
             </div>
 
             <div className={styles.formGroup}>
-              <label>WhatsApp</label>
+              <label htmlFor={paraCampo('perfil-whatsapp')}>WhatsApp</label>
               {isEditing ? (
                 <input
+                  id="perfil-whatsapp"
                   type="tel"
                   value={editForm.whatsapp}
                   onChange={(e) => setEditForm({ ...editForm, whatsapp: e.target.value })}
                   placeholder="+54 9 11 1234-5678"
                 />
               ) : (
-                <p>{editForm.whatsapp || 'No especificado'}</p>
-              )}
-            </div>
-          </div>
-
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label>Provincia</label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={editForm.province}
-                  onChange={(e) => setEditForm({ ...editForm, province: e.target.value })}
-                />
-              ) : (
-                <p>{editForm.province || 'No especificada'}</p>
-              )}
-            </div>
-
-            <div className={styles.formGroup}>
-              <label>Ciudad</label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={editForm.city}
-                  onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-                />
-              ) : (
-                <p>{editForm.city || 'No especificada'}</p>
+                <p>{user?.whatsapp || 'No especificado'}</p>
               )}
             </div>
           </div>
 
           <div className={styles.formGroup}>
-            <label>Dirección</label>
+            <label htmlFor={paraCampo('perfil-ubicacion')}>Ubicación</label>
             {isEditing ? (
               <input
+                id="perfil-ubicacion"
                 type="text"
-                value={editForm.address}
-                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                placeholder="Calle, número, piso, depto"
+                value={editForm.location}
+                onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                placeholder="Ruta 8 km 220, Pergamino, Buenos Aires"
               />
             ) : (
-              <p>{editForm.address || 'No especificada'}</p>
+              <p>{user?.location || 'No especificada'}</p>
             )}
           </div>
 
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
-              <label>CBU para transferencias</label>
+              <label htmlFor={paraCampo('perfil-cbu')}>CBU para transferencias</label>
               {isEditing ? (
                 <input
+                  id="perfil-cbu"
                   type="text"
                   value={editForm.cbu}
                   onChange={(e) => setEditForm({ ...editForm, cbu: e.target.value })}
                   placeholder="CBU"
                 />
               ) : (
-                <p>{editForm.cbu || 'No configurado'}</p>
+                <p>{user?.cbu || 'No configurado'}</p>
               )}
             </div>
             <div className={styles.formGroup}>
-              <label>Alias bancario</label>
+              <label htmlFor={paraCampo('perfil-alias')}>Alias bancario</label>
               {isEditing ? (
                 <input
+                  id="perfil-alias"
                   type="text"
                   value={editForm.bankAlias}
                   onChange={(e) => setEditForm({ ...editForm, bankAlias: e.target.value })}
                   placeholder="Alias"
                 />
               ) : (
-                <p>{editForm.bankAlias || 'No configurado'}</p>
+                <p>{user?.bankAlias || 'No configurado'}</p>
               )}
             </div>
           </div>

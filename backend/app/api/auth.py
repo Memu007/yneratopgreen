@@ -554,18 +554,22 @@ def update_current_user(
     if update_data.full_name is not None:
         current_user.full_name = update_data.full_name
     
+    # Un campo vacío se guarda como ausente, igual que CBU y alias. Si no, una
+    # cuenta sin teléfono que abre el perfil y guarda sin tocar nada pasaría de
+    # "sin dato" a "cadena vacía": el mismo dibujo en pantalla, otro valor en
+    # base y otra respuesta de la API.
     if update_data.phone is not None:
-        current_user.phone = update_data.phone
-    
+        current_user.phone = update_data.phone.strip() or None
+
     if update_data.whatsapp is not None:
-        current_user.whatsapp = update_data.whatsapp
-    
+        current_user.whatsapp = update_data.whatsapp.strip() or None
+
     if update_data.bio is not None:
-        current_user.bio = update_data.bio
-    
+        current_user.bio = update_data.bio.strip() or None
+
     if update_data.location is not None:
-        current_user.location = update_data.location
-    
+        current_user.location = update_data.location.strip() or None
+
     if update_data.avatar_url is not None:
         current_user.avatar_url = update_data.avatar_url
 

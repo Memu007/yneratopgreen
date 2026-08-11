@@ -2918,6 +2918,176 @@ await runCase(39, 'El transportista edita su perfil y los cambios quedan', async
     + '6 rechazos sin escritura';
 });
 
+await runCase(40, 'El perfil no inventa datos y guardar sin cambios no pisa nada', async () => {
+  // El formulario arrancaba con constantes de ejemplo —"+54 9 11 5555-4444",
+  // "CABA", "Av. Corrientes 1234"— y partía la ubicación en tres para volver a
+  // unirla. Abrir y guardar escribía datos falsos sobre una cuenta real y
+  // rompía cualquier ubicación que no tuviera exactamente tres partes.
+  const INVENTADOS = ['5555-4444', 'CABA', 'Av. Corrientes 1234'];
+  const password = 'smoke123';
+
+  // La ubicación tiene DOS partes a propósito: es el caso que se perdía.
+  const conDatos = {
+    email: `perfil.completo.${Date.now()}@example.com`,
+    nombre: 'Perfil Completo',
+    phone: '+54 341 555 0101',
+    whatsapp: '+54 341 555 0102',
+    location: 'Rosario, Santa Fe',
+  };
+  const sinDatos = {
+    email: `perfil.vacio.${Date.now()}@example.com`,
+    nombre: 'Perfil Vacio',
+  };
+
+  await registrarYVerificar({
+    email: conDatos.email,
+    password,
+    full_name: conDatos.nombre,
+    phone: conDatos.phone,
+  });
+  const ingresoCompleto = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email: conDatos.email, password },
+  });
+  await apiRequest('/auth/me', {
+    method: 'PATCH',
+    token: ingresoCompleto.data.access_token,
+    body: { whatsapp: conDatos.whatsapp, location: conDatos.location },
+  });
+
+  await registrarYVerificar({
+    email: sinDatos.email,
+    password,
+    full_name: sinDatos.nombre,
+  });
+  const ingresoVacio = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email: sinDatos.email, password },
+  });
+
+  const perfilDe = async (token) => (await apiRequest('/auth/me', { token })).data;
+
+  async function conPanel(tokens, accion) {
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const context = await browser.newContext();
+      await context.addInitScript(
+        ({ a, r }) => {
+          window.localStorage.setItem('access_token', a);
+          window.localStorage.setItem('refresh_token', r);
+        },
+        { a: tokens.access_token, r: tokens.refresh_token },
+      );
+      const page = await context.newPage();
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.locator('button').filter({ hasText: '👤' }).first().click();
+      await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
+      return await accion(page);
+    } finally {
+      await browser.close();
+    }
+  }
+
+  // --- 1. cuenta CON datos: lo que se ve es lo guardado
+  await conPanel(ingresoCompleto.data, async (page) => {
+    const perfil = page.locator('[class*="_profileForm_"]');
+    const lectura = ((await perfil.textContent()) || '').replace(/\s+/g, ' ');
+    for (const basura of INVENTADOS) {
+      assert(!lectura.includes(basura), `la lectura trae el dato inventado "${basura}"`);
+    }
+    assert(lectura.includes(conDatos.location), `la lectura no muestra la ubicación: ${lectura}`);
+
+    await page.getByRole('button', { name: 'Editar' }).click();
+    await page.locator('#perfil-nombre').waitFor();
+    // El correo no puede ser un control que aparente guardar: no hay endpoint.
+    assert(await perfil.locator('input[type="email"]').count() === 0,
+      'el email sigue siendo editable y el guardado no lo manda');
+
+    for (const [campo, esperado] of [
+      ['#perfil-nombre', conDatos.nombre],
+      ['#perfil-telefono', conDatos.phone],
+      ['#perfil-whatsapp', conDatos.whatsapp],
+      ['#perfil-ubicacion', conDatos.location],
+    ]) {
+      const valor = await page.locator(campo).inputValue();
+      assert(valor === esperado, `${campo} abrió con "${valor}" y no con "${esperado}"`);
+    }
+
+    // Guardar sin tocar nada no puede cambiar un solo carácter.
+    await page.getByRole('button', { name: 'Guardar' }).click();
+    await page.getByText('Perfil actualizado exitosamente').waitFor({ timeout: 15_000 });
+  });
+
+  const despuesDeGuardarIgual = await perfilDe(ingresoCompleto.data.access_token);
+  assert(despuesDeGuardarIgual.full_name === conDatos.nombre, 'guardar sin cambios movió el nombre');
+  assert(despuesDeGuardarIgual.phone === conDatos.phone, 'guardar sin cambios movió el teléfono');
+  assert(despuesDeGuardarIgual.whatsapp === conDatos.whatsapp, 'guardar sin cambios movió el WhatsApp');
+  assert(despuesDeGuardarIgual.location === conDatos.location,
+    `la ubicación de dos partes no sobrevivió: ${JSON.stringify(despuesDeGuardarIgual.location)}`);
+
+  // --- 2. cuenta SIN datos: los campos abren vacíos y siguen vacíos
+  await conPanel(ingresoVacio.data, async (page) => {
+    await page.getByRole('button', { name: 'Editar' }).click();
+    await page.locator('#perfil-nombre').waitFor();
+    for (const campo of ['#perfil-telefono', '#perfil-whatsapp', '#perfil-ubicacion']) {
+      const valor = await page.locator(campo).inputValue();
+      assert(valor === '', `${campo} abrió con "${valor}" en una cuenta sin datos`);
+    }
+    await page.getByRole('button', { name: 'Guardar' }).click();
+    await page.getByText('Perfil actualizado exitosamente').waitFor({ timeout: 15_000 });
+  });
+
+  const vacioDespues = await perfilDe(ingresoVacio.data.access_token);
+  for (const [campo, valor] of Object.entries({
+    phone: vacioDespues.phone,
+    whatsapp: vacioDespues.whatsapp,
+    location: vacioDespues.location,
+  })) {
+    assert(valor === null, `${campo} pasó de ausente a ${JSON.stringify(valor)}`);
+  }
+  const [enBaseVacio] = queryRows(`
+    SELECT COALESCE(phone, '<null>'), COALESCE(whatsapp, '<null>'), COALESCE(location, '<null>')
+    FROM users WHERE email = ${sqlLiteral(sinDatos.email)}
+  `);
+  assert(enBaseVacio.every((valor) => valor === '<null>'),
+    `la base guardó algo en una cuenta sin datos: ${JSON.stringify(enBaseVacio)}`);
+
+  // --- 3. cancelar no puede reaparecer en el guardado siguiente
+  const ubicacionNueva = 'Ruta 8 km 220, Pergamino, Buenos Aires';
+  await conPanel(ingresoCompleto.data, async (page) => {
+    await page.getByRole('button', { name: 'Editar' }).click();
+    await page.locator('#perfil-telefono').fill('+54 11 0000 0000');
+    await page.locator('#perfil-ubicacion').fill('Ubicación abandonada');
+    await page.getByRole('button', { name: 'Cancelar' }).click();
+    await page.locator('#perfil-nombre').waitFor({ state: 'detached' });
+
+    await page.getByRole('button', { name: 'Editar' }).click();
+    const telefono = await page.locator('#perfil-telefono').inputValue();
+    const ubicacion = await page.locator('#perfil-ubicacion').inputValue();
+    assert(telefono === conDatos.phone, `cancelar dejó el teléfono en "${telefono}"`);
+    assert(ubicacion === conDatos.location, `cancelar dejó la ubicación en "${ubicacion}"`);
+
+    // --- 4. y un cambio explícito sí se guarda
+    await page.locator('#perfil-ubicacion').fill(ubicacionNueva);
+    await page.getByRole('button', { name: 'Guardar' }).click();
+    await page.getByText('Perfil actualizado exitosamente').waitFor({ timeout: 15_000 });
+  });
+
+  const final = await perfilDe(ingresoCompleto.data.access_token);
+  assert(final.location === ubicacionNueva, `el cambio explícito no se guardó: ${final.location}`);
+  assert(final.phone === conDatos.phone, 'la edición cancelada volvió en el guardado siguiente');
+
+  const [enBase] = queryRows(`
+    SELECT location, phone, whatsapp FROM users WHERE email = ${sqlLiteral(conDatos.email)}
+  `);
+  assert(enBase[0] === ubicacionNueva, `ubicación SQL inesperada: ${enBase[0]}`);
+  assert(enBase[1] === conDatos.phone, `teléfono SQL inesperado: ${enBase[1]}`);
+  assert(enBase[2] === conDatos.whatsapp, `WhatsApp SQL inesperado: ${enBase[2]}`);
+
+  return `sin constantes de ejemplo; "${conDatos.location}" intacta al guardar sin cambios; `
+    + 'cuenta vacía sigue nula en API y SQL; cancelar no reaparece';
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 
