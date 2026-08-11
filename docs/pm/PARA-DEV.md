@@ -1159,7 +1159,7 @@ El barrido externo completo sí encontró un rojo ajeno a esta pieza: dos
 órdenes de administración. No invalida el arreglo de perfil, pero reabre la
 puerta global y dispara la tarea siguiente.
 
-## Tarea activa única: cerrar cobertura accesible de perfiles y administración
+## Tarea cerrada y aceptada: cobertura accesible de perfiles y administración
 
 ### Evidencia y resultado exigido
 
@@ -1196,3 +1196,95 @@ violaciones, frená y reportala antes de ampliar.
 
 Entregá un commit de producto y otro separado con el informe en `PARA-PM.md`.
 Ahí termina la tarea.
+
+**Aceptada por PM el 2026-08-11:** producto `6fd060d`, informe `1f7150f`. Tu
+objeción aritmética es correcta: el inventario es 50 y no 48. Build y
+`diff --check` independientes verdes. La PM desplegó el Backend nuevo en el
+Railway descartable; el seed creó el transportista en la primera corrida y lo
+reconoció en la segunda. El barrido público terminó **50/50**, sin violaciones
+de ningún impacto. No reabras esta pieza.
+
+## Tarea activa única — bloque largo: listado compatible de transportistas
+
+Objetivo vertical: en el checkout, una persona elige un destino del padrón y
+ve, por cada futura orden/vendedor del carrito, los transportistas cuya base
+cubre el destino y todos sus orígenes. Es la Pieza B de logística y el bloque
+que falta para demostrar la geolocalización de fletes del hito intermedio. No
+incluye todavía elegir transportista ni revelar contacto.
+
+### 1. Cerrar primero el dato contractual incompleto
+
+Hoy sólo existen el texto del vehículo y un booleano. `ALCANCE-Y-LIMITES.md` y
+`DECISIONS.md` exigen que la habilitación sea una **declaración con detalle y
+fecha**.
+
+- Agregá detalle de la declaración y fecha registrada por el servidor. La
+  persona no escribe ni retrodata la fecha.
+- Registro y edición de transportista exigen el detalle; una declaración nueva
+  o un cambio de detalle actualiza la fecha. Se muestra como declaración del
+  transportista, nunca como verificación de TopGreen.
+- No inventes detalle para perfiles existentes. Si la migración encuentra uno
+  sin detalle, queda incompleto y no aparece como compatible hasta completarlo.
+  El transportista demo sí debe quedar completo e idempotente.
+- Migración reversible, esquema/API, registro, perfil y regresión. Sin archivos,
+  organismos externos, vencimientos ni validación oficial.
+
+### 2. Destino oficial y persistente
+
+- Reemplazá provincia fija + ciudad libre del checkout por los selectores
+  encadenados del padrón ya usado en catálogo y perfiles. La dirección exacta
+  sigue siendo texto libre y no entra al cálculo.
+- Cada checkout nuevo envía y valida `shipping_locality_id`. Persistilo en cada
+  orden creada, con FK a localidades; las órdenes históricas deben seguir
+  leyendo aunque no tengan ese dato. Provincia y ciudad visibles se derivan del
+  padrón, no de texto aportado por el cliente.
+- Cambiar provincia o localidad invalida inmediatamente cualquier resultado
+  anterior. Una respuesta tardía no puede pisar el destino actual.
+
+### 3. Compatibilidad geográfica por carrito
+
+- El backend deriva los grupos del carrito activo: una futura orden por
+  vendedor. No acepta que el cliente le dicte vendedor, origen ni radio.
+- Para cada grupo, un transportista es compatible sólo si su base está dentro
+  de su radio declarado respecto del destino **y de cada localidad de origen
+  distinta** de los productos de ese grupo. Un producto sin localidad oficial
+  hace que ese grupo no pueda declarar compatibilidad; no se adivina desde
+  texto libre.
+- Usá `ST_DWithin` sobre `localities.coordinates` para filtrar en base. No
+  calcules distancias en Python ni traigas todos los transportistas para
+  filtrarlos en memoria. `ST_Distance` puede producir las distancias visibles
+  en km.
+- Sólo entran cuentas activas, verificadas, transportistas, con declaración
+  completa, base válida y radio positivo. La capacidad se muestra pero no
+  filtra. No ordenes por “mejor”; el directorio no recomienda.
+- La respuesta y las tarjetas muestran nombre, base, vehículo, declaración,
+  fecha, radio, capacidad y distancias rectas a destino y a cada origen. No
+  envían email, teléfono, WhatsApp, domicilio, CBU ni alias.
+- La interfaz distingue cargando, sin coincidencias, grupo sin origen oficial y
+  error real. Un destino nuevo reemplaza el listado anterior; no lo mezcla.
+
+### 4. Evidencia obligatoria
+
+- Regresión integral con al menos dos vendedores y orígenes distintos, límites
+  dentro/fuera del radio y cambio de destino. Para cada grupo, compará la API
+  con SQL/PostGIS equivalente; no uses cantidades fijas del seed.
+- Demostrá que un candidato que falla en un solo origen queda afuera, que un
+  perfil incompleto queda afuera y que ningún campo de contacto aparece ni en
+  el JSON ni en el DOM.
+- Demostrá validación y persistencia del destino en las órdenes nuevas sin
+  romper lectura de órdenes históricas ni los dos checkouts actuales.
+- Build, suite completa, accesibilidad, contraste y `diff --check` verdes. Si
+  agregás recorridos permanentes, actualizá el inventario exigido con la cuenta
+  correcta y explicala.
+
+### Límites y freno
+
+Bloque estimado de **1–2 días**. No implementes selección de transportista,
+contacto, asignación a la orden, vista logística del transportista, tarifa,
+ruteo, GPS, mapas, peso/capacidad automática, suscripciones ni pagos nuevos.
+No toques Railway. No uses distancia por caminos ni una API externa.
+
+Si el modelo actual de carrito no permite identificar los orígenes por grupo,
+o una migración obliga a romper órdenes existentes, frená con el caso concreto
+antes de cambiar la regla contractual. Entregá un commit de producto y otro
+separado con el informe en `PARA-PM.md`. Ahí termina la tarea.

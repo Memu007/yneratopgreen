@@ -4,19 +4,17 @@ Actualizado: 2026-08-11.
 
 ## Entrega aceptada y tarea actual
 
-La integridad y accesibilidad de la edición general del perfil quedó aceptada
-el 2026-08-11: producto `c5d2caa`, informe `6dfff09`. Build y `diff --check`
-independientes quedaron verdes. La PM desplegó ese Backend en Railway y
-reprodujo con una cuenta nueva que teléfono, WhatsApp y ubicación ausentes
-siguen siendo `null` después de guardar los tres campos vacíos. La dev informa
-40/40 y demostró el rojo del formulario anterior.
+La cobertura accesible de perfiles y administración quedó aceptada el
+2026-08-11: producto `6fd060d`, informe `1f7150f`. La Dev objetó correctamente
+la cuenta pedida por PM: lectura y edición del transportista en dos medidas
+agregan cuatro recorridos, por lo que el inventario correcto es 50, no 48.
 
-La PM también ejecutó el barrido completo contra Railway: las 46 pantallas se
-abrieron, y la edición de perfil pasó en escritorio y celular. El resultado
-global no fue verde: `scrollable-region-focusable` encontró dos violaciones
-serias preexistentes en las tablas móviles de productos y órdenes de
-administración. Son ajenas al diff aceptado; se cierran como tarea separada y
-no se ocultan ni se cargan retroactivamente a esta entrega.
+La PM compiló el frontend, desplegó el Backend en Railway, corrió el seed dos
+veces y reprodujo el barrido completo contra el entorno público: **50/50**, cero
+violaciones de cualquier impacto. La primera corrida del seed creó el cuarto
+usuario transportista y la segunda reconoció el existente. Las tres tablas
+móviles de administración y las vistas de transportista pasaron. La dev
+informa además suite 41/41 e idempotencia contrastada por SQL.
 
 **Hallazgo operativo:** el frontend se desplegó automáticamente desde `main`,
 pero Backend siguió sirviendo el commit anterior. Para probar esta entrega la
@@ -24,10 +22,12 @@ PM tuvo que desplegar Backend manualmente. El entorno sigue siendo descartable;
 no se puede usar su estado verde como prueba de que los próximos cambios de
 backend se publicaron.
 
-**Tarea activa única de la dev:** volver a cerrar la puerta accesible: corregir
-las dos regiones desplazables móviles y sumar un transportista demo completo
-para que sus controles de perfil entren en el barrido permanente. El alcance y
-los frenos están al final de `PARA-DEV.md`.
+**Tarea activa única de la dev, bloque largo:** construir el listado de
+transportistas compatibles por origen, destino y radio, junto con el destino
+oficial que le falta al checkout. Antes de listar debe cerrar el dato
+contractual todavía ausente: detalle y fecha de la declaración de habilitación.
+No incluye selección, contacto ni inclusión en la orden; esos quedan para la
+Pieza C. El alcance y los frenos están al final de `PARA-DEV.md`.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
