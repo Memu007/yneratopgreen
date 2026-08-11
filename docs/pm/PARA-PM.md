@@ -2,182 +2,173 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-Fecha: 2026-08-10.
+Fecha: 2026-08-11.
 
 ## 1. Resultado
 
-**Terminado.** `d4623b4`, este informe aparte. La suite pasa de 38 a **39
-casos**.
+**Terminado.** El commit de producto es **`c5d2caa`**; este informe va aparte y
+su hash te lo digo abajo. La suite pasa de 39 a **40 casos** y el barrido de
+accesibilidad de 44 a **46 pantallas**.
 
-Un aviso arriba de todo, porque cambia cómo leer la evidencia: **el entorno
-perdió las imágenes y los contenedores Docker**, y el registro sigue bloqueado
-por egreso. Está explicado en el punto 6; la suite igual corrió entera.
+Antes que nada: **tenés razón con el hash.** El informe anterior decía
+`d4623b4` porque escribí el número antes de rebasar sobre tu commit, y el
+rebase lo reescribió a `c484513`. Es un error mío de procedimiento, no una
+confusión de contenido. Desde ahora anoto el hash después de rebasar.
 
-## 2. Situación encontrada
+## 2. Causa
 
-Confirmo tu diagnóstico y agrego el alcance exacto. Los cinco datos se guardan
-en el alta y `/auth/me` los devuelve, pero no había ningún camino de edición:
+El formulario del panel nunca leía la cuenta. Arrancaba con constantes:
 
-| Pieza | Estado |
-|---|---|
-| `UserUpdateRequest` | sin los cinco campos |
-| `PATCH /auth/me` | no los leía ni los escribía |
-| `AuthContext.updateProfile` | no los mandaba |
-| Panel de perfil | no los mostraba |
+```ts
+phone: '+54 9 11 5555-4444',
+whatsapp: '+54 9 11 5555-4444',
+province: 'Buenos Aires', city: 'CABA', address: 'Av. Corrientes 1234',
+```
 
-Como `UserUpdateRequest` es un modelo común de Pydantic, mandarlos igual no
-fallaba: los descartaba en silencio y devolvía 200. Es la peor forma de no
-funcionar y es lo que reproduce el rojo del punto 5.
+y guardaba `location` como `` `${address}, ${city}, ${province}` ``. De ahí
+salen los tres defectos, que son el mismo:
+
+1. abrir edición y guardar **escribía datos falsos** sobre una cuenta real;
+2. una ubicación que no tuviera exactamente tres partes **no sobrevivía**:
+   `"Rosario, Santa Fe"` se convertía en `"Av. Corrientes 1234, CABA, Buenos
+   Aires"`;
+3. el email y el WhatsApp eran controles que **aparentaban guardar** y el
+   envío ignoraba.
 
 ## 3. Qué hice
 
-**Backend.** Los cinco campos entran al esquema. `is_carrier` **no**: quién
-puede volverse transportista, o dejar de serlo, es la política que marcaste
-como no decidida, así que el endpoint no la puede tomar por su cuenta. Una
-cuenta que no es transportista recibe 400 y ningún dato de transporte.
+**Una sola función arma el formulario** desde la cuenta y desde nada más. Lo
+que no está guardado empieza vacío. La usan la hidratación y el cancelar, así
+que no pueden divergir: cancelar devuelve **todos** los campos —generales y de
+transporte— al último estado guardado.
 
-La validación trabaja sobre el estado **prospectivo** —lo enviado sobre lo
-guardado— y recién asigna cuando el conjunto entero es válido. Es el mismo
-patrón del carrito y responde a tu criterio de que un envío parcial no puede
-dejar un estado inválido:
+**La ubicación pasa a ser un campo de texto libre que se conserva tal cual.**
+Es la única representación reversible con el dato de hoy: `users.location` es
+un `String(255)` libre, y cualquier partición en tres pierde información en
+cuanto el texto tiene dos partes, cuatro, o una coma dentro de la calle. Sin
+padrón nuevo, sin campos nuevos y sin migración. **No cambié el formato de lo
+ya guardado**: el consumidor que parte por comas para mostrar la ubicación del
+vendedor sigue viendo exactamente la misma cadena.
 
-| Envío parcial | Respuesta |
-|---|---|
-| localidad fuera del padrón | 400 "La localidad base no pertenece al padrón" |
-| radio `0` o negativo | 422, igual que en el alta |
-| transporte en blanco | 400 "El transporte es obligatorio para transportistas" |
-| habilitación retirada | 400 "El transporte debe estar habilitado" |
-| cuenta que no es transportista | 400, y sigue sin datos de transporte |
+**El email queda de sólo lectura.** No existe endpoint que lo cambie, y
+cambiarlo exigiría reconfirmarlo: es una pieza propia, no un campo. **El
+WhatsApp sí se envía ahora**, que era el arreglo correcto para ese otro control
+ignorado.
 
-Ninguno escribe: la validación termina antes de tocar el modelo y antes del
-`commit`.
+**Un cambio chico en el backend que hacía falta.** `PATCH /auth/me` guardaba la
+cadena vacía tal cual. Entonces una cuenta sin teléfono que abría y guardaba
+sin tocar nada pasaba de "sin dato" a "cadena vacía": mismo dibujo, otro valor
+en base y otra respuesta de la API. Ahora un texto vacío se guarda como
+ausente en teléfono, WhatsApp, biografía y ubicación, **igual que ya se hacía
+con CBU y alias**. Sin eso no se puede cumplir "conservar exactamente el valor
+persistido, incluso si está vacío".
 
-**Un agregado que me pareció imprescindible.** `/auth/me` devolvía sólo
-`carrier_base_locality_id`. Con un identificador no se puede ni mostrar la
-localidad ni abrir el selector en la provincia correcta. Agregué tres derivados
-de **sólo lectura** —nombre de localidad, id y nombre de provincia— resueltos
-por la relación que ya existía. Sin columnas nuevas y sin migración.
+## 4. El barrido encontró algo apenas se lo abrió
 
-**Interfaz.** La sección aparece únicamente si la cuenta es transportista.
-Lectura con los nombres del padrón; edición con selector de provincia y
-localidad, transporte, radio, capacidad y la casilla de declaración.
+Incorporé el modo edición al barrido en las dos medidas, con marcador propio
+(`#perfil-nombre`) y comprobando además la vuelta a lectura. En la primera
+corrida, esto:
 
-## 4. Tres decisiones que conviene que mires
+```text
+[serious] color-contrast
+  2 elementos en: escritorio/panel: edición de perfil, celular/panel: edición
+  · ._cancelButton_…  <button>Cancelar</button>
+```
 
-1. **Cancelar ahora restaura los datos de transporte.** Antes el formulario
-   conservaba lo tipeado, así que una edición abandonada volvía a enviarse en
-   el guardado siguiente. Lo acoté a los campos nuevos; los de comprador y
-   vendedor siguen comportándose igual.
-2. **El error visible del perfil pasa a ser el motivo real de la API**, con el
-   texto genérico anterior como respaldo cuando no hay mensaje. Es un desvío
-   chico de "los mensajes actuales no cambian" y lo hice a propósito: sin eso,
-   un rechazo de padrón se veía como "Error al guardar el perfil". Si preferís
-   el genérico, lo vuelvo en una línea.
-3. **El radio se frena en el cliente antes de enviar.** El formulario del panel
-   no está dentro de un `<form>`, así que no hay validación nativa: sin ese
-   freno el campo vacío salía sin radio y el backend conservaba el anterior sin
-   avisar.
+El botón **Cancelar** usaba `#666` sobre `#f0f0f0`: 5,04:1, que pasa. Pero el
+puntero queda encima del botón apenas se entra en edición, y sobre el fondo del
+hover —`#e0e0e0`— da **4,34:1**. Lo pasé a `#555`: **6,54:1** en reposo y
+**5,65:1** en hover, así cumple en los dos estados. Es exactamente lo que
+anticipaste: la pantalla podía quedar verde sin abrirse nunca.
+
+**Probé que la puerta falla si no abre.** Rompí la navegación a edición a
+propósito y el comando cortó, sin declararla medida:
+
+```text
+Error: No llegué a «panel: edición de perfil» en escritorio: el marcador de la
+pantalla no apareció. La puerta no puede medir lo que no abrió.
+```
+
+Restauré el guion. La rotura no está versionada.
+
+De paso, ya que tocaba este archivo, **alineé el marcador `?token=` a
+fragmento**, como pediste que se hiciera cuando estos guiones se volvieran a
+tocar. El de `contraste.mjs` sigue igual: no lo toqué en esta pieza.
 
 ## 5. La regresión
 
-Caso **39**, integral y por el camino real:
+Caso **40**:
 
 ```text
-[PASS] 39 El transportista edita su perfil y los cambios quedan —
-  panel + API + SQL: Pergamino → 11 de Septiembre, 320.5 km;
-  6 rechazos sin escritura
+[PASS] 40 El perfil no inventa datos y guardar sin cambios no pisa nada —
+  sin constantes de ejemplo; "Rosario, Santa Fe" intacta al guardar sin
+  cambios; cuenta vacía sigue nula en API y SQL; cancelar no reaparece
 ```
 
-Cubre alta y confirmación, `/auth/me` con el padrón resuelto, los cinco datos
-editados desde el panel —incluida la casilla, que se destilda y se vuelve a
-tildar—, recarga, **nuevo ingreso**, contraste con SQL y los seis rechazos con
-comprobación de que el registro quedó intacto.
+Dos cuentas reales, por el panel:
 
-**El rojo forzado encontró un defecto mío, y lo agradezco.** Saqué los cinco
-campos del esquema para simular el estado anterior y el caso falló, pero por
-una razón equivocada: un tiempo de espera agotado en el selector de localidad.
-Investigándolo apareció un error real de mi propio código: elegir **la misma**
-provincia vaciaba la lista de localidades y no la volvía a cargar, porque el
-estado no cambiaba y el efecto no se repetía. En la corrida verde había pasado
-por casualidad, ganándole la carrera al vaciado. Corregí las dos cosas —el
-cambio nulo y una respuesta vieja que podía pisar a la nueva— y recién ahí el
-rojo salió por el motivo correcto:
+| Comprobación | Cuenta con datos | Cuenta sin datos |
+|---|---|---|
+| Lectura sin constantes de ejemplo | sí | sí |
+| Los campos abren con lo guardado | los cuatro, exactos | los tres, **vacíos** |
+| Guardar sin cambios | nombre, teléfono, WhatsApp y ubicación idénticos | siguen **nulos** en `/auth/me` y en SQL |
+| No hay control de email | comprobado | — |
+| Cancelar tras editar dos campos | vuelve a lo guardado y no reaparece al guardar | — |
+| Cambio explícito de ubicación | guardado y contrastado con SQL | — |
+
+La ubicación de prueba tiene **dos** partes a propósito: es el caso que se
+perdía.
+
+**Rojo forzado.** Devolví las constantes al formulario y el caso falló nombrando
+el dato inventado:
 
 ```text
-[FAIL] 39 — tras recargar falta "11 de Septiembre" en "…Transporte habilitado
-  Camión chico original Radio de cobertura (km) 40 km Capacidad de carga
-  Hasta 8 toneladas…"
+[FAIL] 40 — #perfil-telefono abrió con "+54 9 11 5555-4444" y no con
+  "+54 341 555 0101"
 ```
 
-Es decir: el panel avisa "Perfil actualizado exitosamente" y no guardó nada.
-Ese es exactamente el fallo silencioso que la pieza cierra.
+Con eso corta antes de llegar a las comprobaciones de ubicación; aclaro el
+alcance de ese rojo para no venderlo como más de lo que prueba: demuestra la
+hidratación inventada, y la pérdida de la ubicación queda demostrada por la
+comprobación verde de que `"Rosario, Santa Fe"` sobrevive, que con el guardado
+anterior era imposible por construcción.
 
-## 6. El entorno perdió Docker, y cómo corrí igual la suite
-
-`docker images` y `docker ps -a` vienen **vacíos**: no quedó ninguna imagen ni
-contenedor de los que usaste en Gate A. Levanté el demonio, pero reconstruir
-exige descargar y el registro sigue bloqueado:
-
-```text
-docker pull postgis/postgis:16-3.4
-failed to copy: … production.cloudfront.docker.com/…/blobs/… : Forbidden
-```
-
-No lo rodeé. La suite habla con la base y con la aplicación por
-`docker exec topgreen-db` y `docker exec topgreen-api`, así que sobre la
-instalación **nativa** —el Camino B que aceptaste en `896386a`— no arranca.
-
-Lo resolví **sin tocar la suite**: un puente ejecutable llamado `docker`,
-adelante en el `PATH`, que traduce esas dos invocaciones exactas al `psql` y al
-Python nativos y **rechaza cualquier otra**. No está versionado, no relaja
-ninguna comprobación y el archivo que ejecuta la suite es el mismo que está en
-el repo. Prefiero esto a modificar `querySql`: un respaldo silencioso adentro
-del guion podría tapar mañana un Docker roto de verdad.
-
-Con eso, base recreada desde cero cada vez —borrar, crear, PostGIS, seis
-migraciones, seed, outbox vacío—:
-
-| Corrida | Resultado |
-|---|---|
-| Con el esquema anterior | **38/39**, sólo el 39 en rojo |
-| Con la corrección | **39/39** |
-
-Queda pendiente para vos, si querés cerrarlo: **repetir la suite sobre Docker**
-en tu entorno. Es la misma división que usamos en Gate A.
-
-## 7. Estado final
+## 6. Estado final
 
 | Comprobación | Resultado |
 |---|---|
-| Suite completa, base recreada | **39/39** |
-| Caso 39 con el código anterior | rojo, y por el motivo correcto |
-| `npm run build` | verde |
-| `npm run a11y -- --todas` | 44/44 pantallas, 0 violaciones de cualquier impacto |
+| Suite completa, base recreada | **40/40** |
+| Caso 40 con el formulario anterior | rojo, nombrando el dato inventado |
+| `npm run a11y -- --todas` | **46/46** pantallas, 0 violaciones de cualquier impacto |
+| Puerta de accesibilidad con la navegación rota | corta y no declara la pantalla |
 | `npm run contraste` | 36/36 mediciones, 0 textos fuera de umbral |
+| `npm run build` | verde |
 | `git -c core.whitespace=cr-at-eol diff --cached --check` | sin avisos |
 
-Los dos barridos los corrí porque toqué el panel. Ninguna de sus cuentas es
-transportista, así que la sección nueva no entra en lo medido; lo corro para
-demostrar que no rompí las 44 pantallas que ya estaban.
+Corrí contraste sin que lo pidieras porque toqué un color; no repetí nada de
+pagos, catálogo ni Railway.
 
-## 8. Riesgos y hallazgos
+**Sigue el bloqueo de Docker** de la entrega anterior: no hay imágenes en el
+entorno y el registro devuelve `Forbidden`. La suite corrió sobre la
+instalación nativa con el mismo puente en el `PATH` que te describí, sin
+modificar `smoke.mjs`.
 
-**Sin migración.** Ninguna hacía falta: las columnas ya existían.
+## 7. Riesgos y lo que queda afuera
 
-**Tres cosas que vi y no toqué**, porque estaban fuera del alcance:
+**Un riesgo de producto, chico y consciente.** La ubicación es ahora un solo
+campo libre. Se gana que nunca se pierda lo guardado; se pierde la sugerencia
+visual de que hay que cargar provincia y ciudad. El texto de ejemplo del campo
+la mantiene. Si querés ubicación estructurada de verdad, eso es padrón y
+migración, y es una pieza aparte que hay que decidir.
 
-1. **El formulario de perfil arranca con datos inventados.** `phone`,
-   `whatsapp`, `province`, `city` y `address` se inicializan con constantes
-   —`+54 9 11 5555-4444`, `CABA`, `Av. Corrientes 1234`— en vez de con los
-   datos de la cuenta. Quien guarda su perfil se escribe encima el teléfono con
-   uno falso. Es previo a esta pieza y toca la edición general que pediste no
-   cambiar, pero es un defecto de verdad y conviene una pieza corta.
-2. **Los campos previos del formulario no tienen nombre accesible** en modo
-   edición: la etiqueta no está asociada al control. Los míos sí. No lo detecta
-   la puerta porque el barrido mide el panel en lectura, nunca en edición.
-3. **La edición del perfil no está en el barrido de accesibilidad.** Es la
-   misma familia que los marcadores `?token=` que dejaste anotados: cuando se
-   vuelvan a tocar esos guiones, entra.
+**El bloque de transportista no entra al barrido.** Las tres cuentas del seed
+no son transportistas, así que la pantalla medida es la de un usuario común y
+mis controles nuevos de transporte quedan fuera. No lo resolví por mi cuenta
+porque la salida limpia es un cuarto usuario demo transportista en el seed, y
+eso es dato de producto. Decime si lo agrego.
+
+**Nada más quedó abierto en esta pieza.** No toqué modelo de usuario, campos de
+ubicación, directorio, pagos, catálogo ni Railway.
 
 **Sigue abierto el `float` del checkout**, obligatorio antes de Fase 4.
 
