@@ -22,12 +22,19 @@ PM tuvo que desplegar Backend manualmente. El entorno sigue siendo descartable;
 no se puede usar su estado verde como prueba de que los próximos cambios de
 backend se publicaron.
 
-**Tarea activa única de la dev, bloque largo:** construir el listado de
-transportistas compatibles por origen, destino y radio, junto con el destino
-oficial que le falta al checkout. Antes de listar debe cerrar el dato
-contractual todavía ausente: detalle y fecha de la declaración de habilitación.
-No incluye selección, contacto ni inclusión en la orden; esos quedan para la
-Pieza C. El alcance y los frenos están al final de `PARA-DEV.md`.
+La dev entregó el bloque largo de compatibilidad en producto `e3fe9cb` e
+informe `e063c18`, pero **todavía no está aceptado**. La revisión PM encontró un
+falso verde funcional: la pantalla consulta los transportistas compatibles
+antes de sincronizar con el servidor el carrito local que la persona está
+viendo. La prueba lo oculta porque prepara previamente el carrito por API; en
+uso normal puede responder “carrito vacío” o usar una compra anterior.
+
+**Tarea activa única de la dev:** corregir esa secuencia dentro de la misma
+Pieza B y reemplazar el falso verde por una regresión que parta de un carrito
+servidor vacío o distinto y cargue el carrito visible sólo desde la interfaz.
+No se reabren PostGIS, la migración, la declaración, la persistencia del
+destino ni el alcance de la Pieza C. El criterio exacto está al final de
+`PARA-DEV.md`.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 

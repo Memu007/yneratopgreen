@@ -1288,3 +1288,42 @@ Si el modelo actual de carrito no permite identificar los orígenes por grupo,
 o una migración obliga a romper órdenes existentes, frená con el caso concreto
 antes de cambiar la regla contractual. Entregá un commit de producto y otro
 separado con el informe en `PARA-PM.md`. Ahí termina la tarea.
+
+### Revisión PM de la entrega `e3fe9cb`: no aceptada todavía
+
+El informe `e063c18`, el build independiente y el `diff --check` están verdes,
+pero la evidencia funcional tiene un falso verde que bloquea la aceptación:
+
+- `CartContext` mantiene el carrito visible en almacenamiento local y no lo
+  sincroniza al agregar, quitar o cambiar cantidades.
+- `CheckoutModal` consulta `/logistics/compatible-carriers` al elegir localidad
+  antes de ejecutar `/cart/sync`; esa sincronización ocurre recién al avanzar
+  a pago.
+- El caso 43 prepara por API el carrito del servidor antes de abrir la interfaz.
+  Por eso no demuestra que el listado corresponda al carrito que la persona
+  acaba de armar en pantalla y puede pasar aunque la integración real falle.
+
+Corregí únicamente esta integración dentro de la tarea ya entregada:
+
+1. Antes de la primera consulta de compatibilidad para el destino elegido,
+   sincronizá y esperá el carrito local exacto mediante `/cart/sync`. Si falla
+   la sincronización, no consultes compatibilidad y mostrá el error real.
+2. El estado de carga debe cubrir sincronización y consulta. La protección
+   contra respuestas tardías debe cubrir ambas operaciones: una respuesta de
+   un carrito o destino anterior no puede reemplazar el estado vigente.
+3. Si el carrito visible cambia con el checkout abierto, invalidá el resultado
+   y volvé a sincronizar antes de mostrar compatibilidad. Podés reutilizar una
+   sincronización sólo mientras puedas demostrar que representa exactamente el
+   mismo snapshot del carrito.
+4. Reemplazá el falso verde por una regresión que empiece con carrito servidor
+   vacío o deliberadamente distinto, agregue el producto sólo desde la UI,
+   abra checkout, elija destino y compruebe que los grupos corresponden
+   exactamente al carrito visible. Caso preferido: servidor con producto A y
+   UI con producto B; la respuesta debe reflejar B y nunca A.
+5. Conservá la comparación SQL/PostGIS y la privacidad del caso 43, pero su
+   tramo UI no puede depender del carrito preparado antes por API.
+
+No cambies la migración, la regla geográfica, la declaración, la persistencia
+de órdenes, Railway ni abras selección, contacto o asignación. Corré el caso
+corregido, la suite y puertas proporcionales, build y `diff --check`. Entregá
+un nuevo commit de producto y el informe separado; ahí vuelve a PM.
