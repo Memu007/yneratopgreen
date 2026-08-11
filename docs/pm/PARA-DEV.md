@@ -1327,3 +1327,36 @@ No cambies la migración, la regla geográfica, la declaración, la persistencia
 de órdenes, Railway ni abras selección, contacto o asignación. Corré el caso
 corregido, la suite y puertas proporcionales, build y `diff --check`. Entregá
 un nuevo commit de producto y el informe separado; ahí vuelve a PM.
+
+### Segunda revisión PM de `1ec7082`: todavía no aceptada
+
+El caso A/B nuevo corrige el falso verde original y el alcance se mantuvo bien,
+pero la protección declarada para ambas operaciones no está completa:
+
+1. El número de consulta evita que una promesa vieja actualice React, pero no
+   evita que su `POST /cart/sync` escriba después de un POST nuevo. Si cambia el
+   carrito mientras la primera sincronización está en vuelo, la vieja puede
+   terminar última, sobrescribir el carrito servidor y hacer que la consulta
+   vigente lea el snapshot anterior. El `if (!vigente()) return` ocurre después
+   de que esa escritura ya sucedió.
+2. Cuando `localityId` queda vacío, el efecto retorna antes de incrementar
+   `consultaDeFletes`. Cambiar provincia borra la localidad; una respuesta en
+   vuelo del destino anterior sigue siendo considerada vigente y puede volver
+   a escribir `fletes` aunque ya no haya destino.
+
+Corregí sólo esas dos carreras. Serializá o coordiná las sincronizaciones para
+que una escritura vieja nunca pueda quedar como estado final ni alimentar la
+consulta vigente; cancelar del lado cliente no alcanza si el servidor ya pudo
+procesar el POST. Invalidá la generación antes de cualquier retorno por destino
+vacío.
+
+Agregá una regresión determinista que demore la sincronización vieja, cambie el
+carrito, deje terminar primero la nueva y luego libere la vieja; al consultar,
+servidor y listado deben representar únicamente el snapshot nuevo. Agregá el
+caso de cambiar provincia o vaciar destino con una respuesta anterior en vuelo:
+al finalizar no debe reaparecer ningún listado viejo. No alcanza una prueba
+dependiente de tiempos naturales de red.
+
+No reescribas el caso A/B que ya sirve ni amplíes el módulo. Corré los casos
+enfocados, suite y puertas proporcionales, build y `diff --check`; entregá nuevo
+commit de producto e informe separado. Ahí vuelve a PM.

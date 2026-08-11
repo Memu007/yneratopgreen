@@ -29,12 +29,17 @@ antes de sincronizar con el servidor el carrito local que la persona está
 viendo. La prueba lo oculta porque prepara previamente el carrito por API; en
 uso normal puede responder “carrito vacío” o usar una compra anterior.
 
-**Tarea activa única de la dev:** corregir esa secuencia dentro de la misma
-Pieza B y reemplazar el falso verde por una regresión que parta de un carrito
-servidor vacío o distinto y cargue el carrito visible sólo desde la interfaz.
-No se reabren PostGIS, la migración, la declaración, la persistencia del
-destino ni el alcance de la Pieza C. El criterio exacto está al final de
-`PARA-DEV.md`.
+La primera corrección llegó en producto `1ec7082` e informe `2fdbd60`. El caso
+A/B ya demuestra que el carrito visible reemplaza al viejo del servidor, pero
+**todavía no está aceptada**: dos sincronizaciones pueden terminar fuera de
+orden y la vieja todavía puede sobrescribir la nueva en el servidor. Además,
+vaciar el destino no incrementa la generación de consulta, por lo que una
+respuesta anterior sigue considerándose vigente.
+
+**Tarea activa única de la dev:** cerrar esas dos carreras dentro de la misma
+Pieza B y dejar una regresión determinista que fuerce el orden inverso. No se
+reabren PostGIS, la migración, la declaración, la persistencia del destino ni
+el alcance de la Pieza C. El criterio exacto está al final de `PARA-DEV.md`.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
