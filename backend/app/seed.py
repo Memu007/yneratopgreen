@@ -120,6 +120,11 @@ def create_seed_data():
                 carrier_base_locality_id=base.id,
                 carrier_transport="Camión con acoplado, dominio DEMO 01",
                 carrier_transport_certified=True,
+                carrier_certification_detail=(
+                    "Declaración demo: RUTA habilitación de transporte de "
+                    "cargas generales, sin número real"
+                ),
+                carrier_certification_declared_at=datetime.utcnow(),
                 carrier_coverage_radius_km=250,
                 carrier_capacity="Hasta 30 toneladas de granos",
             )

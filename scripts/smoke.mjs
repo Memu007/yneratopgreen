@@ -243,6 +243,36 @@ function queryCount(sql) {
   return value;
 }
 
+// El destino de un envío dejó de ser texto libre: ahora es una localidad del
+// padrón oficial, y de ahí salen la ciudad y la provincia que se muestran.
+let localidadDeEnvioCache = null;
+function localidadDeEnvio() {
+  if (!localidadDeEnvioCache) {
+    const [fila] = queryRows(`
+      SELECT id FROM localities
+      WHERE name = 'Pergamino' AND province_name = 'Buenos Aires'
+      LIMIT 1
+    `);
+    assert(fila, 'el padrón no tiene Pergamino, Buenos Aires');
+    [localidadDeEnvioCache] = fila;
+  }
+  return localidadDeEnvioCache;
+}
+
+// El destino del checkout son dos selectores encadenados del padrón: primero
+// la provincia, y recién con ella cargada aparece la localidad.
+async function elegirDestino(page, localidad, provincia = '06') {
+  await page.locator('#checkout-provincia').selectOption(provincia);
+  const localidades = page.locator('#checkout-localidad option');
+  await page.waitForFunction(
+    () => document.querySelectorAll('#checkout-localidad option').length > 1,
+    null,
+    { timeout: 15_000 },
+  );
+  await page.locator('#checkout-localidad').selectOption({ label: localidad });
+  await localidades.first().waitFor({ state: 'attached' });
+}
+
 async function apiRequest(path, { method = 'GET', token, body } = {}) {
   const headers = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -525,8 +555,7 @@ await runCase(8, 'Crear orden desde el carrito', async () => {
     token: state.buyerToken,
     body: {
       shipping_address: 'Av. Smoke 123',
-      shipping_city: 'Balcarce',
-      shipping_province: 'Buenos Aires',
+      shipping_locality_id: localidadDeEnvio(),
       shipping_postal_code: '7620',
       notes: 'Orden automatizada sin pago',
     },
@@ -951,8 +980,7 @@ await runCase(15, 'Datos bancarios correctos y orden esperando comprobante', asy
     token: state.buyerToken,
     body: {
       shipping_address: 'Av. Transferencia 123',
-      shipping_city: 'Rosario',
-      shipping_province: 'Santa Fe',
+      shipping_locality_id: localidadDeEnvio(),
       shipping_postal_code: '2000',
       notes: 'Orden smoke por transferencia',
     },
@@ -1079,8 +1107,7 @@ await runCase(18, 'Rechazo de comprobante guarda el motivo', async () => {
     token: state.buyerToken,
     body: {
       shipping_address: 'Av. Rechazo 456',
-      shipping_city: 'Rosario',
-      shipping_province: 'Santa Fe',
+      shipping_locality_id: localidadDeEnvio(),
       shipping_postal_code: '2000',
     },
   });
@@ -1149,8 +1176,7 @@ await runCase(19, 'Transferencia completa desde la interfaz', async () => {
 
     await page.getByRole('heading', { name: /Datos de Envío/ }).waitFor();
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
-    await page.locator('form select').selectOption('Buenos Aires');
-    await page.getByPlaceholder('Rosario').fill('Rosario');
+    await elegirDestino(page, 'Pergamino');
     await page
       .getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B')
       .fill('Av. Transferencia UI 789');
@@ -1405,6 +1431,7 @@ await runCase(22, 'Registro de transportista desde la interfaz', async () => {
   const password = 'smoke123';
   const transport = 'Camión habilitado dominio SM0 KE21';
   const capacity = 'Hasta 40 toneladas de semillas';
+  const declaracion = 'RUTA, cargas generales, N.° SMOKE-22';
   const radius = 125.5;
   const browser = await chromium.launch({ headless: true });
 
@@ -1423,6 +1450,7 @@ await runCase(22, 'Registro de transportista desde la interfaz', async () => {
     await page.getByLabel('Localidad base').selectOption(state.location.localityId);
     await page.locator('input[name="carrierTransport"]').fill(transport);
     await page.getByLabel('Declaro que el transporte está habilitado').check();
+    await page.locator('input[name="carrierCertificationDetail"]').fill(declaracion);
     await page.locator('input[name="carrierCoverageRadiusKm"]').fill(String(radius));
     await page.locator('input[name="carrierCapacity"]').fill(capacity);
     await page.locator('input[name="password"]').fill(password);
@@ -1460,6 +1488,8 @@ await runCase(22, 'Registro de transportista desde la interfaz', async () => {
         u.carrier_base_locality_id,
         u.carrier_transport,
         u.carrier_transport_certified::text,
+        COALESCE(u.carrier_certification_detail, ''),
+        (u.carrier_certification_declared_at IS NOT NULL)::text,
         u.carrier_coverage_radius_km::text,
         COALESCE(u.carrier_capacity, ''),
         l.name
@@ -1473,10 +1503,13 @@ await runCase(22, 'Registro de transportista desde la interfaz', async () => {
     assert(databaseCarrier[2] === state.location.localityId, 'localidad base SQL incorrecta');
     assert(databaseCarrier[3] === transport, 'transporte SQL incorrecto');
     assert(databaseCarrier[4] === 'true', 'habilitación SQL no quedó activa');
-    assert(Number(databaseCarrier[5]) === radius, `radio SQL inesperado: ${databaseCarrier[5]}`);
-    assert(databaseCarrier[6] === capacity, 'capacidad SQL incorrecta');
+    assert(databaseCarrier[5] === declaracion, `declaración SQL incorrecta: ${databaseCarrier[5]}`);
+    assert(databaseCarrier[6] === 'true', 'la fecha de la declaración no la puso el servidor');
+    assert(Number(databaseCarrier[7]) === radius, `radio SQL inesperado: ${databaseCarrier[7]}`);
+    assert(databaseCarrier[8] === capacity, 'capacidad SQL incorrecta');
 
-    return `UI + API + DB, localidad=${databaseCarrier[7]}, radio=${databaseCarrier[5]} km`;
+    return `UI + API + DB, localidad=${databaseCarrier[9]}, radio=${databaseCarrier[7]} km, `
+      + 'declaración con fecha del servidor';
   } finally {
     await browser.close();
   }
@@ -1495,8 +1528,7 @@ async function crearOrdenTransferencia(calle) {
     token: state.buyerToken,
     body: {
       shipping_address: calle,
-      shipping_city: 'Rosario',
-      shipping_province: 'Santa Fe',
+      shipping_locality_id: localidadDeEnvio(),
       shipping_postal_code: '2000',
     },
   });
@@ -1713,8 +1745,7 @@ await runCase(27, 'Una orden por transferencia de más de cien millones', async 
     token: state.buyerToken,
     body: {
       shipping_address: 'Ruta 8 km 220',
-      shipping_city: 'Pergamino',
-      shipping_province: 'Buenos Aires',
+      shipping_locality_id: localidadDeEnvio(),
       shipping_postal_code: '2700',
       notes: 'Orden cara por transferencia',
     },
@@ -1954,8 +1985,7 @@ await runCase(28, 'Un total fuera del contrato se rechaza sin escribir nada', as
         token: state.buyerToken,
         body: {
           shipping_address: 'Ruta 8 km 220',
-          shipping_city: 'Pergamino',
-          shipping_province: 'Buenos Aires',
+          shipping_locality_id: localidadDeEnvio(),
           shipping_postal_code: '2700',
           notes: 'Orden que se pasa del contrato',
         },
@@ -2145,8 +2175,7 @@ await runCase(30, 'El motivo real de la sincronización llega al comprador', asy
     await page.getByRole('button', { name: 'Continuar compra' }).click();
     await page.getByRole('heading', { name: /Datos de Envío/ }).waitFor();
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
-    await page.locator('form select').selectOption('Buenos Aires');
-    await page.getByPlaceholder('Rosario').fill('Pergamino');
+    await elegirDestino(page, 'Pergamino');
     await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
     await page.getByPlaceholder('2000').fill('2700');
     await page.locator('form:has(h2) button[type="submit"]').click();
@@ -2215,8 +2244,7 @@ await runCase(31, 'Sin datos bancarios, el comprador ve el motivo del vendedor',
     await page.getByRole('button', { name: 'Continuar compra' }).click();
     await page.getByRole('heading', { name: /Datos de Envío/ }).waitFor();
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
-    await page.locator('form select').selectOption('Buenos Aires');
-    await page.getByPlaceholder('Rosario').fill('Pergamino');
+    await elegirDestino(page, 'Pergamino');
     await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
     await page.getByPlaceholder('2000').fill('2700');
     await page.locator('form:has(h2) button[type="submit"]').click();
@@ -2772,6 +2800,7 @@ await runCase(39, 'El transportista edita su perfil y los cambios quedan', async
     carrier_base_locality_id: inicial.id,
     carrier_transport: 'Camión chico original',
     carrier_transport_certified: true,
+    carrier_certification_detail: 'RUTA, cargas generales, N.° SMOKE-39',
     carrier_coverage_radius_km: 40,
     carrier_capacity: 'Hasta 8 toneladas',
   });
@@ -3185,6 +3214,406 @@ await runCase(41, 'Repetir el seed no duplica ni altera las cuentas demo', async
 
   return `${DEMO.length} cuentas demo idénticas tras repetir el seed; `
     + `transportista en ${transportista[1]}, ${transportista[2]}, radio ${transportista[5]} km`;
+});
+
+await runCase(42, 'La habilitación es una declaración con detalle y fecha del servidor', async () => {
+  assert(state.location, 'caso 5 no dejó provincia/localidad');
+  const password = 'smoke123';
+  const email = `declaracion.${Date.now()}@example.com`;
+
+  // Sin detalle no hay alta de transportista: el contrato pide declaración,
+  // no un booleano suelto.
+  const sinDetalle = await expectApiError(422, () => apiRequest('/auth/register', {
+    method: 'POST',
+    body: {
+      email: `sin.detalle.${Date.now()}@example.com`,
+      password,
+      full_name: 'Sin Detalle',
+      is_carrier: true,
+      carrier_base_locality_id: state.location.localityId,
+      carrier_transport: 'Camión sin declaración',
+      carrier_transport_certified: true,
+      carrier_coverage_radius_km: 100,
+    },
+  }));
+  assert(/habilitaci/i.test(sinDetalle), `el rechazo no explica el motivo: ${sinDetalle}`);
+
+  const detalleInicial = 'RUTA, cargas generales, N.° DECL-1';
+  await registrarYVerificar({
+    email,
+    password,
+    full_name: 'Declara Transportista',
+    is_carrier: true,
+    carrier_base_locality_id: state.location.localityId,
+    carrier_transport: 'Camión declarado',
+    carrier_transport_certified: true,
+    carrier_certification_detail: detalleInicial,
+    carrier_coverage_radius_km: 100,
+  });
+  const ingreso = await apiRequest('/auth/login', { method: 'POST', body: { email, password } });
+  const token = ingreso.data.access_token;
+
+  const alta = (await apiRequest('/auth/me', { token })).data;
+  assert(alta.carrier_certification_detail === detalleInicial, 'no se guardó el detalle');
+  assert(alta.carrier_certification_declared_at, 'no quedó fecha de declaración');
+
+  // La fecha no la escribe quien declara: un intento de mandarla se ignora.
+  const conFechaFalsa = await apiRequest('/auth/me', {
+    method: 'PATCH',
+    token,
+    body: {
+      carrier_certification_detail: detalleInicial,
+      carrier_certification_declared_at: '1999-01-01T00:00:00',
+    },
+  });
+  assert(
+    conFechaFalsa.data.carrier_certification_declared_at === alta.carrier_certification_declared_at,
+    'se pudo retrodatar la declaración desde el pedido',
+  );
+
+  // Guardar sin cambiar el detalle no rejuvenece una declaración vieja.
+  const sinCambios = await apiRequest('/auth/me', {
+    method: 'PATCH', token, body: { carrier_capacity: 'Hasta 12 toneladas' },
+  });
+  assert(
+    sinCambios.data.carrier_certification_declared_at === alta.carrier_certification_declared_at,
+    'la fecha se movió sin declarar nada nuevo',
+  );
+
+  // Un detalle distinto SÍ es una declaración nueva.
+  await new Promise((listo) => setTimeout(listo, 1100));
+  const detalleNuevo = 'RUTA, cargas peligrosas, N.° DECL-2';
+  const declaradoDeNuevo = await apiRequest('/auth/me', {
+    method: 'PATCH', token, body: { carrier_certification_detail: detalleNuevo },
+  });
+  assert(declaradoDeNuevo.data.carrier_certification_detail === detalleNuevo,
+    'no se guardó el detalle nuevo');
+  assert(
+    declaradoDeNuevo.data.carrier_certification_declared_at > alta.carrier_certification_declared_at,
+    'declarar de nuevo no actualizó la fecha',
+  );
+
+  // Vaciar el detalle deja el perfil incompleto: se rechaza.
+  await expectApiError(400, () => apiRequest('/auth/me', {
+    method: 'PATCH', token, body: { carrier_certification_detail: '   ' },
+  }));
+
+  const [enBase] = queryRows(`
+    SELECT carrier_certification_detail,
+           (carrier_certification_declared_at IS NOT NULL)::text
+    FROM users WHERE email = ${sqlLiteral(email)}
+  `);
+  assert(enBase[0] === detalleNuevo, `detalle SQL inesperado: ${enBase[0]}`);
+  assert(enBase[1] === 'true', 'la fecha no quedó en base');
+
+  return 'alta sin detalle rechazada; fecha puesta por el servidor, no retrodatable, '
+    + 'inmóvil sin cambios y renovada al volver a declarar';
+});
+
+await runCase(43, 'Fletes compatibles por futura orden, con PostGIS y sin contacto', async () => {
+  // Dos vendedores con orígenes distintos, un destino del padrón y candidatos
+  // en el límite del radio. La compatibilidad exige cubrir el destino Y CADA
+  // origen del grupo.
+  const password = 'smoke123';
+  const marca = Date.now();
+  const localidad = (nombre, provincia) => {
+    const [fila] = queryRows(`
+      SELECT id FROM localities
+      WHERE name = ${sqlLiteral(nombre)} AND province_name = ${sqlLiteral(provincia)}
+      LIMIT 1
+    `);
+    assert(fila, `el padrón no tiene ${nombre}, ${provincia}`);
+    return fila[0];
+  };
+  const destino = localidad('Pergamino', 'Buenos Aires');
+  const origenA = localidad('Rosario', 'Santa Fe');
+  const origenB = localidad('Córdoba', 'Córdoba');
+
+  const km = (a, b) => Number(queryRows(`
+    SELECT ROUND((ST_Distance(x.coordinates, y.coordinates)/1000)::numeric, 1)
+    FROM localities x, localities y
+    WHERE x.id = ${sqlLiteral(a)} AND y.id = ${sqlLiteral(b)}
+  `)[0][0]);
+  const aRosario = km(destino, origenA);
+  const aCordoba = km(destino, origenB);
+  assert(aRosario > 0 && aCordoba > aRosario, 'las distancias del padrón no son las esperadas');
+
+  // Los cuatro candidatos tienen su base en el destino, así que lo que los
+  // separa es sólo el radio y el estado de su perfil.
+  const candidatos = [
+    { etiqueta: 'amplio', radio: Math.ceil(aCordoba) + 10, completo: true },
+    { etiqueta: 'unorigen', radio: Math.ceil(aRosario) + 10, completo: true },
+    { etiqueta: 'justodentro', radio: Math.ceil(aRosario), completo: true },
+    { etiqueta: 'justoafuera', radio: Math.floor(aRosario) - 1, completo: true },
+    { etiqueta: 'incompleto', radio: Math.ceil(aCordoba) + 10, completo: false },
+  ];
+  const correoDe = {};
+  for (const candidato of candidatos) {
+    const correo = `flete.${candidato.etiqueta}.${marca}@example.com`;
+    correoDe[candidato.etiqueta] = correo;
+    await registrarYVerificar({
+      email: correo,
+      password,
+      full_name: `Flete ${candidato.etiqueta} ${marca}`,
+      is_carrier: true,
+      carrier_base_locality_id: destino,
+      carrier_transport: `Camión ${candidato.etiqueta}`,
+      carrier_transport_certified: true,
+      carrier_certification_detail: 'RUTA, cargas generales, prueba',
+      carrier_coverage_radius_km: candidato.radio,
+      carrier_capacity: '20 toneladas',
+    });
+    if (!candidato.completo) {
+      // Como los perfiles anteriores a la migración: sin declaración. No se
+      // inventa una y por eso no puede aparecer como compatible.
+      querySql(`
+        UPDATE users SET carrier_certification_detail = NULL,
+                         carrier_certification_declared_at = NULL
+        WHERE email = ${sqlLiteral(correo)}
+      `);
+    }
+  }
+
+  // Dos publicaciones de vendedores distintos, con orígenes distintos.
+  const publicaciones = queryRows(`
+    SELECT p.id, p.seller_id FROM products p
+    WHERE p.status = 'ACTIVE' AND p.stock > 0
+    ORDER BY p.seller_id, p.id
+  `);
+  const primeraDeCada = new Map();
+  for (const [id, vendedor] of publicaciones) {
+    if (!primeraDeCada.has(vendedor)) primeraDeCada.set(vendedor, id);
+  }
+  const [[vendedorA, productoA], [vendedorB, productoB]] = [...primeraDeCada.entries()].slice(0, 2);
+  assert(productoB, 'hace falta más de un vendedor con publicaciones activas');
+  const origenPrevioA = queryRows(
+    `SELECT COALESCE(locality_id, '') FROM products WHERE id = ${sqlLiteral(productoA)}`)[0][0];
+  const origenPrevioB = queryRows(
+    `SELECT COALESCE(locality_id, '') FROM products WHERE id = ${sqlLiteral(productoB)}`)[0][0];
+
+  try {
+    querySql(`UPDATE products SET locality_id = ${sqlLiteral(origenA)} WHERE id = ${sqlLiteral(productoA)}`);
+    querySql(`UPDATE products SET locality_id = ${sqlLiteral(origenB)} WHERE id = ${sqlLiteral(productoB)}`);
+
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    for (const producto of [productoA, productoB]) {
+      await apiRequest('/cart/items', {
+        method: 'POST', token: state.buyerToken, body: { product_id: producto, quantity: 1 },
+      });
+    }
+
+    const listado = (await apiRequest(
+      `/logistics/compatible-carriers?destination_locality_id=${destino}`,
+      { token: state.buyerToken },
+    )).data;
+    assert(listado.groups.length === 2, `esperaba 2 grupos y vinieron ${listado.groups.length}`);
+
+    const nombresDe = (vendedor) => {
+      const grupo = listado.groups.find((g) => g.seller_id === vendedor);
+      assert(grupo, `falta el grupo del vendedor ${vendedor}`);
+      return grupo.carriers.map((c) => c.full_name).filter((n) => n.includes(String(marca)));
+    };
+    const enRosario = nombresDe(vendedorA);
+    const enCordoba = nombresDe(vendedorB);
+
+    // El que sólo cubre un origen queda afuera del grupo lejano.
+    assert(enRosario.includes(`Flete unorigen ${marca}`), 'falta el que cubre Rosario');
+    assert(!enCordoba.includes(`Flete unorigen ${marca}`),
+      'un candidato que falla en un solo origen quedó adentro');
+    assert(enCordoba.includes(`Flete amplio ${marca}`), 'falta el que cubre los dos');
+    // El límite del radio.
+    assert(enRosario.includes(`Flete justodentro ${marca}`), 'el candidato al límite quedó afuera');
+    assert(!enRosario.includes(`Flete justoafuera ${marca}`),
+      'un candidato fuera del radio quedó adentro');
+    // El perfil sin declaración no se lista en ningún grupo.
+    for (const lista of [enRosario, enCordoba]) {
+      assert(!lista.includes(`Flete incompleto ${marca}`),
+        'un perfil sin declaración apareció como compatible');
+    }
+
+    // Contraste con PostGIS, grupo por grupo: no se comparan cantidades fijas.
+    for (const [vendedor, origenes] of [[vendedorA, [origenA]], [vendedorB, [origenB]]]) {
+      const esperados = queryRows(`
+        SELECT u.full_name FROM users u
+        JOIN localities b ON b.id = u.carrier_base_locality_id
+        WHERE u.is_carrier AND u.is_active AND u.is_verified
+          AND u.carrier_transport_certified
+          AND btrim(COALESCE(u.carrier_certification_detail, '')) <> ''
+          AND u.carrier_certification_declared_at IS NOT NULL
+          AND COALESCE(u.carrier_coverage_radius_km, 0) > 0
+          AND ST_DWithin(b.coordinates,
+                (SELECT coordinates FROM localities WHERE id = ${sqlLiteral(destino)}),
+                u.carrier_coverage_radius_km::float * 1000)
+          AND NOT EXISTS (
+            SELECT 1 FROM localities o
+            WHERE o.id IN (${origenes.map(sqlLiteral).join(', ')})
+              AND NOT ST_DWithin(b.coordinates, o.coordinates,
+                    u.carrier_coverage_radius_km::float * 1000))
+        ORDER BY u.full_name
+      `).map((fila) => fila[0]);
+      const grupo = listado.groups.find((g) => g.seller_id === vendedor);
+      const deLaApi = grupo.carriers.map((c) => c.full_name).sort();
+      assert(JSON.stringify(deLaApi) === JSON.stringify([...esperados].sort()),
+        `API y PostGIS no coinciden para ${vendedor}:\n  API: ${deLaApi.join(', ')}`
+        + `\n  SQL: ${esperados.join(', ')}`);
+    }
+
+    // Ni un dato de contacto en la respuesta.
+    const crudo = JSON.stringify(listado).toLowerCase();
+    for (const prohibido of ['email', 'phone', 'whatsapp', 'cbu', 'alias', '@example.com']) {
+      assert(!crudo.includes(prohibido), `el listado expone «${prohibido}»`);
+    }
+
+    // Un producto sin localidad oficial deja al grupo sin poder declarar nada.
+    querySql(`UPDATE products SET locality_id = NULL WHERE id = ${sqlLiteral(productoB)}`);
+    const conHueco = (await apiRequest(
+      `/logistics/compatible-carriers?destination_locality_id=${destino}`,
+      { token: state.buyerToken },
+    )).data;
+    const grupoSinOrigen = conHueco.groups.find((g) => g.seller_id === vendedorB);
+    assert(grupoSinOrigen.origin_missing === true, 'el grupo sin origen no se marca');
+    assert(grupoSinOrigen.carriers.length === 0, 'un grupo sin origen no puede listar fletes');
+    querySql(`UPDATE products SET locality_id = ${sqlLiteral(origenB)} WHERE id = ${sqlLiteral(productoB)}`);
+
+    // Cambiar el destino cambia el resultado.
+    const otroDestino = (await apiRequest(
+      `/logistics/compatible-carriers?destination_locality_id=${origenB}`,
+      { token: state.buyerToken },
+    )).data;
+    const enOtroDestino = otroDestino.groups
+      .find((g) => g.seller_id === vendedorA).carriers
+      .map((c) => c.full_name).filter((n) => n.includes(String(marca)));
+    assert(!enOtroDestino.includes(`Flete unorigen ${marca}`),
+      'cambiar el destino no cambió la compatibilidad');
+
+    // Un destino que no está en el padrón no se calcula.
+    await expectApiError(400, () => apiRequest(
+      '/logistics/compatible-carriers?destination_locality_id=00000000',
+      { token: state.buyerToken },
+    ));
+
+    // Y lo mismo en la pantalla: el checkout muestra el listado y tampoco
+    // tiene ahí un dato de contacto.
+    const navegador = await chromium.launch({ headless: true });
+    let visto = '';
+    try {
+      const contexto = await navegador.newContext();
+      await contexto.addInitScript(
+        ({ a, r }) => {
+          window.localStorage.setItem('access_token', a);
+          window.localStorage.setItem('refresh_token', r);
+        },
+        { a: state.buyerToken, r: state.buyerRefreshToken },
+      );
+      const page = await contexto.newPage();
+      await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+      await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+      await page.getByRole('button', { name: /Agregar/ }).first().click();
+      await page.getByRole('button', { name: /Carrito/ }).click();
+      await page.getByRole('button', { name: 'Continuar compra' }).click();
+      await page.getByRole('heading', { name: /Datos de Env/ }).waitFor();
+      await elegirDestino(page, 'Pergamino');
+
+      const seccion = page.locator('[class*="_fletes_"]');
+      await seccion.waitFor({ state: 'visible', timeout: 15_000 });
+      await page.getByText('Base:').first().waitFor({ state: 'visible', timeout: 15_000 });
+      visto = ((await seccion.textContent()) || '').replace(/\s+/g, ' ');
+      assert(/TopGreen no verifica esta habilitación/.test(visto),
+        'la pantalla no aclara que la habilitación es una declaración');
+      for (const prohibido of ['@example.com', '+54', 'CBU', 'cbu', 'alias']) {
+        assert(!visto.includes(prohibido), `la pantalla muestra «${prohibido}»`);
+      }
+    } finally {
+      await navegador.close();
+    }
+
+    return `2 grupos, ${enRosario.length} y ${enCordoba.length} candidatos propios; `
+      + `límite en ${aRosario} km respetado; API = PostGIS; sin contacto en JSON ni DOM`;
+  } finally {
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    for (const [producto, previo] of [[productoA, origenPrevioA], [productoB, origenPrevioB]]) {
+      querySql(previo
+        ? `UPDATE products SET locality_id = ${sqlLiteral(previo)} WHERE id = ${sqlLiteral(producto)}`
+        : `UPDATE products SET locality_id = NULL WHERE id = ${sqlLiteral(producto)}`);
+    }
+  }
+});
+
+await runCase(44, 'El destino de la orden sale del padrón y las órdenes viejas siguen legibles', async () => {
+  const destino = localidadDeEnvio();
+
+  // Un destino que no existe no crea nada.
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  await apiRequest('/cart/items', {
+    method: 'POST', token: state.buyerToken,
+    body: { product_id: state.product.id, quantity: 1 },
+  });
+  const ordenesAntes = queryCount(
+    `SELECT COUNT(*) FROM orders WHERE buyer_id = ${sqlLiteral(state.buyerId)}`);
+  const rechazo = await expectApiError(400, () => apiRequest('/orders/checkout/transfer', {
+    method: 'POST',
+    token: state.buyerToken,
+    body: {
+      shipping_address: 'Ruta 8 km 220',
+      shipping_locality_id: '00000000',
+      shipping_postal_code: '2700',
+      notes: 'Destino inventado',
+    },
+  }));
+  assert(/padr/i.test(rechazo), `el rechazo no explica el motivo: ${rechazo}`);
+  assert(
+    queryCount(`SELECT COUNT(*) FROM orders WHERE buyer_id = ${sqlLiteral(state.buyerId)}`)
+      === ordenesAntes,
+    'un destino inválido igual creó una orden',
+  );
+
+  // Con un destino del padrón, la orden lo guarda y la ciudad y la provincia
+  // salen del padrón, no del texto del cliente.
+  const creada = await apiRequest('/orders/checkout/transfer', {
+    method: 'POST',
+    token: state.buyerToken,
+    body: {
+      shipping_address: 'Ruta 8 km 220',
+      shipping_locality_id: destino,
+      shipping_postal_code: '2700',
+      notes: 'Orden con destino oficial',
+    },
+  });
+  const [orden] = creada.data.orders;
+  const [enBase] = queryRows(`
+    SELECT o.shipping_locality_id,
+           l.name,
+           l.province_name,
+           o.shipping_address_json->>'city',
+           o.shipping_address_json->>'province'
+    FROM orders o
+    JOIN localities l ON l.id = o.shipping_locality_id
+    WHERE o.id = ${sqlLiteral(orden.order_id)}
+  `);
+  assert(enBase, 'la orden nueva no quedó con destino del padrón');
+  assert(enBase[0] === destino, `destino SQL inesperado: ${enBase[0]}`);
+  assert(enBase[3] === enBase[1], 'la ciudad guardada no es la del padrón');
+  assert(enBase[4] === enBase[2], 'la provincia guardada no es la del padrón');
+
+  // Una orden anterior a la logística no tiene destino y tiene que seguir
+  // leyéndose igual.
+  querySql(`
+    UPDATE orders SET shipping_locality_id = NULL
+    WHERE id = ${sqlLiteral(orden.order_id)}
+  `);
+  const historica = await apiRequest(`/orders/${orden.order_id}`, { token: state.buyerToken });
+  assert(historica.status === 200,
+    `una orden sin destino dejó de leerse: HTTP ${historica.status}`);
+  assert(historica.data.order_number === orden.order_number, 'la orden histórica cambió de número');
+  const listado = await apiRequest('/orders/my?as_role=buyer', { token: state.buyerToken });
+  assert(listado.status === 200, 'el listado de órdenes se rompe con una orden sin destino');
+  assert(
+    listado.data.some((o) => o.order_number === orden.order_number),
+    'la orden sin destino desapareció del listado',
+  );
+
+  return `destino inválido rechazado sin escribir; ${enBase[1]}, ${enBase[2]} guardada desde el `
+    + 'padrón; orden sin destino sigue legible en detalle y listado';
 });
 
 const passed = results.filter((result) => result.passed).length;

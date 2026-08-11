@@ -76,6 +76,8 @@ export interface User {
   carrierBaseProvinceName?: string;
   carrierTransport?: string;
   carrierTransportCertified?: boolean;
+  carrierCertificationDetail?: string;
+  carrierCertificationDeclaredAt?: string;
   carrierCoverageRadiusKm?: number;
   carrierCapacity?: string;
   role: 'user' | 'admin' | 'seller' | 'buyer' | 'both';
@@ -117,6 +119,8 @@ export interface RegisterData {
   carrierBaseLocalityId?: string;
   carrierTransport?: string;
   carrierTransportCertified?: boolean;
+  carrierCertificationDetail?: string;
+  carrierCertificationDeclaredAt?: string;
   carrierCoverageRadiusKm?: number;
   carrierCapacity?: string;
 }

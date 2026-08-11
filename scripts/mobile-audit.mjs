@@ -206,8 +206,10 @@ async function exerciseCheckout(browser, viewport, buyerTokens) {
     await page.getByRole('button', { name: 'Continuar compra' }).click();
     await page.getByRole('heading', { name: /Datos de Envío/ }).waitFor();
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
-    await page.locator('form select').selectOption('Buenos Aires');
-    await page.getByPlaceholder('Rosario').fill('Rosario');
+    await page.locator('#checkout-provincia').selectOption('06');
+    await page.waitForFunction(
+      () => document.querySelectorAll('#checkout-localidad option').length > 1);
+    await page.locator('#checkout-localidad').selectOption({ label: 'Pergamino' });
     await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Av. Prueba 123');
     await page.getByPlaceholder('2000').fill('2000');
     await page.locator('form:has(h2) button[type="submit"]').click();

@@ -1,12 +1,53 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import styles from './CheckoutModal.module.css';
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_BASE_URL, apiFetch, apiGet, tokenStorage } from '../../utils/api';
 import { ProductImage } from '../ProductImage/ProductImage';
+import {
+  getLocalities,
+  getProvinces,
+  LocalityResponse,
+  ProvinceResponse,
+} from '../../utils/catalogService';
 
 interface CheckoutModalProps {
   onClose: () => void;
+}
+
+/** Transportistas que cubren el viaje, agrupados por futura orden. */
+interface DistanciaOrigen {
+  locality_id: string;
+  name: string;
+  province_name: string;
+  distance_km: number;
+}
+
+interface TransportistaCompatible {
+  id: string;
+  full_name: string;
+  base_locality_name: string;
+  base_province_name: string;
+  transport: string;
+  certification_detail: string;
+  certification_declared_at: string;
+  coverage_radius_km: number;
+  capacity?: string;
+  distance_to_destination_km: number;
+  distances_to_origins: DistanciaOrigen[];
+}
+
+interface GrupoDeFletes {
+  seller_id: string;
+  seller_name: string;
+  origins: { id: string; name: string; province_name: string }[];
+  origin_missing: boolean;
+  carriers: TransportistaCompatible[];
+}
+
+interface FletesCompatibles {
+  destination: { id: string; name: string; province_name: string };
+  groups: GrupoDeFletes[];
 }
 
 type CheckoutStep = 'shipping' | 'payment' | 'transfer';
@@ -42,12 +83,79 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
   const [shippingData, setShippingData] = useState({
     fullName: user?.name || '',
     phone: '',
-    province: '',
-    city: '',
+    provinceId: '',
+    localityId: '',
     address: '',
     postalCode: '',
     notes: '',
   });
+
+  // --- destino del padrón y fletes compatibles ------------------------------
+  const [provincias, setProvincias] = useState<ProvinceResponse[]>([]);
+  const [localidades, setLocalidades] = useState<LocalityResponse[]>([]);
+  const [padronError, setPadronError] = useState('');
+  const [fletes, setFletes] = useState<FletesCompatibles | null>(null);
+  const [fletesCargando, setFletesCargando] = useState(false);
+  const [fletesError, setFletesError] = useState('');
+  // Cada consulta de fletes lleva número: una respuesta tardía de un destino
+  // anterior no puede pisar el resultado del destino actual.
+  const consultaDeFletes = useRef(0);
+
+  useEffect(() => {
+    void getProvinces()
+      .then(setProvincias)
+      .catch(() => setPadronError('No se pudo cargar el padrón de provincias.'));
+  }, []);
+
+  useEffect(() => {
+    if (!shippingData.provinceId) {
+      setLocalidades([]);
+      return;
+    }
+    let vigente = true;
+    void getLocalities(shippingData.provinceId)
+      .then((data) => {
+        if (!vigente) return;
+        setLocalidades(data);
+        setPadronError('');
+      })
+      .catch(() => {
+        if (vigente) setPadronError('No se pudieron cargar las localidades.');
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [shippingData.provinceId]);
+
+  useEffect(() => {
+    const destino = shippingData.localityId;
+    // Cambiar de destino invalida el listado anterior en el acto: mostrar
+    // fletes de otro destino sería peor que no mostrar ninguno.
+    setFletes(null);
+    setFletesError('');
+    if (!destino) {
+      setFletesCargando(false);
+      return;
+    }
+
+    const consulta = consultaDeFletes.current + 1;
+    consultaDeFletes.current = consulta;
+    setFletesCargando(true);
+
+    void apiGet<FletesCompatibles>(
+      `/logistics/compatible-carriers?destination_locality_id=${encodeURIComponent(destino)}`,
+    )
+      .then((data) => {
+        if (consultaDeFletes.current !== consulta) return;
+        setFletes(data);
+        setFletesCargando(false);
+      })
+      .catch((err) => {
+        if (consultaDeFletes.current !== consulta) return;
+        setFletesError(err instanceof Error ? err.message : 'No se pudieron buscar fletes');
+        setFletesCargando(false);
+      });
+  }, [shippingData.localityId]);
 
   const handleShippingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,8 +233,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
       // 2. Crear la orden con los datos de envío
       const checkoutData = {
         shipping_address: `${shippingData.address}, ${shippingData.fullName}`,
-        shipping_city: shippingData.city,
-        shipping_province: shippingData.province,
+        // La ciudad y la provincia las deriva el backend del padrón: no se
+        // mandan como texto porque no son dato del cliente.
+        shipping_locality_id: shippingData.localityId,
         shipping_postal_code: shippingData.postalCode,
         notes: shippingData.notes || `Tel: ${shippingData.phone}`
       };
@@ -154,6 +263,90 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
       currency: 'ARS',
       minimumFractionDigits: 0,
     }).format(price);
+  };
+
+  const fechaDeDeclaracion = (iso: string) => {
+    const fecha = new Date(iso);
+    return Number.isNaN(fecha.getTime())
+      ? iso
+      : fecha.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  /**
+   * Transportistas que cubren el viaje, uno por futura orden. Es un directorio:
+   * no ordena por «mejor», no puntúa y no muestra datos de contacto. Elegir
+   * transportista todavía no existe.
+   */
+  const renderFletes = () => {
+    if (!shippingData.localityId) return null;
+
+    return (
+      <section className={styles.fletes} aria-live="polite">
+        <h3 className={styles.fletesTitulo}>Transportistas que cubren el viaje</h3>
+
+        {fletesCargando && <p className={styles.fleteAviso}>Buscando transportistas…</p>}
+
+        {fletesError && (
+          <p className={styles.fleteAviso} role="alert">⚠️ {fletesError}</p>
+        )}
+
+        {!fletesCargando && !fletesError && fletes?.groups.map((grupo) => (
+          <div key={grupo.seller_id} className={styles.fleteGrupo}>
+            <h4 className={styles.fleteGrupoTitulo}>
+              Envío de {grupo.seller_name}
+              {grupo.origins.length > 0 && (
+                <span className={styles.fleteOrigenes}>
+                  {' '}desde {grupo.origins.map((o) => `${o.name}, ${o.province_name}`).join(' y ')}
+                </span>
+              )}
+            </h4>
+
+            {grupo.origin_missing ? (
+              <p className={styles.fleteAviso}>
+                Este vendedor todavía no cargó la localidad oficial de alguna de sus
+                publicaciones, así que no podemos calcular qué transportistas cubren el viaje.
+              </p>
+            ) : grupo.carriers.length === 0 ? (
+              <p className={styles.fleteAviso}>
+                Ningún transportista declara cubrir este destino y este origen.
+              </p>
+            ) : (
+              <ul className={styles.fleteLista}>
+                {grupo.carriers.map((carrier) => (
+                  <li key={carrier.id} className={styles.fleteTarjeta}>
+                    <p className={styles.fleteNombre}>{carrier.full_name}</p>
+                    <p className={styles.fleteDato}>
+                      Base: {carrier.base_locality_name}, {carrier.base_province_name}
+                      {' · '}radio declarado {carrier.coverage_radius_km} km
+                    </p>
+                    <p className={styles.fleteDato}>{carrier.transport}</p>
+                    {carrier.capacity && (
+                      <p className={styles.fleteDato}>Capacidad: {carrier.capacity}</p>
+                    )}
+                    <p className={styles.fleteDato}>
+                      A {carrier.distance_to_destination_km} km del destino
+                      {carrier.distances_to_origins.map((d) => (
+                        <span key={d.locality_id}> · a {d.distance_km} km de {d.name}</span>
+                      ))}
+                    </p>
+                    <p className={styles.fleteDeclaracion}>
+                      Declara: {carrier.certification_detail}
+                      {' ('}declarado el {fechaDeDeclaracion(carrier.certification_declared_at)}
+                      {'). '}
+                      TopGreen no verifica esta habilitación.
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+
+        <p className={styles.fleteNota}>
+          Las distancias son en línea recta. Todavía no se elige transportista desde acá.
+        </p>
+      </section>
+    );
   };
 
   const renderShippingStep = () => (
@@ -188,49 +381,44 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
 
         <div className={styles.formGroup}>
           <label htmlFor="checkout-provincia">Provincia *</label>
-          <select id="checkout-provincia"
+          <select
+            id="checkout-provincia"
             required
-            value={shippingData.province}
-            onChange={(e) => setShippingData({ ...shippingData, province: e.target.value })}
+            value={shippingData.provinceId}
+            onChange={(e) => setShippingData({
+              ...shippingData,
+              provinceId: e.target.value,
+              localityId: '',
+            })}
           >
             <option value="">Seleccionar provincia</option>
-            <option value="Buenos Aires">Buenos Aires</option>
-            <option value="CABA">CABA</option>
-            <option value="Catamarca">Catamarca</option>
-            <option value="Chaco">Chaco</option>
-            <option value="Chubut">Chubut</option>
-            <option value="Córdoba">Córdoba</option>
-            <option value="Corrientes">Corrientes</option>
-            <option value="Entre Ríos">Entre Ríos</option>
-            <option value="Formosa">Formosa</option>
-            <option value="Jujuy">Jujuy</option>
-            <option value="La Pampa">La Pampa</option>
-            <option value="La Rioja">La Rioja</option>
-            <option value="Mendoza">Mendoza</option>
-            <option value="Misiones">Misiones</option>
-            <option value="Neuquén">Neuquén</option>
-            <option value="Río Negro">Río Negro</option>
-            <option value="Salta">Salta</option>
-            <option value="San Juan">San Juan</option>
-            <option value="San Luis">San Luis</option>
-            <option value="Santa Cruz">Santa Cruz</option>
-            <option value="Santa Fe">Santa Fe</option>
-            <option value="Santiago del Estero">Santiago del Estero</option>
-            <option value="Tierra del Fuego">Tierra del Fuego</option>
-            <option value="Tucumán">Tucumán</option>
+            {provincias.map((provincia) => (
+              <option key={provincia.id} value={provincia.id}>{provincia.name}</option>
+            ))}
           </select>
         </div>
 
         <div className={styles.formGroup}>
-          <label>Ciudad *</label>
-          <input
-            type="text"
+          <label htmlFor="checkout-localidad">Localidad *</label>
+          <select
+            id="checkout-localidad"
             required
-            value={shippingData.city}
-            onChange={(e) => setShippingData({ ...shippingData, city: e.target.value })}
-            placeholder="Rosario"
-          />
+            value={shippingData.localityId}
+            onChange={(e) => setShippingData({ ...shippingData, localityId: e.target.value })}
+            disabled={!shippingData.provinceId}
+          >
+            <option value="">Seleccionar localidad</option>
+            {localidades.map((localidad) => (
+              <option key={localidad.id} value={localidad.id}>{localidad.name}</option>
+            ))}
+          </select>
         </div>
+
+        {padronError && (
+          <div className={styles.formGroupFull}>
+            <p className={styles.fleteAviso} role="alert">{padronError}</p>
+          </div>
+        )}
 
         <div className={styles.formGroupFull}>
           <label>Dirección Completa *</label>
@@ -264,6 +452,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
           />
         </div>
       </div>
+
+      {renderFletes()}
 
       <button type="submit" className={styles.nextButton}>
         Continuar al Pago →

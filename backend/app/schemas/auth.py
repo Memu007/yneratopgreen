@@ -21,6 +21,9 @@ class UserRegisterRequest(BaseModel):
     carrier_base_locality_id: Optional[str] = Field(None, max_length=20)
     carrier_transport: Optional[str] = Field(None, max_length=255)
     carrier_transport_certified: bool = False
+    # El detalle de la declaración lo escribe el transportista; la fecha la
+    # pone el servidor y no viaja en el pedido.
+    carrier_certification_detail: Optional[str] = Field(None, max_length=500)
     carrier_coverage_radius_km: Optional[float] = Field(None, gt=0)
     carrier_capacity: Optional[str] = Field(None, max_length=255)
 
@@ -34,6 +37,10 @@ class UserRegisterRequest(BaseModel):
             raise ValueError("El transporte es obligatorio para transportistas")
         if not self.carrier_transport_certified:
             raise ValueError("El transporte debe estar habilitado")
+        if not (self.carrier_certification_detail or "").strip():
+            raise ValueError(
+                "Contá qué habilitación tenés: organismo, tipo y número si lo hay"
+            )
         if self.carrier_coverage_radius_km is None:
             raise ValueError("El radio de cobertura es obligatorio para transportistas")
         return self
@@ -92,6 +99,8 @@ class UserResponse(BaseModel):
     carrier_base_province_name: Optional[str] = None
     carrier_transport: Optional[str]
     carrier_transport_certified: bool
+    carrier_certification_detail: Optional[str] = None
+    carrier_certification_declared_at: Optional[datetime] = None
     carrier_coverage_radius_km: Optional[float]
     carrier_capacity: Optional[str]
     rating_average: float = 5.0
@@ -149,6 +158,9 @@ class UserUpdateRequest(BaseModel):
     carrier_base_locality_id: Optional[str] = Field(None, max_length=20)
     carrier_transport: Optional[str] = Field(None, max_length=255)
     carrier_transport_certified: Optional[bool] = None
+    # La fecha de la declaración no se acepta desde afuera: la escribe el
+    # servidor cuando cambia el detalle o se vuelve a declarar.
+    carrier_certification_detail: Optional[str] = Field(None, max_length=500)
     carrier_coverage_radius_km: Optional[float] = Field(None, gt=0)
     carrier_capacity: Optional[str] = Field(None, max_length=255)
 

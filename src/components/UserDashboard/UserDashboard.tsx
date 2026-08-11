@@ -186,6 +186,7 @@ const formularioDesde = (cuenta: User | null) => ({
   carrierBaseLocalityId: cuenta?.carrierBaseLocalityId || '',
   carrierTransport: cuenta?.carrierTransport || '',
   carrierTransportCertified: cuenta?.carrierTransportCertified ?? false,
+  carrierCertificationDetail: cuenta?.carrierCertificationDetail || '',
   // El radio viaja como texto mientras se edita y se convierte al guardar: así
   // el campo puede quedar vacío sin volverse NaN.
   carrierCoverageRadiusKm:
@@ -501,6 +502,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               carrierBaseLocalityId: editForm.carrierBaseLocalityId,
               carrierTransport: editForm.carrierTransport,
               carrierTransportCertified: editForm.carrierTransportCertified,
+              carrierCertificationDetail: editForm.carrierCertificationDetail,
               carrierCoverageRadiusKm: radio,
               carrierCapacity: editForm.carrierCapacity,
             }
@@ -1457,6 +1459,32 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                     </p>
                   </>
                 )}
+              </div>
+
+              <div className={styles.formGroup}>
+                <label htmlFor={paraCampo('perfil-habilitacion-detalle')}>
+                  Detalle de la habilitación
+                </label>
+                {isEditing ? (
+                  <input
+                    id="perfil-habilitacion-detalle"
+                    type="text"
+                    value={editForm.carrierCertificationDetail}
+                    onChange={(e) => setEditForm({
+                      ...editForm,
+                      carrierCertificationDetail: e.target.value,
+                    })}
+                    placeholder="RUTA, transporte de cargas generales, N.° 12345"
+                  />
+                ) : (
+                  <p>{user?.carrierCertificationDetail || 'Sin declarar'}</p>
+                )}
+                <p className={styles.carrierNota}>
+                  {user?.carrierCertificationDeclaredAt
+                    ? `Declarado el ${new Date(user.carrierCertificationDeclaredAt)
+                        .toLocaleDateString('es-AR')}. TopGreen no verifica esta habilitación.`
+                    : 'Es tu declaración. TopGreen no la verifica y guarda la fecha en que la hacés.'}
+                </p>
               </div>
             </>
           )}

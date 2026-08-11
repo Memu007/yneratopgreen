@@ -1502,3 +1502,13 @@
     transform: rotate(360deg);
   }
 }
+
+/* Aclaración de que la habilitación es una declaración del transportista y no
+   una verificación de TopGreen. */
+.formGroup .carrierNota {
+  margin: 0;
+  padding: 0;
+  background: none;
+  font-size: 13px;
+  color: #555;
+}

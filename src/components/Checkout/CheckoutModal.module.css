@@ -729,3 +729,86 @@
     transform: rotate(360deg);
   }
 }
+
+/* --- Transportistas compatibles ------------------------------------------
+   Es un directorio, no una recomendación: mismo peso visual para todas las
+   tarjetas, sin destacados ni orden por «mejor». */
+.fletes {
+  margin: 24px 0 8px;
+  padding: 20px;
+  background: #f6f8f3;
+  border: 1px solid #d8e2cf;
+  border-radius: 12px;
+}
+
+.fletesTitulo {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  color: #2d5016;
+}
+
+.fleteGrupo {
+  margin-top: 16px;
+}
+
+.fleteGrupoTitulo {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  color: #2d5016;
+}
+
+.fleteOrigenes {
+  font-weight: 400;
+  color: #4a5340;
+}
+
+.fleteLista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.fleteTarjeta {
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1px solid #d8e2cf;
+  border-radius: 10px;
+}
+
+.fleteNombre {
+  margin: 0 0 6px;
+  font-weight: 700;
+  color: #24301c;
+}
+
+.fleteDato {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+  color: #4a5340;
+}
+
+.fleteDeclaracion {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed #d8e2cf;
+  font-size: 0.85rem;
+  color: #4a5340;
+}
+
+.fleteAviso {
+  margin: 0;
+  padding: 10px 12px;
+  background: #ffffff;
+  border-left: 4px solid #7a8b6a;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #3d4636;
+}
+
+.fleteNota {
+  margin: 16px 0 0;
+  font-size: 0.82rem;
+  color: #4a5340;
+}

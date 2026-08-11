@@ -100,7 +100,7 @@ async def shutdown_event():
 # Importar y registrar routers
 from app.api import (
     auth, catalog, products, cart, orders, contact,
-    ratings, admin, notifications
+    ratings, admin, notifications, logistics
 )
 
 app.include_router(auth.router, prefix=settings.API_PREFIX)
@@ -112,3 +112,4 @@ app.include_router(contact.router, prefix=settings.API_PREFIX)
 app.include_router(ratings.router, prefix=settings.API_PREFIX)
 app.include_router(admin.router, prefix=settings.API_PREFIX)
 app.include_router(notifications.router, prefix=settings.API_PREFIX)
+app.include_router(logistics.router, prefix=settings.API_PREFIX)

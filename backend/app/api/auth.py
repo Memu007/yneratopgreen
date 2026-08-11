@@ -111,6 +111,15 @@ def register_user(
         carrier_transport_certified=(
             user_data.carrier_transport_certified if user_data.is_carrier else False
         ),
+        carrier_certification_detail=(
+            user_data.carrier_certification_detail.strip()
+            if user_data.is_carrier and user_data.carrier_certification_detail
+            else None
+        ),
+        # La fecha la pone el servidor: nadie la escribe ni la retrodata.
+        carrier_certification_declared_at=(
+            datetime.utcnow() if user_data.is_carrier else None
+        ),
         carrier_coverage_radius_km=(
             user_data.carrier_coverage_radius_km if user_data.is_carrier else None
         ),
@@ -460,6 +469,7 @@ CAMPOS_DE_TRANSPORTISTA = (
     "carrier_base_locality_id",
     "carrier_transport",
     "carrier_transport_certified",
+    "carrier_certification_detail",
     "carrier_coverage_radius_km",
     "carrier_capacity",
 )
@@ -499,6 +509,7 @@ def _aplicar_perfil_de_transportista(
     localidad = (prospectivo["carrier_base_locality_id"] or "").strip() or None
     transporte = (prospectivo["carrier_transport"] or "").strip() or None
     habilitado = bool(prospectivo["carrier_transport_certified"])
+    detalle = (prospectivo["carrier_certification_detail"] or "").strip() or None
     radio = prospectivo["carrier_coverage_radius_km"]
     capacidad = (prospectivo["carrier_capacity"] or "").strip() or None
 
@@ -522,6 +533,11 @@ def _aplicar_perfil_de_transportista(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El transporte debe estar habilitado",
         )
+    if not detalle:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Contá qué habilitación tenés: organismo, tipo y número si lo hay",
+        )
     # El esquema ya rechaza un radio no positivo que venga en el envío; esto
     # cubre además un valor guardado que hubiera quedado fuera de contrato.
     if radio is None or float(radio) <= 0:
@@ -530,9 +546,21 @@ def _aplicar_perfil_de_transportista(
             detail="El radio de cobertura tiene que ser mayor que cero",
         )
 
+    # Una declaración nueva —o un detalle distinto— es una declaración nueva, y
+    # lleva la fecha de hoy. Guardar sin cambiar el detalle no la mueve: sería
+    # rejuvenecer una declaración vieja sin que nadie declarara nada.
+    declaracion_nueva = (
+        detalle != current_user.carrier_certification_detail
+        or current_user.carrier_certification_declared_at is None
+        or not current_user.carrier_transport_certified
+    )
+
     current_user.carrier_base_locality_id = localidad
     current_user.carrier_transport = transporte
     current_user.carrier_transport_certified = habilitado
+    current_user.carrier_certification_detail = detalle
+    if declaracion_nueva:
+        current_user.carrier_certification_declared_at = datetime.utcnow()
     current_user.carrier_coverage_radius_km = radio
     current_user.carrier_capacity = capacidad
 

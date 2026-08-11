@@ -46,7 +46,15 @@ class Order(Base):
     
     # Dirección de envío (JSON para flexibilidad)
     shipping_address_json = Column(JSON, nullable=True)
-    
+    # Destino del padrón oficial. Queda NULL en las órdenes anteriores a la
+    # logística: siguen siendo legibles, sin destino calculable.
+    shipping_locality_id = Column(
+        String(20),
+        ForeignKey("localities.id"),
+        nullable=True,
+        index=True,
+    )
+
     # Notas
     buyer_notes = Column(String(500), nullable=True)
     seller_notes = Column(String(500), nullable=True)

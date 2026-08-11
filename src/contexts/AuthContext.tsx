@@ -36,6 +36,8 @@ interface BackendUser {
   carrier_base_province_name?: string;
   carrier_transport?: string;
   carrier_transport_certified?: boolean;
+  carrier_certification_detail?: string;
+  carrier_certification_declared_at?: string;
   carrier_coverage_radius_km?: number;
   carrier_capacity?: string;
   rating_average?: number;
@@ -91,6 +93,8 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
     carrierBaseProvinceName: backendUser.carrier_base_province_name,
     carrierTransport: backendUser.carrier_transport,
     carrierTransportCertified: backendUser.carrier_transport_certified,
+    carrierCertificationDetail: backendUser.carrier_certification_detail,
+    carrierCertificationDeclaredAt: backendUser.carrier_certification_declared_at,
     carrierCoverageRadiusKm: backendUser.carrier_coverage_radius_km,
     carrierCapacity: backendUser.carrier_capacity,
     ratingAverage: backendUser.rating_average ?? 0,
@@ -178,6 +182,7 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
         carrier_base_locality_id: userData.carrierBaseLocalityId,
         carrier_transport: userData.carrierTransport,
         carrier_transport_certified: userData.carrierTransportCertified,
+        carrier_certification_detail: userData.carrierCertificationDetail,
         carrier_coverage_radius_km: userData.carrierCoverageRadiusKm,
         carrier_capacity: userData.carrierCapacity,
       });
@@ -239,6 +244,7 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
       carrier_base_locality_id: userData.carrierBaseLocalityId,
       carrier_transport: userData.carrierTransport,
       carrier_transport_certified: userData.carrierTransportCertified,
+      carrier_certification_detail: userData.carrierCertificationDetail,
       carrier_coverage_radius_km: userData.carrierCoverageRadiusKm,
       carrier_capacity: userData.carrierCapacity,
       });

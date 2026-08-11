@@ -46,8 +46,11 @@ class OrderResponse(BaseModel):
 
 class CheckoutRequest(BaseModel):
     shipping_address: str
-    shipping_city: str
-    shipping_province: str
+    # La localidad del padrón es el destino real: de ella salen la ciudad y la
+    # provincia que se muestran, y sobre ella se calcula la compatibilidad de
+    # fletes. La dirección exacta sigue siendo texto libre y no entra al
+    # cálculo.
+    shipping_locality_id: str = Field(..., min_length=1, max_length=20)
     shipping_postal_code: str
     notes: Optional[str] = None
 

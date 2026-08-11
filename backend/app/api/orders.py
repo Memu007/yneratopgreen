@@ -13,6 +13,7 @@ from decimal import Decimal
 from app.db.base import get_db
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.cart import Cart, CartStatus
+from app.models.locality import Locality
 from app.models.product import Product
 from app.core.dependencies import get_current_user
 from app.core.montos import validar_total
@@ -46,6 +47,24 @@ def generate_order_number() -> str:
     return f"ORD-{timestamp}-{random}"
 
 
+def resolver_destino(db: Session, locality_id: str) -> Locality:
+    """El destino de un envío tiene que ser una localidad del padrón oficial.
+
+    De ahí salen la ciudad y la provincia que se muestran —no del texto que
+    manda el cliente— y sobre ella se calcula qué transportistas cubren el
+    viaje. Se valida antes de escribir una sola fila.
+    """
+    destino = db.query(Locality).filter(
+        Locality.id == (locality_id or "").strip()
+    ).first()
+    if not destino:
+        raise HTTPException(
+            status_code=400,
+            detail="La localidad de destino no pertenece al padrón oficial",
+        )
+    return destino
+
+
 @router.post("/checkout", response_model=OrderResponse)
 def checkout(
     checkout_data: CheckoutRequest,
@@ -64,7 +83,10 @@ def checkout(
     
     if not cart or not cart.items:
         raise HTTPException(status_code=400, detail="El carrito está vacío")
-    
+
+    # Antes de escribir nada: el destino tiene que existir en el padrón.
+    destino = resolver_destino(db, checkout_data.shipping_locality_id)
+
     # Agrupar items por vendedor (una orden por vendedor)
     items_by_seller = {}
     for item in cart.items:
@@ -106,10 +128,12 @@ def checkout(
             total_amount=total_amount,
             shipping_address_json={
                 "address": checkout_data.shipping_address,
-                "city": checkout_data.shipping_city,
-                "province": checkout_data.shipping_province,
-                "postal_code": checkout_data.shipping_postal_code
+                "city": destino.name,
+                "province": destino.province_name,
+                "postal_code": checkout_data.shipping_postal_code,
+                "locality_id": destino.id,
             },
+            shipping_locality_id=destino.id,
             buyer_notes=checkout_data.notes
         )
         
@@ -259,6 +283,9 @@ def checkout_bank_transfer(
     """Crear una orden por vendedor, sin modificar el checkout de Mercado Pago."""
     cart, groups = _get_transfer_groups(db, current_user)
 
+    # Antes de escribir nada: el destino tiene que existir en el padrón.
+    destino = resolver_destino(db, checkout_data.shipping_locality_id)
+
     # Mismo control que el checkout comun, y por el mismo motivo: antes de
     # que exista una sola fila.
     for group in groups:
@@ -292,10 +319,12 @@ def checkout_bank_transfer(
             transfer_account_holder=seller.full_name,
             shipping_address_json={
                 "address": checkout_data.shipping_address,
-                "city": checkout_data.shipping_city,
-                "province": checkout_data.shipping_province,
+                "city": destino.name,
+                "province": destino.province_name,
                 "postal_code": checkout_data.shipping_postal_code,
+                "locality_id": destino.id,
             },
+            shipping_locality_id=destino.id,
             buyer_notes=checkout_data.notes,
         )
         db.add(order)

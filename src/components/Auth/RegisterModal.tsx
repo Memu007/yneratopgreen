@@ -31,6 +31,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     carrierBaseLocalityId: '',
     carrierTransport: '',
     carrierTransportCertified: false,
+    carrierCertificationDetail: '',
     carrierCoverageRadiusKm: undefined,
     carrierCapacity: '',
   });
@@ -292,6 +293,24 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                 />
                 Declaro que el transporte está habilitado
               </label>
+
+              <div className={styles.formGroup}>
+                <label className={styles.label}>
+                  Detalle de la habilitación <span className={styles.required}>*</span>
+                </label>
+                <input
+                  type="text"
+                  name="carrierCertificationDetail"
+                  className={styles.input}
+                  placeholder="RUTA, transporte de cargas generales, N.° 12345"
+                  value={formData.carrierCertificationDetail}
+                  onChange={handleChange}
+                  required
+                />
+                <p className={styles.helpText}>
+                  Es tu declaración. TopGreen no la verifica y guarda la fecha en que la hacés.
+                </p>
+              </div>
 
               <div className={styles.formGroup}>
                 <label className={styles.label}>

@@ -54,6 +54,11 @@ class User(Base):
         server_default=false(),
         nullable=False,
     )
+    # La habilitación es una DECLARACIÓN del transportista, no una
+    # verificación de TopGreen: el detalle lo escribe él y la fecha la pone el
+    # servidor cuando la declara o la cambia.
+    carrier_certification_detail = Column(String(500), nullable=True)
+    carrier_certification_declared_at = Column(DateTime, nullable=True)
     carrier_coverage_radius_km = Column(Numeric(10, 2), nullable=True)
     carrier_capacity = Column(String(255), nullable=True)
     
