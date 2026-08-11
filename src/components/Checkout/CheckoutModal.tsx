@@ -97,9 +97,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
   const [fletes, setFletes] = useState<FletesCompatibles | null>(null);
   const [fletesCargando, setFletesCargando] = useState(false);
   const [fletesError, setFletesError] = useState('');
-  // Cada consulta de fletes lleva número: una respuesta tardía de un destino
-  // anterior no puede pisar el resultado del destino actual.
+  // Cada consulta de fletes lleva número, y el número cubre la sincronización
+  // y la búsqueda: una respuesta tardía de un destino o de un carrito
+  // anteriores no puede pisar el resultado vigente.
   const consultaDeFletes = useRef(0);
+  // Retrato exacto del carrito visible. Si cambia mientras el checkout está
+  // abierto, lo de antes deja de valer y hay que volver a sincronizar.
+  const retratoDelCarrito = items
+    .map((item) => `${item.product.id}x${item.quantity}`)
+    .sort()
+    .join('|');
+  const carritoSincronizado = useRef('');
 
   useEffect(() => {
     void getProvinces()
@@ -129,8 +137,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
 
   useEffect(() => {
     const destino = shippingData.localityId;
-    // Cambiar de destino invalida el listado anterior en el acto: mostrar
-    // fletes de otro destino sería peor que no mostrar ninguno.
+    // Cambiar de destino, o de carrito, invalida el listado anterior en el
+    // acto: mostrar fletes de otro viaje sería peor que no mostrar ninguno.
     setFletes(null);
     setFletesError('');
     if (!destino) {
@@ -141,21 +149,37 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     const consulta = consultaDeFletes.current + 1;
     consultaDeFletes.current = consulta;
     setFletesCargando(true);
+    const vigente = () => consultaDeFletes.current === consulta;
 
-    void apiGet<FletesCompatibles>(
-      `/logistics/compatible-carriers?destination_locality_id=${encodeURIComponent(destino)}`,
-    )
-      .then((data) => {
-        if (consultaDeFletes.current !== consulta) return;
+    void (async () => {
+      try {
+        // El carrito que ve la persona vive en el navegador y el servidor
+        // arma los grupos con el suyo. Sin sincronizar primero, el listado
+        // podría describir un carrito que ya no existe —o uno vacío—. La
+        // sincronización se reutiliza sólo mientras el carrito visible sea
+        // exactamente el mismo que se mandó.
+        if (carritoSincronizado.current !== retratoDelCarrito) {
+          await syncBackendCart();
+          if (!vigente()) return;
+          carritoSincronizado.current = retratoDelCarrito;
+        }
+
+        const data = await apiGet<FletesCompatibles>(
+          `/logistics/compatible-carriers?destination_locality_id=${encodeURIComponent(destino)}`,
+        );
+        if (!vigente()) return;
         setFletes(data);
-        setFletesCargando(false);
-      })
-      .catch((err) => {
-        if (consultaDeFletes.current !== consulta) return;
+      } catch (err) {
+        if (!vigente()) return;
+        // Si la sincronización falla, no se consulta compatibilidad y se
+        // muestra el motivo real, no un listado que no representa nada.
+        carritoSincronizado.current = '';
         setFletesError(err instanceof Error ? err.message : 'No se pudieron buscar fletes');
-        setFletesCargando(false);
-      });
-  }, [shippingData.localityId]);
+      } finally {
+        if (vigente()) setFletesCargando(false);
+      }
+    })();
+  }, [shippingData.localityId, retratoDelCarrito]);
 
   const handleShippingSubmit = (e: React.FormEvent) => {
     e.preventDefault();

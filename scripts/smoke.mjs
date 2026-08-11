@@ -3492,8 +3492,20 @@ await runCase(43, 'Fletes compatibles por futura orden, con PostGIS y sin contac
       { token: state.buyerToken },
     ));
 
-    // Y lo mismo en la pantalla: el checkout muestra el listado y tampoco
-    // tiene ahí un dato de contacto.
+    // Y ahora la integración de verdad. El carrito que ve la persona vive en
+    // el navegador; el servidor arma los grupos con el suyo. Para que el
+    // tramo de pantalla pruebe algo, el carrito del servidor arranca con el
+    // producto del vendedor A y la interfaz agrega SÓLO el del vendedor B:
+    // el listado tiene que hablar de B y jamás de A.
+    const nombreA = queryRows(
+      `SELECT name FROM products WHERE id = ${sqlLiteral(productoA)}`)[0][0];
+    const nombreB = queryRows(
+      `SELECT name FROM products WHERE id = ${sqlLiteral(productoB)}`)[0][0];
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    await apiRequest('/cart/items', {
+      method: 'POST', token: state.buyerToken, body: { product_id: productoA, quantity: 1 },
+    });
+
     const navegador = await chromium.launch({ headless: true });
     let visto = '';
     try {
@@ -3502,13 +3514,21 @@ await runCase(43, 'Fletes compatibles por futura orden, con PostGIS y sin contac
         ({ a, r }) => {
           window.localStorage.setItem('access_token', a);
           window.localStorage.setItem('refresh_token', r);
+          // El navegador arranca sin carrito propio: lo arma la persona.
+          window.localStorage.removeItem('agromarket_cart');
         },
         { a: state.buyerToken, r: state.buyerRefreshToken },
       );
       const page = await contexto.newPage();
       await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
       await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+      const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+      await buscador.fill(nombreB);
+      await buscador.press('Enter');
+      await page.getByRole('heading', { name: nombreB, exact: true, level: 3 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
       await page.getByRole('button', { name: /Agregar/ }).first().click();
+
       await page.getByRole('button', { name: /Carrito/ }).click();
       await page.getByRole('button', { name: 'Continuar compra' }).click();
       await page.getByRole('heading', { name: /Datos de Env/ }).waitFor();
@@ -3518,6 +3538,29 @@ await runCase(43, 'Fletes compatibles por futura orden, con PostGIS y sin contac
       await seccion.waitFor({ state: 'visible', timeout: 15_000 });
       await page.getByText('Base:').first().waitFor({ state: 'visible', timeout: 15_000 });
       visto = ((await seccion.textContent()) || '').replace(/\s+/g, ' ');
+
+      // El grupo es el del carrito visible, no el que el servidor tenía antes.
+      const vendedorDeB = queryRows(
+        `SELECT u.full_name FROM users u
+         JOIN products p ON p.seller_id = u.id
+         WHERE p.id = ${sqlLiteral(productoB)}`)[0][0];
+      const vendedorDeA = queryRows(
+        `SELECT u.full_name FROM users u
+         JOIN products p ON p.seller_id = u.id
+         WHERE p.id = ${sqlLiteral(productoA)}`)[0][0];
+      assert(visto.includes(`Envío de ${vendedorDeB}`),
+        `el listado no habla del carrito visible (${nombreB}): "${visto.slice(0, 220)}"`);
+      assert(!visto.includes(`Envío de ${vendedorDeA}`),
+        `el listado sigue mostrando el carrito viejo del servidor (${nombreA})`);
+      // Y el carrito del servidor quedó igual al visible: un solo producto, el B.
+      const enServidor = queryRows(`
+        SELECT ci.product_id FROM cart_items ci
+        JOIN carts c ON c.id = ci.cart_id
+        WHERE c.user_id = ${sqlLiteral(state.buyerId)} AND c.status = 'ACTIVE'
+      `).map((fila) => fila[0]);
+      assert(enServidor.length === 1 && enServidor[0] === productoB,
+        `el carrito del servidor no se sincronizó: ${JSON.stringify(enServidor)}`);
+
       assert(/TopGreen no verifica esta habilitación/.test(visto),
         'la pantalla no aclara que la habilitación es una declaración');
       for (const prohibido of ['@example.com', '+54', 'CBU', 'cbu', 'alias']) {
@@ -3528,7 +3571,8 @@ await runCase(43, 'Fletes compatibles por futura orden, con PostGIS y sin contac
     }
 
     return `2 grupos, ${enRosario.length} y ${enCordoba.length} candidatos propios; `
-      + `límite en ${aRosario} km respetado; API = PostGIS; sin contacto en JSON ni DOM`;
+      + `límite en ${aRosario} km respetado; API = PostGIS; el listado sigue al `
+      + 'carrito armado en pantalla, no al del servidor; sin contacto en JSON ni DOM';
   } finally {
     await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
     for (const [producto, previo] of [[productoA, origenPrevioA], [productoB, origenPrevioB]]) {
