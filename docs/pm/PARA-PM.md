@@ -6,102 +6,121 @@ Fecha: 2026-08-11.
 
 ## 1. Resultado
 
-**Corregido.** El commit es **`1ec7082`**, sobre `e3fe9cb`; este informe va
-aparte y encima.
-
-**Tenías razón, y el hallazgo es bueno.** Dos archivos: `CheckoutModal.tsx` y
-el tramo de pantalla del caso 43. La suite sigue en 44 casos y el barrido en 52
+**Corregido.** El commit es **`db85ff4`**, sobre `1ec7082`; este informe va
+aparte y encima. La suite pasa de 44 a **46 casos**; el barrido sigue en 52
 pantallas.
 
-## 2. El falso verde, con nombre y apellido
+**Las dos carreras eran reales**, y una de las dos era peor de lo que decía tu
+descripción. Va primero eso, y al final una cosa que **no** puedo demostrar y
+te la digo sin adornos.
 
-Tu diagnóstico es correcto en las tres partes. Lo resumo con lo que agregué al
-mirarlo:
+## 2. La primera carrera: peor de lo que parecía
 
-El carrito que ve la persona vive en el navegador. El servidor arma los grupos
-con **su** carrito, y ese sólo se sincroniza al avanzar al pago. Entre que
-alguien abre el checkout y elige destino, el carrito del servidor puede estar
-vacío, o traer lo de una sesión anterior. El listado describía, entonces, un
-viaje que no era el suyo.
+Tu punto era el número de consulta, que evita que una promesa vieja actualice
+React pero no que su `POST` escriba después. Correcto. Pero al buscar de dónde
+podía salir esa segunda escritura encontré algo más concreto:
 
-Y mi caso 43 no lo veía **porque yo mismo se lo escondí**: preparaba el carrito
-del servidor por API y recién después abría la interfaz. Los dos coincidían por
-construcción. Es exactamente la clase de prueba que mide el andamio en vez del
-producto.
+**El paso de pago sincronizaba el carrito por su cuenta.** `selectBankTransfer`
+y el envío del pedido llamaban directo a la sincronización, fuera de todo
+control. Entonces alcanzaba con esto, sin tocar nada raro:
 
-## 3. Qué hice
+1. la persona elige destino y sale la escritura A;
+2. con A en vuelo, toca «Continuar al Pago» y sale la escritura B;
+3. si A termina última, el servidor queda con el carrito anterior;
+4. y **las opciones de transferencia y la orden se calculan sobre ese carrito**.
 
-| Punto que pediste | Cómo quedó |
-|---|---|
-| Sincronizar y esperar antes de la primera consulta | `/cart/sync` con el carrito local exacto, y recién después la búsqueda |
-| Si falla la sincronización, no consultar | se corta ahí y se muestra el motivo real de la API |
-| Carga que cubra las dos operaciones | un solo estado desde antes de sincronizar hasta después de responder |
-| Protección de respuestas tardías en ambas | el número de consulta se comprueba después de cada espera |
-| Invalidar si el carrito cambia | un retrato del carrito visible dispara el efecto |
-| Reutilizar sólo con el mismo snapshot | se reutiliza únicamente si el retrato es idéntico al que se mandó |
+O sea: no era sólo un listado equivocado, era una orden equivocada.
 
-El retrato es la lista de `producto × cantidad` ordenada. Si cambia una
-cantidad, cambia el retrato, y se vuelve a sincronizar antes de mostrar nada.
-Si un error deja la sincronización a medias, el retrato guardado se borra, así
-que el intento siguiente vuelve a sincronizar en vez de confiar en algo que no
-pasó.
+**Todas las sincronizaciones pasan ahora por una sola cola encadenada.** La
+última en salir es la última en escribir, y nadie —ni los fletes ni el pago—
+lee nada hasta que la cola se vacía. Dos detalles que hacen falta para que eso
+sea cierto:
 
-## 4. La regresión que reemplaza al falso verde
+- el retrato que decide si hay que sincronizar es el **último encolado**, no el
+  último terminado: con una escritura en vuelo el servidor todavía no
+  representa lo que se ve;
+- una sincronización fallida limpia ese retrato **haya quedado vigente o no**,
+  para que el intento siguiente vuelva a mandar el carrito en vez de suponer
+  que ya está.
 
-Tomé tu caso preferido, tal cual:
+## 3. La segunda: generación siempre
 
-```text
-[PASS] 43 … el listado sigue al carrito armado en pantalla, no al del
-  servidor; sin contacto en JSON ni DOM
-```
+Un renglón: el número se incrementa **antes** de cualquier retorno, también
+cuando no hay destino. Antes, cambiar de provincia vaciaba la localidad y salía
+sin mover la generación, así que la respuesta en vuelo de la anterior seguía
+pasando por vigente.
 
-El tramo de pantalla ahora:
+## 4. Las regresiones
 
-1. carga el carrito **del servidor** con el producto del vendedor A;
-2. abre el navegador con `agromarket_cart` **borrado**: la persona empieza sin
-   carrito propio;
-3. busca por nombre el producto del vendedor **B** y lo agrega sólo desde la
-   interfaz;
-4. abre el checkout, elige destino;
-5. exige que el listado diga **«Envío de B»**, que **no** nombre a A, y que el
-   carrito del servidor haya quedado con un solo ítem: el de B.
-
-**Rojo forzado, que es lo que faltaba la vez pasada.** Saqué la sincronización
-previa y el caso falló nombrando el defecto:
+Caso **45**, con la escritura retenida a voluntad —no con tiempos de red—:
 
 ```text
-[FAIL] 43 — el listado no habla del carrito visible (Terneros Angus - Lote 20
-  cabezas): "…Envío de Administrador TopGreen desde Rosario, Santa Fe…"
+[PASS] 45 … con una escritura en vuelo: 0 escrituras encima, 0 consultas de
+  fletes y 0 de pago; liberada, el servidor queda con el carrito visible y el
+  pago describe al vendedor correcto
 ```
 
-Ese rojo es la prueba de que ahora el caso mide la integración y no el andamio.
+Servidor con el producto de un vendedor, interfaz con el de otro, la primera
+escritura del carrito retenida por la prueba, y en el medio la persona avanza
+al pago. Se exige que **nadie escriba ni lea por encima** mientras la escritura
+está sin confirmar, y que al liberarla el servidor quede con el carrito visible
+y el pago hable del vendedor correcto.
 
-Conservé intactas la comparación con PostGIS grupo por grupo y la comprobación
-de privacidad; lo único que cambió del caso es de dónde sale el carrito del
-tramo de pantalla.
+**Rojo forzado.** Devolví el pago a sincronizar por su cuenta y el caso lo
+nombró:
 
-## 5. Estado final
+```text
+[FAIL] 45 — el pago escribió el carrito por encima de una escritura en vuelo
+  (2 en total)
+```
+
+## 5. Lo que el caso 46 no prueba
+
+Acá te debo una y prefiero decirla yo.
+
+El caso **46** hace lo que pediste: retiene la respuesta del destino anterior,
+vacía la localidad cambiando de provincia, libera la respuesta y comprueba que
+no reaparezca ningún listado. Pasa.
+
+**Pero también pasa con la carrera puesta.** Lo corrí a propósito con la
+generación devuelta a su lugar viejo y siguió verde. El motivo es que la
+sección de fletes no se dibuja cuando no hay destino: aunque la respuesta
+tardía escriba el estado, no hay nada en pantalla que lo muestre, y al elegir
+un destino nuevo el estado se limpia antes de consultar.
+
+O sea: **la segunda carrera no es observable desde la interfaz hoy**. La
+corrección es correcta y barata, y deja de depender de que la sección siga
+ocultándose; pero el caso 46 documenta el comportamiento, no demuestra el
+arreglo. No quiero anotarlo como prueba de algo que no prueba.
+
+Si querés una prueba que sí discrimine, la única forma honesta que veo es hacer
+observable el estado —por ejemplo que la sección muestre «elegí un destino» en
+vez de desaparecer—, y eso es un cambio de interfaz que no voy a hacer sin que
+lo pidas.
+
+## 6. Estado final
 
 | Comprobación | Resultado |
 |---|---|
-| Suite completa, base recreada | **44/44** |
-| Caso 43 sin la sincronización previa | rojo, nombrando el producto que falta |
+| Suite completa, base recreada | **46/46** |
+| Caso 45 con el pago escribiendo por su cuenta | rojo, nombrando la causa |
+| Caso 46 con la generación vieja | **verde igual** — ver punto 5 |
 | `npm run a11y -- --todas` | **52/52**, 0 violaciones de cualquier impacto |
 | `npm run build` | verde |
 | `git -c core.whitespace=cr-at-eol diff --cached --check` | sin avisos |
 
-No repetí contraste: no toqué un solo color ni estilo. No toqué migración,
-regla geográfica, declaración, persistencia de órdenes ni Railway, y no abrí
-selección, contacto ni asignación.
+No repetí contraste: no toqué colores ni estilos. No reescribí el caso A/B, no
+amplié el módulo y no toqué migración, regla geográfica, declaración,
+persistencia de órdenes ni Railway.
 
-## 6. Riesgos
+## 7. Riesgo
 
-**Uno, y conviene que lo sepas.** Ahora el carrito del servidor se sincroniza
-al elegir destino, no sólo al pagar. Es más temprano que antes, pero es la
-misma escritura que ya hacía el checkout y sin ella el listado no puede ser
-cierto. Efecto secundario real: si alguien abre el checkout y no compra, su
-carrito de servidor queda igual al visible. Me parece correcto —son el mismo
-carrito—, pero es un cambio de momento y no quiero que aparezca como sorpresa.
+**Uno.** El paso de pago ahora reutiliza la sincronización de la búsqueda de
+fletes cuando el carrito no cambió, en vez de mandar la suya. Es una escritura
+menos y el resultado es el mismo, pero si mañana aparece una forma de cambiar
+el carrito desde el checkout —el botón «quitar» que quedó fuera del MVP—, hay
+que comprobar que el retrato la refleje. Está escrito así justamente para que
+ese cambio dispare una sincronización nueva, pero conviene mirarlo cuando pase.
 
 **Sigue abierto el `float` del checkout**, obligatorio antes de Fase 4.
 
