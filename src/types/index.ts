@@ -140,6 +140,10 @@ export interface CartContextType {
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
+  // Manda el carrito visible al servidor. Las llamadas se encadenan: la
+  // última en salir es la última en escribir, y esperar la promesa
+  // garantiza que no quedó ninguna escritura anterior en vuelo.
+  sincronizarConServidor: () => Promise<void>;
 }
 
 // Order Types

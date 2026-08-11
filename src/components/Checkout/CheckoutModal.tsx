@@ -68,7 +68,7 @@ interface BankTransferOrder extends BankTransferOption {
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
-  const { items, totalAmount, clearCart } = useCart();
+  const { items, totalAmount, clearCart, sincronizarConServidor } = useCart();
   const { user } = useAuth();
 
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('shipping');
@@ -107,30 +107,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     .map((item) => `${item.product.id}x${item.quantity}`)
     .sort()
     .join('|');
-  // Último retrato PUESTO EN LA COLA, no el último terminado: si hay una
-  // sincronización en vuelo, el servidor todavía no representa lo que se ve.
-  const retratoEncolado = useRef('');
-  // Las sincronizaciones se encadenan una detrás de otra. Cancelar del lado
-  // del cliente no alcanza: el POST viejo ya viajó y, si termina último, deja
-  // el carrito de antes como estado final del servidor y la consulta vigente
-  // lee ese snapshot. Encadenarlas garantiza que la última en salir es la
-  // última en escribir.
-  const colaDeSincronizacion = useRef<Promise<void>>(Promise.resolve());
-
-  const asegurarCarritoEnServidor = (retrato: string) => {
-    if (retratoEncolado.current !== retrato) {
-      retratoEncolado.current = retrato;
-      const turno = colaDeSincronizacion.current
-        .catch(() => undefined)
-        .then(() => syncBackendCart());
-      colaDeSincronizacion.current = turno;
-    }
-    // Se espera la cola entera, aunque esta corrida no haya encolado nada:
-    // consultar con una sincronización vieja en vuelo sería leer el carrito
-    // anterior.
-    return colaDeSincronizacion.current;
-  };
-
   useEffect(() => {
     void getProvinces()
       .then(setProvincias)
@@ -182,7 +158,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         // El carrito que ve la persona vive en el navegador y el servidor
         // arma los grupos con el suyo. Sin sincronizar primero, el listado
         // podría describir un carrito que ya no existe —o uno vacío—.
-        await asegurarCarritoEnServidor(retratoDelCarrito);
+        await sincronizarConServidor();
         if (!vigente()) return;
 
         const data = await apiGet<FletesCompatibles>(
@@ -191,10 +167,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         if (!vigente()) return;
         setFletes(data);
       } catch (err) {
-        // Una sincronización fallida no dejó el carrito del servidor donde
-        // debía, así que el intento siguiente tiene que volver a mandarlo:
-        // esto se limpia haya quedado vigente o no.
-        retratoEncolado.current = '';
         if (!vigente()) return;
         // Si la sincronización falla, no se consulta compatibilidad y se
         // muestra el motivo real, no un listado que no representa nada.
@@ -203,27 +175,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         if (vigente()) setFletesCargando(false);
       }
     })();
-  }, [shippingData.localityId, retratoDelCarrito]);
+  }, [shippingData.localityId, retratoDelCarrito, sincronizarConServidor]);
 
   const handleShippingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setCurrentStep('payment');
     void selectBankTransfer();
-  };
-
-  const syncBackendCart = async () => {
-    const cartItems = items.map(item => ({
-      product_id: item.product.id,
-      quantity: item.quantity
-    }));
-    // Sin respaldo por producto: si la sincronización falla, el motivo real
-    // sube tal cual. El respaldo anterior reintentaba con POST y PUT, y podía
-    // reemplazar el motivo verdadero por «Producto no encontrado en el
-    // carrito», que no le dice nada a quien está comprando.
-    await apiFetch('/cart/sync', {
-      method: 'POST',
-      body: JSON.stringify({ items: cartItems })
-    });
   };
 
   const selectBankTransfer = async () => {
@@ -233,7 +190,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
       // Por la misma cola que la búsqueda de fletes: si una sincronización
       // anterior sigue en vuelo, ésta no puede adelantarla y terminar
       // escribiendo última sobre el carrito del servidor.
-      await asegurarCarritoEnServidor(retratoDelCarrito);
+      await sincronizarConServidor();
       setTransferOptions(await apiGet<BankTransferOption[]>('/orders/transfer-options'));
     } catch (err) {
       setTransferOptions([]);
@@ -279,7 +236,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     setIsLoading(true);
 
     try {
-      await asegurarCarritoEnServidor(retratoDelCarrito);
+      await sincronizarConServidor();
 
       // 2. Crear la orden con los datos de envío
       const checkoutData = {

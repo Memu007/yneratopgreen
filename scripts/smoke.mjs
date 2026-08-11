@@ -3660,26 +3660,29 @@ await runCase(44, 'El destino de la orden sale del padrón y las órdenes viejas
     + 'padrón; orden sin destino sigue legible en detalle y listado';
 });
 
-await runCase(45, 'Una sincronización vieja no puede quedar última ni alimentar la consulta', async () => {
-  // Dos escrituras del carrito en vuelo a la vez: la vieja, retenida a
-  // propósito, y la nueva. Si la vieja termina última, el carrito del servidor
-  // queda con el snapshot anterior y todo lo que se calcule después —fletes y
-  // opciones de pago— describe un carrito que la persona ya no tiene.
-  // Los tiempos no se dejan al azar: la vieja se libera cuando la prueba
-  // quiere.
+await runCase(45, 'La escritura de un carrito abandonado no puede quedar última', async () => {
+  // El checkout se desmonta al cerrarlo. Si la coordinación de las escrituras
+  // viviera adentro suyo, cerrar con una escritura en vuelo, cambiar el
+  // carrito y volver a abrir crearía otra cola: la escritura nueva saldría por
+  // su cuenta, y la vieja —huérfana— terminaría última encima del carrito
+  // vigente. Todo el recorrido es de interfaz, sin recargar la página, y los
+  // tiempos los decide la prueba, no la red.
   const publicaciones = queryRows(`
     SELECT p.id, p.seller_id, p.name FROM products p
-    WHERE p.status = 'ACTIVE' AND p.stock > 0
+    WHERE p.status = 'ACTIVE' AND p.stock > 0 AND p.publication_type <> 'servicio'
     ORDER BY p.seller_id, p.id
   `);
   const primeraDeCada = new Map();
   for (const [id, vendedor, nombre] of publicaciones) {
-    if (!primeraDeCada.has(vendedor)) primeraDeCada.set(vendedor, { id, nombre });
+    if (!primeraDeCada.has(vendedor)) primeraDeCada.set(vendedor, { id, nombre, vendedor });
   }
-  const [[vendedorViejo, viejo], [, nuevo]] = [...primeraDeCada.entries()].slice(0, 2);
-  assert(nuevo, 'hacen falta dos vendedores con publicaciones activas');
-  const nombreDelVendedorViejo = queryRows(
-    `SELECT full_name FROM users WHERE id = ${sqlLiteral(vendedorViejo)}`)[0][0];
+  const [productoA, productoB] = [...primeraDeCada.values()].slice(0, 2);
+  assert(productoB, 'hacen falta dos vendedores con publicaciones activas');
+  const nombreDelVendedor = (id) => queryRows(
+    `SELECT full_name FROM users WHERE id = ${sqlLiteral(id)}`)[0][0];
+  const vendedorDeA = nombreDelVendedor(productoA.vendedor);
+  const vendedorDeB = nombreDelVendedor(productoB.vendedor);
+  assert(vendedorDeA !== vendedorDeB, 'los dos productos tienen que ser de vendedores distintos');
 
   const carritoDelServidor = () => queryRows(`
     SELECT ci.product_id FROM cart_items ci
@@ -3688,11 +3691,7 @@ await runCase(45, 'Una sincronización vieja no puede quedar última ni alimenta
     ORDER BY ci.product_id
   `).map((fila) => fila[0]);
 
-  // El servidor arranca con el producto viejo; la persona va a armar otro.
   await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
-  await apiRequest('/cart/items', {
-    method: 'POST', token: state.buyerToken, body: { product_id: viejo.id, quantity: 1 },
-  });
 
   const browser = await chromium.launch({ headless: true });
   try {
@@ -3707,92 +3706,117 @@ await runCase(45, 'Una sincronización vieja no puede quedar última ni alimenta
     );
     const page = await context.newPage();
 
-    // La PRIMERA escritura del carrito queda retenida a voluntad. Con ella en
-    // vuelo se mira que nadie escriba ni lea por encima.
-    let liberar = () => {};
-    const retenida = new Promise((listo) => { liberar = listo; });
-    let sincronizaciones = 0;
-    let consultasDeFletes = 0;
-    let consultasDePago = 0;
+    // La primera escritura del carrito queda retenida hasta que la prueba la
+    // suelte; de las respuestas se lleva cuenta para no medir sobre una
+    // escritura que todavía está viajando.
+    let liberarA = () => {};
+    const retenidaA = new Promise((listo) => { liberarA = listo; });
+    const cuerpos = [];
+    let respuestas = 0;
     await page.route('**/api/cart/sync', async (ruta) => {
-      sincronizaciones += 1;
-      if (sincronizaciones === 1) await retenida;
+      const numero = cuerpos.length + 1;
+      cuerpos.push(ruta.request().postData() || '');
+      if (numero === 1) await retenidaA;
       await ruta.continue();
     });
-    await page.route('**/api/logistics/compatible-carriers*', async (ruta) => {
-      consultasDeFletes += 1;
-      await ruta.continue();
+    page.on('response', (respuesta) => {
+      if (respuesta.url().includes('/api/cart/sync')) respuestas += 1;
     });
-    await page.route('**/api/orders/transfer-options*', async (ruta) => {
-      consultasDePago += 1;
-      await ruta.continue();
-    });
+
+    const esperarA = async (condicion, mensaje, limite = 20_000) => {
+      const hasta = Date.now() + limite;
+      while (Date.now() < hasta) {
+        if (condicion()) return;
+        await page.waitForTimeout(100);
+      }
+      throw new Error(mensaje);
+    };
+
+    // Nunca se recarga la página: recargar rearmaría cualquier cola por sí
+    // solo y la prueba dejaría de medir lo que dice medir.
+    const agregarDesdeLaInterfaz = async (producto) => {
+      const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+      await buscador.fill(producto.nombre);
+      await buscador.press('Enter');
+      await page.getByRole('heading', { name: producto.nombre, exact: true, level: 3 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+      await page.getByRole('button', { name: /Agregar/ }).first().click();
+    };
+
+    const abrirCheckout = async () => {
+      await page.getByRole('button', { name: /Carrito/ }).click();
+      await page.getByRole('button', { name: 'Continuar compra' }).click();
+      await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15_000 });
+      await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
+      await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
+      await page.getByPlaceholder('2000').fill('2700');
+    };
+
+    const cerrar = () => page.locator('button[aria-label="Cerrar"]:visible').first().click();
 
     await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
-    const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
-    await buscador.fill(nuevo.nombre);
-    await buscador.press('Enter');
-    await page.getByRole('heading', { name: nuevo.nombre, exact: true, level: 3 })
-      .waitFor({ state: 'visible', timeout: 15_000 });
-    await page.getByRole('button', { name: /Agregar/ }).first().click();
+
+    // 1. carrito A armado en pantalla, checkout, destino: sale su escritura y
+    //    queda retenida.
+    await agregarDesdeLaInterfaz(productoA);
+    await abrirCheckout();
+    await elegirDestino(page, 'Pergamino');
+    await esperarA(() => cuerpos.length === 1, 'la elección del destino no disparó la escritura del carrito');
+    await page.waitForTimeout(1000);
+    assert(cuerpos.length === 1, `esperaba una sola escritura en vuelo, hubo ${cuerpos.length}`);
+    assert(cuerpos[0].includes(productoA.id), 'la escritura retenida no lleva el carrito A');
+    assert(respuestas === 0, 'la escritura retenida ya había contestado');
+
+    // 2. con esa escritura en vuelo se cierra el checkout, se cambia el
+    //    carrito visible de A a B y se vuelve a abrir.
+    await cerrar();
+    await page.getByRole('heading', { name: /Datos de Env/ })
+      .waitFor({ state: 'hidden', timeout: 15_000 });
 
     await page.getByRole('button', { name: /Carrito/ }).click();
-    await page.getByRole('button', { name: 'Continuar compra' }).click();
-    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor();
+    await page.getByRole('heading', { name: /Mi Carrito/ }).waitFor({ timeout: 15_000 });
+    await page.locator('button[title="Eliminar"]:visible').first().click();
+    await page.getByText('Tu carrito está vacío').waitFor({ timeout: 15_000 });
+    await cerrar();
+    await agregarDesdeLaInterfaz(productoB);
+    await abrirCheckout();
 
-    // El resto del formulario, que es obligatorio para poder avanzar.
-    await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
-    await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
-    await page.getByPlaceholder('2000').fill('2700');
-
-    // Destino elegido: sale la primera sincronización y queda retenida.
+    // 3. destino de nuevo: sale la escritura de B, con tiempo de sobra para
+    //    terminar ANTES de que se libere la vieja.
     await elegirDestino(page, 'Pergamino');
-    await page.waitForFunction(() => true);
-    await page.waitForTimeout(1200);
-    assert(sincronizaciones === 1, `esperaba 1 sincronización en vuelo, hubo ${sincronizaciones}`);
-    // Con la escritura del carrito sin confirmar, no se puede haber consultado:
-    // leería el carrito anterior.
-    assert(consultasDeFletes === 0,
-      'se consultó compatibilidad con la sincronización todavía en vuelo');
+    await page.waitForTimeout(3000);
+    liberarA();
+    await esperarA(() => respuestas >= 2,
+      `las dos escrituras no llegaron a contestar (${respuestas} de 2)`);
+    await page.waitForTimeout(1000);
 
-    // Con la escritura retenida, la persona avanza al pago. El paso de pago
-    // también sincroniza: si lo hiciera por su cuenta, habría dos escrituras
-    // en vuelo y la vieja podría terminar última. Tiene que esperar.
-    await page.getByRole('button', { name: /Continuar al Pago/ }).click();
-    await page.waitForTimeout(2000);
-    assert(sincronizaciones === 1,
-      `el pago escribió el carrito por encima de una escritura en vuelo `
-      + `(${sincronizaciones} en total)`);
-    assert(consultasDePago === 0,
-      'el pago pidió las opciones con la escritura del carrito sin confirmar');
-    assert(consultasDeFletes === 0,
-      'se consultó compatibilidad con la escritura del carrito sin confirmar');
-
-    // Recién ahora se libera. Todo lo que sigue tiene que leer el carrito
-    // nuevo, nunca el que el servidor tenía antes.
-    liberar();
-    await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: 15_000 });
-    await page.waitForFunction(
-      () => !document.body.textContent?.includes('Cargando opciones'),
-      null,
-      { timeout: 15_000 },
-    ).catch(() => {});
-    await page.waitForTimeout(2500);
-
+    // 4. servidor, listado y paso de pago tienen que representar sólo a B.
     const enServidor = carritoDelServidor();
-    assert(enServidor.length === 1 && enServidor[0] === nuevo.id,
-      `el carrito del servidor no quedó igual al visible: ${JSON.stringify(enServidor)}`);
+    assert(enServidor.length === 1 && enServidor[0] === productoB.id,
+      `la escritura del carrito abandonado quedó última: el servidor tiene `
+      + `${JSON.stringify(enServidor)} y en pantalla está ${productoB.id}`);
 
-    const pago = ((await page.locator('[class*="_modal_"]').textContent()) || '')
-      .replace(/\s+/g, ' ');
-    assert(!pago.includes(nombreDelVendedorViejo),
-      `el paso de pago describe el carrito viejo (${nombreDelVendedorViejo})`);
-    assert(consultasDePago > 0, 'el pago nunca llegó a pedir las opciones');
+    const seccion = page.locator('[class*="_fletes_"]');
+    await seccion.getByText(/Envío de/).first().waitFor({ state: 'visible', timeout: 20_000 });
+    const listado = ((await seccion.textContent()) || '').replace(/\s+/g, ' ');
+    assert(listado.includes(`Envío de ${vendedorDeB}`),
+      `el listado no habla del carrito vigente: "${listado.slice(0, 200)}"`);
+    assert(!listado.includes(`Envío de ${vendedorDeA}`),
+      `el listado sigue mostrando el carrito abandonado (${vendedorDeA})`);
 
-    return `con una escritura en vuelo: 0 escrituras encima, 0 consultas de fletes y `
-      + `0 de pago; liberada, el servidor queda con el carrito visible y el pago `
-      + 'describe al vendedor correcto';
+    await page.getByRole('button', { name: /Continuar al Pago/ }).click();
+    await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: 15_000 });
+    const datosBancarios = page.locator('[class*="_confirmationInfo_"]');
+    await datosBancarios.getByRole('heading', { level: 3 }).first()
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    const pago = ((await datosBancarios.textContent()) || '').replace(/\s+/g, ' ');
+    assert(pago.includes(vendedorDeB), `el pago no describe el carrito vigente: "${pago.slice(0, 200)}"`);
+    assert(!pago.includes(vendedorDeA), `el pago describe el carrito abandonado (${vendedorDeA})`);
+
+    return `carrito cambiado de A a B con la escritura de A retenida y liberada última: `
+      + `el servidor, el listado y los datos bancarios hablan sólo de ${vendedorDeB} `
+      + `(${cuerpos.length} escrituras, ${respuestas} respuestas)`;
   } finally {
     await browser.close();
     await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });

@@ -1,8 +1,17 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { CartItem, CartContextType, Product } from '../types';
 import { useToast } from '../components/Toast/Toast';
+import { apiFetch } from '../utils/api';
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
+
+// Cómo se resume un carrito para saber si el servidor ya tiene esto mismo.
+// Es pura y vive afuera del componente: así no cambia de identidad en cada
+// render.
+const retratoDe = (lista: CartItem[]) => lista
+  .map((item) => `${item.product.id}x${item.quantity}`)
+  .sort()
+  .join('|');
 
 export const useCart = () => {
   const context = useContext(CartContext);
@@ -114,6 +123,58 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     setItems([]);
   };
 
+  // --- sincronización con el carrito del servidor ---------------------------
+  // Vive acá y no en el checkout a propósito. El modal se desmonta al
+  // cerrarlo, y con él moriría una cola local: alcanzaría con cerrar el
+  // checkout mientras una escritura está en vuelo, cambiar el carrito y
+  // volver a abrirlo para que la instancia nueva escriba por su cuenta y la
+  // vieja terminara última sobre el carrito vigente. El carrito sobrevive a
+  // sus pantallas; la coordinación de sus escrituras también.
+  const colaDeSincronizacion = useRef<Promise<void>>(Promise.resolve());
+  const retratoEncolado = useRef('');
+  // La lista se lee de una referencia al día y no del cierre: así la función
+  // no cambia de identidad en cada render y quien la use en un efecto puede
+  // declararla como dependencia sin volver a ejecutarlo de más.
+  const itemsVigentes = useRef(items);
+  itemsVigentes.current = items;
+
+  const sincronizarConServidor = useCallback(() => {
+    const lista = itemsVigentes.current;
+    const retrato = retratoDe(lista);
+    if (retratoEncolado.current !== retrato) {
+      retratoEncolado.current = retrato;
+      // La foto se toma AL ENCOLAR: cada turno manda lo que había cuando le
+      // tocó el lugar en la fila, así el último en salir es el último en
+      // escribir.
+      const instantanea = lista.map((item) => ({
+        product_id: item.product.id,
+        quantity: item.quantity,
+      }));
+      const turno = colaDeSincronizacion.current
+        .catch(() => undefined)
+        .then(async () => {
+          try {
+            // Sin respaldo por producto: si falla, el motivo real sube tal
+            // cual y quien esté esperando decide qué mostrar.
+            await apiFetch('/cart/sync', {
+              method: 'POST',
+              body: JSON.stringify({ items: instantanea }),
+            });
+          } catch (error) {
+            // No quedó escrito lo que se pedía: el intento siguiente tiene
+            // que volver a mandarlo en vez de darlo por hecho.
+            retratoEncolado.current = '';
+            throw error;
+          }
+        });
+      colaDeSincronizacion.current = turno;
+    }
+    // Se espera la cola entera aunque esta llamada no haya encolado nada:
+    // con una escritura anterior en vuelo, el servidor todavía no
+    // representa lo que se ve.
+    return colaDeSincronizacion.current;
+  }, []);
+
   const itemCount = items.reduce((total, item) => total + item.quantity, 0);
   const totalAmount = items.reduce(
     (total, item) => total + item.product.price * item.quantity,
@@ -128,6 +189,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     removeItem,
     updateQuantity,
     clearCart,
+    sincronizarConServidor,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
