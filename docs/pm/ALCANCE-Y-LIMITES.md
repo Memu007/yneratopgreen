@@ -118,9 +118,10 @@ documentacion ARCA/Carta de Porte ni verificacion oficial de certificados.
 **Limite:** TopGreen no recibe, retiene, divide ni gira dinero de las ventas
 entre terceros. No entran comision de marketplace, conciliacion bancaria ni
 reembolsos automaticos de transferencias. El PDF no menciona OAuth ni define
-el destinatario de Mercado Pago: queda en revisión si OAuth por vendedor, con
-comisión de marketplace cero, es infraestructura necesaria para el checkout ya
-vendido y no una ampliación funcional.
+el destinatario de Mercado Pago. La revisión técnica confirmó que OAuth por
+vendedor, con comisión de marketplace cero, es infraestructura necesaria para
+el checkout ya vendido: el vendedor cobra directo y paga la comisión normal de
+Mercado Pago. No agrega una comisión ni una función comercial de TopGreen.
 
 El comprobante es opcional como evidencia; el vendedor valida contra su
 cuenta bancaria. La referencia de la orden debe permitir identificar el

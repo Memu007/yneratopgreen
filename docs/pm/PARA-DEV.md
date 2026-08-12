@@ -1786,3 +1786,26 @@ No uses el módulo heredado como autoridad: tiene split 5 %, OAuth y supuestos
 viejos. Señalá qué puede reutilizarse sólo después de compararlo con la API
 actual. Esta consulta va en esfuerzo **Alto**, no Extra. Hasta que PM responda,
 no montes `payments.py`, no restaures comisión y no cambies esquema ni entorno.
+
+**Análisis aceptado por PM:** informe `925de4e`, con una corrección contractual.
+Mercado Pago está prometido explícitamente en el PDF y no puede correrse sin
+acuerdo con la clienta. Para cumplir específicamente ese requisito sin que
+TopGreen cobre fondos ajenos, OAuth por vendedor es el camino mínimo seguro.
+
+PM confirmó directamente en la documentación oficial:
+
+- Checkout Pro de marketplace usa el token OAuth de cada vendedor;
+- la comisión de Mercado Pago se descuenta de los fondos del vendedor y la de
+  marketplace puede ser cero (`marketplace_fee: 0`);
+- Checkout Pro sigue creando preferencias en `/checkout/preferences`; API
+  Orders es una alternativa de Checkout API, no el reemplazo de este flujo;
+- el modelo general disponible es 1:1; 1:N requiere cartera asesorada/contacto
+  comercial con Mercado Pago;
+- webhooks llevan firma y se reintentan, por lo que firma, consulta posterior e
+  idempotencia propia son obligatorias.
+
+No implementes todavía. Falta confirmación de Emi sobre las consecuencias de
+producto: cada vendedor debe vincular su cuenta y un carrito multivendedor se
+paga por órdenes separadas. Mantenete en **Alto**. Si Emi confirma, PM abrirá la
+implementación en **Extra**, incluyendo cifrado y ciclo de vida de tokens; no se
+reutiliza el módulo heredado sin recortarlo contra ese alcance.

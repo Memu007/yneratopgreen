@@ -74,11 +74,27 @@ vendedor sigue siendo preliminarmente la opción más segura porque TopGreen no
 custodia ni redistribuye dinero, y puede ser el mecanismo técnico necesario
 para cumplir lo prometido, no una función comercial adicional.
 
-**Tarea activa sólo de análisis:** la Dev debe contrastar esa conclusión con la
-documentación oficial y el código, sin implementar nada, según el cierre de
-`PARA-DEV.md`. Sigue en **Alto**. Después PM decide si OAuth con comisión cero
-entra como implementación del checkout ya vendido o si requiere hablar con la
-clienta.
+El análisis técnico de la Dev `925de4e` queda **aceptado con una corrección**.
+OAuth por vendedor es más seguro que hacer cobrar a TopGreen y trae ciclo de
+vida de tokens, cifrado, revocación, webhooks firmados y un pago por vendedor.
+Pero Mercado Pago no es sólo «conversión» postergable: el PDF lo incluye
+explícitamente. OAuth con comisión de marketplace cero es la implementación
+mínima segura de ese requisito ya vendido, no una ampliación funcional.
+
+La PM confirmó en documentación oficial que Checkout Pro de marketplace exige
+el token OAuth de cada vendedor; la comisión normal de Mercado Pago se descuenta
+al vendedor; `marketplace_fee: 0` es válido; y Checkout Pro sigue usando
+`/checkout/preferences`. La nueva API Orders corresponde a Checkout API, no
+reemplaza las preferencias de Checkout Pro. El modelo general es 1:1; un carrito
+con varios vendedores requiere un pago por orden salvo acceso comercial al
+modelo 1:N.
+
+**Decisión pendiente de Emi, sin tarea activa de producto:** confirmar el flujo
+seguro ya ofrecido: cada vendedor vincula Mercado Pago, cobra directamente y
+paga la comisión normal; TopGreen cobra comisión cero. Conviene informar a la
+clienta las dos consecuencias operativas —vinculación por vendedor y pagos
+separados—, sin tratarlas como adicional. La Dev sigue en **Alto** mientras
+espera; la implementación completa justificará volver a **Extra**.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 

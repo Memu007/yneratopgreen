@@ -25,11 +25,21 @@ prohibieron OAuth o split. Por lo tanto, «sin OAuth» no era un límite textual
 la clienta: fue una interpretación interna posterior que puede corregirse si
 OAuth es el medio técnico necesario para que cada vendedor cobre directamente.
 
-Hipótesis preliminar de PM: OAuth por vendedor, sin comisión de marketplace,
-es más seguro que hacer cobrar a TopGreen y puede cumplir la función ya vendida
-sin ampliar el resultado comercial. Antes de decidir se pidió a la Dev un
-contraste técnico adversarial y sin código. Hasta esa respuesta `payments.py` y
-`mp_oauth` siguen desmontados.
+El contraste técnico de la Dev `925de4e` y la verificación directa de PM
+confirman la hipótesis: OAuth por vendedor, sin comisión de marketplace, es la
+implementación segura del Checkout Pro ya vendido. No amplía el resultado
+comercial, aunque sí exige infraestructura sensible que debe construirse bien.
+
+Checkout Pro sigue usando preferencias (`/checkout/preferences`); la API Orders
+nueva pertenece a Checkout API. `marketplace_fee: 0` es válido. La comisión
+normal la descuenta Mercado Pago al vendedor. El modelo estándar es 1:1, por lo
+que cada orden/vendedor necesita su pago; 1:N requiere relación comercial
+asesorada con Mercado Pago.
+
+Queda pendiente confirmación de Emi antes de implementar: cada vendedor debe
+vincular Mercado Pago y los carritos multivendedor implican pagos separados.
+Eso se informa a la clienta como funcionamiento del requisito, no como adicional.
+Hasta entonces `payments.py` y `mp_oauth` siguen desmontados.
 
 ## 2026-08-09 — Navegación contextual sin ampliar el MVP
 
