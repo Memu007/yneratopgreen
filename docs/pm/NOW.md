@@ -29,20 +29,23 @@ antes de sincronizar con el servidor el carrito local que la persona está
 viendo. La prueba lo oculta porque prepara previamente el carrito por API; en
 uso normal puede responder “carrito vacío” o usar una compra anterior.
 
-La tercera corrección llegó en producto `fe73073` e informe `68db92f`. El caso
-45 ahora sí fuerza dos snapshots y la coordinación sobrevive al desmontaje del
-checkout. Esa parte queda conforme, pero **la entrega todavía no está
-aceptada**: la deduplicación del `CartContext` identifica sólo producto y
-cantidad, no la cuenta autenticada. Dos usuarios sucesivos con el mismo carrito
-pueden compartir falsamente el estado “ya sincronizado”; además, un turno viejo
-que todavía no empezó puede ejecutarse después del login con las credenciales
-de la cuenta nueva.
+La Pieza B de logística queda **aceptada**: producto inicial `e3fe9cb`, cierre
+de identidad `93ea92c` e informe final `8dc9543`. Los casos 43, 45, 47 y 48 ya
+fuerzan carrito visible, desmontaje, orden inverso y cambio de cuenta. La PM
+revisó el flujo y obtuvo build independiente verde. La suite completa no pudo
+arrancar en el entorno PM porque Docker sigue apagado; la dev informa 48/48 y
+la revisión del código de las regresiones no encontró preparación artificial.
 
-**Tarea activa única de la dev:** aislar cola y deduplicación por identidad de
-sesión y demostrar que cerrar sesión nunca mezcla carritos ni credenciales. No
-se reabren la prueba A/B, la corrección de destino, PostGIS, la migración, la
-declaración, la persistencia del destino ni la Pieza C. El criterio exacto está
-al final de `PARA-DEV.md`.
+La revisión descubrió un problema separado y previo de autenticación: si una
+petición trae cookie y `Authorization` de cuentas distintas, el backend elige
+la cookie. Eso puede convertir una petición demorada de A en una operación de
+B. No invalida la cola ya corregida, pero sí bloquea avanzar a otra pieza que
+confíe en identidad.
+
+**Tarea activa única de la dev:** hacer inequívoca la resolución de credenciales
+de acceso y refresh. Dos credenciales distintas deben rechazarse, no elegir una
+silenciosamente. No se reabre logística ni se cambia almacenamiento, duración
+o emisión de tokens. El criterio exacto está al final de `PARA-DEV.md`.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 

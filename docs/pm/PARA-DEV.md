@@ -1435,3 +1435,55 @@ No cambies autenticación general, no agregues dependencia y no abras alcance.
 Conservá los casos 43, 45 y 46. Corré el caso nuevo o ampliado, suite y puertas
 proporcionales, build y `diff --check`; entregá nuevo commit de producto e
 informe separado. Ahí vuelve a PM.
+
+### Quinta revisión PM: Pieza B aceptada
+
+Aceptados producto `e3fe9cb` con cierre `93ea92c` e informe final `8dc9543`.
+Los casos 43, 45, 47 y 48 ahora miden los recorridos reales pedidos. Build y
+`diff --check` independientes verdes. La PM intentó la suite completa, pero no
+pasó de la preparación porque el daemon de Docker local está apagado; se acepta
+la evidencia 48/48 informada junto con la inspección de las regresiones. No
+reabras esta pieza.
+
+## Tarea activa única — credenciales contradictorias
+
+Tu hallazgo queda confirmado en código: los endpoints protegidos prefieren la
+cookie de acceso sobre el Bearer, y refresh hace lo mismo con su cookie. Si
+ambos pertenecen a usuarios distintos, hoy la API opera silenciosamente como
+uno de ellos. Es un límite de identidad, no una preferencia de transporte.
+
+### Resultado exigido
+
+1. Una sola credencial presente sigue funcionando, tanto cookie como Bearer.
+2. Si cookie y Bearer están presentes y son el mismo token, funciona una sola
+   vez como esa identidad.
+3. Si ambos están presentes y difieren, la API responde 401 sin revelar cuál
+   era válido y sin leer datos privados ni ejecutar ninguna escritura. No gana
+   cookie ni header y no se intenta continuar con uno después de rechazar otro.
+4. Aplicá la misma regla a access y refresh. Los endpoints opcionales no pueden
+   personalizar una respuesta bajo credenciales contradictorias: deben quedar
+   anónimos o rechazar de forma consistente, sin elegir identidad.
+5. Login, refresh automático, logout y los clientes actuales de una sola fuente
+   siguen funcionando. No cambies tokens, expiraciones, cookies, localStorage,
+   roles, CORS ni criptografía.
+
+### Evidencia obligatoria
+
+- Regresión con dos cuentas reales: header A + cookie B sobre `/auth/me` y una
+  escritura protegida como `/cart/sync` debe dar 401 y dejar ambas cuentas sin
+  cambios. Invertí A/B para demostrar que el orden no decide.
+- Los equivalentes con sólo header, sólo cookie y ambos iguales deben conservar
+  identidad y funcionar.
+- Repetí la matriz para `/auth/refresh`, usando refresh tokens; una contradicción
+  no emite tokens nuevos ni modifica cookies de sesión.
+- Conservá 43, 45, 47 y 48. Suite completa, build y `diff --check`; pruebas de
+  accesibilidad/contraste sólo si tocás interfaz, cosa que no debería hacer falta.
+
+### Alcance y freno
+
+Resolvé la fuente contradictoria en el punto común mínimo. No refactorices toda
+la autenticación, no cambies el contrato de respuestas salvo el conflicto, no
+agregues revocación, sesiones en base, CSRF, OAuth ni dependencias. Si una
+fuente única existente depende realmente de la precedencia actual, traé el
+recorrido antes de ampliar. Entregá commit de producto e informe separado; ahí
+vuelve a PM.
