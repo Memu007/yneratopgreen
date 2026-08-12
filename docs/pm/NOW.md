@@ -35,22 +35,19 @@ escribir; la misma regla cubre access, refresh y la dependencia opcional. La PM
 obtuvo build independiente, sintaxis Python y `diff --check` verdes. La dev
 informa suite 50/50; no se repitió accesibilidad porque no cambió interfaz.
 
-La Dev entregó la Pieza C en producto `ecfaa4c` e informe `a374aa6`. La
-estructura general, autorización, atomicidad y privacidad está bien encaminada;
-build, sintaxis Python y `diff --check` independientes quedaron verdes. **Aún no
-se acepta** por dos falsos verdes no cubiertos por los 55 casos informados:
+La Pieza C de logística queda **aceptada**: producto inicial `ecfaa4c`, cierre
+`a960eef` e informe final `75379a2`. La respuesta tardía de selección ya no
+restaura contacto descartado y cada ítem congela el origen oficial usado al
+comprar. Las regresiones 56–58 fuerzan los defectos anteriores. La PM obtuvo
+build, sintaxis Python y `diff --check` verdes; la dev informa suite 58/58,
+accesibilidad 56/56 y contraste 40/40.
 
-- una respuesta tardía de “Seleccionar” puede sobrescribir la decisión posterior
-  “por cuenta propia” y volver a mostrar contacto;
-- la operación asignada deriva el origen desde la localidad actual del producto,
-  no desde la compra, por lo que editar una publicación puede cambiar el punto
-  de retiro de una operación histórica.
-
-**Tarea activa única de la dev:** corregir esas dos carreras históricas dentro
-de la misma Pieza C y agregar regresiones deterministas. No se reabren el diseño,
-la autorización, PostGIS, pagos ni el resto de la migración. Sigue justificando
-esfuerzo Extra hasta cerrar esta revisión. El criterio exacto está al final de
-`PARA-DEV.md`.
+**Tarea activa única de la dev:** cerrar la puerta demostrable del hito
+intermedio con un solo recorrido reproducible que una catálogo, búsqueda,
+ubicación de productos y geolocalización/selección de flete. No agrega producto:
+convierte las piezas aceptadas en la evidencia contractual conjunta que falta
+para habilitar el segundo cobro. El criterio exacto está al final de
+`PARA-DEV.md`. Para esta tarea alcanza esfuerzo **Alto**; Extra deja de aportar.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
@@ -189,28 +186,25 @@ y tierras quedaron decididos para una Fase 6 posterior al MVP contractual.
 
 ## Dónde estamos
 
-La ultima medicion heredada fue **~53%**, pero ya no es una cifra vigente:
-no incorporaba la Pieza A de transportistas y mezclaba alcance contractual
-con alcance nuevo. Hasta reponderar `MATRIZ.md`, el control se hace por las
-puertas de `CRONOGRAMA.md`, no por un porcentaje unico.
+La medición contractual reponderada al 2026-08-12 es **~83%**. Es una
+aproximación por esfuerzo, no habilita cobros ni reemplaza las puertas de
+`CRONOGRAMA.md`. El hito intermedio está funcionalmente construido pero sigue
+pendiente hasta reproducir catálogo, búsqueda y geolocalización juntas.
 
 Ponderado por esfuerzo, no por cantidad de renglones. Los nueve
 requisitos de logística son un módulo entero, no nueve tareas chicas.
 
 | Bloque | Peso | Avance |
 |---|---|---|
-| Comprador y vendedor | 30 % | 90 % |
-| **Logística y transportistas** | **25 %** | **Pieza A parcial; B/C en 0** |
+| Comprador y vendedor | 30 % | 95 % |
+| **Logística y transportistas** | **25 %** | **100 % funcional; falta demo conjunta** |
 | Pagos | 15 % | 50 % |
-| Catálogo y categorías | 8 % | 90 % |
-| Stack y responsive | 10 % | 70 % |
-| Cierre, despliegue y entrega | 12 % | 35 % |
+| Catálogo y categorías | 8 % | 100 % |
+| Stack y responsive | 10 % | 85 % |
+| Cierre, despliegue y entrega | 12 % | 45 % |
 
-**Subió sólo 4 puntos aunque se construyó mucho**, y el motivo importa:
-la transferencia bancaria sumó, pero Mercado Pago **restó**. Estaba
-contado como medio hecho y pasó a cero al desmontarlo. Fue la decisión
-correcta y aun así el número la castiga; así tiene que ser un porcentaje
-honesto.
+El faltante grande ya no es logística: es Mercado Pago básico y el cierre de
+producción/entrega. No se adelantan por entusiasmo; manda el cronograma.
 
 Se pasó de un repositorio donde la base de datos no se podía crear a un
 sistema que levanta desde cero con un comando. Todo lo declarado tiene
@@ -248,7 +242,7 @@ evidencia de ejecución detrás.
 - **Catálogo de demostración**: 30 publicaciones en doce categorías y
   nueve provincias. Seed idempotente, corrido dos veces sin duplicar.
 
-**Tres lecturas para no leer mal ese 53 %:**
+**Tres lecturas para no leer mal ese 83 %:**
 
 1. Buena parte de la jornada fue arqueología, no construcción.
 2. El mayor salto lo dio el recorte de alcance, no el código. Esa palanca

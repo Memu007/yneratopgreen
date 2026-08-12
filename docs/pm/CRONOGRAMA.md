@@ -1,6 +1,6 @@
 # Cronograma — el plan, con fechas reales
 
-Actualizado: 2026-08-10.
+Actualizado: 2026-08-12.
 
 **Fuente única: la sección 5 del PDF** *Documento de Especificación
 Funcional y Propuesta Comercial*, el que armó el socio y que la clienta
@@ -33,7 +33,7 @@ trabajo previo y no consumen el plazo contractual.
 | 4 — Pagos y checkout | Mercado Pago y validación de transferencias | 9–10 | 02/10 | 15/10 |
 | 5 — QA y lanzamiento | Pruebas, usabilidad, carga inicial, **despliegue en producción** | 11–12 | 16/10 | 29/10 |
 
-**Hoy es lunes 2026-08-10: semana 1, día 4.** La puerta de Fase 1 se cerró de
+**Hoy es miércoles 2026-08-12: semana 1, día 6.** La puerta de Fase 1 se cerró de
 forma anticipada; el ensayo Railway es evidencia temprana de Fase 5, no un
 despliegue productivo ni un adelanto del hito final.
 
@@ -83,8 +83,8 @@ Contraste fase por fase, contra lo verificado en `MATRIZ.md`:
 | Fase | Semanas | Estado real al 2026-08-05 |
 |---|---|---|
 | 1 — Diseño y UX/UI | 1–2 | **Puerta cerrada el 06/08, antes del inicio contractual.** Comprador, vendedor y logística tienen flujo navegable y evidencia responsive. El prototipo logístico fue aceptado en `823c3fe`. |
-| 2 — Desarrollo base | 3–5 | **Trabajo previo avanzado, no cerrado.** Arquitectura, PostgreSQL + PostGIS, migraciones, seed y validación por correo existen. Falta cerrar el perfil transportista editable. |
-| 3 — Buscador y catálogo | 6–8 | **A medias.** Buscador, catalogo y geolocalizacion de **productos**: 13/13 localidades y 32/32 publicaciones verificadas en interfaz contra SQL. Geolocalizacion de **fletes**: en cero. |
+| 2 — Desarrollo base | 3–5 | **Puerta funcional cerrada por trabajo previo.** Arquitectura, PostgreSQL + PostGIS, migraciones, seed, correo y perfiles editables incluidos transportistas tienen evidencia. |
+| 3 — Buscador y catálogo | 6–8 | **Producto construido; falta cierre demostrable conjunto.** Catálogo/filtros y logística A–C están aceptados. El hito no se reclama hasta recorrerlos juntos en una evidencia reproducible. |
 | 4 — Pagos y checkout | 9–10 | **A medias.** Transferencia bancaria cerrada con 25 casos; Mercado Pago esta desmontado y se rehace. |
 | 5 — QA y lanzamiento | 11–12 | **Empezada fuera de orden.** Hay 25 casos de humo ejecutados desde base limpia y preparacion de Railway, sin despliegue ni revision de seguridad. |
 
@@ -174,6 +174,8 @@ usen Mercado Pago.
   `0039e00`, sin mezclar vencimiento ni reserva de stock.
 - ~~07-20/08, Fase 1: cerrar el flujo UX/UI de logística y registrar su
   evidencia.~~ **Cerrado el 06/08** en `823c3fe`, antes del inicio contractual.
+- 12/08: logística A–C construida y aceptada. Antes de abrir otra función se
+  cierra una demostración conjunta del hito intermedio.
 - 21/08: entrar a Fase 2 con la puerta de Fase 1 cerrada o con desvio
   explicito.
 

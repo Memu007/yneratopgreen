@@ -1,7 +1,7 @@
 # Matriz requisito contractual → evidencia → estado
 
-Contrastada contra `CONTRATO.md`. Actualizada el 2026-07-25 con la línea
-base PostgreSQL en verde.
+Contrastada contra `CONTRATO.md`. Actualizada el 2026-08-12 después del cierre
+de las Piezas A, B y C de logística.
 
 **Estados:** ✅ verificado con evidencia de ejecución · 🟡 existe en
 código, sin verificar · ⚪ parcial · ❌ inexistente
@@ -13,7 +13,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Requisito | Estado | Evidencia |
 |-----------|--------|-----------|
 | Registro | ✅ | Smoke test: `201`, usuario creado |
-| …con validación | ❌ | Validación por correo definida el 2026-08-05; campo `is_verified` existe, flujo todavía sin implementar |
+| …con validación | ✅ | Registro, correo de 24 horas y un solo uso, reenvío no enumerable, confirmación y login verificados |
 | Perfil | ✅ | `GET /auth/me` y `PATCH /auth/me` responden `200` |
 | Buscador con filtro por **categoría** | ✅ | Smoke test `200`, filtros de categoría, precio y stock aplicados |
 | Buscador con filtro por **ubicación** | ✅ | Verificacion completa del 2026-08-05: 13/13 localidades y 32/32 publicaciones coincidieron entre interfaz y SQL; selectores encadenados y `locality_id` en URL. Ver `EVIDENCIA-FILTROS-UBICACION.md` |
@@ -24,7 +24,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 
 | Requisito | Estado | Evidencia |
 |-----------|--------|-----------|
-| Registro con validación | ❌ | Validación por correo definida; flujo todavía sin implementar |
+| Registro con validación | ✅ | Mismo flujo confirmado de correo; una cuenta sin verificar no abre sesión |
 | Panel de control básico | ✅ | Carga perfil, ventas y productos en UI, con el contador de ventas ya corregido |
 | Publicación desde la UI | ✅ | Producto completo publicado con imagen, verificado en la suite en interfaz, API y base. Cubre también el caso de imagen fallida |
 | Publicación con **ubicación** | ✅ | `locality_id` obligatorio contra el padrón oficial. Verificado: Balcarce `06063010` guardado en base |
@@ -35,17 +35,19 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 
 | Requisito | Estado | Evidencia |
 |-----------|--------|-----------|
-| Transportista como tipo especial de proveedor | ⚪ | Pieza A: `is_carrier` sobre `users`, sin rol nuevo. Smoke 21 UI + API + DB |
+| Transportista como tipo especial de proveedor | ✅ | `is_carrier` sobre `users`, sin rol nuevo; alta, perfil y edición cubiertos |
 | Declara ubicación base | ✅ | Smoke 21: localidad del padrón persistida y contrastada con SQL |
-| Declara transporte habilitado certificado | ⚪ | Texto + booleano obligatorios; falta convertirlo en declaración atribuida con detalle y fecha |
+| Declara transporte habilitado certificado | ✅ | Declaración atribuida con detalle y fecha del servidor; TopGreen no la presenta como verificación propia |
 | Declara zona de cobertura en km | ✅ | Smoke 21: radio 125,50 km persistido y contrastado con SQL |
 | Declara capacidad de carga | ✅ | Smoke 21: capacidad persistida y contrastada con SQL |
-| Sistema detecta ubicación de comprador y vendedor | ❌ | — |
-| Lista transportistas compatibles en la zona | ❌ | — |
-| Seleccionar e incluir en la transacción | ❌ | — |
-| Contactar directo con los datos provistos | ❌ | — |
+| Sistema detecta ubicación de comprador y vendedor | ✅ | Destino del padrón y origen congelado por ítem; grupos derivados del carrito servidor |
+| Lista transportistas compatibles en la zona | ✅ | PostGIS por radio contra destino y todos los orígenes; directorio sin contacto previo |
+| Seleccionar e incluir en la transacción | ✅ | Decisión por orden, revalidación al elegir y confirmar, persistencia y vista del transportista |
+| Contactar directo con los datos provistos | ✅ | Contacto revelado sólo después de seleccionar y visible para comprador/vendedor |
 
-**Fase contractual 3. Es el diferencial del producto y está en cero.**
+**Fase contractual 3 construida.** Falta una evidencia conjunta y reproducible
+de catálogo + búsquedas + geolocalización para habilitar formalmente el hito
+intermedio.
 
 ## 3.3 Pagos
 
@@ -68,7 +70,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Bienes y Ganado | ✅ Categoría sembrada con dos productos, cada uno con localidad |
 | Maquinaria y Servicios | ✅ Maquinaria, Herramientas y Laboreo con productos |
 | Tecnología para el Cultivo | ✅ Categoría sembrada con dos productos, cada uno con localidad |
-| Módulo de Logística Integrada | ⚪ Existe la categoría de servicio Transporte y Logística. El directorio de transportistas no está construido |
+| Módulo de Logística Integrada | ✅ Directorio por PostGIS, selección, contacto protegido e inclusión en la operación |
 
 ## 4. Tecnologías
 
@@ -84,7 +86,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 
 | Requisito | Estado |
 |-----------|--------|
-| Pruebas integrales | ✅ Suite de 25 casos ejecutada desde base limpia el 2026-08-05; misma suite, runner nativo por falta de Docker. Los casos 22–25 tienen rojo previo. Pendiente repetir por el camino oficial antes del lanzamiento |
+| Pruebas integrales | ✅ Suite informada 58/58 desde base limpia; build PM independiente verde. Pendiente repetir por el camino oficial Docker antes del lanzamiento |
 | Carga inicial de datos | ✅ Seed idempotente con 30 publicaciones en 12 categorías y 9 provincias, más 4.028 localidades. Verificado corriéndolo dos veces sin duplicar |
 | Despliegue en producción | ❌ |
 | Capacitación del panel de administración | ❌ |

@@ -1635,3 +1635,46 @@ enfocados, suite completa, build, puertas visuales proporcionales y
 `diff --check`. No agregues restricciones, snapshots de contacto, estados
 logísticos ni dependencias fuera de estos dos defectos. Entregá commit de
 producto e informe separado; ahí vuelve a PM.
+
+**Aceptada por PM:** producto inicial `ecfaa4c`, cierre `a960eef`, informe
+`75379a2`. Las regresiones 56–58 discriminan contra la versión anterior; ambos
+checkouts congelan origen y la respuesta tardía ya no recupera contacto. Build,
+sintaxis Python y `diff --check` independientes verdes. La dev informa 58/58,
+56/56 y 40/40. No reabras la Pieza C.
+
+## Tarea activa única — puerta del hito intermedio
+
+No construyas otra función. El segundo hito depende de **demostrar juntas** las
+tres capacidades textuales: catálogo, búsquedas y geolocalización funcional.
+Hoy existen, pero su evidencia está repartida entre casos distintos.
+
+Dejá un único recorrido de navegador, reproducible desde base limpia, que:
+
+1. use el catálogo real y aplique categoría más provincia/localidad desde la
+   interfaz; contraste los resultados visibles con SQL, sin cantidades fijas;
+2. abra un producto del resultado, lo agregue, elija destino oficial y muestre
+   el grupo/origen que el servidor derivó;
+3. muestre al menos un transportista compatible calculado por PostGIS, sin
+   contacto previo; lo seleccione, revele contacto y cree la orden;
+4. contraste por SQL destino, origen congelado, transportista y modo de traslado;
+5. entre como el transportista y muestre esa operación sin datos financieros ni
+   contacto del comprador.
+
+El recorrido debe usar sólo datos que deja el **seed idempotente**. No puede
+preparar productos, radios, carritos u orígenes por API/SQL antes de abrir el
+navegador. Si el seed actual no ofrece un tramo compatible, hacé el cambio
+mínimo sobre el transportista demo o una publicación demo existente y probá
+seed inicial + repetido sin duplicar. SQL se usa después para contrastar, no
+para fabricar el escenario.
+
+Agregá un comando explícito y corto para ejecutar esta puerta sin correr casos
+ajenos; debe terminar con un resumen legible para una demostración y rojo ante
+cualquier paso omitido. Reutilizá Playwright y helpers existentes, sin nueva
+dependencia ni segundo framework. Conservá la suite completa y las puertas ya
+aceptadas; build y `diff --check` verdes.
+
+No toques Railway, Mercado Pago, estilos, migraciones, privacidad ni reglas de
+compatibilidad salvo que descubras un defecto reproducible —en ese caso frená y
+reportalo. Entregá commit de producto y el informe separado. Esta tarea va en
+esfuerzo **Alto**, no Extra. Ahí vuelve a PM para decidir si el hito intermedio
+queda habilitado para presentar y cobrar.
