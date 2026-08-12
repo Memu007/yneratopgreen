@@ -1755,17 +1755,34 @@ discriminan contra la aritmética anterior; build, sintaxis, importes exactos y
 `diff --check` independientes verdes. La Dev informa suite 61/61 y puerta 6/6.
 No reabras esta pieza.
 
-## Pausa de implementación — decisión de fondos de Mercado Pago
+## Consulta técnica adversarial — quién cobra por Mercado Pago
 
-No hay una nueva tarea de producto todavía. La documentación oficial vigente
-de Mercado Pago confirma que una integración de marketplace que acredita a
-cada vendedor necesita su `access_token` obtenido por OAuth. Eso contradice el
-límite aprobado de «sin OAuth de vendedores». Usar una única credencial de
-Checkout Pro acredita en la cuenta de TopGreen y contradice la decisión de que
-la plataforma no recibe dinero de terceros.
+No implementes nada todavía. PM releyó el PDF original y corrigió una premisa:
+la propuesta promete «checkout básico» para crédito, débito y dinero en cuenta,
+pero no define destinatario, split ni OAuth. «Sin OAuth de vendedores» fue una
+interpretación interna posterior, no texto ofrecido a la clienta.
 
-PM pidió a Emi elegir una de esas dos consecuencias. Hasta entonces no montes
-`payments.py`, no restaures el split heredado, no diseñes un atajo con tokens
-pegados en perfiles y no cambies modelos ni configuración. Podés bajar de
-**Extra a Alto**; cuando la decisión exista, PM dejará una pieza nueva con el
-alcance y las pruebas correspondientes.
+Contrastá, con documentación oficial vigente y el código actual, esta hipótesis
+de PM: **Checkout Pro usando el token OAuth de cada vendedor, sin comisión de
+marketplace, es la forma mínima y más segura de cumplir el checkout vendido sin
+que TopGreen reciba ni redistribuya fondos de terceros.** Sé adversarial; si la
+hipótesis es falsa o incompleta, decilo.
+
+Respondé en `PARA-PM.md`, sin código ni dependencias, con evidencia concreta:
+
+1. si Mercado Pago Argentina admite ese flujo y si `marketplace_fee` puede
+   omitirse o quedar efectivamente en cero;
+2. quién figura como cobrador y quién paga la comisión normal de Mercado Pago;
+3. si Checkout Pro cubre crédito, débito y dinero en cuenta en ese modelo;
+4. qué onboarding, credenciales, OAuth, refresh, cifrado y revocación requiere
+   por vendedor;
+5. cómo se alinea con una orden por vendedor y qué pasa con un carrito de varios
+   vendedores;
+6. qué hace falta para preferencia, retorno, webhook firmado, idempotencia y
+   estados, separando prueba automática de credenciales reales externas;
+7. tamaño aproximado y riesgos frente a la alternativa de que cobre TopGreen.
+
+No uses el módulo heredado como autoridad: tiene split 5 %, OAuth y supuestos
+viejos. Señalá qué puede reutilizarse sólo después de compararlo con la API
+actual. Esta consulta va en esfuerzo **Alto**, no Extra. Hasta que PM responda,
+no montes `payments.py`, no restaures comisión y no cambies esquema ni entorno.

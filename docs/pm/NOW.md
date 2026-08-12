@@ -66,12 +66,19 @@ precio publicado al confirmar; la orden lo congela. Antes de pagar siempre debe
 mostrarse el total vigente. Es la opción mínima que no obliga al vendedor a
 honrar carritos abandonados indefinidamente.
 
-**Bloqueo de decisión, sin tarea activa de producto:** Mercado Pago exige elegir
-quién recibe el dinero. Una sola credencial hace cobrar a TopGreen; para que
-cobre cada vendedor, el flujo oficial de marketplace exige OAuth por vendedor.
-Las dos alternativas contradicen una decisión vigente. La Dev queda en pausa y
-puede bajar a **Alto** hasta que Emi elija; no se implementa una tercera vía
-inventada.
+La PM releyó el PDF original: se prometió checkout básico de Mercado Pago para
+crédito, débito y dinero en cuenta, pero el documento **no define quién recibe
+los fondos ni prohíbe OAuth**. «Sin OAuth de vendedores» era una interpretación
+interna de alcance, no una condición ofrecida a la clienta. Que cobre cada
+vendedor sigue siendo preliminarmente la opción más segura porque TopGreen no
+custodia ni redistribuye dinero, y puede ser el mecanismo técnico necesario
+para cumplir lo prometido, no una función comercial adicional.
+
+**Tarea activa sólo de análisis:** la Dev debe contrastar esa conclusión con la
+documentación oficial y el código, sin implementar nada, según el cierre de
+`PARA-DEV.md`. Sigue en **Alto**. Después PM decide si OAuth con comisión cero
+entra como implementación del checkout ya vendido o si requiere hablar con la
+clienta.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 

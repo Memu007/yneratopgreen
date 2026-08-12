@@ -13,21 +13,23 @@ Antes de iniciar cualquier pago debe verse ese total vigente. Motivo: evita que
 un carrito abandonado obligue al vendedor a sostener un precio indefinidamente,
 sin agregar reservas ni vencimientos fuera del MVP.
 
-## 2026-08-12 — Mercado Pago bloqueado por destino de los fondos
+## 2026-08-12 — Mercado Pago: el PDF no prohíbe OAuth
 
 La documentación oficial de Mercado Pago para marketplaces exige usar el token
 de cada vendedor obtenido mediante OAuth:
 https://www.mercadopago.com.ar/developers/es/docs/checkout-pro/how-tos/integrate-marketplace
 
-Por eso no se pueden mantener simultáneamente estas dos decisiones vigentes:
+La revisión del PDF original confirma que se ofreció checkout básico para
+crédito, débito y dinero en cuenta, pero no se definió quién cobra ni se
+prohibieron OAuth o split. Por lo tanto, «sin OAuth» no era un límite textual de
+la clienta: fue una interpretación interna posterior que puede corregirse si
+OAuth es el medio técnico necesario para que cada vendedor cobre directamente.
 
-- TopGreen no recibe ni redistribuye dinero de ventas de terceros.
-- El MVP no incluye OAuth de vendedores ni split de marketplace.
-
-Con una credencial única de Checkout Pro cobra la cuenta dueña de esa
-credencial. Para que cobre cada vendedor, hay que autorizarlo por OAuth. Emi
-debe elegir qué consecuencia comercial acepta antes de escribir la nueva
-integración. Hasta entonces `payments.py` y `mp_oauth` siguen desmontados.
+Hipótesis preliminar de PM: OAuth por vendedor, sin comisión de marketplace,
+es más seguro que hacer cobrar a TopGreen y puede cumplir la función ya vendida
+sin ampliar el resultado comercial. Antes de decidir se pidió a la Dev un
+contraste técnico adversarial y sin código. Hasta esa respuesta `payments.py` y
+`mp_oauth` siguen desmontados.
 
 ## 2026-08-09 — Navegación contextual sin ampliar el MVP
 

@@ -116,9 +116,11 @@ documentacion ARCA/Carta de Porte ni verificacion oficial de certificados.
   con posibilidad de adjuntar comprobante y validacion manual del vendedor.
 
 **Limite:** TopGreen no recibe, retiene, divide ni gira dinero de las ventas
-entre terceros. No entran split payments, OAuth de vendedores, comision de
-marketplace, conciliacion bancaria ni reembolsos automaticos de
-transferencias.
+entre terceros. No entran comision de marketplace, conciliacion bancaria ni
+reembolsos automaticos de transferencias. El PDF no menciona OAuth ni define
+el destinatario de Mercado Pago: queda en revisión si OAuth por vendedor, con
+comisión de marketplace cero, es infraestructura necesaria para el checkout ya
+vendido y no una ampliación funcional.
 
 El comprobante es opcional como evidencia; el vendedor valida contra su
 cuenta bancaria. La referencia de la orden debe permitir identificar el
