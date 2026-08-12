@@ -1678,3 +1678,28 @@ compatibilidad salvo que descubras un defecto reproducible —en ese caso frená
 reportalo. Entregá commit de producto y el informe separado. Esta tarea va en
 esfuerzo **Alto**, no Extra. Ahí vuelve a PM para decidir si el hito intermedio
 queda habilitado para presentar y cobrar.
+
+### Primera revisión PM de `1e8822d`: todavía no aceptada
+
+El alcance es correcto y no hay cambios de producto. Build, sintaxis y
+`diff --check` independientes están verdes. La PM no pudo ejecutar la ruta
+oficial desde base limpia porque su Docker local está apagado; eso es un límite
+del entorno PM, no un defecto atribuido a la entrega. No reabras el recorrido ni
+sumes casos.
+
+Corregí sólo estos dos falsos positivos de la puerta:
+
+1. En el paso del catálogo, eliminá `waitForTimeout(1200)`. Sincronizá con una
+   señal determinística de la consulta de productos correspondiente a la
+   categoría, provincia y localidad elegidas, y recién después compará DOM con
+   SQL. Una respuesta más lenta no puede producir una medición prematura.
+2. En la vista del transportista, delimitá la comprobación a la tarjeta de
+   `Operación #${datos.orden}`. Dentro de esa tarjeta deben estar el producto,
+   la cantidad y el recorrido de esa orden; dentro de esa misma tarjeta no
+   pueden aparecer importes, datos financieros ni contacto del comprador. La
+   presencia de esos textos en otra operación no puede hacer pasar el caso.
+
+Agregá una regresión mínima o una falla forzada que demuestre cada discriminante
+sin crear otro framework. Conservá el comando, los seis pasos, el helper SQL y
+la suite completa. El informe separado debe citar el commit real `1e8822d` como
+entrega inicial —no `cc08aa2`— y el nuevo commit de cierre. Esfuerzo **Alto**.

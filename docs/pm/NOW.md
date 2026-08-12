@@ -42,12 +42,21 @@ comprar. Las regresiones 56–58 fuerzan los defectos anteriores. La PM obtuvo
 build, sintaxis Python y `diff --check` verdes; la dev informa suite 58/58,
 accesibilidad 56/56 y contraste 40/40.
 
-**Tarea activa única de la dev:** cerrar la puerta demostrable del hito
-intermedio con un solo recorrido reproducible que una catálogo, búsqueda,
-ubicación de productos y geolocalización/selección de flete. No agrega producto:
-convierte las piezas aceptadas en la evidencia contractual conjunta que falta
-para habilitar el segundo cobro. El criterio exacto está al final de
-`PARA-DEV.md`. Para esta tarea alcanza esfuerzo **Alto**; Extra deja de aportar.
+La primera entrega de la puerta del hito llegó en producto `1e8822d` e informe
+`d74fc03`, pero **todavía no está aceptada**. La PM obtuvo build, sintaxis y
+`diff --check` verdes. La ruta oficial desde base limpia no pudo correrse porque
+el Docker local de PM está apagado; la Dev informa 58/58 y puerta 6/6.
+
+La revisión encontró dos falsos positivos posibles en la evidencia: el filtro
+espera 1,2 segundos en vez de sincronizar con la respuesta que contiene los
+resultados y la vista del transportista comprueba producto, recorrido y
+privacidad sobre todo el `body`, no dentro de la tarjeta de la orden recién
+creada. El informe además cita el hash inexistente `cc08aa2` en vez de
+`1e8822d`.
+
+**Tarea activa única de la dev:** corregir únicamente esas dos pruebas y el
+hash del informe según el cierre de `PARA-DEV.md`. No hay función de producto
+para reabrir. Sigue en esfuerzo **Alto**; Extra no aporta.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
