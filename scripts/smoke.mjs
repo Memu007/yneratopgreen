@@ -3374,10 +3374,13 @@ await runCase(43, 'Fletes compatibles por futura orden, con PostGIS y sin contac
     }
   }
 
-  // Dos publicaciones de vendedores distintos, con orígenes distintos.
+  // Dos publicaciones de vendedores distintos, con orígenes distintos. Los
+  // servicios quedan afuera: su tarjeta ofrece «Consultar», no «Agregar», y el
+  // id es un UUID, así que sin este filtro el tramo de interfaz depende del
+  // orden que le tocó al seed.
   const publicaciones = queryRows(`
     SELECT p.id, p.seller_id FROM products p
-    WHERE p.status = 'ACTIVE' AND p.stock > 0
+    WHERE p.status = 'ACTIVE' AND p.stock > 0 AND p.publication_type <> 'servicio'
     ORDER BY p.seller_id, p.id
   `);
   const primeraDeCada = new Map();
@@ -3883,6 +3886,312 @@ await runCase(46, 'Vaciar el destino descarta la respuesta que venía en camino'
   } finally {
     await browser.close();
     await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  }
+});
+
+await runCase(47, 'Un login nuevo no hereda el "ya sincronizado" del anterior', async () => {
+  // La cola de sincronización vive en el proveedor del carrito, que no se
+  // desmonta al cerrar sesión. Si el resumen que decide "esto ya está
+  // sincronizado" mira sólo producto y cantidad, la cuenta que entra después
+  // con el mismo carrito no manda nada, y su carrito del servidor —vacío—
+  // alimenta fletes, opciones de pago y la orden.
+  const [[productoId, nombreDelProducto]] = queryRows(`
+    SELECT p.id, p.name FROM products p
+    WHERE p.status = 'ACTIVE' AND p.stock > 0 AND p.publication_type <> 'servicio'
+    ORDER BY p.id LIMIT 1
+  `);
+
+  const segunda = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email: 'cliente@ejemplo.com', password: 'cliente123' },
+  });
+  const tokenDeLaSegunda = segunda.data.access_token;
+  const [[idDeLaSegunda]] = queryRows(
+    "SELECT id FROM users WHERE email = 'cliente@ejemplo.com'");
+
+  const carritoDe = (usuario) => queryRows(`
+    SELECT ci.product_id FROM cart_items ci
+    JOIN carts c ON c.id = ci.cart_id
+    WHERE c.user_id = ${sqlLiteral(usuario)} AND c.status = 'ACTIVE'
+    ORDER BY ci.product_id
+  `).map((fila) => fila[0]);
+
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  await apiRequest('/cart', { method: 'DELETE', token: tokenDeLaSegunda });
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext();
+    await context.addInitScript(
+      ({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+        window.localStorage.removeItem('agromarket_cart');
+      },
+      { a: state.buyerToken, r: state.buyerRefreshToken },
+    );
+    const page = await context.newPage();
+
+    const escrituras = [];
+    await page.route('**/api/cart/sync', async (ruta) => {
+      escrituras.push(ruta.request().postData() || '');
+      await ruta.continue();
+    });
+
+    const esperarA = async (condicion, mensaje, limite = 20_000) => {
+      const hasta = Date.now() + limite;
+      while (Date.now() < hasta) {
+        if (condicion()) return;
+        await page.waitForTimeout(100);
+      }
+      throw new Error(mensaje);
+    };
+
+    // Sin recargar nunca: recargar rearmaría cola y sesión por su cuenta.
+    const asegurarCatalogo = async () => {
+      if (await page.locator('#catalog-category').count() === 0) {
+        await page.getByRole('button', { name: 'TopGreen', exact: true }).first().click();
+      }
+      await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+    };
+
+    const agregarDesdeLaInterfaz = async () => {
+      await asegurarCatalogo();
+      const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+      await buscador.fill(nombreDelProducto);
+      await buscador.press('Enter');
+      await page.getByRole('heading', { name: nombreDelProducto, exact: true, level: 3 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+      await page.getByRole('button', { name: /Agregar/ }).first().click();
+    };
+
+    const comprarHastaElDestino = async () => {
+      await page.getByRole('button', { name: /Carrito/ }).click();
+      await page.getByRole('button', { name: 'Continuar compra' }).click();
+      await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15_000 });
+      await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0202');
+      await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
+      await page.getByPlaceholder('2000').fill('2700');
+      await elegirDestino(page, 'Pergamino');
+    };
+
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+
+    // La primera cuenta sincroniza su carrito.
+    await agregarDesdeLaInterfaz();
+    await comprarHastaElDestino();
+    await page.locator('[class*="_fletes_"]').getByText(/Envío de/).first()
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    assert(escrituras.length === 1, `esperaba 1 escritura de la primera cuenta, hubo ${escrituras.length}`);
+    const primera = carritoDe(state.buyerId);
+    assert(primera.length === 1 && primera[0] === productoId,
+      `la primera cuenta no dejó su carrito en el servidor: ${JSON.stringify(primera)}`);
+
+    // Cerrar sesión y entrar con otra cuenta, sin recargar la página.
+    await page.locator('button[aria-label="Cerrar"]:visible').first().click();
+    await page.getByRole('button', { name: 'Salir' }).click();
+    await page.getByRole('button', { name: 'Ingresar' }).waitFor({ timeout: 15_000 });
+    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 15_000 });
+    await page.getByPlaceholder('tu@email.com').fill('cliente@ejemplo.com');
+    await page.getByPlaceholder('••••••••').fill('cliente123');
+    await page.locator('[class*="_submitButton_"][type="submit"]').click();
+    await page.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 15_000 });
+
+    // Mismo producto, misma cantidad: el resumen del carrito es idéntico.
+    await agregarDesdeLaInterfaz();
+    await comprarHastaElDestino();
+    await esperarA(() => escrituras.length === 2,
+      'la segunda cuenta no volvió a sincronizar: heredó el "ya está" de la anterior '
+      + `y quedó en ${escrituras.length} escritura(s) en total`);
+    await page.locator('[class*="_fletes_"]').getByText(/Envío de/).first()
+      .waitFor({ state: 'visible', timeout: 20_000 });
+
+    const segundaEnServidor = carritoDe(idDeLaSegunda);
+    assert(segundaEnServidor.length === 1 && segundaEnServidor[0] === productoId,
+      `el carrito de la segunda cuenta no quedó en el servidor: ${JSON.stringify(segundaEnServidor)}`);
+
+    return `mismo carrito en dos sesiones: 2 escrituras, una por cuenta; `
+      + 'el listado de la segunda sale de su propio carrito, no del heredado';
+  } finally {
+    await browser.close();
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    await apiRequest('/cart', { method: 'DELETE', token: tokenDeLaSegunda });
+  }
+});
+
+await runCase(48, 'Un turno encolado no sale con las credenciales de la sesión nueva', async () => {
+  // Una escritura encolada bajo una sesión puede arrancar cuando ya entró
+  // otra: `apiFetch` firma con las credenciales del momento, así que saldría
+  // autenticada como la cuenta nueva llevando la instantánea de la vieja. Y la
+  // cuenta nueva no puede quedar esperando detrás de una escritura ajena.
+  const publicaciones = queryRows(`
+    SELECT p.id, p.name FROM products p
+    WHERE p.status = 'ACTIVE' AND p.stock > 0 AND p.publication_type <> 'servicio'
+    ORDER BY p.id LIMIT 3
+  `);
+  assert(publicaciones.length === 3, 'hacen falta tres publicaciones activas');
+  const [primero, segundo, tercero] = publicaciones.map(([id, nombre]) => ({ id, nombre }));
+
+  const segunda = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email: 'cliente@ejemplo.com', password: 'cliente123' },
+  });
+  const tokenDeLaSegunda = segunda.data.access_token;
+  const [[idDeLaSegunda]] = queryRows(
+    "SELECT id FROM users WHERE email = 'cliente@ejemplo.com'");
+
+  const carritoDe = (usuario) => queryRows(`
+    SELECT ci.product_id FROM cart_items ci
+    JOIN carts c ON c.id = ci.cart_id
+    WHERE c.user_id = ${sqlLiteral(usuario)} AND c.status = 'ACTIVE'
+    ORDER BY ci.product_id
+  `).map((fila) => fila[0]);
+
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  await apiRequest('/cart', { method: 'DELETE', token: tokenDeLaSegunda });
+
+  let liberarLaPrimera = () => {};
+  const retenida = new Promise((listo) => { liberarLaPrimera = listo; });
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext();
+    await context.addInitScript(
+      ({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+        window.localStorage.removeItem('agromarket_cart');
+      },
+      { a: state.buyerToken, r: state.buyerRefreshToken },
+    );
+    const page = await context.newPage();
+    const escrituras = [];
+    await page.route('**/api/cart/sync', async (ruta) => {
+      const numero = escrituras.length + 1;
+      escrituras.push({
+        cuerpo: ruta.request().postData() || '',
+        autorizacion: ruta.request().headers().authorization || '',
+      });
+      if (numero === 1) {
+        // La primera SALE ya, con la sesión que la originó todavía abierta, y
+        // lo que se retiene es su respuesta. Retener el envío la convertiría en
+        // otra cosa —una petición que todavía no viajó— y la prueba dejaría de
+        // representar «en vuelo cuando se cerró la sesión».
+        const respuesta = await ruta.fetch();
+        await retenida;
+        await ruta.fulfill({ response: respuesta });
+        return;
+      }
+      await ruta.continue();
+    });
+
+    const esperarA = async (condicion, mensaje, limite = 20_000) => {
+      const hasta = Date.now() + limite;
+      while (Date.now() < hasta) {
+        if (condicion()) return;
+        await page.waitForTimeout(100);
+      }
+      throw new Error(mensaje);
+    };
+
+    // Sin recargar nunca: recargar rearmaría cola y sesión por su cuenta.
+    const asegurarCatalogo = async () => {
+      if (await page.locator('#catalog-category').count() === 0) {
+        await page.getByRole('button', { name: 'TopGreen', exact: true }).first().click();
+      }
+      await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+    };
+
+    const agregarDesdeLaInterfaz = async (producto) => {
+      await asegurarCatalogo();
+      const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+      await buscador.fill(producto.nombre);
+      await buscador.press('Enter');
+      await page.getByRole('heading', { name: producto.nombre, exact: true, level: 3 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+      await page.getByRole('button', { name: /Agregar/ }).first().click();
+    };
+
+    const comprarHastaElDestino = async () => {
+      await page.getByRole('button', { name: /Carrito/ }).click();
+      await page.getByRole('button', { name: 'Continuar compra' }).click();
+      await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15_000 });
+      await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0303');
+      await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
+      await page.getByPlaceholder('2000').fill('2700');
+      await elegirDestino(page, 'Pergamino');
+    };
+
+    const cerrarModal = () => page.locator('button[aria-label="Cerrar"]:visible').first().click();
+
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+
+    // La primera cuenta: una escritura retenida y otra encolada detrás,
+    // todavía sin arrancar.
+    await agregarDesdeLaInterfaz(primero);
+    await comprarHastaElDestino();
+    await esperarA(() => escrituras.length === 1, 'no salió la primera escritura');
+    await cerrarModal();
+    await agregarDesdeLaInterfaz(segundo);
+    await comprarHastaElDestino();
+    await page.waitForTimeout(1500);
+    assert(escrituras.length === 1,
+      `la escritura encolada arrancó antes de tiempo: ${escrituras.length}`);
+    await cerrarModal();
+
+    // Cambio de cuenta con la primera escritura todavía en vuelo y la segunda
+    // esperando turno.
+    await page.getByRole('button', { name: 'Salir' }).click();
+    await page.getByRole('button', { name: 'Ingresar' }).waitFor({ timeout: 15_000 });
+    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 15_000 });
+    await page.getByPlaceholder('tu@email.com').fill('cliente@ejemplo.com');
+    await page.getByPlaceholder('••••••••').fill('cliente123');
+    await page.locator('[class*="_submitButton_"][type="submit"]').click();
+    await page.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 15_000 });
+
+    // La cuenta nueva arma su carrito. No puede quedar esperando detrás de la
+    // escritura ajena, que sigue retenida.
+    await agregarDesdeLaInterfaz(tercero);
+    await comprarHastaElDestino();
+    await esperarA(() => escrituras.length === 2,
+      'la cuenta nueva quedó esperando detrás de la escritura de la sesión anterior');
+    await page.locator('[class*="_fletes_"]').getByText(/Envío de/).first()
+      .waitFor({ state: 'visible', timeout: 20_000 });
+
+    // Recién ahora se libera la primera. Su compañera de cola, encolada por la
+    // sesión anterior, no puede salir ahora que las credenciales son de otra.
+    liberarLaPrimera();
+    await page.waitForTimeout(3000);
+
+    assert(escrituras.length === 2,
+      `salió una escritura de más tras el cambio de cuenta: ${escrituras.length}`);
+    const [conRetencion, deLaCuentaNueva] = escrituras;
+    assert(conRetencion.autorizacion === `Bearer ${state.buyerToken}`,
+      'la escritura retenida no viajó con las credenciales de su propia sesión');
+    assert(deLaCuentaNueva.autorizacion !== conRetencion.autorizacion,
+      'la escritura de la cuenta nueva viajó con las credenciales de la anterior');
+    assert(deLaCuentaNueva.cuerpo.includes(tercero.id)
+      && !deLaCuentaNueva.cuerpo.includes(segundo.id),
+      `la escritura de la cuenta nueva lleva la instantánea de la anterior: ${deLaCuentaNueva.cuerpo}`);
+
+    const anterior = carritoDe(state.buyerId);
+    assert(anterior.length === 1 && anterior[0] === primero.id,
+      `la sesión anterior no quedó con lo que alcanzó a mandar: ${JSON.stringify(anterior)}`);
+    const nueva = carritoDe(idDeLaSegunda);
+    assert(nueva.length === 1 && nueva[0] === tercero.id,
+      `el carrito de la cuenta nueva no es el suyo: ${JSON.stringify(nueva)}`);
+
+    return 'con una escritura retenida y otra encolada, el cambio de cuenta descarta la '
+      + 'encolada, la nueva no espera detrás de la ajena y cada carrito queda con lo suyo';
+  } finally {
+    liberarLaPrimera();
+    await browser.close();
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    await apiRequest('/cart', { method: 'DELETE', token: tokenDeLaSegunda });
   }
 });
 

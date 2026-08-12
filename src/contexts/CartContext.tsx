@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { CartItem, CartContextType, Product } from '../types';
 import { useToast } from '../components/Toast/Toast';
+import { useAuth } from './AuthContext';
 import { apiFetch } from '../utils/api';
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -28,6 +29,7 @@ interface CartProviderProps {
 export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
   const { showToast } = useToast();
+  const { user } = useAuth();
 
   // Cargar carrito desde localStorage al iniciar
   useEffect(() => {
@@ -132,13 +134,30 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   // sus pantallas; la coordinación de sus escrituras también.
   const colaDeSincronizacion = useRef<Promise<void>>(Promise.resolve());
   const retratoEncolado = useRef('');
-  // La lista se lee de una referencia al día y no del cierre: así la función
-  // no cambia de identidad en cada render y quien la use en un efecto puede
-  // declararla como dependencia sin volver a ejecutarlo de más.
+  // De quién son esa cola y ese retrato. El proveedor no se desmonta al cerrar
+  // sesión, así que sin esto la cuenta que entra después heredaría el «esto ya
+  // está sincronizado» de la anterior y su carrito del servidor se quedaría
+  // con lo que hubiera antes.
+  const identidadDeLaCola = useRef<string | null>(null);
+  // La identidad y la lista se leen de referencias al día y no del cierre: así
+  // la función no cambia de identidad en cada render y quien la use en un
+  // efecto puede declararla como dependencia sin volver a ejecutarlo de más.
+  const identidadVigente = useRef<string | null>(null);
+  identidadVigente.current = user?.id ?? null;
   const itemsVigentes = useRef(items);
   itemsVigentes.current = items;
 
   const sincronizarConServidor = useCallback(() => {
+    const identidad = identidadVigente.current;
+    if (identidadDeLaCola.current !== identidad) {
+      // Sesión distinta: cola nueva y retrato en blanco. La cola anterior no
+      // se espera: una petición que ya viajó se resuelve donde el servidor la
+      // haya tomado, y hacer que esta sesión la aguarde sería dejarla colgada
+      // de una ajena.
+      identidadDeLaCola.current = identidad;
+      colaDeSincronizacion.current = Promise.resolve();
+      retratoEncolado.current = '';
+    }
     const lista = itemsVigentes.current;
     const retrato = retratoDe(lista);
     if (retratoEncolado.current !== retrato) {
@@ -153,6 +172,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       const turno = colaDeSincronizacion.current
         .catch(() => undefined)
         .then(async () => {
+          // Este turno pudo esperar detrás de otro y arrancar cuando la sesión
+          // ya cambió. `apiFetch` firma con las credenciales del momento: si
+          // saliera ahora, escribiría el carrito de una cuenta con la
+          // instantánea de otra. No sale.
+          if (identidadVigente.current !== identidad) return;
           try {
             // Sin respaldo por producto: si falla, el motivo real sube tal
             // cual y quien esté esperando decide qué mostrar.
@@ -162,8 +186,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
             });
           } catch (error) {
             // No quedó escrito lo que se pedía: el intento siguiente tiene
-            // que volver a mandarlo en vez de darlo por hecho.
-            retratoEncolado.current = '';
+            // que volver a mandarlo en vez de darlo por hecho. Sólo si el
+            // retrato sigue siendo el de esta sesión: si ya cambió, borrarlo
+            // pisaría el de la cuenta nueva.
+            if (identidadDeLaCola.current === identidad) retratoEncolado.current = '';
             throw error;
           }
         });
