@@ -42,21 +42,23 @@ comprar. Las regresiones 56–58 fuerzan los defectos anteriores. La PM obtuvo
 build, sintaxis Python y `diff --check` verdes; la dev informa suite 58/58,
 accesibilidad 56/56 y contraste 40/40.
 
-La primera entrega de la puerta del hito llegó en producto `1e8822d` e informe
-`d74fc03`, pero **todavía no está aceptada**. La PM obtuvo build, sintaxis y
-`diff --check` verdes. La ruta oficial desde base limpia no pudo correrse porque
-el Docker local de PM está apagado; la Dev informa 58/58 y puerta 6/6.
+La puerta conjunta del hito intermedio queda **aceptada**: producto inicial
+`1e8822d`, cierre `3580faa` e informe `803e8e9`. El catálogo se sincroniza con
+la respuesta filtrada y contrasta pantalla, API y SQL aun retrasándola 2,5 s;
+la operación se comprueba dentro de la tarjeta exacta recién creada. Las dos
+fallas forzadas discriminan los falsos positivos anteriores. La PM obtuvo
+build, sintaxis y `diff --check` verdes. La ruta oficial desde base limpia no
+pudo repetirse porque el Docker local de PM está apagado; la Dev informa
+puerta 6/6 y suite 58/58 desde base recreada.
 
-La revisión encontró dos falsos positivos posibles en la evidencia: el filtro
-espera 1,2 segundos en vez de sincronizar con la respuesta que contiene los
-resultados y la vista del transportista comprueba producto, recorrido y
-privacidad sobre todo el `body`, no dentro de la tarjeta de la orden recién
-creada. El informe además cita el hash inexistente `cc08aa2` en vez de
-`1e8822d`.
+**El hito intermedio queda habilitado para presentar y cobrar.** La evidencia
+une catálogo, búsqueda y geolocalización funcional en un único recorrido.
 
-**Tarea activa única de la dev:** corregir únicamente esas dos pruebas y el
-hash del informe según el cierre de `PARA-DEV.md`. No hay función de producto
-para reabrir. Sigue en esfuerzo **Alto**; Extra no aporta.
+**Tarea activa única de la dev:** cerrar el contrato monetario previo a Fase 4:
+reemplazar aritmética `float` por `Decimal` en ambos checkouts y sus totales de
+carrito/transferencia, con centavos en el rango alto admitido. No se abre aún
+Mercado Pago. El criterio exacto está al final de `PARA-DEV.md`. Por tocar
+dinero y dos recorridos, esta pieza sí justifica esfuerzo **Extra**.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
@@ -197,8 +199,7 @@ y tierras quedaron decididos para una Fase 6 posterior al MVP contractual.
 
 La medición contractual reponderada al 2026-08-12 es **~83%**. Es una
 aproximación por esfuerzo, no habilita cobros ni reemplaza las puertas de
-`CRONOGRAMA.md`. El hito intermedio está funcionalmente construido pero sigue
-pendiente hasta reproducir catálogo, búsqueda y geolocalización juntas.
+`CRONOGRAMA.md`. El hito intermedio ya tiene demostración conjunta aceptada.
 
 Ponderado por esfuerzo, no por cantidad de renglones. Los nueve
 requisitos de logística son un módulo entero, no nueve tareas chicas.
@@ -206,7 +207,7 @@ requisitos de logística son un módulo entero, no nueve tareas chicas.
 | Bloque | Peso | Avance |
 |---|---|---|
 | Comprador y vendedor | 30 % | 95 % |
-| **Logística y transportistas** | **25 %** | **100 % funcional; falta demo conjunta** |
+| **Logística y transportistas** | **25 %** | **100 % y demostración conjunta aceptada** |
 | Pagos | 15 % | 50 % |
 | Catálogo y categorías | 8 % | 100 % |
 | Stack y responsive | 10 % | 85 % |

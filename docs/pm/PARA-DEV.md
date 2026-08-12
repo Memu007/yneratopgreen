@@ -1703,3 +1703,49 @@ Agregá una regresión mínima o una falla forzada que demuestre cada discrimina
 sin crear otro framework. Conservá el comando, los seis pasos, el helper SQL y
 la suite completa. El informe separado debe citar el commit real `1e8822d` como
 entrega inicial —no `cc08aa2`— y el nuevo commit de cierre. Esfuerzo **Alto**.
+
+**Aceptada por PM:** producto inicial `1e8822d`, cierre `3580faa`, informe
+`803e8e9`. Las dos fallas forzadas discriminan los falsos positivos anteriores;
+build, sintaxis y `diff --check` independientes verdes. La Dev informa puerta
+6/6 y suite 58/58. El hito intermedio queda habilitado para presentar y cobrar.
+
+## Tarea activa única — contrato monetario antes de Fase 4
+
+Objetivo: que ningún total que se guarda o decide una orden pase por aritmética
+binaria `float`. Cerrá juntos los dos recorridos existentes —checkout común y
+transferencia— antes de reconstruir Mercado Pago.
+
+Alcance exacto:
+
+1. Usá `Decimal` desde el precio `NUMERIC` hasta subtotal, total, snapshot y
+   persistencia en ambos checkouts. Incluí los totales del carrito sincronizado
+   y `transfer-options`, porque alimentan esos recorridos. Multiplicación y suma
+   monetarias no pueden volver a `float`.
+2. Reutilizá `app/core/montos.py` y los límites `NUMERIC(12,2)` / `(14,2)` ya
+   aceptados. Centralizá sólo lo mínimo que evite repetir conversión o
+   cuantización. No agregues una segunda política de redondeo.
+3. Conservá el contrato JSON que hoy consume el frontend. Si el borde exige un
+   número JSON, convertí sólo después de calcular y validar el `Decimal`; no
+   uses esa conversión para persistir ni continuar aritmética.
+4. No toques distancias, ratings, stock ni otros `float` no monetarios. No
+   actives ni refactorices `payments.py`: sus routers siguen desmontados y se
+   reconstruyen en la siguiente pieza. No hace falta migración; las columnas ya
+   son `Numeric` con precisión correcta.
+
+Regresiones obligatorias, en ambos checkouts:
+
+- tres unidades de un precio con centavos simples (por ejemplo 0,10) conservan
+  exactamente 0,30 en opción/carrito, respuesta y SQL;
+- 99 unidades de `9.999.999.999,97` conservan exactamente
+  `989.999.999.997,03`; esta prueba debe ponerse roja contra el cálculo `float`
+  anterior y contrastar snapshots, subtotal y total por API y SQL;
+- varios vendedores mantienen total independiente y, si uno excede el máximo,
+  el rechazo ocurre antes de escribir cualquier orden y el carrito sigue
+  activo, como ya exige la atomicidad aceptada.
+
+No uses comparación redondeada de pantalla como única prueba: el discriminante
+de centavos debe observar el valor de API y SQL. Conservá suite, puerta del hito,
+build y `diff --check` verdes. Entregá commit de producto e informe separado con
+los comandos y una demostración explícita de rojo contra la versión anterior.
+Esta pieza va en esfuerzo **Extra** por cruzar los dos caminos que crean órdenes;
+no abras Mercado Pago ni cambios visuales.

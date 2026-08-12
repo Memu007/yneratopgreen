@@ -45,9 +45,9 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Seleccionar e incluir en la transacción | ✅ | Decisión por orden, revalidación al elegir y confirmar, persistencia y vista del transportista |
 | Contactar directo con los datos provistos | ✅ | Contacto revelado sólo después de seleccionar y visible para comprador/vendedor |
 
-**Fase contractual 3 construida.** Falta una evidencia conjunta y reproducible
-de catálogo + búsquedas + geolocalización para habilitar formalmente el hito
-intermedio.
+**Fase contractual 3 y hito intermedio aceptados.** La puerta `npm run hito`
+encadena catálogo, búsqueda y geolocalización desde el filtro hasta la vista del
+transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 
 ## 3.3 Pagos
 
