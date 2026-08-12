@@ -29,19 +29,20 @@ antes de sincronizar con el servidor el carrito local que la persona está
 viendo. La prueba lo oculta porque prepara previamente el carrito por API; en
 uso normal puede responder “carrito vacío” o usar una compra anterior.
 
-La segunda corrección llegó en producto `db85ff4` e informe `864699c`. La
-generación del destino quedó corregida y la cola ordena las escrituras mientras
-vive una misma instancia del checkout, pero **todavía no está aceptada**. El
-caso 45 no usa dos snapshots: retiene B y vuelve a pedir B, por lo que prueba
-deduplicación y no el orden A/B exigido. La cola además vive dentro del modal;
-cerrar el checkout con A en vuelo y reabrirlo con B crea otra cola, que puede
-dejar terminar A después y sobrescribir B.
+La tercera corrección llegó en producto `fe73073` e informe `68db92f`. El caso
+45 ahora sí fuerza dos snapshots y la coordinación sobrevive al desmontaje del
+checkout. Esa parte queda conforme, pero **la entrega todavía no está
+aceptada**: la deduplicación del `CartContext` identifica sólo producto y
+cantidad, no la cuenta autenticada. Dos usuarios sucesivos con el mismo carrito
+pueden compartir falsamente el estado “ya sincronizado”; además, un turno viejo
+que todavía no empezó puede ejecutarse después del login con las credenciales
+de la cuenta nueva.
 
-**Tarea activa única de la dev:** hacer que la coordinación sobreviva al cierre
-y reapertura del checkout y probar determinísticamente dos snapshots distintos.
-La corrección de destino no necesita una ampliación visual. No se reabren
-PostGIS, la migración, la declaración, la persistencia del destino ni el
-alcance de la Pieza C. El criterio exacto está al final de `PARA-DEV.md`.
+**Tarea activa única de la dev:** aislar cola y deduplicación por identidad de
+sesión y demostrar que cerrar sesión nunca mezcla carritos ni credenciales. No
+se reabren la prueba A/B, la corrección de destino, PostGIS, la migración, la
+declaración, la persistencia del destino ni la Pieza C. El criterio exacto está
+al final de `PARA-DEV.md`.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 

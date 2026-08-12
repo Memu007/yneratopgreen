@@ -1397,3 +1397,41 @@ No hace falta otra prueba para el caso 46 ni tocar su corrección. No reabras
 PostGIS, migraciones, declaración, órdenes, Railway o la Pieza C. Corré el caso
 enfocado, suite y puertas proporcionales, build y `diff --check`; entregá nuevo
 commit de producto e informe separado. Ahí vuelve a PM.
+
+### Cuarta revisión PM de `fe73073`: falta el límite de identidad
+
+El caso 45 nuevo sí usa A/B distintos, fuerza el orden y se pone rojo con la
+cola local. La coordinación en `CartContext` es el dueño correcto y esa parte
+queda conforme. No la reescribas otra vez.
+
+Queda un problema de integridad entre sesiones: `retratoEncolado` resume sólo
+producto y cantidad, y la cola sobrevive al logout porque vive en el proveedor.
+Si la cuenta A ya sincronizó X, cierra sesión y la cuenta B arma el mismo X, la
+función puede considerarlo sincronizado aunque el carrito servidor de B esté
+vacío o sea distinto. Además, un turno de A encolado pero todavía no iniciado
+ejecuta `apiFetch` cuando le llega el turno; si para entonces entró B, puede usar
+las credenciales vigentes de B para escribir la instantánea de A.
+
+Corregí sólo el límite de sesión:
+
+1. La deduplicación debe incluir la identidad autenticada, no sólo el retrato
+   del carrito. Un login nuevo nunca hereda “ya sincronizado” de otro usuario.
+2. Trabajo encolado bajo una sesión no puede comenzar usando credenciales de
+   una sesión posterior. Al salir o cambiar de identidad debe descartarse de
+   forma segura o conservar explícitamente su identidad original; no alcanza
+   con vaciar los ítems visibles.
+3. Una petición que ya salió antes del logout puede terminar para su usuario
+   original, pero no puede bloquear ni sobrescribir el carrito de la cuenta
+   nueva.
+
+Agregá una regresión determinista, sin recargar: A sincroniza un carrito X,
+cierra sesión, entra B con carrito servidor vacío o distinto, arma el mismo X
+desde la interfaz y elige destino. Debe salir una sincronización nueva y sólo el
+carrito de B debe quedar en X. Cubrí además un turno de A encolado pero aún no
+iniciado al cambiar de cuenta: nunca debe salir autenticado como B ni escribir
+en su carrito.
+
+No cambies autenticación general, no agregues dependencia y no abras alcance.
+Conservá los casos 43, 45 y 46. Corré el caso nuevo o ampliado, suite y puertas
+proporcionales, build y `diff --check`; entregá nuevo commit de producto e
+informe separado. Ahí vuelve a PM.
