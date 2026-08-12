@@ -100,6 +100,13 @@ estado visible, pero todavía no crea preferencias ni cobra. La Dev pasa a
 **Extra**; entrega producto e informe separado y vuelve a PM antes de abrir la
 Pieza MP-B.
 
+Primera entrega de producto `5aee032`, **todavía no aceptada**. PM verificó
+build, sintaxis y `diff --check`; el límite de no mover dinero se conserva.
+Vuelve a Dev por tres defectos acotados: el permiso destructivo de migración no
+exige exactamente `1`, una clave Fernet no vacía pero inválida puede escapar
+como 500 al renovar y cancelar no consume el `state`. También falta el commit
+separado con el informe final. MP-B no se abre.
+
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
 **Cerrado por PM el 2026-08-10.** Emi declaró descartable el proyecto Railway

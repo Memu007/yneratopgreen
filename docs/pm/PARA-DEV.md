@@ -1873,3 +1873,42 @@ Entregá un commit de producto y otro separado con el informe en `PARA-PM.md`:
 decisiones tomadas, esquema final, versión/dependencias justificadas, comandos,
 resultados y riesgos residuales. Ahí vuelve a PM. La Pieza MP-B —preferencia por
 orden y secuencia multivendedor— no empieza hasta que MP-A sea aceptada.
+
+### Primera revisión PM de `5aee032`: todavía no aceptada
+
+La arquitectura y el límite de la pieza son correctos: las credenciales quedan
+cifradas, `manual-link` desaparece, sólo se monta OAuth y el módulo que mueve
+dinero sigue apagado. PM obtuvo build, sintaxis Python y `diff --check` verdes.
+No reescribas esos bloques ni abras preferencias, órdenes o webhooks.
+
+Quedan tres defectos acotados y falta la entrega documental:
+
+1. **El freno destructivo acepta cualquier texto.** La migración documenta que
+   sólo `MP_MIGRACION_DESCARTAR_TOKENS=1` autoriza el descarte, pero comprueba
+   sólo que la variable sea no vacía. Hoy `=0`, `=false` o un error tipográfico
+   también borran credenciales. Exigí igualdad exacta con `1` y probá que sin
+   variable, con `0` y con `false` la migración se detiene sin modificar nada;
+   sólo con `1` avanza.
+2. **Una clave Fernet mal formada todavía puede producir 500 al renovar.**
+   `integracion_configurada()` considera configurada cualquier cadena no vacía;
+   después `refresh_token_de()` captura `NoSeDescifra`, pero no
+   `SinClaveDeCifrado`. El caso 71 usa otra clave Fernet válida y no discrimina
+   este camino. Agregá una regresión con una clave no vacía inválida: estado,
+   inicio y renovación deben fallar cerrados con una respuesta accionable, sin
+   500 ni secreto.
+3. **Cancelar no gasta el `state`.** El callback retorna `cancelado` antes de
+   llamar a `consumir_estado`; ese intento queda vigente hasta expirar aunque
+   ya volvió de Mercado Pago. Consumí y validá el `state` también en la salida
+   cancelada, y comprobá que repetirlo después devuelve `estado_invalido` y no
+   escribe vínculo.
+
+Eliminá además los dos helpers JWT de OAuth que quedaron sin ningún llamador en
+`core/security.py`: el contrato nuevo dice que el `state` vive sólo en base y
+dejar una segunda implementación muerta contradice esa propiedad.
+
+Conservá los casos 62–71 y sumá sólo los discriminantes anteriores. Corré los
+casos enfocados y una única vez al final la suite completa, hito, accesibilidad,
+contraste, build, migración upgrade/downgrade, `alembic check` y `diff --check`.
+Entregá un commit de corrección y el informe separado que todavía falta en
+`PARA-PM.md`, con resultados reales y aritmética de inventarios. Esfuerzo
+**Extra**. Ahí vuelve a PM; MP-B sigue cerrada.
