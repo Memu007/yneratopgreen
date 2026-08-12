@@ -5,6 +5,30 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-12 — El precio se confirma al crear la orden
+
+El carrito no reserva ni promete el precio de una publicación. Rige el precio
+vigente cuando el comprador confirma; ahí la orden lo congela en su snapshot.
+Antes de iniciar cualquier pago debe verse ese total vigente. Motivo: evita que
+un carrito abandonado obligue al vendedor a sostener un precio indefinidamente,
+sin agregar reservas ni vencimientos fuera del MVP.
+
+## 2026-08-12 — Mercado Pago bloqueado por destino de los fondos
+
+La documentación oficial de Mercado Pago para marketplaces exige usar el token
+de cada vendedor obtenido mediante OAuth:
+https://www.mercadopago.com.ar/developers/es/docs/checkout-pro/how-tos/integrate-marketplace
+
+Por eso no se pueden mantener simultáneamente estas dos decisiones vigentes:
+
+- TopGreen no recibe ni redistribuye dinero de ventas de terceros.
+- El MVP no incluye OAuth de vendedores ni split de marketplace.
+
+Con una credencial única de Checkout Pro cobra la cuenta dueña de esa
+credencial. Para que cobre cada vendedor, hay que autorizarlo por OAuth. Emi
+debe elegir qué consecuencia comercial acepta antes de escribir la nueva
+integración. Hasta entonces `payments.py` y `mp_oauth` siguen desmontados.
+
 ## 2026-08-09 — Navegación contextual sin ampliar el MVP
 
 Emi aprobó para Fase 3 que la ubicación del detalle de una publicación sea una

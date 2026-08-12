@@ -1749,3 +1749,23 @@ build y `diff --check` verdes. Entregá commit de producto e informe separado co
 los comandos y una demostración explícita de rojo contra la versión anterior.
 Esta pieza va en esfuerzo **Extra** por cruzar los dos caminos que crean órdenes;
 no abras Mercado Pago ni cambios visuales.
+
+**Aceptada por PM:** producto `2220e94`, informe `8abaeb2`. Los casos 59–61
+discriminan contra la aritmética anterior; build, sintaxis, importes exactos y
+`diff --check` independientes verdes. La Dev informa suite 61/61 y puerta 6/6.
+No reabras esta pieza.
+
+## Pausa de implementación — decisión de fondos de Mercado Pago
+
+No hay una nueva tarea de producto todavía. La documentación oficial vigente
+de Mercado Pago confirma que una integración de marketplace que acredita a
+cada vendedor necesita su `access_token` obtenido por OAuth. Eso contradice el
+límite aprobado de «sin OAuth de vendedores». Usar una única credencial de
+Checkout Pro acredita en la cuenta de TopGreen y contradice la decisión de que
+la plataforma no recibe dinero de terceros.
+
+PM pidió a Emi elegir una de esas dos consecuencias. Hasta entonces no montes
+`payments.py`, no restaures el split heredado, no diseñes un atajo con tokens
+pegados en perfiles y no cambies modelos ni configuración. Podés bajar de
+**Extra a Alto**; cuando la decisión exista, PM dejará una pieza nueva con el
+alcance y las pruebas correspondientes.

@@ -54,11 +54,24 @@ puerta 6/6 y suite 58/58 desde base recreada.
 **El hito intermedio queda habilitado para presentar y cobrar.** La evidencia
 une catálogo, búsqueda y geolocalización funcional en un único recorrido.
 
-**Tarea activa única de la dev:** cerrar el contrato monetario previo a Fase 4:
-reemplazar aritmética `float` por `Decimal` en ambos checkouts y sus totales de
-carrito/transferencia, con centavos en el rango alto admitido. No se abre aún
-Mercado Pago. El criterio exacto está al final de `PARA-DEV.md`. Por tocar
-dinero y dos recorridos, esta pieza sí justifica esfuerzo **Extra**.
+El contrato monetario previo a Fase 4 queda **aceptado**: producto `2220e94` e
+informe `8abaeb2`. Ambos checkouts, carrito y opciones de transferencia calculan
+y persisten con `Decimal`; los casos 59–61 discriminan `0,10 × 3`, el rango alto
+y la atomicidad multivendedor contra el código anterior. La PM obtuvo build,
+sintaxis Python, comprobación directa de los dos importes y `diff --check`
+verdes. La Dev informa suite 61/61 y puerta del hito 6/6 desde base recreada.
+
+**Decisión de producto cerrada por PM:** el carrito no reserva precio. Rige el
+precio publicado al confirmar; la orden lo congela. Antes de pagar siempre debe
+mostrarse el total vigente. Es la opción mínima que no obliga al vendedor a
+honrar carritos abandonados indefinidamente.
+
+**Bloqueo de decisión, sin tarea activa de producto:** Mercado Pago exige elegir
+quién recibe el dinero. Una sola credencial hace cobrar a TopGreen; para que
+cobre cada vendedor, el flujo oficial de marketplace exige OAuth por vendedor.
+Las dos alternativas contradicen una decisión vigente. La Dev queda en pausa y
+puede bajar a **Alto** hasta que Emi elija; no se implementa una tercera vía
+inventada.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
@@ -197,7 +210,7 @@ y tierras quedaron decididos para una Fase 6 posterior al MVP contractual.
 
 ## Dónde estamos
 
-La medición contractual reponderada al 2026-08-12 es **~83%**. Es una
+La medición contractual reponderada al 2026-08-12 es **~84%**. Es una
 aproximación por esfuerzo, no habilita cobros ni reemplaza las puertas de
 `CRONOGRAMA.md`. El hito intermedio ya tiene demostración conjunta aceptada.
 
@@ -208,7 +221,7 @@ requisitos de logística son un módulo entero, no nueve tareas chicas.
 |---|---|---|
 | Comprador y vendedor | 30 % | 95 % |
 | **Logística y transportistas** | **25 %** | **100 % y demostración conjunta aceptada** |
-| Pagos | 15 % | 50 % |
+| Pagos | 15 % | 55 % |
 | Catálogo y categorías | 8 % | 100 % |
 | Stack y responsive | 10 % | 85 % |
 | Cierre, despliegue y entrega | 12 % | 45 % |

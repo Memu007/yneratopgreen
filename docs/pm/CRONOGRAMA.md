@@ -85,7 +85,7 @@ Contraste fase por fase, contra lo verificado en `MATRIZ.md`:
 | 1 — Diseño y UX/UI | 1–2 | **Puerta cerrada el 06/08, antes del inicio contractual.** Comprador, vendedor y logística tienen flujo navegable y evidencia responsive. El prototipo logístico fue aceptado en `823c3fe`. |
 | 2 — Desarrollo base | 3–5 | **Puerta funcional cerrada por trabajo previo.** Arquitectura, PostgreSQL + PostGIS, migraciones, seed, correo y perfiles editables incluidos transportistas tienen evidencia. |
 | 3 — Buscador y catálogo | 6–8 | **Puerta cerrada anticipadamente el 12/08.** Catálogo, búsqueda y geolocalización están encadenados en una evidencia reproducible; el hito intermedio queda habilitado. |
-| 4 — Pagos y checkout | 9–10 | **A medias.** Transferencia bancaria cerrada con 25 casos; Mercado Pago esta desmontado y se rehace. |
+| 4 — Pagos y checkout | 9–10 | **A medias.** Transferencia y contrato monetario exacto cerrados. Mercado Pago sigue desmontado y bloqueado hasta decidir quién recibe sus fondos. |
 | 5 — QA y lanzamiento | 11–12 | **Empezada fuera de orden.** Hay 25 casos de humo ejecutados desde base limpia y preparacion de Railway, sin despliegue ni revision de seguridad. |
 
 **Tres consecuencias, y son de la PM:**
@@ -99,9 +99,9 @@ Contraste fase por fase, contra lo verificado en `MATRIZ.md`:
    clienta con las fases del PDF mientras internamente se trabaja en otro
    orden. Cuando se reporte hacia afuera, **se reporta con estas cinco
    fases**.
-3. **Lo que queda no esta distribuido como el cuadro supone.** El grueso
-   contractual de transportistas todavia falta, pero las funciones de Fase
-   6 ya no compiten con QA ni con el lanzamiento del MVP.
+3. **Lo que queda no esta distribuido como el cuadro supone.** Logística ya
+   cerró; el faltante funcional grande es Mercado Pago y después el cierre de
+   producción. Las funciones de Fase 6 no compiten con ninguno de los dos.
 
 ---
 
@@ -174,8 +174,8 @@ usen Mercado Pago.
 - ~~07-20/08, Fase 1: cerrar el flujo UX/UI de logística y registrar su
   evidencia.~~ **Cerrado el 06/08** en `823c3fe`, antes del inicio contractual.
 - 12/08: logística A–C y demostración conjunta aceptadas; hito intermedio
-  habilitado. La siguiente pieza cierra aritmética monetaria antes de Fase 4,
-  sin abrir todavía Mercado Pago.
+  habilitado. La aritmética monetaria también cerró; Mercado Pago no se abre
+  hasta que Emi decida si cobra TopGreen o cada vendedor mediante OAuth.
 - 21/08: entrar a Fase 2 con la puerta de Fase 1 cerrada o con desvio
   explicito.
 
