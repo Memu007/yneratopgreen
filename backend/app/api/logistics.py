@@ -174,18 +174,26 @@ def select_carrier(
 
 
 def _operacion(order: Order) -> CarrierOperation:
+    # El origen sale del snapshot del ítem, no de la publicación: si se leyera
+    # la localidad actual, el vendedor podría cambiarle el punto de retiro al
+    # transportista después de la compra. Un ítem sin snapshot —anterior a esta
+    # pieza— no aporta origen y no se reemplaza por el de hoy.
     origenes = {}
     for item in order.items:
-        producto = item.product
-        if producto is not None and producto.locality is not None:
-            origenes[producto.locality.id] = producto.locality
+        if not item.origin_locality_id:
+            continue
+        origenes[item.origin_locality_id] = LocalityBrief(
+            id=item.origin_locality_id,
+            name=item.origin_locality_name or '',
+            province_name=item.origin_province_name or '',
+        )
     destino = order.shipping_locality if order.shipping_locality_id else None
     return CarrierOperation(
         order_id=order.id,
         order_number=order.order_number,
         created_at=order.created_at,
         seller_name=order.seller.full_name,
-        origins=[_breve(o) for o in origenes.values()],
+        origins=list(origenes.values()),
         destination=_breve(destino) if destino else None,
         items=[
             CarrierOperationItem(

@@ -162,7 +162,8 @@ def checkout(
                 product_image_snapshot=primary_image,
                 unit_price_snapshot=float(product.price),
                 quantity=cart_item.quantity,
-                total_price=float(product.price) * cart_item.quantity
+                total_price=float(product.price) * cart_item.quantity,
+                **origen_de(product),
             )
             
             db.add(order_item)
@@ -353,6 +354,7 @@ def checkout_bank_transfer(
                 unit_price_snapshot=float(product.price),
                 quantity=cart_item.quantity,
                 total_price=float(product.price) * cart_item.quantity,
+                **origen_de(product),
             ))
 
         created.append((order, seller))
@@ -496,6 +498,27 @@ def decide_transfer_receipt(
         amount=float(order.total_amount),
         transfer_receipt_url=order.transfer_receipt_url,
     )
+
+
+def origen_de(product) -> dict:
+    """El origen oficial de una publicación, congelado para la orden.
+
+    Se guarda el id y también el texto: el id conserva la relación con el
+    padrón y el texto deja la operación legible aunque el padrón cambie.
+    Sin localidad oficial no se inventa nada: quedan los tres en None.
+    """
+    localidad = product.locality if product.locality_id else None
+    if localidad is None:
+        return {
+            "origin_locality_id": None,
+            "origin_locality_name": None,
+            "origin_province_name": None,
+        }
+    return {
+        "origin_locality_id": localidad.id,
+        "origin_locality_name": localidad.name,
+        "origin_province_name": localidad.province_name,
+    }
 
 
 def traslado_de(order: Order) -> OrderShipping:

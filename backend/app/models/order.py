@@ -104,6 +104,16 @@ class OrderItem(Base):
     product_name_snapshot = Column(String(255), nullable=False)
     product_image_snapshot = Column(String(500), nullable=True)
     unit_price_snapshot = Column(Numeric(12, 2), nullable=False)
+    # De dónde sale la carga, congelado al confirmar. Si se leyera la localidad
+    # actual de la publicación, el vendedor podría cambiarle el punto de retiro
+    # al transportista después de la compra. NULL en los ítems anteriores a
+    # esta pieza: eso es "origen no informado", no un origen que haya que
+    # adivinar.
+    origin_locality_id = Column(
+        String(20), ForeignKey("localities.id"), nullable=True
+    )
+    origin_locality_name = Column(String(200), nullable=True)
+    origin_province_name = Column(String(100), nullable=True)
     
     # Cantidad y total
     quantity = Column(Integer, nullable=False)

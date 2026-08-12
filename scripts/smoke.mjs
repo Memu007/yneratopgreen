@@ -5099,6 +5099,274 @@ await runCase(55, 'Una orden anterior a la logística sigue legible y la migraci
     + 'propia; downgrade y upgrade con datos adentro y `alembic check` sin diferencias';
 });
 
+await runCase(56, 'Una selección tardía no revive una decisión ya descartada', async () => {
+  // Con la confirmación de un transportista en vuelo, la persona cambia ese
+  // pedido a "coordino por mi cuenta". La respuesta llega DESPUÉS. Si el
+  // cliente sólo mirara el destino y el carrito —que no cambiaron—, volvería a
+  // poner el transportista y a mostrar su contacto encima de una decisión que
+  // ya se tomó. Los tiempos los decide la prueba, no la red.
+  const escenario = await prepararEscenarioDeFletes();
+  const { destino, pedidoA, transportistas } = escenario;
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  const ordenesAntes = ordenesDe(state.buyerId).length;
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext();
+    await context.addInitScript(
+      ({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+        window.localStorage.removeItem('agromarket_cart');
+      },
+      { a: state.buyerToken, r: state.buyerRefreshToken },
+    );
+    const page = await context.newPage();
+
+    let liberarSeleccion = () => {};
+    const retenida = new Promise((listo) => { liberarSeleccion = listo; });
+    let selecciones = 0;
+    await page.route('**/api/logistics/select-carrier', async (ruta) => {
+      selecciones += 1;
+      if (selecciones === 1) await retenida;
+      await ruta.continue();
+    });
+    const checkouts = [];
+    await page.route('**/api/orders/checkout/transfer', async (ruta) => {
+      checkouts.push(ruta.request().postData() || '');
+      await ruta.continue();
+    });
+
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+    const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+    await buscador.fill(pedidoA.nombre);
+    await buscador.press('Enter');
+    await page.getByRole('heading', { name: pedidoA.nombre, exact: true, level: 3 })
+      .waitFor({ state: 'visible', timeout: 15_000 });
+    await page.getByRole('button', { name: /Agregar/ }).first().click();
+
+    await page.getByRole('button', { name: /Carrito/ }).click();
+    await page.getByRole('button', { name: 'Continuar compra' }).click();
+    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15_000 });
+    await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0505');
+    await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
+    await page.getByPlaceholder('2000').fill('2700');
+    await elegirDestino(page, 'Pergamino');
+
+    const seccion = page.locator('[class*="_fletes_"]');
+    await seccion.getByRole('radio', { name: /Necesito flete/ }).first()
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    await seccion.getByRole('radio', { name: /Necesito flete/ }).first().check();
+    await seccion.getByRole('button', {
+      name: new RegExp(`Seleccionar a ${transportistas.amplio.nombre}`),
+    }).click();
+
+    // La confirmación está en vuelo y retenida.
+    const hasta = Date.now() + 15_000;
+    while (selecciones === 0 && Date.now() < hasta) await page.waitForTimeout(100);
+    assert(selecciones === 1, 'no salió la confirmación de la selección');
+
+    // Con ella retenida, la persona cambia de idea.
+    await seccion.getByRole('radio', { name: /Coordino el traslado por mi cuenta/ })
+      .first().check();
+    await page.waitForTimeout(500);
+
+    // Recién ahora llega la respuesta de la selección abandonada.
+    liberarSeleccion();
+    await page.waitForTimeout(3000);
+
+    const visto = ((await seccion.textContent()) || '').replace(/\s+/g, ' ');
+    assert(!visto.includes('Transportista elegido'),
+      'la respuesta tardía reinstaló el transportista');
+    assert(!visto.includes(transportistas.amplio.email),
+      'la respuesta tardía volvió a mostrar el contacto');
+    assert(await seccion.getByRole('radio', { name: /Coordino el traslado por mi cuenta/ })
+      .first().isChecked(), 'la decisión por cuenta propia dejó de estar elegida');
+
+    // Y lo que se manda al confirmar la compra es esa decisión, no la otra.
+    await page.locator('form:has(h2) button[type="submit"]').click();
+    await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: 20_000 });
+    await page.locator('input[value="bank_transfer"]').check();
+    await page.getByRole('button', { name: /Crear orden/ }).click();
+    await page.getByRole('heading', { name: /Transferencia bancaria/ })
+      .waitFor({ timeout: 20_000 });
+
+    assert(checkouts.length === 1, `esperaba un checkout, hubo ${checkouts.length}`);
+    const enviado = JSON.parse(checkouts[0]);
+    assert(JSON.stringify(enviado.shipping_decisions) ===
+      JSON.stringify([{ seller_id: pedidoA.vendedor, mode: 'self' }]),
+      `el checkout mandó otra cosa: ${checkouts[0]}`);
+
+    const nuevas = ordenesDe(state.buyerId).slice(ordenesAntes);
+    assert(nuevas.length === 1 && nuevas[0][2] === 'self' && nuevas[0][3] === '-',
+      `la orden no quedó por cuenta propia: ${JSON.stringify(nuevas)}`);
+
+    return 'selección retenida, decisión cambiada a cuenta propia y liberada después: '
+      + 'no reaparece transportista ni contacto, y la orden queda por cuenta propia';
+  } finally {
+    await browser.close();
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    escenario.restaurar();
+  }
+});
+
+await runCase(57, 'El origen de una operación es el del momento de la compra', async () => {
+  // El nombre y el precio del producto ya eran snapshot. El origen no lo era y
+  // se leía de la publicación: bastaba con que el vendedor la editara después
+  // de la compra para cambiarle el punto de retiro al transportista.
+  const escenario = await prepararEscenarioDeFletes();
+  const { destino, origenA, origenB, pedidoA, transportistas } = escenario;
+  const nombreDeOrigen = (id) => {
+    const [fila] = queryRows(
+      `SELECT name, province_name FROM localities WHERE id = ${sqlLiteral(id)}`);
+    return { nombre: fila[0], provincia: fila[1] };
+  };
+  const origenDeLaCompra = nombreDeOrigen(origenA);
+  const origenPosterior = nombreDeOrigen(origenB);
+
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  await apiRequest('/cart/sync', {
+    method: 'POST', token: state.buyerToken,
+    body: { items: [{ product_id: pedidoA.id, quantity: 1 }] },
+  });
+  const creada = await apiRequest('/orders/checkout/transfer', {
+    method: 'POST', token: state.buyerToken,
+    body: {
+      shipping_address: 'Ruta 8 km 220',
+      shipping_locality_id: destino,
+      shipping_postal_code: '2700',
+      shipping_decisions: [
+        { seller_id: pedidoA.vendedor, mode: 'carrier', carrier_id: transportistas.amplio.id },
+      ],
+    },
+  });
+  assert(creada.status === 200, `no se pudo crear la orden: HTTP ${creada.status}`);
+  const [ordenId] = creada.data.orders.map((o) => o.order_id);
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    // El vendedor cambia la localidad de su publicación DESPUÉS de la compra.
+    querySql(`UPDATE products SET locality_id = ${sqlLiteral(origenB)} `
+      + `WHERE id = ${sqlLiteral(pedidoA.id)}`);
+
+    const operacion = (await apiRequest(`/logistics/my-operations/${ordenId}`,
+      { token: transportistas.amplio.token })).data;
+    const origenes = operacion.origins.map((o) => `${o.name}, ${o.province_name}`);
+    assert(origenes.includes(`${origenDeLaCompra.nombre}, ${origenDeLaCompra.provincia}`),
+      `la operación perdió el origen de la compra: ${JSON.stringify(origenes)}`);
+    assert(!origenes.includes(`${origenPosterior.nombre}, ${origenPosterior.provincia}`),
+      `la operación adoptó el origen nuevo de la publicación: ${JSON.stringify(origenes)}`);
+
+    // Y lo mismo en la pantalla del transportista.
+    const context = await browser.newContext();
+    await context.addInitScript(
+      ({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+      },
+      { a: transportistas.amplio.token, r: transportistas.amplio.refresco },
+    );
+    const page = await context.newPage();
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.locator('button').filter({ hasText: '👤' }).first().click();
+    await page.getByRole('button', { name: /Mis Operaciones/ })
+      .waitFor({ state: 'visible', timeout: 15_000 });
+    await page.getByRole('button', { name: /Mis Operaciones/ }).click();
+    await page.getByText(/Operación #/).first().waitFor({ state: 'visible', timeout: 15_000 });
+    const visto = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
+    assert(visto.includes(origenDeLaCompra.nombre),
+      `la pantalla no muestra el origen de la compra (${origenDeLaCompra.nombre})`);
+    assert(!visto.includes(origenPosterior.nombre),
+      `la pantalla muestra el origen nuevo de la publicación (${origenPosterior.nombre})`);
+
+    return `la publicación se mudó de ${origenDeLaCompra.nombre} a ${origenPosterior.nombre} `
+      + 'después de la compra y la operación sigue diciendo la primera, en API y en pantalla';
+  } finally {
+    await browser.close();
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    escenario.restaurar();
+  }
+});
+
+await runCase(58, 'Un ítem sin origen guardado no inventa uno, ni antes ni después', async () => {
+  // Los ítems anteriores a esta pieza no tienen origen congelado. Eso es
+  // "origen no informado": no se rellena con la localidad de hoy, que es
+  // justamente lo que el snapshot vino a evitar.
+  const escenario = await prepararEscenarioDeFletes();
+  const { destino, origenA, origenB, pedidoA, transportistas } = escenario;
+  const nombreDe = (id) => queryRows(
+    `SELECT name FROM localities WHERE id = ${sqlLiteral(id)}`)[0][0];
+
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  await apiRequest('/cart/sync', {
+    method: 'POST', token: state.buyerToken,
+    body: { items: [{ product_id: pedidoA.id, quantity: 1 }] },
+  });
+  const creada = await apiRequest('/orders/checkout/transfer', {
+    method: 'POST', token: state.buyerToken,
+    body: {
+      shipping_address: 'Ruta 8 km 220',
+      shipping_locality_id: destino,
+      shipping_postal_code: '2700',
+      shipping_decisions: [
+        { seller_id: pedidoA.vendedor, mode: 'carrier', carrier_id: transportistas.amplio.id },
+      ],
+    },
+  });
+  const [ordenId] = creada.data.orders.map((o) => o.order_id);
+
+  try {
+    // Se vuelve histórico el ítem: sin snapshot, como quedaron los de antes.
+    querySql(`UPDATE order_items SET origin_locality_id = NULL, `
+      + `origin_locality_name = NULL, origin_province_name = NULL `
+      + `WHERE order_id = ${sqlLiteral(ordenId)}`);
+    // Y la publicación se muda, para que haya un origen "de hoy" disponible.
+    querySql(`UPDATE products SET locality_id = ${sqlLiteral(origenB)} `
+      + `WHERE id = ${sqlLiteral(pedidoA.id)}`);
+
+    const operacion = (await apiRequest(`/logistics/my-operations/${ordenId}`,
+      { token: transportistas.amplio.token })).data;
+    assert(operacion.order_number, 'una operación sin origen guardado dejó de leerse');
+    assert(operacion.items.length > 0, 'la operación perdió sus artículos');
+    assert(operacion.origins.length === 0,
+      `sin snapshot se inventó un origen: ${JSON.stringify(operacion.origins)}`);
+    const crudo = JSON.stringify(operacion);
+    for (const localidad of [origenA, origenB]) {
+      assert(!crudo.includes(nombreDe(localidad)),
+        `la operación se presenta como si saliera de ${nombreDe(localidad)}`);
+    }
+
+    const enLista = (await apiRequest('/logistics/my-operations',
+      { token: transportistas.amplio.token })).data.operations
+      .find((o) => o.order_id === ordenId);
+    assert(enLista && enLista.origins.length === 0,
+      'en el listado, la operación sin origen guardado no se lee igual');
+
+    // La migración va y vuelve, con datos adentro. El upgrade corre sí o sí.
+    const bajada = correrAlembic('downgrade -1');
+    const subida = correrAlembic('upgrade head');
+    assert(/Running downgrade/.test(bajada), `el downgrade no corrió: ${bajada.slice(-200)}`);
+    assert(/Running upgrade/.test(subida), `el upgrade no corrió: ${subida.slice(-200)}`);
+    const limpio = correrAlembic('check');
+    assert(/No new upgrade operations detected/.test(limpio),
+      `alembic check encontró diferencias: ${limpio.slice(-200)}`);
+
+    const trasVolver = (await apiRequest(`/logistics/my-operations/${ordenId}`,
+      { token: transportistas.amplio.token })).data;
+    assert(trasVolver.order_number === operacion.order_number,
+      'la operación dejó de leerse después de ir y volver la migración');
+    assert(trasVolver.origins.length === 0,
+      'después de la migración apareció un origen que nadie guardó');
+
+    return 'ítem sin origen guardado: la operación se lee, no muestra origen y no adopta '
+      + 'el de la publicación; downgrade, upgrade y `alembic check` limpios';
+  } finally {
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    escenario.restaurar();
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

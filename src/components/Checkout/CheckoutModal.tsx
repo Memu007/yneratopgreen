@@ -131,6 +131,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
   // y la búsqueda: una respuesta tardía de un destino o de un carrito
   // anteriores no puede pisar el resultado vigente.
   const consultaDeFletes = useRef(0);
+  // Y cada cambio de decisión de un pedido lleva su propio número. Es una
+  // secuencia que sólo sube y nunca se reinicia: un turno viejo no puede
+  // volver a coincidir con uno nuevo, ni siquiera después de vaciar el mapa.
+  const secuenciaDeDecisiones = useRef(0);
+  const ultimaDecision = useRef<Record<string, number>>({});
   // Retrato exacto del carrito visible. Si cambia mientras el checkout está
   // abierto, lo de antes deja de valer y hay que volver a sincronizar.
   const retratoDelCarrito = items
@@ -215,19 +220,39 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     setDecisiones({});
     setErroresDeSeleccion({});
     setSeleccionando('');
+    // Con la secuencia monótona, vaciar el mapa alcanza: cualquier turno en
+    // vuelo deja de coincidir y su respuesta se descarta.
+    ultimaDecision.current = {};
   }, [shippingData.localityId, retratoDelCarrito]);
 
+  const marcarDecision = (vendedor: string) => {
+    secuenciaDeDecisiones.current += 1;
+    ultimaDecision.current[vendedor] = secuenciaDeDecisiones.current;
+    return secuenciaDeDecisiones.current;
+  };
+
   const decidir = (vendedor: string, decision: DecisionDeTraslado) => {
+    // Decidir invalida cualquier selección de ESE pedido que siga en vuelo:
+    // sin esto, una respuesta que llega tarde reinstala el transportista —y su
+    // contacto— encima de un "coordino por mi cuenta" ya elegido.
+    marcarDecision(vendedor);
+    setSeleccionando('');
     setErroresDeSeleccion((actuales) => ({ ...actuales, [vendedor]: '' }));
     setDecisiones((actuales) => ({ ...actuales, [vendedor]: decision }));
   };
 
   const elegirTransportista = async (vendedor: string, transportista: string) => {
-    // La misma generación que la búsqueda: si mientras se confirmaba cambió el
-    // destino o el carrito, esta respuesta llega tarde y no puede devolver una
-    // selección —ni un contacto— que ya se invalidó.
+    // Dos condiciones para que la respuesta valga cuando llegue: que no haya
+    // cambiado el destino ni el carrito —la generación de la búsqueda— y que
+    // este pedido no haya vuelto a decidirse mientras tanto. La segunda es la
+    // que cubre el cambio a cuenta propia, que no mueve la generación.
     const consulta = consultaDeFletes.current;
-    setSeleccionando(`${vendedor}:${transportista}`);
+    const turno = marcarDecision(vendedor);
+    const clave = `${vendedor}:${transportista}`;
+    const vigente = () => consultaDeFletes.current === consulta
+      && ultimaDecision.current[vendedor] === turno;
+
+    setSeleccionando(clave);
     setErroresDeSeleccion((actuales) => ({ ...actuales, [vendedor]: '' }));
     try {
       const respuesta = await apiFetch<RespuestaDeSeleccion>('/logistics/select-carrier', {
@@ -238,19 +263,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
           carrier_id: transportista,
         }),
       });
-      if (consultaDeFletes.current !== consulta) return;
+      if (!vigente()) return;
       setDecisiones((actuales) => ({
         ...actuales,
         [vendedor]: { modo: 'carrier', elegido: respuesta.carrier },
       }));
     } catch (err) {
-      if (consultaDeFletes.current !== consulta) return;
+      if (!vigente()) return;
       setErroresDeSeleccion((actuales) => ({
         ...actuales,
         [vendedor]: err instanceof Error ? err.message : 'No se pudo elegir el transportista',
       }));
     } finally {
-      if (consultaDeFletes.current === consulta) setSeleccionando('');
+      // Sólo apaga el "seleccionando…" si sigue siendo el suyo: una respuesta
+      // tardía no puede desbloquear una selección posterior ni dejar la
+      // pantalla trabada.
+      setSeleccionando((actual) => (actual === clave ? '' : actual));
     }
   };
 
