@@ -36,16 +36,19 @@ revisó el flujo y obtuvo build independiente verde. La suite completa no pudo
 arrancar en el entorno PM porque Docker sigue apagado; la dev informa 48/48 y
 la revisión del código de las regresiones no encontró preparación artificial.
 
-La revisión descubrió un problema separado y previo de autenticación: si una
-petición trae cookie y `Authorization` de cuentas distintas, el backend elige
-la cookie. Eso puede convertir una petición demorada de A en una operación de
-B. No invalida la cola ya corregida, pero sí bloquea avanzar a otra pieza que
-confíe en identidad.
+El conflicto de credenciales queda **aceptado**: producto `70b0d7b`, informe
+`ce5ae84`. Cookie y Bearer distintos reciben 401 antes de resolver identidad o
+escribir; la misma regla cubre access, refresh y la dependencia opcional. La PM
+obtuvo build independiente, sintaxis Python y `diff --check` verdes. La dev
+informa suite 50/50; no se repitió accesibilidad porque no cambió interfaz.
 
-**Tarea activa única de la dev:** hacer inequívoca la resolución de credenciales
-de acceso y refresh. Dos credenciales distintas deben rechazarse, no elegir una
-silenciosamente. No se reabre logística ni se cambia almacenamiento, duración
-o emisión de tokens. El criterio exacto está al final de `PARA-DEV.md`.
+**Tarea activa única de la dev, bloque largo:** cerrar la Pieza C de logística:
+decisión explícita por cada futura orden, selección segura del transportista,
+contacto sólo después de seleccionar, persistencia en la orden y vistas
+limitadas para comprador, vendedor y transportista. Es un bloque de privacidad
+y checkout; sigue justificando esfuerzo Extra. No incluye tarifa, cobro del
+flete, estados logísticos ni ruteo. El criterio exacto está al final de
+`PARA-DEV.md`.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 

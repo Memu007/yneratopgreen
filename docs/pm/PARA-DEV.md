@@ -1487,3 +1487,100 @@ agregues revocación, sesiones en base, CSRF, OAuth ni dependencias. Si una
 fuente única existente depende realmente de la precedencia actual, traé el
 recorrido antes de ampliar. Entregá commit de producto e informe separado; ahí
 vuelve a PM.
+
+**Aceptada por PM:** producto `70b0d7b`, informe `ce5ae84`. Build, sintaxis
+Python y `diff --check` independientes verdes; la dev informa 50/50. La regla
+401 ante tokens distintos coincide con el criterio y no se detectó elección de
+identidad posterior al rechazo. No reabras esta pieza.
+
+## Tarea activa única — bloque largo: selección e inclusión del flete
+
+Objetivo vertical: completar la Pieza C usando el flujo aprobado en
+`docs/ux/logistica/`. Para cada grupo del carrito —una futura orden por
+vendedor— el comprador debe elegir explícitamente un transportista compatible
+o declarar que coordina el traslado por su cuenta. La decisión llega a la orden
+y cada participante ve únicamente lo necesario.
+
+Bloque estimado de **1–2 días**. Mantené esfuerzo Extra: toca autorización,
+privacidad, migración y los dos checkouts.
+
+### 1. Decisión explícita y contacto protegido
+
+- La elección es por grupo/vendedor, no una sola para todo el carrito. Ninguna
+  orden puede quedar en el estado ambiguo “necesito flete pero no elegí”.
+- Las dos únicas decisiones válidas son transportista seleccionado o traslado
+  por cuenta propia. La interfaz no avanza hasta resolver todos los grupos.
+- Antes de elegir, el listado conserva cero email, teléfono, WhatsApp,
+  domicilio y datos bancarios. Al seleccionar, el backend vuelve a derivar el
+  grupo del carrito y revalida que ese transportista cubra destino y todos sus
+  orígenes; recién entonces devuelve al comprador email y los teléfonos de
+  contacto disponibles. No confíes en los candidatos enviados por el cliente.
+- Cambiar destino, productos, cantidades o vendedor invalida inmediatamente
+  selección y contacto de los grupos afectados. Una respuesta tardía no puede
+  restaurarlos. Quitar/cambiar selección vuelve a ocultar el contacto.
+- “Por cuenta propia” no revela contacto ni crea un transportista ficticio.
+
+### 2. Persistencia y atomicidad de los dos checkouts
+
+- Persistí por orden el modo de traslado y, cuando corresponda, el
+  transportista elegido mediante una relación válida. Migración reversible;
+  órdenes históricas sin esos datos siguen legibles y se muestran como traslado
+  no definido, no se reinterpretan como cuenta propia.
+- Transferencia y Mercado Pago reciben el mapa de decisiones, pero el backend
+  deriva los grupos reales. Debe exigir exactamente una decisión por grupo,
+  rechazar grupos extra, vendedores inyectados, transportistas incompatibles,
+  inactivos o incompletos y cualquier carrier en modo cuenta propia.
+- Revalidá todo justo antes de crear órdenes. Si falla una decisión, no se crea
+  ninguna orden, no se descuenta stock y no queda una operación parcial.
+- La compatibilidad se exige al elegir y otra vez al confirmar; que el perfil,
+  radio, origen o destino cambien entre ambos pasos debe producir un error
+  visible y conservar el carrito.
+
+### 3. Vistas y límites de privacidad
+
+- Comprador: en checkout/resumen e historial ve su decisión. Si eligió
+  transportista, ve nombre, base, transporte, capacidad y contacto; si eligió
+  cuenta propia, ve esa frase y nada más.
+- Vendedor: en la venta ve transportista elegido y su contacto, o que el
+  comprador coordina por su cuenta. No gana acciones logísticas nuevas.
+- Transportista elegido: vista propia de operaciones asignadas con origen,
+  destino, artículos y cantidades existentes. No recibe teléfono/email del
+  comprador, precios, totales, comprobantes, CBU, alias ni otros datos
+  financieros. Un transportista no elegido no puede enumerar ni abrir la
+  operación.
+- Una asignación histórica sigue visible aunque el perfil luego quede
+  incompleto o inactivo; eso no lo vuelve elegible para operaciones nuevas.
+- No agregues aceptar/rechazar viaje, estados de entrega, chat, notificaciones,
+  tarifa ni pago al transportista.
+
+### 4. Evidencia obligatoria
+
+- Recorrido integral con al menos dos vendedores: uno resuelto con
+  transportista y otro por cuenta propia. Probá ambos checkouts y contrastá
+  órdenes/stock con SQL, sin cantidades fijas del seed.
+- Contacto ausente antes de seleccionar tanto en JSON como DOM; presente sólo
+  para el comprador después de revalidar. Quitar selección y cambiar destino o
+  carrito vuelven a ocultarlo.
+- Inyección de carrier incompatible/de otro grupo y decisiones faltantes o
+  extra: rechazo atómico, cero órdenes nuevas y stock intacto.
+- Autorización de las tres vistas: comprador y vendedor ven lo permitido;
+  carrier elegido ve sólo necesidad logística; carrier ajeno recibe 403/404;
+  ningún JSON ni DOM del carrier contiene datos financieros o contacto del
+  comprador.
+- Orden histórica sin decisión sigue legible. Migración downgrade/upgrade y
+  `alembic check` verdes.
+- Suite completa, build, accesibilidad en escritorio/celular para cada pantalla
+  nueva, contraste y `diff --check`. Actualizá los inventarios con aritmética
+  explícita si agregás recorridos permanentes.
+
+### Alcance y freno
+
+Reutilizá el padrón, la consulta PostGIS, el agrupamiento del carrito, las
+órdenes y el prototipo ya aprobados. No rediseñes el checkout fuera de ese
+acuerdo y no agregues dependencias. No implementes mapas, distancia por ruta,
+GPS, cálculo de peso/capacidad, precio o cobro del flete, Carta de Porte,
+mensajería, planes ni Railway.
+
+Si los dos checkouts no pueden validar todas las decisiones antes de la primera
+escritura, frená con el caso concreto: no aceptamos compensar órdenes parciales
+después. Entregá commit de producto e informe separado; ahí vuelve a PM.
