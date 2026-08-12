@@ -42,6 +42,8 @@ const ESPERADAS = [
   'detalle',
   'carrito',
   'checkout envío',
+  'checkout traslado',
+  'checkout transportista elegido',
   'checkout pago',
   'perfil vendedor',
   'mis ventas',
@@ -386,6 +388,13 @@ for (const medida of MEDIDAS) {
     await page.getByRole('button', { name: 'Cerrar' }).first().click();
     await vendidoPor.waitFor({ state: 'hidden', timeout: ESPERA });
 
+    // Una publicación con origen dentro del radio del transportista demo: sin
+    // eso no hay a quién elegir y las pantallas del traslado no existirían.
+    const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+    await buscador.fill('Fertilizante Triple 15');
+    await buscador.press('Enter');
+    await page.getByRole('heading', { name: 'Fertilizante Triple 15 - NPK', exact: true, level: 3 })
+      .waitFor({ state: 'visible', timeout: ESPERA });
     await page.getByRole('button', { name: /Agregar/ }).first().click();
     await page.getByRole('button', { name: /Carrito/ }).click();
     await revisar(page, `${medida.n} carrito`, page.getByRole('heading', { name: /Mi Carrito/ }));
@@ -399,6 +408,17 @@ for (const medida of MEDIDAS) {
     await page.waitForFunction(
       () => document.querySelectorAll('#checkout-localidad option').length > 1);
     await page.locator('#checkout-localidad').selectOption({ label: 'Pergamino' });
+    const traslado = page.locator('[class*="_fletes_"]');
+    await traslado.getByRole('radio', { name: /Necesito flete/ }).first()
+      .waitFor({ state: 'visible', timeout: ESPERA });
+    await traslado.getByRole('radio', { name: /Necesito flete/ }).first().check();
+    await revisar(page, `${medida.n} checkout traslado`,
+      page.getByRole('heading', { name: 'Cómo se traslada cada pedido' }));
+
+    await traslado.getByRole('button', { name: /^Seleccionar a / }).first().click();
+    await revisar(page, `${medida.n} checkout transportista elegido`,
+      traslado.getByText('Transportista elegido'));
+
     await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
     await page.getByPlaceholder('2000').fill('2700');
     await page.locator('form:has(h2) button[type="submit"]').click();

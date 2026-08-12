@@ -18,6 +18,7 @@ from app.models.product import Product
 from app.core.dependencies import get_current_user
 from app.core.montos import validar_total
 from app.models.user import User
+from app.schemas.logistics import OrderShipping
 from app.schemas.orders import (
     BankTransferCheckoutResponse,
     BankTransferDecisionRequest,
@@ -26,6 +27,14 @@ from app.schemas.orders import (
     CheckoutRequest,
     OrderItemResponse,
     OrderResponse,
+)
+from app.services.logistica import (
+    MODO_PROPIO,
+    MODO_TRANSPORTISTA,
+    carrito_activo,
+    grupos_del_carrito,
+    resolver_decisiones,
+    resolver_destino,
 )
 from app.services.storage import get_storage
 from app.api.notifications import (
@@ -47,24 +56,6 @@ def generate_order_number() -> str:
     return f"ORD-{timestamp}-{random}"
 
 
-def resolver_destino(db: Session, locality_id: str) -> Locality:
-    """El destino de un envío tiene que ser una localidad del padrón oficial.
-
-    De ahí salen la ciudad y la provincia que se muestran —no del texto que
-    manda el cliente— y sobre ella se calcula qué transportistas cubren el
-    viaje. Se valida antes de escribir una sola fila.
-    """
-    destino = db.query(Locality).filter(
-        Locality.id == (locality_id or "").strip()
-    ).first()
-    if not destino:
-        raise HTTPException(
-            status_code=400,
-            detail="La localidad de destino no pertenece al padrón oficial",
-        )
-    return destino
-
-
 @router.post("/checkout", response_model=OrderResponse)
 def checkout(
     checkout_data: CheckoutRequest,
@@ -75,26 +66,23 @@ def checkout(
     Crear orden desde el carrito actual.
     Convierte el carrito en orden y descuenta stock.
     """
-    # Obtener carrito activo
-    cart = db.query(Cart).filter(
-        Cart.user_id == current_user.id,
-        Cart.status == CartStatus.ACTIVE
-    ).first()
-    
-    if not cart or not cart.items:
-        raise HTTPException(status_code=400, detail="El carrito está vacío")
+    cart = carrito_activo(db, current_user)
 
     # Antes de escribir nada: el destino tiene que existir en el padrón.
     destino = resolver_destino(db, checkout_data.shipping_locality_id)
 
-    # Agrupar items por vendedor (una orden por vendedor)
-    items_by_seller = {}
-    for item in cart.items:
-        seller_id = item.product.seller_id
-        if seller_id not in items_by_seller:
-            items_by_seller[seller_id] = []
-        items_by_seller[seller_id].append(item)
-    
+    # Los grupos los deriva el servidor del carrito, no el cliente. Cada uno
+    # tiene que traer su decisión de traslado, y cada transportista elegido
+    # se revalida contra este destino y estos orígenes antes de la primera
+    # fila: si una decisión falla, no se crea ninguna orden.
+    grupos = grupos_del_carrito(cart)
+    elegidos = resolver_decisiones(
+        db, destino, grupos, checkout_data.shipping_decisions
+    )
+    items_by_seller = {
+        seller_id: grupo.items for seller_id, grupo in grupos.items()
+    }
+
     # Validar TODOS los totales antes de escribir: si alguno no entra en el
     # contrato monetario, la respuesta es 4xx y no queda una orden a medias.
     for _seller_id, _items in items_by_seller.items():
@@ -134,6 +122,10 @@ def checkout(
                 "locality_id": destino.id,
             },
             shipping_locality_id=destino.id,
+            shipping_mode=(
+                MODO_TRANSPORTISTA if elegidos[seller_id] else MODO_PROPIO
+            ),
+            carrier_id=elegidos[seller_id].id if elegidos[seller_id] else None,
             buyer_notes=checkout_data.notes
         )
         
@@ -286,6 +278,12 @@ def checkout_bank_transfer(
     # Antes de escribir nada: el destino tiene que existir en el padrón.
     destino = resolver_destino(db, checkout_data.shipping_locality_id)
 
+    # Y las decisiones de traslado, TODAS, antes de la primera fila. Si una
+    # falla no se crea ninguna orden ni se toca stock.
+    elegidos = resolver_decisiones(
+        db, destino, grupos_del_carrito(cart), checkout_data.shipping_decisions
+    )
+
     # Mismo control que el checkout comun, y por el mismo motivo: antes de
     # que exista una sola fila.
     for group in groups:
@@ -325,6 +323,10 @@ def checkout_bank_transfer(
                 "locality_id": destino.id,
             },
             shipping_locality_id=destino.id,
+            shipping_mode=(
+                MODO_TRANSPORTISTA if elegidos[seller.id] else MODO_PROPIO
+            ),
+            carrier_id=elegidos[seller.id].id if elegidos[seller.id] else None,
             buyer_notes=checkout_data.notes,
         )
         db.add(order)
@@ -496,6 +498,36 @@ def decide_transfer_receipt(
     )
 
 
+def traslado_de(order: Order) -> OrderShipping:
+    """El traslado de una orden, para comprador y vendedor.
+
+    Sin modo es una orden anterior a la logística: queda «no definido» y no
+    se convierte en cuenta propia. Con transportista se devuelve su
+    contacto, que es el punto de haberlo elegido; sigue apareciendo aunque
+    su perfil haya quedado incompleto o inactivo después, porque la
+    asignación ya ocurrió.
+    """
+    if order.shipping_mode != MODO_TRANSPORTISTA or order.carrier is None:
+        return OrderShipping(mode=order.shipping_mode)
+
+    carrier = order.carrier
+    base = carrier.carrier_base_locality
+    return OrderShipping(
+        mode=MODO_TRANSPORTISTA,
+        carrier_name=carrier.full_name,
+        carrier_base=(
+            f"{base.name}, {base.province_name}" if base is not None else None
+        ),
+        carrier_transport=carrier.carrier_transport,
+        carrier_capacity=carrier.carrier_capacity,
+        carrier_certification_detail=carrier.carrier_certification_detail,
+        carrier_certification_declared_at=carrier.carrier_certification_declared_at,
+        carrier_email=carrier.email,
+        carrier_phone=carrier.phone,
+        carrier_whatsapp=carrier.whatsapp,
+    )
+
+
 @router.get("/my", response_model=list[OrderResponse])
 def get_my_orders(
     as_role: str = "buyer",  # "buyer" o "seller"
@@ -573,6 +605,7 @@ def get_my_orders(
             seller_bank_holder=order.transfer_account_holder,
             transfer_receipt_url=order.transfer_receipt_url,
             rejection_reason=order.cancellation_reason,
+            shipping=traslado_de(order),
         ))
     
     return result
@@ -619,6 +652,7 @@ def get_order_detail(
         seller_bank_holder=order.transfer_account_holder,
         transfer_receipt_url=order.transfer_receipt_url,
         rejection_reason=order.cancellation_reason,
+        shipping=traslado_de(order),
     )
 
 

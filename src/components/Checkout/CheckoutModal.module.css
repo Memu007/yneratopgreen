@@ -812,3 +812,114 @@
   font-size: 0.82rem;
   color: #4a5340;
 }
+
+/* --- decisión de traslado, un pedido a la vez ---------------------------- */
+
+.fleteOpciones {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.fleteOpcion {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  background: #ffffff;
+  border: 1px solid #d8e2cf;
+  border-radius: 10px;
+  cursor: pointer;
+  color: #24301c;
+  font-size: 0.92rem;
+}
+
+.fleteOpcion input {
+  margin-top: 3px;
+  accent-color: #2d5016;
+}
+
+.fleteOpcionAyuda {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.85rem;
+  color: #4a5340;
+}
+
+.fletePendiente {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #6b3f00;
+}
+
+.fleteSinContacto {
+  margin: 8px 0 10px;
+  font-size: 0.85rem;
+  color: #4a5340;
+  font-style: italic;
+}
+
+.fleteElegir {
+  width: 100%;
+  padding: 10px 14px;
+  background: #2d5016;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fleteElegir:hover:not(:disabled) {
+  background: #244011;
+}
+
+.fleteElegir:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fleteElegido {
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 2px solid #2d5016;
+  border-radius: 10px;
+}
+
+.fleteEtiqueta {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #3d4636;
+}
+
+.fleteContacto {
+  margin: 6px 0 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #24301c;
+  word-break: break-word;
+}
+
+.fleteAcciones {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.fleteQuitar {
+  padding: 8px 14px;
+  background: #ffffff;
+  color: #8a2216;
+  border: 1px solid #8a2216;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fleteQuitar:hover {
+  background: #fdeceb;
+}

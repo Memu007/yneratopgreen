@@ -6,6 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from uuid import UUID
 from datetime import datetime
 
+from app.schemas.logistics import OrderShipping
+
 
 class OrderItemResponse(BaseModel):
     id: UUID
@@ -40,8 +42,23 @@ class OrderResponse(BaseModel):
     seller_bank_holder: Optional[str] = None
     transfer_receipt_url: Optional[str] = None
     rejection_reason: Optional[str] = None
+    # Cómo se traslada. Va tanto al comprador como al vendedor: los dos
+    # necesitan saber quién mueve la carga, o que la mueve el comprador.
+    shipping: OrderShipping = OrderShipping()
     
     model_config = ConfigDict(from_attributes=True)
+
+
+class ShippingDecision(BaseModel):
+    """Qué hace el comprador con el traslado de un pedido.
+
+    Sólo dos decisiones son válidas y no hay tercera: eligió transportista,
+    o coordina por su cuenta. `carrier_id` es un id y nada más; que cubra
+    el viaje lo decide el servidor.
+    """
+    seller_id: str = Field(..., min_length=1, max_length=36)
+    mode: Literal["carrier", "self"]
+    carrier_id: Optional[str] = Field(None, max_length=36)
 
 
 class CheckoutRequest(BaseModel):
@@ -53,6 +70,10 @@ class CheckoutRequest(BaseModel):
     shipping_locality_id: str = Field(..., min_length=1, max_length=20)
     shipping_postal_code: str
     notes: Optional[str] = None
+    # Una decisión de traslado por futura orden. La lista puede llegar
+    # vacía o de más: el servidor deriva los grupos reales del carrito y
+    # exige exactamente una decisión por grupo antes de escribir nada.
+    shipping_decisions: List[ShippingDecision] = Field(default_factory=list)
 
 
 class BankTransferOption(BaseModel):

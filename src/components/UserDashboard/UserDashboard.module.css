@@ -1512,3 +1512,40 @@
   font-size: 13px;
   color: #555;
 }
+
+/* --- traslado de la orden y operaciones asignadas ------------------------ */
+
+.traslado {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  background: #f6f8f3;
+  border: 1px solid #d8e2cf;
+  border-radius: 10px;
+}
+
+.trasladoTitulo {
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #2d5016;
+}
+
+.trasladoTexto {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+  color: #3d4636;
+}
+
+.trasladoContacto {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #24301c;
+  word-break: break-word;
+}
+
+.trasladoDeclaracion {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  color: #4a5340;
+}

@@ -12,7 +12,8 @@ import {
   ProvinceResponse,
 } from '../../utils/catalogService';
 
-type TabType = 'profile' | 'notifications' | 'purchases' | 'sales' | 'products';
+type TabType = 'profile' | 'notifications' | 'purchases' | 'sales' | 'products'
+  | 'operations';
 
 // Interface para notificaciones
 interface Notification {
@@ -35,6 +36,34 @@ interface BackendOrderItem {
   product_image_snapshot?: string;
 }
 
+/**
+ * Cómo se traslada una orden. `mode` ausente es una orden anterior a la
+ * logística: traslado no definido, que no es lo mismo que cuenta propia.
+ */
+interface TrasladoDeLaOrden {
+  mode?: 'carrier' | 'self' | null;
+  carrier_name?: string;
+  carrier_base?: string;
+  carrier_transport?: string;
+  carrier_capacity?: string;
+  carrier_certification_detail?: string;
+  carrier_certification_declared_at?: string;
+  carrier_email?: string;
+  carrier_phone?: string;
+  carrier_whatsapp?: string;
+}
+
+/** Una operación asignada, tal como la ve el transportista. */
+interface OperacionAsignada {
+  order_id: string;
+  order_number: string;
+  created_at: string;
+  seller_name: string;
+  origins: { id: string; name: string; province_name: string }[];
+  destination?: { id: string; name: string; province_name: string } | null;
+  items: { product_name: string; quantity: number }[];
+}
+
 interface BackendOrder {
   id: string;
   order_number: string;
@@ -52,6 +81,7 @@ interface BackendOrder {
   seller_whatsapp?: string;
   transfer_receipt_url?: string;
   rejection_reason?: string;
+  shipping?: TrasladoDeLaOrden;
 }
 
 interface Order {
@@ -76,6 +106,7 @@ interface Order {
   };
   transferReceiptUrl?: string;
   rejectionReason?: string;
+  shipping?: TrasladoDeLaOrden;
 }
 
 interface UserProduct {
@@ -262,6 +293,34 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     return statusMap[status.toLowerCase()] || 'pending';
   };
 
+  // Operaciones asignadas: sólo las pide quien es transportista, y el servidor
+  // devuelve únicamente las suyas. No hay parámetro de transportista.
+  const [operaciones, setOperaciones] = useState<OperacionAsignada[]>([]);
+  const [cargandoOperaciones, setCargandoOperaciones] = useState(false);
+  const [errorDeOperaciones, setErrorDeOperaciones] = useState('');
+
+  useEffect(() => {
+    if (activeTab !== 'operations') return;
+    let vigente = true;
+    setCargandoOperaciones(true);
+    setErrorDeOperaciones('');
+    void apiGet<{ operations: OperacionAsignada[] }>('/logistics/my-operations')
+      .then((respuesta) => {
+        if (vigente) setOperaciones(respuesta.operations);
+      })
+      .catch((error) => {
+        if (vigente) {
+          setErrorDeOperaciones(
+            error instanceof Error ? error.message : 'No se pudieron cargar las operaciones',
+          );
+        }
+      })
+      .finally(() => {
+        if (vigente) setCargandoOperaciones(false);
+      });
+    return () => { vigente = false; };
+  }, [activeTab]);
+
   // Cargar órdenes (compras y ventas) cuando cambia de pestaña
   useEffect(() => {
     const loadOrders = async () => {
@@ -288,6 +347,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             } : undefined,
             transferReceiptUrl: o.transfer_receipt_url,
             rejectionReason: o.rejection_reason,
+            shipping: o.shipping,
           }));
           setPurchases(mappedOrders);
         } else if (activeTab === 'sales') {
@@ -309,6 +369,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             } : undefined,
             transferReceiptUrl: o.transfer_receipt_url,
             rejectionReason: o.rejection_reason,
+            shipping: o.shipping,
           }));
           setSales(mappedOrders);
         }
@@ -1498,6 +1559,150 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     </div>
   );
 
+  const fechaDeclarada = (iso?: string) => {
+    if (!iso) return '';
+    const fecha = new Date(iso);
+    return Number.isNaN(fecha.getTime())
+      ? iso
+      : fecha.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  /**
+   * El traslado de una orden. Lo ven comprador y vendedor, con la misma
+   * información y distinta frase. Sin modo es una orden anterior a la
+   * logística: se dice que no está definido, no que la coordina alguien.
+   */
+  const renderTraslado = (traslado: TrasladoDeLaOrden | undefined, comoComprador: boolean) => {
+    const modo = traslado?.mode;
+
+    if (modo !== 'carrier' && modo !== 'self') {
+      return (
+        <div className={styles.traslado}>
+          <div className={styles.trasladoTitulo}>🚚 Traslado</div>
+          <p className={styles.trasladoTexto}>Traslado no definido.</p>
+        </div>
+      );
+    }
+
+    if (modo === 'self') {
+      return (
+        <div className={styles.traslado}>
+          <div className={styles.trasladoTitulo}>🚚 Traslado</div>
+          <p className={styles.trasladoTexto}>
+            {comoComprador
+              ? 'Coordinás el traslado por tu cuenta.'
+              : 'El comprador coordina el traslado por su cuenta.'}
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className={styles.traslado}>
+        <div className={styles.trasladoTitulo}>🚚 Transportista</div>
+        <p className={styles.trasladoTexto}><strong>{traslado?.carrier_name}</strong></p>
+        {traslado?.carrier_base && (
+          <p className={styles.trasladoTexto}>Base: {traslado.carrier_base}</p>
+        )}
+        {traslado?.carrier_transport && (
+          <p className={styles.trasladoTexto}>{traslado.carrier_transport}</p>
+        )}
+        {traslado?.carrier_capacity && (
+          <p className={styles.trasladoTexto}>Capacidad: {traslado.carrier_capacity}</p>
+        )}
+        <p className={styles.trasladoContacto}>
+          {traslado?.carrier_email}
+          {traslado?.carrier_phone && ` · ${traslado.carrier_phone}`}
+          {traslado?.carrier_whatsapp && traslado.carrier_whatsapp !== traslado.carrier_phone
+            && ` · WhatsApp ${traslado.carrier_whatsapp}`}
+        </p>
+        {traslado?.carrier_certification_detail && (
+          <p className={styles.trasladoDeclaracion}>
+            Declara: {traslado.carrier_certification_detail}
+            {traslado.carrier_certification_declared_at
+              && ` (declarado el ${fechaDeclarada(traslado.carrier_certification_declared_at)})`}
+            . TopGreen no verifica esta habilitación.
+          </p>
+        )}
+        <p className={styles.trasladoDeclaracion}>
+          La coordinación y el precio del flete se acuerdan directamente.
+        </p>
+      </div>
+    );
+  };
+
+  /**
+   * Lo que ve el transportista de una operación asignada: qué mover, desde
+   * dónde y hacia dónde. Sin precios, sin totales, sin comprobantes y sin
+   * contacto del comprador: nada de eso hace falta para mover una carga.
+   */
+  const renderOperaciones = () => (
+    <div className={styles.section}>
+      <div className={styles.sectionHeader}>
+        <h2>Mis Operaciones</h2>
+        <span className={styles.count}>{operaciones.length} asignadas</span>
+      </div>
+
+      {errorDeOperaciones && (
+        <p className={styles.trasladoTexto} role="alert">⚠️ {errorDeOperaciones}</p>
+      )}
+
+      {cargandoOperaciones ? (
+        <div className={styles.emptyState}>
+          <div className={styles.emptyIcon}>⏳</div>
+          <h3>Cargando tus operaciones...</h3>
+        </div>
+      ) : operaciones.length === 0 ? (
+        <div className={styles.emptyState}>
+          <div className={styles.emptyIcon}>🚚</div>
+          <h3>Todavía no te eligieron para ningún viaje</h3>
+          <p>Cuando un comprador te elija, la operación aparece acá.</p>
+        </div>
+      ) : (
+        <div className={styles.ordersList}>
+          {operaciones.map((operacion) => (
+            <div key={operacion.order_id} className={styles.orderCard}>
+              <div className={styles.orderHeader}>
+                <div>
+                  <h3>Operación #{operacion.order_number}</h3>
+                  <p className={styles.orderDate}>
+                    📅 {new Date(operacion.created_at).toLocaleDateString('es-AR')}
+                  </p>
+                </div>
+              </div>
+
+              <div className={styles.traslado}>
+                <div className={styles.trasladoTitulo}>📍 Recorrido</div>
+                <p className={styles.trasladoTexto}>
+                  Retiro en {operacion.origins.length > 0
+                    ? operacion.origins.map((o) => `${o.name}, ${o.province_name}`).join(' y ')
+                    : 'origen no informado'}
+                  {' '}— entrega en {operacion.destination
+                    ? `${operacion.destination.name}, ${operacion.destination.province_name}`
+                    : 'destino no informado'}
+                </p>
+                <p className={styles.trasladoTexto}>Entrega {operacion.seller_name}</p>
+              </div>
+
+              <div className={styles.orderItems}>
+                {operacion.items.map((item, index) => (
+                  <div key={index} className={styles.orderItem}>
+                    <span className={styles.itemName}>{item.product_name}</span>
+                    <span className={styles.itemQuantity}>x{item.quantity}</span>
+                  </div>
+                ))}
+              </div>
+
+              <p className={styles.trasladoDeclaracion}>
+                La coordinación y el precio del flete se acuerdan directamente.
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   const renderPurchases = () => {
     const filteredPurchases = filterStatus === 'all' 
       ? purchases 
@@ -1577,6 +1782,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 <div className={styles.orderTotal}>
                   <strong>Total:</strong> ${order.total.toLocaleString('es-AR')}
                 </div>
+
+                {renderTraslado(order.shipping, true)}
 
                 {order.rejectionReason && (
                   <div className={styles.contactInfo}>
@@ -1683,6 +1890,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               <div className={styles.orderTotal}>
                 <strong>Total:</strong> ${order.total.toLocaleString('es-AR')}
               </div>
+
+              {renderTraslado(order.shipping, false)}
 
               {order.buyer && order.status !== 'cancelled' && (
                 <div className={styles.contactInfo}>
@@ -2019,6 +2228,20 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             </svg>
             Mis Ventas
           </button>
+          {esTransportista && (
+            <button
+              className={`${styles.tab} ${activeTab === 'operations' ? styles.tabActive : ''}`}
+              onClick={() => setActiveTab('operations')}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M1 3h15v13H1z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M16 8h4l3 3v5h-7z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="5.5" cy="18.5" r="2.5" strokeWidth="2"/>
+                <circle cx="18.5" cy="18.5" r="2.5" strokeWidth="2"/>
+              </svg>
+              Mis Operaciones
+            </button>
+          )}
           <button
             className={`${styles.tab} ${activeTab === 'products' ? styles.tabActive : ''}`}
             onClick={() => setActiveTab('products')}
@@ -2035,6 +2258,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           {activeTab === 'notifications' && renderNotifications()}
           {activeTab === 'purchases' && renderPurchases()}
           {activeTab === 'sales' && renderSales()}
+          {activeTab === 'operations' && esTransportista && renderOperaciones()}
           {activeTab === 'products' && renderProducts()}
         </div>
       </div>

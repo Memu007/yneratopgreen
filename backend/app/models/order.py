@@ -55,6 +55,13 @@ class Order(Base):
         index=True,
     )
 
+    # Cómo se traslada la orden. NULL es "traslado no definido": son las
+    # órdenes anteriores a la logística, y no se leen como cuenta propia
+    # porque nadie declaró eso. 'carrier' exige carrier_id; 'self' exige que
+    # no lo haya.
+    shipping_mode = Column(String(20), nullable=True)
+    carrier_id = Column(String(36), ForeignKey("users.id"), nullable=True, index=True)
+
     # Notas
     buyer_notes = Column(String(500), nullable=True)
     seller_notes = Column(String(500), nullable=True)
@@ -74,6 +81,10 @@ class Order(Base):
     # Relaciones
     buyer = relationship("User", foreign_keys=[buyer_id], back_populates="orders_as_buyer")
     seller = relationship("User", foreign_keys=[seller_id], back_populates="orders_as_seller")
+    # Sin back_populates: el transportista no "tiene órdenes", tiene
+    # operaciones asignadas, y esa vista se arma con su propia consulta.
+    carrier = relationship("User", foreign_keys=[carrier_id])
+    shipping_locality = relationship("Locality", foreign_keys=[shipping_locality_id])
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
     payment = relationship("Payment", back_populates="order", uselist=False)
 

@@ -49,7 +49,8 @@ const ESPERADAS = [
   'detalle de producto',
   'carrito',
   'checkout: envío',
-  'checkout: fletes compatibles',
+  'checkout: traslado del pedido',
+  'checkout: transportista elegido',
   'checkout: pago',
   'panel del comprador',
   'panel: edición de perfil',
@@ -59,6 +60,7 @@ const ESPERADAS = [
   'panel: mis productos',
   'panel del transportista',
   'panel: edición de transportista',
+  'panel: operaciones del transportista',
   'administración',
   'administración: usuarios',
   'administración: productos',
@@ -207,6 +209,15 @@ async function comprador(page, medida) {
   await page.getByRole('button', { name: 'Cerrar' }).first().click();
   await page.getByRole('heading', { name: 'Vendido por' }).waitFor({ state: 'hidden', timeout: ESPERA });
 
+  // Una publicación del seed cuya localidad de origen entra en el radio del
+  // transportista demo: sin eso no habría a quién elegir y las dos pantallas
+  // nuevas del traslado no existirían. Si el seed cambia, esto falla en vez de
+  // medir de menos.
+  const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+  await buscador.fill('Fertilizante Triple 15');
+  await buscador.press('Enter');
+  await page.getByRole('heading', { name: 'Fertilizante Triple 15 - NPK', exact: true, level: 3 })
+    .waitFor({ state: 'visible', timeout: ESPERA });
   await page.getByRole('button', { name: /Agregar/ }).first().click();
   await page.getByRole('button', { name: /Carrito/ }).click();
   await revisar(page, 'carrito', medida,
@@ -222,10 +233,21 @@ async function comprador(page, medida) {
     () => document.querySelectorAll('#checkout-localidad option').length > 1);
   await page.locator('#checkout-localidad').selectOption({ label: 'Pergamino' });
 
-  // Elegir el destino abre el listado de transportistas: es contenido nuevo
-  // dentro del mismo paso, con su propio texto, así que se mide aparte.
-  await revisar(page, 'checkout: fletes compatibles', medida,
-    page.getByRole('heading', { name: 'Transportistas que cubren el viaje' }));
+  // Elegir el destino abre la decisión de traslado: es contenido nuevo dentro
+  // del mismo paso, con sus propios controles, así que se mide aparte.
+  const traslado = page.locator('[class*="_fletes_"]');
+  await traslado.getByRole('radio', { name: /Necesito flete/ }).first()
+    .waitFor({ state: 'visible', timeout: ESPERA });
+  await traslado.getByRole('radio', { name: /Necesito flete/ }).first().check();
+  await revisar(page, 'checkout: traslado del pedido', medida,
+    page.getByRole('heading', { name: 'Cómo se traslada cada pedido' }));
+
+  // Con transportista elegido la pantalla cambia: aparece el contacto y el
+  // control para quitarlo. Son controles nuevos y se miden aparte.
+  await traslado.getByRole('button', { name: /^Seleccionar a / }).first().click();
+  await revisar(page, 'checkout: transportista elegido', medida,
+    traslado.getByText('Transportista elegido'));
+
   await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
   await page.getByPlaceholder('2000').fill('2700');
   await page.locator('form:has(h2) button[type="submit"]').click();
@@ -287,6 +309,10 @@ async function transportista(page, medida) {
 
   await page.getByRole('button', { name: 'Cancelar' }).click();
   await page.locator('#perfil-localidad-base').waitFor({ state: 'detached', timeout: ESPERA });
+
+  await page.getByRole('button', { name: 'Mis Operaciones' }).click();
+  await revisar(page, 'panel: operaciones del transportista', medida,
+    page.getByRole('heading', { name: 'Mis Operaciones' }));
 }
 
 async function administracion(page, medida) {

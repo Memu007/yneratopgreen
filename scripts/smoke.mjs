@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { chromium } from 'playwright';
 
@@ -293,6 +293,19 @@ function queryCount(sql) {
   return value;
 }
 
+// Cada futura orden necesita decir cómo se traslada. En los casos que no
+// miran logística la decisión es siempre la misma —el comprador coordina—,
+// pero tiene que estar: el checkout ya no acepta un pedido sin resolver.
+function trasladoPropio(usuario = state.buyerId) {
+  return queryRows(`
+    SELECT DISTINCT p.seller_id
+    FROM cart_items ci
+    JOIN carts c ON c.id = ci.cart_id
+    JOIN products p ON p.id = ci.product_id
+    WHERE c.user_id = ${sqlLiteral(usuario)} AND c.status = 'ACTIVE'
+  `).map(([vendedor]) => ({ seller_id: vendedor, mode: 'self' }));
+}
+
 // El destino de un envío dejó de ser texto libre: ahora es una localidad del
 // padrón oficial, y de ahí salen la ciudad y la provincia que se muestran.
 let localidadDeEnvioCache = null;
@@ -354,12 +367,49 @@ async function pedirCrudo(path, { method = 'GET', header, cookie, body } = {}) {
   };
 }
 
+// El checkout ya no avanza hasta que cada pedido diga cómo se traslada. Los
+// casos que no miran logística lo resuelven igual que una persona apurada:
+// coordino por mi cuenta, uno por uno.
+async function resolverTrasladoPropio(page) {
+  const propias = page
+    .locator('[class*="_fletes_"]')
+    .getByRole('radio', { name: /Coordino el traslado por mi cuenta/ });
+  await propias.first().waitFor({ state: 'visible', timeout: 20_000 });
+  const cuantas = await propias.count();
+  for (let i = 0; i < cuantas; i += 1) await propias.nth(i).check();
+  return cuantas;
+}
+
+// La suite reutiliza conexiones. Si el servidor cierra una justo cuando el
+// cliente la iba a usar, el error es de socket y no de la API: no hubo
+// respuesta, no hubo status, no hubo nada. Se reintenta UNA vez y sólo en ese
+// caso; cualquier HTTP —incluido un 500— pasa derecho, porque eso sí es una
+// respuesta y la prueba tiene que verla.
+const ERRORES_DE_SOCKET = new Set([
+  'ECONNRESET', 'ECONNREFUSED', 'EPIPE', 'UND_ERR_SOCKET',
+]);
+
+function esCorteDeConexion(error) {
+  const causa = error?.cause;
+  return ERRORES_DE_SOCKET.has(causa?.code) || ERRORES_DE_SOCKET.has(error?.code);
+}
+
+async function pedirConReintento(url, opciones) {
+  try {
+    return await fetch(url, opciones);
+  } catch (error) {
+    if (!esCorteDeConexion(error)) throw error;
+    await new Promise((listo) => setTimeout(listo, 250));
+    return fetch(url, opciones);
+  }
+}
+
 async function apiRequest(path, { method = 'GET', token, body } = {}) {
   const headers = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await pedirConReintento(`${API_URL}${path}`, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -639,6 +689,7 @@ await runCase(8, 'Crear orden desde el carrito', async () => {
       shipping_locality_id: localidadDeEnvio(),
       shipping_postal_code: '7620',
       notes: 'Orden automatizada sin pago',
+      shipping_decisions: trasladoPropio(),
     },
   });
 
@@ -1064,6 +1115,7 @@ await runCase(15, 'Datos bancarios correctos y orden esperando comprobante', asy
       shipping_locality_id: localidadDeEnvio(),
       shipping_postal_code: '2000',
       notes: 'Orden smoke por transferencia',
+      shipping_decisions: trasladoPropio(),
     },
   });
   const [order] = checkout.data.orders;
@@ -1190,6 +1242,7 @@ await runCase(18, 'Rechazo de comprobante guarda el motivo', async () => {
       shipping_address: 'Av. Rechazo 456',
       shipping_locality_id: localidadDeEnvio(),
       shipping_postal_code: '2000',
+      shipping_decisions: trasladoPropio(),
     },
   });
   const rejectedOrder = checkout.data.orders[0];
@@ -1262,6 +1315,7 @@ await runCase(19, 'Transferencia completa desde la interfaz', async () => {
       .getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B')
       .fill('Av. Transferencia UI 789');
     await page.getByPlaceholder('2000').fill('2000');
+    await resolverTrasladoPropio(page);
     await page.locator('form:has(h2) button[type="submit"]').click();
 
     await page.getByRole('heading', { name: /Método de Pago/ }).waitFor();
@@ -1611,6 +1665,7 @@ async function crearOrdenTransferencia(calle) {
       shipping_address: calle,
       shipping_locality_id: localidadDeEnvio(),
       shipping_postal_code: '2000',
+      shipping_decisions: trasladoPropio(),
     },
   });
   const [order] = checkout.data.orders;
@@ -1829,6 +1884,7 @@ await runCase(27, 'Una orden por transferencia de más de cien millones', async 
       shipping_locality_id: localidadDeEnvio(),
       shipping_postal_code: '2700',
       notes: 'Orden cara por transferencia',
+      shipping_decisions: trasladoPropio(),
     },
   });
   const [orden] = checkout.data.orders;
@@ -2069,6 +2125,7 @@ await runCase(28, 'Un total fuera del contrato se rechaza sin escribir nada', as
           shipping_locality_id: localidadDeEnvio(),
           shipping_postal_code: '2700',
           notes: 'Orden que se pasa del contrato',
+          shipping_decisions: trasladoPropio(),
         },
       }),
     );
@@ -2259,13 +2316,12 @@ await runCase(30, 'El motivo real de la sincronización llega al comprador', asy
     await elegirDestino(page, 'Pergamino');
     await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
     await page.getByPlaceholder('2000').fill('2700');
-    await page.locator('form:has(h2) button[type="submit"]').click();
 
-    await page.getByRole('heading', { name: /Método de Pago/ }).waitFor();
-    await page.locator('input[value="bank_transfer"]').check();
-
+    // La sincronización falla, así que el checkout no puede ni armar los
+    // pedidos ni dejar resolver su traslado: el motivo real aparece acá, antes
+    // del pago, y es el de la API.
     const aviso = page.locator('[role="alert"]');
-    await aviso.waitFor({ state: 'visible', timeout: 15_000 });
+    await aviso.waitFor({ state: 'visible', timeout: 20_000 });
     const texto = (await aviso.textContent()) || '';
     assert(
       /ya no está disponible/i.test(texto),
@@ -2278,8 +2334,10 @@ await runCase(30, 'El motivo real de la sincronización llega al comprador', asy
     );
     assert(respaldo.length === 0, `el checkout usó el respaldo: ${respaldo.join(', ')}`);
 
-    // el modal sigue abierto y no se creó ninguna orden
-    await page.getByRole('heading', { name: /Método de Pago/ }).waitFor({ state: 'visible' });
+    // Y no avanza: se queda en datos de envío y no se creó ninguna orden.
+    await page.locator('form:has(h2) button[type="submit"]').click();
+    await page.waitForTimeout(1500);
+    await page.getByRole('heading', { name: /Datos de Envío/ }).waitFor({ state: 'visible' });
     const ordenesDespues = queryCount('SELECT COUNT(*) FROM orders');
     assert(ordenesDespues === ordenesAntes, `se creó una orden pese al error`);
     return `aviso visible con role="alert": "${texto.trim().slice(0, 80)}"; `
@@ -2328,6 +2386,7 @@ await runCase(31, 'Sin datos bancarios, el comprador ve el motivo del vendedor',
     await elegirDestino(page, 'Pergamino');
     await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
     await page.getByPlaceholder('2000').fill('2700');
+    await resolverTrasladoPropio(page);
     await page.locator('form:has(h2) button[type="submit"]').click();
 
     await page.getByRole('heading', { name: /Método de Pago/ }).waitFor();
@@ -3620,6 +3679,12 @@ await runCase(43, 'Fletes compatibles por futura orden, con PostGIS y sin contac
 
       const seccion = page.locator('[class*="_fletes_"]');
       await seccion.waitFor({ state: 'visible', timeout: 15_000 });
+      // El directorio se abre al decir "necesito flete": antes de eso la
+      // pantalla sólo pregunta cómo se traslada el pedido.
+      const pedirFlete = seccion.getByRole('radio', { name: /Necesito flete/ });
+      await pedirFlete.first().waitFor({ state: 'visible', timeout: 15_000 });
+      const cuantosGrupos = await pedirFlete.count();
+      for (let i = 0; i < cuantosGrupos; i += 1) await pedirFlete.nth(i).check();
       await page.getByText('Base:').first().waitFor({ state: 'visible', timeout: 15_000 });
       visto = ((await seccion.textContent()) || '').replace(/\s+/g, ' ');
 
@@ -3686,6 +3751,7 @@ await runCase(44, 'El destino de la orden sale del padrón y las órdenes viejas
       shipping_locality_id: '00000000',
       shipping_postal_code: '2700',
       notes: 'Destino inventado',
+      shipping_decisions: trasladoPropio(),
     },
   }));
   assert(/padr/i.test(rechazo), `el rechazo no explica el motivo: ${rechazo}`);
@@ -3705,6 +3771,7 @@ await runCase(44, 'El destino de la orden sale del padrón y las órdenes viejas
       shipping_locality_id: destino,
       shipping_postal_code: '2700',
       notes: 'Orden con destino oficial',
+      shipping_decisions: trasladoPropio(),
     },
   });
   const [orden] = creada.data.orders;
@@ -3889,6 +3956,7 @@ await runCase(45, 'La escritura de un carrito abandonado no puede quedar última
     assert(!listado.includes(`Envío de ${vendedorDeA}`),
       `el listado sigue mostrando el carrito abandonado (${vendedorDeA})`);
 
+    await resolverTrasladoPropio(page);
     await page.getByRole('button', { name: /Continuar al Pago/ }).click();
     await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: 15_000 });
     const datosBancarios = page.locator('[class*="_confirmationInfo_"]');
@@ -4439,6 +4507,596 @@ await runCase(50, 'La misma regla vale para el refresco, sin emitir ni tocar coo
 
   return 'refresco con una sola credencial y con las dos iguales emite normalmente; '
     + 'contradictorio da 401 en los dos órdenes, sin emitir tokens y sin tocar cookies';
+});
+
+// --- escenario de logística compartido por los casos de la Pieza C ----------
+// Dos vendedores con orígenes distintos, un destino del padrón y dos
+// transportistas: uno que cubre las dos puntas de los dos grupos y otro que
+// sólo llega a uno. Con eso alcanza para probar elección, incompatibilidad e
+// inyección sin inventar cantidades del seed.
+async function prepararEscenarioDeFletes() {
+  const marca = Date.now();
+  const password = 'smoke123';
+  const localidad = (nombre, provincia) => {
+    const [fila] = queryRows(`
+      SELECT id FROM localities
+      WHERE name = ${sqlLiteral(nombre)} AND province_name = ${sqlLiteral(provincia)}
+      LIMIT 1
+    `);
+    assert(fila, `el padrón no tiene ${nombre}, ${provincia}`);
+    return fila[0];
+  };
+  const destino = localidad('Pergamino', 'Buenos Aires');
+  const origenA = localidad('Rosario', 'Santa Fe');
+  const origenB = localidad('Córdoba', 'Córdoba');
+  const km = (a, b) => Number(queryRows(`
+    SELECT ROUND((ST_Distance(x.coordinates, y.coordinates)/1000)::numeric, 1)
+    FROM localities x, localities y
+    WHERE x.id = ${sqlLiteral(a)} AND y.id = ${sqlLiteral(b)}
+  `)[0][0]);
+  const aRosario = km(destino, origenA);
+  const aCordoba = km(destino, origenB);
+  assert(aCordoba > aRosario, 'las distancias del padrón no son las esperadas');
+
+  const publicaciones = queryRows(`
+    SELECT p.id, p.seller_id, p.name, p.stock FROM products p
+    WHERE p.status = 'ACTIVE' AND p.stock > 0 AND p.publication_type <> 'servicio'
+    ORDER BY p.seller_id, p.id
+  `);
+  const primeraDeCada = new Map();
+  for (const [id, vendedor, nombre, stock] of publicaciones) {
+    if (!primeraDeCada.has(vendedor)) {
+      primeraDeCada.set(vendedor, { id, vendedor, nombre, stock: Number(stock) });
+    }
+  }
+  const [pedidoA, pedidoB] = [...primeraDeCada.values()].slice(0, 2);
+  assert(pedidoB, 'hacen falta dos vendedores con publicaciones activas');
+
+  const origenPrevio = {
+    [pedidoA.id]: queryRows(
+      `SELECT COALESCE(locality_id, '') FROM products WHERE id = ${sqlLiteral(pedidoA.id)}`)[0][0],
+    [pedidoB.id]: queryRows(
+      `SELECT COALESCE(locality_id, '') FROM products WHERE id = ${sqlLiteral(pedidoB.id)}`)[0][0],
+  };
+  querySql(`UPDATE products SET locality_id = ${sqlLiteral(origenA)} WHERE id = ${sqlLiteral(pedidoA.id)}`);
+  querySql(`UPDATE products SET locality_id = ${sqlLiteral(origenB)} WHERE id = ${sqlLiteral(pedidoB.id)}`);
+
+  const transportistas = {};
+  for (const [etiqueta, radio] of [
+    ['amplio', Math.ceil(aCordoba) + 20],
+    ['corto', Math.ceil(aRosario) + 5],
+  ]) {
+    const correo = `piezac.${etiqueta}.${marca}@example.com`;
+    await registrarYVerificar({
+      email: correo,
+      password,
+      full_name: `Flete ${etiqueta} ${marca}`,
+      phone: `+54 9 11 4000-${etiqueta === 'amplio' ? '0001' : '0002'}`,
+      whatsapp: `+54 9 11 4000-${etiqueta === 'amplio' ? '0001' : '0002'}`,
+      is_carrier: true,
+      carrier_base_locality_id: destino,
+      carrier_transport: `Camión ${etiqueta}`,
+      carrier_transport_certified: true,
+      carrier_certification_detail: `RUTA, cargas generales, N.° ${etiqueta.toUpperCase()}-${marca}`,
+      carrier_coverage_radius_km: radio,
+      carrier_capacity: '30 toneladas',
+    });
+    const sesion = await apiRequest('/auth/login', {
+      method: 'POST', body: { email: correo, password },
+    });
+    transportistas[etiqueta] = {
+      email: correo,
+      password,
+      token: sesion.data.access_token,
+      refresco: sesion.data.refresh_token,
+      id: queryRows(`SELECT id FROM users WHERE email = ${sqlLiteral(correo)}`)[0][0],
+      nombre: `Flete ${etiqueta} ${marca}`,
+    };
+  }
+
+  const restaurar = () => {
+    for (const [producto, previo] of Object.entries(origenPrevio)) {
+      querySql(`UPDATE products SET locality_id = ${previo ? sqlLiteral(previo) : 'NULL'} `
+        + `WHERE id = ${sqlLiteral(producto)}`);
+    }
+  };
+
+  return { destino, origenA, origenB, pedidoA, pedidoB, transportistas, restaurar, marca };
+}
+
+function nombreDeUsuario(id) {
+  return queryRows(`SELECT full_name FROM users WHERE id = ${sqlLiteral(id)}`)[0][0];
+}
+
+// Alembic donde vive la aplicación, igual que el seed y las consultas. Sus
+// avisos salen por stderr, así que se juntan las dos salidas: si sólo se
+// mirara stdout, una migración correcta parecería no haber corrido.
+function correrAlembic(comando) {
+  const corrida = spawnSync(
+    'docker',
+    ['exec', '-i', 'topgreen-api', 'alembic', ...comando.split(' ')],
+    { encoding: 'utf8' },
+  );
+  return `${corrida.stdout ?? ''}${corrida.stderr ?? ''}`;
+}
+
+function ordenesDe(usuario) {
+  return queryRows(`
+    SELECT o.id, o.seller_id, COALESCE(o.shipping_mode, '-'), COALESCE(o.carrier_id, '-')
+    FROM orders o WHERE o.buyer_id = ${sqlLiteral(usuario)}
+    ORDER BY o.created_at, o.id
+  `);
+}
+
+function stockDe(producto) {
+  return Number(queryRows(`SELECT stock FROM products WHERE id = ${sqlLiteral(producto)}`)[0][0]);
+}
+
+await runCase(51, 'Cada pedido resuelve su traslado y la decisión llega a la orden', async () => {
+  // Dos vendedores en el mismo carrito: uno se resuelve eligiendo
+  // transportista desde la interfaz y el otro por cuenta propia. La orden de
+  // cada uno tiene que guardar exactamente eso.
+  const escenario = await prepararEscenarioDeFletes();
+  const { destino, pedidoA, pedidoB, transportistas } = escenario;
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  const ordenesAntes = ordenesDe(state.buyerId).length;
+  const stockAntes = [stockDe(pedidoA.id), stockDe(pedidoB.id)];
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext();
+    await context.addInitScript(
+      ({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+        window.localStorage.removeItem('agromarket_cart');
+      },
+      { a: state.buyerToken, r: state.buyerRefreshToken },
+    );
+    const page = await context.newPage();
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+
+    for (const pedido of [pedidoA, pedidoB]) {
+      const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+      await buscador.fill(pedido.nombre);
+      await buscador.press('Enter');
+      await page.getByRole('heading', { name: pedido.nombre, exact: true, level: 3 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+      await page.getByRole('button', { name: /Agregar/ }).first().click();
+    }
+
+    await page.getByRole('button', { name: /Carrito/ }).click();
+    await page.getByRole('button', { name: 'Continuar compra' }).click();
+    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15_000 });
+    await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0404');
+    await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
+    await page.getByPlaceholder('2000').fill('2700');
+    await elegirDestino(page, 'Pergamino');
+
+    const seccion = page.locator('[class*="_fletes_"]');
+    await seccion.getByRole('radio', { name: /Coordino el traslado por mi cuenta/ })
+      .first().waitFor({ state: 'visible', timeout: 20_000 });
+
+    // Sin resolver, la interfaz no avanza.
+    await page.locator('form:has(h2) button[type="submit"]').click();
+    await page.waitForTimeout(800);
+    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ state: 'visible' });
+    assert(ordenesDe(state.buyerId).length === ordenesAntes,
+      'avanzó al pago sin resolver el traslado');
+
+    // Pedido del vendedor A: transportista elegido desde la pantalla.
+    const grupoA = seccion.locator('[class*="_fleteGrupo_"]')
+      .filter({ hasText: `Envío de ${nombreDeUsuario(pedidoA.vendedor)}` });
+    await grupoA.getByRole('radio', { name: /Necesito flete/ }).check();
+    await grupoA.getByRole('button', { name: new RegExp(`Seleccionar a ${transportistas.amplio.nombre}`) })
+      .click();
+    await grupoA.getByText('Transportista elegido').waitFor({ state: 'visible', timeout: 20_000 });
+
+    // Pedido del vendedor B: por cuenta propia.
+    const grupoB = seccion.locator('[class*="_fleteGrupo_"]')
+      .filter({ hasText: `Envío de ${nombreDeUsuario(pedidoB.vendedor)}` });
+    await grupoB.getByRole('radio', { name: /Coordino el traslado por mi cuenta/ }).check();
+
+    await page.locator('form:has(h2) button[type="submit"]').click();
+    await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: 20_000 });
+    await page.locator('input[value="bank_transfer"]').check();
+    await page.getByRole('button', { name: /Crear orden/ }).click();
+    await page.getByRole('heading', { name: /Transferencia bancaria/ })
+      .waitFor({ timeout: 20_000 });
+
+    const despues = ordenesDe(state.buyerId);
+    assert(despues.length === ordenesAntes + 2,
+      `esperaba 2 órdenes nuevas, hubo ${despues.length - ordenesAntes}`);
+    const nuevas = despues.slice(ordenesAntes);
+    const deA = nuevas.find(([, vendedor]) => vendedor === pedidoA.vendedor);
+    const deB = nuevas.find(([, vendedor]) => vendedor === pedidoB.vendedor);
+    assert(deA && deA[2] === 'carrier' && deA[3] === transportistas.amplio.id,
+      `la orden con transportista no guardó la decisión: ${JSON.stringify(deA)}`);
+    assert(deB && deB[2] === 'self' && deB[3] === '-',
+      `la orden por cuenta propia no guardó la decisión: ${JSON.stringify(deB)}`);
+    assert(stockDe(pedidoA.id) === stockAntes[0] && stockDe(pedidoB.id) === stockAntes[1],
+      'el checkout por transferencia movió stock, y no le toca');
+
+    return `2 pedidos, 2 decisiones distintas: ${transportistas.amplio.nombre} en uno y `
+      + 'cuenta propia en el otro; sin resolver no avanza y el stock queda intacto';
+  } finally {
+    await browser.close();
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    escenario.restaurar();
+  }
+});
+
+await runCase(52, 'El contacto aparece al elegir y desaparece cuando la elección deja de valer', async () => {
+  // Antes de elegir no hay contacto, ni en el JSON ni en la pantalla. Al
+  // elegir aparece, porque el servidor revalidó. Al quitar la selección, o al
+  // cambiar el destino, vuelve a desaparecer.
+  const escenario = await prepararEscenarioDeFletes();
+  const { destino, pedidoA, transportistas } = escenario;
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  await apiRequest('/cart/sync', {
+    method: 'POST', token: state.buyerToken,
+    body: { items: [{ product_id: pedidoA.id, quantity: 1 }] },
+  });
+
+  // 1. el listado, en JSON, no trae contacto de nadie
+  const listado = (await apiRequest(
+    `/logistics/compatible-carriers?destination_locality_id=${destino}`,
+    { token: state.buyerToken },
+  )).data;
+  const crudo = JSON.stringify(listado).toLowerCase();
+  for (const prohibido of ['email', 'phone', 'whatsapp', '@example.com', 'cbu', 'alias']) {
+    assert(!crudo.includes(prohibido), `el listado expone «${prohibido}»`);
+  }
+
+  // 2. al elegir, y sólo entonces, el servidor devuelve el contacto
+  const elegido = (await apiRequest('/logistics/select-carrier', {
+    method: 'POST', token: state.buyerToken,
+    body: {
+      destination_locality_id: destino,
+      seller_id: pedidoA.vendedor,
+      carrier_id: transportistas.amplio.id,
+    },
+  })).data;
+  assert(elegido.carrier.email === transportistas.amplio.email,
+    'la selección no devolvió el correo del transportista');
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext();
+    await context.addInitScript(
+      ({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+        window.localStorage.removeItem('agromarket_cart');
+      },
+      { a: state.buyerToken, r: state.buyerRefreshToken },
+    );
+    const page = await context.newPage();
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+    const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+    await buscador.fill(pedidoA.nombre);
+    await buscador.press('Enter');
+    await page.getByRole('heading', { name: pedidoA.nombre, exact: true, level: 3 })
+      .waitFor({ state: 'visible', timeout: 15_000 });
+    await page.getByRole('button', { name: /Agregar/ }).first().click();
+    await page.getByRole('button', { name: /Carrito/ }).click();
+    await page.getByRole('button', { name: 'Continuar compra' }).click();
+    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15_000 });
+    await elegirDestino(page, 'Pergamino');
+
+    const seccion = page.locator('[class*="_fletes_"]');
+    await seccion.getByRole('radio', { name: /Necesito flete/ }).first()
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    await seccion.getByRole('radio', { name: /Necesito flete/ }).first().check();
+    await page.getByText('Base:').first().waitFor({ state: 'visible', timeout: 20_000 });
+
+    const sinElegir = (await seccion.textContent()) || '';
+    assert(!sinElegir.includes(transportistas.amplio.email),
+      'el listado muestra el correo antes de elegir');
+    assert(!sinElegir.includes('4000-0001'),
+      'el listado muestra el teléfono antes de elegir');
+    assert(sinElegir.includes('Los datos de contacto aparecen cuando lo seleccionás'),
+      'no se avisa que el contacto aparece al seleccionar');
+
+    // 3. elegir desde la pantalla: ahora sí, contacto
+    await seccion.getByRole('button', {
+      name: new RegExp(`Seleccionar a ${transportistas.amplio.nombre}`),
+    }).click();
+    await seccion.getByText('Transportista elegido').waitFor({ state: 'visible', timeout: 20_000 });
+    const conElegido = (await seccion.textContent()) || '';
+    assert(conElegido.includes(transportistas.amplio.email),
+      'elegido y sin contacto a la vista');
+
+    // 4. quitar la selección lo vuelve a ocultar
+    await seccion.getByRole('button', { name: 'Quitar del pedido' }).click();
+    await page.waitForTimeout(500);
+    const trasQuitar = (await seccion.textContent()) || '';
+    assert(!trasQuitar.includes(transportistas.amplio.email),
+      'quitar la selección dejó el contacto a la vista');
+
+    // 5. y cambiar el destino también: lo elegido para otro viaje no vale
+    await seccion.getByRole('button', {
+      name: new RegExp(`Seleccionar a ${transportistas.amplio.nombre}`),
+    }).click();
+    await seccion.getByText('Transportista elegido').waitFor({ state: 'visible', timeout: 20_000 });
+    await elegirDestino(page, 'Rosario', '82');
+    await page.waitForTimeout(2500);
+    const trasCambiarDestino = (await seccion.textContent()) || '';
+    assert(!trasCambiarDestino.includes(transportistas.amplio.email),
+      'cambiar el destino conservó el contacto de la elección anterior');
+    assert(!trasCambiarDestino.includes('Transportista elegido'),
+      'cambiar el destino conservó la selección anterior');
+
+    return 'sin contacto en JSON ni DOM antes de elegir; presente al elegir; '
+      + 'oculto de nuevo al quitar la selección y al cambiar el destino';
+  } finally {
+    await browser.close();
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    escenario.restaurar();
+  }
+});
+
+await runCase(53, 'Una decisión inválida no deja media compra hecha', async () => {
+  // Todo lo que puede venir mal desde el cliente, junto: transportista que no
+  // cubre el viaje, transportista de otro grupo, decisión faltante, decisión
+  // de más, vendedor inventado y cuenta propia con transportista. Ninguna
+  // puede crear una orden ni mover una unidad de stock.
+  const escenario = await prepararEscenarioDeFletes();
+  const { destino, pedidoA, pedidoB, transportistas } = escenario;
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  await apiRequest('/cart/sync', {
+    method: 'POST', token: state.buyerToken,
+    body: {
+      items: [
+        { product_id: pedidoA.id, quantity: 1 },
+        { product_id: pedidoB.id, quantity: 1 },
+      ],
+    },
+  });
+
+  const ordenesAntes = ordenesDe(state.buyerId).length;
+  const stockAntes = [stockDe(pedidoA.id), stockDe(pedidoB.id)];
+  const sobre = (decisiones) => ({
+    shipping_address: 'Ruta 8 km 220',
+    shipping_locality_id: destino,
+    shipping_postal_code: '2700',
+    shipping_decisions: decisiones,
+  });
+  const propioA = { seller_id: pedidoA.vendedor, mode: 'self' };
+  const propioB = { seller_id: pedidoB.vendedor, mode: 'self' };
+
+  const intentos = [
+    ['falta una decisión', [propioA], /Falta decidir/i],
+    ['una decisión de más', [propioA, propioB, { seller_id: state.buyerId, mode: 'self' }],
+      /no está en el carrito/i],
+    ['vendedor inventado', [propioA, { seller_id: 'no-existe', mode: 'self' }],
+      /no está en el carrito/i],
+    ['dos decisiones para el mismo vendedor', [propioA, propioA, propioB],
+      /dos decisiones/i],
+    ['transportista sin elegir', [{ seller_id: pedidoA.vendedor, mode: 'carrier' }, propioB],
+      /Falta elegir el transportista/i],
+    ['cuenta propia con transportista',
+      [{ ...propioA, carrier_id: transportistas.amplio.id }, propioB],
+      /no puede llevar transportista/i],
+    ['transportista que no cubre el viaje',
+      [propioA, { seller_id: pedidoB.vendedor, mode: 'carrier', carrier_id: transportistas.corto.id }],
+      /ya no cubre este viaje/i],
+    ['transportista inventado',
+      [propioA, { seller_id: pedidoB.vendedor, mode: 'carrier', carrier_id: state.buyerId }],
+      /ya no cubre este viaje/i],
+  ];
+
+  for (const [rutas, endpoint] of [['transferencia', '/orders/checkout/transfer'],
+    ['Mercado Pago', '/orders/checkout']]) {
+    for (const [etiqueta, decisiones, esperado] of intentos) {
+      const motivo = await expectApiError(400, () => apiRequest(endpoint, {
+        method: 'POST', token: state.buyerToken, body: sobre(decisiones),
+      }));
+      assert(esperado.test(motivo),
+        `${rutas} / ${etiqueta}: motivo inesperado «${motivo}»`);
+      assert(ordenesDe(state.buyerId).length === ordenesAntes,
+        `${rutas} / ${etiqueta}: se creó una orden igual`);
+      assert(stockDe(pedidoA.id) === stockAntes[0] && stockDe(pedidoB.id) === stockAntes[1],
+        `${rutas} / ${etiqueta}: se movió stock`);
+    }
+  }
+
+  // El transportista corto sí sirve para el grupo que sí cubre: la
+  // incompatibilidad es del viaje, no del transportista.
+  const bueno = await apiRequest('/orders/checkout/transfer', {
+    method: 'POST', token: state.buyerToken,
+    body: sobre([
+      { seller_id: pedidoA.vendedor, mode: 'carrier', carrier_id: transportistas.corto.id },
+      propioB,
+    ]),
+  });
+  assert(bueno.status === 200, `la decisión válida falló: HTTP ${bueno.status}`);
+  const creadas = ordenesDe(state.buyerId).slice(ordenesAntes);
+  assert(creadas.length === 2, `esperaba 2 órdenes, hubo ${creadas.length}`);
+
+  escenario.restaurar();
+  return `${intentos.length} decisiones inválidas por cada checkout: 400 con motivo, `
+    + '0 órdenes nuevas y stock intacto; la válida crea las 2 órdenes';
+});
+
+await runCase(54, 'Cada participante ve lo suyo y el transportista sólo su necesidad logística', async () => {
+  // Las tres vistas sobre las mismas órdenes: comprador, vendedor y
+  // transportista elegido. Y un transportista ajeno, que no tiene que poder
+  // ni enumerar ni abrir la operación.
+  const escenario = await prepararEscenarioDeFletes();
+  const { destino, pedidoA, pedidoB, transportistas } = escenario;
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  await apiRequest('/cart/sync', {
+    method: 'POST', token: state.buyerToken,
+    body: {
+      items: [
+        // La cantidad sale del stock real, no de un número fijo: el seed
+        // publica de a una unidad en algunos casos.
+        { product_id: pedidoA.id, quantity: Math.min(2, pedidoA.stock) },
+        { product_id: pedidoB.id, quantity: 1 },
+      ],
+    },
+  });
+  const creadas = await apiRequest('/orders/checkout/transfer', {
+    method: 'POST', token: state.buyerToken,
+    body: {
+      shipping_address: 'Ruta 8 km 220',
+      shipping_locality_id: destino,
+      shipping_postal_code: '2700',
+      shipping_decisions: [
+        { seller_id: pedidoA.vendedor, mode: 'carrier', carrier_id: transportistas.amplio.id },
+        { seller_id: pedidoB.vendedor, mode: 'self' },
+      ],
+    },
+  });
+  assert(creadas.status === 200, `no se pudo crear el escenario: HTTP ${creadas.status}`);
+
+  try {
+    // --- comprador: ve su decisión y el contacto del transportista
+    const compras = (await apiRequest('/orders/my?as_role=buyer', { token: state.buyerToken })).data;
+    const conFlete = compras.find((o) => o.shipping?.mode === 'carrier');
+    const porSuCuenta = compras.find((o) => o.shipping?.mode === 'self');
+    assert(conFlete && conFlete.shipping.carrier_name === transportistas.amplio.nombre,
+      'el comprador no ve el transportista que eligió');
+    assert(conFlete.shipping.carrier_email === transportistas.amplio.email,
+      'el comprador no ve el contacto del transportista');
+    assert(porSuCuenta, 'el comprador no ve el pedido que coordina por su cuenta');
+    assert(!porSuCuenta.shipping.carrier_name,
+      'el pedido por cuenta propia inventó un transportista');
+
+    // --- vendedor: lo mismo, desde su venta
+    const vendedor = queryRows(
+      `SELECT email FROM users WHERE id = ${sqlLiteral(pedidoA.vendedor)}`)[0][0];
+    const { acceso: tokenVendedor } = emitirTokensDeSesion(vendedor);
+    const ventas = (await apiRequest('/orders/my?as_role=seller', { token: tokenVendedor })).data;
+    const venta = ventas.find((o) => o.shipping?.mode === 'carrier');
+    assert(venta && venta.shipping.carrier_email === transportistas.amplio.email,
+      'el vendedor no ve el transportista ni su contacto');
+
+    // --- transportista elegido: sólo necesidad logística
+    const operaciones = (await apiRequest('/logistics/my-operations',
+      { token: transportistas.amplio.token })).data.operations;
+    assert(operaciones.length >= 1, 'el transportista elegido no ve su operación');
+    const crudo = JSON.stringify(operaciones).toLowerCase();
+    for (const prohibido of ['price', 'amount', 'total', 'cbu', 'alias', 'receipt',
+      'phone', 'whatsapp', '@example.com', 'buyer']) {
+      assert(!crudo.includes(prohibido),
+        `la vista del transportista expone «${prohibido}»`);
+    }
+    const [operacion] = operaciones;
+    assert(operacion.items.every((item) => item.quantity > 0),
+      'la operación no dice cuánto hay que mover');
+    assert(operacion.destination && operacion.destination.name === 'Pergamino',
+      'la operación no dice a dónde va');
+    assert(operacion.origins.length > 0, 'la operación no dice de dónde sale');
+
+    // --- transportista ajeno: la operación no existe para él
+    await expectApiError(404, () => apiRequest(
+      `/logistics/my-operations/${operacion.order_id}`,
+      { token: transportistas.corto.token },
+    ));
+    const listaAjena = (await apiRequest('/logistics/my-operations',
+      { token: transportistas.corto.token })).data.operations;
+    assert(listaAjena.length === 0,
+      `un transportista ajeno enumeró ${listaAjena.length} operaciones`);
+
+    // --- y tampoco puede leer la orden por la puerta de las órdenes
+    await expectApiError(403, () => apiRequest(`/orders/${operacion.order_id}`,
+      { token: transportistas.amplio.token }));
+
+    // --- en pantalla: el panel del transportista tampoco muestra plata
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const context = await browser.newContext();
+      await context.addInitScript(
+        ({ a, r }) => {
+          window.localStorage.setItem('access_token', a);
+          window.localStorage.setItem('refresh_token', r);
+        },
+        { a: transportistas.amplio.token, r: transportistas.amplio.refresco },
+      );
+      const page = await context.newPage();
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.locator('button').filter({ hasText: '👤' }).first().click();
+      await page.getByRole('button', { name: /Mis Operaciones/ })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+      await page.getByRole('button', { name: /Mis Operaciones/ }).click();
+      await page.getByRole('heading', { name: 'Mis Operaciones' })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+      await page.getByText(/Operación #/).first().waitFor({ state: 'visible', timeout: 15_000 });
+      const visto = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
+      assert(visto.includes('Pergamino'), 'el panel no muestra el destino');
+      assert(!/\$\s?\d/.test(visto), `el panel del transportista muestra importes: "${visto.slice(0, 200)}"`);
+      for (const prohibido of ['CBU', 'Alias', 'comprobante', '@example.com']) {
+        assert(!visto.toLowerCase().includes(prohibido.toLowerCase()),
+          `el panel del transportista muestra «${prohibido}»`);
+      }
+    } finally {
+      await browser.close();
+    }
+
+    return 'comprador y vendedor ven la decisión y el contacto; el transportista elegido '
+      + 've origen, destino y cantidades sin un solo dato financiero; el ajeno recibe 404 '
+      + 'y lista vacía';
+  } finally {
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    escenario.restaurar();
+  }
+});
+
+await runCase(55, 'Una orden anterior a la logística sigue legible y la migración vuelve atrás', async () => {
+  // Las órdenes que existían antes no tienen decisión, y eso NO es cuenta
+  // propia: nadie declaró nada. Tienen que seguir leyéndose y decirlo así.
+  const [antigua] = queryRows(`
+    SELECT o.id, o.buyer_id FROM orders o
+    WHERE o.shipping_mode IS NULL
+    ORDER BY o.created_at LIMIT 1
+  `);
+  let idAntigua = antigua ? antigua[0] : null;
+  if (!idAntigua) {
+    // Si todas las órdenes de esta corrida ya tienen decisión, se fabrica el
+    // estado histórico en la base, que es exactamente lo que dejó la
+    // migración en las órdenes viejas.
+    const [fila] = queryRows(`
+      SELECT id FROM orders WHERE buyer_id = ${sqlLiteral(state.buyerId)}
+      ORDER BY created_at DESC LIMIT 1
+    `);
+    assert(fila, 'no hay ninguna orden para volver histórica');
+    idAntigua = fila[0];
+    querySql(`UPDATE orders SET shipping_mode = NULL, carrier_id = NULL `
+      + `WHERE id = ${sqlLiteral(idAntigua)}`);
+  }
+
+  const detalle = (await apiRequest(`/orders/${idAntigua}`, { token: state.buyerToken })).data;
+  assert(detalle.order_number, 'una orden sin decisión dejó de leerse');
+  assert(!detalle.shipping?.mode,
+    `una orden sin decisión se reinterpretó como «${detalle.shipping?.mode}»`);
+  assert(!detalle.shipping?.carrier_name,
+    'una orden sin decisión inventó un transportista');
+
+  const listado = (await apiRequest('/orders/my?as_role=buyer', { token: state.buyerToken })).data;
+  const enListado = listado.find((o) => o.id === idAntigua);
+  assert(enListado && !enListado.shipping?.mode,
+    'en el listado, la orden sin decisión no se lee igual');
+
+  // La migración va y vuelve, con datos adentro. El upgrade corre sí o sí:
+  // dejar la base a mitad de camino rompería todo lo que venga después.
+  const bajada = correrAlembic('downgrade -1');
+  const subida = correrAlembic('upgrade head');
+  assert(/Running downgrade/.test(bajada), `el downgrade no corrió: ${bajada.slice(-200)}`);
+  assert(/Running upgrade/.test(subida), `el upgrade no corrió: ${subida.slice(-200)}`);
+  const limpio = correrAlembic('check');
+  assert(/No new upgrade operations detected/.test(limpio),
+    `alembic check encontró diferencias: ${limpio.slice(-200)}`);
+
+  const trasVolver = (await apiRequest(`/orders/${idAntigua}`, { token: state.buyerToken })).data;
+  assert(trasVolver.order_number === detalle.order_number,
+    'la orden dejó de leerse después de ir y volver la migración');
+
+  return 'orden sin decisión legible en detalle y listado, sin reinterpretarse como cuenta '
+    + 'propia; downgrade y upgrade con datos adentro y `alembic check` sin diferencias';
 });
 
 const passed = results.filter((result) => result.passed).length;

@@ -50,6 +50,30 @@ interface FletesCompatibles {
   groups: GrupoDeFletes[];
 }
 
+/**
+ * El transportista ya elegido, con el contacto que el listado no trae. Sólo
+ * llega desde el servidor, después de que revalidó que cubre este grupo.
+ */
+interface TransportistaElegido extends TransportistaCompatible {
+  email: string;
+  phone?: string;
+  whatsapp?: string;
+}
+
+interface RespuestaDeSeleccion {
+  seller_id: string;
+  seller_name: string;
+  carrier: TransportistaElegido;
+}
+
+/**
+ * Qué decidió el comprador para un pedido. Sin entrada en el mapa, no decidió
+ * nada todavía: ese es el tercer estado y es el que no deja avanzar.
+ */
+type DecisionDeTraslado =
+  | { modo: 'self' }
+  | { modo: 'carrier'; elegido?: TransportistaElegido };
+
 type CheckoutStep = 'shipping' | 'payment' | 'transfer';
 
 interface BankTransferOption {
@@ -97,6 +121,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
   const [fletes, setFletes] = useState<FletesCompatibles | null>(null);
   const [fletesCargando, setFletesCargando] = useState(false);
   const [fletesError, setFletesError] = useState('');
+  // Una decisión por pedido. Se vacía entero cuando cambia el destino o el
+  // carrito: lo que se eligió para otro viaje no vale para éste, y el contacto
+  // que se había revelado deja de mostrarse.
+  const [decisiones, setDecisiones] = useState<Record<string, DecisionDeTraslado>>({});
+  const [seleccionando, setSeleccionando] = useState('');
+  const [erroresDeSeleccion, setErroresDeSeleccion] = useState<Record<string, string>>({});
   // Cada consulta de fletes lleva número, y el número cubre la sincronización
   // y la búsqueda: una respuesta tardía de un destino o de un carrito
   // anteriores no puede pisar el resultado vigente.
@@ -177,8 +207,92 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     })();
   }, [shippingData.localityId, retratoDelCarrito, sincronizarConServidor]);
 
+  // Cambiar destino, productos, cantidades o vendedor invalida lo decidido.
+  // No se conserva "lo que ya había elegido" para el viaje nuevo: sería
+  // afirmar una compatibilidad que nadie comprobó, y dejar a la vista un
+  // contacto que se reveló para otra cosa.
+  useEffect(() => {
+    setDecisiones({});
+    setErroresDeSeleccion({});
+    setSeleccionando('');
+  }, [shippingData.localityId, retratoDelCarrito]);
+
+  const decidir = (vendedor: string, decision: DecisionDeTraslado) => {
+    setErroresDeSeleccion((actuales) => ({ ...actuales, [vendedor]: '' }));
+    setDecisiones((actuales) => ({ ...actuales, [vendedor]: decision }));
+  };
+
+  const elegirTransportista = async (vendedor: string, transportista: string) => {
+    // La misma generación que la búsqueda: si mientras se confirmaba cambió el
+    // destino o el carrito, esta respuesta llega tarde y no puede devolver una
+    // selección —ni un contacto— que ya se invalidó.
+    const consulta = consultaDeFletes.current;
+    setSeleccionando(`${vendedor}:${transportista}`);
+    setErroresDeSeleccion((actuales) => ({ ...actuales, [vendedor]: '' }));
+    try {
+      const respuesta = await apiFetch<RespuestaDeSeleccion>('/logistics/select-carrier', {
+        method: 'POST',
+        body: JSON.stringify({
+          destination_locality_id: shippingData.localityId,
+          seller_id: vendedor,
+          carrier_id: transportista,
+        }),
+      });
+      if (consultaDeFletes.current !== consulta) return;
+      setDecisiones((actuales) => ({
+        ...actuales,
+        [vendedor]: { modo: 'carrier', elegido: respuesta.carrier },
+      }));
+    } catch (err) {
+      if (consultaDeFletes.current !== consulta) return;
+      setErroresDeSeleccion((actuales) => ({
+        ...actuales,
+        [vendedor]: err instanceof Error ? err.message : 'No se pudo elegir el transportista',
+      }));
+    } finally {
+      if (consultaDeFletes.current === consulta) setSeleccionando('');
+    }
+  };
+
+  const decisionResuelta = (vendedor: string) => {
+    const decision = decisiones[vendedor];
+    if (!decision) return false;
+    return decision.modo === 'self' || Boolean(decision.elegido);
+  };
+
+  // Ningún pedido puede quedar en "necesito flete pero no elegí": eso no es
+  // una decisión, es la mitad de una.
+  const pedidosSinResolver = (fletes?.groups ?? []).filter(
+    (grupo) => !decisionResuelta(grupo.seller_id),
+  );
+  const trasladoResuelto = Boolean(fletes) && pedidosSinResolver.length === 0;
+
+  // Un pedido sin decidir NO se manda como cuenta propia: se omite, y el
+  // servidor lo rechaza por nombre. Suponer una decisión que nadie tomó sería
+  // peor que fallar, sobre todo si el carrito cambió después del paso de envío.
+  const decisionesParaElServidor = () => (fletes?.groups ?? []).flatMap((grupo) => {
+    const decision = decisiones[grupo.seller_id];
+    if (!decision) return [];
+    return [{
+      seller_id: grupo.seller_id,
+      mode: decision.modo,
+      carrier_id: decision.modo === 'carrier' ? decision.elegido?.id : undefined,
+    }];
+  });
+
   const handleShippingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!trasladoResuelto) {
+      setError(
+        fletes
+          ? `Falta decidir cómo se traslada ${pedidosSinResolver.length === 1
+              ? 'un pedido'
+              : `${pedidosSinResolver.length} pedidos`}.`
+          : 'Elegí el destino para poder resolver el traslado.',
+      );
+      return;
+    }
+    setError('');
     setCurrentStep('payment');
     void selectBankTransfer();
   };
@@ -245,6 +359,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         // mandan como texto porque no son dato del cliente.
         shipping_locality_id: shippingData.localityId,
         shipping_postal_code: shippingData.postalCode,
+        // Una decisión por pedido. El servidor vuelve a derivar los grupos y a
+        // revalidar cada transportista: esto es lo que el comprador dijo, no
+        // una verdad.
+        shipping_decisions: decisionesParaElServidor(),
         notes: shippingData.notes || `Tel: ${shippingData.phone}`
       };
 
@@ -280,17 +398,99 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
       : fecha.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
+  /** Una tarjeta del directorio: quién cubre el viaje, sin contacto. */
+  const tarjetaDeCandidato = (
+    grupo: GrupoDeFletes,
+    carrier: TransportistaCompatible,
+  ) => (
+    <li key={carrier.id} className={styles.fleteTarjeta}>
+      <p className={styles.fleteNombre}>{carrier.full_name}</p>
+      <p className={styles.fleteDato}>
+        Base: {carrier.base_locality_name}, {carrier.base_province_name}
+        {' · '}radio declarado {carrier.coverage_radius_km} km
+      </p>
+      <p className={styles.fleteDato}>{carrier.transport}</p>
+      {carrier.capacity && (
+        <p className={styles.fleteDato}>Capacidad: {carrier.capacity}</p>
+      )}
+      <p className={styles.fleteDato}>
+        A {carrier.distance_to_destination_km} km del destino
+        {carrier.distances_to_origins.map((d) => (
+          <span key={d.locality_id}> · a {d.distance_km} km de {d.name}</span>
+        ))}
+      </p>
+      <p className={styles.fleteDeclaracion}>
+        Declara: {carrier.certification_detail}
+        {' ('}declarado el {fechaDeDeclaracion(carrier.certification_declared_at)}
+        {'). '}
+        TopGreen no verifica esta habilitación.
+      </p>
+      <p className={styles.fleteSinContacto}>
+        Los datos de contacto aparecen cuando lo seleccionás.
+      </p>
+      <button
+        type="button"
+        className={styles.fleteElegir}
+        disabled={seleccionando !== ''}
+        onClick={() => void elegirTransportista(grupo.seller_id, carrier.id)}
+      >
+        {seleccionando === `${grupo.seller_id}:${carrier.id}`
+          ? 'Seleccionando…'
+          : `Seleccionar a ${carrier.full_name}`}
+      </button>
+    </li>
+  );
+
+  /** El transportista ya elegido para un pedido, con su contacto. */
+  const bloqueDelElegido = (grupo: GrupoDeFletes, elegido: TransportistaElegido) => (
+    <div className={styles.fleteElegido}>
+      <p className={styles.fleteEtiqueta}>Transportista elegido</p>
+      <p className={styles.fleteNombre}>{elegido.full_name}</p>
+      <p className={styles.fleteDato}>
+        Base: {elegido.base_locality_name}, {elegido.base_province_name}
+        {' · '}{elegido.transport}
+      </p>
+      {elegido.capacity && (
+        <p className={styles.fleteDato}>Capacidad: {elegido.capacity}</p>
+      )}
+      <p className={styles.fleteContacto}>
+        {elegido.email}
+        {elegido.phone && ` · ${elegido.phone}`}
+        {elegido.whatsapp && elegido.whatsapp !== elegido.phone
+          && ` · WhatsApp ${elegido.whatsapp}`}
+      </p>
+      <p className={styles.fleteDeclaracion}>
+        Declara: {elegido.certification_detail}
+        {' ('}declarado el {fechaDeDeclaracion(elegido.certification_declared_at)}
+        {'). '}
+        TopGreen no verifica esta habilitación.
+      </p>
+      <p className={styles.fleteNota}>
+        La coordinación y el precio del flete se acuerdan directamente.
+      </p>
+      <div className={styles.fleteAcciones}>
+        <button
+          type="button"
+          className={styles.fleteQuitar}
+          onClick={() => decidir(grupo.seller_id, { modo: 'carrier' })}
+        >
+          Quitar del pedido
+        </button>
+      </div>
+    </div>
+  );
+
   /**
-   * Transportistas que cubren el viaje, uno por futura orden. Es un directorio:
-   * no ordena por «mejor», no puntúa y no muestra datos de contacto. Elegir
-   * transportista todavía no existe.
+   * El traslado, pedido por pedido. Cada futura orden se resuelve con una de
+   * dos decisiones y no hay tercera: transportista elegido, o el comprador
+   * coordina. Antes de elegir no se muestra ningún dato de contacto.
    */
   const renderFletes = () => {
     if (!shippingData.localityId) return null;
 
     return (
       <section className={styles.fletes} aria-live="polite">
-        <h3 className={styles.fletesTitulo}>Transportistas que cubren el viaje</h3>
+        <h3 className={styles.fletesTitulo}>Cómo se traslada cada pedido</h3>
 
         {fletesCargando && <p className={styles.fleteAviso}>Buscando transportistas…</p>}
 
@@ -298,60 +498,95 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
           <p className={styles.fleteAviso} role="alert">⚠️ {fletesError}</p>
         )}
 
-        {!fletesCargando && !fletesError && fletes?.groups.map((grupo) => (
-          <div key={grupo.seller_id} className={styles.fleteGrupo}>
-            <h4 className={styles.fleteGrupoTitulo}>
-              Envío de {grupo.seller_name}
-              {grupo.origins.length > 0 && (
-                <span className={styles.fleteOrigenes}>
-                  {' '}desde {grupo.origins.map((o) => `${o.name}, ${o.province_name}`).join(' y ')}
-                </span>
-              )}
-            </h4>
+        {!fletesCargando && !fletesError && fletes?.groups.map((grupo) => {
+          const decision = decisiones[grupo.seller_id];
+          const puedeLlevarFlete = !grupo.origin_missing;
+          const grupoId = `traslado-${grupo.seller_id}`;
+          return (
+            <div key={grupo.seller_id} className={styles.fleteGrupo}>
+              <h4 className={styles.fleteGrupoTitulo}>
+                Envío de {grupo.seller_name}
+                {grupo.origins.length > 0 && (
+                  <span className={styles.fleteOrigenes}>
+                    {' '}desde {grupo.origins.map((o) => `${o.name}, ${o.province_name}`).join(' y ')}
+                  </span>
+                )}
+              </h4>
 
-            {grupo.origin_missing ? (
-              <p className={styles.fleteAviso}>
-                Este vendedor todavía no cargó la localidad oficial de alguna de sus
-                publicaciones, así que no podemos calcular qué transportistas cubren el viaje.
-              </p>
-            ) : grupo.carriers.length === 0 ? (
-              <p className={styles.fleteAviso}>
-                Ningún transportista declara cubrir este destino y este origen.
-              </p>
-            ) : (
-              <ul className={styles.fleteLista}>
-                {grupo.carriers.map((carrier) => (
-                  <li key={carrier.id} className={styles.fleteTarjeta}>
-                    <p className={styles.fleteNombre}>{carrier.full_name}</p>
-                    <p className={styles.fleteDato}>
-                      Base: {carrier.base_locality_name}, {carrier.base_province_name}
-                      {' · '}radio declarado {carrier.coverage_radius_km} km
-                    </p>
-                    <p className={styles.fleteDato}>{carrier.transport}</p>
-                    {carrier.capacity && (
-                      <p className={styles.fleteDato}>Capacidad: {carrier.capacity}</p>
-                    )}
-                    <p className={styles.fleteDato}>
-                      A {carrier.distance_to_destination_km} km del destino
-                      {carrier.distances_to_origins.map((d) => (
-                        <span key={d.locality_id}> · a {d.distance_km} km de {d.name}</span>
-                      ))}
-                    </p>
-                    <p className={styles.fleteDeclaracion}>
-                      Declara: {carrier.certification_detail}
-                      {' ('}declarado el {fechaDeDeclaracion(carrier.certification_declared_at)}
-                      {'). '}
-                      TopGreen no verifica esta habilitación.
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
+              {grupo.origin_missing && (
+                <p className={styles.fleteAviso}>
+                  Este vendedor todavía no cargó la localidad oficial de alguna de sus
+                  publicaciones, así que no podemos calcular qué transportistas cubren el
+                  viaje. Sólo podés seguir coordinando el traslado por tu cuenta.
+                </p>
+              )}
+
+              <div className={styles.fleteOpciones} role="radiogroup" aria-label={`Traslado del envío de ${grupo.seller_name}`}>
+                {puedeLlevarFlete && (
+                  <label className={styles.fleteOpcion}>
+                    <input
+                      type="radio"
+                      name={grupoId}
+                      checked={decision?.modo === 'carrier'}
+                      onChange={() => decidir(grupo.seller_id, { modo: 'carrier' })}
+                    />
+                    <span>
+                      <strong>Necesito flete</strong>
+                      <span className={styles.fleteOpcionAyuda}>
+                        Elegís un transportista que cubre este tramo.
+                      </span>
+                    </span>
+                  </label>
+                )}
+                <label className={styles.fleteOpcion}>
+                  <input
+                    type="radio"
+                    name={grupoId}
+                    checked={decision?.modo === 'self'}
+                    onChange={() => decidir(grupo.seller_id, { modo: 'self' })}
+                  />
+                  <span>
+                    <strong>Coordino el traslado por mi cuenta</strong>
+                    <span className={styles.fleteOpcionAyuda}>
+                      Seguís al pago sin elegir transportista.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              {erroresDeSeleccion[grupo.seller_id] && (
+                <p className={styles.fleteAviso} role="alert">
+                  ⚠️ {erroresDeSeleccion[grupo.seller_id]}
+                </p>
+              )}
+
+              {decision?.modo === 'carrier' && decision.elegido
+                && bloqueDelElegido(grupo, decision.elegido)}
+
+              {decision?.modo === 'carrier' && !decision.elegido && (
+                grupo.carriers.length === 0 ? (
+                  <p className={styles.fleteAviso}>
+                    Ningún transportista declara cubrir este destino y este origen.
+                    Probá con otro destino, o coordiná el traslado por tu cuenta.
+                  </p>
+                ) : (
+                  <ul className={styles.fleteLista}>
+                    {grupo.carriers.map((carrier) => tarjetaDeCandidato(grupo, carrier))}
+                  </ul>
+                )
+              )}
+
+              {!decision && (
+                <p className={styles.fletePendiente}>
+                  Todavía no dijiste cómo se traslada este pedido.
+                </p>
+              )}
+            </div>
+          );
+        })}
 
         <p className={styles.fleteNota}>
-          Las distancias son en línea recta. Todavía no se elige transportista desde acá.
+          Distancias estimadas en línea recta.
         </p>
       </section>
     );
