@@ -1584,3 +1584,54 @@ mensajería, planes ni Railway.
 Si los dos checkouts no pueden validar todas las decisiones antes de la primera
 escritura, frená con el caso concreto: no aceptamos compensar órdenes parciales
 después. Entregá commit de producto e informe separado; ahí vuelve a PM.
+
+### Primera revisión PM de `ecfaa4c`: todavía no aceptada
+
+La arquitectura general, la revalidación compartida, la atomicidad previa a la
+primera fila y los límites de las tres vistas quedan conformes. Build, sintaxis
+Python y `diff --check` independientes verdes. No reescribas esas partes.
+
+Quedan dos defectos funcionales concretos:
+
+1. **Una selección tardía restaura una decisión descartada.**
+   `elegirTransportista` sólo compara la generación de destino/carrito. Si el
+   POST está en vuelo y la persona cambia ese grupo a “coordino por mi cuenta”,
+   la generación no cambia; cuando llega la respuesta, vuelve a guardar modo
+   `carrier` y revela el contacto. El caso 52 espera cada respuesta y por eso no
+   cubre la carrera.
+2. **El origen de una operación histórica es mutable.** `_operacion` recorre
+   `item.product.locality`, que es la localidad actual de la publicación. El
+   vendedor puede editarla después de la compra y el transportista pasa a ver
+   otro punto de retiro. Nombre y cantidad ya son snapshots; el origen de la
+   carga también debe representar el momento de la orden.
+
+Corregí únicamente esos dos puntos:
+
+- Cada cambio de decisión de un grupo —por cuenta propia, quitar, cambiar o una
+  nueva selección— invalida cualquier selección anterior en vuelo para ese
+  grupo. Una respuesta tardía puede terminar en red, pero no cambiar la decisión
+  ni volver a mostrar contacto. No hace falta bloquear toda la pantalla.
+- Guardá por ítem de orden el origen oficial usado al confirmar. Debe ser un
+  snapshot estructurado y legible aunque después cambie la publicación. Las
+  operaciones nuevas lo leen de ahí; los ítems históricos sin snapshot siguen
+  legibles sin inventar origen. Migración reversible y sin reinterpretar datos
+  anteriores.
+
+### Regresiones exigidas
+
+1. Retené determinísticamente la respuesta de `/logistics/select-carrier`,
+   elegí “por cuenta propia” antes de liberarla y comprobá que, al llegar, sigue
+   modo propio, no aparece contacto y el checkout envía `self`. La prueba debe
+   ponerse roja con `ecfaa4c`; no uses tiempos naturales de red.
+2. Creá una orden con transportista y origen A, cambiá después la localidad de
+   la publicación a B y comprobá por API y DOM del transportista que la
+   operación conserva A. Restaurá la publicación al terminar.
+3. Una orden/ítem anterior sin snapshot de origen sigue siendo legible y no se
+   presenta falsamente como A ni B. Probá downgrade/upgrade y `alembic check`.
+
+Conservá los casos 51–55; ajustá el inventario sólo si agregás una ruta visual
+permanente, no por sumar regresiones dentro de una ruta existente. Corré casos
+enfocados, suite completa, build, puertas visuales proporcionales y
+`diff --check`. No agregues restricciones, snapshots de contacto, estados
+logísticos ni dependencias fuera de estos dos defectos. Entregá commit de
+producto e informe separado; ahí vuelve a PM.

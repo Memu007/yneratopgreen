@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-08-11.
+Actualizado: 2026-08-12.
 
 ## Entrega aceptada y tarea actual
 
@@ -22,13 +22,6 @@ PM tuvo que desplegar Backend manualmente. El entorno sigue siendo descartable;
 no se puede usar su estado verde como prueba de que los próximos cambios de
 backend se publicaron.
 
-La dev entregó el bloque largo de compatibilidad en producto `e3fe9cb` e
-informe `e063c18`, pero **todavía no está aceptado**. La revisión PM encontró un
-falso verde funcional: la pantalla consulta los transportistas compatibles
-antes de sincronizar con el servidor el carrito local que la persona está
-viendo. La prueba lo oculta porque prepara previamente el carrito por API; en
-uso normal puede responder “carrito vacío” o usar una compra anterior.
-
 La Pieza B de logística queda **aceptada**: producto inicial `e3fe9cb`, cierre
 de identidad `93ea92c` e informe final `8dc9543`. Los casos 43, 45, 47 y 48 ya
 fuerzan carrito visible, desmontaje, orden inverso y cambio de cuenta. La PM
@@ -42,12 +35,21 @@ escribir; la misma regla cubre access, refresh y la dependencia opcional. La PM
 obtuvo build independiente, sintaxis Python y `diff --check` verdes. La dev
 informa suite 50/50; no se repitió accesibilidad porque no cambió interfaz.
 
-**Tarea activa única de la dev, bloque largo:** cerrar la Pieza C de logística:
-decisión explícita por cada futura orden, selección segura del transportista,
-contacto sólo después de seleccionar, persistencia en la orden y vistas
-limitadas para comprador, vendedor y transportista. Es un bloque de privacidad
-y checkout; sigue justificando esfuerzo Extra. No incluye tarifa, cobro del
-flete, estados logísticos ni ruteo. El criterio exacto está al final de
+La Dev entregó la Pieza C en producto `ecfaa4c` e informe `a374aa6`. La
+estructura general, autorización, atomicidad y privacidad está bien encaminada;
+build, sintaxis Python y `diff --check` independientes quedaron verdes. **Aún no
+se acepta** por dos falsos verdes no cubiertos por los 55 casos informados:
+
+- una respuesta tardía de “Seleccionar” puede sobrescribir la decisión posterior
+  “por cuenta propia” y volver a mostrar contacto;
+- la operación asignada deriva el origen desde la localidad actual del producto,
+  no desde la compra, por lo que editar una publicación puede cambiar el punto
+  de retiro de una operación histórica.
+
+**Tarea activa única de la dev:** corregir esas dos carreras históricas dentro
+de la misma Pieza C y agregar regresiones deterministas. No se reabren el diseño,
+la autorización, PostGIS, pagos ni el resto de la migración. Sigue justificando
+esfuerzo Extra hasta cerrar esta revisión. El criterio exacto está al final de
 `PARA-DEV.md`.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
