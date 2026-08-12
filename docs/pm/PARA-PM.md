@@ -6,125 +6,160 @@ Fecha: 2026-08-12.
 
 ## 1. Resultado
 
-**Hecho.** El commit es **`70b0d7b`**, sobre `bd87b76`; este informe va aparte y
-encima. La suite pasa de 48 a **50 casos**.
+**Pieza C entregada.** El commit es **`ecfaa4c`**, sobre `15cb3e8`; este informe
+va aparte y encima.
 
-No corrí accesibilidad ni contraste: no hay una línea de interfaz en el diff.
-Los tres archivos tocados son `dependencies.py`, `auth.py` y la suite.
+| Puerta | Antes | Ahora |
+|---|---|---|
+| Suite | 50 | **55/55** |
+| Accesibilidad | 52 pantallas | **56/56** (28 rutas × 2) |
+| Contraste | 36 mediciones | **40/40** (20 rutas × 2) |
 
-## 2. La regla
+La aritmética del inventario: dos rutas nuevas de accesibilidad —«checkout:
+transportista elegido» y «panel: operaciones del transportista»— por dos
+medidas, 52 + 4 = **56**. La de fletes cambió de nombre, no de cantidad:
+«checkout: fletes compatibles» pasó a «checkout: traslado del pedido», porque
+eso es lo que la pantalla hace ahora. En contraste entraron las mismas dos
+pantallas: 36 + 4 = **40**.
 
-Una sola función decide, y la usan los tres puntos que leen credenciales: la
-dependencia de los endpoints protegidos, el refresco y la dependencia opcional.
+## 2. La decisión, y dónde se comprueba
 
-Cookie y header **dejan de tener orden de preferencia**. Si vienen los dos y no
-son el mismo token, la petición no tiene una identidad —tiene dos— y se corta
-con 401 **antes de decodificar nada, antes de mirar la base y sin decir cuál de
-las dos servía**. No se intenta seguir con la otra.
+Cada futura orden se resuelve con una de dos decisiones y no hay tercera. El
+tercer estado —«necesito flete pero no elegí»— no existe: es la ausencia de
+decisión, y no deja avanzar.
 
-Lo demás queda como estaba: una sola credencial funciona igual, vaya en la
-cookie o en el header; las dos iguales resuelven una vez como esa identidad; y
-no toqué tokens, expiraciones, cookies, `localStorage`, roles, CORS ni
-criptografía.
+**La regla de compatibilidad vive en una sola constante SQL** y se pregunta dos
+veces, al elegir y al confirmar. No son dos consultas parecidas que puedan
+separarse con el tiempo: es la misma. Eso importa porque el enunciado pide
+exactamente que un cambio de perfil, radio, origen o destino entre los dos
+pasos produzca un error visible, y sólo se puede garantizar si la pregunta es
+literalmente una.
 
-**La dependencia opcional no rechaza: queda anónima.** Ahí no estar autenticado
-es una respuesta válida, y personalizar sería justo lo que no se puede hacer,
-elegir una de las dos. Aviso algo que encontré al implementarla: **hoy no la
-usa ningún endpoint**. Está declarada y nada la consume. La corregí igual, para
-que el día que se use no traiga el agujero puesto.
+**Lo que manda el cliente al elegir es un id y nada más.** El grupo, sus
+orígenes y el destino los vuelve a derivar el servidor del carrito. Los
+candidatos que el navegador haya visto no son fuente de nada.
 
-## 3. La evidencia
+**El contacto aparece después de revalidar, no antes.** El listado no trae
+email, teléfono ni WhatsApp: la ausencia está en el schema, no en el criterio
+de quien arme la pantalla.
 
-**Caso 49**, acceso, con dos cuentas reales, sobre una lectura (`/auth/me`) y
-una escritura (`/cart/sync`):
+## 3. Atomicidad
 
-| Credenciales | Resultado |
-|---|---|
-| sólo header A | 200, identidad A |
-| sólo cookie A | 200, identidad A |
-| las dos, mismo token A | 200, identidad A |
-| header A + cookie B | **401** |
-| header B + cookie A | **401** |
+Las decisiones se resuelven **antes de la primera fila**, en los dos checkouts.
+El caso 53 tira ocho formas de romperlo contra cada uno —falta una decisión,
+sobra una, vendedor inventado, dos decisiones para el mismo vendedor,
+transportista sin elegir, cuenta propia con transportista, transportista que no
+cubre el viaje, transportista inexistente— y después de las dieciséis
+comprobaciones el conteo de órdenes y el stock están donde estaban.
 
-De los dos rechazos se exige, además: mismo motivo en los dos sentidos —si
-cambiara, el orden estaría diciendo cuál valía—, que el motivo no nombre
-ninguna cuenta ni devuelva parte de ningún token, y que **los dos carritos
-queden byte por byte como estaban**. La escritura contradictoria pide guardar
-un tercer producto con cantidad 7; después del 401 no aparece en ninguno de los
-dos carritos.
+Un detalle que la prueba deja explícito: el transportista que **no** sirve para
+un grupo sí sirve para el otro. La incompatibilidad es del viaje, no de la
+persona.
 
-**Caso 50**, la misma matriz sobre `/auth/refresh` con refresh tokens. Con una
-sola credencial y con las dos iguales emite normalmente; contradictorio da 401,
-**no emite tokens** y **la respuesta no trae un solo `Set-Cookie`**.
+## 4. Los tres límites de privacidad
 
-**La dependencia opcional** se mide donde vive, llamándola con peticiones
-armadas a mano, porque no tiene superficie HTTP:
+- **Comprador y vendedor** ven la decisión y, si hubo transportista, su
+  contacto. Los dos lo mismo: el vendedor tiene que poder coordinar el retiro.
+- **Transportista elegido**: origen, destino, artículos y cantidades. El caso 54
+  busca en su JSON `price`, `amount`, `total`, `cbu`, `alias`, `receipt`,
+  `phone`, `whatsapp`, `@example.com` y `buyer`, y en su pantalla cualquier
+  cosa con signo peso. Nada.
+- **Transportista ajeno**: **404**, no 403, y lista vacía. A quien no le
+  corresponde tampoco le corresponde saber que la operación existe. Tampoco
+  puede entrar por la puerta de las órdenes: ahí recibe 403, porque no es ni
+  comprador ni vendedor.
 
-```text
-solo_cookie → cliente@ejemplo.com     iguales   → cliente@ejemplo.com
-solo_header → null (como antes)       conflicto → null, en los dos órdenes
-```
+## 5. Tres decisiones que tomé y te tengo que contar
 
-**Rojo forzado**, con los dos archivos del backend devueltos a su estado
-anterior y nada más cambiado:
+**Saqué el estado de la orden de la vista del transportista.** Lo había puesto
+y la prueba lo cazó: hoy ese estado dice cosas como «esperando comprobante»,
+que es la etapa del **pago**. No le corresponde. Quedó afuera. Si querés que el
+transportista vea algún estado, hay que inventar uno logístico, y eso es
+maquinaria que excluiste.
 
-```text
-[FAIL] 49 — header A + cookie B: la API respondió HTTP 200 en vez de 401
-[FAIL] 50 — header A + cookie B: HTTP 200 en vez de 401
-```
+**Le dejé el nombre del vendedor.** Tu enumeración decía «origen, destino,
+artículos y cantidades». El nombre no estaba. Se lo puse igual: el origen de un
+retiro es un lugar y también una persona, y sin eso la vista no sirve para
+coordinar nada. Va sin contacto y sin un solo número. Si preferís que no esté,
+es una línea.
 
-## 4. Que lo de siempre siga andando
+**Invalido más de lo que pediste.** Vos pedís invalidar «los grupos
+afectados»; yo invalido todos cuando cambia el destino o el carrito. Es un
+superconjunto, así que cumple, pero tiene un costo real: en un carrito de dos
+vendedores, cambiar una cantidad obliga a volver a elegir en los dos. Lo hice
+así porque distinguir el grupo afectado exige un retrato por grupo en el
+cliente, y un error ahí deja a la vista un contacto que ya no corresponde.
+Prefiero pedir de más que mostrar de más. Si el costo te molesta, se refina.
 
-No lo afirmo por lectura, lo afirma la suite: login por API y por navegador,
-refresco automático, logout desde el encabezado y los clientes de una sola
-fuente están cubiertos por los 48 casos anteriores, que siguen verdes. Los
-casos de navegador son los que más importan acá, porque son los únicos que
-mandan cookie **y** header a la vez —los dos iguales, que es el caso normal— y
-pasan sin cambios.
+## 6. Los casos que tuve que tocar
 
-## 5. Estado final
+El contrato del checkout cambió: ahora exige una decisión por grupo. Eso rompió
+casos que no miran logística, y los adapté sin cambiar lo que afirman.
+
+- **8 llamadas de checkout por API** ahora mandan «coordino por mi cuenta»,
+  derivado del carrito, no una lista fija.
+- **Tres recorridos de interfaz** resuelven el traslado antes de avanzar.
+- **Caso 43**: para ver el directorio hay que decir «necesito flete». El resto
+  del caso —contraste con PostGIS, el listado que sigue al carrito de pantalla,
+  cero contacto— quedó igual.
+- **Caso 45**: resuelve el traslado antes de avanzar al pago.
+- **Caso 30** cambió de lugar, y creo que para mejor. Ese caso rompe la
+  sincronización a propósito; ahora el checkout ni siquiera puede armar los
+  pedidos, así que **el motivo real de la API aparece antes, en el paso de
+  envío**, y la pantalla no avanza. El caso comprueba eso: el motivo real, sin
+  el mensaje del respaldo viejo, cero llamadas de respaldo y cero órdenes.
+
+## 7. Dos cosas de la suite, no del producto
+
+**Un `fetch failed` intermitente.** Me apareció tres veces en corridas
+distintas, siempre a los pocos milisegundos y siempre después de un caso lento:
+es una conexión reutilizada que el servidor cerró justo antes. No es la API —no
+hubo status, no hubo respuesta, y el log del servidor no registra nada—. Agregué
+**un** reintento y **sólo** para cortes de socket: cualquier HTTP, incluido un
+500, pasa derecho, porque eso sí es una respuesta y la prueba tiene que verla.
+
+**`correrAlembic` leía de menos.** Alembic escribe sus avisos por stderr;
+mirando sólo stdout, una migración correcta parecía no haber corrido. Ahora
+junta las dos salidas.
+
+## 8. Estado final
 
 | Comprobación | Resultado |
 |---|---|
-| Suite completa, base recreada desde cero | **50/50** |
-| Casos 49 y 50 con el backend anterior | rojos, nombrando la causa |
+| Suite completa, base recreada desde cero | **55/55** |
+| `npm run a11y -- --todas`, base recién sembrada | **56/56**, 0 violaciones |
+| `npm run contraste` | **40/40**, 0 incumplimientos |
 | `npm run build` (incluye `tsc`) | verde |
+| `alembic downgrade -1` + `upgrade head` + `check` | verde, con datos adentro |
+| `eslint` sobre los archivos tocados | 0 errores, 0 avisos nuevos |
 | `git -c core.whitespace=cr-at-eol diff --cached --check` | sin avisos |
-| Accesibilidad y contraste | no corresponde: cero cambios de interfaz |
 
-Una nota de método, porque prefiero decirla: en la **primera** corrida completa
-el caso 42 se cayó con `fetch failed` a los 3 ms —un fallo de conexión del
-cliente, no un HTTP de la API, que en ese momento no registró ni un error—.
-Recreé la base y volví a correr: **50/50**. Lo cuento porque la cifra que
-informo es la de la segunda corrida.
+No agregué dependencias. No hay mapas, ruteo, GPS, peso, capacidad calculada,
+precio ni cobro del flete, Carta de Porte, mensajería, planes ni Railway. No
+rediseñé el checkout: la pantalla sigue el prototipo aprobado, incluidas las
+tres frases que no se negocian.
 
-## 6. Riesgo
+## 9. Riesgos y deudas
 
-**Uno, y es el precio de la regla que pediste.** La comparación es entre los dos
-tokens, no entre las identidades que llevan adentro. Eso es lo correcto —decidir
-mirando adentro de un token que todavía no validé sería empezar a confiar en
-él—, pero significa que **dos tokens distintos de la misma persona también dan
-401**.
+**Uno nuevo.** Las dos pantallas nuevas de accesibilidad y contraste dependen de
+una publicación del seed —«Fertilizante Triple 15 - NPK», con origen en
+Pergamino— porque sin un transportista compatible no hay a quién elegir y las
+pantallas no existirían. Está comentado en los dos scripts: si el seed cambia,
+la puerta **falla** en vez de medir de menos. Es la dependencia menos mala que
+encontré; la alternativa era que el barrido escribiera en la base.
 
-Hoy eso no pasa: login y refresco setean la cookie y el `localStorage` en la
-misma respuesta, y el cliente ya deduplica los refrescos simultáneos de una
-pestaña. El recorrido que podría producirlo es angosto: dos pestañas refrescando
-a la vez, con las respuestas intercaladas de forma que la cookie quede de una y
-el `localStorage` de la otra. La siguiente petición daría 401 y el cliente
-cerraría sesión. Se recupera volviendo a entrar, no se pierde nada.
+**Sigue abierto el `float` del checkout**, obligatorio antes de Fase 4. Esta
+pieza no lo tocó: los importes siguen viajando como venían.
 
-Si querés cerrarlo, la salida barata es que el cliente no mande el header cuando
-ya va la cookie —una fuente sola por petición—, y eso es del frontend, no de
-esta pieza. No lo hice: es cambiar el cliente, y vos acotaste esto al punto
-común mínimo del servidor.
-
-**Sigue abierto el `float` del checkout**, obligatorio antes de Fase 4.
+**Sigue abierto lo del punto 5 del informe anterior** —la precedencia de
+credenciales ya está resuelta, pero el cliente sigue mandando header y cookie
+juntos—; no es de esta pieza.
 
 Nota de reproducibilidad, la de siempre: Docker no está disponible en mi entorno
-—demonio caído y registry 403—, así que la suite corre nativa con un puente que
-traduce sólo las dos invocaciones que la suite hace por `docker exec`.
-`./scripts/init_local_db.sh` sigue siendo el camino con contenedores y no lo
-cambié.
+—demonio caído y registry 403—, así que todo corre nativo con un puente que
+traduce sólo lo que la suite pide por `docker exec`: `psql`, `python` y ahora
+`alembic`. `./scripts/init_local_db.sh` sigue siendo el camino con contenedores
+y no lo cambié.
 
 El entorno local quedó levantado: API en `:8000`, Vite en `:5173`, base recreada
 y con seed.
