@@ -98,9 +98,13 @@ async def shutdown_event():
 
 
 # Importar y registrar routers
+#
+# `payments` NO se monta: el cobro por Mercado Pago todavía no está construido
+# y el módulo heredado que quedó en el repositorio no es autoridad de nada.
+# `mp_oauth` sí, porque vincular la cuenta del vendedor no mueve un peso.
 from app.api import (
     auth, catalog, products, cart, orders, contact,
-    ratings, admin, notifications, logistics
+    ratings, admin, notifications, logistics, mp_oauth
 )
 
 app.include_router(auth.router, prefix=settings.API_PREFIX)
@@ -113,3 +117,4 @@ app.include_router(ratings.router, prefix=settings.API_PREFIX)
 app.include_router(admin.router, prefix=settings.API_PREFIX)
 app.include_router(notifications.router, prefix=settings.API_PREFIX)
 app.include_router(logistics.router, prefix=settings.API_PREFIX)
+app.include_router(mp_oauth.router, prefix=settings.API_PREFIX)

@@ -17,6 +17,7 @@ from app.models.payment import Payment, PaymentStatus
 from app.models.form_option import FormOption, OptionType
 from app.models.rating import Rating
 from app.models.notification import Notification, NotificationType
+from app.models.mp_oauth_state import MPOAuthState
 
 __all__ = [
     "User",
@@ -43,5 +44,6 @@ __all__ = [
     "Rating",
     "Notification",
     "NotificationType",
+    "MPOAuthState",
 ]
 

@@ -1,89 +1,100 @@
-# Configuración de Mercado Pago (Split Payments)
+# Configuración de Mercado Pago
 
-> **Estado:** La integración de Mercado Pago se entrega **desvinculada**.
-> Este documento es para el nuevo equipo técnico que reactivará los pagos.
+> **Estado:** el **vínculo** de la cuenta de cada vendedor está construido y
+> funciona; el **cobro** todavía no existe. Las credenciales de la aplicación
+> se entregan vacías, así que la integración arranca apagada.
 
 ---
 
-## 1. Estado actual
+## 1. Qué hay y qué no
 
-- Todas las variables `MP_*` se entregan **vacías** en los archivos `.env*`.
-- El SDK del marketplace se inicializa **lazy** (`_get_marketplace_sdk()` en
-  [`backend/app/api/payments.py`](../backend/app/api/payments.py)). Mientras
-  no haya `MP_ACCESS_TOKEN`:
-  - `POST /api/payments/create-preference` responde **HTTP 503** con mensaje
-    `"La integración con Mercado Pago no está configurada..."`.
-  - `POST /api/payments/sync-status/{order_id}` responde **HTTP 503** igual.
-  - `POST /api/payments/webhook` responde **HTTP 200** con
-    `{"status": "ignored", "reason": "mp_not_configured"}` para evitar
-    tormentas de reintentos desde Mercado Pago.
-  - `GET /api/payments/public-key` responde
-    `{"public_key": "", "configured": false}` sin lanzar excepción.
-  - `GET /api/mp-oauth/auth-url` y `POST /api/mp-oauth/refresh-token`
-    responden **HTTP 503** si falta `MP_APP_ID` o `MP_CLIENT_SECRET`.
-  - `GET /api/mp-oauth/callback` redirige al dashboard con
-    `?mp_error=mp_not_configured` si llega una autorización sin credenciales.
-- El frontend detecta los 503 y muestra:
-  - En el checkout ([`CheckoutModal.tsx`](../src/components/Checkout/CheckoutModal.tsx)):
-    banner "La integración de pago no está configurada... Tu pedido quedó
-    registrado como pendiente."
-  - En el dashboard ([`UserDashboard.tsx`](../src/components/UserDashboard/UserDashboard.tsx)):
-    sección Mercado Pago muestra "Integración de Mercado Pago desvinculada"
-    en lugar del botón de vinculación.
-- El resto del backend (catálogo, órdenes, autenticación, carrito) funciona
-  normalmente con MP desactivado.
+**Hay vínculo OAuth.** Un vendedor conecta su cuenta de Mercado Pago desde su
+panel, ve su estado, la renueva y la desconecta. Vincular no mueve dinero.
+
+**No hay cobro.** No se crean preferencias, no se procesan pagos y no hay
+webhook. El módulo heredado `backend/app/api/payments.py` sigue en el árbol
+pero **no está montado**: sus rutas responden 404, no 503. No es autoridad de
+nada y hay que recortarlo contra el alcance antes de reutilizar una línea.
+
+**Quién cobra.** El vendedor, en su propia cuenta. TopGreen no recibe, no
+retiene y no reparte el dinero de una venta, y no cobra comisión de
+marketplace. La comisión que se descuenta es la de Mercado Pago, que se le
+descuenta al vendedor como en cualquier venta suya.
+
+**Con las variables vacías** el panel del vendedor muestra «Cobro por Mercado
+Pago no disponible» y el resto del marketplace funciona igual, incluida la
+venta por transferencia. Eso está probado: caso 68 de la suite.
 
 ---
 
 ## 2. Variables a configurar
 
-Editar `backend/.env` (no commitearlo: ya está en `.gitignore`):
+Editar `backend/.env` (no se commitea: ya está en `.gitignore`).
 
 | Variable | Descripción | Dónde se obtiene |
 |----------|-------------|------------------|
 | `MP_APP_ID` | ID numérico de la aplicación | Panel MP → Tus aplicaciones |
 | `MP_CLIENT_SECRET` | Secret OAuth de la aplicación | Panel MP → Credenciales |
-| `MP_PUBLIC_KEY` | Public key (frontend, JS Checkout) | Panel MP → Credenciales |
-| `MP_ACCESS_TOKEN` | Access token del marketplace | Panel MP → Credenciales |
-| `MP_REDIRECT_URI` | URL pública del callback OAuth | Debe ser registrada en MP |
-| `MP_COMMISSION_PERCENT` | Comisión del marketplace (%) | Valor de negocio (sugerido: `5.0`) |
-| `NGROK_URL` | URL pública del backend (para webhook) | Túnel ngrok / dominio público |
-| `FRONTEND_URL` | URL pública del frontend | Donde corre el SPA en producción |
+| `MP_REDIRECT_URI` | URL pública del callback OAuth | Se registra en el panel MP |
+| `MP_TOKEN_KEY` | Clave con la que se cifran las credenciales del vendedor | Se genera (ver abajo) |
+| `FRONTEND_URL` | URL pública del frontend | Donde corre el SPA |
 
-Plantillas vacías:
-- [`backend/.env.example`](../backend/.env.example) — desarrollo local
-- [`backend/.env.production.example`](../backend/.env.production.example) — producción
+Las cuatro primeras y la clave tienen que estar **todas**: si falta una sola,
+la integración se considera no configurada y no se vincula nada. Es a
+propósito. Poder vincular sin poder cifrar sería peor que no poder vincular.
+
+`MP_PUBLIC_KEY`, `MP_ACCESS_TOKEN`, `MP_COMMISSION_PERCENT` y `NGROK_URL` sólo
+las lee el módulo de cobro, que no está montado. Cuando se construya el cobro,
+`MP_COMMISSION_PERCENT` va en **cero** y `NGROK_URL` se reemplaza por una URL
+pública configurable.
+
+### La clave de cifrado
+
+Los tokens del vendedor son la llave con la que cobra en su cuenta. Se guardan
+cifrados con Fernet y la clave vive **fuera del repositorio**:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Tres cosas que hay que saber antes de tocarla:
+
+1. **No se versiona ni se comparte.** Va en el gestor de secretos del entorno.
+2. **Rotarla invalida todos los vínculos**: lo guardado deja de abrir, cada
+   vendedor pasa a «reconectar» y tiene que autorizar de nuevo. No es una
+   catástrofe —el sistema lo maneja solo— pero es una molestia para todos a la
+   vez, así que se avisa antes.
+3. **Sin clave no se guarda nada en claro.** Se prefiere no vincular.
 
 ---
 
-## 3. Cómo reactivar Mercado Pago
+## 3. Cómo activar el vínculo
 
 1. Crear (o reutilizar) una aplicación en el
    [panel de desarrolladores de Mercado Pago](https://www.mercadopago.com.ar/developers/panel/app).
-2. Copiar las credenciales de **producción** (no las de prueba) y completarlas
-   en `backend/.env`. Ejemplo:
+2. Completar `backend/.env`:
    ```dotenv
    MP_APP_ID=1234567890
-   MP_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-   MP_PUBLIC_KEY=APP_USR-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-   MP_ACCESS_TOKEN=APP_USR-xxxxxxxxxxxxxxxx-xxxxxx-xxxxxxxxxxxxxxxx-xxxxxxxxx
+   MP_CLIENT_SECRET=<secret de la aplicación>
    MP_REDIRECT_URI=https://tu-dominio.com/api/mp-oauth/callback
-   MP_COMMISSION_PERCENT=5.0
-   NGROK_URL=https://tu-dominio.com
+   MP_TOKEN_KEY=<clave Fernet generada>
    FRONTEND_URL=https://tu-dominio.com
    ```
-3. Registrar el `MP_REDIRECT_URI` en el panel MP de la app
-   (Configuración → Redirect URIs).
-4. Registrar el webhook (`https://tu-dominio.com/api/payments/webhook`)
-   en el panel MP (Notificaciones webhook → Eventos: `payment`).
-5. Reiniciar el contenedor del backend:
-   ```powershell
-   docker compose restart topgreen-api
-   ```
-6. Validar:
-   - `GET /api/payments/public-key` debe devolver `configured: true`.
-   - El dashboard de un vendedor debe mostrar el botón "Vincular Mercado Pago"
-     en lugar del banner de desvinculación.
+3. Registrar ese mismo `MP_REDIRECT_URI` en el panel MP
+   (Configuración → Redirect URIs). Tiene que coincidir carácter por carácter.
+
+   **Ojo con este valor.** El callback valida que la vuelta traiga la sesión
+   del vendedor, así que tiene que apuntar a un host al que el navegador le
+   mande la cookie de sesión. Si el frontend y la API comparten origen —como
+   en desarrollo, a través del proxy—, usá ese origen. Si apunta a un host que
+   no recibe la cookie, todos los intentos van a terminar en «se cerró tu
+   sesión durante la conexión», que es correcto pero inútil.
+4. Reiniciar el backend.
+5. Validar: un vendedor entra a su panel y ve «Cuenta no vinculada» con el
+   botón, en vez de «Cobro por Mercado Pago no disponible».
+
+`MP_AUTH_BASE_URL` y `MP_API_BASE_URL` existen para que la prueba automatizada
+pueda apuntar a un doble local. **En producción no se definen.**
 
 ---
 
@@ -91,23 +102,28 @@ Plantillas vacías:
 
 | Archivo | Rol |
 |---------|-----|
-| [`backend/app/core/config.py`](../backend/app/core/config.py) | Lee todas las variables `MP_*` desde el entorno |
-| [`backend/app/api/payments.py`](../backend/app/api/payments.py) | Crea preferencias, procesa webhook, sincroniza estado |
-| [`backend/app/api/mp_oauth.py`](../backend/app/api/mp_oauth.py) | OAuth de vendedores (link / unlink / refresh) |
-| [`src/components/Checkout/CheckoutModal.tsx`](../src/components/Checkout/CheckoutModal.tsx) | Flujo de checkout del comprador |
-| [`src/components/UserDashboard/UserDashboard.tsx`](../src/components/UserDashboard/UserDashboard.tsx) | Sección MP del vendedor |
+| [`backend/app/services/mp_vinculo.py`](../backend/app/services/mp_vinculo.py) | La regla del vínculo: estado, validación del callback, guardado, renovación |
+| [`backend/app/api/mp_oauth.py`](../backend/app/api/mp_oauth.py) | Las cinco rutas HTTP del vínculo |
+| [`backend/app/core/cifrado.py`](../backend/app/core/cifrado.py) | Cifrado en reposo de credenciales de terceros |
+| [`backend/app/models/mp_oauth_state.py`](../backend/app/models/mp_oauth_state.py) | El `state` de OAuth: con dueño, con vencimiento y de un solo uso |
+| [`src/components/UserDashboard/UserDashboard.tsx`](../src/components/UserDashboard/UserDashboard.tsx) | La sección de Mercado Pago del vendedor |
+| [`backend/app/api/payments.py`](../backend/app/api/payments.py) | Cobro heredado. **No montado.** No usar como referencia |
 
 ---
 
-## 5. Pruebas mínimas tras reactivar
+## 5. Qué falta para cobrar
 
-1. **Vendedor** entra al dashboard → ve botón "Vincular Mercado Pago" → completa
-   OAuth → vuelve al dashboard con cuenta vinculada.
-2. **Comprador** agrega productos al carrito → checkout con método "Mercado
-   Pago" → es redirigido al `init_point` de MP → completa el pago de prueba.
-3. Webhook recibe la notificación → la orden cambia a estado `paid`.
-4. `POST /api/payments/sync-status/{order_id}` permite sincronizar
-   manualmente si el webhook no llega.
+Lo que sigue **no está hecho** y no se puede prometer como si lo estuviera:
+
+- Una preferencia por orden. Mercado Pago trabaja 1:1, así que un carrito con
+  tres vendedores son tres pagos y tres redirecciones.
+- El contrato de `POST /api/orders/checkout`, que hoy crea una orden por
+  vendedor y devuelve una sola.
+- Webhook con validación de firma propia, consulta posterior a la API para
+  confirmar el estado, idempotencia y tolerancia a los reintentos.
+- Revocación del permiso del lado de Mercado Pago. Hoy desvincular borra lo
+  local; el vendedor le retira el permiso a la aplicación desde su cuenta.
+- Reescribir la aritmética del módulo heredado en `Decimal`: hoy usa `float`.
 
 ---
 

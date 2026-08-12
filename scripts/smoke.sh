@@ -52,6 +52,24 @@ fi
 cp .env.example .env
 cp backend/.env.example backend/.env
 
+echo "===> Configurando el vinculo de Mercado Pago contra el doble local"
+# La suite prueba el vinculo OAuth de punta a punta y por eso necesita la
+# integracion configurada. Estos valores son INVENTADOS y apuntan al doble que
+# levanta la propia suite (scripts/lib/mp-doble.mjs): no hay credenciales
+# reales de Mercado Pago en este repositorio y no las va a haber.
+#
+# La clave de cifrado se genera nueva en cada corrida. Fernet pide 32 bytes al
+# azar en base64 urlsafe, que es exactamente lo que produce esta linea; se usa
+# openssl y no Python para no depender de que el host tenga `cryptography`.
+{
+  echo "MP_APP_ID=app-local-de-prueba"
+  echo "MP_CLIENT_SECRET=secreto-local-inventado"
+  echo "MP_REDIRECT_URI=http://localhost:5173/api/mp-oauth/callback"
+  echo "MP_TOKEN_KEY=$(openssl rand -base64 32 | tr '+/' '-_')"
+  echo "MP_AUTH_BASE_URL=http://127.0.0.1:8099"
+  echo "MP_API_BASE_URL=http://127.0.0.1:8099"
+} >> backend/.env
+
 echo "===> Compilando frontend"
 npm run build
 
@@ -85,7 +103,7 @@ if [ "$frontend_ready" != "true" ]; then
   exit 1
 fi
 
-echo "===> Ejecutando 46 smoke tests"
+echo "===> Ejecutando 71 smoke tests"
 set +e
 node scripts/smoke.mjs "$@"
 smoke_exit=$?

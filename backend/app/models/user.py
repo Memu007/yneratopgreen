@@ -1,7 +1,7 @@
 """
 Modelo de Usuario - Sistema de autenticación y perfiles
 """
-from sqlalchemy import Boolean, Column, DateTime, Enum as SQLEnum, ForeignKey, Integer, Numeric, String, false
+from sqlalchemy import Boolean, Column, DateTime, Enum as SQLEnum, ForeignKey, Integer, Numeric, String, Text, false
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -69,11 +69,18 @@ class User(Base):
     purchases_count = Column(Integer, default=0, nullable=False)  # Compras completadas
     
     # Mercado Pago - Vinculación de cuenta de vendedor (OAuth)
-    mp_user_id = Column(String(50), nullable=True)  # ID de usuario en Mercado Pago
-    mp_access_token = Column(String(500), nullable=True)  # Token para recibir pagos
-    mp_refresh_token = Column(String(500), nullable=True)  # Token para renovar access_token
+    # Las credenciales son del vendedor, no nuestras: se guardan cifradas
+    # (app/core/cifrado.py) y no hay forma de leerlas sin la clave, que vive
+    # fuera del repositorio. Nada de esto sale nunca en una respuesta.
+    mp_user_id = Column(String(50), nullable=True, unique=True)  # Cuenta de MP vinculada
+    mp_access_token_cifrado = Column(Text, nullable=True)  # Token de cobro, cifrado
+    mp_refresh_token_cifrado = Column(Text, nullable=True)  # Token de renovación, cifrado
     mp_token_expires_at = Column(DateTime, nullable=True)  # Expiración del access_token
     mp_linked_at = Column(DateTime, nullable=True)  # Fecha de vinculación de cuenta MP
+    # Se enciende cuando Mercado Pago rechaza las credenciales o cuando lo
+    # guardado dejó de abrir. El vendedor ve «reconectar» y puede resolverlo
+    # solo; el sistema no vuelve a intentar con algo que ya sabe que no sirve.
+    mp_requiere_reconexion = Column(Boolean, default=False, nullable=False)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

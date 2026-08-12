@@ -3,6 +3,7 @@ import styles from './UserDashboard.module.css';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Toast/Toast';
 import { apiGet, apiPatch, apiDelete, apiPost, tokenStorage, API_BASE_URL } from '../../utils/api';
+import { explicarMP, type VinculoMP } from '../../utils/mercadoPago';
 import { ProductImage } from '../ProductImage/ProductImage';
 import { User } from '../../types';
 import {
@@ -250,6 +251,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   // Estado para modal de edición
   const [editingProduct, setEditingProduct] = useState<EditFormData | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Vinculo con Mercado Pago. `mpVinculo` es lo unico que decide que se ve:
+  // no se guardan tokens ni nada parecido, porque el backend no los manda.
+  const [mpVinculo, setMpVinculo] = useState<VinculoMP | null>(null);
+  const [mpCargando, setMpCargando] = useState(true);
+  const [mpTrabajando, setMpTrabajando] = useState(false);
   
   // Estado para notificaciones
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -460,6 +467,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     loadNotifications();
   }, [activeTab]);
 
+  useEffect(() => {
+    void cargarVinculoMP();
+  }, []);
+
   // Cargar categorías cuando se abre el modal de edición
   useEffect(() => {
     if (editingProduct) {
@@ -468,6 +479,70 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         .catch(err => console.error('Error cargando categorías:', err));
     }
   }, [editingProduct !== null]);
+
+  const cargarVinculoMP = async () => {
+    setMpCargando(true);
+    try {
+      setMpVinculo(await apiGet<VinculoMP>('/mp-oauth/status'));
+    } catch {
+      // Que no se pueda leer el estado del vinculo no rompe el panel: se
+      // muestra como no disponible y el resto sigue andando.
+      setMpVinculo(null);
+    } finally {
+      setMpCargando(false);
+    }
+  };
+
+  // Vincular y reconectar son la misma accion: se abre un intento nuevo y se
+  // manda a la persona a autorizar. El intento anterior queda invalidado.
+  const conectarMercadoPago = async () => {
+    setMpTrabajando(true);
+    try {
+      const { auth_url } = await apiPost<{ auth_url: string }>('/mp-oauth/auth-url', {});
+      window.location.href = auth_url;
+    } catch {
+      showToast('No se pudo iniciar la conexión con Mercado Pago.', 'error');
+      setMpTrabajando(false);
+    }
+  };
+
+  const renovarMercadoPago = async () => {
+    setMpTrabajando(true);
+    try {
+      const estado = await apiPost<VinculoMP>('/mp-oauth/refresh', {});
+      setMpVinculo(estado);
+      showToast(
+        estado.estado === 'conectado' ? 'Conexión renovada.' : explicarMP(estado.motivo),
+        estado.estado === 'conectado' ? 'success' : 'warning',
+      );
+    } catch {
+      showToast('No se pudo renovar la conexión.', 'error');
+    } finally {
+      setMpTrabajando(false);
+    }
+  };
+
+  const desvincularMercadoPago = async () => {
+    const confirmado = await showConfirm({
+      title: 'Desvincular Mercado Pago',
+      message: 'Se borran de TopGreen las credenciales de tu cuenta.\n\n'
+        + 'Para retirarle el permiso a la aplicación también del lado de Mercado Pago, '
+        + 'hacelo desde tu cuenta.',
+      confirmText: 'Desvincular',
+      type: 'warning',
+    });
+    if (!confirmado) return;
+
+    setMpTrabajando(true);
+    try {
+      setMpVinculo(await apiPost<VinculoMP>('/mp-oauth/unlink', {}));
+      showToast('Cuenta de Mercado Pago desvinculada.', 'success');
+    } catch {
+      showToast('No se pudo desvincular la cuenta.', 'error');
+    } finally {
+      setMpTrabajando(false);
+    }
+  };
 
   // Estado temporal para edición de perfil
   const [editForm, setEditForm] = useState(() => formularioDesde(user));
@@ -1553,6 +1628,118 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           <div className={styles.privacyNote}>
             🔒 Tu información de contacto solo se comparte con los compradores después de que confirmen la compra
           </div>
+        </div>
+      </div>
+
+      {/* Mercado Pago: dónde cobra el vendedor. El dinero va a su cuenta,
+          TopGreen no lo recibe ni lo reparte. */}
+      <div className={styles.mpSection}>
+        <div className={styles.sectionHeader}>
+          <h2>💳 Mercado Pago — dónde cobrás</h2>
+        </div>
+        <div className={styles.mpContent}>
+          {mpCargando ? (
+            <p>Cargando estado…</p>
+          ) : mpVinculo?.estado === 'conectado' ? (
+            <div className={styles.mpLinked}>
+              <span className={styles.mpStatus}>✅ Cuenta vinculada</span>
+              <p>Cuenta de Mercado Pago: <strong>{mpVinculo.mp_user_id}</strong></p>
+              <p className={styles.mpInfo}>
+                Cuando el cobro con Mercado Pago esté disponible, los pagos de tus
+                ventas van a entrar directamente en tu cuenta. TopGreen no los recibe
+                ni los reparte, y no te cobra comisión por vender; Mercado Pago te
+                descuenta la suya, como en cualquier venta tuya.
+              </p>
+              {mpVinculo.conviene_renovar && (
+                <>
+                  <div className={styles.mpWarning}>
+                    ⏳ <strong>Tu conexión vence pronto</strong>
+                  </div>
+                  <button
+                    className={styles.mpLinkButton}
+                    onClick={renovarMercadoPago}
+                    disabled={mpTrabajando}
+                  >
+                    {mpTrabajando ? 'Renovando…' : 'Renovar conexión'}
+                  </button>
+                </>
+              )}
+              <button
+                className={styles.mpUnlinkButton}
+                onClick={desvincularMercadoPago}
+                disabled={mpTrabajando}
+              >
+                Desvincular cuenta
+              </button>
+            </div>
+          ) : mpVinculo?.estado === 'requiere_reconexion' ? (
+            <div className={styles.mpUnlinked}>
+              <div className={styles.mpWarning}>
+                ⚠️ <strong>Hay que reconectar tu cuenta</strong>
+              </div>
+              <p>
+                El permiso que le diste a TopGreen sobre tu cuenta
+                {mpVinculo.mp_user_id ? <> <strong>{mpVinculo.mp_user_id}</strong></> : null}
+                {' '}dejó de estar disponible. Reconectala para dejar tu cobro por
+                Mercado Pago en condiciones.
+              </p>
+              <button
+                className={styles.mpLinkButton}
+                onClick={conectarMercadoPago}
+                disabled={mpTrabajando}
+              >
+                {mpTrabajando ? 'Abriendo Mercado Pago…' : '🔗 Reconectar cuenta'}
+              </button>
+              <button
+                className={styles.mpUnlinkButton}
+                onClick={desvincularMercadoPago}
+                disabled={mpTrabajando}
+              >
+                Desvincular cuenta
+              </button>
+            </div>
+          ) : mpVinculo?.estado === 'desconectado' ? (
+            <div className={styles.mpUnlinked}>
+              <div className={styles.mpWarning}>
+                ⚠️ <strong>Cuenta no vinculada</strong>
+              </div>
+              <p>
+                Vinculá tu cuenta de Mercado Pago para dejar lista tu forma de cobro:
+                cuando esté disponible, los pagos de tus ventas van a entrar
+                directamente ahí. El cobro por transferencia no depende de esto y
+                sigue funcionando igual.
+              </p>
+              <div className={styles.mpBenefits}>
+                <h4>Qué pasa cuando la vinculás:</h4>
+                <ul>
+                  <li>✅ Cobrás vos, en tu propia cuenta</li>
+                  <li>✅ TopGreen no recibe ni retiene ese dinero</li>
+                  <li>✅ Podés desvincularla cuando quieras</li>
+                </ul>
+              </div>
+              <button
+                className={styles.mpLinkButton}
+                onClick={conectarMercadoPago}
+                disabled={mpTrabajando}
+              >
+                {mpTrabajando ? 'Abriendo Mercado Pago…' : '🔗 Vincular Mercado Pago'}
+              </button>
+              <p className={styles.mpHelp}>
+                Te lleva a Mercado Pago para que autorices la conexión. TopGreen nunca
+                ve ni te pide tu contraseña.
+              </p>
+            </div>
+          ) : (
+            <div className={styles.mpUnlinked}>
+              <div className={styles.mpWarning}>
+                ⚠️ <strong>Cobro por Mercado Pago no disponible</strong>
+              </div>
+              <p>
+                Todavía no está habilitado en la plataforma. Tus ventas por
+                transferencia no se ven afectadas.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

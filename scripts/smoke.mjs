@@ -1,7 +1,11 @@
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { chromium } from 'playwright';
 
+import {
+  DETALLE_CRUDO, SECRETO_DE_ACCESO, SECRETO_DE_REFRESCO, levantarDoble,
+} from './lib/mp-doble.mjs';
 import { queryCount, queryRows, querySql, sqlLiteral } from './lib/sql.mjs';
 
 const API_URL = process.env.SMOKE_API_URL || 'http://localhost:8000/api';
@@ -224,6 +228,160 @@ print(json.dumps({
     "iguales": quien(cookie=datos["a"], header=datos["a"]),
     "conflicto": quien(cookie=datos["a"], header=datos["b"]),
     "conflicto_invertido": quien(cookie=datos["b"], header=datos["a"]),
+}))
+`;
+
+// Rotar MP_TOKEN_KEY sin migrar lo guardado deja credenciales que ya no abren.
+// Es un escenario real —una rotación a medias, un backup restaurado en otro
+// entorno— y el contrato dice que tiene que fallar cerrado y accionable, no
+// con un 500. Se prueba adentro de la aplicación porque la rotación es un
+// cambio de configuración del proceso, no algo que se pida por HTTP.
+const MP_CLAVE_ROTADA = `
+import json
+from urllib.parse import parse_qs, urlparse
+
+from cryptography.fernet import Fernet
+from fastapi.testclient import TestClient
+
+from app.core.config import settings
+from app.main import app
+
+cliente = TestClient(app, base_url="https://testserver")
+cliente.post("/api/auth/login", json={
+    "email": "vendedor@ejemplo.com", "password": "vendedor123"})
+
+inicio = cliente.post("/api/mp-oauth/auth-url", json={})
+state = parse_qs(urlparse(inicio.json()["auth_url"]).query)["state"][0]
+cliente.get("/api/mp-oauth/callback", params={"code": "ok:900001", "state": state},
+            follow_redirects=False)
+antes = cliente.get("/api/mp-oauth/status").json()
+
+settings.MP_TOKEN_KEY = Fernet.generate_key().decode()
+
+estado = cliente.get("/api/mp-oauth/status")
+renovacion = cliente.post("/api/mp-oauth/refresh", json={})
+
+print("RESULTADO " + json.dumps({
+    "antes": antes.get("estado"),
+    "status": estado.status_code,
+    "estado": estado.json().get("estado"),
+    "cuenta": estado.json().get("mp_user_id"),
+    "refresh_status": renovacion.status_code,
+    "refresh_estado": renovacion.json().get("estado"),
+    "motivo": renovacion.json().get("motivo"),
+    "cuerpos": estado.text + renovacion.text,
+}))
+`;
+
+// Con la configuración de Mercado Pago vacía, el vínculo tiene que apagarse
+// solo y el resto del marketplace seguir andando. Se prueba dentro de la
+// aplicación, con su propio grafo de dependencias: levantar una segunda API en
+// otro puerto probaría otra cosa.
+const MP_SIN_CONFIGURAR = `
+import json
+from fastapi.testclient import TestClient
+from app.core.config import settings
+
+for clave in ("MP_APP_ID", "MP_CLIENT_SECRET", "MP_REDIRECT_URI", "MP_TOKEN_KEY"):
+    setattr(settings, clave, "")
+
+from app.main import app
+
+cliente = TestClient(app, base_url="https://testserver")
+cliente.post("/api/auth/login", json={
+    "email": "vendedor@ejemplo.com", "password": "vendedor123"})
+
+estado = cliente.get("/api/mp-oauth/status")
+vincular = cliente.post("/api/mp-oauth/auth-url", json={})
+catalogo = cliente.get("/api/catalog/categories")
+productos = cliente.get("/api/catalog/products")
+
+print("RESULTADO " + json.dumps({
+    "status": estado.status_code,
+    "estado": estado.json().get("estado"),
+    "auth_url": vincular.status_code,
+    "detalle": str(vincular.json().get("detail", "")),
+    "catalogo": catalogo.status_code,
+    "productos": productos.status_code,
+}))
+`;
+
+// Lo que se registra cuando algo sale mal es donde más fácil se escapa un
+// secreto: el cuerpo del error de Mercado Pago trae el motivo del rechazo del
+// client_secret. Se capta el log de la aplicación mientras pasan las dos cosas
+// que más tientan a loguear de más.
+//
+// El state vencido se fabrica moviendo la constante de la propia aplicación:
+// es la única forma de probar el vencimiento sin esperar quince minutos y sin
+// escribir filas por afuera del producto.
+const MP_LOGS_SIN_SECRETOS = `
+import io, json, logging
+from urllib.parse import parse_qs, urlparse
+
+from fastapi.testclient import TestClient
+
+from app.main import app
+from app.services import mp_vinculo
+
+memoria = io.StringIO()
+manejador = logging.StreamHandler(memoria)
+manejador.setFormatter(logging.Formatter("%(name)s %(levelname)s %(message)s"))
+
+# Se capta TODO lo que registra la aplicacion -incluidos los rastreos, que es
+# donde mas facil se escapa un secreto- y nada de lo que registra el arnes. El
+# cliente de pruebas escribe cada URL que pide, con el state adentro; eso es
+# ruido de la prueba y no dice nada sobre lo que hace el producto.
+ajenos = []
+
+class SoloLaAplicacion(logging.Filter):
+    def filter(self, registro):
+        if registro.name.split(".")[0] == "app":
+            return True
+        ajenos.append(registro.name)
+        return False
+
+manejador.addFilter(SoloLaAplicacion())
+raiz = logging.getLogger()
+raiz.addHandler(manejador)
+raiz.setLevel(logging.DEBUG)
+
+cliente = TestClient(app, base_url="https://testserver")
+cliente.post("/api/auth/login", json={
+    "email": "vendedor@ejemplo.com", "password": "vendedor123"})
+respuestas = []
+
+def state_nuevo():
+    inicio = cliente.post("/api/mp-oauth/auth-url", json={})
+    respuestas.append(inicio.text)
+    url = inicio.json()["auth_url"]
+    return parse_qs(urlparse(url).query)["state"][0]
+
+def motivo(state, code):
+    vuelta = cliente.get(
+        "/api/mp-oauth/callback", params={"code": code, "state": state},
+        follow_redirects=False)
+    destino = vuelta.headers.get("location", "")
+    respuestas.append(destino)
+    return parse_qs(urlparse(destino).query).get("mp_error", [""])[0]
+
+mp_vinculo.MINUTOS_DE_ESTADO = -1
+vencido = motivo(state_nuevo(), "ok:900001")
+
+mp_vinculo.MINUTOS_DE_ESTADO = 15
+state = state_nuevo()
+rechazo = motivo(state, "rechazo")
+
+raiz.removeHandler(manejador)
+registro = memoria.getvalue()
+
+print("RESULTADO " + json.dumps({
+    "vencido": vencido,
+    "rechazo": rechazo,
+    "log": registro,
+    "lineas": len([l for l in registro.splitlines() if l.strip()]),
+    "ajenos": len(ajenos),
+    "respuestas": chr(10).join(respuestas),
+    "state": state,
 }))
 `;
 
@@ -1358,14 +1516,26 @@ await runCase(19, 'Transferencia completa desde la interfaz', async () => {
 
 await runCase(20, 'Las rutas financieras heredadas no están expuestas', async () => {
   await expectApiError(404, () => apiRequest('/payments/public-key'));
-  await expectApiError(404, () => apiRequest('/mp-oauth/status', {
-    token: state.sellerToken,
-  }));
   await expectApiError(404, () => apiRequest('/payments/simulate-payment/inexistente', {
     method: 'POST',
     token: state.buyerToken,
   }));
-  return 'payments, mp-oauth y simulate-payment respondieron HTTP 404';
+
+  // El vínculo OAuth sí está montado, y es lo único de Mercado Pago que
+  // existe: conectar la cuenta donde cobra un vendedor no mueve un peso.
+  // Hasta la pieza MP-A esta ruta también daba 404, y esperar eso hoy sería
+  // exigir que la parte aceptada no exista. El inventario completo de su
+  // superficie —y que la de cobro sigue cerrada— está en el caso 67.
+  const { status, data } = await apiRequest('/mp-oauth/status', {
+    token: state.sellerToken,
+  });
+  assert(status === 200 && typeof data?.estado === 'string',
+    `/mp-oauth/status respondió ${status}: ${JSON.stringify(data)}`);
+  assert(!JSON.stringify(data).includes('token'),
+    `el estado del vínculo menciona un token: ${JSON.stringify(data)}`);
+
+  return 'payments y simulate-payment en HTTP 404; el vínculo OAuth contesta su '
+    + `estado ("${data.estado}") sin exponer credenciales`;
 });
 
 await runCase(21, 'Respaldo de imágenes en el recorrido de demostración', async () => {
@@ -5564,6 +5734,587 @@ await runCase(61, 'Con varios vendedores, cada total es suyo y uno fuera de cont
   return 'dos vendedores con totales independientes ($0,30 y $19.999.999,98); '
     + 'con uno fuera de contrato, 0 órdenes nuevas por los dos checkouts y el carrito '
     + 'sigue activo';
+});
+
+// --- vínculo OAuth con Mercado Pago ------------------------------------------
+// Todo este bloque corre contra el doble local (scripts/lib/mp-doble.mjs). No
+// hay credenciales reales en el proyecto y no las va a haber: la prueba con
+// una cuenta de verdad la hace quien tenga acceso legítimo a esa cuenta.
+const MP_PUERTO_DEL_DOBLE = 8099;
+
+// La aplicación puede escribir sus propias líneas antes del resultado, así que
+// el guion lo marca y acá se busca la marca, no la última línea.
+function leerResultado(salida) {
+  const linea = salida.split(/\r?\n/).find((texto) => texto.startsWith('RESULTADO '));
+  assert(linea, `el guion no devolvió resultado: ${salida.slice(-300)}`);
+  return JSON.parse(linea.slice('RESULTADO '.length));
+}
+
+function huellaDe(state) {
+  return createHash('sha256').update(state).digest('hex');
+}
+
+// `querySql` recorta la salida entera, así que una columna NULA al principio o
+// al final de la fila se pierde y corre a las demás. Cada columna viaja con un
+// centinela para que ninguna quede vacía en el borde.
+const NULO = 'NULO';
+
+function vinculoEnLaBase(email) {
+  const [fila] = queryRows(`
+    SELECT coalesce(mp_user_id, '${NULO}'),
+           coalesce(mp_access_token_cifrado, '${NULO}'),
+           coalesce(mp_refresh_token_cifrado, '${NULO}'),
+           coalesce(mp_requiere_reconexion::text, '${NULO}'),
+           coalesce(mp_token_expires_at::text, '${NULO}')
+    FROM users WHERE email = ${sqlLiteral(email)}
+  `);
+  assert(fila, `no existe el usuario ${email}`);
+  assert(fila.length === 5, `la fila de ${email} vino con ${fila.length} columnas`);
+  const [cuenta, acceso, refresco, reconexion, vence] = fila.map(
+    (valor) => (valor === NULO ? null : valor),
+  );
+  return { cuenta, acceso, refresco, reconexion: reconexion === 't', vence };
+}
+
+async function ingresarVendedor(email, password) {
+  const { data } = await apiRequest('/auth/login', {
+    method: 'POST', body: { email, password },
+  });
+  return { token: data.access_token, id: data.user.id };
+}
+
+// El pedido de vinculación devuelve la URL a la que iría el navegador.
+async function pedirUrlDeVinculo(token) {
+  const { datos, status } = await pedirCrudo('/mp-oauth/auth-url', {
+    method: 'POST', header: token, body: {},
+  });
+  assert(status === 200, `auth-url respondió ${status}: ${JSON.stringify(datos)}`);
+  return datos.auth_url;
+}
+
+// La pantalla de autorización del doble contesta como contestaría Mercado
+// Pago: un 302 al callback con `code` y `state`.
+async function autorizarEnElDoble(authUrl, guion) {
+  const url = new URL(authUrl);
+  url.searchParams.set('guion', guion);
+  const respuesta = await fetch(url, { redirect: 'manual' });
+  const destino = respuesta.headers.get('location');
+  assert(destino, 'el doble no devolvió el callback');
+  return destino;
+}
+
+async function volverDelCallback(callbackUrl, cookieToken) {
+  const respuesta = await fetch(callbackUrl, {
+    headers: cookieToken ? { Cookie: `access_token=${cookieToken}` } : {},
+    redirect: 'manual',
+  });
+  const destino = respuesta.headers.get('location') || '';
+  const parametros = new URL(destino, FRONTEND_URL).searchParams;
+  return {
+    status: respuesta.status,
+    destino,
+    ok: parametros.get('mp'),
+    motivo: parametros.get('mp_error'),
+    cuerpo: await respuesta.text(),
+  };
+}
+
+// Un vínculo completo, del principio al fin, como lo haría el navegador.
+async function vincular(token, guion) {
+  const authUrl = await pedirUrlDeVinculo(token);
+  const callback = await autorizarEnElDoble(authUrl, guion);
+  return { ...(await volverDelCallback(callback, token)), authUrl, callback };
+}
+
+async function estadoDelVinculo(token) {
+  const { datos } = await pedirCrudo('/mp-oauth/status', { header: token });
+  return datos;
+}
+
+async function desvincular(token) {
+  await pedirCrudo('/mp-oauth/unlink', { method: 'POST', header: token, body: {} });
+}
+
+const SECRETOS_DEL_DOBLE = [SECRETO_DE_ACCESO, SECRETO_DE_REFRESCO, DETALLE_CRUDO,
+  'secreto-local-inventado'];
+
+function sinSecretos(texto, donde) {
+  for (const secreto of SECRETOS_DEL_DOBLE) {
+    assert(!String(texto).includes(secreto),
+      `${donde} contiene un secreto («${secreto.slice(0, 22)}…»)`);
+  }
+}
+
+await runCase(62, 'El vínculo se guarda cifrado y el state no queda escrito en claro', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await desvincular(vendedor.token);
+
+    const inicial = await estadoDelVinculo(vendedor.token);
+    assert(inicial.estado === 'desconectado',
+      `el vendedor no arranca desconectado: ${JSON.stringify(inicial)}`);
+
+    const authUrl = await pedirUrlDeVinculo(vendedor.token);
+    const url = new URL(authUrl);
+    const state = url.searchParams.get('state');
+    assert(url.searchParams.get('client_id') === 'app-local-de-prueba',
+      'la URL de autorización no lleva el client_id de la aplicación');
+    assert(state && state.length >= 32, `el state es corto o falta: ${state}`);
+
+    // Lo que hay en la base es la huella, no el valor. El state viaja en una
+    // URL: termina en el historial y en los logs del proxy, así que lo
+    // guardado no puede servir para fabricar un callback.
+    assert(queryCount(`SELECT COUNT(*) FROM mp_oauth_states
+      WHERE state_hash = ${sqlLiteral(huellaDe(state))}`) === 1,
+      'el state no quedó registrado por su huella');
+    assert(queryCount(`SELECT COUNT(*) FROM mp_oauth_states
+      WHERE state_hash = ${sqlLiteral(state)}`) === 0,
+      'el state quedó guardado en claro');
+
+    const callback = await autorizarEnElDoble(authUrl, 'ok:900001');
+    const vuelta = await volverDelCallback(callback, vendedor.token);
+    assert(vuelta.status === 302 && vuelta.ok === 'vinculado',
+      `el callback no vinculó: ${vuelta.status} → ${vuelta.destino}`);
+
+    const conectado = await estadoDelVinculo(vendedor.token);
+    assert(conectado.estado === 'conectado' && conectado.mp_user_id === '900001',
+      `estado inesperado: ${JSON.stringify(conectado)}`);
+    sinSecretos(JSON.stringify(conectado), 'la respuesta de /status');
+    assert(!('access_token' in conectado) && !('mp_access_token' in conectado),
+      'la respuesta de /status trae un campo de token');
+
+    const guardado = vinculoEnLaBase('vendedor@ejemplo.com');
+    assert(guardado.acceso?.startsWith('gAAAA') && guardado.refresco?.startsWith('gAAAA'),
+      'lo guardado no tiene forma de texto cifrado');
+    sinSecretos(`${guardado.acceso}${guardado.refresco}`, 'la base');
+    assert(guardado.cuenta === '900001', `la cuenta guardada es ${guardado.cuenta}`);
+
+    // Las columnas en claro que traía el proyecto ya no existen.
+    const heredadas = queryCount(`SELECT COUNT(*) FROM information_schema.columns
+      WHERE table_name = 'users'
+        AND column_name IN ('mp_access_token', 'mp_refresh_token')`);
+    assert(heredadas === 0, `siguen existiendo ${heredadas} columna(s) en claro`);
+
+    const usado = queryCount(`SELECT COUNT(*) FROM mp_oauth_states
+      WHERE state_hash = ${sqlLiteral(huellaDe(state))} AND usado_el IS NOT NULL`);
+    assert(usado === 1, 'el state no quedó sellado como usado');
+
+    return 'vínculo completo: la base guarda Fernet y la huella del state, la '
+      + 'respuesta no trae credenciales y las dos columnas en claro se fueron';
+  } finally {
+    await desvincular(vendedor.token);
+    await doble.cerrar();
+  }
+});
+
+await runCase(63, 'Callback repetido, alterado, sin sesión o de otra sesión no vincula nada', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const otro = await ingresarVendedor('otro.vendedor.smoke@example.com', 'smoke123');
+  try {
+    await desvincular(vendedor.token);
+    await desvincular(otro.token);
+
+    // --- 1. repetido: el segundo callback no encuentra state que gastar
+    const primero = await vincular(vendedor.token, 'ok:900001');
+    assert(primero.ok === 'vinculado', `el primer vínculo falló: ${primero.destino}`);
+    const repetido = await volverDelCallback(primero.callback, vendedor.token);
+    assert(repetido.motivo === 'estado_invalido',
+      `el callback repetido devolvió «${repetido.motivo}»`);
+
+    await desvincular(vendedor.token);
+
+    // --- 2. alterado: un carácter distinto en el state
+    const authUrl = await pedirUrlDeVinculo(vendedor.token);
+    const legitimo = await autorizarEnElDoble(authUrl, 'ok:900001');
+    const alterado = new URL(legitimo);
+    const original = alterado.searchParams.get('state');
+    alterado.searchParams.set('state', `${original.slice(0, -1)}${original.endsWith('a') ? 'b' : 'a'}`);
+    const tocado = await volverDelCallback(alterado.toString(), vendedor.token);
+    assert(tocado.motivo === 'estado_invalido',
+      `el state alterado devolvió «${tocado.motivo}»`);
+
+    // --- 3. sin sesión: el state sigue siendo válido, pero nadie lo reclama
+    const anonimo = await volverDelCallback(legitimo, null);
+    assert(anonimo.motivo === 'sin_sesion',
+      `el callback sin sesión devolvió «${anonimo.motivo}»`);
+
+    // --- 4. otra sesión: el state era del vendedor, la cookie es del otro
+    const deOtro = await pedirUrlDeVinculo(vendedor.token);
+    const callbackAjeno = await autorizarEnElDoble(deOtro, 'ok:900001');
+    const ajeno = await volverDelCallback(callbackAjeno, otro.token);
+    assert(ajeno.motivo === 'sesion_distinta',
+      `el callback de otra sesión devolvió «${ajeno.motivo}»`);
+
+    // Después de los cuatro rechazos no quedó nadie vinculado.
+    for (const [quien, email] of [
+      ['el vendedor', 'vendedor@ejemplo.com'],
+      ['el otro vendedor', 'otro.vendedor.smoke@example.com'],
+    ]) {
+      const fila = vinculoEnLaBase(email);
+      assert(!fila.cuenta && !fila.acceso && !fila.refresco,
+        `${quien} quedó con algo escrito: ${JSON.stringify(fila)}`);
+    }
+
+    return 'los cuatro callbacks torcidos —repetido, alterado, sin sesión y de otra '
+      + 'sesión— devuelven su motivo y no dejan una sola credencial escrita';
+  } finally {
+    await desvincular(vendedor.token);
+    await desvincular(otro.token);
+    await doble.cerrar();
+  }
+});
+
+await runCase(64, 'Una cuenta de Mercado Pago no puede cobrar para dos vendedores', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const primero = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const segundo = await ingresarVendedor('otro.vendedor.smoke@example.com', 'smoke123');
+  try {
+    await desvincular(primero.token);
+    await desvincular(segundo.token);
+
+    const uno = await vincular(primero.token, 'ok:900001');
+    assert(uno.ok === 'vinculado', `el primero no pudo vincular: ${uno.destino}`);
+
+    // El segundo autoriza LA MISMA cuenta de Mercado Pago.
+    const choque = await vincular(segundo.token, 'ok:900001');
+    assert(choque.motivo === 'cuenta_en_uso',
+      `el segundo pudo tomar la cuenta ajena: «${choque.motivo}»`);
+    const rechazado = await estadoDelVinculo(segundo.token);
+    assert(rechazado.estado === 'desconectado',
+      `el segundo quedó en ${rechazado.estado}`);
+
+    // Con su propia cuenta sí.
+    const propia = await vincular(segundo.token, 'ok:900002');
+    assert(propia.ok === 'vinculado', `el segundo no pudo con su cuenta: ${propia.destino}`);
+
+    // Y la base lo sostiene aunque alguien escriba por afuera de la API.
+    let laBaseFrena = false;
+    try {
+      querySql(`UPDATE users SET mp_user_id = '900001'
+        WHERE email = ${sqlLiteral('otro.vendedor.smoke@example.com')}`);
+    } catch {
+      laBaseFrena = true;
+    }
+    assert(laBaseFrena, 'la base aceptó dos vendedores con la misma cuenta de MP');
+
+    return 'la segunda vinculación a la misma cuenta se rechaza con «cuenta_en_uso», '
+      + 'con su propia cuenta funciona, y el índice único lo sostiene desde SQL';
+  } finally {
+    await desvincular(primero.token);
+    await desvincular(segundo.token);
+    await doble.cerrar();
+  }
+});
+
+await runCase(65, 'Renovar rota las dos credenciales; si el vendedor revoca, queda en reconectar', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const otro = await ingresarVendedor('otro.vendedor.smoke@example.com', 'smoke123');
+  try {
+    await desvincular(vendedor.token);
+    await desvincular(otro.token);
+
+    // --- 1. rotación: las dos credenciales cambian, la cuenta no
+    const alta = await vincular(vendedor.token, 'ok:900001');
+    assert(alta.ok === 'vinculado', `no vinculó: ${alta.destino}`);
+    const antes = vinculoEnLaBase('vendedor@ejemplo.com');
+
+    const { datos: renovado, status } = await pedirCrudo('/mp-oauth/refresh', {
+      method: 'POST', header: vendedor.token, body: {},
+    });
+    assert(status === 200 && renovado.estado === 'conectado',
+      `la renovación devolvió ${status}: ${JSON.stringify(renovado)}`);
+    const despues = vinculoEnLaBase('vendedor@ejemplo.com');
+    assert(despues.acceso !== antes.acceso && despues.refresco !== antes.refresco,
+      'la renovación no rotó las dos credenciales');
+    assert(despues.cuenta === antes.cuenta,
+      `la renovación cambió la cuenta: ${antes.cuenta} → ${despues.cuenta}`);
+    sinSecretos(JSON.stringify(renovado), 'la respuesta de /refresh');
+
+    // --- 2. revocación: el vendedor le sacó el permiso a la aplicación
+    const conRevocacion = await vincular(otro.token, 'ok:900002#rechazo');
+    assert(conRevocacion.ok === 'vinculado', `no vinculó: ${conRevocacion.destino}`);
+    const { datos: caido, status: statusCaido } = await pedirCrudo('/mp-oauth/refresh', {
+      method: 'POST', header: otro.token, body: {},
+    });
+    assert(statusCaido === 200,
+      `la renovación fallida devolvió ${statusCaido}, tendría que ser una respuesta útil`);
+    assert(caido.estado === 'requiere_reconexion' && caido.motivo === 'mp_rechazo',
+      `estado tras la revocación: ${JSON.stringify(caido)}`);
+    sinSecretos(JSON.stringify(caido), 'la respuesta de la renovación fallida');
+    assert(caido.mp_user_id === '900002',
+      'el vendedor no puede ver qué cuenta tiene que reconectar');
+
+    // --- 3. y se sale del pozo reconectando, sin pasar por soporte
+    const reconectado = await vincular(otro.token, 'ok:900002');
+    assert(reconectado.ok === 'vinculado', `no pudo reconectar: ${reconectado.destino}`);
+    const final = await estadoDelVinculo(otro.token);
+    assert(final.estado === 'conectado', `quedó en ${final.estado}`);
+    assert(vinculoEnLaBase('otro.vendedor.smoke@example.com').reconexion === false,
+      'la bandera de reconexión quedó encendida después de reconectar');
+
+    return 'la renovación rota acceso y refresco sin cambiar de cuenta; una revocación '
+      + 'deja «requiere_reconexion» con 200 y el vendedor sale solo reconectando';
+  } finally {
+    await desvincular(vendedor.token);
+    await desvincular(otro.token);
+    await doble.cerrar();
+  }
+});
+
+await runCase(66, 'Mercado Pago mudo o con respuesta rara no vincula ni filtra su error', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await desvincular(vendedor.token);
+
+    const esperados = [
+      ['rechazo', 'mp_rechazo', 'un 401 con el detalle del client_secret adentro'],
+      ['basura', 'respuesta_invalida', 'un 200 que no es JSON'],
+      ['incompleto', 'respuesta_invalida', 'un 200 sin refresh_token'],
+      ['lento', 'mp_sin_respuesta', 'una conexión que nunca contesta'],
+    ];
+
+    for (const [guion, motivo, descripcion] of esperados) {
+      const intento = await vincular(vendedor.token, guion);
+      assert(intento.motivo === motivo,
+        `con ${descripcion} el motivo fue «${intento.motivo}», no «${motivo}»`);
+      sinSecretos(`${intento.destino} ${intento.cuerpo}`, `la vuelta con ${guion}`);
+
+      const fila = vinculoEnLaBase('vendedor@ejemplo.com');
+      assert(!fila.cuenta && !fila.acceso,
+        `con ${descripcion} quedó algo escrito: ${JSON.stringify(fila)}`);
+    }
+
+    const estado = await estadoDelVinculo(vendedor.token);
+    assert(estado.estado === 'desconectado',
+      `después de cuatro fallas quedó en ${estado.estado}`);
+
+    return 'las cuatro fallas de Mercado Pago —rechazo, basura, respuesta incompleta y '
+      + 'silencio— dan su motivo, no escriben nada y no dejan pasar el texto de MP';
+  } finally {
+    await desvincular(vendedor.token);
+    await doble.cerrar();
+  }
+});
+
+await runCase(67, 'La vinculación a mano ya no existe y el cobro sigue apagado', async () => {
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+
+  // Pegar un access_token a mano era la puerta de atrás del módulo heredado.
+  const aMano = await pedirCrudo('/mp-oauth/manual-link', {
+    method: 'POST', header: vendedor.token,
+    body: { mp_access_token: 'APP_USR-cualquier-cosa', mp_user_id: '900009' },
+  });
+  assert([404, 405].includes(aMano.status),
+    `manual-link contestó ${aMano.status}: ${JSON.stringify(aMano.datos)}`);
+
+  // Y lo que mueve plata sigue sin estar montado.
+  for (const ruta of ['/payments/create-preference', '/payments/webhook', '/payments/my']) {
+    const { status } = await pedirCrudo(ruta, { header: vendedor.token });
+    assert(status === 404, `${ruta} contestó ${status} en vez de 404`);
+  }
+
+  // El contrato publicado tampoco los menciona: no es que estén escondidos.
+  const { datos: esquema } = await pedirCrudo('/openapi.json');
+  const rutas = Object.keys(esquema.paths || {});
+  const cobro = rutas.filter((ruta) => /payments|manual-link/.test(ruta));
+  assert(cobro.length === 0, `el esquema publica rutas de cobro: ${cobro.join(', ')}`);
+  const vinculo = rutas.filter((ruta) => ruta.includes('mp-oauth')).sort();
+  assert(vinculo.length === 5,
+    `el vínculo publica ${vinculo.length} rutas: ${vinculo.join(', ')}`);
+
+  return `manual-link responde ${aMano.status}, las tres rutas de cobro 404, y el esquema `
+    + 'publica exactamente las 5 del vínculo y ninguna de pagos';
+});
+
+await runCase(68, 'Sin configuración el vínculo se apaga solo y el resto del marketplace sigue', async () => {
+  // Se prueba con la aplicación de verdad, en el proceso donde vive, con la
+  // configuración vaciada. Levantar una segunda API en otro puerto sería
+  // probar otra cosa.
+  const observado = leerResultado(correrEnLaApi(MP_SIN_CONFIGURAR, ''));
+
+  assert(observado.status === 200 && observado.estado === 'no_configurado',
+    `/status devolvió ${observado.status} con estado ${observado.estado}`);
+  assert(observado.auth_url === 503,
+    `/auth-url devolvió ${observado.auth_url} en vez de 503`);
+  assert(!/MP_APP_ID|MP_CLIENT_SECRET|MP_TOKEN_KEY|\.env/.test(observado.detalle),
+    `el mensaje al usuario nombra variables internas: «${observado.detalle}»`);
+  assert(observado.catalogo === 200 && observado.productos === 200,
+    `el resto del marketplace se degradó: ${JSON.stringify(observado)}`);
+
+  return 'con MP_APP_ID, MP_CLIENT_SECRET, MP_REDIRECT_URI y MP_TOKEN_KEY vacías el '
+    + 'estado es «no_configurado», vincular da 503 sin nombrar variables, y catálogo '
+    + 'y productos siguen en 200';
+});
+
+await runCase(69, 'Ni la respuesta ni los logs se llevan un secreto puesto', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  try {
+    const observado = leerResultado(correrEnLaApi(MP_LOGS_SIN_SECRETOS, ''));
+
+    assert(observado.vencido === 'estado_invalido',
+      `un state nacido vencido devolvió «${observado.vencido}»`);
+    assert(observado.rechazo === 'mp_rechazo',
+      `el rechazo de MP devolvió «${observado.rechazo}»`);
+
+    // Que haya logueado algo: si no, la prueba no probaría nada.
+    assert(observado.lineas > 0, 'la aplicación no registró ni una línea');
+    assert(/Mercado Pago/i.test(observado.log),
+      'no se registró el rechazo de Mercado Pago');
+
+    for (const secreto of [SECRETO_DE_ACCESO, SECRETO_DE_REFRESCO, DETALLE_CRUDO,
+      'secreto-local-inventado', 'invalid_client']) {
+      assert(!observado.log.includes(secreto),
+        `los logs tienen «${secreto.slice(0, 24)}…»`);
+      assert(!observado.respuestas.includes(secreto),
+        `las respuestas tienen «${secreto.slice(0, 24)}…»`);
+    }
+    assert(!observado.log.includes(observado.state),
+      'los logs tienen el state completo, que es lo que valida el callback');
+
+    return `${observado.lineas} líneas de la aplicación durante un rechazo y un state `
+      + `vencido, con el motivo adentro y sin token, sin client_secret y sin el texto de `
+      + `MP (${observado.ajenos} registros del arnés quedaron fuera de la medición)`;
+  } finally {
+    await doble.cerrar();
+  }
+});
+
+await runCase(70, 'El vendedor vincula, ve y desvincula desde el panel, en escritorio y en celular', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const browser = await chromium.launch({ headless: true });
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const pantallas = [
+    ['escritorio', { width: 1280, height: 900 }],
+    ['celular', { width: 390, height: 844 }],
+  ];
+  const recorridos = [];
+
+  try {
+    await desvincular(vendedor.token);
+
+    for (const [nombre, viewport] of pantallas) {
+      const context = await browser.newContext({ viewport });
+      const page = await context.newPage();
+      const erroresDePagina = [];
+      page.on('pageerror', (error) => erroresDePagina.push(error.message));
+
+      try {
+        // Se entra por el formulario y no inyectando el token: el callback
+        // viene del navegador y necesita la cookie de sesión de verdad.
+        await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+        await page.getByRole('button', { name: 'Ingresar' }).click();
+        await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 15_000 });
+        await page.getByPlaceholder('tu@email.com').fill('vendedor@ejemplo.com');
+        await page.getByPlaceholder('••••••••').fill('vendedor123');
+        await page.locator('[class*="_submitButton_"][type="submit"]').click();
+        await page.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 15_000 });
+
+        const abrirPanel = async () => {
+          await page.locator('button').filter({ hasText: '👤' }).first().click();
+          await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor({ timeout: 15_000 });
+        };
+        await abrirPanel();
+
+        const seccion = page.locator('[class*="_mpSection_"]');
+        await seccion.waitFor({ state: 'visible', timeout: 15_000 });
+        const desconectado = (await seccion.textContent()) || '';
+        assert(/Cuenta no vinculada/.test(desconectado),
+          `${nombre}: el panel no arranca desconectado: ${desconectado.replace(/\s+/g, ' ').slice(0, 160)}`);
+
+        // Vincular manda a Mercado Pago; acá el doble contesta y devuelve.
+        // Se navega a mano al mismo destino porque el doble no es MP: lo que
+        // se prueba es que el botón manda a la URL correcta y que la vuelta
+        // deja la pantalla en «conectado».
+        const [autorizacion] = await Promise.all([
+          page.waitForRequest((pedido) => pedido.url().includes(`:${MP_PUERTO_DEL_DOBLE}/authorization`),
+            { timeout: 20_000 }),
+          page.getByRole('button', { name: /Vincular Mercado Pago/ }).click(),
+        ]);
+        assert(autorizacion.url().includes('client_id=app-local-de-prueba'),
+          `${nombre}: la URL de autorización no lleva el client_id`);
+
+        // La vuelta la recibe el encabezado, que es lo único montado en una
+        // carga nueva: avisa, limpia la URL y reabre el panel solo. Si eso no
+        // pasara, la persona volvería a la portada sin saber si quedó
+        // vinculada, que es exactamente lo que hacía antes.
+        await page.getByText('Tu cuenta de Mercado Pago quedó vinculada.')
+          .waitFor({ timeout: 20_000 });
+        const vuelta = new URL(page.url());
+        assert(!vuelta.searchParams.has('mp') && !vuelta.searchParams.has('mp_error'),
+          `${nombre}: el resultado quedó pegado en la URL: ${page.url()}`);
+
+        await page.getByRole('heading', { name: 'Mi Perfil' })
+          .waitFor({ timeout: 15_000 });
+        await seccion.waitFor({ state: 'visible', timeout: 15_000 });
+        const conectado = (await seccion.textContent()) || '';
+        assert(/Cuenta vinculada/.test(conectado) && /900001/.test(conectado),
+          `${nombre}: el panel no muestra la cuenta vinculada: ${conectado.replace(/\s+/g, ' ').slice(0, 200)}`);
+        sinSecretos(await page.content(), `${nombre}: la página`);
+
+        // Desvincular, con su confirmación.
+        await seccion.getByRole('button', { name: 'Desvincular cuenta' }).click();
+        await page.getByRole('button', { name: 'Desvincular' }).click();
+        await page.getByText('Cuenta de Mercado Pago desvinculada.').waitFor({ timeout: 15_000 });
+        const final = (await seccion.textContent()) || '';
+        assert(/Cuenta no vinculada/.test(final),
+          `${nombre}: el panel no volvió a desconectado: ${final.replace(/\s+/g, ' ').slice(0, 160)}`);
+
+        // Desvincular es borrar, no marcar: no queda credencial, ni cuenta, ni
+        // vencimiento, ni intentos de vinculación colgados.
+        const tras = vinculoEnLaBase('vendedor@ejemplo.com');
+        assert(!tras.cuenta && !tras.acceso && !tras.refresco && !tras.vence,
+          `${nombre}: desvincular dejó algo escrito: ${JSON.stringify(tras)}`);
+        assert(queryCount(`SELECT COUNT(*) FROM mp_oauth_states
+          WHERE user_id = ${sqlLiteral(vendedor.id)}`) === 0,
+          `${nombre}: quedaron intentos de vinculación después de desvincular`);
+        assert(erroresDePagina.length === 0,
+          `${nombre}: errores de página: ${erroresDePagina.join(' | ')}`);
+        recorridos.push(nombre);
+      } finally {
+        await context.close();
+      }
+    }
+
+    return `recorrido completo en ${recorridos.join(' y ')}: desconectado → autorización `
+      + 'en Mercado Pago → conectado con la cuenta a la vista → desvinculado, sin errores '
+      + 'de página y sin credenciales en el HTML';
+  } finally {
+    await browser.close();
+    await desvincular(vendedor.token);
+    await doble.cerrar();
+  }
+});
+
+await runCase(71, 'Con la clave de cifrado rotada, el vínculo pide reconexión y no se rompe', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await desvincular(vendedor.token);
+    const observado = leerResultado(correrEnLaApi(MP_CLAVE_ROTADA, ''));
+
+    assert(observado.antes === 'conectado',
+      `el vínculo no quedó conectado antes de rotar: ${observado.antes}`);
+    assert(observado.status === 200 && observado.estado === 'requiere_reconexion',
+      `con la clave rotada el estado fue ${observado.status}/${observado.estado}`);
+    assert(observado.cuenta === '900001',
+      'el vendedor no ve qué cuenta tiene que reconectar');
+    assert(observado.refresh_status === 200,
+      `renovar con la clave rotada devolvió ${observado.refresh_status}, no una respuesta útil`);
+    assert(observado.refresh_estado === 'requiere_reconexion'
+      && observado.motivo === 'credencial_ilegible',
+      `la renovación devolvió ${observado.refresh_estado}/${observado.motivo}`);
+    sinSecretos(observado.cuerpos, 'las respuestas con la clave rotada');
+
+    return 'rotada la clave sin migrar, el estado pasa solo a «requiere_reconexion» con la '
+      + 'cuenta a la vista, renovar responde 200 con motivo propio y no aparece un 500';
+  } finally {
+    await desvincular(vendedor.token);
+    await doble.cerrar();
+  }
 });
 
 const passed = results.filter((result) => result.passed).length;

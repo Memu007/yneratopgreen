@@ -1262,8 +1262,8 @@
 
 .mpUnlinkButton {
   background: transparent;
-  border: 1px solid #ef4444;
-  color: #ef4444;
+  border: 1px solid #b91c1c;
+  color: #b91c1c;
   padding: 8px 16px;
   border-radius: 6px;
   cursor: pointer;
@@ -1291,7 +1291,7 @@
 }
 
 .mpUnlinked > p {
-  color: #6b7280;
+  color: #4b5563;
   margin-bottom: 20px;
   line-height: 1.6;
 }
@@ -1352,7 +1352,7 @@
 .mpHelp {
   margin-top: 16px;
   font-size: 13px;
-  color: #6b7280;
+  color: #4b5563;
 }
 
 .mpHelp a {

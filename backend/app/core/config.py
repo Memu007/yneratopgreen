@@ -75,10 +75,24 @@ class Settings(BaseSettings):
     MP_ACCESS_TOKEN: str = ""
     MP_COMMISSION_PERCENT: float = 5.0  # Porcentaje de comisión para TopGreen
     
-    # Mercado Pago - OAuth para vincular vendedores (Split Payments)
+    # Mercado Pago - OAuth para vincular la cuenta de cada vendedor.
+    # El vendedor cobra en su cuenta: TopGreen no recibe ni redistribuye
+    # fondos de terceros. Sin estas tres —o sin la clave de cifrado de acá
+    # abajo— la integración se ofrece apagada.
     MP_APP_ID: str = ""  # Application ID del marketplace
     MP_CLIENT_SECRET: str = ""  # Client Secret del marketplace
     MP_REDIRECT_URI: str = ""  # URL de callback OAuth
+
+    # Clave Fernet con la que se cifran las credenciales del vendedor antes de
+    # tocar la base. Vive fuera del repositorio. Si falta, no se vincula nada:
+    # guardar un token de tercero en claro no es una alternativa aceptable.
+    MP_TOKEN_KEY: str = ""
+
+    # Bases de los servicios de Mercado Pago. Son configuración porque la
+    # prueba automatizada levanta un doble local y apunta la API ahí; en
+    # producción no se definen y quedan estos valores.
+    MP_AUTH_BASE_URL: str = "https://auth.mercadopago.com.ar"
+    MP_API_BASE_URL: str = "https://api.mercadopago.com"
     
     # URL de ngrok (para desarrollo)
     NGROK_URL: str = ""

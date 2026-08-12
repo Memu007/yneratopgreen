@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import styles from './Header.module.css';
 import { useAuth } from '../../contexts/AuthContext';
 import { CartButton } from '../Cart/CartModal';
 import { UserDashboard } from '../UserDashboard/UserDashboard';
+import { useToast } from '../Toast/Toast';
+import { explicarMP, resultadoDeMercadoPago } from '../../utils/mercadoPago';
 
 type PageSection = 'home' | 'marketplace' | 'about' | 'services' | 'contact' | 'payment-success' | 'payment-failure' | 'payment-pending' | 'verificar-correo';
 
@@ -30,7 +32,35 @@ export const Header: React.FC<HeaderProps> = ({
   onNavigate,
 }) => {
   const { user, isAuthenticated, logout } = useAuth();
+  const { showToast } = useToast();
   const [showDashboard, setShowDashboard] = useState(false);
+  const [vueltaDeMP, setVueltaDeMP] = useState(false);
+
+  // La vuelta de Mercado Pago aterriza en una carga nueva de la página, con el
+  // panel cerrado. Se recibe acá, que es lo que siempre está montado: si se
+  // atendiera en el panel, el vendedor volvería a la portada sin enterarse de
+  // si su cuenta quedó vinculada o no.
+  useEffect(() => {
+    const resultado = resultadoDeMercadoPago();
+    if (!resultado) return;
+
+    if (resultado.vinculado) {
+      showToast('Tu cuenta de Mercado Pago quedó vinculada.', 'success');
+    } else {
+      showToast(explicarMP(resultado.motivo), 'error');
+    }
+    setVueltaDeMP(true);
+  }, []);
+
+  // Y se lo devuelve a donde estaba, pero recién cuando la sesión terminó de
+  // restaurarse: al montar todavía no se sabe quién es. Si resulta que no hay
+  // sesión —que es justamente el caso `sin_sesion`— no se abre nada, porque el
+  // panel sin usuario no tiene qué mostrar; el aviso ya dijo qué hacer.
+  useEffect(() => {
+    if (!vueltaDeMP || !isAuthenticated) return;
+    setShowDashboard(true);
+    setVueltaDeMP(false);
+  }, [vueltaDeMP, isAuthenticated]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
