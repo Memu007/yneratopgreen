@@ -184,7 +184,7 @@ con su fecha y su motivo.
 | Logística | 07/25 | **Directorio por geolocalización, no motor de ruteo.** Lo dice el contrato |
 | Cobertura del transportista | 07/26 | **Radio en km**, no zonas declaradas. Lo dice el contrato |
 | La plataforma y el dinero | 07/26 | **No recibe, retiene ni administra fondos de terceros** |
-| Mercado Pago heredado | 07/26 | **Desmontado.** Era split con comisión y OAuth, no el "checkout básico" del contrato. Se rehace sin split en Fase 4 |
+| Mercado Pago heredado | 07/26 y 12/08 | **Desmontado.** No se reutiliza como autoridad. Emi confirmó Checkout Pro con OAuth por vendedor, cobro directo y comisión de marketplace cero |
 | Transferencia bancaria | 05/08 | Cerrada y aceptada. Sin órdenes inmortales |
 | Nombre comercial del transportista | 05/08 | **Rechazado para el MVP.** Se usa `full_name` |
 | Revisión de seguridad | 07/25 | **Al final, como condición para desplegar.** No se adelanta y no se saltea |
@@ -371,7 +371,8 @@ Pieza A de transportistas. **El control se hace por las puertas de
   la operación. Es Fase 3 y es el diferencial del producto.
 - **Validación por correo** — Fase 2.
 - **Perfil de transportista editable** — Fase 2, con dos objeciones abiertas.
-- **Mercado Pago para compras**, sin split — Fase 4.
+- **Mercado Pago para compras**, OAuth por vendedor y comisión de marketplace
+  cero — Fase 4. Una orden y un pago por vendedor.
 - **Despliegue real**, revisión de seguridad y correcciones de celular —
   Fase 5.
 

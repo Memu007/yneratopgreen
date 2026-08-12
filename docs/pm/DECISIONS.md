@@ -5,6 +5,19 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-12 — Emi confirma Mercado Pago por vendedor
+
+Cada vendedor vincula su propia cuenta de Mercado Pago mediante OAuth, cobra
+directamente y asume la comisión normal del procesador. TopGreen no recibe,
+retiene ni redistribuye fondos y configura comisión de marketplace cero. En un
+carrito multivendedor hay una orden y un pago por vendedor.
+
+La confirmación habilita la implementación en piezas y esfuerzo **Extra**. La
+primera pieza es sólo la base OAuth segura: cifrado, rotación, revocación y
+estado visible. No se activa un cobro hasta que esa base sea aceptada. Motivo:
+es la implementación mínima del Checkout Pro ofrecido y evita que TopGreen
+custodie dinero ajeno.
+
 ## 2026-08-12 — El precio se confirma al crear la orden
 
 El carrito no reserva ni promete el precio de una publicación. Rige el precio

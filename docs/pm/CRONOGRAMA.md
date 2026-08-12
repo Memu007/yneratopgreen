@@ -85,7 +85,7 @@ Contraste fase por fase, contra lo verificado en `MATRIZ.md`:
 | 1 — Diseño y UX/UI | 1–2 | **Puerta cerrada el 06/08, antes del inicio contractual.** Comprador, vendedor y logística tienen flujo navegable y evidencia responsive. El prototipo logístico fue aceptado en `823c3fe`. |
 | 2 — Desarrollo base | 3–5 | **Puerta funcional cerrada por trabajo previo.** Arquitectura, PostgreSQL + PostGIS, migraciones, seed, correo y perfiles editables incluidos transportistas tienen evidencia. |
 | 3 — Buscador y catálogo | 6–8 | **Puerta cerrada anticipadamente el 12/08.** Catálogo, búsqueda y geolocalización están encadenados en una evidencia reproducible; el hito intermedio queda habilitado. |
-| 4 — Pagos y checkout | 9–10 | **A medias.** Transferencia y contrato monetario exacto cerrados. El análisis confirmó OAuth por vendedor y comisión cero como implementación segura del Checkout Pro ofrecido; falta confirmación operativa de Emi antes de construir. |
+| 4 — Pagos y checkout | 9–10 | **A medias.** Transferencia y contrato monetario exacto cerrados. Emi confirmó OAuth por vendedor y comisión cero; está abierta la primera pieza de implementación segura. |
 | 5 — QA y lanzamiento | 11–12 | **Empezada fuera de orden.** Hay 25 casos de humo ejecutados desde base limpia y preparacion de Railway, sin despliegue ni revision de seguridad. |
 
 **Tres consecuencias, y son de la PM:**
@@ -146,8 +146,9 @@ logistica ya esten implementadas.
 
 ### Fase 4 - hasta el 15/10
 
-- Checkout basico de Mercado Pago para las compras, sin split ni OAuth de
-  vendedores.
+- Checkout Pro de Mercado Pago para las compras: cada vendedor vincula su
+  cuenta por OAuth, cobra directo y TopGreen aplica comisión de marketplace
+  cero. Una orden y un pago por vendedor.
 - Transferencia directa con CBU/alias, referencia, comprobante posible y
   decision manual del vendedor.
 - La maquina de estados no deja ordenes inmortales y cada transicion tiene
@@ -216,7 +217,7 @@ agregar alcance ni adelantar fases.
 | Fase 2 | [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) | Patrones y pruebas de verificación de correo, recuperación de contraseña, Docker y CI. | No copiar el proyecto ni migrar a SQLModel, Tailwind u otra arquitectura. |
 | Fase 3 | [GeoAlchemy2](https://github.com/geoalchemy/geoalchemy2) | Consultas PostGIS por radio y distancia con la dependencia que TopGreen ya tiene. | Directorio por origen, destino y radio; sin ruteo ni motor por peso. |
 | Fase 3 | [Georef Argentina](https://github.com/datosgobar/georef-ar-api) | API oficial para normalizar localidades y guardar sus coordenadas. | Consumir la API; no levantar ni copiar el repositorio completo. |
-| Fase 4 | [SDK oficial de Mercado Pago](https://github.com/mercadopago/sdk-python) | Ejemplos oficiales de idempotencia, pagos y pruebas; actualización aislada del SDK si corresponde. | Sin split, OAuth de vendedores ni suscripciones; la versión se decide y prueba en esa pieza. |
+| Fase 4 | [SDK oficial de Mercado Pago](https://github.com/mercadopago/sdk-python) | OAuth, preferencias, idempotencia, validación de notificaciones y pruebas. | Pago 1:1 al vendedor, comisión de marketplace cero y sin suscripciones; la versión se decide y prueba en una pieza aislada. |
 
 **No usar:** FastAPI Users mientras siga en mantenimiento; `fastapi-mail`
 si no es compatible con las versiones fijadas; otro marketplace completo;

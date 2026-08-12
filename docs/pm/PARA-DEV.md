@@ -1804,8 +1804,72 @@ PM confirmó directamente en la documentación oficial:
 - webhooks llevan firma y se reintentan, por lo que firma, consulta posterior e
   idempotencia propia son obligatorias.
 
-No implementes todavía. Falta confirmación de Emi sobre las consecuencias de
-producto: cada vendedor debe vincular su cuenta y un carrito multivendedor se
-paga por órdenes separadas. Mantenete en **Alto**. Si Emi confirma, PM abrirá la
-implementación en **Extra**, incluyendo cifrado y ciclo de vida de tokens; no se
-reutiliza el módulo heredado sin recortarlo contra ese alcance.
+Emi confirmó las consecuencias de producto: cada vendedor vincula Mercado Pago,
+cobra directamente y paga la comisión normal; TopGreen aplica comisión de
+marketplace cero. Un carrito multivendedor se paga por órdenes separadas. La
+implementación queda habilitada por piezas y pasa a **Extra**.
+
+## Tarea activa única — Pieza MP-A: vínculo OAuth seguro del vendedor
+
+Construí sólo la base que permite conectar una cuenta vendedora de Mercado Pago
+sin activar todavía preferencias, pagos, retornos ni webhooks. El resultado debe
+permitir vincular, consultar el estado, renovar/revincular y desvincular desde el
+panel del vendedor sin exponer secretos.
+
+### Contrato de seguridad y producto
+
+1. El flujo usa OAuth oficial con estado aleatorio, de un solo uso, con
+   vencimiento y ligado al usuario que inició el vínculo. Callback repetido,
+   vencido, alterado o asociado a otra sesión no vincula nada.
+2. Access token, refresh token y cualquier verificador sensible quedan cifrados
+   en reposo con una clave fuera del repositorio. No debe quedar ningún token
+   recuperable como texto plano en base, respuesta, URL ni log. La migración
+   retira o invalida las columnas heredadas en claro sin intentar conservar
+   vínculos demo inseguros.
+3. Un mismo usuario de Mercado Pago no puede quedar vinculado a dos cuentas de
+   TopGreen. El refresh rota credenciales de manera atómica; token vencido,
+   revocado, clave incorrecta o respuesta externa inválida fallan cerrado y
+   dejan un estado accionable de «reconectar», nunca un 500 opaco.
+4. Desvincular borra localmente todas las credenciales y el identificador
+   asociado. Eliminá la vía `manual-link`: pegar un access token no es un método
+   permitido.
+5. El panel del vendedor muestra sólo desconectado, conectado o requiere
+   reconexión, con acciones coherentes. Ningún dato secreto ni error crudo de
+   Mercado Pago llega al navegador. Conservá la UI existente; no rediseñes.
+6. Configuración ausente devuelve un estado seguro y explícito sin degradar el
+   resto del marketplace. Actualizá ejemplos y documentación de variables sin
+   valores reales. Verificá contra documentación oficial si el SDK fijado se
+   usa en esta pieza; actualizalo sólo si aporta una API utilizada y compatible.
+
+Podés reescribir o reemplazar `mp_oauth.py`; el archivo heredado no es
+autoridad. **No montes ni refactorices `payments.py`**, no restaures el 5 %, no
+crees preferencias y no cambies estados de órdenes o stock. No agregues
+suscripciones, custodia, 1:N, conciliación, reembolsos ni credenciales reales.
+
+### Evidencia obligatoria
+
+- Migración upgrade/downgrade y `alembic check`; una inspección de base prueba
+  que los tokens ficticios no aparecen en claro.
+- Pruebas con el servicio externo simulado: éxito, timeout/error, estado
+  alterado/vencido/reutilizado, cuenta MP duplicada, refresh con rotación,
+  revocación y desvinculación. La misma prueba verifica que respuesta y logs no
+  contienen secretos.
+- Una regresión demuestra que `manual-link` ya no existe y que los routers de
+  cobro siguen en 404; sólo queda activo el alcance OAuth aceptado.
+- Recorrido de navegador del vendedor en escritorio y celular: desconectado →
+  iniciar vínculo simulado → conectado → desvinculado/reconectar. Accesibilidad
+  y contraste proporcionales a las pantallas tocadas.
+- Suite completa, puerta del hito, build, sintaxis Python y `diff --check`
+  verdes. Si agregás recorridos permanentes, actualizá inventarios con
+  aritmética explícita.
+
+### Condición de freno y entrega
+
+Si Mercado Pago no permite asegurar alguno de estos estados sin una decisión
+de producto adicional, o la migración encuentra tokens reales no nulos, frená
+y reportá el caso antes de borrarlos. No pruebes con credenciales de producción.
+
+Entregá un commit de producto y otro separado con el informe en `PARA-PM.md`:
+decisiones tomadas, esquema final, versión/dependencias justificadas, comandos,
+resultados y riesgos residuales. Ahí vuelve a PM. La Pieza MP-B —preferencia por
+orden y secuencia multivendedor— no empieza hasta que MP-A sea aceptada.

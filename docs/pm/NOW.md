@@ -89,12 +89,16 @@ reemplaza las preferencias de Checkout Pro. El modelo general es 1:1; un carrito
 con varios vendedores requiere un pago por orden salvo acceso comercial al
 modelo 1:N.
 
-**Decisión pendiente de Emi, sin tarea activa de producto:** confirmar el flujo
-seguro ya ofrecido: cada vendedor vincula Mercado Pago, cobra directamente y
-paga la comisión normal; TopGreen cobra comisión cero. Conviene informar a la
-clienta las dos consecuencias operativas —vinculación por vendedor y pagos
-separados—, sin tratarlas como adicional. La Dev sigue en **Alto** mientras
-espera; la implementación completa justificará volver a **Extra**.
+**Decisión confirmada por Emi:** cada vendedor vincula Mercado Pago, cobra
+directamente y paga la comisión normal; TopGreen cobra comisión cero. Un carrito
+multivendedor requiere un pago por orden/vendedor. Estas dos consecuencias se
+informan a la clienta como funcionamiento del requisito, no como adicional.
+
+**Tarea activa única:** Pieza MP-A, conexión OAuth segura del vendedor. Incluye
+cifrado y ciclo de vida de credenciales, vínculo/revinculación/desvinculación y
+estado visible, pero todavía no crea preferencias ni cobra. La Dev pasa a
+**Extra**; entrega producto e informe separado y vuelve a PM antes de abrir la
+Pieza MP-B.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
