@@ -5309,6 +5309,263 @@ await runCase(58, 'Un ítem sin origen guardado no inventa uno, ni antes ni desp
   }
 });
 
+// --- contrato monetario -----------------------------------------------------
+// Publicar con un precio exacto y comprarlo por los dos caminos. El precio se
+// manda como número JSON, que es lo que manda el frontend; lo que se exige es
+// que de ahí en adelante nadie lo pase por aritmética binaria.
+async function publicarConPrecio(precio, stock, etiqueta, token = state.sellerToken) {
+  const [categoria] = queryRows('SELECT id FROM categories ORDER BY name LIMIT 1');
+  const creado = await apiRequest('/products', {
+    method: 'POST',
+    token,
+    body: {
+      name: `Smoke ${etiqueta} ${Date.now()}`,
+      description: 'Publicación de prueba del contrato monetario.',
+      category_id: categoria[0],
+      price: precio,
+      stock,
+      unit: 'unidad',
+      locality_id: state.location.localityId,
+      publication_type: 'producto',
+    },
+  });
+  return creado.data.id;
+}
+
+function montosDeLaOrden(ordenId) {
+  const [fila] = queryRows(`
+    SELECT o.subtotal, o.shipping_cost, o.total_amount,
+           oi.unit_price_snapshot, oi.total_price
+    FROM orders o JOIN order_items oi ON oi.order_id = o.id
+    WHERE o.id = ${sqlLiteral(ordenId)}
+  `);
+  assert(fila, `la orden ${ordenId} no está en la base`);
+  const [subtotal, envio, total, unitario, linea] = fila;
+  return { subtotal, envio, total, unitario, linea };
+}
+
+// Un solo recorrido, parametrizado: mismo precio y misma cantidad por los dos
+// caminos que crean órdenes. Devuelve lo que vio la API y lo que quedó en SQL.
+async function comprarPorLosDosCaminos(productoId, cantidad, vendedorId) {
+  const visto = {};
+
+  for (const [camino, endpoint] of [
+    ['transferencia', '/orders/checkout/transfer'],
+    ['mercadopago', '/orders/checkout'],
+  ]) {
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    const carrito = await apiRequest('/cart/sync', {
+      method: 'POST', token: state.buyerToken,
+      body: { items: [{ product_id: productoId, quantity: cantidad }] },
+    });
+    const [linea] = carrito.data.items;
+
+    const opciones = (await apiRequest('/orders/transfer-options',
+      { token: state.buyerToken })).data;
+    const opcion = opciones.find((o) => o.seller_id === vendedorId);
+    assert(opcion, 'transfer-options no trajo al vendedor de la publicación');
+
+    const respuesta = await apiRequest(endpoint, {
+      method: 'POST', token: state.buyerToken,
+      body: {
+        shipping_address: 'Ruta 8 km 220',
+        shipping_locality_id: localidadDeEnvio(),
+        shipping_postal_code: '2700',
+        shipping_decisions: [{ seller_id: vendedorId, mode: 'self' }],
+      },
+    });
+
+    const ordenId = camino === 'transferencia'
+      ? respuesta.data.orders[0].order_id
+      : respuesta.data.id;
+    visto[camino] = {
+      carritoLinea: linea.subtotal,
+      carritoTotal: carrito.data.total_amount,
+      opcion: opcion.amount,
+      respuesta: camino === 'transferencia'
+        ? respuesta.data.orders[0].amount
+        : respuesta.data.total_amount,
+      subtotalApi: camino === 'transferencia' ? null : respuesta.data.subtotal,
+      enBase: montosDeLaOrden(ordenId),
+    };
+  }
+
+  return visto;
+}
+
+await runCase(59, 'Tres unidades de diez centavos son treinta centavos, no 0,30000000000000004', async () => {
+  // El caso más chico posible y el que más duele: 0,1 no existe en binario.
+  // Sumarlo tres veces da 0,30000000000000004 y eso es lo que veía el
+  // comprador en el carrito, en la opción de pago y en la respuesta.
+  const producto = await publicarConPrecio(0.10, 20, 'diez centavos');
+  const [[vendedor]] = queryRows(
+    `SELECT seller_id FROM products WHERE id = ${sqlLiteral(producto)}`);
+
+  const visto = await comprarPorLosDosCaminos(producto, 3, vendedor);
+
+  for (const [camino, datos] of Object.entries(visto)) {
+    for (const [donde, valor] of [
+      ['la línea del carrito', datos.carritoLinea],
+      ['el total del carrito', datos.carritoTotal],
+      ['la opción de transferencia', datos.opcion],
+      ['la respuesta del checkout', datos.respuesta],
+      ...(datos.subtotalApi === null ? [] : [['el subtotal de la respuesta', datos.subtotalApi]]),
+    ]) {
+      assert(valor === 0.3,
+        `${camino}: ${donde} devolvió ${valor} en vez de 0.3`);
+    }
+    assert(datos.enBase.subtotal === '0.30' && datos.enBase.total === '0.30'
+      && datos.enBase.linea === '0.30' && datos.enBase.unitario === '0.10',
+      `${camino}: en la base quedó ${JSON.stringify(datos.enBase)}`);
+    assert(datos.enBase.envio === '0.00',
+      `${camino}: el envío quedó en ${datos.enBase.envio}`);
+  }
+
+  return '3 × $0,10 = $0,30 exacto en carrito, opción, respuesta y SQL, por los dos '
+    + 'checkouts; en binario esa cuenta da 0.30000000000000004';
+});
+
+await runCase(60, 'El tope del contrato conserva los centavos por los dos caminos', async () => {
+  // 99 × 9.999.999.999,97 = 989.999.999.997,03 exacto. En binario da
+  // 989.999.999.997,0299: el error es de una diezmilésima, así que la columna
+  // NUMERIC lo redondea y lo esconde. Donde se ve es en lo que devuelve la
+  // API, que es lo que el comprador lee y lo que consume el frontend.
+  const producto = await publicarConPrecio(9999999999.97, 99, 'tope con centavos');
+  const [[vendedor]] = queryRows(
+    `SELECT seller_id FROM products WHERE id = ${sqlLiteral(producto)}`);
+
+  const visto = await comprarPorLosDosCaminos(producto, 99, vendedor);
+  const EXACTO = 989999999997.03;
+
+  for (const [camino, datos] of Object.entries(visto)) {
+    for (const [donde, valor] of [
+      ['la línea del carrito', datos.carritoLinea],
+      ['el total del carrito', datos.carritoTotal],
+      ['la opción de transferencia', datos.opcion],
+      ['la respuesta del checkout', datos.respuesta],
+      ...(datos.subtotalApi === null ? [] : [['el subtotal de la respuesta', datos.subtotalApi]]),
+    ]) {
+      assert(valor === EXACTO,
+        `${camino}: ${donde} devolvió ${valor} en vez de ${EXACTO}`);
+    }
+    assert(datos.enBase.unitario === '9999999999.97',
+      `${camino}: el snapshot unitario quedó en ${datos.enBase.unitario}`);
+    assert(datos.enBase.linea === '989999999997.03',
+      `${camino}: el importe del ítem quedó en ${datos.enBase.linea}`);
+    assert(datos.enBase.subtotal === '989999999997.03'
+      && datos.enBase.total === '989999999997.03',
+      `${camino}: en la base quedó ${JSON.stringify(datos.enBase)}`);
+  }
+
+  return '99 × $9.999.999.999,97 = $989.999.999.997,03 exacto en carrito, opción, '
+    + 'respuesta, snapshot, subtotal y total, por los dos checkouts';
+});
+
+await runCase(61, 'Con varios vendedores, cada total es suyo y uno fuera de contrato no escribe nada', async () => {
+  // Dos vendedores en el mismo carrito. Los totales no se suman entre sí: el
+  // límite es por orden. Y si el de uno se pasa, no se crea NINGUNA orden y el
+  // carrito sigue vivo para que la persona pueda corregir.
+  const barato = await publicarConPrecio(0.10, 20, 'multivendedor barato');
+  const sesionAdmin = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'admin@topgreen.com', password: 'admin123' },
+  });
+  // Arranca con un precio chico para poder entrar al carrito; el acto 2 lo
+  // sube al máximo publicable con el producto ya adentro.
+  const caro = await publicarConPrecio(
+    9999999.99, 200, 'multivendedor caro', sesionAdmin.data.access_token);
+  const [[vendedorBarato]] = queryRows(
+    `SELECT seller_id FROM products WHERE id = ${sqlLiteral(barato)}`);
+  const [[vendedorCaro]] = queryRows(
+    `SELECT seller_id FROM products WHERE id = ${sqlLiteral(caro)}`);
+  assert(vendedorBarato !== vendedorCaro, 'las dos publicaciones son del mismo vendedor');
+
+  const decisiones = [
+    { seller_id: vendedorBarato, mode: 'self' },
+    { seller_id: vendedorCaro, mode: 'self' },
+  ];
+  const envio = (extra) => ({
+    shipping_address: 'Ruta 8 km 220',
+    shipping_locality_id: localidadDeEnvio(),
+    shipping_postal_code: '2700',
+    shipping_decisions: decisiones,
+    ...extra,
+  });
+
+  // --- 1. totales independientes, sin sumarse entre sí
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  await apiRequest('/cart/sync', {
+    method: 'POST', token: state.buyerToken,
+    body: {
+      items: [
+        { product_id: barato, quantity: 3 },
+        { product_id: caro, quantity: 2 },
+      ],
+    },
+  });
+  const opciones = (await apiRequest('/orders/transfer-options',
+    { token: state.buyerToken })).data;
+  const delBarato = opciones.find((o) => o.seller_id === vendedorBarato);
+  const delCaro = opciones.find((o) => o.seller_id === vendedorCaro);
+  assert(delBarato.amount === 0.3,
+    `el total del vendedor barato es ${delBarato.amount}, no 0.3`);
+  assert(delCaro.amount === 19999999.98,
+    `el total del vendedor caro es ${delCaro.amount}, no 19999999.98`);
+
+  const creadas = await apiRequest('/orders/checkout/transfer', {
+    method: 'POST', token: state.buyerToken, body: envio(),
+  });
+  assert(creadas.data.orders.length === 2, 'no se crearon las dos órdenes');
+  const porVendedor = Object.fromEntries(
+    creadas.data.orders.map((o) => [o.seller_id, o.amount]));
+  assert(porVendedor[vendedorBarato] === 0.3 && porVendedor[vendedorCaro] === 19999999.98,
+    `los totales se mezclaron: ${JSON.stringify(porVendedor)}`);
+
+  // --- 2. uno fuera de contrato: ninguna orden y el carrito intacto
+  //
+  // El carrito no deja armar un total imposible: lo rechaza al agregar, al
+  // cambiar cantidad y al sincronizar. Así que el carrito se arma dentro del
+  // contrato y se pasa después, por donde puede pasar de verdad: el vendedor
+  // sube el precio con el producto ya en el carrito.
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  await apiRequest('/cart/sync', {
+    method: 'POST', token: state.buyerToken,
+    body: {
+      items: [
+        { product_id: barato, quantity: 3 },
+        { product_id: caro, quantity: 150 },
+      ],
+    },
+  });
+  // 9.999.999.999,99 × 150 = 1.499.999.999.998,50: por encima del máximo.
+  await apiRequest(`/products/${caro}`, {
+    method: 'PATCH', token: sesionAdmin.data.access_token,
+    body: { price: 9999999999.99 },
+  });
+  const ordenesAntes = queryCount('SELECT COUNT(*) FROM orders');
+  const itemsAntes = queryCount('SELECT COUNT(*) FROM order_items');
+
+  for (const endpoint of ['/orders/checkout/transfer', '/orders/checkout']) {
+    const motivo = await expectApiError(400, () => apiRequest(endpoint, {
+      method: 'POST', token: state.buyerToken, body: envio(),
+    }));
+    assert(/supera el máximo admitido/i.test(motivo),
+      `${endpoint}: motivo inesperado «${motivo}»`);
+    assert(queryCount('SELECT COUNT(*) FROM orders') === ordenesAntes
+      && queryCount('SELECT COUNT(*) FROM order_items') === itemsAntes,
+      `${endpoint}: se escribió algo pese al rechazo`);
+    const [[estado]] = queryRows(`
+      SELECT c.status FROM carts c
+      WHERE c.user_id = ${sqlLiteral(state.buyerId)} AND c.status = 'ACTIVE'
+    `);
+    assert(estado === 'ACTIVE', `${endpoint}: el carrito quedó en ${estado}`);
+  }
+
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  return 'dos vendedores con totales independientes ($0,30 y $19.999.999,98); '
+    + 'con uno fuera de contrato, 0 órdenes nuevas por los dos checkouts y el carrito '
+    + 'sigue activo';
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

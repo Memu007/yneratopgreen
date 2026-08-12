@@ -43,6 +43,27 @@ def formatear(monto) -> str:
     return f"{'-' if negativo else ''}{'.'.join(grupos)},{decimales}"
 
 
+# Envío sin cargo. Existe como Decimal para que nadie escriba 0.0 y arrastre
+# un float dentro de una suma monetaria.
+SIN_CARGO = Decimal("0")
+
+
+def importe_de_linea(precio, cantidad: int) -> Decimal:
+    """Precio unitario por cantidad, siempre en Decimal.
+
+    No redondea, y no hace falta: un NUMERIC(12,2) multiplicado por un entero
+    da como mucho dos decimales, y sumar dos decimales sigue dando dos. Si
+    alguna vez hiciera falta una politica de redondeo, se decide aca y en
+    ningun otro lado.
+
+    Existe para que la multiplicacion monetaria se escriba UNA vez. Cada
+    `float(precio) * cantidad` suelto era una oportunidad de perder centavos:
+    99 por 9.999.999.999,97 da 989.999.999.997,03 exacto y 989.999.999.997,0299
+    en binario.
+    """
+    return _a_decimal(precio) * cantidad
+
+
 def validar_precio_unitario(precio, que: str = "El precio") -> Decimal:
     """Un precio publicable tiene que entrar en NUMERIC(12,2)."""
     valor = _a_decimal(precio)

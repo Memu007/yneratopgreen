@@ -16,7 +16,7 @@ from app.models.cart import Cart, CartStatus
 from app.models.locality import Locality
 from app.models.product import Product
 from app.core.dependencies import get_current_user
-from app.core.montos import validar_total
+from app.core.montos import SIN_CARGO, importe_de_linea, validar_total
 from app.models.user import User
 from app.schemas.logistics import OrderShipping
 from app.schemas.orders import (
@@ -88,11 +88,12 @@ def checkout(
     for _seller_id, _items in items_by_seller.items():
         for _item in _items:
             validar_total(
-                Decimal(str(_item.product.price)) * _item.quantity,
+                importe_de_linea(_item.product.price, _item.quantity),
                 f"El importe de «{_item.product.name}»",
             )
         validar_total(
-            sum((Decimal(str(x.product.price)) * x.quantity for x in _items), Decimal(0)),
+            sum((importe_de_linea(x.product.price, x.quantity) for x in _items),
+                Decimal(0)),
             "El total de la orden",
         )
 
@@ -101,8 +102,13 @@ def checkout(
     # Crear una orden por cada vendedor
     for seller_id, items in items_by_seller.items():
         # Calcular totales
-        subtotal = sum(float(item.product.price) * item.quantity for item in items)
-        shipping_cost = 0.0
+        # Todo el camino del dinero en Decimal: el precio ya viene NUMERIC de
+        # la base y no se lo convierte a binario en ningún punto.
+        subtotal = sum(
+            (importe_de_linea(item.product.price, item.quantity) for item in items),
+            Decimal(0),
+        )
+        shipping_cost = SIN_CARGO
         total_amount = subtotal + shipping_cost
         
         # Crear orden
@@ -160,9 +166,9 @@ def checkout(
                 product_id=product.id,
                 product_name_snapshot=product.name,
                 product_image_snapshot=primary_image,
-                unit_price_snapshot=float(product.price),
+                unit_price_snapshot=product.price,
                 quantity=cart_item.quantity,
-                total_price=float(product.price) * cart_item.quantity,
+                total_price=importe_de_linea(product.price, cart_item.quantity),
                 **origen_de(product),
             )
             
@@ -216,9 +222,9 @@ def checkout(
             id=order.id,
             order_number=order.order_number,
             status=order.status.value,
-            subtotal=float(order.subtotal),
-            shipping_cost=float(order.shipping_cost),
-            total_amount=float(order.total_amount),
+            subtotal=order.subtotal,
+            shipping_cost=order.shipping_cost,
+            total_amount=order.total_amount,
             items=items_response,
             created_at=order.created_at
         ))
@@ -261,7 +267,11 @@ def get_transfer_options(
             seller_name=group["seller"].full_name,
             cbu=group["seller"].cbu,
             alias_bancario=group["seller"].alias_bancario,
-            amount=sum(float(item.product.price) * item.quantity for item in group["items"]),
+            amount=sum(
+                (importe_de_linea(item.product.price, item.quantity)
+                 for item in group["items"]),
+                Decimal(0),
+            ),
         )
         for group in groups
     ]
@@ -290,11 +300,11 @@ def checkout_bank_transfer(
     for group in groups:
         for item in group["items"]:
             validar_total(
-                Decimal(str(item.product.price)) * item.quantity,
+                importe_de_linea(item.product.price, item.quantity),
                 f"El importe de «{item.product.name}»",
             )
         validar_total(
-            sum((Decimal(str(i.product.price)) * i.quantity
+            sum((importe_de_linea(i.product.price, i.quantity)
                  for i in group["items"]), Decimal(0)),
             "El total de la orden",
         )
@@ -304,14 +314,17 @@ def checkout_bank_transfer(
     for group in groups:
         seller = group["seller"]
         items = group["items"]
-        subtotal = sum(float(item.product.price) * item.quantity for item in items)
+        subtotal = sum(
+            (importe_de_linea(item.product.price, item.quantity) for item in items),
+            Decimal(0),
+        )
         order = Order(
             order_number=generate_order_number(),
             buyer_id=current_user.id,
             seller_id=seller.id,
             status=OrderStatus.AWAITING_TRANSFER_RECEIPT,
             subtotal=subtotal,
-            shipping_cost=0,
+            shipping_cost=SIN_CARGO,
             total_amount=subtotal,
             transfer_cbu=seller.cbu,
             transfer_alias_bancario=seller.alias_bancario,
@@ -351,9 +364,9 @@ def checkout_bank_transfer(
                 product_id=product.id,
                 product_name_snapshot=product.name,
                 product_image_snapshot=primary_image,
-                unit_price_snapshot=float(product.price),
+                unit_price_snapshot=product.price,
                 quantity=cart_item.quantity,
-                total_price=float(product.price) * cart_item.quantity,
+                total_price=importe_de_linea(product.price, cart_item.quantity),
                 **origen_de(product),
             ))
 
@@ -379,7 +392,7 @@ def checkout_bank_transfer(
             seller_name=order.transfer_account_holder,
             cbu=order.transfer_cbu,
             alias_bancario=order.transfer_alias_bancario,
-            amount=float(order.total_amount),
+            amount=order.total_amount,
         )
         for order, seller in created
     ])
@@ -434,7 +447,7 @@ async def upload_transfer_receipt(
         seller_name=order.transfer_account_holder,
         cbu=order.transfer_cbu,
         alias_bancario=order.transfer_alias_bancario,
-        amount=float(order.total_amount),
+        amount=order.total_amount,
         transfer_receipt_url=order.transfer_receipt_url,
     )
 
@@ -495,7 +508,7 @@ def decide_transfer_receipt(
         seller_name=order.transfer_account_holder,
         cbu=order.transfer_cbu,
         alias_bancario=order.transfer_alias_bancario,
-        amount=float(order.total_amount),
+        amount=order.total_amount,
         transfer_receipt_url=order.transfer_receipt_url,
     )
 
@@ -612,9 +625,9 @@ def get_my_orders(
             id=order.id,
             order_number=order.order_number,
             status=order.status.value,
-            subtotal=float(order.subtotal),
-            shipping_cost=float(order.shipping_cost),
-            total_amount=float(order.total_amount),
+            subtotal=order.subtotal,
+            shipping_cost=order.shipping_cost,
+            total_amount=order.total_amount,
             items=items_response,
             created_at=order.created_at,
             buyer_name=buyer_name,
@@ -665,9 +678,9 @@ def get_order_detail(
         id=order.id,
         order_number=order.order_number,
         status=order.status.value,
-        subtotal=float(order.subtotal),
-        shipping_cost=float(order.shipping_cost),
-        total_amount=float(order.total_amount),
+        subtotal=order.subtotal,
+        shipping_cost=order.shipping_cost,
+        total_amount=order.total_amount,
         items=items_response,
         created_at=order.created_at,
         seller_cbu=order.transfer_cbu,

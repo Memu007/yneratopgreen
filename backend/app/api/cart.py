@@ -12,7 +12,11 @@ from app.models.product_image import ProductImage
 from app.models.category import Category
 from app.core.dependencies import get_current_user
 from decimal import Decimal
-from app.core.montos import validar_precio_unitario, validar_total
+from app.core.montos import (
+    importe_de_linea,
+    validar_precio_unitario,
+    validar_total,
+)
 from app.models.user import User
 from app.schemas.cart import (
     CartItemCreateRequest,
@@ -89,14 +93,14 @@ def get_cart(
             ProductImage.is_primary == True
         ).first()
         
-        subtotal = item.product.price * item.quantity
+        subtotal = importe_de_linea(item.product.price, item.quantity)
         total_amount += subtotal
         
         items_response.append(CartItemResponse(
             id=item.id,
             product_id=item.product_id,
             product_name=item.product.name,
-            product_price=float(item.product.price),
+            product_price=item.product.price,
             product_image=primary_image[0] if primary_image else None,
             quantity=item.quantity,
             subtotal=subtotal
@@ -184,10 +188,10 @@ def add_to_cart(
         id=cart_item.id,
         product_id=cart_item.product_id,
         product_name=product.name,
-        product_price=float(product.price),
+        product_price=product.price,
         product_image=primary_image[0] if primary_image else None,
         quantity=cart_item.quantity,
-        subtotal=float(product.price) * cart_item.quantity
+        subtotal=importe_de_linea(product.price, cart_item.quantity)
     )
 
 
@@ -235,10 +239,10 @@ def update_cart_item_by_product(
         id=cart_item.id,
         product_id=cart_item.product_id,
         product_name=cart_item.product.name,
-        product_price=float(cart_item.product.price),
+        product_price=cart_item.product.price,
         product_image=primary_image[0] if primary_image else None,
         quantity=cart_item.quantity,
-        subtotal=float(cart_item.product.price) * cart_item.quantity
+        subtotal=importe_de_linea(cart_item.product.price, cart_item.quantity)
     )
 
 
@@ -283,10 +287,10 @@ def update_cart_item(
         id=cart_item.id,
         product_id=cart_item.product_id,
         product_name=cart_item.product.name,
-        product_price=float(cart_item.product.price),
+        product_price=cart_item.product.price,
         product_image=primary_image[0] if primary_image else None,
         quantity=cart_item.quantity,
-        subtotal=float(cart_item.product.price) * cart_item.quantity
+        subtotal=importe_de_linea(cart_item.product.price, cart_item.quantity)
     )
 
 
@@ -431,7 +435,7 @@ def sync_cart(
     db.query(CartItem).filter(CartItem.cart_id == cart.id).delete()
 
     items_response = []
-    total_amount = 0.0
+    total_amount = Decimal("0")
 
     for product_id in orden:
         product = efectivos[product_id]["producto"]
@@ -452,14 +456,14 @@ def sync_cart(
             ProductImage.is_primary == True
         ).first()
 
-        subtotal = float(product.price) * quantity
+        subtotal = importe_de_linea(product.price, quantity)
         total_amount += subtotal
 
         items_response.append(CartItemResponse(
             id=cart_item.id,
             product_id=product.id,
             product_name=product.name,
-            product_price=float(product.price),
+            product_price=product.price,
             product_image=primary_image[0] if primary_image else None,
             quantity=quantity,
             subtotal=subtotal
