@@ -4,156 +4,123 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 
 Fecha: 2026-08-12.
 
-## 1. Resultado
+## 0. Primero, el hash que te di mal
 
-**La puerta del hito está hecha.** El commit es **`cc08aa2`**, sobre `24719cb`;
-este informe va aparte y encima.
+La entrega inicial de la puerta es **`1e8822d`**, no `cc08aa2`. Escribí el
+informe con el hash de antes de enmendar el commit: había convertido sin querer
+todo `package.json` a LF —lo lee Python en modo texto y lo escribe igual—, lo
+volví a dejar como estaba y el hash cambió. Reporté el viejo. Es la segunda vez
+que me pasa con hashes; a partir de ahora el número lo saco de `git log`
+después del último toque, no de mi memoria.
+
+Cierre de esta pieza: **`3580faa`**, sobre `8f7e67f`. Este informe va aparte y
+encima.
+
+## 1. Los dos falsos positivos
+
+Tenías razón en los dos, y los dos eran del mismo tipo: la comprobación podía
+pasar sin que lo comprobado fuera cierto.
+
+### El catálogo se medía por reloj
+
+`waitForTimeout(1200)` entre elegir la localidad y comparar. Una consulta más
+lenta que ese número y la puerta comparaba el catálogo anterior contra el SQL
+nuevo —o pasaba de casualidad, que es peor—.
+
+Ahora sincroniza por señal: espera la **respuesta** de la consulta que lleva las
+tres condiciones juntas —categoría, provincia y localidad— y después que la
+grilla haya terminado de pintar exactamente esa respuesta, contando tarjetas
+contra el tamaño del cuerpo recibido.
+
+Y agregué algo que no me pediste pero hace la puerta honesta sola: **la puerta
+retrasa esa consulta 2,5 s a propósito**. Cada corrida demuestra, con el
+retraso puesto, que no está esperando un reloj. El contraste pasó a ser de tres
+puntas: pantalla, API y SQL.
+
+Un detalle que encontré al implementarlo: la categoría viaja en la URL como
+**id**, no como nombre. El predicado la exige presente y no vacía, junto con la
+provincia y el id de localidad —que sale del propio selector, no de una
+constante—.
+
+### La vista del transportista se medía sobre la página entera
+
+El recorrido, el producto y la ausencia de importes se buscaban en todo el
+`body`. Un texto de otra operación podía hacer pasar el caso.
+
+Ahora todo se mira dentro de la tarjeta de esa operación, y esa tarjeta tiene
+que ser **exactamente una**. Aproveché para agregar la cantidad, contrastada
+contra el ítem de la orden: antes se afirmaba «cantidades» sin mirar ninguna.
+
+## 2. Las dos fallas forzadas
+
+Con la misma convención que la suite (`--force-failure=`), fuera de la puerta y
+a pedido:
 
 ```bash
-npm run hito
+npm run hito -- --force-failure=catalogo-sin-senal
 ```
-
-Un solo comando, un solo navegador, un solo viaje. No corre ningún caso ajeno.
-
 ```text
-=== Puerta del hito intermedio ===
-
-  ✓ catálogo filtrado por categoría y ubicación oficial
-      Insumos agrícolas · Pergamino, Buenos Aires: 1 de 30 publicaciones, y las
-      mismas que devuelve SQL
-  ✓ detalle, carrito y destino del padrón
-      «Fertilizante Triple 15 - NPK» en el carrito; destino Pergamino; el
-      servidor derivó el envío de Juan Vendedor desde Pergamino, Buenos Aires
-  ✓ transportistas compatibles por PostGIS, sin contacto
-      1 transportista(s) que cubren el tramo, iguales a PostGIS (Carlos
-      Transportista), y ni un dato de contacto a la vista
-  ✓ selección, contacto revelado y orden creada
-      Carlos Transportista elegido, contacto visible
-      (transportista@ejemplo.com · +54 2477 55-0101) y orden ORD-…-57AF77AA creada
-  ✓ contraste por SQL de la orden
-      destino Pergamino, origen congelado Pergamino, traslado «carrier» con
-      Carlos Transportista, vendedor Juan Vendedor
-  ✓ la operación como transportista
-      transportista@ejemplo.com ve la operación con recorrido y cantidades, sin
-      importes ni contacto del comprador
-
-  6 de 6 pasos del recorrido, encadenados en un solo viaje
-
-HITO DEMOSTRADO: catálogo, búsqueda filtrada y geolocalización funcional,
-encadenados de punta a punta
-```
-
-## 2. Lo que la hace una demostración y no una escenografía
-
-**Están encadenados.** No son seis comprobaciones que casualmente van seguidas:
-lo que el filtro deja es lo que se compra, y lo que se compra es lo que el
-transportista termina viendo. El nombre de la publicación sale del paso 1 y
-viaja hasta el 6; el número de orden sale del 4 y se contrasta en el 5 y en el
-6. Si el encadenamiento se rompiera en el medio, no habría paso siguiente que
-mirar.
-
-**No fabrica nada.** Antes de abrir el navegador no hay una sola llamada a la
-API ni una sola escritura en SQL. Cuentas, publicaciones, categorías, orígenes
-y el transportista salen del seed. SQL aparece **después** de cada paso, y sólo
-para contrastar.
-
-**Los contrastes no tienen números escritos a mano.** El paso 1 compara el
-conjunto de publicaciones visibles contra el conjunto que devuelve SQL, y
-además exige que sin filtrar haya estrictamente más —si no, el filtro no
-filtró—. El paso 3 compara el listado visible contra la misma regla resuelta en
-PostGIS, no contra una cantidad esperada.
-
-## 3. El seed no hizo falta tocarlo
-
-Me lo autorizabas y no fue necesario. El seed ya deja el tramo completo:
-
-| Qué | Del seed |
-|---|---|
-| Publicación | «Fertilizante Triple 15 - NPK», categoría *Insumos agrícolas* |
-| Origen oficial | Pergamino, Buenos Aires |
-| Transportista | Carlos Transportista, base en Pergamino, radio 250 km |
-| Destino | Pergamino: las dos puntas del viaje a 0 km de su base |
-
-Como no cambié el seed, tampoco hacía falta volver a probar alta y repetición:
-el caso 41 ya exige que repetirlo no duplique ni altere las cuentas demo, y
-sigue verde.
-
-## 4. Rojo cuando falta un paso
-
-No alcanza con que falle: la puerta también tiene que darse cuenta de que un
-paso **no corrió**. Lo probé sacando el paso 3 y dejando el resto igual:
-
-```text
-  ✓ catálogo filtrado por categoría y ubicación oficial
-  ✓ detalle, carrito y destino del padrón
-  — transportistas compatibles por PostGIS, sin contacto: NO SE CORRIÓ
-  ✗ selección, contacto revelado y orden creada
-  — contraste por SQL de la orden: NO SE CORRIÓ
-  — la operación como transportista: NO SE CORRIÓ
-
-  2 de 6 pasos del recorrido
+  ✗ catálogo filtrado por categoría y ubicación oficial
+      la pantalla y SQL no coinciden:
+      pantalla:
+      SQL:      Fertilizante Triple 15 - NPK
 HITO NO DEMOSTRADO        (salida 1)
 ```
+Vuelve a la espera por reloj. Con la consulta retrasada, la pantalla todavía
+está vacía y SQL ya tiene la publicación: exactamente el falso positivo que
+señalaste, ahora visible.
 
-El recorrido exigido es una lista fija en el script: si falta uno, sobra uno o
-se repite, la puerta falla. Es la misma idea del inventario de accesibilidad.
+```bash
+npm run hito -- --force-failure=tarjeta-suplantada
+```
+```text
+  ✗ la operación como transportista
+      esperaba una sola tarjeta de la operación ORD-…-80BE2179, encontré 0
+HITO NO DEMOSTRADO        (salida 1)
+```
+Inyecta en la página los mismos textos de la tarjeta —número de operación,
+producto y recorrido— **fuera** de ella, y borra la tarjeta real. Una
+comprobación de página entera pasaría con el señuelo; la de tarjeta encuentra
+cero. Es la demostración exacta de que la presencia de esos textos en otro lado
+no alcanza.
 
-## 5. Reproducibilidad
-
-- Base recreada desde cero y sembrada: **verde**.
-- Segunda corrida seguida, sin recrear nada: **verde**. No depende de arrancar
-  con la base intacta, sólo de que el seed esté.
-
-## 6. Lo único que toqué del código existente
-
-`scripts/lib/sql.mjs`. La suite ya tenía su acceso SQL adentro; la puerta nueva
-necesitaba el mismo. Lo saqué a un módulo y la suite lo importa, en vez de
-dejar dos copias que se separen con el tiempo. Es un movimiento mecánico: la
-suite entera sigue en 58/58.
-
-No hay una línea de producto en el diff. No toqué Railway, Mercado Pago,
-estilos, migraciones, privacidad ni reglas de compatibilidad. Sin dependencias
-nuevas y sin segundo framework: es el mismo Playwright.
-
-## 7. Estado final
+## 3. Estado final
 
 | Comprobación | Resultado |
 |---|---|
 | `npm run hito`, base recreada desde cero | **6/6 pasos** |
-| `npm run hito` con un paso sacado | rojo, nombrando cuáles no corrieron |
+| `--force-failure=catalogo-sin-senal` | rojo, salida 1 |
+| `--force-failure=tarjeta-suplantada` | rojo, salida 1 |
 | Suite completa, base recreada desde cero | **58/58** |
-| `npm run a11y -- --todas` | **56/56**, 0 violaciones |
-| `npm run contraste` | **40/40**, 0 incumplimientos |
 | `npm run build` (incluye `tsc`) | verde |
 | `git -c core.whitespace=cr-at-eol diff --check` | sin avisos |
 
-Corrí las dos puertas visuales aunque el diff no toca interfaz. No hacía falta;
-las corrí porque de esta puerta depende una decisión de cobro y prefiero que
-los seis números estén todos frescos.
+Conservé el comando, los seis pasos, el helper SQL y la suite. No agregué casos
+ni framework: las dos fallas forzadas son dos ramas del mismo script. No hay
+una línea de producto en el diff —el único archivo tocado es `scripts/hito.mjs`—
+así que no volví a correr accesibilidad ni contraste; sus últimos verdes son de
+la corrida anterior, 56/56 y 40/40, y nada de lo que miden cambió.
 
-## 8. Riesgos y deudas
+## 4. Sobre tu Docker apagado
 
-**Uno, y es el de siempre con esta clase de puerta.** El recorrido depende de
-datos concretos del seed: una categoría, una localidad, una publicación y el
-transportista demo. Están escritos como constantes arriba del script, con el
-motivo al lado. Si el seed cambia, la puerta **falla en vez de medir de menos**,
-que es lo que quiero; pero es una dependencia real y hay que acordarse de ella
-al tocar el seed.
+Lo anoto porque nos va a seguir pasando: vos no pudiste correr la ruta oficial
+y yo tampoco tengo Docker en mi entorno. Los dos estamos verificando por
+caminos nativos distintos. Si querés que eso deje de ser una nota al pie, lo
+más barato es que las puertas acepten una variable con el comando de acceso a
+la base en vez de asumir `docker exec` —hoy está escrito ahí adentro—. No lo
+hice porque no me lo pediste y toca los tres scripts; queda propuesto.
 
-**Una observación sobre lo que la puerta NO demuestra**, para que no la
-presentes de más: el tramo del seed tiene origen y destino en la misma
-localidad, así que las dos distancias son 0 km. Que la regla geográfica
-discrimine de verdad —radios que alcanzan y radios que no— lo prueban los casos
-43 y 53 de la suite, no ésta. Esta puerta demuestra que las tres capacidades
-están conectadas, no que el cálculo sea fino.
+## 5. Riesgos y deudas
 
-**Sigue abierto el `float` del checkout**, obligatorio antes de Fase 4.
+Los mismos de la entrega anterior, sin cambios:
 
-Nota de reproducibilidad, la de siempre: Docker no está disponible en mi entorno
-—demonio caído y registry 403—, así que todo corre nativo con un puente que
-traduce sólo lo que las puertas piden por `docker exec`: `psql`, `python` y
-`alembic`. `./scripts/init_local_db.sh` sigue siendo el camino con contenedores
-y no lo cambié.
+- el recorrido depende de datos concretos del seed, escritos como constantes
+  arriba del script; si el seed cambia, la puerta falla en vez de medir de
+  menos;
+- el tramo del seed tiene origen y destino en la misma localidad, así que las
+  distancias son 0 km: que la regla geográfica **discrimine** lo prueban los
+  casos 43 y 53, no esta puerta;
+- sigue abierto el **`float` del checkout**, obligatorio antes de Fase 4.
 
 El entorno local quedó levantado: API en `:8000`, Vite en `:5173`, base recreada
 y con seed.
