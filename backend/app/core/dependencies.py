@@ -13,28 +13,82 @@ from app.models.user import User, UserRole
 
 security = HTTPBearer(auto_error=False)
 
+# Una petición puede traer la credencial en la cookie o en el header. Cuando
+# trae las dos y no son el mismo token, no tiene UNA identidad: tiene dos, y
+# quedarse con cualquiera de ellas es decidir por quien la mandó. Antes ganaba
+# la cookie en silencio, así que una petición con el header de una cuenta y la
+# cookie de otra se ejecutaba como la segunda. La regla es la misma para el
+# token de acceso y para el de refresco.
+CREDENCIALES_EN_CONFLICTO = "Credenciales en conflicto"
+
+
+def hay_conflicto_de_credenciales(
+    request: Request,
+    nombre_de_cookie: str,
+    del_header: Optional[str],
+) -> bool:
+    """
+    Si la petición trae cookie y header, y no son el mismo token.
+    """
+    de_cookie = request.cookies.get(nombre_de_cookie)
+    return bool(de_cookie and del_header and de_cookie != del_header)
+
+
+def bearer_del_header(request: Request) -> Optional[str]:
+    """
+    El token del header Authorization, para quien no use la dependencia.
+    """
+    encabezado = request.headers.get("Authorization")
+    if encabezado and encabezado.startswith("Bearer "):
+        return encabezado[7:]
+    return None
+
+
+def credencial_unica(
+    request: Request,
+    nombre_de_cookie: str,
+    del_header: Optional[str],
+) -> Optional[str]:
+    """
+    La única credencial de la petición, o None si no trae ninguna.
+
+    No hay preferencia entre cookie y header. Si vienen las dos y difieren,
+    corta acá: antes de decodificar nada, antes de mirar la base y sin decir
+    cuál de las dos servía. Tampoco se sigue con la otra después de rechazar
+    una.
+    """
+    if hay_conflicto_de_credenciales(request, nombre_de_cookie, del_header):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=CREDENCIALES_EN_CONFLICTO,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return request.cookies.get(nombre_de_cookie) or del_header
+
 
 def get_token_from_cookie_or_header(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> str:
     """
-    Obtiene el token JWT desde cookies (preferido) o header Authorization
+    Obtiene el token JWT de la cookie o del header Authorization
+
+    Con las dos presentes y distintas, la petición se rechaza: ver
+    `credencial_unica`.
     """
-    # Intentar obtener desde cookie (método principal)
-    token = request.cookies.get("access_token")
-    
-    # Si no hay cookie, intentar desde header Authorization
-    if not token and credentials:
-        token = credentials.credentials
-    
+    token = credencial_unica(
+        request,
+        "access_token",
+        credentials.credentials if credentials else None,
+    )
+
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="No autenticado. Token no encontrado.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     return token
 
 
@@ -156,13 +210,26 @@ def require_seller(current_user: User = Depends(get_current_user)) -> User:
 # Dependency opcional (no falla si no hay token)
 def get_current_user_optional(
     request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ) -> Optional[User]:
     """
     Obtiene el usuario actual si existe token, sino retorna None
     Útil para endpoints públicos que pueden personalizar la respuesta si hay usuario
+
+    Con credenciales contradictorias la respuesta queda anónima: personalizar
+    sería elegir una de las dos identidades, que es justo lo que no se puede
+    hacer. No se rechaza porque acá no estar autenticado es una respuesta
+    válida.
     """
     try:
+        if hay_conflicto_de_credenciales(
+            request,
+            "access_token",
+            credentials.credentials if credentials else None,
+        ):
+            return None
+
         token = request.cookies.get("access_token")
         if not token:
             return None

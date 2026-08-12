@@ -27,7 +27,11 @@ from app.core.security import (
     decode_token
 )
 from sqlalchemy import func
-from app.core.dependencies import get_current_user
+from app.core.dependencies import (
+    bearer_del_header,
+    credencial_unica,
+    get_current_user,
+)
 from app.core.config import settings
 from app.api.notifications import notify_welcome
 from app.models.order import Order
@@ -355,15 +359,12 @@ def refresh_access_token(
     - Lee el refresh_token desde cookies o header Authorization
     - Valida y genera nuevo access_token
     """
-    # Intentar obtener refresh token desde cookie
-    refresh_token = request.cookies.get("refresh_token")
-    
-    # Si no hay cookie, intentar desde header Authorization
-    if not refresh_token:
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            refresh_token = auth_header[7:]  # Remover "Bearer "
-    
+    # Cookie o header, pero no las dos con tokens distintos: en ese caso
+    # corta antes de decodificar, de mirar la base y de emitir nada.
+    refresh_token = credencial_unica(
+        request, "refresh_token", bearer_del_header(request)
+    )
+
     if not refresh_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

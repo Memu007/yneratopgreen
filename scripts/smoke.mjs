@@ -231,6 +231,56 @@ print(create_refresh_token(data={"sub": u.id}))
   return { acceso: salida[0], refresco: salida[1] };
 }
 
+// La dependencia opcional no la usa hoy ningún endpoint, así que no tiene
+// superficie HTTP donde medirla. Se la llama donde vive, con peticiones armadas
+// a mano, que es la única forma honesta de comprobar que no elige identidad.
+const PROBAR_OPCIONAL = `
+import asyncio, json, sys
+from starlette.requests import Request
+from app.core.dependencies import get_current_user_optional, security
+from app.db.base import SessionLocal
+
+datos = json.loads(sys.stdin.read())
+
+def peticion(cookie=None, header=None):
+    encabezados = []
+    if cookie:
+        encabezados.append((b"cookie", f"access_token={cookie}".encode()))
+    if header:
+        encabezados.append((b"authorization", f"Bearer {header}".encode()))
+    return Request({
+        "type": "http", "http_version": "1.1", "method": "GET", "scheme": "http",
+        "path": "/", "raw_path": b"/", "query_string": b"", "root_path": "",
+        "headers": encabezados, "client": ("127.0.0.1", 0), "server": ("127.0.0.1", 8000),
+    })
+
+def quien(cookie=None, header=None):
+    pedido = peticion(cookie, header)
+    credenciales = asyncio.run(security(pedido))
+    db = SessionLocal()
+    try:
+        usuario = get_current_user_optional(pedido, credenciales, db)
+        return usuario.email if usuario else None
+    finally:
+        db.close()
+
+print(json.dumps({
+    "solo_cookie": quien(cookie=datos["a"]),
+    "solo_header": quien(header=datos["a"]),
+    "iguales": quien(cookie=datos["a"], header=datos["a"]),
+    "conflicto": quien(cookie=datos["a"], header=datos["b"]),
+    "conflicto_invertido": quien(cookie=datos["b"], header=datos["a"]),
+}))
+`;
+
+function correrEnLaApi(script, entrada) {
+  return execFileSync(
+    'docker',
+    ['exec', '-i', 'topgreen-api', 'python', '-c', script],
+    { encoding: 'utf8', input: entrada, stdio: ['pipe', 'pipe', 'pipe'] },
+  ).trim();
+}
+
 function queryRows(sql) {
   const output = querySql(sql);
   if (!output) return [];
@@ -271,6 +321,37 @@ async function elegirDestino(page, localidad, provincia = '06') {
   );
   await page.locator('#checkout-localidad').selectOption({ label: localidad });
   await localidades.first().waitFor({ state: 'attached' });
+}
+
+// Una petición con control fino de dónde va la credencial. `apiRequest` manda
+// siempre el header; acá hace falta poder mandar la cookie, las dos, o las dos
+// con tokens distintos.
+async function pedirCrudo(path, { method = 'GET', header, cookie, body } = {}) {
+  const headers = { Accept: 'application/json' };
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (header) headers.Authorization = `Bearer ${header}`;
+  if (cookie) headers.Cookie = cookie;
+
+  const respuesta = await fetch(`${API_URL}${path}`, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  const crudo = await respuesta.text();
+  let datos = null;
+  if (crudo) {
+    try {
+      datos = JSON.parse(crudo);
+    } catch {
+      datos = crudo;
+    }
+  }
+  return {
+    status: respuesta.status,
+    datos,
+    galletas: respuesta.headers.getSetCookie(),
+  };
 }
 
 async function apiRequest(path, { method = 'GET', token, body } = {}) {
@@ -4193,6 +4274,171 @@ await runCase(48, 'Un turno encolado no sale con las credenciales de la sesión 
     await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
     await apiRequest('/cart', { method: 'DELETE', token: tokenDeLaSegunda });
   }
+});
+
+await runCase(49, 'Cookie y Bearer contradictorios no eligen identidad', async () => {
+  // Los endpoints protegidos leían la cookie primero y el header sólo si no
+  // había cookie. Con el header de una cuenta y la cookie de otra, la API
+  // trabajaba en silencio como la segunda. Dos credenciales distintas no son
+  // una identidad: son dos, y quedarse con cualquiera es decidir por quien
+  // mandó la petición.
+  const otra = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email: 'cliente@ejemplo.com', password: 'cliente123' },
+  });
+  const tokenA = state.buyerToken;
+  const tokenB = otra.data.access_token;
+  const [[idB]] = queryRows("SELECT id FROM users WHERE email = 'cliente@ejemplo.com'");
+
+  const [productoX, productoY, productoZ] = queryRows(`
+    SELECT p.id FROM products p
+    WHERE p.status = 'ACTIVE' AND p.stock > 0 AND p.publication_type <> 'servicio'
+    ORDER BY p.id LIMIT 3
+  `).map((fila) => fila[0]);
+
+  const carritoDe = (usuario) => queryRows(`
+    SELECT ci.product_id, ci.quantity FROM cart_items ci
+    JOIN carts c ON c.id = ci.cart_id
+    WHERE c.user_id = ${sqlLiteral(usuario)} AND c.status = 'ACTIVE'
+    ORDER BY ci.product_id
+  `).map((fila) => fila.join('x')).join('|');
+
+  // Cada cuenta con su carrito, escrito con una sola credencial.
+  await apiRequest('/cart/sync', {
+    method: 'POST', token: tokenA, body: { items: [{ product_id: productoX, quantity: 1 }] },
+  });
+  await apiRequest('/cart/sync', {
+    method: 'POST', token: tokenB, body: { items: [{ product_id: productoY, quantity: 1 }] },
+  });
+  const antesDeA = carritoDe(state.buyerId);
+  const antesDeB = carritoDe(idB);
+  assert(antesDeA && antesDeB && antesDeA !== antesDeB,
+    'la preparación no dejó dos carritos distintos');
+
+  // --- lectura: una sola credencial, y las dos iguales, siguen andando
+  const correoDe = (id) => queryRows(
+    `SELECT email FROM users WHERE id = ${sqlLiteral(id)}`)[0][0];
+  const correoDeA = correoDe(state.buyerId);
+  const correoDeB = correoDe(idB);
+
+  const soloHeader = await pedirCrudo('/auth/me', { header: tokenA });
+  assert(soloHeader.status === 200 && soloHeader.datos.email === correoDeA,
+    `sólo header: HTTP ${soloHeader.status} para ${soloHeader.datos?.email}`);
+  const soloCookie = await pedirCrudo('/auth/me', { cookie: `access_token=${tokenA}` });
+  assert(soloCookie.status === 200 && soloCookie.datos.email === correoDeA,
+    `sólo cookie: HTTP ${soloCookie.status} para ${soloCookie.datos?.email}`);
+  const iguales = await pedirCrudo('/auth/me', {
+    header: tokenA, cookie: `access_token=${tokenA}`,
+  });
+  assert(iguales.status === 200 && iguales.datos.email === correoDeA,
+    `las dos iguales: HTTP ${iguales.status} para ${iguales.datos?.email}`);
+
+  // --- lectura contradictoria, en los dos órdenes
+  const contradictorias = [
+    ['header A + cookie B', tokenA, tokenB],
+    ['header B + cookie A', tokenB, tokenA],
+  ];
+  const motivos = new Set();
+  for (const [etiqueta, header, cookie] of contradictorias) {
+    const respuesta = await pedirCrudo('/auth/me', {
+      header, cookie: `access_token=${cookie}`,
+    });
+    assert(respuesta.status === 401,
+      `${etiqueta}: la API respondió HTTP ${respuesta.status} en vez de 401`);
+    const detalle = String(respuesta.datos?.detail ?? respuesta.datos ?? '');
+    assert(!detalle.includes(correoDeA) && !detalle.includes(correoDeB),
+      `${etiqueta}: el rechazo nombra una cuenta ("${detalle}")`);
+    assert(!detalle.includes(header.slice(0, 12)) && !detalle.includes(cookie.slice(0, 12)),
+      `${etiqueta}: el rechazo devuelve parte de un token`);
+    motivos.add(detalle);
+  }
+  assert(motivos.size === 1,
+    `el motivo cambia según el orden y deja ver cuál valía: ${[...motivos].join(' / ')}`);
+
+  // --- escritura contradictoria: 401 y ningún carrito tocado
+  for (const [etiqueta, header, cookie] of contradictorias) {
+    const respuesta = await pedirCrudo('/cart/sync', {
+      method: 'POST',
+      header,
+      cookie: `access_token=${cookie}`,
+      body: { items: [{ product_id: productoZ, quantity: 7 }] },
+    });
+    assert(respuesta.status === 401,
+      `${etiqueta} escribiendo: HTTP ${respuesta.status} en vez de 401`);
+    assert(carritoDe(state.buyerId) === antesDeA,
+      `${etiqueta}: se escribió sobre el carrito de la primera cuenta`);
+    assert(carritoDe(idB) === antesDeB,
+      `${etiqueta}: se escribió sobre el carrito de la segunda cuenta`);
+  }
+
+  // --- la dependencia opcional no elige identidad: queda anónima
+  const opcional = JSON.parse(correrEnLaApi(PROBAR_OPCIONAL, JSON.stringify({
+    a: tokenA, b: tokenB,
+  })));
+  assert(opcional.solo_cookie === correoDeA,
+    `la dependencia opcional dejó de reconocer la cookie: ${opcional.solo_cookie}`);
+  assert(opcional.iguales === correoDeA,
+    `la dependencia opcional no reconoce las dos iguales: ${opcional.iguales}`);
+  assert(opcional.conflicto === null && opcional.conflicto_invertido === null,
+    `la dependencia opcional eligió identidad: ${JSON.stringify(opcional)}`);
+
+  return 'sólo header, sólo cookie y las dos iguales conservan identidad; '
+    + 'contradictorias dan 401 en los dos órdenes, con el mismo motivo, sin nombrar '
+    + 'cuenta ni token, sin escribir ningún carrito y sin personalizar lo opcional';
+});
+
+await runCase(50, 'La misma regla vale para el refresco, sin emitir ni tocar cookies', async () => {
+  // El refresco leía su cookie primero y el header después. Un refresco
+  // contradictorio no puede emitir tokens ni mover cookies de sesión.
+  const otra = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email: 'cliente@ejemplo.com', password: 'cliente123' },
+  });
+  const refrescoA = state.buyerRefreshToken;
+  const refrescoB = otra.data.refresh_token;
+  const [[idB]] = queryRows("SELECT id FROM users WHERE email = 'cliente@ejemplo.com'");
+  const correoDeA = queryRows(
+    `SELECT email FROM users WHERE id = ${sqlLiteral(state.buyerId)}`)[0][0];
+  const correoDeB = queryRows(
+    `SELECT email FROM users WHERE id = ${sqlLiteral(idB)}`)[0][0];
+
+  const emite = (respuesta) => Boolean(respuesta.datos?.access_token);
+
+  const soloHeader = await pedirCrudo('/auth/refresh', { method: 'POST', header: refrescoA });
+  assert(soloHeader.status === 200 && emite(soloHeader)
+    && soloHeader.datos.user.email === correoDeA,
+    `sólo header: HTTP ${soloHeader.status}`);
+  const soloCookie = await pedirCrudo('/auth/refresh', {
+    method: 'POST', cookie: `refresh_token=${refrescoA}`,
+  });
+  assert(soloCookie.status === 200 && emite(soloCookie)
+    && soloCookie.datos.user.email === correoDeA,
+    `sólo cookie: HTTP ${soloCookie.status}`);
+  const iguales = await pedirCrudo('/auth/refresh', {
+    method: 'POST', header: refrescoA, cookie: `refresh_token=${refrescoA}`,
+  });
+  assert(iguales.status === 200 && emite(iguales) && iguales.datos.user.email === correoDeA,
+    `las dos iguales: HTTP ${iguales.status}`);
+
+  for (const [etiqueta, header, cookie] of [
+    ['header A + cookie B', refrescoA, refrescoB],
+    ['header B + cookie A', refrescoB, refrescoA],
+  ]) {
+    const respuesta = await pedirCrudo('/auth/refresh', {
+      method: 'POST', header, cookie: `refresh_token=${cookie}`,
+    });
+    assert(respuesta.status === 401,
+      `${etiqueta}: HTTP ${respuesta.status} en vez de 401`);
+    assert(!emite(respuesta), `${etiqueta}: el rechazo igual emitió tokens`);
+    assert(respuesta.galletas.length === 0,
+      `${etiqueta}: el rechazo movió cookies de sesión (${respuesta.galletas.length})`);
+    const detalle = String(respuesta.datos?.detail ?? respuesta.datos ?? '');
+    assert(!detalle.includes(correoDeA) && !detalle.includes(correoDeB),
+      `${etiqueta}: el rechazo nombra una cuenta ("${detalle}")`);
+  }
+
+  return 'refresco con una sola credencial y con las dos iguales emite normalmente; '
+    + 'contradictorio da 401 en los dos órdenes, sin emitir tokens y sin tocar cookies';
 });
 
 const passed = results.filter((result) => result.passed).length;
