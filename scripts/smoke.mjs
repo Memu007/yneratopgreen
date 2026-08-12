@@ -2,6 +2,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { chromium } from 'playwright';
 
+import { queryCount, queryRows, querySql, sqlLiteral } from './lib/sql.mjs';
+
 const API_URL = process.env.SMOKE_API_URL || 'http://localhost:8000/api';
 const FRONTEND_URL = process.env.SMOKE_FRONTEND_URL || 'http://localhost:5173';
 const forcedFailure = process.argv
@@ -14,59 +16,11 @@ if (forcedFailure && forcedFailure !== 'health') {
   process.exit(2);
 }
 
-const localEnv = parseEnvFile('.env');
-const DB_USER = localEnv.DB_USER || 'topgreen';
-const DB_NAME = localEnv.DB_NAME || 'topgreen';
 const state = {};
 const results = [];
 
-function parseEnvFile(path) {
-  const values = {};
-
-  for (const rawLine of readFileSync(path, 'utf8').split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith('#')) continue;
-
-    const separator = line.indexOf('=');
-    if (separator === -1) continue;
-
-    const key = line.slice(0, separator).trim();
-    const value = line.slice(separator + 1).trim().replace(/^(['"])(.*)\1$/, '$2');
-    values[key] = value;
-  }
-
-  return values;
-}
-
 function assert(condition, message) {
   if (!condition) throw new Error(message);
-}
-
-function sqlLiteral(value) {
-  return `'${String(value).replaceAll("'", "''")}'`;
-}
-
-function querySql(sql) {
-  return execFileSync(
-    'docker',
-    [
-      'exec',
-      'topgreen-db',
-      'psql',
-      '-U',
-      DB_USER,
-      '-d',
-      DB_NAME,
-      '-tA',
-      '-F',
-      '\t',
-      '-v',
-      'ON_ERROR_STOP=1',
-      '-c',
-      sql,
-    ],
-    { encoding: 'utf8' },
-  ).trim();
 }
 
 // Carga un contenido de .env con el MISMO Settings de la aplicación. Corre
@@ -279,18 +233,6 @@ function correrEnLaApi(script, entrada) {
     ['exec', '-i', 'topgreen-api', 'python', '-c', script],
     { encoding: 'utf8', input: entrada, stdio: ['pipe', 'pipe', 'pipe'] },
   ).trim();
-}
-
-function queryRows(sql) {
-  const output = querySql(sql);
-  if (!output) return [];
-  return output.split(/\r?\n/).map((line) => line.split('\t'));
-}
-
-function queryCount(sql) {
-  const value = Number.parseInt(querySql(sql), 10);
-  assert(Number.isInteger(value), `La consulta SQL no devolvió un entero: ${sql}`);
-  return value;
 }
 
 // Cada futura orden necesita decir cómo se traslada. En los casos que no
