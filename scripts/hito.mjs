@@ -20,6 +20,12 @@
  * Termina en rojo si algún paso falla o si alguno no llegó a correr.
  *
  *   npm run hito
+ *
+ * Dos fallas forzadas, para poder ver que las comprobaciones discriminan y no
+ * pasan solas. No son parte de la puerta: se piden a mano.
+ *
+ *   npm run hito -- --force-failure=catalogo-sin-senal
+ *   npm run hito -- --force-failure=tarjeta-suplantada
  */
 import { chromium } from 'playwright';
 
@@ -50,6 +56,17 @@ const TRANSPORTISTA = { email: 'transportista@ejemplo.com', password: 'transport
 const CATEGORIA = 'Insumos agrícolas';
 const PROVINCIA = { id: '06', nombre: 'Buenos Aires' };
 const LOCALIDAD = 'Pergamino';
+
+const FALLAS_FORZADAS = ['catalogo-sin-senal', 'tarjeta-suplantada'];
+const forzado = process.argv
+  .find((argumento) => argumento.startsWith('--force-failure='))
+  ?.split('=', 2)[1];
+
+if (forzado && !FALLAS_FORZADAS.includes(forzado)) {
+  console.error(`Falla forzada desconocida: ${forzado}`);
+  console.error(`Valores permitidos: ${FALLAS_FORZADAS.join(', ')}`);
+  process.exit(2);
+}
 
 const hechos = [];
 const fallas = [];
@@ -113,11 +130,59 @@ async function main() {
         null,
         { timeout: ESPERA },
       );
-      await page.locator('#catalog-locality').selectOption({ label: LOCALIDAD });
-      await page.waitForTimeout(1200);
+
+      // La localidad se toma del propio selector: el id oficial sale de la
+      // pantalla, no de una constante escrita acá.
+      const idLocalidad = await page.locator('#catalog-locality').evaluate(
+        (selector, nombre) => {
+          const opcion = [...selector.options].find((o) => o.textContent.trim() === nombre);
+          return opcion ? opcion.value : '';
+        },
+        LOCALIDAD,
+      );
+      assert(idLocalidad, `el selector no ofrece ${LOCALIDAD}`);
+
+      // La consulta filtrada llega tarde a propósito. Con una espera por reloj
+      // esto mediría el catálogo anterior y la puerta pasaría midiendo otra
+      // cosa; con la señal de la respuesta, el retraso es irrelevante.
+      await page.route('**/api/catalog/products*', async (ruta) => {
+        if (ruta.request().url().includes(`locality_id=${idLocalidad}`)) {
+          await new Promise((listo) => setTimeout(listo, 2500));
+        }
+        await ruta.continue();
+      });
+
+      // La consulta que trae las tres condiciones a la vez. La categoría viaja
+      // como id, no como nombre, así que se exige presente y no vacía.
+      const filtrada = page.waitForResponse(
+        (respuesta) => respuesta.url().includes('/catalog/products?')
+          && respuesta.url().includes(`locality_id=${idLocalidad}`)
+          && /[?&]category=[^&]+/.test(respuesta.url())
+          && /[?&]province=[^&]+/.test(respuesta.url())
+          && respuesta.status() === 200,
+        { timeout: ESPERA },
+      );
+      await page.locator('#catalog-locality').selectOption(idLocalidad);
+
+      const grilla = page.locator('[class*="_productsGrid_"]');
+      let deLaApi = null;
+      if (forzado === 'catalogo-sin-senal') {
+        // La espera por reloj de la primera entrega, tal cual: 1,2 s y a medir.
+        filtrada.catch(() => {});
+        await page.waitForTimeout(1200);
+      } else {
+        deLaApi = (await (await filtrada).json()).items.map((p) => p.name).sort();
+        // Y la pantalla tiene que haber terminado de pintar ESA respuesta.
+        await page.waitForFunction(
+          (cuantos) => document.querySelectorAll(
+            '[class*="_productsGrid_"] h3',
+          ).length === cuantos,
+          deLaApi.length,
+          { timeout: ESPERA },
+        );
+      }
 
       // Sólo las tarjetas del catálogo: el pie de página también tiene h3.
-      const grilla = page.locator('[class*="_productsGrid_"]');
       const visibles = (await grilla.getByRole('heading', { level: 3 }).allTextContents())
         .map((texto) => texto.trim())
         .filter(Boolean)
@@ -136,8 +201,15 @@ async function main() {
         ORDER BY p.name
       `).map(([nombre]) => nombre).sort();
 
+      await page.unroute('**/api/catalog/products*');
+
       assert(enBase.length > 0,
         'el seed no deja ninguna publicación con esa categoría y esa localidad');
+      if (deLaApi) {
+        assert(JSON.stringify(deLaApi) === JSON.stringify(enBase),
+          `la API y SQL no coinciden:\n      API: ${deLaApi.join(', ')}`
+          + `\n      SQL: ${enBase.join(', ')}`);
+      }
       assert(JSON.stringify(visibles) === JSON.stringify(enBase),
         `la pantalla y SQL no coinciden:\n      pantalla: ${visibles.join(', ')}`
         + `\n      SQL:      ${enBase.join(', ')}`);
@@ -146,7 +218,8 @@ async function main() {
 
       datos.publicacion = enBase[0];
       return `${CATEGORIA} · ${LOCALIDAD}, ${PROVINCIA.nombre}: ${enBase.length} de `
-        + `${sinFiltrar} publicaciones, y las mismas que devuelve SQL`;
+        + `${sinFiltrar} publicaciones; pantalla, API y SQL dicen lo mismo pese a `
+        + 'una consulta retrasada 2,5 s a propósito';
     });
 
     // ---------------------------------------------------------------- 2
@@ -340,10 +413,39 @@ async function main() {
         .waitFor({ state: 'visible', timeout: ESPERA });
       await page.getByText(`Operación #${datos.orden}`).waitFor({ timeout: ESPERA });
 
-      const visto = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
-      assert(visto.includes(LOCALIDAD), 'la operación no muestra el recorrido');
-      assert(visto.includes(datos.publicacion), 'la operación no dice qué hay que mover');
-      assert(!/\$\s?\d/.test(visto), 'la operación muestra importes');
+      if (forzado === 'tarjeta-suplantada') {
+        // Los mismos textos, pero fuera de la tarjeta, y la tarjeta real
+        // borrada. Una comprobación que mire la página entera pasaría igual;
+        // una que mire la tarjeta tiene que ponerse roja.
+        await page.evaluate((textos) => {
+          const senuelo = document.createElement('div');
+          senuelo.textContent = textos.join(' · ');
+          document.body.appendChild(senuelo);
+          document.querySelectorAll('[class*="_orderCard_"]')
+            .forEach((tarjeta) => tarjeta.remove());
+        }, [`Operación #${datos.orden}`, datos.publicacion, LOCALIDAD]);
+      }
+
+      // Todo se mira DENTRO de la tarjeta de esta operación. Que un texto
+      // exista en otra operación, o en cualquier otro lugar de la página, no
+      // puede hacer pasar la comprobación.
+      const tarjeta = page.locator('[class*="_orderCard_"]')
+        .filter({ hasText: `Operación #${datos.orden}` });
+      const cuantas = await tarjeta.count();
+      assert(cuantas === 1,
+        `esperaba una sola tarjeta de la operación ${datos.orden}, encontré ${cuantas}`);
+
+      const visto = ((await tarjeta.textContent()) || '').replace(/\s+/g, ' ');
+      assert(visto.includes(LOCALIDAD), 'la tarjeta no muestra el recorrido');
+      assert(visto.includes(datos.publicacion), 'la tarjeta no dice qué hay que mover');
+      const [[cantidad]] = queryRows(`
+        SELECT oi.quantity FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE o.order_number = ${sqlLiteral(datos.orden)}
+      `);
+      assert(visto.includes(`x${cantidad}`),
+        `la tarjeta no dice cuánto hay que mover (x${cantidad}): "${visto.slice(0, 200)}"`);
+      assert(!/\$\s?\d/.test(visto), 'la tarjeta muestra importes');
 
       const [[correoComprador, telefonoComprador]] = queryRows(`
         SELECT email, COALESCE(phone, '') FROM users
@@ -358,8 +460,8 @@ async function main() {
           `la operación muestra «${prohibido}»`);
       }
 
-      return `${TRANSPORTISTA.email} ve la operación ${datos.orden} con recorrido y `
-        + 'cantidades, sin importes ni contacto del comprador';
+      return `${TRANSPORTISTA.email} ve la tarjeta de ${datos.orden} con recorrido y `
+        + 'cantidades, y dentro de esa tarjeta no hay importes ni contacto del comprador';
     });
   } catch {
     // El paso ya se registró; el resumen decide el código de salida.
