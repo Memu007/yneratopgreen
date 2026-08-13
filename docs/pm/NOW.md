@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-08-12.
+Actualizado: 2026-08-13.
 
 ## Entrega aceptada y tarea actual
 
@@ -117,6 +117,14 @@ quedan conformes; PM verificó build, sintaxis y `diff --check`. Vuelve por tres
 defectos: confirmar el mismo carrito en paralelo puede duplicar órdenes, una
 orden terminal todavía devuelve/crea link y «Mis compras» no permite recuperar
 un pago interrumpido. MP-C no se abre.
+
+La corrección MP-B `fe4a0b2` e informe `64b0bd3` cierran esos tres defectos;
+PM verificó build, sintaxis y `diff --check`. **Todavía no se acepta MP-B** por
+un único borde bloqueante descubierto en la revisión: la ruta general de cambio
+de estado referencia `old_status`, variable inexistente, al cancelar o rechazar
+y puede responder 500. La suite 84/84 informada usa la ruta específica de
+cancelación y no lo cubre. La Dev tiene una corrección acotada y una regresión
+por esa ruta; MP-C continúa cerrada.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 

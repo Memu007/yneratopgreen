@@ -2048,3 +2048,25 @@ nueva; una acción dentro de «Mis compras» no crea por sí sola otra pantalla.
 Corré suite completa una vez al final, hito, build, accesibilidad, contraste,
 migración ida/vuelta, `alembic check` y `diff --check`. Entregá corrección de
 producto e informe separado. Esfuerzo **Extra**; MP-C sigue cerrada.
+
+### Segunda revisión PM de `fe4a0b2`: queda una corrección bloqueante
+
+Los tres defectos anteriores quedan conformes por código y por las regresiones
+82–84: la conversión condicional del carrito cierra la doble confirmación, una
+orden terminal ya no ofrece ni crea pago y «Mis compras» recupera el enlace
+sólo para el comprador. PM obtuvo build, sintaxis y `diff --check` verdes. No
+reabras esos bloques.
+
+Queda un único 500 reproducible por inspección en la misma salida terminal que
+acabás de tocar: `update_order_status()` guarda el estado previo como
+`current_status`, pero al cancelar o rechazar evalúa `old_status`, que no existe.
+La suite 84/84 no lo ve porque el caso 83 usa `POST /cancel`, no
+`PATCH /orders/{id}/status`. Corregí la referencia y agregá una regresión que
+atraviese esta segunda ruta hasta un estado terminal y que quede roja contra
+`fe4a0b2`; debe probar respuesta no-500, estado persistido, intención local
+anulada y la restauración de stock que corresponda al estado anterior. No
+amplíes alcance ni abras MP-C.
+
+Después corré una sola vez la suite completa y las puertas proporcionales.
+Entregá producto e informe separados. Esfuerzo **Extra**. MP-B se acepta apenas
+este borde quede cerrado.
