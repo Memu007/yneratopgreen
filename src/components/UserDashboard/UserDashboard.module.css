@@ -1219,7 +1219,10 @@
 }
 
 .mpSection .sectionHeader {
-  background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%);
+  /* El par claro daba 2.77:1 con el título en blanco: 18px en negrita no
+     llega a "texto grande", así que el mínimo es 4.5:1. Es el mismo azul del
+     botón de la sección, que ya estaba medido. */
+  background: linear-gradient(135deg, #075985 0%, #0369a1 100%);
   padding: 16px 24px;
 }
 

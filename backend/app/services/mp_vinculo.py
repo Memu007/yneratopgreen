@@ -375,7 +375,7 @@ def refresh_token_de(db: Session, user: User) -> Optional[str]:
         return None
     try:
         return descifrar(user.mp_refresh_token_cifrado)
-    except NoSeDescifra:
+    except (NoSeDescifra, SinClaveDeCifrado):
         logger.warning(
             "Credencial de Mercado Pago ilegible para el usuario %s", user.id
         )

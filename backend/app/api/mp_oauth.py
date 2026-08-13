@@ -117,21 +117,26 @@ async def volver_de_mercado_pago(
     uno nuestro, vivo y sin usar; que la sesión del navegador sea la misma que
     lo pidió; y que la cuenta de Mercado Pago no esté ya cobrando para otro
     vendedor. Si falla cualquiera, no se toca la base.
+
+    El `state` se gasta apenas llega la vuelta, sea cual sea el resultado.
+    Cancelar es haber vuelto: ese intento ya no puede volver a servir.
     """
+    if not mp_vinculo.integracion_configurada():
+        return _volver(mp_vinculo.SIN_CONFIGURAR)
+
+    # El state se gasta antes que nada y **también cuando la vuelta viene
+    # cancelada**. El intento ya se usó: si al cancelar quedara vigente, el
+    # mismo state seguiría sirviendo hasta que venza. Un callback repetido no
+    # encuentra nada que gastar, aunque todo lo demás esté bien.
+    user_id = mp_vinculo.consumir_estado(db, state)
+    if not user_id:
+        return _volver(mp_vinculo.ESTADO_INVALIDO)
+
     if error:
         # El vendedor dijo que no, o MP abortó. Su texto no se muestra.
         return _volver(mp_vinculo.CANCELADO)
 
-    if not mp_vinculo.integracion_configurada():
-        return _volver(mp_vinculo.SIN_CONFIGURAR)
-
     if not code:
-        return _volver(mp_vinculo.ESTADO_INVALIDO)
-
-    # Se gasta el state antes que nada: un callback repetido ya no encuentra
-    # nada que gastar, aunque todo lo demás esté bien.
-    user_id = mp_vinculo.consumir_estado(db, state)
-    if not user_id:
         return _volver(mp_vinculo.ESTADO_INVALIDO)
 
     if posible_usuario is None:

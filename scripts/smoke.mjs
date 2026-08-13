@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { chromium } from 'playwright';
@@ -231,6 +231,52 @@ print(json.dumps({
 }))
 `;
 
+// Una clave de cifrado no vacía pero inválida no es una clave. Antes
+// `hay_clave()` sólo miraba que la variable estuviera escrita, así que la
+// integración se ofrecía como configurada y la renovación terminaba en 500 al
+// intentar descifrar. Se vincula con la clave buena, se rompe la clave, y se
+// mira que las tres puertas fallen cerradas y accionables.
+const MP_CLAVE_INVALIDA = `
+import json
+from urllib.parse import parse_qs, urlparse
+
+from fastapi.testclient import TestClient
+
+from app.core.config import settings
+from app.main import app
+
+# Sin esto un 500 llegaría como excepción y no como respuesta: lo que se
+# quiere medir es justamente que no haya 500.
+cliente = TestClient(app, base_url="https://testserver", raise_server_exceptions=False)
+cliente.post("/api/auth/login", json={
+    "email": "vendedor@ejemplo.com", "password": "vendedor123"})
+
+inicio = cliente.post("/api/mp-oauth/auth-url", json={})
+state = parse_qs(urlparse(inicio.json()["auth_url"]).query)["state"][0]
+cliente.get("/api/mp-oauth/callback", params={"code": "ok:900001", "state": state},
+            follow_redirects=False)
+antes = cliente.get("/api/mp-oauth/status").json().get("estado")
+
+settings.MP_TOKEN_KEY = "esto-no-es-una-clave-fernet"
+
+estado = cliente.get("/api/mp-oauth/status")
+vincular = cliente.post("/api/mp-oauth/auth-url", json={})
+renovacion = cliente.post("/api/mp-oauth/refresh", json={})
+catalogo = cliente.get("/api/catalog/categories")
+
+print("RESULTADO " + json.dumps({
+    "antes": antes,
+    "status": estado.status_code,
+    "estado": estado.json().get("estado"),
+    "auth_url": vincular.status_code,
+    "refresh_status": renovacion.status_code,
+    "refresh_estado": renovacion.json().get("estado"),
+    "motivo": renovacion.json().get("motivo"),
+    "catalogo": catalogo.status_code,
+    "cuerpos": estado.text + vincular.text + renovacion.text,
+}))
+`;
+
 // Rotar MP_TOKEN_KEY sin migrar lo guardado deja credenciales que ya no abren.
 // Es un escenario real —una rotación a medias, un backup restaurado en otro
 // entorno— y el contrato dice que tiene que fallar cerrado y accionable, no
@@ -385,6 +431,29 @@ print("RESULTADO " + json.dumps({
 }))
 `;
 
+// Igual que `correrEnLaApi`, pero sin bloquear el hilo de Node.
+//
+// Hace falta cuando el caso además levanta el doble de Mercado Pago, porque el
+// doble vive en ESTE proceso: con `execFileSync` el hilo se queda esperando al
+// guion, el doble no llega a atender la conexión que el guion le abre, y el
+// pedido muere por tiempo. El síntoma es «Mercado Pago no respondió» en una
+// prueba donde el doble estaba corriendo.
+function correrEnLaApiSinBloquear(script, entrada = '') {
+  return new Promise((resolver, rechazar) => {
+    const hijo = spawn('docker', ['exec', '-i', 'topgreen-api', 'python', '-c', script]);
+    let salida = '';
+    let error = '';
+    hijo.stdout.on('data', (trozo) => { salida += trozo; });
+    hijo.stderr.on('data', (trozo) => { error += trozo; });
+    hijo.on('error', rechazar);
+    hijo.on('close', (codigo) => {
+      if (codigo === 0) resolver(salida);
+      else rechazar(new Error(`el guion terminó en ${codigo}: ${error.slice(-400)}`));
+    });
+    hijo.stdin.end(entrada);
+  });
+}
+
 function correrEnLaApi(script, entrada) {
   return execFileSync(
     'docker',
@@ -445,7 +514,10 @@ async function pedirCrudo(path, { method = 'GET', header, cookie, body } = {}) {
   if (header) headers.Authorization = `Bearer ${header}`;
   if (cookie) headers.Cookie = cookie;
 
-  const respuesta = await fetch(`${API_URL}${path}`, {
+  // Mismo reintento acotado a errores de socket que usa `apiRequest`: la
+  // suite reutiliza conexiones y el servidor cierra alguna cuando pasa un
+  // rato entre pedido y pedido. Cualquier HTTP pasa derecho.
+  const respuesta = await pedirConReintento(`${API_URL}${path}`, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -4723,11 +4795,24 @@ function nombreDeUsuario(id) {
 // Alembic donde vive la aplicación, igual que el seed y las consultas. Sus
 // avisos salen por stderr, así que se juntan las dos salidas: si sólo se
 // mirara stdout, una migración correcta parecería no haber corrido.
-function correrAlembic(comando) {
+function correrAlembic(comando, variables = []) {
+  // Las variables viajan con `-e`, que es como docker exec las mete adentro
+  // del contenedor, y además en el entorno del proceso para que funcione
+  // igual cuando la API corre nativa.
   const corrida = spawnSync(
     'docker',
-    ['exec', '-i', 'topgreen-api', 'alembic', ...comando.split(' ')],
-    { encoding: 'utf8' },
+    [
+      'exec',
+      ...variables.flatMap((asignacion) => ['-e', asignacion]),
+      '-i', 'topgreen-api', 'alembic', ...comando.split(' '),
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        ...Object.fromEntries(variables.map((a) => a.split('=', 2))),
+      },
+    },
   );
   return `${corrida.stdout ?? ''}${corrida.stderr ?? ''}`;
 }
@@ -5903,8 +5988,11 @@ await runCase(62, 'El vínculo se guarda cifrado y el state no queda escrito en 
     return 'vínculo completo: la base guarda Fernet y la huella del state, la '
       + 'respuesta no trae credenciales y las dos columnas en claro se fueron';
   } finally {
-    await desvincular(vendedor.token);
+    // El doble se cierra primero y pase lo que pase: si la limpieza de
+    // datos fallara, el puerto quedaría tomado y el caso siguiente
+    // moriría con EADDRINUSE por un problema que no es suyo.
     await doble.cerrar();
+    try { await desvincular(vendedor.token); } catch { /* la limpieza no tapa el motivo real */ }
   }
 });
 
@@ -5960,9 +6048,12 @@ await runCase(63, 'Callback repetido, alterado, sin sesión o de otra sesión no
     return 'los cuatro callbacks torcidos —repetido, alterado, sin sesión y de otra '
       + 'sesión— devuelven su motivo y no dejan una sola credencial escrita';
   } finally {
-    await desvincular(vendedor.token);
-    await desvincular(otro.token);
+    // El doble se cierra primero y pase lo que pase: si la limpieza de
+    // datos fallara, el puerto quedaría tomado y el caso siguiente
+    // moriría con EADDRINUSE por un problema que no es suyo.
     await doble.cerrar();
+    try { await desvincular(vendedor.token); } catch { /* la limpieza no tapa el motivo real */ }
+    try { await desvincular(otro.token); } catch { /* la limpieza no tapa el motivo real */ }
   }
 });
 
@@ -6002,9 +6093,12 @@ await runCase(64, 'Una cuenta de Mercado Pago no puede cobrar para dos vendedore
     return 'la segunda vinculación a la misma cuenta se rechaza con «cuenta_en_uso», '
       + 'con su propia cuenta funciona, y el índice único lo sostiene desde SQL';
   } finally {
-    await desvincular(primero.token);
-    await desvincular(segundo.token);
+    // El doble se cierra primero y pase lo que pase: si la limpieza de
+    // datos fallara, el puerto quedaría tomado y el caso siguiente
+    // moriría con EADDRINUSE por un problema que no es suyo.
     await doble.cerrar();
+    try { await desvincular(primero.token); } catch { /* la limpieza no tapa el motivo real */ }
+    try { await desvincular(segundo.token); } catch { /* la limpieza no tapa el motivo real */ }
   }
 });
 
@@ -6058,9 +6152,12 @@ await runCase(65, 'Renovar rota las dos credenciales; si el vendedor revoca, que
     return 'la renovación rota acceso y refresco sin cambiar de cuenta; una revocación '
       + 'deja «requiere_reconexion» con 200 y el vendedor sale solo reconectando';
   } finally {
-    await desvincular(vendedor.token);
-    await desvincular(otro.token);
+    // El doble se cierra primero y pase lo que pase: si la limpieza de
+    // datos fallara, el puerto quedaría tomado y el caso siguiente
+    // moriría con EADDRINUSE por un problema que no es suyo.
     await doble.cerrar();
+    try { await desvincular(vendedor.token); } catch { /* la limpieza no tapa el motivo real */ }
+    try { await desvincular(otro.token); } catch { /* la limpieza no tapa el motivo real */ }
   }
 });
 
@@ -6095,8 +6192,11 @@ await runCase(66, 'Mercado Pago mudo o con respuesta rara no vincula ni filtra s
     return 'las cuatro fallas de Mercado Pago —rechazo, basura, respuesta incompleta y '
       + 'silencio— dan su motivo, no escriben nada y no dejan pasar el texto de MP';
   } finally {
-    await desvincular(vendedor.token);
+    // El doble se cierra primero y pase lo que pase: si la limpieza de
+    // datos fallara, el puerto quedaría tomado y el caso siguiente
+    // moriría con EADDRINUSE por un problema que no es suyo.
     await doble.cerrar();
+    try { await desvincular(vendedor.token); } catch { /* la limpieza no tapa el motivo real */ }
   }
 });
 
@@ -6153,7 +6253,7 @@ await runCase(68, 'Sin configuración el vínculo se apaga solo y el resto del m
 await runCase(69, 'Ni la respuesta ni los logs se llevan un secreto puesto', async () => {
   const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
   try {
-    const observado = leerResultado(correrEnLaApi(MP_LOGS_SIN_SECRETOS, ''));
+    const observado = leerResultado(await correrEnLaApiSinBloquear(MP_LOGS_SIN_SECRETOS));
 
     assert(observado.vencido === 'estado_invalido',
       `un state nacido vencido devolvió «${observado.vencido}»`);
@@ -6221,9 +6321,11 @@ await runCase(70, 'El vendedor vincula, ve y desvincula desde el panel, en escri
 
         const seccion = page.locator('[class*="_mpSection_"]');
         await seccion.waitFor({ state: 'visible', timeout: 15_000 });
-        const desconectado = (await seccion.textContent()) || '';
-        assert(/Cuenta no vinculada/.test(desconectado),
-          `${nombre}: el panel no arranca desconectado: ${desconectado.replace(/\s+/g, ' ').slice(0, 160)}`);
+        // El estado del vínculo llega por una consulta aparte: hasta que
+        // contesta, la sección dice «Cargando estado…». Se espera el texto que
+        // se quiere afirmar en vez de mirar lo que haya en ese instante.
+        await seccion.getByText('Cuenta no vinculada')
+          .waitFor({ state: 'visible', timeout: 15_000 });
 
         // Vincular manda a Mercado Pago; acá el doble contesta y devuelve.
         // Se navega a mano al mismo destino porque el doble no es MP: lo que
@@ -6250,18 +6352,21 @@ await runCase(70, 'El vendedor vincula, ve y desvincula desde el panel, en escri
         await page.getByRole('heading', { name: 'Mi Perfil' })
           .waitFor({ timeout: 15_000 });
         await seccion.waitFor({ state: 'visible', timeout: 15_000 });
+        await seccion.getByText('Cuenta vinculada', { exact: false })
+          .waitFor({ state: 'visible', timeout: 15_000 });
         const conectado = (await seccion.textContent()) || '';
-        assert(/Cuenta vinculada/.test(conectado) && /900001/.test(conectado),
-          `${nombre}: el panel no muestra la cuenta vinculada: ${conectado.replace(/\s+/g, ' ').slice(0, 200)}`);
+        assert(/900001/.test(conectado),
+          `${nombre}: el panel no muestra qué cuenta quedó vinculada: ${conectado.replace(/\s+/g, ' ').slice(0, 200)}`);
         sinSecretos(await page.content(), `${nombre}: la página`);
 
         // Desvincular, con su confirmación.
         await seccion.getByRole('button', { name: 'Desvincular cuenta' }).click();
-        await page.getByRole('button', { name: 'Desvincular' }).click();
+        // `name` matchea por subcadena: sin `exact` esto también agarra
+        // «Desvincular cuenta», que es el botón que acabamos de tocar.
+        await page.getByRole('button', { name: 'Desvincular', exact: true }).click();
         await page.getByText('Cuenta de Mercado Pago desvinculada.').waitFor({ timeout: 15_000 });
-        const final = (await seccion.textContent()) || '';
-        assert(/Cuenta no vinculada/.test(final),
-          `${nombre}: el panel no volvió a desconectado: ${final.replace(/\s+/g, ' ').slice(0, 160)}`);
+        await seccion.getByText('Cuenta no vinculada')
+          .waitFor({ state: 'visible', timeout: 15_000 });
 
         // Desvincular es borrar, no marcar: no queda credencial, ni cuenta, ni
         // vencimiento, ni intentos de vinculación colgados.
@@ -6283,9 +6388,10 @@ await runCase(70, 'El vendedor vincula, ve y desvincula desde el panel, en escri
       + 'en Mercado Pago → conectado con la cuenta a la vista → desvinculado, sin errores '
       + 'de página y sin credenciales en el HTML';
   } finally {
-    await browser.close();
-    await desvincular(vendedor.token);
+    // Mismo criterio: primero lo que libera recursos, después la limpieza.
     await doble.cerrar();
+    try { await browser.close(); } catch { /* ya estaba cerrado */ }
+    try { await desvincular(vendedor.token); } catch { /* no tapa el motivo real */ }
   }
 });
 
@@ -6294,7 +6400,7 @@ await runCase(71, 'Con la clave de cifrado rotada, el vínculo pide reconexión 
   const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
   try {
     await desvincular(vendedor.token);
-    const observado = leerResultado(correrEnLaApi(MP_CLAVE_ROTADA, ''));
+    const observado = leerResultado(await correrEnLaApiSinBloquear(MP_CLAVE_ROTADA));
 
     assert(observado.antes === 'conectado',
       `el vínculo no quedó conectado antes de rotar: ${observado.antes}`);
@@ -6312,8 +6418,155 @@ await runCase(71, 'Con la clave de cifrado rotada, el vínculo pide reconexión 
     return 'rotada la clave sin migrar, el estado pasa solo a «requiere_reconexion» con la '
       + 'cuenta a la vista, renovar responde 200 con motivo propio y no aparece un 500';
   } finally {
-    await desvincular(vendedor.token);
+    // El doble se cierra primero y pase lo que pase: si la limpieza de
+    // datos fallara, el puerto quedaría tomado y el caso siguiente
+    // moriría con EADDRINUSE por un problema que no es suyo.
     await doble.cerrar();
+    try { await desvincular(vendedor.token); } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(72, 'Cancelar en Mercado Pago también gasta el intento', async () => {
+  // Volver cancelado es volver. Si el state siguiera vivo, ese mismo intento
+  // serviría después para vincular, que es exactamente lo que no queremos de
+  // un pedido que la persona ya abandonó.
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await desvincular(vendedor.token);
+
+    const authUrl = await pedirUrlDeVinculo(vendedor.token);
+    const state = new URL(authUrl).searchParams.get('state');
+    const callback = (parametros) => `${API_URL}/mp-oauth/callback?${parametros}`;
+
+    const cancelado = await volverDelCallback(
+      callback(`error=access_denied&error_description=El+usuario+cancelo`
+        + `&state=${encodeURIComponent(state)}`),
+      vendedor.token,
+    );
+    assert(cancelado.motivo === 'cancelado',
+      `cancelar devolvió «${cancelado.motivo}»`);
+    sinSecretos(`${cancelado.destino} ${cancelado.cuerpo}`, 'la vuelta cancelada');
+
+    assert(queryCount(`SELECT COUNT(*) FROM mp_oauth_states
+      WHERE state_hash = ${sqlLiteral(huellaDe(state))} AND usado_el IS NOT NULL`) === 1,
+      'el intento cancelado quedó vivo');
+
+    // Y con el mismo state, ahora sí con un código bueno, no vincula.
+    const reintento = await volverDelCallback(
+      callback(`code=ok%3A900001&state=${encodeURIComponent(state)}`), vendedor.token);
+    assert(reintento.motivo === 'estado_invalido',
+      `el state cancelado se pudo reusar: «${reintento.motivo}»`);
+
+    const fila = vinculoEnLaBase('vendedor@ejemplo.com');
+    assert(!fila.cuenta && !fila.acceso && !fila.refresco,
+      `quedó algo escrito: ${JSON.stringify(fila)}`);
+    const estado = await estadoDelVinculo(vendedor.token);
+    assert(estado.estado === 'desconectado', `quedó en ${estado.estado}`);
+
+    return 'la vuelta cancelada sella el intento; reusar ese mismo state con un código '
+      + 'válido devuelve «estado_invalido» y no escribe una sola credencial';
+  } finally {
+    // El doble se cierra primero y pase lo que pase: si la limpieza de
+    // datos fallara, el puerto quedaría tomado y el caso siguiente
+    // moriría con EADDRINUSE por un problema que no es suyo.
+    await doble.cerrar();
+    try { await desvincular(vendedor.token); } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(73, 'Una clave de cifrado inválida apaga el vínculo, no lo revienta', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await desvincular(vendedor.token);
+    const observado = leerResultado(await correrEnLaApiSinBloquear(MP_CLAVE_INVALIDA));
+
+    assert(observado.antes === 'conectado',
+      `el vínculo no quedó conectado con la clave buena: ${observado.antes}`);
+
+    // Una cadena que no es una clave Fernet cuenta como no configurada: es
+    // más honesto que ofrecer una integración que no puede guardar nada.
+    assert(observado.status === 200 && observado.estado === 'no_configurado',
+      `el estado fue ${observado.status}/${observado.estado}`);
+    assert(observado.auth_url === 503,
+      `vincular devolvió ${observado.auth_url} en vez de 503`);
+    assert(observado.refresh_status === 200,
+      `renovar devolvió ${observado.refresh_status}: con la clave rota tiene que `
+      + 'contestar algo accionable, no un 500');
+    assert(observado.refresh_estado === 'no_configurado'
+      && observado.motivo === 'sin_configurar',
+      `la renovación devolvió ${observado.refresh_estado}/${observado.motivo}`);
+    assert(observado.catalogo === 200,
+      `el resto del marketplace se degradó: catálogo en ${observado.catalogo}`);
+    sinSecretos(observado.cuerpos, 'las respuestas con la clave inválida');
+    assert(!/fernet|MP_TOKEN_KEY/i.test(observado.cuerpos),
+      `las respuestas nombran la clave o la biblioteca: ${observado.cuerpos.slice(0, 200)}`);
+
+    return 'con MP_TOKEN_KEY escrita pero inválida: estado «no_configurado», vincular 503 '
+      + 'y renovar 200 con motivo, ningún 500 y el catálogo intacto';
+  } finally {
+    // El doble se cierra primero y pase lo que pase: si la limpieza de
+    // datos fallara, el puerto quedaría tomado y el caso siguiente
+    // moriría con EADDRINUSE por un problema que no es suyo.
+    await doble.cerrar();
+    try { await desvincular(vendedor.token); } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(74, 'El descarte de credenciales en claro sólo lo autoriza un 1', async () => {
+  // Este freno borra credenciales de terceros y no se deshace. Que se abriera
+  // con cualquier texto -«0», «false», un dedazo- era una puerta abierta.
+  const bajada = correrAlembic('downgrade -1');
+  assert(/Running downgrade/.test(bajada), `el downgrade no corrió: ${bajada.slice(-200)}`);
+
+  const enClaro = () => queryCount(
+    "SELECT COUNT(*) FROM users WHERE mp_access_token IS NOT NULL");
+  const columnasViejas = () => queryCount(`SELECT COUNT(*) FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name IN ('mp_access_token', 'mp_refresh_token')`);
+
+  try {
+    // Un token como el que dejaba `manual-link`, que es el caso que el freno
+    // existe para atajar.
+    querySql(`UPDATE users SET mp_access_token = 'APP_USR-de-prueba-en-claro'
+      WHERE email = ${sqlLiteral('vendedor@ejemplo.com')}`);
+    assert(enClaro() === 1, 'no se pudo fabricar el escenario del freno');
+
+    const negados = [
+      [[], 'la variable sin definir'],
+      [['MP_MIGRACION_DESCARTAR_TOKENS='], 'vacía'],
+      [['MP_MIGRACION_DESCARTAR_TOKENS=0'], 'en 0'],
+      [['MP_MIGRACION_DESCARTAR_TOKENS=false'], 'en false'],
+      [['MP_MIGRACION_DESCARTAR_TOKENS=11'], 'en 11'],
+    ];
+
+    for (const [variables, comoLoLlamamos] of negados) {
+      const salida = correrAlembic('upgrade head', variables);
+      assert(/credenciales de Mercado Pago/.test(salida),
+        `con la variable ${comoLoLlamamos} la migración no frenó: ${salida.slice(-250)}`);
+      assert(enClaro() === 1,
+        `con la variable ${comoLoLlamamos} se borró la credencial igual`);
+      assert(columnasViejas() === 2,
+        `con la variable ${comoLoLlamamos} la migración avanzó a medias`);
+    }
+
+    // El mensaje dice cuántos hay, nunca cuáles ni de quién.
+    const frenada = correrAlembic('upgrade head');
+    assert(/Hay 1 usuario/.test(frenada), `el mensaje no dice cuántos: ${frenada.slice(-250)}`);
+    assert(!/vendedor@ejemplo\.com|APP_USR/.test(frenada),
+      'el mensaje del freno filtra de quién es la credencial');
+
+    const autorizada = correrAlembic('upgrade head', ['MP_MIGRACION_DESCARTAR_TOKENS=1']);
+    assert(/Running upgrade/.test(autorizada),
+      `con 1 la migración no avanzó: ${autorizada.slice(-250)}`);
+    assert(columnasViejas() === 0, 'las columnas en claro siguen existiendo');
+
+    return 'cinco valores que no son «1» -sin definir, vacía, 0, false y 11- frenan la '
+      + 'migración sin tocar la credencial; el mensaje dice cuántas hay y no de quién; '
+      + 'sólo con 1 avanza y las columnas en claro desaparecen';
+  } finally {
+    // Pase lo que pase, la base queda en head para lo que venga después.
+    correrAlembic('upgrade head', ['MP_MIGRACION_DESCARTAR_TOKENS=1']);
   }
 });
 

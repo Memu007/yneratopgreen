@@ -15,7 +15,8 @@ tercero que no podemos garantizar.
 FRENO: si la base trae tokens no nulos, `upgrade()` se detiene y no borra
 nada. Puede haber una cuenta real detras. Quien opere decide, los revisa, y
 recien despues confirma el descarte con
-`MP_MIGRACION_DESCARTAR_TOKENS=1 alembic upgrade head`.
+`MP_MIGRACION_DESCARTAR_TOKENS=1 alembic upgrade head`. Vale exactamente '1':
+cualquier otro valor -incluido '0' o 'false'- se lee como "no autorizado".
 
 Lo que se agrega:
 
@@ -70,7 +71,11 @@ def upgrade() -> None:
             f'SELECT count(*) FROM users WHERE {condicion}'
         )).scalar_one()
 
-        if con_token and not os.environ.get('MP_MIGRACION_DESCARTAR_TOKENS'):
+        # Igualdad exacta con '1'. Con `not os.environ.get(...)` alcanzaba
+        # cualquier texto para autorizar un borrado irreversible: '0',
+        # 'false' o un dedazo tambien pasaban. Ante la duda, no se borra.
+        autorizado = os.environ.get('MP_MIGRACION_DESCARTAR_TOKENS') == '1'
+        if con_token and not autorizado:
             # Se informa cuantos, nunca cuales ni de quien.
             raise RuntimeError(
                 f'Hay {con_token} usuario(s) con credenciales de Mercado Pago '

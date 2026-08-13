@@ -36,8 +36,21 @@ class NoSeDescifra(RuntimeError):
 
 
 def hay_clave() -> bool:
-    """¿Está configurado el cifrado? Sin esto la integración no se ofrece."""
-    return bool(settings.MP_TOKEN_KEY)
+    """¿Hay clave y sirve? Sin esto la integración no se ofrece.
+
+    No alcanza con que la variable esté escrita: una cadena cualquiera no es
+    una clave Fernet. Si sólo se mirara que no está vacía, la integración se
+    ofrecería como configurada y reventaría más adelante, en el momento de
+    guardar o de leer una credencial de un tercero. Se comprueba acá, una vez,
+    y todo lo de arriba puede confiar.
+    """
+    if not settings.MP_TOKEN_KEY:
+        return False
+    try:
+        _motor(settings.MP_TOKEN_KEY)
+    except SinClaveDeCifrado:
+        return False
+    return True
 
 
 @lru_cache(maxsize=2)
