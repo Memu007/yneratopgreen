@@ -305,37 +305,54 @@ la clase de falla que se lee como problema del producto y no lo es.
 
 ## 12. Estado de las puertas
 
-| Puerta | Resultado | Cuándo se midió |
-|---|---|---|
-| Suite completa, base recreada y sembrada | **74/74** | antes del último ajuste de color |
-| `npm run hito` | **6/6** | ídem |
-| Accesibilidad (`npm run a11y`) | **56/56**, cero violaciones bloqueantes | ídem |
-| Contraste (`npm run contraste`) | **40/40**, cero textos por debajo | **después**, y es la que encontró el color |
-| `npm run build` | verde | después |
-| Sintaxis Python | verde | después |
-| Migración ida y vuelta + `alembic check` | verde | dentro de la suite, caso 55 |
-| Espacios al final y marcadores de conflicto | cero y cero | después |
+Todo lo que sigue está medido **sobre el código que estás leyendo**, después
+del último cambio, con la base recreada y sembrada desde cero.
 
-**Te lo digo con la fecha puesta porque importa.** El contraste encontró un
-cuarto color —el encabezado de la sección, blanco sobre `#0ea5e9`, 2,77:1— y lo
-corregí *después* de correr la suite, el hito y accesibilidad. Es un cambio de
-una línea de CSS y ninguna de esas tres puertas mira colores, pero la corrida
-que confirma esos números sobre el código exacto que estás leyendo **está
-corriendo mientras te escribo esto**. Si sale distinto, te lo digo yo en el
-próximo mensaje, no lo vas a descubrir vos.
+| Puerta | Resultado |
+|---|---|
+| Suite completa (`node scripts/smoke.mjs`) | **74/74**, cero fallas |
+| `npm run hito` | **6/6** pasos encadenados |
+| Accesibilidad (`npm run a11y`) | **56/56** pantallas, cero violaciones bloqueantes |
+| Contraste (`npm run contraste`) | **40/40** mediciones, cero textos por debajo del mínimo |
+| `npm run build` | verde |
+| Sintaxis Python | verde |
+| Migración ida y vuelta + `alembic check` | verde, dentro de la suite (caso 55) |
+| Freno de la migración | probado con cinco valores que no son «1» (caso 74) |
+| Espacios al final de línea agregados / marcadores de conflicto | cero / cero |
 
-Lo que no puedo declarar verde con esta corrida: la suite completa sobre el
-código final. Lo tendrás en minutos.
+**Aritmética de los inventarios.** No agregué recorridos permanentes: la sección
+de Mercado Pago vive adentro de pantallas que los inventarios ya exigían
+—«panel del vendedor» en accesibilidad, «perfil vendedor» en contraste—, así que
+se audita sola sin sumar entradas. Accesibilidad: 28 pantallas × 2 medidas = 56.
+Contraste: 20 pantallas × 2 medidas = 40. Los dos números son los mismos de
+antes de esta pieza, y eso es lo correcto: lo que cambió es que esas dos
+pantallas ahora tienen adentro algo que antes no tenían. Por eso aparecieron los
+cuatro colores.
+
+La suite pasó de 61 a **74 casos**: trece nuevos (62 a 74) y uno modificado, el
+20, que exigía 404 en el vínculo cuando el vínculo no existía.
 
 ### Sobre los colores: van cuatro
 
-Uno más que en el informe anterior. Todos de la misma sección y por la misma
-razón: estuvo fuera del árbol desde antes de que existieran las puertas de
-accesibilidad y contraste, así que ninguno de sus colores se había medido nunca.
-El último es el encabezado, y lo resolví con el azul que la propia sección ya
-usaba en su botón (5,93:1 y 7,56:1 en los extremos del degradado): no agregué
-paleta ni cambié el aspecto.
+Todos de la misma sección y por la misma razón: estuvo fuera del árbol desde
+antes de que existieran las puertas de accesibilidad y contraste, así que
+ninguno de sus colores se había medido nunca. El último es el encabezado —blanco
+sobre `#0ea5e9`, 2,77:1— y lo resolví con el azul que la propia sección ya usaba
+en su botón (5,93:1 y 7,56:1 en los extremos del degradado): no agregué paleta
+ni cambié el aspecto.
 
-Vale la pena que quede anotado: **axe no encuentra estos**. No resuelve
-gradientes, así que los reporta como «incompletos» y sigue. Los cuatro los
-encontró `contraste.mjs`, que es exactamente para lo que existe.
+Vale la pena que quede anotado: **axe no encuentra ninguno de los cuatro**. No
+resuelve gradientes, así que los reporta como «incompletos» y sigue. Los cuatro
+los cazó `contraste.mjs`, que es exactamente para lo que existe.
+
+### Una corrida roja que no fue del producto
+
+Antes de la corrida buena hubo una con cuatro rojos, y la explico porque queda
+en los logs. La API y Vite se cayeron a mitad de camino —los verifiqué después,
+los dos en `000`—: eso volteó el caso 70, que se quedó sin navegador, y el 71,
+que no pudo hablar con la API. Los casos 72 y 73 murieron en cascada con
+`EADDRINUSE`, y ahí sí había una fragilidad mía: en el `finally`, desvincular
+iba antes de cerrar el doble local, así que una limpieza fallida dejaba el
+puerto tomado y hundía al caso siguiente por un problema ajeno. Ahora el doble
+se cierra primero y siempre; la limpieza de datos va después y no puede tumbar
+nada.
