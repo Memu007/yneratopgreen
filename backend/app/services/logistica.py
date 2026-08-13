@@ -287,3 +287,24 @@ def resolver_decisiones(
         )
 
     return elegidos
+
+
+def origen_de(product) -> dict:
+    """El origen oficial de una publicación, congelado para la orden.
+
+    Se guarda el id y también el texto: el id conserva la relación con el
+    padrón y el texto deja la operación legible aunque el padrón cambie.
+    Sin localidad oficial no se inventa nada: quedan los tres en None.
+    """
+    localidad = product.locality if product.locality_id else None
+    if localidad is None:
+        return {
+            "origin_locality_id": None,
+            "origin_locality_name": None,
+            "origin_province_name": None,
+        }
+    return {
+        "origin_locality_id": localidad.id,
+        "origin_locality_name": localidad.name,
+        "origin_province_name": localidad.province_name,
+    }

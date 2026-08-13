@@ -74,21 +74,47 @@ type DecisionDeTraslado =
   | { modo: 'self' }
   | { modo: 'carrier'; elegido?: TransportistaElegido };
 
-type CheckoutStep = 'shipping' | 'payment' | 'transfer';
+type CheckoutStep = 'shipping' | 'payment' | 'orders';
 
-interface BankTransferOption {
+type MedioDePago = 'transfer' | 'mercadopago';
+
+/**
+ * Con qué se le puede pagar a un vendedor del carrito, y cuánto.
+ *
+ * `methods` puede traer los dos medios, uno solo, o ninguno. Ninguno no rompe
+ * el carrito: identifica cuál de los pedidos no se puede pagar todavía y por
+ * qué, para que la persona sepa qué sacar.
+ */
+interface OpcionDePago {
   seller_id: string;
   seller_name: string;
+  amount: number;
+  methods: MedioDePago[];
+  reason?: string;
   cbu?: string;
   alias_bancario?: string;
-  amount: number;
 }
 
-interface BankTransferOrder extends BankTransferOption {
+/**
+ * Una orden ya creada. Un carrito de dos vendedores devuelve dos, y cada una
+ * se paga por separado: no existe el pago único.
+ */
+interface OrdenCreada {
   order_id: string;
   order_number: string;
   status: string;
+  seller_id: string;
+  seller_name: string;
+  payment_method: MedioDePago;
+  amount: number;
+  /** 'lista' si ya se puede pagar; 'pendiente' si falta preparar el pago. */
+  preparation: string;
+  /** Por qué quedó pendiente. Es un código nuestro, no texto de Mercado Pago. */
+  reason?: string;
+  cbu?: string;
+  alias_bancario?: string;
   transfer_receipt_url?: string;
+  payment_url?: string;
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
@@ -98,11 +124,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('shipping');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [transferOptions, setTransferOptions] = useState<BankTransferOption[]>([]);
-  const [transferOrders, setTransferOrders] = useState<BankTransferOrder[]>([]);
-  const [transferFiles, setTransferFiles] = useState<Record<string, File>>({});
-  const [transferMessages, setTransferMessages] = useState<Record<string, string>>({});
-  const [loadingTransferOptions, setLoadingTransferOptions] = useState(false);
+  const [opcionesDePago, setOpcionesDePago] = useState<OpcionDePago[]>([]);
+  // Un medio por grupo de vendedor. Sin entrada, ese grupo no decidió: igual
+  // que con el traslado, no se manda una decisión que nadie tomó.
+  const [mediosElegidos, setMediosElegidos] = useState<Record<string, MedioDePago>>({});
+  const [ordenes, setOrdenes] = useState<OrdenCreada[]>([]);
+  const [comprobantes, setComprobantes] = useState<Record<string, File>>({});
+  const [mensajes, setMensajes] = useState<Record<string, string>>({});
+  const [cargandoOpciones, setCargandoOpciones] = useState(false);
+  const [reintentando, setReintentando] = useState('');
   
   const [shippingData, setShippingData] = useState({
     fullName: user?.name || '',
@@ -322,30 +352,52 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     }
     setError('');
     setCurrentStep('payment');
-    void selectBankTransfer();
+    void cargarOpcionesDePago();
   };
 
-  const selectBankTransfer = async () => {
+  const cargarOpcionesDePago = async () => {
     setError('');
-    setLoadingTransferOptions(true);
+    setCargandoOpciones(true);
     try {
       // Por la misma cola que la búsqueda de fletes: si una sincronización
       // anterior sigue en vuelo, ésta no puede adelantarla y terminar
       // escribiendo última sobre el carrito del servidor.
       await sincronizarConServidor();
-      setTransferOptions(await apiGet<BankTransferOption[]>('/orders/transfer-options'));
+      const opciones = await apiGet<OpcionDePago[]>('/orders/payment-options');
+      setOpcionesDePago(opciones);
+      // Con un solo medio posible no hay nada que elegir: marcarlo es
+      // describir la única opción que existe. Con dos, no se presupone
+      // ninguna, y una elección anterior sólo sobrevive si sigue disponible.
+      setMediosElegidos((actuales) => {
+        const siguientes: Record<string, MedioDePago> = {};
+        for (const opcion of opciones) {
+          const previo = actuales[opcion.seller_id];
+          if (previo && opcion.methods.includes(previo)) {
+            siguientes[opcion.seller_id] = previo;
+          } else if (opcion.methods.length === 1) {
+            siguientes[opcion.seller_id] = opcion.methods[0];
+          }
+        }
+        return siguientes;
+      });
     } catch (err) {
-      setTransferOptions([]);
-      setError(err instanceof Error ? err.message : 'No se pudo ofrecer transferencia');
+      setOpcionesDePago([]);
+      setMediosElegidos({});
+      setError(err instanceof Error ? err.message : 'No se pudieron cargar las formas de pago');
     } finally {
-      setLoadingTransferOptions(false);
+      setCargandoOpciones(false);
     }
   };
 
+  const elegirMedio = (vendedor: string, medio: MedioDePago) => {
+    setError('');
+    setMediosElegidos((actuales) => ({ ...actuales, [vendedor]: medio }));
+  };
+
   const uploadTransferReceipt = async (orderId: string) => {
-    const file = transferFiles[orderId];
+    const file = comprobantes[orderId];
     if (!file) {
-      setTransferMessages(current => ({ ...current, [orderId]: 'Seleccioná un comprobante' }));
+      setMensajes(current => ({ ...current, [orderId]: 'Seleccioná un comprobante' }));
       return;
     }
     const body = new FormData();
@@ -360,20 +412,64 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
-      setTransferOrders(current => current.map(order =>
+      setOrdenes(current => current.map(order =>
         order.order_id === orderId ? { ...order, ...data } : order
       ));
-      setTransferMessages(current => ({ ...current, [orderId]: 'Comprobante enviado' }));
+      setMensajes(current => ({ ...current, [orderId]: 'Comprobante enviado' }));
     } catch (err) {
-      setTransferMessages(current => ({
+      setMensajes(current => ({
         ...current,
         [orderId]: err instanceof Error ? err.message : 'No se pudo subir el comprobante',
       }));
     }
   };
 
+  /**
+   * Vuelve a pedir el link de pago de una orden que quedó pendiente.
+   *
+   * La orden ya existe y no se toca: el servidor devuelve la misma intención
+   * de pago si ya la había. Reintentar no crea otra orden ni otro pago.
+   */
+  const reintentarPago = async (orderId: string) => {
+    setReintentando(orderId);
+    setMensajes(current => ({ ...current, [orderId]: '' }));
+    try {
+      const actualizada = await apiFetch<OrdenCreada>(`/orders/${orderId}/payment-link`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      setOrdenes(current => current.map(order =>
+        order.order_id === orderId ? actualizada : order
+      ));
+    } catch (err) {
+      setMensajes(current => ({
+        ...current,
+        [orderId]: err instanceof Error ? err.message : 'No se pudo preparar el pago',
+      }));
+    } finally {
+      setReintentando('');
+    }
+  };
+
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Un grupo sin ningún medio no se puede comprar, y decirlo acá es mejor
+    // que dejar que el servidor rechace el carrito entero después.
+    const sinMedio = opcionesDePago.filter((opcion) => opcion.methods.length === 0);
+    if (sinMedio.length > 0) {
+      setError(
+        `${sinMedio.map((opcion) => opcion.seller_name).join(', ')} no puede recibir `
+        + 'pagos en este momento. Sacá sus productos del carrito para continuar.',
+      );
+      return;
+    }
+    const sinElegir = opcionesDePago.filter((opcion) => !mediosElegidos[opcion.seller_id]);
+    if (opcionesDePago.length === 0 || sinElegir.length > 0) {
+      setError('Falta elegir cómo le pagás a cada vendedor del carrito.');
+      return;
+    }
+
     setError('');
     setIsLoading(true);
 
@@ -391,16 +487,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         // revalidar cada transportista: esto es lo que el comprador dijo, no
         // una verdad.
         shipping_decisions: decisionesParaElServidor(),
+        // Y una forma de pago por pedido, con la misma regla: el servidor
+        // vuelve a derivar los grupos y exige exactamente una por grupo.
+        payment_decisions: opcionesDePago.map((opcion) => ({
+          seller_id: opcion.seller_id,
+          method: mediosElegidos[opcion.seller_id],
+        })),
         notes: shippingData.notes || `Tel: ${shippingData.phone}`
       };
 
-      const response = await apiFetch<{ orders: BankTransferOrder[] }>('/orders/checkout/transfer', {
+      const response = await apiFetch<{ orders: OrdenCreada[] }>('/orders/checkout', {
         method: 'POST',
         body: JSON.stringify(checkoutData)
       });
-      setTransferOrders(response.orders);
+      setOrdenes(response.orders);
       clearCart();
-      setCurrentStep('transfer');
+      setCurrentStep('orders');
 
     } catch (err) {
       console.error('Error en checkout:', err);
@@ -732,11 +834,29 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     </form>
   );
 
+  const nombreDelMedio = (medio: MedioDePago) => (
+    medio === 'transfer' ? 'Transferencia bancaria' : 'Mercado Pago'
+  );
+
+  const detalleDelMedio = (medio: MedioDePago) => (
+    medio === 'transfer'
+      ? 'Transferís directamente a la cuenta del vendedor y adjuntás el comprobante.'
+      : 'Pagás en Mercado Pago. Cobra el vendedor, en su cuenta.'
+  );
+
+  /**
+   * El pago, vendedor por vendedor.
+   *
+   * El carrito se resuelve por grupos, igual que el traslado: cada grupo va a
+   * ser una orden y cada orden se paga sola. Un grupo puede ir por Mercado
+   * Pago y otro por transferencia, y eso se dice antes de confirmar, no
+   * después de haber creado las órdenes.
+   */
   const renderPaymentStep = () => (
     <form onSubmit={handlePaymentSubmit} className={styles.form}>
       <div className={styles.stepHeader}>
         <h2>💳 Método de Pago</h2>
-        <p>Selecciona cómo deseas pagar tu pedido</p>
+        <p>Elegí cómo le pagás a cada vendedor</p>
       </div>
 
       {error && (
@@ -745,98 +865,189 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         </div>
       )}
 
-      <div className={styles.paymentMethods}>
-        <label className={`${styles.paymentOption} ${styles.paymentOptionActive}`}>
-          <input
-            type="radio"
-            name="payment"
-            value="bank_transfer"
-            checked
-            readOnly
-          />
-          <div className={styles.paymentContent}>
-            <div className={styles.paymentIcon}>🏦</div>
-            <div>
-              <div className={styles.paymentTitle}>Transferencia bancaria</div>
-              <div className={styles.paymentDescription}>
-                Transferí directamente al vendedor y adjuntá el comprobante
-              </div>
-            </div>
-          </div>
-        </label>
-      </div>
+      {opcionesDePago.length > 1 && (
+        <div className={styles.avisoMultiple}>
+          <p>
+            Tu carrito tiene productos de {opcionesDePago.length} vendedores, así que
+            se van a crear <strong>{opcionesDePago.length} órdenes separadas</strong>,
+            una por vendedor. <strong>Cada una se paga por separado</strong> y cada
+            vendedor entrega lo suyo: no hay un pago único ni un envío único.
+          </p>
+        </div>
+      )}
 
-      <div className={styles.confirmationInfo}>
-        <p>
-          El pago es una transferencia directa a la cuenta del vendedor.
-          TopGreen no recibe ni retiene el dinero.
-        </p>
-        {loadingTransferOptions ? (
-          <p>Cargando datos bancarios...</p>
-        ) : transferOptions.map(option => (
-          <div key={option.seller_id} className={styles.infoCard}>
-            <h3>{option.seller_name}</h3>
-            {option.cbu && <p><strong>CBU:</strong> {option.cbu}</p>}
-            {option.alias_bancario && <p><strong>Alias:</strong> {option.alias_bancario}</p>}
-            <p><strong>Monto:</strong> {formatPrice(option.amount)}</p>
-          </div>
-        ))}
-      </div>
+      <p className={styles.pagoNota}>
+        TopGreen no recibe ni retiene el dinero. Cada pago va a la cuenta del vendedor.
+      </p>
+
+      {cargandoOpciones ? (
+        <p>Cargando formas de pago…</p>
+      ) : opcionesDePago.map((opcion) => (
+        <fieldset key={opcion.seller_id} className={styles.grupoDePago}>
+          <legend className={styles.grupoDePagoTitulo}>
+            {opcion.seller_name} · {formatPrice(opcion.amount)}
+          </legend>
+
+          {opcion.methods.length === 0 ? (
+            <p className={styles.pagoSinMedio} role="alert">
+              {opcion.reason || 'Este vendedor no puede recibir pagos en este momento.'}
+              {' '}Sacá sus productos del carrito para poder continuar.
+            </p>
+          ) : (
+            <div className={styles.paymentMethods}>
+              {opcion.methods.map((medio) => (
+                <label
+                  key={medio}
+                  className={`${styles.paymentOption} ${
+                    mediosElegidos[opcion.seller_id] === medio ? styles.paymentOptionActive : ''
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={`pago-${opcion.seller_id}`}
+                    value={medio}
+                    checked={mediosElegidos[opcion.seller_id] === medio}
+                    onChange={() => elegirMedio(opcion.seller_id, medio)}
+                  />
+                  <div className={styles.paymentContent}>
+                    <div className={styles.paymentIcon}>
+                      {medio === 'transfer' ? '🏦' : '💳'}
+                    </div>
+                    <div>
+                      <div className={styles.paymentTitle}>{nombreDelMedio(medio)}</div>
+                      <div className={styles.paymentDescription}>{detalleDelMedio(medio)}</div>
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+
+          {mediosElegidos[opcion.seller_id] === 'transfer'
+            && (opcion.cbu || opcion.alias_bancario) && (
+            <div className={styles.datosBancarios}>
+              {opcion.cbu && <p><strong>CBU:</strong> {opcion.cbu}</p>}
+              {opcion.alias_bancario && (
+                <p><strong>Alias:</strong> {opcion.alias_bancario}</p>
+              )}
+            </div>
+          )}
+        </fieldset>
+      ))}
 
       <div className={styles.formActions}>
         <button type="button" className={styles.backButton} onClick={() => setCurrentStep('shipping')} disabled={isLoading}>
           ← Volver
         </button>
         <button type="submit" className={styles.nextButton} disabled={isLoading}>
-          {isLoading ? 'Procesando...' : 'Crear orden y adjuntar comprobante'}
+          {isLoading ? 'Procesando...' : 'Confirmar y crear las órdenes'}
         </button>
       </div>
     </form>
   );
 
-  const renderTransferStep = () => (
-    <div className={styles.confirmation}>
-      <h2>🏦 Transferencia bancaria</h2>
-      <p>Adjuntá un comprobante por vendedor. La orden queda pendiente hasta su validación.</p>
+  /** La transferencia de una orden: a dónde va la plata y con qué concepto. */
+  const bloqueDeTransferencia = (orden: OrdenCreada) => (
+    <>
+      {orden.cbu && <p><strong>CBU:</strong> {orden.cbu}</p>}
+      {orden.alias_bancario && <p><strong>Alias:</strong> {orden.alias_bancario}</p>}
+      <p><strong>Titular:</strong> {orden.seller_name}</p>
       <p>
-        El pago es una transferencia directa a la cuenta del vendedor.
-        TopGreen no recibe ni retiene el dinero.
+        Usá <strong>{orden.order_number}</strong> como concepto de la
+        transferencia. Es lo que le permite al vendedor reconocer tu pago
+        en su resumen bancario.
       </p>
-      {transferOrders.map(order => (
-        <div key={order.order_id} className={styles.infoCard}>
-          <h3>{order.seller_name}</h3>
-          <p><strong>Referencia de pago:</strong> {order.order_number}</p>
-          {order.cbu && <p><strong>CBU:</strong> {order.cbu}</p>}
-          {order.alias_bancario && <p><strong>Alias:</strong> {order.alias_bancario}</p>}
-          <p><strong>Titular:</strong> {order.seller_name}</p>
-          <p><strong>Monto:</strong> {formatPrice(order.amount)}</p>
-          <p>
-            Usá <strong>{order.order_number}</strong> como concepto de la
-            transferencia. Es lo que le permite al vendedor reconocer tu pago
-            en su resumen bancario.
-          </p>
-          {order.status === 'transfer_receipt_submitted' ? (
-            <p>✅ Comprobante enviado. Esperando validación del vendedor.</p>
-          ) : (
-            <>
-              <input
-                type="file"
-                accept=".jpg,.jpeg,.png,.webp,.pdf"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) setTransferFiles(current => ({ ...current, [order.order_id]: file }));
-                }}
-              />
-              <button
-                type="button"
-                className={styles.nextButton}
-                onClick={() => void uploadTransferReceipt(order.order_id)}
-              >
-                Adjuntar comprobante
-              </button>
-            </>
-          )}
-          {transferMessages[order.order_id] && <p>{transferMessages[order.order_id]}</p>}
+      {orden.status === 'transfer_receipt_submitted' ? (
+        <p>✅ Comprobante enviado. Esperando validación del vendedor.</p>
+      ) : (
+        <>
+          <input
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp,.pdf"
+            aria-label={`Comprobante de la orden ${orden.order_number}`}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) setComprobantes(current => ({ ...current, [orden.order_id]: file }));
+            }}
+          />
+          <button
+            type="button"
+            className={styles.nextButton}
+            onClick={() => void uploadTransferReceipt(orden.order_id)}
+          >
+            Adjuntar comprobante
+          </button>
+        </>
+      )}
+    </>
+  );
+
+  /**
+   * El pago por Mercado Pago de una orden.
+   *
+   * El link lleva a Mercado Pago y ahí cobra el vendedor. Volver de esa
+   * pantalla no dice nada del pago: quién confirma es Mercado Pago, no el
+   * navegador, así que acá la orden sigue diciendo «pendiente de confirmación»
+   * hasta que lo informe.
+   */
+  const bloqueDeMercadoPago = (orden: OrdenCreada) => (
+    orden.preparation === 'lista' && orden.payment_url ? (
+      <>
+        <a
+          className={styles.pagarMP}
+          href={orden.payment_url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Pagar con Mercado Pago
+        </a>
+        <p>
+          Cobra {orden.seller_name} en su cuenta de Mercado Pago. La orden queda
+          <strong> pendiente de confirmación</strong>: volver de esa pantalla no
+          confirma el pago, lo confirma Mercado Pago.
+        </p>
+      </>
+    ) : (
+      <>
+        <p role="alert">
+          No se pudo preparar el pago
+          {orden.reason ? ` (${orden.reason})` : ''}. La orden está creada y podés
+          reintentar: no se va a crear otra orden ni otro pago.
+        </p>
+        <button
+          type="button"
+          className={styles.reintentar}
+          disabled={reintentando === orden.order_id}
+          onClick={() => void reintentarPago(orden.order_id)}
+        >
+          {reintentando === orden.order_id ? 'Preparando…' : 'Reintentar el pago'}
+        </button>
+      </>
+    )
+  );
+
+  /** La cola de órdenes: una tarjeta por vendedor, cada una con su pago. */
+  const renderOrdenesStep = () => (
+    <div className={styles.confirmation}>
+      <h2>✅ Tus órdenes</h2>
+      <p>
+        {ordenes.length === 1
+          ? 'Se creó una orden.'
+          : `Se crearon ${ordenes.length} órdenes, una por vendedor. Cada una se paga por separado.`}
+      </p>
+      <p>
+        TopGreen no recibe ni retiene el dinero. Cada pago va a la cuenta del vendedor.
+      </p>
+      {ordenes.map(orden => (
+        <div key={orden.order_id} className={styles.infoCard}>
+          <h3>{orden.seller_name}</h3>
+          <p><strong>Referencia de pago:</strong> {orden.order_number}</p>
+          <p><strong>Monto:</strong> {formatPrice(orden.amount)}</p>
+          <p><strong>Forma de pago:</strong> {nombreDelMedio(orden.payment_method)}</p>
+          {orden.payment_method === 'transfer'
+            ? bloqueDeTransferencia(orden)
+            : bloqueDeMercadoPago(orden)}
+          {mensajes[orden.order_id] && <p>{mensajes[orden.order_id]}</p>}
         </div>
       ))}
       <button type="button" className={styles.finishButton} onClick={onClose}>
@@ -894,14 +1105,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
             <span>Envío</span>
           </div>
           <div className={styles.progressLine}></div>
-          <div className={`${styles.progressStep} ${currentStep === 'payment' ? styles.progressStepActive : currentStep === 'transfer' ? styles.progressStepComplete : ''}`}>
+          <div className={`${styles.progressStep} ${currentStep === 'payment' ? styles.progressStepActive : currentStep === 'orders' ? styles.progressStepComplete : ''}`}>
             <div className={styles.progressCircle}>2</div>
             <span>Pago</span>
           </div>
           <div className={styles.progressLine}></div>
-          <div className={`${styles.progressStep} ${currentStep === 'transfer' ? styles.progressStepActive : ''}`}>
+          <div className={`${styles.progressStep} ${currentStep === 'orders' ? styles.progressStepActive : ''}`}>
             <div className={styles.progressCircle}>3</div>
-            <span>Comprobante</span>
+            <span>Órdenes</span>
           </div>
         </div>
 
@@ -909,10 +1120,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
           <div className={styles.main}>
             {currentStep === 'shipping' && renderShippingStep()}
             {currentStep === 'payment' && renderPaymentStep()}
-            {currentStep === 'transfer' && renderTransferStep()}
+            {currentStep === 'orders' && renderOrdenesStep()}
           </div>
 
-          {currentStep !== 'transfer' && renderOrderSummary()}
+          {currentStep !== 'orders' && renderOrderSummary()}
         </div>
       </div>
     </div>

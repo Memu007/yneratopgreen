@@ -1,8 +1,10 @@
 # Configuración de Mercado Pago
 
 > **Estado:** el **vínculo** de la cuenta de cada vendedor está construido y
-> funciona; el **cobro** todavía no existe. Las credenciales de la aplicación
-> se entregan vacías, así que la integración arranca apagada.
+> funciona. El **cobro** está construido pero **apagado**: falta el webhook que
+> confirme los pagos, así que encenderlo sería cobrar sin poder confirmar. Las
+> credenciales de la aplicación se entregan vacías y el interruptor del cobro
+> sale en `false`.
 
 ---
 
@@ -11,10 +13,21 @@
 **Hay vínculo OAuth.** Un vendedor conecta su cuenta de Mercado Pago desde su
 panel, ve su estado, la renueva y la desconecta. Vincular no mueve dinero.
 
-**No hay cobro.** No se crean preferencias, no se procesan pagos y no hay
-webhook. El módulo heredado `backend/app/api/payments.py` sigue en el árbol
-pero **no está montado**: sus rutas responden 404, no 503. No es autoridad de
-nada y hay que recortarlo contra el alcance antes de reutilizar una línea.
+**Hay cobro, apagado.** El checkout puede pedirle a Mercado Pago una
+preferencia de Checkout Pro por cada orden, a nombre del vendedor y con su
+credencial. Con `MP_CHECKOUT_HABILITADO=false` —el valor por defecto y el que
+va a producción— ese medio no se ofrece, pedirlo a mano da 400 y no se crea
+ninguna preferencia.
+
+**No hay confirmación de pago.** No hay webhook, no hay consulta de estado a
+Mercado Pago y no hay política de stock. Por eso el interruptor está apagado:
+una orden por Mercado Pago queda «pendiente de confirmación» y nadie la mueve.
+Volver del navegador desde Mercado Pago **no es evidencia de pago** y no cambia
+ninguna orden.
+
+El módulo heredado `backend/app/api/payments.py` **ya no existe**: escribía en
+columnas que se eliminaron y reembolsaba con el token del marketplace, que es
+dinero de terceros.
 
 **Quién cobra.** El vendedor, en su propia cuenta. TopGreen no recibe, no
 retiene y no reparte el dinero de una venta, y no cobra comisión de
@@ -43,10 +56,16 @@ Las cuatro primeras y la clave tienen que estar **todas**: si falta una sola,
 la integración se considera no configurada y no se vincula nada. Es a
 propósito. Poder vincular sin poder cifrar sería peor que no poder vincular.
 
-`MP_PUBLIC_KEY`, `MP_ACCESS_TOKEN`, `MP_COMMISSION_PERCENT` y `NGROK_URL` sólo
-las lee el módulo de cobro, que no está montado. Cuando se construya el cobro,
-`MP_COMMISSION_PERCENT` va en **cero** y `NGROK_URL` se reemplaza por una URL
-pública configurable.
+Dos más, del cobro:
+
+| Variable | Descripción | Valor |
+|----------|-------------|-------|
+| `MP_CHECKOUT_HABILITADO` | Interruptor del cobro por Mercado Pago | `false` hasta que exista el webhook |
+| `MP_NOTIFICACION_URL` | A dónde avisa Mercado Pago cuando cambia un pago | Vacía: todavía no hay quien atienda |
+
+`MP_PUBLIC_KEY`, `MP_ACCESS_TOKEN` y `NGROK_URL` no las lee nadie. TopGreen no
+cobra comisión por venta, así que no hay ninguna variable de comisión:
+`marketplace_fee` no se manda, ni siquiera en cero.
 
 ### La clave de cifrado
 
@@ -107,7 +126,9 @@ pueda apuntar a un doble local. **En producción no se definen.**
 | [`backend/app/core/cifrado.py`](../backend/app/core/cifrado.py) | Cifrado en reposo de credenciales de terceros |
 | [`backend/app/models/mp_oauth_state.py`](../backend/app/models/mp_oauth_state.py) | El `state` de OAuth: con dueño, con vencimiento y de un solo uso |
 | [`src/components/UserDashboard/UserDashboard.tsx`](../src/components/UserDashboard/UserDashboard.tsx) | La sección de Mercado Pago del vendedor |
-| [`backend/app/api/payments.py`](../backend/app/api/payments.py) | Cobro heredado. **No montado.** No usar como referencia |
+| [`backend/app/services/checkout.py`](../backend/app/services/checkout.py) | La regla del checkout, una sola vez: grupos, medios, validación y creación de órdenes |
+| [`backend/app/services/mp_preferencia.py`](../backend/app/services/mp_preferencia.py) | La preferencia de Checkout Pro de una orden: qué viaja, qué se guarda y por qué reintentar no duplica |
+| [`src/components/Checkout/CheckoutModal.tsx`](../src/components/Checkout/CheckoutModal.tsx) | El pago por grupo de vendedor y la cola de órdenes |
 
 ---
 
@@ -115,15 +136,18 @@ pueda apuntar a un doble local. **En producción no se definen.**
 
 Lo que sigue **no está hecho** y no se puede prometer como si lo estuviera:
 
-- Una preferencia por orden. Mercado Pago trabaja 1:1, así que un carrito con
-  tres vendedores son tres pagos y tres redirecciones.
-- El contrato de `POST /api/orders/checkout`, que hoy crea una orden por
-  vendedor y devuelve una sola.
 - Webhook con validación de firma propia, consulta posterior a la API para
-  confirmar el estado, idempotencia y tolerancia a los reintentos.
+  confirmar el estado, idempotencia y tolerancia a los reintentos. Sin esto
+  ninguna orden pasa a pagada, y por eso el interruptor va apagado.
+- La política de stock: hoy crear la orden no reserva ni descuenta nada, así
+  que dos compradores pueden pagar la misma unidad.
+- El aviso al vendedor cuando el pago se confirma. Hoy sólo se le avisa que la
+  orden fue colocada, que no es lo mismo.
+- Recuperar el link de pago desde «Mis compras». Existe la ruta idempotente
+  `POST /api/orders/{id}/payment-link`, pero ninguna pantalla la ofrece después
+  de cerrar el checkout.
 - Revocación del permiso del lado de Mercado Pago. Hoy desvincular borra lo
   local; el vendedor le retira el permiso a la aplicación desde su cuenta.
-- Reescribir la aritmética del módulo heredado en `Decimal`: hoy usa `float`.
 
 ---
 

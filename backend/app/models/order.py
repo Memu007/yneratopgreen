@@ -66,6 +66,12 @@ class Order(Base):
     buyer_notes = Column(String(500), nullable=True)
     seller_notes = Column(String(500), nullable=True)
     cancellation_reason = Column(String(500), nullable=True)
+    # Cómo se paga ESTA orden. Un carrito con varios vendedores puede tener
+    # un grupo por Mercado Pago y otro por transferencia, así que el medio es
+    # de la orden y no del carrito. NULL es una orden anterior a esta pieza:
+    # no informado, que no es lo mismo que transferencia.
+    payment_method = Column(String(20), nullable=True, index=True)
+
     transfer_receipt_url = Column(String(500), nullable=True)
     transfer_cbu = Column(String(64), nullable=True)
     transfer_alias_bancario = Column(String(100), nullable=True)

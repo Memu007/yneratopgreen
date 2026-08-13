@@ -24,8 +24,13 @@ fastapi-cors==0.0.6
 # Logging
 structlog==24.1.0
 
-# Mercado Pago
-mercadopago==2.2.1
+# Mercado Pago: se habla por HTTP con `httpx`, que ya está en esta lista.
+#
+# El SDK oficial estaba acá para el módulo heredado de cobro, que ya no existe.
+# No se agrega de vuelta por decoración: su versión 3.x mueve el cobro a la
+# API de Orders, que Mercado Pago publica como beta, y lo que usamos -el
+# intercambio de OAuth y las preferencias de Checkout Pro- son dos llamadas
+# HTTP estables que no necesitan una dependencia más.
 
 # Validación de imágenes
 pillow==10.2.0

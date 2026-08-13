@@ -76,25 +76,35 @@ Prefijo común: `/api`
 
 ## Órdenes — `/api/orders`
 
+El carrito se resuelve por **grupos de vendedor**: un carrito con dos
+vendedores es una orden por vendedor, y cada orden se paga por separado.
+
 | Método | Path | Auth | Descripción |
 |--------|------|------|-------------|
-| POST | `/orders` | JWT | Crear orden desde el carrito. Body: `{shipping_address, payment_method}`. |
-| GET | `/orders/me` | JWT | Mis órdenes (como comprador). |
-| GET | `/orders/me/sold` | JWT | Órdenes donde soy vendedor. |
+| GET | `/orders/payment-options` | JWT | Por grupo del carrito: importe, medios disponibles (`transfer`, `mercadopago`) y datos bancarios si corresponde. |
+| POST | `/orders/checkout` | JWT | Crea **una orden por vendedor**. Exige una decisión de traslado y una de pago por grupo. Devuelve `{orders: [...]}`. |
+| POST | `/orders/checkout/transfer` | JWT | Lo mismo, con el medio puesto en transferencia. Misma respuesta. |
+| POST | `/orders/{id}/payment-link` | JWT (buyer) | Deja lista —o vuelve a devolver— la preferencia de una orden de Mercado Pago. Idempotente. |
+| POST | `/orders/{id}/transfer-receipt` | JWT (buyer) | Adjuntar comprobante de transferencia. |
+| PATCH | `/orders/{id}/transfer-receipt` | JWT (seller) | Aprobar o rechazar el comprobante. |
+| GET | `/orders/my` | JWT | Mis órdenes, como comprador y como vendedor. |
 | GET | `/orders/{id}` | JWT (buyer/seller/admin) | Detalle de orden. |
-| PUT | `/orders/{id}/status` | JWT (seller/admin) | Actualizar estado (`shipped`, `delivered`, `cancelled`). |
+| PATCH | `/orders/{id}/status` | JWT (seller/admin) | Actualizar estado. |
+| POST | `/orders/{id}/cancel` | JWT (buyer/seller) | Cancelar. No devuelve dinero: TopGreen no lo administra. |
 
 ---
 
-## Pagos — `/api/payments`
+## Pagos
 
-| Método | Path | Auth | Descripción |
-|--------|------|------|-------------|
-| GET | `/payments/public-key` | — | Devuelve `{public_key, configured}`. Si MP no está configurado, `configured=false`. |
-| POST | `/payments/create-preference` | JWT | Crear preferencia MP para una orden. **HTTP 503** si MP no está configurado. |
-| POST | `/payments/sync-status/{order_id}` | JWT | Sincronizar estado del pago manualmente. |
-| POST | `/payments/webhook` | — (firma MP) | Webhook de notificaciones MP. |
-| POST | `/payments/refund/{order_id}` | JWT (seller/admin) | Reembolso. |
+**No hay `/api/payments`.** El módulo heredado de cobro no existe más: escribía
+en columnas que ya no están y reembolsaba con el token del marketplace, que es
+plata de terceros. Lo que hay hoy del cobro por Mercado Pago es
+`POST /orders/{id}/payment-link`, que pide una preferencia de Checkout Pro **a
+nombre del vendedor**, y sólo si `MP_CHECKOUT_HABILITADO` está encendido.
+
+El webhook, la consulta de estado y la política de stock son de la pieza
+siguiente. Sin ellos, ningún pago se confirma: la orden queda «pendiente de
+confirmación» y volver de Mercado Pago en el navegador no cambia nada.
 
 ---
 
@@ -102,10 +112,11 @@ Prefijo común: `/api`
 
 | Método | Path | Auth | Descripción |
 |--------|------|------|-------------|
-| GET | `/mp-oauth/auth-url` | JWT | URL para iniciar OAuth con MP. |
+| GET | `/mp-oauth/status` | JWT | Estado del vínculo: `no_configurado`, `desconectado`, `conectado` o `requiere_reconexion`. Nunca devuelve credenciales. |
+| POST | `/mp-oauth/auth-url` | JWT | URL para iniciar OAuth con MP. Emite un `state` de un solo uso. |
 | GET | `/mp-oauth/callback` | — | Callback de MP tras autorización. |
-| POST | `/mp-oauth/refresh-token` | JWT | Refrescar token MP del vendedor. |
-| DELETE | `/mp-oauth/unlink` | JWT | Desvincular cuenta MP del vendedor. |
+| POST | `/mp-oauth/refresh` | JWT | Renovar la credencial del vendedor. |
+| POST | `/mp-oauth/unlink` | JWT | Desvincular la cuenta MP del vendedor. |
 
 ---
 

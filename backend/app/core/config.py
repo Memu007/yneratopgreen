@@ -73,7 +73,6 @@ class Settings(BaseSettings):
     # Mercado Pago - Credenciales del Marketplace (recibe comisión)
     MP_PUBLIC_KEY: str = ""
     MP_ACCESS_TOKEN: str = ""
-    MP_COMMISSION_PERCENT: float = 5.0  # Porcentaje de comisión para TopGreen
     
     # Mercado Pago - OAuth para vincular la cuenta de cada vendedor.
     # El vendedor cobra en su cuenta: TopGreen no recibe ni redistribuye
@@ -87,6 +86,19 @@ class Settings(BaseSettings):
     # tocar la base. Vive fuera del repositorio. Si falta, no se vincula nada:
     # guardar un token de tercero en claro no es una alternativa aceptable.
     MP_TOKEN_KEY: str = ""
+
+    # Interruptor del cobro por Mercado Pago. **Apagado por defecto.**
+    # Con esto en falso ninguna ruta de comprador crea preferencias, el
+    # checkout no ofrece el medio y la venta por transferencia funciona igual.
+    # Se enciende recién cuando exista el webhook firmado, la consulta de
+    # estado y la política de stock: hasta entonces, cobrar de verdad sería
+    # prometer algo que no podemos confirmar.
+    MP_CHECKOUT_HABILITADO: bool = False
+
+    # A dónde vuelve el comprador desde Mercado Pago y a dónde avisa MP. Son
+    # URLs públicas y se configuran; no se arman con NGROK_URL ni se adivinan.
+    # La de notificación queda vacía hasta que exista el webhook.
+    MP_NOTIFICACION_URL: str = ""
 
     # Bases de los servicios de Mercado Pago. Son configuración porque la
     # prueba automatizada levanta un doble local y apunta la API ahí; en

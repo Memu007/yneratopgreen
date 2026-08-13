@@ -345,9 +345,11 @@ async function main() {
 
       await page.locator('form:has(h2) button[type="submit"]').click();
       await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: ESPERA });
-      await page.locator('input[value="bank_transfer"]').check();
-      await page.getByRole('button', { name: /Crear orden/ }).click();
-      await page.getByRole('heading', { name: /Transferencia bancaria/ })
+      // El pago se elige por grupo de vendedor. Acá hay uno solo, pero se
+      // marca igual: es lo que hace el comprador.
+      await page.locator('input[value="transfer"]').first().check();
+      await page.getByRole('button', { name: /Confirmar y crear las órdenes/ }).click();
+      await page.getByRole('heading', { name: /Tus órdenes/ })
         .waitFor({ timeout: ESPERA });
 
       const [[orden]] = queryRows(`
@@ -395,7 +397,7 @@ async function main() {
       // Cerrar la confirmación y dejar que se vaya el aviso: si no, el
       // encabezado queda tapado y el clic no llega.
       await page.locator('button[aria-label="Cerrar"]:visible').first().click();
-      await page.getByRole('heading', { name: /Transferencia bancaria/ })
+      await page.getByRole('heading', { name: /Tus órdenes/ })
         .waitFor({ state: 'hidden', timeout: ESPERA });
       await page.locator('[class*="_toast_"]').first()
         .waitFor({ state: 'hidden', timeout: ESPERA }).catch(() => {});

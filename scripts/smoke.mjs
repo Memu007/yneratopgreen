@@ -4,7 +4,8 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 import {
-  DETALLE_CRUDO, SECRETO_DE_ACCESO, SECRETO_DE_REFRESCO, levantarDoble,
+  CUENTA_LENTA, CUENTA_RECHAZA, DETALLE_CRUDO, SECRETO_DE_ACCESO,
+  SECRETO_DE_REFRESCO, levantarDoble,
 } from './lib/mp-doble.mjs';
 import { queryCount, queryRows, querySql, sqlLiteral } from './lib/sql.mjs';
 
@@ -552,6 +553,22 @@ async function resolverTrasladoPropio(page) {
   return cuantas;
 }
 
+/**
+ * Elige transferencia en todos los grupos del paso de pago.
+ *
+ * Ahora hay un medio por vendedor, así que un carrito de dos vendedores tiene
+ * dos radios de transferencia. Marcarlos uno por uno es lo que hace el
+ * comprador, y deja la decisión explícita incluso cuando es la única posible.
+ */
+async function elegirTransferencia(page) {
+  await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: 20_000 });
+  const radios = page.locator('input[value="transfer"]');
+  await radios.first().waitFor({ state: 'visible', timeout: 20_000 });
+  const cuantos = await radios.count();
+  for (let i = 0; i < cuantos; i += 1) await radios.nth(i).check();
+  return cuantos;
+}
+
 // La suite reutiliza conexiones. Si el servidor cierra una justo cuando el
 // cliente la iba a usar, el error es de socket y no de la API: no hubo
 // respuesta, no hubo status, no hubo nada. Se reintenta UNA vez y sólo en ese
@@ -862,13 +879,26 @@ await runCase(8, 'Crear orden desde el carrito', async () => {
       shipping_postal_code: '7620',
       notes: 'Orden automatizada sin pago',
       shipping_decisions: trasladoPropio(),
+      payment_decisions: [{ seller_id: state.sellerId, method: 'transfer' }],
     },
   });
 
-  assert(order.data?.id, 'checkout no devolvió una orden');
-  assert(order.data.items?.length === 1, 'la orden no conserva el ítem del carrito');
-  state.orderId = order.data.id;
-  return `HTTP ${order.status}, order_id=${order.data.id}, status=${order.data.status}`;
+  // El checkout devuelve TODAS las órdenes del carrito, incluso cuando es una.
+  assert(Array.isArray(order.data?.orders), 'checkout no devolvió la lista de órdenes');
+  assert(order.data.orders.length === 1,
+    `esperaba una orden, devolvió ${order.data.orders.length}`);
+  const [creada] = order.data.orders;
+  assert(creada.order_id, 'la orden creada no trae identificador');
+  assert(creada.payment_method === 'transfer',
+    `la orden quedó con medio ${creada.payment_method}`);
+  state.orderId = creada.order_id;
+
+  // Y los ítems del carrito quedaron en la orden: se comprueba contra el
+  // detalle, no contra la respuesta del checkout, que ya no los repite.
+  const detalle = await apiRequest(`/orders/${creada.order_id}`, { token: state.buyerToken });
+  assert(detalle.data.items?.length === 1, 'la orden no conserva el ítem del carrito');
+  return `HTTP ${order.status}, order_id=${creada.order_id}, status=${creada.status}, `
+    + `medio=${creada.payment_method}`;
 });
 
 await runCase(9, 'Publicar producto como vendedor desde la interfaz', async () => {
@@ -1182,11 +1212,13 @@ await runCase(13, 'Desde el seed, los dos vendedores ya cobran por transferencia
     });
   }
 
-  const opciones = await apiRequest('/orders/transfer-options', { token: state.buyerToken });
+  const opciones = await apiRequest('/orders/payment-options', { token: state.buyerToken });
   const detalles = [];
   for (const [etiqueta, sellerId] of [['vendedor', state.sellerId], ['admin', adminId]]) {
     const opcion = opciones.data.find((candidate) => candidate.seller_id === sellerId);
     assert(opcion, `la API no ofrecio transferencia para el ${etiqueta}`);
+    assert(opcion.methods.includes('transfer'),
+      `el ${etiqueta} no tiene transferencia entre sus medios: ${JSON.stringify(opcion.methods)}`);
     assert(opcion.cbu, `el ${etiqueta} salio del seed sin CBU`);
     assert(opcion.alias_bancario, `el ${etiqueta} salio del seed sin alias`);
 
@@ -1210,7 +1242,7 @@ await runCase(13, 'Desde el seed, los dos vendedores ya cobran por transferencia
     + detalles.join('; ');
 });
 
-await runCase(14, 'Transferencia exige CBU o alias del vendedor', async () => {
+await runCase(14, 'Sin CBU ni alias, la transferencia no se ofrece ni se acepta', async () => {
   // El caso crea su propio estado faltante y lo restaura: ya no depende de que
   // el seed venga incompleto, porque desde el caso 13 el seed viene completo.
   const [previo] = queryRows(`
@@ -1231,10 +1263,37 @@ await runCase(14, 'Transferencia exige CBU o alias del vendedor', async () => {
       token: state.buyerToken,
       body: { product_id: state.product.id, quantity: 1 },
     });
+    // El medio deja de ofrecerse, y el resto del carrito sigue siendo
+    // consultable: un vendedor sin datos bancarios ya no voltea la consulta
+    // entera, porque no tener CBU dejó de significar no poder cobrar.
+    const opciones = await apiRequest('/orders/payment-options', { token: state.buyerToken });
+    const opcion = opciones.data.find((o) => o.seller_id === state.sellerId);
+    assert(opcion, 'payment-options no trajo al vendedor del carrito');
+    assert(!opcion.methods.includes('transfer'),
+      `se ofreció transferencia sin datos bancarios: ${JSON.stringify(opcion.methods)}`);
+    assert(!opcion.cbu && !opcion.alias_bancario,
+      'se devolvieron datos bancarios que no existen');
+    if (opcion.methods.length === 0) {
+      assert(/no configuró CBU ni alias/i.test(opcion.reason || ''),
+        `motivo inesperado: ${opcion.reason}`);
+    }
+
+    // Y el servidor lo rechaza igual si el cliente insiste: lo que no se
+    // ofrece tampoco se acepta.
     const error = await expectApiError(400, () =>
-      apiRequest('/orders/transfer-options', { token: state.buyerToken }),
+      apiRequest('/orders/checkout/transfer', {
+        method: 'POST',
+        token: state.buyerToken,
+        body: {
+          shipping_address: 'Av. Smoke 123',
+          shipping_locality_id: localidadDeEnvio(),
+          shipping_postal_code: '7620',
+          shipping_decisions: trasladoPropio(),
+        },
+      }),
     );
-    assert(/no configuró CBU ni alias/i.test(error), `motivo inesperado: ${error}`);
+    assert(/no puede recibir pagos por ese medio/i.test(error),
+      `motivo inesperado: ${error}`);
   } finally {
     // se restaura pase lo que pase, para no dejar la base peor que como estaba
     await apiRequest('/auth/me', {
@@ -1250,7 +1309,8 @@ await runCase(14, 'Transferencia exige CBU o alias del vendedor', async () => {
   `);
   assert(restaurado[0] === previo[0], 'no se restauró el CBU del vendedor');
   assert(restaurado[1] === previo[1], 'no se restauró el alias del vendedor');
-  return 'HTTP 400 con motivo visible; estado bancario vaciado y restaurado por la prueba';
+  return 'sin CBU ni alias: el medio no aparece en payment-options y el checkout '
+    + 'lo rechaza con HTTP 400; estado bancario vaciado y restaurado por la prueba';
 });
 
 await runCase(15, 'Datos bancarios correctos y orden esperando comprobante', async () => {
@@ -1263,7 +1323,7 @@ await runCase(15, 'Datos bancarios correctos y orden esperando comprobante', asy
     token: state.sellerToken,
     body: bankData,
   });
-  const options = await apiRequest('/orders/transfer-options', {
+  const options = await apiRequest('/orders/payment-options', {
     token: state.buyerToken,
   });
   const [databaseBank] = queryRows(`
@@ -1490,8 +1550,7 @@ await runCase(19, 'Transferencia completa desde la interfaz', async () => {
     await resolverTrasladoPropio(page);
     await page.locator('form:has(h2) button[type="submit"]').click();
 
-    await page.getByRole('heading', { name: /Método de Pago/ }).waitFor();
-    await page.locator('input[value="bank_transfer"]').check();
+    await elegirTransferencia(page);
     await page
       .getByText(/TopGreen no recibe ni retiene el dinero/)
       .waitFor({ state: 'visible' });
@@ -1499,9 +1558,9 @@ await runCase(19, 'Transferencia completa desde la interfaz', async () => {
     const bankDetails = await page.locator('form:has(h2)').textContent();
     assert(bankDetails?.includes(databaseBank[0]), 'la UI no muestra el CBU guardado en SQL');
     assert(bankDetails?.includes(databaseBank[1]), 'la UI no muestra el alias guardado en SQL');
-    await page.getByRole('button', { name: /Crear orden y adjuntar comprobante/ }).click();
+    await page.getByRole('button', { name: /Confirmar y crear las órdenes/ }).click();
 
-    await page.getByRole('heading', { name: /Transferencia bancaria/ }).waitFor();
+    await page.getByRole('heading', { name: /Tus órdenes/ }).waitFor();
     await page.locator('input[type="file"]').setInputFiles({
       name: 'comprobante-ui.png',
       mimeType: 'image/png',
@@ -2534,7 +2593,7 @@ await runCase(30, 'El motivo real de la sincronización llega al comprador', asy
 });
 
 await runCase(31, 'Sin datos bancarios, el comprador ve el motivo del vendedor', async () => {
-  // El motivo tiene que venir de /orders/transfer-options y no del carrito.
+  // El motivo tiene que venir de /orders/payment-options y no del carrito.
   const [previo] = queryRows(`
     SELECT coalesce(cbu, ''), coalesce(alias_bancario, '')
     FROM users WHERE id = ${sqlLiteral(state.sellerId)}
@@ -2574,13 +2633,14 @@ await runCase(31, 'Sin datos bancarios, el comprador ve el motivo del vendedor',
     await page.locator('form:has(h2) button[type="submit"]').click();
 
     await page.getByRole('heading', { name: /Método de Pago/ }).waitFor();
-    await page.locator('input[value="bank_transfer"]').check();
+    // Sin ningún medio disponible no hay radio que marcar: lo que tiene que
+    // aparecer es el motivo, y en el grupo de ESE vendedor.
     const aviso = page.locator('[role="alert"]');
     await aviso.waitFor({ state: 'visible', timeout: 15_000 });
     const texto = (await aviso.textContent()) || '';
     assert(
       /no configuró CBU ni alias/i.test(texto),
-      `no se ve el motivo de transfer-options, se ve: "${texto.trim()}"`,
+      `no se ve el motivo de payment-options, se ve: "${texto.trim()}"`,
     );
     return `aviso visible: "${texto.trim().slice(0, 90)}"`;
   } finally {
@@ -4143,10 +4203,10 @@ await runCase(45, 'La escritura de un carrito abandonado no puede quedar última
     await resolverTrasladoPropio(page);
     await page.getByRole('button', { name: /Continuar al Pago/ }).click();
     await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: 15_000 });
-    const datosBancarios = page.locator('[class*="_confirmationInfo_"]');
-    await datosBancarios.getByRole('heading', { level: 3 }).first()
-      .waitFor({ state: 'visible', timeout: 20_000 });
-    const pago = ((await datosBancarios.textContent()) || '').replace(/\s+/g, ' ');
+    const grupos = page.locator('fieldset[class*="_grupoDePago_"]');
+    await grupos.first().waitFor({ state: 'visible', timeout: 20_000 });
+    const pago = ((await grupos.first().textContent()) || '').replace(/\s+/g, ' ');
+    assert(await grupos.count() === 1, `el pago armó ${await grupos.count()} grupos`);
     assert(pago.includes(vendedorDeB), `el pago no describe el carrito vigente: "${pago.slice(0, 200)}"`);
     assert(!pago.includes(vendedorDeA), `el pago describe el carrito abandonado (${vendedorDeA})`);
 
@@ -4896,10 +4956,9 @@ await runCase(51, 'Cada pedido resuelve su traslado y la decisión llega a la or
     await grupoB.getByRole('radio', { name: /Coordino el traslado por mi cuenta/ }).check();
 
     await page.locator('form:has(h2) button[type="submit"]').click();
-    await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: 20_000 });
-    await page.locator('input[value="bank_transfer"]').check();
-    await page.getByRole('button', { name: /Crear orden/ }).click();
-    await page.getByRole('heading', { name: /Transferencia bancaria/ })
+    await elegirTransferencia(page);
+    await page.getByRole('button', { name: /Confirmar y crear las órdenes/ }).click();
+    await page.getByRole('heading', { name: /Tus órdenes/ })
       .waitFor({ timeout: 20_000 });
 
     const despues = ordenesDe(state.buyerId);
@@ -5329,7 +5388,7 @@ await runCase(56, 'Una selección tardía no revive una decisión ya descartada'
       await ruta.continue();
     });
     const checkouts = [];
-    await page.route('**/api/orders/checkout/transfer', async (ruta) => {
+    await page.route('**/api/orders/checkout', async (ruta) => {
       checkouts.push(ruta.request().postData() || '');
       await ruta.continue();
     });
@@ -5383,10 +5442,9 @@ await runCase(56, 'Una selección tardía no revive una decisión ya descartada'
 
     // Y lo que se manda al confirmar la compra es esa decisión, no la otra.
     await page.locator('form:has(h2) button[type="submit"]').click();
-    await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: 20_000 });
-    await page.locator('input[value="bank_transfer"]').check();
-    await page.getByRole('button', { name: /Crear orden/ }).click();
-    await page.getByRole('heading', { name: /Transferencia bancaria/ })
+    await elegirTransferencia(page);
+    await page.getByRole('button', { name: /Confirmar y crear las órdenes/ }).click();
+    await page.getByRole('heading', { name: /Tus órdenes/ })
       .waitFor({ timeout: 20_000 });
 
     assert(checkouts.length === 1, `esperaba un checkout, hubo ${checkouts.length}`);
@@ -5606,7 +5664,7 @@ async function comprarPorLosDosCaminos(productoId, cantidad, vendedorId) {
 
   for (const [camino, endpoint] of [
     ['transferencia', '/orders/checkout/transfer'],
-    ['mercadopago', '/orders/checkout'],
+    ['plural', '/orders/checkout'],
   ]) {
     await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
     const carrito = await apiRequest('/cart/sync', {
@@ -5615,10 +5673,10 @@ async function comprarPorLosDosCaminos(productoId, cantidad, vendedorId) {
     });
     const [linea] = carrito.data.items;
 
-    const opciones = (await apiRequest('/orders/transfer-options',
+    const opciones = (await apiRequest('/orders/payment-options',
       { token: state.buyerToken })).data;
     const opcion = opciones.find((o) => o.seller_id === vendedorId);
-    assert(opcion, 'transfer-options no trajo al vendedor de la publicación');
+    assert(opcion, 'payment-options no trajo al vendedor de la publicación');
 
     const respuesta = await apiRequest(endpoint, {
       method: 'POST', token: state.buyerToken,
@@ -5627,21 +5685,19 @@ async function comprarPorLosDosCaminos(productoId, cantidad, vendedorId) {
         shipping_locality_id: localidadDeEnvio(),
         shipping_postal_code: '2700',
         shipping_decisions: [{ seller_id: vendedorId, mode: 'self' }],
+        payment_decisions: [{ seller_id: vendedorId, method: 'transfer' }],
       },
     });
 
-    const ordenId = camino === 'transferencia'
-      ? respuesta.data.orders[0].order_id
-      : respuesta.data.id;
+    // Los dos caminos devuelven la misma forma: una lista de órdenes.
+    const [creada] = respuesta.data.orders;
     visto[camino] = {
       carritoLinea: linea.subtotal,
       carritoTotal: carrito.data.total_amount,
       opcion: opcion.amount,
-      respuesta: camino === 'transferencia'
-        ? respuesta.data.orders[0].amount
-        : respuesta.data.total_amount,
-      subtotalApi: camino === 'transferencia' ? null : respuesta.data.subtotal,
-      enBase: montosDeLaOrden(ordenId),
+      respuesta: creada.amount,
+      subtotalApi: null,
+      enBase: montosDeLaOrden(creada.order_id),
     };
   }
 
@@ -5662,7 +5718,7 @@ await runCase(59, 'Tres unidades de diez centavos son treinta centavos, no 0,300
     for (const [donde, valor] of [
       ['la línea del carrito', datos.carritoLinea],
       ['el total del carrito', datos.carritoTotal],
-      ['la opción de transferencia', datos.opcion],
+      ['la opción de pago', datos.opcion],
       ['la respuesta del checkout', datos.respuesta],
       ...(datos.subtotalApi === null ? [] : [['el subtotal de la respuesta', datos.subtotalApi]]),
     ]) {
@@ -5696,7 +5752,7 @@ await runCase(60, 'El tope del contrato conserva los centavos por los dos camino
     for (const [donde, valor] of [
       ['la línea del carrito', datos.carritoLinea],
       ['el total del carrito', datos.carritoTotal],
-      ['la opción de transferencia', datos.opcion],
+      ['la opción de pago', datos.opcion],
       ['la respuesta del checkout', datos.respuesta],
       ...(datos.subtotalApi === null ? [] : [['el subtotal de la respuesta', datos.subtotalApi]]),
     ]) {
@@ -5743,6 +5799,12 @@ await runCase(61, 'Con varios vendedores, cada total es suyo y uno fuera de cont
     shipping_locality_id: localidadDeEnvio(),
     shipping_postal_code: '2700',
     shipping_decisions: decisiones,
+    // El checkout plural exige una forma de pago por grupo; el de
+    // transferencia la pone él y la ignora.
+    payment_decisions: [
+      { seller_id: vendedorBarato, method: 'transfer' },
+      { seller_id: vendedorCaro, method: 'transfer' },
+    ],
     ...extra,
   });
 
@@ -5757,7 +5819,7 @@ await runCase(61, 'Con varios vendedores, cada total es suyo y uno fuera de cont
       ],
     },
   });
-  const opciones = (await apiRequest('/orders/transfer-options',
+  const opciones = (await apiRequest('/orders/payment-options',
     { token: state.buyerToken })).data;
   const delBarato = opciones.find((o) => o.seller_id === vendedorBarato);
   const delCaro = opciones.find((o) => o.seller_id === vendedorCaro);
@@ -6222,6 +6284,15 @@ await runCase(67, 'La vinculación a mano ya no existe y el cobro sigue apagado'
   const rutas = Object.keys(esquema.paths || {});
   const cobro = rutas.filter((ruta) => /payments|manual-link/.test(ruta));
   assert(cobro.length === 0, `el esquema publica rutas de cobro: ${cobro.join(', ')}`);
+
+  // Lo único que toca pagos es la preparación del link de una orden, y no
+  // mueve dinero: pide una preferencia a nombre del vendedor y sólo si el
+  // cobro está encendido. El módulo heredado sigue sin existir.
+  const conPago = rutas.filter((ruta) => /payment/.test(ruta)).sort();
+  assert(conPago.length === 2
+    && conPago.includes('/api/orders/{order_id}/payment-link')
+    && conPago.includes('/api/orders/payment-options'),
+    `el esquema publica ${conPago.length} rutas de pago: ${conPago.join(', ')}`);
   const vinculo = rutas.filter((ruta) => ruta.includes('mp-oauth')).sort();
   assert(vinculo.length === 5,
     `el vínculo publica ${vinculo.length} rutas: ${vinculo.join(', ')}`);
@@ -6517,7 +6588,10 @@ await runCase(73, 'Una clave de cifrado inválida apaga el vínculo, no lo revie
 await runCase(74, 'El descarte de credenciales en claro sólo lo autoriza un 1', async () => {
   // Este freno borra credenciales de terceros y no se deshace. Que se abriera
   // con cualquier texto -«0», «false», un dedazo- era una puerta abierta.
-  const bajada = correrAlembic('downgrade -1');
+  // Se baja hasta la revisión ANTERIOR a la del cifrado, por nombre y no por
+  // «-1»: el freno es de esa migración, y contarlo desde la punta haría que
+  // cada migración nueva mida otra cosa.
+  const bajada = correrAlembic('downgrade c4a91e37d5b8');
   assert(/Running downgrade/.test(bajada), `el downgrade no corrió: ${bajada.slice(-200)}`);
 
   const enClaro = () => queryCount(
@@ -6567,6 +6641,845 @@ await runCase(74, 'El descarte de credenciales en claro sólo lo autoriza un 1',
   } finally {
     // Pase lo que pase, la base queda en head para lo que venga después.
     correrAlembic('upgrade head', ['MP_MIGRACION_DESCARTAR_TOKENS=1']);
+  }
+});
+
+// --- cobro por Mercado Pago (pieza MP-B) -------------------------------------
+// Contra el mismo doble local: no hay credenciales reales y no se cobra nada de
+// verdad. Lo que se prueba es que crear la intención de pago no invente plata,
+// no duplique órdenes ni pagos, y no le mande a Mercado Pago nada que TopGreen
+// no deba mandar.
+
+function productoConStock(vendedor, minimo = 2) {
+  const [fila] = queryRows(`
+    SELECT id FROM products
+    WHERE seller_id = ${sqlLiteral(vendedor)} AND status = 'ACTIVE'
+      AND publication_type <> 'servicio' AND stock >= ${minimo}
+    ORDER BY price
+    LIMIT 1
+  `);
+  assert(fila, `el vendedor ${vendedor} no tiene publicación con stock >= ${minimo}`);
+  return fila[0];
+}
+
+async function armarCarrito(items) {
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  await apiRequest('/cart/sync', {
+    method: 'POST', token: state.buyerToken, body: { items },
+  });
+}
+
+function sobreDePago(pagos, extra = {}) {
+  return {
+    shipping_address: 'Ruta 8 km 220',
+    shipping_locality_id: localidadDeEnvio(),
+    shipping_postal_code: '2700',
+    shipping_decisions: trasladoPropio(),
+    payment_decisions: pagos,
+    ...extra,
+  };
+}
+
+const preferenciasPedidas = (doble) => doble.pedidos.filter((p) => p.ruta === 'preferencia');
+
+function pagosDe(ordenId) {
+  return queryRows(`
+    SELECT coalesce(mp_preference_id, '${NULO}'),
+           coalesce(init_point, '${NULO}'),
+           coalesce(mp_external_reference, '${NULO}'),
+           total_amount,
+           status::text
+    FROM payments WHERE order_id = ${sqlLiteral(ordenId)}
+  `);
+}
+
+function ordenEnLaBase(ordenId) {
+  const [fila] = queryRows(`
+    SELECT status::text, coalesce(payment_method, '${NULO}'), total_amount,
+           coalesce(transfer_cbu, '${NULO}')
+    FROM orders WHERE id = ${sqlLiteral(ordenId)}
+  `);
+  assert(fila, `la orden ${ordenId} no está en la base`);
+  const [estado, medio, total, cbu] = fila;
+  // En la base el estado es el NOMBRE del enum -PLACED, no «placed»-, así que
+  // se normaliza acá y no en cada caso.
+  return { estado: estado.toLowerCase(), medio, total, cbu: cbu === NULO ? null : cbu };
+}
+
+const MP_COMPRADOR = { email: 'cliente@ejemplo.com', password: 'cliente123' };
+
+// Deja al comprador con sesión propia dentro de este bloque: los casos del
+// vínculo dejan el carrito y el token del comprador en cualquier estado.
+async function comprador() {
+  const { data } = await apiRequest('/auth/login', {
+    method: 'POST', body: MP_COMPRADOR,
+  });
+  state.buyerToken = data.access_token;
+  state.buyerId = data.user.id;
+  return data.user.id;
+}
+
+await runCase(75, 'Carrito mixto: una orden por vendedor, cada una con su medio', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const otro = await ingresarVendedor('admin@topgreen.com', 'admin123');
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    await desvincular(otro.token);
+    const vinculado = await vincular(vendedor.token, 'ok:900101');
+    assert(vinculado.ok === 'vinculado', `el vendedor no vinculó: ${vinculado.motivo}`);
+
+    const suyo = productoConStock(vendedor.id);
+    const delOtro = productoConStock(otro.id);
+    await armarCarrito([
+      { product_id: suyo, quantity: 2 },
+      { product_id: delOtro, quantity: 1 },
+    ]);
+    const stockAntes = [stockDe(suyo), stockDe(delOtro)];
+
+    // Lo que la pantalla puede ofrecer: dos grupos, y Mercado Pago sólo en el
+    // que tiene vínculo.
+    const opciones = (await apiRequest('/orders/payment-options',
+      { token: state.buyerToken })).data;
+    assert(opciones.length === 2, `payment-options devolvió ${opciones.length} grupos`);
+    const conMP = opciones.find((o) => o.seller_id === vendedor.id);
+    const sinMP = opciones.find((o) => o.seller_id === otro.id);
+    assert(conMP.methods.includes('mercadopago') && conMP.methods.includes('transfer'),
+      `el vendedor vinculado ofrece ${JSON.stringify(conMP.methods)}`);
+    assert(!sinMP.methods.includes('mercadopago'),
+      `el vendedor sin vínculo ofrece Mercado Pago: ${JSON.stringify(sinMP.methods)}`);
+
+    const creado = await apiRequest('/orders/checkout', {
+      method: 'POST', token: state.buyerToken,
+      body: sobreDePago([
+        { seller_id: vendedor.id, method: 'mercadopago' },
+        { seller_id: otro.id, method: 'transfer' },
+      ]),
+    });
+    const ordenes = creado.data.orders;
+    assert(ordenes.length === 2, `el checkout devolvió ${ordenes.length} órdenes`);
+
+    const ordenMP = ordenes.find((o) => o.payment_method === 'mercadopago');
+    const ordenTR = ordenes.find((o) => o.payment_method === 'transfer');
+    assert(ordenMP && ordenTR, 'no salió una orden de cada medio');
+    assert(ordenMP.preparation === 'lista' && ordenMP.payment_url,
+      `la orden de MP quedó ${ordenMP.preparation} (${ordenMP.reason || 'sin motivo'})`);
+    assert(!ordenMP.cbu && !ordenMP.alias_bancario,
+      'la orden de Mercado Pago trae datos bancarios que no le corresponden');
+    assert(ordenTR.cbu || ordenTR.alias_bancario,
+      'la orden de transferencia no dice a dónde transferir');
+    assert(!ordenTR.payment_url, 'la orden de transferencia trae link de Mercado Pago');
+
+    // Una sola preferencia: la del grupo que la eligió.
+    const pedidas = preferenciasPedidas(doble);
+    assert(pedidas.length === 1, `el doble recibió ${pedidas.length} preferencias`);
+
+    // Y una sola fila de pago, la de esa orden.
+    assert(pagosDe(ordenMP.order_id).length === 1,
+      'la orden de Mercado Pago no tiene exactamente un pago');
+    assert(pagosDe(ordenTR.order_id).length === 0,
+      'la orden de transferencia creó una fila de pago');
+
+    const enBaseMP = ordenEnLaBase(ordenMP.order_id);
+    const enBaseTR = ordenEnLaBase(ordenTR.order_id);
+    assert(enBaseMP.medio === 'mercadopago' && enBaseTR.medio === 'transfer',
+      `los medios quedaron ${enBaseMP.medio}/${enBaseTR.medio}`);
+    assert(enBaseMP.estado === 'placed',
+      `la orden de MP nació en ${enBaseMP.estado}, no colocada`);
+    assert(enBaseMP.estado !== 'paid' && enBaseMP.estado !== 'payment_confirmed',
+      'la orden de Mercado Pago nació marcada como pagada');
+    assert(enBaseTR.estado === 'awaiting_transfer_receipt',
+      `la orden de transferencia nació en ${enBaseTR.estado}`);
+    assert(enBaseMP.cbu === null, 'la orden de MP guardó un CBU');
+
+    // Crear la intención de pago no compromete stock: nadie descuenta nada
+    // hasta que el pago esté confirmado, y todavía no hay quien lo confirme.
+    assert(stockDe(suyo) === stockAntes[0] && stockDe(delOtro) === stockAntes[1],
+      `el stock se movió: ${stockAntes} → ${[stockDe(suyo), stockDe(delOtro)]}`);
+
+    return `dos vendedores, dos órdenes: ${ordenMP.order_number} por Mercado Pago `
+      + `(1 preferencia, 1 pago, estado ${enBaseMP.estado}) y ${ordenTR.order_number} `
+      + 'por transferencia (0 preferencias, 0 pagos); stock intacto en las dos';
+  } finally {
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(76, 'Dos vendedores con Mercado Pago: pagos separados y el que falla se reanuda', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const otro = await ingresarVendedor('admin@topgreen.com', 'admin123');
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    await desvincular(otro.token);
+    // El segundo vincula una cuenta que el doble rechaza al crear preferencias:
+    // vincular bien y fallar al cobrar es exactamente lo que pasa cuando el
+    // vendedor le revoca el permiso a la aplicación después.
+    assert((await vincular(vendedor.token, 'ok:900201')).ok === 'vinculado',
+      'el primer vendedor no vinculó');
+    assert((await vincular(otro.token, `ok:${CUENTA_RECHAZA}`)).ok === 'vinculado',
+      'el segundo vendedor no vinculó');
+
+    const suyo = productoConStock(vendedor.id);
+    const delOtro = productoConStock(otro.id);
+    await armarCarrito([
+      { product_id: suyo, quantity: 1 },
+      { product_id: delOtro, quantity: 1 },
+    ]);
+
+    const creado = await apiRequest('/orders/checkout', {
+      method: 'POST', token: state.buyerToken,
+      body: sobreDePago([
+        { seller_id: vendedor.id, method: 'mercadopago' },
+        { seller_id: otro.id, method: 'mercadopago' },
+      ]),
+    });
+    const ordenes = creado.data.orders;
+    assert(ordenes.length === 2, `el checkout devolvió ${ordenes.length} órdenes`);
+
+    const buena = ordenes.find((o) => o.seller_id === vendedor.id);
+    const trabada = ordenes.find((o) => o.seller_id === otro.id);
+    assert(buena.preparation === 'lista' && buena.payment_url,
+      `la orden que sí se podía preparar quedó ${buena.preparation}`);
+    assert(trabada.preparation === 'pendiente' && !trabada.payment_url,
+      `la orden del vendedor que rechaza quedó ${trabada.preparation}`);
+    assert(trabada.reason === 'mp_rechazo',
+      `el motivo es «${trabada.reason}» y no el código nuestro`);
+    sinSecretos(JSON.stringify(creado.data), 'la respuesta del checkout');
+
+    // Las dos existen y son distintas: la que falló no se borra ni se
+    // convierte en otra cosa, se reanuda.
+    assert(buena.order_id !== trabada.order_id, 'las dos órdenes son la misma');
+    assert(ordenEnLaBase(trabada.order_id).estado === 'placed',
+      'la orden que no pudo preparar el pago no quedó colocada');
+    assert(pagosDe(trabada.order_id).length === 0,
+      'la orden que falló dejó una fila de pago a medias');
+    assert(pagosDe(buena.order_id).length === 1,
+      'la orden que salió bien no tiene exactamente un pago');
+
+    // Los dos pagos son de cuentas distintas y con claves distintas: nada se
+    // mezcló entre vendedores.
+    const pedidas = preferenciasPedidas(doble);
+    assert(pedidas.length === 2, `el doble recibió ${pedidas.length} preferencias`);
+    const claves = new Set(pedidas.map((p) => p.idempotencia));
+    assert(claves.size === 2, 'las dos órdenes usaron la misma clave de idempotencia');
+    const cuentas = new Set(pedidas.map((p) => (p.autorizacion.match(/-(\d{6,})-\d+$/) || [])[1]));
+    assert(cuentas.size === 2, `las dos preferencias fueron a la cuenta ${[...cuentas]}`);
+
+    // Y el reintento del que falló sigue fallando igual, sin duplicar nada.
+    const reintento = await apiRequest(`/orders/${trabada.order_id}/payment-link`, {
+      method: 'POST', token: state.buyerToken, body: {},
+    });
+    assert(reintento.data.preparation === 'pendiente' && reintento.data.reason === 'mp_rechazo',
+      `el reintento devolvió ${JSON.stringify(reintento.data)}`);
+    assert(pagosDe(trabada.order_id).length === 0, 'el reintento dejó un pago a medias');
+
+    // Y si el vendedor revoca el vínculo, el reintento lo dice con su propio
+    // motivo: la orden no cae a transferencia por atrás ni se marca de nada.
+    await desvincular(otro.token);
+    const sinVinculo = await apiRequest(`/orders/${trabada.order_id}/payment-link`, {
+      method: 'POST', token: state.buyerToken, body: {},
+    });
+    assert(sinVinculo.data.preparation === 'pendiente'
+      && sinVinculo.data.reason === 'sin_vinculo',
+      `con el vínculo revocado el reintento devolvió ${JSON.stringify(sinVinculo.data)}`);
+    assert(sinVinculo.data.payment_method === 'mercadopago',
+      'la orden cambió de medio sola al perder el vínculo');
+    assert(pagosDe(trabada.order_id).length === 0,
+      'el reintento sin vínculo dejó una fila de pago');
+
+    // Cuando el vendedor arregla su cuenta, la MISMA orden se paga: se
+    // revincula con una cuenta que sí contesta y se reanuda.
+    assert((await vincular(otro.token, 'ok:900202')).ok === 'vinculado',
+      'el segundo vendedor no pudo revincular');
+    const reanudada = await apiRequest(`/orders/${trabada.order_id}/payment-link`, {
+      method: 'POST', token: state.buyerToken, body: {},
+    });
+    assert(reanudada.data.preparation === 'lista' && reanudada.data.payment_url,
+      `la orden no se reanudó: ${JSON.stringify(reanudada.data)}`);
+    assert(reanudada.data.order_id === trabada.order_id,
+      'reanudar creó otra orden en vez de usar la misma');
+    assert(pagosDe(trabada.order_id).length === 1,
+      'reanudar no dejó exactamente un pago');
+    assert(ordenesDe(state.buyerId).filter(
+      ([id]) => id === buena.order_id || id === trabada.order_id).length === 2,
+      'el conteo de órdenes del comprador cambió al reanudar');
+
+    return 'dos órdenes por Mercado Pago con claves y cuentas distintas; la que el '
+      + 'vendedor no podía cobrar quedó «pendiente» con motivo propio (mp_rechazo, y '
+      + 'sin_vinculo tras revocar), sin pago a medias, y se reanudó sobre la misma '
+      + 'orden cuando su cuenta volvió';
+  } finally {
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await desvincular(otro.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(77, 'Doble clic, corte de tiempo y reintento no crean un segundo pago', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900301')).ok === 'vinculado',
+      'el vendedor no vinculó');
+
+    await armarCarrito([{ product_id: productoConStock(vendedor.id), quantity: 1 }]);
+    const creado = await apiRequest('/orders/checkout', {
+      method: 'POST', token: state.buyerToken,
+      body: sobreDePago([{ seller_id: vendedor.id, method: 'mercadopago' }]),
+    });
+    const [orden] = creado.data.orders;
+    assert(orden.preparation === 'lista', `la orden quedó ${orden.preparation}`);
+    const preferenciasDelAlta = preferenciasPedidas(doble).length;
+    assert(preferenciasDelAlta === 1, `el alta pidió ${preferenciasDelAlta} preferencias`);
+
+    // Doble clic de verdad: cinco pedidos a la vez sobre la misma orden.
+    const enParalelo = await Promise.all(Array.from({ length: 5 }, () =>
+      apiRequest(`/orders/${orden.order_id}/payment-link`, {
+        method: 'POST', token: state.buyerToken, body: {},
+      })));
+    const links = new Set(enParalelo.map((r) => r.data.payment_url));
+    assert(links.size === 1 && links.has(orden.payment_url),
+      `cinco pedidos devolvieron ${links.size} links distintos`);
+    assert(preferenciasPedidas(doble).length === preferenciasDelAlta,
+      `los reintentos pidieron ${preferenciasPedidas(doble).length - preferenciasDelAlta} `
+      + 'preferencias de más');
+    assert(pagosDe(orden.order_id).length === 1,
+      `la orden terminó con ${pagosDe(orden.order_id).length} pagos`);
+
+    // Y el índice único es el que lo garantiza, no la suerte del orden de
+    // llegada: insertar un segundo pago para la misma orden es imposible.
+    let segundo = 'la base aceptó un segundo pago para la misma orden';
+    try {
+      querySql(`INSERT INTO payments
+        (id, order_id, total_amount, status, created_at, updated_at)
+        VALUES (gen_random_uuid()::text, ${sqlLiteral(orden.order_id)}, 1,
+                'PENDING', now(), now())`);
+    } catch (error) {
+      segundo = String(error.stderr || error.message);
+    }
+    assert(/duplicate key|unique/i.test(segundo),
+      `la base no frenó el segundo pago: ${segundo.slice(0, 200)}`);
+
+    // Corte de tiempo: la cuenta lenta no contesta nunca y el que corta es la
+    // API. La orden queda pendiente, reanudable, y sin pago escrito.
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, `ok:${CUENTA_LENTA}`)).ok === 'vinculado',
+      'no se pudo vincular la cuenta lenta');
+    await armarCarrito([{ product_id: productoConStock(vendedor.id), quantity: 1 }]);
+    const arranque = Date.now();
+    const lento = await apiRequest('/orders/checkout', {
+      method: 'POST', token: state.buyerToken,
+      body: sobreDePago([{ seller_id: vendedor.id, method: 'mercadopago' }]),
+    });
+    const tardanza = Math.round((Date.now() - arranque) / 1000);
+    const [colgada] = lento.data.orders;
+    assert(colgada.preparation === 'pendiente' && colgada.reason === 'mp_sin_respuesta',
+      `con Mercado Pago mudo la orden quedó ${JSON.stringify(colgada)}`);
+    assert(pagosDe(colgada.order_id).length === 0,
+      'el corte de tiempo dejó una fila de pago');
+    assert(ordenEnLaBase(colgada.order_id).estado === 'placed',
+      'la orden del corte de tiempo no quedó colocada');
+
+    return `cinco pedidos simultáneos devolvieron el mismo link, con 1 preferencia y `
+      + `1 pago; la base rechaza un segundo pago para la misma orden; con Mercado Pago `
+      + `mudo la API cortó a los ~${tardanza}s y la orden quedó pendiente sin pago`;
+  } finally {
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(78, 'La decisión de pago que falta, sobra o es ajena se rechaza antes de escribir', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const otro = await ingresarVendedor('admin@topgreen.com', 'admin123');
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    await desvincular(otro.token);
+    assert((await vincular(vendedor.token, 'ok:900401')).ok === 'vinculado',
+      'el vendedor no vinculó');
+
+    const suyo = productoConStock(vendedor.id);
+    const delOtro = productoConStock(otro.id);
+    await armarCarrito([
+      { product_id: suyo, quantity: 1 },
+      { product_id: delOtro, quantity: 1 },
+    ]);
+
+    const conMP = { seller_id: vendedor.id, method: 'mercadopago' };
+    const conTR = { seller_id: otro.id, method: 'transfer' };
+    const intentos = [
+      ['sin ninguna decisión', [], /falta elegir cómo pagarle/i],
+      ['con una sola de dos', [conMP], /falta elegir cómo pagarle/i],
+      ['con la misma dos veces', [conMP, conMP], /dos formas de pago para el mismo/i],
+      ['con un vendedor que no está en el carrito',
+        [conMP, conTR, { seller_id: state.buyerId, method: 'transfer' }],
+        /vendedor que no está en el carrito/i],
+      ['con Mercado Pago para quien no lo tiene',
+        [conMP, { seller_id: otro.id, method: 'mercadopago' }],
+        /no puede recibir pagos por ese medio/i],
+    ];
+
+    const ordenesAntes = ordenesDe(state.buyerId).length;
+    const pagosAntes = queryCount('SELECT COUNT(*) FROM payments');
+    const stockAntes = [stockDe(suyo), stockDe(delOtro)];
+
+    // Una forma de pago inventada la frena el esquema, en el borde y con 422:
+    // `method` es un literal cerrado, así que no llega a la regla de negocio.
+    intentos.push(['con un medio inventado',
+      [conMP, { seller_id: otro.id, method: 'efectivo' }], /method/i, 422]);
+
+    for (const [etiqueta, decisiones, esperado, codigo = 400] of intentos) {
+      const motivo = await expectApiError(codigo, () => apiRequest('/orders/checkout', {
+        method: 'POST', token: state.buyerToken, body: sobreDePago(decisiones),
+      }));
+      assert(esperado.test(JSON.stringify(motivo)),
+        `${etiqueta}: motivo inesperado «${JSON.stringify(motivo)}»`);
+      assert(ordenesDe(state.buyerId).length === ordenesAntes,
+        `${etiqueta}: se creó una orden igual`);
+      assert(queryCount('SELECT COUNT(*) FROM payments') === pagosAntes,
+        `${etiqueta}: se creó un pago igual`);
+      assert(preferenciasPedidas(doble).length === 0,
+        `${etiqueta}: se pidió una preferencia pese al rechazo`);
+      assert(stockDe(suyo) === stockAntes[0] && stockDe(delOtro) === stockAntes[1],
+        `${etiqueta}: se movió stock`);
+      const [[estado]] = queryRows(`SELECT c.status FROM carts c
+        WHERE c.user_id = ${sqlLiteral(state.buyerId)} AND c.status = 'ACTIVE'`);
+      assert(estado === 'ACTIVE', `${etiqueta}: el carrito quedó en ${estado}`);
+    }
+
+    // Y con las dos decisiones que sí corresponden, sale.
+    const creado = await apiRequest('/orders/checkout', {
+      method: 'POST', token: state.buyerToken, body: sobreDePago([conMP, conTR]),
+    });
+    assert(creado.data.orders.length === 2, 'con las decisiones correctas no salieron dos órdenes');
+
+    return `seis formas de mandar mal las decisiones —${intentos.length} en total— rechazadas `
+      + 'con HTTP 400 y motivo propio: 0 órdenes, 0 pagos, 0 preferencias, stock quieto y '
+      + 'carrito activo; con las correctas, dos órdenes';
+  } finally {
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(79, 'Lo que viaja a Mercado Pago: el importe de la orden, sin comisión ni secretos', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900501')).ok === 'vinculado',
+      'el vendedor no vinculó');
+
+    // Un precio que en binario no existe: 3 × 0,10 da 0,30000000000000004.
+    const producto = await publicarConPrecio(0.10, 20, 'preferencia de diez centavos');
+    await armarCarrito([{ product_id: producto, quantity: 3 }]);
+
+    const creado = await apiRequest('/orders/checkout', {
+      method: 'POST', token: state.buyerToken,
+      body: sobreDePago([{ seller_id: vendedor.id, method: 'mercadopago' }]),
+    });
+    const [orden] = creado.data.orders;
+    assert(orden.preparation === 'lista', `la orden quedó ${orden.preparation}`);
+
+    const [pedida] = preferenciasPedidas(doble);
+    assert(pedida, 'el doble no recibió ninguna preferencia');
+    const cuerpo = pedida.cuerpo;
+
+    // 1. El importe es el de la orden, y es exacto. La cuenta se hace en
+    //    centavos enteros: sumar 0,1 tres veces en punto flotante da
+    //    0,30000000000000004, que es justamente el error que no puede entrar.
+    const centavos = cuerpo.items.reduce(
+      (total, item) => total + Math.round(item.unit_price * 100) * item.quantity, 0);
+    assert(orden.amount === 0.3, `la orden dice ${orden.amount} y no 0.3`);
+    assert(centavos === Math.round(orden.amount * 100),
+      `a Mercado Pago le llegaron ${centavos} centavos y la orden dice ${orden.amount}`);
+    assert(cuerpo.items.length === 1 && cuerpo.items[0].quantity === 3,
+      `los ítems viajaron como ${JSON.stringify(cuerpo.items)}`);
+    const [pago] = pagosDe(orden.order_id);
+    assert(pago[3] === '0.30', `en la base el pago quedó en ${pago[3]}`);
+    assert(cuerpo.items.every((item) => item.currency_id === 'ARS'),
+      'algún ítem viajó sin moneda o en otra moneda');
+
+    // 2. Nada de comisión. Ni el 5 % que había antes, ni un cero: lo que no se
+    //    manda no se discute, y TopGreen no recibe ese dinero.
+    assert(!('marketplace_fee' in cuerpo),
+      `el cuerpo lleva marketplace_fee = ${JSON.stringify(cuerpo.marketplace_fee)}`);
+    assert(!JSON.stringify(cuerpo).includes('marketplace_fee'),
+      'marketplace_fee aparece en algún lado del cuerpo');
+
+    // 3. La referencia es nuestra, inequívoca y sin datos de nadie.
+    assert(cuerpo.external_reference === `topgreen-${orden.order_number}`,
+      `la referencia es «${cuerpo.external_reference}»`);
+    assert(!/@|\d{22}/.test(JSON.stringify(cuerpo)),
+      'el cuerpo lleva un correo o algo con forma de CBU');
+
+    // 4. Los retornos salen de la configuración, no de un texto pegado, y
+    //    llevan la orden para que la pantalla sepa de cuál vuelve. La URL de
+    //    aviso no viaja porque no está configurada: mandar una que no atiende
+    //    nadie sería pedirle a Mercado Pago que reintente contra el vacío.
+    for (const clave of ['success', 'pending', 'failure']) {
+      const url = (cuerpo.back_urls || {})[clave];
+      assert(url && url.startsWith(FRONTEND_URL),
+        `la URL de retorno «${clave}» es ${url} y no sale de la configuración`);
+      assert(url.includes(orden.order_number),
+        `la URL de retorno «${clave}» no dice de qué orden vuelve: ${url}`);
+    }
+    assert(!('notification_url' in cuerpo),
+      `viajó una URL de aviso sin estar configurada: ${cuerpo.notification_url}`);
+
+    // 5. La clave de idempotencia va en la cabecera y sale de la orden.
+    assert(pedida.idempotencia === `topgreen-orden-${orden.order_id}`,
+      `la clave de idempotencia es «${pedida.idempotencia}»`);
+
+    // 6. Autoriza el vendedor, con su token, y ese token no vuelve a salir por
+    //    ningún lado que no sea la cabecera hacia Mercado Pago.
+    assert(pedida.autorizacion.startsWith('Bearer '), 'la preferencia viajó sin autorización');
+    assert(pedida.autorizacion.includes('900501'),
+      'la preferencia no autoriza con la cuenta del vendedor');
+    sinSecretos(JSON.stringify(creado.data), 'la respuesta del checkout');
+    sinSecretos(JSON.stringify(cuerpo), 'el cuerpo de la preferencia');
+    const [guardado] = pagosDe(orden.order_id);
+    sinSecretos(guardado.join(' '), 'la fila de pago');
+
+    // 7. No se guarda el cuerpo crudo de Mercado Pago: lo que no se guarda no
+    //    se filtra.
+    const columnas = queryCount(`SELECT COUNT(*) FROM information_schema.columns
+      WHERE table_name = 'payments'
+        AND column_name IN ('mp_response', 'commission_amount', 'commission_percent',
+                            'seller_amount')`);
+    assert(columnas === 0, `la tabla de pagos sigue con ${columnas} columna(s) de las viejas`);
+
+    return `3 × $0,10 llegó a Mercado Pago como 0.3 exacto y quedó 0.30 en la base; sin `
+      + `marketplace_fee; referencia topgreen-${orden.order_number}; clave de idempotencia `
+      + 'derivada de la orden; autoriza el token del vendedor y no hay cuerpo crudo guardado';
+  } finally {
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+// Con el cobro apagado —que es como sale a producción— Mercado Pago no existe
+// para el comprador: no se ofrece, no se acepta si lo piden a mano, no se crea
+// ninguna preferencia, y la venta por transferencia sigue funcionando igual.
+// Se prueba adentro de la aplicación, con la bandera apagada en su propia
+// configuración: levantar otra API sería probar otra cosa.
+const MP_COBRO_APAGADO = `
+import json
+from fastapi.testclient import TestClient
+
+from app.core.config import settings
+settings.MP_CHECKOUT_HABILITADO = False
+
+from app.main import app
+from app.models.order import Order
+from app.models.payment import Payment
+from app.db.base import SessionLocal
+
+datos = json.loads(input())
+
+cliente = TestClient(app, base_url="https://testserver")
+cliente.post("/api/auth/login", json={
+    "email": "cliente@ejemplo.com", "password": "cliente123"})
+
+cliente.delete("/api/cart")
+cliente.post("/api/cart/sync", json={"items": [
+    {"product_id": datos["producto"], "quantity": 1}]})
+
+opciones = cliente.get("/api/orders/payment-options").json()
+
+sobre = {
+    "shipping_address": "Ruta 8 km 220",
+    "shipping_locality_id": datos["localidad"],
+    "shipping_postal_code": "2700",
+    "shipping_decisions": [{"seller_id": datos["vendedor"], "mode": "self"}],
+}
+
+a_mano = cliente.post("/api/orders/checkout", json={
+    **sobre,
+    "payment_decisions": [{"seller_id": datos["vendedor"], "method": "mercadopago"}],
+})
+
+por_transferencia = cliente.post("/api/orders/checkout", json={
+    **sobre,
+    "payment_decisions": [{"seller_id": datos["vendedor"], "method": "transfer"}],
+})
+creadas = por_transferencia.json().get("orders", []) if por_transferencia.status_code == 200 else []
+
+# Y el reintento del link tampoco puede encender nada.
+sesion = SessionLocal()
+try:
+    orden = sesion.query(Order).filter(
+        Order.id == creadas[0]["order_id"]).first() if creadas else None
+    if orden is not None:
+        orden.payment_method = "mercadopago"
+        sesion.commit()
+        enlace = cliente.post(f"/api/orders/{orden.id}/payment-link")
+        reintento = {"status": enlace.status_code, "cuerpo": enlace.json()}
+        pagos = sesion.query(Payment).filter(Payment.order_id == orden.id).count()
+    else:
+        reintento, pagos = None, -1
+finally:
+    sesion.close()
+
+print("RESULTADO " + json.dumps({
+    "opciones": opciones,
+    "a_mano": {"status": a_mano.status_code, "detalle": str(a_mano.json().get("detail", ""))},
+    "transferencia": {
+        "status": por_transferencia.status_code,
+        "ordenes": [
+            {"medio": o["payment_method"], "preparacion": o["preparation"],
+             "link": o.get("payment_url"), "cbu": bool(o.get("cbu") or o.get("alias_bancario")),
+             "order_id": o["order_id"]}
+            for o in creadas
+        ],
+    },
+    "reintento": reintento,
+    "pagos": pagos,
+}))
+`;
+
+await runCase(80, 'Con el cobro apagado no hay Mercado Pago en ningún lado y la transferencia sigue', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await comprador();
+    // El vendedor está vinculado y con datos bancarios: lo único que decide
+    // que Mercado Pago no se ofrezca es la bandera.
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900601')).ok === 'vinculado',
+      'el vendedor no vinculó');
+    const conectado = await estadoDelVinculo(vendedor.token);
+    assert(conectado.estado === 'conectado', `el vendedor quedó ${conectado.estado}`);
+
+    const producto = productoConStock(vendedor.id, 1);
+    const observado = leerResultado(await correrEnLaApiSinBloquear(
+      MP_COBRO_APAGADO,
+      JSON.stringify({
+        producto, vendedor: vendedor.id, localidad: localidadDeEnvio(),
+      }),
+    ));
+
+    // 1. No se ofrece.
+    const [opcion] = observado.opciones;
+    assert(opcion, 'payment-options no devolvió el grupo del vendedor');
+    assert(!opcion.methods.includes('mercadopago'),
+      `con la bandera apagada se ofrece ${JSON.stringify(opcion.methods)}`);
+    assert(opcion.methods.includes('transfer'),
+      'apagar el cobro se llevó puesta la transferencia');
+
+    // 2. No se acepta aunque lo pidan a mano.
+    assert(observado.a_mano.status === 400,
+      `pedir Mercado Pago a mano devolvió ${observado.a_mano.status}`);
+    assert(/no puede recibir pagos por ese medio/i.test(observado.a_mano.detalle),
+      `motivo inesperado: «${observado.a_mano.detalle}»`);
+
+    // 3. La transferencia sigue entera.
+    assert(observado.transferencia.status === 200
+      && observado.transferencia.ordenes.length === 1,
+      `el checkout por transferencia devolvió ${observado.transferencia.status}`);
+    const [creada] = observado.transferencia.ordenes;
+    assert(creada.medio === 'transfer' && creada.preparacion === 'lista' && creada.cbu,
+      `la orden por transferencia quedó ${JSON.stringify(creada)}`);
+    assert(!creada.link, 'la orden por transferencia trae link de Mercado Pago');
+
+    // 4. Ni el reintento del link enciende nada: la orden queda pendiente con
+    //    el motivo, y no hay pago.
+    assert(observado.reintento && observado.reintento.status === 200,
+      `el reintento devolvió ${JSON.stringify(observado.reintento)}`);
+    assert(observado.reintento.cuerpo.preparation === 'pendiente'
+      && observado.reintento.cuerpo.reason === 'deshabilitado',
+      `el reintento devolvió ${JSON.stringify(observado.reintento.cuerpo)}`);
+    assert(observado.pagos === 0, `quedaron ${observado.pagos} pagos con el cobro apagado`);
+
+    // 5. Y el doble no vio pasar nada en todo el caso.
+    assert(preferenciasPedidas(doble).length === 0,
+      `el doble recibió ${preferenciasPedidas(doble).length} preferencias con el cobro apagado`);
+
+    return 'con MP_CHECKOUT_HABILITADO en false: el medio no se ofrece, pedirlo a mano da '
+      + '400, el reintento del link responde «deshabilitado», 0 preferencias y 0 pagos; '
+      + 'la orden por transferencia se crea igual y con sus datos bancarios';
+  } finally {
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(81, 'La pantalla cobra por grupo, arma la cola de órdenes y no declara pagado', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const otro = await ingresarVendedor('admin@topgreen.com', 'admin123');
+  const browser = await chromium.launch({ headless: true });
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    await desvincular(otro.token);
+    assert((await vincular(vendedor.token, 'ok:900701')).ok === 'vinculado',
+      'el vendedor no vinculó');
+
+    // La publicación más vieja de cada vendedor, que es una del seed: los
+    // casos anteriores dejan publicaciones de prueba y este caso mide la
+    // pantalla de pago, no el catálogo.
+    const publicacion = (dueno) => {
+      const [fila] = queryRows(`
+        SELECT id, name FROM products
+        WHERE seller_id = ${sqlLiteral(dueno)} AND status = 'ACTIVE'
+          AND publication_type <> 'servicio' AND stock >= 1
+        ORDER BY created_at, id
+        LIMIT 1
+      `);
+      assert(fila, `el vendedor ${dueno} no tiene publicación activa`);
+      return { id: fila[0], nombre: fila[1] };
+    };
+    const conMP = publicacion(vendedor.id);
+    const conTR = publicacion(otro.id);
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    const ordenesAntes = ordenesDe(state.buyerId).length;
+
+    const context = await browser.newContext();
+    await context.addInitScript(
+      ({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+        window.localStorage.removeItem('agromarket_cart');
+      },
+      { a: state.buyerToken, r: state.buyerRefreshToken },
+    );
+    const page = await context.newPage();
+    const errores = [];
+    page.on('pageerror', (error) => errores.push(String(error)));
+
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+    for (const item of [conMP, conTR]) {
+      const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+      await buscador.fill(item.nombre);
+      await buscador.press('Enter');
+      await page.getByRole('heading', { name: item.nombre, exact: true, level: 3 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+      await page.getByRole('button', { name: /Agregar/ }).first().click();
+    }
+
+    await page.getByRole('button', { name: /Carrito/ }).click();
+    await page.getByRole('button', { name: 'Continuar compra' }).click();
+    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15_000 });
+    await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0808');
+    await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
+    await page.getByPlaceholder('2000').fill('2700');
+    await elegirDestino(page, 'Pergamino');
+    await resolverTrasladoPropio(page);
+    await page.locator('form:has(h2) button[type="submit"]').click();
+
+    // --- lo que la pantalla dice ANTES de confirmar
+    await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: 20_000 });
+    const aviso = page.locator('[class*="_avisoMultiple_"]');
+    await aviso.waitFor({ state: 'visible', timeout: 15_000 });
+    const textoDelAviso = (await aviso.textContent()) || '';
+    assert(/2 órdenes separadas/i.test(textoDelAviso) && /por separado/i.test(textoDelAviso),
+      `el aviso del carrito multivendedor dice: «${textoDelAviso.trim()}»`);
+
+    const grupos = page.locator('fieldset[class*="_grupoDePago_"]');
+    assert(await grupos.count() === 2, `la pantalla armó ${await grupos.count()} grupos`);
+    const grupoMP = grupos.filter({ hasText: nombreDeUsuario(vendedor.id) });
+    const grupoTR = grupos.filter({ hasText: nombreDeUsuario(otro.id) });
+    assert(await grupoMP.locator('input[value="mercadopago"]').count() === 1,
+      'el vendedor vinculado no ofrece Mercado Pago en la pantalla');
+    assert(await grupoTR.locator('input[value="mercadopago"]').count() === 0,
+      'la pantalla ofrece Mercado Pago para un vendedor sin vínculo');
+
+    // Sin elegir el medio del grupo que tiene dos, no avanza.
+    await page.getByRole('button', { name: /Confirmar y crear las órdenes/ }).click();
+    await page.locator('[role="alert"]').first().waitFor({ state: 'visible', timeout: 10_000 });
+    assert(ordenesDe(state.buyerId).length === ordenesAntes,
+      'confirmó sin que el comprador eligiera el medio de un grupo');
+
+    await grupoMP.locator('input[value="mercadopago"]').check();
+    await grupoTR.locator('input[value="transfer"]').check();
+    await page.getByRole('button', { name: /Confirmar y crear las órdenes/ }).click();
+
+    // --- la cola de órdenes
+    await page.getByRole('heading', { name: /Tus órdenes/ }).waitFor({ timeout: 25_000 });
+    const nuevas = ordenesDe(state.buyerId).slice(ordenesAntes);
+    assert(nuevas.length === 2, `se crearon ${nuevas.length} órdenes`);
+    const [ordenMP] = nuevas.filter(([id]) => ordenEnLaBase(id).medio === 'mercadopago');
+    const [ordenTR] = nuevas.filter(([id]) => ordenEnLaBase(id).medio === 'transfer');
+    assert(ordenMP && ordenTR, 'no salió una orden de cada medio');
+
+    const enlace = page.locator('a[class*="_pagarMP_"]');
+    await enlace.waitFor({ state: 'visible', timeout: 15_000 });
+    const destino = await enlace.getAttribute('href');
+    const [pagoMP] = pagosDe(ordenMP[0]);
+    assert(destino === pagoMP[1], `el link de la pantalla es ${destino} y el guardado ${pagoMP[1]}`);
+    assert(await enlace.getAttribute('target') === '_blank',
+      'el link de pago no abre en otra pestaña');
+    assert(preferenciasPedidas(doble).length === 1,
+      `el doble recibió ${preferenciasPedidas(doble).length} preferencias`);
+
+    const texto = (await page.locator('[class*="_confirmation_"]').textContent()) || '';
+    assert(!/\bpagad[oa]\b/i.test(texto), `la pantalla dice pagado: «${texto.slice(0, 200)}»`);
+    assert(/pendiente de confirmación/i.test(texto),
+      'la pantalla no dice que el pago está pendiente de confirmación');
+    assert(/no confirma el pago/i.test(texto),
+      'la pantalla no aclara que volver de Mercado Pago no confirma nada');
+    const numeroTR = queryRows(
+      `SELECT order_number FROM orders WHERE id = ${sqlLiteral(ordenTR[0])}`)[0][0];
+    assert(texto.includes(numeroTR),
+      'la cola no muestra la orden por transferencia con su referencia');
+
+    // --- volver de Mercado Pago no cambia nada
+    const antes = [ordenEnLaBase(ordenMP[0]).estado, pagosDe(ordenMP[0])[0][4]];
+    const numeroMP = queryRows(
+      `SELECT order_number FROM orders WHERE id = ${sqlLiteral(ordenMP[0])}`)[0][0];
+    const vuelta = await context.newPage();
+    await vuelta.goto(`${FRONTEND_URL}/?orden=${numeroMP}&status=approved&payment_id=1`,
+      { waitUntil: 'domcontentloaded' });
+    await vuelta.waitForTimeout(1500);
+    const textoDeLaVuelta = (await vuelta.locator('body').textContent()) || '';
+    assert(!/\bpagad[oa]\b/i.test(textoDeLaVuelta),
+      'volver de Mercado Pago deja la palabra «pagado» en pantalla');
+    const despues = [ordenEnLaBase(ordenMP[0]).estado, pagosDe(ordenMP[0])[0][4]];
+    assert(antes[0] === despues[0] && antes[1] === despues[1],
+      `volver cambió el estado: ${antes} → ${despues}`);
+    assert(pagosDe(ordenMP[0]).length === 1, 'volver creó otra fila de pago');
+    assert(errores.length === 0, `errores JS: ${errores.join(' | ')}`);
+
+    return `dos grupos en pantalla con sus medios (uno con Mercado Pago y otro sin), `
+      + `aviso de dos órdenes separadas antes de confirmar, una sola preferencia, cola `
+      + `con el link del doble y la orden por transferencia; volver a la URL de retorno `
+      + `dejó la orden en ${despues[0]} y el pago en ${despues[1]}`;
+  } finally {
+    await doble.cerrar();
+    await browser.close();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
   }
 });
 

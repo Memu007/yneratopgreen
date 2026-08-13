@@ -923,3 +923,92 @@
 .fleteQuitar:hover {
   background: #fdeceb;
 }
+
+/* --- el pago, un grupo de vendedor a la vez ------------------------------ */
+
+.avisoMultiple {
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  background: #f6f8f3;
+  border-left: 4px solid #2d5016;
+  border-radius: 8px;
+  color: #24301c;
+  font-size: 0.92rem;
+}
+
+.avisoMultiple p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.pagoNota {
+  margin: 0 0 16px;
+  color: #4a5340;
+  font-size: 0.88rem;
+}
+
+.grupoDePago {
+  margin: 0 0 20px;
+  padding: 16px;
+  border: 1px solid #d8e2cf;
+  border-radius: 12px;
+}
+
+.grupoDePagoTitulo {
+  padding: 0 8px;
+  color: #24301c;
+  font-weight: 700;
+}
+
+.pagoSinMedio {
+  margin: 0;
+  padding: 10px 12px;
+  background: #fff3f3;
+  border: 1px solid #ffcdd2;
+  border-radius: 8px;
+  color: #c62828;
+  font-size: 0.9rem;
+}
+
+.datosBancarios {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #d8e2cf;
+  color: #3d4636;
+  font-size: 0.9rem;
+}
+
+.datosBancarios p {
+  margin: 4px 0;
+}
+
+.pagarMP {
+  display: inline-block;
+  margin: 12px 0 4px;
+  padding: 12px 20px;
+  background: #2d5016;
+  border-radius: 8px;
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.pagarMP:hover {
+  background: #244011;
+}
+
+.reintentar {
+  margin-top: 8px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 2px solid #2d5016;
+  border-radius: 8px;
+  color: #2d5016;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.reintentar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

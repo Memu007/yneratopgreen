@@ -35,6 +35,13 @@ export const DETALLE_CRUDO = 'invalid_client: el client_secret no coincide';
 
 const GUIONES = ['lento', 'rechazo', 'basura', 'incompleto'];
 
+// Cuentas de Mercado Pago con guion propio a la hora de crear preferencias.
+// Vincular una de estas es la forma de pedirle al doble que falle de una
+// manera concreta, sin tocar el producto.
+export const CUENTA_RECHAZA = '900777';
+export const CUENTA_LENTA = '900778';
+export const CUENTA_INCOMPLETA = '900779';
+
 function interpretar(texto) {
   if (typeof texto !== 'string') return { tipo: 'rechazo' };
   if (texto.startsWith('ok:')) return { tipo: 'ok', mpUserId: texto.slice(3) };
@@ -45,6 +52,9 @@ function interpretar(texto) {
 export function levantarDoble(puerto = 8099) {
   const pedidos = [];
   const demorados = [];
+  // Clave de idempotencia -> id de preferencia. Es lo que permite comprobar
+  // que reintentar no crea una segunda preferencia.
+  const preferencias = new Map();
   // Cada emisión es distinta de la anterior: así una renovación se puede
   // distinguir de la credencial que reemplazó.
   let emision = 0;
@@ -53,7 +63,7 @@ export function levantarDoble(puerto = 8099) {
     emision += 1;
     respuesta.writeHead(200, { 'Content-Type': 'application/json' });
     respuesta.end(JSON.stringify({
-      access_token: `${SECRETO_DE_ACCESO}-${emision}`,
+      access_token: `${SECRETO_DE_ACCESO}-${mpUserId}-${emision}`,
       // El refresh se lleva puesto el guion de la próxima renovación.
       refresh_token: `${SECRETO_DE_REFRESCO}-${emision}#${guionDelRefresh}`,
       user_id: mpUserId,
@@ -74,6 +84,58 @@ export function levantarDoble(puerto = 8099) {
       destino.searchParams.set('state', url.searchParams.get('state') || '');
       respuesta.writeHead(302, { Location: destino.toString() });
       respuesta.end();
+      return;
+    }
+
+    // --- preferencias de Checkout Pro
+    if (pedido.method === 'POST' && url.pathname === '/checkout/preferences') {
+      let crudo = '';
+      pedido.on('data', (trozo) => { crudo += trozo; });
+      pedido.on('end', () => {
+        let cuerpo = null;
+        try { cuerpo = JSON.parse(crudo); } catch { cuerpo = null; }
+        const registro = {
+          ruta: 'preferencia',
+          autorizacion: pedido.headers.authorization || '',
+          idempotencia: pedido.headers['x-idempotency-key'] || '',
+          cuerpo,
+        };
+        pedidos.push(registro);
+
+        // El guion cuelga del vendedor: el token que emitió el doble lleva
+        // adentro su cuenta de Mercado Pago. Así la prueba elige qué pasa
+        // vinculando una cuenta u otra, sin que el producto tenga que
+        // mandar nada especial.
+        const referencia = String(cuerpo?.external_reference || '');
+        const cuenta = (registro.autorizacion.match(/-(\d{6,})-\d+$/) || [])[1] || '';
+        if (cuenta === CUENTA_LENTA) { demorados.push(respuesta); return; }
+        if (cuenta === CUENTA_RECHAZA) {
+          respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+          respuesta.end(JSON.stringify({ message: DETALLE_CRUDO, error: 'invalid_token' }));
+          return;
+        }
+        if (cuenta === CUENTA_INCOMPLETA) {
+          respuesta.writeHead(201, { 'Content-Type': 'application/json' });
+          respuesta.end(JSON.stringify({ id: 'pref-sin-link' }));
+          return;
+        }
+
+        // Idempotencia de verdad: la misma clave devuelve la misma
+        // preferencia, como haría Mercado Pago.
+        const clave = registro.idempotencia || `sin-clave-${preferencias.size}`;
+        if (!preferencias.has(clave)) {
+          preferencias.set(clave, `pref-${preferencias.size + 1}-${Date.now()}`);
+        }
+        const id = preferencias.get(clave);
+        respuesta.writeHead(201, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({
+          id,
+          init_point: `https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=${id}`,
+          sandbox_init_point: `https://sandbox.mercadopago.com.ar/checkout?pref_id=${id}`,
+          external_reference: referencia,
+          client_id: 'app-local-de-prueba',
+        }));
+      });
       return;
     }
 
@@ -137,6 +199,7 @@ export function levantarDoble(puerto = 8099) {
     servidor.listen(puerto, '127.0.0.1', () => {
       resolver({
         pedidos,
+        preferencias,
         cerrar: () => new Promise((listo) => {
           for (const respuesta of demorados) respuesta.destroy();
           servidor.closeAllConnections?.();

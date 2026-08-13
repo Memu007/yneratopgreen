@@ -61,6 +61,19 @@ class ShippingDecision(BaseModel):
     carrier_id: Optional[str] = Field(None, max_length=36)
 
 
+class PaymentDecision(BaseModel):
+    """Con qué se le paga a un vendedor del carrito.
+
+    Igual que la decisión de traslado: una por grupo, la manda el cliente y la
+    valida el servidor contra los grupos reales y contra lo que ese vendedor
+    puede recibir hoy. Un carrito puede tener un grupo por Mercado Pago y otro
+    por transferencia; lo que no puede es tener un grupo sin decidir.
+    """
+
+    seller_id: str = Field(..., min_length=1, max_length=36)
+    method: Literal["transfer", "mercadopago"]
+
+
 class CheckoutRequest(BaseModel):
     shipping_address: str
     # La localidad del padrón es el destino real: de ella salen la ciudad y la
@@ -74,6 +87,30 @@ class CheckoutRequest(BaseModel):
     # vacía o de más: el servidor deriva los grupos reales del carrito y
     # exige exactamente una decisión por grupo antes de escribir nada.
     shipping_decisions: List[ShippingDecision] = Field(default_factory=list)
+    # Una forma de pago por futura orden, con la misma regla: el servidor exige
+    # exactamente una por grupo. El checkout que sólo hace transferencia no la
+    # manda, porque la pone él.
+    payment_decisions: List[PaymentDecision] = Field(default_factory=list)
+
+
+class OpcionDePago(BaseModel):
+    """Con qué se le puede pagar a un vendedor del carrito, y cuánto.
+
+    Una por grupo. `methods` es lo que ese vendedor puede recibir hoy: puede
+    traer los dos medios, uno solo, o ninguno. Ninguno no es un error del
+    carrito —el resto de los pedidos sigue siendo comprable—, así que viene con
+    su motivo para que el comprador sepa cuál sacar.
+    """
+
+    seller_id: str
+    seller_name: str
+    amount: float
+    methods: List[Literal["transfer", "mercadopago"]] = Field(default_factory=list)
+    # Por qué no hay ninguno. Sólo viene cuando `methods` está vacío.
+    reason: Optional[str] = None
+    # Los datos bancarios sólo si transferencia es una opción de verdad.
+    cbu: Optional[str] = None
+    alias_bancario: Optional[str] = None
 
 
 class BankTransferOption(BaseModel):
@@ -91,8 +128,41 @@ class BankTransferOrderResponse(BankTransferOption):
     transfer_receipt_url: Optional[str] = None
 
 
-class BankTransferCheckoutResponse(BaseModel):
-    orders: List[BankTransferOrderResponse]
+class OrdenCreada(BaseModel):
+    """Una orden recién creada, como la ve el comprador.
+
+    La respuesta del checkout es siempre una lista de estas, incluso cuando hay
+    una sola: un carrito con tres vendedores son tres órdenes, y devolver la
+    primera y callarse las otras dos fue exactamente el defecto que esta pieza
+    corrige.
+    """
+
+    order_id: str
+    order_number: str
+    status: str
+    seller_id: str
+    seller_name: str
+    # Con qué se paga ESTA orden: "transfer" o "mercadopago".
+    payment_method: str
+    # El total congelado en la orden. No se recalcula para mostrarlo.
+    amount: float
+    # "lista" si ya se puede pagar; "pendiente" si falta preparar el pago y se
+    # puede reintentar sin crear otra orden.
+    preparation: str
+    # Por qué quedó pendiente, como código nuestro. Nunca texto de Mercado Pago.
+    reason: Optional[str] = None
+
+    # Transferencia: a dónde transferir, congelado al comprar.
+    cbu: Optional[str] = None
+    alias_bancario: Optional[str] = None
+    transfer_receipt_url: Optional[str] = None
+
+    # Mercado Pago: el link para pagar en la cuenta del vendedor.
+    payment_url: Optional[str] = None
+
+
+class CheckoutResponse(BaseModel):
+    orders: List[OrdenCreada]
 
 
 class BankTransferDecisionRequest(BaseModel):

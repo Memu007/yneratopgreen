@@ -1,0 +1,209 @@
+"""La preferencia de Checkout Pro de una orden.
+
+Una orden, una preferencia, un pago. Nada de esto mueve dinero todavía: crear
+una preferencia es pedirle a Mercado Pago un link de pago a nombre del
+vendedor. Quién cobra es él, en su cuenta, con su token.
+
+Tres cosas que no se negocian acá:
+
+1. **El importe sale de la orden ya escrita.** No del carrito, no de la
+   publicación, no de una cuenta hecha en el momento. Si el vendedor cambia el
+   precio después de confirmar, la orden y el pago siguen diciendo lo mismo.
+2. **`marketplace_fee` no se manda.** Ni en cero: lo que no se manda no se
+   discute. TopGreen no cobra comisión por venta y no recibe ese dinero.
+3. **Reintentar no duplica.** La orden tiene una sola intención de pago, y la
+   clave de idempotencia se deriva de la orden, así que un doble clic o un
+   timeout con la respuesta perdida terminan en la misma preferencia.
+
+Se guarda lo mínimo: identificadores, la URL para pagar, el importe exacto y
+nuestro propio estado. El cuerpo completo de la respuesta de Mercado Pago no
+se guarda: lo que no se guarda no se filtra.
+"""
+from __future__ import annotations
+
+import logging
+from decimal import Decimal
+from typing import Optional
+
+import httpx
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.models.order import Order
+from app.models.payment import Payment, PaymentStatus
+from app.models.user import User
+from app.services import mp_vinculo
+
+logger = logging.getLogger(__name__)
+
+SEGUNDOS_DE_ESPERA = 15.0
+MONEDA = "ARS"
+
+# Motivos, del mismo estilo que el vínculo: códigos nuestros, nunca el texto
+# de Mercado Pago.
+SIN_VINCULO = "sin_vinculo"
+MP_RECHAZO = "mp_rechazo"
+MP_SIN_RESPUESTA = "mp_sin_respuesta"
+RESPUESTA_INVALIDA = "respuesta_invalida"
+DESHABILITADO = "deshabilitado"
+
+
+class NoSePudoPreparar(Exception):
+    """No se pudo dejar lista la preferencia. Trae un motivo, no un cuerpo."""
+
+    def __init__(self, motivo: str):
+        super().__init__(motivo)
+        self.motivo = motivo
+
+
+def _numero_json(monto: Decimal) -> float:
+    """Convierte el importe para meterlo en el JSON que viaja a Mercado Pago.
+
+    Es el borde de serialización, no una cuenta: acá no se suma ni se
+    multiplica nada. Aun así se comprueba que el viaje de ida y vuelta sea
+    exacto, porque mandar un importe distinto del que dice la orden sería
+    exactamente el error que el contrato monetario existe para evitar.
+    """
+    numero = float(monto)
+    if Decimal(str(numero)) != Decimal(monto):
+        raise NoSePudoPreparar(RESPUESTA_INVALIDA)
+    return numero
+
+
+def referencia_de(orden: Order) -> str:
+    """La referencia que va a viajar y volver. Inequívoca y sin datos de nadie."""
+    return f"topgreen-{orden.order_number}"
+
+
+def clave_de_idempotencia(orden: Order) -> str:
+    """Estable por orden: dos intentos de la misma orden son el mismo pedido."""
+    return f"topgreen-orden-{orden.id}"
+
+
+def _cuerpo_de_la_preferencia(orden: Order) -> dict:
+    """Arma el pedido a partir de lo que ya está guardado en la orden."""
+    items = [
+        {
+            "title": item.product_name_snapshot,
+            "quantity": int(item.quantity),
+            "unit_price": _numero_json(item.unit_price_snapshot),
+            "currency_id": MONEDA,
+        }
+        for item in orden.items
+    ]
+
+    frente = (settings.FRONTEND_URL or "http://localhost:5173").rstrip("/")
+    cuerpo = {
+        "items": items,
+        "external_reference": referencia_de(orden),
+        "back_urls": {
+            "success": f"{frente}/?orden={orden.order_number}",
+            "pending": f"{frente}/?orden={orden.order_number}",
+            "failure": f"{frente}/?orden={orden.order_number}",
+        },
+        # Nada de `marketplace_fee`: ni el 5 % de antes ni un cero. TopGreen no
+        # cobra comisión por venta.
+    }
+
+    # La URL de aviso sólo va si está configurada. Mandar una que no atiende
+    # nadie sería pedirle a Mercado Pago que reintente contra el vacío.
+    if settings.MP_NOTIFICACION_URL:
+        cuerpo["notification_url"] = settings.MP_NOTIFICACION_URL
+
+    return cuerpo
+
+
+async def _pedir_preferencia(token: str, cuerpo: dict, idempotencia: str) -> dict:
+    url = f"{settings.MP_API_BASE_URL.rstrip('/')}/checkout/preferences"
+    cabeceras = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "X-Idempotency-Key": idempotencia,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=SEGUNDOS_DE_ESPERA) as cliente:
+            respuesta = await cliente.post(url, json=cuerpo, headers=cabeceras)
+    except httpx.HTTPError as error:
+        logger.warning("Mercado Pago no respondió: %s", type(error).__name__)
+        raise NoSePudoPreparar(MP_SIN_RESPUESTA) from error
+
+    if respuesta.status_code >= 400:
+        # Sólo el código. El cuerpo trae detalles de la aplicación y del token.
+        logger.warning(
+            "Mercado Pago rechazó la preferencia (HTTP %s)", respuesta.status_code
+        )
+        raise NoSePudoPreparar(MP_RECHAZO)
+
+    try:
+        datos = respuesta.json()
+    except ValueError as error:
+        raise NoSePudoPreparar(RESPUESTA_INVALIDA) from error
+
+    if not isinstance(datos, dict) or not datos.get("id") or not datos.get("init_point"):
+        faltan = [c for c in ("id", "init_point")
+                  if not (isinstance(datos, dict) and datos.get(c))]
+        logger.warning("Respuesta de Mercado Pago incompleta: faltan %s", faltan)
+        raise NoSePudoPreparar(RESPUESTA_INVALIDA)
+
+    return datos
+
+
+def pago_de(db: Session, orden: Order) -> Optional[Payment]:
+    return db.query(Payment).filter(Payment.order_id == orden.id).first()
+
+
+async def preparar_pago(db: Session, orden: Order, vendedor: User) -> Payment:
+    """Deja lista la preferencia de una orden. Es idempotente.
+
+    Si la orden ya tiene una preferencia con su link, se devuelve esa: no se
+    pide otra. Es lo que hace que un doble clic, un reintento después de un
+    timeout o una respuesta perdida terminen en el mismo lugar y no en dos
+    pagos para la misma compra.
+    """
+    if not settings.MP_CHECKOUT_HABILITADO:
+        raise NoSePudoPreparar(DESHABILITADO)
+
+    existente = pago_de(db, orden)
+    if existente and existente.mp_preference_id and existente.init_point:
+        return existente
+
+    token = mp_vinculo.access_token_de(db, vendedor)
+    if not token:
+        raise NoSePudoPreparar(SIN_VINCULO)
+
+    datos = await _pedir_preferencia(
+        token, _cuerpo_de_la_preferencia(orden), clave_de_idempotencia(orden)
+    )
+
+    pago = existente or Payment(
+        order_id=orden.id,
+        total_amount=orden.total_amount,
+        status=PaymentStatus.PENDING,
+    )
+    # Sólo esto: identificadores, la URL para pagar, el importe exacto de la
+    # orden y nuestro estado. Ni el cuerpo de Mercado Pago ni el token.
+    pago.mp_preference_id = str(datos["id"])
+    pago.init_point = str(datos["init_point"])
+    pago.mp_external_reference = referencia_de(orden)
+    pago.total_amount = orden.total_amount
+    pago.status = PaymentStatus.PENDING
+
+    db.add(pago)
+    try:
+        db.commit()
+    except IntegrityError:
+        # Dos pedidos al mismo tiempo —un doble clic, un reintento mientras el
+        # primero seguía en vuelo— llegan los dos hasta acá creyendo que no hay
+        # pago. El índice único de `order_id` deja pasar uno solo, y el que
+        # pierde se queda con el que ganó: la orden tiene una intención de pago
+        # y no dos. La clave de idempotencia hace que además sea la misma
+        # preferencia del lado de Mercado Pago.
+        db.rollback()
+        ganador = pago_de(db, orden)
+        if ganador is None:
+            raise
+        return ganador
+
+    db.refresh(pago)
+    return pago

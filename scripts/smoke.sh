@@ -68,6 +68,12 @@ echo "===> Configurando el vinculo de Mercado Pago contra el doble local"
   echo "MP_TOKEN_KEY=$(openssl rand -base64 32 | tr '+/' '-_')"
   echo "MP_AUTH_BASE_URL=http://127.0.0.1:8099"
   echo "MP_API_BASE_URL=http://127.0.0.1:8099"
+  # El cobro por Mercado Pago se enciende SOLO para la suite y SOLO
+  # contra el doble. En produccion la bandera queda apagada hasta que
+  # exista el webhook firmado, la consulta de estado y la politica de
+  # stock: sin eso, cobrar de verdad seria prometer lo que no podemos
+  # confirmar.
+  echo "MP_CHECKOUT_HABILITADO=true"
 } >> backend/.env
 
 echo "===> Compilando frontend"
@@ -103,7 +109,7 @@ if [ "$frontend_ready" != "true" ]; then
   exit 1
 fi
 
-echo "===> Ejecutando 71 smoke tests"
+echo "===> Ejecutando 81 smoke tests"
 set +e
 node scripts/smoke.mjs "$@"
 smoke_exit=$?

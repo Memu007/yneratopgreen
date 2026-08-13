@@ -1,7 +1,7 @@
 """
 Modelo de Pagos - Integración con Mercado Pago
 """
-from sqlalchemy import Column, String, DateTime, Numeric, ForeignKey, Enum as SQLEnum, JSON
+from sqlalchemy import Column, String, DateTime, Numeric, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -25,7 +25,12 @@ class Payment(Base):
 
     # Identificación
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    order_id = Column(String(36), ForeignKey("orders.id"), nullable=False, index=True)
+    # Única: una orden tiene una intención de pago y no dos. Es lo que hace
+    # que reintentar -doble clic, timeout, respuesta perdida- reutilice la
+    # misma en vez de fabricar otra.
+    order_id = Column(
+        String(36), ForeignKey("orders.id"), nullable=False, index=True, unique=True
+    )
     
     # Datos de Mercado Pago
     mp_preference_id = Column(String(100), nullable=True, index=True)  # ID de preferencia
@@ -36,11 +41,14 @@ class Payment(Base):
     # Estado
     status = Column(SQLEnum(PaymentStatus), default=PaymentStatus.PENDING, nullable=False)
     
-    # Montos
-    total_amount = Column(Numeric(14, 2), nullable=False)  # Monto total pagado
-    commission_amount = Column(Numeric(14, 2), nullable=False)  # Comisión TopGreen
-    commission_percent = Column(Numeric(5, 2), nullable=False)  # Porcentaje aplicado
-    seller_amount = Column(Numeric(14, 2), nullable=False)  # Monto para el vendedor
+    # Monto. Uno solo, y sale del total ya congelado en la orden.
+    #
+    # Acá vivían `commission_amount`, `commission_percent` y `seller_amount`.
+    # Se fueron porque mentían: TopGreen no cobra comisión por venta, y
+    # `seller_amount` guardaba el 100 % del total, que no es lo que el vendedor
+    # cobra —Mercado Pago le descuenta la suya—. Un número que nadie puede
+    # sostener es peor que ningún número.
+    total_amount = Column(Numeric(14, 2), nullable=False)
     
     # Datos del pagador (snapshot de MP)
     payer_email = Column(String(255), nullable=True)
@@ -53,8 +61,10 @@ class Payment(Base):
     # URLs
     init_point = Column(String(500), nullable=True)  # URL para pagar
     
-    # Datos adicionales de MP
-    mp_response = Column(JSON, nullable=True)  # Respuesta completa de MP
+    # El cuerpo completo de la respuesta de Mercado Pago NO se guarda. Traía
+    # datos del pagador y de la aplicación que no necesitamos para nada, y lo
+    # que no se guarda no se filtra. Queda lo que hace falta: identificadores,
+    # la URL para pagar, el importe y nuestro propio estado.
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

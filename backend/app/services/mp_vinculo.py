@@ -365,6 +365,27 @@ def marcar_reconexion(db: Session, user: User) -> None:
     db.commit()
 
 
+def access_token_de(db: Session, user: User) -> Optional[str]:
+    """El token con el que se cobra en la cuenta del vendedor, en claro y para
+    usarlo ya. `None` si no se puede.
+
+    No lo devuelve ningún endpoint ni se guarda en ningún lado: se descifra,
+    se usa en la llamada a Mercado Pago y se olvida. Si no abre, el vínculo
+    pasa a «reconectar» en el acto, porque una credencial que no podemos leer
+    es una credencial que no tenemos.
+    """
+    if not user.mp_access_token_cifrado:
+        return None
+    try:
+        return descifrar(user.mp_access_token_cifrado)
+    except (NoSeDescifra, SinClaveDeCifrado):
+        logger.warning(
+            "Credencial de cobro ilegible para el usuario %s", user.id
+        )
+        marcar_reconexion(db, user)
+        return None
+
+
 def refresh_token_de(db: Session, user: User) -> Optional[str]:
     """Devuelve el refresh en claro para usarlo ya, o `None` si no se puede.
 

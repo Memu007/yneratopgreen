@@ -20,16 +20,30 @@ from app.core.montos import SIN_CARGO, importe_de_linea, validar_total
 from app.models.user import User
 from app.schemas.logistics import OrderShipping
 from app.schemas.orders import (
-    BankTransferCheckoutResponse,
+    CheckoutResponse,
+    OpcionDePago,
+    OrdenCreada,
     BankTransferDecisionRequest,
-    BankTransferOption,
     BankTransferOrderResponse,
     CheckoutRequest,
     OrderItemResponse,
     OrderResponse,
 )
+from app.services import mp_preferencia
+from app.services.checkout import (
+    LISTA,
+    MEDIO_MERCADO_PAGO,
+    MEDIO_TRANSFERENCIA,
+    PENDIENTE_DE_PAGO,
+    crear_ordenes,
+    medios_disponibles,
+    motivo_sin_medios,
+)
+from app.services.checkout import generate_order_number
+from app.services.checkout import preparar as preparar_checkout
 from app.services.logistica import (
     MODO_PROPIO,
+    origen_de,
     MODO_TRANSPORTISTA,
     carrito_activo,
     grupos_del_carrito,
@@ -41,360 +55,179 @@ from app.api.notifications import (
     notify_order_placed, notify_order_received, notify_order_confirmed,
     notify_order_shipped, notify_order_delivered, notify_order_cancelled
 )
-# Import lazy para evitar circular imports
-def get_refund_processor():
-    from app.api.payments import process_refund
-    return process_refund
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 
-def generate_order_number() -> str:
-    """Generar número de orden único"""
-    timestamp = datetime.now().strftime("%Y%m%d")
-    random = secrets.token_hex(4).upper()
-    return f"ORD-{timestamp}-{random}"
+def _respuesta_de(orden, vendedor, pago=None, motivo=None) -> OrdenCreada:
+    """Una orden creada, como la ve el comprador. Sin recalcular nada."""
+    es_mp = orden.payment_method == MEDIO_MERCADO_PAGO
+    listo = bool(pago and pago.init_point) if es_mp else True
+    return OrdenCreada(
+        order_id=orden.id,
+        order_number=orden.order_number,
+        status=orden.status.value,
+        seller_id=orden.seller_id,
+        seller_name=vendedor.full_name,
+        payment_method=orden.payment_method,
+        amount=orden.total_amount,
+        preparation=LISTA if listo else PENDIENTE_DE_PAGO,
+        reason=motivo,
+        cbu=orden.transfer_cbu,
+        alias_bancario=orden.transfer_alias_bancario,
+        transfer_receipt_url=orden.transfer_receipt_url,
+        payment_url=pago.init_point if (es_mp and pago) else None,
+    )
 
 
-@router.post("/checkout", response_model=OrderResponse)
-def checkout(
+def _avisar(db: Session, ordenes) -> None:
+    """Los avisos no pueden voltear una compra ya escrita."""
+    for orden in ordenes:
+        try:
+            notify_order_placed(db, orden)
+            notify_order_received(db, orden)
+        except Exception as error:  # noqa: BLE001
+            print(f"Error enviando notificación: {error}")
+
+
+async def _preparar_pagos(db: Session, ordenes, pedidos) -> list:
+    """Deja lista una preferencia por cada orden que se paga con Mercado Pago.
+
+    Las órdenes ya están escritas y son válidas. Si Mercado Pago no contesta,
+    esa orden queda «pendiente» con su motivo y se puede reintentar sin crear
+    otra: lo que no se hace es borrarla ni cambiarle el medio por atrás.
+    """
+    por_vendedor = {pedido.seller_id: pedido for pedido in pedidos}
+    salida = []
+    for orden in ordenes:
+        pedido = por_vendedor[orden.seller_id]
+        if pedido.medio != MEDIO_MERCADO_PAGO:
+            salida.append(_respuesta_de(orden, pedido.seller))
+            continue
+        try:
+            pago = await mp_preferencia.preparar_pago(db, orden, pedido.seller)
+            salida.append(_respuesta_de(orden, pedido.seller, pago=pago))
+        except mp_preferencia.NoSePudoPreparar as fallo:
+            salida.append(_respuesta_de(orden, pedido.seller, motivo=fallo.motivo))
+    return salida
+
+
+@router.post("/checkout", response_model=CheckoutResponse)
+async def checkout(
     checkout_data: CheckoutRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    """Convierte el carrito en órdenes: una por vendedor.
+
+    Devuelve **todas**. Antes creaba una por vendedor y devolvía sólo la
+    primera, así que un carrito de dos vendedores dejaba una orden escrita que
+    el comprador no veía y no podía pagar.
+
+    Se valida el carrito entero antes de la primera fila —destino, traslado,
+    medio de pago, vínculo del vendedor, precios, cantidades, totales y
+    stock—. Si algo no cierra, no se crea ninguna orden y el carrito queda
+    activo.
     """
-    Crear orden desde el carrito actual.
-    Convierte el carrito en orden y descuenta stock.
-    """
-    cart = carrito_activo(db, current_user)
-
-    # Antes de escribir nada: el destino tiene que existir en el padrón.
-    destino = resolver_destino(db, checkout_data.shipping_locality_id)
-
-    # Los grupos los deriva el servidor del carrito, no el cliente. Cada uno
-    # tiene que traer su decisión de traslado, y cada transportista elegido
-    # se revalida contra este destino y estos orígenes antes de la primera
-    # fila: si una decisión falla, no se crea ninguna orden.
-    grupos = grupos_del_carrito(cart)
-    elegidos = resolver_decisiones(
-        db, destino, grupos, checkout_data.shipping_decisions
-    )
-    items_by_seller = {
-        seller_id: grupo.items for seller_id, grupo in grupos.items()
-    }
-
-    # Validar TODOS los totales antes de escribir: si alguno no entra en el
-    # contrato monetario, la respuesta es 4xx y no queda una orden a medias.
-    for _seller_id, _items in items_by_seller.items():
-        for _item in _items:
-            validar_total(
-                importe_de_linea(_item.product.price, _item.quantity),
-                f"El importe de «{_item.product.name}»",
-            )
-        validar_total(
-            sum((importe_de_linea(x.product.price, x.quantity) for x in _items),
-                Decimal(0)),
-            "El total de la orden",
-        )
-
-    created_orders = []
-    
-    # Crear una orden por cada vendedor
-    for seller_id, items in items_by_seller.items():
-        # Calcular totales
-        # Todo el camino del dinero en Decimal: el precio ya viene NUMERIC de
-        # la base y no se lo convierte a binario en ningún punto.
-        subtotal = sum(
-            (importe_de_linea(item.product.price, item.quantity) for item in items),
-            Decimal(0),
-        )
-        shipping_cost = SIN_CARGO
-        total_amount = subtotal + shipping_cost
-        
-        # Crear orden
-        order = Order(
-            order_number=generate_order_number(),
-            buyer_id=current_user.id,
-            seller_id=seller_id,
-            status=OrderStatus.PLACED,
-            subtotal=subtotal,
-            shipping_cost=shipping_cost,
-            total_amount=total_amount,
-            shipping_address_json={
-                "address": checkout_data.shipping_address,
-                "city": destino.name,
-                "province": destino.province_name,
-                "postal_code": checkout_data.shipping_postal_code,
-                "locality_id": destino.id,
-            },
-            shipping_locality_id=destino.id,
-            shipping_mode=(
-                MODO_TRANSPORTISTA if elegidos[seller_id] else MODO_PROPIO
-            ),
-            carrier_id=elegidos[seller_id].id if elegidos[seller_id] else None,
-            buyer_notes=checkout_data.notes
-        )
-        
-        db.add(order)
-        db.flush()  # Para obtener el ID de la orden
-        
-        # Crear items de la orden
-        order_items = []
-        for cart_item in items:
-            product = cart_item.product
-            
-            # Verificar stock nuevamente (solo para productos, no servicios)
-            is_service = product.category.is_service if product.category else False
-            if not is_service and (product.stock or 0) < cart_item.quantity:
-                db.rollback()
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Stock insuficiente para {product.name}"
-                )
-            
-            # Obtener imagen primaria
-            primary_image = None
-            if product.images:
-                for img in product.images:
-                    if img.is_primary:
-                        primary_image = img.url
-                        break
-            
-            # Crear item de orden (con snapshot de datos)
-            order_item = OrderItem(
-                order_id=order.id,
-                product_id=product.id,
-                product_name_snapshot=product.name,
-                product_image_snapshot=primary_image,
-                unit_price_snapshot=product.price,
-                quantity=cart_item.quantity,
-                total_price=importe_de_linea(product.price, cart_item.quantity),
-                **origen_de(product),
-            )
-            
-            db.add(order_item)
-            order_items.append(order_item)
-            
-            # NOTA: El stock se descuenta cuando el pago es aprobado (en payments.py webhook)
-            # No descontar aquí porque el usuario puede abandonar el pago
-        
-        # Guardar datos para response antes del commit
-        created_orders.append({
-            "order": order,
-            "order_items": order_items[:]
-        })
-    
-    # Limpiar carrito antes del commit único
-    cart.status = CartStatus.CONVERTED
-    
-    # Commit único al final
-    db.commit()
-    
-    # Enviar notificaciones para cada orden creada
-    for order_data in created_orders:
-        order = order_data["order"]
-        try:
-            notify_order_placed(db, order)   # Al comprador
-            notify_order_received(db, order) # Al vendedor
-        except Exception as e:
-            # No fallar si las notificaciones fallan
-            print(f"Error enviando notificación: {e}")
-    
-    # Preparar responses después del commit
-    order_responses = []
-    for order_data in created_orders:
-        order = order_data["order"]
-        order_items = order_data["order_items"]
-        db.refresh(order)
-        
-        items_response = [
-            OrderItemResponse(
-                id=item.id,
-                product_name_snapshot=item.product_name_snapshot,
-                unit_price_snapshot=item.unit_price_snapshot,
-                quantity=item.quantity,
-                subtotal=item.unit_price_snapshot * item.quantity
-            )
-            for item in order_items
-        ]
-        
-        order_responses.append(OrderResponse(
-            id=order.id,
-            order_number=order.order_number,
-            status=order.status.value,
-            subtotal=order.subtotal,
-            shipping_cost=order.shipping_cost,
-            total_amount=order.total_amount,
-            items=items_response,
-            created_at=order.created_at
-        ))
-    
-    # Retornar la primera orden (o podrías retornar todas)
-    return order_responses[0] if order_responses else None
+    cart, destino, pedidos = preparar_checkout(db, current_user, checkout_data)
+    ordenes = crear_ordenes(db, current_user, cart, destino, pedidos, checkout_data)
+    _avisar(db, ordenes)
+    return CheckoutResponse(orders=await _preparar_pagos(db, ordenes, pedidos))
 
 
-def _get_transfer_groups(db: Session, current_user: User):
-    cart = db.query(Cart).filter(
-        Cart.user_id == current_user.id,
-        Cart.status == CartStatus.ACTIVE,
-    ).first()
-    if not cart or not cart.items:
-        raise HTTPException(status_code=400, detail="El carrito está vacío")
-
-    groups = {}
-    for item in cart.items:
-        seller = item.product.seller
-        if not seller.cbu and not seller.alias_bancario:
-            raise HTTPException(
-                status_code=400,
-                detail=f"{seller.full_name} no configuró CBU ni alias bancario",
-            )
-        groups.setdefault(seller.id, {"seller": seller, "items": []})["items"].append(item)
-
-    return cart, list(groups.values())
-
-
-@router.get("/transfer-options", response_model=list[BankTransferOption])
-def get_transfer_options(
+@router.post("/{order_id}/payment-link", response_model=OrdenCreada)
+async def preparar_link_de_pago(
+    order_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Datos bancarios y monto por vendedor para el carrito activo."""
-    _, groups = _get_transfer_groups(db, current_user)
-    return [
-        BankTransferOption(
-            seller_id=group["seller"].id,
-            seller_name=group["seller"].full_name,
-            cbu=group["seller"].cbu,
-            alias_bancario=group["seller"].alias_bancario,
+    """Deja lista —o vuelve a devolver— la preferencia de una orden.
+
+    Es el reintento de `preparation: "pendiente"`. Es idempotente: si la orden
+    ya tiene su link, devuelve ese. Nunca crea otra orden ni otra intención de
+    pago.
+    """
+    orden = db.query(Order).filter(
+        Order.id == order_id, Order.buyer_id == current_user.id
+    ).first()
+    if not orden:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+    if orden.payment_method != MEDIO_MERCADO_PAGO:
+        raise HTTPException(
+            status_code=400, detail="Esta orden no se paga con Mercado Pago"
+        )
+
+    vendedor = db.query(User).filter(User.id == orden.seller_id).first()
+    try:
+        pago = await mp_preferencia.preparar_pago(db, orden, vendedor)
+    except mp_preferencia.NoSePudoPreparar as fallo:
+        return _respuesta_de(orden, vendedor, motivo=fallo.motivo)
+    return _respuesta_de(orden, vendedor, pago=pago)
+
+
+@router.get("/payment-options", response_model=list[OpcionDePago])
+def opciones_de_pago(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Con qué se puede pagar cada grupo del carrito, y cuánto.
+
+    Un carrito de dos vendedores se paga en dos pagos, y cada vendedor tiene
+    los medios que tiene: uno puede cobrar por Mercado Pago y el otro sólo por
+    transferencia. Esto es lo que la pantalla necesita para pedir una decisión
+    por grupo, en vez de suponer una sola para todo el carrito.
+
+    Un vendedor sin ningún medio ya no voltea la consulta entera con un 400:
+    viene con `methods` vacío y su motivo. Antes, un solo vendedor sin CBU
+    dejaba al comprador sin ver los datos de los otros, y con Mercado Pago en
+    el medio eso además sería falso: no tener CBU dejó de significar no poder
+    cobrar.
+    """
+    cart = carrito_activo(db, current_user)
+
+    opciones = []
+    for seller_id, grupo in grupos_del_carrito(cart).items():
+        medios = medios_disponibles(grupo.vendedor)
+        hay_transferencia = MEDIO_TRANSFERENCIA in medios
+        opciones.append(OpcionDePago(
+            seller_id=seller_id,
+            seller_name=grupo.vendedor.full_name,
             amount=sum(
                 (importe_de_linea(item.product.price, item.quantity)
-                 for item in group["items"]),
+                 for item in grupo.items),
                 Decimal(0),
             ),
-        )
-        for group in groups
-    ]
+            methods=medios,
+            reason=None if medios else motivo_sin_medios(grupo.vendedor),
+            cbu=grupo.vendedor.cbu if hay_transferencia else None,
+            alias_bancario=(
+                grupo.vendedor.alias_bancario if hay_transferencia else None
+            ),
+        ))
+    return opciones
 
 
-@router.post("/checkout/transfer", response_model=BankTransferCheckoutResponse)
+@router.post("/checkout/transfer", response_model=CheckoutResponse)
 def checkout_bank_transfer(
     checkout_data: CheckoutRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Crear una orden por vendedor, sin modificar el checkout de Mercado Pago."""
-    cart, groups = _get_transfer_groups(db, current_user)
+    """El mismo checkout, con el medio puesto: todo por transferencia.
 
-    # Antes de escribir nada: el destino tiene que existir en el padrón.
-    destino = resolver_destino(db, checkout_data.shipping_locality_id)
-
-    # Y las decisiones de traslado, TODAS, antes de la primera fila. Si una
-    # falla no se crea ninguna orden ni se toca stock.
-    elegidos = resolver_decisiones(
-        db, destino, grupos_del_carrito(cart), checkout_data.shipping_decisions
+    No tiene reglas propias. Antes tenía su copia de los totales, el stock, los
+    snapshots y la logística; dos copias de la misma regla son dos reglas que
+    se van a separar, y la que se olvide va a ser la que toque plata.
+    """
+    cart, destino, pedidos = preparar_checkout(
+        db, current_user, checkout_data, medio_unico=MEDIO_TRANSFERENCIA
     )
+    ordenes = crear_ordenes(db, current_user, cart, destino, pedidos, checkout_data)
+    _avisar(db, ordenes)
 
-    # Mismo control que el checkout comun, y por el mismo motivo: antes de
-    # que exista una sola fila.
-    for group in groups:
-        for item in group["items"]:
-            validar_total(
-                importe_de_linea(item.product.price, item.quantity),
-                f"El importe de «{item.product.name}»",
-            )
-        validar_total(
-            sum((importe_de_linea(i.product.price, i.quantity)
-                 for i in group["items"]), Decimal(0)),
-            "El total de la orden",
-        )
-
-    created = []
-
-    for group in groups:
-        seller = group["seller"]
-        items = group["items"]
-        subtotal = sum(
-            (importe_de_linea(item.product.price, item.quantity) for item in items),
-            Decimal(0),
-        )
-        order = Order(
-            order_number=generate_order_number(),
-            buyer_id=current_user.id,
-            seller_id=seller.id,
-            status=OrderStatus.AWAITING_TRANSFER_RECEIPT,
-            subtotal=subtotal,
-            shipping_cost=SIN_CARGO,
-            total_amount=subtotal,
-            transfer_cbu=seller.cbu,
-            transfer_alias_bancario=seller.alias_bancario,
-            transfer_account_holder=seller.full_name,
-            shipping_address_json={
-                "address": checkout_data.shipping_address,
-                "city": destino.name,
-                "province": destino.province_name,
-                "postal_code": checkout_data.shipping_postal_code,
-                "locality_id": destino.id,
-            },
-            shipping_locality_id=destino.id,
-            shipping_mode=(
-                MODO_TRANSPORTISTA if elegidos[seller.id] else MODO_PROPIO
-            ),
-            carrier_id=elegidos[seller.id].id if elegidos[seller.id] else None,
-            buyer_notes=checkout_data.notes,
-        )
-        db.add(order)
-        db.flush()
-
-        for cart_item in items:
-            product = cart_item.product
-            is_service = product.category.is_service if product.category else False
-            if not is_service and (product.stock or 0) < cart_item.quantity:
-                db.rollback()
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Stock insuficiente para {product.name}",
-                )
-            primary_image = next(
-                (image.url for image in product.images if image.is_primary),
-                None,
-            )
-            db.add(OrderItem(
-                order_id=order.id,
-                product_id=product.id,
-                product_name_snapshot=product.name,
-                product_image_snapshot=primary_image,
-                unit_price_snapshot=product.price,
-                quantity=cart_item.quantity,
-                total_price=importe_de_linea(product.price, cart_item.quantity),
-                **origen_de(product),
-            ))
-
-        created.append((order, seller))
-
-    cart.status = CartStatus.CONVERTED
-    db.commit()
-
-    for order, _ in created:
-        db.refresh(order)
-        try:
-            notify_order_placed(db, order)
-            notify_order_received(db, order)
-        except Exception as error:
-            print(f"Error enviando notificación: {error}")
-
-    return BankTransferCheckoutResponse(orders=[
-        BankTransferOrderResponse(
-            order_id=order.id,
-            order_number=order.order_number,
-            status=order.status.value,
-            seller_id=seller.id,
-            seller_name=order.transfer_account_holder,
-            cbu=order.transfer_cbu,
-            alias_bancario=order.transfer_alias_bancario,
-            amount=order.total_amount,
-        )
-        for order, seller in created
+    por_vendedor = {pedido.seller_id: pedido.seller for pedido in pedidos}
+    return CheckoutResponse(orders=[
+        _respuesta_de(orden, por_vendedor[orden.seller_id]) for orden in ordenes
     ])
 
 
@@ -511,27 +344,6 @@ def decide_transfer_receipt(
         amount=order.total_amount,
         transfer_receipt_url=order.transfer_receipt_url,
     )
-
-
-def origen_de(product) -> dict:
-    """El origen oficial de una publicación, congelado para la orden.
-
-    Se guarda el id y también el texto: el id conserva la relación con el
-    padrón y el texto deja la operación legible aunque el padrón cambie.
-    Sin localidad oficial no se inventa nada: quedan los tres en None.
-    """
-    localidad = product.locality if product.locality_id else None
-    if localidad is None:
-        return {
-            "origin_locality_id": None,
-            "origin_locality_name": None,
-            "origin_province_name": None,
-        }
-    return {
-        "origin_locality_id": localidad.id,
-        "origin_locality_name": localidad.name,
-        "origin_province_name": localidad.province_name,
-    }
 
 
 def traslado_de(order: Order) -> OrderShipping:
@@ -780,21 +592,12 @@ def update_order_status(
                     product.sales_count = max(0, (product.sales_count or 0) - item.quantity)
                     print(f"📦 Stock restaurado para {product.name}: +{item.quantity}")
         
-        # Procesar reembolso si la orden fue pagada
-        if old_status in [OrderStatus.PAID, OrderStatus.CONFIRMED]:
-            try:
-                process_refund = get_refund_processor()
-                
-                # Siempre reembolso TOTAL (100%) sin importar quién cancela
-                refund_result = process_refund(db, order, full_refund=True)
-                print(f"🔄 Reembolso TOTAL procesado")
-                
-                if refund_result["success"]:
-                    print(f"✅ Reembolso procesado: {refund_result}")
-                else:
-                    print(f"⚠️ No se pudo reembolsar: {refund_result['message']}")
-            except Exception as e:
-                print(f"❌ Error en reembolso: {e}")
+        # Acá había una llamada de reembolso al módulo heredado de cobro. No
+        # existe más: ese módulo devolvía dinero con el token del marketplace
+        # cuando el del vendedor no estaba, y TopGreen no administra plata de
+        # terceros. Hoy no hay ninguna orden pagada por la plataforma, así que
+        # no hay nada que devolver; cuando exista el cobro confirmado (MP-C),
+        # la devolución se diseña con su propia regla.
     
     db.commit()
     
@@ -881,26 +684,14 @@ def cancel_order(
     
     db.commit()
     
-    # Procesar reembolso si la orden estaba pagada.
-    # Las órdenes por transferencia bancaria quedan afuera: el dinero fue de
-    # cuenta a cuenta y TopGreen no lo administra, así que no hay nada que
-    # devolver desde acá. Cualquier reintegro lo arreglan comprador y vendedor.
-    es_transferencia = bool(order.transfer_cbu or order.transfer_alias_bancario)
-    refund_result = None
-    if not es_transferencia and order.status in [OrderStatus.CANCELLED, OrderStatus.REJECTED]:
-        try:
-            process_refund = get_refund_processor()
-            # Siempre reembolso TOTAL (100%) sin importar quién cancela
-            print(f"🔄 Procesando reembolso TOTAL (100%)")
-            refund_result = process_refund(db, order, full_refund=True)
-            if refund_result:
-                print(f"✅ Reembolso procesado: {refund_result}")
-            else:
-                print(f"⚠️ No se pudo procesar reembolso (puede que no haya pago)")
-        except Exception as e:
-            print(f"❌ Error al procesar reembolso: {e}")
-            import traceback
-            traceback.print_exc()
+    # Cancelar no devuelve dinero, y ahora lo dice en vez de aparentarlo.
+    #
+    # Por transferencia el dinero fue de cuenta a cuenta y TopGreen no lo
+    # administra: el reintegro lo arreglan comprador y vendedor. Por Mercado
+    # Pago todavía no hay ningún pago confirmado —eso llega con el webhook—,
+    # así que tampoco hay qué devolver. El camino que había acá llamaba al
+    # módulo heredado, que reembolsaba con el token del marketplace cuando el
+    # del vendedor faltaba; eso es exactamente administrar plata de terceros.
     
     # Enviar notificación de cancelación
     try:
@@ -908,4 +699,4 @@ def cancel_order(
     except Exception as e:
         print(f"Error enviando notificación: {e}")
     
-    return {"message": "Orden cancelada", "order_id": str(order.id), "refund": refund_result}
+    return {"message": "Orden cancelada", "order_id": str(order.id)}
