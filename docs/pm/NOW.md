@@ -106,10 +106,10 @@ PM confirmó build, sintaxis Python, los tres discriminantes por código y
 `diff --check`. Docker local sigue apagado, por lo que PM no repitió la suite
 integral. No hay preferencias ni cobros: `payments.py` sigue desmontado.
 
-**Tarea activa única:** Pieza MP-B, contrato plural y preferencias de Checkout
-Pro contra el doble local, con activación productiva cerrada hasta MP-C. La Dev
-sigue en **Extra**. Un vendedor sin vínculo MP conserva transferencia y
-catálogo; el checkout resuelve el medio por grupo de vendedor.
+**Tarea abierta entonces:** Pieza MP-B, contrato plural y preferencias de
+Checkout Pro contra el doble local, con activación productiva cerrada hasta
+MP-C. Un vendedor sin vínculo MP conserva transferencia y catálogo; el checkout
+resuelve el medio por grupo de vendedor.
 
 Primera entrega MP-B `c671a4c` e informe `1bc3d08`, **todavía no aceptados**.
 La arquitectura, bandera apagada, preferencia sin comisión y contrato plural
@@ -125,6 +125,18 @@ de estado referencia `old_status`, variable inexistente, al cancelar o rechazar
 y puede responder 500. La suite 84/84 informada usa la ruta específica de
 cancelación y no lo cubre. La Dev tiene una corrección acotada y una regresión
 por esa ruta; MP-C continúa cerrada.
+
+La Pieza MP-B queda **aceptada**: producto final `abebedb` e informe `c406a4b`.
+El caso 85 atraviesa las dos salidas terminales por `PATCH /orders/{id}/status`
+y cubre respuesta, persistencia, intención local, stock y cierre del pago. PM
+confirmó la corrección, la discriminación contra `fe4a0b2`, sintaxis Python y
+`diff --check`; Docker local sigue apagado, por lo que la ejecución 85/85 y las
+demás puertas son evidencia informada por la Dev.
+
+**Tarea activa única:** Pieza MP-C, verdad de pago por webhook firmado,
+transiciones idempotentes y política segura de stock/vencimiento contra el doble
+local. La Dev continúa en **Extra**. La bandera productiva permanece apagada:
+esta pieza no autoriza credenciales reales, Railway ni cobros.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 

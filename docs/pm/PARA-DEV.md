@@ -2070,3 +2070,109 @@ amplíes alcance ni abras MP-C.
 Después corré una sola vez la suite completa y las puertas proporcionales.
 Entregá producto e informe separados. Esfuerzo **Extra**. MP-B se acepta apenas
 este borde quede cerrado.
+
+## Tarea activa — MP-C: verdad del pago, estados y stock
+
+MP-B queda aceptada en `abebedb` con informe `c406a4b`. El arreglo de
+`current_status` y el caso 85 cierran el último borde; no lo vuelvas a trabajar.
+
+Esta pieza completa el núcleo seguro de Checkout Pro **contra el doble local**.
+La bandera productiva continúa apagada. No uses credenciales reales, no toques
+Railway, no agregues suscripciones, comisión, cuotas propias, conciliación
+contable, reembolsos manuales ni rediseño visual. Esfuerzo **Extra**.
+
+### 1. La única verdad es Mercado Pago
+
+Montá el tópico `payment` como Webhook, no IPN. La URL de preferencia no debe
+degradar la notificación firmada: usá la forma oficial que conserva Webhooks.
+Validá antes de procesar `x-signature`, `x-request-id` y `data.id` con HMAC
+SHA-256, comparación constante, secreto obligatorio fuera del repo y tolerancia
+temporal explícita. Firma ausente, mal formada, vencida o incorrecta no toca la
+base ni consulta cuentas ajenas.
+
+El cuerpo sólo enruta. Después de autenticar, consultá `/v1/payments/{id}` con
+el token OAuth descifrado del vendedor y tomá de esa respuesta el estado real.
+Antes de asociarlo verificá como mínimo: vendedor/cobrador vinculado,
+`external_reference`, preferencia, orden, moneda e importe `Decimal` exacto.
+Un ID de otro vendedor, monto o moneda alterados y referencias cruzadas no
+mueven nada. Token revocado o MP transitorio dejan respuesta reintentable, no
+un falso rechazo ni un 200 que pierda el evento.
+
+La vuelta `success`, `pending` o `failure` del navegador sólo informa que se
+está verificando y refresca el estado local. Ningún query param marca pagado.
+
+Documentación oficial contrastada por PM el 13/08:
+
+- https://www.mercadopago.com.ar/developers/es/docs/checkout-pro/payment-notifications
+- https://www.mercadopago.com.ar/developers/es/docs/checkout-pro/configure-back-urls
+
+### 2. Máquina idempotente y eventos fuera de orden
+
+Persistí sólo los identificadores y campos operativos necesarios, nunca el
+cuerpo crudo ni tokens. Una preferencia puede producir más de un intento: un
+rechazo inicial no puede tapar una aprobación posterior, y una notificación
+vieja no puede hacer retroceder un pago aprobado. Duplicar o paralelizar el
+mismo evento produce exactamente una transición y un efecto de stock.
+
+Como mínimo distinguí `pending`, `in_process`, `approved`, `rejected`,
+`cancelled/expired`, `refunded` y `charged_back` si la API de pagos los devuelve.
+No inventes equivalencias destructivas: pendiente/en proceso conserva la orden
+pagable; aprobado deja pago `APPROVED` y orden `PAID`; rechazo de un intento no
+cancela una preferencia todavía reutilizable. Para devolución o contracargo,
+dejá un estado local explícito y accionable, sin ejecutar un reembolso nuevo.
+
+Bloqueá las filas necesarias para que webhook, cancelación, vencimiento y
+reintento no compitan. El vendedor no puede confirmar ni enviar manualmente una
+orden MP no pagada; transferencia conserva sus transiciones aceptadas.
+
+### 3. Reserva y vencimiento sin sobreventa
+
+Al confirmar un grupo MP, reservá sus cantidades de forma atómica en la misma
+transacción local que crea la orden. Dos compradores por la última unidad dan
+una sola reserva; el otro recibe 4xx claro antes de cualquier preferencia. La
+reserva reduce disponibilidad pero no aumenta `sales_count`. La aprobación la
+consolida una sola vez; cancelar, expirar o terminar sin cobro la libera una
+sola vez. Servicios no reservan unidades.
+
+La preferencia lleva vigencia oficial (`expires`, inicio y fin) igual al plazo
+local. Definí un plazo razonable y configurable para los medios contractuales
+—crédito, débito y dinero en cuenta—, sin habilitar efectivo/ticket que exija
+esperas incompatibles. Una reserva vencida **no se libera sólo por el reloj**:
+el reconciliador consulta primero a MP con el vendedor correcto. Si hay pago
+aprobado, lo procesa; si no lo hay y la preferencia terminó, cierra y libera.
+Debe existir una entrada idempotente ejecutable para reconciliar vencidas; en
+esta pieza se prueba contra el doble, pero todavía no se programa en Railway.
+
+Si la API oficial no permite cerrar de forma segura el link ya emitido o aparece
+una carrera en la que se puede cobrar después de liberar stock, frená y
+documentá el caso con evidencia. No lo tapes con un reembolso automático ni
+habilites la bandera.
+
+### 4. Evidencia adversarial
+
+Extendé el doble para firmar Webhooks y devolver pagos consultables. Las nuevas
+regresiones deben ponerse rojas contra MP-B y cubrir, sin cantidades fijas del
+seed:
+
+1. firma válida; firma ausente, alterada, vencida y `data.id` cambiado;
+2. evento válido pero pago de otro vendedor, referencia/preferencia cruzada,
+   importe o moneda distintos;
+3. retorno del navegador falso no cambia nada; sólo webhook + consulta aprobada
+   marca `PAID`;
+4. duplicado, paralelo y fuera de orden: un único pago/efecto; rechazo seguido
+   de aprobación funciona y aprobación seguida de rechazo no retrocede;
+5. dos compradores por la última unidad: una reserva/orden MP y cero
+   preferencias para el perdedor; ventas no suben antes de aprobar;
+6. aprobación consolida una vez; cancelación o vencimiento conciliado libera
+   una vez; repetir cualquiera no altera stock;
+7. token revocado y MP caído devuelven condición reintentable, mantienen el
+   estado anterior y luego convergen al reintentar;
+8. comprador, vendedor y recarga ven pendiente, aprobado o problema de forma
+   coherente; nunca un éxito derivado de `back_url`.
+
+Con bandera apagada siguen siendo cero las preferencias y cobros reales. Corré
+suite completa una vez al final, hito, build, accesibilidad/contraste sólo si
+cambia DOM visible, migración ida/vuelta con datos, `alembic check` y
+`diff --check`. Entregá commit de producto e informe separado, incluyendo rojo
+contra MP-B, tabla de estados, campos persistidos, inventario de efectos y
+riesgos que impidan activar producción. Ahí vuelve a PM; no abras despliegue.

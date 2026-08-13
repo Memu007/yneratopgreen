@@ -5,6 +5,31 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-13 — Un retorno no prueba pago y Mercado Pago reserva stock
+
+La fuente de verdad de un cobro es una notificación Webhook autenticada seguida
+de una consulta del pago a la API de Mercado Pago con el token del vendedor.
+Los parámetros de retorno del navegador nunca cambian orden, pago ni stock.
+El webhook se configura como Webhook —no IPN— y valida `x-signature`,
+`x-request-id` y `data.id` con el secreto fuera del repositorio.
+
+Una orden de Mercado Pago reserva stock de forma atómica antes de exponer la
+preferencia. La reserva no incrementa ventas; se confirma una sola vez al pago
+aprobado y se libera una sola vez al terminar sin cobro. El vencimiento local no
+libera a ciegas: primero reconcilia con Mercado Pago para no vender dos veces ni
+cobrar algo cuyo stock ya fue liberado. La preferencia comparte el mismo plazo.
+
+Motivo: descontar recién al webhook puede cobrar sin mercadería; reservar sin
+vencimiento deja stock inmortal; confiar en la vuelta del navegador permite
+falsos pagos. La documentación oficial recomienda Webhooks firmados y permite
+definir vigencia de preferencias:
+https://www.mercadopago.com.ar/developers/es/docs/checkout-pro/payment-notifications
+https://www.mercadopago.com.ar/developers/es/docs/checkout-pro/additional-settings/term-of-preference
+
+La duración exacta y el mecanismo productivo de ejecución se validan contra el
+doble en MP-C. La bandera sigue apagada hasta probar el recorrido real; esta
+decisión no incorpora reembolsos automáticos, suscripciones ni comisión.
+
 ## 2026-08-13 — Mercado Pago es opcional por vendedor
 
 Un vendedor sin vínculo usable de Mercado Pago conserva publicaciones y puede
