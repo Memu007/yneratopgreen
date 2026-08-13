@@ -2,357 +2,308 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-Fecha: 2026-08-12. Tercer informe del día.
+Fecha: 2026-08-13.
 
-**Pieza MP-A entregada.** Un vendedor conecta su cuenta de Mercado Pago desde su
-panel, ve en qué estado está, la renueva y la desconecta. No se creó ni una
-preferencia, no se movió un peso, no toqué órdenes ni stock. `payments.py`
-sigue desmontado y la comisión sigue sin restaurarse.
+**Pieza MP-B entregada.** El carrito se resuelve por grupos de vendedor: cada
+grupo elige con qué paga, cada grupo es una orden, y cada orden por Mercado
+Pago tiene su preferencia de Checkout Pro y su fila de pago. **No se cobra
+nada**: la bandera sale apagada, y con ella apagada Mercado Pago no existe para
+el comprador. No se reserva ni se descuenta stock, ninguna vuelta del navegador
+marca nada como pagado, y no hay webhook.
 
-Antes de nada, dos cosas que quiero que leas aunque saltees el resto:
+Tres cosas antes del detalle, por si salteás el resto:
 
-- **Encontré y arreglé un agujero de producto que no estaba en tu lista**: al
-  volver de Mercado Pago, el vendedor caía en la portada sin ningún aviso. Ni
-  «listo» ni «falló». Punto 3.
-- **Rotar `MP_TOKEN_KEY` invalida todos los vínculos.** Está documentado y el
-  sistema lo maneja solo —cada vendedor pasa a «reconectar»—, pero es una
-  decisión de operación que alguien tiene que conocer antes de rotarla. Punto 7.
+- **Saqué `backend/app/api/payments.py`.** No estaba montado, pero `orders.py`
+  lo llamaba por import perezoso desde dos lugares, y uno de ellos —cancelar—
+  corre para cualquier orden que no sea por transferencia. Con MP-B esas
+  órdenes empiezan a existir. Punto 6.
+- **El checkout singular creaba varias órdenes y devolvía una sola.** Lo medí
+  contra `4d90a8b` antes de tocarlo. Punto 9.
+- **Queda un agujero de uso que no cerré**: si el comprador cierra el checkout,
+  ninguna pantalla le vuelve a ofrecer el link de pago de su orden de Mercado
+  Pago. El dato está y la ruta es idempotente; falta la pantalla. Punto 10.
 
 ## 1. El contrato, punto por punto
 
 | Lo que pediste | Cómo quedó |
 |---|---|
-| State aleatorio, de un solo uso, con vencimiento y ligado a quien lo pidió | Tabla `mp_oauth_states`: 32 bytes al azar, 15 minutos, se sella al usarse |
-| Callback repetido, vencido, alterado o de otra sesión no vincula | Cuatro rechazos distintos, con motivo propio cada uno |
-| Credenciales cifradas con clave fuera del repositorio | Fernet; sin clave la integración no se ofrece |
-| Nada recuperable en claro en base, respuesta, URL ni log | Verificado en los cuatro lugares |
-| La migración retira lo heredado sin conservar vínculos inseguros | Se van las dos columnas y además se invalida la cuenta y las fechas |
-| Una cuenta de MP no puede quedar en dos cuentas de TopGreen | Chequeo + índice único que lo sostiene desde SQL |
-| Refresh rota credenciales de manera atómica | Las dos y el vencimiento, en la misma transacción |
-| Vencido, revocado, clave incorrecta o respuesta inválida fallan cerrado | Los cuatro dan «reconectar» con 200, ninguno da 500 |
-| Desvincular borra todo lo local | Credenciales, cuenta, fechas y states pendientes |
-| Se elimina `manual-link` | No existe; el esquema publicado tampoco lo menciona |
-| Tres estados en el panel, sin secretos ni errores crudos | Tres más «no disponible», con la UI que ya estaba |
-| Configuración ausente no degrada el resto | `no_configurado`, y catálogo y productos siguen en 200 |
+| Un medio por grupo, y que un grupo pueda ir por MP y otro por transferencia | `payment_decisions`, una por vendedor; los grupos los deriva el servidor del carrito |
+| Decisión faltante, extra, ajena o no disponible rechaza todo | Cuatro rechazos con motivo propio, antes de la primera fila; el quinto —medio inventado— lo frena el esquema con 422 |
+| Respuesta plural y estable | `{"orders": [...]}`: una entrada por orden, con vendedor, medio, total congelado y estado de preparación |
+| Una preferencia y un pago por grupo MP | Una fila de `payments` por orden, sostenida por índice único |
+| Sin `marketplace_fee` | No viaja: ni el 5 % ni un cero |
+| `external_reference` inequívoca e idempotencia estable por orden | `topgreen-{order_number}` y `X-Idempotency-Key: topgreen-orden-{order_id}` |
+| Importe desde la orden, sin `float` recalculado | `Decimal` hasta el borde JSON, con ida y vuelta exacta comprobada |
+| Persistir lo mínimo | Identificadores, `init_point`, importe y estado nuestro; el cuerpo de MP no se guarda |
+| Campos de comisión y respuesta cruda que mienten | Se van los cuatro por migración, y `MP_COMMISSION_PERCENT` del código y de los dos ejemplos |
+| Interruptor apagado por defecto y en producción | `MP_CHECKOUT_HABILITADO=false` en `config.py`, `.env.example` y el ejemplo de producción |
+| La pantalla lo explica antes de confirmar | Aviso de N órdenes separadas y N pagos separados, arriba de los grupos |
+| El navegador no declara pagado | La orden queda «pendiente de confirmación»; volver a la URL de retorno no cambia orden ni pago |
 
-## 2. Las cinco decisiones que tomé
+## 2. Una sola regla de checkout
 
-**Se guarda la huella del state, no el state.** El valor viaja en una URL: queda
-en el historial del navegador, en el `Referer` y en el log de acceso de
-cualquier proxy. Lo que está en la base no tiene por qué servir para fabricar
-un callback, así que guardo `SHA-256` y comparo huellas.
+Había dos: `/orders/checkout` y `/orders/checkout/transfer`, cada uno con su
+copia de los totales, el stock, los snapshots y la logística. Dos copias de la
+misma regla son dos reglas que se van a separar, y la que se olvide va a ser la
+que toque plata.
 
-**El callback exige sesión.** Pediste que un callback «asociado a otra sesión»
-no vincule. Fui un paso más allá: si no hay sesión, tampoco. Es más estricto y
-tiene un costo que te debo decir: si al vendedor se le vence la sesión mientras
-está autorizando en Mercado Pago, vuelve, ve «entrá de nuevo y volvé a
-intentar» y tiene que repetir. Preferí eso a vincular una cuenta de cobro sin
-saber con certeza de quién es la ventana que volvió.
+Ahora la regla vive en `backend/app/services/checkout.py` y los dos endpoints
+traducen a HTTP y nada más:
 
-**Consumir el state es una sola sentencia SQL.** `UPDATE … WHERE usado_el IS
-NULL … RETURNING user_id`. Leer primero y sellar después dejaría una ventana en
-la que dos callbacks simultáneos con el mismo state vinculan los dos. Así
-compiten por la misma fila y la base deja pasar uno.
+- `preparar(...)` valida el carrito **entero** y no escribe nada: destino,
+  traslado, medio de pago, vínculo del vendedor, precios, cantidades, totales y
+  stock. Devuelve el plan.
+- `crear_ordenes(...)` escribe una orden por vendedor en **un solo commit**.
+- El checkout por transferencia llama a lo mismo con el medio puesto.
 
-**El estado descifra de verdad.** `estado_de()` no se conforma con que haya algo
-guardado: lo abre. Si la clave se rotó sin migrar, el vendedor ve «reconectar»
-en el acto y no «conectado» hasta que una venta falle. Cuesta descifrar dos
-textos cortos por consulta de estado; enterarse tarde cuesta más.
+`/orders/transfer-options` se fue y en su lugar está `/orders/payment-options`,
+que contesta lo que la pantalla necesita: por grupo, cuánto y con qué se le
+puede pagar. La diferencia no es de nombre. El viejo devolvía **HTTP 400 para
+todo el carrito** si un vendedor no tenía CBU; con Mercado Pago en el medio eso
+además es falso, porque no tener CBU dejó de significar no poder cobrar. Ahora
+ese grupo viene con `methods: []` y su motivo, y el comprador ve cuál de sus
+pedidos tiene que sacar.
 
-**Renovar nunca devuelve 500.** Cualquier falla —MP caído, permiso revocado,
-clave cambiada, respuesta rara— contesta 200 con el estado «requiere_reconexion»
-y un motivo de un enum nuestro. Un 500 no le dice nada a nadie y no se puede
-accionar; «reconectá tu cuenta» sí.
+## 3. La preferencia: qué viaja y qué no
 
-## 3. Un agujero que no estaba en la lista
+Uso la superficie estable de **preferencias** (`POST /checkout/preferences`), no
+Orders. Y saqué el SDK oficial de `requirements.txt`: no lo usa nadie —son dos
+llamadas HTTP con `httpx`— y su rama 3.x mueve el cobro justamente a Orders,
+que Mercado Pago publica como beta. Tener una dependencia para no usarla es
+decoración; fijarla en una versión que empuja a una API beta es peor.
 
-La vuelta de Mercado Pago es una **carga nueva de la página**, y el panel del
-vendedor es un modal: en esa carga no está montado. El código heredado atendía
-`?mp_linked=success` dentro del panel, así que el aviso lo escuchaba un
-componente que no existía en ese momento.
+Lo que viaja, medido sobre el cuerpo que capturó el doble (caso 79):
 
-Resultado real: el vendedor autorizaba en Mercado Pago, volvía a la portada de
-TopGreen y **no pasaba nada**. Ni un cartel, ni el panel abierto, ni forma de
-saber si había quedado vinculado, con `?mp=vinculado` colgado de la URL.
+- Los ítems y el importe salen de la **orden ya escrita** y sus snapshots. Si
+  el vendedor cambia el precio después de confirmar, la orden y el pago siguen
+  diciendo lo mismo.
+- Moneda `ARS` en cada ítem.
+- `external_reference: topgreen-{order_number}`, sin datos de nadie.
+- `back_urls` armadas con la configuración y el número de orden.
+- **No viaja `notification_url`** porque no está configurada: mandar una que no
+  atiende nadie es pedirle a Mercado Pago que reintente contra el vacío.
+- **No viaja `marketplace_fee`.** Ni en cero: lo que no se manda no se discute.
+- Autoriza el access token **del vendedor**, descifrado en el momento, usado y
+  olvidado. No lo devuelve ninguna ruta y no aparece en ningún log.
 
-Lo pasé al encabezado, que sí está siempre montado: muestra el aviso, limpia la
-URL y vuelve a abrir el panel. Con dos cuidados: espera a que la sesión termine
-de restaurarse —al montar todavía no se sabe quién es— y si resulta que no hay
-sesión no abre nada, porque el panel sin usuario no tiene qué mostrar.
+Lo que se guarda: el id de preferencia, el `init_point`, la referencia, el
+importe exacto y nuestro estado. El cuerpo de la respuesta de Mercado Pago no
+se guarda —lo que no se guarda no se filtra— y las columnas `commission_amount`,
+`commission_percent`, `seller_amount` y `mp_response` se fueron por migración.
 
-## 4. Dos cosas más que aparecieron
+**Reintentar no duplica**, y lo sostienen tres cosas juntas: la clave de
+idempotencia derivada de la orden, el índice único de `payments.order_id`, y el
+manejo explícito del choque —si dos pedidos simultáneos llegan los dos hasta el
+`INSERT`, el que pierde se queda con el que ganó en vez de devolver un 500—. El
+caso 77 dispara cinco pedidos a la vez sobre la misma orden: un solo link, una
+sola preferencia, una sola fila.
 
-**Tres colores heredados no llegaban a 4,5:1.** El botón de desvincular
-(`#ef4444`, 3,28:1 sobre el degradado de la sección) y dos párrafos grises
-(`#6b7280`, 4,21:1). La sección estuvo fuera del árbol desde antes de que
-existieran las puertas de accesibilidad y contraste, así que nunca se midieron.
-Los oscurecí a `#b91c1c` (5,64:1) y `#4b5563` (6,59:1). Mismos tamaños, mismos
-pesos, misma estructura: no rediseñé nada, corregí tres valores.
+## 4. El interruptor
 
-**El caso 20 exigía que `/mp-oauth/status` diera 404.** Era correcto mientras el
-módulo estaba desmontado. Sostenerlo hoy sería exigir que la parte que aceptaste
-no exista, así que ese caso pasó a comprobar que las rutas de **cobro** siguen
-en 404 y que el vínculo contesta su estado sin exponer credenciales. El
-inventario completo de la superficie está en el caso 67.
+`MP_CHECKOUT_HABILITADO` arranca en `false` en el código, en `.env.example` y en
+el ejemplo de producción. Con la bandera apagada:
 
-## 5. El SDK: no lo toqué, y por qué
+- `payment-options` no ofrece el medio;
+- pedirlo a mano da 400 con motivo;
+- el reintento del link responde «deshabilitado»;
+- el doble no recibe ninguna preferencia y no queda ninguna fila de pago;
+- la venta por transferencia funciona igual, con sus datos bancarios.
 
-Pediste verificar si el SDK fijado se usa en esta pieza. **No se usa.** El
-intercambio OAuth son dos POST a un endpoint de tokens; lo hace `httpx`, que ya
-es una dependencia del proyecto.
+La suite lo enciende **sólo contra el doble local** (`scripts/smoke.sh`), y el
+caso 80 lo prueba apagándolo dentro de la propia aplicación, con su grafo de
+dependencias: levantar otra API en otro puerto probaría otra cosa.
 
-Dejé `mercadopago==2.2.1` como estaba. Subir a 3.5.0 no aporta una API que esta
-pieza use, y dejaría en el árbol un `payments.py` escrito contra 2.x que ni
-siquiera importaría. Ese salto va con la pieza que reescriba el cobro, y ahí el
-piso es **3.4.0**: hasta esa versión la validación de firma de webhooks del
-propio SDK comparaba segundos contra un reloj en milisegundos.
+## 5. La pantalla
 
-## 6. Esquema final
+El paso de pago dejó de ser un radio único de adorno. Ahora, por cada grupo:
+quién cobra, cuánto, y los medios que ese vendedor puede recibir hoy. Si un
+grupo tiene un solo medio posible viene marcado —elegir la única opción que
+existe no es una decisión—; si tiene dos, no se presupone ninguna.
 
-En `users` se van `mp_access_token` y `mp_refresh_token` (`VARCHAR(500)`, en
-claro) y quedan:
+Arriba de todo, cuando el carrito tiene más de un vendedor, dice **antes de
+confirmar** que se van a crear N órdenes separadas, que cada una se paga por
+separado y que cada vendedor entrega lo suyo.
+
+El tercer paso ya no se llama «Comprobante» sino «Órdenes», porque ahora es una
+cola: cada orden con su referencia, su monto y su medio. Las de transferencia,
+con CBU, alias, titular y el comprobante para adjuntar. Las de Mercado Pago,
+con el link que abre en otra pestaña y esta frase, que es la que importa:
+
+> Cobra {vendedor} en su cuenta de Mercado Pago. La orden queda **pendiente de
+> confirmación**: volver de esa pantalla no confirma el pago, lo confirma
+> Mercado Pago.
+
+Si la preferencia no se pudo preparar, la orden aparece igual, con su motivo y
+un botón de reintento que no crea otra orden ni otro pago.
+
+## 6. Lo que saqué, y por qué
+
+**`backend/app/api/payments.py`** (857 líneas). No estaba montado desde antes de
+MP-A, pero seguía siendo alcanzable: `orders.py` lo importaba en caliente desde
+`get_refund_processor()` y lo llamaba en dos lugares. Uno es el cambio de
+estado; el otro es **cancelar**, y esa rama corre para cualquier orden que no
+sea por transferencia. Hasta ayer no existía ninguna. Con MP-B empiezan a
+existir.
+
+Qué hacía ese código si lo hubieran llamado: buscaba el pago, leía
+`seller.mp_access_token` —columna que MP-A borró, o sea `AttributeError`— y, si
+el vendedor no tenía token, **reembolsaba con el token del marketplace**. Eso es
+exactamente administrar plata de terceros. Además escribía en las cuatro
+columnas que esta pieza elimina, así que después de la migración era código que
+no podía funcionar.
+
+Cancelar ya no devuelve dinero, y ahora lo dice en vez de aparentarlo: por
+transferencia el dinero fue de cuenta a cuenta y nosotros no lo administramos;
+por Mercado Pago todavía no hay ningún pago confirmado. La respuesta de cancelar
+ya no trae el campo `refund`, que era siempre nulo y no lo leía nadie.
+
+También se fueron `MP_COMMISSION_PERCENT` (código y los dos ejemplos),
+`mercadopago==2.2.1` de `requirements.txt`, el esquema
+`BankTransferCheckoutResponse` y el helper `_get_transfer_groups`.
+
+## 7. Migración
+
+`e4c72a9b1f83`. Agrega `orders.payment_method` —las órdenes anteriores quedan en
+NULL, que es «no informado» y no «transferencia»; la única excepción son las que
+guardaron snapshot bancario, que es dato duro y no conjetura—, borra las cuatro
+columnas de `payments` y convierte su índice de `order_id` en único. Va y vuelve
+con datos adentro, y `alembic check` no encuentra diferencias.
+
+## 8. Puertas
+
+Todo contra la base local y el doble; ninguna credencial real.
+
+| Puerta | Comando | Resultado |
+|---|---|---|
+| Suite | `node scripts/smoke.mjs` | **81 de 81**, sobre base recién migrada y sembrada |
+| Hito | `npm run hito` | 6 de 6 pasos encadenados |
+| Accesibilidad | `npm run a11y` | 56 de 56 pantallas, 0 violaciones bloqueantes |
+| Contraste | `npm run contraste` | 40 de 40 mediciones, 6120 textos, 0 incumplimientos |
+| Build | `npm run build` | `tsc` y `vite build` limpios |
+| Migración | `alembic downgrade -1`, `upgrade head`, `alembic check` | Va y vuelve con datos adentro; «No new upgrade operations detected» |
+| Espacios | `git diff --check` | 0 espacios reales al final de línea y 0 marcadores de conflicto |
+
+`git diff --check` marca 992 líneas, y todas son el CR de fin de línea de los
+archivos CRLF del repositorio: el mismo ruido que te reporté la vez pasada. Lo
+que la puerta busca de verdad —un espacio o un tabulador al final del texto, y
+los marcadores de conflicto— da **cero** en las dos cuentas.
+
+Los siete colores nuevos de la pantalla de pago están todos arriba de 4,5:1
+—el más bajo es el aviso de «este vendedor no puede recibir pagos», 5,18:1, que
+es el mismo par que ya usaban los errores—. El paso de pago lo miden las dos
+puertas; la cola de órdenes no, porque medirla exigiría que una puerta de
+auditoría confirmara una compra, y esas puertas no escriben. Sus colores son
+los mismos tokens ya medidos más el botón de pago (blanco sobre `#2d5016`,
+9,25:1) y el de reintento (`#2d5016` sobre blanco, 9,25:1).
+
+## 9. El rojo contra la versión anterior
+
+Volví el producto a `4d90a8b` —la suite nueva quedó en su lugar— y bajé la base
+un paso, para correr las propiedades de esta pieza contra el código anterior.
+Siete observaciones; dos me importan de verdad:
 
 ```
-mp_user_id                VARCHAR(50)  UNIQUE   -- una cuenta, un vendedor
-mp_access_token_cifrado   TEXT                  -- Fernet
-mp_refresh_token_cifrado  TEXT                  -- Fernet
-mp_token_expires_at       TIMESTAMP
-mp_linked_at              TIMESTAMP
-mp_requiere_reconexion    BOOLEAN NOT NULL DEFAULT false
+GET  /orders/payment-options            → HTTP 404
+POST /orders/checkout                   → HTTP 200, devolvió 1 orden y escribió 2
+     medio de la orden en la respuesta  → null
+     preferencias que recibió el doble  → 0
+POST /orders/{id}/payment-link          → HTTP 404
+checkout con una decisión de pago de un vendedor ajeno
+     y ninguna de los dos del carrito   → HTTP 200; órdenes escritas: 2
+columna orders.payment_method           → no existe
 ```
 
-Y la tabla nueva:
+La segunda línea es el defecto que abriste: **el carrito de dos vendedores
+escribía dos órdenes y devolvía una**. La anteúltima es el que encontré
+armando el caso 78: el checkout viejo **ignoraba `payment_decisions` por
+completo**, así que una decisión inyectada no fallaba, simplemente no existía.
 
-```
-mp_oauth_states(id, user_id → users ON DELETE CASCADE,
-                state_hash UNIQUE, creado_el, expira_el, usado_el)
-```
+Cada una de esas líneas es hoy una aserción de un caso: 75 y 81 miran la
+respuesta plural y los medios por grupo, 76 y 77 el link y su reintento, 78 los
+rechazos antes de escribir, 79 el cuerpo que viaja, 80 la bandera apagada.
 
-**La migración no migra el contenido y frena si encuentra algo.** Un token que
-estuvo en claro no se «convierte» en seguro: ya estuvo expuesto. Se descarta, y
-se invalida el vínculo entero —cuenta y fechas incluidas— para no dejar a nadie
-en «conectado» sobre una credencial que no existe. Si la base trae tokens no
-nulos, `upgrade()` **se detiene y no borra nada**, con un mensaje que dice
-cuántos son (nunca cuáles, ni de quién) y qué hacer. Recién con
-`MP_MIGRACION_DESCARTAR_TOKENS=1` descarta.
+## 10. Riesgos y lo que no hice
 
-En nuestra base había **cero**. Lo verifiqué antes de escribir la migración.
+Los seis primeros son consecuencia de haber frenado donde pediste. El último
+no es mío pero te lo señalo.
 
-## 7. Riesgos residuales
+1. **La orden por Mercado Pago no tiene quién la mueva.** Nace colocada y ahí
+   se queda: sin webhook y sin consulta de estado, el pago local queda
+   `PENDING` para siempre. El comprador ve «pendiente de confirmación», que es
+   verdad; el vendedor ve una orden colocada y nada que le diga si le pagaron.
+   Es la razón principal por la que la bandera va apagada.
 
-Los digo yo antes de que los encuentres vos.
+2. **El aviso al vendedor sale al crear la orden, no al cobrarla.** Es lo mismo
+   que ya pasaba con transferencia, pero con Mercado Pago la distancia entre
+   «orden colocada» y «plata en la cuenta» la controla un tercero. MP-C tiene
+   que agregar el aviso de pago confirmado; hasta entonces, un vendedor no
+   debería despachar por una notificación de MP-B.
 
-1. **Desvincular no le revoca el permiso a la aplicación del lado de Mercado
-   Pago.** Borra todo lo local, que es lo que está bajo nuestro control, y la
-   pantalla le dice al vendedor que lo revoque desde su cuenta. No inventé un
-   endpoint de revocación porque no pude abrir la documentación para
-   confirmarlo. **Averigualo vos**: si existe, es un agregado chico.
-2. **El log de acceso del servidor sí ve el `code` y el `state`**, porque van en
-   la URL del callback. Es inherente a OAuth y por eso el state es de un solo
-   uso y dura 15 minutos. Lo que sí controlamos —lo que registra nuestro
-   código— está medido: durante un rechazo de MP la aplicación escribe una sola
-   línea, «Mercado Pago rechazó el pedido de tokens (HTTP 401)», sin cuerpo, sin
-   token y sin `client_secret`.
-3. **Rotar `MP_TOKEN_KEY` invalida todos los vínculos a la vez.** El sistema no
-   se rompe: cada vendedor ve «reconectar». Pero es una molestia colectiva y
-   hay que avisar antes. Está escrito en `SETUP_PAYMENTS.md`.
-4. **Un intento de vinculación por vendedor.** Pedir la URL invalida el intento
-   anterior. Si alguien abre dos pestañas, la primera deja de servir y ve «el
-   pedido venció o ya se había usado». Es el precio de que un state viejo no
-   quede vivo.
-5. **`MP_COMMISSION_PERCENT` sigue en 5.0.** Sólo la lee el módulo de cobro, que
-   no está montado, así que hoy no hace nada. Ponerla en cero es una línea, pero
-   es de la pieza que monte el cobro y no de ésta. Dejé la nota en el `.env.example`.
-6. **El vínculo no habilita cobrar.** Que un vendedor aparezca «conectado» no
-   significa que se pueda pagar con tarjeta: eso no existe todavía. Si esto se
-   le muestra a la clienta, que quede claro.
+3. **El link de pago no se recupera desde «Mis compras».** Si el comprador
+   cierra el checkout, la cola de órdenes desaparece de la pantalla. El dato no
+   se pierde —`POST /orders/{id}/payment-link` devuelve el mismo link y es
+   idempotente— pero ninguna pantalla lo ofrece. Es chico y no lo metí acá para
+   no mezclarlo con la pieza, pero **antes de encender la bandera hay que
+   cerrarlo**: si no, una compra interrumpida no se puede terminar de pagar.
 
-## 8. Lo que no hice
+4. **No se reserva ni se descuenta stock.** Freno respetado. Consecuencia
+   honesta: dos compradores pueden crear dos órdenes por la misma unidad y los
+   dos podrían pagar. Con la bandera apagada no hay pagos y hoy no hay daño; la
+   política de stock es condición para encenderla.
 
-No monté `payments.py`, no lo refactoricé, no restauré el 5 %, no creé
-preferencias, no cambié estados de órdenes ni stock, no agregué suscripciones,
-custodia, 1:N, conciliación ni reembolsos. No hay una sola credencial real de
-Mercado Pago en el repositorio ni en mi entorno: los valores locales son
-inventados y apuntan a un doble que levanta la propia suite.
+5. **El importe viaja como número JSON.** Es el único lugar donde el dinero
+   deja de ser `Decimal`, y es inevitable: el cuerpo es JSON. Está acotado a la
+   serialización —ahí no se suma ni se multiplica nada— y se comprueba que la
+   ida y vuelta sea exacta; si alguna vez no coincidiera, la preferencia no se
+   crea.
 
-## 9. La evidencia
+6. **`orders.payment_method` queda NULL en las órdenes viejas.** Elegí no
+   rellenar salvo donde hay evidencia (snapshot bancario). Si más adelante
+   agrupás por medio, esas órdenes van a caer en «no informado», que es lo
+   correcto.
 
-Diez casos nuevos en la suite —del 62 al 71— y uno modificado. Todos corren
-contra un doble local de Mercado Pago (`scripts/lib/mp-doble.mjs`) que levanta
-la propia prueba.
+7. **`docs/pm/PROJECT.md` sigue diciendo «split payment 5 % para la plataforma,
+   95 % para el vendedor», configurable por `MP_COMMISSION_PERCENT`.** Esa
+   variable ya no existe y el modelo contradice tu propio
+   `ALCANCE-Y-LIMITES.md`, que dice comisión de marketplace cero y que TopGreen
+   no administra fondos de terceros. No lo toqué porque el modelo de negocio es
+   tuyo, pero alguien lo va a leer y va a creerle.
 
-| # | Qué prueba |
+**Lo que no hice, a propósito:** webhook, consulta de estado a Mercado Pago,
+transiciones de orden por pago, reserva o descuento de stock, credenciales
+reales, y encender la bandera en ningún lado. Tampoco abrí un pull request.
+
+## 11. Inventario
+
+**Nuevos**
+
+| Archivo | Qué es |
 |---|---|
-| 62 | Vínculo completo: Fernet en la base, huella del state, respuesta sin credenciales, columnas en claro eliminadas |
-| 63 | Callback repetido, alterado, sin sesión y de otra sesión: cuatro motivos, cero escrituras |
-| 64 | Una cuenta de MP en dos vendedores: rechazo por API y por índice único |
-| 65 | Renovación con rotación de las dos credenciales; revocación → «reconectar»; se sale reconectando |
-| 66 | MP rechaza, contesta basura, contesta incompleto y no contesta: cuatro motivos, nada escrito, nada filtrado |
-| 67 | `manual-link` no existe; tres rutas de cobro en 404; el esquema publica 5 rutas de vínculo y ninguna de pago |
-| 68 | Sin configuración: `no_configurado`, vincular da 503, catálogo y productos siguen en 200 |
-| 69 | Un state nacido vencido y un rechazo de MP: lo que registra la aplicación no tiene token, ni `client_secret`, ni el texto de MP |
-| 70 | Recorrido del vendedor en escritorio y celular: desconectado → autorizar → conectado → desvinculado |
-| 71 | Clave de cifrado rotada: «requiere_reconexion» con motivo propio, sin 500 |
+| `backend/app/services/checkout.py` | La regla del checkout, una sola vez: grupos, medios, validación completa y creación en un commit |
+| `backend/app/services/mp_preferencia.py` | La preferencia de Checkout Pro de una orden: qué viaja, qué se guarda, por qué reintentar no duplica |
+| `backend/alembic/versions/20260813_0100_e4c72a9b1f83_...py` | Medio por orden y la fila de pago sin comisión que mienta |
 
-Un detalle del 69, porque hace a lo que se puede afirmar: mido **lo que registra
-la aplicación**, no lo que registra el arnés de prueba. El cliente de pruebas
-escribe cada URL que pide, con el state adentro; eso es ruido de la medición y
-no dice nada del producto. El caso informa cuántos registros ajenos dejó afuera.
+**Modificados**
 
-También toqué `scripts/smoke.sh`: copia `.env.example` sobre `backend/.env`, así
-que sin agregarle nada la integración quedaría apagada y los diez casos
-fallarían en cualquier máquina que no sea la mía. Ahora escribe la
-configuración del doble y **genera una clave Fernet nueva en cada corrida**.
-
-### Una corrección sobre mi propia evidencia
-
-Vengo informándote «`diff --check` limpio» todos los ciclos. **Lo estaba
-corriendo después del commit**, con el árbol ya limpio: `git diff` vacío no
-marca nada, así que la comprobación no comprobaba nada.
-
-Corrido como corresponde —sobre los cambios sin commitear— marca 530 líneas, y
-las 530 son el `CR` de fin de línea de los archivos CRLF, que es como está
-buena parte de este repositorio desde antes de que yo llegara. No lo introduce
-este cambio: `git show 2220e94 --check`, el contrato monetario que te informé
-«limpio», marca 38 por exactamente lo mismo.
-
-Lo que la comprobación busca de verdad sí está verificado y en cero: **ninguna**
-línea agregada termina en espacio o tabulación, y **ningún** marcador de
-conflicto. Los seis archivos nuevos tampoco tienen espacios al final.
-
-No cambia ninguna conclusión técnica de los informes anteriores. Cambia el peso
-de una línea de evidencia que te di nueve veces, y preferí decírtelo yo.
-
-### Los inventarios no cambian, y es a propósito
-
-No agregué recorridos permanentes: la sección de Mercado Pago vive **adentro**
-de pantallas que los inventarios ya exigen —«panel del vendedor» en
-accesibilidad, «perfil vendedor» en contraste—, así que se audita sola sin
-sumar entradas. Los números siguen siendo 28 pantallas × 2 medidas = 56 en
-accesibilidad y 20 × 2 = 40 en contraste. Que no cambien no es que no se mida:
-es que ahora esas dos pantallas tienen adentro algo que antes no tenían, y por
-eso aparecieron los tres colores del punto 4.
-
-### El freno de la migración, probado
-
-No alcanza con escribirlo. Lo corrí en una base aparte, `topgreen_freno`,
-creada para esto y borrada después:
-
-1. Base en la revisión anterior, con un usuario que tiene
-   `mp_access_token = 'APP_USR-token-de-prueba-en-claro'`.
-2. `alembic upgrade head` → **se detiene**: «Hay 1 usuario(s) con credenciales
-   de Mercado Pago en claro… si alguna es real, avisale a esa persona que va a
-   tener que revincular». Dice cuántos, no cuáles.
-3. Consulto la fila: **el token sigue ahí**. El freno no borró nada.
-4. `MP_MIGRACION_DESCARTAR_TOKENS=1 alembic upgrade head` → pasa, y las dos
-   columnas en claro dejan de existir.
-
-## 11. Los tres defectos que encontraste en `5aee032`
-
-Los tres eran ciertos, los tres estaban en la parte que más importa —la que
-protege credenciales ajenas— y ninguno lo había visto yo. Van arreglados de
-raíz, no en el borde.
-
-**1. El freno destructivo se abría con cualquier texto.** Escribí
-`if not os.environ.get('MP_MIGRACION_DESCARTAR_TOKENS')`, o sea que `=0`,
-`=false` o un dedazo autorizaban un borrado irreversible de credenciales de
-terceros. Ahora es igualdad exacta con `1`. Probado con cinco valores que **no**
-son uno —sin definir, vacía, `0`, `false`, `11`—: los cinco frenan, ninguno toca
-la credencial y ninguno deja la migración a medias. Sólo con `1` avanza.
-
-**2. Una clave Fernet mal formada podía terminar en 500.** Tu diagnóstico era
-exacto, incluido que el caso 71 no lo discriminaba: usa otra clave *válida*, así
-que sólo ejercita `NoSeDescifra` y nunca pasa por `SinClaveDeCifrado`.
-
-Lo arreglé donde nace y no donde explota: `hay_clave()` ahora comprueba que la
-clave **sirva**, no que esté escrita. Con eso `integracion_configurada()` dice
-la verdad y las tres puertas fallan cerradas solas: estado `no_configurado`,
-vincular `503`, renovar `200` con motivo. `refresh_token_de()` atrapa además
-`SinClaveDeCifrado`, que es el cinturón después del tirante.
-
-Una consecuencia que quiero que veas explícita: con la clave rota, un vendedor
-que **estaba** vinculado pasa a ver «no disponible», no «reconectar». Es
-correcto —el problema es de la plataforma, no de su cuenta, y reconectar no lo
-arreglaría— pero es una diferencia de trato que conviene que esté decidida y no
-que pase de casualidad.
-
-**3. Cancelar no gastaba el `state`.** Volver cancelado es volver: ese intento
-ya se usó. Ahora el `state` se consume apenas llega la vuelta, sea cual sea el
-resultado, y antes de mirar si vino con error. Reusarlo después con un código
-bueno devuelve `estado_invalido` y no escribe una sola credencial.
-
-Y se fueron los dos helpers JWT muertos de `core/security.py`. Tenías razón en
-el fondo del planteo: dejar una segunda implementación del `state`, aunque no
-la llame nadie, contradice la propiedad que la pieza afirma.
-
-### Dos cosas del arnés, que no son del producto
-
-- **`pedirCrudo` no tenía el reintento de socket** que sí tiene `apiRequest`.
-  Con un guion que tarda diez segundos, el servidor cierra la conexión ociosa y
-  el pedido siguiente muere sin haber llegado. Mismo reintento, acotado a
-  errores de socket: cualquier HTTP pasa derecho.
-- **`correrAlembic` no sabía pasar variables de entorno**, que es justo lo que
-  el caso 74 necesita. Ahora viajan con `-e`, como en `docker exec`, y también
-  en el entorno del proceso para que funcione con la API nativa.
-
-### Y un pozo que me hice solo
-
-El caso 69 y el 71 fallaron una corrida entera con «Mercado Pago no respondió»
-teniendo el doble arriba. La causa: `execFileSync` bloquea el hilo de Node, y el
-doble vive en **ese mismo proceso**. Mientras el guion corría, el doble no
-llegaba a atender la conexión que el propio guion le abría. Lo anoto porque es
-la clase de falla que se lee como problema del producto y no lo es.
-
-## 12. Estado de las puertas
-
-Todo lo que sigue está medido **sobre el código que estás leyendo**, después
-del último cambio, con la base recreada y sembrada desde cero.
-
-| Puerta | Resultado |
+| Archivo | Qué cambió |
 |---|---|
-| Suite completa (`node scripts/smoke.mjs`) | **74/74**, cero fallas |
-| `npm run hito` | **6/6** pasos encadenados |
-| Accesibilidad (`npm run a11y`) | **56/56** pantallas, cero violaciones bloqueantes |
-| Contraste (`npm run contraste`) | **40/40** mediciones, cero textos por debajo del mínimo |
-| `npm run build` | verde |
-| Sintaxis Python | verde |
-| Migración ida y vuelta + `alembic check` | verde, dentro de la suite (caso 55) |
-| Freno de la migración | probado con cinco valores que no son «1» (caso 74) |
-| Espacios al final de línea agregados / marcadores de conflicto | cero / cero |
+| `backend/app/api/orders.py` | Contrato plural, `/payment-options`, `/{id}/payment-link`, sin el reembolso heredado |
+| `backend/app/schemas/orders.py` | `PaymentDecision`, `OpcionDePago`, `OrdenCreada`, `CheckoutResponse` |
+| `backend/app/models/order.py` | `payment_method` |
+| `backend/app/models/payment.py` | Cuatro columnas menos, `order_id` único |
+| `backend/app/core/config.py` | Interruptor, URL de aviso, sin comisión |
+| `backend/app/services/mp_vinculo.py` | `access_token_de`: descifra, se usa y se olvida |
+| `backend/app/services/logistica.py` | `origen_de`, que estaba en el endpoint y ahora es de la logística |
+| `src/components/Checkout/CheckoutModal.tsx` y su CSS | Medio por grupo, aviso multivendedor, cola de órdenes |
+| `backend/requirements.txt` | Sin el SDK de Mercado Pago |
+| `backend/.env.example`, `backend/.env.production.example` | Interruptor apagado, URL de aviso vacía, sin comisión |
+| `scripts/smoke.mjs` | 81 casos: 7 nuevos y 8 al día |
+| `scripts/lib/mp-doble.mjs` | El doble sirve preferencias, con idempotencia real y cuentas con guion |
+| `scripts/smoke.sh`, `scripts/hito.mjs` | El interruptor para la suite; el hito elige medio por grupo |
+| `docs/API_ENDPOINTS.md`, `docs/SETUP_PAYMENTS.md` | Puestos al día con lo que hay |
 
-**Aritmética de los inventarios.** No agregué recorridos permanentes: la sección
-de Mercado Pago vive adentro de pantallas que los inventarios ya exigían
-—«panel del vendedor» en accesibilidad, «perfil vendedor» en contraste—, así que
-se audita sola sin sumar entradas. Accesibilidad: 28 pantallas × 2 medidas = 56.
-Contraste: 20 pantallas × 2 medidas = 40. Los dos números son los mismos de
-antes de esta pieza, y eso es lo correcto: lo que cambió es que esas dos
-pantallas ahora tienen adentro algo que antes no tenían. Por eso aparecieron los
-cuatro colores.
+**Borrado**
 
-La suite pasó de 61 a **74 casos**: trece nuevos (62 a 74) y uno modificado, el
-20, que exigía 404 en el vínculo cuando el vínculo no existía.
-
-### Sobre los colores: van cuatro
-
-Todos de la misma sección y por la misma razón: estuvo fuera del árbol desde
-antes de que existieran las puertas de accesibilidad y contraste, así que
-ninguno de sus colores se había medido nunca. El último es el encabezado —blanco
-sobre `#0ea5e9`, 2,77:1— y lo resolví con el azul que la propia sección ya usaba
-en su botón (5,93:1 y 7,56:1 en los extremos del degradado): no agregué paleta
-ni cambié el aspecto.
-
-Vale la pena que quede anotado: **axe no encuentra ninguno de los cuatro**. No
-resuelve gradientes, así que los reporta como «incompletos» y sigue. Los cuatro
-los cazó `contraste.mjs`, que es exactamente para lo que existe.
-
-### Una corrida roja que no fue del producto
-
-Antes de la corrida buena hubo una con cuatro rojos, y la explico porque queda
-en los logs. La API y Vite se cayeron a mitad de camino —los verifiqué después,
-los dos en `000`—: eso volteó el caso 70, que se quedó sin navegador, y el 71,
-que no pudo hablar con la API. Los casos 72 y 73 murieron en cascada con
-`EADDRINUSE`, y ahí sí había una fragilidad mía: en el `finally`, desvincular
-iba antes de cerrar el doble local, así que una limpieza fallida dejaba el
-puerto tomado y hundía al caso siguiente por un problema ajeno. Ahora el doble
-se cierra primero y siempre; la limpieza de datos va después y no puede tumbar
-nada.
+| Archivo | Por qué |
+|---|---|
+| `backend/app/api/payments.py` | 857 líneas alcanzables desde cancelar, que reembolsaban con el token del marketplace y escribían en columnas que ya no existen |
