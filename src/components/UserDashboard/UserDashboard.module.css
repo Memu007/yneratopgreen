@@ -1552,3 +1552,50 @@
   font-size: 0.82rem;
   color: #4a5340;
 }
+
+/* --- el pago que quedó a medias, en Mis compras -------------------------- */
+
+.pagoPendiente {
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: #f6f8f3;
+  border: 1px solid #d8e2cf;
+  border-radius: 10px;
+}
+
+.pagoPendienteTexto {
+  margin: 0 0 10px;
+  color: #24301c;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.pagoPendienteBoton {
+  padding: 10px 18px;
+  background: #2d5016;
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pagoPendienteBoton:hover:not(:disabled) {
+  background: #244011;
+}
+
+.pagoPendienteBoton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pagoPendienteError {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  background: #fff3f3;
+  border: 1px solid #ffcdd2;
+  border-radius: 8px;
+  color: #c62828;
+  font-size: 0.85rem;
+}

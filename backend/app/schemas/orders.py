@@ -45,6 +45,15 @@ class OrderResponse(BaseModel):
     # Cómo se traslada. Va tanto al comprador como al vendedor: los dos
     # necesitan saber quién mueve la carga, o que la mueve el comprador.
     shipping: OrderShipping = OrderShipping()
+
+    # Con qué se paga esta orden. Lo ven los dos: el vendedor también tiene que
+    # saber si esperar un comprobante o un aviso de Mercado Pago.
+    payment_method: Optional[str] = None
+    # Y esto es **sólo del comprador**: el link para terminar de pagar y si
+    # todavía se puede. Nadie más los recibe, ni el vendedor ni el
+    # transportista, porque pagar es del que compró.
+    payment_url: Optional[str] = None
+    can_pay: bool = False
     
     model_config = ConfigDict(from_attributes=True)
 

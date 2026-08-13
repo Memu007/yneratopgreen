@@ -7195,7 +7195,7 @@ from app.core.config import settings
 settings.MP_CHECKOUT_HABILITADO = False
 
 from app.main import app
-from app.models.order import Order
+from app.models.order import Order, OrderStatus
 from app.models.payment import Payment
 from app.db.base import SessionLocal
 
@@ -7235,7 +7235,11 @@ try:
     orden = sesion.query(Order).filter(
         Order.id == creadas[0]["order_id"]).first() if creadas else None
     if orden is not None:
+        # Se fabrica el peor caso: una orden que SÍ se podría pagar por Mercado
+        # Pago -colocada y con ese medio-, para que lo único que pueda frenar
+        # el link sea la bandera.
         orden.payment_method = "mercadopago"
+        orden.status = OrderStatus.PLACED
         sesion.commit()
         enlace = cliente.post(f"/api/orders/{orden.id}/payment-link")
         reintento = {"status": enlace.status_code, "cuerpo": enlace.json()}
@@ -7473,6 +7477,380 @@ await runCase(81, 'La pantalla cobra por grupo, arma la cola de órdenes y no de
       + `aviso de dos órdenes separadas antes de confirmar, una sola preferencia, cola `
       + `con el link del doble y la orden por transferencia; volver a la URL de retorno `
       + `dejó la orden en ${despues[0]} y el pago en ${despues[1]}`;
+  } finally {
+    await doble.cerrar();
+    await browser.close();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+// Dos confirmaciones que llegan juntas. La ventana no se abre desde el
+// navegador —ahí el botón se deshabilita— sino entre dos trabajadores de la
+// API: los dos leen el mismo carrito activo y los dos creen que les toca.
+// Acá se fuerza esa superposición reteniendo a la primera justo antes de
+// escribir, que es exactamente donde la carrera existe.
+const MP_DOS_CONFIRMACIONES = `
+import json, threading
+
+from fastapi.testclient import TestClient
+
+from app.main import app
+from app.api import orders as rutas
+from app.db.base import SessionLocal
+from app.models.cart import Cart, CartStatus
+from app.models.order import Order
+from app.models.payment import Payment
+
+datos = json.loads(input())
+
+original = rutas.crear_ordenes
+llego_la_primera = threading.Event()
+puede_seguir = threading.Event()
+candado = threading.Lock()
+turno = {"primera": True}
+
+
+def retenida(*args, **kwargs):
+    with candado:
+        soy_la_primera = turno["primera"]
+        turno["primera"] = False
+    if soy_la_primera:
+        llego_la_primera.set()
+        puede_seguir.wait(30)
+    return original(*args, **kwargs)
+
+
+rutas.crear_ordenes = retenida
+
+
+def sesion():
+    cliente = TestClient(app, base_url="https://testserver")
+    cliente.post("/api/auth/login", json={
+        "email": "cliente@ejemplo.com", "password": "cliente123"})
+    return cliente
+
+
+sobre = {
+    "shipping_address": "Ruta 8 km 220",
+    "shipping_locality_id": datos["localidad"],
+    "shipping_postal_code": "2700",
+    "shipping_decisions": [{"seller_id": datos["vendedor"], "mode": "self"}],
+    "payment_decisions": [{"seller_id": datos["vendedor"], "method": "mercadopago"}],
+}
+
+respuestas = {}
+
+
+def confirmar(nombre, cliente):
+    try:
+        r = cliente.post("/api/orders/checkout", json=sobre)
+        respuestas[nombre] = {"status": r.status_code, "cuerpo": r.json()}
+    except Exception as error:  # noqa: BLE001
+        respuestas[nombre] = {"status": -1, "cuerpo": {"error": type(error).__name__}}
+
+
+def contar():
+    consulta = SessionLocal()
+    try:
+        return (
+            consulta.query(Order).filter(Order.buyer_id == datos["comprador"]).count(),
+            consulta.query(Payment).count(),
+            consulta.query(Cart).filter(
+                Cart.user_id == datos["comprador"],
+                Cart.status == CartStatus.ACTIVE).count(),
+        )
+    finally:
+        consulta.close()
+
+
+antes = contar()
+
+primera = threading.Thread(target=confirmar, args=("primera", sesion()))
+primera.start()
+llego_la_primera.wait(30)
+
+segunda = threading.Thread(target=confirmar, args=("segunda", sesion()))
+segunda.start()
+segunda.join(60)
+
+puede_seguir.set()
+primera.join(60)
+
+despues = contar()
+
+print("RESULTADO " + json.dumps({
+    "primera": respuestas.get("primera"),
+    "segunda": respuestas.get("segunda"),
+    "ordenes": [antes[0], despues[0]],
+    "pagos": [antes[1], despues[1]],
+    "carritos_activos": despues[2],
+}))
+`;
+
+await runCase(82, 'Dos confirmaciones simultáneas crean una sola compra', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900901')).ok === 'vinculado',
+      'el vendedor no vinculó');
+
+    const producto = productoConStock(vendedor.id, 1);
+    await armarCarrito([{ product_id: producto, quantity: 1 }]);
+    const stockAntes = stockDe(producto);
+
+    const observado = leerResultado(await correrEnLaApiSinBloquear(
+      MP_DOS_CONFIRMACIONES,
+      JSON.stringify({
+        vendedor: vendedor.id, comprador: state.buyerId, localidad: localidadDeEnvio(),
+      }),
+    ));
+
+    const estados = [observado.primera.status, observado.segunda.status].sort();
+    assert(estados[0] === 200 && estados[1] === 409,
+      `las dos confirmaciones devolvieron ${JSON.stringify(estados)}`);
+
+    // La que gana crea su orden; la que pierde no escribe nada y lo dice.
+    const ganadora = observado.primera.status === 200 ? observado.primera : observado.segunda;
+    const perdedora = observado.primera.status === 409 ? observado.primera : observado.segunda;
+    assert(ganadora.cuerpo.orders.length === 1,
+      `la ganadora creó ${ganadora.cuerpo.orders.length} órdenes`);
+    assert(/ya se confirmó/i.test(String(perdedora.cuerpo.detail)),
+      `el motivo de la perdedora es «${perdedora.cuerpo.detail}»`);
+
+    const [ordenesAntes, ordenesDespues] = observado.ordenes;
+    assert(ordenesDespues === ordenesAntes + 1,
+      `se crearon ${ordenesDespues - ordenesAntes} órdenes en vez de una`);
+    const [pagosAntes, pagosDespues] = observado.pagos;
+    assert(pagosDespues === pagosAntes + 1,
+      `se crearon ${pagosDespues - pagosAntes} pagos en vez de uno`);
+    assert(preferenciasPedidas(doble).length === 1,
+      `el doble recibió ${preferenciasPedidas(doble).length} preferencias`);
+    assert(observado.carritos_activos === 0,
+      `quedaron ${observado.carritos_activos} carritos activos`);
+    assert(stockDe(producto) === stockAntes, 'se movió stock');
+
+    return 'con las dos confirmaciones superpuestas: una crea la compra y la otra '
+      + 'recibe 409 con motivo; 1 orden, 1 pago, 1 preferencia, 0 carritos activos '
+      + 'y stock quieto';
+  } finally {
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(83, 'Una orden cancelada o rechazada no ofrece ni crea link de pago', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900902')).ok === 'vinculado',
+      'el vendedor no vinculó');
+
+    // Dos órdenes iguales: una la cancela el comprador y la otra la rechaza
+    // el vendedor. Las dos son terminales y ninguna se puede pagar más.
+    const creadas = [];
+    for (const quien of ['comprador', 'vendedor']) {
+      await armarCarrito([{ product_id: productoConStock(vendedor.id, 1), quantity: 1 }]);
+      const respuesta = await apiRequest('/orders/checkout', {
+        method: 'POST', token: state.buyerToken,
+        body: sobreDePago([{ seller_id: vendedor.id, method: 'mercadopago' }]),
+      });
+      const [orden] = respuesta.data.orders;
+      assert(orden.preparation === 'lista', `la orden de ${quien} quedó ${orden.preparation}`);
+      creadas.push({ quien, orden });
+    }
+
+    // Antes de terminarlas, el comprador las ve pagables en «Mis compras».
+    const antes = (await apiRequest('/orders/my?as_role=buyer', { token: state.buyerToken })).data;
+    for (const { quien, orden } of creadas) {
+      const vista = antes.find((o) => o.order_number === orden.order_number);
+      assert(vista.can_pay === true && vista.payment_url,
+        `antes de terminarla, la de ${quien} no se podía pagar`);
+    }
+
+    await apiRequest(`/orders/${creadas[0].orden.order_id}/cancel`, {
+      method: 'POST', token: state.buyerToken, body: { reason: 'me arrepentí' },
+    });
+    await apiRequest(`/orders/${creadas[1].orden.order_id}/cancel`, {
+      method: 'POST', token: vendedor.token, body: { reason: 'no tengo stock' },
+    });
+
+    const preferenciasDelAlta = preferenciasPedidas(doble).length;
+    const despues = (await apiRequest('/orders/my?as_role=buyer', { token: state.buyerToken })).data;
+
+    for (const { quien, orden } of creadas) {
+      const enLaBase = ordenEnLaBase(orden.order_id);
+      assert(['cancelled', 'rejected'].includes(enLaBase.estado),
+        `la de ${quien} quedó en ${enLaBase.estado}`);
+
+      // La intención local deja de decir «pendiente» sobre algo que ya no se
+      // va a cobrar.
+      const [pago] = pagosDe(orden.order_id);
+      assert(pago && pago[4] === 'CANCELLED',
+        `la intención local de la de ${quien} quedó en ${pago && pago[4]}`);
+
+      // Ni la API la ofrece...
+      const vista = despues.find((o) => o.order_number === orden.order_number);
+      assert(vista.can_pay === false && !vista.payment_url,
+        `la de ${quien} sigue ofreciendo pago: ${JSON.stringify(vista.payment_url)}`);
+
+      // ...ni la deja pedir a mano.
+      const negado = await expectApiError(409, () =>
+        apiRequest(`/orders/${orden.order_id}/payment-link`, {
+          method: 'POST', token: state.buyerToken, body: {},
+        }));
+      assert(/ya no se puede pagar/i.test(negado), `motivo inesperado: «${negado}»`);
+    }
+
+    assert(preferenciasPedidas(doble).length === preferenciasDelAlta,
+      'se pidió una preferencia para una orden terminal');
+    assert(queryCount(`SELECT COUNT(*) FROM payments WHERE order_id IN (
+      ${creadas.map(({ orden }) => sqlLiteral(orden.order_id)).join(', ')})`) === 2,
+      'el rechazo creó o borró filas de pago');
+
+    return 'cancelada por el comprador y rechazada por el vendedor: las dos quedan con '
+      + 'la intención local anulada, sin oferta de pago en «Mis compras» y con 409 al '
+      + 'pedir el link a mano; 0 preferencias nuevas';
+  } finally {
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(84, 'El pago que quedó a medias se retoma desde Mis compras, en escritorio y en celular', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const otro = await ingresarVendedor('admin@topgreen.com', 'admin123');
+  const browser = await chromium.launch({ headless: true });
+  const recorridos = [];
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    await desvincular(otro.token);
+    assert((await vincular(vendedor.token, 'ok:900903')).ok === 'vinculado',
+      'el vendedor no vinculó');
+
+    const abrirCompras = async (page) => {
+      await page.locator('button').filter({ hasText: '👤' }).first().click();
+      await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor({ timeout: 15_000 });
+      await page.getByRole('button', { name: /Mis Compras/i }).click();
+      await page.getByRole('heading', { name: 'Mis Compras' }).waitFor({ timeout: 15_000 });
+    };
+    const tarjetaDe = (page, numero) => page.locator('[class*="_orderCard_"]')
+      .filter({ hasText: numero });
+
+    for (const [nombre, viewport] of [
+      ['escritorio', { width: 1280, height: 900 }],
+      ['celular', { width: 390, height: 844 }],
+    ]) {
+      // Una compra por Mercado Pago y otra por transferencia, para que la
+      // acción aparezca en una sola.
+      await armarCarrito([
+        { product_id: productoConStock(vendedor.id, 1), quantity: 1 },
+        { product_id: productoConStock(otro.id, 1), quantity: 1 },
+      ]);
+      const creado = await apiRequest('/orders/checkout', {
+        method: 'POST', token: state.buyerToken,
+        body: sobreDePago([
+          { seller_id: vendedor.id, method: 'mercadopago' },
+          { seller_id: otro.id, method: 'transfer' },
+        ]),
+      });
+      const conMP = creado.data.orders.find((o) => o.payment_method === 'mercadopago');
+      const conTR = creado.data.orders.find((o) => o.payment_method === 'transfer');
+      assert(conMP && conTR, 'no salió una orden de cada medio');
+
+      const context = await browser.newContext({ viewport });
+      await context.addInitScript(
+        ({ a, r }) => {
+          window.localStorage.setItem('access_token', a);
+          window.localStorage.setItem('refresh_token', r);
+        },
+        { a: state.buyerToken, r: state.buyerRefreshToken },
+      );
+      const page = await context.newPage();
+      const errores = [];
+      page.on('pageerror', (error) => errores.push(String(error)));
+
+      try {
+        await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+        await abrirCompras(page);
+
+        const laDeMP = tarjetaDe(page, conMP.order_number);
+        const laDeTransferencia = tarjetaDe(page, conTR.order_number);
+        const continuar = laDeMP.getByRole('button', { name: /Continuar pago|Preparar pago/ });
+        await continuar.waitFor({ state: 'visible', timeout: 20_000 });
+        assert(await laDeTransferencia
+          .getByRole('button', { name: /Continuar pago|Preparar pago/ }).count() === 0,
+          `${nombre}: la orden por transferencia ofrece continuar el pago`);
+
+        // El link que abre es el que guardó el servidor, no uno inventado.
+        // Mercado Pago no existe en esta prueba: se corta la navegación y se
+        // mira a dónde iba, así se afirma el destino sin salir a internet.
+        let destino = '';
+        await context.route('https://www.mercadopago.com.ar/**', async (ruta) => {
+          destino = ruta.request().url();
+          await ruta.fulfill({
+            status: 200, contentType: 'text/html', body: '<p>Mercado Pago no viene a esta prueba</p>',
+          });
+        });
+        const [pestaña] = await Promise.all([
+          context.waitForEvent('page', { timeout: 20_000 }),
+          continuar.click(),
+        ]);
+        await pestaña.waitForLoadState('domcontentloaded').catch(() => {});
+        const [pago] = pagosDe(conMP.order_id);
+        assert(destino === pago[1],
+          `${nombre}: iba a ${destino} y el guardado es ${pago[1]}`);
+        await pestaña.close();
+
+        // Recargar conserva la salida: no depende de nada que viva sólo en
+        // esta pantalla.
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await abrirCompras(page);
+        await tarjetaDe(page, conMP.order_number)
+          .getByRole('button', { name: /Continuar pago/ })
+          .waitFor({ state: 'visible', timeout: 20_000 });
+
+        // Y cuando la orden termina, la acción desaparece.
+        await apiRequest(`/orders/${conMP.order_id}/cancel`, {
+          method: 'POST', token: state.buyerToken, body: { reason: 'prueba' },
+        });
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await abrirCompras(page);
+        await tarjetaDe(page, conMP.order_number).waitFor({ state: 'visible', timeout: 20_000 });
+        assert(await tarjetaDe(page, conMP.order_number)
+          .getByRole('button', { name: /Continuar pago|Preparar pago/ }).count() === 0,
+          `${nombre}: la orden cancelada sigue ofreciendo pagar`);
+
+        assert(errores.length === 0, `${nombre}: errores JS ${errores.join(' | ')}`);
+        recorridos.push(`${nombre}: ${conMP.order_number} con acción, ${conTR.order_number} sin`);
+      } finally {
+        await context.close();
+      }
+    }
+
+    // El vendedor no ve la acción de pagar en ninguna de sus ventas: pagar no
+    // es suyo, y el link tampoco.
+    const ventas = (await apiRequest('/orders/my?as_role=seller',
+      { token: vendedor.token })).data;
+    assert(ventas.every((o) => o.can_pay === false && !o.payment_url),
+      'alguna venta le entrega al vendedor el link de pago del comprador');
+
+    return `${recorridos.join('; ')}; recargar conserva la acción, cancelar la saca, y el `
+      + 'vendedor nunca recibe el link';
   } finally {
     await doble.cerrar();
     await browser.close();

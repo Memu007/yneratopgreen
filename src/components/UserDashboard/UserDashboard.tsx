@@ -83,10 +83,15 @@ interface BackendOrder {
   transfer_receipt_url?: string;
   rejection_reason?: string;
   shipping?: TrasladoDeLaOrden;
+  payment_method?: string;
+  payment_url?: string;
+  can_pay?: boolean;
 }
 
 interface Order {
   id: string;
+  /** El identificador real de la orden. `id` es el número que se muestra. */
+  orderId: string;
   date: string;
   status: 'pending' | 'awaiting-transfer-receipt' | 'transfer-receipt-submitted' | 'paid' | 'confirmed' | 'in-transit' | 'delivered' | 'cancelled' | 'rejected';
   total: number;
@@ -108,6 +113,13 @@ interface Order {
   transferReceiptUrl?: string;
   rejectionReason?: string;
   shipping?: TrasladoDeLaOrden;
+  /**
+   * Lo del pago, y sólo para el comprador: el servidor manda el link y si la
+   * orden todavía se puede pagar. La pantalla no lo deduce del estado.
+   */
+  paymentMethod?: string;
+  paymentUrl?: string;
+  canPay?: boolean;
 }
 
 interface UserProduct {
@@ -300,6 +312,48 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     return statusMap[status.toLowerCase()] || 'pending';
   };
 
+  // Preparar o recuperar el link de pago de una orden propia.
+  //
+  // La compra por Mercado Pago se termina en Mercado Pago, y el comprador
+  // puede cerrar el checkout antes de eso: sin esto, la orden queda creada y
+  // sin ninguna forma visible de pagarla. La ruta es idempotente, así que
+  // volver acá devuelve el mismo link y nunca crea otra orden ni otro pago.
+  const [preparandoPago, setPreparandoPago] = useState('');
+  const [errorDePago, setErrorDePago] = useState<Record<string, string>>({});
+
+  const continuarPago = async (orden: Order) => {
+    if (orden.paymentUrl) {
+      window.open(orden.paymentUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    setPreparandoPago(orden.orderId);
+    setErrorDePago((actuales) => ({ ...actuales, [orden.orderId]: '' }));
+    try {
+      const listo = await apiPost<{ payment_url?: string; reason?: string }>(
+        `/orders/${orden.orderId}/payment-link`,
+      );
+      if (listo.payment_url) {
+        setPurchases((actuales) => actuales.map((o) => (
+          o.orderId === orden.orderId ? { ...o, paymentUrl: listo.payment_url } : o
+        )));
+        window.open(listo.payment_url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      setErrorDePago((actuales) => ({
+        ...actuales,
+        [orden.orderId]: `No se pudo preparar el pago${listo.reason ? ` (${listo.reason})` : ''}. `
+          + 'La orden sigue creada y podés reintentar.',
+      }));
+    } catch (err) {
+      setErrorDePago((actuales) => ({
+        ...actuales,
+        [orden.orderId]: err instanceof Error ? err.message : 'No se pudo preparar el pago',
+      }));
+    } finally {
+      setPreparandoPago('');
+    }
+  };
+
   // Operaciones asignadas: sólo las pide quien es transportista, y el servidor
   // devuelve únicamente las suyas. No hay parámetro de transportista.
   const [operaciones, setOperaciones] = useState<OperacionAsignada[]>([]);
@@ -339,6 +393,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           const response = await apiGet<BackendOrder[]>('/orders/my?as_role=buyer');
           const mappedOrders: Order[] = response.map(o => ({
             id: o.order_number,
+            orderId: o.id,
             date: o.created_at,
             status: mapBackendStatus(o.status),
             total: o.total_amount,
@@ -347,6 +402,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               quantity: i.quantity,
               price: i.unit_price_snapshot
             })),
+            paymentMethod: o.payment_method,
+            paymentUrl: o.payment_url,
+            canPay: o.can_pay,
             seller: o.seller_name ? {
               name: o.seller_name,
               phone: o.seller_phone || '',
@@ -361,6 +419,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           const response = await apiGet<BackendOrder[]>('/orders/my?as_role=seller');
           const mappedOrders: Order[] = response.map(o => ({
             id: o.order_number,
+            orderId: o.id,
             date: o.created_at,
             status: mapBackendStatus(o.status),
             total: o.total_amount,
@@ -369,6 +428,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               quantity: i.quantity,
               price: i.unit_price_snapshot
             })),
+            paymentMethod: o.payment_method,
             buyer: o.buyer_name ? {
               name: o.buyer_name,
               phone: o.buyer_phone || '',
@@ -665,6 +725,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       const response = await apiGet<BackendOrder[]>(`/orders/my?as_role=${role}`);
       const mappedOrders: Order[] = response.map(o => ({
         id: o.order_number,
+        orderId: o.id,
         date: o.created_at,
         status: mapBackendStatus(o.status),
         total: o.total_amount,
@@ -673,6 +734,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           quantity: i.quantity,
           price: i.unit_price_snapshot
         })),
+        paymentMethod: o.payment_method,
+        paymentUrl: o.payment_url,
+        canPay: o.can_pay,
         buyer: o.buyer_name ? {
           name: o.buyer_name,
           phone: o.buyer_phone || '',
@@ -1971,6 +2035,36 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 </div>
 
                 {renderTraslado(order.shipping, true)}
+
+                {/*
+                  El pago que quedó a medias. Aparece sólo si el servidor dice
+                  que esta orden todavía se puede pagar y que es de Mercado
+                  Pago: una cancelada, una rechazada o una por transferencia no
+                  ofrecen nada.
+                */}
+                {order.canPay && order.paymentMethod === 'mercadopago' && (
+                  <div className={styles.pagoPendiente}>
+                    <p className={styles.pagoPendienteTexto}>
+                      Esta orden se paga con Mercado Pago y todavía está
+                      <strong> pendiente de confirmación</strong>.
+                    </p>
+                    <button
+                      type="button"
+                      className={styles.pagoPendienteBoton}
+                      disabled={preparandoPago === order.orderId}
+                      onClick={() => void continuarPago(order)}
+                    >
+                      {preparandoPago === order.orderId
+                        ? 'Preparando…'
+                        : order.paymentUrl ? 'Continuar pago' : 'Preparar pago'}
+                    </button>
+                    {errorDePago[order.orderId] && (
+                      <p className={styles.pagoPendienteError} role="alert">
+                        {errorDePago[order.orderId]}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {order.rejectionReason && (
                   <div className={styles.contactInfo}>

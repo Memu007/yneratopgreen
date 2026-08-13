@@ -153,6 +153,28 @@ def pago_de(db: Session, orden: Order) -> Optional[Payment]:
     return db.query(Payment).filter(Payment.order_id == orden.id).first()
 
 
+def anular_intencion(db: Session, orden: Order) -> bool:
+    """Da por muerta la intención de pago local de una orden que terminó.
+
+    No llama a Mercado Pago y no devuelve dinero: sólo deja de decir
+    «pendiente» sobre algo que ya no se va a cobrar. Devuelve si había algo que
+    anular.
+
+    Lo que esto **no** puede hacer, y hay que saberlo: la preferencia que ya
+    viajó sigue existiendo del lado de Mercado Pago, así que un comprador que
+    guardó el link podría pagarla igual. Cerrar ese borde necesita la consulta
+    de estado y el webhook, que son de MP-C; hasta entonces, lo que queda de
+    este lado es no ofrecer más el link y no mentir sobre el estado.
+    """
+    pago = pago_de(db, orden)
+    if pago is None or pago.status == PaymentStatus.CANCELLED:
+        return False
+
+    pago.status = PaymentStatus.CANCELLED
+    db.add(pago)
+    return True
+
+
 async def preparar_pago(db: Session, orden: Order, vendedor: User) -> Payment:
     """Deja lista la preferencia de una orden. Es idempotente.
 

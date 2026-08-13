@@ -36,6 +36,7 @@ from app.services.checkout import (
     MEDIO_TRANSFERENCIA,
     PENDIENTE_DE_PAGO,
     crear_ordenes,
+    es_pagable,
     medios_disponibles,
     motivo_sin_medios,
 )
@@ -61,7 +62,7 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 
 def _respuesta_de(orden, vendedor, pago=None, motivo=None) -> OrdenCreada:
     """Una orden creada, como la ve el comprador. Sin recalcular nada."""
-    es_mp = orden.payment_method == MEDIO_MERCADO_PAGO
+    es_mp = orden.payment_method == MEDIO_MERCADO_PAGO and es_pagable(orden)
     listo = bool(pago and pago.init_point) if es_mp else True
     return OrdenCreada(
         order_id=orden.id,
@@ -155,6 +156,14 @@ async def preparar_link_de_pago(
     if orden.payment_method != MEDIO_MERCADO_PAGO:
         raise HTTPException(
             status_code=400, detail="Esta orden no se paga con Mercado Pago"
+        )
+    # Y que la orden todavía admita un pago. Comprobar dueño y medio pero no
+    # estado dejaba una puerta abierta: una orden cancelada o rechazada volvía
+    # a entregar su preferencia, y si no la tenía, la creaba.
+    if not es_pagable(orden):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Esta orden está {orden.status.value} y ya no se puede pagar.",
         )
 
     vendedor = db.query(User).filter(User.id == orden.seller_id).first()
@@ -346,6 +355,20 @@ def decide_transfer_receipt(
     )
 
 
+def _pago_del_comprador(db: Session, order: Order) -> dict:
+    """Lo que el comprador necesita para terminar de pagar su orden.
+
+    Sólo para él, sólo por Mercado Pago y sólo mientras la orden se pueda
+    pagar. Al vendedor y al transportista no les toca: no es información suya y
+    pagar no es su acción.
+    """
+    if order.payment_method != MEDIO_MERCADO_PAGO or not es_pagable(order):
+        return {"payment_url": None, "can_pay": False}
+
+    pago = mp_preferencia.pago_de(db, order)
+    return {"payment_url": pago.init_point if pago else None, "can_pay": True}
+
+
 def traslado_de(order: Order) -> OrderShipping:
     """El traslado de una orden, para comprador y vendedor.
 
@@ -454,6 +477,9 @@ def get_my_orders(
             transfer_receipt_url=order.transfer_receipt_url,
             rejection_reason=order.cancellation_reason,
             shipping=traslado_de(order),
+            payment_method=order.payment_method,
+            **(_pago_del_comprador(db, order) if as_role != "seller"
+               else {"payment_url": None, "can_pay": False}),
         ))
     
     return result
@@ -501,6 +527,9 @@ def get_order_detail(
         transfer_receipt_url=order.transfer_receipt_url,
         rejection_reason=order.cancellation_reason,
         shipping=traslado_de(order),
+        payment_method=order.payment_method,
+        **(_pago_del_comprador(db, order) if order.buyer_id == current_user.id
+           else {"payment_url": None, "can_pay": False}),
     )
 
 
@@ -582,6 +611,9 @@ def update_order_status(
         order.delivered_at = datetime.now()
     elif new_status in [OrderStatus.CANCELLED, OrderStatus.REJECTED]:
         order.cancellation_reason = status_data.get("reason", "")
+        # La orden terminó: la intención de pago local deja de decir
+        # «pendiente» sobre algo que ya no se va a cobrar.
+        mp_preferencia.anular_intencion(db, order)
         # Restaurar stock si se cancela (solo si fue pagada/confirmada y solo para productos)
         if old_status in [OrderStatus.PAID, OrderStatus.CONFIRMED]:
             for item in order.items:
@@ -676,11 +708,12 @@ def cancel_order(
                 product.sales_count = max(0, (product.sales_count or 0) - item.quantity)
                 print(f"📦 Stock restaurado para {product.name}: +{item.quantity}")
     
-    # Guardar el estado previo para el reembolso
-    previous_status = order.status
     order.status = OrderStatus.CANCELLED if is_buyer else OrderStatus.REJECTED
     order.cancellation_reason = cancel_data.get("reason", "") if cancel_data else ""
     order.updated_at = datetime.now()
+    # Igual que en el cambio de estado: lo que ya no se puede pagar tampoco
+    # sigue figurando como pago pendiente nuestro.
+    mp_preferencia.anular_intencion(db, order)
     
     db.commit()
     

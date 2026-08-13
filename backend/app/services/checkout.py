@@ -29,6 +29,7 @@ from decimal import Decimal
 from typing import Dict, List, Optional
 
 from fastapi import HTTPException
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -56,6 +57,24 @@ MEDIO_MERCADO_PAGO = "mercadopago"
 # Estado de preparación que ve el comprador por cada orden creada.
 LISTA = "lista"                      # se puede pagar ya
 PENDIENTE_DE_PAGO = "pendiente"      # falta preparar el pago; se puede reintentar
+
+# Los únicos estados en los que una orden todavía se puede pagar. Fuera de
+# estos, la orden terminó —bien o mal— y ofrecer un pago sería cobrar por algo
+# que ya no existe.
+ESTADOS_PAGABLES = (OrderStatus.PLACED,)
+
+CARRITO_YA_CONFIRMADO = (
+    "Esta compra ya se confirmó. Mirá «Mis compras»: no se creó una segunda."
+)
+
+
+def es_pagable(orden: Order) -> bool:
+    """¿Esta orden todavía admite un pago?
+
+    Cancelada, rechazada, entregada o ya pagada: no. Y no es un detalle de
+    pantalla —el link se pide por API—, así que lo decide el servidor.
+    """
+    return orden.status in ESTADOS_PAGABLES
 
 
 def generate_order_number() -> str:
@@ -230,6 +249,30 @@ def preparar(
     return cart, destino, pedidos
 
 
+def _tomar_el_carrito(db: Session, cart: Cart) -> None:
+    """Convierte el carrito, y sólo la primera vez.
+
+    Es un `UPDATE ... WHERE status = ACTIVE`: la base decide quién gana, no el
+    navegador ni un booleano de la pantalla. Dos confirmaciones simultáneas
+    —doble clic, dos pestañas, un reintento sobre una respuesta perdida—
+    pasan las dos por la validación creyendo que el carrito es suyo; acá una
+    sola se lo lleva. La segunda encuentra cero filas y se va sin escribir una
+    orden, un pago ni una preferencia.
+
+    Va **antes** de la primera fila y en la misma transacción: si algo falla
+    después, el carrito vuelve atrás con todo lo demás.
+    """
+    tomado = db.execute(
+        update(Cart)
+        .where(Cart.id == cart.id, Cart.status == CartStatus.ACTIVE)
+        .values(status=CartStatus.CONVERTED)
+    ).rowcount
+
+    if not tomado:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=CARRITO_YA_CONFIRMADO)
+
+
 def crear_ordenes(
     db: Session,
     user: User,
@@ -243,7 +286,13 @@ def crear_ordenes(
     Acá ya no se valida nada: lo que llega viene de `preparar`, y volver a
     decidir en el momento de escribir sería tener la regla en dos lugares otra
     vez.
+
+    Lo primero es **tomar el carrito**, y eso sí es una decisión: dos
+    confirmaciones simultáneas leen el mismo carrito activo y las dos creen que
+    les toca. La que pierde no escribe nada.
     """
+    _tomar_el_carrito(db, cart)
+
     creadas: List[Order] = []
 
     for pedido in pedidos:
@@ -302,7 +351,6 @@ def crear_ordenes(
 
         creadas.append(orden)
 
-    cart.status = CartStatus.CONVERTED
     db.commit()
 
     for orden in creadas:
