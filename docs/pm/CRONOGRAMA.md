@@ -160,9 +160,13 @@ usen Mercado Pago.
 ### Fase 5 - hasta el 29/10
 
 - Suite integral desde base limpia, responsive y usabilidad verificados.
+- `npm run lint` cerrado y finales de línea normalizados mediante una política
+  versionada, en un cambio mecánico separado de cualquier función.
 - Datos iniciales cargados sin credenciales demo inseguras.
 - Seguridad, backups, persistencia de imagenes y HTTPS revisados.
 - Despliegue real en produccion y accesos administrativos entregados.
+- Documentación técnica contrastada contra el producto; afirmaciones viejas o
+  falsas retiradas antes de capacitar.
 - Capacitacion basica y documentacion tecnica del despliegue listas.
 - Acta de lanzamiento que fija el inicio de los 90 dias de garantia.
 

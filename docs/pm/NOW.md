@@ -430,10 +430,9 @@ así se detectó. Los números fijos envejecen mal.
   /payments/simulate-payment/{order_id}` dejaba a un comprador
   autenticado pasar su propia orden a `PAID` sin pagar. **Eliminado.**
 
-  Los routers `payments` y `mp_oauth` ya no se montan, y el caso 19 de la
-  suite verifica que responden `404` —no `503`—, así que la propiedad es
-  del código y no de la configuración. Se reconstruye sin split cuando
-  haya credenciales.
+  El router `payments` sigue sin montarse y las rutas de cobro permanecen en
+  `404`. El vínculo `mp_oauth` fue reconstruido y aceptado en MP-A; no mueve
+  dinero. Preferencias, webhook y activación se construyen en MP-B/MP-C.
 - **Sin despliegue.** Nadie levantó esto en un servidor real. La fase 5
   está en cero salvo las pruebas.
 - **Revisión de seguridad: al final, como condición para desplegar.** La
@@ -471,6 +470,35 @@ transportista recibe origen, destino y necesidad logística, sin precios,
 comprobantes ni detalle financiero. Las ubicaciones del MVP son las
 localidades oficiales; no se agrega exposición de domicilios exactos.
 
+## Línea base de calidad — 2026-08-13
+
+Evaluación interna de PM, no porcentaje contractual: **aproximadamente 7,5/10
+para un MVP**. La base es sólida y está por encima de un prototipo improvisado,
+pero todavía no es producción madura.
+
+Fortalezas que se conservan como estándar de las piezas siguientes:
+
+- puertas reproducibles de producto, hito, accesibilidad y contraste;
+- importes con `Decimal`, snapshots y validación anterior a escribir;
+- migraciones reversibles y evidencia que discrimina contra la versión previa;
+- límites de autorización y privacidad comprobados;
+- OAuth con credenciales cifradas, state de un solo uso y fallos cerrados.
+
+Deudas asignadas, no tareas activas nuevas:
+
+- MP-B centraliza la creación de órdenes y elimina la duplicación entre
+  checkouts; MP-C reemplaza definitivamente el módulo de pagos heredado;
+- los componentes y guiones grandes se dividen sólo cuando la pieza que los
+  toca lo necesite para evitar duplicación o hacer verificable una regla. No se
+  hace una reescritura cosmética;
+- Fase 5 cierra `lint`, política de finales de línea, documentación falsa o
+  vieja, auditoría integral de seguridad y despliegue reproducible;
+- Mercado Pago no se considera maduro hasta probar preferencia, webhook,
+  idempotencia, stock y un cobro externo controlado.
+
+La calificación se revisa después de MP-C y nuevamente antes del lanzamiento;
+no habilita adelantar Fase 6 ni gastar el colchón.
+
 ## Deuda técnica registrada, sin acción
 
 - Identificadores como `String(36)` en lugar del tipo `uuid` nativo.
@@ -482,3 +510,10 @@ localidades oficiales; no se agrega exposición de domicilios exactos.
   dependencia externa. Mitigado con el respaldo del `ProductCard`.
 - `docs/PROJECT_STATUS.md` acumula **ocho afirmaciones verificadas como
   falsas**. Se reescribe entero más adelante; mientras tanto, no usarlo.
+- `npm run lint` conserva deuda previa y no es todavía una puerta verde.
+- El repositorio mezcla LF y CRLF; `diff --check` puede reportar ruido por CR
+  heredado. La normalización se hace en un commit mecánico aislado, con
+  `.gitattributes`, después de pagos y antes de la auditoría final.
+- Hay componentes y guiones extensos. No se fragmentan por cantidad de líneas:
+  se extrae sólo la lógica compartida que una pieza activa necesite probar o
+  reutilizar.
