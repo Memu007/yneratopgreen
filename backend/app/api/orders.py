@@ -614,8 +614,18 @@ def update_order_status(
         # La orden terminó: la intención de pago local deja de decir
         # «pendiente» sobre algo que ya no se va a cobrar.
         mp_preferencia.anular_intencion(db, order)
-        # Restaurar stock si se cancela (solo si fue pagada/confirmada y solo para productos)
-        if old_status in [OrderStatus.PAID, OrderStatus.CONFIRMED]:
+        # Restaurar stock si se cancela: sólo si el estado del que se viene
+        # había descontado stock, y sólo para productos.
+        #
+        # Acá decía `old_status`, que no existe: el estado previo se guarda
+        # como `current_status` más arriba. Cualquier cancelación o rechazo por
+        # esta ruta terminaba en un 500 antes de escribir el motivo.
+        #
+        # Con las transiciones de hoy este bloque no llega a restaurar nada:
+        # a terminal sólo se entra desde «colocada», y colocar no descuenta
+        # stock. Queda escrito con el estado correcto para cuando exista un
+        # estado que sí lo descuente.
+        if current_status in [OrderStatus.PAID, OrderStatus.CONFIRMED]:
             for item in order.items:
                 product = item.product
                 is_service = product.category.is_service if product and product.category else False

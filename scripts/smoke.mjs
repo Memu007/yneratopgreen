@@ -7861,6 +7861,95 @@ await runCase(84, 'El pago que quedó a medias se retoma desde Mis compras, en e
   }
 });
 
+await runCase(85, 'Rechazar o cancelar por el cambio de estado también cierra la orden', async () => {
+  // La otra puerta a un estado terminal es `PATCH /orders/{id}/status`, y no
+  // la miraba nadie: el caso 83 entra por `POST /cancel`. Por esta ruta la
+  // cancelación moría en un 500 antes de escribir el motivo.
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900905')).ok === 'vinculado',
+      'el vendedor no vinculó');
+
+    const salidas = [
+      ['el vendedor rechaza', 'rejected', () => vendedor.token, 'no tengo stock'],
+      ['el comprador cancela', 'cancelled', () => state.buyerToken, 'me arrepentí'],
+    ];
+    const observado = [];
+
+    for (const [etiqueta, destino, tokenDe, motivo] of salidas) {
+      const producto = productoConStock(vendedor.id, 1);
+      await armarCarrito([{ product_id: producto, quantity: 1 }]);
+      const creado = await apiRequest('/orders/checkout', {
+        method: 'POST', token: state.buyerToken,
+        body: sobreDePago([{ seller_id: vendedor.id, method: 'mercadopago' }]),
+      });
+      const [orden] = creado.data.orders;
+      assert(orden.preparation === 'lista', `${etiqueta}: la orden quedó ${orden.preparation}`);
+      assert(pagosDe(orden.order_id).length === 1, `${etiqueta}: no hay intención de pago`);
+
+      const stockAntes = stockDe(producto);
+      const preferenciasAntes = preferenciasPedidas(doble).length;
+
+      // Lo primero es que no sea un 500: el motivo del PATCH se escribía
+      // después del error, así que ni el estado ni la razón llegaban a la base.
+      const cambio = await apiRequest(`/orders/${orden.order_id}/status`, {
+        method: 'PATCH', token: tokenDe(), body: { status: destino, reason: motivo },
+      });
+      assert(cambio.status === 200, `${etiqueta}: el PATCH devolvió ${cambio.status}`);
+      assert(cambio.data.new_status === destino,
+        `${etiqueta}: la respuesta dice ${cambio.data.new_status}`);
+
+      // El estado quedó escrito, con su motivo.
+      const enLaBase = ordenEnLaBase(orden.order_id);
+      assert(enLaBase.estado === destino, `${etiqueta}: en la base quedó ${enLaBase.estado}`);
+      const [[razon]] = queryRows(`SELECT coalesce(cancellation_reason, '${NULO}')
+        FROM orders WHERE id = ${sqlLiteral(orden.order_id)}`);
+      assert(razon === motivo, `${etiqueta}: el motivo guardado es «${razon}»`);
+
+      // La intención local se anula por esta ruta igual que por la otra.
+      const [pago] = pagosDe(orden.order_id);
+      assert(pago && pago[4] === 'CANCELLED',
+        `${etiqueta}: la intención local quedó en ${pago && pago[4]}`);
+
+      // El stock que corresponde restaurar es ninguno: a terminal se entra
+      // desde «colocada», y colocar no descuenta stock. Si alguna vez se
+      // descontara antes, este número tendría que subir y este caso lo vería.
+      assert(stockDe(producto) === stockAntes,
+        `${etiqueta}: el stock pasó de ${stockAntes} a ${stockDe(producto)}`);
+
+      // Y la orden terminal no vuelve a ofrecer ni a crear pago.
+      const negado = await expectApiError(409, () =>
+        apiRequest(`/orders/${orden.order_id}/payment-link`, {
+          method: 'POST', token: state.buyerToken, body: {},
+        }));
+      assert(/ya no se puede pagar/i.test(negado), `${etiqueta}: motivo inesperado «${negado}»`);
+      assert(preferenciasPedidas(doble).length === preferenciasAntes,
+        `${etiqueta}: se pidió una preferencia después de terminar la orden`);
+
+      const compras = (await apiRequest('/orders/my?as_role=buyer',
+        { token: state.buyerToken })).data;
+      const vista = compras.find((o) => o.order_number === orden.order_number);
+      assert(vista.can_pay === false && !vista.payment_url,
+        `${etiqueta}: «Mis compras» sigue ofreciendo pagarla`);
+
+      observado.push(`${etiqueta} → ${destino}, stock ${stockAntes}`);
+    }
+
+    return `${observado.join('; ')}; por el PATCH de estado las dos salidas responden 200, `
+      + 'escriben estado y motivo, anulan la intención local, no mueven stock y dejan la '
+      + 'orden sin puerta de pago';
+  } finally {
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 
