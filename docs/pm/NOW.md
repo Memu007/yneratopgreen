@@ -111,6 +111,13 @@ Pro contra el doble local, con activación productiva cerrada hasta MP-C. La Dev
 sigue en **Extra**. Un vendedor sin vínculo MP conserva transferencia y
 catálogo; el checkout resuelve el medio por grupo de vendedor.
 
+Primera entrega MP-B `c671a4c` e informe `1bc3d08`, **todavía no aceptados**.
+La arquitectura, bandera apagada, preferencia sin comisión y contrato plural
+quedan conformes; PM verificó build, sintaxis y `diff --check`. Vuelve por tres
+defectos: confirmar el mismo carrito en paralelo puede duplicar órdenes, una
+orden terminal todavía devuelve/crea link y «Mis compras» no permite recuperar
+un pago interrumpido. MP-C no se abre.
+
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
 **Cerrado por PM el 2026-08-10.** Emi declaró descartable el proyecto Railway

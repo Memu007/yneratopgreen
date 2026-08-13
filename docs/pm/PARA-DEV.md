@@ -2009,3 +2009,42 @@ activar una ruta real antes de MP-C, frená: no tapes ese borde con rollback
 después de un efecto externo. Entregá commit de producto e informe separado con
 rojo contra la versión anterior, comandos, inventarios y riesgos. Esfuerzo
 **Extra**. Ahí vuelve a PM; no abras webhook ni producción.
+
+### Primera revisión PM de `c671a4c`: todavía no aceptada
+
+El alcance principal queda conforme: regla común de checkout, respuesta plural,
+medio por vendedor, preferencia sin comisión, pago único por orden, bandera
+apagada y eliminación del módulo heredado. PM obtuvo build, sintaxis y
+`diff --check` verdes; no reabras esos bloques ni agregues webhook o stock.
+
+Quedan tres defectos funcionales de MP-B:
+
+1. **El doble clic probado no es el doble clic peligroso.** El caso 77 dispara
+   cinco veces `payment-link` sobre una orden ya creada. Dos
+   `POST /orders/checkout` simultáneos todavía pueden leer el mismo carrito
+   `ACTIVE`, crear dos juegos de órdenes y dos preferencias: `carrito_activo()`
+   no bloquea la fila y `crear_ordenes()` recién la convierte al final. Cerrá la
+   carrera en base —no con un booleano del navegador— y probala reteniendo dos
+   confirmaciones concurrentes. Exactamente una convierte el carrito; la otra
+   recibe 4xx accionable, sin nuevas órdenes, pagos ni preferencias.
+2. **Una orden terminal conserva una puerta de pago.** `payment-link` comprueba
+   dueño y medio, pero no estado. Después de cancelar o rechazar una orden MP,
+   vuelve a entregar la preferencia existente; si todavía no existía, puede
+   crearla. Una orden `CANCELLED`, `REJECTED` o cualquier estado no pagable no
+   ofrece ni crea link. Marcá coherentemente la intención local al cancelar y
+   dejá explícito el riesgo residual del link externo ya conocido para MP-C.
+   No inventes reembolso ni llames a Mercado Pago en esta pieza.
+3. **La reanudación existe sólo como API.** El informe reconoce que cerrar el
+   modal deja al comprador sin forma visible de recuperar el link. «Reanudable»
+   fue criterio de MP-B, no una mejora posterior. En `Mis compras`, sólo el
+   comprador y sólo para su orden MP todavía pagable ve «Continuar pago» o
+   «Preparar pago» usando la ruta idempotente. Nunca aparece en transferencia,
+   vendedor, transportista ni orden terminal; recargar conserva la salida.
+
+Agregá regresiones que se pongan rojas contra `c671a4c` para los tres puntos,
+incluido navegador en escritorio y celular para recuperación/ausencia del CTA.
+Conservá 75–81 y ajustá inventarios sólo si realmente aparece una pantalla
+nueva; una acción dentro de «Mis compras» no crea por sí sola otra pantalla.
+Corré suite completa una vez al final, hito, build, accesibilidad, contraste,
+migración ida/vuelta, `alembic check` y `diff --check`. Entregá corrección de
+producto e informe separado. Esfuerzo **Extra**; MP-C sigue cerrada.
