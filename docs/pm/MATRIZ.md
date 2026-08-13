@@ -53,7 +53,7 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 
 | Requisito | Estado | Evidencia |
 |-----------|--------|-----------|
-| Mercado Pago, checkout básico | ❌ | Lo heredado sigue desmontado. Emi confirmó el 2026-08-12 Checkout Pro con OAuth por vendedor, cobro directo y comisión de marketplace cero; Pieza MP-A abierta. Sigue ❌ hasta demostrar el cobro, no por falta de decisión |
+| Mercado Pago, checkout básico | ❌ | Base OAuth segura aceptada: `5aee032` + `e5cb94e`, informes `81f89ce`/`38a952b`; Dev informa casos 62–74 verdes. Lo heredado y todo cobro siguen desmontados. MP-B abierta; permanece ❌ hasta demostrar pago y webhook, no por falta de vínculo |
 | — Agujero encontrado y cerrado | ✅ | `POST /payments/simulate-payment/{order_id}` permitía a un comprador autenticado pasar su propia orden a `PAID` sin pagar. Eliminado. Smoke 19: `payments`, `mp-oauth` y `simulate-payment` responden `404` porque los routers no se montan, no porque falten credenciales |
 | Exactitud monetaria de carrito y ambos checkouts | ✅ | `2220e94`: aritmética `Decimal` hasta persistencia. Casos 59–61 cubren centavos simples, rango alto y rechazo multivendedor atómico; PM verificó build, sintaxis, importes y `diff --check` |
 | Transferencia: los datos bancarios no cambian bajo el comprador | ✅ | Smoke 14: se crea la orden, se cambian CBU y alias en el perfil del vendedor, y el comprador sigue viendo los originales. API contrastada contra SQL |

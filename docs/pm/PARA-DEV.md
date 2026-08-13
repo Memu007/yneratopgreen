@@ -1912,3 +1912,100 @@ contraste, build, migración upgrade/downgrade, `alembic check` y `diff --check`
 Entregá un commit de corrección y el informe separado que todavía falta en
 `PARA-PM.md`, con resultados reales y aritmética de inventarios. Esfuerzo
 **Extra**. Ahí vuelve a PM; MP-B sigue cerrada.
+
+**Aceptada por PM:** producto inicial `5aee032`, corrección `e5cb94e` e informes
+`81f89ce` y `38a952b`. Los casos 72–74 discriminan los tres defectos contra la
+entrega inicial. PM obtuvo build, sintaxis, revisión directa de los
+discriminantes y `diff --check` verdes; Docker local apagado impidió repetir la
+suite. La Dev informa 74/74, hito 6/6, accesibilidad 56/56 y contraste 40/40.
+No reabras MP-A.
+
+## Tarea activa única — Pieza MP-B: contrato plural y preferencias seguras
+
+Prepará el checkout por vendedor y una preferencia estable de Checkout Pro por
+orden, pero **no habilites cobros reales todavía**. Esta pieza corre de punta a
+punta contra el doble local; la activación productiva queda cerrada hasta que
+MP-C acepte webhook, estados y reserva/liberación de stock.
+
+### 1. Decisión de producto
+
+- Mercado Pago es opcional por vendedor. Sin vínculo usable, el vendedor sigue
+  publicado y ofrece transferencia si tiene CBU o alias.
+- El carrito se resuelve por grupos de vendedor. Cada grupo exige exactamente
+  un medio disponible y una decisión logística; un grupo puede usar Mercado
+  Pago y otro transferencia.
+- Un carrito multivendedor genera una orden por vendedor y, para cada grupo MP,
+  una preferencia y un pago separado. La pantalla lo explica antes de confirmar.
+
+### 2. Contrato y atomicidad local
+
+Corregí el contrato singular de `/orders/checkout`: nunca puede crear varias
+órdenes y devolver sólo la primera. Reutilizá la validación y creación común de
+los dos checkouts; no mantengas una tercera copia de totales, stock, snapshots o
+logística.
+
+Antes de la primera escritura, el servidor deriva los grupos del carrito y
+revalida en conjunto: destino, traslado, medio elegido, datos bancarios cuando
+corresponda, vínculo MP legible, precio vigente, cantidades y totales. Una
+decisión faltante, extra, de otro vendedor o ya no disponible rechaza todo sin
+órdenes nuevas y deja el carrito activo.
+
+La respuesta es plural y estable: una entrada por orden con vendedor, medio,
+total congelado y estado de preparación. Transferencia conserva su snapshot
+bancario; MP tiene una única fila de pago por orden. No uses el modelo heredado
+como contrato: eliminá o migrá campos de comisión/respuesta cruda que mientan o
+no hagan falta. Comisión TopGreen es cero.
+
+### 3. Preferencia de Checkout Pro
+
+- Usá la superficie estable de **preferencias**, no Orders beta. Verificá y
+  fijá una versión oficial compatible del SDK sólo si realmente se usa; no
+  actualices por decoración.
+- La autorización es el access token descifrado del vendedor. Vínculo caído
+  antes de crear deja ese grupo sin MP y no cae a transferencia en silencio.
+- Importe, moneda e ítems salen de la orden y sus snapshots ya persistidos. No
+  se recalcula dinero, no hay aritmética `float` y no se toma el precio actual
+  después de confirmar.
+- Omití `marketplace_fee`; no mandes 5 ni una comisión duplicada. Usá
+  `external_reference` inequívoca, URLs públicas por configuración y una clave
+  de idempotencia estable por orden.
+- Persistí sólo identificadores, URL necesaria, importe exacto y estado propio.
+  No guardes el cuerpo completo de Mercado Pago ni secretos.
+- Reintentar tras timeout, doble clic o respuesta perdida reutiliza la misma
+  orden/idempotencia y nunca crea otra orden ni otra intención local.
+
+### 4. Cerrado hasta MP-C
+
+Agregá un interruptor explícito de checkout MP, apagado por defecto y en los
+ejemplos/Railway. Con él apagado, ninguna ruta de comprador crea preferencias,
+el esquema/UX no ofrece pagar por MP y transferencia sigue funcionando. La
+suite lo enciende sólo contra el doble local. No uses credenciales reales.
+
+La UI puede demostrar la cola de órdenes y enlaces contra el doble, pero no
+declara «pagado» por volver de una URL: retorno del navegador no es evidencia
+de pago. Todavía no descuentes ni reserves stock por Mercado Pago, y por eso la
+bandera productiva no se habilita. MP-C incorporará webhook firmado, consulta a
+MP, estados idempotentes y la política de stock antes de permitir dinero real.
+
+### 5. Evidencia y freno
+
+- Un vendedor MP y otro por transferencia: decisiones visibles por grupo,
+  confirmación única, dos órdenes y una sola preferencia; respuesta y SQL
+  coinciden sin cantidades fijas del seed.
+- Dos vendedores MP: dos órdenes/preferencias diferenciadas y reanudables;
+  doble clic, timeout antes/después de la respuesta y reintento no duplican.
+- Vínculo ausente, revocado o ilegible; elección inyectada; decisión faltante o
+  extra: rechazo anterior a toda escritura externa/local y carrito intacto.
+- Payload capturado por el doble: total exacto desde snapshot, vendedor
+  correcto, `external_reference`, retornos/notificación configurados y ausencia
+  de `marketplace_fee`, token, secreto y floats recalculados.
+- Con bandera apagada: cero preferencia y cero oferta MP en API/DOM; transferencia
+  completa sigue verde. Ningún retorno modifica orden o pago.
+- Migraciones ida/vuelta y `alembic check`; suite completa, hito, build,
+  accesibilidad/contraste proporcionales y `diff --check` verdes.
+
+Si crear la preferencia exige comprometer stock, marcar pagado por retorno o
+activar una ruta real antes de MP-C, frená: no tapes ese borde con rollback
+después de un efecto externo. Entregá commit de producto e informe separado con
+rojo contra la versión anterior, comandos, inventarios y riesgos. Esfuerzo
+**Extra**. Ahí vuelve a PM; no abras webhook ni producción.

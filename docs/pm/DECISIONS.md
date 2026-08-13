@@ -5,6 +5,21 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-13 — Mercado Pago es opcional por vendedor
+
+Un vendedor sin vínculo usable de Mercado Pago conserva publicaciones y puede
+cobrar por transferencia si tiene datos bancarios. No se le exige Mercado Pago
+para publicar ni se oculta su catálogo. En un carrito mixto, cada grupo muestra
+sólo los medios realmente disponibles para ese vendedor.
+
+Motivo: preserva el flujo contractual ya aceptado y evita convertir una
+integración de pago en requisito de publicación. Si el vínculo cae, se apaga
+Mercado Pago para ese vendedor; no desaparecen sus productos.
+
+Una clave de cifrado ausente o mal formada es una falla de configuración de la
+plataforma, por lo que el estado visible es `no_configurado`, no «reconectar»:
+el vendedor no puede solucionar una clave operativa rota.
+
 ## 2026-08-12 — Emi confirma Mercado Pago por vendedor
 
 Cada vendedor vincula su propia cuenta de Mercado Pago mediante OAuth, cobra

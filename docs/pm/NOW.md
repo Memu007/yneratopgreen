@@ -94,18 +94,22 @@ directamente y paga la comisión normal; TopGreen cobra comisión cero. Un carri
 multivendedor requiere un pago por orden/vendedor. Estas dos consecuencias se
 informan a la clienta como funcionamiento del requisito, no como adicional.
 
-**Tarea activa única:** Pieza MP-A, conexión OAuth segura del vendedor. Incluye
-cifrado y ciclo de vida de credenciales, vínculo/revinculación/desvinculación y
-estado visible, pero todavía no crea preferencias ni cobra. La Dev pasa a
-**Extra**; entrega producto e informe separado y vuelve a PM antes de abrir la
-Pieza MP-B.
+La Pieza MP-A queda **aceptada**: producto inicial `5aee032`, corrección
+`e5cb94e` e informes `81f89ce` y `38a952b`. El vínculo OAuth usa state opaco de
+un solo uso, credenciales cifradas, cuenta MP única por vendedor y salidas
+accionables; `manual-link` desapareció. La corrección exige exactamente `1`
+para descartar tokens heredados, trata una clave Fernet inválida sin 500 y
+consume también el intento cancelado.
 
-Primera entrega de producto `5aee032`, **todavía no aceptada**. PM verificó
-build, sintaxis y `diff --check`; el límite de no mover dinero se conserva.
-Vuelve a Dev por tres defectos acotados: el permiso destructivo de migración no
-exige exactamente `1`, una clave Fernet no vacía pero inválida puede escapar
-como 500 al renovar y cancelar no consume el `state`. También falta el commit
-separado con el informe final. MP-B no se abre.
+La Dev informa suite **74/74**, hito 6/6, accesibilidad 56/56 y contraste 40/40.
+PM confirmó build, sintaxis Python, los tres discriminantes por código y
+`diff --check`. Docker local sigue apagado, por lo que PM no repitió la suite
+integral. No hay preferencias ni cobros: `payments.py` sigue desmontado.
+
+**Tarea activa única:** Pieza MP-B, contrato plural y preferencias de Checkout
+Pro contra el doble local, con activación productiva cerrada hasta MP-C. La Dev
+sigue en **Extra**. Un vendedor sin vínculo MP conserva transferencia y
+catálogo; el checkout resuelve el medio por grupo de vendedor.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 

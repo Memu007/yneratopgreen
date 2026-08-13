@@ -85,7 +85,7 @@ Contraste fase por fase, contra lo verificado en `MATRIZ.md`:
 | 1 — Diseño y UX/UI | 1–2 | **Puerta cerrada el 06/08, antes del inicio contractual.** Comprador, vendedor y logística tienen flujo navegable y evidencia responsive. El prototipo logístico fue aceptado en `823c3fe`. |
 | 2 — Desarrollo base | 3–5 | **Puerta funcional cerrada por trabajo previo.** Arquitectura, PostgreSQL + PostGIS, migraciones, seed, correo y perfiles editables incluidos transportistas tienen evidencia. |
 | 3 — Buscador y catálogo | 6–8 | **Puerta cerrada anticipadamente el 12/08.** Catálogo, búsqueda y geolocalización están encadenados en una evidencia reproducible; el hito intermedio queda habilitado. |
-| 4 — Pagos y checkout | 9–10 | **A medias.** Transferencia y contrato monetario exacto cerrados. Emi confirmó OAuth por vendedor y comisión cero; está abierta la primera pieza de implementación segura. |
+| 4 — Pagos y checkout | 9–10 | **A medias.** Transferencia, exactitud monetaria y vínculo OAuth seguro cerrados. Está abierta MP-B: contrato plural y preferencias; todavía no se habilitan cobros reales. |
 | 5 — QA y lanzamiento | 11–12 | **Empezada fuera de orden.** Hay 25 casos de humo ejecutados desde base limpia y preparacion de Railway, sin despliegue ni revision de seguridad. |
 
 **Tres consecuencias, y son de la PM:**
