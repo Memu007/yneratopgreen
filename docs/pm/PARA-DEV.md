@@ -2389,3 +2389,23 @@ de prueba. La próxima acción es humana de PM/Emi: acceder al panel integrador,
 usar la cuenta **vendedora** de prueba ya creada, autorizarla por OAuth y recién
 entonces repetir el guion. Dev sigue sin tarea activa hasta una devolución que
 demuestre un defecto de código.
+
+## 2026-08-14 — Vendedor de prueba correcto; falta aislar la sesión compradora
+
+PM vinculó correctamente el vendedor demo a la cuenta vendedora de prueba y
+abrió una preferencia real con una compradora de prueba. Mercado Pago llegó a
+la revisión de ARS 18.500, pero devolvió su error genérico al confirmar, primero
+con una tarjeta guardada y luego con la Visa de prueba oficial y titular
+`APRO`. En ambos intentos quedaron cero pagos, cero Webhooks y cero filas en
+`mp_intentos_de_pago`.
+
+La orden `ORD-20260814-630AEE45` se canceló por la ruta normal. PM contrastó en
+base: orden y pago cancelados, reserva liberada, link cerrado, stock 240,
+reservado 0 y ventas 0. Railway quedó en `SUCCESS`, health verde y
+`MP_CHECKOUT_HABILITADO=false` efectivo.
+
+**No hay tarea activa de Dev.** La documentación oficial de Checkout Pro pide
+hacer la compra de prueba en incógnito para evitar duplicidad de credenciales;
+este ensayo cambió vendedor y comprador dentro del mismo perfil. PM/Emi debe
+repetir una sola aprobación con sesiones aisladas. Sólo vuelve a Dev si ese
+ensayo falla y aporta evidencia de una solicitud propia o un pago consultable.

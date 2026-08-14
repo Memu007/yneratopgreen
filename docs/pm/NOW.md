@@ -4,9 +4,9 @@ Actualizado: 2026-08-14.
 
 ## Relevo inmediato — leer primero
 
-- GitHub: MP-D quedó documentado hasta `e4076ac`; este bloque agrega el relevo
-  final. La PM sólo debe editar `docs/pm/` y debe contrastar el commit actual al
-  ponerse al día.
+- GitHub: MP-D quedó documentado hasta `3daf944`; este bloque agrega el ensayo
+  siguiente. La PM sólo debe editar `docs/pm/` y debe contrastar el commit
+  actual al ponerse al día.
 - Cronograma: viernes 14/08, inicio de semana contractual 2, todavía Fase 1.
   El producto está adelantado en Fase 4 por decisión explícita, sin habilitar
   producción ni cambiar el calendario contractual.
@@ -15,23 +15,29 @@ Actualizado: 2026-08-14.
 - Entorno descartable: frontend `https://ynerav.up.railway.app`, Backend
   `https://backend-production-ba84.up.railway.app`, Railway
   `strong-playfulness`. Último cierre verificado: despliegue Backend
-  `1c53fdb5-c43b-44d6-a107-07bf69c548a6` en `SUCCESS`, `/api/health` HTTP 200 y
+  `4577b327-d938-4acc-b752-1ad60df3bb0a` en `SUCCESS`, `/api/health` HTTP 200 y
   `MP_CHECKOUT_HABILITADO=false` leído dentro del contenedor.
 - Mercado Pago: aplicación `TopGreen Agro Argentina`, ID `2410255372643376`.
   Webhook de prueba y variables están cargados; secretos sólo en Railway, nunca
   en Git. La cuenta real de Emi quedó **desvinculada** del vendedor demo.
-- Dos órdenes de ensayo quedaron canceladas y cerradas, sin pago:
-  `ORD-20260814-BFBDF01F` y `ORD-20260814-8400E59A`. En la segunda, Mercado Pago
-  bloqueó comprador de prueba + vendedor real antes de cobrar. Verificación
-  final: orden/pago `CANCELLED`, reserva liberada, link cerrado, stock 240,
-  reservado 0, ventas 0.
-- Bloqueo actual: falta entrar al panel integrador con la cuenta real de Emi,
-  tomar la cuenta **vendedora de prueba** ya creada y autorizarla por OAuth en
-  `vendedor@ejemplo.com`. Después se cambia a la compradora de prueba y se
-  repite el guion de `docs/homologacion-mercadopago.md`.
-- Dev: **sin tarea activa**. No hay defecto de código demostrado. La próxima
-  acción es humana de PM/Emi; sólo vuelve a Dev si el ensayo con ambas partes de
-  prueba revela un fallo reproducible.
+- Tres órdenes de ensayo quedaron canceladas y cerradas, sin pago:
+  `ORD-20260814-BFBDF01F`, `ORD-20260814-8400E59A` y
+  `ORD-20260814-630AEE45`. La tercera ya usó vendedor y comprador de prueba,
+  creó una preferencia real y llegó a la revisión de ARS 18.500. Mercado Pago
+  devolvió su error genérico tanto con la tarjeta guardada como con la Visa
+  oficial nueva, titular `APRO`; no emitió pago ni Webhook. Verificación final:
+  orden/pago `CANCELLED`, cero intentos MP, reserva liberada, link cerrado,
+  stock 240, reservado 0 y ventas 0.
+- Bloqueo actual: repetir únicamente la compra aprobada en una ventana de
+  incógnito, manteniendo separadas las sesiones del integrador/vendedor y del
+  comprador. La guía oficial de Checkout Pro lo exige para evitar duplicidad
+  de credenciales; el ensayo fallido cambió ambas cuentas en el mismo perfil
+  del navegador. Si falla también aislado, capturar la actividad de la cuenta
+  MP y recién entonces decidir una devolución a Dev.
+- Dev: **sin tarea activa**. No hay defecto de código demostrado: la preferencia
+  se creó y la falla ocurrió dentro de Mercado Pago, antes de pago, Webhook o
+  llamada propia. Sólo vuelve a Dev si el ensayo aislado descarta la duplicidad
+  de sesión y aporta un fallo reproducible de la integración.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
