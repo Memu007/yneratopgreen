@@ -2,160 +2,115 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-Fecha: 2026-08-14. Sexto informe: **MP-D, la homologación preparada**.
+Fecha: 2026-08-14. Séptimo informe: **la corrección corta de MP-D**.
 
-Empiezo por el freno, porque cambia cómo leer todo lo demás.
+Gracias por abrir la documentación y traer las seis respuestas. Corregí las seis
+cosas y no toqué nada más: sin ejecutar la homologación, sin infraestructura y
+sin cambiar la validación.
 
-## 1. La pasada documental no la pude hacer, y no la voy a simular
+## 1. Los seis puntos
 
-La primera mitad de MP-D era contrastar el código aceptado contra la
-documentación oficial vigente, en los contratos que el doble no puede probar. No
-pude: **la salida de red hacia Mercado Pago está bloqueada por política del
-entorno**, y no en un dominio sino en todos los que probé.
+**1. Webhooks en el panel: dejó de ser un `[VERIFICAR]` y pasó a ser paso
+obligatorio.** El runbook ahora dice los tres pasos —cargar la URL de prueba,
+seleccionar el evento **Pagos**, guardar— y dice lo que faltaba y explica por
+qué importa: **ahí es donde se genera el secreto de firma**. Sin ese paso no hay
+`MP_WEBHOOK_SECRET`, y sin secreto el webhook responde 503 a todo.
 
-```
-https://www.mercadopago.com.ar   bloqueado por el proxy de egress
-https://api.mercadopago.com      sin respuesta
-https://www.mercadopago.com.br   sin respuesta
-https://www.mercadopago.com.mx   sin respuesta
-https://www.mercadopago.cl       sin respuesta
-```
+Y quedó escrito que panel y payload cumplen funciones distintas y hacen falta
+los dos: el panel declara la integración y crea el secreto; la
+`notification_url` de cada preferencia es la que rige para ese pago y **tiene
+prioridad**. Antes el documento dejaba entender que con mandarla en el payload
+alcanzaba.
 
-El propio manual del proxy dice qué corresponde hacer: *«never disable TLS
-verification, never unset HTTPS_PROXY, and do not retry organization policy
-denials — report them instead»*. Es además la regla que ya tenemos con Emi: una
-política de seguridad del entorno no se rodea —ni con otro navegador, ni con un
-túnel, ni con un espejo—; se informa. Así que se informa.
+**2. Los tres perfiles.** Agregué una tabla que resuelve quién es quién antes de
+tocar el panel: **integrador** es la cuenta dueña de la aplicación —TopGreen—, y
+no cobra ni paga; **vendedor** y **comprador** son las dos cuentas de prueba.
+Tres roles, no cuatro cuentas, y lo digo con esas palabras para que nadie fabrique
+una cuenta de más.
 
-Lo que **no** hice, y quiero que quede dicho porque era la salida fácil: buscar
-la misma documentación en un dominio que el proxy todavía no bloquee, o citar de
-memoria. Vos pediste fuente oficial **con fecha** para toda afirmación sobre la
-API real. Una cita de memoria disfrazada de fuente es peor que no tener la
-fuente, porque parece verificada.
+La única comprobación humana que dejé abierta es la que corresponde: si el panel
+exigiera que la aplicación la cree una cuenta de prueba integradora en vez de la
+cuenta real, se hace lo que diga el panel y se anota. No inventé una cuarta
+cuenta para taparla.
 
-Sí funciona el buscador web, y devuelve resúmenes de terceros sobre esos mismos
-documentos. No los uso como fuente: no son oficiales y no tienen fecha.
+**3. Firma: confirmada, y la inconsistencia registrada.** El manifiesto, la
+omisión entera del campo ausente y la minúscula del `data.id` alfanumérico
+coinciden. Quedó anotado que la página oficial llama milisegundos al `ts` pero
+muestra un ejemplo de diez dígitos, que son segundos; el código tolera las dos
+formas y **no cambia el valor que firma**, así que la ambigüedad no lo afecta.
+No abrí ningún cambio funcional por esto.
 
-### Lo que queda pendiente de verificar, en forma de preguntas cerradas
+**4. Respuesta de pago: dicho como corresponde.** El runbook ahora afirma que la
+referencia oficial documenta `collector_id` arriba, la metadata, el
+`external_reference`, la moneda y el importe, y que **no documenta
+`preference_id`**. Por lo tanto la política actual queda como está y es la
+correcta: comparar el `preference_id` **sólo si viene**, y atar fuerte por el
+`orden_id` de la metadata.
 
-Esto es lo que hay que mirar apenas haya acceso —o lo puede mirar cualquiera con
-un navegador—. Están escritas para responderse con un sí o un no y una cita.
+**5. Cierre de preferencia: compatible, y lo que falta observar.** Queda dicho
+que la API oficial de actualización acepta `expires`, `expiration_date_from` y
+`expiration_date_to` —que es lo que manda el código—, y quedan marcadas como
+**[CONFIRMAR EN LA EJECUCIÓN]** las dos cosas que la documentación no responde:
+que una fecha pasada deje el link inutilizable de verdad, y qué devuelve al
+repetir el cierre. Los pasos 9 y 11 del guion son los que lo miran.
 
-1. **Firma del Webhook.** ¿El manifiesto es exactamente
-   `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`? ¿Se omite entera la parte
-   cuyo campo no viene? ¿El `data.id` alfanumérico va en minúsculas? ¿El `ts` es
-   en segundos o milisegundos?
-2. **`source_news=webhooks`.** ¿Es el parámetro vigente y va en la
-   `notification_url` de la preferencia? ¿Hace falta además declarar la URL en
-   el panel de la aplicación?
-3. **Campos reales de `/v1/payments/{id}`.** ¿Existe `preference_id` en la
-   respuesta? Hoy lo comparo **sólo si viene**, y la atadura fuerte es el
-   `orden_id` de la metadata. ¿`collector_id` viene siempre en el nivel de
-   arriba o a veces sólo dentro de `collector`?
-4. **Cierre de preferencia.** ¿`PUT /checkout/preferences/{id}` con `expires` y
-   una fecha pasada sigue siendo la forma oficial de apagar un link emitido?
-   ¿Devuelve algún error propio si ya venció?
-5. **Estados y tipos.** ¿La lista de estados de pago sigue siendo la que trato
-   —`pending`, `in_process`, `authorized`, `in_mediation`, `approved`,
-   `rejected`, `cancelled`, `expired`, `refunded`, `charged_back`—? ¿Hay alguno
-   nuevo? ¿`excluded_payment_types` con `ticket` y `atm` sigue siendo la forma
-   de excluir efectivo y cajero?
-6. **OAuth de cuenta de prueba.** ¿Una cuenta de prueba puede autorizar la
-   aplicación por OAuth como un vendedor real, o hay diferencias?
+Anotado también que no se confunda con `date_of_expiration`, que es para pagos
+offline.
 
-Ninguna de las seis se puede responder desde acá, y ninguna la voy a responder a
-ojo.
+**6. `atm` dejó de presentarse como universal.** `ticket` está documentado como
+excluible. Para `atm` el runbook ahora pide mirarlo en `GET /v1/payment_methods`
+con el token argentino de prueba durante la ejecución, y dice explícitamente que
+si no apareciera **no es un problema** —excluir un tipo que no existe no rompe
+nada— y que no bloquea la preparación ni justifica tocar el código antes de
+verlo.
 
-## 2. Lo que sí entregué
+## 2. El comentario falso de `config.py`
 
-La segunda mitad de MP-D no depende de la documentación: depende del código
-aceptado y de lo que se puede probar localmente. Está en
-`docs/homologacion-mercadopago.md`, y es un documento para que lo siga una
-persona en orden, sin leer código.
+Corregido, y **sólo el comentario**: el validador quedó intacto, y lo verifiqué
+mirando el diff línea por línea —ninguna línea del `field_validator` ni del
+`raise` cambió—.
 
-Lo puse en un archivo del repositorio y no acá adentro por una razón: este
-archivo lo reemplazo entero en cada informe, y un runbook que Emi va a seguir
-paso a paso no puede vivir en algo que se borra en el ciclo siguiente. Si
-preferís que viva sólo acá, se mueve.
+Decía que toda query degrada el aviso a IPN. Ahora dice el motivo verdadero por
+el que la base se declara sin query: **el parámetro que decide qué clase de
+aviso llega lo tiene que poner el código y no el entorno**, y aceptar query
+arbitraria dejaría que una variable mal puesta lo pise. Y aclara que «vacía» no
+es lo mismo que «sin webhook», porque el panel y el payload son cosas distintas.
 
-Tiene los cinco puntos que pediste:
+## 3. El aviso perdido, sin dominio ajeno
 
-1. **Checklist de cuentas, aplicación y secretos**, con qué produce cada cosa y
-   dónde termina el valor. Ninguna contraseña ni token pasa por mí ni por Git.
-2. **Variables y URLs exactas**, sacadas del código y no de mi memoria:
-   `{API}/api/mp-oauth/callback`, `{API}/api/mp/webhook` y los tres retornos en
-   `{FRONT}/payment/…`. La bandera arranca y termina apagada, y durante la
-   homologación se enciende en un solo paso del guion.
-3. **Comando único del reconciliador**, frecuencia propuesta con el número que
-   la justifica, y la prueba de solapamiento.
-4. **Guion de punta a punta**, diecisiete pasos con qué mirar en cada uno.
-5. **Criterio de rollback**: qué se apaga, qué se sigue aceptando y qué no hay
-   que hacer.
+Cambié el paso 13 del guion. Antes decía «apuntar la URL a otro lado», que es
+justamente lo que no hay que hacer: mandarle a un tercero avisos con datos de un
+pago es filtrarlos, y además deja el resultado a merced de lo que ese tercero
+conteste.
 
-## 3. La prueba de solapamiento, y lo que muestra de más
+Ahora es un fallo controlado y reversible **sobre nuestro propio dominio**: se
+apunta `MP_NOTIFICACION_URL` a una ruta que no existe en la misma API
+—`{API}/api/mp/webhook-fuera-de-servicio`—, con **una sola orden en vuelo**, se
+paga, se restaura la variable y se corre el reconciliador. El motivo de cada
+decisión está escrito al lado del paso.
 
-Pediste prueba de que dos ejecuciones solapadas no duplican efectos. Es el caso
-**100**, y son **dos procesos en paralelo**, no dos llamadas seguidas: una orden
-abandonada y vencida —hay que cancelarla y devolver su unidad— y una cobrada sin
-aviso —hay que procesarla—, cada una sobre una publicación distinta para poder
-atribuir cada efecto.
+## 4. Comprobación focal
 
-```
-corrida A   {"cobrada":1, "en_curso":1, "vencida":1}
-corrida B   {"cobrada":1, "en_curso":1, "liberada":1}
-```
+Como pediste, sin repetir la suite.
 
-Mirá los dos resúmenes antes de leer la conclusión: **las dos corridas informan
-haber actuado sobre las mismas dos órdenes**. Y sin embargo hubo exactamente una
-cancelación, una unidad devuelta, un descuento de stock, una venta contada y una
-sola fila de intento.
-
-No es contradicción, es el diseño, y prefiero decirlo yo antes de que lo piques:
-lo que garantiza «una sola vez» no es que el barrido corra una sola vez —eso no
-se puede garantizar— sino el `UPDATE ... WHERE` condicional sobre la marca de
-reserva, que la base serializa. El que gana la fila aplica el efecto; el que la
-pierde no hace nada y **lo informa igual**. El resumen registra lo que cada
-corrida miró, no lo que movió. Quien lea esos números en producción tiene que
-saberlo, así que está escrito también en el runbook.
-
-Una tercera corrida posterior no mueve nada.
-
-## 4. Código
-
-**Ninguno de producto.** No encontré un hueco que la documentación o una prueba
-local demostrara, y sin la documentación no voy a inventar uno. Lo único que
-agregué es el caso 100 y un ayudante de la suite para pedir dos publicaciones
-distintas del mismo vendedor.
-
-Ese ayudante salió de una falla mía: la primera versión del caso usaba el mismo
-producto para las dos órdenes, y ahí una liberación y una consolidación se
-compensan en el total reservado —de 2 a 0— así que la prueba no podía distinguir
-«cada efecto una vez» de «dos efectos cruzados». Con publicaciones distintas cada
-efecto es atribuible.
-
-## 5. Puertas
-
-| Puerta | Resultado |
+| | |
 |---|---|
-| Suite completa | **100 de 100**, 0 fallas |
+| Caso 95 —firma antes del cuerpo y `source_news=webhooks`— | **PASS** |
 | `git diff --check` (con `cr-at-eol`) | limpio |
+| Diff de `config.py` | 11 líneas, todas de comentario; validador sin tocar |
 
-No corrí hito, build, accesibilidad ni contraste: no hay cambio de producto ni
-de DOM en esta entrega. Si querés las cuatro igual, las corro.
+Una cosa que no puedo darte y prefiero decir por qué: **el caso 79 no se puede
+correr aislado**. Depende de `state.location`, que arma un caso temprano, así que
+filtrado explota con `localityId` indefinido antes de llegar a lo suyo. No es una
+regresión: el 79 pasó en la corrida completa 100/100 de `b8d69cd`, y desde
+entonces lo único que cambió en el producto es un comentario. Si querés el 79
+verde de nuevo hay que correr la suite entera, y dijiste que no hacía falta.
 
-## 6. Dónde frena esto
+## 5. Lo que sigue igual
 
-Frena en el punto exacto que pediste: **la homologación necesita acciones de Emi
-que yo no puedo ni debo hacer** —crear la aplicación, las dos cuentas de prueba,
-obtener el secreto de firma y cargar las variables en el Railway descartable—, y
-además necesita una verificación documental que este entorno no permite hacer.
+Sin ejecutar la homologación, sin infraestructura nueva, sin tocar Railway, la
+bandera en `false` y ninguna credencial en el repositorio.
 
-No abrí despliegue, no toqué Railway, la bandera sigue en `false` y no hay una
-sola credencial inventada en el repositorio.
-
-Lo que necesito para seguir, en orden de bloqueo:
-
-1. que se destrabe el acceso a la documentación oficial, o que alguien responda
-   las seis preguntas de la sección 1 con cita y fecha;
-2. que Emi cree lo de la sección 1 del runbook y cargue las variables;
-3. una orden explícita para ejecutar la homologación, que hoy no tengo.
+Sigue haciendo falta, en este orden: que Emi cree la aplicación y las dos cuentas
+de prueba, configure Webhooks en el panel —que es lo que genera el secreto— y
+cargue las variables; y una orden explícita para ejecutar, que no tengo.
