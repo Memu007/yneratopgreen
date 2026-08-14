@@ -121,6 +121,16 @@ async def _una(db: Session, orden: Order) -> str:
         )
         return SIN_RESPUESTA
 
+    # Lo que `sincronizar` decidió, escrito antes de volver a leer.
+    #
+    # La sesión de esta aplicación tiene `autoflush=False`, así que lo que quedó
+    # en memoria —que la orden pasó a pagada, por ejemplo— no llega solo a la
+    # base cuando se vuelve a consultar. Sin este `flush`, el `refresh` de abajo
+    # relee la fila vieja y **descarta** ese cambio: el barrido informaba
+    # «cobrada» y la orden se quedaba en `placed`, que es justo el estado falso
+    # que este módulo existe para no dejar.
+    db.flush()
+
     # El candado, otra vez y explícito: `sincronizar` pudo no haber llegado a
     # tomarlo —una orden sin intención sale antes—, y de acá para abajo se
     # escribe. El webhook toma este mismo candado antes de tocar nada, así que

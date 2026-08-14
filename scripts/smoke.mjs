@@ -7019,8 +7019,16 @@ await runCase(76, 'Dos vendedores con Mercado Pago: pagos separados y el que fal
     assert(buena.order_id !== trabada.order_id, 'las dos órdenes son la misma');
     assert(ordenEnLaBase(trabada.order_id).estado === 'placed',
       'la orden que no pudo preparar el pago no quedó colocada');
-    assert(pagosDe(trabada.order_id).length === 0,
-      'la orden que falló dejó una fila de pago a medias');
+    // La fila de pago existe —la intención se escribe con la reserva, antes de
+    // hablar con Mercado Pago— pero está **vacía de Mercado Pago**: sin
+    // preferencia y sin link. Que exista es lo que hace que esa reserva pueda
+    // vencer; que esté vacía es lo que prueba que nada quedó a medias.
+    const [intencion] = pagosDe(trabada.order_id);
+    assert(intencion, 'la orden que falló quedó sin intención de pago y su reserva no vence');
+    assert(pagosDe(trabada.order_id).length === 1, 'quedó más de una fila de pago');
+    assert(intencion[0] === NULO && intencion[1] === NULO,
+      `la fila de pago quedó a medias con datos de Mercado Pago: ${intencion.join(' | ')}`);
+    assert(intencion[4] === 'PENDING', `la intención quedó en «${intencion[4]}»`);
     assert(pagosDe(buena.order_id).length === 1,
       'la orden que salió bien no tiene exactamente un pago');
 
@@ -7039,7 +7047,12 @@ await runCase(76, 'Dos vendedores con Mercado Pago: pagos separados y el que fal
     });
     assert(reintento.data.preparation === 'pendiente' && reintento.data.reason === 'mp_rechazo',
       `el reintento devolvió ${JSON.stringify(reintento.data)}`);
-    assert(pagosDe(trabada.order_id).length === 0, 'el reintento dejó un pago a medias');
+    // El reintento que vuelve a fallar tampoco escribe nada de Mercado Pago: la
+    // intención sigue siendo la misma, una sola y vacía.
+    const trasReintento = pagosDe(trabada.order_id);
+    assert(trasReintento.length === 1, `el reintento dejó ${trasReintento.length} filas de pago`);
+    assert(trasReintento[0][0] === NULO && trasReintento[0][1] === NULO,
+      `el reintento dejó un pago a medias: ${trasReintento[0].join(' | ')}`);
 
     // Y si el vendedor revoca el vínculo, el reintento lo dice con su propio
     // motivo: la orden no cae a transferencia por atrás ni se marca de nada.
@@ -7052,8 +7065,11 @@ await runCase(76, 'Dos vendedores con Mercado Pago: pagos separados y el que fal
       `con el vínculo revocado el reintento devolvió ${JSON.stringify(sinVinculo.data)}`);
     assert(sinVinculo.data.payment_method === 'mercadopago',
       'la orden cambió de medio sola al perder el vínculo');
-    assert(pagosDe(trabada.order_id).length === 0,
-      'el reintento sin vínculo dejó una fila de pago');
+    const sinVinculoEnLaBase = pagosDe(trabada.order_id);
+    assert(sinVinculoEnLaBase.length === 1,
+      `perder el vínculo dejó ${sinVinculoEnLaBase.length} filas de pago`);
+    assert(sinVinculoEnLaBase[0][0] === NULO && sinVinculoEnLaBase[0][1] === NULO,
+      `el reintento sin vínculo dejó un pago a medias: ${sinVinculoEnLaBase[0].join(' | ')}`);
 
     // Cuando el vendedor arregla su cuenta, la MISMA orden se paga: se
     // revincula con una cuenta que sí contesta y se reanuda.
@@ -7148,8 +7164,12 @@ await runCase(77, 'Doble clic, corte de tiempo y reintento no crean un segundo p
     const [colgada] = lento.data.orders;
     assert(colgada.preparation === 'pendiente' && colgada.reason === 'mp_sin_respuesta',
       `con Mercado Pago mudo la orden quedó ${JSON.stringify(colgada)}`);
-    assert(pagosDe(colgada.order_id).length === 0,
-      'el corte de tiempo dejó una fila de pago');
+    // Igual que arriba: queda la intención con su plazo, sin nada de Mercado
+    // Pago adentro. Antes no quedaba ninguna, y esa reserva no vencía nunca.
+    const [tras_el_corte] = pagosDe(colgada.order_id);
+    assert(tras_el_corte, 'el corte de tiempo dejó la reserva sin intención que la venza');
+    assert(tras_el_corte[0] === NULO && tras_el_corte[1] === NULO,
+      `el corte de tiempo dejó una fila a medias: ${tras_el_corte.join(' | ')}`);
     assert(ordenEnLaBase(colgada.order_id).estado === 'placed',
       'la orden del corte de tiempo no quedó colocada');
 
@@ -8700,7 +8720,8 @@ await runCase(91, 'El reloj no libera stock: lo libera Mercado Pago', async () =
     const conCobro = await reconciliar();
     assert(conCobro.cobrada === 1, `la reconciliación dijo ${JSON.stringify(conCobro)}`);
     assert(ordenEnLaBase(cobrada.order_id).estado === 'paid',
-      'el reconciliador no procesó el pago aprobado que nadie había avisado');
+      'el reconciliador no procesó el pago aprobado que nadie había avisado: quedó en '
+      + `«${ordenEnLaBase(cobrada.order_id).estado}» y el barrido dijo ${JSON.stringify(conCobro)}`);
     assert(stockDe(cobrada.producto) === stockB - 1 && ventasDe(cobrada.producto) === ventasB + 1,
       'la consolidación por reconciliación no descontó exactamente una vez');
     assert(reservaDe(cobrada.order_id) === 'consolidada',
@@ -8966,6 +8987,8 @@ await runCase(94, 'La preferencia que falla no deja una reserva inmortal', async
 
     const producto = productoConStock(vendedor.id, 1);
     const antes = stockDe(producto);
+    // En diferencias: el producto puede traer reservas de otras compras vivas.
+    const reservadoAntes = reservadoDe(producto);
     await armarCarrito([{ product_id: producto, quantity: 1 }]);
     const creado = await apiRequest('/orders/checkout', {
       method: 'POST', token: state.buyerToken,
@@ -8979,7 +9002,8 @@ await runCase(94, 'La preferencia que falla no deja una reserva inmortal', async
     // llegado a tener link.
     assert(reservaDe(orden.order_id) === 'reservada',
       `la reserva quedó en «${reservaDe(orden.order_id)}»`);
-    assert(reservadoDe(producto) === 1, `reservado quedó en ${reservadoDe(producto)}`);
+    assert(reservadoDe(producto) === reservadoAntes + 1,
+      `lo reservado pasó de ${reservadoAntes} a ${reservadoDe(producto)}: tenía que subir una`);
 
     // Y ésta es la corrección: la intención de pago se escribió con la reserva,
     // antes de hablar con Mercado Pago, así que tiene plazo y el reconciliador
@@ -8996,14 +9020,15 @@ await runCase(94, 'La preferencia que falla no deja una reserva inmortal', async
     const primera = await reconciliar();
     assert(reservaDe(orden.order_id) === 'liberada',
       `tras reconciliar la reserva quedó en «${reservaDe(orden.order_id)}»`);
-    assert(reservadoDe(producto) === 0, `quedó ${reservadoDe(producto)} reservado`);
+    assert(reservadoDe(producto) === reservadoAntes,
+      `lo reservado quedó en ${reservadoDe(producto)} y tenía que volver a ${reservadoAntes}`);
     assert(stockDe(producto) === antes, `el stock quedó en ${stockDe(producto)} y era ${antes}`);
     assert(ordenEnLaBase(orden.order_id).estado === 'cancelled',
       'la orden abandonada no quedó cancelada');
 
     // Y una sola vez: repetir el barrido no vuelve a soltar nada.
     await reconciliar();
-    assert(reservadoDe(producto) === 0 && stockDe(producto) === antes,
+    assert(reservadoDe(producto) === reservadoAntes && stockDe(producto) === antes,
       'repetir el reconciliador movió el stock otra vez');
 
     return `la preferencia falló, la orden quedó reservada con su plazo escrito, el `
