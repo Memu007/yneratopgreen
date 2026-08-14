@@ -2236,3 +2236,56 @@ final suite completa, hito, build, migración ida/vuelta con datos,
 `alembic check` y `diff --check`; accesibilidad/contraste sólo si cambia DOM.
 Entregá producto e informe separados. Esfuerzo **Extra**. La bandera, Railway
 y credenciales reales siguen fuera de alcance.
+
+## 2026-08-14 — MP-C aceptada; siguiente portón MP-D
+
+MP-C queda aceptada con `b47ae14`, `39c3907` y `98ca684`; informe final
+`0f9646b`. Los seis bordes de la revisión quedan cerrados. También quedan
+aceptadas las dos correcciones que encontraste al revisar tu propia entrega:
+dos cobros no dejan de ser dos porque uno se devuelva, y el diff de
+`UserDashboard.tsx` vuelve a mostrar sólo las siete líneas reales.
+
+PM verificó el código de las seis correcciones y sus regresiones, build,
+sintaxis Python y `diff --check`. No repitió la suite porque Docker local sigue
+apagado; 99/99, hito 6/6, migración y puertas visuales continúan como evidencia
+tuya. Buena objeción sobre el intercalado del caso 99: la prueba final retiene
+la búsqueda que decide, demuestra el `FOR UPDATE` y no fabrica un falso verde.
+
+### Tarea activa única — MP-D: preparar la homologación real sin encenderla
+
+No agregues funciones de producto ni rediseño. No uses una cuenta, comprador,
+tarjeta ni dinero reales. No toques Railway todavía y no cambies
+`MP_CHECKOUT_HABILITADO=false`. Esfuerzo **Extra**.
+
+Hacé primero una pasada adversarial corta contra la documentación oficial
+vigente de Mercado Pago y el código aceptado, limitada a los contratos que el
+doble no puede probar: OAuth de cuenta de prueba, forma real de la preferencia,
+campos reales de `/v1/payments`, firma del Webhook, cierre de preferencia y
+estados/tipos contractuales. No reescribas lo que ya está probado si coincide.
+
+Después dejá lista, pero sin ejecutarla, una homologación reproducible sobre el
+Railway descartable:
+
+1. checklist exacto de cuentas de prueba, aplicación y secretos que Emi debe
+   crear o autorizar, sin pedir ni guardar contraseñas ni tokens en el repo;
+2. variables mínimas y URLs exactas de OAuth, retorno y notificación, siempre
+   con secretos fuera de Git y bandera todavía apagada;
+3. comando único del reconciliador, frecuencia propuesta y prueba de que dos
+   ejecuciones solapadas no duplican efectos; no agregues una cola ni un
+   framework si la entrada idempotente actual alcanza;
+4. guion de punta a punta con vendedor y comprador de prueba: vincular,
+   preferencia, pago aprobado/rechazado, Webhook firmado, estado visible,
+   stock, cancelación segura y reconciliación de aviso perdido;
+5. criterio de rollback: qué se apaga, qué avisos se siguen aceptando y cómo se
+   preservan cobros ya ocurridos.
+
+Implementá sólo un hueco de código o configuración si la documentación oficial
+o una prueba local demuestra que existe. Toda afirmación sobre la API real
+debe llevar fuente oficial y fecha. Si la homologación necesita una acción
+humana o credencial de Emi, frená exactamente ahí y entregá un informe breve
+con lo que falta; no lo sustituyas por credenciales inventadas ni abras alcance.
+
+Entregá cualquier corrección de producto en commit separado y el informe en
+`PARA-PM.md`. Si no hace falta código, entregá sólo el informe. Ahí vuelve a
+PM; desplegar al Railway descartable y mover dinero de prueba requieren una
+orden posterior explícita.

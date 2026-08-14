@@ -1,7 +1,7 @@
 # Matriz requisito contractual → evidencia → estado
 
-Contrastada contra `CONTRATO.md`. Actualizada el 2026-08-13 después del cierre
-de MP-B.
+Contrastada contra `CONTRATO.md`. Actualizada el 2026-08-14 después del cierre
+de MP-C contra el doble local.
 
 **Estados:** ✅ verificado con evidencia de ejecución · 🟡 existe en
 código, sin verificar · ⚪ parcial · ❌ inexistente
@@ -53,7 +53,7 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 
 | Requisito | Estado | Evidencia |
 |-----------|--------|-----------|
-| Mercado Pago, checkout básico | ⚪ | MP-A OAuth aceptada (`5aee032` + `e5cb94e`). MP-B plural/preferencias aceptada (`c671a4c` + `fe4a0b2` + `abebedb`): una orden/pago por vendedor, comisión cero, reanudación y bandera apagada; Dev informa 85/85. Falta MP-C: webhook firmado, estados y stock; no se ha cobrado dinero real |
+| Mercado Pago, checkout básico | ⚪ | MP-A OAuth y MP-B preferencias aceptadas. MP-C aceptada en `b47ae14` + `39c3907` + `98ca684`: Webhook firmado, consulta autoritativa, estados idempotentes, reserva/vencimiento y doble cobro visible; Dev informa 99/99. Falta homologar contra Mercado Pago de prueba, publicar la URL y programar el reconciliador; bandera apagada y cero dinero real |
 | — Agujero encontrado y cerrado | ✅ | `POST /payments/simulate-payment/{order_id}` permitía a un comprador autenticado pasar su propia orden a `PAID` sin pagar. Eliminado. Smoke 19: `payments`, `mp-oauth` y `simulate-payment` responden `404` porque los routers no se montan, no porque falten credenciales |
 | Exactitud monetaria de carrito y ambos checkouts | ✅ | `2220e94`: aritmética `Decimal` hasta persistencia. Casos 59–61 cubren centavos simples, rango alto y rechazo multivendedor atómico; PM verificó build, sintaxis, importes y `diff --check` |
 | Transferencia: los datos bancarios no cambian bajo el comprador | ✅ | Smoke 14: se crea la orden, se cambian CBU y alias en el perfil del vendedor, y el comprador sigue viendo los originales. API contrastada contra SQL |
@@ -87,7 +87,7 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 
 | Requisito | Estado |
 |-----------|--------|
-| Pruebas integrales | ✅ Suite informada 58/58 desde base limpia; build PM independiente verde. Pendiente repetir por el camino oficial Docker antes del lanzamiento |
+| Pruebas integrales | ✅ Dev informa 99/99 desde base limpia y hito 6/6; PM verificó build, sintaxis y regresiones MP-C por código. Pendiente repetir la suite oficial con Docker desde PM antes del lanzamiento |
 | Carga inicial de datos | ✅ Seed idempotente con 30 publicaciones en 12 categorías y 9 provincias, más 4.028 localidades. Verificado corriéndolo dos veces sin duplicar |
 | Despliegue en producción | ❌ |
 | Capacitación del panel de administración | ❌ |
@@ -101,9 +101,9 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 **Lo verificado es el recorrido de compra completo** más el stack
 tecnológico contractual, incluida la base de datos con PostGIS.
 
-**Lo que falta es el diferencial**: geolocalización, logística y
-transferencia bancaria. Son bloques enteros en cero, y son los que el
-contrato usa para definir el producto.
+**Los bloques funcionales contractuales ya existen.** Lo que falta para cerrar
+el producto es homologar Mercado Pago contra su entorno real de prueba y
+completar QA, operación, despliegue productivo, documentación y capacitación.
 
 Dos observaciones que el porcentaje no muestra:
 

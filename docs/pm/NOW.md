@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-08-13.
+Actualizado: 2026-08-14.
 
 ## Entrega aceptada y tarea actual
 
@@ -133,7 +133,7 @@ confirmó la corrección, la discriminación contra `fe4a0b2`, sintaxis Python y
 `diff --check`; Docker local sigue apagado, por lo que la ejecución 85/85 y las
 demás puertas son evidencia informada por la Dev.
 
-**Tarea activa única:** Pieza MP-C, verdad de pago por webhook firmado,
+**Tarea activa hasta esta revisión:** Pieza MP-C, verdad de pago por webhook firmado,
 transiciones idempotentes y política segura de stock/vencimiento contra el doble
 local. La Dev continúa en **Extra**. La bandera productiva permanece apagada:
 esta pieza no autoriza credenciales reales, Railway ni cobros.
@@ -147,6 +147,30 @@ local cuando falla la primera preferencia, `notification_url` contrario al
 modo Webhook oficial, cancelación de una orden MP ya pagada, edición de stock
 por debajo de lo reservado, preferencia viva/doble aprobación y pérdida del
 bloqueo dentro del reconciliador. Producción y bandera siguen cerradas.
+
+La Pieza MP-C queda **aceptada**: corrección principal `b47ae14`, cierre
+transaccional `39c3907`, corrección de doble cobro `98ca684` e informe final
+`0f9646b`. La intención y su vencimiento nacen con la reserva; el Webhook se
+autentica antes de leer el cuerpo y usa la URL oficial; una orden cobrada no se
+cancela; el stock no baja de lo reservado; el primer cobro cierra el link y
+dos cobros quedan visibles en revisión; el reconciliador conserva el candado
+hasta decidir. La Dev agregó regresiones 94–99 y encontró/corrigió además dos
+fallas propias antes del cierre.
+
+PM verificó el diff de código y las seis regresiones, compilación frontend,
+sintaxis Python y `diff --check`. Docker local sigue apagado, por lo que la
+suite 99/99, hito 6/6, migración y puertas visuales son evidencia informada por
+la Dev, no repetida por PM.
+
+**MP-C no habilita producción.** La bandera sigue apagada y Railway no se
+tocó. El próximo portón es MP-D: homologación contra Mercado Pago de prueba,
+URL pública firmada y reconciliación programada en el Railway descartable. No
+se usan compradores ni dinero reales y no se activa producción sin una
+aceptación nueva de PM y autorización explícita de Emi.
+
+**Tarea activa única:** MP-D, preparar la homologación real sin ejecutarla. La
+Dev continúa en **Extra** y debe volver a PM antes de tocar Railway o usar
+credenciales de prueba.
 
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 

@@ -1,6 +1,6 @@
 # Cronograma — el plan, con fechas reales
 
-Actualizado: 2026-08-13.
+Actualizado: 2026-08-14.
 
 **Fuente única: la sección 5 del PDF** *Documento de Especificación
 Funcional y Propuesta Comercial*, el que armó el socio y que la clienta
@@ -33,7 +33,7 @@ trabajo previo y no consumen el plazo contractual.
 | 4 — Pagos y checkout | Mercado Pago y validación de transferencias | 9–10 | 02/10 | 15/10 |
 | 5 — QA y lanzamiento | Pruebas, usabilidad, carga inicial, **despliegue en producción** | 11–12 | 16/10 | 29/10 |
 
-**Hoy es jueves 2026-08-13: semana 1, día 7.** La puerta de Fase 1 se cerró de
+**Hoy es viernes 2026-08-14: semana 2, día 1.** La puerta de Fase 1 se cerró de
 forma anticipada; el ensayo Railway es evidencia temprana de Fase 5, no un
 despliegue productivo ni un adelanto del hito final.
 
@@ -85,7 +85,7 @@ Contraste fase por fase, contra lo verificado en `MATRIZ.md`:
 | 1 — Diseño y UX/UI | 1–2 | **Puerta cerrada el 06/08, antes del inicio contractual.** Comprador, vendedor y logística tienen flujo navegable y evidencia responsive. El prototipo logístico fue aceptado en `823c3fe`. |
 | 2 — Desarrollo base | 3–5 | **Puerta funcional cerrada por trabajo previo.** Arquitectura, PostgreSQL + PostGIS, migraciones, seed, correo y perfiles editables incluidos transportistas tienen evidencia. |
 | 3 — Buscador y catálogo | 6–8 | **Puerta cerrada anticipadamente el 12/08.** Catálogo, búsqueda y geolocalización están encadenados en una evidencia reproducible; el hito intermedio queda habilitado. |
-| 4 — Pagos y checkout | 9–10 | **Avanzada.** Transferencia, exactitud monetaria, OAuth y preferencias plurales cerrados. Está abierta MP-C: webhook, estados y stock; todavía no se habilitan cobros reales. |
+| 4 — Pagos y checkout | 9–10 | **Código funcional cerrado contra dobles.** Transferencia, exactitud monetaria, OAuth, preferencias, Webhook, estados y stock aceptados. Falta homologación contra Mercado Pago de prueba, URL pública y reconciliador programado; todavía no se habilitan cobros reales. |
 | 5 — QA y lanzamiento | 11–12 | **Empezada fuera de orden.** Hay 25 casos de humo ejecutados desde base limpia y preparacion de Railway, sin despliegue ni revision de seguridad. |
 
 **Tres consecuencias, y son de la PM:**
