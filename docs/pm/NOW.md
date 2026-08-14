@@ -138,6 +138,16 @@ transiciones idempotentes y política segura de stock/vencimiento contra el dobl
 local. La Dev continúa en **Extra**. La bandera productiva permanece apagada:
 esta pieza no autoriza credenciales reales, Railway ni cobros.
 
+Primera entrega MP-C `9fa0eaf` e informe `4199aab`, **todavía no aceptados**.
+La base es sólida —firma HMAC, consulta al cobrador, intentos, reserva atómica,
+estado visible y reconciliador— y PM obtuvo build, sintaxis y `diff --check`
+verdes. La suite 93/93 es evidencia informada por la Dev porque Docker local de
+PM sigue apagado. Vuelve por seis bordes no cubiertos: reserva sin intención
+local cuando falla la primera preferencia, `notification_url` contrario al
+modo Webhook oficial, cancelación de una orden MP ya pagada, edición de stock
+por debajo de lo reservado, preferencia viva/doble aprobación y pérdida del
+bloqueo dentro del reconciliador. Producción y bandera siguen cerradas.
+
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
 **Cerrado por PM el 2026-08-10.** Emi declaró descartable el proyecto Railway

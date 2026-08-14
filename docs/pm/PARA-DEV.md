@@ -2176,3 +2176,63 @@ cambia DOM visible, migración ida/vuelta con datos, `alembic check` y
 `diff --check`. Entregá commit de producto e informe separado, incluyendo rojo
 contra MP-B, tabla de estados, campos persistidos, inventario de efectos y
 riesgos que impidan activar producción. Ahí vuelve a PM; no abras despliegue.
+
+### Primera revisión PM de `9fa0eaf`: todavía no aceptada
+
+La arquitectura principal queda conforme: firma HMAC, consulta con token del
+cobrador, asociación por orden/importe/moneda, intentos idempotentes, reserva
+atómica, retorno no autoritativo, estado visible y bandera apagada. PM obtuvo
+build, sintaxis Python y `diff --check` verdes. No reabras esos bloques ni
+agregues alcance. La suite 93/93 no fuerza seis bordes bloqueantes:
+
+1. **La primera preferencia fallida deja una reserva inmortal.**
+   `crear_ordenes()` confirma orden y reserva; recién después
+   `preparar_pago()` crea `Payment.expires_at`. Si MP falla antes de esa fila,
+   la orden queda `RESERVADA` sin `Payment`, y `_candidatas()` la excluye por
+   su `JOIN payments`: nunca vence ni libera. Persistí la intención y su plazo
+   en la misma transacción local que la reserva, antes del efecto externo. Un
+   timeout/rechazo permanente seguido de abandono debe entrar al reconciliador,
+   terminar sin pago y liberar exactamente una vez.
+2. **La URL configurada no fuerza Webhooks como afirma el informe.** La
+   documentación oficial vigente dice que, al configurar `notification_url`
+   en una preferencia, se agrega `source_news=webhooks` para recibir
+   exclusivamente Webhooks. El validador actual prohíbe cualquier query y el
+   caso 86 consagra esa regla equivocada. Conservá una base configurable sin
+   parámetros y agregá vos únicamente el parámetro oficial al payload; no
+   aceptes query arbitraria del entorno. Además autenticá con `data.id` de la
+   URL y headers **antes** de parsear el cuerpo: hoy se lee entero y se permite
+   usar el ID del cuerpo antes de validar, contra el contrato escrito.
+   Fuente: https://www.mercadopago.com.ar/developers/es/docs/checkout-bricks/additional-content/your-integrations/notifications/webhooks
+3. **Una orden MP ya pagada todavía se cancela sin reembolso.** En `/cancel`,
+   `venia_pagada=True` evita el 409: comprador o vendedor dejan la orden
+   terminal y restauran stock aunque el dinero siga con el vendedor. Una orden
+   MP con cobro acreditado no se cancela por estas rutas; queda `PAID` y el
+   inventario no se mueve. Probá ambos roles después del webhook aprobado, no
+   sólo el pago que aparece durante la cancelación.
+4. **El vendedor puede quitar stock ya reservado.** `PATCH /products/{id}`
+   acepta bajar `stock` por debajo de `stock_reservado` —incluso mientras otra
+   transacción reserva—; después `consolidar()` recorta a cero con `greatest` y
+   oculta la falta. Serializá edición y reserva sobre la fila de producto y
+   rechazá todo stock explícito inferior a lo reservado. Probá edición normal,
+   edición inválida y carrera contra la última unidad.
+5. **La preferencia queda viva después del primer cobro.** Checkout Pro puede
+   entregar varios intentos por la misma preferencia; hoy una primera
+   aprobación no la vence y dos IDs aprobados se resumen como un solo éxito.
+   Cerrá el link al primer aprobado. Si aparece más de una aprobación, no
+   consolides stock dos veces ni reembolses: dejá un estado operativo visible
+   que exija revisión y conserve todos los IDs. Probá dos pagos aprobados
+   distintos y la falla transitoria al cerrar el link.
+6. **El reconciliador pierde el candado antes de decidir.** `_una()` bloquea la
+   orden, pero `cobro.sincronizar()` hace `commit`; luego `_una()` revisa y
+   cierra/libera sin haber recuperado el bloqueo. Forzá un webhook aprobado
+   entre la búsqueda vacía y el cierre: nunca debe quedar cobro con reserva
+   liberada ni estado terminal falso. Mantené o recuperá el bloqueo en la
+   sección local que decide y hacé el commit en un solo dueño transaccional.
+
+Agregá una regresión discriminante por punto, roja contra `9fa0eaf`; las de
+concurrencia deben retener exactamente el intercalado peligroso, no confiar en
+dos llamadas que quizá se serialicen solas. Conservá los casos 86–93. Corré al
+final suite completa, hito, build, migración ida/vuelta con datos,
+`alembic check` y `diff --check`; accesibilidad/contraste sólo si cambia DOM.
+Entregá producto e informe separados. Esfuerzo **Extra**. La bandera, Railway
+y credenciales reales siguen fuera de alcance.
