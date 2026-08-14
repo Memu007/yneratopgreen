@@ -215,6 +215,21 @@ Siguen pendientes Webhooks, secreto y variables de Railway, OAuth del vendedor,
 ejecución de pagos de prueba y cualquier activación productiva. No se cargaron
 secretos en el repositorio, no se tocó Railway y no se movió dinero.
 
+**Duda del rótulo cerrada por PM el 2026-08-14:** la
+[guía oficial vigente de Checkout Pro](https://www.mercadopago.com.ar/developers/es/docs/checkout-pro/create-application)
+indica exactamente el alta realizada —pagos online, desarrollo propio,
+Checkouts y Checkout Pro— y su paso siguiente documentado es crear una
+preferencia. La referencia oficial conserva
+[`POST /checkout/preferences`](https://www.mercadopago.com.ar/developers/es/reference/online-payments/checkout-pro/preferences/create-preference/post)
+y
+[`PUT /checkout/preferences/{id}`](https://www.mercadopago.com.ar/developers/es/reference/online-payments/checkout-pro/preferences/update-preference/put)
+dentro de Checkout Pro. El panel de la aplicación terminada también la
+identifica como «Integración con CheckoutPro».
+Por estas tres señales concordantes, «API de Orders» en el resumen del asistente
+no obliga a cambiar el contrato implementado. No se hizo una llamada con el
+token porque ya no era necesaria para resolver la clasificación y habría
+ampliado el uso autorizado de credenciales sin aportar una decisión distinta.
+
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
 **Cerrado por PM el 2026-08-10.** Emi declaró descartable el proyecto Railway
