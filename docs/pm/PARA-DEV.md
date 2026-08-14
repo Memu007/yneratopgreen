@@ -2360,3 +2360,17 @@ apagada y no toques Railway.
 Entregá corrección documental/informe separados. No repitas suite completa:
 una comprobación focal de lo que toques y `diff --check` alcanzan. Esfuerzo
 **Alto** para esta corrección corta; Extra ya no aporta.
+
+## 2026-08-14 — Preparación MP-D aceptada; pausa en la puerta humana
+
+Aceptados el runbook `86d755b`, el caso 100, la corrección `13434a4` y el
+informe `76611d0`. La devolución quedó resuelta sin ampliar alcance: panel y
+payload diferenciados, tres perfiles, contratos oficiales incorporados,
+comentario falso corregido sin tocar el validador y aviso perdido limitado al
+dominio propio. PM verificó el diff y `diff --check`; el caso 95 focal informado
+es proporcional al cambio.
+
+No abras otra pieza ni toques Railway. No hay tarea activa para Dev hasta que
+Emi complete las acciones humanas del runbook y autorice explícitamente la
+ejecución de la homologación. La bandera permanece apagada, el Webhook sigue
+sin credenciales y no se usa dinero real.

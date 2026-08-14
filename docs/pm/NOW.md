@@ -186,6 +186,21 @@ También debe corregirse el comentario viejo del código que todavía afirma que
 toda query degrada a IPN, contradiciendo `source_news=webhooks`. MP-D no se
 ejecuta ni se abre Railway.
 
+La preparación de MP-D queda **aceptada**: runbook inicial `86d755b`, caso 100
+de reconciliadores solapados, corrección documental `13434a4` e informe final
+`76611d0`. El panel Webhooks, los tres perfiles, la firma, los campos reales de
+pago, el cierre de preferencia y los medios quedaron contrastados con fuentes
+oficiales; el comentario técnico falso y el ensayo de aviso perdido quedaron
+corregidos sin cambiar comportamiento.
+
+PM confirmó que el único cambio de producto son 11 líneas de comentario y que
+el validador permanece intacto; `diff --check` queda verde. La Dev informa caso
+95 focal verde y conserva la evidencia previa 100/100. **No hay tarea activa de
+Dev:** MP-D queda detenido en una acción humana de Emi —crear/autorizar la
+aplicación, vendedor y comprador de prueba, configurar Webhooks y cargar las
+variables en el Railway descartable— y en una orden explícita posterior para
+ejecutar. La bandera sigue apagada y no se movió dinero.
+
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
 **Cerrado por PM el 2026-08-10.** Emi declaró descartable el proyecto Railway
