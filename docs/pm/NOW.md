@@ -254,6 +254,50 @@ se reinició Backend, no se ejecutaron migraciones, no se vinculó al vendedor,
 no se corrió el guion MP-D y no hubo pagos. El próximo paso requiere una orden
 separada de Emi para desplegar/homologar.
 
+**MP-D ejecutado parcialmente por PM el 2026-08-14, sin pago:** Emi dio la
+orden separada para homologar en `strong-playfulness`, exclusivamente con
+cuentas y datos de prueba. Backend quedó desplegado con el manifiesto correcto
+(`Dockerfile.railway`, migración previa y salud en `/api/health`) y la cuenta
+TopGreen `vendedor@ejemplo.com` quedó vinculada por OAuth a la cuenta vendedora
+de prueba. La interfaz confirmó que el vendedor cobra en su propia cuenta y que
+TopGreen no recibe ni retiene el dinero.
+
+PM encendió temporalmente `MP_CHECKOUT_HABILITADO`, entró como la compradora de
+prueba de TopGreen y creó la orden `ORD-20260814-BFBDF01F` por ARS 18.500 sobre
+`Insecticida Lambda Cihalotrina 1L`. Mercado Pago generó la preferencia en la
+cuenta vinculada del vendedor; antes de pagar, la base mostró orden `PLACED`,
+reserva `reservada`, pago `PENDING`, preferencia presente, ningún `payment_id`,
+stock 240, reservado 1 y ventas 0. El checkout mostró producto e importe
+correctos.
+
+La sesión de Mercado Pago abierta en el navegador resultó ser la cuenta real de
+Emi y mostró sus medios reales. PM lo detectó antes de cualquier acción de
+pago, no pulsó «Pagar» y Emi ordenó explícitamente **no comprar**. La orden de
+prueba se canceló desde TopGreen: la comprobación posterior en base devolvió
+orden y pago `CANCELLED`, reserva `liberada`, `link_cerrado=true`, ningún pago,
+stock 240, reservado 0 y ventas 0. Finalmente Railway quedó con
+`MP_CHECKOUT_HABILITADO=false` efectivo y Backend respondió HTTP 200. No se
+movió dinero ni quedó un enlace de esta orden utilizable.
+
+Por lo tanto, MP-D **no está homologado completo**. Quedaron sin ejecutar el
+pago aprobado, Webhook, descuento único de stock, rechazo, reconciliación y
+vencimiento. No deben darse por verdes ni delegarse como si ya tuvieran
+evidencia real. Para retomarlo hará falta iniciar sesión realmente con la
+cuenta compradora de prueba y una autorización nueva de Emi para efectuar un
+pago de prueba.
+
+**Incidentes operativos de esta ejecución:** el primer intento de desplegar
+Backend desde la raíz aplicó por error el manifiesto del frontend. PM lo
+detectó antes de OAuth o pagos; al retirarlo también se retiró el despliegue
+Backend sano y hubo un 404 breve. Se recuperó desde una copia temporal que
+contenía sólo `backend/`, sin alterar Git ni los volúmenes. Más tarde, durante
+el encendido temporal, Railway demoró el reemplazo y una orden de reinicio que
+la CLI reportó como fallida terminó apagando el contenedor recién sano; hubo un
+502 transitorio y se recuperó mediante un redeploy del mismo artefacto. La base
+y los archivos persistentes no se perdieron. Lección operativa: no usar
+`railway up` desde la raíz para Backend, no usar `railway down` como rollback y
+no pedir `restart` mientras un despliegue todavía está cambiando de estado.
+
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
 **Cerrado por PM el 2026-08-10.** Emi declaró descartable el proyecto Railway
