@@ -4,9 +4,9 @@ Actualizado: 2026-08-14.
 
 ## Relevo inmediato — leer primero
 
-- GitHub: MP-D quedó documentado hasta `3daf944`; este bloque agrega el ensayo
-  siguiente. La PM sólo debe editar `docs/pm/` y debe contrastar el commit
-  actual al ponerse al día.
+- GitHub: MP-D quedó documentado hasta `e28446b` y la cortesía de vendedores se
+  decidió en `4cf40eb`. La PM sólo debe editar `docs/pm/` y debe contrastar el
+  commit actual al ponerse al día.
 - Cronograma: viernes 14/08, inicio de semana contractual 2, todavía Fase 1.
   El producto está adelantado en Fase 4 por decisión explícita, sin habilitar
   producción ni cambiar el calendario contractual.
@@ -34,10 +34,11 @@ Actualizado: 2026-08-14.
   de credenciales; el ensayo fallido cambió ambas cuentas en el mismo perfil
   del navegador. Si falla también aislado, capturar la actividad de la cuenta
   MP y recién entonces decidir una devolución a Dev.
-- Dev: **sin tarea activa**. No hay defecto de código demostrado: la preferencia
-  se creó y la falla ocurrió dentro de Mercado Pago, antes de pago, Webhook o
-  llamada propia. Sólo vuelve a Dev si el ensayo aislado descarta la duplicidad
-  de sesión y aporta un fallo reproducible de la integración.
+- Dev: **tarea activa única**, esfuerzo Alto: documentación manual de vendedores
+  como cortesía de primera clienta, con orden completa en `PARA-DEV.md`. Es
+  independiente de MP-D y no bloquea publicaciones, pagos ni el cronograma.
+  Mercado Pago sólo vuelve a Dev si el ensayo aislado aporta un defecto propio
+  reproducible.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar

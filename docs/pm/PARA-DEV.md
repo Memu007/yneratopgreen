@@ -2409,3 +2409,82 @@ hacer la compra de prueba en incógnito para evitar duplicidad de credenciales;
 este ensayo cambió vendedor y comprador dentro del mismo perfil. PM/Emi debe
 repetir una sola aprobación con sesiones aisladas. Sólo vuelve a Dev si ese
 ensayo falla y aporta evidencia de una solicitud propia o un pago consultable.
+
+## Tarea activa única — Documentación de vendedores revisada
+
+Emi aprobó esta pieza como cortesía sin costo para la primera clienta. Es
+independiente de la homologación externa de Mercado Pago: no investigues MP-D,
+no toques Railway ni cambies ninguna bandera. Esfuerzo **Alto**, no Extra.
+
+### Resultado de producto
+
+Una persona que quiera vender puede presentar CUIT, razón social y una única
+constancia fiscal PDF. La clienta la revisa desde administración y decide
+pendiente, aprobada o rechazada. Una aprobación muestra el distintivo exacto
+**«Documentación revisada»** donde se identifica públicamente al vendedor. No
+uses «Vendedor verificado» ni texto que garantice identidad, solvencia o
+ausencia de fraude.
+
+La revisión es informativa y **no bloquea** registro, publicaciones, catálogo,
+checkout, transferencias ni Mercado Pago. No conviertas esta cortesía en KYC.
+
+### Alcance cerrado
+
+- Datos: CUIT argentino con validación formal, razón social y un PDF vigente
+  presentado por el propio usuario. Conservá sólo el archivo actual; al
+  reemplazarlo, el anterior deja de ser accesible y se elimina del almacenamiento.
+- Estados: sin presentación, pendiente, aprobada y rechazada. Presentar o
+  reemplazar documentación siempre vuelve a pendiente y retira el distintivo.
+- El usuario ve su estado y, ante rechazo, un motivo breve y accionable. No ve
+  identidad interna del administrador.
+- Administración tiene una cola filtrable, abre el PDF privado y aprueba o
+  rechaza. Rechazar exige motivo; cada decisión registra administrador, fecha y
+  transición en la auditoría existente.
+- El PDF sólo puede verlo su titular y un administrador. Nunca queda en URL
+  pública, respuesta de catálogo, logs ni nombre de archivo predecible. Aplicá
+  límite razonable de tamaño y comprobá extensión, tipo declarado y firma PDF;
+  un archivo disfrazado debe fallar antes de persistirse.
+- El distintivo público deriva del estado aprobado actual. Mostralo en el bloque
+  de vendedor que ya existe en el detalle de publicación y en cualquier otro
+  componente de identidad que ya reutilice ese mismo dato, sin crear una ruta o
+  perfil público nuevo. No expongas CUIT, razón social, PDF, motivo ni datos de
+  revisión.
+
+### Fuera de alcance y condición de freno
+
+Sin RENAPER, ARCA, DNI, selfie, biometría, OCR, consulta fiscal automática,
+alertas de vencimiento, monitoreo periódico, puntuación de riesgo, bloqueo de
+cuentas ni garantía antifraude. Sin dependencia nueva salvo que la validación
+segura del PDF sea imposible con lo que ya existe; si ocurre, frená y proponé
+una sola opción con su motivo antes de instalarla. No rediseñes administración.
+
+Si el modelo actual de usuarios impide ofrecerlo sin inventar un rol vendedor,
+no agregues un rol: proponé el criterio mínimo que reutilice publicaciones o el
+panel existente y esperá decisión de PM.
+
+### Evidencia adversarial y aceptación
+
+1. Usuario A no puede presentar, leer ni reemplazar documentación de B; un no
+   administrador no puede listar pendientes ni decidir estados.
+2. CUIT inválido, PDF sobredimensionado, tipo incorrecto y archivo renombrado a
+   `.pdf` fallan sin fila ni archivo huérfano.
+3. Presentación válida queda pendiente y sin distintivo; aprobación admin crea
+   una sola transición auditada y muestra «Documentación revisada» únicamente
+   para ese vendedor.
+4. Rechazo exige motivo, lo muestra al titular y nunca muestra distintivo;
+   volver a presentar retira el rechazo y queda pendiente.
+5. Reemplazar una presentación aprobada quita el distintivo, conserva sólo el
+   archivo nuevo y no deja una URL anterior utilizable.
+6. Dos decisiones administrativas concurrentes no producen un estado sin
+   autor, una auditoría falsa ni dos efectos contradictorios aceptados.
+7. Publicar y comprar siguen funcionando en los cuatro estados; esta pieza no
+   altera pagos, stock ni la elegibilidad actual para vender.
+
+La regresión debe demostrar al menos permisos, archivo disfrazado, ciclo
+aprobación→reemplazo y decisión concurrente contra la versión anterior. Corré
+suite completa desde base limpia, puerta del hito, migración ida/vuelta con
+datos, `alembic check`, build y `diff --check`. Como cambia interfaz visible,
+corré accesibilidad y contraste en las vistas nuevas o modificadas, en ambas
+medidas. Entregá commit de producto y luego informe separado en `PARA-PM.md`,
+con inventario de datos guardados, permisos, archivos eliminados y pruebas.
+Ahí volvés a PM; no abras otra mejora.
