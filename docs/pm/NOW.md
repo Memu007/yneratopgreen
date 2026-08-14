@@ -172,6 +172,20 @@ aceptación nueva de PM y autorización explícita de Emi.
 Dev continúa en **Extra** y debe volver a PM antes de tocar Railway o usar
 credenciales de prueba.
 
+Primera entrega MP-D `86d755b` e informe `b8d69cd`, **todavía no aceptados**.
+El runbook reproducible y el caso 100 de dos reconciliadores solapados quedan
+bien encaminados; no hubo código de producto, credenciales, Railway ni bandera.
+La Dev frenó correctamente ante el bloqueo de documentación de su entorno.
+
+PM sí pudo consultar las fuentes oficiales vigentes el 14/08 y devolvió una
+corrección documental acotada: el panel de la aplicación debe configurar URL
+de prueba, evento Pagos y guardar para generar el secreto; el checklist de
+marketplace debe distinguir integrador, vendedor y comprador; y el runbook
+debe incorporar los contratos ya confirmados sin dejar `[VERIFICAR]` genéricos.
+También debe corregirse el comentario viejo del código que todavía afirma que
+toda query degrada a IPN, contradiciendo `source_news=webhooks`. MP-D no se
+ejecuta ni se abre Railway.
+
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
 **Cerrado por PM el 2026-08-10.** Emi declaró descartable el proyecto Railway

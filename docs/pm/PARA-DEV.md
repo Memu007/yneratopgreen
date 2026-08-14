@@ -2289,3 +2289,74 @@ Entregá cualquier corrección de producto en commit separado y el informe en
 `PARA-PM.md`. Si no hace falta código, entregá sólo el informe. Ahí vuelve a
 PM; desplegar al Railway descartable y mover dinero de prueba requieren una
 orden posterior explícita.
+
+### Primera revisión PM de MP-D `86d755b`: preparación buena, corrección corta
+
+El freno fue correcto: no correspondía sortear la política de red ni citar de
+memoria. El runbook es útil, el alcance se respetó y el caso 100 prueba dos
+procesos realmente solapados con efectos atribuibles. PM revisó el diff y
+`diff --check`; Docker local sigue apagado, por lo que 100/100 continúa como
+evidencia informada por vos.
+
+PM sí pudo abrir la documentación oficial vigente el 14/08. No ejecutes la
+homologación ni agregues infraestructura: corregí sólo el documento, el
+comentario técnico falso y, si hace falta, aserciones documentales de la suite.
+
+1. **Webhooks en el panel no es opcional.** Para Checkout Pro se configura la
+   URL de prueba, se selecciona el evento **Pagos** y se guarda; recién ahí se
+   genera el secreto de firma. La `notification_url` de cada preferencia tiene
+   prioridad y `source_news=webhooks` sigue siendo la forma oficial de pedir
+   Webhooks en vez de IPN. Convertí el `[VERIFICAR]` del runbook en paso
+   obligatorio y explicá que panel y payload cumplen funciones distintas.
+   Fuentes:
+   https://www.mercadopago.com.ar/developers/es/docs/checkout-pro/payment-notifications
+   y
+   https://www.mercadopago.com.ar/developers/es/docs/checkout-bricks/additional-content/your-integrations/notifications/webhooks
+2. **Marketplace distingue tres perfiles de prueba:** integrador, vendedor y
+   comprador. El checklist actual nombra la cuenta real de TopGreen, vendedor y
+   comprador, pero no resuelve el perfil integrador. Decí explícitamente qué
+   cuenta es dueña de la aplicación y cuál actúa como integradora en la prueba;
+   si el panel real es quien lo determina, dejá esa única comprobación humana
+   cerrada y no inventes una cuarta cuenta. Fuentes:
+   https://www.mercadopago.com.ar/developers/es/docs/your-integrations/test/accounts
+   y
+   https://www.mercadopago.com.ar/developers/es/docs/split-payments/split-1-1/integration-configuration/integrate-marketplace
+3. **Firma confirmada.** El manifiesto, omisión de campos ausentes y minúscula
+   alfanumérica coinciden. La página llama milisegundos al `ts` pero muestra un
+   ejemplo de diez dígitos; el código ya tolera segundos y milisegundos sin
+   cambiar el valor firmado. Registrá esa inconsistencia oficial, no abras un
+   cambio funcional.
+4. **Respuesta de pago confirmada parcialmente.** La referencia oficial de
+   `GET /v1/payments/{id}` documenta `collector_id` arriba, metadata,
+   `external_reference`, moneda e importe; no documenta `preference_id`. La
+   política actual —compararlo sólo si viene y atar fuerte por metadata— queda
+   correcta y debe decirse así.
+   Fuente:
+   https://www.mercadopago.com.ar/developers/es/reference/online-payments/checkout-pro/get-payment/get
+5. **Cierre de preferencia compatible, todavía sujeto a prueba real.** La API
+   oficial de actualización acepta `expires`, `expiration_date_from` y
+   `expiration_date_to`; la homologación debe confirmar que una fecha pasada
+   deja inutilizable el link y qué devuelve al repetir. No confundas esto con
+   `date_of_expiration`, que la guía usa para pagos offline.
+   Fuente:
+   https://www.mercadopago.com.ar/developers/es/reference/online-payments/checkout-pro/preferences/update-preference/put
+6. **Medios.** `excluded_payment_types: ticket` está documentado. No presentes
+   `atm` como universal hasta observarlo en `GET /v1/payment_methods` con el
+   token argentino de prueba; dejalo como dato a confirmar en la ejecución, no
+   como bloqueo de preparación.
+   Fuente:
+   https://www.mercadopago.com.ar/developers/es/docs/checkout-pro/additional-settings/payment-methods
+
+Además corregí conceptualmente un resto de MP-C: el comentario previo a
+`MP_NOTIFICACION_URL` en `backend/app/core/config.py` todavía afirma que toda
+query degrada a IPN, mientras el validador y el payload ya implementan el
+parámetro oficial. Cambiá sólo ese comentario; no cambies la validación.
+
+En el guion de aviso perdido, reemplazá «apuntar a otro lado» por un fallo
+controlado y reversible de la URL de prueba —sin dominio ajeno y con una sola
+orden en vuelo—, seguido de restauración y reconciliación. Conservá la bandera
+apagada y no toques Railway.
+
+Entregá corrección documental/informe separados. No repitas suite completa:
+una comprobación focal de lo que toques y `diff --check` alcanzan. Esfuerzo
+**Alto** para esta corrección corta; Extra ya no aporta.
