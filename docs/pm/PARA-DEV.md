@@ -2374,3 +2374,18 @@ No abras otra pieza ni toques Railway. No hay tarea activa para Dev hasta que
 Emi complete las acciones humanas del runbook y autorice explícitamente la
 ejecución de la homologación. La bandera permanece apagada, el Webhook sigue
 sin credenciales y no se usa dinero real.
+
+## 2026-08-14 — Homologación externa todavía bloqueada; sin tarea de código
+
+PM ejecutó dos intentos controlados en Railway. El segundo llegó al pago con
+comprador de prueba, pero Mercado Pago lo frenó correctamente porque el
+vendedor demo estaba vinculado por error a la cuenta real de Emi. No hubo pago
+ni Webhook; la orden se canceló, el stock se liberó una vez, el link quedó
+cerrado y `MP_CHECKOUT_HABILITADO=false` volvió a quedar efectivo. La cuenta
+real fue desvinculada del vendedor demo.
+
+No corrijas producto ni cambies el runbook: éste ya exigía vendedor y comprador
+de prueba. La próxima acción es humana de PM/Emi: acceder al panel integrador,
+usar la cuenta **vendedora** de prueba ya creada, autorizarla por OAuth y recién
+entonces repetir el guion. Dev sigue sin tarea activa hasta una devolución que
+demuestre un defecto de código.

@@ -258,9 +258,12 @@ separada de Emi para desplegar/homologar.
 orden separada para homologar en `strong-playfulness`, exclusivamente con
 cuentas y datos de prueba. Backend quedó desplegado con el manifiesto correcto
 (`Dockerfile.railway`, migración previa y salud en `/api/health`) y la cuenta
-TopGreen `vendedor@ejemplo.com` quedó vinculada por OAuth a la cuenta vendedora
-de prueba. La interfaz confirmó que el vendedor cobra en su propia cuenta y que
-TopGreen no recibe ni retiene el dinero.
+TopGreen `vendedor@ejemplo.com` quedó vinculada por OAuth a una cuenta que en
+ese momento se creyó vendedora de prueba. La interfaz confirmó que el vendedor
+cobra en su propia cuenta y que TopGreen no recibe ni retiene el dinero. La
+segunda ejecución descrita abajo demostró que la cuenta vinculada era en
+realidad la cuenta productiva de Emi; esta afirmación queda corregida y no se
+usa como evidencia de homologación.
 
 PM encendió temporalmente `MP_CHECKOUT_HABILITADO`, entró como la compradora de
 prueba de TopGreen y creó la orden `ORD-20260814-BFBDF01F` por ARS 18.500 sobre
@@ -282,9 +285,35 @@ movió dinero ni quedó un enlace de esta orden utilizable.
 Por lo tanto, MP-D **no está homologado completo**. Quedaron sin ejecutar el
 pago aprobado, Webhook, descuento único de stock, rechazo, reconciliación y
 vencimiento. No deben darse por verdes ni delegarse como si ya tuvieran
-evidencia real. Para retomarlo hará falta iniciar sesión realmente con la
-cuenta compradora de prueba y una autorización nueva de Emi para efectuar un
-pago de prueba.
+evidencia real. Para retomarlo hacen falta las dos partes de prueba: vincular
+al vendedor de prueba y pagar desde el comprador de prueba. No alcanza con
+cambiar sólo al comprador.
+
+**Segundo intento controlado de MP-D, 2026-08-14:** Emi autorizó efectuar un
+pago exclusivamente de prueba. PM inició sesión en Mercado Pago como comprador
+de prueba, creó la orden `ORD-20260814-8400E59A` por ARS 18.500 y confirmó en
+base el estado previo: orden `PLACED`, reserva `reservada`, pago `PENDING`, sin
+`payment_id`, stock 240, reservado 1 y ventas 0. El checkout identificó la
+sesión como cuenta de prueba y mostró una tarjeta oficial de prueba. Al pulsar
+«Pagar», Mercado Pago frenó la operación antes de cobrar con el mensaje de que
+una de las partes era de prueba.
+
+La verificación posterior explicó el bloqueo: el vendedor TopGreen estaba
+vinculado al MP user `241548475`, correspondiente a la cuenta real de Emi, no a
+la cuenta vendedora de prueba. No hubo pago ni Webhook: la orden seguía
+`PLACED`, el pago `PENDING`, sin `payment_id`, stock 240, reservado 1 y ventas
+0. PM canceló esa orden desde «Mis compras» y comprobó luego orden y pago
+`CANCELLED`, reserva `liberada`, `link_cerrado=true`, stock 240, reservado 0 y
+ventas 0. También desvinculó la cuenta real del vendedor demo.
+
+Railway terminó el despliegue de cierre en `SUCCESS`, Backend respondió HTTP
+200 y `MP_CHECKOUT_HABILITADO=false` quedó efectivo. La protección de Mercado
+Pago y la cancelación segura de TopGreen funcionaron; el pago aprobado,
+Webhook, descuento de stock, rechazo, aviso perdido y vencimiento continúan sin
+evidencia externa. No hay corrección de producto asignada a Dev: el siguiente
+paso es una acción humana de PM/Emi, entrar al panel integrador, obtener la
+cuenta **vendedora** de prueba ya creada, vincularla por OAuth y repetir el
+guion con el comprador de prueba.
 
 **Incidentes operativos de esta ejecución:** el primer intento de desplegar
 Backend desde la raíz aplicó por error el manifiesto del frontend. PM lo
@@ -435,7 +464,7 @@ y tierras quedaron decididos para una Fase 6 posterior al MVP contractual.
 
 ## Dónde estamos
 
-La medición contractual reponderada al 2026-08-12 es **~84%**. Es una
+La medición contractual reponderada al 2026-08-14 es **~89%**. Es una
 aproximación por esfuerzo, no habilita cobros ni reemplaza las puertas de
 `CRONOGRAMA.md`. El hito intermedio ya tiene demostración conjunta aceptada.
 
@@ -446,10 +475,10 @@ requisitos de logística son un módulo entero, no nueve tareas chicas.
 |---|---|---|
 | Comprador y vendedor | 30 % | 95 % |
 | **Logística y transportistas** | **25 %** | **100 % y demostración conjunta aceptada** |
-| Pagos | 15 % | 55 % |
+| Pagos | 15 % | 85 %; código aceptado, homologación externa incompleta |
 | Catálogo y categorías | 8 % | 100 % |
 | Stack y responsive | 10 % | 85 % |
-| Cierre, despliegue y entrega | 12 % | 45 % |
+| Cierre, despliegue y entrega | 12 % | 50 % |
 
 El faltante grande ya no es logística: es Mercado Pago básico y el cierre de
 producción/entrega. No se adelantan por entusiasmo; manda el cronograma.
