@@ -2,115 +2,112 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-Fecha: 2026-08-14. Séptimo informe: **la corrección corta de MP-D**.
+Fecha: 2026-08-14. Octavo informe: **el rótulo «API de Orders» y nuestra
+integración**.
 
-Gracias por abrir la documentación y traer las seis respuestas. Corregí las seis
-cosas y no toqué nada más: sin ejecutar la homologación, sin infraestructura y
-sin cambiar la validación.
+Al día desde `2fa4f3e`. Investigación solamente: no toqué código, ni Railway, ni
+credenciales, ni webhooks.
 
-## 1. Los seis puntos
+## 1. No pude verificar contra la documentación oficial
 
-**1. Webhooks en el panel: dejó de ser un `[VERIFICAR]` y pasó a ser paso
-obligatorio.** El runbook ahora dice los tres pasos —cargar la URL de prueba,
-seleccionar el evento **Pagos**, guardar— y dice lo que faltaba y explica por
-qué importa: **ahí es donde se genera el secreto de firma**. Sin ese paso no hay
-`MP_WEBHOOK_SECRET`, y sin secreto el webhook responde 503 a todo.
+Lo mismo que en MP-D, y lo compruebo de nuevo antes de decirlo:
 
-Y quedó escrito que panel y payload cumplen funciones distintas y hacen falta
-los dos: el panel declara la integración y crea el secreto; la
-`notification_url` de cada preferencia es la que rige para ese pago y **tiene
-prioridad**. Antes el documento dejaba entender que con mandarla en el payload
-alcanzaba.
+```
+https://www.mercadopago.com.ar/developers/es/docs        sin respuesta
+https://www.mercadopago.com.ar/developers/es/reference   sin respuesta
+https://api.mercadopago.com/                             sin respuesta
+WebFetch → EGRESS_BLOCKED: "blocked by the network egress proxy"
+```
 
-**2. Los tres perfiles.** Agregué una tabla que resuelve quién es quién antes de
-tocar el panel: **integrador** es la cuenta dueña de la aplicación —TopGreen—, y
-no cobra ni paga; **vendedor** y **comprador** son las dos cuentas de prueba.
-Tres roles, no cuatro cuentas, y lo digo con esas palabras para que nadie fabrique
-una cuenta de más.
+La política de red del entorno sigue bloqueando `mercadopago.com`. No la rodeo y
+no contesto de memoria: **esta pregunta decide si la integración entera sirve**,
+y una respuesta mía sin fuente sería exactamente el tipo de afirmación que no se
+puede usar para tomar esa decisión.
 
-La única comprobación humana que dejé abierta es la que corresponde: si el panel
-exigiera que la aplicación la cree una cuenta de prueba integradora en vez de la
-cuenta real, se hace lo que diga el panel y se anota. No inventé una cuarta
-cuenta para taparla.
+Lo único con fecha y fuente oficial que tenemos internamente es tu propia
+verificación del 14/08, que abrió
+`…/reference/online-payments/checkout-pro/preferences/update-preference/put`.
+Que esa referencia exista **bajo Checkout Pro** es evidencia de que la API de
+preferencias estaba documentada y vigente ese día — pero no responde por sí sola
+qué habilita una aplicación rotulada «API de Orders», que es otra cosa.
 
-**3. Firma: confirmada, y la inconsistencia registrada.** El manifiesto, la
-omisión entera del campo ausente y la minúscula del `data.id` alfanumérico
-coinciden. Quedó anotado que la página oficial llama milisegundos al `ts` pero
-muestra un ejemplo de diez dígitos, que son segundos; el código tolera las dos
-formas y **no cambia el valor que firma**, así que la ambigüedad no lo afecta.
-No abrí ningún cambio funcional por esto.
+## 2. La pregunta, precisada
 
-**4. Respuesta de pago: dicho como corresponde.** El runbook ahora afirma que la
-referencia oficial documenta `collector_id` arriba, la metadata, el
-`external_reference`, la moneda y el importe, y que **no documenta
-`preference_id`**. Por lo tanto la política actual queda como está y es la
-correcta: comparar el `preference_id` **sólo si viene**, y atar fuerte por el
-`orden_id` de la metadata.
+«¿El rótulo permite nuestra integración?» es ambiguo y por eso es difícil de
+responder. Lo que hay que resolver es esto, que es verificable:
 
-**5. Cierre de preferencia: compatible, y lo que falta observar.** Queda dicho
-que la API oficial de actualización acepta `expires`, `expiration_date_from` y
-`expiration_date_to` —que es lo que manda el código—, y quedan marcadas como
-**[CONFIRMAR EN LA EJECUCIÓN]** las dos cosas que la documentación no responde:
-que una fecha pasada deje el link inutilizable de verdad, y qué devuelve al
-repetir el cierre. Los pasos 9 y 11 del guion son los que lo miran.
+> **¿Una aplicación dada de alta con ese producto autoriza estos cinco llamados,
+> con el token OAuth de un vendedor tercero?**
 
-Anotado también que no se confunda con `date_of_expiration`, que es para pagos
-offline.
+Si la respuesta es sí para los cinco, el rótulo es cosmético y no cambia nada. Si
+falla alguno, sabemos exactamente cuál y qué hay que rehacer.
 
-**6. `atm` dejó de presentarse como universal.** `ticket` está documentado como
-excluible. Para `atm` el runbook ahora pide mirarlo en `GET /v1/payment_methods`
-con el token argentino de prueba durante la ejecución, y dice explícitamente que
-si no apareciera **no es un problema** —excluir un tipo que no existe no rompe
-nada— y que no bloquea la preparación ni justifica tocar el código antes de
-verlo.
+## 3. El contrato exacto que hay que contrastar
 
-## 2. El comentario falso de `config.py`
+Todo lo que el producto le pide a Mercado Pago, sacado del código y no de mi
+memoria. Nada más que esto: no hay un sexto llamado escondido.
 
-Corregido, y **sólo el comentario**: el validador quedó intacto, y lo verifiqué
-mirando el diff línea por línea —ninguna línea del `field_validator` ni del
-`raise` cambió—.
+| # | Llamado | Para qué | Dónde está |
+|---|---|---|---|
+| 1 | `POST /checkout/preferences` | crear el link de pago | `mp_preferencia.py:171` |
+| 2 | `PUT /checkout/preferences/{id}` | apagar un link ya emitido | `mp_pagos.py:166` |
+| 3 | `GET /v1/payments/{id}` | la única fuente de verdad del estado | `mp_pagos.py:112` |
+| 4 | `GET /v1/payments/search` | recuperar un aviso perdido | `mp_pagos.py:128` |
+| 5 | `POST /oauth/token` | vincular y renovar al vendedor | `mp_vinculo.py:243` |
 
-Decía que toda query degrada el aviso a IPN. Ahora dice el motivo verdadero por
-el que la base se declara sin query: **el parámetro que decide qué clase de
-aviso llega lo tiene que poner el código y no el entorno**, y aceptar query
-arbitraria dejaría que una variable mal puesta lo pise. Y aclara que «vacía» no
-es lo mismo que «sin webhook», porque el panel y el payload son cosas distintas.
+Más la pantalla de autorización (`/authorization`, `response_type=code`,
+`mp_vinculo.py:218`) y los dos `grant_type` que usamos: `authorization_code` y
+`refresh_token` (`mp_vinculo.py:285` y `:297`).
 
-## 3. El aviso perdido, sin dominio ajeno
+El cuerpo de la preferencia lleva exactamente: `items`, `external_reference`,
+`back_urls`, `expires` con `expiration_date_from`/`expiration_date_to`,
+`metadata`, `payment_methods.excluded_payment_types` y `notification_url`.
+**No lleva `marketplace_fee`** —ni en cero— y no lleva `auto_return`.
 
-Cambié el paso 13 del guion. Antes decía «apuntar la URL a otro lado», que es
-justamente lo que no hay que hacer: mandarle a un tercero avisos con datos de un
-pago es filtrarlos, y además deja el resultado a merced de lo que ese tercero
-conteste.
+El primero de los cinco es el que decide: **si una aplicación «API de Orders» no
+autoriza `POST /checkout/preferences`, no hay integración**, porque el resto
+cuelga de la preferencia que ese llamado crea.
 
-Ahora es un fallo controlado y reversible **sobre nuestro propio dominio**: se
-apunta `MP_NOTIFICACION_URL` a una ruta que no existe en la misma API
-—`{API}/api/mp/webhook-fuera-de-servicio`—, con **una sola orden en vuelo**, se
-paga, se restaura la variable y se corre el reconciliador. El motivo de cada
-decisión está escrito al lado del paso.
+## 4. Cómo se responde esto, de más barato a más caro
 
-## 4. Comprobación focal
+1. **Documentación oficial.** Vos tenés acceso y yo no. Dos preguntas concretas:
+   ¿qué habilita el tipo de aplicación que el panel rotuló «API de Orders»?
+   ¿`/checkout/preferences` sigue siendo el camino vigente de Checkout Pro, o
+   quedó reemplazado por otro endpoint para altas nuevas?
+2. **El panel de la aplicación.** La ficha de credenciales de
+   `TopGreen Agro Argentina` (`2410255372643376`) lista qué productos quedaron
+   habilitados. Es una mirada de Emi, sin tocar nada.
+3. **Una sola llamada real, que es la prueba definitiva.** Crear **una**
+   preferencia con el token de prueba y mirar el código de respuesta. Si
+   devuelve 201, la pregunta está contestada de la única forma que no admite
+   interpretación.
 
-Como pediste, sin repetir la suite.
+   Vale decir algo sobre esa tercera: **crear una preferencia no mueve dinero**
+   —es pedir un link— así que es segura en ese sentido. Pero necesita
+   credenciales, y hoy me dijiste que no las toque, así que **no la hice**. Queda
+   propuesta, no ejecutada.
 
-| | |
-|---|---|
-| Caso 95 —firma antes del cuerpo y `source_news=webhooks`— | **PASS** |
-| `git diff --check` (con `cr-at-eol`) | limpio |
-| Diff de `config.py` | 11 líneas, todas de comentario; validador sin tocar |
+## 5. Qué pasaría si el rótulo sí importara
 
-Una cosa que no puedo darte y prefiero decir por qué: **el caso 79 no se puede
-correr aislado**. Depende de `state.location`, que arma un caso temprano, así que
-filtrado explota con `localityId` indefinido antes de llegar a lo suyo. No es una
-regresión: el 79 pasó en la corrida completa 100/100 de `b8d69cd`, y desde
-entonces lo único que cambió en el producto es un comentario. Si querés el 79
-verde de nuevo hay que correr la suite entera, y dijiste que no hacía falta.
+Para que la decisión no dependa de esperar: si resultara que esa aplicación no
+sirve para preferencias, lo que hay que cambiar es **acotado y conocido**, y no
+toca nada de lo que costó los últimos ciclos.
 
-## 5. Lo que sigue igual
+Lo que **no** se toca en ningún escenario: la firma del webhook, la máquina de
+estados de cobro, la reserva de stock, el reconciliador, el candado, la
+idempotencia. Todo eso opera sobre nuestras propias tablas y sobre
+`GET /v1/payments/{id}`, no sobre la forma de crear el link.
 
-Sin ejecutar la homologación, sin infraestructura nueva, sin tocar Railway, la
-bandera en `false` y ninguna credencial en el repositorio.
+Lo que se tocaría: el módulo que arma y apaga el link
+—`mp_preferencia.py` y las dos rutas de preferencia en `mp_pagos.py`— y el
+doble. Es la pieza más chica de todo el cobro, y está aislada justamente porque
+es la que depende de una decisión de producto de Mercado Pago.
 
-Sigue haciendo falta, en este orden: que Emi cree la aplicación y las dos cuentas
-de prueba, configure Webhooks en el panel —que es lo que genera el secreto— y
-cargue las variables; y una orden explícita para ejecutar, que no tengo.
+No lo estoy proponiendo ni empezando: lo digo para que sepas el tamaño del
+riesgo mientras se consigue la evidencia.
+
+## 6. Lo que no hice
+
+No toqué código, Railway, credenciales ni webhooks. No creé ninguna preferencia.
+No busqué la documentación en un dominio que el proxy no bloquee. No respondí de
+memoria. La bandera sigue en `false`.
