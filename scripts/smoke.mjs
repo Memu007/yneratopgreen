@@ -6692,6 +6692,24 @@ function productoConStock(vendedor, minimo = 2) {
   return fila[0];
 }
 
+// Dos publicaciones distintas del mismo vendedor. Hace falta cuando una prueba
+// tiene que atribuir un efecto a una compra y no a otra: con el mismo producto,
+// una liberación y una consolidación se ven iguales en el total reservado.
+function dosProductosDistintos(vendedor, minimo = 2) {
+  const filas = queryRows(`
+    SELECT p.id FROM products p
+    JOIN categories c ON c.id = p.category_id
+    WHERE p.seller_id = ${sqlLiteral(vendedor)} AND p.status = 'ACTIVE'
+      AND p.publication_type <> 'servicio' AND c.is_service = false
+      AND coalesce(p.stock, 0) - p.stock_reservado >= ${minimo}
+    ORDER BY p.price
+    LIMIT 2
+  `);
+  assert(filas.length === 2,
+    `el vendedor ${vendedor} no tiene dos publicaciones con ${minimo} disponible(s)`);
+  return [filas[0][0], filas[1][0]];
+}
+
 async function armarCarrito(items) {
   await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
   await apiRequest('/cart/sync', {
@@ -9442,6 +9460,80 @@ await runCase(99, 'El reconciliador no suelta el candado entre preguntar y decid
     return `con el pago entrando entre la búsqueda y el cierre, la fila estaba bloqueada; la `
       + `orden quedó pagada y consolidada, el stock bajó una sola unidad y el barrido `
       + `no la venció (${JSON.stringify(resumen)})`;
+  } finally {
+    await doble.cerrar();
+    try {
+      if (vendedor) await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(100, 'Dos reconciliadores a la vez no duplican ningún efecto', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let vendedor = null;
+  try {
+    vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900615')).ok === 'vinculado', 'no vinculó');
+
+    // Una que nadie pagó y ya venció: al barrido le toca cerrarla y devolver
+    // su unidad. Y una cobrada sin avisar: le toca procesar el pago.
+    // Dos publicaciones distintas a propósito: con la misma, una liberación y
+    // una consolidación se compensan en el total reservado y la prueba no
+    // podría distinguir «cada efecto una vez» de «dos efectos cruzados».
+    const [productoA, productoB] = dosProductosDistintos(vendedor.id);
+    const abandonada = await ordenMercadoPago(vendedor, { producto: productoA });
+    const cobrada = await ordenMercadoPago(vendedor, { producto: productoB });
+    assert(abandonada.producto !== cobrada.producto, 'las dos órdenes usaron el mismo producto');
+    doble.crearPago({
+      referencia: `topgreen-${cobrada.order_number}`,
+      preferencia: cobrada.preferencia, cuenta: '900615', monto: cobrada.amount,
+      ordenId: cobrada.order_id, ordenNumero: cobrada.order_number, estado: 'approved',
+    });
+    vencerElLink(abandonada.order_id);
+    vencerElLink(cobrada.order_id);
+
+    const reservadoAbandonada = reservadoDe(abandonada.producto);
+    const stockCobrada = stockDe(cobrada.producto);
+    const ventasCobrada = ventasDe(cobrada.producto);
+
+    // Los dos a la vez, de verdad: dos procesos, no dos llamadas seguidas.
+    // Es la forma en que esto va a correr si alguien programa el barrido y una
+    // corrida se solapa con la anterior porque la primera tardó de más.
+    const [uno, dos] = await Promise.all([reconciliar(), reconciliar()]);
+
+    // La abandonada: cerrada una vez y con su unidad devuelta una vez.
+    assert(ordenEnLaBase(abandonada.order_id).estado === 'cancelled',
+      `la abandonada quedó en «${ordenEnLaBase(abandonada.order_id).estado}»`);
+    assert(reservadoDe(abandonada.producto) === reservadoAbandonada - 1,
+      `lo reservado pasó de ${reservadoAbandonada} a ${reservadoDe(abandonada.producto)}: `
+      + 'se soltó más de una vez');
+    assert(reservaDe(abandonada.order_id) === 'liberada',
+      `la reserva quedó en «${reservaDe(abandonada.order_id)}»`);
+
+    // La cobrada: pagada, con un solo descuento y una sola venta contada.
+    assert(ordenEnLaBase(cobrada.order_id).estado === 'paid',
+      `la cobrada quedó en «${ordenEnLaBase(cobrada.order_id).estado}»`);
+    assert(stockDe(cobrada.producto) === stockCobrada - 1,
+      `el stock pasó de ${stockCobrada} a ${stockDe(cobrada.producto)}: se descontó de más`);
+    assert(ventasDe(cobrada.producto) === ventasCobrada + 1,
+      `las ventas pasaron de ${ventasCobrada} a ${ventasDe(cobrada.producto)}`);
+    assert(intentosDe(cobrada.order_id).length === 1,
+      `quedaron ${intentosDe(cobrada.order_id).length} intentos para un solo pago`);
+
+    // Y una tercera corrida, ya con todo resuelto, no encuentra nada que hacer
+    // con estas dos: la entrada es idempotente y no sólo entre paralelas.
+    const tercera = await reconciliar();
+    assert(reservadoDe(abandonada.producto) === reservadoAbandonada - 1
+      && stockDe(cobrada.producto) === stockCobrada - 1
+      && ventasDe(cobrada.producto) === ventasCobrada + 1,
+      `la tercera corrida movió algo: ${JSON.stringify(tercera)}`);
+
+    return 'dos barridos en paralelo sobre una orden abandonada y una cobrada sin avisar: '
+      + `1 cancelación, 1 unidad devuelta, 1 descuento y 1 venta contada `
+      + `(${JSON.stringify(uno)} y ${JSON.stringify(dos)}); la tercera corrida no movió nada`;
   } finally {
     await doble.cerrar();
     try {
