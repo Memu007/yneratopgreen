@@ -169,6 +169,12 @@ usen Mercado Pago.
   falsas retiradas antes de capacitar.
 - Capacitacion basica y documentacion tecnica del despliegue listas.
 - Acta de lanzamiento que fija el inicio de los 90 dias de garantia.
+- Cortesía de primera clienta, después de las funciones contractuales pendientes
+  y antes de cerrar la puerta de lanzamiento:
+  revisión manual de CUIT, razón social y una constancia fiscal; estados de
+  revisión, trazabilidad administrativa y distintivo «Documentación revisada».
+  La clienta decide; TopGreen no certifica identidad ni garantiza ausencia de
+  fraude. Sin RENAPER/ARCA, DNI, biometría ni validación automática.
 
 **Limite:** Dockerfiles o archivos de Railway no prueban despliegue.
 

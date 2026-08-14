@@ -5,6 +5,24 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-14 — Cortesía de cierre: documentación de vendedores revisada
+
+Emi decide incorporar sin costo adicional una verificación **manual y mínima**
+de documentación de vendedores como gesto para la primera clienta. La opera la
+clienta desde administración; Ynera construye el flujo, pero no certifica la
+identidad ni asume la decisión.
+
+Alcance cerrado: CUIT, razón social, una constancia fiscal en PDF, estados
+pendiente/aprobado/rechazado, registro de quién decidió y cuándo, y distintivo
+visible **«Documentación revisada»**. No se usa «Vendedor verificado» porque
+implicaría una garantía mayor que la comprobación realizada.
+
+Quedan fuera RENAPER/ARCA, DNI, selfie o biometría, validación automática,
+monitoreo permanente, alertas de vencimiento y garantía contra fraude. Entra
+como cortesía de cierre después de las funciones contractuales pendientes y
+antes de cerrar la puerta de lanzamiento; no desplaza Mercado Pago, no modifica
+los hitos y no consume el colchón de las semanas 13–14.
+
 ## 2026-08-13 — Un retorno no prueba pago y Mercado Pago reserva stock
 
 La fuente de verdad de un cobro es una notificación Webhook autenticada seguida
