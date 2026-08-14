@@ -201,6 +201,20 @@ aplicación, vendedor y comprador de prueba, configurar Webhooks y cargar las
 variables en el Railway descartable— y en una orden explícita posterior para
 ejecutar. La bandera sigue apagada y no se movió dinero.
 
+**Avance externo verificado por PM el 2026-08-14:** se creó en la cuenta real
+de Emi la aplicación separada `TopGreen Agro Argentina`, número
+`2410255372643376`, para pagos online, desarrollo propio y Checkout Pro, con el
+frontend descartable como sitio de prueba. No se reutilizó ni modificó
+`cdiynera`, que pertenece a CDI y apunta a otro despliegue. Mercado Pago ya
+tenía dos cuentas argentinas reutilizables, una compradora y una vendedora; no
+se crearon duplicados ni se consumieron cupos. El asistente del panel rotuló la
+aplicación como Checkout Pro pero mostró «API de Orders» en la confirmación:
+antes de homologar debe contrastarse ese rótulo con el contrato implementado
+mediante `/checkout/preferences`, sin asumir compatibilidad por el solo alta.
+Siguen pendientes Webhooks, secreto y variables de Railway, OAuth del vendedor,
+ejecución de pagos de prueba y cualquier activación productiva. No se cargaron
+secretos en el repositorio, no se tocó Railway y no se movió dinero.
+
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
 **Cerrado por PM el 2026-08-10.** Emi declaró descartable el proyecto Railway
