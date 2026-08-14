@@ -230,6 +230,30 @@ no obliga a cambiar el contrato implementado. No se hizo una llamada con el
 token porque ya no era necesaria para resolver la clasificación y habría
 ampliado el uso autorizado de credenciales sin aportar una decisión distinta.
 
+**Preparación externa completada por PM el 2026-08-14, sin homologar:** Emi
+autorizó y realizó los consentimientos humanos; la aplicación conserva la URL
+OAuth `https://backend-production-ba84.up.railway.app/api/mp-oauth/callback`.
+Webhooks quedó configurado en modo de prueba con
+`https://backend-production-ba84.up.railway.app/api/mp/webhook` y el evento que
+el panel vigente denomina **«Pagos (legacy)»**; no se seleccionó «Order (Mercado
+Pago)» porque el contrato implementado recibe avisos de pagos y consulta
+`/v1/payments`. Para poder obtener Client ID/Secret, Emi activó las credenciales
+productivas desde el panel; esa activación habilita capacidad técnica pero no
+movió dinero ni enciende TopGreen por sí sola.
+
+Railway `strong-playfulness`, servicio Backend, entorno `production`, recibió
+las once variables previstas: `FRONTEND_URL`, `MP_APP_ID`,
+`MP_CHECKOUT_HABILITADO`, `MP_CLIENT_SECRET`, `MP_MINUTOS_DE_GRACIA`,
+`MP_MINUTOS_DE_VIGENCIA`, `MP_NOTIFICACION_URL`, `MP_REDIRECT_URI`,
+`MP_TOKEN_KEY`, `MP_TOLERANCIA_FIRMA_SEGUNDOS` y `MP_WEBHOOK_SECRET`. Las tres
+secretas viajaron directamente a Railway, nunca a Git ni al chat; los archivos
+temporales de transferencia se eliminaron y los valores se limpiaron de la
+sesión. La comprobación posterior devolvió los once nombres y
+`MP_CHECKOUT_HABILITADO=false`. Todas se cargaron con despliegues omitidos: no
+se reinició Backend, no se ejecutaron migraciones, no se vinculó al vendedor,
+no se corrió el guion MP-D y no hubo pagos. El próximo paso requiere una orden
+separada de Emi para desplegar/homologar.
+
 ## Ensayo Railway descartable — Gate A y Gate B cerrados
 
 **Cerrado por PM el 2026-08-10.** Emi declaró descartable el proyecto Railway
