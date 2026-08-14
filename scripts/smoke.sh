@@ -69,11 +69,15 @@ echo "===> Configurando el vinculo de Mercado Pago contra el doble local"
   echo "MP_AUTH_BASE_URL=http://127.0.0.1:8099"
   echo "MP_API_BASE_URL=http://127.0.0.1:8099"
   # El cobro por Mercado Pago se enciende SOLO para la suite y SOLO
-  # contra el doble. En produccion la bandera queda apagada hasta que
-  # exista el webhook firmado, la consulta de estado y la politica de
-  # stock: sin eso, cobrar de verdad seria prometer lo que no podemos
-  # confirmar.
+  # contra el doble. En produccion la bandera queda apagada: que el webhook
+  # firmado, la consulta de estado y la reserva de stock existan y esten
+  # probados no es lo mismo que haberlos operado con plata real.
   echo "MP_CHECKOUT_HABILITADO=true"
+  # El secreto con el que el doble firma los avisos. Es inventado, igual que
+  # todo lo de arriba, y tiene que coincidir con el que usa scripts/smoke.mjs.
+  echo "MP_WEBHOOK_SECRET=secreto-local-de-prueba-no-es-real"
+  echo "MP_MINUTOS_DE_VIGENCIA=30"
+  echo "MP_MINUTOS_DE_GRACIA=10"
 } >> backend/.env
 
 echo "===> Compilando frontend"
@@ -109,7 +113,7 @@ if [ "$frontend_ready" != "true" ]; then
   exit 1
 fi
 
-echo "===> Ejecutando 85 smoke tests"
+echo "===> Ejecutando 93 smoke tests"
 set +e
 node scripts/smoke.mjs "$@"
 smoke_exit=$?

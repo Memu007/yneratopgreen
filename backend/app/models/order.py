@@ -62,6 +62,14 @@ class Order(Base):
     shipping_mode = Column(String(20), nullable=True)
     carrier_id = Column(String(36), ForeignKey("users.id"), nullable=True, index=True)
 
+    # En qué anda la reserva de stock de esta orden. Es una sola palabra y es
+    # la que hace que el efecto sobre el stock ocurra **exactamente una vez**:
+    # consolidar y liberar son `UPDATE ... WHERE stock_reserva = 'reservada'`,
+    # así que un aviso repetido, uno en paralelo y uno fuera de orden compiten
+    # por la misma fila y sólo uno la mueve. NULL es "esta orden no reserva":
+    # transferencia y todo lo anterior a esta pieza.
+    stock_reserva = Column(String(20), nullable=True, index=True)
+
     # Notas
     buyer_notes = Column(String(500), nullable=True)
     seller_notes = Column(String(500), nullable=True)

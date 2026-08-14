@@ -15,6 +15,7 @@ from app.models.product import Product, ProductStatus
 from app.models.product_image import ProductImage
 from app.models.locality import Locality
 from app.models.user import User
+from app.services import stock
 from app.schemas.catalog import (
     CategoryResponse,
     SubcategoryBase,
@@ -277,7 +278,11 @@ def get_products(
         query = query.filter(Product.price <= max_price)
     
     if in_stock:
-        query = query.filter(Product.stock > 0)
+        # Disponible, no existente: una unidad reservada por una compra que
+        # está esperando el pago no es una unidad que se pueda vender hoy.
+        query = query.filter(
+            func.coalesce(Product.stock, 0) - Product.stock_reservado > 0
+        )
     
     if seller_id:
         query = query.filter(Product.seller_id == seller_id)
@@ -344,7 +349,7 @@ def get_products(
             "description": product.description,
             "price": product.price,
             "currency": product.currency,
-            "stock": product.stock,
+            "stock": stock.disponible(product),
             "unit": product.unit,
             "category_id": product.category_id,
             "category_name": category_name,
@@ -421,7 +426,7 @@ def get_product_detail(
         "description": product.description,
         "price": product.price,
         "currency": product.currency,
-        "stock": product.stock,
+        "stock": stock.disponible(product),
         "unit": product.unit,
         "category_id": product.category_id,
         "category_name": product.category.name,

@@ -37,6 +37,7 @@ const ESPERADAS = [
   'about (foto blanca)',
   'about (foto negra)',
   'verificación de correo',
+  'vuelta de Mercado Pago',
   'catálogo',
   'catálogo (hover)',
   'detalle',
@@ -368,6 +369,13 @@ for (const medida of MEDIDAS) {
     });
     await revisar(page, `${medida.n} verificación de correo`,
       page.getByRole('button', { name: 'Reenviar el enlace' }));
+
+    // La pantalla a la que vuelve el comprador desde Mercado Pago. Se entra
+    // sin número de orden a propósito: es el estado en el que no se puede
+    // confirmar nada, que es justo el que no debe parecer un éxito.
+    await page.goto(`${WEB}/payment/success`, { waitUntil: 'domcontentloaded' });
+    await revisar(page, `${medida.n} vuelta de Mercado Pago`,
+      page.getByRole('button', { name: 'Ir al marketplace' }));
 
     await page.goto(`${WEB}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await revisar(page, `${medida.n} catálogo`, page.locator('#catalog-category'));

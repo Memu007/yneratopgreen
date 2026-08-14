@@ -22,6 +22,7 @@ se guarda: lo que no se guarda no se filtra.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
@@ -33,7 +34,7 @@ from app.core.config import settings
 from app.models.order import Order
 from app.models.payment import Payment, PaymentStatus
 from app.models.user import User
-from app.services import mp_vinculo
+from app.services import mp_pagos, mp_vinculo
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +82,19 @@ def clave_de_idempotencia(orden: Order) -> str:
     return f"topgreen-orden-{orden.id}"
 
 
-def _cuerpo_de_la_preferencia(orden: Order) -> dict:
+def vencimiento_de(desde: Optional[datetime] = None) -> datetime:
+    """Hasta cuándo vale el link que se está por pedir.
+
+    Es un solo instante para dos cosas —la vigencia oficial de la preferencia y
+    la reserva de stock de la orden—, y eso no es casualidad: si el link
+    viviera más que la reserva, se podría cobrar mercadería ya entregada a otro.
+    """
+    return (desde or datetime.utcnow()) + timedelta(
+        minutes=settings.MP_MINUTOS_DE_VIGENCIA
+    )
+
+
+def _cuerpo_de_la_preferencia(orden: Order, hasta: datetime) -> dict:
     """Arma el pedido a partir de lo que ya está guardado en la orden."""
     items = [
         {
@@ -97,10 +110,29 @@ def _cuerpo_de_la_preferencia(orden: Order) -> dict:
     cuerpo = {
         "items": items,
         "external_reference": referencia_de(orden),
+        # El navegador vuelve a una pantalla que dice que **se está
+        # verificando**, no a una que festeja. Que la vuelta sea por «success»
+        # no prueba nada: esa URL la escribe cualquiera.
         "back_urls": {
-            "success": f"{frente}/?orden={orden.order_number}",
-            "pending": f"{frente}/?orden={orden.order_number}",
-            "failure": f"{frente}/?orden={orden.order_number}",
+            "success": f"{frente}/payment/success?orden={orden.order_number}",
+            "pending": f"{frente}/payment/pending?orden={orden.order_number}",
+            "failure": f"{frente}/payment/failure?orden={orden.order_number}",
+        },
+        # Vigencia oficial, la misma que la reserva. Sin `expires` el link vale
+        # para siempre, y con él una reserva que no vence nunca —o, peor, una
+        # venta cobrada sobre stock que ya se liberó.
+        "expires": True,
+        "expiration_date_from": mp_pagos.momento_para_mp(datetime.utcnow()),
+        "expiration_date_to": mp_pagos.momento_para_mp(hasta),
+        # Nuestro propio sello. Vuelve adentro del pago y ata ese pago a esta
+        # orden por un camino distinto del de la referencia externa. No lleva
+        # dato de ninguna persona.
+        "metadata": {"orden_id": orden.id, "orden_numero": orden.order_number},
+        # Efectivo y cajero quedan afuera. No es una preferencia comercial: se
+        # acreditan en días, y la reserva de stock que los espera bloquearía
+        # esa venta para todos los demás durante días.
+        "payment_methods": {
+            "excluded_payment_types": [{"id": "ticket"}, {"id": "atm"}]
         },
         # Nada de `marketplace_fee`: ni el 5 % de antes ni un cero. TopGreen no
         # cobra comisión por venta.
@@ -153,6 +185,17 @@ def pago_de(db: Session, orden: Order) -> Optional[Payment]:
     return db.query(Payment).filter(Payment.order_id == orden.id).first()
 
 
+def vigente(pago: Optional[Payment], ahora: Optional[datetime] = None) -> bool:
+    """¿El link de esta orden todavía sirve para pagar?
+
+    Sin intención o sin vigencia declarada la respuesta es que sí: son las
+    órdenes anteriores a esta pieza, y no hay nada que se les haya vencido.
+    """
+    if pago is None or pago.expires_at is None:
+        return True
+    return pago.expires_at > (ahora or datetime.utcnow())
+
+
 def anular_intencion(db: Session, orden: Order) -> bool:
     """Da por muerta la intención de pago local de una orden que terminó.
 
@@ -160,11 +203,11 @@ def anular_intencion(db: Session, orden: Order) -> bool:
     «pendiente» sobre algo que ya no se va a cobrar. Devuelve si había algo que
     anular.
 
-    Lo que esto **no** puede hacer, y hay que saberlo: la preferencia que ya
-    viajó sigue existiendo del lado de Mercado Pago, así que un comprador que
-    guardó el link podría pagarla igual. Cerrar ese borde necesita la consulta
-    de estado y el webhook, que son de MP-C; hasta entonces, lo que queda de
-    este lado es no ofrecer más el link y no mentir sobre el estado.
+    Esto solo **no alcanza** cuando ya se emitió un link: la preferencia sigue
+    viva del lado de Mercado Pago y alguien que la guardó podría pagarla. Quien
+    cierra ese borde es `cobro.cerrar_cobro`, que la vence en Mercado Pago
+    antes de soltar la mercadería. Acá queda lo que se puede hacer sin red:
+    dejar de figurar como pago pendiente nuestro.
     """
     pago = pago_de(db, orden)
     if pago is None or pago.status == PaymentStatus.CANCELLED:
@@ -194,8 +237,9 @@ async def preparar_pago(db: Session, orden: Order, vendedor: User) -> Payment:
     if not token:
         raise NoSePudoPreparar(SIN_VINCULO)
 
+    hasta = vencimiento_de()
     datos = await _pedir_preferencia(
-        token, _cuerpo_de_la_preferencia(orden), clave_de_idempotencia(orden)
+        token, _cuerpo_de_la_preferencia(orden, hasta), clave_de_idempotencia(orden)
     )
 
     pago = existente or Payment(
@@ -203,12 +247,14 @@ async def preparar_pago(db: Session, orden: Order, vendedor: User) -> Payment:
         total_amount=orden.total_amount,
         status=PaymentStatus.PENDING,
     )
-    # Sólo esto: identificadores, la URL para pagar, el importe exacto de la
-    # orden y nuestro estado. Ni el cuerpo de Mercado Pago ni el token.
+    # Sólo esto: identificadores, la URL para pagar, hasta cuándo vale, el
+    # importe exacto de la orden y nuestro estado. Ni el cuerpo de Mercado Pago
+    # ni el token.
     pago.mp_preference_id = str(datos["id"])
     pago.init_point = str(datos["init_point"])
     pago.mp_external_reference = referencia_de(orden)
     pago.total_amount = orden.total_amount
+    pago.expires_at = hasta
     pago.status = PaymentStatus.PENDING
 
     db.add(pago)

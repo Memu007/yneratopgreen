@@ -39,6 +39,14 @@ class Product(Base):
     price = Column(Numeric(12, 2), nullable=False)
     currency = Column(String(3), default="ARS", nullable=False)  # ARS, USD, etc
     stock = Column(Integer, default=0, nullable=True)  # nullable for services
+    # Unidades comprometidas por una compra en curso que todavía no se cobró.
+    # No se restan de `stock` —la mercadería sigue en el galpón— pero sí de lo
+    # disponible: dos compradores no pueden llevarse la misma última unidad. Al
+    # acreditarse el pago la reserva se consolida (baja `stock`, sube
+    # `sales_count`); si la compra muere, se libera. Nunca queda negativo.
+    stock_reservado = Column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
     unit = Column(String(50), nullable=True)  # unidad, kg, bolsa 20kg, hectárea, etc
     min_order_quantity = Column(Integer, default=1, nullable=False)
     

@@ -1,131 +1,206 @@
-import { useEffect, useState } from 'react';
-import { apiPost } from '../../utils/api';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { apiPost, tokenStorage } from '../../utils/api';
 import styles from './PaymentResultPage.module.css';
 
+/**
+ * La pantalla a la que vuelve el comprador desde Mercado Pago.
+ *
+ * Acá había un cartel que decía «¡Pago Exitoso!» porque la persona había
+ * llegado por `/payment/success`. Esa URL la escribe cualquiera: no prueba que
+ * se haya pagado nada, y decirlo es peor que no decir nada, porque el
+ * comprador se va tranquilo de una compra que nadie cobró.
+ *
+ * Lo que hace ahora es lo único honesto que se puede hacer desde un navegador:
+ * decir de dónde volvió la persona, y **preguntarle al servidor** —que le
+ * pregunta a Mercado Pago— qué pasó de verdad. Mientras no haya respuesta,
+ * dice que está verificando. Si Mercado Pago no contesta, lo dice también.
+ */
+
 interface PaymentResultProps {
+  /** Por cuál de las tres vueltas llegó. Es contexto, no un resultado. */
   status: 'success' | 'failure' | 'pending';
   onGoToOrders: () => void;
   onGoHome: () => void;
 }
 
-interface PaymentInfo {
-  orderId: string | null;
-  paymentId: string | null;
-  status: string | null;
-  externalReference: string | null;
+interface EstadoDePago {
+  order_number: string;
+  status: string;
+  payment_state?: string | null;
+  verificado: boolean;
+  can_pay: boolean;
+  payment_url?: string | null;
 }
 
+/** Cuántas veces se vuelve a preguntar antes de dejar de insistir. */
+const INTENTOS = 5;
+const ESPERA_MS = 3000;
+
+const TEXTO_DEL_ESTADO: Record<string, { titulo: string; detalle: string }> = {
+  aprobado: {
+    titulo: 'Pago acreditado',
+    detalle:
+      'Mercado Pago confirmó el pago y tu orden ya figura como pagada. El '
+      + 'vendedor la ve igual.',
+  },
+  en_proceso: {
+    titulo: 'Mercado Pago está procesando el pago',
+    detalle:
+      'Todavía no está acreditado. Cuando lo esté, tu orden va a figurar como '
+      + 'pagada sin que tengas que hacer nada.',
+  },
+  rechazado: {
+    titulo: 'El pago fue rechazado',
+    detalle:
+      'Mercado Pago no aprobó el intento. Tu orden sigue en pie: podés volver '
+      + 'a intentar desde «Mis compras» mientras el link siga vigente.',
+  },
+  pendiente: {
+    titulo: 'Todavía no hay un pago registrado',
+    detalle:
+      'Mercado Pago no informó ningún pago para esta orden. Si acabás de '
+      + 'pagar, puede tardar unos minutos en aparecer.',
+  },
+  devuelto: {
+    titulo: 'El pago fue devuelto',
+    detalle: 'Mercado Pago informó una devolución de este pago.',
+  },
+  contracargo: {
+    titulo: 'El pago tiene un contracargo',
+    detalle: 'El dinero de este pago se retiró. Escribile al vendedor.',
+  },
+  cancelado: {
+    titulo: 'El pago quedó cancelado',
+    detalle: 'Esta orden ya no se puede pagar por Mercado Pago.',
+  },
+};
+
 export function PaymentResultPage({ status, onGoToOrders, onGoHome }: PaymentResultProps) {
-  const [paymentInfo, setPaymentInfo] = useState<PaymentInfo>({
-    orderId: null,
-    paymentId: null,
-    status: null,
-    externalReference: null,
-  });
+  const [numeroDeOrden] = useState(() =>
+    new URLSearchParams(window.location.search).get('orden')
+  );
+  const [estado, setEstado] = useState<EstadoDePago | null>(null);
+  const [verificando, setVerificando] = useState(true);
+  const [sinSesion, setSinSesion] = useState(false);
+  const [falloLaConsulta, setFalloLaConsulta] = useState(false);
+  const cancelado = useRef(false);
+
+  const preguntar = useCallback(async () => {
+    if (!numeroDeOrden) {
+      setVerificando(false);
+      return;
+    }
+    if (!tokenStorage.getAccessToken()) {
+      // Sin sesión no se puede saber nada de una orden, y está bien que sea
+      // así: en qué anda una compra no es información pública.
+      setSinSesion(true);
+      setVerificando(false);
+      return;
+    }
+
+    for (let intento = 0; intento < INTENTOS && !cancelado.current; intento += 1) {
+      try {
+        const respuesta = await apiPost<EstadoDePago>(
+          `/orders/${encodeURIComponent(numeroDeOrden)}/payment-state`,
+          {}
+        );
+        if (cancelado.current) return;
+        setEstado(respuesta);
+        setFalloLaConsulta(!respuesta.verificado);
+        // Un estado que ya no se va a mover solo: se deja de preguntar.
+        if (respuesta.payment_state && respuesta.payment_state !== 'pendiente') {
+          setVerificando(false);
+          return;
+        }
+      } catch {
+        if (cancelado.current) return;
+        setFalloLaConsulta(true);
+      }
+      await new Promise((seguir) => { setTimeout(seguir, ESPERA_MS); });
+    }
+    if (!cancelado.current) setVerificando(false);
+  }, [numeroDeOrden]);
 
   useEffect(() => {
-    // Obtener parámetros de la URL
-    const params = new URLSearchParams(window.location.search);
-    const orderId = params.get('order_id');
-    
-    setPaymentInfo({
-      orderId: orderId,
-      paymentId: params.get('payment_id'),
-      status: params.get('status'),
-      externalReference: params.get('external_reference'),
-    });
+    cancelado.current = false;
+    void preguntar();
+    return () => {
+      cancelado.current = true;
+    };
+  }, [preguntar]);
 
-    // Si el pago fue exitoso, sincronizar el estado con el backend
-    if (status === 'success' && orderId) {
-      syncPaymentStatus(orderId);
-    }
-  }, [status]);
+  const conocido = estado?.payment_state
+    ? TEXTO_DEL_ESTADO[estado.payment_state]
+    : undefined;
 
-  const syncPaymentStatus = async (orderId: string) => {
-    try {
-      await apiPost<{ message: string; synced: boolean }>(`/payments/sync-status/${orderId}`, {});
-    } catch (error) {
-      console.error('Error sincronizando estado del pago:', error);
-      // No mostramos error al usuario, el pago ya fue exitoso
-    }
-  };
+  const titulo = verificando
+    ? 'Estamos verificando tu pago'
+    : conocido?.titulo ?? 'No pudimos confirmar el pago todavía';
 
-  const getStatusConfig = () => {
-    switch (status) {
-      case 'success':
-        return {
-          icon: '✓',
-          iconClass: styles.successIcon,
-          title: '¡Pago Exitoso!',
-          message: 'Tu pago ha sido procesado correctamente. El vendedor será notificado y comenzará a preparar tu pedido.',
-          subMessage: 'Recibirás un email con los detalles de tu compra.',
-        };
-      case 'failure':
-        return {
-          icon: '✗',
-          iconClass: styles.failureIcon,
-          title: 'Pago Rechazado',
-          message: 'No pudimos procesar tu pago. Por favor, intenta con otro medio de pago o verifica los datos de tu tarjeta.',
-          subMessage: 'Tu pedido no ha sido cancelado, puedes intentar pagar nuevamente.',
-        };
-      case 'pending':
-        return {
-          icon: '⏳',
-          iconClass: styles.pendingIcon,
-          title: 'Pago Pendiente',
-          message: 'Tu pago está siendo procesado. Esto puede demorar entre unos minutos y 2 días hábiles dependiendo del medio de pago.',
-          subMessage: 'Te notificaremos por email cuando se acredite.',
-        };
-      default:
-        return {
-          icon: '?',
-          iconClass: styles.pendingIcon,
-          title: 'Estado Desconocido',
-          message: 'No pudimos determinar el estado de tu pago.',
-          subMessage: 'Por favor, revisa tus órdenes para más información.',
-        };
-    }
-  };
+  const detalle = verificando
+    ? 'Le estamos preguntando a Mercado Pago. Volver de esa pantalla no '
+      + 'confirma un pago: lo confirma Mercado Pago.'
+    : conocido?.detalle
+      ?? 'No conseguimos respuesta de Mercado Pago en este momento. Tu orden no '
+         + 'cambió: miralá en «Mis compras» dentro de un rato.';
 
-  const config = getStatusConfig();
+  const deDondeVolvio = {
+    success: 'Volviste desde la pantalla de pago de Mercado Pago.',
+    pending: 'Mercado Pago te devolvió con el pago en revisión.',
+    failure: 'Mercado Pago te devolvió sin completar el pago.',
+  }[status];
 
   return (
     <div className={styles.container}>
       <div className={styles.card}>
-        <div className={`${styles.iconCircle} ${config.iconClass}`}>
-          <span className={styles.icon}>{config.icon}</span>
-        </div>
-        
-        <h1 className={styles.title}>{config.title}</h1>
-        <p className={styles.message}>{config.message}</p>
-        <p className={styles.subMessage}>{config.subMessage}</p>
+        <h1 className={styles.title}>{titulo}</h1>
 
-        {paymentInfo.orderId && (
+        <p className={styles.message} aria-live="polite">{detalle}</p>
+
+        {/*
+          De dónde volvió la persona se dice, porque le sirve de contexto. Lo
+          que no se hace es tomarlo por un resultado.
+        */}
+        <p className={styles.subMessage}>{deDondeVolvio}</p>
+
+        {numeroDeOrden && (
           <div className={styles.orderInfo}>
-            <p><strong>Orden:</strong> #{paymentInfo.externalReference || paymentInfo.orderId}</p>
+            <p><strong>Orden:</strong> #{numeroDeOrden}</p>
+            {estado && <p><strong>Estado de la orden:</strong> {estado.status}</p>}
           </div>
         )}
+
+        {sinSesion && (
+          <p className={styles.subMessage}>
+            Iniciá sesión para ver en qué quedó esta orden.
+          </p>
+        )}
+
+        {falloLaConsulta && !verificando && (
+          <p className={styles.subMessage} role="alert">
+            No pudimos confirmarlo con Mercado Pago recién. Lo que ves es lo
+            último que sabemos.
+          </p>
+        )}
+
+        {/*
+          El botón dice a dónde lleva de verdad. «Mis compras» vive adentro
+          del panel que se abre desde el nombre, arriba a la derecha, así que
+          prometer que este botón la abre sería mentir en chiquito.
+        */}
+        <p className={styles.subMessage}>
+          Podés ver esta orden en «Mis compras», dentro de tu panel: abrilo
+          desde tu nombre, arriba a la derecha.
+        </p>
 
         <div className={styles.actions}>
           <button className={styles.primaryButton} onClick={onGoToOrders}>
-            Ver Mis Órdenes
+            Ir al marketplace
           </button>
           <button className={styles.secondaryButton} onClick={onGoHome}>
-            Volver al Inicio
+            Volver al inicio
           </button>
         </div>
-
-        {status === 'failure' && (
-          <div className={styles.helpSection}>
-            <h3>¿Necesitas ayuda?</h3>
-            <ul>
-              <li>Verifica que los datos de tu tarjeta sean correctos</li>
-              <li>Asegúrate de tener fondos suficientes</li>
-              <li>Intenta con otro medio de pago</li>
-              <li>Contacta a tu banco si el problema persiste</li>
-            </ul>
-          </div>
-        )}
       </div>
     </div>
   );

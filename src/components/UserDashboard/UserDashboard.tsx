@@ -86,6 +86,7 @@ interface BackendOrder {
   payment_method?: string;
   payment_url?: string;
   can_pay?: boolean;
+  payment_state?: string;
 }
 
 interface Order {
@@ -120,7 +121,54 @@ interface Order {
   paymentMethod?: string;
   paymentUrl?: string;
   canPay?: boolean;
+  /**
+   * En qué anda el pago por Mercado Pago, dicho por el servidor después de
+   * preguntárselo a Mercado Pago. Lo ven el comprador y el vendedor, y dice
+   * lo mismo para los dos.
+   */
+  paymentState?: string;
 }
+
+/**
+ * Qué se le dice a una persona sobre el pago de su orden por Mercado Pago.
+ *
+ * Las mismas palabras para el comprador y para el vendedor: si a uno le
+ * dijéramos «aprobado» y al otro «pendiente», el que despacha y el que reclama
+ * estarían mirando dos verdades distintas.
+ *
+ * Ninguno de estos textos sale de la URL por la que volvió nadie. Salen del
+ * servidor, que se lo preguntó a Mercado Pago.
+ */
+const TEXTO_DEL_PAGO: Record<string, { texto: string; problema?: boolean }> = {
+  pendiente: {
+    texto: 'Todavía no hay ningún pago registrado en Mercado Pago para esta orden.',
+  },
+  en_proceso: {
+    texto:
+      'Mercado Pago está procesando el pago. Cuando se acredite, la orden va a '
+      + 'figurar como pagada sola.',
+  },
+  aprobado: { texto: 'Pago acreditado en Mercado Pago.' },
+  rechazado: {
+    texto:
+      'El último intento de pago fue rechazado. Se puede volver a intentar con '
+      + 'el mismo link mientras siga vigente.',
+    problema: true,
+  },
+  devuelto: {
+    texto:
+      'Mercado Pago informó una devolución de este pago. Revisalo antes de '
+      + 'despachar.',
+    problema: true,
+  },
+  contracargo: {
+    texto:
+      'Este pago tiene un contracargo: el dinero se retiró. Revisalo antes de '
+      + 'despachar.',
+    problema: true,
+  },
+  cancelado: { texto: 'El pago de esta orden quedó cancelado.' },
+};
 
 interface UserProduct {
   id: string;
@@ -405,6 +453,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             paymentMethod: o.payment_method,
             paymentUrl: o.payment_url,
             canPay: o.can_pay,
+            paymentState: o.payment_state,
             seller: o.seller_name ? {
               name: o.seller_name,
               phone: o.seller_phone || '',
@@ -429,6 +478,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               price: i.unit_price_snapshot
             })),
             paymentMethod: o.payment_method,
+            paymentState: o.payment_state,
             buyer: o.buyer_name ? {
               name: o.buyer_name,
               phone: o.buyer_phone || '',
@@ -737,6 +787,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         paymentMethod: o.payment_method,
         paymentUrl: o.payment_url,
         canPay: o.can_pay,
+        paymentState: o.payment_state,
         buyer: o.buyer_name ? {
           name: o.buyer_name,
           phone: o.buyer_phone || '',
@@ -2042,6 +2093,23 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   Pago: una cancelada, una rechazada o una por transferencia no
                   ofrecen nada.
                 */}
+                {/*
+                  En qué anda el pago, para los dos lados. Va antes del botón
+                  porque es la información; el botón es la acción.
+                */}
+                {order.paymentMethod === 'mercadopago' && order.paymentState
+                  && TEXTO_DEL_PAGO[order.paymentState] && (
+                  <p
+                    className={`${styles.estadoDePago} ${
+                      TEXTO_DEL_PAGO[order.paymentState].problema
+                        ? styles.estadoDePagoProblema
+                        : ''
+                    }`}
+                  >
+                    {TEXTO_DEL_PAGO[order.paymentState].texto}
+                  </p>
+                )}
+
                 {order.canPay && order.paymentMethod === 'mercadopago' && (
                   <div className={styles.pagoPendiente}>
                     <p className={styles.pagoPendienteTexto}>
@@ -2194,6 +2262,24 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                     Ver comprobante
                   </a>
                 </div>
+              )}
+
+              {/*
+                En qué anda el pago por Mercado Pago. Es el mismo texto que ve
+                el comprador: si acá dijera otra cosa, el que despacha y el que
+                reclama estarían mirando dos verdades.
+              */}
+              {order.paymentMethod === 'mercadopago' && order.paymentState
+                && TEXTO_DEL_PAGO[order.paymentState] && (
+                <p
+                  className={`${styles.estadoDePago} ${
+                    TEXTO_DEL_PAGO[order.paymentState].problema
+                      ? styles.estadoDePagoProblema
+                      : ''
+                  }`}
+                >
+                  {TEXTO_DEL_PAGO[order.paymentState].texto}
+                </p>
               )}
 
               <div className={styles.orderActions}>

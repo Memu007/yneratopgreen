@@ -37,7 +37,7 @@ from app.core.montos import SIN_CARGO, importe_de_linea, validar_total
 from app.models.cart import Cart, CartStatus
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.user import User
-from app.services import mp_vinculo
+from app.services import mp_vinculo, stock
 from app.services.logistica import (
     MODO_PROPIO,
     origen_de,
@@ -230,12 +230,16 @@ def preparar(
         validar_total(subtotal, "El total de la orden")
 
         # El stock se mira acá, con todos los grupos a la vista, para que un
-        # faltante del último no deje creadas las órdenes de los primeros.
+        # faltante del último no deje creadas las órdenes de los primeros. Lo
+        # que se mira es lo **disponible** —lo que hay menos lo reservado por
+        # compras en curso—, no lo que hay: ofrecer una unidad que ya tiene
+        # dueño esperando el pago es prometer dos veces la misma bolsa.
+        #
+        # Esta comprobación es cortesía, no garantía: entre leerla y escribir
+        # pasa tiempo. Quien garantiza es la reserva de `crear_ordenes`.
         for item in grupo.items:
-            producto = item.product
-            es_servicio = producto.category.is_service if producto.category else False
-            if not es_servicio and (producto.stock or 0) < item.quantity:
-                _rechazar(f"Stock insuficiente para {producto.name}")
+            if not stock.hay_para(item.product, item.quantity):
+                _rechazar(f"Stock insuficiente para {item.product.name}")
 
         pedidos.append(PedidoPreparado(
             seller_id=seller_id,
@@ -348,6 +352,26 @@ def crear_ordenes(
                 total_price=importe_de_linea(producto.price, item.quantity),
                 **origen_de(producto),
             ))
+
+        if pedido.medio == MEDIO_MERCADO_PAGO:
+            # La reserva va **acá**: en la misma transacción que escribe la
+            # orden, antes de que exista una preferencia y antes del commit.
+            #
+            # Es lo que decide de verdad quién se lleva la última unidad. Dos
+            # compradores llegan hasta este punto con la validación de arriba
+            # aprobada —los dos leyeron el mismo número—, y el `UPDATE`
+            # condicional de la reserva deja pasar a uno. El otro se lleva un
+            # 409, con todo lo suyo deshecho: sin orden, sin preferencia y con
+            # el carrito otra vez vivo para que pueda corregir.
+            #
+            # Por transferencia no se reserva: ahí el stock se descuenta
+            # cuando el vendedor acepta el comprobante, que es cuando esa
+            # venta se vuelve cierta.
+            try:
+                stock.reservar(db, orden, pedido.items)
+            except HTTPException:
+                db.rollback()
+                raise
 
         creadas.append(orden)
 

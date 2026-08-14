@@ -1599,3 +1599,23 @@
   color: #c62828;
   font-size: 0.85rem;
 }
+
+/* En qué anda el pago por Mercado Pago. Lo ven comprador y vendedor. */
+.estadoDePago {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  background: #f6f8f3;
+  border-left: 3px solid #2d5016;
+  border-radius: 6px;
+  color: #24301c;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Devolución, contracargo o rechazo: no alcanza con el color, así que el
+   texto ya dice qué pasa y qué conviene hacer. */
+.estadoDePagoProblema {
+  background: #fff3f3;
+  border-left-color: #c62828;
+  color: #8c1d1d;
+}

@@ -90,15 +90,44 @@ class Settings(BaseSettings):
     # Interruptor del cobro por Mercado Pago. **Apagado por defecto.**
     # Con esto en falso ninguna ruta de comprador crea preferencias, el
     # checkout no ofrece el medio y la venta por transferencia funciona igual.
-    # Se enciende recién cuando exista el webhook firmado, la consulta de
-    # estado y la política de stock: hasta entonces, cobrar de verdad sería
-    # prometer algo que no podemos confirmar.
+    #
+    # El webhook firmado, la consulta de estado y la reserva de stock ya
+    # existen y están probados contra un doble local. Eso no alcanza para
+    # encenderlo: falta operarlo con credenciales reales, con la URL de aviso
+    # publicada y con el reconciliador programado. Encenderlo es una decisión
+    # de puesta en producción, no una consecuencia de que el código exista.
     MP_CHECKOUT_HABILITADO: bool = False
 
     # A dónde vuelve el comprador desde Mercado Pago y a dónde avisa MP. Son
     # URLs públicas y se configuran; no se arman con NGROK_URL ni se adivinan.
-    # La de notificación queda vacía hasta que exista el webhook.
+    #
+    # La de notificación **no puede llevar query string**: Mercado Pago degrada
+    # el aviso a IPN —un GET con `topic` e `id`, sin firma— cuando la URL trae
+    # parámetros, y ahí se pierde lo único que autentica el aviso. Vacía
+    # significa que no se declara ninguna y MP no avisa a nadie.
     MP_NOTIFICACION_URL: str = ""
+
+    # El secreto con el que Mercado Pago firma cada aviso. Vive fuera del
+    # repositorio, igual que la clave de cifrado. **Sin esto no se procesa un
+    # solo aviso**: un webhook que no se puede autenticar es un endpoint por el
+    # que cualquiera declara pagos ajenos.
+    MP_WEBHOOK_SECRET: str = ""
+
+    # Cuánta diferencia se acepta entre el reloj del aviso y el nuestro. Un
+    # aviso viejo reenviado es un aviso repetido, y el margen existe para que
+    # no lo sea para siempre.
+    MP_TOLERANCIA_FIRMA_SEGUNDOS: int = 300
+
+    # Cuánto vive un link de pago, y con él la reserva de stock que lo
+    # acompaña. Va igual a la vigencia oficial de la preferencia: que el link
+    # muera después que la reserva sería habilitar un cobro sin mercadería.
+    MP_MINUTOS_DE_VIGENCIA: int = 30
+
+    # Margen que se espera **después** del vencimiento antes de liberar una
+    # reserva. Un pago iniciado en el último segundo tarda en aparecer en la
+    # consulta a Mercado Pago; liberar sin ese margen es soltar mercadería que
+    # quizá ya se cobró.
+    MP_MINUTOS_DE_GRACIA: int = 10
 
     # Bases de los servicios de Mercado Pago. Son configuración porque la
     # prueba automatizada levanta un doble local y apunta la API ahí; en
@@ -112,6 +141,26 @@ class Settings(BaseSettings):
     # URLs Frontend (para callbacks de pago)
     FRONTEND_URL: str = "http://localhost:5173"
     
+    @field_validator("MP_NOTIFICACION_URL")
+    @classmethod
+    def _url_de_aviso_sin_parametros(cls, valor: str) -> str:
+        """La URL de aviso no puede llevar query string.
+
+        No es una preferencia de estilo. Mercado Pago **degrada el aviso a
+        IPN** —un GET con `topic` e `id`, sin firma— cuando la URL declarada
+        trae parámetros, y desde ese momento no hay nada que autentique lo que
+        llega. Un webhook que no se puede autenticar es peor que no tener
+        webhook, porque parece que funciona.
+
+        Se falla al arrancar y no en la primera notificación perdida.
+        """
+        if valor and "?" in valor:
+            raise ValueError(
+                "MP_NOTIFICACION_URL no puede llevar parámetros: con query string "
+                "Mercado Pago manda IPN sin firma y el aviso deja de ser verificable"
+            )
+        return valor
+
     @field_validator("UPLOAD_DIR", "EMAIL_OUTBOX_DIR")
     @classmethod
     def _resolver_carpeta(cls, valor: str) -> str:

@@ -42,6 +42,7 @@ const ESPERADAS = [
   'registro',
   'registro: correo pendiente',
   'verificación de correo',
+  'vuelta de Mercado Pago',
   'quienes somos',
   'servicios',
   'contacto',
@@ -176,6 +177,13 @@ async function publicas(page, medida) {
   });
   await revisar(page, 'verificación de correo', medida,
     page.getByRole('button', { name: 'Reenviar el enlace' }));
+
+  // La vuelta desde Mercado Pago. Sin número de orden: ese es el estado en el
+  // que la pantalla no puede confirmar nada, y es el que importa que no
+  // parezca un éxito.
+  await page.goto(`${WEB}/payment/success`, { waitUntil: 'domcontentloaded' });
+  await revisar(page, 'vuelta de Mercado Pago', medida,
+    page.getByRole('button', { name: 'Ir al marketplace' }));
   await page.goto(WEB, { waitUntil: 'domcontentloaded' });
 
   // las otras tres públicas están a un clic del encabezado y el barrido de

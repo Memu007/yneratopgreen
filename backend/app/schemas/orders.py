@@ -54,8 +54,30 @@ class OrderResponse(BaseModel):
     # transportista, porque pagar es del que compró.
     payment_url: Optional[str] = None
     can_pay: bool = False
-    
+    # En qué anda el pago por Mercado Pago: pendiente, en proceso, aprobado,
+    # rechazado, devuelto, contracargo o cancelado. Lo ven los dos y dice lo
+    # mismo para los dos. NULL en las órdenes que no se pagan por ahí.
+    payment_state: Optional[str] = None
+
     model_config = ConfigDict(from_attributes=True)
+
+
+class EstadoDePago(BaseModel):
+    """En qué anda el pago de una orden, después de preguntárselo a MP.
+
+    Es lo que mira la pantalla a la que vuelve el comprador desde Mercado
+    Pago. No hay acá ningún campo que salga de la URL por la que volvió: la
+    vuelta dice de dónde viene la persona, no qué pasó con la plata.
+    """
+
+    order_number: str
+    status: str
+    payment_state: Optional[str] = None
+    # `False` cuando no se pudo confirmar con Mercado Pago —no contestó, la
+    # credencial no sirve— y lo que se muestra es lo último que sabíamos.
+    verificado: bool = True
+    can_pay: bool = False
+    payment_url: Optional[str] = None
 
 
 class ShippingDecision(BaseModel):

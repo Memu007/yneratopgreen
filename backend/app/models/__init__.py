@@ -18,6 +18,7 @@ from app.models.form_option import FormOption, OptionType
 from app.models.rating import Rating
 from app.models.notification import Notification, NotificationType
 from app.models.mp_oauth_state import MPOAuthState
+from app.models.mp_intento import MPIntentoDePago
 
 __all__ = [
     "User",
@@ -45,5 +46,6 @@ __all__ = [
     "Notification",
     "NotificationType",
     "MPOAuthState",
+    "MPIntentoDePago",
 ]
 

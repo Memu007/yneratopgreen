@@ -25,6 +25,7 @@
 // vincula bien y le revoca el permiso a la aplicación después.
 //
 // Cualquier valor desconocido cae en `rechazo`, que es el default seguro.
+import { createHmac } from 'node:crypto';
 import { createServer } from 'node:http';
 
 // Cuerpos con secretos adentro: si alguno de estos textos aparece en una
@@ -32,6 +33,22 @@ import { createServer } from 'node:http';
 export const SECRETO_DE_ACCESO = 'APP_USR-doble-acceso-no-es-real';
 export const SECRETO_DE_REFRESCO = 'TG-doble-refresco-no-es-real';
 export const DETALLE_CRUDO = 'invalid_client: el client_secret no coincide';
+
+// La firma con la que Mercado Pago autentica un aviso. Se arma acá, del lado
+// del doble, exactamente como la arma Mercado Pago: así lo que la prueba
+// comprueba es que el producto la valida, y no que los dos usan la misma
+// función.
+//
+//   manifiesto = id:<data.id>;request-id:<x-request-id>;ts:<ts>;
+//   x-signature = ts=<ts>,v1=<hmac sha256 hex del manifiesto>
+export function firmaDeAviso(secreto, { dataId, requestId, ts }) {
+  const segundos = String(ts ?? Math.floor(Date.now() / 1000));
+  const partes = [`id:${dataId};`];
+  if (requestId) partes.push(`request-id:${requestId};`);
+  partes.push(`ts:${segundos};`);
+  const v1 = createHmac('sha256', secreto).update(partes.join('')).digest('hex');
+  return `ts=${segundos},v1=${v1}`;
+}
 
 const GUIONES = ['lento', 'rechazo', 'basura', 'incompleto'];
 
@@ -55,9 +72,39 @@ export function levantarDoble(puerto = 8099) {
   // Clave de idempotencia -> id de preferencia. Es lo que permite comprobar
   // que reintentar no crea una segunda preferencia.
   const preferencias = new Map();
+  // Las preferencias por su id, con su cuerpo y si ya se las venció. Vencer
+  // una es la única forma oficial de apagar un link ya emitido, y la prueba
+  // necesita poder mirar si el producto lo hizo antes de soltar el stock.
+  const emitidas = new Map();
+  // Los pagos que este Mercado Pago de mentira conoce. La prueba los crea con
+  // `crearPago` y los mueve con `actualizarPago`; el producto sólo puede
+  // enterarse consultándolos, que es la única fuente de verdad que acepta.
+  const pagos = new Map();
+  // Los identificadores de pago de Mercado Pago son únicos para siempre, y la
+  // base los trata así: `mp_payment_id` es único. Si el doble arrancara
+  // siempre en el mismo número, dos casos distintos fabricarían el mismo pago
+  // y el segundo se encontraría con la fila del primero. Se arranca en un
+  // número que depende del reloj para que eso no pase.
+  let proximoPago = Date.now() % 100_000_000;
+  // Con esto en verdadero, la consulta de pagos devuelve 500: es "Mercado Pago
+  // caído", que tiene que dar una respuesta reintentable y no un rechazo.
+  let caido = false;
+  // Con esto en verdadero, la consulta de pagos devuelve 401: es el token del
+  // vendedor revocado desde el panel de Mercado Pago. Tiene que dar una
+  // respuesta reintentable, no un rechazo del pago.
+  let revocado = false;
   // Cada emisión es distinta de la anterior: así una renovación se puede
   // distinguir de la credencial que reemplazó.
   let emision = 0;
+
+  function cuentaDelToken(autorizacion) {
+    return (String(autorizacion || '').match(/-(\d{6,})-\d+$/) || [])[1] || '';
+  }
+
+  function responderJson(respuesta, codigo, cuerpo) {
+    respuesta.writeHead(codigo, { 'Content-Type': 'application/json' });
+    respuesta.end(JSON.stringify(cuerpo));
+  }
 
   function responderTokens(respuesta, mpUserId, guionDelRefresh) {
     emision += 1;
@@ -127,6 +174,7 @@ export function levantarDoble(puerto = 8099) {
           preferencias.set(clave, `pref-${preferencias.size + 1}-${Date.now()}`);
         }
         const id = preferencias.get(clave);
+        emitidas.set(id, { cuerpo, cuenta, vencida: false });
         respuesta.writeHead(201, { 'Content-Type': 'application/json' });
         respuesta.end(JSON.stringify({
           id,
@@ -136,6 +184,73 @@ export function levantarDoble(puerto = 8099) {
           client_id: 'app-local-de-prueba',
         }));
       });
+      return;
+    }
+
+    // --- vencer una preferencia ya emitida: apagar el link.
+    if (pedido.method === 'PUT' && url.pathname.startsWith('/checkout/preferences/')) {
+      let crudo = '';
+      pedido.on('data', (trozo) => { crudo += trozo; });
+      pedido.on('end', () => {
+        const id = decodeURIComponent(url.pathname.split('/').pop());
+        let cuerpo = null;
+        try { cuerpo = JSON.parse(crudo); } catch { cuerpo = null; }
+        const cuenta = cuentaDelToken(pedido.headers.authorization);
+        pedidos.push({ ruta: 'vencer', preferencia: id, cuerpo, cuenta });
+
+        if (cuenta === CUENTA_LENTA) { demorados.push(respuesta); return; }
+        if (cuenta === CUENTA_RECHAZA || revocado) {
+          responderJson(respuesta, 401, { message: DETALLE_CRUDO });
+          return;
+        }
+        // Si Mercado Pago está caído, lo está para todo: apagar un link
+        // tampoco funciona, y eso es justo lo que no puede dar por cerrado
+        // un cobro.
+        if (caido) { responderJson(respuesta, 500, { message: 'algo se rompió acá' }); return; }
+        const emitida = emitidas.get(id);
+        if (!emitida) { responderJson(respuesta, 404, { message: 'no existe' }); return; }
+        emitida.vencida = true;
+        emitida.cuerpo = { ...emitida.cuerpo, ...(cuerpo || {}) };
+        responderJson(respuesta, 200, { id, ...(cuerpo || {}) });
+      });
+      return;
+    }
+
+    // --- la búsqueda de pagos de una orden. Es lo que usa el reconciliador
+    //     cuando el aviso nunca llegó.
+    if (pedido.method === 'GET' && url.pathname === '/v1/payments/search') {
+      const cuenta = cuentaDelToken(pedido.headers.authorization);
+      const referencia = url.searchParams.get('external_reference') || '';
+      pedidos.push({ ruta: 'buscar', referencia, cuenta });
+      if (cuenta === CUENTA_LENTA) { demorados.push(respuesta); return; }
+      if (cuenta === CUENTA_RECHAZA) {
+        responderJson(respuesta, 401, { message: DETALLE_CRUDO });
+        return;
+      }
+      if (revocado) { responderJson(respuesta, 401, { message: DETALLE_CRUDO }); return; }
+      if (caido) { responderJson(respuesta, 500, { message: 'algo se rompió acá' }); return; }
+      const results = [...pagos.values()].filter(
+        (pago) => pago.external_reference === referencia,
+      );
+      responderJson(respuesta, 200, { results, paging: { total: results.length } });
+      return;
+    }
+
+    // --- la consulta de un pago. Es la única fuente de verdad del producto.
+    if (pedido.method === 'GET' && url.pathname.startsWith('/v1/payments/')) {
+      const id = decodeURIComponent(url.pathname.split('/').pop());
+      const cuenta = cuentaDelToken(pedido.headers.authorization);
+      pedidos.push({ ruta: 'consultar', pago: id, cuenta });
+      if (cuenta === CUENTA_LENTA) { demorados.push(respuesta); return; }
+      if (cuenta === CUENTA_RECHAZA) {
+        responderJson(respuesta, 401, { message: DETALLE_CRUDO });
+        return;
+      }
+      if (revocado) { responderJson(respuesta, 401, { message: DETALLE_CRUDO }); return; }
+      if (caido) { responderJson(respuesta, 500, { message: 'algo se rompió acá' }); return; }
+      const pago = pagos.get(id);
+      if (!pago) { responderJson(respuesta, 404, { message: 'no existe' }); return; }
+      responderJson(respuesta, 200, pago);
       return;
     }
 
@@ -200,6 +315,47 @@ export function levantarDoble(puerto = 8099) {
       resolver({
         pedidos,
         preferencias,
+        emitidas,
+        pagos,
+        // Fabrica un pago como los que devuelve Mercado Pago. Nada de esto
+        // llega al producto por el aviso: el aviso sólo trae el identificador
+        // y el producto tiene que venir a buscar el resto acá.
+        crearPago({
+          referencia, preferencia, cuenta, monto, moneda = 'ARS',
+          ordenId, ordenNumero, estado = 'approved', actualizado, aprobado,
+          devuelto, id,
+        } = {}) {
+          proximoPago += 1;
+          const identificador = String(id ?? proximoPago);
+          const ahora = new Date().toISOString();
+          const pago = {
+            id: identificador,
+            status: estado,
+            currency_id: moneda,
+            transaction_amount: monto,
+            collector_id: cuenta,
+            external_reference: referencia,
+            preference_id: preferencia,
+            metadata: ordenId ? { orden_id: ordenId, orden_numero: ordenNumero } : {},
+            date_created: ahora,
+            date_approved: aprobado ?? (estado === 'approved' ? ahora : null),
+            date_last_updated: actualizado ?? ahora,
+            transaction_amount_refunded: devuelto ?? 0,
+          };
+          pagos.set(identificador, pago);
+          return pago;
+        },
+        actualizarPago(id, cambios) {
+          const pago = pagos.get(String(id));
+          if (!pago) throw new Error(`el doble no conoce el pago ${id}`);
+          Object.assign(pago, cambios);
+          return pago;
+        },
+        // "Mercado Pago caído": responde 500 a las consultas de pago.
+        caer(valor = true) { caido = valor; },
+        // "El vendedor le revocó el permiso a la aplicación": 401 de MP.
+        revocar(valor = true) { revocado = valor; },
+        vencida(preferencia) { return Boolean(emitidas.get(preferencia)?.vencida); },
         cerrar: () => new Promise((listo) => {
           for (const respuesta of demorados) respuesta.destroy();
           servidor.closeAllConnections?.();

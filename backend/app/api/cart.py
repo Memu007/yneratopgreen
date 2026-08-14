@@ -8,6 +8,7 @@ from decimal import Decimal
 from app.db.base import get_db
 from app.models.cart import Cart, CartItem, CartStatus
 from app.models.product import Product, ProductStatus
+from app.services import stock
 from app.models.product_image import ProductImage
 from app.models.category import Category
 from app.core.dependencies import get_current_user
@@ -132,11 +133,13 @@ def add_to_cart(
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     
     # Verificar stock (solo para productos, no servicios)
-    is_service = product.category.is_service if product.category else False
-    if not is_service and (product.stock or 0) < item_data.quantity:
+    # Lo que se mira es lo **disponible**: lo que hay menos lo que ya está
+    # reservado por compras esperando el pago. Ofrecer una unidad con dueño
+    # sería mandar a esa persona a un checkout que va a rebotar.
+    if not stock.hay_para(product, item_data.quantity):
         raise HTTPException(
             status_code=400,
-            detail=f"Stock insuficiente. Disponible: {product.stock}"
+            detail=f"Stock insuficiente. Disponible: {stock.disponible(product)}"
         )
     
     # el precio unitario tiene que entrar en el snapshot del carrito
@@ -154,10 +157,10 @@ def add_to_cart(
     if existing_item:
         # Actualizar cantidad
         new_quantity = existing_item.quantity + item_data.quantity
-        if not is_service and (product.stock or 0) < new_quantity:
+        if not stock.hay_para(product, new_quantity):
             raise HTTPException(
                 status_code=400,
-                detail=f"Stock insuficiente. Disponible: {product.stock}"
+                detail=f"Stock insuficiente. Disponible: {stock.disponible(product)}"
             )
         validar_total_prospectivo(cart, product, new_quantity, existing_item)
         existing_item.quantity = new_quantity
@@ -216,11 +219,10 @@ def update_cart_item_by_product(
         raise HTTPException(status_code=404, detail="Producto no encontrado en el carrito")
     
     # Verificar stock (solo para productos, no servicios)
-    is_service = cart_item.product.category.is_service if cart_item.product.category else False
-    if not is_service and (cart_item.product.stock or 0) < item_data.quantity:
+    if not stock.hay_para(cart_item.product, item_data.quantity):
         raise HTTPException(
             status_code=400,
-            detail=f"Stock insuficiente. Disponible: {cart_item.product.stock}"
+            detail=f"Stock insuficiente. Disponible: {stock.disponible(cart_item.product)}"
         )
     
     validar_total_prospectivo(cart_item.cart, cart_item.product,
@@ -264,11 +266,10 @@ def update_cart_item(
         raise HTTPException(status_code=403, detail="No tienes permiso")
     
     # Verificar stock (solo para productos, no servicios)
-    is_service = cart_item.product.category.is_service if cart_item.product.category else False
-    if not is_service and (cart_item.product.stock or 0) < item_data.quantity:
+    if not stock.hay_para(cart_item.product, item_data.quantity):
         raise HTTPException(
             status_code=400,
-            detail=f"Stock insuficiente. Disponible: {cart_item.product.stock}"
+            detail=f"Stock insuficiente. Disponible: {stock.disponible(cart_item.product)}"
         )
     
     validar_total_prospectivo(cart_item.cart, cart_item.product,
@@ -403,10 +404,9 @@ def sync_cart(
     for product_id in orden:
         entrada = efectivos[product_id]
         product = entrada["producto"]
-        is_service = product.category.is_service if product.category else False
-        if is_service:
+        if stock.es_servicio(product):
             continue
-        disponible = product.stock or 0
+        disponible = stock.disponible(product)
         if disponible <= 0:
             raise HTTPException(
                 status_code=400,

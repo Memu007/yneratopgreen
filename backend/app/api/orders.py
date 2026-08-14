@@ -9,6 +9,7 @@ from io import BytesIO
 import os
 import secrets
 from decimal import Decimal
+import logging
 
 from app.db.base import get_db
 from app.models.order import Order, OrderItem, OrderStatus
@@ -21,6 +22,7 @@ from app.models.user import User
 from app.schemas.logistics import OrderShipping
 from app.schemas.orders import (
     CheckoutResponse,
+    EstadoDePago,
     OpcionDePago,
     OrdenCreada,
     BankTransferDecisionRequest,
@@ -29,7 +31,7 @@ from app.schemas.orders import (
     OrderItemResponse,
     OrderResponse,
 )
-from app.services import mp_preferencia
+from app.services import cobro, mp_pagos, mp_preferencia, stock
 from app.services.checkout import (
     LISTA,
     MEDIO_MERCADO_PAGO,
@@ -58,6 +60,8 @@ from app.api.notifications import (
 )
 
 router = APIRouter(prefix="/orders", tags=["orders"])
+
+logger = logging.getLogger(__name__)
 
 
 def _respuesta_de(orden, vendedor, pago=None, motivo=None) -> OrdenCreada:
@@ -165,6 +169,15 @@ async def preparar_link_de_pago(
             status_code=409,
             detail=f"Esta orden está {orden.status.value} y ya no se puede pagar.",
         )
+    # Y que el link no se haya vencido. La vigencia es la misma que la de la
+    # reserva de stock: pasado ese momento las unidades pueden estar prometidas
+    # a otro, así que volver a entregar el link sería habilitar un cobro sin
+    # mercadería.
+    if not mp_preferencia.vigente(mp_preferencia.pago_de(db, orden)):
+        raise HTTPException(
+            status_code=409,
+            detail="El link de pago de esta orden venció. Volvé a hacer la compra.",
+        )
 
     vendedor = db.query(User).filter(User.id == orden.seller_id).first()
     try:
@@ -172,6 +185,51 @@ async def preparar_link_de_pago(
     except mp_preferencia.NoSePudoPreparar as fallo:
         return _respuesta_de(orden, vendedor, motivo=fallo.motivo)
     return _respuesta_de(orden, vendedor, pago=pago)
+
+
+@router.post("/{order_id}/payment-state", response_model=EstadoDePago)
+async def estado_del_pago(
+    order_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Le pregunta a Mercado Pago en qué anda el pago de una orden.
+
+    Es lo que usa la pantalla a la que vuelve el comprador desde Mercado Pago.
+    Y es importante lo que **no** hace: no lee de qué URL volvió la persona, no
+    mira ningún query param y no marca nada como pagado por haber vuelto. Sólo
+    pregunta y devuelve lo que Mercado Pago conteste, con las mismas
+    comprobaciones que el webhook.
+
+    Si Mercado Pago no contesta, devuelve lo último que sabíamos y lo dice con
+    `verificado: false`. Inventar un estado sería peor que no tener uno.
+    """
+    orden = db.query(Order).filter(
+        ((Order.id == order_id) | (Order.order_number == order_id)),
+        Order.buyer_id == current_user.id,
+    ).first()
+    if not orden:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+
+    verificado = True
+    if orden.payment_method == MEDIO_MERCADO_PAGO:
+        try:
+            await cobro.sincronizar(db, orden)
+        except mp_pagos.NoSeConsulta as fallo:
+            logger.warning(
+                "No se pudo verificar el pago de %s: %s", orden.order_number, fallo.motivo
+            )
+            db.rollback()
+            verificado = False
+        db.refresh(orden)
+
+    return EstadoDePago(
+        order_number=orden.order_number,
+        status=orden.status.value,
+        payment_state=cobro.estado_visible(db, orden),
+        verificado=verificado,
+        **_pago_del_comprador(db, orden),
+    )
 
 
 @router.get("/payment-options", response_model=list[OpcionDePago])
@@ -325,11 +383,15 @@ def decide_transfer_receipt(
         order.status = OrderStatus.REJECTED
         order.cancellation_reason = reason
     else:
+        # Disponible, no existente: por transferencia el stock se descuenta
+        # recién acá, así que hay que respetar lo que otras compras tienen
+        # reservado y todavía no pagaron.
         for item in order.items:
-            product = item.product
-            is_service = product.category.is_service if product and product.category else False
-            if product and not is_service and (product.stock or 0) < item.quantity:
-                raise HTTPException(status_code=400, detail=f"Stock insuficiente para {product.name}")
+            if item.product and not stock.hay_para(item.product, item.quantity):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Stock insuficiente para {item.product.name}",
+                )
         for item in order.items:
             product = item.product
             is_service = product.category.is_service if product and product.category else False
@@ -361,12 +423,21 @@ def _pago_del_comprador(db: Session, order: Order) -> dict:
     Sólo para él, sólo por Mercado Pago y sólo mientras la orden se pueda
     pagar. Al vendedor y al transportista no les toca: no es información suya y
     pagar no es su acción.
+
+    Un link vencido no se ofrece. Las unidades que sostenían esa compra pueden
+    estar ya prometidas a otro comprador.
     """
     if order.payment_method != MEDIO_MERCADO_PAGO or not es_pagable(order):
         return {"payment_url": None, "can_pay": False}
 
     pago = mp_preferencia.pago_de(db, order)
+    if not mp_preferencia.vigente(pago):
+        return {"payment_url": None, "can_pay": False}
     return {"payment_url": pago.init_point if pago else None, "can_pay": True}
+
+
+def _sin_pago_del_comprador() -> dict:
+    return {"payment_url": None, "can_pay": False}
 
 
 def traslado_de(order: Order) -> OrderShipping:
@@ -478,8 +549,12 @@ def get_my_orders(
             rejection_reason=order.cancellation_reason,
             shipping=traslado_de(order),
             payment_method=order.payment_method,
+            # En qué anda el pago lo ven los dos, con las mismas palabras: si
+            # al comprador le dijéramos «aprobado» y al vendedor «pendiente»,
+            # el que despacha y el que reclama estarían mirando dos verdades.
+            payment_state=cobro.estado_visible(db, order),
             **(_pago_del_comprador(db, order) if as_role != "seller"
-               else {"payment_url": None, "can_pay": False}),
+               else _sin_pago_del_comprador()),
         ))
     
     return result
@@ -528,13 +603,53 @@ def get_order_detail(
         rejection_reason=order.cancellation_reason,
         shipping=traslado_de(order),
         payment_method=order.payment_method,
+        payment_state=cobro.estado_visible(db, order),
         **(_pago_del_comprador(db, order) if order.buyer_id == current_user.id
-           else {"payment_url": None, "can_pay": False}),
+           else _sin_pago_del_comprador()),
     )
 
 
+ORDEN_YA_COBRADA = (
+    "Esta orden ya tiene un pago acreditado en Mercado Pago, así que no se "
+    "cancela. Actualizá la pantalla para verla al día."
+)
+
+
+async def _terminar_el_cobro(db: Session, order: Order) -> None:
+    """Cierra el cobro de una orden que termina, antes de darla por terminada.
+
+    El orden de las cosas es la regla: primero se apaga el link en Mercado Pago
+    y recién después se suelta la mercadería que esa compra tenía reservada. Al
+    revés queda la ventana por la que alguien paga un link vivo sobre unidades
+    que ya se le prometieron a otro.
+
+    Y si en el camino aparece que la orden **sí** se pagó, no se cancela nada:
+    se guarda esa verdad y se dice. Cancelar una orden cobrada sería soltar
+    mercadería que ya tiene dueño y dejar la plata sin explicación.
+    """
+    if order.payment_method != MEDIO_MERCADO_PAGO:
+        mp_preferencia.anular_intencion(db, order)
+        return
+
+    venia_pagada = order.status == OrderStatus.PAID
+    try:
+        resultado = await cobro.cerrar_cobro(db, order)
+    except mp_pagos.NoSeConsulta as fallo:
+        # No se pudo hablar con Mercado Pago. La orden termina igual —la
+        # persona ya decidió— pero la reserva queda esperando al
+        # reconciliador, que es quien puede confirmar que nadie pagó.
+        logger.warning("Cierre de cobro diferido en %s: %s", order.order_number, fallo.motivo)
+        stock.marcar_cierre_pendiente(db, order)
+        mp_preferencia.anular_intencion(db, order)
+        return
+
+    if resultado == "cobrada" and not venia_pagada:
+        db.commit()
+        raise HTTPException(status_code=409, detail=ORDEN_YA_COBRADA)
+
+
 @router.patch("/{order_id}/status")
-def update_order_status(
+async def update_order_status(
     order_id: str,
     status_data: dict,
     db: Session = Depends(get_db),
@@ -547,10 +662,12 @@ def update_order_status(
     - Vendedor: PLACED -> CONFIRMED, CONFIRMED -> SHIPPED, PLACED -> REJECTED
     - Comprador: SHIPPED -> DELIVERED, PLACED -> CANCELLED
     """
-    # Buscar por UUID o por order_number
+    # Buscar por UUID o por order_number, con la fila bloqueada: por acá se
+    # llega a un estado terminal, y terminar compite con el aviso de Mercado
+    # Pago y con el reconciliador sobre la misma orden.
     order = db.query(Order).filter(
         (Order.id == order_id) | (Order.order_number == order_id)
-    ).first()
+    ).with_for_update().first()
     
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
@@ -589,6 +706,15 @@ def update_order_status(
     allowed_transitions = []
     if is_seller:
         allowed_transitions = seller_transitions.get(current_status, [])
+        # Por Mercado Pago, «colocada» quiere decir que el link existe y que
+        # nadie pagó todavía. Confirmar o despachar desde ahí sería trabajar
+        # gratis por decisión de un botón: lo único que el vendedor puede
+        # hacer sobre una orden suya no cobrada es rechazarla.
+        if order.payment_method == MEDIO_MERCADO_PAGO and current_status != OrderStatus.PAID:
+            allowed_transitions = [
+                estado for estado in allowed_transitions
+                if estado == OrderStatus.REJECTED
+            ]
     if is_buyer:
         allowed_transitions = buyer_transitions.get(current_status, [])
     
@@ -597,7 +723,13 @@ def update_order_status(
             status_code=400, 
             detail=f"No puedes cambiar de {current_status.value} a {new_status.value}"
         )
-    
+
+    # Antes de escribir el estado terminal: apagar el link y soltar lo
+    # reservado. Va acá y no después porque de acá puede salir un 409 —la
+    # orden estaba pagada—, y ahí no hay nada que cancelar.
+    if new_status in (OrderStatus.CANCELLED, OrderStatus.REJECTED):
+        await _terminar_el_cobro(db, order)
+
     # Actualizar estado
     order.status = new_status
     order.updated_at = datetime.now()
@@ -611,9 +743,6 @@ def update_order_status(
         order.delivered_at = datetime.now()
     elif new_status in [OrderStatus.CANCELLED, OrderStatus.REJECTED]:
         order.cancellation_reason = status_data.get("reason", "")
-        # La orden terminó: la intención de pago local deja de decir
-        # «pendiente» sobre algo que ya no se va a cobrar.
-        mp_preferencia.anular_intencion(db, order)
         # Restaurar stock si se cancela: sólo si el estado del que se viene
         # había descontado stock, y sólo para productos.
         #
@@ -666,7 +795,7 @@ def update_order_status(
 
 
 @router.post("/{order_id}/cancel")
-def cancel_order(
+async def cancel_order(
     order_id: str,
     cancel_data: Optional[dict] = Body(default=None),
     db: Session = Depends(get_db),
@@ -707,8 +836,15 @@ def cancel_order(
             detail="Solo se pueden cancelar órdenes pendientes, pagadas o confirmadas"
         )
 
-    # Restaurar stock SOLO si la orden ya fue pagada (el stock se descontó al aprobar el pago)
-    # Solo para productos, no servicios
+    # Apagar el link y soltar lo reservado, en ese orden, antes de escribir el
+    # estado terminal. Si de acá sale que la orden ya estaba cobrada, no se
+    # cancela: sale un 409 y la orden queda al día.
+    await _terminar_el_cobro(db, order)
+
+    # Restaurar stock del descuento **ya consolidado**: por transferencia se
+    # descuenta al aceptar el comprobante y por Mercado Pago al acreditarse el
+    # pago. Lo que estaba sólo reservado no pasa por acá: eso ya lo soltó el
+    # cierre del cobro, y sumarlo dos veces inventaría mercadería.
     if order.status in [OrderStatus.PAID, OrderStatus.CONFIRMED]:
         for item in order.items:
             product = item.product
@@ -716,25 +852,20 @@ def cancel_order(
             if product and not is_service:
                 product.stock = (product.stock or 0) + item.quantity
                 product.sales_count = max(0, (product.sales_count or 0) - item.quantity)
-                print(f"📦 Stock restaurado para {product.name}: +{item.quantity}")
     
     order.status = OrderStatus.CANCELLED if is_buyer else OrderStatus.REJECTED
     order.cancellation_reason = cancel_data.get("reason", "") if cancel_data else ""
     order.updated_at = datetime.now()
-    # Igual que en el cambio de estado: lo que ya no se puede pagar tampoco
-    # sigue figurando como pago pendiente nuestro.
-    mp_preferencia.anular_intencion(db, order)
-    
+
     db.commit()
     
-    # Cancelar no devuelve dinero, y ahora lo dice en vez de aparentarlo.
+    # Cancelar no devuelve dinero, y lo dice en vez de aparentarlo.
     #
     # Por transferencia el dinero fue de cuenta a cuenta y TopGreen no lo
     # administra: el reintegro lo arreglan comprador y vendedor. Por Mercado
-    # Pago todavía no hay ningún pago confirmado —eso llega con el webhook—,
-    # así que tampoco hay qué devolver. El camino que había acá llamaba al
-    # módulo heredado, que reembolsaba con el token del marketplace cuando el
-    # del vendedor faltaba; eso es exactamente administrar plata de terceros.
+    # Pago, si el pago se acreditó la cancelación no llega hasta acá —sale el
+    # 409 de arriba—, y si no se acreditó no hay nada que devolver. Devolver
+    # dinero de terceros no es algo que esta plataforma haga.
     
     # Enviar notificación de cancelación
     try:

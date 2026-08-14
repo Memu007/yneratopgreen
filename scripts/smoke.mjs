@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 
 import {
   CUENTA_LENTA, CUENTA_RECHAZA, DETALLE_CRUDO, SECRETO_DE_ACCESO,
-  SECRETO_DE_REFRESCO, levantarDoble,
+  SECRETO_DE_REFRESCO, firmaDeAviso, levantarDoble,
 } from './lib/mp-doble.mjs';
 import { queryCount, queryRows, querySql, sqlLiteral } from './lib/sql.mjs';
 
@@ -6285,20 +6285,28 @@ await runCase(67, 'La vinculación a mano ya no existe y el cobro sigue apagado'
   const cobro = rutas.filter((ruta) => /payments|manual-link/.test(ruta));
   assert(cobro.length === 0, `el esquema publica rutas de cobro: ${cobro.join(', ')}`);
 
-  // Lo único que toca pagos es la preparación del link de una orden, y no
-  // mueve dinero: pide una preferencia a nombre del vendedor y sólo si el
-  // cobro está encendido. El módulo heredado sigue sin existir.
+  // Lo que toca pagos son tres rutas de la orden, y ninguna mueve dinero:
+  // qué medios acepta cada vendedor, el link a nombre del vendedor —sólo con
+  // el cobro encendido— y en qué anda ese pago según Mercado Pago. El módulo
+  // heredado, que sí movía plata, sigue sin existir.
   const conPago = rutas.filter((ruta) => /payment/.test(ruta)).sort();
-  assert(conPago.length === 2
-    && conPago.includes('/api/orders/{order_id}/payment-link')
-    && conPago.includes('/api/orders/payment-options'),
-    `el esquema publica ${conPago.length} rutas de pago: ${conPago.join(', ')}`);
+  assert(conPago.join(' | ') === [
+    '/api/orders/payment-options',
+    '/api/orders/{order_id}/payment-link',
+    '/api/orders/{order_id}/payment-state',
+  ].join(' | '), `el esquema publica ${conPago.length} rutas de pago: ${conPago.join(', ')}`);
+
+  // Y una sola puerta más hacia Mercado Pago: la que recibe sus avisos. No
+  // cobra, no devuelve y no acepta nada sin firma; lo que hace es preguntar.
+  const deMercadoPago = rutas.filter((ruta) => /\/mp\//.test(ruta)).sort();
+  assert(deMercadoPago.join(' | ') === '/api/mp/webhook',
+    `el esquema publica ${deMercadoPago.length} rutas de Mercado Pago: ${deMercadoPago.join(', ')}`);
   const vinculo = rutas.filter((ruta) => ruta.includes('mp-oauth')).sort();
   assert(vinculo.length === 5,
     `el vínculo publica ${vinculo.length} rutas: ${vinculo.join(', ')}`);
 
-  return `manual-link responde ${aMano.status}, las tres rutas de cobro 404, y el esquema `
-    + 'publica exactamente las 5 del vínculo y ninguna de pagos';
+  return `manual-link responde ${aMano.status}, las tres rutas del módulo heredado 404, y el `
+    + 'esquema publica las 5 del vínculo, 3 de pago sobre la orden y 1 webhook';
 });
 
 await runCase(68, 'Sin configuración el vínculo se apaga solo y el resto del marketplace sigue', async () => {
@@ -6650,15 +6658,23 @@ await runCase(74, 'El descarte de credenciales en claro sólo lo autoriza un 1',
 // no duplique órdenes ni pagos, y no le mande a Mercado Pago nada que TopGreen
 // no deba mandar.
 
+// Una publicación de ese vendedor que de verdad se pueda comprar hoy.
+//
+// «Con stock» quiere decir DISPONIBLE: lo que hay menos lo reservado por
+// compras que están esperando el pago. Y de una categoría de productos, no de
+// servicios: un servicio no ocupa unidades, así que elegir uno acá sería
+// probar la reserva de stock sobre algo que no reserva nada.
 function productoConStock(vendedor, minimo = 2) {
   const [fila] = queryRows(`
-    SELECT id FROM products
-    WHERE seller_id = ${sqlLiteral(vendedor)} AND status = 'ACTIVE'
-      AND publication_type <> 'servicio' AND stock >= ${minimo}
-    ORDER BY price
+    SELECT p.id FROM products p
+    JOIN categories c ON c.id = p.category_id
+    WHERE p.seller_id = ${sqlLiteral(vendedor)} AND p.status = 'ACTIVE'
+      AND p.publication_type <> 'servicio' AND c.is_service = false
+      AND coalesce(p.stock, 0) - p.stock_reservado >= ${minimo}
+    ORDER BY p.price
     LIMIT 1
   `);
-  assert(fila, `el vendedor ${vendedor} no tiene publicación con stock >= ${minimo}`);
+  assert(fila, `el vendedor ${vendedor} no tiene publicación con ${minimo} disponible(s)`);
   return fila[0];
 }
 
@@ -6717,6 +6733,112 @@ async function comprador() {
   state.buyerToken = data.access_token;
   state.buyerId = data.user.id;
   return data.user.id;
+}
+
+// El mismo secreto que backend/.env. No es real y no vale en ningún lado: es
+// el que comparten Mercado Pago y la aplicación para firmar los avisos.
+const SECRETO_DEL_WEBHOOK = 'secreto-local-de-prueba-no-es-real';
+
+// Manda un aviso de webhook como lo manda Mercado Pago: el identificador del
+// pago en la URL —que es el que entra en la firma—, el tópico, y un cuerpo que
+// sólo sirve para saber a quién preguntarle.
+//
+// `firma: null` manda el aviso sin firmar. `firma: '...'` manda una a mano,
+// para poder alterarla.
+async function avisar({
+  dataId, cuenta, secreto = SECRETO_DEL_WEBHOOK, ts, requestId = 'pedido-de-prueba',
+  firma, tipo = 'payment', cuerpo, idEnLaUrl,
+} = {}) {
+  const segundos = ts ?? Math.floor(Date.now() / 1000);
+  const cabeceras = { 'Content-Type': 'application/json', 'x-request-id': requestId };
+  const calculada = firma === undefined
+    ? firmaDeAviso(secreto, { dataId, requestId, ts: segundos })
+    : firma;
+  if (calculada !== null) cabeceras['x-signature'] = calculada;
+
+  const enLaUrl = idEnLaUrl ?? dataId;
+  const respuesta = await pedirConReintento(
+    `${API_URL}/mp/webhook?data.id=${encodeURIComponent(enLaUrl)}&type=${tipo}`,
+    {
+      method: 'POST',
+      headers: cabeceras,
+      body: JSON.stringify(cuerpo ?? {
+        type: tipo, action: 'payment.updated',
+        data: { id: String(dataId) }, user_id: cuenta,
+      }),
+    },
+  );
+  let datos = null;
+  try { datos = await respuesta.json(); } catch { datos = null; }
+  return { status: respuesta.status, resultado: datos?.resultado };
+}
+
+// Una compra por Mercado Pago, lista para pagar. Devuelve la orden creada más
+// el producto que llevó, para poder mirarle el stock.
+async function ordenMercadoPago(vendedor, { cantidad = 1, producto } = {}) {
+  const item = producto ?? productoConStock(vendedor.id, cantidad + 1);
+  await armarCarrito([{ product_id: item, quantity: cantidad }]);
+  const creado = await apiRequest('/orders/checkout', {
+    method: 'POST', token: state.buyerToken,
+    body: sobreDePago([{ seller_id: vendedor.id, method: 'mercadopago' }]),
+  });
+  const [orden] = creado.data.orders;
+  assert(orden && orden.preparation === 'lista',
+    `la orden quedó ${orden && orden.preparation}`);
+  const [pago] = pagosDe(orden.order_id);
+  return { ...orden, producto: item, preferencia: pago[0] };
+}
+
+function intentosDe(ordenId) {
+  return queryRows(`
+    SELECT mp_payment_id, estado, monto, moneda
+    FROM mp_intentos_de_pago WHERE order_id = ${sqlLiteral(ordenId)}
+    ORDER BY creado_el
+  `);
+}
+
+function reservaDe(ordenId) {
+  const [fila] = queryRows(`
+    SELECT coalesce(stock_reserva, '${NULO}') FROM orders WHERE id = ${sqlLiteral(ordenId)}
+  `);
+  assert(fila, `la orden ${ordenId} no está en la base`);
+  return fila[0];
+}
+
+function reservadoDe(producto) {
+  return Number(queryRows(
+    `SELECT stock_reservado FROM products WHERE id = ${sqlLiteral(producto)}`)[0][0]);
+}
+
+function ventasDe(producto) {
+  return Number(queryRows(
+    `SELECT sales_count FROM products WHERE id = ${sqlLiteral(producto)}`)[0][0]);
+}
+
+// Adelanta el reloj de una orden: le vence el link y su reserva. Se toca la
+// base y no el producto porque esperar media hora no es una prueba.
+function vencerElLink(ordenId, minutos = 60) {
+  querySql(`
+    UPDATE payments SET expires_at = now() - interval '${minutos} minutes'
+    WHERE order_id = ${sqlLiteral(ordenId)}
+  `);
+}
+
+// El reconciliador, por su entrada ejecutable de verdad.
+async function reconciliar() {
+  const salida = await correrEnLaApiSinBloquear(
+    'from app.reconciliar import main\nmain()\n');
+  const linea = salida.split(/\r?\n/).find((l) => l.startsWith('RECONCILIACION'));
+  assert(linea, `el reconciliador no dijo nada:\n${salida.slice(-400)}`);
+  return JSON.parse(linea.slice('RECONCILIACION '.length));
+}
+
+// El estado del pago tal como lo ve cada uno en su lista de órdenes.
+async function comoLoVe(token, rol, numeroDeOrden) {
+  const { data } = await apiRequest(`/orders/my?as_role=${rol}`, { token });
+  const vista = data.find((o) => o.order_number === numeroDeOrden);
+  assert(vista, `${rol} no ve la orden ${numeroDeOrden}`);
+  return vista;
 }
 
 await runCase(75, 'Carrito mixto: una orden por vendedor, cada una con su medio', async () => {
@@ -7170,9 +7292,40 @@ await runCase(79, 'Lo que viaja a Mercado Pago: el importe de la orden, sin comi
                             'seller_amount')`);
     assert(columnas === 0, `la tabla de pagos sigue con ${columnas} columna(s) de las viejas`);
 
+    // 8. El link vence, y vence cuando dice la base. Sin vigencia oficial el
+    //    link vale para siempre y la reserva de stock que lo espera también.
+    assert(cuerpo.expires === true, 'la preferencia viajó sin vigencia');
+    const [conVigencia] = queryRows(`SELECT expires_at FROM payments
+      WHERE order_id = ${sqlLiteral(orden.order_id)}`);
+    assert(conVigencia[0], 'la intención de pago quedó sin vencimiento guardado');
+    const declarado = Date.parse(cuerpo.expiration_date_to);
+    const enLaBase = Date.parse(`${conVigencia[0].replace(' ', 'T')}Z`);
+    assert(Number.isFinite(declarado) && Number.isFinite(enLaBase),
+      `las fechas no se entienden: ${cuerpo.expiration_date_to} / ${conVigencia[0]}`);
+    assert(Math.abs(declarado - enLaBase) < 2000,
+      `a Mercado Pago se le declaró ${cuerpo.expiration_date_to} y la base dice ${conVigencia[0]}`);
+    assert(Date.parse(cuerpo.expiration_date_from) < declarado,
+      'la ventana de vigencia empieza después de terminar');
+
+    // 9. Efectivo y cajero quedan afuera: se acreditan en días, y la reserva
+    //    que los espera bloquearía esa venta para todos los demás.
+    const excluidos = (cuerpo.payment_methods?.excluded_payment_types || [])
+      .map((tipo) => tipo.id).sort();
+    assert(excluidos.join(',') === 'atm,ticket',
+      `los tipos excluidos son ${JSON.stringify(excluidos)}`);
+    assert(!('installments' in (cuerpo.payment_methods || {})),
+      'la preferencia decide cuotas, que no es una decisión nuestra');
+
+    // 10. La metadata ata el pago a esta orden por un camino distinto del de
+    //     la referencia, y no lleva dato de ninguna persona.
+    assert(cuerpo.metadata?.orden_id === orden.order_id
+      && cuerpo.metadata?.orden_numero === orden.order_number,
+      `la metadata es ${JSON.stringify(cuerpo.metadata)}`);
+
     return `3 × $0,10 llegó a Mercado Pago como 0.3 exacto y quedó 0.30 en la base; sin `
       + `marketplace_fee; referencia topgreen-${orden.order_number}; clave de idempotencia `
-      + 'derivada de la orden; autoriza el token del vendedor y no hay cuerpo crudo guardado';
+      + 'derivada de la orden; vigencia declarada igual a la guardada; efectivo y cajero '
+      + 'excluidos; autoriza el token del vendedor y no hay cuerpo crudo guardado';
   } finally {
     await doble.cerrar();
     try {
@@ -7941,6 +8094,811 @@ await runCase(85, 'Rechazar o cancelar por el cambio de estado también cierra l
     return `${observado.join('; ')}; por el PATCH de estado las dos salidas responden 200, `
       + 'escriben estado y motivo, anulan la intención local, no mueven stock y dejan la '
       + 'orden sin puerta de pago';
+  } finally {
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(86, 'Sin firma válida el webhook no mira nada', async () => {
+  // El webhook es una URL pública. Lo único que separa un aviso de Mercado
+  // Pago de uno inventado es la firma, así que lo que se comprueba acá es que
+  // un aviso mal firmado no consulte cuentas ajenas ni toque una fila.
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900601')).ok === 'vinculado',
+      'el vendedor no vinculó');
+
+    const orden = await ordenMercadoPago(vendedor);
+    const pago = doble.crearPago({
+      referencia: `topgreen-${orden.order_number}`,
+      preferencia: orden.preferencia,
+      cuenta: '900601',
+      monto: orden.amount,
+      ordenId: orden.order_id,
+      ordenNumero: orden.order_number,
+      estado: 'approved',
+    });
+
+    const consultasAntes = doble.pedidos.filter((p) => p.ruta === 'consultar').length;
+    const stockAntes = stockDe(orden.producto);
+    const reservadoAntes = reservadoDe(orden.producto);
+    const buena = firmaDeAviso(SECRETO_DEL_WEBHOOK, {
+      dataId: pago.id, requestId: 'pedido-de-prueba', ts: Math.floor(Date.now() / 1000),
+    });
+
+    const rechazos = [
+      ['sin firma', { firma: null }],
+      ['firma de otro secreto', { secreto: 'no-es-el-secreto' }],
+      ['firma alterada', { firma: `${buena.slice(0, -1)}${buena.endsWith('a') ? 'b' : 'a'}` }],
+      ['firma mal formada', { firma: 'v1=lo-que-sea' }],
+      ['firma vencida', { ts: Math.floor(Date.now() / 1000) - 4000 }],
+      ['firma del futuro', { ts: Math.floor(Date.now() / 1000) + 4000 }],
+      // Firmado sobre un identificador y mandado con otro: la firma ata el
+      // aviso a **ese** pago y no a cualquiera.
+      ['data.id cambiado', { idEnLaUrl: '999999999' }],
+    ];
+
+    const vistos = [];
+    for (const [etiqueta, opciones] of rechazos) {
+      const salida = await avisar({ dataId: pago.id, cuenta: '900601', ...opciones });
+      assert(salida.status === 401,
+        `${etiqueta}: el webhook respondió ${salida.status} en vez de 401`);
+      vistos.push(`${etiqueta}→${salida.resultado}`);
+    }
+
+    // Ninguno de esos avisos preguntó nada, ni movió nada.
+    assert(doble.pedidos.filter((p) => p.ruta === 'consultar').length === consultasAntes,
+      'un aviso sin firma válida llegó a consultar la cuenta del vendedor');
+    assert(ordenEnLaBase(orden.order_id).estado === 'placed',
+      'un aviso sin firma válida movió el estado de la orden');
+    assert(intentosDe(orden.order_id).length === 0,
+      'un aviso sin firma válida dejó un intento de pago escrito');
+    assert(stockDe(orden.producto) === stockAntes
+      && reservadoDe(orden.producto) === reservadoAntes,
+      'un aviso sin firma válida movió el stock');
+
+    // Y el mismo aviso, bien firmado, sí.
+    const bueno = await avisar({ dataId: pago.id, cuenta: '900601' });
+    assert(bueno.status === 200 && bueno.resultado === 'aplicado',
+      `el aviso firmado devolvió ${bueno.status} ${bueno.resultado}`);
+    assert(ordenEnLaBase(orden.order_id).estado === 'paid',
+      'el aviso firmado y aprobado no dejó la orden pagada');
+    assert(doble.pedidos.filter((p) => p.ruta === 'consultar').length > consultasAntes,
+      'el aviso firmado no consultó el pago en Mercado Pago');
+
+    // Y una última puerta, que es de configuración: una URL de aviso con
+    // parámetros hace que Mercado Pago mande IPN sin firma. Si eso se pudiera
+    // configurar, todo lo de arriba sería decorativo.
+    const plantilla = readFileSync('backend/.env.example', 'utf8')
+      .replace(/^MP_NOTIFICACION_URL=.*$/m,
+        'MP_NOTIFICACION_URL=https://topgreen.test/api/mp/webhook?x=1')
+      .replace(/\b(?:CAMBIAR|GENERAR)_[A-Z0-9_]+/g, 'valor_de_prueba_de_mas_de_32_caracteres');
+    const rechazo = cargarConSettings(plantilla);
+    assert(!rechazo.trim().endsWith('CARGA_OK'),
+      'Settings aceptó una URL de aviso con parámetros: el webhook se degrada a IPN sin firma');
+    assert(/MP_NOTIFICACION_URL/.test(rechazo),
+      `el rechazo no dice qué clave está mal: ${rechazo.slice(-300)}`);
+
+    return `${vistos.length} avisos mal firmados devolvieron 401 sin consultar ni escribir `
+      + `(${vistos.join(', ')}); el mismo aviso bien firmado dejó la orden pagada; y una URL `
+      + 'de aviso con parámetros no arranca';
+  } finally {
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(87, 'Firmado pero ajeno: cobrador, referencia, importe o moneda que no cierran', async () => {
+  // La firma dice que el aviso viene de Mercado Pago. No dice que el pago sea
+  // de esta orden. Acá se comprueba lo segundo, que es lo que separa un cobro
+  // de una declaración.
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const otro = await ingresarVendedor('admin@topgreen.com', 'admin123');
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    await desvincular(otro.token);
+    assert((await vincular(vendedor.token, 'ok:900602')).ok === 'vinculado',
+      'el vendedor no vinculó');
+    assert((await vincular(otro.token, 'ok:900603')).ok === 'vinculado',
+      'el otro vendedor no vinculó');
+
+    // Una orden de cada vendedor: la del segundo sirve para cruzar referencias.
+    const orden = await ordenMercadoPago(vendedor);
+    const ajena = await ordenMercadoPago(otro);
+
+    const propio = {
+      referencia: `topgreen-${orden.order_number}`,
+      preferencia: orden.preferencia,
+      cuenta: '900602',
+      monto: orden.amount,
+      ordenId: orden.order_id,
+      ordenNumero: orden.order_number,
+      estado: 'approved',
+    };
+
+    const cruces = [
+      ['cobra otra cuenta', { ...propio, cuenta: '900999' }, 'cobrador_ajeno'],
+      ['referencia que no existe', { ...propio, referencia: 'topgreen-ORD-INVENTADA' },
+        'referencia_desconocida'],
+      ['referencia de otro vendedor',
+        { ...propio, referencia: `topgreen-${ajena.order_number}`, ordenId: ajena.order_id },
+        'vendedor_ajeno'],
+      ['preferencia de otra compra', { ...propio, preferencia: 'pref-de-otra-compra' },
+        'preferencia_ajena'],
+      ['metadata de otra orden', { ...propio, ordenId: ajena.order_id }, 'orden_ajena'],
+      ['importe alterado', { ...propio, monto: Number(orden.amount) + 1 }, 'importe_distinto'],
+      ['moneda alterada', { ...propio, moneda: 'USD' }, 'moneda_distinta'],
+    ];
+
+    const estadoAntes = ordenEnLaBase(orden.order_id).estado;
+    const stockAntes = stockDe(orden.producto);
+    const reservadoAntes = reservadoDe(orden.producto);
+    const ventasAntes = ventasDe(orden.producto);
+    const vistos = [];
+
+    for (const [etiqueta, datos, esperado] of cruces) {
+      const pago = doble.crearPago(datos);
+      const salida = await avisar({ dataId: pago.id, cuenta: '900602' });
+      // 200 a propósito: el aviso quedó resuelto y Mercado Pago no tiene que
+      // volver. Lo que no hubo es efecto.
+      assert(salida.status === 200,
+        `${etiqueta}: el webhook respondió ${salida.status}`);
+      assert(salida.resultado === esperado,
+        `${etiqueta}: el motivo fue «${salida.resultado}» y no «${esperado}»`);
+      vistos.push(`${etiqueta}→${salida.resultado}`);
+    }
+
+    assert(ordenEnLaBase(orden.order_id).estado === estadoAntes,
+      'un pago ajeno movió el estado de la orden');
+    assert(intentosDe(orden.order_id).length === 0,
+      'un pago ajeno quedó escrito como intento de esta orden');
+    assert(reservaDe(orden.order_id) === 'reservada',
+      `la reserva quedó en ${reservaDe(orden.order_id)}`);
+    assert(stockDe(orden.producto) === stockAntes
+      && reservadoDe(orden.producto) === reservadoAntes
+      && ventasDe(orden.producto) === ventasAntes,
+      'un pago ajeno movió stock, reserva o ventas');
+    assert(ordenEnLaBase(ajena.order_id).estado === 'placed',
+      'la orden del otro vendedor se movió');
+
+    return `${vistos.length} pagos firmados pero ajenos no movieron nada `
+      + `(${vistos.join(', ')})`;
+  } finally {
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await desvincular(otro.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(88, 'Volver de Mercado Pago no paga nada: lo dice el webhook', async () => {
+  // La pantalla de vuelta decía «¡Pago Exitoso!» por haber llegado a
+  // /payment/success. Esa URL la escribe cualquiera. Acá se entra a esa misma
+  // pantalla sin que exista un solo pago, y después se hace existir uno.
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const browser = await chromium.launch({ headless: true });
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900604')).ok === 'vinculado',
+      'el vendedor no vinculó');
+
+    const orden = await ordenMercadoPago(vendedor);
+    const stockAntes = stockDe(orden.producto);
+
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await context.addInitScript(
+      ({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+      },
+      { a: state.buyerToken, r: state.buyerRefreshToken },
+    );
+    const page = await context.newPage();
+    const vuelta = `${FRONTEND_URL}/payment/success?orden=${orden.order_number}`;
+
+    try {
+      await page.goto(vuelta, { waitUntil: 'domcontentloaded' });
+      // Lo primero que se ve es que se está verificando, no un festejo.
+      await page.getByText(/Estamos verificando tu pago/i).waitFor({ timeout: 15_000 });
+      const primero = await page.locator('body').innerText();
+      assert(!/pago exitoso|pago acreditado|¡gracias por tu compra!/i.test(primero),
+        `la vuelta de «success» declaró un pago que no existe:\n${primero.slice(0, 300)}`);
+
+      // Y cuando termina de preguntar, dice que no hay ningún pago. Tarda: la
+      // pantalla vuelve a preguntar cinco veces antes de darse por vencida,
+      // que es lo que hace que un pago que tarda en aparecer igual aparezca.
+      await page.getByText(/Todavía no hay un pago registrado/i).waitFor({ timeout: 45_000 });
+      assert(ordenEnLaBase(orden.order_id).estado === 'placed',
+        'entrar a /payment/success movió el estado de la orden');
+      assert(intentosDe(orden.order_id).length === 0,
+        'entrar a /payment/success escribió un intento de pago');
+      assert(stockDe(orden.producto) === stockAntes, 'la vuelta del navegador movió stock');
+
+      // Ahora sí: un pago aprobado y su aviso firmado.
+      const pago = doble.crearPago({
+        referencia: `topgreen-${orden.order_number}`,
+        preferencia: orden.preferencia,
+        cuenta: '900604',
+        monto: orden.amount,
+        ordenId: orden.order_id,
+        ordenNumero: orden.order_number,
+        estado: 'approved',
+      });
+      const aviso = await avisar({ dataId: pago.id, cuenta: '900604' });
+      assert(aviso.resultado === 'aplicado', `el aviso devolvió ${aviso.resultado}`);
+
+      await page.goto(vuelta, { waitUntil: 'domcontentloaded' });
+      await page.getByText(/Pago acreditado/i).waitFor({ timeout: 30_000 });
+      assert(ordenEnLaBase(orden.order_id).estado === 'paid',
+        'con el pago aprobado la orden no quedó pagada');
+
+      return 'la vuelta por «success» sin pago dice que está verificando y después que no '
+        + 'hay pago, sin mover orden ni stock; recién el webhook con la consulta aprobada '
+        + 'la deja pagada';
+    } finally {
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(89, 'Repetido, en paralelo y fuera de orden: una transición y un efecto', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900605')).ok === 'vinculado',
+      'el vendedor no vinculó');
+
+    // --- 1. Un rechazo primero. No cierra nada: el link se puede reusar.
+    const orden = await ordenMercadoPago(vendedor, { cantidad: 2 });
+    const base = {
+      referencia: `topgreen-${orden.order_number}`,
+      preferencia: orden.preferencia,
+      cuenta: '900605',
+      monto: orden.amount,
+      ordenId: orden.order_id,
+      ordenNumero: orden.order_number,
+    };
+    const stockAntes = stockDe(orden.producto);
+    const ventasAntes = ventasDe(orden.producto);
+    const reservadoAntes = reservadoDe(orden.producto);
+
+    const rechazado = doble.crearPago({ ...base, estado: 'rejected' });
+    await avisar({ dataId: rechazado.id, cuenta: '900605' });
+    assert(ordenEnLaBase(orden.order_id).estado === 'placed',
+      'un rechazo cerró la orden');
+    assert(reservaDe(orden.order_id) === 'reservada',
+      'un rechazo soltó la reserva');
+    const trasRechazo = await comoLoVe(state.buyerToken, 'buyer', orden.order_number);
+    assert(trasRechazo.payment_state === 'rechazado' && trasRechazo.can_pay === true,
+      `tras el rechazo el comprador ve ${trasRechazo.payment_state} / ${trasRechazo.can_pay}`);
+
+    // --- 2. Después una aprobación, por el mismo link y con otro intento.
+    const aprobado = doble.crearPago({ ...base, estado: 'approved' });
+    const primero = await avisar({ dataId: aprobado.id, cuenta: '900605' });
+    assert(primero.resultado === 'aplicado', `la aprobación devolvió ${primero.resultado}`);
+    assert(ordenEnLaBase(orden.order_id).estado === 'paid',
+      'el rechazo anterior tapó la aprobación');
+
+    const cantidad = stockAntes - stockDe(orden.producto);
+    assert(cantidad === 2, `la aprobación descontó ${cantidad} unidades y no 2`);
+    assert(ventasDe(orden.producto) === ventasAntes + 2,
+      'las ventas no subieron al aprobar, o subieron de más');
+    assert(reservadoDe(orden.producto) === reservadoAntes - 2,
+      'la reserva no se consolidó: quedó comprometida además de descontada');
+
+    // --- 3. El mismo aviso, cinco veces: tres seguidas y dos a la vez.
+    const stockTrasAprobar = stockDe(orden.producto);
+    const ventasTrasAprobar = ventasDe(orden.producto);
+    const repetidos = [];
+    for (let vez = 0; vez < 3; vez += 1) {
+      repetidos.push((await avisar({ dataId: aprobado.id, cuenta: '900605' })).resultado);
+    }
+    const paralelos = await Promise.all([
+      avisar({ dataId: aprobado.id, cuenta: '900605' }),
+      avisar({ dataId: aprobado.id, cuenta: '900605' }),
+    ]);
+    repetidos.push(...paralelos.map((p) => p.resultado));
+    assert(repetidos.every((r) => r === 'repetido'),
+      `los avisos repetidos devolvieron ${repetidos.join(', ')}`);
+    assert(intentosDe(orden.order_id).length === 2,
+      `quedaron ${intentosDe(orden.order_id).length} intentos y son 2 pagos distintos`);
+    assert(stockDe(orden.producto) === stockTrasAprobar
+      && ventasDe(orden.producto) === ventasTrasAprobar,
+      'repetir el aviso movió el stock una segunda vez');
+
+    // --- 4. Una noticia vieja no hace retroceder una aprobación.
+    doble.actualizarPago(aprobado.id, {
+      status: 'rejected',
+      date_last_updated: new Date(Date.now() - 3600_000).toISOString(),
+    });
+    const vieja = await avisar({ dataId: aprobado.id, cuenta: '900605' });
+    assert(vieja.resultado === 'viejo', `la noticia vieja devolvió ${vieja.resultado}`);
+    assert(ordenEnLaBase(orden.order_id).estado === 'paid',
+      'una noticia vieja despagó la orden');
+
+    // Y una noticia nueva que igual querría deshacer la aprobación tampoco:
+    // lo que sí la deshace —devolución, contracargo— tiene su propio estado.
+    doble.actualizarPago(aprobado.id, {
+      status: 'rejected', date_last_updated: new Date().toISOString(),
+    });
+    const retroceso = await avisar({ dataId: aprobado.id, cuenta: '900605' });
+    assert(retroceso.resultado === 'retroceso',
+      `el retroceso devolvió ${retroceso.resultado}`);
+    assert(ordenEnLaBase(orden.order_id).estado === 'paid', 'la orden retrocedió');
+
+    // --- 5. Devolución y contracargo: estado propio, sin devolver dinero ni
+    //        inventar un movimiento de stock.
+    doble.actualizarPago(aprobado.id, {
+      status: 'refunded',
+      transaction_amount_refunded: orden.amount,
+      date_last_updated: new Date().toISOString(),
+    });
+    await avisar({ dataId: aprobado.id, cuenta: '900605' });
+    const devuelta = await comoLoVe(state.buyerToken, 'buyer', orden.order_number);
+    assert(devuelta.payment_state === 'devuelto',
+      `tras la devolución se ve ${devuelta.payment_state}`);
+
+    doble.actualizarPago(aprobado.id, {
+      status: 'charged_back', date_last_updated: new Date().toISOString(),
+    });
+    await avisar({ dataId: aprobado.id, cuenta: '900605' });
+    const contracargo = await comoLoVe(vendedor.token, 'seller', orden.order_number);
+    assert(contracargo.payment_state === 'contracargo',
+      `tras el contracargo el vendedor ve ${contracargo.payment_state}`);
+    assert(stockDe(orden.producto) === stockTrasAprobar,
+      'la devolución movió stock sola, sin que nadie lo decidiera');
+
+    return 'rechazo → aprobación funciona; 5 avisos del mismo pago dejaron 1 transición y '
+      + '1 descuento; una noticia vieja y un retroceso no despagaron; devolución y '
+      + 'contracargo quedan con estado propio y sin mover stock';
+  } finally {
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(90, 'Dos compradores por la última unidad: una sola reserva', async () => {
+  // La comprobación de stock del checkout es cortesía: los dos compradores
+  // leen el mismo número y los dos creen que les alcanza. Lo que decide es la
+  // reserva, que es un UPDATE condicional y la base serializa.
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900606')).ok === 'vinculado',
+      'el vendedor no vinculó');
+
+    // Una publicación con una sola unidad. Nada de cantidades del seed: el
+    // caso tiene que decir cuánto hay. Y en una categoría de productos, no de
+    // servicios: un servicio no ocupa unidades y no reserva ninguna.
+    const [categoria] = queryRows(
+      'SELECT id FROM categories WHERE is_service = false ORDER BY name LIMIT 1');
+    const creada = await apiRequest('/products', {
+      method: 'POST', token: vendedor.token,
+      body: {
+        name: `Smoke última bolsa ${Date.now()}`,
+        description: 'Publicación de prueba de la reserva de stock.',
+        category_id: categoria[0],
+        price: 1500,
+        stock: 1,
+        unit: 'unidad',
+        locality_id: state.location.localityId,
+        publication_type: 'producto',
+      },
+    });
+    const producto = creada.data.id;
+    assert(stockDe(producto) === 1, `la publicación quedó con ${stockDe(producto)}`);
+
+    // El segundo comprador es de este caso, y nace acá.
+    const rival = `rival.${Date.now()}@example.com`;
+    await registrarYVerificar({
+      email: rival, password: 'rival123', full_name: 'Compradora Rival',
+      phone: '+54 11 5555 0199', role: 'user',
+    });
+    const { data: sesion } = await apiRequest('/auth/login', {
+      method: 'POST', body: { email: rival, password: 'rival123' },
+    });
+    const rivalToken = sesion.access_token;
+    const rivalId = sesion.user.id;
+
+    // Los dos carritos, con la misma última unidad adentro.
+    await armarCarrito([{ product_id: producto, quantity: 1 }]);
+    await apiRequest('/cart', { method: 'DELETE', token: rivalToken });
+    await apiRequest('/cart/sync', {
+      method: 'POST', token: rivalToken, body: { items: [{ product_id: producto, quantity: 1 }] },
+    });
+
+    const preferenciasAntes = preferenciasPedidas(doble).length;
+    const sobre = (usuario) => sobreDePago(
+      [{ seller_id: vendedor.id, method: 'mercadopago' }],
+      { shipping_decisions: trasladoPropio(usuario) },
+    );
+
+    // A la vez, de verdad: las dos peticiones en vuelo al mismo tiempo.
+    const [uno, otro] = await Promise.allSettled([
+      apiRequest('/orders/checkout', {
+        method: 'POST', token: state.buyerToken, body: sobre(state.buyerId),
+      }),
+      apiRequest('/orders/checkout', {
+        method: 'POST', token: rivalToken, body: sobre(rivalId),
+      }),
+    ]);
+
+    const ganadores = [uno, otro].filter((r) => r.status === 'fulfilled');
+    const perdedores = [uno, otro].filter((r) => r.status === 'rejected');
+    assert(ganadores.length === 1,
+      `ganaron ${ganadores.length} compradores la misma unidad`);
+    assert(/HTTP 4\d\d/.test(String(perdedores[0].reason?.message || '')),
+      `el que perdió recibió «${perdedores[0].reason?.message}» y no un 4xx claro`);
+
+    const orden = ganadores[0].value.data.orders[0];
+    assert(reservaDe(orden.order_id) === 'reservada',
+      `la orden ganadora quedó con reserva ${reservaDe(orden.order_id)}`);
+
+    // La mercadería sigue estando: se reservó, no se vendió.
+    assert(stockDe(producto) === 1, `el stock quedó en ${stockDe(producto)} y no en 1`);
+    assert(reservadoDe(producto) === 1, `quedaron ${reservadoDe(producto)} unidades reservadas`);
+    assert(ventasDe(producto) === 0,
+      `las ventas subieron a ${ventasDe(producto)} sin que nadie pagara`);
+
+    // Y para el que perdió no se pidió ninguna preferencia: el 4xx llegó
+    // antes de que hubiera un link que cobrar.
+    assert(preferenciasPedidas(doble).length === preferenciasAntes + 1,
+      `se pidieron ${preferenciasPedidas(doble).length - preferenciasAntes} preferencias `
+      + 'para una sola orden');
+    assert(ordenesDe(rivalId).length + ordenesDe(state.buyerId).length
+      >= 1, 'no quedó ninguna orden');
+
+    // El que perdió conserva su carrito: puede corregir sin volver a armarlo.
+    const carritoDelQuePerdio = perdedores[0] === uno ? state.buyerToken : rivalToken;
+    const { data: carrito } = await apiRequest('/cart', { token: carritoDelQuePerdio });
+    assert((carrito.items || []).length === 1,
+      'el comprador que perdió se quedó sin carrito');
+
+    return 'dos checkouts simultáneos por 1 unidad: 1 orden con reserva, el otro 4xx con su '
+      + 'carrito vivo, 1 sola preferencia pedida, stock 1 y ventas 0 hasta que se pague';
+  } finally {
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(91, 'El reloj no libera stock: lo libera Mercado Pago', async () => {
+  // Una reserva vencida no se suelta porque venció. Se le pregunta primero a
+  // Mercado Pago, y recién si no hay pago —y el link quedó cerrado— vuelve la
+  // mercadería. Una sola vez, aunque el reconciliador corra diez.
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900607')).ok === 'vinculado',
+      'el vendedor no vinculó');
+
+    const observado = [];
+
+    // --- a) Vencida y sin ningún pago: se cierra el link y vuelve el stock.
+    const sinPago = await ordenMercadoPago(vendedor);
+    const stockA = stockDe(sinPago.producto);
+    const reservadoA = reservadoDe(sinPago.producto);
+    assert(reservaDe(sinPago.order_id) === 'reservada', 'no quedó reservada');
+    vencerElLink(sinPago.order_id);
+
+    const primera = await reconciliar();
+    assert(primera.vencida === 1, `la reconciliación dijo ${JSON.stringify(primera)}`);
+    assert(doble.vencida(sinPago.preferencia),
+      'se liberó el stock sin haber apagado el link en Mercado Pago');
+    assert(ordenEnLaBase(sinPago.order_id).estado === 'cancelled',
+      `la orden vencida quedó ${ordenEnLaBase(sinPago.order_id).estado}`);
+    assert(reservaDe(sinPago.order_id) === 'liberada',
+      `la reserva quedó ${reservaDe(sinPago.order_id)}`);
+    assert(reservadoDe(sinPago.producto) === reservadoA - 1
+      && stockDe(sinPago.producto) === stockA,
+      'la liberación no devolvió exactamente lo reservado');
+
+    // Correrlo de nuevo no mueve nada: la entrada es idempotente.
+    const otraVez = await reconciliar();
+    assert(!otraVez.vencida, `la segunda corrida volvió a vencer: ${JSON.stringify(otraVez)}`);
+    assert(reservadoDe(sinPago.producto) === reservadoA - 1,
+      'la segunda corrida movió el stock otra vez');
+
+    // Y esa orden ya no ofrece link ni lo vuelve a crear.
+    const negado = await expectApiError(409, () => apiRequest(
+      `/orders/${sinPago.order_id}/payment-link`,
+      { method: 'POST', token: state.buyerToken, body: {} },
+    ));
+    assert(/ya no se puede pagar|venció/i.test(negado), `motivo inesperado: ${negado}`);
+    observado.push('sin pago → link cerrado, orden cancelada, 1 unidad devuelta');
+
+    // --- b) Vencida pero con un pago aprobado que nunca nos avisaron. Acá el
+    //        reloj querría liberar y la plata dice que no.
+    const cobrada = await ordenMercadoPago(vendedor);
+    const stockB = stockDe(cobrada.producto);
+    const ventasB = ventasDe(cobrada.producto);
+    doble.crearPago({
+      referencia: `topgreen-${cobrada.order_number}`,
+      preferencia: cobrada.preferencia,
+      cuenta: '900607',
+      monto: cobrada.amount,
+      ordenId: cobrada.order_id,
+      ordenNumero: cobrada.order_number,
+      estado: 'approved',
+    });
+    vencerElLink(cobrada.order_id);
+
+    const conCobro = await reconciliar();
+    assert(conCobro.cobrada === 1, `la reconciliación dijo ${JSON.stringify(conCobro)}`);
+    assert(ordenEnLaBase(cobrada.order_id).estado === 'paid',
+      'el reconciliador no procesó el pago aprobado que nadie había avisado');
+    assert(stockDe(cobrada.producto) === stockB - 1 && ventasDe(cobrada.producto) === ventasB + 1,
+      'la consolidación por reconciliación no descontó exactamente una vez');
+    assert(reservaDe(cobrada.order_id) === 'consolidada',
+      `la reserva quedó ${reservaDe(cobrada.order_id)}`);
+    observado.push('vencida con pago aprobado → pagada y consolidada, no liberada');
+
+    // Repetir no consolida dos veces.
+    await reconciliar();
+    assert(stockDe(cobrada.producto) === stockB - 1,
+      'reconciliar dos veces descontó dos veces');
+
+    // --- c) Vencida con un pago en proceso: no se toca. Un pago empezado
+    //        todavía puede acreditarse, y el vencimiento no se lo quita.
+    const enProceso = await ordenMercadoPago(vendedor);
+    const reservadoC = reservadoDe(enProceso.producto);
+    doble.crearPago({
+      referencia: `topgreen-${enProceso.order_number}`,
+      preferencia: enProceso.preferencia,
+      cuenta: '900607',
+      monto: enProceso.amount,
+      ordenId: enProceso.order_id,
+      ordenNumero: enProceso.order_number,
+      estado: 'in_process',
+    });
+    vencerElLink(enProceso.order_id);
+
+    const enCurso = await reconciliar();
+    assert(enCurso.en_curso === 1, `la reconciliación dijo ${JSON.stringify(enCurso)}`);
+    assert(reservaDe(enProceso.order_id) === 'reservada',
+      'se soltó la mercadería de una compra que todavía se estaba pagando');
+    assert(reservadoDe(enProceso.producto) === reservadoC,
+      'se liberó stock de un pago en proceso');
+    assert(ordenEnLaBase(enProceso.order_id).estado === 'placed',
+      'se canceló una orden con un pago en proceso');
+    observado.push('vencida con pago en proceso → intacta');
+
+    // --- d) Cancelar con Mercado Pago caído. La orden termina —la persona ya
+    //        decidió— pero la mercadería NO se suelta hasta poder confirmar
+    //        que el link quedó apagado. Soltarla antes es exactamente la
+    //        carrera que no puede existir: alguien paga un link vivo por
+    //        unidades que ya se le prometieron a otro.
+    const aCiegas = await ordenMercadoPago(vendedor);
+    const reservadoD = reservadoDe(aCiegas.producto);
+    doble.caer(true);
+    const cancelada = await apiRequest(`/orders/${aCiegas.order_id}/cancel`, {
+      method: 'POST', token: state.buyerToken, body: { reason: 'me arrepentí' },
+    });
+    doble.caer(false);
+    assert(cancelada.status === 200, `cancelar devolvió ${cancelada.status}`);
+    assert(ordenEnLaBase(aCiegas.order_id).estado === 'cancelled',
+      'la cancelación no llegó a escribirse porque Mercado Pago no contestaba');
+    assert(reservaDe(aCiegas.order_id) === 'cierre_pendiente',
+      `la reserva quedó ${reservaDe(aCiegas.order_id)} y no en cierre pendiente`);
+    assert(reservadoDe(aCiegas.producto) === reservadoD,
+      'se soltó la mercadería sin haber podido apagar el link');
+    assert(!doble.vencida(aCiegas.preferencia), 'el doble caído igual venció el link');
+
+    // Y cuando Mercado Pago vuelve, el reconciliador cierra y suelta. Una vez.
+    const alVolver = await reconciliar();
+    assert(alVolver.liberada === 1, `la reconciliación dijo ${JSON.stringify(alVolver)}`);
+    assert(doble.vencida(aCiegas.preferencia), 'el link nunca se apagó');
+    assert(reservaDe(aCiegas.order_id) === 'liberada',
+      `la reserva quedó ${reservaDe(aCiegas.order_id)}`);
+    assert(reservadoDe(aCiegas.producto) === reservadoD - 1,
+      'la liberación diferida no devolvió exactamente lo reservado');
+    await reconciliar();
+    assert(reservadoDe(aCiegas.producto) === reservadoD - 1,
+      'la segunda corrida volvió a liberar');
+    observado.push('cancelada con MP caído → cierre pendiente, y el reconciliador suelta 1 vez');
+
+    return observado.join('; ');
+  } finally {
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(92, 'Token revocado y Mercado Pago caído: reintentable, no rechazado', async () => {
+  // No poder saber qué pasó no es lo mismo que saber que no pasó. Un 200 acá
+  // se traga el aviso —Mercado Pago no vuelve— y el pago queda perdido.
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900608')).ok === 'vinculado',
+      'el vendedor no vinculó');
+
+    const orden = await ordenMercadoPago(vendedor);
+    const pago = doble.crearPago({
+      referencia: `topgreen-${orden.order_number}`,
+      preferencia: orden.preferencia,
+      cuenta: '900608',
+      monto: orden.amount,
+      ordenId: orden.order_id,
+      ordenNumero: orden.order_number,
+      estado: 'approved',
+    });
+    const stockAntes = stockDe(orden.producto);
+    const vistos = [];
+
+    const noSePudo = async (etiqueta, esperado) => {
+      const salida = await avisar({ dataId: pago.id, cuenta: '900608' });
+      assert(salida.status === 503,
+        `${etiqueta}: respondió ${salida.status} en vez de 503 reintentable`);
+      assert(salida.resultado === esperado,
+        `${etiqueta}: el motivo fue «${salida.resultado}» y no «${esperado}»`);
+      assert(ordenEnLaBase(orden.order_id).estado === 'placed',
+        `${etiqueta}: la orden se movió sin haber podido consultar`);
+      assert(intentosDe(orden.order_id).length === 0,
+        `${etiqueta}: quedó escrito un intento sin haber podido consultar`);
+      assert(stockDe(orden.producto) === stockAntes, `${etiqueta}: se movió el stock`);
+      vistos.push(`${etiqueta}→${salida.status} ${salida.resultado}`);
+    };
+
+    // 1. El vendedor le revocó el permiso a la aplicación: Mercado Pago
+    //    contesta 401 a la consulta.
+    doble.revocar(true);
+    await noSePudo('permiso revocado', 'token_rechazado');
+    doble.revocar(false);
+
+    // 2. Mercado Pago caído.
+    doble.caer(true);
+    await noSePudo('Mercado Pago caído', 'mp_sin_respuesta');
+    doble.caer(false);
+
+    // 3. Sin credencial de este lado: el vínculo se cortó.
+    await desvincular(vendedor.token);
+    const sinVinculo = await avisar({ dataId: pago.id, cuenta: '900608' });
+    assert(sinVinculo.status === 503 && sinVinculo.resultado === 'sin_destinatario',
+      `sin vínculo respondió ${sinVinculo.status} ${sinVinculo.resultado}`);
+    assert(ordenEnLaBase(orden.order_id).estado === 'placed',
+      'sin vínculo se movió la orden igual');
+    vistos.push(`vínculo cortado→${sinVinculo.status} ${sinVinculo.resultado}`);
+
+    // 4. Y cuando el mundo se arregla, el mismo aviso converge.
+    assert((await vincular(vendedor.token, 'ok:900608')).ok === 'vinculado',
+      'el vendedor no volvió a vincular');
+    const bueno = await avisar({ dataId: pago.id, cuenta: '900608' });
+    assert(bueno.status === 200 && bueno.resultado === 'aplicado',
+      `al reintentar devolvió ${bueno.status} ${bueno.resultado}`);
+    assert(ordenEnLaBase(orden.order_id).estado === 'paid',
+      'al reintentar la orden no quedó pagada');
+    assert(stockDe(orden.producto) === stockAntes - 1,
+      'al converger el stock no se descontó exactamente una vez');
+
+    return `${vistos.join('; ')}; con el mundo arreglado el mismo aviso quedó aplicado y la `
+      + 'orden pagada, con un solo descuento de stock';
+  } finally {
+    doble.caer(false);
+    doble.revocar(false);
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(93, 'Comprador y vendedor ven lo mismo, y no se despacha lo que no se cobró', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900609')).ok === 'vinculado',
+      'el vendedor no vinculó');
+
+    const orden = await ordenMercadoPago(vendedor);
+
+    const mirar = async (etiqueta) => {
+      const delComprador = await comoLoVe(state.buyerToken, 'buyer', orden.order_number);
+      const delVendedor = await comoLoVe(vendedor.token, 'seller', orden.order_number);
+      assert(delComprador.payment_state === delVendedor.payment_state,
+        `${etiqueta}: el comprador ve «${delComprador.payment_state}» y el vendedor `
+        + `«${delVendedor.payment_state}»`);
+      // El link es sólo del comprador. El vendedor no paga por nadie.
+      assert(!delVendedor.payment_url && delVendedor.can_pay === false,
+        `${etiqueta}: al vendedor le llegó el link de pago`);
+      return delComprador.payment_state;
+    };
+
+    const pendiente = await mirar('sin pagar');
+    assert(pendiente === 'pendiente', `sin pagar se ve «${pendiente}»`);
+
+    // El vendedor no confirma ni despacha una orden que no cobró. No es una
+    // regla de pantalla: se pide por API.
+    for (const destino of ['confirmed', 'shipped', 'delivered']) {
+      const negado = await expectApiError(400, () => apiRequest(
+        `/orders/${orden.order_id}/status`,
+        { method: 'PATCH', token: vendedor.token, body: { status: destino } },
+      ));
+      assert(/No puedes cambiar/i.test(negado), `«${destino}» falló por otra cosa: ${negado}`);
+    }
+    assert(ordenEnLaBase(orden.order_id).estado === 'placed',
+      'alguna de esas transiciones pasó igual');
+
+    // --- Se acredita el pago.
+    const pago = doble.crearPago({
+      referencia: `topgreen-${orden.order_number}`,
+      preferencia: orden.preferencia,
+      cuenta: '900609',
+      monto: orden.amount,
+      ordenId: orden.order_id,
+      ordenNumero: orden.order_number,
+      estado: 'approved',
+    });
+    await avisar({ dataId: pago.id, cuenta: '900609' });
+
+    const aprobado = await mirar('pagada');
+    assert(aprobado === 'aprobado', `pagada se ve «${aprobado}»`);
+    // Y recargar dice lo mismo: no hay nada que viva sólo en una pantalla.
+    assert((await mirar('pagada, releída')) === 'aprobado', 'releer cambió lo que se ve');
+
+    // Ahora sí puede confirmar.
+    const confirmada = await apiRequest(`/orders/${orden.order_id}/status`, {
+      method: 'PATCH', token: vendedor.token, body: { status: 'confirmed' },
+    });
+    assert(confirmada.status === 200 && confirmada.data.new_status === 'confirmed',
+      `confirmar devolvió ${confirmada.status}`);
+
+    // --- Una devolución posterior lo dice, para los dos, y no despacha sola.
+    doble.actualizarPago(pago.id, {
+      status: 'refunded',
+      transaction_amount_refunded: orden.amount,
+      date_last_updated: new Date().toISOString(),
+    });
+    await avisar({ dataId: pago.id, cuenta: '900609' });
+    const devuelto = await mirar('devuelta');
+    assert(devuelto === 'devuelto', `tras la devolución se ve «${devuelto}»`);
+
+    return 'comprador y vendedor ven el mismo estado en las cuatro lecturas; el vendedor no '
+      + 'pudo confirmar, enviar ni entregar sin cobro y sí después de aprobado; la '
+      + 'devolución queda visible para los dos';
   } finally {
     await doble.cerrar();
     try {
