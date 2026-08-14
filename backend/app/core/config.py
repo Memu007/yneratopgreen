@@ -101,10 +101,17 @@ class Settings(BaseSettings):
     # A dónde vuelve el comprador desde Mercado Pago y a dónde avisa MP. Son
     # URLs públicas y se configuran; no se arman con NGROK_URL ni se adivinan.
     #
-    # La de notificación **no puede llevar query string**: Mercado Pago degrada
-    # el aviso a IPN —un GET con `topic` e `id`, sin firma— cuando la URL trae
-    # parámetros, y ahí se pierde lo único que autentica el aviso. Vacía
-    # significa que no se declara ninguna y MP no avisa a nadie.
+    # La de notificación se declara **sin query string**, y el motivo no es que
+    # los parámetros degraden el aviso: es que el único parámetro que decide
+    # qué clase de aviso llega —`source_news=webhooks`, el oficial para recibir
+    # Webhooks firmados en vez de IPN— lo tiene que poner el código y no el
+    # entorno. Lo agrega `mp_preferencia.url_de_aviso()`. Aceptar query
+    # arbitraria acá dejaría que una variable mal puesta lo pise.
+    #
+    # Vacía significa que no se declara ninguna en la preferencia. Ojo: eso no
+    # es lo mismo que no tener webhook. La URL configurada en el panel de la
+    # aplicación y la que viaja en cada preferencia cumplen funciones distintas,
+    # y la del payload tiene prioridad.
     MP_NOTIFICACION_URL: str = ""
 
     # El secreto con el que Mercado Pago firma cada aviso. Vive fuera del
