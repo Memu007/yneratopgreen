@@ -93,6 +93,34 @@ export function levantarDoble(puerto = 8099) {
   // vendedor revocado desde el panel de Mercado Pago. Tiene que dar una
   // respuesta reintentable, no un rechazo del pago.
   let revocado = false;
+
+  // Cuántas veces seguidas va a fallar el cierre de una preferencia. No es lo
+  // mismo que `caido`: acá Mercado Pago contesta todo menos apagar el link.
+  let fallosDeCierre = 0;
+
+  // Una búsqueda retenida a mitad de camino, para poder meter un webhook
+  // adentro de la ventana que el reconciliador tiene abierta.
+  let pausaDeBusqueda = null;
+  let resolverLaBusqueda = null;
+  let busquedasHechas = 0;
+  let busquedaQueSePausa = 1;
+  // De qué orden es la búsqueda que se retiene. El reconciliador barre todas
+  // las candidatas, así que contar búsquedas a secas retendría la de
+  // cualquiera; lo que hace falta es retener la de UNA orden concreta.
+  let referenciaQueSePausa = null;
+  // Lo mismo para la creación de una preferencia: retenerla deja el checkout
+  // con la reserva ya escrita y todavía sin link.
+  let pausaDePreferencia = null;
+  let resolverLaPreferencia = null;
+
+  // El cuerpo con el que se contesta una preferencia creada.
+  const cuerpoDeLaPreferencia = (id, referencia) => ({
+    id,
+    init_point: `https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=${id}`,
+    sandbox_init_point: `https://sandbox.mercadopago.com.ar/checkout?pref_id=${id}`,
+    external_reference: referencia,
+    client_id: 'app-local-de-prueba',
+  });
   // Cada emisión es distinta de la anterior: así una renovación se puede
   // distinguir de la credencial que reemplazó.
   let emision = 0;
@@ -175,14 +203,21 @@ export function levantarDoble(puerto = 8099) {
         }
         const id = preferencias.get(clave);
         emitidas.set(id, { cuerpo, cuenta, vencida: false });
-        respuesta.writeHead(201, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({
-          id,
-          init_point: `https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=${id}`,
-          sandbox_init_point: `https://sandbox.mercadopago.com.ar/checkout?pref_id=${id}`,
-          external_reference: referencia,
-          client_id: 'app-local-de-prueba',
-        }));
+
+        // Retener la preferencia deja el checkout a mitad de camino: la orden
+        // y su reserva ya están escritas y confirmadas, y el link todavía no
+        // existe. Es la ventana exacta en la que una edición de stock puede
+        // llegar sin ver lo que la compra ya comprometió.
+        const responderPreferencia = () => {
+          respuesta.writeHead(201, { 'Content-Type': 'application/json' });
+          respuesta.end(JSON.stringify(cuerpoDeLaPreferencia(id, referencia)));
+        };
+        if (pausaDePreferencia) {
+          pausaDePreferencia.then(responderPreferencia);
+          pausaDePreferencia = null;
+          return;
+        }
+        responderPreferencia();
       });
       return;
     }
@@ -207,6 +242,15 @@ export function levantarDoble(puerto = 8099) {
         // tampoco funciona, y eso es justo lo que no puede dar por cerrado
         // un cobro.
         if (caido) { responderJson(respuesta, 500, { message: 'algo se rompió acá' }); return; }
+        // Falla transitoria del cierre, y sólo del cierre: consultar y buscar
+        // siguen funcionando. Es el caso que importa para el link que quedó
+        // vivo después de cobrar, porque ahí el pago se registra igual y lo
+        // único que falla es apagar la preferencia.
+        if (fallosDeCierre > 0) {
+          fallosDeCierre -= 1;
+          responderJson(respuesta, 500, { message: 'no se pudo vencer ahora' });
+          return;
+        }
         const emitida = emitidas.get(id);
         if (!emitida) { responderJson(respuesta, 404, { message: 'no existe' }); return; }
         emitida.vencida = true;
@@ -229,10 +273,30 @@ export function levantarDoble(puerto = 8099) {
       }
       if (revocado) { responderJson(respuesta, 401, { message: DETALLE_CRUDO }); return; }
       if (caido) { responderJson(respuesta, 500, { message: 'algo se rompió acá' }); return; }
-      const results = [...pagos.values()].filter(
-        (pago) => pago.external_reference === referencia,
-      );
-      responderJson(respuesta, 200, { results, paging: { total: results.length } });
+
+      // La pausa soltable. Es distinta de la cuenta lenta —que no contesta
+      // nunca— y existe para poder retener **exactamente** el intercalado
+      // peligroso en vez de confiar en que dos llamadas sueltas caigan en el
+      // orden justo, que es no probar nada.
+      //
+      // La respuesta se arma cuando se suelta, no cuando se pide: es lo que
+      // hace Mercado Pago cuando tarda, y es lo que permite que la prueba
+      // meta un pago dentro de la ventana.
+      const responderBusqueda = () => {
+        const results = [...pagos.values()].filter(
+          (pago) => pago.external_reference === referencia,
+        );
+        responderJson(respuesta, 200, { results, paging: { total: results.length } });
+      };
+      if (!referenciaQueSePausa || referencia === referenciaQueSePausa) busquedasHechas += 1;
+      if (pausaDeBusqueda
+        && (!referenciaQueSePausa || referencia === referenciaQueSePausa)
+        && busquedasHechas === busquedaQueSePausa) {
+        pausaDeBusqueda.then(responderBusqueda);
+        pausaDeBusqueda = null;
+        return;
+      }
+      responderBusqueda();
       return;
     }
 
@@ -356,6 +420,32 @@ export function levantarDoble(puerto = 8099) {
         // "El vendedor le revocó el permiso a la aplicación": 401 de MP.
         revocar(valor = true) { revocado = valor; },
         vencida(preferencia) { return Boolean(emitidas.get(preferencia)?.vencida); },
+        // Hace fallar los próximos `cuantos` intentos de apagar un link.
+        fallarElCierre(cuantos = 1) { fallosDeCierre = cuantos; },
+        // Retiene una búsqueda de pagos hasta que la suelten. `desde` dice
+        // cuál: 1 es la próxima, 2 la siguiente. El reconciliador hace dos por
+        // orden —una al preguntar y otra al cerrar— y la que importa retener
+        // es la segunda, que es la que decide si se suelta la mercadería.
+        pausarLaBusqueda({ desde = 1, referencia = null } = {}) {
+          busquedasHechas = 0;
+          busquedaQueSePausa = desde;
+          referenciaQueSePausa = referencia;
+          pausaDeBusqueda = new Promise((resolver) => { resolverLaBusqueda = resolver; });
+        },
+        soltarLaBusqueda() { if (resolverLaBusqueda) resolverLaBusqueda(); },
+        // Retiene la próxima creación de preferencia hasta que la suelten.
+        pausarLaPreferencia() {
+          pausaDePreferencia = new Promise((r) => { resolverLaPreferencia = r; });
+        },
+        soltarLaPreferencia() { if (resolverLaPreferencia) resolverLaPreferencia(); },
+        // Cuántas búsquedas se pidieron: sirve para saber que la retenida ya
+        // llegó antes de meterle el webhook adentro.
+        busquedas(referencia = null) {
+          return pedidos.filter(
+            (p) => p.ruta === 'buscar' && (!referencia || p.referencia === referencia),
+          ).length;
+        },
+        cierres() { return pedidos.filter((p) => p.ruta === 'vencer').length; },
         cerrar: () => new Promise((listo) => {
           for (const respuesta of demorados) respuesta.destroy();
           servidor.closeAllConnections?.();

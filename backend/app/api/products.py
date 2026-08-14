@@ -235,7 +235,16 @@ async def update_product(
     Actualizar un producto existente.
     Solo el dueño o un admin pueden actualizar.
     """
-    product = db.query(Product).filter(Product.id == product_id).first()
+    # La fila se bloquea desde el principio, y eso es parte de la correccion,
+    # no una precaucion generica: editar el stock y reservarlo compiten por el
+    # mismo numero. La reserva del checkout es un UPDATE condicional sobre esta
+    # misma fila, asi que tomarla con FOR UPDATE ordena a las dos: o la reserva
+    # entra antes y la edicion la ve, o la edicion entra antes y la reserva se
+    # calcula sobre el stock nuevo. Sin candado, las dos leen el mismo numero y
+    # la ultima en escribir borra a la otra.
+    product = db.query(Product).filter(
+        Product.id == product_id
+    ).with_for_update().first()
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     
@@ -248,6 +257,26 @@ async def update_product(
     
     # Actualizar campos
     update_data = product_data.model_dump(exclude_unset=True)
+
+    # El stock no puede bajar de lo que ya esta comprometido.
+    #
+    # Habia compras en curso que reservaron unidades de este producto y todavia
+    # esperan que se acredite el pago. Si el vendedor pone un stock menor que
+    # esas unidades, la resta queda en negativo y la consolidacion del pago la
+    # recorta a cero: la falta no explota, se esconde, y alguien se queda sin
+    # la mercaderia que ya habia pagado. Se rechaza con el numero a la vista
+    # para que el vendedor sepa cual es el piso y por que.
+    reservado = product.stock_reservado or 0
+    if update_data.get("stock") is not None and int(update_data["stock"]) < reservado:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"No podes dejar el stock en {int(update_data['stock'])}: hay "
+                f"{reservado} unidad(es) reservadas por compras en curso que "
+                "todavia esperan el pago. Ese es el minimo hasta que se "
+                "resuelvan."
+            ),
+        )
 
     # El precio se valida ANTES de tocar el modelo: por la ruta de edicion,
     # un valor fuera de NUMERIC(12,2) terminaba en un 500 de base.

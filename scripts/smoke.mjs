@@ -4,7 +4,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 import {
-  CUENTA_LENTA, CUENTA_RECHAZA, DETALLE_CRUDO, SECRETO_DE_ACCESO,
+  CUENTA_INCOMPLETA, CUENTA_LENTA, CUENTA_RECHAZA, DETALLE_CRUDO, SECRETO_DE_ACCESO,
   SECRETO_DE_REFRESCO, firmaDeAviso, levantarDoble,
 } from './lib/mp-doble.mjs';
 import { queryCount, queryRows, querySql, sqlLiteral } from './lib/sql.mjs';
@@ -654,7 +654,14 @@ async function expectApiError(expectedStatus, callback) {
   throw new Error(`la API no respondió HTTP ${expectedStatus}`);
 }
 
+// Correr un subconjunto mientras se desarrolla un caso nuevo. La corrida que
+// vale es siempre la completa, así que una corrida filtrada lo dice en el
+// resumen y **nunca** puede confundirse con una verde de verdad.
+const CASOS_PEDIDOS = (process.env.SMOKE_CASOS || '')
+  .split(',').map((n) => Number(n.trim())).filter((n) => Number.isFinite(n) && n > 0);
+
 async function runCase(number, name, callback) {
+  if (CASOS_PEDIDOS.length && !CASOS_PEDIDOS.includes(number)) return;
   const startedAt = Date.now();
 
   try {
@@ -665,6 +672,13 @@ async function runCase(number, name, callback) {
   } catch (error) {
     const elapsed = Date.now() - startedAt;
     const message = error instanceof Error ? error.message : String(error);
+    // Con SMOKE_STACK=1 se imprime la traza y la causa. El mensaje suelto de
+    // un `fetch failed` no dice contra qué falló, y adivinarlo es perder una
+    // corrida entera por vez.
+    if (process.env.SMOKE_STACK) {
+      console.log(error?.stack || error);
+      if (error?.cause) console.log('causa:', error.cause);
+    }
     results.push({ number, name, passed: false, observation: message, elapsed });
     console.log(`[FAIL] ${String(number).padStart(2, '0')} ${name} — ${message} (${elapsed} ms)`);
   }
@@ -6833,6 +6847,31 @@ async function reconciliar() {
   return JSON.parse(linea.slice('RECONCILIACION '.length));
 }
 
+// Espera a que una condición se cumpla sin navegador de por medio. Sirve para
+// saber que la otra punta de una carrera ya llegó al punto que importa, en vez
+// de dormir un rato y confiar.
+async function esperarA(condicion, mensaje, limite = 20_000) {
+  const hasta = Date.now() + limite;
+  while (Date.now() < hasta) {
+    if (await condicion()) return;
+    await new Promise((seguir) => { setTimeout(seguir, 50); });
+  }
+  throw new Error(`no pasó a tiempo: ${mensaje}`);
+}
+
+// ¿La fila de esta orden está bloqueada por otra transacción? Se pregunta con
+// NOWAIT: si no se puede tomar el candado al instante, es que alguien lo tiene.
+function ordenBloqueada(ordenId) {
+  try {
+    querySql(`SELECT 1 FROM orders WHERE id = ${sqlLiteral(ordenId)} FOR UPDATE NOWAIT`);
+    return false;
+  } catch (error) {
+    const texto = `${error}${error?.stderr || ''}${error?.stdout || ''}`;
+    if (/could not obtain lock|no se pudo obtener el bloqueo|lock.*NOWAIT/i.test(texto)) return true;
+    throw error;
+  }
+}
+
 // El estado del pago tal como lo ve cada uno en su lista de órdenes.
 async function comoLoVe(token, rol, numeroDeOrden) {
   const { data } = await apiRequest(`/orders/my?as_role=${rol}`, { token });
@@ -8908,6 +8947,468 @@ await runCase(93, 'Comprador y vendedor ven lo mismo, y no se despacha lo que no
   }
 });
 
+await runCase(94, 'La preferencia que falla no deja una reserva inmortal', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let vendedor = null;
+  try {
+    // El ingreso va adentro del try: si falla antes, el doble queda escuchando
+    // el puerto y el caso siguiente no puede ni levantarlo.
+    vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+    await comprador();
+    await desvincular(vendedor.token);
+    // Una cuenta a la que el doble le devuelve una preferencia inservible: es
+    // el rechazo permanente del enunciado. Se elige ésta y no la que rechaza
+    // todo porque acá lo que tiene que fallar es **sólo** la preferencia: si
+    // también fallara la consulta, el reconciliador no podría preguntar y el
+    // caso mediría otra cosa.
+    assert((await vincular(vendedor.token, `ok:${CUENTA_INCOMPLETA}`)).ok === 'vinculado',
+      'no se pudo vincular la cuenta de preferencia inservible');
+
+    const producto = productoConStock(vendedor.id, 1);
+    const antes = stockDe(producto);
+    await armarCarrito([{ product_id: producto, quantity: 1 }]);
+    const creado = await apiRequest('/orders/checkout', {
+      method: 'POST', token: state.buyerToken,
+      body: sobreDePago([{ seller_id: vendedor.id, method: 'mercadopago' }]),
+    });
+    const [orden] = creado.data.orders;
+    assert(orden && orden.preparation !== 'lista',
+      `la preferencia no falló: quedó «${orden && orden.preparation}»`);
+
+    // La orden existe y tiene mercadería comprometida aunque nunca haya
+    // llegado a tener link.
+    assert(reservaDe(orden.order_id) === 'reservada',
+      `la reserva quedó en «${reservaDe(orden.order_id)}»`);
+    assert(reservadoDe(producto) === 1, `reservado quedó en ${reservadoDe(producto)}`);
+
+    // Y ésta es la corrección: la intención de pago se escribió con la reserva,
+    // antes de hablar con Mercado Pago, así que tiene plazo y el reconciliador
+    // la puede encontrar. Sin esa fila la reserva no vencía nunca.
+    const [pago] = pagosDe(orden.order_id);
+    assert(pago, 'la orden quedó reservada y sin ninguna fila de pago');
+    const [[vence]] = queryRows(
+      `SELECT expires_at IS NOT NULL FROM payments WHERE order_id = ${sqlLiteral(orden.order_id)}`,
+    );
+    assert(vence === 't', 'la intención de pago quedó sin plazo');
+
+    // Se abandona: vence y entra al barrido.
+    vencerElLink(orden.order_id);
+    const primera = await reconciliar();
+    assert(reservaDe(orden.order_id) === 'liberada',
+      `tras reconciliar la reserva quedó en «${reservaDe(orden.order_id)}»`);
+    assert(reservadoDe(producto) === 0, `quedó ${reservadoDe(producto)} reservado`);
+    assert(stockDe(producto) === antes, `el stock quedó en ${stockDe(producto)} y era ${antes}`);
+    assert(ordenEnLaBase(orden.order_id).estado === 'cancelled',
+      'la orden abandonada no quedó cancelada');
+
+    // Y una sola vez: repetir el barrido no vuelve a soltar nada.
+    await reconciliar();
+    assert(reservadoDe(producto) === 0 && stockDe(producto) === antes,
+      'repetir el reconciliador movió el stock otra vez');
+
+    return `la preferencia falló, la orden quedó reservada con su plazo escrito, el `
+      + `reconciliador la cerró y devolvió 1 unidad (${JSON.stringify(primera)}); `
+      + 'repetirlo no movió nada';
+  } finally {
+    await doble.cerrar();
+    try {
+      if (vendedor) await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(95, 'El aviso se autentica antes de leer el cuerpo, y la URL pide Webhooks', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let vendedor = null;
+  try {
+    // El ingreso va adentro del try: si falla antes, el doble queda escuchando
+    // el puerto y el caso siguiente no puede ni levantarlo.
+    vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900610')).ok === 'vinculado', 'no vinculó');
+    const orden = await ordenMercadoPago(vendedor);
+    const propio = doble.crearPago({
+      referencia: `topgreen-${orden.order_number}`,
+      preferencia: orden.preferencia,
+      cuenta: '900610', monto: orden.amount,
+      ordenId: orden.order_id, ordenNumero: orden.order_number,
+      estado: 'approved',
+    });
+
+    // --- 1. Sin `data.id` en la URL no hay nada que autenticar. Que el cuerpo
+    //        lo traiga no alcanza: el cuerpo no está firmado.
+    const consultasAntes = doble.pedidos.filter((p) => p.ruta === 'consultar').length;
+    const sinUrl = await pedirConReintento(`${API_URL}/mp/webhook?type=payment`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-request-id': 'pedido-de-prueba',
+        'x-signature': firmaDeAviso(SECRETO_DEL_WEBHOOK, {
+          dataId: propio.id, requestId: 'pedido-de-prueba',
+        }),
+      },
+      body: JSON.stringify({
+        type: 'payment', data: { id: String(propio.id) }, user_id: '900610',
+      }),
+    });
+    assert(sinUrl.status === 401,
+      `un aviso con el id sólo en el cuerpo devolvió ${sinUrl.status}`);
+    assert(doble.pedidos.filter((p) => p.ruta === 'consultar').length === consultasAntes,
+      'se consultó Mercado Pago con un aviso que no se podía autenticar');
+    assert(ordenEnLaBase(orden.order_id).estado === 'placed', 'la orden se movió igual');
+
+    // --- 2. Con dos identificadores distintos, manda el de la URL: es el
+    //        único que entró en la firma. El del cuerpo ni se mira.
+    const otro = doble.crearPago({
+      referencia: 'topgreen-ORD-INEXISTENTE', preferencia: 'pref-ajena',
+      cuenta: '900610', monto: orden.amount, estado: 'approved',
+    });
+    const cruzado = await avisar({
+      dataId: propio.id, cuenta: '900610',
+      cuerpo: {
+        type: 'payment', action: 'payment.updated',
+        data: { id: String(otro.id) }, user_id: '900610',
+      },
+    });
+    assert(cruzado.status === 200, `el aviso cruzado devolvió ${cruzado.status}`);
+    const consultados = doble.pedidos.filter((p) => p.ruta === 'consultar').map((p) => p.pago);
+    assert(consultados.includes(String(propio.id)),
+      'no se consultó el pago que venía firmado en la URL');
+    assert(!consultados.includes(String(otro.id)),
+      'se consultó el pago que venía en el cuerpo, que no está firmado');
+    assert(ordenEnLaBase(orden.order_id).estado === 'paid',
+      'el pago de la URL no se aplicó');
+
+    // --- 3. La URL de aviso viaja con el parámetro oficial, y lo pone el
+    //        código: la base configurada no puede traer query.
+    const salida = await correrEnLaApiSinBloquear([
+      'from app.core.config import settings',
+      'from app.services import mp_preferencia',
+      'from pydantic import ValidationError',
+      'from app.core.config import Settings',
+      'settings.MP_NOTIFICACION_URL = "https://topgreen.example/api/mp/webhook"',
+      'print("URL", mp_preferencia.url_de_aviso())',
+      'try:',
+      '    Settings(MP_NOTIFICACION_URL="https://x/y?source_news=ipn")',
+      '    print("BASE acepta query")',
+      'except ValidationError:',
+      '    print("BASE rechaza query")',
+    ].join('\n'));
+    assert(/URL https:\/\/topgreen\.example\/api\/mp\/webhook\?source_news=webhooks/.test(salida),
+      `la URL de aviso no lleva el parámetro oficial:\n${salida.slice(-300)}`);
+    assert(/BASE rechaza query/.test(salida),
+      `la base configurada acepta query arbitraria:\n${salida.slice(-300)}`);
+
+    return 'sin data.id en la URL el aviso da 401 sin consultar; con el cuerpo cruzado se '
+      + 'consulta el de la URL y no el del cuerpo; y la notification_url viaja con '
+      + 'source_news=webhooks puesto por el código sobre una base sin query';
+  } finally {
+    await doble.cerrar();
+    try {
+      if (vendedor) await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(96, 'Una orden de Mercado Pago cobrada no se cancela, ni comprador ni vendedor', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let vendedor = null;
+  try {
+    // El ingreso va adentro del try: si falla antes, el doble queda escuchando
+    // el puerto y el caso siguiente no puede ni levantarlo.
+    vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900611')).ok === 'vinculado', 'no vinculó');
+
+    const orden = await ordenMercadoPago(vendedor);
+    const producto = orden.producto;
+    const pago = doble.crearPago({
+      referencia: `topgreen-${orden.order_number}`,
+      preferencia: orden.preferencia, cuenta: '900611', monto: orden.amount,
+      ordenId: orden.order_id, ordenNumero: orden.order_number, estado: 'approved',
+    });
+    await avisar({ dataId: pago.id, cuenta: '900611' });
+    assert(ordenEnLaBase(orden.order_id).estado === 'paid', 'la orden no quedó pagada');
+
+    const stockCobrado = stockDe(producto);
+    const ventasCobradas = ventasDe(producto);
+    const reservaCobrada = reservaDe(orden.order_id);
+
+    // El comprador intenta cancelar una orden que ya tiene plata adentro.
+    const delComprador = await expectApiError(409, () => apiRequest(
+      `/orders/${orden.order_id}/cancel`,
+      { method: 'POST', token: state.buyerToken, body: { reason: 'me arrepentí' } },
+    ));
+    assert(/pago acreditado/i.test(delComprador),
+      `el 409 del comprador dijo otra cosa: ${delComprador}`);
+
+    // Y el vendedor por la misma ruta, que es por donde rechaza.
+    const delVendedor = await expectApiError(409, () => apiRequest(
+      `/orders/${orden.order_id}/cancel`,
+      { method: 'POST', token: vendedor.token, body: { reason: 'no tengo stock' } },
+    ));
+    assert(/pago acreditado/i.test(delVendedor),
+      `el 409 del vendedor dijo otra cosa: ${delVendedor}`);
+
+    // Nada se movió: ni el estado, ni el inventario, ni las ventas.
+    assert(ordenEnLaBase(orden.order_id).estado === 'paid',
+      `la orden quedó en «${ordenEnLaBase(orden.order_id).estado}»`);
+    assert(stockDe(producto) === stockCobrado,
+      `el stock pasó de ${stockCobrado} a ${stockDe(producto)}`);
+    assert(ventasDe(producto) === ventasCobradas, 'las ventas se movieron');
+    assert(reservaDe(orden.order_id) === reservaCobrada, 'la reserva se movió');
+
+    return `los dos intentos de cancelar una orden cobrada dieron 409; sigue pagada, el stock `
+      + `en ${stockCobrado} y las ventas en ${ventasCobradas}`;
+  } finally {
+    await doble.cerrar();
+    try {
+      if (vendedor) await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(97, 'El vendedor no puede quitar stock que ya está reservado', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let vendedor = null;
+  try {
+    // El ingreso va adentro del try: si falla antes, el doble queda escuchando
+    // el puerto y el caso siguiente no puede ni levantarlo.
+    vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900612')).ok === 'vinculado', 'no vinculó');
+
+    const orden = await ordenMercadoPago(vendedor);
+    const producto = orden.producto;
+    // En absolutos no: el producto puede traer reservas de otras compras. Lo
+    // que importa es el piso que esas reservas imponen, sea cual sea.
+    const reservado = reservadoDe(producto);
+    assert(reservado >= 1, `la compra no reservó nada: ${reservado}`);
+    const stockAntes = stockDe(producto);
+
+    // Bajar el stock por debajo de lo comprometido se rechaza, con el número.
+    const negado = await expectApiError(400, () => apiRequest(
+      `/products/${producto}`,
+      { method: 'PATCH', token: vendedor.token, body: { stock: reservado - 1 } },
+    ));
+    assert(/reservada/i.test(negado), `el rechazo no explica lo reservado: ${negado}`);
+    assert(stockDe(producto) === stockAntes,
+      `el stock cambió igual: ${stockDe(producto)} en vez de ${stockAntes}`);
+
+    // La edición normal sigue funcionando, y el borde exacto también: dejarlo
+    // justo en lo reservado se acepta.
+    const subir = await apiRequest(`/products/${producto}`, {
+      method: 'PATCH', token: vendedor.token, body: { stock: stockAntes + 5 },
+    });
+    assert(subir.status === 200, `subir el stock devolvió ${subir.status}`);
+    assert(stockDe(producto) === stockAntes + 5, 'el stock no subió');
+    const justo = await apiRequest(`/products/${producto}`, {
+      method: 'PATCH', token: vendedor.token, body: { stock: reservado },
+    });
+    assert(justo.status === 200, `dejarlo en lo reservado devolvió ${justo.status}`);
+
+    // La carrera de verdad: la edición llega con un checkout en vuelo. Se
+    // retiene la creación de la preferencia, que ocurre DESPUÉS de que la
+    // reserva ya quedó escrita y confirmada.
+    const otro = productoConStock(vendedor.id, 1);
+    const reservadoDelOtro = reservadoDe(otro);
+    await armarCarrito([{ product_id: otro, quantity: 1 }]);
+    doble.pausarLaPreferencia();
+    const enVuelo = apiRequest('/orders/checkout', {
+      method: 'POST', token: state.buyerToken,
+      body: sobreDePago([{ seller_id: vendedor.id, method: 'mercadopago' }]),
+    });
+    await esperarA(() => reservadoDe(otro) === reservadoDelOtro + 1,
+      'la reserva del checkout en vuelo');
+    const enCarrera = await expectApiError(400, () => apiRequest(
+      `/products/${otro}`,
+      { method: 'PATCH', token: vendedor.token, body: { stock: reservadoDelOtro } },
+    ));
+    assert(/reservada/i.test(enCarrera), `la carrera falló por otra cosa: ${enCarrera}`);
+    doble.soltarLaPreferencia();
+    await enVuelo;
+
+    return 'bajar el stock por debajo de lo reservado da 400 con el motivo; subirlo y dejarlo '
+      + 'justo en lo reservado funcionan; y con un checkout en vuelo la edición ya ve la '
+      + 'reserva escrita';
+  } finally {
+    await doble.cerrar();
+    try {
+      if (vendedor) await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(98, 'El link se apaga al primer cobro, y dos aprobados piden revisión', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let vendedor = null;
+  try {
+    // El ingreso va adentro del try: si falla antes, el doble queda escuchando
+    // el puerto y el caso siguiente no puede ni levantarlo.
+    vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900613')).ok === 'vinculado', 'no vinculó');
+
+    // --- 1. Un cobro apaga su link. Una preferencia cobrada sigue sirviendo
+    //        del lado de Mercado Pago si nadie la vence.
+    const primera = await ordenMercadoPago(vendedor);
+    const pagoUno = doble.crearPago({
+      referencia: `topgreen-${primera.order_number}`,
+      preferencia: primera.preferencia, cuenta: '900613', monto: primera.amount,
+      ordenId: primera.order_id, ordenNumero: primera.order_number, estado: 'approved',
+    });
+    await avisar({ dataId: pagoUno.id, cuenta: '900613' });
+    assert(doble.vencida(primera.preferencia),
+      'la preferencia siguió viva después de cobrar');
+
+    // --- 2. Si apagarlo falla, el pago se registra igual y queda anotado que
+    //        el link sigue abierto. El reconciliador lo reintenta.
+    const segunda = await ordenMercadoPago(vendedor);
+    doble.fallarElCierre(1);
+    const pagoDos = doble.crearPago({
+      referencia: `topgreen-${segunda.order_number}`,
+      preferencia: segunda.preferencia, cuenta: '900613', monto: segunda.amount,
+      ordenId: segunda.order_id, ordenNumero: segunda.order_number, estado: 'approved',
+    });
+    const avisado = await avisar({ dataId: pagoDos.id, cuenta: '900613' });
+    assert(avisado.status === 200, `el aviso devolvió ${avisado.status} por no poder cerrar`);
+    assert(ordenEnLaBase(segunda.order_id).estado === 'paid',
+      'no poder apagar el link se llevó puesto el cobro');
+    assert(!doble.vencida(segunda.preferencia), 'el doble dice que se venció y falló');
+    const [[abierto]] = queryRows(
+      `SELECT link_cerrado FROM payments WHERE order_id = ${sqlLiteral(segunda.order_id)}`);
+    assert(abierto === 'f', 'quedó anotado como cerrado un link que no se pudo cerrar');
+
+    await reconciliar();
+    assert(doble.vencida(segunda.preferencia),
+      'el reconciliador no reintentó apagar el link');
+    const [[cerrado]] = queryRows(
+      `SELECT link_cerrado FROM payments WHERE order_id = ${sqlLiteral(segunda.order_id)}`);
+    assert(cerrado === 't', 'el reintento no quedó anotado');
+
+    // --- 3. Dos pagos aprobados distintos para la misma orden. Pasa aunque el
+    //        link se apague al primero: dos intentos en vuelo se pueden
+    //        acreditar los dos.
+    const stockTrasUno = stockDe(primera.producto);
+    const ventasTrasUno = ventasDe(primera.producto);
+    const pagoBis = doble.crearPago({
+      referencia: `topgreen-${primera.order_number}`,
+      preferencia: primera.preferencia, cuenta: '900613', monto: primera.amount,
+      ordenId: primera.order_id, ordenNumero: primera.order_number, estado: 'approved',
+    });
+    await avisar({ dataId: pagoBis.id, cuenta: '900613' });
+
+    const visto = await comoLoVe(state.buyerToken, 'buyer', primera.order_number);
+    const delVendedor = await comoLoVe(vendedor.token, 'seller', primera.order_number);
+    assert(visto.payment_state === 'en_revision',
+      `con dos cobros el comprador ve «${visto.payment_state}»`);
+    assert(delVendedor.payment_state === 'en_revision',
+      `con dos cobros el vendedor ve «${delVendedor.payment_state}»`);
+
+    // Los dos identificadores se conservan, y la mercadería salió una vez.
+    const ids = intentosDe(primera.order_id).map((f) => f[0]);
+    assert(ids.includes(String(pagoUno.id)) && ids.includes(String(pagoBis.id)),
+      `no están los dos pagos guardados: ${ids.join(', ')}`);
+    assert(stockDe(primera.producto) === stockTrasUno,
+      `el stock se descontó dos veces: ${stockTrasUno} -> ${stockDe(primera.producto)}`);
+    assert(ventasDe(primera.producto) === ventasTrasUno, 'las ventas subieron dos veces');
+    assert(doble.pedidos.filter((p) => p.ruta === 'reembolso').length === 0,
+      'se pidió un reembolso solo');
+
+    return 'el primer cobro apagó su link; con el cierre caído el pago se registró igual y el '
+      + 'reconciliador lo apagó después; y dos aprobados distintos dejan «en revisión» con '
+      + 'los dos ids guardados y un solo descuento de stock';
+  } finally {
+    await doble.cerrar();
+    try {
+      if (vendedor) await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(99, 'El reconciliador no suelta el candado entre preguntar y decidir', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let vendedor = null;
+  try {
+    // El ingreso va adentro del try: si falla antes, el doble queda escuchando
+    // el puerto y el caso siguiente no puede ni levantarlo.
+    vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, 'ok:900614')).ok === 'vinculado', 'no vinculó');
+
+    const orden = await ordenMercadoPago(vendedor);
+    const producto = orden.producto;
+    const stockAntes = stockDe(producto);
+    // En diferencias, no en absolutos: el producto puede venir con reservas de
+    // otras compras, y lo que se mide acá es lo que mueve ESTA.
+    const reservadoAntes = reservadoDe(producto);
+    vencerElLink(orden.order_id);
+
+    // El reconciliador hace dos búsquedas por orden: una al preguntar y otra
+    // al cerrar. La segunda es la que decide si se suelta la mercadería, así
+    // que es la que se retiene: ahí adentro entra el pago.
+    // Se retiene la búsqueda **de esta orden**, no la segunda a secas: el
+    // barrido pasa por todas las candidatas, y contar búsquedas sueltas
+    // retendría la de cualquier otra.
+    const referencia = `topgreen-${orden.order_number}`;
+    doble.pausarLaBusqueda({ desde: 2, referencia });
+    const barrido = reconciliar();
+
+    await esperarA(() => doble.busquedas(referencia) >= 2,
+      'la búsqueda con la que el reconciliador decide sobre esta orden');
+
+    // Con la decisión a medio camino, la fila tiene que estar bloqueada. Si no
+    // lo está, entre preguntar y decidir hay una ventana por la que se cuela
+    // un cobro y la orden termina cancelada con plata adentro.
+    assert(ordenBloqueada(orden.order_id),
+      'el reconciliador soltó el candado de la orden entre preguntar y decidir');
+
+    // Y ahora sí: el pago aparece dentro de la ventana, y el aviso llega.
+    const pago = doble.crearPago({
+      referencia: `topgreen-${orden.order_number}`,
+      preferencia: orden.preferencia, cuenta: '900614', monto: orden.amount,
+      ordenId: orden.order_id, ordenNumero: orden.order_number, estado: 'approved',
+    });
+    const aviso = avisar({ dataId: pago.id, cuenta: '900614' });
+    doble.soltarLaBusqueda();
+
+    const resumen = await barrido;
+    const respuesta = await aviso;
+
+    assert(respuesta.status === 200, `el aviso terminó en ${respuesta.status}`);
+    assert(ordenEnLaBase(orden.order_id).estado === 'paid',
+      `la orden quedó en «${ordenEnLaBase(orden.order_id).estado}» con un pago acreditado`);
+    assert(reservaDe(orden.order_id) === 'consolidada',
+      `quedó cobro con la reserva en «${reservaDe(orden.order_id)}»`);
+    assert(stockDe(producto) === stockAntes - 1,
+      `el stock quedó en ${stockDe(producto)} y tenía que bajar una sola unidad desde ${stockAntes}`);
+    assert(reservadoDe(producto) === reservadoAntes - 1,
+      `lo reservado pasó de ${reservadoAntes} a ${reservadoDe(producto)}: tenía que bajar una`);
+    assert(!resumen.vencida && !resumen.liberada,
+      `el reconciliador cerró una orden que se estaba pagando: ${JSON.stringify(resumen)}`);
+
+    return `con el pago entrando entre la búsqueda y el cierre, la fila estaba bloqueada; la `
+      + `orden quedó pagada y consolidada, el stock bajó una sola unidad y el barrido `
+      + `no la venció (${JSON.stringify(resumen)})`;
+  } finally {
+    await doble.cerrar();
+    try {
+      if (vendedor) await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 
@@ -8920,6 +9421,9 @@ for (const result of results) {
   );
 }
 console.log('-------------------');
+if (CASOS_PEDIDOS.length) {
+  console.log(`CORRIDA FILTRADA (SMOKE_CASOS=${CASOS_PEDIDOS.join(',')}): NO es la suite completa`);
+}
 console.log(`${passed}/${results.length} pasaron; ${failed} fallaron`);
 
 if (failed > 0) process.exitCode = 1;

@@ -631,7 +631,19 @@ async def _terminar_el_cobro(db: Session, order: Order) -> None:
         mp_preferencia.anular_intencion(db, order)
         return
 
-    venia_pagada = order.status == OrderStatus.PAID
+    # Lo primero es lo que ya sabemos, sin preguntarle a nadie: si esta orden
+    # tiene un cobro acreditado, no se cancela y no se toca el inventario.
+    #
+    # Esto antes tenía una excepción —si la orden ya venía en PAID se dejaba
+    # pasar— y era exactamente al revés de lo que corresponde: que el pago se
+    # hubiera acreditado *antes* no lo vuelve cancelable, lo vuelve intocable.
+    # Con esa excepción, comprador o vendedor dejaban la orden en un estado
+    # terminal y devolvían la mercadería al catálogo mientras la plata seguía
+    # en la cuenta del vendedor. Deshacer un cobro no es una operación que
+    # tenga esta plataforma: TopGreen no administra fondos de terceros.
+    if cobro.hay_cobro(db, order):
+        raise HTTPException(status_code=409, detail=ORDEN_YA_COBRADA)
+
     try:
         resultado = await cobro.cerrar_cobro(db, order)
     except mp_pagos.NoSeConsulta as fallo:
@@ -643,7 +655,10 @@ async def _terminar_el_cobro(db: Session, order: Order) -> None:
         mp_preferencia.anular_intencion(db, order)
         return
 
-    if resultado == "cobrada" and not venia_pagada:
+    # Y si el cobro aparece recién ahora, al apagar el link, vale lo mismo: la
+    # cancelación no ocurre. Se guarda lo que Mercado Pago dijo —esa venta
+    # existe— y quien pidió cancelar se entera de que llegó tarde.
+    if resultado == "cobrada":
         db.commit()
         raise HTTPException(status_code=409, detail=ORDEN_YA_COBRADA)
 
@@ -845,7 +860,14 @@ async def cancel_order(
     # descuenta al aceptar el comprobante y por Mercado Pago al acreditarse el
     # pago. Lo que estaba sólo reservado no pasa por acá: eso ya lo soltó el
     # cierre del cobro, y sumarlo dos veces inventaría mercadería.
-    if order.status in [OrderStatus.PAID, OrderStatus.CONFIRMED]:
+    # Y sólo por transferencia: una orden de Mercado Pago con cobro acreditado
+    # nunca llega hasta acá —`_terminar_el_cobro` la corta con un 409—, y una
+    # sin cobrar tiene su mercadería reservada, no descontada, así que ya la
+    # soltó el cierre del cobro. Sumarla acá la inventaría dos veces.
+    if (
+        order.payment_method != MEDIO_MERCADO_PAGO
+        and order.status in [OrderStatus.PAID, OrderStatus.CONFIRMED]
+    ):
         for item in order.items:
             product = item.product
             is_service = product.category.is_service if product and product.category else False

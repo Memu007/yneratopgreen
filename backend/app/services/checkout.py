@@ -36,8 +36,9 @@ from app.core.config import settings
 from app.core.montos import SIN_CARGO, importe_de_linea, validar_total
 from app.models.cart import Cart, CartStatus
 from app.models.order import Order, OrderItem, OrderStatus
+from app.models.payment import Payment, PaymentStatus
 from app.models.user import User
-from app.services import mp_vinculo, stock
+from app.services import mp_preferencia, mp_vinculo, stock
 from app.services.logistica import (
     MODO_PROPIO,
     origen_de,
@@ -372,6 +373,26 @@ def crear_ordenes(
             except HTTPException:
                 db.rollback()
                 raise
+
+            # Y junto con la reserva, su plazo. La intención de pago se
+            # escribe **antes** de hablar con Mercado Pago, no después de que
+            # conteste.
+            #
+            # El motivo es concreto: si la preferencia se pedía primero y la
+            # fila se escribía con la respuesta, un timeout o un rechazo
+            # permanente dejaba la orden reservada y sin ninguna fila de pago.
+            # El reconciliador busca por el vencimiento de esa fila, así que
+            # esa reserva no vencía nunca y la mercadería quedaba comprometida
+            # para siempre por una compra que no llegó a existir.
+            #
+            # Acá nace con el plazo ya puesto, y ese plazo es el que después
+            # declara la preferencia: la reserva y el link mueren juntos.
+            db.add(Payment(
+                order_id=orden.id,
+                total_amount=orden.total_amount,
+                status=PaymentStatus.PENDING,
+                expires_at=mp_preferencia.vencimiento_de(),
+            ))
 
         creadas.append(orden)
 

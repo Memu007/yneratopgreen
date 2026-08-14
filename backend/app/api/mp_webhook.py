@@ -6,11 +6,14 @@ de lo que llegó merece que se lo mire.
 
 El orden es este y no otro:
 
-1. **Firma.** Sin ella no se sigue. No se lee el cuerpo, no se consulta la
-   cuenta de ningún vendedor y no se toca una fila.
-2. **El cuerpo enruta y nada más.** De él se sacan dos cosas: qué pago y de qué
-   cuenta. Que el cuerpo diga «approved» no aprueba nada: el cuerpo no está
-   firmado y lo escribe quien lo mande.
+1. **Firma.** Se valida con el `data.id` de la URL y los headers, y el cuerpo
+   **todavía no se leyó**: no es que se lea y se ignore, es que no se lee. Sin
+   firma válida no se consulta la cuenta de ningún vendedor y no se toca una
+   fila.
+2. **El cuerpo enruta y nada más.** Se lee recién después de autenticar, y de
+   él sale una sola cosa: de qué cuenta viene. Ni siquiera qué pago —ese es el
+   de la URL, que es el que quedó firmado—. Que el cuerpo diga «approved» no
+   aprueba nada: lo escribe quien lo mande.
 3. **La verdad se consulta.** `GET /v1/payments/{id}` con el token del
    vendedor, y de esa respuesta —no de la que llegó— sale el estado.
 
@@ -50,20 +53,17 @@ SIN_DESTINATARIO = "sin_destinatario"
 OTRO_TOPICO = "otro_topico"
 
 
-def _dato(cuerpo: dict, pedido: Request) -> Optional[str]:
-    """El identificador del pago.
+def _dato(pedido: Request) -> Optional[str]:
+    """El identificador del pago, **de la URL y nada más que de la URL**.
 
-    Mercado Pago lo manda en la URL —y **ese** es el que entra en la firma— y
-    además en el cuerpo. Se prefiere el de la URL por eso mismo: es el que
-    quedó autenticado.
+    Es el que entra en el manifiesto que se firma, así que es el único que
+    sirve para autenticar. El cuerpo también lo trae, pero el cuerpo no está
+    firmado: tomarlo como respaldo dejaría que quien manda el aviso elija qué
+    pago se consulta, que es exactamente el agujero que la firma tapa. Si no
+    viene en la URL, el aviso no se puede autenticar y no se procesa.
     """
     de_la_url = pedido.query_params.get("data.id") or pedido.query_params.get("id")
-    if de_la_url:
-        return str(de_la_url)
-    datos = cuerpo.get("data")
-    if isinstance(datos, dict) and datos.get("id"):
-        return str(datos["id"])
-    return None
+    return str(de_la_url) if de_la_url else None
 
 
 def _topico(cuerpo: dict, pedido: Request) -> str:
@@ -85,14 +85,9 @@ async def webhook(
     db: Session = Depends(get_db),
 ):
     """Recibe un aviso de Mercado Pago. Devuelve siempre un código nuestro."""
-    try:
-        cuerpo = await pedido.json()
-    except Exception:  # noqa: BLE001
-        cuerpo = {}
-    if not isinstance(cuerpo, dict):
-        cuerpo = {}
-
-    identificador = _dato(cuerpo, pedido)
+    # El cuerpo todavía no se lee. Lo único que se mira para autenticar es lo
+    # que está firmado: el `data.id` de la URL y los dos headers.
+    identificador = _dato(pedido)
 
     try:
         mp_firma.validar(
@@ -114,7 +109,16 @@ async def webhook(
         respuesta.status_code = 401
         return {"resultado": fallo.motivo}
 
-    # --- Desde acá el aviso está autenticado. Sigue sin decidir nada.
+    # --- Desde acá el aviso está autenticado. Recién ahora se lee el cuerpo,
+    # y sólo para enrutar: qué tópico es y de qué cuenta viene. El estado real
+    # no sale de acá, sale de la consulta.
+    try:
+        cuerpo = await pedido.json()
+    except Exception:  # noqa: BLE001
+        cuerpo = {}
+    if not isinstance(cuerpo, dict):
+        cuerpo = {}
+
     if _topico(cuerpo, pedido) not in TOPICO_PAGO:
         return {"resultado": OTRO_TOPICO}
 

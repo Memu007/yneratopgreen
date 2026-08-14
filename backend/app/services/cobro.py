@@ -90,6 +90,16 @@ VISIBLE_RECHAZADO = "rechazado"
 VISIBLE_DEVUELTO = "devuelto"
 VISIBLE_CONTRACARGO = "contracargo"
 VISIBLE_CANCELADO = "cancelado"
+VISIBLE_EN_REVISION = "en_revision"
+
+# Los estados de la intención que significan que hubo plata. Se agrupan porque
+# los tres disparan lo mismo: la mercadería reservada sale, y sale una vez.
+CON_COBRO = (
+    PaymentStatus.APPROVED,
+    PaymentStatus.REFUNDED,
+    PaymentStatus.CHARGED_BACK,
+    PaymentStatus.EN_REVISION,
+)
 
 MOTIVO_VENCIDA = "El link de pago venció sin que se acreditara el pago."
 
@@ -321,6 +331,17 @@ def _resumen(intentos: List[MPIntentoDePago]) -> PaymentStatus:
         return PaymentStatus.CHARGED_BACK
     if DEVUELTO in estados:
         return PaymentStatus.REFUNDED
+    if len({i.mp_payment_id for i in intentos if i.estado == APROBADO}) > 1:
+        # Dos pagos aprobados distintos para la misma orden. Una preferencia de
+        # Checkout Pro sigue sirviendo después de cobrada, así que esto es
+        # posible aunque el link se apague al primer cobro: dos intentos que
+        # venían en vuelo pueden acreditarse los dos.
+        #
+        # Resumirlo como «aprobado» contaría una venta donde hay dos cobros, y
+        # es justo el error que nadie ve hasta que el comprador reclama. No se
+        # consolida mercadería dos veces, no se devuelve plata sola —eso no lo
+        # decide un `if`— y los dos identificadores quedan guardados.
+        return PaymentStatus.EN_REVISION
     if APROBADO in estados:
         return PaymentStatus.APPROVED
     if any(e in EN_PROCESO for e in estados):
@@ -372,10 +393,42 @@ def aplicar(db: Session, orden: Order, pago: Payment) -> PaymentStatus:
     pago.status = resumen
     db.add(pago)
 
-    if resumen in (PaymentStatus.APPROVED, PaymentStatus.REFUNDED, PaymentStatus.CHARGED_BACK):
+    if resumen in CON_COBRO:
+        # El caso que no se puede tapar: llegó plata sobre una reserva que ya
+        # se soltó.
+        #
+        # Pasa en una sola situación, y es la que quedó documentada como riesgo
+        # abierto: un pago que ya estaba en vuelo cuando se apagó el link se
+        # acredita después de que la mercadería volvió al catálogo. No hay
+        # candado que lo evite —el pago existe del lado de Mercado Pago aunque
+        # acá nadie se haya enterado— y devolver la plata solos no es una
+        # operación que tenga esta plataforma.
+        #
+        # Lo que sí se puede evitar es mentir sobre el resultado. Dejar la
+        # orden en un estado terminal —cancelada, vencida— con un cobro
+        # acreditado adentro sería un estado terminal falso: nadie lo mira
+        # nunca más y la plata queda sin explicación. Así que la orden vuelve a
+        # decir que está pagada, la intención queda en revisión, y el stock
+        # **no** se vuelve a tomar: puede haberse vendido a otro en el medio, y
+        # esa es justamente la decisión que necesita una persona.
+        if orden.stock_reserva == stock.LIBERADA:
+            logger.error(
+                "Cobro acreditado sobre una reserva ya liberada en %s: queda en revisión",
+                orden.order_number,
+            )
+            pago.status = PaymentStatus.EN_REVISION
+            db.add(pago)
+            if orden.status != OrderStatus.PAID:
+                orden.status = OrderStatus.PAID
+                orden.updated_at = datetime.utcnow()
+                db.add(orden)
+            return PaymentStatus.EN_REVISION
+
         # Hubo cobro: la mercadería reservada sale. Una devolución posterior
         # **no** la devuelve sola —puede estar despachada—; queda el estado
-        # visible para que el vendedor decida.
+        # visible para que el vendedor decida. Con dos aprobados también sale
+        # una sola vez: lo que decide es el `UPDATE` condicional de la reserva,
+        # no la cantidad de pagos.
         stock.consolidar(db, orden)
         if orden.status == OrderStatus.PLACED:
             orden.status = OrderStatus.PAID
@@ -383,6 +436,35 @@ def aplicar(db: Session, orden: Order, pago: Payment) -> PaymentStatus:
             db.add(orden)
 
     return resumen
+
+
+async def apagar_link(db: Session, orden: Order, pago: Payment, token: Optional[str]) -> bool:
+    """Apaga la preferencia de una orden que ya cobró. Devuelve si quedó hecho.
+
+    Una preferencia de Checkout Pro **no se muere sola cuando se cobra**: el
+    link sigue sirviendo y se puede volver a pagar. Así que en cuanto entra el
+    primer pago acreditado se la vence, que es la única operación oficial para
+    cerrar un link ya emitido.
+
+    Puede fallar —Mercado Pago no contesta, el token se revocó— y entonces no
+    se miente: `link_cerrado` queda en falso y el reconciliador lo reintenta.
+    No se hace ruido en la respuesta del webhook por esto: el pago se
+    registró igual, y perder el aviso por no haber podido apagar un link sería
+    cambiar un problema chico por uno grande.
+    """
+    if pago.link_cerrado or not pago.mp_preference_id or not token:
+        return bool(pago.link_cerrado)
+    try:
+        await mp_pagos.vencer_preferencia(token, pago.mp_preference_id)
+    except mp_pagos.NoSeConsulta as fallo:
+        logger.warning(
+            "No se pudo apagar el link ya cobrado de %s: %s",
+            orden.order_number, fallo.motivo,
+        )
+        return False
+    pago.link_cerrado = True
+    db.add(pago)
+    return True
 
 
 async def procesar_pago(db: Session, mp_payment_id: str, vendedor: User) -> str:
@@ -404,20 +486,33 @@ async def procesar_pago(db: Session, mp_payment_id: str, vendedor: User) -> str:
 
     resultado = _guardar_intento(db, orden, pago, intento)
     if resultado == APLICADO:
-        aplicar(db, orden, pago)
+        resumen = aplicar(db, orden, pago)
+        if resumen in CON_COBRO:
+            # Cobrada: se apaga el link antes de confirmar. La llamada va con
+            # la fila bloqueada, y es a propósito: si se soltara el candado
+            # para hacerla, otro pago podría entrar por el mismo link justo
+            # mientras lo estamos apagando.
+            await apagar_link(db, orden, pago, token)
         db.commit()
     else:
         db.rollback()
     return resultado
 
 
-async def sincronizar(db: Session, orden: Order) -> str:
+async def sincronizar(db: Session, orden: Order, confirmar: bool = True) -> str:
     """Le pregunta a Mercado Pago por todos los intentos de una orden.
 
     Es lo que se usa cuando el aviso no llegó: el reconciliador, el comprador
     que vuelve del navegador. Aplica lo que encuentre con las mismas reglas
     que el webhook, así que no hay un segundo camino por el que una orden se
     pueda marcar pagada.
+
+    `confirmar=False` deja la transacción abierta **con el candado de la orden
+    todavía tomado**, para quien va a seguir decidiendo sobre esa misma fila.
+    Es lo que necesita el reconciliador: si acá se hiciera `commit`, el candado
+    se soltaría entre «pregunté y no había pago» y «entonces libero», y en esa
+    rendija entra un webhook que aprueba. El resultado sería lo único que este
+    módulo no puede permitir: plata cobrada con la mercadería ya devuelta.
     """
     pago = mp_preferencia.pago_de(db, orden)
     if pago is None:
@@ -454,8 +549,11 @@ async def sincronizar(db: Session, orden: Order) -> str:
         if _guardar_intento(db, orden, pago, intento) == APLICADO:
             hubo = True
 
-    aplicar(db, orden, pago)
-    db.commit()
+    resumen = aplicar(db, orden, pago)
+    if resumen in CON_COBRO:
+        await apagar_link(db, orden, pago, token)
+    if confirmar:
+        db.commit()
     return APLICADO if hubo else REPETIDO
 
 
@@ -510,6 +608,11 @@ async def cerrar_cobro(db: Session, orden: Order) -> str:
         stock.marcar_cierre_pendiente(db, orden)
         return "diferido"
 
+    # El link quedó apagado. Se anota, porque de eso depende que nadie lo
+    # vuelva a intentar y que el reconciliador no lo reintente al pedo.
+    pago.link_cerrado = True
+    db.add(pago)
+
     for datos in pagos_de_la_orden:
         try:
             _, _, intento = verificar(db, datos, vendedor)
@@ -544,6 +647,8 @@ def estado_visible(db: Session, orden: Order) -> Optional[str]:
     if pago is None:
         return VISIBLE_PENDIENTE
 
+    if pago.status == PaymentStatus.EN_REVISION:
+        return VISIBLE_EN_REVISION
     if pago.status == PaymentStatus.CHARGED_BACK:
         return VISIBLE_CONTRACARGO
     if pago.status == PaymentStatus.REFUNDED:

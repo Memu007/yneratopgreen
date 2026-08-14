@@ -43,6 +43,13 @@ const TEXTO_DEL_ESTADO: Record<string, { titulo: string; detalle: string }> = {
       'Mercado Pago confirmó el pago y tu orden ya figura como pagada. El '
       + 'vendedor la ve igual.',
   },
+  en_revision: {
+    titulo: 'Hay más de un pago para esta orden',
+    detalle:
+      'Mercado Pago registró más de un pago aprobado. Tu orden figura como '
+      + 'pagada y la mercadería se descontó una sola vez; los pagos los tiene '
+      + 'que revisar el vendedor antes de seguir.',
+  },
   en_proceso: {
     titulo: 'Mercado Pago está procesando el pago',
     detalle:

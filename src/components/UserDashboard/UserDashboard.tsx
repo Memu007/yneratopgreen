@@ -149,6 +149,13 @@ const TEXTO_DEL_PAGO: Record<string, { texto: string; problema?: boolean }> = {
       + 'figurar como pagada sola.',
   },
   aprobado: { texto: 'Pago acreditado en Mercado Pago.' },
+  en_revision: {
+    texto:
+      'Mercado Pago registró más de un pago aprobado para esta orden. La '
+      + 'mercadería se descontó una sola vez y no se devolvió plata sola: hace '
+      + 'falta revisar los pagos antes de seguir.',
+    problema: true,
+  },
   rechazado: {
     texto:
       'El último intento de pago fue rechazado. Se puede volver a intentar con '

@@ -1,7 +1,7 @@
 """
 Modelo de Pagos - Integración con Mercado Pago
 """
-from sqlalchemy import Column, String, DateTime, Numeric, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Boolean, Column, String, DateTime, Numeric, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -27,6 +27,13 @@ class PaymentStatus(str, enum.Enum):
     # dinero se retiró. No lo ejecutamos nosotros y no lo revertimos nosotros;
     # es un estado para que el vendedor lo vea y actúe.
     CHARGED_BACK = "charged_back"
+    # Mas de un pago aprobado distinto para la misma orden. Checkout Pro puede
+    # entregar varios intentos por la misma preferencia, y si dos llegan a
+    # acreditarse, resumir eso como "aprobado" contaria una sola venta cuando
+    # hay dos cobros. No se consolida mercaderia dos veces y no se devuelve
+    # plata sola: queda este estado, que pide que una persona lo mire, y los
+    # dos identificadores siguen guardados en `mp_intentos_de_pago`.
+    EN_REVISION = "en_revision"
 
 
 class Payment(Base):
@@ -91,6 +98,15 @@ class Payment(Base):
     # fue con el módulo heredado, que era el que devolvía dinero.
     refunded_at = Column(DateTime, nullable=True)  # Cuando MP informó la devolución
     refund_amount = Column(Numeric(14, 2), nullable=True)  # Monto devuelto según MP
+
+    # Si el link de pago ya esta apagado del lado de Mercado Pago.
+    #
+    # Se apaga apenas el primer pago se acredita, porque una preferencia sigue
+    # sirviendo despues de cobrada y nada impide que alguien vuelva a pagarla.
+    # Como apagarlo es una llamada a Mercado Pago y puede fallar, hace falta
+    # saber si quedo hecho: mientras esto sea falso con un cobro acreditado, el
+    # reconciliador lo vuelve a intentar.
+    link_cerrado = Column(Boolean, default=False, nullable=False)
 
     # Relaciones
     order = relationship("Order", back_populates="payment")

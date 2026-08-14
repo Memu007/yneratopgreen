@@ -94,6 +94,27 @@ def vencimiento_de(desde: Optional[datetime] = None) -> datetime:
     )
 
 
+# El parámetro oficial que pide Webhooks y no IPN. Lo agrega el código, nunca
+# el entorno: la base configurada tiene que venir sin query —una arbitraria
+# podría pisar esto o degradar el aviso— y el único parámetro que viaja es
+# este, que es el que la documentación de Mercado Pago manda poner para
+# recibir exclusivamente notificaciones Webhook, que son las firmadas.
+PARAMETRO_DE_WEBHOOKS = "source_news=webhooks"
+
+
+def url_de_aviso() -> str:
+    """La URL de aviso tal como viaja en la preferencia.
+
+    La base sale de la configuración y no puede traer parámetros; el único que
+    se agrega es el oficial. Si en algún momento la base llegara con query
+    —no debería: el validador lo rechaza al arrancar— se respeta el `&` para
+    no romper la URL en vez de fabricar una segunda `?`.
+    """
+    base = settings.MP_NOTIFICACION_URL
+    separador = "&" if "?" in base else "?"
+    return f"{base}{separador}{PARAMETRO_DE_WEBHOOKS}"
+
+
 def _cuerpo_de_la_preferencia(orden: Order, hasta: datetime) -> dict:
     """Arma el pedido a partir de lo que ya está guardado en la orden."""
     items = [
@@ -141,7 +162,7 @@ def _cuerpo_de_la_preferencia(orden: Order, hasta: datetime) -> dict:
     # La URL de aviso sólo va si está configurada. Mandar una que no atiende
     # nadie sería pedirle a Mercado Pago que reintente contra el vacío.
     if settings.MP_NOTIFICACION_URL:
-        cuerpo["notification_url"] = settings.MP_NOTIFICACION_URL
+        cuerpo["notification_url"] = url_de_aviso()
 
     return cuerpo
 
@@ -237,7 +258,11 @@ async def preparar_pago(db: Session, orden: Order, vendedor: User) -> Payment:
     if not token:
         raise NoSePudoPreparar(SIN_VINCULO)
 
-    hasta = vencimiento_de()
+    # El plazo ya lo fijó el checkout cuando reservó la mercadería, y es el que
+    # manda: la vigencia del link no puede pasarse del final de la reserva. Sólo
+    # se calcula uno nuevo si la fila viniera sin plazo, que hoy no pasa por
+    # esta ruta y queda como red por si alguna orden vieja llega hasta acá.
+    hasta = (existente.expires_at if existente and existente.expires_at else vencimiento_de())
     datos = await _pedir_preferencia(
         token, _cuerpo_de_la_preferencia(orden, hasta), clave_de_idempotencia(orden)
     )

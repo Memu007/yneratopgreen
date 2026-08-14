@@ -144,20 +144,25 @@ class Settings(BaseSettings):
     @field_validator("MP_NOTIFICACION_URL")
     @classmethod
     def _url_de_aviso_sin_parametros(cls, valor: str) -> str:
-        """La URL de aviso no puede llevar query string.
+        """La base configurada se declara limpia: sin query string.
 
-        No es una preferencia de estilo. Mercado Pago **degrada el aviso a
-        IPN** —un GET con `topic` e `id`, sin firma— cuando la URL declarada
-        trae parámetros, y desde ese momento no hay nada que autentique lo que
-        llega. Un webhook que no se puede autenticar es peor que no tener
-        webhook, porque parece que funciona.
+        No es que Mercado Pago rechace una URL con parámetros. Es que el
+        parámetro que decide **qué clase de aviso llega** lo tiene que poner el
+        código y no el entorno: la documentación oficial indica agregar
+        `source_news=webhooks` a la `notification_url` de la preferencia para
+        recibir exclusivamente Webhooks —los firmados— y no IPN. Ese parámetro
+        lo agrega `mp_preferencia.url_de_aviso()`.
+
+        Si además se aceptara query arbitraria del entorno, una variable mal
+        puesta podría pisarlo o sumar ruido a una URL pública. Así que la base
+        entra limpia y el único parámetro que viaja es el oficial.
 
         Se falla al arrancar y no en la primera notificación perdida.
         """
         if valor and "?" in valor:
             raise ValueError(
-                "MP_NOTIFICACION_URL no puede llevar parámetros: con query string "
-                "Mercado Pago manda IPN sin firma y el aviso deja de ser verificable"
+                "MP_NOTIFICACION_URL se declara sin parámetros: el único que viaja "
+                "es source_news=webhooks, y lo agrega el código al armar la preferencia"
             )
         return valor
 

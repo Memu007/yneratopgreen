@@ -40,8 +40,9 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.base import SessionLocal
 from app.models.order import Order, OrderStatus
-from app.models.payment import Payment
-from app.services import cobro, mp_pagos, stock
+from app.models.payment import Payment, PaymentStatus
+from app.models.user import User
+from app.services import cobro, mp_pagos, mp_preferencia, mp_vinculo, stock
 from app.services.checkout import MEDIO_MERCADO_PAGO
 
 logger = logging.getLogger(__name__)
@@ -64,29 +65,55 @@ def _candidatas(db: Session) -> List[Order]:
     poder soltarse—.
     """
     limite = datetime.utcnow() - timedelta(minutes=settings.MP_MINUTOS_DE_GRACIA)
+    # El `JOIN` es por fuera: una reserva **sin** fila de pago tiene que
+    # aparecer acá, no desaparecer. Hoy el checkout escribe la intención en la
+    # misma transacción que la reserva, así que no debería existir ninguna; el
+    # `outerjoin` está para que, si existe igual —una fila vieja, una escritura
+    # a medias—, la mercadería se recupere en vez de quedar comprometida para
+    # siempre por una compra que nunca llegó a tener link.
+    sin_pago = Payment.id.is_(None)
+    reserva_viva = Order.stock_reserva.in_([stock.RESERVADA, stock.CIERRE_PENDIENTE])
+    vencida = (
+        (Order.stock_reserva == stock.CIERRE_PENDIENTE)
+        | (Payment.expires_at <= limite)
+        | (sin_pago & (Order.created_at <= limite))
+    )
+    # Y un tercer grupo, que no tiene nada que ver con vencimientos: órdenes ya
+    # cobradas cuyo link no se pudo apagar. La reserva de esas ya está
+    # consolidada, así que por reserva no entrarían nunca, y sin embargo son
+    # las más urgentes: una preferencia viva sobre una orden cobrada se puede
+    # volver a pagar.
+    link_abierto = Payment.link_cerrado.is_(False) & Payment.status.in_(
+        [PaymentStatus.APPROVED, PaymentStatus.EN_REVISION]
+    )
     return (
         db.query(Order)
-        .join(Payment, Payment.order_id == Order.id)
+        .outerjoin(Payment, Payment.order_id == Order.id)
         .filter(
             Order.payment_method == MEDIO_MERCADO_PAGO,
-            Order.stock_reserva.in_([stock.RESERVADA, stock.CIERRE_PENDIENTE]),
-            (
-                (Order.stock_reserva == stock.CIERRE_PENDIENTE)
-                | (Payment.expires_at <= limite)
-            ),
+            (reserva_viva & vencida) | link_abierto,
         )
         .all()
     )
 
 
 async def _una(db: Session, orden: Order) -> str:
-    """Reconcilia una orden. Devuelve qué le pasó."""
-    # La fila, bloqueada: esto compite con el webhook y con una cancelación.
-    db.query(Order).filter(Order.id == orden.id).with_for_update().first()
+    """Reconcilia una orden. Devuelve qué le pasó.
 
+    Todo lo que decide pasa **bajo un solo candado y en una sola transacción**,
+    y eso no es prolijidad: preguntar y decidir tienen que ser el mismo acto.
+    Si entre «Mercado Pago dice que no hay pago» y «entonces libero» la fila
+    queda suelta, un webhook que apruebe en esa rendija deja la peor
+    combinación que este módulo puede producir —plata cobrada y mercadería
+    devuelta— y encima con la orden diciendo que se venció.
+
+    Por eso `sincronizar` se llama sin confirmar: hace la consulta sin candado,
+    lo toma para aplicar y lo **devuelve puesto**. Lo que sigue son decisiones
+    con la fila en la mano.
+    """
     try:
         # Primero preguntar. Siempre primero preguntar.
-        await cobro.sincronizar(db, orden)
+        await cobro.sincronizar(db, orden, confirmar=False)
     except mp_pagos.NoSeConsulta as fallo:
         db.rollback()
         logger.warning(
@@ -94,11 +121,30 @@ async def _una(db: Session, orden: Order) -> str:
         )
         return SIN_RESPUESTA
 
+    # El candado, otra vez y explícito: `sincronizar` pudo no haber llegado a
+    # tomarlo —una orden sin intención sale antes—, y de acá para abajo se
+    # escribe. El webhook toma este mismo candado antes de tocar nada, así que
+    # si llega uno mientras decidimos, espera; y cuando entre, va a ver lo que
+    # dejamos, no lo que había cuando preguntamos.
+    db.query(Order).filter(Order.id == orden.id).with_for_update().first()
     db.refresh(orden)
+
     if cobro.hay_cobro(db, orden):
+        # Cobrada. Lo único que puede faltar acá es apagar el link: si al
+        # acreditarse el pago la llamada a Mercado Pago falló, la preferencia
+        # sigue viva y se puede volver a pagar una orden ya cobrada. Este es el
+        # reintento de eso, y por eso la orden entra al barrido aunque su
+        # reserva ya esté consolidada.
+        pago = mp_preferencia.pago_de(db, orden)
+        if pago is not None and not pago.link_cerrado:
+            vendedor = db.query(User).filter(User.id == orden.seller_id).first()
+            token = mp_vinculo.access_token_de(db, vendedor) if vendedor else None
+            await cobro.apagar_link(db, orden, pago, token)
+        db.commit()
         return COBRADA
     if cobro.hay_intento_en_curso(db, orden):
         # Empezó a pagar. El vencimiento del link no le quita ese pago.
+        db.commit()
         return EN_CURSO
 
     resultado = await cobro.cerrar_cobro(db, orden)
