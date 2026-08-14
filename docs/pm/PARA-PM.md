@@ -256,3 +256,34 @@ la vez pasada: `backend/.env.production.example` no tenía ninguna de las cuatro
 claves de MP-C —ni el secreto del webhook— y su comentario decía que todavía no
 existía el webhook firmado. Están agregadas, todas vacías, con la bandera en
 `false`. Si te parece alcance de más, se saca en un commit.
+
+## 10. Dos que encontré yo, revisando lo que ya te había entregado
+
+Mientras esperaba tu respuesta me puse a revisar el diff como si fuera tuyo.
+Aparecieron dos, las dos mías, y las dos ya subidas con su rojo medido.
+
+**`_resumen` contaba los cobros vivos, no los que ocurrieron.** Con dos pagos
+aprobados sobre la misma orden y una devolución posterior de uno, el conteo
+bajaba a uno, ganaba la precedencia de devolución, y la orden quedaba diciendo
+«devuelto»: limpio, cerrado, y con un cobro todavía en pie. El vendedor habría
+leído que le devolvieron todo. Es el mismo error que me marcaste en tu punto 5,
+una capa más abajo: resumir dos cobros como uno.
+
+Ahora se cuentan por identificador los que estuvieron aprobados, devueltos o con
+contracargo, y ese conteo se mira **antes** que cualquier otra precedencia. La
+plata que ya se movió no deja de haberse movido porque una parte volvió. El caso
+98 lo fija: sin el arreglo se pone rojo con «devolver uno de los dos cobros dejó
+la orden en devuelto».
+
+**Y le pisé los finales de línea a `UserDashboard.tsx`.** El archivo es mixto
+—2891 líneas con CRLF y 218 con LF— y al agregarle el texto del estado nuevo
+quedó normalizado entero. El agregado son siete líneas; el diff mostraba 443.
+Doscientas dieciocho de esas no las escribí yo, y un diff que toca lo que nadie
+tocó no se puede revisar. Cada línea que ya existía recuperó su terminador.
+
+Ninguna de las dos cambia lo que te conté arriba. Las digo porque el trabajo no
+termina cuando el push sale verde, y porque prefiero que las leas acá y no que
+las encuentres.
+
+Puertas después de las dos: suite **99 de 99**, hito **6 de 6**, build limpio,
+`alembic check` sin operaciones nuevas y `diff --check` limpio.
