@@ -327,21 +327,37 @@ def _resumen(intentos: List[MPIntentoDePago]) -> PaymentStatus:
     sirviendo para volver a intentar.
     """
     estados = [i.estado for i in intentos]
-    if CONTRACARGO in estados:
-        return PaymentStatus.CHARGED_BACK
-    if DEVUELTO in estados:
-        return PaymentStatus.REFUNDED
-    if len({i.mp_payment_id for i in intentos if i.estado == APROBADO}) > 1:
-        # Dos pagos aprobados distintos para la misma orden. Una preferencia de
-        # Checkout Pro sigue sirviendo después de cobrada, así que esto es
-        # posible aunque el link se apague al primer cobro: dos intentos que
-        # venían en vuelo pueden acreditarse los dos.
+
+    # Primero de todo: ¿cuántos pagos distintos llegaron a cobrarse alguna vez?
+    #
+    # Se cuentan por identificador y **incluyendo los que después se devolvieron
+    # o tuvieron contracargo**, y eso es lo que corrige el error obvio: si se
+    # contaran sólo los que hoy están aprobados, dos cobros con uno devuelto
+    # después darían uno solo, la orden diría «devuelto» —limpio, cerrado— y el
+    # vendedor leería que le devolvieron todo cuando le queda un cobro vivo. La
+    # plata que ya se movió no deja de haberse movido porque una parte volvió.
+    #
+    # Más de uno es siempre para una persona: no lo resuelve ninguna regla de
+    # precedencia, y por eso este `if` va antes que todos los demás.
+    cobrados_alguna_vez = {
+        i.mp_payment_id for i in intentos
+        if i.estado in (APROBADO, DEVUELTO, CONTRACARGO)
+    }
+    if len(cobrados_alguna_vez) > 1:
+        # Una preferencia de Checkout Pro sigue sirviendo después de cobrada,
+        # así que esto es posible aunque el link se apague al primer cobro: dos
+        # intentos que venían en vuelo pueden acreditarse los dos.
         #
         # Resumirlo como «aprobado» contaría una venta donde hay dos cobros, y
         # es justo el error que nadie ve hasta que el comprador reclama. No se
         # consolida mercadería dos veces, no se devuelve plata sola —eso no lo
-        # decide un `if`— y los dos identificadores quedan guardados.
+        # decide un `if`— y todos los identificadores quedan guardados.
         return PaymentStatus.EN_REVISION
+
+    if CONTRACARGO in estados:
+        return PaymentStatus.CHARGED_BACK
+    if DEVUELTO in estados:
+        return PaymentStatus.REFUNDED
     if APROBADO in estados:
         return PaymentStatus.APPROVED
     if any(e in EN_PROCESO for e in estados):

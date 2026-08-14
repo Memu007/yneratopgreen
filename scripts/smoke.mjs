@@ -9348,9 +9348,26 @@ await runCase(98, 'El link se apaga al primer cobro, y dos aprobados piden revis
     assert(doble.pedidos.filter((p) => p.ruta === 'reembolso').length === 0,
       'se pidió un reembolso solo');
 
+    // --- 4. Y devolver UNO de los dos no limpia la orden. Si se contaran sólo
+    //        los aprobados de hoy, el conteo bajaría a uno y la orden diría
+    //        «devuelto», que le contaría al vendedor que le devolvieron todo
+    //        cuando le queda un cobro vivo.
+    doble.actualizarPago(pagoBis.id, {
+      status: 'refunded',
+      transaction_amount_refunded: primera.amount,
+      date_last_updated: new Date().toISOString(),
+    });
+    await avisar({ dataId: pagoBis.id, cuenta: '900613' });
+    const trasLaDevolucion = await comoLoVe(state.buyerToken, 'buyer', primera.order_number);
+    assert(trasLaDevolucion.payment_state === 'en_revision',
+      `devolver uno de los dos cobros dejó la orden en «${trasLaDevolucion.payment_state}»`);
+    assert(intentosDe(primera.order_id).length >= 2,
+      'se perdió alguno de los identificadores al devolver');
+
     return 'el primer cobro apagó su link; con el cierre caído el pago se registró igual y el '
-      + 'reconciliador lo apagó después; y dos aprobados distintos dejan «en revisión» con '
-      + 'los dos ids guardados y un solo descuento de stock';
+      + 'reconciliador lo apagó después; dos aprobados distintos dejan «en revisión» con '
+      + 'los dos ids guardados y un solo descuento de stock; y devolver uno de los dos no '
+      + 'la limpia: sigue en revisión';
   } finally {
     await doble.cerrar();
     try {
