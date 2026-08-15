@@ -43,6 +43,10 @@ class UserReputationResponse(BaseModel):
     rating_count: int
     sales_count: int
     purchases_count: int
+    # El mismo booleano que el detalle de publicación, por el mismo motivo:
+    # esta respuesta es la que alimenta el perfil público del vendedor, así que
+    # el distintivo sale de acá y no de una ruta nueva.
+    documentacion_revisada: bool = False
 
 
 @router.post("/", response_model=RatingResponse)
@@ -159,7 +163,8 @@ def get_user_reputation(
         rating_average=float(user.rating_average),
         rating_count=user.rating_count,
         sales_count=sales_count,
-        purchases_count=purchases_count
+        purchases_count=purchases_count,
+        documentacion_revisada=user.documentacion_revisada,
     )
 
 

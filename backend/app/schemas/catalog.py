@@ -52,7 +52,12 @@ class SellerInfo(BaseModel):
     rating_average: float = 0.0
     rating_count: int = 0
     sales_count: int = 0
-    
+    # Lo único de la revisión documental que es público: si hoy está aprobada.
+    # Ni el CUIT, ni la razón social, ni el archivo, ni quién revisó, ni el
+    # motivo de un rechazo. Un booleano no dice nada de nadie que no sea el
+    # distintivo que ya se muestra en pantalla.
+    documentacion_revisada: bool = False
+
     model_config = ConfigDict(from_attributes=True)
 
 class SellerBasicInfo(BaseModel):
@@ -62,7 +67,11 @@ class SellerBasicInfo(BaseModel):
     location: Optional[str] = None
     rating_average: float = 0.0
     rating_count: int = 0
-    
+    # Viaja en la tarjeta porque el detalle de la publicación se abre con el
+    # objeto de la tarjeta. La grilla no lo dibuja: el distintivo se muestra en
+    # el bloque del vendedor del detalle.
+    documentacion_revisada: bool = False
+
     model_config = ConfigDict(from_attributes=True)
 
 class ProductBase(BaseModel):

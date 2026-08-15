@@ -1,6 +1,6 @@
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 import {
@@ -9541,6 +9541,767 @@ await runCase(100, 'Dos reconciliadores a la vez no duplican ningún efecto', as
       await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
     } catch { /* la limpieza no tapa el motivo real */ }
   }
+});
+
+// ============================================================================
+// Documentación fiscal de vendedores, revisada a mano (casos 101 a 108)
+//
+// La pieza es una cortesía y es informativa: no habilita ni bloquea nada. Por
+// eso la regresión mira dos cosas distintas —que la revisión funcione y que
+// NO cambie el marketplace— y la segunda vale tanto como la primera.
+// ============================================================================
+
+// Dónde guarda la aplicación las constancias. Se le pregunta a ella en vez de
+// suponer la ruta: es configurable, y contar archivos en la carpeta
+// equivocada daría siempre cero y siempre verde.
+const CARPETA_DOCUMENTOS = correrEnLaApi(
+  'from app.core.config import settings\nprint(settings.DOCUMENTOS_DIR)',
+  '',
+).trim();
+
+function documentosEnDisco() {
+  try {
+    return readdirSync(CARPETA_DOCUMENTOS).filter((n) => n.endsWith('.pdf')).length;
+  } catch {
+    return 0;
+  }
+}
+
+function filasDeDocumentacion() {
+  return queryCount('SELECT COUNT(*) FROM documentacion_de_vendedores');
+}
+
+function documentacionDe(userId) {
+  // El `'fin'` de la última columna no es decorativo: `querySql` recorta la
+  // salida, así que una columna vacía al final se pierde y la fila vuelve con
+  // menos campos de los que se pidieron. Con un valor fijo al final, las tres
+  // que pueden venir nulas quedan siempre adentro.
+  const [fila] = queryRows(`
+    SELECT estado::text, cuit, razon_social, archivo_ruta,
+           COALESCE(motivo_de_rechazo, ''), COALESCE(revisado_por_id, ''),
+           COALESCE(revisado_el::text, ''), 'fin'
+    FROM documentacion_de_vendedores WHERE user_id = ${sqlLiteral(userId)}
+  `);
+  if (!fila) return null;
+  const [estado, cuit, razon, ruta, motivo, revisor, revisadoEl] = fila;
+  // psql devuelve NULL como cadena vacía. Se normaliza acá y no en cada
+  // afirmación: comparar contra '' en una y contra null en otra es la clase
+  // de detalle que hace pasar una prueba que no probó nada.
+  const oNulo = (valor) => (valor === '' ? null : valor);
+  return {
+    estado, cuit, razon, ruta,
+    motivo: oNulo(motivo),
+    revisor: oNulo(revisor),
+    revisadoEl: oNulo(revisadoEl),
+  };
+}
+
+function auditoriasDe(documentacionId, accion) {
+  return queryCount(`
+    SELECT COUNT(*) FROM audit_logs
+    WHERE entity = 'documentacion_de_vendedor'
+      AND entity_id = ${sqlLiteral(documentacionId)}
+      AND action = ${sqlLiteral(accion)}
+  `);
+}
+
+function idDeLaDocumentacion(userId) {
+  const [fila] = queryRows(`
+    SELECT id FROM documentacion_de_vendedores WHERE user_id = ${sqlLiteral(userId)}
+  `);
+  return fila ? fila[0] : null;
+}
+
+// Un PDF chico pero de verdad: firma al principio y marcador de fin al final,
+// que es lo que mira el servidor. No se versiona ningún archivo de prueba.
+function pdfDePrueba(marca = 'constancia') {
+  return Buffer.from(
+    '%PDF-1.4\n'
+    + '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n'
+    + '2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\n'
+    + `% ${marca}\n`
+    + 'trailer<</Root 1 0 R>>\n%%EOF\n',
+  );
+}
+
+// Un JPEG con el nombre cambiado a .pdf. La extensión y el tipo declarado los
+// elige quien sube; la firma no.
+function jpegDisfrazado() {
+  return Buffer.concat([
+    Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+    Buffer.from('JFIF'),
+    Buffer.alloc(512, 0x20),
+    Buffer.from('%%EOF'),
+  ]);
+}
+
+async function presentarDocumentacion({
+  token, cuit, razonSocial, archivo, nombre = 'constancia.pdf', tipo = 'application/pdf',
+}) {
+  const form = new FormData();
+  form.append('cuit', cuit);
+  form.append('razon_social', razonSocial);
+  form.append('archivo', new Blob([archivo], { type: tipo }), nombre);
+  const respuesta = await fetch(`${API_URL}/documentacion`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  const crudo = await respuesta.text();
+  const data = crudo ? JSON.parse(crudo) : null;
+  if (!respuesta.ok) {
+    throw new Error(
+      `POST /documentacion respondió HTTP ${respuesta.status}: ${data?.detail || crudo}`,
+    );
+  }
+  return { status: respuesta.status, data };
+}
+
+// Los cuatro CUIT de prueba son formalmente válidos: el dígito verificador
+// está bien calculado. Uno inválido se arma cambiándole el último dígito.
+const CUIT_VENDEDOR = '30-71009999-1';
+const CUIT_SEGUNDO = '30-11111111-8';
+const CUIT_TERCERO = '27-12345678-0';
+const CUIT_ROTO = '30710099999';
+
+// Un segundo vendedor propio de estos casos: hace falta alguien de quien el
+// primero NO pueda leer nada, y hace falta poder afirmar que el distintivo
+// aparece para uno y no para el otro.
+async function segundoVendedor() {
+  if (state.docSegundo) return state.docSegundo;
+  const credenciales = {
+    email: `smoke.doc.${Date.now()}@example.com`,
+    password: 'smokedoc123',
+    full_name: 'Vendedora Documentación',
+    phone: '+54 11 5555 0808',
+    role: 'user',
+  };
+  await registrarYVerificar(credenciales);
+  const ingreso = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email: credenciales.email, password: credenciales.password },
+  });
+  state.docSegundo = {
+    token: ingreso.data.access_token,
+    id: ingreso.data.user.id,
+    email: credenciales.email,
+  };
+  return state.docSegundo;
+}
+
+async function tokenDeAdmin() {
+  if (state.docAdminToken) return state.docAdminToken;
+  const ingreso = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email: 'admin@topgreen.com', password: 'admin123' },
+  });
+  state.docAdminToken = ingreso.data.access_token;
+  return state.docAdminToken;
+}
+
+await runCase(101, 'Documentación: nadie lee ni toca la de otro', async () => {
+  const admin = await tokenDeAdmin();
+  const otro = await segundoVendedor();
+
+  // El vendedor del seed presenta; la segunda cuenta no presenta nada.
+  await presentarDocumentacion({
+    token: state.sellerToken,
+    cuit: CUIT_VENDEDOR,
+    razonSocial: 'Campo Verde SRL',
+    archivo: pdfDePrueba('del vendedor'),
+  });
+  const documentacionId = idDeLaDocumentacion(state.sellerId);
+  assert(documentacionId, 'la presentación del vendedor no quedó en la base');
+
+  // 1. Las rutas del titular no aceptan de quién es: operan sobre quien pide.
+  // Por eso la segunda cuenta, preguntando lo mismo, no ve nada del primero.
+  const ajena = await apiRequest('/documentacion', { token: otro.token });
+  assert(ajena.data.estado === 'sin_presentacion',
+    `la segunda cuenta vio documentación ajena: ${JSON.stringify(ajena.data)}`);
+
+  const archivoAjeno = await expectApiError(404, () =>
+    apiRequest('/documentacion/archivo', { token: otro.token }));
+  assert(/no presentaste/i.test(archivoAjeno), `motivo inesperado: ${archivoAjeno}`);
+
+  // 2. Reemplazar tampoco alcanza al de otro: la segunda cuenta presentando
+  // crea LO SUYO y deja intacta la presentación del primero.
+  const rutaAntes = documentacionDe(state.sellerId).ruta;
+  await presentarDocumentacion({
+    token: otro.token,
+    cuit: CUIT_SEGUNDO,
+    razonSocial: 'La Segunda SA',
+    archivo: pdfDePrueba('de la segunda'),
+  });
+  const delPrimero = documentacionDe(state.sellerId);
+  assert(delPrimero.ruta === rutaAntes,
+    'presentar desde otra cuenta cambió el archivo del primero');
+  assert(documentacionDe(otro.id).razon === 'La Segunda SA',
+    'la segunda cuenta no dejó su propia presentación');
+
+  // 3. Un no administrador no ve la cola, ni un PDF ajeno, ni decide.
+  const cola = await expectApiError(403, () =>
+    apiRequest('/admin/documentacion', { token: state.sellerToken }));
+  const archivoPorAdmin = await expectApiError(403, () =>
+    apiRequest(`/admin/documentacion/${documentacionId}/archivo`, { token: otro.token }));
+  const decision = await expectApiError(403, () =>
+    apiRequest(`/admin/documentacion/${documentacionId}/decidir`, {
+      method: 'POST', token: otro.token, body: { decision: 'aprobada' },
+    }));
+  assert(/administradores/i.test(cola), `motivo inesperado en la cola: ${cola}`);
+
+  // 4. Y el administrador sí llega a las dos cosas.
+  const colaAdmin = await apiRequest('/admin/documentacion?estado=pendiente', { token: admin });
+  assert(colaAdmin.data.items.some((i) => i.user_id === state.sellerId),
+    'la cola del administrador no trae la presentación pendiente');
+
+  return 'titular aislado por construcción (la ruta no toma user_id); no admin: '
+    + `403 en cola, archivo y decisión; la cola del admin trae ${colaAdmin.data.total} fila(s)`;
+});
+
+await runCase(102, 'Documentación: lo inválido no deja fila ni archivo huérfano', async () => {
+  const otro = await segundoVendedor();
+  const filasAntes = filasDeDocumentacion();
+  const archivosAntes = documentosEnDisco();
+  const estadoAntes = documentacionDe(otro.id);
+
+  const grande = Buffer.concat([
+    Buffer.from('%PDF-1.4\n'),
+    Buffer.alloc(6 * 1024 * 1024, 0x30),
+    Buffer.from('\n%%EOF\n'),
+  ]);
+
+  const rechazos = {};
+  rechazos.cuit = await expectApiError(400, () => presentarDocumentacion({
+    token: otro.token, cuit: CUIT_ROTO, razonSocial: 'La Segunda SA',
+    archivo: pdfDePrueba(),
+  }));
+  rechazos.tamano = await expectApiError(400, () => presentarDocumentacion({
+    token: otro.token, cuit: CUIT_SEGUNDO, razonSocial: 'La Segunda SA',
+    archivo: grande,
+  }));
+  rechazos.tipo = await expectApiError(400, () => presentarDocumentacion({
+    token: otro.token, cuit: CUIT_SEGUNDO, razonSocial: 'La Segunda SA',
+    archivo: pdfDePrueba(), tipo: 'image/jpeg',
+  }));
+  rechazos.disfrazado = await expectApiError(400, () => presentarDocumentacion({
+    token: otro.token, cuit: CUIT_SEGUNDO, razonSocial: 'La Segunda SA',
+    archivo: jpegDisfrazado(),
+  }));
+  rechazos.extension = await expectApiError(400, () => presentarDocumentacion({
+    token: otro.token, cuit: CUIT_SEGUNDO, razonSocial: 'La Segunda SA',
+    archivo: pdfDePrueba(), nombre: 'constancia.jpg',
+  }));
+  rechazos.razon = await expectApiError(400, () => presentarDocumentacion({
+    token: otro.token, cuit: CUIT_SEGUNDO, razonSocial: '   ',
+    archivo: pdfDePrueba(),
+  }));
+
+  assert(/verificador/i.test(rechazos.cuit), `el CUIT roto no explica por qué: ${rechazos.cuit}`);
+  assert(/5 MB/.test(rechazos.tamano), `el tamaño no dice el máximo: ${rechazos.tamano}`);
+  assert(/firma de un PDF/i.test(rechazos.disfrazado),
+    `el disfrazado no se rechaza por la firma: ${rechazos.disfrazado}`);
+
+  // Ni una fila de más ni un archivo de más: el rechazo es antes de escribir.
+  assert(filasDeDocumentacion() === filasAntes,
+    `quedaron ${filasDeDocumentacion() - filasAntes} filas de una presentación rechazada`);
+  assert(documentosEnDisco() === archivosAntes,
+    `quedaron ${documentosEnDisco() - archivosAntes} archivos huérfanos en disco`);
+
+  const estadoDespues = documentacionDe(otro.id);
+  assert(estadoDespues.ruta === estadoAntes.ruta && estadoDespues.cuit === estadoAntes.cuit,
+    'un rechazo pisó la presentación anterior');
+
+  return `6 rechazos (CUIT, tamaño, tipo declarado, firma, extensión, razón social) `
+    + `con ${filasAntes} filas y ${archivosAntes} archivos intactos`;
+});
+
+await runCase(103, 'Documentación: aprobar enciende el distintivo, y sólo el de ese vendedor', async () => {
+  const admin = await tokenDeAdmin();
+  const otro = await segundoVendedor();
+  const documentacionId = idDeLaDocumentacion(state.sellerId);
+
+  // Antes de la decisión: pendiente y sin distintivo en ninguna parte.
+  const [productoDelVendedor] = queryRows(`
+    SELECT id FROM products
+    WHERE seller_id = ${sqlLiteral(state.sellerId)} AND status = 'ACTIVE'
+    LIMIT 1
+  `);
+  assert(productoDelVendedor, 'el vendedor no tiene publicaciones activas');
+  const productoId = productoDelVendedor[0];
+
+  const antes = await apiRequest(`/catalog/products/${productoId}`);
+  assert(antes.data.seller.documentacion_revisada === false,
+    'el distintivo ya estaba encendido con la documentación pendiente');
+
+  const decidida = await apiRequest(`/admin/documentacion/${documentacionId}/decidir`, {
+    method: 'POST', token: admin, body: { decision: 'aprobada' },
+  });
+  assert(decidida.data.estado === 'aprobada', `quedó en «${decidida.data.estado}»`);
+
+  const enLaBase = documentacionDe(state.sellerId);
+  assert(enLaBase.estado === 'APROBADA', `en la base quedó «${enLaBase.estado}»`);
+  assert(enLaBase.revisor && enLaBase.revisadoEl,
+    'la aprobación quedó sin autor o sin fecha');
+  assert(auditoriasDe(documentacionId, 'documentacion_revisada') === 1,
+    `quedaron ${auditoriasDe(documentacionId, 'documentacion_revisada')} transiciones auditadas`);
+
+  // El distintivo, en los dos lugares que lo muestran.
+  const detalle = await apiRequest(`/catalog/products/${productoId}`);
+  assert(detalle.data.seller.documentacion_revisada === true,
+    'el detalle no muestra el distintivo después de aprobar');
+  const reputacion = await apiRequest(`/ratings/user/${state.sellerId}`);
+  assert(reputacion.data.documentacion_revisada === true,
+    'la reputación no muestra el distintivo después de aprobar');
+
+  // Y sólo el de ese vendedor: el otro sigue pendiente y sin distintivo.
+  const reputacionAjena = await apiRequest(`/ratings/user/${otro.id}`);
+  assert(reputacionAjena.data.documentacion_revisada === false,
+    'aprobar una documentación encendió el distintivo de otro vendedor');
+
+  // Nada del dato fiscal sale a lo público.
+  const publico = JSON.stringify(detalle.data) + JSON.stringify(reputacion.data);
+  for (const secreto of ['30-71009999-1', '30710099991', 'Campo Verde SRL', '.pdf', 'cuit']) {
+    assert(!publico.includes(secreto),
+      `la respuesta pública filtró «${secreto}»`);
+  }
+
+  return 'aprobada con autor y fecha, 1 transición auditada, distintivo en detalle y '
+    + 'reputación, apagado en el otro vendedor y sin CUIT, razón social ni archivo a la vista';
+});
+
+await runCase(104, 'Documentación: el rechazo exige motivo y se puede corregir', async () => {
+  const admin = await tokenDeAdmin();
+  const otro = await segundoVendedor();
+  const documentacionId = idDeLaDocumentacion(otro.id);
+
+  const sinMotivo = await expectApiError(400, () =>
+    apiRequest(`/admin/documentacion/${documentacionId}/decidir`, {
+      method: 'POST', token: admin, body: { decision: 'rechazada' },
+    }));
+  assert(/motivo/i.test(sinMotivo), `no explica que falta el motivo: ${sinMotivo}`);
+  assert(documentacionDe(otro.id).estado === 'PENDIENTE',
+    'el rechazo sin motivo igual cambió el estado');
+
+  const motivo = 'La constancia está vencida: subí una emitida este año.';
+  await apiRequest(`/admin/documentacion/${documentacionId}/decidir`, {
+    method: 'POST', token: admin, body: { decision: 'rechazada', motivo },
+  });
+
+  // El titular ve el motivo, y no ve quién decidió.
+  const mia = await apiRequest('/documentacion', { token: otro.token });
+  assert(mia.data.estado === 'rechazada', `el titular ve «${mia.data.estado}»`);
+  assert(mia.data.motivo_de_rechazo === motivo, 'el titular no ve el motivo real');
+  assert(!JSON.stringify(mia.data).toLowerCase().includes('admin'),
+    `la respuesta al titular nombra a quien revisó: ${JSON.stringify(mia.data)}`);
+
+  const reputacion = await apiRequest(`/ratings/user/${otro.id}`);
+  assert(reputacion.data.documentacion_revisada === false,
+    'un rechazo dejó el distintivo encendido');
+
+  // Volver a presentar retira el rechazo y vuelve a pendiente.
+  const nueva = await presentarDocumentacion({
+    token: otro.token, cuit: CUIT_SEGUNDO, razonSocial: 'La Segunda SA',
+    archivo: pdfDePrueba('corregida'),
+  });
+  assert(nueva.data.estado === 'pendiente', `volvió a «${nueva.data.estado}»`);
+  assert(nueva.data.motivo_de_rechazo === null, 'el motivo viejo sigue a la vista');
+  const enLaBase = documentacionDe(otro.id);
+  assert(enLaBase.motivo === null && !enLaBase.revisor,
+    `la fila conserva la revisión anterior: ${JSON.stringify(enLaBase)}`);
+
+  return 'rechazo sin motivo: 400 y estado intacto; con motivo: el titular lo ve, sin '
+    + 'distintivo y sin saber quién decidió; volver a presentar retira el rechazo';
+});
+
+await runCase(105, 'Documentación: reemplazar una aprobada retira el distintivo y borra la anterior', async () => {
+  const documentacionId = idDeLaDocumentacion(state.sellerId);
+  const antes = documentacionDe(state.sellerId);
+  assert(antes.estado === 'APROBADA', `el caso 103 no dejó una aprobada: ${antes.estado}`);
+
+  const rutaVieja = antes.ruta;
+  const archivosAntes = documentosEnDisco();
+  const filasAntes = filasDeDocumentacion();
+
+  const reemplazo = await presentarDocumentacion({
+    token: state.sellerToken, cuit: CUIT_VENDEDOR, razonSocial: 'Campo Verde SRL',
+    archivo: pdfDePrueba('la nueva'),
+  });
+  assert(reemplazo.data.estado === 'pendiente',
+    `reemplazar dejó «${reemplazo.data.estado}» y no pendiente`);
+
+  const despues = documentacionDe(state.sellerId);
+  assert(despues.ruta !== rutaVieja, 'el reemplazo reusó el archivo anterior');
+  assert(!existsSync(`${CARPETA_DOCUMENTOS}/${rutaVieja}`),
+    `el archivo anterior sigue en disco: ${rutaVieja}`);
+  assert(existsSync(`${CARPETA_DOCUMENTOS}/${despues.ruta}`),
+    'el archivo nuevo no quedó en disco');
+  assert(documentosEnDisco() === archivosAntes,
+    `hay ${documentosEnDisco() - archivosAntes} archivos de más: se conserva sólo el actual`);
+  assert(filasDeDocumentacion() === filasAntes, 'el reemplazo duplicó la fila');
+
+  // El distintivo se apaga: lo revisado fue el papel anterior.
+  const reputacion = await apiRequest(`/ratings/user/${state.sellerId}`);
+  assert(reputacion.data.documentacion_revisada === false,
+    'el distintivo sobrevivió al reemplazo de la documentación aprobada');
+
+  // Y la fila es la misma: reemplazar no abre un expediente nuevo.
+  assert(idDeLaDocumentacion(state.sellerId) === documentacionId,
+    'el reemplazo cambió la identidad de la presentación');
+  assert(auditoriasDe(documentacionId, 'documentacion_presentada') >= 2,
+    'el reemplazo no quedó auditado');
+
+  return `distintivo apagado, un solo archivo (${archivosAntes}), el anterior borrado del `
+    + 'disco y sin fila nueva';
+});
+
+await runCase(106, 'Documentación: dos decisiones a la vez dejan una sola', async () => {
+  const admin = await tokenDeAdmin();
+  const documentacionId = idDeLaDocumentacion(state.sellerId);
+  assert(documentacionDe(state.sellerId).estado === 'PENDIENTE',
+    'el caso 105 no dejó una pendiente para decidir');
+
+  const auditoriasAntes = auditoriasDe(documentacionId, 'documentacion_revisada');
+
+  // Las dos a la vez de verdad, no una después de la otra: es lo que pasa
+  // cuando dos personas miran la misma cola abierta.
+  const decidir = (decision, motivo) => fetch(
+    `${API_URL}/admin/documentacion/${documentacionId}/decidir`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${admin}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision, motivo }),
+    },
+  ).then(async (r) => ({ status: r.status, cuerpo: await r.text() }));
+
+  const [uno, dos] = await Promise.all([
+    decidir('aprobada'),
+    decidir('rechazada', 'Falta la constancia del año en curso.'),
+  ]);
+
+  const codigos = [uno.status, dos.status].sort();
+  assert(codigos[0] === 200 && codigos[1] === 409,
+    `las dos decisiones concurrentes devolvieron ${JSON.stringify(codigos)}: `
+    + 'una tiene que ganar y la otra enterarse');
+
+  const enLaBase = documentacionDe(state.sellerId);
+  assert(enLaBase.estado === 'APROBADA' || enLaBase.estado === 'RECHAZADA',
+    `quedó en un estado imposible: ${enLaBase.estado}`);
+  assert(enLaBase.revisor && enLaBase.revisadoEl,
+    'quedó una decisión sin autor o sin fecha');
+  // Y si ganó el rechazo, tiene su motivo; si ganó la aprobación, no lo tiene.
+  assert(
+    enLaBase.estado === 'RECHAZADA' ? Boolean(enLaBase.motivo) : enLaBase.motivo === null,
+    `el motivo no corresponde al estado ganador: ${JSON.stringify(enLaBase)}`,
+  );
+
+  const nuevas = auditoriasDe(documentacionId, 'documentacion_revisada') - auditoriasAntes;
+  assert(nuevas === 1, `quedaron ${nuevas} transiciones auditadas para una sola decisión`);
+
+  return `una 200 y una 409; quedó «${enLaBase.estado}» con autor y fecha y una sola `
+    + 'transición auditada';
+});
+
+await runCase(107, 'Documentación: publicar y vender funcionan en los cuatro estados', async () => {
+  const admin = await tokenDeAdmin();
+
+  // Una cuenta ESTRENADA acá, y no la de los casos anteriores: «sin
+  // presentación» es uno de los cuatro estados que hay que medir, y a esta
+  // altura la otra cuenta ya presentó. Reusarla mediría pendiente dos veces
+  // y dejaría el primer estado sin probar sin que nada fallara.
+  const credenciales = {
+    email: `smoke.doc.estados.${Date.now()}@example.com`,
+    password: 'smokedoc123',
+    full_name: 'Vendedora Cuatro Estados',
+    phone: '+54 11 5555 0909',
+    role: 'user',
+  };
+  await registrarYVerificar(credenciales);
+  const ingreso = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email: credenciales.email, password: credenciales.password },
+  });
+  const vendedora = { token: ingreso.data.access_token, id: ingreso.data.user.id };
+
+  // Los datos bancarios los carga ella por la ruta de siempre: sin CBU nadie
+  // puede cobrar por transferencia, y eso no tiene que ver con esta pieza.
+  await apiRequest('/auth/me', {
+    method: 'PATCH',
+    token: vendedora.token,
+    body: { cbu: '0000009000000000000042', alias_bancario: 'demo.smoke.documentacion' },
+  });
+
+  // Una categoría de PRODUCTO, no de servicio: el catálogo separa los dos y
+  // una publicación de servicio no aparece con el filtro en «productos».
+  const [categoria] = queryRows(
+    'SELECT id FROM categories WHERE is_service = false ORDER BY name LIMIT 1',
+  );
+  const resultados = [];
+
+  const publicarYVender = async (estado) => {
+    const creado = await apiRequest('/products', {
+      method: 'POST',
+      token: vendedora.token,
+      body: {
+        name: `Smoke documentación ${estado} ${Date.now()}`,
+        description: 'Publicación de prueba de la revisión documental.',
+        category_id: categoria[0],
+        price: 15000,
+        stock: 5,
+        unit: 'unidad',
+        locality_id: state.location.localityId,
+        publication_type: 'producto',
+      },
+    });
+    const productoId = creado.data.id;
+
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    await apiRequest('/cart/items', {
+      method: 'POST',
+      token: state.buyerToken,
+      body: { product_id: productoId, quantity: 1 },
+    });
+    const opciones = await apiRequest('/orders/payment-options', { token: state.buyerToken });
+    const suya = opciones.data.find((o) => o.seller_id === vendedora.id);
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+
+    const detalle = await apiRequest(`/catalog/products/${productoId}`);
+    const enElCatalogo = await apiRequest(
+      `/catalog/products?seller_id=${vendedora.id}&page_size=100`,
+    );
+
+    resultados.push({
+      estado,
+      publica: creado.status === 201 || creado.status === 200,
+      enCatalogo: enElCatalogo.data.items.some((p) => p.id === productoId),
+      cobra: Boolean(suya && suya.methods.includes('transfer') && suya.cbu),
+      distintivo: detalle.data.seller.documentacion_revisada,
+    });
+  };
+
+  // 1. Sin presentación.
+  const inicial = await apiRequest('/documentacion', { token: vendedora.token });
+  assert(inicial.data.estado === 'sin_presentacion',
+    `la cuenta recién creada ya tenía documentación «${inicial.data.estado}»`);
+  await publicarYVender('sin_presentacion');
+
+  // 2. Pendiente.
+  await presentarDocumentacion({
+    token: vendedora.token, cuit: CUIT_TERCERO, razonSocial: 'Cuatro Estados SA',
+    archivo: pdfDePrueba('estados'),
+  });
+  await publicarYVender('pendiente');
+
+  // 3. Aprobada.
+  const suId = idDeLaDocumentacion(vendedora.id);
+  await apiRequest(`/admin/documentacion/${suId}/decidir`, {
+    method: 'POST', token: admin, body: { decision: 'aprobada' },
+  });
+  await publicarYVender('aprobada');
+
+  // 4. Rechazada.
+  await presentarDocumentacion({
+    token: vendedora.token, cuit: CUIT_TERCERO, razonSocial: 'Cuatro Estados SA',
+    archivo: pdfDePrueba('para rechazar'),
+  });
+  await apiRequest(`/admin/documentacion/${suId}/decidir`, {
+    method: 'POST', token: admin,
+    body: { decision: 'rechazada', motivo: 'Falta el sello de la constancia.' },
+  });
+  await publicarYVender('rechazada');
+
+  assert(resultados.length === 4, `se midieron ${resultados.length} estados y son cuatro`);
+  for (const fila of resultados) {
+    assert(fila.publica, `con documentación «${fila.estado}» no pudo publicar`);
+    assert(fila.enCatalogo, `con documentación «${fila.estado}» la publicación no salió al catálogo`);
+    assert(fila.cobra, `con documentación «${fila.estado}» no pudo ofrecer transferencia`);
+  }
+  const conDistintivo = resultados.filter((r) => r.distintivo).map((r) => r.estado);
+  assert(conDistintivo.length === 1 && conDistintivo[0] === 'aprobada',
+    `el distintivo apareció en ${JSON.stringify(conDistintivo)} y sólo va en «aprobada»`);
+
+  return 'los cuatro estados publican, salen al catálogo y ofrecen transferencia; el '
+    + `distintivo sólo en «aprobada» (${resultados.map((r) => `${r.estado}:${r.distintivo ? 'sí' : 'no'}`).join(', ')})`;
+});
+
+await runCase(108, 'Documentación: presentar, revisar y ver el distintivo en el navegador', async () => {
+  const admin = await tokenDeAdmin();
+
+  // Cuenta nueva con una publicación propia: hace falta una pantalla donde el
+  // distintivo pueda aparecer, y tiene que ser de este vendedor y de nadie más.
+  const credenciales = {
+    email: `smoke.doc.nav.${Date.now()}@example.com`,
+    password: 'smokedoc123',
+    full_name: 'Vendedora Navegador',
+    phone: '+54 11 5555 1010',
+    role: 'user',
+  };
+  await registrarYVerificar(credenciales);
+  const ingreso = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email: credenciales.email, password: credenciales.password },
+  });
+  const vendedora = { token: ingreso.data.access_token, id: ingreso.data.user.id };
+
+  const [categoria] = queryRows(
+    'SELECT id FROM categories WHERE is_service = false ORDER BY name LIMIT 1',
+  );
+  const nombreProducto = `Smoke distintivo ${Date.now()}`;
+  await apiRequest('/products', {
+    method: 'POST',
+    token: vendedora.token,
+    body: {
+      name: nombreProducto,
+      description: 'Publicación para mirar el distintivo en pantalla.',
+      category_id: categoria[0],
+      price: 21000,
+      stock: 4,
+      unit: 'unidad',
+      locality_id: state.location.localityId,
+      publication_type: 'producto',
+    },
+  });
+
+  const browser = await chromium.launch({ headless: true });
+  const observado = {};
+  try {
+    // --- 1. La vendedora presenta desde su panel ---
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 15_000 });
+    await page.getByPlaceholder('tu@email.com').fill(credenciales.email);
+    await page.getByPlaceholder('••••••••').fill(credenciales.password);
+    await page.locator('[class*="_submitButton_"][type="submit"]').click();
+    await page.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 15_000 });
+
+    await page.locator('button').filter({ hasText: '👤' }).first().click();
+    await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor({ timeout: 15_000 });
+
+    const seccion = page.locator('[class*="_docSection_"]');
+    await seccion.waitFor({ state: 'visible', timeout: 15_000 });
+    await seccion.getByText('Sin presentar').waitFor({ state: 'visible', timeout: 15_000 });
+
+    await page.getByRole('button', { name: 'Presentar documentación' }).click();
+    await page.locator('#doc-cuit').fill(CUIT_TERCERO);
+    await page.locator('#doc-razon-social').fill('Navegador SA');
+    await page.locator('#doc-archivo').setInputFiles({
+      name: 'constancia-afip.pdf',
+      mimeType: 'application/pdf',
+      buffer: pdfDePrueba('navegador'),
+    });
+    await page.getByRole('button', { name: 'Enviar para revisión' }).click();
+    await seccion.getByText('Pendiente de revisión')
+      .waitFor({ state: 'visible', timeout: 15_000 });
+    observado.tituloTrasPresentar = 'Pendiente de revisión';
+
+    // Un rechazo primero, para que el motivo se vea en pantalla y no sólo en
+    // la API: es lo único accionable que recibe quien presentó.
+    const suId = idDeLaDocumentacion(vendedora.id);
+    await apiRequest(`/admin/documentacion/${suId}/decidir`, {
+      method: 'POST', token: admin,
+      body: { decision: 'rechazada', motivo: 'La constancia no tiene el CUIT visible.' },
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.locator('button').filter({ hasText: '👤' }).first().click();
+    await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor({ timeout: 15_000 });
+    const rechazo = page.locator('[class*="_docRechazo_"]');
+    await rechazo.waitFor({ state: 'visible', timeout: 15_000 });
+    observado.motivoEnPantalla = (await rechazo.innerText()).includes('CUIT visible');
+    assert(observado.motivoEnPantalla, `el motivo no se ve: "${await rechazo.innerText()}"`);
+    assert((await rechazo.getAttribute('role')) === 'alert',
+      'el motivo del rechazo no se anuncia como aviso');
+
+    // Y vuelve a presentar desde la interfaz, que es el camino de corrección.
+    await page.getByRole('button', { name: 'Reemplazar documentación' }).click();
+    await page.locator('#doc-cuit').fill(CUIT_TERCERO);
+    await page.locator('#doc-razon-social').fill('Navegador SA');
+    await page.locator('#doc-archivo').setInputFiles({
+      name: 'constancia-corregida.pdf',
+      mimeType: 'application/pdf',
+      buffer: pdfDePrueba('corregida'),
+    });
+    await page.getByRole('button', { name: 'Enviar para revisión' }).click();
+    await page.locator('[class*="_docSection_"]').getByText('Pendiente de revisión')
+      .waitFor({ state: 'visible', timeout: 15_000 });
+    await ctx.close();
+
+    // --- 2. La administración revisa desde su cola ---
+    const ctxAdmin = await browser.newContext();
+    const pa = await ctxAdmin.newPage();
+    await pa.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await pa.getByRole('button', { name: 'Ingresar' }).click();
+    await pa.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 15_000 });
+    await pa.getByPlaceholder('tu@email.com').fill('admin@topgreen.com');
+    await pa.getByPlaceholder('••••••••').fill('admin123');
+    await pa.locator('[class*="_submitButton_"][type="submit"]').click();
+    await pa.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 15_000 });
+
+    await pa.locator('button').filter({ hasText: '⚙️' }).first().click();
+    await pa.getByRole('heading', { name: 'Panel de Administración' }).waitFor({ timeout: 15_000 });
+    await pa.getByRole('button', { name: /📄 Documentación/ }).click();
+
+    const filaDeLaVendedora = pa.locator('tr').filter({ hasText: credenciales.email });
+    await filaDeLaVendedora.waitFor({ state: 'visible', timeout: 15_000 });
+    observado.enLaCola = true;
+
+    // El PDF no es un enlace: se pide con la sesión. Se comprueba que la
+    // descarga la hace la API autenticada y que responde el archivo.
+    const [respuestaPdf] = await Promise.all([
+      pa.waitForResponse((r) => r.url().includes('/admin/documentacion/')
+        && r.url().endsWith('/archivo')),
+      filaDeLaVendedora.getByRole('button', { name: /\.pdf$/ }).click(),
+    ]);
+    observado.pdfHttp = respuestaPdf.status();
+    assert(respuestaPdf.status() === 200,
+      `abrir la constancia devolvió HTTP ${respuestaPdf.status()}`);
+    assert((respuestaPdf.headers()['content-type'] || '').includes('application/pdf'),
+      `la constancia no volvió como PDF: ${respuestaPdf.headers()['content-type']}`);
+
+    await filaDeLaVendedora.getByRole('button', { name: 'Aprobar' }).click();
+    await pa.locator('tr').filter({ hasText: credenciales.email })
+      .waitFor({ state: 'detached', timeout: 15_000 });
+    observado.saleDeLaCola = true;
+    await ctxAdmin.close();
+
+    // --- 3. El distintivo, en la publicación, para cualquiera ---
+    const ctxPublico = await browser.newContext();
+    const pp = await ctxPublico.newPage();
+    await pp.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await pp.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+    await pp.waitForFunction(
+      () => document.querySelectorAll('#catalog-category option').length > 1,
+    );
+    await pp.locator('#catalog-type').selectOption('productos');
+    await pp.getByPlaceholder('Buscar productos, semillas, maquinaria...').fill(nombreProducto);
+    await pp.getByPlaceholder('Buscar productos, semillas, maquinaria...').press('Enter');
+    const titulo = pp.getByRole('heading', { name: nombreProducto, exact: true, level: 3 });
+    await titulo.waitFor({ state: 'visible', timeout: 15_000 });
+    await titulo.click();
+    const detalle = pp.getByRole('heading', { name: nombreProducto, exact: true, level: 2 })
+      .locator('xpath=ancestor::div[contains(@class,"modal")]');
+    await detalle.waitFor({ state: 'visible', timeout: 15_000 });
+    const distintivo = detalle.getByText('Documentación revisada');
+    await distintivo.waitFor({ state: 'visible', timeout: 15_000 });
+    observado.distintivoVisible = true;
+
+    // El texto es exactamente ese. «Vendedor verificado» prometería otra cosa.
+    const textoDelDetalle = await detalle.innerText();
+    assert(!/verificad/i.test(textoDelDetalle),
+      'el detalle dice «verificado», que promete más que una revisión de papeles');
+    // Y sigue sin mostrar nada del dato fiscal.
+    for (const secreto of ['27-12345678-0', '27123456780', 'Navegador SA', '.pdf']) {
+      assert(!textoDelDetalle.includes(secreto),
+        `el detalle público muestra «${secreto}»`);
+    }
+    await ctxPublico.close();
+  } finally {
+    await browser.close();
+  }
+
+  return 'presentó desde el panel (pendiente), vio el motivo del rechazo como aviso, '
+    + `corrigió; la cola abrió el PDF con sesión (HTTP ${observado.pdfHttp}) y aprobó; `
+    + 'el detalle muestra «Documentación revisada» sin CUIT, razón social ni archivo';
 });
 
 const passed = results.filter((result) => result.passed).length;

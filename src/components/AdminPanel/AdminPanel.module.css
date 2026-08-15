@@ -1429,3 +1429,91 @@
     font-size: 0.7rem;
   }
 }
+/* ==========================================================================
+   Documentación de vendedores
+   ========================================================================== */
+
+.documentacionSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.docPendientes {
+  color: #24301c;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* La aclaración de qué significa aprobar. Va arriba de la cola y no en una
+   ayuda escondida: quien decide tiene que leer que esto no certifica nada. */
+.docNota {
+  margin: 0;
+  padding: 10px 14px;
+  background: #f3f8f0;
+  border-left: 3px solid #2d5016;
+  border-radius: 6px;
+  color: #24301c;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.docEmail {
+  color: #5a6b52;
+  font-size: 0.78rem;
+}
+
+/* El PDF se pide con el token, así que es un botón y no un enlace. */
+.docArchivo {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #1b5e20;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* El estado se lee en la palabra; el color acompaña. */
+.docEstado {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.docEstado[data-estado='pendiente'] {
+  background: #fff8e1;
+  color: #7a4f01;
+}
+
+.docEstado[data-estado='aprobada'] {
+  background: #e8f5e9;
+  color: #1b5e20;
+}
+
+.docEstado[data-estado='rechazada'] {
+  background: #fff3f3;
+  color: #8c1d1d;
+}
+
+.docRechazo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+}
+
+.docRechazo label {
+  color: #24301c;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.docRechazo input {
+  padding: 6px 8px;
+  border: 1px solid #b9c4b2;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}

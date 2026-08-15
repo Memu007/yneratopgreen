@@ -54,6 +54,14 @@ class Settings(BaseSettings):
     PUBLIC_UPLOAD_BASE: str = "/uploads"
     MAX_UPLOAD_SIZE_MB: int = 10
     ALLOWED_IMAGE_TYPES: List[str] = ["image/jpeg", "image/png", "image/webp"]
+
+    # Constancias fiscales de vendedores. Van a una carpeta **separada** de
+    # UPLOAD_DIR y no a una subcarpeta suya, porque UPLOAD_DIR entero está
+    # montado como estático público: cualquier cosa que caiga adentro se sirve
+    # sin preguntar quién la pide. Estos PDF salen sólo por un endpoint que
+    # comprueba que quien pregunta es el titular o un administrador.
+    DOCUMENTOS_DIR: str = "documentos"
+    MAX_DOCUMENTO_SIZE_MB: int = 5
     
     # Storage Backend: "local", "s3", "cloudinary"
     STORAGE_BACKEND: str = "local"
@@ -173,7 +181,7 @@ class Settings(BaseSettings):
             )
         return valor
 
-    @field_validator("UPLOAD_DIR", "EMAIL_OUTBOX_DIR")
+    @field_validator("UPLOAD_DIR", "EMAIL_OUTBOX_DIR", "DOCUMENTOS_DIR")
     @classmethod
     def _resolver_carpeta(cls, valor: str) -> str:
         """Una carpeta relativa se resuelve contra backend/, no contra el

@@ -94,6 +94,13 @@ class User(Base):
     orders_as_seller = relationship("Order", foreign_keys="Order.seller_id", back_populates="seller")
     audit_logs = relationship("AuditLog", back_populates="user")
     carrier_base_locality = relationship("Locality")
+    documentacion = relationship(
+        "DocumentacionDeVendedor",
+        foreign_keys="DocumentacionDeVendedor.user_id",
+        back_populates="usuario",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     # La API devuelve el identificador de la localidad base, que no se puede
     # mostrar en pantalla. Estos tres derivados vienen del padrón por la
@@ -109,6 +116,20 @@ class User(Base):
     @property
     def carrier_base_province_name(self):
         return self.carrier_base_locality.province_name if self.carrier_base_locality else None
+
+    # Lo único de la revisión documental que sale a una respuesta pública. Es
+    # un derivado del estado actual —no una columna— para que retirar el
+    # distintivo al reemplazar la documentación no dependa de acordarse de
+    # apagar una marca en otro lado.
+    @property
+    def documentacion_revisada(self) -> bool:
+        from app.models.documentacion import EstadoDeDocumentacion
+
+        documentacion = self.documentacion
+        return bool(
+            documentacion
+            and documentacion.estado == EstadoDeDocumentacion.APROBADA
+        )
 
     def __repr__(self):
         return f"<User {self.email} ({self.role})>"

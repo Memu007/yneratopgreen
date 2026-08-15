@@ -92,6 +92,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                     {product.seller.name}
                     <span className={styles.viewProfile}>Ver perfil →</span>
                   </div>
+                  {/* El texto es exactamente «Documentación revisada»: dice lo
+                      que se hizo —alguien miró una constancia— y no promete
+                      identidad comprobada ni ausencia de fraude. */}
+                  {product.seller.documentacionRevisada && (
+                    <div className={styles.sellerDocumentacion}>
+                      <span aria-hidden="true">📄</span> Documentación revisada
+                    </div>
+                  )}
                   <div className={styles.sellerRating}>
                     {product.seller.ratingCount > 0 ? (
                       <>

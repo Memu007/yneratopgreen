@@ -37,3 +37,8 @@ uploads/
 # Correos del transporte outbox. Llevan enlaces de verificación con su token:
 # no se versionan ni se publican.
 outbox/
+
+# Constancias fiscales de vendedores (DOCUMENTOS_DIR=documentos). Son datos
+# fiscales de personas reales presentados en privado: no se versionan, no se
+# publican y no salen del servidor donde se guardan.
+documentos/

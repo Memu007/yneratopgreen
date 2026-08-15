@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import styles from './UserDashboard.module.css';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Toast/Toast';
-import { apiGet, apiPatch, apiDelete, apiPost, tokenStorage, API_BASE_URL } from '../../utils/api';
+import { apiGet, apiPatch, apiDelete, apiPost, apiUpload, apiBlob, tokenStorage, API_BASE_URL } from '../../utils/api';
 import { explicarMP, type VinculoMP } from '../../utils/mercadoPago';
+import { ETIQUETA_DE_ESTADO, type MiDocumentacion } from '../../utils/documentacion';
 import { ProductImage } from '../ProductImage/ProductImage';
 import { User } from '../../types';
 import {
@@ -324,6 +325,18 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   const [mpVinculo, setMpVinculo] = useState<VinculoMP | null>(null);
   const [mpCargando, setMpCargando] = useState(true);
   const [mpTrabajando, setMpTrabajando] = useState(false);
+
+  // Documentación fiscal presentada para revisión manual. No habilita ni
+  // bloquea nada: sin presentar, pendiente o rechazada se publica y se vende
+  // igual. Lo único que cambia una aprobación es que aparece el distintivo.
+  const [documentacion, setDocumentacion] = useState<MiDocumentacion | null>(null);
+  const [docCargando, setDocCargando] = useState(true);
+  const [docEnviando, setDocEnviando] = useState(false);
+  const [docError, setDocError] = useState<string | null>(null);
+  const [docCuit, setDocCuit] = useState('');
+  const [docRazonSocial, setDocRazonSocial] = useState('');
+  const [docArchivo, setDocArchivo] = useState<File | null>(null);
+  const [docFormularioAbierto, setDocFormularioAbierto] = useState(false);
   
   // Estado para notificaciones
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -584,8 +597,65 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     loadNotifications();
   }, [activeTab]);
 
+  const cargarDocumentacion = async () => {
+    setDocCargando(true);
+    try {
+      setDocumentacion(await apiGet<MiDocumentacion>('/documentacion'));
+    } catch {
+      // Igual que con el vínculo: que no se pueda leer el estado no rompe el
+      // panel. Se muestra como desconocido y el resto sigue andando.
+      setDocumentacion(null);
+    } finally {
+      setDocCargando(false);
+    }
+  };
+
+  const presentarDocumentacion = async () => {
+    if (!docArchivo) {
+      setDocError('Elegí la constancia en PDF que querés presentar.');
+      return;
+    }
+
+    setDocEnviando(true);
+    setDocError(null);
+    try {
+      const formulario = new FormData();
+      formulario.append('cuit', docCuit);
+      formulario.append('razon_social', docRazonSocial);
+      formulario.append('archivo', docArchivo);
+      const estado = await apiUpload<MiDocumentacion>('/documentacion', formulario);
+      setDocumentacion(estado);
+      setDocFormularioAbierto(false);
+      setDocArchivo(null);
+      showToast('Documentación presentada. Queda pendiente de revisión.', 'success');
+    } catch (error) {
+      // El motivo real de la API, no uno inventado: la persona tiene que poder
+      // corregir el CUIT o el archivo con lo que dice el servidor.
+      setDocError(error instanceof Error ? error.message : 'No se pudo presentar la documentación.');
+    } finally {
+      setDocEnviando(false);
+    }
+  };
+
+  const verMiConstancia = async () => {
+    try {
+      const archivo = await apiBlob('/documentacion/archivo');
+      const url = URL.createObjectURL(archivo);
+      window.open(url, '_blank', 'noopener');
+      // La URL temporal se suelta después de que el navegador la abrió; si se
+      // revoca en el acto, la pestaña nueva se queda sin nada que mostrar.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'No se pudo abrir la constancia.',
+        'error',
+      );
+    }
+  };
+
   useEffect(() => {
     void cargarVinculoMP();
+    void cargarDocumentacion();
   }, []);
 
   // Cargar categorías cuando se abre el modal de edición
@@ -1861,6 +1931,155 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 transferencia no se ven afectadas.
               </p>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Documentación fiscal. Es opcional y no habilita nada: publicar,
+          vender y cobrar funcionan igual sin presentarla. Lo único que cambia
+          una aprobación es que aparece el distintivo en tus publicaciones. */}
+      <div className={styles.docSection}>
+        <div className={styles.sectionHeader}>
+          <h2>📄 Documentación fiscal</h2>
+        </div>
+        <div className={styles.docContent}>
+          {docCargando ? (
+            <p>Cargando estado…</p>
+          ) : (
+            <>
+              <p className={styles.docEstado}>
+                Estado:{' '}
+                <strong data-estado={documentacion?.estado ?? 'sin_presentacion'}>
+                  {ETIQUETA_DE_ESTADO[documentacion?.estado ?? 'sin_presentacion']}
+                </strong>
+              </p>
+
+              {documentacion?.estado === 'rechazada' && documentacion.motivo_de_rechazo && (
+                <div className={styles.docRechazo} role="alert">
+                  <strong>Por qué se rechazó:</strong> {documentacion.motivo_de_rechazo}
+                </div>
+              )}
+
+              {documentacion && documentacion.estado !== 'sin_presentacion' && (
+                <dl className={styles.docDatos}>
+                  <div>
+                    <dt>CUIT</dt>
+                    <dd>{documentacion.cuit}</dd>
+                  </div>
+                  <div>
+                    <dt>Razón social</dt>
+                    <dd>{documentacion.razon_social}</dd>
+                  </div>
+                  <div>
+                    <dt>Constancia</dt>
+                    <dd>
+                      <button
+                        type="button"
+                        className={styles.docVerArchivo}
+                        onClick={verMiConstancia}
+                      >
+                        {documentacion.archivo_nombre}
+                      </button>
+                    </dd>
+                  </div>
+                </dl>
+              )}
+
+              <p className={styles.docAyuda}>
+                Presentar tu CUIT, tu razón social y una constancia fiscal es
+                opcional. No hace falta para publicar, vender ni cobrar. Si la
+                revisión sale aprobada, en tus publicaciones aparece
+                «Documentación revisada».
+              </p>
+
+              {!docFormularioAbierto ? (
+                <button
+                  type="button"
+                  className={styles.docBoton}
+                  onClick={() => {
+                    setDocCuit(documentacion?.cuit ?? '');
+                    setDocRazonSocial(documentacion?.razon_social ?? '');
+                    setDocArchivo(null);
+                    setDocError(null);
+                    setDocFormularioAbierto(true);
+                  }}
+                >
+                  {documentacion && documentacion.estado !== 'sin_presentacion'
+                    ? 'Reemplazar documentación'
+                    : 'Presentar documentación'}
+                </button>
+              ) : (
+                <div className={styles.docFormulario}>
+                  {documentacion?.estado === 'aprobada' && (
+                    <p className={styles.docAviso}>
+                      Reemplazarla retira el distintivo hasta que se revise la
+                      nueva: lo revisado fue el papel anterior.
+                    </p>
+                  )}
+
+                  <div className={styles.formGroup}>
+                    <label htmlFor="doc-cuit">CUIT</label>
+                    <input
+                      id="doc-cuit"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="30-71009999-1"
+                      value={docCuit}
+                      onChange={(e) => setDocCuit(e.target.value)}
+                    />
+                  </div>
+
+                  <div className={styles.formGroup}>
+                    <label htmlFor="doc-razon-social">Razón social</label>
+                    <input
+                      id="doc-razon-social"
+                      type="text"
+                      placeholder="Campo Verde SRL"
+                      value={docRazonSocial}
+                      onChange={(e) => setDocRazonSocial(e.target.value)}
+                    />
+                  </div>
+
+                  <div className={styles.formGroup}>
+                    <label htmlFor="doc-archivo">Constancia fiscal (PDF)</label>
+                    <input
+                      id="doc-archivo"
+                      type="file"
+                      accept="application/pdf"
+                      onChange={(e) => setDocArchivo(e.target.files?.[0] ?? null)}
+                    />
+                  </div>
+
+                  {docError && (
+                    <div className={styles.docError} role="alert">
+                      {docError}
+                    </div>
+                  )}
+
+                  <div className={styles.editActions}>
+                    <button
+                      type="button"
+                      className={styles.saveButton}
+                      onClick={presentarDocumentacion}
+                      disabled={docEnviando}
+                    >
+                      {docEnviando ? 'Enviando…' : 'Enviar para revisión'}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.cancelButton}
+                      onClick={() => {
+                        setDocFormularioAbierto(false);
+                        setDocError(null);
+                      }}
+                      disabled={docEnviando}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

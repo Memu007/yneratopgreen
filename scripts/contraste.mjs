@@ -47,8 +47,10 @@ const ESPERADAS = [
   'checkout transportista elegido',
   'checkout pago',
   'perfil vendedor',
+  'documentación fiscal',
   'mis ventas',
   'administración',
+  'administración documentación',
 ];
 const ESPERA = 20000;
 const MEDIDAS = [
@@ -443,6 +445,16 @@ for (const medida of MEDIDAS) {
     await page.locator('button').filter({ hasText: '👤' }).first().click();
     await revisar(page, `${medida.n} perfil vendedor`,
       page.getByRole('heading', { name: 'Mi Perfil' }));
+
+    // Con el formulario abierto: la sección cerrada no muestra las etiquetas
+    // ni el aviso de error, que es donde vive el texto nuevo de esta pieza.
+    await page.getByRole('button', {
+      name: /Presentar documentación|Reemplazar documentación/,
+    }).click();
+    await revisar(page, `${medida.n} documentación fiscal`,
+      page.locator('#doc-archivo'));
+    await page.getByRole('button', { name: 'Cancelar' }).last().click();
+
     await page.getByRole('button', { name: 'Mis Ventas' }).click();
     await revisar(page, `${medida.n} mis ventas`,
       page.getByRole('heading', { name: 'Mis Ventas' }));
@@ -456,6 +468,11 @@ for (const medida of MEDIDAS) {
     await page.getByRole('button', { name: /Admin/i }).first().click();
     await revisar(page, `${medida.n} administración`,
       page.getByRole('heading', { name: 'Panel de Administración' }));
+
+    await page.locator('[class*="_tabs_"]').first()
+      .getByRole('button', { name: /Documentaci.n/i }).first().click();
+    await revisar(page, `${medida.n} administración documentación`,
+      page.locator('[class*="_documentacionSection_"]'));
     await ctx.close();
   }
 }

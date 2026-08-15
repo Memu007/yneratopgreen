@@ -15,6 +15,7 @@ interface SellerReputation {
   rating_count: number;
   sales_count: number;
   purchases_count: number;
+  documentacion_revisada?: boolean;
 }
 
 interface Review {
@@ -82,6 +83,14 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
             {sellerName.charAt(0).toUpperCase()}
           </div>
           <h2 className={styles.sellerName}>{sellerName}</h2>
+          {/* El mismo distintivo del detalle, con el mismo texto exacto. Sale
+              de la reputación, que es el dato de identidad que este modal ya
+              pedía: no hay ruta ni perfil público nuevo. */}
+          {reputation?.documentacion_revisada && (
+            <p className={styles.documentacion}>
+              <span aria-hidden="true">📄</span> Documentación revisada
+            </p>
+          )}
         </div>
 
         {loading ? (

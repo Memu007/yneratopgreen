@@ -92,6 +92,23 @@
   text-align: center;
 }
 
+/* El fondo del encabezado es un degradado, así que el distintivo lleva su
+   propio fondo opaco: medir texto sobre un degradado obliga a mirar los dos
+   extremos, y una pastilla sólida no depende de dónde caiga. Blanco con
+   #1b5e20 da 9,4:1. */
+.documentacion {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1b5e20;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .loading {
   display: flex;
   flex-direction: column;

@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styles from './AdminPanel.module.css';
 import { useToast } from '../Toast/Toast';
-import { apiGet, apiPost, apiPatch, apiDelete } from '../../utils/api';
+import { apiGet, apiPost, apiPatch, apiDelete, apiBlob } from '../../utils/api';
 import { ProductImage } from '../ProductImage/ProductImage';
+import {
+  ETIQUETA_DE_ESTADO,
+  pesoLegible,
+  type ColaDeDocumentacion,
+  type DocumentacionEnCola,
+} from '../../utils/documentacion';
 
-type AdminTab = 'dashboard' | 'users' | 'products' | 'orders' | 'categories' | 'config';
+type AdminTab =
+  | 'dashboard' | 'users' | 'products' | 'orders' | 'categories' | 'config'
+  | 'documentacion';
 
 interface DashboardStats {
   total_users: number;
@@ -198,6 +206,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [editingOption, setEditingOption] = useState<FormOption | null>(null);
   const [newOption, setNewOption] = useState({ value: '', label: '', display_order: 0 });
 
+  // Documentación de vendedores. La cola arranca filtrada en pendientes
+  // porque es lo único que pide una acción; el resto es consulta.
+  const [documentacion, setDocumentacion] = useState<DocumentacionEnCola[]>([]);
+  const [docPendientes, setDocPendientes] = useState(0);
+  const [docFiltro, setDocFiltro] = useState<string>('pendiente');
+  const [docRechazando, setDocRechazando] = useState<string | null>(null);
+  const [docMotivo, setDocMotivo] = useState('');
+
   // Bloquear scroll del body cuando el modal está abierto
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -220,7 +236,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     if (activeTab === 'orders') loadOrders();
     if (activeTab === 'categories') loadCategories();
     if (activeTab === 'config') loadFormOptions();
-  }, [activeTab, userRoleFilter, categoryFilter, selectedOptionType]);
+    if (activeTab === 'documentacion') loadDocumentacion();
+  }, [activeTab, userRoleFilter, categoryFilter, selectedOptionType, docFiltro]);
 
   const loadDashboard = async () => {
     setLoading(true);
@@ -231,6 +248,62 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       console.error('Error cargando dashboard:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDocumentacion = async () => {
+    setLoading(true);
+    try {
+      const query = docFiltro ? `?estado=${docFiltro}` : '';
+      const data = await apiGet<ColaDeDocumentacion>(`/admin/documentacion${query}`);
+      setDocumentacion(data.items);
+      setDocPendientes(data.pendientes);
+    } catch (error) {
+      console.error('Error cargando documentación:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verConstancia = async (fila: DocumentacionEnCola) => {
+    try {
+      const archivo = await apiBlob(`/admin/documentacion/${fila.id}/archivo`);
+      const url = URL.createObjectURL(archivo);
+      window.open(url, '_blank', 'noopener');
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'No se pudo abrir la constancia.',
+        'error',
+      );
+    }
+  };
+
+  const decidirDocumentacion = async (
+    fila: DocumentacionEnCola,
+    decision: 'aprobada' | 'rechazada',
+    motivo?: string,
+  ) => {
+    try {
+      await apiPost(`/admin/documentacion/${fila.id}/decidir`, { decision, motivo });
+      showToast(
+        decision === 'aprobada'
+          ? `Documentación de ${fila.user_nombre} aprobada.`
+          : `Documentación de ${fila.user_nombre} rechazada.`,
+        'success',
+      );
+      setDocRechazando(null);
+      setDocMotivo('');
+      await loadDocumentacion();
+    } catch (error) {
+      // Si otro administrador decidió primero, el servidor contesta 409 con el
+      // estado real. Se muestra tal cual y se recarga: la cola tiene que
+      // mostrar lo que pasó, no insistir con lo que este navegador creía.
+      showToast(
+        error instanceof Error ? error.message : 'No se pudo registrar la decisión.',
+        'error',
+      );
+      await loadDocumentacion();
     }
   };
 
@@ -599,7 +672,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           >
             📁 Categorías
           </button>
-          <button 
+          <button
+            className={`${styles.tab} ${activeTab === 'documentacion' ? styles.active : ''}`}
+            onClick={() => setActiveTab('documentacion')}
+          >
+            📄 Documentación
+          </button>
+          <button
             className={`${styles.tab} ${activeTab === 'config' ? styles.active : ''}`}
             onClick={() => setActiveTab('config')}
           >
@@ -791,6 +870,156 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               <div className={styles.pagination}>
                 Total: {usersTotal} usuarios
               </div>
+            </div>
+          )}
+
+          {/* DOCUMENTACIÓN DE VENDEDORES
+              Revisión manual: se mira la constancia y se decide. No habilita ni
+              bloquea nada del marketplace; aprobar sólo enciende el distintivo. */}
+          {activeTab === 'documentacion' && (
+            <div className={styles.documentacionSection}>
+              <div className={styles.toolbar}>
+                <select
+                  aria-label="Filtrar documentación por estado"
+                  value={docFiltro}
+                  onChange={(e) => setDocFiltro(e.target.value)}
+                  className={styles.filterSelect}
+                >
+                  <option value="pendiente">Pendientes</option>
+                  <option value="aprobada">Aprobadas</option>
+                  <option value="rechazada">Rechazadas</option>
+                  <option value="">Todas</option>
+                </select>
+                <span className={styles.docPendientes}>
+                  {docPendientes} pendiente{docPendientes === 1 ? '' : 's'} de revisión
+                </span>
+              </div>
+
+              <p className={styles.docNota}>
+                Revisión manual e informativa. Aprobar muestra «Documentación
+                revisada» en las publicaciones de ese vendedor; no certifica su
+                identidad ni garantiza la operación, y no habilita ni bloquea
+                publicar, vender o cobrar.
+              </p>
+
+              <TablaDesplazable etiqueta="Documentación presentada por vendedores">
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Vendedor</th>
+                      <th>CUIT</th>
+                      <th>Razón social</th>
+                      <th>Constancia</th>
+                      <th>Estado</th>
+                      <th>Presentada</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {documentacion.map((fila) => (
+                      <tr key={fila.id}>
+                        <td>
+                          {fila.user_nombre}
+                          <br />
+                          <span className={styles.docEmail}>{fila.user_email}</span>
+                        </td>
+                        <td>{fila.cuit}</td>
+                        <td>{fila.razon_social}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className={styles.docArchivo}
+                            onClick={() => verConstancia(fila)}
+                          >
+                            {fila.archivo_nombre}
+                          </button>
+                          <br />
+                          <span className={styles.docEmail}>{pesoLegible(fila.archivo_bytes)}</span>
+                        </td>
+                        <td>
+                          <span
+                            className={styles.docEstado}
+                            data-estado={fila.estado}
+                          >
+                            {ETIQUETA_DE_ESTADO[fila.estado]}
+                          </span>
+                          {fila.estado !== 'pendiente' && fila.revisado_por_nombre && (
+                            <>
+                              <br />
+                              <span className={styles.docEmail}>
+                                por {fila.revisado_por_nombre} el {formatDate(fila.revisado_el || '')}
+                              </span>
+                            </>
+                          )}
+                          {fila.estado === 'rechazada' && fila.motivo_de_rechazo && (
+                            <>
+                              <br />
+                              <span className={styles.docEmail}>{fila.motivo_de_rechazo}</span>
+                            </>
+                          )}
+                        </td>
+                        <td>{formatDate(fila.presentado_el)}</td>
+                        <td>
+                          {fila.estado !== 'pendiente' ? (
+                            <span className={styles.docEmail}>Ya revisada</span>
+                          ) : docRechazando === fila.id ? (
+                            <div className={styles.docRechazo}>
+                              <label htmlFor={`doc-motivo-${fila.id}`}>
+                                Motivo del rechazo
+                              </label>
+                              <input
+                                id={`doc-motivo-${fila.id}`}
+                                type="text"
+                                maxLength={500}
+                                placeholder="Qué tiene que corregir"
+                                value={docMotivo}
+                                onChange={(e) => setDocMotivo(e.target.value)}
+                              />
+                              <button
+                                className={styles.actionBtn}
+                                disabled={!docMotivo.trim()}
+                                onClick={() => decidirDocumentacion(fila, 'rechazada', docMotivo)}
+                              >
+                                Confirmar rechazo
+                              </button>
+                              <button
+                                className={styles.cancelBtn}
+                                onClick={() => {
+                                  setDocRechazando(null);
+                                  setDocMotivo('');
+                                }}
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <button
+                                className={`${styles.actionBtn} ${styles.activate}`}
+                                onClick={() => decidirDocumentacion(fila, 'aprobada')}
+                              >
+                                Aprobar
+                              </button>
+                              <button
+                                className={`${styles.actionBtn} ${styles.deactivate}`}
+                                onClick={() => {
+                                  setDocRechazando(fila.id);
+                                  setDocMotivo('');
+                                }}
+                              >
+                                Rechazar
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TablaDesplazable>
+              {documentacion.length === 0 && !loading && (
+                <p className={styles.noData}>No hay documentación con ese estado.</p>
+              )}
             </div>
           )}
 

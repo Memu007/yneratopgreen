@@ -15,6 +15,7 @@ from app.models.product import Product, ProductStatus
 from app.models.product_image import ProductImage
 from app.models.locality import Locality
 from app.models.user import User
+from app.models.documentacion import DocumentacionDeVendedor, EstadoDeDocumentacion
 from app.services import stock
 from app.schemas.catalog import (
     CategoryResponse,
@@ -244,13 +245,25 @@ def get_products(
         User.full_name.label("seller_name"),
         User.location.label("seller_location"),
         User.rating_average.label("seller_rating_average"),
-        User.rating_count.label("seller_rating_count")
+        User.rating_count.label("seller_rating_count"),
+        # El distintivo también viaja en la tarjeta, y no por capricho: el
+        # detalle de la publicación se abre con el objeto de la tarjeta, así
+        # que sin esto el bloque del vendedor nunca lo vería. La grilla no lo
+        # dibuja. Sale de un `outerjoin` acotado a la aprobada, que no
+        # multiplica filas porque hay una documentación por usuario.
+        DocumentacionDeVendedor.id.isnot(None).label("seller_documentacion_revisada")
     ).join(
         Category, Product.category_id == Category.id
     ).outerjoin(
         Subcategory, Product.subcategory_id == Subcategory.id
     ).join(
         User, Product.seller_id == User.id
+    ).outerjoin(
+        DocumentacionDeVendedor,
+        and_(
+            DocumentacionDeVendedor.user_id == User.id,
+            DocumentacionDeVendedor.estado == EstadoDeDocumentacion.APROBADA,
+        )
     ).outerjoin(
         ProductImage,
         and_(ProductImage.product_id == Product.id, ProductImage.is_primary == True)
@@ -326,7 +339,9 @@ def get_products(
     
     # Construir response
     items = []
-    for product, category_name, is_service, subcategory_id, subcategory_name, seller_id, seller_name, seller_location, seller_rating_avg, seller_rating_count in results:
+    for (product, category_name, is_service, subcategory_id, subcategory_name,
+         seller_id, seller_name, seller_location, seller_rating_avg,
+         seller_rating_count, seller_documentacion_revisada) in results:
         # Obtener imagen primaria
         primary_image = db.query(ProductImage.url).filter(
             ProductImage.product_id == product.id,
@@ -339,7 +354,8 @@ def get_products(
             full_name=seller_name,
             location=seller_location,
             rating_average=float(seller_rating_avg) if seller_rating_avg else 0.0,
-            rating_count=int(seller_rating_count) if seller_rating_count else 0
+            rating_count=int(seller_rating_count) if seller_rating_count else 0,
+            documentacion_revisada=bool(seller_documentacion_revisada),
         )
         
         product_dict = {
@@ -392,7 +408,9 @@ def get_product_detail(
     """
     # Query con relaciones cargadas
     product = db.query(Product).options(
-        joinedload(Product.seller),
+        # La documentación viaja con el vendedor porque de ella sale el
+        # distintivo: pedirla aparte sería una consulta más por cada detalle.
+        joinedload(Product.seller).joinedload(User.documentacion),
         joinedload(Product.category),
         joinedload(Product.images)
     ).filter(
@@ -415,7 +433,8 @@ def get_product_detail(
         location=product.seller.location,
         rating_average=float(product.seller.rating_average) if product.seller.rating_average else 0.0,
         rating_count=int(product.seller.rating_count) if product.seller.rating_count else 0,
-        sales_count=int(product.seller.sales_count) if product.seller.sales_count else 0
+        sales_count=int(product.seller.sales_count) if product.seller.sales_count else 0,
+        documentacion_revisada=product.seller.documentacion_revisada,
     )
     
     # Construir response

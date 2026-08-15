@@ -18,6 +18,10 @@ export interface Product {
     rating: number;
     ratingCount: number;
     salesCount: number;
+    // La clienta revisó la documentación fiscal de este vendedor. No es una
+    // verificación de identidad ni una garantía: por eso el cartel dice
+    // «Documentación revisada» y nada más.
+    documentacionRevisada?: boolean;
     address: {
       province: string;
       city: string;

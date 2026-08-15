@@ -19,6 +19,7 @@ from app.models.rating import Rating
 from app.models.notification import Notification, NotificationType
 from app.models.mp_oauth_state import MPOAuthState
 from app.models.mp_intento import MPIntentoDePago
+from app.models.documentacion import DocumentacionDeVendedor, EstadoDeDocumentacion
 
 __all__ = [
     "User",
@@ -47,5 +48,7 @@ __all__ = [
     "NotificationType",
     "MPOAuthState",
     "MPIntentoDePago",
+    "DocumentacionDeVendedor",
+    "EstadoDeDocumentacion",
 ]
 

@@ -1619,3 +1619,148 @@
   border-left-color: #c62828;
   color: #8c1d1d;
 }
+
+/* Documentación fiscal del vendedor. Verde y no azul: es otra cosa que
+   Mercado Pago y conviene que no se confundan de un vistazo. */
+.docSection {
+  margin-top: 24px;
+  background: linear-gradient(135deg, #f3f8f0 0%, #e8f5e9 100%);
+  border-radius: 12px;
+  border: 1px solid #2d5016;
+  overflow: hidden;
+}
+
+.docSection .sectionHeader {
+  background: linear-gradient(135deg, #2d5016 0%, #1b5e20 100%);
+  padding: 16px 24px;
+}
+
+.docSection .sectionHeader h2 {
+  color: white;
+  font-size: 18px;
+  margin: 0;
+}
+
+.docContent {
+  padding: 24px;
+}
+
+.docEstado {
+  margin: 0 0 12px;
+  color: #24301c;
+  font-size: 0.95rem;
+}
+
+/* El estado no se distingue sólo por color: la etiqueta ya lo dice con
+   palabras. El fondo es un refuerzo, no la información. */
+.docEstado strong[data-estado='pendiente'] {
+  background: #fff8e1;
+  color: #7a4f01;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.docEstado strong[data-estado='aprobada'] {
+  background: #e8f5e9;
+  color: #1b5e20;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.docEstado strong[data-estado='rechazada'] {
+  background: #fff3f3;
+  color: #8c1d1d;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.docRechazo {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  background: #fff3f3;
+  border-left: 3px solid #c62828;
+  border-radius: 6px;
+  color: #8c1d1d;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.docDatos {
+  margin: 0 0 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.docDatos dt {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4a5544;
+}
+
+.docDatos dd {
+  margin: 2px 0 0;
+  color: #24301c;
+  font-size: 0.95rem;
+}
+
+/* El PDF se pide con el token, así que no puede ser un enlace: es un botón
+   que lo trae y lo abre. Se lo viste como enlace para que se lea como tal. */
+.docVerArchivo {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #1b5e20;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.docAyuda {
+  margin: 0 0 16px;
+  color: #3c4a36;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.docAviso {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  background: #fff8e1;
+  border-left: 3px solid #b8860b;
+  border-radius: 6px;
+  color: #7a4f01;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.docError {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  background: #fff3f3;
+  border: 1px solid #ffcdd2;
+  border-radius: 8px;
+  color: #8c1d1d;
+  font-size: 0.88rem;
+}
+
+.docBoton {
+  background: #2d5016;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.docBoton:hover {
+  background: #1b5e20;
+}
+
+.docFormulario {
+  margin-top: 8px;
+  display: grid;
+  gap: 4px;
+}

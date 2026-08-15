@@ -165,6 +165,14 @@ export async function apiFetch<T = any>(
     credentials: 'include', // Incluir cookies en todas las requests
   };
 
+  // Con FormData el Content-Type lo tiene que poner el navegador, porque
+  // incluye el `boundary` que separa las partes. Dejar el `application/json`
+  // de los headers por defecto manda un multipart que el servidor no puede
+  // partir, y el error que vuelve no se parece en nada a la causa.
+  if (config.body instanceof FormData) {
+    delete (config.headers as Record<string, string>)['Content-Type'];
+  }
+
   try {
     const response = await fetch(url, config);
 
@@ -249,11 +257,33 @@ export const apiDelete = <T = any>(endpoint: string) =>
   apiFetch<T>(endpoint, { method: 'DELETE' });
 
 /**
+ * Descarga un archivo protegido y devuelve su contenido.
+ *
+ * Un `<a href>` no lleva el `Authorization`, así que un documento privado no
+ * se puede abrir con un enlace: hay que pedirlo con el token y quedarse con
+ * los bytes. Quien llama arma la URL temporal y —esto importa— la revoca.
+ */
+export async function apiBlob(endpoint: string): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: 'GET',
+    headers: getDefaultHeaders(),
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(mensajeDeError(errorData?.detail, response));
+  }
+
+  return response.blob();
+}
+
+/**
  * Helper para upload de archivos (FormData)
  */
 export const apiUpload = <T = any>(endpoint: string, formData: FormData) =>
   apiFetch<T>(endpoint, {
     method: 'POST',
     body: formData,
-    headers: {}, // No incluir Content-Type para FormData (se setea automáticamente con boundary)
+    headers: {}, // El Content-Type con boundary lo pone el navegador (ver apiFetch)
   });

@@ -104,7 +104,8 @@ async def shutdown_event():
 # `mp_oauth` sí, porque vincular la cuenta del vendedor no mueve un peso.
 from app.api import (
     auth, catalog, products, cart, orders, contact,
-    ratings, admin, notifications, logistics, mp_oauth, mp_webhook
+    ratings, admin, notifications, logistics, mp_oauth, mp_webhook,
+    documentacion
 )
 
 app.include_router(auth.router, prefix=settings.API_PREFIX)
@@ -119,3 +120,5 @@ app.include_router(notifications.router, prefix=settings.API_PREFIX)
 app.include_router(logistics.router, prefix=settings.API_PREFIX)
 app.include_router(mp_oauth.router, prefix=settings.API_PREFIX)
 app.include_router(mp_webhook.router, prefix=settings.API_PREFIX)
+app.include_router(documentacion.router, prefix=settings.API_PREFIX)
+app.include_router(documentacion.router_admin, prefix=settings.API_PREFIX)

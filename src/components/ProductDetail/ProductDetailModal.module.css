@@ -270,6 +270,22 @@
   margin-top: 4px;
 }
 
+/* Distintivo de documentación revisada. Verde sobrio y no una medalla: es una
+   revisión manual de un papel, no un sello de identidad comprobada. El par
+   #1b5e20 sobre #e8f5e9 mide 8,3:1, muy por encima del mínimo. */
+.sellerDocumentacion {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: #e8f5e9;
+  color: #1b5e20;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .privacyNote {
   margin-top: 12px;
   padding: 10px;

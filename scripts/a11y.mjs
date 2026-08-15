@@ -57,6 +57,7 @@ const ESPERADAS = [
   'panel: edición de perfil',
   'panel: mis compras',
   'panel del vendedor',
+  'panel: documentación fiscal',
   'panel: mis ventas',
   'panel: mis productos',
   'panel del transportista',
@@ -66,6 +67,7 @@ const ESPERADAS = [
   'administración: usuarios',
   'administración: productos',
   'administración: órdenes',
+  'administración: documentación',
 ];
 
 const ESPERA = 20000;
@@ -289,6 +291,17 @@ async function vendedor(page, medida) {
   await revisar(page, 'panel del vendedor', medida,
     page.getByRole('heading', { name: 'Mi Perfil' }));
 
+  // El formulario de documentación, abierto: los tres campos y sus etiquetas
+  // sólo existen mientras está abierto, así que medir la sección cerrada no
+  // mediría ninguno de los controles nuevos.
+  await page.getByRole('button', {
+    name: /Presentar documentación|Reemplazar documentación/,
+  }).click();
+  await revisar(page, 'panel: documentación fiscal', medida,
+    page.locator('#doc-archivo'));
+
+  await page.getByRole('button', { name: 'Cancelar' }).last().click();
+
   await page.getByRole('button', { name: 'Mis Ventas' }).click();
   await revisar(page, 'panel: mis ventas', medida,
     page.getByRole('heading', { name: 'Mis Ventas' }));
@@ -333,6 +346,7 @@ async function administracion(page, medida) {
     ['Usuarios', 'administración: usuarios'],
     ['Productos', 'administración: productos'],
     ['Órdenes', 'administración: órdenes'],
+    ['Documentación', 'administración: documentación'],
   ]) {
     // acotado a la barra de pestañas: fuera de ella hay botones con el mismo
     // texto en la página que queda detrás del modal

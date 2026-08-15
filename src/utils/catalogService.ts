@@ -71,6 +71,9 @@ export interface SellerInfo {
   rating_average: number;
   rating_count: number;
   sales_count?: number;
+  // Sólo lo trae el detalle: la tarjeta del listado no lo pide, y por eso el
+  // distintivo aparece al abrir la publicación y no en la grilla.
+  documentacion_revisada?: boolean;
 }
 
 export interface SellerBasicInfo {
@@ -210,6 +213,10 @@ export const convertBackendProductToFrontend = (backendProduct: ProductFromBacke
       rating: sellerRating,
       ratingCount: sellerRatingCount,
       salesCount: sellerSalesCount,
+      // `=== true` y no un booleano casteado: la tarjeta del listado no manda
+      // el campo, y ausente tiene que leerse como «no», nunca como «sí».
+      documentacionRevisada:
+        (seller as SellerInfo | undefined)?.documentacion_revisada === true,
       address: {
         province: locationParts[0] || 'Argentina',
         city: locationParts[1] || '',
