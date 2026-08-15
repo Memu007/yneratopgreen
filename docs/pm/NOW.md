@@ -41,12 +41,11 @@ Actualizado: 2026-08-15.
   de credenciales; el ensayo fallido cambió ambas cuentas en el mismo perfil
   del navegador. Si falla también aislado, capturar la actividad de la cuenta
   MP y recién entonces decidir una devolución a Dev.
-- Dev: **tarea activa única**, esfuerzo Alto: corrección mínima del prototipo
-  aislado de logística. `8002fea` queda sin aceptar porque los campos de texto
-  no sincronizan el estado antes del primer clic; «Capacidad de carga» se borra
-  y bloquea el alta. El recorrido comprador y los límites del MVP sí quedaron
-  conformes. La orden discriminante está al final de `PARA-DEV.md`; no toca
-  producto, Mercado Pago ni Railway.
+- Dev: sin tarea activa. El prototipo aislado de logística quedó aceptado con
+  base `8002fea`, corrección `c26495d` e informe `ee2fefb`. Antes de llevar algo
+  al producto, Emi y PM deben decidir los tres campos propuestos, si las cargas
+  sólo se muestran o filtran y si la ficha alcanza para comparar. Mercado Pago
+  y Railway no se reabren por esta pieza.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -55,12 +54,12 @@ Actualizado: 2026-08-15.
 
 ## Entrega aceptada y tarea actual
 
-El prototipo logístico `8002fea` y su informe `aef145d` están **en revisión, no
-aceptados**. PM completó el recorrido comprador y confirmó selección, contacto
-posterior y cierre sin falsa contratación. El alta queda bloqueada en capacidad:
-escribir y pulsar Siguiente sin desenfocar borra el valor porque el estado sólo
-se sincroniza por `change`. La Dev tiene una corrección acotada; no se abre
-producto real hasta decidir los tres campos propuestos.
+El prototipo logístico queda **aceptado**: base `8002fea`, corrección `c26495d`
+e informe `ee2fefb`. PM completó el comprador y el alta, reprodujo el primer
+clic corregido en escritorio y 390×844, confirmó los valores exactos en el
+resumen, cero corte móvil y cero errores de consola. Es una simulación aislada:
+no agrega todavía marca/modelo, dominio separado ni cargas permitidas al
+producto real.
 
 La documentación manual de vendedores queda **aceptada**: producto base
 `b8fee0e`, cierre `9988879` e informe `bbb0d2d`. Es informativa y no bloquea

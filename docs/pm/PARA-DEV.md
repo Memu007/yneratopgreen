@@ -2665,3 +2665,21 @@ tratamiento actual de radios, checks y selects.
    `src/`, backend, dependencias ni conviertas propuestas en producto.
 
 Ahí volvés a PM. No abras otra pieza.
+
+## 2026-08-15 — Prototipo logístico aceptado
+
+Aceptados el prototipo base `8002fea`, la corrección `c26495d` y el informe
+final `ee2fefb`. La sincronización inmediata conserva textos, números y textarea
+sin redibujar por tecla; radios, checks y selects continúan por `change`.
+
+PM reprodujo el caso exacto en escritorio y 390×844: escribió capacidad y
+pulsó **Siguiente** sin desenfocar; el primer clic avanzó al paso 5 y el valor no
+se borró. También completó el alta y confirmó en el resumen marca/modelo,
+dominio, capacidad, carga, habilitación y radio. En móvil no hubo corte
+horizontal y la consola quedó sin errores.
+
+Los dos recorridos aislados quedan cerrados. **No hay tarea activa para Dev.**
+No conviertas los tres campos propuestos en producto hasta que Emi y PM decidan
+si entran, si las cargas sólo se muestran o también filtran, y si la ficha
+alcanza para comparar. El límite del MVP sigue siendo selección y contacto, sin
+cotización, reserva, cobro ni seguimiento del flete.
