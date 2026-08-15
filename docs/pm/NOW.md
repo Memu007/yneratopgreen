@@ -10,6 +10,14 @@ Actualizado: 2026-08-14.
 - Cronograma: viernes 14/08, inicio de semana contractual 2, todavía Fase 1.
   El producto está adelantado en Fase 4 por decisión explícita, sin habilitar
   producción ni cambiar el calendario contractual.
+- Firma: Emi informó que probablemente ocurra el viernes 21/08. Es una fecha
+  posible, no confirmada: no reanclar todavía. Si ese día queda confirmado como
+  firma y comienzo, recalcular el cuadro completo en un único cambio.
+- Orden acordado: la Dev termina sólo la documentación manual de vendedores y
+  después no abre otra función antes de la firma. PM puede relevar UX sin
+  implementar y hacer una única prueba MP con sesiones aisladas. Tras la firma:
+  UX de recorridos principales, pulido de logística, hito intermedio, pagos en
+  su fase y finalmente seguridad, responsive, QA, producción y capacitación.
 - Avance estimado: MVP **~89 %**; pagos **~85 %**. Código MP-A/B/C aceptado;
   homologación externa MP-D incompleta. Hito intermedio aceptado; hito final no.
 - Entorno descartable: frontend `https://ynerav.up.railway.app`, Backend
