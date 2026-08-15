@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TopGreen · Revisión de logística — prototipo</title>
+<!--
+  PROTOTIPO DESCARTABLE. No es producto y no se despliega.
+
+  Existe para mirar dos recorridos de logística antes de tocar la aplicación:
+  el alta de quien ofrece flete y la compra de quien lo necesita. No pega a
+  ninguna API, no guarda nada y no comparte una sola línea con `src/`.
+
+  El límite que el prototipo tiene que dejar claro, porque es el del MVP:
+  TopGreen es un DIRECTORIO GEOGRÁFICO. El transportista declara qué lleva y
+  hasta dónde; en una compra se listan los que cubren las dos puntas; el
+  comprador elige uno y recién ahí ve el contacto. TopGreen no cotiza, no
+  cobra, no reserva disponibilidad y no administra estados de un servicio.
+  El precio y la coordinación se acuerdan entre las partes.
+
+  Por eso el recorrido del comprador termina en SELECCIONAR Y CONTACTAR. No hay
+  pago del flete, ni «servicio contratado», ni seguimiento.
+
+  Los campos marcados «Propuesta» todavía no existen en el producto. Están acá
+  para decidir si entran, no porque estén hechos.
+-->
+<style>
+  /* Los tokens son los de src/index.css: emerald + slate, Inter. Se copian
+     y no se importan a propósito: el prototipo tiene que poder abrirse solo,
+     y no debe poder romperse por un cambio en el producto. */
+  :root {
+    --primary-600: #059669;
+    --primary-700: #047857;
+    --primary-800: #065f46;
+    --primary-50: #ecfdf5;
+    --primary-100: #d1fae5;
+    --primary-text: #047857;
+
+    --slate-50: #f8fafc;
+    --slate-100: #f1f5f9;
+    --slate-200: #e2e8f0;
+    --slate-300: #cbd5e1;
+    --slate-500: #64748b;
+    --slate-600: #475569;
+    --slate-700: #334155;
+    --slate-800: #1e293b;
+    --slate-900: #0f172a;
+
+    --warning-bg: #fffbeb;
+    --warning-border: #f59e0b;
+    --warning-text: #b45309;
+    --info-bg: #eff6ff;
+    --info-border: #3b82f6;
+    --info-text: #1d4ed8;
+
+    --radio: 12px;
+    --sombra: 0 1px 3px rgba(15, 23, 42, .08), 0 8px 24px rgba(15, 23, 42, .06);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    /* Nada de horizontal: la revisión se mira en 1440x900 y en 390x844. */
+    overflow-x: hidden;
+  }
+
+  body {
+    background: var(--slate-50);
+    color: var(--slate-800);
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+
+  /* El foco se ve siempre y en todo: es una revisión de recorrido y hay que
+     poder recorrerla con el teclado. */
+  :focus-visible {
+    outline: 3px solid var(--primary-700);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .saltar {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    background: var(--primary-700);
+    color: #fff;
+    padding: 10px 16px;
+    z-index: 20;
+  }
+  .saltar:focus { left: 8px; top: 8px; }
+
+  /* ---------------------------------------------------------------- marco */
+
+  header.marca {
+    background: linear-gradient(135deg, var(--primary-700) 0%, var(--primary-800) 100%);
+    color: #fff;
+    padding: 18px 24px;
+  }
+
+  .marca-interior {
+    max-width: 1120px;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -.01em;
+    margin: 0;
+  }
+  .logo span { color: #a7f3d0; }
+
+  .sello-prototipo {
+    background: #fff;
+    color: var(--primary-800);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+
+  main {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 24px 20px 64px;
+  }
+
+  /* ------------------------------------------------------------- portada */
+
+  .aviso-alcance {
+    background: var(--info-bg);
+    border-left: 4px solid var(--info-border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 0 0 24px;
+    color: var(--slate-700);
+    font-size: 14px;
+  }
+  .aviso-alcance strong { color: var(--info-text); }
+
+  .caminos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .camino {
+    background: #fff;
+    border: 1px solid var(--slate-200);
+    border-radius: var(--radio);
+    box-shadow: var(--sombra);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .camino h2 { margin: 0; font-size: 20px; color: var(--slate-900); }
+  .camino p { margin: 0; color: var(--slate-600); font-size: 15px; }
+  .camino ol { margin: 0; padding-left: 20px; color: var(--slate-600); font-size: 14px; }
+  .camino li { margin-bottom: 2px; }
+
+  /* --------------------------------------------------------------- pasos */
+
+  .cabecera-recorrido {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .cabecera-recorrido h2 { margin: 0; font-size: 20px; color: var(--slate-900); }
+
+  .contador {
+    color: var(--slate-500);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .barra {
+    height: 6px;
+    background: var(--slate-200);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .barra > div {
+    height: 100%;
+    background: var(--primary-600);
+    border-radius: 999px;
+    transition: width .2s ease;
+  }
+
+  .tarjeta {
+    background: #fff;
+    border: 1px solid var(--slate-200);
+    border-radius: var(--radio);
+    box-shadow: var(--sombra);
+    padding: 24px;
+  }
+
+  .tarjeta h3 { margin: 0 0 6px; font-size: 19px; color: var(--slate-900); }
+
+  .porque {
+    margin: 0 0 20px;
+    color: var(--slate-600);
+    font-size: 14.5px;
+  }
+
+  .campo { margin-bottom: 18px; }
+
+  .campo > label,
+  .grupo > legend {
+    display: block;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--slate-700);
+    margin-bottom: 6px;
+  }
+
+  .ayuda {
+    display: block;
+    color: var(--slate-500);
+    font-size: 13px;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  input[type="text"], input[type="number"], select, textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--slate-300);
+    border-radius: 8px;
+    font: inherit;
+    font-size: 15px;
+    color: var(--slate-800);
+    background: #fff;
+  }
+
+  textarea { min-height: 74px; resize: vertical; }
+
+  .grupo {
+    border: 1px solid var(--slate-200);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 0 0 18px;
+  }
+
+  .opcion {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .opcion:hover { background: var(--slate-50); }
+  .opcion input { margin-top: 4px; flex: none; }
+  .opcion strong { display: block; color: var(--slate-800); font-size: 15px; }
+
+  .casillas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 2px;
+  }
+
+  /* -------------------------------------------------- actual vs propuesta */
+
+  /* Un campo que todavía no existe se distingue a la vista y con palabras.
+     Sin esto, una revisión aprueba de hecho tres campos que nadie decidió. */
+  .propuesta {
+    border-left: 3px solid var(--warning-border);
+    background: var(--warning-bg);
+    padding: 12px 14px;
+    border-radius: 0 8px 8px 0;
+  }
+
+  .etiqueta-propuesta {
+    display: inline-block;
+    background: var(--warning-text);
+    color: #fff;
+    border-radius: 999px;
+    padding: 1px 9px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  .leyenda {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--warning-text);
+    background: var(--warning-bg);
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: 0 0 20px;
+  }
+
+  /* ------------------------------------------------------- transportistas */
+
+  .lista-fletes { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+
+  .flete {
+    border: 1px solid var(--slate-200);
+    border-radius: 10px;
+    padding: 16px;
+    background: #fff;
+  }
+  .flete.elegido {
+    border-color: var(--primary-600);
+    background: var(--primary-50);
+  }
+
+  .flete-nombre { margin: 0 0 4px; font-weight: 700; color: var(--slate-900); font-size: 16px; }
+  .flete-dato { margin: 0 0 3px; color: var(--slate-600); font-size: 14px; }
+
+  .flete-declara {
+    margin: 8px 0 0;
+    color: var(--warning-text);
+    background: var(--warning-bg);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .flete-sin-contacto {
+    margin: 8px 0 12px;
+    color: var(--slate-500);
+    font-size: 13px;
+    font-style: italic;
+  }
+
+  .flete-contacto {
+    margin: 8px 0 0;
+    padding: 10px 12px;
+    background: #fff;
+    border: 1px dashed var(--primary-600);
+    border-radius: 8px;
+    color: var(--primary-800);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  /* ------------------------------------------------------------- resumen */
+
+  .resumen { list-style: none; margin: 0 0 18px; padding: 0; display: grid; gap: 10px; }
+  .resumen > li {
+    display: grid;
+    grid-template-columns: minmax(150px, 220px) 1fr;
+    gap: 4px 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--slate-100);
+  }
+  .resumen dt, .resumen .clave {
+    color: var(--slate-500);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+  }
+  .resumen .valor { color: var(--slate-800); font-size: 15px; }
+
+  .no-hace {
+    background: var(--slate-100);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-top: 18px;
+    font-size: 14px;
+    color: var(--slate-700);
+  }
+  .no-hace h4 { margin: 0 0 8px; font-size: 14px; color: var(--slate-900); }
+  .no-hace ul { margin: 0; padding-left: 20px; }
+
+  /* -------------------------------------------------------------- avisos */
+
+  .aviso {
+    margin: 0 0 16px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    background: var(--warning-bg);
+    border-left: 4px solid var(--warning-border);
+    color: var(--warning-text);
+  }
+
+  /* ------------------------------------------------------------ acciones */
+
+  .acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--slate-200);
+  }
+
+  button {
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 10px 18px;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+
+  .primario { background: var(--primary-700); color: #fff; }
+  .primario:hover:not(:disabled) { background: var(--primary-800); }
+  .primario:disabled { background: var(--slate-300); color: var(--slate-600); cursor: not-allowed; }
+
+  .secundario { background: #fff; color: var(--slate-700); border-color: var(--slate-300); }
+  .secundario:hover { background: var(--slate-50); }
+
+  .terciario {
+    background: none;
+    border: none;
+    color: var(--primary-text);
+    text-decoration: underline;
+    padding: 10px 6px;
+  }
+
+  .empujar { margin-left: auto; }
+
+  .elegir {
+    background: var(--primary-700);
+    color: #fff;
+    padding: 8px 14px;
+    font-size: 14px;
+  }
+  .elegir:hover { background: var(--primary-800); }
+
+  .quitar {
+    background: #fff;
+    color: var(--slate-700);
+    border-color: var(--slate-300);
+    padding: 8px 14px;
+    font-size: 14px;
+  }
+
+  footer.pie {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0 20px 48px;
+    color: var(--slate-500);
+    font-size: 13px;
+  }
+
+  [hidden] { display: none !important; }
+
+  @media (max-width: 640px) {
+    main { padding: 16px 14px 48px; }
+    .tarjeta { padding: 18px 16px; }
+    .resumen > li { grid-template-columns: 1fr; }
+    .acciones { flex-direction: column-reverse; align-items: stretch; }
+    .empujar { margin-left: 0; }
+    .acciones button { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+
+<header class="marca">
+  <div class="marca-interior">
+    <p class="logo">Top<span>Green</span></p>
+    <span class="sello-prototipo">Prototipo de revisión · no es el producto</span>
+  </div>
+</header>
+
+<main id="contenido">
+
+  <!-- ============================================================ portada -->
+  <section id="portada" aria-labelledby="titulo-portada">
+    <h1 id="titulo-portada" style="font-size:24px;margin:0 0 6px;color:var(--slate-900)">
+      Logística: dos recorridos para revisar
+    </h1>
+    <p style="margin:0 0 20px;color:var(--slate-600)">
+      Elegí un recorrido. Podés volver, avanzar, reiniciarlo o cambiar al otro
+      en cualquier momento.
+    </p>
+
+    <p class="aviso-alcance">
+      <strong>Qué es hoy TopGreen en logística:</strong> un directorio
+      geográfico. El transportista declara qué transporta y hasta dónde llega;
+      cuando alguien compra, se listan los que cubren el origen y el destino; el
+      comprador elige uno y recién entonces ve el contacto.
+      <strong>TopGreen no cotiza el flete, no lo cobra, no reserva
+      disponibilidad y no administra el servicio.</strong> El precio y la
+      coordinación se acuerdan directamente entre las partes.
+    </p>
+
+    <ul class="caminos">
+      <li class="camino">
+        <h2>Ofrezco logística</h2>
+        <p>Alta de un transportista: qué lleva, con qué y hasta dónde.</p>
+        <ol>
+          <li>Elegir ofrecer logística</li>
+          <li>Localidad base</li>
+          <li>Vehículo</li>
+          <li>Capacidad de carga</li>
+          <li>Cargas o usos permitidos</li>
+          <li>Habilitación declarada</li>
+          <li>Radio de cobertura</li>
+          <li>Qué va a ver el comprador</li>
+        </ol>
+        <button type="button" class="primario" data-ir="transportista">
+          Recorrer el alta del transportista
+        </button>
+      </li>
+
+      <li class="camino">
+        <h2>Necesito logística</h2>
+        <p>Una compra que hay que trasladar, hasta el contacto del transportista.</p>
+        <ol>
+          <li>La compra y su origen</li>
+          <li>Destino de entrega</li>
+          <li>Traslado propio o flete</li>
+          <li>Quiénes cubren el tramo</li>
+          <li>Selección</li>
+          <li>Contacto y cierre de la compra</li>
+        </ol>
+        <button type="button" class="primario" data-ir="comprador">
+          Recorrer la compra con flete
+        </button>
+      </li>
+    </ul>
+  </section>
+
+  <!-- ========================================================== recorrido -->
+  <section id="recorrido" hidden aria-labelledby="titulo-recorrido">
+    <div class="cabecera-recorrido">
+      <h2 id="titulo-recorrido"></h2>
+      <p class="contador" id="contador"></p>
+    </div>
+
+    <div class="barra"><div id="progreso" style="width:0%"></div></div>
+
+    <div class="tarjeta">
+      <div id="paso" aria-live="polite"></div>
+
+      <div class="acciones">
+        <button type="button" class="secundario" id="atras">← Atrás</button>
+        <button type="button" class="terciario" id="reiniciar">Reiniciar recorrido</button>
+        <button type="button" class="terciario" id="cambiar">Cambiar de recorrido</button>
+        <button type="button" class="primario empujar" id="siguiente">Siguiente →</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pie">
+  Prototipo descartable de Ynera Labs para revisar el recorrido de logística de
+  TopGreen. No consulta datos reales, no guarda nada y no representa el estado
+  final del producto.
+</footer>
+
+<script>
+(() => {
+  'use strict';
+
+  // ------------------------------------------------------------- el estado
+  // Todo vive en memoria y se tira al reiniciar. Un prototipo que persiste es
+  // un prototipo que empieza a parecerse a un producto.
+  const inicial = () => ({
+    // alta del transportista
+    ofrece: '',
+    localidadBase: '',
+    tipoVehiculo: '',
+    marcaModelo: '',
+    dominio: '',
+    capacidad: '',
+    cargas: [],
+    declaraHabilitacion: false,
+    detalleHabilitacion: '',
+    radio: '',
+    // compra
+    destino: '',
+    modoTraslado: '',
+    elegido: null,
+  });
+
+  let datos = inicial();
+  let recorrido = null;
+  let indice = 0;
+  let aviso = '';
+
+  // ------------------------------------------------------------ el catálogo
+  // Localidades reales del padrón para que la revisión hable en argentino, no
+  // en «Ciudad 1». No se consulta nada: es una lista fija del prototipo.
+  const LOCALIDADES = [
+    'Pergamino, Buenos Aires',
+    'Junín, Buenos Aires',
+    'Colón, Buenos Aires',
+    'Rojas, Buenos Aires',
+    'Venado Tuerto, Santa Fe',
+    'Río Cuarto, Córdoba',
+    'Marcos Juárez, Córdoba',
+  ];
+
+  const TIPOS = [
+    'Camión con acoplado',
+    'Camión chasis',
+    'Camioneta con batea',
+    'Tractor con carretón',
+    'Camión térmico',
+  ];
+
+  const CARGAS = [
+    'Granos a granel',
+    'Bolsones y big bags',
+    'Maquinaria agrícola',
+    'Agroquímicos',
+    'Hacienda en pie',
+    'Carga refrigerada',
+  ];
+
+  // La compra que se está trasladando. Fija: lo que se revisa es el traslado.
+  const COMPRA = {
+    producto: 'Sembradora de grano fino 21 líneas',
+    vendedor: 'Juan Vendedor',
+    origen: 'Pergamino, Buenos Aires',
+    cantidad: '1 unidad',
+    peso: 'Aproximadamente 4,2 toneladas',
+  };
+
+  // El directorio del prototipo. `cubre` es qué destinos declara alcanzar:
+  // así se puede mostrar de verdad que la lista depende de las dos puntas.
+  const DIRECTORIO = [
+    {
+      id: 'carlos',
+      nombre: 'Carlos Transportista',
+      base: 'Pergamino, Buenos Aires',
+      radio: 150,
+      tipo: 'Camión con acoplado',
+      marcaModelo: 'Scania R450',
+      dominio: 'AB 123 CD',
+      capacidad: 'Hasta 30 toneladas',
+      cargas: ['Maquinaria agrícola', 'Granos a granel'],
+      declara: 'Habilitación de transporte de cargas generales, vigente',
+      declaradoEl: '02/08/2026',
+      contacto: 'transportista@ejemplo.com · +54 2477 55-0101',
+      cubre: ['Junín, Buenos Aires', 'Colón, Buenos Aires', 'Rojas, Buenos Aires',
+              'Venado Tuerto, Santa Fe'],
+      alDestino: { 'Junín, Buenos Aires': 78, 'Colón, Buenos Aires': 52,
+                   'Rojas, Buenos Aires': 41, 'Venado Tuerto, Santa Fe': 143 },
+    },
+    {
+      id: 'fletes-sur',
+      nombre: 'Fletes del Sur',
+      base: 'Junín, Buenos Aires',
+      radio: 90,
+      tipo: 'Tractor con carretón',
+      marcaModelo: 'Iveco Stralis',
+      dominio: 'AC 456 EF',
+      capacidad: 'Hasta 45 toneladas, carga sobredimensionada',
+      cargas: ['Maquinaria agrícola'],
+      declara: 'Permiso de carga sobredimensionada con acompañamiento',
+      declaradoEl: '28/07/2026',
+      contacto: 'fletesdelsur@ejemplo.com · +54 2362 44-0202',
+      cubre: ['Junín, Buenos Aires', 'Rojas, Buenos Aires'],
+      alDestino: { 'Junín, Buenos Aires': 3, 'Rojas, Buenos Aires': 62 },
+    },
+    {
+      id: 'granos-express',
+      nombre: 'Granos Express',
+      base: 'Venado Tuerto, Santa Fe',
+      radio: 120,
+      tipo: 'Camión con acoplado',
+      marcaModelo: 'Mercedes-Benz Actros',
+      dominio: 'AD 789 GH',
+      capacidad: 'Hasta 28 toneladas de granos',
+      cargas: ['Granos a granel', 'Bolsones y big bags'],
+      declara: 'Habilitación para transporte de granos, vigente',
+      declaradoEl: '11/08/2026',
+      contacto: 'granosexpress@ejemplo.com · +54 3462 33-0303',
+      cubre: ['Venado Tuerto, Santa Fe', 'Colón, Buenos Aires'],
+      alDestino: { 'Venado Tuerto, Santa Fe': 5, 'Colón, Buenos Aires': 118 },
+    },
+  ];
+
+  const compatibles = () => DIRECTORIO.filter((t) => t.cubre.includes(datos.destino));
+
+  // ---------------------------------------------------------------- ayudas
+  const esc = (t) => String(t).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+
+  const marcaPropuesta = '<span class="etiqueta-propuesta">Propuesta</span>';
+
+  const LEYENDA = '<p class="leyenda">'
+    + '<span aria-hidden="true">◆</span>'
+    + '<span>Lo que está sobre fondo ámbar y dice «Propuesta» <strong>todavía no '
+    + 'existe en el producto</strong>: está acá para decidir si entra.</span></p>';
+
+  const pistaDeRadio = () => (Number(datos.radio) > 0
+    ? `Con base en ${esc(datos.localidadBase || 'tu localidad')} y ${esc(datos.radio)} km, `
+      + 'aparecés en viajes cuyo origen y destino caigan dentro.'
+    : 'Con la localidad base define en qué viajes aparecés.');
+
+  const opciones = (lista, valor) => ['<option value="">Elegí una opción</option>']
+    .concat(lista.map((o) => `<option value="${esc(o)}"${o === valor ? ' selected' : ''}>${esc(o)}</option>`))
+    .join('');
+
+  // ------------------------------------------------------------- los pasos
+  // Cada paso dice qué se decide y por qué, porque una revisión sin el porqué
+  // sólo puede opinar del color.
+
+  const ALTA = [
+    {
+      titulo: 'Ofrecer logística',
+      porque: 'Ser transportista no es un rol aparte ni una cuenta distinta: es '
+        + 'algo que una cuenta existente activa. Si no lo activás, nada de esto '
+        + 'aparece en tu panel.',
+      cuerpo: () => `
+        <fieldset class="grupo">
+          <legend>¿Qué querés hacer en TopGreen?</legend>
+          <label class="opcion">
+            <input type="radio" name="rol" value="si" ${datos.ofrece === 'si' ? 'checked' : ''}
+                   data-set="ofrece">
+            <span><strong>Ofrecer logística</strong>
+              <span class="ayuda">Aparecés en el directorio cuando alguien compre y
+              tu declaración cubra las dos puntas del viaje.</span></span>
+          </label>
+          <label class="opcion">
+            <input type="radio" name="rol" value="no" ${datos.ofrece === 'no' ? 'checked' : ''}
+                   data-set="ofrece">
+            <span><strong>Sólo comprar y vender</strong>
+              <span class="ayuda">Tu cuenta sigue igual que hoy.</span></span>
+          </label>
+        </fieldset>
+        ${datos.ofrece === 'no' ? '<p class="aviso">Sin ofrecer logística no hay nada '
+          + 'más que completar en este recorrido. Cambiá la opción o pasá al otro '
+          + 'recorrido.</p>' : ''}`,
+      valida: () => datos.ofrece === 'si'
+        ? '' : 'Elegí «Ofrecer logística» para seguir con el alta.',
+    },
+    {
+      titulo: 'Localidad base',
+      porque: 'Es el punto desde el que se mide todo. La compatibilidad con un '
+        + 'viaje se calcula contra esta localidad y el radio que declares, no '
+        + 'contra dónde estés ese día.',
+      cuerpo: () => `
+        <div class="campo">
+          <label for="localidad">Localidad base
+            <span class="ayuda">Del padrón oficial de localidades.</span></label>
+          <select id="localidad" data-set="localidadBase">${opciones(LOCALIDADES, datos.localidadBase)}</select>
+        </div>`,
+      valida: () => datos.localidadBase ? '' : 'Elegí tu localidad base.',
+    },
+    {
+      titulo: 'El vehículo',
+      porque: 'Es lo primero que mira quien compara. Hoy el producto guarda una '
+        + 'sola descripción libre; acá se prueba partirla en campos, que es lo '
+        + 'que permitiría comparar y, más adelante, filtrar.',
+      cuerpo: () => `
+        ${LEYENDA}
+        <div class="campo">
+          <label for="tipo">Tipo de transporte</label>
+          <select id="tipo" data-set="tipoVehiculo">${opciones(TIPOS, datos.tipoVehiculo)}</select>
+        </div>
+        <div class="campo propuesta">
+          <label for="marca">Marca y modelo ${marcaPropuesta}
+            <span class="ayuda">Hoy va suelto adentro de la descripción del transporte.</span></label>
+          <input type="text" id="marca" data-set="marcaModelo" value="${esc(datos.marcaModelo)}"
+                 placeholder="Scania R450">
+        </div>
+        <div class="campo propuesta">
+          <label for="dominio">Dominio ${marcaPropuesta}
+            <span class="ayuda">Hoy se escribe dentro del mismo texto libre. Separarlo
+            permite mostrarlo con formato y, si alguna vez hiciera falta, validarlo.</span></label>
+          <input type="text" id="dominio" data-set="dominio" value="${esc(datos.dominio)}"
+                 placeholder="AB 123 CD">
+        </div>`,
+      valida: () => datos.tipoVehiculo ? '' : 'Elegí el tipo de transporte.',
+    },
+    {
+      titulo: 'Capacidad de carga',
+      porque: 'Quien compra necesita saber si su carga entra. Es texto libre a '
+        + 'propósito: una sembradora y treinta toneladas de soja no se miden '
+        + 'igual, y encasillarlo dejaría afuera la mitad de los casos.',
+      cuerpo: () => `
+        <div class="campo">
+          <label for="capacidad">Capacidad de carga
+            <span class="ayuda">Como se lo explicarías a un cliente.</span></label>
+          <input type="text" id="capacidad" data-set="capacidad" value="${esc(datos.capacidad)}"
+                 placeholder="Hasta 30 toneladas">
+        </div>`,
+      valida: () => datos.capacidad.trim() ? '' : 'Escribí tu capacidad de carga.',
+    },
+    {
+      titulo: 'Cargas o usos permitidos',
+      porque: 'Es la diferencia entre aparecer en la lista correcta y perder '
+        + 'tiempo con consultas que no podés tomar. Hoy no existe: la única pista '
+        + 'está adentro del texto del transporte.',
+      cuerpo: () => `
+        ${LEYENDA}
+        <fieldset class="grupo propuesta">
+          <legend>Qué transportás ${marcaPropuesta}</legend>
+          <div class="casillas">
+            ${CARGAS.map((c, i) => `
+              <label class="opcion">
+                <input type="checkbox" id="carga-${i}" value="${esc(c)}" data-carga
+                       ${datos.cargas.includes(c) ? 'checked' : ''}>
+                <span>${esc(c)}</span>
+              </label>`).join('')}
+          </div>
+        </fieldset>
+        <p class="ayuda" style="margin-top:-8px">
+          Se puede seguir sin marcar nada: el campo no existe todavía y este
+          recorrido no debe obligar a algo que no está decidido.
+        </p>`,
+      valida: () => '',
+    },
+    {
+      titulo: 'Habilitación',
+      porque: 'Esto es una declaración tuya y nada más. TopGreen no la comprueba '
+        + 'contra ningún organismo, y por eso el comprador la ve con esa aclaración '
+        + 'al lado y con la fecha en que la declaraste.',
+      cuerpo: () => `
+        <fieldset class="grupo">
+          <legend>Habilitación de transporte</legend>
+          <label class="opcion">
+            <input type="checkbox" id="declara" data-set="declaraHabilitacion"
+                   ${datos.declaraHabilitacion ? 'checked' : ''}>
+            <span><strong>Declaro tener habilitación vigente</strong>
+              <span class="ayuda">Lo declarás vos. TopGreen no lo verifica.</span></span>
+          </label>
+        </fieldset>
+        <div class="campo">
+          <label for="detalle">Detalle de la habilitación</label>
+          <textarea id="detalle" data-set="detalleHabilitacion"
+                    placeholder="Habilitación de transporte de cargas generales, vigente">${esc(datos.detalleHabilitacion)}</textarea>
+        </div>
+        <p class="aviso">
+          Este texto se muestra tal cual al comprador, con la aclaración
+          «TopGreen no verifica esta habilitación» y la fecha de tu declaración.
+        </p>`,
+      valida: () => (datos.declaraHabilitacion && !datos.detalleHabilitacion.trim())
+        ? 'Escribí qué habilitación declarás, o destildá la declaración.' : '',
+    },
+    {
+      titulo: 'Radio de cobertura',
+      porque: 'Junto con la localidad base define en qué viajes aparecés. Se mide '
+        + 'contra las dos puntas: si el origen o el destino quedan afuera del '
+        + 'radio, no aparecés en esa compra.',
+      cuerpo: () => `
+        <div class="campo">
+          <label for="radio">Radio de cobertura, en kilómetros</label>
+          <input type="number" id="radio" min="1" max="2000" data-set="radio"
+                 data-pista="pista-radio" value="${esc(datos.radio)}" placeholder="150">
+          <!-- La pista se escribe siempre, aunque esté vacía, y se actualiza en
+               el lugar. Si apareciera al terminar de escribir, el paso crecería
+               justo cuando la persona ya está yendo al botón: el botón se corre
+               y el clic se pierde. -->
+          <span class="ayuda" id="pista-radio">${pistaDeRadio()}</span>
+        </div>`,
+      valida: () => (Number(datos.radio) > 0)
+        ? '' : 'Escribí un radio de cobertura mayor que cero.',
+    },
+    {
+      titulo: 'Lo que va a ver el comprador',
+      porque: 'Antes de terminar conviene mirar la ficha como la ve el otro lado. '
+        + 'Notá qué NO está: tu contacto, que aparece sólo si te seleccionan.',
+      cuerpo: () => {
+        const cargas = datos.cargas.length ? datos.cargas.join(', ') : '—';
+        return `
+        <div class="flete">
+          <p class="flete-nombre">Tu nombre y apellido</p>
+          <p class="flete-dato">Base: ${esc(datos.localidadBase || '—')} ·
+            radio declarado ${esc(datos.radio || '—')} km</p>
+          <p class="flete-dato">${esc(datos.tipoVehiculo || '—')}${
+            datos.marcaModelo ? ' · ' + esc(datos.marcaModelo) : ''}${
+            datos.dominio ? ' · dominio ' + esc(datos.dominio) : ''}</p>
+          <p class="flete-dato">Capacidad: ${esc(datos.capacidad || '—')}</p>
+          <p class="flete-dato">Cargas: ${esc(cargas)}</p>
+          ${datos.declaraHabilitacion ? `<p class="flete-declara">
+            Declara: ${esc(datos.detalleHabilitacion || 'sin detalle')} (declarado hoy).
+            TopGreen no verifica esta habilitación.</p>` : ''}
+          <p class="flete-sin-contacto">Los datos de contacto aparecen cuando lo seleccionás.</p>
+        </div>
+
+        <div class="no-hace">
+          <h4>Lo que TopGreen no hace con esto</h4>
+          <ul>
+            <li>No cotiza tu flete ni sugiere un precio.</li>
+            <li>No cobra ni intermedia el pago del viaje.</li>
+            <li>No reserva tu disponibilidad ni te asigna viajes.</li>
+            <li>No verifica tu habilitación ante ningún organismo.</li>
+          </ul>
+        </div>
+
+        <p class="leyenda" style="margin-top:18px">
+          <span aria-hidden="true">◆</span>
+          <span>Tres campos de este recorrido son propuestas sin decidir:
+          <strong>marca y modelo</strong>, <strong>dominio separado</strong> y
+          <strong>cargas permitidas</strong>. El resto ya existe.</span>
+        </p>`;
+      },
+      valida: () => '',
+      ultimo: true,
+    },
+  ];
+
+  const COMPRA_PASOS = [
+    {
+      titulo: 'La compra y su origen',
+      porque: 'El origen no lo elige el comprador: sale de dónde está la '
+        + 'publicación. Es una de las dos puntas del viaje.',
+      cuerpo: () => `
+        <ul class="resumen">
+          <li><span class="clave">Producto</span><span class="valor">${esc(COMPRA.producto)}</span></li>
+          <li><span class="clave">Vendedor</span><span class="valor">${esc(COMPRA.vendedor)}</span></li>
+          <li><span class="clave">Cantidad</span><span class="valor">${esc(COMPRA.cantidad)}</span></li>
+          <li><span class="clave">Peso aproximado</span><span class="valor">${esc(COMPRA.peso)}</span></li>
+          <li><span class="clave">Origen</span><span class="valor">${esc(COMPRA.origen)}</span></li>
+        </ul>
+        <p class="ayuda">El origen viene de la publicación y no se edita acá.</p>`,
+      valida: () => '',
+    },
+    {
+      titulo: 'Destino de entrega',
+      porque: 'La otra punta. De acá en adelante todo depende de este dato: quién '
+        + 'aparece en la lista cambia según el destino, no sólo según el origen.',
+      cuerpo: () => `
+        <div class="campo">
+          <label for="destino">¿Dónde lo recibís?</label>
+          <select id="destino" data-set="destino">${opciones(LOCALIDADES, datos.destino)}</select>
+        </div>
+        ${datos.destino ? `<p class="ayuda">Tramo:
+          ${esc(COMPRA.origen)} → ${esc(datos.destino)}.</p>` : ''}`,
+      valida: () => datos.destino ? '' : 'Elegí el destino de entrega.',
+      alSalir: () => {
+        // Cambiar el destino invalida una selección hecha para otro tramo.
+        if (datos.elegido && !compatibles().some((t) => t.id === datos.elegido)) {
+          datos.elegido = null;
+        }
+      },
+    },
+    {
+      titulo: '¿Cómo se traslada?',
+      porque: 'Son dos caminos y no hay un tercero. Elegir «por mi cuenta» es una '
+        + 'respuesta completa: el checkout sigue sin transportista y TopGreen no '
+        + 'vuelve a preguntar.',
+      cuerpo: () => `
+        <fieldset class="grupo">
+          <legend>Traslado de ${esc(COMPRA.producto)}</legend>
+          <label class="opcion">
+            <input type="radio" name="modo" value="carrier" data-set="modoTraslado"
+                   ${datos.modoTraslado === 'carrier' ? 'checked' : ''}>
+            <span><strong>Necesito flete</strong>
+              <span class="ayuda">Elegís un transportista que cubre este tramo.</span></span>
+          </label>
+          <label class="opcion">
+            <input type="radio" name="modo" value="self" data-set="modoTraslado"
+                   ${datos.modoTraslado === 'self' ? 'checked' : ''}>
+            <span><strong>Coordino el traslado por mi cuenta</strong>
+              <span class="ayuda">Seguís al pago sin elegir transportista.</span></span>
+          </label>
+        </fieldset>
+        ${datos.modoTraslado === 'self' ? '<p class="ayuda">Con esta opción el '
+          + 'recorrido salta la lista de transportistas y va directo al cierre.</p>' : ''}`,
+      valida: () => datos.modoTraslado ? '' : 'Elegí cómo se traslada el producto.',
+    },
+    {
+      titulo: 'Quiénes cubren este tramo',
+      porque: 'Salen del directorio: declararon una base y un radio que alcanzan '
+        + 'el origen y el destino. Se comparan acá, sin contacto: el contacto es '
+        + 'la consecuencia de elegir, no la forma de comparar.',
+      // La lista sólo tiene sentido si se pidió flete.
+      saltar: () => datos.modoTraslado !== 'carrier',
+      cuerpo: () => {
+        const lista = compatibles();
+        if (!lista.length) {
+          return `<p class="aviso">Ningún transportista declara cubrir
+            ${esc(COMPRA.origen)} y ${esc(datos.destino)}. Probá con otro destino,
+            o volvé y coordiná el traslado por tu cuenta.</p>`;
+        }
+        return `<ul class="lista-fletes">${lista.map((t) => {
+          const elegido = datos.elegido === t.id;
+          return `
+          <li class="flete${elegido ? ' elegido' : ''}">
+            <p class="flete-nombre">${esc(t.nombre)}</p>
+            <p class="flete-dato">Base: ${esc(t.base)} · radio declarado ${t.radio} km</p>
+            <p class="flete-dato">${esc(t.tipo)} · ${esc(t.marcaModelo)} · dominio ${esc(t.dominio)}</p>
+            <p class="flete-dato">Capacidad: ${esc(t.capacidad)}</p>
+            <p class="flete-dato">Cargas: ${esc(t.cargas.join(', '))}</p>
+            <p class="flete-dato">A ${t.alDestino[datos.destino]} km del destino</p>
+            <p class="flete-declara">Declara: ${esc(t.declara)} (declarado el
+              ${esc(t.declaradoEl)}). TopGreen no verifica esta habilitación.</p>
+            ${elegido
+              ? `<p class="flete-contacto">${esc(t.contacto)}</p>
+                 <p class="ayuda">Contacto visible porque lo seleccionaste.</p>
+                 <button type="button" class="quitar" data-quitar>Quitar del pedido</button>`
+              : `<p class="flete-sin-contacto">Los datos de contacto aparecen cuando lo seleccionás.</p>
+                 <button type="button" class="elegir" data-elegir="${t.id}">
+                   Seleccionar a ${esc(t.nombre)}</button>`}
+          </li>`;
+        }).join('')}</ul>
+        <p class="leyenda" style="margin-top:16px">
+          <span aria-hidden="true">◆</span>
+          <span><strong>Marca y modelo</strong>, <strong>dominio</strong> y
+          <strong>cargas</strong> son propuestas: hoy esa información viaja
+          mezclada en una sola línea de texto libre.</span>
+        </p>`;
+      },
+      valida: () => datos.elegido
+        ? '' : 'Seleccioná un transportista para seguir, o volvé y elegí coordinar por tu cuenta.',
+    },
+    {
+      titulo: 'Compra confirmada',
+      porque: 'Acá termina lo que hace TopGreen. Lo que sigue —cuánto sale el '
+        + 'flete y cuándo pasa— se acuerda entre el comprador y el transportista.',
+      cuerpo: () => {
+        const t = DIRECTORIO.find((c) => c.id === datos.elegido);
+        return `
+        <ul class="resumen">
+          <li><span class="clave">Producto</span><span class="valor">${esc(COMPRA.producto)}</span></li>
+          <li><span class="clave">Tramo</span><span class="valor">${esc(COMPRA.origen)} → ${esc(datos.destino)}</span></li>
+          <li><span class="clave">Traslado</span><span class="valor">${
+            datos.modoTraslado === 'self'
+              ? 'Lo coordina el comprador'
+              : 'Con transportista seleccionado'}</span></li>
+          ${t ? `<li><span class="clave">Transportista</span>
+            <span class="valor">${esc(t.nombre)}<br>${esc(t.contacto)}</span></li>` : ''}
+        </ul>
+
+        ${t ? `<p class="aviso">
+          <strong>El precio y la coordinación del flete se acuerdan
+          directamente con ${esc(t.nombre)}.</strong> TopGreen no cotiza, no
+          cobra y no interviene en ese acuerdo.</p>`
+          : `<p class="aviso">Coordinás el traslado por tu cuenta. TopGreen no
+             participa del retiro ni de la entrega.</p>`}
+
+        <div class="no-hace">
+          <h4>Lo que este cierre NO significa</h4>
+          <ul>
+            <li>No hay flete pagado ni cotizado en TopGreen.</li>
+            <li>No hay servicio contratado ni disponibilidad reservada.</li>
+            <li>No hay seguimiento del viaje dentro de la plataforma.</li>
+            <li>La compra del producto sí está confirmada con el vendedor.</li>
+          </ul>
+        </div>`;
+      },
+      valida: () => '',
+      ultimo: true,
+    },
+  ];
+
+  const RECORRIDOS = {
+    transportista: { titulo: 'Ofrezco logística · alta del transportista', pasos: ALTA },
+    comprador: { titulo: 'Necesito logística · compra con flete', pasos: COMPRA_PASOS },
+  };
+
+  // ------------------------------------------------------------- el motor
+  const $ = (sel) => document.querySelector(sel);
+  const portada = $('#portada');
+  const seccion = $('#recorrido');
+  const contenedor = $('#paso');
+
+  // Los pasos que hoy corresponden: uno puede quedar afuera según lo elegido
+  // —la lista de transportistas si el traslado es propio—.
+  const visibles = () => RECORRIDOS[recorrido].pasos.filter((p) => !(p.saltar && p.saltar()));
+
+  function pintar(foco) {
+    const pasos = visibles();
+    if (indice >= pasos.length) indice = pasos.length - 1;
+    const paso = pasos[indice];
+
+    $('#titulo-recorrido').textContent = RECORRIDOS[recorrido].titulo;
+    $('#contador').textContent = `Paso ${indice + 1} de ${pasos.length}`;
+    $('#progreso').style.width = `${((indice + 1) / pasos.length) * 100}%`;
+
+    contenedor.innerHTML = `
+      <h3>${esc(paso.titulo)}</h3>
+      <p class="porque">${paso.porque}</p>
+      ${aviso ? `<p class="aviso" role="alert">${esc(aviso)}</p>` : ''}
+      ${paso.cuerpo()}`;
+
+    $('#atras').disabled = indice === 0;
+    $('#siguiente').textContent = paso.ultimo ? 'Terminar recorrido' : 'Siguiente →';
+
+    if (foco) {
+      const primero = contenedor.querySelector('input, select, textarea, button');
+      (primero || contenedor.querySelector('h3')).focus?.();
+    }
+  }
+
+  function abrir(cual) {
+    recorrido = cual;
+    indice = 0;
+    aviso = '';
+    datos = inicial();
+    portada.hidden = true;
+    seccion.hidden = false;
+    pintar(true);
+    seccion.scrollIntoView({ block: 'start' });
+  }
+
+  function volverAPortada() {
+    recorrido = null;
+    datos = inicial();
+    seccion.hidden = true;
+    portada.hidden = false;
+    portada.querySelector('button')?.focus();
+  }
+
+  // Un solo escucha para todo el contenido: los pasos se vuelven a dibujar
+  // enteros, así que enganchar por elemento dejaría escuchas colgados.
+  contenedor.addEventListener('change', (e) => {
+    const campo = e.target.dataset.set;
+    if (campo) {
+      datos[campo] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+      aviso = '';
+      // Se redibuja sólo cuando la elección cambia QUÉ pasos o qué bloques hay,
+      // y sólo desde controles que se resuelven de un clic. Nunca desde un
+      // campo de texto: ahí el redibujo llega al salir del campo, o sea justo
+      // cuando la persona va camino al botón, y el botón se le corre.
+      if (['ofrece', 'modoTraslado', 'destino'].includes(campo)) {
+        pintar(false);
+      }
+      return;
+    }
+    if (e.target.hasAttribute('data-carga')) {
+      const valor = e.target.value;
+      datos.cargas = e.target.checked
+        ? datos.cargas.concat(valor)
+        : datos.cargas.filter((c) => c !== valor);
+    }
+  });
+
+  // Lo derivado que sí conviene ver mientras se escribe se actualiza en su
+  // propio nodo, sin volver a dibujar el paso y sin mover nada de lugar.
+  contenedor.addEventListener('input', (e) => {
+    const pista = e.target.dataset.pista;
+    if (!pista) return;
+    datos[e.target.dataset.set] = e.target.value;
+    const nodo = document.getElementById(pista);
+    if (nodo) nodo.textContent = pistaDeRadio();
+  });
+
+  contenedor.addEventListener('click', (e) => {
+    const elegir = e.target.closest('[data-elegir]');
+    if (elegir) {
+      datos.elegido = elegir.dataset.elegir;
+      aviso = '';
+      pintar(false);
+      return;
+    }
+    if (e.target.closest('[data-quitar]')) {
+      datos.elegido = null;
+      pintar(false);
+    }
+  });
+
+  document.querySelectorAll('[data-ir]').forEach((b) => {
+    b.addEventListener('click', () => abrir(b.dataset.ir));
+  });
+
+  $('#siguiente').addEventListener('click', () => {
+    const pasos = visibles();
+    const paso = pasos[indice];
+    const problema = paso.valida();
+    if (problema) {
+      aviso = problema;
+      pintar(false);
+      contenedor.querySelector('[role="alert"]')?.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    paso.alSalir?.();
+    aviso = '';
+    if (paso.ultimo) { volverAPortada(); return; }
+    indice = Math.min(indice + 1, visibles().length - 1);
+    pintar(true);
+  });
+
+  $('#atras').addEventListener('click', () => {
+    aviso = '';
+    indice = Math.max(indice - 1, 0);
+    pintar(true);
+  });
+
+  $('#reiniciar').addEventListener('click', () => abrir(recorrido));
+  $('#cambiar').addEventListener('click', volverAPortada);
+})();
+</script>
+</body>
+</html>
