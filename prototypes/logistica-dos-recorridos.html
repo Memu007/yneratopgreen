@@ -1128,9 +1128,42 @@
     portada.querySelector('button')?.focus();
   }
 
+  // Qué controles guardan su valor mientras se escribe. Todo lo que se
+  // teclea entra acá; los que se resuelven de un clic —radios, casillas y
+  // selects— siguen guardando por `change`.
+  const seEscribe = (nodo) => nodo.tagName === 'TEXTAREA'
+    || (nodo.tagName === 'INPUT' && ['text', 'number'].includes(nodo.type));
+
+  /**
+   * El estado se sincroniza con cada tecla, y esto no es una optimización:
+   * es la corrección de un defecto. Si el valor vive sólo en `change`, basta
+   * con que ese evento no llegue antes que la validación —un autocompletado
+   * del navegador, un gestor de contraseñas, otro orden de blur y clic— para
+   * que la validación lea el estado viejo, falle, y el redibujo BORRE de la
+   * pantalla lo que la persona acababa de escribir.
+   *
+   * No se redibuja en cada tecla: sólo se guarda, y lo derivado que se muestra
+   * se actualiza en su propio nodo, sin mover nada de lugar.
+   */
+  contenedor.addEventListener('input', (e) => {
+    const nodo = e.target;
+    const campo = nodo.dataset.set;
+    if (!campo || !seEscribe(nodo)) return;
+    datos[campo] = nodo.value;
+
+    const pista = nodo.dataset.pista;
+    if (pista) {
+      const destino = document.getElementById(pista);
+      if (destino) destino.textContent = pistaDeRadio();
+    }
+  });
+
   // Un solo escucha para todo el contenido: los pasos se vuelven a dibujar
   // enteros, así que enganchar por elemento dejaría escuchas colgados.
   contenedor.addEventListener('change', (e) => {
+    // Lo que se teclea ya quedó guardado por `input`; volver a tomarlo acá
+    // sería tener dos dueños del mismo dato.
+    if (seEscribe(e.target)) return;
     const campo = e.target.dataset.set;
     if (campo) {
       datos[campo] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -1150,16 +1183,6 @@
         ? datos.cargas.concat(valor)
         : datos.cargas.filter((c) => c !== valor);
     }
-  });
-
-  // Lo derivado que sí conviene ver mientras se escribe se actualiza en su
-  // propio nodo, sin volver a dibujar el paso y sin mover nada de lugar.
-  contenedor.addEventListener('input', (e) => {
-    const pista = e.target.dataset.pista;
-    if (!pista) return;
-    datos[e.target.dataset.set] = e.target.value;
-    const nodo = document.getElementById(pista);
-    if (nodo) nodo.textContent = pistaDeRadio();
   });
 
   contenedor.addEventListener('click', (e) => {
