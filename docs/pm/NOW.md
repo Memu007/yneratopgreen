@@ -12,9 +12,9 @@ Actualizado: 2026-08-15.
   y la firma legal quedó programada para el viernes 21/08, nueva ancla de la
   semana 1. Las doce semanas cierran el 12/11 y el colchón el 26/11. El producto
   está adelantado en Fase 4 sin habilitar producción ni el hito final.
-- Orden acordado: la Dev no abre otra función antes de la firma. PM puede
-  relevar UX sin implementar y hacer una única prueba MP con sesiones aisladas.
-  Tras la firma:
+- Orden acordado: antes de la firma la Dev sólo prepara una simulación UX
+  aislada de logística, autorizada por Emi; no modifica producto. PM puede
+  relevar UX y hacer una única prueba MP con sesiones aisladas. Tras la firma:
   UX de recorridos principales, pulido de logística, hito intermedio, pagos en
   su fase y finalmente seguridad, responsive, QA, producción y capacitación.
 - Avance estimado: MVP **~89 %**; pagos **~85 %**. Código MP-A/B/C aceptado;
@@ -41,11 +41,11 @@ Actualizado: 2026-08-15.
   de credenciales; el ensayo fallido cambió ambas cuentas en el mismo perfil
   del navegador. Si falla también aislado, capturar la actividad de la cuenta
   MP y recién entonces decidir una devolución a Dev.
-- Dev: **sin tarea activa**. La cortesía documental quedó aceptada con 110/110
-  informados; PM reprodujo build, sintaxis, `diff --check` y el rechazo de una
-  carpeta privada dentro del árbol público. Docker apagado impidió repetir la
-  suite y migraciones. Mercado Pago sólo vuelve a Dev si el ensayo aislado
-  aporta un defecto propio reproducible.
+- Dev: **tarea activa única**, esfuerzo Alto: prototipo aislado de los dos
+  recorridos logísticos —alta del transportista y selección/contacto desde la
+  compra—, con orden al final de `PARA-DEV.md`. No toca producto ni inventa
+  cotización o pago del flete. Mercado Pago sólo vuelve a Dev si el ensayo
+  aislado aporta un defecto propio reproducible.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar

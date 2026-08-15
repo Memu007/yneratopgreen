@@ -2543,3 +2543,88 @@ puertas visuales.
 La cortesía queda cerrada. **No hay tarea activa para Dev antes de la firma.**
 No abras otra función, MP-D ni Railway. Volvés sólo ante una orden nueva de PM
 o si el ensayo externo aislado de Mercado Pago demuestra un defecto propio.
+
+## Tarea activa única — Simulación UX de logística en dos recorridos
+
+Emi autoriza esta excepción antes de la firma porque logística es un recorrido
+crítico. No es una función productiva ni reabre backend: prepará un prototipo
+aislado, navegable y descartable para revisar el producto antes de tocar la
+aplicación. Esfuerzo **Alto**, no Extra.
+
+### Límite de producto que el prototipo debe decir con claridad
+
+El MVP vigente es un **directorio geográfico**: el transportista declara su
+capacidad y cobertura; en una compra se listan opciones compatibles; el
+comprador selecciona una y recién entonces obtiene el contacto. TopGreen no
+cotiza ni cobra el flete, no reserva disponibilidad y no administra estados de
+un servicio logístico. La coordinación económica ocurre entre las partes.
+
+Por eso el segundo recorrido termina en **seleccionar y contactar**, no en un
+pago ficticio ni en «servicio contratado». Si el prototipo demuestra que Emi
+necesita cotización, aceptación, pago o seguimiento dentro de TopGreen, se
+documenta como decisión de alcance posterior y no se implementa acá.
+
+### Entregable aislado
+
+Creá una revisión navegable fuera del árbol productivo, por ejemplo
+`prototypes/logistica-dos-recorridos.html`, sin dependencias nuevas y sin tocar
+`src/`, backend, migraciones, seed, Railway, Mercado Pago ni las puertas
+existentes. Debe poder abrirse con un servidor estático y usar la identidad
+visual y el lenguaje actual de TopGreen; no una landing genérica.
+
+Debe ofrecer desde el inicio dos caminos independientes, con Atrás, Siguiente,
+reinicio y cambio de recorrido:
+
+1. **Ofrecer logística / alta del transportista**
+   - elegir registrarse como transportista;
+   - localidad base;
+   - vehículo: tipo, marca/modelo y dominio;
+   - capacidad de carga;
+   - cargas o usos permitidos;
+   - declaración y detalle de habilitación, sin afirmar verificación de
+     TopGreen;
+   - radio de cobertura;
+   - resumen final de lo que verá el comprador.
+2. **Necesito logística / recorrido comprador**
+   - compra y origen del producto;
+   - destino de entrega;
+   - decisión explícita entre traslado propio o «Necesito flete»;
+   - lista de transportistas compatibles con ambas puntas;
+   - comparación de vehículo, capacidad, usos permitidos, cobertura y
+     declaración de habilitación, sin exponer contacto todavía;
+   - selección de una opción;
+   - contacto visible después de seleccionar;
+   - confirmación de la compra del producto y aviso claro de que precio y
+     coordinación del flete se acuerdan directamente.
+
+### Actual versus propuesta
+
+El prototipo puede probar campos nuevos, pero debe distinguirlos visualmente y
+en una nota final:
+
+- **ya existe:** localidad, descripción libre del transporte, capacidad libre,
+  declaración/detalle de habilitación, radio, compatibilidad geográfica,
+  selección y contacto posterior;
+- **propuesta para validar:** marca/modelo, dominio separado y categorías de
+  cargas permitidas.
+
+No presentes esos tres campos como terminados ni modifiques el esquema para
+soportarlos.
+
+### Criterios de aceptación
+
+1. Ambos recorridos se completan por separado y pueden reiniciarse sin recargar.
+2. Cada paso muestra contexto suficiente para entender qué se decide y por qué.
+3. La opción propia no obliga a elegir transportista; la opción con flete no
+   avanza sin una selección compatible.
+4. Ningún texto promete precio, pago, reserva, verificación oficial o
+   contratación dentro de TopGreen.
+5. La revisión funciona a 1440×900 y 390×844 sin corte horizontal, conserva
+   foco visible y no arroja errores de consola.
+6. Entregá un commit del prototipo y otro con informe en `PARA-PM.md`: enlace
+   local exacto, mapa de pantallas, campos actuales/propuestos y decisiones que
+   Emi tiene que tomar. No corras la suite de producto: no debe haber producto
+   modificado.
+
+Ahí volvés a PM. No conviertas ninguna conclusión del prototipo en código real
+sin una aprobación nueva.

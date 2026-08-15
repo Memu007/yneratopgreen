@@ -5,6 +5,22 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-15 — La simulación logística no amplía silenciosamente el MVP
+
+Emi pidió revisar por separado el alta de quien ofrece logística y el camino de
+quien necesita contratarla. Se aprueba un prototipo UX aislado antes de la
+firma porque el recorrido es crítico; no se habilita todavía una función nueva
+en producto.
+
+La simulación debe respetar el alcance vigente: TopGreen lista transportistas
+compatibles, permite seleccionar y luego revela contacto. No cotiza, cobra,
+reserva ni hace seguimiento del flete. Llamar a eso «contratación dentro de la
+plataforma» sería prometer una función inexistente y fuera del MVP actual.
+
+Marca/modelo, dominio separado y categorías de carga se prueban como propuesta
+UX porque Emi los considera importantes. Se distinguen de los campos existentes
+y sólo pasan al producto con una decisión posterior de alcance.
+
 ## 2026-08-14 — Antes de la firma no se abre otra función
 
 La Dev termina únicamente la tarea activa de documentación revisada de
