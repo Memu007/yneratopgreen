@@ -4,15 +4,14 @@ Actualizado: 2026-08-14.
 
 ## Relevo inmediato — leer primero
 
-- GitHub: MP-D quedó documentado hasta `e28446b` y la cortesía de vendedores se
-  decidió en `4cf40eb`. La PM sólo debe editar `docs/pm/` y debe contrastar el
-  commit actual al ponerse al día.
-- Cronograma: viernes 14/08, inicio de semana contractual 2, todavía Fase 1.
-  El producto está adelantado en Fase 4 por decisión explícita, sin habilitar
-  producción ni cambiar el calendario contractual.
-- Firma: Emi informó que probablemente ocurra el viernes 21/08. Es una fecha
-  posible, no confirmada: no reanclar todavía. Si ese día queda confirmado como
-  firma y comienzo, recalcular el cuadro completo en un único cambio.
+- GitHub: MP-D quedó documentado hasta `e28446b`, la cortesía de vendedores se
+  asignó en `5ee2170` y el orden previo a la firma en `50dd989`. Este cambio
+  reancla el cronograma. La PM sólo debe editar `docs/pm/` y contrastar el commit
+  actual al ponerse al día.
+- Cronograma: viernes 14/08, preparación previa. La clienta dio el OK comercial
+  y la firma legal quedó programada para el viernes 21/08, nueva ancla de la
+  semana 1. Las doce semanas cierran el 12/11 y el colchón el 26/11. El producto
+  está adelantado en Fase 4 sin habilitar producción ni el hito final.
 - Orden acordado: la Dev termina sólo la documentación manual de vendedores y
   después no abre otra función antes de la firma. PM puede relevar UX sin
   implementar y hacer una única prueba MP con sesiones aisladas. Tras la firma:
@@ -440,7 +439,7 @@ después por este archivo.
 
 Lo que no cambia con el relevo, y es lo importante:
 
-- **El calendario del PDF, que arranca mañana viernes 07/08.** Ver
+- **El calendario del PDF, reanclado al viernes 21/08.** Ver
   `CRONOGRAMA.md`.
 - **Todo lo que está en `DECISIONS.md` sigue decidido.** Discutirlo se
   puede; cambiarlo es decisión de Emi.
@@ -485,16 +484,15 @@ el compromiso escrito con la clienta. Están ancladas a fechas reales en
 
 | Fase | Semanas | Desde | Hasta |
 |---|---|---|---|
-| 1 — Diseño y UX/UI | 1–2 | 07/08 | 20/08 |
-| 2 — Desarrollo base | 3–5 | 21/08 | 10/09 |
-| 3 — Buscador y catálogo | 6–8 | 11/09 | 01/10 |
-| 4 — Pagos y checkout | 9–10 | 02/10 | 15/10 |
-| 5 — QA y lanzamiento | 11–12 | 16/10 | 29/10 |
+| 1 — Diseño y UX/UI | 1–2 | 21/08 | 03/09 |
+| 2 — Desarrollo base | 3–5 | 04/09 | 24/09 |
+| 3 — Buscador y catálogo | 6–8 | 25/09 | 15/10 |
+| 4 — Pagos y checkout | 9–10 | 16/10 | 29/10 |
+| 5 — QA y lanzamiento | 11–12 | 30/10 | 12/11 |
 
-**Hoy es lunes 2026-08-10 y estamos en la semana 1.** Emi confirmó que la
-semana 1 comenzó el **viernes 2026-08-07** y que cada semana corre de
-viernes a jueves. Las doce semanas cierran el **2026-10-29** y el colchon
-llega al **2026-11-12**.
+**Este bloque se escribió antes del reanclaje.** La fecha vigente está en
+`CRONOGRAMA.md`: semana 1 desde el **viernes 2026-08-21**, cierre de doce
+semanas el **2026-11-12** y colchón hasta el **2026-11-26**.
 
 **El PDF original lo tiene Emi, fuera del repositorio**, porque incluye
 montos y forma de pago. Lo versionado y suficiente para trabajar son la
@@ -678,8 +676,8 @@ así se detectó. Los números fijos envejecen mal.
 
 ## Bloqueos y pendientes
 
-- ~~**Fecha de inicio pendiente.**~~ **Resuelto el 2026-08-05:** semana 1
-  comienza el viernes 2026-08-07.
+- ~~**Fecha de inicio pendiente.**~~ **Reemplazada el 2026-08-14:** semana 1
+  comienza con la firma legal programada para el viernes 2026-08-21.
 - ~~**Tratamiento de suscripciones pendiente.**~~ **Resuelto el
   2026-08-05:** suscripciones, planes, mensajeria y tierras van a Fase 6,
   despues del MVP contractual.

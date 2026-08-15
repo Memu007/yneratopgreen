@@ -42,8 +42,9 @@ La forma más rápida de perder tiempo acá es reabrirlas.
 3. **Lo que figura en `DECISIONS.md` está decidido.** Podés discutirlo —te
    invito a hacerlo— pero cambiarlo es una decisión de Emi, no tuya ni mía.
 
-**El reloj arranca mañana, viernes 07/08.** Hoy es jueves 06/08: es el
-último día de preparación.
+**El reloj contractual arranca con la firma programada para el viernes
+21/08.** La clienta dio el OK comercial el 14/08; el trabajo anterior es
+adelanto y no consume semanas.
 
 ---
 
@@ -134,22 +135,23 @@ clienta al final. Pedíselo a él si querés leerlo entero.
 
 | Fase | Contenido según el PDF | Semanas | Desde | Hasta |
 |---|---|---|---|---|
-| 1 — Diseño y UX/UI | Pantallas y flujos de comprador, vendedor y logística | 1–2 | **07/08** | **20/08** |
-| 2 — Desarrollo base | Arquitectura, base, registro de roles y perfiles | 3–5 | 21/08 | 10/09 |
-| 3 — Buscador y catálogo | Motor de búsqueda y **geolocalización de fletes** | 6–8 | 11/09 | 01/10 |
-| 4 — Pagos y checkout | Mercado Pago y validación de transferencias | 9–10 | 02/10 | 15/10 |
-| 5 — QA y lanzamiento | Pruebas, carga inicial y **despliegue en producción** | 11–12 | 16/10 | 29/10 |
+| 1 — Diseño y UX/UI | Pantallas y flujos de comprador, vendedor y logística | 1–2 | **21/08** | **03/09** |
+| 2 — Desarrollo base | Arquitectura, base, registro de roles y perfiles | 3–5 | 04/09 | 24/09 |
+| 3 — Buscador y catálogo | Motor de búsqueda y **geolocalización de fletes** | 6–8 | 25/09 | 15/10 |
+| 4 — Pagos y checkout | Mercado Pago y validación de transferencias | 9–10 | 16/10 | 29/10 |
+| 5 — QA y lanzamiento | Pruebas, carga inicial y **despliegue en producción** | 11–12 | 30/10 | 12/11 |
 
-**Ancla:** Emi confirmó el 2026-08-05 que la **semana 1 empieza el viernes
-2026-08-07**. Cada semana corre de viernes a jueves.
+**Ancla:** Emi confirmó el 2026-08-14 el OK comercial y la firma programada: la
+**semana 1 empieza el viernes 2026-08-21**. Cada semana corre de viernes a
+jueves. Reemplaza el ancla provisoria del 07/08.
 
-**Plazo: 12 a 14 semanas.** Las doce cierran el **29/10**; el colchón que el
-propio PDF concede llega al **12/11**. Ese colchón es la única holgura que
+**Plazo: 12 a 14 semanas.** Las doce cierran el **12/11**; el colchón que el
+propio PDF concede llega al **26/11**. Ese colchón es la única holgura que
 existe: **gastarlo es una decisión, no un accidente**, y cada corrimiento se
 anota en `CRONOGRAMA.md` con su motivo.
 
 **Garantía:** 90 días desde el lanzamiento. Sobre la fecha de doce semanas,
-hasta el **2027-01-27**.
+hasta el **2027-02-10**.
 
 ### Los tres hitos de cobro
 
@@ -177,7 +179,7 @@ con su fecha y su motivo.
 
 | Decisión | Cuándo | En una línea |
 |---|---|---|
-| Inicio del plazo | 05/08 | Semana 1 desde el viernes 07/08 |
+| Inicio del plazo | 14/08 | Semana 1 desde la firma programada para el viernes 21/08 |
 | Suscripciones, planes, mensajería y tierras | 05/08 | **Van a Fase 6, después del lanzamiento.** No compiten con las fases 1 a 5 |
 | "Registro con validación" | 05/08 | Es **por correo**: enlace de un solo uso, 24 h, reenvío, login bloqueado hasta verificar |
 | Hosting | 05/08 | **Railway**, aprobado. Configuración no cuenta como despliegue |

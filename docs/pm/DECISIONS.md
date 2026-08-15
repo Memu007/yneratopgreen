@@ -23,10 +23,11 @@ Mercado Pago se prueba temprano porque es el mayor riesgo externo, pero no se
 activa ni presenta como terminado antes de su fase. No se posterga su primera
 prueba hasta el final y tampoco se usa el adelanto para regalar alcance.
 
-La posible firma del viernes 2026-08-21 **todavía no cambia el ancla**. Si se
-confirma que firma y comienzo contractual ocurren ese día, PM reancla el cuadro
-completo recién entonces; hasta esa confirmación se conserva el cronograma
-vigente.
+La clienta dio el OK comercial en reunión y la firma legal quedó programada
+para el viernes 2026-08-21. Ese día es la nueva ancla de la semana 1 y
+reemplaza la fecha provisoria del 07/08. Las doce semanas cierran el 12/11 y el
+colchón de catorce el 26/11. Hasta la firma termina la tarea activa, pero no se
+abre alcance nuevo que pueda verse afectado por la redacción legal final.
 
 ## 2026-08-14 — Cortesía de cierre: documentación de vendedores revisada
 

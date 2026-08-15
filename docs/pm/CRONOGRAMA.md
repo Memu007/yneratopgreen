@@ -14,17 +14,14 @@ hay que corregir el plan interno.
 
 ## 1. El ancla
 
-El PDF numera semanas, no fechas. Emi confirmo el ancla comercial el
-2026-08-05.
+El PDF numera semanas, no fechas. El 2026-08-14 Emi confirmó el OK comercial
+dado por la clienta en reunión y la firma legal programada para el viernes
+2026-08-21.
 
-**Ancla aprobada: viernes 2026-08-07 = primer dia de la semana 1.** Cada
-semana corre de viernes a jueves. Las fechas anteriores corresponden a
-trabajo previo y no consumen el plazo contractual.
-
-**Firma posterior posible, todavía no confirmada:** Emi informó el 14/08 que el
-contrato probablemente se firme el viernes 21/08. No se cambian fechas por una
-expectativa. Si firma y comienzo quedan confirmados para ese día, PM reancla
-todas las semanas en un único cambio; no mezcla el cuadro anterior con el nuevo.
+**Ancla confirmada: viernes 2026-08-21 = primer día de la semana 1.** Cada
+semana corre de viernes a jueves. El trabajo anterior es adelanto previo y no
+consume el plazo contractual. Esta ancla reemplaza la del 07/08 registrada el
+05/08, cuando la fecha de firma todavía no estaba cerrada.
 
 ---
 
@@ -32,29 +29,28 @@ todas las semanas en un único cambio; no mezcla el cuadro anterior con el nuevo
 
 | Fase | Contenido según el PDF | Semanas | Desde | Hasta |
 |---|---|---|---|---|
-| 1 — Diseño y UX/UI | Pantallas, flujo de comprador, vendedor y logística | 1–2 | 07/08 | 20/08 |
-| 2 — Desarrollo base | Arquitectura, base de datos, registro de roles y perfiles | 3–5 | 21/08 | 10/09 |
-| 3 — Buscador y catálogo | Motor de búsqueda y **módulo de geolocalización de fletes** | 6–8 | 11/09 | 01/10 |
-| 4 — Pagos y checkout | Mercado Pago y validación de transferencias | 9–10 | 02/10 | 15/10 |
-| 5 — QA y lanzamiento | Pruebas, usabilidad, carga inicial, **despliegue en producción** | 11–12 | 16/10 | 29/10 |
+| 1 — Diseño y UX/UI | Pantallas, flujo de comprador, vendedor y logística | 1–2 | 21/08 | 03/09 |
+| 2 — Desarrollo base | Arquitectura, base de datos, registro de roles y perfiles | 3–5 | 04/09 | 24/09 |
+| 3 — Buscador y catálogo | Motor de búsqueda y **módulo de geolocalización de fletes** | 6–8 | 25/09 | 15/10 |
+| 4 — Pagos y checkout | Mercado Pago y validación de transferencias | 9–10 | 16/10 | 29/10 |
+| 5 — QA y lanzamiento | Pruebas, usabilidad, carga inicial, **despliegue en producción** | 11–12 | 30/10 | 12/11 |
 
-**Hoy es viernes 2026-08-14: semana 2, día 1.** La puerta de Fase 1 se cerró de
-forma anticipada; el ensayo Railway es evidencia temprana de Fase 5, no un
-despliegue productivo ni un adelanto del hito final.
+**Hoy es viernes 2026-08-14: preparación previa a la semana 1.** La puerta de
+Fase 1 se cerró anticipadamente; el ensayo Railway es evidencia temprana de
+Fase 5, no un despliegue productivo ni un adelanto del hito final.
 
 ### El colchón de dos semanas
 
 El PDF dice **"12 a 14 semanas"**. Las doce llegan al **jueves
-2026-10-29**; las catorce, al **jueves 2026-11-12**.
-
-Ese colchón es de la propuesta, no un invento nuestro, y es la única
+2026-11-12** y las catorce al **jueves
+2026-11-26**. Ese colchón es de la propuesta, no un invento nuestro, y es la única
 holgura que existe. **Gastarlo es una decisión, no un accidente**: cada
 semana que se corre hay que registrarla acá con el motivo.
 
 ### Garantía
 
 90 días de soporte por errores, **contados desde el lanzamiento**. Sobre
-la fecha de doce semanas, corre hasta el **2027-01-27**. Todo lo que se
+la fecha de doce semanas, corre hasta el **2027-02-10**. Todo lo que se
 despliegue con un agujero se arregla gratis, con urgencia, dentro de esa
 ventana.
 
@@ -115,7 +111,7 @@ Contraste fase por fase, contra lo verificado en `MATRIZ.md`:
 Una fase no se cierra por fecha ni por porcentaje. Se cierra cuando toda su
 puerta tiene evidencia reproducible.
 
-### Fase 1 - hasta el 20/08
+### Fase 1 - hasta el 03/09
 
 - Flujo de comprador: registro, busqueda, detalle, carrito, checkout e
   historial.
@@ -127,7 +123,7 @@ puerta tiene evidencia reproducible.
 **Limite:** se cierra el diseño y navegacion. No exige que las Piezas B/C de
 logistica ya esten implementadas.
 
-### Fase 2 - hasta el 10/09
+### Fase 2 - hasta el 24/09
 
 - Arquitectura reproducible, PostgreSQL + PostGIS, migraciones y seed.
 - Comprador y vendedor registrados con validacion de correo electronico.
@@ -137,7 +133,7 @@ logistica ya esten implementadas.
 
 **Limite:** no incluye todavia el algoritmo de coincidencia ni pagos.
 
-### Fase 3 - hasta el 01/10
+### Fase 3 - hasta el 15/10
 
 - Las cinco familias del catalogo estan navegables.
 - Busqueda por categoria y ubicacion, verificada de punta a punta.
@@ -149,7 +145,7 @@ logistica ya esten implementadas.
 
 **Limite:** directorio, no ruteo; capacidad informativa, no motor por peso.
 
-### Fase 4 - hasta el 15/10
+### Fase 4 - hasta el 29/10
 
 - Checkout Pro de Mercado Pago para las compras: cada vendedor vincula su
   cuenta por OAuth, cobra directo y TopGreen aplica comisión de marketplace
@@ -162,7 +158,7 @@ logistica ya esten implementadas.
 **Limite:** las suscripciones no pertenecen a esta fase contractual aunque
 usen Mercado Pago.
 
-### Fase 5 - hasta el 29/10
+### Fase 5 - hasta el 12/11
 
 - Suite integral desde base limpia, responsive y usabilidad verificados.
 - `npm run lint` cerrado y finales de línea normalizados mediante una política
@@ -192,7 +188,7 @@ usen Mercado Pago.
 - 12/08: logística A–C y demostración conjunta aceptadas; hito intermedio
   habilitado. La aritmética monetaria también cerró; antes de abrir Mercado
   Pago, la Dev contrasta sin código el flujo de cobro directo por vendedor.
-- 21/08: entrar a Fase 2 con la puerta de Fase 1 cerrada o con desvio
+- 04/09: entrar a Fase 2 con la puerta de Fase 1 cerrada o con desvio
   explicito.
 
 Los limites funcionales completos estan en `ALCANCE-Y-LIMITES.md`.
@@ -202,7 +198,7 @@ Los limites funcionales completos estan en `ALCANCE-Y-LIMITES.md`.
 ## 6. Decisión de plazo y alcance posterior
 
 - Trabajo contractual restante estimado: **7 a 9 semanas**.
-- Plazo contractual desde el 07/08: **12 semanas**, 14 con contingencia.
+- Plazo contractual desde el 21/08: **12 semanas**, 14 con contingencia.
 - El trabajo previo deja margen, pero no habilita ampliar el MVP.
 
 Emi decidio el 2026-08-05 que **primero se cumple entero el cronograma del
