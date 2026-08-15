@@ -1,20 +1,21 @@
 # Estado actual
 
-Actualizado: 2026-08-14.
+Actualizado: 2026-08-15.
 
 ## Relevo inmediato — leer primero
 
-- GitHub: MP-D quedó documentado hasta `e28446b`, la cortesía de vendedores se
-  asignó en `5ee2170` y el orden previo a la firma en `50dd989`. Este cambio
-  reancla el cronograma. La PM sólo debe editar `docs/pm/` y contrastar el commit
-  actual al ponerse al día.
+- GitHub: la Dev entregó la cortesía documental en `b8fee0e` e informó en
+  `0c368c7`. La primera revisión PM conserva la base pero no la acepta todavía:
+  vuelve por dos bordes acotados, documentados al final de `PARA-DEV.md`. La PM
+  sólo debe editar `docs/pm/` y contrastar el commit actual al ponerse al día.
 - Cronograma: viernes 14/08, preparación previa. La clienta dio el OK comercial
   y la firma legal quedó programada para el viernes 21/08, nueva ancla de la
   semana 1. Las doce semanas cierran el 12/11 y el colchón el 26/11. El producto
   está adelantado en Fase 4 sin habilitar producción ni el hito final.
-- Orden acordado: la Dev termina sólo la documentación manual de vendedores y
-  después no abre otra función antes de la firma. PM puede relevar UX sin
-  implementar y hacer una única prueba MP con sesiones aisladas. Tras la firma:
+- Orden acordado: la Dev cierra sólo los dos bordes de la documentación manual
+  de vendedores y después no abre otra función antes de la firma. PM puede
+  relevar UX sin implementar y hacer una única prueba MP con sesiones aisladas.
+  Tras la firma:
   UX de recorridos principales, pulido de logística, hito intermedio, pagos en
   su fase y finalmente seguridad, responsive, QA, producción y capacitación.
 - Avance estimado: MVP **~89 %**; pagos **~85 %**. Código MP-A/B/C aceptado;
@@ -41,10 +42,11 @@ Actualizado: 2026-08-14.
   de credenciales; el ensayo fallido cambió ambas cuentas en el mismo perfil
   del navegador. Si falla también aislado, capturar la actividad de la cuenta
   MP y recién entonces decidir una devolución a Dev.
-- Dev: **tarea activa única**, esfuerzo Alto: documentación manual de vendedores
-  como cortesía de primera clienta, con orden completa en `PARA-DEV.md`. Es
-  independiente de MP-D y no bloquea publicaciones, pagos ni el cronograma.
-  Mercado Pago sólo vuelve a Dev si el ensayo aislado aporta un defecto propio
+- Dev: **tarea activa única**, esfuerzo Alto: cerrar aprobación obsoleta tras
+  reemplazo y rechazar una carpeta documental ubicada dentro del árbol público
+  de uploads. Producto `b8fee0e`, informe `0c368c7`; PM obtuvo build, sintaxis y
+  `diff --check` verdes, pero Docker apagado impidió repetir 108/108. Mercado
+  Pago sólo vuelve a Dev si el ensayo aislado aporta un defecto propio
   reproducible.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden

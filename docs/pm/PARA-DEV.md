@@ -2488,3 +2488,39 @@ corré accesibilidad y contraste en las vistas nuevas o modificadas, en ambas
 medidas. Entregá commit de producto y luego informe separado en `PARA-PM.md`,
 con inventario de datos guardados, permisos, archivos eliminados y pruebas.
 Ahí volvés a PM; no abras otra mejora.
+
+## 2026-08-15 — Primera revisión PM de `b8fee0e`: base conforme, dos cierres
+
+La pieza no queda aceptada todavía. Se conservan el modelo informativo, los
+permisos, el almacenamiento privado, la interfaz, el distintivo exacto y los
+casos 101–108. PM obtuvo build, sintaxis de Python y guiones y `diff --check`
+verdes; Docker continúa apagado, por lo que 108/108 y las demás puertas siguen
+siendo evidencia informada por vos.
+
+Corregí únicamente estos dos bordes:
+
+1. **Una decisión puede aprobar un archivo que el administrador nunca vio.**
+   La fila y su `id` sobreviven al reemplazo. Si administración abre la cola o
+   el PDF A, el titular lo reemplaza por B y luego se aprueba usando el mismo
+   `documentacion_id`, la ruta actual aprueba B aunque la persona revisó A.
+   La decisión debe llevar un discriminante de la presentación que se mostró
+   —el `presentado_el` que ya devuelve la cola alcanza si se compara de forma
+   exacta— y responder 409 si la presentación cambió. La aprobación vigente no
+   debe cambiar, no debe auditarse una revisión y el distintivo debe seguir
+   apagado hasta recargar la cola y revisar la presentación actual. No expongas
+   `archivo_ruta` ni agregues historial de PDFs.
+2. **La privacidad depende hoy de escribir bien una variable.**
+   Los ejemplos separan `DOCUMENTOS_DIR` de `UPLOAD_DIR`, pero la configuración
+   acepta que sean iguales o que documentos quede dentro del árbol servido en
+   `/uploads`. En ese caso una constancia pasa a ser pública sin que el código
+   falle. Hacé que la aplicación rechace al arrancar, con mensaje accionable,
+   todo `DOCUMENTOS_DIR` que resuelto sea igual a `UPLOAD_DIR` o descendiente
+   suyo. Conservá los valores actuales de desarrollo y producción.
+
+Agregá una regresión discriminante por punto, roja contra `b8fee0e`: decisión
+con versión vieja después de un reemplazo, y arranque/configuración con carpeta
+privada dentro de uploads. Después dejá verdes los casos 101–108 y las nuevas.
+Corré suite completa, build, migración ida/vuelta con datos, `alembic check` y
+`diff --check`; accesibilidad y contraste no hace falta repetirlos si el DOM no
+cambia. Entregá producto e informe separados. Esfuerzo **Alto**; no abras otra
+función, MP-D ni Railway.
