@@ -2628,3 +2628,40 @@ soportarlos.
 
 Ahí volvés a PM. No conviertas ninguna conclusión del prototipo en código real
 sin una aprobación nueva.
+
+## 2026-08-15 — Primera revisión PM de `8002fea`: prototipo conforme, recorrido de alta bloqueado
+
+La entrega todavía no queda aceptada. El recorrido comprador sí fue reproducido
+completo: cambia de cuatro a cinco pasos al pedir flete, no avanza sin elegir,
+mantiene oculto el contacto hasta la selección y cierra sin prometer cotización,
+pago, reserva ni seguimiento. El alcance aislado y la separación entre campos
+actuales y propuestos también quedan conformes.
+
+Hay un defecto bloqueante y discriminante en el alta. En **Capacidad de carga**,
+escribí `Hasta 30 toneladas` y hacé clic inmediatamente en **Siguiente**: el
+valor se borra, aparece «Escribí tu capacidad de carga» y el recorrido queda en
+el paso 4. PM lo reprodujo con escritura normal, con `fill` y también saliendo
+del campo con Tab. Por lo tanto contradice la comprobación informada y también
+la corrección de clic perdido descripta en `PARA-PM.md`.
+
+La causa está acotada: los campos de texto ordinarios guardan en `datos` sólo
+por `change`; el manejador `input` sincroniza únicamente el campo que lleva
+`data-pista`. Cuando la validación redibuja desde el estado todavía viejo,
+vacía el DOM. Corregí sólo la sincronización inmediata de estado para todos los
+textos, números y textarea, sin volver a redibujar en cada tecla. Conservá el
+tratamiento actual de radios, checks y selects.
+
+### Criterios de cierre
+
+1. Marca/modelo, dominio, capacidad, detalle de habilitación y radio conservan
+   lo escrito aunque se pulse **Siguiente** sin desenfocar antes.
+2. El primer clic avanza cuando el campo obligatorio es válido y el resumen
+   final conserva exactamente esos valores.
+3. Ambos recorridos siguen completos; «por mi cuenta», selección/contacto y los
+   límites de producto no cambian.
+4. Repetí la acción exacta en 1440×900 y 390×844 y comprobá consola y corte
+   horizontal. No hace falta correr la suite de producto.
+5. Un commit mínimo del prototipo y otro del informe corregido. No toques
+   `src/`, backend, dependencias ni conviertas propuestas en producto.
+
+Ahí volvés a PM. No abras otra pieza.

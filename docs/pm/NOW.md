@@ -41,11 +41,12 @@ Actualizado: 2026-08-15.
   de credenciales; el ensayo fallido cambió ambas cuentas en el mismo perfil
   del navegador. Si falla también aislado, capturar la actividad de la cuenta
   MP y recién entonces decidir una devolución a Dev.
-- Dev: **tarea activa única**, esfuerzo Alto: prototipo aislado de los dos
-  recorridos logísticos —alta del transportista y selección/contacto desde la
-  compra—, con orden al final de `PARA-DEV.md`. No toca producto ni inventa
-  cotización o pago del flete. Mercado Pago sólo vuelve a Dev si el ensayo
-  aislado aporta un defecto propio reproducible.
+- Dev: **tarea activa única**, esfuerzo Alto: corrección mínima del prototipo
+  aislado de logística. `8002fea` queda sin aceptar porque los campos de texto
+  no sincronizan el estado antes del primer clic; «Capacidad de carga» se borra
+  y bloquea el alta. El recorrido comprador y los límites del MVP sí quedaron
+  conformes. La orden discriminante está al final de `PARA-DEV.md`; no toca
+  producto, Mercado Pago ni Railway.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -53,6 +54,13 @@ Actualizado: 2026-08-15.
   `railway down` como rollback ni `restart` durante un despliegue.
 
 ## Entrega aceptada y tarea actual
+
+El prototipo logístico `8002fea` y su informe `aef145d` están **en revisión, no
+aceptados**. PM completó el recorrido comprador y confirmó selección, contacto
+posterior y cierre sin falsa contratación. El alta queda bloqueada en capacidad:
+escribir y pulsar Siguiente sin desenfocar borra el valor porque el estado sólo
+se sincroniza por `change`. La Dev tiene una corrección acotada; no se abre
+producto real hasta decidir los tres campos propuestos.
 
 La documentación manual de vendedores queda **aceptada**: producto base
 `b8fee0e`, cierre `9988879` e informe `bbb0d2d`. Es informativa y no bloquea
