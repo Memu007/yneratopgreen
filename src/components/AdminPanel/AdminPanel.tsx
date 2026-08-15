@@ -285,7 +285,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     motivo?: string,
   ) => {
     try {
-      await apiPost(`/admin/documentacion/${fila.id}/decidir`, { decision, motivo });
+      // Va el `presentado_el` **de la fila que se está mirando**, tal como lo
+      // devolvió la cola: es lo que le dice al servidor qué presentación se
+      // revisó. Si el vendedor la reemplazó mientras tanto, contesta 409 en
+      // vez de aprobar un papel que nadie abrió.
+      await apiPost(`/admin/documentacion/${fila.id}/decidir`, {
+        decision,
+        motivo,
+        presentado_el: fila.presentado_el,
+      });
       showToast(
         decision === 'aprobada'
           ? `Documentación de ${fila.user_nombre} aprobada.`

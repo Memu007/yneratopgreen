@@ -52,11 +52,14 @@ function cargarConSettings(contenido) {
   } catch (error) {
     // Del traceback interesa el motivo y la clave culpable, no las capas de
     // Pydantic: si el fallo no dice qué clave sobra, la prueba no sirve.
+    // «Value error» entra en la lista porque es la forma que toma un rechazo
+    // escrito a mano en un validador; sin ella, esos motivos se perdían
+    // enteros y la prueba sólo podía afirmar «no cargó», no por qué.
     const salida = `${error.stdout ?? ''}${error.stderr ?? ''}`;
     const motivo = salida
       .split(/\r?\n/)
       .map((linea) => linea.trim())
-      .filter((linea) => /validation error|Extra inputs|Field required|^[A-Z][A-Z0-9_]*$/.test(linea))
+      .filter((linea) => /validation error|Extra inputs|Field required|Value error|^[A-Z][A-Z0-9_]*$/.test(linea))
       .join(' | ');
     return motivo || salida;
   }
@@ -9689,6 +9692,27 @@ async function segundoVendedor() {
   return state.docSegundo;
 }
 
+// Qué presentación está viendo la cola ahora mismo. Toda decisión viaja con
+// este valor: la fila sobrevive al reemplazo, así que el `id` solo no alcanza
+// para saber qué papel se revisó.
+async function presentacionEnLaCola(documentacionId, admin) {
+  const cola = await apiRequest('/admin/documentacion', { token: admin });
+  const fila = cola.data.items.find((i) => i.id === documentacionId);
+  assert(fila, `la cola no trae la documentación ${documentacionId}`);
+  return fila.presentado_el;
+}
+
+// Decidir como lo hace la interfaz: primero mira la cola, después decide sobre
+// lo que la cola mostró.
+async function decidirDocumentacion(admin, documentacionId, decision, motivo) {
+  const presentadoEl = await presentacionEnLaCola(documentacionId, admin);
+  return apiRequest(`/admin/documentacion/${documentacionId}/decidir`, {
+    method: 'POST',
+    token: admin,
+    body: { decision, motivo, presentado_el: presentadoEl },
+  });
+}
+
 async function tokenDeAdmin() {
   if (state.docAdminToken) return state.docAdminToken;
   const ingreso = await apiRequest('/auth/login', {
@@ -9745,7 +9769,9 @@ await runCase(101, 'Documentación: nadie lee ni toca la de otro', async () => {
     apiRequest(`/admin/documentacion/${documentacionId}/archivo`, { token: otro.token }));
   const decision = await expectApiError(403, () =>
     apiRequest(`/admin/documentacion/${documentacionId}/decidir`, {
-      method: 'POST', token: otro.token, body: { decision: 'aprobada' },
+      method: 'POST',
+      token: otro.token,
+      body: { decision: 'aprobada', presentado_el: new Date().toISOString() },
     }));
   assert(/administradores/i.test(cola), `motivo inesperado en la cola: ${cola}`);
 
@@ -9833,9 +9859,7 @@ await runCase(103, 'Documentación: aprobar enciende el distintivo, y sólo el d
   assert(antes.data.seller.documentacion_revisada === false,
     'el distintivo ya estaba encendido con la documentación pendiente');
 
-  const decidida = await apiRequest(`/admin/documentacion/${documentacionId}/decidir`, {
-    method: 'POST', token: admin, body: { decision: 'aprobada' },
-  });
+  const decidida = await decidirDocumentacion(admin, documentacionId, 'aprobada');
   assert(decidida.data.estado === 'aprobada', `quedó en «${decidida.data.estado}»`);
 
   const enLaBase = documentacionDe(state.sellerId);
@@ -9875,17 +9899,13 @@ await runCase(104, 'Documentación: el rechazo exige motivo y se puede corregir'
   const documentacionId = idDeLaDocumentacion(otro.id);
 
   const sinMotivo = await expectApiError(400, () =>
-    apiRequest(`/admin/documentacion/${documentacionId}/decidir`, {
-      method: 'POST', token: admin, body: { decision: 'rechazada' },
-    }));
+    decidirDocumentacion(admin, documentacionId, 'rechazada'));
   assert(/motivo/i.test(sinMotivo), `no explica que falta el motivo: ${sinMotivo}`);
   assert(documentacionDe(otro.id).estado === 'PENDIENTE',
     'el rechazo sin motivo igual cambió el estado');
 
   const motivo = 'La constancia está vencida: subí una emitida este año.';
-  await apiRequest(`/admin/documentacion/${documentacionId}/decidir`, {
-    method: 'POST', token: admin, body: { decision: 'rechazada', motivo },
-  });
+  await decidirDocumentacion(admin, documentacionId, 'rechazada', motivo);
 
   // El titular ve el motivo, y no ve quién decidió.
   const mia = await apiRequest('/documentacion', { token: otro.token });
@@ -9964,12 +9984,13 @@ await runCase(106, 'Documentación: dos decisiones a la vez dejan una sola', asy
 
   // Las dos a la vez de verdad, no una después de la otra: es lo que pasa
   // cuando dos personas miran la misma cola abierta.
+  const presentadoEl = await presentacionEnLaCola(documentacionId, admin);
   const decidir = (decision, motivo) => fetch(
     `${API_URL}/admin/documentacion/${documentacionId}/decidir`,
     {
       method: 'POST',
       headers: { Authorization: `Bearer ${admin}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ decision, motivo }),
+      body: JSON.stringify({ decision, motivo, presentado_el: presentadoEl }),
     },
   ).then(async (r) => ({ status: r.status, cuerpo: await r.text() }));
 
@@ -10093,9 +10114,7 @@ await runCase(107, 'Documentación: publicar y vender funcionan en los cuatro es
 
   // 3. Aprobada.
   const suId = idDeLaDocumentacion(vendedora.id);
-  await apiRequest(`/admin/documentacion/${suId}/decidir`, {
-    method: 'POST', token: admin, body: { decision: 'aprobada' },
-  });
+  await decidirDocumentacion(admin, suId, 'aprobada');
   await publicarYVender('aprobada');
 
   // 4. Rechazada.
@@ -10103,10 +10122,7 @@ await runCase(107, 'Documentación: publicar y vender funcionan en los cuatro es
     token: vendedora.token, cuit: CUIT_TERCERO, razonSocial: 'Cuatro Estados SA',
     archivo: pdfDePrueba('para rechazar'),
   });
-  await apiRequest(`/admin/documentacion/${suId}/decidir`, {
-    method: 'POST', token: admin,
-    body: { decision: 'rechazada', motivo: 'Falta el sello de la constancia.' },
-  });
+  await decidirDocumentacion(admin, suId, 'rechazada', 'Falta el sello de la constancia.');
   await publicarYVender('rechazada');
 
   assert(resultados.length === 4, `se midieron ${resultados.length} estados y son cuatro`);
@@ -10198,10 +10214,9 @@ await runCase(108, 'Documentación: presentar, revisar y ver el distintivo en el
     // Un rechazo primero, para que el motivo se vea en pantalla y no sólo en
     // la API: es lo único accionable que recibe quien presentó.
     const suId = idDeLaDocumentacion(vendedora.id);
-    await apiRequest(`/admin/documentacion/${suId}/decidir`, {
-      method: 'POST', token: admin,
-      body: { decision: 'rechazada', motivo: 'La constancia no tiene el CUIT visible.' },
-    });
+    await decidirDocumentacion(
+      admin, suId, 'rechazada', 'La constancia no tiene el CUIT visible.',
+    );
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.locator('button').filter({ hasText: '👤' }).first().click();
     await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor({ timeout: 15_000 });
@@ -10302,6 +10317,129 @@ await runCase(108, 'Documentación: presentar, revisar y ver el distintivo en el
   return 'presentó desde el panel (pendiente), vio el motivo del rechazo como aviso, '
     + `corrigió; la cola abrió el PDF con sesión (HTTP ${observado.pdfHttp}) y aprobó; `
     + 'el detalle muestra «Documentación revisada» sin CUIT, razón social ni archivo';
+});
+
+await runCase(109, 'Documentación: no se aprueba un papel que nadie abrió', async () => {
+  const admin = await tokenDeAdmin();
+
+  // Cuenta propia del caso: hace falta una presentación pendiente y sin
+  // historia, y las de los casos anteriores ya pasaron por decisiones.
+  const credenciales = {
+    email: `smoke.doc.reemplazo.${Date.now()}@example.com`,
+    password: 'smokedoc123',
+    full_name: 'Vendedora Reemplazo',
+    phone: '+54 11 5555 1111',
+    role: 'user',
+  };
+  await registrarYVerificar(credenciales);
+  const ingreso = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email: credenciales.email, password: credenciales.password },
+  });
+  const vendedora = { token: ingreso.data.access_token, id: ingreso.data.user.id };
+
+  // A: lo que administración abre y mira.
+  await presentarDocumentacion({
+    token: vendedora.token, cuit: CUIT_TERCERO, razonSocial: 'Reemplazo SA',
+    archivo: pdfDePrueba('el A, el que se revisa'),
+  });
+  const documentacionId = idDeLaDocumentacion(vendedora.id);
+  const laQueSeRevisa = await presentacionEnLaCola(documentacionId, admin);
+
+  // Y se abre de verdad: éste es el archivo que la persona vio.
+  const abierto = await apiRequest(
+    `/admin/documentacion/${documentacionId}/archivo`, { token: admin },
+  );
+  assert(abierto.status === 200, `abrir el PDF devolvió HTTP ${abierto.status}`);
+  const rutaDeA = documentacionDe(vendedora.id).ruta;
+
+  // B: el titular lo reemplaza mientras la cola sigue abierta en la pantalla.
+  await presentarDocumentacion({
+    token: vendedora.token, cuit: CUIT_TERCERO, razonSocial: 'Reemplazo SA',
+    archivo: pdfDePrueba('el B, el que nadie miró'),
+  });
+  const rutaDeB = documentacionDe(vendedora.id).ruta;
+  assert(rutaDeA !== rutaDeB, 'el reemplazo no cambió el archivo: el caso no prueba nada');
+  assert(idDeLaDocumentacion(vendedora.id) === documentacionId,
+    'el reemplazo cambió el id: sin id compartido no hay nada que discriminar');
+
+  const auditoriasAntes = auditoriasDe(documentacionId, 'documentacion_revisada');
+
+  // La aprobación llega con lo que la cola mostraba: la presentación A.
+  const choque = await expectApiError(409, () =>
+    apiRequest(`/admin/documentacion/${documentacionId}/decidir`, {
+      method: 'POST',
+      token: admin,
+      body: { decision: 'aprobada', presentado_el: laQueSeRevisa },
+    }));
+  assert(/reemplaz/i.test(choque), `el 409 no explica el motivo: ${choque}`);
+
+  // Nada se movió: ni el estado, ni la auditoría, ni el distintivo.
+  const despues = documentacionDe(vendedora.id);
+  assert(despues.estado === 'PENDIENTE',
+    `la presentación quedó en «${despues.estado}» con una decisión que no correspondía`);
+  assert(!despues.revisor && !despues.revisadoEl,
+    `quedó una revisión registrada: ${JSON.stringify(despues)}`);
+  assert(auditoriasDe(documentacionId, 'documentacion_revisada') === auditoriasAntes,
+    'se auditó una revisión que no ocurrió');
+  const reputacion = await apiRequest(`/ratings/user/${vendedora.id}`);
+  assert(reputacion.data.documentacion_revisada === false,
+    'el distintivo se encendió sobre un papel que nadie abrió');
+
+  // Recargar la cola y revisar la presentación actual sí decide.
+  const buena = await decidirDocumentacion(admin, documentacionId, 'aprobada');
+  assert(buena.data.estado === 'aprobada', `quedó en «${buena.data.estado}»`);
+  assert(documentacionDe(vendedora.id).ruta === rutaDeB,
+    'se aprobó una presentación que ya no era la actual');
+  assert(auditoriasDe(documentacionId, 'documentacion_revisada') === auditoriasAntes + 1,
+    'la aprobación válida no dejó exactamente una transición');
+
+  return 'aprobar con la versión vieja: 409, sin cambiar el estado, sin auditar y sin '
+    + 'distintivo; recargando la cola, la presentación actual se aprueba y deja una '
+    + 'sola transición';
+});
+
+await runCase(110, 'La carpeta de constancias no puede caer adentro de la pública', async () => {
+  // La privacidad de un PDF no puede depender de escribir bien una variable.
+  // Si DOCUMENTOS_DIR queda dentro de UPLOAD_DIR, que se publica entero, las
+  // constancias pasan a ser descargables **sin que el código falle en ningún
+  // lado**: sigue guardando y sirviendo con normalidad. Por eso la aplicación
+  // tiene que negarse a arrancar.
+  const base = readFileSync('backend/.env.example', 'utf8')
+    .replace(/\bCAMBIAR_[A-Z0-9_]+/g, 'valor-de-prueba-para-cargar-settings');
+
+  const casos = [
+    ['la misma carpeta', 'UPLOAD_DIR=uploads\nDOCUMENTOS_DIR=uploads'],
+    ['una subcarpeta', 'UPLOAD_DIR=uploads\nDOCUMENTOS_DIR=uploads/constancias'],
+    ['dando la vuelta con ..', 'UPLOAD_DIR=uploads\nDOCUMENTOS_DIR=documentos/../uploads/privado'],
+    ['con rutas absolutas', 'UPLOAD_DIR=/data/uploads\nDOCUMENTOS_DIR=/data/uploads/docs'],
+  ];
+
+  const rechazos = [];
+  for (const [etiqueta, extra] of casos) {
+    const salida = cargarConSettings(`${base}\n${extra}\n`);
+    assert(!salida.includes('CARGA_OK'),
+      `«${etiqueta}»: la aplicación arrancó con las constancias adentro de lo público`);
+    rechazos.push(etiqueta);
+  }
+
+  // El mensaje tiene que servirle a quien configura, no sólo decir que no.
+  const detalle = cargarConSettings(`${base}\nUPLOAD_DIR=uploads\nDOCUMENTOS_DIR=uploads/constancias\n`);
+  assert(/DOCUMENTOS_DIR/.test(detalle) && /UPLOAD_DIR/.test(detalle),
+    `el rechazo no nombra las dos variables: ${detalle}`);
+
+  // Y las dos plantillas versionadas siguen cargando: la comprobación nueva no
+  // puede romper la configuración que se entrega.
+  for (const plantilla of ['backend/.env.example', 'backend/.env.production.example']) {
+    const contenido = readFileSync(plantilla, 'utf8')
+      .replace(/\b(?:CAMBIAR|GENERAR)_[A-Z0-9_]+/g, 'valor-de-prueba-para-cargar-settings');
+    const salida = cargarConSettings(contenido);
+    assert(salida.includes('CARGA_OK'), `${plantilla} dejó de cargar: ${salida}`);
+  }
+
+  return `${rechazos.length} configuraciones peligrosas rechazadas al arrancar `
+    + `(${rechazos.join(', ')}), con las dos variables nombradas en el motivo, y las `
+    + 'dos plantillas versionadas cargando';
 });
 
 const passed = results.filter((result) => result.passed).length;

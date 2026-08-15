@@ -85,6 +85,13 @@ class ColaDeDocumentacion(BaseModel):
 class Decision(BaseModel):
     decision: str = Field(..., description="aprobada o rechazada")
     motivo: Optional[str] = Field(None, max_length=500)
+    # Cuál presentación se revisó. Es obligatorio y no una comodidad: la fila
+    # sobrevive al reemplazo, así que sin esto una decisión tomada mirando un
+    # PDF puede caer sobre otro que lo reemplazó mientras tanto. Se copia tal
+    # cual lo devuelve la cola.
+    presentado_el: datetime = Field(
+        ..., description="El presentado_el de la presentación que se revisó"
+    )
 
 
 def _mia(documentacion: Optional[DocumentacionDeVendedor]) -> MiDocumentacion:
@@ -396,14 +403,22 @@ def decidir(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
-    """Aprueba o rechaza una presentación pendiente.
+    """Aprueba o rechaza **la presentación que se revisó**, no la que haya.
 
-    Dos administradores decidiendo a la vez es el caso que hay que resolver, no
-    el raro: la cola es compartida y se mira en simultáneo. La fila se toma con
-    `FOR UPDATE`, así que el segundo espera al primero y encuentra un estado
-    que ya no es pendiente; ahí devuelve 409 en vez de pisar la decisión ajena.
-    Sin eso quedarían dos transiciones auditadas para un solo papel y el último
-    en escribir ganaría por azar.
+    Hay dos carreras distintas acá y cada una tiene su respuesta.
+
+    La primera son dos administradores decidiendo a la vez, que es el caso
+    esperable y no el raro: la cola es compartida y se mira en simultáneo. La
+    fila se toma con `FOR UPDATE`, así que el segundo espera al primero y
+    encuentra un estado que ya no es pendiente; ahí devuelve 409 en vez de
+    pisar la decisión ajena.
+
+    La segunda es más silenciosa y es la que arreglan estas líneas: la fila y
+    su `id` **sobreviven al reemplazo**. Alguien abre el PDF A, el titular
+    presenta B mientras tanto, y la aprobación llega con el mismo `id`. Sin un
+    discriminante, aprueba B con la revisión de A: un papel que nadie miró
+    queda aprobado y la auditoría dice que se revisó. Por eso la decisión trae
+    el `presentado_el` que la cola mostró y se compara exacto.
     """
     try:
         decision = EstadoDeDocumentacion(cuerpo.decision.lower())
@@ -435,6 +450,18 @@ def decidir(
     )
     if documentacion is None:
         raise HTTPException(status_code=404, detail="Documentación no encontrada")
+
+    # Antes que el estado: si la presentación cambió, ni siquiera importa en
+    # qué quedó. Lo que se revisó ya no está.
+    if documentacion.presentado_el != cuerpo.presentado_el:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "El vendedor reemplazó su documentación después de que la "
+                "abriste. Actualizá la cola y revisá la presentación actual "
+                "antes de decidir."
+            ),
+        )
 
     if documentacion.estado != EstadoDeDocumentacion.PENDIENTE:
         raise HTTPException(

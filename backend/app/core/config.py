@@ -3,7 +3,7 @@ Configuración de la aplicación usando Pydantic Settings.
 Lee variables de entorno desde backend/.env
 """
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pathlib import Path
 from typing import List
 import os
@@ -192,6 +192,34 @@ class Settings(BaseSettings):
         if not ruta.is_absolute():
             ruta = DIRECTORIO_BACKEND / ruta
         return str(ruta)
+
+    @model_validator(mode="after")
+    def _documentos_fuera_de_lo_publico(self):
+        """La carpeta de constancias no puede caer adentro de la pública.
+
+        `UPLOAD_DIR` se monta **entero** como estático en `/uploads`: todo lo
+        que esté adentro se sirve sin preguntar quién lo pide. Si
+        `DOCUMENTOS_DIR` apunta ahí —o a una subcarpeta suya— las constancias
+        fiscales quedan descargables por cualquiera, y el código no falla en
+        ningún lado: sigue guardando y sirviendo con normalidad.
+
+        Por eso se rechaza al arrancar y no se confía en que la variable esté
+        bien escrita. Una privacidad que depende de no equivocarse al copiar
+        una plantilla no es una privacidad.
+        """
+        publica = Path(self.UPLOAD_DIR).resolve()
+        privada = Path(self.DOCUMENTOS_DIR).resolve()
+
+        if privada == publica or publica in privada.parents:
+            raise ValueError(
+                f"DOCUMENTOS_DIR ({privada}) está dentro de UPLOAD_DIR "
+                f"({publica}), que se publica entero en "
+                f"{self.PUBLIC_UPLOAD_BASE}. Las constancias fiscales quedarían "
+                "descargables por cualquiera. Poné DOCUMENTOS_DIR en una carpeta "
+                "aparte, por ejemplo 'documentos' al lado de 'uploads' o "
+                "/data/documentos junto a /data/uploads."
+            )
+        return self
 
     class Config:
         env_file = str(DIRECTORIO_BACKEND / ".env")
