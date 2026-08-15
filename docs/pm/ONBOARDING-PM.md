@@ -25,6 +25,23 @@ Es el disparador formal de un relevo. No uses como fuente el chat anterior.
 Este procedimiento también está resumido en el `AGENTS.md` de la raíz para que
 una sesión nueva lo encuentre antes de conocer la estructura del proyecto.
 
+### Contexto institucional de Inera
+
+El contexto compartido de la consultora vive en
+<https://github.com/Memu007/ynerasecondbrain>, integrado en `main` el
+2026-08-15 mediante el commit `f34627e`. Sirve para identidad, proyectos y
+reglas transversales; **no reemplaza este onboarding, el contrato, Git ni las
+decisiones locales de TopGreen**.
+
+- Si Emi dice solamente **“ponete al día”**, seguí primero este procedimiento
+  local.
+- Si dice **“ponete al día con Inera”** o pide contexto transversal, leé además
+  `AGENTS.md` y `docs/ONBOARDING.md` del Second Brain mediante un acceso
+  autorizado a GitHub.
+- El puente automático desde el `AGENTS.md` raíz de TopGreen sigue pendiente.
+  Una PM no lo instala: este rol sólo edita `docs/pm/`. Hasta entonces, no
+  afirmes que las reglas de Inera se cargan solas.
+
 ---
 
 ## 0. Lo primero, porque es lo que más cuesta caro

@@ -4,6 +4,12 @@ Actualizado: 2026-08-15.
 
 ## Relevo inmediato — leer primero
 
+- Contexto Inera: el Second Brain institucional quedó integrado en
+  `Memu007/ynerasecondbrain`, `main` `f34627e`, el 2026-08-15. TopGreen sigue
+  siendo la fuente de verdad para contrato, cronograma, estado y tareas. El
+  puente en el `AGENTS.md` raíz está pendiente; una PM no debe instalarlo porque
+  sólo edita `docs/pm/`. Ante “ponete al día con Inera”, consultar además ese
+  repo; ante “ponete al día”, manda el onboarding local.
 - GitHub: la documentación de vendedores quedó aceptada: producto `b8fee0e`,
   cierre `9988879` e informe `bbb0d2d`. Los dos bordes de la primera revisión
   quedaron cerrados. La PM sólo debe editar `docs/pm/` y contrastar el commit
