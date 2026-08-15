@@ -4,16 +4,15 @@ Actualizado: 2026-08-15.
 
 ## Relevo inmediato — leer primero
 
-- GitHub: la Dev entregó la cortesía documental en `b8fee0e` e informó en
-  `0c368c7`. La primera revisión PM conserva la base pero no la acepta todavía:
-  vuelve por dos bordes acotados, documentados al final de `PARA-DEV.md`. La PM
-  sólo debe editar `docs/pm/` y contrastar el commit actual al ponerse al día.
+- GitHub: la documentación de vendedores quedó aceptada: producto `b8fee0e`,
+  cierre `9988879` e informe `bbb0d2d`. Los dos bordes de la primera revisión
+  quedaron cerrados. La PM sólo debe editar `docs/pm/` y contrastar el commit
+  actual al ponerse al día.
 - Cronograma: viernes 14/08, preparación previa. La clienta dio el OK comercial
   y la firma legal quedó programada para el viernes 21/08, nueva ancla de la
   semana 1. Las doce semanas cierran el 12/11 y el colchón el 26/11. El producto
   está adelantado en Fase 4 sin habilitar producción ni el hito final.
-- Orden acordado: la Dev cierra sólo los dos bordes de la documentación manual
-  de vendedores y después no abre otra función antes de la firma. PM puede
+- Orden acordado: la Dev no abre otra función antes de la firma. PM puede
   relevar UX sin implementar y hacer una única prueba MP con sesiones aisladas.
   Tras la firma:
   UX de recorridos principales, pulido de logística, hito intermedio, pagos en
@@ -42,12 +41,11 @@ Actualizado: 2026-08-15.
   de credenciales; el ensayo fallido cambió ambas cuentas en el mismo perfil
   del navegador. Si falla también aislado, capturar la actividad de la cuenta
   MP y recién entonces decidir una devolución a Dev.
-- Dev: **tarea activa única**, esfuerzo Alto: cerrar aprobación obsoleta tras
-  reemplazo y rechazar una carpeta documental ubicada dentro del árbol público
-  de uploads. Producto `b8fee0e`, informe `0c368c7`; PM obtuvo build, sintaxis y
-  `diff --check` verdes, pero Docker apagado impidió repetir 108/108. Mercado
-  Pago sólo vuelve a Dev si el ensayo aislado aporta un defecto propio
-  reproducible.
+- Dev: **sin tarea activa**. La cortesía documental quedó aceptada con 110/110
+  informados; PM reprodujo build, sintaxis, `diff --check` y el rechazo de una
+  carpeta privada dentro del árbol público. Docker apagado impidió repetir la
+  suite y migraciones. Mercado Pago sólo vuelve a Dev si el ensayo aislado
+  aporta un defecto propio reproducible.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -55,6 +53,15 @@ Actualizado: 2026-08-15.
   `railway down` como rollback ni `restart` durante un despliegue.
 
 ## Entrega aceptada y tarea actual
+
+La documentación manual de vendedores queda **aceptada**: producto base
+`b8fee0e`, cierre `9988879` e informe `bbb0d2d`. Es informativa y no bloquea
+registro, publicaciones, checkout ni cobros; sólo una presentación aprobada
+muestra «Documentación revisada». La aprobación obsoleta tras reemplazo queda
+cerrada por versión de presentación y la configuración falla si los PDF caen
+dentro del árbol público. PM obtuvo build y controles estáticos verdes y
+reprodujo el rechazo de configuración; la Dev informa suite 110/110 y
+migraciones verdes. No hay tarea nueva para Dev antes de la firma.
 
 La cobertura accesible de perfiles y administración quedó aceptada el
 2026-08-11: producto `6fd060d`, informe `1f7150f`. La Dev objetó correctamente

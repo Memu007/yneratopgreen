@@ -2524,3 +2524,22 @@ Corré suite completa, build, migración ida/vuelta con datos, `alembic check` y
 `diff --check`; accesibilidad y contraste no hace falta repetirlos si el DOM no
 cambia. Entregá producto e informe separados. Esfuerzo **Alto**; no abras otra
 función, MP-D ni Railway.
+
+## 2026-08-15 — Documentación de vendedores aceptada
+
+Aceptados el producto base `b8fee0e`, el cierre `9988879` y el informe final
+`bbb0d2d`. La decisión identifica obligatoriamente la presentación que la cola
+mostró y una versión vieja recibe 409 sin estado, auditoría ni distintivo. La
+configuración rechaza al arrancar una carpeta documental igual o descendiente
+del árbol público de uploads.
+
+PM verificó el diff, la comparación bajo candado, el rechazo real de una ruta
+peligrosa, la carga de una ruta segura, build, sintaxis y `diff --check`.
+Docker local sigue apagado, por lo que 110/110, migración ida/vuelta y
+`alembic check` son evidencia informada por vos, no repetida por PM. Los casos
+109 y 110 son discriminantes y el DOM no cambió, así que no se repiten las
+puertas visuales.
+
+La cortesía queda cerrada. **No hay tarea activa para Dev antes de la firma.**
+No abras otra función, MP-D ni Railway. Volvés sólo ante una orden nueva de PM
+o si el ensayo externo aislado de Mercado Pago demuestra un defecto propio.
