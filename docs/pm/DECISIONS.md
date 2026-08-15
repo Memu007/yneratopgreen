@@ -5,6 +5,29 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-14 — Antes de la firma no se abre otra función
+
+La Dev termina únicamente la tarea activa de documentación revisada de
+vendedores. Después no se abre otra función de producto hasta que el contrato
+esté firmado. Durante la espera, PM puede relevar UX sin implementar y repetir
+una sola homologación técnica de Mercado Pago con sesiones aisladas; la bandera
+vuelve a quedar apagada.
+
+Después de la firma, el orden interno será: UX de los recorridos principales,
+pulido de logística dentro de esos recorridos, demostración del hito intermedio,
+Mercado Pago en su fase contractual y, al final, seguridad, responsive, QA,
+producción y capacitación. Logística ya está cerrada funcionalmente: sólo un
+defecto reproducible habilita reabrirla antes del pulido.
+
+Mercado Pago se prueba temprano porque es el mayor riesgo externo, pero no se
+activa ni presenta como terminado antes de su fase. No se posterga su primera
+prueba hasta el final y tampoco se usa el adelanto para regalar alcance.
+
+La posible firma del viernes 2026-08-21 **todavía no cambia el ancla**. Si se
+confirma que firma y comienzo contractual ocurren ese día, PM reancla el cuadro
+completo recién entonces; hasta esa confirmación se conserva el cronograma
+vigente.
+
 ## 2026-08-14 — Cortesía de cierre: documentación de vendedores revisada
 
 Emi decide incorporar sin costo adicional una verificación **manual y mínima**

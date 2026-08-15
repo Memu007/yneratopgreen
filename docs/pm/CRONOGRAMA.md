@@ -21,6 +21,11 @@ El PDF numera semanas, no fechas. Emi confirmo el ancla comercial el
 semana corre de viernes a jueves. Las fechas anteriores corresponden a
 trabajo previo y no consumen el plazo contractual.
 
+**Firma posterior posible, todavía no confirmada:** Emi informó el 14/08 que el
+contrato probablemente se firme el viernes 21/08. No se cambian fechas por una
+expectativa. Si firma y comienzo quedan confirmados para ese día, PM reancla
+todas las semanas en un único cambio; no mezcla el cuadro anterior con el nuevo.
+
 ---
 
 ## 2. El cuadro
