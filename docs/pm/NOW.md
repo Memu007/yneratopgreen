@@ -43,9 +43,10 @@ Actualizado: 2026-08-15.
   MP y recién entonces decidir una devolución a Dev.
 - Dev: sin tarea activa. El prototipo aislado de logística quedó aceptado con
   base `8002fea`, corrección `c26495d` e informe `ee2fefb`. Antes de llevar algo
-  al producto, Emi y PM deben decidir los tres campos propuestos, si las cargas
-  sólo se muestran o filtran y si la ficha alcanza para comparar. Mercado Pago
-  y Railway no se reabren por esta pieza.
+  al producto, PM cerró la decisión: marca/modelo opcional y visible; dominio
+  privado hasta seleccionar; cargas opcionales y sólo informativas, sin filtro
+  duro. Se implementa después de la firma dentro del pulido logístico. Mercado
+  Pago y Railway no se reabren por esta pieza.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -59,7 +60,9 @@ e informe `ee2fefb`. PM completó el comprador y el alta, reprodujo el primer
 clic corregido en escritorio y 390×844, confirmó los valores exactos en el
 resumen, cero corte móvil y cero errores de consola. Es una simulación aislada:
 no agrega todavía marca/modelo, dominio separado ni cargas permitidas al
-producto real.
+producto real. PM decidió que los tres entran después de la firma con alcance
+mínimo: marca/modelo visible, dominio posterior a la selección y cargas sólo
+informativas. No se agrega cotización, reserva, pago ni seguimiento del flete.
 
 La documentación manual de vendedores queda **aceptada**: producto base
 `b8fee0e`, cierre `9988879` e informe `bbb0d2d`. Es informativa y no bloquea

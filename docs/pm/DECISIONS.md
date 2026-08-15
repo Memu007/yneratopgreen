@@ -5,6 +5,36 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-15 — Datos logísticos mínimos: comparar mejor sin construir un Uber de fletes
+
+Después de revisar el prototipo y contrastarlo con productos del sector, PM
+cierra la propuesta de los tres campos. La referencia útil de Agrofy no es su
+marca sino el patrón: categoría y atributos estructurados mejoran búsqueda y
+comparación; las plataformas especializadas que suman cotización,
+disponibilidad, flota y seguimiento ya operan un producto logístico distinto.
+
+Para el MVP de TopGreen rige esta solución mínima:
+
+- **marca y modelo:** entra como dato opcional y visible para comparar; no es
+  filtro ni requisito para aparecer;
+- **dominio:** entra como dato opcional y privado; se revela sólo después de
+  seleccionar al transportista, junto con el contacto. No se usa como prueba
+  de identidad, no se muestra en el directorio y no filtra;
+- **cargas permitidas:** entra como selección múltiple opcional, con «Otra» y
+  detalle libre. En el MVP sólo se muestra; no excluye transportistas ni crea
+  una promesa de compatibilidad automática.
+
+El filtrado duro por carga se posterga hasta tener taxonomía validada y datos
+reales suficientemente completos. Activarlo ahora haría desaparecer perfiles
+que no completaron un campo nuevo y confundiría ausencia de dato con
+incompatibilidad. La ficha alcanza para el MVP con localidad base, tipo de
+vehículo, marca/modelo, capacidad, cargas declaradas, radio, distancias y
+habilitación declarada; dominio y contacto aparecen después de seleccionar.
+
+Se mantiene el límite contractual: TopGreen selecciona y conecta. No cotiza,
+reserva, cobra ni sigue el flete. La implementación se programa después de la
+firma dentro del pulido UX/logístico; no es tarea activa de Dev hoy.
+
 ## 2026-08-15 — La simulación logística no amplía silenciosamente el MVP
 
 Emi pidió revisar por separado el alta de quien ofrece logística y el camino de
