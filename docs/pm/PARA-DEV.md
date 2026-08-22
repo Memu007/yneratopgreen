@@ -2828,3 +2828,23 @@ revisión de seguridad.
 Entregá un commit mínimo de dependencia y otro con informe. Esfuerzo **Alto**,
 no Extra. Si la versión corregida exige una actualización encadenada o rompe un
 flujo multipart existente, frená y traé una sola opción mínima antes de ampliar.
+
+## 2026-08-22 — Hotfix `python-multipart` aceptado
+
+Aceptados dependencia `b496ed4` e informe `0bad6a0`. PM confirmó en el JSON
+oficial de PyPI que `0.0.31` no tiene vulnerabilidades registradas y que las
+versiones anteriores acumulan los avisos descritos; `0.0.32` sólo incorpora una
+mejora posterior de rendimiento, por lo que `0.0.31` cumple la decisión de usar
+la mínima corregida. También obtuvo sintaxis Python y `diff --check` verdes.
+
+La Dev informa instalación limpia, `pip check`, los tres recorridos multipart y
+suite 115/115. Docker local de PM sigue apagado, así que la suite integral no se
+repitió de forma independiente.
+
+El cambio de código queda cerrado, pero **la exposición del Backend descartable
+no queda cerrada hasta desplegar `b496ed4` y comprobar la versión efectiva dentro
+del contenedor**. Esa acción corresponde ahora a PM/Emi porque Railway quedó
+fuera de tu tarea y su auto-deploy de Backend no es confiable.
+
+No hay tarea nueva para Dev hasta ese despliegue. Después se abre por separado
+la decisión CSRF/localStorage; no adelantes diseño ni otra función.

@@ -50,11 +50,10 @@ Actualizado: 2026-08-22.
   de credenciales; el ensayo fallido cambió ambas cuentas en el mismo perfil
   del navegador. Si falla también aislado, capturar la actividad de la cuenta
   MP y recién entonces decidir una devolución a Dev.
-- Dev: los tres datos logísticos quedan aceptados en `0395d67` + `4a57722`:
-  marca/modelo visible, dominio privado hasta seleccionar y cargas declaradas
-  sin filtro. Tarea activa en `PARA-DEV.md`: hotfix mínimo de
-  `python-multipart`, sin actualización general ni cambio de producto. Después
-  se decide por separado la estrategia CSRF/localStorage.
+- Dev: los tres datos logísticos quedan aceptados en `0395d67` + `4a57722`.
+  Hotfix `python-multipart` aceptado en `b496ed4`; no hay tarea Dev hasta que PM
+  despliegue Backend y confirme `0.0.31` dentro del contenedor. Después se decide
+  por separado la estrategia CSRF/localStorage.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -71,9 +70,13 @@ filtran ni reordenan. El caso 115 cierra el detalle huérfano de «Otra» por al
 edición, API y SQL. PM verificó normalizador, build, sintaxis y checks estáticos;
 la Dev informa suite 115/115 y conserva puertas visuales previas.
 
-**Tarea activa:** hotfix acotado de `python-multipart==0.0.6` por vulnerabilidad
-alta aplicable a las cargas multipart. CSRF/localStorage queda como decisión
-separada inmediata, no como ampliación de este parche.
+El hotfix de `python-multipart` queda **aceptado en código**: dependencia
+`b496ed4`, informe `0bad6a0`. El pin pasa de `0.0.6` a `0.0.31`, mínima versión
+sin avisos registrados por PyPI al 22/08. La Dev informa instalación limpia,
+`pip check`, recorridos de imagen, comprobante y documentación, y suite 115/115;
+PM confirmó fuentes oficiales, sintaxis y diff. **Pendiente operativo:** desplegar
+Backend y comprobar `0.0.31` dentro del contenedor; hasta entonces el entorno
+descartable continúa expuesto. Luego se abre CSRF/localStorage por separado.
 
 El prototipo logístico queda **aceptado**: base `8002fea`, corrección `c26495d`
 e informe `ee2fefb`. PM completó el comprador y el alta, reprodujo el primer
