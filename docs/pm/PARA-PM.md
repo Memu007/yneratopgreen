@@ -2,239 +2,177 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-Fecha: 2026-08-22. Decimoséptimo informe: **consulta de arquitectura sobre CSRF
-y tokens**. No toqué una línea de código ni ningún otro documento.
+Fecha: 2026-08-22. Decimoctavo informe: **el CSRF, cerrado — y una premisa mía
+que se cayó**.
 
-**El riesgo es explotable hoy y lo reproduje entero.** Desde un sitio ajeno, en
-un navegador de verdad, le reemplacé a un vendedor su documentación fiscal
-aprobada. Va todo abajo.
+Commit de producto `6ece3fb`. Tus dos correcciones eran correctas y una de
+ellas me evitó dejar abierto justo lo que estaba cerrando. Pero hay algo más
+grande: **`SameSite=Lax` no se puede usar**, y lo descubrí midiendo. Va primero,
+porque de eso depende un criterio tuyo.
 
-## 1. Riesgo real, con archivos y líneas
+## 1. Tus dos correcciones, comprobadas
 
-### 1.1 CSRF: explotable, demostrado
+**La del refresco tenía razón y era grave.** `/auth/refresh` no pasa por la
+dependencia de acceso: llama a `credencial_unica` directo (`auth.py:390`). Con
+mi propuesta original, renovar —que **emite credenciales nuevas**, o sea que es
+una mutación— seguía siendo disparable con la cookie sola. Mi propio criterio 4
+habría fallado contra mi propia implementación.
 
-Tres piezas que por separado parecen razonables:
+**La de `credentials: 'include'` también, y la medí antes de aceptarla:**
 
-| Dónde | Qué hace |
+| Modo | Resultado del alta de sesión entre sitios |
 |---|---|
-| `backend/app/api/auth.py:254-269` (ingreso) y `:432-447` (refresco) | emite `access_token` y `refresh_token` como cookies `HttpOnly; Secure; SameSite=None` |
-| `backend/app/core/dependencies.py:69-90` | `get_token_from_cookie_or_header` acepta **la cookie sola** como credencial de cualquier ruta protegida |
-| `backend/app/main.py:40-47` | CORS con `allow_credentials=True` y una lista de orígenes |
+| `credentials: 'include'` | login 200 · **2 cookies guardadas** |
+| `credentials: 'same-origin'` | login 200 · **0 cookies** ← el navegador ignoró `Set-Cookie` |
+| `credentials: 'omit'` | login 200 · **0 cookies** ← ídem |
 
-`SameSite=None` significa, textualmente, *mandá esta cookie en toda petición
-entre sitios*. Y como la cookie sola alcanza para autenticar, cualquier sitio
-que la víctima visite puede actuar en su nombre.
+Sacarlo habría dejado al callback de Mercado Pago sin cookie que reconocer. No
+toqué una línea del frontend.
 
-**Lo que CORS no hace.** CORS no impide que la petición salga ni que el
-servidor la ejecute: impide que el atacante **lea la respuesta**. Es la
-diferencia entre no poder ver el resultado y no poder causarlo. Pedí una lista
-de comprobación de esto y acá está medida:
+## 2. Lo que se cayó: `SameSite=Lax` no se puede usar acá
 
-```
-1. la víctima inicia sesión en el sitio real: 200
-2. la víctima abre otro sitio: http://localhost:9099
-   · token en su localStorage ahí: null        ← el atacante no tiene ningún token
-3. la petición del sitio ajeno: "Failed to fetch"  ← CORS le tapó la RESPUESTA
+Tu criterio 1 pide que ninguna cookie salga con `SameSite=None`. **No lo
+cumplí, y no es por comodidad.**
 
-documentación del vendedor ANTES:   Campo Verde SRL · APROBADA
-documentación del vendedor DESPUÉS: Robada Por CSRF SRL · PENDIENTE
-```
-
-El registro del servidor lo confirma: `POST /api/documentacion → 201 Created`.
-
-Daño concreto: el vendedor **pierde el distintivo «Documentación revisada»** y
-te queda en la cola de administración un papel falso a su nombre, presentado
-por una página que él sólo visitó.
-
-### 1.2 Por dónde entra, exactamente
-
-No entra por todos lados, y la diferencia importa para dimensionar la
-corrección. Una petición entre sitios sólo evita la verificación previa si su
-tipo de contenido es de los «simples». Lo medí:
-
-| Prueba | Resultado |
-|---|---|
-| ruta JSON con `Content-Type: text/plain` (simple) | **422**: FastAPI no interpreta ese cuerpo. No entra |
-| ruta JSON con `application/json` | 200 por consola, pero en un navegador **hay verificación previa** y el origen ajeno no está permitido |
-| ruta `multipart/form-data` | **entra**: es tipo simple, no hay verificación previa |
-
-Así que la superficie explotable son las rutas que aceptan formulario, que son
-exactamente tres, más el refresco:
-
-| Ruta | Archivo | Qué logra el atacante |
-|---|---|---|
-| `POST /api/documentacion` | `documentacion.py:210-213` | **reemplazar la documentación fiscal**, tirando abajo el distintivo |
-| `POST /api/orders/{id}/transfer-receipt` | `orders.py:302-304` | subir un comprobante falso a una orden ajena |
-| `POST /api/products/{id}/images` | `products.py:115-117` | meter imágenes en publicaciones de la víctima |
-| `POST /api/auth/refresh` | `auth.py:378` | **200 y dos cookies nuevas**: es un POST sin cuerpo ni cabeceras propias, o sea simple. Renueva la sesión ajena en silencio |
-
-No hay ninguna ruta `GET` que mute estado, así que no hay vector por `<img>`.
-
-### 1.3 XSS: el riesgo es real pero **no** es el que se citó
-
-Los tokens viven en `localStorage` (`src/utils/api.ts:14-26`). Es cierto que un
-XSS los roba. Pero busqué el sumidero y **no hay ninguno**: cero
-`dangerouslySetInnerHTML` y cero asignaciones a `innerHTML` en todo `src/`.
-
-Con eso quiero ser honesto en las dos direcciones. **Una:** hoy no tenemos una
-vía de XSS propia, así que el riesgo de `localStorage` es hipotético y depende
-de una dependencia comprometida. **Dos:** el CSRF de arriba **no es
-hipotético, lo ejecuté**. Si hay que gastar esfuerzo en un solo lugar, no es
-en mover los tokens.
-
-Y hay algo peor que cualquiera de las dos opciones por separado: **hoy
-tenemos las dos superficies y el beneficio de ninguna.** Los tokens están en
-`localStorage` —con su riesgo de XSS— *y además* viajan como cookie ambiental
-—con su riesgo de CSRF—, porque `src/utils/api.ts:66,165,270` manda
-`credentials: 'include'` en todo y encima el `Authorization`.
-
-### 1.4 Dos cosas más que encontré mirando esto
-
-- **El cierre de sesión no revoca nada.** `auth.py:371-372` borra las cookies
-  del navegador y listo: no hay lista de revocación en ningún lado. Un token
-  filtrado sirve **24 horas** (acceso) y el de refresco **30 días**
-  (`config.py:35-36`). Cerrar sesión no lo acorta.
-- **La cookie de borrado no coincide en atributos** con la que se emitió
-  (`SameSite=lax` y sin `Secure`, contra `SameSite=none; Secure`). Lo probé y
-  **igual borra**, porque el navegador identifica la cookie por nombre, dominio
-  y ruta. Lo digo para que no figure como hallazgo: no lo es.
-
-## 2. Las tres opciones
-
-| | Bearer/localStorage solo | Sólo cookies | Híbrido mínimo |
-|---|---|---|---|
-| CSRF | **imposible**: no hay credencial ambiental | hay que agregar token CSRF o validar `Origin` en toda ruta mutadora | **imposible en las rutas mutadoras**, si la cookie no las autentica |
-| XSS | el token es robable | la cookie no es legible por script | el token es robable |
-| Vuelta de Mercado Pago | **se rompe** | funciona | funciona |
-| Tamaño del cambio | medio, y rompe algo que anda | grande | **una palabra en cuatro lugares, más una función** |
-
-La columna que decide es la tercera. `GET /api/mp/callback`
-(`mp_oauth.py:106-113`) es una **navegación de nivel superior** que dispara
-Mercado Pago: ninguna cabecera puede acompañarla. Su única forma de saber qué
-navegador volvió es la cookie, vía `get_current_user_optional`
-(`dependencies.py:211-233`), que lee **sólo** la cookie.
-
-Por eso «sacar la cookie» no es la respuesta: **la cookie no es peso muerto,
-tiene exactamente un uso legítimo.** Ese callback, además, ya está protegido
-contra CSRF por su `state` de un solo uso, que se gasta y se compara contra la
-identidad del navegador (`mp_oauth.py:131-148`).
-
-## 3. Recomendación única
-
-**`SameSite=None` → `SameSite=Lax`, y que la cookie deje de autenticar rutas
-mutadoras.** Nada de token CSRF. Nada de validar `Origin`.
-
-No te lo propongo por doctrina: monté las dos conductas en el navegador,
-cambiando **sólo el atributo de la cookie, sin tocar el repositorio**.
+Medido, con control, cambiando **una sola** variable —si la página y la API son
+el mismo sitio— contra la misma API emitiendo la misma cookie `Lax`:
 
 ```
-A. el mismo ataque entre sitios, con la cookie en Lax
-   → documentación después: Campo Verde SRL · APROBADA   (intacta)
-   → registro del servidor:  POST /api/documentacion 401 Unauthorized
+MISMO sitio     (página 127.0.0.1:5173 → API 127.0.0.1:8000)
+   login 200 · cookies guardadas: 2 (access_token SameSite=Lax, refresh_token SameSite=Lax)
 
-B. navegación de nivel superior entre sitios (la vuelta de Mercado Pago)
-   → 200 · la cookie Lax SÍ viajó
+sitios DISTINTOS (página localhost:5173 → API 127.0.0.1:8000)
+   login 200 · cookies guardadas: 0  ← el navegador DESCARTÓ el Set-Cookie
 ```
 
-`Lax` está hecho exactamente para esto: no acompaña peticiones entre sitios que
-mutan, y sí acompaña una navegación de nivel superior. Mata el ataque y
-conserva el único uso.
+`SameSite=Lax` no gobierna sólo cuándo se **manda** una cookie: gobierna
+también cuándo se **guarda**. Entre sitios distintos, un `Set-Cookie` marcado
+`Lax` se descarta. En producción la página está en `ynerav.up.railway.app` y la
+API en otro dominio, así que con `Lax` **la cookie nunca llegaría a existir**, y
+la vuelta de Mercado Pago se quedaría sin a quién reconocer.
 
-Le agrego la segunda mitad porque `Lax` solo depende de que el navegador y yo
-estemos de acuerdo sobre qué es «otro sitio», y hay un caso donde no lo tengo
-confirmado —lo explico en el riesgo 1—. Si además la cookie **no puede**
-autenticar una ruta mutadora, la pregunta deja de importar: no hay camino, del
-mismo modo que el dominio del transportista no sale del directorio porque no
-está en el contrato, y no porque nos acordemos de sacarlo.
+### Dónde me equivoqué yo
 
-## 4. Cambios exactos, regresiones y esfuerzo
+Esto contradice la evidencia que te llevé en el informe anterior, y el error es
+mío y es concreto: **para probar `Lax` inyecté la cookie en el navegador con
+`addCookies`**, que la escribe de prepo y **saltea justamente la regla de
+guardado**. Después medí sólo si viajaba. Probé la mitad del camino y la
+presenté como el camino entero. La conclusión «con Lax el ataque muere y el
+callback sobrevive» era verdadera sobre una cookie que en producción no habría
+existido.
+
+## 3. Y sin embargo el ataque está cerrado
+
+Porque lo que lo cierra no es el atributo. Lo medí en el navegador, con la
+cookie **plenamente ambiental** (`SameSite=None`, guardada y viajando) contra el
+código de este commit:
+
+```
+cookies guardadas: 2 access_token SameSite=None, refresh_token SameSite=None
+la función de ataque existe: function
+resultado: la petición SALIÓ y CORS tapó la respuesta (TypeError)
+
+filas de documentación escritas: 0
+el servidor:  POST /api/documentacion → 401 Unauthorized
+```
+
+La petición salió, llegó al servidor, y **el servidor la rechazó**. La mitad
+estructural hace todo el trabajo; `Lax` no aportaba nada que ésta no diera, y
+encima rompía la vinculación.
+
+**Lo dejé en `None` y freno acá, como pediste.** No cambio tu criterio por mi
+cuenta: te traigo la medición y la decisión es tuya.
+
+## 4. Qué quedó implementado
 
 | Archivo | Cambio |
 |---|---|
-| `backend/app/api/auth.py:259, 268, 437, 446` | `samesite="none"` → `"lax"` (cuatro veces) |
-| `backend/app/api/auth.py:371-372` | el borrado emite los mismos atributos que la emisión |
-| `backend/app/core/dependencies.py:69-90` | `get_token_from_cookie_or_header` lee **sólo** la cabecera |
-| `backend/app/core/dependencies.py:211-233` | queda como está: es el único lector legítimo de la cookie, para el callback |
-| `src/utils/api.ts:66, 165, 270` | sacar `credentials: 'include'` — ya no aporta nada y deja de mandar una credencial que no se usa |
+| `dependencies.py` | `token_del_header` reemplaza a `get_token_from_cookie_or_header`: rutas protegidas, sólo `Authorization` |
+| `dependencies.py` | se **borra** `credencial_unica`, que era la que aceptaba la cookie |
+| `dependencies.py` | `get_current_user_optional` conserva la cookie: único lector, para el callback |
+| `auth.py` | `/auth/refresh` lee sólo la cabecera |
+| `auth.py` | el borrado de cookies emite los mismos atributos que la emisión |
+| `src/` | **sin cambios**, como indicaste |
 
-**No cambia** ninguna pantalla, ningún modelo, ninguna migración, ni el
-`Authorization` que la interfaz ya manda en todas sus peticiones. Lo verifiqué
-ruta por ruta, incluidas las tres cargas multipart
-(`CheckoutModal.tsx:414`, `UserDashboard.tsx:1352`, `AddProductModal.tsx:509`).
+Borré `credencial_unica` en vez de dejarla sin uso: una función que sigue ahí
+es una que alguien vuelve a enchufar sin enterarse de por qué se había dejado
+de usar.
 
-**Regresiones necesarias:**
+## 5. Rutas, credencial aceptada y resultado
 
-1. Un caso nuevo que **reproduzca el ataque y espere que falle**: multipart
-   entre sitios con la cookie sola contra las tres rutas, comprobando por SQL
-   que no se escribió nada. Tiene que fallar contra el commit de hoy.
-2. Un caso que compruebe que la vuelta de Mercado Pago **sigue reconociendo al
-   navegador** con la cookie en `Lax`.
-3. **Los casos 49 y 50 hay que reescribirlos.** Hoy prueban que cookie y
-   cabecera contradictorias dan 401. Con la cookie fuera de las rutas
-   protegidas esa contradicción deja de existir ahí: la regla nueva es que la
-   cabecera es la única credencial. Te lo marco porque **es una defensa
-   existente que esta propuesta retira**, y no quiero que se pierda sin que lo
-   decidas: deja de hacer falta porque desaparece la ambigüedad que la motivaba.
+| Ruta | Cookie sola | Cabecera sola |
+|---|---|---|
+| `GET /auth/me` y toda ruta protegida | **401** | 200 |
+| `POST /cart/sync` | **401**, sin tocar el carrito | 200 |
+| `POST /documentacion` (multipart) | **401**, 0 filas escritas | 201 |
+| `POST /products/{id}/images` (multipart) | **401**, 0 imágenes | 200 |
+| `POST /orders/{id}/transfer-receipt` (multipart) | **401**, sin adjuntar | 200 |
+| `POST /auth/refresh` | **401**, 0 cookies emitidas | 200, emite 2 |
+| `GET /mp-oauth/callback` | **reconoce al dueño** (es su único uso) | no aplica: navegación sin cabecera |
 
-**Esfuerzo: bajo.** Cinco archivos, sin migración ni interfaz. La mayor parte
-del trabajo son las regresiones, no el cambio.
+Con las dos credenciales presentes manda la cabecera. Ya no hay contradicción
+que resolver, porque no hay dos fuentes: hay una.
 
-## 5. Lo que dejo afuera por YAGNI
+## 6. Un defecto que apareció solo
 
-- **Token CSRF sincronizado.** Es la defensa clásica y acá sobra: sin
-  credencial ambiental en rutas mutadoras no hay qué falsificar. Agregarlo
-  sería mantener un mecanismo entero para un riesgo ya cerrado.
-- **Validar `Origin`/`Referer`.** Redundante con lo anterior, y frágil: hay
-  clientes y proxies que no mandan `Origin`, y terminaríamos aflojando la regla
-  hasta que no sirva.
-- **Mover los tokens fuera de `localStorage`.** Hoy no hay sumidero de XSS
-  propio. Es una decisión que tomaría con una CSP puesta, y va aparte.
-- **Revocación de tokens al cerrar sesión.** Es real (punto 1.4) pero es otra
-  pieza: necesita almacenamiento de revocados y decidir vidas de token.
-- **Soporte para clientes externos de API.** No está en el contrato.
-- **Acortar las 24 horas del token de acceso.** Discutible, medible, y no es
-  esto.
+Reescribiendo las pruebas encontré que **el cierre de sesión no borraba las
+cookies en el navegador cruzado**. El caso 117 contra el commit anterior falla
+con «cerrar sesión dejó 2 cookies».
 
-## 6. Criterios de aceptación
+En el informe pasado te dije que el borrado funcionaba «aunque los atributos no
+coincidieran». **Eso estaba mal y lo medí mal**: lo probé con `curl`, que no
+aplica las reglas de cookies del navegador. Un `Set-Cookie` de borrado marcado
+`Lax` sale por la misma puerta que la de arriba: entre sitios, se descarta. La
+sesión seguía viva en el navegador después de salir. Con el borrado alineado a
+la emisión, se borra.
 
-1. Ninguna cookie se emite ya con `SameSite=None`: `grep` sobre `auth.py` no
-   encuentra `"none"`.
-2. El ataque reproducido en este informe, repetido tal cual, **deja la
-   documentación del vendedor en `APROBADA`** y el servidor responde 401.
-3. Lo mismo contra las otras dos rutas multipart: sin escritura.
-4. `POST /api/auth/refresh` entre sitios **no emite cookies nuevas**.
-5. La vuelta de Mercado Pago sigue reconociendo al navegador: el callback con
-   `state` válido y sesión propia vincula la cuenta.
-6. Una petición con la cookie válida y **sin** `Authorization` recibe **401**
-   en cualquier ruta protegida.
-7. Una petición con `Authorization` válido y **sin** cookie sigue funcionando
-   en todas: la interfaz no cambia de conducta.
-8. Suite completa desde base limpia, con los casos 49 y 50 reescritos, y el
-   caso nuevo del ataque fallando contra el commit anterior.
+## 7. Evidencia
 
-## 7. Riesgos de la propuesta
+| Caso | Qué prueba | Contra `717f40b` |
+|---|---|---|
+| 49 (reescrito) | la cookie sola no autentica, ni para leer ni para escribir | **falla**: «la cookie sola autenticó: HTTP 200» |
+| 50 (reescrito) | renovar sólo con cabecera | **falla**: «la cookie sola renovó: HTTP 200» |
+| 116 (nuevo) | las cuatro mutaciones del ataque, con cookie sola | **falla**: «devolvió HTTP 201 en vez de 401» |
+| 117 (nuevo) | ciclo de la cookie en navegador cruzado + vuelta de MP | **falla**: «cerrar sesión dejó 2 cookies» |
 
-1. **No pude confirmar si `up.railway.app` es un sufijo público.** Si no lo
-   fuera, `ynerav.up.railway.app` y el Backend serían «el mismo sitio» y una
-   cookie `Lax` viajaría entre ellos —y desde cualquier otra aplicación alojada
-   en Railway—. **Por eso la recomendación no depende de esa respuesta**: la
-   segunda mitad, que la cookie no autentique rutas mutadoras, cierra el riesgo
-   sea cual sea. Consultarlo requiere `publicsuffix.org`, que el proxy de
-   salida de mi entorno **bloquea**; no lo rodeé.
-2. **El dominio productivo futuro cambia el cálculo, a mejor.** Con
-   `topgreen.com` y `api.topgreen.com` todo pasa a ser el mismo sitio y la
-   cookie `Lax` funcionaría también para la interfaz. Nada de lo propuesto hay
-   que rehacerlo.
-3. **Esto no toca el riesgo de XSS.** Sigue igual que hoy. Dicho, no tapado.
-4. **La ventana sigue abierta hasta desplegar.** Igual que con el hotfix
-   anterior.
+| Puerta | Resultado |
+|---|---|
+| **Suite completa desde base limpia** | **117/117, 0 fallas** |
+| Build | limpio |
+| Sintaxis Python | limpio |
+| `diff --check` | limpio |
 
-## 8. Cómo quedó mi entorno
+Seis guiones que corren dentro de la API se autenticaban por cookie y pasaron a
+cabecera. **No les saqué la cookie**: el callback de Mercado Pago la necesita, y
+el caso 117 lo comprueba de punta a punta.
 
-Lo digo porque hice un ataque de verdad: monté un sitio de prueba local, lo usé,
-**lo apagué y lo borré**, y dejé la documentación del vendedor restaurada en
-`Campo Verde SRL · APROBADA`. No hice ninguna prueba contra Railway. El
-repositorio quedó sin una línea modificada: `git status` vacío salvo este
-informe.
+## 8. Lo que decidís vos
 
-Freno acá. Vos elegís; no implemento nada hasta que lo digas.
+**Una sola pregunta: qué hacemos con `SameSite`.** Las tres salidas que veo, y
+mi recomendación:
+
+1. **Dejarlo en `None`** (lo que está). El ataque queda cerrado igual y la
+   vinculación funciona. Es lo que recomiendo.
+2. Pasar a `Lax` y **aceptar que la vinculación con Mercado Pago se rompe**
+   hasta que frontend y Backend compartan sitio. No lo recomiendo.
+3. Rediseñar el callback para que no necesite la cookie. Es alcance nuevo y no
+   lo abro.
+
+Cuando tengamos `topgreen.com` y `api.topgreen.com` pasan a ser el mismo sitio
+y `Lax` se vuelve posible. Nada de esto habría que rehacerlo.
+
+## 9. Riesgos
+
+1. **Criterio 1 sin cumplir**, dicho arriba y con la medición.
+2. **Acotar la cookie por `path` a `/api/mp-oauth` sería un cierre extra** —el
+   navegador no la mandaría a ninguna otra ruta—. **No lo propongo porque no lo
+   medí**: acabo de equivocarme por proponer algo que no había medido entero, y
+   no lo voy a repetir en el mismo informe.
+3. **Sigue sin haber revocación al cerrar sesión.** Ahora el navegador sí
+   pierde las cookies, pero el token sigue siendo válido hasta que vence.
+4. **No desplegué nada**, como pediste.
+
+Todo lo ofensivo quedó local y acotado: el sitio de prueba se apagó y se borró,
+y no toqué Railway.
+
+Freno acá.
