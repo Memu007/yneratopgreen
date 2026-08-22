@@ -31,8 +31,9 @@ Actualizado: 2026-08-22.
 - Entorno descartable: frontend `https://ynerav.up.railway.app`, Backend
   `https://backend-production-ba84.up.railway.app`, Railway
   `strong-playfulness`. Último cierre verificado: despliegue Backend
-  `4577b327-d938-4acc-b752-1ad60df3bb0a` en `SUCCESS`, `/api/health` HTTP 200 y
-  `MP_CHECKOUT_HABILITADO=false` leído dentro del contenedor.
+  `c73a0f2b-4a03-423a-a074-99bdf9c6cf77` en `SUCCESS`, `/api/health` HTTP 200 y
+  log de build con `python-multipart==0.0.31` instalado. La bandera de pagos no
+  se modificó durante este despliegue.
 - Mercado Pago: aplicación `TopGreen Agro Argentina`, ID `2410255372643376`.
   Webhook de prueba y variables están cargados; secretos sólo en Railway, nunca
   en Git. La cuenta real de Emi quedó **desvinculada** del vendedor demo.
@@ -51,9 +52,9 @@ Actualizado: 2026-08-22.
   del navegador. Si falla también aislado, capturar la actividad de la cuenta
   MP y recién entonces decidir una devolución a Dev.
 - Dev: los tres datos logísticos quedan aceptados en `0395d67` + `4a57722`.
-  Hotfix `python-multipart` aceptado en `b496ed4`; no hay tarea Dev hasta que PM
-  despliegue Backend y confirme `0.0.31` dentro del contenedor. Después se decide
-  por separado la estrategia CSRF/localStorage.
+  Hotfix `python-multipart` aceptado en `b496ed4` y desplegado por PM; no hay
+  tarea Dev activa. La próxima decisión separada es la estrategia
+  CSRF/localStorage; no mezclarla con diseño.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -74,9 +75,17 @@ El hotfix de `python-multipart` queda **aceptado en código**: dependencia
 `b496ed4`, informe `0bad6a0`. El pin pasa de `0.0.6` a `0.0.31`, mínima versión
 sin avisos registrados por PyPI al 22/08. La Dev informa instalación limpia,
 `pip check`, recorridos de imagen, comprobante y documentación, y suite 115/115;
-PM confirmó fuentes oficiales, sintaxis y diff. **Pendiente operativo:** desplegar
-Backend y comprobar `0.0.31` dentro del contenedor; hasta entonces el entorno
-descartable continúa expuesto. Luego se abre CSRF/localStorage por separado.
+PM confirmó fuentes oficiales, sintaxis y diff. **Cierre operativo 22/08:** PM
+desplegó una copia temporal verificada de `backend/` desde `main` `38270de`, sin
+alterar Git ni los volúmenes. Railway aplicó las migraciones pendientes, marcó
+`c73a0f2b-4a03-423a-a074-99bdf9c6cf77` como `SUCCESS`, instaló explícitamente
+`python-multipart-0.0.31` según el log de build y `/api/health` respondió 200.
+Dos intentos previos no se promovieron: `c0907885` fue `SKIPPED` por el filtro
+`/backend/**`; `c90f36bb` tomó el manifiesto raíz del frontend y quedó `FAILED`
+por healthcheck. El Backend anterior permaneció activo. Lección: para una carga
+CLI aislada usar una copia temporal de `backend/` con el `watchPatterns`
+omitido; nunca ejecutar `railway up` desde la raíz del repo apuntando a Backend.
+El siguiente bloque se abre sólo como decisión CSRF/localStorage separada.
 
 El prototipo logístico queda **aceptado**: base `8002fea`, corrección `c26495d`
 e informe `ee2fefb`. PM completó el comprador y el alta, reprodujo el primer
