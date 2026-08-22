@@ -23,8 +23,11 @@ Actualizado: 2026-08-22.
   relevar UX y hacer una única prueba MP con sesiones aisladas. Tras la firma:
   UX de recorridos principales, pulido de logística, hito intermedio, pagos en
   su fase y finalmente seguridad, responsive, QA, producción y capacitación.
-- Avance estimado: MVP **~89 %**; pagos **~85 %**. Código MP-A/B/C aceptado;
-  homologación externa MP-D incompleta. Hito intermedio aceptado; hito final no.
+- Avance por dimensión, revisado el 22/08: funcionalidad MVP **~88–90 %**;
+  preparación productiva **~75–80 %**; avance contractual combinado
+  **~82–85 %**. Pagos **~85 %**. Código MP-A/B/C aceptado; homologación
+  externa MP-D incompleta. Hito intermedio aceptado; hito final no. El antiguo
+  **~89 %** describía funcionalidad, no una entrega lista para producción.
 - Entorno descartable: frontend `https://ynerav.up.railway.app`, Backend
   `https://backend-production-ba84.up.railway.app`, Railway
   `strong-playfulness`. Último cierre verificado: despliegue Backend
@@ -786,6 +789,37 @@ Deudas asignadas, no tareas activas nuevas:
 
 La calificación se revisa después de MP-C y nuevamente antes del lanzamiento;
 no habilita adelantar Fase 6 ni gastar el colchón.
+
+## Contraste externo de auditoría — 2026-08-22
+
+Una auditoría independiente sobre `main` `6d6b985` estimó correctamente el
+avance contractual en **~80–85 %**: el faltante dominante ya no es funcional,
+sino homologación de Mercado Pago, seguridad, despliegue, backups, CI y cierre
+de entrega. PM reprodujo `npm run lint` con **14 errores y 8 advertencias** y
+confirmó que no existen tests unitarios ni CI; la suite E2E sigue siendo la
+evidencia principal y su última ejecución completa todavía depende de la Dev.
+El README conserva el número viejo de 46 casos.
+
+La auditoría acertó al registrar JWT persistidos en `localStorage`, ausencia de
+rate limiting, credenciales conocidas del seed y auto-deploy inconsistente del
+Backend. Dos riesgos adicionales encontrados por PM no pueden esperar a la
+auditoría integral de Fase 5:
+
+- `python-multipart==0.0.6` está afectado por una vulnerabilidad alta de ReDoS
+  y el producto usa formularios multipart. Debe actualizarse y probarse antes
+  de seguir exponiendo cargas públicas.
+- El backend acepta cookies `HttpOnly` con `SameSite=None` además de Bearer,
+  pero no hay defensa CSRF visible por token ni validación de origen. Hace falta
+  revisar las rutas mutadoras y cerrar una estrategia única antes de producción.
+
+La ruta S3 sí existe, pero no es desplegable todavía: falta la dependencia y
+evidencia de integración. Las contraseñas demo no se cargan automáticamente en
+Railway, aunque el seed debe quedar bloqueado explícitamente en producción.
+
+**Orden de decisión:** no mezclar estos hallazgos con la tarea logística ya
+asignada. Al recibir esa entrega, PM decide un hotfix de seguridad acotado antes
+de abrir otro bloque funcional. MP-D continúa como prueba humana aislada hasta
+que reproduzca un defecto propio del producto.
 
 ## Deuda técnica registrada, sin acción
 
