@@ -2989,3 +2989,11 @@ Railway bajo el sufijo público `up.railway.app`.
 La suite 117/117 queda como evidencia de Dev: Docker local de PM permanece
 apagado. No hay tarea nueva para Dev. PM debe desplegar únicamente el Backend,
 comprobar `SUCCESS` y `/api/health`, y recién después elegir la pieza siguiente.
+
+### Despliegue cerrado por PM
+
+Backend `ab617231-9b78-46c3-8e0f-205cd6ee9037` quedó `SUCCESS` el 22/08. Railway
+ejecutó Alembic sin error, inició la aplicación y el health público respondió
+HTTP 200. Se desplegó desde copia aislada sin `watchPatterns`; no se tocó el
+frontend ni la bandera de pagos. La pieza CSRF queda cerrada también en el
+entorno descartable. Seguís sin tarea activa hasta nueva orden de PM.

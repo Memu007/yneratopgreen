@@ -31,9 +31,9 @@ Actualizado: 2026-08-22.
 - Entorno descartable: frontend `https://ynerav.up.railway.app`, Backend
   `https://backend-production-ba84.up.railway.app`, Railway
   `strong-playfulness`. Último cierre verificado: despliegue Backend
-  `c73a0f2b-4a03-423a-a074-99bdf9c6cf77` en `SUCCESS`, `/api/health` HTTP 200 y
-  log de build con `python-multipart==0.0.31` instalado. La bandera de pagos no
-  se modificó durante este despliegue.
+  `ab617231-9b78-46c3-8e0f-205cd6ee9037` en `SUCCESS`, `/api/health` HTTP 200,
+  migración limpia y aplicación iniciada. Incluye el cierre CSRF `6ece3fb` y el
+  hotfix previo `python-multipart==0.0.31`. La bandera de pagos no se modificó.
 - Mercado Pago: aplicación `TopGreen Agro Argentina`, ID `2410255372643376`.
   Webhook de prueba y variables están cargados; secretos sólo en Railway, nunca
   en Git. La cuenta real de Emi quedó **desvinculada** del vendedor demo.
@@ -101,8 +101,12 @@ cruzado; la defensa CSRF es estructural, no el atributo. Sin token CSRF,
 `0f330a7` e informes `6264fa2`/`e1185b3` quedan **aceptados**. PM reprodujo
 build, sintaxis Python, revisión de lectores de cookie, `node --check` y
 `diff --check`; la Dev informa suite 117/117 desde base limpia. Docker local de
-PM sigue apagado, por lo que esa suite no fue repetida independientemente. El
-Backend público continúa con la versión anterior hasta que PM lo despliegue.
+PM sigue apagado, por lo que esa suite no fue repetida independientemente.
+**Cierre operativo 22/08:** PM desplegó únicamente el Backend desde una copia
+aislada, sin `watchPatterns`; Railway promovió
+`ab617231-9b78-46c3-8e0f-205cd6ee9037` a `SUCCESS`, ejecutó Alembic sin error,
+inició la aplicación y `/api/health` respondió HTTP 200. La corrección ya está
+activa en el entorno descartable.
 
 El prototipo logístico queda **aceptado**: base `8002fea`, corrección `c26495d`
 e informe `ee2fefb`. PM completó el comprador y el alta, reprodujo el primer
