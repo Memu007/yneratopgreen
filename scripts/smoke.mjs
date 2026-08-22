@@ -4802,7 +4802,12 @@ await runCase(50, 'Renovar es una mutación: sólo con la cabecera', async () =>
     `SELECT email FROM users WHERE id = ${sqlLiteral(state.buyerId)}`)[0][0];
   const emite = (respuesta) => Boolean(respuesta.datos?.access_token);
 
-  // 1. Con la cabecera renueva, y las cookies que emite son Lax.
+  // 1. Con la cabecera renueva y emite sus dos cookies. Salen `SameSite=None`,
+  //    que acá no es una concesión: la página y la API viven en sitios distintos
+  //    —en Railway, dos servicios bajo un sufijo público—, y entre sitios el
+  //    navegador DESCARTA un `Set-Cookie` marcado `Lax`. Con `Lax` la cookie no
+  //    llegaría a existir. Lo que protege no es el atributo: es que ninguna ruta
+  //    que mute acepta la cookie, y esta misma prueba lo exige más abajo.
   const soloHeader = await pedirCrudo('/auth/refresh', { method: 'POST', header: refrescoA });
   assert(soloHeader.status === 200 && emite(soloHeader)
     && soloHeader.datos.user.email === correoDeA,
@@ -11226,7 +11231,7 @@ await runCase(117, 'En el navegador cruzado: la cookie se guarda, se renueva, se
     const deSesion = async () => (await ctx.cookies())
       .filter((c) => c.name === 'access_token' || c.name === 'refresh_token');
 
-    // 1. Entrar guarda las dos cookies, y salen Lax.
+    // 1. Entrar guarda las dos cookies, y salen `SameSite=None`.
     const entrada = await page.evaluate(async (api) => (await fetch(`${api}/auth/login`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
       body: JSON.stringify({ email: 'vendedor@ejemplo.com', password: 'vendedor123' }),
@@ -11234,11 +11239,12 @@ await runCase(117, 'En el navegador cruzado: la cookie se guarda, se renueva, se
     const guardadas = await deSesion();
     assert(guardadas.length === 2,
       `el navegador guardó ${guardadas.length} cookies de sesión en vez de 2`);
-    // `None` y no `Lax`: está medido que entre sitios distintos el navegador
-    // DESCARTA un `Set-Cookie` marcado `Lax`, así que con `Lax` esta cookie no
-    // llegaría a existir y la vuelta de Mercado Pago se quedaría sin a quién
-    // reconocer. Que la cookie sea ambiental ya no habilita nada: ninguna ruta
-    // que mute la acepta.
+    // `None` y no `Lax`, y está medido con control: entre sitios distintos el
+    // navegador DESCARTA un `Set-Cookie` marcado `Lax` —no sólo deja de
+    // mandarlo, no lo guarda—, así que con `Lax` esta cookie no llegaría a
+    // existir y la vuelta de Mercado Pago se quedaría sin a quién reconocer.
+    // Que la cookie sea ambiental ya no habilita nada: la seguridad no viene
+    // del atributo, viene de que ninguna ruta que mute acepta la cookie.
     for (const galleta of guardadas) {
       assert(galleta.sameSite === 'None',
         `${galleta.name} quedó SameSite=${galleta.sameSite}: entre sitios no se guardaría`);
@@ -11247,7 +11253,8 @@ await runCase(117, 'En el navegador cruzado: la cookie se guarda, se renueva, se
     }
     const primeras = Object.fromEntries(guardadas.map((c) => [c.name, c.value]));
 
-    // 2. Renovar con la cabecera las reemplaza: siguen Lax y cambian de valor.
+    // 2. Renovar con la cabecera las reemplaza, y las nuevas siguen saliendo
+    //    `SameSite=None` por lo mismo que arriba.
     const renovado = await page.evaluate(async ({ api, refresco }) =>
       (await fetch(`${api}/auth/refresh`, {
         method: 'POST', credentials: 'include',
