@@ -50,10 +50,11 @@ Actualizado: 2026-08-22.
   de credenciales; el ensayo fallido cambió ambas cuentas en el mismo perfil
   del navegador. Si falla también aislado, capturar la actividad de la cuenta
   MP y recién entonces decidir una devolución a Dev.
-- Dev: tarea activa postfirma en `PARA-DEV.md`: llevar al producto los tres datos
-  ya validados en el prototipo. Marca/modelo será opcional y visible; dominio,
-  privado hasta seleccionar; cargas, opcionales e informativas, sin filtro duro.
-  Mercado Pago, Railway, cotización, reserva, cobro y seguimiento quedan fuera.
+- Dev: los tres datos logísticos quedan aceptados en `0395d67` + `4a57722`:
+  marca/modelo visible, dominio privado hasta seleccionar y cargas declaradas
+  sin filtro. Tarea activa en `PARA-DEV.md`: hotfix mínimo de
+  `python-multipart`, sin actualización general ni cambio de producto. Después
+  se decide por separado la estrategia CSRF/localStorage.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -61,6 +62,18 @@ Actualizado: 2026-08-22.
   `railway down` como rollback ni `restart` durante un despliegue.
 
 ## Entrega aceptada y tarea actual
+
+Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
+de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se
+muestran antes de elegir; el dominio no existe en el contrato ni en la consulta
+de candidatos y aparece con el contacto tras selección válida. Las cargas no
+filtran ni reordenan. El caso 115 cierra el detalle huérfano de «Otra» por alta,
+edición, API y SQL. PM verificó normalizador, build, sintaxis y checks estáticos;
+la Dev informa suite 115/115 y conserva puertas visuales previas.
+
+**Tarea activa:** hotfix acotado de `python-multipart==0.0.6` por vulnerabilidad
+alta aplicable a las cargas multipart. CSRF/localStorage queda como decisión
+separada inmediata, no como ampliación de este parche.
 
 El prototipo logístico queda **aceptado**: base `8002fea`, corrección `c26495d`
 e informe `ee2fefb`. PM completó el comprador y el alta, reprodujo el primer

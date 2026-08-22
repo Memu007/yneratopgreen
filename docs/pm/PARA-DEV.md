@@ -2779,3 +2779,52 @@ cubre enviar el detalle solo desde un alta o una edición sin cargas.
 
 Entregá un commit mínimo y luego el informe corregido. No abras el hotfix de
 seguridad ni otra función hasta que PM cierre esta pieza.
+
+## 2026-08-22 — Datos logísticos aceptados
+
+Aceptados producto `0395d67`, corrección `4a57722` e informes `510c39f` y
+`580f254`. El detalle de «Otra» queda gobernado por el estado prospectivo y no
+por la forma del pedido; alta, edición, actualización legítima y limpieza
+convergen en el normalizador compartido. La corrección del ayudante de stock es
+válida: usa unidades libres y elimina la dependencia del UUID aleatorio.
+
+PM reprodujo directamente los tres contratos del normalizador, sintaxis Python,
+`node --check` y `diff --check`; además conservaba build verde sobre el producto
+base. Docker local sigue apagado, así que la ejecución 115/115 permanece como
+evidencia informada por vos. La evidencia visual anterior se conserva porque la
+corrección no cambió interfaz.
+
+La pieza queda cerrada. No vuelvas a tocar logística salvo una regresión nueva.
+
+## Tarea activa única — hotfix de `python-multipart`
+
+El contraste externo encontró `python-multipart==0.0.6` en
+`backend/requirements.txt`. Esa versión está afectada por la vulnerabilidad alta
+de ReDoS en el análisis de `Content-Type`, y el producto usa multipart en cargas
+de imágenes, comprobantes y documentación. Como el Backend descartable está
+expuesto, esta deuda no espera a la auditoría integral de Fase 5.
+
+### Alcance
+
+- Confirmá el aviso oficial y elegí la versión corregida mínima que sea
+  compatible con el FastAPI actual. Actualizá sólo los pines estrictamente
+  necesarios; sin actualización general de dependencias.
+- Instalá desde cero y comprobá que la versión efectiva sea la declarada y que
+  no queden dependencias incompatibles.
+- Corré los recorridos existentes que atraviesan multipart: imagen de producto,
+  comprobante de transferencia y documentación del vendedor. Luego suite
+  completa desde base limpia, sintaxis Python y `diff --check`.
+- Dejá evidencia del pin anterior/nuevo y de los recorridos cubiertos. No hagas
+  una prueba de denegación de servicio contra Railway ni fabriques una carga
+  costosa para demostrar el advisory.
+
+### Fuera de alcance
+
+Sin cambios de producto, UI, modelos, migraciones, Railway, Mercado Pago ni
+subida general de FastAPI/SQLAlchemy. Tampoco resuelvas todavía localStorage o
+CSRF: requieren una decisión de arquitectura separada y serán la siguiente
+revisión de seguridad.
+
+Entregá un commit mínimo de dependencia y otro con informe. Esfuerzo **Alto**,
+no Extra. Si la versión corregida exige una actualización encadenada o rompe un
+flujo multipart existente, frená y traé una sola opción mínima antes de ampliar.
