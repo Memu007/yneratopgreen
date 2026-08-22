@@ -2977,3 +2977,15 @@ que la seguridad proviene de no aceptar cookie en mutaciones. No cambies código
 asserts, cookies, casos, frontend ni arquitectura. Ejecutá `node --check` sobre
 el guion y `diff --check`; no repitas la suite. Entregá el commit mínimo y una
 nota breve en `PARA-PM.md`. Ahí frenás.
+
+## 2026-08-22 — Cierre CSRF aceptado
+
+Aceptados producto `6ece3fb`, corrección documental `0f330a7` e informes
+`6264fa2`/`e1185b3`. PM verificó que el último diff sólo cambia comentarios y
+reprodujo `node --check` y `diff --check` en verde. También quedan aceptadas la
+separación Bearer/cookie y la excepción `SameSite=None` para los dos sitios
+Railway bajo el sufijo público `up.railway.app`.
+
+La suite 117/117 queda como evidencia de Dev: Docker local de PM permanece
+apagado. No hay tarea nueva para Dev. PM debe desplegar únicamente el Backend,
+comprobar `SUCCESS` y `/api/health`, y recién después elegir la pieza siguiente.

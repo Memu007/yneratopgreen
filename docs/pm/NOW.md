@@ -55,8 +55,9 @@ Actualizado: 2026-08-22.
   Hotfix `python-multipart` aceptado en `b496ed4` y desplegado por PM. La
   auditoría CSRF `717f40b` reprodujo una escritura multipart entre sitios sin
   token robado. Base de cierre CSRF `6ece3fb`: Bearer header-only para API y
-  refresh, cookie `SameSite=None` sólo leída por el callback MP. Tarea Dev activa
-  mínima: corregir tres comentarios de prueba que todavía dicen `Lax`.
+  refresh, cookie `SameSite=None` sólo leída por el callback MP. Corrección de
+  comentarios `0f330a7` aceptada. No hay tarea Dev activa: PM debe desplegar el
+  Backend y comprobar health antes de abrir la pieza siguiente.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -96,8 +97,12 @@ mantiene Bearer/localStorage para toda API protegida y sólo permite leer la
 cookie desde el callback MP con `state`. `SameSite=None` permanece porque
 `up.railway.app` es un sufijo público y el navegador descarta `Lax` en el login
 cruzado; la defensa CSRF es estructural, no el atributo. Sin token CSRF,
-`Origin` global, revocación ni CSP en esta pieza. Falta corregir tres comentarios
-contradictorios del smoke, cerrar por PM y desplegar.
+`Origin` global, revocación ni CSP en esta pieza. Producto `6ece3fb`, comentarios
+`0f330a7` e informes `6264fa2`/`e1185b3` quedan **aceptados**. PM reprodujo
+build, sintaxis Python, revisión de lectores de cookie, `node --check` y
+`diff --check`; la Dev informa suite 117/117 desde base limpia. Docker local de
+PM sigue apagado, por lo que esa suite no fue repetida independientemente. El
+Backend público continúa con la versión anterior hasta que PM lo despliegue.
 
 El prototipo logístico queda **aceptado**: base `8002fea`, corrección `c26495d`
 e informe `ee2fefb`. PM completó el comprador y el alta, reprodujo el primer
