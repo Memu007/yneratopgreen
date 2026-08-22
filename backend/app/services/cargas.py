@@ -56,14 +56,38 @@ def normalizar(
       orden tildó las casillas cada uno;
     - rechaza lo que no está en el catálogo diciendo qué se acepta, en vez de
       guardarlo y que aparezca en pantalla un valor que nadie puede leer;
-    - **suelta el detalle si «Otra» no quedó declarada**: un detalle sin su
-      opción es un texto que se mostraría solo, sin nada que lo explique.
+    - **el detalle vive o muere con «Otra»**: sobrevive si «otra» quedó
+      declarada, y se limpia en cualquier otro caso.
+
+    Esa última regla mira **lo que queda declarado**, y nada más. En
+    particular NO mira si el pedido trajo o no el campo de las cargas: los dos
+    llamadores —alta y edición— pasan acá el estado que va a quedar guardado,
+    así que `declaradas is None` significa «no queda ninguna declarada», no
+    «no me lo mandaron». Cuando la regla dependía de eso, mandar sólo el
+    detalle guardaba un texto huérfano que después no se mostraba en ningún
+    lado: la misma acción tenía dos resultados según qué campos viajaban.
     """
+    limpias = _declaradas(declaradas)
+    lleva_otra = limpias is not None and CLAVE_OTRA in limpias
+
+    if not lleva_otra:
+        # Sin «Otra» el detalle no acompaña a nada, así que no se guarda. Y no
+        # se comprueba su largo: rechazar por el tamaño de algo que igual se
+        # descarta sería frenar un pedido por un valor que no iba a quedar.
+        return limpias, None
+
+    limpio = _detalle(detalle)
+    if not limpio:
+        raise CargaInvalida(
+            "Elegiste «Otra»: contá en una línea qué transportás"
+        )
+    return limpias, limpio
+
+
+def _declaradas(declaradas: Optional[List[str]]) -> Optional[List[str]]:
+    """Las claves válidas, sin repetir y en el orden del catálogo."""
     if declaradas is None:
-        # No se envió el campo: no hay nada que normalizar. El detalle se
-        # resuelve igual, porque puede venir solo.
-        limpio = _detalle(detalle)
-        return None, limpio
+        return None
 
     if len(declaradas) > MAXIMO_DECLARADAS:
         raise CargaInvalida(
@@ -84,17 +108,7 @@ def normalizar(
             )
         vistas.add(clave)
 
-    limpias = [clave for clave in CLAVES if clave in vistas]
-    limpio = _detalle(detalle)
-
-    if CLAVE_OTRA in vistas and not limpio:
-        raise CargaInvalida(
-            "Elegiste «Otra»: contá en una línea qué transportás"
-        )
-    if CLAVE_OTRA not in vistas:
-        limpio = None
-
-    return (limpias or None), limpio
+    return [clave for clave in CLAVES if clave in vistas] or None
 
 
 def _detalle(detalle: Optional[str]) -> Optional[str]:

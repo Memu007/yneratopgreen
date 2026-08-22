@@ -10524,14 +10524,22 @@ async function transportistaConDatos({ destino, etiqueta, radio = 400, extra = {
 // que el transportista cubre. Devuelve cómo volver a dejar el producto como
 // estaba.
 async function carritoConOrigen(origenId) {
+  // Lo que importa acá es lo que se puede vender HOY, que es `stock` menos lo
+  // reservado por compras en curso: mirar sólo `stock` elegía publicaciones
+  // que la API rechaza con «Disponible: 0». Y se toma la más holgada en vez de
+  // la primera por identificador, porque los identificadores son UUID que el
+  // seed genera al azar en cada corrida: ordenar por ahí hacía que el caso
+  // dependiera del sorteo y fallara una corrida sí y otra no.
   const [fila] = queryRows(`
-    SELECT p.id, COALESCE(p.locality_id, '')
+    SELECT p.id, COALESCE(p.locality_id, ''), 'fin'
     FROM products p
-    WHERE p.status = 'ACTIVE' AND p.stock > 0 AND p.publication_type <> 'servicio'
-    ORDER BY p.id
+    WHERE p.status = 'ACTIVE'
+      AND p.publication_type <> 'servicio'
+      AND COALESCE(p.stock, 0) - COALESCE(p.stock_reservado, 0) > 0
+    ORDER BY COALESCE(p.stock, 0) - COALESCE(p.stock_reservado, 0) DESC, p.id
     LIMIT 1
   `);
-  assert(fila, 'no hay publicaciones activas para armar el carrito');
+  assert(fila, 'no hay publicaciones activas con unidades libres para armar el carrito');
   const [producto, origenPrevio] = fila;
   querySql(`UPDATE products SET locality_id = ${sqlLiteral(origenId)} WHERE id = ${sqlLiteral(producto)}`);
   await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
@@ -10952,6 +10960,90 @@ await runCase(114, 'En pantalla: se comparan marca y cargas, el dominio recién 
   return 'el titular ve y edita los tres datos con el aviso de que el dominio es privado; '
     + 'la tarjeta compara marca y cargas sin dominio ni contacto; elegir los revela y '
     + 'quitar la selección los saca, y ninguna otra respuesta de la pantalla los trajo';
+});
+
+await runCase(115, 'Un detalle de «Otra» sin «Otra» no sobrevive, venga del alta o de una edición', async () => {
+  const destino = localidadDelPadron('Pergamino', 'Buenos Aires');
+
+  // La suerte del detalle depende de UNA sola cosa: si «otra» quedó declarada.
+  // No de si el pedido trajo o no el campo de las cargas. Eso es lo que este
+  // caso separa, porque es justo por ahí por donde se colaba.
+  const huerfano = 'Bidones sueltos de 200 litros';
+
+  const enBase = (id) => {
+    // El `'fin'` es por `querySql`, que recorta la salida: una columna vacía
+    // al final se pierde y la fila vuelve con menos campos de los pedidos.
+    const [fila] = queryRows(`
+      SELECT COALESCE(carrier_cargo_types::text, 'NULO'),
+             COALESCE(carrier_cargo_other, 'NULO'),
+             (carrier_cargo_other IS NULL)::text,
+             'fin'
+      FROM users WHERE id = ${sqlLiteral(id)}`);
+    return { cargas: fila[0], detalle: fila[1], esNulo: fila[2] === 'true' };
+  };
+
+  // 1. En el ALTA: se manda el detalle y no se manda ninguna carga.
+  const delAlta = await transportistaConDatos({
+    destino, etiqueta: 'huerfano', extra: { carrier_cargo_other: huerfano },
+  });
+  const altaApi = (await apiRequest('/auth/me', { token: delAlta.token })).data;
+  assert(altaApi.carrier_cargo_other === null,
+    `el alta guardó un detalle sin «Otra» declarada: ${JSON.stringify(altaApi.carrier_cargo_other)}`);
+  const altaSql = enBase(delAlta.id);
+  assert(altaSql.esNulo,
+    `en la base quedó un detalle huérfano del alta: ${altaSql.detalle}`);
+
+  // 2. En una EDICIÓN, sobre un perfil que no declaró nada: sólo el detalle.
+  const editado = await transportistaConDatos({ destino, etiqueta: 'edicion' });
+  const soloDetalle = (await apiRequest('/auth/me', {
+    method: 'PATCH', token: editado.token, body: { carrier_cargo_other: huerfano },
+  })).data;
+  assert(soloDetalle.carrier_cargo_other === null,
+    `la edición guardó un detalle sin «Otra»: ${JSON.stringify(soloDetalle.carrier_cargo_other)}`);
+  assert(enBase(editado.id).esNulo,
+    `en la base quedó un detalle huérfano de la edición: ${enBase(editado.id).detalle}`);
+
+  // 3. Y con cargas declaradas que NO incluyen «otra», mandando sólo el detalle.
+  await apiRequest('/auth/me', {
+    method: 'PATCH', token: editado.token, body: { carrier_cargo_types: ['maquinaria'] },
+  });
+  const conOtras = (await apiRequest('/auth/me', {
+    method: 'PATCH', token: editado.token, body: { carrier_cargo_other: huerfano },
+  })).data;
+  assert(conOtras.carrier_cargo_other === null,
+    `declarando maquinaria se guardó el detalle de «Otra»: ${JSON.stringify(conOtras.carrier_cargo_other)}`);
+  assert(JSON.stringify(conOtras.carrier_cargo_types) === JSON.stringify(['maquinaria']),
+    `la declaración cambió al mandar sólo el detalle: ${JSON.stringify(conOtras.carrier_cargo_types)}`);
+
+  // 4. El camino legítimo sigue funcionando, y esto es lo que impide que la
+  //    corrección sea «borrar el detalle siempre».
+  const legitimo = (await apiRequest('/auth/me', {
+    method: 'PATCH', token: editado.token,
+    body: { carrier_cargo_types: ['maquinaria', 'otra'], carrier_cargo_other: huerfano },
+  })).data;
+  assert(legitimo.carrier_cargo_other === huerfano,
+    `declarando «Otra» no se guardó su detalle: ${JSON.stringify(legitimo.carrier_cargo_other)}`);
+
+  // 5. Con «otra» ya declarada, mandar sólo el detalle lo actualiza: acá el
+  //    campo tampoco viaja, y sin embargo el detalle tiene que sobrevivir.
+  const actualizado = (await apiRequest('/auth/me', {
+    method: 'PATCH', token: editado.token,
+    body: { carrier_cargo_other: '  Bidones   de 20 litros  ' },
+  })).data;
+  assert(actualizado.carrier_cargo_other === 'Bidones de 20 litros',
+    `con «Otra» declarada no se pudo actualizar el detalle: ${JSON.stringify(actualizado.carrier_cargo_other)}`);
+
+  // 6. Y al soltar «otra», el detalle se va con ella.
+  const sinOtra = (await apiRequest('/auth/me', {
+    method: 'PATCH', token: editado.token, body: { carrier_cargo_types: ['maquinaria'] },
+  })).data;
+  assert(sinOtra.carrier_cargo_other === null,
+    `quitar «Otra» dejó su detalle colgado: ${JSON.stringify(sinOtra.carrier_cargo_other)}`);
+  assert(enBase(editado.id).esNulo, 'en la base el detalle quedó colgado tras quitar «Otra»');
+
+  return 'un detalle sin «Otra» no se guarda por ninguno de los dos caminos —alta y '
+    + 'edición— ni mandando el campo de cargas ni omitiéndolo; con «Otra» declarada se '
+    + 'guarda, se actualiza mandando sólo el detalle, y se va cuando «Otra» se va';
 });
 
 const passed = results.filter((result) => result.passed).length;
