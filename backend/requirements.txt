@@ -1,7 +1,9 @@
 # FastAPI y servidor
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
-python-multipart==0.0.6
+# 0.0.31 es la version minima sin avisos abiertos: 0.0.6 arrastra nueve CVE
+# y 0.0.7 -la que corrige el ReDoS de Content-Type- todavia deja ocho.
+python-multipart==0.0.31
 
 # Base de datos
 sqlalchemy==2.0.25
