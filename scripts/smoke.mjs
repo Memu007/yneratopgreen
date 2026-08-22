@@ -1810,7 +1810,7 @@ await runCase(21, 'Respaldo de imágenes en el recorrido de demostración', asyn
   }
 });
 
-await runCase(22, 'Registro de transportista desde la interfaz', async () => {
+await runCase(22, 'Registro de transportista desde la interfaz, con los tres datos del vehículo', async () => {
   assert(state.location, 'caso 5 no dejó provincia/localidad');
   await expectApiError(422, () => apiRequest('/auth/register', {
     method: 'POST',
@@ -1828,6 +1828,11 @@ await runCase(22, 'Registro de transportista desde la interfaz', async () => {
   const capacity = 'Hasta 40 toneladas de semillas';
   const declaracion = 'RUTA, cargas generales, N.° SMOKE-22';
   const radius = 125.5;
+  // Los tres opcionales, escritos como los escribiría una persona apurada:
+  // con espacios de más, para que la normalización tenga algo que hacer.
+  const modelo = '  Scania   R450  ';
+  const dominio = ' SM0   KE21 ';
+  const detalleDeOtra = '  Bidones de 200 litros  ';
   const browser = await chromium.launch({ headless: true });
 
   try {
@@ -1844,6 +1849,15 @@ await runCase(22, 'Registro de transportista desde la interfaz', async () => {
     await page.getByLabel('Provincia base').selectOption(state.location.provinceId);
     await page.getByLabel('Localidad base').selectOption(state.location.localityId);
     await page.locator('input[name="carrierTransport"]').fill(transport);
+    await page.locator('#registro-modelo').fill(modelo);
+    await page.locator('#registro-dominio').fill(dominio);
+    // Se tildan al revés del catálogo —«Otra» primero— porque lo que se guarda
+    // tiene que salir en el orden del catálogo y no en el orden en que tildó.
+    await page.getByRole('group', { name: 'Cargas que transportás' })
+      .getByRole('checkbox', { name: 'Otra', exact: true }).check();
+    await page.getByRole('group', { name: 'Cargas que transportás' })
+      .getByRole('checkbox', { name: 'Granos a granel' }).check();
+    await page.locator('#registro-carga-otra').fill(detalleDeOtra);
     await page.getByLabel('Declaro que el transporte está habilitado').check();
     await page.locator('input[name="carrierCertificationDetail"]').fill(declaracion);
     await page.locator('input[name="carrierCoverageRadiusKm"]').fill(String(radius));
@@ -1887,7 +1901,12 @@ await runCase(22, 'Registro de transportista desde la interfaz', async () => {
         (u.carrier_certification_declared_at IS NOT NULL)::text,
         u.carrier_coverage_radius_km::text,
         COALESCE(u.carrier_capacity, ''),
-        l.name
+        l.name,
+        COALESCE(u.carrier_vehicle_model, ''),
+        COALESCE(u.carrier_plate, ''),
+        COALESCE(u.carrier_cargo_types::text, ''),
+        COALESCE(u.carrier_cargo_other, ''),
+        'fin'
       FROM users u
       JOIN localities l ON l.id = u.carrier_base_locality_id
       WHERE u.email = ${sqlLiteral(email)}
@@ -1903,8 +1922,26 @@ await runCase(22, 'Registro de transportista desde la interfaz', async () => {
     assert(Number(databaseCarrier[7]) === radius, `radio SQL inesperado: ${databaseCarrier[7]}`);
     assert(databaseCarrier[8] === capacity, 'capacidad SQL incorrecta');
 
+    // Los tres opcionales del alta: llegan normalizados y el dominio, que en
+    // el directorio no existe, en el perfil de su titular sí está.
+    assert(databaseCarrier[10] === 'Scania R450',
+      `marca y modelo SQL sin normalizar: «${databaseCarrier[10]}»`);
+    assert(databaseCarrier[11] === 'SM0 KE21',
+      `dominio SQL sin normalizar: «${databaseCarrier[11]}»`);
+    const declaradasEnBase = JSON.parse(databaseCarrier[12] || 'null');
+    assert(
+      JSON.stringify(declaradasEnBase) === JSON.stringify(['granos_a_granel', 'otra']),
+      `cargas SQL en otro orden o con otro contenido: ${databaseCarrier[12]}`,
+    );
+    assert(databaseCarrier[13] === 'Bidones de 200 litros',
+      `detalle de «Otra» SQL sin normalizar: «${databaseCarrier[13]}»`);
+    assert(login.data.user.carrier_plate === 'SM0 KE21',
+      'el propio perfil no devuelve el dominio de su titular');
+
     return `UI + API + DB, localidad=${databaseCarrier[9]}, radio=${databaseCarrier[7]} km, `
-      + 'declaración con fecha del servidor';
+      + `declaración con fecha del servidor; del alta salieron «${databaseCarrier[10]}», `
+      + `dominio «${databaseCarrier[11]}» y ${declaradasEnBase.length} cargas en orden `
+      + 'de catálogo aunque se tildaron al revés';
   } finally {
     await browser.close();
   }
@@ -10440,6 +10477,481 @@ await runCase(110, 'La carpeta de constancias no puede caer adentro de la públi
   return `${rechazos.length} configuraciones peligrosas rechazadas al arrancar `
     + `(${rechazos.join(', ')}), con las dos variables nombradas en el motivo, y las `
     + 'dos plantillas versionadas cargando';
+});
+
+// ============================================================================
+// Datos logísticos del transportista (casos 111 a 114)
+//
+// Tres datos opcionales con tres reglas distintas, y cada caso cuida una:
+// el dominio es privado hasta que hay selección, las cargas declaradas no
+// filtran, y lo que se escribe se normaliza de una sola forma.
+// ============================================================================
+
+const DOMINIO_VIGILADO = 'ZZ 999 XX';
+
+// Un transportista propio de estos casos, con base en el destino que se le
+// pida y radio de sobra: lo que se mide acá no es la geografía.
+async function transportistaConDatos({ destino, etiqueta, radio = 400, extra = {} }) {
+  const credenciales = {
+    email: `flete.datos.${etiqueta}.${Date.now()}@example.com`,
+    password: 'smoke123',
+    full_name: `Flete Datos ${etiqueta} ${Date.now()}`,
+    is_carrier: true,
+    carrier_base_locality_id: destino,
+    carrier_transport: 'Camión con acoplado',
+    carrier_transport_certified: true,
+    carrier_certification_detail: 'RUTA, cargas generales, prueba',
+    carrier_coverage_radius_km: radio,
+    carrier_capacity: '30 toneladas',
+    ...extra,
+  };
+  await registrarYVerificar(credenciales);
+  const ingreso = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email: credenciales.email, password: credenciales.password },
+  });
+  const [fila] = queryRows(
+    `SELECT id FROM users WHERE email = ${sqlLiteral(credenciales.email)}`);
+  return {
+    ...credenciales,
+    etiqueta,
+    id: fila[0],
+    token: ingreso.data.access_token,
+  };
+}
+
+// Un carrito de una sola futura orden, con el origen puesto en una localidad
+// que el transportista cubre. Devuelve cómo volver a dejar el producto como
+// estaba.
+async function carritoConOrigen(origenId) {
+  const [fila] = queryRows(`
+    SELECT p.id, COALESCE(p.locality_id, '')
+    FROM products p
+    WHERE p.status = 'ACTIVE' AND p.stock > 0 AND p.publication_type <> 'servicio'
+    ORDER BY p.id
+    LIMIT 1
+  `);
+  assert(fila, 'no hay publicaciones activas para armar el carrito');
+  const [producto, origenPrevio] = fila;
+  querySql(`UPDATE products SET locality_id = ${sqlLiteral(origenId)} WHERE id = ${sqlLiteral(producto)}`);
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  await apiRequest('/cart/items', {
+    method: 'POST', token: state.buyerToken, body: { product_id: producto, quantity: 1 },
+  });
+  return {
+    producto,
+    restaurar: () => querySql(
+      origenPrevio
+        ? `UPDATE products SET locality_id = ${sqlLiteral(origenPrevio)} WHERE id = ${sqlLiteral(producto)}`
+        : `UPDATE products SET locality_id = NULL WHERE id = ${sqlLiteral(producto)}`,
+    ),
+  };
+}
+
+function localidadDelPadron(nombre, provincia) {
+  const [fila] = queryRows(`
+    SELECT id FROM localities
+    WHERE name = ${sqlLiteral(nombre)} AND province_name = ${sqlLiteral(provincia)}
+    LIMIT 1
+  `);
+  assert(fila, `el padrón no tiene ${nombre}, ${provincia}`);
+  return fila[0];
+}
+
+async function candidatosPara(destino) {
+  return (await apiRequest(
+    `/logistics/compatible-carriers?destination_locality_id=${destino}`,
+    { token: state.buyerToken },
+  )).data;
+}
+
+await runCase(111, 'El dominio no existe antes de elegir, y aparece al elegir', async () => {
+  const destino = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const transportista = await transportistaConDatos({
+    destino,
+    etiqueta: 'privado',
+    extra: {
+      carrier_vehicle_model: 'Scania R450',
+      carrier_plate: DOMINIO_VIGILADO,
+      carrier_cargo_types: ['maquinaria', 'granos_a_granel'],
+    },
+  });
+
+  const carrito = await carritoConOrigen(destino);
+  try {
+    // --- 1. El listado: lo público sí, lo privado no ---
+    const listado = await candidatosPara(destino);
+    const crudo = JSON.stringify(listado);
+    const mio = listado.groups
+      .flatMap((g) => g.carriers)
+      .find((c) => c.id === transportista.id);
+    assert(mio, 'el transportista de la prueba no aparece entre los compatibles');
+
+    assert(mio.vehicle_model === 'Scania R450',
+      `la marca no llegó al listado: ${JSON.stringify(mio.vehicle_model)}`);
+    assert(JSON.stringify(mio.cargo_declared) === JSON.stringify(['granos_a_granel', 'maquinaria'].map(
+      (c) => ({ granos_a_granel: 'Granos a granel', maquinaria: 'Maquinaria agrícola' })[c])),
+      `las cargas no llegaron en orden de catálogo: ${JSON.stringify(mio.cargo_declared)}`);
+
+    assert(!crudo.includes(DOMINIO_VIGILADO),
+      'el dominio salió en la respuesta de candidatos, que es la de antes de elegir');
+    assert(!('plate' in mio), 'el candidato trae el campo del dominio');
+    assert(!crudo.includes(transportista.email),
+      'el contacto salió antes de seleccionar');
+
+    // Tampoco en el catálogo ni en la reputación, que son públicos de verdad.
+    const catalogo = await apiRequest('/catalog/products?page_size=100');
+    assert(!JSON.stringify(catalogo.data).includes(DOMINIO_VIGILADO),
+      'el dominio aparece en el catálogo');
+    const reputacion = await apiRequest(`/ratings/user/${transportista.id}`);
+    assert(!JSON.stringify(reputacion.data).includes(DOMINIO_VIGILADO),
+      'el dominio aparece en la reputación pública');
+
+    // --- 2. La selección: recién ahí ---
+    const grupo = listado.groups.find((g) => g.carriers.some((c) => c.id === transportista.id));
+    const elegido = (await apiRequest('/logistics/select-carrier', {
+      method: 'POST',
+      token: state.buyerToken,
+      body: {
+        destination_locality_id: destino,
+        seller_id: grupo.seller_id,
+        carrier_id: transportista.id,
+      },
+    })).data.carrier;
+    assert(elegido.plate === DOMINIO_VIGILADO,
+      `al seleccionar, el dominio no vino: ${JSON.stringify(elegido.plate)}`);
+    assert(elegido.email === transportista.email, 'al seleccionar no vino el contacto');
+    assert(elegido.vehicle_model === 'Scania R450', 'la marca se perdió al seleccionar');
+
+    // --- 3. Cambiar de elegido no arrastra el dominio anterior ---
+    const otro = await transportistaConDatos({
+      destino,
+      etiqueta: 'segundo',
+      extra: { carrier_plate: 'AA 111 BB', carrier_vehicle_model: 'Iveco Stralis' },
+    });
+    const listadoDos = await candidatosPara(destino);
+    const grupoDos = listadoDos.groups.find(
+      (g) => g.carriers.some((c) => c.id === otro.id));
+    assert(grupoDos, 'el segundo transportista no quedó compatible');
+    const segundo = (await apiRequest('/logistics/select-carrier', {
+      method: 'POST',
+      token: state.buyerToken,
+      body: {
+        destination_locality_id: destino,
+        seller_id: grupoDos.seller_id,
+        carrier_id: otro.id,
+      },
+    })).data;
+    const crudoSegundo = JSON.stringify(segundo);
+    assert(segundo.carrier.plate === 'AA 111 BB',
+      `la segunda selección no trajo su dominio: ${segundo.carrier.plate}`);
+    assert(!crudoSegundo.includes(DOMINIO_VIGILADO),
+      'la segunda selección conserva el dominio del transportista anterior');
+
+    return 'el listado trae marca y cargas y no el dominio ni el contacto; el dominio '
+      + 'aparece al seleccionar, y una selección nueva no arrastra la anterior';
+  } finally {
+    carrito.restaurar();
+    try { await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken }); } catch { /* la limpieza no tapa el motivo */ }
+  }
+});
+
+await runCase(112, 'Las cargas declaradas no filtran ni reordenan a nadie', async () => {
+  const destino = localidadDelPadron('Pergamino', 'Buenos Aires');
+  // Tres transportistas: uno que declara, uno que declara otra cosa y uno que
+  // no declara nada. El último es el que importa: si las cargas filtraran,
+  // sería el primero en desaparecer.
+  const conCargas = await transportistaConDatos({
+    destino, etiqueta: 'concargas',
+    extra: { carrier_cargo_types: ['granos_a_granel'] },
+  });
+  const conOtras = await transportistaConDatos({
+    destino, etiqueta: 'conotras',
+    extra: { carrier_cargo_types: ['hacienda'] },
+  });
+  const sinCargas = await transportistaConDatos({ destino, etiqueta: 'sincargas' });
+
+  const carrito = await carritoConOrigen(destino);
+  try {
+    const idsYOrden = (listado) => listado.groups
+      .flatMap((g) => g.carriers)
+      .map((c) => c.id);
+
+    const antes = idsYOrden(await candidatosPara(destino));
+    for (const quien of [conCargas, conOtras, sinCargas]) {
+      assert(antes.includes(quien.id), `${quien.etiqueta} no aparece de entrada`);
+    }
+
+    // Ahora se cambia lo declarado de todas las formas posibles: agregar,
+    // quitar, reemplazar y declarar por primera vez.
+    await apiRequest('/auth/me', {
+      method: 'PATCH', token: conCargas.token,
+      body: { carrier_cargo_types: ['granos_a_granel', 'refrigerada', 'otra'],
+              carrier_cargo_other: 'Semillas certificadas' },
+    });
+    await apiRequest('/auth/me', {
+      method: 'PATCH', token: conOtras.token, body: { carrier_cargo_types: [] },
+    });
+    await apiRequest('/auth/me', {
+      method: 'PATCH', token: sinCargas.token, body: { carrier_cargo_types: ['agroquimicos'] },
+    });
+
+    const despues = idsYOrden(await candidatosPara(destino));
+    assert(JSON.stringify(antes) === JSON.stringify(despues),
+      'cambiar las cargas declaradas cambió el conjunto o el orden de candidatos:\n'
+      + `  antes:   ${JSON.stringify(antes)}\n  después: ${JSON.stringify(despues)}`);
+
+    // Y el que no declara nada sigue apareciendo, con su lista vacía.
+    const listado = await candidatosPara(destino);
+    const vacio = listado.groups.flatMap((g) => g.carriers).find((c) => c.id === conOtras.id);
+    assert(vacio, 'el que se quedó sin declarar nada desapareció del directorio');
+    assert(Array.isArray(vacio.cargo_declared) && vacio.cargo_declared.length === 0,
+      `sin declarar nada la lista tendría que venir vacía: ${JSON.stringify(vacio.cargo_declared)}`);
+
+    // El detalle de «Otra» se muestra pegado a su opción, no suelto.
+    const conOtra = listado.groups.flatMap((g) => g.carriers).find((c) => c.id === conCargas.id);
+    assert(conOtra.cargo_declared.includes('Otra: Semillas certificadas'),
+      `el detalle de «Otra» no se muestra con su opción: ${JSON.stringify(conOtra.cargo_declared)}`);
+
+    return `${antes.length} candidatos antes y los mismos ${despues.length} después, en el `
+      + 'mismo orden, tras agregar, vaciar y estrenar declaraciones; el que no declara '
+      + 'nada sigue en el directorio';
+  } finally {
+    carrito.restaurar();
+    try { await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken }); } catch { /* idem */ }
+  }
+});
+
+await runCase(113, 'Los tres datos se guardan como se escriben, con límites explícitos', async () => {
+  const destino = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const quien = await transportistaConDatos({ destino, etiqueta: 'normaliza' });
+
+  const mio = async () => (await apiRequest('/auth/me', { token: quien.token })).data;
+
+  // 1. Alta sin ninguno de los tres: perfil válido y campos vacíos.
+  const inicial = await mio();
+  assert(inicial.carrier_vehicle_model === null && inicial.carrier_plate === null,
+    `un alta sin los datos nuevos no los deja vacíos: ${JSON.stringify(inicial.carrier_plate)}`);
+  assert(Array.isArray(inicial.carrier_cargo_types) && inicial.carrier_cargo_types.length === 0,
+    'sin declarar nada, las cargas tendrían que venir como lista vacía');
+
+  // 2. Duplicados, mayúsculas y espacios: una sola forma guardada.
+  const guardado = (await apiRequest('/auth/me', {
+    method: 'PATCH', token: quien.token,
+    body: {
+      carrier_cargo_types: ['  MAQUINARIA ', 'maquinaria', 'granos_a_granel', 'Maquinaria'],
+      carrier_vehicle_model: '  Scania R450  ',
+      carrier_plate: '  AB   123   CD  ',
+    },
+  })).data;
+  assert(JSON.stringify(guardado.carrier_cargo_types) === JSON.stringify(['granos_a_granel', 'maquinaria']),
+    `las cargas no quedaron normalizadas: ${JSON.stringify(guardado.carrier_cargo_types)}`);
+  assert(guardado.carrier_vehicle_model === 'Scania R450',
+    `la marca conservó espacios: ${JSON.stringify(guardado.carrier_vehicle_model)}`);
+  assert(guardado.carrier_plate === 'AB 123 CD',
+    `el dominio no colapsó los espacios: ${JSON.stringify(guardado.carrier_plate)}`);
+
+  // 3. «Otra» exige detalle, y el detalle se suelta si «Otra» se va.
+  const sinDetalle = await expectApiError(400, () => apiRequest('/auth/me', {
+    method: 'PATCH', token: quien.token,
+    body: { carrier_cargo_types: ['otra'], carrier_cargo_other: '   ' },
+  }));
+  assert(/Otra/.test(sinDetalle), `el rechazo no explica qué falta: ${sinDetalle}`);
+
+  const conOtra = (await apiRequest('/auth/me', {
+    method: 'PATCH', token: quien.token,
+    body: { carrier_cargo_types: ['otra'], carrier_cargo_other: '  bidones   de 200 litros ' },
+  })).data;
+  assert(conOtra.carrier_cargo_other === 'bidones de 200 litros',
+    `el detalle no quedó normalizado: ${JSON.stringify(conOtra.carrier_cargo_other)}`);
+
+  const sinOtra = (await apiRequest('/auth/me', {
+    method: 'PATCH', token: quien.token, body: { carrier_cargo_types: ['maquinaria'] },
+  })).data;
+  assert(sinOtra.carrier_cargo_other === null,
+    `quitar «Otra» dejó su detalle colgado: ${JSON.stringify(sinOtra.carrier_cargo_other)}`);
+
+  // 4. Lo que no está en el catálogo se rechaza diciendo qué vale.
+  const invalida = await expectApiError(400, () => apiRequest('/auth/me', {
+    method: 'PATCH', token: quien.token, body: { carrier_cargo_types: ['tractores'] },
+  }));
+  assert(/granos_a_granel/.test(invalida), `el rechazo no dice cuáles valen: ${invalida}`);
+
+  // 5. Límites explícitos: largo del detalle y cantidad de declaradas.
+  const largo = await expectApiError(400, () => apiRequest('/auth/me', {
+    method: 'PATCH', token: quien.token,
+    body: { carrier_cargo_types: ['otra'], carrier_cargo_other: 'x'.repeat(121) },
+  }));
+  assert(/120/.test(largo), `el límite del detalle no se dice: ${largo}`);
+
+  // 6. Otro usuario no puede tocar esto, ni el que no es transportista.
+  const ajeno = await expectApiError(400, () => apiRequest('/auth/me', {
+    method: 'PATCH', token: state.buyerToken, body: { carrier_plate: 'XX 000 XX' },
+  }));
+  // El motivo exacto importa: si la cuenta no es transportista, el rechazo
+  // tiene que ser ése y no «te falta la localidad base», que sería la puerta
+  // de un perfil incompleto y no la de no tener perfil.
+  assert(/no tiene perfil de transportista/i.test(ajeno),
+    `el rechazo no es el de una cuenta sin perfil de transportista: ${ajeno}`);
+  // El `'fin'` al final es por `querySql`, que recorta la salida: una columna
+  // vacía al final se pierde y la fila vuelve con menos campos de los pedidos.
+  const [suyo] = queryRows(
+    `SELECT is_carrier::text, COALESCE(carrier_plate, ''), 'fin' FROM users
+     WHERE id = ${sqlLiteral(state.buyerId)}`);
+  assert(suyo[0] === 'false' && suyo[1] === '',
+    `el intento le escribió datos de transportista a una cuenta que no lo es: ${JSON.stringify(suyo)}`);
+  const [sigue] = queryRows(
+    `SELECT COALESCE(carrier_plate, '') FROM users WHERE id = ${sqlLiteral(quien.id)}`);
+  assert(sigue[0] === 'AB 123 CD', `el dominio del transportista cambió: ${sigue[0]}`);
+
+  // 7. Guardar sólo el dominio no borra lo declarado.
+  await apiRequest('/auth/me', {
+    method: 'PATCH', token: quien.token, body: { carrier_plate: 'CD 456 EF' },
+  });
+  const final = await mio();
+  assert(JSON.stringify(final.carrier_cargo_types) === JSON.stringify(['maquinaria']),
+    `editar un campo borró otro: ${JSON.stringify(final.carrier_cargo_types)}`);
+
+  return 'duplicados, mayúsculas y espacios normalizados; «Otra» con detalle obligatorio y '
+    + 'soltado al quitarla; catálogo cerrado y límite de 120 anunciados; una edición '
+    + 'parcial no pisa el resto';
+});
+
+await runCase(114, 'En pantalla: se comparan marca y cargas, el dominio recién al elegir', async () => {
+  const escenario = await prepararEscenarioDeFletes();
+  const { destino, pedidoA, transportistas } = escenario;
+
+  // Los tres datos, cargados por la ruta de siempre: el propio transportista
+  // editando su perfil. El dominio es el que se vigila en el DOM.
+  const DOMINIO = 'QQ 777 WW';
+  await apiRequest('/auth/me', {
+    method: 'PATCH', token: transportistas.amplio.token,
+    body: {
+      carrier_vehicle_model: 'Scania R450',
+      carrier_plate: DOMINIO,
+      carrier_cargo_types: ['maquinaria', 'otra'],
+      carrier_cargo_other: 'Bidones de 200 litros',
+    },
+  });
+
+  const browser = await chromium.launch({ headless: true });
+  const observado = {};
+  try {
+    // --- 1. El titular ve y edita sus tres datos en su panel ---
+    const ctxTransportista = await browser.newContext();
+    const pt = await ctxTransportista.newPage();
+    await pt.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await pt.getByRole('button', { name: 'Ingresar' }).click();
+    await pt.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 15_000 });
+    await pt.getByPlaceholder('tu@email.com').fill(transportistas.amplio.email);
+    await pt.getByPlaceholder('••••••••').fill(transportistas.amplio.password);
+    await pt.locator('[class*="_submitButton_"][type="submit"]').click();
+    await pt.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 15_000 });
+    await pt.locator('button').filter({ hasText: '👤' }).first().click();
+    await pt.getByRole('heading', { name: 'Mi Perfil' }).waitFor({ timeout: 15_000 });
+
+    const suPanel = await pt.locator('[class*="_profileSection_"], form, main').first().innerText()
+      .catch(async () => pt.locator('body').innerText());
+    const textoPanel = await pt.locator('body').innerText();
+    assert(textoPanel.includes('Scania R450'), 'el titular no ve su marca y modelo');
+    assert(textoPanel.includes(DOMINIO), 'el titular no ve su propio dominio');
+    assert(/Privado/i.test(textoPanel),
+      'el panel no le avisa al titular que el dominio no se muestra en el listado');
+    assert(/Maquinaria agrícola/.test(textoPanel), 'el titular no ve sus cargas declaradas');
+    assert(/Bidones de 200 litros/.test(textoPanel), 'el detalle de «Otra» no se muestra');
+    observado.panel = true;
+    await ctxTransportista.close();
+
+    // --- 2. El comprador: compara sin dominio, y lo ve al elegir ---
+    const ctx = await browser.newContext();
+    await ctx.addInitScript(({ a, r }) => {
+      window.localStorage.setItem('access_token', a);
+      window.localStorage.setItem('refresh_token', r);
+    }, { a: state.buyerToken, r: state.buyerRefreshToken });
+    const page = await ctx.newPage();
+
+    // Nada de lo que pide la pantalla puede traer el dominio antes de elegir:
+    // se vigilan TODAS las respuestas, no sólo la que se mira.
+    const fugas = [];
+    page.on('response', async (respuesta) => {
+      const url = respuesta.url();
+      if (!url.includes('/api/') || url.includes('/select-carrier')) return;
+      try {
+        const cuerpo = await respuesta.text();
+        if (cuerpo.includes(DOMINIO)) fugas.push(url);
+      } catch { /* una respuesta sin cuerpo legible no aporta */ }
+    });
+
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+    const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+    await buscador.fill(pedidoA.nombre);
+    await buscador.press('Enter');
+    await page.getByRole('heading', { name: pedidoA.nombre, exact: true, level: 3 })
+      .waitFor({ state: 'visible', timeout: 15_000 });
+    await page.getByRole('button', { name: /Agregar/ }).first().click();
+
+    await page.getByRole('button', { name: /Carrito/ }).click();
+    await page.getByRole('button', { name: 'Continuar compra' }).click();
+    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15_000 });
+    await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0505');
+    await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
+    await page.getByPlaceholder('2000').fill('2700');
+    await elegirDestino(page, 'Pergamino');
+
+    const seccion = page.locator('[class*="_fletes_"]');
+    const grupo = seccion.locator('[class*="_fleteGrupo_"]')
+      .filter({ hasText: `Envío de ${nombreDeUsuario(pedidoA.vendedor)}` });
+    await grupo.getByRole('radio', { name: /Necesito flete/ }).check();
+    await grupo.getByRole('button', { name: new RegExp(`Seleccionar a ${transportistas.amplio.nombre}`) })
+      .waitFor({ state: 'visible', timeout: 20_000 });
+
+    // Antes de elegir: marca y cargas sí, dominio y contacto no.
+    const comparando = await grupo.innerText();
+    assert(comparando.includes('Scania R450'),
+      'la tarjeta del candidato no muestra la marca para comparar');
+    assert(/Declara transportar:.*Maquinaria agrícola/.test(comparando),
+      `la tarjeta no muestra las cargas declaradas: ${comparando.slice(0, 300)}`);
+    assert(!comparando.includes(DOMINIO),
+      'el dominio está en pantalla antes de elegir transportista');
+    assert(!comparando.includes(transportistas.amplio.email),
+      'el contacto está en pantalla antes de elegir');
+    observado.antes = true;
+
+    // Al elegir: aparece, junto al contacto.
+    await grupo.getByRole('button', { name: new RegExp(`Seleccionar a ${transportistas.amplio.nombre}`) })
+      .click();
+    await grupo.getByText('Transportista elegido').waitFor({ state: 'visible', timeout: 20_000 });
+    const elegido = await grupo.innerText();
+    assert(elegido.includes(DOMINIO), 'después de elegir, el dominio no aparece');
+    assert(elegido.includes(transportistas.amplio.email), 'después de elegir, falta el contacto');
+    observado.despues = true;
+
+    // Y al quitarlo, se va con él: no queda un dato privado de una decisión
+    // que ya no existe.
+    await grupo.getByRole('button', { name: 'Quitar del pedido' }).click();
+    await grupo.getByRole('button', { name: new RegExp(`Seleccionar a ${transportistas.amplio.nombre}`) })
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    const trasQuitar = await grupo.innerText();
+    assert(!trasQuitar.includes(DOMINIO), 'el dominio quedó en pantalla después de quitar la selección');
+    assert(!trasQuitar.includes(transportistas.amplio.email),
+      'el contacto quedó en pantalla después de quitar la selección');
+    observado.quitado = true;
+
+    assert(fugas.length === 0,
+      `el dominio viajó en ${fugas.length} respuesta(s) que no son la de selección: `
+      + fugas.slice(0, 3).join(', '));
+
+    await ctx.close();
+  } finally {
+    await browser.close();
+    escenario.restaurar();
+    try { await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken }); } catch { /* idem */ }
+  }
+
+  return 'el titular ve y edita los tres datos con el aviso de que el dominio es privado; '
+    + 'la tarjeta compara marca y cargas sin dominio ni contacto; elegir los revela y '
+    + 'quitar la selección los saca, y ninguna otra respuesta de la pantalla los trajo';
 });
 
 const passed = results.filter((result) => result.passed).length;

@@ -38,6 +38,7 @@ const ESPERADAS = [
   'about (foto negra)',
   'verificación de correo',
   'vuelta de Mercado Pago',
+  'alta de transportista',
   'catálogo',
   'catálogo (hover)',
   'detalle',
@@ -49,6 +50,8 @@ const ESPERADAS = [
   'perfil vendedor',
   'documentación fiscal',
   'mis ventas',
+  'perfil transportista',
+  'perfil transportista (edición)',
   'administración',
   'administración documentación',
 ];
@@ -214,6 +217,7 @@ const MEDIR = () => {
 const navegador = await chromium.launch({ headless: true });
 const comprador = await login('cliente@ejemplo.com', 'cliente123');
 const vendedor = await login('vendedor@ejemplo.com', 'vendedor123');
+const transportista = await login('transportista@ejemplo.com', 'transportista123');
 const admin = await login('admin@topgreen.com', 'admin123');
 
 async function sesion(ctxOpts, tokens) {
@@ -343,6 +347,22 @@ for (const medida of MEDIDAS) {
   const viewport = { width: medida.width, height: medida.height };
 
   {
+    // Sin sesión: el alta sólo existe para quien no entró. La sección de
+    // transportista es media pantalla más, con sus propias etiquetas, avisos
+    // y el catálogo de cargas; medir el alta común no medía ninguna.
+    const ctx = await sesion({ viewport }, null);
+    const page = await ctx.newPage();
+    await page.goto(WEB, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Ingresar' }).first().click();
+    await page.getByRole('button', { name: /Reg[íi]strate aqu[íi]/i }).first().click();
+    await page.getByRole('checkbox', { name: /Quiero registrarme como transportista/ })
+      .check();
+    await revisar(page, `${medida.n} alta de transportista`,
+      page.locator('input[name="carrierPlate"]'));
+    await ctx.close();
+  }
+
+  {
     const ctx = await sesion({ viewport }, comprador);
     const page = await ctx.newPage();
 
@@ -458,6 +478,23 @@ for (const medida of MEDIDAS) {
     await page.getByRole('button', { name: 'Mis Ventas' }).click();
     await revisar(page, `${medida.n} mis ventas`,
       page.getByRole('heading', { name: 'Mis Ventas' }));
+    await ctx.close();
+  }
+
+  {
+    // El perfil del transportista, en sus dos estados: leyendo, donde los tres
+    // datos salen como texto, y editando, donde salen como controles y aparece
+    // el aviso de que el dominio es privado.
+    const ctx = await sesion({ viewport }, transportista);
+    const page = await ctx.newPage();
+    await page.goto(WEB, { waitUntil: 'domcontentloaded' });
+    await page.locator('button').filter({ hasText: '👤' }).first().click();
+    await revisar(page, `${medida.n} perfil transportista`,
+      page.getByRole('heading', { name: 'Datos de transportista' }));
+
+    await page.getByRole('button', { name: 'Editar' }).click();
+    await revisar(page, `${medida.n} perfil transportista (edición)`,
+      page.locator('#perfil-localidad-base'));
     await ctx.close();
   }
 

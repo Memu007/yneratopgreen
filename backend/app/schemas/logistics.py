@@ -40,6 +40,15 @@ class CarrierCandidate(BaseModel):
     base_locality_name: str
     base_province_name: str
     transport: str
+    # Marca y modelo del vehículo. Público: es de lo que se compara antes de
+    # elegir. Opcional, porque un perfil viejo no lo tiene cargado.
+    vehicle_model: Optional[str] = None
+    # Lo que declara transportar, ya en texto mostrable. **No filtra**: quién
+    # aparece acá y en qué orden lo deciden la localidad base y el radio.
+    cargo_declared: List[str] = []
+    # El dominio NO está en este esquema, y esa ausencia es la que lo mantiene
+    # fuera del directorio. No es que las rutas se acuerden de no ponerlo: no
+    # tienen dónde.
     # Declaración del transportista, nunca una verificación de TopGreen.
     certification_detail: str
     certification_declared_at: datetime
@@ -76,10 +85,17 @@ class SelectCarrierRequest(BaseModel):
 
 
 class SelectedCarrier(CarrierCandidate):
-    """El elegido, ya revalidado, con el contacto que hasta acá no se mostró."""
+    """El elegido, ya revalidado, con el contacto que hasta acá no se mostró.
+
+    El dominio viaja junto con el contacto y por el mismo motivo: identifica un
+    vehículo concreto de una persona concreta, y quien todavía no eligió no
+    tiene por qué poder anotárselo. Aparece recién cuando el servidor
+    revalidó que ese transportista cubre ese viaje.
+    """
     email: str
     phone: Optional[str] = None
     whatsapp: Optional[str] = None
+    plate: Optional[str] = None
 
 
 class SelectCarrierResponse(BaseModel):
@@ -125,9 +141,29 @@ class OrderShipping(BaseModel):
     carrier_name: Optional[str] = None
     carrier_base: Optional[str] = None
     carrier_transport: Optional[str] = None
+    carrier_vehicle_model: Optional[str] = None
+    carrier_cargo_declared: List[str] = []
     carrier_capacity: Optional[str] = None
     carrier_certification_detail: Optional[str] = None
     carrier_certification_declared_at: Optional[datetime] = None
     carrier_email: Optional[str] = None
     carrier_phone: Optional[str] = None
     carrier_whatsapp: Optional[str] = None
+    # Con el contacto, porque acá la selección ya ocurrió.
+    carrier_plate: Optional[str] = None
+
+
+class TipoDeCarga(BaseModel):
+    """Una opción del catálogo cerrado de cargas."""
+    value: str
+    label: str
+
+
+class TiposDeCargaResponse(BaseModel):
+    """El vocabulario que acepta el perfil.
+
+    Sale del servidor y no de una constante en la pantalla: lo que se guarda
+    son estas claves, así que la lista que se ofrece y la que se valida tienen
+    que ser la misma cosa.
+    """
+    types: List[TipoDeCarga]

@@ -40,6 +40,7 @@ const ESPERADAS = [
   'inicio',
   'ingreso',
   'registro',
+  'registro: alta de transportista',
   'registro: correo pendiente',
   'verificación de correo',
   'vuelta de Mercado Pago',
@@ -154,6 +155,21 @@ async function publicas(page, medida) {
   await page.getByRole('button', { name: /Reg[íi]strate aqu[íi]/i }).first().click();
   await revisar(page, 'registro', medida,
     page.getByRole('heading', { name: 'Crear Cuenta' }));
+
+  // El alta de transportista es media pantalla más, que sólo existe con la
+  // casilla tildada: ahí viven los campos del vehículo y el catálogo de
+  // cargas. Medir sólo el alta común no medía ninguno de esos controles.
+  await page.getByRole('checkbox', { name: /Quiero registrarme como transportista/ })
+    .check();
+  await revisar(page, 'registro: alta de transportista', medida,
+    page.locator('input[name="carrierPlate"]'));
+
+  // Se destilda para que el alta que sigue sea la común: con la casilla puesta
+  // el formulario pide localidad base y no se podría enviar.
+  await page.getByRole('checkbox', { name: /Quiero registrarme como transportista/ })
+    .uncheck();
+  await page.locator('input[name="carrierPlate"]')
+    .waitFor({ state: 'detached', timeout: ESPERA });
 
   // El aviso de "revisá tu correo" es una pantalla propia, no un estado
   // decorativo: se llega dando de alta una cuenta de verdad. El correo lleva

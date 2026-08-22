@@ -5,6 +5,7 @@ import { useToast } from '../Toast/Toast';
 import { apiGet, apiPatch, apiDelete, apiPost, apiUpload, apiBlob, tokenStorage, API_BASE_URL } from '../../utils/api';
 import { explicarMP, type VinculoMP } from '../../utils/mercadoPago';
 import { ETIQUETA_DE_ESTADO, type MiDocumentacion } from '../../utils/documentacion';
+import { type TipoDeCarga } from '../../utils/logistica';
 import { ProductImage } from '../ProductImage/ProductImage';
 import { User } from '../../types';
 import {
@@ -47,12 +48,16 @@ interface TrasladoDeLaOrden {
   carrier_name?: string;
   carrier_base?: string;
   carrier_transport?: string;
+  carrier_vehicle_model?: string;
+  carrier_cargo_declared?: string[];
   carrier_capacity?: string;
   carrier_certification_detail?: string;
   carrier_certification_declared_at?: string;
   carrier_email?: string;
   carrier_phone?: string;
   carrier_whatsapp?: string;
+  // Con el contacto: en una orden la selección ya ocurrió.
+  carrier_plate?: string;
 }
 
 /** Una operación asignada, tal como la ve el transportista. */
@@ -292,6 +297,11 @@ const formularioDesde = (cuenta: User | null) => ({
   carrierCoverageRadiusKm:
     cuenta?.carrierCoverageRadiusKm != null ? String(cuenta.carrierCoverageRadiusKm) : '',
   carrierCapacity: cuenta?.carrierCapacity || '',
+  carrierVehicleModel: cuenta?.carrierVehicleModel || '',
+  carrierPlate: cuenta?.carrierPlate || '',
+  // Las cargas viajan como el conjunto de claves tildadas.
+  carrierCargoTypes: cuenta?.carrierCargoTypes ?? [],
+  carrierCargoOther: cuenta?.carrierCargoOther || '',
 });
 
 interface UserDashboardProps {
@@ -337,6 +347,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   const [docRazonSocial, setDocRazonSocial] = useState('');
   const [docArchivo, setDocArchivo] = useState<File | null>(null);
   const [docFormularioAbierto, setDocFormularioAbierto] = useState(false);
+
+  // El catálogo de cargas lo trae el servidor: lo que se guarda son sus
+  // claves, así que la lista que se ofrece para tildar tiene que ser la misma
+  // que valida el alta. Duplicarla acá quedaría desincronizada en silencio.
+  const [tiposDeCarga, setTiposDeCarga] = useState<TipoDeCarga[]>([]);
   
   // Estado para notificaciones
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -768,6 +783,15 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       .catch(() => setCarrierPadronError('No se pudo cargar el padrón de provincias.'));
   }, [isEditing, esTransportista, carrierProvinces.length]);
 
+  // El vocabulario de cargas, para las casillas. Se pide una sola vez y sólo
+  // si la cuenta es transportista.
+  useEffect(() => {
+    if (!esTransportista || tiposDeCarga.length > 0) return;
+    void apiGet<{ types: TipoDeCarga[] }>('/logistics/cargo-types')
+      .then((data) => setTiposDeCarga(data.types))
+      .catch(() => setTiposDeCarga([]));
+  }, [esTransportista, tiposDeCarga.length]);
+
   useEffect(() => {
     if (!isEditing || !esTransportista || !carrierProvinceId) return;
     // Si se cambia de provincia con una consulta en vuelo, la respuesta vieja
@@ -828,6 +852,15 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               carrierCertificationDetail: editForm.carrierCertificationDetail,
               carrierCoverageRadiusKm: radio,
               carrierCapacity: editForm.carrierCapacity,
+              carrierVehicleModel: editForm.carrierVehicleModel,
+              carrierPlate: editForm.carrierPlate,
+              carrierCargoTypes: editForm.carrierCargoTypes,
+              // El detalle sólo acompaña si «Otra» quedó tildada; si no, el
+              // servidor lo suelta igual, y mandarlo confundiria al leer el
+              // cuerpo de la peticion.
+              carrierCargoOther: editForm.carrierCargoTypes.includes('otra')
+                ? editForm.carrierCargoOther
+                : '',
             }
           : {}),
       });
@@ -1725,6 +1758,106 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
 
               <div className={styles.formRow}>
                 <div className={styles.formGroup}>
+                  <label htmlFor={paraCampo('perfil-modelo')}>Marca y modelo</label>
+                  {isEditing ? (
+                    <input
+                      id="perfil-modelo"
+                      type="text"
+                      value={editForm.carrierVehicleModel}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        carrierVehicleModel: e.target.value,
+                      })}
+                      placeholder="Scania R450"
+                    />
+                  ) : (
+                    <p>{user?.carrierVehicleModel || 'No especificado'}</p>
+                  )}
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor={paraCampo('perfil-dominio')}>Dominio</label>
+                  {isEditing ? (
+                    <input
+                      id="perfil-dominio"
+                      type="text"
+                      value={editForm.carrierPlate}
+                      onChange={(e) => setEditForm({ ...editForm, carrierPlate: e.target.value })}
+                      placeholder="AB 123 CD"
+                    />
+                  ) : (
+                    <p>{user?.carrierPlate || 'No especificado'}</p>
+                  )}
+                  {/* Dónde termina este dato, dicho en el campo: quien lo
+                      escribe tiene que saber quién lo va a ver. */}
+                  <p className={styles.campoPrivado}>
+                    🔒 Privado: no aparece en el listado de transportistas. Lo ve
+                    el comprador recién después de seleccionarte, junto con tu
+                    contacto.
+                  </p>
+                </div>
+              </div>
+
+              <div className={styles.formGroup}>
+                <span className={styles.etiquetaGrupo} id="perfil-cargas">
+                  Cargas que transportás
+                </span>
+                {isEditing ? (
+                  <>
+                    <div className={styles.cargasGrilla} role="group" aria-labelledby="perfil-cargas">
+                      {tiposDeCarga.map((tipo) => (
+                        <label key={tipo.value} className={styles.carrierCheckbox}>
+                          <input
+                            type="checkbox"
+                            checked={editForm.carrierCargoTypes.includes(tipo.value)}
+                            onChange={(e) => setEditForm({
+                              ...editForm,
+                              carrierCargoTypes: e.target.checked
+                                ? [...editForm.carrierCargoTypes, tipo.value]
+                                : editForm.carrierCargoTypes.filter((c) => c !== tipo.value),
+                            })}
+                          />
+                          {tipo.label}
+                        </label>
+                      ))}
+                    </div>
+                    {editForm.carrierCargoTypes.includes('otra') && (
+                      <div className={styles.formGroup}>
+                        <label htmlFor="perfil-carga-otra">Contá qué transportás</label>
+                        <input
+                          id="perfil-carga-otra"
+                          type="text"
+                          maxLength={120}
+                          value={editForm.carrierCargoOther}
+                          onChange={(e) => setEditForm({
+                            ...editForm,
+                            carrierCargoOther: e.target.value,
+                          })}
+                          placeholder="Bidones de 200 litros"
+                        />
+                      </div>
+                    )}
+                    <p className={styles.ayudaCampo}>
+                      Es una declaración tuya y sirve para que el comprador compare.
+                      No decide en qué viajes aparecés: eso lo siguen definiendo tu
+                      localidad base y tu radio.
+                    </p>
+                  </>
+                ) : (
+                  <p>
+                    {(user?.carrierCargoTypes?.length ?? 0) > 0
+                      ? user!.carrierCargoTypes!
+                          .map((clave) => (clave === 'otra'
+                            ? `Otra: ${user?.carrierCargoOther || 'sin detalle'}`
+                            : tiposDeCarga.find((t) => t.value === clave)?.label || clave))
+                          .join(' · ')
+                      : 'No especificadas'}
+                  </p>
+                )}
+              </div>
+
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
                   <label htmlFor={paraCampo('perfil-radio')}>Radio de cobertura (km)</label>
                   {isEditing ? (
                     <input
@@ -2133,10 +2266,19 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           <p className={styles.trasladoTexto}>Base: {traslado.carrier_base}</p>
         )}
         {traslado?.carrier_transport && (
-          <p className={styles.trasladoTexto}>{traslado.carrier_transport}</p>
+          <p className={styles.trasladoTexto}>
+            {traslado.carrier_transport}
+            {traslado.carrier_vehicle_model ? ` · ${traslado.carrier_vehicle_model}` : ''}
+            {traslado.carrier_plate ? ` · dominio ${traslado.carrier_plate}` : ''}
+          </p>
         )}
         {traslado?.carrier_capacity && (
           <p className={styles.trasladoTexto}>Capacidad: {traslado.carrier_capacity}</p>
+        )}
+        {(traslado?.carrier_cargo_declared?.length ?? 0) > 0 && (
+          <p className={styles.trasladoTexto}>
+            Declara transportar: {traslado!.carrier_cargo_declared!.join(' · ')}
+          </p>
         )}
         <p className={styles.trasladoContacto}>
           {traslado?.carrier_email}

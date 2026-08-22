@@ -37,7 +37,7 @@ from app.api.notifications import notify_welcome
 from app.models.order import Order
 from app.models.locality import Locality
 from app.services.correo import ErrorDeCorreo
-from app.services import verificacion
+from app.services import cargas, verificacion
 from app.services.verificacion import ResultadoDeVerificacion
 import structlog
 
@@ -96,6 +96,29 @@ def register_user(
                 detail="La localidad base no pertenece al padrón",
             )
     
+    # Los tres datos opcionales del vehículo. Se normalizan antes de crear la
+    # cuenta: si la declaración de cargas no entra, el alta falla y no queda un
+    # usuario a medio hacer.
+    if user_data.is_carrier:
+        try:
+            modelo_del_alta = cargas.texto_acotado(
+                user_data.carrier_vehicle_model, cargas.MAXIMO_MODELO,
+                "La marca y modelo",
+            )
+            dominio_del_alta = cargas.texto_acotado(
+                user_data.carrier_plate, cargas.MAXIMO_DOMINIO, "El dominio",
+            )
+            cargas_declaradas, detalle_de_otra = cargas.normalizar(
+                user_data.carrier_cargo_types, user_data.carrier_cargo_other
+            )
+        except cargas.CargaInvalida as error:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)
+            )
+    else:
+        modelo_del_alta = dominio_del_alta = None
+        cargas_declaradas, detalle_de_otra = None, None
+
     # Crear nuevo usuario
     new_user = User(
         email=user_data.email,
@@ -132,6 +155,10 @@ def register_user(
             if user_data.is_carrier
             else None
         ),
+        carrier_vehicle_model=modelo_del_alta,
+        carrier_plate=dominio_del_alta,
+        carrier_cargo_types=cargas_declaradas,
+        carrier_cargo_other=detalle_de_otra,
     )
     
     db.add(new_user)
@@ -473,6 +500,10 @@ CAMPOS_DE_TRANSPORTISTA = (
     "carrier_certification_detail",
     "carrier_coverage_radius_km",
     "carrier_capacity",
+    "carrier_vehicle_model",
+    "carrier_plate",
+    "carrier_cargo_types",
+    "carrier_cargo_other",
 )
 
 
@@ -503,6 +534,7 @@ def _aplicar_perfil_de_transportista(
             ),
         )
 
+
     prospectivo = {
         campo: cambios.get(campo, getattr(current_user, campo))
         for campo in CAMPOS_DE_TRANSPORTISTA
@@ -513,6 +545,24 @@ def _aplicar_perfil_de_transportista(
     detalle = (prospectivo["carrier_certification_detail"] or "").strip() or None
     radio = prospectivo["carrier_coverage_radius_km"]
     capacidad = (prospectivo["carrier_capacity"] or "").strip() or None
+    # Los tres opcionales se resuelven sobre el estado prospectivo, igual que
+    # el resto: mandar sólo el dominio no puede borrar lo que ya estaba
+    # declarado en las cargas.
+    try:
+        modelo = cargas.texto_acotado(
+            prospectivo["carrier_vehicle_model"], cargas.MAXIMO_MODELO,
+            "La marca y modelo",
+        )
+        dominio = cargas.texto_acotado(
+            prospectivo["carrier_plate"], cargas.MAXIMO_DOMINIO, "El dominio",
+        )
+        declaradas, detalle_otra = cargas.normalizar(
+            prospectivo["carrier_cargo_types"], prospectivo["carrier_cargo_other"]
+        )
+    except cargas.CargaInvalida as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)
+        )
 
     if not localidad:
         raise HTTPException(
@@ -564,6 +614,10 @@ def _aplicar_perfil_de_transportista(
         current_user.carrier_certification_declared_at = datetime.utcnow()
     current_user.carrier_coverage_radius_km = radio
     current_user.carrier_capacity = capacidad
+    current_user.carrier_vehicle_model = modelo
+    current_user.carrier_plate = dominio
+    current_user.carrier_cargo_types = declaradas
+    current_user.carrier_cargo_other = detalle_otra
 
 
 @router.patch("/me", response_model=UserResponse)

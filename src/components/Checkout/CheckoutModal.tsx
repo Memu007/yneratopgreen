@@ -29,6 +29,11 @@ interface TransportistaCompatible {
   base_locality_name: string;
   base_province_name: string;
   transport: string;
+  // Marca y modelo, y lo que declara transportar: se muestran para comparar
+  // ANTES de elegir. El dominio no está en este tipo, igual que no está en el
+  // esquema de la API.
+  vehicle_model?: string | null;
+  cargo_declared: string[];
   certification_detail: string;
   certification_declared_at: string;
   coverage_radius_km: number;
@@ -58,6 +63,8 @@ interface TransportistaElegido extends TransportistaCompatible {
   email: string;
   phone?: string;
   whatsapp?: string;
+  // El dominio llega acá y en ningún paso anterior.
+  plate?: string | null;
 }
 
 interface RespuestaDeSeleccion {
@@ -539,9 +546,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         Base: {carrier.base_locality_name}, {carrier.base_province_name}
         {' · '}radio declarado {carrier.coverage_radius_km} km
       </p>
-      <p className={styles.fleteDato}>{carrier.transport}</p>
+      <p className={styles.fleteDato}>
+        {carrier.transport}
+        {carrier.vehicle_model ? ` · ${carrier.vehicle_model}` : ''}
+      </p>
       {carrier.capacity && (
         <p className={styles.fleteDato}>Capacidad: {carrier.capacity}</p>
+      )}
+      {carrier.cargo_declared.length > 0 && (
+        <p className={styles.fleteDato}>
+          Declara transportar: {carrier.cargo_declared.join(' · ')}
+        </p>
       )}
       <p className={styles.fleteDato}>
         A {carrier.distance_to_destination_km} km del destino
@@ -579,9 +594,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
       <p className={styles.fleteDato}>
         Base: {elegido.base_locality_name}, {elegido.base_province_name}
         {' · '}{elegido.transport}
+        {elegido.vehicle_model ? ` · ${elegido.vehicle_model}` : ''}
       </p>
       {elegido.capacity && (
         <p className={styles.fleteDato}>Capacidad: {elegido.capacity}</p>
+      )}
+      {elegido.cargo_declared.length > 0 && (
+        <p className={styles.fleteDato}>
+          Declara transportar: {elegido.cargo_declared.join(' · ')}
+        </p>
+      )}
+      {/* El dominio aparece con el contacto y no antes: identifica un vehículo
+          concreto, y quien todavía no eligió no tiene por qué anotárselo. */}
+      {elegido.plate && (
+        <p className={styles.fleteDato}>Dominio: {elegido.plate}</p>
       )}
       <p className={styles.fleteContacto}>
         {elegido.email}

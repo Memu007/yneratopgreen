@@ -218,3 +218,20 @@
   color: #6c757d;
   margin-top: 0.25rem;
 }
+
+
+/* A dónde va un dato, al lado del campo que lo pide. */
+.ayudaPrivada {
+  margin: 6px 0 0;
+  color: #475569;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+/* Las cargas declaradas: en escritorio entran en dos columnas y en 390px
+   caen a una sola, sin que el modal desborde. */
+.cargasGrilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 4px 14px;
+}

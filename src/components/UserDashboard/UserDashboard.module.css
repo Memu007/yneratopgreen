@@ -1764,3 +1764,35 @@
   display: grid;
   gap: 4px;
 }
+
+
+/* Aclaración de a dónde va un dato, pegada al campo que lo pide. */
+.campoPrivado {
+  margin: 6px 0 0;
+  color: #4a5544;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.ayudaCampo {
+  margin: 8px 0 0;
+  color: #4a5544;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+/* Un grupo de casillas necesita su propia etiqueta: `label` va con un control
+   y acá hay varios. */
+.etiquetaGrupo {
+  display: block;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #24301c;
+  margin-bottom: 8px;
+}
+
+.cargasGrilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 4px 14px;
+}

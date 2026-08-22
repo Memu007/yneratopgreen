@@ -113,7 +113,7 @@ if [ "$frontend_ready" != "true" ]; then
   exit 1
 fi
 
-echo "===> Ejecutando 110 smoke tests"
+echo "===> Ejecutando 114 smoke tests"
 set +e
 node scripts/smoke.mjs "$@"
 smoke_exit=$?

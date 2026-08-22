@@ -31,7 +31,7 @@ from app.schemas.orders import (
     OrderItemResponse,
     OrderResponse,
 )
-from app.services import cobro, mp_pagos, mp_preferencia, stock
+from app.services import cargas, cobro, mp_pagos, mp_preferencia, stock
 from app.services.checkout import (
     LISTA,
     MEDIO_MERCADO_PAGO,
@@ -461,12 +461,18 @@ def traslado_de(order: Order) -> OrderShipping:
             f"{base.name}, {base.province_name}" if base is not None else None
         ),
         carrier_transport=carrier.carrier_transport,
+        carrier_vehicle_model=carrier.carrier_vehicle_model,
+        carrier_cargo_declared=cargas.declaradas(carrier),
         carrier_capacity=carrier.carrier_capacity,
         carrier_certification_detail=carrier.carrier_certification_detail,
         carrier_certification_declared_at=carrier.carrier_certification_declared_at,
         carrier_email=carrier.email,
         carrier_phone=carrier.phone,
         carrier_whatsapp=carrier.whatsapp,
+        # El dominio va con el contacto: esta orden ya tiene transportista
+        # elegido, así que la reserva de mostrarlo sólo después de elegir ya
+        # se cumplió.
+        carrier_plate=carrier.carrier_plate,
     )
 
 

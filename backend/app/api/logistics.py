@@ -31,7 +31,10 @@ from app.schemas.logistics import (
     SelectCarrierRequest,
     SelectCarrierResponse,
     SelectedCarrier,
+    TipoDeCarga,
+    TiposDeCargaResponse,
 )
+from app.services import cargas
 from app.services.logistica import (
     CANDIDATOS_COMPATIBLES,
     DISTANCIAS_A_ORIGENES,
@@ -81,6 +84,10 @@ def _candidatos(db: Session, destino: Locality, grupo) -> List[CarrierCandidate]
             certification_declared_at=fila["carrier_certification_declared_at"],
             coverage_radius_km=float(fila["carrier_coverage_radius_km"]),
             capacity=fila["carrier_capacity"],
+            vehicle_model=fila["carrier_vehicle_model"],
+            cargo_declared=cargas.declaradas_de(
+                fila["carrier_cargo_types"], fila["carrier_cargo_other"]
+            ),
             distance_to_destination_km=round(float(fila["km_destino"]), 1),
             distances_to_origins=[
                 DistanceToOrigin(
@@ -94,6 +101,20 @@ def _candidatos(db: Session, destino: Locality, grupo) -> List[CarrierCandidate]
         )
         for fila in filas
     ]
+
+
+@router.get("/cargo-types", response_model=TiposDeCargaResponse)
+def cargo_types():
+    """El catálogo cerrado de cargas que acepta el perfil.
+
+    Sale del servidor y no de una constante en la pantalla: lo que se guarda
+    son estas claves, así que la lista que se ofrece para tildar y la que
+    valida el alta tienen que ser la misma. Es público y de sólo lectura: no
+    dice nada de nadie, es vocabulario.
+    """
+    return TiposDeCargaResponse(
+        types=[TipoDeCarga(value=clave, label=etiqueta) for clave, etiqueta in cargas.CARGAS]
+    )
 
 
 @router.get("/compatible-carriers", response_model=CompatibleCarriersResponse)
@@ -169,6 +190,7 @@ def select_carrier(
             email=transportista.email,
             phone=transportista.phone,
             whatsapp=transportista.whatsapp,
+            plate=transportista.carrier_plate,
         ),
     )
 

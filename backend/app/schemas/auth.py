@@ -1,8 +1,8 @@
 """
 Schemas de Autenticación - Validación de requests y responses
 """
-from pydantic import BaseModel, EmailStr, Field, model_validator
-from typing import Optional
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+from typing import List, Optional
 from datetime import datetime
 
 from app.models.user import UserRole
@@ -26,6 +26,17 @@ class UserRegisterRequest(BaseModel):
     carrier_certification_detail: Optional[str] = Field(None, max_length=500)
     carrier_coverage_radius_km: Optional[float] = Field(None, gt=0)
     carrier_capacity: Optional[str] = Field(None, max_length=255)
+    # Los tres opcionales. Que sean opcionales no es un descuido: un
+    # transportista tiene que poder darse de alta sin ellos, y un perfil que
+    # ya existía no puede volverse inválido porque aparecieron campos nuevos.
+    # Los `max_length` de acá son un tope contra un envío desmedido, no el
+    # límite que se le anuncia a la persona: ese lo aplica el servicio, en
+    # castellano y diciendo el número. Dos capas con el mismo número harían
+    # ganar siempre a la que peor lo explica.
+    carrier_vehicle_model: Optional[str] = Field(None, max_length=500)
+    carrier_plate: Optional[str] = Field(None, max_length=500)
+    carrier_cargo_types: Optional[List[str]] = None
+    carrier_cargo_other: Optional[str] = Field(None, max_length=500)
 
     @model_validator(mode="after")
     def validate_carrier_profile(self):
@@ -103,13 +114,29 @@ class UserResponse(BaseModel):
     carrier_certification_declared_at: Optional[datetime] = None
     carrier_coverage_radius_km: Optional[float]
     carrier_capacity: Optional[str]
+    carrier_vehicle_model: Optional[str] = None
+    # El dominio aparece acá porque esta respuesta es la del propio perfil y la
+    # de administración: quien lo escribió tiene que poder verlo y corregirlo.
+    # A lo público no sale nunca desde este esquema, que no se usa en el
+    # directorio ni en el catálogo.
+    carrier_plate: Optional[str] = None
+    carrier_cargo_types: List[str] = []
+    carrier_cargo_other: Optional[str] = None
     rating_average: float = 5.0
     rating_count: int = 0
     sales_count: int = 0
     purchases_count: int = 0
     created_at: datetime
     last_login: Optional[datetime]
-    
+
+    @field_validator("carrier_cargo_types", mode="before")
+    @classmethod
+    def _sin_declarar_es_lista_vacia(cls, valor):
+        """En la base «no declaró nada» es NULL; para quien consume la
+        respuesta es una lista vacía. Que la diferencia se resuelva acá y no en
+        cada pantalla."""
+        return valor or []
+
     class Config:
         from_attributes = True
 
@@ -163,6 +190,14 @@ class UserUpdateRequest(BaseModel):
     carrier_certification_detail: Optional[str] = Field(None, max_length=500)
     carrier_coverage_radius_km: Optional[float] = Field(None, gt=0)
     carrier_capacity: Optional[str] = Field(None, max_length=255)
+    # Los `max_length` de acá son un tope contra un envío desmedido, no el
+    # límite que se le anuncia a la persona: ese lo aplica el servicio, en
+    # castellano y diciendo el número. Dos capas con el mismo número harían
+    # ganar siempre a la que peor lo explica.
+    carrier_vehicle_model: Optional[str] = Field(None, max_length=500)
+    carrier_plate: Optional[str] = Field(None, max_length=500)
+    carrier_cargo_types: Optional[List[str]] = None
+    carrier_cargo_other: Optional[str] = Field(None, max_length=500)
 
 
 class ChangePasswordRequest(BaseModel):

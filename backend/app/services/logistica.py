@@ -74,6 +74,12 @@ CANDIDATOS_COMPATIBLES = text(f"""
         u.carrier_certification_declared_at,
         u.carrier_coverage_radius_km,
         u.carrier_capacity,
+        -- Marca/modelo y cargas viajan porque se muestran para comparar. El
+        -- dominio no se trae: mantenerlo afuera de la consulta del directorio
+        -- es una defensa más barata que acordarse de no ponerlo en la salida.
+        u.carrier_vehicle_model,
+        u.carrier_cargo_types,
+        u.carrier_cargo_other,
         ST_Distance(b.coordinates, d.coordinates) / 1000.0 AS km_destino
     FROM users u
     JOIN localities b ON b.id = u.carrier_base_locality_id

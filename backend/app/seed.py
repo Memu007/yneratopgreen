@@ -118,7 +118,9 @@ def create_seed_data():
                 location="Ruta 8 km 220, Pergamino, Buenos Aires",
                 is_carrier=True,
                 carrier_base_locality_id=base.id,
-                carrier_transport="Camión con acoplado, dominio DEMO 01",
+                # El tipo, sin el dominio adentro: para eso están ahora los
+                # campos propios de acá abajo.
+                carrier_transport="Camión con acoplado",
                 carrier_transport_certified=True,
                 carrier_certification_detail=(
                     "Declaración demo: RUTA habilitación de transporte de "
@@ -127,11 +129,33 @@ def create_seed_data():
                 carrier_certification_declared_at=datetime.utcnow(),
                 carrier_coverage_radius_km=250,
                 carrier_capacity="Hasta 30 toneladas de granos",
+                carrier_vehicle_model="Scania R450",
+                # Dominio SINTETICO: el formato no corresponde a ninguna patente
+                # real emitida. Es privado y sale sólo después de seleccionarlo.
+                carrier_plate="DEMO 01",
+                carrier_cargo_types=["granos_a_granel", "maquinaria"],
             )
             db.add(carrier)
             print("  ✅ Transportista creado: transportista@ejemplo.com / transportista123")
         else:
-            print("  ⏭️  Transportista ya existe")
+            # Los tres datos son nuevos, así que un transportista demo de una
+            # instalación anterior los tiene vacíos. Se completan SÓLO si están
+            # vacíos, igual que los datos bancarios: repetir el seed nunca pisa
+            # algo que alguien haya personalizado.
+            completados = []
+            if not carrier.carrier_vehicle_model:
+                carrier.carrier_vehicle_model = "Scania R450"
+                completados.append("marca y modelo")
+            if not carrier.carrier_plate:
+                carrier.carrier_plate = "DEMO 01"
+                completados.append("dominio")
+            if not carrier.carrier_cargo_types:
+                carrier.carrier_cargo_types = ["granos_a_granel", "maquinaria"]
+                completados.append("cargas declaradas")
+            if completados:
+                print(f"  ✅ Transportista: completado {', '.join(completados)}")
+            else:
+                print("  ⏭️  Transportista ya existe")
 
 
         # === DATOS BANCARIOS DEMO === #

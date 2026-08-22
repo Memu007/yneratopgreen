@@ -84,6 +84,14 @@ export interface User {
   carrierCertificationDeclaredAt?: string;
   carrierCoverageRadiusKm?: number;
   carrierCapacity?: string;
+  // Marca y modelo: público, sirve para comparar antes de elegir.
+  carrierVehicleModel?: string;
+  // Dominio: PRIVADO. Lo ve su titular acá, y el comprador recién después
+  // de seleccionar a este transportista. No sale en el directorio.
+  carrierPlate?: string;
+  // Claves del catálogo cerrado; las etiquetas ya resueltas las trae la API.
+  carrierCargoTypes?: string[];
+  carrierCargoOther?: string;
   role: 'user' | 'admin' | 'seller' | 'buyer' | 'both';
   avatar?: string;
   avatarUrl?: string;
@@ -127,6 +135,10 @@ export interface RegisterData {
   carrierCertificationDeclaredAt?: string;
   carrierCoverageRadiusKm?: number;
   carrierCapacity?: string;
+  carrierVehicleModel?: string;
+  carrierPlate?: string;
+  carrierCargoTypes?: string[];
+  carrierCargoOther?: string;
 }
 
 // Cart Types

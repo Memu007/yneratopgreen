@@ -1,7 +1,7 @@
 """
 Modelo de Usuario - Sistema de autenticación y perfiles
 """
-from sqlalchemy import Boolean, Column, DateTime, Enum as SQLEnum, ForeignKey, Integer, Numeric, String, Text, false
+from sqlalchemy import Boolean, Column, DateTime, Enum as SQLEnum, ForeignKey, Integer, JSON, Numeric, String, Text, false
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -48,6 +48,31 @@ class User(Base):
         index=True,
     )
     carrier_transport = Column(String(255), nullable=True)
+
+    # Los tres datos que antes viajaban mezclados adentro de `carrier_transport`
+    # o directamente no existían. Los tres son OPCIONALES: un perfil que ya
+    # estaba cargado sigue siendo válido sin completar ninguno.
+    #
+    # `carrier_vehicle_model` es público: sirve para comparar antes de elegir.
+    carrier_vehicle_model = Column(String(120), nullable=True)
+    # `carrier_plate` es PRIVADO. No sale en el directorio, ni en la respuesta
+    # de candidatos, ni en el catálogo: aparece junto con el contacto y recién
+    # después de que el comprador seleccionó a este transportista. Lo que lo
+    # mantiene afuera no es un cuidado al escribir cada respuesta, es que el
+    # esquema de candidato no lo tiene.
+    carrier_plate = Column(String(20), nullable=True)
+    # Qué declara transportar. Es una DECLARACIÓN y no un filtro: no decide
+    # quién aparece en una búsqueda ni en qué orden. Se guardan las claves del
+    # catálogo cerrado —no las etiquetas— para que un cambio de redacción no
+    # tenga que reescribir filas.
+    # `none_as_null` no es un detalle: sin él, «no declaró nada» se guarda como
+    # el `null` de JSON, que en SQL **no es NULL**. Una consulta que preguntara
+    # `IS NULL` no encontraría a nadie y el que la escribió no se enteraría.
+    carrier_cargo_types = Column(JSON(none_as_null=True), nullable=True)
+    # El detalle de «Otra», que sólo tiene sentido mientras «otra» esté entre
+    # las declaradas.
+    carrier_cargo_other = Column(String(120), nullable=True)
+
     carrier_transport_certified = Column(
         Boolean,
         default=False,

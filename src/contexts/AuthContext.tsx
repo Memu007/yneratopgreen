@@ -40,6 +40,10 @@ interface BackendUser {
   carrier_certification_declared_at?: string;
   carrier_coverage_radius_km?: number;
   carrier_capacity?: string;
+  carrier_vehicle_model?: string;
+  carrier_plate?: string;
+  carrier_cargo_types?: string[];
+  carrier_cargo_other?: string;
   rating_average?: number;
   rating_count?: number;
   sales_count?: number;
@@ -97,6 +101,10 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
     carrierCertificationDeclaredAt: backendUser.carrier_certification_declared_at,
     carrierCoverageRadiusKm: backendUser.carrier_coverage_radius_km,
     carrierCapacity: backendUser.carrier_capacity,
+    carrierVehicleModel: backendUser.carrier_vehicle_model,
+    carrierPlate: backendUser.carrier_plate,
+    carrierCargoTypes: backendUser.carrier_cargo_types ?? [],
+    carrierCargoOther: backendUser.carrier_cargo_other,
     ratingAverage: backendUser.rating_average ?? 0,
     ratingCount: backendUser.rating_count ?? 0,
     salesCount: backendUser.sales_count ?? 0,
@@ -185,6 +193,10 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
         carrier_certification_detail: userData.carrierCertificationDetail,
         carrier_coverage_radius_km: userData.carrierCoverageRadiusKm,
         carrier_capacity: userData.carrierCapacity,
+        carrier_vehicle_model: userData.carrierVehicleModel,
+        carrier_plate: userData.carrierPlate,
+        carrier_cargo_types: userData.carrierCargoTypes,
+        carrier_cargo_other: userData.carrierCargoOther,
       });
 
       // El alta no abre sesión: no hay tokens que guardar ni usuario que
@@ -247,6 +259,10 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
       carrier_certification_detail: userData.carrierCertificationDetail,
       carrier_coverage_radius_km: userData.carrierCoverageRadiusKm,
       carrier_capacity: userData.carrierCapacity,
+      carrier_vehicle_model: userData.carrierVehicleModel,
+      carrier_plate: userData.carrierPlate,
+      carrier_cargo_types: userData.carrierCargoTypes,
+      carrier_cargo_other: userData.carrierCargoOther,
       });
 
       setUser(mapBackendUserToFrontend(response));

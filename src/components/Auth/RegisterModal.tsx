@@ -9,6 +9,8 @@ import {
   LocalityResponse,
   ProvinceResponse,
 } from '../../utils/catalogService';
+import { apiGet } from '../../utils/api';
+import { type TipoDeCarga } from '../../utils/logistica';
 
 interface RegisterModalProps {
   onClose: () => void;
@@ -34,8 +36,16 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     carrierCertificationDetail: '',
     carrierCoverageRadiusKm: undefined,
     carrierCapacity: '',
+    carrierVehicleModel: '',
+    carrierPlate: '',
+    carrierCargoTypes: [],
+    carrierCargoOther: '',
   });
   const [provinces, setProvinces] = useState<ProvinceResponse[]>([]);
+  // El catálogo de cargas lo sirve el servidor: lo que se guarda son sus
+  // claves, así que la lista que se ofrece acá tiene que ser la misma que
+  // valida el alta. Una copia en la pantalla se desincronizaría en silencio.
+  const [tiposDeCarga, setTiposDeCarga] = useState<TipoDeCarga[]>([]);
   const [localities, setLocalities] = useState<LocalityResponse[]>([]);
   const [provinceId, setProvinceId] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -54,6 +64,15 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       });
     }
   }, [formData.isCarrier, provinces.length]);
+
+  // Si el catálogo no llega, la sección sigue usable: las cargas son
+  // opcionales, así que no se traba el alta por no poder ofrecerlas.
+  useEffect(() => {
+    if (!formData.isCarrier || tiposDeCarga.length > 0) return;
+    void apiGet<{ types: TipoDeCarga[] }>('/logistics/cargo-types')
+      .then((r) => setTiposDeCarga(r.types))
+      .catch(() => setTiposDeCarga([]));
+  }, [formData.isCarrier, tiposDeCarga.length]);
 
   useEffect(() => {
     if (!provinceId) {
@@ -82,7 +101,14 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     setIsLoading(true);
 
     try {
-      const respuesta = await register(formData);
+      const respuesta = await register({
+        ...formData,
+        // Sin «Otra» declarada, el detalle no describe nada: se suelta acá
+        // igual que en el perfil, para no mandar un dato huérfano.
+        carrierCargoOther: formData.carrierCargoTypes?.includes('otra')
+          ? formData.carrierCargoOther
+          : '',
+      });
       setPendiente(respuesta);
       showToast(`Te mandamos un correo a ${respuesta.email}.`, 'success');
     } catch (err: unknown) {
@@ -165,11 +191,12 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           {error && <div className={styles.error}>{error}</div>}
 
           <div className={styles.formGroup}>
-            <label className={styles.label}>
+            <label className={styles.label} htmlFor="registro-nombre">
               Nombre completo <span className={styles.required}>*</span>
             </label>
             <input
               type="text"
+              id="registro-nombre"
               name="name"
               className={styles.input}
               placeholder="Juan Pérez"
@@ -180,11 +207,12 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           </div>
 
           <div className={styles.formGroup}>
-            <label className={styles.label}>
+            <label className={styles.label} htmlFor="registro-email">
               Email <span className={styles.required}>*</span>
             </label>
             <input
               type="email"
+              id="registro-email"
               name="email"
               className={styles.input}
               placeholder="tu@email.com"
@@ -195,9 +223,10 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           </div>
 
           <div className={styles.formGroup}>
-            <label className={styles.label}>Teléfono</label>
+            <label className={styles.label} htmlFor="registro-telefono">Teléfono</label>
             <input
               type="tel"
+              id="registro-telefono"
               name="phone"
               className={styles.input}
               placeholder="+54 9 11 1234-5678"
@@ -267,11 +296,12 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               </div>
 
               <div className={styles.formGroup}>
-                <label className={styles.label}>
+                <label className={styles.label} htmlFor="registro-transporte">
                   Transporte habilitado <span className={styles.required}>*</span>
                 </label>
                 <input
                   type="text"
+                  id="registro-transporte"
                   name="carrierTransport"
                   className={styles.input}
                   placeholder="Camión con acoplado, dominio AB 123 CD"
@@ -281,6 +311,90 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                 />
               </div>
 
+              {/* Los tres opcionales. Sin asterisco y con el aviso de que se
+                  pueden completar después: pedirlos como obligatorios en el
+                  alta ahuyentaría a quien sólo quiere empezar. */}
+              <div className={styles.formGroup}>
+                <label className={styles.label} htmlFor="registro-modelo">Marca y modelo</label>
+                <input
+                  type="text"
+                  id="registro-modelo"
+                  name="carrierVehicleModel"
+                  className={styles.input}
+                  placeholder="Scania R450"
+                  value={formData.carrierVehicleModel}
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div className={styles.formGroup}>
+                <label className={styles.label} htmlFor="registro-dominio">Dominio</label>
+                <input
+                  type="text"
+                  id="registro-dominio"
+                  name="carrierPlate"
+                  className={styles.input}
+                  placeholder="AB 123 CD"
+                  value={formData.carrierPlate}
+                  onChange={handleChange}
+                />
+                <p className={styles.ayudaPrivada}>
+                  🔒 Privado: no aparece en el listado de transportistas. Lo ve el
+                  comprador recién después de seleccionarte, junto con tu contacto.
+                </p>
+              </div>
+
+              <div className={styles.formGroup}>
+                <span className={styles.label} id="registro-cargas">
+                  Cargas que transportás
+                </span>
+                <div
+                  className={styles.cargasGrilla}
+                  role="group"
+                  aria-labelledby="registro-cargas"
+                >
+                  {tiposDeCarga.map((tipo) => (
+                    <label key={tipo.value} className={styles.checkboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={formData.carrierCargoTypes?.includes(tipo.value) ?? false}
+                        onChange={(e) => setFormData((current) => ({
+                          ...current,
+                          carrierCargoTypes: e.target.checked
+                            ? [...(current.carrierCargoTypes ?? []), tipo.value]
+                            : (current.carrierCargoTypes ?? [])
+                                .filter((c) => c !== tipo.value),
+                        }))}
+                      />
+                      {tipo.label}
+                    </label>
+                  ))}
+                </div>
+                {formData.carrierCargoTypes?.includes('otra') && (
+                  <div className={styles.formGroup}>
+                    <label className={styles.label} htmlFor="registro-carga-otra">
+                      Contá qué transportás <span className={styles.required}>*</span>
+                    </label>
+                    <input
+                      id="registro-carga-otra"
+                      type="text"
+                      maxLength={120}
+                      className={styles.input}
+                      placeholder="Bidones de 200 litros"
+                      value={formData.carrierCargoOther}
+                      onChange={(e) => setFormData((current) => ({
+                        ...current,
+                        carrierCargoOther: e.target.value,
+                      }))}
+                    />
+                  </div>
+                )}
+                <p className={styles.helpText}>
+                  Es una declaración tuya y sirve para que el comprador compare.
+                  No decide en qué viajes aparecés: eso lo siguen definiendo tu
+                  localidad base y tu radio.
+                </p>
+              </div>
               <label className={styles.checkboxLabel}>
                 <input
                   type="checkbox"
@@ -295,11 +409,12 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               </label>
 
               <div className={styles.formGroup}>
-                <label className={styles.label}>
+                <label className={styles.label} htmlFor="registro-detalle">
                   Detalle de la habilitación <span className={styles.required}>*</span>
                 </label>
                 <input
                   type="text"
+                  id="registro-detalle"
                   name="carrierCertificationDetail"
                   className={styles.input}
                   placeholder="RUTA, transporte de cargas generales, N.° 12345"
@@ -313,13 +428,14 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               </div>
 
               <div className={styles.formGroup}>
-                <label className={styles.label}>
+                <label className={styles.label} htmlFor="registro-radio">
                   Radio de cobertura (km) <span className={styles.required}>*</span>
                 </label>
                 <input
                   type="number"
                   min="0.01"
                   step="0.01"
+                  id="registro-radio"
                   name="carrierCoverageRadiusKm"
                   className={styles.input}
                   value={formData.carrierCoverageRadiusKm ?? ''}
@@ -334,9 +450,10 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               </div>
 
               <div className={styles.formGroup}>
-                <label className={styles.label}>Capacidad de carga (opcional)</label>
+                <label className={styles.label} htmlFor="registro-capacidad">Capacidad de carga (opcional)</label>
                 <input
                   type="text"
+                  id="registro-capacidad"
                   name="carrierCapacity"
                   className={styles.input}
                   placeholder="Hasta 40 toneladas de semillas"
@@ -348,12 +465,13 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           )}
 
           <div className={styles.formGroup}>
-            <label className={styles.label}>
+            <label className={styles.label} htmlFor="registro-clave">
               Contraseña <span className={styles.required}>*</span>
             </label>
             <div className={styles.passwordGroup}>
               <input
                 type={showPassword ? 'text' : 'password'}
+                id="registro-clave"
                 name="password"
                 className={styles.input}
                 placeholder="Mínimo 6 caracteres"
@@ -372,12 +490,13 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           </div>
 
           <div className={styles.formGroup}>
-            <label className={styles.label}>
+            <label className={styles.label} htmlFor="registro-clave-2">
               Confirmar contraseña <span className={styles.required}>*</span>
             </label>
             <input
               type={showPassword ? 'text' : 'password'}
               className={styles.input}
+              id="registro-clave-2"
               placeholder="Repite tu contraseña"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
