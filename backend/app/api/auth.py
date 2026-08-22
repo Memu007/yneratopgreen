@@ -29,7 +29,6 @@ from app.core.security import (
 from sqlalchemy import func
 from app.core.dependencies import (
     bearer_del_header,
-    credencial_unica,
     get_current_user,
 )
 from app.core.config import settings
@@ -368,8 +367,18 @@ def logout_user(response: Response):
     
     - Elimina las cookies de tokens
     """
-    response.delete_cookie(key="access_token")
-    response.delete_cookie(key="refresh_token")
+    # Con los mismos atributos con que se emitieron. El navegador identifica
+    # la cookie por nombre, dominio y ruta, así que borrar funcionaba igual;
+    # que la baja diga lo mismo que el alta evita que mañana un cambio de
+    # `path` deje una cookie viva que nadie sabe que sigue ahí.
+    for nombre in ("access_token", "refresh_token"):
+        response.delete_cookie(
+            key=nombre,
+            path="/",
+            httponly=True,
+            samesite="none",
+            secure=True,
+        )
     
     return {"message": "Sesión cerrada exitosamente"}
 
@@ -386,11 +395,12 @@ def refresh_access_token(
     - Lee el refresh_token desde cookies o header Authorization
     - Valida y genera nuevo access_token
     """
-    # Cookie o header, pero no las dos con tokens distintos: en ese caso
-    # corta antes de decodificar, de mirar la base y de emitir nada.
-    refresh_token = credencial_unica(
-        request, "refresh_token", bearer_del_header(request)
-    )
+    # Sólo el header, igual que las rutas protegidas. Renovar EMITE
+    # credenciales nuevas: es una mutación, y una cookie que el navegador manda
+    # sola no puede dispararla. Este endpoint no pasa por la dependencia de
+    # acceso —lee su propio token—, así que si no se cerraba acá también,
+    # quedaba abierto justo lo que se estaba cerrando en el resto.
+    refresh_token = bearer_del_header(request)
 
     if not refresh_token:
         raise HTTPException(

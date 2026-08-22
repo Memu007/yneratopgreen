@@ -252,8 +252,12 @@ from app.main import app
 # Sin esto un 500 llegaría como excepción y no como respuesta: lo que se
 # quiere medir es justamente que no haya 500.
 cliente = TestClient(app, base_url="https://testserver", raise_server_exceptions=False)
-cliente.post("/api/auth/login", json={
-    "email": "vendedor@ejemplo.com", "password": "vendedor123"})
+# La cookie ya no autentica rutas protegidas: la credencial va en la cabecera.
+# La cookie sigue guardada en el cliente, que es lo que necesita el callback.
+cliente.headers["Authorization"] = "Bearer " + cliente.post(
+    "/api/auth/login",
+    json={"email": "vendedor@ejemplo.com", "password": "vendedor123"},
+).json()["access_token"]
 
 inicio = cliente.post("/api/mp-oauth/auth-url", json={})
 state = parse_qs(urlparse(inicio.json()["auth_url"]).query)["state"][0]
@@ -297,8 +301,12 @@ from app.core.config import settings
 from app.main import app
 
 cliente = TestClient(app, base_url="https://testserver")
-cliente.post("/api/auth/login", json={
-    "email": "vendedor@ejemplo.com", "password": "vendedor123"})
+# La cookie ya no autentica rutas protegidas: la credencial va en la cabecera.
+# La cookie sigue guardada en el cliente, que es lo que necesita el callback.
+cliente.headers["Authorization"] = "Bearer " + cliente.post(
+    "/api/auth/login",
+    json={"email": "vendedor@ejemplo.com", "password": "vendedor123"},
+).json()["access_token"]
 
 inicio = cliente.post("/api/mp-oauth/auth-url", json={})
 state = parse_qs(urlparse(inicio.json()["auth_url"]).query)["state"][0]
@@ -338,8 +346,12 @@ for clave in ("MP_APP_ID", "MP_CLIENT_SECRET", "MP_REDIRECT_URI", "MP_TOKEN_KEY"
 from app.main import app
 
 cliente = TestClient(app, base_url="https://testserver")
-cliente.post("/api/auth/login", json={
-    "email": "vendedor@ejemplo.com", "password": "vendedor123"})
+# La cookie ya no autentica rutas protegidas: la credencial va en la cabecera.
+# La cookie sigue guardada en el cliente, que es lo que necesita el callback.
+cliente.headers["Authorization"] = "Bearer " + cliente.post(
+    "/api/auth/login",
+    json={"email": "vendedor@ejemplo.com", "password": "vendedor123"},
+).json()["access_token"]
 
 estado = cliente.get("/api/mp-oauth/status")
 vincular = cliente.post("/api/mp-oauth/auth-url", json={})
@@ -396,8 +408,12 @@ raiz.addHandler(manejador)
 raiz.setLevel(logging.DEBUG)
 
 cliente = TestClient(app, base_url="https://testserver")
-cliente.post("/api/auth/login", json={
-    "email": "vendedor@ejemplo.com", "password": "vendedor123"})
+# La cookie ya no autentica rutas protegidas: la credencial va en la cabecera.
+# La cookie sigue guardada en el cliente, que es lo que necesita el callback.
+cliente.headers["Authorization"] = "Bearer " + cliente.post(
+    "/api/auth/login",
+    json={"email": "vendedor@ejemplo.com", "password": "vendedor123"},
+).json()["access_token"]
 respuestas = []
 
 def state_nuevo():
@@ -644,6 +660,36 @@ async function apiUpload(path, { token, filename, content, contentType }) {
     throw new Error(`POST ${path} respondió HTTP ${response.status}: ${data?.detail || rawBody}`);
   }
   return { status: response.status, data };
+}
+
+/**
+ * Una carga multipart con la credencial que se le indique, sin ayudarla.
+ *
+ * `apiUpload` manda siempre la cabecera; acá hace falta poder mandar SÓLO la
+ * cookie, que es exactamente lo que hace un sitio ajeno: multipart es un tipo
+ * de contenido «simple», así que el navegador lo manda sin verificación previa
+ * y con la cookie puesta.
+ */
+async function subirCrudo(path, { header, cookie, campos = {}, archivo } = {}) {
+  const form = new FormData();
+  for (const [clave, valor] of Object.entries(campos)) form.append(clave, valor);
+  if (archivo) {
+    form.append(archivo.campo, new Blob([archivo.contenido], { type: archivo.tipo }),
+      archivo.nombre);
+  }
+  const headers = {};
+  if (header) headers.Authorization = `Bearer ${header}`;
+  if (cookie) headers.Cookie = cookie;
+  // Un origen que no es el nuestro, como el del ataque que reprodujimos.
+  headers.Origin = 'https://sitio-atacante.example';
+
+  const respuesta = await pedirConReintento(`${API_URL}${path}`, {
+    method: 'POST', headers, body: form,
+  });
+  const crudo = await respuesta.text();
+  let datos = null;
+  if (crudo) { try { datos = JSON.parse(crudo); } catch { datos = crudo; } }
+  return { status: respuesta.status, datos, galletas: respuesta.headers.getSetCookie() };
 }
 
 async function expectApiError(expectedStatus, callback) {
@@ -4642,12 +4688,12 @@ await runCase(48, 'Un turno encolado no sale con las credenciales de la sesión 
   }
 });
 
-await runCase(49, 'Cookie y Bearer contradictorios no eligen identidad', async () => {
-  // Los endpoints protegidos leían la cookie primero y el header sólo si no
-  // había cookie. Con el header de una cuenta y la cookie de otra, la API
-  // trabajaba en silencio como la segunda. Dos credenciales distintas no son
-  // una identidad: son dos, y quedarse con cualquiera es decidir por quien
-  // mandó la petición.
+await runCase(49, 'La cookie no autentica una ruta protegida: sólo la cabecera', async () => {
+  // Antes la cookie alcanzaba sola, y eso era CSRF: el navegador la manda en
+  // cualquier petición hacia acá, la haya pedido nuestra página o la de un
+  // tercero. Estaba demostrado, no supuesto. Ahora la credencial sale del
+  // header y de ningún otro lado, así que no hay nada que un sitio ajeno pueda
+  // hacer viajar solo.
   const otra = await apiRequest('/auth/login', {
     method: 'POST',
     body: { email: 'cliente@ejemplo.com', password: 'cliente123' },
@@ -4658,8 +4704,11 @@ await runCase(49, 'Cookie y Bearer contradictorios no eligen identidad', async (
 
   const [productoX, productoY, productoZ] = queryRows(`
     SELECT p.id FROM products p
-    WHERE p.status = 'ACTIVE' AND p.stock > 0 AND p.publication_type <> 'servicio'
-    ORDER BY p.id LIMIT 3
+    WHERE p.status = 'ACTIVE'
+      AND p.publication_type <> 'servicio'
+      AND COALESCE(p.stock, 0) - COALESCE(p.stock_reservado, 0) > 0
+    ORDER BY COALESCE(p.stock, 0) - COALESCE(p.stock_reservado, 0) DESC, p.id
+    LIMIT 3
   `).map((fila) => fila[0]);
 
   const carritoDe = (usuario) => queryRows(`
@@ -4669,7 +4718,6 @@ await runCase(49, 'Cookie y Bearer contradictorios no eligen identidad', async (
     ORDER BY ci.product_id
   `).map((fila) => fila.join('x')).join('|');
 
-  // Cada cuenta con su carrito, escrito con una sola credencial.
   await apiRequest('/cart/sync', {
     method: 'POST', token: tokenA, body: { items: [{ product_id: productoX, quantity: 1 }] },
   });
@@ -4681,130 +4729,108 @@ await runCase(49, 'Cookie y Bearer contradictorios no eligen identidad', async (
   assert(antesDeA && antesDeB && antesDeA !== antesDeB,
     'la preparación no dejó dos carritos distintos');
 
-  // --- lectura: una sola credencial, y las dos iguales, siguen andando
   const correoDe = (id) => queryRows(
     `SELECT email FROM users WHERE id = ${sqlLiteral(id)}`)[0][0];
   const correoDeA = correoDe(state.buyerId);
   const correoDeB = correoDe(idB);
 
+  // 1. La cabecera sola sigue siendo la credencial.
   const soloHeader = await pedirCrudo('/auth/me', { header: tokenA });
   assert(soloHeader.status === 200 && soloHeader.datos.email === correoDeA,
-    `sólo header: HTTP ${soloHeader.status} para ${soloHeader.datos?.email}`);
+    `sólo cabecera: HTTP ${soloHeader.status} para ${soloHeader.datos?.email}`);
+
+  // 2. La cookie sola ya no autentica nada, ni para leer.
   const soloCookie = await pedirCrudo('/auth/me', { cookie: `access_token=${tokenA}` });
-  assert(soloCookie.status === 200 && soloCookie.datos.email === correoDeA,
-    `sólo cookie: HTTP ${soloCookie.status} para ${soloCookie.datos?.email}`);
-  const iguales = await pedirCrudo('/auth/me', {
-    header: tokenA, cookie: `access_token=${tokenA}`,
+  assert(soloCookie.status === 401,
+    `la cookie sola autenticó: HTTP ${soloCookie.status} para ${soloCookie.datos?.email}`);
+  const motivo = String(soloCookie.datos?.detail ?? soloCookie.datos ?? '');
+  assert(!motivo.includes(correoDeA) && !motivo.includes(tokenA.slice(0, 12)),
+    `el rechazo devuelve cuenta o token: "${motivo}"`);
+
+  // 3. Con las dos, manda la cabecera: es la que puso quien escribió la
+  //    llamada. Ya no hay contradicción que resolver porque la cookie no es
+  //    una credencial acá; que la de la otra cuenta esté puesta no cambia nada.
+  const conCookieAjena = await pedirCrudo('/auth/me', {
+    header: tokenA, cookie: `access_token=${tokenB}`,
   });
-  assert(iguales.status === 200 && iguales.datos.email === correoDeA,
-    `las dos iguales: HTTP ${iguales.status} para ${iguales.datos?.email}`);
+  assert(conCookieAjena.status === 200 && conCookieAjena.datos.email === correoDeA,
+    `la cookie ajena movió la identidad: ${conCookieAjena.status} ${conCookieAjena.datos?.email}`);
+  const alReves = await pedirCrudo('/auth/me', {
+    header: tokenB, cookie: `access_token=${tokenA}`,
+  });
+  assert(alReves.status === 200 && alReves.datos.email === correoDeB,
+    `al revés: ${alReves.status} ${alReves.datos?.email}`);
 
-  // --- lectura contradictoria, en los dos órdenes
-  const contradictorias = [
-    ['header A + cookie B', tokenA, tokenB],
-    ['header B + cookie A', tokenB, tokenA],
-  ];
-  const motivos = new Set();
-  for (const [etiqueta, header, cookie] of contradictorias) {
-    const respuesta = await pedirCrudo('/auth/me', {
-      header, cookie: `access_token=${cookie}`,
-    });
-    assert(respuesta.status === 401,
-      `${etiqueta}: la API respondió HTTP ${respuesta.status} en vez de 401`);
-    const detalle = String(respuesta.datos?.detail ?? respuesta.datos ?? '');
-    assert(!detalle.includes(correoDeA) && !detalle.includes(correoDeB),
-      `${etiqueta}: el rechazo nombra una cuenta ("${detalle}")`);
-    assert(!detalle.includes(header.slice(0, 12)) && !detalle.includes(cookie.slice(0, 12)),
-      `${etiqueta}: el rechazo devuelve parte de un token`);
-    motivos.add(detalle);
-  }
-  assert(motivos.size === 1,
-    `el motivo cambia según el orden y deja ver cuál valía: ${[...motivos].join(' / ')}`);
+  // 4. Y escribiendo: la cookie sola no toca un carrito.
+  const escritura = await pedirCrudo('/cart/sync', {
+    method: 'POST',
+    cookie: `access_token=${tokenA}`,
+    body: { items: [{ product_id: productoZ, quantity: 7 }] },
+  });
+  assert(escritura.status === 401,
+    `la cookie sola escribió: HTTP ${escritura.status}`);
+  assert(carritoDe(state.buyerId) === antesDeA, 'se escribió sobre el primer carrito');
+  assert(carritoDe(idB) === antesDeB, 'se escribió sobre el segundo carrito');
 
-  // --- escritura contradictoria: 401 y ningún carrito tocado
-  for (const [etiqueta, header, cookie] of contradictorias) {
-    const respuesta = await pedirCrudo('/cart/sync', {
-      method: 'POST',
-      header,
-      cookie: `access_token=${cookie}`,
-      body: { items: [{ product_id: productoZ, quantity: 7 }] },
-    });
-    assert(respuesta.status === 401,
-      `${etiqueta} escribiendo: HTTP ${respuesta.status} en vez de 401`);
-    assert(carritoDe(state.buyerId) === antesDeA,
-      `${etiqueta}: se escribió sobre el carrito de la primera cuenta`);
-    assert(carritoDe(idB) === antesDeB,
-      `${etiqueta}: se escribió sobre el carrito de la segunda cuenta`);
-  }
-
-  // --- la dependencia opcional no elige identidad: queda anónima
+  // 5. La dependencia opcional SÍ sigue leyendo la cookie, y eso no es un
+  //    olvido: es lo único que puede reconocer la vuelta de Mercado Pago, que
+  //    es una navegación de nivel superior sin cabecera posible.
   const opcional = JSON.parse(correrEnLaApi(PROBAR_OPCIONAL, JSON.stringify({
     a: tokenA, b: tokenB,
   })));
   assert(opcional.solo_cookie === correoDeA,
-    `la dependencia opcional dejó de reconocer la cookie: ${opcional.solo_cookie}`);
-  assert(opcional.iguales === correoDeA,
-    `la dependencia opcional no reconoce las dos iguales: ${opcional.iguales}`);
+    `la opcional dejó de reconocer la cookie y el callback de MP se queda sin identidad: ${opcional.solo_cookie}`);
   assert(opcional.conflicto === null && opcional.conflicto_invertido === null,
-    `la dependencia opcional eligió identidad: ${JSON.stringify(opcional)}`);
+    `la opcional eligió identidad con dos credenciales: ${JSON.stringify(opcional)}`);
 
-  return 'sólo header, sólo cookie y las dos iguales conservan identidad; '
-    + 'contradictorias dan 401 en los dos órdenes, con el mismo motivo, sin nombrar '
-    + 'cuenta ni token, sin escribir ningún carrito y sin personalizar lo opcional';
+  return 'la cabecera sola autentica; la cookie sola da 401 para leer y para escribir, '
+    + 'sin nombrar cuenta ni token y sin tocar ningún carrito; con las dos manda la '
+    + 'cabecera; y la dependencia opcional conserva la cookie para la vuelta de Mercado Pago';
 });
 
-await runCase(50, 'La misma regla vale para el refresco, sin emitir ni tocar cookies', async () => {
-  // El refresco leía su cookie primero y el header después. Un refresco
-  // contradictorio no puede emitir tokens ni mover cookies de sesión.
+await runCase(50, 'Renovar es una mutación: sólo con la cabecera', async () => {
+  // El refresco EMITE credenciales nuevas. No pasa por la dependencia de
+  // acceso —lee su propio token—, así que cerrar sólo la dependencia lo habría
+  // dejado abierto justo a él.
   const otra = await apiRequest('/auth/login', {
     method: 'POST',
     body: { email: 'cliente@ejemplo.com', password: 'cliente123' },
   });
   const refrescoA = state.buyerRefreshToken;
   const refrescoB = otra.data.refresh_token;
-  const [[idB]] = queryRows("SELECT id FROM users WHERE email = 'cliente@ejemplo.com'");
   const correoDeA = queryRows(
     `SELECT email FROM users WHERE id = ${sqlLiteral(state.buyerId)}`)[0][0];
-  const correoDeB = queryRows(
-    `SELECT email FROM users WHERE id = ${sqlLiteral(idB)}`)[0][0];
-
   const emite = (respuesta) => Boolean(respuesta.datos?.access_token);
 
+  // 1. Con la cabecera renueva, y las cookies que emite son Lax.
   const soloHeader = await pedirCrudo('/auth/refresh', { method: 'POST', header: refrescoA });
   assert(soloHeader.status === 200 && emite(soloHeader)
     && soloHeader.datos.user.email === correoDeA,
-    `sólo header: HTTP ${soloHeader.status}`);
+    `sólo cabecera: HTTP ${soloHeader.status}`);
+  assert(soloHeader.galletas.length === 2,
+    `renovar con cabecera emitió ${soloHeader.galletas.length} cookies en vez de 2`);
+
+  // 2. La cookie sola no renueva, y no emite nada.
   const soloCookie = await pedirCrudo('/auth/refresh', {
     method: 'POST', cookie: `refresh_token=${refrescoA}`,
   });
-  assert(soloCookie.status === 200 && emite(soloCookie)
-    && soloCookie.datos.user.email === correoDeA,
-    `sólo cookie: HTTP ${soloCookie.status}`);
-  const iguales = await pedirCrudo('/auth/refresh', {
-    method: 'POST', header: refrescoA, cookie: `refresh_token=${refrescoA}`,
+  assert(soloCookie.status === 401,
+    `la cookie sola renovó: HTTP ${soloCookie.status}`);
+  assert(!emite(soloCookie), 'el rechazo igual emitió tokens');
+  assert(soloCookie.galletas.length === 0,
+    `el rechazo movió ${soloCookie.galletas.length} cookies`);
+  const motivo = String(soloCookie.datos?.detail ?? soloCookie.datos ?? '');
+  assert(!motivo.includes(correoDeA), `el rechazo nombra una cuenta: "${motivo}"`);
+
+  // 3. Con las dos, manda la cabecera. La cookie ajena no arrastra la sesión.
+  const conCookieAjena = await pedirCrudo('/auth/refresh', {
+    method: 'POST', header: refrescoA, cookie: `refresh_token=${refrescoB}`,
   });
-  assert(iguales.status === 200 && emite(iguales) && iguales.datos.user.email === correoDeA,
-    `las dos iguales: HTTP ${iguales.status}`);
+  assert(conCookieAjena.status === 200 && conCookieAjena.datos.user.email === correoDeA,
+    `la cookie ajena movió a quién se le renueva: ${conCookieAjena.datos?.user?.email}`);
 
-  for (const [etiqueta, header, cookie] of [
-    ['header A + cookie B', refrescoA, refrescoB],
-    ['header B + cookie A', refrescoB, refrescoA],
-  ]) {
-    const respuesta = await pedirCrudo('/auth/refresh', {
-      method: 'POST', header, cookie: `refresh_token=${cookie}`,
-    });
-    assert(respuesta.status === 401,
-      `${etiqueta}: HTTP ${respuesta.status} en vez de 401`);
-    assert(!emite(respuesta), `${etiqueta}: el rechazo igual emitió tokens`);
-    assert(respuesta.galletas.length === 0,
-      `${etiqueta}: el rechazo movió cookies de sesión (${respuesta.galletas.length})`);
-    const detalle = String(respuesta.datos?.detail ?? respuesta.datos ?? '');
-    assert(!detalle.includes(correoDeA) && !detalle.includes(correoDeB),
-      `${etiqueta}: el rechazo nombra una cuenta ("${detalle}")`);
-  }
-
-  return 'refresco con una sola credencial y con las dos iguales emite normalmente; '
-    + 'contradictorio da 401 en los dos órdenes, sin emitir tokens y sin tocar cookies';
+  return 'renovar con cabecera emite sus dos cookies; la cookie sola da 401 sin emitir '
+    + 'tokens ni mover cookies; con las dos manda la cabecera';
 });
 
 // --- escenario de logística compartido por los casos de la Pieza C ----------
@@ -7472,8 +7498,11 @@ from app.db.base import SessionLocal
 datos = json.loads(input())
 
 cliente = TestClient(app, base_url="https://testserver")
-cliente.post("/api/auth/login", json={
-    "email": "cliente@ejemplo.com", "password": "cliente123"})
+# Idem: la cabecera autentica, la cookie queda para lo que la necesite.
+cliente.headers["Authorization"] = "Bearer " + cliente.post(
+    "/api/auth/login",
+    json={"email": "cliente@ejemplo.com", "password": "cliente123"},
+).json()["access_token"]
 
 cliente.delete("/api/cart")
 cliente.post("/api/cart/sync", json={"items": [
@@ -7798,8 +7827,10 @@ rutas.crear_ordenes = retenida
 
 def sesion():
     cliente = TestClient(app, base_url="https://testserver")
-    cliente.post("/api/auth/login", json={
-        "email": "cliente@ejemplo.com", "password": "cliente123"})
+    cliente.headers["Authorization"] = "Bearer " + cliente.post(
+        "/api/auth/login",
+        json={"email": "cliente@ejemplo.com", "password": "cliente123"},
+    ).json()["access_token"]
     return cliente
 
 
@@ -11044,6 +11075,257 @@ await runCase(115, 'Un detalle de «Otra» sin «Otra» no sobrevive, venga del 
   return 'un detalle sin «Otra» no se guarda por ninguno de los dos caminos —alta y '
     + 'edición— ni mandando el campo de cargas ni omitiéndolo; con «Otra» declarada se '
     + 'guarda, se actualiza mandando sólo el detalle, y se va cuando «Otra» se va';
+});
+
+await runCase(116, 'La cookie sola no dispara ninguna de las cuatro mutaciones del ataque', async () => {
+  // Las cuatro reproducciones del CSRF que quedó demostrado en el informe.
+  // Multipart es un tipo de contenido «simple»: un sitio ajeno lo manda sin
+  // verificación previa y el navegador le pone la cookie. Lo que lo cierra no
+  // es CORS —que sólo tapa la respuesta— sino que la cookie no autentica.
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const cookieDelVendedor = `access_token=${vendedor.token}`;
+  const pdf = `%PDF-1.4\n${'x'.repeat(400)}\n%%EOF`;
+  // Una imagen de verdad: con uno inventado el rechazo sería de la validación
+  // de imágenes y no diría nada sobre qué credencial se aceptó.
+  const png = RECIBO_PNG;
+
+  const documentacionDe = (email) => {
+    // El `'fin'` es por `querySql`, que recorta la salida: una columna vacía
+    // al final se pierde y la fila vuelve con menos campos de los pedidos.
+    const [fila] = queryRows(`
+      SELECT COALESCE(d.razon_social, ''), COALESCE(d.estado::text, ''), 'fin'
+      FROM users u LEFT JOIN documentacion_de_vendedores d ON d.user_id = u.id
+      WHERE u.email = ${sqlLiteral(email)}`);
+    return `${fila[0]}|${fila[1]}`;
+  };
+
+  const [[productoDelVendedor]] = queryRows(`
+    SELECT id FROM products WHERE seller_id = ${sqlLiteral(vendedor.id)}
+    ORDER BY id LIMIT 1`);
+  assert(productoDelVendedor, 'el vendedor del seed no tiene publicaciones');
+  const imagenesDe = (producto) => queryCount(
+    `SELECT COUNT(*) FROM product_images WHERE product_id = ${sqlLiteral(producto)}`);
+
+  const orden = await crearOrdenTransferencia('Ruta 8 km 300');
+  const comprobanteDe = (id) => {
+    const [fila] = queryRows(
+      `SELECT COALESCE(transfer_receipt_url, ''), 'fin' FROM orders WHERE id = ${sqlLiteral(id)}`);
+    return fila[0];
+  };
+
+  // Un CUIT con dígito verificador válido: si no, el rechazo sería de la
+  // validación del producto y no probaría nada de credenciales.
+  const cuit = '20123456786';
+
+  const antes = {
+    documentacion: documentacionDe('vendedor@ejemplo.com'),
+    imagenes: imagenesDe(productoDelVendedor),
+    comprobante: comprobanteDe(orden.order_id),
+  };
+
+  // --- 1, 2 y 3: las tres rutas multipart, con la cookie sola
+  const intentos = [
+    ['documentación fiscal', '/documentacion', cookieDelVendedor, {
+      campos: { cuit, razon_social: 'Robada Por CSRF SRL' },
+      archivo: { campo: 'archivo', nombre: 'suplantado.pdf', contenido: pdf, tipo: 'application/pdf' },
+    }],
+    ['imágenes de publicación', `/products/${productoDelVendedor}/images`, cookieDelVendedor, {
+      archivo: { campo: 'files', nombre: 'intrusa.png', contenido: png, tipo: 'image/png' },
+    }],
+    ['comprobante de transferencia', `/orders/${orden.order_id}/transfer-receipt`,
+      `access_token=${state.buyerToken}`, {
+      archivo: { campo: 'file', nombre: 'falso.png', contenido: png, tipo: 'image/png' },
+    }],
+  ];
+
+  for (const [etiqueta, ruta, cookie, cuerpo] of intentos) {
+    const respuesta = await subirCrudo(ruta, { cookie, ...cuerpo });
+    assert(respuesta.status === 401,
+      `${etiqueta}: la cookie sola devolvió HTTP ${respuesta.status} en vez de 401`);
+    const motivo = String(respuesta.datos?.detail ?? respuesta.datos ?? '');
+    assert(!/vendedor@ejemplo\.com|cliente@ejemplo\.com/.test(motivo),
+      `${etiqueta}: el rechazo nombra una cuenta: "${motivo}"`);
+  }
+
+  assert(documentacionDe('vendedor@ejemplo.com') === antes.documentacion,
+    `la documentación cambió: ${antes.documentacion} → ${documentacionDe('vendedor@ejemplo.com')}`);
+  assert(imagenesDe(productoDelVendedor) === antes.imagenes,
+    `entraron imágenes: ${antes.imagenes} → ${imagenesDe(productoDelVendedor)}`);
+  assert(comprobanteDe(orden.order_id) === antes.comprobante,
+    'se adjuntó un comprobante con la cookie sola');
+
+  // --- 4: renovar, que es la cuarta mutación y no pasa por la dependencia
+  const renovacion = await pedirCrudo('/auth/refresh', {
+    method: 'POST', cookie: `refresh_token=${state.buyerRefreshToken}`,
+  });
+  assert(renovacion.status === 401,
+    `renovar con la cookie sola: HTTP ${renovacion.status}`);
+  assert(renovacion.galletas.length === 0,
+    `renovar rechazado igual emitió ${renovacion.galletas.length} cookies`);
+  assert(!renovacion.datos?.access_token, 'renovar rechazado igual emitió un token');
+
+  // --- y lo mismo con la cabecera: las cuatro tienen que seguir andando
+  const conCabecera = await subirCrudo('/documentacion', {
+    header: vendedor.token,
+    campos: { cuit, razon_social: 'Campo Verde SRL' },
+    archivo: { campo: 'archivo', nombre: 'constancia.pdf', contenido: pdf, tipo: 'application/pdf' },
+  });
+  assert(conCabecera.status === 201,
+    `con cabecera la documentación no entró: HTTP ${conCabecera.status} ${JSON.stringify(conCabecera.datos)}`);
+
+  const imagenConCabecera = await subirCrudo(`/products/${productoDelVendedor}/images`, {
+    header: vendedor.token,
+    archivo: { campo: 'files', nombre: 'propia.png', contenido: png, tipo: 'image/png' },
+  });
+  assert(imagenConCabecera.status < 400,
+    `con cabecera la imagen no entró: HTTP ${imagenConCabecera.status}`);
+  assert(imagenesDe(productoDelVendedor) === antes.imagenes + 1,
+    `con cabecera no se sumó la imagen: ${imagenesDe(productoDelVendedor)}`);
+
+  const comprobanteConCabecera = await subirCrudo(
+    `/orders/${orden.order_id}/transfer-receipt`, {
+      header: state.buyerToken,
+      archivo: { campo: 'file', nombre: 'recibo.png', contenido: png, tipo: 'image/png' },
+    });
+  assert(comprobanteConCabecera.status < 400,
+    `con cabecera el comprobante no entró: HTTP ${comprobanteConCabecera.status}`);
+  assert(comprobanteDe(orden.order_id) !== antes.comprobante,
+    'con cabecera el comprobante no quedó adjunto');
+
+  const renovacionBuena = await pedirCrudo('/auth/refresh', {
+    method: 'POST', header: state.buyerRefreshToken,
+  });
+  assert(renovacionBuena.status === 200 && renovacionBuena.datos?.access_token,
+    `con cabecera no se pudo renovar: HTTP ${renovacionBuena.status}`);
+  state.buyerToken = renovacionBuena.datos.access_token;
+  state.buyerRefreshToken = renovacionBuena.datos.refresh_token;
+
+  return 'las tres cargas multipart y la renovación devuelven 401 con la cookie sola, sin '
+    + 'escribir documentación, imágenes ni comprobante y sin emitir credenciales; con la '
+    + 'cabecera las cuatro siguen funcionando';
+});
+
+await runCase(117, 'En el navegador cruzado: la cookie se guarda, se renueva, se borra y sirve para volver de Mercado Pago', async () => {
+  // «Cruzado» de verdad: la página vive en `localhost` y la API en `127.0.0.1`.
+  // Son hosts distintos, así que para el navegador son sitios distintos, que es
+  // la situación de producción —frontend y Backend en dominios separados— y la
+  // única en la que `Lax` significa algo.
+  const apiCruzada = API_URL.replace('localhost', '127.0.0.1');
+  assert(!FRONTEND_URL.includes('127.0.0.1'),
+    'la página y la API quedaron en el mismo host: el caso no probaría nada cruzado');
+
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const navegador = await chromium.launch({ headless: true });
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  try {
+    await desvincular(vendedor.token);
+    const ctx = await navegador.newContext();
+    const page = await ctx.newPage();
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+
+    const deSesion = async () => (await ctx.cookies())
+      .filter((c) => c.name === 'access_token' || c.name === 'refresh_token');
+
+    // 1. Entrar guarda las dos cookies, y salen Lax.
+    const entrada = await page.evaluate(async (api) => (await fetch(`${api}/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ email: 'vendedor@ejemplo.com', password: 'vendedor123' }),
+    })).json(), apiCruzada);
+    const guardadas = await deSesion();
+    assert(guardadas.length === 2,
+      `el navegador guardó ${guardadas.length} cookies de sesión en vez de 2`);
+    // `None` y no `Lax`: está medido que entre sitios distintos el navegador
+    // DESCARTA un `Set-Cookie` marcado `Lax`, así que con `Lax` esta cookie no
+    // llegaría a existir y la vuelta de Mercado Pago se quedaría sin a quién
+    // reconocer. Que la cookie sea ambiental ya no habilita nada: ninguna ruta
+    // que mute la acepta.
+    for (const galleta of guardadas) {
+      assert(galleta.sameSite === 'None',
+        `${galleta.name} quedó SameSite=${galleta.sameSite}: entre sitios no se guardaría`);
+      assert(galleta.httpOnly, `${galleta.name} dejó de ser HttpOnly`);
+      assert(galleta.secure, `${galleta.name} dejó de ser Secure`);
+    }
+    const primeras = Object.fromEntries(guardadas.map((c) => [c.name, c.value]));
+
+    // 2. Renovar con la cabecera las reemplaza: siguen Lax y cambian de valor.
+    const renovado = await page.evaluate(async ({ api, refresco }) =>
+      (await fetch(`${api}/auth/refresh`, {
+        method: 'POST', credentials: 'include',
+        headers: { Authorization: `Bearer ${refresco}` },
+      })).json(), { api: apiCruzada, refresco: entrada.refresh_token });
+    assert(renovado.access_token, 'renovar desde el navegador no devolvió token');
+    const renovadas = await deSesion();
+    // Lo que importa no es que el texto del token cambie —dos JWT emitidos en
+    // el mismo segundo para la misma cuenta salen idénticos— sino que la cookie
+    // guardada sea la que acaba de emitir el refresco.
+    const guardadaAhora = renovadas.find((c) => c.name === 'access_token');
+    assert(guardadaAhora && guardadaAhora.value === renovado.access_token,
+      'la cookie guardada no es la que emitió el refresco');
+    assert(renovadas.length === 2, `tras renovar quedaron ${renovadas.length} cookies`);
+    for (const galleta of renovadas) {
+      assert(galleta.sameSite === 'None',
+        `tras renovar ${galleta.name} quedó SameSite=${galleta.sameSite}`);
+      assert(galleta.value.length > 20, `${galleta.name} quedó vacía tras renovar`);
+    }
+
+    // 3. Salir las borra, también cruzado.
+    await page.evaluate(async (api) => (await fetch(`${api}/auth/logout`, {
+      method: 'POST', credentials: 'include',
+    })).status, apiCruzada);
+    const trasSalir = await deSesion();
+    assert(trasSalir.length === 0,
+      `cerrar sesión dejó ${trasSalir.length} cookies: ${trasSalir.map((c) => c.name).join(', ')}`);
+
+    // 4. La vuelta de Mercado Pago: navegación de nivel superior entre sitios,
+    //    sin ninguna cabecera posible. Es lo único para lo que existe la cookie.
+    await page.evaluate(async (api) => (await fetch(`${api}/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ email: 'vendedor@ejemplo.com', password: 'vendedor123' }),
+    })).json(), apiCruzada);
+    assert((await deSesion()).length === 2, 'la segunda entrada no dejó cookies');
+
+    const authUrl = await pedirUrlDeVinculo(vendedor.token);
+    const callback = (await autorizarEnElDoble(authUrl, 'ok:900001'))
+      .replace('localhost', '127.0.0.1');
+
+    await page.goto(callback, { waitUntil: 'domcontentloaded' });
+    const destino = new URL(page.url());
+    assert(destino.searchParams.get('mp') === 'vinculado',
+      `la vuelta no vinculó: ${destino.search} · ${destino.searchParams.get('mp_error')}`);
+
+    const fila = vinculoEnLaBase('vendedor@ejemplo.com');
+    assert(fila.cuenta === '900001',
+      `la cuenta vinculada no es la del vendedor: ${JSON.stringify(fila.cuenta)}`);
+    assert(fila.acceso && fila.refresco, 'no quedaron credenciales guardadas');
+
+    // 5. Y el dueño se sigue comprobando: el mismo state, con la cookie de
+    //    otra cuenta, no vincula. La cookie identifica; no autoriza sola.
+    await desvincular(vendedor.token);
+    const otroAuthUrl = await pedirUrlDeVinculo(vendedor.token);
+    const otroCallback = (await autorizarEnElDoble(otroAuthUrl, 'ok:900002'))
+      .replace('localhost', '127.0.0.1');
+    await page.evaluate(async (api) => (await fetch(`${api}/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ email: 'cliente@ejemplo.com', password: 'cliente123' }),
+    })).json(), apiCruzada);
+
+    await page.goto(otroCallback, { waitUntil: 'domcontentloaded' });
+    const ajeno = new URL(page.url());
+    assert(ajeno.searchParams.get('mp_error') === 'sesion_distinta',
+      `el state ajeno devolvió «${ajeno.searchParams.get('mp_error')}» en vez de sesion_distinta`);
+    const sinVinculo = vinculoEnLaBase('vendedor@ejemplo.com');
+    assert(!sinVinculo.cuenta,
+      `se vinculó con la sesión de otra cuenta: ${sinVinculo.cuenta}`);
+
+    await ctx.close();
+    return 'entrar guarda dos cookies HttpOnly y Secure, renovar con cabecera las reemplaza, '
+      + 'salir las borra; la vuelta de Mercado Pago —navegación de nivel superior entre '
+      + 'sitios— llega con la cookie y vincula, y con la sesión de otra cuenta no vincula';
+  } finally {
+    await navegador.close();
+    await doble.cerrar();
+    try { await desvincular(vendedor.token); } catch { /* la limpieza no tapa el motivo real */ }
+  }
 });
 
 const passed = results.filter((result) => result.passed).length;

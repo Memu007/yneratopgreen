@@ -13,15 +13,18 @@ from app.models.user import User, UserRole
 
 security = HTTPBearer(auto_error=False)
 
-# Una petición puede traer la credencial en la cookie o en el header. Cuando
-# trae las dos y no son el mismo token, no tiene UNA identidad: tiene dos, y
-# quedarse con cualquiera de ellas es decidir por quien la mandó. Antes ganaba
-# la cookie en silencio, así que una petición con el header de una cuenta y la
-# cookie de otra se ejecutaba como la segunda. La regla es la misma para el
-# token de acceso y para el de refresco.
-CREDENCIALES_EN_CONFLICTO = "Credenciales en conflicto"
-
-
+# La cookie NO autentica rutas protegidas. Es una credencial ambiental: el
+# navegador la manda sola, sin que la página lo pida, y eso alcanzaba para que
+# un sitio ajeno actuara en nombre de quien lo visitara. Estaba demostrado, no
+# supuesto: una carga multipart desde otro origen reemplazaba la documentación
+# fiscal de un vendedor. Lo que lo cierra no es un atributo bien puesto ni un
+# token de comprobación, es que **no hay camino**: acá la credencial sale del
+# header `Authorization` y de ningún otro lado.
+#
+# La cookie sigue existiendo por un único motivo, y sólo la lee
+# `get_current_user_optional`: la vuelta de Mercado Pago es una navegación de
+# nivel superior, y ninguna cabecera puede acompañarla. Esa ruta ya se defiende
+# sola con su `state` de un solo uso.
 def hay_conflicto_de_credenciales(
     request: Request,
     nombre_de_cookie: str,
@@ -44,43 +47,22 @@ def bearer_del_header(request: Request) -> Optional[str]:
     return None
 
 
-def credencial_unica(
-    request: Request,
-    nombre_de_cookie: str,
-    del_header: Optional[str],
-) -> Optional[str]:
-    """
-    La única credencial de la petición, o None si no trae ninguna.
-
-    No hay preferencia entre cookie y header. Si vienen las dos y difieren,
-    corta acá: antes de decodificar nada, antes de mirar la base y sin decir
-    cuál de las dos servía. Tampoco se sigue con la otra después de rechazar
-    una.
-    """
-    if hay_conflicto_de_credenciales(request, nombre_de_cookie, del_header):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=CREDENCIALES_EN_CONFLICTO,
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return request.cookies.get(nombre_de_cookie) or del_header
-
-
-def get_token_from_cookie_or_header(
-    request: Request,
+def token_del_header(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> str:
     """
-    Obtiene el token JWT de la cookie o del header Authorization
+    El token de acceso, del header `Authorization`. De ahí y de ningún otro lado.
 
-    Con las dos presentes y distintas, la petición se rechaza: ver
-    `credencial_unica`.
+    No mira la cookie a propósito. Una cookie viaja sola en cualquier petición
+    que el navegador haga hacia acá, la haya pedido nuestra página o la de un
+    tercero; el header lo pone quien escribe la llamada. Por eso la cookie no
+    puede ser la credencial de algo que cambia estado.
+
+    Que acá no se lea la cookie es también lo que hace innecesaria la vieja
+    regla de credenciales en conflicto: no hay dos fuentes que puedan
+    contradecirse, hay una.
     """
-    token = credencial_unica(
-        request,
-        "access_token",
-        credentials.credentials if credentials else None,
-    )
+    token = credentials.credentials if credentials else None
 
     if not token:
         raise HTTPException(
@@ -93,7 +75,7 @@ def get_token_from_cookie_or_header(
 
 
 def get_current_user(
-    token: str = Depends(get_token_from_cookie_or_header),
+    token: str = Depends(token_del_header),
     db: Session = Depends(get_db)
 ) -> User:
     """
@@ -217,10 +199,16 @@ def get_current_user_optional(
     Obtiene el usuario actual si existe token, sino retorna None
     Útil para endpoints públicos que pueden personalizar la respuesta si hay usuario
 
-    Con credenciales contradictorias la respuesta queda anónima: personalizar
-    sería elegir una de las dos identidades, que es justo lo que no se puede
-    hacer. No se rechaza porque acá no estar autenticado es una respuesta
-    válida.
+    Es el ÚNICO lugar que lee la cookie, y existe por la vuelta de Mercado
+    Pago: una navegación de nivel superior a la que ninguna cabecera puede
+    acompañar. Esa ruta no queda expuesta por leerla, porque se defiende con su
+    `state` de un solo uso, que además se compara contra esta identidad.
+
+    La comprobación de contradicción se conserva acá aunque una navegación no
+    pueda traer header: si mañana esta dependencia se usa en una ruta que sí
+    los recibe, una cookie de una cuenta y un header de otra volverían a
+    personalizar en silencio por la primera. Con las dos, la respuesta queda
+    anónima; no se rechaza, porque acá no estar autenticado es válido.
     """
     try:
         if hay_conflicto_de_credenciales(
