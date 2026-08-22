@@ -1,6 +1,6 @@
 # Cronograma — el plan, con fechas reales
 
-Actualizado: 2026-08-14.
+Actualizado: 2026-08-22.
 
 **Fuente única: la sección 5 del PDF** *Documento de Especificación
 Funcional y Propuesta Comercial*, el que armó el socio y que la clienta
@@ -16,9 +16,9 @@ hay que corregir el plan interno.
 
 El PDF numera semanas, no fechas. El 2026-08-14 Emi confirmó el OK comercial
 dado por la clienta en reunión y la firma legal programada para el viernes
-2026-08-21.
+2026-08-21. El 2026-08-22 confirmó que el contrato quedó firmado.
 
-**Ancla confirmada: viernes 2026-08-21 = primer día de la semana 1.** Cada
+**Ancla confirmada y vigente: viernes 2026-08-21 = primer día de la semana 1.** Cada
 semana corre de viernes a jueves. El trabajo anterior es adelanto previo y no
 consume el plazo contractual. Esta ancla reemplaza la del 07/08 registrada el
 05/08, cuando la fecha de firma todavía no estaba cerrada.
@@ -35,9 +35,9 @@ consume el plazo contractual. Esta ancla reemplaza la del 07/08 registrada el
 | 4 — Pagos y checkout | Mercado Pago y validación de transferencias | 9–10 | 16/10 | 29/10 |
 | 5 — QA y lanzamiento | Pruebas, usabilidad, carga inicial, **despliegue en producción** | 11–12 | 30/10 | 12/11 |
 
-**Hoy es viernes 2026-08-14: preparación previa a la semana 1.** La puerta de
-Fase 1 se cerró anticipadamente; el ensayo Railway es evidencia temprana de
-Fase 5, no un despliegue productivo ni un adelanto del hito final.
+**Hoy es sábado 2026-08-22: semana 1 en curso.** La puerta de Fase 1 se cerró
+anticipadamente; el ensayo Railway es evidencia temprana de Fase 5, no un
+despliegue productivo ni un adelanto del hito final.
 
 ### El colchón de dos semanas
 

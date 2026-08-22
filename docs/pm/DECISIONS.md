@@ -5,6 +5,18 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-22 — Firma confirmada; comienza trabajo postfirma
+
+Emi confirmó que el contrato quedó firmado. Se mantiene el ancla ya acordada:
+viernes 2026-08-21 como primer día de la semana 1; Fase 1 cierra el 03/09, las
+doce semanas el 12/11 y el colchón contractual el 26/11.
+
+Se levanta el freno previo a la firma. La primera pieza de producto integra los
+tres datos logísticos ya validados en el prototipo y decididos el 15/08. No se
+abre un rediseño genérico ni Mercado Pago: el bloque tiene alcance y evidencia
+propios. Después corresponde revisar los recorridos principales con problemas
+concretos, no con una orden vaga de “mejorar UX”.
+
 ## 2026-08-15 — Datos logísticos mínimos: comparar mejor sin construir un Uber de fletes
 
 Después de revisar el prototipo y contrastarlo con productos del sector, PM

@@ -2683,3 +2683,62 @@ No conviertas los tres campos propuestos en producto hasta que Emi y PM decidan
 si entran, si las cargas sólo se muestran o también filtran, y si la ficha
 alcanza para comparar. El límite del MVP sigue siendo selección y contacto, sin
 cotización, reserva, cobro ni seguimiento del flete.
+
+## 2026-08-22 — Tarea activa única: datos logísticos validados en producto
+
+La firma quedó confirmada. Implementá el primer bloque postfirma: llevar al
+producto real los tres datos opcionales ya aprobados en la decisión del
+2026-08-15 y probados en `prototypes/logistica-dos-recorridos.html`.
+
+Antes de editar, leé esa decisión y recorré el flujo actual completo en
+`backend/app/models/user.py`, esquemas y rutas de autenticación/logística,
+servicio de coincidencia, alta/edición de perfil, checkout y casos de logística
+del smoke. Elegí vos el esquema mínimo; no dupliques campos existentes.
+
+### Resultado y alcance
+
+- **Marca/modelo:** dato opcional, editable y visible para comparar antes de
+  seleccionar transportista.
+- **Dominio:** dato opcional y privado. No puede aparecer en el directorio,
+  respuesta de candidatos, catálogo, logs ni otro recurso público; se revela
+  junto con el contacto únicamente después de una selección válida por el flujo
+  autorizado existente.
+- **Cargas permitidas:** selección múltiple opcional, con «Otra» y detalle libre.
+  Se muestra como declaración del transportista, pero no filtra, ordena ni
+  excluye candidatos.
+- Alta, edición y transportista demo deben soportar los tres datos. Perfiles
+  existentes y campos vacíos siguen funcionando sin completar nada.
+- Migración reversible y segura para datos existentes. No sobrescribas valores
+  personalizados al repetir el seed.
+
+### Fuera de alcance
+
+Sin cotización, reserva, disponibilidad, pago, seguimiento, compatibilidad
+automática por carga, validación del dominio, ARCA/RENAPER, rol nuevo ni rediseño
+general. No toques Mercado Pago, Railway, documentación de vendedores ni
+banderas productivas.
+
+### Criterios de aceptación
+
+1. Alta y edición conservan exactamente los tres datos; vacíos siguen válidos y
+   otro usuario no puede modificarlos.
+2. Antes de seleccionar, API y DOM muestran marca/modelo y cargas declaradas,
+   pero nunca dominio ni contacto. Después de una selección válida, la respuesta
+   existente revela dominio y contacto; quitar o cambiar selección no conserva
+   datos privados viejos.
+3. Con los mismos transportistas, agregar, quitar o cambiar cargas declaradas no
+   modifica el conjunto ni el orden de candidatos compatibles. La coincidencia
+   sigue dependiendo sólo de las reglas geográficas vigentes.
+4. «Otra» conserva su detalle; duplicados, espacios y valores inválidos quedan
+   normalizados o rechazados de forma consistente, con límites explícitos.
+5. Migración ida/vuelta con datos existentes, seed repetido y regresiones de
+   privacidad, permisos y ausencia de filtro pasan. Las regresiones deben fallar
+   contra el commit anterior por la propiedad que prueban.
+6. Corré suite completa desde base limpia, puerta del hito, `alembic check`,
+   build y `diff --check`. Como cambia interfaz, corré accesibilidad y contraste
+   en alta, perfil y selección, en escritorio y 390×844.
+
+Entregá un commit de producto y luego informe separado en `PARA-PM.md` con
+migración, superficies donde aparece cada dato, evidencia y riesgos. Si el flujo
+actual no permite mantener el dominio fuera de la respuesta preselección, frená
+y proponé una sola corrección mínima antes de continuar. No abras otra mejora.

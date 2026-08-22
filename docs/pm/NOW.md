@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-08-15.
+Actualizado: 2026-08-22.
 
 ## Relevo inmediato — leer primero
 
@@ -14,10 +14,10 @@ Actualizado: 2026-08-15.
   cierre `9988879` e informe `bbb0d2d`. Los dos bordes de la primera revisión
   quedaron cerrados. La PM sólo debe editar `docs/pm/` y contrastar el commit
   actual al ponerse al día.
-- Cronograma: viernes 14/08, preparación previa. La clienta dio el OK comercial
-  y la firma legal quedó programada para el viernes 21/08, nueva ancla de la
-  semana 1. Las doce semanas cierran el 12/11 y el colchón el 26/11. El producto
-  está adelantado en Fase 4 sin habilitar producción ni el hito final.
+- Cronograma: firma confirmada por Emi el 22/08. Se conserva el ancla contractual
+  acordada: viernes 21/08, primer día de la semana 1. Fase 1 corre hasta el 03/09;
+  las doce semanas cierran el 12/11 y el colchón el 26/11. El producto está
+  adelantado en Fase 4 sin habilitar producción ni el hito final.
 - Orden acordado: antes de la firma la Dev sólo prepara una simulación UX
   aislada de logística, autorizada por Emi; no modifica producto. PM puede
   relevar UX y hacer una única prueba MP con sesiones aisladas. Tras la firma:
@@ -47,12 +47,10 @@ Actualizado: 2026-08-15.
   de credenciales; el ensayo fallido cambió ambas cuentas en el mismo perfil
   del navegador. Si falla también aislado, capturar la actividad de la cuenta
   MP y recién entonces decidir una devolución a Dev.
-- Dev: sin tarea activa. El prototipo aislado de logística quedó aceptado con
-  base `8002fea`, corrección `c26495d` e informe `ee2fefb`. Antes de llevar algo
-  al producto, PM cerró la decisión: marca/modelo opcional y visible; dominio
-  privado hasta seleccionar; cargas opcionales y sólo informativas, sin filtro
-  duro. Se implementa después de la firma dentro del pulido logístico. Mercado
-  Pago y Railway no se reabren por esta pieza.
+- Dev: tarea activa postfirma en `PARA-DEV.md`: llevar al producto los tres datos
+  ya validados en el prototipo. Marca/modelo será opcional y visible; dominio,
+  privado hasta seleccionar; cargas, opcionales e informativas, sin filtro duro.
+  Mercado Pago, Railway, cotización, reserva, cobro y seguimiento quedan fuera.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
