@@ -2742,3 +2742,40 @@ Entregá un commit de producto y luego informe separado en `PARA-PM.md` con
 migración, superficies donde aparece cada dato, evidencia y riesgos. Si el flujo
 actual no permite mantener el dominio fuera de la respuesta preselección, frená
 y proponé una sola corrección mínima antes de continuar. No abras otra mejora.
+
+## 2026-08-22 — Primera revisión de `0395d67`: base conforme, cierre devuelto
+
+La arquitectura y el alcance quedan bien encaminados: el dominio está ausente
+del contrato y la consulta de candidatos, marca/modelo y cargas se comparan, y
+las cargas no entran en la regla geográfica. PM obtuvo build, sintaxis Python y
+`diff --check` verdes. Docker local continúa apagado, por lo que 114/114 y las
+puertas visuales siguen siendo evidencia informada por vos.
+
+La entrega **todavía no queda aceptada** por una inconsistencia discriminante en
+el normalizador compartido. Hoy:
+
+```python
+normalizar(None, "Bidones sueltos") == (None, "Bidones sueltos")
+```
+
+Eso permite guardar `carrier_cargo_other` sin haber declarado `otra`; el texto
+queda huérfano e invisible. Contradice la regla del propio servicio y el criterio
+de normalización consistente. La prueba actual cubre quitar `otra`, pero no
+cubre enviar el detalle solo desde un alta o una edición sin cargas.
+
+### Corrección mínima
+
+- Corregí la raíz únicamente en `app.services.cargas.normalizar`: si el estado
+  prospectivo no contiene `otra`, el detalle no puede sobrevivir. Elegí limpiar
+  o rechazar, pero mantené la misma política en alta y edición y explicala.
+- Agregá una regresión que atraviese API y SQL para detalle sin `otra`; debe
+  fallar contra `0395d67` por conservar el valor huérfano.
+- Sin migración nueva, rediseño, campos, dependencias ni cambios visuales.
+- Corregí en el informe el hash inexistente `3aa6d32`: el commit de producto
+  publicado es `0395d67`.
+- Corré la regresión, suite completa, sintaxis y `diff --check`. No repitas
+  accesibilidad, contraste, hito ni migración: esta corrección no toca esas
+  superficies y su evidencia anterior se conserva.
+
+Entregá un commit mínimo y luego el informe corregido. No abras el hotfix de
+seguridad ni otra función hasta que PM cierre esta pieza.
