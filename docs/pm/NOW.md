@@ -56,8 +56,9 @@ Actualizado: 2026-08-22.
   auditoría CSRF `717f40b` reprodujo una escritura multipart entre sitios sin
   token robado. Base de cierre CSRF `6ece3fb`: Bearer header-only para API y
   refresh, cookie `SameSite=None` sólo leída por el callback MP. Corrección de
-  comentarios `0f330a7` aceptada. No hay tarea Dev activa: PM debe desplegar el
-  Backend y comprobar health antes de abrir la pieza siguiente.
+  comentarios `0f330a7` aceptada y desplegada. Tarea Dev activa: primera pieza
+  visual del marketplace público, limitada a identidad, imágenes, jerarquía y
+  eliminación de emojis; sin cambiar flujos, backend ni pagos.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar

@@ -2997,3 +2997,79 @@ ejecutó Alembic sin error, inició la aplicación y el health público respondi
 HTTP 200. Se desplegó desde copia aislada sin `watchPatterns`; no se tocó el
 frontend ni la bandera de pagos. La pieza CSRF queda cerrada también en el
 entorno descartable. Seguís sin tarea activa hasta nueva orden de PM.
+
+## 2026-08-22 — Tarea activa única: UX-1, identidad del marketplace público
+
+Emi aprobó comenzar el trabajo visual junto con PM. Hoy el producto se percibe
+como una plantilla: wordmark débil, navegación institucional genérica, emojis
+como interfaz y fotos aleatorias de `picsum.photos` —incluidas imágenes ajenas
+al agro—. No hagas un rediseño total ni elijas la marca por nosotros. Esta
+primera pieza debe dejar una superficie pública fuerte y revisable; después
+Emi decide sobre el resto.
+
+### Dirección aprobada
+
+«Campo argentino moderno»: editorial, sobrio y tecnológico. Marfil/canvas,
+verde profundo, grafito y un acento cosecha. Referencias funcionales:
+`https://www.agrofy.com.ar/` y `https://www.agroads.com.ar/`: tomar su jerarquía
+de marca, búsqueda, ubicación, fotografía y publicación; no copiar su saturación
+publicitaria, carruseles ni filas de iconitos.
+
+### Alcance de esta pieza
+
+- Sólo la superficie pública: `Header`, shell del marketplace/filtros,
+  `ProductGrid`, `ProductCard`, `ProductDetailModal` y `Footer`, con los estados
+  de carga, vacío y error que aparecen en ese recorrido.
+- Reordená la cabecera alrededor de una marca tipográfica clara, búsqueda y
+  acciones reales existentes. No inventes enlaces, secciones ni funciones.
+- Eliminá emojis de esa superficie. Para acciones funcionales preferí texto;
+  si una señal necesita símbolo, usá un SVG mínimo y coherente con
+  `currentColor`, sin instalar una biblioteca de iconos.
+- Rehacé la jerarquía de las tarjetas: imagen, categoría/tipo, título, precio,
+  unidad, ubicación disponible y vendedor. La tarjeta puede seguir conservando
+  su acción actual, pero sin un botón protagonista por cada dato ni decoración.
+- Ninguna URL de `picsum.photos` debe volver a mostrar una fotografía aleatoria.
+  En esta pieza no busques ni descargues stock de terceros. Para esos registros,
+  mostrales un fallback diseñado y explícitamente ilustrativo por familia, con
+  nombre de categoría; no finjas que es la foto exacta del producto. Las fotos
+  locales reales sólo se usan donde correspondan semánticamente.
+- Dejá un inventario breve de imágenes finales que convendría producir después:
+  cantidad, tema, proporción y uso. PM/Emi decidirán y generarán esos activos en
+  una pieza separada; no fabriques treinta imágenes ahora.
+- El footer deja de enlazar a perfiles genéricos de Twitter/LinkedIn/Instagram.
+  Si no existe una URL real de TopGreen, no se muestra ese enlace.
+- Definí tokens visuales reutilizables, pero no migres todo el proyecto ni abras
+  tema oscuro. Podés proponer una fuente local con licencia comercial clara;
+  si no podés verificar origen/licencia y dejarla documentada, usá el stack del
+  sistema y no descargues nada.
+
+### Fuera de alcance
+
+Sin backend, base, seed, auth, paneles, carrito, checkout, Mercado Pago,
+logística, textos legales ni cambio de comportamiento. Sin hero publicitario
+nuevo, bot, mapas, animaciones, paquetes visuales o dependencia de imágenes
+externas. No retoques todavía las otras apariciones internas de emojis: traé su
+inventario, no las mezcles.
+
+### Criterios de aceptación
+
+1. En 1440×900 la primera pantalla se reconoce como marketplace agro propio:
+   marca, búsqueda, filtros/resultados y acción principal tienen jerarquía sin
+   aspecto de dashboard SaaS.
+2. En 390×844 no hay corte horizontal, controles diminutos ni pérdida de
+   búsqueda, filtros o acciones.
+3. Cero emojis visibles en el recorrido público acotado y cero fotos aleatorias
+   de `picsum.photos`; el fallback no induce a creer que es una foto real.
+4. No aparecen acciones falsas ni se rompe búsqueda, filtros, apertura de
+   detalle, agregar/contratar, navegación por ubicación o login.
+5. Contraste y foco permanecen conformes. Corré build, las puertas visuales y
+   la suite funcional; si una puerta cambia de inventario, frená antes de
+   rebajarla o regrabarla.
+6. Un commit de producto y otro de informe. Incluí capturas 1440×900 y 390×844,
+   lista exacta de archivos, antes/después, inventario de activos pendiente y
+   cualquier decisión que deba tomar Emi. No despliegues Backend.
+
+Esfuerzo **Extra**: el juicio visual importa, pero el alcance sigue siendo una
+sola superficie. Si para lograrlo necesitás tocar más de estos componentes o
+inventar una identidad/logotipo definitivo, frená y consultá. Al terminar,
+respondé en `PARA-PM.md` y no abras UX-2.
