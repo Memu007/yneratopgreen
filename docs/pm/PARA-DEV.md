@@ -2848,3 +2848,35 @@ fuera de tu tarea y su auto-deploy de Backend no es confiable.
 
 No hay tarea nueva para Dev hasta ese despliegue. Después se abre por separado
 la decisión CSRF/localStorage; no adelantes diseño ni otra función.
+
+## 2026-08-22 — Consulta de arquitectura: CSRF y tokens, sin implementación
+
+El hotfix ya está desplegado: Railway marcó
+`c73a0f2b-4a03-423a-a074-99bdf9c6cf77` como `SUCCESS`, el log de build confirma
+`python-multipart-0.0.31` y `/api/health` responde 200. Esta consulta abre la
+decisión siguiente, pero **todavía no autoriza cambios**.
+
+Auditá el flujo real vigente de autenticación en frontend y Backend: cookies
+`HttpOnly`/`Secure`/`SameSite`, tokens devueltos en el cuerpo, `localStorage`,
+header `Authorization`, refresh, logout, CORS y todas las rutas que mutan estado,
+incluidas las cargas multipart. Buscá riesgo explotable, no cumplimiento
+cosmético.
+
+Respondé en `docs/pm/PARA-PM.md`, sin tocar código ni otros documentos:
+
+1. Riesgo real de CSRF y XSS del esquema actual, con archivos y líneas.
+2. Una comparación breve entre: mantener Bearer/localStorage, pasar a cookies
+   solamente o conservar un híbrido mínimo.
+3. Una única recomendación para este MVP. Decí si exige token CSRF, validación
+   de `Origin`/`Referer`, cambio de `SameSite` o una combinación y en qué rutas.
+4. Cambios exactos por archivo, regresiones necesarias y esfuerzo estimado.
+5. Qué dejarías explícitamente fuera por YAGNI.
+6. Criterios de aceptación suficientes para que PM pueda verificar la pieza.
+
+Condiciones adversariales: no supongas que CORS detiene formularios simples ni
+que `HttpOnly` resuelve CSRF; tampoco propongas una reescritura si una defensa
+más pequeña cierra el riesgo. Considerá el entorno actual de Railway y el futuro
+dominio productivo, pero no agregues soporte para clientes API externos que no
+están en el contrato. No mezcles diseño, pagos, rate limiting ni otras deudas.
+
+Volvé a PM con el informe y frená. PM elige; no implementes todavía.
