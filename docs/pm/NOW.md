@@ -54,8 +54,9 @@ Actualizado: 2026-08-22.
 - Dev: los tres datos logísticos quedan aceptados en `0395d67` + `4a57722`.
   Hotfix `python-multipart` aceptado en `b496ed4` y desplegado por PM. La
   auditoría CSRF `717f40b` reprodujo una escritura multipart entre sitios sin
-  token robado. Tarea Dev activa: cerrar CSRF con Bearer header-only para API y
-  refresh, y cookie `Lax` sólo para el callback MP; sin tocar diseño.
+  token robado. Base de cierre CSRF `6ece3fb`: Bearer header-only para API y
+  refresh, cookie `SameSite=None` sólo leída por el callback MP. Tarea Dev activa
+  mínima: corregir tres comentarios de prueba que todavía dicen `Lax`.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -90,10 +91,13 @@ omitido; nunca ejecutar `railway up` desde la raíz del repo apuntando a Backend
 La consulta CSRF `717f40b` queda aceptada en su hallazgo y corregida por PM en
 la ejecución: no se elimina `credentials: include`, porque el frontend y Backend
 son orígenes distintos y login/refresh/logout necesitan respetar `Set-Cookie`;
-además `/auth/refresh` debe quedar explícitamente header-only. La arquitectura
-elegida mantiene Bearer/localStorage para toda API protegida y limita la cookie
-`SameSite=Lax` al callback MP con `state`. Sin token CSRF, `Origin` global,
-revocación ni CSP en esta pieza. Dev implementa y PM verificará/deplegará.
+además `/auth/refresh` queda explícitamente header-only. La base `6ece3fb`
+mantiene Bearer/localStorage para toda API protegida y sólo permite leer la
+cookie desde el callback MP con `state`. `SameSite=None` permanece porque
+`up.railway.app` es un sufijo público y el navegador descarta `Lax` en el login
+cruzado; la defensa CSRF es estructural, no el atributo. Sin token CSRF,
+`Origin` global, revocación ni CSP en esta pieza. Falta corregir tres comentarios
+contradictorios del smoke, cerrar por PM y desplegar.
 
 El prototipo logístico queda **aceptado**: base `8002fea`, corrección `c26495d`
 e informe `ee2fefb`. PM completó el comprador y el alta, reprodujo el primer

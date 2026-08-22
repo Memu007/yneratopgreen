@@ -2951,3 +2951,29 @@ un ataque contra Railway; toda reproducción ofensiva queda local y acotada.
 Esfuerzo **Alto**, no Extra. Si conservar `credentials: include` hace fallar una
 premisa de tu prueba o el callback necesita otra cookie distinta, frená y traé
 evidencia antes de ampliar. No abras otra deuda.
+
+## 2026-08-22 — Primera revisión de `6ece3fb`: seguridad conforme, texto contradictorio
+
+La corrección de arquitectura queda conforme: rutas protegidas y refresh leen
+sólo Bearer; la cookie permanece como única identidad ambiental del callback MP;
+el frontend conserva `credentials: include`; las cuatro mutaciones con cookie
+sola quedan rechazadas. PM confirmó además en la Public Suffix List oficial que
+`up.railway.app` es un sufijo público: los dos servicios Railway son sitios
+distintos, por lo que la excepción `SameSite=None` está justificada mientras no
+haya dominio propio. Build, sintaxis Python, usos de cookies y `diff --check`
+quedaron verdes. Docker local continúa apagado; 117/117 sigue siendo evidencia
+informada por vos.
+
+La entrega no se cierra todavía porque la propia regresión conserva tres
+comentarios que afirman lo contrario de lo que ejecuta y exige:
+
+- `scripts/smoke.mjs:4805`: dice que las cookies emitidas son `Lax`;
+- `scripts/smoke.mjs:11229`: dice que al entrar «salen Lax»;
+- `scripts/smoke.mjs:11250`: dice que al renovar «siguen Lax».
+
+En los tres casos los asserts correctos exigen `None`. Corregí únicamente esos
+comentarios para que expliquen que `None` es necesario en el entorno cruzado y
+que la seguridad proviene de no aceptar cookie en mutaciones. No cambies código,
+asserts, cookies, casos, frontend ni arquitectura. Ejecutá `node --check` sobre
+el guion y `diff --check`; no repitas la suite. Entregá el commit mínimo y una
+nota breve en `PARA-PM.md`. Ahí frenás.
