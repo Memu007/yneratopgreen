@@ -52,9 +52,10 @@ Actualizado: 2026-08-22.
   del navegador. Si falla también aislado, capturar la actividad de la cuenta
   MP y recién entonces decidir una devolución a Dev.
 - Dev: los tres datos logísticos quedan aceptados en `0395d67` + `4a57722`.
-  Hotfix `python-multipart` aceptado en `b496ed4` y desplegado por PM; no hay
-  tarea Dev activa. La próxima decisión separada es la estrategia
-  CSRF/localStorage; no mezclarla con diseño.
+  Hotfix `python-multipart` aceptado en `b496ed4` y desplegado por PM. La
+  auditoría CSRF `717f40b` reprodujo una escritura multipart entre sitios sin
+  token robado. Tarea Dev activa: cerrar CSRF con Bearer header-only para API y
+  refresh, y cookie `Lax` sólo para el callback MP; sin tocar diseño.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -85,7 +86,14 @@ Dos intentos previos no se promovieron: `c0907885` fue `SKIPPED` por el filtro
 por healthcheck. El Backend anterior permaneció activo. Lección: para una carga
 CLI aislada usar una copia temporal de `backend/` con el `watchPatterns`
 omitido; nunca ejecutar `railway up` desde la raíz del repo apuntando a Backend.
-El siguiente bloque se abre sólo como decisión CSRF/localStorage separada.
+
+La consulta CSRF `717f40b` queda aceptada en su hallazgo y corregida por PM en
+la ejecución: no se elimina `credentials: include`, porque el frontend y Backend
+son orígenes distintos y login/refresh/logout necesitan respetar `Set-Cookie`;
+además `/auth/refresh` debe quedar explícitamente header-only. La arquitectura
+elegida mantiene Bearer/localStorage para toda API protegida y limita la cookie
+`SameSite=Lax` al callback MP con `state`. Sin token CSRF, `Origin` global,
+revocación ni CSP en esta pieza. Dev implementa y PM verificará/deplegará.
 
 El prototipo logístico queda **aceptado**: base `8002fea`, corrección `c26495d`
 e informe `ee2fefb`. PM completó el comprador y el alta, reprodujo el primer

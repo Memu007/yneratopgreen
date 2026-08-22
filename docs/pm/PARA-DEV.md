@@ -2880,3 +2880,74 @@ dominio productivo, pero no agregues soporte para clientes API externos que no
 están en el contrato. No mezcles diseño, pagos, rate limiting ni otras deudas.
 
 Volvé a PM con el informe y frená. PM elige; no implementes todavía.
+
+## 2026-08-22 — Decisión PM sobre `717f40b` y tarea activa única: cerrar CSRF
+
+La auditoría queda **aceptada en el hallazgo**: demostraste un CSRF real sobre
+multipart, restauraste el dato y no modificaste producto. También es correcta
+la arquitectura base: Bearer para la API protegida y una cookie `Lax` limitada
+a reconocer la navegación de vuelta de Mercado Pago. No se agrega token CSRF.
+
+La implementación propuesta necesita dos correcciones obligatorias antes de
+codificar:
+
+1. **No saques `credentials: 'include'` del frontend.** Producción llama desde
+   `ynerav.up.railway.app` al origen distinto del Backend. Ese modo no sólo
+   envía cookies: determina si el navegador respeta `Set-Cookie` en la respuesta.
+   Quitarlo de login o refresh impediría guardar/renovar la cookie que luego
+   necesita el callback de Mercado Pago; quitarlo de logout impediría confiar
+   en su borrado cruzado. Se conserva por funcionalidad, aunque las rutas
+   protegidas ignoren la cookie.
+2. **`POST /api/auth/refresh` debe quedar header-only.** Su implementación no
+   pasa por `get_token_from_cookie_or_header`: llama directamente a
+   `credencial_unica(request, "refresh_token", ...)`. Cambiar sólo la dependencia
+   de acceso dejaría esta mutación autenticable con cookie y contradiría tu
+   propia defensa estructural y el criterio 4 del informe.
+
+### Implementación autorizada
+
+- En `backend/app/api/auth.py`, emitir access y refresh cookies con
+  `SameSite=Lax` en login y refresh; al borrarlas conservar atributos
+  equivalentes. En el endpoint de refresh, aceptar únicamente el refresh token
+  del header `Authorization`; una cookie sola debe dar 401 y no emitir nada.
+- En `backend/app/core/dependencies.py`, las rutas protegidas deben obtener el
+  access token únicamente del header `Authorization`. Conservá
+  `get_current_user_optional` como lector exclusivo de la cookie para el
+  callback de Mercado Pago; no amplíes sus usos.
+- Conservá `credentials: 'include'`, `tokenStorage` y los headers Bearer actuales
+  del frontend. No hace falta modificar frontend salvo que una regresión pruebe
+  un defecto concreto.
+- Reescribí los casos 49/50 para la regla nueva, sin conservar una prueba de
+  conflicto entre dos credenciales cuando una de ellas ya no participa.
+- Agregá regresiones para las tres rutas multipart con cookie sola: 401 y cero
+  escritura comprobada. Agregá cookie-sola contra refresh: 401 y ninguna cookie
+  nueva. Header-solo válido debe seguir funcionando para acceso, refresh y los
+  tres uploads.
+- Probá que login y refresh siguen almacenando las cookies y que logout las
+  elimina en el recorrido cruzado real del frontend; luego comprobá que el
+  callback MP con `state` válido reconoce la cookie `Lax` y conserva sus reglas
+  de dueño, vencimiento y un solo uso.
+
+### Límites
+
+Sin mover tokens fuera de `localStorage`, revocación, CSP, rate limiting,
+validación global de `Origin`/`Referer`, token CSRF, cambios de vida de JWT,
+clientes API externos, diseño, pagos ni migraciones. No conviertas la prueba en
+un ataque contra Railway; toda reproducción ofensiva queda local y acotada.
+
+### Criterios de aceptación
+
+1. Ninguna cookie de autenticación se emite con `SameSite=None`.
+2. Cookie sola nunca autentica una ruta protegida ni `/auth/refresh`; las cuatro
+   reproducciones CSRF no escriben y no renuevan sesión.
+3. Bearer solo conserva todos los recorridos protegidos y multipart.
+4. La cookie `Lax` se guarda/renueva/elimina desde el frontend cruzado y el
+   callback MP sigue reconociendo al dueño correcto con `state` válido.
+5. Suite completa desde base limpia; regresiones nuevas deben fallar contra
+   `717f40b` por la propiedad que prueban. Build y `diff --check` verdes.
+6. Un commit de producto y otro de informe en `PARA-PM.md`, con tabla de rutas,
+   credencial aceptada y resultado. No despliegues: PM cierra y despliega.
+
+Esfuerzo **Alto**, no Extra. Si conservar `credentials: include` hace fallar una
+premisa de tu prueba o el callback necesita otra cookie distinta, frená y traé
+evidencia antes de ampliar. No abras otra deuda.
