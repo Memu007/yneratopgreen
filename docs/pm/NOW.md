@@ -82,6 +82,10 @@ Actualizado: 2026-08-22.
   índices `02/03` y en el texto de publicación pausada, y la regla táctil de
   44×44 está escrita de forma más absoluta que la implementación. Diseño debe
   corregir sólo esos bordes; Opus sigue pausada.
+- Corrección de Diseño `344dbe9`: PM reprodujo axe en los tres prototipos y los
+  tres viewports, **9/9 sin violaciones, errores ni overflow**. Los dos bloqueos
+  quedan técnicamente cerrados. Puerta 3 espera únicamente la aprobación visual
+  explícita de Emi del wordmark y sistema B; Opus continúa pausada hasta ese sí.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
