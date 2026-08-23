@@ -96,8 +96,11 @@ Actualizado: 2026-08-23.
   `publication_type` y categoría, panel por anatomía, foto opcional, offline y
   zoom 200 %, y retira los mocks con Unsplash. PM reprodujo build aislado, lint,
   sintaxis y checks estáticos; la Dev informa suite 123/123 y puertas visuales
-  completas desde base limpia. Falta revisión visual de Emi en el entorno
-  descartable; la Dev queda sin tarea y no abre UX-3 ni despliega.
+  completas desde base limpia. **Emi rechazó parcialmente la revisión visual**:
+  Inicio y Servicios conservan la composición vieja, la masa índigo no se
+  siente agro y el tratamiento tapa la fotografía. La devolución y la nueva
+  pieza de Diseño están en `diseno-premium/DEVOLUCION-EMI-UX2B.md`. La Dev
+  queda sin tarea y no abre UX-3 ni despliega hasta recibir un nuevo handoff.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -112,8 +115,10 @@ la superficie pública y autenticada; las cuatro anatomías salen de datos
 persistentes. PM revisó las capturas y reprodujo build aislado, lint, sintaxis y
 checks estáticos. Docker local permanece apagado, por lo que suite 123/123,
 a11y 64/64, contraste 52/52 e hito 6/6 son evidencia informada por Dev. La
-única puerta pendiente de esta pieza es la revisión visual de Emi sobre el
-entorno descartable. La Dev no tiene tarea activa.
+puerta visual de Emi quedó **rechazada parcialmente**: el mercado conserva su
+base funcional y de información, pero Inicio, Servicios y la dirección global
+de color/fotografía vuelven a Diseño. Ver
+`diseno-premium/DEVOLUCION-EMI-UX2B.md`. La Dev no tiene tarea activa.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se
