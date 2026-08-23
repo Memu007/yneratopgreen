@@ -71,6 +71,11 @@ Actualizado: 2026-08-22.
   `docs/pm/diseno-premium/DECISION-PUERTA-2.md`. La diseñadora debe cerrar
   Puerta 3 —wordmark propio, sistema, catálogo denso y cuatro anatomías— antes
   de que Opus reciba una implementación. B todavía no es diseño final.
+- El handoff obligatorio para la Dev está en
+  `docs/pm/diseno-premium/REQUISITOS-HANDOFF-DEV.md`: identidad y activos
+  utilizables, tokens, cuatro anatomías, componentes/estados, tres viewports,
+  prototipos aislados y mapa contra el producto real. Opus no empieza con
+  láminas sueltas ni completa decisiones de diseño por su cuenta.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar

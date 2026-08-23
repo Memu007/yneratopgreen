@@ -70,3 +70,7 @@ Puerta 3 debe corregir estos bordes:
 La diseñadora no toca `src/`, Backend, datos, pruebas ni despliegue. Persiste
 esta entrega únicamente en `docs/pm/diseno-premium/`, la presenta a Emi y PM y
 frena. Opus sigue sin tarea activa hasta aceptar Puerta 3.
+
+El paquete obligatorio y la puerta de salida completa están definidos en
+`REQUISITOS-HANDOFF-DEV.md`. Ese documento prevalece si una lista resumida de
+esta decisión resulta menos específica.
