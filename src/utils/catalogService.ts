@@ -11,11 +11,13 @@ const IMAGES_BASE_URL = import.meta.env.VITE_IMAGES_URL || '';
 /**
  * Construye la URL completa para una imagen
  */
-// Placeholder SVG como data URI (no requiere conexión externa)
-const PLACEHOLDER_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmNGVkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzJkNTAxNiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuKaoiBTaW4gSW1hZ2VuPC90ZXh0Pjwvc3ZnPg==';
-
+// Sin URL no se inventa una imagen. Acá había un SVG en data-URI —fondo
+// verde claro, Arial, «Sin Imagen» con un símbolo— que se colaba antes del
+// respaldo del sistema: una publicación sin foto terminaba mostrando un
+// tercer diseño que nadie aprobó ni midió. La cadena vacía deja que
+// `ProductImage` diga «Sin fotografía» con los activos del paquete.
 function getImageUrl(url: string | undefined): string {
-  if (!url) return PLACEHOLDER_IMAGE;
+  if (!url) return '';
   // Si ya es una URL completa (http/https), retornarla tal cual
   if (url.startsWith('http://') || url.startsWith('https://')) {
     return url;
@@ -41,6 +43,10 @@ export interface CategoryResponse {
   is_service: boolean;
   operation_kind?: string;
   condition?: string | null;
+  pricing_type?: string | null;
+  availability?: string | null;
+  response_time?: string | null;
+  coverage_zones?: string[] | null;
   subcategories: SubcategoryResponse[];
   created_at: string;
 }
@@ -102,6 +108,10 @@ export interface ProductFromBackend {
   is_service?: boolean;
   operation_kind?: string;
   condition?: string | null;
+  pricing_type?: string | null;
+  availability?: string | null;
+  response_time?: string | null;
+  coverage_zones?: string[] | null;
   primary_image?: string;
   seller?: SellerBasicInfo;
   views_count: number;
@@ -235,5 +245,9 @@ export const convertBackendProductToFrontend = (backendProduct: ProductFromBacke
     isService: backendProduct.is_service || false,
     operationKind: normalizarAnatomia(backendProduct.operation_kind),
     condition: normalizarCondicion(backendProduct.condition),
+    pricingType: backendProduct.pricing_type || undefined,
+    availability: backendProduct.availability || undefined,
+    responseTime: backendProduct.response_time || undefined,
+    coverageZones: backendProduct.coverage_zones || undefined,
   };
 };

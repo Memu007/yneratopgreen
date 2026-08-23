@@ -1,97 +1,73 @@
+/* El pie: índigo pleno, sin degradado y sin adornos. Es el cierre del sistema
+   y por eso repite la marca, no un cajón donde apilar enlaces. */
+
 .footer {
-  /* Verde plano, no degradado: el degradado le daba brillo de plantilla y
-     además obligaba a medir el contraste contra dos fondos distintos. */
-  background-color: var(--marca-verde);
-  color: #ffffff;
-  margin-top: auto;
-  border-top: 3px solid var(--marca-cosecha);
+  margin-top: var(--tg-space-20);
+  color: var(--tg-color-text-inverse);
+  background-color: var(--tg-color-brand);
 }
 
-.footerContent {
-  /* La misma medida que la cabecera y el contenido. */
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 48px 24px 32px;
+.grilla {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 32px;
+  grid-template-columns: 1.4fr repeat(3, 1fr);
+  gap: var(--tg-space-10);
+  padding-block: var(--tg-space-12);
 }
 
-.footerSection h3 {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  margin-bottom: 16px;
-  color: var(--marca-cosecha);
+.marca {
+  width: min(100%, 360px);
+  height: auto;
 }
 
-.footerSection ul {
+.bajada {
+  margin-top: var(--tg-space-3);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 14px;
+}
+
+.titulo {
+  margin-bottom: var(--tg-space-3);
+  font-weight: 650;
+}
+
+.lista {
+  display: grid;
+  gap: var(--tg-space-2);
+  margin: 0;
+  padding: 0;
   list-style: none;
-  padding: 0;
+}
+
+/* Sobre índigo, el enlace va en blanco: el azul del token de enlace da 1,7:1
+   contra este fondo y no se puede leer. */
+.footer a {
+  color: var(--tg-color-text-inverse);
+}
+
+.dato {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.legal {
+  padding-block: var(--tg-space-4);
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  font-size: 13px;
+}
+
+.legal p {
   margin: 0;
+  font-size: 13px;
 }
 
-.footerSection ul li {
-  margin-bottom: 10px;
-}
-
-.footerSection ul li a,
-.footerSection ul li button {
-  color: rgba(255, 255, 255, 0.8);
-  text-decoration: none;
-  font-size: var(--font-size-base);
-  transition: color var(--transition-fast);
-  background: none;
-  border: none;
-  padding: 0;
-  font-family: var(--font-family);
-  cursor: pointer;
-  text-align: left;
-}
-
-.footerSection ul li a:hover,
-.footerSection ul li button:hover {
-  color: white;
-  text-decoration: underline;
-}
-
-
-
-
-
-.footerBottom {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 20px 24px;
-  text-align: center;
-}
-
-.footerBottom p {
-  margin: 0;
-  font-size: var(--font-size-base);
-  color: rgba(255, 255, 255, 0.85);
-}
-
-@media (max-width: 968px) {
-  .footerContent {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 32px;
-    padding: 40px 24px 32px;
+@media (max-width: 1023px) {
+  .grilla {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
-@media (max-width: 640px) {
-  .footerContent {
+@media (max-width: 599px) {
+  .grilla {
     grid-template-columns: 1fr;
-    gap: 24px;
-    padding: 32px 20px 24px;
-  }
-
-  .footerSection {
-    text-align: center;
-  }
-
-  .footerBottom {
-    padding: 16px 20px;
+    gap: var(--tg-space-8);
   }
 }

@@ -1,613 +1,459 @@
-/* El sistema visual aprobado entra primero: todo lo que sigue puede leer
-   sus tokens, y ninguna regla de abajo puede pisar la definición. */
+/* La capa global del producto.
+ *
+ * Una sola fuente de verdad para los valores: `tokens.css`. Todo lo de acá
+ * abajo los consume, incluidos los nombres viejos —`--text-primary`,
+ * `--color-primary-600`, `--radius-lg`— que siguen existiendo como ALIAS y ya
+ * no tienen valor propio. Es lo que permite que veinte hojas de componente
+ * cambien de paleta sin editarlas una por una, y lo que impide que queden dos
+ * paletas discutiendo: si un alias apunta a un token, no puede desincronizarse.
+ *
+ * Los tokens `--marca-*` de la pieza anterior se retiraron por completo. Sus
+ * usos están reescritos a `--tg-*`; no quedó ninguno.
+ */
 @import './tokens.css';
 
-/* ================================================
-   TopGreen Design System
-   Paleta: Tailwind Slate + Emerald
-   Fuente: Inter
-   ================================================ */
-
-/* === CSS VARIABLES - TEMA CLARO === */
 :root {
-  /* Colores primarios (Emerald) */
-  --color-primary-50: #ecfdf5;
-  --color-primary-100: #d1fae5;
-  --color-primary-200: #a7f3d0;
-  --color-primary-300: #6ee7b7;
-  --color-primary-400: #34d399;
-  --color-primary-500: #10b981;
-  --color-primary-600: #059669;
-  --color-primary-700: #047857;
-  --color-primary-800: #065f46;
-  --color-primary-900: #064e3b;
-  
-  /* Colores neutrales (Slate) */
-  --color-slate-50: #f8fafc;
-  --color-slate-100: #f1f5f9;
-  --color-slate-200: #e2e8f0;
-  --color-slate-300: #cbd5e1;
-  --color-slate-400: #94a3b8;
-  --color-slate-500: #64748b;
-  --color-slate-600: #475569;
-  --color-slate-700: #334155;
-  --color-slate-800: #1e293b;
-  --color-slate-900: #0f172a;
-  --color-slate-950: #020617;
-  
-  /* Colores semánticos.
-     Estos son para fondos, bordes e iconos. Como texto sobre fondos claros
-     ninguno alcanza el 4,5:1 que pide WCAG AA: success 2,54, warning 2,15,
-     error 3,76, info 3,68. Para texto usar los tokens *-text de abajo. */
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-error: #ef4444;
-  --color-info: #3b82f6;
+  /* --- Alias de color ---------------------------------------------------
+     La familia «primary» dejó de ser el emerald de interfaz: la acción del
+     sistema es la tinta índigo. Los diez escalones colapsan en los cuatro
+     papeles que el sistema realmente distingue, porque tener diez tonos de un
+     color es tener nueve maneras de elegir mal. */
+  --color-primary-50: var(--tg-color-surface-subtle);
+  --color-primary-100: var(--tg-color-surface-subtle);
+  --color-primary-200: var(--tg-color-border);
+  --color-primary-300: var(--tg-color-border-control);
+  --color-primary-400: var(--tg-color-border-control);
+  --color-primary-500: var(--tg-color-action);
+  --color-primary-600: var(--tg-color-action);
+  --color-primary-700: var(--tg-color-action);
+  --color-primary-800: var(--tg-color-action-hover);
+  --color-primary-900: var(--tg-color-brand);
 
-  /* Colores para TEXTO sobre fondos claros. Medidos sobre #ffffff y sobre
-     #f8fafc, que son los dos fondos donde aparecen:
-       primary  #047857 → 5,48 / 5,24
-       success  #047857 → 5,48 / 5,24
-       warning  #b45309 → 5,02 / 4,80
-       error    #b91c1c → 6,47 / 6,18
-       info     #1d4ed8 → 6,70 / 6,41
-     Los tonos de arriba se conservan tal cual para fondo y borde, donde el
-     mínimo de texto no aplica. */
-  --color-primary-text: #047857;
-  --color-success-text: #047857;
-  --color-warning-text: #b45309;
-  --color-error-text: #b91c1c;
-  --color-info-text: #1d4ed8;
+  --color-slate-50: var(--tg-color-surface-muted);
+  --color-slate-100: var(--tg-color-surface-muted);
+  --color-slate-200: var(--tg-color-border);
+  --color-slate-300: var(--tg-color-border-control);
+  --color-slate-400: var(--tg-color-border-control);
+  --color-slate-500: var(--tg-color-text-secondary);
+  --color-slate-600: var(--tg-color-text-secondary);
+  --color-slate-700: var(--tg-color-text);
+  --color-slate-800: var(--tg-color-text);
+  --color-slate-900: var(--tg-color-text);
+  --color-slate-950: var(--tg-color-text);
 
-  /* Tema claro - Colores de superficie */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-tertiary: #f1f5f9;
-  --bg-elevated: #ffffff;
-  --bg-hover: rgba(5, 150, 105, 0.04);
-  
-  /* Tema claro - Colores de texto */
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-tertiary: #64748b;
-  --text-disabled: #94a3b8;
-  --text-inverse: #ffffff;
-  --text-placeholder: #6b7280;
-  
-  /* Tema claro - Bordes */
-  --border-primary: #e2e8f0;
-  --border-secondary: #cbd5e1;
-  --border-focus: #059669;
-  
-  /* Tema claro - Sombras */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-  --shadow-focus: 0 0 0 3px rgba(5, 150, 105, 0.2);
-  
-  /* Gradientes */
-  /* El gradiente lleva texto blanco encima, así que tiene que cumplir en
-     todo su recorrido, no sólo en el extremo oscuro. Arrancaba en #059669,
-     que da 3,77:1. Ahora va de #047857 (5,48) a #065f46 (7,68), y el hover
-     de #065f46 (7,68) a #064e3b (9,72). Son tonos que ya existían. */
-  --gradient-primary: linear-gradient(135deg, #047857 0%, #065f46 100%);
-  --gradient-primary-hover: linear-gradient(135deg, #065f46 0%, #064e3b 100%);
-  
-  /* Sidebar */
-  --sidebar-bg: #0f172a;
-  --sidebar-text: #f8fafc;
-  --sidebar-text-secondary: #94a3b8;
-  --sidebar-hover: rgba(248, 250, 252, 0.08);
-  --sidebar-active: rgba(5, 150, 105, 0.2);
-  
-  /* Header */
-  --header-bg: #ffffff;
-  --header-border: #e2e8f0;
-  
-  /* Cards */
-  --card-bg: #ffffff;
-  --card-border: #e2e8f0;
-  --card-shadow: var(--shadow-sm);
-  --card-shadow-hover: var(--shadow-md);
-  
-  /* Inputs */
-  --input-bg: #ffffff;
-  --input-border: #cbd5e1;
-  --input-border-focus: #059669;
-  --input-placeholder: #6b7280;
-  --input-text: #0f172a;
-  
-  /* DataGrid */
-  --datagrid-header-bg: #0f172a;
-  --datagrid-header-text: #ffffff;
-  --datagrid-row-alt: #f8fafc;
-  
-  /* Espaciado base */
-  --spacing-xs: 4px;
-  --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
-  --spacing-2xl: 48px;
-  
-  /* Border radius */
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 20px;
-  --radius-full: 9999px;
-  
-  /* === IDENTIDAD «campo argentino moderno» ===
-     Capa nueva, encima de la paleta emerald/slate que ya estaba: acá NO se
-     migra el resto del proyecto. Se usa en la superficie pública —cabecera,
-     resultados, tarjeta, detalle y pie—; el resto sigue con sus tokens.
+  /* Semánticos. Los `-text` existían porque el tono de fondo no se podía leer
+     como texto; ahora el token ya viene medido para texto y son el mismo. */
+  --color-success: var(--tg-color-success);
+  --color-warning: var(--tg-color-warning);
+  --color-error: var(--tg-color-error);
+  --color-info: var(--tg-color-info);
+  --color-primary-text: var(--tg-color-link);
+  --color-success-text: var(--tg-color-success);
+  --color-warning-text: var(--tg-color-warning);
+  --color-error-text: var(--tg-color-error);
+  --color-info-text: var(--tg-color-info);
 
-     Los cuatro colores de la dirección aprobada, y qué hace cada uno:
-       lienzo   marfil de fondo, para sacarle el blanco de dashboard
-       verde    el verde profundo de la marca, no el emerald de interfaz
-       grafito  la tinta, cálida y no azulada, para que conviva con el marfil
-       cosecha  el acento, medido aparte porque como texto necesita otro tono
+  /* Superficies y texto */
+  --bg-primary: var(--tg-color-surface);
+  --bg-secondary: var(--tg-color-canvas);
+  --bg-tertiary: var(--tg-color-surface-muted);
+  --bg-elevated: var(--tg-color-surface);
+  --bg-hover: var(--tg-color-surface-subtle);
 
-     Contrastes medidos sobre los dos fondos donde aparecen, marfil #F7F4EC y
-     marfil hondo #EFEADD. Todos los tokens de TEXTO pasan 4,5:1:
-       grafito        14,78 / 13,53
-       grafito-suave   7,26 /  6,64
-       grafito-tenue   6,30 /  5,77
-       verde          10,08 /  9,22
-       verde-medio     5,81 /  5,32
-       cosecha-texto   6,47 /  5,92
-     Y al revés, sobre el verde profundo: blanco 11,08 · marfil 10,08.
+  --text-primary: var(--tg-color-text);
+  --text-secondary: var(--tg-color-text-secondary);
+  --text-tertiary: var(--tg-color-text-secondary);
+  --text-disabled: var(--tg-color-disabled-text);
+  --text-inverse: var(--tg-color-text-inverse);
+  --text-placeholder: var(--tg-color-text-secondary);
 
-     El tenue arrancó en #6B655D, que da 5,24 sobre marfil y parecía de sobra.
-     La puerta lo midió en 4,49 sobre el fondo REAL de la ilustración —marfil
-     hondo con la trama encima, #E8E3D6—, once centésimas por debajo. El fondo
-     que hay que medir es el que se ve, no el que dice la variable. */
-  --marca-lienzo: #F7F4EC;
-  --marca-lienzo-hondo: #EFEADD;
-  --marca-verde: #1B4332;
-  --marca-verde-medio: #2D6A4F;
-  --marca-grafito: #22201D;
-  --marca-grafito-suave: #55504A;
-  --marca-grafito-tenue: #5F5951;
+  /* Bordes. El sutil separa y no delimita nada operable; el de control SÍ es
+     el límite de algo que se toca y por eso llega a 3:1. */
+  --border-primary: var(--tg-color-border);
+  --border-secondary: var(--tg-color-border-control);
+  --border-focus: var(--tg-color-focus);
+  --border-color: var(--tg-color-border);
 
-  /* El acento aparece en dos papeles y por eso son dos tokens. Como fondo o
-     filete es el dorado de cosecha; como TEXTO ese dorado da 1,9:1 y no se
-     puede leer, así que hay un tono propio. Confundirlos es el error que ya
-     costó una pieza entera de contraste. */
-  --marca-cosecha: #D9A441;
-  --marca-cosecha-texto: #7A4F0E;
+  /* Sombras. Las tarjetas y los paneles no llevan: la jerarquía la hacen la
+     regla, el borde y el fondo. Queda una sola, para lo que de verdad flota. */
+  --shadow-sm: var(--tg-shadow-none);
+  --shadow-md: var(--tg-shadow-none);
+  --shadow-lg: var(--tg-shadow-overlay);
+  --shadow-xl: var(--tg-shadow-overlay);
+  --shadow-focus: 0 0 0 3px var(--tg-color-focus);
 
-  /* Líneas. La tenue separa y no delimita nada operable: es decoración, y el
-     mínimo de 3:1 no le aplica. La fuerte sí llega a 3,45:1 sobre marfil y es
-     la que se usa cuando el borde ES el límite de un control. */
-  --marca-linea: #E2DBC8;
-  --marca-linea-fuerte: #8F8264;
+  /* Los degradados se van: son un alias plano del color de acción. */
+  --gradient-primary: var(--tg-color-action);
+  --gradient-primary-hover: var(--tg-color-action-hover);
 
-  /* Tipografía */
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  
-  /* Escala tipográfica */
-  --font-size-xs: 0.75rem;      /* 12px */
-  --font-size-sm: 0.8125rem;    /* 13px */
-  --font-size-base: 0.875rem;   /* 14px */
-  --font-size-md: 1rem;         /* 16px */
-  --font-size-lg: 1.125rem;     /* 18px */
-  --font-size-xl: 1.25rem;      /* 20px */
-  --font-size-2xl: 1.5rem;      /* 24px */
-  --font-size-3xl: 1.875rem;    /* 30px */
-  
-  /* Pesos tipográficos */
+  --sidebar-bg: var(--tg-color-brand);
+  --sidebar-text: var(--tg-color-text-inverse);
+  --sidebar-text-secondary: rgba(255, 255, 255, 0.78);
+  --sidebar-hover: rgba(255, 255, 255, 0.08);
+  --sidebar-active: rgba(255, 255, 255, 0.16);
+
+  --header-bg: var(--tg-color-canvas);
+  --header-border: var(--tg-color-border);
+
+  --card-bg: var(--tg-color-surface);
+  --card-border: var(--tg-color-border);
+  --card-shadow: var(--tg-shadow-none);
+  --card-shadow-hover: var(--tg-shadow-none);
+
+  --input-bg: var(--tg-color-surface);
+  --input-border: var(--tg-color-border-control);
+  --input-border-focus: var(--tg-color-selection-border);
+  --input-placeholder: var(--tg-color-text-secondary);
+  --input-text: var(--tg-color-text);
+
+  --datagrid-header-bg: var(--tg-color-brand);
+  --datagrid-header-text: var(--tg-color-text-inverse);
+  --datagrid-row-alt: var(--tg-color-surface-muted);
+
+  /* Espaciado */
+  --spacing-xs: var(--tg-space-1);
+  --spacing-sm: var(--tg-space-2);
+  --spacing-md: var(--tg-space-4);
+  --spacing-lg: var(--tg-space-6);
+  --spacing-xl: var(--tg-space-8);
+  --spacing-2xl: var(--tg-space-12);
+
+  /* Radios. El sistema tiene cuatro y ninguno es una píldora: la geometría
+     recta es parte de la identidad, no una preferencia. */
+  --radius-sm: var(--tg-radius-sm);
+  --radius-md: var(--tg-radius-sm);
+  --radius-lg: var(--tg-radius-md);
+  --radius-xl: var(--tg-radius-md);
+  --radius-2xl: var(--tg-radius-lg);
+  --radius-full: var(--tg-radius-sm);
+
+  /* Tipografía. El cuerpo sube de 14 a 16 px: es el mínimo del sistema para
+     texto y controles, y era la causa de que todo se leyera chico. */
+  --font-family: var(--tg-font-ui);
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-base: 16px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 28px;
+
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
-  --font-weight-bold: 700;
-  --font-weight-extrabold: 800;
-  
-  /* Transiciones */
-  --transition-fast: 150ms ease;
-  --transition-normal: 200ms ease;
-  --transition-slow: 300ms ease;
-  
-  /* Z-index */
-  --z-dropdown: 100;
-  --z-sticky: 200;
-  --z-modal-backdrop: 400;
-  --z-modal: 500;
-  --z-tooltip: 600;
+  --font-weight-bold: 650;
+  --font-weight-extrabold: 700;
+
+  --transition-fast: var(--tg-duration-fast) var(--tg-ease-standard);
+  --transition-normal: var(--tg-duration-base) var(--tg-ease-standard);
+  --transition-slow: var(--tg-duration-base) var(--tg-ease-standard);
+
+  --z-dropdown: var(--tg-z-drawer);
+  --z-sticky: var(--tg-z-sticky);
+  --z-modal-backdrop: var(--tg-z-modal);
+  --z-modal: var(--tg-z-modal);
+  --z-tooltip: var(--tg-z-toast);
 }
 
-/* === CSS VARIABLES - TEMA OSCURO === */
-[data-theme="dark"] {
-  /* Tema oscuro - Colores de superficie (Navy más claro) */
-  --bg-primary: #1e293b;
-  --bg-secondary: #2d3a4f;
-  --bg-tertiary: #3d4a5f;
-  --bg-elevated: #2d3a4f;
-  --bg-hover: rgba(5, 150, 105, 0.1);
-  
-  /* Tema oscuro - Colores de texto */
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-tertiary: #94a3b8;
-  --text-disabled: #64748b;
-  --text-inverse: #0f172a;
-  --text-placeholder: rgba(245, 245, 245, 0.7);
-  
-  /* Tema oscuro - Bordes */
-  --border-primary: #3d4a5f;
-  --border-secondary: #4d5a6f;
-  --border-focus: #10b981;
-  
-  /* Tema oscuro - Sombras */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
-  --shadow-focus: 0 0 0 3px rgba(16, 185, 129, 0.3);
-  
-  /* Sidebar oscuro (navy más claro) */
-  --sidebar-bg: #1e293b;
-  --sidebar-hover: rgba(248, 250, 252, 0.08);
-  
-  /* Header oscuro */
-  --header-bg: #2d3a4f;
-  --header-border: #3d4a5f;
-  
-  /* Cards oscuro */
-  --card-bg: #2d3a4f;
-  --card-border: #3d4a5f;
-  
-  /* Inputs oscuro */
-  --input-bg: #2d3a4f;
-  --input-border: #4d5a6f;
-  --input-placeholder: rgba(245, 245, 245, 0.7);
-  --input-text: #f5f5f5;
-  
-  /* DataGrid oscuro */
-  --datagrid-row-alt: #2d3a4f;
-}
+/* === BASE === */
 
-/* === RESET Y BASE === */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+*, *::before, *::after { box-sizing: border-box; }
 
 html {
+  /* Una sola apariencia. El sistema aprobado no tiene paleta oscura, y la que
+     había no la elegía nadie: ningún control la ofrecía, se encendía sola con
+     la preferencia del sistema operativo y nunca se le midió el contraste. */
+  color-scheme: light;
   scroll-behavior: smooth;
 }
 
 body {
-  font-family: var(--font-family);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-regular);
+  margin: 0;
+  min-width: 320px;
+  font-family: var(--tg-font-ui);
+  font-size: 16px;
+  font-weight: 400;
   line-height: 1.5;
-  color: var(--text-primary);
-  background-color: var(--bg-secondary);
+  color: var(--tg-color-text);
+  background-color: var(--tg-color-canvas);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color var(--transition-normal), color var(--transition-normal);
+  text-rendering: optimizeLegibility;
+}
+
+body, button, input, select, textarea { font-family: var(--tg-font-ui); }
+button, input, select, textarea { font-size: inherit; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+
+img { display: block; max-width: 100%; }
+
+/* El foco es un contorno externo y no depende del borde del control: un borde
+   que cambia de color se pierde encima de un fondo parecido. */
+:focus-visible {
+  outline: 3px solid var(--tg-color-focus);
+  outline-offset: 3px;
+}
+
+::selection {
+  color: var(--tg-color-text);
+  background-color: var(--tg-color-selection);
 }
 
 /* === TIPOGRAFÍA === */
-h1 {
-  font-size: var(--font-size-3xl);
-  font-weight: var(--font-weight-extrabold);
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+
+h1, h2, h3 {
+  margin: 0;
+  font-family: var(--tg-font-display);
+  font-weight: 520;
+  letter-spacing: -0.025em;
 }
 
-h2 {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-}
+h1 { font-size: clamp(36px, 4vw, 56px); line-height: 1.02; }
+h2 { font-size: clamp(28px, 3vw, 40px); line-height: 1.08; }
+h3 { font-size: 24px; line-height: 1.15; }
 
-h3 {
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1.3;
-}
+h4, h5, h6 { margin: 0; font-weight: 650; line-height: 1.25; }
+h4 { font-size: 22px; }
+h5 { font-size: 18px; }
+h6 { font-size: 16px; }
 
-h4 {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1.35;
-}
+p { font-size: 16px; line-height: 1.6; }
 
-h5, h6 {
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1.4;
-}
+.subtitle1 { font-size: 16px; font-weight: 500; }
+.subtitle2 { font-size: 16px; font-weight: 600; }
+.body1 { font-size: 16px; font-weight: 400; }
+.body2 { font-size: 14px; font-weight: 400; }
+.caption { font-size: 12px; font-weight: 400; color: var(--tg-color-text-secondary); }
 
-p {
-  font-size: var(--font-size-base);
-  line-height: 1.6;
-}
-
-.subtitle1 {
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-medium);
-}
-
-.subtitle2 {
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
-}
-
-.body1 {
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-regular);
-}
-
-.body2 {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-regular);
-}
-
-.caption {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-regular);
-  color: var(--text-tertiary);
-}
-
-/* === LINKS === */
+/* === ENLACES === */
 a {
+  color: var(--tg-color-link);
   text-decoration: none;
-  color: inherit;
   transition: color var(--transition-fast);
 }
 
-a:hover {
-  color: var(--color-primary-text);
-}
+a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 
-/* === BUTTONS === */
+/* === BOTONES === */
 button {
-  font-family: var(--font-family);
-  font-weight: var(--font-weight-semibold);
+  font-weight: 650;
   cursor: pointer;
   border: none;
-  outline: none;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-normal),
+              background-color var(--transition-normal),
+              border-color var(--transition-normal);
 }
 
-button:focus-visible {
-  outline: 2px solid var(--border-focus);
-  outline-offset: 2px;
-}
-
-/* Botón primario (contained) */
 .btn-primary {
-  background: var(--gradient-primary);
-  color: var(--text-inverse);
-  padding: var(--spacing-sm) 20px;
-  border-radius: var(--radius-md);
-  font-weight: var(--font-weight-semibold);
-  text-transform: none;
-  box-shadow: none;
+  min-height: var(--tg-control-min);
+  background-color: var(--tg-color-action);
+  color: var(--tg-color-text-inverse);
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  border-radius: var(--tg-radius-sm);
+  font-weight: 650;
 }
 
-.btn-primary:hover {
-  background: var(--gradient-primary-hover);
-  transform: translateY(-1px);
-}
+.btn-primary:hover { background-color: var(--tg-color-action-hover); }
 
-.btn-primary:active {
-  transform: translateY(0);
-}
-
-/* Botón outlined */
 .btn-outlined {
+  min-height: var(--tg-control-min);
   background: transparent;
-  color: var(--color-primary-text);
-  padding: var(--spacing-sm) 20px;
-  border: 1.5px solid var(--color-primary-600);
-  border-radius: var(--radius-md);
-  font-weight: var(--font-weight-semibold);
-  text-transform: none;
+  color: var(--tg-color-text);
+  padding: 10px 18px;
+  border: 1px solid var(--tg-color-border-control);
+  border-radius: var(--tg-radius-sm);
+  font-weight: 650;
 }
 
 .btn-outlined:hover {
-  background: var(--bg-hover);
-  transform: translateY(-1px);
+  background-color: var(--tg-color-surface-subtle);
+  border-color: var(--tg-color-text);
 }
 
-/* Botón texto */
 .btn-text {
+  min-height: var(--tg-control-min);
   background: transparent;
-  color: var(--color-primary-text);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius-md);
-  font-weight: var(--font-weight-semibold);
-  text-transform: none;
+  color: var(--tg-color-link);
+  padding: 10px var(--tg-space-2);
+  border-radius: var(--tg-radius-sm);
+  font-weight: 650;
 }
 
-.btn-text:hover {
-  background: var(--bg-hover);
-}
+.btn-text:hover { background-color: var(--tg-color-surface-subtle); }
 
-/* === INPUTS === */
+/* === CAMPOS === */
 input, select, textarea {
-  font-family: var(--font-family);
-  font-size: var(--font-size-base);
-  color: var(--input-text);
-  background-color: var(--input-bg);
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-sm) var(--spacing-md);
-  transition: all var(--transition-fast);
+  min-height: var(--tg-control-min);
+  color: var(--tg-color-text);
+  background-color: var(--tg-color-surface);
+  border: 1px solid var(--tg-color-border-control);
+  border-radius: var(--tg-radius-sm);
+  padding: 10px 12px;
+  transition: border-color var(--transition-fast);
 }
 
-input::placeholder, textarea::placeholder {
-  color: var(--input-placeholder);
-}
+input::placeholder, textarea::placeholder { color: var(--tg-color-text-secondary); }
+select option { background-color: var(--tg-color-surface); color: var(--tg-color-text); }
 
-select {
-  color: var(--input-text);
-}
-
-select option {
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-}
-
-input:focus, select:focus, textarea:focus {
-  outline: none;
-  border-color: var(--input-border-focus);
-  box-shadow: var(--shadow-focus);
+/* El campo enfocado engrosa su borde además de recibir el contorno: el grosor
+   se ve incluso cuando el contorno queda contra un fondo del mismo tono. */
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  border-width: 2px;
+  border-color: var(--tg-color-selection-border);
 }
 
 input:disabled, select:disabled, textarea:disabled {
-  background-color: var(--bg-tertiary);
-  color: var(--text-disabled);
+  color: var(--tg-color-disabled-text);
+  background-color: var(--tg-color-disabled-bg);
   cursor: not-allowed;
 }
 
-/* === CARDS === */
+input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] {
+  border-width: 2px;
+  border-color: var(--tg-color-error);
+}
+
+/* === PIEZAS === */
 .card {
-  background-color: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--card-shadow);
-  transition: all var(--transition-normal);
+  background-color: var(--tg-color-surface);
+  border: 1px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-none);
+  box-shadow: none;
 }
 
-.card:hover {
-  box-shadow: var(--card-shadow-hover);
-  transform: translateY(-2px);
-}
-
-/* === CHIPS === */
 .chip {
   display: inline-flex;
   align-items: center;
-  padding: 4px 12px;
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  background-color: var(--bg-tertiary);
-  color: var(--text-secondary);
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: var(--tg-radius-sm);
+  font-size: 12px;
+  font-weight: 650;
+  background-color: var(--tg-color-surface-muted);
+  color: var(--tg-color-text-secondary);
 }
 
 .chip-primary {
-  background-color: var(--color-primary-100);
-  color: var(--color-primary-700);
+  background-color: var(--tg-color-selection);
+  color: var(--tg-color-text);
+  border-left: 2px solid var(--tg-color-brand);
 }
 
-[data-theme="dark"] .chip-primary {
-  background-color: rgba(5, 150, 105, 0.2);
-  color: var(--color-primary-400);
-}
-
-/* === ALERTS === */
+/* Los avisos llevan color Y filete: el color solo no es un mensaje para quien
+   no lo distingue. */
 .alert {
-  padding: var(--spacing-md);
-  border-radius: var(--radius-lg);
-  font-size: var(--font-size-base);
+  padding: var(--tg-space-4);
+  border-left: 4px solid currentColor;
+  border-radius: var(--tg-radius-none);
+  font-size: 16px;
 }
 
-.alert-success {
-  background-color: var(--color-primary-50);
-  color: var(--color-primary-800);
-  border: 1px solid var(--color-primary-200);
-}
+.alert-success { color: var(--tg-color-success); background-color: var(--tg-color-success-bg); }
+.alert-error { color: var(--tg-color-error); background-color: var(--tg-color-error-bg); }
+.alert-warning { color: var(--tg-color-warning); background-color: var(--tg-color-warning-bg); }
+.alert-info { color: var(--tg-color-info); background-color: var(--tg-color-info-bg); }
 
-.alert-error {
-  background-color: #fef2f2;
-  color: #991b1b;
-  border: 1px solid #fecaca;
-}
-
-.alert-warning {
-  background-color: #fffbeb;
-  color: #92400e;
-  border: 1px solid #fde68a;
-}
-
-.alert-info {
-  background-color: #eff6ff;
-  color: #1e40af;
-  border: 1px solid #bfdbfe;
-}
-
-[data-theme="dark"] .alert-success {
-  background-color: rgba(16, 185, 129, 0.1);
-  border-color: rgba(16, 185, 129, 0.3);
-}
-
-[data-theme="dark"] .alert-error {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: #fca5a5;
-  border-color: rgba(239, 68, 68, 0.3);
-}
-
-[data-theme="dark"] .alert-warning {
-  background-color: rgba(245, 158, 11, 0.1);
-  color: #fcd34d;
-  border-color: rgba(245, 158, 11, 0.3);
-}
-
-[data-theme="dark"] .alert-info {
-  background-color: rgba(59, 130, 246, 0.1);
-  color: #93c5fd;
-  border-color: rgba(59, 130, 246, 0.3);
-}
-
-/* === TOOLTIPS === */
 .tooltip {
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-xs);
-  background-color: var(--color-slate-900);
-  color: var(--color-slate-50);
+  padding: var(--tg-space-2) var(--tg-space-3);
+  border-radius: var(--tg-radius-sm);
+  font-size: 12px;
+  background-color: var(--tg-color-brand);
+  color: var(--tg-color-text-inverse);
 }
 
 /* === SCROLLBAR === */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--tg-color-surface-muted); }
+::-webkit-scrollbar-thumb { background: var(--tg-color-border-control); border-radius: var(--tg-radius-sm); }
+::-webkit-scrollbar-thumb:hover { background: var(--tg-color-text-secondary); }
+
+/* === PRIMITIVAS DEL SISTEMA ===
+   Las clases con prefijo `tg-` son globales a propósito: son el vocabulario
+   que comparten todas las pantallas. Un módulo CSS por componente sirve para
+   lo que ese componente tiene de propio, no para redibujar un botón. */
+
+.tg-container {
+  width: min(100%, calc(var(--tg-container-max) + (2 * var(--tg-gutter-desktop))));
+  margin-inline: auto;
+  padding-inline: var(--tg-gutter-desktop);
 }
 
-::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+.tg-eyebrow {
+  font-size: 12px;
+  line-height: 1.25;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--tg-color-accent);
 }
 
-::-webkit-scrollbar-thumb {
-  background: var(--color-slate-400);
-  border-radius: var(--radius-full);
+.tg-meta {
+  font-size: 12px;
+  line-height: 1.25;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--tg-color-text-secondary);
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-slate-500);
+/* Los números que se comparan entre filas van tabulares: si cada dígito mide
+   distinto, dos precios de la misma cifra no se alinean. */
+.tg-price { font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -0.035em; }
+.tg-data { font-variant-numeric: tabular-nums; }
+
+.tg-lead { max-width: 66ch; color: var(--tg-color-text-secondary); font-size: 18px; line-height: 1.55; }
+.tg-small { color: var(--tg-color-text-secondary); font-size: 14px; }
+
+.tg-rule { border: 0; border-top: 1px solid var(--tg-color-border); margin: 0; }
+.tg-surface { background-color: var(--tg-color-surface); border: 1px solid var(--tg-color-border); }
+
+.tg-button {
+  min-height: var(--tg-control-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tg-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--tg-radius-sm);
+  padding: 10px 18px;
+  font-weight: 650;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
 }
 
-[data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: var(--color-slate-600);
+.tg-button--primary { color: var(--tg-color-text-inverse); background-color: var(--tg-color-action); }
+.tg-button--primary:hover { color: var(--tg-color-text-inverse); background-color: var(--tg-color-action-hover); text-decoration: none; }
+.tg-button--secondary { color: var(--tg-color-text); background: transparent; border-color: var(--tg-color-border-control); }
+.tg-button--secondary:hover { background-color: var(--tg-color-surface-subtle); border-color: var(--tg-color-text); text-decoration: none; }
+.tg-button--tertiary { color: var(--tg-color-link); background: transparent; padding-inline: var(--tg-space-2); }
+.tg-button--danger { color: var(--tg-color-text-inverse); background-color: var(--tg-color-error); }
+
+/* Deshabilitado con colores propios y no con opacidad: la opacidad se apila y
+   un control atenuado adentro de un bloque atenuado deja de leerse. */
+.tg-button[disabled],
+.tg-button[aria-disabled="true"] {
+  color: var(--tg-color-disabled-text);
+  background-color: var(--tg-color-disabled-bg);
+  border-color: var(--tg-color-border);
+  cursor: not-allowed;
 }
 
-[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-slate-500);
-}
+.tg-field { display: grid; gap: var(--tg-space-2); }
+.tg-field label { font-weight: 620; }
+.tg-field input, .tg-field select, .tg-field textarea { width: 100%; }
+.tg-field textarea { min-height: 112px; resize: vertical; }
+.tg-field-help { color: var(--tg-color-text-secondary); font-size: 14px; }
+.tg-field-error { color: var(--tg-color-error); font-size: 14px; font-weight: 560; }
 
-/* === SELECTION === */
-::selection {
-  background-color: var(--color-primary-200);
-  color: var(--color-primary-900);
-}
-
-[data-theme="dark"] ::selection {
-  background-color: var(--color-primary-700);
-  color: var(--color-primary-100);
-}
+.tg-check, .tg-radio { min-height: 44px; display: flex; align-items: center; gap: 10px; }
+.tg-check input, .tg-radio input { inline-size: 20px; block-size: 20px; min-height: 0; accent-color: var(--tg-color-brand); }
 
 /* === UTILIDADES === */
-.sr-only {
+.sr-only, .tg-sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -619,54 +465,34 @@ input:disabled, select:disabled, textarea:disabled {
   border: 0;
 }
 
-.text-primary { color: var(--text-primary); }
-.text-secondary { color: var(--text-secondary); }
-.text-tertiary { color: var(--text-tertiary); }
-.text-success { color: var(--color-success-text); }
-.text-error { color: var(--color-error-text); }
-.text-warning { color: var(--color-warning-text); }
+.text-primary { color: var(--tg-color-text); }
+.text-secondary { color: var(--tg-color-text-secondary); }
+.text-tertiary { color: var(--tg-color-text-secondary); }
+.text-success { color: var(--tg-color-success); }
+.text-error { color: var(--tg-color-error); }
+.text-warning { color: var(--tg-color-warning); }
 
-.bg-primary { background-color: var(--bg-primary); }
-.bg-secondary { background-color: var(--bg-secondary); }
-.bg-tertiary { background-color: var(--bg-tertiary); }
+.bg-primary { background-color: var(--tg-color-surface); }
+.bg-secondary { background-color: var(--tg-color-canvas); }
+.bg-tertiary { background-color: var(--tg-color-surface-muted); }
 
-/* === ANIMACIONES === */
+/* === MOVIMIENTO ===
+   Sólo lo necesario: aparecer y desaparecer. Sin desplazamientos ni rebotes,
+   que es de donde salía la sensación de plantilla. */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-@keyframes slideUp {
-  from { 
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to { 
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+.animate-fadeIn { animation: fadeIn var(--transition-normal); }
+.animate-slideUp { animation: fadeIn var(--transition-normal); }
+.animate-slideDown { animation: fadeIn var(--transition-normal); }
 
-@keyframes slideDown {
-  from { 
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to { 
-    opacity: 1;
-    transform: translateY(0);
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
-
-.animate-fadeIn {
-  animation: fadeIn var(--transition-normal);
-}
-
-.animate-slideUp {
-  animation: slideUp var(--transition-normal);
-}
-
-.animate-slideDown {
-  animation: slideDown var(--transition-normal);
-}
-

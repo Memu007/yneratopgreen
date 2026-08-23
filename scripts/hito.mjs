@@ -226,10 +226,10 @@ async function main() {
     await paso('detalle, carrito y destino del padrón', async () => {
       await page.locator('[class*="_productsGrid_"]')
         .getByRole('heading', { name: datos.publicacion, exact: true, level: 3 }).click();
-      await page.getByRole('heading', { name: 'Vendido por' }).waitFor({ timeout: ESPERA });
+      await page.getByRole('dialog').waitFor({ timeout: ESPERA });
       // Agregar desde el detalle cierra el modal solo.
-      await page.getByRole('button', { name: /Agregar al Carrito/ }).click();
-      await page.getByRole('heading', { name: 'Vendido por' })
+      await page.getByRole('button', { name: /Agregar|Iniciar operación|Contratar/ }).first().click();
+      await page.getByRole('dialog')
         .waitFor({ state: 'hidden', timeout: ESPERA });
 
       await page.getByRole('button', { name: /Carrito/ }).click();

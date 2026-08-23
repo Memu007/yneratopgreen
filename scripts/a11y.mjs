@@ -206,7 +206,7 @@ async function publicas(page, medida) {
 
   // las otras tres públicas están a un clic del encabezado y el barrido de
   // contraste ya las cubre; sin ellas las dos puertas medirían distinto
-  await page.getByRole('button', { name: 'Quienes Somos', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Quiénes somos', exact: true }).first().click();
   await revisar(page, 'quienes somos', medida,
     page.getByRole('heading', { name: 'Nuestro equipo' }));
 
@@ -228,18 +228,18 @@ async function comprador(page, medida) {
   // se declaraba medida sin haberse abierto nunca.
   await page.locator('[class*="_card_"]').first().click();
   await revisar(page, 'detalle de producto', medida,
-    page.getByRole('heading', { name: 'Vendido por' }));
+    page.getByRole('dialog'));
 
   // cerrar de verdad y comprobarlo: si el detalle queda abierto, el "Agregar"
   // siguiente sería el del modal y no el de la grilla
   await page.getByRole('button', { name: 'Cerrar' }).first().click();
-  await page.getByRole('heading', { name: 'Vendido por' }).waitFor({ state: 'hidden', timeout: ESPERA });
+  await page.getByRole('dialog').waitFor({ state: 'hidden', timeout: ESPERA });
 
   // Una publicación del seed cuya localidad de origen entra en el radio del
   // transportista demo: sin eso no habría a quién elegir y las dos pantallas
   // nuevas del traslado no existirían. Si el seed cambia, esto falla en vez de
   // medir de menos.
-  const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+  const buscador = page.getByPlaceholder('Buscar producto, servicio o ubicación');
   await buscador.fill('Fertilizante Triple 15');
   await buscador.press('Enter');
   await page.getByRole('heading', { name: 'Fertilizante Triple 15 - NPK', exact: true, level: 3 })

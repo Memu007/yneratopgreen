@@ -1745,7 +1745,11 @@ await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorr
       pedidosDeRelleno += 1;
       return route.fulfill({ status: 404, body: 'imagen rota por smoke' });
     });
-  const ilustracion = (raiz) => raiz.getByText('Imagen ilustrativa').first();
+  // Dos rótulos distintos, que es lo nuevo: antes los dos caminos —sin foto
+  // y foto rota— caían en el mismo cartel, así que el caso no podía notar
+  // si el respaldo estaba diciendo la verdad sobre cuál de las dos pasó.
+  const sinFoto = (raiz) => raiz.getByText('Sin fotografía').first();
+  const fotoRota = (raiz) => raiz.getByText('No pudimos cargar la imagen').first();
 
   try {
     const buyerContext = await browser.newContext();
@@ -1771,10 +1775,10 @@ await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorr
     await buyerPage.locator('#catalog-type').selectOption('productos');
     const productName = state.product.name;
     await buyerPage
-      .getByPlaceholder('Buscar productos, semillas, maquinaria...')
+      .getByPlaceholder('Buscar producto, servicio o ubicación')
       .fill(productName);
     await buyerPage
-      .getByPlaceholder('Buscar productos, semillas, maquinaria...')
+      .getByPlaceholder('Buscar producto, servicio o ubicación')
       .press('Enter');
     const productHeading = buyerPage.getByRole('heading', {
       name: productName,
@@ -1793,7 +1797,7 @@ await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorr
     });
     await detailHeading.waitFor({ state: 'visible' });
     const detailModal = detailHeading.locator('xpath=ancestor::div[contains(@class,\"modal\")]');
-    await ilustracion(detailModal).waitFor();
+    await sinFoto(detailModal).waitFor();
     await detailModal.getByRole('button', { name: 'Cerrar' }).click();
 
     await addButton.click();
@@ -1801,11 +1805,11 @@ await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorr
     const cartHeading = buyerPage.getByRole('heading', { name: /Mi Carrito/ });
     await cartHeading.waitFor();
     const cartModal = cartHeading.locator('xpath=ancestor::div[contains(@class,\"modal\")]');
-    await ilustracion(cartModal).waitFor();
+    await sinFoto(cartModal).waitFor();
     await cartModal.getByRole('button', { name: 'Continuar compra' }).click();
     const shippingHeading = buyerPage.getByRole('heading', { name: /Datos de Envío/ });
     const checkoutModal = shippingHeading.locator('xpath=ancestor::div[contains(@class,\"modal\")]');
-    await ilustracion(checkoutModal).waitFor();
+    await sinFoto(checkoutModal).waitFor();
     await buyerContext.close();
 
     const sellerContext = await browser.newContext();
@@ -1826,7 +1830,7 @@ await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorr
     await sellerPage.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
     await sellerPage.getByRole('button', { name: 'Mis Productos' }).click();
     await sellerPage.getByRole('heading', { name: 'Mis Productos' }).waitFor();
-    await ilustracion(sellerPage).waitFor();
+    await sinFoto(sellerPage).waitFor();
     await sellerContext.close();
 
     const adminLogin = await apiRequest('/auth/login', {
@@ -1852,7 +1856,7 @@ await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorr
     await adminPage.getByRole('button', { name: '📦 Productos' }).click();
     const table = adminPage.locator('table');
     await table.waitFor();
-    await ilustracion(table).waitFor();
+    await sinFoto(table).waitFor();
     await adminContext.close();
 
     assert(pedidosDeRelleno === 0,
@@ -1870,12 +1874,12 @@ await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorr
     });
     await rotaPage.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await rotaPage.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
-    await ilustracion(rotaPage).waitFor();
+    await fotoRota(rotaPage).waitFor();
     await rotaContext.close();
 
     return 'ninguna imagen de relleno se pidió en los cinco recorridos, y en su lugar '
-      + 'aparece la ilustración de familia; una imagen propia rota sigue cayendo al '
-      + 'mismo respaldo';
+      + 'dice «Sin fotografía»; una imagen propia rota cae en el otro respaldo, que '
+      + 'dice «No pudimos cargar la imagen» y no la confunde con una que nunca hubo';
   } finally {
     await browser.close();
   }
@@ -2666,8 +2670,8 @@ await runCase(30, 'El motivo real de la sincronización llega al comprador', asy
 
     await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
-    await page.getByPlaceholder('Buscar productos, semillas, maquinaria...').fill(nombre);
-    await page.getByPlaceholder('Buscar productos, semillas, maquinaria...').press('Enter');
+    await page.getByPlaceholder('Buscar producto, servicio o ubicación').fill(nombre);
+    await page.getByPlaceholder('Buscar producto, servicio o ubicación').press('Enter');
     const tarjeta = page.getByRole('heading', { name: nombre, exact: true, level: 3 });
     await tarjeta.waitFor({ state: 'visible', timeout: 15_000 });
     await page.getByRole('button', { name: /Agregar/ }).first().click();
@@ -2741,8 +2745,8 @@ await runCase(31, 'Sin datos bancarios, el comprador ve el motivo del vendedor',
     const page = await context.newPage();
     await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
-    await page.getByPlaceholder('Buscar productos, semillas, maquinaria...').fill(state.product.name);
-    await page.getByPlaceholder('Buscar productos, semillas, maquinaria...').press('Enter');
+    await page.getByPlaceholder('Buscar producto, servicio o ubicación').fill(state.product.name);
+    await page.getByPlaceholder('Buscar producto, servicio o ubicación').press('Enter');
     await page
       .getByRole('heading', { name: state.product.name, exact: true, level: 3 })
       .waitFor({ state: 'visible', timeout: 15_000 });
@@ -4034,7 +4038,7 @@ await runCase(43, 'Fletes compatibles por futura orden, con PostGIS y sin contac
       const page = await contexto.newPage();
       await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
       await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
-      const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+      const buscador = page.getByPlaceholder('Buscar producto, servicio o ubicación');
       await buscador.fill(nombreB);
       await buscador.press('Enter');
       await page.getByRole('heading', { name: nombreB, exact: true, level: 3 })
@@ -4255,7 +4259,7 @@ await runCase(45, 'La escritura de un carrito abandonado no puede quedar última
     // Nunca se recarga la página: recargar rearmaría cualquier cola por sí
     // solo y la prueba dejaría de medir lo que dice medir.
     const agregarDesdeLaInterfaz = async (producto) => {
-      const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+      const buscador = page.getByPlaceholder('Buscar producto, servicio o ubicación');
       await buscador.fill(producto.nombre);
       await buscador.press('Enter');
       await page.getByRole('heading', { name: producto.nombre, exact: true, level: 3 })
@@ -4475,7 +4479,7 @@ await runCase(47, 'Un login nuevo no hereda el "ya sincronizado" del anterior', 
 
     const agregarDesdeLaInterfaz = async () => {
       await asegurarCatalogo();
-      const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+      const buscador = page.getByPlaceholder('Buscar producto, servicio o ubicación');
       await buscador.fill(nombreDelProducto);
       await buscador.press('Enter');
       await page.getByRole('heading', { name: nombreDelProducto, exact: true, level: 3 })
@@ -4624,7 +4628,7 @@ await runCase(48, 'Un turno encolado no sale con las credenciales de la sesión 
 
     const agregarDesdeLaInterfaz = async (producto) => {
       await asegurarCatalogo();
-      const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+      const buscador = page.getByPlaceholder('Buscar producto, servicio o ubicación');
       await buscador.fill(producto.nombre);
       await buscador.press('Enter');
       await page.getByRole('heading', { name: producto.nombre, exact: true, level: 3 })
@@ -5025,7 +5029,7 @@ await runCase(51, 'Cada pedido resuelve su traslado y la decisión llega a la or
     await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
 
     for (const pedido of [pedidoA, pedidoB]) {
-      const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+      const buscador = page.getByPlaceholder('Buscar producto, servicio o ubicación');
       await buscador.fill(pedido.nombre);
       await buscador.press('Enter');
       await page.getByRole('heading', { name: pedido.nombre, exact: true, level: 3 })
@@ -5141,7 +5145,7 @@ await runCase(52, 'El contacto aparece al elegir y desaparece cuando la elecció
     const page = await context.newPage();
     await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
-    const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+    const buscador = page.getByPlaceholder('Buscar producto, servicio o ubicación');
     await buscador.fill(pedidoA.nombre);
     await buscador.press('Enter');
     await page.getByRole('heading', { name: pedidoA.nombre, exact: true, level: 3 })
@@ -5505,7 +5509,7 @@ await runCase(56, 'Una selección tardía no revive una decisión ya descartada'
 
     await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
-    const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+    const buscador = page.getByPlaceholder('Buscar producto, servicio o ubicación');
     await buscador.fill(pedidoA.nombre);
     await buscador.press('Enter');
     await page.getByRole('heading', { name: pedidoA.nombre, exact: true, level: 3 })
@@ -7711,7 +7715,7 @@ await runCase(81, 'La pantalla cobra por grupo, arma la cola de órdenes y no de
     await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
     for (const item of [conMP, conTR]) {
-      const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+      const buscador = page.getByPlaceholder('Buscar producto, servicio o ubicación');
       await buscador.fill(item.nombre);
       await buscador.press('Enter');
       await page.getByRole('heading', { name: item.nombre, exact: true, level: 3 })
@@ -10386,8 +10390,8 @@ await runCase(108, 'Documentación: presentar, revisar y ver el distintivo en el
       () => document.querySelectorAll('#catalog-category option').length > 1,
     );
     await pp.locator('#catalog-type').selectOption('productos');
-    await pp.getByPlaceholder('Buscar productos, semillas, maquinaria...').fill(nombreProducto);
-    await pp.getByPlaceholder('Buscar productos, semillas, maquinaria...').press('Enter');
+    await pp.getByPlaceholder('Buscar producto, servicio o ubicación').fill(nombreProducto);
+    await pp.getByPlaceholder('Buscar producto, servicio o ubicación').press('Enter');
     const titulo = pp.getByRole('heading', { name: nombreProducto, exact: true, level: 3 });
     await titulo.waitFor({ state: 'visible', timeout: 15_000 });
     await titulo.click();
@@ -10953,7 +10957,7 @@ await runCase(114, 'En pantalla: se comparan marca y cargas, el dominio recién 
 
     await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
-    const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+    const buscador = page.getByPlaceholder('Buscar producto, servicio o ubicación');
     await buscador.fill(pedidoA.nombre);
     await buscador.press('Enter');
     await page.getByRole('heading', { name: pedidoA.nombre, exact: true, level: 3 })

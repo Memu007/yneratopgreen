@@ -98,6 +98,12 @@ class ProductCardResponse(ProductBase):
     # modelo la descarta: Pydantic ignora lo que no declara.
     operation_kind: str = "insumo"
     condition: Optional[str] = None
+    # Lo que la anatomia de servicio pide obligatorio —cobertura y
+    # modalidad— y ya estaba en la base sin salir a la superficie.
+    pricing_type: Optional[str] = None
+    availability: Optional[str] = None
+    response_time: Optional[str] = None
+    coverage_zones: Optional[List[str]] = None
     primary_image: Optional[str] = None
     seller: SellerBasicInfo
     views_count: int = 0
@@ -116,6 +122,10 @@ class ProductDetailResponse(ProductBase):
     is_service: bool = False
     operation_kind: str = "insumo"
     condition: Optional[str] = None
+    pricing_type: Optional[str] = None
+    availability: Optional[str] = None
+    response_time: Optional[str] = None
+    coverage_zones: Optional[List[str]] = None
     seller: SellerInfo
     images: List[ProductImageResponse] = []
     views_count: int = 0

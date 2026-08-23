@@ -25,6 +25,13 @@ export interface Product {
       que es como se comportaba todo antes de que la columna existiera. */
   operationKind?: OperationKind;
   condition?: Condition;
+  /** Lo que declara una publicación de servicio o logística. Vive en la base
+      desde siempre; hasta ahora no salía en la respuesta pública, y sin
+      cobertura ni modalidad la tarjeta de servicio no se puede dibujar. */
+  pricingType?: string;
+  availability?: string;
+  responseTime?: string;
+  coverageZones?: string[];
   location: {
     province: string;
     city: string;

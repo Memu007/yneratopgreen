@@ -261,6 +261,16 @@ function App() {
       case 'marketplace':
         return (
           <main className={styles.mainContent}>
+            <section className={`tg-container ${styles.presentacion}`} aria-labelledby="titulo-mercado">
+              <div>
+                <div className="tg-eyebrow">Mercado agro</div>
+                <h1 id="titulo-mercado">Operaciones disponibles</h1>
+              </div>
+              <p className="tg-lead">
+                Productos, servicios y logística con precio o modalidad, ubicación,
+                responsable y próximo paso.
+              </p>
+            </section>
             <div className={styles.contentWrapper}>
               <FilterSidebar
                 categories={categories}
@@ -286,8 +296,13 @@ function App() {
                 onInStockChange={setInStockOnly}
                 onMinRatingChange={setMinRating}
                 onResetFilters={resetFilters}
+                cantidadDeResultados={filteredProducts.length}
               />
-              <ProductGrid products={filteredProducts} isLoading={loadingProducts} />
+              <ProductGrid
+                products={filteredProducts}
+                isLoading={loadingProducts}
+                onSolicitarCotizacion={() => handleNavigate('contact')}
+              />
             </div>
           </main>
         );

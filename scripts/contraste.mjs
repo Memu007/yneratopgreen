@@ -374,14 +374,14 @@ for (const medida of MEDIDAS) {
 
     const equipo = page.getByRole('heading', { name: 'Nuestro equipo' });
     for (const [seccion, titulo, marca] of [
-      ['Quienes Somos', 'about', equipo],
+      ['Quiénes somos', 'about', equipo],
       ['Servicios', 'services', page.getByRole('heading', { name: 'Servicios', level: 1 })],
       ['Contacto', 'contact', page.getByRole('heading', { name: 'Contacto', level: 1 })],
     ]) {
       await page.getByRole('button', { name: seccion, exact: true }).first().click();
       await revisar(page, `${medida.n} ${titulo}`, marca);
     }
-    await extremosDeFoto(page, `${medida.n} about`, 'Quienes Somos', equipo);
+    await extremosDeFoto(page, `${medida.n} about`, 'Quiénes somos', equipo);
 
     // La vista del enlace de confirmación, en su estado de rechazo: es el que
     // trae el texto de error y el formulario de reenvío. El de éxito consume
@@ -411,7 +411,7 @@ for (const medida of MEDIDAS) {
     // el detalle se abre haciendo clic en la tarjeta, no en un boton: no existe
     // ningun "Ver detalle". Antes esto lo tapaba un catch vacio y esta pantalla
     // se declaraba medida sin haberse abierto nunca.
-    const vendidoPor = page.getByRole('heading', { name: 'Vendido por' });
+    const vendidoPor = page.getByRole('dialog');
     await page.locator('[class*="_card_"]').first().click();
     await revisar(page, `${medida.n} detalle`, vendidoPor);
 
@@ -420,7 +420,7 @@ for (const medida of MEDIDAS) {
 
     // Una publicación con origen dentro del radio del transportista demo: sin
     // eso no hay a quién elegir y las pantallas del traslado no existirían.
-    const buscador = page.getByPlaceholder('Buscar productos, semillas, maquinaria...');
+    const buscador = page.getByPlaceholder('Buscar producto, servicio o ubicación');
     await buscador.fill('Fertilizante Triple 15');
     await buscador.press('Enter');
     await page.getByRole('heading', { name: 'Fertilizante Triple 15 - NPK', exact: true, level: 3 })

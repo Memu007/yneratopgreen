@@ -1,506 +1,257 @@
+/* El detalle de una publicación.
+   En el producto es una capa y no una página: se abre encima del catálogo y se
+   vuelve sin perder los filtros. La jerarquía es la del sistema —galería,
+   resumen de operación pegado a la derecha, y el cuerpo abajo—, adaptada a que
+   el ancho lo pone la capa y no la ventana. */
+
 .overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.75);
+  inset: 0;
+  z-index: var(--tg-z-modal);
   display: flex;
+  align-items: flex-start;
   justify-content: center;
-  align-items: center;
-  z-index: 2000;
-  padding: 20px;
+  padding: var(--tg-space-8) var(--tg-space-4);
+  background-color: var(--tg-color-overlay);
   overflow-y: auto;
 }
 
 .modal {
-  background: white;
-  border-radius: 16px;
-  max-width: 1200px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
   position: relative;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  animation: slideUp 0.3s ease-out;
+  width: min(100%, 1120px);
+  background-color: var(--tg-color-surface);
+  border: 1px solid var(--tg-color-border);
+  border-top: 4px solid var(--tg-color-accent);
+  border-radius: var(--tg-radius-md);
+  box-shadow: var(--tg-shadow-overlay);
 }
 
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.encabezado {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--tg-space-6);
+  padding: var(--tg-space-8) var(--tg-space-8) var(--tg-space-6);
+  border-bottom: 1px solid var(--tg-color-border);
 }
 
-.closeButton {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  background: white;
-  border: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  font-size: 24px;
+.titulo {
+  margin-top: var(--tg-space-2);
+  overflow-wrap: anywhere;
+}
+
+.categoria {
+  margin-top: var(--tg-space-2);
+  color: var(--tg-color-text-secondary);
+  font-size: 14px;
+}
+
+.cerrar {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  color: var(--tg-color-text);
+  background: transparent;
+  border: 1px solid var(--tg-color-border-control);
+  border-radius: var(--tg-radius-sm);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  z-index: 10;
-  transition: all 0.2s;
 }
 
-.closeButton:hover {
-  background-color: #f0f0f0;
-  transform: scale(1.1);
+.cerrar:hover { background-color: var(--tg-color-surface-subtle); }
+
+.cuerpo {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(340px, 0.74fr);
+  grid-template-areas:
+    'galeria resumen'
+    'detalle resumen';
+  gap: var(--tg-space-8);
+  align-items: start;
+  padding: var(--tg-space-8);
 }
 
-.content {
+.galeria { grid-area: galeria; }
+
+.imagenPrincipal {
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--tg-color-border);
+  overflow: hidden;
+}
+
+.imagenPrincipal img,
+.imagenPrincipal > div {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.resumen {
+  grid-area: resumen;
+  display: grid;
+  gap: var(--tg-space-5);
+  padding: var(--tg-space-6);
+  background-color: var(--tg-color-surface);
+  border: 1px solid var(--tg-color-border);
+  border-top: 4px solid var(--tg-color-accent);
+}
+
+/* Sin galería no queda una columna vacía de 700 px: el cuerpo sube y ocupa
+   la izquierda, y el resumen se queda donde estaba. */
+.sinGaleria {
+  grid-template-areas: 'detalle resumen';
+}
+
+.precio { display: grid; gap: var(--tg-space-1); }
+
+/* El precio no se corta y tampoco se parte en medio de los dígitos: un
+   «$ 950.000.0 / 00» es ilegible como cifra. Baja de cuerpo hasta entrar. */
+.cifra {
+  font-size: clamp(26px, 2.4vw, 44px);
+  line-height: 0.95;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+.precio span { color: var(--tg-color-text-secondary); }
+
+.ubicacion { color: var(--tg-color-text-secondary); }
+
+.datos {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 40px;
-  padding: 40px;
-}
-
-/* Sección de Imágenes */
-.imageSection {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.mainImage {
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 12px;
-  overflow: hidden;
-  background: #f5f5f5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.mainImage img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.thumbnails {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-  gap: 12px;
-}
-
-.thumbnail {
-  aspect-ratio: 1;
-  border-radius: 8px;
-  overflow: hidden;
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: all 0.2s;
-}
-
-.thumbnail img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.thumbnail:hover {
-  border-color: #7fb069;
-}
-
-.thumbnailActive {
-  border-color: #2d5016 !important;
-}
-
-/* Sección de Información */
-.infoSection {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.header {
-  border-bottom: 1px solid #e0e0e0;
-  padding-bottom: 20px;
-}
-
-.category {
-  font-size: 14px;
-  color: var(--marca-grafito-suave);
-  margin-bottom: 8px;
-}
-
-.title {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--marca-verde);
-  margin: 0 0 16px 0;
-  line-height: 1.3;
-}
-
-.priceSection {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.price {
-  font-size: 36px;
-  font-weight: 700;
-  color: var(--marca-verde);
-}
-
-.unit {
-  font-size: 16px;
-  color: var(--marca-grafito-suave);
-}
-
-/* Vendedor */
-.sellerInfo {
-  background-color: var(--marca-lienzo);
-  padding: 20px;
-  border-radius: 12px;
-}
-
-.sellerInfo h3 {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--marca-grafito-suave);
-  margin: 0 0 12px 0;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.sellerCard {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.sellerClickable {
-  cursor: pointer;
-  padding: 12px;
-  border-radius: 10px;
-  transition: all 0.2s ease;
-  background: rgba(45, 80, 22, 0.05);
-}
-
-.sellerClickable:hover {
-  background: rgba(45, 80, 22, 0.1);
-  transform: translateX(4px);
-}
-
-.sellerClickable:hover .viewProfile {
-  opacity: 1;
-}
-
-.sellerAvatar {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background-color: var(--marca-verde);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.sellerDetails {
-  flex: 1;
-}
-
-.sellerName {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--marca-verde);
-  margin-bottom: 4px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.viewProfile {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--marca-verde);
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.sellerRating {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-}
-
-.stars {
-  color: #ffd93d;
-}
-
-.ratingNumber {
-  font-weight: 600;
-  color: var(--marca-grafito);
-}
-
-.salesCount {
-  color: var(--marca-grafito-suave);
-}
-
-.noRating {
-  color: #666666;
-  font-style: italic;
-  font-size: 13px;
-}
-
-.salesInfo {
-  font-size: 12px;
-  color: #666666;
-  margin-top: 4px;
-}
-
-/* Distintivo de documentación revisada. Verde sobrio y no una medalla: es una
-   revisión manual de un papel, no un sello de identidad comprobada. El par
-   #1b5e20 sobre #e8f5e9 mide 8,3:1, muy por encima del mínimo. */
-.sellerDocumentacion {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  padding: 3px 8px;
-  border-radius: 12px;
-  background: #e8f5e9;
-  color: #1b5e20;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.privacyNote {
-  margin-top: 12px;
-  padding: 10px;
-  background: white;
-  border-radius: 6px;
-  font-size: 13px;
-  color: var(--marca-grafito-suave);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* Ubicación */
-.location {
-  display: flex;
-  gap: 12px;
-  padding: 16px;
-  background-color: var(--marca-lienzo);
-  border-radius: 8px;
-}
-
-.locationIcon {
-  font-size: 24px;
-}
-
-.locationTitle {
-  font-size: 12px;
-  color: var(--marca-grafito-suave);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-}
-
-.locationText {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--marca-grafito);
-}
-
-/* Stock */
-.stock {
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.stockAvailable {
-  color: var(--marca-verde);
-}
-
-.stockLow {
-  color: var(--color-error-text);
-}
-
-/* Service Info */
-.serviceInfo {
-  margin: 12px 0;
-}
-
-.serviceBadge {
-  display: inline-block;
-  background-color: var(--marca-cosecha);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-/* Descripción */
-.description h3,
-.features h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--marca-verde);
-  margin: 0 0 12px 0;
-}
-
-.description p {
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--marca-grafito-suave);
   margin: 0;
+  border-top: 1px solid var(--tg-color-border);
 }
 
-/* Características */
-.featuresList {
+.datos > div {
+  padding-block: var(--tg-space-3);
+  border-bottom: 1px solid var(--tg-color-border);
+}
+
+.datos > div:nth-child(even) {
+  padding-left: var(--tg-space-3);
+  border-left: 1px solid var(--tg-color-border);
+}
+
+.datos dt {
+  color: var(--tg-color-text-secondary);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.datos dd { margin: 4px 0 0; font-weight: 620; }
+
+.acciones { display: grid; gap: var(--tg-space-3); }
+
+.detalle {
+  grid-area: detalle;
   display: grid;
-  gap: 10px;
+  gap: var(--tg-space-8);
 }
 
-.featureItem {
-  display: flex;
-  padding: 10px;
-  background-color: var(--marca-lienzo);
-  border-radius: 6px;
-  font-size: 14px;
+.seccion {
+  display: grid;
+  gap: var(--tg-space-3);
+  padding-top: var(--tg-space-6);
+  border-top: 1px solid var(--tg-color-border);
 }
 
-.featureKey {
-  font-weight: 600;
-  color: var(--marca-verde);
-  min-width: 120px;
+.descripcion {
+  max-width: 74ch;
+  font-size: 18px;
+  line-height: 1.7;
 }
 
-.featureValue {
-  color: var(--marca-grafito-suave);
-}
+.vendedor { display: grid; gap: var(--tg-space-2); }
 
-/* Etiquetas */
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.tag {
-  padding: 6px 12px;
-  background: #4a7c29;
-  color: white;
-  border-radius: 20px;
+.documentacion {
+  justify-self: start;
+  padding: 3px 8px;
+  color: var(--tg-color-success);
+  background-color: var(--tg-color-success-bg);
+  border-left: 2px solid var(--tg-color-success);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 620;
 }
 
-/* Acciones */
-.actions {
-  display: flex;
-  gap: 12px;
-  padding-top: 20px;
-  border-top: 1px solid #e0e0e0;
-  position: sticky;
-  bottom: 0;
-  background: white;
-  padding: 20px 0 0 0;
+.logistica {
+  padding: var(--tg-space-6);
+  background-color: var(--tg-color-info-bg);
+  border-top: 4px solid var(--tg-color-info);
 }
 
-.quantitySelector {
-  display: flex;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  overflow: hidden;
-  height: 50px;
+.tablaContenedor { overflow-x: auto; }
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
 }
 
-.quantitySelector button {
-  width: 45px;
-  border: none;
-  background: #f5f5f5;
-  cursor: pointer;
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--marca-verde);
-  transition: background 0.2s;
+.tabla th,
+.tabla td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--tg-color-border);
 }
 
-.quantitySelector button:hover:not(:disabled) {
-  background: #e0e0e0;
+.tabla th {
+  width: 34%;
+  color: var(--tg-color-text-secondary);
+  background-color: var(--tg-color-surface-muted);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.quantitySelector button:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
+.tabla td { font-weight: 570; }
 
-.quantitySelector input {
-  width: 60px;
-  border: none;
-  text-align: center;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.addToCartButton {
-  flex: 1;
-  padding: 0 32px;
-  background-color: var(--marca-verde);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.addToCartButton:hover:not(:disabled) {
-  background: #1e3510;
-  transform: translateY(-1px);
-}
-
-.addToCartButton:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-
-/* Responsive */
-@media (max-width: 968px) {
-  .content {
+@media (max-width: 1023px) {
+  /* El resumen deja de estar al costado: en una sola columna, quedarse pegado
+     produce saltos y se superpone con el cuerpo al hacer scroll. */
+  .cuerpo {
     grid-template-columns: 1fr;
-    padding: 24px;
+    grid-template-areas: 'galeria' 'resumen' 'detalle';
+  }
+}
+
+@media (max-width: 599px) {
+  .overlay { padding: 0; }
+
+  .modal {
+    width: 100%;
+    min-height: 100%;
+    border: 0;
+    border-top: 4px solid var(--tg-color-accent);
+    border-radius: 0;
   }
 
-  .title {
-    font-size: 24px;
-  }
+  .encabezado { padding: var(--tg-space-5); }
+  .cuerpo { gap: var(--tg-space-6); padding: var(--tg-space-5); }
+  .resumen { padding: var(--tg-space-5); }
+  .cifra { font-size: 40px; }
+  .descripcion { font-size: 16px; }
 
-  .price {
-    font-size: 28px;
-  }
-
-  .actions {
-    flex-direction: column;
-  }
-
-  .quantitySelector {
+  /* La tabla se vuelve pares rótulo/valor: una tabla de dos columnas con
+     scroll horizontal adentro de una capa es imposible de leer con el pulgar. */
+  .tabla,
+  .tabla tbody,
+  .tabla tr,
+  .tabla th,
+  .tabla td {
+    display: block;
     width: 100%;
   }
+
+  .tabla tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid var(--tg-color-border);
+  }
+
+  .tabla th,
+  .tabla td { border: 0; }
 }

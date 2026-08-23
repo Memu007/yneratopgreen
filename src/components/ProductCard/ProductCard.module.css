@@ -1,218 +1,222 @@
-/* La tarjeta de resultado.
-   Un solo dato manda —el precio—, una sola acción, y el resto es contexto.
-   Antes cada dato tenía su propio adorno: la descripción recortada, tres
-   etiquetas, una píldora verde para el vendedor y un botón con carrito. Todo
-   junto pesaba lo mismo, así que nada se leía primero. */
+/* La tarjeta de una operación, en cuatro formas.
+   Comparten sistema —regla superior, borde, tipografía, escala— pero no fingen
+   que se compran igual: una cosechadora, una bolsa de urea, un servicio de
+   muestreo y un flete no se deciden con los mismos datos. */
 
 .card {
-  background-color: #ffffff;
-  border: 1px solid var(--marca-linea);
-  border-radius: var(--radius-lg);
+  min-width: 0;
   overflow: hidden;
+  background-color: var(--tg-color-surface);
+  border: 1px solid var(--tg-color-border);
+  /* La regla superior es la firma del sistema. En índigo para lo que se
+     compra; en bermellón para lo que se cotiza. */
+  border-top: 3px solid var(--tg-color-brand);
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.card:hover {
-  border-color: var(--marca-verde);
-  box-shadow: 0 6px 20px rgba(34, 32, 29, 0.09);
+.card:hover { border-color: var(--tg-color-border-control); }
+.card:focus-within { border-color: var(--tg-color-text); }
+
+.media {
+  aspect-ratio: 16 / 9;
+  border-bottom: 1px solid var(--tg-color-border);
 }
 
-.card:focus-within {
-  border-color: var(--marca-verde);
-}
-
-/* --- imagen --------------------------------------------------------------- */
-
-.imageContainer {
-  position: relative;
-  width: 100%;
-  /* Proporción fija: con altura suelta, una grilla de fotos de distinto alto
-     hace escalones y se pierde la lectura en columnas. */
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-  background-color: var(--marca-lienzo-hondo);
-}
-
-.image {
+.media img,
+.media > div {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
 }
 
-/* Sólo se avisa lo excepcional. El stock disponible ya no se grita en una
-   píldora sobre la foto: si hay, se compra; si no hay, hay que decirlo. */
-.sinStock,
-.servicio {
-  position: absolute;
-  top: 0.625rem;
-  left: 0.625rem;
-  padding: 0.2rem 0.55rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.6875rem;
-  font-weight: 700;
+.cuerpo {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tg-space-4);
+  padding: var(--tg-space-5);
+}
+
+.encabezado {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--tg-space-3);
+}
+
+/* La condición no es un adorno: es lo primero que mira quien compra una
+   máquina, y por eso va arriba y con filete propio. */
+.estado {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 7px;
+  color: var(--tg-color-text);
+  background-color: var(--tg-color-selection);
+  border-left: 2px solid var(--tg-color-brand);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.titulo {
+  /* Alto mínimo para que los precios de una fila queden a la misma altura
+     aunque los títulos midan distinto; y corte por palabra, no por carácter. */
+  min-height: 2.3em;
+  overflow-wrap: anywhere;
+}
+
+.ubicacion {
+  color: var(--tg-color-text-secondary);
+}
+
+.datosDeServicio {
+  display: grid;
+  margin: 0;
+  border-top: 1px solid var(--tg-color-border);
+}
+
+.datosDeServicio > div {
+  padding-block: var(--tg-space-3);
+  border-bottom: 1px solid var(--tg-color-border);
+}
+
+.datosDeServicio dt {
+  color: var(--tg-color-text-secondary);
+  font-size: 11px;
+  font-weight: 650;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.sinStock {
-  background-color: var(--marca-grafito);
-  color: #ffffff;
+.datosDeServicio dd {
+  margin: 4px 0 0;
+  font-weight: 600;
 }
 
-.servicio {
-  background-color: var(--marca-cosecha);
-  color: var(--marca-grafito);
-}
-
-/* --- cuerpo --------------------------------------------------------------- */
-
-.content {
+.precio {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.875rem 1rem 1rem;
-  flex: 1;
+  gap: 2px;
 }
 
-.category {
-  font-size: 0.6875rem;
+/* El precio no se trunca nunca —es el dato que se compara entre tarjetas— y
+   tampoco se parte en medio de los dígitos: baja de cuerpo hasta entrar. */
+.cifra {
+  font-size: clamp(24px, 2.2vw, 38px);
+  line-height: 1;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+.precio span {
+  color: var(--tg-color-text-secondary);
+  font-size: 13px;
+}
+
+.stock {
+  color: var(--tg-color-text-secondary);
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--marca-grafito-tenue);
-  line-height: 1.3;
-  /* Una línea: si una categoría larga se parte en dos, empuja el título de esa
-     tarjeta y los precios de la fila dejan de estar a la misma altura. */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.title {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.3;
-  color: var(--marca-grafito);
-  /* Dos líneas y corta: tres títulos de largo distinto desalinean los precios,
-     que es justo lo que hay que poder comparar de un vistazo. */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+.stockOk { color: var(--tg-color-success); }
 
-.ubicacion {
-  font-size: 0.8125rem;
-  color: var(--marca-grafito-suave);
-}
-
-.priceSection {
-  margin-top: auto;
-  padding-top: 0.625rem;
-}
-
-.price {
-  font-size: 1.375rem;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  color: var(--marca-grafito);
-  line-height: 1.15;
-}
-
-.unit {
-  font-size: 0.8125rem;
-  color: var(--marca-grafito-tenue);
-}
-
-/* --- pie ------------------------------------------------------------------ */
-
-.footer {
+.vendedor {
   display: flex;
-  align-items: flex-end;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 0.75rem;
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--marca-linea);
+  align-items: center;
+  gap: var(--tg-space-2);
+  padding-top: var(--tg-space-3);
+  border-top: 1px solid var(--tg-color-border);
+  font-size: 13px;
+  font-weight: 590;
 }
 
-.seller {
-  display: flex;
-  flex-direction: column;
+.vendedorNombre {
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.sellerName {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--marca-grafito-suave);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.calificacion { color: var(--tg-color-text-secondary); }
+
+.cantidad {
+  display: grid;
+  grid-template-columns: auto 72px 1fr;
+  align-items: center;
+  gap: var(--tg-space-2);
+  margin-top: auto;
 }
 
-/* La calificación se dice con palabras. Una estrella sola obliga a saber que
-   es sobre cinco, y con lector de pantalla se anuncia como «estrella». */
-.rating {
-  font-size: 0.75rem;
-  color: var(--marca-grafito-tenue);
+.cantidad label {
+  font-size: 13px;
+  font-weight: 620;
 }
 
-.ratingCount {
-  color: var(--marca-grafito-tenue);
+.cantidad input { width: 100%; }
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tg-space-3);
+  margin-top: auto;
 }
 
-.addToCartButton {
-  flex-shrink: 0;
-  padding: 0.45rem 0.9rem;
-  background: transparent;
-  color: var(--marca-verde);
-  border: 1px solid var(--marca-verde);
-  border-radius: var(--radius-md);
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+/* --- Activo de alto valor ------------------------------------------------
+   Ocupa el ancho completo de los resultados. No es un destacado pagado: es la
+   forma de la anatomía, porque lo que hay que leer de una máquina —condición,
+   precio, ubicación, vendedor— no entra en una columna de 300 px sin quedar
+   apilado en una tira. */
+.activo {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr);
 }
 
-.addToCartButton:hover:not(.disabled) {
-  background-color: var(--marca-verde);
-  color: #ffffff;
+.activo .media {
+  height: 100%;
+  aspect-ratio: auto;
+  border-bottom: 0;
+  border-right: 1px solid var(--tg-color-border);
 }
 
-.addToCartButton.disabled {
-  color: var(--marca-grafito-tenue);
-  border-color: var(--marca-linea-fuerte);
-  cursor: not-allowed;
+.activo .cuerpo { padding: var(--tg-space-8); }
+
+.activo .titulo {
+  min-height: 0;
+  font-size: clamp(32px, 3.1vw, 48px);
 }
 
-@media (max-width: 480px) {
-  .content {
-    padding: 0.75rem 0.875rem 0.875rem;
+/* --- Servicio y logística ------------------------------------------------
+   Sin imagen y con la regla en bermellón: es lo que se cotiza, no lo que se
+   agrega al carrito. */
+.servicio,
+.logistica {
+  border-top-color: var(--tg-color-accent);
+}
+
+.servicio .cuerpo,
+.logistica .cuerpo {
+  height: 100%;
+}
+
+@media (max-width: 700px) {
+  .activo { display: block; }
+
+  .activo .media {
+    min-height: 230px;
+    border-right: 0;
+    border-bottom: 1px solid var(--tg-color-border);
   }
 
-  .title {
-    font-size: 0.9375rem;
-  }
+  .activo .cuerpo { padding: var(--tg-space-5); }
+  .activo .titulo { font-size: 34px; }
+}
 
-  .price {
-    font-size: 1.25rem;
-  }
-
-  .footer {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.5rem;
-  }
-
-  .addToCartButton {
-    width: 100%;
-  }
+@media (max-width: 599px) {
+  /* En 390 px los dos botones en línea quedan en 150 px cada uno y el texto
+     completo no entra: van uno por fila, con el texto entero. */
+  .acciones { display: grid; }
+  .cantidad { grid-template-columns: auto 72px; }
+  .cantidad button { grid-column: 1 / -1; }
 }

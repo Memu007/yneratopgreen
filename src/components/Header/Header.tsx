@@ -20,9 +20,21 @@ interface HeaderProps {
   onNavigate: (section: PageSection) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ 
-  searchQuery, 
-  onSearchChange, 
+// Las secciones que existen de verdad. No se agregan destinos inventados: la
+// navegación es un contrato con lo que la aplicación sabe abrir. «Mercado» es
+// nueva en la barra pero no es un destino nuevo: hasta ahora la única forma de
+// volver al catálogo era hacer clic en la marca.
+const SECCIONES: [PageSection, string][] = [
+  ['home', 'Inicio'],
+  ['marketplace', 'Mercado'],
+  ['services', 'Servicios'],
+  ['about', 'Quiénes somos'],
+  ['contact', 'Contacto'],
+];
+
+export const Header: React.FC<HeaderProps> = ({
+  searchQuery,
+  onSearchChange,
   onSearchSubmit,
   onLoginClick,
   onCartClick,
@@ -69,102 +81,89 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className={styles.header}>
-      <div className={styles.container}>
-        {/* Primera fila: quiénes somos, qué se busca y qué se puede hacer.
-            Es el orden de un marketplace y no el de un panel: antes la marca
-            era un botón más, perdido entre las acciones. */}
-        <div className={styles.barraSuperior}>
-          <div className={styles.marca}>
-            {/* La bajada va AFUERA del botón a propósito: lo clickeable es el
-                nombre, y su nombre accesible queda siendo «TopGreen» y nada más. */}
-            <button
-              className={styles.marcaNombre}
-              onClick={() => onNavigate('marketplace')}
-            >
-              Top<span className={styles.marcaVerde}>Green</span>
+      <div className={`tg-container ${styles.masthead}`}>
+        {/* El wordmark es un archivo, no letras compuestas a mano: su dibujo
+            está convertido a contornos, así que no depende de que la fuente
+            haya cargado. El nombre accesible es «TopGreen» y nada más. */}
+        <button className={styles.marca} onClick={() => onNavigate('marketplace')}>
+          <img src="/marca/topgreen-compact.svg" alt="TopGreen" width={431} height={112} />
+        </button>
+
+        {/* La búsqueda vive donde hay resultados que filtrar. En las otras
+            secciones no hay grilla, así que un buscador ahí sería un control
+            que parece hacer algo y no hace nada. */}
+        {currentSection === 'marketplace' && (
+          <form className={styles.buscador} onSubmit={handleSubmit} role="search">
+            <label className="tg-sr-only" htmlFor="buscar-mercado">
+              Buscar en el mercado
+            </label>
+            <input
+              id="buscar-mercado"
+              type="search"
+              className={styles.buscadorCampo}
+              placeholder="Buscar producto, servicio o ubicación"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+            />
+            <button type="submit" className={`tg-button tg-button--primary ${styles.buscadorBoton}`}>
+              Buscar
             </button>
-            <span className={styles.marcaBajada}>Marketplace agro</span>
-          </div>
+          </form>
+        )}
 
-          {/* La búsqueda vive donde hay resultados que filtrar. En las otras
-              secciones no hay grilla, así que un buscador ahí sería un control
-              que parece hacer algo y no hace nada. */}
-          {currentSection === 'marketplace' && (
-            <form className={styles.buscador} onSubmit={handleSubmit} role="search">
-              <input
-                type="search"
-                className={styles.buscadorCampo}
-                placeholder="Buscar productos, semillas, maquinaria..."
-                aria-label="Buscar en el marketplace"
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-              />
-              <button type="submit" className={styles.buscadorBoton}>
-                Buscar
-              </button>
-            </form>
+        <div className={styles.acciones}>
+          {isAuthenticated && user?.role === 'admin' && onAdminClick && (
+            <button className="tg-button tg-button--secondary" onClick={onAdminClick}>
+              Admin
+            </button>
           )}
-
-          <div className={styles.acciones}>
-            {isAuthenticated && user?.role === 'admin' && onAdminClick && (
-              <button className={styles.accionSecundaria} onClick={onAdminClick}>
-                Admin
+          {isAuthenticated && (
+            <button className="tg-button tg-button--primary" onClick={onSellClick}>
+              Vender
+            </button>
+          )}
+          {isAuthenticated ? (
+            <>
+              <CartButton onClick={onCartClick} />
+              {/* El nombre propio no sirve como etiqueta: cambia con cada
+                  cuenta. La etiqueta dice qué abre el botón. */}
+              <button
+                className={`tg-button tg-button--secondary ${styles.cuenta}`}
+                aria-label="Mi cuenta"
+                onClick={() => setShowDashboard(true)}
+              >
+                {user?.name}
               </button>
-            )}
-            {isAuthenticated && (
-              <button className={styles.accionPrincipal} onClick={onSellClick}>
-                Vender
+              <button className="tg-button tg-button--tertiary" onClick={logout}>
+                Salir
               </button>
-            )}
-            {isAuthenticated ? (
-              <>
-                <CartButton onClick={onCartClick} />
-                <div className={styles.menuDeCuenta}>
-                  {/* El nombre propio no sirve como etiqueta: cambia con cada
-                      cuenta. La etiqueta dice qué abre el botón. */}
-                  <button
-                    className={styles.cuenta}
-                    aria-label="Mi cuenta"
-                    onClick={() => setShowDashboard(true)}
-                  >
-                    {user?.name}
-                  </button>
-                  <button className={styles.accionSecundaria} onClick={logout}>
-                    Salir
-                  </button>
-                </div>
-              </>
-            ) : (
-              <button className={styles.accionSecundaria} onClick={onLoginClick}>
-                Ingresar
-              </button>
-            )}
-          </div>
+            </>
+          ) : (
+            <button className="tg-button tg-button--secondary" onClick={onLoginClick}>
+              Ingresar
+            </button>
+          )}
         </div>
+      </div>
 
-        {/* Segunda fila: las secciones institucionales, que no compiten con la
-            marca ni con la búsqueda. */}
-        <nav className={styles.nav} aria-label="Secciones del sitio">
-          {([
-            ['home', 'Home'],
-            ['about', 'Quienes Somos'],
-            ['services', 'Servicios'],
-            ['contact', 'Contacto'],
-          ] as [PageSection, string][]).map(([seccion, texto]) => (
+      <nav className={styles.nav} aria-label="Secciones del sitio">
+        <div className={`tg-container ${styles.navInterior}`}>
+          {SECCIONES.map(([seccion, texto]) => (
             <button
               key={seccion}
-              className={currentSection === seccion ? styles.navLinkActive : styles.navLink}
+              className={styles.navLink}
+              aria-current={currentSection === seccion ? 'page' : undefined}
               onClick={() => onNavigate(seccion)}
             >
               {texto}
             </button>
           ))}
-        </nav>
-      </div>
+        </div>
+      </nav>
 
       {showDashboard && (
-        <UserDashboard 
-          onClose={() => setShowDashboard(false)} 
+        <UserDashboard
+          onClose={() => setShowDashboard(false)}
           onPublishClick={() => {
             setShowDashboard(false);
             onSellClick();

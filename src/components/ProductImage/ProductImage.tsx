@@ -1,51 +1,36 @@
 import { useEffect, useState } from 'react';
 import styles from './ProductImage.module.css';
-import { IlustracionDeFamilia } from './IlustracionDeFamilia';
-import { esFotoDeRelleno, familiaDe } from '../../utils/ilustracion';
+import { esFotoDeRelleno } from '../../utils/fotos';
 
 interface ProductImageProps {
   src?: string;
   alt: string;
   className?: string;
   loading?: 'eager' | 'lazy';
-  /** El nombre de la categoría, para elegir el motivo. Opcional a propósito:
-      donde no se sepa, el motivo genérico sigue siendo honesto. */
-  categoria?: string;
 }
 
-export function ProductImage({
-  src,
-  alt,
-  className = '',
-  loading,
-  categoria,
-}: ProductImageProps) {
-  // Dos motivos distintos para no mostrar una foto, y conviene no confundirlos:
-  // que no haya imagen, y que la que hay sea de relleno. El segundo no falla
-  // nunca —carga perfecto y muestra cualquier cosa—, así que se decide por el
-  // origen antes de pedirla, y no esperando un error que no va a llegar.
-  const deRelleno = esFotoDeRelleno(src);
+export function ProductImage({ src, alt, className = '', loading }: ProductImageProps) {
+  // Dos ausencias distintas, y conviene no confundirlas: que no haya foto, y
+  // que hubiera una y no cargue. La primera es del vendedor y la segunda es
+  // nuestra o de la red, así que se dicen con palabras distintas y con dibujos
+  // distintos. Una foto de relleno cuenta como la primera: hay una URL, pero
+  // no es una foto de esta publicación.
+  const sinFoto = esFotoDeRelleno(src);
   const [fallo, setFallo] = useState(false);
 
   useEffect(() => setFallo(false), [src]);
 
-  if (deRelleno || fallo) {
+  if (sinFoto || fallo) {
+    const texto = fallo ? 'No pudimos cargar la imagen' : 'Sin fotografía';
     return (
       // La clase de quien llama es para la FOTO: trae `object-fit` y
-      // `display: block`, que acá romperían la columna. La ilustración se
-      // ocupa sola de llenar su contenedor.
-      <div className={styles.ilustracion}>
-        <div className={styles.motivo} aria-hidden="true">
-          <IlustracionDeFamilia familia={familiaDe(categoria)} />
-        </div>
-        {/* La categoría, no el nombre del producto: la ilustración representa a
-            la familia, y prometer más que eso sería fingir una foto. */}
-        <span className={styles.familia}>{categoria || 'Publicación'}</span>
-        <span className={styles.aclaracion}>Imagen ilustrativa</span>
-        {/* Lo mismo, para quien no ve el dibujo. */}
-        <span className={styles.soloLectores}>
-          {`Imagen ilustrativa de ${categoria || 'la publicación'}. Sin foto del producto: ${alt}`}
-        </span>
+      // `display: block`, que acá romperían la composición.
+      <div
+        className={`${styles.fallback} ${fallo ? styles.roto : ''}`}
+        role="img"
+        aria-label={`${texto}. ${alt}`}
+      >
+        <span className={styles.copy}>{texto}</span>
       </div>
     );
   }

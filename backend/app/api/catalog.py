@@ -379,6 +379,12 @@ def get_products(
             "operation_kind": product.operation_kind,
             # Nuevo o usado, o nada. Sólo el activo la trae con valor.
             "condition": product.condition,
+            # Cobertura y modalidad: la tarjeta de servicio no se puede
+            # dibujar sin ellas, y estaban guardadas sin salir nunca.
+            "pricing_type": product.pricing_type,
+            "availability": product.availability,
+            "response_time": product.response_time,
+            "coverage_zones": product.coverage_zones or None,
             "primary_image": primary_image[0] if primary_image else None,
             "seller": seller_info,
             "views_count": product.views_count,
@@ -459,6 +465,10 @@ def get_product_detail(
         "is_service": product.category.is_service,
         "operation_kind": product.operation_kind,
         "condition": product.condition,
+        "pricing_type": product.pricing_type,
+        "availability": product.availability,
+        "response_time": product.response_time,
+        "coverage_zones": product.coverage_zones or None,
         "seller": seller_info,
         "images": sorted(product.images, key=lambda x: (not x.is_primary, x.display_order)),
         "views_count": product.views_count,

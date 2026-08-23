@@ -3,7 +3,19 @@ import { Product } from '../../types';
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Toast/Toast';
-import { formatPrice } from '../../utils/formatters';
+import {
+  precioVisible,
+  formatCantidad,
+  etiquetaDeCatalogo,
+  formatRating,
+} from '../../utils/formatters';
+import {
+  accionDe,
+  normalizarAnatomia,
+  ETIQUETA_DE_ANATOMIA,
+  ETIQUETA_DE_CONDICION,
+} from '../../utils/anatomia';
+import { useCapaModal } from '../../hooks/useCapaModal';
 import { SellerProfileModal } from '../SellerProfile/SellerProfileModal';
 import styles from './ProductDetailModal.module.css';
 import { ProductImage } from '../ProductImage/ProductImage';
@@ -11,246 +23,273 @@ import { ProductImage } from '../ProductImage/ProductImage';
 interface ProductDetailModalProps {
   product: Product;
   onClose: () => void;
+  onSolicitarCotizacion?: () => void;
 }
 
-export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product, onClose }) => {
+/** Una fila de la tabla técnica. Se omite entera si el dato no está: una fila
+ *  con un guion no informa, y varias seguidas parecen una ficha vacía. */
+const Fila: React.FC<{ rotulo: string; valor?: string | null }> = ({ rotulo, valor }) =>
+  valor ? (
+    <tr>
+      <th scope="row">{rotulo}</th>
+      <td>{valor}</td>
+    </tr>
+  ) : null;
+
+export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
+  product,
+  onClose,
+  onSolicitarCotizacion,
+}) => {
   const { addItem } = useCart();
   const { isAuthenticated } = useAuth();
   const { showToast } = useToast();
   const [quantity, setQuantity] = useState(1);
-  const [selectedImage, setSelectedImage] = useState(0);
   const [showSellerProfile, setShowSellerProfile] = useState(false);
-  const isService = product.isService || false;
+  const capa = useCapaModal<HTMLDivElement>(onClose);
+
+  const anatomia = normalizarAnatomia(product.operationKind);
+  const accion = accionDe(product);
+  const esServicio = anatomia === 'servicio' || anatomia === 'logistica';
+  const cobertura = product.coverageZones?.length ? product.coverageZones.join(', ') : '';
 
   // Antes esto era `[product.image, product.image, product.image]`: tres
   // miniaturas de la MISMA foto, que al hacer clic no cambiaban nada. Una
   // galería que no lleva a ningún lado es una acción falsa.
-  const images = [product.image].filter(Boolean);
+  const imagen = product.image;
 
-  const handleAddToCart = () => {
+  const ejecutar = () => {
+    if (accion.tipo === 'cotizar') {
+      onSolicitarCotizacion?.();
+      onClose();
+      return;
+    }
+    if (accion.tipo !== 'comprar') return;
+
     if (!isAuthenticated) {
-      showToast('Debes iniciar sesión para agregar productos al carrito', 'warning');
+      showToast('Tenés que ingresar para agregar publicaciones al carrito', 'warning');
+      return;
+    }
+    if (!esServicio && quantity > product.stock) {
+      showToast(`Quedan ${product.stock} disponibles`, 'warning');
       return;
     }
 
-    if (!isService && quantity > product.stock) {
-      showToast(`Solo hay ${product.stock} unidades disponibles`, 'warning');
-      return;
-    }
-
-    addItem(product, quantity);
-    showToast(`${quantity} ${product.unit || 'unidad'}(s) de ${product.name} agregado al carrito`, 'success');
+    addItem(product, esServicio ? 1 : quantity);
+    showToast(`Agregado: ${product.name}`, 'success');
     onClose();
   };
 
+  const ubicacion = [product.location.province, product.location.city]
+    .filter(Boolean)
+    .join(', ');
+
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor"
-               strokeWidth="1.8" strokeLinecap="round" aria-hidden="true" focusable="false">
-            <path d="M3.5 3.5 L12.5 12.5 M12.5 3.5 L3.5 12.5" />
-          </svg>
-        </button>
-
-        <div className={styles.content}>
-          {/* Galería de Imágenes */}
-          <div className={styles.imageSection}>
-            <div className={styles.mainImage}>
-              <ProductImage
-                src={images[selectedImage]}
-                alt={product.name}
-                categoria={product.category}
-              />
+      <div
+        className={styles.modal}
+        ref={capa}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="detalle-titulo"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={styles.encabezado}>
+          <div>
+            <div className="tg-eyebrow">
+              {[ETIQUETA_DE_ANATOMIA[anatomia], product.condition && ETIQUETA_DE_CONDICION[product.condition]]
+                .filter(Boolean)
+                .join(' · ')}
             </div>
-            {/* Las miniaturas aparecen cuando hay más de una foto que elegir.
-                Antes eran tres, y las tres eran la misma imagen. */}
-            {images.length > 1 && (
-              <div className={styles.thumbnails}>
-                {images.map((img, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    aria-label={`Ver imagen ${idx + 1} de ${images.length}`}
-                    aria-pressed={selectedImage === idx}
-                    className={`${styles.thumbnail} ${selectedImage === idx ? styles.thumbnailActive : ''}`}
-                    onClick={() => setSelectedImage(idx)}
-                  >
-                    <ProductImage src={img} alt="" categoria={product.category} />
-                  </button>
-                ))}
-              </div>
-            )}
+            <h2 id="detalle-titulo" className={styles.titulo}>{product.name}</h2>
+            <p className={styles.categoria}>
+              {[product.category, product.subcategory].filter(Boolean).join(' · ')}
+            </p>
           </div>
+          <button className={styles.cerrar} aria-label="Cerrar" onClick={onClose}>
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor"
+                 strokeWidth="1.8" strokeLinecap="round" aria-hidden="true" focusable="false">
+              <path d="M3.5 3.5 L12.5 12.5 M12.5 3.5 L3.5 12.5" />
+            </svg>
+          </button>
+        </div>
 
-          {/* Información del Producto */}
-          <div className={styles.infoSection}>
-            <div className={styles.header}>
-              <div className={styles.category}>
-                {[product.category, product.subcategory].filter(Boolean).join(' · ')}
+        <div className={`${styles.cuerpo} ${esServicio ? styles.sinGaleria : ''}`}>
+          {/* Servicio y logística no llevan galería: lo que hay que leer es su
+              alcance. Un servicio sin foto no es un servicio incompleto. */}
+          {!esServicio && (
+            <section className={styles.galeria} aria-label="Imagen de la publicación">
+              <div className={styles.imagenPrincipal}>
+                <ProductImage src={imagen} alt={product.name} />
               </div>
-              <h2 className={styles.title}>{product.name}</h2>
-              <div className={styles.priceSection}>
-                <span className={styles.price}>{formatPrice(product.price, product.currency)}</span>
-                <span className={styles.unit}>por {product.unit}</span>
-              </div>
+            </section>
+          )}
+
+          {/* El resumen de la operación: precio, dónde, en qué condición y qué
+              se puede hacer. Es lo que decide, y por eso va junto y arriba. */}
+          <aside className={styles.resumen}>
+            <div className={styles.precio}>
+              <strong className={`tg-price ${styles.cifra}`}>{precioVisible(product)}</strong>
+              {Number(product.price) > 0 && product.unit && <span>por {product.unit}</span>}
             </div>
 
-            {/* Información del Vendedor - SOLO NOMBRE Y CALIFICACIÓN */}
-            <div className={styles.sellerInfo}>
-              <h3>Vendido por</h3>
-              <div 
-                className={`${styles.sellerCard} ${styles.sellerClickable}`}
-                onClick={() => setShowSellerProfile(true)}
-              >
-                <div className={styles.sellerAvatar}>
-                  {product.seller.name.charAt(0)}
+            {ubicacion && <p className={styles.ubicacion}>{ubicacion}</p>}
+
+            <dl className={styles.datos}>
+              {product.condition && (
+                <div>
+                  <dt>Condición</dt>
+                  <dd>{ETIQUETA_DE_CONDICION[product.condition]}</dd>
                 </div>
-                <div className={styles.sellerDetails}>
-                  <div className={styles.sellerName}>
-                    {product.seller.name}
-                    <span className={styles.viewProfile}>Ver perfil</span>
-                  </div>
-                  {/* El texto es exactamente «Documentación revisada»: dice lo
-                      que se hizo —alguien miró una constancia— y no promete
-                      identidad comprobada ni ausencia de fraude. */}
-                  {product.seller.documentacionRevisada && (
-                    <div className={styles.sellerDocumentacion}>
-                      <svg viewBox="0 0 16 16" width="13" height="13" fill="none"
-                           stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-                           strokeLinejoin="round" aria-hidden="true" focusable="false">
-                        <path d="M2.5 8.5 L6 12 L13.5 4" />
-                      </svg>
-                      Documentación revisada
-                    </div>
-                  )}
-                  <div className={styles.sellerRating}>
-                    {product.seller.ratingCount > 0 ? (
-                      <>
-                        <span className={styles.ratingNumber}>
-                          {product.seller.rating.toFixed(1)} de 5
-                        </span>
-                        <span className={styles.salesCount}>
-                          ({product.seller.ratingCount} {product.seller.ratingCount === 1 ? 'calificación' : 'calificaciones'})
-                        </span>
-                      </>
-                    ) : (
-                      <span className={styles.noRating}>Sin calificaciones aún</span>
-                    )}
-                  </div>
-                  {product.seller.salesCount > 0 && (
-                    <div className={styles.salesInfo}>
-                      {product.seller.salesCount} {product.seller.salesCount === 1 ? 'venta' : 'ventas'}
-                    </div>
-                  )}
+              )}
+              {cobertura && (
+                <div>
+                  <dt>Cobertura</dt>
+                  <dd>{cobertura}</dd>
                 </div>
-              </div>
-              <div className={styles.privacyNote}>
-                Los datos de contacto se comparten al confirmar la compra
-              </div>
-            </div>
-
-            {/* Ubicación */}
-            <div className={styles.location}>
-              <div>
-                <div className={styles.locationTitle}>Ubicación</div>
-                <div className={styles.locationText}>
-                  {[product.location.province, product.location.city]
-                    .filter(Boolean)
-                    .join(', ')}
+              )}
+              {product.pricingType && (
+                <div>
+                  <dt>Modalidad</dt>
+                  <dd>{etiquetaDeCatalogo(product.pricingType)}</dd>
                 </div>
-              </div>
-            </div>
-
-            {/* Stock - Solo para productos, no servicios */}
-            {!isService && (
-              <div className={styles.stock}>
-                <span className={product.stock > 10 ? styles.stockAvailable : styles.stockLow}>
-                  {product.stock > 0 ? `${product.stock} disponibles` : 'Sin stock'}
-                </span>
-              </div>
-            )}
-            {isService && (
-              <div className={styles.serviceInfo}>
-                <span className={styles.serviceBadge}>Servicio disponible</span>
-              </div>
-            )}
-
-            {/* Descripción */}
-            <div className={styles.description}>
-              <h3>Descripción</h3>
-              <p>{product.description}</p>
-            </div>
-
-            {/* Características */}
-            {Object.keys(product.features).length > 0 && (
-              <div className={styles.features}>
-                <h3>Características</h3>
-                <div className={styles.featuresList}>
-                  {Object.entries(product.features).map(([key, value]) => (
-                    <div key={key} className={styles.featureItem}>
-                      <span className={styles.featureKey}>{key}:</span>
-                      <span className={styles.featureValue}>{value}</span>
-                    </div>
-                  ))}
+              )}
+              {product.availability && (
+                <div>
+                  <dt>Disponibilidad</dt>
+                  <dd>{etiquetaDeCatalogo(product.availability)}</dd>
                 </div>
-              </div>
-            )}
+              )}
+              {product.responseTime && (
+                <div>
+                  <dt>Respuesta</dt>
+                  <dd>{etiquetaDeCatalogo(product.responseTime)}</dd>
+                </div>
+              )}
+              {!esServicio && (
+                <div>
+                  <dt>Disponible</dt>
+                  <dd>{product.stock > 0 ? formatCantidad(product.stock, product.unit) : 'Sin stock'}</dd>
+                </div>
+              )}
+            </dl>
 
-            {/* Etiquetas */}
-            {product.tags.length > 0 && (
-              <div className={styles.tags}>
-                {product.tags.map((tag) => (
-                  <span key={tag} className={styles.tag}>
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Agregar al Carrito */}
-            <div className={styles.actions}>
-              <div className={styles.quantitySelector}>
-                <button
-                  aria-label="Quitar una unidad"
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  disabled={quantity <= 1}
-                >
-                  −
-                </button>
+            {/* La cantidad se elige donde contar unidades significa algo. */}
+            {anatomia === 'insumo' && accion.tipo === 'comprar' && (
+              <div className="tg-field">
+                <label htmlFor="detalle-cantidad">Cantidad</label>
                 <input
+                  id="detalle-cantidad"
                   type="number"
-                  aria-label="Cantidad"
+                  min={1}
+                  max={product.stock}
                   value={quantity}
                   onChange={(e) => {
-                    const val = parseInt(e.target.value) || 1;
-                    const maxVal = isService ? 999 : product.stock;
-                    setQuantity(Math.min(maxVal, Math.max(1, val)));
+                    const pedida = parseInt(e.target.value, 10) || 1;
+                    setQuantity(Math.min(product.stock, Math.max(1, pedida)));
                   }}
-                  min="1"
-                  max={isService ? 999 : product.stock}
                 />
-                <button
-                  aria-label="Agregar una unidad"
-                  onClick={() => setQuantity(quantity + 1)}
-                  disabled={!isService && quantity >= product.stock}
-                >
-                  +
-                </button>
               </div>
+            )}
+
+            <div className={styles.acciones}>
               <button
-                className={styles.addToCartButton}
-                onClick={handleAddToCart}
-                disabled={!isService && product.stock === 0}
+                className="tg-button tg-button--primary"
+                onClick={ejecutar}
+                disabled={accion.tipo === 'sin-stock' || (accion.tipo === 'cotizar' && !onSolicitarCotizacion)}
               >
-                {isService ? 'Contratar Servicio' : (product.stock > 0 ? 'Agregar al Carrito' : 'Sin Stock')}
+                {accion.etiqueta}
+              </button>
+              <button
+                className="tg-button tg-button--secondary"
+                onClick={() => setShowSellerProfile(true)}
+              >
+                Ver perfil del vendedor
               </button>
             </div>
+
+            <p className="tg-small">
+              {accion.tipo === 'cotizar'
+                ? 'La cotización se pide por Contacto: todavía no existe una solicitud atada a esta publicación.'
+                : 'Conserva el carrito y el checkout de siempre; no abre mensajería ni reserva.'}
+            </p>
+          </aside>
+
+          <div className={styles.detalle}>
+            <section className={styles.seccion}>
+              <div className="tg-eyebrow">Descripción</div>
+              <h3>Datos informados por el vendedor</h3>
+              <p className={styles.descripcion}>{product.description}</p>
+              <p className="tg-small">
+                TopGreen presenta la información cargada en la publicación. No implica inspección.
+              </p>
+            </section>
+
+            {/* La tabla técnica sale de características estructuradas. Si no
+                hay, no se arma partiendo la descripción: eso sería inventar
+                una ficha que el vendedor nunca completó. */}
+            {Object.keys(product.features).length > 0 && (
+              <section className={styles.seccion}>
+                <div className="tg-eyebrow">Información técnica</div>
+                <h3>Especificaciones declaradas</h3>
+                <div className={styles.tablaContenedor}>
+                  <table className={styles.tabla}>
+                    <caption className="tg-sr-only">Especificaciones declaradas por el vendedor</caption>
+                    <tbody>
+                      {Object.entries(product.features).map(([clave, valor]) => (
+                        <Fila key={clave} rotulo={clave} valor={valor} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+
+            <section className={styles.seccion}>
+              <div className="tg-eyebrow">Contraparte</div>
+              <h3>{product.seller.name}</h3>
+              <div className={styles.vendedor}>
+                <p className="tg-small">
+                  {product.seller.ratingCount > 0
+                    ? `${formatRating(product.seller.rating)} · ${product.seller.ratingCount} ${product.seller.ratingCount === 1 ? 'calificación' : 'calificaciones'}`
+                    : 'Sin calificaciones aún'}
+                </p>
+                {product.seller.salesCount > 0 && (
+                  <p className="tg-small">
+                    {product.seller.salesCount} {product.seller.salesCount === 1 ? 'venta' : 'ventas'}
+                  </p>
+                )}
+                {/* El texto es exactamente «Documentación revisada»: dice lo
+                    que se hizo —alguien miró una constancia— y no promete
+                    identidad comprobada ni ausencia de fraude. */}
+                {product.seller.documentacionRevisada && (
+                  <p className={styles.documentacion}>Documentación revisada</p>
+                )}
+                <p className="tg-small">
+                  Los datos de contacto se comparten al confirmar la compra.
+                </p>
+              </div>
+            </section>
+
+            {!esServicio && (
+              <section className={`${styles.seccion} ${styles.logistica}`}>
+                <div className="tg-eyebrow">Logística</div>
+                <h3>El traslado se define en el checkout</h3>
+                <p>
+                  Después de indicar el destino, TopGreen consulta transportistas
+                  compatibles con la carga y la cobertura declarada.
+                </p>
+                <p className="tg-small" id="ayuda-transportistas">
+                  No se habilita antes de conocer el destino. No existe un directorio
+                  público independiente.
+                </p>
+              </section>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Modal de Perfil del Vendedor */}
       {showSellerProfile && (
         <SellerProfileModal
           sellerId={product.seller.id}

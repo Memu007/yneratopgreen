@@ -1,283 +1,186 @@
-/* Cabecera del marketplace.
-   La jerarquía es la de un marketplace y no la de un panel: marca, búsqueda y
-   acciones arriba; secciones abajo. Antes la marca era un botón más entre las
-   acciones, y cada acción tenía su propio color —rojo para administración,
-   amarillo para vender—, que es lo que hacía que todo pareciera un tablero. */
+/* La cabecera: quién es el sitio, qué se busca, qué se puede hacer y a dónde
+   se va. Dos bandas —marca/búsqueda/acciones arriba, secciones abajo— porque
+   mezclarlas hacía que la marca fuera un botón más entre otros seis. */
 
 .header {
-  background-color: var(--marca-lienzo);
-  border-bottom: 1px solid var(--marca-linea);
   position: sticky;
+  z-index: var(--tg-z-sticky);
   top: 0;
-  z-index: 100;
+  background-color: rgba(248, 247, 243, 0.98);
+  border-bottom: 1px solid var(--tg-color-border);
 }
 
-.container {
-  /* La misma medida y el mismo respiro que `.mainContent`: si no, la marca
-     no arranca donde arranca el contenido y el corte se ve. */
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0.875rem 1.5rem 0;
-}
-
-.barraSuperior {
-  display: flex;
+.masthead {
+  min-height: 88px;
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(300px, 1fr) auto;
   align-items: center;
-  gap: 1.5rem;
+  gap: var(--tg-space-8);
 }
 
-/* --- marca ---------------------------------------------------------------- */
-
+/* La marca es un botón sin apariencia de botón: lo que se ve es el wordmark. */
 .marca {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  flex-shrink: 0;
-}
-
-.marcaNombre {
-  background: none;
-  border: none;
+  display: inline-flex;
+  width: min(100%, 254px);
   padding: 0;
+  background: none;
+  border: 0;
   cursor: pointer;
-  font-size: 1.5rem;
-  font-weight: 800;
-  /* Apretado a propósito: una palabra compuesta se lee como una sola cosa. */
-  letter-spacing: -0.02em;
-  line-height: 1.05;
-  color: var(--marca-grafito);
-  white-space: nowrap;
 }
 
-.marcaVerde {
-  color: var(--marca-verde);
+.marca img {
+  width: 100%;
+  height: auto;
 }
-
-.marcaNombre:hover .marcaVerde {
-  color: var(--marca-verde-medio);
-}
-
-.marcaBajada {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--marca-grafito-tenue);
-  white-space: nowrap;
-}
-
-/* --- búsqueda ------------------------------------------------------------- */
 
 .buscador {
   display: flex;
-  flex: 1;
   min-width: 0;
-  max-width: 560px;
-  border: 1px solid var(--marca-linea-fuerte);
-  border-radius: var(--radius-md);
-  background-color: #ffffff;
-  overflow: hidden;
 }
 
-.buscador:focus-within {
-  border-color: var(--marca-verde);
-  box-shadow: 0 0 0 3px rgba(27, 67, 50, 0.12);
-}
-
+/* El campo y el botón comparten un solo bloque: sin radio y sin separación,
+   se leen como un control y no como dos cosas que quedaron al lado. */
 .buscadorCampo {
+  min-height: 46px;
   flex: 1;
   min-width: 0;
-  padding: 0.625rem 0.875rem;
-  border: none;
-  background: transparent;
-  font-size: 0.9375rem;
-  color: var(--marca-grafito);
-}
-
-.buscadorCampo::placeholder {
-  color: var(--marca-grafito-tenue);
-}
-
-.buscadorCampo:focus {
-  outline: none;
+  border-radius: 0;
+  border-right: 0;
 }
 
 .buscadorBoton {
-  padding: 0.625rem 1.25rem;
-  background-color: var(--marca-verde);
-  color: #ffffff;
-  border: none;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
+  min-height: 46px;
+  border-radius: 0;
+  flex-shrink: 0;
 }
-
-.buscadorBoton:hover {
-  background-color: var(--marca-verde-medio);
-}
-
-/* --- acciones ------------------------------------------------------------- */
 
 .acciones {
   display: flex;
-  gap: 0.5rem;
   align-items: center;
-  margin-left: auto;
-  /* Se dobla en vez de empujar. Sin sesión son dos botones y entra en
-     cualquier ancho; con sesión son cuatro —vender, carrito, cuenta y salir— y
-     en 390px la fila medía 378px, que sumada a la marca desbordaba la página. */
-  flex-wrap: wrap;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--tg-space-3);
   min-width: 0;
 }
 
-/* Una sola acción principal. Que «Vender» y «Admin» tuvieran cada una su color
-   propio no era jerarquía: era ruido, y hacía que ninguna de las dos mandara. */
-.accionPrincipal {
-  padding: 0.5rem 1.1rem;
-  background-color: var(--marca-verde);
-  color: #ffffff;
-  border: 1px solid var(--marca-verde);
-  border-radius: var(--radius-md);
-  font-size: 0.9375rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.accionPrincipal:hover {
-  background-color: var(--marca-verde-medio);
-  border-color: var(--marca-verde-medio);
-}
-
-.accionSecundaria {
-  padding: 0.5rem 0.9rem;
-  background: transparent;
-  color: var(--marca-grafito-suave);
-  border: 1px solid var(--marca-linea-fuerte);
-  border-radius: var(--radius-md);
-  font-size: 0.9375rem;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.accionSecundaria:hover {
-  color: var(--marca-verde);
-  border-color: var(--marca-verde);
-}
-
-.menuDeCuenta {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
+/* El nombre de la cuenta puede ser largo y no puede empujar al resto. */
 .cuenta {
-  padding: 0.5rem 0.75rem;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--marca-verde);
-  cursor: pointer;
-  max-width: 12rem;
+  max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: inline-block;
+  line-height: 24px;
 }
-
-.cuenta:hover {
-  background-color: rgba(27, 67, 50, 0.07);
-}
-
-/* --- secciones ------------------------------------------------------------ */
 
 .nav {
-  display: flex;
-  gap: 0.25rem;
-  margin-top: 0.625rem;
+  border-top: 1px solid var(--tg-color-border);
 }
 
-.navLink,
-.navLinkActive {
+.navInterior {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-8);
+}
+
+/* La sección actual se marca con un filete de acento abajo, no con una píldora
+   rellena: el relleno pesa lo mismo que un botón y compite con las acciones. */
+.navLink {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  color: var(--tg-color-text);
   background: none;
-  border: none;
-  padding: 0.5rem 0.75rem 0.6rem;
-  font-size: 0.9375rem;
-  font-weight: 500;
-  cursor: pointer;
-  color: var(--marca-grafito-suave);
-  /* El activo se marca con un filete de cosecha y no con una píldora llena:
-     la pastilla de color competía con la marca y con la acción principal. */
+  border: 0;
   border-bottom: 2px solid transparent;
-  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 570;
+  cursor: pointer;
 }
 
 .navLink:hover {
-  color: var(--marca-verde);
+  border-bottom-color: var(--tg-color-border-control);
 }
 
-.navLinkActive {
-  color: var(--marca-verde);
-  font-weight: 600;
-  border-bottom-color: var(--marca-cosecha);
+.navLink[aria-current='page'] {
+  border-bottom-color: var(--tg-color-accent);
 }
 
-/* --- medidas chicas ------------------------------------------------------- */
-
-@media (max-width: 968px) {
-  .container {
-    padding: 0.75rem 1rem 0;
+@media (max-width: 1023px) {
+  .masthead {
+    grid-template-columns: minmax(200px, 260px) 1fr auto;
+    gap: var(--tg-space-4);
   }
 
-  .barraSuperior {
-    flex-wrap: wrap;
-    gap: 0.75rem;
-  }
-
+  /* La búsqueda baja a su propia línea: comprimida entre marca y acciones no
+     entra ni el placeholder. */
   .buscador {
-    order: 3;
-    flex-basis: 100%;
-    max-width: 100%;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin-bottom: var(--tg-space-4);
+  }
+
+  .navInterior {
+    gap: var(--tg-space-6);
+  }
+}
+
+@media (max-width: 599px) {
+  /* En celular la cabecera deja de ser pegajosa: 136 px fijos arriba de una
+     pantalla de 844 se comen el primer resultado. */
+  .header {
+    position: static;
+  }
+
+  .masthead {
+    min-height: auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--tg-space-3);
+    padding-block: var(--tg-space-4);
+  }
+
+  .marca {
+    width: 196px;
+    max-width: calc(100% - 108px);
+    flex: 0 1 196px;
+    order: 1;
   }
 
   .acciones {
-    gap: 0.4rem;
+    flex: 1 1 auto;
+    order: 2;
+    gap: var(--tg-space-2);
   }
 
-  .nav {
-    overflow-x: auto;
-    /* La barra de desplazamiento no puede tapar el filete del activo. */
-    padding-bottom: 2px;
-  }
-}
-
-@media (max-width: 480px) {
-  .marcaNombre {
-    font-size: 1.25rem;
-  }
-
-  .marcaBajada {
-    font-size: 0.625rem;
-  }
-
-  .accionPrincipal,
-  .accionSecundaria,
-  .cuenta {
-    padding: 0.45rem 0.7rem;
-    font-size: 0.875rem;
+  .buscador {
+    width: 100%;
+    flex: 0 0 100%;
+    order: 3;
+    margin: 0;
   }
 
   .cuenta {
-    max-width: 6rem;
+    max-width: 120px;
   }
 
-  .navLink,
-  .navLinkActive {
-    font-size: 0.875rem;
-    padding: 0.45rem 0.55rem 0.55rem;
+  /* Cinco secciones no entran en una línea de 350 px útiles: van en dos
+     columnas, que es leerlas, y no en un scroll horizontal, que es esconderlas. */
+  .navInterior {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0 var(--tg-space-4);
+    padding-block: var(--tg-space-2);
+  }
+
+  /* En la grilla de dos columnas el botón se estira a todo el ancho de su
+     celda y el filete de la sección actual quedaba tres veces más largo que
+     la palabra. Se ajusta al texto. */
+  .navLink {
+    min-width: 0;
+    justify-self: start;
   }
 }
