@@ -76,6 +76,12 @@ Actualizado: 2026-08-22.
   utilizables, tokens, cuatro anatomías, componentes/estados, tres viewports,
   prototipos aislados y mapa contra el producto real. Opus no empieza con
   láminas sueltas ni completa decisiones de diseño por su cuenta.
+- Handoff Puerta 3 `8bd91d7`: completo en alcance y conforme en dirección, pero
+  todavía no aceptado. La revisión independiente está en
+  `handoff/REVISION-PM-8bd91d7.md`: axe encontró contraste serious en los
+  índices `02/03` y en el texto de publicación pausada, y la regla táctil de
+  44×44 está escrita de forma más absoluta que la implementación. Diseño debe
+  corregir sólo esos bordes; Opus sigue pausada.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
