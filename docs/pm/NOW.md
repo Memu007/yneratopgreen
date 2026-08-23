@@ -66,6 +66,11 @@ Actualizado: 2026-08-22.
   razonamiento muy alto como diseñadora premium. Su brief está en
   `docs/pm/BRIEF-DISENO-PREMIUM.md`: primero estrategia y benchmarking; después
   dos direcciones visuales; finalmente handoff a Opus. La Dev continúa pausada.
+- Puertas de marca: la estrategia `La operación a la vista` queda aceptada y
+  Emi eligió **B — Mesa de negocios**. La decisión y ocho condiciones están en
+  `docs/pm/diseno-premium/DECISION-PUERTA-2.md`. La diseñadora debe cerrar
+  Puerta 3 —wordmark propio, sistema, catálogo denso y cuatro anatomías— antes
+  de que Opus reciba una implementación. B todavía no es diseño final.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
