@@ -35,9 +35,17 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, isLoading = 
   if (isLoading) {
     return (
       <div className={styles.grid}>
-        <div className={styles.emptyState}>
-          <div className={styles.loadingSpinner}>⏳</div>
-          <h3 className={styles.emptyTitle}>Cargando productos...</h3>
+        {/* Bloques del tamaño de las tarjetas que vienen, en vez de un reloj de
+            arena centrado: la página no salta cuando llegan los resultados. */}
+        <div className={styles.productsGrid} aria-busy="true" aria-live="polite">
+          <span className={styles.soloLectores}>Buscando publicaciones…</span>
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className={styles.esqueleto} aria-hidden="true">
+              <div className={styles.esqueletoImagen} />
+              <div className={styles.esqueletoLinea} />
+              <div className={`${styles.esqueletoLinea} ${styles.esqueletoCorta}`} />
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -47,10 +55,9 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, isLoading = 
     return (
       <div className={styles.grid}>
         <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>🔍</div>
-          <h3 className={styles.emptyTitle}>No se encontraron productos</h3>
+          <h3 className={styles.emptyTitle}>No hay publicaciones para esta búsqueda</h3>
           <p className={styles.emptyText}>
-            Intenta ajustar los filtros o realiza una búsqueda diferente
+            Probá con menos filtros, otra provincia u otras palabras.
           </p>
         </div>
       </div>

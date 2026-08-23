@@ -121,27 +121,6 @@
   accent-color: var(--color-primary-600);
 }
 
-.ratingStars {
-  display: flex;
-  gap: 0.25rem;
-  margin-top: 0.5rem;
-}
-
-.star {
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: #5c636a;
-  transition: color 0.2s;
-}
-
-.star.active {
-  color: var(--color-warning-text);
-}
-
-.star:hover {
-  color: #92400e;
-}
-
 .resetButton {
   width: 100%;
   padding: 0.75rem;

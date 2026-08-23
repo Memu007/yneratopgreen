@@ -252,7 +252,7 @@ async function exerciseSeller(browser, viewport, sellerTokens) {
   try {
     dashboard.state.screen = '07-seller-panel';
     await dashboard.page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await dashboard.page.locator('button').filter({ hasText: '👤' }).first().click();
+    await dashboard.page.getByRole('button', { name: 'Mi cuenta' }).first().click();
     await dashboard.page.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
     await inspect(dashboard.page, dashboard.state, viewport, '07-seller-panel');
     await dashboard.page.getByRole('button', { name: 'Mis Productos' }).click();
@@ -268,7 +268,7 @@ async function exerciseAdmin(browser, viewport, adminTokens) {
   try {
     state.screen = '07-admin-panel';
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: '⚙️ Admin' }).click();
+    await page.getByRole('button', { name: 'Admin' }).click();
     await page.getByRole('heading', { name: 'Panel de Administración' }).waitFor();
     await inspect(page, state, viewport, '07-admin-panel');
     await page.getByRole('button', { name: '📦 Productos' }).click();

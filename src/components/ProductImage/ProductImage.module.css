@@ -1,19 +1,66 @@
-.imageFallback {
+/* La ilustración que reemplaza a una foto que no es del producto.
+   Tiene que leerse como una decisión de diseño y decir que es ilustrativa: si
+   pareciera una foto de verdad, sería el mismo engaño con mejor gusto. */
+
+.ilustracion {
+  position: relative;
   width: 100%;
   height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 0.4rem;
   padding: 1rem;
   text-align: center;
-  background: linear-gradient(135deg, var(--color-primary-50) 0%, var(--color-primary-100) 100%);
-  color: var(--color-primary-700);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1.4;
+  background-color: var(--marca-lienzo-hondo);
+  /* Una trama de surcos apenas visible, para que el marfil no quede plano. */
+  background-image: repeating-linear-gradient(
+    115deg,
+    transparent 0 11px,
+    rgba(34, 32, 29, 0.035) 11px 12px
+  );
+  color: var(--marca-verde);
 }
 
-[data-theme="dark"] .imageFallback {
-  background: linear-gradient(135deg, rgba(5, 150, 105, 0.1) 0%, rgba(5, 150, 105, 0.15) 100%);
-  color: var(--color-primary-400);
+.motivo {
+  width: 92px;
+  max-width: 55%;
+  color: var(--marca-verde);
+  opacity: 0.85;
+}
+
+.motivo svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.familia {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--marca-verde);
+  line-height: 1.25;
+}
+
+.aclaracion {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--marca-grafito-tenue);
+}
+
+/* Se lee con lector de pantalla y no ocupa lugar. No se usa `display: none`
+   porque eso también lo saca del árbol accesible. */
+.soloLectores {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

@@ -281,7 +281,7 @@ async function comprador(page, medida) {
     page.getByRole('heading', { name: /M.todo de Pago/ }));
 
   await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-  await page.locator('button').filter({ hasText: '👤' }).first().click();
+  await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
   await revisar(page, 'panel del comprador', medida,
     page.getByRole('heading', { name: 'Mi Perfil' }));
 
@@ -303,7 +303,7 @@ async function comprador(page, medida) {
 
 async function vendedor(page, medida) {
   await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-  await page.locator('button').filter({ hasText: '👤' }).first().click();
+  await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
   await revisar(page, 'panel del vendedor', medida,
     page.getByRole('heading', { name: 'Mi Perfil' }));
 
@@ -336,7 +336,7 @@ async function vendedor(page, medida) {
  */
 async function transportista(page, medida) {
   await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-  await page.locator('button').filter({ hasText: '👤' }).first().click();
+  await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
   await revisar(page, 'panel del transportista', medida,
     page.getByRole('heading', { name: 'Datos de transportista' }));
 

@@ -1,11 +1,15 @@
 .footer {
-  background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+  /* Verde plano, no degradado: el degradado le daba brillo de plantilla y
+     además obligaba a medir el contraste contra dos fondos distintos. */
+  background-color: var(--marca-verde);
   color: #ffffff;
   margin-top: auto;
+  border-top: 3px solid var(--marca-cosecha);
 }
 
 .footerContent {
-  max-width: 1200px;
+  /* La misma medida que la cabecera y el contenido. */
+  max-width: 1400px;
   margin: 0 auto;
   padding: 48px 24px 32px;
   display: grid;
@@ -14,10 +18,12 @@
 }
 
 .footerSection h3 {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   margin-bottom: 16px;
-  color: #ffffff;
+  color: var(--marca-cosecha);
 }
 
 .footerSection ul {
@@ -50,33 +56,9 @@
   text-decoration: underline;
 }
 
-.socialLinks {
-  display: flex;
-  gap: 16px;
-  margin-top: 12px;
-}
 
-.socialLinks a {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-full);
-  color: white;
-  transition: all var(--transition-normal);
-}
 
-.socialLinks a:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
-}
 
-.socialLinks svg {
-  width: 20px;
-  height: 20px;
-}
 
 .footerBottom {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -107,10 +89,6 @@
 
   .footerSection {
     text-align: center;
-  }
-
-  .socialLinks {
-    justify-content: center;
   }
 
   .footerBottom {

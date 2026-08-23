@@ -22,7 +22,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
   const [showSellerProfile, setShowSellerProfile] = useState(false);
   const isService = product.isService || false;
 
-  const images = [product.image, product.image, product.image]; // Mock: en producción serían múltiples imágenes
+  // Antes esto era `[product.image, product.image, product.image]`: tres
+  // miniaturas de la MISMA foto, que al hacer clic no cambiaban nada. Una
+  // galería que no lleva a ningún lado es una acción falsa.
+  const images = [product.image].filter(Boolean);
 
   const handleAddToCart = () => {
     if (!isAuthenticated) {
@@ -44,32 +47,48 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
-          ✕
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor"
+               strokeWidth="1.8" strokeLinecap="round" aria-hidden="true" focusable="false">
+            <path d="M3.5 3.5 L12.5 12.5 M12.5 3.5 L3.5 12.5" />
+          </svg>
         </button>
 
         <div className={styles.content}>
           {/* Galería de Imágenes */}
           <div className={styles.imageSection}>
             <div className={styles.mainImage}>
-              <ProductImage src={images[selectedImage]} alt={product.name} />
+              <ProductImage
+                src={images[selectedImage]}
+                alt={product.name}
+                categoria={product.category}
+              />
             </div>
-            <div className={styles.thumbnails}>
-              {images.map((img, idx) => (
-                <div
-                  key={idx}
-                  className={`${styles.thumbnail} ${selectedImage === idx ? styles.thumbnailActive : ''}`}
-                  onClick={() => setSelectedImage(idx)}
-                >
-                  <ProductImage src={img} alt={`${product.name} ${idx + 1}`} />
-                </div>
-              ))}
-            </div>
+            {/* Las miniaturas aparecen cuando hay más de una foto que elegir.
+                Antes eran tres, y las tres eran la misma imagen. */}
+            {images.length > 1 && (
+              <div className={styles.thumbnails}>
+                {images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    aria-label={`Ver imagen ${idx + 1} de ${images.length}`}
+                    aria-pressed={selectedImage === idx}
+                    className={`${styles.thumbnail} ${selectedImage === idx ? styles.thumbnailActive : ''}`}
+                    onClick={() => setSelectedImage(idx)}
+                  >
+                    <ProductImage src={img} alt="" categoria={product.category} />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Información del Producto */}
           <div className={styles.infoSection}>
             <div className={styles.header}>
-              <div className={styles.category}>{product.category} › {product.subcategory}</div>
+              <div className={styles.category}>
+                {[product.category, product.subcategory].filter(Boolean).join(' · ')}
+              </div>
               <h2 className={styles.title}>{product.name}</h2>
               <div className={styles.priceSection}>
                 <span className={styles.price}>{formatPrice(product.price, product.currency)}</span>
@@ -90,24 +109,26 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                 <div className={styles.sellerDetails}>
                   <div className={styles.sellerName}>
                     {product.seller.name}
-                    <span className={styles.viewProfile}>Ver perfil →</span>
+                    <span className={styles.viewProfile}>Ver perfil</span>
                   </div>
                   {/* El texto es exactamente «Documentación revisada»: dice lo
                       que se hizo —alguien miró una constancia— y no promete
                       identidad comprobada ni ausencia de fraude. */}
                   {product.seller.documentacionRevisada && (
                     <div className={styles.sellerDocumentacion}>
-                      <span aria-hidden="true">📄</span> Documentación revisada
+                      <svg viewBox="0 0 16 16" width="13" height="13" fill="none"
+                           stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+                           strokeLinejoin="round" aria-hidden="true" focusable="false">
+                        <path d="M2.5 8.5 L6 12 L13.5 4" />
+                      </svg>
+                      Documentación revisada
                     </div>
                   )}
                   <div className={styles.sellerRating}>
                     {product.seller.ratingCount > 0 ? (
                       <>
-                        <span className={styles.stars}>
-                          {'⭐'.repeat(Math.floor(product.seller.rating))}
-                        </span>
                         <span className={styles.ratingNumber}>
-                          {product.seller.rating.toFixed(1)}
+                          {product.seller.rating.toFixed(1)} de 5
                         </span>
                         <span className={styles.salesCount}>
                           ({product.seller.ratingCount} {product.seller.ratingCount === 1 ? 'calificación' : 'calificaciones'})
@@ -125,17 +146,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                 </div>
               </div>
               <div className={styles.privacyNote}>
-                🔒 Los datos de contacto se compartirán al confirmar la compra
+                Los datos de contacto se comparten al confirmar la compra
               </div>
             </div>
 
             {/* Ubicación */}
             <div className={styles.location}>
-              <div className={styles.locationIcon}>📍</div>
               <div>
                 <div className={styles.locationTitle}>Ubicación</div>
                 <div className={styles.locationText}>
-                  {product.location.city}, {product.location.province}
+                  {[product.location.province, product.location.city]
+                    .filter(Boolean)
+                    .join(', ')}
                 </div>
               </div>
             </div>
@@ -150,7 +172,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
             )}
             {isService && (
               <div className={styles.serviceInfo}>
-                <span className={styles.serviceBadge}>🔧 Servicio disponible</span>
+                <span className={styles.serviceBadge}>Servicio disponible</span>
               </div>
             )}
 
@@ -221,7 +243,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                 onClick={handleAddToCart}
                 disabled={!isService && product.stock === 0}
               >
-                {isService ? '📋 Contratar Servicio' : (product.stock > 0 ? '🛒 Agregar al Carrito' : 'Sin Stock')}
+                {isService ? 'Contratar Servicio' : (product.stock > 0 ? 'Agregar al Carrito' : 'Sin Stock')}
               </button>
             </div>
           </div>

@@ -70,93 +70,96 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className={styles.header}>
       <div className={styles.container}>
-        <div className={styles.headerContent}>
-          <nav className={styles.nav}>
+        {/* Primera fila: quiénes somos, qué se busca y qué se puede hacer.
+            Es el orden de un marketplace y no el de un panel: antes la marca
+            era un botón más, perdido entre las acciones. */}
+        <div className={styles.barraSuperior}>
+          <div className={styles.marca}>
+            {/* La bajada va AFUERA del botón a propósito: lo clickeable es el
+                nombre, y su nombre accesible queda siendo «TopGreen» y nada más. */}
             <button
-              className={currentSection === 'home' ? styles.navLinkActive : styles.navLink}
-              onClick={() => onNavigate('home')}
+              className={styles.marcaNombre}
+              onClick={() => onNavigate('marketplace')}
             >
-              Home
+              Top<span className={styles.marcaVerde}>Green</span>
             </button>
-            <button
-              className={currentSection === 'about' ? styles.navLinkActive : styles.navLink}
-              onClick={() => onNavigate('about')}
-            >
-              Quienes Somos
-            </button>
-            <button
-              className={currentSection === 'services' ? styles.navLinkActive : styles.navLink}
-              onClick={() => onNavigate('services')}
-            >
-              Servicios
-            </button>
-            <button
-              className={currentSection === 'contact' ? styles.navLinkActive : styles.navLink}
-              onClick={() => onNavigate('contact')}
-            >
-              Contacto
-            </button>
-          </nav>
+            <span className={styles.marcaBajada}>Marketplace agro</span>
+          </div>
 
+          {/* La búsqueda vive donde hay resultados que filtrar. En las otras
+              secciones no hay grilla, así que un buscador ahí sería un control
+              que parece hacer algo y no hace nada. */}
           {currentSection === 'marketplace' && (
-            <form className={styles.searchBar} onSubmit={handleSubmit}>
+            <form className={styles.buscador} onSubmit={handleSubmit} role="search">
               <input
-                type="text"
-                className={styles.searchInput}
+                type="search"
+                className={styles.buscadorCampo}
                 placeholder="Buscar productos, semillas, maquinaria..."
+                aria-label="Buscar en el marketplace"
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
               />
-              <button type="submit" className={styles.searchButton}>
+              <button type="submit" className={styles.buscadorBoton}>
                 Buscar
               </button>
             </form>
           )}
 
-          <div className={styles.actions}>
+          <div className={styles.acciones}>
             {isAuthenticated && user?.role === 'admin' && onAdminClick && (
-              <button className={styles.adminButton} onClick={onAdminClick}>
-                ⚙️ Admin
+              <button className={styles.accionSecundaria} onClick={onAdminClick}>
+                Admin
               </button>
             )}
             {isAuthenticated && (
-              <button className={styles.sellButton} onClick={onSellClick}>
-                📦 Vender
+              <button className={styles.accionPrincipal} onClick={onSellClick}>
+                Vender
               </button>
             )}
             {isAuthenticated ? (
               <>
-                <button
-                  className={currentSection === 'marketplace' ? styles.navLinkActive : styles.marketplaceButton}
-                  onClick={() => onNavigate('marketplace')}
-                >
-                  TopGreen
-                </button>
                 <CartButton onClick={onCartClick} />
-                <div className={styles.userMenu}>
-                  <button className={styles.userNameButton} onClick={() => setShowDashboard(true)}>
-                    👤 {user?.name}
+                <div className={styles.menuDeCuenta}>
+                  {/* El nombre propio no sirve como etiqueta: cambia con cada
+                      cuenta. La etiqueta dice qué abre el botón. */}
+                  <button
+                    className={styles.cuenta}
+                    aria-label="Mi cuenta"
+                    onClick={() => setShowDashboard(true)}
+                  >
+                    {user?.name}
                   </button>
-                  <button className={styles.actionButton} onClick={logout}>
+                  <button className={styles.accionSecundaria} onClick={logout}>
                     Salir
                   </button>
                 </div>
               </>
             ) : (
-              <>
-                <button className={styles.actionButton} onClick={onLoginClick}>
-                  Ingresar
-                </button>
-                <button
-                  className={currentSection === 'marketplace' ? styles.navLinkActive : styles.marketplaceButton}
-                  onClick={() => onNavigate('marketplace')}
-                >
-                  TopGreen
-                </button>
-              </>
+              <button className={styles.accionSecundaria} onClick={onLoginClick}>
+                Ingresar
+              </button>
             )}
           </div>
         </div>
+
+        {/* Segunda fila: las secciones institucionales, que no compiten con la
+            marca ni con la búsqueda. */}
+        <nav className={styles.nav} aria-label="Secciones del sitio">
+          {([
+            ['home', 'Home'],
+            ['about', 'Quienes Somos'],
+            ['services', 'Servicios'],
+            ['contact', 'Contacto'],
+          ] as [PageSection, string][]).map(([seccion, texto]) => (
+            <button
+              key={seccion}
+              className={currentSection === seccion ? styles.navLinkActive : styles.navLink}
+              onClick={() => onNavigate(seccion)}
+            >
+              {texto}
+            </button>
+          ))}
+        </nav>
       </div>
 
       {showDashboard && (

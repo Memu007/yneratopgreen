@@ -407,7 +407,7 @@ async function main() {
         .waitFor({ state: 'visible', timeout: ESPERA });
       await ingresar(page, TRANSPORTISTA);
 
-      await page.locator('button').filter({ hasText: '👤' }).first().click();
+      await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
       await page.getByRole('button', { name: /Mis Operaciones/ })
         .waitFor({ state: 'visible', timeout: ESPERA });
       await page.getByRole('button', { name: /Mis Operaciones/ }).click();

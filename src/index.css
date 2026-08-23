@@ -135,6 +135,52 @@
   --radius-2xl: 20px;
   --radius-full: 9999px;
   
+  /* === IDENTIDAD «campo argentino moderno» ===
+     Capa nueva, encima de la paleta emerald/slate que ya estaba: acá NO se
+     migra el resto del proyecto. Se usa en la superficie pública —cabecera,
+     resultados, tarjeta, detalle y pie—; el resto sigue con sus tokens.
+
+     Los cuatro colores de la dirección aprobada, y qué hace cada uno:
+       lienzo   marfil de fondo, para sacarle el blanco de dashboard
+       verde    el verde profundo de la marca, no el emerald de interfaz
+       grafito  la tinta, cálida y no azulada, para que conviva con el marfil
+       cosecha  el acento, medido aparte porque como texto necesita otro tono
+
+     Contrastes medidos sobre los dos fondos donde aparecen, marfil #F7F4EC y
+     marfil hondo #EFEADD. Todos los tokens de TEXTO pasan 4,5:1:
+       grafito        14,78 / 13,53
+       grafito-suave   7,26 /  6,64
+       grafito-tenue   6,30 /  5,77
+       verde          10,08 /  9,22
+       verde-medio     5,81 /  5,32
+       cosecha-texto   6,47 /  5,92
+     Y al revés, sobre el verde profundo: blanco 11,08 · marfil 10,08.
+
+     El tenue arrancó en #6B655D, que da 5,24 sobre marfil y parecía de sobra.
+     La puerta lo midió en 4,49 sobre el fondo REAL de la ilustración —marfil
+     hondo con la trama encima, #E8E3D6—, once centésimas por debajo. El fondo
+     que hay que medir es el que se ve, no el que dice la variable. */
+  --marca-lienzo: #F7F4EC;
+  --marca-lienzo-hondo: #EFEADD;
+  --marca-verde: #1B4332;
+  --marca-verde-medio: #2D6A4F;
+  --marca-grafito: #22201D;
+  --marca-grafito-suave: #55504A;
+  --marca-grafito-tenue: #5F5951;
+
+  /* El acento aparece en dos papeles y por eso son dos tokens. Como fondo o
+     filete es el dorado de cosecha; como TEXTO ese dorado da 1,9:1 y no se
+     puede leer, así que hay un tono propio. Confundirlos es el error que ya
+     costó una pieza entera de contraste. */
+  --marca-cosecha: #D9A441;
+  --marca-cosecha-texto: #7A4F0E;
+
+  /* Líneas. La tenue separa y no delimita nada operable: es decoración, y el
+     mínimo de 3:1 no le aplica. La fuerte sí llega a 3,45:1 sobre marfil y es
+     la que se usa cuando el borde ES el límite de un control. */
+  --marca-linea: #E2DBC8;
+  --marca-linea-fuerte: #8F8264;
+
   /* Tipografía */
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   

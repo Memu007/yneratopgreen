@@ -71,10 +71,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     return category?.subcategories?.filter(s => s.is_active) || [];
   }, [categories, selectedCategory]);
 
-  const handleRatingClick = (rating: number) => {
-    onMinRatingChange(rating === minRating ? 0 : rating);
-  };
-
   return (
     <aside className={styles.sidebar}>
       <h2 className={styles.sidebarTitle}>Filtros</h2>
@@ -217,20 +213,28 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
         </div>
       </div>
 
-      {/* Calificación del vendedor */}
+      {/* Calificación del vendedor.
+          Eran cinco `span` con `onClick`: no se llegaban con el teclado, no
+          tenían nombre y había que saber que una estrella llena significaba
+          «esta cantidad o más». Ahora es el mismo control que los otros
+          filtros y dice lo que hace. */}
       <div className={styles.filterSection}>
-        <label className={styles.filterLabel}>Calificación mínima</label>
-        <div className={styles.ratingStars}>
-          {[1, 2, 3, 4, 5].map((star) => (
-            <span
-              key={star}
-              className={`${styles.star} ${star <= minRating ? styles.active : ''}`}
-              onClick={() => handleRatingClick(star)}
-            >
-              {star <= minRating ? '★' : '☆'}
-            </span>
+        <label className={styles.filterLabel} htmlFor="catalog-rating">
+          Calificación mínima del vendedor
+        </label>
+        <select
+          id="catalog-rating"
+          className={styles.select}
+          value={minRating}
+          onChange={(e) => onMinRatingChange(Number(e.target.value))}
+        >
+          <option value={0}>Cualquiera</option>
+          {[1, 2, 3, 4, 5].map((estrellas) => (
+            <option key={estrellas} value={estrellas}>
+              {estrellas} de 5 o más
+            </option>
           ))}
-        </div>
+        </select>
       </div>
 
       <button className={styles.resetButton} onClick={onResetFilters}>

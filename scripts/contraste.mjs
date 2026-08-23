@@ -462,7 +462,7 @@ for (const medida of MEDIDAS) {
     const ctx = await sesion({ viewport }, vendedor);
     const page = await ctx.newPage();
     await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-    await page.locator('button').filter({ hasText: '👤' }).first().click();
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
     await revisar(page, `${medida.n} perfil vendedor`,
       page.getByRole('heading', { name: 'Mi Perfil' }));
 
@@ -488,7 +488,7 @@ for (const medida of MEDIDAS) {
     const ctx = await sesion({ viewport }, transportista);
     const page = await ctx.newPage();
     await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-    await page.locator('button').filter({ hasText: '👤' }).first().click();
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
     await revisar(page, `${medida.n} perfil transportista`,
       page.getByRole('heading', { name: 'Datos de transportista' }));
 

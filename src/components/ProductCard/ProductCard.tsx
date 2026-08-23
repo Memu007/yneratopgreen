@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import styles from './ProductCard.module.css';
 import { Product } from '../../types';
-import { formatPrice, truncateText } from '../../utils/formatters';
+import { formatPrice } from '../../utils/formatters';
 import { useCart } from '../../contexts/CartContext';
 import { ProductDetailModal } from '../ProductDetail/ProductDetailModal';
 import { ProductImage } from '../ProductImage/ProductImage';
@@ -23,6 +23,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     }
   };
 
+  // Es la ubicación declarada por el VENDEDOR, no el origen de la
+  // publicación: ese vive en la base como localidad y no sale en la
+  // respuesta pública. Se muestra en el orden en que viene, sin reordenar:
+  // el texto es libre y adivinar cuál parte es provincia inventaba
+  // «Argentina, Buenos Aires».
+  const ubicacion = [product.location?.province, product.location?.city]
+    .filter(Boolean)
+    .join(', ');
+
   return (
     <>
     <div className={styles.card} onClick={() => setShowDetail(true)}>
@@ -30,72 +39,58 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         <ProductImage
           src={product.image}
           alt={product.name}
+          categoria={product.category}
           className={styles.image}
           loading="lazy"
         />
-        {!isService && (
-          <span className={`${styles.stockBadge} ${!hasStock ? styles.outOfStock : ''}`}>
-            {hasStock ? `Stock: ${product.stock}` : 'Sin stock'}
-          </span>
+        {!isService && !hasStock && (
+          <span className={styles.sinStock}>Sin stock</span>
         )}
-        {isService && (
-          <span className={styles.serviceBadge}>Servicio</span>
-        )}
+        {isService && <span className={styles.servicio}>Servicio</span>}
       </div>
 
       <div className={styles.content}>
+        {/* La categoría es contexto y va arriba, chica. Antes se imprimía
+            «categoría › subcategoría» aunque no hubiera subcategoría, y quedaba
+            un separador colgado al final de la línea. */}
         <div className={styles.category}>
-          {product.category} › {product.subcategory}
+          {[product.category, product.subcategory].filter(Boolean).join(' · ')}
         </div>
 
         <h3 className={styles.title}>{product.name}</h3>
 
-        <p className={styles.description}>
-          {truncateText(product.description, 100)}
-        </p>
+        {ubicacion && <div className={styles.ubicacion}>{ubicacion}</div>}
 
-        {product.tags && product.tags.length > 0 && (
-          <div className={styles.features}>
-            {product.tags.slice(0, 3).map((tag, index) => (
-              <span key={index} className={styles.featureTag}>
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-
+        {/* El precio es lo que se compara entre tarjetas: manda solo. La
+            descripción y las etiquetas se fueron porque no se comparan, y eran
+            lo que hacía que cada tarjeta pareciera un formulario. */}
         <div className={styles.priceSection}>
-          <div>
-            <div className={styles.price}>
-              {formatPrice(product.price, product.currency)}
-            </div>
-            <div className={styles.unit}>
-              por {product.unit}
-            </div>
+          <div className={styles.price}>
+            {formatPrice(product.price, product.currency)}
           </div>
-
-          <button 
-            className={`${styles.addToCartButton} ${!hasStock ? styles.disabled : ''}`}
-            onClick={handleAddToCart}
-            disabled={!hasStock}
-          >
-            {isService ? '📋 Consultar' : (hasStock ? '🛒 Agregar' : 'Sin stock')}
-          </button>
+          <div className={styles.unit}>por {product.unit}</div>
         </div>
 
         <div className={styles.footer}>
           <div className={styles.seller}>
-            <div className={styles.sellerName}>
-              {product.seller.name}
-            </div>
-            <div className={styles.rating}>
-              {product.seller.ratingCount > 0 ? (
-                <>⭐ {product.seller.rating.toFixed(1)} <span className={styles.ratingCount}>({product.seller.ratingCount})</span></>
-              ) : (
-                <span className={styles.noRating}>Sin calificaciones</span>
-              )}
-            </div>
+            <span className={styles.sellerName}>{product.seller.name}</span>
+            {product.seller.ratingCount > 0 && (
+              <span className={styles.rating}>
+                {product.seller.rating.toFixed(1)} de 5
+                <span className={styles.ratingCount}>
+                  {` (${product.seller.ratingCount})`}
+                </span>
+              </span>
+            )}
           </div>
+
+          <button
+            className={`${styles.addToCartButton} ${!hasStock ? styles.disabled : ''}`}
+            onClick={handleAddToCart}
+            disabled={!hasStock}
+          >
+            {isService ? 'Consultar' : (hasStock ? 'Agregar' : 'Sin stock')}
+          </button>
         </div>
       </div>
     </div>

@@ -1673,7 +1673,7 @@ await runCase(19, 'Transferencia completa desde la interfaz', async () => {
       );
       const sellerPage = await sellerContext.newPage();
       await sellerPage.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-      await sellerPage.locator('button').filter({ hasText: '👤' }).first().click();
+      await sellerPage.getByRole('button', { name: 'Mi cuenta' }).first().click();
       await sellerPage.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
       await sellerPage.getByRole('button', { name: 'Mis Ventas' }).click();
       const saleHeading = sellerPage.getByRole('heading', {
@@ -1732,14 +1732,20 @@ await runCase(20, 'Las rutas financieras heredadas no están expuestas', async (
     + `estado ("${data.estado}") sin exponer credenciales`;
 });
 
-await runCase(21, 'Respaldo de imágenes en el recorrido de demostración', async () => {
+await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorrido', async () => {
+  // Este caso probaba que una URL rota se reemplazara por un respaldo. La
+  // propiedad ahora es más fuerte: las URLs de relleno del seed —`picsum`
+  // devuelve una foto AL AZAR— ni siquiera se piden, porque no fallan nunca y
+  // esperar su error era esperar algo que no iba a pasar. El interceptor sigue
+  // acá, pero para comprobar que no se dispara.
   const browser = await chromium.launch({ headless: true });
-  let blockedSeedImages = 0;
+  let pedidosDeRelleno = 0;
   const blockSeedImages = (page) =>
     page.route('https://picsum.photos/**', (route) => {
-      blockedSeedImages += 1;
+      pedidosDeRelleno += 1;
       return route.fulfill({ status: 404, body: 'imagen rota por smoke' });
     });
+  const ilustracion = (raiz) => raiz.getByText('Imagen ilustrativa').first();
 
   try {
     const buyerContext = await browser.newContext();
@@ -1787,7 +1793,7 @@ await runCase(21, 'Respaldo de imágenes en el recorrido de demostración', asyn
     });
     await detailHeading.waitFor({ state: 'visible' });
     const detailModal = detailHeading.locator('xpath=ancestor::div[contains(@class,\"modal\")]');
-    await detailModal.getByRole('img', { name: productName, exact: true }).first().waitFor();
+    await ilustracion(detailModal).waitFor();
     await detailModal.getByRole('button', { name: 'Cerrar' }).click();
 
     await addButton.click();
@@ -1795,11 +1801,11 @@ await runCase(21, 'Respaldo de imágenes en el recorrido de demostración', asyn
     const cartHeading = buyerPage.getByRole('heading', { name: /Mi Carrito/ });
     await cartHeading.waitFor();
     const cartModal = cartHeading.locator('xpath=ancestor::div[contains(@class,\"modal\")]');
-    await cartModal.getByRole('img', { name: productName, exact: true }).waitFor();
+    await ilustracion(cartModal).waitFor();
     await cartModal.getByRole('button', { name: 'Continuar compra' }).click();
     const shippingHeading = buyerPage.getByRole('heading', { name: /Datos de Envío/ });
     const checkoutModal = shippingHeading.locator('xpath=ancestor::div[contains(@class,\"modal\")]');
-    await checkoutModal.getByRole('img', { name: productName, exact: true }).waitFor();
+    await ilustracion(checkoutModal).waitFor();
     await buyerContext.close();
 
     const sellerContext = await browser.newContext();
@@ -1816,11 +1822,11 @@ await runCase(21, 'Respaldo de imágenes en el recorrido de demostración', asyn
     const sellerPage = await sellerContext.newPage();
     await blockSeedImages(sellerPage);
     await sellerPage.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await sellerPage.locator('button').filter({ hasText: '👤' }).first().click();
+    await sellerPage.getByRole('button', { name: 'Mi cuenta' }).first().click();
     await sellerPage.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
     await sellerPage.getByRole('button', { name: 'Mis Productos' }).click();
     await sellerPage.getByRole('heading', { name: 'Mis Productos' }).waitFor();
-    await sellerPage.getByRole('img').first().waitFor();
+    await ilustracion(sellerPage).waitFor();
     await sellerContext.close();
 
     const adminLogin = await apiRequest('/auth/login', {
@@ -1841,16 +1847,35 @@ await runCase(21, 'Respaldo de imágenes en el recorrido de demostración', asyn
     const adminPage = await adminContext.newPage();
     await blockSeedImages(adminPage);
     await adminPage.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await adminPage.getByRole('button', { name: '⚙️ Admin' }).click();
+    await adminPage.getByRole('button', { name: 'Admin' }).click();
     await adminPage.getByRole('heading', { name: 'Panel de Administración' }).waitFor();
     await adminPage.getByRole('button', { name: '📦 Productos' }).click();
     const table = adminPage.locator('table');
     await table.waitFor();
-    await table.getByRole('img').first().waitFor();
+    await ilustracion(table).waitFor();
     await adminContext.close();
 
-    assert(blockedSeedImages > 0, 'Playwright no forzó ninguna URL de picsum.photos a HTTP 404');
-    return 'URLs rotas reemplazadas en detalle, carrito, checkout, vendedor y administración';
+    assert(pedidosDeRelleno === 0,
+      `el navegador pidió ${pedidosDeRelleno} imágenes a picsum.photos: una foto al azar `
+      + 'puede terminar al lado de un precio y un vendedor reales');
+
+    // Y la propiedad vieja, que sigue importando: una foto de verdad que se
+    // rompe no puede dejar el recorrido sin imagen. Se rompe una nuestra.
+    const rotaContext = await browser.newContext();
+    const rotaPage = await rotaContext.newPage();
+    let rotasForzadas = 0;
+    await rotaPage.route('**/uploads/**', (route) => {
+      rotasForzadas += 1;
+      return route.fulfill({ status: 404, body: 'imagen rota por smoke' });
+    });
+    await rotaPage.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await rotaPage.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+    await ilustracion(rotaPage).waitFor();
+    await rotaContext.close();
+
+    return 'ninguna imagen de relleno se pidió en los cinco recorridos, y en su lugar '
+      + 'aparece la ilustración de familia; una imagen propia rota sigue cayendo al '
+      + 'mismo respaldo';
   } finally {
     await browser.close();
   }
@@ -3317,7 +3342,7 @@ await runCase(39, 'El transportista edita su perfil y los cambios quedan', async
     );
     const page = await context.newPage();
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await page.locator('button').filter({ hasText: '👤' }).first().click();
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
     await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
     await page.getByRole('heading', { name: 'Datos de transportista' }).waitFor();
 
@@ -3342,7 +3367,7 @@ await runCase(39, 'El transportista edita su perfil y los cambios quedan', async
 
     // Recargar tiene que mostrar lo guardado, no lo que quedó en memoria.
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.locator('button').filter({ hasText: '👤' }).first().click();
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
     await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
     const recargado = ((await perfil.textContent()) || '').replace(/\s+/g, ' ');
     for (const esperado of [destino.name, transporteNuevo, `${radioNuevo} km`, capacidadNueva]) {
@@ -3507,7 +3532,7 @@ await runCase(40, 'El perfil no inventa datos y guardar sin cambios no pisa nada
       );
       const page = await context.newPage();
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-      await page.locator('button').filter({ hasText: '👤' }).first().click();
+      await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
       await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
       return await accion(page);
     } finally {
@@ -5360,7 +5385,7 @@ await runCase(54, 'Cada participante ve lo suyo y el transportista sólo su nece
       );
       const page = await context.newPage();
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-      await page.locator('button').filter({ hasText: '👤' }).first().click();
+      await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
       await page.getByRole('button', { name: /Mis Operaciones/ })
         .waitFor({ state: 'visible', timeout: 15_000 });
       await page.getByRole('button', { name: /Mis Operaciones/ }).click();
@@ -5609,7 +5634,7 @@ await runCase(57, 'El origen de una operación es el del momento de la compra', 
     );
     const page = await context.newPage();
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await page.locator('button').filter({ hasText: '👤' }).first().click();
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
     await page.getByRole('button', { name: /Mis Operaciones/ })
       .waitFor({ state: 'visible', timeout: 15_000 });
     await page.getByRole('button', { name: /Mis Operaciones/ }).click();
@@ -6478,7 +6503,7 @@ await runCase(70, 'El vendedor vincula, ve y desvincula desde el panel, en escri
         await page.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 15_000 });
 
         const abrirPanel = async () => {
-          await page.locator('button').filter({ hasText: '👤' }).first().click();
+          await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
           await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor({ timeout: 15_000 });
         };
         await abrirPanel();
@@ -8049,7 +8074,7 @@ await runCase(84, 'El pago que quedó a medias se retoma desde Mis compras, en e
       'el vendedor no vinculó');
 
     const abrirCompras = async (page) => {
-      await page.locator('button').filter({ hasText: '👤' }).first().click();
+      await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
       await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor({ timeout: 15_000 });
       await page.getByRole('button', { name: /Mis Compras/i }).click();
       await page.getByRole('heading', { name: 'Mis Compras' }).waitFor({ timeout: 15_000 });
@@ -10264,7 +10289,7 @@ await runCase(108, 'Documentación: presentar, revisar y ver el distintivo en el
     await page.locator('[class*="_submitButton_"][type="submit"]').click();
     await page.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 15_000 });
 
-    await page.locator('button').filter({ hasText: '👤' }).first().click();
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
     await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor({ timeout: 15_000 });
 
     const seccion = page.locator('[class*="_docSection_"]');
@@ -10291,7 +10316,7 @@ await runCase(108, 'Documentación: presentar, revisar y ver el distintivo en el
       admin, suId, 'rechazada', 'La constancia no tiene el CUIT visible.',
     );
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.locator('button').filter({ hasText: '👤' }).first().click();
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
     await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor({ timeout: 15_000 });
     const rechazo = page.locator('[class*="_docRechazo_"]');
     await rechazo.waitFor({ state: 'visible', timeout: 15_000 });
@@ -10325,7 +10350,7 @@ await runCase(108, 'Documentación: presentar, revisar y ver el distintivo en el
     await pa.locator('[class*="_submitButton_"][type="submit"]').click();
     await pa.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 15_000 });
 
-    await pa.locator('button').filter({ hasText: '⚙️' }).first().click();
+    await pa.getByRole('button', { name: 'Admin' }).first().click();
     await pa.getByRole('heading', { name: 'Panel de Administración' }).waitFor({ timeout: 15_000 });
     await pa.getByRole('button', { name: /📄 Documentación/ }).click();
 
@@ -10891,7 +10916,7 @@ await runCase(114, 'En pantalla: se comparan marca y cargas, el dominio recién 
     await pt.getByPlaceholder('••••••••').fill(transportistas.amplio.password);
     await pt.locator('[class*="_submitButton_"][type="submit"]').click();
     await pt.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 15_000 });
-    await pt.locator('button').filter({ hasText: '👤' }).first().click();
+    await pt.getByRole('button', { name: 'Mi cuenta' }).first().click();
     await pt.getByRole('heading', { name: 'Mi Perfil' }).waitFor({ timeout: 15_000 });
 
     const suPanel = await pt.locator('[class*="_profileSection_"], form, main').first().innerText()

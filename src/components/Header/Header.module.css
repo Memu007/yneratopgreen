@@ -1,309 +1,283 @@
+/* Cabecera del marketplace.
+   La jerarquía es la de un marketplace y no la de un panel: marca, búsqueda y
+   acciones arriba; secciones abajo. Antes la marca era un botón más entre las
+   acciones, y cada acción tenía su propio color —rojo para administración,
+   amarillo para vender—, que es lo que hacía que todo pareciera un tablero. */
+
 .header {
-  background-color: var(--header-bg);
-  box-shadow: var(--shadow-sm);
-  border-bottom: 1px solid var(--header-border);
+  background-color: var(--marca-lienzo);
+  border-bottom: 1px solid var(--marca-linea);
   position: sticky;
   top: 0;
   z-index: 100;
-  transition: background-color var(--transition-normal), border-color var(--transition-normal);
 }
 
 .container {
-  max-width: 1200px;
+  /* La misma medida y el mismo respiro que `.mainContent`: si no, la marca
+     no arranca donde arranca el contenido y el corte se ve. */
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 1rem 1.5rem;
+  padding: 0.875rem 1.5rem 0;
 }
 
-.headerContent {
+.barraSuperior {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-  justify-content: space-between;
+  gap: 1.5rem;
 }
 
-.logo {
-  font-size: 1.75rem;
-  font-weight: bold;
-  color: #2d6a4f;
+/* --- marca ---------------------------------------------------------------- */
+
+.marca {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.marcaNombre {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 1.5rem;
+  font-weight: 800;
+  /* Apretado a propósito: una palabra compuesta se lee como una sola cosa. */
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--marca-grafito);
+  white-space: nowrap;
+}
+
+.marcaVerde {
+  color: var(--marca-verde);
+}
+
+.marcaNombre:hover .marcaVerde {
+  color: var(--marca-verde-medio);
+}
+
+.marcaBajada {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--marca-grafito-tenue);
+  white-space: nowrap;
+}
+
+/* --- búsqueda ------------------------------------------------------------- */
+
+.buscador {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  max-width: 560px;
+  border: 1px solid var(--marca-linea-fuerte);
+  border-radius: var(--radius-md);
+  background-color: #ffffff;
+  overflow: hidden;
+}
+
+.buscador:focus-within {
+  border-color: var(--marca-verde);
+  box-shadow: 0 0 0 3px rgba(27, 67, 50, 0.12);
+}
+
+.buscadorCampo {
+  flex: 1;
+  min-width: 0;
+  padding: 0.625rem 0.875rem;
+  border: none;
+  background: transparent;
+  font-size: 0.9375rem;
+  color: var(--marca-grafito);
+}
+
+.buscadorCampo::placeholder {
+  color: var(--marca-grafito-tenue);
+}
+
+.buscadorCampo:focus {
+  outline: none;
+}
+
+.buscadorBoton {
+  padding: 0.625rem 1.25rem;
+  background-color: var(--marca-verde);
+  color: #ffffff;
+  border: none;
+  font-size: 0.9375rem;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  user-select: none;
 }
 
-.logo span {
-  color: #52b788;
+.buscadorBoton:hover {
+  background-color: var(--marca-verde-medio);
 }
 
-.logoImage {
-  height: 40px;
-  width: auto;
-}
+/* --- acciones ------------------------------------------------------------- */
 
-/* Navigation */
-.nav {
+.acciones {
   display: flex;
   gap: 0.5rem;
+  align-items: center;
+  margin-left: auto;
+  /* Se dobla en vez de empujar. Sin sesión son dos botones y entra en
+     cualquier ancho; con sesión son cuatro —vender, carrito, cuenta y salir— y
+     en 390px la fila medía 378px, que sumada a la marca desbordaba la página. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+/* Una sola acción principal. Que «Vender» y «Admin» tuvieran cada una su color
+   propio no era jerarquía: era ruido, y hacía que ninguna de las dos mandara. */
+.accionPrincipal {
+  padding: 0.5rem 1.1rem;
+  background-color: var(--marca-verde);
+  color: #ffffff;
+  border: 1px solid var(--marca-verde);
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.accionPrincipal:hover {
+  background-color: var(--marca-verde-medio);
+  border-color: var(--marca-verde-medio);
+}
+
+.accionSecundaria {
+  padding: 0.5rem 0.9rem;
+  background: transparent;
+  color: var(--marca-grafito-suave);
+  border: 1px solid var(--marca-linea-fuerte);
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.accionSecundaria:hover {
+  color: var(--marca-verde);
+  border-color: var(--marca-verde);
+}
+
+.menuDeCuenta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cuenta {
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--marca-verde);
+  cursor: pointer;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cuenta:hover {
+  background-color: rgba(27, 67, 50, 0.07);
+}
+
+/* --- secciones ------------------------------------------------------------ */
+
+.nav {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.625rem;
 }
 
 .navLink,
 .navLinkActive {
   background: none;
   border: none;
-  padding: 0.5rem 1rem;
-  font-size: 0.95rem;
-  font-weight: var(--font-weight-medium);
+  padding: 0.5rem 0.75rem 0.6rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
   cursor: pointer;
-  border-radius: var(--radius-md);
-  transition: all var(--transition-fast);
-  color: var(--text-secondary);
+  color: var(--marca-grafito-suave);
+  /* El activo se marca con un filete de cosecha y no con una píldora llena:
+     la pastilla de color competía con la marca y con la acción principal. */
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
 }
 
 .navLink:hover {
-  background-color: var(--bg-hover);
-  color: var(--color-primary-text);
+  color: var(--marca-verde);
 }
 
 .navLinkActive {
-  background: var(--gradient-primary);
-  color: var(--text-inverse);
-}
-
-.navLinkActive:hover {
-  background: var(--gradient-primary-hover);
-}
-
-.searchBar {
-  display: flex;
-  gap: 0.5rem;
-  max-width: 350px;
-}
-
-.searchInput {
-  flex: 1;
-  padding: 0.5rem 0.75rem;
-  background-color: var(--input-bg);
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-md);
-  font-size: 0.9rem;
-  color: var(--text-primary);
-  transition: all var(--transition-fast);
-  min-width: 180px;
-}
-
-.searchInput::placeholder {
-  color: var(--input-placeholder);
-}
-
-.searchInput:focus {
-  outline: none;
-  border-color: var(--input-border-focus);
-  box-shadow: var(--shadow-focus);
-}
-
-.searchButton {
-  padding: 0.5rem 1rem;
-  background: var(--gradient-primary);
-  color: var(--text-inverse);
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: 0.9rem;
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  white-space: nowrap;
-}
-
-.searchButton:hover {
-  background: var(--gradient-primary-hover);
-  transform: translateY(-1px);
-}
-
-.actions {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  margin-left: auto;
-}
-
-.themeToggle {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--bg-tertiary);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-md);
-  font-size: 1.25rem;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.themeToggle:hover {
-  background-color: var(--bg-hover);
-  border-color: var(--color-primary-500);
-  transform: scale(1.05);
-}
-
-.themeToggle:active {
-  transform: scale(0.95);
-}
-
-.adminButton {
-  padding: 0.6rem 1.2rem;
-  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.95rem;
+  color: var(--marca-verde);
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
+  border-bottom-color: var(--marca-cosecha);
 }
 
-.adminButton:hover {
-  background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
-}
-
-.sellButton {
-  padding: 0.6rem 1.2rem;
-  background-color: #ffd93d;
-  color: #2d5016;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.sellButton:hover {
-  background-color: #ffb703;
-  transform: translateY(-1px);
-}
-
-.userMenu {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.userNameButton {
-  padding: 0.6rem 1.2rem;
-  background-color: transparent;
-  color: var(--color-primary-700);
-  border: 2px solid var(--color-primary-600);
-  border-radius: var(--radius-md);
-  font-size: 0.95rem;
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  white-space: nowrap;
-}
-
-.userNameButton:hover {
-  background: var(--gradient-primary);
-  border-color: transparent;
-  color: var(--text-inverse);
-}
-
-.actionButton {
-  padding: 0.5rem 1rem;
-  background-color: transparent;
-  color: var(--color-primary-text);
-  border: 1.5px solid var(--color-primary-600);
-  border-radius: var(--radius-md);
-  font-size: 0.9rem;
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  white-space: nowrap;
-}
-
-.actionButton:hover {
-  background: var(--gradient-primary);
-  border-color: transparent;
-  color: var(--text-inverse);
-  transform: translateY(-1px);
-}
-
-.marketplaceButton {
-  padding: 0.5rem 1rem;
-  background-color: #2d6a4f;
-  color: white;
-  border: 2px solid #2d6a4f;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.marketplaceButton:hover {
-  background-color: #1e4d35;
-  border-color: #1e4d35;
-}
+/* --- medidas chicas ------------------------------------------------------- */
 
 @media (max-width: 968px) {
-  .headerContent {
-    flex-direction: column;
-    gap: 1rem;
+  .container {
+    padding: 0.75rem 1rem 0;
   }
 
-  .nav {
-    width: 100%;
-    overflow-x: auto;
-    padding-bottom: 8px;
+  .barraSuperior {
+    flex-wrap: wrap;
+    gap: 0.75rem;
   }
 
-  .navLink,
-  .navLinkActive {
-    font-size: 0.85rem;
-    padding: 0.5rem 0.75rem;
-  }
-
-  .searchBar {
-    width: 100%;
+  .buscador {
+    order: 3;
+    flex-basis: 100%;
     max-width: 100%;
   }
 
-  .actions {
-    width: 100%;
-    justify-content: space-between;
-    flex-wrap: wrap;
+  .acciones {
+    gap: 0.4rem;
   }
 
-  .sellButton,
-  .userNameButton,
-  .actionButton {
-    font-size: 0.85rem;
-    padding: 0.5rem 0.9rem;
+  .nav {
+    overflow-x: auto;
+    /* La barra de desplazamiento no puede tapar el filete del activo. */
+    padding-bottom: 2px;
   }
 }
 
 @media (max-width: 480px) {
-  .logo {
-    font-size: 1.3rem;
+  .marcaNombre {
+    font-size: 1.25rem;
+  }
+
+  .marcaBajada {
+    font-size: 0.625rem;
+  }
+
+  .accionPrincipal,
+  .accionSecundaria,
+  .cuenta {
+    padding: 0.45rem 0.7rem;
+    font-size: 0.875rem;
+  }
+
+  .cuenta {
+    max-width: 6rem;
   }
 
   .navLink,
   .navLinkActive {
-    font-size: 0.8rem;
-    padding: 0.4rem 0.6rem;
-  }
-
-  .searchInput {
-    font-size: 0.85rem;
-  }
-
-  .searchButton {
-    padding: 0.65rem 1rem;
-    font-size: 0.85rem;
+    font-size: 0.875rem;
+    padding: 0.45rem 0.55rem 0.55rem;
   }
 }

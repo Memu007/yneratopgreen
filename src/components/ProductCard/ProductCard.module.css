@@ -1,236 +1,218 @@
+/* La tarjeta de resultado.
+   Un solo dato manda —el precio—, una sola acción, y el resto es contexto.
+   Antes cada dato tenía su propio adorno: la descripción recortada, tres
+   etiquetas, una píldora verde para el vendedor y un botón con carrito. Todo
+   junto pesaba lo mismo, así que nada se leía primero. */
+
 .card {
-  background-color: var(--card-bg);
-  border-radius: var(--radius-xl);
+  background-color: #ffffff;
+  border: 1px solid var(--marca-linea);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: var(--card-shadow);
-  transition: all var(--transition-normal);
   cursor: pointer;
   display: flex;
   flex-direction: column;
   height: 100%;
-  border: 1px solid var(--card-border);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--card-shadow-hover);
-  border-color: var(--color-primary-500);
+  border-color: var(--marca-verde);
+  box-shadow: 0 6px 20px rgba(34, 32, 29, 0.09);
 }
 
+.card:focus-within {
+  border-color: var(--marca-verde);
+}
+
+/* --- imagen --------------------------------------------------------------- */
+
 .imageContainer {
-  width: 100%;
-  height: 200px;
-  overflow: hidden;
-  background-color: var(--bg-tertiary);
   position: relative;
+  width: 100%;
+  /* Proporción fija: con altura suelta, una grilla de fotos de distinto alto
+     hace escalones y se pierde la lectura en columnas. */
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background-color: var(--marca-lienzo-hondo);
 }
 
 .image {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
-.imageFallback {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  text-align: center;
-  background: linear-gradient(135deg, var(--color-primary-50) 0%, var(--color-primary-100) 100%);
-  color: var(--color-primary-700);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1.4;
-}
-
-[data-theme="dark"] .imageFallback {
-  background: linear-gradient(135deg, rgba(5, 150, 105, 0.1) 0%, rgba(5, 150, 105, 0.15) 100%);
-  color: var(--color-primary-400);
-}
-
-.stockBadge {
+/* Sólo se avisa lo excepcional. El stock disponible ya no se grita en una
+   píldora sobre la foto: si hay, se compra; si no hay, hay que decirlo. */
+.sinStock,
+.servicio {
   position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  background: var(--gradient-primary);
-  color: var(--text-inverse);
-  padding: 0.35rem 0.75rem;
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  top: 0.625rem;
+  left: 0.625rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.stockBadge.outOfStock {
-  background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
+.sinStock {
+  background-color: var(--marca-grafito);
+  color: #ffffff;
 }
 
-.serviceBadge {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
-  color: var(--text-inverse);
-  padding: 0.35rem 0.75rem;
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+.servicio {
+  background-color: var(--marca-cosecha);
+  color: var(--marca-grafito);
 }
+
+/* --- cuerpo --------------------------------------------------------------- */
 
 .content {
-  padding: 1rem;
   display: flex;
   flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.875rem 1rem 1rem;
   flex: 1;
 }
 
 .category {
-  font-size: var(--font-size-xs);
-  color: var(--text-tertiary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  font-weight: var(--font-weight-semibold);
-  margin-bottom: 0.5rem;
-  letter-spacing: 0.05em;
-}
-
-.title {
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-  margin-bottom: 0.5rem;
-  line-height: 1.4;
-  min-height: 2.8rem;
-}
-
-.description {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-  margin-bottom: 1rem;
-  line-height: 1.5;
-  flex: 1;
-}
-
-.features {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.featureTag {
-  background-color: var(--color-primary-100);
-  color: var(--color-primary-700);
-  padding: 0.25rem 0.65rem;
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-}
-
-[data-theme="dark"] .featureTag {
-  background-color: rgba(5, 150, 105, 0.2);
-  color: var(--color-primary-400);
-}
-
-.price {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-primary-text);
-}
-
-[data-theme="dark"] .price {
-  color: var(--color-primary-400);
-}
-
-.unit {
-  font-size: var(--font-size-xs);
-  color: var(--text-tertiary);
-}
-
-.priceSection {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-  gap: 1rem;
-}
-
-.addToCartButton {
-  padding: 0.65rem 1.25rem;
-  background: var(--gradient-primary);
-  color: var(--text-inverse);
-  border: none;
-  border-radius: var(--radius-md);
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  font-size: var(--font-size-base);
+  color: var(--marca-grafito-tenue);
+  line-height: 1.3;
+  /* Una línea: si una categoría larga se parte en dos, empuja el título de esa
+     tarjeta y los precios de la fila dejan de estar a la misma altura. */
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.addToCartButton:hover:not(.disabled) {
-  background: var(--gradient-primary-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+.title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--marca-grafito);
+  /* Dos líneas y corta: tres títulos de largo distinto desalinean los precios,
+     que es justo lo que hay que poder comparar de un vistazo. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.addToCartButton.disabled {
-  background: var(--color-slate-400);
-  cursor: not-allowed;
+.ubicacion {
+  font-size: 0.8125rem;
+  color: var(--marca-grafito-suave);
 }
+
+.priceSection {
+  margin-top: auto;
+  padding-top: 0.625rem;
+}
+
+.price {
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--marca-grafito);
+  line-height: 1.15;
+}
+
+.unit {
+  font-size: 0.8125rem;
+  color: var(--marca-grafito-tenue);
+}
+
+/* --- pie ------------------------------------------------------------------ */
 
 .footer {
-  border-top: 1px solid var(--border-primary);
-  padding-top: 0.75rem;
   display: flex;
-  justify-content: center;
-  align-items: center;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--marca-linea);
 }
 
 .seller {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  background: linear-gradient(135deg, var(--color-primary-50) 0%, var(--color-primary-100) 100%);
-  border-radius: var(--radius-md);
-  width: 100%;
-  justify-content: center;
-}
-
-[data-theme="dark"] .seller {
-  background: linear-gradient(135deg, rgba(5, 150, 105, 0.1) 0%, rgba(5, 150, 105, 0.15) 100%);
+  flex-direction: column;
+  min-width: 0;
 }
 
 .sellerName {
-  font-size: var(--font-size-sm);
-  color: var(--color-primary-700);
-  font-weight: var(--font-weight-semibold);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--marca-grafito-suave);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-[data-theme="dark"] .sellerName {
-  color: var(--color-primary-400);
-}
-
+/* La calificación se dice con palabras. Una estrella sola obliga a saber que
+   es sobre cinco, y con lector de pantalla se anuncia como «estrella». */
 .rating {
-  font-size: var(--font-size-xs);
-  color: var(--color-warning-text);
-  font-weight: var(--font-weight-semibold);
-  display: flex;
-  align-items: center;
-  gap: 2px;
+  font-size: 0.75rem;
+  color: var(--marca-grafito-tenue);
 }
 
 .ratingCount {
-  color: var(--text-secondary);
-  font-weight: var(--font-weight-normal);
-  font-size: 0.7rem;
+  color: var(--marca-grafito-tenue);
 }
 
-.noRating {
-  color: var(--text-secondary);
-  font-weight: var(--font-weight-normal);
-  font-style: italic;
-  font-size: 0.7rem;
+.addToCartButton {
+  flex-shrink: 0;
+  padding: 0.45rem 0.9rem;
+  background: transparent;
+  color: var(--marca-verde);
+  border: 1px solid var(--marca-verde);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.addToCartButton:hover:not(.disabled) {
+  background-color: var(--marca-verde);
+  color: #ffffff;
+}
+
+.addToCartButton.disabled {
+  color: var(--marca-grafito-tenue);
+  border-color: var(--marca-linea-fuerte);
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .content {
+    padding: 0.75rem 0.875rem 0.875rem;
+  }
+
+  .title {
+    font-size: 0.9375rem;
+  }
+
+  .price {
+    font-size: 1.25rem;
+  }
+
+  .footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .addToCartButton {
+    width: 100%;
+  }
 }
