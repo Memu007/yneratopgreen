@@ -58,9 +58,10 @@ Actualizado: 2026-08-22.
   refresh, cookie `SameSite=None` sólo leída por el callback MP. Corrección de
   comentarios `0f330a7` aceptada y desplegada. UX-1 `e701cb4` conserva flujos y
   puertas, pero **no fue aceptada visualmente**: se percibe genérica y con
-  aspecto de AI slop. Tarea Dev activa: UX-2A, una prueba estática 1440×900 de
-  dirección marketplace agro premium, inspirada en la jerarquía comercial de
-  Agrofy sin copiarla. No modifica producto; PM/Emi la aprueban antes de UX-2B.
+  aspecto de AI slop. UX-2A queda **en pausa antes de empezar**: Emi y PM
+  definirán primero la identidad de TopGreen —personalidad, tipografía, color,
+  fotografía y voz— y recién entonces se dará una dirección aprobada a la Dev.
+  La Dev queda sin tarea activa y no debe crear una skill ni otro mockup a ciegas.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar

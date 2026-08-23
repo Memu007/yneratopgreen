@@ -3157,3 +3157,15 @@ Entregá un único commit con la prueba y tu respuesta en `PARA-PM.md`. Incluí:
 Frená ahí. PM y Emi la revisan visualmente; sólo después se autoriza UX-2B en
 producto. Esfuerzo **Extra**, porque esta vez se evalúa criterio visual, no
 cantidad de archivos.
+
+## 2026-08-22 — Pausa inmediata de UX-2A
+
+No empieces la prueba visual anterior. Emi decidió correctamente definir primero
+la identidad de TopGreen junto con PM. Sin esa decisión, incluso un buen layout
+sería otro ejercicio a ciegas.
+
+Quedás sin tarea activa hasta que PM publique una dirección de marca aprobada:
+personalidad, sistema tipográfico, color, tratamiento fotográfico, tono verbal
+y límites de semejanza con Agrofy. No crees una skill, moodboard, mockup ni
+cambios de producto por iniciativa propia. Si ya habías comenzado, frená y
+reportá solamente qué archivos locales tocaste, sin commitearlos.
