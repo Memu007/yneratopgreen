@@ -56,7 +56,7 @@
 .edge-card { min-height: 300px; display: flex; flex-direction: column; gap: var(--tg-space-3); padding: var(--tg-space-5); background: var(--tg-color-surface); border: 1px solid var(--tg-color-border); }
 .edge-card .photo-fallback { min-height: 160px; margin: calc(-1 * var(--tg-space-5)); margin-bottom: var(--tg-space-2); }
 .edge-card .button { margin-top: auto; align-self: start; }
-.edge-card--paused { color: var(--tg-color-disabled-text); background: var(--tg-color-disabled-bg); }
+.edge-card--paused { background: var(--tg-color-disabled-bg); }
 .price--editorial { font-family: var(--tg-font-display); font-size: 32px; font-weight: 520; }
 
 .overlay-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--tg-space-6); }

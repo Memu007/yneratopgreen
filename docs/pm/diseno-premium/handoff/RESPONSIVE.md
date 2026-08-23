@@ -47,6 +47,11 @@ Las capturas son consecuencias de estas reglas; no son la especificación.
 | Datos técnicos | Máximo 3 visibles | Tabla/lista completa presente |
 | Botón | Texto completo; puede ocupar ancho total | Texto completo |
 
-Todos los controles táctiles son de al menos 44×44 px. Ninguna acción depende
-de hover. `:focus-visible` usa outline externo de 3 px. Se verifica que
+Las acciones y controles principales —botones, campos, selects, checks, radios,
+carga de archivo, cierre de capas y tabs— tienen un área mínima de `44×44 px`.
+No se extiende esa regla a todo enlace textual: breadcrumbs y enlaces inline,
+de tablero o pie cumplen WCAG 2.5.8 mediante un target de al menos `24×24 px`,
+separación suficiente respecto de targets vecinos o la excepción inline cuando
+forman parte de una línea de texto. Ninguna acción depende de hover.
+`:focus-visible` usa outline externo de 3 px. Se verifica que
 `scrollWidth === clientWidth` en los tres viewports antes de aceptar.

@@ -22,9 +22,11 @@ autorizado para Opus**.
 - 25 archivos contractuales requeridos presentes.
 - 3 HTML parseados; enlaces internos, anclas y assets locales resueltos.
 - 14 PNG con dimensiones nominales exactas.
-- Contraste: texto principal 14,83:1; secundario 5,78:1; acento 5,47:1;
-  éxito 5,98:1; advertencia 6,47:1; error 6,57:1; link 7,83:1;
-  borde de control 3,51:1.
+- Precheck de pares de tokens: texto principal 14,83:1; secundario 5,78:1;
+  acento 5,47:1; éxito 5,98:1; advertencia 6,47:1; error 6,57:1; link
+  7,83:1; borde de control 3,51:1. Estos ratios no sustituyen la medición del
+  DOM completo; el resultado axe por prototipo y viewport se registra en
+  [CIERRE-REVISION-PM-8bd91d7.md](./CIERRE-REVISION-PM-8bd91d7.md).
 - SVG parseables como XML.
 - `git diff -- src backend`: vacío. El producto no fue modificado.
 - `git status`: sólo `docs/pm/diseno-premium/handoff/` nuevo, sin commit.

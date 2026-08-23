@@ -71,7 +71,6 @@
 .operation-card--data { border-top-color: var(--tg-color-accent); }
 .operation-card--data .operation-card__body { height: 100%; }
 .operation-card--data .button { margin-top: auto; }
-.operation-index { position: absolute; top: var(--tg-space-4); right: var(--tg-space-4); color: var(--tg-color-border); font-family: var(--tg-font-display); font-size: 52px; line-height: 1; }
 .pagination { display: flex; justify-content: center; align-items: center; gap: var(--tg-space-5); padding-top: var(--tg-space-10); }
 .footer-copy { color: rgba(255,255,255,.78); margin-top: var(--tg-space-3); }
 

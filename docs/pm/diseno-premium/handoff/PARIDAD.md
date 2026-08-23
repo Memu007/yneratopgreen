@@ -48,7 +48,10 @@ diseño y desarrollo con evidencia reproducible.
 - [ ] 768×1024 cambia filtros y grilla según `RESPONSIVE.md`.
 - [ ] 390×844 conserva contenido/acción y no tiene overflow horizontal.
 - [ ] Orden DOM y tabulación es lógico; no se usa CSS para alterar lectura.
-- [ ] Objetivos táctiles ≥44×44 px; ningún flujo depende de hover.
+- [ ] Acciones y controles principales tienen targets ≥44×44 px.
+- [ ] Enlaces textuales, breadcrumbs, tablero y pie cumplen WCAG 2.5.8 por
+  target ≥24×24 px, separación suficiente o excepción inline documentada.
+- [ ] Ningún flujo depende de hover.
 - [ ] Zoom 200 % y texto aumentado siguen operables.
 - [ ] `prefers-reduced-motion` evita movimiento no esencial.
 
