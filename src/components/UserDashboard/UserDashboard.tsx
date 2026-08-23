@@ -19,9 +19,16 @@ import {
   OperationKind,
   ETIQUETA_DE_ANATOMIA,
   ETIQUETA_DE_CONDICION,
+  esDeServicio,
   normalizarAnatomia,
   normalizarCondicion,
 } from '../../utils/anatomia';
+import {
+  etiquetaDeCatalogo,
+  formatCantidad,
+  formatPrice,
+  precioVisible,
+} from '../../utils/formatters';
 import { useCapaModal } from '../../hooks/useCapaModal';
 
 type TabType = 'profile' | 'notifications' | 'purchases' | 'sales' | 'products'
@@ -198,6 +205,11 @@ interface UserProduct {
   category: string;
   price: number;
   stock: number;
+  /** La anatomía declarada. Decide qué muestra la tarjeta del panel, igual
+   *  que en el catálogo: un servicio no tiene stock ni fotografía. */
+  operationKind?: string;
+  unit?: string;
+  pricingType?: string;
   image: string;
   status: 'active' | 'paused' | 'sold-out';
   views: number;
@@ -286,7 +298,12 @@ interface EditFormData {
 // Helper para construir URL de imagen - usar variable de entorno o vacío para rutas relativas
 const IMAGES_BASE_URL = import.meta.env.VITE_IMAGES_URL || '';
 const getImageUrl = (url: string | undefined): string => {
-  if (!url) return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmNGVkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzJkNTAxNiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuKaoiBTaW4gSW1hZ2VuPC90ZXh0Pjwvc3ZnPg==';
+  // Sin URL no se inventa una imagen. Aca habia una SEGUNDA copia del SVG en
+  // data-URI -fondo verde claro, Arial, «Sin Imagen» con un simbolo-: la del
+  // catalogo se retiro en la entrega anterior y esta quedo viva en el panel,
+  // que es exactamente donde la captura la mostro. Con la cadena vacia manda
+  // `ProductImage`, que dice «Sin fotografia» con el respaldo del sistema.
+  if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
   return `${IMAGES_BASE_URL}${url}`;
 };
@@ -568,9 +585,16 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           // Obtener la imagen principal
           const primaryImage = p.images?.find(img => img.is_primary)?.url || p.images?.[0]?.url;
           
-          // Determinar el estado del producto
+          // Determinar el estado del producto.
+          //
+          // «Agotado» sólo existe donde hay unidades que agotar. Un servicio no
+          // reserva stock —lo decide `category.is_service`— y sin embargo la
+          // fila guarda 0, porque la columna tiene ese valor por omisión y el
+          // alta le pasa NULL. Con la regla vieja, todo servicio publicado se
+          // mostraba «Agotado».
+          const usaStock = !esDeServicio(normalizarAnatomia(p.operation_kind));
           let status: UserProduct['status'] = 'active';
-          if (p.stock === 0) status = 'sold-out';
+          if (usaStock && p.stock === 0) status = 'sold-out';
           else if (p.status === 'draft' || p.status === 'paused') status = 'paused';
           
           return {
@@ -579,6 +603,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             category: p.category?.name || 'Sin categoría',
             price: p.price,
             stock: p.stock,
+            operationKind: p.operation_kind,
+            unit: p.unit,
+            pricingType: p.pricing_type,
             image: getImageUrl(primaryImage),
             status,
             views: p.views_count || 0,
@@ -2474,14 +2501,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                       <span className={styles.itemName}>{item.productName}</span>
                       <span className={styles.itemQuantity}>x{item.quantity}</span>
                       <span className={styles.itemPrice}>
-                        ${item.price.toLocaleString('es-AR')}
+                        {formatPrice(item.price)}
                       </span>
                     </div>
                   ))}
                 </div>
 
                 <div className={styles.orderTotal}>
-                  <strong>Total:</strong> ${order.total.toLocaleString('es-AR')}
+                  <strong>Total:</strong> {formatPrice(order.total)}
                 </div>
 
                 {renderTraslado(order.shipping, true)}
@@ -2629,14 +2656,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                     <span className={styles.itemName}>{item.productName}</span>
                     <span className={styles.itemQuantity}>x{item.quantity}</span>
                     <span className={styles.itemPrice}>
-                      ${item.price.toLocaleString('es-AR')}
+                      {formatPrice(item.price)}
                     </span>
                   </div>
                 ))}
               </div>
 
               <div className={styles.orderTotal}>
-                <strong>Total:</strong> ${order.total.toLocaleString('es-AR')}
+                <strong>Total:</strong> {formatPrice(order.total)}
               </div>
 
               {renderTraslado(order.shipping, false)}
@@ -2764,12 +2791,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   const renderProducts = () => (
     <div className={styles.section}>
       <div className={styles.sectionHeader}>
-        <h2>Mis Productos</h2>
+        <h2>Mis publicaciones</h2>
         <button 
           className={styles.addButton}
           onClick={onPublishClick}
         >
-          + Publicar Producto
+          + Publicar
         </button>
       </div>
 
@@ -2786,28 +2813,53 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         </div>
       ) : userProducts.length > 0 ? (
         <div className={styles.productsGrid}>
-          {userProducts.map((product) => (
-            <div key={product.id} className={styles.productCard}>
-              <div className={styles.productImage}>
-                <ProductImage src={product.image} alt={product.name} />
-                <div className={`${styles.productStatusBadge} ${styles[`status-${product.status}`]}`}>
-                  {product.status === 'active' && ' Activo'}
-                  {product.status === 'paused' && ' Pausado'}
-                  {product.status === 'sold-out' && ' Agotado'}
-                </div>
+          {userProducts.map((product) => {
+            // La anatomía manda acá igual que en el catálogo. La tarjeta del
+            // panel imprimía siempre foto, precio con formato propio y
+            // «Stock: N unidades»: sobre un servicio eso es un dato que nadie
+            // cargó —el stock de un servicio es NULL— y una foto que no existe.
+            const anatomia = normalizarAnatomia(product.operationKind);
+            const deServicio = esDeServicio(anatomia);
+            const estado = product.status === 'active'
+              ? 'Activo'
+              : product.status === 'paused' ? 'Pausado' : 'Agotado';
+            const distintivo = (
+              <div className={`${styles.productStatusBadge} ${styles[`status-${product.status}`]}`}>
+                {estado}
               </div>
+            );
+
+            return (
+            <div key={product.id} className={styles.productCard}>
+              {deServicio ? (
+                <div className={styles.productEncabezado}>{distintivo}</div>
+              ) : (
+                <div className={styles.productImage}>
+                  <ProductImage src={product.image} alt={product.name} />
+                  {distintivo}
+                </div>
+              )}
 
               <div className={styles.productInfo}>
+                <p className={styles.anatomiaEtiqueta}>{ETIQUETA_DE_ANATOMIA[anatomia]}</p>
                 <h3>{product.name}</h3>
                 <p className={styles.productCategory}>{product.category}</p>
-                
+
                 <div className={styles.productMeta}>
                   <div className={styles.productPrice}>
-                    <strong>${product.price.toLocaleString('es-AR')}</strong>
+                    <strong>{precioVisible(product)}</strong>
                   </div>
-                  <div className={styles.productStock}>
-                    Stock: {product.stock} unidades
-                  </div>
+                  {deServicio ? (
+                    product.pricingType ? (
+                      <div className={styles.productStock}>
+                        {etiquetaDeCatalogo(product.pricingType)}
+                      </div>
+                    ) : null
+                  ) : (
+                    <div className={styles.productStock}>
+                      Stock: {formatCantidad(product.stock, product.unit)}
+                    </div>
+                  )}
                 </div>
 
                 <div className={styles.productStats}>
@@ -2859,18 +2911,19 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}></div>
-          <h3>Aún no tienes productos publicados</h3>
-          <p>Comienza a vender tus productos agrícolas en TopGreen</p>
+          <h3>Todavía no publicaste nada</h3>
+          <p>Acá vas a ver tus productos y tus servicios publicados.</p>
           <button 
             className={styles.primaryButton}
             onClick={onPublishClick}
           >
-            + Publicar mi primer producto
+            + Publicar la primera
           </button>
         </div>
       )}
@@ -3025,7 +3078,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            Mis Productos
+            Mis publicaciones
           </button>
         </div>
 

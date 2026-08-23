@@ -54,6 +54,8 @@ Diseño y las dos filas de revisión —Emi y PM— son de ustedes, no mías.
   locale.** `src/utils/formatters.ts` usa `Intl.NumberFormat` e
   `Intl.DateTimeFormat` con el locale como constante única, espacio duro entre
   símbolo y cifra y entre cantidad y unidad, y fecha corta `22 ago 2026`.
+  **También el panel del vendedor**, que hasta la corrección imprimía precios
+  con su propio `toLocaleString` y «Stock: N unidades» a mano: caso 120.
 - [x] **`A cotizar` reemplaza precio inexistente/0 cuando corresponda.**
   `precioVisible()` es el único camino a pantalla. Las tres publicaciones del
   seed con `a_convenir` muestran `A cotizar` y no `$ 0`.
@@ -75,12 +77,13 @@ Diseño y las dos filas de revisión —Emi y PM— son de ustedes, no mías.
 
 - [x] **Activo de alto valor prioriza condición y usa `Iniciar operación`.**
 - [x] **Insumo permite cantidad/stock y usa `Agregar` sólo cuando procede.**
-- [ ] **Servicio muestra alcance/modalidad y cotización sin simular compra
+- [x] **Servicio muestra alcance/modalidad y cotización sin simular compra
   cerrada.** Muestra cobertura, modalidad y respuesta —datos que estaban en la
-  base y no salían—, y un servicio sin precio publicado dice `A cotizar` y
-  ofrece `Solicitar cotización` hacia Contacto. **Queda sin marcar** porque un
-  servicio CON precio publicado conserva la compra por carrito y checkout, que
-  es lo que hace hoy: ver «Diferencias intencionales», punto 1.
+  base y no salían—; con precio publicado usa `Contratar` con el carrito y el
+  checkout de siempre, y sin precio dice `A cotizar` y ofrece `Solicitar
+  cotización` hacia Contacto. **PM lo decidió así el 2026-08-23** y actualizó
+  `ANATOMIAS.md` y `COPY.md`; no hay compra simulada ni mensajería prometida.
+  El panel del vendedor muestra lo mismo: caso 120.
 - [x] **Logística muestra equipo/capacidad/cobertura; transportistas
   compatibles sólo aparecen en checkout después del destino.** La publicación
   de logística muestra lo que declara —cobertura, modalidad, respuesta—; no hay
@@ -108,11 +111,13 @@ Diseño y las dos filas de revisión —Emi y PM— son de ustedes, no mías.
   técnica del detalle pasa a pares rótulo/valor por debajo de 600 px.
 - [x] **Toasts se anuncian y no dependen del color.** Región viva `role=status`
   más un rótulo en palabras.
-- [ ] **Loading, vacío, error, offline, disabled, sin stock, pausado, sin foto,
-  imagen rota, título largo y sin precio están implementados.** Todos menos
-  **offline**: no hay un estado propio de «sin conexión»; un fallo de red cae
-  hoy en el mismo mensaje de error del mercado. Es deuda declarada, no
-  implementada.
+- [x] **Loading, vacío, error, offline, disabled, sin stock, pausado, sin foto,
+  sin datos.** El mercado no tenía estado de error: cualquier falla terminaba
+  en la lista vacía con «No hay operaciones con estos filtros», que afirma algo
+  que nadie comprobó. Ahora una caída del servidor dice que no pudimos cargar y
+  ofrece reintentar, y sin red dice exactamente `Sin conexión. Revisá tu red e
+  intentá de nuevo.`. Los dos estados y la navegación viva durante el error los
+  comprueba el caso 122.
 
 ## Responsive y acceso
 
@@ -127,17 +132,25 @@ Diseño y las dos filas de revisión —Emi y PM— son de ustedes, no mías.
   `--tg-control-min` en botones, campos y casillas; la casilla incluye su texto.
 - [x] **Enlaces textuales, breadcrumbs, tablero y pie cumplen WCAG 2.5.8.**
 - [x] **Ningún flujo depende de hover.** El hover sólo cambia color o borde.
-- [ ] **Zoom 200 % y texto aumentado siguen operables.** No lo medí con una
-  puerta: es la única casilla de esta sección que no puedo respaldar con un
-  comando. No la marco.
-- [x] **`prefers-reduced-motion` evita movimiento no esencial.** Bloque global
-  en `index.css`; además el sistema dejó una sola animación, la de aparecer.
+- [x] **Zoom 200 % y texto aumentado siguen operables.** Medido, no
+  inspeccionado: el caso 123 recorre catálogo, detalle, ingreso, carrito,
+  checkout y panel a 640×360 —lo que queda de 1280×720 al 200 %— y exige que no
+  haya corte horizontal, que la acción principal siga visible, habilitada y
+  dentro del ancho, y que cada parada del tabulador muestre el anillo de foco.
+  Encontró dos defectos reales, ya corregidos: la cabecera pegajosa tapaba la
+  primera tarjeta del catálogo, y nueve reglas de formulario apagaban el anillo
+  de foco con `outline: none`.
 
 ## Imágenes y activos
 
 - [x] **Foto real conserva relación, alt y evidencia.** Y no queda ninguna foto
   que no sea de la clienta o del vendedor: las cinco de stock que se pedían a
   Unsplash se retiraron (diferencia 7).
+- [x] **La fotografía es opcional de verdad.** El alta la exigía —bloqueaba
+  publicar sin una imagen y rotulaba la sección con `*`—, y el handoff la
+  declara opcional con respaldo neutro. Ahora se publica sin foto y el catálogo
+  y la ficha dicen «Sin fotografía»: caso 121. La validación de tipo y tamaño
+  sigue donde estaba para lo que sí se adjunta.
 - [x] **Ausencia de URL usa `no-photo.svg`; error usa `photo-broken.svg`.**
   Con textos distintos —«Sin fotografía» y «No pudimos cargar la imagen»— que
   el caso 21 de la suite exige por separado.
@@ -163,14 +176,16 @@ Diseño y las dos filas de revisión —Emi y PM— son de ustedes, no mías.
 
 | # | Diferencia | Motivo | Responsable |
 |---|---|---|---|
-| 1 | Un servicio **con precio publicado** conserva `Agregar`/carrito en vez de `Solicitar cotización`. | `COPY.md` manda cotización para todo servicio, pero eso saca del circuito a 14 de 17 servicios activos que hoy tienen precio real, y el camino de compra de un servicio funciona de punta a punta —lo recorre la suite; los ítems de orden con servicios que llegué a contar salían de mi base local de pruebas, no de uso de clientes—. La orden decía frenar antes de redefinir qué es comprable. Sólo se cerró el caso `A cotizar`, que hoy dejaba pasar una orden de $0. | dev, 2026-08-23 — decide PM |
-| 2 | La **condición** del activo es opcional, no obligatoria. | El catálogo aprobado tiene dos categorías de activo donde «nuevo o usado» no significa nada: «Bienes y Ganado» y «Tierras y parcelas». Obligarla haría que el vendedor conteste cualquier cosa para poder publicar. | dev, 2026-08-23 — decide PM |
+| 1 | Un servicio **con precio publicado** se contrata por carrito y checkout en vez de derivar a `Solicitar cotización`. | `COPY.md` manda cotización para todo servicio, pero eso saca del circuito a 14 de 17 servicios activos que hoy tienen precio real, y el camino de compra de un servicio funciona de punta a punta —lo recorre la suite; los ítems de orden con servicios que llegué a contar salían de mi base local de pruebas, no de uso de clientes—. La orden decía frenar antes de redefinir qué es comprable. Sólo se cerró el caso `A cotizar`, que hoy dejaba pasar una orden de $0. | dev, 2026-08-23 — **PM lo aprobó el 2026-08-23** y actualizó `COPY.md` y `ANATOMIAS.md` |
+| 2 | La **condición** del activo es opcional, no obligatoria. | El catálogo aprobado tiene dos categorías de activo donde «nuevo o usado» no significa nada: «Bienes y Ganado» y «Tierras y parcelas». Obligarla haría que el vendedor conteste cualquier cosa para poder publicar. | dev, 2026-08-23 — **PM lo aprobó el 2026-08-23**: no se exige un dato falso en el MVP |
 | 3 | La tarjeta de **activo** no muestra año, horas ni potencia. | El backend entrega `features: {}`: no hay características estructuradas. `ANATOMIAS.md` las declara opcionales y manda omitir la fila en vez de inventarla. | dev, 2026-08-23 |
 | 4 | No hay **ID de operación** en el detalle. | `ANATOMIAS.md` lo lista como opcional y el modelo no tiene un identificador de operación para mostrar. | dev, 2026-08-23 |
 | 5 | La **navegación** suma `Mercado` y usa `Quiénes somos` acentuado. | `Mercado` no es un destino nuevo: hasta ahora la única forma de volver al catálogo era hacer clic en la marca. | dev, 2026-08-23 |
 | 6 | `Inicio`, `Quiénes somos` y `Servicios` reciben marca, fuentes, tokens, cabecera, pie y controles, pero **conservan su composición**. | La orden lo pide así: Diseño no entregó esas páginas. | dev, 2026-08-23 |
 | 7 | En `Inicio` y `Quiénes somos` el fondo fotográfico pasa a ser el índigo del sistema, y tres de las cinco tarjetas de `Servicios` quedan con «Sin fotografía». | Eran cinco fotos de stock pedidas a `images.unsplash.com` **en cada visita**: fotos temporales y una dependencia externa, las dos prohibidas por la orden. Los dos fondos ya iban tapados por una banda al 85–88 %. Las dos fotos propias de la clienta se conservan. | dev, 2026-08-23 |
 | 8 | `Contacto` ya no muestra el bloque «Seguinos en Redes». | Los tres enlaces iban a `twitter.com`, `linkedin.com` e `instagram.com`: dominios pelados, no perfiles de TopGreen. Enlaces falsos. Vuelven el día que existan perfiles reales. | dev, 2026-08-23 |
+| 9 | Con la ventana de menos de 480 px de alto, la cabecera deja de ser pegajosa. | Al 200 % de zoom ocupa 194 px de los 360 disponibles y tapaba la primera tarjeta del catálogo, que quedaba imposible de tocar. Es la misma decisión que ya estaba tomada para el celular, con el alto como disparador. | dev, 2026-08-23 |
+| 10 | La sección del panel se llama «Mis publicaciones» y el botón dice «+ Publicar». | Lo pidió PM el 2026-08-23: la sección lista productos y servicios, y llamarla «Mis Productos» dejaba a los servicios afuera del nombre. | PM, 2026-08-23 |
 
 ## Evidencia de aceptación
 

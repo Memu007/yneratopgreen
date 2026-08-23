@@ -137,3 +137,29 @@ def usa_condicion(anatomia: Optional[str]) -> bool:
     y la ficha omite la fila cuando falta.
     """
     return anatomia == ACTIVO
+
+
+# --- El tipo de publicación y la categoría --------------------------------
+#
+# `publication_type` es anterior a las anatomías y decide otra cosa: si la fila
+# guarda stock o guarda los campos de servicio —modalidad, disponibilidad,
+# tiempo de respuesta, cobertura—. `categories.is_service` decide cómo se cobra
+# y si se reserva stock. Los dos tienen que decir lo mismo.
+#
+# Cuando no lo dicen queda una fila que la interfaz lee como servicio y el alta
+# trató como producto: muestra stock y foto sobre algo que nunca descuenta
+# unidades. No se corrige sola —convertir la fila cambiaría en silencio lo que
+# el vendedor publicó y lo que una orden vieja compró—: se rechaza al escribir.
+PRODUCTO = "producto"
+SERVICIO_PUBLICADO = "servicio"
+
+TIPOS_DE_PUBLICACION = (PRODUCTO, SERVICIO_PUBLICADO)
+
+
+def tipo_de_publicacion(categoria_es_servicio) -> str:
+    """El `publication_type` que le corresponde a una categoría."""
+    return SERVICIO_PUBLICADO if categoria_es_servicio else PRODUCTO
+
+
+def tipo_compatible(publication_type: Optional[str], categoria_es_servicio) -> bool:
+    return publication_type == tipo_de_publicacion(categoria_es_servicio)

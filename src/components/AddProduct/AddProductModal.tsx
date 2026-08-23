@@ -455,10 +455,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
       return;
     }
 
-    if (images.length === 0) {
-      showToast(`Por favor agrega al menos una imagen del ${publicationType}`, 'warning');
-      return;
-    }
+    // La fotografía es opcional, y acá se bloqueaba la publicación sin una.
+    // `ANATOMIAS.md` la declara opcional con respaldo neutro, el catálogo y la
+    // ficha ya saben decir «Sin fotografía», y exigirla empujaba al vendedor a
+    // subir cualquier imagen para poder publicar. La validación de tipo y de
+    // tamaño sigue donde estaba: se aplica a lo que sí se adjunta.
 
     setIsSubmitting(true);
 
@@ -765,11 +766,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
 
           {/* Imágenes */}
           <div className={styles.section}>
-            <h3>{publicationType === 'producto' ? 'Imágenes del Producto *' : 'Imágenes del Servicio *'}</h3>
+            <h3>{publicationType === 'producto' ? 'Fotografías del producto' : 'Fotografías del servicio'} (opcional)</h3>
             <p className={styles.sectionDescription}>
-              {publicationType === 'producto' 
-                ? 'Agrega fotos de alta calidad de tu producto. La primera imagen será la imagen principal.'
-                : 'Agrega fotos de tu equipo, trabajos realizados o certificaciones. La primera imagen será la imagen principal.'
+              {publicationType === 'producto'
+                ? 'La primera es la principal. Si no subís ninguna, la publicación se muestra con el aviso «Sin fotografía» y se puede publicar igual.'
+                : 'Fotos del equipo, de trabajos realizados o de certificaciones. La primera es la principal. Si no subís ninguna, la publicación se muestra con el aviso «Sin fotografía» y se puede publicar igual.'
               }
             </p>
             

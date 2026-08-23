@@ -6,6 +6,11 @@ import { ProductCard } from '../ProductCard/ProductCard';
 interface ProductGridProps {
   products: Product[];
   isLoading?: boolean;
+  /** El mercado no cargó. Es distinto de que no haya resultados, y por eso no
+      comparte cartel: acá no sabemos qué hay. */
+  error?: string | null;
+  /** Volver a preguntar. Sin esto, el único camino era recargar la página. */
+  onReintentar?: () => void;
   /** Adónde va quien pide una cotización. Se pasa hacia abajo hasta la tarjeta
       y el detalle: sin destino, el botón queda deshabilitado en vez de
       prometer una solicitud que no existe. */
@@ -17,6 +22,8 @@ type SortOption = 'relevance' | 'price-asc' | 'price-desc' | 'newest' | 'rating'
 export const ProductGrid: React.FC<ProductGridProps> = ({
   products,
   isLoading = false,
+  error = null,
+  onReintentar,
   onSolicitarCotizacion,
 }) => {
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
@@ -54,6 +61,28 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
               <div className={`${styles.esqueletoLinea} ${styles.esqueletoCorta}`} />
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Una falla no es un catálogo vacío. Antes las dos terminaban en «No hay
+  // operaciones con estos filtros», así que la página afirmaba que no existe
+  // lo que no pudo preguntar.
+  if (error) {
+    return (
+      <div className={styles.resultados}>
+        <div className={styles.vacio} role="alert">
+          <h3>{error}</h3>
+          {onReintentar && (
+            <button
+              type="button"
+              className="tg-button tg-button--secondary"
+              onClick={onReintentar}
+            >
+              Reintentar
+            </button>
+          )}
         </div>
       </div>
     );

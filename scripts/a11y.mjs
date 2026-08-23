@@ -322,9 +322,9 @@ async function vendedor(page, medida) {
   await revisar(page, 'panel: mis ventas', medida,
     page.getByRole('heading', { name: 'Mis Ventas' }));
 
-  await page.getByRole('button', { name: 'Mis Productos' }).click();
+  await page.getByRole('button', { name: 'Mis publicaciones' }).click();
   await revisar(page, 'panel: mis productos', medida,
-    page.getByRole('heading', { name: 'Mis Productos' }));
+    page.getByRole('heading', { name: 'Mis publicaciones' }));
 }
 
 /**

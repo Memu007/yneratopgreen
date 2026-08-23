@@ -1842,8 +1842,8 @@ await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorr
     await sellerPage.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await sellerPage.getByRole('button', { name: 'Mi cuenta' }).first().click();
     await sellerPage.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
-    await sellerPage.getByRole('button', { name: 'Mis Productos' }).click();
-    await sellerPage.getByRole('heading', { name: 'Mis Productos' }).waitFor();
+    await sellerPage.getByRole('button', { name: 'Mis publicaciones' }).click();
+    await sellerPage.getByRole('heading', { name: 'Mis publicaciones' }).waitFor();
     await sinFoto(sellerPage).waitFor();
     await sellerContext.close();
 
@@ -5757,7 +5757,11 @@ await runCase(58, 'Un ítem sin origen guardado no inventa uno, ni antes ni desp
 // manda como número JSON, que es lo que manda el frontend; lo que se exige es
 // que de ahí en adelante nadie lo pase por aritmética binaria.
 async function publicarConPrecio(precio, stock, etiqueta, token = state.sellerToken) {
-  const [categoria] = queryRows('SELECT id FROM categories ORDER BY name LIMIT 1');
+  // Una categoría de PRODUCTOS: esto publica con stock y `publication_type`
+  // «producto». Sin el filtro salía «Acopio», que es de servicios, y dejaba
+  // una publicación que decía producto adentro de una categoría de servicio.
+  const [categoria] = queryRows(
+    'SELECT id FROM categories WHERE is_service = false ORDER BY name LIMIT 1');
   const creado = await apiRequest('/products', {
     method: 'POST',
     token,
@@ -11470,7 +11474,7 @@ await runCase(118, 'La anatomía la declara la publicación, no la deduce la int
     + 'anatomías distintas, y el dato viaja en listado y detalle';
 });
 
-await runCase(119, 'El alta y la edición no pueden dejar una anatomía que contradiga la categoría', async () => {
+await runCase(119, 'El alta y la edición no pueden dejar una publicación que contradiga su categoría', async () => {
   const [producto] = queryRows(`
     SELECT id, name, default_operation_kind, 'fin' FROM categories
     WHERE is_service = false AND slug = 'maquinaria-agricola'
@@ -11531,21 +11535,88 @@ await runCase(119, 'El alta y la edición no pueden dejar una anatomía que cont
   assert(/activo/.test(cruzadaEnEdicion) && /insumo/.test(cruzadaEnEdicion),
     `el rechazo de la edición no dice qué opciones valen: ${cruzadaEnEdicion}`);
 
-  // 5. Pero mover la publicación de categoría sí es una decisión del vendedor:
-  //    la anatomía vieja ya no encaja, y se adopta la que declara la nueva en
-  //    vez de dejar una contradicción guardada.
-  const movida = await apiRequest(`/products/${declarada.data.id}`, {
-    method: 'PATCH', token: vendedor, body: { category_id: servicio[0] },
+  // 5. El tipo de publicación tampoco puede cruzar el límite, y son dos
+  //    rechazos distintos con dos mensajes distintos: `servicio` en una
+  //    categoría de productos, y `producto` en una de servicios. Sin esto
+  //    quedaba una fila que la interfaz lee como servicio y el alta guardó
+  //    como producto —con stock y sin ningún campo de servicio—.
+  const servicioEnProductos = await expectApiError(400, () => apiRequest('/products', {
+    method: 'POST', token: vendedor,
+    body: base({ category_id: producto[0], publication_type: 'servicio' }),
+  }));
+  assert(/es de productos/.test(servicioEnProductos) && /«servicio»/.test(servicioEnProductos),
+    `el rechazo del servicio en una categoría de productos no lo explica: ${servicioEnProductos}`);
+
+  const productoEnServicios = await expectApiError(400, () => apiRequest('/products', {
+    method: 'POST', token: vendedor,
+    body: base({ category_id: servicio[0], publication_type: 'producto' }),
+  }));
+  assert(/es de servicios/.test(productoEnServicios) && /«producto»/.test(productoEnServicios),
+    `el rechazo del producto en una categoría de servicios no lo explica: ${productoEnServicios}`);
+  assert(servicioEnProductos !== productoEnServicios,
+    'los dos cruces del alta dan el mismo mensaje y no se pueden distinguir');
+
+  // 6. Y mover la publicación al otro lado tampoco: `publication_type` no es
+  //    editable, así que el movimiento dejaría la contradicción guardada. Se
+  //    frena, dice por qué, y **la fila no se toca**.
+  const [antes] = queryRows(`
+    SELECT category_id::text, operation_kind, publication_type, COALESCE(stock::text, 'sin stock'), 'fin'
+    FROM products WHERE id = ${sqlLiteral(declarada.data.id)}
+  `);
+  const cruceDeCategoria = await expectApiError(400, () => apiRequest(
+    `/products/${declarada.data.id}`,
+    { method: 'PATCH', token: vendedor, body: { category_id: servicio[0] } },
+  ));
+  assert(/No se puede mover/.test(cruceDeCategoria) && new RegExp(servicio[1]).test(cruceDeCategoria),
+    `el rechazo del movimiento no dice a dónde no se puede mover: ${cruceDeCategoria}`);
+  assert(cruceDeCategoria !== servicioEnProductos && cruceDeCategoria !== productoEnServicios,
+    'el rechazo de la edición no se distingue de los del alta');
+
+  const [despues] = queryRows(`
+    SELECT category_id::text, operation_kind, publication_type, COALESCE(stock::text, 'sin stock'), 'fin'
+    FROM products WHERE id = ${sqlLiteral(declarada.data.id)}
+  `);
+  assert(JSON.stringify(antes) === JSON.stringify(despues),
+    `el rechazo dejó la fila cambiada: antes ${JSON.stringify(antes)} y después ${JSON.stringify(despues)}`);
+
+  // 7. Mover dentro del mismo lado sí se puede, y ahí la anatomía declarada
+  //    **sobrevive**: un activo que se muda de «Maquinaria» a «Insumos
+  //    agrícolas» sigue siendo un activo. La categoría sólo decide la omisión
+  //    para el que no declaró nada; no pisa lo que el vendedor eligió.
+  const [otroProducto] = queryRows(`
+    SELECT id, name, default_operation_kind, 'fin' FROM categories
+    WHERE is_service = false AND slug = 'insumos-agricolas'
+  `);
+  assert(otroProducto, 'falta la categoría de productos a la que mover');
+  assert(otroProducto[2] !== 'activo',
+    'la categoría destino declara «activo» y el caso no probaría nada');
+
+  const conActivo = await apiRequest('/products', {
+    method: 'POST', token: vendedor,
+    body: base({ category_id: producto[0], operation_kind: 'activo', condition: 'usado' }),
   });
-  assert(movida.data.operation_kind === servicio[2],
-    `al mover a «${servicio[1]}» quedó «${movida.data.operation_kind}» y no «${servicio[2]}»`);
+  const movida = await apiRequest(`/products/${conActivo.data.id}`, {
+    method: 'PATCH', token: vendedor, body: { category_id: otroProducto[0] },
+  });
+  assert(movida.data.operation_kind === 'activo',
+    `al mover a «${otroProducto[1]}» la anatomía declarada se perdió: quedó «${movida.data.operation_kind}»`);
 
   const [guardada] = queryRows(`
-    SELECT p.operation_kind, c.is_service, 'fin' FROM products p
-    JOIN categories c ON c.id = p.category_id WHERE p.id = ${sqlLiteral(declarada.data.id)}
+    SELECT p.operation_kind, c.is_service, p.publication_type, 'fin' FROM products p
+    JOIN categories c ON c.id = p.category_id WHERE p.id = ${sqlLiteral(conActivo.data.id)}
   `);
   assert((guardada[0] === 'servicio' || guardada[0] === 'logistica') === (guardada[1] === 't' || guardada[1] === true),
     `la fila guardada quedó contradiciendo a su categoría: ${JSON.stringify(guardada)}`);
+  assert((guardada[2] === 'servicio') === (guardada[1] === 't' || guardada[1] === true),
+    `el tipo de publicación quedó contradiciendo a su categoría: ${JSON.stringify(guardada)}`);
+
+  // Ninguna fila de la base puede estar cruzada, no sólo las de este caso.
+  const [cruzadas] = queryRows(`
+    SELECT COUNT(*)::text, 'fin' FROM products p JOIN categories c ON c.id = p.category_id
+    WHERE (p.publication_type = 'servicio') <> c.is_service
+  `);
+  assert(cruzadas[0] === '0',
+    `quedaron ${cruzadas[0]} publicaciones con el tipo cruzado contra su categoría`);
 
   // 6. La condición vive con la anatomía: sólo el activo la guarda, y al
   //    dejar de serlo se suelta en vez de quedar escrita sobre algo que ya
@@ -11579,12 +11650,450 @@ await runCase(119, 'El alta y la edición no pueden dejar una anatomía que cont
   assert(soltada[0] === 'sin declarar',
     `dejar de ser activo no soltó la condición: ${JSON.stringify(soltada)}`);
 
-  return 'sin declarar hereda la de la categoría, declarada manda la publicación, '
-    + 'cruzar el límite se rechaza en alta y en edición diciendo qué vale, '
-    + 'y mover de categoría adopta la nueva en vez de guardar una contradicción; '
-    + 'la condición sólo la guarda el activo y se suelta al dejar de serlo';
+  return 'sin declarar hereda la de la categoría y declarada manda la publicación; '
+    + 'los tres cruces se rechazan con tres mensajes distintos —servicio en '
+    + 'categoría de productos, producto en categoría de servicios y mover la '
+    + 'publicación al otro lado, que además deja la fila intacta—; mover dentro '
+    + 'del mismo lado conserva la anatomía declarada, ninguna fila de la base queda '
+    + 'cruzada, y la condición sólo la guarda el activo y se suelta al dejar de serlo';
 });
 
+
+await runCase(120, '«Mis publicaciones» muestra cada anatomía como es, y no como un producto', async () => {
+  // La captura de la entrega anterior mostraba «Muestreo de Suelo» —un
+  // servicio— con foto, con «Stock: 3000 unidades» y con el precio impreso a
+  // mano. El stock de un servicio es NULL en la base: ese 3000 salía de otra
+  // fila del formato, no de un dato del vendedor.
+  const vendedor = (await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  })).data;
+
+  const [servicioConPrecio] = queryRows(`
+    SELECT p.name, p.price::text, p.pricing_type, p.operation_kind, 'fin' FROM products p
+    JOIN users u ON u.id = p.seller_id JOIN categories c ON c.id = p.category_id
+    WHERE u.email = 'vendedor@ejemplo.com' AND c.is_service = true AND p.price > 0
+    ORDER BY p.created_at LIMIT 1
+  `);
+  const [productoConStock] = queryRows(`
+    SELECT p.name, p.stock::text, COALESCE(p.unit, 'sin unidad'), 'fin' FROM products p
+    JOIN users u ON u.id = p.seller_id JOIN categories c ON c.id = p.category_id
+    WHERE u.email = 'vendedor@ejemplo.com' AND c.is_service = false AND p.stock > 0
+    ORDER BY p.created_at LIMIT 1
+  `);
+  assert(servicioConPrecio && productoConStock, 'el seed no dejó un servicio y un producto del mismo vendedor');
+
+  // Y uno sin precio publicado, que es el que imprimía «$ 0».
+  const [categoriaDeServicio] = queryRows(
+    "SELECT id, 'fin' FROM categories WHERE slug = 'acopio'");
+  const sinPrecio = `Smoke servicio a cotizar ${Date.now()}`;
+  await apiRequest('/products', {
+    method: 'POST', token: vendedor.access_token,
+    body: {
+      name: sinPrecio,
+      description: 'Servicio de prueba sin precio publicado, para ver qué imprime el panel.',
+      category_id: categoriaDeServicio[0],
+      price: 0,
+      unit: 'servicio',
+      locality_id: localidadDelPadron('Pergamino', 'Buenos Aires'),
+      publication_type: 'servicio',
+      operation_kind: 'servicio',
+      pricing_type: 'a_convenir',
+    },
+  });
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext();
+    await contexto.addInitScript(
+      ({ accessToken, refreshToken }) => {
+        window.localStorage.setItem('access_token', accessToken);
+        window.localStorage.setItem('refresh_token', refreshToken);
+      },
+      { accessToken: vendedor.access_token, refreshToken: vendedor.refresh_token },
+    );
+    const page = await contexto.newPage();
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
+    await page.getByRole('button', { name: 'Mis publicaciones' }).click();
+    await page.getByRole('heading', { name: 'Mis publicaciones' }).waitFor();
+
+    const tarjeta = (nombre) => page
+      .getByRole('heading', { name: nombre, exact: true, level: 3 })
+      .locator('xpath=ancestor::*[contains(@class,"productCard")]');
+
+    // 1. El servicio con precio: sin stock, sin fotografía, con su modalidad.
+    const conPrecio = tarjeta(servicioConPrecio[0]);
+    await conPrecio.waitFor({ timeout: 20_000 });
+    const textoServicio = await conPrecio.innerText();
+    assert(!/Stock/i.test(textoServicio),
+      `el servicio sigue mostrando stock: ${JSON.stringify(textoServicio)}`);
+    assert(!/Sin fotograf/i.test(textoServicio) && !/No pudimos cargar/i.test(textoServicio),
+      `el servicio sigue reservando lugar para una fotografía: ${JSON.stringify(textoServicio)}`);
+    assert(await conPrecio.locator('img, [role="img"]').count() === 0,
+      'el servicio dibuja una imagen en el panel');
+    // El distintivo de estado tiene que seguir DENTRO de su tarjeta: al sacarle
+    // la caja de la foto se quedó sin ancestro posicionado y se fue a la
+    // esquina del panel, lejos de la publicación que describe.
+    // Y dice «Activo», no «Agotado»: un servicio no reserva unidades, así que
+    // no se agota. La fila igual guarda stock 0 —es el valor por omisión de la
+    // columna—, y con eso alcanzaba para mostrar agotado todo lo publicado.
+    assert(/^Activo$/m.test(textoServicio),
+      `la tarjeta del servicio no muestra su estado como corresponde: ${JSON.stringify(textoServicio)}`);
+    // El rótulo es el de SU anatomía: el seed puede darnos un servicio o una
+    // publicación de logística, y decir «Servicio» sobre un flete sería el
+    // mismo error que este caso persigue.
+    const etiquetaEsperada = { servicio: 'Servicio', logistica: 'Logística' }[servicioConPrecio[3]];
+    assert(etiquetaEsperada, `anatomía inesperada en el seed: ${servicioConPrecio[3]}`);
+    assert(textoServicio.toUpperCase().includes(etiquetaEsperada.toUpperCase()),
+      `la tarjeta no dice que es «${etiquetaEsperada}»: ${JSON.stringify(textoServicio)}`);
+    const miles = Number(servicioConPrecio[1]).toLocaleString('es-AR', { maximumFractionDigits: 0 });
+    assert(textoServicio.includes(miles),
+      `el precio no salió por el formateador compartido: esperaba ${miles} en ${JSON.stringify(textoServicio)}`);
+    assert(!/\$\s*0(\D|$)/.test(textoServicio),
+      `el servicio con precio imprimió cero: ${JSON.stringify(textoServicio)}`);
+
+    // 2. El servicio sin precio dice «A cotizar» y no «$ 0».
+    const aCotizar = tarjeta(sinPrecio);
+    await aCotizar.waitFor({ timeout: 20_000 });
+    const textoSinPrecio = await aCotizar.innerText();
+    assert(/A cotizar/.test(textoSinPrecio),
+      `el servicio sin precio no dice «A cotizar»: ${JSON.stringify(textoSinPrecio)}`);
+    assert(!/\$/.test(textoSinPrecio),
+      `el servicio sin precio imprimió un importe: ${JSON.stringify(textoSinPrecio)}`);
+    assert(/A convenir/.test(textoSinPrecio),
+      `la modalidad no salió por el formateador compartido: ${JSON.stringify(textoSinPrecio)}`);
+    assert(!/Agotado/.test(textoSinPrecio),
+      `un servicio recién publicado aparece agotado: ${JSON.stringify(textoSinPrecio)}`);
+
+    // 3. El producto conserva lo suyo: stock con su unidad y lugar de foto.
+    const producto = tarjeta(productoConStock[0]);
+    await producto.waitFor({ timeout: 20_000 });
+    const textoProducto = await producto.innerText();
+    const cantidad = Number(productoConStock[1]).toLocaleString('es-AR');
+    assert(textoProducto.includes(`Stock: ${cantidad}`),
+      `el producto perdió su stock formateado: esperaba «Stock: ${cantidad}» en ${JSON.stringify(textoProducto)}`);
+    if (productoConStock[2] !== 'sin unidad') {
+      assert(textoProducto.includes(productoConStock[2]),
+        `el stock del producto no dice la unidad: ${JSON.stringify(textoProducto)}`);
+    }
+    assert(await producto.locator('img, [role="img"]').count() > 0,
+      'el producto dejó de mostrar su lugar de fotografía');
+    // Y el lugar de la foto es el del sistema, no un dibujo escondido: el panel
+    // tenía su propia copia de un SVG en data-URI que decía «Sin Imagen».
+    assert(await producto.locator('img[src^="data:"]').count() === 0,
+      'el panel sigue metiendo una imagen inventada en data-URI');
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+  }
+
+  return 'en el panel del vendedor el servicio no muestra stock, no reserva lugar '
+    + 'para una foto que no puede tener y dice su modalidad; el servicio sin precio '
+    + 'dice «A cotizar» en vez de $ 0; y el producto conserva stock con unidad y su '
+    + 'lugar de fotografía';
+});
+
+await runCase(121, 'Se puede publicar sin fotografía, y el sistema lo dice en vez de esconderlo', async () => {
+  // El handoff declara la fotografía opcional con respaldo neutro, y el alta la
+  // exigía: sin una imagen el formulario no dejaba publicar. Eso empuja al
+  // vendedor a subir cualquier cosa con tal de poder vender.
+  // El caso se para solo: su sesión, su categoría y su localidad, para que una
+  // corrida filtrada mida lo mismo que la suite entera.
+  const vendedor = (await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  })).data;
+  const [categoria] = queryRows(`
+    SELECT name, 'fin' FROM categories WHERE is_service = false AND is_active = true
+    ORDER BY name LIMIT 1
+  `);
+  const [ubicacion] = queryRows(`
+    SELECT l.province_id, l.id, 'fin' FROM localities l
+    WHERE l.name = 'Pergamino' AND l.province_name = 'Buenos Aires' LIMIT 1
+  `);
+  assert(categoria && ubicacion, 'faltan categoría o localidad para completar el formulario');
+  const [vendedorId] = queryRows(
+    "SELECT id::text, 'fin' FROM users WHERE email = 'vendedor@ejemplo.com'");
+
+  const nombre = `Producto Smoke Sin Foto ${Date.now()}`;
+  const browser = await chromium.launch({ headless: true });
+  const erroresDePagina = [];
+
+  try {
+    const contexto = await browser.newContext();
+    await contexto.addInitScript(
+      ({ accessToken, refreshToken }) => {
+        window.localStorage.setItem('access_token', accessToken);
+        window.localStorage.setItem('refresh_token', refreshToken);
+      },
+      { accessToken: vendedor.access_token, refreshToken: vendedor.refresh_token },
+    );
+    const page = await contexto.newPage();
+    page.on('pageerror', (error) => erroresDePagina.push(error.message));
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+
+    // 1. Publicar sin adjuntar un solo archivo.
+    await page.getByRole('button', { name: /Vender/ }).first().click();
+    await page.getByRole('heading', { name: /Publicar un producto/i }).waitFor({ state: 'visible' });
+
+    const rotuloDeFotos = await page.getByRole('heading', { name: /Fotograf/i }).first().innerText();
+    assert(/opcional/i.test(rotuloDeFotos),
+      `el rótulo de las fotos no dice que son opcionales: ${JSON.stringify(rotuloDeFotos)}`);
+    assert(!/\*/.test(rotuloDeFotos),
+      `el rótulo de las fotos sigue marcado como obligatorio: ${JSON.stringify(rotuloDeFotos)}`);
+
+    await page.locator('#name').fill(nombre);
+    await page.locator('#category option').filter({ hasText: categoria[0] })
+      .first().waitFor({ state: 'attached', timeout: 10_000 });
+    await page.locator('#category').selectOption({ label: categoria[0] });
+    await page.locator('#description')
+      .fill('Publicación sin fotografía, para comprobar que el sistema dice la ausencia.');
+    await page.locator('#price').fill('54321');
+    await page.locator('#stock').fill('2');
+    await page.locator('#province').selectOption(ubicacion[0]);
+    await page.locator('#locality').selectOption(ubicacion[1]);
+    await page.locator('form button[type="submit"]').click();
+    await page.getByText(/publicado exitosamente!/i).waitFor({ state: 'visible', timeout: 20_000 });
+
+    // 2. Quedó publicada, y sin ninguna imagen inventada.
+    const [fila] = queryRows(`
+      SELECT p.id::text, COUNT(pi.id)::text, 'fin'
+      FROM products p LEFT JOIN product_images pi ON pi.product_id = p.id
+      WHERE p.name = ${sqlLiteral(nombre)} AND p.seller_id = ${sqlLiteral(vendedorId[0])}
+      GROUP BY p.id
+    `);
+    assert(fila, 'la publicación sin foto no quedó en la base');
+    assert(fila[1] === '0', `la publicación sin foto quedó con ${fila[1]} imágenes`);
+
+    // 3. El catálogo la muestra y dice que no hay fotografía.
+    const comprador = await browser.newContext();
+    const publica = await comprador.newPage();
+    await publica.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await publica.getByPlaceholder('Buscar producto, servicio o ubicación').fill(nombre);
+    await publica.getByPlaceholder('Buscar producto, servicio o ubicación').press('Enter');
+
+    const titulo = publica.getByRole('heading', { name: nombre, exact: true, level: 3 });
+    await titulo.waitFor({ state: 'visible', timeout: 20_000 });
+    const tarjeta = titulo.locator('xpath=ancestor::*[contains(@class,"card")]');
+    await tarjeta.getByText('Sin fotografía').first().waitFor({ state: 'visible' });
+    assert(await tarjeta.getByText('No pudimos cargar la imagen').count() === 0,
+      'la tarjeta confunde «no hay foto» con «la foto falló»');
+
+    // 4. Y la ficha también, con el mismo rótulo y sin dibujo de relleno.
+    await titulo.click();
+    const ficha = publica.getByRole('dialog');
+    await ficha.waitFor({ timeout: 20_000 });
+    await ficha.getByText('Sin fotografía').first().waitFor({ state: 'visible' });
+    assert(await ficha.getByText('No pudimos cargar la imagen').count() === 0,
+      'la ficha confunde «no hay foto» con «la foto falló»');
+
+    assert(erroresDePagina.length === 0, `errores JS: ${erroresDePagina.join(' | ')}`);
+    await comprador.close();
+    await contexto.close();
+  } finally {
+    await browser.close();
+  }
+
+  return 'el alta publica sin adjuntar ninguna imagen y rotula las fotos como '
+    + 'opcionales; la publicación queda con 0 imágenes en la base, y el catálogo '
+    + 'y la ficha dicen «Sin fotografía» en vez de inventar un dibujo';
+});
+
+await runCase(122, 'Sin conexión se dice sin conexión, y una caída del servidor no se disfraza de red', async () => {
+  // El mercado no tenía estado de error: cualquier falla terminaba en la lista
+  // vacía con el cartel «No hay operaciones con estos filtros», que afirma algo
+  // que nadie comprobó. Son dos fallas distintas y se dicen distinto.
+  const browser = await chromium.launch({ headless: true });
+  const SIN_RED = 'Sin conexión. Revisá tu red e intentá de nuevo.';
+
+  try {
+    const contexto = await browser.newContext();
+    const page = await contexto.newPage();
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('heading', { name: /operaciones$/ }).first().waitFor({ timeout: 20_000 });
+
+    // 1. El servidor se cae, con red presente: mensaje general, no «sin red».
+    await page.route('**/api/catalog/products*', (route) => route.fulfill({
+      status: 500, contentType: 'application/json',
+      body: JSON.stringify({ detail: 'caída controlada del catálogo' }),
+    }));
+    await page.getByPlaceholder('Buscar producto, servicio o ubicación').fill('trigo');
+    await page.getByPlaceholder('Buscar producto, servicio o ubicación').press('Enter');
+
+    const aviso = page.getByRole('alert');
+    await aviso.waitFor({ state: 'visible', timeout: 20_000 });
+    const textoDelServidor = await aviso.innerText();
+    assert(/No pudimos cargar el mercado/.test(textoDelServidor),
+      `la caída del servidor no muestra el mensaje general: ${JSON.stringify(textoDelServidor)}`);
+    assert(!textoDelServidor.includes('Sin conexión'),
+      `la caída del servidor se disfraza de falta de red: ${JSON.stringify(textoDelServidor)}`);
+    assert(!/No hay operaciones con estos filtros/.test(textoDelServidor),
+      'la falla sigue confundiéndose con un catálogo vacío');
+
+    // 2. Con el error a la vista, la navegación sigue viva: no se silencia nada.
+    await page.getByRole('button', { name: 'Quiénes somos', exact: true }).first().click();
+    await page.getByRole('heading', { level: 1 }).first().waitFor({ timeout: 15_000 });
+    await page.getByRole('button', { name: 'Mercado', exact: true }).first().click();
+    await aviso.waitFor({ state: 'visible', timeout: 20_000 });
+
+    // 3. Sin red: el texto exacto que pidió PM.
+    await contexto.setOffline(true);
+    await page.getByRole('button', { name: 'Reintentar' }).click();
+    await page.getByText(SIN_RED, { exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
+    const textoSinRed = await page.getByRole('alert').innerText();
+    assert(textoSinRed.includes(SIN_RED),
+      `el aviso sin red no dice el texto acordado: ${JSON.stringify(textoSinRed)}`);
+
+    // 4. Vuelve la red y el servidor: reintentar trae el catálogo de verdad.
+    await contexto.setOffline(false);
+    await page.unroute('**/api/catalog/products*');
+    await page.getByRole('button', { name: 'Reintentar' }).click();
+    await page.getByRole('heading', { name: /operaciones$/ }).first().waitFor({ timeout: 20_000 });
+    assert(await page.getByRole('alert').count() === 0,
+      'el aviso de error quedó pegado después de que el catálogo volvió');
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+  }
+
+  return 'una caída del servidor muestra el mensaje general, sin red muestra el '
+    + 'texto exacto «' + SIN_RED + '», ninguna de las dos se confunde con un '
+    + 'catálogo vacío, la navegación sigue funcionando con el error a la vista y '
+    + 'reintentar recupera el catálogo';
+});
+
+await runCase(123, 'Al 200 % de zoom las cinco pantallas siguen siendo usables', async () => {
+  // Zoom del navegador al 200 % = la mitad de píxeles CSS de ancho y de alto.
+  // Una pantalla de escritorio de 1280x720 queda en 640x360, que es lo que se
+  // emula acá. No se mide «a ojo»: por pantalla se comprueba que no haya corte
+  // horizontal, que la acción principal siga visible y habilitada, y que el
+  // foco del teclado se vea.
+  const ANCHO = 640;
+  const ALTO = 360;
+  const browser = await chromium.launch({ headless: true });
+  const medidas = [];
+
+  const medir = async (page, pantalla, accion) => {
+    const caja = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      cliente: document.documentElement.clientWidth,
+    }));
+    assert(caja.scroll <= caja.cliente + 1,
+      `${pantalla} al 200 % se corta a lo ancho: scrollWidth=${caja.scroll} clientWidth=${caja.cliente}`);
+
+    await accion.first().waitFor({ state: 'visible', timeout: 20_000 });
+    assert(await accion.first().isEnabled(),
+      `${pantalla}: la acción principal quedó deshabilitada al 200 %`);
+    const recuadro = await accion.first().boundingBox();
+    assert(recuadro && recuadro.width > 0 && recuadro.height > 0,
+      `${pantalla}: la acción principal no tiene superficie al 200 %`);
+    assert(recuadro.x >= -1 && recuadro.x + recuadro.width <= caja.cliente + 1,
+      `${pantalla}: la acción principal queda fuera del ancho al 200 % (x=${recuadro.x}, ancho=${recuadro.width})`);
+
+    // El foco del teclado tiene que verse, y en TODAS las paradas: alcanza con
+    // un campo que se lo coma para que la persona pierda el hilo. Se tabula
+    // desde el principio y se mira el contorno calculado de cada elemento que
+    // queda enfocado.
+    const sinAnillo = [];
+    for (let i = 0; i < 8; i += 1) {
+      await page.keyboard.press('Tab');
+      // El anillo entra con una transición de 0,2 s: medirlo en el mismo
+      // instante del Tab devuelve 0 px de ancho y hace ver un defecto que no
+      // existe. Se espera a que termine de dibujarse.
+      await page.waitForTimeout(300);
+      const parada = await page.evaluate(() => {
+        const activo = document.activeElement;
+        if (!activo || activo === document.body) return null;
+        const estilo = getComputedStyle(activo);
+        const caja = activo.getBoundingClientRect();
+        if (caja.width === 0 || caja.height === 0) return null;
+        return {
+          quien: `${activo.tagName.toLowerCase()}${activo.id ? '#' + activo.id : ''}`,
+          estilo: estilo.outlineStyle,
+          ancho: parseFloat(estilo.outlineWidth) || 0,
+        };
+      });
+      if (!parada) continue;
+      if (parada.estilo === 'none' || parada.ancho < 2) sinAnillo.push(parada.quien);
+    }
+    assert(sinAnillo.length === 0,
+      `${pantalla}: el foco no se ve al 200 % en ${sinAnillo.join(', ')}`);
+
+    medidas.push(`${pantalla} ${caja.scroll}/${caja.cliente}`);
+  };
+
+  try {
+    // 1. Catálogo y 2. detalle y 3. ingreso, sin sesión.
+    const anonimo = await browser.newContext({ viewport: { width: ANCHO, height: ALTO } });
+    const publica = await anonimo.newPage();
+    await publica.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await publica.locator('article').first().waitFor({ timeout: 20_000 });
+    await medir(publica, 'catálogo', publica.getByRole('button', { name: /Agregar|Iniciar operación|Contratar|Solicitar cotización|Sin stock/ }));
+
+    await publica.locator('article').first().click();
+    const ficha = publica.getByRole('dialog');
+    await ficha.waitFor({ timeout: 20_000 });
+    await medir(publica, 'detalle', ficha.getByRole('button', { name: /Agregar|Iniciar operación|Contratar|Solicitar cotización|Sin stock/ }));
+    await publica.keyboard.press('Escape');
+    await ficha.waitFor({ state: 'hidden', timeout: 20_000 });
+
+    await publica.getByRole('button', { name: 'Ingresar' }).first().click();
+    await publica.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    await medir(publica, 'ingreso', publica.locator('form button[type="submit"]'));
+    await anonimo.close();
+
+    // 4. Carrito y checkout, con sesión de comprador.
+    const comprador = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: 'cliente@ejemplo.com', password: 'cliente123' },
+    })).data;
+    const conSesion = await browser.newContext({ viewport: { width: ANCHO, height: ALTO } });
+    await conSesion.addInitScript(
+      ({ accessToken, refreshToken }) => {
+        window.localStorage.setItem('access_token', accessToken);
+        window.localStorage.setItem('refresh_token', refreshToken);
+      },
+      { accessToken: comprador.access_token, refreshToken: comprador.refresh_token },
+    );
+    const compra = await conSesion.newPage();
+    await compra.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await compra.getByRole('button', { name: /^Agregar/ }).first().click();
+    await compra.getByRole('button', { name: /Carrito/ }).first().click();
+    await compra.getByRole('heading', { name: /Mi carrito/i }).waitFor({ timeout: 20_000 });
+    await medir(compra, 'carrito', compra.getByRole('button', { name: 'Continuar compra' }));
+
+    await compra.getByRole('button', { name: 'Continuar compra' }).click();
+    await compra.getByRole('heading', { name: /Datos de env/i }).waitFor({ timeout: 20_000 });
+    await medir(compra, 'checkout', compra.getByRole('button', { name: /Continuar|Siguiente|Confirmar/ }));
+    await conSesion.close();
+
+    // 5. Panel del vendedor.
+    const vendedor = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+    })).data;
+    const panelCtx = await browser.newContext({ viewport: { width: ANCHO, height: ALTO } });
+    await panelCtx.addInitScript(
+      ({ accessToken, refreshToken }) => {
+        window.localStorage.setItem('access_token', accessToken);
+        window.localStorage.setItem('refresh_token', refreshToken);
+      },
+      { accessToken: vendedor.access_token, refreshToken: vendedor.refresh_token },
+    );
+    const panel = await panelCtx.newPage();
+    await panel.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await panel.getByRole('button', { name: 'Mi cuenta' }).first().click();
+    await panel.getByRole('button', { name: 'Mis publicaciones' }).click();
+    await panel.getByRole('heading', { name: 'Mis publicaciones' }).waitFor({ timeout: 20_000 });
+    await medir(panel, 'panel', panel.getByRole('button', { name: '+ Publicar' }));
+    await panelCtx.close();
+  } finally {
+    await browser.close();
+  }
+
+  return `640x360 —equivalente a 1280x720 al 200 %— en catálogo, detalle, ingreso, `
+    + `carrito, checkout y panel: sin corte horizontal (${medidas.join('; ')}), `
+    + 'acción principal visible, habilitada y dentro del ancho, y foco de teclado visible';
+});
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

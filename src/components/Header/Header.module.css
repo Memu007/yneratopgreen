@@ -10,6 +10,22 @@
   border-bottom: 1px solid var(--tg-color-border);
 }
 
+/* Con la ventana baja, la cabecera deja de ser pegajosa.
+ *
+ * Al 200 % de zoom una pantalla de 1280x720 queda en 640x360 px CSS y la
+ * cabecera -marca, buscador y navegacion- ocupa 194 de esos 360. Pegada
+ * arriba se come mas de la mitad del alto util y tapa lo que uno acaba de
+ * traer a la vista: la medicion encontro que la primera tarjeta del catalogo
+ * queda DEBAJO de la cabecera y no se puede tocar. Suelta, se va con el
+ * scroll y la pantalla vuelve a ser usable. Es la misma decision que ya
+ * estaba tomada para el celular, con el alto como disparador en vez del
+ * ancho: al 200 % el ancho sigue siendo de escritorio. */
+@media (max-height: 480px) {
+  .header {
+    position: static;
+  }
+}
+
 .masthead {
   min-height: 88px;
   display: grid;

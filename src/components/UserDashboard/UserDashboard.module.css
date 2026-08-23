@@ -248,7 +248,10 @@
 }
 
 .formGroup input:focus {
-  outline: none;
+  /* Sin `outline: none`: el anillo de foco del sistema es lo unico que le
+     dice a quien navega con teclado donde esta parado, y cambiar el color
+     del borde no alcanza -al 200 % de zoom la medicion lo encontro-. El
+     borde de marca se conserva ademas del anillo. */
   border-color: var(--tg-color-brand);
   box-shadow: var(--tg-shadow-none);
 }
@@ -265,7 +268,10 @@
 }
 
 .formGroup select:focus {
-  outline: none;
+  /* Sin `outline: none`: el anillo de foco del sistema es lo unico que le
+     dice a quien navega con teclado donde esta parado, y cambiar el color
+     del borde no alcanza -al 200 % de zoom la medicion lo encontro-. El
+     borde de marca se conserva ademas del anillo. */
   border-color: var(--tg-color-brand);
   box-shadow: var(--tg-shadow-none);
 }
@@ -751,6 +757,37 @@
   box-shadow: var(--tg-shadow-none);
 }
 
+/* Un servicio no tiene fotografía, así que no tiene caja de fotografía: en su
+   lugar va una franja con el estado. Antes la tarjeta del panel abría siempre
+   con la foto y el respaldo «Sin fotografía» ocupaba 200 px sobre algo que no
+   puede tener foto. */
+.productEncabezado {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 16px 16px 0;
+}
+
+/* Descendiente y no una clase suelta a proposito: `.productStatusBadge` se
+   define despues en este archivo y, con la misma especificidad, ganaba por
+   orden. El distintivo se iba con `position: absolute` al primer ancestro
+   posicionado -el modal- y aparecia arriba a la derecha del panel, lejos de
+   su tarjeta. */
+.productEncabezado .productStatusBadge {
+  position: static;
+}
+
+/* La anatomía, dicha con todas las letras: es lo que decide qué muestra la
+   tarjeta, y el vendedor tiene que poder verla sin abrir la edición. */
+.anatomiaEtiqueta {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 620;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tg-color-text-secondary);
+}
+
 .productImage {
   position: relative;
   width: 100%;
@@ -776,19 +813,24 @@
   backdrop-filter: blur(10px);
 }
 
+/* Los tres distintivos se habian quedado con sus colores literales: la pasada
+   de color mapeo hexadecimales y estos estaban escritos en `rgba`. Mientras
+   vivian sobre la fotografia nadie los podia medir; al salir a fondo claro,
+   `a11y` midio el verde oliva con texto blanco en 2,3:1. Van a los tokens de
+   estado, que son los mismos que usa el resto del sistema. */
 .status-active {
-  background: rgba(127, 176, 105, 0.95);
-  color: white;
+  background: var(--tg-color-success);
+  color: var(--tg-color-text-inverse);
 }
 
 .status-paused {
-  background: rgba(255, 217, 61, 0.95);
-  color: var(--tg-color-brand);
+  background: var(--tg-color-warning);
+  color: var(--tg-color-text-inverse);
 }
 
 .status-sold-out {
-  background: rgba(211, 47, 47, 0.95);
-  color: white;
+  background: var(--tg-color-error);
+  color: var(--tg-color-text-inverse);
 }
 
 .productInfo {
@@ -1023,7 +1065,10 @@
 .editFormGroup input:focus,
 .editFormGroup textarea:focus,
 .editFormGroup select:focus {
-  outline: none;
+  /* Sin `outline: none`: el anillo de foco del sistema es lo unico que le
+     dice a quien navega con teclado donde esta parado, y cambiar el color
+     del borde no alcanza -al 200 % de zoom la medicion lo encontro-. El
+     borde de marca se conserva ademas del anillo. */
   border-color: var(--tg-color-brand);
   box-shadow: var(--tg-shadow-none);
 }

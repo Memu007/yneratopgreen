@@ -346,7 +346,10 @@
 .formGroup input:focus,
 .formGroup textarea:focus,
 .formGroup select:focus {
-  outline: none;
+  /* Sin `outline: none`: el anillo de foco del sistema es lo unico que le
+     dice a quien navega con teclado donde esta parado, y cambiar el color
+     del borde no alcanza -al 200 % de zoom la medicion lo encontro-. El
+     borde de marca se conserva ademas del anillo. */
   border-color: var(--tg-color-brand);
   box-shadow: var(--tg-shadow-none);
 }

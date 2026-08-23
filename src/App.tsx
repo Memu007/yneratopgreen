@@ -44,6 +44,10 @@ function App() {
   const [isLoadingLocalities, setIsLoadingLocalities] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productsRevision, setProductsRevision] = useState(0);
+  // Qué decir cuando el mercado no carga. Sin esto, una falla de red terminaba
+  // en la lista vacía y el cartel «No hay operaciones con estos filtros», que
+  // es mentira: no es que no haya, es que no pudimos preguntar.
+  const [errorDeCatalogo, setErrorDeCatalogo] = useState<string | null>(null);
   
   const {
     searchQuery,
@@ -157,6 +161,7 @@ function App() {
 
     let cancelled = false;
     setLoadingProducts(true);
+    setErrorDeCatalogo(null);
     getProducts({
         search: searchQuery || undefined,
         category: categories.find((category) => category.name === selectedCategory)?.id,
@@ -180,6 +185,17 @@ function App() {
         if (cancelled) return;
         console.error('Error al cargar productos:', error);
         setProducts([]);
+        // Dos fallas distintas, y conviene no confundirlas: quedarse sin red es
+        // algo que la persona puede resolver, y que se lo cuenten es lo que le
+        // permite hacerlo. Que el servidor falle no es asunto suyo. El resto de
+        // los errores conserva el mensaje general a propósito: inventar un
+        // «sin conexión» donde hay conexión manda a revisar el módem por nada.
+        const sinRed = typeof navigator !== 'undefined' && navigator.onLine === false;
+        setErrorDeCatalogo(
+          sinRed
+            ? 'Sin conexión. Revisá tu red e intentá de nuevo.'
+            : 'No pudimos cargar el mercado. Volvé a intentarlo en un momento.',
+        );
       })
       .finally(() => {
         if (!cancelled) setLoadingProducts(false);
@@ -301,6 +317,8 @@ function App() {
               <ProductGrid
                 products={filteredProducts}
                 isLoading={loadingProducts}
+                error={errorDeCatalogo}
+                onReintentar={() => setProductsRevision((intento) => intento + 1)}
                 onSolicitarCotizacion={() => handleNavigate('contact')}
               />
             </div>

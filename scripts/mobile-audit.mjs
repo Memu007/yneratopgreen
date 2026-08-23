@@ -255,8 +255,8 @@ async function exerciseSeller(browser, viewport, sellerTokens) {
     await dashboard.page.getByRole('button', { name: 'Mi cuenta' }).first().click();
     await dashboard.page.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
     await inspect(dashboard.page, dashboard.state, viewport, '07-seller-panel');
-    await dashboard.page.getByRole('button', { name: 'Mis Productos' }).click();
-    await dashboard.page.getByRole('heading', { name: 'Mis Productos' }).waitFor();
+    await dashboard.page.getByRole('button', { name: 'Mis publicaciones' }).click();
+    await dashboard.page.getByRole('heading', { name: 'Mis publicaciones' }).waitFor();
     await inspect(dashboard.page, dashboard.state, viewport, '07-seller-products');
   } finally {
     await dashboard.context.close();

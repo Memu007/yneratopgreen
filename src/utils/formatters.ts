@@ -1,5 +1,3 @@
-import { Product } from '../types';
-
 /**
  * Formato de moneda, cantidad y fecha.
  *
@@ -25,8 +23,15 @@ export const formatPrice = (price: number, currency: string = 'ARS'): string => 
  * regala, que es exactamente lo contrario de lo que pasa: no hay precio
  * todavía. `COPY.md` lo prohíbe por escrito.
  */
-export const precioVisible = (product: Product): string =>
-  Number(product.price) > 0 ? formatPrice(product.price, product.currency) : 'A cotizar';
+export const precioVisible = (
+  /* Cualquier cosa que tenga precio: la publicación del catálogo y también la
+   * fila del panel del vendedor, que no es un `Product` completo. La regla es
+   * una sola y vive acá, no copiada en cada pantalla. */
+  publicacion: { price: number; currency?: string },
+): string =>
+  Number(publicacion.price) > 0
+    ? formatPrice(publicacion.price, publicacion.currency)
+    : 'A cotizar';
 
 /** Cantidad y unidad juntas, sin que la línea pueda cortarlas. */
 export const formatCantidad = (cantidad: number, unidad?: string): string => {

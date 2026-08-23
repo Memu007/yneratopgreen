@@ -1064,8 +1064,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                     {products.map(product => (
                       <tr key={product.id}>
                         <td>
+                          {/* Sin imagen no se pasa un SVG inventado: aca habia
+                              una TERCERA copia del respaldo verde en data-URI.
+                              `ProductImage` ya sabe decir «Sin fotografia». */}
                           <ProductImage
-                            src={product.image ? `${import.meta.env.VITE_IMAGES_URL || ''}${product.image}` : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iI2YwZjRlZCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiMyZDUwMTYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj7imqI8L3RleHQ+PC9zdmc+'}
+                            src={product.image ? `${import.meta.env.VITE_IMAGES_URL || ''}${product.image}` : ''}
                             alt={product.name}
                             className={styles.productThumb}
                           />

@@ -72,6 +72,30 @@ async def create_product(
     validar_precio_unitario(product_data.price)
 
     pub_type = product_data.publication_type  # "producto" o "servicio"
+
+    # El tipo de publicación y la categoría tienen que decir lo mismo.
+    #
+    # Sin esto se puede publicar «producto» dentro de una categoría de
+    # servicios: la fila guarda stock y ningún campo de servicio, la anatomía
+    # la muestra como servicio y el cobro la trata como servicio. Es una fila
+    # que dice dos cosas a la vez, y ninguna pantalla puede mostrarla bien.
+    # Se rechaza al escribir en vez de convertirla sola: convertirla cambiaría
+    # en silencio lo que el vendedor publicó.
+    if not anatomia.tipo_compatible(pub_type, category.is_service):
+        if category.is_service:
+            detalle = (
+                f"La categoría «{category.name}» es de servicios y esta "
+                f"publicación es de tipo «{pub_type}». Publicala como servicio "
+                "o elegí una categoría de productos."
+            )
+        else:
+            detalle = (
+                f"La categoría «{category.name}» es de productos y esta "
+                f"publicación es de tipo «{pub_type}». Publicala como producto "
+                "o elegí una categoría de servicios."
+            )
+        raise HTTPException(status_code=400, detail=detalle)
+
     is_service = pub_type == "servicio"
 
     # La anatomía se declara o se hereda de la categoría, pero nunca puede
@@ -351,6 +375,33 @@ async def update_product(
         category = db.query(Category).filter(Category.id == category_id).first()
         if not category:
             raise HTTPException(status_code=404, detail="Categoría no encontrada")
+
+        # Mover la publicación al otro lado del límite se rechaza.
+        #
+        # `publication_type` no es editable —no está en el esquema de la
+        # edición—, así que una publicación de tipo «producto» que aterriza en
+        # una categoría de servicios queda diciendo dos cosas a la vez: la
+        # interfaz la lee como servicio y la fila sigue teniendo stock y
+        # ningún campo de servicio. Convertirla acá seria peor: cambiaría en
+        # silencio lo que el vendedor publicó y lo que las órdenes viejas
+        # compraron. Se frena, y la fila no se toca.
+        #
+        # Sólo se mira cuando la categoría cambia de verdad: una publicación
+        # vieja que ya venía cruzada tiene que poder seguir editándose para
+        # corregir el resto.
+        if "category_id" in update_data and category.id != product.category_id:
+            tipo_actual = product.publication_type or anatomia.PRODUCTO
+            if not anatomia.tipo_compatible(tipo_actual, category.is_service):
+                lado = "servicios" if category.is_service else "productos"
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"No se puede mover esta publicación a «{category.name}»: "
+                        f"es de tipo «{tipo_actual}» y «{category.name}» es una "
+                        f"categoría de {lado}. El tipo de publicación no se "
+                        "edita: publicá una nueva."
+                    ),
+                )
 
         propuesta = update_data.get("operation_kind", product.operation_kind)
         if not anatomia.compatible(propuesta, category.is_service):
