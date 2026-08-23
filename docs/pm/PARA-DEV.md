@@ -3462,3 +3462,11 @@ no amplíes por tu cuenta.
 
 No despliegues. Hacé commits auditables, empujá producto e informe y frená para
 revisión de PM/Emi.
+
+### Validación PM del handoff `0a05a0a`
+
+PM revisó las tres superficies A, la comparación A/B, contratos de datos,
+activos y hashes. UX-2C queda habilitada con los límites de
+`extension-comercial/REVISION-PM-0a05a0a.md`. La aprobación permite implementar,
+no desplegar ni publicar. La cesión de las fotos y el reemplazo final del hero
+de Servicios son puertas de salida ajenas a este ciclo de Dev.

@@ -108,6 +108,12 @@ Actualizado: 2026-08-23.
   La tarea activa vuelve a Dev como **UX-2C** según el último bloque de
   `PARA-DEV.md`. B queda archivada; no se reabren wordmark ni anatomías y no se
   despliega hasta revisión PM/Emi.
+- **Revisión PM de la extensión `0a05a0a`:** apta para implementar UX-2C, no
+  todavía para publicación. La verificación independiente está en
+  `diseno-premium/extension-comercial/REVISION-PM-0a05a0a.md`. Quedan como
+  puertas de salida la cesión/autoría de las dos fotos fuente y el reemplazo
+  final de la foto interina de Servicios. Conteos, cards y fotos conceptuales
+  del HTML no pueden copiarse al producto.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
