@@ -91,14 +91,13 @@ Actualizado: 2026-08-23.
   pausada y recibe UX-2B en Extra: implementar el handoff por capas, preservar
   funciones, resolver semántica explícita de las cuatro anatomías y pasar todas
   las puertas antes de desplegar. La diseñadora vuelve a quedar sin tarea.
-- UX-2B llegó en `08907cd`–`873ad2e`, con informe `8943143`. PM acepta la
-  dirección visual y las decisiones de contratar servicios con precio y dejar
-  condición opcional cuando no aplica, pero **no acepta todavía el cierre**:
-  encontró cruce posible entre `publication_type` y categoría de servicio,
-  panel del vendedor mostrando stock/formato de producto para servicios, foto
-  todavía obligatoria, ausencia del estado offline y zoom 200 % sin medir. La
-  única tarea activa de Dev es la corrección acotada escrita al final de
-  `PARA-DEV.md`; sin despliegue ni UX-3.
+- UX-2B queda **aceptada técnicamente por PM**: base `08907cd`–`873ad2e`, cierre
+  `177cdb2`, informes `8943143`/`6b9bd1d`. La corrección cierra el cruce entre
+  `publication_type` y categoría, panel por anatomía, foto opcional, offline y
+  zoom 200 %, y retira los mocks con Unsplash. PM reprodujo build aislado, lint,
+  sintaxis y checks estáticos; la Dev informa suite 123/123 y puertas visuales
+  completas desde base limpia. Falta revisión visual de Emi en el entorno
+  descartable; la Dev queda sin tarea y no abre UX-3 ni despliega.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -106,6 +105,15 @@ Actualizado: 2026-08-23.
   `railway down` como rollback ni `restart` durante un despliegue.
 
 ## Entrega aceptada y tarea actual
+
+UX-2B queda aceptada técnicamente con producto `08907cd`–`873ad2e`, corrección
+`177cdb2` e informes `8943143`/`6b9bd1d`. “Mesa de negocios” ya está aplicada a
+la superficie pública y autenticada; las cuatro anatomías salen de datos
+persistentes. PM revisó las capturas y reprodujo build aislado, lint, sintaxis y
+checks estáticos. Docker local permanece apagado, por lo que suite 123/123,
+a11y 64/64, contraste 52/52 e hito 6/6 son evidencia informada por Dev. La
+única puerta pendiente de esta pieza es la revisión visual de Emi sobre el
+entorno descartable. La Dev no tiene tarea activa.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se

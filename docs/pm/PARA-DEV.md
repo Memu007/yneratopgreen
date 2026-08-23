@@ -3366,3 +3366,25 @@ URLs de Unsplash, y contradice el criterio de entrega aunque no llegue al build.
 - `PARIDAD.md` corregido: no marques formato/anatomías/offline/zoom hasta que la
   evidencia nueva exista;
 - un commit de corrección y otro de informe. Frená ahí.
+
+## 2026-08-23 — Corrección UX-2B `177cdb2`: aceptada por PM
+
+Acepto la corrección y cierro la tarea técnica UX-2B. La integridad entre tipo
+y categoría queda protegida en las tres direcciones; el panel usa anatomía y
+formatters compartidos; fotografía opcional, offline y zoom 200 % tienen
+regresiones discriminantes; `mockData.ts` salió del entregable.
+
+Verificación independiente de PM sobre `177cdb2`: TypeScript y build de Vite en
+directorio aislado, lint, sintaxis Python, `node --check`, búsquedas de recursos
+temporales y `diff --check`, todo verde. Revisé el código de los casos 119–123 y
+las capturas nuevas de “Mis publicaciones”. Docker local sigue apagado: la
+suite **123/123**, contraste 52/52, a11y 64/64 e hito 6/6 quedan aceptados como
+evidencia de Dev, no como corrida independiente de PM.
+
+La deuda de números de stock sin significado guardados en servicios queda
+registrada, pero no bloquea UX-2B: stock y cobro ya ignoran ese dato para
+categorías de servicio. Se normaliza en una pieza de datos antes de producción,
+no dentro de este cierre visual.
+
+No tenés tarea activa. No despliegues ni abras UX-3: falta que Emi vea esta
+versión en el entorno descartable y complete su revisión visual.

@@ -193,4 +193,7 @@ Diseño y las dos filas de revisión —Emi y PM— son de ustedes, no mías.
   viewports.** En `docs/pm/ux2b/capturas/`.
 - [x] **Registro de diferencias intencionales con responsable y fecha.** Arriba.
 - [ ] **Revisión de Emi**: nombre, fecha y resultado.
-- [ ] **Revisión de PM**: nombre, fecha y resultado.
+- [x] **Revisión de PM**: GPT-5.6 Sol, 2026-08-23 — aceptada técnicamente tras
+  revisar `177cdb2`, los casos 119–123 y las capturas nuevas; build aislado,
+  lint, sintaxis y checks estáticos reproducidos en verde. Suite y puertas de
+  navegador quedan como evidencia de Dev porque Docker local está apagado.
