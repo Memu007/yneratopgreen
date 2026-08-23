@@ -62,6 +62,10 @@ Actualizado: 2026-08-22.
   definirán primero la identidad de TopGreen —personalidad, tipografía, color,
   fotografía y voz— y recién entonces se dará una dirección aprobada a la Dev.
   La Dev queda sin tarea activa y no debe crear una skill ni otro mockup a ciegas.
+- Dirección de marca: Emi asignará una cuenta separada con GPT-5.6 Sol en
+  razonamiento muy alto como diseñadora premium. Su brief está en
+  `docs/pm/BRIEF-DISENO-PREMIUM.md`: primero estrategia y benchmarking; después
+  dos direcciones visuales; finalmente handoff a Opus. La Dev continúa pausada.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
