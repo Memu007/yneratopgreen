@@ -3073,3 +3073,87 @@ Esfuerzo **Extra**: el juicio visual importa, pero el alcance sigue siendo una
 sola superficie. Si para lograrlo necesitás tocar más de estos componentes o
 inventar una identidad/logotipo definitivo, frená y consultá. Al terminar,
 respondé en `PARA-PM.md` y no abras UX-2.
+
+## 2026-08-22 — UX-1 no aceptada visualmente; tarea activa UX-2A
+
+El código `e701cb4` conserva los flujos y pasa las puertas informadas, pero la
+dirección visual **no fue aceptada por Emi ni por PM**. Se ve más ordenada que
+antes, pero todavía parece una plantilla generada: las ilustraciones beige se
+repiten y dominan la grilla, la marca no tiene presencia, las tarjetas son
+genéricas, la navegación dice “Home / Quienes somos / Servicios / Contacto” y
+la tipografía/composición no transmiten un marketplace agro premium.
+
+No parches esa versión ni hagas otro rediseño completo a ciegas. La tarea activa
+es una **prueba visual de dirección**, sin modificar producto todavía.
+
+### Referencia y lectura correcta
+
+Tomá Agrofy como referencia de categoría y nivel comercial, no como plantilla a
+copiar. Lo valioso es:
+
+- producto y fotografía agro real como protagonistas;
+- marca de alto contraste y reconocible en un vistazo;
+- buscador dominante y navegación comercial compacta;
+- densidad de catálogo: más producto visible, menos aire de dashboard;
+- jerarquía clara de título, precio, ubicación y condición del aviso;
+- sensación de negocio agro argentino establecido, no de SaaS genérico.
+
+No copies sus banners publicitarios, carruseles, asistente, categorías ni
+componentes. Tampoco uses “premium” como excusa para degradados, glassmorphism,
+sombras blandas, tarjetas flotantes, íconos decorativos, microcopy aspiracional
+o una paleta beige monocorde. Todo eso volvería a producir AI slop.
+
+### Entrega solicitada: una sola dirección fuerte
+
+Prepará una prueba estática y reversible, fuera del flujo productivo, que muestre:
+
+1. primera pantalla del marketplace en **1440×900**;
+2. cabecera completa, buscador, navegación comercial, filtros y primera fila de
+   publicaciones;
+3. una ampliación de tarjeta y una vista de detalle para comprobar que el mismo
+   sistema se sostiene;
+4. una hoja breve con tipografías, escala, color, bordes, espaciado y tratamiento
+   fotográfico.
+
+Usá contenido real del seed, no lorem ipsum. Para esta prueba podés usar las
+fotografías agro reales que ya existen en `public/`, pero no las presentes como
+foto exacta de una publicación si no lo son: la composición puede rotularlas
+como material de dirección. **No uses** `picsum`, ilustraciones lineales de
+familia, emojis, bibliotecas de iconos, fotos descargadas sin licencia ni
+imágenes generadas por vos. Si hacen falta activos específicos, dejá los slots
+y un inventario exacto; PM/Emi los producirá después de aprobar la dirección.
+
+La salida puede vivir en `docs/pm/ux2a/` como HTML/CSS autocontenido más PNG.
+No debe importarse desde la aplicación, entrar al build ni cambiar el despliegue.
+
+### Decisiones visuales que sí debés tomar
+
+- proponé un wordmark tipográfico más contundente, todavía no un logo definitivo;
+- reemplazá la navegación institucional por categorías/acciones propias de un
+  marketplace, usando sólo destinos que ya existen o marcándolos como jerarquía
+  de navegación en la prueba;
+- planteá grilla de catálogo más densa y tarjetas menos altas, con la imagen
+  ocupando el papel principal y sin botón “Agregar” como solución universal;
+- separá con claridad publicación, servicio y logística cuando el tipo de aviso
+  lo exija; no todos deben verse como producto de carrito;
+- elegí una combinación tipográfica con personalidad agro/comercial y licencia
+  verificable, o documentá la sustitución local usada en el mockup;
+- conservá accesibilidad y contraste desde el sistema, no como corrección final.
+
+### Límites y condición de freno
+
+No cambies `src/`, Backend, seed, tests, rutas, auth, carrito, checkout,
+logística, Mercado Pago ni datos. No crees todavía una skill ni un design system
+permanente: primero tiene que existir una dirección aprobada. Una skill ahora
+sólo haría reproducible un criterio todavía equivocado.
+
+Entregá un único commit con la prueba y tu respuesta en `PARA-PM.md`. Incluí:
+
+- tres decisiones que evitan que la propuesta vuelva a parecer AI slop;
+- diferencias concretas contra `e701cb4` y contra Agrofy;
+- lista de activos que faltarían para llevarla a producto;
+- riesgos funcionales de implementarla después.
+
+Frená ahí. PM y Emi la revisan visualmente; sólo después se autoriza UX-2B en
+producto. Esfuerzo **Extra**, porque esta vez se evalúa criterio visual, no
+cantidad de archivos.
