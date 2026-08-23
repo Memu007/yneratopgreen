@@ -247,11 +247,11 @@ async function comprador(page, medida) {
   await page.getByRole('button', { name: /Agregar/ }).first().click();
   await page.getByRole('button', { name: /Carrito/ }).click();
   await revisar(page, 'carrito', medida,
-    page.getByRole('heading', { name: /Mi Carrito/ }));
+    page.getByRole('heading', { name: /Mi carrito/i }));
 
   await page.getByRole('button', { name: 'Continuar compra' }).click();
   await revisar(page, 'checkout: envío', medida,
-    page.getByRole('heading', { name: /Datos de Env/ }));
+    page.getByRole('heading', { name: /Datos de env/i }));
 
   await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
   await page.locator('#checkout-provincia').selectOption('06');
@@ -278,7 +278,7 @@ async function comprador(page, medida) {
   await page.getByPlaceholder('2000').fill('2700');
   await page.locator('form:has(h2) button[type="submit"]').click();
   await revisar(page, 'checkout: pago', medida,
-    page.getByRole('heading', { name: /M.todo de Pago/ }));
+    page.getByRole('heading', { name: /Medio de pago/i }));
 
   await page.goto(WEB, { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Mi cuenta' }).first().click();

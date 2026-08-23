@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import styles from './AuthModal.module.css';
-import { useAuth } from '../../contexts/AuthContext';
-import { useToast } from '../Toast/Toast';
+import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../hooks/useToast';
 import { RegisterData, RegistroPendiente } from '../../types';
 import {
   getLocalities,
@@ -11,6 +11,7 @@ import {
 } from '../../utils/catalogService';
 import { apiGet } from '../../utils/api';
 import { type TipoDeCarga } from '../../utils/logistica';
+import { useCapaModal } from '../../hooks/useCapaModal';
 
 interface RegisterModalProps {
   onClose: () => void;
@@ -150,9 +151,19 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     }
   };
 
+  // Atrapa el foco, lo devuelve al cerrar, cierra con Escape y traba el
+  // scroll del fondo. Ninguna capa del producto hacía nada de esto.
+  const capa = useCapaModal<HTMLDivElement>(onClose);
+
   return (
     <div className={styles.modalOverlay} onClick={handleOverlayClick}>
-      <div className={styles.modal}>
+      <div className={styles.modal}
+        ref={capa}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Crear cuenta"
+        tabIndex={-1}
+      >
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>Crear Cuenta</h2>
           <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
@@ -339,7 +350,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                   onChange={handleChange}
                 />
                 <p className={styles.ayudaPrivada}>
-                  🔒 Privado: no aparece en el listado de transportistas. Lo ve el
+                  Privado: no aparece en el listado de transportistas. Lo ve el
                   comprador recién después de seleccionarte, junto con tu contacto.
                 </p>
               </div>
@@ -484,7 +495,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                 className={styles.togglePassword}
                 onClick={() => setShowPassword(!showPassword)}
               >
-                {showPassword ? '👁️' : '👁️‍🗨️'}
+                {showPassword ? 'Ocultar' : 'Mostrar'}
               </button>
             </div>
           </div>

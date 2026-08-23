@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from './SellerProfileModal.module.css';
 import { apiGet } from '../../utils/api';
+import { useCapaModal } from '../../hooks/useCapaModal';
 
 interface SellerProfileModalProps {
   sellerId: string;
@@ -60,9 +61,10 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
     loadSellerData();
   }, [sellerId]);
 
-  const renderStars = (score: number) => {
-    return '⭐'.repeat(score) + '☆'.repeat(5 - score);
-  };
+  // La calificación se dice con el número. Cinco estrellas obligan a saber
+  // que son sobre cinco, y un lector de pantalla las anuncia una por una:
+  // «estrella, estrella, estrella…».
+  const renderStars = (score: number) => `${score} de 5`;
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -73,9 +75,19 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
     });
   };
 
+  // Atrapa el foco, lo devuelve al cerrar, cierra con Escape y traba el
+  // scroll del fondo. Ninguna capa del producto hacía nada de esto.
+  const capa = useCapaModal<HTMLDivElement>(onClose);
+
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}
+        ref={capa}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Perfil del vendedor"
+        tabIndex={-1}
+      >
         <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>×</button>
         
         <div className={styles.header}>
@@ -88,7 +100,7 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
               pedía: no hay ruta ni perfil público nuevo. */}
           {reputation?.documentacion_revisada && (
             <p className={styles.documentacion}>
-              <span aria-hidden="true">📄</span> Documentación revisada
+              Documentación revisada
             </p>
           )}
         </div>

@@ -1,10 +1,11 @@
 import React from 'react';
 import styles from './CartModal.module.css';
 import { ProductImage } from '../ProductImage/ProductImage';
-import { useCart } from '../../contexts/CartContext';
-import { useAuth } from '../../contexts/AuthContext';
-import { useToast } from '../Toast/Toast';
+import { useCart } from '../../hooks/useCart';
+import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../hooks/useToast';
 import { formatPrice } from '../../utils/formatters';
+import { useCapaModal } from '../../hooks/useCapaModal';
 
 interface CartModalProps {
   isOpen: boolean;
@@ -13,6 +14,10 @@ interface CartModalProps {
 }
 
 export const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckout }) => {
+  // Antes de cualquier `return` temprano: un hook se llama siempre y en
+  // el mismo orden. El interruptor es el que decide si hace algo.
+  const capa = useCapaModal<HTMLDivElement>(onClose, isOpen);
+
   const { items, itemCount, totalAmount, updateQuantity, removeItem, clearCart } = useCart();
   const { isAuthenticated } = useAuth();
   const { showToast, showConfirm } = useToast();
@@ -49,10 +54,16 @@ export const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckou
 
   return (
     <div className={styles.modalOverlay} onClick={handleOverlayClick}>
-      <div className={styles.modal}>
+      <div className={styles.modal}
+        ref={capa}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Mi carrito"
+        tabIndex={-1}
+      >
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>
-            🛒 Mi Carrito ({itemCount})
+            Mi carrito ({itemCount})
           </h2>
           <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
             ×
@@ -62,7 +73,6 @@ export const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckou
         <div className={styles.cartContent}>
           {items.length === 0 ? (
             <div className={styles.emptyCart}>
-              <div className={styles.emptyIcon}>🛒</div>
               <p className={styles.emptyText}>Tu carrito está vacío</p>
               <p className={styles.emptySubtext}>
                 Agrega productos para comenzar tu compra
@@ -103,9 +113,9 @@ export const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckou
                       <button
                         className={styles.removeButton}
                         onClick={() => removeItem(item.product.id)}
-                        title="Eliminar"
+                        aria-label={`Quitar ${item.product.name} del carrito`}
                       >
-                        🗑️
+                        Quitar
                       </button>
                     </div>
 
@@ -155,8 +165,7 @@ export const CartButton: React.FC<CartButtonProps> = ({ onClick }) => {
   const { itemCount } = useCart();
 
   return (
-    <button className={styles.cartButton} onClick={onClick}>
-      <span className={styles.cartIcon}>🛒</span>
+    <button className={`tg-button tg-button--secondary ${styles.cartButton}`} onClick={onClick}>
       <span>Carrito</span>
       {itemCount > 0 && <span className={styles.badge}>{itemCount}</span>}
     </button>

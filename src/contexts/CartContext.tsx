@@ -1,10 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, useCallback, ReactNode } from 'react';
+import { CartContext } from './contextos';
 import { CartItem, CartContextType, Product } from '../types';
-import { useToast } from '../components/Toast/Toast';
-import { useAuth } from './AuthContext';
+import { useToast } from '../hooks/useToast';
+import { useAuth } from '../hooks/useAuth';
 import { apiFetch } from '../utils/api';
-
-const CartContext = createContext<CartContextType | undefined>(undefined);
 
 // Cómo se resume un carrito para saber si el servidor ya tiene esto mismo.
 // Es pura y vive afuera del componente: así no cambia de identidad en cada
@@ -13,14 +12,6 @@ const retratoDe = (lista: CartItem[]) => lista
   .map((item) => `${item.product.id}x${item.quantity}`)
   .sort()
   .join('|');
-
-export const useCart = () => {
-  const context = useContext(CartContext);
-  if (!context) {
-    throw new Error('useCart debe ser usado dentro de CartProvider');
-  }
-  return context;
-};
 
 interface CartProviderProps {
   children: ReactNode;

@@ -118,13 +118,13 @@ export const ContactPage: React.FC = () => {
               
               {submitStatus === 'success' && (
                 <div className={styles.successMessage}>
-                  ✓ Se abrió tu cliente de email con el mensaje. ¡Envialo para contactarnos!
+                  Se abrió tu cliente de correo con el mensaje. Enviálo para contactarnos.
                 </div>
               )}
               
               {submitStatus === 'error' && (
                 <div className={styles.errorMessage}>
-                  ✗ Hubo un error. Por favor intentá de nuevo o contactanos por WhatsApp.
+                  No pudimos abrir tu cliente de correo. Intentá de nuevo o escribinos por WhatsApp.
                 </div>
               )}
 
@@ -223,7 +223,6 @@ export const ContactPage: React.FC = () => {
               <h2>Información de Contacto</h2>
               
               <div className={styles.infoCard}>
-                <div className={styles.infoIcon}>📧</div>
                 <div>
                   <h3>Email</h3>
                   <a href="mailto:info@topgreen.com.ar">info@topgreen.com.ar</a>
@@ -231,7 +230,6 @@ export const ContactPage: React.FC = () => {
               </div>
 
               <div className={styles.infoCard}>
-                <div className={styles.infoIcon}>📱</div>
                 <div>
                   <h3>Teléfono / WhatsApp</h3>
                   <a href="tel:+5492233485801">+54 9 223 348 5801</a>
@@ -239,7 +237,6 @@ export const ContactPage: React.FC = () => {
               </div>
 
               <div className={styles.infoCard}>
-                <div className={styles.infoIcon}>📍</div>
                 <div>
                   <h3>Ubicación</h3>
                   <p>Mar del Plata, Argentina</p>
@@ -248,7 +245,6 @@ export const ContactPage: React.FC = () => {
               </div>
 
               <div className={styles.infoCard}>
-                <div className={styles.infoIcon}>🕐</div>
                 <div>
                   <h3>Horarios</h3>
                   <p>Lunes a Viernes: 9:00 - 18:00</p>

@@ -580,7 +580,7 @@ async function resolverTrasladoPropio(page) {
  * comprador, y deja la decisión explícita incluso cuando es la única posible.
  */
 async function elegirTransferencia(page) {
-  await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: 20_000 });
+  await page.getByRole('heading', { name: /Medio de pago/i }).waitFor({ timeout: 20_000 });
   const radios = page.locator('input[value="transfer"]');
   await radios.first().waitFor({ state: 'visible', timeout: 20_000 });
   const cuantos = await radios.count();
@@ -1603,7 +1603,7 @@ await runCase(19, 'Transferencia completa desde la interfaz', async () => {
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
 
-    await page.getByRole('heading', { name: /Datos de Envío/ }).waitFor();
+    await page.getByRole('heading', { name: /Datos de env/i }).waitFor();
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
     await elegirDestino(page, 'Pergamino');
     await page
@@ -1802,12 +1802,12 @@ await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorr
 
     await addButton.click();
     await buyerPage.getByRole('button', { name: /Carrito/ }).click();
-    const cartHeading = buyerPage.getByRole('heading', { name: /Mi Carrito/ });
+    const cartHeading = buyerPage.getByRole('heading', { name: /Mi carrito/i });
     await cartHeading.waitFor();
     const cartModal = cartHeading.locator('xpath=ancestor::div[contains(@class,\"modal\")]');
     await sinFoto(cartModal).waitFor();
     await cartModal.getByRole('button', { name: 'Continuar compra' }).click();
-    const shippingHeading = buyerPage.getByRole('heading', { name: /Datos de Envío/ });
+    const shippingHeading = buyerPage.getByRole('heading', { name: /Datos de env/i });
     const checkoutModal = shippingHeading.locator('xpath=ancestor::div[contains(@class,\"modal\")]');
     await sinFoto(checkoutModal).waitFor();
     await buyerContext.close();
@@ -2683,7 +2683,7 @@ await runCase(30, 'El motivo real de la sincronización llega al comprador', asy
 
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
-    await page.getByRole('heading', { name: /Datos de Envío/ }).waitFor();
+    await page.getByRole('heading', { name: /Datos de env/i }).waitFor();
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
     await elegirDestino(page, 'Pergamino');
     await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
@@ -2709,7 +2709,7 @@ await runCase(30, 'El motivo real de la sincronización llega al comprador', asy
     // Y no avanza: se queda en datos de envío y no se creó ninguna orden.
     await page.locator('form:has(h2) button[type="submit"]').click();
     await page.waitForTimeout(1500);
-    await page.getByRole('heading', { name: /Datos de Envío/ }).waitFor({ state: 'visible' });
+    await page.getByRole('heading', { name: /Datos de env/i }).waitFor({ state: 'visible' });
     const ordenesDespues = queryCount('SELECT COUNT(*) FROM orders');
     assert(ordenesDespues === ordenesAntes, `se creó una orden pese al error`);
     return `aviso visible con role="alert": "${texto.trim().slice(0, 80)}"; `
@@ -2753,7 +2753,7 @@ await runCase(31, 'Sin datos bancarios, el comprador ve el motivo del vendedor',
     await page.getByRole('button', { name: /Agregar/ }).first().click();
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
-    await page.getByRole('heading', { name: /Datos de Envío/ }).waitFor();
+    await page.getByRole('heading', { name: /Datos de env/i }).waitFor();
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
     await elegirDestino(page, 'Pergamino');
     await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
@@ -2761,7 +2761,7 @@ await runCase(31, 'Sin datos bancarios, el comprador ve el motivo del vendedor',
     await resolverTrasladoPropio(page);
     await page.locator('form:has(h2) button[type="submit"]').click();
 
-    await page.getByRole('heading', { name: /Método de Pago/ }).waitFor();
+    await page.getByRole('heading', { name: /Medio de pago/i }).waitFor();
     // Sin ningún medio disponible no hay radio que marcar: lo que tiene que
     // aparecer es el motivo, y en el grupo de ESE vendedor.
     const aviso = page.locator('[role="alert"]');
@@ -4047,7 +4047,7 @@ await runCase(43, 'Fletes compatibles por futura orden, con PostGIS y sin contac
 
       await page.getByRole('button', { name: /Carrito/ }).click();
       await page.getByRole('button', { name: 'Continuar compra' }).click();
-      await page.getByRole('heading', { name: /Datos de Env/ }).waitFor();
+      await page.getByRole('heading', { name: /Datos de env/i }).waitFor();
       await elegirDestino(page, 'Pergamino');
 
       const seccion = page.locator('[class*="_fletes_"]');
@@ -4270,7 +4270,7 @@ await runCase(45, 'La escritura de un carrito abandonado no puede quedar última
     const abrirCheckout = async () => {
       await page.getByRole('button', { name: /Carrito/ }).click();
       await page.getByRole('button', { name: 'Continuar compra' }).click();
-      await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15_000 });
+      await page.getByRole('heading', { name: /Datos de env/i }).waitFor({ timeout: 15_000 });
       await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
       await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
       await page.getByPlaceholder('2000').fill('2700');
@@ -4295,11 +4295,11 @@ await runCase(45, 'La escritura de un carrito abandonado no puede quedar última
     // 2. con esa escritura en vuelo se cierra el checkout, se cambia el
     //    carrito visible de A a B y se vuelve a abrir.
     await cerrar();
-    await page.getByRole('heading', { name: /Datos de Env/ })
+    await page.getByRole('heading', { name: /Datos de env/i })
       .waitFor({ state: 'hidden', timeout: 15_000 });
 
     await page.getByRole('button', { name: /Carrito/ }).click();
-    await page.getByRole('heading', { name: /Mi Carrito/ }).waitFor({ timeout: 15_000 });
+    await page.getByRole('heading', { name: /Mi carrito/i }).waitFor({ timeout: 15_000 });
     await page.locator('button[title="Eliminar"]:visible').first().click();
     await page.getByText('Tu carrito está vacío').waitFor({ timeout: 15_000 });
     await cerrar();
@@ -4330,8 +4330,8 @@ await runCase(45, 'La escritura de un carrito abandonado no puede quedar última
       `el listado sigue mostrando el carrito abandonado (${vendedorDeA})`);
 
     await resolverTrasladoPropio(page);
-    await page.getByRole('button', { name: /Continuar al Pago/ }).click();
-    await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: 15_000 });
+    await page.getByRole('button', { name: /Continuar al pago/i }).click();
+    await page.getByRole('heading', { name: /Medio de pago/i }).waitFor({ timeout: 15_000 });
     const grupos = page.locator('fieldset[class*="_grupoDePago_"]');
     await grupos.first().waitFor({ state: 'visible', timeout: 20_000 });
     const pago = ((await grupos.first().textContent()) || '').replace(/\s+/g, ' ');
@@ -4383,7 +4383,7 @@ await runCase(46, 'Vaciar el destino descarta la respuesta que venía en camino'
     await page.getByRole('button', { name: /Agregar/ }).first().click();
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
-    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor();
+    await page.getByRole('heading', { name: /Datos de env/i }).waitFor();
 
     await elegirDestino(page, 'Pergamino');
     await page.waitForTimeout(1000);
@@ -4490,7 +4490,7 @@ await runCase(47, 'Un login nuevo no hereda el "ya sincronizado" del anterior', 
     const comprarHastaElDestino = async () => {
       await page.getByRole('button', { name: /Carrito/ }).click();
       await page.getByRole('button', { name: 'Continuar compra' }).click();
-      await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15_000 });
+      await page.getByRole('heading', { name: /Datos de env/i }).waitFor({ timeout: 15_000 });
       await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0202');
       await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
       await page.getByPlaceholder('2000').fill('2700');
@@ -4639,7 +4639,7 @@ await runCase(48, 'Un turno encolado no sale con las credenciales de la sesión 
     const comprarHastaElDestino = async () => {
       await page.getByRole('button', { name: /Carrito/ }).click();
       await page.getByRole('button', { name: 'Continuar compra' }).click();
-      await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15_000 });
+      await page.getByRole('heading', { name: /Datos de env/i }).waitFor({ timeout: 15_000 });
       await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0303');
       await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
       await page.getByPlaceholder('2000').fill('2700');
@@ -5039,7 +5039,7 @@ await runCase(51, 'Cada pedido resuelve su traslado y la decisión llega a la or
 
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
-    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15_000 });
+    await page.getByRole('heading', { name: /Datos de env/i }).waitFor({ timeout: 15_000 });
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0404');
     await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
     await page.getByPlaceholder('2000').fill('2700');
@@ -5052,7 +5052,7 @@ await runCase(51, 'Cada pedido resuelve su traslado y la decisión llega a la or
     // Sin resolver, la interfaz no avanza.
     await page.locator('form:has(h2) button[type="submit"]').click();
     await page.waitForTimeout(800);
-    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ state: 'visible' });
+    await page.getByRole('heading', { name: /Datos de env/i }).waitFor({ state: 'visible' });
     assert(ordenesDe(state.buyerId).length === ordenesAntes,
       'avanzó al pago sin resolver el traslado');
 
@@ -5153,7 +5153,7 @@ await runCase(52, 'El contacto aparece al elegir y desaparece cuando la elecció
     await page.getByRole('button', { name: /Agregar/ }).first().click();
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
-    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15_000 });
+    await page.getByRole('heading', { name: /Datos de env/i }).waitFor({ timeout: 15_000 });
     await elegirDestino(page, 'Pergamino');
 
     const seccion = page.locator('[class*="_fletes_"]');
@@ -5518,7 +5518,7 @@ await runCase(56, 'Una selección tardía no revive una decisión ya descartada'
 
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
-    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15_000 });
+    await page.getByRole('heading', { name: /Datos de env/i }).waitFor({ timeout: 15_000 });
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0505');
     await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
     await page.getByPlaceholder('2000').fill('2700');
@@ -7725,7 +7725,7 @@ await runCase(81, 'La pantalla cobra por grupo, arma la cola de órdenes y no de
 
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
-    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15_000 });
+    await page.getByRole('heading', { name: /Datos de env/i }).waitFor({ timeout: 15_000 });
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0808');
     await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
     await page.getByPlaceholder('2000').fill('2700');
@@ -7734,7 +7734,7 @@ await runCase(81, 'La pantalla cobra por grupo, arma la cola de órdenes y no de
     await page.locator('form:has(h2) button[type="submit"]').click();
 
     // --- lo que la pantalla dice ANTES de confirmar
-    await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: 20_000 });
+    await page.getByRole('heading', { name: /Medio de pago/i }).waitFor({ timeout: 20_000 });
     const aviso = page.locator('[class*="_avisoMultiple_"]');
     await aviso.waitFor({ state: 'visible', timeout: 15_000 });
     const textoDelAviso = (await aviso.textContent()) || '';
@@ -10966,7 +10966,7 @@ await runCase(114, 'En pantalla: se comparan marca y cargas, el dominio recién 
 
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
-    await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: 15_000 });
+    await page.getByRole('heading', { name: /Datos de env/i }).waitFor({ timeout: 15_000 });
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0505');
     await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
     await page.getByPlaceholder('2000').fill('2700');

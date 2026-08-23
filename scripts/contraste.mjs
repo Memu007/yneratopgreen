@@ -427,11 +427,11 @@ for (const medida of MEDIDAS) {
       .waitFor({ state: 'visible', timeout: ESPERA });
     await page.getByRole('button', { name: /Agregar/ }).first().click();
     await page.getByRole('button', { name: /Carrito/ }).click();
-    await revisar(page, `${medida.n} carrito`, page.getByRole('heading', { name: /Mi Carrito/ }));
+    await revisar(page, `${medida.n} carrito`, page.getByRole('heading', { name: /Mi carrito/i }));
 
     await page.getByRole('button', { name: 'Continuar compra' }).click();
     await revisar(page, `${medida.n} checkout envío`,
-      page.getByRole('heading', { name: /Datos de Env/ }));
+      page.getByRole('heading', { name: /Datos de env/i }));
 
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
     await page.locator('#checkout-provincia').selectOption('06');
@@ -453,7 +453,7 @@ for (const medida of MEDIDAS) {
     await page.getByPlaceholder('2000').fill('2700');
     await page.locator('form:has(h2) button[type="submit"]').click();
     await revisar(page, `${medida.n} checkout pago`,
-      page.getByRole('heading', { name: /M.todo de Pago/ }));
+      page.getByRole('heading', { name: /Medio de pago/i }));
 
     await ctx.close();
   }

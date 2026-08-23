@@ -1,11 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useToast } from '../Toast/Toast';
+import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../hooks/useToast';
 import { NewProductData } from '../../types';
 import { apiPost, apiGet, API_BASE_URL, tokenStorage } from '../../utils/api';
 import styles from './AddProductModal.module.css';
 import { ProductImage } from '../ProductImage/ProductImage';
 import { Condition, OperationKind, ETIQUETA_DE_ANATOMIA, ETIQUETA_DE_CONDICION } from '../../utils/anatomia';
+import { useCapaModal } from '../../hooks/useCapaModal';
 
 interface AddProductModalProps {
   isOpen: boolean;
@@ -77,6 +78,10 @@ interface LocalityOption {
 }
 
 export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSubmit }) => {
+  // Antes de cualquier `return` temprano: un hook se llama siempre y en
+  // el mismo orden. El interruptor es el que decide si hace algo.
+  const capa = useCapaModal<HTMLDivElement>(onClose, isOpen);
+
   const { user, isAuthenticated } = useAuth();
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -612,9 +617,15 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
 
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
-      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}
+        ref={capa}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Publicar"
+        tabIndex={-1}
+      >
         <div className={styles.modalHeader}>
-          <h2>{publicationType === 'producto' ? '🌾 Agregar Nuevo Producto' : '🔧 Ofrecer Nuevo Servicio'}</h2>
+          <h2>{publicationType === 'producto' ? 'Publicar un producto' : 'Publicar un servicio'}</h2>
           <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>✕</button>
         </div>
 
@@ -628,14 +639,14 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                 className={`${styles.typeButton} ${publicationType === 'producto' ? styles.typeButtonActive : ''}`}
                 onClick={() => handleTypeChange('producto')}
               >
-                📦 Producto
+                Producto
               </button>
               <button
                 type="button"
                 className={`${styles.typeButton} ${publicationType === 'servicio' ? styles.typeButtonActive : ''}`}
                 onClick={() => handleTypeChange('servicio')}
               >
-                🔧 Servicio
+                Servicio
               </button>
             </div>
           </div>
@@ -771,7 +782,6 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
               onClick={() => fileInputRef.current?.click()}
             >
               <div className={styles.dropZoneContent}>
-                <div className={styles.uploadIcon}>📸</div>
                 <p className={styles.dropZoneText}>
                   <strong>Arrastra imágenes aquí</strong> o haz clic para seleccionar
                 </p>
@@ -801,7 +811,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                       <ProductImage src={image.url} alt={`Preview ${index + 1}`} />
                       {formData.image === image.url && (
                         <div className={styles.mainImageBadge}>
-                          ⭐ Principal
+                          Principal
                         </div>
                       )}
                       <div className={styles.imageActions}>
@@ -810,18 +820,18 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                             type="button"
                             onClick={() => setAsMainImage(image.id)}
                             className={styles.setMainButton}
-                            title="Establecer como imagen principal"
+                            aria-label="Usar como imagen principal"
                           >
-                            ⭐
+                            Principal
                           </button>
                         )}
                         <button
                           type="button"
                           onClick={() => removeImage(image.id)}
                           className={styles.removeImageButton}
-                          title="Eliminar imagen"
+                          aria-label="Quitar esta imagen"
                         >
-                          🗑️
+                          Quitar
                         </button>
                       </div>
                     </div>
@@ -1039,7 +1049,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                     <div className={styles.featuresList}>
                       {serviceData.coverageZones.map((zone, index) => (
                         <div key={index} className={styles.featureTag}>
-                          📍 {zone}
+                          {zone}
                           <button
                             type="button"
                             onClick={() => removeCoverageZone(zone)}
@@ -1176,7 +1186,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
               Cancelar
             </button>
             <button type="submit" className={styles.submitButton} disabled={isSubmitting}>
-              {isSubmitting ? '⏳ Publicando...' : publicationType === 'producto' ? '📦 Publicar Producto' : '🔧 Publicar Servicio'}
+              {isSubmitting ? 'Publicando…' : publicationType === 'producto' ? 'Publicar producto' : 'Publicar servicio'}
             </button>
           </div>
         </form>

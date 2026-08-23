@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from './UserDashboard.module.css';
-import { useAuth } from '../../contexts/AuthContext';
-import { useToast } from '../Toast/Toast';
+import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../hooks/useToast';
 import { apiGet, apiPatch, apiDelete, apiPost, apiUpload, apiBlob, tokenStorage, API_BASE_URL } from '../../utils/api';
 import { explicarMP, type VinculoMP } from '../../utils/mercadoPago';
 import { ETIQUETA_DE_ESTADO, type MiDocumentacion } from '../../utils/documentacion';
@@ -22,6 +22,7 @@ import {
   normalizarAnatomia,
   normalizarCondicion,
 } from '../../utils/anatomia';
+import { useCapaModal } from '../../hooks/useCapaModal';
 
 type TabType = 'profile' | 'notifications' | 'purchases' | 'sales' | 'products'
   | 'operations';
@@ -596,7 +597,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     };
 
     loadUserProducts();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Cargar notificaciones cuando se monta el componente o cambia de pestaña
   useEffect(() => {
@@ -688,14 +689,17 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     void cargarDocumentacion();
   }, []);
 
-  // Cargar categorías cuando se abre el modal de edición
+  // Cargar categorías cuando se ABRE el modal de edición. La condición vive
+  // en una variable y no adentro del arreglo de dependencias: ahí la
+  // herramienta no puede analizarla, y de paso queda dicho que lo que
+  // importa es la apertura y no cada tecla que se escribe adentro.
+  const editando = editingProduct !== null;
   useEffect(() => {
-    if (editingProduct) {
-      apiGet<CategoryFromBackend[]>('/catalog/categories?include_empty=true')
-        .then(data => setCategories(data))
-        .catch(err => console.error('Error cargando categorías:', err));
-    }
-  }, [editingProduct !== null]);
+    if (!editando) return;
+    apiGet<CategoryFromBackend[]>('/catalog/categories?include_empty=true')
+      .then(data => setCategories(data))
+      .catch(err => console.error('Error cargando categorías:', err));
+  }, [editando]);
 
   const cargarVinculoMP = async () => {
     setMpCargando(true);
@@ -1050,22 +1054,24 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     }
   };
 
-  const getNotificationIcon = (type: string) => {
-    const icons: Record<string, string> = {
-      'order_placed': '🛒',
-      'order_received': '📦',
-      'order_confirmed': '✅',
-      'order_shipped': '🚚',
-      'order_delivered': '🎉',
-      'order_cancelled': '❌',
-      'order_rejected': '🚫',
-      'payment_approved': '💳',
-      'payment_failed': '⚠️',
-      'product_sold': '💰',
-      'welcome': '👋',
-      'system': '🔔',
+  // Una palabra y no un dibujo. El emoji no dice nada a quien no lo
+  // distingue, y un lector de pantalla anuncia «camión» en vez de «enviado».
+  const rotuloDeAviso = (type: string) => {
+    const etiquetas: Record<string, string> = {
+      'order_placed': 'Pedido',
+      'order_received': 'Venta',
+      'order_confirmed': 'Confirmado',
+      'order_shipped': 'Enviado',
+      'order_delivered': 'Entregado',
+      'order_cancelled': 'Cancelado',
+      'order_rejected': 'Rechazado',
+      'payment_approved': 'Pago',
+      'payment_failed': 'Pago fallido',
+      'product_sold': 'Vendido',
+      'welcome': 'Bienvenida',
+      'system': 'Aviso',
     };
-    return icons[type] || '🔔';
+    return etiquetas[type] || 'Aviso';
   };
 
   const formatNotificationDate = (dateStr: string) => {
@@ -1537,7 +1543,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           <div className={styles.statInfo}>
             <p className={styles.statLabel}>Reputación</p>
             <p className={styles.statValue}>
-              {(user?.ratingCount ?? 0) > 0 ? `⭐ ${(user?.ratingAverage ?? 0).toFixed(1)}` : '—'}
+              {(user?.ratingCount ?? 0) > 0 ? ` ${(user?.ratingAverage ?? 0).toFixed(1)}` : '—'}
             </p>
           </div>
         </div>
@@ -1591,7 +1597,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           <div className={styles.userRating}>
             {(user?.ratingCount ?? 0) > 0 ? (
               <>
-                <span className={styles.stars}>{'⭐'.repeat(Math.round(user?.ratingAverage ?? 0))}</span>
+                <span className={styles.stars}>{''.repeat(Math.round(user?.ratingAverage ?? 0))}</span>
                 <span className={styles.ratingValue}>{(user?.ratingAverage ?? 0).toFixed(1)}</span>
               </>
             ) : (
@@ -1812,7 +1818,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   {/* Dónde termina este dato, dicho en el campo: quien lo
                       escribe tiene que saber quién lo va a ver. */}
                   <p className={styles.campoPrivado}>
-                    🔒 Privado: no aparece en el listado de transportistas. Lo ve
+                    Privado: no aparece en el listado de transportistas. Lo ve
                     el comprador recién después de seleccionarte, junto con tu
                     contacto.
                   </p>
@@ -1972,7 +1978,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           )}
 
           <div className={styles.privacyNote}>
-            🔒 Tu información de contacto solo se comparte con los compradores después de que confirmen la compra
+            Tu información de contacto solo se comparte con los compradores después de que confirmen la compra
           </div>
         </div>
       </div>
@@ -1981,14 +1987,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           TopGreen no lo recibe ni lo reparte. */}
       <div className={styles.mpSection}>
         <div className={styles.sectionHeader}>
-          <h2>💳 Mercado Pago — dónde cobrás</h2>
+          <h2> Mercado Pago — dónde cobrás</h2>
         </div>
         <div className={styles.mpContent}>
           {mpCargando ? (
             <p>Cargando estado…</p>
           ) : mpVinculo?.estado === 'conectado' ? (
             <div className={styles.mpLinked}>
-              <span className={styles.mpStatus}>✅ Cuenta vinculada</span>
+              <span className={styles.mpStatus}> Cuenta vinculada</span>
               <p>Cuenta de Mercado Pago: <strong>{mpVinculo.mp_user_id}</strong></p>
               <p className={styles.mpInfo}>
                 Cuando el cobro con Mercado Pago esté disponible, los pagos de tus
@@ -1999,7 +2005,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               {mpVinculo.conviene_renovar && (
                 <>
                   <div className={styles.mpWarning}>
-                    ⏳ <strong>Tu conexión vence pronto</strong>
+                    <strong>Tu conexión vence pronto</strong>
                   </div>
                   <button
                     className={styles.mpLinkButton}
@@ -2021,7 +2027,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           ) : mpVinculo?.estado === 'requiere_reconexion' ? (
             <div className={styles.mpUnlinked}>
               <div className={styles.mpWarning}>
-                ⚠️ <strong>Hay que reconectar tu cuenta</strong>
+                <strong>Hay que reconectar tu cuenta</strong>
               </div>
               <p>
                 El permiso que le diste a TopGreen sobre tu cuenta
@@ -2034,7 +2040,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 onClick={conectarMercadoPago}
                 disabled={mpTrabajando}
               >
-                {mpTrabajando ? 'Abriendo Mercado Pago…' : '🔗 Reconectar cuenta'}
+                {mpTrabajando ? 'Abriendo Mercado Pago…' : ' Reconectar cuenta'}
               </button>
               <button
                 className={styles.mpUnlinkButton}
@@ -2047,7 +2053,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           ) : mpVinculo?.estado === 'desconectado' ? (
             <div className={styles.mpUnlinked}>
               <div className={styles.mpWarning}>
-                ⚠️ <strong>Cuenta no vinculada</strong>
+                <strong>Cuenta no vinculada</strong>
               </div>
               <p>
                 Vinculá tu cuenta de Mercado Pago para dejar lista tu forma de cobro:
@@ -2058,9 +2064,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               <div className={styles.mpBenefits}>
                 <h4>Qué pasa cuando la vinculás:</h4>
                 <ul>
-                  <li>✅ Cobrás vos, en tu propia cuenta</li>
-                  <li>✅ TopGreen no recibe ni retiene ese dinero</li>
-                  <li>✅ Podés desvincularla cuando quieras</li>
+                  <li> Cobrás vos, en tu propia cuenta</li>
+                  <li> TopGreen no recibe ni retiene ese dinero</li>
+                  <li> Podés desvincularla cuando quieras</li>
                 </ul>
               </div>
               <button
@@ -2068,7 +2074,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 onClick={conectarMercadoPago}
                 disabled={mpTrabajando}
               >
-                {mpTrabajando ? 'Abriendo Mercado Pago…' : '🔗 Vincular Mercado Pago'}
+                {mpTrabajando ? 'Abriendo Mercado Pago…' : ' Vincular Mercado Pago'}
               </button>
               <p className={styles.mpHelp}>
                 Te lleva a Mercado Pago para que autorices la conexión. TopGreen nunca
@@ -2078,7 +2084,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           ) : (
             <div className={styles.mpUnlinked}>
               <div className={styles.mpWarning}>
-                ⚠️ <strong>Cobro por Mercado Pago no disponible</strong>
+                <strong>Cobro por Mercado Pago no disponible</strong>
               </div>
               <p>
                 Todavía no está habilitado en la plataforma. Tus ventas por
@@ -2094,7 +2100,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           una aprobación es que aparece el distintivo en tus publicaciones. */}
       <div className={styles.docSection}>
         <div className={styles.sectionHeader}>
-          <h2>📄 Documentación fiscal</h2>
+          <h2> Documentación fiscal</h2>
         </div>
         <div className={styles.docContent}>
           {docCargando ? (
@@ -2260,7 +2266,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     if (modo !== 'carrier' && modo !== 'self') {
       return (
         <div className={styles.traslado}>
-          <div className={styles.trasladoTitulo}>🚚 Traslado</div>
+          <div className={styles.trasladoTitulo}> Traslado</div>
           <p className={styles.trasladoTexto}>Traslado no definido.</p>
         </div>
       );
@@ -2269,7 +2275,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     if (modo === 'self') {
       return (
         <div className={styles.traslado}>
-          <div className={styles.trasladoTitulo}>🚚 Traslado</div>
+          <div className={styles.trasladoTitulo}> Traslado</div>
           <p className={styles.trasladoTexto}>
             {comoComprador
               ? 'Coordinás el traslado por tu cuenta.'
@@ -2281,7 +2287,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
 
     return (
       <div className={styles.traslado}>
-        <div className={styles.trasladoTitulo}>🚚 Transportista</div>
+        <div className={styles.trasladoTitulo}> Transportista</div>
         <p className={styles.trasladoTexto}><strong>{traslado?.carrier_name}</strong></p>
         {traslado?.carrier_base && (
           <p className={styles.trasladoTexto}>Base: {traslado.carrier_base}</p>
@@ -2335,17 +2341,17 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       </div>
 
       {errorDeOperaciones && (
-        <p className={styles.trasladoTexto} role="alert">⚠️ {errorDeOperaciones}</p>
+        <p className={styles.trasladoTexto} role="alert"> {errorDeOperaciones}</p>
       )}
 
       {cargandoOperaciones ? (
         <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>⏳</div>
+          <div className={styles.emptyIcon}></div>
           <h3>Cargando tus operaciones...</h3>
         </div>
       ) : operaciones.length === 0 ? (
         <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>🚚</div>
+          <div className={styles.emptyIcon}></div>
           <h3>Todavía no te eligieron para ningún viaje</h3>
           <p>Cuando un comprador te elija, la operación aparece acá.</p>
         </div>
@@ -2357,13 +2363,13 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 <div>
                   <h3>Operación #{operacion.order_number}</h3>
                   <p className={styles.orderDate}>
-                    📅 {new Date(operacion.created_at).toLocaleDateString('es-AR')}
+                    {new Date(operacion.created_at).toLocaleDateString('es-AR')}
                   </p>
                 </div>
               </div>
 
               <div className={styles.traslado}>
-                <div className={styles.trasladoTitulo}>📍 Recorrido</div>
+                <div className={styles.trasladoTitulo}> Recorrido</div>
                 <p className={styles.trasladoTexto}>
                   Retiro en {operacion.origins.length > 0
                     ? operacion.origins.map((o) => `${o.name}, ${o.province_name}`).join(' y ')
@@ -2408,12 +2414,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
 
         {loadingOrders ? (
           <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>⏳</div>
+            <div className={styles.emptyIcon}></div>
             <h3>Cargando tus compras...</h3>
           </div>
         ) : purchases.length === 0 ? (
           <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>🛒</div>
+            <div className={styles.emptyIcon}></div>
             <h3>Aún no tienes compras</h3>
             <p>Explora el marketplace y realiza tu primera compra</p>
           </div>
@@ -2453,7 +2459,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 <div className={styles.orderHeader}>
                   <div>
                     <h3>Pedido #{order.id}</h3>
-                    <p className={styles.orderDate}>📅 {new Date(order.date).toLocaleDateString('es-AR')}</p>
+                    <p className={styles.orderDate}> {new Date(order.date).toLocaleDateString('es-AR')}</p>
                   </div>
                   {getStatusBadge(order.status)}
                 </div>
@@ -2531,16 +2537,16 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
 
                 {order.seller && (order.status === 'confirmed' || order.status === 'in-transit' || order.status === 'delivered') && (
                   <div className={styles.contactInfo}>
-                    <div className={styles.unlocked}>🔓 Información de Contacto del Vendedor</div>
+                    <div className={styles.unlocked}> Información de Contacto del Vendedor</div>
                     <p><strong>{order.seller.name}</strong></p>
-                    <p>📞 {order.seller.phone}</p>
+                    <p> {order.seller.phone}</p>
                     <a 
                       href={`https://wa.me/${order.seller.whatsapp.replace(/[^0-9]/g, '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={styles.whatsappButton}
                     >
-                      💬 Contactar por WhatsApp
+                      Contactar por WhatsApp
                     </a>
                   </div>
                 )}
@@ -2554,7 +2560,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                       className={styles.rejectButton}
                       onClick={() => handleCancelPurchase(order.id)}
                     >
-                      ❌ Cancelar Pedido
+                      Cancelar Pedido
                     </button>
                   )}
                   {order.status === 'in-transit' && (
@@ -2562,7 +2568,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                       className={styles.confirmButton}
                       onClick={() => handleConfirmDelivery(order.id)}
                     >
-                      ✅ Confirmar Recepción
+                      Confirmar Recepción
                     </button>
                   )}
                   {order.status === 'delivered' && !ratedOrders.has(order.id) && (
@@ -2570,7 +2576,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                       className={styles.confirmButton}
                       onClick={() => openRatingModal(order.id, order.seller?.name || 'Vendedor')}
                     >
-                      ⭐ Calificar Vendedor
+                      Calificar Vendedor
                     </button>
                   )}
                 </div>
@@ -2592,12 +2598,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
 
       {loadingOrders ? (
         <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>⏳</div>
+          <div className={styles.emptyIcon}></div>
           <h3>Cargando tus ventas...</h3>
         </div>
       ) : sales.length === 0 ? (
         <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>💰</div>
+          <div className={styles.emptyIcon}></div>
           <h3>Aún no tienes ventas</h3>
           <p>Publica productos y espera a que los compradores te encuentren</p>
         </div>
@@ -2608,7 +2614,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               <div className={styles.orderHeader}>
                 <div>
                   <h3>Venta #{order.id}</h3>
-                  <p className={styles.orderDate}>📅 {new Date(order.date).toLocaleDateString('es-AR')}</p>
+                  <p className={styles.orderDate}> {new Date(order.date).toLocaleDateString('es-AR')}</p>
                 </div>
                 {getStatusBadge(order.status)}
               </div>
@@ -2633,16 +2639,16 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
 
               {order.buyer && order.status !== 'cancelled' && (
                 <div className={styles.contactInfo}>
-                  <div className={styles.unlocked}>🔓 Información del Comprador</div>
+                  <div className={styles.unlocked}> Información del Comprador</div>
                   <p><strong>{order.buyer.name}</strong></p>
-                  <p>📞 {order.buyer.phone}</p>
-                  <p>📍 {order.buyer.address}</p>
+                  <p> {order.buyer.phone}</p>
+                  <p> {order.buyer.address}</p>
                 </div>
               )}
 
               {order.transferReceiptUrl && (
                 <div className={styles.contactInfo}>
-                  <div className={styles.unlocked}>🏦 Comprobante de transferencia</div>
+                  <div className={styles.unlocked}> Comprobante de transferencia</div>
                   <a
                     href={getImageUrl(order.transferReceiptUrl)}
                     target="_blank"
@@ -2696,16 +2702,16 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                       onClick={() => handleTransferDecision(order.id, 'approve')}
                     >
                       {order.status === 'transfer-receipt-submitted'
-                        ? '✅ Aprobar comprobante'
-                        : '✅ Aprobar transferencia'}
+                        ? ' Aprobar comprobante'
+                        : ' Aprobar transferencia'}
                     </button>
                     <button
                       className={styles.rejectButton}
                       onClick={() => handleTransferDecision(order.id, 'reject')}
                     >
                       {order.status === 'transfer-receipt-submitted'
-                        ? '❌ Rechazar comprobante'
-                        : '❌ Rechazar transferencia'}
+                        ? ' Rechazar comprobante'
+                        : ' Rechazar transferencia'}
                     </button>
                   </>
                 )}
@@ -2716,14 +2722,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                         className={styles.confirmButton}
                         onClick={() => handleConfirmOrder(order.id)}
                       >
-                        ✅ Confirmar Pedido
+                        Confirmar Pedido
                       </button>
                     )}
                     <button 
                       className={styles.rejectButton}
                       onClick={() => handleRejectOrder(order.id)}
                     >
-                      ❌ Rechazar
+                      Rechazar
                     </button>
                   </>
                 )}
@@ -2733,13 +2739,13 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                       className={styles.confirmButton}
                       onClick={() => handleMarkAsShipped(order.id)}
                     >
-                      🚚 Marcar como Enviado
+                      Marcar como Enviado
                     </button>
                     <button 
                       className={styles.rejectButton}
                       onClick={() => handleRejectOrder(order.id)}
                     >
-                      ❌ Cancelar Venta
+                      Cancelar Venta
                     </button>
                   </>
                 )}
@@ -2765,12 +2771,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
 
       {loadingProducts ? (
         <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>⏳</div>
+          <div className={styles.emptyIcon}></div>
           <h3>Cargando tus productos...</h3>
         </div>
       ) : productsError ? (
         <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>⚠️</div>
+          <div className={styles.emptyIcon}></div>
           <h3>Error al cargar productos</h3>
           <p>{productsError}</p>
         </div>
@@ -2781,9 +2787,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               <div className={styles.productImage}>
                 <ProductImage src={product.image} alt={product.name} />
                 <div className={`${styles.productStatusBadge} ${styles[`status-${product.status}`]}`}>
-                  {product.status === 'active' && '✅ Activo'}
-                  {product.status === 'paused' && '⏸️ Pausado'}
-                  {product.status === 'sold-out' && '❌ Agotado'}
+                  {product.status === 'active' && ' Activo'}
+                  {product.status === 'paused' && ' Pausado'}
+                  {product.status === 'sold-out' && ' Agotado'}
                 </div>
               </div>
 
@@ -2833,7 +2839,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                       className={styles.toggleBtn}
                       onClick={() => handleToggleProductStatus(product.id, product.status)}
                     >
-                      {product.status === 'active' ? '⏸️ Pausar' : '▶️ Activar'}
+                      {product.status === 'active' ? ' Pausar' : ' Activar'}
                     </button>
                   )}
 
@@ -2853,7 +2859,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         </div>
       ) : (
         <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>📦</div>
+          <div className={styles.emptyIcon}></div>
           <h3>Aún no tienes productos publicados</h3>
           <p>Comienza a vender tus productos agrícolas en TopGreen</p>
           <button 
@@ -2870,7 +2876,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   const renderNotifications = () => (
     <div className={styles.section}>
       <div className={styles.sectionHeader}>
-        <h2>🔔 Notificaciones</h2>
+        <h2> Notificaciones</h2>
         {notifications.length > 0 && unreadCount > 0 && (
           <button 
             className={styles.markAllReadBtn}
@@ -2888,7 +2894,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         </div>
       ) : notifications.length === 0 ? (
         <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>🔔</div>
+          <div className={styles.emptyIcon}></div>
           <h3>No tienes notificaciones</h3>
           <p>Cuando ocurran eventos importantes, las verás aquí</p>
         </div>
@@ -2901,7 +2907,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               onClick={() => !notification.is_read && handleMarkNotificationRead(notification.id)}
             >
               <div className={styles.notificationIcon}>
-                {getNotificationIcon(notification.type)}
+                {rotuloDeAviso(notification.type)}
               </div>
               <div className={styles.notificationContent}>
                 <div className={styles.notificationHeader}>
@@ -2929,9 +2935,19 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     </div>
   );
 
+  // Atrapa el foco, lo devuelve al cerrar, cierra con Escape y traba el
+  // scroll del fondo. Ninguna capa del producto hacía nada de esto.
+  const capa = useCapaModal<HTMLDivElement>(onClose);
+
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}
+        ref={capa}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Mi cuenta"
+        tabIndex={-1}
+      >
         <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
           ×
         </button>
@@ -3024,7 +3040,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         <div className={styles.editModalOverlay} onClick={() => setEditingProduct(null)}>
           <div className={styles.editModal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.editModalHeader}>
-              <h2>✏️ Editar {editingProduct.publication_type === 'servicio' ? 'Servicio' : 'Producto'}</h2>
+              <h2> Editar {editingProduct.publication_type === 'servicio' ? 'Servicio' : 'Producto'}</h2>
               <button 
                 className={styles.closeButton}
                 onClick={() => setEditingProduct(null)}
@@ -3036,8 +3052,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             <div className={styles.editModalContent}>
               {/* Nombre */}
               <div className={styles.editFormGroup}>
-                <label>Nombre del {editingProduct.publication_type === 'servicio' ? 'Servicio' : 'Producto'}</label>
+                <label htmlFor="edit-nombre">Nombre del {editingProduct.publication_type === 'servicio' ? 'Servicio' : 'Producto'}</label>
                 <input
+                  id="edit-nombre"
                   type="text"
                   value={editingProduct.name}
                   onChange={(e) => setEditingProduct({
@@ -3049,8 +3066,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               
               {/* Descripción */}
               <div className={styles.editFormGroup}>
-                <label>Descripción</label>
+                <label htmlFor="edit-descripcion">Descripción</label>
                 <textarea
+                  id="edit-descripcion"
                   value={editingProduct.description}
                   onChange={(e) => setEditingProduct({
                     ...editingProduct,
@@ -3063,8 +3081,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               {/* Categoría y Subcategoría */}
               <div className={styles.editFormRow}>
                 <div className={styles.editFormGroup}>
-                  <label>Categoría</label>
+                  <label htmlFor="edit-categoria">Categoría</label>
                   <input
+                    id="edit-categoria"
                     type="text"
                     value={editingProduct.category_name}
                     disabled
@@ -3074,8 +3093,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 </div>
                 
                 <div className={styles.editFormGroup}>
-                  <label>Subcategoría</label>
+                  <label htmlFor="edit-subcategoria">Subcategoría</label>
                   <select
+                    id="edit-subcategoria"
                     value={editingProduct.subcategory_id}
                     onChange={(e) => {
                       const selectedSubcat = categories
@@ -3145,8 +3165,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               {editingProduct.publication_type === 'producto' ? (
                 <div className={styles.editFormRow}>
                   <div className={styles.editFormGroup}>
-                    <label>Precio ($)</label>
+                    <label htmlFor="edit-precio">Precio ($)</label>
                     <input
+                      id="edit-precio"
                       type="text"
                       value={editingProduct.price}
                       onChange={(e) => setEditingProduct({
@@ -3158,8 +3179,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   </div>
                   
                   <div className={styles.editFormGroup}>
-                    <label>Stock</label>
+                    <label htmlFor="edit-stock">Stock</label>
                     <input
+                      id="edit-stock"
                       type="text"
                       value={editingProduct.stock}
                       onChange={(e) => setEditingProduct({
@@ -3171,8 +3193,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   </div>
                   
                   <div className={styles.editFormGroup}>
-                    <label>Unidad</label>
+                    <label htmlFor="edit-unidad">Unidad</label>
                     <select
+                      id="edit-unidad"
                       value={editingProduct.unit}
                       onChange={(e) => setEditingProduct({
                         ...editingProduct,
@@ -3192,8 +3215,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 <>
                   <div className={styles.editFormRow}>
                     <div className={styles.editFormGroup}>
-                      <label>Tipo de Precio</label>
+                      <label htmlFor="edit-tipo-precio">Tipo de Precio</label>
                       <select
+                        id="edit-tipo-precio"
                         value={editingProduct.pricing_type || 'por_hora'}
                         onChange={(e) => setEditingProduct({
                           ...editingProduct,
@@ -3208,8 +3232,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                     </div>
                     
                     <div className={styles.editFormGroup}>
-                      <label>Precio ($)</label>
+                      <label htmlFor="edit-precio-servicio">Precio ($)</label>
                       <input
+                        id="edit-precio-servicio"
                         type="text"
                         value={editingProduct.price}
                         onChange={(e) => setEditingProduct({
@@ -3224,8 +3249,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   
                   <div className={styles.editFormRow}>
                     <div className={styles.editFormGroup}>
-                      <label>Disponibilidad</label>
+                      <label htmlFor="edit-disponibilidad">Disponibilidad</label>
                       <select
+                        id="edit-disponibilidad"
                         value={editingProduct.availability || 'inmediata'}
                         onChange={(e) => setEditingProduct({
                           ...editingProduct,
@@ -3239,8 +3265,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                     </div>
                     
                     <div className={styles.editFormGroup}>
-                      <label>Tiempo de respuesta</label>
+                      <label htmlFor="edit-respuesta">Tiempo de respuesta</label>
                       <select
+                        id="edit-respuesta"
                         value={editingProduct.response_time || '24hs'}
                         onChange={(e) => setEditingProduct({
                           ...editingProduct,
@@ -3257,8 +3284,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   
                   <div className={styles.editFormRow}>
                     <div className={styles.editFormGroup}>
-                      <label>Años de experiencia</label>
+                      <label htmlFor="edit-experiencia">Años de experiencia</label>
                       <input
+                        id="edit-experiencia"
                         type="number"
                         value={editingProduct.experience_years || ''}
                         onChange={(e) => setEditingProduct({
@@ -3290,8 +3318,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               {/* Ubicación */}
               <div className={styles.editFormRow}>
                 <div className={styles.editFormGroup}>
-                  <label>Provincia</label>
+                  <label htmlFor="edit-provincia">Provincia</label>
                   <select
+                    id="edit-provincia"
                     value={editingProduct.location_province}
                     onChange={(e) => setEditingProduct({
                       ...editingProduct,
@@ -3306,8 +3335,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 </div>
                 
                 <div className={styles.editFormGroup}>
-                  <label>Ciudad</label>
+                  <label htmlFor="edit-ciudad">Ciudad</label>
                   <input
+                    id="edit-ciudad"
                     type="text"
                     value={editingProduct.location_city}
                     onChange={(e) => setEditingProduct({
@@ -3321,7 +3351,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               
               {/* Sección de Imágenes */}
               <div className={styles.editFormGroup}>
-                <label>📷 Imágenes del {editingProduct.publication_type === 'servicio' ? 'Servicio' : 'Producto'}</label>
+                <label> Imágenes del {editingProduct.publication_type === 'servicio' ? 'Servicio' : 'Producto'}</label>
                 <div className={styles.editImagesContainer}>
                   {/* Imágenes existentes */}
                   {editingProduct.existingImages.map((img, index) => (
@@ -3389,7 +3419,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 onClick={handleSaveEditProduct}
                 disabled={isSavingEdit}
               >
-                {isSavingEdit ? 'Guardando...' : '💾 Guardar Cambios'}
+                {isSavingEdit ? 'Guardando...' : ' Guardar Cambios'}
               </button>
             </div>
           </div>
@@ -3426,7 +3456,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           >
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
               <h2 style={{ margin: 0, color: '#2d5016', fontSize: '1.5rem' }}>
-                ⭐ Calificar a {ratingModal.sellerName}
+                Calificar a {ratingModal.sellerName}
               </h2>
             </div>
             
@@ -3456,11 +3486,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 ))}
               </div>
               <p style={{ textAlign: 'center', marginTop: '12px', color: '#666', fontSize: '1.1rem' }}>
-                {ratingScore === 1 && '😞 Muy malo'}
-                {ratingScore === 2 && '😕 Malo'}
-                {ratingScore === 3 && '😐 Regular'}
-                {ratingScore === 4 && '🙂 Bueno'}
-                {ratingScore === 5 && '😃 Excelente'}
+                {ratingScore === 1 && ' Muy malo'}
+                {ratingScore === 2 && ' Malo'}
+                {ratingScore === 3 && ' Regular'}
+                {ratingScore === 4 && ' Bueno'}
+                {ratingScore === 5 && ' Excelente'}
               </p>
             </div>
             

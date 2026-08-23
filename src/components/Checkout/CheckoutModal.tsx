@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import styles from './CheckoutModal.module.css';
-import { useCart } from '../../contexts/CartContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { useCart } from '../../hooks/useCart';
+import { useAuth } from '../../hooks/useAuth';
 import { API_BASE_URL, apiFetch, apiGet, tokenStorage } from '../../utils/api';
 import { ProductImage } from '../ProductImage/ProductImage';
 import {
@@ -10,6 +10,7 @@ import {
   LocalityResponse,
   ProvinceResponse,
 } from '../../utils/catalogService';
+import { useCapaModal } from '../../hooks/useCapaModal';
 
 interface CheckoutModalProps {
   onClose: () => void;
@@ -651,7 +652,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         {fletesCargando && <p className={styles.fleteAviso}>Buscando transportistas…</p>}
 
         {fletesError && (
-          <p className={styles.fleteAviso} role="alert">⚠️ {fletesError}</p>
+          <p className={styles.fleteAviso} role="alert">{fletesError}</p>
         )}
 
         {!fletesCargando && !fletesError && fletes?.groups.map((grupo) => {
@@ -712,7 +713,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
 
               {erroresDeSeleccion[grupo.seller_id] && (
                 <p className={styles.fleteAviso} role="alert">
-                  ⚠️ {erroresDeSeleccion[grupo.seller_id]}
+                  {erroresDeSeleccion[grupo.seller_id]}
                 </p>
               )}
 
@@ -751,7 +752,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
   const renderShippingStep = () => (
     <form onSubmit={handleShippingSubmit} className={styles.form}>
       <div className={styles.stepHeader}>
-        <h2>📦 Datos de Envío</h2>
+        <h2>Datos de envío</h2>
         <p>Completa tus datos para recibir el pedido</p>
       </div>
 
@@ -855,7 +856,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
       {renderFletes()}
 
       <button type="submit" className={styles.nextButton}>
-        Continuar al Pago →
+        Continuar al pago
       </button>
     </form>
   );
@@ -881,13 +882,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
   const renderPaymentStep = () => (
     <form onSubmit={handlePaymentSubmit} className={styles.form}>
       <div className={styles.stepHeader}>
-        <h2>💳 Método de Pago</h2>
+        <h2>Medio de pago</h2>
         <p>Elegí cómo le pagás a cada vendedor</p>
       </div>
 
       {error && (
         <div className={styles.errorMessage} role="alert">
-          ⚠️ {error}
+          {error}
         </div>
       )}
 
@@ -937,7 +938,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
                   />
                   <div className={styles.paymentContent}>
                     <div className={styles.paymentIcon}>
-                      {medio === 'transfer' ? '🏦' : '💳'}
+                      {medio === 'transfer' ? 'Transferencia' : 'Mercado Pago'}
                     </div>
                     <div>
                       <div className={styles.paymentTitle}>{nombreDelMedio(medio)}</div>
@@ -963,7 +964,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
 
       <div className={styles.formActions}>
         <button type="button" className={styles.backButton} onClick={() => setCurrentStep('shipping')} disabled={isLoading}>
-          ← Volver
+          Volver
         </button>
         <button type="submit" className={styles.nextButton} disabled={isLoading}>
           {isLoading ? 'Procesando...' : 'Confirmar y crear las órdenes'}
@@ -984,7 +985,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         en su resumen bancario.
       </p>
       {orden.status === 'transfer_receipt_submitted' ? (
-        <p>✅ Comprobante enviado. Esperando validación del vendedor.</p>
+        <p>Comprobante enviado. Esperando la validación del vendedor.</p>
       ) : (
         <>
           <input
@@ -1055,7 +1056,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
   /** La cola de órdenes: una tarjeta por vendedor, cada una con su pago. */
   const renderOrdenesStep = () => (
     <div className={styles.confirmation}>
-      <h2>✅ Tus órdenes</h2>
+      <h2>Tus órdenes</h2>
       <p>
         {ordenes.length === 1
           ? 'Se creó una orden.'
@@ -1118,9 +1119,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     </div>
   );
 
+  // Atrapa el foco, lo devuelve al cerrar, cierra con Escape y traba el
+  // scroll del fondo. Ninguna capa del producto hacía nada de esto.
+  const capa = useCapaModal<HTMLDivElement>(onClose);
+
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}
+        ref={capa}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Checkout"
+        tabIndex={-1}
+      >
         <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
           ×
         </button>

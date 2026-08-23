@@ -1,37 +1,12 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { useState, useCallback, ReactNode } from 'react';
+import { ToastContext, type ToastType, type ConfirmOptions } from '../../contexts/contextos';
 import styles from './Toast.module.css';
-
-// Tipos de toast
-type ToastType = 'success' | 'error' | 'warning' | 'info';
 
 interface Toast {
   id: number;
   message: string;
   type: ToastType;
 }
-
-interface ConfirmOptions {
-  title: string;
-  message: string;
-  confirmText?: string;
-  cancelText?: string;
-  type?: 'danger' | 'warning' | 'info';
-}
-
-interface ToastContextType {
-  showToast: (message: string, type?: ToastType) => void;
-  showConfirm: (options: ConfirmOptions) => Promise<boolean>;
-}
-
-const ToastContext = createContext<ToastContextType | null>(null);
-
-export const useToast = () => {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error('useToast must be used within a ToastProvider');
-  }
-  return context;
-};
 
 interface ToastProviderProps {
   children: ReactNode;
@@ -84,12 +59,16 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  const getIcon = (type: ToastType) => {
+  // Un rótulo en palabras, no un emoji. Tres motivos: el color solo no es
+  // un mensaje para quien no lo distingue; un lector de pantalla anuncia
+  // «marca de verificación blanca» en vez de «listo»; y un dibujo de
+  // sistema operativo no es parte de ninguna identidad.
+  const rotuloDe = (type: ToastType) => {
     switch (type) {
-      case 'success': return '✅';
-      case 'error': return '❌';
-      case 'warning': return '⚠️';
-      case 'info': return 'ℹ️';
+      case 'success': return 'Listo';
+      case 'error': return 'Error';
+      case 'warning': return 'Atención';
+      case 'info': return 'Aviso';
     }
   };
 
@@ -98,16 +77,16 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
       {children}
       
       {/* Toast Container */}
-      <div className={styles.toastContainer}>
+      <div className={styles.toastContainer} role="status" aria-live="polite" aria-atomic="false">
         {toasts.map(toast => (
           <div 
             key={toast.id} 
             className={`${styles.toast} ${styles[toast.type]}`}
             onClick={() => removeToast(toast.id)}
           >
-            <span className={styles.icon}>{getIcon(toast.type)}</span>
+            <span className={styles.rotulo}>{rotuloDe(toast.type)}</span>
             <span className={styles.message}>{toast.message}</span>
-            <button className={styles.closeBtn}>×</button>
+            <button className={styles.closeBtn} aria-label="Cerrar aviso">×</button>
           </div>
         ))}
       </div>

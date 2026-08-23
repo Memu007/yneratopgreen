@@ -8,7 +8,7 @@ import {
   ETIQUETA_DE_ANATOMIA,
   ETIQUETA_DE_CONDICION,
 } from '../../utils/anatomia';
-import { useCart } from '../../contexts/CartContext';
+import { useCart } from '../../hooks/useCart';
 import { ProductDetailModal } from '../ProductDetail/ProductDetailModal';
 import { ProductImage } from '../ProductImage/ProductImage';
 

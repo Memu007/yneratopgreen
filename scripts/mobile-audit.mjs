@@ -168,7 +168,7 @@ async function exercisePublicCatalog(browser, viewport) {
     await inspect(page, state, viewport, '01-home');
 
     state.screen = '02-filters';
-    await page.getByRole('button', { name: /Explorar Productos/ }).click();
+    await page.getByRole('button', { name: /Ver el mercado/i }).click();
     await waitForCatalog(page);
     await page.locator('#catalog-category').selectOption({ index: 1 });
     await page.locator('#catalog-province').selectOption({ index: 1 });
@@ -200,11 +200,11 @@ async function exerciseCheckout(browser, viewport, buyerTokens) {
     await addButton.waitFor({ state: 'visible' });
     await addButton.click();
     await page.getByRole('button', { name: /Carrito/ }).click();
-    await page.getByRole('heading', { name: /Mi Carrito/ }).waitFor();
+    await page.getByRole('heading', { name: /Mi carrito/i }).waitFor();
     await inspect(page, state, viewport, '05-cart');
 
     await page.getByRole('button', { name: 'Continuar compra' }).click();
-    await page.getByRole('heading', { name: /Datos de Envío/ }).waitFor();
+    await page.getByRole('heading', { name: /Datos de env/i }).waitFor();
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
     await page.locator('#checkout-provincia').selectOption('06');
     await page.waitForFunction(
@@ -213,7 +213,7 @@ async function exerciseCheckout(browser, viewport, buyerTokens) {
     await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Av. Prueba 123');
     await page.getByPlaceholder('2000').fill('2000');
     await page.locator('form:has(h2) button[type="submit"]').click();
-    await page.getByRole('heading', { name: /Método de Pago/ }).waitFor();
+    await page.getByRole('heading', { name: /Medio de pago/i }).waitFor();
     await inspect(page, state, viewport, '05-checkout-payment');
   } finally {
     await context.close();

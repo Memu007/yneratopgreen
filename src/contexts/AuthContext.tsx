@@ -1,16 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
+import { AuthContext } from './contextos';
 import { User, AuthContextType, RegisterData, RegistroPendiente } from '../types';
 import { apiGet, apiPost, apiPatch, tokenStorage } from '../utils/api';
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth debe ser usado dentro de AuthProvider');
-  }
-  return context;
-};
 
 interface AuthProviderProps {
   children: ReactNode;

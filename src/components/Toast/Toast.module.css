@@ -59,6 +59,17 @@
   color: #0c5460;
 }
 
+.rotulo {
+  flex-shrink: 0;
+  align-self: flex-start;
+  padding: 2px 7px;
+  border-left: 2px solid currentColor;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .icon {
   font-size: 1.3rem;
 }

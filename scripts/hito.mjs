@@ -115,11 +115,14 @@ async function main() {
 
     // ---------------------------------------------------------------- 1
     await paso('catálogo filtrado por categoría y ubicación oficial', async () => {
-      await page.locator('button').filter({ hasText: 'TopGreen' }).first().click();
+      await page.getByRole('button', { name: 'TopGreen', exact: true }).first().click();
       await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: ESPERA });
 
+      // El conteo dejó de ser un número suelto: ahora es «N operaciones», que
+      // es lo que el usuario lee. Se toma el número de ahí.
       const contar = async () => Number(
-        (await page.locator('[class*="_resultsNumber_"]').first().textContent()) || '0',
+        ((await page.locator('[class*="_conteo_"]').first().textContent()) || '0')
+          .replace(/[^0-9]/g, '') || '0',
       );
       const sinFiltrar = await contar();
 
@@ -164,7 +167,7 @@ async function main() {
       );
       await page.locator('#catalog-locality').selectOption(idLocalidad);
 
-      const grilla = page.locator('[class*="_productsGrid_"]');
+      const grilla = page.locator('[class*="_grilla_"]');
       let deLaApi = null;
       if (forzado === 'catalogo-sin-senal') {
         // La espera por reloj de la primera entrega, tal cual: 1,2 s y a medir.
@@ -175,7 +178,7 @@ async function main() {
         // Y la pantalla tiene que haber terminado de pintar ESA respuesta.
         await page.waitForFunction(
           (cuantos) => document.querySelectorAll(
-            '[class*="_productsGrid_"] h3',
+            '[class*="_grilla_"] h3',
           ).length === cuantos,
           deLaApi.length,
           { timeout: ESPERA },
@@ -224,18 +227,21 @@ async function main() {
 
     // ---------------------------------------------------------------- 2
     await paso('detalle, carrito y destino del padrón', async () => {
-      await page.locator('[class*="_productsGrid_"]')
+      await page.locator('[class*="_grilla_"]')
         .getByRole('heading', { name: datos.publicacion, exact: true, level: 3 }).click();
       await page.getByRole('dialog').waitFor({ timeout: ESPERA });
       // Agregar desde el detalle cierra el modal solo.
-      await page.getByRole('button', { name: /Agregar|Iniciar operación|Contratar/ }).first().click();
+      // Acotado al diálogo: la tarjeta de atrás tiene un botón con el mismo
+      // nombre, y sin acotar `.first()` elige el que está tapado.
+      await page.getByRole('dialog')
+        .getByRole('button', { name: /Agregar|Iniciar operación|Contratar/ }).first().click();
       await page.getByRole('dialog')
         .waitFor({ state: 'hidden', timeout: ESPERA });
 
       await page.getByRole('button', { name: /Carrito/ }).click();
-      await page.getByRole('heading', { name: /Mi Carrito/ }).waitFor({ timeout: ESPERA });
+      await page.getByRole('heading', { name: /Mi carrito/i }).waitFor({ timeout: ESPERA });
       await page.getByRole('button', { name: 'Continuar compra' }).click();
-      await page.getByRole('heading', { name: /Datos de Env/ }).waitFor({ timeout: ESPERA });
+      await page.getByRole('heading', { name: /Datos de env/i }).waitFor({ timeout: ESPERA });
 
       await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5000-1000');
       await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
@@ -344,7 +350,7 @@ async function main() {
         'se eligió transportista y no apareció su correo');
 
       await page.locator('form:has(h2) button[type="submit"]').click();
-      await page.getByRole('heading', { name: /M.todo de Pago/ }).waitFor({ timeout: ESPERA });
+      await page.getByRole('heading', { name: /Medio de pago/i }).waitFor({ timeout: ESPERA });
       // El pago se elige por grupo de vendedor. Acá hay uno solo, pero se
       // marca igual: es lo que hace el comprador.
       await page.locator('input[value="transfer"]').first().check();

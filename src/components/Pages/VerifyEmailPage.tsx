@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 // Se reutilizan los estilos de la pantalla de resultado de pago: misma forma
 // —tarjeta centrada con título, mensaje y acciones— así que no hace falta una
 // hoja nueva. Los círculos de ícono de esa hoja quedan afuera; ver abajo.

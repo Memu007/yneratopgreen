@@ -149,7 +149,7 @@ function mensajeDeError(detail: unknown, response: { status: number; statusText?
 /**
  * Fetch wrapper con manejo de errores, cookies y refresh automático
  */
-export async function apiFetch<T = any>(
+export async function apiFetch<T = unknown>(
   endpoint: string,
   options: RequestInit = {},
   retry = true
@@ -220,13 +220,13 @@ export async function apiFetch<T = any>(
 /**
  * Helper para GET requests
  */
-export const apiGet = <T = any>(endpoint: string) => 
+export const apiGet = <T = unknown>(endpoint: string) =>
   apiFetch<T>(endpoint, { method: 'GET' });
 
 /**
  * Helper para POST requests
  */
-export const apiPost = <T = any>(endpoint: string, data?: any) =>
+export const apiPost = <T = unknown>(endpoint: string, data?: unknown) =>
   apiFetch<T>(endpoint, {
     method: 'POST',
     body: data ? JSON.stringify(data) : undefined,
@@ -235,7 +235,7 @@ export const apiPost = <T = any>(endpoint: string, data?: any) =>
 /**
  * Helper para PUT requests
  */
-export const apiPut = <T = any>(endpoint: string, data: any) =>
+export const apiPut = <T = unknown>(endpoint: string, data: unknown) =>
   apiFetch<T>(endpoint, {
     method: 'PUT',
     body: JSON.stringify(data),
@@ -244,7 +244,7 @@ export const apiPut = <T = any>(endpoint: string, data: any) =>
 /**
  * Helper para PATCH requests
  */
-export const apiPatch = <T = any>(endpoint: string, data: any) =>
+export const apiPatch = <T = unknown>(endpoint: string, data: unknown) =>
   apiFetch<T>(endpoint, {
     method: 'PATCH',
     body: JSON.stringify(data),
@@ -253,7 +253,7 @@ export const apiPatch = <T = any>(endpoint: string, data: any) =>
 /**
  * Helper para DELETE requests
  */
-export const apiDelete = <T = any>(endpoint: string) =>
+export const apiDelete = <T = unknown>(endpoint: string) =>
   apiFetch<T>(endpoint, { method: 'DELETE' });
 
 /**
@@ -281,7 +281,7 @@ export async function apiBlob(endpoint: string): Promise<Blob> {
 /**
  * Helper para upload de archivos (FormData)
  */
-export const apiUpload = <T = any>(endpoint: string, formData: FormData) =>
+export const apiUpload = <T = unknown>(endpoint: string, formData: FormData) =>
   apiFetch<T>(endpoint, {
     method: 'POST',
     body: formData,

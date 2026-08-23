@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import styles from './Header.module.css';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { CartButton } from '../Cart/CartModal';
 import { UserDashboard } from '../UserDashboard/UserDashboard';
-import { useToast } from '../Toast/Toast';
+import { useToast } from '../../hooks/useToast';
 import { explicarMP, resultadoDeMercadoPago } from '../../utils/mercadoPago';
 
 type PageSection = 'home' | 'marketplace' | 'about' | 'services' | 'contact' | 'payment-success' | 'payment-failure' | 'payment-pending' | 'verificar-correo';
@@ -62,7 +62,11 @@ export const Header: React.FC<HeaderProps> = ({
       showToast(explicarMP(resultado.motivo), 'error');
     }
     setVueltaDeMP(true);
-  }, []);
+    // `showToast` está memorizado en su proveedor con dependencias vacías:
+    // su identidad no cambia, así que declararlo no hace que el efecto
+    // vuelva a correr. Omitirlo era esconderle a la herramienta que el
+    // efecto lo usa.
+  }, [showToast]);
 
   // Y se lo devuelve a donde estaba, pero recién cuando la sesión terminó de
   // restaurarse: al montar todavía no se sabe quién es. Si resulta que no hay

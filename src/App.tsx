@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import styles from './App.module.css';
 import { Header } from './components/Header/Header';
 import { Footer } from './components/Footer/Footer';
-import { useAuth } from './contexts/AuthContext';
+import { useAuth } from './hooks/useAuth';
 import { FilterSidebar } from './components/FilterSidebar/FilterSidebar';
 import { ProductGrid } from './components/ProductGrid/ProductGrid';
 import { LoginModal } from './components/Auth/LoginModal';

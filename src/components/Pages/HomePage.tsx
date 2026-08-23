@@ -1,7 +1,7 @@
 import React from 'react';
 import styles from './HomePage.module.css';
-import { useAuth } from '../../contexts/AuthContext';
-import { useToast } from '../Toast/Toast';
+import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../hooks/useToast';
 
 interface HomePageProps {
   onNavigateToMarketplace: () => void;
@@ -11,7 +11,7 @@ interface HomePageProps {
   onLoginClick?: () => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({ onNavigateToMarketplace, onNavigateToContact: _onNavigateToContact, onNavigateToServices, onPublishClick, onLoginClick }) => {
+export const HomePage: React.FC<HomePageProps> = ({ onNavigateToMarketplace, onNavigateToServices, onPublishClick, onLoginClick }) => {
   const { user } = useAuth();
   const { showToast } = useToast();
 
@@ -38,14 +38,14 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigateToMarketplace, onN
             Bienvenido a <span className={styles.brandName}>TopGreen</span>
           </h1>
           <p className={styles.heroSubtitle}>
-            El marketplace líder del agro argentino
+            Mercado agro: productos, servicios y logística
           </p>
           <p className={styles.heroDescription}>
-            Conectamos productores, comercializadores y profesionales del sector agropecuario
-            en una plataforma segura y confiable.
+            Conectamos productores, comercializadores y profesionales del sector
+            agropecuario en un mismo lugar.
           </p>
           <button className={styles.ctaButton} onClick={onNavigateToMarketplace}>
-            Explorar Productos 🌾
+            Ver el mercado
           </button>
         </div>
       </section>
@@ -96,7 +96,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigateToMarketplace, onN
           
           <div className={styles.servicesButtonWrapper}>
             <button className={styles.servicesButton} onClick={onNavigateToServices}>
-              Ver Nuestros Servicios →
+              Ver nuestros servicios
             </button>
           </div>
         </div>

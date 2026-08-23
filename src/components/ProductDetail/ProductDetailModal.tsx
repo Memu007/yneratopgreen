@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Product } from '../../types';
-import { useCart } from '../../contexts/CartContext';
-import { useAuth } from '../../contexts/AuthContext';
-import { useToast } from '../Toast/Toast';
+import { useCart } from '../../hooks/useCart';
+import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../hooks/useToast';
 import {
   precioVisible,
   formatCantidad,

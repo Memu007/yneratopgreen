@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import styles from './AdminPanel.module.css';
-import { useToast } from '../Toast/Toast';
+import { useToast } from '../../hooks/useToast';
 import { apiGet, apiPost, apiPatch, apiDelete, apiBlob } from '../../utils/api';
 import { ProductImage } from '../ProductImage/ProductImage';
 import {
@@ -9,6 +9,7 @@ import {
   type ColaDeDocumentacion,
   type DocumentacionEnCola,
 } from '../../utils/documentacion';
+import { useCapaModal } from '../../hooks/useCapaModal';
 
 type AdminTab =
   | 'dashboard' | 'users' | 'products' | 'orders' | 'categories' | 'config'
@@ -190,7 +191,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [newCategory, setNewCategory] = useState({
     name: '',
     description: '',
-    icon: '📦',
+    icon: '',
     is_service: false,
     display_order: 0
   });
@@ -222,24 +223,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     };
   }, []);
 
-  // Cargar dashboard stats
-  useEffect(() => {
-    if (activeTab === 'dashboard') {
-      loadDashboard();
-    }
-  }, [activeTab]);
-
-  // Cargar datos según pestaña
-  useEffect(() => {
-    if (activeTab === 'users') loadUsers();
-    if (activeTab === 'products') loadProducts();
-    if (activeTab === 'orders') loadOrders();
-    if (activeTab === 'categories') loadCategories();
-    if (activeTab === 'config') loadFormOptions();
-    if (activeTab === 'documentacion') loadDocumentacion();
-  }, [activeTab, userRoleFilter, categoryFilter, selectedOptionType, docFiltro]);
-
-  const loadDashboard = async () => {
+  const loadDashboard = useCallback(async () => {
     setLoading(true);
     try {
       const data = await apiGet<DashboardStats>('/admin/dashboard');
@@ -249,9 +233,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadDocumentacion = async () => {
+  // Cargar dashboard stats
+  useEffect(() => {
+    if (activeTab === 'dashboard') {
+      loadDashboard();
+    }
+  }, [activeTab, loadDashboard]);
+
+  const loadDocumentacion = useCallback(async () => {
     setLoading(true);
     try {
       const query = docFiltro ? `?estado=${docFiltro}` : '';
@@ -263,7 +254,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [docFiltro]);
 
   const verConstancia = async (fila: DocumentacionEnCola) => {
     try {
@@ -315,7 +306,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     }
   };
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
       const params = userRoleFilter ? `?role=${userRoleFilter}` : '';
@@ -327,9 +318,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userRoleFilter]);
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     setLoading(true);
     try {
       const data = await apiGet<{ products: AdminProduct[]; total: number }>('/admin/products');
@@ -340,9 +331,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     setLoading(true);
     try {
       const data = await apiGet<{ orders: AdminOrder[]; total: number }>('/admin/orders');
@@ -353,9 +344,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
     setLoading(true);
     try {
       let params = '?include_inactive=true';
@@ -370,9 +361,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [categoryFilter, showToast]);
 
-  const loadFormOptions = async () => {
+  const loadFormOptions = useCallback(async () => {
     setLoading(true);
     try {
       // Cargar tipos de opciones si aún no lo hemos hecho
@@ -390,7 +381,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedOptionType, optionTypes.length, showToast]);
+
+  // Cargar datos según pestaña
+  useEffect(() => {
+    if (activeTab === 'users') loadUsers();
+    if (activeTab === 'products') loadProducts();
+    if (activeTab === 'orders') loadOrders();
+    if (activeTab === 'categories') loadCategories();
+    if (activeTab === 'config') loadFormOptions();
+    if (activeTab === 'documentacion') loadDocumentacion();
+  }, [activeTab, userRoleFilter, categoryFilter, selectedOptionType, docFiltro,
+      loadUsers, loadProducts, loadOrders, loadCategories, loadFormOptions,
+      loadDocumentacion]);
 
   const handleCreateOption = async () => {
     if (!newOption.value.trim() || !newOption.label.trim()) {
@@ -461,7 +464,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       await apiPost('/admin/categories', newCategory);
       showToast('Categoría creada exitosamente', 'success');
       setShowCreateCategory(false);
-      setNewCategory({ name: '', description: '', icon: '📦', is_service: false, display_order: 0 });
+      setNewCategory({ name: '', description: '', icon: '', is_service: false, display_order: 0 });
       loadCategories();
     } catch (error: unknown) {
       console.error('Error creando categoría:', error);
@@ -592,9 +595,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       await apiPatch(`/admin/users/${userId}`, { role: newRole });
       showToast('Rol actualizado correctamente', 'success');
       loadUsers();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error cambiando rol:', error);
-      const message = error?.message || error?.detail || 'Error al cambiar rol';
+      const message = error instanceof Error ? error.message : 'Error al cambiar rol';
       showToast(message, 'error');
     }
   };
@@ -641,9 +644,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     );
   };
 
+  // Atrapa el foco, lo devuelve al cerrar, cierra con Escape y traba el
+  // scroll del fondo. Ninguna capa del producto hacía nada de esto.
+  const capa = useCapaModal<HTMLDivElement>(onClose);
+
   return (
     <div className={styles.overlay}>
-      <div className={styles.panel}>
+      <div className={styles.panel}
+        ref={capa}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Administración"
+        tabIndex={-1}
+      >
         <div className={styles.header}>
           <h1>Panel de Administración</h1>
           <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>×</button>
@@ -654,43 +667,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             className={`${styles.tab} ${activeTab === 'dashboard' ? styles.active : ''}`}
             onClick={() => setActiveTab('dashboard')}
           >
-            📊 Dashboard
+            Dashboard
           </button>
           <button 
             className={`${styles.tab} ${activeTab === 'users' ? styles.active : ''}`}
             onClick={() => setActiveTab('users')}
           >
-            👥 Usuarios
+            Usuarios
           </button>
           <button 
             className={`${styles.tab} ${activeTab === 'products' ? styles.active : ''}`}
             onClick={() => setActiveTab('products')}
           >
-            📦 Productos
+            Productos
           </button>
           <button 
             className={`${styles.tab} ${activeTab === 'orders' ? styles.active : ''}`}
             onClick={() => setActiveTab('orders')}
           >
-            🛒 Órdenes
+            Órdenes
           </button>
           <button 
             className={`${styles.tab} ${activeTab === 'categories' ? styles.active : ''}`}
             onClick={() => setActiveTab('categories')}
           >
-            📁 Categorías
+            Categorías
           </button>
           <button
             className={`${styles.tab} ${activeTab === 'documentacion' ? styles.active : ''}`}
             onClick={() => setActiveTab('documentacion')}
           >
-            📄 Documentación
+            Documentación
           </button>
           <button
             className={`${styles.tab} ${activeTab === 'config' ? styles.active : ''}`}
             onClick={() => setActiveTab('config')}
           >
-            ⚙️ Configuración
+            Configuración
           </button>
         </div>
 
@@ -702,56 +715,56 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             <div className={styles.dashboard}>
               <div className={styles.statsGrid}>
                 <div className={styles.statCard}>
-                  <div className={styles.statIcon}>👥</div>
+                  <div className={styles.statIcon}></div>
                   <div className={styles.statInfo}>
                     <span className={styles.statValue}>{stats.total_users}</span>
                     <span className={styles.statLabel}>Usuarios Totales</span>
                   </div>
                 </div>
                 <div className={styles.statCard}>
-                  <div className={styles.statIcon}>🏪</div>
+                  <div className={styles.statIcon}></div>
                   <div className={styles.statInfo}>
                     <span className={styles.statValue}>{stats.total_sellers}</span>
                     <span className={styles.statLabel}>Vendedores</span>
                   </div>
                 </div>
                 <div className={styles.statCard}>
-                  <div className={styles.statIcon}>🛍️</div>
+                  <div className={styles.statIcon}></div>
                   <div className={styles.statInfo}>
                     <span className={styles.statValue}>{stats.total_customers}</span>
                     <span className={styles.statLabel}>Clientes</span>
                   </div>
                 </div>
                 <div className={styles.statCard}>
-                  <div className={styles.statIcon}>📦</div>
+                  <div className={styles.statIcon}></div>
                   <div className={styles.statInfo}>
                     <span className={styles.statValue}>{stats.active_products}</span>
                     <span className={styles.statLabel}>Productos Activos</span>
                   </div>
                 </div>
                 <div className={styles.statCard}>
-                  <div className={styles.statIcon}>🛒</div>
+                  <div className={styles.statIcon}></div>
                   <div className={styles.statInfo}>
                     <span className={styles.statValue}>{stats.total_orders}</span>
                     <span className={styles.statLabel}>Órdenes Totales</span>
                   </div>
                 </div>
                 <div className={styles.statCard}>
-                  <div className={styles.statIcon}>⏳</div>
+                  <div className={styles.statIcon}></div>
                   <div className={styles.statInfo}>
                     <span className={styles.statValue}>{stats.pending_orders}</span>
                     <span className={styles.statLabel}>Pendientes</span>
                   </div>
                 </div>
                 <div className={styles.statCard}>
-                  <div className={styles.statIcon}>✅</div>
+                  <div className={styles.statIcon}></div>
                   <div className={styles.statInfo}>
                     <span className={styles.statValue}>{stats.completed_orders}</span>
                     <span className={styles.statLabel}>Completadas</span>
                   </div>
                 </div>
                 <div className={styles.statCard} style={{ gridColumn: 'span 2', background: 'var(--gradient-primary)' }}>
-                  <div className={styles.statIcon} style={{ color: 'white' }}>💰</div>
+                  <div className={styles.statIcon} style={{ color: 'white' }}></div>
                   <div className={styles.statInfo}>
                     <span className={styles.statValue} style={{ color: 'white' }}>{formatCurrency(stats.total_revenue)}</span>
                     <span className={styles.statLabel} style={{ color: '#ffffff' }}>Ingresos</span>
@@ -812,7 +825,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                     />
                     <select aria-label="Rol del nuevo usuario"
                       value={newUser.role}
-                      onChange={(e) => setNewUser({...newUser, role: e.target.value as any})}
+                      onChange={(e) => setNewUser({...newUser, role: e.target.value as 'user' | 'admin'})}
                     >
                       <option value="user">Usuario</option>
                       <option value="admin">Administrador</option>
@@ -1117,7 +1130,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                             className={styles.viewBtn}
                             onClick={() => setSelectedOrder(order)}
                           >
-                            👁️ Ver
+                            Ver
                           </button>
                         </td>
                       </tr>
@@ -1137,7 +1150,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         <div className={styles.orderDetailOverlay} onClick={() => setSelectedOrder(null)}>
           <div className={styles.orderDetailModal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.orderDetailHeader}>
-              <h2>📋 Orden {selectedOrder.order_number}</h2>
+              <h2> Orden {selectedOrder.order_number}</h2>
               <button className={styles.closeButton} aria-label="Cerrar" onClick={() => setSelectedOrder(null)}>×</button>
             </div>
             
@@ -1253,7 +1266,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                     type="text"
                     value={newCategory.icon}
                     onChange={(e) => setNewCategory({...newCategory, icon: e.target.value})}
-                    placeholder="📦"
+                    placeholder=""
                     maxLength={4}
                   />
                 </div>
@@ -1305,11 +1318,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 <div key={category.id} className={`${styles.categoryCard} ${!category.is_active ? styles.inactive : ''}`}>
                   <div className={styles.categoryHeader}>
                     <div className={styles.categoryInfo}>
-                      <span className={styles.categoryIcon}>{category.icon || '📦'}</span>
+                      <span className={styles.categoryIcon}>{category.icon || ''}</span>
                       <div>
                         <h3>{category.name}</h3>
                         <span className={styles.categoryMeta}>
-                          {category.is_service ? '🔧 Servicio' : '📦 Producto'} • 
+                          {category.is_service ? ' Servicio' : ' Producto'} •
                           {category.subcategories.length} subcategorías • 
                           {category.product_count} {category.is_service ? 'servicios' : 'productos'}
                           {!category.is_active && <span className={styles.inactiveTag}> • Inactiva</span>}
@@ -1321,13 +1334,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         className={styles.expandBtn}
                         onClick={() => toggleCategoryExpanded(category.id)}
                       >
-                        {expandedCategories.has(category.id) ? '▼' : '▶'} Subcategorías
+                        {expandedCategories.has(category.id) ? '' : ''} Subcategorías
                       </button>
                       <button 
                         className={styles.editBtn}
                         onClick={() => setEditingCategory(category)}
                       >
-                        ✏️
+
                       </button>
                       <button 
                         className={styles.deleteBtn}
@@ -1335,7 +1348,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         disabled={category.product_count > 0}
                         title={category.product_count > 0 ? 'No se puede eliminar (tiene productos)' : 'Eliminar'}
                       >
-                        🗑️
+
                       </button>
                     </div>
                   </div>
@@ -1457,7 +1470,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       {activeTab === 'config' && (
         <div className={styles.configSection}>
           <div className={styles.configHeader}>
-            <h2>⚙️ Configuración de Formularios</h2>
+            <h2> Configuración de Formularios</h2>
             <p>Administra las opciones de los dropdowns del sistema</p>
           </div>
           
@@ -1465,11 +1478,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           <div className={styles.configTabs}>
             {optionTypes.map(type => {
               const icons: Record<string, string> = {
-                province: '📍',
-                unit: '📏',
-                pricing_type: '💰',
-                availability: '📅',
-                response_time: '⏱️'
+                province: '',
+                unit: '',
+                pricing_type: '',
+                availability: '',
+                response_time: ''
               };
               return (
                 <button
@@ -1477,7 +1490,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   className={`${styles.configTab} ${selectedOptionType === type.value ? styles.active : ''}`}
                   onClick={() => setSelectedOptionType(type.value)}
                 >
-                  {icons[type.value] || '📋'} {type.label}
+                  {icons[type.value] || ''} {type.label}
                 </button>
               );
             })}
@@ -1583,13 +1596,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                           className={styles.editBtn}
                           onClick={() => setEditingOption(option)}
                         >
-                          ✏️
+
                         </button>
                         <button 
                           className={styles.deleteBtn}
                           onClick={() => handleDeleteOption(option.id, option.label)}
                         >
-                          🗑️
+
                         </button>
                       </div>
                     </>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import styles from './AuthModal.module.css';
-import { useAuth } from '../../contexts/AuthContext';
-import { useToast } from '../Toast/Toast';
+import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../hooks/useToast';
+import { useCapaModal } from '../../hooks/useCapaModal';
 
 interface LoginModalProps {
   onClose: () => void;
@@ -62,9 +63,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSwitchToRegis
     }
   };
 
+  // Atrapa el foco, lo devuelve al cerrar, cierra con Escape y traba el
+  // scroll del fondo. Ninguna capa del producto hacía nada de esto.
+  const capa = useCapaModal<HTMLDivElement>(onClose);
+
   return (
     <div className={styles.modalOverlay} onClick={handleOverlayClick}>
-      <div className={styles.modal}>
+      <div className={styles.modal}
+        ref={capa}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Ingresar"
+        tabIndex={-1}
+      >
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>Iniciar Sesión</h2>
           <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
@@ -122,7 +133,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSwitchToRegis
                 className={styles.togglePassword}
                 onClick={() => setShowPassword(!showPassword)}
               >
-                {showPassword ? '👁️' : '👁️‍🗨️'}
+                {showPassword ? 'Ocultar' : 'Mostrar'}
               </button>
             </div>
           </div>

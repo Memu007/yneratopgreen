@@ -15,6 +15,14 @@ import { useEffect, useRef } from 'react';
  *
  * Devuelve la referencia que hay que poner en el contenedor de la capa.
  */
+/**
+ * La pila de capas abiertas. Existe por las capas anidadas: el detalle abre el
+ * perfil del vendedor, y sin esto Escape cerraría la de abajo —los dos oyentes
+ * viven en `document` y se disparan en orden de registro, o sea el de afuera
+ * primero—. Sólo responde la última que se abrió.
+ */
+const PILA: symbol[] = [];
+
 const FOCALIZABLES = [
   'a[href]',
   'button:not([disabled])',
@@ -24,10 +32,17 @@ const FOCALIZABLES = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(', ');
 
-export function useCapaModal<T extends HTMLElement>(onClose: () => void) {
+export function useCapaModal<T extends HTMLElement>(onClose: () => void, activa = true) {
   const contenedor = useRef<T>(null);
 
   useEffect(() => {
+    // El interruptor no es un lujo: un hook tiene que llamarse siempre y en el
+    // mismo orden, así que la capa que todavía no se abrió lo llama igual. Sin
+    // esto atraparía el foco y trabaría el scroll con nada en pantalla.
+    if (!activa) return;
+
+    const propia = Symbol('capa');
+    PILA.push(propia);
     const previo = document.activeElement as HTMLElement | null;
     const overflowPrevio = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -38,6 +53,7 @@ export function useCapaModal<T extends HTMLElement>(onClose: () => void) {
     (primero || contenedor.current)?.focus();
 
     const alTeclear = (e: KeyboardEvent) => {
+      if (PILA[PILA.length - 1] !== propia) return;
       if (e.key === 'Escape') {
         e.stopPropagation();
         onClose();
@@ -67,11 +83,13 @@ export function useCapaModal<T extends HTMLElement>(onClose: () => void) {
 
     document.addEventListener('keydown', alTeclear, true);
     return () => {
+      const i = PILA.lastIndexOf(propia);
+      if (i >= 0) PILA.splice(i, 1);
       document.removeEventListener('keydown', alTeclear, true);
       document.body.style.overflow = overflowPrevio;
       previo?.focus?.();
     };
-  }, [onClose]);
+  }, [onClose, activa]);
 
   return contenedor;
 }
