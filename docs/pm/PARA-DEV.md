@@ -3388,3 +3388,77 @@ no dentro de este cierre visual.
 
 No tenés tarea activa. No despliegues ni abras UX-3: falta que Emi vea esta
 versión en el entorno descartable y complete su revisión visual.
+
+## 2026-08-23 — A aprobada; tarea activa única: extensión comercial UX-2C
+
+Emi revisó por separado A y B y eligió **A — Mercado a cielo abierto**. Diseño
+convirtió esa dirección en un handoff ejecutable en
+`docs/pm/diseno-premium/extension-comercial/`. Esta tarea reemplaza la pausa
+anterior. No reabras B, wordmark, tipografías, anatomías ni producto.
+
+### Lectura obligatoria
+
+Seguí, en orden, el índice de
+`docs/pm/diseno-premium/extension-comercial/README.md`. El contrato principal es
+`IMPLEMENTACION-DEV.md`; `MAPA-COMPONENTES.md` lo vincula con el repo y
+`PARIDAD.md` es la puerta de cierre. Lo no redefinido sigue bajo
+`docs/pm/diseno-premium/handoff/`.
+
+### Resultado requerido
+
+1. **Inicio completo:** reemplazar placa índigo, bienvenida, beneficios con
+   iconos y claims por el hero split, taxonomía estática, preview real de
+   operaciones, bloque de datos y CTA aprobados.
+2. **Servicios completo:** retirar video con overlay, lista hardcodeada y claims
+   de IA/satélites/IoT; usar hero split, publicaciones reales de
+   servicio/logística sin foto en la card, criterios de comparación y CTA.
+3. **Mercado:** conservar funciones/anatomías y aplicar canvas, acción, intro,
+   cabecera y densidad de la misma dirección.
+4. **Sistema compartido:** canvas `#F4F1EA`, acción `#B93424`, hover/link
+   `#8F281D`, índigo como texto/estructura y overlay fotográfico 0 %.
+5. **Fotografía:** copiar sólo los cuatro WebP de
+   `assets/produccion/`; no servir JPG con EXIF/GPS y no copiar ningún
+   `*-concepto.webp`.
+
+### Datos y comportamiento
+
+- Preview de Inicio: `getProducts`, hasta tres resultados y total de
+  `ProductListResponse.total`; nunca `30` o `destacadas` hardcodeado.
+- Preview de Servicios: catálogo canónico filtrado por dominio
+  `servicio/logistica`; sin endpoint nuevo ni inferencia por título/precio.
+- `Ver servicios publicados` llama `setSelectedType('servicios')` antes de
+  navegar al Mercado; cambiar sólo la URL no actualiza el hook montado.
+- Reutilizar `ProductCard`, `ProductImage`, `precioVisible`,
+  `normalizarAnatomia` y `accionDe`, o una variante compacta que consuma las
+  mismas fuentes. No crear formatters ni CTAs paralelos.
+- Preservar búsqueda, filtros, detalle, carrito, checkout, logística, auth,
+  roles, callback MP, paneles, administración, publicación y contacto.
+
+### Límites
+
+- Sin Backend, migración, seed, pagos, despliegue ni nuevas dependencias.
+- Sin chat, mapa, financiación, verificación, rankings, claims o rutas nuevas.
+- Quiénes somos y Contacto reciben tokens/header/footer; no inventes otra
+  composición sin una pantalla aprobada.
+- La foto interina de Servicios no se amplía y su reemplazo final no es tarea
+  Dev.
+
+Si la preview real exige cambiar API o contratos, frená y traé la mínima opción;
+no amplíes por tu cuenta.
+
+### Evidencia y cierre
+
+- completar `extension-comercial/PARIDAD.md` con evidencia;
+- capturas de Inicio, Servicios y Mercado a 1440×900, 768×1024 y 390×844,
+  además de comparación antes/después;
+- loading, vacío, error, offline, foto rota/ausente, texto largo, teclado,
+  reduced motion y zoom 200 %;
+- `npm run build`, `npm run lint`, `npm run contraste`, `npm run a11y`,
+  `npm run hito` y suite completa desde base limpia;
+- cero recursos externos, assets conceptuales, overflow, claims prohibidos o
+  doble tema;
+- informe final en `PARA-PM.md` con commits, archivos, conteos, diferencias y
+  deuda real.
+
+No despliegues. Hacé commits auditables, empujá producto e informe y frená para
+revisión de PM/Emi.

@@ -101,6 +101,13 @@ Actualizado: 2026-08-23.
   siente agro y el tratamiento tapa la fotografía. La devolución y la nueva
   pieza de Diseño están en `diseno-premium/DEVOLUCION-EMI-UX2B.md`. La Dev
   queda sin tarea y no abre UX-3 ni despliega hasta recibir un nuevo handoff.
+- **Extensión comercial aprobada:** Emi comparó A/B y eligió **A — Mercado a
+  cielo abierto**. Diseño entregó en `diseno-premium/extension-comercial/`
+  prototipos de Inicio, Servicios y Mercado, tokens, copy, fotografía, activos,
+  tres viewports, mapa, paridad y auditoría axe 9/9 sin violaciones/overflow.
+  La tarea activa vuelve a Dev como **UX-2C** según el último bloque de
+  `PARA-DEV.md`. B queda archivada; no se reabren wordmark ni anatomías y no se
+  despliega hasta revisión PM/Emi.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -110,15 +117,14 @@ Actualizado: 2026-08-23.
 ## Entrega aceptada y tarea actual
 
 UX-2B queda aceptada técnicamente con producto `08907cd`–`873ad2e`, corrección
-`177cdb2` e informes `8943143`/`6b9bd1d`. “Mesa de negocios” ya está aplicada a
-la superficie pública y autenticada; las cuatro anatomías salen de datos
-persistentes. PM revisó las capturas y reprodujo build aislado, lint, sintaxis y
-checks estáticos. Docker local permanece apagado, por lo que suite 123/123,
-a11y 64/64, contraste 52/52 e hito 6/6 son evidencia informada por Dev. La
-puerta visual de Emi quedó **rechazada parcialmente**: el mercado conserva su
-base funcional y de información, pero Inicio, Servicios y la dirección global
-de color/fotografía vuelven a Diseño. Ver
-`diseno-premium/DEVOLUCION-EMI-UX2B.md`. La Dev no tiene tarea activa.
+`177cdb2` e informes `8943143`/`6b9bd1d`. Las cuatro anatomías salen de datos
+persistentes y no se reabren. La devolución visual posterior de Emi ya tiene
+dirección aprobada: **A — Mercado a cielo abierto**, documentada completa en
+`diseno-premium/extension-comercial/`. Dev tiene como tarea activa UX-2C:
+implementar Inicio, Servicios y la coherencia cromática/fotográfica del Mercado
+sin tocar Backend, pagos ni funciones. Diseño auditó sus prototipos 9/9 con axe,
+sin errores ni overflow; Dev debe repetir puertas sobre el producto y frenar
+antes de desplegar.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se

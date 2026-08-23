@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>TopGreen · Mercado · referencia aprobada</title>
+  <link rel="stylesheet" href="./prototipo.css">
+</head>
+<body>
+  <a class="skip-link" href="#contenido">Saltar al contenido</a>
+  <header class="site-header">
+    <div class="container masthead market-masthead">
+      <a class="brand" href="./inicio.html" aria-label="TopGreen, inicio"><img src="../handoff/assets/wordmark/topgreen-compact.svg" width="431" height="112" alt="TopGreen"></a>
+      <form class="market-search" role="search"><label class="sr-only" for="buscar">Buscar en el mercado</label><input id="buscar" type="search" placeholder="Buscar producto, servicio o ubicación"><button class="button button--dark" type="submit">Buscar</button></form>
+      <div class="header-actions"><button class="button button--primary" type="button">Publicar</button><button class="button" type="button">Ingresar</button></div>
+    </div>
+    <nav class="market-nav" aria-label="Secciones del prototipo"><div class="container site-nav"><a href="./inicio.html">Inicio</a><a href="./mercado.html" aria-current="page">Mercado</a><a href="./servicios.html">Servicios</a><span>Quiénes somos</span><span>Contacto</span></div></nav>
+  </header>
+
+  <main id="contenido">
+    <section class="container market-intro" aria-labelledby="titulo-mercado"><div><div class="eyebrow">Mercado agro</div><h1 id="titulo-mercado">Operaciones disponibles</h1></div><p class="lead">Compará maquinaria, insumos, servicios y logística con los datos que definen cada operación.</p></section>
+    <section class="container market-shell" aria-label="Catálogo">
+      <aside class="filters" aria-label="Filtros"><div class="filters-title"><h2>Filtrar</h2><button class="text-link" type="button">Limpiar</button></div><div class="field"><label for="tipo">Tipo de operación</label><select id="tipo"><option>Todos</option></select></div><div class="field"><label for="categoria">Categoría</label><select id="categoria"><option>Todas las categorías</option></select></div><div class="field"><label for="provincia">Provincia</label><select id="provincia"><option>Todas las provincias</option></select></div><div class="field"><label for="precio">Precio</label><select id="precio"><option>Cualquier precio</option></select></div></aside>
+      <div>
+        <button class="filters-mobile" type="button"><strong>Filtrar</strong><span>Ver filtros</span></button>
+        <div class="results-head"><div><div class="eyebrow">Resultados</div><h2>30 operaciones</h2></div><div class="meta">Orden: más relevantes</div></div>
+        <div class="market-results">
+          <article class="listing"><img src="./assets/tractor-listing-concepto.webp" alt="Material conceptual: tractor rojo de una publicación demo"><div class="listing-body"><div class="eyebrow">Activo de alto valor</div><h3>Tractor 4×4 · 2019</h3><div class="meta">Azul, Buenos Aires · 3.400 h</div><div class="price">$ 98.000.000</div><span class="badge">Información de la publicación visible</span><div class="listing-action">Ver operación</div></div></article>
+          <article class="listing"><img src="./assets/insumo-listing-concepto.webp" alt="Material conceptual: pallet de bolsas de insumo"><div class="listing-body"><div class="eyebrow">Insumo</div><h3>Urea granulada 46 %</h3><div class="meta">Río Cuarto · bolsa de 50 kg</div><div class="price">$ 39.000</div><span class="badge">Información de la publicación visible</span><div class="listing-action">Ver disponibilidad</div></div></article>
+          <article class="listing listing--service"><img src="./assets/servicio-taller-concepto.webp" alt="Material conceptual: asistencia técnica de maquinaria"><div class="listing-body"><div class="eyebrow">Servicio</div><h3>Asistencia técnica en campo</h3><div class="meta">Buenos Aires · cobertura declarada</div><div class="price">A cotizar</div><span class="badge">Información de la publicación visible</span><div class="listing-action">Consultar condiciones</div></div></article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer"><div class="container footer-grid"><div><img class="footer-brand" src="../handoff/assets/wordmark/topgreen-mono-light.svg" width="896" height="112" alt="TopGreen"><p class="footer-copy">Mercado agro: productos, servicios y logística.</p></div><div><div class="footer-title">Mercado</div><ul class="footer-list"><li><a href="./mercado.html">Operaciones</a></li><li><span>Publicar</span></li></ul></div><div><div class="footer-title">TopGreen</div><ul class="footer-list"><li><a href="./servicios.html">Servicios</a></li><li><span>Quiénes somos</span></li></ul></div><div><div class="footer-title">Ayuda</div><ul class="footer-list"><li><span>Contacto</span></li><li><span>Términos y privacidad</span></li></ul></div></div><div class="container footer-legal">Referencia de diseño. Las opciones de filtro y los conteos reales deben provenir de la API.</div></footer>
+</body>
+</html>

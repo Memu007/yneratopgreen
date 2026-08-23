@@ -1,0 +1,69 @@
+:root {
+  /* Tipografía aprobada; los archivos y licencias viven en handoff/assets/fonts. */
+  --tg-font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --tg-font-ui: "Work Sans", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* A — Mercado a cielo abierto. El color nombra un rol, no un componente. */
+  --tg-color-canvas: #f4f1ea;
+  --tg-color-surface: #ffffff;
+  --tg-color-surface-subtle: #e7ecef;
+  --tg-color-surface-muted: #eeece6;
+  --tg-color-text: #17213d;
+  --tg-color-text-secondary: #566074;
+  --tg-color-text-inverse: #ffffff;
+  --tg-color-brand: #17213d;
+  --tg-color-action: #b93424;
+  --tg-color-action-hover: #8f281d;
+  --tg-color-link: #8f281d;
+  --tg-color-selection: #e8ecf4;
+  --tg-color-selection-border: #17213d;
+  --tg-color-success: #1f6b4f;
+  --tg-color-success-bg: #e7f3ed;
+  --tg-color-warning: #79520f;
+  --tg-color-warning-bg: #f3e7c8;
+  --tg-color-error: #a22f2f;
+  --tg-color-error-bg: #f8e7e5;
+  --tg-color-info: #1d4e89;
+  --tg-color-info-bg: #e7eef8;
+  --tg-color-border: #cbd1d8;
+  --tg-color-border-control: #7c8494;
+  --tg-color-focus: #b93424;
+  --tg-color-disabled-bg: #e5e7ec;
+  --tg-color-disabled-text: #6c7280;
+
+  /* Espaciado base 4. */
+  --tg-space-1: 4px;
+  --tg-space-2: 8px;
+  --tg-space-3: 12px;
+  --tg-space-4: 16px;
+  --tg-space-5: 20px;
+  --tg-space-6: 24px;
+  --tg-space-8: 32px;
+  --tg-space-10: 40px;
+  --tg-space-12: 48px;
+  --tg-space-16: 64px;
+  --tg-space-20: 80px;
+
+  /* Grilla y límites. */
+  --tg-container-max: 1320px;
+  --tg-reading-max: 760px;
+  --tg-gutter-desktop: 48px;
+  --tg-gutter-tablet: 32px;
+  --tg-gutter-mobile: 20px;
+  --tg-grid-gap-desktop: 24px;
+  --tg-grid-gap-tablet: 20px;
+  --tg-grid-gap-mobile: 16px;
+
+  /* Geometría deliberadamente seca. */
+  --tg-radius-none: 0;
+  --tg-radius-sm: 2px;
+  --tg-radius-md: 4px;
+  --tg-radius-lg: 6px;
+  --tg-shadow-none: none;
+  --tg-control-min: 44px;
+
+  /* Movimiento funcional. */
+  --tg-duration-fast: 120ms;
+  --tg-duration-base: 160ms;
+  --tg-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
