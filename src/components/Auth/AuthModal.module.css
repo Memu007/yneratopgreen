@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: var(--tg-color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -23,13 +23,13 @@
 
 .modal {
   background: white;
-  border-radius: 12px;
+  border-radius: var(--tg-radius-sm);
   padding: 2rem;
   max-width: 450px;
   width: 90%;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--tg-shadow-overlay);
   animation: slideUp 0.3s ease-out;
 }
 
@@ -50,13 +50,13 @@
   align-items: center;
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
-  border-bottom: 2px solid #e9ecef;
+  border-bottom: 2px solid var(--tg-color-border);
 }
 
 .modalTitle {
   font-size: 1.75rem;
   font-weight: bold;
-  color: #1b4332;
+  color: var(--tg-color-text);
 }
 
 .closeButton {
@@ -64,14 +64,14 @@
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  color: #6c757d;
+  color: var(--tg-color-text-secondary);
   padding: 0.25rem 0.5rem;
   line-height: 1;
   transition: color 0.2s;
 }
 
 .closeButton:hover {
-  color: #dc3545;
+  color: var(--tg-color-error);
 }
 
 .form {
@@ -90,26 +90,26 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  color: #2d6a4f;
+  color: var(--tg-color-brand);
   font-weight: 600;
 }
 
 .label {
   font-weight: 600;
-  color: #2d6a4f;
+  color: var(--tg-color-brand);
   font-size: 0.95rem;
 }
 
 .required {
-  color: #dc3545;
+  color: var(--tg-color-error);
   margin-left: 0.25rem;
 }
 
 .input,
 .select {
   padding: 0.75rem 1rem;
-  border: 2px solid #d8f3dc;
-  border-radius: 6px;
+  border: 2px solid var(--tg-color-success-bg);
+  border-radius: var(--tg-radius-lg);
   font-size: 0.95rem;
   transition: all 0.2s;
 }
@@ -117,12 +117,12 @@
 .input:focus,
 .select:focus {
   outline: none;
-  border-color: #52b788;
-  box-shadow: 0 0 0 3px rgba(82, 183, 136, 0.1);
+  border-color: var(--tg-color-brand);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .input::placeholder {
-  color: #adb5bd;
+  color: var(--tg-color-border-control);
 }
 
 .passwordGroup {
@@ -133,25 +133,24 @@
   position: absolute;
   right: 1rem;
   top: 50%;
-  transform: translateY(-50%);
   background: none;
   border: none;
   cursor: pointer;
-  color: #6c757d;
+  color: var(--tg-color-text-secondary);
   font-size: 1.1rem;
   padding: 0.25rem;
 }
 
 .togglePassword:hover {
-  color: #2d6a4f;
+  color: var(--tg-color-brand);
 }
 
 .submitButton {
   padding: 0.875rem;
-  background-color: #2d6a4f;
+  background-color: var(--tg-color-brand);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--tg-radius-lg);
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
@@ -160,38 +159,37 @@
 }
 
 .submitButton:hover:not(:disabled) {
-  background-color: #1b4332;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(45, 106, 79, 0.3);
+  background-color: var(--tg-color-text);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .submitButton:disabled {
-  background-color: #95d5b2;
+  background-color: var(--tg-color-brand);
   cursor: not-allowed;
 }
 
 .error {
-  background-color: #f8d7da;
-  color: #842029;
+  background-color: var(--tg-color-error-bg);
+  color: var(--tg-color-error);
   padding: 0.75rem 1rem;
-  border-radius: 6px;
+  border-radius: var(--tg-radius-lg);
   font-size: 0.9rem;
-  border: 1px solid #f5c2c7;
+  border: 1px solid var(--tg-color-error-bg);
 }
 
 .success {
-  background-color: #d1e7dd;
-  color: #0f5132;
+  background-color: var(--tg-color-success-bg);
+  color: var(--tg-color-brand);
   padding: 0.75rem 1rem;
-  border-radius: 6px;
+  border-radius: var(--tg-radius-lg);
   font-size: 0.9rem;
-  border: 1px solid #badbcc;
+  border: 1px solid var(--tg-color-success-bg);
 }
 
 .switchText {
   text-align: center;
   margin-top: 1.5rem;
-  color: #6c757d;
+  color: var(--tg-color-text-secondary);
   font-size: 0.95rem;
 }
 
@@ -201,7 +199,7 @@
   padding: 0;
   font-size: inherit;
   font-family: inherit;
-  color: #2d6a4f;
+  color: var(--tg-color-brand);
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
@@ -209,13 +207,13 @@
 }
 
 .switchLink:hover {
-  color: #1b4332;
+  color: var(--tg-color-text);
   text-decoration: underline;
 }
 
 .helpText {
   font-size: 0.85rem;
-  color: #6c757d;
+  color: var(--tg-color-text-secondary);
   margin-top: 0.25rem;
 }
 
@@ -223,7 +221,7 @@
 /* A dónde va un dato, al lado del campo que lo pide. */
 .ayudaPrivada {
   margin: 6px 0 0;
-  color: #475569;
+  color: var(--tg-color-text-secondary);
   font-size: 0.78rem;
   line-height: 1.45;
 }

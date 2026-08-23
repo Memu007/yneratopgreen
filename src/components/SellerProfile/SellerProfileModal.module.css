@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.75);
+  background-color: var(--tg-color-overlay);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -15,13 +15,13 @@
 
 .modal {
   background: var(--bg-primary);
-  border-radius: 16px;
+  border-radius: var(--tg-radius-sm);
   max-width: 600px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
   position: relative;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--tg-shadow-overlay);
   animation: slideUp 0.3s ease-out;
 }
 
@@ -65,8 +65,8 @@
   flex-direction: column;
   align-items: center;
   padding: 30px 20px 20px;
-  background: linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-700) 100%);
-  border-radius: 16px 16px 0 0;
+  background: var(--color-primary-600);
+  border-radius: var(--tg-radius-sm) var(--tg-radius-sm) 0 0;
 }
 
 .avatar {
@@ -81,7 +81,7 @@
   font-size: 32px;
   font-weight: 700;
   margin-bottom: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .sellerName {
@@ -95,16 +95,16 @@
 /* El fondo del encabezado es un degradado, así que el distintivo lleva su
    propio fondo opaco: medir texto sobre un degradado obliga a mirar los dos
    extremos, y una pastilla sólida no depende de dónde caiga. Blanco con
-   #1b5e20 da 9,4:1. */
+   var(--tg-color-brand) da 9,4:1. */
 .documentacion {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   margin: 10px 0 0;
   padding: 4px 10px;
-  border-radius: 12px;
-  background: #ffffff;
-  color: #1b5e20;
+  border-radius: var(--tg-radius-sm);
+  background: var(--tg-color-surface);
+  color: var(--tg-color-brand);
   font-size: 13px;
   font-weight: 600;
 }
@@ -146,7 +146,7 @@
 
 .reputationCard {
   background: var(--bg-secondary);
-  border-radius: 12px;
+  border-radius: var(--tg-radius-sm);
   padding: 25px;
   text-align: center;
 }
@@ -222,7 +222,7 @@
 
 .noReviews {
   background: var(--bg-secondary);
-  border-radius: 12px;
+  border-radius: var(--tg-radius-sm);
   padding: 30px 20px;
   text-align: center;
 }
@@ -246,7 +246,7 @@
 
 .reviewCard {
   background: var(--bg-secondary);
-  border-radius: 10px;
+  border-radius: var(--tg-radius-sm);
   padding: 15px;
   border-left: 3px solid var(--color-primary-500);
 }

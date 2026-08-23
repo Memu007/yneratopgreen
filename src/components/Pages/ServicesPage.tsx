@@ -28,7 +28,9 @@ const services = [
   {
     number: '03',
     title: 'Monitoreo de Cultivos con Inteligencia Artificial',
-    image: 'https://images.unsplash.com/photo-1508614589041-895b88991e3e?w=600&q=80',
+    // Sin foto propia: acá había una imagen de stock pedida a Unsplash en
+    // cada visita. `ProductImage` rotula la ausencia y no inventa una.
+    image: '',
     points: [
       'Implementación de sistemas de monitoreo inteligente que combinan sensores y análisis de datos en tiempo real para gestionar el riego, la fertilización y el control de plagas de manera precisa.',
       'Utilización de algoritmos de inteligencia artificial para predecir necesidades y optimizar el manejo de cultivos.'
@@ -37,7 +39,9 @@ const services = [
   {
     number: '04',
     title: 'Consultoría en Sostenibilidad y Uso Eficiente de Recursos',
-    image: 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=600&q=80',
+    // Sin foto propia: acá había una imagen de stock pedida a Unsplash en
+    // cada visita. `ProductImage` rotula la ausencia y no inventa una.
+    image: '',
     points: [
       'Desarrollo de estrategias personalizadas que emplean tecnologías como el Internet de las Cosas (IoT) y satélites para reducir el uso de agua, energía y otros insumos, mejorando la sostenibilidad sin sacrificar la productividad.',
       'Implementación de prácticas agrícolas innovadoras que protegen el medio ambiente y promueven la resiliencia de los ecosistemas.'
@@ -46,7 +50,9 @@ const services = [
   {
     number: '05',
     title: 'Capacitación y Formación en Nuevas Tecnologías',
-    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=600&q=80',
+    // Sin foto propia: acá había una imagen de stock pedida a Unsplash en
+    // cada visita. `ProductImage` rotula la ausencia y no inventa una.
+    image: '',
     points: [
       'Programas de formación que cubren las últimas tendencias en agricultura digital, incluyendo el uso de inteligencia artificial, imágenes satelitales y herramientas de precisión.',
       'Talleres prácticos diseñados para mejorar las competencias técnicas y de gestión, asegurando que los participantes puedan aprovechar al máximo las nuevas tecnologías en el campo.'

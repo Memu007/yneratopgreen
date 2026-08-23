@@ -627,18 +627,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      active: '#15803d',
-      paused: '#b45309',
-      draft: '#6b7280',
-      deleted: '#dc2626',
-      placed: '#1d4ed8',
-      confirmed: '#6d28d9',
-      shipped: '#b45309',
-      delivered: '#15803d',
-      cancelled: '#dc2626'
+      active: 'var(--tg-color-brand)',
+      paused: 'var(--tg-color-warning)',
+      draft: 'var(--tg-color-text-secondary)',
+      deleted: 'var(--tg-color-error)',
+      placed: 'var(--tg-color-info)',
+      confirmed: 'var(--tg-color-info)',
+      shipped: 'var(--tg-color-warning)',
+      delivered: 'var(--tg-color-brand)',
+      cancelled: 'var(--tg-color-error)'
     };
     return (
-      <span className={styles.badge} style={{ backgroundColor: colors[status] || '#666' }}>
+      <span className={styles.badge} style={{ backgroundColor: colors[status] || 'var(--tg-color-text-secondary)' }}>
         {status}
       </span>
     );
@@ -767,7 +767,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   <div className={styles.statIcon} style={{ color: 'white' }}></div>
                   <div className={styles.statInfo}>
                     <span className={styles.statValue} style={{ color: 'white' }}>{formatCurrency(stats.total_revenue)}</span>
-                    <span className={styles.statLabel} style={{ color: '#ffffff' }}>Ingresos</span>
+                    <span className={styles.statLabel} style={{ color: 'var(--tg-color-surface)' }}>Ingresos</span>
                   </div>
                 </div>
               </div>

@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: var(--tg-color-overlay);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -15,19 +15,18 @@
 
 .modalContent {
   background-color: white;
-  border-radius: 12px;
+  border-radius: var(--tg-radius-sm);
   max-width: 800px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--tg-shadow-overlay);
   animation: slideIn 0.3s ease-out;
 }
 
 @keyframes slideIn {
   from {
     opacity: 0;
-    transform: translateY(-20px);
   }
   to {
     opacity: 1;
@@ -40,7 +39,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 24px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--tg-color-border);
   position: sticky;
   top: 0;
   background-color: white;
@@ -50,14 +49,14 @@
 .modalHeader h2 {
   margin: 0;
   font-size: 24px;
-  color: #2d5016;
+  color: var(--tg-color-brand);
 }
 
 .closeButton {
   background: none;
   border: none;
   font-size: 28px;
-  color: #666;
+  color: var(--tg-color-text-secondary);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -70,8 +69,8 @@
 }
 
 .closeButton:hover {
-  background-color: #f0f0f0;
-  color: #333;
+  background-color: var(--tg-color-surface-muted);
+  color: var(--tg-color-text);
 }
 
 .form {
@@ -85,14 +84,14 @@
 .section h3 {
   margin: 0 0 16px 0;
   font-size: 18px;
-  color: #2d5016;
-  border-bottom: 2px solid #7fb069;
+  color: var(--tg-color-brand);
+  border-bottom: 2px solid var(--tg-color-brand);
   padding-bottom: 8px;
 }
 
 .sectionDescription {
   margin: -8px 0 16px 0;
-  color: #666;
+  color: var(--tg-color-text-secondary);
   font-size: 14px;
 }
 
@@ -106,13 +105,13 @@
 .typeButton {
   flex: 1;
   padding: 16px 24px;
-  border: 2px solid #ddd;
-  border-radius: 12px;
+  border: 2px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-sm);
   background: white;
   cursor: pointer;
   font-size: 16px;
   font-weight: 600;
-  color: #666;
+  color: var(--tg-color-text-secondary);
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
@@ -121,16 +120,16 @@
 }
 
 .typeButton:hover {
-  border-color: #7fb069;
-  background: #f9fff6;
-  color: #2d5016;
+  border-color: var(--tg-color-brand);
+  background: var(--tg-color-surface-subtle);
+  color: var(--tg-color-brand);
 }
 
 .typeButtonActive {
-  border-color: #2d5016;
-  background: linear-gradient(135deg, #e6f7e6 0%, #d4f1d4 100%);
-  color: #2d5016;
-  box-shadow: 0 4px 12px rgba(45, 80, 22, 0.2);
+  border-color: var(--tg-color-brand);
+  background: var(--tg-color-surface-subtle);
+  color: var(--tg-color-brand);
+  box-shadow: var(--tg-shadow-none);
 }
 
 /* Checkbox Group */
@@ -138,8 +137,8 @@
   display: flex;
   align-items: center;
   padding: 12px;
-  background: #f8f9fa;
-  border-radius: 8px;
+  background: var(--tg-color-surface);
+  border-radius: var(--tg-radius-lg);
   margin-top: 4px;
 }
 
@@ -149,37 +148,36 @@
   gap: 10px;
   cursor: pointer;
   font-size: 14px;
-  color: #333;
+  color: var(--tg-color-text);
 }
 
 .checkboxLabel input[type="checkbox"] {
   width: 18px;
   height: 18px;
-  accent-color: #2d5016;
+  accent-color: var(--tg-color-brand);
   cursor: pointer;
 }
 
 /* Drag and Drop Zone */
 .dropZone {
-  border: 3px dashed #ccc;
-  border-radius: 12px;
+  border: 3px dashed var(--tg-color-border-control);
+  border-radius: var(--tg-radius-sm);
   padding: 40px;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background: var(--tg-color-surface);
   margin-bottom: 24px;
 }
 
 .dropZone:hover {
-  border-color: #7fb069;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e6f7e6 100%);
-  transform: translateY(-2px);
+  border-color: var(--tg-color-brand);
+  background: var(--tg-color-info-bg);
 }
 
 .dropZone.dragging {
-  border-color: #2d5016;
-  background: linear-gradient(135deg, #e6f7e6 0%, #d4f1d4 100%);
+  border-color: var(--tg-color-brand);
+  background: var(--tg-color-surface-subtle);
   transform: scale(1.02);
 }
 
@@ -201,17 +199,17 @@
 .dropZoneText {
   margin: 0 0 8px 0;
   font-size: 16px;
-  color: #333;
+  color: var(--tg-color-text);
 }
 
 .dropZoneText strong {
-  color: #2d5016;
+  color: var(--tg-color-brand);
 }
 
 .dropZoneHint {
   margin: 0;
   font-size: 13px;
-  color: #666;
+  color: var(--tg-color-text-secondary);
 }
 
 /* Image Preview */
@@ -229,21 +227,20 @@
 .imagePreview {
   position: relative;
   aspect-ratio: 1;
-  border-radius: 12px;
+  border-radius: var(--tg-radius-sm);
   overflow: hidden;
-  border: 3px solid #e0e0e0;
+  border: 3px solid var(--tg-color-border);
   transition: all 0.3s ease;
-  background-color: #f5f5f5;
+  background-color: var(--tg-color-surface-muted);
 }
 
 .imagePreview:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .imagePreview.mainImage {
-  border-color: #ffd93d;
-  box-shadow: 0 0 0 3px rgba(255, 217, 61, 0.3);
+  border-color: var(--tg-color-warning);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .imagePreview img {
@@ -256,13 +253,13 @@
   position: absolute;
   top: 8px;
   left: 8px;
-  background: linear-gradient(135deg, #ffd93d 0%, #ffc107 100%);
-  color: #2d5016;
+  background: var(--tg-color-warning);
+  color: var(--tg-color-brand);
   padding: 4px 12px;
-  border-radius: 20px;
+  border-radius: var(--tg-radius-sm);
   font-size: 12px;
   font-weight: bold;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--tg-shadow-none);
   z-index: 2;
 }
 
@@ -271,7 +268,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  background: var(--tg-color-overlay);
   padding: 12px 8px 8px;
   display: flex;
   justify-content: center;
@@ -297,28 +294,28 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .setMainButton:hover {
-  background-color: #ffd93d;
+  background-color: var(--tg-color-warning);
   transform: scale(1.1);
 }
 
 .removeImageButton:hover {
-  background-color: #ff4444;
+  background-color: var(--tg-color-error);
   transform: scale(1.1);
 }
 
 .imageCount {
   text-align: center;
-  color: #666;
+  color: var(--tg-color-text-secondary);
   font-size: 14px;
   font-weight: 500;
   margin: 0;
   padding: 12px;
-  background-color: #f8f9fa;
-  border-radius: 8px;
+  background-color: var(--tg-color-surface);
+  border-radius: var(--tg-radius-lg);
 }
 
 .formGroup {
@@ -330,7 +327,7 @@
   display: block;
   margin-bottom: 6px;
   font-weight: 500;
-  color: #333;
+  color: var(--tg-color-text);
   font-size: 14px;
 }
 
@@ -339,8 +336,8 @@
 .formGroup select {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  border: 1px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-lg);
   font-size: 14px;
   font-family: inherit;
   transition: border-color 0.2s;
@@ -350,13 +347,13 @@
 .formGroup textarea:focus,
 .formGroup select:focus {
   outline: none;
-  border-color: #7fb069;
-  box-shadow: 0 0 0 3px rgba(127, 176, 105, 0.1);
+  border-color: var(--tg-color-brand);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .formGroup input:disabled,
 .formGroup select:disabled {
-  background-color: #f5f5f5;
+  background-color: var(--tg-color-surface-muted);
   cursor: not-allowed;
 }
 
@@ -364,7 +361,7 @@
   display: block;
   margin-top: 4px;
   font-size: 12px;
-  color: #666;
+  color: var(--tg-color-text-secondary);
 }
 
 .formRow {
@@ -387,25 +384,25 @@
 .featureInput input {
   flex: 1;
   padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  border: 1px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-lg);
   font-size: 14px;
 }
 
 .tagInput input {
   flex: 1;
   padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  border: 1px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-lg);
   font-size: 14px;
 }
 
 .addButton {
   padding: 10px 20px;
-  background-color: #4a7c29;
+  background-color: var(--tg-color-brand);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--tg-radius-lg);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -414,7 +411,7 @@
 }
 
 .addButton:hover {
-  background-color: #6a9456;
+  background-color: var(--tg-color-brand);
 }
 
 .featureList {
@@ -428,20 +425,20 @@
   justify-content: space-between;
   align-items: center;
   padding: 10px 12px;
-  background-color: #f8f9fa;
-  border-radius: 6px;
+  background-color: var(--tg-color-surface);
+  border-radius: var(--tg-radius-lg);
   font-size: 14px;
 }
 
 .featureItem strong {
-  color: #2d5016;
+  color: var(--tg-color-brand);
   margin-right: 8px;
 }
 
 .removeButton {
   background: none;
   border: none;
-  color: #999;
+  color: var(--tg-color-border-control);
   cursor: pointer;
   padding: 0;
   width: 24px;
@@ -454,7 +451,7 @@
 }
 
 .removeButton:hover {
-  background-color: #b91c1c;
+  background-color: var(--tg-color-error);
   color: white;
 }
 
@@ -469,9 +466,9 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background-color: #4a7c29;
+  background-color: var(--tg-color-brand);
   color: white;
-  border-radius: 20px;
+  border-radius: var(--tg-radius-sm);
   font-size: 13px;
   font-weight: 500;
 }
@@ -503,7 +500,7 @@
   justify-content: flex-end;
   margin-top: 32px;
   padding-top: 24px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--tg-color-border);
   position: sticky;
   bottom: 0;
   background-color: white;
@@ -512,7 +509,7 @@
 .cancelButton,
 .submitButton {
   padding: 12px 24px;
-  border-radius: 6px;
+  border-radius: var(--tg-radius-lg);
   font-size: 15px;
   font-weight: 500;
   cursor: pointer;
@@ -521,21 +518,21 @@
 }
 
 .cancelButton {
-  background-color: #f0f0f0;
-  color: #333;
+  background-color: var(--tg-color-surface-muted);
+  color: var(--tg-color-text);
 }
 
 .cancelButton:hover {
-  background-color: #e0e0e0;
+  background-color: var(--tg-color-border);
 }
 
 .submitButton {
-  background-color: #2d5016;
+  background-color: var(--tg-color-brand);
   color: white;
 }
 
 .submitButton:hover {
-  background-color: #1e3510;
+  background-color: var(--tg-color-text);
 }
 
 /* Responsive */

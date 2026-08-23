@@ -226,7 +226,7 @@ async function exerciseSeller(browser, viewport, sellerTokens) {
     publication.state.screen = '06-publication';
     await publication.page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await publication.page.getByRole('button', { name: /Vender/ }).click();
-    await publication.page.getByRole('heading', { name: /Agregar Nuevo Producto/ }).waitFor();
+    await publication.page.getByRole('heading', { name: /Publicar un producto/i }).waitFor();
     await publication.page.locator('#name').fill('Auditoría móvil sin publicar');
     await publication.page.waitForFunction(() => document.querySelectorAll('#category option').length > 1);
     await publication.page.locator('#category').selectOption({ index: 1 });
@@ -271,7 +271,7 @@ async function exerciseAdmin(browser, viewport, adminTokens) {
     await page.getByRole('button', { name: 'Admin' }).click();
     await page.getByRole('heading', { name: 'Panel de Administración' }).waitFor();
     await inspect(page, state, viewport, '07-admin-panel');
-    await page.getByRole('button', { name: '📦 Productos' }).click();
+    await page.getByRole('button', { name: 'Productos' }).click();
     await page.locator('table').waitFor();
     await inspect(page, state, viewport, '07-admin-products');
   } finally {

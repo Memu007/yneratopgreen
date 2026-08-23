@@ -36,8 +36,16 @@ Para una categoria que no figura en la tabla declarada se elige la opcion que
 stock y «Agregar», que es exactamente `insumo`; todo servicio se comporta como
 `servicio`.
 
-La vuelta atras borra las tres columnas. Es segura: ninguna otra tabla las
-referencia y ningun calculo de precio, stock, orden ni pago las mira.
+La vuelta atras borra las tres columnas. Es segura para el resto del sistema:
+ninguna otra tabla las referencia y ningun calculo de precio, stock, orden ni
+pago las mira.
+
+**Pero borra las declaraciones de los vendedores, y volver a subir no las
+recupera**: al no existir la columna, el dato deja de existir, y el `upgrade`
+vuelve a rellenar con la omision de cada categoria. Es lo que significa borrar
+una columna, y queda dicho para que nadie baje esta migracion en produccion
+creyendo que la vuelta es gratis: se pierde la clasificacion que cada vendedor
+corrigio a mano.
 """
 from alembic import op
 import sqlalchemy as sa

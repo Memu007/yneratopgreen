@@ -1476,15 +1476,15 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
 
   const getStatusBadge = (status: Order['status']) => {
     const statusConfig = {
-      pending: { label: 'Pendiente de Pago', color: '#b45309' },
-      'awaiting-transfer-receipt': { label: 'Esperando Comprobante', color: '#b45309' },
-      'transfer-receipt-submitted': { label: 'Comprobante a Revisar', color: '#0369a1' },
-      paid: { label: 'Pagado', color: '#047857' },
-      confirmed: { label: 'Confirmado', color: '#4a7c29' },
-      'in-transit': { label: 'En Tránsito', color: '#0f766e' },
-      delivered: { label: 'Entregado', color: '#2d5016' },
-      cancelled: { label: 'Cancelado', color: '#d32f2f' },
-      rejected: { label: 'Rechazado', color: '#dc2626' },
+      pending: { label: 'Pendiente de Pago', color: 'var(--tg-color-warning)' },
+      'awaiting-transfer-receipt': { label: 'Esperando Comprobante', color: 'var(--tg-color-warning)' },
+      'transfer-receipt-submitted': { label: 'Comprobante a Revisar', color: 'var(--tg-color-info)' },
+      paid: { label: 'Pagado', color: 'var(--tg-color-brand)' },
+      confirmed: { label: 'Confirmado', color: 'var(--tg-color-brand)' },
+      'in-transit': { label: 'En Tránsito', color: 'var(--tg-color-info)' },
+      delivered: { label: 'Entregado', color: 'var(--tg-color-brand)' },
+      cancelled: { label: 'Cancelado', color: 'var(--tg-color-error)' },
+      rejected: { label: 'Rechazado', color: 'var(--tg-color-error)' },
     };
 
     const config = statusConfig[status];
@@ -1534,7 +1534,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       {/* Estadísticas del usuario */}
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
-          <div className={styles.statIcon} style={{background: 'linear-gradient(135deg, #4a7c29 0%, #2d5016 100%)'}}>
+          <div className={styles.statIcon}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               <circle cx="12" cy="7" r="4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -1543,13 +1543,17 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           <div className={styles.statInfo}>
             <p className={styles.statLabel}>Reputación</p>
             <p className={styles.statValue}>
-              {(user?.ratingCount ?? 0) > 0 ? ` ${(user?.ratingAverage ?? 0).toFixed(1)}` : '—'}
+              {/* Con palabras y no con una raya: «—» obliga a adivinar si es
+                  cero, si falta el dato o si se rompió algo. */}
+              {(user?.ratingCount ?? 0) > 0
+                ? `${(user?.ratingAverage ?? 0).toFixed(1)} de 5`
+                : 'Sin calificaciones aún'}
             </p>
           </div>
         </div>
 
         <div className={styles.statCard}>
-          <div className={styles.statIcon} style={{background: 'linear-gradient(135deg, #52b788 0%, #2d6a4f 100%)'}}>
+          <div className={styles.statIcon}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -1561,7 +1565,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         </div>
 
         <div className={styles.statCard}>
-          <div className={styles.statIcon} style={{background: 'linear-gradient(135deg, #ffd93d 0%, #ffb703 100%)'}}>
+          <div className={styles.statIcon}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M12 2L2 7l10 5 10-5-10-5z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M2 17l10 5 10-5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -1575,7 +1579,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         </div>
 
         <div className={styles.statCard}>
-          <div className={styles.statIcon} style={{background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'}}>
+          <div className={styles.statIcon}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <circle cx="9" cy="21" r="1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               <circle cx="20" cy="21" r="1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -1601,7 +1605,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 <span className={styles.ratingValue}>{(user?.ratingAverage ?? 0).toFixed(1)}</span>
               </>
             ) : (
-              <span className={styles.noRating}>Sin calificaciones</span>
+              <span className={styles.noRating}>Sin calificaciones aún</span>
             )}
           </div>
         </div>
@@ -3399,7 +3403,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                     </label>
                   )}
                 </div>
-                <small style={{ color: '#666', marginTop: '8px', display: 'block' }}>
+                <small style={{ color: 'var(--tg-color-text-secondary)', marginTop: '8px', display: 'block' }}>
                   {editingProduct.existingImages.length + editingProduct.newImages.length} de {MAX_IMAGES_PER_PRODUCT} imágenes
                   {(editingProduct.existingImages.length + editingProduct.newImages.length) >= MAX_IMAGES_PER_PRODUCT && 
                     ' (máximo alcanzado)'}
@@ -3455,13 +3459,13 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <h2 style={{ margin: 0, color: '#2d5016', fontSize: '1.5rem' }}>
+              <h2 style={{ margin: 0, color: 'var(--tg-color-brand)', fontSize: '1.5rem' }}>
                 Calificar a {ratingModal.sellerName}
               </h2>
             </div>
             
             <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', marginBottom: '12px', fontWeight: '600', color: '#333' }}>
+              <label style={{ display: 'block', marginBottom: '12px', fontWeight: '600', color: 'var(--tg-color-text)' }}>
                 Tu calificación
               </label>
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', fontSize: '2.5rem' }}>
@@ -3473,7 +3477,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                       setRatingScore(star);
                     }}
                     style={{ 
-                      color: star <= ratingScore ? '#b45309' : '#5c636a',
+                      color: star <= ratingScore ? 'var(--tg-color-warning)' : 'var(--tg-color-text-secondary)',
                       cursor: 'pointer',
                       transition: 'transform 0.2s, color 0.2s',
                       userSelect: 'none'
@@ -3485,7 +3489,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   </span>
                 ))}
               </div>
-              <p style={{ textAlign: 'center', marginTop: '12px', color: '#666', fontSize: '1.1rem' }}>
+              <p style={{ textAlign: 'center', marginTop: '12px', color: 'var(--tg-color-text-secondary)', fontSize: '1.1rem' }}>
                 {ratingScore === 1 && ' Muy malo'}
                 {ratingScore === 2 && ' Malo'}
                 {ratingScore === 3 && ' Regular'}
@@ -3495,7 +3499,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             </div>
             
             <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: 'var(--tg-color-text)' }}>
                 Comentario (opcional)
               </label>
               <textarea
@@ -3519,7 +3523,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   boxSizing: 'border-box'
                 }}
               />
-              <small style={{ color: '#888' }}>{ratingComment.length}/500 caracteres</small>
+              <small style={{ color: 'var(--tg-color-text-secondary)' }}>{ratingComment.length}/500 caracteres</small>
             </div>
             
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
@@ -3533,7 +3537,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   borderRadius: '8px',
                   border: '2px solid #ddd',
                   backgroundColor: 'white',
-                  color: '#666',
+                  color: 'var(--tg-color-text-secondary)',
                   cursor: 'pointer',
                   fontSize: '1rem',
                   fontWeight: '600'
@@ -3551,7 +3555,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   padding: '12px 24px',
                   borderRadius: '8px',
                   border: 'none',
-                  backgroundColor: submittingRating ? '#ccc' : '#2d5016',
+                  backgroundColor: submittingRating ? 'var(--tg-color-border-control)' : 'var(--tg-color-brand)',
                   color: 'white',
                   cursor: submittingRating ? 'not-allowed' : 'pointer',
                   fontSize: '1rem',

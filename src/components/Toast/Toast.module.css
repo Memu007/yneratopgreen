@@ -16,8 +16,8 @@
   align-items: center;
   gap: 12px;
   padding: 14px 18px;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-radius: var(--tg-radius-sm);
+  box-shadow: var(--tg-shadow-overlay);
   cursor: pointer;
   animation: slideIn 0.3s ease-out;
   backdrop-filter: blur(10px);
@@ -36,27 +36,27 @@
 }
 
 .toast.success {
-  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-  border-left: 4px solid #28a745;
-  color: #155724;
+  background: var(--tg-color-success-bg);
+  border-left: 4px solid var(--tg-color-brand);
+  color: var(--tg-color-brand);
 }
 
 .toast.error {
-  background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
-  border-left: 4px solid #dc3545;
-  color: #721c24;
+  background: var(--tg-color-error-bg);
+  border-left: 4px solid var(--tg-color-error);
+  color: var(--tg-color-error);
 }
 
 .toast.warning {
-  background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
-  border-left: 4px solid #ffc107;
-  color: #856404;
+  background: var(--tg-color-warning-bg);
+  border-left: 4px solid var(--tg-color-warning);
+  color: var(--tg-color-warning);
 }
 
 .toast.info {
-  background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
-  border-left: 4px solid #17a2b8;
-  color: #0c5460;
+  background: var(--tg-color-border-control);
+  border-left: 4px solid var(--tg-color-info);
+  color: var(--tg-color-info);
 }
 
 .rotulo {
@@ -104,7 +104,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--tg-color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -120,8 +120,8 @@
 /* Confirm Modal */
 .confirmModal {
   background: white;
-  border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  border-radius: var(--tg-radius-sm);
+  box-shadow: var(--tg-shadow-overlay);
   max-width: 420px;
   width: 90%;
   overflow: hidden;
@@ -145,16 +145,16 @@
 }
 
 .confirmHeader.danger {
-  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+  background: var(--tg-color-error);
 }
 
 .confirmHeader.warning {
-  background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
-  color: #212529;
+  background: var(--tg-color-warning);
+  color: var(--tg-color-text);
 }
 
 .confirmHeader.info {
-  background: linear-gradient(135deg, #2d6a4f 0%, #1b4332 100%);
+  background: var(--tg-color-brand);
 }
 
 .confirmHeader h3 {
@@ -169,7 +169,7 @@
 
 .confirmBody p {
   margin: 0;
-  color: #495057;
+  color: var(--tg-color-text-secondary);
   font-size: 1rem;
   line-height: 1.6;
   white-space: pre-line;
@@ -184,10 +184,10 @@
 
 .cancelButton {
   padding: 10px 20px;
-  border: 2px solid #dee2e6;
-  background: white;
-  color: #495057;
-  border-radius: 8px;
+  border: 2px solid var(--tg-color-border-control);
+  background: var(--tg-color-surface);
+  color: var(--tg-color-text);
+  border-radius: var(--tg-radius-sm);
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
@@ -195,15 +195,15 @@
 }
 
 .cancelButton:hover {
-  background: #f8f9fa;
-  border-color: #adb5bd;
+  background: var(--tg-color-surface);
+  border-color: var(--tg-color-border-control);
 }
 
 .confirmButton {
   padding: 10px 24px;
   border: none;
   color: white;
-  border-radius: 8px;
+  border-radius: var(--tg-radius-lg);
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
@@ -211,31 +211,28 @@
 }
 
 .confirmButton.danger {
-  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+  background: var(--tg-color-error);
 }
 
 .confirmButton.danger:hover {
-  background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
-  transform: translateY(-1px);
+  background: var(--tg-color-error);
 }
 
 .confirmButton.warning {
-  background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
-  color: #212529;
+  background: var(--tg-color-warning);
+  color: var(--tg-color-text);
 }
 
 .confirmButton.warning:hover {
-  background: linear-gradient(135deg, #e0a800 0%, #d39e00 100%);
-  transform: translateY(-1px);
+  background: var(--tg-color-warning);
 }
 
 .confirmButton.info {
-  background: linear-gradient(135deg, #2d6a4f 0%, #1b4332 100%);
+  background: var(--tg-color-brand);
 }
 
 .confirmButton.info:hover {
-  background: linear-gradient(135deg, #1b4332 0%, #143528 100%);
-  transform: translateY(-1px);
+  background: var(--tg-color-text);
 }
 
 /* Responsive */

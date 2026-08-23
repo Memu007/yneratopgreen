@@ -3,7 +3,7 @@
 }
 
 .hero {
-  background: linear-gradient(135deg, #2d5016 0%, #4a7c29 100%);
+  background: var(--tg-color-brand);
   color: white;
   padding: 80px 24px 60px;
   text-align: center;
@@ -40,7 +40,7 @@
 .infoContainer h2 {
   font-size: 28px;
   font-weight: 700;
-  color: #2d5016;
+  color: var(--tg-color-brand);
   margin-bottom: 24px;
 }
 
@@ -58,7 +58,7 @@
 
 .formGroup label {
   font-weight: 500;
-  color: #333;
+  color: var(--tg-color-text);
   margin-bottom: 8px;
   font-size: 14px;
 }
@@ -67,8 +67,8 @@
 .formGroup textarea,
 .formGroup select {
   padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  border: 1px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-lg);
   font-size: 15px;
   font-family: inherit;
   transition: border-color 0.2s;
@@ -78,26 +78,25 @@
 .formGroup textarea:focus,
 .formGroup select:focus {
   outline: none;
-  border-color: #7fb069;
-  box-shadow: 0 0 0 3px rgba(127, 176, 105, 0.1);
+  border-color: var(--tg-color-brand);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .submitButton {
-  background-color: #2d5016;
+  background-color: var(--tg-color-brand);
   color: white;
   border: none;
   padding: 14px 28px;
   font-size: 16px;
   font-weight: 600;
-  border-radius: 6px;
+  border-radius: var(--tg-radius-lg);
   cursor: pointer;
   transition: all 0.3s;
   flex: 1;
 }
 
 .submitButton:hover:not(:disabled) {
-  background-color: #1e3510;
-  transform: translateY(-2px);
+  background-color: var(--tg-color-text);
 }
 
 .submitButton:disabled {
@@ -117,21 +116,20 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background-color: #075e54;
+  background-color: var(--tg-color-brand);
   color: white;
   border: none;
   padding: 14px 20px;
   font-size: 15px;
   font-weight: 600;
-  border-radius: 6px;
+  border-radius: var(--tg-radius-lg);
   cursor: pointer;
   transition: all 0.3s;
   flex: 1;
 }
 
 .whatsappButton:hover {
-  background-color: #054a41;
-  transform: translateY(-2px);
+  background-color: var(--tg-color-brand);
 }
 
 .whatsappButton svg {
@@ -140,23 +138,23 @@
 
 /* Success/Error Messages */
 .successMessage {
-  background-color: #d4edda;
-  color: #155724;
+  background-color: var(--tg-color-success-bg);
+  color: var(--tg-color-brand);
   padding: 16px;
-  border-radius: 8px;
+  border-radius: var(--tg-radius-lg);
   margin-bottom: 20px;
   font-weight: 500;
-  border: 1px solid #c3e6cb;
+  border: 1px solid var(--tg-color-success-bg);
 }
 
 .errorMessage {
-  background-color: #f8d7da;
-  color: #721c24;
+  background-color: var(--tg-color-error-bg);
+  color: var(--tg-color-error);
   padding: 16px;
-  border-radius: 8px;
+  border-radius: var(--tg-radius-lg);
   margin-bottom: 20px;
   font-weight: 500;
-  border: 1px solid #f5c6cb;
+  border: 1px solid var(--tg-color-error-bg);
 }
 
 /* Info Cards */
@@ -170,8 +168,8 @@
   display: flex;
   gap: 16px;
   padding: 20px;
-  background: #f8f9fa;
-  border-radius: 8px;
+  background: var(--tg-color-surface);
+  border-radius: var(--tg-radius-lg);
   transition: transform 0.3s;
 }
 
@@ -187,12 +185,12 @@
 .infoCard h3 {
   font-size: 16px;
   font-weight: 600;
-  color: #2d5016;
+  color: var(--tg-color-brand);
   margin-bottom: 6px;
 }
 
 .infoCard a {
-  color: #2d5016;
+  color: var(--tg-color-brand);
   text-decoration: none;
   font-size: 15px;
 }
@@ -203,63 +201,26 @@
 
 .infoCard p {
   margin: 4px 0;
-  color: #555;
+  color: var(--tg-color-text-secondary);
   font-size: 15px;
 }
 
 .muted {
-  color: #5c636a !important;
+  color: var(--tg-color-text-secondary) !important;
   font-size: 14px !important;
-}
-
-/* Social Section */
-.socialSection {
-  margin-top: 8px;
-  padding: 20px;
-  background: linear-gradient(135deg, #f0f4ed 0%, #e8f0e1 100%);
-  border-radius: 8px;
-}
-
-.socialSection h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: #2d5016;
-  margin-bottom: 12px;
-}
-
-.socialLinks {
-  display: flex;
-  gap: 12px;
-}
-
-.socialLinks a {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #2d5016;
-  border-radius: 50%;
-  color: white;
-  transition: all 0.3s;
-}
-
-.socialLinks a:hover {
-  background-color: #4a7c29;
-  transform: translateY(-2px);
 }
 
 /* FAQ Section */
 .faqSection {
   padding: 64px 24px;
-  background: #f8f9fa;
+  background: var(--tg-color-surface);
 }
 
 .faqSection h2 {
   font-size: 32px;
   font-weight: 700;
   text-align: center;
-  color: #2d5016;
+  color: var(--tg-color-brand);
   margin-bottom: 40px;
 }
 
@@ -272,20 +233,20 @@
 .faqCard {
   background: white;
   padding: 24px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: var(--tg-radius-lg);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .faqCard h3 {
   font-size: 18px;
   font-weight: 600;
-  color: #2d5016;
+  color: var(--tg-color-brand);
   margin-bottom: 12px;
 }
 
 .faqCard p {
   font-size: 15px;
-  color: #555;
+  color: var(--tg-color-text-secondary);
   line-height: 1.6;
   margin: 0;
 }

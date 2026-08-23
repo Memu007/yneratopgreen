@@ -1,10 +1,10 @@
 .cartButton {
   position: relative;
   background-color: transparent;
-  border: 2px solid #2d6a4f;
-  color: #2d6a4f;
+  border: 2px solid var(--tg-color-brand);
+  color: var(--tg-color-brand);
   padding: 0.6rem 1.2rem;
-  border-radius: 6px;
+  border-radius: var(--tg-radius-lg);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
@@ -15,7 +15,7 @@
 }
 
 .cartButton:hover {
-  background-color: #2d6a4f;
+  background-color: var(--tg-color-brand);
   color: white;
 }
 
@@ -27,7 +27,7 @@
   position: absolute;
   top: -8px;
   right: -8px;
-  background-color: #dc3545;
+  background-color: var(--tg-color-error);
   color: white;
   border-radius: 50%;
   width: 22px;
@@ -45,7 +45,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: var(--tg-color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -64,13 +64,13 @@
 
 .modal {
   background: white;
-  border-radius: 12px;
+  border-radius: var(--tg-radius-sm);
   max-width: 700px;
   width: 90%;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--tg-shadow-overlay);
   animation: slideUp 0.3s ease-out;
 }
 
@@ -90,13 +90,13 @@
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem 2rem;
-  border-bottom: 2px solid #e9ecef;
+  border-bottom: 2px solid var(--tg-color-border);
 }
 
 .modalTitle {
   font-size: 1.5rem;
   font-weight: bold;
-  color: #1b4332;
+  color: var(--tg-color-text);
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -107,14 +107,14 @@
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  color: #6c757d;
+  color: var(--tg-color-text-secondary);
   padding: 0.25rem 0.5rem;
   line-height: 1;
   transition: color 0.2s;
 }
 
 .closeButton:hover {
-  color: #dc3545;
+  color: var(--tg-color-error);
 }
 
 .cartContent {
@@ -135,12 +135,12 @@
 
 .emptyText {
   font-size: 1.1rem;
-  color: #6c757d;
+  color: var(--tg-color-text-secondary);
   margin-bottom: 0.5rem;
 }
 
 .emptySubtext {
-  color: #adb5bd;
+  color: var(--tg-color-border-control);
   font-size: 0.95rem;
 }
 
@@ -154,20 +154,20 @@
   display: flex;
   gap: 1rem;
   padding: 1rem;
-  background-color: #f8f9fa;
-  border-radius: 8px;
+  background-color: var(--tg-color-surface);
+  border-radius: var(--tg-radius-lg);
   transition: background-color 0.2s;
 }
 
 .cartItem:hover {
-  background-color: #e9ecef;
+  background-color: var(--tg-color-border);
 }
 
 .itemImage {
   width: 100px;
   height: 100px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: var(--tg-radius-lg);
   flex-shrink: 0;
 }
 
@@ -180,19 +180,19 @@
 
 .itemName {
   font-weight: 600;
-  color: #1b4332;
+  color: var(--tg-color-text);
   font-size: 1rem;
 }
 
 .itemPrice {
-  color: #2d6a4f;
+  color: var(--tg-color-brand);
   font-weight: 600;
   font-size: 1.1rem;
 }
 
 .itemUnit {
   font-size: 0.85rem;
-  color: #5c636a;
+  color: var(--tg-color-text-secondary);
 }
 
 .quantityControls {
@@ -204,10 +204,10 @@
 
 .quantityButton {
   background-color: white;
-  border: 1px solid #d8f3dc;
+  border: 1px solid var(--tg-color-success-bg);
   width: 32px;
   height: 32px;
-  border-radius: 4px;
+  border-radius: var(--tg-radius-md);
   cursor: pointer;
   font-size: 1.1rem;
   font-weight: bold;
@@ -218,8 +218,8 @@
 }
 
 .quantityButton:hover {
-  background-color: #d8f3dc;
-  border-color: #52b788;
+  background-color: var(--tg-color-success-bg);
+  border-color: var(--tg-color-brand);
 }
 
 .quantityValue {
@@ -248,24 +248,24 @@
   align-items: center;
   margin-top: 0.5rem;
   padding-top: 0.5rem;
-  border-top: 1px solid #dee2e6;
+  border-top: 1px solid var(--tg-color-border-control);
 }
 
 .subtotalLabel {
   font-size: 0.9rem;
-  color: #5c636a;
+  color: var(--tg-color-text-secondary);
 }
 
 .subtotalValue {
   font-weight: 600;
-  color: #1b4332;
+  color: var(--tg-color-text);
   font-size: 1rem;
 }
 
 .cartFooter {
   padding: 1.5rem 2rem;
-  border-top: 2px solid #e9ecef;
-  background-color: #f8f9fa;
+  border-top: 2px solid var(--tg-color-border);
+  background-color: var(--tg-color-surface);
 }
 
 .totalSection {
@@ -278,13 +278,13 @@
 .totalLabel {
   font-size: 1.2rem;
   font-weight: 600;
-  color: #495057;
+  color: var(--tg-color-text-secondary);
 }
 
 .totalValue {
   font-size: 1.8rem;
   font-weight: bold;
-  color: #2d6a4f;
+  color: var(--tg-color-brand);
 }
 
 .footerButtons {
@@ -296,26 +296,26 @@
   flex: 1;
   padding: 0.875rem;
   background-color: white;
-  color: #dc3545;
-  border: 2px solid #dc3545;
-  border-radius: 6px;
+  color: var(--tg-color-error);
+  border: 2px solid var(--tg-color-error);
+  border-radius: var(--tg-radius-lg);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .clearButton:hover {
-  background-color: #dc3545;
+  background-color: var(--tg-color-error);
   color: white;
 }
 
 .checkoutButton {
   flex: 2;
   padding: 0.875rem;
-  background-color: #2d6a4f;
+  background-color: var(--tg-color-brand);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--tg-radius-lg);
   font-weight: 600;
   font-size: 1rem;
   cursor: pointer;
@@ -323,9 +323,8 @@
 }
 
 .checkoutButton:hover {
-  background-color: #1b4332;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(45, 106, 79, 0.3);
+  background-color: var(--tg-color-text);
+  box-shadow: var(--tg-shadow-none);
 }
 
 @media (max-width: 768px) {

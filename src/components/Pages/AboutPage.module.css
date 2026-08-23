@@ -12,7 +12,7 @@
 
 /* ==================== INFO SECTION ==================== */
 .infoSection {
-  background: #f5f7fa;
+  background: var(--tg-color-surface);
   padding: 80px 0;
 }
 
@@ -30,38 +30,37 @@
 .infoTitle {
   font-size: 42px;
   font-weight: 700;
-  color: #1e3a5f;
+  color: var(--tg-color-info);
   margin-bottom: 24px;
   line-height: 1.2;
 }
 
 .brandName {
-  color: #2d5016;
+  color: var(--tg-color-brand);
 }
 
 .infoDescription {
   font-size: 16px;
   line-height: 1.8;
-  color: #555;
+  color: var(--tg-color-text-secondary);
   margin-bottom: 32px;
 }
 
 .contactButton {
-  background: #4a7c29;
+  background: var(--tg-color-brand);
   color: white;
   border: none;
   padding: 16px 40px;
   font-size: 16px;
   font-weight: 600;
-  border-radius: 30px;
+  border-radius: var(--tg-radius-sm);
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .contactButton:hover {
-  background: #2d5016;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(127, 176, 105, 0.3);
+  background: var(--tg-color-brand);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .infoMedia {
@@ -74,9 +73,9 @@
   position: relative;
   width: 100%;
   max-width: 550px;
-  border-radius: 12px;
+  border-radius: var(--tg-radius-sm);
   overflow: hidden;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .heroImage {
@@ -89,7 +88,7 @@
   width: 100%;
   height: auto;
   display: block;
-  border-radius: 12px;
+  border-radius: var(--tg-radius-sm);
 }
 
 .playButton {
@@ -106,7 +105,7 @@
   justify-content: center;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .playButton:hover {
@@ -117,17 +116,16 @@
 .playButton svg {
   width: 30px;
   height: 30px;
-  color: #1e3a5f;
+  color: var(--tg-color-info);
   margin-left: 4px;
 }
 
 /* ==================== MISSION & VISION SECTION ==================== */
 .missionVisionSection {
   position: relative;
-  background-image: url('https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=1920&q=80');
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
+  /* Misma razon que la portada: fondo del sistema, sin foto de stock
+     traida de un tercero en cada visita. */
+  background-color: var(--tg-color-brand);
   padding: 100px 0;
 }
 
@@ -159,7 +157,7 @@
   top: 0;
   width: 4px;
   height: 40px;
-  background: #7fb069;
+  background: var(--tg-color-brand);
 }
 
 .missionCard h2,
@@ -186,7 +184,7 @@
 .teamTitle {
   font-size: 36px;
   font-weight: 400;
-  color: #64748b;
+  color: var(--tg-color-text-secondary);
   text-align: center;
   margin-bottom: 60px;
   font-style: italic;
@@ -221,18 +219,18 @@
   width: 220px;
   height: 220px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #e8e8e8 0%, #d0d0d0 100%);
+  background: var(--tg-color-border);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--tg-shadow-none);
   overflow: hidden;
 }
 
 .photoPlaceholder svg {
   width: 100px;
   height: 100px;
-  color: #999;
+  color: var(--tg-color-border-control);
 }
 
 .memberImage {
@@ -241,8 +239,8 @@
   border-radius: 50%;
   object-fit: cover;
   object-position: center 15%;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-  border: 4px solid #fff;
+  box-shadow: var(--tg-shadow-none);
+  border: 4px solid var(--tg-color-surface);
 }
 
 .memberInfo {
@@ -252,13 +250,13 @@
 .memberName {
   font-size: 28px;
   font-weight: 700;
-  color: #1e3a5f;
+  color: var(--tg-color-info);
   margin-bottom: 8px;
 }
 
 .memberRole {
   font-size: 16px;
-  color: #1e3a5f;
+  color: var(--tg-color-info);
   font-weight: 500;
   margin-bottom: 20px;
 }
@@ -266,17 +264,17 @@
 .memberDescription {
   font-size: 15px;
   line-height: 1.8;
-  color: #555;
+  color: var(--tg-color-text-secondary);
   margin-bottom: 12px;
 }
 
 .memberDescription strong {
-  color: #1e3a5f;
+  color: var(--tg-color-info);
 }
 
 /* ==================== CTA SECTION ==================== */
 .ctaSection {
-  background: linear-gradient(135deg, #2d5016 0%, #4a7c29 100%);
+  background: var(--tg-color-brand);
   padding: 80px 24px;
   text-align: center;
   color: white;
@@ -302,19 +300,18 @@
 
 .ctaPrimary {
   background: white;
-  color: #2d5016;
+  color: var(--tg-color-brand);
   border: none;
   padding: 16px 36px;
   font-size: 16px;
   font-weight: 600;
-  border-radius: 30px;
+  border-radius: var(--tg-radius-sm);
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .ctaPrimary:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .ctaSecondary {
@@ -324,15 +321,14 @@
   padding: 16px 36px;
   font-size: 16px;
   font-weight: 600;
-  border-radius: 30px;
+  border-radius: var(--tg-radius-sm);
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .ctaSecondary:hover {
   background: white;
-  color: #2d5016;
-  transform: translateY(-3px);
+  color: var(--tg-color-brand);
 }
 
 /* ==================== RESPONSIVE ==================== */

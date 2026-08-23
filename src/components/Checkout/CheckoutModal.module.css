@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.75);
+  background-color: var(--tg-color-overlay);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -15,13 +15,13 @@
 
 .modal {
   background: white;
-  border-radius: 16px;
+  border-radius: var(--tg-radius-sm);
   max-width: 1200px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
   position: relative;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--tg-shadow-overlay);
   animation: slideUp 0.3s ease-out;
 }
 
@@ -50,13 +50,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--tg-shadow-none);
   z-index: 10;
   transition: all 0.2s;
 }
 
 .closeButton:hover {
-  background-color: #f0f0f0;
+  background-color: var(--tg-color-surface-muted);
   transform: scale(1.1);
 }
 
@@ -66,7 +66,7 @@
   align-items: center;
   justify-content: center;
   padding: 40px 60px 20px;
-  background: linear-gradient(135deg, #f0f4ed 0%, #ffffff 100%);
+  background: var(--tg-color-surface-muted);
 }
 
 .progressStep {
@@ -80,8 +80,8 @@
   width: 45px;
   height: 45px;
   border-radius: 50%;
-  background: #e0e0e0;
-  color: #595959;
+  background: var(--tg-color-surface-muted);
+  color: var(--tg-color-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -91,31 +91,31 @@
 }
 
 .progressStepActive .progressCircle {
-  background: #2d5016;
+  background: var(--tg-color-brand);
   color: white;
   transform: scale(1.15);
 }
 
 .progressStepComplete .progressCircle {
-  background: #4a7c29;
+  background: var(--tg-color-brand);
   color: white;
 }
 
 .progressStep span {
   font-size: 13px;
-  color: #666;
+  color: var(--tg-color-text-secondary);
   font-weight: 500;
 }
 
 .progressStepActive span {
-  color: #2d5016;
+  color: var(--tg-color-brand);
   font-weight: 700;
 }
 
 .progressLine {
   width: 80px;
   height: 2px;
-  background: #e0e0e0;
+  background: var(--tg-color-border);
   margin: 0 12px;
   margin-bottom: 24px;
 }
@@ -152,20 +152,20 @@
 
 .stepHeader {
   padding-bottom: 20px;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 2px solid var(--tg-color-border);
 }
 
 .stepHeader h2 {
   margin: 0 0 8px 0;
   font-size: 26px;
-  color: #2d5016;
+  color: var(--tg-color-brand);
   font-weight: 700;
 }
 
 .stepHeader p {
   margin: 0;
   font-size: 15px;
-  color: #666;
+  color: var(--tg-color-text-secondary);
 }
 
 .formGrid {
@@ -189,7 +189,7 @@
 .formGroupFull label {
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: var(--tg-color-text);
 }
 
 .formGroup input,
@@ -197,8 +197,8 @@
 .formGroupFull input,
 .formGroupFull textarea {
   padding: 12px 16px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
+  border: 2px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-lg);
   font-size: 15px;
   font-family: inherit;
   transition: all 0.2s;
@@ -209,8 +209,8 @@
 .formGroupFull input:focus,
 .formGroupFull textarea:focus {
   outline: none;
-  border-color: #7fb069;
-  box-shadow: 0 0 0 3px rgba(127, 176, 105, 0.1);
+  border-color: var(--tg-color-brand);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .formGroupFull textarea {
@@ -228,16 +228,16 @@
 .paymentOption {
   display: flex;
   padding: 20px;
-  border: 2px solid #e0e0e0;
-  border-radius: 12px;
+  border: 2px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-sm);
   cursor: pointer;
   transition: all 0.2s;
   position: relative;
 }
 
 .paymentOption:hover {
-  border-color: #7fb069;
-  background: #f8faf8;
+  border-color: var(--tg-color-brand);
+  background: var(--tg-color-surface);
 }
 
 .paymentOption input[type="radio"] {
@@ -246,8 +246,8 @@
 }
 
 .paymentOptionActive {
-  border-color: #2d5016;
-  background: linear-gradient(135deg, #f0f4ed 0%, #ffffff 100%);
+  border-color: var(--tg-color-brand);
+  background: var(--tg-color-surface-muted);
 }
 
 .paymentContent {
@@ -264,13 +264,13 @@
 .paymentTitle {
   font-size: 18px;
   font-weight: 700;
-  color: #2d5016;
+  color: var(--tg-color-brand);
   margin-bottom: 4px;
 }
 
 .paymentDescription {
   font-size: 14px;
-  color: #666;
+  color: var(--tg-color-text-secondary);
   line-height: 1.4;
 }
 
@@ -280,7 +280,7 @@
 .finishButton {
   padding: 14px 32px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--tg-radius-lg);
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -288,14 +288,13 @@
 }
 
 .nextButton {
-  background: #2d5016;
+  background: var(--tg-color-brand);
   color: white;
   width: 100%;
 }
 
 .nextButton:hover {
-  background: #1e3510;
-  transform: translateY(-2px);
+  background: var(--tg-color-text);
 }
 
 .formActions {
@@ -305,13 +304,13 @@
 }
 
 .backButton {
-  background: #f0f0f0;
-  color: #666;
+  background: var(--tg-color-surface-muted);
+  color: var(--tg-color-text-secondary);
   flex: 1;
 }
 
 .backButton:hover {
-  background: #e0e0e0;
+  background: var(--tg-color-border);
 }
 
 .formActions .nextButton {
@@ -320,22 +319,22 @@
 
 /* Sidebar - Order Summary */
 .sidebar {
-  background: linear-gradient(135deg, #f0f4ed 0%, #ffffff 100%);
+  background: var(--tg-color-surface-muted);
   padding: 24px;
-  border-radius: 12px;
+  border-radius: var(--tg-radius-sm);
   height: fit-content;
   position: sticky;
   top: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .sidebar h3 {
   margin: 0 0 20px 0;
   font-size: 20px;
-  color: #2d5016;
+  color: var(--tg-color-brand);
   font-weight: 700;
   padding-bottom: 16px;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 2px solid var(--tg-color-border);
 }
 
 .summaryItems {
@@ -349,13 +348,13 @@
   display: flex;
   gap: 12px;
   padding-bottom: 16px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--tg-color-border);
 }
 
 .summaryItemImage {
   width: 60px;
   height: 60px;
-  border-radius: 8px;
+  border-radius: var(--tg-radius-lg);
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -376,19 +375,19 @@
 .summaryItemName {
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: var(--tg-color-text);
   line-height: 1.3;
 }
 
 .summaryItemQuantity {
   font-size: 13px;
-  color: #666;
+  color: var(--tg-color-text-secondary);
 }
 
 .summaryItemPrice {
   font-size: 15px;
   font-weight: 700;
-  color: #2d5016;
+  color: var(--tg-color-brand);
 }
 
 .summaryTotal {
@@ -396,7 +395,7 @@
   flex-direction: column;
   gap: 12px;
   padding-top: 16px;
-  border-top: 2px solid #e0e0e0;
+  border-top: 2px solid var(--tg-color-border);
 }
 
 .summaryRow {
@@ -406,7 +405,7 @@
 }
 
 .summaryRow .free {
-  color: #2d5016;
+  color: var(--tg-color-brand);
   font-size: 13px;
   font-weight: 600;
 }
@@ -415,9 +414,9 @@
   display: flex;
   justify-content: space-between;
   font-size: 20px;
-  color: #2d5016;
+  color: var(--tg-color-brand);
   padding-top: 12px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--tg-color-border);
 }
 
 /* Confirmation */
@@ -441,23 +440,21 @@
     transform: translateY(0);
   }
   40% {
-    transform: translateY(-20px);
   }
   60% {
-    transform: translateY(-10px);
   }
 }
 
 .confirmation h2 {
   margin: 0 0 12px 0;
   font-size: 32px;
-  color: #2d5016;
+  color: var(--tg-color-brand);
   font-weight: 700;
 }
 
 .orderNumber {
   font-size: 16px;
-  color: #666;
+  color: var(--tg-color-text-secondary);
   margin-bottom: 32px;
 }
 
@@ -472,32 +469,32 @@
 .infoCard {
   background: white;
   padding: 24px;
-  border-radius: 12px;
+  border-radius: var(--tg-radius-sm);
   text-align: left;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--tg-color-border);
 }
 
 .infoCard h3 {
   margin: 0 0 16px 0;
   font-size: 18px;
-  color: #2d5016;
+  color: var(--tg-color-brand);
   font-weight: 700;
 }
 
 .infoCard p {
   margin: 6px 0;
   font-size: 14px;
-  color: #333;
+  color: var(--tg-color-text);
   line-height: 1.6;
 }
 
 .notes {
   margin-top: 12px;
   padding: 12px;
-  background: #f8f9fa;
-  border-radius: 6px;
+  background: var(--tg-color-surface);
+  border-radius: var(--tg-radius-lg);
   font-style: italic;
-  color: #666;
+  color: var(--tg-color-text-secondary);
 }
 
 .sellerContacts {
@@ -507,11 +504,11 @@
 
 .unlocked {
   padding: 16px;
-  background: #e8f0e1;
-  border-left: 4px solid #7fb069;
-  border-radius: 8px;
+  background: var(--tg-color-surface-subtle);
+  border-left: 4px solid var(--tg-color-brand);
+  border-radius: var(--tg-radius-lg);
   text-align: left;
-  color: #2d5016;
+  color: var(--tg-color-brand);
   font-size: 15px;
   margin-bottom: 24px;
 }
@@ -519,19 +516,19 @@
 .sellerContactCard {
   background: white;
   padding: 24px;
-  border-radius: 12px;
+  border-radius: var(--tg-radius-sm);
   text-align: left;
-  border: 2px solid #7fb069;
+  border: 2px solid var(--tg-color-brand);
   margin-bottom: 20px;
 }
 
 .sellerContactCard h3 {
   margin: 0 0 16px 0;
   font-size: 20px;
-  color: #2d5016;
+  color: var(--tg-color-brand);
   font-weight: 700;
   padding-bottom: 12px;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 2px solid var(--tg-color-border);
 }
 
 .sellerProducts {
@@ -541,7 +538,7 @@
 .sellerProducts h4 {
   margin: 0 0 12px 0;
   font-size: 15px;
-  color: #666;
+  color: var(--tg-color-text-secondary);
   font-weight: 600;
 }
 
@@ -549,19 +546,19 @@
   display: flex;
   justify-content: space-between;
   padding: 8px 12px;
-  background: #f8f9fa;
-  border-radius: 6px;
+  background: var(--tg-color-surface);
+  border-radius: var(--tg-radius-lg);
   margin-bottom: 8px;
   font-size: 14px;
 }
 
 .sellerTotal {
   padding: 12px;
-  background: linear-gradient(135deg, #f0f4ed 0%, #e8f0e1 100%);
-  border-radius: 6px;
+  background: var(--tg-color-surface-muted);
+  border-radius: var(--tg-radius-lg);
   text-align: right;
   margin-top: 12px;
-  color: #2d5016;
+  color: var(--tg-color-brand);
   font-size: 16px;
 }
 
@@ -574,32 +571,31 @@
 .addressInfo p {
   margin: 6px 0;
   font-size: 14px;
-  color: #333;
+  color: var(--tg-color-text);
 }
 
 .whatsappButton {
   display: inline-block;
   margin-top: 12px;
   padding: 10px 20px;
-  background: #075e54;
+  background: var(--tg-color-brand);
   color: white;
   text-decoration: none;
-  border-radius: 8px;
+  border-radius: var(--tg-radius-lg);
   font-weight: 600;
   transition: all 0.2s;
 }
 
 .whatsappButton:hover {
-  background: #054a41;
-  transform: translateY(-2px);
+  background: var(--tg-color-brand);
 }
 
 .totalSection {
   width: 100%;
   padding: 24px;
-  background: linear-gradient(135deg, #2d5016 0%, #3a6b1e 100%);
+  background: var(--tg-color-brand);
   color: white;
-  border-radius: 12px;
+  border-radius: var(--tg-radius-sm);
   margin-bottom: 32px;
 }
 
@@ -610,18 +606,18 @@
 
 .nextSteps {
   width: 100%;
-  background: #fff9e6;
+  background: var(--tg-color-warning-bg);
   padding: 24px;
-  border-radius: 12px;
+  border-radius: var(--tg-radius-sm);
   text-align: left;
-  border-left: 4px solid #ffd93d;
+  border-left: 4px solid var(--tg-color-warning);
   margin-bottom: 32px;
 }
 
 .nextSteps h3 {
   margin: 0 0 16px 0;
   font-size: 18px;
-  color: #2d5016;
+  color: var(--tg-color-brand);
 }
 
 .nextSteps ol {
@@ -632,20 +628,19 @@
 .nextSteps li {
   margin: 8px 0;
   font-size: 15px;
-  color: #333;
+  color: var(--tg-color-text);
   line-height: 1.6;
 }
 
 .finishButton {
-  background: #2d5016;
+  background: var(--tg-color-brand);
   color: white;
   padding: 16px 48px;
   font-size: 16px;
 }
 
 .finishButton:hover {
-  background: #1e3510;
-  transform: translateY(-2px);
+  background: var(--tg-color-text);
 }
 
 /* Responsive */
@@ -687,11 +682,11 @@
 
 /* Error message */
 .errorMessage {
-  background: #fff3f3;
-  border: 1px solid #ffcdd2;
-  color: #c62828;
+  background: var(--tg-color-error-bg);
+  border: 1px solid var(--tg-color-error-bg);
+  color: var(--tg-color-error);
   padding: 12px 16px;
-  border-radius: 8px;
+  border-radius: var(--tg-radius-lg);
   margin-bottom: 20px;
   font-size: 14px;
 }
@@ -699,10 +694,10 @@
 /* Payment badge */
 .paymentBadge {
   display: inline-block;
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--tg-color-surface-subtle);
+  color: var(--tg-color-brand);
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--tg-radius-md);
   font-size: 12px;
   font-weight: 500;
   margin-top: 4px;
@@ -718,8 +713,8 @@
 .spinner {
   width: 60px;
   height: 60px;
-  border: 4px solid #e0e0e0;
-  border-top-color: #2e7d32;
+  border: 4px solid var(--tg-color-border);
+  border-top-color: var(--tg-color-brand);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -736,15 +731,15 @@
 .fletes {
   margin: 24px 0 8px;
   padding: 20px;
-  background: #f6f8f3;
-  border: 1px solid #d8e2cf;
-  border-radius: 12px;
+  background: var(--tg-color-surface-muted);
+  border: 1px solid var(--tg-color-success-bg);
+  border-radius: var(--tg-radius-sm);
 }
 
 .fletesTitulo {
   margin: 0 0 4px;
   font-size: 1.05rem;
-  color: #2d5016;
+  color: var(--tg-color-brand);
 }
 
 .fleteGrupo {
@@ -754,12 +749,12 @@
 .fleteGrupoTitulo {
   margin: 0 0 8px;
   font-size: 0.95rem;
-  color: #2d5016;
+  color: var(--tg-color-brand);
 }
 
 .fleteOrigenes {
   font-weight: 400;
-  color: #4a5340;
+  color: var(--tg-color-text);
 }
 
 .fleteLista {
@@ -772,45 +767,45 @@
 
 .fleteTarjeta {
   padding: 14px 16px;
-  background: #ffffff;
-  border: 1px solid #d8e2cf;
-  border-radius: 10px;
+  background: var(--tg-color-surface);
+  border: 1px solid var(--tg-color-success-bg);
+  border-radius: var(--tg-radius-sm);
 }
 
 .fleteNombre {
   margin: 0 0 6px;
   font-weight: 700;
-  color: #24301c;
+  color: var(--tg-color-text);
 }
 
 .fleteDato {
   margin: 0 0 4px;
   font-size: 0.9rem;
-  color: #4a5340;
+  color: var(--tg-color-text);
 }
 
 .fleteDeclaracion {
   margin: 8px 0 0;
   padding-top: 8px;
-  border-top: 1px dashed #d8e2cf;
+  border-top: 1px dashed var(--tg-color-success-bg);
   font-size: 0.85rem;
-  color: #4a5340;
+  color: var(--tg-color-text);
 }
 
 .fleteAviso {
   margin: 0;
   padding: 10px 12px;
-  background: #ffffff;
-  border-left: 4px solid #7a8b6a;
-  border-radius: 8px;
+  background: var(--tg-color-surface);
+  border-left: 4px solid var(--tg-color-text-secondary);
+  border-radius: var(--tg-radius-lg);
   font-size: 0.9rem;
-  color: #3d4636;
+  color: var(--tg-color-text);
 }
 
 .fleteNota {
   margin: 16px 0 0;
   font-size: 0.82rem;
-  color: #4a5340;
+  color: var(--tg-color-text);
 }
 
 /* --- decisión de traslado, un pedido a la vez ---------------------------- */
@@ -826,53 +821,53 @@
   gap: 10px;
   align-items: flex-start;
   padding: 12px 14px;
-  background: #ffffff;
-  border: 1px solid #d8e2cf;
-  border-radius: 10px;
+  background: var(--tg-color-surface);
+  border: 1px solid var(--tg-color-success-bg);
+  border-radius: var(--tg-radius-sm);
   cursor: pointer;
-  color: #24301c;
+  color: var(--tg-color-text);
   font-size: 0.92rem;
 }
 
 .fleteOpcion input {
   margin-top: 3px;
-  accent-color: #2d5016;
+  accent-color: var(--tg-color-brand);
 }
 
 .fleteOpcionAyuda {
   display: block;
   margin-top: 2px;
   font-size: 0.85rem;
-  color: #4a5340;
+  color: var(--tg-color-text);
 }
 
 .fletePendiente {
   margin: 0;
   font-size: 0.88rem;
-  color: #6b3f00;
+  color: var(--tg-color-warning);
 }
 
 .fleteSinContacto {
   margin: 8px 0 10px;
   font-size: 0.85rem;
-  color: #4a5340;
+  color: var(--tg-color-text);
   font-style: italic;
 }
 
 .fleteElegir {
   width: 100%;
   padding: 10px 14px;
-  background: #2d5016;
-  color: #ffffff;
+  background: var(--tg-color-brand);
+  color: var(--tg-color-surface);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--tg-radius-lg);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
 }
 
 .fleteElegir:hover:not(:disabled) {
-  background: #244011;
+  background: var(--tg-color-brand);
 }
 
 .fleteElegir:disabled {
@@ -882,9 +877,9 @@
 
 .fleteElegido {
   padding: 14px 16px;
-  background: #ffffff;
-  border: 2px solid #2d5016;
-  border-radius: 10px;
+  background: var(--tg-color-surface);
+  border: 2px solid var(--tg-color-brand);
+  border-radius: var(--tg-radius-sm);
 }
 
 .fleteEtiqueta {
@@ -892,14 +887,14 @@
   font-size: 0.78rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #3d4636;
+  color: var(--tg-color-text);
 }
 
 .fleteContacto {
   margin: 6px 0 0;
   font-size: 0.92rem;
   font-weight: 600;
-  color: #24301c;
+  color: var(--tg-color-text);
   word-break: break-word;
 }
 
@@ -911,17 +906,17 @@
 
 .fleteQuitar {
   padding: 8px 14px;
-  background: #ffffff;
-  color: #8a2216;
-  border: 1px solid #8a2216;
-  border-radius: 8px;
+  background: var(--tg-color-surface);
+  color: var(--tg-color-error);
+  border: 1px solid var(--tg-color-error);
+  border-radius: var(--tg-radius-lg);
   font-size: 0.88rem;
   font-weight: 600;
   cursor: pointer;
 }
 
 .fleteQuitar:hover {
-  background: #fdeceb;
+  background: var(--tg-color-error-bg);
 }
 
 /* --- el pago, un grupo de vendedor a la vez ------------------------------ */
@@ -929,10 +924,10 @@
 .avisoMultiple {
   margin: 0 0 20px;
   padding: 14px 16px;
-  background: #f6f8f3;
-  border-left: 4px solid #2d5016;
-  border-radius: 8px;
-  color: #24301c;
+  background: var(--tg-color-surface-muted);
+  border-left: 4px solid var(--tg-color-brand);
+  border-radius: var(--tg-radius-lg);
+  color: var(--tg-color-text);
   font-size: 0.92rem;
 }
 
@@ -943,38 +938,38 @@
 
 .pagoNota {
   margin: 0 0 16px;
-  color: #4a5340;
+  color: var(--tg-color-text);
   font-size: 0.88rem;
 }
 
 .grupoDePago {
   margin: 0 0 20px;
   padding: 16px;
-  border: 1px solid #d8e2cf;
-  border-radius: 12px;
+  border: 1px solid var(--tg-color-success-bg);
+  border-radius: var(--tg-radius-sm);
 }
 
 .grupoDePagoTitulo {
   padding: 0 8px;
-  color: #24301c;
+  color: var(--tg-color-text);
   font-weight: 700;
 }
 
 .pagoSinMedio {
   margin: 0;
   padding: 10px 12px;
-  background: #fff3f3;
-  border: 1px solid #ffcdd2;
-  border-radius: 8px;
-  color: #c62828;
+  background: var(--tg-color-error-bg);
+  border: 1px solid var(--tg-color-error-bg);
+  border-radius: var(--tg-radius-lg);
+  color: var(--tg-color-error);
   font-size: 0.9rem;
 }
 
 .datosBancarios {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px dashed #d8e2cf;
-  color: #3d4636;
+  border-top: 1px dashed var(--tg-color-success-bg);
+  color: var(--tg-color-text);
   font-size: 0.9rem;
 }
 
@@ -986,24 +981,24 @@
   display: inline-block;
   margin: 12px 0 4px;
   padding: 12px 20px;
-  background: #2d5016;
-  border-radius: 8px;
-  color: #ffffff;
+  background: var(--tg-color-brand);
+  border-radius: var(--tg-radius-lg);
+  color: var(--tg-color-surface);
   font-weight: 600;
   text-decoration: none;
 }
 
 .pagarMP:hover {
-  background: #244011;
+  background: var(--tg-color-brand);
 }
 
 .reintentar {
   margin-top: 8px;
   padding: 10px 14px;
-  background: #ffffff;
-  border: 2px solid #2d5016;
-  border-radius: 8px;
-  color: #2d5016;
+  background: var(--tg-color-surface);
+  border: 2px solid var(--tg-color-brand);
+  border-radius: var(--tg-radius-lg);
+  color: var(--tg-color-brand);
   font-weight: 600;
   cursor: pointer;
 }

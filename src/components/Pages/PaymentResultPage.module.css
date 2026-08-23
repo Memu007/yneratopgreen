@@ -4,17 +4,17 @@
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);
+  background: var(--tg-color-surface);
 }
 
 .card {
   background: white;
-  border-radius: 16px;
+  border-radius: var(--tg-radius-sm);
   padding: 3rem;
   max-width: 500px;
   width: 100%;
   text-align: center;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .iconCircle {
@@ -28,15 +28,15 @@
 }
 
 .successIcon {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: var(--tg-color-brand);
 }
 
 .failureIcon {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  background: var(--tg-color-error);
 }
 
 .pendingIcon {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  background: var(--tg-color-warning);
 }
 
 .icon {
@@ -46,35 +46,35 @@
 
 .title {
   font-size: 1.75rem;
-  color: #1f2937;
+  color: var(--tg-color-text);
   margin-bottom: 1rem;
   font-weight: 700;
 }
 
 .message {
-  color: #4b5563;
+  color: var(--tg-color-text-secondary);
   font-size: 1rem;
   line-height: 1.6;
   margin-bottom: 0.5rem;
 }
 
 .subMessage {
-  color: #6b7280;
+  color: var(--tg-color-text-secondary);
   font-size: 0.9rem;
   margin-bottom: 1.5rem;
 }
 
 .orderInfo {
-  background: #f9fafb;
-  border-radius: 8px;
+  background: var(--tg-color-surface);
+  border-radius: var(--tg-radius-lg);
   padding: 1rem;
   margin-bottom: 1.5rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tg-color-border);
 }
 
 .orderInfo p {
   margin: 0;
-  color: #374151;
+  color: var(--tg-color-text);
 }
 
 .actions {
@@ -85,10 +85,10 @@
 
 .primaryButton {
   padding: 0.875rem 1.5rem;
-  background: linear-gradient(135deg, #15803d 0%, #14532d 100%);
+  background: var(--tg-color-brand);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--tg-radius-lg);
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
@@ -96,16 +96,15 @@
 }
 
 .primaryButton:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+  box-shadow: var(--tg-shadow-none);
 }
 
 .secondaryButton {
   padding: 0.875rem 1.5rem;
   background: white;
-  color: #374151;
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
+  color: var(--tg-color-text);
+  border: 2px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-lg);
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
@@ -113,19 +112,19 @@
 }
 
 .secondaryButton:hover {
-  border-color: #22c55e;
-  color: #15803d;
+  border-color: var(--tg-color-brand);
+  color: var(--tg-color-brand);
 }
 
 .helpSection {
   margin-top: 2rem;
   padding-top: 1.5rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--tg-color-border);
   text-align: left;
 }
 
 .helpSection h3 {
-  color: #374151;
+  color: var(--tg-color-text);
   font-size: 1rem;
   margin-bottom: 0.75rem;
 }
@@ -133,7 +132,7 @@
 .helpSection ul {
   margin: 0;
   padding-left: 1.25rem;
-  color: #6b7280;
+  color: var(--tg-color-text-secondary);
   font-size: 0.9rem;
 }
 

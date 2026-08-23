@@ -733,6 +733,20 @@ async function runCase(number, name, callback) {
   }
 }
 
+/**
+ * El botón de compra DE ESA publicación.
+ *
+ * Antes alcanzaba con el primer «Agregar» de la página. Ya no: el activo de
+ * alto valor dice «Iniciar operación», el servicio con precio dice
+ * «Contratar», y en la grilla hay una acción por tarjeta. Se busca el título
+ * y se baja al botón de su propia tarjeta.
+ */
+function accionDeLaTarjeta(page, nombre) {
+  const titulo = page.getByRole('heading', { name: nombre, exact: true, level: 3 });
+  const tarjeta = titulo.locator('xpath=ancestor::*[contains(@class,"card")]');
+  return tarjeta.getByRole('button', { name: /Agregar|Iniciar operación|Contratar/ }).first();
+}
+
 await runCase(1, 'Salud del servicio', async () => {
   const path = forcedFailure === 'health' ? '/health__forced_failure' : '/health';
   const { status, data } = await apiRequest(path);
@@ -1004,7 +1018,7 @@ await runCase(9, 'Publicar producto como vendedor desde la interfaz', async () =
     await sellButton.click();
 
     await page
-      .getByRole('heading', { name: /Agregar Nuevo Producto/i })
+      .getByRole('heading', { name: /Publicar un producto/i })
       .waitFor({ state: 'visible' });
     await page.locator('#name').fill(productName);
 
@@ -1119,7 +1133,7 @@ await runCase(10, 'Fallo de imagen visible sin perder la publicación', async ()
     await sellButton.click();
 
     await page
-      .getByRole('heading', { name: /Agregar Nuevo Producto/i })
+      .getByRole('heading', { name: /Publicar un producto/i })
       .waitFor({ state: 'visible' });
     await page.locator('#name').fill(productName);
     await page.locator('#category').selectOption({ label: state.product.category_name });
@@ -1599,7 +1613,7 @@ await runCase(19, 'Transferencia completa desde la interfaz', async () => {
       () => document.querySelectorAll('#catalog-category option').length > 1,
     );
     await page.locator('#catalog-type').selectOption('productos');
-    await page.getByRole('button', { name: /Agregar/ }).first().click();
+    await page.getByRole('button', { name: /Agregar|Iniciar operación|Contratar/ }).first().click();
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
 
@@ -1634,7 +1648,7 @@ await runCase(19, 'Transferencia completa desde la interfaz', async () => {
     });
     await page.getByRole('button', { name: 'Adjuntar comprobante' }).click();
     await page
-      .getByText(/Comprobante enviado\. Esperando validación del vendedor/)
+      .getByText(/Comprobante enviado\. Esperando la validación del vendedor/)
       .waitFor({ state: 'visible', timeout: 15_000 });
 
     assert(pageErrors.length === 0, `errores JS: ${pageErrors.join(' | ')}`);
@@ -1786,7 +1800,7 @@ await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorr
       level: 3,
     });
     await productHeading.waitFor({ state: 'visible' });
-    const productCard = productHeading.locator('xpath=ancestor::div[contains(@class,\"card\")]');
+    const productCard = productHeading.locator('xpath=ancestor::*[contains(@class,\"card\")]');
     const addButton = productCard.getByRole('button', { name: /Agregar/ });
 
     await productHeading.click();
@@ -1853,7 +1867,7 @@ await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorr
     await adminPage.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await adminPage.getByRole('button', { name: 'Admin' }).click();
     await adminPage.getByRole('heading', { name: 'Panel de Administración' }).waitFor();
-    await adminPage.getByRole('button', { name: '📦 Productos' }).click();
+    await adminPage.getByRole('button', { name: 'Productos' }).click();
     const table = adminPage.locator('table');
     await table.waitFor();
     await sinFoto(table).waitFor();
@@ -2674,7 +2688,7 @@ await runCase(30, 'El motivo real de la sincronización llega al comprador', asy
     await page.getByPlaceholder('Buscar producto, servicio o ubicación').press('Enter');
     const tarjeta = page.getByRole('heading', { name: nombre, exact: true, level: 3 });
     await tarjeta.waitFor({ state: 'visible', timeout: 15_000 });
-    await page.getByRole('button', { name: /Agregar/ }).first().click();
+    await accionDeLaTarjeta(page, nombre).click();
 
     // recién ahora se desactiva: el carrito local ya lo tiene
     await apiRequest(`/products/${productoId}`, {
@@ -2750,7 +2764,7 @@ await runCase(31, 'Sin datos bancarios, el comprador ve el motivo del vendedor',
     await page
       .getByRole('heading', { name: state.product.name, exact: true, level: 3 })
       .waitFor({ state: 'visible', timeout: 15_000 });
-    await page.getByRole('button', { name: /Agregar/ }).first().click();
+    await accionDeLaTarjeta(page, state.product.name).click();
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
     await page.getByRole('heading', { name: /Datos de env/i }).waitFor();
@@ -4043,7 +4057,7 @@ await runCase(43, 'Fletes compatibles por futura orden, con PostGIS y sin contac
       await buscador.press('Enter');
       await page.getByRole('heading', { name: nombreB, exact: true, level: 3 })
         .waitFor({ state: 'visible', timeout: 15_000 });
-      await page.getByRole('button', { name: /Agregar/ }).first().click();
+      await accionDeLaTarjeta(page, nombreB).click();
 
       await page.getByRole('button', { name: /Carrito/ }).click();
       await page.getByRole('button', { name: 'Continuar compra' }).click();
@@ -4264,7 +4278,7 @@ await runCase(45, 'La escritura de un carrito abandonado no puede quedar última
       await buscador.press('Enter');
       await page.getByRole('heading', { name: producto.nombre, exact: true, level: 3 })
         .waitFor({ state: 'visible', timeout: 15_000 });
-      await page.getByRole('button', { name: /Agregar/ }).first().click();
+      await accionDeLaTarjeta(page, producto.nombre).click();
     };
 
     const abrirCheckout = async () => {
@@ -4300,7 +4314,9 @@ await runCase(45, 'La escritura de un carrito abandonado no puede quedar última
 
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('heading', { name: /Mi carrito/i }).waitFor({ timeout: 15_000 });
-    await page.locator('button[title="Eliminar"]:visible').first().click();
+    // El botón del carrito dejó de identificarse por `title` —que no es un
+    // nombre accesible confiable— y pasó a decir «Quitar» con su etiqueta.
+    await page.getByRole('button', { name: /^Quitar / }).first().click();
     await page.getByText('Tu carrito está vacío').waitFor({ timeout: 15_000 });
     await cerrar();
     await agregarDesdeLaInterfaz(productoB);
@@ -4380,7 +4396,7 @@ await runCase(46, 'Vaciar el destino descarta la respuesta que venía en camino'
 
     await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
-    await page.getByRole('button', { name: /Agregar/ }).first().click();
+    await page.getByRole('button', { name: /Agregar|Iniciar operación|Contratar/ }).first().click();
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
     await page.getByRole('heading', { name: /Datos de env/i }).waitFor();
@@ -4484,7 +4500,7 @@ await runCase(47, 'Un login nuevo no hereda el "ya sincronizado" del anterior', 
       await buscador.press('Enter');
       await page.getByRole('heading', { name: nombreDelProducto, exact: true, level: 3 })
         .waitFor({ state: 'visible', timeout: 15_000 });
-      await page.getByRole('button', { name: /Agregar/ }).first().click();
+      await accionDeLaTarjeta(page, nombreDelProducto).click();
     };
 
     const comprarHastaElDestino = async () => {
@@ -4633,7 +4649,7 @@ await runCase(48, 'Un turno encolado no sale con las credenciales de la sesión 
       await buscador.press('Enter');
       await page.getByRole('heading', { name: producto.nombre, exact: true, level: 3 })
         .waitFor({ state: 'visible', timeout: 15_000 });
-      await page.getByRole('button', { name: /Agregar/ }).first().click();
+      await accionDeLaTarjeta(page, producto.nombre).click();
     };
 
     const comprarHastaElDestino = async () => {
@@ -5034,7 +5050,7 @@ await runCase(51, 'Cada pedido resuelve su traslado y la decisión llega a la or
       await buscador.press('Enter');
       await page.getByRole('heading', { name: pedido.nombre, exact: true, level: 3 })
         .waitFor({ state: 'visible', timeout: 15_000 });
-      await page.getByRole('button', { name: /Agregar/ }).first().click();
+      await accionDeLaTarjeta(page, pedido.nombre).click();
     }
 
     await page.getByRole('button', { name: /Carrito/ }).click();
@@ -5150,7 +5166,7 @@ await runCase(52, 'El contacto aparece al elegir y desaparece cuando la elecció
     await buscador.press('Enter');
     await page.getByRole('heading', { name: pedidoA.nombre, exact: true, level: 3 })
       .waitFor({ state: 'visible', timeout: 15_000 });
-    await page.getByRole('button', { name: /Agregar/ }).first().click();
+    await accionDeLaTarjeta(page, pedidoA.nombre).click();
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
     await page.getByRole('heading', { name: /Datos de env/i }).waitFor({ timeout: 15_000 });
@@ -5514,7 +5530,7 @@ await runCase(56, 'Una selección tardía no revive una decisión ya descartada'
     await buscador.press('Enter');
     await page.getByRole('heading', { name: pedidoA.nombre, exact: true, level: 3 })
       .waitFor({ state: 'visible', timeout: 15_000 });
-    await page.getByRole('button', { name: /Agregar/ }).first().click();
+    await accionDeLaTarjeta(page, pedidoA.nombre).click();
 
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
@@ -7720,7 +7736,7 @@ await runCase(81, 'La pantalla cobra por grupo, arma la cola de órdenes y no de
       await buscador.press('Enter');
       await page.getByRole('heading', { name: item.nombre, exact: true, level: 3 })
         .waitFor({ state: 'visible', timeout: 15_000 });
-      await page.getByRole('button', { name: /Agregar/ }).first().click();
+      await accionDeLaTarjeta(page, item.nombre).click();
     }
 
     await page.getByRole('button', { name: /Carrito/ }).click();
@@ -10356,7 +10372,7 @@ await runCase(108, 'Documentación: presentar, revisar y ver el distintivo en el
 
     await pa.getByRole('button', { name: 'Admin' }).first().click();
     await pa.getByRole('heading', { name: 'Panel de Administración' }).waitFor({ timeout: 15_000 });
-    await pa.getByRole('button', { name: /📄 Documentación/ }).click();
+    await pa.getByRole('button', { name: /Documentación/ }).click();
 
     const filaDeLaVendedora = pa.locator('tr').filter({ hasText: credenciales.email });
     await filaDeLaVendedora.waitFor({ state: 'visible', timeout: 15_000 });
@@ -10962,7 +10978,7 @@ await runCase(114, 'En pantalla: se comparan marca y cargas, el dominio recién 
     await buscador.press('Enter');
     await page.getByRole('heading', { name: pedidoA.nombre, exact: true, level: 3 })
       .waitFor({ state: 'visible', timeout: 15_000 });
-    await page.getByRole('button', { name: /Agregar/ }).first().click();
+    await accionDeLaTarjeta(page, pedidoA.nombre).click();
 
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
@@ -11392,17 +11408,46 @@ await runCase(118, 'La anatomía la declara la publicación, no la deduce la int
   assert(JSON.stringify(presentes) === JSON.stringify(['activo', 'insumo', 'logistica', 'servicio']),
     `faltan anatomías en el catálogo sembrado: ${JSON.stringify(presentes)}`);
 
-  // 3. Y la prueba de que es un dato de la publicación y no de su categoría:
-  //    hay una categoría con dos anatomías distintas adentro. Si la regla
-  //    fuera «la categoría manda», esto sería imposible.
-  const [mezclada] = queryRows(`
-    SELECT c.slug, COUNT(DISTINCT p.operation_kind), 'fin'
-    FROM products p JOIN categories c ON c.id = p.category_id
-    WHERE p.status = 'ACTIVE'
-    GROUP BY c.slug HAVING COUNT(DISTINCT p.operation_kind) > 1
-    ORDER BY c.slug LIMIT 1
+  // 3. Y la prueba de que es un dato de la PUBLICACIÓN y no de su categoría:
+  //    dos publicaciones de la misma categoría, con anatomías distintas.
+  //
+  //    Antes esto se comprobaba buscando una categoría mezclada en la base, y
+  //    era frágil por un motivo real: el caso 58 baja y vuelve a subir la
+  //    migración, y bajar BORRA la columna. Al volver a subir, cada
+  //    publicación toma otra vez la omisión de su categoría y la mezcla
+  //    desaparece. Se prueba creándola, que no depende del orden ni de lo que
+  //    haya hecho el resto de la suite.
+  const [categoriaDeProducto] = queryRows(`
+    SELECT id, name, 'fin' FROM categories WHERE is_service = false AND slug = 'maquinaria-agricola'
   `);
-  assert(mezclada, 'ninguna categoría tiene dos anatomías: la anatomía sería derivable de la categoría');
+  const vendedorParaMezcla = (await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  })).data.access_token;
+  const localidadParaMezcla = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const publicarMezcla = async (anatomia, extra = {}) => (await apiRequest('/products', {
+    method: 'POST', token: vendedorParaMezcla,
+    body: {
+      name: `Smoke mezcla ${anatomia} ${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
+      description: 'Publicación de prueba de la anatomía por publicación.',
+      category_id: categoriaDeProducto[0],
+      price: 250000, stock: 4, unit: 'unidad',
+      locality_id: localidadParaMezcla,
+      publication_type: 'producto',
+      operation_kind: anatomia,
+      ...extra,
+    },
+  })).data;
+
+  const comoActivo = await publicarMezcla('activo', { condition: 'usado' });
+  const comoInsumo = await publicarMezcla('insumo');
+  const mezclaEnBase = queryRows(`
+    SELECT operation_kind, 'fin' FROM products
+    WHERE id IN (${sqlLiteral(comoActivo.id)}, ${sqlLiteral(comoInsumo.id)})
+    ORDER BY operation_kind
+  `).map(([kind]) => kind);
+  assert(JSON.stringify(mezclaEnBase) === JSON.stringify(['activo', 'insumo']),
+    `dos publicaciones de «${categoriaDeProducto[1]}» no conservaron anatomías distintas: `
+    + JSON.stringify(mezclaEnBase));
 
   // 4. La respuesta pública la trae, en el listado y en el detalle.
   const listado = (await apiRequest('/catalog/products?page_size=100')).data;
@@ -11421,7 +11466,8 @@ await runCase(118, 'La anatomía la declara la publicación, no la deduce la int
     `el detalle dice «${detalle.operation_kind}» y la base «${unaFila[1]}»`);
 
   return `${total} publicaciones activas con anatomía declarada, ninguna contradice a su categoría; `
-    + `las cuatro presentes, «${mezclada[0]}» tiene ${mezclada[1]} adentro, y viaja en listado y detalle`;
+    + `las cuatro presentes; dos publicaciones de «${categoriaDeProducto[1]}» conservan `
+    + 'anatomías distintas, y el dato viaja en listado y detalle';
 });
 
 await runCase(119, 'El alta y la edición no pueden dejar una anatomía que contradiga la categoría', async () => {
