@@ -11,7 +11,7 @@ título o la fotografía.
 | Dato | Regla |
 |---|---|
 | Nombre, categoría, ubicación, vendedor | Obligatorios |
-| Condición | Obligatoria: nuevo/usado u opción del catálogo real |
+| Condición | Obligatoria cuando aplica: nuevo/usado. Puede omitirse cuando el activo no admite esa clasificación —por ejemplo, hacienda o tierra—; nunca forzar un dato falso. |
 | Precio o modalidad | Uno obligatorio: valor publicado o `A cotizar`; nunca `$0` |
 | Año, horas, potencia | Opcionales; mostrar sólo los presentes, máximo tres comparables |
 | Fotografía | Opcional; fallback neutro si falta o falla |
@@ -62,13 +62,15 @@ cantidad válida más cercana y explica el límite.
 | Modalidad | Obligatoria: por hectárea, visita, proyecto u opción real |
 | Precio | Valor real o `A cotizar`; nunca `$0` |
 | Disponibilidad/tiempo de respuesta | Opcionales; no inventar si faltan |
-| Acción | `Solicitar cotización` sólo como puente a Contacto existente, sin prometer mensajería ni prefill |
+| Acción con precio | `Contratar`; conserva carrito y checkout actuales, sin prometer mensajería ni reserva. |
+| Acción sin precio | `Solicitar cotización` como puente a Contacto existente, sin prometer mensajería ni prefill. |
 
 ### Detalle
 
 Prioriza cobertura, modalidad, disponibilidad, equipamiento declarado y
-descripción. No muestra selector de cantidad de carrito salvo que PM decida que
-ese servicio es comprable como unidad estandarizada.
+descripción. Un servicio con precio publicado se contrata como una unidad por el
+checkout existente y no muestra selector de cantidad. Sin precio, deriva a
+Contacto.
 
 ## 4. Logística
 
@@ -77,7 +79,8 @@ Hay dos contextos que no deben mezclarse.
 ### Publicación de un servicio logístico
 
 Obligatorios: prestador, base, tipo de equipo, carga declarada, cobertura/radio,
-modalidad y precio o `A cotizar`. CTA implementable actual: puente a Contacto.
+modalidad y precio o `A cotizar`. Con precio publicado usa `Contratar`; sin
+precio usa el puente a Contacto.
 
 ### Selección de transportista en checkout
 

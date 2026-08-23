@@ -3296,3 +3296,73 @@ documentá la razón.
 Esfuerzo **Extra**. No pidas razonamiento extenso ni avances cosméticos: usá el
 presupuesto en ejecución y verificación. Al terminar, empujá código e informe y
 frená. PM revisa y decide el despliegue.
+
+## 2026-08-23 — UX-2B: base visual aceptable, cierre todavía no aceptado
+
+Revisé los cuatro commits `08907cd`–`873ad2e` y el informe `8943143`. La
+dirección visual **B — Mesa de negocios** queda aceptada como base: no abras
+otro rediseño. También cierro las dos decisiones que trajiste:
+
+- un servicio o logística **con precio** conserva `Contratar` y el checkout;
+  sin precio usa `Solicitar cotización` hacia Contacto. Es preferible a cortar
+  catorce ventas existentes y corrige la orden de `$0`;
+- `condition` queda opcional para activos donde nuevo/usado no aplica, como
+  tierra y hacienda. No vamos a exigir un dato falso en el MVP.
+
+Actualicé `ANATOMIAS.md` y `COPY.md` para que ya no contradigan esas decisiones.
+
+Verificación independiente de PM: lint, sintaxis Python, diff-check y build de
+Vite a un directorio aislado quedan verdes. `npm run build` no pudo vaciar el
+`dist/` local por permisos del artefacto previo, después de que TypeScript ya
+había compilado; no es evidencia de una falla del código. Docker sigue apagado,
+por lo que PM no reprodujo la suite 119/119. Revisé además las capturas y el
+código, y encontré cinco faltantes que impiden aceptar UX-2B.
+
+## Tarea activa única: corrección de cierre UX-2B
+
+No abras UX-3, no rediseñes, no despliegues y no cambies pagos. Corregí sólo
+estos puntos:
+
+1. **Integridad producto/servicio.** El caso 119 mueve una fila con
+   `publication_type='producto'` a una categoría `is_service=true` y sólo cambia
+   `operation_kind`. Eso deja la interfaz diciendo servicio mientras el alta y
+   sus campos siguen tratándola como producto. En creación, rechazá las dos
+   combinaciones cruzadas entre `publication_type` y `category.is_service`. En
+   edición, como `publication_type` no es editable, rechazá mover la categoría
+   al otro lado y comprobá que la fila no mutó. No conviertas campos ni órdenes
+   en silencio. Ajustá el caso 119 para discriminar los tres rechazos.
+2. **“Mis Productos” debe respetar la anatomía.** La propia captura
+   `panel-estados-1440x900.png` muestra “Muestreo de Suelo” como servicio pero
+   imprime `Stock: 3000 unidades`, foto y `$7.500` mediante formato paralelo.
+   Usá `operation_kind` y los formatters compartidos: servicio/logística no
+   muestran stock ni foto; precio cero dice `A cotizar`; activos/insumos
+   conservan lo que corresponda. Renombrá únicamente el título/acción genéricos
+   de esa sección si hace falta para no llamar “producto” a todo. No rehagas el
+   panel.
+3. **Fotografía realmente opcional.** El handoff la declara opcional, pero el
+   alta bloquea `images.length === 0` y rotula la sección con `*`. Permití
+   publicar sin foto y dejá una regresión de navegador que cree una publicación
+   así y compruebe `Sin fotografía` en catálogo y detalle. Conservá validación
+   de tipo/tamaño cuando sí se adjunta un archivo.
+4. **Estado sin conexión.** Cuando falla la carga del mercado y
+   `navigator.onLine === false`, mostrale exactamente `Sin conexión. Revisá tu
+   red e intentá de nuevo.`; el resto de fallas conserva el mensaje general. Un
+   caso controlado debe probar ambos estados sin silenciar navegación.
+5. **Zoom 200 %.** Medí, no marques por inspección. Catálogo, detalle, ingreso,
+   carrito/checkout y panel deben seguir operables al 200 %: contenido y acción
+   principal alcanzables, foco visible y sin corte horizontal que impida usar
+   la pantalla. Si falla, corregí sólo el selector responsable.
+
+Retirá también `src/data/mockData.ts`: está muerto, contiene contenido falso y
+URLs de Unsplash, y contradice el criterio de entrega aunque no llegue al build.
+
+### Puertas de cierre
+
+- build, lint, contraste, a11y, hito y suite completa desde base limpia;
+- migración/seed sólo se repiten para confirmar que siguen verdes; no hace
+  falta otra migración;
+- capturas nuevas sólo de “Mis publicaciones” en 1440 y 390, más evidencia
+  textual del zoom 200 %;
+- `PARIDAD.md` corregido: no marques formato/anatomías/offline/zoom hasta que la
+  evidencia nueva exista;
+- un commit de corrección y otro de informe. Frená ahí.

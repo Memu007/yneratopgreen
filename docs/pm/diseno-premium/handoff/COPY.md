@@ -19,8 +19,10 @@ directa. Explica condiciones y próximos pasos sin grandilocuencia.
 | Activo de alto valor con precio | `Iniciar operación` | `Ver condiciones` | La primaria conserva carrito y checkout actuales; no abre chat ni negociación. |
 | Insumo con stock | `Agregar` | `Ver detalle` | Requiere cantidad cuando corresponda. |
 | Insumo sin stock | `Sin stock` | `Ver detalle` | Primaria deshabilitada, sin urgencia artificial. |
-| Servicio | `Solicitar cotización` | `Ver alcance` | En esta versión deriva a Contacto; no promete una solicitud ligada a la publicación. |
-| Logística pública | `Solicitar cotización` | `Ver cobertura` | Describe el servicio publicado. |
+| Servicio con precio | `Contratar` | `Ver alcance` | Conserva carrito y checkout actuales como una unidad; no promete mensajería ni reserva. |
+| Servicio sin precio | `Solicitar cotización` | `Ver alcance` | En esta versión deriva a Contacto; no promete una solicitud ligada a la publicación. |
+| Logística pública con precio | `Contratar` | `Ver cobertura` | Conserva carrito y checkout actuales como una unidad. |
+| Logística pública sin precio | `Solicitar cotización` | `Ver cobertura` | Deriva a Contacto y describe el servicio publicado. |
 | Logística en checkout | `Elegir transportista` | `Traslado por cuenta propia` | Sólo después de destino y carrito sincronizado. |
 
 `Ver transportistas` queda deshabilitado fuera del checkout con la ayuda:
