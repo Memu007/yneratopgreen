@@ -5,6 +5,7 @@ import { NewProductData } from '../../types';
 import { apiPost, apiGet, API_BASE_URL, tokenStorage } from '../../utils/api';
 import styles from './AddProductModal.module.css';
 import { ProductImage } from '../ProductImage/ProductImage';
+import { Condition, OperationKind, ETIQUETA_DE_ANATOMIA, ETIQUETA_DE_CONDICION } from '../../utils/anatomia';
 
 interface AddProductModalProps {
   isOpen: boolean;
@@ -44,6 +45,7 @@ interface CategoryFromBackend {
   id: string;
   name: string;
   is_service: boolean;
+  default_operation_kind: OperationKind;
   subcategories: Subcategory[];
 }
 
@@ -96,6 +98,14 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   
   // Tipo de publicación: producto o servicio
   const [publicationType, setPublicationType] = useState<'producto' | 'servicio'>('producto');
+  // Cuál de las cuatro anatomías es. Arranca con la que declara la categoría
+  // elegida y el vendedor puede corregirla: es él quien sabe si lo que sube
+  // es una máquina única o un insumo que se vende de a bolsas.
+  const [operationKind, setOperationKind] = useState<OperationKind>('insumo');
+  // Nuevo o usado. Sólo la pide el activo de alto valor, y se puede dejar
+  // sin declarar: en hacienda y campos el par no significa nada, y obligar a
+  // elegir uno haría que el vendedor conteste cualquier cosa para publicar.
+  const [condition, setCondition] = useState<Condition | ''>('');
   
   const [formData, setFormData] = useState<NewProductData>({
     name: '',
@@ -170,6 +180,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   // publicar IDs inexistentes mientras la carga todavía está en curso.
   const currentCategories = backendCategories.map(cat => ({
     value: cat.name,
+    anatomiaPorOmision: cat.default_operation_kind,
     subcategories: cat.subcategories?.map((s: Subcategory) => s.name) || []
   }));
   
@@ -197,6 +208,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
 
   // Reset form cuando cambia el tipo
   const handleTypeChange = (type: 'producto' | 'servicio') => {
+    setOperationKind(type === 'servicio' ? 'servicio' : 'insumo');
     setPublicationType(type);
     setFormData(prev => ({
       ...prev,
@@ -225,6 +237,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   };
 
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    // La categoría propone; el vendedor dispone. Sin esto habría que
+    // elegir la anatomía a ciegas en cada alta.
+    const elegida = currentCategories.find(cat => cat.value === e.target.value);
+    if (elegida) setOperationKind(elegida.anatomiaPorOmision);
     setFormData(prev => ({
       ...prev,
       category: e.target.value,
@@ -470,6 +486,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
         subcategory_id: subcategoryId,  // Agregar subcategory_id
         locality_id: formData.localityId,
         publication_type: publicationType,
+        operation_kind: operationKind,
+        condition: operationKind === 'activo' && condition ? condition : undefined,
       };
 
       // Campos específicos según tipo
@@ -674,6 +692,51 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                 </select>
               </div>
             </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="operation-kind">Clase de publicación *</label>
+              <select
+                id="operation-kind"
+                name="operation-kind"
+                value={operationKind}
+                onChange={(e) => setOperationKind(e.target.value as OperationKind)}
+                required
+              >
+                {(publicationType === 'servicio'
+                  ? (['servicio', 'logistica'] as OperationKind[])
+                  : (['activo', 'insumo'] as OperationKind[])
+                ).map(clase => (
+                  <option key={clase} value={clase}>{ETIQUETA_DE_ANATOMIA[clase]}</option>
+                ))}
+              </select>
+              <p className={styles.helpText}>
+                {publicationType === 'servicio'
+                  ? 'Logística es transporte y fletes; el resto de los trabajos son servicios.'
+                  : 'Un activo es un bien puntual —una máquina, un campo, una hacienda— y pide condición. Un insumo se vende por unidad de medida y con stock.'}
+              </p>
+            </div>
+
+            {operationKind === 'activo' && (
+              <div className={styles.formGroup}>
+                <label htmlFor="condition">Condición</label>
+                <select
+                  id="condition"
+                  name="condition"
+                  value={condition}
+                  onChange={(e) => setCondition(e.target.value as Condition | '')}
+                >
+                  <option value="">Sin declarar</option>
+                  {(['nuevo', 'usado'] as Condition[]).map(valor => (
+                    <option key={valor} value={valor}>{ETIQUETA_DE_CONDICION[valor]}</option>
+                  ))}
+                </select>
+                <p className={styles.helpText}>
+                  Es lo primero que mira quien compra una máquina. Dejala sin
+                  declarar sólo si no aplica —hacienda, campos—: no la completes
+                  con una respuesta que no sea cierta.
+                </p>
+              </div>
+            )}
 
             <div className={styles.formGroup}>
               <label htmlFor="description">Descripción *</label>

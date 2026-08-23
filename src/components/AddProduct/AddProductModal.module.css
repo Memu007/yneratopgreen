@@ -564,3 +564,12 @@
     width: 100%;
   }
 }
+
+/* La ayuda debajo de un control: explica una decisión, no la decora. Va en
+   texto secundario para que no compita con la etiqueta del campo. */
+.helpText {
+  margin: 0.375rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--tg-color-text-secondary);
+}

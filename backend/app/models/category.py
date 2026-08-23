@@ -24,6 +24,14 @@ class Category(Base):
     
     # Tipo de categoría
     is_service = Column(Boolean, default=False, nullable=False)  # True para categorías de servicio
+
+    # La anatomía que traen por omisión las publicaciones de esta
+    # categoría. Es lo que preselecciona el alta y lo que usó la migración
+    # para los registros que ya existían. Siempre cae del mismo lado que
+    # `is_service`.
+    default_operation_kind = Column(
+        String(20), nullable=False, server_default="insumo"
+    )
     
     # Estado
     is_active = Column(Boolean, default=True, nullable=False)

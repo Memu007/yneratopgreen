@@ -14,6 +14,14 @@ import {
   LocalityResponse,
   ProvinceResponse,
 } from '../../utils/catalogService';
+import {
+  Condition,
+  OperationKind,
+  ETIQUETA_DE_ANATOMIA,
+  ETIQUETA_DE_CONDICION,
+  normalizarAnatomia,
+  normalizarCondicion,
+} from '../../utils/anatomia';
 
 type TabType = 'profile' | 'notifications' | 'purchases' | 'sales' | 'products'
   | 'operations';
@@ -231,6 +239,8 @@ interface BackendProduct {
   likes_count: number;
   created_at: string;
   publication_type?: string;
+  operation_kind?: string;
+  condition?: string | null;
   // Campos de servicio
   pricing_type?: string;
   availability?: string;
@@ -258,6 +268,11 @@ interface EditFormData {
   newImages: Array<{ file: File; preview: string }>;
   imagesToDelete: string[];
   publication_type: 'producto' | 'servicio';
+  // La anatomía declarada. Se puede corregir: los registros anteriores a la
+  // columna tomaron la que declara su categoría, y sólo el vendedor sabe si
+  // lo que publicó es una máquina única o un insumo con stock.
+  operation_kind: OperationKind;
+  condition: Condition | '';
   // Campos de servicio
   pricing_type?: string;
   availability?: string;
@@ -1262,6 +1277,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       newImages: [],
       imagesToDelete: [],
       publication_type: isService ? 'servicio' : 'producto',
+      operation_kind: normalizarAnatomia(product.operation_kind),
+      condition: normalizarCondicion(product.condition) || '',
       // Campos de servicio
       pricing_type: product.pricing_type || 'por_hora',
       availability: product.availability || 'inmediata',
@@ -1302,6 +1319,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         description: editingProduct.description,
         price: price,
         location: location,
+        operation_kind: editingProduct.operation_kind,
+        condition: editingProduct.operation_kind === 'activo' && editingProduct.condition
+          ? editingProduct.condition
+          : null,
       };
       
       // Agregar subcategoría si existe
@@ -3079,6 +3100,47 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 </div>
               </div>
               
+              {/* Clase de publicación: la que decide qué muestra la tarjeta y
+                  qué acción ofrece. Se puede corregir acá porque los avisos
+                  anteriores a la columna heredaron la de su categoría. */}
+              <div className={styles.editFormGroup}>
+                <label htmlFor="edit-operation-kind">Clase de publicación</label>
+                <select
+                  id="edit-operation-kind"
+                  value={editingProduct.operation_kind}
+                  onChange={(e) => setEditingProduct({
+                    ...editingProduct,
+                    operation_kind: e.target.value as OperationKind,
+                  })}
+                >
+                  {(editingProduct.publication_type === 'servicio'
+                    ? (['servicio', 'logistica'] as OperationKind[])
+                    : (['activo', 'insumo'] as OperationKind[])
+                  ).map(clase => (
+                    <option key={clase} value={clase}>{ETIQUETA_DE_ANATOMIA[clase]}</option>
+                  ))}
+                </select>
+              </div>
+
+              {editingProduct.operation_kind === 'activo' && (
+                <div className={styles.editFormGroup}>
+                  <label htmlFor="edit-condition">Condición</label>
+                  <select
+                    id="edit-condition"
+                    value={editingProduct.condition}
+                    onChange={(e) => setEditingProduct({
+                      ...editingProduct,
+                      condition: e.target.value as Condition | '',
+                    })}
+                  >
+                    <option value="">Sin declarar</option>
+                    {(['nuevo', 'usado'] as Condition[]).map(valor => (
+                      <option key={valor} value={valor}>{ETIQUETA_DE_CONDICION[valor]}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Precio, Stock y Unidad - Solo para productos */}
               {editingProduct.publication_type === 'producto' ? (
                 <div className={styles.editFormRow}>

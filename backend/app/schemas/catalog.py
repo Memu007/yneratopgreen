@@ -24,6 +24,9 @@ class CategoryBase(BaseModel):
     icon: Optional[str] = None
     display_order: int = 0
     is_service: bool = False
+    # La anatomia que traen por omision las publicaciones de esta categoria.
+    # El alta la usa para preseleccionar y para saber que opciones ofrecer.
+    default_operation_kind: str = "insumo"
 
 class CategoryResponse(CategoryBase):
     id: str
@@ -91,6 +94,10 @@ class ProductCardResponse(ProductBase):
     subcategory_id: Optional[str] = None
     subcategory_name: Optional[str] = None
     is_service: bool = False
+    # La anatomia declarada. Sin esta linea el diccionario la arma y el
+    # modelo la descarta: Pydantic ignora lo que no declara.
+    operation_kind: str = "insumo"
+    condition: Optional[str] = None
     primary_image: Optional[str] = None
     seller: SellerBasicInfo
     views_count: int = 0
@@ -107,6 +114,8 @@ class ProductDetailResponse(ProductBase):
     category_id: str
     category_name: str
     is_service: bool = False
+    operation_kind: str = "insumo"
+    condition: Optional[str] = None
     seller: SellerInfo
     images: List[ProductImageResponse] = []
     views_count: int = 0

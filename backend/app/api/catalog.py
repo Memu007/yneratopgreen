@@ -107,6 +107,7 @@ def get_categories(
                 "icon": category.icon,
                 "display_order": int(category.display_order) if category.display_order else 0,
                 "is_service": category.is_service,
+                "default_operation_kind": category.default_operation_kind,
                 "product_count": count,
                 "subcategories": subcategory_list,
                 "created_at": category.created_at
@@ -372,6 +373,12 @@ def get_products(
             "subcategory_id": subcategory_id,
             "subcategory_name": subcategory_name,
             "is_service": is_service,
+            # Cual de las cuatro anatomias es. Sale de la columna
+            # declarada, no de una regla del frontend: la tarjeta elige
+            # que datos mostrar y que accion ofrecer a partir de aca.
+            "operation_kind": product.operation_kind,
+            # Nuevo o usado, o nada. Sólo el activo la trae con valor.
+            "condition": product.condition,
             "primary_image": primary_image[0] if primary_image else None,
             "seller": seller_info,
             "views_count": product.views_count,
@@ -450,6 +457,8 @@ def get_product_detail(
         "category_id": product.category_id,
         "category_name": product.category.name,
         "is_service": product.category.is_service,
+        "operation_kind": product.operation_kind,
+        "condition": product.condition,
         "seller": seller_info,
         "images": sorted(product.images, key=lambda x: (not x.is_primary, x.display_order)),
         "views_count": product.views_count,

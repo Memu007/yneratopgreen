@@ -29,6 +29,22 @@ class Product(Base):
     
     # Tipo de publicación (producto o servicio)
     publication_type = Column(String(20), default="producto", nullable=False, index=True)
+
+    # Qué clase de operación es, de las cuatro que el diseño distingue:
+    # activo de alto valor, insumo, servicio o logística. Es un dato
+    # declarado en el alta, no una lectura del precio ni del título: la
+    # tarjeta y el detalle eligen qué mostrar y qué acción ofrecer a partir
+    # de acá. Nunca contradice a `category.is_service`, que es quien sigue
+    # decidiendo el cobro y la reserva de stock. Ver `services/anatomia.py`.
+    operation_kind = Column(
+        String(20), nullable=False, server_default="insumo", index=True
+    )
+
+    # Nuevo o usado. La anatomia de activo de alto valor la exige —es lo
+    # primero que mira quien compra una maquina—, y las otras tres no la
+    # usan. Nula en los registros anteriores a la columna: nadie puede
+    # saber hoy si aquel tractor era usado sin adivinarle la descripcion.
+    condition = Column(String(20), nullable=True)
     
     # Clasificación
     category_id = Column(String(36), ForeignKey("categories.id"), nullable=False, index=True)

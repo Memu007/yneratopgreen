@@ -3,6 +3,7 @@
  */
 import { apiGet } from './api';
 import { Product } from '../types';
+import { normalizarAnatomia, normalizarCondicion } from './anatomia';
 
 // Base URL para imágenes - usar variable de entorno o ruta relativa (vacía para producción)
 const IMAGES_BASE_URL = import.meta.env.VITE_IMAGES_URL || '';
@@ -38,6 +39,8 @@ export interface CategoryResponse {
   icon: string;
   product_count: number;
   is_service: boolean;
+  operation_kind?: string;
+  condition?: string | null;
   subcategories: SubcategoryResponse[];
   created_at: string;
 }
@@ -97,6 +100,8 @@ export interface ProductFromBackend {
   subcategory_id?: string;
   subcategory_name?: string;
   is_service?: boolean;
+  operation_kind?: string;
+  condition?: string | null;
   primary_image?: string;
   seller?: SellerBasicInfo;
   views_count: number;
@@ -228,5 +233,7 @@ export const convertBackendProductToFrontend = (backendProduct: ProductFromBacke
     tags: [], // El backend no tiene tags aún
     createdAt: backendProduct.created_at,
     isService: backendProduct.is_service || false,
+    operationKind: normalizarAnatomia(backendProduct.operation_kind),
+    condition: normalizarCondicion(backendProduct.condition),
   };
 };

@@ -1,0 +1,119 @@
+/* Los tokens del sistema visual aprobado — «B, Mesa de negocios».
+ *
+ * Es la única fuente de verdad de color, tipografía, espacio, geometría, foco
+ * y movimiento. Nada de acá se elige por gusto en un componente: si un color
+ * no está, es porque el sistema no lo tiene, y agregar uno suelto es empezar a
+ * tener dos sistemas.
+ *
+ * Los valores salen de `docs/pm/diseno-premium/handoff/tokens.css` y los
+ * contrastes medidos están en `TOKENS.md`. No redondear un incumplimiento
+ * hacia arriba.
+ */
+
+/* Las dos familias, servidas desde el propio sitio. `swap` a propósito: con
+ * `block` el texto queda invisible mientras baja la fuente, y un precio que
+ * tarda en aparecer es peor que un precio con la tipografía de respaldo. */
+@font-face {
+  font-family: 'Newsreader';
+  src: url('/fuentes/Newsreader.woff2') format('woff2-variations');
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Work Sans';
+  src: url('/fuentes/WorkSans.woff2') format('woff2-variations');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Tipografía */
+  --tg-font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --tg-font-ui: 'Work Sans', Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Color por rol. El nombre dice para qué sirve, no de qué color es: así un
+     ajuste de paleta no obliga a renombrar medio producto. */
+  --tg-color-canvas: #f8f7f3;
+  --tg-color-surface: #ffffff;
+  --tg-color-surface-subtle: #e8ecf4;
+  --tg-color-surface-muted: #f0f1f3;
+  --tg-color-text: #17213d;
+  --tg-color-text-secondary: #596174;
+  --tg-color-text-inverse: #ffffff;
+  --tg-color-brand: #17213d;
+  --tg-color-accent: #b93424;
+  --tg-color-link: #1d4e89;
+  --tg-color-action: #17213d;
+  --tg-color-action-hover: #243057;
+  --tg-color-selection: #e8ecf4;
+  --tg-color-selection-border: #17213d;
+  --tg-color-success: #1f6b4f;
+  --tg-color-success-bg: #e7f3ed;
+  --tg-color-warning: #79520f;
+  --tg-color-warning-bg: #f3e7c8;
+  --tg-color-error: #a22f2f;
+  --tg-color-error-bg: #f8e7e5;
+  --tg-color-info: #1d4e89;
+  --tg-color-info-bg: #e7eef8;
+  --tg-color-border: #cfd3dc;
+  --tg-color-border-control: #7c8494;
+  --tg-color-focus: #b93424;
+  /* Los deshabilitados llevan color explícito y no opacidad heredada: la
+     opacidad apila, y un control deshabilitado adentro de un bloque atenuado
+     termina ilegible sin que nadie lo haya decidido. */
+  --tg-color-disabled-bg: #e5e7ec;
+  --tg-color-disabled-text: #777d8b;
+  --tg-color-overlay: rgba(23, 33, 61, 0.72);
+
+  /* Espaciado base 4 */
+  --tg-space-1: 4px;
+  --tg-space-2: 8px;
+  --tg-space-3: 12px;
+  --tg-space-4: 16px;
+  --tg-space-5: 20px;
+  --tg-space-6: 24px;
+  --tg-space-8: 32px;
+  --tg-space-10: 40px;
+  --tg-space-12: 48px;
+  --tg-space-16: 64px;
+  --tg-space-20: 80px;
+
+  /* Contenedor y grilla */
+  --tg-container-max: 1320px;
+  --tg-reading-max: 760px;
+  --tg-gutter-desktop: 48px;
+  --tg-gutter-tablet: 32px;
+  --tg-gutter-mobile: 20px;
+  --tg-grid-gap-desktop: 24px;
+  --tg-grid-gap-tablet: 20px;
+  --tg-grid-gap-mobile: 16px;
+
+  /* Geometría. Las tarjetas no llevan sombra: la jerarquía la hacen la regla,
+     el borde y el fondo. La sombra queda para lo que de verdad flota. */
+  --tg-radius-none: 0;
+  --tg-radius-sm: 2px;
+  --tg-radius-md: 4px;
+  --tg-radius-lg: 6px;
+  --tg-border-hairline: 1px;
+  --tg-border-strong: 2px;
+  --tg-shadow-none: none;
+  --tg-shadow-overlay: 0 20px 60px rgba(23, 33, 61, 0.18);
+  --tg-control-min: 44px;
+
+  /* Movimiento necesario y nada más */
+  --tg-duration-fast: 120ms;
+  --tg-duration-base: 160ms;
+  --tg-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Capas */
+  --tg-z-sticky: 20;
+  --tg-z-drawer: 40;
+  --tg-z-modal: 60;
+  --tg-z-toast: 80;
+
+  /* Puntos de corte contractuales (usar en media queries, no recalcular):
+     mobile 0–599; tablet 600–1023; desktop >=1024; ancho amplio >=1280. */
+}

@@ -20,6 +20,7 @@ from app.models.user import User, UserRole
 from app.schemas.products import ProductCreateRequest, ProductUpdateRequest, ProductResponse
 from app.core.config import settings
 from app.services.storage import get_storage
+from app.services import anatomia
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -72,7 +73,34 @@ async def create_product(
 
     pub_type = product_data.publication_type  # "producto" o "servicio"
     is_service = pub_type == "servicio"
-    
+
+    # La anatomía se declara o se hereda de la categoría, pero nunca puede
+    # contradecir a `category.is_service`: ese booleano es el que decide si la
+    # publicación reserva stock y cómo se cobra. Un `insumo` dentro de una
+    # categoría de servicio mostraría stock y «Agregar» sobre algo que nunca
+    # descuenta unidades, así que se rechaza en vez de corregirse sola.
+    operation_kind = product_data.operation_kind or anatomia.por_omision(
+        category.slug, category.is_service
+    )
+    if not anatomia.compatible(operation_kind, category.is_service):
+        esperadas = anatomia.DE_SERVICIO if category.is_service else (
+            anatomia.ACTIVO, anatomia.INSUMO
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"La categoría «{category.name}» no admite publicaciones de tipo "
+                f"«{operation_kind}». Opciones válidas: {', '.join(esperadas)}."
+            ),
+        )
+
+    # La condición —nuevo o usado— sólo existe para el activo de alto valor.
+    # Las otras tres la descartan si viene, para que no quede un dato guardado
+    # que ninguna pantalla muestra y que una edición futura resucite.
+    condition = (
+        product_data.condition if anatomia.usa_condicion(operation_kind) else None
+    )
+
     # Crear producto/servicio
     new_product = Product(
         name=product_data.name,
@@ -88,6 +116,8 @@ async def create_product(
         seller_id=current_user.id,
         status=ProductStatus.ACTIVE,
         publication_type=pub_type,
+        operation_kind=operation_kind,
+        condition=condition,
         # Campos de servicio
         pricing_type=product_data.pricing_type if is_service else None,
         availability=product_data.availability if is_service else None,
@@ -107,6 +137,7 @@ async def create_product(
         name=new_product.name,
         slug=new_product.slug,
         publication_type=product_data.publication_type,
+        operation_kind=new_product.operation_kind,
         message=f"{tipo_msg} '{new_product.name}' creado exitosamente"
     )
 
@@ -309,6 +340,42 @@ async def update_product(
             raise HTTPException(status_code=404, detail="Localidad no encontrada")
         update_data["location"] = f"{locality.name}, {locality.province_name}"
     
+    # La anatomia se revalida cuando cambia ella o cuando cambia la categoria:
+    # mover una publicacion de «Maquinaria» a «Contratistas» sin mirar dejaria
+    # un `activo` dentro de una categoria de servicio, que es justamente la
+    # contradiccion que la columna existe para impedir. Si sólo cambió la
+    # categoría y la anatomía vieja ya no encaja, se adopta la que declara la
+    # categoría nueva: el vendedor movió la publicación a propósito.
+    if "operation_kind" in update_data or "category_id" in update_data:
+        category_id = update_data.get("category_id", product.category_id)
+        category = db.query(Category).filter(Category.id == category_id).first()
+        if not category:
+            raise HTTPException(status_code=404, detail="Categoría no encontrada")
+
+        propuesta = update_data.get("operation_kind", product.operation_kind)
+        if not anatomia.compatible(propuesta, category.is_service):
+            if "operation_kind" in update_data:
+                esperadas = anatomia.DE_SERVICIO if category.is_service else (
+                    anatomia.ACTIVO, anatomia.INSUMO
+                )
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"La categoría «{category.name}» no admite publicaciones "
+                        f"de tipo «{propuesta}». Opciones válidas: "
+                        f"{', '.join(esperadas)}."
+                    ),
+                )
+            propuesta = anatomia.por_omision(category.slug, category.is_service)
+        update_data["operation_kind"] = propuesta
+
+        # La condición vive o muere con la anatomía: si la publicación deja
+        # de ser un activo, el «usado» que traía dejó de significar algo y
+        # se suelta. No se exige al editar una publicación vieja que nunca
+        # la tuvo: bloquear ahí sería impedir corregir el resto.
+        if not anatomia.usa_condicion(propuesta):
+            update_data["condition"] = None
+
     for field, value in update_data.items():
         setattr(product, field, value)
     
@@ -319,6 +386,8 @@ async def update_product(
         id=product.id,
         name=product.name,
         slug=product.slug,
+        publication_type=product.publication_type or "producto",
+        operation_kind=product.operation_kind,
         message="Producto actualizado exitosamente"
     )
 
@@ -442,6 +511,8 @@ async def get_my_products(
             "sales_count": product.sales_count,
             "created_at": product.created_at.isoformat() if product.created_at else None,
             "publication_type": product.publication_type or "producto",
+            "operation_kind": product.operation_kind,
+            "condition": product.condition,
             "category_id": str(product.category_id) if product.category_id else None,
             "category": {
                 "id": str(product.category.id),

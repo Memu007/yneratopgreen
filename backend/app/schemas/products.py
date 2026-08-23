@@ -18,6 +18,13 @@ class ProductCreateRequest(BaseModel):
     
     # Tipo de publicación
     publication_type: Literal["producto", "servicio"] = "producto"
+
+    # La anatomía declarada. Opcional: si no viene, se usa la que declara la
+    # categoría elegida. Si viene y contradice a `category.is_service`, el alta
+    # se rechaza en lugar de corregirla en silencio.
+    operation_kind: Optional[Literal["activo", "insumo", "servicio", "logistica"]] = None
+    # Obligatoria cuando la anatomia es `activo`; ignorada en las otras.
+    condition: Optional[Literal["nuevo", "usado"]] = None
     
     # Campos específicos para servicios
     pricing_type: Optional[str] = Field(None, max_length=50)  # por_hora, por_hectarea, por_trabajo, a_convenir
@@ -38,6 +45,8 @@ class ProductUpdateRequest(BaseModel):
     unit: Optional[str] = Field(None, max_length=50)
     locality_id: Optional[str] = Field(None, max_length=20)
     status: Optional[Literal["active", "paused"]] = None  # Para pausar/activar producto
+    operation_kind: Optional[Literal["activo", "insumo", "servicio", "logistica"]] = None
+    condition: Optional[Literal["nuevo", "usado"]] = None
     
     # Campos específicos para servicios
     pricing_type: Optional[str] = Field(None, max_length=50)
@@ -53,4 +62,5 @@ class ProductResponse(BaseModel):
     name: str
     slug: str
     publication_type: str = "producto"
+    operation_kind: str = "insumo"
     message: str = "Publicación creada exitosamente"

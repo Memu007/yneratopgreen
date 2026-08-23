@@ -1,3 +1,7 @@
+/* El sistema visual aprobado entra primero: todo lo que sigue puede leer
+   sus tokens, y ninguna regla de abajo puede pisar la definición. */
+@import './tokens.css';
+
 /* ================================================
    TopGreen Design System
    Paleta: Tailwind Slate + Emerald

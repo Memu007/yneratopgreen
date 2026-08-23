@@ -11360,6 +11360,181 @@ await runCase(117, 'En el navegador cruzado: la cookie se guarda, se renueva, se
   }
 });
 
+await runCase(118, 'La anatomía la declara la publicación, no la deduce la interfaz', async () => {
+  // 1. Todas tienen una de las cuatro, y ninguna contradice a `is_service`.
+  //    Ese booleano es el que decide el cobro y la reserva de stock: una
+  //    publicación que dijera «insumo» dentro de una categoría de servicio
+  //    mostraría stock y «Agregar» sobre algo que nunca descuenta unidades.
+  const [conteo] = queryRows(`
+    SELECT
+      COUNT(*) FILTER (WHERE p.operation_kind NOT IN ('activo','insumo','servicio','logistica')),
+      COUNT(*) FILTER (WHERE (p.operation_kind IN ('servicio','logistica')) <> c.is_service),
+      COUNT(*), 'fin'
+    FROM products p JOIN categories c ON c.id = p.category_id
+    WHERE p.status = 'ACTIVE'
+  `);
+  const [fueraDelCatalogo, contradicen, total] = conteo;
+  assert(Number(total) > 0, 'no hay publicaciones activas para medir');
+  assert(Number(fueraDelCatalogo) === 0,
+    `${fueraDelCatalogo} publicaciones tienen una anatomía fuera del catálogo`);
+  assert(Number(contradicen) === 0,
+    `${contradicen} publicaciones tienen una anatomía que contradice a su categoría`);
+
+  // 2. Las cuatro existen en el catálogo sembrado: si faltara una, la grilla
+  //    nunca dibujaría esa anatomía y la puerta pasaría sin haberla mirado.
+  const presentes = queryRows(`
+    SELECT DISTINCT operation_kind, 'fin' FROM products WHERE status = 'ACTIVE'
+  `).map(([kind]) => kind).sort();
+  assert(JSON.stringify(presentes) === JSON.stringify(['activo', 'insumo', 'logistica', 'servicio']),
+    `faltan anatomías en el catálogo sembrado: ${JSON.stringify(presentes)}`);
+
+  // 3. Y la prueba de que es un dato de la publicación y no de su categoría:
+  //    hay una categoría con dos anatomías distintas adentro. Si la regla
+  //    fuera «la categoría manda», esto sería imposible.
+  const [mezclada] = queryRows(`
+    SELECT c.slug, COUNT(DISTINCT p.operation_kind), 'fin'
+    FROM products p JOIN categories c ON c.id = p.category_id
+    WHERE p.status = 'ACTIVE'
+    GROUP BY c.slug HAVING COUNT(DISTINCT p.operation_kind) > 1
+    ORDER BY c.slug LIMIT 1
+  `);
+  assert(mezclada, 'ninguna categoría tiene dos anatomías: la anatomía sería derivable de la categoría');
+
+  // 4. La respuesta pública la trae, en el listado y en el detalle.
+  const listado = (await apiRequest('/catalog/products?page_size=100')).data;
+  const items = listado.products || listado.items || [];
+  assert(items.length > 0, 'el catálogo público no devolvió publicaciones');
+  const sinAnatomia = items.filter((p) => !p.operation_kind);
+  assert(sinAnatomia.length === 0,
+    `${sinAnatomia.length} publicaciones del listado público no traen operation_kind`);
+
+  const [unaFila] = queryRows(`
+    SELECT id, operation_kind, 'fin' FROM products
+    WHERE status = 'ACTIVE' AND operation_kind = 'logistica' ORDER BY id LIMIT 1
+  `);
+  const detalle = (await apiRequest(`/catalog/products/${unaFila[0]}`)).data;
+  assert(detalle.operation_kind === unaFila[1],
+    `el detalle dice «${detalle.operation_kind}» y la base «${unaFila[1]}»`);
+
+  return `${total} publicaciones activas con anatomía declarada, ninguna contradice a su categoría; `
+    + `las cuatro presentes, «${mezclada[0]}» tiene ${mezclada[1]} adentro, y viaja en listado y detalle`;
+});
+
+await runCase(119, 'El alta y la edición no pueden dejar una anatomía que contradiga la categoría', async () => {
+  const [producto] = queryRows(`
+    SELECT id, name, default_operation_kind, 'fin' FROM categories
+    WHERE is_service = false AND slug = 'maquinaria-agricola'
+  `);
+  const [servicio] = queryRows(`
+    SELECT id, name, default_operation_kind, 'fin' FROM categories
+    WHERE is_service = true AND slug = 'contratistas'
+  `);
+  assert(producto && servicio, 'faltan las categorías que necesita el caso');
+
+  // El caso se para solo: pide su propia sesión y su propia localidad en vez
+  // de heredarlas de un caso anterior, para que una corrida filtrada mida lo
+  // mismo que la suite entera.
+  const vendedor = (await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  })).data.access_token;
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+
+  const base = (extra) => ({
+    name: `Smoke anatomía ${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
+    description: 'Publicación de prueba de la anatomía declarada.',
+    price: 100000,
+    stock: 3,
+    unit: 'unidad',
+    locality_id: localidad,
+    publication_type: 'producto',
+    ...extra,
+  });
+
+  // 1. Sin declararla, hereda la que declara la categoría.
+  const heredada = await apiRequest('/products', {
+    method: 'POST', token: vendedor, body: base({ category_id: producto[0] }),
+  });
+  assert(heredada.data.operation_kind === producto[2],
+    `el alta sin declarar dio «${heredada.data.operation_kind}» y la categoría declara «${producto[2]}»`);
+
+  // 2. Declarándola, manda la publicación.
+  const declarada = await apiRequest('/products', {
+    method: 'POST', token: vendedor,
+    body: base({ category_id: producto[0], operation_kind: 'insumo' }),
+  });
+  assert(declarada.data.operation_kind === 'insumo',
+    `el alta declarando «insumo» guardó «${declarada.data.operation_kind}»`);
+
+  // 3. Una anatomía del otro lado se rechaza, y el rechazo dice cuáles valen.
+  const cruzada = await expectApiError(400, () => apiRequest('/products', {
+    method: 'POST', token: vendedor,
+    body: base({ category_id: producto[0], operation_kind: 'servicio' }),
+  }));
+  assert(/activo/.test(cruzada) && /insumo/.test(cruzada),
+    `el rechazo del alta no dice qué opciones valen: ${cruzada}`);
+
+  // 4. En la edición, lo mismo: no se puede cruzar el límite a mano.
+  const cruzadaEnEdicion = await expectApiError(400, () => apiRequest(
+    `/products/${declarada.data.id}`,
+    { method: 'PATCH', token: vendedor, body: { operation_kind: 'logistica' } },
+  ));
+  assert(/activo/.test(cruzadaEnEdicion) && /insumo/.test(cruzadaEnEdicion),
+    `el rechazo de la edición no dice qué opciones valen: ${cruzadaEnEdicion}`);
+
+  // 5. Pero mover la publicación de categoría sí es una decisión del vendedor:
+  //    la anatomía vieja ya no encaja, y se adopta la que declara la nueva en
+  //    vez de dejar una contradicción guardada.
+  const movida = await apiRequest(`/products/${declarada.data.id}`, {
+    method: 'PATCH', token: vendedor, body: { category_id: servicio[0] },
+  });
+  assert(movida.data.operation_kind === servicio[2],
+    `al mover a «${servicio[1]}» quedó «${movida.data.operation_kind}» y no «${servicio[2]}»`);
+
+  const [guardada] = queryRows(`
+    SELECT p.operation_kind, c.is_service, 'fin' FROM products p
+    JOIN categories c ON c.id = p.category_id WHERE p.id = ${sqlLiteral(declarada.data.id)}
+  `);
+  assert((guardada[0] === 'servicio' || guardada[0] === 'logistica') === (guardada[1] === 't' || guardada[1] === true),
+    `la fila guardada quedó contradiciendo a su categoría: ${JSON.stringify(guardada)}`);
+
+  // 6. La condición vive con la anatomía: sólo el activo la guarda, y al
+  //    dejar de serlo se suelta en vez de quedar escrita sobre algo que ya
+  //    no la muestra.
+  const conCondicion = await apiRequest('/products', {
+    method: 'POST', token: vendedor,
+    body: base({ category_id: producto[0], operation_kind: 'activo', condition: 'usado' }),
+  });
+  const [guardadaCondicion] = queryRows(`
+    SELECT COALESCE(condition, 'sin declarar'), 'fin' FROM products WHERE id = ${sqlLiteral(conCondicion.data.id)}
+  `);
+  assert(guardadaCondicion[0] === 'usado',
+    `el activo no guardó su condición: ${JSON.stringify(guardadaCondicion)}`);
+
+  const insumoConCondicion = await apiRequest('/products', {
+    method: 'POST', token: vendedor,
+    body: base({ category_id: producto[0], operation_kind: 'insumo', condition: 'usado' }),
+  });
+  const [descartada] = queryRows(`
+    SELECT COALESCE(condition, 'sin declarar'), 'fin' FROM products WHERE id = ${sqlLiteral(insumoConCondicion.data.id)}
+  `);
+  assert(descartada[0] === 'sin declarar',
+    `un insumo se quedó con una condición guardada: ${JSON.stringify(descartada)}`);
+
+  await apiRequest(`/products/${conCondicion.data.id}`, {
+    method: 'PATCH', token: vendedor, body: { operation_kind: 'insumo' },
+  });
+  const [soltada] = queryRows(`
+    SELECT COALESCE(condition, 'sin declarar'), 'fin' FROM products WHERE id = ${sqlLiteral(conCondicion.data.id)}
+  `);
+  assert(soltada[0] === 'sin declarar',
+    `dejar de ser activo no soltó la condición: ${JSON.stringify(soltada)}`);
+
+  return 'sin declarar hereda la de la categoría, declarada manda la publicación, '
+    + 'cruzar el límite se rechaza en alta y en edición diciendo qué vale, '
+    + 'y mover de categoría adopta la nueva en vez de guardar una contradicción; '
+    + 'la condición sólo la guarda el activo y se suelta al dejar de serlo';
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

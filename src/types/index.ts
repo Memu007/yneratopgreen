@@ -1,3 +1,13 @@
+/** Las cuatro clases de operación que distingue el marketplace. La declara
+    la publicación en el alta; la interfaz no la deduce. */
+export type OperationKind = 'activo' | 'insumo' | 'servicio' | 'logistica';
+
+/** Nuevo o usado. Sólo la trae el activo de alto valor, y puede faltar: hay
+    activos —hacienda, campos— donde el par no significa nada, y los avisos
+    anteriores a la columna nunca la declararon. Donde falta, se omite la
+    fila; no se inventa «nuevo». */
+export type Condition = 'nuevo' | 'usado';
+
 export interface Product {
   id: string;
   name: string;
@@ -8,6 +18,13 @@ export interface Product {
   description: string;
   image: string;
   isService?: boolean;
+  /** Cuál de las cuatro anatomías es: la declara la publicación en el alta y
+      viaja en la respuesta pública. La tarjeta y el detalle eligen qué datos
+      mostrar y qué acción ofrecer a partir de acá, nunca del precio ni del
+      título. Ausente sólo en datos viejos de prueba: se lee como insumo,
+      que es como se comportaba todo antes de que la columna existiera. */
+  operationKind?: OperationKind;
+  condition?: Condition;
   location: {
     province: string;
     city: string;

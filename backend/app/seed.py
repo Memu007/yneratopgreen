@@ -16,6 +16,7 @@ from app.models.form_option import FormOption
 from app.models.locality import Locality
 from app.core.security import hash_password
 from app.seed_localities import seed_localities
+from app.services import anatomia
 from datetime import datetime
 
 
@@ -351,6 +352,12 @@ def create_seed_data():
         for cat_data in categories_data:
             category_values = cat_data.copy()
             subcategories = category_values.pop("subcategories")
+            # La anatomia por omision sale del catalogo de dominio, no de una
+            # clave repetida doce veces: si manana cambia, cambia en un lugar.
+            category_values["default_operation_kind"] = anatomia.por_omision(
+                category_values["slug"],
+                bool(category_values.get("is_service", False)),
+            )
             existing_cat = db.query(Category).filter(
                 Category.slug == category_values["slug"]
             ).first()
@@ -516,6 +523,8 @@ def create_seed_data():
             {
                 "name": "Pulverizadora Jacto 600L",
                 "slug": "pulverizadora-jacto-600",
+                # Condicion declarada segun lo que dice su propia ficha: «Excelente estado, 2 anos de uso».
+                "condition": "usado",
                 "description": "Pulverizadora de arrastre marca Jacto, capacidad 600 litros. Barra de 12 metros con picos regulables. Excelente estado, 2 años de uso.",
                 "category_id": cat_herramientas.id,
                 "price": 1850000.0,
@@ -548,6 +557,8 @@ def create_seed_data():
             {
                 "name": "Cosechadora John Deere 9750",
                 "slug": "cosechadora-john-deere-9750",
+                # Condicion declarada segun lo que dice su propia ficha: «ano 2018, 1200 horas de uso».
+                "condition": "usado",
                 "description": "Cosechadora John Deere 9750 STS, año 2018. 1200 horas de uso. Motor 6090H de 350HP. Cabezal maicero y plataforma draper incluidos. Service al día.",
                 "category_id": cat_maquinaria.id,
                 "price": 125000000.0,
@@ -601,6 +612,8 @@ def create_seed_data():
             {
                 "name": "Rastra de Discos 24 Platos",
                 "slug": "rastra-discos-24-platos",
+                # Condicion declarada segun lo que dice su propia ficha: estructura reforzada, sin uso declarado.
+                "condition": "nuevo",
                 "description": "Rastra de discos excéntricos, 24 platos de 26 pulgadas. Ancho de labor 3.60m. Estructura reforzada. Ideal para preparación de suelo.",
                 "category_id": cat_herramientas.id,
                 "price": 2450000.0,
@@ -647,6 +660,8 @@ def create_seed_data():
             {
                 "name": "Dron Pulverizador Agrícola 20L",
                 "slug": "dron-pulverizador-agricola-20l",
+                # Condicion declarada segun lo que dice su propia ficha: equipo de linea, sin uso declarado.
+                "condition": "nuevo",
                 "description": "Dron agrícola pulverizador con tanque de 20 litros. Autonomía 15 minutos por batería. Cobertura 10 ha/hora. Incluye 2 baterías, control remoto y software de mapeo. Compatible con APP de vuelo autónomo.",
                 "category_id": cat_tecnologia.id,
                 "price": 8500000.0,
@@ -662,6 +677,9 @@ def create_seed_data():
             {
                 "name": "Sensores de Humedad de Suelo IoT",
                 "slug": "sensores-humedad-suelo-iot",
+                # Kit estandarizado con stock real: se compra de a unidades,
+                # no es un activo unico que necesite declarar condicion.
+                "operation_kind": "insumo",
                 "description": "Kit de 5 sensores de humedad de suelo con conectividad IoT LoRaWAN. Medición de humedad, temperatura y conductividad a 30cm de profundidad. Batería solar, autonomía 3 años. Dashboard web incluido.",
                 "category_id": cat_tecnologia.id,
                 "price": 920000.0,
@@ -692,6 +710,8 @@ def create_seed_data():
             {
                 "name": "Tractor Pauny 280A Doble Tracción",
                 "slug": "tractor-pauny-280a-doble-traccion",
+                # Condicion declarada segun lo que dice su propia ficha: «ano 2019 y 3.400 horas».
+                "condition": "usado",
                 "description": "Tractor Pauny 280A de 180 HP, doble tracción, año 2019 y 3.400 horas. Cubiertas al 70%, hidráulico y toma de fuerza operativos.",
                 "category_id": cat_maquinaria.id,
                 "price": 98000000.0,
@@ -964,6 +984,8 @@ def create_seed_data():
             {
                 "name": "Equipo de Riego por Goteo para 10 Hectáreas",
                 "slug": "equipo-riego-goteo-10-hectareas",
+                # Idem: kit de riego, con stock y unidad, no un equipo unico.
+                "operation_kind": "insumo",
                 "description": "Kit completo para riego por goteo de hasta 10 hectáreas, con cabezal de filtrado, cañería principal, cintas y accesorios de conexión.",
                 "category_id": category("riego-drenaje").id,
                 "price": 4800000.0,
@@ -979,6 +1001,8 @@ def create_seed_data():
             {
                 "name": "Manga Ganadera con Balanza Electrónica",
                 "slug": "manga-ganadera-balanza-electronica",
+                # Condicion declarada segun lo que dice su propia ficha: «Lista para instalar».
+                "condition": "nuevo",
                 "description": "Manga reforzada para manejo bovino con cepo, puertas laterales y balanza electrónica de hasta 1.500 kg. Lista para instalar.",
                 "category_id": category("ganaderia-forrajes").id,
                 "price": 7600000.0,
@@ -1111,6 +1135,18 @@ def create_seed_data():
             )
             product_values["locality_id"] = locality_id
             product_values["location"] = location
+            # La anatomia: la que declara la publicacion, o la de su
+            # categoria. Las dos que la declaran son kits estandarizados con
+            # stock real dentro de una categoria de equipos; verlas como
+            # activos de alto valor les pediria condicion y les sacaria el
+            # selector de cantidad que si tienen.
+            product_values.setdefault(
+                "operation_kind",
+                anatomia.por_omision(
+                    category_slug,
+                    bool(category(category_slug).is_service),
+                ),
+            )
 
             # Verificar si el producto ya existe
             existing_prod = db.query(Product).filter(
@@ -1135,6 +1171,11 @@ def create_seed_data():
             else:
                 existing_prod.category_id = product_values["category_id"]
                 existing_prod.subcategory_id = product_values["subcategory_id"]
+                # Tambien se resincroniza: una base sembrada antes de que
+                # existiera la columna quedo con la omision de su categoria,
+                # y el seed es quien sabe cual declara cada publicacion.
+                existing_prod.operation_kind = product_values["operation_kind"]
+                existing_prod.condition = product_values.get("condition")
                 existing_prod.locality_id = locality_id
                 existing_prod.location = location
                 print(f"  ⏭️  Producto '{product_values['name']}' ya existe")
