@@ -86,6 +86,11 @@ Actualizado: 2026-08-22.
   tres viewports, **9/9 sin violaciones, errores ni overflow**. Los dos bloqueos
   quedan técnicamente cerrados. Puerta 3 espera únicamente la aprobación visual
   explícita de Emi del wordmark y sistema B; Opus continúa pausada hasta ese sí.
+- **Puerta 3 aprobada:** Emi confirmó visualmente B — Mesa de negocios el
+  2026-08-23. PM ya había cerrado 9/9 auditorías en `833ee0e`. Opus deja de estar
+  pausada y recibe UX-2B en Extra: implementar el handoff por capas, preservar
+  funciones, resolver semántica explícita de las cuatro anatomías y pasar todas
+  las puertas antes de desplegar. La diseñadora vuelve a quedar sin tarea.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar

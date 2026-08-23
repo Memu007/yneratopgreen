@@ -3169,3 +3169,130 @@ personalidad, sistema tipográfico, color, tratamiento fotográfico, tono verbal
 y límites de semejanza con Agrofy. No crees una skill, moodboard, mockup ni
 cambios de producto por iniciativa propia. Si ya habías comenzado, frená y
 reportá solamente qué archivos locales tocaste, sin commitearlos.
+
+## 2026-08-23 — Puerta 3 aprobada; tarea activa única UX-2B
+
+Emi aprobó visualmente **B — Mesa de negocios** y PM reprodujo el cierre técnico
+en `833ee0e`: nueve combinaciones de prototipo/viewport, cero violaciones axe,
+errores de consola o desbordes. La pausa anterior queda levantada.
+
+Implementá el sistema aprobado en
+`docs/pm/diseno-premium/handoff/`. Ese directorio es la fuente de verdad de
+marca, tokens, anatomías, copy, responsive, fotografía, estados y paridad. Los
+HTML/CSS son referencia aislada: no los copies como arquitectura React ni los
+importes al build.
+
+### Resultado requerido
+
+La superficie real debe aplicar B de forma consistente, no sólo recolorear el
+marketplace. Incluye:
+
+1. fundación global: wordmark, fuentes self-hosted, tokens, foco, controles,
+   overlays, responsive y fallbacks de imagen;
+2. cabecera y pie en variantes anónima, comprador, vendedor y administrador;
+3. mercado: buscador, filtros, orden, carga/vacío/error, grilla y detalle;
+4. anatomías distintas para activo de alto valor, insumo, servicio y logística;
+5. componentes compartidos existentes que el handoff mapea: alta/edición de
+   publicación, carrito, checkout, perfil de vendedor, panel de usuario,
+   administración, toast, auth y contacto;
+6. estados negativos y límites de contenido de `PARIDAD.md`;
+7. 1440×900, 768×1024 y 390×844 sin pérdida funcional ni aspecto de plantilla.
+
+Home, Quiénes somos y Servicios reciben el sistema compartido —marca, fuentes,
+tokens, cabecera, pie y controles—, pero **no inventes una nueva composición de
+contenido**: Diseño no entregó esas páginas. No agregues fotografías ni hero.
+
+### Primera decisión técnica obligatoria — cuatro anatomías
+
+El producto actual no expone una semántica inequívoca para elegir entre las
+cuatro anatomías. No la infieras sólo por precio, título, CSS ni una lista
+privada en frontend.
+
+Antes de ramificar las tarjetas, encontrá la solución mínima persistente y
+explicala en el informe. Puede ser un campo/enumeración explícito de publicación
+o una clasificación de dominio igualmente trazable; debe cubrir alta, edición,
+API pública, seed, migración y registros existentes. La migración no puede
+dejar publicaciones ambiguas ni cambiar la lógica de cobro por accidente.
+
+Si resolverlo exige redefinir qué es comprable, alterar órdenes existentes o
+contradice el contrato, frená antes de migrar y traé dos opciones con una
+recomendación. Si puede resolverse de manera compatible, implementalo dentro de
+la tarea y agregá regresiones de alta, edición, API, catálogo y detalle.
+
+### Comportamiento que debe preservarse
+
+- búsqueda, filtros oficiales, URL y navegación por ubicación;
+- apertura/cierre de detalle y perfil;
+- stock, cantidad, carrito y los dos checkouts;
+- logística por origen/destino y privacidad del contacto;
+- publicación, edición, carga de archivos y documentación;
+- sesiones, roles, Mercado Pago, avisos de callback y estados de pago;
+- paneles, administración y contacto.
+
+`Iniciar operación` para un activo con precio usa la compra actual; no abre
+chat, reserva ni negociación. `Solicitar cotización` sólo puede llevar a
+Contacto de forma honesta. `Ver transportistas` sigue exclusivamente dentro del
+checkout tras carrito y destino. Respetá completo
+`FUTURO-NO-IMPLEMENTAR.md`.
+
+### Activos e imágenes
+
+- Copiá únicamente activos autorizados en `ACTIVOS.md`; conservá licencias.
+- Self-host de las fuentes efectivamente usadas, sin Google Fonts en runtime.
+- Retirá del producto los fallbacks ilustrados de UX-1 y usá `no-photo.svg` y
+  `photo-broken.svg` con sus estados distintos.
+- No agregues stock, fotos conceptuales ni imágenes generadas. El entorno demo
+  puede verse sin fotografía; PM/Emi resolverán un pack con derechos después.
+- No cambies imágenes reales cargadas por vendedores ni su semántica `alt`.
+
+### Arquitectura y alcance
+
+- Reutilizá componentes y callbacks; no construyas una aplicación paralela.
+- Una sola capa de tokens: retirá los tokens y estilos de UX-1 que queden
+  obsoletos, sin mantener dos temas visuales activos.
+- Sin librería de iconos, framework CSS, dependencia visual opaca, mapa, chat,
+  financiación, reputación nueva, internacionalización funcional ni contenido
+  falso.
+- No toques pagos ni seguridad salvo el cambio de tipos necesario para compilar
+  y preservar contratos; cualquier defecto real encontrado se reporta antes de
+  ampliar.
+- No despliegues. Railway y producción quedan en PM.
+
+### Secuencia de commits
+
+El trabajo puede ser largo, pero mantenelo auditable:
+
+1. **Fundación y dominio:** activos/tokens/fuentes más semántica persistente de
+   anatomías, migración, seed y contratos API.
+2. **Superficie pública:** header/footer, mercado, filtros, cards, detalle,
+   fallbacks y responsive.
+3. **Superficies autenticadas:** alta, carrito, checkout, paneles, admin, auth,
+   contacto, overlays, tablas, formularios y estados.
+4. **Puertas y evidencia:** regresiones, correcciones de paridad, capturas e
+   informe.
+
+No hagas commits sólo por cumplir el número: cada uno debe compilar y explicar
+su frontera. Si el árbol no puede quedar funcional entre 1 y 2, unilos y
+documentá la razón.
+
+### Criterios de aceptación
+
+1. `PARIDAD.md` completo con evidencia, diferencias intencionales y responsable.
+2. Las cuatro anatomías salen de datos explícitos y conservan la acción correcta.
+3. Cero claims prohibidos, emojis públicos, fotos temporales, `picsum`, enlaces
+   falsos, navegación inventada o doble sistema visual.
+4. Capturas comparativas de catálogo, detalle y tablero/estados en 1440×900,
+   768×1024 y 390×844; cero overflow y controles conforme a `RESPONSIVE.md`.
+5. Teclado, foco, Escape/restauración en capas, zoom 200 %, reduced motion,
+   imágenes ausentes/rotas y textos largos comprobados.
+6. `npm run build`, `npm run lint`, `npm run contraste`, `npm run a11y`,
+   `npm run hito` y suite completa desde base limpia en verde. No rebajes,
+   regrabes ni reduzcas inventarios para obtener verde.
+7. Migraciones upgrade/downgrade y seed idempotente si cambia dominio.
+8. `git -c core.whitespace=cr-at-eol diff --check` limpio.
+9. Informe final en `PARA-PM.md` con commits, archivos, antes/después, conteos de
+   puertas, decisiones, deudas verdaderas y lo dejado fuera.
+
+Esfuerzo **Extra**. No pidas razonamiento extenso ni avances cosméticos: usá el
+presupuesto en ejecución y verificación. Al terminar, empujá código e informe y
+frená. PM revisa y decide el despliegue.

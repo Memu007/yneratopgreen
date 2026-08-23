@@ -96,7 +96,8 @@ No aprobar si ocurre cualquiera de estos puntos:
 | Revisor | Resultado | Alcance / devolución | Fecha |
 |---|---|---|---|
 | Emi | Aprobado para versionar | Autorizó subir el paquete completo al repo; no autoriza todavía entrega a Opus. | 2026-08-23 |
-| PM | Pendiente | — | — |
+| PM | Aprobado | Reprodujo 9/9 auditorías sin violaciones, errores ni overflow; cierre técnico `833ee0e`. | 2026-08-23 |
 
-Resultado conjunto: **pendiente de PM**. El paquete puede quedar versionado en
-`main`, pero no pasa a Opus ni autoriza implementación.
+Resultado conjunto: **Puerta 3 aprobada por Emi y PM el 2026-08-23**. Se
+autoriza entregar el handoff a Opus mediante una tarea de implementación
+acotada y verificable; el paquete por sí solo no autoriza inventar producto.
