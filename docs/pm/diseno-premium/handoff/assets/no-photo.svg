@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-labelledby="title desc">
+  <title id="title">Sin fotografía</title>
+  <desc id="desc">Fondo editorial neutro para una publicación sin fotografía.</desc>
+  <rect width="800" height="600" fill="#E8ECF4"/>
+  <path d="M0 150H800M0 300H800M0 450H800M200 0V600M400 0V600M600 0V600" stroke="#CFD3DC" stroke-width="1"/>
+  <path d="M126 174V126H174M626 126H674V174M674 426V474H626M174 474H126V426" fill="none" stroke="#7C8494" stroke-width="4"/>
+  <rect x="24" y="24" width="6" height="552" fill="#B93424"/>
+</svg>

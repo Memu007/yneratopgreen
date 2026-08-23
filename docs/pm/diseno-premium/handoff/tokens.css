@@ -1,0 +1,83 @@
+:root {
+  /* Tipografía */
+  --tg-font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --tg-font-ui: "Work Sans", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* Color por rol */
+  --tg-color-canvas: #f8f7f3;
+  --tg-color-surface: #ffffff;
+  --tg-color-surface-subtle: #e8ecf4;
+  --tg-color-surface-muted: #f0f1f3;
+  --tg-color-text: #17213d;
+  --tg-color-text-secondary: #596174;
+  --tg-color-text-inverse: #ffffff;
+  --tg-color-brand: #17213d;
+  --tg-color-accent: #b93424;
+  --tg-color-link: #1d4e89;
+  --tg-color-action: #17213d;
+  --tg-color-action-hover: #243057;
+  --tg-color-selection: #e8ecf4;
+  --tg-color-selection-border: #17213d;
+  --tg-color-success: #1f6b4f;
+  --tg-color-success-bg: #e7f3ed;
+  --tg-color-warning: #79520f;
+  --tg-color-warning-bg: #f3e7c8;
+  --tg-color-error: #a22f2f;
+  --tg-color-error-bg: #f8e7e5;
+  --tg-color-info: #1d4e89;
+  --tg-color-info-bg: #e7eef8;
+  --tg-color-border: #cfd3dc;
+  --tg-color-border-control: #7c8494;
+  --tg-color-focus: #b93424;
+  --tg-color-disabled-bg: #e5e7ec;
+  --tg-color-disabled-text: #777d8b;
+  --tg-color-overlay: rgba(23, 33, 61, 0.72);
+
+  /* Espaciado base 4 */
+  --tg-space-1: 4px;
+  --tg-space-2: 8px;
+  --tg-space-3: 12px;
+  --tg-space-4: 16px;
+  --tg-space-5: 20px;
+  --tg-space-6: 24px;
+  --tg-space-8: 32px;
+  --tg-space-10: 40px;
+  --tg-space-12: 48px;
+  --tg-space-16: 64px;
+  --tg-space-20: 80px;
+
+  /* Contenedor y grilla */
+  --tg-container-max: 1320px;
+  --tg-reading-max: 760px;
+  --tg-gutter-desktop: 48px;
+  --tg-gutter-tablet: 32px;
+  --tg-gutter-mobile: 20px;
+  --tg-grid-gap-desktop: 24px;
+  --tg-grid-gap-tablet: 20px;
+  --tg-grid-gap-mobile: 16px;
+
+  /* Geometría */
+  --tg-radius-none: 0;
+  --tg-radius-sm: 2px;
+  --tg-radius-md: 4px;
+  --tg-radius-lg: 6px;
+  --tg-border-hairline: 1px;
+  --tg-border-strong: 2px;
+  --tg-shadow-none: none;
+  --tg-shadow-overlay: 0 20px 60px rgba(23, 33, 61, 0.18);
+  --tg-control-min: 44px;
+
+  /* Movimiento necesario */
+  --tg-duration-fast: 120ms;
+  --tg-duration-base: 160ms;
+  --tg-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Capas */
+  --tg-z-sticky: 20;
+  --tg-z-drawer: 40;
+  --tg-z-modal: 60;
+  --tg-z-toast: 80;
+
+  /* Breakpoints contractuales (usar en media queries, no recalcular):
+     mobile 0–599; tablet 600–1023; desktop >=1024; ancho amplio >=1280. */
+}

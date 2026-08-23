@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TopGreen — Mercado agro</title>
+  <link rel="stylesheet" href="./shared.css">
+  <link rel="stylesheet" href="./marketplace.css">
+</head>
+<body>
+  <a class="skip-link" href="#resultados">Ir a resultados</a>
+
+  <header class="site-header">
+    <div class="container masthead">
+      <a class="brand-link" href="./marketplace.html" aria-label="TopGreen, mercado agro">
+        <img src="./assets/wordmark/topgreen-compact.svg" alt="TopGreen">
+      </a>
+      <form class="header-search" role="search">
+        <label class="sr-only" for="buscar">Buscar en el mercado</label>
+        <input class="control" id="buscar" type="search" placeholder="Equipo, insumo, servicio o ubicación">
+        <button class="button button--primary" type="submit">Buscar</button>
+      </form>
+      <div class="header-actions">
+        <button class="button button--secondary" type="button">Ingresar</button>
+      </div>
+    </div>
+    <nav class="site-nav" aria-label="Secciones del sitio">
+      <div class="container site-nav__inner">
+        <a href="https://ynerav.up.railway.app/">Inicio</a>
+        <a href="#resultados" aria-current="page">Mercado</a>
+        <a href="#servicios">Servicios</a>
+        <a href="#quienes">Quiénes somos</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="catalog-intro container" aria-labelledby="titulo-marketplace">
+      <div>
+        <div class="eyebrow">Mercado agro</div>
+        <h1 id="titulo-marketplace">Operaciones disponibles</h1>
+      </div>
+      <p class="lead">Productos, servicios y logística presentados con precio o modalidad, ubicación, responsable y próximo paso.</p>
+    </section>
+
+    <details class="filters-mobile container">
+      <summary>Filtros <span aria-hidden="true">＋</span></summary>
+      <div class="filters-mobile__body">
+        <div class="field"><label for="m-tipo">Tipo</label><select id="m-tipo"><option>Todos</option><option>Productos</option><option>Servicios</option></select></div>
+        <div class="field"><label for="m-provincia">Provincia</label><select id="m-provincia"><option>Todas las provincias</option><option>Buenos Aires</option><option>Córdoba</option></select></div>
+        <button class="button button--primary" type="button">Ver resultados</button>
+      </div>
+    </details>
+
+    <div class="container catalog-shell">
+      <aside class="filters" aria-labelledby="titulo-filtros">
+        <div class="filters__heading">
+          <h2 id="titulo-filtros">Filtrar</h2>
+          <button class="button button--tertiary" type="button">Limpiar</button>
+        </div>
+        <div class="field">
+          <label for="tipo">Tipo</label>
+          <select id="tipo"><option>Todos</option><option>Productos</option><option>Servicios</option></select>
+        </div>
+        <div class="field">
+          <label for="categoria">Categoría</label>
+          <select id="categoria"><option>Todas las categorías</option><option>Maquinaria agrícola</option><option>Insumos agrícolas</option><option>Logística</option></select>
+        </div>
+        <div class="field">
+          <label for="provincia">Provincia</label>
+          <select id="provincia"><option>Todas las provincias</option><option>Buenos Aires</option><option>Córdoba</option><option>Santa Fe</option></select>
+        </div>
+        <div class="field">
+          <label for="localidad">Localidad</label>
+          <select id="localidad" disabled><option>Elegí una provincia</option></select>
+        </div>
+        <fieldset class="price-filter">
+          <legend>Precio</legend>
+          <div class="price-filter__row">
+            <div class="field"><label class="sr-only" for="precio-min">Precio mínimo</label><input id="precio-min" inputmode="numeric" placeholder="Mínimo"></div>
+            <div class="field"><label class="sr-only" for="precio-max">Precio máximo</label><input id="precio-max" inputmode="numeric" placeholder="Máximo"></div>
+          </div>
+        </fieldset>
+        <label class="check"><input type="checkbox"> Sólo con stock</label>
+        <div class="field">
+          <label for="calificacion">Calificación del vendedor</label>
+          <select id="calificacion"><option>Cualquiera</option><option>4 de 5 o más</option></select>
+        </div>
+      </aside>
+
+      <section id="resultados" class="results" aria-labelledby="titulo-resultados">
+        <div class="results-toolbar">
+          <div>
+            <div class="meta">Resultados</div>
+            <h2 id="titulo-resultados">30 operaciones</h2>
+          </div>
+          <div class="field sort-field">
+            <label for="orden">Ordenar</label>
+            <select id="orden"><option>Más relevantes</option><option>Menor precio</option><option>Mayor precio</option><option>Más recientes</option></select>
+          </div>
+        </div>
+
+        <div class="catalog-grid">
+          <article class="operation-card operation-card--featured">
+            <div class="photo-fallback operation-card__media" role="img" aria-label="La publicación no tiene fotografía">
+              <span class="photo-fallback__copy">Sin fotografía</span>
+            </div>
+            <div class="operation-card__body">
+              <div class="operation-card__topline"><span class="eyebrow">Activo de alto valor</span><span class="status">Usado</span></div>
+              <h3>Tractor Pauny 280A doble tracción</h3>
+              <p class="location">Azul, Buenos Aires</p>
+              <dl class="facts">
+                <div><dt>Año</dt><dd>2019</dd></div>
+                <div><dt>Horas</dt><dd>3.400 h</dd></div>
+                <div><dt>Potencia</dt><dd>180 HP</dd></div>
+              </dl>
+              <div class="operation-card__price"><strong class="price">$98.000.000</strong><span>por unidad</span></div>
+              <div class="seller-line"><span>Administrador TopGreen</span><span class="evidence">Documentación revisada</span></div>
+              <div class="operation-card__actions">
+                <a class="button button--primary" href="./detalle.html">Iniciar operación</a>
+                <a class="button button--secondary" href="./detalle.html">Ver condiciones</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="operation-card operation-card--standard">
+            <div class="photo-fallback operation-card__media" role="img" aria-label="La publicación no tiene fotografía"><span class="photo-fallback__copy">Sin fotografía</span></div>
+            <div class="operation-card__body">
+              <div class="eyebrow">Insumo</div>
+              <h3>Urea granulada 46% nitrógeno</h3>
+              <p class="location">Río Cuarto, Córdoba</p>
+              <div class="operation-card__price"><strong class="price">$39.000</strong><span>por bolsa de 50 kg</span></div>
+              <p class="stock stock--ok">240 bolsas disponibles</p>
+              <div class="quantity-row">
+                <label for="cantidad-urea">Cantidad</label>
+                <input id="cantidad-urea" type="number" min="1" max="240" value="1">
+                <button class="button button--primary" type="button">Agregar</button>
+              </div>
+            </div>
+          </article>
+
+          <article id="servicios" class="operation-card operation-card--data">
+            <div class="operation-card__body">
+              <div class="operation-index" aria-hidden="true">02</div>
+              <div class="eyebrow">Servicio</div>
+              <h3>Muestreo de suelo y recomendación</h3>
+              <p class="location">Córdoba · Atención en campo</p>
+              <dl class="service-facts">
+                <div><dt>Cobertura</dt><dd>Centro y sur provincial</dd></div>
+                <div><dt>Modalidad</dt><dd>Por hectárea</dd></div>
+                <div><dt>Respuesta</dt><dd>Dentro de 2 días hábiles</dd></div>
+              </dl>
+              <div class="operation-card__price"><strong class="price price--quote">A cotizar</strong></div>
+              <a class="button button--primary" href="#contacto">Solicitar cotización</a>
+            </div>
+          </article>
+
+          <article class="operation-card operation-card--data">
+            <div class="operation-card__body">
+              <div class="operation-index" aria-hidden="true">03</div>
+              <div class="eyebrow">Logística</div>
+              <h3>Flete de maquinaria con carretón</h3>
+              <p class="location">Base en Tandil, Buenos Aires</p>
+              <dl class="service-facts">
+                <div><dt>Equipo</dt><dd>Carretón</dd></div>
+                <div><dt>Carga</dt><dd>Maquinaria agrícola</dd></div>
+                <div><dt>Cobertura</dt><dd>Radio declarado de 350 km</dd></div>
+              </dl>
+              <div class="operation-card__price"><strong class="price price--quote">A cotizar</strong></div>
+              <button class="button button--secondary" type="button" disabled aria-describedby="logistica-ayuda">Ver transportistas</button>
+              <p id="logistica-ayuda" class="small">Se habilita en el checkout después de indicar el destino.</p>
+            </div>
+          </article>
+        </div>
+
+        <nav class="pagination" aria-label="Paginación">
+          <button class="button button--secondary" type="button" disabled>Anterior</button>
+          <span>Página <strong>1</strong> de 8</span>
+          <button class="button button--secondary" type="button">Siguiente</button>
+        </nav>
+      </section>
+    </div>
+  </main>
+
+  <footer id="contacto" class="site-footer">
+    <div class="container footer-grid">
+      <div><img src="./assets/wordmark/topgreen-mono-light.svg" alt="TopGreen" width="360"><p class="small footer-copy">Mercado agro: productos, servicios y logística.</p></div>
+      <div><div class="footer-title">Mercado</div><ul class="footer-list"><li><a href="#resultados">Publicaciones</a></li><li><a href="#servicios">Servicios</a></li></ul></div>
+      <div id="quienes"><div class="footer-title">TopGreen</div><ul class="footer-list"><li><a href="#quienes">Quiénes somos</a></li><li><a href="#contacto">Contacto</a></li></ul></div>
+      <div><div class="footer-title">Contacto</div><ul class="footer-list"><li><a href="mailto:info@topgreen.com.ar">info@topgreen.com.ar</a></li><li>Mar del Plata, Argentina</li></ul></div>
+    </div>
+    <div class="container footer-legal">© 2026 TopGreen. Todos los derechos reservados.</div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-labelledby="title desc">
+  <title id="title">No se pudo cargar la imagen</title>
+  <desc id="desc">Fondo de error para una fotografía que no pudo cargarse.</desc>
+  <rect width="800" height="600" fill="#F8E7E5"/>
+  <path d="M0 150H800M0 300H800M0 450H800M200 0V600M400 0V600M600 0V600" stroke="#E4C9C7" stroke-width="1"/>
+  <path d="M126 174V126H174M626 126H674V174M674 426V474H626M174 474H126V426" fill="none" stroke="#A22F2F" stroke-width="4"/>
+  <path d="M330 230L470 370M470 230L330 370" stroke="#A22F2F" stroke-width="8"/>
+  <rect x="24" y="24" width="6" height="552" fill="#A22F2F"/>
+</svg>

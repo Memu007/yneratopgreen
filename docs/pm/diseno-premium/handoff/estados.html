@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TopGreen — Componentes y estados</title>
+  <link rel="stylesheet" href="./shared.css">
+  <link rel="stylesheet" href="./estados.css">
+</head>
+<body>
+  <a class="skip-link" href="#tablero">Ir al tablero</a>
+  <header class="board-header">
+    <div class="container board-header__inner">
+      <img src="./assets/wordmark/topgreen-compact.svg" alt="TopGreen" width="220">
+      <nav aria-label="Prototipos"><a href="./marketplace.html">Catálogo</a><a href="./detalle.html">Detalle</a><a href="#tablero" aria-current="page">Estados</a></nav>
+    </div>
+  </header>
+
+  <main id="tablero" class="container board">
+    <section class="board-intro"><div><div class="eyebrow">Puerta 3 · Mesa de negocios</div><h1>Componentes y estados</h1></div><p class="lead">Este tablero documenta piezas existentes y variaciones necesarias. No agrega financiación, mapas, mensajería ni un directorio público de transportistas.</p></section>
+
+    <section class="board-section" aria-labelledby="headers-title">
+      <div class="section-title"><span>01</span><div><div class="eyebrow">Navegación</div><h2 id="headers-title">Cabeceras por estado de sesión</h2></div></div>
+      <div class="header-states">
+        <article class="mini-header"><div class="mini-header__meta">Anónimo</div><div class="mini-header__bar"><img src="./assets/wordmark/topgreen-compact.svg" alt="TopGreen"><div class="mini-search">Buscar en el mercado</div><button class="button button--secondary">Ingresar</button></div></article>
+        <article class="mini-header"><div class="mini-header__meta">Comprador autenticado</div><div class="mini-header__bar"><img src="./assets/wordmark/topgreen-compact.svg" alt="TopGreen"><div class="mini-search">Buscar en el mercado</div><button class="button button--secondary">Carrito · 2</button><button class="account-button">Mi cuenta</button></div></article>
+        <article class="mini-header"><div class="mini-header__meta">Vendedor / ambos</div><div class="mini-header__bar"><img src="./assets/wordmark/topgreen-compact.svg" alt="TopGreen"><div class="mini-search">Buscar en el mercado</div><button class="button button--primary">Publicar</button><button class="account-button">Mi cuenta</button></div></article>
+        <article class="mini-header"><div class="mini-header__meta">Administrador</div><div class="mini-header__bar"><img src="./assets/wordmark/topgreen-compact.svg" alt="TopGreen"><div class="mini-search">Buscar en el mercado</div><button class="button button--secondary">Administrar</button><button class="account-button">Mi cuenta</button></div></article>
+      </div>
+    </section>
+
+    <section class="board-section" aria-labelledby="actions-title">
+      <div class="section-title"><span>02</span><div><div class="eyebrow">Acciones</div><h2 id="actions-title">Botones, enlaces y foco</h2></div></div>
+      <div class="component-grid component-grid--four">
+        <div class="specimen"><div class="specimen-label">Primario</div><button class="button button--primary">Iniciar operación</button></div>
+        <div class="specimen"><div class="specimen-label">Secundario</div><button class="button button--secondary">Ver condiciones</button></div>
+        <div class="specimen"><div class="specimen-label">Terciario</div><button class="button button--tertiary">Limpiar filtros</button></div>
+        <div class="specimen"><div class="specimen-label">Enlace</div><a href="./detalle.html#vendedor">Ver perfil del vendedor</a></div>
+        <div class="specimen specimen--focus"><div class="specimen-label">Focus visible</div><button class="button button--secondary">Publicar</button></div>
+        <div class="specimen specimen--selected"><div class="specimen-label">Selected</div><button class="button button--secondary" aria-pressed="true">Buenos Aires</button></div>
+        <div class="specimen specimen--active"><div class="specimen-label">Active</div><button class="button button--primary">Agregar</button></div>
+        <div class="specimen"><div class="specimen-label">Disabled</div><button class="button button--secondary" disabled>Ver transportistas</button></div>
+      </div>
+    </section>
+
+    <section class="board-section" aria-labelledby="forms-title">
+      <div class="section-title"><span>03</span><div><div class="eyebrow">Formularios</div><h2 id="forms-title">Campos y validación</h2></div></div>
+      <div class="form-board">
+        <div class="field"><label for="f-normal">Nombre de la publicación</label><input id="f-normal" value="Tractor Pauny 280A"></div>
+        <div class="field is-focus"><label for="f-focus">Ubicación</label><input id="f-focus" value="Azul, Buenos Aires"><span class="field-help">Foco visible de 3 px, sin depender del color del borde.</span></div>
+        <div class="field"><label for="f-error">Precio</label><input id="f-error" aria-invalid="true" value="0"><span class="field-error">Para “A cotizar”, elegí esa modalidad; no cargues $0.</span></div>
+        <div class="field"><label for="f-disabled">Localidad</label><select id="f-disabled" disabled><option>Elegí primero una provincia</option></select></div>
+        <div class="field"><label for="f-select">Categoría</label><select id="f-select"><option>Maquinaria agrícola</option><option>Insumos agrícolas</option><option>Logística</option></select></div>
+        <div class="field"><label for="f-textarea">Descripción</label><textarea id="f-textarea">Estado general y datos informados por el vendedor.</textarea><span class="field-help">No convertir descripciones en garantías.</span></div>
+        <fieldset class="fieldset"><legend>Tipo de publicación</legend><label class="radio"><input type="radio" name="tipo" checked> Producto</label><label class="radio"><input type="radio" name="tipo"> Servicio</label></fieldset>
+        <fieldset class="fieldset"><legend>Disponibilidad</legend><label class="check"><input type="checkbox" checked> Sólo con stock</label><label class="check"><input type="checkbox"> Publicación activa</label></fieldset>
+        <div class="field file-field"><label for="f-file">Fotografías</label><input id="f-file" type="file" accept="image/*"><span class="field-help">JPG, PNG o WebP; máximo definido por producto. La ausencia no bloquea la publicación.</span></div>
+      </div>
+    </section>
+
+    <section class="board-section" aria-labelledby="cards-title">
+      <div class="section-title"><span>04</span><div><div class="eyebrow">Operaciones</div><h2 id="cards-title">Cuatro anatomías compactas</h2></div></div>
+      <div class="anatomy-grid">
+        <article class="anatomy"><div class="eyebrow">Activo de alto valor</div><h3>Tractor Pauny 280A</h3><p>Usado · Azul, Buenos Aires</p><dl><div><dt>Condición</dt><dd>2019 · 3.400 h</dd></div><div><dt>Precio</dt><dd>$98.000.000</dd></div></dl><button class="button button--primary">Iniciar operación</button></article>
+        <article class="anatomy"><div class="eyebrow">Insumo</div><h3>Urea granulada 46%</h3><p>Bolsa de 50 kg · Córdoba</p><dl><div><dt>Stock</dt><dd>240 bolsas</dd></div><div><dt>Precio</dt><dd>$39.000</dd></div></dl><button class="button button--primary">Agregar</button></article>
+        <article class="anatomy"><div class="eyebrow">Servicio</div><h3>Muestreo de suelo</h3><p>Atención en campo · Centro y sur de Córdoba</p><dl><div><dt>Modalidad</dt><dd>Por hectárea</dd></div><div><dt>Precio</dt><dd>A cotizar</dd></div></dl><button class="button button--primary">Solicitar cotización</button></article>
+        <article class="anatomy"><div class="eyebrow">Logística</div><h3>Flete con carretón</h3><p>Maquinaria agrícola · Radio declarado 350 km</p><dl><div><dt>Equipo</dt><dd>Carretón</dd></div><div><dt>Precio</dt><dd>A cotizar</dd></div></dl><button class="button button--secondary" disabled>Ver transportistas</button><span class="small">Se habilita con destino en checkout.</span></article>
+      </div>
+    </section>
+
+    <section class="board-section" aria-labelledby="system-title">
+      <div class="section-title"><span>05</span><div><div class="eyebrow">Sistema</div><h2 id="system-title">Carga, vacío, error y conexión</h2></div></div>
+      <div class="state-grid">
+        <article class="state-panel"><div class="specimen-label">Loading / skeleton</div><div class="skeleton"><span></span><span></span><span></span></div><p>Cargando operaciones</p></article>
+        <article class="state-panel"><div class="specimen-label">Vacío</div><h3>No hay operaciones con estos filtros</h3><p>Probá con menos filtros, otra provincia u otras palabras.</p><button class="button button--secondary">Limpiar filtros</button></article>
+        <article class="state-panel state-panel--error"><div class="specimen-label">Error recuperable</div><h3>No pudimos cargar el mercado</h3><p>El problema puede ser temporal. Tus filtros se conservaron.</p><button class="button button--secondary">Reintentar</button></article>
+        <article class="state-panel state-panel--offline"><div class="specimen-label">Sin conexión</div><h3>Estás sin conexión</h3><p>Cuando vuelva internet, reintentá para actualizar precios y stock.</p><button class="button button--secondary" disabled>Actualizar</button></article>
+      </div>
+    </section>
+
+    <section class="board-section" aria-labelledby="edge-title">
+      <div class="section-title"><span>06</span><div><div class="eyebrow">Bordes reales</div><h2 id="edge-title">Ausencias, pausa y texto largo</h2></div></div>
+      <div class="edge-grid">
+        <article class="edge-card"><div class="photo-fallback"><span class="photo-fallback__copy">Sin fotografía</span></div><h3>Publicación sin foto</h3><p>Se conservan datos; no se inventa una imagen de categoría.</p></article>
+        <article class="edge-card"><div class="photo-fallback photo-fallback--broken"><span class="photo-fallback__copy">No pudimos cargar la imagen</span></div><h3>Foto rota</h3><p>El error se diferencia de una publicación sin foto.</p></article>
+        <article class="edge-card edge-card--paused"><div class="specimen-label">Publicación pausada</div><h3>Semillas de maíz</h3><p>No aparece en el catálogo público. En “Mis publicaciones” conserva acciones de editar y reactivar.</p><button class="button button--secondary">Reactivar</button></article>
+        <article class="edge-card"><div class="specimen-label">Sin stock</div><h3>Kit de filtros para cosechadora</h3><strong class="price">$540.000</strong><button class="button button--secondary" disabled>Sin stock</button></article>
+        <article class="edge-card"><div class="specimen-label">Precio no publicado</div><h3>Reparación hidráulica</h3><strong class="price price--editorial">A cotizar</strong><a class="button button--primary" href="#contact-sample">Solicitar cotización</a></article>
+        <article class="edge-card"><div class="specimen-label">Texto largo</div><h3>Equipo de riego por goteo para diez hectáreas con filtrado, automatización y accesorios de instalación</h3><p>El título puede ocupar hasta tres líneas en catálogo; después se corta visualmente, pero el nombre completo sigue accesible.</p></article>
+      </div>
+    </section>
+
+    <section class="board-section" aria-labelledby="overlays-title">
+      <div class="section-title"><span>07</span><div><div class="eyebrow">Capas existentes</div><h2 id="overlays-title">Modal, drawer, pestañas, tabla y toast</h2></div></div>
+      <div class="overlay-grid">
+        <article class="layer-demo"><div class="specimen-label">Modal</div><div class="modal-sample" role="dialog" aria-modal="false" aria-labelledby="modal-title"><button class="close-sample" aria-label="Cerrar">×</button><div class="eyebrow">Confirmación</div><h3 id="modal-title">Pausar publicación</h3><p>Dejará de aparecer en el catálogo público.</p><div class="modal-actions"><button class="button button--secondary">Cancelar</button><button class="button button--primary">Pausar</button></div></div></article>
+        <article class="layer-demo"><div class="specimen-label">Drawer de filtros · móvil</div><div class="drawer-sample"><div class="drawer-head"><h3>Filtros</h3><button class="close-sample" aria-label="Cerrar">×</button></div><div class="field"><label for="drawer-prov">Provincia</label><select id="drawer-prov"><option>Buenos Aires</option></select></div><label class="check"><input type="checkbox"> Sólo con stock</label><button class="button button--primary">Ver 12 resultados</button></div></article>
+      </div>
+
+      <div class="tabs-sample">
+        <div class="tabs" role="tablist" aria-label="Mi cuenta"><button role="tab" aria-selected="true">Perfil</button><button role="tab" aria-selected="false">Compras</button><button role="tab" aria-selected="false">Ventas</button><button role="tab" aria-selected="false">Publicaciones</button><button role="tab" aria-selected="false">Operaciones</button></div>
+        <div class="tab-panel" role="tabpanel"><h3>Mis publicaciones</h3><p class="small">La selección se marca con línea y peso; no con una píldora.</p></div>
+      </div>
+
+      <div class="table-wrap"><table class="data-table"><caption>Ejemplo de tabla existente en paneles</caption><thead><tr><th>Publicación</th><th>Estado</th><th>Stock</th><th>Acción</th></tr></thead><tbody><tr><td>Urea granulada</td><td><span class="status-text status-text--success">Activa</span></td><td>240</td><td><button class="button button--tertiary">Editar</button></td></tr><tr><td>Semillas de maíz</td><td><span class="status-text status-text--warning">Pausada</span></td><td>18</td><td><button class="button button--tertiary">Reactivar</button></td></tr><tr><td>Kit de filtros</td><td><span class="status-text status-text--error">Sin stock</span></td><td>0</td><td><button class="button button--tertiary">Editar</button></td></tr></tbody></table></div>
+
+      <div class="toast-row" aria-label="Ejemplos de notificación"><div class="toast toast--success"><strong>Publicación guardada</strong><span>Los cambios ya están visibles.</span></div><div class="toast toast--warning"><strong>Revisá el stock</strong><span>Queda una unidad disponible.</span></div><div class="toast toast--error"><strong>No se pudo guardar</strong><span>Reintentá sin perder los datos cargados.</span></div></div>
+    </section>
+
+    <section class="board-section" aria-labelledby="footer-title-sample">
+      <div class="section-title"><span>08</span><div><div class="eyebrow">Cierre</div><h2 id="footer-title-sample">Footer</h2></div></div>
+      <footer class="footer-sample" id="contact-sample"><img src="./assets/wordmark/topgreen-mono-light.svg" alt="TopGreen"><div><strong>Mercado</strong><a href="./marketplace.html">Publicaciones</a><a href="./marketplace.html#servicios">Servicios</a></div><div><strong>Contacto</strong><a href="mailto:info@topgreen.com.ar">info@topgreen.com.ar</a><span>Mar del Plata, Argentina</span></div></footer>
+    </section>
+  </main>
+</body>
+</html>
