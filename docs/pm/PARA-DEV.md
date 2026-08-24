@@ -3470,3 +3470,47 @@ activos y hashes. UX-2C queda habilitada con los límites de
 `extension-comercial/REVISION-PM-0a05a0a.md`. La aprobación permite implementar,
 no desplegar ni publicar. La cesión de las fotos y el reemplazo final del hero
 de Servicios son puertas de salida ajenas a este ciclo de Dev.
+
+## 2026-08-24 — Revisión UX-2C `e095ab8`: una corrección de escala antes de aceptar
+
+La dirección visual y la implementación general quedan conformes: PM revisó
+las capturas de Inicio, Servicios y Mercado en desktop/mobile y reprodujo
+`npm run build`, `npm run lint`, sintaxis y `diff --check`, todos verdes. No
+reabras composición, tokens, activos, anatomías ni el movimiento de originales.
+
+No acepto todavía el cierre por un borde funcional que el seed de 30 filas no
+puede detectar. `useVistaPrevia({ soloServicios: true })` pide sólo la primera
+página de 100 y filtra en el navegador. Si las 100 publicaciones más nuevas son
+productos, Servicios afirma que no hay servicios aunque existan en la página 2.
+El Mercado comparte el límite: `selectedType` tampoco llega a la consulta ni es
+dependencia del efecto, por lo que `Ver servicios publicados` sólo filtra los
+primeros 100 resultados descargados. Esto contradice una superficie nacional y
+la instrucción de frenar si la preview necesitaba contrato API.
+
+### Corrección autorizada y acotada
+
+1. Agregá a `GET /api/catalog/products` un filtro opcional y validado por
+   `publication_type` (`producto` o `servicio`), aplicado antes del conteo y la
+   paginación. Sin migración ni cambio de esquema.
+2. Exponé el parámetro en `getProducts`.
+3. La preview de Servicios debe pedir `publication_type=servicio` y sólo la
+   cantidad necesaria; no descargar 100 ni filtrar una página parcial. Usá el
+   total filtrado si se muestra, sin inventarlo.
+4. El Mercado debe mandar el filtro cuando `selectedType` sea `productos` o
+   `servicios`, y recargar cuando cambie. Conservá la defensa de dominio del
+   frontend, pero la fuente paginada debe salir filtrada del servidor.
+5. Sumá una regresión discriminante con más de 100 publicaciones más nuevas que
+   un servicio: la preview y el Mercado filtrado deben encontrar el servicio y
+   el total del endpoint debe ser el filtrado. No alcanza una prueba con el seed
+   actual ni una aserción sobre parámetros sin comprobar el resultado.
+
+### Límites
+
+- No agregues paginación UI general en este ciclo; registrá por separado que el
+  Mercado continúa mostrando como máximo 100 resultados por consulta.
+- Sin migración, nuevas dependencias, cambios de pagos/logística/auth, rediseño
+  ni despliegue.
+- No rebajes los casos 124/125 ni las puertas anteriores.
+
+Entregá un commit de producto y otro de informe. Repetí build, lint, contraste,
+a11y, hito y suite desde base limpia; frená sin desplegar.

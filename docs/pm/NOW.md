@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-08-23.
+Actualizado: 2026-08-24.
 
 ## Relevo inmediato — leer primero
 
@@ -114,6 +114,13 @@ Actualizado: 2026-08-23.
   puertas de salida la cesión/autoría de las dos fotos fuente y el reemplazo
   final de la foto interina de Servicios. Conteos, cards y fotos conceptuales
   del HTML no pueden copiarse al producto.
+- **UX-2C `cae6855`–`ddcd1ff`, informe `e095ab8`:** visualmente conforme y con
+  build/lint/checks estáticos reproducidos por PM. Todavía no aceptada: la
+  preview y el filtro de Servicios trabajan sobre sólo los primeros 100
+  resultados y pueden dar un vacío falso cuando el catálogo crezca. Dev tiene
+  una única corrección en el último bloque de `PARA-DEV.md`: filtro opcional
+  `publication_type` antes de paginar, consumo desde preview/Mercado y regresión
+  con más de 100 publicaciones. Sin rediseño, migración ni despliegue.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
