@@ -174,7 +174,8 @@ entregable de Diseño, y las dos revisiones finales —PM y Emi— son de ustede
 - [x] `npm run contraste` — 52/52 mediciones, 0 incumplimientos.
 - [x] `npm run a11y` — 64/64 pantallas, 0 violaciones.
 - [x] `npm run hito` — 6/6 pasos encadenados.
-- [x] suite completa desde base limpia — **125/125**, 0 fallos.
+- [x] suite completa desde base limpia — **126/126**, 0 fallos, según evidencia
+  de Dev. PM no pudo repetirla porque Docker local permanece apagado.
 - [x] `git -c core.whitespace=cr-at-eol diff --check` — limpio.
 
 No rebajar, regrabar ni quitar inventarios para obtener verde. `smoke` sólo en
@@ -191,7 +192,8 @@ el entorno aislado previsto por el repositorio y sin arriesgar datos.
 - [x] Lista exacta de archivos de producto: en el informe.
 - [x] Diferencias intencionales contra el handoff con responsable/fecha: abajo.
 - [x] Informe en `docs/pm/PARA-PM.md` y commits auditables.
-- [ ] Revisión PM.
+- [x] Revisión PM: código `cae6855`–`35eaf30`, aceptado técnicamente el
+  2026-08-24; build, lint, sintaxis y checks estáticos reproducidos.
 - [ ] Revisión visual final de Emi.
 
 ## Diferencias intencionales

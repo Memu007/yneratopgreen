@@ -114,13 +114,14 @@ Actualizado: 2026-08-24.
   puertas de salida la cesión/autoría de las dos fotos fuente y el reemplazo
   final de la foto interina de Servicios. Conteos, cards y fotos conceptuales
   del HTML no pueden copiarse al producto.
-- **UX-2C `cae6855`–`ddcd1ff`, informe `e095ab8`:** visualmente conforme y con
-  build/lint/checks estáticos reproducidos por PM. Todavía no aceptada: la
-  preview y el filtro de Servicios trabajan sobre sólo los primeros 100
-  resultados y pueden dar un vacío falso cuando el catálogo crezca. Dev tiene
-  una única corrección en el último bloque de `PARA-DEV.md`: filtro opcional
-  `publication_type` antes de paginar, consumo desde preview/Mercado y regresión
-  con más de 100 publicaciones. Sin rediseño, migración ni despliegue.
+- **UX-2C aceptada técnicamente:** base `cae6855`–`ddcd1ff`, corrección de
+  escala `35eaf30`, informes `e095ab8`/`d904329`. El filtro opcional
+  `publication_type` se aplica antes de contar/paginar; preview y Mercado ya no
+  pueden dar un vacío falso por mirar sólo los primeros 100. PM reprodujo
+  build, lint, sintaxis y checks estáticos; Dev informa suite 126/126 y puertas
+  completas. Docker local sigue apagado. No desplegar todavía: falta revisión
+  visual final de Emi. Paginación y conteo visible >100 quedan registrados en
+  `ux2c/DEUDA-PAGINACION.md`, fuera de este cierre.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar

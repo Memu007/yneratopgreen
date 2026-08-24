@@ -3514,3 +3514,19 @@ la instrucción de frenar si la preview necesitaba contrato API.
 
 Entregá un commit de producto y otro de informe. Repetí build, lint, contraste,
 a11y, hito y suite desde base limpia; frená sin desplegar.
+
+## 2026-08-24 — Corrección `35eaf30`: UX-2C aceptada técnicamente
+
+Acepto el filtro `publication_type` antes de conteo/paginación, su consumo por
+preview y Mercado, y la regresión 126 con el servicio detrás de 101 productos.
+PM reprodujo build, lint, sintaxis y checks estáticos; la suite 126/126 y las
+puertas de navegador quedan como evidencia de Dev porque Docker local continúa
+apagado.
+
+La afirmación de que el Mercado ya muestra el total verdadero era incorrecta:
+la API lo devuelve, pero `ProductGrid` cuenta `products.length`. PM corrigió
+`ux2c/DEUDA-PAGINACION.md`; no bloquea este cierre porque paginación quedó
+excluida expresamente, pero debe resolverse antes de que el catálogo supere 100
+resultados por filtro.
+
+No tenés tarea activa. No despliegues: falta la revisión visual final de Emi.

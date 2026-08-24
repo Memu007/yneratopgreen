@@ -13,9 +13,10 @@ productos más nuevos. Lo que sigue sin existir es **la página 2**: si un filtr
 tiene más de cien resultados, la pantalla muestra los cien más nuevos y no dice
 que hay más.
 
-Hoy no se nota: el conteo del mercado dice cuántas hay en total según la API, y
-ese número sí es el verdadero. Pero el usuario no tiene forma de llegar a la
-publicación 101.
+Hoy no se nota con el seed, pero hay dos límites: la API devuelve el total
+verdadero y el frontend no lo conserva; el conteo visible usa
+`products.length`, por lo que muestra como máximo `100 operaciones`. Además, la
+persona no tiene forma de llegar a la publicación 101.
 
 ## Por qué no se resolvió acá
 
@@ -40,6 +41,9 @@ este ciclo; registrá por separado que el Mercado continúa mostrando como máxi
 - El filtro por tipo viaja a la consulta y se aplica **antes** del conteo y de
   la paginación.
 - El total del endpoint filtrado es el del conjunto pedido.
+- El total verdadero todavía no se muestra en el Mercado; la interfaz cuenta
+  sólo los elementos cargados. Debe resolverse junto con la navegación de
+  páginas para no prometer resultados inaccesibles.
 - La vista previa de Servicios pide `publication_type=servicio` y sólo tres
   publicaciones, en vez de bajar cien y filtrarlas en el navegador.
 - El caso 126 de la suite fabrica el escenario que el seed no alcanza: un
