@@ -18,6 +18,7 @@ import { ContactPage } from './components/Pages/ContactPage';
 import { PaymentResultPage } from './components/Pages/PaymentResultPage';
 import { VerifyEmailPage } from './components/Pages/VerifyEmailPage';
 import { useProductFilters } from './hooks/useProductFilters';
+import { useVistaPrevia } from './hooks/useVistaPrevia';
 import {
   getProducts,
   getCategories,
@@ -95,6 +96,20 @@ function App() {
 
   const selectedProvinceId =
     provinces.find((province) => province.name === selectedProvince)?.id || '';
+
+  // Las vistas previas de Inicio y de Servicios salen del mismo catalogo que el
+  // mercado, con el mismo orden, y se piden solo cuando su pantalla esta a la
+  // vista. Viven aca y no adentro de cada pagina para no competir con la carga
+  // del mercado ni duplicar el estado de red.
+  const vistaPreviaDeInicio = useVistaPrevia({
+    activa: currentSection === 'home',
+    mensajeDeError: 'No pudimos cargar las operaciones.',
+  });
+  const vistaPreviaDeServicios = useVistaPrevia({
+    activa: currentSection === 'services',
+    soloServicios: true,
+    mensajeDeError: 'No pudimos cargar los servicios.',
+  });
 
   // Cargar catálogos auxiliares al entrar al marketplace.
   useEffect(() => {
@@ -248,6 +263,16 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Ir al mercado con el filtro de servicios puesto.
+  //
+  // Escribir `type=servicios` en la URL no alcanza: el hook de filtros ya esta
+  // montado y lee su estado, no la barra de direcciones. Se fija el estado y
+  // recien despues se navega.
+  const verServiciosPublicados = () => {
+    setSelectedType('servicios');
+    handleNavigate('marketplace');
+  };
+
   const handleProvinceChange = (provinceId: string) => {
     const province = provinces.find((item) => item.id === provinceId);
     setSelectedProvince(province?.name || 'Todas las provincias');
@@ -263,6 +288,7 @@ function App() {
           onNavigateToServices={() => handleNavigate('services')}
           onPublishClick={() => setIsAddProductOpen(true)}
           onLoginClick={() => setAuthModal('login')}
+          vistaPrevia={vistaPreviaDeInicio}
         />;
       case 'verificar-correo':
         return (
@@ -283,8 +309,8 @@ function App() {
                 <h1 id="titulo-mercado">Operaciones disponibles</h1>
               </div>
               <p className="tg-lead">
-                Productos, servicios y logística con precio o modalidad, ubicación,
-                responsable y próximo paso.
+                Compará maquinaria, insumos, servicios y logística con los datos que
+                definen cada operación.
               </p>
             </section>
             <div className={styles.contentWrapper}>
@@ -335,7 +361,15 @@ function App() {
           />
         );
       case 'services':
-        return <ServicesPage onNavigateToContact={() => handleNavigate('contact')} />;
+        return (
+          <ServicesPage
+            onNavigateToContact={() => handleNavigate('contact')}
+            onVerServiciosPublicados={verServiciosPublicados}
+            onPublishClick={() => setIsAddProductOpen(true)}
+            onLoginClick={() => setAuthModal('login')}
+            vistaPrevia={vistaPreviaDeServicios}
+          />
+        );
       case 'contact':
         return <ContactPage />;
       case 'payment-success':
@@ -376,6 +410,8 @@ function App() {
           onNavigateToMarketplace={() => handleNavigate('marketplace')}
           onNavigateToContact={() => handleNavigate('contact')}
           onPublishClick={() => setIsAddProductOpen(true)}
+          onLoginClick={() => setAuthModal('login')}
+          vistaPrevia={vistaPreviaDeInicio}
         />;
     }
   };

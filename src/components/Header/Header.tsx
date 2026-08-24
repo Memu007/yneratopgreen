@@ -83,8 +83,29 @@ export const Header: React.FC<HeaderProps> = ({
     onSearchSubmit();
   };
 
+  // Dos cabeceras, no dos componentes: el mercado necesita el buscador
+  // dominante y la navegacion en una segunda banda; el resto de las paginas
+  // publicas entra en una sola banda compacta. La sesion, los roles, el
+  // carrito y la vuelta de Mercado Pago son los mismos en las dos.
+  const enMercado = currentSection === 'marketplace';
+
+  const navegacion = (
+    <nav className={styles.navInterior} aria-label="Secciones del sitio">
+      {SECCIONES.map(([seccion, texto]) => (
+        <button
+          key={seccion}
+          className={styles.navLink}
+          aria-current={currentSection === seccion ? 'page' : undefined}
+          onClick={() => onNavigate(seccion)}
+        >
+          {texto}
+        </button>
+      ))}
+    </nav>
+  );
+
   return (
-    <header className={styles.header}>
+    <header className={`${styles.header} ${enMercado ? styles.headerMercado : styles.headerCompacto}`}>
       <div className={`tg-container ${styles.masthead}`}>
         {/* El wordmark es un archivo, no letras compuestas a mano: su dibujo
             está convertido a contornos, así que no depende de que la fuente
@@ -96,7 +117,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* La búsqueda vive donde hay resultados que filtrar. En las otras
             secciones no hay grilla, así que un buscador ahí sería un control
             que parece hacer algo y no hace nada. */}
-        {currentSection === 'marketplace' && (
+        {enMercado && (
           <form className={styles.buscador} onSubmit={handleSubmit} role="search">
             <label className="tg-sr-only" htmlFor="buscar-mercado">
               Buscar en el mercado
@@ -114,6 +135,8 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </form>
         )}
+
+        {!enMercado && navegacion}
 
         <div className={styles.acciones}>
           {isAuthenticated && user?.role === 'admin' && onAdminClick && (
@@ -150,20 +173,11 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      <nav className={styles.nav} aria-label="Secciones del sitio">
-        <div className={`tg-container ${styles.navInterior}`}>
-          {SECCIONES.map(([seccion, texto]) => (
-            <button
-              key={seccion}
-              className={styles.navLink}
-              aria-current={currentSection === seccion ? 'page' : undefined}
-              onClick={() => onNavigate(seccion)}
-            >
-              {texto}
-            </button>
-          ))}
+      {enMercado && (
+        <div className={styles.nav}>
+          <div className="tg-container">{navegacion}</div>
         </div>
-      </nav>
+      )}
 
       {showDashboard && (
         <UserDashboard

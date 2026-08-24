@@ -12,13 +12,28 @@
 /* La presentación del Mercado: qué es esta pantalla, antes de la primera fila
    de resultados. No es un hero: no hay fotografía, no hay promesa y no empuja
    el inventario abajo del pliegue. */
+/* La banda de entrada del mercado: alto fijo, titulo y bajada en la misma
+   linea. Es la misma densidad que Inicio y Servicios, sin fotografia: el
+   mercado abre con resultados, no con una portada. */
 .presentacion {
+  min-height: 144px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  align-items: end;
-  gap: var(--tg-space-12);
-  padding-block: var(--tg-space-12);
+  align-items: center;
+  gap: var(--tg-space-8);
+  padding-block: var(--tg-space-8);
   border-bottom: 1px solid var(--tg-color-border);
+}
+
+.presentacion h1 {
+  margin-top: var(--tg-space-1);
+  font-size: clamp(38px, 3.6vw, 50px);
+  line-height: 1;
+}
+
+.presentacion :global(.tg-lead) {
+  max-width: 48ch;
+  font-size: 16px;
 }
 
 .presentacion :global(.tg-lead) { justify-self: end; }
@@ -30,8 +45,8 @@
   padding-top: var(--tg-space-10);
   padding-bottom: var(--tg-space-16);
   display: grid;
-  grid-template-columns: 268px minmax(0, 1fr);
-  gap: var(--tg-space-10);
+  grid-template-columns: 248px minmax(0, 1fr);
+  gap: var(--tg-space-8);
 }
 
 @media (max-width: 1023px) {

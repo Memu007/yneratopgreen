@@ -1,333 +1,309 @@
-.servicesPage {
+/* Servicios — extensión «A, Mercado a cielo abierto».
+   Antes: un video con overlay índigo, cinco servicios escritos a mano y claims
+   de inteligencia artificial, satélites y sustentabilidad. Ahora: una foto de
+   trabajo real sin nada encima y las publicaciones de servicio que existen. */
+
+.pagina {
   min-height: 100vh;
-  background-color: var(--tg-color-surface);
+  background-color: var(--tg-color-canvas);
 }
 
-/* Hero Section */
+/* --- Hero: foto a la izquierda, copy a la derecha ------------------------- */
 .hero {
-  position: relative;
-  height: 350px;
-  overflow: hidden;
-}
-
-.heroVideo {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  min-width: 100%;
-  min-height: 100%;
-  width: auto;
-  height: auto;
-  transform: translate(-50%, -50%);
-  object-fit: cover;
-}
-
-.heroOverlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(23, 33, 61, 0.88);
-}
-
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 24px;
-}
-
-/* Intro Section */
-.introSection {
-  padding: 80px 24px 60px;
+  min-height: 414px;
+  display: grid;
+  grid-template-columns: 56% 44%;
   background-color: var(--tg-color-surface);
-}
-
-.introContent {
-  display: grid;
-  grid-template-columns: 250px 1fr;
-  gap: 60px;
-  align-items: start;
-}
-
-.introTitle {
-  position: relative;
-}
-
-.introTitle h1 {
-  font-size: 48px;
-  font-weight: 700;
-  color: var(--tg-color-brand);
-  margin: 0;
-}
-
-.titleUnderline {
-  width: 60px;
-  height: 4px;
-  background-color: var(--tg-color-brand);
-  margin-top: 16px;
-  border-radius: var(--tg-radius-sm);
-}
-
-.introText {
-  max-width: 800px;
-}
-
-.introText p {
-  font-size: 17px;
-  line-height: 1.8;
-  color: var(--tg-color-text-secondary);
-  margin: 0;
-}
-
-/* Services Section */
-.servicesSection {
-  padding: 40px 24px 80px;
-}
-
-.serviceCard {
-  display: grid;
-  grid-template-columns: 1fr 400px;
-  gap: 50px;
-  align-items: center;
-  padding: 60px 0;
   border-bottom: 1px solid var(--tg-color-border);
 }
 
-.serviceCard:last-child {
-  border-bottom: none;
-}
-
-.serviceCard.reversed {
-  grid-template-columns: 400px 1fr;
-}
-
-.serviceCard.reversed .serviceContent {
-  order: 2;
-}
-
-.serviceCard.reversed .serviceImageWrapper {
-  order: 1;
-}
-
-.serviceContent {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.serviceHeader {
-  display: flex;
-  align-items: flex-start;
-  gap: 24px;
-}
-
-.serviceNumber {
-  font-size: 64px;
-  font-weight: 700;
-  color: var(--tg-color-brand);
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.serviceTitle {
-  font-size: 26px;
-  font-weight: 600;
-  color: var(--tg-color-brand);
-  margin: 0;
-  line-height: 1.3;
-  padding-top: 8px;
-}
-
-.servicePoints {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding-left: 88px;
-}
-
-.servicePoint {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-}
-
-.pointNumber {
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  background: var(--tg-color-brand);
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: 600;
-  box-shadow: var(--tg-shadow-none);
-}
-
-.servicePoint p {
-  margin: 0;
-  font-size: 16px;
-  line-height: 1.7;
-  color: var(--tg-color-text-secondary);
-  padding-top: 6px;
-}
-
-/* Service Image */
-.serviceImageWrapper {
+.heroFoto {
   position: relative;
-  border-radius: var(--tg-radius-sm);
+  min-height: 320px;
   overflow: hidden;
-  box-shadow: var(--tg-shadow-none);
+  border-right: 5px solid var(--tg-color-action);
 }
 
-.serviceImageWrapper::before {
-  content: '';
-  position: absolute;
-  top: -10px;
-  left: -10px;
-  right: 10px;
-  bottom: 10px;
-  border: 3px solid var(--tg-color-brand);
-  border-radius: var(--tg-radius-sm);
-  z-index: -1;
-}
-
-.serviceImage {
-  width: 100%;
-  height: 300px;
-  object-fit: cover;
+.heroFoto picture,
+.heroFoto img {
   display: block;
-  transition: transform 0.4s ease;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.serviceImageWrapper:hover .serviceImage {
-  transform: scale(1.05);
+.heroFoto img {
+  object-position: center 45%;
 }
 
-/* CTA Section */
-.ctaSection {
-  background: var(--tg-color-brand);
-  color: white;
-  padding: 80px 24px;
-  text-align: center;
+.heroCopy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--tg-space-4);
+  padding: var(--tg-space-8)
+    max(var(--tg-gutter-desktop), calc((100vw - var(--tg-container-max)) / 2 + var(--tg-gutter-desktop)))
+    var(--tg-space-8) var(--tg-space-12);
+  background-color: var(--tg-color-canvas);
 }
 
-.ctaSection h2 {
-  font-size: 36px;
-  font-weight: 700;
-  margin-bottom: 16px;
+.heroTitulo {
+  font-size: clamp(40px, 3.4vw, 54px);
+  line-height: 0.98;
 }
 
-.ctaSection p {
-  font-size: 20px;
-  margin-bottom: 32px;
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tg-space-3);
 }
 
-.ctaButton {
-  /* Mismo caso que la portada: el boton vive sobre la banda indigo, asi que
-     va invertido o no se ve. */
+/* Los tres datos que la publicación declara. No son promesas de la plataforma:
+   son las columnas con las que se compara una propuesta. */
+.prueba {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--tg-space-3);
+  padding-top: var(--tg-space-4);
+  border-top: 1px solid var(--tg-color-border);
+}
+
+.prueba div {
+  color: var(--tg-color-text-secondary);
+  font-size: 12px;
+}
+
+.prueba strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--tg-color-text);
+  font-size: 13px;
+}
+
+/* --- Servicios publicados ------------------------------------------------ */
+.operaciones {
+  padding-block: var(--tg-space-8) var(--tg-space-16);
+}
+
+.encabezadoDeSeccion {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--tg-space-6);
+  margin-bottom: var(--tg-space-5);
+}
+
+.encabezadoDeSeccion h2 {
+  font-size: 38px;
+  line-height: 1;
+}
+
+.grilla {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tg-space-6);
+  align-items: start;
+}
+
+.esqueleto {
+  min-height: 232px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tg-space-4);
+  padding: var(--tg-space-5);
   background-color: var(--tg-color-surface);
-  color: var(--tg-color-brand);
-  border: none;
-  padding: 16px 40px;
-  font-size: 18px;
-  font-weight: 600;
-  border-radius: var(--tg-radius-lg);
-  cursor: pointer;
-  transition: all 0.3s;
-  box-shadow: var(--tg-shadow-none);
+  border: 1px solid var(--tg-color-border);
+  border-top: 3px solid var(--tg-color-border);
 }
 
-.ctaButton:hover {
+.esqueletoLinea {
+  height: 14px;
   background-color: var(--tg-color-surface-muted);
-  box-shadow: var(--tg-shadow-none);
 }
 
-/* Responsive */
-@media (max-width: 1000px) {
-  .serviceCard,
-  .serviceCard.reversed {
-    grid-template-columns: 1fr;
-    gap: 30px;
-  }
-
-  .serviceCard.reversed .serviceContent,
-  .serviceCard.reversed .serviceImageWrapper {
-    order: unset;
-  }
-
-  .serviceImageWrapper {
-    max-width: 500px;
-    margin: 0 auto;
-  }
-
-  .servicePoints {
-    padding-left: 0;
-  }
+.esqueletoCorta {
+  width: 55%;
 }
 
-@media (max-width: 768px) {
-  .introContent {
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
-
-  .introTitle h1 {
-    font-size: 36px;
-  }
-
-  .serviceHeader {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .serviceNumber {
-    font-size: 48px;
-  }
-
-  .serviceTitle {
-    font-size: 22px;
-    padding-top: 0;
-  }
-
-  .serviceImage {
-    height: 250px;
-  }
+.aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tg-space-4);
+  padding: var(--tg-space-6);
+  background-color: var(--tg-color-surface);
+  border: 1px solid var(--tg-color-border);
 }
 
-@media (max-width: 500px) {
+.aviso p {
+  margin: 0;
+  font-weight: 560;
+}
+
+/* --- Qué mirar antes de cotizar ------------------------------------------ */
+.decision {
+  padding-block: var(--tg-space-12);
+  background-color: var(--tg-color-surface);
+  border-block: 1px solid var(--tg-color-border);
+}
+
+.decisionGrilla {
+  display: grid;
+  grid-template-columns: 1.1fr repeat(3, 1fr);
+}
+
+.decisionIntro {
+  padding-right: var(--tg-space-10);
+}
+
+.decisionIntro h2 {
+  margin-top: var(--tg-space-1);
+  font-size: 38px;
+  line-height: 1;
+}
+
+.decisionItem {
+  padding: var(--tg-space-1) var(--tg-space-6);
+  border-left: 1px solid var(--tg-color-border);
+}
+
+.decisionItem strong {
+  display: block;
+  margin-bottom: var(--tg-space-2);
+  font-size: 15px;
+}
+
+.decisionItem p {
+  margin: 0;
+  color: var(--tg-color-text-secondary);
+  font-size: 14px;
+}
+
+/* --- Cierre comercial ---------------------------------------------------- */
+.cta {
+  padding-block: var(--tg-space-16);
+}
+
+.ctaInterior {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--tg-space-8);
+  padding-top: var(--tg-space-8);
+  border-top: 4px solid var(--tg-color-action);
+}
+
+.ctaInterior h2 {
+  font-size: 38px;
+}
+
+.ctaInterior p {
+  margin-top: var(--tg-space-2);
+  color: var(--tg-color-text-secondary);
+}
+
+@media (max-width: 1023px) {
   .hero {
-    height: 200px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
   }
 
-  .introSection {
-    padding: 40px 16px;
+  .heroFoto {
+    height: 330px;
+    min-height: 330px;
+    border-right: 0;
+    border-bottom: 5px solid var(--tg-color-action);
   }
 
-  .servicesSection {
-    padding: 20px 16px 60px;
+  .heroCopy {
+    padding: var(--tg-space-8) var(--tg-gutter-tablet);
   }
 
-  .serviceCard {
-    padding: 40px 0;
+  .grilla {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .introTitle h1 {
-    font-size: 28px;
+  .decisionGrilla {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--tg-space-6) 0;
   }
 
-  .serviceTitle {
-    font-size: 20px;
+  .decisionIntro {
+    padding-right: var(--tg-space-6);
+  }
+}
+
+@media (max-width: 599px) {
+  .heroFoto {
+    height: 210px;
+    min-height: 210px;
   }
 
-  .ctaSection h2 {
-    font-size: 28px;
+  .heroCopy {
+    padding: var(--tg-space-6) var(--tg-gutter-mobile);
+    gap: var(--tg-space-3);
   }
 
-  .ctaSection {
-    padding: 60px 16px;
+  .heroTitulo {
+    font-size: 39px;
+  }
+
+  .prueba {
+    display: none;
+  }
+
+  .operaciones {
+    padding-block: var(--tg-space-6) var(--tg-space-10);
+  }
+
+  .encabezadoDeSeccion {
+    align-items: start;
+  }
+
+  .encabezadoDeSeccion h2 {
+    font-size: 30px;
+  }
+
+  .grilla {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .decision {
+    padding-block: var(--tg-space-8);
+  }
+
+  .decisionGrilla {
+    display: block;
+  }
+
+  .decisionIntro {
+    padding: 0 0 var(--tg-space-5);
+  }
+
+  .decisionIntro h2 {
+    font-size: 31px;
+  }
+
+  .decisionItem {
+    padding: var(--tg-space-4) 0;
+    border-left: 0;
+    border-top: 1px solid var(--tg-color-border);
+  }
+
+  .cta {
+    padding-block: var(--tg-space-10);
+  }
+
+  .ctaInterior {
+    display: block;
+  }
+
+  .ctaInterior h2 {
+    font-size: 31px;
+  }
+
+  .ctaInterior .acciones {
+    margin-top: var(--tg-space-5);
   }
 }

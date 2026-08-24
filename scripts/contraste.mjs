@@ -366,7 +366,7 @@ for (const medida of MEDIDAS) {
     const ctx = await sesion({ viewport }, comprador);
     const page = await ctx.newPage();
 
-    const portada = page.getByRole('heading', { name: /Bienvenido a/ });
+    const portada = page.getByRole('heading', { name: /seguir produciendo/ });
     await page.goto(WEB, { waitUntil: 'domcontentloaded' });
     await revisar(page, `${medida.n} portada`, portada);
 
@@ -375,7 +375,7 @@ for (const medida of MEDIDAS) {
     const equipo = page.getByRole('heading', { name: 'Nuestro equipo' });
     for (const [seccion, titulo, marca] of [
       ['Quiénes somos', 'about', equipo],
-      ['Servicios', 'services', page.getByRole('heading', { name: 'Servicios', level: 1 })],
+      ['Servicios', 'services', page.getByRole('heading', { name: /resuelve el trabajo/, level: 1 })],
       ['Contacto', 'contact', page.getByRole('heading', { name: 'Contacto', level: 1 })],
     ]) {
       await page.getByRole('button', { name: seccion, exact: true }).first().click();

@@ -187,6 +187,34 @@
   font-size: clamp(32px, 3.1vw, 48px);
 }
 
+/* --- Variante compacta ---------------------------------------------------
+   La vista previa de Inicio y de Servicios muestra tres operaciones en tres
+   columnas iguales. El activo conserva su anatomia -condicion, precio, accion-
+   pero no su privilegio de fila completa, que ahi no existe. */
+.compacta.activo {
+  grid-column: auto;
+  display: block;
+}
+
+.compacta .media {
+  aspect-ratio: 4 / 3;
+}
+
+.compacta.activo .media {
+  height: auto;
+  border-right: 0;
+  border-bottom: 1px solid var(--tg-color-border);
+}
+
+.compacta.activo .cuerpo {
+  padding: var(--tg-space-5);
+}
+
+.compacta.activo .titulo {
+  min-height: 2.3em;
+  font-size: 25px;
+}
+
 /* --- Servicio y logística ------------------------------------------------
    Sin imagen y con la regla en bermellón: es lo que se cotiza, no lo que se
    agrega al carrito. */

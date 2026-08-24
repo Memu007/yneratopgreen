@@ -6,7 +6,7 @@
   position: sticky;
   z-index: var(--tg-z-sticky);
   top: 0;
-  background-color: rgba(248, 247, 243, 0.98);
+  background-color: rgba(255, 255, 255, 0.98);
   border-bottom: 1px solid var(--tg-color-border);
 }
 
@@ -32,6 +32,30 @@
   grid-template-columns: minmax(220px, 300px) minmax(300px, 1fr) auto;
   align-items: center;
   gap: var(--tg-space-8);
+}
+
+/* Fuera del mercado la cabecera entra en una sola banda: marca, secciones y
+   acciones. Adentro del mercado el buscador manda en la primera banda y las
+   secciones bajan a la segunda, que es donde se las busca cuando hay
+   resultados en pantalla. */
+.headerCompacto .masthead {
+  min-height: 80px;
+  grid-template-columns: minmax(200px, 238px) 1fr auto;
+}
+
+.headerCompacto .navInterior {
+  min-height: 80px;
+  gap: var(--tg-space-6);
+}
+
+.headerCompacto .navLink {
+  min-height: 80px;
+  border-bottom-width: 3px;
+}
+
+.headerMercado .masthead {
+  min-height: 76px;
+  grid-template-columns: minmax(200px, 230px) minmax(320px, 1fr) auto;
 }
 
 /* La marca es un botón sin apariencia de botón: lo que se ve es el wordmark. */
@@ -90,6 +114,7 @@
 }
 
 .nav {
+  background-color: var(--tg-color-surface);
   border-top: 1px solid var(--tg-color-border);
 }
 
@@ -140,6 +165,19 @@
 
   .navInterior {
     gap: var(--tg-space-6);
+  }
+
+  /* En tablet la navegacion no entra al lado de la marca y las acciones:
+     baja a su propia linea, con la regla que la separa. */
+  .headerCompacto .navInterior {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-height: 48px;
+    border-top: 1px solid var(--tg-color-border);
+  }
+
+  .headerCompacto .navLink {
+    min-height: 48px;
   }
 }
 
@@ -198,5 +236,22 @@
   .navLink {
     min-width: 0;
     justify-self: start;
+  }
+
+  /* Las cinco secciones siguen visibles en celular, en dos columnas. El
+     prototipo mostraba tres y escondia el resto con `display: none`; PM lo
+     prohibio por escrito -no pueden perderse del DOM- y esta es la solucion
+     que ya existia: se leen todas, sin scroll horizontal. */
+  .headerCompacto .navInterior {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    order: 4;
+    width: 100%;
+    min-height: 0;
+    border-top: 1px solid var(--tg-color-border);
+  }
+
+  .headerCompacto .navLink {
+    min-height: 44px;
   }
 }

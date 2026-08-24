@@ -1,145 +1,185 @@
 import React from 'react';
 import styles from './ServicesPage.module.css';
-import { ProductImage } from '../ProductImage/ProductImage';
+import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../hooks/useToast';
+import { ProductCard } from '../ProductCard/ProductCard';
+import type { VistaPrevia } from '../../hooks/useVistaPrevia';
 
 interface ServicesPageProps {
   onNavigateToContact?: () => void;
+  /** Lleva al mercado con el filtro de servicios ya puesto. */
+  onVerServiciosPublicados?: () => void;
+  onPublishClick?: () => void;
+  onLoginClick?: () => void;
+  /** Publicaciones reales de servicio y logística. */
+  vistaPrevia: VistaPrevia;
 }
 
-const services = [
-  {
-    number: '01',
-    title: 'Asesoramiento Personalizado en Mecanización',
-    image: '/DJI_0079.JPG',
-    points: [
-      'Evaluación y recomendación de maquinaria agrícola basada en análisis precisos de las necesidades de cada fase de producción.',
-      'Capacitación en el uso y mantenimiento de equipos, integrando tecnología de última generación para mejorar la eficiencia operativa.'
-    ]
-  },
-  {
-    number: '02',
-    title: 'Análisis Ambiental y de Suelo con Tecnología Satelital',
-    image: '/relevamiento-inundacion.jpg',
-    points: [
-      'Estudios avanzados del suelo utilizando datos obtenidos a través de imágenes satelitales y sensores terrestres.',
-      'Recomendaciones personalizadas para prácticas agrícolas sostenibles, optimizando la salud del suelo y la productividad a largo plazo.'
-    ]
-  },
-  {
-    number: '03',
-    title: 'Monitoreo de Cultivos con Inteligencia Artificial',
-    // Sin foto propia: acá había una imagen de stock pedida a Unsplash en
-    // cada visita. `ProductImage` rotula la ausencia y no inventa una.
-    image: '',
-    points: [
-      'Implementación de sistemas de monitoreo inteligente que combinan sensores y análisis de datos en tiempo real para gestionar el riego, la fertilización y el control de plagas de manera precisa.',
-      'Utilización de algoritmos de inteligencia artificial para predecir necesidades y optimizar el manejo de cultivos.'
-    ]
-  },
-  {
-    number: '04',
-    title: 'Consultoría en Sostenibilidad y Uso Eficiente de Recursos',
-    // Sin foto propia: acá había una imagen de stock pedida a Unsplash en
-    // cada visita. `ProductImage` rotula la ausencia y no inventa una.
-    image: '',
-    points: [
-      'Desarrollo de estrategias personalizadas que emplean tecnologías como el Internet de las Cosas (IoT) y satélites para reducir el uso de agua, energía y otros insumos, mejorando la sostenibilidad sin sacrificar la productividad.',
-      'Implementación de prácticas agrícolas innovadoras que protegen el medio ambiente y promueven la resiliencia de los ecosistemas.'
-    ]
-  },
-  {
-    number: '05',
-    title: 'Capacitación y Formación en Nuevas Tecnologías',
-    // Sin foto propia: acá había una imagen de stock pedida a Unsplash en
-    // cada visita. `ProductImage` rotula la ausencia y no inventa una.
-    image: '',
-    points: [
-      'Programas de formación que cubren las últimas tendencias en agricultura digital, incluyendo el uso de inteligencia artificial, imágenes satelitales y herramientas de precisión.',
-      'Talleres prácticos diseñados para mejorar las competencias técnicas y de gestión, asegurando que los participantes puedan aprovechar al máximo las nuevas tecnologías en el campo.'
-    ]
-  }
+/** Lo que hace comparable a una propuesta. Son los datos que la publicación
+ *  declara; no se prometen certificaciones, alianzas ni tecnologías. */
+const COMPARACION: [string, string][] = [
+  ['Cobertura real', 'Provincia, localidades o radio declarados por quien presta el servicio.'],
+  ['Modalidad', 'Por hectárea, visita, proyecto o unidad que la publicación efectivamente informa.'],
+  ['Condiciones', 'Equipamiento, disponibilidad y próximo paso sólo cuando existen datos.'],
 ];
 
-export const ServicesPage: React.FC<ServicesPageProps> = ({ onNavigateToContact }) => {
-  return (
-    <div className={styles.servicesPage}>
-      {/* Hero Section */}
-      <section className={styles.hero}>
-        <video
-          className={styles.heroVideo}
-          autoPlay
-          muted
-          loop
-          playsInline
-        >
-          <source src="/video-servicios.mp4" type="video/mp4" />
-        </video>
-        <div className={styles.heroOverlay}></div>
-      </section>
+const PRUEBA: [string, string][] = [
+  ['Cobertura', 'Zona de trabajo'],
+  ['Modalidad', 'Precio o cotización'],
+  ['Responsable', 'Quién presta el servicio'],
+];
 
-      {/* Intro Section */}
-      <section className={styles.introSection}>
-        <div className={styles.container}>
-          <div className={styles.introContent}>
-            <div className={styles.introTitle}>
-              <h1>Servicios</h1>
-              <div className={styles.titleUnderline}></div>
-            </div>
-            <div className={styles.introText}>
-              <p>
-                En TopGreen, sabemos que cada persona involucrada en la producción agropecuaria enfrenta desafíos 
-                únicos. Por eso, ofrecemos servicios personalizados que combinan la última tecnología en inteligencia 
-                artificial, el uso de satélites y las mejores prácticas en mecanización agrícola. Nuestro objetivo es ayudar 
-                a agricultores, productores y entusiastas del campo a maximizar sus resultados, mejorando la eficiencia 
-                y promoviendo la sostenibilidad.
-              </p>
-            </div>
+export const ServicesPage: React.FC<ServicesPageProps> = ({
+  onNavigateToContact,
+  onVerServiciosPublicados,
+  onPublishClick,
+  onLoginClick,
+  vistaPrevia,
+}) => {
+  const { user } = useAuth();
+  const { showToast } = useToast();
+
+  const publicar = () => {
+    if (!user) {
+      showToast('Debes iniciar sesión para publicar un servicio', 'warning');
+      onLoginClick?.();
+      return;
+    }
+    onPublishClick?.();
+  };
+
+  const { operaciones, cargando, error, reintentar } = vistaPrevia;
+
+  return (
+    <div className={styles.pagina}>
+      <section className={styles.hero} aria-labelledby="titulo-servicios">
+        {/* La fotografía es evidencia de trabajo real y no lleva nada encima:
+            ni texto, ni filtro, ni degradado. */}
+        <div className={styles.heroFoto}>
+          <picture>
+            <source
+              media="(max-width: 599px)"
+              srcSet="/media/comercial/servicios-relevamiento-hero-960-4x3.webp"
+            />
+            <img
+              src="/media/comercial/servicios-relevamiento-hero-960.webp"
+              alt="Relevamiento aéreo de un campo afectado por inundación"
+              width={960}
+              height={540}
+            />
+          </picture>
+        </div>
+        <div className={styles.heroCopy}>
+          <div className="tg-eyebrow">Servicios publicados</div>
+          <h1 id="titulo-servicios" className={styles.heroTitulo}>
+            Encontrá quién resuelve el trabajo.
+          </h1>
+          <p className="tg-lead">
+            Muestreo, labores, asistencia técnica y logística con cobertura, modalidad y
+            responsable declarados.
+          </p>
+          <div className={styles.acciones}>
+            <button className="tg-button tg-button--primary" onClick={onVerServiciosPublicados}>
+              Ver servicios publicados
+            </button>
+            <button className="tg-button tg-button--secondary" onClick={publicar}>
+              Publicar un servicio
+            </button>
+          </div>
+          <div className={styles.prueba}>
+            {PRUEBA.map(([titulo, texto]) => (
+              <div key={titulo}>
+                <strong>{titulo}</strong>
+                {texto}
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Services Grid */}
-      <section className={styles.servicesSection}>
-        <div className={styles.container}>
-          {services.map((service, index) => (
-            <div 
-              key={service.number} 
-              className={`${styles.serviceCard} ${index % 2 === 1 ? styles.reversed : ''}`}
-            >
-              <div className={styles.serviceContent}>
-                <div className={styles.serviceHeader}>
-                  <span className={styles.serviceNumber}>{service.number}</span>
-                  <h2 className={styles.serviceTitle}>{service.title}</h2>
-                </div>
-                <div className={styles.servicePoints}>
-                  {service.points.map((point, pointIndex) => (
-                    <div key={pointIndex} className={styles.servicePoint}>
-                      <span className={styles.pointNumber}>{pointIndex + 1}</span>
-                      <p>{point}</p>
-                    </div>
-                  ))}
-                </div>
+      <section className={`tg-container ${styles.operaciones}`} aria-labelledby="titulo-servicios-activos">
+        <div className={styles.encabezadoDeSeccion}>
+          <div>
+            <div className="tg-eyebrow">Oferta disponible</div>
+            <h2 id="titulo-servicios-activos">Servicios activos</h2>
+          </div>
+          <button className="tg-button tg-button--tertiary" onClick={onVerServiciosPublicados}>
+            Explorar todos
+          </button>
+        </div>
+
+        {cargando ? (
+          /* Sin esqueleto de foto: un servicio no tiene foto en la tarjeta, y
+             reservarle el hueco prometería una que no va a llegar. */
+          <div className={styles.grilla} aria-busy="true" aria-live="polite">
+            <span className="tg-sr-only">Cargando servicios</span>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className={styles.esqueleto} aria-hidden="true">
+                <div className={styles.esqueletoLinea} />
+                <div className={`${styles.esqueletoLinea} ${styles.esqueletoCorta}`} />
+                <div className={styles.esqueletoLinea} />
               </div>
-              <div className={styles.serviceImageWrapper}>
-                <ProductImage
-                  src={service.image}
-                  alt={service.title}
-                  className={styles.serviceImage}
-                />
-              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className={styles.aviso} role="alert">
+            <p>{error}</p>
+            <button className="tg-button tg-button--secondary" onClick={reintentar}>
+              Reintentar
+            </button>
+          </div>
+        ) : operaciones.length === 0 ? (
+          <div className={styles.aviso}>
+            <p>Todavía no hay servicios publicados.</p>
+            <button className="tg-button tg-button--secondary" onClick={publicar}>
+              Publicar un servicio
+            </button>
+          </div>
+        ) : (
+          <div className={styles.grilla}>
+            {operaciones.map((servicio) => (
+              <ProductCard
+                key={servicio.id}
+                product={servicio}
+                variante="compacta"
+                onSolicitarCotizacion={onNavigateToContact}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className={styles.decision} aria-labelledby="titulo-comparar">
+        <div className={`tg-container ${styles.decisionGrilla}`}>
+          <div className={styles.decisionIntro}>
+            <div className="tg-eyebrow">Comparación útil</div>
+            <h2 id="titulo-comparar">Qué mirar antes de cotizar.</h2>
+          </div>
+          {COMPARACION.map(([titulo, texto]) => (
+            <div key={titulo} className={styles.decisionItem}>
+              <strong>{titulo}</strong>
+              <p>{texto}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className={styles.ctaSection}>
-        <div className={styles.container}>
-          <h2>¿Interesado en nuestros servicios?</h2>
-          <p>Contáctanos para una consulta personalizada</p>
-          <button className={styles.ctaButton} onClick={onNavigateToContact}>
-            Contactar Ahora
-          </button>
+      <section className={`tg-container ${styles.cta}`} aria-labelledby="titulo-ofrecer">
+        <div className={styles.ctaInterior}>
+          <div>
+            <h2 id="titulo-ofrecer">¿Prestás un servicio para el agro?</h2>
+            <p>
+              Indicá cobertura, modalidad y responsable para que la propuesta pueda compararse.
+            </p>
+          </div>
+          <div className={styles.acciones}>
+            <button className="tg-button tg-button--primary" onClick={publicar}>
+              Publicar un servicio
+            </button>
+            <button className="tg-button tg-button--secondary" onClick={onVerServiciosPublicados}>
+              Ver servicios
+            </button>
+          </div>
         </div>
       </section>
     </div>

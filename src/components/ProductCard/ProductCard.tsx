@@ -17,6 +17,11 @@ interface ProductCardProps {
   /** Adónde mandar a quien pide una cotización. Sin esto el botón no aparece:
       prometer una solicitud que no existe es peor que no ofrecerla. */
   onSolicitarCotizacion?: () => void;
+  /** `compacta` es la misma tarjeta en una columna angosta —la vista previa de
+      Inicio y de Servicios—. No es otra tarjeta: mismos datos, misma anatomía,
+      misma acción; lo único que cambia es que el activo deja de ocupar la fila
+      entera, porque en una grilla de tres columnas no hay fila entera. */
+  variante?: 'catalogo' | 'compacta';
 }
 
 /** Un dato con su rótulo. Se omite entero cuando el valor no está: una fila de
@@ -29,7 +34,11 @@ const Dato: React.FC<{ rotulo: string; valor?: string | null }> = ({ rotulo, val
     </div>
   ) : null;
 
-export const ProductCard: React.FC<ProductCardProps> = ({ product, onSolicitarCotizacion }) => {
+export const ProductCard: React.FC<ProductCardProps> = ({
+  product,
+  onSolicitarCotizacion,
+  variante = 'catalogo',
+}) => {
   const { addItem } = useCart();
   const [showDetail, setShowDetail] = useState(false);
   const [cantidad, setCantidad] = useState(1);
@@ -62,7 +71,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onSolicitarCo
   return (
     <>
       <article
-        className={`${styles.card} ${styles[anatomia]}`}
+        className={`${styles.card} ${styles[anatomia]} ${variante === 'compacta' ? styles.compacta : ''}`}
         onClick={abrirDetalle}
       >
         {/* Servicio y logística no llevan imagen: lo que hay que comparar de un

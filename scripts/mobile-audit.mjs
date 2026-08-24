@@ -164,11 +164,11 @@ async function exercisePublicCatalog(browser, viewport) {
   try {
     state.screen = '01-home';
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('heading', { name: /Bienvenido a/ }).waitFor();
+    await page.getByRole('heading', { name: /seguir produciendo/ }).waitFor();
     await inspect(page, state, viewport, '01-home');
 
     state.screen = '02-filters';
-    await page.getByRole('button', { name: /Ver el mercado/i }).click();
+    await page.getByRole('button', { name: /Explorar operaciones/i }).click();
     await waitForCatalog(page);
     await page.locator('#catalog-category').selectOption({ index: 1 });
     await page.locator('#catalog-province').selectOption({ index: 1 });

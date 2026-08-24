@@ -1,333 +1,384 @@
-.homePage {
+/* Inicio comercial — extensión «A, Mercado a cielo abierto».
+   La página dejó de ser una placa índigo con una bienvenida: ahora abre con
+   copy y fotografía en columnas separadas, sigue con las cuatro clases de
+   operación y muestra publicaciones reales. Nada de esto lleva overlay. */
+
+.pagina {
   min-height: 100vh;
+  background-color: var(--tg-color-canvas);
 }
 
-/* Hero Section */
+/* --- Hero: dos columnas, cero overlay ------------------------------------ */
 .hero {
-  position: relative;
-  /* Sin fotografia de terceros: la portada se pinta con el indigo del
-     sistema. La banda que habia encima ya tapaba el 88 % de la foto, y
-     pedirsela a Unsplash en cada visita es una dependencia externa que
-     ACTIVOS.md no autoriza. */
-  background-color: var(--tg-color-brand);
-  color: white;
-  padding: 120px 24px;
-  text-align: center;
-  min-height: 600px;
+  min-height: 432px;
+  display: grid;
+  grid-template-columns: 44% 56%;
+  background-color: var(--tg-color-surface);
+  border-bottom: 1px solid var(--tg-color-border);
+}
+
+.heroCopy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--tg-space-4);
+  /* El copy arranca donde arranca el contenedor del resto de la página: el
+     texto del hero y el de las secciones comparten margen izquierdo. */
+  padding: var(--tg-space-8) var(--tg-space-10) var(--tg-space-8)
+    max(var(--tg-gutter-desktop), calc((100vw - var(--tg-container-max)) / 2 + var(--tg-gutter-desktop)));
+  background-color: var(--tg-color-canvas);
+}
+
+.heroTitulo {
+  font-size: clamp(44px, 4vw, 58px);
+  line-height: 0.98;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tg-space-3);
+}
+
+/* El conteo no es un adorno: dice cuántas operaciones hay de verdad, y por eso
+   sólo aparece cuando la API contestó. */
+.conteo {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: var(--tg-space-3);
+  margin: 0;
+  color: var(--tg-color-text-secondary);
+  font-size: 13px;
+  font-weight: 590;
 }
 
-.heroOverlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(23, 33, 61, 0.88);
-  z-index: 1;
+.conteo::before {
+  content: "";
+  width: 28px;
+  height: 2px;
+  background-color: var(--tg-color-action);
 }
 
-.heroContent {
-  max-width: 800px;
-  margin: 0 auto;
+.heroFoto {
   position: relative;
-  z-index: 2;
-}
-
-.heroTitle {
-  font-size: 52px;
-  font-weight: 700;
-  margin-bottom: 16px;
-  line-height: 1.2;
-}
-
-.brandName {
-  color: var(--tg-color-text-inverse);
-  display: inline-block;
-}
-
-.heroSubtitle {
-  font-size: 26px;
-  font-weight: 500;
-  margin-bottom: 16px;
-}
-
-.heroDescription {
-  font-size: 18px;
-  line-height: 1.6;
-  margin-bottom: 32px;
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.ctaButton {
-  /* Sobre el indigo de la portada, el boton del sistema desaparece: es del
-     mismo color que el fondo. La relacion se invierte, que es como el sistema
-     resuelve la marca sobre indigo. */
-  background-color: var(--tg-color-surface);
-  color: var(--tg-color-brand);
-  border: none;
-  padding: 16px 32px;
-  font-size: 18px;
-  font-weight: 600;
-  border-radius: var(--tg-radius-lg);
-  cursor: pointer;
-  transition: all 0.3s;
-  box-shadow: var(--tg-shadow-none);
-}
-
-.ctaButton:hover {
-  background-color: var(--tg-color-surface-muted);
-  box-shadow: var(--tg-shadow-none);
-}
-
-/* Categories Section */
-.categoriesSection {
-  padding: 64px 24px;
-  background-color: var(--tg-color-surface);
-}
-
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.sectionTitle {
-  font-size: 32px;
-  font-weight: 700;
-  text-align: center;
-  margin-bottom: 48px;
-  color: var(--tg-color-brand);
-}
-
-.categoriesGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  max-width: 700px;
-  margin: 0 auto;
-}
-
-.categoryCard {
-  background: white;
-  border-radius: var(--tg-radius-lg);
+  min-height: 320px;
   overflow: hidden;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: var(--tg-shadow-none);
-  position: relative;
+  border-left: 5px solid var(--tg-color-action);
 }
 
-.categoryCard:hover {
-  box-shadow: var(--tg-shadow-none);
-}
-
-.categoryCard:hover .categoryImage {
-  transform: scale(1.1);
-}
-
-.categoryCard:hover .categoryOverlay {
-  background: rgba(23, 33, 61, 0.85);
-}
-
-.categoryImageWrapper {
-  position: relative;
-  width: 100%;
-  height: 200px;
-  overflow: hidden;
-  background-color: var(--tg-color-surface-muted);
-}
-
-.categoryImage {
+.heroFoto picture,
+.heroFoto img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.4s ease;
 }
 
-.categoryOverlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(23, 33, 61, 0.6);
-  transition: background 0.3s ease;
+.heroFoto img {
+  object-position: center 61%;
 }
 
-.categoryContent {
-  padding: 8px;
-  text-align: center;
-  background: white;
+/* --- Taxonomía: contenido, no controles ---------------------------------- */
+.taxonomia {
+  background-color: var(--tg-color-surface);
+  border-bottom: 1px solid var(--tg-color-border);
 }
 
-.categoryName {
+.taxonomiaGrilla {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.taxonomiaItem {
+  min-height: 120px;
+  padding: var(--tg-space-5) var(--tg-space-6);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--tg-space-1);
+  border-left: 1px solid var(--tg-color-border);
+}
+
+.taxonomiaItem:last-child {
+  border-right: 1px solid var(--tg-color-border);
+}
+
+.taxonomiaItem strong {
+  font-family: var(--tg-font-display);
+  font-size: 24px;
+  font-weight: 560;
+  line-height: 1.08;
+}
+
+.taxonomiaItem span {
+  color: var(--tg-color-text-secondary);
   font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 2px;
-  color: var(--tg-color-brand);
 }
 
-.categoryDescription {
-  font-size: 10px;
-  color: var(--tg-color-text-secondary);
-  margin: 0;
-  line-height: 1.2;
+/* --- Operaciones reales -------------------------------------------------- */
+.operaciones {
+  padding-block: var(--tg-space-8) var(--tg-space-16);
 }
 
-/* Benefits Section */
-.benefitsSection {
-  padding: 80px 24px;
-  background: white;
+.encabezadoDeSeccion {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--tg-space-6);
+  margin-bottom: var(--tg-space-5);
 }
 
-.benefitsGrid {
+.encabezadoDeSeccion h2 {
+  font-size: 38px;
+  line-height: 1;
+}
+
+.grilla {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 48px;
-  max-width: 1200px;
-  margin: 0 auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tg-space-6);
+  align-items: start;
 }
 
-@media (max-width: 900px) {
-  .benefitsGrid {
-    grid-template-columns: 1fr;
-    gap: 40px;
-  }
+.esqueleto {
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tg-space-3);
+  padding-bottom: var(--tg-space-5);
+  background-color: var(--tg-color-surface);
+  border: 1px solid var(--tg-color-border);
+  border-top: 3px solid var(--tg-color-border);
 }
 
-.benefitCard {
-  text-align: left;
-  padding: 0;
-  background: white;
-}
-
-.benefitCard:hover {
-  transform: none;
-  border-color: transparent;
-  box-shadow: none;
-}
-
-/* Grid Icon - 9 cuadrados */
-.benefitIconGrid {
-  margin-bottom: 24px;
-}
-
-.gridIcon {
-  display: grid;
-  grid-template-columns: repeat(3, 24px);
-  gap: 6px;
-  width: fit-content;
-}
-
-.gridIcon span {
-  width: 24px;
-  height: 24px;
-  background: var(--tg-color-brand);
-  border-radius: var(--tg-radius-md);
-}
-
-.benefitCard h3 {
-  font-size: 20px;
-  font-weight: 700;
-  margin-bottom: 16px;
-  color: var(--tg-color-info);
-  letter-spacing: 1px;
-}
-
-.benefitCard p {
-  font-size: 15px;
-  color: var(--tg-color-text-secondary);
-  line-height: 1.7;
-  margin: 0;
-}
-
-/* Botón de Servicios */
-.servicesButtonWrapper {
-  text-align: center;
-  margin-top: 48px;
-}
-
-.servicesButton {
-  background: var(--tg-color-brand);
-  color: white;
-  border: none;
-  padding: 16px 40px;
-  font-size: 18px;
-  font-weight: 600;
-  border-radius: var(--tg-radius-sm);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: var(--tg-shadow-none);
-}
-
-.servicesButton:hover {
-  box-shadow: var(--tg-shadow-none);
-}
-
-/* CTA Section */
-.ctaSection {
-  background: var(--tg-color-brand);
-  color: white;
-  padding: 64px 24px;
-  text-align: center;
-}
-
-.ctaSection h2 {
-  font-size: 32px;
-  font-weight: 700;
-  margin-bottom: 16px;
-}
-
-.ctaSection p {
-  font-size: 18px;
-  margin-bottom: 32px;
-}
-
-.secondaryButton {
-  background-color: white;
-  color: var(--tg-color-brand);
-  border: none;
-  padding: 14px 28px;
-  font-size: 16px;
-  font-weight: 600;
-  border-radius: var(--tg-radius-lg);
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.secondaryButton:hover {
+.esqueletoFoto {
+  aspect-ratio: 4 / 3;
   background-color: var(--tg-color-surface-muted);
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .heroTitle {
-    font-size: 36px;
+.esqueletoLinea {
+  height: 14px;
+  margin-inline: var(--tg-space-5);
+  background-color: var(--tg-color-surface-muted);
+}
+
+.esqueletoCorta {
+  width: 55%;
+}
+
+/* Vacío y error comparten forma y no se confunden entre sí: uno dice que no
+   hay nada publicado, el otro dice que no pudimos preguntar. */
+.aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tg-space-4);
+  padding: var(--tg-space-6);
+  background-color: var(--tg-color-surface);
+  border: 1px solid var(--tg-color-border);
+}
+
+.aviso p {
+  margin: 0;
+  font-weight: 560;
+}
+
+/* --- Qué mirar antes de avanzar ------------------------------------------ */
+.decision {
+  padding-block: var(--tg-space-12);
+  background-color: var(--tg-color-surface);
+  border-block: 1px solid var(--tg-color-border);
+}
+
+.decisionGrilla {
+  display: grid;
+  grid-template-columns: 1.1fr repeat(3, 1fr);
+}
+
+.decisionIntro {
+  padding-right: var(--tg-space-10);
+}
+
+.decisionIntro h2 {
+  margin-top: var(--tg-space-1);
+  font-size: 38px;
+  line-height: 1;
+}
+
+.decisionItem {
+  padding: var(--tg-space-1) var(--tg-space-6);
+  border-left: 1px solid var(--tg-color-border);
+}
+
+.decisionItem strong {
+  display: block;
+  margin-bottom: var(--tg-space-2);
+  font-size: 15px;
+}
+
+.decisionItem p {
+  margin: 0;
+  color: var(--tg-color-text-secondary);
+  font-size: 14px;
+}
+
+/* --- Cierre comercial ---------------------------------------------------- */
+.cta {
+  padding-block: var(--tg-space-16);
+}
+
+.ctaInterior {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--tg-space-8);
+  padding-top: var(--tg-space-8);
+  border-top: 4px solid var(--tg-color-action);
+}
+
+.ctaInterior h2 {
+  font-size: 38px;
+}
+
+.ctaInterior p {
+  margin-top: var(--tg-space-2);
+  color: var(--tg-color-text-secondary);
+}
+
+@media (max-width: 1023px) {
+  /* La foto pasa arriba y el copy debajo, y el orden del DOM acompaña: no se
+     usa `order` para contradecir la tabulación. */
+  .hero {
+    display: flex;
+    flex-direction: column-reverse;
+    min-height: 0;
   }
 
-  .heroSubtitle {
+  .heroCopy {
+    padding: var(--tg-space-8) var(--tg-gutter-tablet);
+  }
+
+  .heroFoto {
+    height: 330px;
+    min-height: 330px;
+    border-left: 0;
+    border-bottom: 5px solid var(--tg-color-action);
+  }
+
+  .taxonomiaGrilla {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .taxonomiaItem {
+    min-height: 104px;
+    border-bottom: 1px solid var(--tg-color-border);
+  }
+
+  .grilla {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .decisionGrilla {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--tg-space-6) 0;
+  }
+
+  .decisionIntro {
+    padding-right: var(--tg-space-6);
+  }
+}
+
+@media (max-width: 599px) {
+  /* En celular el copy va primero: es lo que responde qué es esto. */
+  .hero {
+    flex-direction: column;
+  }
+
+  .heroCopy {
+    padding: var(--tg-space-6) var(--tg-gutter-mobile);
+    gap: var(--tg-space-3);
+  }
+
+  .heroTitulo {
+    font-size: 39px;
+  }
+
+  .heroFoto {
+    height: 205px;
+    min-height: 205px;
+    border-left: 0;
+    border-top: 5px solid var(--tg-color-action);
+    border-bottom: 0;
+  }
+
+  .conteo {
+    display: none;
+  }
+
+  .taxonomiaItem {
+    min-height: 98px;
+    padding: var(--tg-space-4) var(--tg-space-3);
+  }
+
+  .taxonomiaItem strong {
     font-size: 20px;
   }
 
-  .heroDescription {
-    font-size: 16px;
+  .taxonomiaItem span {
+    font-size: 11px;
   }
 
-  .sectionTitle {
-    font-size: 28px;
+  .operaciones {
+    padding-block: var(--tg-space-6) var(--tg-space-10);
   }
 
-  .categoriesGrid {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 16px;
+  .encabezadoDeSeccion {
+    align-items: start;
   }
 
-  .benefitsGrid {
-    grid-template-columns: 1fr;
-    gap: 24px;
+  .encabezadoDeSeccion h2 {
+    font-size: 30px;
+  }
+
+  .grilla {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .decision {
+    padding-block: var(--tg-space-8);
+  }
+
+  .decisionGrilla {
+    display: block;
+  }
+
+  .decisionIntro {
+    padding: 0 0 var(--tg-space-5);
+  }
+
+  .decisionIntro h2 {
+    font-size: 31px;
+  }
+
+  .decisionItem {
+    padding: var(--tg-space-4) 0;
+    border-left: 0;
+    border-top: 1px solid var(--tg-color-border);
+  }
+
+  .cta {
+    padding-block: var(--tg-space-10);
+  }
+
+  .ctaInterior {
+    display: block;
+  }
+
+  .ctaInterior h2 {
+    font-size: 31px;
+  }
+
+  .ctaInterior .acciones {
+    margin-top: var(--tg-space-5);
   }
 }

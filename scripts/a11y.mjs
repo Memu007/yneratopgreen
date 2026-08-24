@@ -146,7 +146,7 @@ const pestaniaActiva = (page, nombre) => page
 async function publicas(page, medida) {
   await page.goto(WEB, { waitUntil: 'domcontentloaded' });
   await revisar(page, 'inicio', medida,
-    page.getByRole('heading', { name: /Bienvenido a/ }));
+    page.getByRole('heading', { name: /seguir produciendo/ }));
 
   await page.getByRole('button', { name: 'Ingresar' }).first().click();
   await revisar(page, 'ingreso', medida,
@@ -212,7 +212,7 @@ async function publicas(page, medida) {
 
   await page.getByRole('button', { name: 'Servicios', exact: true }).first().click();
   await revisar(page, 'servicios', medida,
-    page.getByRole('heading', { name: 'Servicios', level: 1 }));
+    page.getByRole('heading', { name: /resuelve el trabajo/, level: 1 }));
 
   await page.getByRole('button', { name: 'Contacto', exact: true }).first().click();
   await revisar(page, 'contacto', medida,
