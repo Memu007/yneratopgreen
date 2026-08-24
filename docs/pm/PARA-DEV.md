@@ -3530,3 +3530,14 @@ excluida expresamente, pero debe resolverse antes de que el catálogo supere 100
 resultados por filtro.
 
 No tenés tarea activa. No despliegues: falta la revisión visual final de Emi.
+
+## 2026-08-24 — Puerta visual de Emi: rechazada; Dev continúa pausada
+
+Emi revisó UX-2C localmente. La arquitectura y la implementación técnica se
+conservan, pero la identidad crema + rojo óxido + serif dominante se percibe
+como un diario, no como un marketplace agro. Ver
+`diseno-premium/DEVOLUCION-EMI-UX2C.md`.
+
+No cambies producto, no pruebes paletas y no despliegues. Diseño debe resolver
+color, escala tipográfica y señalética sobre la estructura existente, y Emi
+debe aprobar la comparación antes de una nueva tarea Dev.

@@ -194,7 +194,8 @@ el entorno aislado previsto por el repositorio y sin arriesgar datos.
 - [x] Informe en `docs/pm/PARA-PM.md` y commits auditables.
 - [x] Revisión PM: código `cae6855`–`35eaf30`, aceptado técnicamente el
   2026-08-24; build, lint, sintaxis y checks estáticos reproducidos.
-- [ ] Revisión visual final de Emi.
+- [ ] Revisión visual final de Emi: **rechazada el 2026-08-24**; ver
+  `../diseno-premium/DEVOLUCION-EMI-UX2C.md`.
 
 ## Diferencias intencionales
 
