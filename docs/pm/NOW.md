@@ -125,6 +125,13 @@ Actualizado: 2026-08-24.
   implementación y vuelve sólo color/tipografía/señalética a Diseño; Dev queda
   pausada y no se despliega. Paginación y conteo visible >100 quedan registrados
   en `ux2c/DEUDA-PAGINACION.md`, fuera de este cierre.
+- **Prueba Ox Alpha autorizada:** antes de volver a la diseñadora o a Dev, Ox
+  debe demostrar criterio sobre un alcance mínimo. El contrato está en
+  `diseno-premium/PRUEBA-OX-ALPHA.md`: tres variantes navegables A/B/C del mismo
+  primer viewport real de Inicio, usando copy/foto/acciones existentes y sin
+  tocar `src/`, producto o despliegue. La puerta visual se evalúa en navegador
+  con Emi; si ninguna variante evita diario, banco, SaaS IA y eco genérico, se
+  detiene sin ampliar al resto del sitio.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
