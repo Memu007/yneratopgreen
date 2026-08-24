@@ -36,18 +36,24 @@
 
   /* Color por rol. El nombre dice para qué sirve, no de qué color es: así un
      ajuste de paleta no obliga a renombrar medio producto. */
-  --tg-color-canvas: #f8f7f3;
+  /* Extension comercial A - Mercado a cielo abierto (2026-08-23).
+     El canvas se entibia, la accion pasa a rojo oxido y el link comercial
+     acompana. El indigo no desaparece: sigue siendo marca, texto, pie y
+     estructura, pero deja de ser la masa de las pantallas publicas. Los
+     valores y sus contrastes medidos estan en
+     docs/pm/diseno-premium/extension-comercial/TOKENS-Y-CONTRASTE.md. */
+  --tg-color-canvas: #f4f1ea;
   --tg-color-surface: #ffffff;
-  --tg-color-surface-subtle: #e8ecf4;
-  --tg-color-surface-muted: #f0f1f3;
+  --tg-color-surface-subtle: #e7ecef;
+  --tg-color-surface-muted: #eeece6;
   --tg-color-text: #17213d;
-  --tg-color-text-secondary: #596174;
+  --tg-color-text-secondary: #566074;
   --tg-color-text-inverse: #ffffff;
   --tg-color-brand: #17213d;
   --tg-color-accent: #b93424;
-  --tg-color-link: #1d4e89;
-  --tg-color-action: #17213d;
-  --tg-color-action-hover: #243057;
+  --tg-color-link: #8f281d;
+  --tg-color-action: #b93424;
+  --tg-color-action-hover: #8f281d;
   --tg-color-selection: #e8ecf4;
   --tg-color-selection-border: #17213d;
   --tg-color-success: #1f6b4f;
@@ -58,14 +64,14 @@
   --tg-color-error-bg: #f8e7e5;
   --tg-color-info: #1d4e89;
   --tg-color-info-bg: #e7eef8;
-  --tg-color-border: #cfd3dc;
+  --tg-color-border: #cbd1d8;
   --tg-color-border-control: #7c8494;
   --tg-color-focus: #b93424;
   /* Los deshabilitados llevan color explícito y no opacidad heredada: la
      opacidad apila, y un control deshabilitado adentro de un bloque atenuado
      termina ilegible sin que nadie lo haya decidido. */
   --tg-color-disabled-bg: #e5e7ec;
-  --tg-color-disabled-text: #777d8b;
+  --tg-color-disabled-text: #6c7280;
   --tg-color-overlay: rgba(23, 33, 61, 0.72);
 
   /* Espaciado base 4 */
