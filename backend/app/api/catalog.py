@@ -212,6 +212,11 @@ def get_products(
     max_price: Optional[float] = Query(None, ge=0, description="Precio máximo"),
     in_stock: Optional[bool] = Query(None, description="Solo productos con stock"),
     seller_id: Optional[str] = Query(None, description="Filtrar por vendedor"),
+    publication_type: Optional[str] = Query(
+        None,
+        regex="^(producto|servicio)$",
+        description="Filtrar por tipo de publicacion: producto o servicio",
+    ),
     province: Optional[str] = Query(None, description="Filtrar por provincia (nombre canónico del padrón Georef)"),
     locality_id: Optional[str] = Query(None, description="Filtrar por localidad (ID del padrón Georef)"),
     sort_by: str = Query("created_at", regex="^(created_at|price|sales|views)$"),
@@ -228,6 +233,7 @@ def get_products(
     - min_price/max_price: Rango de precios
     - in_stock: Solo con stock disponible
     - seller_id: Productos de un vendedor específico
+    - publication_type: producto o servicio
     - province: Nombre canónico de la provincia (ej: "Buenos Aires")
     - locality_id: ID de localidad del padrón Georef (ej: "06063010")
     
@@ -300,6 +306,20 @@ def get_products(
     
     if seller_id:
         query = query.filter(Product.seller_id == seller_id)
+
+    # Producto o servicio, decidido en la base y no en el navegador.
+    #
+    # Sin esto, quien quiere ver servicios tiene que bajar una pagina del
+    # catalogo entero y filtrarla del otro lado: si las cien publicaciones mas
+    # nuevas son productos, la pantalla dice que no hay servicios aunque
+    # existan. El filtro va acá arriba, entre los demas, para que el `total`
+    # que se cuenta abajo sea el del conjunto pedido.
+    #
+    # `publication_type` no puede contradecir a `categories.is_service` -el
+    # alta y la edicion rechazan las tres combinaciones cruzadas-, asi que
+    # filtrar por uno u otro devuelve exactamente lo mismo.
+    if publication_type:
+        query = query.filter(Product.publication_type == publication_type)
     
     # Filtro por provincia — subconsulta sobre localities, match exacto
     if province:

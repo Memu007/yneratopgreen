@@ -166,6 +166,10 @@ export const getProducts = async (params: {
   max_price?: number;
   in_stock?: boolean;
   seller_id?: string;
+  /** Producto o servicio, filtrado en la base. Sin esto hay que bajar una
+      página del catálogo entero y filtrarla acá, que sólo funciona mientras el
+      catálogo entre en una página. */
+  publication_type?: 'producto' | 'servicio';
   sort_by?: 'created_at' | 'price' | 'sales' | 'views';
   sort_order?: 'asc' | 'desc';
   page?: number;

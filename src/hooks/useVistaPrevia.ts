@@ -15,11 +15,10 @@ export interface VistaPrevia {
   /** Hasta `cantidad` publicaciones, en el orden en que las devolvió la API. */
   operaciones: Product[];
   /**
-   * Cuántas hay en total según la API.
+   * Cuántas hay en total según la API, para el conjunto pedido.
    *
-   * Es `null` cuando la vista filtró del lado del navegador —el caso de
-   * servicios—, porque ahí el total de la respuesta cuenta el catálogo entero
-   * y usarlo diría «12 servicios» sobre un número que no son servicios.
+   * Cuando la vista pide sólo servicios, el endpoint filtra antes de contar,
+   * así que este número son servicios y no el catálogo entero.
    */
   total: number | null;
   cargando: boolean;
@@ -28,9 +27,6 @@ export interface VistaPrevia {
 }
 
 const SIN_CONEXION = 'Sin conexión. Revisá tu red e intentá de nuevo.';
-
-/** Lo que se pide cuando hay que filtrar por dominio del lado del navegador. */
-const PAGINA_PARA_FILTRAR = 100;
 
 export function useVistaPrevia({
   activa,
@@ -59,29 +55,32 @@ export function useVistaPrevia({
     setCargando(true);
     setError(null);
 
-    // Servicios y logística no tienen filtro propio en la API: se pide el
-    // catálogo canónico y se filtra por la misma regla de dominio que usa todo
-    // el producto —`operationKind`—, nunca por título ni por precio.
+    // El filtro por tipo lo hace la base, antes de contar y de paginar.
+    //
+    // Antes esto pedía las cien publicaciones más nuevas y las filtraba acá.
+    // Andaba con treinta filas y mentía con mil: si las cien más nuevas eran
+    // productos, la pantalla decía que no hay servicios publicados. Lo
+    // encontró PM leyendo el código, no la suite, porque el seed no llega a
+    // cien.
     getProducts({
       page: 1,
-      page_size: soloServicios ? PAGINA_PARA_FILTRAR : cantidad,
+      page_size: cantidad,
+      publication_type: soloServicios ? 'servicio' : undefined,
       sort_by: 'created_at',
       sort_order: 'desc',
     })
       .then((respuesta) => {
         if (cancelado) return;
         const publicaciones = respuesta.items.map(convertBackendProductToFrontend);
-        if (soloServicios) {
-          setOperaciones(
-            publicaciones
-              .filter((publicacion) => esDeServicio(normalizarAnatomia(publicacion.operationKind)))
-              .slice(0, cantidad),
-          );
-          setTotal(null);
-        } else {
-          setOperaciones(publicaciones.slice(0, cantidad));
-          setTotal(respuesta.total);
-        }
+        // La defensa de dominio se conserva aunque el servidor ya filtró: si
+        // alguna vez volviera una publicación que no es de servicio, la
+        // pantalla no la muestra como si lo fuera.
+        const visibles = soloServicios
+          ? publicaciones.filter((publicacion) =>
+              esDeServicio(normalizarAnatomia(publicacion.operationKind)))
+          : publicaciones;
+        setOperaciones(visibles.slice(0, cantidad));
+        setTotal(respuesta.total);
       })
       .catch((fallo) => {
         if (cancelado) return;

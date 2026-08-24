@@ -187,6 +187,16 @@ function App() {
         max_price:
           priceMax === Number.MAX_SAFE_INTEGER ? undefined : priceMax,
         in_stock: inStockOnly || undefined,
+        // El tipo de operacion viaja a la consulta, no se filtra despues.
+        //
+        // La pagina baja como maximo cien publicaciones. Con el filtro del
+        // lado del navegador, pedir «servicios» miraba las cien mas nuevas y
+        // se quedaba con las que fueran servicio: si ninguna lo era, el
+        // mercado decia que no hay, aunque hubiera doscientas mas atras.
+        publication_type:
+          selectedType === 'productos' ? 'producto'
+            : selectedType === 'servicios' ? 'servicio'
+              : undefined,
         page: 1,
         page_size: 100,
         sort_by: 'created_at',
@@ -222,6 +232,9 @@ function App() {
   }, [
     currentSection,
     searchQuery,
+    // `selectedType` es dependencia de verdad desde que viaja a la consulta:
+    // sin esto, cambiar de productos a servicios no volvia a pedir nada.
+    selectedType,
     selectedCategory,
     selectedProvince,
     selectedProvinceId,

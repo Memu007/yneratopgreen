@@ -12356,6 +12356,137 @@ await runCase(125, 'Servicios muestra publicaciones reales de servicio y logíst
     + 'servicios o logística de la base y no ganan foto; «Ver servicios publicados» deja el '
     + 'filtro puesto y el error tiene su propio texto';
 });
+
+await runCase(126, 'Con más de cien publicaciones nuevas encima, los servicios siguen apareciendo', async () => {
+  // El borde que encontró PM leyendo el código: la vista previa de Servicios y
+  // el filtro del Mercado bajaban una página de cien publicaciones y filtraban
+  // del lado del navegador. Con treinta filas anda; con mil miente. Este caso
+  // fabrica el escenario que el seed no puede: un servicio tapado por ciento
+  // una publicaciones más nuevas.
+  const vendedor = (await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  })).data.access_token;
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const [categoriaDeServicio] = queryRows(
+    "SELECT id, 'fin' FROM categories WHERE slug = 'asesoramiento'");
+  const [categoriaDeProducto] = queryRows(
+    "SELECT id, 'fin' FROM categories WHERE is_service = false ORDER BY name LIMIT 1");
+  assert(categoriaDeServicio && categoriaDeProducto, 'faltan las categorías del caso');
+
+  const marca = Date.now();
+  const servicioTapado = `Smoke servicio tapado ${marca}`;
+  await apiRequest('/products', {
+    method: 'POST', token: vendedor,
+    body: {
+      name: servicioTapado,
+      description: 'Servicio publicado antes de la avalancha de productos nuevos.',
+      category_id: categoriaDeServicio[0],
+      price: 45000,
+      unit: 'hectárea',
+      locality_id: localidad,
+      publication_type: 'servicio',
+      operation_kind: 'servicio',
+      pricing_type: 'por_hectarea',
+    },
+  });
+
+  // Ciento una publicaciones más nuevas. Es una más que la página que el
+  // mercado descarga: con cien exactas el defecto viejo podía sobrevivir.
+  const TAPA = 101;
+  for (let i = 0; i < TAPA; i += 1) {
+    await apiRequest('/products', {
+      method: 'POST', token: vendedor,
+      body: {
+        name: `Smoke tapa ${marca}-${String(i).padStart(3, '0')}`,
+        description: 'Publicación de producto creada para tapar al servicio anterior.',
+        category_id: categoriaDeProducto[0],
+        price: 1000 + i,
+        stock: 5,
+        unit: 'unidad',
+        locality_id: localidad,
+        publication_type: 'producto',
+        operation_kind: 'insumo',
+      },
+    });
+  }
+
+  const [posicion] = queryRows(`
+    SELECT COUNT(*)::text, 'fin' FROM products
+    WHERE status = 'ACTIVE' AND created_at > (
+      SELECT created_at FROM products WHERE name = ${sqlLiteral(servicioTapado)}
+    )
+  `);
+  assert(Number(posicion[0]) > 100,
+    `el servicio quedó a ${posicion[0]} publicaciones del frente y el caso necesita más de 100`);
+
+  // 1. El endpoint filtra en la base: lo que devuelve son servicios, y el
+  //    total es el del conjunto pedido y no el del catálogo entero.
+  const filtrado = await apiRequest('/catalog/products?publication_type=servicio&page_size=3');
+  assert(filtrado.status === 200, `el filtro por tipo respondió HTTP ${filtrado.status}`);
+  assert(filtrado.data.items.length > 0, 'el filtro por tipo no devolvió ninguna publicación');
+  // La respuesta pública no publica `publication_type` —y no se lo agrego por
+  // una prueba—, así que se comprueba por la anatomía, que es la misma regla:
+  // un `servicio` sólo puede ser `servicio` o `logistica`, y el alta rechaza
+  // cualquier cruce entre las dos columnas.
+  assert(filtrado.data.items.every((item) => ['servicio', 'logistica'].includes(item.operation_kind)),
+    `el filtro por tipo devolvió publicaciones que no son de servicio: ${
+      filtrado.data.items.map((item) => item.operation_kind).join(', ')}`);
+  assert(filtrado.data.items[0].name === servicioTapado,
+    `el servicio más nuevo no encabeza el filtro: ${filtrado.data.items[0].name}`);
+
+  const [enBase] = queryRows(`
+    SELECT COUNT(*)::text, 'fin' FROM products p JOIN categories c ON c.id = p.category_id
+    WHERE p.status = 'ACTIVE' AND p.publication_type = 'servicio'
+  `);
+  const [todas] = queryRows(
+    "SELECT COUNT(*)::text, 'fin' FROM products WHERE status = 'ACTIVE'");
+  assert(String(filtrado.data.total) === enBase[0],
+    `el total del endpoint filtrado dice ${filtrado.data.total} y en la base hay ${enBase[0]} servicios`);
+  assert(filtrado.data.total !== Number(todas[0]),
+    'el total filtrado es igual al del catálogo entero: no filtró antes de contar');
+
+  // 2. Un valor inventado no pasa: el parámetro está validado.
+  const invalido = await expectApiError(422, () =>
+    apiRequest('/catalog/products?publication_type=cualquiera'));
+  assert(/publication_type/.test(invalido),
+    `el rechazo del tipo inválido no dice de qué parámetro habla: ${invalido}`);
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext();
+    const page = await contexto.newPage();
+
+    // 3. La vista previa de Servicios lo encuentra, tapado y todo.
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Servicios', exact: true }).first().click();
+    await page.getByRole('heading', { name: /resuelve el trabajo/, level: 1 }).waitFor({ timeout: 20_000 });
+    await page.locator('article[class*="card"]').first().waitFor({ timeout: 20_000 });
+    await page.getByRole('heading', { name: servicioTapado, exact: true, level: 3 })
+      .waitFor({ state: 'visible', timeout: 20_000 });
+
+    // 4. Y el Mercado filtrado por servicios, también.
+    await page.getByRole('button', { name: /Ver servicios publicados/ }).first().click();
+    await page.locator('#catalog-type').waitFor({ state: 'attached', timeout: 25_000 });
+    const tipo = await page.locator('#catalog-type').inputValue();
+    assert(tipo === 'servicios', `el filtro del mercado quedó en «${tipo}»`);
+    await page.getByRole('heading', { name: servicioTapado, exact: true, level: 3 })
+      .waitFor({ state: 'visible', timeout: 25_000 });
+
+    const conteo = await page.locator('[class*="_conteo_"]').first().innerText();
+    const mostradas = Number((conteo.match(/\d+/) || ['0'])[0]);
+    assert(mostradas > 0 && mostradas <= Number(enBase[0]),
+      `el mercado filtrado dice «${conteo}» y en la base hay ${enBase[0]} servicios`);
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+  }
+
+  return `con ${posicion[0]} publicaciones más nuevas encima, el endpoint filtrado devuelve `
+    + `sólo servicios y cuenta ${filtrado.data.total} de ${todas[0]} publicaciones activas; `
+    + 'un tipo inválido da 422; y tanto la vista previa de Servicios como el Mercado '
+    + 'filtrado encuentran el servicio tapado';
+});
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

@@ -204,3 +204,28 @@ el entorno aislado previsto por el repositorio y sin arriesgar datos.
 | 4 | Los originales sin uso salieron de `public/`. | «Los JPG originales con EXIF/GPS no se sirven» es criterio de aceptación, y todo lo que vive en `public/` se publica. Se movieron a `docs/pm/originales/`, no se borraron. | dev, 2026-08-24 |
 | 5 | `.tg-container` pasa a usar los tres gutters —48, 32 y 20— en vez del de escritorio siempre. | Estaba en los tokens desde el primer handoff y el contenedor no lo aplicaba: en 390 px dejaba 294 px útiles y la cabecera se partía en tres líneas. | dev, 2026-08-24 |
 | 6 | El hero de Inicio en celular muestra el copy primero y la foto después; en tablet, la foto primero. | Es lo que pide `RESPONSIVE.md` para cada ancho, resuelto con `flex-direction` y no con `order`, para que la lectura accesible siga al DOM. | dev, 2026-08-24 |
+
+## Corrección del borde de escala (2026-08-24)
+
+PM no aceptó el cierre por un borde que el seed de 30 filas no puede detectar:
+la vista previa de Servicios pedía cien publicaciones y filtraba en el
+navegador, y el mercado hacía lo mismo con `selectedType`. Con más de cien
+publicaciones nuevas encima, los dos afirmaban que no había servicios.
+
+- [x] `GET /api/catalog/products` acepta `publication_type` (`producto` o
+  `servicio`), validado por patrón y aplicado **antes** del conteo y de la
+  paginación. Sin migración ni cambio de esquema.
+- [x] `getProducts` expone el parámetro.
+- [x] La vista previa de Servicios pide `publication_type=servicio` y sólo tres
+  publicaciones; ya no descarga cien. La defensa de dominio del frontend se
+  conserva.
+- [x] El mercado manda el filtro cuando el tipo es `productos` o `servicios`, y
+  `selectedType` pasó a ser dependencia del efecto: antes cambiar de tipo no
+  volvía a pedir nada.
+- [x] **Caso 126**: publica un servicio, lo tapa con 101 publicaciones más
+  nuevas y exige que el endpoint filtrado devuelva sólo servicios, que su total
+  sea el filtrado y no el del catálogo, que un tipo inválido dé 422, y que
+  tanto la vista previa como el mercado filtrado encuentren el servicio
+  tapado. Sin el filtro en la base, el caso se cae.
+- [x] La deuda de paginación queda registrada aparte, en
+  `DEUDA-PAGINACION.md`.
