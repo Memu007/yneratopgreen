@@ -380,6 +380,18 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
   padding-inline: var(--tg-gutter-desktop);
 }
 
+/* El margen lateral se achica con la pantalla. Los tres valores estan en los
+   tokens desde el primer handoff -48, 32 y 20- pero el contenedor usaba
+   siempre el de escritorio: en 390 px eso dejaba 294 px utiles y la cabecera
+   se partia en tres lineas. */
+@media (max-width: 1023px) {
+  .tg-container { padding-inline: var(--tg-gutter-tablet); }
+}
+
+@media (max-width: 599px) {
+  .tg-container { padding-inline: var(--tg-gutter-mobile); }
+}
+
 .tg-eyebrow {
   font-size: 12px;
   line-height: 1.25;

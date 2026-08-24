@@ -5412,7 +5412,11 @@ await runCase(54, 'Cada participante ve lo suyo y el transportista sólo su nece
       await page.getByRole('heading', { name: 'Mis Operaciones' })
         .waitFor({ state: 'visible', timeout: 15_000 });
       await page.getByText(/Operación #/).first().waitFor({ state: 'visible', timeout: 15_000 });
-      const visto = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
+      // Lo que se mide es el panel, no la pagina que quedo atras: la portada
+      // muestra operaciones reales con su precio y su localidad, y leer `body`
+      // mezclaba esa vitrina con lo que el transportista ve de su operacion.
+      const panel = page.locator('[class*="overlay"]').first();
+      const visto = ((await panel.textContent()) || '').replace(/\s+/g, ' ');
       assert(visto.includes('Pergamino'), 'el panel no muestra el destino');
       assert(!/\$\s?\d/.test(visto), `el panel del transportista muestra importes: "${visto.slice(0, 200)}"`);
       for (const prohibido of ['CBU', 'Alias', 'comprobante', '@example.com']) {
@@ -5659,7 +5663,11 @@ await runCase(57, 'El origen de una operación es el del momento de la compra', 
       .waitFor({ state: 'visible', timeout: 15_000 });
     await page.getByRole('button', { name: /Mis Operaciones/ }).click();
     await page.getByText(/Operación #/).first().waitFor({ state: 'visible', timeout: 15_000 });
-    const visto = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
+    // Lo que se mide es el panel, no la pagina que quedo atras: la portada
+    // muestra operaciones reales con su precio y su localidad, y leer `body`
+    // mezclaba esa vitrina con lo que el transportista ve de su operacion.
+    const panel = page.locator('[class*="overlay"]').first();
+    const visto = ((await panel.textContent()) || '').replace(/\s+/g, ' ');
     assert(visto.includes(origenDeLaCompra.nombre),
       `la pantalla no muestra el origen de la compra (${origenDeLaCompra.nombre})`);
     assert(!visto.includes(origenPosterior.nombre),
@@ -12024,9 +12032,19 @@ await runCase(123, 'Al 200 % de zoom las cinco pantallas siguen siendo usables',
   };
 
   try {
-    // 1. Catálogo y 2. detalle y 3. ingreso, sin sesión.
+    // 1. Las dos superficies comerciales, 2. catálogo, 3. detalle y 4. ingreso,
+    //    sin sesión.
     const anonimo = await browser.newContext({ viewport: { width: ANCHO, height: ALTO } });
     const publica = await anonimo.newPage();
+
+    await publica.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await publica.getByRole('heading', { name: /seguir produciendo/, level: 1 }).waitFor({ timeout: 20_000 });
+    await medir(publica, 'inicio', publica.getByRole('button', { name: 'Explorar operaciones' }));
+
+    await publica.getByRole('button', { name: 'Servicios', exact: true }).first().click();
+    await publica.getByRole('heading', { name: /resuelve el trabajo/, level: 1 }).waitFor({ timeout: 20_000 });
+    await medir(publica, 'servicios', publica.getByRole('button', { name: 'Ver servicios publicados' }));
+
     await publica.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await publica.locator('article').first().waitFor({ timeout: 20_000 });
     await medir(publica, 'catálogo', publica.getByRole('button', { name: /Agregar|Iniciar operación|Contratar|Solicitar cotización|Sin stock/ }));
@@ -12090,9 +12108,253 @@ await runCase(123, 'Al 200 % de zoom las cinco pantallas siguen siendo usables',
     await browser.close();
   }
 
-  return `640x360 —equivalente a 1280x720 al 200 %— en catálogo, detalle, ingreso, `
-    + `carrito, checkout y panel: sin corte horizontal (${medidas.join('; ')}), `
+  return `640x360 —equivalente a 1280x720 al 200 %— en inicio, servicios, catálogo, `
+    + `detalle, ingreso, carrito, checkout y panel: sin corte horizontal (${medidas.join('; ')}), `
     + 'acción principal visible, habilitada y dentro del ancho, y foco de teclado visible';
+});
+
+await runCase(124, 'Inicio muestra operaciones reales, con el total de la API y sin claims', async () => {
+  // La portada era una placa índigo con «Bienvenido a TopGreen», tres
+  // beneficios con iconos y tres claims —inteligencia artificial, mecanización
+  // y confianza respaldada por alianzas— que el producto no demuestra.
+  const CLAIMS = [
+    /Bienvenido a TopGreen/i,
+    /inteligencia artificial/i,
+    /MECANIZACIÓN/,
+    /CONFIANZA/,
+    /alianzas/i,
+    /destacad/i,
+  ];
+
+  const catalogo = await apiRequest('/catalog/products?page=1&page_size=1');
+  const total = catalogo.data.total;
+  assert(typeof total === 'number' && total > 0, `la API no devolvió un total usable: ${total}`);
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    const pedidos = [];
+    page.on('request', (r) => pedidos.push(r.url()));
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('heading', { name: /seguir produciendo/, level: 1 }).waitFor({ timeout: 20_000 });
+
+    const texto = await page.locator('main, body').first().innerText();
+    for (const claim of CLAIMS) {
+      assert(!claim.test(texto), `la portada sigue diciendo ${claim}: ${JSON.stringify(texto.slice(0, 400))}`);
+    }
+
+    // 1. El conteo es el de la API, no un número escrito a mano.
+    const conteo = await page.getByText(/operaci(ón|ones) disponibles? ahora/).innerText();
+    assert(conteo.includes(String(total)),
+      `el conteo dice «${conteo}» y la API informa ${total}`);
+
+    // 2. Hasta tres publicaciones, y son publicaciones que existen en la base.
+    //    Se espera a la primera: mientras la vista previa carga hay esqueletos,
+    //    y contar en ese momento mediria el esqueleto y no el resultado.
+    const tarjetas = page.locator('article[class*="card"]');
+    await tarjetas.first().waitFor({ state: 'visible', timeout: 20_000 });
+    const cuantas = await tarjetas.count();
+    assert(cuantas > 0 && cuantas <= 3, `la vista previa muestra ${cuantas} operaciones`);
+    for (let i = 0; i < cuantas; i += 1) {
+      const titulo = (await tarjetas.nth(i).getByRole('heading', { level: 3 }).innerText()).trim();
+      const [fila] = queryRows(`
+        SELECT COUNT(*)::text, 'fin' FROM products WHERE name = ${sqlLiteral(titulo)} AND status = 'ACTIVE'
+      `);
+      assert(fila[0] !== '0', `«${titulo}» no es una publicación activa de la base`);
+    }
+
+    // 3. La fotografía del hero es uno de los dos derivados autorizados, y no
+    //    se pidió ninguna imagen conceptual ni ningún dominio externo.
+    const heroe = await page.locator('img[src*="/media/comercial/"]').first().getAttribute('src');
+    assert(/home-cosecha-hero-(1920|1200)\.webp$/.test(heroe || ''),
+      `el hero no usa un derivado autorizado: ${heroe}`);
+    const concepto = pedidos.filter((u) => /-concepto\.webp/.test(u));
+    assert(concepto.length === 0, `se pidieron imágenes conceptuales: ${concepto.join(', ')}`);
+    const externos = pedidos.filter((u) => {
+      const host = new URL(u).hostname;
+      return host !== 'localhost' && host !== '127.0.0.1';
+    });
+    assert(externos.length === 0, `la portada pidió recursos externos: ${externos.join(', ')}`);
+
+    // 4. Sin overlay sobre la fotografía: ninguna capa encima con fondo propio.
+    const encima = await page.evaluate(() => {
+      const foto = document.querySelector('img[src*="/media/comercial/"]');
+      if (!foto) return 'sin foto';
+      const caja = foto.getBoundingClientRect();
+      const arriba = document.elementFromPoint(caja.x + caja.width / 2, caja.y + caja.height / 2);
+      if (!arriba) return 'sin elemento';
+      return arriba.tagName;
+    });
+    assert(encima === 'IMG', `hay algo encima de la fotografía del hero: ${encima}`);
+
+    // 5. El servidor se cae: se dice, se puede reintentar y no se confunde con
+    //    «todavía no hay operaciones publicadas».
+    await page.route('**/api/catalog/products*', (route) => route.fulfill({
+      status: 500, contentType: 'application/json', body: JSON.stringify({ detail: 'caída controlada' }),
+    }));
+    await page.getByRole('button', { name: 'Ver todas las operaciones' }).click();
+    await page.getByRole('button', { name: 'Inicio', exact: true }).first().click();
+    const aviso = page.getByRole('alert');
+    await aviso.waitFor({ state: 'visible', timeout: 20_000 });
+    const textoDelError = await aviso.innerText();
+    assert(/No pudimos cargar las operaciones/.test(textoDelError),
+      `el error de la portada no se explica: ${JSON.stringify(textoDelError)}`);
+    assert(!/Todavía no hay operaciones/.test(textoDelError),
+      'la falla se confunde con un catálogo vacío');
+
+    // 6. Sin red: el texto acordado, y no el general.
+    await contexto.setOffline(true);
+    await page.getByRole('button', { name: 'Reintentar' }).click();
+    await page.getByText('Sin conexión. Revisá tu red e intentá de nuevo.', { exact: true })
+      .waitFor({ state: 'visible', timeout: 20_000 });
+
+    // 7. Vuelve todo y reintentar recupera las operaciones de verdad.
+    await contexto.setOffline(false);
+    await page.unroute('**/api/catalog/products*');
+    await page.getByRole('button', { name: 'Reintentar' }).click();
+    await page.locator('article[class*="card"]').first().waitFor({ timeout: 20_000 });
+    assert(await page.getByRole('alert').count() === 0,
+      'el aviso de error quedó pegado después de recuperar las operaciones');
+
+    // 8. Un título largo no rompe la composición ni se corta con puntos
+    //    suspensivos: el nombre completo tiene que poder leerse.
+    const vendedor = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+    })).data.access_token;
+    const [categoriaLarga] = queryRows(
+      "SELECT id, 'fin' FROM categories WHERE is_service = false ORDER BY name LIMIT 1");
+    const nombreLargo = `Cabezal maicero de arrastre con sinfín reforzado, kit de cuchillas y `
+      + `repuestos originales para cosechadora de gran porte ${Date.now()}`;
+    await apiRequest('/products', {
+      method: 'POST', token: vendedor,
+      body: {
+        name: nombreLargo,
+        description: 'Publicación de prueba de texto largo en la vista previa de la portada.',
+        category_id: categoriaLarga[0],
+        price: 123456789,
+        stock: 4,
+        unit: 'unidad',
+        locality_id: localidadDelPadron('Pergamino', 'Buenos Aires'),
+        publication_type: 'producto',
+        operation_kind: 'insumo',
+      },
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    const tarjetaLarga = page
+      .getByRole('heading', { name: nombreLargo, exact: true, level: 3 });
+    await tarjetaLarga.waitFor({ state: 'visible', timeout: 20_000 });
+    const medida = await page.evaluate(() => ({
+      s: document.documentElement.scrollWidth,
+      c: document.documentElement.clientWidth,
+    }));
+    assert(medida.s <= medida.c + 1,
+      `un título largo desbordó la portada: scrollWidth=${medida.s} clientWidth=${medida.c}`);
+    const recorte = await tarjetaLarga.evaluate((el) => getComputedStyle(el).textOverflow);
+    assert(recorte !== 'ellipsis', 'el título de la operación se corta con puntos suspensivos');
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+  }
+
+  return `la portada no tiene claims ni «destacadas»; el conteo repite el total de la API (${total}), `
+    + 'las operaciones son publicaciones activas de la base, el hero usa un derivado autorizado '
+    + 'sin nada encima y sin pedidos externos, error, sin conexión y recuperación se distinguen, '
+    + 'y un título de 140 caracteres no desborda ni se corta con puntos suspensivos';
+});
+
+await runCase(125, 'Servicios muestra publicaciones reales de servicio y logística, sin video ni claims', async () => {
+  // La página describía una consultora: video con overlay índigo, cinco
+  // servicios escritos a mano y promesas de inteligencia artificial,
+  // satélites, IoT, sustentabilidad y alianzas.
+  const CLAIMS = [
+    /inteligencia artificial/i,
+    /satélit/i,
+    /Internet de las Cosas/i,
+    /IoT/,
+    /sostenibilidad|sustentabilidad/i,
+    /alianzas/i,
+  ];
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    const pedidos = [];
+    page.on('request', (r) => pedidos.push(r.url()));
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Servicios', exact: true }).first().click();
+    await page.getByRole('heading', { name: /resuelve el trabajo/, level: 1 }).waitFor({ timeout: 20_000 });
+
+    const texto = await page.locator('main, body').first().innerText();
+    for (const claim of CLAIMS) {
+      assert(!claim.test(texto), `Servicios sigue prometiendo ${claim}`);
+    }
+    assert(await page.locator('video').count() === 0, 'sigue habiendo un video en Servicios');
+
+    // 1. El hero es el derivado interino autorizado, sin ampliarlo y sin nada
+    //    encima.
+    const heroe = await page.locator('img[src*="/media/comercial/"]').first().getAttribute('src');
+    assert(/servicios-relevamiento-hero-960(-4x3)?\.webp$/.test(heroe || ''),
+      `el hero de Servicios no usa un derivado autorizado: ${heroe}`);
+    const concepto = pedidos.filter((u) => /-concepto\.webp/.test(u));
+    assert(concepto.length === 0, `se pidieron imágenes conceptuales: ${concepto.join(', ')}`);
+
+    // 2. Las publicaciones son de verdad, y son de servicio o de logística.
+    const tarjetas = page.locator('article[class*="card"]');
+    await tarjetas.first().waitFor({ state: 'visible', timeout: 20_000 });
+    const cuantas = await tarjetas.count();
+    assert(cuantas > 0 && cuantas <= 3, `Servicios muestra ${cuantas} publicaciones`);
+    for (let i = 0; i < cuantas; i += 1) {
+      const tarjeta = tarjetas.nth(i);
+      const titulo = (await tarjeta.getByRole('heading', { level: 3 }).innerText()).trim();
+      const [fila] = queryRows(`
+        SELECT p.operation_kind, c.is_service::text, 'fin' FROM products p
+        JOIN categories c ON c.id = p.category_id
+        WHERE p.name = ${sqlLiteral(titulo)} AND p.status = 'ACTIVE'
+      `);
+      assert(fila, `«${titulo}» no es una publicación activa de la base`);
+      assert(fila[0] === 'servicio' || fila[0] === 'logistica',
+        `«${titulo}» no es un servicio: la base dice «${fila[0]}»`);
+      // La tarjeta de un servicio no gana fotografía, ni siquiera el respaldo.
+      assert(await tarjeta.locator('img, [role="img"]').count() === 0,
+        `la tarjeta de «${titulo}» dibuja una imagen`);
+    }
+
+    // 3. «Ver servicios publicados» deja el filtro puesto, no sólo la URL.
+    await page.getByRole('button', { name: 'Ver servicios publicados' }).click();
+    await page.getByRole('heading', { name: 'Operaciones disponibles', level: 1 }).waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(1200);
+    const tipo = await page.locator('#catalog-type').inputValue();
+    assert(tipo === 'servicios', `el filtro de tipo quedó en «${tipo}»`);
+    const rotulos = await page.locator('article[class*="card"] .tg-eyebrow').allInnerTexts();
+    assert(rotulos.length > 0, 'el mercado filtrado no muestra ninguna operación');
+    for (const rotulo of rotulos) {
+      assert(/servicio|logística/i.test(rotulo),
+        `el mercado filtrado por servicios muestra «${rotulo}»`);
+    }
+
+    // 4. El error de Servicios tiene su propio texto.
+    await page.route('**/api/catalog/products*', (route) => route.fulfill({
+      status: 500, contentType: 'application/json', body: JSON.stringify({ detail: 'caída controlada' }),
+    }));
+    await page.getByRole('button', { name: 'Servicios', exact: true }).first().click();
+    const aviso = page.getByRole('alert');
+    await aviso.waitFor({ state: 'visible', timeout: 20_000 });
+    const textoDelError = await aviso.innerText();
+    assert(/No pudimos cargar los servicios/.test(textoDelError),
+      `el error de Servicios no se explica: ${JSON.stringify(textoDelError)}`);
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+  }
+
+  return 'Servicios no tiene video, ni lista escrita a mano, ni claims de IA, satélites, IoT o '
+    + 'sustentabilidad; el hero usa el derivado interino autorizado; las publicaciones son '
+    + 'servicios o logística de la base y no ganan foto; «Ver servicios publicados» deja el '
+    + 'filtro puesto y el error tiene su propio texto';
 });
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
