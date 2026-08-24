@@ -2,256 +2,217 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-Fecha: 2026-08-23. Vigésimo segundo informe: **UX-2B, corrección de cierre**.
+Fecha: 2026-08-24. Vigésimo tercer informe: **UX-2C, extensión comercial agro
+«A — Mercado a cielo abierto»**.
 
-Los cinco puntos corregidos, `src/data/mockData.ts` retirado, y cuatro casos de
-navegador nuevos que dejan la evidencia adentro de la suite en vez de en una
-captura. No abrí UX-3, no rediseñé nada, no toqué pagos y no desplegué.
+Tres commits de producto y este informe. Inicio y Servicios dejaron de ser una
+placa índigo con claims; el mercado quedó en la misma temperatura sin perder una
+sola función.
 
 | Commit | Qué trae |
 |---|---|
-| `177cdb2` | Los cinco puntos, `mockData.ts` afuera y los casos 120–123 |
+| `cae6855` | Fundación: tokens comerciales y los cuatro activos autorizados |
+| `dc40762` | Cabecera por contexto, Inicio, Servicios y el mercado |
+| `ddcd1ff` | Estados medidos, márgenes responsivos y evidencia |
 | este | Este informe |
 
----
-
-## 1. Integridad producto/servicio
-
-Tenías razón y era peor de lo que decía tu revisión.
-
-**Lo que faltaba.** `publication_type` decide qué guarda la fila —stock, o los
-campos de servicio— y `category.is_service` decide cómo se cobra. Nadie los
-obligaba a decir lo mismo. Se podía crear una publicación «producto» dentro de
-una categoría de servicios: la fila guardaba stock y ningún campo de servicio,
-la interfaz la leía como servicio y el cobro la trataba como servicio. Una fila
-que dice dos cosas a la vez.
-
-**Lo que hice.**
-
-- **En el alta**, las dos combinaciones cruzadas se rechazan con **mensajes
-  distintos**, uno por cada dirección: «la categoría es de servicios y esta
-  publicación es de tipo producto» y su simétrico. No se convierte nada: la
-  conversión cambiaría en silencio lo que el vendedor publicó.
-- **En la edición**, como `publication_type` no es editable, se rechaza mover la
-  categoría al otro lado, con un tercer mensaje propio. La validación corre
-  **antes** de tocar el modelo, así que la fila no muta: el caso lo comprueba
-  leyendo `category_id`, `operation_kind`, `publication_type` y `stock` antes y
-  después del rechazo y exigiendo que sean idénticos.
-- El chequeo sólo mira cuando la categoría **cambia de verdad**: una publicación
-  vieja que ya venía cruzada tiene que poder seguir editándose para corregir el
-  resto.
-- En la interfaz no hace falta nada: el campo de categoría de la edición ya está
-  deshabilitado y dice «La categoría no se puede cambiar».
-
-**Lo que apareció al medirlo.** El caso ahora exige además que **ninguna fila de
-la base** esté cruzada, y esa aserción se puso roja: había **seis**. Cinco las
-creaba la propia suite. Un ayudante de los casos monetarios elegía categoría con
-`SELECT id FROM categories ORDER BY name LIMIT 1`, que devuelve «Acopio», que es
-de servicios, y publicaba ahí un «producto» con stock. Nuestras propias pruebas
-venían fabricando el defecto que vos encontraste. El ayudante ahora filtra por
-`is_service = false`.
-
-El caso 119 quedó reescrito para **discriminar los tres rechazos**: comprueba que
-los tres mensajes existan, que digan cosas distintas y que no se confundan entre
-sí. Y una corrección a lo que te dije la vez pasada: mover una publicación de
-categoría **dentro del mismo lado** ya no adopta la anatomía de la categoría
-nueva, conserva la declarada. La categoría sólo decide la omisión de quien no
-declaró nada; pisar la declaración del vendedor sería otra forma de cambiarle la
-publicación sin avisar.
+29 archivos de producto y documentación, más 13 capturas.
 
 ---
 
-## 2. «Mis publicaciones» respeta la anatomía
+## 0. Antes de nada: el entorno se perdió y hubo que reconstruirlo
 
-**Lo que mostraba.** La tarjeta del panel imprimía siempre foto, precio con su
-propio `toLocaleString` y `Stock: N unidades`. Sobre «Muestreo de Suelo» eso era
-triple mentira: el stock de un servicio es `NULL` en la base —ese «3000» salía
-del formato, no de un dato—, la foto no existe, y el precio no pasaba por el
-formateador que dice `A cotizar`.
+El contenedor se reinició entre ciclos y se llevó todo lo que no estaba
+versionado: el repositorio clonado, PostgreSQL, PostGIS, el entorno de Python,
+`node_modules` y mis guiones locales. Reconstruí: clon nuevo —ahora en
+`/home/user/yneratopgreen`—, PostGIS instalado, base recreada, migraciones,
+seed, y el puente local que traduce el `docker exec` de las puertas a la
+instalación nativa.
 
-**Lo que hace ahora.** La anatomía manda, igual que en el catálogo:
+Una sola cosa quedó resuelta con un rodeo: **Playwright 1.62 pide una compilación
+de Chromium que este entorno no trae y cuya descarga está bloqueada**. En vez de
+tocar el repositorio, apunté la versión que Playwright espera a la Chromium que
+el entorno ya tiene. Las puertas corren con el navegador del entorno; el
+repositorio no cambió por esto.
 
-| | Activo / Insumo | Servicio / Logística |
+---
+
+## 1. Qué cambió en cada superficie
+
+### Inicio
+
+Se fueron la placa índigo, «Bienvenido a TopGreen», los tres beneficios con
+iconos y los tres claims —tecnología con inteligencia artificial, mecanización
+y confianza respaldada por alianzas con empresas líderes—.
+
+Quedó: hero en dos columnas con la fotografía de cosecha **sin nada encima**,
+las cuatro clases de operación como contenido, `Operaciones disponibles` con
+publicaciones reales, el bloque de datos que definen una operación, y el cierre
+para publicar.
+
+### Servicios
+
+Se fueron el video con overlay índigo, la lista de cinco servicios escrita a
+mano y todos los claims: inteligencia artificial, satélites, IoT,
+sustentabilidad, eficiencia y alianzas. Quedó el hero con la foto de
+relevamiento —la interina, sin ampliar—, `Servicios activos` con publicaciones
+reales de servicio y logística, el bloque de comparación y el cierre.
+
+### Mercado
+
+No perdió nada: filtros, búsqueda, orden, grilla, detalle, carrito, checkout,
+cotización, sesión, roles y callback de Mercado Pago siguen como estaban. Cambió
+la temperatura —canvas, acción, link—, el copy de la entrada y la densidad de la
+banda de intro.
+
+### Cabecera
+
+Dos variantes de la misma cabecera, no dos componentes: fuera del mercado entra
+en una sola banda; adentro el buscador manda arriba y las secciones bajan a la
+segunda.
+
+---
+
+## 2. Los datos, que es donde se gana o se pierde
+
+- La vista previa pide el **catálogo canónico**, el mismo del mercado y en el
+  mismo orden. No hay endpoint nuevo ni lista guardada en código.
+- El conteo de Inicio es `response.total`. El caso 124 le pregunta el total a la
+  API y exige que la portada repita ese número: si alguien vuelve a escribir 30
+  a mano, el caso se cae.
+- **No hay «destacadas»**. El producto no tiene dato de curaduría; llamarlas así
+  sería inventar un criterio.
+- Servicios filtra por `operationKind` —la regla de dominio de todo el producto—
+  y nunca por título ni por precio. En ese caso la vista previa **no publica un
+  total**: el total de la respuesta cuenta el catálogo entero, y usarlo diría
+  «12 servicios» sobre un número que no son servicios.
+- `Ver servicios publicados` fija `selectedType('servicios')` **antes** de
+  navegar. Escribir el tipo en la URL no alcanza, como decía tu contrato: el
+  hook ya está montado y lee su estado. El caso 125 lo comprueba mirando el
+  selector del mercado y las anatomías que quedan a la vista.
+- Las tarjetas de la vista previa **son `ProductCard`**, en variante compacta:
+  mismo `precioVisible`, misma `accionDe`, mismo respaldo de fotografía, mismas
+  cuatro anatomías. Lo único que cambia es que el activo de alto valor deja de
+  ocupar la fila entera, porque en una grilla de tres columnas no hay fila
+  entera.
+
+---
+
+## 3. Lo que medí, además de las puertas
+
+Tres criterios del contrato que ninguna puerta del repositorio cubría:
+
+| Criterio | Límite | Medido |
 |---|---|---|
-| Fotografía | sí, con respaldo si falta | no |
-| Stock | `Stock: 3.000 kg`, con su unidad | no |
-| Precio | por `precioVisible()` | por `precioVisible()`; sin precio, `A cotizar` |
-| Modalidad | — | `Por hectárea`, `A convenir`… por `etiquetaDeCatalogo()` |
+| Superficie rellena con índigo o rojo en el primer viewport | ≤ 8 % | **0,70 %** en Inicio, **0,79 %** en Servicios |
+| Placa oscura continua | ≤ 64 px | **44 px** (el botón de acción) |
+| Overlay sobre fotografía | 0 % | 0 %, comprobado preguntando qué elemento hay en el centro de la foto |
+| Movimiento con `prefers-reduced-motion` | ninguno | cero elementos con transición o animación viva; cero `video` |
+| Recursos externos | cero | **cero dominios externos** en las nueve combinaciones |
 
-Cada tarjeta lleva además la anatomía escrita —ACTIVO DE ALTO VALOR, INSUMO
-ESTANDARIZADO, SERVICIO, LOGÍSTICA—, que es lo que decide qué se muestra y el
-vendedor tenía que poder verlo sin abrir la edición.
-
-`precioVisible()` pasó a aceptar cualquier cosa que tenga precio, no sólo un
-`Product` completo, para que la regla viva en un solo lugar. De paso, los cuatro
-importes de las órdenes del panel dejaron su formato propio y usan `formatPrice`.
-
-**Los rótulos.** «Mis Productos» → «Mis publicaciones»; «+ Publicar Producto» →
-«+ Publicar»; el vacío dice «Todavía no publicaste nada. Acá vas a ver tus
-productos y tus servicios publicados.». Nada más: el panel no se rehízo.
-
-Lo prueba el **caso 120**, y lo probé al revés antes de darlo por bueno: forzando
-`deServicio = false` la tarjeta vuelve a decir «Sin fotografía» y `Stock: 10.000
-tonelada` sobre una publicación de logística. Ese es el defecto que viste.
-
-**Y saqué la captura antes de darla por terminada, que es lo que faltó la vez
-pasada.** Encontró tres cosas más, todas en esa misma pantalla:
-
-1. **El distintivo de estado se había ido a la esquina del panel.** Al sacarle la
-   caja de la foto, el distintivo —que es `position: absolute`— se quedó sin
-   ancestro posicionado y aterrizó arriba a la derecha del modal, encima del
-   botón de cerrar. Mi regla nueva perdía por orden de aparición contra la
-   vieja, con la misma especificidad. Ahora es un descendiente y el caso 120
-   exige que el distintivo esté **dentro** de la tarjeta.
-2. **Una tercera copia del respaldo verde en data-URI.** La del catálogo la
-   retiré en la entrega anterior; el panel tenía la suya —«Sin Imagen» en Arial
-   sobre verde claro— y la administración una más, de 50×50. Las dos se fueron:
-   manda `ProductImage`, que dice «Sin fotografía». El caso 120 exige además que
-   ninguna imagen del panel venga en `data:`.
-3. **Todos los servicios se mostraban «Agotado».** La columna `stock` tiene 0
-   por omisión, el alta le pasa `NULL` para un servicio y la base guarda 0; el
-   panel derivaba «agotado» de ese cero. Un servicio no reserva unidades, así
-   que no se agota: ahora el estado sólo mira el stock donde hay stock.
-4. **Y una cuarta, que encontró `a11y` y no la captura**: los tres distintivos
-   de estado tenían todavía sus colores literales en `rgba` —la pasada de color
-   mapeó hexadecimales—, y el verde oliva con texto blanco da **2,3:1**.
-   Mientras el distintivo vivía sobre la fotografía nadie podía medirlo; al
-   salir a fondo claro la puerta lo vio de inmediato. Ahora usan los tokens de
-   estado. Es el mismo patrón que ya me pasó con el mapeo: **mover algo de
-   lugar no lo arregla, lo hace medible**.
+Las nueve combinaciones son las tres superficies por los tres anchos, y en todas
+`scrollWidth === clientWidth`, cero errores de página, cero errores de consola y
+cero pedidos fallidos.
 
 ---
 
-## 3. La fotografía es opcional de verdad
+## 4. Tres cosas que encontré arreglando esto
 
-El alta bloqueaba con «Por favor agrega al menos una imagen» y rotulaba la
-sección con asterisco. `ANATOMIAS.md` la declara opcional con respaldo neutro, y
-exigirla empuja al vendedor a subir cualquier cosa para poder vender.
-
-Ahora la sección dice «Fotografías del producto (opcional)» y explica qué pasa si
-no subís ninguna. **La validación de tipo y de tamaño no se tocó**: el frontend
-sigue filtrando lo que no es imagen y el backend sigue rechazando extensiones
-fuera de `.jpg/.jpeg/.png/.webp` y archivos de más de 5 MB.
-
-El **caso 121** publica desde el navegador sin adjuntar un solo archivo,
-comprueba que la publicación quede con **0 imágenes** en la base, y que el
-catálogo y la ficha digan «Sin fotografía» —y no «No pudimos cargar la imagen»,
-que es la otra cosa—.
-
----
-
-## 4. Estado sin conexión
-
-El mercado **no tenía estado de error**. Cualquier falla —servidor caído, red
-cortada— terminaba en la lista vacía con «No hay operaciones con estos filtros»,
-que afirma algo que nadie comprobó.
-
-- Sin red (`navigator.onLine === false`): **`Sin conexión. Revisá tu red e
-  intentá de nuevo.`**, textual.
-- Cualquier otra falla: «No pudimos cargar el mercado. Volvé a intentarlo en un
-  momento.». No se disfraza de problema de red: mandar a revisar el módem cuando
-  el módem anda es hacerle perder el tiempo a la persona.
-- Los dos avisos son `role="alert"` y traen **Reintentar**, que vuelve a
-  preguntar sin recargar la página.
-
-El **caso 122** prueba los dos estados en la misma corrida: primero interviene
-sólo el pedido del catálogo con un 500 —con red presente—, después usa el modo
-sin conexión del navegador. Comprueba que ninguno de los dos se confunda con el
-catálogo vacío, que **la navegación siga viva con el error a la vista** —sale a
-Quiénes somos y vuelve— y que reintentar recupere el catálogo de verdad.
+1. **El margen lateral nunca fue responsivo.** `.tg-container` usaba el gutter de
+   escritorio en los tres anchos. Los tres valores —48, 32 y 20— están en los
+   tokens desde el primer handoff; el contenedor no los aplicaba. En 390 px eso
+   dejaba 294 px útiles y partía la cabecera en tres líneas: la marca en una, el
+   botón en otra, las secciones en tres filas. Con el margen correcto la
+   cabecera bajó de 346 a 199 px.
+2. **`public/` estaba sirviendo los originales.** Vite publica esa carpeta
+   entera. Ahí vivían `DJI_0079.JPG` —5,9 MB, con GPS en el EXIF—, las dos tomas
+   del relevamiento, `cosecha-01.jpg` y el `video-servicios.mp4` de 20,9 MB que
+   esta pieza retiró. Ninguno se usa ya y `ACTIVOS.md` prohíbe servir los JPG
+   fuente. Los moví a `docs/pm/originales/` con un README que dice de dónde
+   vienen: **se movieron, no se borraron**, porque son material de la clienta y
+   la fuente de los derivados aprobados.
+3. **Dos casos de la suite leían de más.** Los casos 54 y 57 afirman algo sobre
+   el panel del transportista y lo medían sobre `body` entero. Con la portada
+   mostrando operaciones reales —con su precio y su localidad— esa lectura
+   mezclaba la vitrina de atrás con el panel. Los acoté al panel, que es lo que
+   dicen medir. No se debilitó ninguna aserción: la propiedad quedó más precisa.
 
 ---
 
-## 5. Zoom 200 %: medido, y encontró dos defectos
-
-**Cómo se mide.** El zoom del navegador al 200 % deja la mitad de píxeles CSS:
-una pantalla de 1280×720 queda en 640×360. El **caso 123** recorre catálogo,
-detalle, ingreso, carrito, checkout y panel a ese tamaño y exige tres cosas por
-pantalla: sin corte horizontal (`scrollWidth === clientWidth`), acción principal
-visible, habilitada y dentro del ancho, y **anillo de foco visible en cada parada
-del tabulador**.
-
-Encontró dos defectos reales:
-
-1. **La cabecera pegajosa tapaba el catálogo.** 194 px de los 360 disponibles, y
-   pegada arriba: la primera tarjeta quedaba debajo y **no se podía tocar** —el
-   navegador la traía a la vista y la cabecera se la comía—. Con menos de 480 px
-   de alto la cabecera deja de ser pegajosa. Es la misma decisión que ya estaba
-   tomada para el celular; lo que cambia es el disparador, porque al 200 % el
-   ancho sigue siendo de escritorio.
-2. **Nueve reglas apagaban el anillo de foco.** `outline: none` en los campos del
-   checkout, del alta, de la administración, del ingreso, de contacto y del
-   panel: cambiaban el color del borde y listo. Quien navega con teclado perdía
-   la referencia. Se quitaron las nueve; el borde de marca se conserva **además**
-   del anillo.
-
-Una tercera cosa era mía y no del producto: el anillo entra con una transición de
-0,2 s y mi primera medición lo leía en el mismo instante del Tab, así que veía
-0 px de ancho en todas partes. El instrumento espera a que el anillo termine de
-dibujarse.
-
----
-
-## 6. `mockData.ts`
-
-Retirado. Eran diez publicaciones inventadas con fotos de Unsplash; no lo
-importaba nadie y no llegaba al build, pero estaba versionado en un repositorio
-que se entrega. `npm run build` y `npm run lint` siguen limpios sin él.
-
----
-
-## 7. Puertas
+## 5. Puertas
 
 | Puerta | Resultado |
 |---|---|
 | `npm run build` | limpio |
 | `npm run lint` | **0 errores, 0 avisos** |
-| `npm run contraste` | **52/52** mediciones, **0** incumplimientos |
+| `npm run contraste` | **52/52** mediciones exigidas, **0** incumplimientos |
 | `npm run a11y` | **64/64** pantallas, **0** violaciones |
 | `npm run hito` | **6/6** pasos encadenados |
-| suite completa desde base limpia | **123/123**, 0 fallos |
+| suite completa desde base limpia | **125/125**, 0 fallos |
 | `git -c core.whitespace=cr-at-eol diff --check` | limpio |
 
-Migración y seed corrieron de nuevo en la misma pasada —base borrada y creada
-desde cero— sólo para confirmar que siguen verdes: **no hay migración nueva**,
-el esquema no cambió en esta corrección.
+Sin migración: el esquema no cambió. La base se recreó desde cero en la misma
+pasada sólo para confirmar que migración y seed siguen verdes.
 
-Los cuatro casos nuevos (120–123) se escribieron en rojo primero. Dejo el rojo de
-cada uno porque es lo que dice qué se está midiendo:
+Dos casos nuevos y uno ampliado:
 
-- **119**: «la API no respondió HTTP 400» con el backend anterior.
-- **120**: `Stock: 10.000 tonelada` y «Sin fotografía» sobre una publicación de
-  logística.
-- **121**: el rótulo de las fotos no decía «opcional» y el formulario no dejaba
-  publicar.
-- **122**: no existía ningún `role="alert"` que esperar.
-- **123**: la cabecera pegajosa interceptaba el clic en la primera tarjeta.
-
----
-
-## 8. Capturas
-
-`docs/pm/ux2b/capturas/mis-publicaciones-1440x900.png` y
-`mis-publicaciones-390x844.png`, con el seed limpio: se ven las cuatro anatomías
-en el panel y los servicios sin stock ni foto. Las demás capturas de la entrega
-anterior quedan como estaban.
+- **124, Inicio**: claims, conteo real, publicaciones que existen en la base,
+  hero autorizado sin nada encima, cero pedidos externos ni conceptuales, error
+  y sin conexión distinguidos, y un título de 140 caracteres que no desborda ni
+  se corta.
+- **125, Servicios**: sin video ni claims, hero interino autorizado,
+  publicaciones que la base confirma como servicio o logística y sin foto en la
+  tarjeta, filtro que queda puesto, error con texto propio.
+- **123, zoom 200 %**: ahora recorre también Inicio y Servicios.
 
 ---
 
-## 9. Lo que dejo dicho
+## 6. Capturas
 
-- **Los servicios guardan un stock que no significa nada.** El seed les escribe
-  un número —16 publicaciones— y el alta por API les deja 0, porque la columna
-  tiene ese valor por omisión y `NULL` no lo desactiva. No cambia el cobro, que
-  lo decide `is_service`, y ya no se muestra en ninguna pantalla; pero es un dato
-  que miente y ya produjo un defecto visible («Agotado» en todos los servicios).
-  Sacarlo pide tocar el modelo y el seed, que no estaban en la orden: queda
-  anotado para decidirlo.
-- **`PARIDAD.md` quedó con todas las casillas marcadas menos las dos revisiones,
-  que son tuyas y de Emi.** Las cuatro que estaban sin marcar —anatomía de
-  servicio, formato del panel, offline y zoom— ahora tienen evidencia: los casos
-  120, 121, 122 y 123.
-- Sumé dos diferencias intencionales: la cabecera que se suelta con la ventana
-  baja, y el renombre de la sección del panel, que fue tu pedido.
+`docs/pm/ux2c/capturas/` — Inicio, Servicios y Mercado en 1440×900, 768×1024 y
+390×844, más página completa de Inicio y Servicios en 1440 y 390.
+
+**Comparación antes/después**: el «antes» son las capturas de la entrega
+anterior, `docs/pm/ux2b/capturas/inicio-*.png` y `servicios-*.png` —la placa
+índigo con «Bienvenido a TopGreen» y el hero de Servicios con el video tapado—.
+El «después» es este directorio.
+
+---
+
+## 7. Diferencias intencionales
+
+Seis, con responsable y fecha, en `docs/pm/ux2c/PARIDAD.md`. Las dos que
+conviene que mires:
+
+1. **En celular la navegación muestra las cinco secciones en dos filas.** El
+   prototipo muestra tres y esconde «Quiénes somos» y «Contacto» con
+   `display: none`; vos lo prohibiste por escrito. Mantuve la solución que ya
+   existía.
+2. **La acción de cada tarjeta de la portada es la real** —`Iniciar operación`,
+   `Agregar` con cantidad, `Solicitar cotización`— y no el texto `Ver operación`
+   del prototipo. Esa línea del prototipo describe una navegación; la tarjeta
+   real ejecuta la acción aprobada en UX-2B, y cambiarla sería el CTA paralelo
+   que el contrato prohíbe.
+
+---
+
+## 8. Lo que dejo dicho
+
+- **La taxonomía de Inicio no es clickeable.** Hoy no hay traducción inequívoca
+  de «Maquinaria y campos» a un filtro: son dos categorías, y «Logística» es una
+  anatomía. El contrato dice que sólo vuelve botón cuando exista ese mapeo. Si
+  querés habilitarla, te traigo la correspondencia exacta antes de tocarla.
+- **La foto final de Servicios sigue pendiente** y no es tarea Dev. La interina
+  está en su resolución natural y no se amplió.
+- **Quiénes somos y Contacto** recibieron tokens, cabecera y pie, y conservan su
+  composición: no inventé otra sin pantalla aprobada. `Quiénes somos` sigue
+  usando su video propio, que esta pieza no tocó.
+- **`ACTIVOS.md` nombra los JPG fuente con su ruta anterior** —`public/…`—
+  porque es documento de Diseño y no lo edito desde Dev. La ruta nueva está en
+  `docs/pm/originales/README.md`.
+- La deuda de los servicios con stock sin significado sigue abierta, como
+  acordamos: se normaliza en la pieza de datos, no acá.
+
+No desplegué nada.
 
 Vuelvo a PM.
