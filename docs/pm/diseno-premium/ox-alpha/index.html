@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TopGreen — Dirección visual · Exploración A / B / C</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #E9E7E0;
+    color: #20241F;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  code { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: .92em; background: #DFDDD5; padding: 1px 5px; }
+  a { color: inherit; }
+
+  .bar { max-width: 1560px; margin: 0 auto; padding: 44px 40px 8px; }
+  .bar h1 { margin: 0; font-size: 26px; line-height: 1.2; letter-spacing: -.01em; }
+  .bar h1 span { display: block; margin-top: 6px; font-size: 13px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: #5A6158; }
+  .notas { margin: 18px 0 0; padding: 18px 22px; background: #F5F4EF; border: 1px solid #D6D9D2; font-size: 13.5px; line-height: 1.65; color: #3A413A; max-width: 980px; }
+  .notas p { margin: 0 0 8px; } .notas p:last-child { margin: 0; }
+
+  .variante { max-width: 1560px; margin: 60px auto 0; padding: 0 40px 8px; }
+  .cab { display: flex; align-items: flex-start; gap: 20px; margin-bottom: 22px; }
+  .chip {
+    flex: none; width: 52px; height: 52px; display: grid; place-items: center;
+    background: #20241F; color: #F5F4EF; font-size: 24px; font-weight: 700; letter-spacing: .02em;
+  }
+  .cab h2 { margin: 2px 0 4px; font-size: 21px; letter-spacing: -.01em; }
+  .cab .idea { margin: 0; max-width: 860px; font-size: 14.5px; line-height: 1.55; color: #4C544B; }
+
+  .ficha {
+    display: grid; grid-template-columns: repeat(3, 1fr) 1.35fr; gap: 0;
+    background: #F5F4EF; border: 1px solid #D6D9D2; margin-bottom: 24px;
+  }
+  .ficha > div { padding: 16px 20px 18px; border-left: 1px solid #D6D9D2; }
+  .ficha > div:first-child { border-left: 0; }
+  .ficha h3 { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #6A7267; }
+  .ficha p, .ficha li { font-size: 13px; line-height: 1.55; color: #333A33; }
+  .ficha ul, .ficha ol { margin: 0; padding-left: 16px; }
+  .ficha .sw { display: flex; align-items: center; gap: 8px; margin: 0 0 5px; }
+  .ficha .sw i { flex: none; width: 14px; height: 14px; border: 1px solid rgba(32,36,31,.25); }
+  .ficha code { background: #E7E5DD; }
+  .veredicto b { font-weight: 700; }
+  .si { font-weight: 700; }
+
+  .planos { display: grid; grid-template-columns: minmax(0, 1fr) 424px; gap: 28px; align-items: start; }
+  figure.plano { margin: 0; }
+  .plano figcaption {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+    font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: #6A7267; margin-bottom: 10px;
+  }
+  .plano figcaption a { font-size: 11px; color: #3A413A; }
+  .frame { position: relative; overflow: hidden; border: 1px solid #20241F; background: #fff; }
+  .frame iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: top left; background: #fff; }
+
+  footer { max-width: 1560px; margin: 70px auto 0; padding: 0 40px 60px; font-size: 12.5px; line-height: 1.6; color: #6A7267; }
+
+  @media (max-width: 1100px) {
+    .planos { grid-template-columns: 1fr; }
+    .ficha { grid-template-columns: 1fr 1fr; }
+    .ficha > div { border-top: 1px solid #D6D9D2; }
+    .ficha > div:nth-child(-n+2) { border-top: 0; }
+    .ficha > div:nth-child(odd) { border-left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <h1>
+    TopGreen — dirección visual
+    <span>Exploración controlada · Header + primer viewport de Inicio · A / B / C</span>
+  </h1>
+  <div class="notas">
+    <p><strong>Qué es:</strong> seis frames estáticos (1440 px y 390 px) sobre el producto real de <code>Memu007/yneratopgreen</code> (rama <code>main</code>). El repositorio no fue modificado; no hay React ni cambios de navegación, rutas, datos ni comportamiento.</p>
+    <p><strong>Estado (2026-08-25):</strong> dirección confirmada — <strong>B · Mercado nacional</strong>. Cierre mobile aplicado: los cinco destinos de navegación visibles en grilla compacta y la fotografía real dentro del primer viewport de 844 px (taxonomía reordenada debajo del hero, sin eliminarla). A y C quedan como evidencia de contraste; no se regeneran. El desktop de B es el aprobado y no se modificó en esta pasada.</p>
+    <p><strong>Datos honestos:</strong> el conteo muestra «30» porque es el valor ilustrativo que ya usa el handoff aprobado (<code>extension-comercial/inicio.html</code>); en producto se vincula a <code>response.total</code> y no se escribe número provisorio. El wordmark es el dibujo actual (<code>topgreen-compact.svg</code>) re-tintado por variante — no hay logo nuevo. La fotografía es el único derivado aprobado para Home (<code>home-cosecha-hero</code>), sin texto encima. La taxonomía del frame B es la contenida real de la página (contenido, no controles).</p>
+    <p><strong>Tipografías:</strong> self-hosted en <code>assets/fonts/</code> (licencias OFL: Barlow, Inter, Inter Tight, IBM Plex). Contraste de texto verificado ≥ 4,5:1 en todas las variantes.</p>
+  </div>
+</header>
+
+<main>
+
+  <section class="variante" id="concepto-a">
+    <div class="cab">
+      <span class="chip">A</span>
+      <div>
+        <h2>Operación de campo</h2>
+        <p class="idea">Directa, robusta, física. La portada se comporta como un piso de trabajo: reglas gruesas, tipografía de maquinaria, la cosecha ocupando más de la mitad de la pantalla y el conteo estampado como una placa de rendimiento.</p>
+      </div>
+    </div>
+
+    <div class="ficha">
+      <div>
+        <h3>Tipografías</h3>
+        <p><strong>Barlow</strong> (700 titular · 500/600 texto y controles) y <strong>Barlow Condensed</strong> (600, eyebrows y señalética en mayúsculas). Familia de raíz DIN: la misma lógica de rotulación industrial.</p>
+        <h3 style="margin-top:14px">Colores principales</h3>
+        <p class="sw"><i style="background:#F7F6F2"></i>Blanco cálido <code>#F7F6F2</code></p>
+        <p class="sw"><i style="background:#20241F"></i>Grafito <code>#20241F</code></p>
+        <p class="sw"><i style="background:#1F4531"></i>Verde campo <code>#1F4531</code></p>
+        <p class="sw"><i style="background:#B45309"></i>Ámbar maquinaria <code>#B45309</code></p>
+        <p class="sw"><i style="background:#D6D9D2"></i>Borde mineral <code>#D6D9D2</code></p>
+      </div>
+      <div>
+        <h3>Recurso distintivo de marca</h3>
+        <p><strong>Cinta de operación y medición:</strong> el header deja de ser navbar y pasa a ser una cinta de celdas (sección activa rellena de verde, Ingresar como celda con regla propia). El conteo es un instrumento: numeral de 122 px sobre regla de ticks. El botón primario lleva chaflán y el secundario escuadras en esquina. La foto sangra a los bordes del viewport y apoya en una banda técnica de registro; una etiqueta vertical ocupa el margen y el horizonte de tres bandas cierra el pliegue.</p>
+        <h3 style="margin-top:14px">Por qué se siente agroindustrial</h3>
+        <p>La página se comporta como maquinaria, no como folleto: celdas, reglas, chaflán y un dato estampado a escala de placa. La foto aérea pesa más que el copy y está fechada con una banda de registro, como la evidencia de una campaña.</p>
+      </div>
+      <div class="veredicto">
+        <h3>Anti-tests</h3>
+        <ol>
+          <li><b>No.</b> Cero serif y cero filetes de tapa: la voz es de faena, con números y reglas de estructura.</li>
+          <li><b>No.</b> El verde es acción comercial con botones cuadrados de trabajo, no paleta institucional de sucursal.</li>
+          <li><b>No.</b> Sin gradientes, violetas ni tarjetas flotantes: foto real, dato duro y controles planos.</li>
+          <li><b>No.</b> No hay hojas ni mensaje eco: hay acoplado, cereal y polvadera de cosecha.</li>
+          <li class="si">Sí. Cosecha a página completa + «30 operaciones disponibles ahora» se entienden en un vistazo.</li>
+        </ol>
+      </div>
+      <div>
+        <h3>Notas de aplicación</h3>
+        <p>El ámbar es señal, no relleno: aparece como filete, marcador y foco de teclado, nunca en bloques grandes. El rojo queda reservado para alertas (no interviene en este viewport). El horizonte puede repetirse como cierre de sección en el resto del sitio sin rehacer componentes.</p>
+      </div>
+    </div>
+
+    <div class="planos">
+      <figure class="plano">
+        <figcaption>Escritorio · 1440 × 900 <a href="frames/a-desktop.html">abrir a tamaño real</a></figcaption>
+        <div class="frame"><iframe src="frames/a-desktop.html" data-w="1440" data-h="900" title="Concepto A — escritorio 1440"></iframe></div>
+      </figure>
+      <figure class="plano">
+        <figcaption>Mobile · 390 × 844 <a href="frames/a-mobile.html">abrir a tamaño real</a></figcaption>
+        <div class="frame"><iframe src="frames/a-mobile.html" data-w="390" data-h="844" title="Concepto A — mobile 390"></iframe></div>
+      </figure>
+    </div>
+  </section>
+
+  <section class="variante" id="concepto-b">
+    <div class="cab">
+      <span class="chip">B</span>
+      <div>
+        <h2>Mercado nacional</h2>
+        <p class="idea">Comercial y activa. La marca pesa como un pabellón de mercado, el cereal funciona como señal de oferta y los cuatro rubros reales de la Home aparecen como rótulos numerados: se ve dónde se opera antes de scrollear.</p>
+      </div>
+    </div>
+
+    <div class="ficha">
+      <div>
+        <h3>Tipografías</h3>
+        <p><strong>Inter Tight</strong> (750 titular · 700/800 datos) y <strong>Inter</strong> (UI, texto y números tabulares). Lectura transaccional densa y segura, pensada para catálogo.</p>
+        <h3 style="margin-top:14px">Colores principales</h3>
+        <p class="sw"><i style="background:#F7F6F2"></i>Blanco cálido <code>#F7F6F2</code></p>
+        <p class="sw"><i style="background:#1E4A34"></i>Verde mercado <code>#1E4A34</code></p>
+        <p class="sw"><i style="background:#C49A43"></i>Cereal <code>#C49A43</code> · texto <code>#8A671C</code></p>
+        <p class="sw"><i style="background:#1E2420"></i>Grafito <code>#1E2420</code></p>
+        <p class="sw"><i style="background:#D8DAD2"></i>Borde <code>#D8DAD2</code></p>
+      </div>
+      <div>
+        <h3>Recurso distintivo de marca</h3>
+        <p><strong>Libro mayor de rubros y celda de acción:</strong> bajo el header de masa verde, la taxonomía real se despliega como libro mayor a sangrado completo (01–04 con el dato que distingue cada rubro). El cereal es un solo gesto por zona y significa acción: la celda Ingresar, el filete del botón primario y los ticks mayores del medidor; la sección activa se marca en celda blanca para no competir. La regla del medidor corre a ancho de columna y su línea base continúa exacta en el borde de la banda técnica de la foto: una sola línea de registro cruza el viewport.</p>
+        <h3 style="margin-top:14px">Por qué se siente agroindustrial</h3>
+        <p>Los rubros operables están a la vista antes del pliegue, numerados como índice de mercado; el conteo se lee como medidor, no como eslogan. Es densidad de negocio con la fotografía de faena como evidencia.</p>
+      </div>
+      <div class="veredicto">
+        <h3>Anti-tests</h3>
+        <ol>
+          <li><b>No.</b> La densidad es de mercado, no de revista: rótulos numerados y datos, sin columnas editoriales.</li>
+          <li><b>No.</b> El dorado es señal de oferta sobre verde de faena, no filigrana bancaria; la foto es de trabajo, no de lobby.</li>
+          <li><b>No.</b> Sin ilustraciones ni glassmorphism: la única banda nueva es contenido real de la página.</li>
+          <li><b>No.</b> Nada de hojas ni curvas orgánicas: la señal es seca, numerada y con contraste verificado.</li>
+          <li class="si">Sí. Rubros + conteo + cosecha real: marketplace agro en menos de cinco segundos.</li>
+        </ol>
+      </div>
+      <div>
+        <h3>Notas de aplicación</h3>
+        <p>Los rótulos son contenido, no controles — igual que en la Home actual — hasta que exista traducción inequívoca a filtros. El header verde se sostiene en Mercado (donde ya existe la segunda banda) sin rehacer la arquitectura de dos cabeceras.</p>
+        <p style="margin-top:8px"><strong>Mobile (cierre confirmado):</strong> navegación en grilla compacta 3+2 con los cinco destinos siempre visibles — sin carrusel ni secciones fuera de pantalla; sección activa en celda blanca con filete cereal. La taxonomía se reordena debajo del hero para que la fotografía de cosecha entre en el primer viewport de 844 px; el medidor y las CTA conservan su lugar.</p>
+      </div>
+    </div>
+
+    <div class="planos">
+      <figure class="plano">
+        <figcaption>Escritorio · 1440 × 900 <a href="frames/b-desktop.html">abrir a tamaño real</a></figcaption>
+        <div class="frame"><iframe src="frames/b-desktop.html" data-w="1440" data-h="900" title="Concepto B — escritorio 1440"></iframe></div>
+      </figure>
+      <figure class="plano">
+        <figcaption>Mobile · 390 × 844 <a href="frames/b-mobile.html">abrir a tamaño real</a></figcaption>
+        <div class="frame"><iframe src="frames/b-mobile.html" data-w="390" data-h="844" title="Concepto B — mobile 390"></iframe></div>
+      </figure>
+    </div>
+  </section>
+
+  <section class="variante" id="concepto-c">
+    <div class="cab">
+      <span class="chip">C</span>
+      <div>
+        <h2>Precisión productiva</h2>
+        <p class="idea">Técnica y sistemática. La operación se lee como una ficha de control: nomenclatura numerada, datos tabulares en monoespaciada y la fotografía tratada como evidencia registrada, con marcas de esquina y leyenda al pie.</p>
+      </div>
+    </div>
+
+    <div class="ficha">
+      <div>
+        <h3>Tipografías</h3>
+        <p><strong>IBM Plex Sans</strong> (600 titular · 500/600 UI) y <strong>IBM Plex Mono</strong> (nomenclatura, etiquetas y cifras tabulares). Voz de ingeniería aplicada al campo.</p>
+        <h3 style="margin-top:14px">Colores principales</h3>
+        <p class="sw"><i style="background:#F7F6F2"></i>Blanco cálido <code>#F7F6F2</code></p>
+        <p class="sw"><i style="background:#1F2621"></i>Grafito <code>#1F2621</code></p>
+        <p class="sw"><i style="background:#1C4331"></i>Verde campo <code>#1C4331</code></p>
+        <p class="sw"><i style="background:#5A6B60"></i>Acero mineral <code>#5A6B60</code></p>
+        <p class="sw"><i style="background:#D9DCD4"></i>Borde <code>#D9DCD4</code></p>
+      </div>
+      <div>
+        <h3>Recurso distintivo de marca</h3>
+        <p><strong>Sistema de registro técnico:</strong> navegación como pestañas numeradas que abren la regla del header, regla de medición lateral en el margen, y el conteo presentado como panel instrumento: cifra monoespaciada con cero puntado y regla calibrada en 30 unidades con ticks mayores cada 10. La fotografía es un registro: marcas de esquina y leyenda vertical al pie, sin tocar la imagen.</p>
+        <h3 style="margin-top:14px">Por qué se siente agroindustrial</h3>
+        <p>El agro de precisión es medición y control: todo el viewport declara qué es y de dónde viene, y la escala tipográfica del dato comunica que las operaciones se cuentan y se verifican.</p>
+      </div>
+      <div class="veredicto">
+        <h3>Anti-tests</h3>
+        <ol>
+          <li><b>No.</b> La retícula es de ficha técnica, no de suplemento: mono pequeña, reglas finas y datos.</li>
+          <li><b>No.</b> Grafito y verde con cifras monoespaciadas; nada de azul corporativo ni serif de estudio.</li>
+          <li><b>No.</b> Los ticks y la numeración cumplen función de lectura; no hay decorado genérico ni glassmorphism.</li>
+          <li><b>No.</b> Verde profundo de operación; cero hojas, curvas «eco» o mensajes ambientales.</li>
+          <li class="si">Sí. Conteo en vivo + navegación declarada + cosecha registrada se entienden de inmediato.</li>
+        </ol>
+      </div>
+      <div>
+        <h3>Notas de aplicación</h3>
+        <p>La numeración de navegación es un recurso de señalética, no contenido nuevo: los cinco destinos son los reales. La leyenda de foto usa el texto alternativo aprobado del activo. El sistema escala a catálogo con la misma retícula de ficha.</p>
+      </div>
+    </div>
+
+    <div class="planos">
+      <figure class="plano">
+        <figcaption>Escritorio · 1440 × 900 <a href="frames/c-desktop.html">abrir a tamaño real</a></figcaption>
+        <div class="frame"><iframe src="frames/c-desktop.html" data-w="1440" data-h="900" title="Concepto C — escritorio 1440"></iframe></div>
+      </figure>
+      <figure class="plano">
+        <figcaption>Mobile · 390 × 844 <a href="frames/c-mobile.html">abrir a tamaño real</a></figcaption>
+        <div class="frame"><iframe src="frames/c-mobile.html" data-w="390" data-h="844" title="Concepto C — mobile 390"></iframe></div>
+      </figure>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  Exploración visual de Ox Alpha · prueba aislada, no autoriza cambios en producto ni despliegue · sin variante ganadora: la decisión es de Emi · repo fuente intacto en <code>main</code>.
+</footer>
+
+<script>
+  document.querySelectorAll('.frame').forEach(function (wrap) {
+    var frame = wrap.querySelector('iframe');
+    var natW = parseInt(frame.dataset.w, 10);
+    var natH = parseInt(frame.dataset.h, 10);
+    function fit() {
+      var s = Math.min(1, wrap.clientWidth / natW);
+      frame.style.width = natW + 'px';
+      frame.style.height = natH + 'px';
+      frame.style.transform = 'scale(' + s + ')';
+      wrap.style.height = (natH * s) + 'px';
+    }
+    if ('ResizeObserver' in window) { new ResizeObserver(fit).observe(wrap); } else { window.addEventListener('resize', fit); }
+    fit();
+  });
+</script>
+
+</body>
+</html>

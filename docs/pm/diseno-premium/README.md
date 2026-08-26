@@ -11,9 +11,15 @@ producción.
 - Extensión comercial UX-2C: aceptada técnicamente y rechazada visualmente por
   Emi el 2026-08-24 porque crema + rojo óxido + serif dominante se perciben
   como un diario.
-- Dev: pausada; no se toca ni despliega producto.
-- Exploración activa: [prueba controlada con Ox Alpha](./PRUEBA-OX-ALPHA.md),
-  sólo sobre el primer viewport real de Inicio y fuera de `src/`.
+- Dev: habilitada sólo para UX-2D; no despliega producto.
+- Exploración Ox Alpha: cerrada. Emi eligió **B — Mercado nacional** y PM la
+  aceptó como dirección en
+  [REVISION-PM-OX-ALPHA.md](./REVISION-PM-OX-ALPHA.md). El prototipo offline
+  queda en [`ox-alpha/`](./ox-alpha/).
+- Handoff vigente: [`mercado-nacional-b/`](./mercado-nacional-b/). Extiende B a
+  Inicio, Servicios, Mercado y Header por rol; incluye artefacto offline,
+  fuentes/licencias, activos, contrato Dev, mapa React y paridad. La tarea está
+  limitada a esas superficies y a fundaciones compartidas seguras.
 
 ## Restricción de uso de imágenes
 

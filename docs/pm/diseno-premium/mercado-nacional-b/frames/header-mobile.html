@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Header mobile — TopGreen</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/b.css">
+</head>
+<body>
+
+<header class="hd">
+  <div class="hd-in">
+    <button class="brand" type="button">
+      <img src="../assets/marca/topgreen-mono-oscura.svg" alt="TopGreen">
+    </button>
+    <div class="acciones" id="acciones"></div>
+    <nav class="nav" aria-label="Secciones del sitio">
+      <button class="nav-link is-active" type="button" aria-current="page">Inicio</button>
+      <button class="nav-link" type="button">Mercado</button>
+      <button class="nav-link" type="button">Servicios</button>
+      <button class="nav-link" type="button">Quiénes somos</button>
+      <button class="nav-link" type="button">Contacto</button>
+    </nav>
+  </div>
+</header>
+
+<script>
+  var ESTADOS = {
+    anon: [{ t: 'Ingresar', c: 'accion-cell ingresar' }],
+    comprador: [{ t: 'Carrito (2)', c: 'accion-cell' }, { t: 'Cuenta', c: 'accion-cell' }],
+    vendedor: [{ t: 'Vender', c: 'accion-cell gold' }, { t: 'Carrito (1)', c: 'accion-cell' }, { t: 'Cuenta', c: 'accion-cell' }],
+    admin: [{ t: 'Admin', c: 'accion-cell' }, { t: 'Vender', c: 'accion-cell gold' }, { t: 'Carrito (3)', c: 'accion-cell' }, { t: 'Cuenta', c: 'accion-cell' }]
+  };
+  var estado = new URLSearchParams(location.search).get('estado') || 'anon';
+  var cont = document.getElementById('acciones');
+  (ESTADOS[estado] || ESTADOS.anon).forEach(function (a) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = a.c;
+    b.textContent = a.t;
+    cont.appendChild(b);
+  });
+</script>
+
+</body>
+</html>

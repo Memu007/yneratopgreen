@@ -3541,3 +3541,69 @@ como un diario, no como un marketplace agro. Ver
 No cambies producto, no pruebes paletas y no despliegues. Diseño debe resolver
 color, escala tipográfica y señalética sobre la estructura existente, y Emi
 debe aprobar la comparación antes de una nueva tarea Dev.
+
+## 2026-08-25 — B elegida en Ox Alpha; Dev sigue pausada
+
+Emi eligió **B — Mercado nacional** y PM verificó la exploración aislada en
+desktop y mobile. La decisión y sus límites están en
+`diseno-premium/REVISION-PM-OX-ALPHA.md`; el prototipo queda en
+`diseno-premium/ox-alpha/`.
+
+Esto aprueba una dirección, no una implementación. Sólo existe Header + primer
+viewport de Inicio: no extrapoles color, header, cards o responsive al resto del
+producto y no copies el HTML aislado. Diseño debe cerrar primero Inicio,
+Servicios y Mercado contra los componentes reales. No tenés tarea activa y no
+debes desplegar.
+
+## 2026-08-25 — Tarea activa única: UX-2D / B Mercado nacional
+
+La pausa anterior queda levantada. Diseño extendió B y Emi aprobó la corrección
+final. PM la verificó y versionó un handoff reproducible en
+`docs/pm/diseno-premium/mercado-nacional-b/`.
+
+### Lectura obligatoria
+
+Leé, en orden:
+
+1. `mercado-nacional-b/README.md`;
+2. `mercado-nacional-b/HANDOFF-DEV.md`;
+3. `mercado-nacional-b/MAPA-REACT.md`;
+4. `mercado-nacional-b/PARIDAD.md`;
+5. el tablero offline y sus `frames/`.
+
+### Resultado requerido
+
+Implementá la dirección **B — Mercado nacional** sobre UX-2C sin reabrir
+producto. El alcance visual es Header por rol, Inicio, Servicios y Mercado. Las
+demás superficies conservan estructura y comportamiento y reciben sólo las
+fundaciones compartidas que no rompan operación ni contraste.
+
+No copies el HTML/CSS aislado ni sus datos ilustrativos. Reutilizá componentes,
+API, anatomías, formatters, callbacks y estados actuales. El conteo siempre
+sale del total real. El símbolo `parcela activa` se usa como activo provisional
+del MVP: no lo redibujes.
+
+### Límites duros
+
+- Sin Backend, migración, seed, API, pagos, logística, auth, rutas o
+  dependencias.
+- Sin rediseño inventado de Quiénes somos, Contacto, auth, detalle, carrito,
+  publicación, paneles o administración.
+- Sin recursos externos, fotos inventadas, claims, íconos o segundo tema.
+- Sin resolver la deuda general de paginación >100 dentro de esta tarea.
+- Sin despliegue.
+
+Si el handoff y el código real chocan funcionalmente, preservá el producto,
+frená y reportá la mínima diferencia; no decidas diseño ni contrato por tu
+cuenta.
+
+### Puertas y entrega
+
+Completá `mercado-nacional-b/PARIDAD.md`. Capturá Inicio, Servicios y Mercado
+en `1440×900`, `768×1024` y `390×844`, más los cuatro Headers por rol en
+desktop/mobile. Probá estados, foto ausente/rota, teclado, zoom 200 %, reduced
+motion, copy largo y cero overflow.
+
+Corré build, lint, contraste, a11y completo, hito, suite desde base limpia y
+`diff --check`. Entregá un commit de producto y otro de informe en
+`PARA-PM.md`; empujá ambos y frená para revisión. **No despliegues.**

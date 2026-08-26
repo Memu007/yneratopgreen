@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-08-24.
+Actualizado: 2026-08-25.
 
 ## Relevo inmediato — leer primero
 
@@ -132,6 +132,22 @@ Actualizado: 2026-08-24.
   tocar `src/`, producto o despliegue. La puerta visual se evalúa en navegador
   con Emi; si ninguna variante evita diario, banco, SaaS IA y eco genérico, se
   detiene sin ampliar al resto del sitio.
+- **Dirección Ox Alpha aceptada:** Emi eligió **B — Mercado nacional** y PM
+  verificó la corrección final en desktop y `390×844`. El artefacto offline y
+  licencias están en `diseno-premium/ox-alpha/`; la revisión independiente está
+  en `diseno-premium/REVISION-PM-OX-ALPHA.md`. B elimina la lectura de diario y
+  se acepta como personalidad, paleta, tipografía y señalética. Todavía no es
+  handoff: sólo cubre Header + primer viewport de Inicio. Dev sigue pausada
+  hasta que Diseño extienda B a Inicio, Servicios y Mercado y la vincule con
+  componentes/estados reales.
+- **Handoff B cerrado y UX-2D habilitada:** Diseño extendió B a Inicio,
+  Servicios, Mercado y Header por rol. Emi aprobó la corrección final; PM
+  verificó `1440×900`/`390×844`, cero overflow mobile, buscador, sesión,
+  fallback fotográfico y los SVG corregidos. La fuente versionada está en
+  `diseno-premium/mercado-nacional-b/` con contrato, mapa React y paridad. Dev
+  implementa esa capa sobre UX-2C, conserva flujos y Backend, entrega evidencia
+  en tres viewports y frena sin desplegar. El símbolo `parcela activa` es
+  provisional del MVP: se usa tal cual y no se rediseña en esta tarea.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -140,15 +156,14 @@ Actualizado: 2026-08-24.
 
 ## Entrega aceptada y tarea actual
 
-UX-2B queda aceptada técnicamente con producto `08907cd`–`873ad2e`, corrección
-`177cdb2` e informes `8943143`/`6b9bd1d`. Las cuatro anatomías salen de datos
-persistentes y no se reabren. La devolución visual posterior de Emi ya tiene
-dirección aprobada: **A — Mercado a cielo abierto**, documentada completa en
-`diseno-premium/extension-comercial/`. Dev tiene como tarea activa UX-2C:
-implementar Inicio, Servicios y la coherencia cromática/fotográfica del Mercado
-sin tocar Backend, pagos ni funciones. Diseño auditó sus prototipos 9/9 con axe,
-sin errores ni overflow; Dev debe repetir puertas sobre el producto y frenar
-antes de desplegar.
+UX-2C queda aceptada técnicamente en `35eaf30` pero rechazada en su capa visual
+editorial. La tarea activa es **UX-2D**: reemplazar únicamente esa capa por
+**B — Mercado nacional** según `diseno-premium/mercado-nacional-b/`. Header,
+Inicio, Servicios y Mercado tienen referencias desktop/mobile, activos,
+contrato, mapa y paridad; tablet se resuelve con los breakpoints existentes.
+Se preservan las cuatro anatomías y todos los flujos. Sin Backend, pagos,
+logística, API, dependencias ni despliegue. Opus entrega commits e informe y
+frena para revisión PM/Emi.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se

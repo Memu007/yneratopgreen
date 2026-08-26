@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TopGreen — Extensión B · Inicio / Servicios / Mercado / Header</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: #E9E7E0; color: #20241F; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  code { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: .92em; background: #DFDDD5; padding: 1px 5px; }
+  a { color: inherit; }
+
+  .bar { max-width: 1560px; margin: 0 auto; padding: 44px 40px 8px; }
+  .bar h1 { margin: 0; font-size: 26px; line-height: 1.2; letter-spacing: -.01em; }
+  .bar h1 span { display: block; margin-top: 6px; font-size: 13px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: #5A6158; }
+  .tabs { display: flex; gap: 0; margin-top: 22px; border-bottom: 2px solid #20241F; }
+  .tabs a { padding: 10px 18px; font-size: 13px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; text-decoration: none; color: #4C544B; border-right: 1px solid #D6D9D2; }
+  .tabs a:hover { background: #F5F4EF; color: #20241F; }
+  .notas { margin: 22px 0 0; padding: 18px 22px; background: #F5F4EF; border: 1px solid #D6D9D2; font-size: 13.5px; line-height: 1.65; color: #3A413A; max-width: 1080px; }
+  .notas p { margin: 0 0 8px; } .notas p:last-child { margin: 0; }
+
+  .seccion { max-width: 1560px; margin: 56px auto 0; padding: 0 40px 8px; }
+  .cab { display: flex; align-items: flex-start; gap: 20px; margin-bottom: 20px; }
+  .chip { flex: none; width: 52px; height: 52px; display: grid; place-items: center; background: #1E4A34; color: #F5F4EF; font-size: 20px; font-weight: 700; }
+  .cab h2 { margin: 2px 0 4px; font-size: 21px; letter-spacing: -.01em; }
+  .cab .idea { margin: 0; max-width: 900px; font-size: 14.5px; line-height: 1.55; color: #4C544B; }
+
+  .ficha { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; background: #F5F4EF; border: 1px solid #D6D9D2; margin-bottom: 24px; }
+  .ficha > div { padding: 16px 20px 18px; border-left: 1px solid #D6D9D2; }
+  .ficha > div:first-child { border-left: 0; }
+  .ficha h3 { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #6A7267; }
+  .ficha p, .ficha li { font-size: 13px; line-height: 1.55; color: #333A33; }
+  .ficha ul { margin: 0; padding-left: 16px; }
+  .ficha code { background: #E7E5DD; }
+
+  .planos { display: grid; grid-template-columns: minmax(0, 1fr) 424px; gap: 28px; align-items: start; }
+  figure.plano { margin: 0; }
+  .plano figcaption { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: #6A7267; margin-bottom: 10px; }
+  .plano figcaption a { font-size: 11px; color: #3A413A; }
+  .frame { position: relative; overflow: hidden; border: 1px solid #20241F; background: #fff; }
+  .frame iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: top left; background: #fff; }
+  .plano.ancho { grid-column: 1 / -1; }
+
+  footer { max-width: 1560px; margin: 70px auto 0; padding: 0 40px 60px; font-size: 12.5px; line-height: 1.6; color: #6A7267; }
+
+  @media (max-width: 1100px) {
+    .planos { grid-template-columns: 1fr; }
+    .ficha { grid-template-columns: 1fr; }
+    .ficha > div { border-left: 0; border-top: 1px solid #D6D9D2; }
+    .ficha > div:first-child { border-top: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <h1>
+    TopGreen — Extensión B
+    <span>Inicio · Servicios · Mercado · Estados del Header · 1440 y 390</span>
+  </h1>
+  <nav class="tabs" aria-label="Secciones de la entrega">
+    <a href="#inicio">Inicio</a>
+    <a href="#servicios">Servicios</a>
+    <a href="#mercado">Mercado</a>
+    <a href="#header">Header · Estados</a>
+    <a href="#wordmark">Wordmark</a>
+  </nav>
+  <div class="notas">
+    <p><strong>Qué es:</strong> segunda exploración aislada que demuestra la dirección B — Mercado nacional como sistema sobre tres superficies reales. Fuente de estructura, contenido y comportamiento: el producto en <code>/Users/Emi/Documents/topgreen</code> (leído, no modificado). Sin React, sin cambios de rutas, flujos ni datos.</p>
+    <p><strong>Datos honestos:</strong> las publicaciones, vendedores, localidades, precios, modalidades y coberturas salen del seed real (<code>backend/app/seed.py</code>); «Sin calificaciones aún» es el estado real del seed; «30 operaciones» es ilustrativo (en producto, <code>response.total</code>). Las cards de activo e insumo usan una placa de registro «Sin registro fotográfico» — estado honesto, tratado como pieza deliberada del sistema; el seed usa imágenes externas que este prototipo no puede servir. Las etiquetas de acción por anatomía son las del diccionario aprobado: <code>Iniciar operación</code>, <code>Agregar</code>, <code>Contratar</code>, <code>Solicitar cotización</code>.</p>
+    <p><strong>Wordmark:</strong> evolución única en Inter Tight ExtraBold delineado a curvas, con señal cereal. Cuatro versiones en <code>assets/marca/</code>: horizontal, compacta, monocroma clara y monocroma oscura. Inter e Inter Tight son SIL OFL (licencia comercial verificable, archivos incluidos).</p>
+  </div>
+</header>
+
+<main>
+
+  <section class="seccion" id="inicio">
+    <div class="cab">
+      <span class="chip">01</span>
+      <div>
+        <h2>Inicio B — corregida</h2>
+        <p class="idea">La Home aprobada con sus bordes corregidos: el conteo baja a dato (funciona igual con 3, 30 o 120), la foto y las CTA dominan, Ingresar deja de competir con la acción principal y la grilla mobile 3+2 cierra sin vacíos.</p>
+      </div>
+    </div>
+    <div class="ficha">
+      <div>
+        <h3>Qué corrige</h3>
+        <ul>
+          <li>Medidor secundario: numeral 44 px + regla corta, anclado bajo las CTA.</li>
+          <li>Ingresar pasa a celda fantasma; el cereal queda para «Explorar operaciones».</li>
+          <li>Mobile: grilla 6 columnas — fila 1 tres destinos, fila 2 dos destinos a ancho equilibrado.</li>
+          <li>El header escala por celdas (ver lámina de estados).</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Qué conserva</h3>
+        <ul>
+          <li>Copy, CTAs, foto aprobada sin overlay y libro mayor numerado.</li>
+          <li>Paleta bloqueada: <code>#F7F6F2</code> / <code>#1E4A34</code> / <code>#1E2420</code> / <code>#C49A43</code> / <code>#D8DAD2</code>.</li>
+          <li>Líneas de registro, geometría sobria, sin sombras generalizadas.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Prueba de conteo variable</h3>
+        <p>El medidor es tabular y de ancho fijo: con <code>3</code>, <code>30</code> o <code>120</code> la línea no se mueve y la cifra nunca manda sobre la propuesta comercial. En producto, el valor viene de <code>response.total</code>.</p>
+      </div>
+    </div>
+    <div class="planos">
+      <figure class="plano">
+        <figcaption>Escritorio · 1440 × 900 <a href="frames/inicio-desktop.html">abrir a tamaño real</a></figcaption>
+        <div class="frame"><iframe src="frames/inicio-desktop.html" data-w="1440" data-h="900" title="Inicio B escritorio"></iframe></div>
+      </figure>
+      <figure class="plano">
+        <figcaption>Mobile · 390 × 844 <a href="frames/inicio-mobile.html">abrir a tamaño real</a></figcaption>
+        <div class="frame"><iframe src="frames/inicio-mobile.html" data-w="390" data-h="844" title="Inicio B mobile"></iframe></div>
+      </figure>
+    </div>
+  </section>
+
+  <section class="seccion" id="servicios">
+    <div class="cab">
+      <span class="chip">02</span>
+      <div>
+        <h2>Servicios B</h2>
+        <p class="idea">Publicaciones contratables, no servicios institucionales: cobertura, modalidad, responsable y siguiente acción sobre el hero aprobado, con preview real de servicio y logística (incluye una publicación a cotizar).</p>
+      </div>
+    </div>
+    <div class="ficha">
+      <div>
+        <h3>Contenido real conservado</h3>
+        <ul>
+          <li>Copy íntegro de <code>ServicesPage.tsx</code>: eyebrow, H1, bajada, CTAs y bloque «qué mirar antes de cotizar».</li>
+          <li>Fotografía aprobada del relevamiento, sin overlay, con banda técnica de registro.</li>
+          <li>Trio de prueba: Cobertura / Modalidad / Responsable.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Cards de preview</h3>
+        <ul>
+          <li>Servicio de Siembra con GPS — contratable con precio por hectárea.</li>
+          <li>Transporte de Granos a Puerto — logística con precio por tonelada.</li>
+          <li>Flete de Maquinaria con Carretón — a convenir → <code>Solicitar cotización</code>.</li>
+          <li>Servicio y logística no llevan foto: comparan alcance, no imágenes.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Decisiones B</h3>
+        <ul>
+          <li>Foto a sangrado completo con banda grafito; copy a la derecha.</li>
+          <li>Anatomía con filete superior acero; logística grafito.</li>
+          <li>Acciones según diccionario: <code>Contratar</code> / <code>Ver alcance</code> / <code>Ver cobertura</code>.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="planos">
+      <figure class="plano">
+        <figcaption>Escritorio · 1440 × 900 <a href="frames/servicios-desktop.html">abrir a tamaño real</a></figcaption>
+        <div class="frame"><iframe src="frames/servicios-desktop.html" data-w="1440" data-h="900" title="Servicios B escritorio"></iframe></div>
+      </figure>
+      <figure class="plano">
+        <figcaption>Mobile · 390 × 844 <a href="frames/servicios-mobile.html">abrir a tamaño real</a></figcaption>
+        <div class="frame"><iframe src="frames/servicios-mobile.html" data-w="390" data-h="844" title="Servicios B mobile"></iframe></div>
+      </figure>
+    </div>
+  </section>
+
+  <section class="seccion" id="mercado">
+    <div class="cab">
+      <span class="chip">03</span>
+      <div>
+        <h2>Mercado B</h2>
+        <p class="idea">El catálogo denso y transaccional: buscador dominante, filtros reales, conteo, orden y las cuatro anatomías conviviendo — sin convertir el mercado en landing.</p>
+      </div>
+    </div>
+    <div class="ficha">
+      <div>
+        <h3>Estructura real</h3>
+        <ul>
+          <li>Dos bandas de <code>Header.tsx</code>: buscador arriba, navegación abajo.</li>
+          <li>Filtros de <code>FilterSidebar</code>: Tipo, Categoría, Provincia, Precio + Limpiar filtros.</li>
+          <li>Conteo «30 operaciones» + «Ordenar por» con las cinco opciones reales.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Cuatro anatomías</h3>
+        <ul>
+          <li><strong>Activo:</strong> Cosechadora John Deere 9750, usada, Balcarce → <code>Iniciar operación</code>.</li>
+          <li><strong>Insumo:</strong> Urea 46%, 900 disponibles, selector de cantidad → <code>Agregar</code>.</li>
+          <li><strong>Servicio:</strong> Siembra con GPS, por hectárea → <code>Contratar</code>.</li>
+          <li><strong>Logística:</strong> Flete con carretón, a convenir → <code>Solicitar cotización</code>.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Señal por anatomía</h3>
+        <p>Filete superior: verde activo, cereal insumo, acero servicio, grafito logística. El resto de la card es idéntico: mismos datos, misma acción, misma grilla. Las publicaciones sin foto llevan una placa de registro baja (grilla de parcela, esquinas y rótulo) en lugar de un rectángulo vacío: la card lidera con datos. La apertura de detalle y el carrito quedan como comportamiento del producto, no se maquetan aquí.</p>
+      </div>
+    </div>
+    <div class="planos">
+      <figure class="plano">
+        <figcaption>Escritorio · 1440 × 900 <a href="frames/mercado-desktop.html">abrir a tamaño real</a></figcaption>
+        <div class="frame"><iframe src="frames/mercado-desktop.html" data-w="1440" data-h="900" title="Mercado B escritorio"></iframe></div>
+      </figure>
+      <figure class="plano">
+        <figcaption>Mobile · 390 × 844 <a href="frames/mercado-mobile.html">abrir a tamaño real</a></figcaption>
+        <div class="frame"><iframe src="frames/mercado-mobile.html" data-w="390" data-h="844" title="Mercado B mobile"></iframe></div>
+      </figure>
+    </div>
+  </section>
+
+  <section class="seccion" id="header">
+    <div class="cab">
+      <span class="chip">04</span>
+      <div>
+        <h2>Header — estados de sesión</h2>
+        <p class="idea">Demostración de que el header escala: anónimo, comprador, vendedor y administración en desktop y mobile, con los usuarios reales del seed. No hay páginas de roles: sólo la barra.</p>
+      </div>
+    </div>
+    <div class="planos">
+      <figure class="plano ancho">
+        <figcaption>Lámina completa · desktop y mobile <a href="frames/header-estados.html">abrir a tamaño real</a></figcaption>
+        <div class="frame"><iframe src="frames/header-estados.html" data-w="1240" data-h="1180" title="Estados del Header" style="height:1180px;"></iframe></div>
+      </figure>
+    </div>
+  </section>
+
+  <section class="seccion" id="wordmark">
+    <div class="cab">
+      <span class="chip">WM</span>
+      <div>
+        <h2>Wordmark — evolución única</h2>
+        <p class="idea">Inter Tight ExtraBold delineado a curvas + señal cereal cuadrada (el mismo marcador del sistema). Sin isotipo de hoja, sin otro nombre, sin lectura de banco, diario o marca eco. Una sola evolución, aplicada en los seis frames.</p>
+      </div>
+    </div>
+    <div class="ficha">
+      <div>
+        <h3>Versiones</h3>
+        <ul>
+          <li><code>topgreen-horizontal.svg</code> — con descriptor «Mercado agro · Argentina».</li>
+          <li><code>topgreen-compact.svg</code> — color, fondos claros.</li>
+          <li><code>topgreen-mono-clara.svg</code> — una tinta grafito, fondo claro.</li>
+          <li><code>topgreen-mono-oscura.svg</code> — una tinta blanca, fondo verde.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Símbolo: parcela activa</h3>
+        <p>Cuadrícula 2×2 con contorno y cruz de coordenadas; un cuadrante relleno en cereal marca «el lote que opera». Estructura en verde campo; monocromo en una tinta. Trazos al 10% del símbolo: se lee a 16 px. Reemplaza al cuadrado liso sin tocar la tipografía.</p>
+      </div>
+      <div>
+        <h3>Licencia</h3>
+        <p>Inter e Inter Tight, SIL Open Font License 1.1 — uso comercial permitido y verificable (<code>OFL-Inter.txt</code>, <code>OFL-InterTight.txt</code> en <code>assets/fonts/</code>). Los cuatro SVG están convertidos a contornos: no dependen de la fuente en runtime.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  Extensión B de Ox Alpha · exploración aislada para aprobación visual de Emi y PM · el repositorio del producto no fue modificado · sin handoff técnico en esta etapa.
+</footer>
+
+<script>
+  document.querySelectorAll('.frame').forEach(function (wrap) {
+    var frame = wrap.querySelector('iframe');
+    var natW = parseInt(frame.dataset.w, 10);
+    var natH = parseInt(frame.dataset.h, 10);
+    function fit() {
+      var s = Math.min(1, wrap.clientWidth / natW);
+      frame.style.width = natW + 'px';
+      frame.style.height = natH + 'px';
+      frame.style.transform = 'scale(' + s + ')';
+      wrap.style.height = (natH * s) + 'px';
+    }
+    if ('ResizeObserver' in window) { new ResizeObserver(fit).observe(wrap); } else { window.addEventListener('resize', fit); }
+    fit();
+  });
+</script>
+
+</body>
+</html>

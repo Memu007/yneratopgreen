@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mercado B · 390 — TopGreen (extensión)</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/b.css">
+</head>
+<body>
+
+<header class="hd hd-mercado">
+  <div class="hd-in">
+    <button class="brand" type="button">
+      <img src="../assets/marca/topgreen-mono-oscura.svg" alt="TopGreen">
+    </button>
+    <div class="acciones">
+      <button class="accion-cell" type="button">Carrito (2)</button>
+      <button class="accion-cell" type="button">Cuenta</button>
+    </div>
+    <form class="buscador" role="search" onsubmit="return false">
+      <input type="search" placeholder="Buscar" aria-label="Buscar en el mercado">
+      <button type="submit">Buscar</button>
+    </form>
+    <nav class="nav2" aria-label="Secciones del sitio">
+      <div class="nav">
+        <button class="nav-link" type="button">Inicio</button>
+        <button class="nav-link is-active" type="button" aria-current="page">Mercado</button>
+        <button class="nav-link" type="button">Servicios</button>
+        <button class="nav-link" type="button">Quiénes somos</button>
+        <button class="nav-link" type="button">Contacto</button>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="layout">
+    <div class="main-mercado" style="padding-left:16px; padding-right:16px;">
+      <div class="toolbar">
+        <div class="resultados"><strong>30</strong> <span>operaciones</span></div>
+        <button class="btn-card secondary btn-filtrar-mobile" type="button" style="flex:none; height:40px; padding:0 18px;">Filtrar</button>
+      </div>
+
+      <div class="grilla">
+        <article class="card activo">
+          <div class="media"><img src="../assets/estados/no-photo-b.svg" alt="Sin fotografía"></div>
+          <div class="cuerpo">
+            <div class="encabezado">
+              <span class="anatomia">Activo de alto valor</span>
+              <span class="estado">Usado</span>
+            </div>
+            <h3 class="titulo3">Cosechadora John Deere 9750</h3>
+            <p class="ubicacion">Balcarce, Buenos Aires</p>
+            <div class="precio">
+              <strong class="cifra">$ 125.000.000</strong>
+              <span class="unidad">por unidad</span>
+            </div>
+            <p class="stock ok">1 disponible</p>
+            <div class="vendedor">
+              <span class="vendedor-nombre">Administrador TopGreen</span>
+              <span class="vendedor-rating">Sin calificaciones aún</span>
+            </div>
+            <div class="acciones-card">
+              <button class="btn-card primary" type="button">Iniciar operación</button>
+              <button class="btn-card secondary" type="button">Ver condiciones</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="card insumo">
+          <div class="media"><img src="../assets/estados/no-photo-b.svg" alt="Sin fotografía"></div>
+          <div class="cuerpo">
+            <div class="encabezado">
+              <span class="anatomia">Insumo estandarizado</span>
+            </div>
+            <h3 class="titulo3">Urea Granulada 46% Nitrógeno</h3>
+            <p class="ubicacion">Paraná, Entre Ríos</p>
+            <div class="precio">
+              <strong class="cifra">$ 39.000</strong>
+              <span class="unidad">por bolsa 50kg</span>
+            </div>
+            <p class="stock ok">900 disponibles</p>
+            <div class="vendedor">
+              <span class="vendedor-nombre">Juan Vendedor</span>
+              <span class="vendedor-rating">Sin calificaciones aún</span>
+            </div>
+            <div class="cantidad">
+              <label for="cant-urea-m">Cantidad</label>
+              <input id="cant-urea-m" type="number" value="1" min="1" max="900">
+              <button class="btn-card primary" type="button">Agregar</button>
+            </div>
+            <div class="acciones-card" style="margin-top:10px;">
+              <button class="btn-card secondary" type="button">Ver detalle</button>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </div>
+</main>
+
+</body>
+</html>
