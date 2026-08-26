@@ -3653,3 +3653,14 @@ toques Backend y no despliegues** dentro de UX-2D.1.
   sesión y con el rol más cargado. Incluí teclado, zoom 200 % y cero overflow.
 - Repetí build, lint, contraste, a11y, hito, suite completa y `diff --check`.
   Entregá commit de producto e informe en `PARA-PM.md`; empujá y frená.
+
+## 2026-08-26 — Revisión PM de UX-2D.1: conforme técnicamente, pausa visual
+
+La corrección `2a01775` y el informe `03ed1bf` cumplen el alcance. PM comprobó
+en navegador la misma primera banda en Inicio y Mercado, con la búsqueda debajo
+sólo en Mercado; revisó además las evidencias admin de `1440`, `768` y `390`.
+Build, lint y `diff --check` fueron reproducidos sin fallas. La suite 128/128 y
+las puertas completas quedan como evidencia de Dev porque PM no recreó la base.
+
+No hay tarea activa. No despliegues ni abras otra corrección: falta únicamente
+la confirmación visual de Emi sobre esta cabecera.
