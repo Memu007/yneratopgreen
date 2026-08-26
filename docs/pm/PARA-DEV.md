@@ -3607,3 +3607,49 @@ motion, copy largo y cero overflow.
 Corré build, lint, contraste, a11y completo, hito, suite desde base limpia y
 `diff --check`. Entregá un commit de producto y otro de informe en
 `PARA-PM.md`; empujá ambos y frená para revisión. **No despliegues.**
+
+## 2026-08-26 — Corrección visual acotada UX-2D.1: una sola cabecera
+
+Emi revisó UX-2D en el producto real y **no acepta que el encabezado cambie de
+estructura al entrar al Mercado**. La identidad superior debe permanecer
+estable entre Inicio, Mercado y Servicios. Ésta es la única tarea activa; no
+reabras el resto de UX-2D.
+
+### Resultado requerido
+
+1. Conservá un único `Header` y una **primera banda idéntica** en todas las
+   secciones públicas: marca a la izquierda, las cinco secciones en el mismo
+   orden y las acciones reales de sesión/rol a la derecha.
+2. En Mercado, mové el formulario de búsqueda a una **segunda banda propia,
+   inmediatamente debajo** de esa primera banda. El buscador no reemplaza la
+   navegación ni desplaza las secciones a una barra blanca.
+3. Fuera de Mercado no se muestra el buscador. La búsqueda continúa filtrando
+   exactamente el catálogo actual y conserva etiqueta accesible, submit,
+   valor, callbacks y placeholders existentes.
+4. En tablet y celular preservá todas las secciones y acciones. El orden de
+   lectura debe ser marca/acciones, navegación y, sólo en Mercado, búsqueda.
+   Puede envolver según los breakpoints existentes, pero no esconder destinos,
+   crear menú nuevo ni introducir scroll horizontal.
+
+### No confundir con esta tarea
+
+En el entorno local de revisión, las publicaciones de Logística aparecieron
+como `Insumo estandarizado`. PM comprobó que el frontend nuevo está conectado
+al Backend descartable antiguo: su respuesta pública omite `operation_kind`,
+`pricing_type`, `response_time` y `coverage_zones`. El código y el seed actuales
+sí declaran `logistica`. **No corrijas esto con inferencias en el frontend, no
+toques Backend y no despliegues** dentro de UX-2D.1.
+
+### Límites y puertas
+
+- Sin rediseñar cards, hero, filtros, anatomías, colores, tipografía o copy.
+- Sin Backend, seed, migración, API, auth, pagos, logística, dependencias ni
+  despliegue.
+- Preservá retorno de Mercado Pago, Admin, Vender, carrito, cuenta, salir e
+  ingresar para los roles existentes.
+- Actualizá la regresión del Header para exigir paridad estructural entre
+  Inicio, Mercado y Servicios, y búsqueda en la segunda banda sólo en Mercado.
+- Capturas mínimas: Inicio y Mercado a `1440×900`, `768×1024` y `390×844`, sin
+  sesión y con el rol más cargado. Incluí teclado, zoom 200 % y cero overflow.
+- Repetí build, lint, contraste, a11y, hito, suite completa y `diff --check`.
+  Entregá commit de producto e informe en `PARA-PM.md`; empujá y frená.

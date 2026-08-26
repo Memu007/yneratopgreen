@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-08-25.
+Actualizado: 2026-08-26.
 
 ## Relevo inmediato — leer primero
 
@@ -148,6 +148,18 @@ Actualizado: 2026-08-25.
   implementa esa capa sobre UX-2C, conserva flujos y Backend, entrega evidencia
   en tres viewports y frena sin desplegar. El símbolo `parcela activa` es
   provisional del MVP: se usa tal cual y no se rediseña en esta tarea.
+- **UX-2D entregada; corrección visual UX-2D.1 activa:** producto `465a5c2`,
+  informe `d182f80`. PM reprodujo build, lint y `diff --check`; Dev informa
+  suite 128/128, contraste 52/52, a11y 64/64 e hito 6/6 desde base limpia. Emi
+  acepta la dirección B pero rechazó que Mercado sustituya la navegación de la
+  primera banda por el buscador. La única corrección activa mantiene la misma
+  cabecera superior de Inicio/Servicios y coloca la búsqueda del Mercado en una
+  segunda banda inferior. Sin rediseño adicional, Backend ni despliegue.
+- **Advertencia del entorno descartable:** el Backend remoto usado por la vista
+  local está atrasado respecto de `main` y su catálogo no devuelve aún
+  `operation_kind` ni los campos nuevos de servicio. Por eso Logística cae en
+  el respaldo visual `insumo`; no es una regla a parchear en el frontend. El
+  seed y el Backend actuales declaran correctamente `logistica`.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -156,14 +168,12 @@ Actualizado: 2026-08-25.
 
 ## Entrega aceptada y tarea actual
 
-UX-2C queda aceptada técnicamente en `35eaf30` pero rechazada en su capa visual
-editorial. La tarea activa es **UX-2D**: reemplazar únicamente esa capa por
-**B — Mercado nacional** según `diseno-premium/mercado-nacional-b/`. Header,
-Inicio, Servicios y Mercado tienen referencias desktop/mobile, activos,
-contrato, mapa y paridad; tablet se resuelve con los breakpoints existentes.
-Se preservan las cuatro anatomías y todos los flujos. Sin Backend, pagos,
-logística, API, dependencias ni despliegue. Opus entrega commits e informe y
-frena para revisión PM/Emi.
+UX-2D fue entregada en `465a5c2` y todavía no tiene aceptación visual final. La
+tarea activa única es **UX-2D.1**: preservar la cabecera superior de B sin que
+cambie al entrar al Mercado y colocar el buscador en una segunda banda debajo.
+No se reabren Inicio, Servicios, cards, anatomías, color, tipografía ni
+producto. Sin Backend, pagos, logística, API, dependencias ni despliegue. Opus
+entrega commit e informe y frena para revisión PM/Emi.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se
