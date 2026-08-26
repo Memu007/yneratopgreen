@@ -2,214 +2,160 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-Fecha: 2026-08-26. Vigésimo quinto informe: **UX-2D, la dirección B «Mercado
-nacional» sobre el producto real**.
+Fecha: 2026-08-26. Vigésimo sexto informe: **UX-2D.1, una sola cabecera**.
 
 Un commit de producto y este informe.
 
 | Commit | Qué trae |
 |---|---|
-| `465a5c2` | Tokens, fuentes, marca y placa de estado; cabecera por celdas; Inicio, Servicios y Mercado; el conteo real; casos 127 y 128; capturas y evidencia |
+| `2a01775` | La banda de identidad estable, el buscador en su propia banda, el caso 128 ampliado y las capturas nuevas |
 | este | Este informe |
 
 ---
 
-## 1. Lo que hice, en una línea por frontera
+## 1. Emi tenía razón y el defecto era mío
 
-1. **Fundación.** Una sola capa `--tg-*` con la paleta B —canvas `#f7f6f2`,
-   verde `#1e4a34`, cereal `#c49a43`, acero `#5a6b60`, borde `#d8dad2`—, Inter
-   Tight e Inter servidas desde el sitio, los cuatro SVG del paquete y la placa
-   `no-photo-b.svg` integrada en `ProductImage`.
-2. **Cabecera.** Un solo `Header.tsx`, banda verde dividida en celdas, dos
-   bandas en el Mercado, navegación 3+2 en celular y las acciones de cada rol
-   —`Salir` incluido— en los tres anchos.
-3. **Inicio y Servicios.** La geometría de las láminas sobre el copy, los datos
-   y los callbacks de UX-2C. Nada de negocio se movió.
-4. **Mercado.** Panel de 256 px, barra de resultados, grilla 3/2/1, regla
-   superior por anatomía y **el conteo desde el total de la API**, que es la
-   corrección que devolviste.
-5. **Estados, puertas y evidencia.** Las siete puertas, las diecisiete capturas
-   y `PARIDAD.md` completo casilla por casilla.
+La cabecera cambiaba de estructura al entrar al Mercado: el buscador se metía
+en la banda de marca y empujaba los cinco destinos a una barra blanca aparte.
+Copié eso de las láminas sin ver el problema. En un prototipo estático es una
+lámina por pantalla; en el producto es una cabecera que se transforma justo
+cuando uno pasa de mirar a operar, y la identidad de arriba deja de ser un
+lugar fijo.
 
-## 2. Tu corrección: el conteo
+Ahora hay **una sola banda de identidad**, idéntica en Inicio, Mercado y
+Servicios: marca a la izquierda, los cinco destinos en el mismo orden, las
+acciones reales de sesión y rol a la derecha, a la misma altura. El Mercado no
+la toca: le agrega **una segunda banda propia, debajo**, con el buscador.
+Fuera del Mercado esa banda no existe.
 
-Dijiste que la afirmación de que el Mercado ya mostraba el total verdadero era
-incorrecta, que la API lo devuelve pero `ProductGrid` contaba
-`products.length`. Es exactamente así y lo comprobé antes de tocarlo.
+Comparalo abierto: `capturas/inicio-1440x900.png` contra
+`capturas/mercado-1440x900.png`. La parte de arriba es la misma imagen salvo
+cuál celda está activa.
 
-Ahora `App.tsx` guarda `response.total` y la barra dice **«100 de 155
-operaciones»**: el total es el de la base y la primera cifra confiesa cuántas
-bajaron. No abrí paginación —está fuera de la orden— pero dejé de esconder que
-la lista está cortada.
+## 2. Qué cambié, exactamente
 
-Hay un matiz que quiero decir yo antes de que lo encuentres vos. Dos filtros no
-viajan a la consulta: **subcategoría** y **calificación mínima del vendedor**,
-que los aplica el navegador sobre la página descargada. Mientras no descartan
-ninguna fila, el total de la API sigue describiendo lo que se está mirando; en
-cuanto descartan alguna, deja de describirlo y la barra pasa a contar lo que
-quedó en pantalla. La condición es medible —`filteredProducts.length !==
-products.length`— y no una adivinanza, y está comentada donde se decide.
+- `Header.tsx` deja de tener dos formas. El buscador sale de la banda de marca
+  y pasa a un bloque propio que se dibuja sólo en el Mercado, después de la
+  banda. La navegación vuelve a la banda de identidad en todas las secciones.
+- La segunda banda es verde, como la primera: es la misma banda con un renglón
+  más, no una barra de otro material. La barra blanca era justamente lo que
+  hacía que el Mercado se leyera como otra cabecera.
+- La marca mide lo mismo en todas las secciones. Antes achicaba de 40 a 34 px
+  al entrar al Mercado, que era otra manera de que la banda no fuera la misma.
+- El buscador conserva todo: la etiqueta accesible «Buscar en el mercado», el
+  `id`, el valor, el submit, los callbacks y los dos textos de `placeholder`
+  por ancho. Sigue filtrando el mismo catálogo, ahora desde su banda.
+- El panel de filtros se pega 12 px más abajo y el alto mínimo del Mercado se
+  corrige, porque la cabecera pasó de 112 a 124 px en escritorio.
 
-El **caso 127** es nuevo y prueba justo eso: fabrica un catálogo de más de cien
-publicaciones, exige que la barra diga «100 de 155 operaciones» y que al
-filtrar por servicios el número pase al del conjunto pedido. Contra el código
-anterior falla con «el conteo dice «100 operaciones» y en la base hay 155
-publicaciones activas».
+## 3. El orden de lectura, que es donde me hiciste pensar
 
-El **caso 128** cubre la cabecera: 12 combinaciones de rol × ancho, los cinco
-destinos visibles, cada acción del rol con 44 px de alto, el nombre real en
-escritorio y «Cuenta» en celular, el texto del buscador por ancho y cero
-desborde. Prueba en rojo: quitando el botón `Salir` falla con
-«comprador/escritorio: falta la acción «Salir»».
+Pediste que en tablet y celular el orden fuera marca/acciones, navegación y,
+sólo en Mercado, búsqueda. Estaba dibujado así pero **no escrito así**: en el
+documento la navegación venía antes que las acciones y en pantalla la movía una
+regla de CSS. Para quien usa teclado o lector de pantalla eso es otro orden que
+el que se ve.
 
-## 3. Las diferencias contra el handoff
+Lo di vuelta en el documento: marca, sesión, destinos, búsqueda. Y entonces la
+regla vale para los tres anchos, no sólo para los dos que nombraste:
 
-Están todas en `docs/pm/ux2d/DIFERENCIAS.md`, con su razón y su medición. Las
-tres que te van a importar:
+- en **tablet y celular** la banda ocupa dos renglones y lo que se ve es
+  exactamente lo que dice el documento;
+- en **escritorio** la banda entra en un renglón y los destinos se siguen
+  dibujando en el medio, que es la composición aprobada, mientras el recorrido
+  del teclado mantiene el mismo orden que en los otros dos anchos.
 
-**El activo de alto valor sigue ocupando la fila entera.** La lámina del
-Mercado lo dibuja como una tarjeta más de la grilla de tres. No lo cambié: el
-ancho completo está fijado en `handoff/RESPONSIVE.md` y en la precedencia que
-vos misma escribiste las anatomías son el punto 2 y la composición de este
-paquete el punto 3. Lo que sí cambió es su color: la regla superior pasa a
-verde. Si preferís que entre en la grilla, es un cambio de anatomía y hay que
-reabrirlo en `handoff/`, no resolverlo en un revestimiento.
+Medido en los tres: `TopGreen → Ingresar → Inicio → Mercado → Servicios →
+Quiénes somos → Contacto → campo → Buscar`, con anillo de foco de 3 px en cada
+parada y ninguna parada perdida.
 
-**No existe un rol «comprador» que no pueda vender.** `users.role` es `USER` o
-`ADMIN` y cualquier cuenta con sesión puede publicar, así que la celda `Vender`
-aparece para comprador y para vendedor y las dos capturas se ven iguales.
-Preservé el producto: esconderle `Vender` a una cuenta que todavía no publicó
-le saca una capacidad que hoy tiene. Separar los dos roles es una decisión de
-producto con migración.
+## 4. La regresión
 
-**El anillo de foco no es cereal sobre fondo claro.** La lámina lo pone cereal
-en todas partes; el cereal mide **2,41:1 contra el canvas** y un indicador de
-foco necesita 3:1. Quedó verde de marca sobre claro (**9,32:1**) y cereal sobre
-la banda verde (**3,86:1**), que es donde el verde desaparecería. Mismo anillo,
-mismo grosor, el único color que en cada fondo se ve.
+El caso 128 pasó a exigir las dos propiedades, y se llama por lo que prueba:
+«La cabecera es la misma en Inicio, Mercado y Servicios, y sólo el Mercado suma
+la banda de búsqueda».
 
-## 4. La placa de «sin registro fotográfico»
+Lo que mide, en los tres anchos:
 
-El activo que entregó diseño trae la leyenda dibujada en contornos y a la
-altura que ocupa en una tarjeta se lee entera. Poner al lado un rótulo con las
-mismas tres palabras era decir dos veces lo mismo en el mismo renglón, así que
-la placa habla sola y el nombre accesible del respaldo dice «Sin registro
-fotográfico. <título de la publicación>».
+1. **Paridad estructural.** Retrata la banda de identidad de cada sección
+   —posición, alto, archivo y alto de la marca, y la lista de celdas en orden—
+   y exige que las tres devuelvan lo mismo.
+2. **Orden de lectura.** La primera celda es la marca y las últimas cinco son
+   los destinos, en orden, en el documento.
+3. **El buscador sólo en el Mercado.** No existe en Inicio ni en Servicios; en
+   el Mercado arranca por debajo de la banda de identidad, conserva su etiqueta
+   y su texto por ancho, y **desde ahí filtra**: buscar una publicación real
+   baja el conteo de tarjetas y deja esa publicación en pantalla.
+4. Y lo que ya exigía: las acciones de cada rol con 44 px de alto —`Salir`
+   incluido—, el nombre real en escritorio y «Cuenta» en celular, y cero
+   desborde horizontal.
 
-La placa de **imagen rota** es otra cosa y no lleva palabras dibujadas, así que
-ahí el rótulo escrito se queda. Siguen siendo dos estados que se dicen
-distinto, que es la propiedad que importaba.
+**Prueba en rojo**, con la cabecera anterior puesta de vuelta: falla con
+«escritorio: la banda de identidad de Mercado no es la de Inicio». Es el
+defecto que encontró Emi, dicho por la prueba.
 
-Las pruebas se ajustaron a eso y quedaron más exigentes, no menos: además del
-nombre accesible ahora comprueban que la placa esté **efectivamente pintada**,
-así que si el archivo no cargara, el caso falla en vez de aprobar un rectángulo
-vacío que dice la verdad en el árbol de accesibilidad.
+## 5. Lo que NO toqué
 
-Y en el detalle, el marco de la foto se achica a la altura de la placa cuando
-no hay fotografía: era la única superficie donde el respaldo quedaba como un
-bloque vacío de media pantalla, que es justo lo que el override pedía sacar.
+Anotaste que en el entorno de revisión las publicaciones de Logística aparecen
+como `Insumo estandarizado` porque el frontend nuevo está contra el Backend
+descartable viejo, cuya respuesta pública omite `operation_kind`,
+`pricing_type`, `response_time` y `coverage_zones`.
 
-## 5. Los dos incumplimientos de contraste que encontró la medición
+No lo toqué y no lo voy a inferir en el frontend. Contra el backend de este
+repositorio las cuatro anatomías salen bien: `capturas/mercado-1440x900.png`
+muestra «Activo de alto valor» y los casos 119 y 120 lo exigen fila por fila.
+Poner una inferencia en el navegador para tapar una respuesta incompleta sería
+inventar el dato que falta.
 
-Los dos salieron del mismo lugar: el cereal profundo a 12 px, que es el color
-del ojo de buey y el más justo de la paleta.
+Tampoco toqué cards, hero, filtros, anatomías, colores, tipografía ni copy.
+Ni backend, seed, migración, API, auth, pagos, logística ni dependencias.
 
-**El primero, en el detalle.** El rótulo «Logística» sobre el tinte de
-información `#e7eef8`: **4,45:1** contra 4,5 exigido. No lo resolví moviendo el
-color del rótulo. Ese bloque no es un aviso del sistema: es la anatomía de
-logística, y bajo B su color es el grafito. Pasó a superficie neutra con filete
-grafito y el problema desapareció por donde correspondía. De paso dejó de
-pintar de celeste lo que el resto del producto dice en grafito.
+## 6. Puertas, desde base limpia
 
-**El segundo lo causé yo**, y aparece en el informe porque me lo encontró la
-medición y no el ojo. La columna de copy de Inicio lleva dos filetes verticales
-—el pautado de la hoja, que está en la lámina— y le pasaban por detrás al ojo
-de buey: cereal profundo sobre el gris del filete da **3,69:1**. Le puse fondo
-propio al ojo de buey, así que el filete se interrumpe en ese renglón, que es
-exactamente donde su propia regla horizontal ya lo cruza. No se nota, y ahora
-mide 4,81:1.
-
-Probé bajar el filete a un gris más claro y no alcanza: ni al 6 % de tinta el
-cereal profundo llega a 4,5 sobre él. Por eso la solución es que no se
-superpongan, no que el filete se desvanezca.
-
-La matriz completa está en `docs/pm/ux2d/TOKENS-Y-CONTRASTE.md`, con el detalle
-de dónde **no** llega el cereal profundo: contra los cuatro tintes semánticos
-queda entre 4,15 y 4,45. Para lo que venga, `.alert .tg-eyebrow` toma el color
-del aviso, que ahí sí está medido.
-
-## 6. Dos cosas que encontré y arreglé
-
-- **`rgba(30, 58, 95, .85)` en Quiénes somos.** Un índigo escrito a mano encima
-  del color de marca: el único hex suelto que quedaba en una superficie
-  pública, y justo el tono que B saca de las pantallas. Se fue la capa; la
-  sección ya tenía su fondo.
-- **«Sin calificaciones aún» cortado en el panel del vendedor.** A 24 px la
-  palabra «calificaciones» no entra en la columna de un contador y sin punto de
-  corte se salía de la tarjeta: se leía «Sin calificacione aún». Es anterior a
-  UX-2D —ni el ancho ni el cuerpo los toqué— y ahora corta como texto.
-
-## 7. Una cosa que encontré y no toqué
-
-**Administración no muestra «Vendedores» ni «Clientes».** Los dos contadores
-quedan en blanco porque la respuesta del servidor no trae `total_sellers` ni
-`total_customers`. Falta un campo en el backend y UX-2D tiene prohibido tocar
-backend, así que lo dejo anotado y sin resolver. Decidilo vos.
-
-## 8. Puertas, desde base limpia
-
-Base recreada —migraciones y seed— antes de medir.
+Base recreada —migraciones y seed— antes de medir, y las siete puertas
+encadenadas sobre esa misma base.
 
 | Puerta | Resultado |
 |---|---|
 | `npm run build` | limpio |
 | `npm run lint` | 0 errores, 0 advertencias (`--max-warnings 0`) |
-| `npm run contraste` | 52/52 mediciones, 6.664 textos, **0 incumplimientos** |
+| `npm run contraste` | 52/52 mediciones, 6.630 textos, **0 incumplimientos** |
 | `npm run a11y -- --todas` | 64/64 pantallas, **0 violaciones de cualquier severidad** |
 | `npm run hito` | 6/6 pasos |
 | suite completa | **128/128**, 0 fallos |
 | `git -c core.whitespace=cr-at-eol diff --check` | limpio |
 
-Fuera de las puertas del repositorio medí además, sobre las cinco secciones
-públicas:
+Fuera de las puertas del repositorio, otra vez:
 
-- **zoom 200 %**: 720×450 y 384×512 —el 200 % de los dos anchos contractuales—
-  y 320×256, que es el piso de reflujo de WCAG. 15 mediciones, cero desborde.
+- **zoom 200 %**: las cinco secciones a 720×450 y 384×512 —el 200 % de los dos
+  anchos contractuales— y a 320×256, el piso de reflujo de WCAG. 15 mediciones,
+  cero desborde.
 - **texto al 130 %**: otras 15 mediciones a 1440, 768 y 390. Cero desborde.
-- **movimiento reducido**: cero elementos con transición o animación mayor a
-  1 ms y cero videos.
-- **tipografía**: las dos únicas peticiones de fuente son `/fuentes/Inter.woff2`
-  y `/fuentes/InterTight.woff2`, ambas `loaded`, cero dominios externos y cero
-  rastro de Newsreader o Work Sans en el árbol.
-- **ocho superficies con sesión** —detalle, carrito, panel, administración,
-  Quiénes somos, Contacto, ingreso y publicación—: 0 errores de consola, 0
-  pedidos fallidos, 0 desborde.
+- **teclado**: el recorrido completo de la cabecera en los tres anchos, con el
+  mismo orden y anillo de foco en todas las paradas.
+- **movimiento reducido y tipografía**: sin cambios, cero elementos animados,
+  cero videos, cero dominios externos.
 
-## 9. Una línea de repositorio
+## 7. Capturas
 
-Agregué un `.gitattributes` con dos reglas y nada más: los textos de licencia
-SIL OFL quedan fuera del control de espaciado. Uno de sus renglones trae un
-espacio al final y a un texto de licencia no se le corrige el espaciado; sin la
-regla, `diff --check` fallaba por una licencia de terceros copiada tal cual. No
-cambia el manejo de finales de línea de ningún archivo.
+Regeneré **todas** las de `docs/pm/ux2d/capturas/` contra el código de hoy: si
+la cabecera cambió, las viejas mentían. Se sumaron las seis que pediste con el
+rol más cargado —administración, que es el de más celdas— para Inicio y Mercado
+en los tres anchos, recortadas al primer viewport, que es donde se ve la
+cabecera; el cuerpo de esas páginas ya está en el juego sin sesión.
 
-## 10. Qué hay para mirar
+Las de Inicio sin sesión salieron byte a byte iguales a las anteriores, y es la
+comprobación más corta de que esto salió bien: **la cabecera de Inicio no
+cambió**. La que cambió fue la del Mercado, que ahora es la misma.
 
-- `docs/pm/diseno-premium/mercado-nacional-b/PARIDAD.md`: completo, casilla por
-  casilla, con la evidencia de cada una.
-- `docs/pm/ux2d/capturas/`: Inicio, Servicios y Mercado en 1440×900, 768×1024 y
-  390×844; la cabecera de los cuatro roles en escritorio y celular; y los
-  cuatro SVG a 40, 30, 24 y 16 px.
-- `docs/pm/ux2d/DIFERENCIAS.md`: las doce diferencias contra el handoff.
-- `docs/pm/ux2d/TOKENS-Y-CONTRASTE.md`: la paleta y sus mediciones.
+`PARIDAD.md` y `docs/pm/ux2d/DIFERENCIAS.md` quedaron actualizados: la
+diferencia contra la lámina del Mercado ahora está escrita como diferencia, con
+su motivo.
 
-## 11. Lo que no hice
+## 8. Lo que sigue abierto, sin cambios
 
-No toqué backend, migraciones, seed, API, pagos, logística, autenticación,
-rutas ni dependencias. No abrí la paginación mayor a 100: sigue registrada en
-`docs/pm/ux2c/DEUDA-PAGINACION.md` y lo único que cambió es que ahora el
-Mercado la dice en vez de taparla. No rediseñé Quiénes somos, Contacto,
-autenticación, detalle, carrito, publicación, paneles ni administración: esas
-pantallas recibieron sólo la fundación compartida.
+- La paginación mayor a 100, en `docs/pm/ux2c/DEUDA-PAGINACION.md`.
+- Administración no muestra «Vendedores» ni «Clientes»: falta el campo en el
+  servidor y es backend.
 
-No desplegué. Freno acá para tu revisión y para la puerta visual de Emi.
+No desplegué. Freno acá.
