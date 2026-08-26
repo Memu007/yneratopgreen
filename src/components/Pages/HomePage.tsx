@@ -28,6 +28,9 @@ const TAXONOMIA: [string, string][] = [
   ['Logística', 'Origen, destino y equipo'],
 ];
 
+/** El número de renglón del libro mayor: `01`, `02`, `03`, `04`. */
+const renglon = (indice: number) => String(indice + 1).padStart(2, '0');
+
 /** Los datos que cada publicación tiene que traer para poder compararse. */
 const DECISION: [string, string][] = [
   ['Precio o modalidad', 'Valor publicado, unidad o indicación honesta de cotización.'],
@@ -59,8 +62,14 @@ export const HomePage: React.FC<HomePageProps> = ({
   return (
     <div className={styles.pagina}>
       <section className={styles.hero} aria-labelledby="titulo-inicio">
+        {/* El margen del libro: una regla vertical con el rótulo de la página.
+            Es ornamento del sistema y no información nueva, así que no se
+            anuncia dos veces y desaparece en celular. */}
+        <div className={styles.margen} aria-hidden="true">
+          <span>Mercado agro · Argentina</span>
+        </div>
         <div className={styles.heroCopy}>
-          <div className="tg-eyebrow">Mercado agro · Argentina</div>
+          <p className="tg-eyebrow">Mercado agro · Argentina</p>
           <h1 id="titulo-inicio" className={styles.heroTitulo}>
             Equipos, insumos y servicios para seguir produciendo.
           </h1>
@@ -76,16 +85,23 @@ export const HomePage: React.FC<HomePageProps> = ({
             </button>
           </div>
           {/* El número sale de `response.total`, que es lo que la API dice que
-              hay. Mientras no se sabe, no se escribe un número provisorio. */}
+              hay. Mientras no se sabe, no se escribe un número provisorio: el
+              `30` de la lámina era el dato ilustrativo del prototipo. */}
           {total !== null && (
-            <p className={styles.conteo}>
-              {total === 1 ? '1 operación disponible ahora' : `${total} operaciones disponibles ahora`}
+            <p className={styles.medidor}>
+              <span className={`tg-data ${styles.medidorNumero}`}>{total}</span>
+              <span className={styles.medidorTexto}>
+                {total === 1 ? 'Operación disponible ahora' : 'Operaciones disponibles ahora'}
+              </span>
+              <i className={styles.medidorRegla} aria-hidden="true" />
             </p>
           )}
         </div>
         {/* La fotografía no lleva texto encima ni filtro: ocupa su columna y se
-            ve. Los dos derivados son los únicos autorizados para producción. */}
-        <div className={styles.heroFoto}>
+            ve. Debajo va la banda de registro, que dice qué se está mirando sin
+            taparlo. Los dos derivados son los únicos autorizados para
+            producción. */}
+        <figure className={styles.heroFoto}>
           <picture>
             <source media="(max-width: 599px)" srcSet="/media/comercial/home-cosecha-hero-1200.webp" />
             <img
@@ -95,16 +111,21 @@ export const HomePage: React.FC<HomePageProps> = ({
               height={1080}
             />
           </picture>
-        </div>
+          <figcaption className={styles.fotoBanda}>
+            <span>Cosecha y descarga de grano · Campo argentino</span>
+            <i aria-hidden="true" />
+          </figcaption>
+        </figure>
       </section>
 
       <section className={styles.taxonomia} aria-labelledby="titulo-taxonomia">
         <h2 id="titulo-taxonomia" className="tg-sr-only">Tipos de operación</h2>
-        <div className={`tg-container ${styles.taxonomiaGrilla}`}>
-          {TAXONOMIA.map(([nombre, descriptor]) => (
+        <div className={styles.taxonomiaGrilla}>
+          {TAXONOMIA.map(([nombre, descriptor], indice) => (
             <div key={nombre} className={styles.taxonomiaItem}>
+              <span className={styles.taxonomiaNumero} aria-hidden="true">{renglon(indice)}</span>
               <strong>{nombre}</strong>
-              <span>{descriptor}</span>
+              <span className={styles.taxonomiaDescriptor}>{descriptor}</span>
             </div>
           ))}
         </div>
@@ -113,7 +134,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       <section className={`tg-container ${styles.operaciones}`} aria-labelledby="titulo-operaciones">
         <div className={styles.encabezadoDeSeccion}>
           <div>
-            <div className="tg-eyebrow">Mercado activo</div>
+            <p className="tg-eyebrow">Mercado activo</p>
             <h2 id="titulo-operaciones">Operaciones disponibles</h2>
           </div>
           <button className="tg-button tg-button--tertiary" onClick={onNavigateToMarketplace}>
@@ -163,7 +184,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       <section className={styles.decision} aria-labelledby="titulo-datos">
         <div className={`tg-container ${styles.decisionGrilla}`}>
           <div className={styles.decisionIntro}>
-            <div className="tg-eyebrow">Antes de avanzar</div>
+            <p className="tg-eyebrow">Antes de avanzar</p>
             <h2 id="titulo-datos">Los datos que definen la operación.</h2>
           </div>
           {DECISION.map(([titulo, texto]) => (

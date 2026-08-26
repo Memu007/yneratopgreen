@@ -55,7 +55,7 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({
       <section className={styles.hero} aria-labelledby="titulo-servicios">
         {/* La fotografía es evidencia de trabajo real y no lleva nada encima:
             ni texto, ni filtro, ni degradado. */}
-        <div className={styles.heroFoto}>
+        <figure className={styles.heroFoto}>
           <picture>
             <source
               media="(max-width: 599px)"
@@ -68,9 +68,13 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({
               height={540}
             />
           </picture>
-        </div>
+          <figcaption className={styles.fotoBanda}>
+            <span>Relevamiento aéreo · Campo afectado por inundación</span>
+            <i aria-hidden="true" />
+          </figcaption>
+        </figure>
         <div className={styles.heroCopy}>
-          <div className="tg-eyebrow">Servicios publicados</div>
+          <p className="tg-eyebrow">Servicios publicados</p>
           <h1 id="titulo-servicios" className={styles.heroTitulo}>
             Encontrá quién resuelve el trabajo.
           </h1>
@@ -90,7 +94,7 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({
             {PRUEBA.map(([titulo, texto]) => (
               <div key={titulo}>
                 <strong>{titulo}</strong>
-                {texto}
+                <span>{texto}</span>
               </div>
             ))}
           </div>
@@ -100,7 +104,7 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({
       <section className={`tg-container ${styles.operaciones}`} aria-labelledby="titulo-servicios-activos">
         <div className={styles.encabezadoDeSeccion}>
           <div>
-            <div className="tg-eyebrow">Oferta disponible</div>
+            <p className="tg-eyebrow">Oferta disponible</p>
             <h2 id="titulo-servicios-activos">Servicios activos</h2>
           </div>
           <button className="tg-button tg-button--tertiary" onClick={onVerServiciosPublicados}>
@@ -152,7 +156,7 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({
       <section className={styles.decision} aria-labelledby="titulo-comparar">
         <div className={`tg-container ${styles.decisionGrilla}`}>
           <div className={styles.decisionIntro}>
-            <div className="tg-eyebrow">Comparación útil</div>
+            <p className="tg-eyebrow">Comparación útil</p>
             <h2 id="titulo-comparar">Qué mirar antes de cotizar.</h2>
           </div>
           {COMPARACION.map(([titulo, texto]) => (

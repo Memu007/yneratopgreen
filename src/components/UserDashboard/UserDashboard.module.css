@@ -694,11 +694,17 @@
   margin: 0 0 4px 0;
 }
 
+/* «Sin calificaciones aún» a 24 px no entra en la columna de un contador, y
+   sin punto de corte la palabra se salía de la tarjeta y quedaba tapada por
+   la de al lado: se leía «Sin calificacione aún». Es un texto, no una cifra,
+   así que corta como texto. */
 .statValue {
   font-size: 24px;
   font-weight: 700;
+  line-height: 1.15;
   color: var(--tg-color-brand);
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 /* Filtros */
@@ -759,7 +765,7 @@
 
 /* Un servicio no tiene fotografía, así que no tiene caja de fotografía: en su
    lugar va una franja con el estado. Antes la tarjeta del panel abría siempre
-   con la foto y el respaldo «Sin fotografía» ocupaba 200 px sobre algo que no
+   con la foto y el respaldo «Sin registro fotográfico» ocupaba 200 px sobre algo que no
    puede tener foto. */
 .productEncabezado {
   display: flex;

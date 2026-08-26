@@ -1,9 +1,9 @@
 /* La capa global del producto.
  *
- * Una sola fuente de verdad para los valores: `tokens.css`. Todo lo de acá
- * abajo los consume, incluidos los nombres viejos —`--text-primary`,
- * `--color-primary-600`, `--radius-lg`— que siguen existiendo como ALIAS y ya
- * no tienen valor propio. Es lo que permite que veinte hojas de componente
+ * Una sola fuente de verdad para los valores: `tokens.css`, hoy la dirección
+ * «B, Mercado nacional». Todo lo de acá abajo los consume, incluidos los
+ * nombres viejos —`--text-primary`, `--color-primary-600`, `--radius-lg`— que
+ * siguen existiendo como ALIAS y ya no tienen valor propio. Es lo que permite que veinte hojas de componente
  * cambien de paleta sin editarlas una por una, y lo que impide que queden dos
  * paletas discutiendo: si un alias apunta a un token, no puede desincronizarse.
  *
@@ -15,7 +15,7 @@
 :root {
   /* --- Alias de color ---------------------------------------------------
      La familia «primary» dejó de ser el emerald de interfaz: la acción del
-     sistema es la tinta índigo. Los diez escalones colapsan en los cuatro
+     sistema es el verde de campo. Los diez escalones colapsan en los cuatro
      papeles que el sistema realmente distingue, porque tener diez tonos de un
      color es tener nueve maneras de elegir mal. */
   --color-primary-50: var(--tg-color-surface-subtle);
@@ -195,6 +195,13 @@ img { display: block; max-width: 100%; }
   outline-offset: 3px;
 }
 
+/* Sobre la banda verde el verde del foco desaparece. La regla no es «otro
+   sistema»: es el mismo anillo con el único color que ahí se ve. */
+.tg-sobre-marca :focus-visible {
+  outline-color: var(--tg-color-focus-sobre-marca);
+  outline-offset: -3px;
+}
+
 ::selection {
   color: var(--tg-color-text);
   background-color: var(--tg-color-selection);
@@ -205,16 +212,16 @@ img { display: block; max-width: 100%; }
 h1, h2, h3 {
   margin: 0;
   font-family: var(--tg-font-display);
-  font-weight: 520;
+  font-weight: 750;
   letter-spacing: -0.025em;
 }
 
-h1 { font-size: clamp(36px, 4vw, 56px); line-height: 1.02; }
-h2 { font-size: clamp(28px, 3vw, 40px); line-height: 1.08; }
-h3 { font-size: 24px; line-height: 1.15; }
+h1 { font-size: clamp(36px, 4vw, 56px); line-height: 1; }
+h2 { font-size: clamp(26px, 2.6vw, 34px); line-height: 1.04; }
+h3 { font-size: 20px; line-height: 1.2; }
 
-h4, h5, h6 { margin: 0; font-weight: 650; line-height: 1.25; }
-h4 { font-size: 22px; }
+h4, h5, h6 { margin: 0; font-family: var(--tg-font-display); font-weight: 700; line-height: 1.25; }
+h4 { font-size: 20px; }
 h5 { font-size: 18px; }
 h6 { font-size: 16px; }
 
@@ -350,6 +357,12 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
   font-size: 16px;
 }
 
+/* El cereal profundo llega a 4,5:1 contra el canvas, el blanco y las dos
+   superficies neutras, y NO contra los tintes semánticos —el más flojo es el
+   de deshabilitado, 4,15:1—. Adentro de un aviso, el ojo de buey toma el color
+   del aviso, que ahí sí está medido. */
+.alert .tg-eyebrow { color: inherit; }
+
 .alert-success { color: var(--tg-color-success); background-color: var(--tg-color-success-bg); }
 .alert-error { color: var(--tg-color-error); background-color: var(--tg-color-error-bg); }
 .alert-warning { color: var(--tg-color-warning); background-color: var(--tg-color-warning-bg); }
@@ -393,12 +406,36 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 }
 
 .tg-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   font-size: 12px;
-  line-height: 1.25;
+  line-height: 1;
   font-weight: 650;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--tg-color-accent);
+}
+
+/* La marca de la señal es un cuadro cereal, no el color del texto: el cereal
+   claro se ve pero no llega a 4,5:1, así que pinta la marca y no la letra. */
+.tg-eyebrow::before {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 3px;
+  background-color: var(--tg-color-signal);
+}
+
+/* Y una regla que sigue hasta donde llegue el ancho disponible. Como el ojo de
+   buey es `inline-flex`, se dibuja SÓLO donde alguien le da ancho —el hero, el
+   encabezado de sección—; en una tarjeta, que lo ajusta al texto, mide cero y
+   no aparece. */
+.tg-eyebrow::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background-color: var(--tg-color-border);
 }
 
 .tg-meta {
@@ -412,10 +449,15 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 
 /* Los números que se comparan entre filas van tabulares: si cada dígito mide
    distinto, dos precios de la misma cifra no se alinean. */
-.tg-price { font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -0.035em; }
+.tg-price {
+  font-family: var(--tg-font-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
 .tg-data { font-variant-numeric: tabular-nums; }
 
-.tg-lead { max-width: 66ch; color: var(--tg-color-text-secondary); font-size: 18px; line-height: 1.55; }
+.tg-lead { max-width: 60ch; color: var(--tg-color-text-secondary); font-size: 17px; line-height: 1.55; }
 .tg-small { color: var(--tg-color-text-secondary); font-size: 14px; }
 
 .tg-rule { border: 0; border-top: 1px solid var(--tg-color-border); margin: 0; }

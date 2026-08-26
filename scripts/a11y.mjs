@@ -239,7 +239,7 @@ async function comprador(page, medida) {
   // transportista demo: sin eso no habría a quién elegir y las dos pantallas
   // nuevas del traslado no existirían. Si el seed cambia, esto falla en vez de
   // medir de menos.
-  const buscador = page.getByPlaceholder('Buscar producto, servicio o ubicación');
+  const buscador = page.getByLabel('Buscar en el mercado');
   await buscador.fill('Fertilizante Triple 15');
   await buscador.press('Enter');
   await page.getByRole('heading', { name: 'Fertilizante Triple 15 - NPK', exact: true, level: 3 })

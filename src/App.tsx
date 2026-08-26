@@ -45,6 +45,10 @@ function App() {
   const [isLoadingLocalities, setIsLoadingLocalities] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productsRevision, setProductsRevision] = useState(0);
+  // Cuántas publicaciones hay para esta consulta, según la API. No es lo
+  // mismo que cuántas bajaron: la página trae como máximo cien, y contar las
+  // que llegaron es contar la página, no el mercado.
+  const [totalDeCatalogo, setTotalDeCatalogo] = useState<number | null>(null);
   // Qué decir cuando el mercado no carga. Sin esto, una falla de red terminaba
   // en la lista vacía y el cartel «No hay operaciones con estos filtros», que
   // es mentira: no es que no haya, es que no pudimos preguntar.
@@ -205,11 +209,13 @@ function App() {
       .then((response) => {
         if (cancelled) return;
         setProducts(response.items.map(convertBackendProductToFrontend));
+        setTotalDeCatalogo(response.total);
       })
       .catch((error) => {
         if (cancelled) return;
         console.error('Error al cargar productos:', error);
         setProducts([]);
+        setTotalDeCatalogo(null);
         // Dos fallas distintas, y conviene no confundirlas: quedarse sin red es
         // algo que la persona puede resolver, y que se lo cuenten es lo que le
         // permite hacerlo. Que el servidor falle no es asunto suyo. El resto de
@@ -245,6 +251,18 @@ function App() {
     categories,
     productsRevision,
   ]);
+
+  // El conteo visible sale del total de la API. Dos filtros no viajan a la
+  // consulta —subcategoría y calificación mínima del vendedor— y los aplica
+  // el navegador sobre la página descargada; mientras no descarten ninguna
+  // fila, el total de la API sigue describiendo lo que se está mirando. En
+  // cuanto descartan alguna, deja de describirlo y lo honesto es contar lo
+  // que quedó. La deuda de paginación mayor a cien sigue abierta y está en
+  // `docs/pm/ux2c/DEUDA-PAGINACION.md`.
+  const elNavegadorDescarto = filteredProducts.length !== products.length;
+  const totalDeResultados = totalDeCatalogo !== null && !elNavegadorDescarto
+    ? totalDeCatalogo
+    : filteredProducts.length;
 
   const handleSearchSubmit = () => {
     console.log('Búsqueda realizada:', searchQuery);
@@ -316,16 +334,12 @@ function App() {
       case 'marketplace':
         return (
           <main className={styles.mainContent}>
-            <section className={`tg-container ${styles.presentacion}`} aria-labelledby="titulo-mercado">
-              <div>
-                <div className="tg-eyebrow">Mercado agro</div>
-                <h1 id="titulo-mercado">Operaciones disponibles</h1>
-              </div>
-              <p className="tg-lead">
-                Compará maquinaria, insumos, servicios y logística con los datos que
-                definen cada operación.
-              </p>
-            </section>
+            {/* El mercado abre con resultados y no con una portada: la banda
+                de presentación desaparece porque el destino ya está dicho en
+                la celda activa de la cabecera y el conteo lo confirma. El
+                encabezado de nivel 1 se queda: sacarlo dejaría la pantalla sin
+                título en el árbol del documento. */}
+            <h1 className="tg-sr-only">Operaciones disponibles</h1>
             <div className={styles.contentWrapper}>
               <FilterSidebar
                 categories={categories}
@@ -355,6 +369,7 @@ function App() {
               />
               <ProductGrid
                 products={filteredProducts}
+                total={totalDeResultados}
                 isLoading={loadingProducts}
                 error={errorDeCatalogo}
                 onReintentar={() => setProductsRevision((intento) => intento + 1)}

@@ -9,70 +9,39 @@
   flex: 1;
 }
 
-/* La presentación del Mercado: qué es esta pantalla, antes de la primera fila
-   de resultados. No es un hero: no hay fotografía, no hay promesa y no empuja
-   el inventario abajo del pliegue. */
-/* La banda de entrada del mercado: alto fijo, titulo y bajada en la misma
-   linea. Es la misma densidad que Inicio y Servicios, sin fotografia: el
-   mercado abre con resultados, no con una portada. */
-.presentacion {
-  min-height: 144px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: center;
-  gap: var(--tg-space-8);
-  padding-block: var(--tg-space-8);
-  border-bottom: 1px solid var(--tg-color-border);
-}
-
-.presentacion h1 {
-  margin-top: var(--tg-space-1);
-  font-size: clamp(38px, 3.6vw, 50px);
-  line-height: 1;
-}
-
-.presentacion :global(.tg-lead) {
-  max-width: 48ch;
-  font-size: 16px;
-}
-
-.presentacion :global(.tg-lead) { justify-self: end; }
-
+/* El Mercado abre con resultados: no hay portada, no hay fotografía y no hay
+   promesa antes de la primera fila. La pantalla es una sola grilla de dos
+   columnas —panel de filtros y resultados— que cruza el ancho completo, igual
+   que las celdas de la cabecera. */
 .contentWrapper {
-  width: min(100%, calc(var(--tg-container-max) + (2 * var(--tg-gutter-desktop))));
-  margin-inline: auto;
-  padding-inline: var(--tg-gutter-desktop);
-  padding-top: var(--tg-space-10);
-  padding-bottom: var(--tg-space-16);
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
-  gap: var(--tg-space-8);
+  grid-template-columns: 256px minmax(0, 1fr);
+  min-height: calc(100vh - 112px);
+  background-color: var(--tg-color-canvas);
+}
+
+.contentWrapper > :last-child {
+  min-width: 0;
+  padding: 0 0 var(--tg-space-12) 28px;
 }
 
 @media (max-width: 1023px) {
-  .presentacion {
-    grid-template-columns: 1fr;
-    gap: var(--tg-space-4);
-    padding-block: var(--tg-space-10);
-  }
-
-  .presentacion :global(.tg-lead) { justify-self: start; }
-
   /* Una sola columna, y el panel de filtros deja de ser una columna: se pliega
      dentro del flujo. No se esconde ningún filtro; cambia cómo se llega. */
   .contentWrapper {
     grid-template-columns: 1fr;
-    gap: var(--tg-space-6);
-    padding-inline: var(--tg-gutter-tablet);
-    padding-top: var(--tg-space-6);
+    gap: var(--tg-space-5);
+    min-height: 0;
+    padding: var(--tg-space-6) var(--tg-gutter-tablet) var(--tg-space-10);
+  }
+
+  .contentWrapper > :last-child {
+    padding: 0;
   }
 }
 
 @media (max-width: 599px) {
-  .presentacion { padding-block: var(--tg-space-8); }
-
   .contentWrapper {
     padding-inline: var(--tg-gutter-mobile);
-    padding-bottom: var(--tg-space-10);
   }
 }

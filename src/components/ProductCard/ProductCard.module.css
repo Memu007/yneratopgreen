@@ -1,15 +1,20 @@
 /* La tarjeta de una operación, en cuatro formas.
    Comparten sistema —regla superior, borde, tipografía, escala— pero no fingen
    que se compran igual: una cosechadora, una bolsa de urea, un servicio de
-   muestreo y un flete no se deciden con los mismos datos. */
+   muestreo y un flete no se deciden con los mismos datos.
+
+   Bajo la dirección B la regla superior deja de ser binaria y dice las cuatro
+   anatomías con su propio color: verde el activo, cereal el insumo, acero el
+   servicio y grafito la logística. */
 
 .card {
   min-width: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   background-color: var(--tg-color-surface);
   border: 1px solid var(--tg-color-border);
-  /* La regla superior es la firma del sistema. En índigo para lo que se
-     compra; en bermellón para lo que se cotiza. */
+  border-radius: var(--tg-radius-sm);
   border-top: 3px solid var(--tg-color-brand);
   cursor: pointer;
 }
@@ -17,8 +22,20 @@
 .card:hover { border-color: var(--tg-color-border-control); }
 .card:focus-within { border-color: var(--tg-color-text); }
 
+/* Las cuatro reglas. El borde superior es lo único que cambia de color entre
+   anatomías; el resto de la tarjeta es el mismo sistema. */
+.activo { border-top-color: var(--tg-color-brand); }
+.insumo { border-top-color: var(--tg-color-signal); }
+.servicio { border-top-color: var(--tg-color-steel); }
+.logistica { border-top-color: var(--tg-color-text); }
+
+/* La banda de la fotografía es un renglón y no una portada: lo que decide una
+   compra son el precio, la ubicación y el responsable, y una foto de 250 px
+   los empujaba abajo del pliegue en cada tarjeta. */
 .media {
-  aspect-ratio: 16 / 9;
+  height: 112px;
+  overflow: hidden;
+  background-color: var(--tg-color-canvas);
   border-bottom: 1px solid var(--tg-color-border);
 }
 
@@ -33,8 +50,9 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--tg-space-4);
-  padding: var(--tg-space-5);
+  flex: 1;
+  gap: var(--tg-space-3);
+  padding: var(--tg-space-4) 18px 18px;
 }
 
 .encabezado {
@@ -44,29 +62,59 @@
   gap: var(--tg-space-3);
 }
 
+/* El rótulo de la anatomía lleva marca cuadrada, no filete: el filete es del
+   ojo de buey de las secciones y confundirlos borraba la diferencia entre
+   «esta sección» y «esta clase de operación». */
+.anatomia {
+  gap: var(--tg-space-2);
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  color: var(--tg-color-accent);
+}
+
+.card .anatomia::before {
+  width: 7px;
+  height: 7px;
+}
+
+.servicio .anatomia,
+.logistica .anatomia { color: var(--tg-color-steel); }
+
+.card.servicio .anatomia::before,
+.card.logistica .anatomia::before { background-color: var(--tg-color-steel); }
+
 /* La condición no es un adorno: es lo primero que mira quien compra una
-   máquina, y por eso va arriba y con filete propio. */
+   máquina, y por eso va arriba, en su propia caja. */
 .estado {
   display: inline-flex;
   align-items: center;
+  flex: none;
   min-height: 24px;
-  padding: 3px 7px;
-  color: var(--tg-color-text);
-  background-color: var(--tg-color-selection);
-  border-left: 2px solid var(--tg-color-brand);
-  font-size: 12px;
-  font-weight: 650;
+  padding: 5px var(--tg-space-2);
+  color: var(--tg-color-text-secondary);
+  background-color: var(--tg-color-surface);
+  border: 1px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-sm);
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .titulo {
+  font-size: 18px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
   /* Alto mínimo para que los precios de una fila queden a la misma altura
      aunque los títulos midan distinto; y corte por palabra, no por carácter. */
-  min-height: 2.3em;
+  min-height: 2.4em;
   overflow-wrap: anywhere;
 }
 
 .ubicacion {
   color: var(--tg-color-text-secondary);
+  font-size: 13px;
 }
 
 .datosDeServicio {
@@ -76,33 +124,40 @@
 }
 
 .datosDeServicio > div {
-  padding-block: var(--tg-space-3);
+  display: flex;
+  gap: var(--tg-space-3);
+  padding-block: 7px;
   border-bottom: 1px solid var(--tg-color-border);
 }
 
 .datosDeServicio dt {
-  color: var(--tg-color-text-secondary);
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.06em;
+  flex: none;
+  width: 88px;
+  color: var(--tg-color-steel);
+  font-size: 10.5px;
+  line-height: 1.5;
+  font-weight: 600;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
 }
 
 .datosDeServicio dd {
-  margin: 4px 0 0;
-  font-weight: 600;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .precio {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--tg-space-2);
 }
 
 /* El precio no se trunca nunca —es el dato que se compara entre tarjetas— y
-   tampoco se parte en medio de los dígitos: baja de cuerpo hasta entrar. */
+   tampoco se parte en medio de los dígitos. */
 .cifra {
-  font-size: clamp(24px, 2.2vw, 38px);
+  font-size: 21px;
   line-height: 1;
   overflow-wrap: normal;
   word-break: keep-all;
@@ -110,12 +165,12 @@
 
 .precio span {
   color: var(--tg-color-text-secondary);
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
 .stock {
   color: var(--tg-color-text-secondary);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -125,12 +180,12 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  align-items: center;
+  align-items: baseline;
   gap: var(--tg-space-2);
   padding-top: var(--tg-space-3);
   border-top: 1px solid var(--tg-color-border);
   font-size: 13px;
-  font-weight: 590;
+  font-weight: 650;
 }
 
 .vendedorNombre {
@@ -138,7 +193,11 @@
   overflow-wrap: anywhere;
 }
 
-.calificacion { color: var(--tg-color-text-secondary); }
+.calificacion {
+  color: var(--tg-color-text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
 
 .cantidad {
   display: grid;
@@ -149,8 +208,9 @@
 }
 
 .cantidad label {
-  font-size: 13px;
-  font-weight: 620;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tg-color-text-secondary);
 }
 
 .cantidad input { width: 100%; }
@@ -158,15 +218,22 @@
 .acciones {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--tg-space-3);
+  gap: var(--tg-space-2);
   margin-top: auto;
+}
+
+.acciones :global(.tg-button) {
+  flex: 1;
+  padding-inline: var(--tg-space-3);
+  font-size: 13.5px;
 }
 
 /* --- Activo de alto valor ------------------------------------------------
    Ocupa el ancho completo de los resultados. No es un destacado pagado: es la
    forma de la anatomía, porque lo que hay que leer de una máquina —condición,
    precio, ubicación, vendedor— no entra en una columna de 300 px sin quedar
-   apilado en una tira. */
+   apilado en una tira. Está fijado en `handoff/RESPONSIVE.md`, que en el orden
+   de precedencia de UX-2D manda sobre la lámina de referencia. */
 .activo {
   grid-column: 1 / -1;
   display: grid;
@@ -175,7 +242,6 @@
 
 .activo .media {
   height: 100%;
-  aspect-ratio: auto;
   border-bottom: 0;
   border-right: 1px solid var(--tg-color-border);
 }
@@ -184,8 +250,11 @@
 
 .activo .titulo {
   min-height: 0;
-  font-size: clamp(32px, 3.1vw, 48px);
+  font-size: clamp(28px, 2.6vw, 38px);
+  line-height: 1.05;
 }
+
+.activo .cifra { font-size: clamp(26px, 2.2vw, 32px); }
 
 /* --- Variante compacta ---------------------------------------------------
    La vista previa de Inicio y de Servicios muestra tres operaciones en tres
@@ -193,58 +262,55 @@
    pero no su privilegio de fila completa, que ahi no existe. */
 .compacta.activo {
   grid-column: auto;
-  display: block;
-}
-
-.compacta .media {
-  aspect-ratio: 4 / 3;
+  display: flex;
+  flex-direction: column;
 }
 
 .compacta.activo .media {
-  height: auto;
+  height: 112px;
   border-right: 0;
   border-bottom: 1px solid var(--tg-color-border);
 }
 
 .compacta.activo .cuerpo {
-  padding: var(--tg-space-5);
+  padding: var(--tg-space-4) 18px 18px;
 }
 
 .compacta.activo .titulo {
-  min-height: 2.3em;
-  font-size: 25px;
+  min-height: 2.4em;
+  font-size: 18px;
+  line-height: 1.2;
 }
+
+.compacta.activo .cifra { font-size: 21px; }
 
 /* --- Servicio y logística ------------------------------------------------
-   Sin imagen y con la regla en bermellón: es lo que se cotiza, no lo que se
-   agrega al carrito. */
-.servicio,
-.logistica {
-  border-top-color: var(--tg-color-accent);
-}
-
+   Sin imagen: lo que hay que comparar de un servicio es su alcance, no una
+   foto de alguien trabajando. */
 .servicio .cuerpo,
 .logistica .cuerpo {
   height: 100%;
 }
 
 @media (max-width: 700px) {
-  .activo { display: block; }
+  .activo { display: flex; flex-direction: column; }
 
   .activo .media {
-    min-height: 230px;
+    height: 160px;
     border-right: 0;
     border-bottom: 1px solid var(--tg-color-border);
   }
 
-  .activo .cuerpo { padding: var(--tg-space-5); }
-  .activo .titulo { font-size: 34px; }
+  .activo .cuerpo { padding: var(--tg-space-4) 18px 18px; }
+  .activo .titulo { font-size: 26px; }
+  .activo .cifra { font-size: 24px; }
 }
 
 @media (max-width: 599px) {
   /* En 390 px los dos botones en línea quedan en 150 px cada uno y el texto
      completo no entra: van uno por fila, con el texto entero. */
   .acciones { display: grid; }
+  .media { height: 96px; }
   .cantidad { grid-template-columns: auto 72px; }
   .cantidad button { grid-column: 1 / -1; }
 }

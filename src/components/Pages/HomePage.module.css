@@ -1,7 +1,8 @@
-/* Inicio comercial — extensión «A, Mercado a cielo abierto».
-   La página dejó de ser una placa índigo con una bienvenida: ahora abre con
-   copy y fotografía en columnas separadas, sigue con las cuatro clases de
-   operación y muestra publicaciones reales. Nada de esto lleva overlay. */
+/* Inicio comercial — dirección «B, Mercado nacional».
+   La página abre con copy y fotografía en columnas separadas, sin overlay;
+   sigue con el libro mayor de las cuatro familias y muestra publicaciones
+   reales. El medidor es un dato de la operación, no un monumento: la cifra
+   sale de `response.total`. */
 
 .pagina {
   min-height: 100vh;
@@ -10,60 +11,150 @@
 
 /* --- Hero: dos columnas, cero overlay ------------------------------------ */
 .hero {
-  min-height: 432px;
+  position: relative;
+  min-height: 560px;
   display: grid;
-  grid-template-columns: 44% 56%;
-  background-color: var(--tg-color-surface);
-  border-bottom: 1px solid var(--tg-color-border);
+  grid-template-columns: 47% 53%;
+  background-color: var(--tg-color-canvas);
+}
+
+/* El margen del libro. Es la regla del borde con el rótulo de la sección
+   girado; no informa nada nuevo y por eso está fuera del árbol accesible. */
+.margen {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--tg-color-border);
+}
+
+.margen span {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  color: var(--tg-color-text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .heroCopy {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   justify-content: center;
   gap: var(--tg-space-4);
   /* El copy arranca donde arranca el contenedor del resto de la página: el
      texto del hero y el de las secciones comparten margen izquierdo. */
-  padding: var(--tg-space-8) var(--tg-space-10) var(--tg-space-8)
+  padding: 44px 44px 32px
     max(var(--tg-gutter-desktop), calc((100vw - var(--tg-container-max)) / 2 + var(--tg-gutter-desktop)));
+  /* Los dos filetes del pautado: la columna de copy es una hoja reglada, no un
+     bloque suelto. Son fondo y no elementos, así que no entran en el orden de
+     lectura ni en la tabulación. */
+  background-image:
+    linear-gradient(var(--tg-color-border), var(--tg-color-border)),
+    linear-gradient(var(--tg-color-border), var(--tg-color-border));
+  background-size: 1px 100%, 1px 100%;
+  background-position: 30% 0, 70% 0;
+  background-repeat: no-repeat;
+}
+
+/* El ojo de buey del hero llega de punta a punta de la columna: su regla es
+   parte del pautado.
+
+   Y lleva fondo propio: los dos filetes verticales le pasaban por detrás, y el
+   cereal profundo a 12 px sobre el gris del filete mide 3,69:1 —por debajo del
+   mínimo—. Con el fondo opaco el filete se interrumpe en ese renglón, que es
+   justo donde la propia regla del ojo de buey ya lo cruza. */
+.heroCopy :global(.tg-eyebrow) {
+  width: 100%;
   background-color: var(--tg-color-canvas);
 }
 
 .heroTitulo {
-  font-size: clamp(44px, 4vw, 58px);
-  line-height: 0.98;
+  margin-top: var(--tg-space-2);
+  font-size: clamp(40px, 3.9vw, 54px);
+  line-height: 1;
+  letter-spacing: -0.025em;
 }
 
 .acciones {
   display: flex;
   flex-wrap: wrap;
   gap: var(--tg-space-3);
+  margin-top: var(--tg-space-2);
 }
 
-/* El conteo no es un adorno: dice cuántas operaciones hay de verdad, y por eso
-   sólo aparece cuando la API contestó. */
-.conteo {
+/* La acción principal de las páginas públicas lleva el canto cereal: es la
+   firma del sistema y no se reparte por todos los botones verdes. */
+.acciones :global(.tg-button--primary) {
+  min-height: 54px;
+  padding-inline: 28px;
+  border-left: 4px solid var(--tg-color-signal);
+  font-size: 15.5px;
+}
+
+.acciones :global(.tg-button--secondary) {
+  min-height: 54px;
+  padding-inline: 28px;
+  border-width: 1.5px;
+  border-color: var(--tg-color-text);
+  font-size: 15.5px;
+}
+
+.acciones :global(.tg-button--secondary):hover {
+  color: var(--tg-color-canvas);
+  background-color: var(--tg-color-text);
+  border-color: var(--tg-color-text);
+}
+
+/* El medidor: cuántas operaciones hay de verdad. Aparece sólo cuando la API
+   contestó, y trata 0, 1 y N con el mismo dato real. */
+.medidor {
   display: flex;
   align-items: center;
-  gap: var(--tg-space-3);
-  margin: 0;
-  color: var(--tg-color-text-secondary);
-  font-size: 13px;
-  font-weight: 590;
+  gap: var(--tg-space-4);
+  width: 100%;
+  margin: var(--tg-space-3) 0 0;
 }
 
-.conteo::before {
-  content: "";
-  width: 28px;
-  height: 2px;
-  background-color: var(--tg-color-action);
+.medidorNumero {
+  font-family: var(--tg-font-display);
+  font-size: 44px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.medidorTexto {
+  max-width: 17ch;
+  color: var(--tg-color-text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 650;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.medidorRegla {
+  flex: 1;
+  max-width: 170px;
+  height: 13px;
+  border-top: 2px solid var(--tg-color-text);
+  background: repeating-linear-gradient(90deg, var(--tg-color-text) 0 1px, transparent 1px 10px)
+    top left / 100% 7px no-repeat;
 }
 
 .heroFoto {
   position: relative;
   min-height: 320px;
+  margin: 0;
   overflow: hidden;
-  border-left: 5px solid var(--tg-color-action);
 }
 
 .heroFoto picture,
@@ -75,13 +166,48 @@
 }
 
 .heroFoto img {
-  object-position: center 61%;
+  object-position: center 70%;
 }
 
-/* --- Taxonomía: contenido, no controles ---------------------------------- */
+/* La banda de registro va debajo de la foto y no encima del sujeto: dice qué
+   se está mirando sin taparlo ni teñirlo. */
+.fotoBanda {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tg-space-5);
+  padding-inline: 22px;
+  background-color: var(--tg-color-brand);
+  color: var(--tg-color-text-inverse);
+}
+
+.fotoBanda span {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fotoBanda i {
+  flex: none;
+  width: 130px;
+  height: 8px;
+  background: repeating-linear-gradient(90deg, var(--tg-color-signal) 0 2px, transparent 2px 12px)
+    right top / 100% 8px no-repeat;
+}
+
+/* --- Libro mayor: contenido, no controles -------------------------------- */
 .taxonomia {
   background-color: var(--tg-color-surface);
-  border-bottom: 1px solid var(--tg-color-border);
+  border-block: 1px solid var(--tg-color-border);
 }
 
 .taxonomiaGrilla {
@@ -90,8 +216,8 @@
 }
 
 .taxonomiaItem {
-  min-height: 120px;
-  padding: var(--tg-space-5) var(--tg-space-6);
+  min-height: 96px;
+  padding: 18px 26px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -99,25 +225,39 @@
   border-left: 1px solid var(--tg-color-border);
 }
 
+.taxonomiaItem:first-child {
+  border-left: 0;
+  padding-left: max(var(--tg-gutter-desktop), calc((100vw - var(--tg-container-max)) / 2 + var(--tg-gutter-desktop)));
+}
+
 .taxonomiaItem:last-child {
-  border-right: 1px solid var(--tg-color-border);
+  padding-right: max(var(--tg-gutter-desktop), calc((100vw - var(--tg-container-max)) / 2 + var(--tg-gutter-desktop)));
+}
+
+.taxonomiaNumero {
+  font-family: var(--tg-font-display);
+  color: var(--tg-color-accent);
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.14em;
 }
 
 .taxonomiaItem strong {
-  font-family: var(--tg-font-display);
-  font-size: 24px;
-  font-weight: 560;
-  line-height: 1.08;
+  font-size: 16.5px;
+  font-weight: 650;
+  line-height: 1.15;
 }
 
-.taxonomiaItem span {
+.taxonomiaDescriptor {
   color: var(--tg-color-text-secondary);
-  font-size: 13px;
+  font-size: 12.5px;
+  line-height: 1.4;
 }
 
 /* --- Operaciones reales -------------------------------------------------- */
 .operaciones {
-  padding-block: var(--tg-space-8) var(--tg-space-16);
+  padding-block: var(--tg-space-10) var(--tg-space-16);
 }
 
 .encabezadoDeSeccion {
@@ -125,23 +265,41 @@
   align-items: end;
   justify-content: space-between;
   gap: var(--tg-space-6);
-  margin-bottom: var(--tg-space-5);
+  margin-bottom: var(--tg-space-6);
 }
 
 .encabezadoDeSeccion h2 {
-  font-size: 38px;
-  line-height: 1;
+  margin-top: var(--tg-space-2);
+}
+
+.encabezadoDeSeccion :global(.tg-eyebrow) {
+  width: 280px;
+  max-width: 100%;
+}
+
+/* El enlace terciario lleva el subrayado cereal: es un destino, no un botón. */
+.encabezadoDeSeccion :global(.tg-button--tertiary) {
+  padding-inline: 0;
+  color: var(--tg-color-text);
+  border-bottom: 2px solid var(--tg-color-signal);
+  border-radius: 0;
+  font-size: 14px;
+}
+
+.encabezadoDeSeccion :global(.tg-button--tertiary):hover {
+  color: var(--tg-color-brand);
+  background: none;
 }
 
 .grilla {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--tg-space-6);
+  gap: var(--tg-grid-gap-desktop);
   align-items: start;
 }
 
 .esqueleto {
-  min-height: 320px;
+  min-height: 280px;
   display: flex;
   flex-direction: column;
   gap: var(--tg-space-3);
@@ -152,13 +310,13 @@
 }
 
 .esqueletoFoto {
-  aspect-ratio: 4 / 3;
+  height: 112px;
   background-color: var(--tg-color-surface-muted);
 }
 
 .esqueletoLinea {
   height: 14px;
-  margin-inline: var(--tg-space-5);
+  margin-inline: 18px;
   background-color: var(--tg-color-surface-muted);
 }
 
@@ -176,6 +334,7 @@
   padding: var(--tg-space-6);
   background-color: var(--tg-color-surface);
   border: 1px solid var(--tg-color-border);
+  border-top: 3px solid var(--tg-color-border-control);
 }
 
 .aviso p {
@@ -200,9 +359,7 @@
 }
 
 .decisionIntro h2 {
-  margin-top: var(--tg-space-1);
-  font-size: 38px;
-  line-height: 1;
+  margin-top: var(--tg-space-2);
 }
 
 .decisionItem {
@@ -214,6 +371,7 @@
   display: block;
   margin-bottom: var(--tg-space-2);
   font-size: 15px;
+  font-weight: 650;
 }
 
 .decisionItem p {
@@ -233,11 +391,7 @@
   align-items: center;
   gap: var(--tg-space-8);
   padding-top: var(--tg-space-8);
-  border-top: 4px solid var(--tg-color-action);
-}
-
-.ctaInterior h2 {
-  font-size: 38px;
+  border-top: 4px solid var(--tg-color-brand);
 }
 
 .ctaInterior p {
@@ -254,15 +408,17 @@
     min-height: 0;
   }
 
+  .margen {
+    display: none;
+  }
+
   .heroCopy {
     padding: var(--tg-space-8) var(--tg-gutter-tablet);
   }
 
   .heroFoto {
-    height: 330px;
-    min-height: 330px;
-    border-left: 0;
-    border-bottom: 5px solid var(--tg-color-action);
+    height: 300px;
+    min-height: 300px;
   }
 
   .taxonomiaGrilla {
@@ -270,12 +426,27 @@
   }
 
   .taxonomiaItem {
-    min-height: 104px;
+    min-height: 88px;
     border-bottom: 1px solid var(--tg-color-border);
+  }
+
+  .taxonomiaItem:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .taxonomiaItem:first-child,
+  .taxonomiaItem:nth-child(3) {
+    padding-left: var(--tg-gutter-tablet);
+  }
+
+  .taxonomiaItem:nth-child(2),
+  .taxonomiaItem:last-child {
+    padding-right: var(--tg-gutter-tablet);
   }
 
   .grilla {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--tg-grid-gap-tablet);
   }
 
   .decisionGrilla {
@@ -295,37 +466,58 @@
   }
 
   .heroCopy {
-    padding: var(--tg-space-6) var(--tg-gutter-mobile);
+    padding: 18px var(--tg-gutter-mobile) 22px;
     gap: var(--tg-space-3);
+    background-image: none;
   }
 
   .heroTitulo {
-    font-size: 39px;
+    font-size: 33px;
+  }
+
+  .acciones {
+    flex-direction: column;
+    align-self: stretch;
+  }
+
+  .acciones :global(.tg-button) {
+    width: 100%;
+    min-height: 52px;
+  }
+
+  /* De canto a pie: en una columna angosta el canto izquierdo se pierde
+     contra el borde de la pantalla. */
+  .acciones :global(.tg-button--primary) {
+    border-left-width: 0;
+    border-bottom: 4px solid var(--tg-color-signal);
+  }
+
+  .medidorNumero {
+    font-size: 38px;
   }
 
   .heroFoto {
-    height: 205px;
-    min-height: 205px;
-    border-left: 0;
-    border-top: 5px solid var(--tg-color-action);
-    border-bottom: 0;
+    height: 240px;
+    min-height: 240px;
+    border-top: 2px solid var(--tg-color-text);
   }
 
-  .conteo {
-    display: none;
+  .fotoBanda {
+    height: 30px;
+    padding-inline: 14px;
+  }
+
+  .fotoBanda i {
+    width: 80px;
   }
 
   .taxonomiaItem {
-    min-height: 98px;
-    padding: var(--tg-space-4) var(--tg-space-3);
+    min-height: 84px;
+    padding: 14px var(--tg-gutter-mobile);
   }
 
-  .taxonomiaItem strong {
-    font-size: 20px;
-  }
-
-  .taxonomiaItem span {
-    font-size: 11px;
+  .taxonomiaItem:nth-child(-n + 2) {
+    border-top: 0;
   }
 
   .operaciones {
@@ -333,15 +525,14 @@
   }
 
   .encabezadoDeSeccion {
+    flex-direction: column;
     align-items: start;
-  }
-
-  .encabezadoDeSeccion h2 {
-    font-size: 30px;
+    gap: var(--tg-space-3);
   }
 
   .grilla {
     grid-template-columns: minmax(0, 1fr);
+    gap: var(--tg-grid-gap-mobile);
   }
 
   .decision {
@@ -356,10 +547,6 @@
     padding: 0 0 var(--tg-space-5);
   }
 
-  .decisionIntro h2 {
-    font-size: 31px;
-  }
-
   .decisionItem {
     padding: var(--tg-space-4) 0;
     border-left: 0;
@@ -372,10 +559,6 @@
 
   .ctaInterior {
     display: block;
-  }
-
-  .ctaInterior h2 {
-    font-size: 31px;
   }
 
   .ctaInterior .acciones {

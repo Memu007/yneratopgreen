@@ -1,0 +1,6 @@
+# Los textos de licencia son de terceros y se versionan tal cual vinieron: uno
+# de los renglones de la SIL OFL trae un espacio al final y no se le toca, así
+# que queda fuera del control de espaciado. No cambia el manejo de finales de
+# línea de ningún archivo.
+public/fuentes/OFL-*.txt -whitespace
+docs/pm/diseno-premium/**/OFL-*.txt -whitespace

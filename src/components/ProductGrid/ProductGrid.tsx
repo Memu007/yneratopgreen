@@ -5,6 +5,10 @@ import { ProductCard } from '../ProductCard/ProductCard';
 
 interface ProductGridProps {
   products: Product[];
+  /** Cuántas publicaciones hay para esta consulta, según la API. La grilla
+      dibuja como máximo la página descargada, así que contar las tarjetas
+      dibujadas sería contar la página y no el mercado. */
+  total?: number;
   isLoading?: boolean;
   /** El mercado no cargó. Es distinto de que no haya resultados, y por eso no
       comparte cartel: acá no sabemos qué hay. */
@@ -21,6 +25,7 @@ type SortOption = 'relevance' | 'price-asc' | 'price-desc' | 'newest' | 'rating'
 
 export const ProductGrid: React.FC<ProductGridProps> = ({
   products,
+  total,
   isLoading = false,
   error = null,
   onReintentar,
@@ -88,20 +93,26 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
     );
   }
 
-  const cantidad = products.length;
+  const dibujadas = products.length;
+  // El total de la API cuando llegó; si no llegó, lo que hay en pantalla.
+  const disponibles = total ?? dibujadas;
+  // Y cuando el mercado tiene más de lo que entró en la página, se dice: no se
+  // esconde el total verdadero ni se lo confunde con la página cargada. La
+  // paginación sigue siendo deuda abierta y está registrada aparte.
+  const parcial = disponibles > dibujadas;
 
   return (
     <div className={styles.resultados}>
       <div className={styles.barra}>
-        <div>
-          <div className="tg-meta">Resultados</div>
-          {/* «Operaciones» y no «productos»: el conjunto mezcla bienes,
-              servicios y logística, y llamarlo productos deja afuera a dos
-              tercios de lo que hay. */}
-          <h2 className={styles.conteo}>
-            {cantidad === 1 ? '1 operación' : `${cantidad} operaciones`}
-          </h2>
-        </div>
+        {/* «Operaciones» y no «productos»: el conjunto mezcla bienes,
+            servicios y logística, y llamarlo productos deja afuera a dos
+            tercios de lo que hay. */}
+        <h2 className={styles.conteo}>
+          <strong className="tg-data">
+            {parcial ? `${dibujadas} de ${disponibles}` : disponibles}
+          </strong>
+          <span>{disponibles === 1 ? 'operación' : 'operaciones'}</span>
+        </h2>
 
         <div className={`tg-field ${styles.orden}`}>
           <label htmlFor="catalog-sort">Ordenar por</label>
@@ -119,7 +130,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
         </div>
       </div>
 
-      {cantidad === 0 ? (
+      {dibujadas === 0 ? (
         <div className={styles.vacio}>
           <h3>No hay operaciones con estos filtros.</h3>
           <p className="tg-small">Probá con menos filtros, otra provincia u otras palabras.</p>

@@ -96,9 +96,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
         <div id="panel-de-filtros" className={`${styles.cuerpo} ${abierto ? styles.abierto : ''}`}>
           <div className={styles.encabezado}>
             <h2 className={styles.titulo}>Filtrar</h2>
-            <button className="tg-button tg-button--tertiary" onClick={onResetFilters}>
-              Limpiar
-            </button>
           </div>
 
           {/* Tipo: Producto/Servicio */}
@@ -263,6 +260,10 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               ))}
             </select>
           </div>
+
+          <button className={styles.limpiar} onClick={onResetFilters}>
+            Limpiar filtros
+          </button>
 
           {/* En celular el panel es parte del flujo y termina devolviendo
               a los resultados con el número puesto. En escritorio esta fila

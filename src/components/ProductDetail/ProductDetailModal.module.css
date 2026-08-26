@@ -79,6 +79,14 @@
   overflow: hidden;
 }
 
+/* Sin fotografía, el marco no reserva el hueco de la foto que falta: se achica
+   a la placa de registro, que es lo que hay para mostrar. La proporción es la
+   de la placa. La imagen ROTA sí conserva el marco: ahí hubo una foto y el
+   tamaño del hueco es parte de lo que se está diciendo. */
+.imagenPrincipal:has(> [data-estado='sin-foto']) {
+  aspect-ratio: 800 / 220;
+}
+
 .imagenPrincipal img,
 .imagenPrincipal > div {
   width: 100%;
@@ -177,10 +185,15 @@
   font-weight: 620;
 }
 
+/* El bloque de logística de una publicación no es un aviso del sistema: es la
+   anatomía de logística, y bajo B su color es el grafito. Con el celeste de
+   «información» el rótulo de la anatomía —cereal profundo— quedaba en 4,45:1,
+   por debajo del mínimo, y además pintaba de azul lo que el resto del producto
+   dice en grafito. */
 .logistica {
   padding: var(--tg-space-6);
-  background-color: var(--tg-color-info-bg);
-  border-top: 4px solid var(--tg-color-info);
+  background-color: var(--tg-color-surface-muted);
+  border-top: 4px solid var(--tg-color-text);
 }
 
 .tablaContenedor { overflow-x: auto; }

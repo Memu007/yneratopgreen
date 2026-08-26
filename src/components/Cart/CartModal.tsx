@@ -159,15 +159,24 @@ export const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckou
 // Botón del carrito para el header
 interface CartButtonProps {
   onClick: () => void;
+  /** La cabecera lo dibuja como una celda de su banda; el resto del producto
+      lo usaría con su apariencia propia. */
+  className?: string;
 }
 
-export const CartButton: React.FC<CartButtonProps> = ({ onClick }) => {
+export const CartButton: React.FC<CartButtonProps> = ({ onClick, className }) => {
   const { itemCount } = useCart();
 
   return (
-    <button className={`tg-button tg-button--secondary ${styles.cartButton}`} onClick={onClick}>
+    // La cantidad va adentro del nombre y no en un disco flotante: el disco
+    // era rojo —el color del error— para decir «tenés dos cosas», y sobre la
+    // banda de marca quedaba pegado al borde de la celda de al lado.
+    <button
+      className={className || `tg-button tg-button--secondary ${styles.cartButton}`}
+      onClick={onClick}
+    >
       <span>Carrito</span>
-      {itemCount > 0 && <span className={styles.badge}>{itemCount}</span>}
+      {itemCount > 0 && <span className={styles.cuenta}>({itemCount})</span>}
     </button>
   );
 };

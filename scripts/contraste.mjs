@@ -420,7 +420,7 @@ for (const medida of MEDIDAS) {
 
     // Una publicación con origen dentro del radio del transportista demo: sin
     // eso no hay a quién elegir y las pantallas del traslado no existirían.
-    const buscador = page.getByPlaceholder('Buscar producto, servicio o ubicación');
+    const buscador = page.getByLabel('Buscar en el mercado');
     await buscador.fill('Fertilizante Triple 15');
     await buscador.press('Enter');
     await page.getByRole('heading', { name: 'Fertilizante Triple 15 - NPK', exact: true, level: 3 })

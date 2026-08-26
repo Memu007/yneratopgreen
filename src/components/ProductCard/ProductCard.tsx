@@ -84,7 +84,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
         <div className={styles.cuerpo}>
           <div className={styles.encabezado}>
-            <span className="tg-eyebrow">{ETIQUETA_DE_ANATOMIA[anatomia]}</span>
+            <span className={`tg-eyebrow ${styles.anatomia}`}>{ETIQUETA_DE_ANATOMIA[anatomia]}</span>
             {product.condition && (
               <span className={styles.estado}>{ETIQUETA_DE_CONDICION[product.condition]}</span>
             )}

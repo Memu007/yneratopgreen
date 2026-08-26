@@ -1,23 +1,34 @@
 /* La cabecera: quién es el sitio, qué se busca, qué se puede hacer y a dónde
-   se va. Dos bandas —marca/búsqueda/acciones arriba, secciones abajo— porque
-   mezclarlas hacía que la marca fuera un botón más entre otros seis. */
+   se va.
+
+   Bajo la dirección B la banda es verde y está dividida en celdas: la marca,
+   cada sección y cada acción del rol ocupan una celda con su propio filete.
+   Es lo que deja que un rol sume «Admin» o «Vender» sin rediseñar nada: entra
+   una celda más. Fuera del mercado alcanza una banda; adentro del mercado el
+   buscador manda arriba y las secciones bajan a una segunda banda blanca,
+   que es donde se las busca cuando hay resultados en pantalla. */
 
 .header {
+  /* El filete que separa celdas vive acá y no repetido en cada regla: es un
+     blanco translúcido porque tiene que funcionar sobre el verde y sobre
+     cualquier estado de hover que se le pinte debajo. */
+  --celda-filete: rgba(255, 255, 255, 0.28);
+  --celda-hover: rgba(255, 255, 255, 0.1);
+
   position: sticky;
   z-index: var(--tg-z-sticky);
   top: 0;
-  background-color: rgba(255, 255, 255, 0.98);
-  border-bottom: 1px solid var(--tg-color-border);
+  background-color: var(--tg-color-brand);
 }
 
 /* Con la ventana baja, la cabecera deja de ser pegajosa.
  *
  * Al 200 % de zoom una pantalla de 1280x720 queda en 640x360 px CSS y la
- * cabecera -marca, buscador y navegacion- ocupa 194 de esos 360. Pegada
- * arriba se come mas de la mitad del alto util y tapa lo que uno acaba de
- * traer a la vista: la medicion encontro que la primera tarjeta del catalogo
- * queda DEBAJO de la cabecera y no se puede tocar. Suelta, se va con el
- * scroll y la pantalla vuelve a ser usable. Es la misma decision que ya
+ * cabecera -marca, buscador y navegacion- ocupa buena parte de esos 360.
+ * Pegada arriba se come mas de la mitad del alto util y tapa lo que uno acaba
+ * de traer a la vista: la medicion encontro que la primera tarjeta del
+ * catalogo queda DEBAJO de la cabecera y no se puede tocar. Suelta, se va con
+ * el scroll y la pantalla vuelve a ser usable. Es la misma decision que ya
  * estaba tomada para el celular, con el alto como disparador en vez del
  * ancho: al 200 % el ancho sigue siendo de escritorio. */
 @media (max-height: 480px) {
@@ -27,235 +38,319 @@
 }
 
 .masthead {
-  min-height: 88px;
-  display: grid;
-  grid-template-columns: minmax(220px, 300px) minmax(300px, 1fr) auto;
-  align-items: center;
-  gap: var(--tg-space-8);
+  display: flex;
+  align-items: stretch;
+  min-height: 64px;
 }
 
-/* Fuera del mercado la cabecera entra en una sola banda: marca, secciones y
-   acciones. Adentro del mercado el buscador manda en la primera banda y las
-   secciones bajan a la segunda, que es donde se las busca cuando hay
-   resultados en pantalla. */
-.headerCompacto .masthead {
-  min-height: 80px;
-  grid-template-columns: minmax(200px, 238px) 1fr auto;
-}
-
-.headerCompacto .navInterior {
-  min-height: 80px;
-  gap: var(--tg-space-6);
-}
-
-.headerCompacto .navLink {
-  min-height: 80px;
-  border-bottom-width: 3px;
-}
-
-.headerMercado .masthead {
-  min-height: 76px;
-  grid-template-columns: minmax(200px, 230px) minmax(320px, 1fr) auto;
-}
-
-/* La marca es un botón sin apariencia de botón: lo que se ve es el wordmark. */
+/* La marca arranca donde arranca el contenido de la página; las celdas de
+   sesión llegan hasta el borde. La banda no es una caja centrada: es un
+   renglón que cruza la pantalla. */
 .marca {
-  display: inline-flex;
-  width: min(100%, 254px);
-  padding: 0;
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 0 var(--tg-space-6) 0
+    max(var(--tg-gutter-desktop), calc((100vw - var(--tg-container-max)) / 2 + var(--tg-gutter-desktop)));
   background: none;
   border: 0;
+  border-right: 1px solid var(--celda-filete);
   cursor: pointer;
 }
 
 .marca img {
-  width: 100%;
-  height: auto;
+  width: auto;
+  height: 40px;
+}
+
+.headerMercado .marca img {
+  height: 34px;
 }
 
 .buscador {
   display: flex;
+  align-items: center;
+  flex: 1;
   min-width: 0;
+  padding: 0 var(--tg-space-5);
 }
 
 /* El campo y el botón comparten un solo bloque: sin radio y sin separación,
    se leen como un control y no como dos cosas que quedaron al lado. */
 .buscadorCampo {
-  min-height: 46px;
   flex: 1;
   min-width: 0;
+  height: var(--tg-control-min);
+  min-height: var(--tg-control-min);
+  padding: 0 var(--tg-space-4);
+  border: 0;
   border-radius: 0;
-  border-right: 0;
+  background-color: var(--tg-color-surface);
+  color: var(--tg-color-text);
+  font-size: 14.5px;
 }
 
 .buscadorBoton {
-  min-height: 46px;
+  flex: none;
+  height: var(--tg-control-min);
+  min-height: var(--tg-control-min);
+  padding: 0 26px;
+  border: 0;
   border-radius: 0;
-  flex-shrink: 0;
+  background-color: var(--tg-color-signal);
+  color: var(--tg-color-text);
+  font-weight: 650;
+  font-size: 14.5px;
 }
 
-.acciones {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: var(--tg-space-3);
-  min-width: 0;
-}
-
-/* El nombre de la cuenta puede ser largo y no puede empujar al resto. */
-.cuenta {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: inline-block;
-  line-height: 24px;
-}
-
-.nav {
-  background-color: var(--tg-color-surface);
-  border-top: 1px solid var(--tg-color-border);
+.buscadorBoton:hover {
+  background-color: var(--tg-color-signal-hover);
 }
 
 .navInterior {
-  min-height: 48px;
   display: flex;
-  align-items: center;
-  gap: var(--tg-space-8);
+  align-items: stretch;
+  min-width: 0;
 }
 
-/* La sección actual se marca con un filete de acento abajo, no con una píldora
-   rellena: el relleno pesa lo mismo que un botón y compite con las acciones. */
 .navLink {
-  min-height: 44px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  padding: 0;
-  color: var(--tg-color-text);
+  justify-content: center;
+  min-height: 64px;
+  padding: 0 22px;
   background: none;
   border: 0;
-  border-bottom: 2px solid transparent;
-  font-size: 14px;
-  font-weight: 570;
+  border-right: 1px solid var(--celda-filete);
+  color: var(--tg-color-text-inverse);
+  font-size: 14.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
   cursor: pointer;
 }
 
 .navLink:hover {
-  border-bottom-color: var(--tg-color-border-control);
+  background-color: var(--celda-hover);
 }
 
+/* La sección actual se marca invirtiendo la celda: sobre una banda de celdas,
+   un filete inferior de 2 px no se ve y una píldora rellena sería un botón
+   más. La celda blanca dice «estás acá» sin agregar una forma nueva. */
 .navLink[aria-current='page'] {
-  border-bottom-color: var(--tg-color-accent);
+  background-color: var(--tg-color-surface);
+  color: var(--tg-color-text);
+  font-weight: 650;
 }
 
+.acciones {
+  display: flex;
+  align-items: stretch;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.celda {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-1);
+  min-height: 44px;
+  padding: 0 var(--tg-space-5);
+  background: none;
+  border: 0;
+  border-left: 1px solid var(--celda-filete);
+  color: var(--tg-color-text-inverse);
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.celda:hover {
+  background-color: var(--celda-hover);
+}
+
+/* El cereal es la acción comercial del rol y nada más: publicar. No marca
+   éxito, no marca advertencia y no se reparte entre las otras celdas. */
+.celdaVender {
+  background-color: var(--tg-color-signal);
+  color: var(--tg-color-text);
+  font-weight: 650;
+}
+
+.celdaVender:hover {
+  background-color: var(--tg-color-signal-hover);
+}
+
+/* El nombre de la cuenta puede ser largo y no puede empujar al resto. */
+.cuenta {
+  max-width: 200px;
+}
+
+.cuenta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.soloMovil {
+  display: none;
+}
+
+.nav {
+  background-color: var(--tg-color-surface);
+  border-bottom: 1px solid var(--tg-color-border);
+}
+
+.nav .navLink {
+  min-height: 48px;
+  border-right: 1px solid var(--tg-color-border);
+  color: var(--tg-color-text);
+}
+
+.nav .navLink:hover {
+  background-color: var(--tg-color-canvas);
+}
+
+.nav .navLink[aria-current='page'] {
+  background-color: var(--tg-color-surface);
+  box-shadow: inset 0 -3px 0 var(--tg-color-brand);
+  font-weight: 650;
+}
+
+/* --- Tablet: 600–1023 -----------------------------------------------------
+   Cinco secciones al lado de la marca y de las acciones no entran en 768 px.
+   Bajan a su propio renglón, en cinco columnas iguales: es la misma banda con
+   una fila más, no otra identidad. */
 @media (max-width: 1023px) {
+  .marca {
+    padding-left: var(--tg-gutter-tablet);
+  }
+
   .masthead {
-    grid-template-columns: minmax(200px, 260px) 1fr auto;
-    gap: var(--tg-space-4);
+    flex-wrap: wrap;
   }
 
-  /* La búsqueda baja a su propia línea: comprimida entre marca y acciones no
-     entra ni el placeholder. */
-  .buscador {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    margin-bottom: var(--tg-space-4);
-  }
-
-  .navInterior {
-    gap: var(--tg-space-6);
-  }
-
-  /* En tablet la navegacion no entra al lado de la marca y las acciones:
-     baja a su propia linea, con la regla que la separa. */
   .headerCompacto .navInterior {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    min-height: 48px;
-    border-top: 1px solid var(--tg-color-border);
+    order: 3;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    border-top: 1px solid var(--celda-filete);
   }
 
   .headerCompacto .navLink {
     min-height: 48px;
+    padding: 10px var(--tg-space-2);
+    font-size: 13.5px;
+  }
+
+  .headerCompacto .navLink:last-child {
+    border-right: 0;
   }
 }
 
+/* --- Celular: 0–599 ------------------------------------------------------ */
 @media (max-width: 599px) {
-  /* En celular la cabecera deja de ser pegajosa: 136 px fijos arriba de una
-     pantalla de 844 se comen el primer resultado. */
+  /* En celular la cabecera deja de ser pegajosa: fijos arriba, tres renglones
+     se comen el primer resultado de una pantalla de 844. */
   .header {
     position: static;
   }
 
   .masthead {
-    min-height: auto;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--tg-space-2);
-    padding-block: var(--tg-space-3);
+    min-height: 54px;
   }
 
   .marca {
-    width: 172px;
-    max-width: calc(100% - 108px);
-    flex: 0 1 172px;
-    order: 1;
+    padding: 0 var(--tg-space-4);
+    border-right: 0;
   }
 
+  .marca img,
+  .headerMercado .marca img {
+    height: 30px;
+  }
+
+  /* Con cuatro o cinco celdas de sesión —el caso de administración— la fila no
+     alcanza. Se envuelve hacia abajo en vez de desbordar a los costados: un
+     renglón más se lee, un scroll horizontal no se encuentra. */
   .acciones {
-    flex: 1 1 auto;
-    order: 2;
-    gap: var(--tg-space-2);
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
   }
 
-  .buscador {
-    width: 100%;
-    flex: 0 0 100%;
-    order: 3;
-    margin: 0;
+  .celda {
+    padding: 0 var(--tg-space-3);
+    font-size: 12.5px;
   }
 
   .cuenta {
-    max-width: 120px;
+    max-width: none;
   }
 
-  /* Cinco secciones no entran en una línea de 350 px útiles: van en tres
-     columnas y dos filas, que es leerlas, y no en un scroll horizontal ni en un
+  .soloEscritorio {
+    display: none;
+  }
+
+  .soloMovil {
+    display: inline;
+  }
+
+  /* Cinco secciones no entran en una línea de 358 px útiles: van en tres y
+     dos, que es leerlas, y no en un scroll horizontal ni en un
      `display: none`, que es esconderlas. */
-  .navInterior {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0 var(--tg-space-2);
-    padding-block: var(--tg-space-1);
-  }
-
-  /* En la grilla de dos columnas el botón se estira a todo el ancho de su
-     celda y el filete de la sección actual quedaba tres veces más largo que
-     la palabra. Se ajusta al texto. */
-  .navLink {
-    min-width: 0;
-    justify-self: start;
-    font-size: 13px;
-    line-height: 1.15;
-  }
-
-  /* Las cinco secciones siguen visibles en celular, en dos columnas. El
-     prototipo mostraba tres y escondia el resto con `display: none`; PM lo
-     prohibio por escrito -no pueden perderse del DOM- y esta es la solucion
-     que ya existia: se leen todas, sin scroll horizontal. */
+  .navInterior,
   .headerCompacto .navInterior {
-    grid-column: 1 / -1;
-    grid-row: auto;
-    order: 4;
+    order: 3;
     width: 100%;
-    min-height: 0;
-    border-top: 1px solid var(--tg-color-border);
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    border-top: 1px solid var(--celda-filete);
   }
 
+  .navLink,
   .headerCompacto .navLink {
+    grid-column: span 2;
     min-height: 44px;
+    padding: 10px var(--tg-space-2);
+    font-size: 13px;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .navLink:nth-child(3) {
+    border-right: 0;
+  }
+
+  .navLink:nth-child(4),
+  .navLink:nth-child(5) {
+    grid-column: span 3;
+    border-top: 1px solid var(--celda-filete);
+  }
+
+  .navLink:nth-child(5) {
+    border-right: 0;
+  }
+
+  /* En el mercado el buscador ocupa su propio renglón completo: comprimido
+     entre la marca y las acciones no entra ni el nombre del control. */
+  .headerMercado .buscador {
+    order: 3;
+    width: 100%;
+    flex: none;
+    padding: var(--tg-space-2) var(--tg-space-4);
+    border-top: 1px solid var(--celda-filete);
+  }
+
+  .nav .navLink:nth-child(3),
+  .nav .navLink:nth-child(5) {
+    border-right: 0;
+  }
+
+  .nav .navLink:nth-child(4),
+  .nav .navLink:nth-child(5) {
+    border-top: 1px solid var(--tg-color-border);
   }
 }

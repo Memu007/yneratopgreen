@@ -302,7 +302,7 @@ const getImageUrl = (url: string | undefined): string => {
   // data-URI -fondo verde claro, Arial, «Sin Imagen» con un simbolo-: la del
   // catalogo se retiro en la entrega anterior y esta quedo viva en el panel,
   // que es exactamente donde la captura la mostro. Con la cadena vacia manda
-  // `ProductImage`, que dice «Sin fotografia» con el respaldo del sistema.
+  // `ProductImage`, que dice «Sin registro fotografico» con el respaldo del sistema.
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
   return `${IMAGES_BASE_URL}${url}`;

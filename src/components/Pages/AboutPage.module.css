@@ -129,14 +129,12 @@
   padding: 100px 0;
 }
 
+/* La capa que quedaba acá era un índigo escrito a mano —`rgba(30,58,95,.85)`—
+   encima del color de marca: el único hex suelto de una superficie pública, y
+   justo el tono que la dirección B saca de las pantallas. La sección ya tiene
+   su fondo; la capa sólo lo ensuciaba. */
 .missionVisionOverlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(30, 58, 95, 0.85);
-  z-index: 1;
+  display: none;
 }
 
 .missionVisionGrid {
@@ -151,13 +149,14 @@
   padding-left: 20px;
 }
 
+/* Sobre el verde de marca, un filete verde de marca no existe. */
 .cardAccent {
   position: absolute;
   left: 0;
   top: 0;
   width: 4px;
   height: 40px;
-  background: var(--tg-color-brand);
+  background: var(--tg-color-signal);
 }
 
 .missionCard h2,

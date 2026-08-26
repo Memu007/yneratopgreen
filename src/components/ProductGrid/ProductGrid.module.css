@@ -1,30 +1,79 @@
 /* Los resultados: cuántos hay, cómo se ordenan y la grilla.
-   El conteo es un dato de la operación, no un adorno, y por eso está a la
-   altura de un título de sección. */
+   El conteo es un dato de la operación y sale del total de la API: contar las
+   tarjetas dibujadas es contar la página, no el mercado. */
 
 .resultados { min-width: 0; }
 
 .barra {
-  min-height: 70px;
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
-  gap: var(--tg-space-6);
-  margin-bottom: var(--tg-space-6);
+  align-items: center;
+  gap: var(--tg-space-4);
+  padding-block: 18px var(--tg-space-4);
 }
 
 .conteo {
-  font-size: clamp(26px, 2.4vw, 34px);
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-3);
+  font-size: 19px;
+  line-height: 1;
 }
 
-.orden { width: 220px; }
+/* La marca cereal delante del número: la misma señal del ojo de buey, acá
+   diciendo «esto es el dato de la pantalla». */
+.conteo::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background-color: var(--tg-color-signal);
+}
+
+.conteo strong {
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.conteo span {
+  color: var(--tg-color-text-secondary);
+  font-family: var(--tg-font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.orden {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-3);
+  width: auto;
+}
+
+.orden label {
+  color: var(--tg-color-steel);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.orden select {
+  width: 220px;
+  border-width: 1.5px;
+  border-color: var(--tg-color-border);
+  font-size: 13.5px;
+}
 
 /* Tres columnas en escritorio, dos en tablet, una en celular; el activo de
    alto valor ocupa la fila entera y eso lo decide su propia hoja. */
 .grilla {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--tg-space-6);
+  gap: var(--tg-grid-gap-desktop);
+  align-items: start;
 }
 
 .vacio {
@@ -40,7 +89,7 @@
 /* --- Carga ---------------------------------------------------------------- */
 
 .esqueleto {
-  min-height: 320px;
+  min-height: 280px;
   display: flex;
   flex-direction: column;
   gap: var(--tg-space-3);
@@ -51,28 +100,37 @@
 }
 
 .esqueletoImagen {
-  aspect-ratio: 16 / 9;
+  height: 112px;
   background-color: var(--tg-color-surface-muted);
 }
 
 .esqueletoLinea {
   height: 14px;
-  margin-inline: var(--tg-space-5);
+  margin-inline: 18px;
   background-color: var(--tg-color-surface-muted);
 }
 
 .esqueletoCorta { width: 55%; }
 
 @media (max-width: 1180px) {
-  .grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grilla {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--tg-grid-gap-tablet);
+  }
 }
 
 @media (max-width: 700px) {
   .barra {
-    flex-direction: column;
-    align-items: stretch;
+    flex-wrap: wrap;
+    gap: var(--tg-space-3);
+    padding-block: var(--tg-space-4);
   }
 
   .orden { width: 100%; }
-  .grilla { grid-template-columns: 1fr; }
+  .orden select { width: 100%; }
+
+  .grilla {
+    grid-template-columns: 1fr;
+    gap: var(--tg-grid-gap-mobile);
+  }
 }

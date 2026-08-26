@@ -1,7 +1,8 @@
-/* Servicios — extensión «A, Mercado a cielo abierto».
-   Antes: un video con overlay índigo, cinco servicios escritos a mano y claims
-   de inteligencia artificial, satélites y sustentabilidad. Ahora: una foto de
-   trabajo real sin nada encima y las publicaciones de servicio que existen. */
+/* Servicios — dirección «B, Mercado nacional».
+   Una foto de trabajo real sin nada encima, su banda de registro, y las
+   publicaciones de servicio y de logística que existen. Sin claims de
+   inteligencia artificial, satélites ni sustentabilidad: nada que la
+   publicación no declare. */
 
 .pagina {
   min-height: 100vh;
@@ -10,18 +11,18 @@
 
 /* --- Hero: foto a la izquierda, copy a la derecha ------------------------- */
 .hero {
-  min-height: 414px;
+  min-height: 520px;
   display: grid;
-  grid-template-columns: 56% 44%;
-  background-color: var(--tg-color-surface);
-  border-bottom: 1px solid var(--tg-color-border);
+  grid-template-columns: 53% 47%;
+  background-color: var(--tg-color-canvas);
 }
 
 .heroFoto {
   position: relative;
   min-height: 320px;
+  margin: 0;
   overflow: hidden;
-  border-right: 5px solid var(--tg-color-action);
+  border-right: 2px solid var(--tg-color-text);
 }
 
 .heroFoto picture,
@@ -36,26 +37,89 @@
   object-position: center 45%;
 }
 
+/* La banda de registro va debajo de la foto, en grafito: es la misma pieza que
+   en Inicio con el otro tono, porque acá la foto es la columna oscura. */
+.fotoBanda {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tg-space-5);
+  padding-inline: 22px;
+  background-color: var(--tg-color-text);
+  color: var(--tg-color-text-inverse);
+}
+
+.fotoBanda span {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fotoBanda i {
+  flex: none;
+  width: 130px;
+  height: 8px;
+  background: repeating-linear-gradient(90deg, var(--tg-color-signal) 0 2px, transparent 2px 12px)
+    right top / 100% 8px no-repeat;
+}
+
 .heroCopy {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   justify-content: center;
   gap: var(--tg-space-4);
-  padding: var(--tg-space-8)
+  padding: 44px
     max(var(--tg-gutter-desktop), calc((100vw - var(--tg-container-max)) / 2 + var(--tg-gutter-desktop)))
-    var(--tg-space-8) var(--tg-space-12);
-  background-color: var(--tg-color-canvas);
+    32px var(--tg-space-12);
+}
+
+.heroCopy :global(.tg-eyebrow) {
+  width: 100%;
 }
 
 .heroTitulo {
-  font-size: clamp(40px, 3.4vw, 54px);
-  line-height: 0.98;
+  margin-top: var(--tg-space-2);
+  font-size: clamp(36px, 3.4vw, 48px);
+  line-height: 1;
+  letter-spacing: -0.025em;
 }
 
 .acciones {
   display: flex;
   flex-wrap: wrap;
   gap: var(--tg-space-3);
+  margin-top: var(--tg-space-2);
+}
+
+.acciones :global(.tg-button--primary) {
+  min-height: 54px;
+  padding-inline: 28px;
+  border-left: 4px solid var(--tg-color-signal);
+  font-size: 15.5px;
+}
+
+.acciones :global(.tg-button--secondary) {
+  min-height: 54px;
+  padding-inline: 28px;
+  border-width: 1.5px;
+  border-color: var(--tg-color-text);
+  font-size: 15.5px;
+}
+
+.acciones :global(.tg-button--secondary):hover {
+  color: var(--tg-color-canvas);
+  background-color: var(--tg-color-text);
+  border-color: var(--tg-color-text);
 }
 
 /* Los tres datos que la publicación declara. No son promesas de la plataforma:
@@ -63,26 +127,42 @@
 .prueba {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--tg-space-3);
-  padding-top: var(--tg-space-4);
+  width: 100%;
+  margin-top: var(--tg-space-3);
   border-top: 1px solid var(--tg-color-border);
 }
 
-.prueba div {
-  color: var(--tg-color-text-secondary);
-  font-size: 12px;
+.prueba > div {
+  padding: 14px var(--tg-space-4) 0 0;
+}
+
+.prueba > div + div {
+  padding-left: var(--tg-space-4);
+  border-left: 1px solid var(--tg-color-border);
 }
 
 .prueba strong {
   display: block;
-  margin-bottom: 2px;
+  color: var(--tg-color-steel);
+  font-size: 10.5px;
+  line-height: 1;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.prueba span {
+  display: block;
+  margin-top: 6px;
   color: var(--tg-color-text);
-  font-size: 13px;
+  font-size: 13.5px;
+  line-height: 1.35;
+  font-weight: 600;
 }
 
 /* --- Servicios publicados ------------------------------------------------ */
 .operaciones {
-  padding-block: var(--tg-space-8) var(--tg-space-16);
+  padding-block: var(--tg-space-10) var(--tg-space-16);
 }
 
 .encabezadoDeSeccion {
@@ -90,18 +170,35 @@
   align-items: end;
   justify-content: space-between;
   gap: var(--tg-space-6);
-  margin-bottom: var(--tg-space-5);
+  margin-bottom: var(--tg-space-6);
 }
 
 .encabezadoDeSeccion h2 {
-  font-size: 38px;
-  line-height: 1;
+  margin-top: var(--tg-space-2);
+}
+
+.encabezadoDeSeccion :global(.tg-eyebrow) {
+  width: 280px;
+  max-width: 100%;
+}
+
+.encabezadoDeSeccion :global(.tg-button--tertiary) {
+  padding-inline: 0;
+  color: var(--tg-color-text);
+  border-bottom: 2px solid var(--tg-color-signal);
+  border-radius: 0;
+  font-size: 14px;
+}
+
+.encabezadoDeSeccion :global(.tg-button--tertiary):hover {
+  color: var(--tg-color-brand);
+  background: none;
 }
 
 .grilla {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--tg-space-6);
+  gap: var(--tg-grid-gap-desktop);
   align-items: start;
 }
 
@@ -133,6 +230,7 @@
   padding: var(--tg-space-6);
   background-color: var(--tg-color-surface);
   border: 1px solid var(--tg-color-border);
+  border-top: 3px solid var(--tg-color-border-control);
 }
 
 .aviso p {
@@ -157,9 +255,7 @@
 }
 
 .decisionIntro h2 {
-  margin-top: var(--tg-space-1);
-  font-size: 38px;
-  line-height: 1;
+  margin-top: var(--tg-space-2);
 }
 
 .decisionItem {
@@ -171,6 +267,7 @@
   display: block;
   margin-bottom: var(--tg-space-2);
   font-size: 15px;
+  font-weight: 650;
 }
 
 .decisionItem p {
@@ -190,11 +287,7 @@
   align-items: center;
   gap: var(--tg-space-8);
   padding-top: var(--tg-space-8);
-  border-top: 4px solid var(--tg-color-action);
-}
-
-.ctaInterior h2 {
-  font-size: 38px;
+  border-top: 4px solid var(--tg-color-brand);
 }
 
 .ctaInterior p {
@@ -210,10 +303,10 @@
   }
 
   .heroFoto {
-    height: 330px;
-    min-height: 330px;
+    height: 300px;
+    min-height: 300px;
     border-right: 0;
-    border-bottom: 5px solid var(--tg-color-action);
+    border-bottom: 2px solid var(--tg-color-text);
   }
 
   .heroCopy {
@@ -222,6 +315,7 @@
 
   .grilla {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--tg-grid-gap-tablet);
   }
 
   .decisionGrilla {
@@ -236,21 +330,59 @@
 
 @media (max-width: 599px) {
   .heroFoto {
-    height: 210px;
-    min-height: 210px;
+    height: 240px;
+    min-height: 240px;
+  }
+
+  .fotoBanda {
+    height: 30px;
+    padding-inline: 14px;
+  }
+
+  .fotoBanda i {
+    width: 80px;
   }
 
   .heroCopy {
-    padding: var(--tg-space-6) var(--tg-gutter-mobile);
+    padding: 18px var(--tg-gutter-mobile) 22px;
     gap: var(--tg-space-3);
   }
 
   .heroTitulo {
-    font-size: 39px;
+    font-size: 31px;
   }
 
+  .acciones {
+    flex-direction: column;
+    align-self: stretch;
+  }
+
+  .acciones :global(.tg-button) {
+    width: 100%;
+    min-height: 52px;
+  }
+
+  .acciones :global(.tg-button--primary) {
+    border-left-width: 0;
+    border-bottom: 4px solid var(--tg-color-signal);
+  }
+
+  /* Los tres datos siguen estando: en una columna, uno debajo del otro. Antes
+     desaparecían con `display: none`, que es esconder la única explicación de
+     con qué se compara una propuesta. */
   .prueba {
-    display: none;
+    grid-template-columns: 1fr;
+  }
+
+  .prueba > div {
+    padding: 12px 0 0;
+  }
+
+  .prueba > div + div {
+    margin-top: 12px;
+    padding: 12px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--tg-color-border);
   }
 
   .operaciones {
@@ -258,15 +390,14 @@
   }
 
   .encabezadoDeSeccion {
+    flex-direction: column;
     align-items: start;
-  }
-
-  .encabezadoDeSeccion h2 {
-    font-size: 30px;
+    gap: var(--tg-space-3);
   }
 
   .grilla {
     grid-template-columns: minmax(0, 1fr);
+    gap: var(--tg-grid-gap-mobile);
   }
 
   .decision {
@@ -281,10 +412,6 @@
     padding: 0 0 var(--tg-space-5);
   }
 
-  .decisionIntro h2 {
-    font-size: 31px;
-  }
-
   .decisionItem {
     padding: var(--tg-space-4) 0;
     border-left: 0;
@@ -297,10 +424,6 @@
 
   .ctaInterior {
     display: block;
-  }
-
-  .ctaInterior h2 {
-    font-size: 31px;
   }
 
   .ctaInterior .acciones {

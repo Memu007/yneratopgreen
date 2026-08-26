@@ -1066,7 +1066,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         <td>
                           {/* Sin imagen no se pasa un SVG inventado: aca habia
                               una TERCERA copia del respaldo verde en data-URI.
-                              `ProductImage` ya sabe decir «Sin fotografia». */}
+                              `ProductImage` ya sabe decir «Sin registro fotografico». */}
                           <ProductImage
                             src={product.image ? `${import.meta.env.VITE_IMAGES_URL || ''}${product.image}` : ''}
                             alt={product.name}

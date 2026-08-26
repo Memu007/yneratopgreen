@@ -15,7 +15,7 @@ const IMAGES_BASE_URL = import.meta.env.VITE_IMAGES_URL || '';
 // verde claro, Arial, «Sin Imagen» con un símbolo— que se colaba antes del
 // respaldo del sistema: una publicación sin foto terminaba mostrando un
 // tercer diseño que nadie aprobó ni midió. La cadena vacía deja que
-// `ProductImage` diga «Sin fotografía» con los activos del paquete.
+// `ProductImage` diga «Sin registro fotográfico» con los activos del paquete.
 function getImageUrl(url: string | undefined): string {
   if (!url) return '';
   // Si ya es una URL completa (http/https), retornarla tal cual

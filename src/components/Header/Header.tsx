@@ -32,6 +32,31 @@ const SECCIONES: [PageSection, string][] = [
   ['contact', 'Contacto'],
 ];
 
+// El punto de corte contractual de celular, leído una sola vez y escuchado.
+// Se usa para lo único que el CSS no puede resolver: el texto de un
+// `placeholder` es un atributo, no contenido, y no se puede reescribir con una
+// media query. Todo lo demás que cambia en celular lo decide la hoja.
+const CONSULTA_MOVIL = '(max-width: 599px)';
+
+function useEsMovil(): boolean {
+  const [esMovil, setEsMovil] = useState(
+    () => typeof window !== 'undefined'
+      && typeof window.matchMedia === 'function'
+      && window.matchMedia(CONSULTA_MOVIL).matches,
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const consulta = window.matchMedia(CONSULTA_MOVIL);
+    const alCambiar = () => setEsMovil(consulta.matches);
+    alCambiar();
+    consulta.addEventListener('change', alCambiar);
+    return () => consulta.removeEventListener('change', alCambiar);
+  }, []);
+
+  return esMovil;
+}
+
 export const Header: React.FC<HeaderProps> = ({
   searchQuery,
   onSearchChange,
@@ -47,6 +72,7 @@ export const Header: React.FC<HeaderProps> = ({
   const { showToast } = useToast();
   const [showDashboard, setShowDashboard] = useState(false);
   const [vueltaDeMP, setVueltaDeMP] = useState(false);
+  const esMovil = useEsMovil();
 
   // La vuelta de Mercado Pago aterriza en una carga nueva de la página, con el
   // panel cerrado. Se recibe acá, que es lo que siempre está montado: si se
@@ -106,12 +132,13 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className={`${styles.header} ${enMercado ? styles.headerMercado : styles.headerCompacto}`}>
-      <div className={`tg-container ${styles.masthead}`}>
+      <div className={`tg-sobre-marca ${styles.masthead}`}>
         {/* El wordmark es un archivo, no letras compuestas a mano: su dibujo
             está convertido a contornos, así que no depende de que la fuente
-            haya cargado. El nombre accesible es «TopGreen» y nada más. */}
+            haya cargado. Sobre la banda verde va la versión monocroma clara;
+            el nombre accesible es «TopGreen» y nada más. */}
         <button className={styles.marca} onClick={() => onNavigate('marketplace')}>
-          <img src="/marca/topgreen-compact.svg" alt="TopGreen" width={431} height={112} />
+          <img src="/marca/topgreen-mono-light.svg" alt="TopGreen" width={555} height={110} />
         </button>
 
         {/* La búsqueda vive donde hay resultados que filtrar. En las otras
@@ -126,11 +153,14 @@ export const Header: React.FC<HeaderProps> = ({
               id="buscar-mercado"
               type="search"
               className={styles.buscadorCampo}
-              placeholder="Buscar producto, servicio o ubicación"
+              /* En 390 px el texto descriptivo no entra y se corta a la mitad
+                 de una palabra. La instrucción corta dice lo mismo y cabe; la
+                 etiqueta, que es lo que lee un lector de pantalla, no cambia. */
+              placeholder={esMovil ? 'Buscar' : 'Buscar producto, servicio o ubicación'}
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
             />
-            <button type="submit" className={`tg-button tg-button--primary ${styles.buscadorBoton}`}>
+            <button type="submit" className={styles.buscadorBoton}>
               Buscar
             </button>
           </form>
@@ -138,35 +168,41 @@ export const Header: React.FC<HeaderProps> = ({
 
         {!enMercado && navegacion}
 
+        {/* La sesión crece por celdas: cada acción que suma el rol entra como
+            una celda más con su propio separador, y el cereal queda reservado
+            a la acción comercial —Vender—. */}
         <div className={styles.acciones}>
           {isAuthenticated && user?.role === 'admin' && onAdminClick && (
-            <button className="tg-button tg-button--secondary" onClick={onAdminClick}>
+            <button className={styles.celda} onClick={onAdminClick}>
               Admin
             </button>
           )}
           {isAuthenticated && (
-            <button className="tg-button tg-button--primary" onClick={onSellClick}>
+            <button className={`${styles.celda} ${styles.celdaVender}`} onClick={onSellClick}>
               Vender
             </button>
           )}
           {isAuthenticated ? (
             <>
-              <CartButton onClick={onCartClick} />
+              <CartButton onClick={onCartClick} className={styles.celda} />
               {/* El nombre propio no sirve como etiqueta: cambia con cada
-                  cuenta. La etiqueta dice qué abre el botón. */}
+                  cuenta. La etiqueta dice qué abre el botón. En escritorio se
+                  muestra el nombre real; en celular se muestra «Cuenta»
+                  porque un nombre variable no entra sin cortarse. */}
               <button
-                className={`tg-button tg-button--secondary ${styles.cuenta}`}
+                className={`${styles.celda} ${styles.cuenta}`}
                 aria-label="Mi cuenta"
                 onClick={() => setShowDashboard(true)}
               >
-                {user?.name}
+                <span className={styles.soloEscritorio}>{user?.name}</span>
+                <span className={styles.soloMovil}>Cuenta</span>
               </button>
-              <button className="tg-button tg-button--tertiary" onClick={logout}>
+              <button className={styles.celda} onClick={logout}>
                 Salir
               </button>
             </>
           ) : (
-            <button className="tg-button tg-button--secondary" onClick={onLoginClick}>
+            <button className={styles.celda} onClick={onLoginClick}>
               Ingresar
             </button>
           )}

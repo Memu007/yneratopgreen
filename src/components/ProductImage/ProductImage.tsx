@@ -21,16 +21,24 @@ export function ProductImage({ src, alt, className = '', loading }: ProductImage
   useEffect(() => setFallo(false), [src]);
 
   if (sinFoto || fallo) {
-    const texto = fallo ? 'No pudimos cargar la imagen' : 'Sin fotografía';
+    const texto = fallo ? 'No pudimos cargar la imagen' : 'Sin registro fotográfico';
     return (
       // La clase de quien llama es para la FOTO: trae `object-fit` y
       // `display: block`, que acá romperían la composición.
+      //
+      // La placa de «sin registro» ya trae la leyenda dibujada en contornos, y
+      // repetirla al lado sería decir dos veces lo mismo en el mismo renglón:
+      // ahí el nombre accesible es lo que la enuncia. La placa de imagen rota
+      // no dice nada, así que ahí el rótulo escrito se queda.
       <div
         className={`${styles.fallback} ${fallo ? styles.roto : ''}`}
+        // Quien contiene la placa necesita saber cuál de los dos estados es
+        // para no reservarle a una placa baja el hueco de una fotografía.
+        data-estado={fallo ? 'rota' : 'sin-foto'}
         role="img"
         aria-label={`${texto}. ${alt}`}
       >
-        <span className={styles.copy}>{texto}</span>
+        {fallo && <span className={styles.copy}>{texto}</span>}
       </div>
     );
   }

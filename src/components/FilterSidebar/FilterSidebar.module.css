@@ -1,8 +1,8 @@
 /* El panel de filtros.
-   Un solo DOM para los tres anchos: en escritorio es una columna fija al
-   costado; en tablet y celular es el mismo bloque plegado. No hay dos
-   componentes ni dos juegos de controles, así que no puede haber dos estados
-   distintos de los mismos filtros. */
+   Un solo DOM para los tres anchos: en escritorio es la columna blanca de 256
+   px al costado de los resultados; en tablet y celular es el mismo bloque
+   plegado. No hay dos componentes ni dos juegos de controles, así que no puede
+   haber dos estados distintos de los mismos filtros. */
 
 .panel { min-width: 0; }
 
@@ -15,8 +15,7 @@
 .cuerpo {
   display: grid;
   gap: var(--tg-space-5);
-  padding-right: var(--tg-space-6);
-  border-right: 1px solid var(--tg-color-border);
+  align-content: start;
 }
 
 .encabezado {
@@ -26,20 +25,38 @@
   gap: var(--tg-space-3);
 }
 
-.titulo { font-size: 30px; }
+.titulo {
+  font-size: 17px;
+  line-height: 1.2;
+}
 
 .filterSection {
   display: grid;
   gap: var(--tg-space-2);
 }
 
+/* Los rótulos del panel son micro-rótulos de registro: dicen de qué es el
+   control sin competir con la opción elegida, que es lo que hay que leer. */
 .filterLabel {
-  font-weight: 620;
+  color: var(--tg-color-steel);
+  font-size: 10.5px;
+  line-height: 1;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .select,
 .priceInput {
   width: 100%;
+  border-width: 1.5px;
+  border-color: var(--tg-color-border);
+  font-size: 13.5px;
+}
+
+.select:hover,
+.priceInput:hover {
+  border-color: var(--tg-color-border-control);
 }
 
 .priceInputs {
@@ -60,6 +77,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  font-size: 13.5px;
   font-weight: 400;
   cursor: pointer;
 }
@@ -71,14 +89,45 @@
   accent-color: var(--tg-color-brand);
 }
 
+/* Limpiar es un destino, no un botón: subrayado cereal y nada más. Va al final
+   de los controles porque es lo que se busca después de haberlos puesto. */
+.limpiar {
+  justify-self: start;
+  min-height: var(--tg-control-min);
+  padding: 0;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid var(--tg-color-signal);
+  border-radius: 0;
+  color: var(--tg-color-text);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.limpiar:hover { color: var(--tg-color-brand); }
+
 .verResultados { display: none; }
 
 @media (min-width: 1024px) {
+  /* La columna es blanca y se separa de los resultados con una regla, no con
+     aire: es el borde del panel, no un margen que se puede confundir con el
+     espacio entre tarjetas. */
+  .panel {
+    background-color: var(--tg-color-surface);
+    border-right: 1px solid var(--tg-color-border);
+  }
+
+  .cuerpo {
+    padding: var(--tg-space-6) 22px var(--tg-space-10);
+  }
+
   /* Pegado al scroll, debajo de la cabecera: los filtros siguen a mano cuando
-     la lista es larga, que es cuando hacen falta. */
+     la lista es larga, que es cuando hacen falta. La cabecera del mercado mide
+     64 px de banda de marca más 48 px de banda de secciones. */
   .plegable {
     position: sticky;
-    top: 152px;
+    top: 112px;
   }
 }
 
@@ -90,6 +139,9 @@
     max-height: 0;
     overflow: hidden;
     padding-block: 0;
+    background-color: var(--tg-color-surface);
+    border: 1px solid var(--tg-color-border);
+    border-top: 0;
     border-width: 0 1px;
   }
 
@@ -118,12 +170,6 @@
     color: var(--tg-color-text-secondary);
     font-size: 14px;
     font-weight: 570;
-  }
-
-  .cuerpo {
-    background-color: var(--tg-color-surface);
-    border: 1px solid var(--tg-color-border);
-    border-top: 0;
   }
 
   .encabezado { display: none; }
