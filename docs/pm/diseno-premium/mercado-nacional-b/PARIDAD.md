@@ -3,7 +3,11 @@
 Dev completa cada casilla con archivo, captura o salida reproducible. Parecido
 visual sin funcionamiento real no cierra la tarea.
 
-> Completado por Dev el 2026-08-26 contra el commit de producto de UX-2D. Las
+> Completado por Dev el 2026-08-26 contra el commit de producto de UX-2D y
+> actualizado con la corrección UX-2D.1 de la cabecera, que Emi pidió después
+> de revisar en el producto: la banda de identidad es la misma en Inicio,
+> Mercado y Servicios, y el buscador vive en una segunda banda propia que sólo
+> aparece en el Mercado. Las
 > capturas están en `../../ux2d/capturas/`, las mediciones de color en
 > `../../ux2d/TOKENS-Y-CONTRASTE.md` y las diferencias justificadas contra este
 > handoff en `../../ux2d/DIFERENCIAS.md`. Las puertas se corrieron desde base
@@ -53,8 +57,15 @@ visual sin funcionamiento real no cierra la tarea.
       «Cuenta»; en escritorio y tablet dice el nombre de la cuenta. El nombre
       accesible es `Mi cuenta` en los tres anchos.
 - [x] Mercado usa buscador + segunda banda; otras páginas usan una banda.
-      `Header.tsx` sigue siendo un solo componente con `headerMercado` y
-      `headerCompacto`. Ver `capturas/mercado-*` contra `capturas/inicio-*`.
+      Un solo `Header.tsx` con **una sola banda de identidad**: marca, los cinco
+      destinos y las celdas de sesión, idénticos en Inicio, Mercado y Servicios.
+      El Mercado agrega debajo una segunda banda con el buscador, y nada más.
+      Antes el buscador se metía en la primera banda y empujaba los destinos a
+      una barra blanca aparte; Emi rechazó esa transformación y UX-2D.1 la
+      corrigió. El caso 128 exige la paridad midiendo posición, alto, marca y
+      celdas de las tres secciones, y en rojo —con la cabecera anterior— falla
+      con «escritorio: la banda de identidad de Mercado no es la de Inicio».
+      Ver `capturas/mercado-*` contra `capturas/inicio-*` al mismo ancho.
 - [x] Cinco destinos visibles en 3+2 a 390, sin scroll ni menú escondido.
       Caso 128 exige `isVisible()` de los cinco destinos en los tres anchos y
       `scrollWidth <= clientWidth`. Captura `capturas/cabecera-anonimo-390.png`.
@@ -66,7 +77,10 @@ visual sin funcionamiento real no cierra la tarea.
       Caso 128 lee el atributo `placeholder` en cada ancho. La etiqueta del
       campo —«Buscar en el mercado», que es lo que se anuncia— no cambia, y las
       tres puertas de navegador ahora localizan el campo por esa etiqueta y no
-      por un texto que depende del ancho.
+      por un texto que depende del ancho. El mismo caso comprueba que el
+      buscador no existe en Inicio ni en Servicios, que en el Mercado empieza
+      por debajo de la banda de identidad y que desde ahí sigue filtrando el
+      catálogo.
 
 ## Inicio
 
@@ -166,7 +180,8 @@ visual sin funcionamiento real no cierra la tarea.
 - [x] Capturas Inicio/Servicios/Mercado en 1440×900, 768×1024 y 390×844.
       Nueve archivos en `capturas/`.
 - [x] Capturas del Header por rol en desktop y mobile.
-      Ocho archivos `capturas/cabecera-*`.
+      Ocho archivos `capturas/cabecera-*`, más seis `capturas/*-admin.png` con
+      Inicio y Mercado en los tres anchos y el rol de más celdas.
 - [x] `scrollWidth === clientWidth` en las superficies afectadas.
       Medido en las cinco secciones públicas a 1440, 768 y 390, y otra vez con
       el texto al 130 %: 15 y 15 mediciones, todas sin desborde. `npm run
@@ -176,7 +191,10 @@ visual sin funcionamiento real no cierra la tarea.
       contractuales— y a 320×256, que es el piso de reflujo de WCAG; 15
       mediciones sin desborde. Texto al 130 %: otras 15. Movimiento reducido:
       cero elementos con transición o animación mayor a 1 ms y cero videos.
-      Teclado y foco: caso 123 de la suite.
+      Teclado y foco: caso 123 de la suite, más el recorrido de la cabecera en
+      los tres anchos —marca, sesión, los cinco destinos y, en el Mercado, campo
+      y botón de búsqueda—, con anillo de foco de 3 px en cada parada y el mismo
+      orden en los tres.
 - [x] Acciones principales `>=44×44`; axe sin serious/critical.
       Caso 128 mide el alto real de cada celda de la cabecera. `axe` sin
       violaciones de ninguna severidad en 64 pantallas.

@@ -109,10 +109,10 @@ export const Header: React.FC<HeaderProps> = ({
     onSearchSubmit();
   };
 
-  // Dos cabeceras, no dos componentes: el mercado necesita el buscador
-  // dominante y la navegacion en una segunda banda; el resto de las paginas
-  // publicas entra en una sola banda compacta. La sesion, los roles, el
-  // carrito y la vuelta de Mercado Pago son los mismos en las dos.
+  // Una sola cabecera y una sola primera banda: marca, las cinco secciones y
+  // las acciones de la sesion, iguales en Inicio, en Servicios y en el Mercado.
+  // Lo unico que cambia al entrar al Mercado es que aparece una segunda banda
+  // con el buscador, debajo. La identidad de arriba no se mueve.
   const enMercado = currentSection === 'marketplace';
 
   const navegacion = (
@@ -131,7 +131,7 @@ export const Header: React.FC<HeaderProps> = ({
   );
 
   return (
-    <header className={`${styles.header} ${enMercado ? styles.headerMercado : styles.headerCompacto}`}>
+    <header className={styles.header}>
       <div className={`tg-sobre-marca ${styles.masthead}`}>
         {/* El wordmark es un archivo, no letras compuestas a mano: su dibujo
             está convertido a contornos, así que no depende de que la fuente
@@ -141,36 +141,14 @@ export const Header: React.FC<HeaderProps> = ({
           <img src="/marca/topgreen-mono-light.svg" alt="TopGreen" width={555} height={110} />
         </button>
 
-        {/* La búsqueda vive donde hay resultados que filtrar. En las otras
-            secciones no hay grilla, así que un buscador ahí sería un control
-            que parece hacer algo y no hace nada. */}
-        {enMercado && (
-          <form className={styles.buscador} onSubmit={handleSubmit} role="search">
-            <label className="tg-sr-only" htmlFor="buscar-mercado">
-              Buscar en el mercado
-            </label>
-            <input
-              id="buscar-mercado"
-              type="search"
-              className={styles.buscadorCampo}
-              /* En 390 px el texto descriptivo no entra y se corta a la mitad
-                 de una palabra. La instrucción corta dice lo mismo y cabe; la
-                 etiqueta, que es lo que lee un lector de pantalla, no cambia. */
-              placeholder={esMovil ? 'Buscar' : 'Buscar producto, servicio o ubicación'}
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-            />
-            <button type="submit" className={styles.buscadorBoton}>
-              Buscar
-            </button>
-          </form>
-        )}
-
-        {!enMercado && navegacion}
-
         {/* La sesión crece por celdas: cada acción que suma el rol entra como
             una celda más con su propio separador, y el cereal queda reservado
-            a la acción comercial —Vender—. */}
+            a la acción comercial —Vender—.
+
+            Va antes que la navegación en el documento, y no después, porque el
+            orden de lectura es el mismo en los tres anchos: identidad y sesión
+            primero, destinos después, búsqueda al final. En celular y en tablet
+            eso además coincide renglón por renglón con lo que se ve. */}
         <div className={styles.acciones}>
           {isAuthenticated && user?.role === 'admin' && onAdminClick && (
             <button className={styles.celda} onClick={onAdminClick}>
@@ -207,11 +185,36 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
         </div>
+
+        {navegacion}
       </div>
 
+      {/* La búsqueda vive donde hay resultados que filtrar, y en su propia
+          banda: en las otras secciones no hay grilla, así que un buscador ahí
+          sería un control que parece hacer algo y no hace nada. Va debajo de la
+          primera banda y no adentro, para no correr de lugar ni la marca ni las
+          secciones ni las acciones al cambiar de pantalla. */}
       {enMercado && (
-        <div className={styles.nav}>
-          <div className="tg-container">{navegacion}</div>
+        <div className={`tg-sobre-marca ${styles.bandaDeBusqueda}`}>
+          <form className={styles.buscador} onSubmit={handleSubmit} role="search">
+            <label className="tg-sr-only" htmlFor="buscar-mercado">
+              Buscar en el mercado
+            </label>
+            <input
+              id="buscar-mercado"
+              type="search"
+              className={styles.buscadorCampo}
+              /* En 390 px el texto descriptivo no entra y se corta a la mitad
+                 de una palabra. La instrucción corta dice lo mismo y cabe; la
+                 etiqueta, que es lo que lee un lector de pantalla, no cambia. */
+              placeholder={esMovil ? 'Buscar' : 'Buscar producto, servicio o ubicación'}
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+            />
+            <button type="submit" className={styles.buscadorBoton}>
+              Buscar
+            </button>
+          </form>
         </div>
       )}
 

@@ -16,7 +16,7 @@
 .contentWrapper {
   display: grid;
   grid-template-columns: 256px minmax(0, 1fr);
-  min-height: calc(100vh - 112px);
+  min-height: calc(100vh - 124px);
   background-color: var(--tg-color-canvas);
 }
 

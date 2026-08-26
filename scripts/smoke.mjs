@@ -12612,11 +12612,19 @@ await runCase(127, 'El conteo del Mercado sale del total de la API y no de la p�
     + `a las ${queryRows("SELECT COUNT(*)::text, 'fin' FROM products WHERE status = 'ACTIVE' AND publication_type = 'servicio'")[0][0]} que hay en la base`;
 });
 
-await runCase(128, 'La cabecera conserva las acciones de cada rol en los tres anchos, sin desbordar', async () => {
-  // La cabecera pasó a ser una banda de celdas y crece con el rol: administrar
-  // suma «Admin», publicar suma «Vender», la sesión suma carrito, cuenta y
-  // salir. Es justo donde algo se cae cuando la pantalla es angosta, y donde
-  // desaparecería «Salir» si alguien copiara la lámina resumida del handoff.
+await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Servicios, y sólo el Mercado suma la banda de búsqueda', async () => {
+  // Dos propiedades en un caso, porque son la misma cabecera.
+  //
+  // La primera: la banda de identidad no cambia de sección a sección. Al entrar
+  // al Mercado, el buscador se metía en esa banda y empujaba las cinco
+  // secciones a una barra blanca aparte, así que la cabecera se transformaba
+  // justo cuando uno pasaba de mirar a operar. Ahora la banda de arriba es
+  // idéntica y el Mercado agrega una segunda banda con el buscador, DEBAJO.
+  //
+  // La segunda: esa banda crece con el rol —administrar suma «Admin», publicar
+  // suma «Vender», la sesión suma carrito, cuenta y salir— y es justo donde
+  // algo se cae cuando la pantalla es angosta, y donde desaparecería «Salir»
+  // si alguien copiara la lámina resumida del handoff.
   const ROLES = [
     ['anónimo', null, ['Ingresar']],
     ['comprador', ['cliente@ejemplo.com', 'cliente123'], ['Carrito', 'Mi cuenta', 'Salir']],
@@ -12630,9 +12638,126 @@ await runCase(128, 'La cabecera conserva las acciones de cada rol en los tres an
   ];
   const SECCIONES = ['Inicio', 'Mercado', 'Servicios', 'Quiénes somos', 'Contacto'];
 
+  // Lo que describe a la banda de identidad: dónde está, cuánto mide, con qué
+  // marca y con qué celdas, en ese orden. Si dos secciones devuelven lo mismo,
+  // la banda es la misma banda.
+  const RETRATO = () => {
+    const cabecera = document.querySelector('header');
+    const banda = cabecera.firstElementChild;
+    const caja = banda.getBoundingClientRect();
+    const marca = banda.querySelector('img');
+    const nombre = (b) => (
+      b.getAttribute('aria-label')
+      || (b.textContent || '').replace(/\s+/g, ' ').trim()
+      || (b.querySelector('img') || {}).alt
+      || '?'
+    );
+    return {
+      arriba: Math.round(caja.top),
+      alto: Math.round(caja.height),
+      marca: marca ? marca.getAttribute('src') : 'sin marca',
+      altoMarca: marca ? Math.round(marca.getBoundingClientRect().height) : 0,
+      celdas: [...banda.querySelectorAll('button')].map(nombre),
+      // El buscador no puede vivir adentro de la banda de identidad.
+      buscadorAdentro: !!banda.querySelector('#buscar-mercado'),
+    };
+  };
+
   const browser = await chromium.launch({ headless: true });
   const revisados = [];
+  const paridades = [];
   try {
+    // --- A. La banda de identidad es la misma en las tres secciones -------
+    for (const [nombreAncho, width, height] of ANCHOS) {
+      const contexto = await browser.newContext({ viewport: { width, height } });
+      const page = await contexto.newPage();
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.locator('header').first().waitFor({ state: 'visible', timeout: 20_000 });
+
+      const retratar = async (seccion) => {
+        await page.locator('header').first()
+          .getByRole('button', { name: seccion, exact: true }).first().click();
+        await page.waitForTimeout(900);
+        return page.evaluate(RETRATO);
+      };
+
+      const inicio = await retratar('Inicio');
+      const mercado = await retratar('Mercado');
+      const servicios = await retratar('Servicios');
+
+      for (const [nombre, retrato] of [['Inicio', inicio], ['Mercado', mercado], ['Servicios', servicios]]) {
+        assert(JSON.stringify(retrato) === JSON.stringify(inicio),
+          `${nombreAncho}: la banda de identidad de ${nombre} no es la de Inicio\n`
+          + `  Inicio:  ${JSON.stringify(inicio)}\n`
+          + `  ${nombre}: ${JSON.stringify(retrato)}`);
+        assert(!retrato.buscadorAdentro,
+          `${nombreAncho}/${nombre}: el buscador está adentro de la banda de identidad`);
+        assert(retrato.celdas.length >= 6,
+          `${nombreAncho}/${nombre}: la banda tiene ${retrato.celdas.length} celdas y faltan destinos`);
+        // El orden de lectura es el mismo en los tres anchos: la marca, después
+        // la sesión, después los cinco destinos. Se comprueba en el documento,
+        // que es lo que recorren el teclado y un lector de pantalla, y no en la
+        // posición dibujada, que cambia con el ancho.
+        assert(retrato.celdas[0] === 'TopGreen',
+          `${nombreAncho}/${nombre}: la banda no arranca por la marca: ${retrato.celdas[0]}`);
+        assert(JSON.stringify(retrato.celdas.slice(-5)) === JSON.stringify(SECCIONES),
+          `${nombreAncho}/${nombre}: los cinco destinos no cierran la banda en orden: `
+          + JSON.stringify(retrato.celdas));
+      }
+
+      // --- B. El buscador existe SÓLO en el Mercado, y en su propia banda --
+      const dondeEstaElBuscador = async (seccion) => {
+        await page.locator('header').first()
+          .getByRole('button', { name: seccion, exact: true }).first().click();
+        await page.waitForTimeout(900);
+        return page.evaluate(() => {
+          const campo = document.querySelector('#buscar-mercado');
+          if (!campo) return null;
+          const banda = document.querySelector('header').firstElementChild;
+          return {
+            arribaDelCampo: Math.round(campo.getBoundingClientRect().top),
+            abajoDeLaBanda: Math.round(banda.getBoundingClientRect().bottom),
+            marcador: campo.getAttribute('placeholder'),
+            etiqueta: (document.querySelector('label[for="buscar-mercado"]') || {}).textContent,
+          };
+        });
+      };
+
+      assert(await dondeEstaElBuscador('Inicio') === null,
+        `${nombreAncho}: Inicio dibuja un buscador que no filtra nada`);
+      assert(await dondeEstaElBuscador('Servicios') === null,
+        `${nombreAncho}: Servicios dibuja un buscador que no filtra nada`);
+
+      const enMercado = await dondeEstaElBuscador('Mercado');
+      assert(enMercado, `${nombreAncho}: el Mercado se quedó sin buscador`);
+      assert(enMercado.arribaDelCampo >= enMercado.abajoDeLaBanda - 1,
+        `${nombreAncho}: el buscador arranca en ${enMercado.arribaDelCampo} y la banda de `
+        + `identidad termina en ${enMercado.abajoDeLaBanda}: no está debajo`);
+      assert(enMercado.etiqueta === 'Buscar en el mercado',
+        `${nombreAncho}: la etiqueta del buscador dice «${enMercado.etiqueta}»`);
+      assert(enMercado.marcador === (nombreAncho === 'celular' ? 'Buscar' : 'Buscar producto, servicio o ubicación'),
+        `${nombreAncho}: el buscador dice «${enMercado.marcador}»`);
+
+      // --- C. Y desde ahí sigue filtrando el catálogo ----------------------
+      const [publicacion] = queryRows(
+        "SELECT name, 'fin' FROM products WHERE status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1");
+      assert(publicacion, 'la base no tiene publicaciones activas para probar la búsqueda');
+      await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+      const antes = await page.locator('article[class*="card"]').count();
+      await page.getByLabel('Buscar en el mercado').fill(publicacion[0]);
+      await page.getByLabel('Buscar en el mercado').press('Enter');
+      await page.waitForTimeout(1500);
+      const despues = await page.locator('article[class*="card"]').count();
+      assert(despues > 0 && despues < antes,
+        `${nombreAncho}: buscar «${publicacion[0]}» pasó de ${antes} a ${despues} tarjetas`);
+      await page.getByRole('heading', { name: publicacion[0], exact: true, level: 3 })
+        .first().waitFor({ state: 'visible', timeout: 20_000 });
+
+      paridades.push(nombreAncho);
+      await contexto.close();
+    }
+
+    // --- D. Las acciones de cada rol, en los tres anchos -------------------
     for (const [rol, credenciales, acciones] of ROLES) {
       let sesion = null;
       if (credenciales) {
@@ -12713,7 +12838,10 @@ await runCase(128, 'La cabecera conserva las acciones de cada rol en los tres an
     await browser.close();
   }
 
-  return `${revisados.length} combinaciones de rol y ancho: los cinco destinos visibles, todas `
+  return `banda de identidad idéntica en Inicio, Mercado y Servicios en ${paridades.length} anchos `
+    + '—misma posición, mismo alto, misma marca y las mismas celdas en el mismo orden—, con el '
+    + 'buscador sólo en el Mercado, debajo de esa banda, filtrando el catálogo desde ahí; y '
+    + `${revisados.length} combinaciones de rol y ancho con los cinco destinos visibles, todas `
     + 'las acciones del rol con 44 px de alto —«Salir» incluido—, el nombre real en escritorio '
     + 'y «Cuenta» en celular, el buscador con su texto por ancho y cero desborde horizontal';
 });

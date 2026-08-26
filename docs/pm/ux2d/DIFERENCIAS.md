@@ -37,19 +37,42 @@ cuenta que todavía no publicó le sacaría una capacidad que hoy tiene. Si el
 negocio quiere separar los dos roles, es una decisión de producto con su
 migración, no un ajuste visual.
 
-## 3. La cabecera conserva `Salir` y el Mercado conserva su `h1`
+## 3. La cabecera no cambia de estructura al entrar al Mercado
+
+`frames/mercado-desktop.html` mete el buscador en la banda de marca y baja los
+cinco destinos a una segunda barra blanca; los otros frames dejan los destinos
+arriba. En un prototipo estático eso es una lámina por pantalla. En el producto
+es una cabecera que se transforma justo cuando uno pasa de mirar a operar, y
+Emi la rechazó en la revisión de UX-2D.
+
+La corrección UX-2D.1: **una sola banda de identidad**, igual en Inicio,
+Mercado y Servicios —marca, los cinco destinos, las celdas de sesión, a la
+misma altura y en el mismo orden—, y el buscador en una **segunda banda propia
+que sólo aparece en el Mercado**, debajo. La banda de arriba no se mueve nunca.
+
+Dos cosas que se decidieron con eso:
+
+- **El orden de lectura es el mismo en los tres anchos**: marca, sesión, los
+  cinco destinos y, sólo en el Mercado, el buscador. Por eso en el documento
+  las acciones van antes que la navegación, aunque en escritorio los destinos
+  se dibujen en el medio: en tablet y en celular, donde la banda ocupa dos
+  renglones, lo que se ve vuelve a ser exactamente lo que dice el documento.
+- **La segunda banda es verde, como la primera.** Es la misma banda con un
+  renglón más, no una barra de otro material. La barra blanca era lo que hacía
+  que el Mercado se leyera como otra cabecera.
+
+## 4. La cabecera conserva `Salir` y el Mercado conserva su `h1`
 
 Dos cosas que las láminas no muestran y que no se pueden perder:
 
 - **`Salir`** entra como una celda neutra más. `MAPA-REACT.md` ya lo advertía.
-- **El título del Mercado.** `frames/mercado-desktop.html` va de la cabecera a
-  los resultados sin banda de presentación, y así quedó: el Mercado abre con
-  resultados. Pero el `<h1>Operaciones disponibles</h1>` sigue en el DOM con
+- **El título del Mercado.** La lámina va de la cabecera a los resultados sin
+  banda de presentación, y así quedó: el Mercado abre con resultados. Pero el `<h1>Operaciones disponibles</h1>` sigue en el DOM con
   `tg-sr-only`. Sacarlo dejaba la pantalla sin encabezado de nivel 1 y sin
   nombre en el árbol del documento, y eso es accesibilidad, que es el punto 1
   de la precedencia. La bajada comercial que acompañaba al título sí se fue.
 
-## 4. El anillo de foco no es cereal sobre fondo claro
+## 5. El anillo de foco no es cereal sobre fondo claro
 
 `assets/css/b.css` pone `:focus-visible { outline: 3px solid var(--gold) }` en
 todas partes. El cereal mide **2,41:1 contra el canvas** y un indicador de foco
@@ -64,7 +87,7 @@ Quedó así:
 Es el mismo anillo de 3 px; lo único que cambia es el único color que en cada
 fondo se ve. Las dos mediciones están en `TOKENS-Y-CONTRASTE.md`.
 
-## 5. El bloque de logística del detalle cambió de color
+## 6. El bloque de logística del detalle cambió de color
 
 En UX-2C ese bloque usaba el tinte de «información». Bajo B eso dejaba el
 rótulo de la anatomía —cereal profundo— en **4,45:1**, por debajo del mínimo,
@@ -74,14 +97,14 @@ Pasó a superficie neutra con filete grafito, que es el color que el handoff le
 asigna a la anatomía de logística. Fue el único incumplimiento de contraste que
 encontró la medición.
 
-## 6. Los controles miden 44 px y no 42
+## 7. Los controles miden 44 px y no 42
 
 Las láminas usan 42 px de alto en los botones de tarjeta y en el buscador del
 Mercado. El repositorio tiene `--tg-control-min: 44px` como piso contractual y
 la propia `PARIDAD.md` exige `>=44×44` en las acciones principales. Quedaron en
 44.
 
-## 7. El carrito dice «Carrito (2)» también en escritorio
+## 8. El carrito dice «Carrito (2)» también en escritorio
 
 La lámina de escritorio dice «Mi carrito (2)» y la de celular «Carrito (2)».
 Quedó «Carrito (n)» en los dos anchos: el nombre accesible del botón es lo que
@@ -90,7 +113,7 @@ ancho es exactamente el problema que acabo de sacar del buscador. La cantidad pa
 flotante a un número entre paréntesis en la misma línea: el rojo es el color
 del error en este sistema y «tenés dos cosas» no es un error.
 
-## 8. La placa de «sin registro fotográfico» no lleva rótulo escrito encima
+## 9. La placa de «sin registro fotográfico» no lleva rótulo escrito encima
 
 `assets/estados/no-photo-b.svg` trae la leyenda dibujada en contornos, y a la
 altura que ocupa en una tarjeta se lee entera. Poner al lado un rótulo con las
@@ -105,14 +128,14 @@ distinto.
 Las pruebas se ajustaron a eso: además del nombre accesible, ahora exigen que
 la placa esté efectivamente pintada, así que un activo que no cargue falla.
 
-## 9. El filtro de tipo sigue siendo un `select`
+## 10. El filtro de tipo sigue siendo un `select`
 
 `frames/mercado-desktop.html` dibuja «Tipo» como tres radios. En el producto es
 un `select` con las mismas tres opciones, con su etiqueta y su estado. Es un
 control existente y probado; cambiarlo era tocar comportamiento en una tarea de
 revestimiento. Recibió el color, el borde y el rótulo en versalitas de B.
 
-## 10. Dos de los cuatro SVG quedan versionados sin consumir
+## 11. Dos de los cuatro SVG quedan versionados sin consumir
 
 `topgreen-compact.svg` y `topgreen-horizontal.svg` son las versiones para fondo
 claro. Hoy la marca aparece en dos lugares —la banda de la cabecera y el pie— y
@@ -120,7 +143,7 @@ los dos son fondo oscuro, así que ambos usan `topgreen-mono-light.svg`. Los
 cuatro archivos están reemplazados como pide el handoff; dos todavía no tienen
 dónde usarse.
 
-## 11. Lo que encontré y no toqué
+## 12. Lo que encontré y no toqué
 
 - **Administración no muestra «Vendedores» ni «Clientes».** Los dos contadores
   quedan en blanco porque la respuesta del servidor no trae `total_sellers` ni
@@ -131,7 +154,7 @@ dónde usarse.
   operaciones» en vez de «100 operaciones». Sigue registrada en
   `docs/pm/ux2c/DEUDA-PAGINACION.md`.
 
-## 12. Lo que encontré y sí arreglé
+## 13. Lo que encontré y sí arreglé
 
 - **`rgba(30, 58, 95, .85)` en Quiénes somos**: un índigo escrito a mano encima
   del color de marca, el único hex suelto que quedaba en una superficie

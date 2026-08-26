@@ -1,10 +1,10 @@
 # Capturas UX-2D — B, Mercado nacional
 
-Salen del código de este commit, contra la base recreada desde cero
-(migraciones + seed, 30 publicaciones) y con la API y el frontend locales. No
-hay retoques: son lo que dibuja el navegador.
+Salen del código actual —UX-2D con la corrección UX-2D.1 de la cabecera—,
+contra la base recreada desde cero (migraciones + seed, 30 publicaciones) y con
+la API y el frontend locales. No hay retoques: son lo que dibuja el navegador.
 
-## Pantallas
+## Pantallas sin sesión
 
 | Archivo | Qué muestra |
 |---|---|
@@ -19,9 +19,29 @@ hay retoques: son lo que dibuja el navegador.
 | `mercado-390x844.png` | Mercado en celular, recortado a 2600 px de alto. |
 
 El Mercado es una lista larga —treinta publicaciones son unos doce mil píxeles
-de alto en celular— y lo que hay que revisar es la cabecera de dos bandas, el
-panel de filtros, la barra de resultados y las primeras filas de tarjetas. El
-resto es la misma tarjeta repetida.
+de alto en celular— y lo que hay que revisar es la cabecera, el panel de
+filtros, la barra de resultados y las primeras filas de tarjetas. El resto es
+la misma tarjeta repetida.
+
+## Pantallas con el rol más cargado
+
+Administración es el rol con más celdas de sesión: `Admin`, `Vender`, carrito,
+cuenta y `Salir`. Estas seis van recortadas al primer viewport, que es donde
+se ve la cabecera completa; el cuerpo de la página ya está en el juego de
+arriba y sería el mismo repetido.
+
+| Archivo | Qué muestra |
+|---|---|
+| `inicio-1440x900-admin.png` | Inicio con sesión de administración, escritorio. |
+| `inicio-768x1024-admin.png` | Inicio con sesión de administración, tablet. |
+| `inicio-390x844-admin.png` | Inicio con sesión de administración, celular. |
+| `mercado-1440x900-admin.png` | Mercado con sesión de administración, escritorio. |
+| `mercado-768x1024-admin.png` | Mercado con sesión de administración, tablet. |
+| `mercado-390x844-admin.png` | Mercado con sesión de administración, celular. |
+
+Comparar `inicio-*` con `mercado-*` al mismo ancho: la banda de arriba es la
+misma —marca, los cinco destinos, las mismas celdas de sesión, a la misma
+altura— y lo único que agrega el Mercado es la banda del buscador, debajo.
 
 ## Cabecera por rol
 
@@ -32,10 +52,13 @@ resto es la misma tarjeta repetida.
 | `cabecera-vendedor-1440.png` / `-390.png` | Juan Vendedor | `Vender`, carrito, cuenta, `Salir` |
 | `cabecera-admin-1440.png` / `-390.png` | Administrador TopGreen | `Admin`, `Vender`, carrito, cuenta, `Salir` |
 
-Las cuatro están tomadas en el Mercado, que es donde la cabecera usa sus dos
-bandas: la de marca con el buscador y las celdas de sesión, y la blanca con los
-cinco destinos.
+Las cuatro están tomadas en el Mercado, que es la única sección con dos bandas.
 
 Comprador y vendedor muestran las mismas celdas y no es un error de la captura:
 en el producto no existe un rol «vendedor». Cualquier cuenta con sesión puede
 publicar, así que `Vender` aparece para las dos. Está explicado en el informe.
+
+## Marca
+
+`marca-cuatro-tamanos.png`: los cuatro SVG a 40, 30, 24 y 16 px de alto, cada
+uno sobre el fondo que le corresponde.

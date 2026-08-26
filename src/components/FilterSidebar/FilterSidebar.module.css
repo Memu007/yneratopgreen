@@ -124,10 +124,10 @@
 
   /* Pegado al scroll, debajo de la cabecera: los filtros siguen a mano cuando
      la lista es larga, que es cuando hacen falta. La cabecera del mercado mide
-     64 px de banda de marca más 48 px de banda de secciones. */
+     64 px de banda de identidad más 60 px de banda de búsqueda. */
   .plegable {
     position: sticky;
-    top: 112px;
+    top: 124px;
   }
 }
 
