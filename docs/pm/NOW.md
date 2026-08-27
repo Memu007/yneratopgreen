@@ -159,8 +159,10 @@ Actualizado: 2026-08-27.
   `d8ce32a` + `b38f29c`: la consola ya no expone tokens ni datos de cuenta y el
   caso 129 cubre login, refresh, logout y rechazo. SEC-2 queda aceptada en
   `ccb868c` + `6cea576`: `pip-audit` baja de 40 avisos a cero y PyJWT conserva
-  los tokens. SEC-2.1 queda activa para retirar tres dependencias sin
-  consumidores. Nada de esto acepta UX-2D.1 ni habilita despliegue.
+  los tokens. SEC-2.1 queda aceptada en `c05e0fb` + `7280404`: el grafo baja a
+  47 paquetes sin consumidores muertos. SEC-3 queda activa para cabeceras HTTP
+  defensivas en Frontend y Backend. Nada de esto acepta UX-2D.1 ni habilita
+  despliegue.
 - **Advertencia del entorno descartable:** el Backend remoto usado por la vista
   local está atrasado respecto de `main` y su catálogo no devuelve aún
   `operation_kind` ni los campos nuevos de servicio. Por eso Logística cae en
@@ -177,11 +179,12 @@ Actualizado: 2026-08-27.
 UX-2D.1 queda conforme técnicamente en `2a01775`; falta la aceptación visual
 final de Emi. La primera banda ya es estable entre Inicio, Mercado y Servicios,
 y el Mercado agrega el buscador debajo. SEC-1 y SEC-2 quedan aceptadas en
-`d8ce32a`/`b38f29c` y `ccb868c`/`6cea576`. **La tarea activa única es SEC-2.1:**
-retirar `pillow`, `fastapi-cors` y `passlib`, que no tienen consumidores, y
-demostrar instalación, auditoría y suite sin ellos. No se reabren Inicio,
-Servicios, cards, anatomías, color ni tipografía y no se despliega. La orden
-completa está al final de `PARA-DEV.md`.
+`d8ce32a`/`b38f29c` y `ccb868c`/`6cea576`; SEC-2.1 queda aceptada en
+`c05e0fb`/`7280404`. **La tarea activa única es SEC-3:** incorporar cabeceras
+HTTP defensivas y una CSP acotada en los candidatos Frontend/Backend, con
+regresión y sin cambiar contratos ni desplegar. No se reabren Inicio,
+Servicios, cards, anatomías, color ni tipografía. La orden completa está al
+final de `PARA-DEV.md`.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se

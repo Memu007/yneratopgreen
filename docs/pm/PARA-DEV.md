@@ -3897,3 +3897,97 @@ cuenta.
 
 Empujá producto e informe, avisá que respondiste y frená para revisión PM. **No
 despliegues.**
+
+## 2026-08-27 — SEC-2.1 `c05e0fb`: aceptada
+
+Acepto producto `c05e0fb` e informe `7280404`. El commit toca únicamente
+`backend/requirements.txt`: salen `pillow`, `fastapi-cors` y `passlib`, junto
+con `environs` y `marshmallow`; `bcrypt` permanece directo. No hay reemplazo ni
+cambio de comportamiento.
+
+Verificación independiente PM: entorno Python 3.11.15 nuevo con 47 paquetes,
+los cinco retirados ausentes, `bcrypt==5.0.0` presente, `pip check` limpio,
+`pip-audit` en cero, compileall y `diff-check` verdes, aplicación importable con
+las mismas 100 rutas y roundtrip JWT correcto. Base limpia, migraciones, seed y
+suite 130/130 quedan como evidencia de Dev porque PM continúa sin Docker.
+
+## Tarea activa única: SEC-3, cabeceras HTTP defensivas sin romper integraciones
+
+La auditoría PM recibió respuestas públicas del Frontend y Backend sin HSTS,
+`Content-Security-Policy`, `X-Content-Type-Options`, protección contra framing,
+`Referrer-Policy` ni `Permissions-Policy`. El Nginx local heredado trae dos
+cabeceras, pero Railway usa `infra/railway/nginx.conf.template`, que no las
+define; FastAPI tampoco aplica una política global.
+
+### Resultado esperado y prioridad
+
+Todas las respuestas públicas deben traer una base defensiva reproducible. El
+Frontend agrega una CSP compatible con el producto real y el Backend conserva
+sus contratos y CORS. No se cambia autenticación, despliegue ni funcionalidad.
+
+Antes de editar, leé `Dockerfile.railway`,
+`infra/railway/nginx.conf.template`, `backend/app/main.py`, la configuración
+CORS y los flujos de imágenes, uploads, OAuth/Checkout Pro y callbacks. Medí
+primero los headers actuales del Frontend y Backend públicos; no asumas que el
+Nginx local es el que sirve Railway.
+
+### Alcance
+
+- En el Frontend servido por Nginx, aplicar en todas las respuestas —documento,
+  fallback SPA, assets y `/health`— como mínimo HSTS, `nosniff`, prohibición de
+  framing, `Referrer-Policy` y una `Permissions-Policy` que niegue capacidades
+  no usadas.
+- Agregar CSP al Frontend: scripts sin `unsafe-eval`; objetos y framing
+  prohibidos; `base-uri` acotado; imágenes, fuentes, estilos y conexiones sólo
+  con las fuentes que el producto realmente usa. `data:`/`blob:` o inline se
+  permiten únicamente donde una función existente los necesita.
+- Los orígenes de API e imágenes no se hardcodean al Railway descartable: salen
+  de la misma configuración de build/despliegue que usa el frontend.
+- En FastAPI, aplicar HSTS, `nosniff`, protección de framing,
+  `Referrer-Policy` y `Permissions-Policy` también en éxito, error y 404, sin
+  alterar CORS, cookies, descargas ni contenidos.
+- Dejar una regresión automática que compruebe valores, cobertura y ausencia de
+  duplicados contradictorios en ambos servicios.
+
+### Límites
+
+- Sin cambiar CORS, tokens/localStorage, cookies, CSRF, OAuth, endpoints,
+  contratos, rutas, HTML visual, dependencias, datos ni esquema.
+- Sin `X-XSS-Protection`, preload de HSTS, wildcard general `https:`/`*` en CSP
+  ni `unsafe-eval`. No rompas Swagger, PDFs, imágenes, previews locales,
+  Checkout Pro o retorno OAuth para hacer verde una lista de headers.
+- Sin desplegar. La prueba se hace en candidatos locales equivalentes a los dos
+  contenedores Railway; PM decide publicación después.
+
+### Criterios de aceptación ejecutables
+
+1. La evidencia roja muestra la ausencia actual en Frontend y Backend. La
+   regresión falla contra esa base y queda verde sólo cuando todas las rutas
+   acordadas entregan una política única y coherente.
+2. Frontend: `/`, un asset versionado, `/health` y una ruta SPA inexistente
+   reciben los headers. Backend: health, una respuesta API correcta, un 401, un
+   404 y una descarga PDF reciben la base defensiva sin perder contenido,
+   `Content-Type`, `Content-Disposition` ni CORS.
+3. Un navegador real recorre páginas públicas y los cuatro roles, imágenes y
+   previews `blob:`, login/refresh/logout, publicación multipart, checkout,
+   OAuth/retorno MP y documentación sin recurso bloqueado ni violación CSP. La
+   política no abre un origen para silenciar una falla: cada permiso queda
+   asociado a un uso real.
+4. Las rutas y respuestas API coinciden con la base anterior salvo por headers;
+   la suite completa —mínimo 130/130—, a11y, contraste e hito quedan verdes
+   desde base limpia.
+5. Quedan verdes build, lint, compileall,
+   `git -c core.whitespace=cr-at-eol diff --check` y la construcción/healthcheck
+   de ambos contenedores candidatos.
+
+### Freno obligatorio
+
+Frená antes de ampliar si la CSP exige un wildcard, si una integración externa
+necesita un origen no identificable desde configuración, si un header rompe
+OAuth/pagos/descargas o si Railway no permite expresar la política sin cambiar
+la topología. Traé la ruta, header, violación y mínima opción; no relajes toda
+la política ni despliegues para probar.
+
+Entregá producto e informe en commits separados, con matriz ruta/header,
+rojo/verde, comandos, navegador, riesgos residuales y hashes. Empujá a
+`Memu007/yneratopgreen`, avisá sólo que respondiste y frená. **No despliegues.**
