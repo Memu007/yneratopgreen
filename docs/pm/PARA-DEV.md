@@ -4135,3 +4135,86 @@ entorno remoto.
 
 Empujá producto e informe a `Memu007/yneratopgreen/main`, avisá sólo que
 respondiste y frená. **No despliegues.**
+
+## 2026-08-27 — SEC-4 `9251701`: aceptada
+
+Acepto producto `9251701` e informe `0956e60`. PM reprodujo las dos entradas:
+la CLI termina con estado 2 y la llamada directa levanta
+`EntornoNoAptoParaSeed`; `production`, variantes, `prod`, `staging`, vacío y
+espacios frenan antes de `SessionLocal`, mientras `local` normalizado pasa. Una
+URL a un puerto muerto no produjo intento de conexión ni la salida nombró las
+ocho credenciales demo. Build, lint, compileall, `pip check` y `diff-check`
+quedan verdes. Base limpia, doble seed y suite 132/132 permanecen como evidencia
+de Dev porque PM no tiene Docker. No hubo despliegue.
+
+## Tarea activa única: SEC-5, el registro público no asigna administradores
+
+### Resultado esperado y prioridad
+
+La revisión PM atravesó `POST /api/auth/register` con una base simulada y el
+payload `role: "admin"`. El endpoint respondió 201, agregó un `User` con rol
+`admin` y confirmó la transacción. Después de verificar el correo, esa cuenta
+tendría las mismas autorizaciones que un administrador. Es una escalada directa
+y desplaza rate limiting y cualquier otra deuda.
+
+Rojo independiente sobre `9251701`:
+
+```text
+POST /api/auth/register  -> HTTP 201
+objeto agregado          -> role=admin
+commit                   -> 1
+```
+
+Antes de editar, leé `backend/app/schemas/auth.py`, `backend/app/api/auth.py`,
+`backend/app/models/user.py`, las dependencias y rutas administrativas,
+`src/contexts/AuthContext.tsx`, `src/components/Auth/RegisterModal.tsx` y los
+casos de registro, confirmación y autorización. Identificá también el único
+camino autorizado actual para crear o promover administradores.
+
+### Alcance y límites
+
+- El rol de una cuenta creada por el endpoint público es propiedad del servidor
+  y siempre queda `USER`, sea una cuenta común o transportista.
+- Un payload público que intenta pedir `admin` debe rechazarse sin crear cuenta,
+  token/correo de verificación, notificación ni otra escritura. La documentación
+  OpenAPI no puede ofrecer `admin` como opción válida del registro público.
+- Registro normal, validación de correo y login siguen funcionando. Conservá la
+  compatibilidad con el frontend actual únicamente donde no debilite la regla.
+- El flujo administrativo autenticado para crear o promover usuarios conserva
+  su autorización y comportamiento.
+- Sin migración, cambio del enum persistido, nuevos roles, rediseño de auth,
+  rate limiting, seed, cookies, JWT, UI visual, Railway, datos ni dependencias.
+  Sin desplegar.
+
+### Criterios de aceptación ejecutables
+
+1. Una regresión atraviesa el endpoint real con `role: "admin"`, falla contra
+   `9251701` porque crea la cuenta, y queda verde sólo cuando la solicitud es
+   rechazada antes de cualquier efecto. SQL, outbox y notificaciones confirman
+   cero escritura.
+2. Omitir el rol y, si se conserva por compatibilidad, enviar explícitamente
+   `role: "user"` crean una cuenta `USER`; un transportista público también
+   queda `USER`. El código que persiste no confía en un rol controlado por el
+   cliente aunque se construya el esquema fuera del HTTP normal.
+3. Tras confirmar e ingresar, una cuenta pública recibe 403 en una ruta
+   administrativa. Un administrador existente conserva acceso y el único flujo
+   administrativo autorizado conserva la capacidad de asignar roles.
+4. El esquema OpenAPI del registro público omite `role` o lo limita únicamente
+   a `user`; nunca anuncia `admin`.
+5. Base limpia, migraciones, seed y suite completa quedan al menos 132/132.
+   También build, lint, compileall y
+   `git -c core.whitespace=cr-at-eol diff --check` quedan verdes. No hace falta
+   repetir a11y, contraste ni hito si no cambia marcado visual.
+6. Producto e informe van en commits separados; el informe incluye rojo/verde,
+   matriz de payload/rol/efectos, OpenAPI, autorizaciones conservadas y hashes.
+
+### Freno obligatorio
+
+Frená si algún cliente contractual necesita elegir `admin` en el registro
+público, si el único flujo administrativo también depende del mismo esquema o
+si cerrar la escalada exige migrar datos. No silenciosamente ignores un valor
+privilegiado sin una regresión que pruebe el rol persistido; traé una única
+opción mínima.
+
+Empujá producto e informe a `Memu007/yneratopgreen/main`, avisá sólo que
+respondiste y frená. **No despliegues.**
