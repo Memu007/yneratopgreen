@@ -13421,12 +13421,97 @@ await runCase(131, 'Toda respuesta publica sale con la base defensiva, y la poli
     }
   }
 
+  // --- D. El error 500 no controlado sale con la MISMA base ----------------
+  // Un 500 no se puede pedir por HTTP: no hay —ni tiene que haber— una ruta que
+  // reviente a pedido. Asi que la prueba levanta la aplicacion REAL donde vive,
+  // con su pila de middleware de verdad, y le engancha EN MEMORIA una ruta que
+  // lanza un RuntimeError. Esa ruta no existe en el producto: nace y muere
+  // adentro de este proceso de Python.
+  //
+  // Lo que esto encontro: `add_middleware` deja la capa por DENTRO de
+  // `ServerErrorMiddleware`, que Starlette pone siempre en la capa 0. Cuando la
+  // excepcion sube, esa capa escribe su respuesta con el `send` crudo y el
+  // middleware de uno no la ve nunca. El 500 salia sin una sola cabecera.
+  const guionDel500 = `
+import json, sys
+from app.main import app
+from starlette.testclient import TestClient
+
+
+@app.get("/__revienta_solo_en_la_prueba__")
+async def _revienta():
+    raise RuntimeError("explosion deliberada de la regresion")
+
+
+medidas = {}
+with TestClient(app, raise_server_exceptions=False) as cliente:
+    for etiqueta, ruta in [("500", "/__revienta_solo_en_la_prueba__"),
+                           ("200", "/api/health"),
+                           ("401", "/api/auth/me"),
+                           ("404", "/api/no-existe")]:
+        r = cliente.get(ruta)
+        medidas[etiqueta] = {
+            "status": r.status_code,
+            "tipo": r.headers.get("content-type"),
+            "cuerpo": r.text[:400],
+            # get_list revela una cabecera repetida, que el dict colapsaria.
+            "cabeceras": {n: r.headers.get_list(n) for n in (
+                "strict-transport-security", "x-content-type-options",
+                "x-frame-options", "referrer-policy", "permissions-policy")},
+        }
+print(json.dumps(medidas))
+`;
+  const crudo500 = execFileSync(
+    'docker',
+    ['exec', '-i', 'topgreen-api', 'python', '-c', guionDel500],
+    { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
+  );
+  const medidas = JSON.parse(crudo500.trim().split(/\r?\n/).at(-1));
+
+  assert(medidas['500'].status === 500,
+    `la ruta que revienta respondio ${medidas['500'].status} en vez de 500`);
+
+  // Las cinco cabeceras, una sola vez y con el MISMO valor que en 200/401/404.
+  for (const [nombre, valor] of Object.entries(ESPERADAS)) {
+    const lista = medidas['500'].cabeceras[nombre];
+    assert(lista.length === 1,
+      `backend/500: ${nombre} aparece ${lista.length} veces -> ${JSON.stringify(lista)}`);
+    assert(lista[0] === valor,
+      `backend/500: ${nombre} vale ${JSON.stringify(lista[0])} y tiene que valer ${JSON.stringify(valor)}`);
+  }
+  const permisosDel500 = medidas['500'].cabeceras['permissions-policy'];
+  assert(permisosDel500.length === 1, `backend/500: Permissions-Policy duplicada`);
+  for (const capacidad of PERMISOS_NEGADOS) {
+    assert(new RegExp(`(^|[ ,])${capacidad}=\\(\\)`).test(permisosDel500[0]),
+      `backend/500: Permissions-Policy no niega ${capacidad}`);
+  }
+  for (const otro of ['200', '401', '404']) {
+    for (const nombre of Object.keys(medidas['500'].cabeceras)) {
+      assert(medidas['500'].cabeceras[nombre][0] === medidas[otro].cabeceras[nombre][0],
+        `backend/500: ${nombre} difiere de la respuesta ${otro}`);
+    }
+  }
+
+  // Y el 500 sigue sin contar nada: mismo cuerpo generico, mismo tipo, cero
+  // rastros de la excepcion.
+  assert(medidas['500'].cuerpo === 'Internal Server Error',
+    `el cuerpo del 500 dejo de ser el generico: ${JSON.stringify(medidas['500'].cuerpo)}`);
+  assert(/^text\/plain/.test(medidas['500'].tipo || ''),
+    `el 500 cambio de Content-Type: ${medidas['500'].tipo}`);
+  for (const rastro of ['RuntimeError', 'Traceback', 'explosion deliberada',
+    'app/main.py', '__revienta']) {
+    assert(!medidas['500'].cuerpo.includes(rastro),
+      `el 500 filtra "${rastro}" al cliente: ${JSON.stringify(medidas['500'].cuerpo)}`);
+  }
+
   return `Backend: ${rutasDelBackend.length} rutas con la base completa —${codigos.join(', ')}—, `
     + 'CORS y preflight intactos, descarga con su tipo y su nombre, y sin CSP en la API a '
     + `proposito. Frontend: ${modo}; politica sin comodines, sin 'unsafe-eval' ni 'unsafe-inline', `
     + 'con los origenes tomados del build y ningun add_header adentro de un location. '
     + 'La receta que arma la politica se ejecuta de verdad: sustituye los dos origenes sin '
-    + 'la ruta y corta la construccion si alguna variable llega vacia';
+    + 'la ruta y corta la construccion si alguna variable llega vacia. Y un RuntimeError no '
+    + 'controlado, lanzado a traves del ASGI real, sale 500 con las cinco cabeceras una sola '
+    + 'vez y con los mismos valores que 200/401/404, sin filtrar la excepcion';
 });
 
 const passed = results.filter((result) => result.passed).length;

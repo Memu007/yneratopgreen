@@ -11,8 +11,32 @@ import structlog
 # Configurar logger
 logger = structlog.get_logger()
 
+class Aplicacion(FastAPI):
+    """FastAPI con la base defensiva por FUERA del manejador de errores.
+
+    `add_middleware` no alcanza para el 500. Starlette arma la pila con
+    `ServerErrorMiddleware` SIEMPRE en la capa 0, o sea por fuera de todo lo que
+    uno registre; cuando una excepción no controlada sube, esa capa la atrapa y
+    escribe su propia respuesta con el `send` crudo del servidor. El middleware
+    de uno nunca ve ese `http.response.start`, así que el 500 salía pelado
+    mientras 200, 401 y 404 salían con las cinco cabeceras.
+
+    `build_middleware_stack` es el punto de extensión previsto para esto: no es
+    privado —no lleva guión bajo— y la propia FastAPI lo redefine para meter su
+    `AsyncExitStackMiddleware`. Acá se envuelve la pila ya armada, de modo que
+    hay UNA sola capa que pone las cabeceras y cubre todas las respuestas, la
+    del 500 incluida. No hay un segundo camino que pueda divergir.
+
+    `CabecerasDefensivas` se resuelve cuando el método corre —en el primer
+    pedido—, no cuando la clase se define, así que puede quedar más abajo.
+    """
+
+    def build_middleware_stack(self):
+        return CabecerasDefensivas(super().build_middleware_stack())
+
+
 # Crear aplicación FastAPI
-app = FastAPI(
+app = Aplicacion(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     docs_url=f"{settings.API_PREFIX}/docs",
@@ -61,10 +85,10 @@ app.add_middleware(
 # un CDN: una política restrictiva la dejaría en blanco sin proteger nada. La
 # política de contenido es del Frontend, que es quien ejecuta código.
 #
-# Tampoco toca CORS: se registra ANTES que `CORSMiddleware` en el código, o sea
-# que corre por FUERA de él, y sólo agrega claves que no existían. Las
-# respuestas que ya traían una de estas cabeceras conservan la suya: no se
-# duplica ni se contradice nada.
+# Tampoco toca CORS: queda por FUERA de `CORSMiddleware` —y de todo lo demás,
+# ver `Aplicacion` arriba— y sólo agrega claves que no existían. Las respuestas
+# que ya traían una de estas cabeceras conservan la suya: no se duplica ni se
+# contradice nada.
 CABECERAS_DEFENSIVAS = (
     # El navegador ignora esto sobre HTTP, así que ponerlo siempre no rompe el
     # entorno local y cubre el despliegue, donde la TLS la termina la
@@ -107,7 +131,9 @@ class CabecerasDefensivas:
         await self.app(scope, receive, enviar)
 
 
-app.add_middleware(CabecerasDefensivas)
+# No va por `add_middleware`: eso la dejaría por DENTRO de
+# `ServerErrorMiddleware` y el 500 saldría sin cabeceras. La instala
+# `Aplicacion.build_middleware_stack`, arriba.
 
 # Montar directorio de uploads (para servir imágenes).
 # StaticFiles exige que la carpeta ya exista, así que se crea antes. En una
