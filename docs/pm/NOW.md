@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-08-26.
+Actualizado: 2026-08-27.
 
 ## Relevo inmediato — leer primero
 
@@ -155,7 +155,9 @@ Actualizado: 2026-08-26.
   había rechazado que Mercado sustituyera la navegación de la primera banda por
   el buscador; la entrega ya mantiene la misma cabecera superior y coloca la
   búsqueda en una segunda banda inferior. PM verificó escritorio, tablet y
-  móvil. Dev queda sin tarea y sin despliegue hasta el sí visual de Emi.
+  móvil. La aceptación visual sigue pendiente. El 27/08 Emi autorizó reactivar
+  a Dev sólo para SEC-1, el cierre independiente de la fuga de secretos por
+  consola; esa autorización no acepta UX-2D.1 ni habilita despliegue.
 - **Advertencia del entorno descartable:** el Backend remoto usado por la vista
   local está atrasado respecto de `main` y su catálogo no devuelve aún
   `operation_kind` ni los campos nuevos de servicio. Por eso Logística cae en
@@ -171,9 +173,11 @@ Actualizado: 2026-08-26.
 
 UX-2D.1 queda conforme técnicamente en `2a01775`; falta la aceptación visual
 final de Emi. La primera banda ya es estable entre Inicio, Mercado y Servicios,
-y el Mercado agrega el buscador debajo. **No hay tarea activa para Dev.** No se
-reabren Inicio, Servicios, cards, anatomías, color, tipografía ni producto y no
-se despliega hasta completar esa puerta visual.
+y el Mercado agrega el buscador debajo. **La tarea activa única es SEC-1:**
+retirar la fuga comprobada de tokens y datos de cuenta por consola, agregar una
+regresión discriminante y preservar el modelo Bearer/localStorage aceptado. No
+se reabren Inicio, Servicios, cards, anatomías, color ni tipografía y no se
+despliega. La orden completa está al final de `PARA-DEV.md`.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se
