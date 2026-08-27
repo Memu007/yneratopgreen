@@ -2,229 +2,218 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## SEC-4 — el seed de demostración no corre fuera de un entorno descartable
+## SEC-5 — el registro público no reparte roles
 
 Hecho. Producto e informe en commits separados. **No desplegué.**
 
-- Producto: `9251701` — «SEC-4: el seed de demostración no corre fuera de un entorno descartable»
-- Archivos: `backend/app/seed.py` (el freno), `scripts/smoke.mjs` (la regresión, caso 132), `RAILWAY.md` (la documentación operativa que decía lo contrario).
+- Producto: `0a898ae` — «SEC-5: el registro público no reparte roles, el rol lo pone el servidor»
+- Archivos: `backend/app/schemas/auth.py`, `backend/app/api/auth.py`, `scripts/smoke.mjs` (caso 133).
+
+Tu rojo se quedaba corto. No es que la cuenta «tendría las mismas
+autorizaciones»: la tiene, y lo atravesé hasta el final.
 
 ---
 
-### 1. El rojo, contra `e78e3d5`
-
-Sobre una base de ensayo **aparte** —`topgreen_sec4`, creada, migrada y borrada
-para esto—, nunca contra Railway ni contra la base con datos de demostración que
-usan las puertas. Le puse dos filas centinela con los mismos identificadores que
-el seed usa, para que cualquier lectura o escritura se notara.
+### 1. El rojo, contra `9251701`, hasta las últimas consecuencias
 
 ```
-ENV=production DATABASE_URL=<base de ensayo> python -m app.seed
-estado de salida: 0
-…
-📝 Credenciales de acceso:
-  Admin:    <las tres cuentas, con su contraseña, impresas en la consola>
+POST /api/auth/register  {"role": "admin"}      -> HTTP 201
+fila persistida                                  -> role=ADMIN, activo=true, verificado=false
+administradores en la base                       -> 1 → 2
+token de verificación                            -> 1
+notificación de bienvenida                       -> 1
+correo en el outbox                              -> +1
 ```
 
-Y escribió. Huella de las 22 tablas, antes y después:
+Y después seguí, porque «tendría» no es una medición:
 
-| tabla | antes | después |
+```
+POST /api/auth/verify-email  (con el token del correo)  -> HTTP 200
+POST /api/auth/login                                     -> sesión abierta
+GET  /api/admin/users                                    -> HTTP 200
+GET  /api/admin/dashboard                                -> HTTP 200
+POST /api/admin/users  {"role": "admin"}                 -> HTTP 201
+```
+
+El token no lo saqué de la base: lo leí del correo, que es lo que tiene quien
+ataca —la casilla es suya—. Con eso, un desconocido termina leyendo el padrón
+completo de usuarios, el tablero, y **creando más administradores**. La escalada
+es total y no necesita nada previo.
+
+La regresión nueva, corrida contra `9251701`, falla en la primera afirmación:
+
+```
+[FAIL] 133 … — la API no respondió HTTP 422
+```
+
+### 2. La corrección: dos capas, y las dos hacen falta
+
+**Capa 1 — el esquema público acota el campo.**
+
+```python
+role: Literal[UserRole.USER] = UserRole.USER
+```
+
+Un pedido con `admin` se rechaza con **422 antes de entrar al endpoint**, así que
+no hay cuenta, ni token, ni correo, ni notificación que deshacer. Y OpenAPI queda
+con `enum: ["user"]`.
+
+Elegí rechazar y no ignorar en silencio, como pediste. Sacar el campo del esquema
+también cerraba la escalada, pero un `"role": "admin"` habría recibido 201 sin que
+nadie se enterara de que pidió algo que no le corresponde.
+
+**Capa 2 — el endpoint no le cree al esquema.**
+
+```python
+role=UserRole.USER,
+```
+
+Antes era `role=user_data.role`. Esta línea no depende de la anterior: es la que
+hace verdadero tu criterio 2.
+
+**Por qué se queda el campo.** El frontend manda `"role": "user"` explícito
+—`src/contexts/AuthContext.tsx`—, así que sacarlo lo rompía. Aceptar ese único
+valor no debilita la regla, porque quien decide qué se guarda es el servidor.
+
+### 3. Matriz payload / rol / efectos, medida contra el endpoint real
+
+| payload | HTTP | rol persistido | tokens | notifs | correos |
+|---|---|---|---|---|---|
+| sin `role` | 201 | **USER** | 1 | 1 | 1 |
+| `role: "user"` | 201 | **USER** | 1 | 1 | 1 |
+| transportista sin `role` | 201 | **USER** | 1 | 1 | 1 |
+| `role: "admin"` | **422** | — | **0** | **0** | **0** |
+| `role: "ADMIN"` | **422** | — | **0** | **0** | **0** |
+| `role: null` | **422** | — | **0** | **0** | **0** |
+| transportista + `role: "admin"` | **422** | — | **0** | **0** | **0** |
+
+Administradores en la base al terminar: **1**, el del seed. `role: null` ya se
+rechazaba antes —el campo nunca fue opcional—; lo incluyo para que se vea que no
+cambié ese comportamiento.
+
+### 4. El que persiste no le cree al esquema, probado
+
+Acotar el tipo frena al HTTP, no a alguien que arme el objeto por dentro. Lo
+construí **salteando la validación** y llamé al endpoint de verdad:
+
+```
+el esquema quedó con role = UserRole.ADMIN   (la validación no corrió)
+lo que se PERSISTIÓ:      UserRole.USER
+```
+
+Está dentro del caso 133, y el caso además exige que el forzado haya funcionado
+—si `model_construct` dejara de saltear la validación, la prueba avisa que no
+está midiendo nada en vez de pasar de arriba—.
+
+### 5. Autorizaciones: lo que se cierra y lo que se conserva
+
+| ruta | cuenta pública confirmada | administrador |
 |---|---|---|
-| users | 1 (el centinela) | 4 |
-| categories | 1 (el centinela) | 13 |
-| localities | 0 | 4028 |
-| products | 0 | 30 |
-| product_images | 0 | 35 |
-| subcategories | 0 | 44 |
-| form_options | 0 | 18 |
+| `GET /api/admin/users` | **403** | 200 |
+| `GET /api/admin/dashboard` | **403** | 200 |
+| `GET /api/admin/products` | **403** | 200 |
+| `GET /api/admin/orders` | **403** | 200 |
 
-El centinela de `users` tenía el mismo correo que la cuenta de administración
-del seed: no sólo escribió, además **pisó** la fila que ya estaba.
-
-La regresión nueva, corrida contra `e78e3d5`, falla:
+Y el único camino autorizado sigue entero:
 
 ```
-[FAIL] 132 … — con ENV=production el seed salio con 1 y tiene que salir con 2
+POST /api/admin/users {"role":"admin"} con sesión de admin   -> 201, la cuenta queda ADMIN
+POST /api/admin/users {"role":"admin"} con sesión pública    -> 403
 ```
 
-Sale con 1 porque intentó conectarse a la base que le pasé —un puerto muerto— y
-se rompió ahí. O sea: llegó hasta la base.
+`/api/admin/users` y `/api/admin/users/{id}` usan `CreateUserRequest` y
+`UpdateUserRequest`, que son **esquemas propios**, no el del registro. Por eso tu
+freno —«si el único flujo administrativo también depende del mismo esquema»— no
+se activó: son independientes y no los toqué.
 
-### 2. El freno, y dónde exactamente está
+También revisé el otro camino por el que se podría colar un rol: el
+`UserUpdateRequest` del perfil propio **no tiene** campo `role`, así que
+`PUT /api/auth/me` nunca pudo escribirlo. El único escritor de roles es
+`admin.py`, bajo `require_admin`.
 
-Lo primero que hace `create_seed_data()`, **antes** de `SessionLocal()`:
-
-```python
-def create_seed_data():
-    """Crear datos iniciales en la base de datos"""
-
-    # Primero el freno y despues la base: si el entorno no corresponde, esta
-    # funcion termina sin haber tocado nada.
-    exigir_entorno_con_seed()
-
-    db = SessionLocal()
-```
-
-La entrada por línea de comandos lo traduce a algo que entienda un script:
-
-```python
-    try:
-        create_seed_data()
-    except EntornoNoAptoParaSeed as error:
-        print(f"\n⛔ {error}", file=sys.stderr)
-        raise SystemExit(2)
-```
-
-Mensaje a la salida de **error** y estado **2**, no 0: un `... && python -m
-app.seed && ...` de un script de despliegue se corta ahí en vez de seguir como
-si nada.
-
-### 3. La decisión que quiero que revises: lista de admitidos, no de prohibidos
-
-```python
-ENTORNOS_CON_SEED = frozenset({"local"})
-```
-
-La lista dice dónde **sí**. Lo pensé al revés primero —«rechazar si
-`ENV == "production"`»— y lo descarté cuando vi qué se colaba. Medido, no
-supuesto:
-
-| `ENV` | con lista de prohibidos | con lista de admitidos |
-|---|---|---|
-| `production` | rechaza | **rechaza** (salida 2) |
-| `Production` | **pasa** | **rechaza** |
-| `PRODUCTION` | **pasa** | **rechaza** |
-| `prod` | **pasa** | **rechaza** |
-| `produccion` | **pasa** | **rechaza** |
-| `staging` | **pasa** | **rechaza** |
-| `` (vacío) | **pasa** | **rechaza** |
-| `local` / `LOCAL` / `" local "` | pasa | pasa |
-
-Si no consta que el entorno es de desarrollo, se trata como producción.
-
-Los dos únicos valores de `ENV` que el proyecto documenta son `local`
-—`backend/.env.example`— y `production` —`backend/.env.production.example` y
-`RAILWAY.md`—. No hay un tercero en ningún lado, y las pruebas no fijan `ENV`,
-así que heredan `local`. Por eso la lista tiene un solo elemento: no inventé
-`dev`, `test` ni `ci`, que nadie usa.
-
-**No agregué ningún `ALLOW_*`.** Se enciende para salir del paso y queda
-encendido para siempre. Para sembrar una base descartable se pone `ENV=local`,
-que es un acto visible. El caso 132 falla si alguien mete un `ALLOW_`, `FORCE_`,
-`SKIP_`, `os.environ` o `getenv` en `seed.py`.
-
-### 4. Cero acceso y cero escritura, probado de dos maneras
-
-**Por la huella.** Puse los centinelas de nuevo, corrí el seed rechazado por las
-dos vías, y comparé las 22 tablas:
+### 6. OpenAPI
 
 ```
-huella IDÉNTICA en las 22 tablas: cero filas leídas o escritas
+UserRegisterRequest.role  ->  {"type":"string","enum":["user"],"const":"user","default":"user"}
+CreateUserRequest.role    ->  {"allOf":[{"$ref":"#/components/schemas/UserRole"}],"default":"user"}
 ```
 
-**Por el puerto muerto.** Le pasé `DATABASE_URL` apuntando a
-`127.0.0.1:59999/no_existe`. Si el freno hubiera corrido después de abrir la
-sesión, habría salido un error de conexión. Salió el rechazo, estado 2, y **cero**
-menciones de `connection`, `OperationalError`, `psycopg` o el puerto. Nunca
-intentó conectarse.
+El esquema público del registro no menciona `admin` en ninguna parte —lo verifica
+el caso 133 sobre el JSON servido, no sobre el código—. El esquema administrativo
+conserva el enum completo, que es lo correcto: ahí sí se pueden asignar roles.
 
-Las dos invocaciones que pediste:
-
-| | estado | stdout | qué dijo |
-|---|---|---|---|
-| `python -m app.seed` | **2** | vacío (0 bytes) | el rechazo, por stderr |
-| `create_seed_data()` directo | — | — | levanta `EntornoNoAptoParaSeed` |
-
-Y la salida no nombra ninguna de las ocho credenciales demo —los cuatro correos
-y las cuatro contraseñas—: lo verifiqué una por una, y el caso 132 lo exige en
-cada corrida.
-
-### 5. Local y pruebas, intactas
-
-Base limpia, migraciones y seed con `ENV=local`, dos veces seguidas:
-
-```
-primera corrida  -> salida 0, 30 productos
-segunda corrida  -> salida 0, 30 productos
-huella IDÉNTICA entre corrida 1 y 2: no duplica ni pisa
-users 4 · categories 12 · subcategories 44 · products 30 · localities 4028 · form_options 18
-```
-
-Cuentas, datos bancarios, publicaciones, taxonomía y el transportista quedan como
-estaban. No borré ni renombré ninguna cuenta demo y no roté ninguna credencial.
-
-### 6. Puertas
+### 7. Puertas, desde base limpia
 
 ```
 base limpia (drop/create + PostGIS + alembic upgrade head + seed)
-node scripts/smoke.mjs                          132/132   (0 fallaron)
+node scripts/smoke.mjs                          133/133   (0 fallaron)
 python -m compileall backend/app                ok
 npm run build                                   ok
 npm run lint                                    ok (--max-warnings 0)
 git -c core.whitespace=cr-at-eol diff --check   limpio
 ```
 
-La suite subió a 132 con el caso nuevo. No repetí a11y, contraste ni hito: no
-cambia ninguna superficie servida, como dijiste.
+No repetí a11y, contraste ni hito: no cambia marcado visual. No toqué el
+frontend.
 
 Diff completo:
 
 ```
- RAILWAY.md          |  29 ++++++++++----
- backend/app/seed.py |  56 +++++++++++++++++++++++++-
- scripts/smoke.mjs   | 111 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ backend/app/api/auth.py     |  10 ++-
+ backend/app/schemas/auth.py |  17 ++++-
+ scripts/smoke.mjs           | 177 ++++++++++++++++++++++++++++++++++++++++++++
 ```
 
-### 7. La documentación decía lo contrario, y la corregí
+Sin migración, sin tocar el enum persistido, sin roles nuevos, sin rediseñar
+auth, sin rate limiting, sin seed, sin cookies, sin JWT, sin UI, sin Railway, sin
+datos y sin dependencias.
 
-`RAILWAY.md` mandaba a correr el seed **en producción**: «Para cargar el catálogo
-de demostración, una vez y desde la consola del servicio `Backend`:
-`python -m app.seed`». Eso ahora es imposible, así que el párrafo dice qué pasa,
-por qué, y qué hacer en su lugar.
+### 8. Un tropiezo mío, dicho como fue
 
-También corregí, en el mismo archivo, la frase que daba por hecho un
-administrador preexistente con contraseña conocida: en producción ese
-administrador no existe, y el primero se crea a mano sobre la base ya migrada.
+La primera corrida completa dio 132/133. No era el producto: al reproducir el
+rojo levanté una API a mano y quedó viva, así que el `uvicorn` del script de base
+limpia no pudo tomar el puerto y la suite siguió midiendo el código viejo. Maté
+el proceso, rearmé la base y quedó 133/133. Lo cuento porque un verde que depende
+de qué proceso quedó colgado no es un verde, y prefiero que lo sepas por mí.
 
-No toqué `README_LOCAL_SETUP.md` ni `docs/DATABASE.md`: ahí el seed se invoca en
-contexto local, que sigue funcionando igual.
+### 9. Riesgos residuales
 
-### 8. Riesgos residuales
+1. **La cuenta creada durante mi reproducción del rojo quedó en mi base local.**
+   La base se recrea entera en cada corrida de puertas, así que ya no existe.
+   **En una base que haya estado expuesta con el código anterior, esto no
+   alcanza**: la corrección impide crear administradores nuevos, no revoca los
+   que ya se hubieran creado. Si Railway estuvo publicado con `9251701` o
+   anterior, hay que auditar `SELECT email, created_at FROM users WHERE
+   role='ADMIN'` y dar de baja lo que no reconozcas. Es lo primero que haría
+   antes de publicar.
+2. **El campo `role` sigue existiendo en el registro público.** Lo dejé por
+   compatibilidad con el frontend. El día que `AuthContext.tsx` deje de mandarlo,
+   se puede sacar del esquema y el caso 133 sigue verde, porque también prueba el
+   alta sin `role`.
+3. **No hay auditoría de cambios de rol.** `admin.py` asigna roles sin dejar
+   registro de quién promovió a quién. No estaba en el alcance y no lo agregué,
+   pero es la pieza que falta para poder responder «¿de dónde salió este
+   administrador?» sin adivinar.
+4. **El correo de confirmación no es una barrera contra esto.** Cualquiera
+   confirma su propia casilla; en el rojo lo hice yo. Sirve para validar que el
+   correo existe, no para autorizar nada.
 
-1. **Un entorno intermedio queda sin seed.** Si mañana existe un `staging` con
-   `ENV=staging`, el seed lo rechaza. Es lo buscado —fallo ruidoso—, pero
-   significa que sembrarlo exige poner `ENV=local` a mano y volver a cambiarlo.
-   Es deliberado: prefiero un paso incómodo y visible a una variable de escape.
-2. **`ENV` no está validado en `Settings`.** Sigue siendo un texto libre y sólo
-   se usa para mostrar el entorno en `/api/health` y en el log de arranque. El
-   freno del seed es hoy el único que lo mira en serio. Restringirlo a un
-   conjunto cerrado en `config.py` sería más prolijo, pero cambia el arranque de
-   la aplicación y eso no estaba en el alcance.
-3. **`python -m app.seed_localities` sigue corriendo en cualquier entorno.**
-   Tiene su propio `__main__` y escribe 4028 filas del padrón oficial. **No trae
-   ninguna credencial** —es dato de referencia, no cuentas—, así que lo dejé
-   fuera del freno; bloquearlo rompería una carga legítima en producción. Lo
-   digo para que sea una decisión tuya y no un olvido mío.
-4. **El seed sigue teniendo contraseñas escritas en el repositorio.** No las
-   roté porque tu alcance lo prohíbe. Dejan de ser un riesgo de producción, pero
-   siguen siendo credenciales conocidas en cualquier base local expuesta a una
-   red.
-
-### 9. Hashes
+### 10. Hashes
 
 ```
-backend/app/seed.py   088aa36ef2ba81c0
-scripts/smoke.mjs     0394be6cc7415eb9
-RAILWAY.md            9d06c652d314f438
+backend/app/schemas/auth.py   556569ff8c196df0
+backend/app/api/auth.py       a7bbae59f0ccc4e6
+scripts/smoke.mjs             5a1faae745694307
 ```
 
 (SHA-256 truncado a 16, del árbol en el commit de producto.)
 
-### 10. Frenos
+### 11. Frenos
 
-El entorno productivo se identifica sin ambigüedad —`ENV=production`, documentado
-en dos archivos— y ninguna puerta necesita correr el seed bajo ese valor: la
-suite lo corre con `ENV=local`, que es lo que trae `backend/.env`. No hizo falta
-tocar variables ni despliegues de Railway, y no lo hice. La reproducción del rojo
-fue en una base de ensayo separada que después borré. No desplegué.
-`PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de empujar.
+Ningún cliente contractual necesita elegir `admin` en el registro público: el
+único que manda el campo es el frontend propio, y manda `"user"`. El flujo
+administrativo no comparte esquema con el registro. Cerrar la escalada no exigió
+migrar datos ni tocar el enum persistido. No ignoré el valor privilegiado en
+silencio: se rechaza con 422 y hay una regresión que mide el rol **persistido**,
+no sólo el código de respuesta. No desplegué. `PRE_FIRMA.md` sigue fuera del
+versionado y lo confirmé antes de empujar.
