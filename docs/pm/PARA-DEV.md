@@ -3991,3 +3991,73 @@ la política ni despliegues para probar.
 Entregá producto e informe en commits separados, con matriz ruta/header,
 rojo/verde, comandos, navegador, riesgos residuales y hashes. Empujá a
 `Memu007/yneratopgreen`, avisá sólo que respondiste y frená. **No despliegues.**
+
+## 2026-08-27 — SEC-3 `625d958`: rechazada por cobertura incompleta de 500
+
+No acepto todavía producto `625d958` ni informe `09d4418`. La base defensiva y
+la CSP quedan bien encaminadas, y PM reprodujo build, lint, compileall y
+`diff-check`; pero la afirmación «toda respuesta pública» no se sostiene en un
+error no controlado.
+
+Rojo independiente PM contra `625d958`, con `TestClient(app,
+raise_server_exceptions=False)` y una ruta agregada sólo en memoria que lanza
+`RuntimeError`:
+
+```text
+/api/health                 200  cinco cabeceras presentes
+/api/no-existe              404  cinco cabeceras presentes
+/__pm/error-no-controlado   500  HSTS=None, nosniff=None, frame=None,
+                                  referrer=None, permissions=False
+```
+
+La causa a contrastar es el orden real de la pila ASGI/Starlette: el middleware
+de SEC-3 ve las respuestas que atraviesan la aplicación, pero el 500 genérico
+que arma la capa exterior no vuelve a pasar por él.
+
+## Tarea activa única: SEC-3R, cerrar las cabeceras del error 500
+
+### Resultado esperado y prioridad
+
+Un error no controlado debe conservar exactamente la misma base defensiva que
+200, 401 y 404, sin cambiar el cuerpo genérico ni exponer detalles. Es una
+corrección del criterio incumplido; no abre una pieza nueva.
+
+Antes de editar, revisá `backend/app/main.py`, el orden efectivo de middleware
+de la versión instalada de Starlette y el caso 131. Reproducí primero el rojo
+de PM contra `625d958`.
+
+### Alcance y límites
+
+- Corregí únicamente la cobertura Backend del 500 y la regresión que la fija.
+- No agregues una ruta de error permanente ni un interruptor de fallo al
+  producto. El error deliberado existe sólo dentro de la prueba.
+- No cambies CSP, Nginx, CORS, contratos, cuerpos, autenticación, dependencias,
+  endpoints, datos, esquema ni despliegue salvo evidencia de necesidad directa.
+- No conviertas la excepción en información para el cliente ni dupliques
+  cabeceras ya presentes.
+
+### Criterios de aceptación ejecutables
+
+1. Una regresión reproduce un `RuntimeError` no controlado a través del ASGI
+   real, falla contra `625d958` y queda verde con la corrección, sin versionar
+   un endpoint artificial.
+2. La respuesta sigue siendo HTTP 500 con el cuerpo y `Content-Type` genéricos
+   de la base; no incluye tipo, mensaje ni traceback de la excepción.
+3. HSTS, `nosniff`, `DENY`, `Referrer-Policy` y `Permissions-Policy` aparecen
+   una sola vez y con los mismos valores que en 200/401/404.
+4. El caso 131 conserva 200, 401, 404, docs, uploads/PDF y preflight CORS; la
+   suite completa queda al menos 131/131 desde base limpia.
+5. Build, lint, compileall, a11y, contraste, hito y
+   `git -c core.whitespace=cr-at-eol diff --check` quedan verdes. El diff de
+   producto es el mínimo necesario y no toca frontend visual.
+
+### Freno obligatorio
+
+Frená si cubrir el 500 exige cambiar el cuerpo de error público, agregar un
+endpoint de diagnóstico, depender de una API privada de Starlette o duplicar
+la política en caminos que puedan divergir. Traé la alternativa mínima con su
+rojo; no amplíes por tu cuenta.
+
+Empujá corrección e informe en commits separados a
+`Memu007/yneratopgreen/main`, avisá sólo que respondiste y frená. **No
+despliegues.**
