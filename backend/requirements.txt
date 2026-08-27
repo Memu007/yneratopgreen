@@ -30,19 +30,16 @@ geoalchemy2==0.15.2
 # mismo secreto. El extra `crypto` queda para no achicar los algoritmos que
 # `JWT_ALGORITHM` puede pedir.
 PyJWT[crypto]==2.13.0
-# `bcrypt` lo importa `app/core/security.py` de forma directa y hasta ahora
-# entraba de prestado, como transitiva de `passlib[bcrypt]`. Un pin propio:
-# la dependencia que el codigo usa se declara.
+# `bcrypt` lo importa `app/core/security.py` de forma directa. Hasta SEC-2
+# entraba de prestado, como transitiva de `passlib[bcrypt]`; ahora tiene pin
+# propio, que es lo que permitio retirar `passlib` sin llevarse puesto el
+# hasheo de contrasenas. `passlib` no lo importaba ningun archivo.
 bcrypt==5.0.0
-passlib[bcrypt]==1.7.4
 pydantic[email]==2.7.0
 
 # Utilidades
 python-dotenv==1.2.2
 pydantic-settings==2.1.0
-
-# CORS y middleware
-fastapi-cors==0.0.6
 
 # Logging
 structlog==24.1.0
@@ -55,11 +52,20 @@ structlog==24.1.0
 # intercambio de OAuth y las preferencias de Checkout Pro- son dos llamadas
 # HTTP estables que no necesitan una dependencia más.
 
-# Validación de imágenes
-pillow==12.3.0
-
 # Testing (opcional)
 pytest==9.0.3
 # pytest-asyncio 0.23 exige pytest < 8: subir pytest obliga a subir este.
 pytest-asyncio==1.4.0
 httpx==0.26.0
+
+# Lo que se fue en SEC-2.1, y por que
+#
+# `pillow`, `fastapi-cors` y `passlib` estuvieron pineados desde el principio
+# y ningun archivo del producto los importaba ni los llamaba. La validacion de
+# imagenes es por extension y `content_type`; el CORS sale de
+# `fastapi.middleware.cors`, que viene con FastAPI; y el hasheo usa `bcrypt`
+# directo. Con `fastapi-cors` se fueron tambien `environs` y `marshmallow`,
+# que eran suyas y de nadie mas.
+#
+# No es limpieza por gusto: un paquete que no se ejecuta igual obliga a seguir
+# sus avisos de seguridad de por vida. Solo `pillow` aportaba veintidos.
