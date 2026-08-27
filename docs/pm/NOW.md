@@ -160,11 +160,12 @@ Actualizado: 2026-08-27.
   caso 129 cubre login, refresh, logout y rechazo. SEC-2 queda aceptada en
   `ccb868c` + `6cea576`: `pip-audit` baja de 40 avisos a cero y PyJWT conserva
   los tokens. SEC-2.1 queda aceptada en `c05e0fb` + `7280404`: el grafo baja a
-  47 paquetes sin consumidores muertos. SEC-3 producto `625d958` e informe
-  `09d4418` quedan rechazados por ahora: 200 y 404 traen la base defensiva, pero
-  un 500 no controlado sale sin las cinco cabeceras. La corrección SEC-3R queda
-  activa y acotada a esa cobertura. Nada de esto acepta UX-2D.1 ni habilita
-  despliegue.
+  47 paquetes sin consumidores muertos. SEC-3 queda aceptada con producto
+  `625d958`, corrección `e78e3d5` e informes `09d4418`/`e131aff`: Frontend y
+  Backend reciben la base defensiva y el 500 no controlado conserva cuerpo
+  genérico con las cinco cabeceras. SEC-4 queda activa para impedir que el seed
+  demo cree credenciales conocidas en producción. Nada de esto acepta UX-2D.1
+  ni habilita despliegue.
 - **Advertencia del entorno descartable:** el Backend remoto usado por la vista
   local está atrasado respecto de `main` y su catálogo no devuelve aún
   `operation_kind` ni los campos nuevos de servicio. Por eso Logística cae en
@@ -182,12 +183,12 @@ UX-2D.1 queda conforme técnicamente en `2a01775`; falta la aceptación visual
 final de Emi. La primera banda ya es estable entre Inicio, Mercado y Servicios,
 y el Mercado agrega el buscador debajo. SEC-1 y SEC-2 quedan aceptadas en
 `d8ce32a`/`b38f29c` y `ccb868c`/`6cea576`; SEC-2.1 queda aceptada en
-`c05e0fb`/`7280404`. SEC-3 `625d958`/`09d4418` queda rechazada hasta corregir
-la respuesta 500 sin cabeceras. **La tarea activa única es SEC-3R:** hacer que
-un error no controlado conserve la misma base defensiva, sin exponer un endpoint
-de prueba, cambiar cuerpos ni relajar la CSP. No se reabren Inicio, Servicios,
-cards, anatomías, color ni tipografía y no se despliega. La orden completa está
-al final de `PARA-DEV.md`.
+`c05e0fb`/`7280404`. SEC-3 queda aceptada en `625d958`/`e78e3d5`, con informes
+`09d4418`/`e131aff`. **La tarea activa única es SEC-4:** bloquear el seed demo
+cuando el entorno es productivo, antes de cualquier acceso o escritura en base,
+sin eliminar los datos de prueba que sostienen las puertas locales. No se
+reabren Inicio, Servicios, cards, anatomías, color ni tipografía y no se
+despliega. La orden completa está al final de `PARA-DEV.md`.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se

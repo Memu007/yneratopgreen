@@ -4061,3 +4061,77 @@ rojo; no amplíes por tu cuenta.
 Empujá corrección e informe en commits separados a
 `Memu007/yneratopgreen/main`, avisá sólo que respondiste y frená. **No
 despliegues.**
+
+## 2026-08-27 — SEC-3 y SEC-3R: aceptadas
+
+Acepto producto `625d958`, corrección `e78e3d5` e informes
+`09d4418`/`e131aff`.
+
+Verificación independiente PM sobre el árbol final: 200 y 404 conservan una
+sola copia de cada cabecera; un `RuntimeError` agregado sólo en memoria devuelve
+500, `text/plain; charset=utf-8` y `Internal Server Error`, sin mensaje ni
+traceback, con HSTS, `nosniff`, `DENY`, `Referrer-Policy` y
+`Permissions-Policy` exactamente una vez. Build, lint, compileall, `pip check`
+y `diff-check` quedan verdes. Base limpia, suite 131/131, candidato Nginx,
+navegador, a11y, contraste e hito permanecen como evidencia de Dev porque PM no
+tiene Docker ni Nginx. No hubo despliegue.
+
+## Tarea activa única: SEC-4, el seed demo no puede correr en producción
+
+### Resultado esperado y prioridad
+
+`python -m app.seed` crea cuatro cuentas con correos y contraseñas conocidas,
+además de datos demo. Hoy `ENV=production` no cambia ese comportamiento. Una
+invocación accidental sobre la base productiva dejaría accesos públicos
+predecibles; debe fallar antes de abrir una sesión o escribir una fila, mientras
+local y pruebas conservan el seed idempotente que necesitan.
+
+Antes de editar, leé `backend/app/seed.py`, `backend/app/core/config.py`,
+`backend/railway-entrypoint.sh`, `backend/.env.production.example`,
+`RAILWAY.md`, los inicializadores locales y los casos de smoke que dependen del
+seed. Contrastá también qué valores de `ENV` están documentados y usados; no
+inventes un bypass productivo para conservar el entorno descartable.
+
+### Alcance y límites
+
+- Hacé que la entrada CLI y la función que ejecuta el seed rechacen el entorno
+  productivo antes de crear `SessionLocal`, consultar o escribir la base.
+- El rechazo debe ser explícito, no exitoso, y no imprimir ninguna credencial
+  demo. El proceso normal de migraciones y arranque no cambia.
+- Local/pruebas conservan exactamente el seed actual y su segunda corrida
+  idempotente. Actualizá sólo la documentación operativa que deba explicar el
+  nuevo rechazo.
+- No borres ni renombres las cuentas demo, no rotes credenciales existentes, no
+  cambies datos, esquema, migraciones, endpoints, auth, rate limiting, Railway,
+  CI, backups, CSP ni dependencias. Sin despliegue.
+
+### Criterios de aceptación ejecutables
+
+1. El rojo contra `e78e3d5` demuestra localmente que `ENV=production` alcanza
+   el seed. No ejecutes esta reproducción contra Railway ni contra una base con
+   datos reales.
+2. En verde, tanto la invocación soportada `python -m app.seed` como una llamada
+   directa a la función terminan con error explícito en entorno productivo antes
+   de abrir la sesión. Una base local con filas centinela queda idéntica y la
+   salida no contiene correos ni contraseñas demo.
+3. Con el entorno local documentado, una base limpia recibe migraciones y seed;
+   la segunda corrida no duplica ni pisa cuentas, datos bancarios,
+   publicaciones, taxonomía o transportistas.
+4. La suite completa queda al menos 131/131 desde base limpia. También quedan
+   verdes compileall, build, lint y
+   `git -c core.whitespace=cr-at-eol diff --check`; no hace falta repetir a11y,
+   contraste ni hito porque no cambia una superficie servida.
+5. Producto e informe van en commits separados. El informe incluye rojo/verde,
+   punto exacto del freno, comprobación de cero acceso/escritura, valores de
+   entorno admitidos y riesgo residual.
+
+### Freno obligatorio
+
+Frená si el entorno productivo actual no se identifica de forma inequívoca, si
+alguna puerta necesita ejecutar el seed bajo ese mismo valor o si impedirlo
+requiere cambiar variables/despliegues de Railway. Traé la evidencia y una sola
+opción mínima; no agregues un `ALLOW_*` que pueda dejarse encendido ni toques el
+entorno remoto.
+
+Empujá producto e informe a `Memu007/yneratopgreen/main`, avisá sólo que
+respondiste y frená. **No despliegues.**
