@@ -2,186 +2,223 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-Fecha: 2026-08-27. Vigésimo séptimo informe: **SEC-1, la credencial deja de
-escribirse en la consola**.
+Fecha: 2026-08-27. Vigésimo octavo informe: **SEC-2, el entorno Python sin
+vulnerabilidades conocidas**.
 
 Un commit de producto y este informe.
 
 | Commit | Qué trae |
 |---|---|
-| `d8ce32a` | Los logs que exponían, retirados; el caso 129 que lo vigila |
-| este | Este informe: el commit inmediatamente posterior a `d8ce32a` en `main` |
-
-Pediste los dos hashes. El del producto es `d8ce32a`. El de este informe no lo
-puedo escribir adentro de sí mismo —cualquier valor que ponga cambia el hash
-que lo contiene—, así que lo digo por su lugar: es el siguiente en `main`, y va
-en el mismo empujón.
+| `ccb868c` | Los pins nuevos, el reemplazo de `python-jose` por PyJWT y el caso 130 |
+| este | Este informe: el commit inmediatamente posterior en `main` |
 
 ---
 
-## 1. Qué estaba expuesto
+## 1. El rojo, reproducido hoy
 
-`src/contexts/AuthContext.tsx`, en el `login`, escribía cuatro líneas seguidas:
+Entorno Python 3.11.15 recién creado, `backend/requirements.txt` instalado,
+`pip-audit 2.10.1`. Lo medí de las dos formas y dan lo mismo:
 
 ```
-console.log('🔄 Intentando login con:', email);
-console.log('✅ Respuesta del backend:', response);
-console.log('✅ Usuario transformado:', frontendUser);
-console.log('✅ Login exitoso');
+$ pip-audit -r backend/requirements.txt
+Found 40 known vulnerabilities in 7 packages
+$ pip-audit --no-deps -r <freeze del entorno>
+Found 40 known vulnerabilities in 7 packages
 ```
 
-La segunda es la grave: `response` es la respuesta entera de `/auth/login`, con
-`access_token`, `refresh_token`, `token_type` y el usuario completo. La primera
-escribe el correo con el que se entra —también cuando el ingreso se rechaza—.
-La tercera vuelve a escribir el usuario ya mapeado: teléfono, WhatsApp,
-ubicación, CBU y alias bancario.
+| Paquete | Versión | Avisos | IDs distintos | Corregido en |
+|---|---|---|---|---|
+| `pillow` | 10.2.0 | 22 | 15 | 12.3.0 |
+| `starlette` | 0.35.1 | 9 | 7 | 1.3.1 |
+| `python-jose` | 3.3.0 | 5 | 3 | 3.4.0 |
+| `fastapi` | 0.109.0 | 1 | 1 | 0.109.1 |
+| `pytest` | 7.4.4 | 1 | 1 | 9.0.3 |
+| `python-dotenv` | 1.0.0 | 1 | 1 | 1.2.2 |
+| `ecdsa` | 0.19.2 | 1 | 1 | **ninguna** |
 
-Eso lo lee cualquier cosa que corra en la misma página: una extensión del
-navegador, un script de terceros, alguien parado atrás de la pantalla del
-soporte técnico. No es un riesgo teórico y por eso no espera a la Fase 5.
+Los 40 de la corrida de hoy, no los 40 de la tuya: coinciden en número pero
+trabajé contra los IDs de esta corrida, como pediste.
 
-La contraseña **no** estaba en la consola: no se registra en ningún punto.
+Un detalle de método, por si volvés a medirlo: si instalás `pip-audit` **dentro
+del mismo entorno** que auditás, aparece un octavo paquete —`setuptools`— que
+no es del proyecto sino de la herramienta y del propio `venv`. Lo aislé en un
+entorno aparte para que el número sea del grafo del producto.
 
-## 2. Qué relevé antes de tocar
+## 2. El único hallazgo sin arreglo por versión, y qué hice
 
-Los 60 `console.*` del frontend, uno por uno. El resultado:
+**`ecdsa 0.19.2` — PYSEC-2026-1325 / CVE-2024-23342.** Es el ataque de
+temporización Minerva sobre la curva P-256. La descripción del propio aviso lo
+dice: *«The python-ecdsa project considers side channel attacks out of scope
+for the project and there is no planned fix.»* No hay ni va a haber versión
+corregida.
 
-- **Los cinco del `login`** en `AuthContext.tsx` son los que exponen.
-- **`LoginModal.tsx:37`** registraba el objeto `err` del ingreso fallido. Hoy
-  ese objeto es un `Error` con el mensaje que se le muestra a la persona
-  —`apiFetch` lanza `new Error(mensaje)` y nunca adjunta el cuerpo de la
-  respuesta—, así que no expone nada. Igual lo endurecí: es la misma línea de
-  código en el mismo flujo y cuesta una línea dejar de arrastrar el objeto.
-- **Los otros 54** son `console.error('...:', error)` de pantallas de catálogo,
-  panel y administración. Registran errores, no credenciales, y son logs
-  operativos: no los toqué.
-- Quedan dos `console.log` en `App.tsx` —el término buscado y el formulario de
-  una publicación nueva— que son rastro de depuración pero no llevan
-  credenciales ni datos de cuenta. Los dejo anotados y sin tocar: la orden pide
-  el mínimo para este hallazgo, no una auditoría general.
+`ecdsa` no está en nuestra lista: entra como dependencia de `python-jose`, en
+**todas** sus versiones. Lo comprobé instalando `python-jose[cryptography]==3.5.0`
+—la última— en un entorno limpio: el paquete queda sin avisos propios, pero
+sigue arrastrando `ecdsa==0.19.2` y el auditor sigue devolviendo uno.
 
-Revisé también el flujo completo: `loadCurrentUser`, `register`, el refresh
-automático de `api.ts` y el `logout` no escriben nada. Y de paso miré el
-backend: no hay ningún `logger` que imprima tokens ni contraseñas.
+**Exposición real en TopGreen: ninguna ejecución.** Firmamos y validamos con
+**HS256**, que es HMAC-SHA256 y no toca curva elíptica en ningún punto. `ecdsa`
+estaba instalado y nunca se ejecutaba. Es presencia en la cadena de suministro,
+no un camino explotable acá.
 
-## 3. Qué cambié
+Pero el criterio que fijaste es `pip-audit` en cero y sin `--ignore-vuln`, y
+con `python-jose` eso es inalcanzable por definición. Así que apliqué la
+cláusula que dejaste abierta —reemplazar la librería si queda encerrada en la
+implementación interna y conserva formato de tokens, algoritmos, expiraciones,
+errores y contratos— y pasé a **PyJWT**, que no depende de `ecdsa`.
 
-Tres archivos, nada más.
+Antes de hacerlo comprobé que el cambio es de librería y no de contrato.
 
-| Archivo | Cambio |
+## 3. La prueba de que nadie pierde la sesión
+
+Con el entorno viejo todavía instalado en paralelo, emití el mismo token con
+las dos librerías: mismas reclamaciones, mismo secreto, mismo algoritmo,
+vencimiento fijo para que la comparación signifique algo.
+
+```
+1) PyJWT lee el token de python-jose:
+   {"exp": 1893499200, "sub": "1111…5555", "type": "access"}
+2) python-jose lee el token de PyJWT:
+   {"exp": 1893499200, "sub": "1111…5555", "type": "access"}
+3) los dos tokens son idénticos byte a byte:  SI
+5) decode_token() del producto acepta el token de python-jose:
+   {'sub': '1111…5555', 'exp': 1893499200, 'type': 'access'}
+   token vencido -> None
+```
+
+**Byte a byte.** Misma cabecera, misma carga, misma firma. Las sesiones abiertas
+en los navegadores siguen siendo válidas después del despliegue, y si algún día
+hubiera que volver atrás, los tokens emitidos por PyJWT los lee python-jose.
+
+El código tocado son tres líneas en un solo archivo,
+`backend/app/core/security.py`: el `import`, y el `except JWTError` que pasa a
+`except PyJWTError`. Las tres llamadas —dos `encode`, un `decode`— tienen la
+misma firma en las dos librerías. El extra `[crypto]` queda puesto para no
+achicar los algoritmos que `JWT_ALGORITHM` puede pedir.
+
+## 4. El caso 130
+
+El riesgo de este cambio no es que deje de andar —eso lo ve cualquier caso de
+login—, es que el token cambie de forma sin que nadie lo note. Así que el caso
+nuevo fija el contrato del token **sin usar ninguna librería de JWT**: parte la
+cadena a mano, decodifica cabecera y carga, y recalcula la firma con
+HMAC-SHA256 crudo. Si mañana se cambia otra vez de librería, esto sigue
+diciendo si el token es el mismo token.
+
+Exige, para el de acceso y el de refresco:
+
+- cabecera exactamente `{"alg":"HS256","typ":"JWT"}`;
+- `sub` igual a la cuenta que entró, `type` correcto, `exp` entero y a la
+  distancia que declara la configuración —15 minutos y 30 días—;
+- **y nada más**: las claves son exactamente `exp,sub,type`, así que el token
+  no lleva la cuenta adentro;
+- la firma verificada recalculando HMAC-SHA256 con el secreto, fuera de PyJWT.
+
+Y que se rechacen con 401: un token con el sujeto cambiado y firmado con otro
+secreto, uno que dice `alg=none`, y uno vencido pero bien firmado.
+
+**Prueba en rojo**: le agregué a propósito una reclamación `iss` al token y el
+caso falla con «el token de acceso lleva reclamaciones de más: exp,iss,sub,type».
+Restauré el archivo; la rotura no está versionada.
+
+## 5. El resto de los pins
+
+| Paquete | Antes | Ahora | Por qué |
+|---|---|---|---|
+| `fastapi` | 0.109.0 | **0.133.0** | Es la versión más baja que deja de acotar Starlette por debajo de 1.0. Sin eso no se puede llegar a Starlette 1.3.1. |
+| `starlette` | 0.35.1 transitiva | **1.3.1 con pin propio** | Primera versión sin avisos abiertos. Entra como pin explícito: la versión la decide la lista, no lo que quede resuelto. |
+| `pydantic[email]` | 2.5.3 | **2.7.0** | Es el mínimo que exige FastAPI 0.133. No subí más. |
+| `pillow` | 10.2.0 | **12.3.0** | 22 de los 40 avisos. |
+| `pytest` | 7.4.4 | **9.0.3** | El aviso pide 9.0.3. |
+| `pytest-asyncio` | 0.23.3 | **1.4.0** | 0.23 exige `pytest < 8`: subir uno obliga al otro. |
+| `python-dotenv` | 1.0.0 | **1.2.2** | El aviso pide 1.2.2. |
+| `python-jose[cryptography]` | 3.3.0 | **fuera** | Explicado arriba. |
+| `PyJWT[crypto]` | — | **2.13.0** | Lo reemplaza. |
+| `bcrypt` | transitiva | **5.0.0 con pin propio** | Ver abajo. |
+
+**`bcrypt` merecía su propio pin.** `app/core/security.py` lo importa directo
+—`import bcrypt`— y hasta ahora entraba de prestado, como transitiva de
+`passlib[bcrypt]`. Es decir: la única dependencia que hashea contraseñas no
+estaba declarada, y sobrevivía porque otra cosa la arrastraba. La versión
+resuelta es la misma que ya había; lo que cambia es que ahora está escrita.
+
+Todo lo demás quedó donde estaba. No subí nada por decoración.
+
+## 6. Una consecuencia del salto, tres líneas
+
+FastAPI 0.133 deprecó `regex=` en favor de `pattern=` y lo avisa en cada
+arranque. Son tres usos en `backend/app/api/catalog.py` —`publication_type`,
+`sort_by` y `sort_order`—, con el mismo valor de expresión regular. Los cambié:
+es consecuencia directa de este salto, no limpieza lateral, y `pattern` ya
+existía en la versión anterior, así que el cambio es compatible en las dos
+direcciones.
+
+## 7. El verde
+
+```
+$ pip check
+No broken requirements found.
+$ pip-audit -r backend/requirements.txt
+No known vulnerabilities found
+$ pip-audit --no-deps -r <freeze del entorno nuevo>
+No known vulnerabilities found
+```
+
+Grafo: 53 paquetes antes, 52 ahora. Salieron `ecdsa`, `pyasn1`, `rsa`, `six` y
+`python-jose`; entraron `PyJWT`, `Pygments`, `annotated-doc` y
+`typing-inspection`.
+
+| Puerta | Resultado |
 |---|---|
-| `src/contexts/AuthContext.tsx` | Se van las cuatro líneas del `login`. El `console.error` del fallo se queda pero registra el **mensaje** y no el objeto. |
-| `src/components/Auth/LoginModal.tsx` | Mismo criterio: el mensaje, no el objeto. |
-| `scripts/smoke.mjs` | Caso 129, nuevo. |
-
-No moví tokens fuera de `localStorage`, no toqué cookies, CSRF, OAuth,
-expiraciones, endpoints ni contratos. El modelo Bearer/localStorage del cierre
-`6ece3fb` queda como está. Ninguna dependencia nueva. Ningún cambio visual.
-
-## 4. La regresión: cómo mira
-
-Escuchar el evento `console` de Playwright **no alcanza**: cuando el argumento
-es un objeto, el evento entrega `JSHandle@object` y el token no aparece. Con
-eso, la fuga habría pasado desapercibida.
-
-El caso 129 espía la consola **desde adentro de la página**: envuelve
-`log`, `info`, `debug`, `warn`, `error`, `trace`, `table` y `dir` antes de que
-corra cualquier script, serializa cada argumento —incluidos los `Error`, que
-`JSON.stringify` deja en `{}`— y guarda el texto. Es exactamente lo que ve
-quien está en el mismo documento. El evento de Playwright se mira igual, como
-segunda red.
-
-Después de un ingreso real, exige que no aparezca ninguno de estos valores, en
-ningún nivel: el **access token** y el **refresh token** que quedaron
-guardados, la **contraseña**, el **correo de ingreso** y el **identificador de
-la cuenta** —que es la huella del objeto usuario, esté en la forma del backend
-o en la del frontend—. Y por forma: ninguna de las claves `access_token`,
-`refresh_token` o `token_type`.
-
-Además comprueba que nada de esto se arregló rompiendo la autenticación:
-
-1. el ingreso deja el par de tokens y la cuenta en la cabecera;
-2. una pantalla protegida —el panel— abre con la sesión;
-3. **el refresh automático sigue vivo**: se rompe a propósito el access token
-   guardado, se pide algo protegido que no sea de `/auth/`, y el caso exige que
-   el token se renueve solo, que la sesión no se caiga y que el token nuevo
-   tampoco aparezca en la consola;
-4. `Salir` borra el par y devuelve `Ingresar`;
-5. un **ingreso rechazado** no escribe el correo ni la contraseña que se
-   intentaron, y no guarda ningún token.
-
-## 5. Rojo y verde
-
-**En rojo**, con el árbol sin tocar —sólo el caso agregado—:
-
-```
-$ SMOKE_CASOS=129 node scripts/smoke.mjs
-[FAIL] 129 El ingreso no deja la credencial escrita en la consola del navegador
-  — el access token quedó impreso en la consola; el refresh token quedó impreso
-    en la consola; el correo de ingreso quedó impreso en la consola; el
-    identificador de la cuenta quedó impreso en la consola; la consola imprimió
-    la respuesta de autenticación
---- consola ---
-log: 🔄 Intentando login con: cliente@ejemplo.com
-log: ✅ Respuesta del backend: {"user":{"id":"a6823944-…","email":"cliente@ejemplo.com",
-     "full_name":"María Cliente","phone":"+54 11 9876-5432",…
-0/1 pasaron; 1 fallaron
-```
-
-Cinco de las seis afirmaciones fallan. La sexta —la contraseña— pasa desde el
-primer día porque nunca se registró.
-
-Restauré el árbol antes de implementar: la rotura no está versionada en ningún
-commit.
-
-**En verde**, después del cambio:
-
-```
-$ SMOKE_CASOS=129 node scripts/smoke.mjs
-[PASS] 129 El ingreso no deja la credencial escrita en la consola del navegador
-1/1 pasaron; 0 fallaron
-```
-
-## 6. Puertas, desde base limpia
-
-Base recreada —migraciones y seed— y después las puertas, encadenadas sobre
-esa misma base.
-
-| Comando | Resultado |
-|---|---|
+| entorno 3.11 nuevo con `requirements.txt` | instala y `pip check` limpio |
+| `pip-audit` | **0 vulnerabilidades conocidas** |
+| aplicación importa y arranca | sí, 100 rutas |
+| `alembic heads` | una sola cabeza, `a91c47e2b6d8` |
+| base limpia: migraciones + seed | sin intervención manual |
+| `python -m compileall -q backend/app backend/alembic` | limpio |
 | `npm run build` | limpio |
-| `npm run lint` | 0 errores, 0 advertencias (`--max-warnings 0`) |
-| `node scripts/smoke.mjs` | **129/129**, 0 fallos |
+| `npm run lint` | 0 errores, 0 advertencias |
+| suite oficial completa desde base limpia | **130/130**, 0 fallos |
 | `git -c core.whitespace=cr-at-eol diff --check` | limpio |
 
-No corrí contraste, a11y ni hito: este cambio no toca una sola línea de estilo
-ni de marcado, y sus tres archivos no aparecen en el alcance de esas puertas.
-Si las querés igual, las corro.
+La suite cubre lo que pediste verificar especialmente: login, refresh, logout y
+validación de JWT; alta de publicaciones con imágenes por multipart;
+documentación en PDF por multipart; y el arranque de FastAPI en cada caso de
+navegador.
 
-## 7. Riesgos que quedan
+## 8. Riesgos que quedan
 
-Digo lo que **no** cierra esto, para que no quede la sensación de que el tema
-está resuelto:
+1. **El salto de FastAPI es grande**: 0.109 → 0.133, con Starlette 0.35 → 1.3.1
+   y pydantic 2.5 → 2.7. No lo elegí por gusto: era la única forma de cerrar
+   los nueve avisos de Starlette. La suite completa lo respalda, pero es el
+   cambio con más superficie de esta entrega y conviene mirarlo en el primer
+   despliegue.
+2. **`ecdsa` sale del grafo, no del mundo.** Si algún día vuelve una librería
+   que lo arrastre, el aviso vuelve. Queda dicho para que no sorprenda.
+3. **Tres dependencias que nadie usa.** `pillow` no lo importa ningún archivo
+   del backend —la validación de imágenes es por extensión y `content_type`—,
+   `fastapi-cors` tampoco: el CORS sale de `fastapi.middleware.cors`, que viene
+   con FastAPI. Y `passlib` tampoco: `security.py` usa `bcrypt` directo. Las
+   tres las dejé pineadas porque tu orden dice que el diff sea sólo pins y no
+   una limpieza lateral. Si querés, sacarlas es un commit corto: se van
+   `pillow`, `fastapi-cors`, `environs` y `marshmallow` del grafo, y con ellas
+   22 avisos futuros de Pillow que hoy estamos obligados a seguir de por vida
+   por un paquete que no se importa en ningún lado. **Decidilo vos.**
+4. **`pip-audit` es una foto del feed.** Cero hoy no es cero para siempre. Esto
+   pide una corrida periódica, no un cierre único.
+5. **El `Dockerfile.railway` no cambió** y no hacía falta: instala
+   `requirements.txt` tal cual. La imagen `python:3.11-slim` trae su propio
+   `setuptools`, que el auditor puede marcar según el día; no es del grafo del
+   proyecto y no lo pineé para no meter en la lista algo que no usamos.
 
-1. **Los tokens siguen en `localStorage`.** Cualquier script que corra en la
-   página los lee de ahí, con consola o sin consola. Sacar el log angosta la
-   exposición —ya no quedan escritos en un lugar que se copia y se pega en un
-   ticket de soporte— pero no la elimina. El modelo Bearer/localStorage es el
-   aceptado en `6ece3fb` y la orden dice explícitamente no rediseñarlo.
-2. **La prueba mira la consola, no la red.** El par de tokens sigue viajando en
-   la respuesta de `/auth/login`, que es donde tiene que estar, y se ve en la
-   pestaña de red del navegador como en cualquier aplicación. Eso no es una
-   fuga; lo aclaro para que la prueba no se lea como más de lo que prueba.
-3. **Quedan los dos `console.log` de `App.tsx`.** No llevan credenciales. Si
-   querés que se vayan, es una línea y otro commit.
-4. **La prueba cubre el flujo del navegador.** No mira los logs del servidor
-   —los revisé a mano y están limpios— ni el almacenamiento del navegador.
+## 9. Freno
 
-## 8. Freno
+No frené: el único hallazgo sin arreglo por versión se cerró sin tocar el
+modelo de sesión, sin cambiar el formato ni la autoridad del token —lo probé
+byte a byte— y sin tocar contratos, datos ni pagos. Si aun así preferís no
+mover `python-jose`, el camino alternativo es aceptar `ecdsa` como riesgo
+declarado; en ese caso `pip-audit` queda en uno y hay que decirlo por escrito,
+no silenciarlo.
 
-No hubo nada que me obligara a frenar: la fuga se cerró sin tocar el modelo de
-sesión, no encontré secretos emitidos por el backend ni por una dependencia, y
-la prueba se escribió con la infraestructura que ya estaba.
-
-La aceptación visual de UX-2D.1 sigue pendiente de Emi y esta pieza no la toca.
-No desplegué.
+La aceptación visual de UX-2D.1 sigue pendiente de Emi. No desplegué.
