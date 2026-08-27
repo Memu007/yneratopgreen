@@ -3735,3 +3735,95 @@ Entregá un commit de producto y otro con el informe en `PARA-PM.md`. El informe
 debe traer archivos, rojo/verde, comandos y salidas resumidas, riesgos
 residuales y ambos hashes. Empujá los dos y frená para revisión PM. **No
 despliegues.**
+
+## 2026-08-27 — SEC-1 `d8ce32a`: aceptada
+
+Acepto producto `d8ce32a` e informe `b38f29c`. La fuga queda retirada en el
+contexto y el modal sin cambiar Bearer/localStorage; el caso 129 observa los
+objetos dentro de la página, discrimina el rojo anterior y conserva login,
+sesión protegida, refresh, logout e ingreso rechazado.
+
+Verificación independiente PM: el diff se limita a los dos puntos del login y
+la regresión, sin dependencias, Backend, estilos ni marcado; `npm run build`,
+`npm run lint`, `node --check scripts/smoke.mjs` y
+`git -c core.whitespace=cr-at-eol diff --check` quedan verdes. PM confirmó por
+código la fuga anterior y su retiro. La suite 129/129 desde base limpia queda
+como evidencia de Dev: este entorno no tiene Docker y la descarga de Chromium
+agotó el tiempo de espera. No pido contraste, a11y ni hito porque el diff no
+toca sus superficies.
+
+## Tarea activa única: SEC-2, dependencias Python sin vulnerabilidades conocidas
+
+La auditoría PM ejecutó `pip-audit -r backend/requirements.txt` y obtuvo 40
+hallazgos conocidos en siete paquetes instalados, entre ellos FastAPI,
+Starlette, python-jose, python-dotenv, Pillow, pytest y la dependencia ecdsa.
+El número es una foto del feed, no la especificación: reproducí la salida hoy y
+trabajá contra los IDs que devuelva la corrida nueva.
+
+### Resultado esperado y prioridad
+
+Dejá el entorno Python reproducible con versiones compatibles que no tengan
+vulnerabilidades conocidas publicadas por `pip-audit`, sin cambiar contratos ni
+comportamiento del producto. Es otro riesgo concreto ya encontrado; no abre la
+auditoría general de Fase 5.
+
+Antes de editar, revisá `backend/requirements.txt`,
+`backend/Dockerfile.railway`, el grafo resuelto en Python 3.11 y los usos reales
+de los paquetes señalados. Elegí el conjunto mínimo compatible; no actualices
+por decoración ni cambies librerías si una versión corregida resuelve el mismo
+problema.
+
+### Alcance
+
+- Reproducir el rojo en un entorno Python 3.11 limpio con `pip-audit` y guardar
+  paquete, versión, ID y versión corregida disponible.
+- Actualizar sólo los pins directos necesarios y dejar que el resolvedor
+  demuestre el grafo final. Todos los pins continúan explícitos y
+  reproducibles.
+- Si una dependencia sin versión corregida obliga a reemplazar una librería,
+  podés hacerlo únicamente si queda encerrado en la implementación interna y
+  conserva formato de tokens, algoritmos permitidos, expiraciones, errores y
+  contratos actuales. Si cualquiera de esos bordes cambia, frená primero.
+- Verificar especialmente autenticación/JWT, carga y lectura de imágenes,
+  multipart/documentación, arranque FastAPI y comandos de prueba.
+- Reutilizar la suite existente. Agregá una regresión sólo si el cambio de
+  dependencia descubre un comportamiento que la suite no cubre.
+
+### Fuera de alcance
+
+- Sin frontend/npm, esquema, migración nueva, seed funcional, endpoints, UX,
+  catálogo, pagos, logística, CSP, cabeceras HTTP ni despliegue.
+- Sin actualización general a `latest`, cambio de framework, refactor de auth
+  o limpieza lateral.
+- No usar `--ignore-vuln`, exclusiones, supresiones ni comentarios para hacer
+  verde el auditor. Un riesgo aceptado necesita decisión PM, no silencio.
+
+### Criterios de aceptación ejecutables
+
+1. La evidencia roja lista los hallazgos del conjunto anterior. Después del
+   cambio, un entorno Python 3.11 recién creado instala
+   `backend/requirements.txt`, `pip check` termina limpio y `pip-audit` informa
+   cero vulnerabilidades conocidas para el grafo instalado.
+2. La aplicación importa y arranca, Alembic llega a una sola cabeza y una base
+   limpia completa migraciones y seed sin intervención manual.
+3. La suite oficial completa —mínimo 129/129— queda verde desde esa misma base;
+   login, refresh, logout, validación JWT, imágenes, multipart y documentación
+   siguen cubiertos y funcionando.
+4. Quedan verdes `python -m compileall -q backend/app backend/alembic`,
+   `npm run build`, `npm run lint` y
+   `git -c core.whitespace=cr-at-eol diff --check`.
+5. El diff contiene sólo pins, el cambio interno estrictamente necesario si un
+   paquete no tiene corrección compatible, pruebas justificadas y el informe.
+   No aparecen cambios de contrato ni dependencia frontend.
+
+### Freno obligatorio
+
+Frená sin versionar una migración de librería si un hallazgo no tiene arreglo
+compatible, si el auditor sólo puede quedar verde ignorándolo, si cambia el
+formato/autoridad de tokens o si una actualización exige tocar contratos,
+datos, pagos o más de un bloque funcional. Informá el ID, exposición real,
+opciones mínimas, esfuerzo y riesgo para que PM decida.
+
+Entregá un commit de producto y otro con el informe en `PARA-PM.md`, incluyendo
+grafo antes/después, rojo/verde, comandos, suite, riesgos residuales y hashes.
+Empujá ambos y frená para revisión PM. **No despliegues.**
