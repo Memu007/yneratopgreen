@@ -2,160 +2,186 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-Fecha: 2026-08-26. Vigésimo sexto informe: **UX-2D.1, una sola cabecera**.
+Fecha: 2026-08-27. Vigésimo séptimo informe: **SEC-1, la credencial deja de
+escribirse en la consola**.
 
 Un commit de producto y este informe.
 
 | Commit | Qué trae |
 |---|---|
-| `2a01775` | La banda de identidad estable, el buscador en su propia banda, el caso 128 ampliado y las capturas nuevas |
-| este | Este informe |
+| `d8ce32a` | Los logs que exponían, retirados; el caso 129 que lo vigila |
+| este | Este informe: el commit inmediatamente posterior a `d8ce32a` en `main` |
+
+Pediste los dos hashes. El del producto es `d8ce32a`. El de este informe no lo
+puedo escribir adentro de sí mismo —cualquier valor que ponga cambia el hash
+que lo contiene—, así que lo digo por su lugar: es el siguiente en `main`, y va
+en el mismo empujón.
 
 ---
 
-## 1. Emi tenía razón y el defecto era mío
+## 1. Qué estaba expuesto
 
-La cabecera cambiaba de estructura al entrar al Mercado: el buscador se metía
-en la banda de marca y empujaba los cinco destinos a una barra blanca aparte.
-Copié eso de las láminas sin ver el problema. En un prototipo estático es una
-lámina por pantalla; en el producto es una cabecera que se transforma justo
-cuando uno pasa de mirar a operar, y la identidad de arriba deja de ser un
-lugar fijo.
+`src/contexts/AuthContext.tsx`, en el `login`, escribía cuatro líneas seguidas:
 
-Ahora hay **una sola banda de identidad**, idéntica en Inicio, Mercado y
-Servicios: marca a la izquierda, los cinco destinos en el mismo orden, las
-acciones reales de sesión y rol a la derecha, a la misma altura. El Mercado no
-la toca: le agrega **una segunda banda propia, debajo**, con el buscador.
-Fuera del Mercado esa banda no existe.
+```
+console.log('🔄 Intentando login con:', email);
+console.log('✅ Respuesta del backend:', response);
+console.log('✅ Usuario transformado:', frontendUser);
+console.log('✅ Login exitoso');
+```
 
-Comparalo abierto: `capturas/inicio-1440x900.png` contra
-`capturas/mercado-1440x900.png`. La parte de arriba es la misma imagen salvo
-cuál celda está activa.
+La segunda es la grave: `response` es la respuesta entera de `/auth/login`, con
+`access_token`, `refresh_token`, `token_type` y el usuario completo. La primera
+escribe el correo con el que se entra —también cuando el ingreso se rechaza—.
+La tercera vuelve a escribir el usuario ya mapeado: teléfono, WhatsApp,
+ubicación, CBU y alias bancario.
 
-## 2. Qué cambié, exactamente
+Eso lo lee cualquier cosa que corra en la misma página: una extensión del
+navegador, un script de terceros, alguien parado atrás de la pantalla del
+soporte técnico. No es un riesgo teórico y por eso no espera a la Fase 5.
 
-- `Header.tsx` deja de tener dos formas. El buscador sale de la banda de marca
-  y pasa a un bloque propio que se dibuja sólo en el Mercado, después de la
-  banda. La navegación vuelve a la banda de identidad en todas las secciones.
-- La segunda banda es verde, como la primera: es la misma banda con un renglón
-  más, no una barra de otro material. La barra blanca era justamente lo que
-  hacía que el Mercado se leyera como otra cabecera.
-- La marca mide lo mismo en todas las secciones. Antes achicaba de 40 a 34 px
-  al entrar al Mercado, que era otra manera de que la banda no fuera la misma.
-- El buscador conserva todo: la etiqueta accesible «Buscar en el mercado», el
-  `id`, el valor, el submit, los callbacks y los dos textos de `placeholder`
-  por ancho. Sigue filtrando el mismo catálogo, ahora desde su banda.
-- El panel de filtros se pega 12 px más abajo y el alto mínimo del Mercado se
-  corrige, porque la cabecera pasó de 112 a 124 px en escritorio.
+La contraseña **no** estaba en la consola: no se registra en ningún punto.
 
-## 3. El orden de lectura, que es donde me hiciste pensar
+## 2. Qué relevé antes de tocar
 
-Pediste que en tablet y celular el orden fuera marca/acciones, navegación y,
-sólo en Mercado, búsqueda. Estaba dibujado así pero **no escrito así**: en el
-documento la navegación venía antes que las acciones y en pantalla la movía una
-regla de CSS. Para quien usa teclado o lector de pantalla eso es otro orden que
-el que se ve.
+Los 60 `console.*` del frontend, uno por uno. El resultado:
 
-Lo di vuelta en el documento: marca, sesión, destinos, búsqueda. Y entonces la
-regla vale para los tres anchos, no sólo para los dos que nombraste:
+- **Los cinco del `login`** en `AuthContext.tsx` son los que exponen.
+- **`LoginModal.tsx:37`** registraba el objeto `err` del ingreso fallido. Hoy
+  ese objeto es un `Error` con el mensaje que se le muestra a la persona
+  —`apiFetch` lanza `new Error(mensaje)` y nunca adjunta el cuerpo de la
+  respuesta—, así que no expone nada. Igual lo endurecí: es la misma línea de
+  código en el mismo flujo y cuesta una línea dejar de arrastrar el objeto.
+- **Los otros 54** son `console.error('...:', error)` de pantallas de catálogo,
+  panel y administración. Registran errores, no credenciales, y son logs
+  operativos: no los toqué.
+- Quedan dos `console.log` en `App.tsx` —el término buscado y el formulario de
+  una publicación nueva— que son rastro de depuración pero no llevan
+  credenciales ni datos de cuenta. Los dejo anotados y sin tocar: la orden pide
+  el mínimo para este hallazgo, no una auditoría general.
 
-- en **tablet y celular** la banda ocupa dos renglones y lo que se ve es
-  exactamente lo que dice el documento;
-- en **escritorio** la banda entra en un renglón y los destinos se siguen
-  dibujando en el medio, que es la composición aprobada, mientras el recorrido
-  del teclado mantiene el mismo orden que en los otros dos anchos.
+Revisé también el flujo completo: `loadCurrentUser`, `register`, el refresh
+automático de `api.ts` y el `logout` no escriben nada. Y de paso miré el
+backend: no hay ningún `logger` que imprima tokens ni contraseñas.
 
-Medido en los tres: `TopGreen → Ingresar → Inicio → Mercado → Servicios →
-Quiénes somos → Contacto → campo → Buscar`, con anillo de foco de 3 px en cada
-parada y ninguna parada perdida.
+## 3. Qué cambié
 
-## 4. La regresión
+Tres archivos, nada más.
 
-El caso 128 pasó a exigir las dos propiedades, y se llama por lo que prueba:
-«La cabecera es la misma en Inicio, Mercado y Servicios, y sólo el Mercado suma
-la banda de búsqueda».
+| Archivo | Cambio |
+|---|---|
+| `src/contexts/AuthContext.tsx` | Se van las cuatro líneas del `login`. El `console.error` del fallo se queda pero registra el **mensaje** y no el objeto. |
+| `src/components/Auth/LoginModal.tsx` | Mismo criterio: el mensaje, no el objeto. |
+| `scripts/smoke.mjs` | Caso 129, nuevo. |
 
-Lo que mide, en los tres anchos:
+No moví tokens fuera de `localStorage`, no toqué cookies, CSRF, OAuth,
+expiraciones, endpoints ni contratos. El modelo Bearer/localStorage del cierre
+`6ece3fb` queda como está. Ninguna dependencia nueva. Ningún cambio visual.
 
-1. **Paridad estructural.** Retrata la banda de identidad de cada sección
-   —posición, alto, archivo y alto de la marca, y la lista de celdas en orden—
-   y exige que las tres devuelvan lo mismo.
-2. **Orden de lectura.** La primera celda es la marca y las últimas cinco son
-   los destinos, en orden, en el documento.
-3. **El buscador sólo en el Mercado.** No existe en Inicio ni en Servicios; en
-   el Mercado arranca por debajo de la banda de identidad, conserva su etiqueta
-   y su texto por ancho, y **desde ahí filtra**: buscar una publicación real
-   baja el conteo de tarjetas y deja esa publicación en pantalla.
-4. Y lo que ya exigía: las acciones de cada rol con 44 px de alto —`Salir`
-   incluido—, el nombre real en escritorio y «Cuenta» en celular, y cero
-   desborde horizontal.
+## 4. La regresión: cómo mira
 
-**Prueba en rojo**, con la cabecera anterior puesta de vuelta: falla con
-«escritorio: la banda de identidad de Mercado no es la de Inicio». Es el
-defecto que encontró Emi, dicho por la prueba.
+Escuchar el evento `console` de Playwright **no alcanza**: cuando el argumento
+es un objeto, el evento entrega `JSHandle@object` y el token no aparece. Con
+eso, la fuga habría pasado desapercibida.
 
-## 5. Lo que NO toqué
+El caso 129 espía la consola **desde adentro de la página**: envuelve
+`log`, `info`, `debug`, `warn`, `error`, `trace`, `table` y `dir` antes de que
+corra cualquier script, serializa cada argumento —incluidos los `Error`, que
+`JSON.stringify` deja en `{}`— y guarda el texto. Es exactamente lo que ve
+quien está en el mismo documento. El evento de Playwright se mira igual, como
+segunda red.
 
-Anotaste que en el entorno de revisión las publicaciones de Logística aparecen
-como `Insumo estandarizado` porque el frontend nuevo está contra el Backend
-descartable viejo, cuya respuesta pública omite `operation_kind`,
-`pricing_type`, `response_time` y `coverage_zones`.
+Después de un ingreso real, exige que no aparezca ninguno de estos valores, en
+ningún nivel: el **access token** y el **refresh token** que quedaron
+guardados, la **contraseña**, el **correo de ingreso** y el **identificador de
+la cuenta** —que es la huella del objeto usuario, esté en la forma del backend
+o en la del frontend—. Y por forma: ninguna de las claves `access_token`,
+`refresh_token` o `token_type`.
 
-No lo toqué y no lo voy a inferir en el frontend. Contra el backend de este
-repositorio las cuatro anatomías salen bien: `capturas/mercado-1440x900.png`
-muestra «Activo de alto valor» y los casos 119 y 120 lo exigen fila por fila.
-Poner una inferencia en el navegador para tapar una respuesta incompleta sería
-inventar el dato que falta.
+Además comprueba que nada de esto se arregló rompiendo la autenticación:
 
-Tampoco toqué cards, hero, filtros, anatomías, colores, tipografía ni copy.
-Ni backend, seed, migración, API, auth, pagos, logística ni dependencias.
+1. el ingreso deja el par de tokens y la cuenta en la cabecera;
+2. una pantalla protegida —el panel— abre con la sesión;
+3. **el refresh automático sigue vivo**: se rompe a propósito el access token
+   guardado, se pide algo protegido que no sea de `/auth/`, y el caso exige que
+   el token se renueve solo, que la sesión no se caiga y que el token nuevo
+   tampoco aparezca en la consola;
+4. `Salir` borra el par y devuelve `Ingresar`;
+5. un **ingreso rechazado** no escribe el correo ni la contraseña que se
+   intentaron, y no guarda ningún token.
+
+## 5. Rojo y verde
+
+**En rojo**, con el árbol sin tocar —sólo el caso agregado—:
+
+```
+$ SMOKE_CASOS=129 node scripts/smoke.mjs
+[FAIL] 129 El ingreso no deja la credencial escrita en la consola del navegador
+  — el access token quedó impreso en la consola; el refresh token quedó impreso
+    en la consola; el correo de ingreso quedó impreso en la consola; el
+    identificador de la cuenta quedó impreso en la consola; la consola imprimió
+    la respuesta de autenticación
+--- consola ---
+log: 🔄 Intentando login con: cliente@ejemplo.com
+log: ✅ Respuesta del backend: {"user":{"id":"a6823944-…","email":"cliente@ejemplo.com",
+     "full_name":"María Cliente","phone":"+54 11 9876-5432",…
+0/1 pasaron; 1 fallaron
+```
+
+Cinco de las seis afirmaciones fallan. La sexta —la contraseña— pasa desde el
+primer día porque nunca se registró.
+
+Restauré el árbol antes de implementar: la rotura no está versionada en ningún
+commit.
+
+**En verde**, después del cambio:
+
+```
+$ SMOKE_CASOS=129 node scripts/smoke.mjs
+[PASS] 129 El ingreso no deja la credencial escrita en la consola del navegador
+1/1 pasaron; 0 fallaron
+```
 
 ## 6. Puertas, desde base limpia
 
-Base recreada —migraciones y seed— antes de medir, y las siete puertas
-encadenadas sobre esa misma base.
+Base recreada —migraciones y seed— y después las puertas, encadenadas sobre
+esa misma base.
 
-| Puerta | Resultado |
+| Comando | Resultado |
 |---|---|
 | `npm run build` | limpio |
 | `npm run lint` | 0 errores, 0 advertencias (`--max-warnings 0`) |
-| `npm run contraste` | 52/52 mediciones, 6.630 textos, **0 incumplimientos** |
-| `npm run a11y -- --todas` | 64/64 pantallas, **0 violaciones de cualquier severidad** |
-| `npm run hito` | 6/6 pasos |
-| suite completa | **128/128**, 0 fallos |
+| `node scripts/smoke.mjs` | **129/129**, 0 fallos |
 | `git -c core.whitespace=cr-at-eol diff --check` | limpio |
 
-Fuera de las puertas del repositorio, otra vez:
+No corrí contraste, a11y ni hito: este cambio no toca una sola línea de estilo
+ni de marcado, y sus tres archivos no aparecen en el alcance de esas puertas.
+Si las querés igual, las corro.
 
-- **zoom 200 %**: las cinco secciones a 720×450 y 384×512 —el 200 % de los dos
-  anchos contractuales— y a 320×256, el piso de reflujo de WCAG. 15 mediciones,
-  cero desborde.
-- **texto al 130 %**: otras 15 mediciones a 1440, 768 y 390. Cero desborde.
-- **teclado**: el recorrido completo de la cabecera en los tres anchos, con el
-  mismo orden y anillo de foco en todas las paradas.
-- **movimiento reducido y tipografía**: sin cambios, cero elementos animados,
-  cero videos, cero dominios externos.
+## 7. Riesgos que quedan
 
-## 7. Capturas
+Digo lo que **no** cierra esto, para que no quede la sensación de que el tema
+está resuelto:
 
-Regeneré **todas** las de `docs/pm/ux2d/capturas/` contra el código de hoy: si
-la cabecera cambió, las viejas mentían. Se sumaron las seis que pediste con el
-rol más cargado —administración, que es el de más celdas— para Inicio y Mercado
-en los tres anchos, recortadas al primer viewport, que es donde se ve la
-cabecera; el cuerpo de esas páginas ya está en el juego sin sesión.
+1. **Los tokens siguen en `localStorage`.** Cualquier script que corra en la
+   página los lee de ahí, con consola o sin consola. Sacar el log angosta la
+   exposición —ya no quedan escritos en un lugar que se copia y se pega en un
+   ticket de soporte— pero no la elimina. El modelo Bearer/localStorage es el
+   aceptado en `6ece3fb` y la orden dice explícitamente no rediseñarlo.
+2. **La prueba mira la consola, no la red.** El par de tokens sigue viajando en
+   la respuesta de `/auth/login`, que es donde tiene que estar, y se ve en la
+   pestaña de red del navegador como en cualquier aplicación. Eso no es una
+   fuga; lo aclaro para que la prueba no se lea como más de lo que prueba.
+3. **Quedan los dos `console.log` de `App.tsx`.** No llevan credenciales. Si
+   querés que se vayan, es una línea y otro commit.
+4. **La prueba cubre el flujo del navegador.** No mira los logs del servidor
+   —los revisé a mano y están limpios— ni el almacenamiento del navegador.
 
-Las de Inicio sin sesión salieron byte a byte iguales a las anteriores, y es la
-comprobación más corta de que esto salió bien: **la cabecera de Inicio no
-cambió**. La que cambió fue la del Mercado, que ahora es la misma.
+## 8. Freno
 
-`PARIDAD.md` y `docs/pm/ux2d/DIFERENCIAS.md` quedaron actualizados: la
-diferencia contra la lámina del Mercado ahora está escrita como diferencia, con
-su motivo.
+No hubo nada que me obligara a frenar: la fuga se cerró sin tocar el modelo de
+sesión, no encontré secretos emitidos por el backend ni por una dependencia, y
+la prueba se escribió con la infraestructura que ya estaba.
 
-## 8. Lo que sigue abierto, sin cambios
-
-- La paginación mayor a 100, en `docs/pm/ux2c/DEUDA-PAGINACION.md`.
-- Administración no muestra «Vendedores» ni «Clientes»: falta el campo en el
-  servidor y es backend.
-
-No desplegué. Freno acá.
+La aceptación visual de UX-2D.1 sigue pendiente de Emi y esta pieza no la toca.
+No desplegué.
