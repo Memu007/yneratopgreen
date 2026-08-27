@@ -3827,3 +3827,73 @@ opciones mínimas, esfuerzo y riesgo para que PM decida.
 Entregá un commit de producto y otro con el informe en `PARA-PM.md`, incluyendo
 grafo antes/después, rojo/verde, comandos, suite, riesgos residuales y hashes.
 Empujá ambos y frená para revisión PM. **No despliegues.**
+
+## 2026-08-27 — SEC-2 `ccb868c`: aceptada
+
+Acepto producto `ccb868c` e informe `6cea576`. PyJWT retira la dependencia ecdsa
+sin cambiar formato, algoritmo, expiraciones ni autoridad de los tokens; el
+caso 130 fija cabecera, reclamaciones, HMAC, vencimiento y rechazos fuera de la
+librería. Los tres `pattern=` son la adaptación mínima a FastAPI 0.133 y no
+cambian los filtros.
+
+Verificación independiente PM: entorno Python 3.11.15 nuevo con 52 paquetes,
+`pip check` limpio, `pip-audit` en cero, aplicación importable con 100 rutas,
+roundtrip JWT y tokens de python-jose/PyJWT idénticos byte a byte y legibles en
+ambas direcciones. También quedan verdes compileall, build, lint, sintaxis del
+smoke y `diff-check`. La base limpia, migraciones, seed y suite 130/130 quedan
+como evidencia de Dev porque PM continúa sin Docker.
+
+### Regla permanente de respuesta
+
+Al terminar una entrega, escribí la respuesta completa únicamente en
+`docs/pm/PARA-PM.md`, empujá producto e informe y a Emi avisale sólo que
+**respondiste**. Emi no vuelve a copiar y pegar el informe: cuando diga
+“respondió”, PM actualiza `main` y lo lee desde el repositorio.
+
+## Tarea activa única: SEC-2.1, retirar tres dependencias sin consumidores
+
+Acepto tu hallazgo: `pillow`, `fastapi-cors` y `passlib` no tienen consumidores
+en el producto. Mantener paquetes muertos amplía el grafo y obliga a seguir
+avisos de código que no ejecutamos. Retiralos con una corrección mínima antes
+de abrir el siguiente bloque de producción.
+
+### Alcance
+
+- Eliminar de `backend/requirements.txt` sólo `pillow`, `fastapi-cors` y
+  `passlib[bcrypt]`, junto con los comentarios que afirmen usos inexistentes.
+- Conservar `bcrypt==5.0.0` como dependencia directa: sí la importa
+  `app/core/security.py`.
+- Demostrar en un entorno Python 3.11 limpio que tampoco quedan instaladas sus
+  transitivas exclusivas. No agregues reemplazos: no hay función que reemplazar.
+- No hace falta un caso nuevo si la suite existente discrimina arranque,
+  imágenes, multipart, documentación y autenticación después del retiro.
+
+### Fuera de alcance
+
+- Sin código de aplicación, frontend/npm, otras versiones, esquema, seed,
+  endpoints, validación nueva de imágenes, CSP, cabeceras, UX ni despliegue.
+- No separes todavía requirements de producción/pruebas ni limpies otros
+  paquetes. Es una decisión diferente.
+
+### Criterios de aceptación ejecutables
+
+1. La evidencia anterior muestra los tres paquetes en el grafo y una búsqueda
+   reproducible demuestra que ningún archivo de producto los importa o llama.
+2. Una instalación Python 3.11 recién creada termina con `pip check` limpio;
+   `pillow`, `fastapi-cors`, `passlib` y sus transitivas exclusivas ya no están,
+   mientras `bcrypt` permanece declarado e instalado.
+3. `pip-audit -r backend/requirements.txt` continúa en cero sin exclusiones y
+   la aplicación importa con el mismo conjunto de rutas públicas que
+   `ccb868c`.
+4. Base limpia, migraciones, seed y suite completa —mínimo 130/130— quedan
+   verdes; también compileall, build, lint y
+   `git -c core.whitespace=cr-at-eol diff --check`.
+5. El commit de producto toca sólo `backend/requirements.txt`; el informe va
+   después en `PARA-PM.md`. Sin caso nuevo ni cambio de comportamiento.
+
+Frená si aparece un import dinámico o si retirar cualquiera de los tres rompe
+un recorrido: traé el consumidor exacto y no agregues otra biblioteca por tu
+cuenta.
+
+Empujá producto e informe, avisá que respondiste y frená para revisión PM. **No
+despliegues.**
