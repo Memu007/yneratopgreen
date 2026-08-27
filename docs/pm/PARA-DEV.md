@@ -3664,3 +3664,74 @@ las puertas completas quedan como evidencia de Dev porque PM no recreó la base.
 
 No hay tarea activa. No despliegues ni abras otra corrección: falta únicamente
 la confirmación visual de Emi sobre esta cabecera.
+
+## 2026-08-27 — Tarea activa única: SEC-1, retirar secretos de la consola de autenticación
+
+Emi autorizó reactivar a Dev para este cierre de seguridad independiente. La
+aceptación visual de UX-2D.1 continúa pendiente: esta tarea no la da por
+cerrada, no reabre diseño y no habilita despliegue.
+
+### Resultado esperado y prioridad
+
+El login actual escribe en la consola del navegador el correo, el usuario
+transformado y la respuesta completa de `/auth/login`; esa respuesta contiene
+`access_token` y `refresh_token`. Eliminá esa exposición sin cambiar el
+comportamiento de autenticación. Es un agujero ya reproducido, por lo que no se
+posterga a la auditoría general de Fase 5.
+
+Antes de editar, inspeccioná el flujo real de login, refresh y logout y todos
+los `console.*` del frontend que puedan imprimir credenciales, tokens,
+respuestas de autenticación o datos completos de cuenta. Leé la base CSRF
+aceptada en `NOW.md` y los cierres `6ece3fb` + `0f330a7`: Bearer/localStorage y
+la cookie reservada al callback MP no se rediseñan en esta pieza.
+
+### Alcance
+
+- Retirar o volver inocuos únicamente los logs que exponen correo de login,
+  credenciales, tokens, respuestas de autenticación o el objeto completo del
+  usuario.
+- Agregar una regresión automática sobre el login real que observe la consola y
+  falle si aparece el valor del access token, el refresh token, la contraseña,
+  el correo usado para ingresar o la respuesta/usuario completos.
+- Cubrir login correcto y rechazado; confirmar que refresh, sesión autenticada
+  y logout conservan el comportamiento actual.
+- Reutilizar la infraestructura de pruebas existente. Sin dependencia nueva.
+
+### Fuera de alcance
+
+- No mover tokens fuera de `localStorage`, cambiar cookies, CSRF, OAuth,
+  expiraciones, endpoints ni contratos de API.
+- Sin CSP, cabeceras HTTP, actualización masiva de dependencias, Backend,
+  migraciones, seed, pagos, catálogo, UX, copy ni despliegue.
+- No convertir esto en una auditoría general ni borrar logs operativos que no
+  contengan información sensible.
+
+### Criterios de aceptación ejecutables
+
+1. Mostrá la regresión en rojo contra el estado anterior: un login válido debe
+   detectar al menos el token o la respuesta completa en consola. Restaurá el
+   árbol antes de implementar; la rotura no se versiona.
+2. Después del cambio, la misma prueba completa login válido e inválido y no
+   encuentra access token, refresh token, contraseña, correo de ingreso,
+   respuesta de autenticación ni objeto completo de usuario en ningún nivel de
+   consola.
+3. Login, sesión protegida, refresh y logout continúan funcionando con el
+   mecanismo actual; la regresión compara comportamiento antes/después y no
+   acepta ocultar un fallo de autenticación.
+4. Quedan verdes la prueba nueva, `npm run build`, `npm run lint`, la suite
+   oficial completa desde base limpia y
+   `git -c core.whitespace=cr-at-eol diff --check`.
+5. El diff queda limitado al mínimo necesario para este hallazgo, su prueba y
+   el informe. No hay dependencia nueva ni cambio visual.
+
+### Freno obligatorio
+
+Frená antes de ampliar si la fuga no se puede cerrar sin cambiar el modelo de
+sesión aceptado, si encontrás secretos emitidos por Backend o una dependencia,
+o si la prueba exige tocar infraestructura fuera del repositorio. Informá la
+fuente, reproducción y mínima opción; no improvises otro modelo de auth.
+
+Entregá un commit de producto y otro con el informe en `PARA-PM.md`. El informe
+debe traer archivos, rojo/verde, comandos y salidas resumidas, riesgos
+residuales y ambos hashes. Empujá los dos y frená para revisión PM. **No
+despliegues.**
