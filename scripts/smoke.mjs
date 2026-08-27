@@ -12846,6 +12846,170 @@ await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Servicios, y s�
     + 'y «Cuenta» en celular, el buscador con su texto por ancho y cero desborde horizontal';
 });
 
+await runCase(129, 'El ingreso no deja la credencial escrita en la consola del navegador', async () => {
+  // El login imprimía en consola el correo con el que se entra, la respuesta
+  // completa de `/auth/login` —que trae `access_token` y `refresh_token`— y el
+  // objeto entero del usuario. Cualquier cosa que corra en la página lee eso:
+  // una extensión, un script de terceros, alguien mirando la pantalla del
+  // soporte técnico. Este caso mira la consola mientras se entra de verdad.
+  //
+  // No alcanza con escuchar el evento `console` de Playwright: cuando el
+  // argumento es un objeto, el evento entrega «JSHandle@object» y el token no
+  // aparece. Se espía la consola desde adentro de la página, serializando cada
+  // argumento, que es lo que ve de verdad quien está en el mismo documento.
+  const CUENTA = { email: 'cliente@ejemplo.com', password: 'cliente123' };
+
+  const ESPIA = () => {
+    window.__consolaEspiada = [];
+    const serializar = (valor) => {
+      if (typeof valor === 'string') return valor;
+      if (valor instanceof Error) return `${valor.name}: ${valor.message} ${valor.stack || ''}`;
+      try {
+        return JSON.stringify(valor);
+      } catch (error) {
+        return String(valor);
+      }
+    };
+    for (const nivel of ['log', 'info', 'debug', 'warn', 'error', 'trace', 'table', 'dir']) {
+      const original = typeof console[nivel] === 'function' ? console[nivel].bind(console) : null;
+      console[nivel] = (...args) => {
+        try {
+          window.__consolaEspiada.push(`${nivel}: ${args.map(serializar).join(' ')}`);
+        } catch (error) { /* espiar no puede romper la página */ }
+        if (original) original(...args);
+      };
+    }
+  };
+
+  const leerConsola = (page) => page.evaluate(() => (window.__consolaEspiada || []).join('\n'));
+  const guardado = (page, clave) => page.evaluate((k) => localStorage.getItem(k), clave);
+
+  const browser = await chromium.launch({ headless: true });
+  const hallazgos = [];
+  try {
+    // --- 1. Ingreso válido, mirando la consola ---------------------------
+    const contexto = await browser.newContext();
+    await contexto.addInitScript(ESPIA);
+    const page = await contexto.newPage();
+    const eventos = [];
+    page.on('console', (m) => eventos.push(`${m.type()}: ${m.text()}`));
+
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+    await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    await page.getByPlaceholder('tu@email.com').fill(CUENTA.email);
+    await page.getByPlaceholder('••••••••').fill(CUENTA.password);
+    await page.locator('[class*="_submitButton_"][type="submit"]').click();
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().waitFor({ state: 'visible', timeout: 25_000 });
+
+    const acceso = await guardado(page, 'access_token');
+    const refresco = await guardado(page, 'refresh_token');
+    assert(acceso && refresco, 'el ingreso no dejó el par de tokens en el navegador');
+
+    const consola = await leerConsola(page);
+    const [cuentaEnBase] = queryRows(
+      `SELECT id::text, 'fin' FROM users WHERE email = ${sqlLiteral(CUENTA.email)}`);
+    assert(cuentaEnBase, 'la cuenta de prueba no está en la base');
+
+    // Los valores exactos que no pueden estar escritos en ningún nivel.
+    const PROHIBIDO = [
+      ['el access token', acceso],
+      ['el refresh token', refresco],
+      ['la contraseña', CUENTA.password],
+      ['el correo de ingreso', CUENTA.email],
+      ['el identificador de la cuenta', cuentaEnBase[0]],
+    ];
+    for (const [que, valor] of PROHIBIDO) {
+      if (consola.includes(valor)) hallazgos.push(`${que} quedó impreso en la consola`);
+    }
+    // Y la forma: la respuesta de autenticación entera, con sus claves.
+    if (/access_token|refresh_token|token_type/.test(consola)) {
+      hallazgos.push('la consola imprimió la respuesta de autenticación');
+    }
+    assert(hallazgos.length === 0,
+      `${hallazgos.join('; ')}\n--- consola ---\n${consola.slice(0, 900)}`);
+
+    // El evento de Playwright se mira igual, por si algo escribe fuera del
+    // `console` envuelto: no prueba lo mismo, pero no cuesta nada.
+    const crudo = eventos.join('\n');
+    for (const [que, valor] of PROHIBIDO) {
+      assert(!crudo.includes(valor), `${que} salió por el evento de consola`);
+    }
+
+    // --- 2. La sesión sirve: una pantalla protegida carga ----------------
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
+    await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+
+    // --- 3. El refresh automático sigue vivo ------------------------------
+    //     Se rompe el access token guardado y se pide algo protegido que no
+    //     sea de `/auth/`: el envoltorio tiene que renovar con el refresh y
+    //     reintentar sin que la persona se entere.
+    const roto = `${acceso.slice(0, -6)}xxxxxx`;
+    await page.evaluate((t) => localStorage.setItem('access_token', t), roto);
+    await page.getByRole('button', { name: /Notificaciones/ }).first().click();
+    await page.waitForTimeout(2500);
+    const accesoRenovado = await guardado(page, 'access_token');
+    assert(accesoRenovado && accesoRenovado !== roto,
+      'el access token roto no se renovó: el refresh automático dejó de funcionar');
+    assert(await page.getByRole('heading', { name: 'Mi Panel' }).isVisible(),
+      'la sesión se cayó al renovar el token');
+
+    // Y la renovación tampoco se imprime.
+    const consolaTrasRefresh = await leerConsola(page);
+    for (const valor of [accesoRenovado, await guardado(page, 'refresh_token')]) {
+      assert(valor && !consolaTrasRefresh.includes(valor),
+        'la renovación del token quedó impresa en la consola');
+    }
+
+    // --- 4. Salir limpia lo que tiene que limpiar -------------------------
+    await page.getByRole('button', { name: 'Cerrar' }).first().click().catch(() => {});
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(600);
+    await page.getByRole('button', { name: 'Salir', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).first()
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    assert(await guardado(page, 'access_token') === null
+      && await guardado(page, 'refresh_token') === null,
+      'salir dejó tokens guardados en el navegador');
+
+    await contexto.close();
+
+    // --- 5. Ingreso rechazado: tampoco escribe lo que se intentó ---------
+    const contexto2 = await browser.newContext();
+    await contexto2.addInitScript(ESPIA);
+    const page2 = await contexto2.newPage();
+    await page2.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page2.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+    await page2.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    await page2.getByPlaceholder('tu@email.com').fill(CUENTA.email);
+    await page2.getByPlaceholder('••••••••').fill('contrasena-que-no-es');
+    await page2.locator('[class*="_submitButton_"][type="submit"]').click();
+    await page2.getByText(/incorrect|no está confirmada/i).first()
+      .waitFor({ state: 'visible', timeout: 20_000 });
+
+    const consolaRechazo = await leerConsola(page2);
+    for (const [que, valor] of [
+      ['el correo intentado', CUENTA.email],
+      ['la contraseña intentada', 'contrasena-que-no-es'],
+    ]) {
+      assert(!consolaRechazo.includes(valor),
+        `${que} quedó impreso al rechazar el ingreso\n--- consola ---\n${consolaRechazo.slice(0, 600)}`);
+    }
+    assert(await guardado(page2, 'access_token') === null,
+      'un ingreso rechazado guardó un token');
+
+    await contexto2.close();
+  } finally {
+    await browser.close();
+  }
+
+  return 'con un ingreso válido no aparecen en ningún nivel de consola el access token, el '
+    + 'refresh token, la contraseña, el correo de ingreso, el identificador de la cuenta ni '
+    + 'la respuesta de autenticación; la sesión abre una pantalla protegida, el refresh '
+    + 'automático renueva un access token roto sin imprimirlo y salir borra el par; y un '
+    + 'ingreso rechazado no escribe lo que se intentó ni guarda nada';
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

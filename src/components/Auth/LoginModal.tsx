@@ -34,7 +34,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSwitchToRegis
       showToast('¡Bienvenido/a de nuevo!', 'success');
       onClose();
     } catch (err) {
-      console.error('❌ Error en login modal:', err);
+      // El mismo criterio que en el contexto: se registra el mensaje que se
+      // le muestra a la persona, no el objeto que lo trae.
+      console.error('Fallo el ingreso desde el formulario:', err instanceof Error ? err.message : 'error desconocido');
       const errorMessage = err instanceof Error ? err.message : 'Email o contraseña incorrectos';
       setError(errorMessage);
       setFaltaConfirmar(/no está confirmada/i.test(errorMessage));

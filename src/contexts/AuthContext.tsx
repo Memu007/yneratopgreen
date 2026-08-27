@@ -137,27 +137,34 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
         throw new Error('Email y contraseña son requeridos');
       }
 
-      console.log('🔄 Intentando login con:', email);
-      
+      // Acá no se escribe nada en la consola.
+      //
+      // El ingreso manejaba, en cuatro líneas seguidas, el correo con el que
+      // se entra, la respuesta completa de `/auth/login` —que trae el par de
+      // tokens— y el objeto entero del usuario, con teléfono, ubicación, CBU y
+      // alias bancario. Todo eso lo lee cualquier cosa que corra en la misma
+      // página: una extensión del navegador, un script de terceros, alguien
+      // parado atrás de la pantalla. Era rastro de depuración, no información
+      // que alguien necesite: el resultado del ingreso ya se ve en la interfaz
+      // —el aviso de bienvenida, la cuenta en la cabecera— y el rechazo llega
+      // con su mensaje al formulario. El caso 129 de la suite lo vigila.
       const response = await apiPost<AuthResponse>('/auth/login', {
         email,
         password,
       });
-
-      console.log('✅ Respuesta del backend:', response);
 
       // Guardar tokens en localStorage
       if (response.access_token) {
         tokenStorage.setTokens(response.access_token, response.refresh_token);
       }
 
-      const frontendUser = mapBackendUserToFrontend(response.user);
-
-      console.log('✅ Usuario transformado:', frontendUser);
-      setUser(frontendUser);
-      console.log('✅ Login exitoso');
+      setUser(mapBackendUserToFrontend(response.user));
     } catch (error) {
-      console.error('❌ Error en login:', error);
+      // El error que llega acá es el mensaje que se le muestra a la persona,
+      // sin credencial adentro. Se registra el mensaje y no el objeto: si
+      // alguna vez el envoltorio de red empieza a adjuntar la respuesta, el
+      // rastro no se lleva puesto lo que venga con ella.
+      console.error('Fallo el ingreso:', error instanceof Error ? error.message : 'error desconocido');
       if (error instanceof Error) {
         throw error;
       }
