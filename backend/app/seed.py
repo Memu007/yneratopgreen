@@ -14,14 +14,60 @@ from app.models.category import Category
 from app.models.subcategory import Subcategory
 from app.models.form_option import FormOption
 from app.models.locality import Locality
+from app.core.config import settings
 from app.core.security import hash_password
 from app.seed_localities import seed_localities
 from app.services import anatomia
 from datetime import datetime
 
 
+# Este archivo crea cuatro cuentas con correos y contraseñas escritos acá
+# adentro. En una base de verdad eso son accesos públicos y predecibles, así que
+# el seed sólo corre donde los datos son descartables.
+#
+# La lista dice dónde SÍ, no dónde no. Es a propósito: con una lista de entornos
+# prohibidos se colarían `ENV=produccion`, `ENV=prod`, `ENV=Production` o un
+# `ENV` vacío. Acá, si no consta que el entorno es de desarrollo, se trata como
+# producción y no se toca la base. Los dos únicos valores que el proyecto
+# documenta son `local` —`backend/.env.example`— y `production`
+# —`backend/.env.production.example` y `RAILWAY.md`—.
+#
+# No hay variable de escape a propósito: un `ALLOW_SEED` se enciende para salir
+# del paso y queda encendido para siempre. Para sembrar una base descartable se
+# pone `ENV=local`, que es un acto visible y deliberado.
+ENTORNOS_CON_SEED = frozenset({"local"})
+
+
+class EntornoNoAptoParaSeed(RuntimeError):
+    """El seed de demostración no corre fuera de un entorno descartable."""
+
+
+def exigir_entorno_con_seed():
+    """Corta antes de abrir la sesión si el entorno no es descartable.
+
+    Va primero que todo: no consulta, no escribe y no abre `SessionLocal`. El
+    mensaje dice qué pasó y qué hace falta, y no nombra ninguna credencial.
+    """
+    entorno = (settings.ENV or "").strip().lower()
+    if entorno not in ENTORNOS_CON_SEED:
+        admitidos = ", ".join(sorted(ENTORNOS_CON_SEED))
+        raise EntornoNoAptoParaSeed(
+            f"El seed de demostración no corre con ENV={settings.ENV!r}. "
+            f"Sólo corre con ENV en: {admitidos}. "
+            "Crea cuentas de demostración con credenciales conocidas y "
+            "escritas en el repositorio: sobre una base real serían accesos "
+            "públicos y predecibles. No se abrió ninguna conexión ni se "
+            "escribió ninguna fila."
+        )
+
+
 def create_seed_data():
     """Crear datos iniciales en la base de datos"""
+
+    # Primero el freno y despues la base: si el entorno no corresponde, esta
+    # funcion termina sin haber tocado nada.
+    exigir_entorno_con_seed()
+
     
     db = SessionLocal()
     
@@ -1198,4 +1244,12 @@ def create_seed_data():
 
 
 if __name__ == "__main__":
-    create_seed_data()
+    # La entrada por linea de comandos tambien frena, y frena fuerte: mensaje a
+    # la salida de error y estado distinto de cero, para que un `&&` de un
+    # script de despliegue no siga como si nada. `create_seed_data` ya corto
+    # antes de abrir la base; aca solo se traduce a algo que el shell entienda.
+    try:
+        create_seed_data()
+    except EntornoNoAptoParaSeed as error:
+        print(f"\n⛔ {error}", file=sys.stderr)
+        raise SystemExit(2)

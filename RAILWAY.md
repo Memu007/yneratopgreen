@@ -64,9 +64,10 @@ entorno del servicio, nunca en el repositorio. Ver
 `Settings` **rechaza toda clave que no declara** cuando la lee de un archivo.
 Las variables de Railway llegan por entorno, así que una clave de más no
 tumba el arranque, pero tampoco hace nada: no agregues `ADMIN_EMAIL`,
-`ADMIN_PASSWORD` ni `ADMIN_NAME`, que ya no existen. Las credenciales del
-administrador del seed son `admin@topgreen.com` / `admin123` y están escritas
-en `backend/app/seed.py`.
+`ADMIN_PASSWORD` ni `ADMIN_NAME`, que ya no existen. Tampoco hay administrador
+preexistente: las cuentas de demostración con contraseña escrita en el
+repositorio son del seed, y el seed no corre en producción —ver más abajo—. El
+primer administrador se crea a mano sobre la base ya migrada.
 
 El entrypoint acepta tanto `postgresql://` como `postgres://` de Railway y los
 adapta al driver `psycopg` instalado. Antes de cada despliegue Railway ejecuta
@@ -77,14 +78,26 @@ despliegues, agregá un volumen al servicio `Backend` montado en `/data`. Sin
 ese volumen, cada despliegue empieza con `/data` vacío: se pierden las
 imágenes subidas y los mensajes del outbox.
 
-El seed no corre solo. Para cargar el catálogo de demostración, una vez y
-desde la consola del servicio `Backend`:
+**El seed de demostración no corre acá, y ya no puede.** `python -m app.seed`
+crea cuatro cuentas cuyos correos y contraseñas están escritos en
+`backend/app/seed.py`, o sea en el repositorio: sobre una base de verdad serían
+accesos públicos y predecibles. Desde la consola del servicio `Backend`, con
+`ENV=production`, el comando termina con estado 2 y este mensaje, sin abrir
+ninguna conexión ni escribir ninguna fila:
 
-```bash
-python -m app.seed
+```
+⛔ El seed de demostración no corre con ENV='production'. Sólo corre con ENV en: local.
 ```
 
-Es idempotente: repetirlo no duplica nada.
+El freno mira `ENV` y sólo deja pasar `local`. No hay variable para saltearlo:
+una de esas se enciende «un momentito» y queda encendida. Si hace falta una base
+con datos de demostración, se siembra donde los datos son descartables —una base
+local con `ENV=local`— y no acá.
+
+Un despliegue con datos reales no necesita ese seed: las migraciones crean el
+esquema y la primera cuenta se registra desde la aplicación. El padrón oficial
+de localidades, que no trae ninguna credencial, sigue disponible aparte con
+`python -m app.seed_localities`.
 
 ## 3. Frontend
 

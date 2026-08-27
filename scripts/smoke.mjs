@@ -13514,6 +13514,117 @@ print(json.dumps(medidas))
     + 'vez y con los mismos valores que 200/401/404, sin filtrar la excepcion';
 });
 
+await runCase(132, 'El seed de demostracion se niega a correr fuera de un entorno descartable', async () => {
+  // `python -m app.seed` crea cuatro cuentas con correos y contrasenas escritos
+  // en el repositorio. Sobre una base de verdad eso son accesos publicos y
+  // predecibles, y hasta ahora `ENV=production` no cambiaba nada: el seed corria
+  // igual, escribia siete tablas y despues imprimia las tres credenciales.
+  //
+  // Este caso NO toca ninguna base. Le pasa al seed una `DATABASE_URL` que
+  // apunta a un puerto muerto: si el freno funciona, el proceso corta antes de
+  // intentar conectarse y nunca se entera de que esa base no existe. Y si
+  // alguien sacara el freno, el unico dano posible seria un error de conexion.
+  const BASE_INEXISTENTE = 'postgresql+psycopg://nadie:nada@127.0.0.1:59999/no_existe';
+
+  const correrSeed = (entorno) => {
+    const argumentos = ['exec', '-i'];
+    if (entorno !== null) argumentos.push('-e', `ENV=${entorno}`);
+    argumentos.push('-e', `DATABASE_URL=${BASE_INEXISTENTE}`,
+      'topgreen-api', 'python', '-m', 'app.seed');
+    const r = spawnSync('docker', argumentos, { encoding: 'utf8' });
+    return { estado: r.status, salida: r.stdout || '', error: r.stderr || '' };
+  };
+
+  // --- A. El entorno productivo documentado ---------------------------------
+  const produccion = correrSeed('production');
+  assert(produccion.estado === 2,
+    `con ENV=production el seed salio con ${produccion.estado} y tiene que salir con 2`);
+  assert(/no corre con ENV/.test(produccion.error),
+    `el rechazo no explica que paso: ${JSON.stringify(produccion.error.slice(0, 200))}`);
+
+  // Un rechazo que igual intento conectarse no es un rechazo: seria una carrera
+  // perdida por poco. El puerto muerto lo delata.
+  for (const rastro of ['connection', 'could not connect', 'OperationalError',
+    'psycopg', '59999']) {
+    assert(!new RegExp(rastro, 'i').test(produccion.error),
+      `el seed llego a tocar la base antes de frenar: aparece "${rastro}"`);
+  }
+  assert(produccion.salida.trim() === '',
+    `el rechazo escribio en la salida normal: ${JSON.stringify(produccion.salida.slice(0, 200))}`);
+
+  // --- B. Y no se le escapa una credencial ----------------------------------
+  // Los correos y contrasenas viven en el seed; el mensaje de rechazo no los
+  // puede repetir, porque va a parar a la consola de un servicio desplegado.
+  const todo = produccion.salida + produccion.error;
+  for (const credencial of ['admin@topgreen.com', 'vendedor@ejemplo.com',
+    'cliente@ejemplo.com', 'transportista@ejemplo.com',
+    'admin123', 'vendedor123', 'cliente123', 'transportista123']) {
+    assert(!todo.includes(credencial),
+      `el rechazo nombra la credencial demo ${credencial}`);
+  }
+
+  // --- C. La lista dice donde SI, asi que un valor raro tambien se frena ----
+  // Con una lista de prohibidos, cualquiera de estos se colaba.
+  const rechazados = [];
+  for (const entorno of ['Production', 'PRODUCTION', 'prod', 'produccion',
+    'staging', '', '  ']) {
+    const r = correrSeed(entorno);
+    assert(r.estado === 2,
+      `con ENV=${JSON.stringify(entorno)} el seed salio con ${r.estado} en vez de 2`);
+    rechazados.push(JSON.stringify(entorno));
+  }
+
+  // --- D. Y local sigue pasando, sin sembrar nada acá ------------------------
+  // Se pregunta por la funcion del freno, no por el seed entero: correrlo seria
+  // sembrar una base en medio de la suite.
+  const guion = `
+import json
+from app.seed import exigir_entorno_con_seed, ENTORNOS_CON_SEED
+resultado = {"admitidos": sorted(ENTORNOS_CON_SEED)}
+for entorno in ("local", "LOCAL", " local "):
+    import app.core.config as configuracion
+    configuracion.settings.ENV = entorno
+    try:
+        exigir_entorno_con_seed()
+        resultado[entorno] = "pasa"
+    except Exception as error:
+        resultado[entorno] = f"frena: {type(error).__name__}"
+print(json.dumps(resultado))
+`;
+  const crudo = execFileSync(
+    'docker',
+    ['exec', '-i', 'topgreen-api', 'python', '-c', guion],
+    { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
+  );
+  const permitidos = JSON.parse(crudo.trim().split(/\r?\n/).at(-1));
+  for (const entorno of ['local', 'LOCAL', ' local ']) {
+    assert(permitidos[entorno] === 'pasa',
+      `ENV=${JSON.stringify(entorno)} tendria que pasar y ${permitidos[entorno]}`);
+  }
+  assert(permitidos.admitidos.length === 1 && permitidos.admitidos[0] === 'local',
+    `la lista de entornos admitidos crecio: ${JSON.stringify(permitidos.admitidos)}`);
+
+  // --- E. Y no hay puerta trasera -------------------------------------------
+  // Un `ALLOW_SEED` se enciende para salir del paso y queda encendido. Si
+  // alguien agrega uno, este caso lo dice el mismo dia.
+  // Se miran las lineas de codigo, no los comentarios: el propio archivo explica
+  // por que NO hay un `ALLOW_SEED`, y esa explicacion no es una puerta trasera.
+  const fuente = readFileSync('backend/app/seed.py', 'utf8')
+    .split(/\r?\n/)
+    .filter((l) => !/^\s*#/.test(l))
+    .join('\n');
+  for (const puerta of ['ALLOW_', 'FORCE_', 'SKIP_', 'os.environ', 'getenv']) {
+    assert(!fuente.includes(puerta),
+      `app/seed.py incorpora ${puerta}: el freno no puede tener un interruptor`);
+  }
+
+  return `ENV=production: salida 2, sin abrir conexion —la base apuntaba a un puerto muerto y `
+    + `no hubo ni un error de conexion—, sin escribir en la salida normal y sin nombrar `
+    + `ninguna de las ocho credenciales demo. Tambien rechaza ${rechazados.join(', ')}. `
+    + `La lista dice donde SI: admitidos = ${JSON.stringify(permitidos.admitidos)}, y local `
+    + `pasa con mayusculas y con espacios. Sin ALLOW_/FORCE_/SKIP_ ni lectura suelta del entorno`;
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 
