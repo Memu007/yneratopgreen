@@ -2,223 +2,184 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-Fecha: 2026-08-27. Vigésimo octavo informe: **SEC-2, el entorno Python sin
-vulnerabilidades conocidas**.
+Fecha: 2026-08-27. Vigésimo noveno informe: **SEC-2.1, se van tres
+dependencias que nadie importa**.
 
 Un commit de producto y este informe.
 
 | Commit | Qué trae |
 |---|---|
-| `ccb868c` | Los pins nuevos, el reemplazo de `python-jose` por PyJWT y el caso 130 |
+| `c05e0fb` | El retiro de `pillow`, `fastapi-cors` y `passlib` en `backend/requirements.txt` |
 | este | Este informe: el commit inmediatamente posterior en `main` |
 
 ---
 
-## 1. El rojo, reproducido hoy
+## 1. La prueba de que no hay consumidores
 
-Entorno Python 3.11.15 recién creado, `backend/requirements.txt` instalado,
-`pip-audit 2.10.1`. Lo medí de las dos formas y dan lo mismo:
+Tres formas independientes, todas reproducibles.
 
-```
-$ pip-audit -r backend/requirements.txt
-Found 40 known vulnerabilities in 7 packages
-$ pip-audit --no-deps -r <freeze del entorno>
-Found 40 known vulnerabilities in 7 packages
-```
-
-| Paquete | Versión | Avisos | IDs distintos | Corregido en |
-|---|---|---|---|---|
-| `pillow` | 10.2.0 | 22 | 15 | 12.3.0 |
-| `starlette` | 0.35.1 | 9 | 7 | 1.3.1 |
-| `python-jose` | 3.3.0 | 5 | 3 | 3.4.0 |
-| `fastapi` | 0.109.0 | 1 | 1 | 0.109.1 |
-| `pytest` | 7.4.4 | 1 | 1 | 9.0.3 |
-| `python-dotenv` | 1.0.0 | 1 | 1 | 1.2.2 |
-| `ecdsa` | 0.19.2 | 1 | 1 | **ninguna** |
-
-Los 40 de la corrida de hoy, no los 40 de la tuya: coinciden en número pero
-trabajé contra los IDs de esta corrida, como pediste.
-
-Un detalle de método, por si volvés a medirlo: si instalás `pip-audit` **dentro
-del mismo entorno** que auditás, aparece un octavo paquete —`setuptools`— que
-no es del proyecto sino de la herramienta y del propio `venv`. Lo aislé en un
-entorno aparte para que el número sea del grafo del producto.
-
-## 2. El único hallazgo sin arreglo por versión, y qué hice
-
-**`ecdsa 0.19.2` — PYSEC-2026-1325 / CVE-2024-23342.** Es el ataque de
-temporización Minerva sobre la curva P-256. La descripción del propio aviso lo
-dice: *«The python-ecdsa project considers side channel attacks out of scope
-for the project and there is no planned fix.»* No hay ni va a haber versión
-corregida.
-
-`ecdsa` no está en nuestra lista: entra como dependencia de `python-jose`, en
-**todas** sus versiones. Lo comprobé instalando `python-jose[cryptography]==3.5.0`
-—la última— en un entorno limpio: el paquete queda sin avisos propios, pero
-sigue arrastrando `ecdsa==0.19.2` y el auditor sigue devolviendo uno.
-
-**Exposición real en TopGreen: ninguna ejecución.** Firmamos y validamos con
-**HS256**, que es HMAC-SHA256 y no toca curva elíptica en ningún punto. `ecdsa`
-estaba instalado y nunca se ejecutaba. Es presencia en la cadena de suministro,
-no un camino explotable acá.
-
-Pero el criterio que fijaste es `pip-audit` en cero y sin `--ignore-vuln`, y
-con `python-jose` eso es inalcanzable por definición. Así que apliqué la
-cláusula que dejaste abierta —reemplazar la librería si queda encerrada en la
-implementación interna y conserva formato de tokens, algoritmos, expiraciones,
-errores y contratos— y pasé a **PyJWT**, que no depende de `ecdsa`.
-
-Antes de hacerlo comprobé que el cambio es de librería y no de contrato.
-
-## 3. La prueba de que nadie pierde la sesión
-
-Con el entorno viejo todavía instalado en paralelo, emití el mismo token con
-las dos librerías: mismas reclamaciones, mismo secreto, mismo algoritmo,
-vencimiento fijo para que la comparación signifique algo.
+**Búsqueda de texto sobre todo el backend**, incluyendo los tres paquetes y las
+dos transitivas que arrastra `fastapi-cors`:
 
 ```
-1) PyJWT lee el token de python-jose:
-   {"exp": 1893499200, "sub": "1111…5555", "type": "access"}
-2) python-jose lee el token de PyJWT:
-   {"exp": 1893499200, "sub": "1111…5555", "type": "access"}
-3) los dos tokens son idénticos byte a byte:  SI
-5) decode_token() del producto acepta el token de python-jose:
-   {'sub': '1111…5555', 'exp': 1893499200, 'type': 'access'}
-   token vencido -> None
+$ grep -rniE "\b(pil|pillow|passlib|fastapi_cors|fastapi-cors|environs|marshmallow)\b" \
+    backend/ --include=*.py --include=*.ini --include=*.cfg --include=*.toml --include=*.sh
+(sin resultados)
 ```
 
-**Byte a byte.** Misma cabecera, misma carga, misma firma. Las sesiones abiertas
-en los navegadores siguen siendo válidas después del despliegue, y si algún día
-hubiera que volver atrás, los tokens emitidos por PyJWT los lee python-jose.
+**Ausencia de import dinámico**, que es lo que podría esconder un consumidor de
+una búsqueda de texto:
 
-El código tocado son tres líneas en un solo archivo,
-`backend/app/core/security.py`: el `import`, y el `except JWTError` que pasa a
-`except PyJWTError`. Las tres llamadas —dos `encode`, un `decode`— tienen la
-misma firma en las dos librerías. El extra `[crypto]` queda puesto para no
-achicar los algoritmos que `JWT_ALGORITHM` puede pedir.
+```
+$ grep -rnE "importlib|__import__|\bexec\(|\beval\(|pkgutil|entry_points" \
+    backend/app backend/alembic --include=*.py
+(sin resultados)
+```
 
-## 4. El caso 130
+**Recorrido del árbol sintáctico** de cada `.py` de `app/` y `alembic/`. Esto
+resuelve también los imports perezosos, los que viven adentro de una función y
+no arriba del archivo:
 
-El riesgo de este cambio no es que deje de andar —eso lo ve cualquier caso de
-login—, es que el token cambie de forma sin que nadie lo note. Así que el caso
-nuevo fija el contrato del token **sin usar ninguna librería de JWT**: parte la
-cadena a mano, decodifica cabecera y carga, y recalcula la firma con
-HMAC-SHA256 crudo. Si mañana se cambia otra vez de librería, esto sigue
-diciendo si el token es el mismo token.
+```
+modulos de primer nivel importados por el producto: 43
+sospechosos encontrados: ninguno
+los que importa de verdad (terceros): alembic, bcrypt, boto3, botocore,
+  cloudinary, cryptography, fastapi, geoalchemy2, httpx, jwt, pydantic,
+  pydantic_settings, sqlalchemy, structlog
+```
 
-Exige, para el de acceso y el de refresco:
+Que ese método sí encuentra imports perezosos lo demuestra su propio resultado:
+`boto3`, `botocore` y `cloudinary` aparecen ahí y **no están en la lista de
+dependencias**. No es un problema: son los respaldos opcionales de
+almacenamiento en `app/services/storage.py`, importados adentro de la función
+que los usa y con un `ImportError` que dice qué instalar si alguien enciende
+ese camino. Lo menciono porque explica por qué el recorrido devuelve nombres
+que no están en `requirements.txt`, y porque confirma que el barrido ve lo que
+tiene que ver.
 
-- cabecera exactamente `{"alg":"HS256","typ":"JWT"}`;
-- `sub` igual a la cuenta que entró, `type` correcto, `exp` entero y a la
-  distancia que declara la configuración —15 minutos y 30 días—;
-- **y nada más**: las claves son exactamente `exp,sub,type`, así que el token
-  no lleva la cuenta adentro;
-- la firma verificada recalculando HMAC-SHA256 con el secreto, fuera de PyJWT.
+## 2. Qué hace cada uno, y por qué ninguno hace falta
 
-Y que se rechacen con 401: un token con el sujeto cambiado y firmado con otro
-secreto, uno que dice `alg=none`, y uno vencido pero bien firmado.
+- **`pillow`** estaba bajo el comentario «Validación de imágenes». La
+  validación de imágenes que existe es por extensión —`.jpg`, `.jpeg`, `.png`,
+  `.webp`— y por `content_type`, en `app/api/products.py`. Ningún archivo abre
+  una imagen.
+- **`fastapi-cors`** estaba bajo «CORS y middleware». El CORS del producto sale
+  de `fastapi.middleware.cors.CORSMiddleware`, en `app/main.py`, que viene con
+  FastAPI. El paquete sólo servía para arrastrar `environs`.
+- **`passlib`** estaba bajo «Autenticación». El hasheo es `bcrypt` directo en
+  `app/core/security.py`: `bcrypt.gensalt()`, `bcrypt.hashpw()`,
+  `bcrypt.checkpw()`.
 
-**Prueba en rojo**: le agregué a propósito una reclamación `iss` al token y el
-caso falla con «el token de acceso lleva reclamaciones de más: exp,iss,sub,type».
-Restauré el archivo; la rotura no está versionada.
+**`bcrypt` se queda**, con su pin propio. Y quiero marcarlo porque es la razón
+por la que este retiro es seguro: hasta SEC-2, `bcrypt` entraba de prestado
+como transitiva de `passlib[bcrypt]`. Si hubiéramos sacado `passlib` antes de
+declararlo, nos habríamos llevado puesto el hasheo de contraseñas sin que
+ningún archivo cambiara. El pin que agregué la entrega pasada es lo que
+convierte esto en un cambio de una línea y no en un incidente.
 
-## 5. El resto de los pins
+## 3. Las transitivas exclusivas
 
-| Paquete | Antes | Ahora | Por qué |
-|---|---|---|---|
-| `fastapi` | 0.109.0 | **0.133.0** | Es la versión más baja que deja de acotar Starlette por debajo de 1.0. Sin eso no se puede llegar a Starlette 1.3.1. |
-| `starlette` | 0.35.1 transitiva | **1.3.1 con pin propio** | Primera versión sin avisos abiertos. Entra como pin explícito: la versión la decide la lista, no lo que quede resuelto. |
-| `pydantic[email]` | 2.5.3 | **2.7.0** | Es el mínimo que exige FastAPI 0.133. No subí más. |
-| `pillow` | 10.2.0 | **12.3.0** | 22 de los 40 avisos. |
-| `pytest` | 7.4.4 | **9.0.3** | El aviso pide 9.0.3. |
-| `pytest-asyncio` | 0.23.3 | **1.4.0** | 0.23 exige `pytest < 8`: subir uno obliga al otro. |
-| `python-dotenv` | 1.0.0 | **1.2.2** | El aviso pide 1.2.2. |
-| `python-jose[cryptography]` | 3.3.0 | **fuera** | Explicado arriba. |
-| `PyJWT[crypto]` | — | **2.13.0** | Lo reemplaza. |
-| `bcrypt` | transitiva | **5.0.0 con pin propio** | Ver abajo. |
+```
+$ pip show fastapi-cors | grep Requires   -> environs, fastapi
+$ pip show environs     | grep Required-by-> fastapi_cors
+$ pip show marshmallow  | grep Required-by-> environs
+$ pip show passlib      | grep Required-by-> (nadie)
+$ pip show pillow       | grep Required-by-> (nadie)
+```
 
-**`bcrypt` merecía su propio pin.** `app/core/security.py` lo importa directo
-—`import bcrypt`— y hasta ahora entraba de prestado, como transitiva de
-`passlib[bcrypt]`. Es decir: la única dependencia que hashea contraseñas no
-estaba declarada, y sobrevivía porque otra cosa la arrastraba. La versión
-resuelta es la misma que ya había; lo que cambia es que ahora está escrita.
+`environs` la pedía sólo `fastapi-cors`; `marshmallow` la pedía sólo
+`environs`. Las dos se van con él. `environs` también pedía `python-dotenv`,
+que declaramos por nuestra cuenta y se queda.
 
-Todo lo demás quedó donde estaba. No subí nada por decoración.
+## 4. El grafo, antes y después
 
-## 6. Una consecuencia del salto, tres líneas
-
-FastAPI 0.133 deprecó `regex=` en favor de `pattern=` y lo avisa en cada
-arranque. Son tres usos en `backend/app/api/catalog.py` —`publication_type`,
-`sort_by` y `sort_order`—, con el mismo valor de expresión regular. Los cambié:
-es consecuencia directa de este salto, no limpieza lateral, y `pattern` ya
-existía en la versión anterior, así que el cambio es compatible en las dos
-direcciones.
-
-## 7. El verde
+Entorno Python 3.11.15 recién creado en los dos casos.
 
 ```
 $ pip check
 No broken requirements found.
+
+$ diff <(grafo de ccb868c) <(grafo de ahora)
+< environs==15.1.0
+< fastapi_cors==0.0.6
+< marshmallow==4.3.1
+< passlib==1.7.4
+< pillow==12.3.0
+```
+
+Cinco paquetes menos y ni uno más: 52 → **47**. La diferencia es exactamente la
+esperada, sin efectos de costado.
+
+```
 $ pip-audit -r backend/requirements.txt
 No known vulnerabilities found
-$ pip-audit --no-deps -r <freeze del entorno nuevo>
+$ pip-audit --no-deps -r <freeze del entorno>
 No known vulnerabilities found
 ```
 
-Grafo: 53 paquetes antes, 52 ahora. Salieron `ecdsa`, `pyasn1`, `rsa`, `six` y
-`python-jose`; entraron `PyJWT`, `Pygments`, `annotated-doc` y
-`typing-inspection`.
+Cero por los dos métodos, sin exclusiones, sin `--ignore-vuln` y sin
+comentarios de supresión.
+
+## 5. Las rutas, comparadas línea por línea
+
+No alcanza con que la aplicación importe: había que probar que importa **lo
+mismo**. Levanté el árbol de rutas con el grafo de `ccb868c` y con el de ahora,
+ordenado y con método y nombre de cada una:
+
+```
+rutas con el grafo de ccb868c: 100
+rutas ahora: 100
+$ diff rutas-ccb868c.txt rutas-sec21.txt
+IDENTICAS
+```
+
+## 6. Puertas
 
 | Puerta | Resultado |
 |---|---|
 | entorno 3.11 nuevo con `requirements.txt` | instala y `pip check` limpio |
-| `pip-audit` | **0 vulnerabilidades conocidas** |
-| aplicación importa y arranca | sí, 100 rutas |
+| `pillow`, `fastapi-cors`, `passlib`, `environs`, `marshmallow` | fuera del grafo |
+| `bcrypt==5.0.0` | declarado e instalado |
+| `pip-audit` | **0 vulnerabilidades conocidas**, sin exclusiones |
+| rutas públicas | **100, idénticas a `ccb868c`** |
 | `alembic heads` | una sola cabeza, `a91c47e2b6d8` |
-| base limpia: migraciones + seed | sin intervención manual |
+| base limpia: migraciones + seed | sin intervención manual, 30 publicaciones |
 | `python -m compileall -q backend/app backend/alembic` | limpio |
 | `npm run build` | limpio |
 | `npm run lint` | 0 errores, 0 advertencias |
 | suite oficial completa desde base limpia | **130/130**, 0 fallos |
 | `git -c core.whitespace=cr-at-eol diff --check` | limpio |
 
-La suite cubre lo que pediste verificar especialmente: login, refresh, logout y
-validación de JWT; alta de publicaciones con imágenes por multipart;
-documentación en PDF por multipart; y el arranque de FastAPI en cada caso de
-navegador.
+No agregué ningún caso: la suite ya discrimina lo que este retiro podría
+romper. El arranque de FastAPI está en cada caso de navegador; las imágenes por
+multipart, en el alta de publicaciones; la documentación en PDF, en su propio
+recorrido; y la autenticación, en los casos 129 y 130 además de todo el resto.
+Si alguno de los tres paquetes hubiera hecho falta, la corrida se caía.
 
-## 8. Riesgos que quedan
+El commit de producto toca **un solo archivo**, `backend/requirements.txt`. Sin
+código de aplicación, sin frontend, sin otras versiones, sin caso nuevo.
 
-1. **El salto de FastAPI es grande**: 0.109 → 0.133, con Starlette 0.35 → 1.3.1
-   y pydantic 2.5 → 2.7. No lo elegí por gusto: era la única forma de cerrar
-   los nueve avisos de Starlette. La suite completa lo respalda, pero es el
-   cambio con más superficie de esta entrega y conviene mirarlo en el primer
-   despliegue.
-2. **`ecdsa` sale del grafo, no del mundo.** Si algún día vuelve una librería
-   que lo arrastre, el aviso vuelve. Queda dicho para que no sorprenda.
-3. **Tres dependencias que nadie usa.** `pillow` no lo importa ningún archivo
-   del backend —la validación de imágenes es por extensión y `content_type`—,
-   `fastapi-cors` tampoco: el CORS sale de `fastapi.middleware.cors`, que viene
-   con FastAPI. Y `passlib` tampoco: `security.py` usa `bcrypt` directo. Las
-   tres las dejé pineadas porque tu orden dice que el diff sea sólo pins y no
-   una limpieza lateral. Si querés, sacarlas es un commit corto: se van
-   `pillow`, `fastapi-cors`, `environs` y `marshmallow` del grafo, y con ellas
-   22 avisos futuros de Pillow que hoy estamos obligados a seguir de por vida
-   por un paquete que no se importa en ningún lado. **Decidilo vos.**
-4. **`pip-audit` es una foto del feed.** Cero hoy no es cero para siempre. Esto
-   pide una corrida periódica, no un cierre único.
-5. **El `Dockerfile.railway` no cambió** y no hacía falta: instala
-   `requirements.txt` tal cual. La imagen `python:3.11-slim` trae su propio
-   `setuptools`, que el auditor puede marcar según el día; no es del grafo del
-   proyecto y no lo pineé para no meter en la lista algo que no usamos.
+## 7. Riesgos que quedan
 
-## 9. Freno
+1. **Si alguien agrega validación real de imágenes**, `pillow` vuelve —a una
+   versión sin avisos— y con ella sus veintidós avisos abiertos de por vida.
+   Vale la pena decidir entonces si se valida con Pillow o con una comprobación
+   de cabecera de archivo, que no necesita dependencia.
+2. **`boto3` y `cloudinary` siguen sin declarar.** Es deliberado y está bien
+   resuelto —import perezoso con un `ImportError` que dice qué instalar—, pero
+   significa que los dos respaldos de almacenamiento no funcionan con este
+   `requirements.txt` tal cual. Hoy no se usan. No lo toqué porque tu orden
+   acota el diff a retirar los tres, pero queda anotado.
+3. **La separación entre dependencias de producción y de prueba sigue sin
+   hacerse.** `pytest`, `pytest-asyncio` y `httpx` están en la misma lista, y
+   los dos primeros no los usa ningún archivo —tampoco hay tests de Python en
+   el repositorio—. Dijiste que era una decisión aparte y no la toqué.
+4. **`pip-audit` es una foto del feed.** Cero hoy no es cero para siempre.
 
-No frené: el único hallazgo sin arreglo por versión se cerró sin tocar el
-modelo de sesión, sin cambiar el formato ni la autoridad del token —lo probé
-byte a byte— y sin tocar contratos, datos ni pagos. Si aun así preferís no
-mover `python-jose`, el camino alternativo es aceptar `ecdsa` como riesgo
-declarado; en ese caso `pip-audit` queda en uno y hay que decirlo por escrito,
-no silenciarlo.
+## 8. Freno
+
+No frené: no apareció ningún import dinámico ni ningún consumidor, y ninguno de
+los tres retiros rompió un recorrido. No agregué ninguna biblioteca de
+reemplazo, porque no había función que reemplazar.
 
 La aceptación visual de UX-2D.1 sigue pendiente de Emi. No desplegué.
