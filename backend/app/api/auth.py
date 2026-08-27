@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 
 from app.db.base import get_db
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.auth import (
     UserRegisterRequest,
     UserLoginRequest,
@@ -124,7 +124,13 @@ def register_user(
         password_hash=hash_password(user_data.password),
         full_name=user_data.full_name,
         phone=user_data.phone,
-        role=user_data.role,
+        # El rol lo pone el SERVIDOR, no el pedido. El esquema ya rechaza
+        # cualquier cosa que no sea `user`, pero esta linea no depende de eso:
+        # aunque alguien construyera `UserRegisterRequest` por fuera del HTTP y
+        # le forzara otro rol, lo que se guarda sigue siendo USER. Una cuenta
+        # con permisos de administracion se crea desde `/api/admin/users`, que
+        # pide sesion de administrador.
+        role=UserRole.USER,
         is_active=True,
         is_verified=False,
         is_carrier=user_data.is_carrier,

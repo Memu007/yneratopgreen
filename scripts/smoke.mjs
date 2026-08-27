@@ -13625,6 +13625,183 @@ print(json.dumps(resultado))
     + `pasa con mayusculas y con espacios. Sin ALLOW_/FORCE_/SKIP_ ni lectura suelta del entorno`;
 });
 
+await runCase(133, 'El registro publico no reparte roles: el rol lo pone el servidor', async () => {
+  // `POST /api/auth/register` tomaba el rol del cuerpo del pedido y lo guardaba
+  // tal cual. Un desconocido mandaba `"role": "admin"`, recibia 201, confirmaba
+  // el correo desde su propia casilla, entraba y quedaba con el padron de
+  // usuarios y el tablero en la mano. Lo reproduje de punta a punta antes de
+  // tocar nada, y llegaba hasta crear MAS administradores.
+  const sufijo = Date.now().toString(36);
+  const correoDe = (que) => `sec5-${que}-${sufijo}@ejemplo.com`;
+
+  const efectosDe = (correo) => ({
+    cuentas: queryCount(
+      `SELECT count(*) FROM users WHERE email = ${sqlLiteral(correo)}`),
+    tokens: queryCount(
+      'SELECT count(*) FROM email_verification_tokens t JOIN users u ON u.id = t.user_id '
+      + `WHERE u.email = ${sqlLiteral(correo)}`),
+    avisos: queryCount(
+      'SELECT count(*) FROM notifications n JOIN users u ON u.id = n.user_id '
+      + `WHERE u.email = ${sqlLiteral(correo)}`),
+  });
+  const rolDe = (correo) => {
+    const filas = queryRows(
+      `SELECT role FROM users WHERE email = ${sqlLiteral(correo)}`);
+    return filas.length ? filas[0][0] : null;
+  };
+
+  const localidad = queryRows('SELECT id FROM localities LIMIT 1')[0][0];
+  const transportista = (correo, extra) => ({
+    email: correo, password: 'clave123', full_name: 'Transportista SEC5',
+    is_carrier: true, carrier_base_locality_id: localidad,
+    carrier_transport: 'Camion', carrier_transport_certified: true,
+    carrier_certification_detail: 'Declaracion de prueba', carrier_coverage_radius_km: 100,
+    ...extra,
+  });
+
+  // --- A. Pedir `admin` se rechaza, y no deja NADA atras --------------------
+  const admins = () => queryCount("SELECT count(*) FROM users WHERE role = 'ADMIN'");
+  const adminsAntes = admins();
+  const rechazados = [];
+  for (const [etiqueta, cuerpo] of [
+    ['role: "admin"', { email: correoDe('admin'), password: 'clave123', full_name: 'Escalada', role: 'admin' }],
+    ['role: "ADMIN"', { email: correoDe('mayus'), password: 'clave123', full_name: 'Escalada', role: 'ADMIN' }],
+    ['transportista + admin', transportista(correoDe('transp-admin'), { role: 'admin' })],
+  ]) {
+    const correo = cuerpo.email;
+    const correosAntes = contarCorreos();
+    await expectApiError(422, () =>
+      apiRequest('/auth/register', { method: 'POST', body: cuerpo }));
+
+    // Un rechazo que igual escribio algo no es un rechazo.
+    const efectos = efectosDe(correo);
+    assert(efectos.cuentas === 0, `${etiqueta}: quedo una cuenta creada`);
+    assert(efectos.tokens === 0, `${etiqueta}: quedo un token de verificacion`);
+    assert(efectos.avisos === 0, `${etiqueta}: quedo una notificacion`);
+    assert(contarCorreos() === correosAntes,
+      `${etiqueta}: salio un correo del outbox`);
+    rechazados.push(etiqueta);
+  }
+  assert(admins() === adminsAntes,
+    `la cantidad de administradores cambio: ${adminsAntes} -> ${admins()}`);
+
+  // --- B. Lo que SI tiene que seguir funcionando ----------------------------
+  // El frontend manda `"role": "user"` explicito, asi que ese payload no puede
+  // romperse; y un alta sin rol y una de transportista tienen que seguir dando
+  // de alta una cuenta comun.
+  const aceptados = [];
+  for (const [etiqueta, cuerpo] of [
+    ['sin role', { email: correoDe('sin'), password: 'clave123', full_name: 'Sin Rol' }],
+    ['role: "user"', { email: correoDe('user'), password: 'clave123', full_name: 'Con Rol', role: 'user' }],
+    ['transportista', transportista(correoDe('transp'))],
+  ]) {
+    const alta = await apiRequest('/auth/register', { method: 'POST', body: cuerpo });
+    assert(alta.status === 201, `${etiqueta}: el alta respondio ${alta.status}`);
+    assert(rolDe(cuerpo.email) === 'USER',
+      `${etiqueta}: la cuenta quedo con rol ${rolDe(cuerpo.email)}`);
+    aceptados.push(etiqueta);
+  }
+
+  // --- C. Y el que persiste no confia en el esquema -------------------------
+  // Acotar el tipo en el esquema frena al HTTP, pero no a alguien que arme el
+  // objeto por dentro. Se construye salteando la validacion, con el rol forzado
+  // a ADMIN, se llama al endpoint de verdad y se mira que se guardo.
+  const correoForzado = correoDe('forzado');
+  const guion = `
+import json
+from app.schemas.auth import UserRegisterRequest
+from app.api.auth import register_user
+from app.db.base import SessionLocal
+from app.models.user import User, UserRole
+
+forzado = UserRegisterRequest.model_construct(
+    email="${correoForzado}", password="clave123", full_name="Forzado",
+    phone=None, role=UserRole.ADMIN, is_carrier=False,
+    carrier_base_locality_id=None, carrier_transport=None,
+    carrier_transport_certified=False, carrier_certification_detail=None,
+    carrier_coverage_radius_km=None, carrier_capacity=None,
+    carrier_vehicle_model=None, carrier_plate=None,
+    carrier_cargo_types=None, carrier_cargo_other=None,
+)
+db = SessionLocal()
+try:
+    register_user(forzado, db)
+finally:
+    db.close()
+db = SessionLocal()
+u = db.query(User).filter(User.email == "${correoForzado}").first()
+print(json.dumps({"en_el_esquema": forzado.role.value, "persistido": u.role.value}))
+db.close()
+`;
+  const crudo = execFileSync(
+    'docker',
+    ['exec', '-i', 'topgreen-api', 'python', '-c', guion],
+    { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
+  );
+  const forzado = JSON.parse(crudo.trim().split(/\r?\n/).at(-1));
+  assert(forzado.en_el_esquema === 'admin',
+    'la prueba no logro forzar el rol en el esquema: no estaria midiendo nada');
+  assert(forzado.persistido === 'user',
+    `el endpoint guardo el rol que traia el esquema: ${forzado.persistido}`);
+
+  // --- D. Una cuenta publica confirmada no entra a administracion -----------
+  const correoPublico = correoDe('publico');
+  await registrarYVerificar({
+    email: correoPublico, password: 'clave123', full_name: 'Publico SEC5',
+  });
+  const sesionPublica = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: correoPublico, password: 'clave123' },
+  });
+  const publico = sesionPublica.data.access_token;
+  const sesionAdmin = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'admin@topgreen.com', password: 'admin123' },
+  });
+  const administrador = sesionAdmin.data.access_token;
+
+  const rutasAdmin = ['/admin/users', '/admin/dashboard', '/admin/products', '/admin/orders'];
+  for (const ruta of rutasAdmin) {
+    await expectApiError(403, () => apiRequest(ruta, { token: publico }));
+    const comoAdmin = await apiRequest(ruta, { token: administrador });
+    assert(comoAdmin.status === 200,
+      `el administrador perdio el acceso a ${ruta}: ${comoAdmin.status}`);
+  }
+
+  // El unico camino autorizado conserva su capacidad de asignar roles...
+  const correoAscendido = correoDe('ascendido');
+  const creado = await apiRequest('/admin/users', {
+    method: 'POST', token: administrador,
+    body: { email: correoAscendido, password: 'clave123', full_name: 'Ascendido', role: 'admin' },
+  });
+  assert(creado.status === 201, `el alta administrativa respondio ${creado.status}`);
+  assert(rolDe(correoAscendido) === 'ADMIN',
+    'el flujo administrativo dejo de poder asignar el rol de administracion');
+  // ...y sigue siendo el unico.
+  await expectApiError(403, () => apiRequest('/admin/users', {
+    method: 'POST', token: publico,
+    body: { email: correoDe('colado'), password: 'clave123', full_name: 'Colado', role: 'admin' },
+  }));
+
+  // --- E. Y la documentacion no ofrece lo que el servidor no da -------------
+  const respuesta = await fetch(`${API_URL}/openapi.json`);
+  const openapi = await respuesta.json();
+  const rolPublico = openapi.components.schemas.UserRegisterRequest.properties.role;
+  if (rolPublico !== undefined) {
+    const valores = rolPublico.enum || (rolPublico.const ? [rolPublico.const] : null);
+    assert(valores && valores.length === 1 && valores[0] === 'user',
+      `el registro publico anuncia roles ${JSON.stringify(valores)}`);
+  }
+  assert(!JSON.stringify(openapi.components.schemas.UserRegisterRequest).includes('admin'),
+    'el esquema publico del registro menciona admin');
+
+  return `Rechaza ${rechazados.join(', ')} con 422 y sin dejar cuenta, token, notificacion `
+    + `ni correo; los administradores siguen siendo ${adminsAntes}. Acepta ${aceptados.join(', ')} `
+    + 'y las tres quedan USER. Con el esquema construido por fuera del HTTP y el rol forzado a '
+    + `admin, lo persistido sigue siendo ${forzado.persistido}. Una cuenta publica confirmada `
+    + `recibe 403 en las ${rutasAdmin.length} rutas administrativas donde el administrador `
+    + 'recibe 200, y /admin/users conserva su capacidad de asignar el rol. OpenAPI publica '
+    + `role = ${JSON.stringify(rolPublico && (rolPublico.enum || rolPublico.const))}`;
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

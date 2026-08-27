@@ -2,7 +2,7 @@
 Schemas de Autenticación - Validación de requests y responses
 """
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
-from typing import List, Optional
+from typing import List, Literal, Optional
 from datetime import datetime
 
 from app.models.user import UserRole
@@ -16,7 +16,20 @@ class UserRegisterRequest(BaseModel):
     password: str = Field(..., min_length=6, max_length=100)
     full_name: str = Field(..., min_length=2, max_length=255)
     phone: Optional[str] = Field(None, max_length=50)
-    role: UserRole = UserRole.USER  # Por defecto usuario normal
+    # El rol NO es un dato del cliente. Se declara acotado a `user` por dos
+    # motivos, y los dos hacen falta:
+    #
+    #  1. Un pedido con `"role": "admin"` se rechaza con 422 ANTES de entrar al
+    #     endpoint, asi que no crea cuenta, ni token, ni correo, ni
+    #     notificacion. Un valor privilegiado no se ignora en silencio: se
+    #     contesta que no.
+    #  2. El esquema publico de OpenAPI queda con `enum: ["user"]`. La
+    #     documentacion deja de ofrecer `admin` como opcion.
+    #
+    # El campo sobrevive porque el frontend manda `"role": "user"` explicito y
+    # sacarlo lo romperia. Aceptar ese unico valor no debilita la regla: quien
+    # persiste es el endpoint, y persiste USER pase lo que pase.
+    role: Literal[UserRole.USER] = UserRole.USER
     is_carrier: bool = False
     carrier_base_locality_id: Optional[str] = Field(None, max_length=20)
     carrier_transport: Optional[str] = Field(None, max_length=255)
