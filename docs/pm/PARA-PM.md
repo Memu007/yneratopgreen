@@ -2,163 +2,229 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## SEC-3R — el 500 no controlado sale con la misma base defensiva
+## SEC-4 — el seed de demostración no corre fuera de un entorno descartable
 
-Hecho. Corrección e informe en commits separados. **No desplegué.**
+Hecho. Producto e informe en commits separados. **No desplegué.**
 
-- Corrección: `e78e3d5` — «SEC-3R: el 500 no controlado sale con la misma base defensiva»
-- Archivos: `backend/app/main.py` (la corrección), `scripts/smoke.mjs` (la regresión). Nada más.
-
-Tenías razón y el rechazo era correcto. 200, 401 y 404 traían las cinco
-cabeceras; el 500 salía pelado. Lo reproduje antes de tocar nada.
+- Producto: `9251701` — «SEC-4: el seed de demostración no corre fuera de un entorno descartable»
+- Archivos: `backend/app/seed.py` (el freno), `scripts/smoke.mjs` (la regresión, caso 132), `RAILWAY.md` (la documentación operativa que decía lo contrario).
 
 ---
 
-### 1. El rojo, contra `625d958`
+### 1. El rojo, contra `e78e3d5`
+
+Sobre una base de ensayo **aparte** —`topgreen_sec4`, creada, migrada y borrada
+para esto—, nunca contra Railway ni contra la base con datos de demostración que
+usan las puertas. Le puse dos filas centinela con los mismos identificadores que
+el seed usa, para que cualquier lectura o escritura se notara.
 
 ```
---- 500 no controlado -> 500 ---
-    strict-transport-security        FALTA
-    x-content-type-options           FALTA
-    x-frame-options                  FALTA
-    referrer-policy                  FALTA
-    permissions-policy               FALTA
-    content-type                     text/plain; charset=utf-8
-    cuerpo                           'Internal Server Error'
---- 200 /api/health   -> 200 ---   las cinco presentes
---- 401 /api/auth/me  -> 401 ---   las cinco presentes
---- 404 /api/no-existe-> 404 ---   las cinco presentes
+ENV=production DATABASE_URL=<base de ensayo> python -m app.seed
+estado de salida: 0
+…
+📝 Credenciales de acceso:
+  Admin:    <las tres cuentas, con su contraseña, impresas en la consola>
 ```
 
-Y la regresión nueva, corrida contra `625d958`, falla exactamente ahí:
+Y escribió. Huella de las 22 tablas, antes y después:
+
+| tabla | antes | después |
+|---|---|---|
+| users | 1 (el centinela) | 4 |
+| categories | 1 (el centinela) | 13 |
+| localities | 0 | 4028 |
+| products | 0 | 30 |
+| product_images | 0 | 35 |
+| subcategories | 0 | 44 |
+| form_options | 0 | 18 |
+
+El centinela de `users` tenía el mismo correo que la cuenta de administración
+del seed: no sólo escribió, además **pisó** la fila que ya estaba.
+
+La regresión nueva, corrida contra `e78e3d5`, falla:
 
 ```
-[FAIL] 131 … — backend/500: strict-transport-security aparece 0 veces -> []
+[FAIL] 132 … — con ENV=production el seed salio con 1 y tiene que salir con 2
 ```
 
-### 2. Por qué pasaba: no fue un olvido, fue el orden de la pila
+Sale con 1 porque intentó conectarse a la base que le pasé —un puerto muerto— y
+se rompió ahí. O sea: llegó hasta la base.
 
-Medí la pila efectiva de Starlette 1.3.1, no la deduje:
+### 2. El freno, y dónde exactamente está
 
-```
-ANTES (625d958)                         AHORA (e78e3d5)
-  0. ServerErrorMiddleware                0. CabecerasDefensivas
-  1. CabecerasDefensivas          →       1. ServerErrorMiddleware
-  2. CORSMiddleware                       2. CORSMiddleware
-  3. ExceptionMiddleware                  3. ExceptionMiddleware
-  4. AsyncExitStackMiddleware             4. AsyncExitStackMiddleware
-  5. APIRouter                            5. APIRouter
-```
-
-`add_middleware` **no puede** cubrir el 500. Starlette arma la pila con
-`ServerErrorMiddleware` siempre en la capa 0, por fuera de todo lo que uno
-registre. Cuando la excepción sube, esa capa la atrapa y escribe su propia
-respuesta con el `send` **crudo** del servidor: el middleware de uno no ve nunca
-ese `http.response.start`. Por eso 200, 401 y 404 salían bien —esos sí pasan por
-la capa— y el 500 no.
-
-### 3. La corrección, y por qué esta y no otra
-
-Redefiní `build_middleware_stack` en una subclase de `FastAPI`, que envuelve la
-pila ya armada:
+Lo primero que hace `create_seed_data()`, **antes** de `SessionLocal()`:
 
 ```python
-class Aplicacion(FastAPI):
-    def build_middleware_stack(self):
-        return CabecerasDefensivas(super().build_middleware_stack())
+def create_seed_data():
+    """Crear datos iniciales en la base de datos"""
+
+    # Primero el freno y despues la base: si el entorno no corresponde, esta
+    # funcion termina sin haber tocado nada.
+    exigir_entorno_con_seed()
+
+    db = SessionLocal()
 ```
 
-Tres cosas sobre esa elección, porque tu freno las nombra:
+La entrada por línea de comandos lo traduce a algo que entienda un script:
 
-- **No es una API privada de Starlette.** `build_middleware_stack` no lleva guión
-  bajo y **la propia FastAPI la redefine** —`fastapi/applications.py:1021`— para
-  meter su `AsyncExitStackMiddleware`. Es el punto de extensión previsto.
-- **No duplica la política en dos caminos.** Queda **una** capa poniendo las
-  cabeceras, para todas las respuestas. La alternativa que descarté era registrar
-  un manejador de `Exception`: habría funcionado, pero deja dos caminos distintos
-  que pueden divergir, que es justo lo que pedís evitar.
-- **No cambia el comando de despliegue.** `app` sigue siendo una instancia de
-  FastAPI y `uvicorn app.main:app` sigue sirviendo lo mismo.
+```python
+    try:
+        create_seed_data()
+    except EntornoNoAptoParaSeed as error:
+        print(f"\n⛔ {error}", file=sys.stderr)
+        raise SystemExit(2)
+```
 
-Descarté también envolver la app entera (`app = CabecerasDefensivas(app)`): `app`
-dejaría de ser FastAPI y rompería todo lo que va debajo en el módulo.
+Mensaje a la salida de **error** y estado **2**, no 0: un `... && python -m
+app.seed && ...` de un script de despliegue se corta ahí en vez de seguir como
+si nada.
 
-### 4. El 500 sigue sin contar nada
+### 3. La decisión que quiero que revises: lista de admitidos, no de prohibidos
 
-| | antes | ahora |
+```python
+ENTORNOS_CON_SEED = frozenset({"local"})
+```
+
+La lista dice dónde **sí**. Lo pensé al revés primero —«rechazar si
+`ENV == "production"`»— y lo descarté cuando vi qué se colaba. Medido, no
+supuesto:
+
+| `ENV` | con lista de prohibidos | con lista de admitidos |
 |---|---|---|
-| código | 500 | 500 |
-| `Content-Type` | `text/plain; charset=utf-8` | `text/plain; charset=utf-8` |
-| cuerpo | `Internal Server Error` | `Internal Server Error` |
-| cabeceras defensivas | ninguna | las cinco, una vez cada una |
+| `production` | rechaza | **rechaza** (salida 2) |
+| `Production` | **pasa** | **rechaza** |
+| `PRODUCTION` | **pasa** | **rechaza** |
+| `prod` | **pasa** | **rechaza** |
+| `produccion` | **pasa** | **rechaza** |
+| `staging` | **pasa** | **rechaza** |
+| `` (vacío) | **pasa** | **rechaza** |
+| `local` / `LOCAL` / `" local "` | pasa | pasa |
 
-La regresión no se conforma con «están»: exige que cada una aparezca **una sola
-vez** —lee la lista cruda, no el diccionario, que colapsaría un duplicado—, que
-el valor sea **idéntico** al de 200, 401 y 404, que la `Permissions-Policy` niegue
-las diecisiete capacidades, y que el cuerpo no contenga `RuntimeError`,
-`Traceback`, el mensaje de la excepción, `app/main.py` ni el nombre de la ruta.
+Si no consta que el entorno es de desarrollo, se trata como producción.
 
-### 5. Cómo se provoca el 500 sin ensuciar el producto
+Los dos únicos valores de `ENV` que el proyecto documenta son `local`
+—`backend/.env.example`— y `production` —`backend/.env.production.example` y
+`RAILWAY.md`—. No hay un tercero en ningún lado, y las pruebas no fijan `ENV`,
+así que heredan `local`. Por eso la lista tiene un solo elemento: no inventé
+`dev`, `test` ni `ci`, que nadie usa.
 
-No hay ni va a haber una ruta que reviente a pedido. La prueba levanta la
-aplicación **real**, con su pila real, y le engancha **en memoria** una ruta que
-lanza un `RuntimeError`; esa ruta nace y muere adentro del proceso de Python de
-la prueba. El producto no gana ningún endpoint de diagnóstico ni interruptor de
-fallo, y el nombre de esa ruta sólo aparece dentro del caso 131.
+**No agregué ningún `ALLOW_*`.** Se enciende para salir del paso y queda
+encendido para siempre. Para sembrar una base descartable se pone `ENV=local`,
+que es un acto visible. El caso 132 falla si alguien mete un `ALLOW_`, `FORCE_`,
+`SKIP_`, `os.environ` o `getenv` en `seed.py`.
 
-### 6. Puertas, desde base limpia
+### 4. Cero acceso y cero escritura, probado de dos maneras
+
+**Por la huella.** Puse los centinelas de nuevo, corrí el seed rechazado por las
+dos vías, y comparé las 22 tablas:
+
+```
+huella IDÉNTICA en las 22 tablas: cero filas leídas o escritas
+```
+
+**Por el puerto muerto.** Le pasé `DATABASE_URL` apuntando a
+`127.0.0.1:59999/no_existe`. Si el freno hubiera corrido después de abrir la
+sesión, habría salido un error de conexión. Salió el rechazo, estado 2, y **cero**
+menciones de `connection`, `OperationalError`, `psycopg` o el puerto. Nunca
+intentó conectarse.
+
+Las dos invocaciones que pediste:
+
+| | estado | stdout | qué dijo |
+|---|---|---|---|
+| `python -m app.seed` | **2** | vacío (0 bytes) | el rechazo, por stderr |
+| `create_seed_data()` directo | — | — | levanta `EntornoNoAptoParaSeed` |
+
+Y la salida no nombra ninguna de las ocho credenciales demo —los cuatro correos
+y las cuatro contraseñas—: lo verifiqué una por una, y el caso 132 lo exige en
+cada corrida.
+
+### 5. Local y pruebas, intactas
+
+Base limpia, migraciones y seed con `ENV=local`, dos veces seguidas:
+
+```
+primera corrida  -> salida 0, 30 productos
+segunda corrida  -> salida 0, 30 productos
+huella IDÉNTICA entre corrida 1 y 2: no duplica ni pisa
+users 4 · categories 12 · subcategories 44 · products 30 · localities 4028 · form_options 18
+```
+
+Cuentas, datos bancarios, publicaciones, taxonomía y el transportista quedan como
+estaban. No borré ni renombré ninguna cuenta demo y no roté ninguna credencial.
+
+### 6. Puertas
 
 ```
 base limpia (drop/create + PostGIS + alembic upgrade head + seed)
-node scripts/smoke.mjs                          131/131   (0 fallaron)
-npm run a11y -- --todas                         sin violaciones bloqueantes, cobertura completa
-npm run contraste                               TODO OK, cobertura completa
-npm run hito                                    6/6 pasos
+node scripts/smoke.mjs                          132/132   (0 fallaron)
+python -m compileall backend/app                ok
 npm run build                                   ok
 npm run lint                                    ok (--max-warnings 0)
-python -m compileall backend/app                ok
 git -c core.whitespace=cr-at-eol diff --check   limpio
 ```
 
-El caso 131 conserva todo lo anterior: 200, 401, 404, `/api/docs`, `/uploads`,
-la descarga del PDF con su tipo y su nombre, el preflight CORS con su origen, y
-las cuatro rutas del candidato Nginx. No toqué la CSP, ni Nginx, ni CORS, ni un
-contrato, ni el frontend.
+La suite subió a 132 con el caso nuevo. No repetí a11y, contraste ni hito: no
+cambia ninguna superficie servida, como dijiste.
 
-Diff de producto completo:
+Diff completo:
 
 ```
- backend/app/main.py | 38 +++++++++++++++++++----
- scripts/smoke.mjs   | 87 ++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ RAILWAY.md          |  29 ++++++++++----
+ backend/app/seed.py |  56 +++++++++++++++++++++++++-
+ scripts/smoke.mjs   | 111 ++++++++++++++++++++++++++++++++++++++++++++++++++++
 ```
 
-### 7. Riesgos residuales
+### 7. La documentación decía lo contrario, y la corregí
 
-1. **La corrección depende de que `build_middleware_stack` siga existiendo.** Es
-   público y FastAPI misma lo usa, así que una desaparición silenciosa es
-   improbable; y si cambiara, el caso 131 lo muestra el día de la actualización,
-   no en producción.
-2. **El 500 sigue sin cabeceras CORS**, igual que antes: `CORSMiddleware` también
-   queda por dentro de `ServerErrorMiddleware`. No lo cambié porque tu alcance
-   dice no tocar CORS. Consecuencia práctica: un navegador que reciba un 500 en
-   una llamada cruzada ve un error de CORS en vez del 500. No filtra nada y no es
-   nuevo; si querés cerrarlo, es otra tarea con su propio rojo.
-3. **`ServerErrorMiddleware` vuelve a lanzar la excepción** después de responder,
-   para que el servidor la registre. Eso no cambió: el traceback sigue yendo al
-   log del servidor, nunca al cliente.
+`RAILWAY.md` mandaba a correr el seed **en producción**: «Para cargar el catálogo
+de demostración, una vez y desde la consola del servicio `Backend`:
+`python -m app.seed`». Eso ahora es imposible, así que el párrafo dice qué pasa,
+por qué, y qué hacer en su lugar.
 
-### 8. Hashes
+También corregí, en el mismo archivo, la frase que daba por hecho un
+administrador preexistente con contraseña conocida: en producción ese
+administrador no existe, y el primero se crea a mano sobre la base ya migrada.
+
+No toqué `README_LOCAL_SETUP.md` ni `docs/DATABASE.md`: ahí el seed se invoca en
+contexto local, que sigue funcionando igual.
+
+### 8. Riesgos residuales
+
+1. **Un entorno intermedio queda sin seed.** Si mañana existe un `staging` con
+   `ENV=staging`, el seed lo rechaza. Es lo buscado —fallo ruidoso—, pero
+   significa que sembrarlo exige poner `ENV=local` a mano y volver a cambiarlo.
+   Es deliberado: prefiero un paso incómodo y visible a una variable de escape.
+2. **`ENV` no está validado en `Settings`.** Sigue siendo un texto libre y sólo
+   se usa para mostrar el entorno en `/api/health` y en el log de arranque. El
+   freno del seed es hoy el único que lo mira en serio. Restringirlo a un
+   conjunto cerrado en `config.py` sería más prolijo, pero cambia el arranque de
+   la aplicación y eso no estaba en el alcance.
+3. **`python -m app.seed_localities` sigue corriendo en cualquier entorno.**
+   Tiene su propio `__main__` y escribe 4028 filas del padrón oficial. **No trae
+   ninguna credencial** —es dato de referencia, no cuentas—, así que lo dejé
+   fuera del freno; bloquearlo rompería una carga legítima en producción. Lo
+   digo para que sea una decisión tuya y no un olvido mío.
+4. **El seed sigue teniendo contraseñas escritas en el repositorio.** No las
+   roté porque tu alcance lo prohíbe. Dejan de ser un riesgo de producción, pero
+   siguen siendo credenciales conocidas en cualquier base local expuesta a una
+   red.
+
+### 9. Hashes
 
 ```
-backend/app/main.py   aa8b64410282cdd7
-scripts/smoke.mjs     5e23156645f9f8d8
+backend/app/seed.py   088aa36ef2ba81c0
+scripts/smoke.mjs     0394be6cc7415eb9
+RAILWAY.md            9d06c652d314f438
 ```
 
-(SHA-256 truncado a 16, del árbol en el commit de corrección.)
+(SHA-256 truncado a 16, del árbol en el commit de producto.)
 
-### 9. Frenos
+### 10. Frenos
 
-No hizo falta cambiar el cuerpo de error público, ni agregar un endpoint de
-diagnóstico, ni depender de una API privada, ni duplicar la política. No
-desplegué. `PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de
-empujar.
+El entorno productivo se identifica sin ambigüedad —`ENV=production`, documentado
+en dos archivos— y ninguna puerta necesita correr el seed bajo ese valor: la
+suite lo corre con `ENV=local`, que es lo que trae `backend/.env`. No hizo falta
+tocar variables ni despliegues de Railway, y no lo hice. La reproducción del rojo
+fue en una base de ensayo separada que después borré. No desplegué.
+`PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de empujar.
