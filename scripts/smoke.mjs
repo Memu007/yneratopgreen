@@ -1,6 +1,7 @@
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash, createHmac } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
 
 import {
@@ -13129,6 +13130,303 @@ await runCase(130, 'El token sigue siendo el mismo JWT despues de cambiar la bib
     + `declarados y nada mas —${revisados.slice(0, 2).join('; ')}—, con la firma verificada `
     + 'recalculando HMAC-SHA256 fuera de la biblioteca; rechaza sujeto cambiado con otro '
     + 'secreto, alg=none y vencido bien firmado, y el valido abre la sesion';
+});
+
+await runCase(131, 'Toda respuesta publica sale con la base defensiva, y la politica del Frontend no tiene comodines', async () => {
+  // El Frontend y el Backend contestaban sin HSTS, sin politica de contenido,
+  // sin `nosniff`, sin prohibicion de marco, sin `Referrer-Policy` y sin
+  // `Permissions-Policy`. El Nginx local heredado traia dos cabeceras y no es
+  // el que sirve el despliegue: el que sirve es
+  // `infra/railway/nginx.conf.template`, que no definia ninguna.
+  //
+  // Este caso tiene dos mitades, porque los dos servicios se prueban distinto:
+  // el Backend corre aca y se le mide la respuesta de verdad; el Frontend en
+  // produccion lo sirve Nginx, asi que se le exige el contrato a la plantilla
+  // y al Dockerfile que la completa, y ademas se levanta un candidato con esa
+  // misma plantilla cuando la maquina tiene Nginx.
+  const ESPERADAS = {
+    'strict-transport-security': 'max-age=31536000; includeSubDomains',
+    'x-content-type-options': 'nosniff',
+    'x-frame-options': 'DENY',
+    'referrer-policy': 'strict-origin-when-cross-origin',
+  };
+  const PERMISOS_NEGADOS = [
+    'accelerometer', 'autoplay', 'camera', 'display-capture', 'encrypted-media',
+    'fullscreen', 'geolocation', 'gyroscope', 'magnetometer', 'microphone',
+    'midi', 'payment', 'picture-in-picture', 'publickey-credentials-get',
+    'screen-wake-lock', 'usb', 'xr-spatial-tracking',
+  ];
+
+  // Las cabeceras crudas: `fetch` colapsa repetidas en una sola cadena separada
+  // por coma, que es justo lo que hace falta para detectar duplicados.
+  const cabecerasDe = async (url, opciones = {}) => {
+    const r = await fetch(url, { redirect: 'manual', ...opciones });
+    const mapa = {};
+    r.headers.forEach((valor, nombre) => { mapa[nombre.toLowerCase()] = valor; });
+    return { status: r.status, h: mapa, cuerpo: r };
+  };
+
+  const exigirBase = (etiqueta, h) => {
+    for (const [nombre, valor] of Object.entries(ESPERADAS)) {
+      assert(h[nombre] === valor,
+        `${etiqueta}: ${nombre} vale ${JSON.stringify(h[nombre])} y tiene que valer ${JSON.stringify(valor)}`);
+      // Una cabecera repetida con valores distintos llega como «a, b»: dos
+      // politicas para lo mismo es peor que ninguna.
+      assert(!h[nombre].includes(','),
+        `${etiqueta}: ${nombre} llego duplicada -> ${h[nombre]}`);
+    }
+    const permisos = h['permissions-policy'] || '';
+    for (const capacidad of PERMISOS_NEGADOS) {
+      assert(new RegExp(`(^|[ ,])${capacidad}=\\(\\)`).test(permisos),
+        `${etiqueta}: Permissions-Policy no niega ${capacidad} -> ${permisos}`);
+    }
+    assert(!/\bnone\b|\*/.test(permisos.replace(/=\(\)/g, '')),
+      `${etiqueta}: Permissions-Policy tiene un comodin -> ${permisos}`);
+  };
+
+  // --- A. Backend: exito, error, inexistente, documentacion y descarga -----
+  const entrada = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  });
+  const token = entrada.data.access_token;
+  const base = API_URL.replace(/\/api$/, '');
+
+  const rutasDelBackend = [
+    ['salud', `${API_URL}/health`, {}],
+    ['catalogo 200', `${API_URL}/catalog/products?page_size=1`, {}],
+    ['sesion 401', `${API_URL}/auth/me`, {}],
+    ['inexistente 404', `${API_URL}/no-existe-esta-ruta`, {}],
+    ['documentacion interactiva', `${API_URL}/docs`, {}],
+    ['sesion 200', `${API_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } }],
+    ['raiz', `${base}/`, {}],
+  ];
+  const codigos = [];
+  for (const [etiqueta, url, opciones] of rutasDelBackend) {
+    const { status, h } = await cabecerasDe(url, opciones);
+    exigirBase(`backend/${etiqueta}`, h);
+    codigos.push(`${etiqueta}=${status}`);
+  }
+
+  // El CORS no se toca: sigue contestando el preflight y el origen permitido.
+  const preflight = await cabecerasDe(`${API_URL}/auth/login`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: FRONTEND_URL,
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'content-type',
+    },
+  });
+  assert(preflight.h['access-control-allow-origin'] === FRONTEND_URL,
+    `el preflight perdio el origen permitido: ${preflight.h['access-control-allow-origin']}`);
+  exigirBase('backend/preflight', preflight.h);
+
+  // Y una descarga conserva tipo, nombre y contenido.
+  const constancia = await cabecerasDe(`${API_URL}/documentacion/archivo`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (constancia.status === 200) {
+    exigirBase('backend/descarga', constancia.h);
+    assert(constancia.h['content-type'] === 'application/pdf',
+      `la descarga perdio el tipo: ${constancia.h['content-type']}`);
+    assert(/filename=/.test(constancia.h['content-disposition'] || ''),
+      `la descarga perdio el nombre: ${constancia.h['content-disposition']}`);
+    const bytes = new Uint8Array(await constancia.cuerpo.arrayBuffer());
+    assert(bytes.length > 0 && String.fromCharCode(...bytes.slice(0, 4)) === '%PDF',
+      'la descarga dejo de ser un PDF');
+    codigos.push('descarga=200');
+  } else {
+    // Sin documentacion presentada no hay archivo que bajar; el caso no
+    // inventa uno, pero deja dicho que esa fila no se midio.
+    codigos.push(`descarga=${constancia.status} (sin documentacion presentada)`);
+  }
+
+  // La API no pone politica de contenido, y es a proposito: devuelve JSON y
+  // archivos, y la unica pagina HTML que sirve trae sus recursos de un CDN.
+  const salud = await cabecerasDe(`${API_URL}/health`);
+  assert(!salud.h['content-security-policy'],
+    'la API empezo a mandar CSP: revisar que no rompa la documentacion interactiva');
+
+  // --- B. Frontend: el contrato de la plantilla que sirve el despliegue ----
+  const plantilla = readFileSync('infra/railway/nginx.conf.template', 'utf8');
+  const dockerfile = readFileSync('Dockerfile.railway', 'utf8');
+
+  const declarada = (nombre) => {
+    const filas = plantilla.split(/\r?\n/).filter(
+      (l) => new RegExp(`^\\s*add_header\\s+${nombre}\\b`, 'i').test(l));
+    assert(filas.length === 1,
+      `la plantilla declara ${filas.length} veces ${nombre}; tiene que ser una`);
+    assert(/\balways\b/.test(filas[0]),
+      `${nombre} sin \`always\`: no saldria en los errores`);
+    return filas[0];
+  };
+  for (const nombre of ['Strict-Transport-Security', 'X-Content-Type-Options',
+    'X-Frame-Options', 'Referrer-Policy', 'Permissions-Policy',
+    'Content-Security-Policy']) {
+    declarada(nombre);
+  }
+
+  // En Nginx un `add_header` adentro de un `location` REEMPLAZA a los
+  // heredados. Si alguien agrega uno ahi, las seis se caen sin aviso.
+  const dentroDeLocation = plantilla
+    .split(/location\s/).slice(1)
+    .some((trozo) => /add_header/i.test(trozo.split(/\n\s*}/)[0]));
+  assert(!dentroDeLocation,
+    'hay un add_header adentro de un location: eso descarta las cabeceras del server');
+
+  const csp = declarada('Content-Security-Policy');
+  // `'unsafe-inline'` esta en la lista por medicion, no por prolijidad: se
+  // levantaron los dos candidatos, con y sin el permiso, y los veintiocho
+  // atributos `style` de React se aplican igual —React los asigna por CSSOM y
+  // la CSP no gobierna el CSSOM—, sin un solo «Refused to apply inline style».
+  for (const prohibido of ["'unsafe-eval'", "'unsafe-inline'", "https:", "http:", " *"]) {
+    assert(!csp.includes(prohibido),
+      `la politica trae ${prohibido}, que la orden prohibe: ${csp}`);
+  }
+  // `data:` y `blob:` se toleran en UN solo lugar, `img-src`, y porque hay dos
+  // funciones que los necesitan: el alta previsualiza la foto con
+  // `FileReader.readAsDataURL` y la edicion de una publicacion previsualiza las
+  // fotos nuevas con `URL.createObjectURL`. En cualquier otra directiva son un
+  // agujero.
+  const directivas = Object.fromEntries(
+    csp.replace(/^[^"]*"|"[^"]*$/g, '').split(';')
+      .map((d) => d.trim()).filter(Boolean)
+      .map((d) => [d.split(/\s+/)[0], d]));
+  for (const [nombre, cuerpo] of Object.entries(directivas)) {
+    if (nombre === 'img-src') continue;
+    assert(!/\b(data|blob):/.test(cuerpo),
+      `la directiva ${nombre} permite data:/blob: y no le hace falta: ${cuerpo}`);
+  }
+  assert(/img-src[^;]*\bdata:/.test(csp) && /img-src[^;]*\bblob:/.test(csp),
+    `img-src tiene que permitir data: y blob: para las dos vistas previas: ${csp}`);
+  for (const exigido of ["default-src 'self'", "object-src 'none'",
+    "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'",
+    "script-src 'self'", "style-src 'self'", "font-src 'self'", "media-src 'self'"]) {
+    assert(csp.includes(exigido), `la politica no declara ${exigido}: ${csp}`);
+  }
+  // Los origenes no estan escritos a mano: quedan como marcadores que completa
+  // la construccion con las MISMAS variables con las que se compilo el bundle.
+  for (const marcador of ['__CSP_ORIGEN_API__', '__CSP_ORIGEN_IMAGENES__']) {
+    assert(csp.includes(marcador),
+      `la politica escribio un origen a mano en vez de ${marcador}: ${csp}`);
+    assert(dockerfile.includes(marcador),
+      `Dockerfile.railway no sustituye ${marcador}`);
+  }
+  assert(/VITE_API_URL/.test(dockerfile) && /VITE_IMAGES_URL/.test(dockerfile),
+    'Dockerfile.railway no toma los origenes de las variables del build');
+  assert(/grep -q "__CSP_ORIGEN_"/.test(dockerfile),
+    'Dockerfile.railway no falla si queda un marcador sin sustituir');
+
+  // Y la receta no se lee: se EJECUTA. Sin demonio de Docker no se construye la
+  // imagen, pero el paso que arma la politica es un `sh -c` y se puede correr
+  // igual, uniendo las continuaciones como hace Docker. Esto encontro que la
+  // version anterior salia con 0 aunque la variable viniera vacia: `test -n` en
+  // el medio de la cadena no cortaba nada, el marcador se sustituia por nada y
+  // el grep final no lo veia porque el marcador ya no estaba.
+  // La receta se ubica por lo que HACE —es el RUN que nombra el marcador—, no
+  // por como empieza: asi el caso sigue midiendo la receta aunque se reescriba.
+  // Las continuaciones se unen igual que las une Docker, en una sola linea.
+  const bloques = dockerfile
+    .replace(/\\\r?\n\s*/g, ' ')
+    .split(/\r?\n/)
+    .filter((l) => /^RUN /.test(l))
+    .map((l) => l.replace(/^RUN /, '').trim());
+  const conLaPolitica = bloques.filter((b) => b.includes('__CSP_ORIGEN_API__'));
+  assert(conLaPolitica.length === 1,
+    `Dockerfile.railway tiene ${conLaPolitica.length} RUN que arman la politica; tiene que ser uno`);
+  const unida = conLaPolitica[0];
+  const taller = mkdtempSync(`${tmpdir()}/topgreen-receta-`);
+  const copia = `${taller}/plantilla`;
+  const guion = unida.replaceAll('/etc/nginx/templates/default.conf.template', copia);
+  const ejecutar = (api, imagenes) => {
+    writeFileSync(copia, plantilla);
+    return spawnSync('/bin/sh', ['-c', guion], {
+      encoding: 'utf8',
+      env: { ...process.env, VITE_API_URL: api, VITE_IMAGES_URL: imagenes },
+    });
+  };
+
+  const buena = ejecutar('https://api.ejemplo.test/api', 'https://imagenes.ejemplo.test');
+  assert(buena.status === 0, `la receta fallo con variables validas: ${buena.stderr}`);
+  const salida = readFileSync(copia, 'utf8');
+  assert(/connect-src 'self' https:\/\/api\.ejemplo\.test"/.test(salida),
+    'la receta metio la ruta /api en la politica; CSP entiende origenes, no rutas');
+  assert(/img-src[^;]*https:\/\/imagenes\.ejemplo\.test/.test(salida),
+    'la receta no sustituyo el origen de imagenes');
+  assert(!salida.includes('__CSP_ORIGEN_'), 'la receta dejo un marcador sin sustituir');
+
+  const vacia = ejecutar('', 'https://imagenes.ejemplo.test');
+  assert(vacia.status !== 0,
+    'con VITE_API_URL vacia la receta salio con 0: la politica quedaria con un origen en blanco');
+  const vaciaImagenes = ejecutar('https://api.ejemplo.test/api', '');
+  assert(vaciaImagenes.status !== 0,
+    'con VITE_IMAGES_URL vacia la receta salio con 0');
+  rmSync(taller, { recursive: true, force: true });
+
+  // --- C. Y si la maquina tiene Nginx, se sirve de verdad ------------------
+  let modo = 'contrato de la plantilla (esta maquina no tiene nginx)';
+  const hayNginx = spawnSync('nginx', ['-v'], { encoding: 'utf8' }).status === 0;
+  if (hayNginx && existsSync('dist/index.html')) {
+    const carpeta = mkdtempSync(`${tmpdir()}/topgreen-nginx-`);
+    const puerto = 8199;
+    const origenApi = 'http://127.0.0.1:8000';
+    const conf = plantilla
+      .replace('${PORT}', String(puerto))
+      .replace('/usr/share/nginx/html', `${process.cwd()}/dist`)
+      .replaceAll('__CSP_ORIGEN_API__', origenApi)
+      .replaceAll('__CSP_ORIGEN_IMAGENES__', origenApi);
+    writeFileSync(`${carpeta}/servidor.conf`, conf);
+    writeFileSync(`${carpeta}/nginx.conf`, [
+      'worker_processes 1;',
+      `error_log ${carpeta}/error.log warn;`,
+      `pid ${carpeta}/nginx.pid;`,
+      'events { worker_connections 64; }',
+      'http {',
+      '  include /etc/nginx/mime.types;',
+      '  default_type application/octet-stream;',
+      `  access_log ${carpeta}/access.log;`,
+      `  client_body_temp_path ${carpeta}/body;`,
+      `  proxy_temp_path ${carpeta}/proxy;`,
+      `  fastcgi_temp_path ${carpeta}/fastcgi;`,
+      `  uwsgi_temp_path ${carpeta}/uwsgi;`,
+      `  scgi_temp_path ${carpeta}/scgi;`,
+      `  include ${carpeta}/servidor.conf;`,
+      '}',
+    ].join('\n'));
+
+    const prueba = spawnSync('nginx', ['-t', '-c', `${carpeta}/nginx.conf`], { encoding: 'utf8' });
+    assert(prueba.status === 0, `la plantilla no es una configuracion valida: ${prueba.stderr}`);
+    spawnSync('nginx', ['-c', `${carpeta}/nginx.conf`], { encoding: 'utf8' });
+    try {
+      const asset = readdirSync('dist/assets').find((f) => f.endsWith('.js'));
+      assert(asset, 'dist no tiene un asset con hash para medir');
+      for (const [etiqueta, ruta] of [
+        ['documento', '/'],
+        ['asset', `/assets/${asset}`],
+        ['salud', '/health'],
+        ['ruta spa inexistente', '/una-ruta-que-no-existe'],
+      ]) {
+        const { status, h } = await cabecerasDe(`http://127.0.0.1:${puerto}${ruta}`);
+        assert(status === 200, `frontend/${etiqueta} respondio ${status}`);
+        exigirBase(`frontend/${etiqueta}`, h);
+        assert((h['content-security-policy'] || '').includes(origenApi),
+          `frontend/${etiqueta}: la politica no quedo apuntando al origen del build`);
+        assert(!(h['content-security-policy'] || '').includes('__CSP_ORIGEN_'),
+          `frontend/${etiqueta}: quedo un marcador sin sustituir`);
+        assert(!(h['content-security-policy'] || '').includes(','),
+          `frontend/${etiqueta}: la politica llego duplicada`);
+      }
+      modo = `candidato Nginx real en :${puerto}, cuatro rutas`;
+    } finally {
+      spawnSync('nginx', ['-c', `${carpeta}/nginx.conf`, '-s', 'quit'], { encoding: 'utf8' });
+    }
+  }
+
+  return `Backend: ${rutasDelBackend.length} rutas con la base completa —${codigos.join(', ')}—, `
+    + 'CORS y preflight intactos, descarga con su tipo y su nombre, y sin CSP en la API a '
+    + `proposito. Frontend: ${modo}; politica sin comodines, sin 'unsafe-eval' ni 'unsafe-inline', `
+    + 'con los origenes tomados del build y ningun add_header adentro de un location. '
+    + 'La receta que arma la politica se ejecuta de verdad: sustituye los dos origenes sin '
+    + 'la ruta y corta la construccion si alguna variable llega vacia';
 });
 
 const passed = results.filter((result) => result.passed).length;

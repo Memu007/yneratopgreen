@@ -1,9 +1,69 @@
+# Frontend de TopGreen servido por Nginx.
+#
+# Las cabeceras defensivas van a nivel de `server` y no adentro de cada
+# `location`: en Nginx, un `add_header` dentro de un bloque REEMPLAZA a los
+# heredados en vez de sumarse. Declaradas acá arriba y sin ningún `add_header`
+# más abajo, las recibe todo lo que sale de este servidor —el documento, el
+# respaldo de rutas de la SPA, los assets con hash y `/health`—.
+#
+# Los orígenes de la API y de las imágenes no están escritos a mano: se
+# sustituyen al construir la imagen a partir de las mismas `VITE_API_URL` y
+# `VITE_IMAGES_URL` con las que se compiló el bundle, así la política no puede
+# quedar apuntando a un lugar distinto del que el código realmente consulta.
 server {
     listen ${PORT};
     server_name _;
 
     root /usr/share/nginx/html;
     index index.html;
+
+    # HSTS. Sin `preload`: pedir la lista es una decisión que no se puede
+    # deshacer rápido y no es de esta pieza.
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # El navegador no adivina el tipo de un archivo.
+    add_header X-Content-Type-Options "nosniff" always;
+
+    # Nadie mete esta aplicación adentro de un marco. Va dos veces a propósito:
+    # `frame-ancestors` es la regla moderna y `X-Frame-Options` cubre lo viejo.
+    # No se contradicen: las dos dicen que no.
+    add_header X-Frame-Options "DENY" always;
+
+    # Al salir del sitio se manda el origen y no la ruta completa.
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Capacidades que el producto no usa. La lista sale de haber buscado cada
+    # una en el código: no hay geolocalización, ni cámara, ni micrófono, ni
+    # pantalla completa, ni PaymentRequest, ni WebUSB, ni nada de esto.
+    add_header Permissions-Policy "accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), usb=(), xr-spatial-tracking=()" always;
+
+    # La política de contenido, permiso por permiso y con su motivo:
+    #
+    #   script-src 'self'        el bundle es un módulo propio; no hay script
+    #                            embebido en el HTML ni `eval` en el paquete.
+    #   style-src  'self'        sin `'unsafe-inline'`. Los veintiocho atributos
+    #                            `style` que escribe React no lo necesitan: React
+    #                            no los parsea como marcado, los asigna por CSSOM
+    #                            (`node.style`), y la CSP no gobierna el CSSOM. Se
+    #                            midió en los dos candidatos: mismo `display`,
+    #                            mismo cálculo, cero «Refused to apply inline
+    #                            style». Tampoco hay `<style>` inyectado en
+    #                            tiempo de ejecución ni `cssText` en el bundle.
+    #   img-src    data:         la vista previa de una foto antes de subirla:
+    #                            el alta la lee con `FileReader.readAsDataURL`.
+    #   img-src    blob:         editar una publicación previsualiza las fotos
+    #                            nuevas con `URL.createObjectURL`.
+    #   img-src    <imágenes>    las fotos de las publicaciones.
+    #   media-src  'self'        el video de «Quiénes somos», que se sirve desde
+    #                            acá. Queda dicho en vez de heredado.
+    #   connect-src <api>        la API, que en producción es otro origen.
+    #   font-src   'self'        Inter e Inter Tight se sirven desde acá.
+    #   object-src / frame-src 'none'  no hay `<object>`, `<embed>` ni marcos.
+    #   frame-ancestors 'none'   nadie nos enmarca.
+    #   base-uri / form-action 'self'  el `<base>` y los formularios no se
+    #                            pueden reapuntar a otro lado.
+    #   worker-src 'none'        no hay Web Workers ni service worker.
+    add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; frame-src 'none'; object-src 'none'; worker-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data: blob: __CSP_ORIGEN_IMAGENES__; media-src 'self'; connect-src 'self' __CSP_ORIGEN_API__" always;
 
     location = /health {
         access_log off;

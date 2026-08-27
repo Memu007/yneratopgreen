@@ -46,6 +46,69 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+# Cabeceras defensivas en TODA respuesta: la correcta, la que falla, la que no
+# existe y la descarga.
+#
+# Va como middleware puro de ASGI y no como `@app.middleware("http")` porque
+# el decorador de Starlette envuelve la respuesta y no alcanza a lo que
+# responde el propio enrutador antes de llegar a la aplicación —un 404 sin ruta,
+# por ejemplo—. Acá se toca el mensaje `http.response.start`, que es por donde
+# sale TODO, incluida la documentación y los archivos estáticos de `/uploads`.
+#
+# Lo que NO hace, a propósito: no pone `Content-Security-Policy`. La API
+# devuelve JSON y archivos, no documentos con recursos, y la única página HTML
+# que sirve es la documentación interactiva, que trae sus propios archivos de
+# un CDN: una política restrictiva la dejaría en blanco sin proteger nada. La
+# política de contenido es del Frontend, que es quien ejecuta código.
+#
+# Tampoco toca CORS: se registra ANTES que `CORSMiddleware` en el código, o sea
+# que corre por FUERA de él, y sólo agrega claves que no existían. Las
+# respuestas que ya traían una de estas cabeceras conservan la suya: no se
+# duplica ni se contradice nada.
+CABECERAS_DEFENSIVAS = (
+    # El navegador ignora esto sobre HTTP, así que ponerlo siempre no rompe el
+    # entorno local y cubre el despliegue, donde la TLS la termina la
+    # plataforma y la aplicación nunca ve el `https`. Sin `preload`.
+    (b"strict-transport-security", b"max-age=31536000; includeSubDomains"),
+    (b"x-content-type-options", b"nosniff"),
+    (b"x-frame-options", b"DENY"),
+    (b"referrer-policy", b"strict-origin-when-cross-origin"),
+    (
+        b"permissions-policy",
+        b"accelerometer=(), autoplay=(), camera=(), display-capture=(), "
+        b"encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), "
+        b"magnetometer=(), microphone=(), midi=(), payment=(), "
+        b"picture-in-picture=(), publickey-credentials-get=(), "
+        b"screen-wake-lock=(), usb=(), xr-spatial-tracking=()",
+    ),
+)
+
+
+class CabecerasDefensivas:
+    """Suma la base defensiva a cada respuesta, sin pisar lo que ya venga."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def enviar(mensaje):
+            if mensaje["type"] == "http.response.start":
+                cabeceras = mensaje.setdefault("headers", [])
+                puestas = {nombre.lower() for nombre, _ in cabeceras}
+                for nombre, valor in CABECERAS_DEFENSIVAS:
+                    if nombre not in puestas:
+                        cabeceras.append((nombre, valor))
+            await send(mensaje)
+
+        await self.app(scope, receive, enviar)
+
+
+app.add_middleware(CabecerasDefensivas)
+
 # Montar directorio de uploads (para servir imágenes).
 # StaticFiles exige que la carpeta ya exista, así que se crea antes. En una
 # instalación nativa recién clonada no hay ninguna, y el error de origen

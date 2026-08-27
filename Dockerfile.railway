@@ -18,9 +18,44 @@ RUN test -n "${VITE_API_URL}" \
 
 FROM nginx:alpine
 
+# El filtro sigue siendo sólo PORT: es lo único que Nginx resuelve al arrancar.
 ENV NGINX_ENVSUBST_FILTER=PORT
 
 COPY infra/railway/nginx.conf.template /etc/nginx/templates/default.conf.template
+
+# Los orígenes de la política de contenido salen de las MISMAS variables con
+# las que se compiló el bundle, y se sustituyen acá, al construir. No van por
+# `envsubst` en tiempo de arranque a propósito: si la política se armara con
+# variables de despliegue, podría terminar autorizando un origen distinto del
+# que el código quedó consultando. Así no hay forma de que se separen.
+#
+# Se toma el ORIGEN —esquema, host y puerto—, que es lo que entiende CSP: la
+# ruta de `VITE_API_URL` (`/api`) no forma parte de la política.
+ARG VITE_API_URL
+ARG VITE_IMAGES_URL
+# Al final se comprueba ademas que la politica haya quedado con dos origenes
+# con esquema y no con huecos. Ojo: nada de comentarios ADENTRO del RUN, que se
+# une en una sola linea y un `#` se comeria el resto.
+#
+# `set -eu` no es decoracion: sin el, un `test -n` que falla en el medio de la
+# cadena no corta nada —el estado de salida del RUN es el del ULTIMO comando— y
+# una variable vacia terminaria sustituyendo el marcador por nada. La politica
+# saldria con `connect-src 'self' ` y el grep final no se enteraria, porque el
+# marcador si desaparecio. Con `set -eu` la construccion se detiene ahi.
+RUN set -eu; \
+    origen() { printf '%s' "$1" | sed -E 's#^([a-zA-Z][a-zA-Z0-9+.-]*://[^/]+).*#\1#'; }; \
+    api="$(origen "${VITE_API_URL}")"; \
+    imagenes="$(origen "${VITE_IMAGES_URL}")"; \
+    test -n "$api"; \
+    test -n "$imagenes"; \
+    sed -i \
+        -e "s#__CSP_ORIGEN_API__#${api}#g" \
+        -e "s#__CSP_ORIGEN_IMAGENES__#${imagenes}#g" \
+        /etc/nginx/templates/default.conf.template; \
+    grep -qE "img-src [^;]*[a-z]+://" /etc/nginx/templates/default.conf.template; \
+    grep -qE "connect-src [^\"]*[a-z]+://" /etc/nginx/templates/default.conf.template; \
+    ! grep -q "__CSP_ORIGEN_" /etc/nginx/templates/default.conf.template
+
 COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 8080
