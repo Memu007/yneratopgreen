@@ -214,13 +214,13 @@ def get_products(
     seller_id: Optional[str] = Query(None, description="Filtrar por vendedor"),
     publication_type: Optional[str] = Query(
         None,
-        regex="^(producto|servicio)$",
+        pattern="^(producto|servicio)$",
         description="Filtrar por tipo de publicacion: producto o servicio",
     ),
     province: Optional[str] = Query(None, description="Filtrar por provincia (nombre canónico del padrón Georef)"),
     locality_id: Optional[str] = Query(None, description="Filtrar por localidad (ID del padrón Georef)"),
-    sort_by: str = Query("created_at", regex="^(created_at|price|sales|views)$"),
-    sort_order: str = Query("desc", regex="^(asc|desc)$"),
+    sort_by: str = Query("created_at", pattern="^(created_at|price|sales|views)$"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(24, ge=1, le=100)
 ):

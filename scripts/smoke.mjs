@@ -1,5 +1,5 @@
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { chromium } from 'playwright';
 
@@ -13008,6 +13008,127 @@ await runCase(129, 'El ingreso no deja la credencial escrita en la consola del n
     + 'la respuesta de autenticación; la sesión abre una pantalla protegida, el refresh '
     + 'automático renueva un access token roto sin imprimirlo y salir borra el par; y un '
     + 'ingreso rechazado no escribe lo que se intentó ni guarda nada';
+});
+
+await runCase(130, 'El token sigue siendo el mismo JWT despues de cambiar la biblioteca que lo firma', async () => {
+  // `python-jose` salio del proyecto porque arrastra `ecdsa`, que tiene el
+  // ataque Minerva declarado sin arreglo. Lo reemplaza PyJWT. El riesgo de ese
+  // cambio no es que deje de andar —eso lo ve cualquier caso de login—, es que
+  // el token cambie de forma sin que nadie lo note y las sesiones abiertas se
+  // caigan en el despliegue.
+  //
+  // Este caso fija el contrato del token SIN usar ninguna biblioteca de JWT:
+  // parte la cadena a mano, lee la cabecera y la carga, y recalcula la firma
+  // con HMAC-SHA256 crudo. Si mañana se cambia otra vez de biblioteca, esto
+  // sigue diciendo si el token es el mismo token.
+  const env = readFileSync('backend/.env', 'utf8');
+  const leerEnv = (clave) => {
+    const linea = env.split(/\r?\n/).filter((l) => l.startsWith(`${clave}=`)).pop();
+    return linea ? linea.slice(clave.length + 1).trim() : null;
+  };
+  const secreto = leerEnv('JWT_SECRET');
+  const algoritmo = leerEnv('JWT_ALGORITHM') || 'HS256';
+  const minutosDeAcceso = Number(leerEnv('ACCESS_TOKEN_MINUTES') || 15);
+  const diasDeRefresco = Number(leerEnv('REFRESH_TOKEN_DAYS') || 30);
+  assert(secreto, 'backend/.env no declara JWT_SECRET');
+  assert(algoritmo === 'HS256', `el algoritmo configurado es ${algoritmo} y este caso mide HS256`);
+
+  const desdeBase64Url = (s) =>
+    Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+  const aBase64Url = (buf) =>
+    buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const firmar = (cabezaYCarga) =>
+    aBase64Url(createHmac('sha256', secreto).update(cabezaYCarga).digest());
+
+  const partir = (token) => {
+    const trozos = token.split('.');
+    assert(trozos.length === 3, `el token no tiene tres partes: ${trozos.length}`);
+    return {
+      cabecera: JSON.parse(desdeBase64Url(trozos[0])),
+      carga: JSON.parse(desdeBase64Url(trozos[1])),
+      firma: trozos[2],
+      cuerpo: `${trozos[0]}.${trozos[1]}`,
+    };
+  };
+
+  const entrada = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'cliente@ejemplo.com', password: 'cliente123' },
+  });
+  assert(entrada.status === 200, `el ingreso respondio HTTP ${entrada.status}`);
+  const ahora = Math.floor(Date.now() / 1000);
+
+  const revisados = [];
+  for (const [nombre, token, tipoEsperado, segundosEsperados] of [
+    ['acceso', entrada.data.access_token, 'access', minutosDeAcceso * 60],
+    ['refresco', entrada.data.refresh_token, 'refresh', diasDeRefresco * 86400],
+  ]) {
+    assert(token, `el ingreso no devolvio el token de ${nombre}`);
+    const { cabecera, carga, firma, cuerpo } = partir(token);
+
+    // 1. La cabecera es exactamente la de un JWS compacto HS256.
+    assert(JSON.stringify(cabecera) === JSON.stringify({ alg: 'HS256', typ: 'JWT' })
+      || JSON.stringify(cabecera) === JSON.stringify({ typ: 'JWT', alg: 'HS256' }),
+      `la cabecera del token de ${nombre} es ${JSON.stringify(cabecera)}`);
+
+    // 2. Las reclamaciones son las de siempre y el vencimiento es el declarado.
+    assert(typeof carga.sub === 'string' && carga.sub.length > 0,
+      `el token de ${nombre} no trae sujeto`);
+    assert(carga.sub === entrada.data.user.id,
+      `el sujeto del token de ${nombre} no es la cuenta que entro`);
+    assert(carga.type === tipoEsperado,
+      `el token de ${nombre} dice type=${carga.type}`);
+    assert(Number.isInteger(carga.exp), `el vencimiento de ${nombre} no es entero: ${carga.exp}`);
+    const desvio = Math.abs((carga.exp - ahora) - segundosEsperados);
+    assert(desvio <= 120,
+      `el token de ${nombre} vence en ${carga.exp - ahora} s y la configuracion dice ${segundosEsperados} s`);
+    // 3. Nada de mas: el token no lleva la cuenta adentro.
+    const claves = Object.keys(carga).sort().join(',');
+    assert(claves === 'exp,sub,type',
+      `el token de ${nombre} lleva reclamaciones de mas: ${claves}`);
+
+    // 4. Y la firma es HMAC-SHA256 del secreto, recalculada acá sin PyJWT.
+    assert(firma === firmar(cuerpo),
+      `la firma del token de ${nombre} no es HMAC-SHA256 del secreto configurado`);
+
+    revisados.push(`${nombre} vence en ${Math.round((carga.exp - ahora) / 60)} min`);
+  }
+
+  // 5. Lo que NO puede pasar. Un token con la carga cambiada y firmado con
+  //    otro secreto, uno sin algoritmo y uno vencido: los tres rechazados.
+  const acceso = partir(entrada.data.access_token);
+  const cabeceraOriginal = entrada.data.access_token.split('.')[0];
+  const cargaComoTexto = (obj) =>
+    aBase64Url(Buffer.from(JSON.stringify(obj), 'utf8'));
+
+  const otroSujeto = { ...acceso.carga, sub: '00000000-0000-0000-0000-000000000000' };
+  const cuerpoFalso = `${cabeceraOriginal}.${cargaComoTexto(otroSujeto)}`;
+  const firmadoConOtroSecreto = `${cuerpoFalso}.${
+    aBase64Url(createHmac('sha256', 'otro-secreto-que-no-es-el-del-servidor').update(cuerpoFalso).digest())}`;
+
+  const sinAlgoritmo = `${aBase64Url(Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' }), 'utf8'))}.${
+    cargaComoTexto(acceso.carga)}.`;
+
+  const cuerpoVencido = `${cabeceraOriginal}.${cargaComoTexto({ ...acceso.carga, exp: ahora - 3600 })}`;
+  const vencidoBienFirmado = `${cuerpoVencido}.${firmar(cuerpoVencido)}`;
+
+  for (const [que, token] of [
+    ['un token con el sujeto cambiado y firmado con otro secreto', firmadoConOtroSecreto],
+    ['un token que dice alg=none', sinAlgoritmo],
+    ['un token vencido pero bien firmado', vencidoBienFirmado],
+  ]) {
+    await expectApiError(401, () => apiRequest('/auth/me', { token }));
+    revisados.push(`rechaza ${que}`);
+  }
+
+  // 6. Y el bueno sigue abriendo la sesion.
+  const yo = await apiRequest('/auth/me', { token: entrada.data.access_token });
+  assert(yo.status === 200 && yo.data.email === 'cliente@ejemplo.com',
+    `el token valido no abrio la sesion: HTTP ${yo.status}`);
+
+  return `el token es un JWS compacto HS256 con cabecera exacta, sujeto, tipo y vencimiento `
+    + `declarados y nada mas —${revisados.slice(0, 2).join('; ')}—, con la firma verificada `
+    + 'recalculando HMAC-SHA256 fuera de la biblioteca; rechaza sujeto cambiado con otro '
+    + 'secreto, alg=none y vencido bien firmado, y el valido abre la sesion';
 });
 
 const passed = results.filter((result) => result.passed).length;

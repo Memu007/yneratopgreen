@@ -1,9 +1,21 @@
 """
 Utilidades de seguridad: hashing de contraseñas y JWT tokens
+
+Los JWT se firman y se validan con PyJWT. Antes era `python-jose`, que se
+retiró por su cadena de dependencias: arrastra `ecdsa`, y `ecdsa` tiene el
+ataque de temporización Minerva (CVE-2024-23342) declarado fuera de alcance
+por su propio proyecto, o sea sin arreglo posible. Ninguna versión de
+`python-jose` existe sin esa dependencia.
+
+El cambio es de biblioteca y no de contrato: mismo algoritmo, mismas
+reclamaciones, mismo vencimiento y el mismo secreto. Un token emitido por la
+implementación anterior sigue siendo válido acá y viceversa, así que nadie
+pierde la sesión al desplegar. El caso 130 de la suite lo comprueba.
 """
 from datetime import datetime, timedelta
 from typing import Optional
-from jose import jwt, JWTError
+import jwt
+from jwt import PyJWTError
 import bcrypt
 from .config import settings
 
@@ -52,6 +64,6 @@ def decode_token(token: str) -> Optional[dict]:
     try:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
         return payload
-    except JWTError:
+    except PyJWTError:
         return None
 
