@@ -226,6 +226,13 @@ empezar a trabajar como si no estuviera decidida.
 Ninguna de las dos edita el archivo de la otra. `PARA-DEV.md` es tuyo:
 reescribilo entero cuando quieras.
 
+**Regla de relevo de respuestas:** la entrega de Dev siempre queda completa en
+`PARA-PM.md` y empujada a `main`. Después de eso, a Emi sólo le avisa que
+respondió; no le pide copiar el informe al chat. Cuando Emi diga **“respondió”**,
+la PM hace `git pull origin main`, lee el último bloque de `PARA-PM.md` y revisa
+los commits citados. Si el informe no está en el repositorio, la entrega todavía
+no ocurrió.
+
 **Antes de escribirme:**
 
 ```bash
