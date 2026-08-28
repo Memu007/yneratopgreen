@@ -168,8 +168,11 @@ Actualizado: 2026-08-28.
   cualquier otro entorno. SEC-5 queda aceptada en `0a898ae`/`278064a`: el
   registro público rechaza `role: admin` sin efectos y el servidor persiste
   siempre `USER`; el flujo administrativo autenticado conserva la asignación
-  de roles. SEC-6 queda activa para cerrar fuerza bruta exclusivamente en
-  `POST /api/auth/login`. Nada de esto acepta UX-2D.1 ni habilita despliegue.
+  de roles. SEC-6 producto `6c24de7` e informe `b57ae42` quedan rechazados por
+  ahora: cinco errores 500 de base dejan marcas como si fueran credenciales
+  erróneas y el sexto pedido recibe 429. La corrección activa SEC-6R debe contar
+  sólo los fallos 401 sin perder la protección concurrente. Nada de esto acepta
+  UX-2D.1 ni habilita despliegue.
 - **Advertencia del entorno descartable:** el Backend remoto usado por la vista
   local está atrasado respecto de `main` y su catálogo no devuelve aún
   `operation_kind` ni los campos nuevos de servicio. Por eso Logística cae en
@@ -189,11 +192,12 @@ y el Mercado agrega el buscador debajo. SEC-1 y SEC-2 quedan aceptadas en
 `d8ce32a`/`b38f29c` y `ccb868c`/`6cea576`; SEC-2.1 queda aceptada en
 `c05e0fb`/`7280404`. SEC-3 queda aceptada en `625d958`/`e78e3d5`, con informes
 `09d4418`/`e131aff`. SEC-4 queda aceptada en `9251701`/`0956e60`. SEC-5 queda
-aceptada en `0a898ae`/`278064a`. **La tarea activa única es SEC-6:** limitar los
-intentos fallidos de `POST /api/auth/login` por cuenta e IP sin cambiar el
-contrato de autenticación ni abrir un WAF general. No se reabren Inicio,
-Servicios, cards, anatomías, color ni tipografía y no se despliega. La orden
-completa está al final de `PARA-DEV.md`.
+aceptada en `0a898ae`/`278064a`. SEC-6 `6c24de7`/`b57ae42` queda rechazada por
+contabilizar errores 500 como fallos de credenciales. **La tarea activa única es
+SEC-6R:** corregir ese borde sin cambiar umbrales, identidad, contratos ni la
+protección concurrente. No se reabren Inicio, Servicios, cards, anatomías,
+color ni tipografía y no se despliega. La orden completa está al final de
+`PARA-DEV.md`.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se
