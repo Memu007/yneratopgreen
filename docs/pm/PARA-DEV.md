@@ -4331,3 +4331,91 @@ despliegues para probar.
 Empujá producto e informe a `Memu007/yneratopgreen/main`, escribí el informe
 completo sólo en `docs/pm/PARA-PM.md`, avisale a Emi únicamente que respondiste
 y frená. **No despliegues.**
+
+## 2026-08-28 — SEC-6 `6c24de7`: rechazada por contabilizar errores 500
+
+No acepto todavía producto `6c24de7` ni informe `b57ae42`. La política, los
+umbrales, la concurrencia y el tratamiento de IP quedan bien encaminados. PM
+reprodujo build, lint, compileall, `pip check` y `diff-check`; Railway documenta
+`X-Real-IP` como la IP remota y su equipo confirmó públicamente que el borde lo
+sobrescribe y que la aplicación no admite acceso directo por fuera del proxy.
+
+El bloqueo está antes de autenticar. `login_user` reserva por correo e IP y sólo
+devuelve esas marcas en 403 o éxito. Si la consulta a la base falla, la excepción
+sale como 500 pero las dos marcas quedan. Reproducción independiente PM con una
+base doble que levanta `RuntimeError` al consultar:
+
+```text
+intentos 1–5 -> RuntimeError: base no disponible
+intento 6    -> HTTP 429: Demasiados intentos de ingreso
+fallos por correo = 5
+fallos por IP     = 5
+```
+
+Esto contradice la política explícita de contar sólo los fallos de credenciales
+que responden 401 y además puede ocultar una caída real detrás de un 429.
+
+## Tarea activa única: SEC-6R, un 500 no consume el límite de login
+
+### Resultado esperado y prioridad
+
+Conservá SEC-6, pero asegurá que las reservas por correo e IP sobrevivan
+únicamente cuando el resultado sea el 401 genérico por correo inexistente o
+contraseña incorrecta. Cualquier excepción de infraestructura o salida distinta
+de ese 401 debe liberar exactamente las marcas de ese intento, sin abrir una
+carrera en el umbral.
+
+Antes de editar, leé `backend/app/api/auth.py`,
+`backend/app/services/limite_de_intentos.py` y el caso 134. Reproducí primero el
+rojo de PM contra `6c24de7`. No reabras la identidad de IP: la fuente oficial es
+<https://docs.railway.com/networking/public-networking/specs-and-limits> y la
+garantía de sobrescritura está confirmada por Railway en
+<https://station.railway.com/questions/need-authoritative-railway-client-ip-p-b7a7b4bd>.
+
+### Alcance y límites
+
+- Corregí únicamente el ciclo de vida de las dos reservas y agregá la regresión
+  que discrimina el 500. La política, mensajes, umbrales, ventanas, identidad,
+  poda y tope de claves no cambian.
+- Un error de consulta, verificación de contraseña u otra excepción inesperada
+  conserva su respuesta original y no deja marcas. No conviertas un 500 en 401
+  o 429 y no filtres detalles nuevos al cliente.
+- Los dos 401 de credenciales siguen dejando una marca por correo y una por IP;
+  los 403, el éxito y cualquier otro resultado siguen sin consumir cupo.
+- No cambies dependencias, esquema, migraciones, datos, frontend, Railway,
+  entrypoint, headers, otras rutas ni despliegue.
+
+### Criterios de aceptación ejecutables
+
+1. Una regresión provoca un fallo de base dentro del flujo real de login, falla
+   contra `6c24de7` porque el sexto pedido termina en 429 y queda verde con la
+   corrección: seis intentos conservan el mismo 500 original y los contadores de
+   correo e IP quedan en cero.
+2. La misma regresión demuestra que no se emitieron tokens, cookies ni cambios
+   de `last_login`, y que la respuesta no expone la excepción.
+3. Correo inexistente y contraseña incorrecta siguen consumiendo exactamente
+   una marca en cada dimensión; 403, éxito y 500 no consumen ninguna. El sexto
+   401 por correo y el trigésimo primero por IP siguen dando 429 con el mismo
+   cuerpo y `Retry-After`.
+4. La prueba concurrente de SEC-6 conserva cero pedidos atravesando un contador
+   lleno y exactamente uno cuando queda un lugar. La corrección no puede dejar
+   marcas huérfanas ni devolver marcas de otro pedido.
+5. Registro, confirmación/reenvío, login pendiente/inactivo, refresh y logout
+   conservan contrato. La suite completa queda al menos 135/135 desde base
+   limpia; build, lint, compileall, `pip check` y
+   `git -c core.whitespace=cr-at-eol diff --check` quedan verdes.
+6. Producto e informe van en commits separados. El informe incluye el rojo
+   exacto, el verde, contadores después del 500, umbrales conservados,
+   concurrencia, regresiones, riesgos y hashes.
+
+### Freno obligatorio
+
+Frená si liberar una excepción exige debilitar la reserva atómica, si no se
+puede distinguir de forma estable el 401 que sí cuenta o si la corrección
+requiere cambiar el contrato público. Traé la reproducción y una sola opción
+mínima; no agregues infraestructura ni despliegues para probar.
+
+Empujá corrección e informe en commits separados a
+`Memu007/yneratopgreen/main`, escribí la respuesta completa sólo en
+`docs/pm/PARA-PM.md`, avisale a Emi únicamente que respondiste y frená. **No
+despliegues.**
