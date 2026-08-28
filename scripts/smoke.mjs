@@ -13802,6 +13802,305 @@ db.close()
     + `role = ${JSON.stringify(rolPublico && (rolPublico.enum || rolPublico.const))}`;
 });
 
+await runCase(134, 'El ingreso deja de aceptar intentos ilimitados, por cuenta y por origen', async () => {
+  // `POST /api/auth/login` no contaba nada: treinta y un intentos seguidos con la
+  // contrasena equivocada devolvian treinta y un 401 y la cuenta seguia entrando
+  // con la contrasena buena.
+  //
+  // ORDEN DE ESTE CASO, que no es casual. El contador por IP es uno solo para
+  // todo lo que llega de 127.0.0.1, asi que los bloques que fallan a proposito
+  // gastan cupo de ese contador. Los primeros bloques suman unos veinte fallos
+  // —lejos de los treinta— y el bloque que SI busca agotar el limite por IP va
+  // al final y por otra bolsa: manda `X-Forwarded-For`, que fuera del borde cae
+  // en la bolsa de identidades no confiables. Asi el umbral por IP se mide de
+  // punta a punta sin dejar limitado el origen que usan los demas casos.
+  const sufijo = Date.now().toString(36);
+  const correoDe = (que) => `sec6-${que}-${sufijo}@ejemplo.com`;
+  const CLAVE = 'clave-buena-123';
+
+  // `apiRequest` no deja mandar headers ni leer los de la respuesta, y acá hacen
+  // falta las dos cosas.
+  const ingresar = async (email, password, headers = {}) => {
+    const r = await pedirConReintento(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...headers },
+      body: JSON.stringify({ email, password }),
+    });
+    const crudo = await r.text();
+    let cuerpo = null;
+    try { cuerpo = crudo ? JSON.parse(crudo) : null; } catch { cuerpo = crudo; }
+    return { estado: r.status, cuerpo, esperar: r.headers.get('retry-after') };
+  };
+  const ultimoIngresoDe = (correo) => {
+    const filas = queryRows(
+      `SELECT coalesce(last_login::text, '') FROM users WHERE email = ${sqlLiteral(correo)}`);
+    return filas.length ? filas[0][0] : null;
+  };
+
+  const cuenta = async (correo) => {
+    await registrarYVerificar({ email: correo, password: CLAVE, full_name: 'Fuerza Bruta' });
+    return correo;
+  };
+
+  // --- A. Un acierto antes del limite no se rompe y limpia el contador ------
+  const correoAcierto = await cuenta(correoDe('acierto'));
+  for (let i = 1; i <= 4; i += 1) {
+    const r = await ingresar(correoAcierto, 'equivocada');
+    assert(r.estado === 401, `intento ${i} respondio ${r.estado} y tenia que ser 401`);
+  }
+  const antesDelAcierto = ultimoIngresoDe(correoAcierto);
+  const acierto = await ingresar(correoAcierto, CLAVE);
+  assert(acierto.estado === 200, `la credencial correcta respondio ${acierto.estado}`);
+  assert(acierto.cuerpo.access_token && acierto.cuerpo.refresh_token,
+    'el ingreso correcto no emitio los dos tokens');
+  assert(ultimoIngresoDe(correoAcierto) !== antesDelAcierto,
+    'el ingreso correcto no actualizo last_login');
+  // Y el contador de la cuenta quedo limpio: si no, el quinto fallo siguiente
+  // seria el sexto y contestaria 429.
+  for (let i = 1; i <= 5; i += 1) {
+    const r = await ingresar(correoAcierto, 'equivocada');
+    assert(r.estado === 401,
+      `tras el acierto, el fallo ${i} respondio ${r.estado}: el contador no se limpio`);
+  }
+
+  // --- B. El sexto fallo por correo, exacto, y lo que trae el 429 -----------
+  const sexto = await ingresar(correoAcierto, 'equivocada');
+  assert(sexto.estado === 429, `el sexto fallo respondio ${sexto.estado} y tenia que ser 429`);
+  const esperaSexto = Number(sexto.esperar);
+  assert(Number.isInteger(esperaSexto) && esperaSexto > 0 && esperaSexto <= 15 * 60,
+    `Retry-After invalido en el 429: ${JSON.stringify(sexto.esperar)}`);
+  // El cuerpo no puede confirmar la cuenta: si dijera "esta cuenta esta
+  // bloqueada", el limite seria un oraculo para averiguar que correos existen.
+  const textoDel429 = JSON.stringify(sexto.cuerpo).toLowerCase();
+  assert(!textoDel429.includes(correoAcierto.toLowerCase()),
+    'el 429 repite el correo del intento');
+  for (const filtracion of ['cuenta', 'usuario', 'existe', 'contrasena', 'contraseña']) {
+    assert(!textoDel429.includes(filtracion),
+      `el cuerpo del 429 habla de "${filtracion}" y no tiene que confirmar nada`);
+  }
+
+  // Ya limitada, ni siquiera la credencial CORRECTA entra, y no se toca la base.
+  const ultimoAntes = ultimoIngresoDe(correoAcierto);
+  const correctaLimitada = await ingresar(correoAcierto, CLAVE);
+  assert(correctaLimitada.estado === 429,
+    `con el limite puesto, la credencial correcta respondio ${correctaLimitada.estado}`);
+  assert(!correctaLimitada.cuerpo.access_token && !correctaLimitada.cuerpo.refresh_token,
+    'el 429 emitio tokens');
+  assert(ultimoIngresoDe(correoAcierto) === ultimoAntes,
+    'el 429 igual actualizo last_login');
+
+  // --- C. Cuenta que existe y cuenta que no, indistinguibles ---------------
+  const correoQueNoExiste = correoDe('fantasma');
+  const correoQueExiste = await cuenta(correoDe('existe'));
+  const secuencias = {};
+  for (const [etiqueta, correo] of [['existe', correoQueExiste], ['no existe', correoQueNoExiste]]) {
+    const pasos = [];
+    for (let i = 1; i <= 6; i += 1) {
+      const r = await ingresar(correo, 'equivocada');
+      pasos.push({ estado: r.estado, cuerpo: JSON.stringify(r.cuerpo), tieneEspera: r.esperar !== null });
+    }
+    secuencias[etiqueta] = pasos;
+  }
+  assert(JSON.stringify(secuencias['existe']) === JSON.stringify(secuencias['no existe']),
+    'una cuenta que existe y una que no se distinguen por la secuencia o el cuerpo:\n'
+    + `  existe:    ${JSON.stringify(secuencias['existe'])}\n`
+    + `  no existe: ${JSON.stringify(secuencias['no existe'])}`);
+  assert(secuencias['existe'].at(-1).estado === 429 && secuencias['existe'].at(-1).tieneEspera,
+    'el sexto intento contra un correo inexistente no trajo 429 con Retry-After');
+
+  // --- D. Escribir el correo distinto no crea un contador nuevo ------------
+  const correoMayusculas = await cuenta(correoDe('mayusculas'));
+  const formas = [
+    correoMayusculas,
+    correoMayusculas.toUpperCase(),
+    ` ${correoMayusculas} `,
+    correoMayusculas.replace('sec6', 'SEC6'),
+    correoMayusculas.toUpperCase(),
+  ];
+  for (const [indice, forma] of formas.entries()) {
+    const r = await ingresar(forma, 'equivocada');
+    assert(r.estado === 401,
+      `la forma ${indice + 1} del correo respondio ${r.estado}: parece otro contador`);
+  }
+  const sextaForma = await ingresar(correoMayusculas.toUpperCase(), 'equivocada');
+  assert(sextaForma.estado === 429,
+    `cambiar mayusculas creo un contador aparte: el sexto respondio ${sextaForma.estado}`);
+
+  // --- E. Los contratos vecinos, intactos ----------------------------------
+  const correoPendiente = correoDe('pendiente');
+  await apiRequest('/auth/register', {
+    method: 'POST', body: { email: correoPendiente, password: CLAVE, full_name: 'Sin Confirmar' },
+  });
+  const pendiente = await ingresar(correoPendiente, CLAVE);
+  assert(pendiente.estado === 403,
+    `el ingreso sin confirmar respondio ${pendiente.estado} y tiene que seguir siendo 403`);
+  // Y ese 403 no consume cupo: la contrasena estuvo bien. Cinco veces seguidas
+  // siguen dando 403 y no un 429.
+  for (let i = 0; i < 5; i += 1) {
+    const r = await ingresar(correoPendiente, CLAVE);
+    assert(r.estado === 403, `el 403 de cuenta sin confirmar paso a ${r.estado}: cuenta como fallo`);
+  }
+  const sesion = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  });
+  assert(sesion.status === 200, 'una cuenta del seed dejo de poder ingresar');
+  // El refresh lee su token del header Authorization, no del cuerpo.
+  const renovado = await apiRequest('/auth/refresh', {
+    method: 'POST', token: sesion.data.refresh_token,
+  });
+  assert(renovado.status === 200 && renovado.data.access_token,
+    'el refresh dejo de funcionar');
+  const salida = await apiRequest('/auth/logout', { method: 'POST', token: sesion.data.access_token });
+  assert(salida.status === 200, 'el logout dejo de funcionar');
+
+  // --- F. Reloj, limpieza y concurrencia, sobre la pieza de verdad ---------
+  // El vencimiento de una ventana de quince minutos no se prueba esperando
+  // quince minutos: el reloj se inyecta. Y la carrera se prueba con hilos de
+  // verdad, que es lo que hay debajo de un endpoint `def` en Starlette.
+  const guion = `
+import json, threading
+from app.services.limite_de_intentos import (
+    VentanaDeslizante, FALLOS_POR_CORREO, VENTANA_CORREO_SEGUNDOS,
+    FALLOS_POR_IP, VENTANA_IP_SEGUNDOS, clave_de_ip)
+import app.core.config as configuracion
+from starlette.datastructures import Headers
+
+salida = {"politica": [FALLOS_POR_CORREO, VENTANA_CORREO_SEGUNDOS,
+                       FALLOS_POR_IP, VENTANA_IP_SEGUNDOS]}
+
+class Reloj:
+    def __init__(self): self.t = 1000.0
+    def __call__(self): return self.t
+    def avanzar(self, s): self.t += s
+
+reloj = Reloj()
+v = VentanaDeslizante(FALLOS_POR_CORREO, VENTANA_CORREO_SEGUNDOS, reloj=reloj)
+for _ in range(FALLOS_POR_CORREO):
+    v.reservar("una@ejemplo.com")
+espera, _ = v.reservar("una@ejemplo.com")
+salida["espera_al_limite"] = espera
+reloj.avanzar(VENTANA_CORREO_SEGUNDOS - 1)
+espera, _ = v.reservar("una@ejemplo.com")
+salida["espera_casi_vencida"] = espera
+reloj.avanzar(2)
+espera, _ = v.reservar("una@ejemplo.com")
+salida["pasa_al_vencer"] = espera is None
+
+barrido = VentanaDeslizante(FALLOS_POR_CORREO, VENTANA_CORREO_SEGUNDOS, reloj=reloj)
+for i in range(300):
+    barrido.reservar(f"correo{i}@ejemplo.com")
+salida["claves_antes"] = barrido.claves()
+reloj.avanzar(VENTANA_CORREO_SEGUNDOS + 1)
+barrido.olvidar_vencidos()
+salida["claves_despues"] = barrido.claves()
+
+def cuantos_pasan(marcas_previas, simultaneos):
+    ventana = VentanaDeslizante(FALLOS_POR_CORREO, VENTANA_CORREO_SEGUNDOS)
+    for _ in range(marcas_previas):
+        ventana.reservar("carrera@ejemplo.com")
+    pasaron = []
+    puerta = threading.Barrier(simultaneos)
+    def intentar():
+        puerta.wait()
+        espera, _ = ventana.reservar("carrera@ejemplo.com")
+        pasaron.append(espera is None)
+    hilos = [threading.Thread(target=intentar) for _ in range(simultaneos)]
+    for h in hilos: h.start()
+    for h in hilos: h.join()
+    return sum(pasaron)
+
+salida["carrera_en_el_limite"] = cuantos_pasan(FALLOS_POR_CORREO, 8)
+salida["carrera_al_borde"] = cuantos_pasan(FALLOS_POR_CORREO - 1, 8)
+
+class Pedido:
+    def __init__(self, headers):
+        self.headers = Headers(raw=[(k.encode(), v.encode()) for k, v in headers])
+        self.client = type("C", (), {"host": "10.0.0.1"})()
+
+casos = {
+    "sin headers": [],
+    "x-real-ip": [("x-real-ip", "198.51.100.7")],
+    "x-real-ip repetido": [("x-real-ip", "1.2.3.4"), ("x-real-ip", "198.51.100.7")],
+    "x-forwarded-for": [("x-forwarded-for", "203.0.113.99")],
+}
+identidades = {}
+for entorno in ("local", "production"):
+    configuracion.settings.ENV = entorno
+    identidades[entorno] = {n: clave_de_ip(Pedido(h)) for n, h in casos.items()}
+configuracion.settings.ENV = "local"
+salida["identidades"] = identidades
+print(json.dumps(salida))
+`;
+  const medido = JSON.parse(execFileSync(
+    'docker', ['exec', '-i', 'topgreen-api', 'python', '-c', guion],
+    { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
+  ).trim().split(/\r?\n/).at(-1));
+
+  const [porCorreo, ventanaCorreo, porIp, ventanaIp] = medido.politica;
+  assert(porCorreo === 5 && ventanaCorreo === 15 * 60,
+    `la politica por correo cambio: ${porCorreo} en ${ventanaCorreo}s`);
+  assert(porIp === 30 && ventanaIp === 10 * 60,
+    `la politica por IP cambio: ${porIp} en ${ventanaIp}s`);
+  assert(Math.round(medido.espera_al_limite) === ventanaCorreo,
+    `la espera al llegar al limite es ${medido.espera_al_limite} y tenia que ser ${ventanaCorreo}`);
+  assert(Math.round(medido.espera_casi_vencida) === 1,
+    `a un segundo del vencimiento la espera es ${medido.espera_casi_vencida}`);
+  assert(medido.pasa_al_vencer === true,
+    'vencida la ventana el intento sigue limitado: el limite se volvio permanente');
+  assert(medido.claves_antes === 300 && medido.claves_despues === 0,
+    `la limpieza dejo ${medido.claves_despues} claves vencidas de ${medido.claves_antes}`);
+  assert(medido.carrera_en_el_limite === 0,
+    `con el contador en el limite, ${medido.carrera_en_el_limite} de 8 pedidos simultaneos pasaron`);
+  assert(medido.carrera_al_borde === 1,
+    `a un fallo del limite pasaron ${medido.carrera_al_borde} de 8 simultaneos: el umbral se cruza por una carrera`);
+
+  // La identidad, distinguiendo Railway de local a proposito.
+  const local = medido.identidades.local;
+  const railway = medido.identidades.production;
+  assert(local['sin headers'] === '10.0.0.1',
+    `fuera del borde, sin headers, la identidad tendria que ser el par real: ${local['sin headers']}`);
+  assert(local['x-real-ip'] === '10.0.0.1',
+    'fuera del borde se le esta creyendo a X-Real-IP, que ahi no lo escribe nadie');
+  assert(local['x-forwarded-for'] !== '203.0.113.99',
+    'fuera del borde, un X-Forwarded-For inventado se convierte en identidad');
+  assert(railway['x-real-ip'] === '198.51.100.7',
+    `detras del borde no se esta usando X-Real-IP: ${railway['x-real-ip']}`);
+  assert(railway['x-real-ip repetido'] !== '198.51.100.7'
+    && railway['x-real-ip repetido'] !== '1.2.3.4',
+    'un X-Real-IP repetido se toma como identidad valida');
+  assert(railway['x-forwarded-for'] !== '203.0.113.99',
+    'detras del borde, un X-Forwarded-For inventado se convierte en identidad');
+  assert(railway['sin headers'] !== '10.0.0.1',
+    'detras del borde se esta usando client.host, que ahi lo reescribe X-Forwarded-For');
+
+  // --- G. El umbral por IP, de punta a punta y en su propia bolsa ----------
+  // Va ultimo: deja esa bolsa limitada por diez minutos. Los treinta y un
+  // intentos llevan un `X-Forwarded-For` DISTINTO cada uno; que igual choquen
+  // contra el limite prueba a la vez el umbral y que el header inventado no
+  // fabrica un contador nuevo por intento.
+  const porIpCodigos = [];
+  for (let i = 1; i <= porIp + 1; i += 1) {
+    const r = await ingresar(`sec6-ip-${i}-${sufijo}@ejemplo.com`, 'equivocada',
+      { 'X-Forwarded-For': `203.0.113.${i}` });
+    porIpCodigos.push(r.estado);
+  }
+  const primeros = new Set(porIpCodigos.slice(0, porIp));
+  assert(primeros.size === 1 && primeros.has(401),
+    `los primeros ${porIp} intentos por IP no fueron todos 401: ${[...primeros].join(', ')}`);
+  assert(porIpCodigos[porIp] === 429,
+    `el intento ${porIp + 1} respondio ${porIpCodigos[porIp]} y tenia que ser 429`);
+
+  return `Por cuenta: cinco 401 y el sexto 429 con Retry-After ${esperaSexto}s y cuerpo que no `
+    + 'nombra la cuenta; ya limitada, la credencial correcta tambien recibe 429 sin emitir '
+    + 'tokens ni tocar last_login. Un acierto previo limpia solo ese contador. Una cuenta que '
+    + 'existe y una que no entregan secuencia y cuerpo identicos. Cambiar mayusculas o espacios '
+    + `no crea otro contador. Por origen: ${porIp} veces 401 y la ${porIp + 1} 429, con un `
+    + 'X-Forwarded-For distinto en cada intento. El 403 de cuenta sin confirmar no consume cupo, '
+    + 'y refresh y logout siguen enteros. Con el reloj inyectado la ventana vence sola y la '
+    + 'limpieza deja 0 claves de 300; con ocho pedidos simultaneos pasan 0 en el limite y '
+    + 'exactamente 1 a un fallo del limite';
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

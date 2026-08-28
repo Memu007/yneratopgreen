@@ -4,6 +4,7 @@ API de Autenticación - Login, Register, Logout, etc
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
+import math
 
 from app.db.base import get_db
 from app.models.user import User, UserRole
@@ -37,6 +38,7 @@ from app.models.order import Order
 from app.models.locality import Locality
 from app.services.correo import ErrorDeCorreo
 from app.services import cargas, verificacion
+from app.services import limite_de_intentos as limite
 from app.services.verificacion import ResultadoDeVerificacion
 import structlog
 
@@ -51,6 +53,13 @@ router = APIRouter(prefix="/auth", tags=["autenticación"])
 RESPUESTA_GENERICA_DE_REENVIO = (
     "Si el correo corresponde a una cuenta sin confirmar, te enviamos un enlace "
     "nuevo. Revisá tu casilla."
+)
+
+# El 429 no dice nada de la cuenta. Si dijera "esta cuenta esta bloqueada",
+# el limite se volveria un oraculo para averiguar que correos existen: bastaria
+# con fallar seis veces contra cada uno y mirar cual contesta distinto.
+DEMASIADOS_INTENTOS = (
+    "Demasiados intentos de ingreso. Espera unos minutos y volve a probar."
 )
 
 MOTIVO_PENDIENTE = (
@@ -206,6 +215,7 @@ def register_user(
 def login_user(
     credentials: UserLoginRequest,
     response: Response,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
@@ -215,6 +225,35 @@ def login_user(
     - Genera tokens JWT
     - Retorna cookies HttpOnly
     """
+    # Freno de fuerza bruta. Va PRIMERO: si la clave ya esta limitada no se
+    # consulta la base, no se verifica una contrasena, no se emiten tokens y no
+    # se toca `last_login`.
+    #
+    # `reservar` mira y anota en un solo paso, con el candado tomado. Anotar
+    # antes de saber el resultado evita que dos pedidos simultaneos lean el
+    # contador al borde del limite, pasen los dos y crucen el umbral por una
+    # carrera. Si el intento termina NO siendo un fallo de credenciales, la
+    # marca se devuelve mas abajo.
+    clave_correo = limite.clave_de_correo(credentials.email)
+    clave_ip = limite.clave_de_ip(request)
+    espera, ficha_correo = limite.POR_CORREO.reservar(clave_correo)
+    ficha_ip = None
+    if espera is None:
+        espera, ficha_ip = limite.POR_IP.reservar(clave_ip)
+        if espera is not None:
+            limite.POR_CORREO.devolver(clave_correo, ficha_correo)
+    if espera is not None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=DEMASIADOS_INTENTOS,
+            headers={"Retry-After": str(max(1, math.ceil(espera)))},
+        )
+
+    def soltar_las_marcas():
+        """El intento no fue un fallo de credenciales: no cuenta para el limite."""
+        limite.POR_CORREO.devolver(clave_correo, ficha_correo)
+        limite.POR_IP.devolver(clave_ip, ficha_ip)
+
     # Buscar usuario por email
     user = db.query(User).filter(User.email == credentials.email).first()
     
@@ -231,8 +270,10 @@ def login_user(
             detail="Email o contraseña incorrectos"
         )
     
-    # Verificar que esté activo
+    # Los dos rechazos que siguen son 403, no 401: la contrasena estuvo bien.
+    # No cuentan para el limite, asi que la marca se devuelve.
     if not user.is_active:
+        soltar_las_marcas()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuario inactivo. Contacte al administrador."
@@ -242,10 +283,19 @@ def login_user(
     # acá ya se probó la contraseña, así que decirlo no revela nada que quien
     # pregunta no sepa, y sin el motivo real la persona no sabe qué hacer.
     if not user.is_verified:
+        soltar_las_marcas()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=MOTIVO_PENDIENTE,
         )
+
+    # Acerto. Se sueltan las marcas de este intento y se limpia el contador de
+    # la cuenta: quien acerto demostro que es suya. El de la IP NO se limpia, a
+    # proposito: si se limpiara, tener una credencial valida propia alcanzaria
+    # para reiniciar el contador entre tanda y tanda de un ataque de
+    # pulverizacion contra otras cuentas.
+    soltar_las_marcas()
+    limite.POR_CORREO.olvidar(clave_correo)
 
     # Actualizar last_login
     user.last_login = datetime.utcnow()
