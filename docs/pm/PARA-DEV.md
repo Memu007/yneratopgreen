@@ -4419,3 +4419,90 @@ Empujá corrección e informe en commits separados a
 `Memu007/yneratopgreen/main`, escribí la respuesta completa sólo en
 `docs/pm/PARA-PM.md`, avisale a Emi únicamente que respondiste y frená. **No
 despliegues.**
+
+## 2026-08-28 — SEC-6 y SEC-6R: aceptadas
+
+Acepto producto `6c24de7`, corrección `8b806ca` e informes
+`b57ae42`/`1f1902c`.
+
+Verificación independiente PM sobre el árbol final: seis pedidos con una sesión
+que levanta `OperationalError` atraviesan la aplicación real y devuelven seis
+500 con `Internal Server Error`, sin `Set-Cookie`, con cero marcas por correo y
+cero claves por IP. Con una sesión sana que no encuentra el usuario, la secuencia
+sigue siendo cinco 401 y un 429, quedan cinco marcas por correo, una clave por IP
+y `Retry-After: 900`. Build, lint, compileall, `pip check` y `diff-check` quedan
+verdes. Base limpia, migraciones, seed, concurrencia y suite 135/135 permanecen
+como evidencia de Dev porque PM no tiene Docker/PostGIS. No hubo despliegue.
+
+Los límites residuales quedan explícitos: memoria de un proceso, reinicio que
+borra contadores y futura réplica que exigiría un almacén compartido. No se abre
+esa infraestructura mientras la topología versionada siga siendo un solo
+Uvicorn.
+
+## Tarea activa única: OPS-1, identificar el commit desplegado
+
+### Resultado esperado y prioridad
+
+El próximo ensayo debe poder demostrar si Frontend, Backend y `main` corresponden
+al mismo commit. Hoy `/api/health` devuelve una versión fija y el Frontend no
+expone ninguna revisión; eso permitió que una interfaz reciente conviviera con
+un Backend viejo sin una señal inequívoca. Incorporá una identidad de build
+exacta y verificable, sin cambiar la interfaz ni desplegar.
+
+Antes de editar, leé `backend/app/main.py`, `backend/app/core/config.py`,
+`vite.config.ts`, `index.html`, los Dockerfiles/entrypoint y la documentación de
+despliegue. Railway documenta que `RAILWAY_GIT_COMMIT_SHA` contiene el SHA del
+commit que disparó el despliegue:
+<https://docs.railway.com/variables/reference>.
+
+### Alcance y límites
+
+- El Backend expone en `/api/health` la revisión completa de 40 caracteres que
+  recibió del entorno y la registra al arrancar junto con versión y entorno.
+- El artefacto estático del Frontend incorpora esa misma revisión en una señal
+  pública y automatizable —por ejemplo metadata del documento o un recurso
+  estático— sin agregar texto visible, consola ni otra superficie de diseño.
+- Una construcción local sin variable conserva build y arranque con un valor
+  explícito que no pueda confundirse con un commit real. Un valor configurado
+  válido se conserva byte por byte; no lo recortes para la evidencia.
+- No agregues dependencias, endpoints de diagnóstico con secretos, lectura de
+  `.git` en runtime, llamadas a GitHub, cambios visuales, Railway, Docker,
+  autenticación, datos, migraciones ni despliegue. No actualices por intuición
+  la versión comercial `1.0.0`.
+
+### Criterios de aceptación ejecutables
+
+1. Una regresión falla contra `8b806ca` porque Backend y Frontend no publican
+   ninguna revisión. En verde, construí ambos con un SHA sintético fijo de 40
+   hexadecimales y recuperalo exactamente desde `/api/health`, el log de inicio
+   y el artefacto estático del Frontend.
+2. Las tres representaciones coinciden byte por byte y no exponen ninguna otra
+   variable del entorno. El health conserva estado, servicio, versión y entorno,
+   y las cabeceras defensivas de SEC-3.
+3. Sin la variable, desarrollo y pruebas siguen funcionando y muestran un valor
+   inequívocamente no productivo; nunca una cadena vacía que pueda aprobarse por
+   error ni un SHA inventado a partir de la hora.
+4. La evidencia incluye el comando exacto que, tras un futuro despliegue,
+   comparará `git rev-parse main`, la revisión del Frontend y la del Backend. En
+   esta tarea sólo se demuestra localmente; no se toca el entorno remoto.
+5. La suite completa queda al menos 136/136 desde base limpia. También quedan
+   verdes build, lint, compileall, `pip check` y
+   `git -c core.whitespace=cr-at-eol diff --check`; no hace falta repetir a11y,
+   contraste ni hito porque no cambia la presentación visible.
+6. Producto e informe van en commits separados. El informe incluye rojo/verde,
+   las tres revisiones obtenidas, ausencia de filtración, contratos conservados,
+   riesgo residual y hashes.
+
+### Freno obligatorio
+
+Frená si Railway no entrega la variable durante alguno de los dos builds, si el
+Frontend y Backend pueden recibir commits distintos bajo la configuración real,
+si exponer la identidad obliga a mostrarla visualmente o si una carga CLI no
+puede asociarse de forma honesta a un commit. Traé la evidencia y una sola opción
+mínima; no inventes un SHA, no relajes la comparación y no despliegues para
+probar.
+
+Empujá producto e informe en commits separados a
+`Memu007/yneratopgreen/main`, escribí la respuesta completa sólo en
+`docs/pm/PARA-PM.md`, avisale a Emi únicamente que respondiste y frená. **No
+despliegues.**
