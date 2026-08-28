@@ -176,8 +176,11 @@ Actualizado: 2026-08-28.
   publican la misma revisión completa recibida del entorno y una construcción
   local se identifica como `sin-revision-local`. La Dev queda pausada. El
   próximo paso corresponde a PM: desplegar exactamente `main` en el Railway
-  descartable, sólo con autorización explícita de Emi, y contrastar las tres
-  revisiones. Nada de esto acepta UX-2D.1 ni habilita por sí solo el despliegue.
+  descartable y contrastar las tres revisiones. Emi autorizó ese ensayo el
+  2026-08-28 para ejecutarlo desde un chat con acceso a su Brave de escritorio;
+  el handoff autocontenido está en
+  `docs/pm/HANDOFF-DESPLIEGUE-RAILWAY-2026-08-28.md`. Nada de esto acepta
+  UX-2D.1 ni habilita por sí solo producción.
 - **Advertencia del entorno descartable:** el Backend remoto usado por la vista
   local está atrasado respecto de `main` y su catálogo no devuelve aún
   `operation_kind` ni los campos nuevos de servicio. Por eso Logística cae en
@@ -202,8 +205,10 @@ aceptada en `0a898ae`/`278064a`. SEC-6 y SEC-6R quedan aceptadas en
 `c7f480d`/`a0a6eec`: la identidad de build permite contrastar Frontend, Backend
 y `main`. **La Dev queda sin tarea activa.** El próximo paso es operativo y
 corresponde a PM: con autorización explícita de Emi, desplegar exactamente
-`main` en el Railway descartable y ejecutar la comparación documentada. Hasta
-entonces no se despliega ni se abre otro bloque de producto.
+`main` en el Railway descartable y ejecutar la comparación documentada. Emi lo
+autorizó el 2026-08-28; la ejecución completa y sus frenos están en
+`HANDOFF-DESPLIEGUE-RAILWAY-2026-08-28.md`. Hasta completarla no se abre otro
+bloque de producto.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se
