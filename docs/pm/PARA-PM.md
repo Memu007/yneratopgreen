@@ -2,218 +2,258 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## SEC-5 — el registro público no reparte roles
+## SEC-6 — el ingreso deja de aceptar intentos ilimitados
 
 Hecho. Producto e informe en commits separados. **No desplegué.**
 
-- Producto: `0a898ae` — «SEC-5: el registro público no reparte roles, el rol lo pone el servidor»
-- Archivos: `backend/app/schemas/auth.py`, `backend/app/api/auth.py`, `scripts/smoke.mjs` (caso 133).
+- Producto: `6c24de7` — «SEC-6: el ingreso deja de aceptar intentos ilimitados»
+- Archivos: `backend/app/services/limite_de_intentos.py` (nuevo), `backend/app/api/auth.py`, `scripts/smoke.mjs` (caso 134).
 
-Tu rojo se quedaba corto. No es que la cuenta «tendría las mismas
-autorizaciones»: la tiene, y lo atravesé hasta el final.
+Antes del detalle, **una cosa que cambia una premisa de la orden** y que quiero
+que veas primero, porque si no la miro el límite por IP no existiría.
 
 ---
 
-### 1. El rojo, contra `9251701`, hasta las últimas consecuencias
+### 1. `request.client.host` es un dato del cliente, en los dos entornos
+
+Vos escribiste: «localmente existe `request.client.host`». Lo medí antes de
+usarlo y no alcanza.
+
+Uvicorn 0.27 trae **`proxy_headers=True` por defecto** —no hace falta ninguna
+bandera— y con `forwarded_allow_ips` sin fijar confía en el par local. Resultado,
+contra un servidor levantado como lo levanta la suite, sin ninguna bandera de
+proxy:
 
 ```
-POST /api/auth/register  {"role": "admin"}      -> HTTP 201
-fila persistida                                  -> role=ADMIN, activo=true, verificado=false
-administradores en la base                       -> 1 → 2
-token de verificación                            -> 1
-notificación de bienvenida                       -> 1
-correo en el outbox                              -> +1
+sin headers                          -> client.host = 127.0.0.1
+con X-Forwarded-For: 203.0.113.99    -> client.host = 203.0.113.99
 ```
 
-Y después seguí, porque «tendría» no es una medición:
+Y `backend/railway-entrypoint.sh` va más lejos: `--forwarded-allow-ips="*"`, o
+sea confía en cualquiera. Así que `client.host` **es** el `X-Forwarded-For` del
+pedido, tanto en el despliegue como en desarrollo.
 
-```
-POST /api/auth/verify-email  (con el token del correo)  -> HTTP 200
-POST /api/auth/login                                     -> sesión abierta
-GET  /api/admin/users                                    -> HTTP 200
-GET  /api/admin/dashboard                                -> HTTP 200
-POST /api/admin/users  {"role": "admin"}                 -> HTTP 201
-```
+Lo comprobé por las malas: mi primera versión usaba `client.host` fuera del
+borde, y treinta y un intentos con un `X-Forwarded-For` distinto cada uno
+recibieron treinta y un 401. El límite por IP no existía.
 
-El token no lo saqué de la base: lo leí del correo, que es lo que tiene quien
-ataca —la casilla es suya—. Con eso, un desconocido termina leyendo el padrón
-completo de usuarios, el tablero, y **creando más administradores**. La escalada
-es total y no necesita nada previo.
+**Cómo quedó la identidad**, entonces:
 
-La regresión nueva, corrida contra `9251701`, falla en la primera afirmación:
-
-```
-[FAIL] 133 … — la API no respondió HTTP 422
-```
-
-### 2. La corrección: dos capas, y las dos hacen falta
-
-**Capa 1 — el esquema público acota el campo.**
-
-```python
-role: Literal[UserRole.USER] = UserRole.USER
-```
-
-Un pedido con `admin` se rechaza con **422 antes de entrar al endpoint**, así que
-no hay cuenta, ni token, ni correo, ni notificación que deshacer. Y OpenAPI queda
-con `enum: ["user"]`.
-
-Elegí rechazar y no ignorar en silencio, como pediste. Sacar el campo del esquema
-también cerraba la escalada, pero un `"role": "admin"` habría recibido 201 sin que
-nadie se enterara de que pidió algo que no le corresponde.
-
-**Capa 2 — el endpoint no le cree al esquema.**
-
-```python
-role=UserRole.USER,
-```
-
-Antes era `role=user_data.role`. Esta línea no depende de la anterior: es la que
-hace verdadero tu criterio 2.
-
-**Por qué se queda el campo.** El frontend manda `"role": "user"` explícito
-—`src/contexts/AuthContext.tsx`—, así que sacarlo lo rompía. Aceptar ese único
-valor no debilita la regla, porque quien decide qué se guarda es el servidor.
-
-### 3. Matriz payload / rol / efectos, medida contra el endpoint real
-
-| payload | HTTP | rol persistido | tokens | notifs | correos |
-|---|---|---|---|---|---|
-| sin `role` | 201 | **USER** | 1 | 1 | 1 |
-| `role: "user"` | 201 | **USER** | 1 | 1 | 1 |
-| transportista sin `role` | 201 | **USER** | 1 | 1 | 1 |
-| `role: "admin"` | **422** | — | **0** | **0** | **0** |
-| `role: "ADMIN"` | **422** | — | **0** | **0** | **0** |
-| `role: null` | **422** | — | **0** | **0** | **0** |
-| transportista + `role: "admin"` | **422** | — | **0** | **0** | **0** |
-
-Administradores en la base al terminar: **1**, el del seed. `role: null` ya se
-rechazaba antes —el campo nunca fue opcional—; lo incluyo para que se vea que no
-cambié ese comportamiento.
-
-### 4. El que persiste no le cree al esquema, probado
-
-Acotar el tipo frena al HTTP, no a alguien que arme el objeto por dentro. Lo
-construí **salteando la validación** y llamé al endpoint de verdad:
-
-```
-el esquema quedó con role = UserRole.ADMIN   (la validación no corrió)
-lo que se PERSISTIÓ:      UserRole.USER
-```
-
-Está dentro del caso 133, y el caso además exige que el forzado haya funcionado
-—si `model_construct` dejara de saltear la validación, la prueba avisa que no
-está midiendo nada en vez de pasar de arriba—.
-
-### 5. Autorizaciones: lo que se cierra y lo que se conserva
-
-| ruta | cuenta pública confirmada | administrador |
+| pedido | fuera del borde (`ENV≠production`) | detrás del borde (`ENV=production`) |
 |---|---|---|
-| `GET /api/admin/users` | **403** | 200 |
-| `GET /api/admin/dashboard` | **403** | 200 |
-| `GET /api/admin/products` | **403** | 200 |
-| `GET /api/admin/orders` | **403** | 200 |
+| sin headers | `10.0.0.1` (par real) | `identidad-no-confiable` |
+| `X-Real-IP: 198.51.100.7` | `10.0.0.1` (se ignora) | **`198.51.100.7`** |
+| `X-Real-IP` repetido | `10.0.0.1` | `identidad-no-confiable` |
+| `X-Forwarded-For: 203.0.113.99` | `identidad-no-confiable` | `identidad-no-confiable` |
 
-Y el único camino autorizado sigue entero:
+Las dos reglas, dichas en una línea: **detrás del borde manda `X-Real-IP`, que lo
+escribe Railway; fuera del borde manda el par real, y sólo si nadie mandó
+`X-Forwarded-For`.** Lo que no se puede identificar va todo a una misma bolsa:
+contar de más antes que no contar. Un `X-Real-IP` repetido —que es lo que se
+vería si alguien intentara inyectarlo— también cae ahí.
 
-```
-POST /api/admin/users {"role":"admin"} con sesión de admin   -> 201, la cuenta queda ADMIN
-POST /api/admin/users {"role":"admin"} con sesión pública    -> 403
-```
+No frené por esto porque no hace falta confiar en un header falsificable: hay una
+regla por entorno que no depende de ninguno. Pero la premisa era distinta de la
+que trae la orden y prefiero que lo sepas por mí.
 
-`/api/admin/users` y `/api/admin/users/{id}` usan `CreateUserRequest` y
-`UpdateUserRequest`, que son **esquemas propios**, no el del registro. Por eso tu
-freno —«si el único flujo administrativo también depende del mismo esquema»— no
-se activó: son independientes y no los toqué.
-
-También revisé el otro camino por el que se podría colar un rol: el
-`UserUpdateRequest` del perfil propio **no tiene** campo `role`, así que
-`PUT /api/auth/me` nunca pudo escribirlo. El único escritor de roles es
-`admin.py`, bajo `require_admin`.
-
-### 6. OpenAPI
+### 2. El rojo, contra `0a898ae`
 
 ```
-UserRegisterRequest.role  ->  {"type":"string","enum":["user"],"const":"user","default":"user"}
-CreateUserRequest.role    ->  {"allOf":[{"$ref":"#/components/schemas/UserRole"}],"default":"user"}
+31 intentos con la contraseña equivocada:
+  401 401 401 401 401 401 401 401 401 401 401 401 401 401 401 401
+  401 401 401 401 401 401 401 401 401 401 401 401 401 401 401
+6 intentos contra un correo inexistente:  401 401 401 401 401 401
+y después, con la contraseña BUENA:       200
 ```
 
-El esquema público del registro no menciona `admin` en ninguna parte —lo verifica
-el caso 133 sobre el JSON servido, no sobre el código—. El esquema administrativo
-conserva el enum completo, que es lo correcto: ahí sí se pueden asignar roles.
+Ningún freno, y la cuenta entra igual. La regresión nueva, corrida contra
+`0a898ae`, falla:
+
+```
+[FAIL] 134 … — el sexto fallo respondio 401 y tenia que ser 429
+```
+
+### 3. La política, y qué contesta cada intento
+
+| | umbral | ventana | ¿un acierto lo limpia? |
+|---|---|---|---|
+| por **correo** normalizado | 5 fallos | 15 min | **sí**, si fue antes del límite |
+| por **IP** | 30 fallos | 10 min | **no** |
+
+Medido de punta a punta contra el endpoint real:
+
+```
+por cuenta:  401 401 401 401 401 | 429  <- el sexto, exacto
+             Retry-After: 899
+             {"detail":"Demasiados intentos de ingreso. Espera unos minutos y volve a probar."}
+
+por origen:  401 ×30 | 429              <- el trigésimo primero, exacto
+```
+
+El contador por IP **no** se limpia con un acierto a propósito: si se limpiara,
+tener una credencial válida propia alcanzaría para reiniciarlo entre tanda y
+tanda de un ataque de pulverización contra otras cuentas.
+
+Sólo cuentan los fallos que hoy dan 401 —correo inexistente o contraseña
+incorrecta—. Los 403 de cuenta inactiva o sin confirmar no consumen cupo: la
+contraseña estuvo bien. Está probado: seis ingresos seguidos con la clave
+correcta sobre una cuenta sin confirmar dan seis 403, no un 429.
+
+### 4. El 429 no es un oráculo
+
+Si el cuerpo dijera «esta cuenta está bloqueada», el límite se volvería una forma
+de averiguar qué correos existen: bastaría con fallar seis veces contra cada uno
+y mirar cuál contesta distinto. Por eso el caso 134 compara las **dos secuencias
+completas** —código, cuerpo y presencia de `Retry-After`, seis intentos cada
+una— de un correo que existe y uno que no:
+
+```
+existe:    idénticas
+no existe: idénticas
+```
+
+Y exige que el cuerpo no repita el correo ni mencione «cuenta», «usuario»,
+«existe» o «contraseña».
+
+Escribir el correo distinto tampoco crea un contador aparte: `MAYÚSCULAS`,
+` con espacios `, `MiXtO` y la forma normal comparten uno solo. El sexto, escrito
+de la quinta forma distinta, ya recibe 429.
+
+### 5. Antes del límite no se rompe nada; después no se emite nada
+
+| | antes del límite | ya limitado |
+|---|---|---|
+| credencial correcta | 200, dos tokens, cookies, `last_login` actualizado | **429** |
+| tokens emitidos | sí | **ninguno** |
+| `last_login` | cambia | **no cambia** |
+| contador de la cuenta | se limpia | — |
+
+El «no cambia `last_login`» se mide leyendo la columna antes y después, no
+suponiendo. Y que el acierto limpia el contador se prueba al revés: después del
+acierto vuelven a caber **cinco** fallos antes del 429; si no se hubiera
+limpiado, el segundo ya cortaría.
+
+### 6. Reloj, limpieza y concurrencia
+
+Nada de esto espera quince minutos: el reloj se inyecta.
+
+```
+al llegar al límite                -> faltan 900s
+un segundo antes del vencimiento   -> faltan 1s
+un segundo después                 -> pasa
+300 correos distintos              -> 300 claves; vencidas, quedan 0
+```
+
+La carrera se prueba con hilos de verdad, que es lo que hay debajo de un endpoint
+`def` en Starlette:
+
+```
+contador en el límite,  8 pedidos simultáneos -> pasan 0
+a un fallo del límite,  8 pedidos simultáneos -> pasa exactamente 1
+```
+
+Ese «exactamente 1» es el punto. `reservar` **mira y anota en un solo paso**, con
+el candado tomado. Si anotara después de saber el resultado, los ocho leerían el
+contador en 4, los ocho pasarían y el umbral se cruzaría por una carrera. Como la
+marca se toma antes, el intento que no termina siendo un fallo de credenciales la
+devuelve.
+
+El estado queda acotado por tres vías: se podan las ventanas vencidas de la clave
+que se toca, hay un barrido general cada 256 reservas, y un tope de 10.000 claves
+que descarta la más vieja si el barrido no alcanzó.
 
 ### 7. Puertas, desde base limpia
 
 ```
 base limpia (drop/create + PostGIS + alembic upgrade head + seed)
-node scripts/smoke.mjs                          133/133   (0 fallaron)
+node scripts/smoke.mjs                          134/134   (0 fallaron)
 python -m compileall backend/app                ok
+python -m pip check                             No broken requirements found
 npm run build                                   ok
 npm run lint                                    ok (--max-warnings 0)
 git -c core.whitespace=cr-at-eol diff --check   limpio
 ```
 
-No repetí a11y, contraste ni hito: no cambia marcado visual. No toqué el
-frontend.
+No repetí a11y, contraste ni hito: no cambia marcado visual. Registro,
+confirmación, reenvío, login pendiente, login inactivo, refresh y logout
+conservan sus contratos —los cubren sus casos de siempre, y el 134 vuelve a
+tocar los cuatro últimos—.
 
-Diff completo:
+Diff completo, sin dependencias nuevas:
 
 ```
- backend/app/api/auth.py     |  10 ++-
- backend/app/schemas/auth.py |  17 ++++-
- scripts/smoke.mjs           | 177 ++++++++++++++++++++++++++++++++++++++++++++
+ backend/app/api/auth.py                    |  52 ++++-
+ backend/app/services/limite_de_intentos.py | 247 ++++++++++++++++++++++++
+ scripts/smoke.mjs                          | 299 +++++++++++++++++++++++++++++
 ```
 
-Sin migración, sin tocar el enum persistido, sin roles nuevos, sin rediseñar
-auth, sin rate limiting, sin seed, sin cookies, sin JWT, sin UI, sin Railway, sin
-datos y sin dependencias.
+### 8. Dos tropiezos míos
 
-### 8. Un tropiezo mío, dicho como fue
+**El proceso viejo, otra vez.** Al medir a mano dejé un `uvicorn` vivo que el
+script de base limpia no mataba —mataba por PID guardado y por un `pkill` que no
+coincidía—, así que la suite midió un proceso con el contador ya lleno y todo
+daba 429. Endurecí mi script para que mate cualquier `uvicorn` de esta
+aplicación y **falle si queda uno vivo**, en vez de seguir como si nada. Es mi
+herramienta, no producto, pero es la segunda vez que me pasa lo mismo y prefiero
+contarlo.
 
-La primera corrida completa dio 132/133. No era el producto: al reproducir el
-rojo levanté una API a mano y quedó viva, así que el `uvicorn` del script de base
-limpia no pudo tomar el puerto y la suite siguió midiendo el código viejo. Maté
-el proceso, rearmé la base y quedó 133/133. Lo cuento porque un verde que depende
-de qué proceso quedó colgado no es un verde, y prefiero que lo sepas por mí.
+**El caso 134 tiene un orden deliberado.** El contador por IP es uno solo para
+todo lo que llega de 127.0.0.1, así que un bloque que gasta treinta fallos
+dejaría limitado el origen que usan los demás casos. Los bloques que fallan a
+propósito suman unos veinte —lejos de treinta— y el bloque que sí agota el límite
+por IP va **último y por otra bolsa**: manda `X-Forwarded-For`, que fuera del
+borde cae en la bolsa de identidades no confiables. Eso mide el umbral de punta a
+punta, prueba de paso que el header inventado no fabrica un contador por intento,
+y deja el origen normal intacto.
 
 ### 9. Riesgos residuales
 
-1. **La cuenta creada durante mi reproducción del rojo quedó en mi base local.**
-   La base se recrea entera en cada corrida de puertas, así que ya no existe.
-   **En una base que haya estado expuesta con el código anterior, esto no
-   alcanza**: la corrección impide crear administradores nuevos, no revoca los
-   que ya se hubieran creado. Si Railway estuvo publicado con `9251701` o
-   anterior, hay que auditar `SELECT email, created_at FROM users WHERE
-   role='ADMIN'` y dar de baja lo que no reconozcas. Es lo primero que haría
-   antes de publicar.
-2. **El campo `role` sigue existiendo en el registro público.** Lo dejé por
-   compatibilidad con el frontend. El día que `AuthContext.tsx` deje de mandarlo,
-   se puede sacar del esquema y el caso 133 sigue verde, porque también prueba el
-   alta sin `role`.
-3. **No hay auditoría de cambios de rol.** `admin.py` asigna roles sin dejar
-   registro de quién promovió a quién. No estaba en el alcance y no lo agregué,
-   pero es la pieza que falta para poder responder «¿de dónde salió este
-   administrador?» sin adivinar.
-4. **El correo de confirmación no es una barrera contra esto.** Cualquiera
-   confirma su propia casilla; en el rojo lo hice yo. Sirve para validar que el
-   correo existe, no para autorizar nada.
+1. **El estado vive en memoria de un proceso.** La topología versionada corre
+   **un** Uvicorn —`railway-entrypoint.sh`, un solo `exec`—, así que hoy alcanza.
+   Dos consecuencias que quiero explícitas: un reinicio del servicio **borra los
+   contadores**, y si algún día hay más de una réplica cada una contaría por su
+   cuenta, o sea que el límite efectivo se multiplicaría por la cantidad de
+   réplicas. No agregué Redis ni nada externo, como pediste. Si el servicio pasa
+   a más de una réplica, **esto hay que rehacerlo**, y la opción mínima sería un
+   almacén compartido; no la incorporé porque no verifiqué que haga falta.
+2. **`X-Real-IP` es una premisa sobre Railway que no pude verificar acá.** El
+   diseño confía en que el borde lo **escribe pisando** lo que mande el cliente.
+   Si lo agregara sin pisar, un `X-Real-IP` propio podría colarse; por eso, si
+   llega repetido, no se usa. Verificarlo lleva un pedido contra el dominio
+   público con `X-Real-IP: 1.2.3.4` y mirar si el contador lo toma. **Lo haría
+   antes de confiar del todo en el límite por IP**, y es algo que se comprueba
+   sólo con el servicio publicado, o sea vos.
+3. **Treinta fallos por IP cada diez minutos es poco para una oficina.** Varias
+   personas detrás de una misma salida a internet comparten el contador. Es el
+   número que pediste y lo respeté; si aparecen quejas de 429 en un cliente
+   corporativo, el lugar a mirar es ese, no el límite por cuenta.
+4. **La bolsa común puede castigar de más.** En producción, un pedido que llegara
+   sin `X-Real-IP` cae en `identidad-no-confiable` junto con todos los demás en
+   esa situación. Elegí contar de más antes que no contar; si el borde alguna vez
+   dejara de mandar el header, el efecto sería que el login se limita globalmente
+   cada treinta fallos. La alternativa —volver a `client.host`— es la que
+   justamente no sirve, así que preferí el fallo ruidoso.
+5. **No cambié nada de las otras rutas.** Registro, reenvío de correo y refresh
+   siguen sin límite. No estaba en el alcance; el reenvío es el que más se
+   parece a esto y sería la próxima pieza natural.
 
 ### 10. Hashes
 
 ```
-backend/app/schemas/auth.py   556569ff8c196df0
-backend/app/api/auth.py       a7bbae59f0ccc4e6
-scripts/smoke.mjs             5a1faae745694307
+backend/app/services/limite_de_intentos.py   e7bd28f5766f6c03
+backend/app/api/auth.py                      195689c4ca810152
+scripts/smoke.mjs                            88ca12c58c1f33bd
 ```
 
 (SHA-256 truncado a 16, del árbol en el commit de producto.)
 
 ### 11. Frenos
 
-Ningún cliente contractual necesita elegir `admin` en el registro público: el
-único que manda el campo es el frontend propio, y manda `"user"`. El flujo
-administrativo no comparte esquema con el registro. Cerrar la escalada no exigió
-migrar datos ni tocar el enum persistido. No ignoré el valor privilegiado en
-silencio: se rechaza con 422 y hay una regresión que mide el rol **persistido**,
-no sólo el código de respuesta. No desplegué. `PRE_FIRMA.md` sigue fuera del
-versionado y lo confirmé antes de empujar.
+La IP real **sí** se puede distinguir sin confiar en un header falsificable, con
+una regla por entorno; por eso no frené, aunque la premisa de la orden sobre
+`client.host` no se sostenía. No hizo falta infraestructura nueva, ni migración,
+ni persistencia: un proceso, memoria, un candado. El límite no cambia la
+respuesta de una cuenta existente frente a una inexistente —está medido, las dos
+secuencias son idénticas— y no rompe una sesión válida antes del umbral. No
+amplié a otras rutas. No desplegué ni toqué la base o los administradores
+remotos. `PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de empujar.
