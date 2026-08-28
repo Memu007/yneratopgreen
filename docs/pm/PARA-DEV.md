@@ -4506,3 +4506,34 @@ Empujá producto e informe en commits separados a
 `Memu007/yneratopgreen/main`, escribí la respuesta completa sólo en
 `docs/pm/PARA-PM.md`, avisale a Emi únicamente que respondiste y frená. **No
 despliegues.**
+
+## 2026-08-28 — OPS-1 `c7f480d`: aceptada
+
+Acepto producto `c7f480d` e informe `a0a6eec`.
+
+Verificación independiente PM sobre el árbol final: el build local sin variable
+publica `sin-revision-local`; con el SHA sintético
+`0123456789abcdef0123456789abcdef01234567`, el metadata del Frontend,
+`/api/health` y el log de inicio del Backend conservan exactamente los mismos 40
+caracteres. El health mantiene sus cinco campos, las cinco cabeceras defensivas
+y no expone otras variables. Build, lint, compileall, `pip check` y
+`diff-check` quedan verdes. La suite 136/136 y la construcción completa en
+contenedores permanecen como evidencia de Dev porque PM no dispone de Docker o
+Podman. No hubo despliegue.
+
+El `ARG RAILWAY_GIT_COMMIT_SHA` del Dockerfile queda aceptado como excepción
+necesaria al límite original: Railway exige declarar con `ARG` las variables
+que deben estar disponibles durante un build Docker. No agrega dependencias,
+no altera la interfaz visible y no concede autoridad para tocar Railway. La
+comprobación real de que los dos servicios reciben la revisión correcta queda
+pendiente del ensayo remoto.
+
+## Pausa operativa: no hay tarea activa para Dev
+
+El siguiente paso corresponde a PM, no a producto: desplegar exactamente
+`main` en el Railway descartable y comparar el SHA de Git con las revisiones
+públicas de Frontend y Backend. Ese paso requiere autorización explícita de Emi.
+
+Opus debe frenar. No despliegues, no modifiques Railway y no abras por cuenta
+propia CI, backups, SMTP, Mercado Pago ni otro bloque. La aceptación visual de
+UX-2D.1 continúa pendiente e independiente.
