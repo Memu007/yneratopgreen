@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-08-27.
+Actualizado: 2026-08-28.
 
 ## Relevo inmediato — leer primero
 
@@ -165,9 +165,11 @@ Actualizado: 2026-08-27.
   Backend reciben la base defensiva y el 500 no controlado conserva cuerpo
   genérico con las cinco cabeceras. SEC-4 queda aceptada en `9251701`/`0956e60`:
   el seed demo sólo corre con `ENV=local` y frena antes de abrir la base en
-  cualquier otro entorno. SEC-5 queda activa por una escalada crítica: el
-  registro público acepta `role: admin`. Nada de esto acepta UX-2D.1 ni habilita
-  despliegue.
+  cualquier otro entorno. SEC-5 queda aceptada en `0a898ae`/`278064a`: el
+  registro público rechaza `role: admin` sin efectos y el servidor persiste
+  siempre `USER`; el flujo administrativo autenticado conserva la asignación
+  de roles. SEC-6 queda activa para cerrar fuerza bruta exclusivamente en
+  `POST /api/auth/login`. Nada de esto acepta UX-2D.1 ni habilita despliegue.
 - **Advertencia del entorno descartable:** el Backend remoto usado por la vista
   local está atrasado respecto de `main` y su catálogo no devuelve aún
   `operation_kind` ni los campos nuevos de servicio. Por eso Logística cae en
@@ -186,11 +188,12 @@ final de Emi. La primera banda ya es estable entre Inicio, Mercado y Servicios,
 y el Mercado agrega el buscador debajo. SEC-1 y SEC-2 quedan aceptadas en
 `d8ce32a`/`b38f29c` y `ccb868c`/`6cea576`; SEC-2.1 queda aceptada en
 `c05e0fb`/`7280404`. SEC-3 queda aceptada en `625d958`/`e78e3d5`, con informes
-`09d4418`/`e131aff`. SEC-4 queda aceptada en `9251701`/`0956e60`. **La tarea
-activa única es SEC-5:** cerrar la escalada por la que el registro público copia
-`role: admin` a una cuenta nueva. Rate limiting queda después de este bloqueo
-directo. No se reabren Inicio, Servicios, cards, anatomías, color ni tipografía
-y no se despliega. La orden completa está al final de `PARA-DEV.md`.
+`09d4418`/`e131aff`. SEC-4 queda aceptada en `9251701`/`0956e60`. SEC-5 queda
+aceptada en `0a898ae`/`278064a`. **La tarea activa única es SEC-6:** limitar los
+intentos fallidos de `POST /api/auth/login` por cuenta e IP sin cambiar el
+contrato de autenticación ni abrir un WAF general. No se reabren Inicio,
+Servicios, cards, anatomías, color ni tipografía y no se despliega. La orden
+completa está al final de `PARA-DEV.md`.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se

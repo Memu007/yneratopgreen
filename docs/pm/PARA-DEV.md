@@ -4218,3 +4218,116 @@ opción mínima.
 
 Empujá producto e informe a `Memu007/yneratopgreen/main`, avisá sólo que
 respondiste y frená. **No despliegues.**
+
+## 2026-08-28 — SEC-5 `0a898ae`: aceptada
+
+Acepto producto `0a898ae` e informe `278064a`.
+
+Verificación independiente PM sobre el árbol final: `role: "admin"`,
+`"ADMIN"` y `null` reciben 422 antes de ejecutar el endpoint, con cero
+consultas, altas, commits, correos y notificaciones. Alta sin rol, con
+`role: "user"` y de transportista responden 201 y persisten `USER`. Un
+`UserRegisterRequest` construido por dentro con `ADMIN` también termina
+persistido como `USER`. OpenAPI ofrece sólo `user` en el registro público. Una
+cuenta común recibe 403 al crear usuarios; una cuenta administradora conserva
+201 y crea `ADMIN`. Build, lint, compileall, `pip check` y `diff-check` quedan
+verdes. Base limpia, migraciones, seed y suite 133/133 permanecen como evidencia
+de Dev; PM reprodujo el recorrido crítico con `TestClient` y dobles sin tocar
+una base real. No hubo despliegue.
+
+Antes de una publicación hay una comprobación operativa separada: revisar en la
+base que no exista un administrador creado por el registro vulnerable. No la
+hagas desde esta tarea ni toques Railway o datos.
+
+## Tarea activa única: SEC-6, frenar fuerza bruta en el login
+
+### Resultado esperado y prioridad
+
+`POST /api/auth/login` hoy permite intentos de contraseña ilimitados. Cerrá esa
+deuda documentada sin convertirla en bloqueo permanente, sin revelar si una
+cuenta existe y sin extender el cambio a registro, reenvío de correo u otras
+rutas.
+
+Antes de editar, leé `backend/app/api/auth.py`, `backend/app/core/config.py`,
+`backend/railway-entrypoint.sh`, la configuración real de Railway y los casos de
+login, correo, refresh y autorización. Reproducí primero que una secuencia larga
+de credenciales erróneas sigue recibiendo 401 sin freno. Contrastá la topología
+versionada: el entrypoint ejecuta un solo proceso Uvicorn y la documentación de
+Railway identifica la IP remota con `X-Real-IP`; localmente existe
+`request.client.host`. No tomes una cadena `X-Forwarded-For` controlada por el
+cliente como identidad ni asumas réplicas que no verificaste.
+
+### Política mínima
+
+- Contá sólo fallos de credenciales que hoy responden 401: correo inexistente o
+  contraseña incorrecta. Las dos situaciones conservan exactamente el mismo
+  cuerpo y la misma política.
+- Por correo normalizado, permití cinco fallos dentro de 15 minutos; el intento
+  siguiente y los posteriores dentro de la ventana responden 429. Un login
+  correcto previo al límite limpia sólo ese contador.
+- Por IP, permití treinta fallos dentro de 10 minutos; el intento siguiente y
+  los posteriores responden 429. Un acierto no limpia este contador, para que
+  una credencial conocida no habilite un ataque de pulverización.
+- El 429 trae un cuerpo genérico que no confirma cuentas y `Retry-After` con el
+  tiempo restante. Al vencer la ventana, el login vuelve a evaluarse sin
+  intervención. No hay bloqueo manual ni permanente.
+- En Railway, la clave de IP usa el `X-Real-IP` que agrega el borde de la
+  plataforma. Fuera de ese entorno usa la IP del cliente. Un
+  `X-Forwarded-For` inventado no cambia el contador.
+
+### Alcance y límites
+
+- Implementá la pieza mínima, segura ante pedidos concurrentes y con reloj
+  sustituible en pruebas; no uses esperas reales. El estado debe quedar acotado
+  y retirar ventanas vencidas para no crecer sin límite.
+- La configuración versionada ejecuta un proceso. No agregues Redis, Cloudflare,
+  CAPTCHA, WAF, cola, servicio externo ni infraestructura. Si el servicio real
+  tiene más de una réplica, o si sostener el comportamiento correcto exige
+  persistencia, migración o una decisión para múltiples procesos, frená y traé
+  una sola opción con evidencia; no la incorpores por tu cuenta.
+- No cambies textos ni códigos actuales de 401/403, validación de correo,
+  emisión/refresh/logout de tokens, cookies, JWT, esquema de sesión, roles,
+  registro, UI, CORS, CSP, seed, Railway ni datos. No registres correo,
+  contraseña, tokens ni cuerpos de autenticación.
+- Sin desplegar y sin operar sobre la base o los administradores remotos.
+
+### Criterios de aceptación ejecutables
+
+1. Una regresión falla contra `0a898ae` porque al menos 31 intentos erróneos
+   siguen siendo 401. En verde fija exactamente el sexto intento erróneo por
+   correo y el trigésimo primero con correos distintos por IP, sin depender del
+   orden de otros casos ni de un proceso que quedó vivo.
+2. Correo existente con contraseña incorrecta y correo inexistente entregan la
+   misma secuencia de 401/429, cuerpo y `Retry-After`. Variar mayúsculas no crea
+   contadores distintos para el mismo correo.
+3. Antes del límite, credenciales correctas conservan sesión, tokens, cookies y
+   `last_login`; limpian el contador de correo. Al quedar limitado no se emiten
+   tokens, no se actualiza `last_login` y no se imprimen credenciales.
+4. Dos correos desde una IP comparten el límite de IP; un mismo correo desde
+   dos IP comparte el límite de cuenta. Un `X-Forwarded-For` falso no evade el
+   límite. La prueba de `X-Real-IP` diferencia explícitamente Railway de local.
+5. El reloj avanza en la prueba: vencida cada ventana desaparece el 429 y las
+   estructuras no retienen claves vencidas. Una prueba concurrente demuestra
+   que dos pedidos simultáneos no atraviesan el umbral por una carrera.
+6. Registro, confirmación/reenvío de correo, login pendiente, login inactivo,
+   refresh y logout conservan sus contratos. La suite completa queda al menos
+   133/133 desde base limpia.
+7. Quedan verdes build, lint, compileall, `pip check` y
+   `git -c core.whitespace=cr-at-eol diff --check`. No hace falta repetir a11y,
+   contraste ni hito si no cambia marcado visual.
+8. Producto e informe van en commits separados. El informe separa rojo y verde,
+   muestra umbrales, cuenta/IP, 401/429, `Retry-After`, concurrencia, limpieza,
+   regresiones y el límite explícito de reinicios o futuras réplicas.
+
+### Freno obligatorio
+
+Frená si la IP real no puede distinguirse sin confiar en un header falsificable,
+si la implementación correcta para la topología actual exige nueva
+infraestructura o migración, si el límite cambia la respuesta de cuentas
+existentes frente a inexistentes o si rompe una sesión válida antes del umbral.
+Traé la reproducción y una sola alternativa mínima; no amplíes a otras rutas ni
+despliegues para probar.
+
+Empujá producto e informe a `Memu007/yneratopgreen/main`, escribí el informe
+completo sólo en `docs/pm/PARA-PM.md`, avisale a Emi únicamente que respondiste
+y frená. **No despliegues.**
