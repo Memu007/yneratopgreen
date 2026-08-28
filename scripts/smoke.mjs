@@ -14234,6 +14234,139 @@ print(json.dumps(salida))
     + 'consumir cupo';
 });
 
+await runCase(136, 'Backend y Frontend dicen de que commit son, y lo dicen igual', async () => {
+  // Una interfaz nueva convivio con un Backend viejo sin ninguna senal: el health
+  // devolvia una version fija —`1.0.0`, que es la comercial y no se mueve— y el
+  // Frontend no publicaba nada. Ahora los dos publican la revision que les dio el
+  // entorno, y la prueba es que sean LA MISMA, byte por byte.
+  const SHA_SINTETICO = '0123456789abcdef0123456789abcdef01234567';
+  assert(/^[0-9a-f]{40}$/.test(SHA_SINTETICO),
+    'el SHA de la prueba tiene que ser 40 hexadecimales, como el que da Railway');
+
+  // --- A. Sin la variable, un valor que se lee como lo que es --------------
+  // El servidor que atiende la suite corre sin `RAILWAY_GIT_COMMIT_SHA`.
+  const saludLocal = await apiRequest('/health');
+  assert(saludLocal.status === 200, `el health respondio ${saludLocal.status}`);
+  const revisionLocal = saludLocal.data.revision;
+  assert(typeof revisionLocal === 'string' && revisionLocal.length > 0,
+    'el health no publica ninguna revision');
+  assert(!/^[0-9a-f]{40}$/i.test(revisionLocal),
+    `sin variable el health publica algo con forma de SHA: ${revisionLocal}`);
+  assert(/[^0-9a-f]/i.test(revisionLocal),
+    `el valor sin revision podria confundirse con un commit: ${revisionLocal}`);
+
+  // Y el health no perdio nada de lo que ya decia.
+  for (const [clave, valor] of [['status', 'ok'], ['service', 'TopGreen Marketplace API']]) {
+    assert(saludLocal.data[clave] === valor,
+      `el health cambio ${clave}: ${JSON.stringify(saludLocal.data[clave])}`);
+  }
+  assert(saludLocal.data.version === '1.0.0',
+    `la version comercial se movio sola: ${saludLocal.data.version}`);
+  assert(typeof saludLocal.data.environment === 'string' && saludLocal.data.environment,
+    'el health perdio el entorno');
+  // Ni se llevo puesta ninguna otra variable del entorno.
+  const clavesDelHealth = Object.keys(saludLocal.data).sort();
+  assert(JSON.stringify(clavesDelHealth)
+      === JSON.stringify(['environment', 'revision', 'service', 'status', 'version']),
+    `el health expone claves de mas o de menos: ${JSON.stringify(clavesDelHealth)}`);
+  const textoDelHealth = JSON.stringify(saludLocal.data);
+  for (const secreto of ['JWT_SECRET', 'DATABASE_URL', 'SMTP', 'MP_', 'postgres', 'password']) {
+    assert(!textoDelHealth.includes(secreto),
+      `el health filtra ${secreto}: ${textoDelHealth}`);
+  }
+  // Y las cabeceras defensivas de SEC-3 siguen ahi.
+  const cabecerasDelHealth = await fetch(`${API_URL}/health`);
+  for (const cabecera of ['strict-transport-security', 'x-content-type-options',
+    'x-frame-options', 'referrer-policy', 'permissions-policy']) {
+    assert(cabecerasDelHealth.headers.get(cabecera),
+      `el health perdio la cabecera ${cabecera}`);
+  }
+
+  // El Frontend, construido sin la variable, dice lo mismo.
+  const revisionDelDocumento = (html) => {
+    const etiqueta = html.match(
+      /<meta[^>]*name=["']topgreen:revision["'][^>]*>/i);
+    if (!etiqueta) return null;
+    const contenido = etiqueta[0].match(/content=["']([^"']*)["']/i);
+    return contenido ? contenido[1] : null;
+  };
+
+  // --- B. Con la variable puesta, las tres fuentes coinciden --------------
+  // Se construye a una carpeta aparte para no pisar el `dist` que usa el caso
+  // 131, que lo sirve con Nginx.
+  const carpeta = mkdtempSync(`${tmpdir()}/topgreen-revision-`);
+  const construccion = spawnSync(
+    'npx', ['vite', 'build', '--outDir', carpeta, '--emptyOutDir'],
+    { encoding: 'utf8', env: { ...process.env, RAILWAY_GIT_COMMIT_SHA: SHA_SINTETICO } },
+  );
+  assert(construccion.status === 0,
+    `la construccion con la revision fallo: ${(construccion.stderr || '').slice(0, 300)}`);
+  const revisionDelFrontend = revisionDelDocumento(
+    readFileSync(`${carpeta}/index.html`, 'utf8'));
+  assert(revisionDelFrontend === SHA_SINTETICO,
+    `el artefacto publica ${JSON.stringify(revisionDelFrontend)} y no el SHA que recibio`);
+
+  // El Backend, con la misma variable, por el health y por el log de arranque.
+  const guion = `
+import json, io, os, sys
+import structlog
+from starlette.testclient import TestClient
+
+registro = io.StringIO()
+structlog.configure(logger_factory=structlog.PrintLoggerFactory(file=registro))
+
+from app.main import app
+
+with TestClient(app) as c:
+    salud = c.get("/api/health").json()
+print(json.dumps({
+    "salud": salud,
+    "arranque": registro.getvalue(),
+    "variable": os.environ.get("RAILWAY_GIT_COMMIT_SHA"),
+}))
+`;
+  const crudo = execFileSync(
+    'docker',
+    ['exec', '-i', '-e', `RAILWAY_GIT_COMMIT_SHA=${SHA_SINTETICO}`,
+      'topgreen-api', 'python', '-c', guion],
+    { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
+  );
+  const medido = JSON.parse(crudo.trim().split(/\r?\n/).at(-1));
+  const revisionDelBackend = medido.salud.revision;
+  assert(revisionDelBackend === SHA_SINTETICO,
+    `el health publica ${JSON.stringify(revisionDelBackend)} y no el SHA que recibio`);
+
+  // El log de arranque la deja junto a version y entorno.
+  assert(/starting_application/.test(medido.arranque),
+    `no se capturo el log de arranque: ${JSON.stringify(medido.arranque.slice(0, 200))}`);
+  assert(medido.arranque.includes(SHA_SINTETICO),
+    `el log de arranque no trae la revision: ${JSON.stringify(medido.arranque.slice(0, 300))}`);
+  for (const dato of ['version', 'env']) {
+    assert(medido.arranque.includes(dato),
+      `el log de arranque perdio ${dato}: ${JSON.stringify(medido.arranque.slice(0, 300))}`);
+  }
+
+  // --- C. Byte por byte, las tres iguales ---------------------------------
+  const tres = [revisionDelFrontend, revisionDelBackend, medido.arranque.match(/[0-9a-f]{40}/)?.[0]];
+  assert(new Set(tres).size === 1 && tres[0] === SHA_SINTETICO,
+    `las tres representaciones no coinciden: ${JSON.stringify(tres)}`);
+  assert(revisionDelBackend.length === 40,
+    `la revision llego recortada a ${revisionDelBackend.length} caracteres`);
+
+  // Y con la variable puesta el health sigue sin publicar nada mas.
+  assert(JSON.stringify(Object.keys(medido.salud).sort()) === JSON.stringify(clavesDelHealth),
+    `con la revision puesta el health cambio de forma: ${JSON.stringify(Object.keys(medido.salud))}`);
+
+  rmSync(carpeta, { recursive: true, force: true });
+
+  return `Sin la variable, las dos puntas dicen ${JSON.stringify(revisionLocal)}: se lee como lo `
+    + 'que es y no puede aprobarse por error confundiendola con un commit. Con un SHA sintetico '
+    + `de 40 hexadecimales, el artefacto del Frontend, /api/health y el log de arranque devuelven `
+    + `los tres ${SHA_SINTETICO}, byte por byte y sin recortar. El health conserva estado, `
+    + 'servicio, version comercial y entorno, no suma ninguna otra clave del entorno y mantiene '
+    + 'las cinco cabeceras de SEC-3';
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     # Entorno
     ENV: str = "local"
     
+    # Qué commit es esto. Railway pone `RAILWAY_GIT_COMMIT_SHA` con el SHA
+    # completo del commit que disparó el despliegue; fuera de Railway no existe
+    # y queda vacía. Se guarda CRUDA: quien la interpreta es `REVISION`, más
+    # abajo, para que acá no haya dos verdades sobre el mismo dato.
+    RAILWAY_GIT_COMMIT_SHA: str = ""
+
     # API
     API_PREFIX: str = "/api"
     PROJECT_NAME: str = "TopGreen Marketplace"
@@ -228,3 +234,24 @@ class Settings(BaseSettings):
 
 # Instancia global de configuración
 settings = Settings()
+
+
+# Cuando no hay revisión, se dice que no la hay. No una cadena vacía —que se
+# aprueba sola de un vistazo— ni algo derivado de la hora, que parecería un
+# commit sin serlo. Este valor no puede confundirse con un SHA: tiene guiones y
+# no es hexadecimal.
+SIN_REVISION = "sin-revision-local"
+
+
+def _revision_declarada() -> str:
+    """La revisión tal como llegó, sin recortarla.
+
+    Lo único que se decide acá es qué pasa cuando no llega nada: se devuelve un
+    valor que se lee como lo que es. Si llega algo, se devuelve **igual**,
+    aunque no parezca un SHA: acortarlo o normalizarlo haría que dos artefactos
+    distintos se vieran iguales, que es justo lo que esto tiene que impedir.
+    """
+    return (settings.RAILWAY_GIT_COMMIT_SHA or "").strip() or SIN_REVISION
+
+
+REVISION = _revision_declarada()

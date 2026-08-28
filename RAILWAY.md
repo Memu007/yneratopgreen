@@ -141,3 +141,28 @@ Revisá además:
 El healthcheck de Railway se usa **al desplegar**, para decidir si la versión
 nueva reemplaza a la anterior. No es monitoreo continuo: no avisa si el
 servicio se cae más tarde.
+
+### Los dos servicios y `main`, ¿son el mismo commit?
+
+Ya pasó que una interfaz nueva conviviera con un backend viejo sin que nada lo
+dijera. Los dos servicios publican ahora la revisión que les dio Railway
+—`RAILWAY_GIT_COMMIT_SHA`—: el backend en `/api/health`, el frontend en la
+metadata del documento. Este comando compara las tres y falla si no coinciden:
+
+```bash
+git fetch origin main >/dev/null 2>&1
+main=$(git rev-parse origin/main)
+backend=$(curl -fsS "https://<backend>/api/health" \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["revision"])')
+frontend=$(curl -fsS "https://<frontend>/" \
+  | grep -o '<meta name="topgreen:revision" content="[^"]*"' \
+  | sed 's/.*content="//; s/"$//')
+printf 'main      %s\nbackend   %s\nfrontend  %s\n' "$main" "$backend" "$frontend"
+[ "$main" = "$backend" ] && [ "$main" = "$frontend" ] \
+  && echo "OK: los tres son el mismo commit" \
+  || { echo "NO coinciden: hay un servicio atrasado"; exit 1; }
+```
+
+`sin-revision-local` significa que ese artefacto se construyó sin la variable, o
+sea que **no** viene de un despliegue de Railway. Es un valor que se lee como lo
+que es: no lo apruebes como si fuera un commit.

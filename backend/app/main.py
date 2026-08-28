@@ -4,7 +4,7 @@ Aplicación principal FastAPI - TopGreen Marketplace Backend
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from app.core.config import settings
+from app.core.config import settings, REVISION
 from pathlib import Path
 import structlog
 
@@ -160,7 +160,10 @@ async def health_check():
         "status": "ok",
         "service": "TopGreen Marketplace API",
         "version": settings.VERSION,
-        "environment": settings.ENV
+        "environment": settings.ENV,
+        # Qué commit es esto, para poder comparar Frontend, Backend y `main`.
+        # Va sólo la revisión: ninguna otra variable del entorno sale por acá.
+        "revision": REVISION
     }
 
 
@@ -177,7 +180,12 @@ async def root():
 @app.on_event("startup")
 async def startup_event():
     """Acciones al iniciar la aplicación"""
-    logger.info("starting_application", env=settings.ENV, version=settings.VERSION)
+    logger.info(
+        "starting_application",
+        env=settings.ENV,
+        version=settings.VERSION,
+        revision=REVISION,
+    )
 
 
 @app.on_event("shutdown")
