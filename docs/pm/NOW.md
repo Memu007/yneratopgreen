@@ -172,9 +172,12 @@ Actualizado: 2026-08-28.
   `6c24de7`/`8b806ca`, con informes `b57ae42`/`1f1902c`: sólo los dos 401 de
   credenciales consumen cupo; seis caídas de base conservan seis 500 genéricos,
   cero cookies y cero marcas, sin perder los umbrales ni la protección
-  concurrente. OPS-1 queda activa para identificar el commit exacto de
-  Frontend y Backend antes de volver a desplegar. Nada de esto acepta UX-2D.1
-  ni habilita despliegue.
+  concurrente. OPS-1 queda aceptada en `c7f480d`/`a0a6eec`: Backend y Frontend
+  publican la misma revisión completa recibida del entorno y una construcción
+  local se identifica como `sin-revision-local`. La Dev queda pausada. El
+  próximo paso corresponde a PM: desplegar exactamente `main` en el Railway
+  descartable, sólo con autorización explícita de Emi, y contrastar las tres
+  revisiones. Nada de esto acepta UX-2D.1 ni habilita por sí solo el despliegue.
 - **Advertencia del entorno descartable:** el Backend remoto usado por la vista
   local está atrasado respecto de `main` y su catálogo no devuelve aún
   `operation_kind` ni los campos nuevos de servicio. Por eso Logística cae en
@@ -195,11 +198,12 @@ y el Mercado agrega el buscador debajo. SEC-1 y SEC-2 quedan aceptadas en
 `c05e0fb`/`7280404`. SEC-3 queda aceptada en `625d958`/`e78e3d5`, con informes
 `09d4418`/`e131aff`. SEC-4 queda aceptada en `9251701`/`0956e60`. SEC-5 queda
 aceptada en `0a898ae`/`278064a`. SEC-6 y SEC-6R quedan aceptadas en
-`6c24de7`/`8b806ca`, con informes `b57ae42`/`1f1902c`. **La tarea activa única
-es OPS-1:** exponer una identidad de build que permita contrastar Frontend,
-Backend y `main` antes del próximo ensayo de despliegue. No se reabren Inicio,
-Servicios, cards, anatomías, color ni tipografía y no se despliega. La orden
-completa está al final de `PARA-DEV.md`.
+`6c24de7`/`8b806ca`, con informes `b57ae42`/`1f1902c`. OPS-1 queda aceptada en
+`c7f480d`/`a0a6eec`: la identidad de build permite contrastar Frontend, Backend
+y `main`. **La Dev queda sin tarea activa.** El próximo paso es operativo y
+corresponde a PM: con autorización explícita de Emi, desplegar exactamente
+`main` en el Railway descartable y ejecutar la comparación documentada. Hasta
+entonces no se despliega ni se abre otro bloque de producto.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se
