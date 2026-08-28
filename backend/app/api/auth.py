@@ -254,95 +254,108 @@ def login_user(
         limite.POR_CORREO.devolver(clave_correo, ficha_correo)
         limite.POR_IP.devolver(clave_ip, ficha_ip)
 
-    # Buscar usuario por email
-    user = db.query(User).filter(User.email == credentials.email).first()
+    # Las marcas sobreviven SOLO si el intento termina en el 401 generico de
+    # credenciales. Cualquier otra salida —un 403, el acierto, o una excepcion
+    # de infraestructura que se va como 500— las devuelve.
+    #
+    # Se hace con `finally` y no soltandolas a mano en cada salida porque las
+    # salidas a mano se olvidan: si la base se cae en medio de la consulta, la
+    # excepcion sube sin pasar por ninguna linea escrita a proposito y las dos
+    # marcas quedan puestas. Seis caidas seguidas terminaban en 429: un
+    # incidente de infraestructura se convertia en un bloqueo de la cuenta.
+    marcas_consumidas = False
+    try:
+        # Buscar usuario por email
+        user = db.query(User).filter(User.email == credentials.email).first()
     
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email o contraseña incorrectos"
+        if not user:
+            marcas_consumidas = True
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Email o contraseña incorrectos"
+            )
+    
+        # Verificar contraseña
+        if not verify_password(credentials.password, user.password_hash):
+            marcas_consumidas = True
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Email o contraseña incorrectos"
+            )
+    
+        # Los dos rechazos que siguen son 403, no 401: la contrasena estuvo bien.
+        # No cuentan para el limite: el `finally` devuelve la marca.
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Usuario inactivo. Contacte al administrador."
+            )
+
+        # Sin correo confirmado no hay sesión. El motivo es explícito a propósito:
+        # acá ya se probó la contraseña, así que decirlo no revela nada que quien
+        # pregunta no sepa, y sin el motivo real la persona no sabe qué hacer.
+        if not user.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=MOTIVO_PENDIENTE,
+            )
+
+        # Acerto. El `finally` suelta las marcas de este intento; aca se limpia
+        # ademas el contador de la cuenta, porque quien acerto demostro que es
+        # suya. El de la IP NO se limpia, a proposito: si se limpiara, tener una
+        # credencial valida propia alcanzaria para reiniciar el contador entre
+        # tanda y tanda de un ataque de pulverizacion contra otras cuentas.
+        limite.POR_CORREO.olvidar(clave_correo)
+
+        # Actualizar last_login
+        user.last_login = datetime.utcnow()
+        db.commit()
+    
+        # Crear tokens
+        access_token = create_access_token(data={"sub": user.id})
+        refresh_token = create_refresh_token(data={"sub": user.id})
+    
+        # Setear cookies HttpOnly
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            max_age=settings.ACCESS_TOKEN_MINUTES * 60,
+            samesite="none",
+            secure=True
         )
     
-    # Verificar contraseña
-    if not verify_password(credentials.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email o contraseña incorrectos"
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            max_age=settings.REFRESH_TOKEN_DAYS * 24 * 60 * 60,
+            samesite="none",
+            secure=True
         )
     
-    # Los dos rechazos que siguen son 403, no 401: la contrasena estuvo bien.
-    # No cuentan para el limite, asi que la marca se devuelve.
-    if not user.is_active:
-        soltar_las_marcas()
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuario inactivo. Contacte al administrador."
+        # Calcular ventas y compras reales
+        sales_count = db.query(func.count(Order.id)).filter(
+            Order.seller_id == user.id
+        ).scalar() or 0
+
+        purchases_count = db.query(func.count(Order.id)).filter(
+            Order.buyer_id == user.id
+        ).scalar() or 0
+
+        user_data = UserResponse.model_validate(user)
+        user_data.sales_count = sales_count
+        user_data.purchases_count = purchases_count
+
+        return AuthResponse(
+            user=user_data,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            message="Inicio de sesión exitoso"
         )
-
-    # Sin correo confirmado no hay sesión. El motivo es explícito a propósito:
-    # acá ya se probó la contraseña, así que decirlo no revela nada que quien
-    # pregunta no sepa, y sin el motivo real la persona no sabe qué hacer.
-    if not user.is_verified:
-        soltar_las_marcas()
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=MOTIVO_PENDIENTE,
-        )
-
-    # Acerto. Se sueltan las marcas de este intento y se limpia el contador de
-    # la cuenta: quien acerto demostro que es suya. El de la IP NO se limpia, a
-    # proposito: si se limpiara, tener una credencial valida propia alcanzaria
-    # para reiniciar el contador entre tanda y tanda de un ataque de
-    # pulverizacion contra otras cuentas.
-    soltar_las_marcas()
-    limite.POR_CORREO.olvidar(clave_correo)
-
-    # Actualizar last_login
-    user.last_login = datetime.utcnow()
-    db.commit()
-    
-    # Crear tokens
-    access_token = create_access_token(data={"sub": user.id})
-    refresh_token = create_refresh_token(data={"sub": user.id})
-    
-    # Setear cookies HttpOnly
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        max_age=settings.ACCESS_TOKEN_MINUTES * 60,
-        samesite="none",
-        secure=True
-    )
-    
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        max_age=settings.REFRESH_TOKEN_DAYS * 24 * 60 * 60,
-        samesite="none",
-        secure=True
-    )
-    
-    # Calcular ventas y compras reales
-    sales_count = db.query(func.count(Order.id)).filter(
-        Order.seller_id == user.id
-    ).scalar() or 0
-
-    purchases_count = db.query(func.count(Order.id)).filter(
-        Order.buyer_id == user.id
-    ).scalar() or 0
-
-    user_data = UserResponse.model_validate(user)
-    user_data.sales_count = sales_count
-    user_data.purchases_count = purchases_count
-
-    return AuthResponse(
-        user=user_data,
-        access_token=access_token,
-        refresh_token=refresh_token,
-        message="Inicio de sesión exitoso"
-    )
+    finally:
+        if not marcas_consumidas:
+            soltar_las_marcas()
 
 
 @router.post("/verify-email", response_model=MensajeResponse)

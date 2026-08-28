@@ -14101,6 +14101,139 @@ print(json.dumps(salida))
     + 'exactamente 1 a un fallo del limite';
 });
 
+await runCase(135, 'Una caida de la base no gasta el cupo de ingresos de nadie', async () => {
+  // El limite de SEC-6 reserva la marca ANTES de saber como termina el intento,
+  // porque si no dos pedidos simultaneos cruzan el umbral por una carrera. Pero
+  // las marcas se soltaban a mano en cada salida, y una salida a mano se olvida:
+  // si la base se caia en medio de la consulta, la excepcion subia sin pasar por
+  // ninguna de esas lineas y las dos marcas quedaban puestas. Seis caidas
+  // seguidas terminaban en 429. O sea: un incidente de infraestructura le
+  // bloqueaba la cuenta a alguien que nunca escribio mal su contrasena.
+  //
+  // Esta prueba no rompe la base de verdad —eso voltearia toda la suite—: corre
+  // dentro del proceso de la aplicacion y le da al endpoint una sesion que falla
+  // como falla una base caida. El endpoint es el real y la pila de middleware
+  // tambien; lo unico simulado es la sesion.
+  const guion = `
+import json
+from sqlalchemy.exc import OperationalError
+from starlette.testclient import TestClient
+from app.main import app
+from app.db.base import get_db
+from app.models.user import User
+from app.services.limite_de_intentos import (
+    POR_CORREO, POR_IP, FALLOS_POR_CORREO, clave_de_correo)
+
+CORREO = "sec6r-caida@ejemplo.com"
+salida = {}
+
+
+class SesionRota:
+    """Se cae en la consulta, que es donde se cae una base de verdad."""
+    def query(self, *a, **k):
+        raise OperationalError("SELECT 1", {}, Exception("conexion perdida"))
+    def rollback(self): pass
+    def commit(self): pass
+    def close(self): pass
+
+
+def contadores():
+    return [POR_CORREO.fallos_de(clave_de_correo(CORREO)), POR_IP.claves()]
+
+
+# --- A. Seis caidas seguidas ---------------------------------------------
+POR_CORREO.vaciar(); POR_IP.vaciar()
+app.dependency_overrides[get_db] = lambda: SesionRota()
+with TestClient(app, raise_server_exceptions=False) as c:
+    respuestas = [c.post("/api/auth/login",
+                         json={"email": CORREO, "password": "loquesea"})
+                  for _ in range(FALLOS_POR_CORREO + 1)]
+salida["codigos_con_la_base_caida"] = [r.status_code for r in respuestas]
+salida["cuerpos"] = sorted({r.text[:200] for r in respuestas})
+salida["cookies"] = sorted({n for r in respuestas for n in r.cookies.keys()})
+salida["tiene_token"] = any("access_token" in r.text for r in respuestas)
+salida["contadores_tras_la_caida"] = contadores()
+app.dependency_overrides.clear()
+
+# --- B. Y con la base sana, los 401 SIGUEN consumiendo cupo --------------
+# Si la correccion hubiera soltado tambien las marcas del 401, el limite se
+# habria apagado sin que nadie se entere.
+POR_CORREO.vaciar(); POR_IP.vaciar()
+with TestClient(app, raise_server_exceptions=False) as c:
+    codigos = []
+    for _ in range(FALLOS_POR_CORREO + 1):
+        r = c.post("/api/auth/login", json={"email": CORREO, "password": "mal"})
+        codigos.append(r.status_code)
+salida["codigos_con_la_base_sana"] = codigos
+salida["contadores_tras_los_401"] = contadores()
+salida["cuerpo_del_429"] = r.text[:200]
+salida["retry_after"] = r.headers.get("retry-after")
+
+# --- C. El exito y el 403 siguen sin consumir ----------------------------
+POR_CORREO.vaciar(); POR_IP.vaciar()
+with TestClient(app, raise_server_exceptions=False) as c:
+    exito = c.post("/api/auth/login",
+                   json={"email": "vendedor@ejemplo.com", "password": "vendedor123"})
+salida["exito"] = exito.status_code
+salida["contadores_tras_el_exito"] = [
+    POR_CORREO.fallos_de(clave_de_correo("vendedor@ejemplo.com")), POR_IP.claves()]
+POR_CORREO.vaciar(); POR_IP.vaciar()
+print(json.dumps(salida))
+`;
+  const medido = JSON.parse(execFileSync(
+    'docker', ['exec', '-i', 'topgreen-api', 'python', '-c', guion],
+    { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
+  ).trim().split(/\r?\n/).at(-1));
+
+  // --- A. La caida conserva su 500 y no deja marcas ------------------------
+  const conLaCaida = medido.codigos_con_la_base_caida;
+  assert(conLaCaida.length === 6 && conLaCaida.every((c) => c === 500),
+    `los seis intentos con la base caida dieron ${JSON.stringify(conLaCaida)} y tenian que ser seis 500`);
+  const [marcasCorreo, clavesIp] = medido.contadores_tras_la_caida;
+  assert(marcasCorreo === 0,
+    `la caida dejo ${marcasCorreo} marcas por correo: un incidente gasta el cupo de la cuenta`);
+  assert(clavesIp === 0,
+    `la caida dejo ${clavesIp} claves por IP: un incidente gasta el cupo del origen`);
+
+  // El 500 sigue siendo el generico y no cuenta nada de la excepcion.
+  assert(medido.cuerpos.length === 1,
+    `los seis 500 no dieron el mismo cuerpo: ${JSON.stringify(medido.cuerpos)}`);
+  for (const filtracion of ['OperationalError', 'conexion perdida', 'Traceback',
+    'sqlalchemy', 'SELECT', 'app/api/auth.py']) {
+    assert(!medido.cuerpos[0].includes(filtracion),
+      `el 500 expone "${filtracion}": ${medido.cuerpos[0]}`);
+  }
+  assert(medido.tiene_token === false, 'un 500 devolvio un token');
+  assert(medido.cookies.length === 0,
+    `un 500 dejo cookies: ${JSON.stringify(medido.cookies)}`);
+
+  // --- B. Los 401 siguen contando, con el mismo 429 de siempre -------------
+  const conLaBaseSana = medido.codigos_con_la_base_sana;
+  assert(conLaBaseSana.slice(0, 5).every((c) => c === 401) && conLaBaseSana[5] === 429,
+    `la secuencia con la base sana quedo ${JSON.stringify(conLaBaseSana)} en vez de cinco 401 y un 429`);
+  assert(medido.contadores_tras_los_401[0] === 5,
+    `cinco 401 dejaron ${medido.contadores_tras_los_401[0]} marcas por correo`);
+  assert(medido.contadores_tras_los_401[1] === 1,
+    `cinco 401 dejaron ${medido.contadores_tras_los_401[1]} claves por IP`);
+  assert(medido.cuerpo_del_429.includes('Demasiados intentos'),
+    `el cuerpo del 429 cambio: ${medido.cuerpo_del_429}`);
+  const espera = Number(medido.retry_after);
+  assert(Number.isInteger(espera) && espera > 0,
+    `el 429 perdio su Retry-After: ${JSON.stringify(medido.retry_after)}`);
+
+  // --- C. El exito sigue sin consumir --------------------------------------
+  assert(medido.exito === 200, `el ingreso correcto respondio ${medido.exito}`);
+  assert(medido.contadores_tras_el_exito[0] === 0 && medido.contadores_tras_el_exito[1] === 0,
+    `un ingreso correcto dejo marcas: ${JSON.stringify(medido.contadores_tras_el_exito)}`);
+
+  return `Con la base caida, seis intentos dan seis 500 con el mismo cuerpo generico —sin la `
+    + `excepcion, sin tokens y sin cookies— y los contadores quedan en `
+    + `${JSON.stringify(medido.contadores_tras_la_caida)}: un incidente de infraestructura ya no `
+    + 'le gasta el cupo a nadie. Con la base sana los 401 siguen contando uno por dimension y el '
+    + `sexto sigue siendo 429 con su Retry-After de ${espera}s; el ingreso correcto sigue sin `
+    + 'consumir cupo';
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 
