@@ -2,171 +2,129 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## SEC-6 — el ingreso deja de aceptar intentos ilimitados
+## SEC-6R — una caída de la base no gasta el cupo de ingresos de nadie
 
-Hecho. Producto e informe en commits separados. **No desplegué.**
+Hecho. Corrección e informe en commits separados. **No desplegué.**
 
-- Producto: `6c24de7` — «SEC-6: el ingreso deja de aceptar intentos ilimitados»
-- Archivos: `backend/app/services/limite_de_intentos.py` (nuevo), `backend/app/api/auth.py`, `scripts/smoke.mjs` (caso 134).
+- Corrección: `8b806ca` — «SEC-6R: una caída de la base no gasta el cupo de ingresos de nadie»
+- Archivos: `backend/app/api/auth.py` (la corrección), `scripts/smoke.mjs` (caso 135). `limite_de_intentos.py` **no se tocó**.
 
-Antes del detalle, **una cosa que cambia una premisa de la orden** y que quiero
-que veas primero, porque si no la miro el límite por IP no existiría.
+El rechazo era correcto y el defecto es mío. Peor todavía: es un defecto que
+introduje *por* hacer bien la otra mitad. La reserva se toma antes de saber cómo
+termina el intento —eso es lo que impide que dos pedidos simultáneos crucen el
+umbral por una carrera—, pero la devolución la escribí a mano en cada salida. Y
+una salida escrita a mano se olvida: cuando la base se cae en medio de la
+consulta, la excepción sube sin pasar por ninguna de esas líneas.
 
 ---
 
-### 1. `request.client.host` es un dato del cliente, en los dos entornos
+### 1. El rojo, contra `6c24de7`
 
-Vos escribiste: «localmente existe `request.client.host`». Lo medí antes de
-usarlo y no alcanza.
-
-Uvicorn 0.27 trae **`proxy_headers=True` por defecto** —no hace falta ninguna
-bandera— y con `forwarded_allow_ips` sin fijar confía en el par local. Resultado,
-contra un servidor levantado como lo levanta la suite, sin ninguna bandera de
-proxy:
+Seis intentos de ingreso con la base caída, a través del flujo real:
 
 ```
-sin headers                          -> client.host = 127.0.0.1
-con X-Forwarded-For: 203.0.113.99    -> client.host = 203.0.113.99
+codigos:              [500, 500, 500, 500, 500, 429]
+cuerpo del ultimo:    {"detail":"Demasiados intentos de ingreso. Espera unos minutos..."}
+marcas por correo:    5
+claves por IP:        1
 ```
 
-Y `backend/railway-entrypoint.sh` va más lejos: `--forwarded-allow-ips="*"`, o
-sea confía en cualquiera. Así que `client.host` **es** el `X-Forwarded-For` del
-pedido, tanto en el despliegue como en desarrollo.
+El sexto ya no es el incidente: es el límite. Un corte de base de treinta
+segundos le dejaba la cuenta bloqueada quince minutos a alguien que nunca escribió
+mal su contraseña, y encima le decía «demasiados intentos», que es falso.
 
-Lo comprobé por las malas: mi primera versión usaba `client.host` fuera del
-borde, y treinta y un intentos con un `X-Forwarded-For` distinto cada uno
-recibieron treinta y un 401. El límite por IP no existía.
-
-**Cómo quedó la identidad**, entonces:
-
-| pedido | fuera del borde (`ENV≠production`) | detrás del borde (`ENV=production`) |
-|---|---|---|
-| sin headers | `10.0.0.1` (par real) | `identidad-no-confiable` |
-| `X-Real-IP: 198.51.100.7` | `10.0.0.1` (se ignora) | **`198.51.100.7`** |
-| `X-Real-IP` repetido | `10.0.0.1` | `identidad-no-confiable` |
-| `X-Forwarded-For: 203.0.113.99` | `identidad-no-confiable` | `identidad-no-confiable` |
-
-Las dos reglas, dichas en una línea: **detrás del borde manda `X-Real-IP`, que lo
-escribe Railway; fuera del borde manda el par real, y sólo si nadie mandó
-`X-Forwarded-For`.** Lo que no se puede identificar va todo a una misma bolsa:
-contar de más antes que no contar. Un `X-Real-IP` repetido —que es lo que se
-vería si alguien intentara inyectarlo— también cae ahí.
-
-No frené por esto porque no hace falta confiar en un header falsificable: hay una
-regla por entorno que no depende de ninguno. Pero la premisa era distinta de la
-que trae la orden y prefiero que lo sepas por mí.
-
-### 2. El rojo, contra `0a898ae`
+La regresión nueva, corrida contra `6c24de7`, falla exactamente ahí:
 
 ```
-31 intentos con la contraseña equivocada:
-  401 401 401 401 401 401 401 401 401 401 401 401 401 401 401 401
-  401 401 401 401 401 401 401 401 401 401 401 401 401 401 401
-6 intentos contra un correo inexistente:  401 401 401 401 401 401
-y después, con la contraseña BUENA:       200
+[FAIL] 135 … — los seis intentos con la base caida dieron [500,500,500,500,500,429]
+              y tenian que ser seis 500
 ```
 
-Ningún freno, y la cuenta entra igual. La regresión nueva, corrida contra
-`0a898ae`, falla:
+### 2. La corrección
 
-```
-[FAIL] 134 … — el sexto fallo respondio 401 y tenia que ser 429
-```
+El cuerpo del login pasa a estar dentro de un `try`, y la devolución al `finally`:
 
-### 3. La política, y qué contesta cada intento
-
-| | umbral | ventana | ¿un acierto lo limpia? |
-|---|---|---|---|
-| por **correo** normalizado | 5 fallos | 15 min | **sí**, si fue antes del límite |
-| por **IP** | 30 fallos | 10 min | **no** |
-
-Medido de punta a punta contra el endpoint real:
-
-```
-por cuenta:  401 401 401 401 401 | 429  <- el sexto, exacto
-             Retry-After: 899
-             {"detail":"Demasiados intentos de ingreso. Espera unos minutos y volve a probar."}
-
-por origen:  401 ×30 | 429              <- el trigésimo primero, exacto
+```python
+    marcas_consumidas = False
+    try:
+        ...
+        if not user:
+            marcas_consumidas = True
+            raise HTTPException(401, "Email o contraseña incorrectos")
+        ...
+    finally:
+        if not marcas_consumidas:
+            soltar_las_marcas()
 ```
 
-El contador por IP **no** se limpia con un acierto a propósito: si se limpiara,
-tener una credencial válida propia alcanzaría para reiniciarlo entre tanda y
-tanda de un ataque de pulverización contra otras cuentas.
+`marcas_consumidas` se pone en exactamente **dos** lugares: los dos 401 genéricos
+de credenciales. Todo lo demás —los dos 403, el acierto y cualquier excepción—
+cae en el `finally` y devuelve.
 
-Sólo cuentan los fallos que hoy dan 401 —correo inexistente o contraseña
-incorrecta—. Los 403 de cuenta inactiva o sin confirmar no consumen cupo: la
-contraseña estuvo bien. Está probado: seis ingresos seguidos con la clave
-correcta sobre una cuenta sin confirmar dan seis 403, no un 429.
+Es al revés de como estaba, y esa inversión es el punto: antes había que
+acordarse de soltar en cada salida nueva; ahora hay que acordarse de **retener**,
+y retener es lo excepcional. Una salida futura que nadie previó suelta sola.
 
-### 4. El 429 no es un oráculo
+Lo que **no** cambié, porque tu alcance lo prohíbe y porque no hacía falta: la
+reserva sigue siendo atómica y en el mismo orden, cada pedido sigue devolviendo
+su propia ficha —`devolver` busca esa ficha y no la última—, y la política,
+mensajes, umbrales, ventanas, identidad de origen, poda y tope de claves quedaron
+intactos. `limite_de_intentos.py` no tiene una línea distinta.
 
-Si el cuerpo dijera «esta cuenta está bloqueada», el límite se volvería una forma
-de averiguar qué correos existen: bastaría con fallar seis veces contra cada uno
-y mirar cuál contesta distinto. Por eso el caso 134 compara las **dos secuencias
-completas** —código, cuerpo y presencia de `Retry-After`, seis intentos cada
-una— de un correo que existe y uno que no:
+### 3. El verde, medido
 
-```
-existe:    idénticas
-no existe: idénticas
-```
+Con la base caída:
 
-Y exige que el cuerpo no repita el correo ni mencione «cuenta», «usuario»,
-«existe» o «contraseña».
+| | |
+|---|---|
+| códigos | `[500, 500, 500, 500, 500, 500]` |
+| cuerpos distintos | **1** — `Internal Server Error` |
+| marcas por correo | **0** |
+| claves por IP | **0** |
+| tokens emitidos | ninguno |
+| cookies puestas | ninguna |
 
-Escribir el correo distinto tampoco crea un contador aparte: `MAYÚSCULAS`,
-` con espacios `, `MiXtO` y la forma normal comparten uno solo. El sexto, escrito
-de la quinta forma distinta, ya recibe 429.
+Y el 500 no cuenta nada: la prueba exige que el cuerpo no contenga
+`OperationalError`, `conexion perdida`, `Traceback`, `sqlalchemy`, `SELECT` ni
+`app/api/auth.py`.
 
-### 5. Antes del límite no se rompe nada; después no se emite nada
-
-| | antes del límite | ya limitado |
-|---|---|---|
-| credencial correcta | 200, dos tokens, cookies, `last_login` actualizado | **429** |
-| tokens emitidos | sí | **ninguno** |
-| `last_login` | cambia | **no cambia** |
-| contador de la cuenta | se limpia | — |
-
-El «no cambia `last_login`» se mide leyendo la columna antes y después, no
-suponiendo. Y que el acierto limpia el contador se prueba al revés: después del
-acierto vuelven a caber **cinco** fallos antes del 429; si no se hubiera
-limpiado, el segundo ya cortaría.
-
-### 6. Reloj, limpieza y concurrencia
-
-Nada de esto espera quince minutos: el reloj se inyecta.
+Con la base sana, en la misma corrida —y esto es la mitad que importa, porque una
+corrección que soltara **también** las marcas del 401 apagaría el límite sin que
+nadie se entere—:
 
 ```
-al llegar al límite                -> faltan 900s
-un segundo antes del vencimiento   -> faltan 1s
-un segundo después                 -> pasa
-300 correos distintos              -> 300 claves; vencidas, quedan 0
+cinco 401 y el sexto 429      -> [401, 401, 401, 401, 401, 429]
+marcas tras los cinco 401     -> 5 por correo, 1 clave por IP
+cuerpo del 429                -> "Demasiados intentos de ingreso…"  (el mismo)
+Retry-After                   -> 900
+ingreso correcto              -> 200, y deja 0 marcas
 ```
 
-La carrera se prueba con hilos de verdad, que es lo que hay debajo de un endpoint
-`def` en Starlette:
+### 4. Cómo se provoca la caída sin voltear la suite
 
-```
-contador en el límite,  8 pedidos simultáneos -> pasan 0
-a un fallo del límite,  8 pedidos simultáneos -> pasa exactamente 1
-```
+No rompo la base de verdad: la prueba corre **dentro del proceso de la
+aplicación** y le da al endpoint una sesión que falla como falla una base caída
+—se cae en `query`, que es donde se cae—. El endpoint es el real y la pila de
+middleware también; lo único simulado es la sesión, y se instala con
+`app.dependency_overrides`, que es el mecanismo previsto de FastAPI y se limpia al
+salir. El producto no gana ningún interruptor.
 
-Ese «exactamente 1» es el punto. `reservar` **mira y anota en un solo paso**, con
-el candado tomado. Si anotara después de saber el resultado, los ocho leerían el
-contador en 4, los ocho pasarían y el umbral se cruzaría por una carrera. Como la
-marca se toma antes, el intento que no termina siendo un fallo de credenciales la
-devuelve.
+### 5. Lo que sigue igual
 
-El estado queda acotado por tres vías: se podan las ventanas vencidas de la clave
-que se toca, hay un barrido general cada 256 reservas, y un tope de 10.000 claves
-que descarta la más vieja si el barrido no alcanzó.
+- **Concurrencia** (tu criterio 4): el caso 134 no cambió y sigue verde — cero
+  pedidos atraviesan un contador lleno con ocho simultáneos, y exactamente uno
+  cuando queda un lugar. La corrección no toca `reservar`.
+- **Sin marcas huérfanas ni cruzadas**: `devolver(clave, ficha)` busca **esa**
+  ficha en la cola; si no está, no hace nada. Dos pedidos concurrentes tienen
+  fichas distintas y ninguno puede soltar la del otro.
+- **Contratos vecinos**: registro, confirmación, reenvío, login pendiente, login
+  inactivo, refresh y logout, verdes en la suite completa.
 
-### 7. Puertas, desde base limpia
+### 6. Puertas, desde base limpia
 
 ```
 base limpia (drop/create + PostGIS + alembic upgrade head + seed)
-node scripts/smoke.mjs                          134/134   (0 fallaron)
+node scripts/smoke.mjs                          135/135   (0 fallaron)
 python -m compileall backend/app                ok
 python -m pip check                             No broken requirements found
 npm run build                                   ok
@@ -174,86 +132,51 @@ npm run lint                                    ok (--max-warnings 0)
 git -c core.whitespace=cr-at-eol diff --check   limpio
 ```
 
-No repetí a11y, contraste ni hito: no cambia marcado visual. Registro,
-confirmación, reenvío, login pendiente, login inactivo, refresh y logout
-conservan sus contratos —los cubren sus casos de siempre, y el 134 vuelve a
-tocar los cuatro últimos—.
-
-Diff completo, sin dependencias nuevas:
+Diff:
 
 ```
- backend/app/api/auth.py                    |  52 ++++-
- backend/app/services/limite_de_intentos.py | 247 ++++++++++++++++++++++++
- scripts/smoke.mjs                          | 299 +++++++++++++++++++++++++++++
+ backend/app/api/auth.py | 171 ++++++++++++++++++++++++++----------------------
+ scripts/smoke.mjs       | 133 +++++++++++++++++++++++++++++++++++++
 ```
 
-### 8. Dos tropiezos míos
+El número de `auth.py` engaña: la mayor parte es el cuerpo del login corriéndose
+cuatro espacios para entrar en el `try`. Las líneas con contenido nuevo son
+trece: el comentario, `marcas_consumidas = False`, `try:`, dos
+`marcas_consumidas = True`, y las tres del `finally`; y se van las tres llamadas
+sueltas a `soltar_las_marcas()`.
 
-**El proceso viejo, otra vez.** Al medir a mano dejé un `uvicorn` vivo que el
-script de base limpia no mataba —mataba por PID guardado y por un `pkill` que no
-coincidía—, así que la suite midió un proceso con el contador ya lleno y todo
-daba 429. Endurecí mi script para que mate cualquier `uvicorn` de esta
-aplicación y **falle si queda uno vivo**, en vez de seguir como si nada. Es mi
-herramienta, no producto, pero es la segunda vez que me pasa lo mismo y prefiero
-contarlo.
+### 7. Riesgos residuales
 
-**El caso 134 tiene un orden deliberado.** El contador por IP es uno solo para
-todo lo que llega de 127.0.0.1, así que un bloque que gasta treinta fallos
-dejaría limitado el origen que usan los demás casos. Los bloques que fallan a
-propósito suman unos veinte —lejos de treinta— y el bloque que sí agota el límite
-por IP va **último y por otra bolsa**: manda `X-Forwarded-For`, que fuera del
-borde cae en la bolsa de identidades no confiables. Eso mide el umbral de punta a
-punta, prueba de paso que el header inventado no fabrica un contador por intento,
-y deja el origen normal intacto.
+1. **El `finally` protege el cuerpo del endpoint, no lo que pasa después.** Si
+   Starlette fallara al serializar la respuesta —después de que la función
+   retornó—, las marcas ya se habrían devuelto igual, así que ese caso queda del
+   lado seguro. No encontré ningún camino en que se retengan sin ser un 401.
+2. **Un 500 no deja rastro del intento.** Es lo pedido, pero significa que una
+   caída de base es también una ventana en la que nadie cuenta nada: mientras la
+   base esté caída no se puede ni verificar una contraseña, así que no hay
+   fuerza bruta posible, pero tampoco hay registro. Lo digo para que esté escrito.
+3. **Siguen en pie los cinco riesgos de SEC-6**, sin cambios: el estado vive en
+   la memoria de un solo proceso y se pierde al reiniciar; `X-Real-IP` descansa
+   en que Railway lo pise —ahora con tu fuente oficial, que no reabro—; treinta
+   fallos por IP cada diez minutos es poco para una oficina detrás de una sola
+   salida; la bolsa común puede castigar de más; y registro, reenvío y refresh
+   siguen sin límite.
 
-### 9. Riesgos residuales
-
-1. **El estado vive en memoria de un proceso.** La topología versionada corre
-   **un** Uvicorn —`railway-entrypoint.sh`, un solo `exec`—, así que hoy alcanza.
-   Dos consecuencias que quiero explícitas: un reinicio del servicio **borra los
-   contadores**, y si algún día hay más de una réplica cada una contaría por su
-   cuenta, o sea que el límite efectivo se multiplicaría por la cantidad de
-   réplicas. No agregué Redis ni nada externo, como pediste. Si el servicio pasa
-   a más de una réplica, **esto hay que rehacerlo**, y la opción mínima sería un
-   almacén compartido; no la incorporé porque no verifiqué que haga falta.
-2. **`X-Real-IP` es una premisa sobre Railway que no pude verificar acá.** El
-   diseño confía en que el borde lo **escribe pisando** lo que mande el cliente.
-   Si lo agregara sin pisar, un `X-Real-IP` propio podría colarse; por eso, si
-   llega repetido, no se usa. Verificarlo lleva un pedido contra el dominio
-   público con `X-Real-IP: 1.2.3.4` y mirar si el contador lo toma. **Lo haría
-   antes de confiar del todo en el límite por IP**, y es algo que se comprueba
-   sólo con el servicio publicado, o sea vos.
-3. **Treinta fallos por IP cada diez minutos es poco para una oficina.** Varias
-   personas detrás de una misma salida a internet comparten el contador. Es el
-   número que pediste y lo respeté; si aparecen quejas de 429 en un cliente
-   corporativo, el lugar a mirar es ese, no el límite por cuenta.
-4. **La bolsa común puede castigar de más.** En producción, un pedido que llegara
-   sin `X-Real-IP` cae en `identidad-no-confiable` junto con todos los demás en
-   esa situación. Elegí contar de más antes que no contar; si el borde alguna vez
-   dejara de mandar el header, el efecto sería que el login se limita globalmente
-   cada treinta fallos. La alternativa —volver a `client.host`— es la que
-   justamente no sirve, así que preferí el fallo ruidoso.
-5. **No cambié nada de las otras rutas.** Registro, reenvío de correo y refresh
-   siguen sin límite. No estaba en el alcance; el reenvío es el que más se
-   parece a esto y sería la próxima pieza natural.
-
-### 10. Hashes
+### 8. Hashes
 
 ```
-backend/app/services/limite_de_intentos.py   e7bd28f5766f6c03
-backend/app/api/auth.py                      195689c4ca810152
-scripts/smoke.mjs                            88ca12c58c1f33bd
+backend/app/api/auth.py   35b50cb726700923
+scripts/smoke.mjs         25cbeafe5d97c5c5
 ```
 
-(SHA-256 truncado a 16, del árbol en el commit de producto.)
+(SHA-256 truncado a 16, del árbol en el commit de corrección.)
 
-### 11. Frenos
+### 9. Frenos
 
-La IP real **sí** se puede distinguir sin confiar en un header falsificable, con
-una regla por entorno; por eso no frené, aunque la premisa de la orden sobre
-`client.host` no se sostenía. No hizo falta infraestructura nueva, ni migración,
-ni persistencia: un proceso, memoria, un candado. El límite no cambia la
-respuesta de una cuenta existente frente a una inexistente —está medido, las dos
-secuencias son idénticas— y no rompe una sesión válida antes del umbral. No
-amplié a otras rutas. No desplegué ni toqué la base o los administradores
-remotos. `PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de empujar.
+No hizo falta debilitar la reserva atómica: sigue tomándose antes de conocer el
+resultado, con el candado, y lo único que cambió es quién la devuelve. El 401 que
+sí cuenta se distingue de forma estable porque lo marca la propia línea que lo
+levanta, no una inspección posterior de la respuesta. No cambié el contrato
+público: el 500 conserva su cuerpo, el 401 su texto y el 429 su cuerpo y su
+`Retry-After`. No agregué infraestructura ni desplegué. `PRE_FIRMA.md` sigue
+fuera del versionado y lo confirmé antes de empujar.
