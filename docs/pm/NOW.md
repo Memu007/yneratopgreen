@@ -206,6 +206,13 @@ Actualizado: 2026-08-30.
   informe afirma no usar esperas y el freno las prohibía. La tarea activa es
   **UX-COH-1S**, corrección mínima de esa espera por una condición real. No
   desplegar ni abrir todavía compra propia.
+- **UX-COH-1 cerrada:** corrección determinista `aadecb5`, informe `6d14d1d`.
+  El caso 139 ahora espera que el carrito pase realmente de cero a uno y falla
+  con contexto si no ocurre; no queda `waitForTimeout(1200)` ejecutable en esa
+  regresión. PM reprodujo build, lint, compileall, `diff-check` y ausencia de
+  cambios de producto. Docker sigue apagado; 139/139 es evidencia de Dev. La
+  tarea activa pasa al P1 **ORD-SELF-1**: impedir compra propia en API, checkout
+  y UI, sin desplegar.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -228,8 +235,10 @@ y `main`. El ensayo remoto quedó cerrado con coincidencia exacta en
 aceptada en `f716264`/`acbf3b6`: ubicación e inventario cerrados. UX-COH-1R
 queda aceptada funcionalmente en `ee14047`/`babdb95`: el mismo Login y la misma
 acción ya cubren Mercado, Inicio y Servicios, incluida la tarjeta primaria.
-**La tarea activa de Dev es UX-COH-1S:** reemplazar la espera fija del caso 139
-por una condición real y corregir el informe. No debe desplegar.
+UX-COH-1S queda aceptada en `aadecb5`/`6d14d1d`; con eso UX-COH-1 queda cerrada.
+**La tarea activa de Dev es ORD-SELF-1:** impedir que una identidad agregue,
+sincronice o compre su propia publicación, con autoridad en Backend y estado
+coherente en tarjeta/detalle. No debe desplegar.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se

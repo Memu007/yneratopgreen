@@ -12,14 +12,99 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
-## 2026-08-30 — TAREA VIGENTE: UX-COH-1S, retirar la espera fija
+## 2026-08-30 — TAREA VIGENTE: ORD-SELF-1, nadie compra su propia publicación
+
+UX-COH-1S queda aceptada en `aadecb5` con informe `6d14d1d`. La espera fija del
+caso 139 fue reemplazada por `esperarA`, una condición real ya existente; PM
+reprodujo build, lint, compileall, `diff-check` y que el cambio no toca
+`src/` ni Backend. Docker sigue apagado para PM, por lo que 139/139 permanece
+como evidencia de Dev. Las otras esperas fijas informadas no pertenecen a esta
+tarea y no se limpian en bloque.
+
+### Hallazgo P1 reproducido
+
+Una cuenta autenticada puede agregar al carrito una publicación cuyo
+`seller_id` es su propio `user.id`. La interfaz tampoco distingue ese caso. Es
+un estado de negocio inválido: si llega a checkout, comprador y vendedor serían
+la misma persona y se contaminarían órdenes, stock, pagos, calificaciones y
+notificaciones.
+
+### Resultado esperado
+
+La regla vive en el servidor y se aplica antes de escribir: una cuenta nunca
+puede agregar, sincronizar ni convertir en orden una publicación propia. La
+interfaz evita ofrecer la compra cuando ya conoce que la publicación es de la
+sesión actual; el Backend sigue siendo autoridad frente a URL directa, carrito
+viejo o llamada manual.
+
+### Alcance mínimo
+
+- Cerrá `POST /cart/items` y `POST /cart/sync` cuando
+  `product.seller_id == current_user.id`, con el mismo `409` y un mensaje
+  accionable. El rechazo no crea carrito, no borra ni reemplaza el existente y
+  no cambia cantidades.
+- Agregá una segunda defensa en el servicio compartido que prepara el checkout,
+  antes de la primera orden o efecto. Debe cubrir tanto transferencia como
+  Mercado Pago y un carrito legacy ya contaminado. Si `payment-options` consume
+  ese carrito antes del checkout, tampoco debe presentar a la propia cuenta
+  como contraparte válida.
+- En tarjeta y detalle, si la sesión coincide con `product.seller.id`, el CTA de
+  compra no agrega ni abre checkout. Mostrá un estado honesto y no accionable,
+  **«Tu publicación»**. No construyas edición, mensajería ni navegación nueva.
+- Si un carrito local anterior contiene una publicación propia, no la borres en
+  silencio: al sincronizar o continuar debe explicar que hay que quitarla.
+- Aplicá la regla a productos y servicios comprables. No cambies el flujo de
+  cotización sin precio, porque hoy no crea compra ni orden.
+
+### Fuera de alcance
+
+Sin migración, seed, limpieza de carritos históricos, rediseño, cambios de
+precio/stock, pagos, Mercado Pago, logística, ratings, navegación Atrás,
+performance, Railway ni despliegue. No agregues dependencias.
+
+### Criterios ejecutables
+
+1. Una regresión roja contra `aadecb5` demuestra que el vendedor puede agregar
+   su propio producto. En verde, `/cart/items` y `/cart/sync` responden `409`
+   sin filas nuevas ni cambios al carrito previo.
+2. Inyectá sólo en la base descartable un carrito legacy con un ítem propio. Los
+   medios de pago y ambos checkouts lo rechazan antes de crear orden, reservar
+   stock, notificar, preparar preferencia o escribir pago; el carrito queda
+   activo para que la persona quite el ítem.
+3. Un carrito mixto con una publicación propia y otra ajena se rechaza entero;
+   no compra parcialmente la ajena. Tras quitar la propia, la ajena conserva el
+   recorrido normal.
+4. En Inicio, Mercado y Servicios, tarjeta y detalle de una publicación propia
+   muestran «Tu publicación» y no modifican el carrito. Una publicación ajena
+   conserva las etiquetas y acciones aceptadas en UX-COH-1R.
+5. La regla no depende del rol declarado: aplica también a admin o transportista
+   si publican y navegan con la misma identidad.
+6. La suite completa queda al menos 140/140 desde base limpia, dos veces. Build,
+   lint, compileall, `pip check`, a11y, contraste, hito y `diff-check` quedan
+   verdes. Producto e informe van en commits separados.
+
+### Freno
+
+Frená si impedirlo exige borrar datos existentes, cambiar el contrato de pagos
+o decidir qué hacer con órdenes históricas donde comprador y vendedor ya sean
+iguales. Traé cantidad y evidencia; no las repares. No arregles B4/C1–C3 ni las
+esperas fijas restantes.
+
+Respondé sólo en `docs/pm/PARA-PM.md`, avisale a Emi y frená. **No despliegues.**
+
+---
+
+## 2026-08-30 — UX-COH-1S, devolución histórica ya aceptada
+
+Este bloque conserva la devolución que originó `aadecb5`; quedó cerrada y
+aceptada en la tarea vigente de arriba.
 
 La funcionalidad de `ee14047` queda **aceptada**: las tres superficies reales
 de `ProductCard` usan el mismo Login, tarjeta y detalle no producen efectos
 silenciosos y el activo dice «Agregar al carrito». También acepto el ajuste
 antes/después del caso 138 y los selectores `exact: true`.
 
-La entrega todavía no queda cerrada por una contradicción verificable entre el
+En ese momento la entrega no quedó cerrada por una contradicción verificable entre el
 informe y la regresión nueva. El caso 139 contiene:
 
 ```js
