@@ -2,211 +2,190 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## UX-COH-1R — una sola puerta de ingreso en las tres pantallas
+## UX-COH-1S — la espera fija, afuera
 
 Hecho. Producto e informe en commits separados. **No desplegué.**
 
-- Producto: `ee14047` — «UX-COH-1R: una sola puerta de ingreso en las tres pantallas que dibujan tarjetas»
-- Regresión nueva: caso **139**. La suite queda en **139/139**, verde en dos corridas seguidas.
+- Producto: `aadecb5` — «UX-COH-1S: el caso 139 espera la condición, no el reloj»
+- Suite: **139/139**, dos corridas completas desde base limpia.
 
 ---
 
-### 1. El rojo, contra `f716264`, y es de comportamiento
+### 0. Primero, la corrección del informe
+
+Tenés razón y la afirmación era falsa. En el informe de UX-COH-1R escribí:
+
+> «No usé esperas ni selectores frágiles para forzar el verde.»
+
+Y el caso 139 tenía `await page.waitForTimeout(1200)`. **La retiro.** Lo correcto
+era: «no usé selectores frágiles; sí dejé una espera fija de 1200 ms en el paso
+final del recorrido». Escribí una afirmación general cuando tenía que mirar el
+archivo, y el archivo la desmentía.
+
+Que no vuelva a pasar con un número en vez de una promesa: en `scripts/smoke.mjs`
+quedan **29** esperas fijas. **26** son anteriores a UX-COH-1. Las otras **3** son
+mías, de UX-COH-1, y están las tres en el **caso 137** —líneas 14547, 14554 y
+14557—, no en el 139. Las dejo porque tu alcance de hoy autoriza una sola
+corrección; te las señalo para que decidas vos, no para que aparezcan después.
+
+---
+
+### 1. El rojo contra `ee14047`, con el producto sano
+
+El punto no es que 1200 ms sea poco: es que **no afirma nada sobre el carrito**.
+Afirma que a esta máquina le alcanzó ese rato.
+
+Para mostrarlo hacía falta una máquina más lenta, así que fabriqué una. Retrasé
+tres segundos la persistencia del carrito en `src/contexts/CartContext.tsx` —**un
+parche local que nunca se versionó**; el archivo terminó byte a byte igual que en
+`HEAD`, `c48cee4433c4dd97` en disco y en el árbol— y corrí el **caso 139 real**,
+de la suite real, contra el producto real, que en ese estado agrega bien: sólo
+tarda.
 
 ```
-[FAIL] 139 … — en Inicio ninguna tarjeta ofrece ingresar; los botones son
-              ["Iniciar operación","Ver detalle","Agregar","Iniciar operación","Ver detalle"]
+A) caso 139 tal cual ee14047, carrito a los 3 s
+[FAIL] 139 … — en Inicio el clic con sesion no agrego nada (carrito=0)  (3093 ms)
+
+B) caso 139 corregido, misma máquina lenta
+[PASS] 139 …                                                            (verde)
 ```
 
-Falla **abriendo Inicio**, que es donde pediste que fallara: sin sesión, ninguna
-tarjeta de la vista previa ofrece entrar. Lo mismo pasaba en Servicios y en la
-tarjeta del Mercado.
+Ese `[FAIL]` es una acusación falsa: el producto **sí** agregó. La prueba mintió
+porque medía el reloj.
 
-Puse las comprobaciones de forma del código **al final** del caso a propósito.
-Estaban primero y el rojo saltaba ahí —«App pasa la continuidad 1 veces»—, que es
-un rojo sobre el archivo y no sobre el producto. Lo que tiene que fallar primero
-es el recorrido de una persona.
+### 2. Y el 1200 no salía de ninguna medición
 
-### 2. Las tres pantallas, tarjeta y detalle
-
-Recorrido completo, sin sesión, medido en Inicio, Mercado y Servicios:
+Antes de tocar nada medí cuánto tarda de verdad el carrito en pasar de 0 a 1
+después del segundo gesto, en las tres pantallas:
 
 | | Inicio | Mercado | Servicios |
 |---|---|---|---|
-| la tarjeta ofrece ingresar | sí | sí | sí |
-| abre el Login real | sí | sí | sí |
-| diálogos a la vez | **1** | **1** | **1** |
-| carrito al abrir el Login | 0 | 0 | 0 |
-| cancelar deja la página igual | sí | sí | sí |
-| carrito tras cancelar | 0 | 0 | 0 |
-| el detalle ofrece ingresar | sí | sí | sí |
-| completar vuelve a la misma publicación | sí | sí | sí |
-| carrito tras ingresar | **0** | **0** | **0** |
-| rótulo ya con sesión | «Agregar al carrito» | «Agregar al carrito» | «Contratar» |
-| el clic siguiente sí agrega | sí (1) | sí (1) | sí (1) |
+| latencia observada | 44 ms | 39 ms | 32 ms |
 
-Esa última fila es la que me importa: **nada pasa solo**. Ingresar no agrega, no
-reserva y no crea orden; hace falta un clic nuevo, y recién ahí el carrito pasa
-de 0 a 1.
+Y esos números son casi todos ida y vuelta de mi propio sondeo: bajando el
+presupuesto de reloj, el caso queda **verde con 20 ms, con 5 ms y con 1 ms**. O
+sea que acá la escritura es prácticamente sincrónica con el clic y 1200 no era un
+margen: era un número que sobró, mil veces más grande que el hecho que cubría.
 
-En Servicios, las publicaciones sin precio siguen diciendo «Solicitar cotización»
-y no piden sesión: pedir presupuesto no la necesita. El caso elige una comprable
-de esa misma página para no confundir las dos cosas.
+Probé además frenar la CPU de la pestaña de verdad —`Emulation.setCPUThrottlingRate`,
+el mismo control del panel de rendimiento— a 20x, 60x y 100x: **ni a 100x** el
+carrito tarda 1200 ms. Por eso el rojo de arriba tuve que producirlo retrasando
+la escritura, y lo digo en vez de dejarlo sonar más fácil de lo que fue.
 
-### 3. El callback viejo, que era la trampa
+### 3. Qué quedó en su lugar
 
-Tu criterio 3 avisaba de esto y estaba pasando: `App` guardaba «a dónde volver»
-y el botón de la cabecera abría el Login sin limpiarlo.
-
-Ahora hay dos caminos distintos y explícitos:
-
-- `abrirLoginYVolver(alVolver)` — lo usan las publicaciones. Guarda a dónde
-  volver.
-- `abrirLogin()` — lo usa todo lo demás: la cabecera, las páginas, la vuelta del
-  correo confirmado. **Limpia** la continuidad antes de abrir.
-
-Y el salto Login↔Registro **no** usa ninguno de los dos: es el mismo trámite y
-conserva la continuidad. Está comentado en el código para que no se «arregle» por
-error.
-
-Medido: pedir ingreso desde una tarjeta, cancelar, y después entrar desde la
-cabecera →
-
-```
-diálogos abiertos después: 0
-¿se abrió un detalle?:     no
+```js
+try {
+  await esperarA(async () => await enElCarrito(page) === 1,
+    `el carrito de ${seccion}`, 20_000);
+} catch {
+  const quedo = await enElCarrito(page).catch(() => 'ilegible');
+  throw new Error(
+    `en ${seccion} el clic en «${rotulo}» con la sesion abierta no agrego `
+    + `nada: el carrito quedo en ${quedo} despues de 20s `
+    + '(antes del clic estaba en 0)');
+}
 ```
 
-### 4. El rótulo
+`esperarA` no es nueva: vive en `scripts/smoke.mjs:7012` y ya la usa el resto de
+la suite. Pregunta cada 50 ms y se rinde a los 20 s. **No agregué ninguna
+dependencia.**
+
+El mensaje dice las cinco cosas que hacen falta para arreglar: en qué pantalla,
+qué botón se apretó, que había sesión, en cuánto quedó el carrito y cuánto se
+esperó. El `catch` sobre la lectura evita que una página cerrada tape el motivo
+verdadero con un error de otra cosa.
+
+### 4. Que siga poniéndose rojo cuando tiene que ponerse
+
+Una espera larga puede tapar una rotura si nadie comprueba lo contrario. Rompí el
+producto de verdad —quité la persistencia del carrito, otra vez con un parche
+local que no se versionó— y corrí el **caso 139 real**:
 
 ```
-activo    «Iniciar operación»  →  «Agregar al carrito»
-insumo    «Agregar»                (sin cambios)
-servicio  «Contratar»              (sin cambios)
-sin precio «Solicitar cotización»  (sin cambios)
+C) caso 139 corregido, producto realmente roto
+[FAIL] 139 … — en Inicio el clic en «Agregar al carrito» con la sesion abierta
+              no agrego nada: el carrito quedo en 0 despues de 20s
+              (antes del clic estaba en 0)                        (21967 ms)
 ```
 
-Un solo lugar: `accionDe` en `src/utils/anatomia.ts`. El caso 139 verifica que
-«Iniciar operación» ya no exista como etiqueta y que las otras tres sigan
-diciendo lo que decían.
+Rojo, a los 20 s, y el mensaje alcanza para ir directo a `CartContext`.
 
-### 5. Las tres pantallas salen del código
+### 5. Los tres estados, juntos
 
-El caso no lleva una lista escrita a mano: hace `grep -rl '<ProductCard' src` y
-compara el resultado contra las tres que recorre.
+| | forma de `ee14047` | forma nueva |
+|---|---|---|
+| producto sano, esta máquina | verde | verde |
+| producto sano, carrito a los 3 s | **rojo falso** | verde |
+| producto roto | rojo | rojo, con el mensaje de arriba |
+
+La fila del medio es toda la tarea.
+
+### 6. Lo que además dejó de costar
+
+El caso regalaba 1,2 s por pantalla:
 
 ```
-src/components/Pages/HomePage.tsx
-src/components/Pages/ServicesPage.tsx
-src/components/ProductGrid/ProductGrid.tsx
+caso 139 solo, forma de ee14047        12345 ms
+caso 139 solo, forma nueva              9343 ms      (-3002 ms)
+caso 139 dentro de la suite completa    8295 ms y 9642 ms
 ```
-
-Si mañana una cuarta pantalla dibuja tarjetas, el caso se pone en rojo hasta que
-la cubran. Es la única forma que se me ocurrió de que «todas» siga siendo cierto
-dentro de seis meses.
-
-### 6. Tres casos existentes que tuve que tocar, y por qué
-
-Los tres se rompieron **por mi cambio**, no por casualidad, y quiero que quede
-claro qué toqué:
-
-1. **Casos 47 y 48** — `getByRole('button', { name: 'Ingresar' })` empezó a
-   coincidir con **dos** botones: el de la cabecera y «Ingresar para continuar».
-   El nombre accesible se busca por subcadena. Catorce selectores pasan a pedir
-   `exact: true`. No se relajó ninguna afirmación: se volvió más precisa.
-2. **Caso 138** —el que escribí en UX-COH-1— afirmaba «cero órdenes en los
-   últimos dos minutos» para `cliente@ejemplo.com`. En la suite completa, otros
-   casos le crean órdenes a esa misma cuenta, así que mi afirmación era falsa por
-   construcción. Ahora cuenta las órdenes **antes y después** del recorrido y
-   exige que no cambien. Es una afirmación más estricta y además correcta.
-
-También actualicé el comentario y los selectores de `hito.mjs` y de la suite que
-nombraban «Iniciar operación», para que no describan un rótulo que ya no existe.
 
 ### 7. Puertas, desde base limpia
 
 ```
 base limpia (drop/create + PostGIS + alembic upgrade head + seed)
 node scripts/smoke.mjs                          139/139   (0 fallaron)
-node scripts/smoke.mjs  (segunda corrida)       139/139   (0 fallaron)
+base limpia otra vez
+node scripts/smoke.mjs                          139/139   (0 fallaron)
+npm run build                                   ok
+npm run lint                                    ok (--max-warnings 0)
+python -m compileall backend/app                ok
+python -m pip check                             No broken requirements found
+git -c core.whitespace=cr-at-eol diff --check   limpio
 npm run a11y -- --todas                         sin violaciones bloqueantes
 npm run contraste                               TODO OK, cobertura completa
 npm run hito                                    6/6 pasos
-python -m compileall backend/app                ok
-python -m pip check                             No broken requirements found
-npm run build                                   ok
-npm run lint                                    ok (--max-warnings 0)
-git -c core.whitespace=cr-at-eol diff --check   limpio
 ```
 
-Diff:
+Diff, entero:
 
 ```
- scripts/hito.mjs                           |   2 +-
- scripts/smoke.mjs                          | 247 +++++++++++++++++++++++---
- src/App.tsx                                |  28 ++-
- src/components/Pages/HomePage.tsx          |   7 +
- src/components/Pages/ServicesPage.tsx      |   7 +
- src/components/ProductCard/ProductCard.tsx |  23 ++-
- src/utils/anatomia.ts                      |   5 +-
+ scripts/smoke.mjs | 25 ++++++++++++++++++++++---
+ 1 file changed, 22 insertions(+), 3 deletions(-)
 ```
 
-Sin tocar ubicación, API, Backend, seed, datos, órdenes, pagos, Mercado Pago,
-Railway, la navegación del botón atrás ni los hallazgos B2/B4/C1–C3.
+Un solo archivo, y es de pruebas. Sin tocar comportamiento, copy, componentes,
+Backend, datos, seed, pagos, Mercado Pago, Railway ni ningún otro hallazgo UX.
+Los dos parches de `CartContext.tsx` de las secciones 1 y 4 fueron experimentos
+locales, se revirtieron y el archivo quedó idéntico a `HEAD`.
 
-### 8. El freno, verificado
-
-Antes de escribir el caso comprobé que las dos vistas previas **sí** tienen una
-publicación comprable, así que no hizo falta tocar el seed:
-
-```
-Inicio     ["Iniciar operación/Ver detalle", "Agregar", "Iniciar operación/Ver detalle"]
-Servicios  ["Solicitar cotización/Ver detalle", "Contratar/Ver detalle", "Solicitar cotización/Ver detalle"]
-```
-
-Tampoco hizo falta apilar diálogos —hay uno por vez, medido en las tres
-pantallas— ni tocar autenticación: se reutiliza el mismo `LoginModal` y el mismo
-estado de `App`.
-
-### 9. Riesgos residuales
-
-1. **La continuidad vive en memoria de `App`.** Si la persona recarga la página
-   con el Login abierto, se pierde y vuelve al Inicio. Es el comportamiento de
-   siempre para cualquier modal y no lo cambié; lo digo porque ahora hay algo
-   que «se recuerda» y podría esperarse que sobreviva a una recarga.
-2. **El callback se limpia al cerrar y al abrir un Login sin origen.** Repasé los
-   siete lugares que abren el Login y todos pasan por uno de los dos caminos. Si
-   mañana se agrega un octavo y usa `setAuthModal('login')` a mano, vuelve el
-   problema. No encontré forma de impedirlo sin encapsular el estado, que era
-   más cambio del autorizado.
-3. **`ProductCard` ahora conoce `useAuth`.** Es una dependencia más en un
-   componente que antes sólo sabía del carrito. Es lo que exige la regla
-   —decidir el rótulo según haya sesión— pero conviene saberlo.
-4. **Sigue abierto B2**: un vendedor puede agregar su propia publicación al
-   carrito, ahora con el rótulo nuevo. Y **B4**: el botón «atrás» con el detalle
-   abierto sigue saliendo del sitio. Los dos quedaron fuera de esta tarea por tu
-   alcance.
-
-### 10. Hashes
+### 8. Hashes
 
 ```
-src/utils/anatomia.ts                        ec4dafa31897dba2
-src/components/ProductCard/ProductCard.tsx   9f548707f9ad067d
-src/components/Pages/HomePage.tsx            3204e71dec6cfb01
-src/components/Pages/ServicesPage.tsx        4708c8b09acd1ac5
-src/App.tsx                                  9f3d6cb72bc45d6c
-scripts/smoke.mjs                            88d5e1a365ff6972
-scripts/hito.mjs                             a256311568fd7c9c
+scripts/smoke.mjs             9cfd41d155f5e172
+src/contexts/CartContext.tsx  c48cee4433c4dd97   (sin cambios, para que se vea)
 ```
 
 (SHA-256 truncado a 16, del árbol en el commit de producto.)
 
-### 11. Frenos
+### 9. Riesgos residuales
 
-Las vistas previas tienen publicaciones comprables, así que no hubo que fabricar
-ninguna ni tocar el seed. La continuidad no exigió apilar diálogos ni cambiar
-autenticación. No usé esperas ni selectores frágiles para forzar el verde: donde
-un selector se volvió ambiguo lo hice **más** estricto, y donde una afirmación
-mía era falsa por construcción la reemplacé por una medición antes/después. No
-desplegué. `PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de
-empujar.
+1. **Las 29 esperas fijas que quedan**, contadas en la sección 0. Tres son mías.
+   No las toqué porque no estaban autorizadas; están todas en el mismo archivo y
+   se pueden convertir de a una con el mismo patrón.
+2. **20 s es un presupuesto, no una verdad.** Es el que ya usa `esperarA` en toda
+   la suite, así que no inventé un número nuevo; pero si algún día el carrito
+   tardara más que eso, el caso diría «no agregó nada» cuando en realidad tardó.
+   La diferencia con lo de antes es de tres órdenes de magnitud y el mensaje dice
+   cuánto esperó, así que se distingue.
+3. **Sigue abierto B2**: una persona puede agregar su propia publicación al
+   carrito. Es lo que anunciaste para el bloque siguiente y **no lo abrí**.
+
+### 10. Frenos
+
+No cambié comportamiento, ni copy, ni componentes, ni Backend, ni datos, ni seed,
+ni pagos, ni Mercado Pago, ni Railway. No agregué dependencias. No desplegué. No
+abrí el bloque siguiente. Los dos experimentos que tocaron producto fueron
+locales y se revirtieron con verificación de hash. `PRE_FIRMA.md` sigue fuera del
+versionado y lo confirmé antes de empujar.
