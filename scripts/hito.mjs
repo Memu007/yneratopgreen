@@ -234,7 +234,7 @@ async function main() {
       // Acotado al diálogo: la tarjeta de atrás tiene un botón con el mismo
       // nombre, y sin acotar `.first()` elige el que está tapado.
       await page.getByRole('dialog')
-        .getByRole('button', { name: /Agregar|Iniciar operación|Contratar/ }).first().click();
+        .getByRole('button', { name: /Agregar|Agregar al carrito|Contratar/ }).first().click();
       await page.getByRole('dialog')
         .waitFor({ state: 'hidden', timeout: ESPERA });
 

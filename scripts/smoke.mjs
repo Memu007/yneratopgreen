@@ -738,14 +738,17 @@ async function runCase(number, name, callback) {
  * El botón de compra DE ESA publicación.
  *
  * Antes alcanzaba con el primer «Agregar» de la página. Ya no: el activo de
- * alto valor dice «Iniciar operación», el servicio con precio dice
+ * alto valor dice «Agregar al carrito», el servicio con precio dice
  * «Contratar», y en la grilla hay una acción por tarjeta. Se busca el título
  * y se baja al botón de su propia tarjeta.
+ *
+ * Sin sesión el rótulo es otro —«Ingresar para continuar»—, porque la acción
+ * también es otra: se ofrece entrar en vez de agregar en silencio.
  */
 function accionDeLaTarjeta(page, nombre) {
   const titulo = page.getByRole('heading', { name: nombre, exact: true, level: 3 });
   const tarjeta = titulo.locator('xpath=ancestor::*[contains(@class,"card")]');
-  return tarjeta.getByRole('button', { name: /Agregar|Iniciar operación|Contratar/ }).first();
+  return tarjeta.getByRole('button', { name: /Agregar|Agregar al carrito|Contratar/ }).first();
 }
 
 await runCase(1, 'Salud del servicio', async () => {
@@ -1614,7 +1617,7 @@ await runCase(19, 'Transferencia completa desde la interfaz', async () => {
       () => document.querySelectorAll('#catalog-category option').length > 1,
     );
     await page.locator('#catalog-type').selectOption('productos');
-    await page.getByRole('button', { name: /Agregar|Iniciar operación|Contratar/ }).first().click();
+    await page.getByRole('button', { name: /Agregar|Agregar al carrito|Contratar/ }).first().click();
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
 
@@ -1937,7 +1940,7 @@ await runCase(22, 'Registro de transportista desde la interfaz, con los tres dat
   try {
     const page = await browser.newPage();
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
     await page.getByText('Regístrate aquí').click();
     await page.getByRole('heading', { name: 'Crear Cuenta' }).waitFor();
 
@@ -3104,7 +3107,7 @@ await runCase(37, 'Registro, correo y confirmación desde el navegador', async (
     });
 
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
     await page.getByText('Regístrate aquí').click();
     await page.getByRole('heading', { name: 'Crear Cuenta' }).waitFor();
     await page.locator('input[name="name"]').fill('Nav Smoke');
@@ -3132,7 +3135,7 @@ await runCase(37, 'Registro, correo y confirmación desde el navegador', async (
 
     // Login bloqueado, con el motivo real y la salida a mano.
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
     await page.getByPlaceholder('tu@email.com').fill(email);
     await page.getByPlaceholder('••••••••').fill(password);
     await page.locator('[class*="_submitButton_"][type="submit"]').click();
@@ -3261,7 +3264,7 @@ await runCase(38, 'Un error de validación se lee, no dice [object Object]', asy
 
     // --- 1. detalle ESTRUCTURADO: registro con un correo que el backend rechaza
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
     await page.getByText('Regístrate aquí').click();
     await page.getByRole('heading', { name: 'Crear Cuenta' }).waitFor();
     await page.locator('input[name="name"]').fill('Detalle Estructurado');
@@ -3293,7 +3296,7 @@ await runCase(38, 'Un error de validación se lee, no dice [object Object]', asy
     });
 
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
     await page.getByPlaceholder('tu@email.com').fill(pendiente);
     await page.getByPlaceholder('••••••••').fill('smoke123');
     await page.locator('[class*="_submitButton_"][type="submit"]').click();
@@ -4406,7 +4409,7 @@ await runCase(46, 'Vaciar el destino descarta la respuesta que venía en camino'
 
     await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
-    await page.getByRole('button', { name: /Agregar|Iniciar operación|Contratar/ }).first().click();
+    await page.getByRole('button', { name: /Agregar|Agregar al carrito|Contratar/ }).first().click();
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('button', { name: 'Continuar compra' }).click();
     await page.getByRole('heading', { name: /Datos de env/i }).waitFor();
@@ -4539,8 +4542,8 @@ await runCase(47, 'Un login nuevo no hereda el "ya sincronizado" del anterior', 
     // Cerrar sesión y entrar con otra cuenta, sin recargar la página.
     await page.locator('button[aria-label="Cerrar"]:visible').first().click();
     await page.getByRole('button', { name: 'Salir' }).click();
-    await page.getByRole('button', { name: 'Ingresar' }).waitFor({ timeout: 15_000 });
-    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).waitFor({ timeout: 15_000 });
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
     await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 15_000 });
     await page.getByPlaceholder('tu@email.com').fill('cliente@ejemplo.com');
     await page.getByPlaceholder('••••••••').fill('cliente123');
@@ -4693,8 +4696,8 @@ await runCase(48, 'Un turno encolado no sale con las credenciales de la sesión 
     // Cambio de cuenta con la primera escritura todavía en vuelo y la segunda
     // esperando turno.
     await page.getByRole('button', { name: 'Salir' }).click();
-    await page.getByRole('button', { name: 'Ingresar' }).waitFor({ timeout: 15_000 });
-    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).waitFor({ timeout: 15_000 });
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
     await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 15_000 });
     await page.getByPlaceholder('tu@email.com').fill('cliente@ejemplo.com');
     await page.getByPlaceholder('••••••••').fill('cliente123');
@@ -6537,7 +6540,7 @@ await runCase(70, 'El vendedor vincula, ve y desvincula desde el panel, en escri
         // Se entra por el formulario y no inyectando el token: el callback
         // viene del navegador y necesita la cookie de sesión de verdad.
         await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-        await page.getByRole('button', { name: 'Ingresar' }).click();
+        await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
         await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 15_000 });
         await page.getByPlaceholder('tu@email.com').fill('vendedor@ejemplo.com');
         await page.getByPlaceholder('••••••••').fill('vendedor123');
@@ -10324,7 +10327,7 @@ await runCase(108, 'Documentación: presentar, revisar y ver el distintivo en el
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
     await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 15_000 });
     await page.getByPlaceholder('tu@email.com').fill(credenciales.email);
     await page.getByPlaceholder('••••••••').fill(credenciales.password);
@@ -10385,7 +10388,7 @@ await runCase(108, 'Documentación: presentar, revisar y ver el distintivo en el
     const ctxAdmin = await browser.newContext();
     const pa = await ctxAdmin.newPage();
     await pa.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await pa.getByRole('button', { name: 'Ingresar' }).click();
+    await pa.getByRole('button', { name: 'Ingresar', exact: true }).click();
     await pa.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 15_000 });
     await pa.getByPlaceholder('tu@email.com').fill('admin@topgreen.com');
     await pa.getByPlaceholder('••••••••').fill('admin123');
@@ -10952,7 +10955,7 @@ await runCase(114, 'En pantalla: se comparan marca y cargas, el dominio recién 
     const ctxTransportista = await browser.newContext();
     const pt = await ctxTransportista.newPage();
     await pt.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await pt.getByRole('button', { name: 'Ingresar' }).click();
+    await pt.getByRole('button', { name: 'Ingresar', exact: true }).click();
     await pt.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 15_000 });
     await pt.getByPlaceholder('tu@email.com').fill(transportistas.amplio.email);
     await pt.getByPlaceholder('••••••••').fill(transportistas.amplio.password);
@@ -12065,16 +12068,16 @@ await runCase(123, 'Al 200 % de zoom las cinco pantallas siguen siendo usables',
 
     await publica.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await publica.locator('article').first().waitFor({ timeout: 20_000 });
-    await medir(publica, 'catálogo', publica.getByRole('button', { name: /Agregar|Iniciar operación|Contratar|Solicitar cotización|Sin stock|Ingresar para continuar/ }));
+    await medir(publica, 'catálogo', publica.getByRole('button', { name: /Agregar|Agregar al carrito|Contratar|Solicitar cotización|Sin stock|Ingresar para continuar/ }));
 
     await publica.locator('article').first().click();
     const ficha = publica.getByRole('dialog');
     await ficha.waitFor({ timeout: 20_000 });
-    await medir(publica, 'detalle', ficha.getByRole('button', { name: /Agregar|Iniciar operación|Contratar|Solicitar cotización|Sin stock|Ingresar para continuar/ }));
+    await medir(publica, 'detalle', ficha.getByRole('button', { name: /Agregar|Agregar al carrito|Contratar|Solicitar cotización|Sin stock|Ingresar para continuar/ }));
     await publica.keyboard.press('Escape');
     await ficha.waitFor({ state: 'hidden', timeout: 20_000 });
 
-    await publica.getByRole('button', { name: 'Ingresar' }).first().click();
+    await publica.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
     await publica.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
     await medir(publica, 'ingreso', publica.locator('form button[type="submit"]'));
     await anonimo.close();
@@ -14606,6 +14609,12 @@ await runCase(138, 'Sin sesion, el detalle ofrece ingresar y vuelve a la misma p
     return 0;
   });
   const tituloDelDetalle = () => page.locator('#detalle-titulo').first().innerText();
+  // Se cuentan las ordenes de esta cuenta antes y despues: en la suite completa
+  // otros casos le crean ordenes, asi que «ninguna orden reciente» seria falso.
+  const ordenesDelComprador = () => queryCount(
+    'SELECT count(*) FROM orders o JOIN users u ON u.id = o.buyer_id '
+    + "WHERE u.email = 'cliente@ejemplo.com'");
+  const ordenesAntes = ordenesDelComprador();
 
   try {
     await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
@@ -14656,10 +14665,9 @@ await runCase(138, 'Sin sesion, el detalle ofrece ingresar y vuelve a la misma p
       `ya con sesion el boton sigue diciendo «${rotuloConSesion}»`);
     assert(await enElCarrito() === 0,
       'ingresar agrego la publicacion al carrito sin que nadie la pidiera');
-    const ordenes = queryCount(
-      'SELECT count(*) FROM orders o JOIN users u ON u.id = o.buyer_id '
-      + "WHERE u.email = 'cliente@ejemplo.com' AND o.created_at > now() - interval '2 minutes'");
-    assert(ordenes === 0, `ingresar creo ${ordenes} ordenes`);
+    const ordenesDespues = ordenesDelComprador();
+    assert(ordenesDespues === ordenesAntes,
+      `ingresar creo ${ordenesDespues - ordenesAntes} ordenes`);
 
     assert(erroresDePagina.length === 0,
       `el recorrido dejo errores de pagina: ${erroresDePagina[0]}`);
@@ -14671,6 +14679,197 @@ await runCase(138, 'Sin sesion, el detalle ofrece ingresar y vuelve a la misma p
     await context.close();
     await browser.close();
   }
+});
+
+
+await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan tarjetas', async () => {
+  // El detalle ya ofrecia ingresar, pero solo en el Mercado y solo desde el
+  // detalle: la TARJETA agregaba al carrito en silencio —ni un aviso—, y las
+  // vistas previas de Inicio y Servicios no tenian por donde abrir el Login.
+  // Tres caminos a la misma accion, tres comportamientos distintos.
+  //
+  // Ademas «Iniciar operacion» prometia un inicio de operacion que no existe:
+  // lo que hace es agregar al carrito, y ahora lo dice.
+
+  const browser = await chromium.launch({ headless: true });
+  const enElCarrito = (page) => page.evaluate(() => {
+    for (const clave of Object.keys(window.localStorage)) {
+      if (!/cart|carrito/i.test(clave)) continue;
+      try {
+        const guardado = JSON.parse(window.localStorage.getItem(clave) || 'null');
+        if (Array.isArray(guardado)) return guardado.length;
+        if (guardado && Array.isArray(guardado.items)) return guardado.items.length;
+      } catch { /* si no es JSON no es el carrito */ }
+    }
+    return 0;
+  });
+  const recorridas = [];
+
+  try {
+    // --- C. Las tres pantallas, desde la tarjeta y desde el detalle ---------
+    for (const seccion of ['Inicio', 'Mercado', 'Servicios']) {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const page = await context.newPage();
+      try {
+        await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+        await page.locator('header').first()
+          .getByRole('button', { name: seccion, exact: true }).first().click();
+        await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+        const tarjetasAlPrincipio = await page.locator('article[class*="card"]').count();
+
+        // Desde la TARJETA: ofrece ingresar, no agrega en silencio.
+        const enLaTarjeta = page.locator('article[class*="card"]')
+          .getByRole('button', { name: 'Ingresar para continuar' }).first();
+        assert(await enLaTarjeta.count(),
+          `en ${seccion} ninguna tarjeta ofrece ingresar; los botones son `
+          + JSON.stringify((await page.locator('article[class*="card"]')
+            .getByRole('button').allInnerTexts()).slice(0, 6)));
+        await enLaTarjeta.click();
+        await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+        assert(await page.getByRole('dialog').count() === 1,
+          `en ${seccion} hay ${await page.getByRole('dialog').count()} dialogos a la vez`);
+        assert(await enElCarrito(page) === 0,
+          `en ${seccion} la tarjeta agrego algo al carrito antes de la sesion`);
+
+        // Cancelar deja la persona donde estaba, sin efectos.
+        await page.getByRole('button', { name: 'Cerrar' }).first().click();
+        await page.locator('article[class*="card"]').first().waitFor({ timeout: 20_000 });
+        assert(await page.getByRole('dialog').count() === 0,
+          `en ${seccion} quedo un dialogo abierto tras cancelar`);
+        assert(await page.locator('article[class*="card"]').count() === tarjetasAlPrincipio,
+          `cancelar en ${seccion} cambio la pagina`);
+        assert(await enElCarrito(page) === 0,
+          `cancelar en ${seccion} dejo algo en el carrito`);
+
+        // Desde el DETALLE de una publicacion comprable de esa misma pagina.
+        const tarjetaComprable = page.locator('article[class*="card"]')
+          .filter({ has: page.getByRole('button', { name: 'Ingresar para continuar' }) }).first();
+        await tarjetaComprable.locator('h3').click();
+        await page.locator('#detalle-titulo').waitFor({ timeout: 20_000 });
+        const publicacion = (await page.locator('#detalle-titulo').innerText()).trim();
+        const enElDetalle = page.getByRole('dialog')
+          .getByRole('button', { name: 'Ingresar para continuar' }).first();
+        assert(await enElDetalle.count(),
+          `en ${seccion}, el detalle de «${publicacion}» no ofrece ingresar`);
+        await enElDetalle.click();
+        await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+        assert(await page.getByRole('dialog').count() === 1,
+          `en ${seccion} el Login quedo apilado sobre el detalle`);
+
+        // En una de las tres se prueba ademas el ida y vuelta a Registro: saltar
+        // entre los dos formularios es el mismo tramite y no puede perder la
+        // continuidad. Se hace aca y no en las tres para no repetir lo mismo.
+        if (seccion === 'Mercado') {
+          await page.getByRole('button', { name: 'Regístrate aquí' }).first().click();
+          await page.getByRole('heading', { name: /Crear cuenta|Regist/i })
+            .first().waitFor({ timeout: 20_000 });
+          assert(await page.getByRole('dialog').count() === 1,
+            'el salto a Registro apilo un dialogo mas');
+          await page.getByRole('button', { name: 'Inicia sesión aquí' }).first().click();
+          await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+        }
+
+        // Se completa el ingreso y se vuelve a la MISMA publicacion.
+        await page.getByPlaceholder('tu@email.com').fill('cliente@ejemplo.com');
+        await page.getByPlaceholder('••••••••').fill('cliente123');
+        await page.locator('[class*="_submitButton_"][type="submit"]').click();
+        await page.locator('#detalle-titulo').waitFor({ timeout: 25_000 });
+        assert((await page.locator('#detalle-titulo').innerText()).trim() === publicacion,
+          `en ${seccion} se volvio a otra publicacion`);
+        assert(await enElCarrito(page) === 0,
+          `en ${seccion} ingresar agrego la publicacion al carrito sin pedirlo`);
+
+        // Y recien ahora, con un clic nuevo, la accion ocurre.
+        const yaConSesion = page.getByRole('dialog').getByRole('button')
+          .filter({ hasText: /Agregar al carrito|Agregar|Contratar/ }).first();
+        const rotulo = (await yaConSesion.innerText()).trim();
+        assert(!/Ingresar para continuar/.test(rotulo),
+          `en ${seccion} el boton sigue pidiendo ingresar con la sesion abierta`);
+        await yaConSesion.click();
+        await page.waitForTimeout(1200);
+        assert(await enElCarrito(page) === 1,
+          `en ${seccion} el clic con sesion no agrego nada (carrito=${await enElCarrito(page)})`);
+        recorridas.push(`${seccion}:«${rotulo}»`);
+      } finally {
+        await context.close();
+      }
+    }
+
+    // --- D. Un ingreso posterior desde la cabecera no arrastra nada ---------
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await context.newPage();
+    try {
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+      // Se pide ingresar desde una tarjeta y se cancela: la continuidad tiene
+      // que morir ahi.
+      await page.locator('article[class*="card"]')
+        .getByRole('button', { name: 'Ingresar para continuar' }).first().click();
+      await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+      await page.getByRole('button', { name: 'Cerrar' }).first().click();
+      await page.locator('article[class*="card"]').first().waitFor({ timeout: 20_000 });
+      // Y ahora se ingresa desde la cabecera, que no viene de ninguna publicacion.
+      await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+      await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+      await page.getByPlaceholder('tu@email.com').fill('cliente@ejemplo.com');
+      await page.getByPlaceholder('••••••••').fill('cliente123');
+      await page.locator('[class*="_submitButton_"][type="submit"]').click();
+      await page.getByRole('button', { name: 'Mi cuenta' }).first().waitFor({ timeout: 25_000 });
+      assert(await page.locator('#detalle-titulo').count() === 0,
+        'un ingreso desde la cabecera reabrio una publicacion: quedo un callback viejo');
+      assert(await page.getByRole('dialog').count() === 0,
+        'un ingreso desde la cabecera dejo un dialogo abierto');
+    } finally {
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+  }
+
+  // --- E. Y recien ahora, la forma del codigo ------------------------------
+  // Va al final a proposito: lo que tiene que fallar primero es el recorrido
+  // de una persona, no la forma del archivo. Si esto se rompiera solo, seria
+  // una prueba que mira el codigo en vez de mirar el producto.
+  // Si manana una cuarta pantalla dibuja tarjetas, este caso se pone en rojo
+  // hasta que la cubran: es la unica forma de que «todas» siga siendo cierto.
+  const dondeSeDibujanTarjetas = execFileSync(
+    'grep', ['-rl', '<ProductCard', 'src'], { encoding: 'utf8' })
+    .trim().split('\n')
+    .filter((archivo) => !archivo.endsWith('ProductCard/ProductCard.tsx'))
+    .sort();
+  const cubiertas = [
+    'src/components/Pages/HomePage.tsx',
+    'src/components/Pages/ServicesPage.tsx',
+    'src/components/ProductGrid/ProductGrid.tsx',
+  ];
+  assert(JSON.stringify(dondeSeDibujanTarjetas) === JSON.stringify(cubiertas),
+    `ProductCard se dibuja en ${JSON.stringify(dondeSeDibujanTarjetas)} y esta prueba `
+    + `recorre ${JSON.stringify(cubiertas)}`);
+
+  // Y las tres reciben la MISMA funcion de App: un solo Login, no tres.
+  const app = readFileSync('src/App.tsx', 'utf8');
+  const veces = (app.match(/onSolicitarIngreso=\{abrirLoginYVolver\}/g) || []).length;
+  assert(veces >= 3,
+    `App pasa la continuidad ${veces} veces y hacen falta tres pantallas`);
+
+  const acciones = readFileSync('src/utils/anatomia.ts', 'utf8');
+  assert(!/etiqueta: 'Iniciar operación'/.test(acciones),
+    'sigue existiendo el rotulo «Iniciar operación», que prometia otra cosa');
+  assert(/case 'activo':[\s\S]{0,400}?etiqueta: 'Agregar al carrito'/.test(acciones),
+    'el activo no dice «Agregar al carrito»');
+  for (const [anatomia, etiqueta] of [["'insumo'", "'Agregar'"], ['default', "'Contratar'"]]) {
+    assert(new RegExp(`${anatomia}:[\\s\\S]{0,400}?etiqueta: ${etiqueta}`).test(acciones),
+      `${anatomia} dejo de decir ${etiqueta}`);
+  }
+
+
+  return `ProductCard se dibuja en ${dondeSeDibujanTarjetas.length} pantallas y las tres reciben la `
+    + 'misma continuidad de App. En Inicio, Mercado y Servicios, sin sesion tanto la tarjeta como '
+    + 'el detalle ofrecen «Ingresar para continuar» y abren el Login real con un solo dialogo a la '
+    + 'vez; cancelar deja la pagina como estaba y completar vuelve a la misma publicacion, siempre '
+    + `con el carrito en cero. Recien el clic siguiente agrega (${recorridas.join(', ')}). Un `
+    + 'ingreso desde la cabecera no reabre nada. El activo dice «Agregar al carrito» y las otras '
+    + 'anatomias conservan su rotulo';
 });
 
 const passed = results.filter((result) => result.passed).length;

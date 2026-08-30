@@ -11,6 +11,11 @@ interface HomePageProps {
   onNavigateToServices?: () => void;
   onPublishClick?: () => void;
   onLoginClick?: () => void;
+  /** Abre el Login de la aplicación y avisa cuando se cierra, se complete o se
+      cancele. Se pasa hasta la tarjeta: sin sesión, una acción de compra ofrece
+      ingresar en vez de agregar en silencio, y al volver se queda en esta misma
+      página. Es la MISMA función que usa el Mercado; no hay un segundo Login. */
+  onSolicitarIngreso?: (alVolver: () => void) => void;
   /** Publicaciones reales del mismo catálogo que el mercado. */
   vistaPrevia: VistaPrevia;
 }
@@ -43,6 +48,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   onNavigateToContact,
   onPublishClick,
   onLoginClick,
+  onSolicitarIngreso,
   vistaPrevia,
 }) => {
   const { user } = useAuth();
@@ -175,6 +181,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 product={operacion}
                 variante="compacta"
                 onSolicitarCotizacion={onNavigateToContact}
+                onSolicitarIngreso={onSolicitarIngreso}
               />
             ))}
           </div>

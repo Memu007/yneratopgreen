@@ -85,7 +85,10 @@ export function accionDe(product: Product): Accion {
 
   switch (anatomia) {
     case 'activo':
-      return { tipo: 'comprar', etiqueta: 'Iniciar operación' };
+      // Decía «Iniciar operación» y lo que hace es agregar al carrito. No hay
+      // ningún otro inicio de operación detrás: el rótulo prometía una pieza
+      // que no existe. Dice lo que hace.
+      return { tipo: 'comprar', etiqueta: 'Agregar al carrito' };
     case 'insumo':
       return { tipo: 'comprar', etiqueta: 'Agregar' };
     default:

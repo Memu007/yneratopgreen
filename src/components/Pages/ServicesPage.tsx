@@ -11,6 +11,11 @@ interface ServicesPageProps {
   onVerServiciosPublicados?: () => void;
   onPublishClick?: () => void;
   onLoginClick?: () => void;
+  /** Abre el Login de la aplicación y avisa cuando se cierra, se complete o se
+      cancele. Se pasa hasta la tarjeta: sin sesión, una acción de compra ofrece
+      ingresar en vez de agregar en silencio, y al volver se queda en esta misma
+      página. Es la MISMA función que usa el Mercado; no hay un segundo Login. */
+  onSolicitarIngreso?: (alVolver: () => void) => void;
   /** Publicaciones reales de servicio y logística. */
   vistaPrevia: VistaPrevia;
 }
@@ -34,6 +39,7 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({
   onVerServiciosPublicados,
   onPublishClick,
   onLoginClick,
+  onSolicitarIngreso,
   vistaPrevia,
 }) => {
   const { user } = useAuth();
@@ -147,6 +153,7 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({
                 product={servicio}
                 variante="compacta"
                 onSolicitarCotizacion={onNavigateToContact}
+                onSolicitarIngreso={onSolicitarIngreso}
               />
             ))}
           </div>

@@ -93,6 +93,16 @@ function App() {
     setAuthModal('login');
   };
 
+  // Ingresar desde la cabecera, o desde cualquier lado que no sea una
+  // publicación, no arrastra ninguna continuidad. Es explícito a propósito:
+  // un callback que quedó de un ingreso anterior reabriría una publicación
+  // que la persona ya dejó atrás.
+  const abrirLogin = () => {
+    setVolverDespuesDeIngresar(null);
+    setAuthModal('login');
+  };
+
+
   const cerrarAutenticacion = () => {
     setAuthModal(null);
     if (volverDespuesDeIngresar) {
@@ -339,7 +349,8 @@ function App() {
           onNavigateToContact={() => handleNavigate('contact')}
           onNavigateToServices={() => handleNavigate('services')}
           onPublishClick={() => setIsAddProductOpen(true)}
-          onLoginClick={() => setAuthModal('login')}
+          onLoginClick={abrirLogin}
+          onSolicitarIngreso={abrirLoginYVolver}
           vistaPrevia={vistaPreviaDeInicio}
         />;
       case 'verificar-correo':
@@ -347,7 +358,7 @@ function App() {
           <VerifyEmailPage
             onGoToLogin={() => {
               handleNavigate('home');
-              setAuthModal('login');
+              abrirLogin();
             }}
             onGoHome={() => handleNavigate('home')}
           />
@@ -406,7 +417,7 @@ function App() {
             onNavigateToMarketplace={() => handleNavigate('marketplace')}
             onOpenSellModal={() => setIsAddProductOpen(true)}
             isLoggedIn={!!user}
-            onOpenLogin={() => setAuthModal('login')}
+            onOpenLogin={abrirLogin}
             onNavigateToContact={() => handleNavigate('contact')}
           />
         );
@@ -416,7 +427,8 @@ function App() {
             onNavigateToContact={() => handleNavigate('contact')}
             onVerServiciosPublicados={verServiciosPublicados}
             onPublishClick={() => setIsAddProductOpen(true)}
-            onLoginClick={() => setAuthModal('login')}
+            onLoginClick={abrirLogin}
+            onSolicitarIngreso={abrirLoginYVolver}
             vistaPrevia={vistaPreviaDeServicios}
           />
         );
@@ -460,7 +472,8 @@ function App() {
           onNavigateToMarketplace={() => handleNavigate('marketplace')}
           onNavigateToContact={() => handleNavigate('contact')}
           onPublishClick={() => setIsAddProductOpen(true)}
-          onLoginClick={() => setAuthModal('login')}
+          onLoginClick={abrirLogin}
+          onSolicitarIngreso={abrirLoginYVolver}
           vistaPrevia={vistaPreviaDeInicio}
         />;
     }
@@ -472,7 +485,7 @@ function App() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onSearchSubmit={handleSearchSubmit}
-        onLoginClick={() => setAuthModal('login')}
+        onLoginClick={abrirLogin}
         onCartClick={() => setIsCartOpen(true)}
         onSellClick={() => setIsAddProductOpen(true)}
         onAdminClick={() => setIsAdminPanelOpen(true)}
@@ -492,6 +505,9 @@ function App() {
         />
       )}
 
+      {/* Saltar entre Login y Registro es el mismo trámite: la continuidad se
+          conserva, así que estos dos NO usan `abrirLogin`/`abrirRegistro`, que
+          la borran. */}
       {authModal === 'register' && (
         <RegisterModal
           onClose={cerrarAutenticacion}

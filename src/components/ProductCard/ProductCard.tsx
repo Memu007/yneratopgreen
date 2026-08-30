@@ -9,6 +9,7 @@ import {
   ETIQUETA_DE_CONDICION,
 } from '../../utils/anatomia';
 import { useCart } from '../../hooks/useCart';
+import { useAuth } from '../../hooks/useAuth';
 import { ProductDetailModal } from '../ProductDetail/ProductDetailModal';
 import { ProductImage } from '../ProductImage/ProductImage';
 
@@ -47,6 +48,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   variante = 'catalogo',
 }) => {
   const { addItem } = useCart();
+  const { isAuthenticated } = useAuth();
   const [showDetail, setShowDetail] = useState(false);
   const [cantidad, setCantidad] = useState(1);
 
@@ -64,9 +66,26 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   const abrirDetalle = () => setShowDetail(true);
 
+  // La tarjeta y el detalle hacen lo mismo, así que sin sesión tienen que hacer
+  // lo mismo. Antes la tarjeta agregaba al carrito en silencio —ni siquiera
+  // avisaba— y el detalle mostraba un aviso: dos caminos a la misma acción con
+  // dos comportamientos distintos.
+  const faltaIngresar = accion.tipo === 'comprar' && !isAuthenticated;
+  const rotuloDelCta = faltaIngresar ? 'Ingresar para continuar' : accion.etiqueta;
+
+  const pedirIngreso = () => {
+    // Se vuelve a esta misma tarjeta y a esta misma página: no se abre el
+    // detalle ni se agrega nada. Lo que sigue lo decide la persona.
+    onSolicitarIngreso?.(() => {});
+  };
+
   const ejecutar = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (accion.tipo === 'comprar') {
+      if (faltaIngresar) {
+        if (onSolicitarIngreso) pedirIngreso();
+        return;
+      }
       addItem(product, esServicio ? 1 : cantidad);
       return;
     }
@@ -153,7 +172,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 }}
               />
               <button className="tg-button tg-button--primary" onClick={ejecutar}>
-                {accion.etiqueta}
+                {rotuloDelCta}
               </button>
             </div>
           )}
@@ -165,7 +184,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 onClick={ejecutar}
                 disabled={accion.tipo === 'sin-stock' || (accion.tipo === 'cotizar' && !onSolicitarCotizacion)}
               >
-                {accion.etiqueta}
+                {rotuloDelCta}
               </button>
               <button
                 className="tg-button tg-button--secondary"
