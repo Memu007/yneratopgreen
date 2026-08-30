@@ -80,6 +80,27 @@ function App() {
   } = useProductFilters({ products });
 
   const [authModal, setAuthModal] = useState<AuthModalType>(null);
+  // Adónde volver cuando el Login se cierre, se complete o se cancele. Lo usa
+  // el detalle de una publicación: sin sesión ofrece ingresar, se aparta
+  // mientras el Login está arriba y vuelve a abrirse después con la misma
+  // publicación. Se guarda envuelta en otra función porque `useState` trata a
+  // una función como actualizador y la llamaría en vez de guardarla.
+  const [volverDespuesDeIngresar, setVolverDespuesDeIngresar] =
+    useState<(() => void) | null>(null);
+
+  const abrirLoginYVolver = (alVolver: () => void) => {
+    setVolverDespuesDeIngresar(() => alVolver);
+    setAuthModal('login');
+  };
+
+  const cerrarAutenticacion = () => {
+    setAuthModal(null);
+    if (volverDespuesDeIngresar) {
+      const volver = volverDespuesDeIngresar;
+      setVolverDespuesDeIngresar(null);
+      volver();
+    }
+  };
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
@@ -374,6 +395,7 @@ function App() {
                 error={errorDeCatalogo}
                 onReintentar={() => setProductsRevision((intento) => intento + 1)}
                 onSolicitarCotizacion={() => handleNavigate('contact')}
+                onSolicitarIngreso={abrirLoginYVolver}
               />
             </div>
           </main>
@@ -465,14 +487,14 @@ function App() {
       {/* Modales de autenticación */}
       {authModal === 'login' && (
         <LoginModal
-          onClose={() => setAuthModal(null)}
+          onClose={cerrarAutenticacion}
           onSwitchToRegister={() => setAuthModal('register')}
         />
       )}
 
       {authModal === 'register' && (
         <RegisterModal
-          onClose={() => setAuthModal(null)}
+          onClose={cerrarAutenticacion}
           onSwitchToLogin={() => setAuthModal('login')}
         />
       )}

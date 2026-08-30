@@ -19,6 +19,10 @@ interface ProductGridProps {
       y el detalle: sin destino, el botón queda deshabilitado en vez de
       prometer una solicitud que no existe. */
   onSolicitarCotizacion?: () => void;
+  /** Se pasa hacia abajo igual que la cotización: la tarjeta la necesita para
+      que el detalle, sin sesión, ofrezca ingresar en vez de un aviso sin
+      salida. */
+  onSolicitarIngreso?: (alVolver: () => void) => void;
 }
 
 type SortOption = 'relevance' | 'price-asc' | 'price-desc' | 'newest' | 'rating';
@@ -30,6 +34,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
   error = null,
   onReintentar,
   onSolicitarCotizacion,
+  onSolicitarIngreso,
 }) => {
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
 
@@ -142,6 +147,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
               key={product.id}
               product={product}
               onSolicitarCotizacion={onSolicitarCotizacion}
+              onSolicitarIngreso={onSolicitarIngreso}
             />
           ))}
         </div>

@@ -24,7 +24,8 @@ from app.schemas.catalog import (
     ProductDetailResponse,
     ProductListResponse,
     SellerInfo,
-    SellerBasicInfo
+    SellerBasicInfo,
+    UbicacionDePublicacion,
 )
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
@@ -251,6 +252,12 @@ def get_products(
         User.id.label("seller_id"),
         User.full_name.label("seller_name"),
         User.location.label("seller_location"),
+        # De donde es la PUBLICACION. Viaja en la misma consulta y con
+        # `outerjoin` porque `locality_id` admite nulo: una fila vieja sin
+        # localidad no puede sacar de la grilla a la publicacion entera.
+        Locality.id.label("publicacion_locality_id"),
+        Locality.name.label("publicacion_localidad"),
+        Locality.province_name.label("publicacion_provincia"),
         User.rating_average.label("seller_rating_average"),
         User.rating_count.label("seller_rating_count"),
         # El distintivo también viaja en la tarjeta, y no por capricho: el
@@ -271,6 +278,8 @@ def get_products(
             DocumentacionDeVendedor.user_id == User.id,
             DocumentacionDeVendedor.estado == EstadoDeDocumentacion.APROBADA,
         )
+    ).outerjoin(
+        Locality, Product.locality_id == Locality.id
     ).outerjoin(
         ProductImage,
         and_(ProductImage.product_id == Product.id, ProductImage.is_primary == True)
@@ -361,8 +370,10 @@ def get_products(
     # Construir response
     items = []
     for (product, category_name, is_service, subcategory_id, subcategory_name,
-         seller_id, seller_name, seller_location, seller_rating_avg,
-         seller_rating_count, seller_documentacion_revisada) in results:
+         seller_id, seller_name, seller_location,
+         publicacion_locality_id, publicacion_localidad, publicacion_provincia,
+         seller_rating_avg, seller_rating_count,
+         seller_documentacion_revisada) in results:
         # Obtener imagen primaria
         primary_image = db.query(ProductImage.url).filter(
             ProductImage.product_id == product.id,
@@ -379,6 +390,18 @@ def get_products(
             documentacion_revisada=bool(seller_documentacion_revisada),
         )
         
+        # Sin localidad no se inventa una provincia: la publicacion sale sin
+        # ubicacion y la tarjeta simplemente no la dibuja.
+        ubicacion_de_la_publicacion = (
+            UbicacionDePublicacion(
+                locality_id=publicacion_locality_id,
+                locality=publicacion_localidad,
+                province=publicacion_provincia,
+            )
+            if publicacion_locality_id
+            else None
+        )
+
         product_dict = {
             "id": product.id,
             "name": product.name,
@@ -405,6 +428,7 @@ def get_products(
             "availability": product.availability,
             "response_time": product.response_time,
             "coverage_zones": product.coverage_zones or None,
+            "publication_location": ubicacion_de_la_publicacion,
             "primary_image": primary_image[0] if primary_image else None,
             "seller": seller_info,
             "views_count": product.views_count,
@@ -445,6 +469,8 @@ def get_product_detail(
         # distintivo: pedirla aparte sería una consulta más por cada detalle.
         joinedload(Product.seller).joinedload(User.documentacion),
         joinedload(Product.category),
+        # La localidad de la publicacion, en la misma consulta.
+        joinedload(Product.locality),
         joinedload(Product.images)
     ).filter(
         Product.id == product_id,
@@ -470,11 +496,24 @@ def get_product_detail(
         documentacion_revisada=product.seller.documentacion_revisada,
     )
     
+    # De donde es la publicacion. Misma regla que en el listado: sin localidad
+    # no se inventa una provincia.
+    ubicacion_de_la_publicacion = (
+        UbicacionDePublicacion(
+            locality_id=product.locality.id,
+            locality=product.locality.name,
+            province=product.locality.province_name,
+        )
+        if product.locality
+        else None
+    )
+
     # Construir response
     product_dict = {
         "id": product.id,
         "name": product.name,
         "slug": product.slug,
+        "publication_location": ubicacion_de_la_publicacion,
         "description": product.description,
         "price": product.price,
         "currency": product.currency,

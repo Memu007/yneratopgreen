@@ -77,6 +77,25 @@ class SellerBasicInfo(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class UbicacionDePublicacion(BaseModel):
+    """De dónde es la PUBLICACIÓN, no de dónde es quien la publica.
+
+    Sale del padrón oficial por `Product.locality_id`, que es la misma columna
+    con la que el filtro por provincia decide qué entra y qué no. Antes esto no
+    viajaba, así que la tarjeta terminaba mostrando `seller.location` —texto
+    libre del perfil— bajo el rótulo de ubicación: filtrando Buenos Aires
+    aparecía una tarjeta que decía Córdoba.
+
+    Va localidad y provincia, nada más. Ni domicilio, ni coordenadas, ni
+    departamento: para ubicar una operación alcanza con eso.
+    """
+    locality_id: str
+    locality: str
+    province: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ProductBase(BaseModel):
     name: str
     slug: str
@@ -104,6 +123,9 @@ class ProductCardResponse(ProductBase):
     availability: Optional[str] = None
     response_time: Optional[str] = None
     coverage_zones: Optional[List[str]] = None
+    # De dónde es la publicación. `None` sólo si la fila es vieja y no tiene
+    # localidad: no se inventa una provincia para rellenar.
+    publication_location: Optional[UbicacionDePublicacion] = None
     primary_image: Optional[str] = None
     seller: SellerBasicInfo
     views_count: int = 0
@@ -126,6 +148,9 @@ class ProductDetailResponse(ProductBase):
     availability: Optional[str] = None
     response_time: Optional[str] = None
     coverage_zones: Optional[List[str]] = None
+    # De dónde es la publicación. `None` sólo si la fila es vieja y no tiene
+    # localidad: no se inventa una provincia para rellenar.
+    publication_location: Optional[UbicacionDePublicacion] = None
     seller: SellerInfo
     images: List[ProductImageResponse] = []
     views_count: int = 0

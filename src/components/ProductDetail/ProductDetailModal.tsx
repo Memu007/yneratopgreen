@@ -24,6 +24,10 @@ interface ProductDetailModalProps {
   product: Product;
   onClose: () => void;
   onSolicitarCotizacion?: () => void;
+  /** Qué hacer cuando falta la sesión. Sin esto el botón sólo avisaba con un
+      toast: detectaba bien el requisito y dejaba a la persona sin salida,
+      aunque el Login ya existe y la cabecera sabe abrirlo. */
+  onRequiereIngreso?: () => void;
 }
 
 /** Una fila de la tabla técnica. Se omite entera si el dato no está: una fila
@@ -40,6 +44,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   product,
   onClose,
   onSolicitarCotizacion,
+  onRequiereIngreso,
 }) => {
   const { addItem } = useCart();
   const { isAuthenticated } = useAuth();
@@ -58,6 +63,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // galería que no lleva a ningún lado es una acción falsa.
   const imagen = product.image;
 
+  // Sin sesión, el botón no promete lo que no puede hacer: dice que el paso
+  // siguiente es ingresar. El rótulo y la acción tienen que decir lo mismo.
+  const faltaIngresar = accion.tipo === 'comprar' && !isAuthenticated;
+  const rotuloDelCta = faltaIngresar ? 'Ingresar para continuar' : accion.etiqueta;
+
   const ejecutar = () => {
     if (accion.tipo === 'cotizar') {
       onSolicitarCotizacion?.();
@@ -67,7 +77,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     if (accion.tipo !== 'comprar') return;
 
     if (!isAuthenticated) {
-      showToast('Tenés que ingresar para agregar publicaciones al carrito', 'warning');
+      // Se abre el Login de verdad y se vuelve a este mismo detalle, se
+      // complete o se cancele. No se agrega nada al carrito: eso lo decide la
+      // persona con un clic nuevo, ya con su sesión.
+      if (onRequiereIngreso) {
+        onRequiereIngreso();
+        return;
+      }
+      showToast('Tenés que ingresar para continuar', 'warning');
       return;
     }
     if (!esServicio && quantity > product.stock) {
@@ -80,7 +97,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     onClose();
   };
 
-  const ubicacion = [product.location.province, product.location.city]
+  // La ubicación de la publicación, del padrón: localidad y después provincia.
+  // La del vendedor es otro dato y vive en su bloque.
+  const ubicacion = [product.location?.city, product.location?.province]
     .filter(Boolean)
     .join(', ');
 
@@ -199,7 +218,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 onClick={ejecutar}
                 disabled={accion.tipo === 'sin-stock' || (accion.tipo === 'cotizar' && !onSolicitarCotizacion)}
               >
-                {accion.etiqueta}
+                {rotuloDelCta}
               </button>
               <button
                 className="tg-button tg-button--secondary"

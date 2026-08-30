@@ -22,6 +22,12 @@ interface ProductCardProps {
       misma acción; lo único que cambia es que el activo deja de ocupar la fila
       entera, porque en una grilla de tres columnas no hay fila entera. */
   variante?: 'catalogo' | 'compacta';
+  /** Abre el Login de la aplicación y avisa cuando se cierra —se complete o se
+      cancele—. La tarjeta lo usa para el detalle: cierra el detalle mientras el
+      Login está arriba y lo vuelve a abrir después, con la misma publicación.
+      Se hace así, y no apilando dos diálogos, porque los dos son modales con su
+      propia trampa de foco: superpuestos, el teclado queda entre dos. */
+  onSolicitarIngreso?: (alVolver: () => void) => void;
 }
 
 /** Un dato con su rótulo. Se omite entero cuando el valor no está: una fila de
@@ -37,6 +43,7 @@ const Dato: React.FC<{ rotulo: string; valor?: string | null }> = ({ rotulo, val
 export const ProductCard: React.FC<ProductCardProps> = ({
   product,
   onSolicitarCotizacion,
+  onSolicitarIngreso,
   variante = 'catalogo',
 }) => {
   const { addItem } = useCart();
@@ -47,11 +54,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const accion = accionDe(product);
   const esServicio = anatomia === 'servicio' || anatomia === 'logistica';
 
-  // Es la ubicación declarada por el VENDEDOR, no el origen de la publicación:
-  // ese vive en la base como localidad y no sale en la respuesta pública. Se
-  // muestra en el orden en que viene, sin reordenar: el texto es libre y
-  // adivinar cuál parte es provincia inventaba «Argentina, Buenos Aires».
-  const ubicacion = [product.location?.province, product.location?.city]
+  // De dónde es la PUBLICACIÓN, del padrón oficial: la misma columna con la que
+  // el Backend filtra por provincia. Antes acá salía la ubicación del perfil de
+  // quien publica, así que filtrando Buenos Aires podía leerse «Córdoba».
+  // Localidad primero y provincia después, que es como se nombra un lugar.
+  const ubicacion = [product.location?.city, product.location?.province]
     .filter(Boolean)
     .join(', ');
 
@@ -179,6 +186,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           product={product}
           onClose={() => setShowDetail(false)}
           onSolicitarCotizacion={onSolicitarCotizacion}
+          onRequiereIngreso={
+            onSolicitarIngreso
+              ? () => {
+                  setShowDetail(false);
+                  onSolicitarIngreso(() => setShowDetail(true));
+                }
+              : undefined
+          }
         />
       )}
     </>

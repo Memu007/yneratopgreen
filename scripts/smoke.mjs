@@ -12065,12 +12065,12 @@ await runCase(123, 'Al 200 % de zoom las cinco pantallas siguen siendo usables',
 
     await publica.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await publica.locator('article').first().waitFor({ timeout: 20_000 });
-    await medir(publica, 'catálogo', publica.getByRole('button', { name: /Agregar|Iniciar operación|Contratar|Solicitar cotización|Sin stock/ }));
+    await medir(publica, 'catálogo', publica.getByRole('button', { name: /Agregar|Iniciar operación|Contratar|Solicitar cotización|Sin stock|Ingresar para continuar/ }));
 
     await publica.locator('article').first().click();
     const ficha = publica.getByRole('dialog');
     await ficha.waitFor({ timeout: 20_000 });
-    await medir(publica, 'detalle', ficha.getByRole('button', { name: /Agregar|Iniciar operación|Contratar|Solicitar cotización|Sin stock/ }));
+    await medir(publica, 'detalle', ficha.getByRole('button', { name: /Agregar|Iniciar operación|Contratar|Solicitar cotización|Sin stock|Ingresar para continuar/ }));
     await publica.keyboard.press('Escape');
     await ficha.waitFor({ state: 'hidden', timeout: 20_000 });
 
@@ -14365,6 +14365,312 @@ print(json.dumps({
     + `los tres ${SHA_SINTETICO}, byte por byte y sin recortar. El health conserva estado, `
     + 'servicio, version comercial y entorno, no suma ninguna otra clave del entorno y mantiene '
     + 'las cinco cabeceras de SEC-3';
+});
+
+
+await runCase(137, 'La ubicacion que muestra una publicacion es la suya, no la de quien la publica', async () => {
+  // La captura que abrio esto parecia un filtro roto y no lo era. El filtro por
+  // provincia trabaja sobre `products.locality_id`; lo que estaba mal era la
+  // representacion: la respuesta publica no traia la ubicacion de la publicacion,
+  // asi que la tarjeta caia en `seller.location` —texto libre del perfil— y una
+  // rastra de Balcarce, vendida por una cuenta de Cordoba, se leia «Cordoba»
+  // aun filtrando Buenos Aires.
+  //
+  // Antes de tocar nada esto medía, sobre la base del seed, 23 de 30
+  // publicaciones activas mostrando una provincia que no era la suya.
+
+  // --- A. El caso exacto: publicacion en una provincia, vendedor en otra ----
+  const [[nombre, localidad, provincia, ubicacionDelVendedor]] = queryRows(
+    "SELECT p.name, l.name, l.province_name, u.location "
+    + 'FROM products p JOIN localities l ON l.id = p.locality_id '
+    + 'JOIN users u ON u.id = p.seller_id '
+    + "WHERE p.status = 'ACTIVE' AND u.location NOT ILIKE '%' || l.province_name || '%' "
+    + 'ORDER BY p.name LIMIT 1');
+  assert(nombre && localidad && provincia,
+    'el catalogo no tiene ninguna publicacion cuyo vendedor sea de otra provincia: '
+    + 'sin ese caso esta prueba no mide nada');
+
+  const buscado = await apiRequest(
+    `/catalog/products?search=${encodeURIComponent(nombre.slice(0, 20))}`);
+  const publicacion = buscado.data.items.find((i) => i.name === nombre);
+  assert(publicacion, `la API no devolvio «${nombre}»`);
+  assert(publicacion.publication_location,
+    `«${nombre}» sale sin ubicacion de publicacion: la tarjeta va a mostrar la del vendedor`);
+  assert(publicacion.publication_location.locality === localidad
+    && publicacion.publication_location.province === provincia,
+    `la API dice ${JSON.stringify(publicacion.publication_location)} y la base dice `
+    + `${localidad}, ${provincia}`);
+  assert(publicacion.seller.location === ubicacionDelVendedor,
+    'el dato del vendedor dejo de viajar: es suyo y sigue siendo un dato distinto');
+  assert(publicacion.publication_location.province !== ubicacionDelVendedor,
+    'la prueba dejo de distinguir las dos ubicaciones');
+
+  // El detalle dice lo mismo que el listado.
+  const detalle = await apiRequest(`/catalog/products/${publicacion.id}`);
+  assert(JSON.stringify(detalle.data.publication_location)
+      === JSON.stringify(publicacion.publication_location),
+    'el detalle y el listado no coinciden en la ubicacion de la publicacion');
+
+  // --- B. Provincia por provincia, la API contra el SQL equivalente --------
+  // No se fijan cantidades: se compara el CONJUNTO de identificadores, asi la
+  // prueba no envejece cuando el catalogo cambie.
+  const provincias = queryRows(
+    'SELECT DISTINCT l.province_name FROM products p JOIN localities l ON l.id = p.locality_id '
+    + "WHERE p.status = 'ACTIVE' ORDER BY 1").map(([p]) => p);
+  assert(provincias.length >= 2,
+    `hacen falta al menos dos provincias con publicaciones y hay ${provincias.length}`);
+  const comparadas = [];
+  for (const prov of provincias) {
+    const porSql = queryRows(
+      'SELECT p.id FROM products p JOIN localities l ON l.id = p.locality_id '
+      + `WHERE p.status = 'ACTIVE' AND l.province_name = ${sqlLiteral(prov)} ORDER BY 1`)
+      .map(([id]) => id);
+    // Se pagina: con la suite completa una provincia pasa de cien publicaciones
+    // y comparar una sola pagina compararia otra cosa.
+    const items = [];
+    let pagina = 1;
+    let respuesta;
+    do {
+      respuesta = await apiRequest(
+        `/catalog/products?province=${encodeURIComponent(prov)}&page_size=100&page=${pagina}`);
+      items.push(...respuesta.data.items);
+      pagina += 1;
+    } while (items.length < respuesta.data.total && respuesta.data.items.length > 0);
+    const porApi = items.map((i) => i.id).sort();
+    assert(JSON.stringify(porApi) === JSON.stringify([...porSql].sort()),
+      `en ${prov} la API devuelve ${porApi.length} publicaciones y el SQL ${porSql.length}`);
+    assert(respuesta.data.total === porSql.length,
+      `en ${prov} el total dice ${respuesta.data.total} y hay ${porSql.length}`);
+    // Y cada elemento informa ESA provincia como suya.
+    for (const item of items) {
+      assert(item.publication_location && item.publication_location.province === prov,
+        `filtrando ${prov}, «${item.name}» informa `
+        + `${JSON.stringify(item.publication_location && item.publication_location.province)}`);
+    }
+    comparadas.push(`${prov}=${porSql.length}`);
+  }
+
+  // --- C. Privacidad: sale el lugar, no la puerta --------------------------
+  const permitidas = ['locality_id', 'locality', 'province'];
+  assert(JSON.stringify(Object.keys(publicacion.publication_location).sort())
+      === JSON.stringify(permitidas.sort()),
+    `la ubicacion expone ${JSON.stringify(Object.keys(publicacion.publication_location))}`);
+  const textoDelDetalle = JSON.stringify(detalle.data);
+  for (const prohibido of ['latitude', 'longitude', 'coordinates', 'department',
+    'phone', 'whatsapp', 'email']) {
+    assert(!textoDelDetalle.includes(`"${prohibido}"`),
+      `el detalle expone ${prohibido}, que no hace falta para ubicar una operacion`);
+  }
+
+  // --- D. Sin una consulta por tarjeta ------------------------------------
+  // La localidad viaja en la MISMA consulta del listado. Se mide contando
+  // consultas con dos tamanos de pagina: si creciera con la pagina, seria N+1.
+  const guion = `
+import json
+from sqlalchemy import event
+from starlette.testclient import TestClient
+from app.db.base import engine
+from app.main import app
+
+consultas = []
+event.listen(engine, "before_cursor_execute", lambda *a, **k: consultas.append(a[2]))
+medida = {}
+with TestClient(app) as c:
+    for tamano in (4, 20):
+        consultas.clear()
+        r = c.get(f"/api/catalog/products?page_size={tamano}")
+        sobre_localities = sum(1 for q in consultas if "localities" in q.lower())
+        medida[str(tamano)] = [len(r.json()["items"]), sobre_localities]
+print(json.dumps(medida))
+`;
+  const medido = JSON.parse(execFileSync(
+    'docker', ['exec', '-i', 'topgreen-api', 'python', '-c', guion],
+    { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
+  ).trim().split(/\r?\n/).at(-1));
+  const [itemsChicos, consultasChicas] = medido['4'];
+  const [itemsGrandes, consultasGrandes] = medido['20'];
+  assert(itemsGrandes > itemsChicos,
+    'las dos paginas trajeron lo mismo: la medicion de N+1 no compara nada');
+  assert(consultasChicas === consultasGrandes,
+    `las consultas sobre localidades pasan de ${consultasChicas} a ${consultasGrandes} `
+    + 'al agrandar la pagina: hay una consulta por tarjeta');
+
+  // --- E. Y lo que ve una persona ------------------------------------------
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  let vistoEnLaTarjeta = '';
+  try {
+    // Se entra por URL directa con la provincia Y el nombre: la suite crea mas
+    // de cien publicaciones, y sin acotar la busqueda esta tarjeta podria estar
+    // en la pagina tres. Lo que se mide es que la URL hidrate y que la tarjeta
+    // diga la ubicacion correcta, no en que pagina cae.
+    await page.goto(
+      `${FRONTEND_URL}/?section=marketplace&province=${encodeURIComponent(provincia)}`
+      + `&q=${encodeURIComponent(nombre)}`,
+      { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-province').waitFor({ state: 'visible', timeout: 20_000 });
+    // El padron llega por la red: hasta que no estan las opciones, el selector
+    // no puede tener elegida ninguna.
+    await page.waitForFunction(
+      () => document.querySelectorAll('#catalog-province option').length > 1,
+      null, { timeout: 20_000 });
+    await page.waitForFunction(
+      () => (document.querySelector('#catalog-province') || {}).value !== '',
+      null, { timeout: 20_000 });
+    // La URL directa hidrata el selector, y lo hace con ESA provincia.
+    const provinciaElegida = await page.locator('#catalog-province')
+      .evaluate((s) => s.options[s.selectedIndex].textContent.trim());
+    assert(provinciaElegida === provincia,
+      `la URL pedia ${provincia} y el selector quedo en «${provinciaElegida}»`);
+    await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+    const tarjeta = page.locator('article[class*="card"]')
+      .filter({ hasText: nombre }).first();
+    await tarjeta.waitFor({ timeout: 20_000 });
+    vistoEnLaTarjeta = (await tarjeta.innerText()).replace(/\s+/g, ' ');
+    assert(vistoEnLaTarjeta.includes(`${localidad}, ${provincia}`),
+      `la tarjeta no dice «${localidad}, ${provincia}»: ${vistoEnLaTarjeta.slice(0, 160)}`);
+    assert(!vistoEnLaTarjeta.includes(ubicacionDelVendedor),
+      `la tarjeta sigue mostrando la ubicacion del vendedor «${ubicacionDelVendedor}»`);
+
+    // Cambiar de provincia: URL, consulta y tarjetas se mueven juntas, y una
+    // localidad de la provincia anterior no sobrevive.
+    const otra = provincias.find((p) => p !== provincia);
+    const localidades = page.locator('#catalog-locality');
+    if (await localidades.count()) {
+      const opciones = await localidades.locator('option').count();
+      if (opciones > 1) {
+        await localidades.selectOption({ index: 1 });
+        await page.waitForTimeout(1500);
+        assert(/locality_id=/.test(page.url()), 'elegir una localidad no quedo en la URL');
+      }
+    }
+    const buscador = page.locator('input[type="search"], input[placeholder*="Busc" i]').first();
+    if (await buscador.count()) {
+      await buscador.fill('');
+      await page.waitForTimeout(1200);
+    }
+    await page.locator('#catalog-province').selectOption({ label: otra });
+    await page.waitForTimeout(2500);
+    assert(page.url().includes(encodeURIComponent(otra).replace(/%20/g, '+'))
+      || decodeURIComponent(page.url()).includes(otra),
+      `la URL no siguio al cambio de provincia: ${page.url()}`);
+    assert(!/locality_id=/.test(page.url()),
+      'quedo una localidad de la provincia anterior en la URL');
+    await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+    const enLaOtra = await page.locator('article[class*="card"]').allInnerTexts();
+    assert(enLaOtra.length > 0, `filtrando ${otra} no quedo ninguna tarjeta`);
+    for (const texto of enLaOtra) {
+      assert(texto.includes(otra),
+        `filtrando ${otra} hay una tarjeta que no la nombra: ${texto.replace(/\s+/g, ' ').slice(0, 120)}`);
+    }
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+
+  return `«${nombre}» es de ${localidad}, ${provincia} y su vendedor declara `
+    + `«${ubicacionDelVendedor}»: la API informa la ubicacion de la publicacion, el detalle dice `
+    + `lo mismo y la tarjeta muestra «${localidad}, ${provincia}» sin nombrar la del vendedor. `
+    + `Provincia por provincia, los identificadores de la API coinciden con el SQL sobre `
+    + `products.locality_id (${comparadas.join(', ')}) y cada elemento informa la provincia por la `
+    + `que se filtro. La ubicacion lleva solo localidad y provincia. Las consultas sobre localities `
+    + `no crecen con el tamano de pagina (${consultasChicas} con ${itemsChicos} y `
+    + `${consultasGrandes} con ${itemsGrandes})`;
+});
+
+
+await runCase(138, 'Sin sesion, el detalle ofrece ingresar y vuelve a la misma publicacion', async () => {
+  // El detalle detectaba bien que faltaba la sesion y ahi se terminaba: un aviso
+  // que decia «tenes que ingresar» y nada mas. El Login ya existia y la cabecera
+  // ya sabia abrirlo; la persona quedaba en un callejon sin salida.
+  //
+  // Se prueba lo que ve alguien sin sesion, no lo que hace el codigo: el rotulo,
+  // que se abra el Login de verdad, que cancelar y completar vuelvan a la MISMA
+  // publicacion, y que en ningun momento aparezca algo en el carrito.
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  const erroresDePagina = [];
+  page.on('pageerror', (e) => erroresDePagina.push(e.message));
+
+  const enElCarrito = () => page.evaluate(() => {
+    for (const clave of Object.keys(window.localStorage)) {
+      if (!/cart|carrito/i.test(clave)) continue;
+      try {
+        const guardado = JSON.parse(window.localStorage.getItem(clave) || 'null');
+        if (Array.isArray(guardado)) return guardado.length;
+        if (guardado && Array.isArray(guardado.items)) return guardado.items.length;
+      } catch { /* si no es JSON no es el carrito */ }
+    }
+    return 0;
+  });
+  const tituloDelDetalle = () => page.locator('#detalle-titulo').first().innerText();
+
+  try {
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+    await page.locator('article[class*="card"] h3').first().click();
+    await page.locator('#detalle-titulo').waitFor({ timeout: 20_000 });
+    const publicacion = (await tituloDelDetalle()).trim();
+
+    // El rotulo dice cual es el paso siguiente.
+    const cta = page.getByRole('dialog')
+      .getByRole('button', { name: /Ingresar para continuar/ }).first();
+    assert(await cta.count(),
+      'sin sesion el detalle no ofrece ingresar: los botones son '
+      + JSON.stringify(await page.getByRole('dialog').getByRole('button').allInnerTexts()));
+
+    // --- Se cancela ---------------------------------------------------------
+    await cta.click();
+    await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    assert(await enElCarrito() === 0, 'abrir el Login agrego algo al carrito');
+    // Un solo dialogo: el detalle se aparta en vez de quedar debajo con su
+    // propia trampa de foco peleando contra la del Login.
+    assert(await page.getByRole('dialog').count() === 1,
+      `con el Login abierto hay ${await page.getByRole('dialog').count()} dialogos superpuestos`);
+    await page.getByRole('button', { name: 'Cerrar' }).first().click();
+    await page.locator('#detalle-titulo').waitFor({ timeout: 20_000 });
+    assert((await tituloDelDetalle()).trim() === publicacion,
+      `tras cancelar se volvio a «${(await tituloDelDetalle()).trim()}» y no a «${publicacion}»`);
+    assert(await enElCarrito() === 0, 'cancelar el Login dejo algo en el carrito');
+
+    // --- Se completa --------------------------------------------------------
+    await page.getByRole('dialog').getByRole('button', { name: /Ingresar para continuar/ })
+      .first().click();
+    await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    await page.getByPlaceholder('tu@email.com').fill('cliente@ejemplo.com');
+    await page.getByPlaceholder('••••••••').fill('cliente123');
+    await page.locator('[class*="_submitButton_"][type="submit"]').click();
+    await page.locator('#detalle-titulo').waitFor({ timeout: 25_000 });
+    assert((await tituloDelDetalle()).trim() === publicacion,
+      `tras ingresar se volvio a «${(await tituloDelDetalle()).trim()}» y no a «${publicacion}»`);
+    await page.getByRole('button', { name: 'Mi cuenta' }).first()
+      .waitFor({ timeout: 20_000 });
+
+    // Con sesion el boton vuelve a decir lo que hace, y sigue sin haber pasado
+    // nada por su cuenta: ni carrito, ni orden, ni reserva.
+    const rotuloConSesion = (await page.getByRole('dialog').getByRole('button')
+      .filter({ hasText: /Ingresar|Iniciar operaci|Agregar|Contratar/ }).first().innerText()).trim();
+    assert(!/Ingresar para continuar/.test(rotuloConSesion),
+      `ya con sesion el boton sigue diciendo «${rotuloConSesion}»`);
+    assert(await enElCarrito() === 0,
+      'ingresar agrego la publicacion al carrito sin que nadie la pidiera');
+    const ordenes = queryCount(
+      'SELECT count(*) FROM orders o JOIN users u ON u.id = o.buyer_id '
+      + "WHERE u.email = 'cliente@ejemplo.com' AND o.created_at > now() - interval '2 minutes'");
+    assert(ordenes === 0, `ingresar creo ${ordenes} ordenes`);
+
+    assert(erroresDePagina.length === 0,
+      `el recorrido dejo errores de pagina: ${erroresDePagina[0]}`);
+    return `Sin sesion el detalle de «${publicacion}» ofrece «Ingresar para continuar» y abre el `
+      + 'Login real, con un solo dialogo a la vez. Cancelarlo vuelve a esa misma publicacion; '
+      + `completarlo tambien, ya con sesion y con el boton diciendo «${rotuloConSesion}». En los `
+      + 'tres momentos el carrito quedo en cero y no se creo ninguna orden';
+  } finally {
+    await context.close();
+    await browser.close();
+  }
 });
 
 const passed = results.filter((result) => result.passed).length;

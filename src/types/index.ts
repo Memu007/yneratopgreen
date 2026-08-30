@@ -32,6 +32,12 @@ export interface Product {
   availability?: string;
   responseTime?: string;
   coverageZones?: string[];
+  /** De donde es la PUBLICACION, segun el padron oficial: `city` es la
+      localidad y `province` la provincia. Es el mismo dato con el que el
+      Backend filtra, asi que lo que se ve coincide con lo que se filtro. No
+      es `seller.address`, que es el domicilio declarado por quien publica.
+      Las dos quedan vacias cuando la publicacion no tiene localidad: no se
+      inventa una provincia para rellenar. */
   location: {
     province: string;
     city: string;

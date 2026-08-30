@@ -65,6 +65,16 @@ export interface LocalityResponse {
   longitude: number;
 }
 
+/** De dónde es la PUBLICACIÓN, según el padrón oficial. Es la misma columna
+    con la que el Backend filtra por provincia, así que lo que se ve en la
+    tarjeta y lo que decidió el filtro son el mismo dato. No confundir con
+    `SellerInfo.location`, que es texto libre del perfil de quien publica. */
+export interface UbicacionDePublicacion {
+  locality_id: string;
+  locality: string;
+  province: string;
+}
+
 export interface ProductImage {
   id: string;
   url: string;
@@ -93,6 +103,7 @@ export interface SellerBasicInfo {
 }
 
 export interface ProductFromBackend {
+  publication_location?: UbicacionDePublicacion | null;
   id: string;
   name: string;
   slug: string;
@@ -200,9 +211,16 @@ export const getProductDetail = async (productId: string): Promise<ProductDetail
 export const convertBackendProductToFrontend = (backendProduct: ProductFromBackend | ProductDetailFromBackend): Product => {
   const seller = 'seller' in backendProduct ? backendProduct.seller : undefined;
   
-  // Extraer provincia y ciudad de la location si existe
+  // La ubicación de la PUBLICACIÓN sale del padrón, no del perfil de quien
+  // publica. Antes se partía `seller.location` por comas y se mostraba eso:
+  // una rastra de Balcarce, vendida por una cuenta de Córdoba, aparecía como
+  // «Córdoba» incluso filtrando Buenos Aires. Sin localidad no se inventa
+  // nada: quedan vacías y la tarjeta no dibuja la línea.
+  const ubicacion = backendProduct.publication_location;
+
+  // La del vendedor sigue existiendo, pero como dato SUYO y en su bloque.
   const sellerWithLocation = seller && 'location' in seller ? seller as SellerInfo : undefined;
-  const locationParts = sellerWithLocation?.location?.split(',').map(s => s.trim()) || ['Argentina', ''];
+  const partesDelVendedor = sellerWithLocation?.location?.split(',').map(s => s.trim()) || [];
   
   // Obtener la URL de la imagen principal
   const primaryImageUrl = backendProduct.primary_image || 
@@ -223,8 +241,8 @@ export const convertBackendProductToFrontend = (backendProduct: ProductFromBacke
     description: backendProduct.description,
     image: getImageUrl(primaryImageUrl),
     location: {
-      province: locationParts[0] || 'Argentina',
-      city: locationParts[1] || '',
+      province: ubicacion?.province || '',
+      city: ubicacion?.locality || '',
     },
     seller: {
       id: seller?.id || '',
@@ -236,9 +254,11 @@ export const convertBackendProductToFrontend = (backendProduct: ProductFromBacke
       // el campo, y ausente tiene que leerse como «no», nunca como «sí».
       documentacionRevisada:
         (seller as SellerInfo | undefined)?.documentacion_revisada === true,
+      // El domicilio declarado por quien publica, tal como lo escribió. Es su
+      // dato y vive en su bloque: no describe de dónde es la publicación.
       address: {
-        province: locationParts[0] || 'Argentina',
-        city: locationParts[1] || '',
+        province: partesDelVendedor[0] || '',
+        city: partesDelVendedor[1] || '',
       },
     },
     stock: backendProduct.stock,
