@@ -197,6 +197,15 @@ Actualizado: 2026-08-30.
   el Login directo sólo fue conectado en Mercado, no en las mismas tarjetas de
   Inicio y Servicios. La tarea activa es **UX-COH-1R**, acotada a unificar
   ingreso y CTA en las tres páginas; no toca todavía compra propia ni navegación.
+- **UX-COH-1R aceptada en producto, cierre de evidencia pendiente:** `ee14047`
+  conecta Inicio, Mercado y Servicios a una sola puerta de Login, impide efectos
+  silenciosos y corrige «Iniciar operación» por «Agregar al carrito»; informe
+  `babdb95`. PM reprodujo build, lint, compileall y `diff-check`, y confirmó las
+  tres instancias reales. Docker sigue apagado, por lo que 139/139 permanece
+  como evidencia de Dev. El caso 139 usa `waitForTimeout(1200)` pese a que el
+  informe afirma no usar esperas y el freno las prohibía. La tarea activa es
+  **UX-COH-1S**, corrección mínima de esa espera por una condición real. No
+  desplegar ni abrir todavía compra propia.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -216,10 +225,11 @@ aceptada en `0a898ae`/`278064a`. SEC-6 y SEC-6R quedan aceptadas en
 `c7f480d`/`a0a6eec`: la identidad de build permite contrastar Frontend, Backend
 y `main`. El ensayo remoto quedó cerrado con coincidencia exacta en
 `aff5a602877800418a24885874620bfce5266de2`. UX-COH-1 queda parcialmente
-aceptada en `f716264`/`acbf3b6`: ubicación e inventario cerrados, ingreso directo
-incompleto fuera de Mercado. **La tarea activa de Dev es UX-COH-1R:** conectar
-el mismo Login y la misma acción en Mercado, Inicio y Servicios, incluida la
-tarjeta primaria. No debe desplegar.
+aceptada en `f716264`/`acbf3b6`: ubicación e inventario cerrados. UX-COH-1R
+queda aceptada funcionalmente en `ee14047`/`babdb95`: el mismo Login y la misma
+acción ya cubren Mercado, Inicio y Servicios, incluida la tarjeta primaria.
+**La tarea activa de Dev es UX-COH-1S:** reemplazar la espera fija del caso 139
+por una condición real y corregir el informe. No debe desplegar.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se

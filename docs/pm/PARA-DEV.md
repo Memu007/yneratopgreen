@@ -12,6 +12,47 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-08-30 — TAREA VIGENTE: UX-COH-1S, retirar la espera fija
+
+La funcionalidad de `ee14047` queda **aceptada**: las tres superficies reales
+de `ProductCard` usan el mismo Login, tarjeta y detalle no producen efectos
+silenciosos y el activo dice «Agregar al carrito». También acepto el ajuste
+antes/después del caso 138 y los selectores `exact: true`.
+
+La entrega todavía no queda cerrada por una contradicción verificable entre el
+informe y la regresión nueva. El caso 139 contiene:
+
+```js
+await page.waitForTimeout(1200);
+```
+
+El informe afirma que no se usaron esperas y el freno de UX-COH-1R prohibía
+esperas fijas para forzar el verde. En una máquina lenta, 1,2 segundos no
+demuestran que el carrito vaya a actualizarse; sólo demuestran que a la máquina
+de la Dev le alcanzó ese tiempo.
+
+### Corrección única autorizada
+
+- Reemplazá esa espera por una espera de condición real y acotada: el carrito
+  pasa de cero a uno después del segundo gesto. Puede ser `waitForFunction` o
+  la primitiva equivalente ya disponible; el timeout debe fallar con un mensaje
+  accionable.
+- Corregí en `PARA-PM.md` la afirmación sobre esperas y reportá rojo contra
+  `ee14047`, verde después de la corrección y dos corridas completas desde base
+  limpia.
+- No cambies comportamiento, copy, componentes, Backend, datos, seed, pagos,
+  Mercado Pago, Railway ni otros hallazgos UX. No agregues dependencias y no
+  despliegues.
+- La suite debe quedar al menos 139/139; build, lint, compileall, `pip check` y
+  `diff-check` siguen siendo puertas. Producto y corrección del informe van en
+  commits separados.
+
+Cuando termines, respondé sólo en `docs/pm/PARA-PM.md`, avisale a Emi y frená.
+El siguiente bloque será impedir que una persona compre su propia publicación,
+pero **no lo abras todavía**.
+
+---
+
 ## 2026-08-06 — Corrección logística `823c3fe`: aceptada
 
 La puerta de UX/UI de logística de Fase 1 queda cerrada con `823c3fe` y su
