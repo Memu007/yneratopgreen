@@ -319,6 +319,49 @@ verificación y corrección temprana:
 [Claude Code: best practices](https://www.anthropic.com/engineering/claude-code-best-practices)
 y [Agentic coding and persistent returns to expertise](https://www.anthropic.com/research/claude-code-expertise).
 
+### Cuándo pedir una auditoría independiente — regla permanente
+
+La PM debe decidir y recomendar explícitamente cuándo conviene una revisión
+desde contexto cero. No se ejecuta por ansiedad, por calendario solo ni para
+reemplazar la revisión normal de una entrega.
+
+**Abrir una auditoría independiente cuando ocurra al menos una de estas
+puertas:**
+
+1. se cerró una fase o hay un hito de cobro/demo con la clienta;
+2. se aceptó un cambio transversal que afecta tres o más recorridos, o toca
+   autenticación, órdenes, transferencia, administración, datos o navegación;
+3. pasaron dos bloques verticales relevantes o aproximadamente 2–3 semanas
+   desde la última revisión y hubo cambios materiales de producto;
+4. se prepara una publicación o entrega. La revisión general y la auditoría de
+   seguridad final son puertas distintas y ambas deben quedar cerradas.
+
+**No abrirla** después de un commit documental, una corrección mínima ya
+cubierta por regresión, mientras exista una tarea crítica sin terminar o si la
+auditoría anterior todavía no fue triada por PM. Tener uso disponible no es
+motivo suficiente.
+
+Procedimiento obligatorio:
+
+- sesión nueva y contexto independiente; para una revisión normal, GPT-5.6 Sol
+  en Alto es suficiente; Extra/XHigh se reserva para cierre preentrega, dinero,
+  datos o un bloque transversal complejo;
+- alcance único y de sólo lectura, SHA exacto, límites explícitos y prohibición
+  de modificar producto;
+- pedir recorrido, pasos, esperado/actual, evidencia de archivo, corrección
+  mínima y prueba de aceptación; separar confirmados de riesgos;
+- PM contrasta cada P1 con código, contrato y decisiones. La auditora descubre;
+  no prioriza el roadmap ni asigna trabajo por sí sola;
+- los hallazgos aceptados se guardan temporalmente en `docs/pm/`, se entregan a
+  Dev en lotes acotados y se retiran del registro vivo al quedar cerrados;
+- después de las correcciones, la próxima revisión independiente empieza por
+  comprobar que los hallazgos anteriores desaparecieron antes de buscar otros.
+
+Para este proyecto, el registro temporal vigente está en
+`AUDITORIAS-UX-CLAUDE-2026-08-30.md`. Tres auditorías consecutivas ya cubrieron
+navegación, formularios y panel administrativo: no corresponde una cuarta hasta
+cerrar el lote crítico y alcanzar una nueva puerta de las anteriores.
+
 ---
 
 ## 7. Las reglas que no se negocian

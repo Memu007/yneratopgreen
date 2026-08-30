@@ -225,6 +225,12 @@ Actualizado: 2026-08-30.
   es una segunda tarea para
   Dev; cada bloque se abre por separado y el archivo se elimina cuando todos
   sus hallazgos accionables queden aceptados.
+- **Cadencia de auditoría convertida en regla permanente:**
+  `ONBOARDING-PM.md` obliga a la PM a recomendar una revisión independiente al
+  cerrar fase/hito, después de cambios transversales o al preparar entrega, y a
+  rechazarla si aún hay una tarea crítica o hallazgos sin triar. Sol Alto es el
+  valor normal; Extra/XHigh queda para cierres de mayor riesgo. Con tres
+  auditorías consecutivas, no se abre una cuarta hasta cerrar el lote crítico.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
