@@ -4528,12 +4528,140 @@ no altera la interfaz visible y no concede autoridad para tocar Railway. La
 comprobación real de que los dos servicios reciben la revisión correcta queda
 pendiente del ensayo remoto.
 
-## Pausa operativa: no hay tarea activa para Dev
+## 2026-08-30 — OPS-1, ensayo remoto aceptado
 
-El siguiente paso corresponde a PM, no a producto: desplegar exactamente
-`main` en el Railway descartable y comparar el SHA de Git con las revisiones
-públicas de Frontend y Backend. Ese paso requiere autorización explícita de Emi.
+PM desplegó exactamente `main` `aff5a602877800418a24885874620bfce5266de2`
+en el Railway descartable. GitHub, el metadata público del Frontend y
+`/api/health` del Backend publicaron los mismos 40 caracteres; ambos servicios
+quedaron en `SUCCESS` y `MP_CHECKOUT_HABILITADO=false`. No se ejecutó seed ni
+se modificaron variables, pagos, usuarios, órdenes, PostGIS o datos.
 
-Opus debe frenar. No despliegues, no modifiques Railway y no abras por cuenta
-propia CI, backups, SMTP, Mercado Pago ni otro bloque. La aceptación visual de
-UX-2D.1 continúa pendiente e independiente.
+## Tarea activa única: UX-COH-1, recorridos coherentes antes del pulido final
+
+### Hallazgo reproducido y prioridad
+
+La captura de Emi no demuestra que el filtro SQL esté mezclando provincias:
+el selector y la URL tenían `province=Buenos Aires`. La API filtró por
+`Product.locality_id`, pero la tarjeta de «Rastra de Discos 24 Platos» mostró
+«Córdoba, Argentina» porque el listado sólo devuelve `seller.location` y
+`ProductCard` lo presenta como si fuera la ubicación de la publicación.
+
+PM reprodujo en el Railway descartable:
+
+- Maquinaria + Buenos Aires devuelve la rastra y la cosechadora, cuyos orígenes
+  declarados son Balcarce, Buenos Aires;
+- la rastra pertenece a un vendedor cuyo perfil dice Córdoba;
+- Maquinaria + Córdoba devuelve la pulverizadora de Río Cuarto;
+- por eso el filtro de base está bien encaminado y la representación pública
+  es incoherente. La ubicación que decide el filtro no sale en la respuesta.
+
+Esto bloquea la aceptación visual: una persona no puede verificar qué filtró
+si la tarjeta le muestra otro dato bajo el mismo concepto.
+
+Hay un segundo corte confirmado por Emi: una persona sin sesión abre el detalle
+y pulsa «Iniciar operación»; el sistema sólo muestra «Tenés que ingresar» en un
+toast sin acción. Detecta correctamente el requisito, pero deja a la persona en
+un callejón sin salida aunque el Login ya existe y el Header sabe abrirlo.
+
+### Resultado esperado
+
+El catálogo y el detalle muestran como **ubicación de la publicación** la
+localidad y provincia oficiales que ya viven en `Product.locality_id`. La
+ubicación del vendedor sigue siendo un dato distinto y nunca puede sustituir
+ni rotularse como origen del producto o servicio.
+
+Además, el CTA principal del detalle ofrece un ingreso directo cuando falta
+sesión. Debe abrir el Login existente, conservar el detalle y la publicación
+elegida y, al autenticar, devolver a ese contexto. No agrega automáticamente al
+carrito ni inicia una operación sin un segundo gesto consciente.
+
+### Alcance y límites
+
+- Extendé las respuestas de listado y detalle con una ubicación de publicación
+  estructurada, derivada del padrón `Locality`: identificador y nombres de
+  localidad/provincia. No expongas domicilio exacto ni parsees texto libre.
+- Resolvé la localidad en la consulta ya existente; no agregues una consulta
+  por tarjeta ni otro N+1. Los registros legacy sin `locality_id` deben degradar
+  sin 500 y sin inventar una provincia.
+- En Frontend, tipá y convertí ese dato sin reutilizar `seller.location`.
+  Tarjeta y modal de detalle deben mostrar primero localidad y luego provincia.
+- Conservá la semántica actual del filtro: provincia y localidad siguen
+  aplicándose en Backend antes de contar y paginar. Al cambiar provincia, una
+  localidad incompatible sigue limpiándose.
+- El dato del vendedor puede mantenerse dentro de su bloque claramente
+  identificado; no es el dato que aparece como ubicación de la operación.
+- Para una persona anónima, el CTA no debe terminar en un toast sin salida:
+  rotulalo de forma honesta y abrí el Login existente. Reutilizá el estado y el
+  modal de autenticación de `App`; no crees otro formulario ni otra sesión.
+- Tras login exitoso se conserva abierto el mismo detalle. No agregues al
+  carrito automáticamente, no simules una reserva y no alteres login, refresh,
+  logout, tokens o permisos.
+- No cambies seed, datos, migraciones, precios, stock, pagos, Mercado Pago,
+  Railway, diseño general, búsqueda, ordenamiento ni paginación. No despliegues.
+
+### Auditoría exploratoria obligatoria — Extra, pero acotada
+
+Antes de editar, recorré en una base Docker descartable los caminos reales de
+persona anónima, compradora, vendedora, transportista y administradora. Cubrí
+Inicio → Mercado → filtros → detalle → login/registro → carrito/checkout;
+publicación de producto/servicio; selección logística; estados vacío, carga y
+error; vuelta atrás, URL directa, teclado, `1440×900` y `390×844`.
+
+Buscá contradicciones, datos con el rótulo equivocado, CTAs muertos, requisitos
+que sólo avisan sin ofrecer salida, pérdida de contexto, estados sin siguiente
+paso y acciones que prometen algo inexistente. No uses la auditoría para
+rediseñar, cambiar copy por gusto, sumar animaciones o ampliar el MVP.
+
+Implementá solamente los dos defectos ya autorizados —ubicación e ingreso
+directo—. El resto se entrega como inventario priorizado en `PARA-PM.md` con:
+severidad P0/P1/P2, rol, recorrido, pasos, esperado/real, evidencia, alcance
+mínimo propuesto y riesgo. No corrijas hallazgos adicionales hasta decisión de
+PM/Emi.
+
+### Criterios de aceptación ejecutables
+
+1. Una regresión falla contra `aff5a602`: demuestra que una publicación de
+   Balcarce vendida por una cuenta de Córdoba sale sin ubicación de publicación
+   y la tarjeta termina mostrando Córdoba. En verde, API y UI muestran
+   «Balcarce, Buenos Aires» y el vendedor conserva Córdoba sólo como dato suyo.
+2. Para cada provincia probada, los IDs devueltos por la API coinciden con la
+   consulta SQL equivalente sobre `products.locality_id` y `localities`; no se
+   fijan cantidades que envejezcan con el catálogo.
+3. Cada elemento devuelto con `province=X` informa `X` como provincia de la
+   publicación. La UI presenta ese mismo valor; no deriva ubicación desde el
+   vendedor ni desde una cadena separada por comas.
+4. La URL directa hidrata el selector correcto. Cambiar entre Córdoba y Buenos
+   Aires actualiza URL, consulta, conteo y tarjetas de forma coherente, sin
+   conservar una localidad de la provincia anterior.
+5. Listado y detalle conservan privacidad: sólo localidad/provincia de la
+   publicación; ningún domicilio, teléfono o contacto nuevo.
+6. Sin sesión, el CTA visible dice que el paso siguiente es ingresar y abre el
+   Login real. Cancelarlo vuelve al mismo detalle; completarlo vuelve al mismo
+   detalle autenticado. En ninguno de los dos casos se agrega al carrito ni se
+   crea orden, reserva o pago sin un nuevo clic.
+7. La auditoría adjunta matriz de los cinco roles y todos los recorridos
+   indicados. Cada hallazgo tiene evidencia y prioridad; observaciones
+   cosméticas o preferencias quedan separadas y no cuentan como defectos.
+8. La suite completa queda al menos 138/138 desde base limpia y agrega los
+   casos relacionales de ubicación y continuidad de login. También quedan
+   verdes build, lint, compileall,
+   `pip check` y `git -c core.whitespace=cr-at-eol diff --check`.
+9. Producto e informe van en commits separados. El informe incluye rojo/verde,
+   respuesta API antes/después, comparación con SQL, recorridos Córdoba/Buenos
+   Aires, continuidad del Login, ausencia de efectos silenciosos, ausencia de
+   N+1, privacidad, inventario UX, regresiones y hashes.
+
+### Freno obligatorio
+
+Frená si la consulta real demuestra que los IDs filtrados no coinciden con SQL,
+si hay publicaciones activas sin localidad que exijan decidir una migración o
+si corregir el contrato público rompe un consumidor no identificado. Traé la
+reproducción y una sola alternativa mínima; no repares datos ni amplíes UX.
+También frená si conservar el detalle debajo del Login rompe el foco o exige
+anidar diálogos de forma inaccesible: proponé una única continuidad mínima en
+vez de ocultar el problema con otro toast.
+
+Empujá producto e informe en commits separados a
+`Memu007/yneratopgreen/main`, escribí la respuesta completa sólo en
+`docs/pm/PARA-PM.md`, avisale a Emi únicamente que respondiste y frená. **No
+despliegues.**

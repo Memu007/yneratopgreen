@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-08-28.
+Actualizado: 2026-08-30.
 
 ## Relevo inmediato — leer primero
 
@@ -30,10 +30,10 @@ Actualizado: 2026-08-28.
   **~89 %** describía funcionalidad, no una entrega lista para producción.
 - Entorno descartable: frontend `https://ynerav.up.railway.app`, Backend
   `https://backend-production-ba84.up.railway.app`, Railway
-  `strong-playfulness`. Último cierre verificado: despliegue Backend
-  `ab617231-9b78-46c3-8e0f-205cd6ee9037` en `SUCCESS`, `/api/health` HTTP 200,
-  migración limpia y aplicación iniciada. Incluye el cierre CSRF `6ece3fb` y el
-  hotfix previo `python-multipart==0.0.31`. La bandera de pagos no se modificó.
+  `strong-playfulness`. Cierre verificado el 28/08: GitHub, Frontend y Backend
+  publican exactamente `aff5a602877800418a24885874620bfce5266de2`; ambos
+  servicios quedaron en `SUCCESS`, `/api/health` respondió 200 y
+  `MP_CHECKOUT_HABILITADO=false`. No se ejecutó seed ni se tocaron datos.
 - Mercado Pago: aplicación `TopGreen Agro Argentina`, ID `2410255372643376`.
   Webhook de prueba y variables están cargados; secretos sólo en Railway, nunca
   en Git. La cuenta real de Emi quedó **desvinculada** del vendedor demo.
@@ -181,11 +181,23 @@ Actualizado: 2026-08-28.
   el handoff autocontenido está en
   `docs/pm/HANDOFF-DESPLIEGUE-RAILWAY-2026-08-28.md`. Nada de esto acepta
   UX-2D.1 ni habilita por sí solo producción.
-- **Advertencia del entorno descartable:** el Backend remoto usado por la vista
-  local está atrasado respecto de `main` y su catálogo no devuelve aún
-  `operation_kind` ni los campos nuevos de servicio. Por eso Logística cae en
-  el respaldo visual `insumo`; no es una regla a parchear en el frontend. El
-  seed y el Backend actuales declaran correctamente `logistica`.
+- **Advertencia remota resuelta:** el Backend había quedado atrasado y hacía
+  caer Logística en el respaldo `insumo`. OPS-1 cerró esa divergencia: el
+  entorno descartable ya sirve el mismo SHA que `main`. No parchear el
+  Frontend si una divergencia de despliegue vuelve a aparecer.
+- **OPS-1 cerrada también en remoto:** el 2026-08-28 PM desplegó exactamente
+  `main` `aff5a602877800418a24885874620bfce5266de2`; GitHub, Frontend y Backend
+  publicaron el mismo SHA completo, ambos servicios quedaron en `SUCCESS` y
+  `MP_CHECKOUT_HABILITADO=false`. No se ejecutó seed ni se tocaron datos.
+- **UX-COH-1 — tarea activa de Dev:** el filtro usa correctamente la
+  localidad de la publicación, pero tarjeta y detalle muestran
+  `seller.location`. En producción, la rastra con origen Balcarce aparece como
+  «Córdoba, Argentina» porque su vendedor está en Córdoba. Además, «Iniciar
+  operación» sin sesión sólo deja un toast y no abre el ingreso. La tarea en
+  `PARA-DEV.md` corrige esos dos recorridos y encarga en Extra una auditoría UX
+  exploratoria de los cinco roles; los demás hallazgos se informan y priorizan,
+  no se implementan sin nueva decisión. Sin migración, seed, rediseño ni
+  despliegue.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -203,12 +215,11 @@ y el Mercado agrega el buscador debajo. SEC-1 y SEC-2 quedan aceptadas en
 aceptada en `0a898ae`/`278064a`. SEC-6 y SEC-6R quedan aceptadas en
 `6c24de7`/`8b806ca`, con informes `b57ae42`/`1f1902c`. OPS-1 queda aceptada en
 `c7f480d`/`a0a6eec`: la identidad de build permite contrastar Frontend, Backend
-y `main`. **La Dev queda sin tarea activa.** El próximo paso es operativo y
-corresponde a PM: con autorización explícita de Emi, desplegar exactamente
-`main` en el Railway descartable y ejecutar la comparación documentada. Emi lo
-autorizó el 2026-08-28; la ejecución completa y sus frenos están en
-`HANDOFF-DESPLIEGUE-RAILWAY-2026-08-28.md`. Hasta completarla no se abre otro
-bloque de producto.
+y `main`. El ensayo remoto quedó cerrado con coincidencia exacta en
+`aff5a602877800418a24885874620bfce5266de2`. **La tarea activa de Dev es
+UX-COH-1:** separar ubicación de publicación/vendedor, dar ingreso directo desde
+la operación anónima y auditar los recorridos críticos sin corregir por su
+cuenta los hallazgos adicionales. No debe desplegar.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se
@@ -973,7 +984,14 @@ Deudas asignadas, no tareas activas nuevas:
   toca lo necesite para evitar duplicación o hacer verificable una regla. No se
   hace una reescritura cosmética;
 - Fase 5 cierra `lint`, política de finales de línea, documentación falsa o
-  vieja, auditoría integral de seguridad y despliegue reproducible;
+  vieja, auditoría integral de seguridad y despliegue reproducible. La
+  auditoría termina con una puerta red-team en Docker descartable: XSS,
+  autenticación/autorización, abuso, archivos, inyección, privacidad,
+  Mercado Pago y concurrencia. No se habilita producción con hallazgos
+  críticos o altos abiertos; el alcance y los límites completos quedaron en
+  `CRONOGRAMA.md`. La misma puerta audita Railway: accesos y segundo factor,
+  secretos, exposición de red, TLS, logs, persistencia, restauración de backup,
+  observabilidad y coincidencia de SHA entre GitHub y ambos servicios;
 - Mercado Pago no se considera maduro hasta probar preferencia, webhook,
   idempotencia, stock y un cobro externo controlado.
 

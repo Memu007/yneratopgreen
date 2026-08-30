@@ -165,6 +165,31 @@ usen Mercado Pago.
   versionada, en un cambio mecánico separado de cualquier función.
 - Datos iniciales cargados sin credenciales demo inseguras.
 - Seguridad, backups, persistencia de imagenes y HTTPS revisados.
+- Puerta final **red-team**, posterior al cierre funcional y anterior al
+  despliegue productivo. Se ejecuta contra una instalación Docker descartable,
+  con datos sintéticos y sin credenciales ni servicios reales. Debe cubrir, al
+  menos: XSS reflejado, almacenado y DOM; CSP y almacenamiento de sesión;
+  autenticación, autorización e IDOR/BOLA; CSRF/CORS; enumeración, fuerza bruta
+  y límites de abuso; inyección y SSRF; cargas de archivos; exposición en
+  respuestas y logs; webhooks, replay e idempotencia de Mercado Pago; carreras
+  de stock/órdenes; dependencias y contenedor. La evidencia debe ser
+  reproducible desde base limpia y asociada al SHA auditado.
+- La puerta red-team no cierra mientras exista un hallazgo crítico o alto sin
+  corregir. Los medios requieren decisión y riesgo residual escrito; después
+  de cada corrección se repite la regresión afectada y la suite integral. En
+  Railway y Mercado Pago sólo se permiten comprobaciones pasivas y flujos de
+  prueba autorizados: nada destructivo ni contra cuentas o datos reales.
+- La revisión de infraestructura incluye Railway de punta a punta: accesos al
+  proyecto y segundo factor; mínimo privilegio; inventario y alcance de
+  variables sin revelar sus valores; ausencia de secretos en repositorio,
+  imagen, frontend y logs; rotación documentada; servicios y base de datos sin
+  exposición pública innecesaria; TLS, dominios, CORS, cabeceras y healthcheck
+  observados en ejecución; volúmenes y persistencia; backups con una
+  restauración ensayada; límites, métricas y alertas básicas; retención y
+  saneamiento de logs; imagen y dependencias escaneadas; y despliegue
+  reproducible donde GitHub, Backend y Frontend informen el mismo SHA. La
+  configuración productiva debe mantener pagos deshabilitados hasta que cierre
+  su homologación y no puede reutilizar datos, usuarios ni credenciales demo.
 - Despliegue real en produccion y accesos administrativos entregados.
 - Documentación técnica contrastada contra el producto; afirmaciones viejas o
   falsas retiradas antes de capacitar.
