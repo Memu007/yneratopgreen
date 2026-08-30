@@ -213,6 +213,14 @@ Actualizado: 2026-08-30.
   cambios de producto. Docker sigue apagado; 139/139 es evidencia de Dev. La
   tarea activa pasa al P1 **ORD-SELF-1**: impedir compra propia en API, checkout
   y UI, sin desplegar.
+- **Dos auditorías UX externas preservadas:** Claude revisó navegación,
+  claridad, formularios y recorridos de forma estática sobre `7e0b878`. PM
+  contrastó los hallazgos principales, corrigió prioridades y descartó abrir
+  recuperación de contraseña —fuera del MVP— y el falso riesgo del identificador
+  de calificación. El registro temporal y la cola posterior a `ORD-SELF-1` están
+  en `docs/pm/AUDITORIAS-UX-CLAUDE-2026-08-30.md`. No es una segunda tarea para
+  Dev; cada bloque se abre por separado y el archivo se elimina cuando todos
+  sus hallazgos accionables queden aceptados.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
