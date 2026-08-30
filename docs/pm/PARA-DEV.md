@@ -4507,6 +4507,92 @@ Empujá producto e informe en commits separados a
 `docs/pm/PARA-PM.md`, avisale a Emi únicamente que respondiste y frená. **No
 despliegues.**
 
+## 2026-08-30 — UX-COH-1 `f716264`: ubicación aceptada, ingreso incompleto
+
+Acepto la solución de ubicación y el inventario exploratorio. El contrato
+`publication_location`, la comparación relacional con SQL, la degradación sin
+localidad, la privacidad y la ausencia de N+1 de localidades están bien
+resueltos. PM reprodujo build, lint, compileall y `diff-check`; Docker está
+apagado en su entorno, por lo que 138/138 y las puertas visuales permanecen como
+evidencia informada por Dev.
+
+No acepto todavía el ingreso directo como cierre general. `App` entrega
+`abrirLoginYVolver` sólo al `ProductGrid` de Mercado. `HomePage` y
+`ServicesPage` también renderizan `ProductCard`, pero no reciben ni pasan
+`onSolicitarIngreso`; desde sus vistas previas, el mismo detalle vuelve al
+toast sin salida. El caso 138 entra únicamente por `?section=marketplace`, por
+eso no discrimina esta omisión.
+
+La decisión de apartar el detalle mientras Login está abierto es correcta: un
+solo diálogo evita dos trampas de foco y conserva la continuidad al volver.
+
+## Tarea activa única: UX-COH-1R, una sola puerta de ingreso en todas las tarjetas
+
+### Resultado esperado
+
+Toda instancia real de `ProductCard` —Mercado, Inicio y Servicios— usa el mismo
+recorrido de autenticación. Una acción de compra sin sesión nunca agrega en
+silencio ni termina en un toast sin salida: ofrece ingresar, abre el Login real
+y vuelve al mismo contexto sin crear carrito, orden, reserva o pago.
+
+Al quedar autenticada, la persona ve un rótulo que describe la acción real. Para
+la anatomía `activo`, reemplazá «Iniciar operación» por **«Agregar al carrito»**:
+hoy ése es exactamente su efecto y no existe otro inicio de operación detrás.
+`Agregar` para insumo, `Contratar` para servicio/logística y `Solicitar
+cotización` sin precio conservan su semántica actual.
+
+### Alcance y límites
+
+- Pasá la continuidad de Login desde `App` a las vistas previas de Inicio y
+  Servicios, además de Mercado. Reutilizá la misma función y el mismo Login; no
+  dupliques estado ni formularios.
+- Aplicá la regla también al CTA primario de la tarjeta, no sólo al detalle. El
+  hallazgo B3 queda autorizado: tarjeta y detalle deben comportarse igual.
+- Cancelar o completar Login vuelve a la misma página y publicación. Si el
+  detalle estaba abierto, vuelve a ese detalle; si la acción salió de la
+  tarjeta, vuelve a esa tarjeta/página. No ejecutes automáticamente la compra.
+- Corregí sólo el rótulo de `activo` en la fuente central de acciones. No
+  reescribas copy de otras anatomías ni cambies layout.
+- No toques nuevamente ubicación, API, Backend, seed, datos, órdenes, pagos,
+  Mercado Pago, Railway, navegación del botón atrás ni los hallazgos B2/B4/C1–C3.
+  **No despliegues.**
+
+### Criterios de aceptación ejecutables
+
+1. Una regresión contra `f716264` abre un detalle desde Inicio y otro desde
+   Servicios y demuestra que una acción de compra anónima no abre Login. En
+   verde, toda instancia de `ProductCard` que puede comprar ofrece el mismo
+   ingreso directo.
+2. El CTA primario de una tarjeta comprable sin sesión abre Login; nunca agrega
+   al carrito silenciosamente. Cancelar y completar conservan página,
+   publicación y cero efectos. Tras autenticarse, hace falta un nuevo clic.
+3. En Mercado, Inicio y Servicios hay un solo `role=dialog` a la vez. Escape,
+   cierre y cambio Login↔Registro no pierden la continuidad ni dejan un callback
+   viejo que reabra otra publicación en un ingreso posterior desde el Header.
+4. Un activo autenticado muestra «Agregar al carrito» y ese clic agrega; ya no
+   existe «Iniciar operación» asociado a `addItem`. Las demás anatomías
+   conservan rótulo y destino.
+5. La suite completa queda al menos 139/139 desde base limpia y la regresión
+   enumera las tres ubicaciones reales de `ProductCard`; no prueba sólo Mercado.
+   Build, lint, compileall, `pip check`, a11y, contraste, hito y
+   `git -c core.whitespace=cr-at-eol diff --check` quedan verdes.
+6. Producto e informe van en commits separados. El informe incluye rojo contra
+   `f716264`, recorridos de las tres páginas, tarjeta y detalle, cancelación,
+   login exitoso, ausencia de efectos, diálogos/foco, rótulos por anatomía,
+   regresiones y hashes.
+
+### Freno obligatorio
+
+Frená si una vista previa no contiene una publicación comprable y la prueba
+necesita alterar el seed para fabricarla, si la continuidad exige apilar
+diálogos o si unificar la acción obliga a cambiar autenticación. Traé la
+evidencia y una alternativa mínima; no uses esperas o selectores frágiles para
+forzar verde.
+
+Empujá corrección e informe en commits separados a
+`Memu007/yneratopgreen/main`, respondé sólo en `docs/pm/PARA-PM.md`, avisale a
+Emi únicamente que respondiste y frená. **No despliegues.**
+
 ## 2026-08-28 — OPS-1 `c7f480d`: aceptada
 
 Acepto producto `c7f480d` e informe `a0a6eec`.

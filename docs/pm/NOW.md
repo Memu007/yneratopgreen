@@ -189,15 +189,14 @@ Actualizado: 2026-08-30.
   `main` `aff5a602877800418a24885874620bfce5266de2`; GitHub, Frontend y Backend
   publicaron el mismo SHA completo, ambos servicios quedaron en `SUCCESS` y
   `MP_CHECKOUT_HABILITADO=false`. No se ejecutó seed ni se tocaron datos.
-- **UX-COH-1 — tarea activa de Dev:** el filtro usa correctamente la
-  localidad de la publicación, pero tarjeta y detalle muestran
-  `seller.location`. En producción, la rastra con origen Balcarce aparece como
-  «Córdoba, Argentina» porque su vendedor está en Córdoba. Además, «Iniciar
-  operación» sin sesión sólo deja un toast y no abre el ingreso. La tarea en
-  `PARA-DEV.md` corrige esos dos recorridos y encarga en Extra una auditoría UX
-  exploratoria de los cinco roles; los demás hallazgos se informan y priorizan,
-  no se implementan sin nueva decisión. Sin migración, seed, rediseño ni
-  despliegue.
+- **UX-COH-1 parcialmente aceptada:** producto `f716264`, informe `acbf3b6`.
+  La ubicación oficial de la publicación queda bien separada de
+  `seller.location`; Dev midió que el error afectaba 23/30 publicaciones. La
+  auditoría Extra encontró como P1 el rótulo engañoso de `activo`, compra propia,
+  CTA silencioso de tarjeta y botón Atrás del detalle. PM encontró una omisión:
+  el Login directo sólo fue conectado en Mercado, no en las mismas tarjetas de
+  Inicio y Servicios. La tarea activa es **UX-COH-1R**, acotada a unificar
+  ingreso y CTA en las tres páginas; no toca todavía compra propia ni navegación.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -216,10 +215,11 @@ aceptada en `0a898ae`/`278064a`. SEC-6 y SEC-6R quedan aceptadas en
 `6c24de7`/`8b806ca`, con informes `b57ae42`/`1f1902c`. OPS-1 queda aceptada en
 `c7f480d`/`a0a6eec`: la identidad de build permite contrastar Frontend, Backend
 y `main`. El ensayo remoto quedó cerrado con coincidencia exacta en
-`aff5a602877800418a24885874620bfce5266de2`. **La tarea activa de Dev es
-UX-COH-1:** separar ubicación de publicación/vendedor, dar ingreso directo desde
-la operación anónima y auditar los recorridos críticos sin corregir por su
-cuenta los hallazgos adicionales. No debe desplegar.
+`aff5a602877800418a24885874620bfce5266de2`. UX-COH-1 queda parcialmente
+aceptada en `f716264`/`acbf3b6`: ubicación e inventario cerrados, ingreso directo
+incompleto fuera de Mercado. **La tarea activa de Dev es UX-COH-1R:** conectar
+el mismo Login y la misma acción en Mercado, Inicio y Servicios, incluida la
+tarjeta primaria. No debe desplegar.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se
