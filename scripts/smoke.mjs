@@ -14786,9 +14786,28 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
         assert(!/Ingresar para continuar/.test(rotulo),
           `en ${seccion} el boton sigue pidiendo ingresar con la sesion abierta`);
         await yaConSesion.click();
-        await page.waitForTimeout(1200);
-        assert(await enElCarrito(page) === 1,
-          `en ${seccion} el clic con sesion no agrego nada (carrito=${await enElCarrito(page)})`);
+        // Se espera la CONDICION, no el reloj. Aca habia un
+        // `waitForTimeout(1200)` y eso no afirma nada sobre el carrito: afirma
+        // que a ESTA maquina le alcanzo ese rato. Medido, el carrito se escribe
+        // en menos de 1 ms aca —o sea que 1200 no es un margen, es un numero
+        // que sobro— y con el carrito llegando a los 3 s, que es lo que ve una
+        // maquina mas lenta, ese mismo codigo acusa al producto de no agregar
+        // nada cuando el producto agrego bien.
+        //
+        // `esperarA` es la primitiva que ya usa el resto de la suite: pregunta
+        // cada 50 ms y se rinde a los 20 s. En una maquina rapida devuelve al
+        // instante; en una lenta espera lo que haga falta; y si el producto se
+        // rompe de verdad, el caso sigue poniendose rojo.
+        try {
+          await esperarA(async () => await enElCarrito(page) === 1,
+            `el carrito de ${seccion}`, 20_000);
+        } catch {
+          const quedo = await enElCarrito(page).catch(() => 'ilegible');
+          throw new Error(
+            `en ${seccion} el clic en «${rotulo}» con la sesion abierta no agrego `
+            + `nada: el carrito quedo en ${quedo} despues de 20s `
+            + '(antes del clic estaba en 0)');
+        }
         recorridas.push(`${seccion}:«${rotulo}»`);
       } finally {
         await context.close();
