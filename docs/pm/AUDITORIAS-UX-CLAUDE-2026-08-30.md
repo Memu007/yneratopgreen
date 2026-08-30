@@ -272,17 +272,142 @@ real y su frecuencia.
 Borde a reproducir. Si existe, reutilizar la misma puerta de ingreso con
 continuidad ya aceptada; no crear otro flujo.
 
+## Auditoría 3 — panel administrativo
+
+Base revisada: `main` `fc4e24c`; ese commit sólo agrega documentación, por lo
+que el producto continúa en `7e0b878`. La auditora leyó
+`AdminPanel.tsx` y `backend/app/api/admin.py` sin navegador ni Docker.
+
+### ADM-1 — editar categorías y opciones usa el método HTTP equivocado
+
+**Dictamen PM:** confirmado, P1.  
+**Actual:** el Frontend llama `PATCH /admin/categories/{id}` y
+`PATCH /admin/form-options/{id}`, pero el Backend sólo declara `PUT` para ambas
+rutas. FastAPI responde `405`; renombrar, activar o corregir desde el panel es
+imposible.  
+**Cierre mínimo:** usar el `apiPut` ya existente o aceptar PATCH, no las dos
+cosas; regresiones de categoría y opción deben persistir y recargar.
+
+### ADM-2 — las tres tablas administrativas quedan truncadas en veinte filas
+
+**Dictamen PM:** confirmado, P1 antes de operar con volumen.  
+**Actual:** Usuarios, Productos y Órdenes consumen la página por omisión de
+veinte filas. El Backend ya admite página y filtros; el Frontend no envía
+ninguno ni presenta controles, aunque informa el total completo. Todo registro
+21 en adelante queda inaccesible desde el panel.  
+**Cierre mínimo:** paginación real y búsqueda/filtros mínimos con total y página
+coherentes. Es independiente de la deuda de catálogo mayor a cien.
+
+### ADM-3 — métricas vacías y semántica incorrecta del dashboard
+
+**Dictamen PM:** confirmado por contrato de respuesta, P2 alto.  
+**Actual:** el Frontend espera `total_sellers` y `total_customers`; el Backend
+devuelve `total_normal_users` y `total_admins`. Las dos tarjetas quedan vacías.
+Además «Vendedores/Clientes» no son roles separados, varios estados abiertos no
+entran en «Pendientes» y «Ingresos» en realidad es volumen transado porque
+TopGreen no cobra comisión.  
+**Cierre mínimo:** alinear las claves y mostrar usuarios/admins, estados
+abiertos completos y «Volumen vendido».
+
+### ADM-4 — estados internos en inglés y estados nuevos sin tratamiento
+
+**Dictamen PM:** confirmado, P2.  
+El panel imprime `placed`, `shipped`, `awaiting_transfer_receipt`, etc. y los
+estados no contemplados salen grises. Reutilizar una única traducción es-AR y
+mantener el mismo significado que ve comprador/vendedor.
+
+### ADM-5 — acciones de edición y eliminación son botones vacíos
+
+**Dictamen PM:** confirmado, P1 de operabilidad y accesibilidad.  
+La limpieza de iconos dejó `button` sin contenido para editar/eliminar
+categorías y opciones; expandir subcategorías también usa dos cadenas vacías.
+Un administrador no puede saber qué hace cada rectángulo y un lector de
+pantalla no recibe nombre.  
+**Cierre mínimo:** texto visible o activo del sistema con nombre accesible; una
+prueba debe enumerar todas las acciones y comprobar nombres no vacíos.
+
+### ADM-6 — acciones sensibles sin confirmación o resultado visible
+
+**Dictamen PM:** confirmado por cableado, P2 alto.  
+Cambiar rol se ejecuta al elegir el select; desactivar cuenta o cambiar estado
+de publicación no confirma ni muestra éxito. El Backend protege al admin contra
+auto-desactivación/degradación, pero la UI ofrece igualmente esas acciones.  
+**Cierre mínimo:** confirmación con consecuencia concreta para rol,
+desactivación y eliminación; resultado visible. La notificación al vendedor por
+moderación debe validarse contra alcance antes de sumarla.
+
+### ADM-7 — eliminaciones usan confirmación nativa
+
+**Dictamen PM:** confirmado, P2.  
+Categoría, subcategoría y opción usan `window.confirm`. Migrar a la confirmación
+propia sin cambiar reglas de eliminación; cancelar no debe escribir.
+
+### ADM-8 — Escape en detalle de orden cierra el panel completo
+
+**Dictamen PM:** respaldado por jerarquía de capas, P2 a reproducir.  
+El panel tiene `useCapaModal`, pero el detalle de orden no; Escape alcanza el
+cierre global. El primer Escape debe cerrar sólo la capa superior y conservar
+la pestaña/posición; el segundo puede cerrar el panel.
+
+### ADM-9 — el reset manual documentado no es operable desde el panel
+
+**Dictamen PM:** confirmado, P2 y límite de F4.  
+El Backend expone `POST /admin/users/{id}/reset-password`; el Frontend no tiene
+acción. Como recuperación automática está fuera del MVP, una herramienta
+administrativa acotada es la mitigación ya documentada. Requiere confirmación,
+contraseña temporal visible una sola vez y guía operativa; no correo ni flujo
+nuevo de tokens.
+
+### ADM-10 — fallos de carga silenciosos
+
+**Dictamen PM:** confirmado por los `catch`, P2.  
+Dashboard, Usuarios, Productos, Órdenes y Documentación sólo escriben en
+consola. Un `500` deja blanco o una tabla vacía indistinguible de cero datos.  
+**Cierre mínimo:** error visible, reintento y vacío honesto por pestaña.
+
+### ADM-11 — crear usuario oculta el error real
+
+**Dictamen PM:** confirmado, P3.  
+El Frontend sustituye el detalle del Backend por «Error al crear usuario» y no
+anticipa la longitud mínima de contraseña. Mostrar el motivo accionable y
+validar lo básico antes de enviar.
+
+### Riesgos administrativos que exigen reproducción o decisión
+
+- **ADM-R1:** cambiar el `value` de una opción podría dejar publicaciones
+  existentes con el valor viejo. Evaluar inmutabilidad antes de habilitarlo.
+- **ADM-R2:** eliminar una subcategoría usada no parece tener la guarda de una
+  categoría; reproducir contra la base y observar FK/respuesta.
+- **ADM-R3:** cambiar una categoría Producto↔Servicio con publicaciones puede
+  reinterpretar stock y anatomía. Al corregir ADM-1 debe bloquearse o advertirse
+  con evidencia de `product_count`.
+- **ADM-R4:** desactivar una categoría con publicaciones activas puede dejarlas
+  visibles pero sin filtro accesible. Reproducir extremo a extremo.
+- **ADM-R5:** la configuración de Provincias parece legado frente al padrón
+  oficial. Rastrear consumidores antes de retirar o editar.
+
+### Patrón bueno que debe preservarse
+
+La cola de Documentación tiene alcance explicado, filtro, motivo obligatorio,
+control de concurrencia con `409`, autor/fecha y vacío honesto. Es el patrón de
+operabilidad para el resto del panel; no debe simplificarse al arreglar estas
+fichas.
+
 ## Cola recomendada después de `ORD-SELF-1`
 
 La PM no debe entregar todo este archivo como una sola tarea. Orden sugerido:
 
 1. **Recuperación de transferencia:** F2 y protección contra cierre accidental
    en el paso que deja una orden esperando comprobante.
-2. **Regresiones pequeñas de estado:** F1 y R2, con regresiones específicas.
-3. **Navegación coherente:** A1/A2/A3/A8 junto con B4 y C1; una raíz, una tarea.
-4. **Formularios y reputación:** F3 general, F5, F7–F11, en lotes acotados.
-5. **Claridad comercial:** A4–A7, A9/A10, F12/F13.
-6. **Deuda estructural posterior:** C2, C3 y paginación mayor a cien.
+2. **Panel administrable:** ADM-1 y ADM-5 primero; ADM-2 antes de que la base
+   supere veinte filas por entidad. No mezclar todavía el pulido ADM-3/4/6–11.
+3. **Regresiones pequeñas de estado:** F1 y R2, con regresiones específicas.
+4. **Navegación coherente:** A1/A2/A3/A8 junto con B4 y C1; una raíz, una tarea.
+5. **Formularios, reputación y panel:** F3 general, F5, F7–F11 y
+   ADM-3/4/6–11, en lotes acotados.
+6. **Claridad comercial:** A4–A7, A9/A10, F12/F13.
+7. **Deuda estructural posterior:** C2, C3, riesgos administrativos y
+   paginación mayor a cien.
 
 Cada tarea nueva requiere reproducción o prueba roja, alcance mínimo, suite
 completa y aceptación PM. No desplegar una corrección por existir en esta lista.
