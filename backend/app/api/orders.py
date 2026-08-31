@@ -31,7 +31,7 @@ from app.schemas.orders import (
     OrderItemResponse,
     OrderResponse,
 )
-from app.services import cargas, cobro, mp_pagos, mp_preferencia, stock
+from app.services import cargas, cobro, mp_pagos, mp_preferencia, propiedad, stock
 from app.services.checkout import (
     LISTA,
     MEDIO_MERCADO_PAGO,
@@ -251,6 +251,12 @@ def opciones_de_pago(
     cobrar.
     """
     cart = carrito_activo(db, current_user)
+
+    # La propia cuenta no es una contraparte. Sin esto, un carrito con una
+    # publicación propia devolvía el CBU de quien publicó para que se
+    # transfiriera a sí mismo: la pantalla presentaba como forma de pago algo
+    # que el checkout iba a rechazar. Es el mismo freno, un paso antes.
+    propiedad.exigir_carrito_sin_publicaciones_propias(cart, current_user)
 
     opciones = []
     for seller_id, grupo in grupos_del_carrito(cart).items():

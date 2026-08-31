@@ -48,12 +48,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   variante = 'catalogo',
 }) => {
   const { addItem } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [showDetail, setShowDetail] = useState(false);
   const [cantidad, setCantidad] = useState(1);
 
   const anatomia = normalizarAnatomia(product.operationKind);
-  const accion = accionDe(product);
+  // Con la sesión adentro: una publicación propia no se ofrece para comprar.
+  const accion = accionDe(product, user?.id);
   const esServicio = anatomia === 'servicio' || anatomia === 'logistica';
 
   // De dónde es la PUBLICACIÓN, del padrón oficial: la misma columna con la que
@@ -182,7 +183,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <button
                 className="tg-button tg-button--primary"
                 onClick={ejecutar}
-                disabled={accion.tipo === 'sin-stock' || (accion.tipo === 'cotizar' && !onSolicitarCotizacion)}
+                disabled={
+                  accion.tipo === 'sin-stock'
+                  || accion.tipo === 'propia'
+                  || (accion.tipo === 'cotizar' && !onSolicitarCotizacion)
+                }
               >
                 {rotuloDelCta}
               </button>

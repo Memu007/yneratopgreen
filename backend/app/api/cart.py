@@ -8,7 +8,7 @@ from decimal import Decimal
 from app.db.base import get_db
 from app.models.cart import Cart, CartItem, CartStatus
 from app.models.product import Product, ProductStatus
-from app.services import stock
+from app.services import propiedad, stock
 from app.models.product_image import ProductImage
 from app.models.category import Category
 from app.core.dependencies import get_current_user
@@ -131,7 +131,12 @@ def add_to_cart(
     
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-    
+
+    # Nadie compra lo suyo. Va ANTES que el stock y que el precio: una
+    # publicación propia sin stock no tiene un problema de stock, y decirle eso
+    # a quien publicó sería contestarle otra pregunta.
+    propiedad.exigir_que_no_sea_propia(product, current_user)
+
     # Verificar stock (solo para productos, no servicios)
     # Lo que se mira es lo **disponible**: lo que hay menos lo que ya está
     # reservado por compras esperando el pago. Ofrecer una unidad con dueño
@@ -390,6 +395,14 @@ def sync_cart(
                 detail=f"«{product.name}» ya no está disponible. "
                        "Quitala del carrito para continuar.",
             )
+
+        # Y tampoco entra por acá, que es la puerta del carrito guardado en el
+        # navegador. Se rechaza el sync ENTERO: escribir sólo lo ajeno sería
+        # decidir por la persona qué compra. El carrito viejo no se toca —el
+        # reemplazo recién ocurre en la segunda pasada—, así que queda vivo
+        # para que pueda sacar lo que sobra, y el mensaje se lo dice: acá la
+        # publicación ya está en el carrito de su navegador.
+        propiedad.exigir_que_no_sea_propia(product, current_user, en_el_carrito=True)
 
         # Un mismo product_id repetido se normaliza a UNA sola linea sumando
         # cantidades: dos filas del mismo producto dejarian el calculo ambiguo.

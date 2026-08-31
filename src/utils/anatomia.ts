@@ -61,7 +61,9 @@ export type Accion =
   /** No hay precio que cobrar: el puente honesto es Contacto. */
   | { tipo: 'cotizar'; etiqueta: string }
   /** Hay precio, pero no queda nada para vender. */
-  | { tipo: 'sin-stock'; etiqueta: string };
+  | { tipo: 'sin-stock'; etiqueta: string }
+  /** Es de quien la está mirando. Nadie compra lo suyo. */
+  | { tipo: 'propia'; etiqueta: string };
 
 /**
  * La acción primaria de una publicación.
@@ -70,11 +72,27 @@ export type Accion =
  * que una bolsa de urea, pero el camino es el mismo que ya existía: carrito y
  * checkout. Lo único que se cierra es comprar algo que no tiene precio.
  */
-export function accionDe(product: Product): Accion {
+export function accionDe(product: Product, idDeLaSesion?: string | null): Accion {
   const anatomia = normalizarAnatomia(product.operationKind);
 
   if (!tienePrecioPublicado(product)) {
     return { tipo: 'cotizar', etiqueta: 'Solicitar cotización' };
+  }
+
+  // Nadie compra lo suyo. Con comprador y vendedor en la misma cuenta, la orden
+  // que saldría se descuenta y se acredita al mismo dueño, la transferencia va
+  // de una cuenta a sí misma y el aviso de venta le llega a quien compró.
+  //
+  // Va DESPUÉS de la cotización a propósito: pedir presupuesto de la propia
+  // publicación no crea compra, orden ni carrito, así que ese camino queda
+  // exactamente como estaba.
+  //
+  // Y esto es cortesía de la pantalla, no la regla. La regla vive en el
+  // servidor —`/cart/items`, `/cart/sync`, las formas de pago y los dos
+  // checkouts responden 409— y sigue valiendo con la URL directa, con un
+  // carrito guardado de antes o con una llamada hecha a mano.
+  if (idDeLaSesion && product.seller?.id === idDeLaSesion) {
+    return { tipo: 'propia', etiqueta: 'Tu publicación' };
   }
 
   // Un servicio no tiene unidades que reservar: el backend nunca le descontó

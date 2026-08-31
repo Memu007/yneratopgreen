@@ -194,6 +194,57 @@ print(create_refresh_token(data={"sub": u.id}))
   return { acceso: salida[0], refresco: salida[1] };
 }
 
+// Escribe una fila de carrito donde vive la aplicación, con sus modelos. Es el
+// único modo de reproducir «un carrito armado antes de que existiera la regla»:
+// por la API ya no se puede meter una publicación propia, que es justamente lo
+// que hace falta poder reproducir. No se agrega ningún interruptor al producto.
+function inyectarEnElCarrito(email, productId, cantidad) {
+  const script = `
+import json, sys
+from app.db.base import SessionLocal
+from app.models.cart import Cart, CartItem, CartStatus
+from app.models.product import Product
+from app.models.user import User
+
+datos = json.loads(sys.stdin.read())
+db = SessionLocal()
+try:
+    usuario = db.query(User).filter(User.email == datos["email"]).first()
+    if usuario is None:
+        raise SystemExit("no existe " + datos["email"])
+    carrito = db.query(Cart).filter(
+        Cart.user_id == usuario.id, Cart.status == CartStatus.ACTIVE
+    ).first()
+    if carrito is None:
+        carrito = Cart(user_id=usuario.id, status=CartStatus.ACTIVE)
+        db.add(carrito)
+        db.flush()
+    producto = db.query(Product).filter(Product.id == datos["product_id"]).first()
+    if producto is None:
+        raise SystemExit("no existe el producto " + datos["product_id"])
+    db.add(CartItem(
+        cart_id=carrito.id,
+        product_id=producto.id,
+        quantity=datos["cantidad"],
+        unit_price_snapshot=producto.price,
+    ))
+    db.commit()
+    print("INYECTADO")
+finally:
+    db.close()
+`;
+  const salida = execFileSync(
+    'docker',
+    ['exec', '-i', 'topgreen-api', 'python', '-c', script],
+    {
+      encoding: 'utf8',
+      input: JSON.stringify({ email, product_id: productId, cantidad }),
+      stdio: ['pipe', 'pipe', 'pipe'],
+    },
+  );
+  assert(salida.includes('INYECTADO'), `no se pudo inyectar el carrito heredado: ${salida}`);
+}
+
 // La dependencia opcional no la usa hoy ningún endpoint, así que no tiene
 // superficie HTTP donde medirla. Se la llama donde vive, con peticiones armadas
 // a mano, que es la única forma honesta de comprobar que no elige identidad.
@@ -14889,6 +14940,495 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
     + `con el carrito en cero. Recien el clic siguiente agrega (${recorridas.join(', ')}). Un `
     + 'ingreso desde la cabecera no reabre nada. El activo dice «Agregar al carrito» y las otras '
     + 'anatomias conservan su rotulo';
+});
+
+await runCase(140, 'Nadie compra su propia publicacion, ni por la API ni por la pantalla', async () => {
+  // Una cuenta autenticada podia agregar al carrito una publicacion cuyo
+  // `seller_id` es su propio id, y llevarla hasta la orden de verdad: quedaba
+  // una fila con `buyer_id = seller_id`, con su importe, su estado de espera de
+  // comprobante y sus avisos. Comprador y vendedor la misma persona contamina
+  // orden, stock, pago, calificacion y notificacion de una sola vez.
+  //
+  // La regla vive en el SERVIDOR y se aplica antes de escribir. La pantalla
+  // ademas deja de ofrecerlo, pero la pantalla no decide: por eso este caso
+  // ataca primero por la API —con URL directa, carrito viejo y llamada a
+  // mano— y recien despues mira la interfaz.
+
+  const ingresar = async (email, password) => {
+    const { data } = await apiRequest('/auth/login', {
+      method: 'POST', body: { email, password },
+    });
+    return { token: data.access_token, id: data.user.id, email };
+  };
+  const vendedor = await ingresar('vendedor@ejemplo.com', 'vendedor123');
+  const admin = await ingresar('admin@topgreen.com', 'admin123');
+  const fletero = await ingresar('transportista@ejemplo.com', 'transportista123');
+
+  // --- Lo que hay publicado, leido del catalogo publico -------------------
+  const publicaciones = [];
+  for (let pagina = 1; pagina <= 20; pagina += 1) {
+    const { data } = await apiRequest(`/catalog/products?page=${pagina}&page_size=100`);
+    publicaciones.push(...data.items);
+    if (!data.items.length || publicaciones.length >= data.total) break;
+  }
+  const comprable = (p) => Number(p.price) > 0 && (p.is_service || Number(p.stock) > 0);
+  const de = (cuenta, extra = () => true) =>
+    publicaciones.find((p) => p.seller?.id === cuenta.id && comprable(p) && extra(p));
+  const propioProducto = de(vendedor, (p) => !p.is_service);
+  const propioServicio = de(vendedor, (p) => p.is_service);
+  const propioDelAdmin = de(admin);
+  // La ajena se pide con stock para tres: el caso la sincroniza en esa cantidad
+  // y un tope de una unidad taparia el rechazo real con un 400 de stock.
+  const ajeno = publicaciones.find(
+    (p) => p.seller?.id && p.seller.id !== vendedor.id && !p.is_service
+      && comprable(p) && Number(p.stock) >= 3);
+  assert(propioProducto && propioServicio && propioDelAdmin && ajeno,
+    'el catalogo no tiene las publicaciones que este caso necesita comparar');
+
+  // --- Instrumentos de medicion, todos sobre la base ----------------------
+  const carritoDe = (userId) => queryRows(`
+    SELECT ci.product_id, ci.quantity FROM cart_items ci
+    JOIN carts c ON c.id = ci.cart_id
+    WHERE c.user_id = ${sqlLiteral(userId)} AND c.status = 'ACTIVE'
+    ORDER BY ci.product_id
+  `).map((fila) => fila.join('x')).join(', ');
+  const estadoDelCarrito = (userId) => querySql(`
+    SELECT status FROM carts WHERE user_id = ${sqlLiteral(userId)} AND status = 'ACTIVE'
+  `);
+  const ordenesDe = (userId) => queryCount(
+    `SELECT COUNT(*) FROM orders WHERE buyer_id = ${sqlLiteral(userId)}`);
+  const ordenesIncestuosas = () => queryCount(
+    'SELECT COUNT(*) FROM orders WHERE buyer_id = seller_id');
+  const pagos = () => queryCount('SELECT COUNT(*) FROM payments');
+  const avisosDe = (userId) => queryCount(
+    `SELECT COUNT(*) FROM notifications WHERE user_id = ${sqlLiteral(userId)}`);
+  const reservado = (productId) => queryCount(
+    `SELECT COALESCE(stock_reservado, 0) FROM products WHERE id = ${sqlLiteral(productId)}`);
+  const carritosDe = (userId) => queryCount(
+    `SELECT COUNT(*) FROM carts WHERE user_id = ${sqlLiteral(userId)}`);
+
+  // `expectApiError` dice «la API no respondió HTTP 409» y no dice qué SÍ
+  // respondió, que es justo lo que hace falta para entender el rojo: un 200 que
+  // creó la fila no es lo mismo que un 400 por otra razón.
+  const exigir409 = async (que, llamada) => {
+    let respuesta;
+    try {
+      respuesta = await llamada();
+    } catch (error) {
+      const motivo = error instanceof Error ? error.message : String(error);
+      assert(motivo.includes('HTTP 409'),
+        `${que}: se esperaba 409 y respondio ${motivo}`);
+      return motivo;
+    }
+    throw new Error(
+      `${que}: se esperaba 409 y respondio HTTP ${respuesta.status} `
+      + `${JSON.stringify(respuesta.data).slice(0, 200)}`);
+  };
+
+  const NO_ES_TUYO = /tu propia publicacion|tu propia publicación|publicacion propia|publicación propia/i;
+
+  assert(ordenesIncestuosas() === 0,
+    `la base arranca con ${ordenesIncestuosas()} ordenes donde comprador y vendedor son la `
+    + 'misma cuenta; este caso no puede distinguir las suyas');
+
+  // --- A. POST /cart/items ------------------------------------------------
+  await apiRequest('/cart', { method: 'DELETE', token: vendedor.token });
+
+  // Primero una publicacion AJENA, que tiene que seguir entrando: la regla es
+  // sobre la identidad, no sobre el carrito.
+  await apiRequest('/cart/items', {
+    method: 'POST', token: vendedor.token,
+    body: { product_id: ajeno.id, quantity: 2 },
+  });
+  const carritoLegitimo = carritoDe(vendedor.id);
+  assert(carritoLegitimo === `${ajeno.id}x2`,
+    `la publicacion ajena no entro al carrito: ${carritoLegitimo}`);
+
+  for (const propia of [propioProducto, propioServicio]) {
+    const motivo = await exigir409(`POST /cart/items con «${propia.name}»`, () =>
+      apiRequest('/cart/items', {
+        method: 'POST', token: vendedor.token,
+        body: { product_id: propia.id, quantity: 1 },
+      }));
+    assert(NO_ES_TUYO.test(motivo),
+      `«${propia.name}»: el rechazo no explica que la publicacion es suya: ${motivo}`);
+    assert(!/[Qq]uitala del carrito/.test(motivo),
+      `«${propia.name}»: al agregarla no hay nada que quitar y el mensaje lo pide: ${motivo}`);
+    assert(carritoDe(vendedor.id) === carritoLegitimo,
+      `el rechazo de «${propia.name}» toco el carrito: ${carritoDe(vendedor.id)}`);
+  }
+
+  // --- B. POST /cart/sync -------------------------------------------------
+  // El carrito viejo no se reemplaza ni se vacia: se rechaza y queda como
+  // estaba, para que la persona pueda sacar lo que sobra.
+  const soloPropia = await exigir409('POST /cart/sync con una publicacion propia', () =>
+    apiRequest('/cart/sync', {
+      method: 'POST', token: vendedor.token,
+      body: { items: [{ product_id: propioProducto.id, quantity: 1 }] },
+    }));
+  assert(NO_ES_TUYO.test(soloPropia), `sync propio: motivo inesperado: ${soloPropia}`);
+  assert(/[Qq]uitala del carrito/.test(soloPropia),
+    `sync propio: la publicacion ya esta en el carrito y el mensaje no dice que hay que `
+    + `sacarla: ${soloPropia}`);
+  assert(carritoDe(vendedor.id) === carritoLegitimo,
+    `sync rechazado borro el carrito anterior: ${carritoDe(vendedor.id)}`);
+
+  // Mixto: se rechaza ENTERO. No se compra parcialmente lo ajeno.
+  const mixto = await exigir409('POST /cart/sync con un carrito mixto', () =>
+    apiRequest('/cart/sync', {
+      method: 'POST', token: vendedor.token,
+      body: {
+        items: [
+          { product_id: ajeno.id, quantity: 3 },
+          { product_id: propioProducto.id, quantity: 1 },
+        ],
+      },
+    }));
+  assert(NO_ES_TUYO.test(mixto), `sync mixto: motivo inesperado: ${mixto}`);
+  assert(/[Qq]uitala del carrito/.test(mixto),
+    `sync mixto: la publicacion ya esta en el carrito y el mensaje no dice que hay que `
+    + `sacarla: ${mixto}`);
+  assert(carritoDe(vendedor.id) === carritoLegitimo,
+    `el sync mixto escribio la parte ajena: ${carritoDe(vendedor.id)}`);
+
+  // Y sin la propia, el mismo sync pasa: lo que se cierra es la compra propia,
+  // no el carrito.
+  const limpio = await apiRequest('/cart/sync', {
+    method: 'POST', token: vendedor.token,
+    body: { items: [{ product_id: ajeno.id, quantity: 3 }] },
+  });
+  assert(limpio.status === 200 && carritoDe(vendedor.id) === `${ajeno.id}x3`,
+    `sin la propia el carrito ajeno no se sincronizo: ${carritoDe(vendedor.id)}`);
+
+  // --- C. El carrito heredado, el que ya esta contaminado -----------------
+  // Se escribe donde vive la aplicacion, con sus modelos, porque por la API ya
+  // no se puede: es exactamente el carrito de alguien que lo armo antes de que
+  // existiera la regla.
+  inyectarEnElCarrito(vendedor.email, propioProducto.id, 1);
+  const carritoHeredado = carritoDe(vendedor.id);
+  assert(carritoHeredado.includes(propioProducto.id),
+    `no se pudo inyectar el carrito heredado: ${carritoHeredado}`);
+
+  const destino = querySql('SELECT id FROM localities ORDER BY id LIMIT 1');
+  const compraPropia = {
+    shipping_address: 'Calle Falsa 123',
+    shipping_locality_id: destino,
+    shipping_postal_code: '7000',
+    shipping_decisions: [
+      { seller_id: vendedor.id, mode: 'self' },
+      { seller_id: ajeno.seller.id, mode: 'self' },
+    ],
+    payment_decisions: [
+      { seller_id: vendedor.id, method: 'transfer' },
+      { seller_id: ajeno.seller.id, method: 'transfer' },
+    ],
+  };
+
+  const ordenesAntes = ordenesDe(vendedor.id);
+  const pagosAntes = pagos();
+  const avisosAntes = avisosDe(vendedor.id);
+  const reservadoAntes = reservado(propioProducto.id);
+
+  // Los medios de pago no presentan a la propia cuenta como contraparte: antes
+  // devolvia el CBU del vendedor para que se transfiriera a si mismo.
+  const opciones = await exigir409('GET /orders/payment-options', () =>
+    apiRequest('/orders/payment-options', { token: vendedor.token }));
+  assert(NO_ES_TUYO.test(opciones), `payment-options: motivo inesperado: ${opciones}`);
+  assert(/[Qq]uitala del carrito/.test(opciones),
+    `payment-options: la publicacion ya esta en el carrito y el mensaje no dice que hay que `
+    + `sacarla: ${opciones}`);
+
+  for (const ruta of ['/orders/checkout/transfer', '/orders/checkout']) {
+    const motivo = await exigir409(`POST ${ruta}`, () => apiRequest(ruta, {
+      method: 'POST', token: vendedor.token, body: compraPropia,
+    }));
+    assert(NO_ES_TUYO.test(motivo), `${ruta}: motivo inesperado: ${motivo}`);
+    assert(/[Qq]uitala del carrito/.test(motivo),
+      `${ruta}: el mensaje no dice que hay que sacarla del carrito: ${motivo}`);
+  }
+
+  assert(ordenesDe(vendedor.id) === ordenesAntes,
+    `el checkout con carrito heredado creo ordenes: ${ordenesAntes} -> ${ordenesDe(vendedor.id)}`);
+  assert(ordenesIncestuosas() === 0,
+    `quedaron ${ordenesIncestuosas()} ordenes donde comprador y vendedor son la misma cuenta`);
+  assert(pagos() === pagosAntes, 'el checkout rechazado escribio una intencion de pago');
+  assert(avisosDe(vendedor.id) === avisosAntes, 'el checkout rechazado dejo avisos');
+  assert(reservado(propioProducto.id) === reservadoAntes,
+    'el checkout rechazado reservo stock de la publicacion propia');
+  assert(estadoDelCarrito(vendedor.id) === 'ACTIVE',
+    'el carrito quedo convertido: la persona no puede sacar el item que sobra');
+  assert(carritoDe(vendedor.id) === carritoHeredado,
+    `el rechazo cambio el carrito heredado: ${carritoDe(vendedor.id)}`);
+
+  // Y al quitar la propia, lo ajeno sigue su camino normal.
+  await apiRequest('/cart/sync', {
+    method: 'POST', token: vendedor.token,
+    body: { items: [{ product_id: ajeno.id, quantity: 3 }] },
+  });
+  const yaSinLaPropia = await apiRequest('/orders/payment-options', { token: vendedor.token });
+  assert(yaSinLaPropia.status === 200
+    && yaSinLaPropia.data.some((o) => o.seller_id === ajeno.seller.id),
+    'quitada la propia, el pedido ajeno dejo de tener formas de pago');
+  assert(!yaSinLaPropia.data.some((o) => o.seller_id === vendedor.id),
+    'las formas de pago siguen ofreciendo a la propia cuenta como contraparte');
+
+  // --- D. No depende del rol ----------------------------------------------
+  // Admin publica en el seed, asi que se prueba con lo que ya tiene. El
+  // transportista no publica nada, asi que publica ahora por la API real y
+  // despues se retira lo publicado.
+  // Y de paso se mide lo otro que el rechazo no puede hacer: CREAR un carrito.
+  // El admin no compra en toda la suite, asi que no tiene ninguno; si algun dia
+  // lo tuviera, esta afirmacion lo dice y hay que buscar otra cuenta sin carrito.
+  assert(carritosDe(admin.id) === 0,
+    `el admin ya tiene ${carritosDe(admin.id)} carritos: este caso necesita una cuenta `
+    + 'sin carrito para poder afirmar que el rechazo no crea uno');
+  const negadoAlAdmin = await exigir409('POST /cart/items como admin', () =>
+    apiRequest('/cart/items', {
+      method: 'POST', token: admin.token,
+      body: { product_id: propioDelAdmin.id, quantity: 1 },
+    }));
+  assert(NO_ES_TUYO.test(negadoAlAdmin), `admin: motivo inesperado: ${negadoAlAdmin}`);
+  assert(carritosDe(admin.id) === 0,
+    'el rechazo le creo un carrito al admin, que no tenia ninguno');
+
+  const [categoria] = queryRows(`
+    SELECT id FROM categories WHERE is_active = true AND is_service = false
+    ORDER BY name LIMIT 1
+  `);
+  const delFletero = await apiRequest('/products', {
+    method: 'POST', token: fletero.token,
+    body: {
+      name: `Smoke publicacion del transportista ${Date.now()}`,
+      description: 'Publicacion de prueba para comprobar que la regla mira la identidad.',
+      category_id: categoria[0],
+      price: 1000,
+      stock: 5,
+      unit: 'unidad',
+      locality_id: destino,
+      publication_type: 'producto',
+    },
+  });
+  try {
+    const negadoAlFletero = await exigir409('POST /cart/items como transportista', () =>
+      apiRequest('/cart/items', {
+        method: 'POST', token: fletero.token,
+        body: { product_id: delFletero.data.id, quantity: 1 },
+      }));
+    assert(NO_ES_TUYO.test(negadoAlFletero),
+      `transportista: motivo inesperado: ${negadoAlFletero}`);
+  } finally {
+    await apiRequest(`/products/${delFletero.data.id}`, {
+      method: 'DELETE', token: fletero.token,
+    });
+  }
+
+  // --- E. La pantalla, en las tres que dibujan tarjetas -------------------
+  // Dos comprobaciones distintas y a proposito:
+  //
+  // 1. EXHAUSTIVA y sin dirigir: en Inicio, Mercado y Servicios se mira TODA
+  //    tarjeta dibujada y se exige que el rotulo coincida con de quien es la
+  //    publicacion. Es mas fuerte que «hay al menos una»: no hay tarjeta que se
+  //    escape.
+  // 2. DIRIGIDA: en el Mercado se busca por nombre una publicacion propia y una
+  //    ajena. Eso no depende de que haya quedado en la vista previa, asi que la
+  //    prueba no se vuelve vacia ni se pone roja porque el catalogo cambio de
+  //    composicion —en la suite completa los casos anteriores publican decenas
+  //    de productos y tapan el seed—.
+  const datosDe = new Map();
+  for (const p of publicaciones) {
+    // Dos publicaciones distintas con el MISMO nombre no permiten decidir de
+    // quien es la tarjeta que se ve. En vez de afirmar cualquier cosa, ese
+    // nombre queda marcado y sus tarjetas no se cuentan.
+    const anterior = datosDe.get(p.name);
+    if (anterior !== undefined) {
+      if (!anterior || anterior.dueno !== p.seller?.id) datosDe.set(p.name, null);
+    } else {
+      datosDe.set(p.name, p.seller?.id
+        ? { dueno: p.seller.id, precio: Number(p.price) }
+        : null);
+    }
+  }
+
+  const browser = await chromium.launch({ headless: true });
+  const vistas = [];
+  const detallesRevisados = [];
+  let propiasTotales = 0;
+  let ajenasTotales = 0;
+  let sinPrecioTotales = 0;
+  try {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await context.newPage();
+    const enElCarrito = () => page.evaluate(() => {
+      for (const clave of Object.keys(window.localStorage)) {
+        if (!/cart|carrito/i.test(clave)) continue;
+        try {
+          const guardado = JSON.parse(window.localStorage.getItem(clave) || 'null');
+          if (Array.isArray(guardado)) return guardado.length;
+          if (guardado && Array.isArray(guardado.items)) return guardado.items.length;
+        } catch { /* si no es JSON no es el carrito */ }
+      }
+      return 0;
+    });
+
+    // Recorre las tarjetas que haya en pantalla y exige que cada rotulo diga la
+    // verdad sobre de quien es esa publicacion. Devuelve cuantas de cada una.
+    const revisarLoQueSeVe = async (donde) => {
+      const tarjetas = page.locator('article[class*="card"]');
+      const cuantas = await tarjetas.count();
+      let propias = 0;
+      let ajenas = 0;
+      let sinPrecio = 0;
+      for (let i = 0; i < cuantas; i += 1) {
+        const tarjeta = tarjetas.nth(i);
+        const titulo = (await tarjeta.locator('h3').first().innerText()).trim();
+        const datos = datosDe.get(titulo);
+        if (!datos) continue;  // nombre repetido o publicacion que no esta en el catalogo
+        // Se espera a que la tarjeta tenga sus botones antes de leerlos. Sin
+        // esto se la puede leer entre el titulo y el pie y salen cero rotulos,
+        // que no es lo que ofrece: es lo que todavia no dibujo.
+        await tarjeta.getByRole('button').first().waitFor({ timeout: 20_000 });
+        const rotulos = (await tarjeta.getByRole('button').allInnerTexts()).map((t) => t.trim());
+        if (datos.dueno !== vendedor.id) {
+          ajenas += 1;
+          assert(!rotulos.includes('Tu publicación'),
+            `en ${donde}, «${titulo}» no es del vendedor y dice «Tu publicación»`);
+        } else if (datos.precio > 0) {
+          propias += 1;
+          assert(rotulos.includes('Tu publicación'),
+            `en ${donde}, «${titulo}» es del vendedor y ofrece ${JSON.stringify(rotulos)}`);
+          assert(await tarjeta.getByRole('button', { name: 'Tu publicación' }).first().isDisabled(),
+            `en ${donde}, «Tu publicación» de «${titulo}» se puede apretar`);
+        } else {
+          // Propia y SIN precio publicado: sigue diciendo «Solicitar cotizacion»
+          // y esta bien que lo diga. Pedir presupuesto no crea compra, orden ni
+          // carrito, asi que ese camino queda como estaba. Se afirma para que la
+          // excepcion sea deliberada y no un olvido.
+          sinPrecio += 1;
+          assert(!rotulos.includes('Tu publicación')
+            && rotulos.includes('Solicitar cotización'),
+            `en ${donde}, la propia sin precio «${titulo}» ofrece ${JSON.stringify(rotulos)}`);
+        }
+      }
+      return { propias, ajenas, sinPrecio };
+    };
+
+    // Abre el detalle de una tarjeta propia y exige lo mismo que en la tarjeta:
+    // los dos caminos llevan a la misma accion y tienen que decir lo mismo.
+    const revisarElDetalle = async (donde) => {
+      const propia = page.locator('article[class*="card"]')
+        .filter({ has: page.getByRole('button', { name: 'Tu publicación' }) }).first();
+      if (!await propia.count()) return false;
+      await propia.locator('h3').click();
+      await page.locator('#detalle-titulo').waitFor({ timeout: 20_000 });
+      const publicacion = (await page.locator('#detalle-titulo').innerText()).trim();
+      const boton = page.getByRole('dialog')
+        .getByRole('button', { name: 'Tu publicación' }).first();
+      assert(await boton.count(),
+        `en ${donde}, el detalle de «${publicacion}» no dice «Tu publicación»: `
+        + JSON.stringify(await page.getByRole('dialog').getByRole('button').allInnerTexts()));
+      assert(await boton.isDisabled(),
+        `en ${donde}, el detalle de «${publicacion}» deja apretar «Tu publicación»`);
+      await page.getByRole('button', { name: 'Cerrar' }).first().click();
+      await page.locator('article[class*="card"]').first().waitFor({ timeout: 20_000 });
+      detallesRevisados.push(donde);
+      return true;
+    };
+
+    try {
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+      await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+      await page.getByPlaceholder('tu@email.com').fill(vendedor.email);
+      await page.getByPlaceholder('••••••••').fill('vendedor123');
+      await page.locator('[class*="_submitButton_"][type="submit"]').click();
+      await page.getByRole('button', { name: 'Mi cuenta' }).first().waitFor({ timeout: 25_000 });
+
+      // 1. Las tres pantallas, enteras, tal como quedan.
+      for (const seccion of ['Inicio', 'Mercado', 'Servicios']) {
+        await page.locator('header').first()
+          .getByRole('button', { name: seccion, exact: true }).first().click();
+        await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+        const { propias, ajenas, sinPrecio } = await revisarLoQueSeVe(seccion);
+        propiasTotales += propias;
+        ajenasTotales += ajenas;
+        sinPrecioTotales += sinPrecio;
+        await revisarElDetalle(seccion);
+        vistas.push(`${seccion}:${propias}p/${ajenas}a${sinPrecio ? `/${sinPrecio} a cotizar` : ''}`);
+      }
+
+      // 2. Y en el Mercado, buscando cada una por su nombre, que no depende de
+      //    lo que haya quedado arriba en la grilla.
+      for (const [publicacion, mia] of [[propioProducto, true], [ajeno, false]]) {
+        await page.goto(
+          `${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(publicacion.name)}`,
+          { waitUntil: 'domcontentloaded' });
+        const tarjeta = page.locator('article[class*="card"]')
+          .filter({ has: page.getByRole('heading', { name: publicacion.name, exact: true }) })
+          .first();
+        await tarjeta.waitFor({ timeout: 25_000 });
+        await tarjeta.getByRole('button').first().waitFor({ timeout: 25_000 });
+        const rotulos = (await tarjeta.getByRole('button').allInnerTexts()).map((t) => t.trim());
+        assert(rotulos.includes('Tu publicación') === mia,
+          `buscando «${publicacion.name}» —${mia ? 'propia' : 'ajena'}— la tarjeta ofrece `
+          + JSON.stringify(rotulos));
+        if (mia) {
+          propiasTotales += 1;
+          assert(await tarjeta.getByRole('button', { name: 'Tu publicación' }).first().isDisabled(),
+            `buscada por nombre, «Tu publicación» de «${publicacion.name}» se puede apretar`);
+          assert(await revisarElDetalle('Mercado buscado'),
+            `buscada por nombre, «${publicacion.name}» no abrio su detalle`);
+        } else {
+          ajenasTotales += 1;
+          assert(rotulos.some((r) => /Agregar|Contratar|Ingresar para continuar/.test(r)),
+            `la publicacion ajena «${publicacion.name}» perdio su accion: ${JSON.stringify(rotulos)}`);
+        }
+      }
+
+      // Mirar publicaciones propias no puede haber tocado el carrito.
+      const quedo = await enElCarrito();
+      assert(quedo === 0, `recorrer las publicaciones propias dejo ${quedo} en el carrito`);
+    } finally {
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+  }
+
+  assert(propiasTotales > 0 && ajenasTotales > 0,
+    `se revisaron ${propiasTotales} tarjetas propias y ${ajenasTotales} ajenas: `
+    + 'la comparacion no dice nada');
+  assert(detallesRevisados.length > 0, 'no se llego a revisar ningun detalle propio');
+
+  // --- F. Y recien ahora, la forma del codigo ------------------------------
+  // Va al final, igual que en el caso 139: lo que tiene que fallar primero es
+  // el recorrido, no el archivo. Lo que se afirma aca es que los cuatro
+  // caminos que pueden escribir comparten UNA regla y no cuatro copias que se
+  // van a separar; la que se olvide seria la que toca plata.
+  const modulo = readFileSync('backend/app/services/propiedad.py', 'utf8');
+  assert(/def es_propia\(/.test(modulo) && /HTTPException/.test(modulo),
+    'la regla compartida no vive en app/services/propiedad.py');
+  for (const archivo of ['backend/app/api/cart.py',
+                         'backend/app/api/orders.py',
+                         'backend/app/services/checkout.py']) {
+    const texto = readFileSync(archivo, 'utf8');
+    assert(/propiedad\.exigir_/.test(texto),
+      `${archivo} no aplica la regla compartida de publicacion propia`);
+  }
+
+  await apiRequest('/cart', { method: 'DELETE', token: vendedor.token });
+
+  return `El servidor responde 409 a /cart/items y /cart/sync con una publicacion propia `
+    + `—producto y servicio—, no toca el carrito anterior y rechaza el sync mixto entero. `
+    + `Un carrito heredado contaminado hace que payment-options y los dos checkouts respondan `
+    + `409 antes de crear orden, reservar stock, escribir pago o avisar, y el carrito queda `
+    + `activo; quitada la publicacion propia, la ajena sigue su camino. La regla no mira el rol: `
+    + `admin y transportista reciben el mismo 409 con lo suyo. En pantalla se revisaron `
+    + `${propiasTotales} tarjetas propias y ${ajenasTotales} ajenas (${vistas.join(', ')}), mas `
+    + `otras ${sinPrecioTotales} propias sin precio publicado, que siguen diciendo «Solicitar `
+    + `cotización» porque pedir presupuesto no crea compra. Tarjeta y detalle de una publicacion `
+    + `propia dicen «Tu publicación» y el boton no se puede apretar —el detalle se abrio en `
+    + `${detallesRevisados.join(', ')}—, y el carrito queda en cero. Ordenes con comprador igual `
+    + `a vendedor: 0`;
 });
 
 const passed = results.filter((result) => result.passed).length;

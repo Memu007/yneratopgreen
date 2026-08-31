@@ -47,14 +47,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onRequiereIngreso,
 }) => {
   const { addItem } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { showToast } = useToast();
   const [quantity, setQuantity] = useState(1);
   const [showSellerProfile, setShowSellerProfile] = useState(false);
   const capa = useCapaModal<HTMLDivElement>(onClose);
 
   const anatomia = normalizarAnatomia(product.operationKind);
-  const accion = accionDe(product);
+  // La misma decisión que la tarjeta, con la misma función y la misma sesión:
+  // los dos caminos llevan a la misma acción y no pueden ofrecer cosas
+  // distintas sobre la misma publicación.
+  const accion = accionDe(product, user?.id);
   const esServicio = anatomia === 'servicio' || anatomia === 'logistica';
   const cobertura = product.coverageZones?.length ? product.coverageZones.join(', ') : '';
 
@@ -216,7 +219,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <button
                 className="tg-button tg-button--primary"
                 onClick={ejecutar}
-                disabled={accion.tipo === 'sin-stock' || (accion.tipo === 'cotizar' && !onSolicitarCotizacion)}
+                disabled={
+                  accion.tipo === 'sin-stock'
+                  || accion.tipo === 'propia'
+                  || (accion.tipo === 'cotizar' && !onSolicitarCotizacion)
+                }
               >
                 {rotuloDelCta}
               </button>
@@ -231,7 +238,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <p className="tg-small">
               {accion.tipo === 'cotizar'
                 ? 'La cotización se pide por Contacto: todavía no existe una solicitud atada a esta publicación.'
-                : 'Conserva el carrito y el checkout de siempre; no abre mensajería ni reserva.'}
+                : accion.tipo === 'propia'
+                  ? 'Esta publicación es tuya y nadie se compra a sí mismo. Podés seguir viéndola como la ve cualquiera.'
+                  : 'Conserva el carrito y el checkout de siempre; no abre mensajería ni reserva.'}
             </p>
           </aside>
 

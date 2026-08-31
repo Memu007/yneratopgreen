@@ -38,7 +38,7 @@ from app.models.cart import Cart, CartStatus
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.user import User
-from app.services import mp_preferencia, mp_vinculo, stock
+from app.services import mp_preferencia, mp_vinculo, propiedad, stock
 from app.services.logistica import (
     MODO_PROPIO,
     origen_de,
@@ -202,6 +202,13 @@ def preparar(
     base queda como estaba.
     """
     cart = carrito_activo(db, user)
+
+    # Nadie compra lo suyo, y esto va ANTES que todo lo demás. Si fuera después,
+    # un carrito heredado con una publicación propia podría rebotar por el
+    # destino o por el medio de pago y esconder el motivo verdadero. Acá no se
+    # escribió una sola fila todavía y el carrito sigue activo, que es lo que
+    # hace falta para poder corregirlo.
+    propiedad.exigir_carrito_sin_publicaciones_propias(cart, user)
 
     # El destino tiene que existir en el padrón oficial.
     destino = resolver_destino(db, datos.shipping_locality_id)
