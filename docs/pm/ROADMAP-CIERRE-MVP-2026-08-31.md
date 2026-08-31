@@ -24,7 +24,8 @@ final, como acordó Emi.
   `/cart/sync` valida antes de crear y el caso 140 ya distingue las dos puertas.
 - TEST-IMG-1 cerró en `4c015f0`/`cb0875b`; el ajuste aislado del caso 140
   `fa8b382` también fue revisado y aceptado.
-- Tarea única vigente: **TEST-HARNESS-MAC-1**, detallada en `PARA-DEV.md`.
+- Tarea única vigente: **TEST-HARNESS-MAC-1R**, devolución detallada en
+  `PARA-DEV.md`; la primera entrega quedó 96/140 en la Mac de PM.
 - ORD-SELF-1 no cierra ningún hallazgo de las tres auditorías; era la tarea P1
   anterior y las auditorías la excluyeron expresamente.
 - PM reprodujo build, lint y compileall. Docker local fue habilitado el 31/08:
@@ -54,7 +55,7 @@ final, como acordó Emi.
 |---:|---|---|
 | 0 | **ORD-SELF-1R — cerrada** | Aceptada en `40b589b`/`99e828f`: `/cart/sync` valida antes de crear y prueba `409` con cero filas usando una cuenta sin carrito. |
 | 1 | **TEST-IMG-1 — cerrada** | Aceptada en `4c015f0`/`cb0875b`: selección por conteo menor a tres y diagnóstico HTTP/cuerpo. Sólo prueba; sin producto. |
-| 1B | **TEST-HARNESS-MAC-1 — vigente** | Hacer reproducible el lanzador en CRLF/macOS/Docker Desktop y corregir los falsos negativos 86, 105, 110 y 131 sin relajar ninguna aserción de seguridad. |
+| 1B | **TEST-HARNESS-MAC-1R — devuelta** | `4b1a493` llegó a ejecutar los 140 casos, pero quedó 96/140: doble MP en loopback, carpeta documental no escribible y falsa detección de BSD sed. Corregir las tres raíces y repetir la puerta oficial. |
 
 ORD-SELF-1 y TEST-IMG-1 ya cerraron. TEST-HARNESS-MAC-1 debe conseguir una
 ejecución oficial verde y portable antes de usar la suite como puerta de las

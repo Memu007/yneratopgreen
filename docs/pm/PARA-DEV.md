@@ -12,6 +12,58 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-08-31 — DEVOLUCIÓN VIGENTE: TEST-HARNESS-MAC-1R, la puerta oficial sigue roja
+
+La entrega de arnés `4b1a493` e informe `eb719c2` **no queda aceptada**. La
+honestidad del informe fue correcta y PM confirma que CRLF, el ayudante de
+Settings, las sustituciones 86/110, la lectura interna de documentos y el
+rótulo del lanzador están bien orientados. Pero la prueba que faltaba dio
+**96/140** en macOS/Docker Desktop.
+
+No son 44 arreglos. PM aisló tres raíces:
+
+1. **Doble MP inaccesible (33 rojos):** Compose usa
+   `host.docker.internal`, pero `levantarDoble()` sigue con
+   `servidor.listen(..., '127.0.0.1')`. Ligalo a una interfaz alcanzable desde
+   el contenedor. Es un servidor de prueba con valores inventados; no cambies
+   URLs ni seguridad del producto. Verificá desde `topgreen-api` que responde
+   antes de correr la suite completa.
+2. **Carpeta documental no escribible (10 rojos):** el log real muestra
+   `PermissionError` sobre `/app/documentos`. En la configuración local de
+   Compose, dale al API una `DOCUMENTOS_DIR` privada y escribible bajo `/data`,
+   separada de `/data/uploads`. No hagas `chmod 777`, no muevas documentos a la
+   carpeta pública y no cambies el servicio de producto. Comprobá escritura y
+   borrado como `appuser` dentro del contenedor.
+3. **Detección BSD sed falsa (caso 131):** la sonda de una sola expresión
+   clasifica macOS como compatible, pero la receta real de dos `-e` falla. La
+   suite ya depende de Docker: eliminá la heurística y ejecutá siempre la receta
+   extraída dentro de `alpine:3`. Es más corto y prueba el entorno real del
+   Dockerfile.
+
+Los 33 fallos MP son 62–66, 70, 75–100 y 117. Los 10 de documentos son 101–109
+y 116. El restante es 131. La corrida filtrada 2,3,6,101–109 reprodujo el 500
+documental por separado. Evidencia completa en
+`REPRODUCCION-SMOKE-PM-2026-08-31.md`.
+
+### Alcance de la devolución
+
+- Podés tocar únicamente `scripts/lib/mp-doble.mjs`, `docker-compose.yml` y la
+  rama del caso 131 en `scripts/smoke.mjs`, además del informe final.
+- Conservá los arreglos válidos de `4b1a493`; no reescribas el arnés completo.
+- No cambies producto, dependencias, migraciones, seed, Railway ni datos.
+- No saltees casos ni abras TRANSFER-REC-1. No despliegues.
+
+### Puerta de aceptación
+
+1. Pruebas focales: contenedor→doble responde; `appuser` crea/lee/borra en la
+   carpeta documental privada; receta CSP válida pasa en Alpine y variables
+   vacías fallan.
+2. `npm run smoke` oficial **140/140 dos veces**, cada vez desde base limpia en
+   la Mac de PM. Dev puede aportar su verde nativo, pero no sustituye esta
+   puerta; al terminar pedime expresamente las dos corridas de PM.
+3. Conservá las puertas estáticas anteriores y entregá commit de corrección e
+   informe separados. No despliegues.
+
 ## 2026-08-31 — TAREA VIGENTE: TEST-HARNESS-MAC-1, hacer oficial la reproducción local
 
 TEST-IMG-1 queda aceptada en prueba `4c015f0` e informe `cb0875b`. PM revisó el

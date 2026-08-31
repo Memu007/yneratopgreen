@@ -107,3 +107,33 @@ No se mezcla con TEST-IMG-1: esa tarea sigue acotada a quitar el azar del caso
 116. Hasta cerrar ambas piezas, una afirmación de suite oficial completamente
 verde debe venir de una ejecución cuyo sistema operativo y topología se
 declaren explícitamente.
+
+## Revisión de TEST-HARNESS-MAC-1 sobre `4b1a493`
+
+PM ejecutó `npm run smoke` oficial desde cero en macOS con Docker Desktop. El
+bootstrap CRLF ya pasa, Compose construye, migraciones y seed terminan y los
+140 casos llegan a ejecutarse. Resultado: **96/140; 44 fallaron**. Por lo tanto
+la pieza no queda aceptada y no se hizo una segunda corrida completa.
+
+Los 44 rojos se explican por tres raíces reproducidas:
+
+1. **33 casos MP/retorno:** `docker-compose.yml` apunta correctamente la API a
+   `host.docker.internal`, pero `scripts/lib/mp-doble.mjs` continúa escuchando
+   sólo en `127.0.0.1`. El contenedor no puede alcanzar un servidor ligado
+   exclusivamente al loopback del host. Fallan 62–66, 70, 75–100 y 117.
+2. **10 casos de documentación/CSRF:** el contenedor recibe
+   `DOCUMENTOS_DIR=documentos`; resuelve `/app/documentos` y el usuario
+   `appuser` no puede crearlo. Los logs muestran `PermissionError: [Errno 13]
+   Permission denied: '/app/documentos'`. Fallan 101–109 y 116. La lectura de
+   archivos dentro del contenedor es correcta, pero no puede medirse hasta que
+   Compose provea una carpeta privada escribible, fuera de `/data/uploads`.
+3. **Caso 131:** la detección de compatibilidad ejecuta una sola expresión
+   `sed -i -e`; BSD sed la acepta creando un backup `-e`, por lo que se clasifica
+   erróneamente como compatible. La receta real usa dos `-e` y falla en el host
+   con `sed: -e: No such file or directory`. Dado que la suite oficial ya exige
+   Docker, el camino mínimo y fiel es ejecutar siempre esa receta dentro de
+   Alpine, sin heurística por sistema operativo.
+
+Una corrida filtrada posterior confirmó que la raíz documental es independiente
+de los fallos MP: con casos 2, 3, 6 y 101–109 dio 3/12 y el primer POST de
+documentación volvió a 500 por el mismo permiso. No se tocó Railway ni producto.
