@@ -36,9 +36,35 @@ function assert(condition, message) {
 const CARGAR_CON_SETTINGS = `
 import os, sys, tempfile
 from app.core.config import Settings
+
+contenido = sys.stdin.read()
+
+# Las claves que declara el contenido se SACAN del entorno del proceso antes de
+# leerlo. En pydantic-settings el entorno le gana a \`_env_file\`, y adentro del
+# contenedor toda clave de \`backend/.env\` llega como variable de entorno —por
+# \`env_file:\`— mas las que agrega \`environment:\`. Sin esto, este ayudante no
+# mide el contenido que recibe: mide el entorno, y una plantilla peligrosa
+# "carga bien" porque su valor nunca se leyo. Medido: con UPLOAD_DIR y
+# MP_NOTIFICACION_URL en el entorno, los casos 86 y 110 daban CARGA_OK.
+claves = []
+for linea in contenido.splitlines():
+    linea = linea.strip()
+    if not linea or linea.startswith("#") or "=" not in linea:
+        continue
+    claves.append(linea.split("=", 1)[0].strip())
+
+# Y que el contenido no declare la misma clave dos veces: cual gana no esta
+# definido y una prueba no puede apoyarse en eso.
+repetidas = sorted({c for c in claves if claves.count(c) > 1})
+if repetidas:
+    raise SystemExit("CLAVES_REPETIDAS " + ",".join(repetidas))
+
+for clave in claves:
+    os.environ.pop(clave, None)
+
 ruta = os.path.join(tempfile.mkdtemp(), "plantilla.env")
 with open(ruta, "w", encoding="utf-8") as archivo:
-    archivo.write(sys.stdin.read())
+    archivo.write(contenido)
 Settings(_env_file=ruta)
 print("CARGA_OK")
 `;
@@ -60,7 +86,7 @@ function cargarConSettings(contenido) {
     const motivo = salida
       .split(/\r?\n/)
       .map((linea) => linea.trim())
-      .filter((linea) => /validation error|Extra inputs|Field required|Value error|^[A-Z][A-Z0-9_]*$/.test(linea))
+      .filter((linea) => /validation error|Extra inputs|Field required|Value error|CLAVES_REPETIDAS|^[A-Z][A-Z0-9_]*$/.test(linea))
       .join(' | ');
     return motivo || salida;
   }
@@ -9789,9 +9815,33 @@ const CARPETA_DOCUMENTOS = correrEnLaApi(
   '',
 ).trim();
 
+// Los PDF de constancias viven donde vive la aplicacion. Bajo Docker esa
+// carpeta es del contenedor, asi que preguntarle al sistema de archivos del
+// host es preguntarle a la maquina equivocada: `existsSync` contesta que no
+// aunque el archivo este, y el caso se pone rojo con la API sana. Se pregunta
+// donde estan, con el mismo puente que ya se usa para leer la configuracion.
+function existeDocumento(nombre) {
+  const salida = correrEnLaApi(
+    'import os, sys\n'
+    + 'from app.core.config import settings\n'
+    + 'nombre = sys.stdin.read().strip()\n'
+    + 'print("SI" if nombre and os.path.exists(os.path.join(settings.DOCUMENTOS_DIR, nombre)) else "NO")',
+    nombre,
+  );
+  return salida.trim().split(/\r?\n/).at(-1) === 'SI';
+}
+
 function documentosEnDisco() {
   try {
-    return readdirSync(CARPETA_DOCUMENTOS).filter((n) => n.endsWith('.pdf')).length;
+    const salida = correrEnLaApi(
+      'import os\n'
+      + 'from app.core.config import settings\n'
+      + 'carpeta = settings.DOCUMENTOS_DIR\n'
+      + 'nombres = os.listdir(carpeta) if os.path.isdir(carpeta) else []\n'
+      + 'print(len([n for n in nombres if n.endswith(".pdf")]))',
+      '',
+    );
+    return Number(salida.trim().split(/\r?\n/).at(-1));
   } catch {
     return 0;
   }
@@ -10178,9 +10228,9 @@ await runCase(105, 'Documentación: reemplazar una aprobada retira el distintivo
 
   const despues = documentacionDe(state.sellerId);
   assert(despues.ruta !== rutaVieja, 'el reemplazo reusó el archivo anterior');
-  assert(!existsSync(`${CARPETA_DOCUMENTOS}/${rutaVieja}`),
+  assert(!existeDocumento(rutaVieja),
     `el archivo anterior sigue en disco: ${rutaVieja}`);
-  assert(existsSync(`${CARPETA_DOCUMENTOS}/${despues.ruta}`),
+  assert(existeDocumento(despues.ruta),
     'el archivo nuevo no quedó en disco');
   assert(documentosEnDisco() === archivosAntes,
     `hay ${documentosEnDisco() - archivosAntes} archivos de más: se conserva sólo el actual`);
@@ -10635,23 +10685,31 @@ await runCase(110, 'La carpeta de constancias no puede caer adentro de la públi
   const base = readFileSync('backend/.env.example', 'utf8')
     .replace(/\bCAMBIAR_[A-Z0-9_]+/g, 'valor-de-prueba-para-cargar-settings');
 
+  // Las dos claves se REEMPLAZAN, no se agregan al final: la plantilla ya las
+  // declara, y un archivo con la misma clave dos veces deja indefinido cual
+  // gana. `cargarConSettings` ahora rechaza el contenido repetido, asi que
+  // agregarlas romperia el caso a la vista en vez de medir otra cosa.
+  const con = (subidas, documentos) => base
+    .replace(/^UPLOAD_DIR=.*$/m, `UPLOAD_DIR=${subidas}`)
+    .replace(/^DOCUMENTOS_DIR=.*$/m, `DOCUMENTOS_DIR=${documentos}`);
+
   const casos = [
-    ['la misma carpeta', 'UPLOAD_DIR=uploads\nDOCUMENTOS_DIR=uploads'],
-    ['una subcarpeta', 'UPLOAD_DIR=uploads\nDOCUMENTOS_DIR=uploads/constancias'],
-    ['dando la vuelta con ..', 'UPLOAD_DIR=uploads\nDOCUMENTOS_DIR=documentos/../uploads/privado'],
-    ['con rutas absolutas', 'UPLOAD_DIR=/data/uploads\nDOCUMENTOS_DIR=/data/uploads/docs'],
+    ['la misma carpeta', con('uploads', 'uploads')],
+    ['una subcarpeta', con('uploads', 'uploads/constancias')],
+    ['dando la vuelta con ..', con('uploads', 'documentos/../uploads/privado')],
+    ['con rutas absolutas', con('/data/uploads', '/data/uploads/docs')],
   ];
 
   const rechazos = [];
-  for (const [etiqueta, extra] of casos) {
-    const salida = cargarConSettings(`${base}\n${extra}\n`);
+  for (const [etiqueta, contenido] of casos) {
+    const salida = cargarConSettings(`${contenido}\n`);
     assert(!salida.includes('CARGA_OK'),
       `«${etiqueta}»: la aplicación arrancó con las constancias adentro de lo público`);
     rechazos.push(etiqueta);
   }
 
   // El mensaje tiene que servirle a quien configura, no sólo decir que no.
-  const detalle = cargarConSettings(`${base}\nUPLOAD_DIR=uploads\nDOCUMENTOS_DIR=uploads/constancias\n`);
+  const detalle = cargarConSettings(`${con('uploads', 'uploads/constancias')}\n`);
   assert(/DOCUMENTOS_DIR/.test(detalle) && /UPLOAD_DIR/.test(detalle),
     `el rechazo no nombra las dos variables: ${detalle}`);
 
@@ -13456,16 +13514,48 @@ await runCase(131, 'Toda respuesta publica sale con la base defensiva, y la poli
   const taller = mkdtempSync(`${tmpdir()}/topgreen-receta-`);
   const copia = `${taller}/plantilla`;
   const guion = unida.replaceAll('/etc/nginx/templates/default.conf.template', copia);
+
+  // La receta es de Alpine, y su `sed -i -e ...` —sin sufijo de respaldo— es lo
+  // que aceptan GNU y BusyBox. El `sed` de BSD, que es el de macOS, toma el
+  // `-e` siguiente como sufijo y la receta falla ahi: el caso se pone rojo con
+  // la imagen productiva intacta.
+  //
+  // Asi que la receta se corre DONDE FUE ESCRITA. Si el `sed` de esta maquina
+  // ya se comporta como el del destino, se ejecuta directo; si no, se ejecuta
+  // en Alpine, que es la imagen del Dockerfile. No se saltea el caso ni se
+  // reescribe la receta: se ejecuta el mismo texto en el interprete correcto.
+  const sedComoEnAlpine = (() => {
+    const prueba = mkdtempSync(`${tmpdir()}/topgreen-sed-`);
+    try {
+      writeFileSync(`${prueba}/a`, 'x\n');
+      const r = spawnSync('sed', ['-i', '-e', 's/x/y/', `${prueba}/a`], { encoding: 'utf8' });
+      return r.status === 0 && readFileSync(`${prueba}/a`, 'utf8').trim() === 'y';
+    } catch {
+      return false;
+    } finally {
+      rmSync(prueba, { recursive: true, force: true });
+    }
+  })();
+
   const ejecutar = (api, imagenes) => {
     writeFileSync(copia, plantilla);
-    return spawnSync('/bin/sh', ['-c', guion], {
-      encoding: 'utf8',
-      env: { ...process.env, VITE_API_URL: api, VITE_IMAGES_URL: imagenes },
-    });
+    if (sedComoEnAlpine) {
+      return spawnSync('/bin/sh', ['-c', guion], {
+        encoding: 'utf8',
+        env: { ...process.env, VITE_API_URL: api, VITE_IMAGES_URL: imagenes },
+      });
+    }
+    return spawnSync('docker', [
+      'run', '--rm', '-v', `${taller}:${taller}`,
+      '-e', `VITE_API_URL=${api}`, '-e', `VITE_IMAGES_URL=${imagenes}`,
+      'alpine:3', 'sh', '-c', guion,
+    ], { encoding: 'utf8' });
   };
 
   const buena = ejecutar('https://api.ejemplo.test/api', 'https://imagenes.ejemplo.test');
-  assert(buena.status === 0, `la receta fallo con variables validas: ${buena.stderr}`);
+  assert(buena.status === 0,
+    `la receta fallo con variables validas (${sedComoEnAlpine ? 'sh del host' : 'alpine:3'}): `
+    + `${buena.stderr || buena.error?.message || ''}`);
   const salida = readFileSync(copia, 'utf8');
   assert(/connect-src 'self' https:\/\/api\.ejemplo\.test"/.test(salida),
     'la receta metio la ruta /api en la politica; CSP entiende origenes, no rutas');

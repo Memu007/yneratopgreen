@@ -113,7 +113,9 @@ if [ "$frontend_ready" != "true" ]; then
   exit 1
 fi
 
-echo "===> Ejecutando 117 smoke tests"
+# Cuantos casos hay lo dice la suite al terminar; el lanzador no lleva la
+# cuenta, que es como quedo diciendo 117 cuando ya eran mas de 140.
+echo "===> Ejecutando la suite de smoke tests"
 set +e
 node scripts/smoke.mjs "$@"
 smoke_exit=$?

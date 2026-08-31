@@ -32,9 +32,20 @@ services:
       # Configuración de la aplicación. Las claves de abajo la pisan, para
       # que el contenedor no dependa de cómo quedó el .env del backend.
       - ./backend/.env
+    # `host-gateway` es la capacidad nativa de Compose para que el contenedor
+    # alcance a la máquina que lo hospeda. Funciona igual en Docker Desktop y en
+    # Linux, y no depende de que el host tenga una IP fija.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       DATABASE_URL: "postgresql+psycopg://${DB_USER:?DB_USER no está definido en .env}:${DB_PASSWORD:?DB_PASSWORD no está definido en .env}@db:5432/${DB_NAME:?DB_NAME no está definido en .env}"
       UPLOAD_DIR: /data/uploads
+      # El doble local de Mercado Pago que levanta la suite corre en el HOST.
+      # `127.0.0.1` adentro del contenedor es el contenedor: la API no llegaba
+      # nunca. El navegador y las comprobaciones del host siguen usando
+      # loopback —eso vive en backend/.env— y esto es sólo lo que ve la API.
+      MP_AUTH_BASE_URL: "${MP_BASE_DEL_DOBLE:-http://host.docker.internal:8099}"
+      MP_API_BASE_URL: "${MP_BASE_DEL_DOBLE:-http://host.docker.internal:8099}"
     ports:
       - "8000:8000"
     volumes:
