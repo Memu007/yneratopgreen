@@ -11258,10 +11258,40 @@ await runCase(116, 'La cookie sola no dispara ninguna de las cuatro mutaciones d
     return `${fila[0]}|${fila[1]}`;
   };
 
-  const [[productoDelVendedor]] = queryRows(`
-    SELECT id FROM products WHERE seller_id = ${sqlLiteral(vendedor.id)}
-    ORDER BY id LIMIT 1`);
-  assert(productoDelVendedor, 'el vendedor del seed no tiene publicaciones');
+  // El tope que declara `POST /products/{id}/images`. Se escribe acá para poder
+  // ELEGIR bien, no para relajar nada: el limite real del producto no se toca y
+  // este caso tampoco vacia imagenes para fabricarse un verde.
+  const TOPE_DE_IMAGENES = 3;
+
+  // La publicacion se elige entre las que TIENEN LUGAR para otra imagen.
+  //
+  // Antes era `ORDER BY id LIMIT 1` a secas, y los ids del seed son UUID al
+  // azar: si la que salia primera ya tenia sus tres imagenes, la carga positiva
+  // de mas abajo —la que TIENE que entrar con Bearer— rebotaba con 400 y este
+  // caso se ponia rojo con la defensa CSRF intacta. Con dieciseis publicaciones
+  // del vendedor y una sola llena en el seed, eso pasaba una de cada dieciseis
+  // bases. Medido: reproducido llenando esa publicacion por el camino real.
+  //
+  // El `ORDER BY` se conserva para que la eleccion sea estable dentro de una
+  // misma base; lo que cambia es que ahora sale de un conjunto donde la
+  // precondicion del caso se cumple, asi que el resultado ya no depende del
+  // sorteo del seed.
+  const conLugar = queryRows(`
+    SELECT p.id, COUNT(i.id)
+    FROM products p
+    LEFT JOIN product_images i ON i.product_id = p.id
+    WHERE p.seller_id = ${sqlLiteral(vendedor.id)}
+    GROUP BY p.id
+    HAVING COUNT(i.id) < ${TOPE_DE_IMAGENES}
+    ORDER BY p.id
+    LIMIT 1`);
+  assert(conLugar.length,
+    'el vendedor del seed no tiene ninguna publicacion con lugar para otra imagen '
+    + `(el tope es ${TOPE_DE_IMAGENES}); sin eso este caso no puede probar la carga `
+    + 'positiva y hay que revisar el seed, no relajar el limite');
+  const [productoDelVendedor, imagenesAlElegir] = conLugar[0];
+  assert(Number(imagenesAlElegir) < TOPE_DE_IMAGENES,
+    `la publicacion elegida ya tiene ${imagenesAlElegir} imagenes de ${TOPE_DE_IMAGENES}`);
   const imagenesDe = (producto) => queryCount(
     `SELECT COUNT(*) FROM product_images WHERE product_id = ${sqlLiteral(producto)}`);
 
@@ -11337,7 +11367,9 @@ await runCase(116, 'La cookie sola no dispara ninguna de las cuatro mutaciones d
     archivo: { campo: 'files', nombre: 'propia.png', contenido: png, tipo: 'image/png' },
   });
   assert(imagenConCabecera.status < 400,
-    `con cabecera la imagen no entró: HTTP ${imagenConCabecera.status}`);
+    `con cabecera la imagen no entró: HTTP ${imagenConCabecera.status} `
+    + `${JSON.stringify(imagenConCabecera.datos)} — la publicación elegida tenía `
+    + `${imagenesAlElegir} de ${TOPE_DE_IMAGENES} imágenes al empezar`);
   assert(imagenesDe(productoDelVendedor) === antes.imagenes + 1,
     `con cabecera no se sumó la imagen: ${imagenesDe(productoDelVendedor)}`);
 
