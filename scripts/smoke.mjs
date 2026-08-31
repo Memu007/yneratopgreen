@@ -245,6 +245,39 @@ finally:
   assert(salida.includes('INYECTADO'), `no se pudo inyectar el carrito heredado: ${salida}`);
 }
 
+// Deja una cuenta sin ningún carrito, que es como estaba antes de la prueba.
+// Va por los modelos de la aplicación, igual que `inyectarEnElCarrito`: el
+// acceso SQL de las puertas es de lectura de contraste y no fabrica escenarios.
+function vaciarCarritosDe(email) {
+  const script = `
+import sys
+from app.db.base import SessionLocal
+from app.models.cart import Cart, CartItem
+from app.models.user import User
+
+correo = sys.stdin.read().strip()
+db = SessionLocal()
+try:
+    usuario = db.query(User).filter(User.email == correo).first()
+    if usuario is None:
+        raise SystemExit("no existe " + correo)
+    carritos = db.query(Cart).filter(Cart.user_id == usuario.id).all()
+    for carrito in carritos:
+        db.query(CartItem).filter(CartItem.cart_id == carrito.id).delete()
+        db.delete(carrito)
+    db.commit()
+    print("VACIADO")
+finally:
+    db.close()
+`;
+  const salida = execFileSync(
+    'docker',
+    ['exec', '-i', 'topgreen-api', 'python', '-c', script],
+    { encoding: 'utf8', input: email, stdio: ['pipe', 'pipe', 'pipe'] },
+  );
+  assert(salida.includes('VACIADO'), `no se pudieron vaciar los carritos de ${email}: ${salida}`);
+}
+
 // La dependencia opcional no la usa hoy ningún endpoint, así que no tiene
 // superficie HTTP donde medirla. Se la llama donde vive, con peticiones armadas
 // a mano, que es la única forma honesta de comprobar que no elige identidad.
@@ -15006,6 +15039,10 @@ await runCase(140, 'Nadie compra su propia publicacion, ni por la API ni por la 
     `SELECT COALESCE(stock_reservado, 0) FROM products WHERE id = ${sqlLiteral(productId)}`);
   const carritosDe = (userId) => queryCount(
     `SELECT COUNT(*) FROM carts WHERE user_id = ${sqlLiteral(userId)}`);
+  const itemsDe = (userId) => queryCount(`
+    SELECT COUNT(*) FROM cart_items ci JOIN carts c ON c.id = ci.cart_id
+    WHERE c.user_id = ${sqlLiteral(userId)}
+  `);
 
   // `expectApiError` dice «la API no respondió HTTP 409» y no dice qué SÍ
   // respondió, que es justo lo que hace falta para entender el rojo: un 200 que
@@ -15209,6 +15246,16 @@ await runCase(140, 'Nadie compra su propia publicacion, ni por la API ni por la 
     },
   });
   try {
+    // El transportista tampoco compra en toda la suite, asi que llega hasta
+    // aca sin carrito. Eso lo vuelve la unica identidad con la que se puede
+    // afirmar que un rechazo no CREA uno, y se prueba con los dos endpoints:
+    // `/items` y `/sync` no comparten el codigo que decide cuando nace el
+    // carrito, asi que medir uno no dice nada del otro. Antes se medía sólo
+    // `/items`, y por eso este borde de `/sync` pasó sin verse.
+    assert(carritosDe(fletero.id) === 0,
+      `el transportista ya tiene ${carritosDe(fletero.id)} carritos: este caso necesita `
+      + 'una cuenta sin ninguno para poder afirmar que el rechazo no crea uno');
+
     const negadoAlFletero = await exigir409('POST /cart/items como transportista', () =>
       apiRequest('/cart/items', {
         method: 'POST', token: fletero.token,
@@ -15216,7 +15263,49 @@ await runCase(140, 'Nadie compra su propia publicacion, ni por la API ni por la 
       }));
     assert(NO_ES_TUYO.test(negadoAlFletero),
       `transportista: motivo inesperado: ${negadoAlFletero}`);
+    assert(carritosDe(fletero.id) === 0 && itemsDe(fletero.id) === 0,
+      `/cart/items rechazado le dejo ${carritosDe(fletero.id)} carritos y `
+      + `${itemsDe(fletero.id)} items a una cuenta que no tenia ninguno`);
+
+    const syncDelFletero = await exigir409('POST /cart/sync como transportista sin carrito', () =>
+      apiRequest('/cart/sync', {
+        method: 'POST', token: fletero.token,
+        body: { items: [{ product_id: delFletero.data.id, quantity: 1 }] },
+      }));
+    assert(NO_ES_TUYO.test(syncDelFletero),
+      `transportista por sync: motivo inesperado: ${syncDelFletero}`);
+    assert(carritosDe(fletero.id) === 0 && itemsDe(fletero.id) === 0,
+      `/cart/sync rechazado le dejo ${carritosDe(fletero.id)} carritos y `
+      + `${itemsDe(fletero.id)} items a una cuenta que no tenia ninguno: el freno tiene `
+      + 'que ir ANTES de obtener o crear el carrito, no despues');
+
+    // Y esto vale para CUALQUIER rechazo de sync, no solo el de publicacion
+    // propia: al mover la creacion del carrito despues de validar, un sync que
+    // rebota por otra razon tampoco deja una fila.
+    const inexistente = await expectApiError(400, () => apiRequest('/cart/sync', {
+      method: 'POST', token: fletero.token,
+      body: { items: [{ product_id: 'no-existe-este-id', quantity: 1 }] },
+    }));
+    assert(/ya no existe/i.test(inexistente), `sync inexistente: motivo raro: ${inexistente}`);
+    assert(carritosDe(fletero.id) === 0,
+      `un sync rechazado por otra razon dejo ${carritosDe(fletero.id)} carritos`);
+
+    // Lo que NO cambia, y se afirma para que sea deliberado: un sync VALIDO y
+    // vacio sigue representando un carrito vacio. Mover la creacion del
+    // carrito no volvio ambiguo ese caso; sigue naciendo, porque hay algo que
+    // representar.
+    const vacio = await apiRequest('/cart/sync', {
+      method: 'POST', token: fletero.token, body: { items: [] },
+    });
+    assert(vacio.status === 200 && vacio.data.total_items === 0,
+      `un sync vacio valido respondio ${vacio.status} con ${vacio.data?.total_items} items`);
+    assert(carritosDe(fletero.id) === 1 && itemsDe(fletero.id) === 0,
+      `un sync vacio valido dejo ${carritosDe(fletero.id)} carritos y `
+      + `${itemsDe(fletero.id)} items; se esperaba 1 carrito vacio`);
   } finally {
+    // La cuenta vuelve a no tener carrito, que es como llego, para que el caso
+    // se pueda repetir sobre la misma base.
+    vaciarCarritosDe(fletero.email);
     await apiRequest(`/products/${delFletero.data.id}`, {
       method: 'DELETE', token: fletero.token,
     });

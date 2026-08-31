@@ -366,8 +366,12 @@ def sync_cart(
     Útil cuando el frontend maneja el carrito en localStorage y necesita
     sincronizarlo antes del checkout.
     """
-    # Obtener o crear carrito
-    cart = get_or_create_cart(db, current_user.id)
+    # El carrito NO se toca todavía, y ni siquiera se crea: `get_or_create_cart`
+    # hace `commit` cuando no hay uno activo, así que llamarlo acá dejaba una
+    # fila nueva en `carts` incluso cuando el pedido se rechazaba. Una cuenta
+    # sin carrito que mandaba su propia publicación recibía el 409 correcto y
+    # se quedaba con un carrito vacío que nunca pidió. Se crea recién en la
+    # segunda pasada, cuando ya está decidido que se va a escribir.
 
     # === PRIMERA PASADA: resolver y validar SIN ESCRIBIR ================== #
     # El carrito viejo no se toca hasta que el reemplazo entero esté validado.
@@ -445,6 +449,13 @@ def sync_cart(
         validar_total(total_vendedor, "El total del carrito para este vendedor")
 
     # === SEGUNDA PASADA: recién ahora se reemplaza ======================== #
+    # Acá ya pasó todo: publicación propia, existencia, estado, stock y contrato
+    # monetario. Recién ahora se obtiene o se crea el carrito, porque recién
+    # ahora hay algo que guardar. Un sync válido y vacío sigue representando un
+    # carrito vacío, como hasta hoy: lo que cambia es que un sync RECHAZADO no
+    # crea nada.
+    cart = get_or_create_cart(db, current_user.id)
+
     db.query(CartItem).filter(CartItem.cart_id == cart.id).delete()
 
     items_response = []
