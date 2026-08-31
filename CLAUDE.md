@@ -67,7 +67,13 @@ negociación.
 
 - **Muchos archivos mezclan CRLF y LF adentro del mismo archivo.** Hay que
   parchear byte a byte conservando el terminador de cada región, y comparar
-  contra `git show HEAD:` después de editar.
+  contra `git show HEAD:` después de editar. También muerde al leer: un
+  `grep '^CLAVE=.+'` sobre un `.env` con CRLF da positivo aunque el valor esté
+  vacío, porque el `.+` matchea el retorno de carro. Hay que sacarlo con
+  `tr -d '\r'` antes de comparar.
+- **El entorno se arma con `./scripts/entorno_nativo.sh`** —sin Docker— y con
+  `--recrear` para la base limpia que exige la suite. En los contenedores
+  remotos lo corre solo el hook de `.claude/hooks/session-start.sh`.
 - El canal con la PM vive en `docs/pm/`: ella escribe en `PARA-DEV.md`, el
   desarrollo responde **sólo** en `PARA-PM.md` y no toca el archivo de ella.
 - `docs/PROJECT_STATUS.md` no es fuente de verdad.

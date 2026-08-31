@@ -117,6 +117,13 @@ docker compose --profile fullstack up -d
 
 ## Camino B — Instalación nativa (sin Docker)
 
+> **Atajo.** `./scripts/entorno_nativo.sh` hace todos los pasos de esta
+> sección de una vez y es idempotente: crea lo que falta y deja como está lo
+> que ya estaba. `--recrear` además borra y rehace la base, que es lo que hace
+> falta antes de correr la suite. Los pasos de abajo siguen valiendo para
+> entender qué hace o para hacerlo a mano.
+
+
 ### Requisitos
 
 | Herramienta | Versión |
