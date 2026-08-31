@@ -2,135 +2,156 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## TEST-IMG-1 — quitarle el azar al caso 116
+## TEST-HARNESS-MAC-1 — los cinco defectos, y una puerta que no puedo cerrar
 
-Hecho. Prueba e informe en commits separados. **No desplegué.**
+Hecho lo que puedo hacer. Arnés e informe en commits separados. **No desplegué.**
 
-- Prueba: `4c015f0` — «TEST-IMG-1: el caso 116 elige una publicación con lugar
-  para otra imagen»
-- La suite queda en **140/140**, verde en dos corridas completas desde bases
-  limpias.
+- Arnés: `4b1a493` — «TEST-HARNESS-MAC-1: los cinco defectos de portabilidad del arnés»
 
 ---
 
-### 1. La reproducción controlada, sobre una base descartable
+### 0. Empiezo por lo que NO puedo verificar
 
-Sobre una base recién sembrada, llené **por el camino real de la API** la
-publicación que la consulta vieja elegiría. No vacié nada: llené, que es la
-condición que hace fallar al caso.
+**Tu puerta 2 pide `npm run smoke` 140/140 dos veces en macOS con Docker
+Desktop. No la puedo cumplir y no la voy a declarar cumplida.**
 
-```
-la consulta VIEJA elige: «Rastra de Discos 24 Platos» con 2 imágenes
-llenada a 3 imágenes (el tope del endpoint es 3)
+Corro en un contenedor Linux efímero, sin macOS y **sin demonio de Docker**: el
+`docker` de mi PATH es un puente que traduce `docker exec` a la base y al venv
+nativos, y lo escribí yo. No puedo levantar Compose, no puedo construir
+imágenes y no puedo correr `npm run smoke`, que empieza por
+`docker compose down -v`.
 
---- con esa publicación llena ---
-consulta VIEJA -> «Rastra de Discos 24 Platos»           3 imágenes  ← SIN LUGAR
-consulta NUEVA -> «Mantenimiento Preventivo de Cosech…»  1 imagen    ← con lugar
+Así que de los cinco arreglos:
 
-¿la nueva excluye a la llena? SÍ
+| defecto | reproducido | corregido | verificado el verde |
+|---|---|---|---|
+| 1. CRLF en el bootstrap | sí, acá | sí | **sí** |
+| 2. contenedor → host | no (necesita Docker) | sí | **no** |
+| 3. casos 86 y 110 | sí, simulando el entorno del contenedor | sí | **sí** |
+| 4. caso 105 | no (necesita Docker) | sí | parcial |
+| 5. caso 131 | sí, con un `sed` que se comporta como el de BSD | sí | parcial |
 
-subir a la que elige la VIEJA -> HTTP 400
-  {"detail":"El producto ya tiene el máximo de 3 imágenes permitidas"}
-subir a la que elige la NUEVA -> HTTP 200
-```
+Lo digo antes que nada porque un informe que esconde esto no vale nada. Lo que
+sigue es qué medí y con qué.
 
-Y la misma condición, con la suite entera:
-
-```
-suite con el caso 116 tal como estaba
-[FAIL] 116 … — con cabecera la imagen no entró: HTTP 400      139/140
-
-suite con el caso 116 corregido, MISMA condición controlada
-[PASS] 116 …                                                  140/140
-```
-
-Rojo y verde con la misma base preparada igual. Lo único que cambió entre las
-dos corridas es la consulta que elige la publicación.
-
-### 2. La consulta
-
-```sql
-SELECT p.id, COUNT(i.id)
-FROM products p
-LEFT JOIN product_images i ON i.product_id = p.id
-WHERE p.seller_id = …
-GROUP BY p.id
-HAVING COUNT(i.id) < 3
-ORDER BY p.id
-LIMIT 1
-```
-
-Sin UUID escrito a mano y sin nombres del seed. El `ORDER BY p.id` se conserva
-—dentro de una misma base la elección sigue siendo estable—; lo que cambia es
-que ahora sale de un conjunto donde **la precondición del caso ya se cumple**,
-así que el resultado deja de depender del sorteo del seed. Eso es lo que quería
-decir con «determinista»: no que salga siempre la misma publicación, sino que
-salga siempre una que sirve.
-
-Se afirma además que el candidato existe y con cuántas imágenes arranca, y
-—como ya estaba— que después sube exactamente en una. El `3` está escrito en el
-caso para poder **elegir**, no para relajar: el límite real del producto no se
-tocó y el caso no vacía imágenes.
-
-### 3. El error, que ahora dice por qué
+### 1. CRLF en el bootstrap — reproducido y cerrado
 
 ```
-antes:  con cabecera la imagen no entró: HTTP 400
-ahora:  con cabecera la imagen no entró: HTTP 400
-        {"detail":"El producto ya tiene el máximo de 3 imágenes permitidas"}
-        — la publicación elegida tenía 3 de 3 imágenes al empezar
+DB_NAME extraido: $'topgreen\r'
+ERROR: DB_NAME o DB_USER contienen caracteres no permitidos   ← tu rojo, en Linux
 ```
 
-Esa omisión es la razón por la que el defecto tardó en verse: dos corridas rojas
-sin una sola pista del motivo.
-
-### 4. Repetibilidad, y la precondición exacta que lo impide
-
-**El caso 116 completo no se puede repetir sobre una base ya corrida**, y no es
-por las imágenes. Lo medí: una segunda corrida de la suite sobre la misma base
-deja **94/140**, y el primer rojo es el caso 02:
+Es tu mismo error, en mi máquina: no hace falta macOS, alcanza con copiar la
+plantilla versionada, que tiene 48 de 50 líneas en CRLF. Un solo punto de
+lectura, `valor_de_env`, con `tr -d '\r'`. Después:
 
 ```
-[FAIL] 02 Registro de usuario — POST /auth/register respondió HTTP 400:
-          El email ya está registrado
-[FAIL] 03 Ingreso y obtención del token — caso 2 no dejó credenciales
+DB_NAME ahora: topgreen -> pasa el control
 ```
 
-De ahí se cae la cadena de credenciales, y el 116 se cae con ella por
-`con cabecera no se pudo renovar: HTTP 401` —el refresh del comprador—, no por
-imágenes. Es una precondición de la suite entera, no de esta pieza, y no la
-toqué: borrar ese estado para que el 116 se repita sería fabricar un verde.
+### 2. El contenedor no alcanzaba al host — corregido a ciegas
 
-Lo que **sí** es de esta pieza es la elección, y esa la ejercité sola sobre una
-misma base, doce vueltas seguidas de elegir y subir:
+`extra_hosts: - "host.docker.internal:host-gateway"` en el servicio
+`topgreen-api`, y ahí mismo `MP_AUTH_BASE_URL`/`MP_API_BASE_URL` apuntando a
+ese nombre. Es la capacidad nativa de Compose y funciona igual en Docker
+Desktop y en Linux, que es lo que pediste.
+
+Las dos URL quedan separadas de verdad: el navegador y las comprobaciones del
+host siguen con `127.0.0.1:8099` desde `backend/.env`, y sólo la API ve
+`host.docker.internal`. La clave `MP_BASE_DEL_DOBLE` permite pisarlo sin tocar
+el archivo.
+
+Verifiqué que el YAML es válido y que las claves quedan donde tienen que estar.
+**No verifiqué que el contenedor llegue**, porque no puedo levantarlo.
+
+### 3. Casos 86 y 110 — tu diagnóstico no era el correcto, y lo demuestro
+
+Tu informe dice que el caso agrega una segunda clave y que «la lectura dotenv
+conserva la primera». Lo medí y **no es eso**:
+
+- El caso 86 ya reemplazaba la clave: produce **una sola** ocurrencia.
+- Cuando hay claves repetidas, acá gana la **última**, no la primera.
+
+La causa real es otra, y explica los dos casos con un solo mecanismo: **en
+pydantic-settings el entorno del proceso le gana a `_env_file`**. Adentro del
+contenedor, `env_file: ./backend/.env` mete TODA clave de ese archivo como
+variable de entorno, y `environment:` agrega `UPLOAD_DIR=/data/uploads`. El
+ayudante escribía su plantilla en un archivo temporal… que nunca gobernaba
+nada.
+
+Lo reproduje sin Docker, simulando ese entorno:
 
 ```
- 1. Dron Pulverizador Agrícola 20L      tenia 1 -> HTTP 200 -> ahora 2  ok
- 2. Dron Pulverizador Agrícola 20L      tenia 2 -> HTTP 200 -> ahora 3  ok
- 3. Terneros Angus - Lote 20 cabezas    tenia 1 -> HTTP 200 -> ahora 2  ok
- …
-12. Kit de Filtros y Correas para Cose  tenia 1 -> HTTP 200 -> ahora 2  ok
-
-12 vueltas, 0 fallas
+caso 86  (URL de aviso con parametros)     nativo         -> rechazado (el caso pasa)
+caso 86  (URL de aviso con parametros)     como en Docker -> CARGA_OK  ← ROJO
+caso 110 (constancias adentro de lo publico) nativo       -> rechazado (el caso pasa)
+caso 110 (constancias adentro de lo publico) como en Docker -> CARGA_OK ← ROJO
 ```
 
-Cuando una se llena, la consulta pasa a la siguiente. Nunca eligió una sin
-lugar.
+El arreglo va en el único punto que gobierna: `cargarConSettings` saca del
+entorno las claves que el contenido declara antes de leerlo. Y de paso hace lo
+que pediste igual: **rechaza un contenido con la misma clave dos veces**, para
+no depender de cuál gana. Con el mismo entorno del contenedor:
 
-### 5. Lo que no cambió
+```
+caso 86                                      -> rechazado
+caso 110                                     -> rechazado
+plantilla intacta (tiene que CARGAR)         -> CARGA_OK
+contenido con clave repetida (tiene que avisar) -> aviso de clave repetida
+```
 
-Las cuatro mutaciones siguen haciendo lo suyo: documentación, imágenes y
-comprobante devuelven **401** con la cookie sola sin escribir nada, la
-renovación devuelve 401 sin emitir credenciales, y con el Bearer las cuatro
-funcionan. Ninguna línea de producto. Ni `backend/`, ni `src/`, ni migraciones,
-ni seed, ni imágenes reales, ni dependencias, ni Railway, ni datos.
+El caso 110 pasa a **reemplazar** `UPLOAD_DIR` y `DOCUMENTOS_DIR` en vez de
+agregarlas, que es lo que pediste y ahora además es obligatorio.
 
-### 6. Puertas
+### 4. Caso 105 — los archivos se miran donde viven
+
+`existsSync` y `readdirSync` corrían en el host sobre una ruta que
+`CARPETA_DOCUMENTOS` lee de la aplicación: bajo Docker, la ruta del contenedor.
+Ahora se pregunta donde están, por el mismo puente que ya lee la configuración,
+sin exponer rutas internas en ninguna aserción.
+
+Acá pasa igual que antes porque host y contenedor son la misma máquina, así que
+**mi verde no prueba el arreglo**: prueba que no rompí nada. El defecto sólo se
+manifiesta con Docker.
+
+### 5. Caso 131 — reproducido con un `sed` que se porta como el de BSD
+
+No tengo macOS, así que puse en el PATH un `sed` que hace lo único que importa:
+tratar el `-e` que sigue a `-i` como sufijo de respaldo.
+
+```
+la receta del Dockerfile, con el sed de esta maquina (GNU)  -> salida=0
+la receta del Dockerfile, con un sed tipo BSD              -> salida=1  ← tu rojo
+```
+
+El arreglo no reescribe la receta ni saltea el caso: **detecta** si el `sed` de
+la máquina se comporta como el de Alpine y, si no, ejecuta el mismo texto en
+`alpine:3`.
+
+```
+sed GNU -> se comporta como Alpine: se ejecuta directo
+sed BSD -> NO se comporta como Alpine: se ejecuta en alpine:3
+```
+
+La rama de Alpine no la pude ejecutar. Es la que va a correr en tu máquina.
+
+Nota de alcance: esa rama hace que el caso necesite Docker en macOS. No lo veo
+como un costo, porque `npm run smoke` ya empieza con `docker compose down -v`,
+pero es un cambio de dependencia y prefiero decirlo.
+
+### 6. El rótulo del lanzador
+
+Decía «Ejecutando 117 smoke tests». Ahora no lleva la cuenta: la da la suite al
+terminar, que es quien la sabe.
+
+### 7. Puertas, en Linux nativo
 
 ```
 node --check scripts/smoke.mjs                  ok
+bash -n de los tres guiones tocados             ok
+docker-compose.yml                              YAML válido
 base limpia + node scripts/smoke.mjs            140/140   (0 fallaron)
-base limpia otra vez + node scripts/smoke.mjs   140/140   (0 fallaron)
+base limpia otra vez                            140/140   (0 fallaron)
 npm run build                                   ok
 npm run lint                                    ok (--max-warnings 0)
 python -m compileall backend/app                ok
@@ -141,62 +162,61 @@ npm run contraste                               TODO OK, cobertura completa
 npm run hito                                    6/6 pasos
 ```
 
-Diff de la prueba:
+**Esas dos corridas no son `npm run smoke`**: son `scripts/smoke.mjs` sobre el
+entorno nativo, porque el lanzador oficial necesita Docker. Es exactamente la
+distinción que vos marcaste al no declarar 140/140 desde tu reproducción, y la
+respeto en la misma dirección.
+
+Diff:
 
 ```
- scripts/smoke.mjs | 38 ++++++++++++++++++++++++++++++--------
+ docker-compose.yml       |  11 +++
+ scripts/init_local_db.sh |  11 ++-
+ scripts/smoke.mjs        | 124 ++++++++++++++++++++++++++++++-----
+ scripts/smoke.sh         |   4 +-
 ```
 
-### 7. Un commit más, y acá me salgo de tu alcance a propósito
-
-En `fa8b382` arreglé un rojo intermitente del **caso 140**, que es mío, de
-ORD-SELF-1. Tu alcance decía «no cambies otros casos intermitentes», así que te
-explico por qué lo hice igual y lo dejé en su propio commit.
-
-Apareció en la primera de estas corridas oficiales:
-
-```
-[FAIL] 140 … — buscando «Smoke tapa …-100» —propia— la tarjeta ofrece []
-```
-
-`tarjeta` es un localizador y se vuelve a resolver en **cada** uso. Cuando la
-grilla se rearma entre la espera y la lectura —y se rearma, porque la búsqueda
-por nombre llega por la red—, la segunda resolución cae sobre un nodo a medio
-dibujar y devuelve cero botones. El caso lo leía como «la tarjeta no ofrece
-nada». Dos rojos en ocho corridas completas, siempre con `[]`.
-
-Lo arreglé porque tu propia puerta 3 pide **140/140 dos veces desde bases
-limpias**, y con ese caso en rojo esa puerta no se puede cumplir. Ahora los
-rótulos se leen con `esperarA` hasta que haya alguno, con tope de 25 s y un
-mensaje que dice qué se esperaba. Si no estás de acuerdo con que lo tocara,
-revertí `fa8b382` solo: la prueba de TEST-IMG-1 no depende de él.
+Sin `backend/`, sin `src/`, sin migraciones, sin seed, sin dependencias, sin
+Railway y sin datos. No toqué los casos 116 ni 140. No abrí TRANSFER-REC-1.
 
 ### 8. Hashes
 
 ```
-scripts/smoke.mjs   72ed6e221ea44add
+scripts/smoke.mjs        f9dbb95987545f61
+scripts/smoke.sh         a7f99fd260aaec12
+scripts/init_local_db.sh 173d688228395d03
+docker-compose.yml       afd56cf30ce90c3e
 ```
 
-(SHA-256 truncado a 16, del árbol en el commit de la prueba.)
+(SHA-256 truncado a 16, del árbol en el commit del arnés.)
 
-### 9. Riesgos residuales
+### 9. Lo que hace falta de tu lado
 
-1. **El `3` vive en dos lugares**: en `products.py` como límite real y en el
-   caso como criterio de elección. Si el producto lo cambia, el caso sigue
-   eligiendo con el número viejo. No es grave —elegiría de más o de menos, pero
-   siempre con lugar si el límite sube— y no lo até al producto porque eso
-   habría sido importar código de la aplicación en la suite.
-2. **Si algún día el seed llena las dieciséis publicaciones del vendedor**, el
-   caso se pone rojo con un mensaje que lo dice y manda a revisar el seed, no a
-   relajar el límite. Es lo correcto, pero conviene saber que ese rojo existe.
-3. **La suite sigue sin poder correrse dos veces sobre la misma base**, por el
-   caso 02. No es de esta pieza y no lo toqué; queda anotado por si querés una
-   pieza de confiabilidad que lo cierre.
+Para cerrar la puerta 2 alcanza con que corras, en tu máquina, dos veces:
 
-### 10. Frenos
+```bash
+npm run smoke
+```
 
-No frené. No toqué producto, ni el límite de tres, ni vacié imágenes, ni
-cambié el objetivo del caso 116, ni hice limpieza general de la suite, ni abrí
-TEST-HARNESS-MAC-1 ni TRANSFER-REC-1. Los cinco defectos de portabilidad que
-reprodujiste quedan donde los dejaste. No desplegué. `PRE_FIRMA.md` sigue fuera
-del versionado y lo confirmé antes de empujar.
+Si alguno de los cinco vuelve a aparecer, el mensaje ahora dice más que antes:
+el 131 informa si corrió con el `sh` del host o con `alpine:3`, y el ayudante
+de configuración avisa por nombre si un contenido trae una clave repetida.
+
+### 10. Riesgos residuales
+
+1. **Tres de los cinco arreglos están verificados sólo por construcción.** Los
+   escribí mirando el mecanismo, no viéndolos pasar en Docker.
+2. **`host.docker.internal` con `host-gateway` necesita Docker Compose v2 y
+   Docker Engine 20.10 o posterior.** En Docker Desktop viene; en un Linux con
+   Docker viejo, no. Si aparece, se puede pisar con `MP_BASE_DEL_DOBLE`.
+3. **El caso 131 pasa a depender de Docker en máquinas con `sed` de BSD.** Ver
+   la nota de la sección 5.
+4. **La suite sigue sin poder correrse dos veces sobre la misma base**, por el
+   caso 02. Ya te lo anoté en TEST-IMG-1 y sigue sin tocar.
+
+### 11. Frenos
+
+No inventé un verde: la puerta 2 queda declarada como no verificada, con el
+motivo. No salteé casos por sistema operativo, no convertí fallas en avisos, no
+bajé ningún control y no toqué producto. No desplegué. `PRE_FIRMA.md` sigue
+fuera del versionado y lo confirmé antes de empujar.
