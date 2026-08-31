@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-08-30.
+Actualizado: 2026-08-31.
 
 ## Relevo inmediato — leer primero
 
@@ -213,6 +213,16 @@ Actualizado: 2026-08-30.
   cambios de producto. Docker sigue apagado; 139/139 es evidencia de Dev. La
   tarea activa pasa al P1 **ORD-SELF-1**: impedir compra propia en API, checkout
   y UI, sin desplegar.
+- **ORD-SELF-1 devuelta, no aceptada:** producto `ecbb375`, informe `bbdf05d`.
+  La regla compartida, los dos checkouts y el estado «Tu publicación» están bien
+  orientados; PM reprodujo build, lint y compileall. Sin embargo,
+  `POST /cart/sync` llama y commitea `get_or_create_cart` antes de validar la
+  publicación propia. El caso 140 prueba sync con un carrito preexistente y
+  prueba cero carritos sólo para `/cart/items`, por lo que no sostiene la
+  afirmación del informe. Docker local sigue apagado y 140/140 no fue repetido
+  por PM. La tarea única vigente es **ORD-SELF-1R**: mover la creación después
+  de la validación y agregar una regresión roja/verde con una identidad sin
+  carrito. No desplegar.
 - **Tres auditorías UX externas preservadas:** Claude revisó navegación,
   claridad, formularios, recorridos y panel administrativo de forma estática
   sobre `7e0b878`. PM
@@ -231,6 +241,12 @@ Actualizado: 2026-08-30.
   rechazarla si aún hay una tarea crítica o hallazgos sin triar. Sol Alto es el
   valor normal; Extra/XHigh queda para cierres de mayor riesgo. Con tres
   auditorías consecutivas, no se abre una cuarta hasta cerrar el lote crítico.
+- **Roadmap de cierre consolidado:**
+  `docs/pm/ROADMAP-CIERRE-MVP-2026-08-31.md` ordena ORD-SELF-1R, la
+  estabilización del caso 116 y todos los hallazgos accionables de las tres
+  auditorías hasta MP-D, red-team y producción. No altera
+  `CRONOGRAMA.md`, no convierte cortesías en contrato y mantiene una sola tarea
+  de producto activa.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar
@@ -254,9 +270,11 @@ aceptada en `f716264`/`acbf3b6`: ubicación e inventario cerrados. UX-COH-1R
 queda aceptada funcionalmente en `ee14047`/`babdb95`: el mismo Login y la misma
 acción ya cubren Mercado, Inicio y Servicios, incluida la tarjeta primaria.
 UX-COH-1S queda aceptada en `aadecb5`/`6d14d1d`; con eso UX-COH-1 queda cerrada.
-**La tarea activa de Dev es ORD-SELF-1:** impedir que una identidad agregue,
-sincronice o compre su propia publicación, con autoridad en Backend y estado
-coherente en tarjeta/detalle. No debe desplegar.
+**La tarea activa de Dev es ORD-SELF-1R:** corregir únicamente el efecto lateral
+de `/cart/sync` cuando el rechazo ocurre sin carrito previo y demostrar cero
+filas nuevas con una regresión discriminante. ORD-SELF-1 todavía no se acepta.
+Después corresponde TEST-IMG-1 y luego la cola ordenada en
+`ROADMAP-CIERRE-MVP-2026-08-31.md`. No debe desplegar.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se

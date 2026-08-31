@@ -5,7 +5,7 @@ Base revisada: `main` `7e0b87811642627e17241e117ff78dba8d61159e`.
 Método de la auditora: lectura estática; sin navegador, Docker ni cambios al
 repositorio.
 
-Este archivo conserva las dos auditorías externas para que una PM futura no
+Este archivo conserva las tres auditorías externas para que una PM futura no
 dependa del chat ni de memoria. **No es una tarea vigente ni una aceptación de
 todos los diagnósticos.** La PM contrastó los hallazgos principales con código,
 alcance y decisiones; las prioridades corregidas están escritas abajo.
@@ -393,21 +393,13 @@ control de concurrencia con `409`, autor/fecha y vacío honesto. Es el patrón d
 operabilidad para el resto del panel; no debe simplificarse al arreglar estas
 fichas.
 
-## Cola recomendada después de `ORD-SELF-1`
+## Cola operativa
 
-La PM no debe entregar todo este archivo como una sola tarea. Orden sugerido:
+La cola dejó de vivir duplicada en este registro. El orden vigente, con piezas
+acotadas, relación contractual y puertas hasta lanzamiento, está en
+`docs/pm/ROADMAP-CIERRE-MVP-2026-08-31.md`.
 
-1. **Recuperación de transferencia:** F2 y protección contra cierre accidental
-   en el paso que deja una orden esperando comprobante.
-2. **Panel administrable:** ADM-1 y ADM-5 primero; ADM-2 antes de que la base
-   supere veinte filas por entidad. No mezclar todavía el pulido ADM-3/4/6–11.
-3. **Regresiones pequeñas de estado:** F1 y R2, con regresiones específicas.
-4. **Navegación coherente:** A1/A2/A3/A8 junto con B4 y C1; una raíz, una tarea.
-5. **Formularios, reputación y panel:** F3 general, F5, F7–F11 y
-   ADM-3/4/6–11, en lotes acotados.
-6. **Claridad comercial:** A4–A7, A9/A10, F12/F13.
-7. **Deuda estructural posterior:** C2, C3, riesgos administrativos y
-   paginación mayor a cien.
-
-Cada tarea nueva requiere reproducción o prueba roja, alcance mínimo, suite
-completa y aceptación PM. No desplegar una corrección por existir en esta lista.
+Este archivo conserva la evidencia y los dictámenes por código. Cada tarea
+nueva sigue requiriendo reproducción o prueba roja, alcance mínimo, suite
+completa y aceptación PM; no se despliega una corrección por existir en esta
+lista.

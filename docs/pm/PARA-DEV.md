@@ -12,6 +12,78 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-08-31 — DEVOLUCIÓN VIGENTE: ORD-SELF-1R, `/cart/sync` no crea un carrito al rechazar
+
+La entrega ORD-SELF-1 de producto `ecbb375` e informe `bbdf05d` **no queda
+aceptada todavía**. La regla central, las defensas de checkout y el estado de
+interfaz son correctos, pero la evidencia afirma una propiedad que el camino de
+sincronización no cumple.
+
+### Brecha confirmada por PM
+
+En `backend/app/api/cart.py`, `sync_cart()` ejecuta
+`get_or_create_cart(db, current_user.id)` antes de resolver y validar los ítems.
+Ese helper hace `commit` cuando no existe carrito activo. Por lo tanto, una
+cuenta sin carrito que envía su propia publicación recibe el `409` correcto,
+pero puede quedar con un carrito `ACTIVE` nuevo y vacío.
+
+El caso 140 no discrimina este borde:
+
+- prueba `/cart/sync` con el vendedor después de haberle creado un carrito
+  ajeno legítimo;
+- la cuenta sin carrito es el admin, pero con ella sólo prueba
+  `POST /cart/items`, no `POST /cart/sync`;
+- la lectura estática sólo comprueba que la regla compartida aparezca en los
+  archivos, no que preceda a `get_or_create_cart`.
+
+Por eso no alcanza para sostener en el informe que el freno de sync va antes de
+la creación ni que ambos endpoints conservan cero carritos.
+
+### Corrección mínima
+
+- En `/cart/sync`, resolvé y validá el payload completo antes de crear un
+  carrito. Recién después de pasar publicación propia, existencia, estado,
+  stock y contrato monetario se puede obtener o crear el carrito y reemplazar
+  sus ítems.
+- No cambies el comportamiento válido: un sync vacío válido puede seguir
+  representando un carrito vacío según el contrato actual; si mover la creación
+  vuelve ambiguo ese caso, frená e informalo antes de decidir.
+- Extendé el caso 140 con una identidad que no tenga ningún carrito: enviá por
+  `/cart/sync` una publicación propia, exigí `409` y comprobá en SQL que tanto
+  `carts` como `cart_items` permanecen en cero.
+- La nueva aserción debe ponerse roja contra `ecbb375` por la fila de carrito
+  creada y verde después de la corrección. No alcanza con cambiar una
+  comprobación estática.
+- Corregí en el informe la afirmación falsa sobre el orden de
+  `get_or_create_cart` y separá qué prueba `/items` de qué prueba `/sync`.
+
+### Fuera de alcance
+
+- No toques otros hallazgos de las auditorías UX, navegación, transferencias,
+  administración, Mercado Pago, Railway, seed ni datos.
+- No limpies carritos históricos ni cambies mensajes, interfaz o la excepción
+  deliberada de cotización.
+- No arregles el caso 116 dentro de esta devolución. Queda registrado como el
+  siguiente bloque corto de confiabilidad de pruebas.
+- No despliegues.
+
+### Puertas de aceptación
+
+1. Rojo verificable contra `ecbb375` y verde con la corrección para
+   `/cart/sync` sin carrito previo.
+2. `409` con el mismo mensaje; cero filas nuevas en `carts`, `cart_items`,
+   órdenes, pagos, reservas y notificaciones.
+3. El sync mixto conserva entero un carrito anterior y el sync ajeno válido
+   sigue funcionando.
+4. Suite completa desde base limpia, build, lint, compileall, `pip check`,
+   `diff --check`, accesibilidad, contraste e hito en verde.
+5. Un commit de producto y otro separado con el informe en `PARA-PM.md`.
+
+Cuando ORD-SELF-1R quede aceptada, la siguiente pieza será TEST-IMG-1: volver
+determinista el caso 116 sin cambiar producto. La cola completa y su relación
+con las tres auditorías está en
+`docs/pm/ROADMAP-CIERRE-MVP-2026-08-31.md`.
+
 ## 2026-08-30 — TAREA VIGENTE: ORD-SELF-1, nadie compra su propia publicación
 
 UX-COH-1S queda aceptada en `aadecb5` con informe `6d14d1d`. La espera fija del
