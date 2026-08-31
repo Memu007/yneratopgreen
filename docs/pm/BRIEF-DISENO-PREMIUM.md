@@ -1,5 +1,11 @@
 # Brief para dirección de marca — TopGreen
 
+> **Documento histórico.** Desde el 2026-08-31 la marca pública es **BOEDA** y
+> la identidad entregada por la cliente reemplaza nombre, paleta, wordmark,
+> fotografía y voz de este brief. Se conservan únicamente las decisiones de
+> jerarquía, densidad, anatomías y comportamiento que ya fueron aceptadas. Ver
+> `IDENTIDAD-BOEDA-CLIENTE-2026-08-31.md`.
+
 Estado: investigación y definición visual. **No implementar producto.**
 
 ## Rol

@@ -283,6 +283,15 @@ Actualizado: 2026-08-31.
   auditorías hasta MP-D, red-team y producción. No altera
   `CRONOGRAMA.md`, no convierte cortesías en contrato y mantiene una sola tarea
   de producto activa.
+- **Nueva identidad recibida y triada:** la marca pública deja de ser TopGreen
+  y pasa a ser **BOEDA**. La lámina de cliente gobierna nombre, paleta,
+  fotografía y voz; los manuales son visión, no ampliación contractual. La
+  separación entre identidad aplicable, funciones posteriores y nombres
+  técnicos que no deben migrarse está en
+  `docs/pm/IDENTIDAD-BOEDA-CLIENTE-2026-08-31.md`. No cambia la tarea activa:
+  `BRAND-BOEDA-1` queda en cola después de `TEST-HARNESS-MAC-1R` y
+  `TRANSFER-REC-1`, antes del cierre visual/responsive, y requiere el logo
+  vectorial/PNG transparente de la cliente.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar

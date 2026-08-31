@@ -1,4 +1,10 @@
-# Ynera TopGreen — Alcance estable
+# BOEDA — Alcance estable
+
+> Marca pública desde el 2026-08-31: **BOEDA**. El repositorio y los
+> identificadores técnicos pueden seguir usando `TopGreen`; no deben migrarse
+> en bloque. Los materiales nuevos de la cliente son visión y lenguaje, no una
+> ampliación automática del alcance. Ver
+> `IDENTIDAD-BOEDA-CLIENTE-2026-08-31.md`.
 
 Marketplace agropecuario. Este documento cubre lo que no cambia entre
 sesiones. El estado móvil vive en `NOW.md`.

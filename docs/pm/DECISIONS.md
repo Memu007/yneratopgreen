@@ -5,6 +5,21 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-08-31 — BOEDA reemplaza a TopGreen como marca pública
+
+La cliente entregó la identidad BOEDA y confirmó que el producto ya no debe
+presentarse públicamente como TopGreen. La lámina de marca pasa a gobernar
+nombre, paleta, fotografía, tono y recursos visuales. El manual de producto y
+la guía interáreas se aceptan como visión y principios; no amplían por sí solos
+el contrato ni el MVP.
+
+La migración será una pieza separada, `BRAND-BOEDA-1`, después del arnés vigente
+y `TRANSFER-REC-1`, antes del cierre visual/responsive. Se cambiarán las
+superficies visibles al usuario, no de forma ciega los nombres internos de repo,
+base, contenedores, variables o servicios. Antes de implementación se pide el
+logo vectorial y PNG transparente. Triage completo en
+`IDENTIDAD-BOEDA-CLIENTE-2026-08-31.md`.
+
 ## 2026-08-22 — Firma confirmada; comienza trabajo postfirma
 
 Emi confirmó que el contrato quedó firmado. Se mantiene el ancla ya acordada:
