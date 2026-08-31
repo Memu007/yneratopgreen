@@ -40,6 +40,12 @@ services:
     environment:
       DATABASE_URL: "postgresql+psycopg://${DB_USER:?DB_USER no está definido en .env}:${DB_PASSWORD:?DB_PASSWORD no está definido en .env}@db:5432/${DB_NAME:?DB_NAME no está definido en .env}"
       UPLOAD_DIR: /data/uploads
+      # Las constancias fiscales NO pueden caer adentro de `/data/uploads`, que
+      # se sirve entero como estatico publico —la aplicacion se niega a
+      # arrancar si pasa—. Y la carpeta por defecto, `/app/documentos`, no es
+      # escribible por `appuser`: eran diez casos en rojo con `PermissionError`.
+      # Va a su propio volumen, privado y hermano del publico.
+      DOCUMENTOS_DIR: /data/documentos
       # El doble local de Mercado Pago que levanta la suite corre en el HOST.
       # `127.0.0.1` adentro del contenedor es el contenedor: la API no llegaba
       # nunca. El navegador y las comprobaciones del host siguen usando
@@ -52,6 +58,7 @@ services:
       - ./backend/app:/app/app  # Hot reload en desarrollo
       - ./backend/alembic:/app/alembic
       - uploads_data:/data/uploads
+      - documentos_data:/data/documentos
       # El outbox de correo se comparte con el host para que la suite lea
       # el enlace de confirmacion sin ningun endpoint de prueba.
       - ./backend/outbox:/app/outbox
@@ -96,4 +103,7 @@ volumes:
   db_data:
     driver: local
   uploads_data:
+    driver: local
+  # Privado: no lo monta nginx ni ningun otro servicio.
+  documentos_data:
     driver: local

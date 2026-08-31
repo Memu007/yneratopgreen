@@ -13515,36 +13515,20 @@ await runCase(131, 'Toda respuesta publica sale con la base defensiva, y la poli
   const copia = `${taller}/plantilla`;
   const guion = unida.replaceAll('/etc/nginx/templates/default.conf.template', copia);
 
-  // La receta es de Alpine, y su `sed -i -e ...` —sin sufijo de respaldo— es lo
-  // que aceptan GNU y BusyBox. El `sed` de BSD, que es el de macOS, toma el
-  // `-e` siguiente como sufijo y la receta falla ahi: el caso se pone rojo con
-  // la imagen productiva intacta.
+  // La receta se ejecuta SIEMPRE en Alpine, que es donde va a correr de verdad.
   //
-  // Asi que la receta se corre DONDE FUE ESCRITA. Si el `sed` de esta maquina
-  // ya se comporta como el del destino, se ejecuta directo; si no, se ejecuta
-  // en Alpine, que es la imagen del Dockerfile. No se saltea el caso ni se
-  // reescribe la receta: se ejecuta el mismo texto en el interprete correcto.
-  const sedComoEnAlpine = (() => {
-    const prueba = mkdtempSync(`${tmpdir()}/topgreen-sed-`);
-    try {
-      writeFileSync(`${prueba}/a`, 'x\n');
-      const r = spawnSync('sed', ['-i', '-e', 's/x/y/', `${prueba}/a`], { encoding: 'utf8' });
-      return r.status === 0 && readFileSync(`${prueba}/a`, 'utf8').trim() === 'y';
-    } catch {
-      return false;
-    } finally {
-      rmSync(prueba, { recursive: true, force: true });
-    }
-  })();
-
+  // Antes habia una sonda que preguntaba si el `sed` de la maquina se portaba
+  // como el del destino. Contestaba con UNA expresion y la receta real usa
+  // DOS: el `sed` de BSD pasaba la sonda y despues fallaba la receta, asi que
+  // la heuristica clasificaba macOS como compatible y el caso se ponia rojo
+  // igual. Una sonda que no reproduce lo que va a pasar no sirve para decidir.
+  //
+  // La suite ya depende de Docker —`npm run smoke` empieza por
+  // `docker compose down -v`—, asi que correr la receta en `alpine:3` no suma
+  // una dependencia: saca una heuristica y prueba el entorno real del
+  // Dockerfile.
   const ejecutar = (api, imagenes) => {
     writeFileSync(copia, plantilla);
-    if (sedComoEnAlpine) {
-      return spawnSync('/bin/sh', ['-c', guion], {
-        encoding: 'utf8',
-        env: { ...process.env, VITE_API_URL: api, VITE_IMAGES_URL: imagenes },
-      });
-    }
     return spawnSync('docker', [
       'run', '--rm', '-v', `${taller}:${taller}`,
       '-e', `VITE_API_URL=${api}`, '-e', `VITE_IMAGES_URL=${imagenes}`,
@@ -13554,7 +13538,7 @@ await runCase(131, 'Toda respuesta publica sale con la base defensiva, y la poli
 
   const buena = ejecutar('https://api.ejemplo.test/api', 'https://imagenes.ejemplo.test');
   assert(buena.status === 0,
-    `la receta fallo con variables validas (${sedComoEnAlpine ? 'sh del host' : 'alpine:3'}): `
+    'la receta fallo con variables validas dentro de alpine:3: '
     + `${buena.stderr || buena.error?.message || ''}`);
   const salida = readFileSync(copia, 'utf8');
   assert(/connect-src 'self' https:\/\/api\.ejemplo\.test"/.test(salida),

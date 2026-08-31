@@ -373,9 +373,22 @@ export function levantarDoble(puerto = 8099) {
     });
   });
 
+  // A que interfaz se liga el doble.
+  //
+  // Estaba en `127.0.0.1`, y eso lo vuelve inalcanzable para la API cuando
+  // corre en un contenedor: el `host.docker.internal` de Compose llega a la
+  // maquina, pero a una interfaz que el doble no estaba escuchando. Son 33
+  // casos en rojo, medidos en macOS.
+  //
+  // Es un servidor de PRUEBA con valores inventados, que vive lo que dura un
+  // caso y contesta con datos que no valen en ningun lado. Aun asi la
+  // interfaz se puede fijar: `MP_DOBLE_INTERFAZ` la manda, y sin ella se liga
+  // a todas, que es lo unico que funciona igual en Docker Desktop y en Linux.
+  const interfaz = process.env.MP_DOBLE_INTERFAZ || '0.0.0.0';
+
   return new Promise((resolver, rechazar) => {
     servidor.once('error', rechazar);
-    servidor.listen(puerto, '127.0.0.1', () => {
+    servidor.listen(puerto, interfaz, () => {
       resolver({
         pedidos,
         preferencias,
