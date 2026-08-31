@@ -82,7 +82,11 @@ línea de producto cambia.
 5. Un commit de prueba y otro separado con el informe. No desplegar.
 
 Después de aceptar TEST-IMG-1, la siguiente pieza del roadmap es
-TRANSFER-REC-1; no la abras en el mismo turno.
+TEST-HARNESS-MAC-1 y recién después TRANSFER-REC-1; no abras ninguna en el
+mismo turno. PM reprodujo el 31/08 cinco defectos de portabilidad/configuración
+del arnés, no del producto. La evidencia y el alcance futuro están en
+`docs/pm/REPRODUCCION-SMOKE-PM-2026-08-31.md`. **No los corrijas dentro de
+TEST-IMG-1.**
 
 ## 2026-08-31 — DEVOLUCIÓN VIGENTE: ORD-SELF-1R, `/cart/sync` no crea un carrito al rechazar
 

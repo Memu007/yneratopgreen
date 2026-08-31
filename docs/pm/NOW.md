@@ -233,6 +233,18 @@ Actualizado: 2026-08-31.
   local sigue apagado; 140/140 dos veces es evidencia de Dev. El commit
   separado `747cd2c` sólo corrige el desacople del servidor en el arranque
   local; no forma parte de la aceptación funcional ni fue desplegado.
+- **Reproducción independiente con Docker realizada:** PM ejecutó la suite
+  sobre `5cb71ef` desde una base local nueva. El lanzador oficial se detiene
+  antes de los casos porque `.env.example` mezcla CRLF/LF y
+  `init_local_db.sh` no quita `\r`. Con el entorno reconstruido correctamente,
+  el ejecutor dio **136/140**. Los cuatro rojos quedaron reproducidos como
+  falsos negativos del arnés: claves dotenv duplicadas en 86/110, ruta interna
+  de Docker leída desde macOS en 105 y receta GNU/Alpine ejecutada con `sed`
+  BSD en 131. Las propiedades se comprobaron directamente; la imagen Railway
+  construyó, lint quedó verde y runtime npm dio cero vulnerabilidades. No se
+  declara 140/140 oficial hasta corregir el arnés. Evidencia completa en
+  `REPRODUCCION-SMOKE-PM-2026-08-31.md`. TEST-IMG-1 continúa como tarea única;
+  después se abre una pieza separada de portabilidad del arnés.
 - **Tres auditorías UX externas preservadas:** Claude revisó navegación,
   claridad, formularios, recorridos y panel administrativo de forma estática
   sobre `7e0b878`. PM

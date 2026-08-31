@@ -25,8 +25,12 @@ final, como acordó Emi.
 - Tarea única vigente: **TEST-IMG-1**, detallada en `PARA-DEV.md`.
 - ORD-SELF-1 no cierra ningún hallazgo de las tres auditorías; era la tarea P1
   anterior y las auditorías la excluyeron expresamente.
-- PM reprodujo build, lint y compileall. Docker local está apagado; 140/140
-  sigue siendo evidencia informada por Dev, no reproducción independiente.
+- PM reprodujo build, lint y compileall. Docker local fue habilitado el 31/08:
+  el ejecutor funcional dio 136/140 y las cuatro propiedades rojas pasaron al
+  reproducirse correctamente. La suite oficial sigue sin estar verde por cinco
+  defectos del arnés documentados en
+  `REPRODUCCION-SMOKE-PM-2026-08-31.md`; no se convierte esa evidencia en un
+  140/140 nominal.
 
 ## Reglas de ejecución
 
@@ -48,9 +52,12 @@ final, como acordó Emi.
 |---:|---|---|
 | 0 | **ORD-SELF-1R — cerrada** | Aceptada en `40b589b`/`99e828f`: `/cart/sync` valida antes de crear y prueba `409` con cero filas usando una cuenta sin carrito. |
 | 1 | **TEST-IMG-1 — vigente** | Volver determinista el caso 116 eligiendo una publicación con lugar para imagen y mejorar el error. Sólo prueba; sin producto. |
+| 1B | **TEST-HARNESS-MAC-1 — siguiente** | Hacer reproducible el lanzador en CRLF/macOS/Docker Desktop y corregir los falsos negativos 86, 105, 110 y 131 sin relajar ninguna aserción de seguridad. |
 
 ORD-SELF-1 ya cerró. TEST-IMG-1 evita que una probabilidad aproximada de 1/16
-vuelva discutible la evidencia de los bloques siguientes.
+vuelva discutible la evidencia de los bloques siguientes. Después,
+TEST-HARNESS-MAC-1 debe conseguir una ejecución oficial verde y portable antes
+de usar la suite como puerta de las tareas de producto.
 
 ### Puerta 1 — integridad contractual y operación básica
 
