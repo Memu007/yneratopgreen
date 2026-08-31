@@ -286,11 +286,13 @@ if escuchando "$PUERTO_API"; then
   nota "ya había algo escuchando en $PUERTO_API"
 else
   mkdir -p logs
-  # `setsid` y no sólo `&`: el servidor tiene que quedar en su propia sesión,
-  # fuera del árbol de este guion. Con `&` a secas el guion se queda esperándolo
-  # y el arranque de la sesión no termina nunca —medido: colgado a los diez
-  # minutos con la API ya respondiendo—.
-  (cd backend && setsid ./.venv/bin/python -m uvicorn app.main:app \
+  # `setsid --fork` y no sólo `&`: el servidor tiene que quedar fuera del árbol
+  # de este guion. Con `&` a secas el guion se queda esperándolo y el arranque
+  # no termina nunca —medido: colgado a los diez minutos con la API ya
+  # respondiendo—. Y `--fork` es obligatorio: sin él, `setsid` no forka cuando
+  # el proceso no es líder de grupo, así que hace `exec` en el MISMO proceso y
+  # el servidor sigue colgando del guion. Volvió a colgarse por eso.
+  (cd backend && setsid --fork ./.venv/bin/python -m uvicorn app.main:app \
     --host 127.0.0.1 --port "$PUERTO_API" \
     > "$RAIZ/logs/api.log" 2>&1 < /dev/null &) ; disown -a 2>/dev/null || true
   for _ in $(seq 1 30); do
@@ -313,7 +315,7 @@ if escuchando "$PUERTO_FRONT"; then
 else
   mkdir -p logs
   # Lo mismo que la API: fuera del árbol del guion.
-  setsid npx vite --host 127.0.0.1 --port "$PUERTO_FRONT" --strictPort \
+  setsid --fork npx vite --host 127.0.0.1 --port "$PUERTO_FRONT" --strictPort \
     > "$RAIZ/logs/vite.log" 2>&1 < /dev/null &
   disown -a 2>/dev/null || true
   for _ in $(seq 1 30); do escuchando "$PUERTO_FRONT" && break; sleep 1; done
