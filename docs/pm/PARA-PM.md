@@ -2,160 +2,129 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ORD-SELF-1 — nadie compra su propia publicación
+## ORD-SELF-1R — rechazar un sync no puede crear un carrito
 
 Hecho. Producto e informe en commits separados. **No desplegué.**
 
-- Producto: `ecbb375` — «ORD-SELF-1: nadie compra su propia publicación»
-- Regresión nueva: caso **140**. La suite queda en **140/140**, verde en dos
-  corridas completas desde base limpia.
+- Producto: `40b589b` — «ORD-SELF-1R: rechazar un sync no puede crear un carrito»
+- La suite queda en **140/140**, verde en dos corridas completas desde base limpia.
 
 ---
 
-### 1. El rojo contra `aadecb5`, y era peor de lo que decía el hallazgo
+### 0. Primero, la corrección del informe
 
-No es que «se puede agregar al carrito». Se puede **llegar a la orden**. Con el
-vendedor del seed, por la API real:
+Tenías razón y la afirmación era falsa. En el informe de ORD-SELF-1 escribí, en
+la tabla de la sección 4:
 
-```
-POST /cart/items            -> 200, fila creada en su carrito
-POST /cart/sync             -> 200
-GET  /orders/payment-options-> 200 [{seller_name:"Juan Vendedor", methods:["transfer"],
-                                     cbu:"0000009000000000000024", ...}]
-POST /orders/checkout/transfer -> 200 {"orders":[{"order_number":"ORD-20260830-E401B841",
-                                     "status":"awaiting_transfer_receipt","amount":540000}]}
+> «Esa última fila es la que prueba que el rechazo **tampoco crea** un carrito:
+> el freno va antes de `get_or_create_cart`.»
 
-ordenes del vendedor: 0 -> 1
-SELECT COUNT(*) FROM orders WHERE buyer_id = seller_id;  ->  1
-ORD-20260830-E401B841 | AWAITING_TRANSFER_RECEIPT | 540000.00
-```
+Eso era cierto de **`/cart/items`** y lo di por cierto de los dos endpoints. En
+`/cart/sync` era falso: `get_or_create_cart()` era la primera línea de la
+función y hace `commit` cuando no hay carrito activo.
 
-O sea: una orden de **$540.000** esperando que Juan Vendedor le transfiera a
-Juan Vendedor, al CBU que la propia pantalla le ofreció como contraparte.
+El error de método es el que importa: medí una propiedad en un camino y la
+afirmé de otro que no comparte ese código. Los dos endpoints deciden por
+separado cuándo nace el carrito, así que medir uno no dice nada del otro.
 
-El caso 140 lo agarra en el primer paso, y el rojo dice qué respondió y no sólo
-que no fue lo esperado:
+### 1. El rojo contra `ecbb375`
+
+Con el transportista, que llega sin ningún carrito, por la API real:
 
 ```
-[FAIL] 140 … — POST /cart/items con «Kit de Filtros y Correas para Cosechadora»:
-              se esperaba 409 y respondio HTTP 200
-              {"id":"ce491bdd-…","product_id":"17d4912b-…","product_name":"Kit de Filtros…"}
+carritos del transportista antes: 0
+POST /cart/sync -> 409 «… es tu propia publicación: no podés comprarla.
+                         Quitala del carrito para continuar.»
+carritos del transportista despues: 1
+items del transportista despues:    0
+
+122eae3a-ab39-46b3-bf95-2a4a339b06de | ACTIVE | 2026-08-31 10:56:37
 ```
 
-### 2. Dónde vive la regla
+El 409 correcto, y una fila `ACTIVE` vacía que la persona nunca pidió.
 
-En `backend/app/services/propiedad.py`, **una sola vez**, y compara
-**identidades, no roles**. La aplican los cuatro caminos que pueden escribir:
+En el caso 140, con el `cart.py` de `ecbb375`:
 
-| camino | dónde corta | antes de |
+```
+[FAIL] 140 … — /cart/sync rechazado le dejo 1 carritos y 0 items a una cuenta
+              que no tenia ninguno: el freno tiene que ir ANTES de obtener o
+              crear el carrito, no despues
+```
+
+Y con la corrección, `[PASS]`.
+
+### 2. La corrección
+
+Una línea que se mueve. `get_or_create_cart()` sale del principio de
+`sync_cart()` y pasa a la segunda pasada, cuando ya pasaron publicación propia,
+existencia, estado, stock y contrato monetario: o sea cuando ya está decidido
+que se va a escribir.
+
+No cambié la regla, ni el mensaje, ni el orden de las validaciones, ni
+`/cart/items`, ni el checkout, ni la interfaz.
+
+### 3. Qué prueba cada endpoint ahora, por separado
+
+El caso usa las **dos** cuentas que llegan sin carrito, y ya no mezcla lo que
+mide en cada una:
+
+| | admin | transportista |
 |---|---|---|
-| `POST /cart/items` | apenas resuelve el producto | del stock, del precio y del carrito |
-| `POST /cart/sync` | en la primera pasada | de borrar y reemplazar nada |
-| `GET /orders/payment-options` | apenas toma el carrito | de armar los grupos |
-| `checkout.preparar()` | primera línea después del carrito | del destino, del traslado, del medio y de la primera orden |
+| carritos al empezar | 0 | 0 |
+| `POST /cart/items` con lo suyo | 409, **0 carritos** | 409, **0 carritos, 0 ítems** |
+| `POST /cart/sync` con lo suyo | — | 409, **0 carritos, 0 ítems** |
+| `POST /cart/sync` con un id inexistente | — | 400, **0 carritos** |
+| `POST /cart/sync` vacío y válido | — | 200, **1 carrito, 0 ítems** |
 
-Los dos checkouts —transferencia y Mercado Pago— pasan por el mismo `preparar()`,
-así que no hay dos reglas que se puedan separar. El caso 140 lo afirma leyendo
-los archivos: el módulo existe y los tres que escriben lo llaman.
+Las dos filas del medio son las nuevas. La tercera muestra que la corrección
+vale para **cualquier** rechazo de sync y no sólo para el de publicación propia:
+antes, cualquiera de esos 400 también dejaba su carrito.
 
-Que el freno del checkout vaya **antes** que el destino y que el medio de pago no
-es cosmético: si fuera después, un carrito heredado podía rebotar con «la
-localidad no pertenece al padrón» y esconder el motivo verdadero.
+### 4. El sync vacío, que era tu freno
 
-### 3. Los cuatro mensajes, medidos
-
-```
-POST /cart/items      409  «Kit de Filtros…» es tu propia publicación: no podés comprarla.
-POST /cart/sync       409  … no podés comprarla. Quitala del carrito para continuar.
-GET  payment-options  409  … no podés comprarla. Quitala del carrito para continuar.
-POST checkout/transfer 409 … no podés comprarla. Quitala del carrito para continuar.
-POST checkout          409 … no podés comprarla. Quitala del carrito para continuar.
-```
-
-La diferencia es a propósito y el caso la exige en las dos direcciones. Cuando
-la persona **recién la agrega** no hay nada que sacar, y mandarla a «quitala del
-carrito» sería mandarla a buscar algo que no está. Cuando **ya la tiene
-guardada**, el paso siguiente sí es sacarla y hay que decírselo, porque el ítem
-**no se borra solo**: borrarlo en silencio sería decidir por ella sobre algo que
-ella eligió.
-
-### 4. El rechazo no escribe nada
-
-Medido sobre la base, con un carrito heredado contaminado a propósito:
-
-| | antes | después del 409 |
-|---|---|---|
-| filas del carrito | 1 propia + 1 ajena | iguales, mismas cantidades |
-| estado del carrito | `ACTIVE` | `ACTIVE` |
-| órdenes del comprador | n | n |
-| `orders WHERE buyer_id = seller_id` | 0 | **0** |
-| filas en `payments` | n | n |
-| `stock_reservado` de la propia | n | n |
-| notificaciones | n | n |
-| carritos del admin (no tenía ninguno) | 0 | **0** |
-
-Esa última fila es la que prueba que el rechazo **tampoco crea** un carrito: el
-freno va antes de `get_or_create_cart`, y se mide con una cuenta que no tiene
-ninguno.
-
-### 5. Entero, y después normal
-
-- Un sync con **[ajena, propia]** se rechaza **entero**: no se compra la ajena
-  por su cuenta. El carrito anterior queda intacto, no vaciado.
-- Quitada la propia, el mismo sync pasa y `payment-options` vuelve a 200 con el
-  vendedor ajeno —y **sin** la propia cuenta como contraparte—.
-- La propia **sin precio publicado** sigue diciendo «Solicitar cotización»: pedir
-  presupuesto no crea compra, orden ni carrito, así que ese camino queda como
-  estaba, tal como pediste. El caso lo afirma para que la excepción sea
-  deliberada y no un olvido.
-
-### 6. No depende del rol
-
-- **admin**, con una publicación suya del seed → 409.
-- **transportista**, publicando por la API real —tiene rol `user`, así que puede
-  publicar— y agregándola → 409. La publicación se retira al terminar.
-
-La regla no mira `role`; mira `product.seller_id == user.id`.
-
-### 7. La pantalla
-
-En Inicio, Mercado y Servicios, con la sesión del vendedor:
+Lo miré antes de mover nada, porque era la condición que pediste para frenar.
+**No quedó ambiguo:** un sync válido y vacío sigue naciendo con su carrito
+vacío, porque llega a la segunda pasada como cualquier sync válido. Medido:
 
 ```
-Inicio      3 propias / 0 ajenas
-Mercado   100 propias / 0 ajenas
-Servicios   1 propia  / 1 ajena  / 1 propia a cotizar
-detalle propio abierto en: Inicio, Mercado, Servicios, Mercado buscado
-carrito al terminar: 0
+1. sync vacío válido       -> HTTP 200, carritos=1, items=0
+2. sync con id inexistente -> HTTP 400, carritos=0
+3. sync válido ajeno       -> HTTP 200, carritos=1, items=1
 ```
 
-El caso hace dos cosas distintas a propósito:
+El contrato de hoy queda igual. Lo agregué como aserción del caso para que la
+excepción sea deliberada y no dependa de que alguien se acuerde.
 
-1. **Exhaustiva**: recorre **toda** tarjeta dibujada en las tres pantallas y
-   exige que el rótulo diga la verdad sobre de quién es. Es más fuerte que «hay
-   al menos una»: no hay tarjeta que se escape.
-2. **Dirigida**: además busca en el Mercado, por nombre, una propia y una ajena.
-   Eso no depende de qué quedó arriba en la grilla —en la suite completa los
-   casos anteriores publican cien productos y tapan el seed—, así que la prueba
-   no se vuelve vacía ni se pone roja porque el catálogo cambió de composición.
+### 5. Lo que ya estaba y sigue estando
 
-La propia dice **«Tu publicación»**, el botón está deshabilitado en tarjeta y en
-detalle, y el carrito queda en cero. La ajena conserva «Agregar al carrito»,
-«Agregar» y «Contratar», exactamente como quedaron en UX-COH-1R.
+Sin cambios y verde: el 409 con el mismo mensaje en los cinco caminos, el sync
+mixto que se rechaza entero conservando el carrito anterior, el sync ajeno
+válido, las dos defensas del checkout, `payment-options`, «Tu publicación» en
+tarjeta y detalle, la excepción de cotización y `orders WHERE buyer_id =
+seller_id` en **0**.
 
-No construí edición, mensajería ni navegación nueva. El pie del detalle dice
-«Esta publicación es tuya y nadie se compra a sí mismo. Podés seguir viéndola
-como la ve cualquiera» y nada más.
+### 6. La comprobación estática, y por qué no alcanzaba
 
-### 8. Por qué 409 y no 403
+Tenías razón también acá: leer que `propiedad.exigir_` aparece en el archivo no
+dice **dónde** aparece. No la reemplacé por una comprobación estática más fina
+—«que la línea esté antes que la otra» sigue mirando el archivo y no el
+producto—: lo que ahora sostiene la afirmación es la medición de arriba, que
+falla si el orden se rompe, no importa cómo esté escrito. La lectura estática
+quedó donde estaba, al final, como lo que es: un recordatorio de que la regla
+vive en un solo módulo.
 
-No es un permiso que falte: la misma persona, con la misma sesión, compra sin
-problema cualquier otra publicación. Lo que no existe es **esa combinación** de
-comprador y publicación. Es un conflicto con el estado de las cosas, que es lo
-que 409 nombra, y es el código que pediste para el carrito; lo usé también en el
-checkout y en las formas de pago para que la misma regla no hable con dos voces.
+### 7. Que el caso se pueda repetir
 
-### 9. Puertas, desde base limpia
+El sync vacío deja un carrito, así que el caso vacía los carritos del
+transportista al terminar y la cuenta queda como la encontró. Corrí el caso
+**dos veces seguidas sobre la misma base** y pasa las dos. Sin eso, la segunda
+corrida fallaba por su propio rastro, que es la clase de prueba que después
+nadie entiende.
+
+La limpieza va por los modelos de la aplicación, igual que la inyección del
+carrito heredado. El acceso SQL de las puertas sigue siendo de lectura.
+
+### 8. Puertas, desde base limpia
 
 ```
 base limpia (drop/create + PostGIS + alembic upgrade head + seed)
@@ -172,100 +141,51 @@ npm run contraste                               TODO OK, cobertura completa
 npm run hito                                    6/6 pasos
 ```
 
-Diff:
+Diff del producto:
 
 ```
- backend/app/services/propiedad.py                  |  78 +++ (nuevo)
- backend/app/api/cart.py                            |  17 +-
- backend/app/api/orders.py                          |   8 +-
- backend/app/services/checkout.py                   |   9 +-
- src/utils/anatomia.ts                              |  22 +-
- src/components/ProductCard/ProductCard.tsx         |  11 +-
- src/components/ProductDetail/ProductDetailModal.tsx|  17 +-
- scripts/smoke.mjs                                  | 540 +++++++++++++++++
+ backend/app/api/cart.py | 15 ++++++--
+ scripts/smoke.mjs       | 89 ++++++++++++++++++++++++++++++++++++++++++++
 ```
 
-Sin migración, sin seed, sin limpiar carritos históricos, sin rediseño, sin tocar
-precio, stock, pagos, Mercado Pago, logística, ratings, navegación Atrás ni
-Railway. **No agregué dependencias.** El único archivo nuevo es un módulo de 78
-líneas del propio proyecto.
+Sin tocar otros hallazgos, navegación, transferencias, administración, Mercado
+Pago, Railway, seed, datos, carritos históricos, mensajes, interfaz ni la
+excepción de cotización. **El caso 116 no se tocó**, como pediste.
 
-### 10. Un hallazgo que me encontré y NO arreglé: el caso 116
-
-Durante estas corridas el **caso 116** se puso rojo dos veces, con
-`con cabecera la imagen no entró: HTTP 400`. **No es mío** —el diff no toca ni
-`products.py`, ni imágenes, ni una sola línea del caso 116— y ya te lo había
-informado como intermitente en UX-COH-1R. Ahora lo tengo medido:
-
-- El caso elige su publicación así: `SELECT id FROM products WHERE seller_id = …
-  ORDER BY id LIMIT 1`. Los ids son UUID que el seed genera **al azar**, así que
-  cuál sale primera es un sorteo distinto en cada base.
-- `POST /products/{id}/images` tiene un tope de **3 imágenes** por publicación.
-- El seed le deja al vendedor **16 publicaciones**, y **exactamente una** ya
-  tiene 3 imágenes. El caso 126 —el que publica cien productos más— corre
-  después, así que el sorteo es entre esas 16.
-- Cuando sale sorteada esa, la subida que el caso da por buena rebota. Lo
-  reproduje contra la API real, llenando esa publicación por el camino normal:
+### 9. Hashes
 
 ```
-publicacion elegida por el caso 116: «Smoke tapa …-077»
-imagenes despues de llenarla: 3
-la subida que el caso 116 da por buena -> 400
-  {"detail":"El producto ya tiene el máximo de 3 imágenes permitidas"}
-```
-
-Es **1 de cada 16 bases**, o sea ~6 % de las corridas, y coincide con las dos que
-vi. El arreglo es una línea en la consulta del caso —pedir una publicación con
-lugar— y de paso que el `assert` imprima el cuerpo, que hoy no lo hace y por eso
-el rojo no dice por qué. **No lo toqué: no está en tu alcance.** Si querés, lo
-cierro en el bloque siguiente.
-
-### 11. Riesgos residuales
-
-1. **La pantalla no puede saber de quién es una publicación sin sesión.** Sin
-   ingresar, la tarjeta sigue diciendo «Ingresar para continuar», y recién con
-   la sesión abierta pasa a «Tu publicación». Es correcto —no hay identidad que
-   comparar— pero significa que el rótulo cambia después de ingresar.
-2. **El carrito heredado bloquea el checkout entero hasta que se saque el ítem.**
-   Es deliberado y es lo que pediste, pero si alguien tiene la publicación propia
-   guardada de antes, no puede comprar **nada** hasta quitarla. El mensaje dice
-   cuál es y qué hacer.
-3. **`GET /cart` sigue devolviendo el carrito heredado con la publicación propia
-   adentro**, sin marcarla. Es lo que permite verla y sacarla; no la esconde ni
-   la borra. Si querés que la señale en la lista, es otra tarea.
-4. **Si mañana aparece un quinto camino que escriba carrito u órdenes**, esta
-   regla no lo alcanza sola. El caso 140 afirma que los cuatro de hoy la
-   comparten, pero no puede afirmar nada de uno que todavía no existe.
-5. Siguen abiertos **B4** (el botón atrás con el detalle abierto sale del sitio),
-   **C1** (el foco vuelve a `<body>` al cerrar el detalle) y **C2/C3**. No los
-   toqué.
-
-### 12. Hashes
-
-```
-backend/app/services/propiedad.py                    dc4e62c909535250
-backend/app/api/cart.py                              170fab0748dd53d9
-backend/app/api/orders.py                            32b33d9527cd4e2c
-backend/app/services/checkout.py                     ea82e42301e5a650
-src/utils/anatomia.ts                                3d4d9f435b04b4f5
-src/components/ProductCard/ProductCard.tsx           a14bdd5d93447a03
-src/components/ProductDetail/ProductDetailModal.tsx  af6fd747a80aead3
-scripts/smoke.mjs                                    9b36831489ae020f
+backend/app/api/cart.py   579f7187c24e112b
+scripts/smoke.mjs         93021a564d0444fa
 ```
 
 (SHA-256 truncado a 16, del árbol en el commit de producto.)
 
-### 13. Frenos
+### 10. Un commit más, que no es de esta tarea
 
-No hizo falta ninguno de los tres que marcaste: no borré datos, no toqué el
-contrato de pagos y no hay órdenes históricas con comprador igual a vendedor
-—`SELECT COUNT(*) FROM orders WHERE buyer_id = seller_id` da **0** en base
-limpia y sigue dando 0 después de todo el recorrido—. La única que existió la
-creé yo reproduciendo el defecto, y desapareció al recrear la base.
+En `747cd2c` corregí el guion de arranque del entorno que había subido antes:
+`setsid`, cuando el proceso no es líder de grupo, no forka —hace `exec` en el
+mismo proceso—, así que el servidor seguía colgando del guion y el arranque no
+terminaba. Con `--fork` queda afuera de verdad. Lo separé del producto porque no
+tiene nada que ver con ORD-SELF-1R; lo menciono para que no aparezca sin
+explicación en el historial.
 
-El carrito heredado del caso lo escribí donde vive la aplicación, con sus
-modelos, y sólo en la base descartable: por la API ya no se puede meter una
-publicación propia, que es justamente lo que hay que poder reproducir. **No
-agregué ningún interruptor al producto.** No desplegué. No abrí ningún otro
-hallazgo. `PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de
-empujar.
+### 11. Riesgos residuales
+
+1. **`get_or_create_cart` sigue haciendo `commit` por su cuenta.** Lo dejé como
+   está: cambiarlo toca también `/cart/items`, `PUT`, `PATCH`, `DELETE` y el
+   `GET`, y eso excede el alcance. Lo que hice fue no llamarlo antes de tiempo.
+   Si mañana aparece un quinto camino que escriba carrito, va a tener que
+   acordarse de lo mismo.
+2. **`GET /cart` también lo llama**, así que una consulta de lectura le crea el
+   carrito a quien no lo tenía. No es el defecto que reportaste y no lo toqué,
+   pero es la misma raíz y conviene decidirlo junto con el punto anterior.
+3. Sigue abierto el **caso 116**, que anoté con su mecanismo y su frecuencia en
+   el informe anterior y que dejaste para TEST-IMG-1.
+
+### 12. Frenos
+
+No frené: el sync vacío no quedó ambiguo, así que la condición que marcaste no
+se cumplió. No borré datos, no cambié el contrato de pagos, no toqué el caso
+116, no desplegué y no abrí ninguna otra pieza de la cola. `PRE_FIRMA.md` sigue
+fuera del versionado y lo confirmé antes de empujar.
