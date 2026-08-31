@@ -20,11 +20,9 @@ final, como acordó Emi.
 
 ## Estado de entrada
 
-- Última entrega de Dev: ORD-SELF-1, producto `ecbb375`, informe `bbdf05d`.
-- Estado PM: **devuelta**, no aceptada. `/cart/sync` crea/commitea un carrito
-  antes de validar el payload y el caso 140 no prueba el rechazo con una cuenta
-  sin carrito.
-- Tarea única vigente: **ORD-SELF-1R**, detallada en `PARA-DEV.md`.
+- ORD-SELF-1 queda aceptada tras la corrección `40b589b`, informe `99e828f`.
+  `/cart/sync` valida antes de crear y el caso 140 ya distingue las dos puertas.
+- Tarea única vigente: **TEST-IMG-1**, detallada en `PARA-DEV.md`.
 - ORD-SELF-1 no cierra ningún hallazgo de las tres auditorías; era la tarea P1
   anterior y las auditorías la excluyeron expresamente.
 - PM reprodujo build, lint y compileall. Docker local está apagado; 140/140
@@ -48,12 +46,11 @@ final, como acordó Emi.
 
 | Orden | Pieza | Cierre mínimo |
 |---:|---|---|
-| 0 | **ORD-SELF-1R — vigente** | Validar `/cart/sync` antes de crear carrito y probar `409` con cero filas usando una cuenta sin carrito. |
-| 1 | **TEST-IMG-1** | Volver determinista el caso 116 eligiendo una publicación con lugar para imagen y mejorar el error. Sólo prueba; sin producto. |
+| 0 | **ORD-SELF-1R — cerrada** | Aceptada en `40b589b`/`99e828f`: `/cart/sync` valida antes de crear y prueba `409` con cero filas usando una cuenta sin carrito. |
+| 1 | **TEST-IMG-1 — vigente** | Volver determinista el caso 116 eligiendo una publicación con lugar para imagen y mejorar el error. Sólo prueba; sin producto. |
 
-ORD-SELF-1 se acepta recién después del orden 0. TEST-IMG-1 evita que una
-probabilidad aproximada de 1/16 vuelva discutible la evidencia de los bloques
-siguientes.
+ORD-SELF-1 ya cerró. TEST-IMG-1 evita que una probabilidad aproximada de 1/16
+vuelva discutible la evidencia de los bloques siguientes.
 
 ### Puerta 1 — integridad contractual y operación básica
 

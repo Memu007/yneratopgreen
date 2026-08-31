@@ -223,6 +223,16 @@ Actualizado: 2026-08-31.
   por PM. La tarea única vigente es **ORD-SELF-1R**: mover la creación después
   de la validación y agregar una regresión roja/verde con una identidad sin
   carrito. No desplegar.
+- **ORD-SELF-1 cerrada tras corrección:** producto `40b589b`, informe
+  `99e828f`. `get_or_create_cart()` quedó en la segunda pasada de
+  `/cart/sync`, después de todas las validaciones. El caso 140 ahora separa
+  `/items` y `/sync` con identidades sin carrito, se pone rojo contra
+  `ecbb375`, prueba cero filas ante publicación propia e ID inexistente y
+  conserva el sync vacío válido. PM reprodujo build, lint, compileall,
+  `bash -n` del guion de entorno y `diff --check` bajo la política CRLF. Docker
+  local sigue apagado; 140/140 dos veces es evidencia de Dev. El commit
+  separado `747cd2c` sólo corrige el desacople del servidor en el arranque
+  local; no forma parte de la aceptación funcional ni fue desplegado.
 - **Tres auditorías UX externas preservadas:** Claude revisó navegación,
   claridad, formularios, recorridos y panel administrativo de forma estática
   sobre `7e0b878`. PM
@@ -270,11 +280,11 @@ aceptada en `f716264`/`acbf3b6`: ubicación e inventario cerrados. UX-COH-1R
 queda aceptada funcionalmente en `ee14047`/`babdb95`: el mismo Login y la misma
 acción ya cubren Mercado, Inicio y Servicios, incluida la tarjeta primaria.
 UX-COH-1S queda aceptada en `aadecb5`/`6d14d1d`; con eso UX-COH-1 queda cerrada.
-**La tarea activa de Dev es ORD-SELF-1R:** corregir únicamente el efecto lateral
-de `/cart/sync` cuando el rechazo ocurre sin carrito previo y demostrar cero
-filas nuevas con una regresión discriminante. ORD-SELF-1 todavía no se acepta.
-Después corresponde TEST-IMG-1 y luego la cola ordenada en
-`ROADMAP-CIERRE-MVP-2026-08-31.md`. No debe desplegar.
+**La tarea activa de Dev es TEST-IMG-1:** retirar el UUID aleatorio de la
+selección de publicación del caso 116, elegir sólo una con lugar para imagen y
+mostrar el cuerpo si la carga positiva falla. Es una pieza exclusiva de prueba:
+no toca producto ni despliega. Después corresponde TRANSFER-REC-1 según
+`ROADMAP-CIERRE-MVP-2026-08-31.md`.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se

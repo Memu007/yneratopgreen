@@ -12,6 +12,78 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-08-31 — TAREA VIGENTE: TEST-IMG-1, quitar el azar del caso 116
+
+ORD-SELF-1R queda aceptada en producto `40b589b` e informe `99e828f`. La
+corrección mueve `get_or_create_cart()` después de todas las validaciones de
+`/cart/sync`; la regresión separa `/items` de `/sync`, se pone roja contra
+`ecbb375`, conserva cero carritos ante dos rechazos distintos y demuestra que
+un sync vacío válido sigue creando su carrito. PM reprodujo build, lint,
+compileall, sintaxis del guion de entorno y `diff --check` con la política CRLF.
+Docker local sigue apagado, por lo que 140/140 permanece como evidencia de Dev.
+
+### Hallazgo reproducido por Dev y confirmado por PM
+
+El caso 116 elige una publicación del vendedor con:
+
+```sql
+SELECT id FROM products WHERE seller_id = ... ORDER BY id LIMIT 1
+```
+
+Los IDs del seed son UUID aleatorios y una de las dieciséis publicaciones ya
+tiene el máximo de tres imágenes. Cuando esa queda primera, la carga positiva
+con Bearer responde `400`; el caso se pone rojo aunque la defensa CSRF siga
+correcta. La frecuencia informada y coherente con ese estado es cercana a
+1/16. Además, la aserción actual omite el cuerpo de la respuesta y esconde el
+motivo real.
+
+### Resultado esperado
+
+El caso 116 conserva exactamente su objetivo de seguridad, pero elige de forma
+determinista una publicación del vendedor que tenga lugar para al menos una
+imagen. Si la carga positiva falla, el error muestra estado y cuerpo. Ninguna
+línea de producto cambia.
+
+### Alcance mínimo
+
+- Tocá sólo `scripts/smoke.mjs` y después `docs/pm/PARA-PM.md` en el commit de
+  informe.
+- Reemplazá la selección azarosa por una consulta que cuente imágenes por
+  publicación y exija `COUNT < 3` antes de elegir. No hardcodees un UUID ni el
+  nombre de una publicación del seed.
+- Afirmá antes de la carga que el candidato existe y que su conteo inicial es
+  menor que tres; después debe aumentar exactamente en uno.
+- Si `imagenConCabecera` falla, incluí en la aserción HTTP y cuerpo serializado,
+  como ya hace la carga de documentación.
+- Demostrá en una base descartable controlada que la consulta anterior podía
+  seleccionar una publicación llena y que la nueva la excluye. No cambies el
+  límite real de tres ni vacíes imágenes para fabricar un verde.
+
+### Fuera de alcance
+
+- Sin cambios en `backend/`, `src/`, migraciones, seed, imágenes reales,
+  dependencias, Railway ni datos persistentes.
+- No arregles `GET /cart`, `get_or_create_cart` ni ningún hallazgo de las
+  auditorías UX en esta pieza.
+- No hagas limpieza general de la suite ni cambies otros casos intermitentes.
+- No despliegues.
+
+### Puertas de aceptación
+
+1. Reproducción controlada del defecto de selección anterior y exclusión
+   comprobada por la consulta nueva.
+2. Caso 116 verde y repetible; las cuatro mutaciones siguen rechazando cookie
+   sola y aceptando Bearer.
+3. Suite 140/140 dos veces desde bases limpias y caso 116 dos veces sobre una
+   misma base si sus demás precondiciones lo permiten; si no, explicar la
+   precondición exacta en vez de borrar estado.
+4. `node --check scripts/smoke.mjs`, build, lint, compileall, `pip check`,
+   `diff --check`, accesibilidad, contraste e hito en verde.
+5. Un commit de prueba y otro separado con el informe. No desplegar.
+
+Después de aceptar TEST-IMG-1, la siguiente pieza del roadmap es
+TRANSFER-REC-1; no la abras en el mismo turno.
+
 ## 2026-08-31 — DEVOLUCIÓN VIGENTE: ORD-SELF-1R, `/cart/sync` no crea un carrito al rechazar
 
 La entrega ORD-SELF-1 de producto `ecbb375` e informe `bbdf05d` **no queda
