@@ -22,7 +22,9 @@ final, como acordó Emi.
 
 - ORD-SELF-1 queda aceptada tras la corrección `40b589b`, informe `99e828f`.
   `/cart/sync` valida antes de crear y el caso 140 ya distingue las dos puertas.
-- Tarea única vigente: **TEST-IMG-1**, detallada en `PARA-DEV.md`.
+- TEST-IMG-1 cerró en `4c015f0`/`cb0875b`; el ajuste aislado del caso 140
+  `fa8b382` también fue revisado y aceptado.
+- Tarea única vigente: **TEST-HARNESS-MAC-1**, detallada en `PARA-DEV.md`.
 - ORD-SELF-1 no cierra ningún hallazgo de las tres auditorías; era la tarea P1
   anterior y las auditorías la excluyeron expresamente.
 - PM reprodujo build, lint y compileall. Docker local fue habilitado el 31/08:
@@ -51,13 +53,12 @@ final, como acordó Emi.
 | Orden | Pieza | Cierre mínimo |
 |---:|---|---|
 | 0 | **ORD-SELF-1R — cerrada** | Aceptada en `40b589b`/`99e828f`: `/cart/sync` valida antes de crear y prueba `409` con cero filas usando una cuenta sin carrito. |
-| 1 | **TEST-IMG-1 — vigente** | Volver determinista el caso 116 eligiendo una publicación con lugar para imagen y mejorar el error. Sólo prueba; sin producto. |
-| 1B | **TEST-HARNESS-MAC-1 — siguiente** | Hacer reproducible el lanzador en CRLF/macOS/Docker Desktop y corregir los falsos negativos 86, 105, 110 y 131 sin relajar ninguna aserción de seguridad. |
+| 1 | **TEST-IMG-1 — cerrada** | Aceptada en `4c015f0`/`cb0875b`: selección por conteo menor a tres y diagnóstico HTTP/cuerpo. Sólo prueba; sin producto. |
+| 1B | **TEST-HARNESS-MAC-1 — vigente** | Hacer reproducible el lanzador en CRLF/macOS/Docker Desktop y corregir los falsos negativos 86, 105, 110 y 131 sin relajar ninguna aserción de seguridad. |
 
-ORD-SELF-1 ya cerró. TEST-IMG-1 evita que una probabilidad aproximada de 1/16
-vuelva discutible la evidencia de los bloques siguientes. Después,
-TEST-HARNESS-MAC-1 debe conseguir una ejecución oficial verde y portable antes
-de usar la suite como puerta de las tareas de producto.
+ORD-SELF-1 y TEST-IMG-1 ya cerraron. TEST-HARNESS-MAC-1 debe conseguir una
+ejecución oficial verde y portable antes de usar la suite como puerta de las
+tareas de producto.
 
 ### Puerta 1 — integridad contractual y operación básica
 

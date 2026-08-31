@@ -12,6 +12,89 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-08-31 — TAREA VIGENTE: TEST-HARNESS-MAC-1, hacer oficial la reproducción local
+
+TEST-IMG-1 queda aceptada en prueba `4c015f0` e informe `cb0875b`. PM revisó el
+diff y reprodujo sintaxis, build, lint y `diff --check`. La consulta excluye
+publicaciones llenas, afirma su precondición y mantiene el aumento exacto de
+una imagen. El ajuste extra `fa8b382` también queda aceptado por separado:
+reutiliza `esperarA`, vuelve a resolver los botones del caso 140 durante la
+espera y conserva la misma aserción semántica. No hubo producto ni despliegue.
+
+### Defecto confirmado por PM
+
+En macOS con Docker Desktop, `npm run smoke` no es hoy una puerta oficial
+reproducible. La evidencia completa está en
+`docs/pm/REPRODUCCION-SMOKE-PM-2026-08-31.md`. Son cinco defectos del arnés:
+
+1. `.env.example` mezcla finales CRLF/LF y el bootstrap deja `\r` en variables
+   de base;
+2. el proceso dentro de Docker necesita una URL alcanzable del host, mientras
+   navegador y comprobaciones locales usan loopback;
+3. los casos 86 y 110 agregan claves dotenv ya existentes y no prueban el valor
+   que creen haber reemplazado;
+4. el caso 105 intenta leer desde macOS una ruta que sólo existe dentro del
+   contenedor;
+5. el caso 131 ejecuta en BSD `sed` una receta que pertenece a Alpine/GNU.
+
+PM reconstruyó un entorno descartable correcto y obtuvo 136/140. Las cuatro
+propiedades rojas pasaron al ejecutarlas en el contexto correcto, y la imagen
+Railway construyó. Esto no autoriza a declarar 140/140: hay que corregir el
+lanzador y los casos.
+
+### Resultado esperado
+
+Un checkout limpio en macOS con Docker Desktop ejecuta **el comando oficial**
+`npm run smoke` y termina 140/140, sin configuración manual ni ejecución
+directa alternativa. La solución conserva compatibilidad razonable con Linux,
+no debilita aserciones y no agrega dependencias.
+
+### Alcance mínimo
+
+- Tocá sólo el arnés y su documentación inmediata: `scripts/smoke.mjs`,
+  `scripts/smoke.sh`, `scripts/init_local_db.sh`, `docker-compose.yml` o los
+  ejemplos de entorno únicamente si cada archivo resulta necesario.
+- Normalizá o limpiá `\r` en el único punto de lectura que gobierna el
+  bootstrap; no repartas parches por variable.
+- Separá explícitamente la URL que usa el contenedor para alcanzar el host de
+  la URL loopback del navegador, usando una capacidad nativa de Docker Compose
+  que funcione en Docker Desktop y Linux.
+- Para 86/110, reemplazá la clave existente de forma única y verificá que no
+  queden duplicados antes de instanciar Settings.
+- Para 105, verificá archivos donde realmente viven —dentro del contenedor o
+  mediante una frontera pública ya existente— sin exponer rutas internas.
+- Para 131, ejecutá la receta CSP en el entorno para el que fue escrita o
+  volvela portable con herramientas ya disponibles. La imagen final debe
+  seguir demostrando que recibió los valores esperados.
+- Corregí el rótulo obsoleto de cantidad de casos del lanzador si todavía dice
+  117. No abras ninguna otra limpieza.
+
+### Fuera de alcance
+
+- Sin cambios en `backend/`, `src/`, migraciones, seed, reglas de negocio,
+  dependencias, Railway ni datos persistentes.
+- No saltees casos por sistema operativo, no conviertas fallas en warnings y no
+  reduzcas controles de seguridad.
+- No vuelvas a modificar los casos 116/140 salvo que una prueba discriminante
+  demuestre que esta pieza los rompe.
+- No empieces TRANSFER-REC-1 ni hallazgos UX. No despliegues.
+
+### Puertas de aceptación
+
+1. Reproducción roja breve de cada uno de los cinco defectos antes del cambio y
+   explicación del punto único corregido.
+2. `npm run smoke` 140/140 dos veces, cada vez desde una base limpia creada por
+   el propio lanzador, en macOS/Docker Desktop.
+3. Evidencia de que Linux conserva el camino: configuración Compose válida y
+   sin ramas que salteen casos; si no hay host Linux disponible, declararlo sin
+   inventar un verde.
+4. `node --check scripts/smoke.mjs`, `bash -n` de los guiones tocados, build,
+   lint, compileall, `pip check` y `diff --check` en verde.
+5. Un commit de arnés y otro separado con el informe en `PARA-PM.md`. No
+   producto, no dependencias, no despliegue.
+
+Después de aceptación corresponde TRANSFER-REC-1. No la abras en este turno.
+
 ## 2026-08-31 — TAREA VIGENTE: TEST-IMG-1, quitar el azar del caso 116
 
 ORD-SELF-1R queda aceptada en producto `40b589b` e informe `99e828f`. La

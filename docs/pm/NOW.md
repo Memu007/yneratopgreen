@@ -243,8 +243,16 @@ Actualizado: 2026-08-31.
   BSD en 131. Las propiedades se comprobaron directamente; la imagen Railway
   construyó, lint quedó verde y runtime npm dio cero vulnerabilidades. No se
   declara 140/140 oficial hasta corregir el arnés. Evidencia completa en
-  `REPRODUCCION-SMOKE-PM-2026-08-31.md`. TEST-IMG-1 continúa como tarea única;
-  después se abre una pieza separada de portabilidad del arnés.
+  `REPRODUCCION-SMOKE-PM-2026-08-31.md`.
+- **TEST-IMG-1 cerrada:** prueba `4c015f0`, informe `cb0875b`. El caso 116 ya
+  elige por conteo una publicación con menos de tres imágenes, afirma la
+  precondición y muestra HTTP/cuerpo ante una carga fallida. PM revisó el diff
+  y reprodujo sintaxis, build, lint y `diff --check`; la demostración SQL y los
+  dos 140/140 permanecen como evidencia de Dev porque el lanzador oficial en
+  macOS sigue siendo justamente la brecha siguiente. El cambio extra
+  `fa8b382` queda aceptado por separado: sólo vuelve a resolver los botones del
+  caso 140 durante la espera y conserva la misma aserción semántica. No hubo
+  producto ni despliegue.
 - **Tres auditorías UX externas preservadas:** Claude revisó navegación,
   claridad, formularios, recorridos y panel administrativo de forma estática
   sobre `7e0b878`. PM
@@ -292,11 +300,12 @@ aceptada en `f716264`/`acbf3b6`: ubicación e inventario cerrados. UX-COH-1R
 queda aceptada funcionalmente en `ee14047`/`babdb95`: el mismo Login y la misma
 acción ya cubren Mercado, Inicio y Servicios, incluida la tarjeta primaria.
 UX-COH-1S queda aceptada en `aadecb5`/`6d14d1d`; con eso UX-COH-1 queda cerrada.
-**La tarea activa de Dev es TEST-IMG-1:** retirar el UUID aleatorio de la
-selección de publicación del caso 116, elegir sólo una con lugar para imagen y
-mostrar el cuerpo si la carga positiva falla. Es una pieza exclusiva de prueba:
-no toca producto ni despliega. Después corresponde TRANSFER-REC-1 según
-`ROADMAP-CIERRE-MVP-2026-08-31.md`.
+TEST-IMG-1 queda aceptada en `4c015f0`/`cb0875b`, y el arreglo aislado del caso
+140 en `fa8b382`. **La tarea activa de Dev es TEST-HARNESS-MAC-1:** conseguir
+que el comando oficial reproduzca la suite en macOS/Docker Desktop y eliminar
+los falsos negativos 86, 105, 110 y 131 sin relajar sus propiedades. Es una
+pieza exclusiva de arnés; no toca producto ni despliega. Después corresponde
+TRANSFER-REC-1 según `ROADMAP-CIERRE-MVP-2026-08-31.md`.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se
