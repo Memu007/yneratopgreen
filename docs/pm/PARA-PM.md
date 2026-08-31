@@ -2,221 +2,159 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## TEST-HARNESS-MAC-1 — los cinco defectos, y una puerta que no puedo cerrar
+## TEST-HARNESS-MAC-1R — las tres raíces, y la puerta sigue siendo tuya
 
-Hecho lo que puedo hacer. Arnés e informe en commits separados. **No desplegué.**
+Hecho lo que puedo hacer. Corrección e informe en commits separados. **No desplegué.**
 
-- Arnés: `4b1a493` — «TEST-HARNESS-MAC-1: los cinco defectos de portabilidad del arnés»
+- Corrección: `33e5200` — «TEST-HARNESS-MAC-1R: las tres raíces del 96/140 en macOS»
+
+**Y te lo pido expresamente, como pediste: corré `npm run smoke` dos veces en
+tu Mac, cada vez desde base limpia, y decime qué dio.** Yo no puedo cerrar esa
+puerta y no la voy a declarar cerrada.
 
 ---
 
-### 0. Empiezo por lo que NO puedo verificar
+### 1. El doble no escuchaba donde el contenedor llamaba — 33 rojos
 
-**Tu puerta 2 pide `npm run smoke` 140/140 dos veces en macOS con Docker
-Desktop. No la puedo cumplir y no la voy a declarar cumplida.**
-
-Corro en un contenedor Linux efímero, sin macOS y **sin demonio de Docker**: el
-`docker` de mi PATH es un puente que traduce `docker exec` a la base y al venv
-nativos, y lo escribí yo. No puedo levantar Compose, no puedo construir
-imágenes y no puedo correr `npm run smoke`, que empieza por
-`docker compose down -v`.
-
-Así que de los cinco arreglos:
-
-| defecto | reproducido | corregido | verificado el verde |
-|---|---|---|---|
-| 1. CRLF en el bootstrap | sí, acá | sí | **sí** |
-| 2. contenedor → host | no (necesita Docker) | sí | **no** |
-| 3. casos 86 y 110 | sí, simulando el entorno del contenedor | sí | **sí** |
-| 4. caso 105 | no (necesita Docker) | sí | parcial |
-| 5. caso 131 | sí, con un `sed` que se comporta como el de BSD | sí | parcial |
-
-Lo digo antes que nada porque un informe que esconde esto no vale nada. Lo que
-sigue es qué medí y con qué.
-
-### 1. CRLF en el bootstrap — reproducido y cerrado
+Tu diagnóstico es exacto. En `4b1a493` le di a la API un
+`host.docker.internal` que llega a la máquina, pero el doble seguía atendiendo
+sólo loopback. Medido acá, con las dos configuraciones:
 
 ```
-DB_NAME extraido: $'topgreen\r'
-ERROR: DB_NAME o DB_USER contienen caracteres no permitidos   ← tu rojo, en Linux
+ligado a 127.0.0.1 (como estaba):  127.0.0.1  -> HTTP 401
+                                   192.0.2.2  -> ECONNREFUSED   ← el contenedor no llega
+
+ligado a todas (como queda ahora):  127.0.0.1  -> HTTP 401  alcanzable
+                                    192.0.2.2  -> HTTP 401  alcanzable
 ```
 
-Es tu mismo error, en mi máquina: no hace falta macOS, alcanza con copiar la
-plantilla versionada, que tiene 48 de 50 líneas en CRLF. Un solo punto de
-lectura, `valor_de_env`, con `tr -d '\r'`. Después:
+`192.0.2.2` es la dirección no-loopback de esta máquina: es exactamente el
+camino que usa el contenedor. El `401` es la respuesta correcta del doble a un
+`POST /oauth/token` vacío; lo que importa es que **conteste**.
+
+La interfaz quedó parametrizada en `MP_DOBLE_INTERFAZ` por si querés fijarla, y
+por defecto liga a todas, que es lo único que funciona igual en Docker Desktop
+y en Linux. Es un servidor de prueba, con valores inventados, que vive lo que
+dura un caso; aun así prefiero que la decisión esté escrita y no implícita.
+
+### 2. La carpeta documental — 10 rojos
+
+`/app/documentos` no es escribible por `appuser`. La configuración local de
+Compose le da ahora una carpeta privada y escribible:
 
 ```
-DB_NAME ahora: topgreen -> pasa el control
+DOCUMENTOS_DIR   = /data/documentos      (volumen propio, documentos_data)
+UPLOAD_DIR       = /data/uploads
+nginx monta documentos_data:  no
 ```
 
-### 2. El contenedor no alcanzaba al host — corregido a ciegas
-
-`extra_hosts: - "host.docker.internal:host-gateway"` en el servicio
-`topgreen-api`, y ahí mismo `MP_AUTH_BASE_URL`/`MP_API_BASE_URL` apuntando a
-ese nombre. Es la capacidad nativa de Compose y funciona igual en Docker
-Desktop y en Linux, que es lo que pediste.
-
-Las dos URL quedan separadas de verdad: el navegador y las comprobaciones del
-host siguen con `127.0.0.1:8099` desde `backend/.env`, y sólo la API ve
-`host.docker.internal`. La clave `MP_BASE_DEL_DOBLE` permite pisarlo sin tocar
-el archivo.
-
-Verifiqué que el YAML es válido y que las claves quedan donde tienen que estar.
-**No verifiqué que el contenedor llegue**, porque no puedo levantarlo.
-
-### 3. Casos 86 y 110 — tu diagnóstico no era el correcto, y lo demuestro
-
-Tu informe dice que el caso agrega una segunda clave y que «la lectura dotenv
-conserva la primera». Lo medí y **no es eso**:
-
-- El caso 86 ya reemplazaba la clave: produce **una sola** ocurrencia.
-- Cuando hay claves repetidas, acá gana la **última**, no la primera.
-
-La causa real es otra, y explica los dos casos con un solo mecanismo: **en
-pydantic-settings el entorno del proceso le gana a `_env_file`**. Adentro del
-contenedor, `env_file: ./backend/.env` mete TODA clave de ese archivo como
-variable de entorno, y `environment:` agrega `UPLOAD_DIR=/data/uploads`. El
-ayudante escribía su plantilla en un archivo temporal… que nunca gobernaba
-nada.
-
-Lo reproduje sin Docker, simulando ese entorno:
+**Hermana de la pública, no adentro.** Lo comprobé contra la propia
+aplicación, que es quien decide:
 
 ```
-caso 86  (URL de aviso con parametros)     nativo         -> rechazado (el caso pasa)
-caso 86  (URL de aviso con parametros)     como en Docker -> CARGA_OK  ← ROJO
-caso 110 (constancias adentro de lo publico) nativo       -> rechazado (el caso pasa)
-caso 110 (constancias adentro de lo publico) como en Docker -> CARGA_OK ← ROJO
+UPLOAD_DIR     = /data/uploads
+DOCUMENTOS_DIR = /data/documentos
+la aplicación acepta la separación: las constancias no caen adentro de lo público
 ```
 
-El arreglo va en el único punto que gobierna: `cargarConSettings` saca del
-entorno las claves que el contenido declara antes de leerlo. Y de paso hace lo
-que pediste igual: **rechaza un contenido con la misma clave dos veces**, para
-no depender de cuál gana. Con el mismo entorno del contenedor:
+Sin `chmod 777`, sin mover nada a la carpeta pública y sin tocar el servicio.
+**La escritura y el borrado como `appuser` dentro del contenedor no los pude
+comprobar**: no tengo demonio de Docker. Es la primera de tus pruebas focales y
+queda para tu Mac.
+
+### 3. La sonda del `sed` era falsa — caso 131
+
+Tenés razón y el error es mío: la sonda probaba con **una** expresión y la
+receta real usa **dos**. El `sed` de BSD acepta la primera y falla la segunda,
+así que la heurística clasificaba macOS como compatible y el caso se ponía rojo
+igual. Una sonda que no reproduce lo que va a pasar no sirve para decidir.
+
+Se fue. La receta corre siempre en `alpine:3`. Es más corto y prueba el entorno
+real del Dockerfile.
+
+**Y tiene un costo que quiero que veas antes de aceptarlo:** acá, sin Docker,
+el caso 131 ya no puede correr. Mi corrida nativa pasa a **139/140**, con el
+131 en rojo por esto:
 
 ```
-caso 86                                      -> rechazado
-caso 110                                     -> rechazado
-plantilla intacta (tiene que CARGAR)         -> CARGA_OK
-contenido con clave repetida (tiene que avisar) -> aviso de clave repetida
+[FAIL] 131 … — la receta fallo con variables validas dentro de alpine:3:
+              puente docker: sólo se traduce 'docker exec'
 ```
 
-El caso 110 pasa a **reemplazar** `UPLOAD_DIR` y `DOCUMENTOS_DIR` en vez de
-agregarlas, que es lo que pediste y ahora además es obligatorio.
+Eso no es un defecto: es mi entorno diciendo que no tiene Docker, con el
+mensaje correcto. Dos corridas completas desde base limpia dieron lo mismo:
+139/140, y **el 131 fue el único rojo en las dos**. Los 33 casos de Mercado
+Pago y los 10 de documentación están verdes en las dos, ahora con el doble
+ligado a todas las interfaces.
 
-### 4. Caso 105 — los archivos se miran donde viven
-
-`existsSync` y `readdirSync` corrían en el host sobre una ruta que
-`CARPETA_DOCUMENTOS` lee de la aplicación: bajo Docker, la ruta del contenedor.
-Ahora se pregunta donde están, por el mismo puente que ya lee la configuración,
-sin exponer rutas internas en ninguna aserción.
-
-Acá pasa igual que antes porque host y contenedor son la misma máquina, así que
-**mi verde no prueba el arreglo**: prueba que no rompí nada. El defecto sólo se
-manifiesta con Docker.
-
-### 5. Caso 131 — reproducido con un `sed` que se porta como el de BSD
-
-No tengo macOS, así que puse en el PATH un `sed` que hace lo único que importa:
-tratar el `-e` que sigue a `-i` como sufijo de respaldo.
+### 4. Puertas
 
 ```
-la receta del Dockerfile, con el sed de esta maquina (GNU)  -> salida=0
-la receta del Dockerfile, con un sed tipo BSD              -> salida=1  ← tu rojo
+node --check scripts/smoke.mjs y scripts/lib/mp-doble.mjs   ok
+docker-compose.yml                                          YAML válido
+base limpia + node scripts/smoke.mjs                        139/140 (sólo el 131)
+base limpia otra vez                                        139/140 (sólo el 131)
+npm run build                                               ok
+npm run lint                                                ok (--max-warnings 0)
+python -m compileall backend/app                            ok
+python -m pip check                                         ok
+git -c core.whitespace=cr-at-eol diff --check               limpio
+npm run a11y -- --todas                                     ok
+npm run contraste                                           ok
+npm run hito                                                ok
 ```
-
-El arreglo no reescribe la receta ni saltea el caso: **detecta** si el `sed` de
-la máquina se comporta como el de Alpine y, si no, ejecuta el mismo texto en
-`alpine:3`.
-
-```
-sed GNU -> se comporta como Alpine: se ejecuta directo
-sed BSD -> NO se comporta como Alpine: se ejecuta en alpine:3
-```
-
-La rama de Alpine no la pude ejecutar. Es la que va a correr en tu máquina.
-
-Nota de alcance: esa rama hace que el caso necesite Docker en macOS. No lo veo
-como un costo, porque `npm run smoke` ya empieza con `docker compose down -v`,
-pero es un cambio de dependencia y prefiero decirlo.
-
-### 6. El rótulo del lanzador
-
-Decía «Ejecutando 117 smoke tests». Ahora no lleva la cuenta: la da la suite al
-terminar, que es quien la sabe.
-
-### 7. Puertas, en Linux nativo
-
-```
-node --check scripts/smoke.mjs                  ok
-bash -n de los tres guiones tocados             ok
-docker-compose.yml                              YAML válido
-base limpia + node scripts/smoke.mjs            140/140   (0 fallaron)
-base limpia otra vez                            140/140   (0 fallaron)
-npm run build                                   ok
-npm run lint                                    ok (--max-warnings 0)
-python -m compileall backend/app                ok
-python -m pip check                             No broken requirements found
-git -c core.whitespace=cr-at-eol diff --check   limpio
-npm run a11y -- --todas                         sin violaciones bloqueantes
-npm run contraste                               TODO OK, cobertura completa
-npm run hito                                    6/6 pasos
-```
-
-**Esas dos corridas no son `npm run smoke`**: son `scripts/smoke.mjs` sobre el
-entorno nativo, porque el lanzador oficial necesita Docker. Es exactamente la
-distinción que vos marcaste al no declarar 140/140 desde tu reproducción, y la
-respeto en la misma dirección.
 
 Diff:
 
 ```
- docker-compose.yml       |  11 +++
- scripts/init_local_db.sh |  11 ++-
- scripts/smoke.mjs        | 124 ++++++++++++++++++++++++++++++-----
- scripts/smoke.sh         |   4 +-
+ docker-compose.yml       | 12 ++++++++
+ scripts/lib/mp-doble.mjs | 14 +++++++++-
+ scripts/smoke.mjs        | 30 ++++++--------------
 ```
 
-Sin `backend/`, sin `src/`, sin migraciones, sin seed, sin dependencias, sin
-Railway y sin datos. No toqué los casos 116 ni 140. No abrí TRANSFER-REC-1.
+Tres archivos, los tres del alcance que fijaste. Conservé todo `4b1a493`. Sin
+producto, sin dependencias, sin migraciones, sin seed, sin Railway, sin datos.
+No salteé ningún caso y no abrí TRANSFER-REC-1.
 
-### 8. Hashes
+### 5. Tus tres pruebas focales: qué queda de tu lado
+
+| prueba focal | acá | en tu Mac |
+|---|---|---|
+| contenedor → doble responde | probado contra una interfaz no-loopback | falta el salto real |
+| `appuser` crea/lee/borra en la carpeta privada | **no** | falta |
+| receta CSP en Alpine, y variables vacías fallan | **no** | falta |
+
+De las tres, la única que pude atacar de verdad es la primera, y sólo hasta el
+borde de la máquina.
+
+### 6. Hashes
 
 ```
-scripts/smoke.mjs        f9dbb95987545f61
-scripts/smoke.sh         a7f99fd260aaec12
-scripts/init_local_db.sh 173d688228395d03
-docker-compose.yml       afd56cf30ce90c3e
+scripts/lib/mp-doble.mjs  686a593502e09c2f
+docker-compose.yml        97787b22313212b1
+scripts/smoke.mjs         b70f201a9b01514d
 ```
 
-(SHA-256 truncado a 16, del árbol en el commit del arnés.)
+(SHA-256 truncado a 16, del árbol en el commit de corrección.)
 
-### 9. Lo que hace falta de tu lado
+### 7. Riesgos residuales
 
-Para cerrar la puerta 2 alcanza con que corras, en tu máquina, dos veces:
+1. **El doble queda escuchando en todas las interfaces mientras dura un caso.**
+   En una máquina de desarrollo compartida eso es visible en la red local. No
+   sirve para nada —contesta datos inventados y no toca la base— pero es un
+   cambio de exposición y por eso dejé `MP_DOBLE_INTERFAZ` para acotarlo.
+2. **El caso 131 ahora exige Docker en cualquier máquina**, incluida la mía.
+   Es tu decisión y la comparto; el costo es que mi verde nativo ya no puede
+   ser 140/140.
+3. **Tres de los arreglos de esta devolución están verificados por
+   construcción**, no por verlos pasar en Docker. La misma limitación de la
+   entrega anterior.
+4. La suite sigue sin poder correrse dos veces sobre la misma base, por el caso
+   02. Sin tocar, como quedamos.
 
-```bash
-npm run smoke
-```
+### 8. Frenos
 
-Si alguno de los cinco vuelve a aparecer, el mensaje ahora dice más que antes:
-el 131 informa si corrió con el `sh` del host o con `alpine:3`, y el ayudante
-de configuración avisa por nombre si un contenido trae una clave repetida.
-
-### 10. Riesgos residuales
-
-1. **Tres de los cinco arreglos están verificados sólo por construcción.** Los
-   escribí mirando el mecanismo, no viéndolos pasar en Docker.
-2. **`host.docker.internal` con `host-gateway` necesita Docker Compose v2 y
-   Docker Engine 20.10 o posterior.** En Docker Desktop viene; en un Linux con
-   Docker viejo, no. Si aparece, se puede pisar con `MP_BASE_DEL_DOBLE`.
-3. **El caso 131 pasa a depender de Docker en máquinas con `sed` de BSD.** Ver
-   la nota de la sección 5.
-4. **La suite sigue sin poder correrse dos veces sobre la misma base**, por el
-   caso 02. Ya te lo anoté en TEST-IMG-1 y sigue sin tocar.
-
-### 11. Frenos
-
-No inventé un verde: la puerta 2 queda declarada como no verificada, con el
-motivo. No salteé casos por sistema operativo, no convertí fallas en avisos, no
-bajé ningún control y no toqué producto. No desplegué. `PRE_FIRMA.md` sigue
-fuera del versionado y lo confirmé antes de empujar.
+No inventé un verde: la puerta 2 sigue abierta y es tuya. No salteé casos, no
+convertí fallas en avisos, no bajé controles, no toqué producto y no
+desplegué. `PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de
+empujar.
