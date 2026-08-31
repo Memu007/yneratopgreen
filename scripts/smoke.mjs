@@ -15455,8 +15455,22 @@ await runCase(140, 'Nadie compra su propia publicacion, ni por la API ni por la 
           .filter({ has: page.getByRole('heading', { name: publicacion.name, exact: true }) })
           .first();
         await tarjeta.waitFor({ timeout: 25_000 });
-        await tarjeta.getByRole('button').first().waitFor({ timeout: 25_000 });
-        const rotulos = (await tarjeta.getByRole('button').allInnerTexts()).map((t) => t.trim());
+        // Los rotulos se leen hasta que haya alguno, no una sola vez.
+        //
+        // `tarjeta` es un localizador: se vuelve a resolver en CADA uso. Si la
+        // grilla se rearma entre la espera y la lectura —y se rearma, porque la
+        // busqueda por nombre llega por la red—, la segunda resolucion puede
+        // caer sobre un nodo a medio dibujar y devolver cero botones. Eso no es
+        // «la tarjeta no ofrece nada»: es «todavia no la dibujo». Medido: dos
+        // rojos de este caso en ocho corridas completas, siempre con `[]`.
+        //
+        // `esperarA` es la primitiva que ya usa el resto de la suite: pregunta
+        // cada 50 ms y se rinde a los 25 s con un mensaje que dice que pasaba.
+        let rotulos = [];
+        await esperarA(async () => {
+          rotulos = (await tarjeta.getByRole('button').allInnerTexts()).map((t) => t.trim());
+          return rotulos.length > 0;
+        }, `los botones de la tarjeta de «${publicacion.name}» en el Mercado`, 25_000);
         assert(rotulos.includes('Tu publicación') === mia,
           `buscando «${publicacion.name}» —${mia ? 'propia' : 'ajena'}— la tarjeta ofrece `
           + JSON.stringify(rotulos));
