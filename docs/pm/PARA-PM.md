@@ -2,90 +2,74 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## TEST-HARNESS-MAC-1R — las tres raíces, y la puerta sigue siendo tuya
+## TEST-HARNESS-MAC-1S — las dos raíces, y te pido de nuevo las dos corridas
 
 Hecho lo que puedo hacer. Corrección e informe en commits separados. **No desplegué.**
 
-- Corrección: `33e5200` — «TEST-HARNESS-MAC-1R: las tres raíces del 96/140 en macOS»
+- Corrección: `78972cf` — «TEST-HARNESS-MAC-1S: la URL pública separada de la
+  interna, y el destino del volumen»
 
-**Y te lo pido expresamente, como pediste: corré `npm run smoke` dos veces en
-tu Mac, cada vez desde base limpia, y decime qué dio.** Yo no puedo cerrar esa
-puerta y no la voy a declarar cerrada.
+**Te lo pido otra vez, expresamente: corré `npm run smoke` dos veces en tu Mac,
+cada vez desde base limpia, y decime qué dio.**
 
 ---
 
-### 1. El doble no escuchaba donde el contenedor llamaba — 33 rojos
+### 1. La URL de autorización la ve el navegador, y yo la pisé
 
-Tu diagnóstico es exacto. En `4b1a493` le di a la API un
-`host.docker.internal` que llega a la máquina, pero el doble seguía atendiendo
-sólo loopback. Medido acá, con las dos configuraciones:
+Tenés razón y el error es mío. En `33e5200` pisé **las dos** bases con
+`host.docker.internal`, y no son lo mismo:
 
-```
-ligado a 127.0.0.1 (como estaba):  127.0.0.1  -> HTTP 401
-                                   192.0.2.2  -> ECONNREFUSED   ← el contenedor no llega
+- `MP_AUTH_BASE_URL` arma la URL que el servidor **le devuelve al navegador**
+  (`mp_vinculo.py:224`). El navegador corre en el host, que no resuelve ese
+  hostname: `fetch failed` en 62–66.
+- `MP_API_BASE_URL` es la base **servidor a servidor** (`mp_vinculo.py:243`,
+  `mp_preferencia.py:171`, `mp_pagos.py:65`). Esa sí necesita salir del
+  contenedor.
 
-ligado a todas (como queda ahora):  127.0.0.1  -> HTTP 401  alcanzable
-                                    192.0.2.2  -> HTTP 401  alcanzable
-```
-
-`192.0.2.2` es la dirección no-loopback de esta máquina: es exactamente el
-camino que usa el contenedor. El `401` es la respuesta correcta del doble a un
-`POST /oauth/token` vacío; lo que importa es que **conteste**.
-
-La interfaz quedó parametrizada en `MP_DOBLE_INTERFAZ` por si querés fijarla, y
-por defecto liga a todas, que es lo único que funciona igual en Docker Desktop
-y en Linux. Es un servidor de prueba, con valores inventados, que vive lo que
-dura un caso; aun así prefiero que la decisión esté escrita y no implícita.
-
-### 2. La carpeta documental — 10 rojos
-
-`/app/documentos` no es escribible por `appuser`. La configuración local de
-Compose le da ahora una carpeta privada y escribible:
+Compose pisa ahora **sólo la segunda**. La primera vuelve a salir de
+`backend/.env`, que es donde la escribe `smoke.sh`, en loopback. Verificado
+contra el producto, con las dos variables puestas distintas a propósito:
 
 ```
-DOCUMENTOS_DIR   = /data/documentos      (volumen propio, documentos_data)
-UPLOAD_DIR       = /data/uploads
-nginx monta documentos_data:  no
+MP_AUTH_BASE_URL (la que ve el navegador): http://127.0.0.1:8099
+MP_API_BASE_URL  (servidor a servidor)   : http://host.docker.internal:8099
+
+URL de autorizacion armada:
+  http://127.0.0.1:8099/authorization?client_id=app-local-de-prueba&…
 ```
 
-**Hermana de la pública, no adentro.** Lo comprobé contra la propia
-aplicación, que es quien decide:
+Loopback en la que viaja al navegador, `host.docker.internal` en la que usa la
+API. Eso es exactamente lo que pediste.
 
-```
-UPLOAD_DIR     = /data/uploads
-DOCUMENTOS_DIR = /data/documentos
-la aplicación acepta la separación: las constancias no caen adentro de lo público
-```
+### 2. El destino del volumen tenía que existir en la imagen
 
-Sin `chmod 777`, sin mover nada a la carpeta pública y sin tocar el servicio.
-**La escritura y el borrado como `appuser` dentro del contenedor no los pude
-comprobar**: no tengo demonio de Docker. Es la primera de tus pruebas focales y
-queda para tu Mac.
+También acertaste con la causa. `backend/Dockerfile` hacía:
 
-### 3. La sonda del `sed` era falsa — caso 131
-
-Tenés razón y el error es mío: la sonda probaba con **una** expresión y la
-receta real usa **dos**. El `sed` de BSD acepta la primera y falla la segunda,
-así que la heurística clasificaba macOS como compatible y el caso se ponía rojo
-igual. Una sonda que no reproduce lo que va a pasar no sirve para decidir.
-
-Se fue. La receta corre siempre en `alpine:3`. Es más corto y prueba el entorno
-real del Dockerfile.
-
-**Y tiene un costo que quiero que veas antes de aceptarlo:** acá, sin Docker,
-el caso 131 ya no puede correr. Mi corrida nativa pasa a **139/140**, con el
-131 en rojo por esto:
-
-```
-[FAIL] 131 … — la receta fallo con variables validas dentro de alpine:3:
-              puente docker: sólo se traduce 'docker exec'
+```dockerfile
+RUN mkdir -p /data/uploads && chown -R appuser:appuser /data
 ```
 
-Eso no es un defecto: es mi entorno diciendo que no tiene Docker, con el
-mensaje correcto. Dos corridas completas desde base limpia dieron lo mismo:
-139/140, y **el 131 fue el único rojo en las dos**. Los 33 casos de Mercado
-Pago y los 10 de documentación están verdes en las dos, ahora con el doble
-ligado a todas las interfaces.
+Un volumen nuevo se inicializa con lo que la imagen tiene **en su punto de
+montaje**. `/data/uploads` existe en la imagen y hereda dueño; `/data/documentos`
+no existía, así que Docker lo creaba vacío y de root, y `appuser` —UID 1000— no
+podía escribir. De ahí el `PermissionError`, y de ahí que uploads sí funcionara:
+la diferencia no era el `chown`, que ya cubría `/data`, sino que el destino
+existiera.
+
+```dockerfile
+RUN mkdir -p /data/uploads /data/documentos && chown -R appuser:appuser /data
+```
+
+Es la solución mínima que pediste: sin `chmod 777`, sin mover nada a la carpeta
+pública y sin que nginx lo monte. Sigue **separado** de `/data/uploads`, que se
+sirve entero como estático, y la aplicación acepta esa separación —lo verifiqué
+en la entrega anterior—.
+
+### 3. Lo que se conserva
+
+El caso 131 sigue corriendo la receta en `alpine:3`, sin heurística. Todo lo
+válido de `4b1a493` y `33e5200` queda como está. No toqué el arnés en esta
+vuelta: las dos raíces eran de configuración, así que `scripts/` no cambió.
 
 ### 4. Puertas
 
@@ -104,57 +88,59 @@ npm run contraste                                           ok
 npm run hito                                                ok
 ```
 
+El 131 fue el único rojo en las dos corridas, y por lo mismo de siempre: acá no
+hay demonio de Docker, así que la receta no puede correr en Alpine. No es un
+defecto; es mi entorno diciéndolo con el mensaje correcto.
+
 Diff:
 
 ```
- docker-compose.yml       | 12 ++++++++
- scripts/lib/mp-doble.mjs | 14 +++++++++-
- scripts/smoke.mjs        | 30 ++++++--------------
+ backend/Dockerfile | 10 +++++++++-
+ docker-compose.yml |  9 ++++++---
 ```
 
-Tres archivos, los tres del alcance que fijaste. Conservé todo `4b1a493`. Sin
-producto, sin dependencias, sin migraciones, sin seed, sin Railway, sin datos.
-No salteé ningún caso y no abrí TRANSFER-REC-1.
+Dos archivos, los dos del alcance. Sin producto, sin dependencias, sin
+migraciones, sin seed, sin Railway y sin datos. No abrí TRANSFER-REC-1.
 
-### 5. Tus tres pruebas focales: qué queda de tu lado
+### 5. Tus tres pruebas previas a la suite: qué pude y qué no
 
-| prueba focal | acá | en tu Mac |
+| prueba | acá | en tu Mac |
 |---|---|---|
-| contenedor → doble responde | probado contra una interfaz no-loopback | falta el salto real |
-| `appuser` crea/lee/borra en la carpeta privada | **no** | falta |
-| receta CSP en Alpine, y variables vacías fallan | **no** | falta |
+| URL de autorización resoluble en el host | **sí**: `127.0.0.1:8099`, contra el producto | confirmar en el navegador |
+| intercambio del contenedor contra el doble | no: no tengo contenedor | falta |
+| crear/leer/borrar como `appuser` en un volumen **nuevo** | no | falta |
 
-De las tres, la única que pude atacar de verdad es la primera, y sólo hasta el
-borde de la máquina.
+La primera la pude atacar de verdad, porque es una propiedad del código y no
+del contenedor. Las otras dos no.
 
 ### 6. Hashes
 
 ```
-scripts/lib/mp-doble.mjs  686a593502e09c2f
-docker-compose.yml        97787b22313212b1
-scripts/smoke.mjs         b70f201a9b01514d
+docker-compose.yml  2efe1a8089a7227e
+backend/Dockerfile  5cd84db72aeee547
 ```
 
 (SHA-256 truncado a 16, del árbol en el commit de corrección.)
 
 ### 7. Riesgos residuales
 
-1. **El doble queda escuchando en todas las interfaces mientras dura un caso.**
-   En una máquina de desarrollo compartida eso es visible en la red local. No
-   sirve para nada —contesta datos inventados y no toca la base— pero es un
-   cambio de exposición y por eso dejé `MP_DOBLE_INTERFAZ` para acotarlo.
-2. **El caso 131 ahora exige Docker en cualquier máquina**, incluida la mía.
-   Es tu decisión y la comparto; el costo es que mi verde nativo ya no puede
-   ser 140/140.
-3. **Tres de los arreglos de esta devolución están verificados por
-   construcción**, no por verlos pasar en Docker. La misma limitación de la
-   entrega anterior.
-4. La suite sigue sin poder correrse dos veces sobre la misma base, por el caso
-   02. Sin tocar, como quedamos.
+1. **El volumen `documentos_data` que ya tenés creado sigue siendo de root.**
+   El arreglo actúa cuando el volumen se **crea**, y Docker sólo lo inicializa
+   la primera vez. Tu `npm run smoke` empieza con `docker compose down -v`, que
+   lo borra, así que la próxima corrida lo crea de nuevo y ahí toma el dueño
+   correcto. Si probás sin ese `down -v`, va a seguir fallando y no va a ser
+   este arreglo el que falle.
+2. **Hace falta reconstruir la imagen** para que el `mkdir` nuevo exista. El
+   lanzador ya hace `docker compose down -v --remove-orphans` y `init_local_db.sh`
+   levanta con `--build`, así que debería salir solo; lo digo por si probás a
+   mano.
+3. **Dos de las tres pruebas focales siguen sin verificar de mi lado**, por lo
+   mismo de siempre.
+4. Mi verde nativo tiene tope en 139/140 desde que el 131 exige Docker. Es la
+   consecuencia aceptada de la vuelta anterior.
 
 ### 8. Frenos
 
-No inventé un verde: la puerta 2 sigue abierta y es tuya. No salteé casos, no
-convertí fallas en avisos, no bajé controles, no toqué producto y no
-desplegué. `PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de
-empujar.
+No inventé un verde. No salteé casos, no convertí fallas en avisos, no bajé
+controles, no toqué producto y no desplegué. `PRE_FIRMA.md` sigue fuera del
+versionado y lo confirmé antes de empujar.
