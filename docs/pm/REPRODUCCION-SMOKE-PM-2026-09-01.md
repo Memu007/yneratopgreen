@@ -28,7 +28,10 @@ Resultado: **97/140**. Primeros fallos:
 
 El Frontend construyó, DB/API levantaron saludables, migraciones y seed
 terminaron, y 97 casos pasaron. La corrida fue contra contenedores y volúmenes
-nuevos y el cleanup los retiró al finalizar.
+nuevos. Corrección posterior de PM: el lanzador limpia Docker al comienzo de
+cada corrida y deja DB/API activas al salir; la corrida siguiente retiró esa
+base antes de crear otra. No correspondía afirmar que el cleanup final la
+había retirado.
 
 ## Raíz 1 — se mezcló la URL del navegador con la URL interna
 
@@ -86,3 +89,31 @@ terminar. No se desplegó ni se tocaron Railway, producción o datos remotos.
 3. Caso 131 permanece verde y rechaza variables vacías.
 4. `npm run smoke` oficial da **140/140 dos veces**, cada vez desde base limpia
    en la Mac de PM.
+
+## Cierre final — TEST-HARNESS-MAC-1S aceptada
+
+Base revisada: informe `d24fece`; corrección `78972cf`.
+
+PM reconstruyó la imagen y montó un volumen documental nuevo. El proceso de la
+aplicación informó UID 1000, creó, leyó y borró `/data/documentos/prueba-pm.txt`
+sin elevar permisos. El volumen focal se retiró al terminar.
+
+Después se ejecutó `npm run smoke` dos veces en esta Mac:
+
+- corrida 1: **140/140**, 0 fallos, salida 0;
+- corrida 2: **140/140**, 0 fallos, salida 0.
+
+Cada ejecución comenzó con `docker compose down -v --remove-orphans`, eliminó
+la base y los volúmenes de la anterior y levantó una base nueva. Los casos de
+Mercado Pago 62–100 recorrieron la separación host/contenedor sin `fetch
+failed`; los casos documentales 101–110 y 116–117 quedaron verdes; el caso 131
+conservó sus rechazos de configuración. Las líneas de clave duplicada y bloqueo
+de fila fueron efectos esperados de las pruebas adversariales y no fallos del
+runner.
+
+El arnés deja DB/API locales activas al salir por diseño; eso no modifica la
+condición de base limpia de la próxima corrida, porque el descarte ocurre al
+inicio. No se desplegó ni se tocaron Railway, secretos o datos remotos.
+
+**Veredicto final:** TEST-HARNESS-MAC-1S queda aceptada. La siguiente pieza es
+TRANSFER-REC-1.

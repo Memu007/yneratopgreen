@@ -325,12 +325,18 @@ queda aceptada funcionalmente en `ee14047`/`babdb95`: el mismo Login y la misma
 acción ya cubren Mercado, Inicio y Servicios, incluida la tarjeta primaria.
 UX-COH-1S queda aceptada en `aadecb5`/`6d14d1d`; con eso UX-COH-1 queda cerrada.
 TEST-IMG-1 queda aceptada en `4c015f0`/`cb0875b`, y el arreglo aislado del caso
-140 en `fa8b382`. **La tarea activa de Dev es TEST-HARNESS-MAC-1S:** separar la
-URL pública del doble de su URL interna y preparar el volumen documental para
-`appuser`; después debe pedir a PM dos corridas completas desde base limpia.
-Es una pieza exclusiva de arnés/imagen local; no cambia producto ni despliega.
-Después corresponde TRANSFER-REC-1 según
-`ROADMAP-CIERRE-MVP-2026-08-31.md`.
+140 en `fa8b382`. TEST-HARNESS-MAC-1S queda **aceptada** en `78972cf`/`d24fece`:
+PM reprodujo escritura en un volumen documental nuevo como UID 1000 y ejecutó
+dos corridas oficiales consecutivas desde bases limpias, ambas **140/140** con
+salida 0. El lanzador deja DB/API activas al salir y limpia al comienzo de la
+siguiente corrida; no es un despliegue ni afecta la independencia de las dos
+bases.
+
+**La tarea activa de Dev es TRANSFER-REC-1:** desde Mis compras, una orden por
+transferencia en espera debe recuperar el snapshot bancario, el concepto y el
+total, permitir adjuntar el comprobante por la ruta existente y pasar a
+«Comprobante a Revisar». Alcance y puertas en `PARA-DEV.md`; no abre otros
+hallazgos UX ni despliega.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se

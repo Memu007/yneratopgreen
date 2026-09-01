@@ -12,6 +12,70 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-01 — TAREA VIGENTE: TRANSFER-REC-1, recuperar la transferencia desde Mis compras
+
+`TEST-HARNESS-MAC-1S` queda **aceptada** en corrección `78972cf` e informe
+`d24fece`. PM reconstruyó la imagen, creó un volumen documental nuevo y
+comprobó crear/leer/borrar como UID 1000. Después ejecutó `npm run smoke` dos
+veces en esta Mac: ambas corridas partieron del borrado de contenedores y
+volúmenes anterior, terminaron **140/140** y devolvieron salida 0. No hubo
+despliegue ni cambio de producto. El lanzador deja DB/API activas al salir por
+diseño; la limpieza que garantiza la base nueva ocurre al comienzo de cada
+corrida.
+
+### Defecto a reproducir antes de tocar código
+
+Como comprador: checkout por transferencia, crear la orden, cerrar el checkout
+sin adjuntar comprobante, recargar la aplicación y entrar a **Mis compras**.
+Hoy la orden queda correctamente en `awaiting_transfer_receipt`, pero la vista
+sólo permite cancelarla: no recupera los datos bancarios ni ofrece la carga del
+comprobante. Guardá una evidencia roja breve de ese recorrido.
+
+El Backend ya entrega en la orden `seller_cbu`, `seller_alias_bancario`,
+`seller_bank_holder`, `payment_method` y `order_number`, y ya admite
+`POST /orders/{id}/transfer-receipt`. Esta tarea debe consumir ese contrato; no
+crear otro.
+
+### Alcance mínimo
+
+1. Mapeá en la orden de comprador los campos existentes que faltan. Para una
+   transferencia en `awaiting-transfer-receipt`, Mis compras debe mostrar el
+   snapshot de titular y CBU y/o alias, el número de orden como concepto de
+   pago y el total correspondiente.
+2. Desde esa misma orden permití elegir y adjuntar el comprobante por la ruta
+   existente, con el mismo contrato de archivo y autorización del checkout.
+   Un error debe quedar legible y permitir reintentar.
+3. Al terminar la carga, refrescá la fuente real: la orden debe pasar a
+   `transfer-receipt-submitted`, verse como **Comprobante a Revisar** y no
+   seguir ofreciendo otra carga como si faltara.
+4. La continuidad debe sobrevivir cierre del checkout, reapertura del panel y
+   recarga completa. No leas los datos bancarios actuales del perfil: mostrale
+   al comprador el snapshot congelado en la orden.
+
+### Límites
+
+- Preferencia: Frontend y regresión. No cambies Backend salvo que una prueba
+  discriminante demuestre que el contrato arriba descrito falta de verdad.
+- Sin endpoint, migración, estado de orden, almacenamiento ni dependencia
+  nuevos. Sin refactor general del checkout o del panel.
+- No abras `TRANSFER-REVIEW-1`, `FORM-DIRTY-1`, navegación, administración,
+  Mercado Pago, BOEDA ni otros hallazgos UX. No despliegues.
+- Conservá cancelación, permisos, validación de archivo y todas las puertas de
+  seguridad existentes.
+
+### Puerta de aceptación
+
+1. Regresión de navegador roja contra `d24fece` y verde después: crear la
+   transferencia, cerrar antes de adjuntar, recargar, entrar a Mis compras,
+   comprobar snapshot/concepto/total, adjuntar y ver **Comprobante a Revisar**.
+2. En esa regresión, cambiá los datos bancarios del vendedor después de crear
+   la orden y demostrá que Mis compras conserva los originales del snapshot.
+3. La suite completa debe cerrar con el nuevo total desde base limpia; además,
+   build, lint, compileall, `pip check`, `diff --check`, accesibilidad y
+   contraste quedan verdes.
+4. Entregá producto/regresión en un commit e informe separado en
+   `PARA-PM.md`. Frená ahí y pedime revisión; una sola tarea activa.
+
 ## 2026-09-01 — DEVOLUCIÓN VIGENTE: TEST-HARNESS-MAC-1S, dos raíces siguen rojas
 
 La corrección `33e5200` y el informe `501c7e0` **no quedan aceptados todavía**.

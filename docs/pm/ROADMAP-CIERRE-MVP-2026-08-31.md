@@ -1,6 +1,6 @@
 # Roadmap operativo para cerrar el MVP
 
-Actualizado: 2026-08-31.  
+Actualizado: 2026-09-01.  
 Fuentes: `CRONOGRAMA.md`, `ALCANCE-Y-LIMITES.md`, `NOW.md` y
 `AUDITORIAS-UX-CLAUDE-2026-08-30.md`.
 
@@ -24,16 +24,16 @@ final, como acordó Emi.
   `/cart/sync` valida antes de crear y el caso 140 ya distingue las dos puertas.
 - TEST-IMG-1 cerró en `4c015f0`/`cb0875b`; el ajuste aislado del caso 140
   `fa8b382` también fue revisado y aceptado.
-- Tarea única vigente: **TEST-HARNESS-MAC-1R**, devolución detallada en
-  `PARA-DEV.md`; la primera entrega quedó 96/140 en la Mac de PM.
+- TEST-HARNESS-MAC-1S quedó aceptada en `78972cf`/`d24fece`: volumen nuevo
+  escribible como UID 1000 y dos corridas oficiales independientes de PM en
+  **140/140**, cada una iniciada con descarte de la base anterior.
+- Tarea única vigente: **TRANSFER-REC-1**, detallada en `PARA-DEV.md`.
 - ORD-SELF-1 no cierra ningún hallazgo de las tres auditorías; era la tarea P1
   anterior y las auditorías la excluyeron expresamente.
-- PM reprodujo build, lint y compileall. Docker local fue habilitado el 31/08:
-  el ejecutor funcional dio 136/140 y las cuatro propiedades rojas pasaron al
-  reproducirse correctamente. La suite oficial sigue sin estar verde por cinco
-  defectos del arnés documentados en
-  `REPRODUCCION-SMOKE-PM-2026-08-31.md`; no se convierte esa evidencia en un
-  140/140 nominal.
+- La historia de las devoluciones del arnés y su cierre reproducido queda en
+  `REPRODUCCION-SMOKE-PM-2026-08-31.md` y
+  `REPRODUCCION-SMOKE-PM-2026-09-01.md`. La suite ya puede usarse como puerta
+  reproducible para las tareas de producto siguientes.
 
 ## Reglas de ejecución
 
@@ -55,11 +55,10 @@ final, como acordó Emi.
 |---:|---|---|
 | 0 | **ORD-SELF-1R — cerrada** | Aceptada en `40b589b`/`99e828f`: `/cart/sync` valida antes de crear y prueba `409` con cero filas usando una cuenta sin carrito. |
 | 1 | **TEST-IMG-1 — cerrada** | Aceptada en `4c015f0`/`cb0875b`: selección por conteo menor a tres y diagnóstico HTTP/cuerpo. Sólo prueba; sin producto. |
-| 1B | **TEST-HARNESS-MAC-1R — devuelta** | `4b1a493` llegó a ejecutar los 140 casos, pero quedó 96/140: doble MP en loopback, carpeta documental no escribible y falsa detección de BSD sed. Corregir las tres raíces y repetir la puerta oficial. |
+| 1B | **TEST-HARNESS-MAC-1S — cerrada** | Aceptada en `78972cf`/`d24fece`: volumen documental nuevo escribible como UID 1000 y dos corridas oficiales de PM en 140/140 desde bases limpias. |
 
-ORD-SELF-1 y TEST-IMG-1 ya cerraron. TEST-HARNESS-MAC-1 debe conseguir una
-ejecución oficial verde y portable antes de usar la suite como puerta de las
-tareas de producto.
+ORD-SELF-1, TEST-IMG-1 y TEST-HARNESS-MAC-1 ya cerraron. La suite oficial queda
+habilitada como puerta de las tareas de producto.
 
 ### Puerta 1 — integridad contractual y operación básica
 
