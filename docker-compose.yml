@@ -46,11 +46,15 @@ services:
       # escribible por `appuser`: eran diez casos en rojo con `PermissionError`.
       # Va a su propio volumen, privado y hermano del publico.
       DOCUMENTOS_DIR: /data/documentos
-      # El doble local de Mercado Pago que levanta la suite corre en el HOST.
-      # `127.0.0.1` adentro del contenedor es el contenedor: la API no llegaba
-      # nunca. El navegador y las comprobaciones del host siguen usando
-      # loopback —eso vive en backend/.env— y esto es sólo lo que ve la API.
-      MP_AUTH_BASE_URL: "${MP_BASE_DEL_DOBLE:-http://host.docker.internal:8099}"
+      # El doble local de Mercado Pago que levanta la suite corre en el HOST, y
+      # `127.0.0.1` adentro del contenedor es el contenedor: la API no llegaba.
+      #
+      # Se pisa SÓLO la base de API, que es la que usa el servidor para hablar
+      # con Mercado Pago. `MP_AUTH_BASE_URL` NO se toca: con ella se arma la
+      # URL de autorización que se le devuelve al NAVEGADOR, y el navegador
+      # corre en el host, que no resuelve `host.docker.internal`. Pisar las dos
+      # rompía los casos 62 a 66 con `fetch failed`. La de autorización sigue
+      # saliendo de backend/.env, en loopback.
       MP_API_BASE_URL: "${MP_BASE_DEL_DOBLE:-http://host.docker.internal:8099}"
     ports:
       - "8000:8000"

@@ -30,8 +30,16 @@ COPY alembic ./alembic
 # Copiar código de la aplicación
 COPY ./app ./app
 
-# Crear directorio para uploads
-RUN mkdir -p /data/uploads && chown -R appuser:appuser /data
+# Los dos destinos que se montan como volumen, creados ANTES de cambiar de
+# usuario. Un volumen nuevo se inicializa con lo que la imagen tiene en ese
+# punto de montaje: si el directorio no existe, Docker lo crea vacío y de root,
+# y `appuser` —UID 1000— no puede escribir ahí. Es lo que pasaba con
+# `/data/documentos`: PermissionError en las constancias fiscales.
+#
+# `/data/documentos` va SEPARADO de `/data/uploads` a propósito: uploads se
+# sirve entero como estático público y la aplicación se niega a arrancar si las
+# constancias caen adentro.
+RUN mkdir -p /data/uploads /data/documentos && chown -R appuser:appuser /data
 
 # Cambiar a usuario no-root
 USER appuser
