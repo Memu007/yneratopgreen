@@ -259,6 +259,15 @@ Actualizado: 2026-08-31.
   a tres raíces: doble MP ligado sólo a loopback (33), carpeta documental no
   escribible en Compose (10) y falsa detección de BSD sed (1). La devolución
   TEST-HARNESS-MAC-1R corrige sólo esas raíces; no se abre producto.
+- **TEST-HARNESS-MAC-1R devuelta:** corrección `33e5200`, informe `501c7e0`.
+  PM ejecutó la puerta en macOS/Docker Desktop y obtuvo **97/140**. El caso 131
+  queda verde, pero siguen dos raíces: Compose filtra al navegador la URL
+  interna `host.docker.internal`, que macOS no resuelve, y el volumen nuevo de
+  `/data/documentos` nace de root y rechaza a `appuser` UID 1000. Los controles
+  demostraron host→loopback y contenedor→host en HTTP 401, y uploads escribible
+  frente a documentos con `PermissionError`. TEST-HARNESS-MAC-1S corrige sólo
+  esas dos raíces. Evidencia en
+  `REPRODUCCION-SMOKE-PM-2026-09-01.md`.
 - **Tres auditorías UX externas preservadas:** Claude revisó navegación,
   claridad, formularios, recorridos y panel administrativo de forma estática
   sobre `7e0b878`. PM
@@ -289,7 +298,7 @@ Actualizado: 2026-08-31.
   separación entre identidad aplicable, funciones posteriores y nombres
   técnicos que no deben migrarse está en
   `docs/pm/IDENTIDAD-BOEDA-CLIENTE-2026-08-31.md`. No cambia la tarea activa:
-  `BRAND-BOEDA-1` queda en cola después de `TEST-HARNESS-MAC-1R` y
+  `BRAND-BOEDA-1` queda en cola después de `TEST-HARNESS-MAC-1S` y
   `TRANSFER-REC-1`, antes del cierre visual/responsive, y requiere el logo
   vectorial/PNG transparente de la cliente.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
@@ -316,10 +325,11 @@ queda aceptada funcionalmente en `ee14047`/`babdb95`: el mismo Login y la misma
 acción ya cubren Mercado, Inicio y Servicios, incluida la tarjeta primaria.
 UX-COH-1S queda aceptada en `aadecb5`/`6d14d1d`; con eso UX-COH-1 queda cerrada.
 TEST-IMG-1 queda aceptada en `4c015f0`/`cb0875b`, y el arreglo aislado del caso
-140 en `fa8b382`. **La tarea activa de Dev es TEST-HARNESS-MAC-1R:** corregir
-las tres raíces que dejaron el comando oficial en 96/140 y pedir a PM dos
-corridas completas desde base limpia. Es una pieza exclusiva de arnés; no toca
-producto ni despliega. Después corresponde TRANSFER-REC-1 según
+140 en `fa8b382`. **La tarea activa de Dev es TEST-HARNESS-MAC-1S:** separar la
+URL pública del doble de su URL interna y preparar el volumen documental para
+`appuser`; después debe pedir a PM dos corridas completas desde base limpia.
+Es una pieza exclusiva de arnés/imagen local; no cambia producto ni despliega.
+Después corresponde TRANSFER-REC-1 según
 `ROADMAP-CIERRE-MVP-2026-08-31.md`.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre

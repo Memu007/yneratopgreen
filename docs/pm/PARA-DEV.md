@@ -12,6 +12,45 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-01 — DEVOLUCIÓN VIGENTE: TEST-HARNESS-MAC-1S, dos raíces siguen rojas
+
+La corrección `33e5200` y el informe `501c7e0` **no quedan aceptados todavía**.
+El caso 131 sí queda bien resuelto en Alpine, pero la corrida oficial de PM en
+macOS/Docker Desktop dio **97/140**. La reproducción y las pruebas focales están
+en `REPRODUCCION-SMOKE-PM-2026-09-01.md`.
+
+No son 43 arreglos. Persisten dos raíces:
+
+1. **Separá la URL pública de la interna.** Compose pisa hoy
+   `MP_AUTH_BASE_URL` y `MP_API_BASE_URL` con `host.docker.internal`. La primera
+   construye la URL que recibe el navegador: macOS no resuelve ese hostname y
+   los casos 62–66 fallan con `fetch failed`. Dejá `MP_AUTH_BASE_URL` en
+   `127.0.0.1:8099`, como la escribe `smoke.sh`, y sobrescribí sólo
+   `MP_API_BASE_URL` para que la API dentro del contenedor llegue al host. PM
+   probó que host→loopback y contenedor→`host.docker.internal` responden ambos
+   HTTP 401 en el endpoint vacío del doble.
+2. **Prepará el destino del volumen privado en la imagen.** Un volumen nuevo
+   montado en `/data/documentos` da `PermissionError` con UID 1000. El control
+   en `/data/uploads` permite crear, leer y borrar. La diferencia es que el
+   Dockerfile crea/chown-ea uploads pero no documentos. Agregá
+   `/data/documentos` al directorio privado preparado antes de cambiar a
+   `appuser`, o una solución mínima equivalente. Sin `chmod 777`, sin carpeta
+   pública y sin nginx.
+
+### Alcance y puerta
+
+- Conservá el arreglo del caso 131 y todo lo válido de `4b1a493`/`33e5200`.
+- Podés tocar `docker-compose.yml`, el paso de directorios del Dockerfile y el
+  arnés sólo si hace falta afirmar las dos propiedades. No cambies producto,
+  dependencias, migraciones, seed, Railway ni datos.
+- Antes de la suite completa, probá: URL de autorización resoluble en host,
+  intercambio del contenedor contra el doble y crear/leer/borrar como
+  `appuser` sobre un volumen documental **nuevo**.
+- Después pedime otra vez dos corridas oficiales: `npm run smoke` debe dar
+  **140/140 dos veces**, cada una desde base limpia en esta Mac.
+- Entregá corrección e informe separados. No abras `TRANSFER-REC-1` y no
+  despliegues.
+
 ## 2026-08-31 — DEVOLUCIÓN VIGENTE: TEST-HARNESS-MAC-1R, la puerta oficial sigue roja
 
 La entrega de arnés `4b1a493` e informe `eb719c2` **no queda aceptada**. La
