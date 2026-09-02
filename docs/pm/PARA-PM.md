@@ -2,122 +2,95 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## CART-RECOVERY-1 — una copia local inservible ya no voltea la aplicación
+## SERVICE-STATE-1 — el panel dejó de cambiarle la anatomía a lo publicado
 
 Hecho. Producto/regresión e informe en commits separados. **No desplegué.**
 
-- Producto y regresión: `ebb2b20` — «CART-RECOVERY-1: una copia local
-  inservible no voltea la aplicación»
-- Regresión nueva: caso **142**. La suite pasa a **142 casos**.
-
-Tomo la corrección: `TRANSFER-REVIEW-1` no está cerrada. Con «queda cerrada»
-quise decir «no la abrí»; de acá en adelante escribo «no la abrí», que no se
-puede leer como entrega.
+- Producto y regresión: `a038b56` — «SERVICE-STATE-1: una sola conversión para
+  las publicaciones del panel»
+- Regresión nueva: caso **143**. La suite pasa a **143 casos**.
 
 ---
 
-### 1. El rojo, contra `14d561b`, dicho por la propia pantalla
+### 1. El rojo, contra `ebb2b20`
 
 ```
-[FAIL] 142 … — con JSON malformado la aplicacion se cayo:
-  « Ocurrió un errorRecargá la página para volver a intentarlo. »
+[FAIL] 143 … — despues de pausar: el panel lo da por agotado, y un servicio no
+  reserva unidades (la base dice stock 0, estado PAUSED):
+  «Agotado INSUMO ESTANDARIZADO Smoke servicio de estado … Acopio $ 48.000
+   Stock: 0 0 0 Editar»
 ```
 
-Y, desactivando sólo la parte A para poder ver la parte B:
+Mirá el final de esa tarjeta: **el único botón que queda es «Editar»**. El de
+pausar/activar no se dibuja sobre lo agotado, así que el servicio quedaba sin
+forma de reactivarse desde el panel.
+
+### 2. El recorrido completo, antes y después
+
+Lo medí paso por paso sobre un servicio recién publicado —la fila nace con
+stock 0, que es el valor por omisión de la columna—:
 
 ```
-[FAIL] 142 … — un carrito valido no sobrevivio la recarga:
-  antes 732 caracteres, despues "[]"
+                        ANTES (ebb2b20)                       DESPUÉS
+1. recién publicado     Activo · SERVICIO · Por hectárea      igual
+2. pausar               Agotado · INSUMO · Stock: 0           Pausado · SERVICIO · Por hectárea
+                        botones: [Editar]                     botones: [Editar, Activar]
+3. reactivar            imposible: no hay botón               Activo · SERVICIO · Por hectárea
+4. editar               Agotado · INSUMO · Stock: 0           Activo · SERVICIO · Por hectárea
+5. recargar la página   Pausado · SERVICIO · Por hectárea     igual
 ```
 
-Dos rojos independientes contra `14d561b`. El segundo no estaba en tu
-descripción y es el que explica todo lo demás.
+El paso 5 es el que delata dónde estaba la falla: recargando la página entera
+todo volvía a estar bien. La API y la base decían `operation_kind=servicio`,
+`pricing_type=por_hectarea` y `status=PAUSED` en los cinco momentos. Lo que
+cambiaba era **quién** convertía la respuesta.
 
-### 2. Corrección a la premisa: dónde se cae y dónde no
-
-Antes de tocar nada medí los dos valores que pediste en **dos frentes**: Vite
-en desarrollo —`localhost:5173`, que es contra lo que corre la suite— y el
-`dist` construido y servido, que es lo que va a usar el cliente.
-
-```
-valor guardado en agromarket_cart   Vite (5173)        dist servido (4173)
----------------------------------   ----------------   -------------------
-{no es json                         ErrorBoundary      ErrorBoundary
-{"items":[]}                        sigue navegable    ErrorBoundary
-"un carrito"                        sigue navegable    ErrorBoundary
-[{"quantity":2}]                    sigue navegable    ErrorBoundary
-carrito VÁLIDO + recarga            SE PIERDE          sobrevive
-```
-
-Es decir: **la raíz que no es un arreglo sí voltea la aplicación, pero la
-construida, no la de desarrollo.** Una regresión de navegador corriendo contra
-Vite no se puede poner roja por ese valor. Te lo digo antes de que lo leas como
-cobertura que no existe: el caso 142 igual lo exige —y es rojo en el `dist`—,
-pero su rojo en la suite lo aportan el JSON malformado y el carrito perdido.
-
-El motivo es el mismo defecto visto de otro lado. Instrumenté `localStorage`
-antes de que corriera un solo script de la aplicación y anoté cada movimiento
-de la clave durante una recarga:
-
-```
-Vite (modo estricto)           dist servido
-1. getItem  «[{"product"…»     1. getItem  «[{"product"…»
-2. setItem  «[]»               2. setItem  «[]»
-3. getItem  «[]»               3. setItem  «[{"product"…»
-4. setItem  «[]»
-5. setItem  «[]»
-```
-
-El efecto que guardaba corría en el mismo montaje que el que leía y escribía el
-carrito vacío inicial **encima** de lo guardado. En el `dist` la lectura ya
-había mandado y el paso 3 lo devuelve; con React en modo estricto hay un
-segundo montaje que lee justo el vacío del paso 2, y ahí se pierde el carrito
-—y de paso queda tapado el valor inválido antes de que llegue a dibujarse—.
-
-Por eso la corrección no es sólo un `try`: la lectura se muda al armado del
-estado. Una sola lectura, validada, antes del primer render.
+Y en el paso 2 aparecía además una caja de fotografía que un servicio no puede
+tener, más un «Stock: 0» que nadie cargó.
 
 ### 3. Lo que cambió
 
-Un archivo de producto:
+Un archivo de producto y una función:
 
 ```
- src/contexts/CartContext.tsx |  82 ++++++++++++++---
- scripts/smoke.mjs            | 206 +++++++++++++++++++++++++++++++++++++++
+ src/components/UserDashboard/UserDashboard.tsx | 113 +++++--------
+ scripts/smoke.mjs                              | 209 ++++++++++++++++++++++
 ```
 
-Sin Backend, sin endpoint, sin migración, sin dependencia, sin formato nuevo de
-persistencia y sin refactor del carrito, la autenticación ni el checkout.
-
-Qué cuenta como usable es el mínimo que el carrito necesita para existir: una
-publicación identificada, un precio que se pueda cobrar —la misma
-`tienePrecioPublicado` que ya usa el catálogo, no una regla nueva— y una
-cantidad positiva. Con menos que eso no hay total que sumar ni ítem que mandar
-al checkout, y el intento de dibujarlo es justamente lo que tiraba la pantalla.
-
-Lo que sirve se conserva tal cual; si no queda nada aprovechable se descarta
-**sólo** `agromarket_cart` y se arranca con carrito vacío. El caso comprueba en
-cada valor inválido que la sesión y una clave ajena sembrada a propósito siguen
-enteras.
-
-### 4. El carrito del servidor no se toca
-
-La parte C levanta la aplicación con la copia local rota, con sesión y con un
-carrito armado en el servidor, y **escucha las peticiones del navegador**:
+La conversión `BackendProduct → UserProduct` estaba **copiada tres veces** y
+las copias no decían lo mismo: la de la carga inicial ya sabía de anatomía —es
+la que arreglamos en la entrega del panel—, y las otras dos, la de
+`reloadUserProducts` y la de la recarga posterior a editar, se habían quedado
+con la regla vieja. Quedó una sola función pura, `aPublicacionDelPanel`, arriba
+del componente, y los tres caminos la llaman:
 
 ```
-carrito del servidor antes = después
-peticiones a /cart/sync    = 0
+carga inicial                         → map(aPublicacionDelPanel)
+recarga por pausar/activar/eliminar   → map(aPublicacionDelPanel)
+recarga posterior a editar            → map(aPublicacionDelPanel)
 ```
 
-No es que el `sync` viaje vacío: no viaja. El servidor sigue siendo la
-autoridad al entrar al checkout.
+Son 70 líneas menos. Sin capa nueva, sin archivo nuevo, sin Backend, sin
+endpoint, sin migración, sin dependencia y sin rediseño del panel.
+
+La regla que conserva: `operationKind`, `unit` y `pricingType` viajan siempre,
+y «Agotado» sólo existe donde hay unidades que agotar. En una publicación de
+servicio manda su estado real, activo o pausado.
+
+### 4. El control, en los cuatro momentos
+
+El caso 143 lleva además un producto de verdad con stock 0, publicado por el
+mismo camino. Ese **sí** tiene que decir «Agotado», y lo sigue diciendo en la
+carga inicial, después de pausar el servicio, después de editar y después de
+recargar la página. Sin ese control, «que no diga Agotado» se podría cumplir
+rompiendo el caso legítimo.
 
 ### 5. Puertas
 
 ```
-base limpia + node scripts/smoke.mjs            140/142   (121 y 131 rojos)
-base limpia otra vez                            141/142   (131 rojo)
+base limpia + node scripts/smoke.mjs            142/143   (131 rojo)
+base limpia otra vez                            141/143   (131 y 114 rojos)
+base limpia una tercera vez                     142/143   (131 rojo)
 npm run build                                   ok
 npm run lint                                    ok (--max-warnings 0)
 node --check scripts/smoke.mjs                  ok
@@ -129,53 +102,59 @@ npm run contraste                               TODO OK, cobertura completa
 npm run hito                                    6/6 pasos
 ```
 
-**El 131 es el de siempre**: acá no hay demonio de Docker y la receta CSP no
-puede correr en `alpine:3`. En tu Mac pasa.
+El **131** es el de siempre: acá no hay demonio de Docker. En tu Mac pasa.
 
-**El 121 apareció en una corrida y en la otra no**, con el mismo mensaje que
-viste vos en tu primer pase de `TRANSFER-REC-1` —o sea, con mi cambio y sin
-él—: «la tarjeta no pinta la placa de «sin registro fotográfico»». Lo corrí
-aislado y pasó 1/1. No es del carrito: el caso 121 no toca `agromarket_cart`.
-Lo que sí veo es la forma del falso rojo que ya arreglamos en el 139: lee
-`getComputedStyle(...).backgroundImage` en un instante fijo, apenas el elemento
-se hace visible, y sin reintento. Eso es diagnóstico, no medición: no lo abrí
-porque pediste una sola tarea activa. Si querés, es corto.
+Hice **tres** corridas y no dos por el **114**, que se puso rojo en la segunda
+y pasó en la primera y en la tercera, con el mismo commit y el mismo
+procedimiento. Lo que puedo afirmar:
 
-El caso 142 pasó en las dos corridas completas y también aislado.
+- El paso que falla es el clic en la acción de una tarjeta del catálogo: la
+  publicación que eligió `prepararEscenarioDeFletes` no ofrecía «Agregar».
+- **No es de mi cambio.** El caso 114 no abre «Mis publicaciones» y no dibuja
+  ninguna tarjeta del panel; toca el perfil del transportista y el catálogo.
+- Descarté dos causas concretas sobre la base de esa corrida: no era compra de
+  lo propio —vendedor y comprador son cuentas distintas— y no era stock
+  reservado: la publicación elegida no tenía ninguna orden ni ningún carrito.
+- No lo pude reproducir aislado, y eso es una limitación del arnés, no una
+  respuesta: el caso 114 depende de la sesión que deja el caso 03, así que
+  corrido solo entra sin sesión y falla por otro motivo.
+
+No lo abrí porque pediste una sola tarea activa y porque no tengo todavía la
+causa. Si querés que lo persiga, la primera medida que haría es que el caso
+guarde el HTML de la tarjeta cuando el botón no aparece: hoy el mensaje dice
+qué esperaba y no qué había.
 
 ### 6. Hashes
 
 ```
-src/contexts/CartContext.tsx  b99d7a37402d83af
-scripts/smoke.mjs             344f66bd0dd3036c
+src/components/UserDashboard/UserDashboard.tsx  5d314eed22fc6395
+scripts/smoke.mjs                               5c5e3ade09a4b868
 ```
 
 (SHA-256 truncado a 16, del árbol en el commit de producto.)
 
 ### 7. Riesgos residuales
 
-1. **La escritura sigue sin protección.** Leer quedó envuelto; guardar no. Con
-   `localStorage` lleno o bloqueado, `setItem` tira dentro de un efecto y la
-   aplicación vuelve a caer por la misma puerta. No lo toqué porque no pude
-   escribir una prueba que lo provoque sin trucar el navegador, y prefiero no
-   dejar código de producto que ninguna prueba ejercite. Es corto si lo abrís.
-2. **Un carrito viejo con un ítem de precio 0 pierde ese ítem.** Es
-   deliberado: ese ítem generaría una orden de $0, que es lo que
-   `tienePrecioPublicado` vino a cerrar. Lo aviso porque es un cambio de
-   comportamiento para copias guardadas antes de esa regla.
-3. **La recuperación es por ítem, no todo o nada.** Un arreglo con dos ítems
-   buenos y uno roto conserva los dos buenos. Preferí no vaciarle el carrito a
-   alguien por una entrada dañada; si lo querés todo o nada, es un `if`.
-4. **En desarrollo el carrito ahora sobrevive a la recarga.** Antes se perdía,
-   así que cualquier prueba manual que contara con arrancar vacío después de
-   recargar va a ver otra cosa. La suite corre limpia igual.
+1. **La lista del panel sigue viniendo de `/products/my` sin paginar.** No lo
+   toqué —no es esta tarea—, pero con muchas publicaciones esa respuesta crece
+   sin techo y el panel la convierte entera en cada recarga.
+2. **`operationKind` sigue siendo `string` en el tipo del panel**, no
+   `OperationKind`. La conversión lo pasa tal cual y `normalizarAnatomia` lo
+   ordena al dibujar, que es donde ya vivía la regla. Ajustar el tipo tocaría
+   el formulario de edición y no me pareció parte de esto.
+3. **Una publicación de servicio con stock cargado a mano** —la base lo
+   permite— nunca va a decir «Agotado» en el panel. Es deliberado: un servicio
+   no reserva unidades. Lo aviso porque es una decisión, no un olvido.
+4. **El caso 143 deja dos publicaciones nuevas** del vendedor del seed: el
+   servicio y el producto de control con stock 0. Corre último y no ensucia a
+   nadie, pero quedan en la base como cualquier otro dato de la corrida.
 
 ### 8. Frenos
 
-No toqué Backend: ninguna prueba mostró que faltara contrato. No abrí
-`SERVICE-STATE-1`, `TRANSFER-REVIEW-1`, `FORM-DIRTY-1`, navegación,
-administración, Mercado Pago ni BOEDA. No limpié tokens ni preferencias: sólo
-la clave dañada. No desplegué. `PRE_FIRMA.md` sigue fuera del versionado y lo
-confirmé antes de empujar.
+No toqué Backend: la API y la base ya decían lo correcto en todos los pasos. No
+creé capa ni archivo nuevo: una función pura en el mismo módulo alcanzaba. No
+abrí administración, navegación, formularios, BOEDA, Mercado Pago ni el riesgo
+de escritura de `localStorage`. No desplegué. `PRE_FIRMA.md` sigue fuera del
+versionado y lo confirmé antes de empujar.
 
 Freno acá y te pido revisión.
