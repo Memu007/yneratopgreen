@@ -102,6 +102,12 @@ interface BackendOrder {
   seller_name?: string;
   seller_phone?: string;
   seller_whatsapp?: string;
+  // El snapshot bancario de la orden. Es de CUANDO SE COMPRÓ, no lo que el
+  // vendedor tenga hoy: si cambia su CBU mañana, esta orden sigue diciendo a
+  // dónde se acordó transferir.
+  seller_cbu?: string;
+  seller_alias_bancario?: string;
+  seller_bank_holder?: string;
   transfer_receipt_url?: string;
   rejection_reason?: string;
   shipping?: TrasladoDeLaOrden;
@@ -134,6 +140,12 @@ interface Order {
     whatsapp: string;
   };
   transferReceiptUrl?: string;
+  /** A dónde va la plata de ESTA orden, congelado al comprarla. */
+  transferencia?: {
+    cbu?: string;
+    alias?: string;
+    titular?: string;
+  };
   rejectionReason?: string;
   shipping?: TrasladoDeLaOrden;
   /**
@@ -437,6 +449,52 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   const [preparandoPago, setPreparandoPago] = useState('');
   const [errorDePago, setErrorDePago] = useState<Record<string, string>>({});
 
+  // El comprobante de una transferencia que quedó a medias, por orden. Se
+  // guarda el archivo elegido, si se está enviando y el motivo del último
+  // fallo, para que un error se lea y se pueda reintentar sin recargar.
+  const [comprobantes, setComprobantes] = useState<Record<string, File>>({});
+  const [enviandoComprobante, setEnviandoComprobante] = useState('');
+  const [errorDeComprobante, setErrorDeComprobante] = useState<Record<string, string>>({});
+  // Sube de a uno para volver a pedirle las órdenes al servidor. La pantalla no
+  // parchea la orden en memoria: después de subir el comprobante, lo que vale
+  // es lo que diga la fuente real.
+  const [recargaDeOrdenes, setRecargaDeOrdenes] = useState(0);
+
+  const enviarComprobante = async (orden: Order) => {
+    const archivo = comprobantes[orden.orderId];
+    if (!archivo) {
+      setErrorDeComprobante((actuales) => ({
+        ...actuales, [orden.orderId]: 'Elegí el comprobante antes de enviarlo',
+      }));
+      return;
+    }
+    setEnviandoComprobante(orden.orderId);
+    setErrorDeComprobante((actuales) => ({ ...actuales, [orden.orderId]: '' }));
+    try {
+      const cuerpo = new FormData();
+      cuerpo.append('file', archivo);
+      // La misma ruta y el mismo contrato de archivo que usa el checkout: acá
+      // no hay un camino nuevo, sólo otra puerta al mismo.
+      await apiUpload(`/orders/${orden.orderId}/transfer-receipt`, cuerpo);
+      setComprobantes((actuales) => {
+        const siguientes = { ...actuales };
+        delete siguientes[orden.orderId];
+        return siguientes;
+      });
+      setRecargaDeOrdenes((n) => n + 1);
+      showToast('Comprobante enviado. El vendedor lo va a revisar.', 'success');
+    } catch (error) {
+      setErrorDeComprobante((actuales) => ({
+        ...actuales,
+        [orden.orderId]: error instanceof Error
+          ? error.message
+          : 'No se pudo enviar el comprobante',
+      }));
+    } finally {
+      setEnviandoComprobante('');
+    }
+  };
+
   const continuarPago = async (orden: Order) => {
     if (orden.paymentUrl) {
       window.open(orden.paymentUrl, '_blank', 'noopener,noreferrer');
@@ -528,6 +586,15 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               whatsapp: o.seller_whatsapp || o.seller_phone || ''
             } : undefined,
             transferReceiptUrl: o.transfer_receipt_url,
+            // Sólo para el comprador: es él quien tiene que transferir, y lo
+            // que necesita es el snapshot de la orden, no el perfil de hoy.
+            transferencia: (o.seller_cbu || o.seller_alias_bancario || o.seller_bank_holder)
+              ? {
+                cbu: o.seller_cbu,
+                alias: o.seller_alias_bancario,
+                titular: o.seller_bank_holder,
+              }
+              : undefined,
             rejectionReason: o.rejection_reason,
             shipping: o.shipping,
           }));
@@ -566,7 +633,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     };
 
     loadOrders();
-  }, [activeTab]);
+  }, [activeTab, recargaDeOrdenes]);
 
   // Cargar productos del usuario cuando se monta el componente
   useEffect(() => {
@@ -2563,6 +2630,75 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 {order.rejectionReason && (
                   <div className={styles.contactInfo}>
                     <strong>Motivo del rechazo:</strong> {order.rejectionReason}
+                  </div>
+                )}
+
+                {/*
+                  La transferencia que quedó a medias.
+                  Antes esto vivía sólo adentro del checkout: quien cerraba esa
+                  ventana sin adjuntar se quedaba sin forma de pagar una compra
+                  que ya existía, y acá sólo le ofrecíamos cancelarla.
+                  Aparece cuando el servidor dice que la orden es por
+                  transferencia y que todavía espera el comprobante; la pantalla
+                  no deduce el estado.
+                  Los datos bancarios salen del SNAPSHOT de la orden y no del
+                  perfil del vendedor: es a dónde ESTA compra acordó transferir.
+                  Si el vendedor cambia su CBU mañana, pagar a la cuenta nueva
+                  sería pagarle a otra cosa.
+                */}
+                {order.paymentMethod === 'transfer'
+                  && order.status === 'awaiting-transfer-receipt'
+                  && order.transferencia && (
+                  <div className={styles.pagoPendiente}>
+                    <p className={styles.pagoPendienteTexto}>
+                      Esta compra se paga por <strong>transferencia</strong> y
+                      todavía falta el comprobante.
+                    </p>
+                    {order.transferencia.titular && (
+                      <p><strong>Titular:</strong> {order.transferencia.titular}</p>
+                    )}
+                    {order.transferencia.cbu && (
+                      <p><strong>CBU:</strong> {order.transferencia.cbu}</p>
+                    )}
+                    {order.transferencia.alias && (
+                      <p><strong>Alias:</strong> {order.transferencia.alias}</p>
+                    )}
+                    <p><strong>Importe:</strong> {formatPrice(order.total)}</p>
+                    <p>
+                      Usá <strong>{order.id}</strong> como concepto de la
+                      transferencia. Es lo que le permite al vendedor reconocer
+                      tu pago en su resumen bancario.
+                    </p>
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp,.pdf"
+                      aria-label={`Comprobante de la orden ${order.id}`}
+                      onChange={(event) => {
+                        const archivo = event.target.files?.[0];
+                        if (!archivo) return;
+                        setComprobantes((actuales) => ({
+                          ...actuales, [order.orderId]: archivo,
+                        }));
+                        setErrorDeComprobante((actuales) => ({
+                          ...actuales, [order.orderId]: '',
+                        }));
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className={styles.pagoPendienteBoton}
+                      disabled={enviandoComprobante === order.orderId}
+                      onClick={() => void enviarComprobante(order)}
+                    >
+                      {enviandoComprobante === order.orderId
+                        ? 'Enviando…'
+                        : 'Enviar comprobante'}
+                    </button>
+                    {errorDeComprobante[order.orderId] && (
+                      <p className={styles.pagoPendienteError} role="alert">
+                        {errorDeComprobante[order.orderId]}
+                      </p>
+                    )}
                   </div>
                 )}
 

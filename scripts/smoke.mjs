@@ -15640,6 +15640,204 @@ await runCase(140, 'Nadie compra su propia publicacion, ni por la API ni por la 
     + `a vendedor: 0`;
 });
 
+await runCase(141, 'Una transferencia sin comprobante se retoma desde Mis compras', async () => {
+  // El comprador confirma por transferencia, cierra el checkout sin adjuntar y
+  // se va. La orden queda —bien— esperando el comprobante, pero «Mis compras»
+  // solo le ofrecia CANCELAR: los datos bancarios y la carga del comprobante
+  // vivian unicamente adentro del checkout, que ya no existe. O sea que la
+  // unica forma de pagar una compra que ya esta hecha era no haber cerrado esa
+  // ventana.
+  //
+  // Todo lo que hace falta ya lo manda el Backend en la orden del comprador
+  // —`seller_cbu`, `seller_alias_bancario`, `seller_bank_holder`,
+  // `payment_method`, `order_number`— y la ruta de carga ya existe. Esto
+  // consume ese contrato; no crea otro.
+
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const entrada = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'cliente@ejemplo.com', password: 'cliente123' },
+  });
+  const comprador = {
+    token: entrada.data.access_token,
+    refresco: entrada.data.refresh_token,
+    id: entrada.data.user.id,
+  };
+  await apiRequest('/cart', { method: 'DELETE', token: comprador.token });
+
+  const producto = productoConStock(vendedor.id, 1);
+  const [[nombreDelProducto]] = queryRows(
+    `SELECT name FROM products WHERE id = ${sqlLiteral(producto)}`);
+
+  // Los datos bancarios del vendedor, para poder devolverlos como estaban.
+  const [bancoOriginal] = queryRows(`
+    SELECT COALESCE(cbu, ''), COALESCE(alias_bancario, ''), 'fin'
+    FROM users WHERE id = ${sqlLiteral(vendedor.id)}`);
+  assert(bancoOriginal[0] || bancoOriginal[1],
+    'el vendedor del seed no tiene CBU ni alias: sin eso no hay transferencia que retomar');
+
+  const ordenesDelComprador = () => queryRows(`
+    SELECT order_number, status::text, COALESCE(transfer_receipt_url, ''), 'fin'
+    FROM orders WHERE buyer_id = ${sqlLiteral(comprador.id)}
+    ORDER BY created_at DESC`);
+
+  const antes = ordenesDelComprador().length;
+  const taller = mkdtempSync(`${tmpdir()}/topgreen-comprobante-`);
+  const comprobante = `${taller}/comprobante.png`;
+  writeFileSync(comprobante, RECIBO_PNG);
+
+  const browser = await chromium.launch({ headless: true });
+  let bancoCambiado = false;
+  try {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await context.addInitScript(({ a, r }) => {
+      window.localStorage.setItem('access_token', a);
+      window.localStorage.setItem('refresh_token', r);
+      window.localStorage.removeItem('agromarket_cart');
+    }, { a: comprador.token, r: comprador.refresco });
+    const page = await context.newPage();
+
+    const abrirCompras = async () => {
+      await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
+      await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor({ timeout: 15_000 });
+      await page.getByRole('button', { name: /Mis Compras/i }).click();
+      await page.getByRole('heading', { name: 'Mis Compras' }).waitFor({ timeout: 15_000 });
+    };
+
+    try {
+      // --- A. Comprar por transferencia y CERRAR sin adjuntar --------------
+      await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+      await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+      const buscador = page.getByLabel('Buscar en el mercado');
+      await buscador.fill(nombreDelProducto);
+      await buscador.press('Enter');
+      await page.getByRole('heading', { name: nombreDelProducto, exact: true, level: 3 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+      await accionDeLaTarjeta(page, nombreDelProducto).click();
+
+      await page.getByRole('button', { name: /Carrito/ }).click();
+      await page.getByRole('button', { name: 'Continuar compra' }).click();
+      await page.getByRole('heading', { name: /Datos de env/i }).waitFor({ timeout: 15_000 });
+      await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0141');
+      await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 141');
+      await page.getByPlaceholder('2000').fill('2700');
+      await elegirDestino(page, 'Pergamino');
+      await resolverTrasladoPropio(page);
+      await page.locator('form:has(h2) button[type="submit"]').click();
+      await elegirTransferencia(page);
+      await page.getByRole('button', { name: /Confirmar y crear las órdenes/ }).click();
+      await page.getByRole('heading', { name: /Tus órdenes/ }).waitFor({ timeout: 25_000 });
+
+      // Y se va sin adjuntar nada, que es el momento que el defecto castigaba.
+      await page.getByRole('button', { name: 'Cerrar' }).first().click();
+
+      const creadas = ordenesDelComprador();
+      assert(creadas.length === antes + 1,
+        `se esperaba una orden nueva y hay ${creadas.length - antes}`);
+      const [numero, estadoInicial, comprobanteInicial] = creadas[0];
+      assert(estadoInicial === 'AWAITING_TRANSFER_RECEIPT',
+        `la orden quedo en ${estadoInicial} y no esperando comprobante`);
+      assert(comprobanteInicial === '',
+        'la orden nacio con comprobante: el caso no probaria nada');
+
+      // --- B. Recargar y volver: lo que el comprador necesita para pagar ---
+      // Recarga COMPLETA a proposito: lo que se prueba es que la continuidad
+      // no dependa de que el checkout siga vivo en memoria.
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await abrirCompras();
+      const tarjeta = page.locator('[class*="_orderCard_"]').filter({ hasText: numero }).first();
+      await tarjeta.waitFor({ timeout: 20_000 });
+
+      const leer = async () => (await tarjeta.textContent() || '').replace(/\s+/g, ' ');
+      let visto = await leer();
+
+      assert(/Esperando Comprobante/i.test(visto),
+        `la orden no se ve esperando comprobante: «${visto.slice(0, 200)}»`);
+      // El titular y a donde va la plata, del SNAPSHOT de la orden.
+      assert(visto.includes(bancoOriginal[0]) || visto.includes(bancoOriginal[1]),
+        `Mis compras no muestra ni el CBU ni el alias del vendedor: «${visto.slice(0, 300)}»`);
+      // El numero de orden como concepto: es lo que le permite al vendedor
+      // reconocer el pago en su resumen.
+      assert(visto.includes(numero),
+        `Mis compras no dice que el concepto es ${numero}: «${visto.slice(0, 300)}»`);
+      // Y el total, que es cuanto hay que transferir.
+      const [[totalEnLaBase]] = queryRows(
+        `SELECT total_amount FROM orders WHERE order_number = ${sqlLiteral(numero)}`);
+      const enPesos = Number(totalEnLaBase).toLocaleString('es-AR', {
+        minimumFractionDigits: 0, maximumFractionDigits: 0,
+      });
+      assert(visto.includes(enPesos),
+        `Mis compras no muestra el total ${enPesos}: «${visto.slice(0, 300)}»`);
+      // Y tiene por donde adjuntar.
+      const entradaDeArchivo = tarjeta.locator('input[type="file"]');
+      assert(await entradaDeArchivo.count() === 1,
+        `la orden no ofrece adjuntar el comprobante: «${visto.slice(0, 300)}»`);
+
+      // --- C. El snapshot esta congelado -----------------------------------
+      // El vendedor cambia sus datos bancarios DESPUES de la orden. Lo que el
+      // comprador tiene que seguir viendo es a donde acordo transferir, no a
+      // donde el vendedor cobra hoy: si cambiara, pagaria a una cuenta que esa
+      // orden nunca declaro.
+      const cbuNuevo = '0000009000000000000999';
+      await apiRequest('/auth/me', {
+        method: 'PATCH', token: vendedor.token,
+        body: { cbu: cbuNuevo, alias_bancario: 'alias.cambiado.despues' },
+      });
+      bancoCambiado = true;
+
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await abrirCompras();
+      const tarjetaOtraVez = page.locator('[class*="_orderCard_"]')
+        .filter({ hasText: numero }).first();
+      await tarjetaOtraVez.waitFor({ timeout: 20_000 });
+      const conElCambio = (await tarjetaOtraVez.textContent() || '').replace(/\s+/g, ' ');
+      assert(!conElCambio.includes(cbuNuevo) && !conElCambio.includes('alias.cambiado.despues'),
+        `Mis compras mostro los datos bancarios de HOY y no los de la orden: «${conElCambio.slice(0, 300)}»`);
+      assert(conElCambio.includes(bancoOriginal[0]) || conElCambio.includes(bancoOriginal[1]),
+        `se perdio el snapshot bancario de la orden: «${conElCambio.slice(0, 300)}»`);
+
+      // --- D. Adjuntar, y que la fuente real lo diga ------------------------
+      await tarjetaOtraVez.locator('input[type="file"]').setInputFiles(comprobante);
+      await tarjetaOtraVez.getByRole('button', { name: /Enviar comprobante/i }).click();
+
+      await esperarA(async () => {
+        const fila = ordenesDelComprador().find((o) => o[0] === numero);
+        return fila && fila[1] === 'TRANSFER_RECEIPT_SUBMITTED' && fila[2] !== '';
+      }, `la orden ${numero} no quedo con el comprobante enviado`, 25_000);
+
+      // Y la pantalla tiene que decir lo mismo que la base, sin quedarse en el
+      // estado viejo ni seguir pidiendo un comprobante que ya se mando.
+      await esperarA(async () => /Comprobante a Revisar/i.test(
+        (await tarjetaOtraVez.textContent() || '').replace(/\s+/g, ' ')),
+      `la tarjeta de ${numero} no paso a «Comprobante a Revisar»`, 25_000);
+
+      visto = (await tarjetaOtraVez.textContent() || '').replace(/\s+/g, ' ');
+      assert(!/Esperando Comprobante/i.test(visto),
+        `sigue diciendo que espera el comprobante: «${visto.slice(0, 200)}»`);
+      assert(await tarjetaOtraVez.locator('input[type="file"]').count() === 0,
+        'sigue ofreciendo adjuntar otro comprobante como si faltara');
+
+      return `Confirmada por transferencia y cerrado el checkout sin adjuntar, la orden ${numero} `
+        + 'queda esperando comprobante; despues de una recarga completa, «Mis compras» muestra '
+        + 'titular, CBU/alias del snapshot, el numero de orden como concepto y el total, y deja '
+        + 'adjuntar. Cambiar los datos bancarios del vendedor despues de la orden no cambia lo '
+        + 'que ve el comprador. Al adjuntar, la base pasa a TRANSFER_RECEIPT_SUBMITTED con su '
+        + 'archivo y la pantalla dice «Comprobante a Revisar» sin volver a pedirlo';
+    } finally {
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+    rmSync(taller, { recursive: true, force: true });
+    if (bancoCambiado) {
+      // El vendedor vuelve a como estaba: los otros casos cuentan con eso.
+      await apiRequest('/auth/me', {
+        method: 'PATCH', token: vendedor.token,
+        body: { cbu: bancoOriginal[0], alias_bancario: bancoOriginal[1] },
+      });
+    }
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 
