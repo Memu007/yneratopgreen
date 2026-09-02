@@ -16381,11 +16381,24 @@ await runCase(144, 'Administracion: las acciones se entienden, guardan, y no rom
       return fila && fila[0] === descripcionNueva;
     }, 'la edicion de la categoria no llego a la base', 20_000);
 
-    // Y sobrevive a volver a entrar, que es lo que mira quien administra.
+    // Y sobrevive a volver a entrar, que es lo que mira quien administra: se
+    // recarga la aplicacion entera, se vuelve a abrir el formulario y se lee EL
+    // CAMPO. Antes esto era un `|| true` que no podia fallar; eso no probaba
+    // nada y lo dejaba pasar aunque la pantalla mostrara lo viejo.
     await abrirAdministracion();
     await solapa('Categorías');
-    await esperarA(async () => (await tarjeta(nombreDeLaNueva).innerText())
-      .includes(descripcionNueva.slice(0, 30)) || true, 'la tarjeta no volvio', 15_000);
+    await tarjeta(nombreDeLaNueva).waitFor({ timeout: 20_000 });
+    await tarjeta(nombreDeLaNueva).getByRole('button', { name: /^Editar/ }).click();
+    const formularioOtraVez = tarjeta(nombreDeLaNueva).locator('[class*="editCategoryForm"]');
+    await formularioOtraVez.waitFor({ state: 'visible', timeout: 15_000 });
+    const botonesDelFormulario = await revisarLosBotones(
+      `[class*="categoryCard"]:has(h3:text-is("${nombreDeLaNueva}")) [class*="editCategoryForm"]`,
+      'en el formulario de la categoria');
+    const enElCampo = await formularioOtraVez.locator('textarea').inputValue();
+    assert(enElCampo === descripcionNueva,
+      `al volver a entrar el formulario no trae la descripcion guardada: «${enElCampo}»`);
+    await formularioOtraVez.getByRole('button', { name: /^Cancelar/ }).click();
+
     const enLaApi = await apiRequest('/admin/categories', { token });
     const vuelta = enLaApi.data.find((c) => c.id === idDeLaNueva);
     assert(vuelta && vuelta.description === descripcionNueva,
@@ -16431,6 +16444,8 @@ await runCase(144, 'Administracion: las acciones se entienden, guardan, y no rom
     const filaDeLaSub = tarjeta(nombreDeSuCategoria)
       .locator('[class*="subcategoryItem"]').filter({ hasText: subReferenciada[1] });
     await filaDeLaSub.waitFor({ state: 'visible', timeout: 15_000 });
+    const botonesDeLaSub = await revisarLosBotones(
+      `[class*="subcategoryItem"]:has-text("${subReferenciada[1]}")`, 'en la subcategoria');
     await filaDeLaSub.getByRole('button', { name: /^Eliminar/ }).click();
 
     await esperarA(async () => ((await page.locator('body').innerText()) || '')
@@ -16448,9 +16463,15 @@ await runCase(144, 'Administracion: las acciones se entienden, guardan, y no rom
     await tarjeta(nombreDeLaNueva).getByRole('button', { name: /^(Mostrar|Ocultar)/ }).click();
     await tarjeta(nombreDeLaNueva).getByRole('button', { name: /^Agregar una subcategor/ })
       .click();
-    await tarjeta(nombreDeLaNueva).getByPlaceholder('Nombre de subcategoría')
-      .fill(nombreDeLaSubNueva);
-    await tarjeta(nombreDeLaNueva).getByRole('button', { name: /^Agregar la subcategor/ }).click();
+    const altaEnLinea = tarjeta(nombreDeLaNueva).locator('[class*="addSubcategoryForm"]');
+    await altaEnLinea.waitFor({ state: 'visible', timeout: 15_000 });
+    // Las dos acciones del alta —confirmar y cancelar— tambien se miden: eran
+    // «✓» y «✕», que no dicen ni que hacen ni sobre que.
+    const botonesDelAlta = await revisarLosBotones(
+      `[class*="categoryCard"]:has(h3:text-is("${nombreDeLaNueva}")) [class*="addSubcategoryForm"]`,
+      'en el alta de subcategoria');
+    await altaEnLinea.getByPlaceholder('Nombre de subcategoría').fill(nombreDeLaSubNueva);
+    await altaEnLinea.getByRole('button', { name: /^Agregar la subcategor/ }).click();
     await esperarA(async () => queryRows(
       `SELECT id FROM subcategories WHERE name = ${sqlLiteral(nombreDeLaSubNueva)}`).length === 1,
     'la subcategoria nueva no se creo', 20_000);
@@ -16478,6 +16499,8 @@ await runCase(144, 'Administracion: las acciones se entienden, guardan, y no rom
     // no ve valores: se toma el formulario abierto, que es uno solo.
     const edicion = page.locator('[class*="optionEditForm"]');
     await edicion.waitFor({ state: 'visible', timeout: 15_000 });
+    const botonesDeLaEdicion = await revisarLosBotones(
+      '[class*="optionEditForm"]', 'en el formulario de la opcion');
     const valorEnPantalla = edicion.locator('input').first();
     assert(await valorEnPantalla.inputValue() === opcion[1],
       'la pantalla no muestra el valor interno de la opcion');
@@ -16511,15 +16534,32 @@ await runCase(144, 'Administracion: las acciones se entienden, guardan, y no rom
     assert(usanLaOpcion() === usaban,
       'las publicaciones que usaban esa unidad cambiaron de valor');
 
+    // Y se ve al volver: se recarga la aplicacion entera, se vuelve a
+    // Configuracion y se lee la fila en la pantalla. Recien despues se
+    // restaura, para no estar comprobando lo que uno mismo acaba de deshacer.
+    await abrirAdministracion();
+    await solapa('Configuración');
+    await page.getByRole('button', { name: 'Unidades' }).click();
+    const filaEditada = page.locator('[class*="optionItem"]')
+      .filter({ hasText: etiquetaNueva }).first();
+    await filaEditada.waitFor({ state: 'visible', timeout: 20_000 });
+    const textoDeLaFila = (await filaEditada.innerText()).replace(/\s+/g, ' ');
+    assert(textoDeLaFila.includes(etiquetaNueva) && textoDeLaFila.includes(opcion[1]),
+      `al volver, la fila no muestra la etiqueta guardada con su valor interno: `
+      + `«${textoDeLaFila}»`);
+
     // Se deja la etiqueta como estaba: otros casos leen el catalogo.
     await apiRequest(`/admin/form-options/${opcion[0]}`, {
       method: 'PUT', token, body: { label: opcion[2] },
     });
 
     await contexto.close();
-    return `en Administracion las ${botonesDeCategoria} acciones de la categoria y las `
-      + `${botonesDeOpcion} de la opcion tienen nombre propio; editar categoria y opcion `
-      + 'persiste por PUT y se ve al volver a entrar; con '
+    const medidas = botonesDeCategoria + botonesDelFormulario + botonesDeLaSub
+      + botonesDelAlta + botonesDeOpcion + botonesDeLaEdicion;
+    return `en Administracion las ${medidas} acciones de los seis bloques —tarjeta y `
+      + 'formulario de categoria, fila y alta de subcategoria, fila y formulario de '
+      + 'opcion— tienen nombre propio; editar categoria y opcion persiste por PUT y se '
+      + 'lee en la pantalla despues de recargar; con '
       + `${conPublicaciones[3]} publicaciones el tipo de «${conPublicaciones[1]}» no se da `
       + `vuelta —409 y la pantalla lo dice—; la subcategoria «${subReferenciada[1]}» no se `
       + `borra con ${antesDeIntentar} publicaciones que la declaran y ninguna las pierde; y `
