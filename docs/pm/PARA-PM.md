@@ -2,95 +2,123 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## SERVICE-STATE-1 — el panel dejó de cambiarle la anatomía a lo publicado
+## ADMIN-ACTIONS-1 — acciones que se entienden, guardan y no rompen lo publicado
 
 Hecho. Producto/regresión e informe en commits separados. **No desplegué.**
 
-- Producto y regresión: `a038b56` — «SERVICE-STATE-1: una sola conversión para
-  las publicaciones del panel»
-- Regresión nueva: caso **143**. La suite pasa a **143 casos**.
+- Producto y regresión: `edf3cb5` — «ADMIN-ACTIONS-1: acciones que se entienden,
+  guardan y no rompen lo publicado»
+- Regresión nueva: caso **144**. La suite pasa a **144 casos**.
 
 ---
 
-### 1. El rojo, contra `ebb2b20`
+### 1. El rojo, contra `a038b56`
+
+En la pantalla, el caso 144:
 
 ```
-[FAIL] 143 … — despues de pausar: el panel lo da por agotado, y un servicio no
-  reserva unidades (la base dice stock 0, estado PAUSED):
-  «Agotado INSUMO ESTANDARIZADO Smoke servicio de estado … Acopio $ 48.000
-   Stock: 0 0 0 Editar»
+[FAIL] 144 … — en la categoria: 2 de 3 acciones sin nombre que se entienda:
+  [{"i":1,"nombre":"","texto":""},{"i":2,"nombre":"","texto":""}]
 ```
 
-Mirá el final de esa tarjeta: **el único botón que queda es «Editar»**. El de
-pausar/activar no se dibuja sobre lo agotado, así que el servicio quedaba sin
-forma de reactivarse desde el panel.
+Dos de las tres acciones de una categoría no tenían **ni texto ni nombre
+accesible**: para quien usa un lector de pantalla no existían, y para quien ve
+la pantalla eran dos rectángulos vacíos.
 
-### 2. El recorrido completo, antes y después
-
-Lo medí paso por paso sobre un servicio recién publicado —la fila nace con
-stock 0, que es el valor por omisión de la columna—:
+Y en la API y en la base, medido antes de tocar nada:
 
 ```
-                        ANTES (ebb2b20)                       DESPUÉS
-1. recién publicado     Activo · SERVICIO · Por hectárea      igual
-2. pausar               Agotado · INSUMO · Stock: 0           Pausado · SERVICIO · Por hectárea
-                        botones: [Editar]                     botones: [Editar, Activar]
-3. reactivar            imposible: no hay botón               Activo · SERVICIO · Por hectárea
-4. editar               Agotado · INSUMO · Stock: 0           Activo · SERVICIO · Por hectárea
-5. recargar la página   Pausado · SERVICIO · Por hectárea     igual
+PATCH /admin/categories/{id}      -> HTTP 405 Method Not Allowed
+PUT   /admin/categories/{id}      -> HTTP 200
+PATCH /admin/form-options/{id}    -> HTTP 405 Method Not Allowed
+PUT   /admin/form-options/{id}    -> HTTP 200
+
+cambiar el valor interno «kg»     -> HTTP 200; en la base quedó «kg_cambiado»
+                                     y 4 publicaciones seguían diciendo «kg»
+dar vuelta «Maquinaria agrícola»  -> HTTP 200 con 10 publicaciones asociadas;
+   (Producto -> Servicio)            en la base is_service = t
+borrar la subcategoría «Semillas  -> HTTP 200; la subcategoría desapareció y
+   y plántulas» (2 publicaciones)     las dos publicaciones quedaron así:
 ```
 
-El paso 5 es el que delata dónde estaba la falla: recargando la página entera
-todo volvía a estar bien. La API y la base decían `operation_kind=servicio`,
-`pricing_type=por_hectarea` y `status=PAUSED` en los cinco momentos. Lo que
-cambiaba era **quién** convertía la respuesta.
+```
+antes:  Semillas de Maíz DK Premium | <subcategoría> | ACTIVE
+        Semillas de Soja RR Intacta | <subcategoría> | ACTIVE
+después: Semillas de Maíz DK Premium | NULL | ACTIVE
+         Semillas de Soja RR Intacta | NULL | ACTIVE
+```
 
-Y en el paso 2 aparecía además una caja de fotografía que un servicio no puede
-tener, más un «Stock: 0» que nadie cargó.
+Ese último es el que más me preocupó: **no falló nada**. La relación deja
+`subcategory_id` en NULL y el vendedor pierde, sin enterarse, la clasificación
+que había declarado. No hay error, no hay aviso y no hay vuelta atrás.
+
+### 2. Después
+
+```
+PATCH  ->  la pantalla ya no lo usa; editar viaja por PUT y persiste
+valor interno distinto        -> HTTP 409, la base sigue en «kg»
+tipo de categoría con publicaciones -> HTTP 409, is_service intacto
+borrar subcategoría referenciada    -> HTTP 409, la subcategoría sigue y las
+                                       publicaciones conservan la suya
+```
+
+Los tres rechazos dicen cuántas publicaciones lo impiden y qué hacer. Por
+ejemplo:
+
+```
+No se puede eliminar la subcategoría 'Agroquímicos': 2 publicación(es) la
+declaran. Cambialas de subcategoría antes de eliminarla, o desactivá la
+subcategoría para que no se ofrezca en el alta.
+```
+
+Y las acciones, ahora, dicen qué hacen y sobre qué:
+
+```
+antes                      después (texto visible + nombre accesible)
+« » (vacío)                Editar        · «Editar la categoría X»
+« » (vacío)                Eliminar      · «Eliminar la categoría X»
+«Subcategorías»            Mostrar/Ocultar subcategorías · «… las de X»
+«✕»                        Eliminar      · «Eliminar la subcategoría X»
+«✓» / «✕»                  Agregar / Cancelar · «… en X»
+«✓» / «✕» (opción)         Guardar / Cancelar · «… la opción X»
+« » (vacío, opción)        Editar / Eliminar  · «… la opción X»
+```
 
 ### 3. Lo que cambió
 
-Un archivo de producto y una función:
-
 ```
- src/components/UserDashboard/UserDashboard.tsx | 113 +++++--------
- scripts/smoke.mjs                              | 209 ++++++++++++++++++++++
-```
-
-La conversión `BackendProduct → UserProduct` estaba **copiada tres veces** y
-las copias no decían lo mismo: la de la carga inicial ya sabía de anatomía —es
-la que arreglamos en la entrega del panel—, y las otras dos, la de
-`reloadUserProducts` y la de la recarga posterior a editar, se habían quedado
-con la regla vieja. Quedó una sola función pura, `aPublicacionDelPanel`, arriba
-del componente, y los tres caminos la llaman:
-
-```
-carga inicial                         → map(aPublicacionDelPanel)
-recarga por pausar/activar/eliminar   → map(aPublicacionDelPanel)
-recarga posterior a editar            → map(aPublicacionDelPanel)
+ backend/app/api/admin.py                        |  62 +++++-
+ src/components/AdminPanel/AdminPanel.tsx        |  81 +++++--
+ src/components/AdminPanel/AdminPanel.module.css |   8 +
+ scripts/smoke.mjs                               | 278 ++++++++++++++++++++++++
 ```
 
-Son 70 líneas menos. Sin capa nueva, sin archivo nuevo, sin Backend, sin
-endpoint, sin migración, sin dependencia y sin rediseño del panel.
+Sin ruta nueva —se usa el `PUT` que ya existía—, sin migración, sin cascada,
+sin dependencia, sin seed y sin reescribir un solo registro. Las ocho líneas de
+CSS son la clase del aviso que explica por qué el tipo quedó bloqueado.
 
-La regla que conserva: `operationKind`, `unit` y `pricingType` viajan siempre,
-y «Agotado» sólo existe donde hay unidades que agotar. En una publicación de
-servicio manda su estado real, activo o pausado.
+El valor interno de una opción se muestra pero no se edita, y el campo lo dice
+al pasar el puntero. El selector de tipo de una categoría con publicaciones
+queda deshabilitado con el porqué al lado, y el servidor lo rechaza igual: la
+pantalla es cortesía, la regla vive en la API.
 
-### 4. El control, en los cuatro momentos
+### 4. Lo que el caso 144 comprueba que SIGUE funcionando
 
-El caso 143 lleva además un producto de verdad con stock 0, publicado por el
-mismo camino. Ese **sí** tiene que decir «Agotado», y lo sigue diciendo en la
-carga inicial, después de pausar el servicio, después de editar y después de
-recargar la página. Sin ese control, «que no diga Agotado» se podría cumplir
-rompiendo el caso legítimo.
+No alcanza con que nada se pueda romper: hay que poder trabajar.
+
+```
+crear una categoría                       sigue
+editar descripción y guardar              persiste, y se ve al volver a entrar
+crear una subcategoría                    sigue
+eliminar una subcategoría sin referencias sigue
+editar la etiqueta de una opción          persiste, y el valor interno no se toca
+```
 
 ### 5. Puertas
 
 ```
-base limpia + node scripts/smoke.mjs            142/143   (131 rojo)
-base limpia otra vez                            141/143   (131 y 114 rojos)
-base limpia una tercera vez                     142/143   (131 rojo)
+base limpia + node scripts/smoke.mjs            143/144   (131 rojo)
+base limpia otra vez                            143/144   (131 rojo)
 npm run build                                   ok
 npm run lint                                    ok (--max-warnings 0)
 node --check scripts/smoke.mjs                  ok
@@ -102,59 +130,58 @@ npm run contraste                               TODO OK, cobertura completa
 npm run hito                                    6/6 pasos
 ```
 
-El **131** es el de siempre: acá no hay demonio de Docker. En tu Mac pasa.
-
-Hice **tres** corridas y no dos por el **114**, que se puso rojo en la segunda
-y pasó en la primera y en la tercera, con el mismo commit y el mismo
-procedimiento. Lo que puedo afirmar:
-
-- El paso que falla es el clic en la acción de una tarjeta del catálogo: la
-  publicación que eligió `prepararEscenarioDeFletes` no ofrecía «Agregar».
-- **No es de mi cambio.** El caso 114 no abre «Mis publicaciones» y no dibuja
-  ninguna tarjeta del panel; toca el perfil del transportista y el catálogo.
-- Descarté dos causas concretas sobre la base de esa corrida: no era compra de
-  lo propio —vendedor y comprador son cuentas distintas— y no era stock
-  reservado: la publicación elegida no tenía ninguna orden ni ningún carrito.
-- No lo pude reproducir aislado, y eso es una limitación del arnés, no una
-  respuesta: el caso 114 depende de la sesión que deja el caso 03, así que
-  corrido solo entra sin sesión y falla por otro motivo.
-
-No lo abrí porque pediste una sola tarea activa y porque no tengo todavía la
-causa. Si querés que lo persiga, la primera medida que haría es que el caso
-guarde el HTML de la tarjeta cuando el botón no aparece: hoy el mensaje dice
-qué esperaba y no qué había.
+El **131** es el de siempre: acá no hay demonio de Docker. En tu Mac pasa. Los
+casos 114 y 121 pasaron en las dos corridas.
 
 ### 6. Hashes
 
 ```
-src/components/UserDashboard/UserDashboard.tsx  5d314eed22fc6395
-scripts/smoke.mjs                               5c5e3ade09a4b868
+backend/app/api/admin.py                        fb4a0726254b5150
+src/components/AdminPanel/AdminPanel.tsx        82c03d9bbb55e048
+src/components/AdminPanel/AdminPanel.module.css 2514caf5b1cb8f01
+scripts/smoke.mjs                               a4086d0dd9a99fe6
 ```
 
 (SHA-256 truncado a 16, del árbol en el commit de producto.)
 
-### 7. Riesgos residuales
+### 7. Decisiones que tomé y conviene que revises
 
-1. **La lista del panel sigue viniendo de `/products/my` sin paginar.** No lo
-   toqué —no es esta tarea—, pero con muchas publicaciones esa respuesta crece
-   sin techo y el panel la convierte entera en cada recarga.
-2. **`operationKind` sigue siendo `string` en el tipo del panel**, no
-   `OperationKind`. La conversión lo pasa tal cual y `normalizarAnatomia` lo
-   ordena al dibujar, que es donde ya vivía la regla. Ajustar el tipo tocaría
-   el formulario de edición y no me pareció parte de esto.
-3. **Una publicación de servicio con stock cargado a mano** —la base lo
-   permite— nunca va a decir «Agotado» en el panel. Es deliberado: un servicio
-   no reserva unidades. Lo aviso porque es una decisión, no un olvido.
-4. **El caso 143 deja dos publicaciones nuevas** del vendedor del seed: el
-   servicio y el producto de control con stock 0. Corre último y no ensucia a
-   nadie, pero quedan en la base como cualquier otro dato de la corrida.
+1. **«El resto de la edición debe persistir» lo leí como capacidad, no como
+   aplicación parcial.** Si el pedido intenta cambiar el tipo de una categoría
+   con publicaciones, respondo 409 y **no aplico nada** de ese pedido. Aplicar
+   el resto y descartar en silencio el tipo dejaría a quien administra creyendo
+   que lo cambió. Editar todo lo demás —nombre, descripción, icono, orden,
+   estado— sigue funcionando en cualquier pedido que no intente ese cambio, y
+   el caso lo comprueba. Si querías lo otro, decímelo y lo doy vuelta.
+2. **Los tres rechazos son 409 y no 400.** Es el mismo código con el que ya
+   respondemos «no se puede en el estado actual» en carrito y checkout. El
+   borrado de categoría con productos, que ya existía, sigue en 400: no lo
+   toqué para no cambiar algo que no me pediste, así que por ahora conviven.
+3. **La subcategoría cuenta TODAS las publicaciones, también las dadas de
+   baja.** Una publicación eliminada sigue apuntando a esa fila y la clave
+   foránea no declara qué hacer con ella; contarla es lo único que evita que el
+   borrado la toque.
 
-### 8. Frenos
+### 8. Riesgos residuales
 
-No toqué Backend: la API y la base ya decían lo correcto en todos los pasos. No
-creé capa ni archivo nuevo: una función pura en el mismo módulo alcanzaba. No
-abrí administración, navegación, formularios, BOEDA, Mercado Pago ni el riesgo
-de escritura de `localStorage`. No desplegué. `PRE_FIRMA.md` sigue fuera del
-versionado y lo confirmé antes de empujar.
+1. **El `window.confirm` sigue ahí.** El caso lo acepta como lo haría una
+   persona. Queda para `ADMIN-SAFETY-1`, como pediste.
+2. **Los datos ya dañados no se reparan.** Si en alguna base alguien ya borró
+   una subcategoría referenciada, esas publicaciones quedaron con
+   `subcategory_id` en NULL y esto no las recupera: no reescribo registros.
+   Se puede ver con una consulta si querés abrirlo.
+3. **La opción de formulario se puede eliminar aunque haya publicaciones que
+   usen su valor.** No lo cerré: no estaba en el alcance y el efecto es otro
+   —la publicación conserva el texto, lo que se pierde es la etiqueta legible—.
+   Lo dejo anotado porque es de la misma familia.
+4. **La lista de categorías no pagina**, y la de opciones tampoco. No lo abrí.
+
+### 9. Frenos
+
+No agregué rutas `PATCH` ni sostuve dos métodos para la misma mutación. No
+creé confirmaciones nuevas. No abrí paginación, métricas, estados, navegación,
+formularios de publicación, BOEDA, Mercado Pago ni la seguridad final. No
+desplegué. `PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de
+empujar.
 
 Freno acá y te pido revisión.
