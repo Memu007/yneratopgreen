@@ -361,6 +361,13 @@ inmutable, cambio Producto↔Servicio bloqueado en categorías usadas y eliminac
 de subcategorías usadas rechazada limpiamente. Alcance y puertas en
 `PARA-DEV.md`; no abre paginación, rediseño ni despliegue.
 
+La entrega `edf3cb5`/`c657c47` queda **en revisión, no aceptada todavía**. PM
+obtuvo build, lint, compileall, `pip check` y caso 144 aislado en 1/1, pero la
+regresión contiene un `|| true` que vuelve imposible que falle una comprobación
+visual y no verifica la persistencia visible de la opción tras recargar ni
+enumera todos los botones de los formularios. La corrección pedida es sólo de
+evidencia; no autoriza cambios nuevos de producto ni otra tarea.
+
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se
 muestran antes de elegir; el dominio no existe en el contrato ni en la consulta

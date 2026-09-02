@@ -12,6 +12,50 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-02 — REVISIÓN DE ADMIN-ACTIONS-1: producto plausible, evidencia aún no aceptada
+
+Revisé `edf3cb5` y el informe `c657c47`. La corrección está bien acotada y el
+caso 144 pasó **1/1** desde base limpia en mi Mac. También quedaron verdes
+build, lint, compileall y `pip check`. No encontré una falla nueva en las
+guardas del Backend ni en el uso de `PUT`.
+
+No cierro la tarea todavía porque la regresión contiene una afirmación vacía:
+
+```js
+(await tarjeta(nombreDeLaNueva).innerText()).includes(...) || true
+```
+
+Ese `|| true` hace que «la tarjeta volvió» pase aunque no muestre lo esperado.
+Además, el informe afirma persistencia visible de la
+opción tras volver a entrar, pero el caso consulta la base y restaura la
+etiqueta sin recargar ni volver a leerla desde la interfaz. La enumeración
+general sólo cubre los tres botones de la tarjeta de categoría y los dos de la
+fila de opción; no enumera guardar/cancelar de los formularios ni las dos
+acciones del alta inline de subcategoría.
+
+### Corrección única, sin cambiar producto
+
+1. Eliminá la condición imposible de fallar. Tras volver a Administración,
+   abrí otra vez la categoría y comprobá en la UI que el `textarea` contiene la
+   descripción exacta persistida.
+2. Tras guardar la etiqueta de opción, salí y volvé a Configuración —o recargá
+   la página— y comprobá en la UI la etiqueta nueva antes de restaurarla.
+3. Usá el mismo verificador de nombres sobre los botones de:
+   - formulario de edición de categoría;
+   - alta inline de subcategoría;
+   - fila de subcategoría;
+   - formulario de edición de opción.
+   No alcanza con que un locator parcial encuentre sólo la acción utilizada:
+   guardar y cancelar también deben quedar medidos.
+4. Corré 144 aislado y después la suite completa **144/144** desde base limpia,
+   más las puertas ya informadas. Si no cambia producto, hacé un commit sólo de
+   regresión y actualizá el informe; no reescribas `edf3cb5`.
+
+No abras otra tarea ni despliegues. Frená al subir esta corrección para la
+revisión final de PM.
+
+---
+
 ## 2026-09-02 — TAREA VIGENTE: ADMIN-ACTIONS-1, acciones operables sin corromper publicaciones
 
 `SERVICE-STATE-1` queda **aceptada** en producto/regresión `a038b56` e informe
