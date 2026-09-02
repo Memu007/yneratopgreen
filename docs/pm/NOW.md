@@ -340,11 +340,19 @@ La trazabilidad está en `REPRODUCCION-TRANSFER-REC-1-2026-09-02.md`. El informe
 de Dev dice por error que `TRANSFER-REVIEW-1` quedó cerrada: no fue abierta y
 sigue pendiente en el roadmap.
 
-**La tarea activa de Dev es CART-RECOVERY-1:** una copia corrupta de
-`agromarket_cart` debe descartarse de forma acotada, la aplicación debe
-arrancar y un carrito válido del servidor no puede borrarse ni recibir un sync
-vacío por esa recuperación. Alcance y puertas en `PARA-DEV.md`; no abre otras
-tareas ni despliega.
+CART-RECOVERY-1 queda **aceptada** en producto/regresión `ebb2b20` e informe
+`8c29f47`. PM verificó build y lint, el caso 142 aislado en **1/1** y la suite
+oficial completa desde otra base limpia en **142/142**, salida 0; también
+pasaron los casos 121 y 131. Evidencia en
+`REPRODUCCION-CART-RECOVERY-1-2026-09-02.md`. El riesgo de una escritura de
+`localStorage` bloqueada o sin cuota queda registrado como borde futuro y no
+forma parte de esta aceptación.
+
+**La tarea activa de Dev es SERVICE-STATE-1:** un único mapeador del panel debe
+conservar anatomía, modalidad y estado de los servicios en carga inicial,
+pausa/reactivación, edición y recarga. Un servicio con stock técnico 0 no puede
+convertirse en «Agotado»; un producto real sin stock sí. Alcance y puertas en
+`PARA-DEV.md`; no abre otras tareas ni despliega.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se

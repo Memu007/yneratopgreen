@@ -12,6 +12,65 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-02 — TAREA VIGENTE: SERVICE-STATE-1, conservar anatomía y estado de servicios
+
+`CART-RECOVERY-1` queda **aceptada** en producto/regresión `ebb2b20` e informe
+`8c29f47`. PM verificó build y lint, ejecutó el caso 142 aislado desde base
+limpia (**1/1**) y después la suite oficial completa desde otra base limpia:
+**142/142**, salida 0. Los casos 121 y 131 también pasaron. Evidencia en
+`REPRODUCCION-CART-RECOVERY-1-2026-09-02.md`.
+
+El riesgo informado de que `localStorage.setItem` pueda fallar si el navegador
+bloquea o llena el almacenamiento queda registrado, pero no bloquea esta
+aceptación ni se abre ahora: no fue el defecto encargado.
+
+### Defecto a reproducir antes de tocar código
+
+En **Mis publicaciones**, usá una publicación real de servicio o logística con
+stock 0. La carga inicial la reconoce como servicio, pero
+`reloadUserProducts` y la recarga posterior a editar usan `stock === 0` para
+marcarla «Agotado» y omiten `operationKind`, `unit` y `pricingType`.
+
+Reproducí desde la interfaz al menos esta secuencia: servicio activo → pausar →
+reactivar → editar → recargar. Guardá el rojo que demuestre en qué paso pierde
+la anatomía o muestra «Agotado». La API y la base deben seguir diciendo que es
+un servicio; la falla a corregir está en cómo el panel vuelve a mapearlo.
+
+### Alcance mínimo
+
+1. Dejá una sola conversión `BackendProduct → UserProduct` dentro del módulo y
+   usala en la carga inicial, `reloadUserProducts` y la recarga posterior a
+   editar.
+2. Esa conversión conserva `operationKind`, `unit` y `pricingType`; sólo una
+   publicación que usa stock puede quedar «Agotado» por stock 0. En servicios,
+   el estado real activo/pausado manda.
+3. Pausar, reactivar, editar y recargar un servicio deben conservar anatomía,
+   modalidad y estado visibles. Como control, un producto real con stock 0
+   debe seguir apareciendo «Agotado».
+
+### Límites
+
+- Preferencia: un mapeador compartido en `UserDashboard.tsx` y una regresión de
+  navegador. No crees una capa o archivo nuevo si una función pura local basta.
+- Sin Backend, endpoint, migración, dependencia, seed ni cambios de datos
+  contractuales. Sin rediseño del panel.
+- No abras administración, navegación, formularios, BOEDA, Mercado Pago ni el
+  riesgo de escritura de `localStorage`. No despliegues.
+
+### Puerta de aceptación
+
+1. Caso nuevo rojo contra `ebb2b20` y verde después, por el recorrido real del
+   panel: activo, pausa, reactivación, edición y recarga completa.
+2. El caso contrasta UI, API y base; afirma que el servicio nunca se vuelve
+   «Agotado», conserva anatomía/modalidad, y que el control de producto con
+   stock 0 sí sigue «Agotado».
+3. Suite completa desde base limpia con el nuevo total, más build, lint,
+   compileall, `pip check`, `diff --check`, accesibilidad y contraste verdes.
+4. Producto/regresión en un commit e informe separado en `PARA-PM.md`. Frená
+   ahí y pedime revisión; una sola tarea activa.
+
+---
+
 ## 2026-09-02 — TAREA VIGENTE: CART-RECOVERY-1, recuperar un carrito local inválido
 
 `TRANSFER-REC-1` queda **aceptada** en producto/regresión `14d561b` e informe

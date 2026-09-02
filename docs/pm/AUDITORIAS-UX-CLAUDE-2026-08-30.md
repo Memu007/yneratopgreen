@@ -246,9 +246,11 @@ autoridad en checkout; la UI puede anticipar el error, no sustituir esa defensa.
 
 ### R2 — carrito inválido rompe cada arranque
 
-**Dictamen PM:** confirmado, elevar a P1 pequeño.  
-`CartContext` hace `JSON.parse` sin capturar. El `ErrorBoundary` muestra
-«Recargá», pero recargar vuelve a leer el mismo valor inválido y cae otra vez.  
+**Dictamen PM:** cerrado en `ebb2b20`/`8c29f47`; PM verificó caso 142 aislado y
+suite oficial 142/142 desde bases limpias.  
+Antes del cierre, `CartContext` hacía `JSON.parse` sin capturar. El
+`ErrorBoundary` mostraba «Recargá», pero recargar volvía a leer el mismo valor
+inválido y caía otra vez.  
 **Cierre mínimo:** validar/recuperar el valor, retirar sólo la copia local
 inválida y arrancar con carrito vacío; no borrar un carrito servidor válido.
 
