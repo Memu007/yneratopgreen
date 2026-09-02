@@ -15838,6 +15838,212 @@ await runCase(141, 'Una transferencia sin comprobante se retoma desde Mis compra
   }
 });
 
+await runCase(142, 'Una copia local de carrito inservible no voltea la aplicacion', async () => {
+  // `CartContext` leia `agromarket_cart` y hacia `JSON.parse` sin captura. Con
+  // un valor que no fuera un carrito, la excepcion subia hasta el
+  // `ErrorBoundary`: la pantalla entera quedaba en «Ocurrio un error», y
+  // «Recarga la pagina» volvia a caer, porque el dato seguia guardado. No habia
+  // manera de salir sin vaciar el almacenamiento a mano.
+  //
+  // El caso mira lo que ve una persona —si el catalogo esta o no esta— y no el
+  // texto de ninguna implementacion. Y comprueba las tres cosas juntas: que lo
+  // inservible se descarte, que lo valido se conserve, y que recuperar la copia
+  // local no toque el carrito del servidor.
+
+  const entrada = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'cliente@ejemplo.com', password: 'cliente123' },
+  });
+  const comprador = {
+    token: entrada.data.access_token,
+    refresco: entrada.data.refresh_token,
+    id: entrada.data.user.id,
+  };
+  const vendedor = (await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  })).data.user.id;
+
+  // Una clave ajena al carrito, para probar que la recuperacion descarta ESA y
+  // ninguna otra: los tokens y las preferencias no son asunto del carrito.
+  const CLAVE_AJENA = 'topgreen_preferencia_smoke';
+  const VALOR_AJENO = 'no me toques';
+
+  const INSERVIBLES = [
+    ['JSON malformado', '{no es json'],
+    ['raiz que no es un arreglo', '{"items":[{"product_id":"x","quantity":1}]}'],
+    ['arreglo con un item sin publicacion', '[{"quantity":2}]'],
+  ];
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const nuevaPagina = async (guardado) => {
+      const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+      await context.addInitScript(({ v, a, r, ca, va }) => {
+        // Ojo: esto corre en CADA navegacion, tambien en la recarga. Por eso el
+        // carrito solo se escribe cuando se pide; si se reescribiera siempre, la
+        // recarga taparia lo que hizo la aplicacion y la prueba se mentiria sola.
+        if (v !== null) window.localStorage.setItem('agromarket_cart', v);
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+        window.localStorage.setItem(ca, va);
+      }, {
+        v: guardado, a: comprador.token, r: comprador.refresco,
+        ca: CLAVE_AJENA, va: VALOR_AJENO,
+      });
+      const page = await context.newPage();
+      return { context, page };
+    };
+
+    const seCayo = async (page) => await page
+      .getByRole('heading', { name: /Ocurri[oó] un error/i }).count() > 0;
+    const hayCatalogo = async (page) => await page.locator('#catalog-category').count() > 0;
+    const loGuardado = (page) => page.evaluate((ajena) => ({
+      carrito: window.localStorage.getItem('agromarket_cart'),
+      ajena: window.localStorage.getItem(ajena),
+      acceso: window.localStorage.getItem('access_token'),
+    }), CLAVE_AJENA);
+    const cuerpo = async (page) => ((await page.locator('body').textContent()) || '')
+      .replace(/\s+/g, ' ');
+
+    // --- A. lo inservible se descarta y la aplicacion sigue en pie ----------
+    for (const [etiqueta, valor] of INSERVIBLES) {
+      const { context, page } = await nuevaPagina(valor);
+      try {
+        await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+        // Sin espera fija: o aparece el catalogo, o aparece el cartel de caida.
+        await esperarA(async () => await hayCatalogo(page) || await seCayo(page),
+          `la pantalla no resolvio con ${etiqueta}`, 25_000);
+
+        assert(!(await seCayo(page)),
+          `con ${etiqueta} la aplicacion se cayo: «${(await cuerpo(page)).slice(0, 160)}»`);
+        assert(await hayCatalogo(page),
+          `con ${etiqueta} el catalogo no esta y no hay como navegar`);
+
+        const quedo = await loGuardado(page);
+        assert(quedo.carrito === null || quedo.carrito === '[]',
+          `con ${etiqueta} la copia dañada sigue guardada: ${JSON.stringify(quedo.carrito)}`);
+        assert(quedo.ajena === VALOR_AJENO,
+          `con ${etiqueta} se borro una clave que no era el carrito: ${JSON.stringify(quedo.ajena)}`);
+        assert(quedo.acceso === comprador.token,
+          `con ${etiqueta} se perdio la sesion al recuperar el carrito`);
+
+        // El carrito arranca vacio y se puede abrir sin romper nada.
+        await page.getByRole('button', { name: /Carrito/ }).first().click();
+        await page.getByRole('heading', { name: 'Mi carrito (0)' })
+          .waitFor({ state: 'visible', timeout: 15_000 });
+        assert((await cuerpo(page)).includes('Tu carrito está vacío'),
+          `con ${etiqueta} el carrito no arranca vacio: «${(await cuerpo(page)).slice(0, 160)}»`);
+
+        // Y la segunda mitad del defecto: recargar ya no repite la caida.
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await esperarA(async () => await hayCatalogo(page) || await seCayo(page),
+          `la recarga con ${etiqueta} no resolvio`, 25_000);
+        assert(!(await seCayo(page)), `con ${etiqueta} la recarga vuelve a caer`);
+      } finally {
+        await context.close();
+      }
+    }
+
+    // --- B. un carrito valido se conserva tal cual --------------------------
+    // Se arma por el camino real, agregando desde el catalogo, y despues se
+    // recarga la pagina entera. Lo guardado tiene que quedar identico y el
+    // carrito tiene que seguir mostrando su publicacion.
+    const producto = productoConStock(vendedor, 2);
+    const [[nombreDelProducto]] = queryRows(
+      `SELECT name FROM products WHERE id = ${sqlLiteral(producto)}`);
+    let resumenValido = '';
+    {
+      const { context, page } = await nuevaPagina(null);
+      try {
+        await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+        await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 25_000 });
+
+        const buscador = page.getByLabel('Buscar en el mercado');
+        await buscador.fill(nombreDelProducto);
+        await buscador.press('Enter');
+        await page.getByRole('heading', { name: nombreDelProducto, exact: true, level: 3 })
+          .waitFor({ state: 'visible', timeout: 20_000 });
+        await accionDeLaTarjeta(page, nombreDelProducto).click();
+
+        await esperarA(async () => {
+          const guardado = (await loGuardado(page)).carrito;
+          return Boolean(guardado) && guardado.includes(producto);
+        }, 'el producto agregado no llego a la copia local', 15_000);
+        const antes = (await loGuardado(page)).carrito;
+
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 25_000 });
+        await esperarA(async () => (await loGuardado(page)).carrito !== null,
+          'despues de recargar no quedo copia local ninguna', 15_000);
+
+        const despues = (await loGuardado(page)).carrito;
+        assert(despues === antes,
+          `un carrito valido no sobrevivio la recarga: antes ${antes.length} caracteres, `
+          + `despues ${JSON.stringify((despues || '').slice(0, 90))}`);
+
+        // Y se ve, que es lo que le importa a quien compra.
+        await page.getByRole('button', { name: /Carrito/ }).first().click();
+        await page.getByRole('heading', { name: 'Mi carrito (1)' })
+          .waitFor({ state: 'visible', timeout: 15_000 });
+        assert((await cuerpo(page)).includes(nombreDelProducto),
+          `el carrito no muestra «${nombreDelProducto}» despues de recargar`);
+        resumenValido = `«${nombreDelProducto}» sobrevive con los mismos ${antes.length} caracteres`;
+      } finally {
+        await context.close();
+      }
+    }
+
+    // --- C. el carrito del servidor no se toca ------------------------------
+    // Con sesion y con un carrito en el servidor, recuperar una copia local
+    // dañada no puede mandar un `sync` vacio: eso borraria del servidor lo que
+    // esa cuenta tenia, y el servidor es la autoridad al entrar al checkout.
+    let resumenServidor = '';
+    {
+      await apiRequest('/cart', { method: 'DELETE', token: comprador.token });
+      await apiRequest('/cart/items', {
+        method: 'POST', token: comprador.token, body: { product_id: producto, quantity: 2 },
+      });
+      const enElServidor = () => queryRows(`
+        SELECT ci.product_id, ci.quantity::text
+        FROM cart_items ci JOIN carts c ON c.id = ci.cart_id
+        WHERE c.user_id = ${sqlLiteral(comprador.id)}
+        ORDER BY ci.product_id`);
+      const antes = JSON.stringify(enElServidor());
+      assert(antes.includes(producto), `el carrito del servidor no quedo armado: ${antes}`);
+
+      const { context, page } = await nuevaPagina('{no es json');
+      const sincronizaciones = [];
+      page.on('request', (peticion) => {
+        if (peticion.url().includes('/cart/sync')) sincronizaciones.push(peticion.postData() || '');
+      });
+      try {
+        await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+        await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 25_000 });
+        await page.getByRole('button', { name: /Carrito/ }).first().click();
+        await page.getByRole('heading', { name: 'Mi carrito (0)' })
+          .waitFor({ state: 'visible', timeout: 15_000 });
+
+        const despues = JSON.stringify(enElServidor());
+        assert(despues === antes,
+          `recuperar la copia local cambio el carrito del servidor: antes ${antes}, despues ${despues}`);
+        assert(sincronizaciones.length === 0,
+          `la recuperacion mando ${sincronizaciones.length} sincronizacion(es): `
+          + JSON.stringify(sincronizaciones).slice(0, 200));
+        resumenServidor = `${enElServidor().length} item(s) intactos y 0 sync`;
+      } finally {
+        await context.close();
+        await apiRequest('/cart', { method: 'DELETE', token: comprador.token });
+      }
+    }
+
+    return `Con ${INSERVIBLES.length} copias locales inservibles la aplicacion sigue navegable, `
+      + 'se descarta solo agromarket_cart —sesion y otra clave intactas—, el carrito abre vacio y '
+      + `recargar no repite la caida; ${resumenValido}; y con carrito en el servidor: `
+      + resumenServidor;
+  } finally {
+    await browser.close();
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

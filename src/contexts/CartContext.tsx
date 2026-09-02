@@ -4,6 +4,7 @@ import { CartItem, CartContextType, Product } from '../types';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../hooks/useAuth';
 import { apiFetch } from '../utils/api';
+import { tienePrecioPublicado } from '../utils/anatomia';
 
 // Cómo se resume un carrito para saber si el servidor ya tiene esto mismo.
 // Es pura y vive afuera del componente: así no cambia de identidad en cada
@@ -13,28 +14,87 @@ const retratoDe = (lista: CartItem[]) => lista
   .sort()
   .join('|');
 
+// La única clave del carrito. Se nombra una vez porque la recuperación
+// tiene que poder descartar ESA y ninguna otra.
+const CLAVE_DEL_CARRITO = 'agromarket_cart';
+
+/**
+ * ¿Esta entrada de la copia local sirve como ítem del carrito?
+ *
+ * El mínimo es lo que el carrito necesita para existir: una publicación
+ * identificada, con un precio que se pueda cobrar —la misma regla que usa el
+ * catálogo— y una cantidad positiva. Sin eso no hay total que sumar ni ítem
+ * que mandar al checkout, y el intento de dibujarlo tira la aplicación entera.
+ */
+const esItemUsable = (entrada: unknown): entrada is CartItem => {
+  if (!entrada || typeof entrada !== 'object') return false;
+  const { product, quantity } = entrada as { product?: unknown; quantity?: unknown };
+  if (!product || typeof product !== 'object') return false;
+  const { id } = product as { id?: unknown };
+  return typeof id === 'string' && id.trim() !== ''
+    && tienePrecioPublicado(product as Product)
+    && typeof quantity === 'number' && Number.isFinite(quantity) && quantity > 0;
+};
+
+/**
+ * El carrito con el que arranca la pantalla.
+ *
+ * Se lee al construir el estado y no en un efecto. El efecto que guarda corre
+ * en el mismo montaje y, si la lectura fuera otro efecto, escribiría el
+ * carrito vacío inicial encima de lo guardado antes de que esa lectura
+ * llegara a verse: con React en modo estricto —el de `npm run dev`— el
+ * segundo montaje leía ese vacío y el carrito se perdía en cada recarga.
+ *
+ * Lo que no se pueda convertir en un carrito usable se descarta, y se
+ * descarta SÓLO esta clave: los tokens y las preferencias de quien navega no
+ * son asunto del carrito. Un carrito válido se conserva tal cual.
+ */
+const carritoGuardado = (): CartItem[] => {
+  let guardado: string | null = null;
+  try {
+    guardado = localStorage.getItem(CLAVE_DEL_CARRITO);
+  } catch {
+    // Sin almacenamiento —modo privado, permisos— se arranca vacío y se sigue.
+    return [];
+  }
+  if (guardado === null) return [];
+
+  let leido: unknown;
+  try {
+    leido = JSON.parse(guardado);
+  } catch {
+    leido = undefined;
+  }
+
+  const usables = Array.isArray(leido) ? leido.filter(esItemUsable) : [];
+  if (usables.length > 0) return usables;
+
+  // No quedó nada aprovechable: se descarta la copia dañada. Si ya estaba
+  // vacía no hay nada que descartar y la clave se deja como está.
+  if (guardado !== '[]') {
+    try {
+      localStorage.removeItem(CLAVE_DEL_CARRITO);
+    } catch {
+      // Si tampoco se puede borrar, el carrito vacío alcanza para seguir.
+    }
+  }
+  return [];
+};
+
 interface CartProviderProps {
   children: ReactNode;
 }
 
 export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<CartItem[]>(carritoGuardado);
   const { showToast } = useToast();
   const { user } = useAuth();
-
-  // Cargar carrito desde localStorage al iniciar
-  useEffect(() => {
-    const storedCart = localStorage.getItem('agromarket_cart');
-    if (storedCart) {
-      setItems(JSON.parse(storedCart));
-    }
-  }, []);
 
   // Limpiar carrito cuando el usuario cierra sesión
   useEffect(() => {
     const handleLogout = () => {
       setItems([]);
-      localStorage.removeItem('agromarket_cart');
+      localStorage.removeItem(CLAVE_DEL_CARRITO);
     };
     window.addEventListener('user-logout', handleLogout);
     return () => window.removeEventListener('user-logout', handleLogout);
@@ -42,7 +102,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
   // Guardar carrito en localStorage cuando cambie
   useEffect(() => {
-    localStorage.setItem('agromarket_cart', JSON.stringify(items));
+    localStorage.setItem(CLAVE_DEL_CARRITO, JSON.stringify(items));
   }, [items]);
 
   const addItem = (product: Product, quantity: number = 1) => {
