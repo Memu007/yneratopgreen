@@ -348,11 +348,18 @@ pasaron los casos 121 y 131. Evidencia en
 `localStorage` bloqueada o sin cuota queda registrado como borde futuro y no
 forma parte de esta aceptación.
 
-**La tarea activa de Dev es SERVICE-STATE-1:** un único mapeador del panel debe
-conservar anatomía, modalidad y estado de los servicios en carga inicial,
-pausa/reactivación, edición y recarga. Un servicio con stock técnico 0 no puede
-convertirse en «Agotado»; un producto real sin stock sí. Alcance y puertas en
-`PARA-DEV.md`; no abre otras tareas ni despliega.
+SERVICE-STATE-1 queda **aceptada** en producto/regresión `a038b56` e informe
+`bad5a1b`. PM revisó el mapeador único, verificó build y lint, ejecutó el caso
+143 aislado desde base limpia en **1/1** y después la suite oficial completa
+desde otra base limpia en **143/143**, salida 0. También pasaron 114, 121 y
+131. Evidencia en `REPRODUCCION-SERVICE-STATE-1-2026-09-02.md`.
+
+**La tarea activa de Dev es ADMIN-ACTIONS-1:** corregir el `PATCH`/`PUT` de
+categorías y opciones, dar nombre visible y accesible a las acciones del bloque
+y cerrar tres mutaciones peligrosas sin migrar datos: `FormOption.value`
+inmutable, cambio Producto↔Servicio bloqueado en categorías usadas y eliminación
+de subcategorías usadas rechazada limpiamente. Alcance y puertas en
+`PARA-DEV.md`; no abre paginación, rediseño ni despliegue.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se

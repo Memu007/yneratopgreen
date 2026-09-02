@@ -12,6 +12,83 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-02 — TAREA VIGENTE: ADMIN-ACTIONS-1, acciones operables sin corromper publicaciones
+
+`SERVICE-STATE-1` queda **aceptada** en producto/regresión `a038b56` e informe
+`bad5a1b`. PM revisó el diff, verificó build y lint, ejecutó el caso 143 aislado
+desde base limpia (**1/1**) y después la suite oficial completa desde otra base
+limpia: **143/143**, salida 0. En esa corrida también pasaron 114, 121 y 131.
+Evidencia en `REPRODUCCION-SERVICE-STATE-1-2026-09-02.md`.
+
+El rojo transitorio que Dev informó una vez en el caso 114 no reapareció en la
+repetición completa de PM y Dev tampoco logró repetirlo. No abre un cambio de
+producto: si vuelve, el arnés deberá conservar la tarjeta visible que explique
+por qué faltó su acción.
+
+### Defectos y riesgos a reproducir antes de tocar código
+
+1. Editar una categoría o una opción desde Administración envía `PATCH`, pero
+   el Backend sólo expone `PUT`; el recorrido termina en `405` y no persiste.
+2. Editar/eliminar categorías y opciones son botones vacíos. La eliminación de
+   subcategoría y las confirmaciones inline sólo dicen `✕`/`✓`; no comunican una
+   acción inequívoca a simple vista ni por nombre accesible.
+3. El Backend acepta cambiar Producto↔Servicio aun con publicaciones asociadas.
+   Eso puede reinterpretar stock y anatomía ya publicados.
+4. El Backend elimina una subcategoría sin comprobar si una publicación la
+   referencia; la FK no declara borrado en cascada ni `SET NULL`, así que no hay
+   una respuesta de negocio segura.
+5. `FormOption.value` se copia como texto en `Product.unit`, `pricing_type`,
+   `availability` y `response_time`. Cambiarlo no migra esos registros y deja
+   dos valores internos para el mismo concepto.
+
+Guardá el rojo de interfaz/API/base contra `a038b56`. No alcanza con afirmar el
+problema por lectura estática.
+
+### Decisiones y alcance mínimo
+
+1. Reutilizá `apiPut` para categorías y opciones. No agregues rutas `PATCH` ni
+   sostengas dos métodos para la misma mutación.
+2. Cada acción de categorías, subcategorías y opciones debe tener texto visible
+   inequívoco y nombre accesible: mostrar/ocultar, editar, eliminar, guardar y
+   cancelar según corresponda. Sin emojis, iconos inventados ni rediseño.
+3. El valor interno de una opción queda **inmutable después de crearla**. La UI
+   puede mostrarlo, pero no editarlo; el Backend debe rechazar un valor distinto.
+   Etiqueta, orden y estado siguen siendo editables.
+4. Bloqueá en UI y Backend el cambio Producto↔Servicio cuando la categoría tenga
+   al menos una publicación no eliminada. El resto de la edición debe persistir.
+5. Bloqueá la eliminación de una subcategoría que todavía esté referenciada por
+   cualquier publicación y devolvé un error de negocio accionable, sin borrar ni
+   alterar la publicación. Una subcategoría sin referencias sigue eliminándose.
+6. Conservá creación, edición permitida y eliminación permitida: no resuelvas
+   seguridad deshabilitando todo el panel.
+
+### Límites
+
+- Corrección acotada al panel administrativo, sus rutas existentes y la
+  regresión. Sin migración, dependencia, cascada, reescritura de datos ni seed.
+- Sin confirmaciones modales nuevas: `window.confirm` se reemplaza en
+  `ADMIN-SAFETY-1`. Acá sólo se corrigen método, nombres y guardas de integridad.
+- No abras paginación, métricas, estados, navegación, formularios de publicación,
+  BOEDA, Mercado Pago, seguridad final ni otros hallazgos. No despliegues.
+
+### Puerta de aceptación
+
+1. Caso nuevo 144 rojo contra `a038b56` y verde después, usando la UI real de
+   Administración y contrastando API y base.
+2. El caso edita categoría y opción, recarga y prueba persistencia; comprueba que
+   el método ya no devuelve `405` y que todas las acciones del bloque tienen
+   nombre visible/accesible no vacío y específico.
+3. El mismo caso demuestra que no cambian: valor interno de opción, tipo de una
+   categoría usada ni subcategoría usada. Base y publicación quedan intactas y
+   la respuesta es accionable. Como controles, modifica los campos permitidos y
+   elimina una subcategoría nueva sin referencias.
+4. Suite completa desde base limpia con el nuevo total, más build, lint,
+   compileall, `pip check`, `diff --check`, accesibilidad y contraste verdes.
+5. Producto/regresión en un commit e informe separado en `PARA-PM.md`. Frená
+   ahí y pedime revisión; una sola tarea activa.
+
+---
+
 ## 2026-09-02 — TAREA VIGENTE: SERVICE-STATE-1, conservar anatomía y estado de servicios
 
 `CART-RECOVERY-1` queda **aceptada** en producto/regresión `ebb2b20` e informe

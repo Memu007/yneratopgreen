@@ -139,7 +139,13 @@ Debe quitarse la acción/promesa o darle una conducta real, sin inventar planes.
 
 ### F1 — servicios vuelven a «Agotado» después de recargar el panel
 
-**Dictamen PM:** confirmado, P1.  
+**Dictamen PM:** cerrado.
+**Cierre:** `a038b56`/`bad5a1b`. PM verificó el caso 143 aislado en 1/1 y la
+suite oficial en 143/143 desde bases limpias, además de build y lint. El
+mapeador único conserva anatomía, modalidad y estado al cargar, pausar,
+reactivar, editar y recargar; el producto real sin stock permanece «Agotado».
+Evidencia en `REPRODUCCION-SERVICE-STATE-1-2026-09-02.md`.
+**Estado anterior:** confirmado, P1.
 **Recorrido:** Mis publicaciones → pausar/activar, editar o eliminar servicio.  
 **Actual:** la carga inicial distingue servicios sin stock, pero
 `reloadUserProducts` y la recarga posterior a editar aplican `stock === 0`
