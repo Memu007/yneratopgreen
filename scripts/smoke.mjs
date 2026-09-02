@@ -16044,6 +16044,215 @@ await runCase(142, 'Una copia local de carrito inservible no voltea la aplicacio
   }
 });
 
+await runCase(143, 'Pausar, reactivar o editar no le cambian la anatomia a una publicacion', async () => {
+  // «Mis publicaciones» convertia la respuesta del backend en tres lugares
+  // distintos —la carga inicial, la recarga despues de pausar/activar/eliminar
+  // y la recarga despues de editar— y las tres copias no decian lo mismo. Dos
+  // se olvidaban de `operation_kind`, `unit` y `pricing_type`, y ponian
+  // «Agotado» con solo mirar stock 0.
+  //
+  // Lo que veia el vendedor: pausaba un servicio y la tarjeta pasaba a decir
+  // «Agotado», «INSUMO ESTANDARIZADO», «Stock: 0» y a reservar lugar para una
+  // fotografia. Y como el boton de pausar/activar no se dibuja sobre lo
+  // agotado, el servicio quedaba SIN FORMA DE REACTIVARSE desde el panel: habia
+  // que recargar la pagina entera para recuperarlo.
+  //
+  // El caso recorre eso en el navegador y contrasta cada paso con la API y con
+  // la base, que nunca dejaron de decir que es un servicio.
+
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const [categoriaDeServicio] = queryRows(
+    "SELECT id, 'fin' FROM categories WHERE slug = 'acopio'");
+  const [categoriaDeProducto] = queryRows(`
+    SELECT id, 'fin' FROM categories
+    WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
+  assert(categoriaDeServicio && categoriaDeProducto,
+    'faltan categorias de servicio y de producto para armar el caso');
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+
+  // 1. Un servicio recien publicado por el camino real: la fila nace con stock
+  //    0 —es el valor por omision de la columna— y eso es lo que disparaba el
+  //    «Agotado».
+  const nombreDelServicio = `Smoke servicio de estado ${Date.now()}`;
+  const altaDelServicio = await apiRequest('/products', {
+    method: 'POST', token: vendedor.token,
+    body: {
+      name: nombreDelServicio,
+      description: 'Servicio de prueba para comprobar que el panel no le cambia la anatomia.',
+      category_id: categoriaDeServicio[0],
+      price: 48000,
+      unit: 'hectárea',
+      locality_id: localidad,
+      publication_type: 'servicio',
+      operation_kind: 'servicio',
+      pricing_type: 'por_hectarea',
+    },
+  });
+  assert(altaDelServicio.status < 400,
+    `no se pudo publicar el servicio: HTTP ${altaDelServicio.status}`);
+  const idDelServicio = altaDelServicio.data.id;
+
+  // 2. Y el control: un producto de verdad sin unidades. Ese SI tiene que
+  //    decir «Agotado», y tiene que seguir diciendolo despues de cada recarga.
+  const nombreDelProducto = `Smoke producto agotado ${Date.now()}`;
+  const altaDelProducto = await apiRequest('/products', {
+    method: 'POST', token: vendedor.token,
+    body: {
+      name: nombreDelProducto,
+      description: 'Producto de prueba sin unidades disponibles, para el control de «Agotado».',
+      category_id: categoriaDeProducto[0],
+      price: 12500,
+      stock: 0,
+      unit: 'kg',
+      locality_id: localidad,
+      publication_type: 'producto',
+      operation_kind: 'insumo',
+    },
+  });
+  assert(altaDelProducto.status < 400,
+    `no se pudo publicar el producto de control: HTTP ${altaDelProducto.status}`);
+
+  const enLaBase = () => {
+    const [fila] = queryRows(`
+      SELECT operation_kind, COALESCE(pricing_type, ''), COALESCE(stock::text, 'NULL'),
+             status::text, 'fin'
+      FROM products WHERE id = ${sqlLiteral(idDelServicio)}`);
+    assert(fila, 'el servicio desaparecio de la base');
+    return { anatomia: fila[0], modalidad: fila[1], stock: fila[2], estado: fila[3] };
+  };
+  const enLaApi = async () => {
+    const { data } = await apiRequest('/products/my', { token: vendedor.token });
+    const suyo = data.products.find((p) => p.id === idDelServicio);
+    assert(suyo, 'el servicio no vuelve en /products/my');
+    return suyo;
+  };
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    await contexto.addInitScript(({ a }) => {
+      window.localStorage.setItem('access_token', a);
+      window.localStorage.removeItem('agromarket_cart');
+    }, { a: vendedor.token });
+    const page = await contexto.newPage();
+
+    const abrirPublicaciones = async () => {
+      await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
+      await page.getByRole('button', { name: 'Mis publicaciones' }).click();
+      await page.getByRole('heading', { name: 'Mis publicaciones' }).waitFor({ timeout: 20_000 });
+    };
+    const tarjeta = (nombre) => page
+      .getByRole('heading', { name: nombre, exact: true, level: 3 })
+      .locator('xpath=ancestor::*[contains(@class,"productCard")]');
+    const textoDe = async (nombre) => {
+      const donde = tarjeta(nombre);
+      await donde.waitFor({ timeout: 20_000 });
+      return (await donde.innerText()).replace(/\s+/g, ' ');
+    };
+    // Pausar y activar pasan por una confirmacion: se responde adentro de ella
+    // y no en la tarjeta, que tiene un boton con el mismo rotulo.
+    const confirmar = async (rotulo) => {
+      const dialogo = page.locator('[class*="confirmModal"]');
+      await dialogo.waitFor({ state: 'visible', timeout: 15_000 });
+      await dialogo.getByRole('button', { name: rotulo, exact: true }).click();
+      await dialogo.waitFor({ state: 'hidden', timeout: 15_000 });
+    };
+
+    // Lo que tiene que valer SIEMPRE para el servicio, mire cuando mire.
+    const revisarElServicio = async (momento, estadoEsperado) => {
+      const visto = await textoDe(nombreDelServicio);
+      const base = enLaBase();
+      const api = await enLaApi();
+
+      assert(base.anatomia === 'servicio' && api.operation_kind === 'servicio',
+        `${momento}: la base o la API dejaron de decir que es un servicio `
+        + `(base ${base.anatomia}, API ${api.operation_kind})`);
+      assert(!/Agotado/i.test(visto),
+        `${momento}: el panel lo da por agotado, y un servicio no reserva unidades `
+        + `(la base dice stock ${base.stock}, estado ${base.estado}): «${visto}»`);
+      assert(/SERVICIO/i.test(visto) && !/INSUMO/i.test(visto),
+        `${momento}: la tarjeta perdio la anatomia declarada: «${visto}»`);
+      assert(/Por hectárea/i.test(visto),
+        `${momento}: la tarjeta perdio la modalidad «${api.pricing_type}»: «${visto}»`);
+      assert(!/Stock/i.test(visto),
+        `${momento}: la tarjeta le inventa stock a un servicio: «${visto}»`);
+      assert(await tarjeta(nombreDelServicio).locator('img, [role="img"]').count() === 0,
+        `${momento}: la tarjeta reserva lugar para una fotografia que un servicio no tiene`);
+
+      const rotuloEsperado = estadoEsperado === 'paused' ? 'Pausado' : 'Activo';
+      assert(new RegExp(`(^|\\s)${rotuloEsperado}(\\s|$)`).test(visto),
+        `${momento}: la tarjeta no dice «${rotuloEsperado}»: «${visto}»`);
+      // Y sobre todo: se puede volver atras. El boton que falta es el defecto.
+      const siguiente = estadoEsperado === 'paused' ? 'Activar' : 'Pausar';
+      assert(await tarjeta(nombreDelServicio)
+        .getByRole('button', { name: siguiente, exact: false }).count() === 1,
+      `${momento}: la publicacion quedo sin boton para ${siguiente.toLowerCase()}la`);
+      return visto;
+    };
+
+    // El control, en cada momento: un producto sin unidades sigue agotado.
+    const revisarElControl = async (momento) => {
+      const visto = await textoDe(nombreDelProducto);
+      assert(/Agotado/i.test(visto),
+        `${momento}: un producto con stock 0 dejo de mostrarse agotado: «${visto}»`);
+      assert(/Stock: 0/i.test(visto),
+        `${momento}: el producto perdio su stock formateado: «${visto}»`);
+    };
+
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await abrirPublicaciones();
+
+    // --- A. carga inicial ---------------------------------------------------
+    await revisarElServicio('recien publicado', 'active');
+    await revisarElControl('recien publicado');
+
+    // --- B. pausar (recarga por accion) ------------------------------------
+    await tarjeta(nombreDelServicio).getByRole('button', { name: /Pausar/ }).click();
+    await confirmar('Pausar');
+    await esperarA(async () => enLaBase().estado === 'PAUSED',
+      'el servicio no quedo pausado en la base', 20_000);
+    const pausado = await revisarElServicio('despues de pausar', 'paused');
+    await revisarElControl('despues de pausar');
+
+    // --- C. reactivar, que es lo que el defecto impedia ---------------------
+    await tarjeta(nombreDelServicio).getByRole('button', { name: /Activar/ }).click();
+    await confirmar('Activar');
+    await esperarA(async () => enLaBase().estado === 'ACTIVE',
+      'el servicio no volvio a activo en la base', 20_000);
+    await revisarElServicio('despues de reactivar', 'active');
+
+    // --- D. editar (recarga posterior a editar) -----------------------------
+    await tarjeta(nombreDelServicio).getByRole('button', { name: /Editar/ }).click();
+    const descripcion = page.locator('textarea').first();
+    await descripcion.waitFor({ state: 'visible', timeout: 15_000 });
+    const textoNuevo = 'Descripcion editada para forzar la recarga del panel.';
+    await descripcion.fill(textoNuevo);
+    await page.getByRole('button', { name: /Guardar cambios|Guardar/ }).last().click();
+    await esperarA(async () => {
+      const [fila] = queryRows(
+        `SELECT description FROM products WHERE id = ${sqlLiteral(idDelServicio)}`);
+      return fila && fila[0] === textoNuevo;
+    }, 'la edicion no llego a la base', 25_000);
+    await revisarElServicio('despues de editar', 'active');
+    await revisarElControl('despues de editar');
+
+    // --- E. y una carga nueva dice lo mismo que el panel --------------------
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await abrirPublicaciones();
+    await revisarElServicio('despues de recargar la pagina', 'active');
+    await revisarElControl('despues de recargar la pagina');
+
+    await contexto.close();
+    return `el servicio ${nombreDelServicio.slice(-13)} conserva anatomia, modalidad y estado `
+      + 'en la carga inicial, al pausar, al reactivar, al editar y al recargar la pagina '
+      + `—cuando estuvo pausado la tarjeta decia «${pausado.slice(0, 40)}…» y ofrecia activarlo—, `
+      + 'mientras la API y la base siguen diciendo servicio; y el producto de control con '
+      + 'stock 0 sigue mostrandose «Agotado» en los cuatro momentos';
+  } finally {
+    await browser.close();
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

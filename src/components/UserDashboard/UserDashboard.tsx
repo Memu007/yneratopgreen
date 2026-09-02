@@ -320,6 +320,46 @@ const getImageUrl = (url: string | undefined): string => {
   return `${IMAGES_BASE_URL}${url}`;
 };
 
+/**
+ * Una publicación del backend, como la dibuja el panel.
+ *
+ * Esta conversión vivía copiada tres veces —carga inicial, recarga después de
+ * pausar, activar o eliminar, y recarga después de editar— y las copias no
+ * decían lo mismo: dos perdían la anatomía, la unidad y la modalidad, y
+ * marcaban «Agotado» por stock 0 a publicaciones que no reservan unidades.
+ * Así, pausar un servicio lo dejaba sin botón para reactivarlo. Es una sola
+ * conversión para que las tres pantallas no puedan volver a divergir.
+ */
+const aPublicacionDelPanel = (p: BackendProduct): UserProduct => {
+  // La imagen principal, si la hay.
+  const primaria = p.images?.find((img) => img.is_primary)?.url || p.images?.[0]?.url;
+
+  // «Agotado» sólo existe donde hay unidades que agotar. Un servicio no
+  // reserva stock —lo decide su anatomía— y sin embargo la fila guarda 0,
+  // porque la columna tiene ese valor por omisión y el alta le pasa NULL. En
+  // una publicación de servicio manda su estado real: activo o pausado.
+  const usaStock = !esDeServicio(normalizarAnatomia(p.operation_kind));
+  let status: UserProduct['status'] = 'active';
+  if (usaStock && p.stock === 0) status = 'sold-out';
+  else if (p.status === 'draft' || p.status === 'paused') status = 'paused';
+
+  return {
+    id: p.id,
+    name: p.name,
+    category: p.category?.name || 'Sin categoría',
+    price: p.price,
+    stock: p.stock,
+    operationKind: p.operation_kind,
+    unit: p.unit,
+    pricingType: p.pricing_type,
+    image: getImageUrl(primaria),
+    status,
+    views: p.views_count || 0,
+    likes: p.likes_count || 0,
+    publishedDate: p.created_at,
+  };
+};
+
 // Único armador del formulario de perfil. Sale de la cuenta y de nada más: lo
 // que no está guardado empieza vacío, nunca con un dato de ejemplo. Hidratar y
 // cancelar usan esta misma función, así no pueden divergir.
@@ -648,38 +688,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         // Guardar productos originales del backend
         setBackendProducts(response.products);
         
-        const convertedProducts: UserProduct[] = response.products.map((p: BackendProduct) => {
-          // Obtener la imagen principal
-          const primaryImage = p.images?.find(img => img.is_primary)?.url || p.images?.[0]?.url;
-          
-          // Determinar el estado del producto.
-          //
-          // «Agotado» sólo existe donde hay unidades que agotar. Un servicio no
-          // reserva stock —lo decide `category.is_service`— y sin embargo la
-          // fila guarda 0, porque la columna tiene ese valor por omisión y el
-          // alta le pasa NULL. Con la regla vieja, todo servicio publicado se
-          // mostraba «Agotado».
-          const usaStock = !esDeServicio(normalizarAnatomia(p.operation_kind));
-          let status: UserProduct['status'] = 'active';
-          if (usaStock && p.stock === 0) status = 'sold-out';
-          else if (p.status === 'draft' || p.status === 'paused') status = 'paused';
-          
-          return {
-            id: p.id,
-            name: p.name,
-            category: p.category?.name || 'Sin categoría',
-            price: p.price,
-            stock: p.stock,
-            operationKind: p.operation_kind,
-            unit: p.unit,
-            pricingType: p.pricing_type,
-            image: getImageUrl(primaryImage),
-            status,
-            views: p.views_count || 0,
-            likes: p.likes_count || 0,
-            publishedDate: p.created_at,
-          };
-        });
+        const convertedProducts: UserProduct[] = response.products.map(aPublicacionDelPanel);
         
         setUserProducts(convertedProducts);
       } catch (error) {
@@ -1311,25 +1320,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       const response = await apiGet<{ products: BackendProduct[]; total: number }>('/products/my');
       setBackendProducts(response.products);
       
-      const convertedProducts: UserProduct[] = response.products.map((p: BackendProduct) => {
-        const primaryImage = p.images?.find(img => img.is_primary)?.url || p.images?.[0]?.url;
-        let status: UserProduct['status'] = 'active';
-        if (p.stock === 0) status = 'sold-out';
-        else if (p.status === 'draft' || p.status === 'paused') status = 'paused';
-        
-        return {
-          id: p.id,
-          name: p.name,
-          category: p.category?.name || 'Sin categoría',
-          price: p.price,
-          stock: p.stock,
-          image: getImageUrl(primaryImage),
-          status,
-          views: p.views_count || 0,
-          likes: p.likes_count || 0,
-          publishedDate: p.created_at,
-        };
-      });
+      const convertedProducts: UserProduct[] = response.products.map(aPublicacionDelPanel);
       setUserProducts(convertedProducts);
     } catch (error) {
       console.error('Error al recargar productos:', error);
@@ -1485,25 +1476,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       const response = await apiGet<{ products: BackendProduct[]; total: number }>('/products/my');
       setBackendProducts(response.products);
       
-      const convertedProducts: UserProduct[] = response.products.map((p: BackendProduct) => {
-        const primaryImage = p.images?.find(img => img.is_primary)?.url || p.images?.[0]?.url;
-        let status: UserProduct['status'] = 'active';
-        if (p.stock === 0) status = 'sold-out';
-        else if (p.status === 'draft' || p.status === 'paused') status = 'paused';
-        
-        return {
-          id: p.id,
-          name: p.name,
-          category: p.category?.name || 'Sin categoría',
-          price: p.price,
-          stock: p.stock || 0,
-          image: getImageUrl(primaryImage),
-          status,
-          views: p.views_count || 0,
-          likes: p.likes_count || 0,
-          publishedDate: p.created_at,
-        };
-      });
+      const convertedProducts: UserProduct[] = response.products.map(aPublicacionDelPanel);
       setUserProducts(convertedProducts);
       
     } catch (error) {
