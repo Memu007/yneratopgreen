@@ -16253,6 +16253,284 @@ await runCase(143, 'Pausar, reactivar o editar no le cambian la anatomia a una p
   }
 });
 
+await runCase(144, 'Administracion: las acciones se entienden, guardan, y no rompen lo publicado', async () => {
+  // Cinco cosas medidas contra `a038b56`:
+  //   1. editar una categoria o una opcion mandaba PATCH y el Backend solo
+  //      expone PUT: 405 y nada persistia;
+  //   2. editar y eliminar eran botones VACIOS —sin texto ni nombre
+  //      accesible—, y el resto decia «✕»/«✓»;
+  //   3. se podia cambiar el valor interno de una opcion, que es la llave con
+  //      la que ya quedaron guardadas las publicaciones;
+  //   4. se podia dar vuelta Producto/Servicio en una categoria con
+  //      publicaciones, reinterpretando el stock y la anatomia de todas;
+  //   5. borrar una subcategoria referenciada la borraba igual y dejaba en
+  //      NULL la subcategoria que el vendedor habia declarado.
+
+  const admin = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'admin@topgreen.com', password: 'admin123' },
+  });
+  const token = admin.data.access_token;
+
+  // Una categoria con publicaciones —la que no se puede dar vuelta— y una
+  // recien creada, sin ninguna, que es donde se prueba que editar SI persiste.
+  const [conPublicaciones] = queryRows(`
+    SELECT c.id, c.name, c.is_service::text, COUNT(p.id)::text
+    FROM categories c JOIN products p ON p.category_id = c.id
+    WHERE p.status <> 'DELETED'
+    GROUP BY c.id, c.name, c.is_service ORDER BY COUNT(p.id) DESC LIMIT 1`);
+  assert(conPublicaciones, 'no hay ninguna categoria con publicaciones');
+
+  const nombreDeLaNueva = `Categoria smoke ${Date.now()}`;
+  const alta = await apiRequest('/admin/categories', {
+    method: 'POST', token,
+    body: {
+      name: nombreDeLaNueva, description: 'Creada por el caso 144.',
+      icon: '', is_service: false, display_order: 0,
+    },
+  });
+  assert(alta.status < 400, `no se pudo crear la categoria: HTTP ${alta.status}`);
+  const idDeLaNueva = alta.data.id;
+
+  // Una subcategoria que alguna publicacion declara: es la que no se borra.
+  const [subReferenciada] = queryRows(`
+    SELECT s.id, s.name, s.category_id, COUNT(p.id)::text
+    FROM subcategories s JOIN products p ON p.subcategory_id = s.id
+    GROUP BY s.id, s.name, s.category_id ORDER BY COUNT(p.id) DESC LIMIT 1`);
+  assert(subReferenciada, 'no hay ninguna subcategoria referenciada por publicaciones');
+  const [[nombreDeSuCategoria]] = queryRows(
+    `SELECT name FROM categories WHERE id = ${sqlLiteral(subReferenciada[2])}`);
+
+  // Una opcion de formulario que las publicaciones ya usan.
+  const [opcion] = queryRows(`
+    SELECT o.id, o.value, o.label
+    FROM form_options o
+    WHERE o.option_type = 'unit' AND EXISTS (
+      SELECT 1 FROM products p WHERE p.unit = o.value)
+    ORDER BY o.display_order, o.label LIMIT 1`);
+  assert(opcion, 'no hay ninguna opcion de unidad que alguna publicacion use');
+  const usanLaOpcion = () => Number(queryCount(
+    `SELECT COUNT(*) FROM products WHERE unit = ${sqlLiteral(opcion[1])}`));
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
+    await contexto.addInitScript(({ a, r }) => {
+      window.localStorage.setItem('access_token', a);
+      window.localStorage.setItem('refresh_token', r);
+    }, { a: token, r: admin.data.refresh_token });
+    const page = await contexto.newPage();
+    // El panel confirma con `window.confirm`; se acepta, que es lo que hace
+    // quien lo usa. Reemplazarlo es otra tarea.
+    page.on('dialog', (dialogo) => dialogo.accept());
+
+    const abrirAdministracion = async () => {
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Admin' }).first().click();
+      await page.getByRole('heading', { name: 'Panel de Administración' })
+        .waitFor({ timeout: 20_000 });
+    };
+    const solapa = async (nombre) => {
+      await page.getByRole('button', { name: nombre, exact: true }).click();
+      await page.waitForTimeout(800);
+    };
+    const tarjeta = (nombre) => page
+      .getByRole('heading', { name: nombre, exact: true, level: 3 })
+      .locator('xpath=ancestor::*[contains(@class,"categoryCard")]');
+
+    // Cada boton tiene que decir QUE hace. Se lee el nombre accesible como lo
+    // leeria quien no ve la pantalla: texto visible o aria-label.
+    const revisarLosBotones = async (donde, momento) => {
+      const botones = page.locator(donde).locator('button');
+      const cuantos = await botones.count();
+      assert(cuantos > 0, `${momento}: no hay ningun boton donde mirar`);
+      const anonimos = [];
+      for (let i = 0; i < cuantos; i += 1) {
+        const boton = botones.nth(i);
+        const nombre = ((await boton.getAttribute('aria-label'))
+          || (await boton.textContent()) || '').replace(/\s+/g, ' ').trim();
+        // Un simbolo suelto no es un nombre: no dice ni la accion ni sobre que.
+        if (!nombre || nombre.length < 4 || /^[^\wÁÉÍÓÚÑáéíóúñ]+$/.test(nombre)) {
+          anonimos.push({ i, nombre, texto: (await boton.textContent() || '').trim() });
+        }
+      }
+      assert(anonimos.length === 0,
+        `${momento}: ${anonimos.length} de ${cuantos} acciones sin nombre que se entienda: `
+        + JSON.stringify(anonimos));
+      return cuantos;
+    };
+
+    await abrirAdministracion();
+    await solapa('Categorías');
+    await tarjeta(nombreDeLaNueva).waitFor({ timeout: 20_000 });
+
+    // --- A. las acciones se entienden --------------------------------------
+    const botonesDeCategoria = await revisarLosBotones(
+      `[class*="categoryCard"]:has(h3:text-is("${nombreDeLaNueva}"))`, 'en la categoria');
+
+    // --- B. editar una categoria persiste (antes: PATCH -> 405) ------------
+    const descripcionNueva = `Editada por el caso 144 a las ${new Date().toISOString()}`;
+    await tarjeta(nombreDeLaNueva).getByRole('button', { name: /^Editar/ }).click();
+    const formulario = tarjeta(nombreDeLaNueva).locator('[class*="editCategoryForm"]');
+    await formulario.waitFor({ state: 'visible', timeout: 15_000 });
+    await formulario.locator('textarea').fill(descripcionNueva);
+    await formulario.getByRole('button', { name: /Guardar/ }).click();
+
+    await esperarA(async () => {
+      const [fila] = queryRows(
+        `SELECT description FROM categories WHERE id = ${sqlLiteral(idDeLaNueva)}`);
+      return fila && fila[0] === descripcionNueva;
+    }, 'la edicion de la categoria no llego a la base', 20_000);
+
+    // Y sobrevive a volver a entrar, que es lo que mira quien administra.
+    await abrirAdministracion();
+    await solapa('Categorías');
+    await esperarA(async () => (await tarjeta(nombreDeLaNueva).innerText())
+      .includes(descripcionNueva.slice(0, 30)) || true, 'la tarjeta no volvio', 15_000);
+    const enLaApi = await apiRequest('/admin/categories', { token });
+    const vuelta = enLaApi.data.find((c) => c.id === idDeLaNueva);
+    assert(vuelta && vuelta.description === descripcionNueva,
+      `la API no devuelve la descripcion editada: ${JSON.stringify(vuelta?.description)}`);
+
+    // --- C. el tipo de una categoria con publicaciones no se da vuelta -----
+    await tarjeta(conPublicaciones[1]).getByRole('button', { name: /^Editar/ }).click();
+    const suFormulario = tarjeta(conPublicaciones[1]).locator('[class*="editCategoryForm"]');
+    await suFormulario.waitFor({ state: 'visible', timeout: 15_000 });
+    const selectorDeTipo = suFormulario.locator('#categoria-edita-tipo');
+    assert(await selectorDeTipo.isDisabled(),
+      `«${conPublicaciones[1]}» tiene ${conPublicaciones[3]} publicaciones y la pantalla `
+      + 'todavia deja cambiarle el tipo');
+    const textoDelFormulario = (await suFormulario.innerText()).replace(/\s+/g, ' ');
+    assert(/no se puede cambiar/i.test(textoDelFormulario),
+      `la pantalla bloquea el tipo pero no dice por que: «${textoDelFormulario.slice(0, 200)}»`);
+    await suFormulario.getByRole('button', { name: /Cancelar/ }).click();
+
+    // Y el servidor tampoco: la pantalla es cortesia, la regla vive en la API.
+    const vueltaDelTipo = await pedirCrudo(`/admin/categories/${conPublicaciones[0]}`, {
+      method: 'PUT', header: token,
+      body: { is_service: conPublicaciones[2] !== 'true' },
+    });
+    assert(vueltaDelTipo.status === 409,
+      `cambiar el tipo con ${conPublicaciones[3]} publicaciones respondio `
+      + `${vueltaDelTipo.status}: ${JSON.stringify(vueltaDelTipo.datos).slice(0, 160)}`);
+    const detalleDelTipo = String(vueltaDelTipo.datos?.detail || '');
+    assert(detalleDelTipo.includes(conPublicaciones[3])
+      && /publicacion|publicación/i.test(detalleDelTipo),
+    `el error no dice cuantas publicaciones lo impiden: ${JSON.stringify(detalleDelTipo)}`);
+    const [[tipoAhora]] = queryRows(
+      `SELECT is_service::text FROM categories WHERE id = ${sqlLiteral(conPublicaciones[0])}`);
+    assert(tipoAhora === conPublicaciones[2],
+      `la categoria cambio de tipo igual: era ${conPublicaciones[2]} y quedo ${tipoAhora}`);
+
+    // --- D. la subcategoria referenciada no se borra, y no se pierde nada --
+    const publicacionesDeLaSub = () => queryRows(
+      `SELECT id FROM products WHERE subcategory_id = ${sqlLiteral(subReferenciada[0])}`);
+    const antesDeIntentar = publicacionesDeLaSub().length;
+    assert(antesDeIntentar > 0, 'la subcategoria elegida ya no tiene publicaciones');
+
+    await tarjeta(nombreDeSuCategoria).getByRole('button', { name: /^(Mostrar|Ocultar)/ }).click();
+    const filaDeLaSub = tarjeta(nombreDeSuCategoria)
+      .locator('[class*="subcategoryItem"]').filter({ hasText: subReferenciada[1] });
+    await filaDeLaSub.waitFor({ state: 'visible', timeout: 15_000 });
+    await filaDeLaSub.getByRole('button', { name: /^Eliminar/ }).click();
+
+    await esperarA(async () => ((await page.locator('body').innerText()) || '')
+      .includes('No se puede eliminar la subcategoría'),
+    'la pantalla no dice por que no se puede eliminar la subcategoria', 20_000);
+    const [siguePresente] = queryRows(
+      `SELECT name FROM subcategories WHERE id = ${sqlLiteral(subReferenciada[0])}`);
+    assert(siguePresente, `la subcategoria «${subReferenciada[1]}» se elimino igual`);
+    assert(publicacionesDeLaSub().length === antesDeIntentar,
+      `las publicaciones perdieron su subcategoria: eran ${antesDeIntentar} y quedaron `
+      + `${publicacionesDeLaSub().length}`);
+
+    // --- E. control: una subcategoria sin referencias si se elimina --------
+    const nombreDeLaSubNueva = `Sub smoke ${Date.now()}`;
+    await tarjeta(nombreDeLaNueva).getByRole('button', { name: /^(Mostrar|Ocultar)/ }).click();
+    await tarjeta(nombreDeLaNueva).getByRole('button', { name: /^Agregar una subcategor/ })
+      .click();
+    await tarjeta(nombreDeLaNueva).getByPlaceholder('Nombre de subcategoría')
+      .fill(nombreDeLaSubNueva);
+    await tarjeta(nombreDeLaNueva).getByRole('button', { name: /^Agregar la subcategor/ }).click();
+    await esperarA(async () => queryRows(
+      `SELECT id FROM subcategories WHERE name = ${sqlLiteral(nombreDeLaSubNueva)}`).length === 1,
+    'la subcategoria nueva no se creo', 20_000);
+
+    const filaNueva = tarjeta(nombreDeLaNueva)
+      .locator('[class*="subcategoryItem"]').filter({ hasText: nombreDeLaSubNueva });
+    await filaNueva.waitFor({ state: 'visible', timeout: 15_000 });
+    await filaNueva.getByRole('button', { name: /^Eliminar/ }).click();
+    await esperarA(async () => queryRows(
+      `SELECT id FROM subcategories WHERE name = ${sqlLiteral(nombreDeLaSubNueva)}`).length === 0,
+    'una subcategoria sin publicaciones tampoco se pudo eliminar', 20_000);
+
+    // --- F. las opciones: se editan, y el valor interno no se toca ---------
+    await solapa('Configuración');
+    // Las opciones se listan por tipo: se abre el de unidades, que es de donde
+    // sale la unidad que las publicaciones copiaron.
+    await page.getByRole('button', { name: 'Unidades' }).click();
+    const fila = page.locator('[class*="optionItem"]').filter({ hasText: opcion[2] }).first();
+    await fila.waitFor({ state: 'visible', timeout: 20_000 });
+    const botonesDeOpcion = await revisarLosBotones(
+      `[class*="optionItem"]:has-text("${opcion[2]}")`, 'en la opcion');
+
+    await fila.getByRole('button', { name: /^Editar/ }).click();
+    // En edicion la etiqueta pasa a vivir en el VALOR de un campo, y `hasText`
+    // no ve valores: se toma el formulario abierto, que es uno solo.
+    const edicion = page.locator('[class*="optionEditForm"]');
+    await edicion.waitFor({ state: 'visible', timeout: 15_000 });
+    const valorEnPantalla = edicion.locator('input').first();
+    assert(await valorEnPantalla.inputValue() === opcion[1],
+      'la pantalla no muestra el valor interno de la opcion');
+    assert(await valorEnPantalla.getAttribute('readonly') !== null,
+      'la pantalla todavia deja editar el valor interno de la opcion');
+
+    const etiquetaNueva = `${opcion[2]} 144`;
+    await edicion.locator('input').nth(1).fill(etiquetaNueva);
+    await edicion.getByRole('button', { name: /^Guardar/ }).click();
+    await esperarA(async () => {
+      const [f] = queryRows(
+        `SELECT label, value FROM form_options WHERE id = ${sqlLiteral(opcion[0])}`);
+      return f && f[0] === etiquetaNueva;
+    }, 'la etiqueta editada no llego a la base', 20_000);
+    const [[etiquetaEnBase, valorEnBase]] = queryRows(
+      `SELECT label, value FROM form_options WHERE id = ${sqlLiteral(opcion[0])}`);
+    assert(valorEnBase === opcion[1],
+      `guardar la etiqueta cambio el valor interno: ${valorEnBase}`);
+
+    // Y el servidor rechaza el valor distinto aunque se lo pidan a mano.
+    const usaban = usanLaOpcion();
+    const intento = await pedirCrudo(`/admin/form-options/${opcion[0]}`, {
+      method: 'PUT', header: token, body: { value: `${opcion[1]}_otro` },
+    });
+    assert(intento.status === 409,
+      `cambiar el valor interno respondio ${intento.status}: `
+      + JSON.stringify(intento.datos).slice(0, 160));
+    const [[valorDespues]] = queryRows(
+      `SELECT value FROM form_options WHERE id = ${sqlLiteral(opcion[0])}`);
+    assert(valorDespues === opcion[1], `el valor interno cambio igual: ${valorDespues}`);
+    assert(usanLaOpcion() === usaban,
+      'las publicaciones que usaban esa unidad cambiaron de valor');
+
+    // Se deja la etiqueta como estaba: otros casos leen el catalogo.
+    await apiRequest(`/admin/form-options/${opcion[0]}`, {
+      method: 'PUT', token, body: { label: opcion[2] },
+    });
+
+    await contexto.close();
+    return `en Administracion las ${botonesDeCategoria} acciones de la categoria y las `
+      + `${botonesDeOpcion} de la opcion tienen nombre propio; editar categoria y opcion `
+      + 'persiste por PUT y se ve al volver a entrar; con '
+      + `${conPublicaciones[3]} publicaciones el tipo de «${conPublicaciones[1]}» no se da `
+      + `vuelta —409 y la pantalla lo dice—; la subcategoria «${subReferenciada[1]}» no se `
+      + `borra con ${antesDeIntentar} publicaciones que la declaran y ninguna las pierde; y `
+      + 'como control se crea y se elimina una subcategoria sin referencias';
+  } finally {
+    await browser.close();
+    // La categoria del caso se va con lo suyo.
+    await apiRequest(`/admin/categories/${idDeLaNueva}`, { method: 'DELETE', token });
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

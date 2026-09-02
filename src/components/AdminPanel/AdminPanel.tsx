@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import styles from './AdminPanel.module.css';
 import { useToast } from '../../hooks/useToast';
-import { apiGet, apiPost, apiPatch, apiDelete, apiBlob } from '../../utils/api';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete, apiBlob } from '../../utils/api';
 import { ProductImage } from '../ProductImage/ProductImage';
 import {
   ETIQUETA_DE_ESTADO,
@@ -424,8 +424,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     if (!editingOption) return;
     
     try {
-      await apiPatch(`/admin/form-options/${editingOption.id}`, {
-        value: editingOption.value,
+      // El valor interno no viaja: es la llave con la que quedaron guardadas
+      // las publicaciones y el Backend rechaza cambiarlo.
+      await apiPut(`/admin/form-options/${editingOption.id}`, {
         label: editingOption.label,
         display_order: editingOption.display_order,
         is_active: editingOption.is_active
@@ -477,7 +478,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     if (!editingCategory) return;
     
     try {
-      await apiPatch(`/admin/categories/${editingCategory.id}`, {
+      await apiPut(`/admin/categories/${editingCategory.id}`, {
         name: editingCategory.name,
         description: editingCategory.description,
         icon: editingCategory.icon,
@@ -1335,23 +1336,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                     <div className={styles.categoryActions}>
                       <button 
                         className={styles.expandBtn}
+                        aria-label={`${expandedCategories.has(category.id) ? 'Ocultar' : 'Mostrar'} las subcategorías de ${category.name}`}
                         onClick={() => toggleCategoryExpanded(category.id)}
                       >
-                        {expandedCategories.has(category.id) ? '' : ''} Subcategorías
+                        {expandedCategories.has(category.id) ? 'Ocultar' : 'Mostrar'} subcategorías
                       </button>
                       <button 
                         className={styles.editBtn}
+                        aria-label={`Editar la categoría ${category.name}`}
                         onClick={() => setEditingCategory(category)}
                       >
-
+                        Editar
                       </button>
                       <button 
                         className={styles.deleteBtn}
+                        aria-label={`Eliminar la categoría ${category.name}`}
                         onClick={() => handleDeleteCategory(category.id, category.name)}
                         disabled={category.product_count > 0}
-                        title={category.product_count > 0 ? 'No se puede eliminar (tiene productos)' : 'Eliminar'}
+                        title={category.product_count > 0
+                          ? `No se puede eliminar: tiene ${category.product_count} publicación(es)`
+                          : undefined}
                       >
-
+                        Eliminar
                       </button>
                     </div>
                   </div>
@@ -1368,9 +1374,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                               <span>{sub.name}</span>
                               <button 
                                 className={styles.deleteSubBtn}
+                                aria-label={`Eliminar la subcategoría ${sub.name}`}
                                 onClick={() => handleDeleteSubcategory(sub.id, sub.name)}
                               >
-                                ✕
+                                Eliminar
                               </button>
                             </div>
                           ))
@@ -1387,12 +1394,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                             placeholder="Nombre de subcategoría"
                             onKeyDown={(e) => e.key === 'Enter' && handleAddSubcategory(category.id)}
                           />
-                          <button onClick={() => handleAddSubcategory(category.id)}>✓</button>
-                          <button onClick={() => {setShowAddSubcategory(null); setNewSubcategoryName('');}}>✕</button>
+                          <button
+                            aria-label={`Agregar la subcategoría a ${category.name}`}
+                            onClick={() => handleAddSubcategory(category.id)}
+                          >
+                            Agregar
+                          </button>
+                          <button
+                            aria-label={`Cancelar el alta de subcategoría en ${category.name}`}
+                            onClick={() => {setShowAddSubcategory(null); setNewSubcategoryName('');}}
+                          >
+                            Cancelar
+                          </button>
                         </div>
                       ) : (
                         <button 
                           className={styles.addSubBtn}
+                          aria-label={`Agregar una subcategoría a ${category.name}`}
                           onClick={() => setShowAddSubcategory(category.id)}
                         >
                           + Agregar subcategoría
@@ -1427,11 +1445,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                           <label htmlFor="categoria-edita-tipo">Tipo</label>
                           <select id="categoria-edita-tipo"
                             value={editingCategory.is_service ? 'service' : 'product'}
-                            onChange={(e) => setEditingCategory({...editingCategory, is_service: e.target.value === 'service'})}
+                            disabled={category.product_count > 0}
+                            onChange={(e) => setEditingCategory(
+                              {...editingCategory, is_service: e.target.value === 'service'})}
                           >
                             <option value="product">Producto</option>
                             <option value="service">Servicio</option>
                           </select>
+                          {category.product_count > 0 && (
+                            <p className={styles.avisoDeBloqueo}>
+                              El tipo no se puede cambiar: {category.product_count} publicación(es)
+                              ya se publicaron bajo esta categoría. El resto sí se edita.
+                            </p>
+                          )}
                         </div>
                         <div className={styles.formGroup}>
                           <label htmlFor="categoria-edita-estado">Estado</label>
@@ -1509,7 +1535,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               className={styles.addButton}
               onClick={() => setShowCreateOption(!showCreateOption)}
             >
-              {showCreateOption ? '✕ Cerrar' : '+ Nueva Opción'}
+              {showCreateOption ? 'Cerrar' : '+ Nueva Opción'}
             </button>
           </div>
 
@@ -1540,7 +1566,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   style={{ width: '80px' }}
                 />
                 <button className={styles.saveBtn} onClick={handleCreateOption}>
-                  ✓ Crear
+                  Crear opción
                 </button>
               </div>
             </div>
@@ -1561,8 +1587,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                       <input
                         type="text"
                         value={editingOption.value}
-                        onChange={(e) => setEditingOption({...editingOption, value: e.target.value})}
-                        placeholder="Valor"
+                        readOnly
+                        aria-label="Valor interno de la opción (no se puede cambiar)"
+                        title="El valor interno no se puede cambiar: es el que quedó guardado en las publicaciones"
                       />
                       <input
                         type="text"
@@ -1583,8 +1610,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         <option value="active">Activo</option>
                         <option value="inactive">Inactivo</option>
                       </select>
-                      <button className={styles.saveBtn} onClick={handleUpdateOption}>✓</button>
-                      <button className={styles.cancelBtn} onClick={() => setEditingOption(null)}>✕</button>
+                      <button
+                        className={styles.saveBtn}
+                        aria-label={`Guardar la opción ${editingOption.label}`}
+                        onClick={handleUpdateOption}
+                      >
+                        Guardar
+                      </button>
+                      <button
+                        className={styles.cancelBtn}
+                        aria-label={`Cancelar la edición de ${editingOption.label}`}
+                        onClick={() => setEditingOption(null)}
+                      >
+                        Cancelar
+                      </button>
                     </div>
                   ) : (
                     <>
@@ -1597,15 +1636,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         <span className={styles.optionOrder}>#{option.display_order}</span>
                         <button 
                           className={styles.editBtn}
+                          aria-label={`Editar la opción ${option.label}`}
                           onClick={() => setEditingOption(option)}
                         >
-
+                          Editar
                         </button>
                         <button 
                           className={styles.deleteBtn}
+                          aria-label={`Eliminar la opción ${option.label}`}
                           onClick={() => handleDeleteOption(option.id, option.label)}
                         >
-
+                          Eliminar
                         </button>
                       </div>
                     </>

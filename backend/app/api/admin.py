@@ -613,6 +613,27 @@ def update_category(
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
+
+    # Producto y Servicio no son un rótulo: deciden si la publicación reserva
+    # unidades y qué se le muestra al comprador. Cambiar el tipo de una
+    # categoría que ya tiene publicaciones las reinterpreta a todas de una vez,
+    # y ninguna de ellas se editó. Se frena antes de tocar nada; el resto de la
+    # categoría —nombre, descripción, icono, orden, estado— sigue editándose.
+    if category_data.is_service is not None and category_data.is_service != category.is_service:
+        publicadas = db.query(Product).filter(
+            Product.category_id == category.id,
+            Product.status != ProductStatus.DELETED
+        ).count()
+        if publicadas > 0:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"No se puede cambiar el tipo de '{category.name}': tiene "
+                    f"{publicadas} publicación(es) asociada(s). Movelas a otra "
+                    "categoría o dalas de baja antes de cambiarlo. El resto de los "
+                    "datos de la categoría sí se puede editar."
+                )
+            )
     
     # Verificar nombre único si se está cambiando
     if category_data.name and category_data.name != category.name:
@@ -791,6 +812,25 @@ def delete_subcategory(
     if not subcategory:
         raise HTTPException(status_code=404, detail="Subcategoría no encontrada")
     
+    # Sin esta guarda el borrado se llevaba puesta la clasificación de las
+    # publicaciones: la relación deja `subcategory_id` en NULL y el vendedor
+    # pierde, sin enterarse, la subcategoría que había declarado. Se cuentan
+    # TODAS las publicaciones, también las dadas de baja: la fila sigue
+    # apuntando acá y la clave foránea no declara qué hacer con ella.
+    referencias = db.query(Product).filter(
+        Product.subcategory_id == subcategory_id
+    ).count()
+    if referencias > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"No se puede eliminar la subcategoría '{subcategory.name}': "
+                f"{referencias} publicación(es) la declaran. Cambialas de "
+                "subcategoría antes de eliminarla, o desactivá la subcategoría para "
+                "que no se ofrezca en el alta."
+            )
+        )
+
     name = subcategory.name
     db.delete(subcategory)
     db.commit()
@@ -935,16 +975,20 @@ def update_form_option(
     if not option:
         raise HTTPException(status_code=404, detail="Opción no encontrada")
     
+    # El valor interno es la llave con la que ya quedaron guardadas las
+    # publicaciones: `unit`, `pricing_type`, `availability` y `response_time`
+    # copian este texto en la fila del producto. Cambiarlo acá no renombra
+    # ninguna de esas filas —quedarían dos valores internos para el mismo
+    # concepto—, así que no se cambia. La etiqueta visible sí.
     if option_data.value is not None and option_data.value != option.value:
-        # Verificar unicidad
-        existing = db.query(FormOption).filter(
-            FormOption.option_type == option.option_type,
-            FormOption.value == option_data.value,
-            FormOption.id != option_id
-        ).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="Ya existe una opción con ese valor")
-        option.value = option_data.value
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"El valor interno '{option.value}' no se puede cambiar: es el que "
+                "quedó guardado en las publicaciones que ya lo usan. Podés cambiar la "
+                "etiqueta visible, o crear una opción nueva y desactivar ésta."
+            )
+        )
     
     if option_data.label is not None:
         option.label = option_data.label

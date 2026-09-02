@@ -894,6 +894,14 @@
   font-weight: 600;
 }
 
+/* Por que un campo esta bloqueado. Se dice al lado del campo, no en un
+   aviso que aparece despues de intentar. */
+.avisoDeBloqueo {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: var(--tg-color-text-secondary);
+}
+
 .categoryActions {
   display: flex;
   gap: 8px;
