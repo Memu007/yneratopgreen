@@ -2,160 +2,180 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## TRANSFER-REC-1 — la transferencia se retoma desde Mis compras
+## CART-RECOVERY-1 — una copia local inservible ya no voltea la aplicación
 
 Hecho. Producto/regresión e informe en commits separados. **No desplegué.**
 
-- Producto y regresión: `14d561b` — «TRANSFER-REC-1: la transferencia se retoma
-  desde Mis compras»
-- Regresión nueva: caso **141**. La suite pasa a **141 casos**.
+- Producto y regresión: `ebb2b20` — «CART-RECOVERY-1: una copia local
+  inservible no voltea la aplicación»
+- Regresión nueva: caso **142**. La suite pasa a **142 casos**.
+
+Tomo la corrección: `TRANSFER-REVIEW-1` no está cerrada. Con «queda cerrada»
+quise decir «no la abrí»; de acá en adelante escribo «no la abrí», que no se
+puede leer como entrega.
 
 ---
 
-### 1. El rojo, contra `d24fece`, y es el recorrido entero
-
-El caso 141 compra por transferencia **en el navegador**, cierra el checkout sin
-adjuntar, recarga la aplicación completa y vuelve a Mis compras. Contra
-`d24fece`:
+### 1. El rojo, contra `14d561b`, dicho por la propia pantalla
 
 ```
-[FAIL] 141 … — Mis compras no muestra ni el CBU ni el alias del vendedor:
-  «Pedido #ORD-20260902-7F7D68E6 2/9/2026 Esperando Comprobante
-   Insecticida Lambda Cihalotrina 1L x1 $ 18.500 Total: $ 18.500
-   Traslado Coordinás el traslado por tu cuenta. Cancelar Pedido»
+[FAIL] 142 … — con JSON malformado la aplicacion se cayo:
+  « Ocurrió un errorRecargá la página para volver a intentarlo. »
 ```
 
-Ahí está el defecto completo, dicho por la propia pantalla: la orden está
-correctamente en espera de comprobante, se ve el total… y lo único que se puede
-hacer es **cancelar**. Ni titular, ni CBU, ni alias, ni concepto, ni por dónde
-adjuntar.
-
-Dicho de otro modo: la única forma de pagar una compra que ya existía era **no
-haber cerrado esa ventana**.
-
-### 2. Lo que cambió, y lo que no
-
-**No toqué el Backend.** Todo el contrato ya estaba: la orden del comprador
-manda `seller_cbu`, `seller_alias_bancario`, `seller_bank_holder`,
-`payment_method` y `order_number` (`orders.py:557-559` y `611-613`), y
-`POST /orders/{id}/transfer-receipt` ya existía. Lo que faltaba era **consumirlo**:
-el mapeo de la compra descartaba los tres campos bancarios.
-
-Sin endpoint nuevo, sin estado nuevo, sin migración, sin almacenamiento, sin
-dependencias y sin refactor del checkout ni del panel. Dos archivos:
+Y, desactivando sólo la parte A para poder ver la parte B:
 
 ```
- src/components/UserDashboard/UserDashboard.tsx | 138 ++++++++++++++++-
- scripts/smoke.mjs                              | 198 +++++++++++++++++++++++++
+[FAIL] 142 … — un carrito valido no sobrevivio la recarga:
+  antes 732 caracteres, despues "[]"
 ```
 
-### 3. Lo que ve ahora el comprador
+Dos rojos independientes contra `14d561b`. El segundo no estaba en tu
+descripción y es el que explica todo lo demás.
 
-Cuando el servidor dice que la orden es por transferencia **y** que espera el
-comprobante —la pantalla no deduce el estado—, la tarjeta muestra:
+### 2. Corrección a la premisa: dónde se cae y dónde no
 
-- **titular**, **CBU** y **alias**, del snapshot de la orden;
-- el **importe**;
-- el **número de orden como concepto**, con el porqué: es lo que le permite al
-  vendedor reconocer el pago en su resumen bancario;
-- y por dónde **adjuntar**, con la misma ruta y el mismo contrato de archivo que
-  el checkout (`.jpg,.jpeg,.png,.webp,.pdf`).
-
-Un error queda legible, en `role="alert"`, y se puede reintentar sin recargar.
-
-### 4. El snapshot, que es el punto fino
-
-Los datos bancarios salen de la **orden**, no del perfil del vendedor. Lo probé
-en el caso: después de crear la orden, el vendedor cambia su CBU y su alias por
-la API real, y el comprador sigue viendo los de la compra.
+Antes de tocar nada medí los dos valores que pediste en **dos frentes**: Vite
+en desarrollo —`localhost:5173`, que es contra lo que corre la suite— y el
+`dist` construido y servido, que es lo que va a usar el cliente.
 
 ```
-CBU nuevo del vendedor : 0000009000000000000999
-alias nuevo            : alias.cambiado.despues
-lo que ve el comprador : los originales del snapshot
+valor guardado en agromarket_cart   Vite (5173)        dist servido (4173)
+---------------------------------   ----------------   -------------------
+{no es json                         ErrorBoundary      ErrorBoundary
+{"items":[]}                        sigue navegable    ErrorBoundary
+"un carrito"                        sigue navegable    ErrorBoundary
+[{"quantity":2}]                    sigue navegable    ErrorBoundary
+carrito VÁLIDO + recarga            SE PIERDE          sobrevive
 ```
 
-Si mostráramos el dato de hoy, el comprador transferiría a una cuenta que esa
-orden nunca declaró, y el vendedor no tendría cómo reconocer el pago. El caso
-deja el vendedor como estaba al terminar.
+Es decir: **la raíz que no es un arreglo sí voltea la aplicación, pero la
+construida, no la de desarrollo.** Una regresión de navegador corriendo contra
+Vite no se puede poner roja por ese valor. Te lo digo antes de que lo leas como
+cobertura que no existe: el caso 142 igual lo exige —y es rojo en el `dist`—,
+pero su rojo en la suite lo aportan el JSON malformado y el carrito perdido.
 
-### 5. Al adjuntar, manda la fuente real
-
-La pantalla **no parchea la orden en memoria**: al terminar la carga vuelve a
-pedirle las órdenes al servidor. El caso lo comprueba en la base y en la
-pantalla, en ese orden:
-
-```
-en la base   : TRANSFER_RECEIPT_SUBMITTED, con su transfer_receipt_url
-en pantalla  : «Comprobante a Revisar»
-y además     : ya no dice «Esperando Comprobante»
-               y ya no ofrece adjuntar otro como si faltara
-```
-
-### 6. La continuidad sobrevive de verdad
-
-El caso no simula la vuelta: cierra el checkout con su botón, hace un `goto`
-completo a la raíz —recarga entera, no navegación de la SPA—, abre el panel y
-entra a Mis compras. Y lo hace **dos veces**, porque entre medio cambia los
-datos del vendedor y vuelve a entrar.
-
-### 7. Puertas
+El motivo es el mismo defecto visto de otro lado. Instrumenté `localStorage`
+antes de que corriera un solo script de la aplicación y anoté cada movimiento
+de la clave durante una recarga:
 
 ```
-base limpia + node scripts/smoke.mjs            140/141
-base limpia otra vez                            140/141
+Vite (modo estricto)           dist servido
+1. getItem  «[{"product"…»     1. getItem  «[{"product"…»
+2. setItem  «[]»               2. setItem  «[]»
+3. getItem  «[]»               3. setItem  «[{"product"…»
+4. setItem  «[]»
+5. setItem  «[]»
+```
+
+El efecto que guardaba corría en el mismo montaje que el que leía y escribía el
+carrito vacío inicial **encima** de lo guardado. En el `dist` la lectura ya
+había mandado y el paso 3 lo devuelve; con React en modo estricto hay un
+segundo montaje que lee justo el vacío del paso 2, y ahí se pierde el carrito
+—y de paso queda tapado el valor inválido antes de que llegue a dibujarse—.
+
+Por eso la corrección no es sólo un `try`: la lectura se muda al armado del
+estado. Una sola lectura, validada, antes del primer render.
+
+### 3. Lo que cambió
+
+Un archivo de producto:
+
+```
+ src/contexts/CartContext.tsx |  82 ++++++++++++++---
+ scripts/smoke.mjs            | 206 +++++++++++++++++++++++++++++++++++++++
+```
+
+Sin Backend, sin endpoint, sin migración, sin dependencia, sin formato nuevo de
+persistencia y sin refactor del carrito, la autenticación ni el checkout.
+
+Qué cuenta como usable es el mínimo que el carrito necesita para existir: una
+publicación identificada, un precio que se pueda cobrar —la misma
+`tienePrecioPublicado` que ya usa el catálogo, no una regla nueva— y una
+cantidad positiva. Con menos que eso no hay total que sumar ni ítem que mandar
+al checkout, y el intento de dibujarlo es justamente lo que tiraba la pantalla.
+
+Lo que sirve se conserva tal cual; si no queda nada aprovechable se descarta
+**sólo** `agromarket_cart` y se arranca con carrito vacío. El caso comprueba en
+cada valor inválido que la sesión y una clave ajena sembrada a propósito siguen
+enteras.
+
+### 4. El carrito del servidor no se toca
+
+La parte C levanta la aplicación con la copia local rota, con sesión y con un
+carrito armado en el servidor, y **escucha las peticiones del navegador**:
+
+```
+carrito del servidor antes = después
+peticiones a /cart/sync    = 0
+```
+
+No es que el `sync` viaje vacío: no viaja. El servidor sigue siendo la
+autoridad al entrar al checkout.
+
+### 5. Puertas
+
+```
+base limpia + node scripts/smoke.mjs            140/142   (121 y 131 rojos)
+base limpia otra vez                            141/142   (131 rojo)
 npm run build                                   ok
 npm run lint                                    ok (--max-warnings 0)
 node --check scripts/smoke.mjs                  ok
 python -m compileall backend/app                ok
 python -m pip check                             ok
 git -c core.whitespace=cr-at-eol diff --check   limpio
-npm run a11y -- --todas                         sin violaciones bloqueantes
+npm run a11y -- --todas                         64/64 pantallas, 0 bloqueantes
 npm run contraste                               TODO OK, cobertura completa
 npm run hito                                    6/6 pasos
 ```
 
-**El único rojo de las dos corridas es el caso 131**, y es el de siempre: acá no
-hay demonio de Docker, así que la receta CSP no puede correr en `alpine:3`. En
-tu Mac ese caso pasa —lo verificaste vos con 140/140—, así que allá la suite
-tiene que dar **141/141**. No lo declaro yo.
+**El 131 es el de siempre**: acá no hay demonio de Docker y la receta CSP no
+puede correr en `alpine:3`. En tu Mac pasa.
 
-El caso 141 nuevo pasó en las dos corridas completas y también aislado.
+**El 121 apareció en una corrida y en la otra no**, con el mismo mensaje que
+viste vos en tu primer pase de `TRANSFER-REC-1` —o sea, con mi cambio y sin
+él—: «la tarjeta no pinta la placa de «sin registro fotográfico»». Lo corrí
+aislado y pasó 1/1. No es del carrito: el caso 121 no toca `agromarket_cart`.
+Lo que sí veo es la forma del falso rojo que ya arreglamos en el 139: lee
+`getComputedStyle(...).backgroundImage` en un instante fijo, apenas el elemento
+se hace visible, y sin reintento. Eso es diagnóstico, no medición: no lo abrí
+porque pediste una sola tarea activa. Si querés, es corto.
 
-### 8. Hashes
+El caso 142 pasó en las dos corridas completas y también aislado.
+
+### 6. Hashes
 
 ```
-src/components/UserDashboard/UserDashboard.tsx  50c076df6a6eec48
-scripts/smoke.mjs                               80ae524b6e715418
+src/contexts/CartContext.tsx  b99d7a37402d83af
+scripts/smoke.mjs             344f66bd0dd3036c
 ```
 
 (SHA-256 truncado a 16, del árbol en el commit de producto.)
 
-### 9. Riesgos residuales
+### 7. Riesgos residuales
 
-1. **El bloque aparece sólo con `payment_method === 'transfer'` y estado
-   esperando comprobante.** Una orden vieja sin `payment_method` no lo muestra.
-   Preferí eso a deducirlo del estado: si el servidor no lo dice, la pantalla no
-   lo inventa.
-2. **Si la orden no trae ningún dato bancario en el snapshot** —vendedor sin CBU
-   ni alias al momento de comprar—, el bloque no aparece y el comprador sigue
-   viendo sólo cancelar. No lo cubrí porque el checkout no deja llegar ahí: sin
-   medio de pago disponible, esa orden no se crea. Lo digo porque es el borde
-   que quedaría si eso cambiara.
-3. **Reutilicé las clases del panel de pago pendiente** en vez de crear estilos
-   nuevos. Contraste y accesibilidad quedan verdes, pero visualmente el bloque
-   de transferencia y el de Mercado Pago se parecen. Si querés distinguirlos, es
-   una tarea de diseño y no la abrí.
-4. **No toqué el panel del vendedor.** Sigue revisando el comprobante como
-   siempre; TRANSFER-REVIEW-1 queda cerrada, como pediste.
+1. **La escritura sigue sin protección.** Leer quedó envuelto; guardar no. Con
+   `localStorage` lleno o bloqueado, `setItem` tira dentro de un efecto y la
+   aplicación vuelve a caer por la misma puerta. No lo toqué porque no pude
+   escribir una prueba que lo provoque sin trucar el navegador, y prefiero no
+   dejar código de producto que ninguna prueba ejercite. Es corto si lo abrís.
+2. **Un carrito viejo con un ítem de precio 0 pierde ese ítem.** Es
+   deliberado: ese ítem generaría una orden de $0, que es lo que
+   `tienePrecioPublicado` vino a cerrar. Lo aviso porque es un cambio de
+   comportamiento para copias guardadas antes de esa regla.
+3. **La recuperación es por ítem, no todo o nada.** Un arreglo con dos ítems
+   buenos y uno roto conserva los dos buenos. Preferí no vaciarle el carrito a
+   alguien por una entrada dañada; si lo querés todo o nada, es un `if`.
+4. **En desarrollo el carrito ahora sobrevive a la recarga.** Antes se perdía,
+   así que cualquier prueba manual que contara con arrancar vacío después de
+   recargar va a ver otra cosa. La suite corre limpia igual.
 
-### 10. Frenos
+### 8. Frenos
 
-No cambié Backend: ninguna prueba discriminante mostró que faltara contrato,
-así que no había motivo. No agregué endpoint, migración, estado, almacenamiento
-ni dependencias. No hice refactor del checkout ni del panel. Conservé
-cancelación, permisos y la validación de archivo. No abrí TRANSFER-REVIEW-1,
-FORM-DIRTY-1, navegación, administración, Mercado Pago ni BOEDA. No desplegué.
-`PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de empujar.
+No toqué Backend: ninguna prueba mostró que faltara contrato. No abrí
+`SERVICE-STATE-1`, `TRANSFER-REVIEW-1`, `FORM-DIRTY-1`, navegación,
+administración, Mercado Pago ni BOEDA. No limpié tokens ni preferencias: sólo
+la clave dañada. No desplegué. `PRE_FIRMA.md` sigue fuera del versionado y lo
+confirmé antes de empujar.
 
 Freno acá y te pido revisión.
