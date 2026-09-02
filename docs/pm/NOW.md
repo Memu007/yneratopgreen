@@ -332,11 +332,19 @@ salida 0. El lanzador deja DB/API activas al salir y limpia al comienzo de la
 siguiente corrida; no es un despliegue ni afecta la independencia de las dos
 bases.
 
-**La tarea activa de Dev es TRANSFER-REC-1:** desde Mis compras, una orden por
-transferencia en espera debe recuperar el snapshot bancario, el concepto y el
-total, permitir adjuntar el comprobante por la ruta existente y pasar a
-«Comprobante a Revisar». Alcance y puertas en `PARA-DEV.md`; no abre otros
-hallazgos UX ni despliega.
+TRANSFER-REC-1 queda **aceptada** en producto/regresión `14d561b` e informe
+`a9c3fbd`. PM verificó build y lint. La primera suite oficial desde base limpia
+dio 140/141 por un rojo viejo en el caso 121; el caso 141 nuevo pasó. El 121
+pasó 1/1 al aislarlo y la repetición completa cerró **141/141** con salida 0.
+La trazabilidad está en `REPRODUCCION-TRANSFER-REC-1-2026-09-02.md`. El informe
+de Dev dice por error que `TRANSFER-REVIEW-1` quedó cerrada: no fue abierta y
+sigue pendiente en el roadmap.
+
+**La tarea activa de Dev es CART-RECOVERY-1:** una copia corrupta de
+`agromarket_cart` debe descartarse de forma acotada, la aplicación debe
+arrancar y un carrito válido del servidor no puede borrarse ni recibir un sync
+vacío por esa recuperación. Alcance y puertas en `PARA-DEV.md`; no abre otras
+tareas ni despliega.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se

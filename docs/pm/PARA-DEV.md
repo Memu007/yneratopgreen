@@ -12,6 +12,64 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-02 — TAREA VIGENTE: CART-RECOVERY-1, recuperar un carrito local inválido
+
+`TRANSFER-REC-1` queda **aceptada** en producto/regresión `14d561b` e informe
+`a9c3fbd`. PM verificó build y lint, y ejecutó la suite oficial desde base
+limpia: el primer pase dio 140/141 por un rojo viejo en el caso 121; ese caso
+pasó 1/1 aislado y la repetición completa cerró **141/141** con salida 0. El
+caso nuevo 141 pasó en ambos pases completos. Evidencia completa en
+`REPRODUCCION-TRANSFER-REC-1-2026-09-02.md`.
+
+Corrección de alcance: el informe dice por error que `TRANSFER-REVIEW-1` quedó
+cerrada. **No quedó cerrada ni fue abierta**; sigue en la cola del roadmap.
+
+### Defecto a reproducir antes de tocar código
+
+Escribí un valor inválido en `localStorage.agromarket_cart` y recargá. Hoy
+`CartContext` ejecuta `JSON.parse` sin captura, cae en el `ErrorBoundary` y
+«Recargá» vuelve a caer con el mismo dato. Reproducí al menos:
+
+1. JSON malformado;
+2. JSON válido cuya raíz no sea un arreglo.
+
+La prueba debe fallar contra `14d561b` por la caída real de la aplicación, no
+por buscar texto interno o asumir la implementación.
+
+### Alcance mínimo
+
+1. Si la copia local no puede convertirse en un carrito mínimamente usable,
+   descartá **sólo** `agromarket_cart`, arrancá con carrito local vacío y dejá
+   la aplicación navegable.
+2. Un carrito local válido debe conservarse sin cambios y seguir mostrando sus
+   ítems después de recargar.
+3. Si existe una sesión con un carrito válido en el servidor, recuperar la
+   copia local dañada no debe enviar un `sync` vacío, borrar ni modificar ese
+   carrito. El servidor sigue siendo autoridad al entrar al checkout.
+
+### Límites
+
+- Preferencia: corrección mínima en Frontend y regresión de navegador.
+- Sin Backend, endpoint, migración, dependencia ni formato nuevo de
+  persistencia. Sin refactor general de carrito, autenticación o checkout.
+- No limpies tokens, preferencias ni todo `localStorage`; sólo la clave dañada.
+- No abras `SERVICE-STATE-1`, administración, navegación, BOEDA, Mercado Pago
+  ni otros hallazgos UX. No despliegues.
+
+### Puerta de aceptación
+
+1. Caso nuevo rojo contra `14d561b` y verde después que cubra ambos valores
+   inválidos, recarga real y aplicación utilizable.
+2. El mismo caso prueba por separado que un carrito local válido sobrevive y
+   que un carrito servidor válido no se pierde ni recibe una sincronización
+   vacía por la recuperación local.
+3. Suite completa desde base limpia con el nuevo total, más build, lint,
+   compileall, `pip check`, `diff --check`, accesibilidad y contraste verdes.
+4. Producto/regresión en un commit e informe separado en `PARA-PM.md`. Frená
+   ahí y pedime revisión; una sola tarea activa.
+
+---
+
 ## 2026-09-01 — TAREA VIGENTE: TRANSFER-REC-1, recuperar la transferencia desde Mis compras
 
 `TEST-HARNESS-MAC-1S` queda **aceptada** en corrección `78972cf` e informe

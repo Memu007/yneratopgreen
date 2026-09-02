@@ -1,6 +1,6 @@
 # Roadmap operativo para cerrar el MVP
 
-Actualizado: 2026-09-01.  
+Actualizado: 2026-09-02.  
 Fuentes: `CRONOGRAMA.md`, `ALCANCE-Y-LIMITES.md`, `NOW.md` y
 `AUDITORIAS-UX-CLAUDE-2026-08-30.md`.
 
@@ -27,7 +27,11 @@ final, como acordó Emi.
 - TEST-HARNESS-MAC-1S quedó aceptada en `78972cf`/`d24fece`: volumen nuevo
   escribible como UID 1000 y dos corridas oficiales independientes de PM en
   **140/140**, cada una iniciada con descarte de la base anterior.
-- Tarea única vigente: **TRANSFER-REC-1**, detallada en `PARA-DEV.md`.
+- TRANSFER-REC-1 quedó aceptada en `14d561b`/`a9c3fbd`: PM verificó build,
+  lint, el caso 121 aislado y una repetición completa en **141/141** desde base
+  limpia. El primer pase completo había dado 140/141 por un rojo transitorio
+  del caso 121; queda documentado, no oculto.
+- Tarea única vigente: **CART-RECOVERY-1**, detallada en `PARA-DEV.md`.
 - ORD-SELF-1 no cierra ningún hallazgo de las tres auditorías; era la tarea P1
   anterior y las auditorías la excluyeron expresamente.
 - La historia de las devoluciones del arnés y su cierre reproducido queda en
@@ -64,8 +68,8 @@ habilitada como puerta de las tareas de producto.
 
 | Orden | Pieza | Auditoría cubierta | Cierre mínimo |
 |---:|---|---|---|
-| 2 | **TRANSFER-REC-1** | F2 y el borde P1 de F3 | Desde Mis compras, una transferencia pendiente vuelve a mostrar datos bancarios y permite adjuntar comprobante por la ruta existente; cerrar el checkout no deja un callejón sin salida. |
-| 3 | **CART-RECOVERY-1** | R2 | Un `localStorage` corrupto se descarta de forma acotada y la aplicación arranca; no se borra un carrito válido del servidor. |
+| 2 | **TRANSFER-REC-1 — cerrada** | F2 y el borde P1 de F3 | Aceptada en `14d561b`/`a9c3fbd`: Mis compras recupera snapshot, concepto, total y carga de comprobante; PM cerró con repetición oficial 141/141. |
+| 3 | **CART-RECOVERY-1 — vigente** | R2 | Un `localStorage` corrupto se descarta de forma acotada y la aplicación arranca; no se borra un carrito válido del servidor. |
 | 4 | **SERVICE-STATE-1** | F1 | Un único mapeador conserva anatomía y estado de servicios al cargar, editar y recargar el panel. |
 | 5 | **ADMIN-ACTIONS-1** | ADM-1, ADM-5; reproduce ADM-R1/R2/R3 | Las acciones tienen nombre y el método HTTP real; antes de habilitar cambios peligrosos se prueba referencia de opción, subcategoría usada y cambio Producto/Servicio. |
 | 6 | **ADMIN-PAGE-1** | ADM-2 | Usuarios, publicaciones y órdenes tienen paginación y búsqueda/filtros mínimos; el registro 21 es alcanzable y el total es honesto. |
