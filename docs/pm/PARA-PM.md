@@ -2,169 +2,125 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ADMIN-PAGE-1 — las tres listas del panel pasan de la fila veinte
+## ADMIN-PAGE-1R — estados que existen y ninguna respuesta vieja que pise
 
 Hecho. Producto/regresión e informe en commits separados. **No desplegué.**
 
-- Producto y regresión: `fe2b151` — «ADMIN-PAGE-1: las tres listas del panel
-  pasan de la fila veinte»
-- Regresión nueva: caso **145**. La suite pasa a **145 casos**.
+- Corrección: `6cc67b7` — «ADMIN-PAGE-1R: estados que existen y ninguna
+  respuesta vieja que pise»
+- La suite sigue en **145 casos**.
+
+Las dos son mías y las dos son ciertas. El `draft` lo copié del selector que ya
+tenía cada fila de la tabla, sin comprobarlo contra el modelo; y tu hipótesis de
+la respuesta vieja era la correcta.
 
 ---
 
-### 1. El estado anterior, medido antes de tocar nada
+### 1. «Borradores» era una acción falsa
 
-Con la base cargada, abrí el panel y miré las tres listas y lo que pedían:
-
-```
-lista       en la base   filas dibujadas   pie                        controles
-Usuarios         61            20          «Total: 61 usuarios»          ninguno
-Productos       164            20          «Total: 164 productos»        ninguno
-Órdenes          72            20          «Total: 72 órdenes»           ninguno
-
-lo que pidió la pantalla:
-  /admin/users
-  /admin/products
-  /admin/orders
-```
-
-Ni `page` ni `page_size` en ninguna de las tres. El pie decía el total entero
-—o sea que el dato existía— y no había un solo control para llegar a la fila
-21. De 164 publicaciones se administraban 20.
-
-Y el rojo del caso 145 contra `1ac4191`, con esas mismas palabras:
+`ProductStatus` declara cuatro: `active`, `paused`, `sold_out`, `deleted`. El
+selector que agregué ofrecía `draft` y omitía `sold_out`. Lo medí como vos:
 
 ```
-[FAIL] 145 … — usuarios: no hay ningun control para pasar de pagina,
-  y hay 187 filas; el pie dice «Total: 187 usuarios»
+GET /admin/products?status=draft     -> 500
+GET /admin/products?status=sold_out  -> 200
 ```
 
-### 2. Después
+Ahora ofrece los cuatro del modelo, con **«Agotadas»** para `sold_out`.
+
+Y el caso ya no comprueba un estado elegido a mano: **recorre todas las opciones
+que el selector ofrezca**, exige 200 en cada una y comprueba que ninguna fila la
+contradiga. Si alguien vuelve a agregar una opción inventada, el caso la
+encuentra sola.
+
+Un detalle del que me di cuenta corrigiendo esto: la comprobación tiene que
+mirar la **celda de estado** y no la fila entera. La fila trae además los
+rótulos del selector de cada publicación —«Activo Pausado Borrador Eliminado»—,
+así que buscando en la fila cualquier filtro parece cumplirse. Con eso, el
+primer intento me dio un verde que no valía nada.
+
+### 2. La carrera: tenías razón, y ahora es determinista
+
+El caso retiene la carga sin filtro, aplica el filtro, deja llegar primero la
+respuesta filtrada y libera última la vieja. **Sin la guarda**, así queda la
+pantalla:
 
 ```
-lista       pie
-Usuarios    «Total: 61 usuarios · Anterior · Página 1 de 4 · Siguiente»
-Productos   «Total: 164 productos · Anterior · Página 1 de 9 · Siguiente»
-Órdenes     «Total: 72 órdenes · Anterior · Página 1 de 4 · Siguiente»
-
-lo que pide la pantalla:
-  /admin/users?page=1&page_size=20
-  /admin/products?page=1&page_size=20
-  /admin/orders?page=1&page_size=20
+[FAIL] 145 … — una respuesta vieja sin filtro piso lo que estaba pedido:
+  «Total: 248 productos Anterior Página 1 de 13 Siguiente»
 ```
 
-### 3. Lo que cambió
+Con «Pausadas» pedido y aplicado, la pantalla vuelve a las 248 publicaciones sin
+filtro. Con la guarda puesta, el mismo recorrido queda en el total del filtro.
+
+La corrección es la que pediste, la misma en las tres listas: cada una anota qué
+pidió la última vez —página más filtros— y **sólo la respuesta de esa
+combinación escribe filas y total**. Tres líneas por cargador y una referencia
+compartida; sin framework y sin reescribir el panel.
 
 ```
- src/components/AdminPanel/AdminPanel.tsx        | 222 ++++++++++++++--
- src/components/AdminPanel/AdminPanel.module.css |  39 ++-
- scripts/smoke.mjs                               | 321 ++++++++++++++++++++++++
+ src/components/AdminPanel/AdminPanel.tsx |  23 ++++--
+ scripts/smoke.mjs                        | 120 +++++++++++++++++++++++++++----
 ```
 
-**Sin Backend**: la paginación y los filtros ya estaban en la API; lo que
-faltaba era pedirlos. Sin ruta nueva, sin migración, sin dependencia y sin
-tocar el seed.
+### 3. Un hallazgo que dejo anotado y NO toqué
 
-- Cada lista tiene **su propia página**. Se pueden dejar Usuarios en la 2,
-  pasear por Productos y volver: sigue en la 2. El caso lo comprueba.
-- El tamaño es **explícito**: veinte. El servidor ya usaba ese valor por
-  omisión, pero la pantalla no puede deducir cuántas páginas hay de algo que no
-  pidió.
-- El pie es **un solo componente** para las tres listas, así no pueden
-  divergir. «Anterior» y «Siguiente» dicen de qué lista son —«Página siguiente
-  de órdenes»— y se deshabilitan en los extremos.
-- **Cero resultados es «Página 1 de 1»** con la navegación apagada: la lista
-  está vacía, que no es lo mismo que rota, y con «de 0» no habría dónde pararse.
-- **Si la página queda fuera del total** —se filtró, se borró una fila, entró
-  otro administrador— la carga cae a la última página que existe en vez de
-  dibujar un vacío falso.
-
-Controles mínimos, con el contrato que ya existía:
+El selector de estado **de cada fila** de la tabla de publicaciones —el que ya
+existía antes de esta tarea— tiene el mismo problema que corregí en el filtro:
+ofrece «Borrador» y no ofrece «Agotado». Medido contra el Backend:
 
 ```
-Usuarios    buscar por nombre o email · rol · activo/inactivo
-Productos   estado
-Órdenes     estado
+PATCH /admin/products/{id}/status  {"status":"draft"}     -> 400 «Estado inválido: draft»
+PATCH /admin/products/{id}/status  {"status":"sold_out"}  -> 200
 ```
 
-Buscar es una acción y no cada tecla: se aplica con el botón «Buscar» o con
-Enter. Cualquiera de los cuatro controles vuelve a la página 1, porque la que
-se estaba mirando era de otra lista.
+O sea: la administradora puede elegir «Borrador» en cualquier fila y siempre le
+va a fallar, y no tiene forma de marcar una publicación como agotada desde el
+panel. Es la misma familia y son cuatro líneas, pero es producto que no me
+pediste cambiar en esta corrección, así que lo dejo acá para que decidas.
 
-### 4. Lo que comprueba el caso 145
-
-Arma sus propias filas por las rutas de siempre —21 usuarios por
-`POST /admin/users`, 21 publicaciones por el alta del vendedor y 21 órdenes por
-el checkout de transferencia— y después:
-
-```
-en la red        «Siguiente» pide /admin/users?page=2&page_size=20 (y sus dos hermanas)
-contra la API    «Total: N» y «Página 1 de M» salen del total del servidor
-contra la base   el total de usuarios coincide con SELECT COUNT(*)
-la fila testigo  no está en la primera página y aparece en la segunda, en las tres listas
-página propia    Usuarios vuelve a su página 2 después de pasear por las otras dos
-los controles    buscar deja 21 filas en 2 páginas y vuelve a la página 1
-cero resultados  «Página 1 de 1», sin filas y con los dos botones deshabilitados
-los extremos     «Anterior» apagado en la 1, «Siguiente» apagado en la última
-sin contradecir  ninguna fila visible contradice el rol, el estado o la búsqueda
-```
-
-Una nota sobre cómo se mide el paso de página, porque me costó un rojo: el
-rótulo «Página 2 de N» cambia con el estado, apenas se hace clic, y las filas
-cambian cuando **llega** la respuesta. El caso espera la respuesta —que es
-además lo que hay que demostrar— y no el rótulo.
-
-### 5. Puertas
+### 4. Puertas
 
 ```
 base limpia + SMOKE_CASOS=145                   1/1
 base limpia + suite completa                    144/145   (131 rojo)
-base limpia + suite completa, otra vez          144/145   (131 rojo)
 npm run build                                   ok
 npm run lint                                    ok (--max-warnings 0)
 node --check scripts/smoke.mjs                  ok
 python -m compileall backend/app                ok
 python -m pip check                             ok
 git -c core.whitespace=cr-at-eol diff --check   limpio
-npm run a11y -- --todas                         sin violaciones bloqueantes
-npm run contraste                               TODO OK, cobertura completa
 ```
 
-Cada corrida arrancó con su propia base limpia. El **131** es el de siempre
-—acá no hay demonio de Docker— y no lo declaro yo: en tu Mac esto tiene que dar
-**145/145**. Los casos 114, 121 y 144 pasaron en las dos corridas.
+Sobre el **131**: en esta corrida volvió a fallar acá, con el mismo mensaje de
+siempre —el puente de mi entorno sólo traduce `docker exec` y la receta CSP
+necesita `docker run` sobre `alpine:3`—, así que es la limitación de mi máquina
+y no lo toqué. En la tuya pasó y esto tiene que dar **145/145**.
 
-### 6. Hashes
+### 5. Hashes
 
 ```
-src/components/AdminPanel/AdminPanel.tsx        654982ec528d6d78
-src/components/AdminPanel/AdminPanel.module.css 0994e1efe027e073
-scripts/smoke.mjs                               9503d98bc1c143fe
+src/components/AdminPanel/AdminPanel.tsx  371d1da5a09cbb1b
+scripts/smoke.mjs                         7726ab2fe6d7741b
 ```
 
-(SHA-256 truncado a 16, del árbol en el commit de producto.)
+(SHA-256 truncado a 16, del árbol en el commit de corrección.)
 
-### 7. Riesgos residuales
+### 6. Riesgos residuales
 
-1. **Veinte filas es fijo y no se puede cambiar desde la pantalla.** Es lo que
-   pediste; lo anoto porque con listas grandes alguien va a querer 50.
-2. **La página no viaja en la URL.** Recargar la aplicación vuelve a la página
-   1 de cada lista. No lo abrí: el panel es un modal y no tiene ruta propia.
-3. **Las acciones de una fila no conservan la posición del scroll**, aunque sí
-   la página: al desactivar un usuario de la página 3 la lista se recarga en la
-   página 3, pero arriba.
-4. **Órdenes filtra por estado con los diez valores del contrato.** Si mañana
-   se agrega uno, hay que sumarlo a la lista de opciones; no se generan solos.
-5. **El caso 145 deja 21 usuarios, 21 publicaciones y 21 órdenes** en la base
-   de la corrida. Corre último y no ensucia a nadie, pero engorda la base
-   efímera; si querés que limpie al final, lo agrego.
+1. **La guarda descarta la respuesta vieja, no la cancela.** El pedido igual
+   viaja y el servidor igual trabaja. Cancelarlo pide `AbortController` en
+   `apiGet`, que es tocar el cliente HTTP de todo el producto; no me pareció
+   parte de esto.
+2. **Sigue el selector de fila con «Borrador»**, arriba.
+3. Los cuatro riesgos que informé en la entrega anterior siguen en pie: veinte
+   filas fijo, la página no viaja en la URL, el scroll vuelve arriba al recargar
+   una lista, y el caso 145 deja sus 63 filas en la base efímera.
 
-### 8. Frenos
+### 7. Frenos
 
-No toqué Backend, dashboard, categorías, documentación, estados traducidos,
-navegación global, el modal, responsive, BOEDA, pagos ni Railway. No agregué
-buscador de catálogo ni endpoints. No hay migración ni dependencia nueva. No
-desplegué. `PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de
-empujar.
+No toqué Backend, dashboard, navegación, BOEDA, pagos ni Railway. No abrí la
+tarea siguiente. No desplegué. `PRE_FIRMA.md` sigue fuera del versionado y lo
+confirmé antes de empujar.
 
 Freno acá y te pido revisión.
