@@ -1,6 +1,6 @@
 # Roadmap operativo para cerrar el MVP
 
-Actualizado: 2026-09-02.  
+Actualizado: 2026-09-03.  
 Fuentes: `CRONOGRAMA.md`, `ALCANCE-Y-LIMITES.md`, `NOW.md` y
 `AUDITORIAS-UX-CLAUDE-2026-08-30.md`.
 
@@ -37,7 +37,10 @@ final, como acordó Emi.
 - SERVICE-STATE-1 quedó aceptada en `a038b56`/`bad5a1b`: PM verificó el caso
   143 aislado en 1/1 y la suite oficial en **143/143** desde bases limpias,
   además de build y lint; también pasaron 114, 121 y 131.
-- Tarea única vigente: **ADMIN-ACTIONS-1**, detallada en `PARA-DEV.md`.
+- ADMIN-ACTIONS-1 quedó aceptada en `edf3cb5`/`6441a49`/`446bb30`, con informes
+  `c657c47`/`9ae1cec`/`1ac4191`: PM verificó 121 y 144 aislados y dos suites
+  completas consecutivas **144/144** desde bases limpias, más puertas estáticas.
+- Tarea única vigente: **ADMIN-PAGE-1**, detallada en `PARA-DEV.md`.
 - ORD-SELF-1 no cierra ningún hallazgo de las tres auditorías; era la tarea P1
   anterior y las auditorías la excluyeron expresamente.
 - La historia de las devoluciones del arnés y su cierre reproducido queda en
@@ -77,8 +80,8 @@ habilitada como puerta de las tareas de producto.
 | 2 | **TRANSFER-REC-1 — cerrada** | F2 y el borde P1 de F3 | Aceptada en `14d561b`/`a9c3fbd`: Mis compras recupera snapshot, concepto, total y carga de comprobante; PM cerró con repetición oficial 141/141. |
 | 3 | **CART-RECOVERY-1 — cerrada** | R2 | Aceptada en `ebb2b20`/`8c29f47`: copia dañada acotada, copia válida conservada y carrito servidor intacto; PM cerró 142/142. |
 | 4 | **SERVICE-STATE-1 — cerrada** | F1 | Aceptada en `a038b56`/`bad5a1b`: mapeador único, servicio estable y control de producto agotado; PM cerró 143/143. |
-| 5 | **ADMIN-ACTIONS-1 — vigente** | ADM-1, ADM-5; ADM-R1/R2/R3 | PUT real y acciones con nombre; valor interno inmutable, categoría usada sin cambio de tipo y subcategoría usada sin borrado. |
-| 6 | **ADMIN-PAGE-1** | ADM-2 | Usuarios, publicaciones y órdenes tienen paginación y búsqueda/filtros mínimos; el registro 21 es alcanzable y el total es honesto. |
+| 5 | **ADMIN-ACTIONS-1 — cerrada** | ADM-1, ADM-5; ADM-R1/R2/R3 | Aceptada en `edf3cb5`/`6441a49`/`446bb30`: PUT real, acciones con nombre y tres mutaciones peligrosas bloqueadas; PM cerró con dos repeticiones 144/144. |
+| 6 | **ADMIN-PAGE-1 — vigente** | ADM-2 | Usuarios, publicaciones y órdenes tienen paginación y búsqueda/filtros mínimos; el registro 21 es alcanzable y el total es honesto. |
 
 Esta puerta va antes del pulido: transferencia y administración forman parte de
 la operación prometida. Los riesgos ADM-R1/R2/R3 pueden obligar a bloquear una

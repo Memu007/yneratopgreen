@@ -52,3 +52,31 @@ completa, así que un 143/144 no se acepta aunque 144 pase.
 
 No se modificó producto, no se desplegó y no se tocaron Railway ni datos
 remotos.
+
+## Cierre posterior — 2026-09-03
+
+La Dev aisló una carrera del arnés sin cambiar producto. Antes de la búsqueda,
+la publicación nueva ya podía estar visible; el localizador resolvía ese título
+y React reemplazaba la grilla al llegar la respuesta filtrada. Leer el estilo
+del nodo ya separado del documento devolvía una cadena vacía y producía el rojo
+observado. La corrección `446bb30` espera la respuesta 200 de
+`/catalog/products` que contiene `search=` antes de leer el DOM y reintenta la
+placa hasta diez segundos con diagnóstico de conexión, reglas y estado. El
+informe quedó en `1ac4191`.
+
+PM revisó que la espera y el Enter están unidos en el mismo `Promise.all` y que
+el reintento conserva un fallo real en vez de convertirlo en verde. Después
+ejecutó desde bases limpias:
+
+| Corrida | Resultado |
+| --- | ---: |
+| caso 121 aislado | 1/1 |
+| caso 144 aislado | 1/1 |
+| suite completa 1 | 144/144 |
+| suite completa 2 | 144/144 |
+
+También quedaron verdes build, lint, `node --check`, compileall, `pip check` y
+`git diff --check 7063c67..HEAD`. Los mensajes de clave duplicada y lock que
+aparecen al final son efectos esperados de casos adversariales y no fallos de
+la suite. Con dos repeticiones completas consecutivas, ADMIN-ACTIONS-1 cruza la
+puerta y queda aceptada. No hubo despliegue ni cambio remoto.

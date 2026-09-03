@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-08-31.
+Actualizado: 2026-09-03.
 
 ## Relevo inmediato — leer primero
 
@@ -354,28 +354,22 @@ SERVICE-STATE-1 queda **aceptada** en producto/regresión `a038b56` e informe
 desde otra base limpia en **143/143**, salida 0. También pasaron 114, 121 y
 131. Evidencia en `REPRODUCCION-SERVICE-STATE-1-2026-09-02.md`.
 
-**La tarea activa de Dev es ADMIN-ACTIONS-1:** corregir el `PATCH`/`PUT` de
-categorías y opciones, dar nombre visible y accesible a las acciones del bloque
-y cerrar tres mutaciones peligrosas sin migrar datos: `FormOption.value`
-inmutable, cambio Producto↔Servicio bloqueado en categorías usadas y eliminación
-de subcategorías usadas rechazada limpiamente. Alcance y puertas en
-`PARA-DEV.md`; no abre paginación, rediseño ni despliegue.
+ADMIN-ACTIONS-1 queda **aceptada** en producto `edf3cb5`, corrección de
+regresión `6441a49`, estabilización de arnés `446bb30` e informes
+`c657c47`/`9ae1cec`/`1ac4191`. PM revisó los diffs, verificó los casos 121 y 144
+aislados en **1/1** y ejecutó dos suites oficiales completas consecutivas desde
+bases limpias, ambas **144/144**. Build, lint, compileall, `pip check` y
+`diff-check` también quedaron verdes. La causa del rojo intermitente era una
+lectura posible del nodo anterior a la respuesta filtrada; la prueba ahora
+espera la respuesta `search=` y conserva diagnóstico discriminante. Cierre en
+`REPRODUCCION-ADMIN-ACTIONS-1-2026-09-03.md`.
 
-La entrega `edf3cb5`/`c657c47` queda **en revisión, no aceptada todavía**. PM
-obtuvo build, lint, compileall, `pip check` y caso 144 aislado en 1/1, pero la
-regresión contiene un `|| true` que vuelve imposible que falle una comprobación
-visual y no verifica la persistencia visible de la opción tras recargar ni
-enumera todos los botones de los formularios. La corrección pedida es sólo de
-evidencia; no autoriza cambios nuevos de producto ni otra tarea.
-
-La corrección de evidencia `6441a49`/`9ae1cec` resolvió esos tres defectos sin
-tocar producto: el 144 focal pasó 1/1. La tarea sigue abierta porque PM ejecutó
-dos suites completas desde bases limpias y ambas dieron **143/144**, con el caso
-121 como único rojo y el 144 verde; el 131 pasó en las dos. El 121 aislado,
-118–121 y 1–60+121 quedan verdes, por lo que hay una dependencia de orden aún
-sin causa demostrada. Dev debe diagnosticarla sin tocar producto salvo evidencia
-previa y cerrar con dos corridas completas consecutivas 144/144. Reproducción en
-`REPRODUCCION-ADMIN-ACTIONS-1-2026-09-03.md`. No se abre ADMIN-PAGE-1.
+**La tarea activa de Dev es ADMIN-PAGE-1:** hacer accesibles desde el panel las
+filas 21+ de Usuarios, Productos y Órdenes mediante paginación real del servidor,
+total/página coherentes y los filtros mínimos que ya admite la API. El caso 145
+debe probar las tres listas con más de veinte registros. No abre dashboard,
+rediseño, navegación global, BOEDA, pagos ni despliegue. Alcance y puertas en
+`PARA-DEV.md`.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se

@@ -12,6 +12,74 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-03 — TAREA VIGENTE: ADMIN-PAGE-1, las tres listas deben pasar de veinte filas
+
+ADMIN-ACTIONS-1 queda **aceptada** en producto `edf3cb5`, corrección de
+regresión `6441a49`, estabilización de arnés `446bb30` e informes
+`c657c47`/`9ae1cec`/`1ac4191`. Revisé los diffs y ejecuté de primera mano los
+casos 121 y 144 aislados, ambos **1/1**, y después dos suites oficiales
+completas consecutivas desde bases limpias, ambas **144/144**. Build, lint,
+compileall, `pip check` y `diff-check` quedaron verdes. La espera de la respuesta
+que contiene `search=` elimina la lectura del nodo viejo sin ocultar un rojo:
+el reintento conserva diagnóstico y vence a los diez segundos.
+
+La siguiente pieza del roadmap es **ADMIN-PAGE-1**, que cierra ADM-2. Hoy las
+pestañas Usuarios, Productos y Órdenes llaman sus endpoints sin `page` ni
+`page_size`: cada una muestra las primeras veinte filas y al pie informa el
+total completo. No existe forma de llegar a la fila 21 desde la interfaz. El
+Backend ya ofrece la paginación y los filtros necesarios; esta tarea no habilita
+un buscador nuevo de catálogo ni una API administrativa distinta.
+
+### Resultado obligatorio
+
+1. Usuarios, Productos y Órdenes deben tener estado de página independiente,
+   tamaño fijo y explícito de veinte filas, total filtrado y una indicación
+   visible y accesible `Página X de Y`.
+2. Cada pestaña debe ofrecer `Anterior` y `Siguiente`, con nombres accesibles y
+   estado deshabilitado correcto en ambos extremos. La segunda página debe
+   pedir realmente `page=2&page_size=20`; no se vale paginar en memoria las
+   primeras veinte respuestas.
+3. Controles mínimos, usando el contrato que ya existe:
+   - Usuarios: búsqueda por nombre/email, rol y activo/inactivo.
+   - Productos: estado.
+   - Órdenes: estado.
+   No agregues búsqueda textual de productos/órdenes, nuevos endpoints ni
+   filtros por identificadores internos.
+4. Cambiar una búsqueda o filtro vuelve a la página 1. Si una recarga o acción
+   deja la página actual fuera del total disponible, debe caer en la última
+   página válida en vez de mostrar un vacío falso.
+5. El número total y el número de páginas deben corresponder al conjunto
+   filtrado del servidor. Cero resultados es página 1 de 1, con su estado vacío;
+   no debe mostrar página 0 ni habilitar navegación.
+
+### Regresión discriminante
+
+Agregá un caso 145 autónomo sobre base efímera que cree o asegure al menos 21
+filas identificables en **cada** una de las tres listas y recorra el panel real:
+
+- demuestra que una fila testigo fuera de las primeras veinte aparece al usar
+  `Siguiente` en Usuarios, Productos y Órdenes;
+- comprueba en la red `page=2&page_size=20` y contrasta total/páginas con la API
+  o la base, no sólo con texto dibujado;
+- aplica todos los controles mínimos, demuestra que vuelven a página 1 y que
+  ninguna fila visible contradice el filtro;
+- comprueba los límites: `Anterior` deshabilitado en la primera página y
+  `Siguiente` en la última;
+- deja explícito qué fallaba antes. No modifiques el seed permanente para
+  fabricar el caso.
+
+Primero conservá en `PARA-PM.md` la evidencia roja o la medición equivalente del
+estado actual. Después hacé la corrección mínima, ejecutá el 145 aislado y la
+suite oficial completa esperada en **145/145** desde base limpia, más build,
+lint, compileall, `pip check` y `diff-check` real contra la base anterior.
+
+No toques dashboard, categorías, documentación, estados traducidos, navegación
+global, modal, responsive, BOEDA, pagos, Railway ni despliegue. No hay migración
+ni dependencia nueva. Producto/regresión e informe en commits separados; subí
+y frená para revisión adversarial de PM.
+
+---
+
 ## 2026-09-03 — ADMIN-ACTIONS-1R: regresión 144 corregida, suite completa todavía roja
 
 Revisé `6441a49` y el informe `9ae1cec`. La corrección pedida del caso 144 está
