@@ -107,6 +107,72 @@ interface OptionTypeInfo {
   description: string;
 }
 
+/**
+ * Cuántas filas pide cada lista del panel.
+ *
+ * Explícito y fijo. El servidor ya usaba veinte por omisión, pero la
+ * pantalla no puede deducir cuántas páginas hay de un valor que no pidió:
+ * mostraba las primeras veinte filas y al pie el total entero, sin ninguna
+ * forma de llegar a la fila 21.
+ */
+const FILAS_POR_PAGINA = 20;
+
+/**
+ * Cuántas páginas hay para ese total.
+ *
+ * Cero resultados es «página 1 de 1» y no «de 0»: la lista está vacía, que
+ * no es lo mismo que rota, y con «de 0» no habría página donde pararse.
+ */
+const paginasDe = (total: number) => Math.max(1, Math.ceil(total / FILAS_POR_PAGINA));
+
+interface PaginadorProps {
+  /** Qué se está listando, en plural: entra en el total y en los rótulos. */
+  etiqueta: string;
+  pagina: number;
+  total: number;
+  alCambiar: (pagina: number) => void;
+}
+
+/**
+ * El pie de una lista: cuántas hay, en qué página estás y cómo moverte.
+ *
+ * Vive afuera del componente para que las tres listas usen exactamente el
+ * mismo control y no puedan divergir. Los botones dicen qué hacen y sobre
+ * qué lista, y se deshabilitan en los extremos en vez de pedir una página
+ * que no existe.
+ */
+const Paginador: React.FC<PaginadorProps> = ({ etiqueta, pagina, total, alCambiar }) => {
+  const paginas = paginasDe(total);
+  return (
+    <div className={styles.pagination}>
+      <span>Total: {total} {etiqueta}</span>
+      <span className={styles.paginacionControles}>
+        <button
+          type="button"
+          className={styles.paginaBtn}
+          onClick={() => alCambiar(pagina - 1)}
+          disabled={pagina <= 1}
+          aria-label={`Página anterior de ${etiqueta}`}
+        >
+          Anterior
+        </button>
+        <span className={styles.paginaActual} aria-live="polite">
+          Página {pagina} de {paginas}
+        </span>
+        <button
+          type="button"
+          className={styles.paginaBtn}
+          onClick={() => alCambiar(pagina + 1)}
+          disabled={pagina >= paginas}
+          aria-label={`Página siguiente de ${etiqueta}`}
+        >
+          Siguiente
+        </button>
+      </span>
+    </div>
+  );
+};
+
 interface AdminPanelProps {
   onClose: () => void;
 }
@@ -165,6 +231,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [usersTotal, setUsersTotal] = useState(0);
   const [userRoleFilter, setUserRoleFilter] = useState<string>('');
+  // Activo/inactivo viaja como 'true'/'false' o vacío para «todos»: el
+  // servidor distingue el filtro ausente de `is_active=false`.
+  const [userActiveFilter, setUserActiveFilter] = useState<string>('');
+  // Lo que se escribe y lo que se pidió son dos cosas: la lista no se
+  // rearma con cada tecla, sino cuando se busca.
+  const [userSearch, setUserSearch] = useState('');
+  const [userSearchAplicada, setUserSearchAplicada] = useState('');
+  const [usersPage, setUsersPage] = useState(1);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [newUser, setNewUser] = useState({
     email: '',
@@ -177,10 +251,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   // Products
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [productsTotal, setProductsTotal] = useState(0);
+  const [productStatusFilter, setProductStatusFilter] = useState<string>('');
+  const [productsPage, setProductsPage] = useState(1);
   
   // Orders
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [ordersTotal, setOrdersTotal] = useState(0);
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>('');
+  const [ordersPage, setOrdersPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
 
   // Categories
@@ -306,11 +384,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     }
   };
 
+  // Buscar es una acción, no cada tecla: se aplica lo escrito y se vuelve a
+  // la primera página, porque la que se estaba mirando era de otra lista.
+  const aplicarBusquedaDeUsuarios = () => {
+    setUserSearchAplicada(userSearch.trim());
+    setUsersPage(1);
+  };
+
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const params = userRoleFilter ? `?role=${userRoleFilter}` : '';
-      const data = await apiGet<{ users: AdminUser[]; total: number }>(`/admin/users${params}`);
+      const params = new URLSearchParams({
+        page: String(usersPage),
+        page_size: String(FILAS_POR_PAGINA),
+      });
+      if (userRoleFilter) params.set('role', userRoleFilter);
+      if (userActiveFilter) params.set('is_active', userActiveFilter);
+      if (userSearchAplicada) params.set('search', userSearchAplicada);
+      const data = await apiGet<{ users: AdminUser[]; total: number }>(
+        `/admin/users?${params.toString()}`);
+      // La página puede haber quedado fuera del total: se filtró, se borró
+      // una fila, o entró otro administrador. Se cae a la última que
+      // existe en vez de dibujar un vacío que no es cierto.
+      const ultima = paginasDe(data.total);
+      if (usersPage > ultima) {
+        setUsersPage(ultima);
+        return;
+      }
       setUsers(data.users);
       setUsersTotal(data.total);
     } catch (error) {
@@ -318,12 +418,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     } finally {
       setLoading(false);
     }
-  }, [userRoleFilter]);
+  }, [usersPage, userRoleFilter, userActiveFilter, userSearchAplicada]);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiGet<{ products: AdminProduct[]; total: number }>('/admin/products');
+      const params = new URLSearchParams({
+        page: String(productsPage),
+        page_size: String(FILAS_POR_PAGINA),
+      });
+      if (productStatusFilter) params.set('status', productStatusFilter);
+      const data = await apiGet<{ products: AdminProduct[]; total: number }>(
+        `/admin/products?${params.toString()}`);
+      const ultima = paginasDe(data.total);
+      if (productsPage > ultima) {
+        setProductsPage(ultima);
+        return;
+      }
       setProducts(data.products);
       setProductsTotal(data.total);
     } catch (error) {
@@ -331,12 +442,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [productsPage, productStatusFilter]);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiGet<{ orders: AdminOrder[]; total: number }>('/admin/orders');
+      const params = new URLSearchParams({
+        page: String(ordersPage),
+        page_size: String(FILAS_POR_PAGINA),
+      });
+      if (orderStatusFilter) params.set('status', orderStatusFilter);
+      const data = await apiGet<{ orders: AdminOrder[]; total: number }>(
+        `/admin/orders?${params.toString()}`);
+      const ultima = paginasDe(data.total);
+      if (ordersPage > ultima) {
+        setOrdersPage(ultima);
+        return;
+      }
       setOrders(data.orders);
       setOrdersTotal(data.total);
     } catch (error) {
@@ -344,7 +466,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [ordersPage, orderStatusFilter]);
 
   const loadCategories = useCallback(async () => {
     setLoading(true);
@@ -779,14 +901,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {activeTab === 'users' && (
             <div className={styles.usersSection}>
               <div className={styles.toolbar}>
+                <input
+                  type="search"
+                  className={styles.filterSelect}
+                  aria-label="Buscar usuarios por nombre o email"
+                  placeholder="Buscar por nombre o email"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') aplicarBusquedaDeUsuarios(); }}
+                />
+                <button
+                  type="button"
+                  className={styles.addButton}
+                  aria-label="Buscar usuarios"
+                  onClick={aplicarBusquedaDeUsuarios}
+                >
+                  Buscar
+                </button>
                 <select aria-label="Filtrar usuarios por rol"
                   value={userRoleFilter} 
-                  onChange={(e) => setUserRoleFilter(e.target.value)}
+                  onChange={(e) => { setUserRoleFilter(e.target.value); setUsersPage(1); }}
                   className={styles.filterSelect}
                 >
                   <option value="">Todos los roles</option>
                   <option value="admin">Administradores</option>
                   <option value="user">Usuarios</option>
+                </select>
+                <select aria-label="Filtrar usuarios por estado"
+                  value={userActiveFilter}
+                  onChange={(e) => { setUserActiveFilter(e.target.value); setUsersPage(1); }}
+                  className={styles.filterSelect}
+                >
+                  <option value="">Activos e inactivos</option>
+                  <option value="true">Solo activos</option>
+                  <option value="false">Solo inactivos</option>
                 </select>
                 <button 
                   className={styles.addButton}
@@ -889,9 +1037,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   </tbody>
                 </table>
               </TablaDesplazable>
-              <div className={styles.pagination}>
-                Total: {usersTotal} usuarios
-              </div>
+              <Paginador
+                etiqueta="usuarios"
+                pagina={usersPage}
+                total={usersTotal}
+                alCambiar={setUsersPage}
+              />
             </div>
           )}
 
@@ -1048,6 +1199,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {/* PRODUCTS */}
           {activeTab === 'products' && (
             <div className={styles.productsSection}>
+              <div className={styles.toolbar}>
+                <select aria-label="Filtrar publicaciones por estado"
+                  value={productStatusFilter}
+                  onChange={(e) => { setProductStatusFilter(e.target.value); setProductsPage(1); }}
+                  className={styles.filterSelect}
+                >
+                  <option value="">Todos los estados</option>
+                  <option value="active">Activas</option>
+                  <option value="paused">Pausadas</option>
+                  <option value="draft">Borradores</option>
+                  <option value="deleted">Eliminadas</option>
+                </select>
+              </div>
               <TablaDesplazable etiqueta="Publicaciones del catálogo">
                 <table className={styles.table}>
                   <thead>
@@ -1096,15 +1260,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   </tbody>
                 </table>
               </TablaDesplazable>
-              <div className={styles.pagination}>
-                Total: {productsTotal} productos
-              </div>
+              <Paginador
+                etiqueta="productos"
+                pagina={productsPage}
+                total={productsTotal}
+                alCambiar={setProductsPage}
+              />
             </div>
           )}
 
           {/* ORDERS */}
           {activeTab === 'orders' && (
             <div className={styles.ordersSection}>
+              <div className={styles.toolbar}>
+                <select aria-label="Filtrar órdenes por estado"
+                  value={orderStatusFilter}
+                  onChange={(e) => { setOrderStatusFilter(e.target.value); setOrdersPage(1); }}
+                  className={styles.filterSelect}
+                >
+                  <option value="">Todos los estados</option>
+                  <option value="placed">Pedido realizado</option>
+                  <option value="confirmed">Confirmada</option>
+                  <option value="paid">Pagada</option>
+                  <option value="awaiting_transfer_receipt">Esperando comprobante</option>
+                  <option value="transfer_receipt_submitted">Comprobante a revisar</option>
+                  <option value="shipped">Enviada</option>
+                  <option value="delivered">Entregada</option>
+                  <option value="cancelled">Cancelada</option>
+                  <option value="rejected">Rechazada</option>
+                </select>
+              </div>
               <TablaDesplazable etiqueta="Órdenes de compra">
                 <table className={styles.table}>
                   <thead>
@@ -1142,9 +1327,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   </tbody>
                 </table>
               </TablaDesplazable>
-              <div className={styles.pagination}>
-                Total: {ordersTotal} órdenes
-              </div>
+              <Paginador
+                etiqueta="órdenes"
+                pagina={ordersPage}
+                total={ordersTotal}
+                alCambiar={setOrdersPage}
+              />
             </div>
           )}
         </div>

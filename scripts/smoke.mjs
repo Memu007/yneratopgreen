@@ -16640,6 +16640,327 @@ await runCase(144, 'Administracion: las acciones se entienden, guardan, y no rom
   }
 });
 
+await runCase(145, 'Las tres listas de Administracion pasan de la fila veinte', async () => {
+  // Usuarios, Productos y Ordenes pedian su endpoint sin `page` ni `page_size`.
+  // El servidor devuelve veinte filas por omision, asi que la pantalla mostraba
+  // las primeras veinte y al pie el total entero —«Total: 164 productos»— sin
+  // ningun control: no habia forma de llegar a la fila 21 desde la interfaz.
+  //
+  // Este caso arma sus propias filas, cruza lo que ve con lo que devuelve la
+  // API y con la base, y recorre el panel real: pagina, filtra, vuelve a la
+  // primera pagina y comprueba los dos extremos.
+
+  const admin = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'admin@topgreen.com', password: 'admin123' },
+  });
+  const token = admin.data.access_token;
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const comprador = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'cliente@ejemplo.com', password: 'cliente123' },
+  });
+  const tokenComprador = comprador.data.access_token;
+
+  const sello = Date.now();
+  const marca = `Pag145 ${sello}`;
+  const FILAS = 21;
+
+  // --- las filas del caso, por las rutas de siempre -----------------------
+  // 21 usuarios con la misma marca en el nombre: con la busqueda aplicada la
+  // lista es exactamente la del caso, y el ultimo creado queda primero.
+  for (let i = 1; i <= FILAS; i += 1) {
+    const n = String(i).padStart(2, '0');
+    const alta = await apiRequest('/admin/users', {
+      method: 'POST', token,
+      body: {
+        email: `pag145.${sello}.${n}@ejemplo.com`,
+        password: 'smoke145',
+        full_name: `${marca} ${n}`,
+        phone: '+54 11 5555 0145',
+        role: 'user',
+        is_active: true,
+      },
+    });
+    assert(alta.status < 400, `no se pudo crear el usuario ${n}: HTTP ${alta.status}`);
+  }
+
+  const [categoria] = queryRows(`
+    SELECT id, 'fin' FROM categories
+    WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  for (let i = 1; i <= FILAS; i += 1) {
+    const n = String(i).padStart(2, '0');
+    const alta = await apiRequest('/products', {
+      method: 'POST', token: vendedor.token,
+      body: {
+        name: `${marca} publicacion ${n}`,
+        description: 'Publicacion del caso 145, para que la lista pase de veinte filas.',
+        category_id: categoria[0],
+        price: 1000 + i,
+        stock: 3,
+        unit: 'kg',
+        locality_id: localidad,
+        publication_type: 'producto',
+        operation_kind: 'insumo',
+      },
+    });
+    assert(alta.status < 400, `no se pudo publicar ${n}: HTTP ${alta.status}`);
+  }
+
+  // 21 ordenes por transferencia: dos llamadas cada una, por el camino real.
+  const productoParaComprar = productoConStock(vendedor.id, FILAS + 1);
+  await apiRequest('/cart', { method: 'DELETE', token: tokenComprador });
+  const ordenesDelCaso = [];
+  for (let i = 1; i <= FILAS; i += 1) {
+    await apiRequest('/cart/items', {
+      method: 'POST', token: tokenComprador,
+      body: { product_id: productoParaComprar, quantity: 1 },
+    });
+    const checkout = await apiRequest('/orders/checkout/transfer', {
+      method: 'POST', token: tokenComprador,
+      body: {
+        shipping_address: `Ruta 145 km ${i}`,
+        shipping_locality_id: localidad,
+        shipping_postal_code: '2700',
+        shipping_decisions: [{ seller_id: vendedor.id, mode: 'self' }],
+      },
+    });
+    const [orden] = checkout.data.orders;
+    assert(orden?.order_number, `la orden ${i} no salio: ${JSON.stringify(checkout.data)}`);
+    ordenesDelCaso.push(orden.order_number);
+  }
+
+  // --- lo que dice el servidor, que es con lo que se contrasta -------------
+  const enLaApi = async (ruta, extra = {}) => {
+    const q = new URLSearchParams({ page: '1', page_size: '20', ...extra });
+    const { data } = await apiRequest(`${ruta}?${q.toString()}`, { token });
+    return data;
+  };
+  const testigoDePagina2 = async (ruta, clave, extra = {}) => {
+    const q = new URLSearchParams({ page: '2', page_size: '20', ...extra });
+    const { data } = await apiRequest(`${ruta}?${q.toString()}`, { token });
+    assert(data[clave].length > 0, `${ruta} no tiene pagina 2`);
+    return data[clave][0];
+  };
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
+    await contexto.addInitScript(({ a, r }) => {
+      window.localStorage.setItem('access_token', a);
+      window.localStorage.setItem('refresh_token', r);
+    }, { a: token, r: admin.data.refresh_token });
+    const page = await contexto.newPage();
+
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Admin' }).click();
+    await page.getByRole('heading', { name: 'Panel de Administración' })
+      .waitFor({ timeout: 20_000 });
+
+    const solapa = async (nombre) => {
+      await page.getByRole('button', { name: nombre, exact: true }).click();
+      // Se espera a la tabla y no al paginador: si el paginador no existiera,
+      // el caso tiene que decirlo con sus palabras y no morir esperandolo.
+      await page.locator('tbody tr').first().waitFor({ state: 'visible', timeout: 20_000 });
+    };
+    const paginaQueDice = async () => (await page.locator('[class*="paginaActual"]').innerText())
+      .replace(/\s+/g, ' ').trim();
+    const pieCompleto = async () => (await page.locator('[class*="pagination"]').innerText())
+      .replace(/\s+/g, ' ').trim();
+    const filas = async () => (await page.locator('tbody tr').allInnerTexts())
+      .map((t) => t.replace(/\s+/g, ' ').trim());
+    const anterior = (etiqueta) => page.getByRole('button', { name: `Página anterior de ${etiqueta}` });
+    const siguiente = (etiqueta) => page.getByRole('button', { name: `Página siguiente de ${etiqueta}` });
+
+    // Ir a la pagina 2 tiene que ser un pedido al servidor, no un corte en
+    // memoria de las veinte filas que ya estaban.
+    const irASiguiente = async (etiqueta, ruta) => {
+      // El rotulo «Página 2 de N» cambia con el estado, apenas se hace clic; las
+      // filas cambian cuando LLEGA la respuesta. Se espera la respuesta, que es
+      // ademas lo que hay que demostrar: la pagina 2 se pide al servidor.
+      const [respuesta] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes(ruta)
+          && r.url().includes('page=2') && r.url().includes('page_size=20')
+          && r.status() === 200, { timeout: 20_000 }),
+        siguiente(etiqueta).click(),
+      ]);
+      await esperarA(async () => (await paginaQueDice()).includes('Página 2 de'),
+        `${etiqueta}: la pantalla no paso a la pagina 2`, 20_000);
+      return respuesta.url().split('/api')[1];
+    };
+
+    const revisarLista = async ({ solapaNombre, etiqueta, ruta, clave, textoDelTestigo }) => {
+      await solapa(solapaNombre);
+      const datos = await enLaApi(ruta);
+      const paginas = Math.max(1, Math.ceil(datos.total / 20));
+      assert(datos.total >= 21, `${etiqueta}: el caso necesita mas de 20 filas y hay ${datos.total}`);
+
+      const pie = await pieCompleto();
+      assert(await siguiente(etiqueta).count() === 1 && await anterior(etiqueta).count() === 1,
+        `${etiqueta}: no hay ningun control para pasar de pagina, y hay ${datos.total} filas; `
+        + `el pie dice «${pie}»`);
+      assert(pie.includes(`Total: ${datos.total} ${etiqueta}`),
+        `${etiqueta}: el pie no dice el total del servidor (${datos.total}): «${pie}»`);
+      assert((await paginaQueDice()) === `Página 1 de ${paginas}`,
+        `${etiqueta}: la pantalla dice «${await paginaQueDice()}» y el servidor tiene `
+        + `${datos.total} filas, o sea ${paginas} paginas`);
+      assert(await anterior(etiqueta).isDisabled(),
+        `${etiqueta}: en la primera pagina «Anterior» tendria que estar deshabilitado`);
+      assert((await filas()).length === 20,
+        `${etiqueta}: la primera pagina trae ${(await filas()).length} filas y no 20`);
+
+      const testigo = await testigoDePagina2(ruta, clave);
+      const texto = textoDelTestigo(testigo);
+      assert(!(await filas()).some((f) => f.includes(texto)),
+        `${etiqueta}: el testigo «${texto}» ya estaba en la primera pagina`);
+
+      const pedido = await irASiguiente(etiqueta, ruta);
+      await esperarA(async () => (await filas()).some((f) => f.includes(texto)),
+        `${etiqueta}: «${texto}» no aparecio al pasar de pagina; se pidio ${pedido}`, 20_000);
+      assert(await anterior(etiqueta).isEnabled(),
+        `${etiqueta}: en la pagina 2 «Anterior» tendria que poder usarse`);
+      return { total: datos.total, paginas, pedido, testigo: texto };
+    };
+
+    // --- A. las tres listas pasan de la fila veinte ------------------------
+    const usuarios = await revisarLista({
+      solapaNombre: 'Usuarios', etiqueta: 'usuarios',
+      ruta: '/admin/users', clave: 'users',
+      textoDelTestigo: (u) => u.email,
+    });
+    const productos = await revisarLista({
+      solapaNombre: 'Productos', etiqueta: 'productos',
+      ruta: '/admin/products', clave: 'products',
+      textoDelTestigo: (p) => p.name,
+    });
+    const ordenes = await revisarLista({
+      solapaNombre: 'Órdenes', etiqueta: 'órdenes',
+      ruta: '/admin/orders', clave: 'orders',
+      textoDelTestigo: (o) => o.order_number,
+    });
+
+    // Y el total de una de ellas se contrasta ademas contra la base.
+    const enLaBase = Number(queryCount('SELECT COUNT(*) FROM users'));
+    assert(enLaBase === usuarios.total,
+      `usuarios: la base tiene ${enLaBase} y la API dijo ${usuarios.total}`);
+
+    // --- B. Usuarios: buscar, rol y estado ---------------------------------
+    await solapa('Usuarios');
+    // Cada lista tiene SU pagina: se dejo Usuarios en la 2 al principio, se
+    // pasearon las otras dos, y al volver sigue en la 2. Desde ahi se comprueba
+    // que buscar devuelve a la primera.
+    assert((await paginaQueDice()).startsWith('Página 2 de'),
+      `Usuarios no conservo su propia pagina al volver: «${await paginaQueDice()}»`);
+    const buscador = page.getByLabel('Buscar usuarios por nombre o email');
+    await buscador.fill(marca);
+    await page.getByRole('button', { name: 'Buscar usuarios' }).click();
+    await esperarA(async () => (await pieCompleto()).includes(`Total: ${FILAS} usuarios`),
+      `la busqueda por «${marca}» no dejo las ${FILAS} filas del caso: «${await pieCompleto()}»`,
+      20_000);
+    assert((await paginaQueDice()) === 'Página 1 de 2',
+      `buscar no volvio a la primera pagina: «${await paginaQueDice()}»`);
+    for (const fila of await filas()) {
+      assert(fila.includes(marca) || fila.includes(`pag145.${sello}`),
+        `la busqueda dejo una fila que no corresponde: «${fila}»`);
+    }
+    // El testigo de la busqueda: el primero que se creo quedo ultimo.
+    const primeroCreado = `pag145.${sello}.01@ejemplo.com`;
+    assert(!(await filas()).some((f) => f.includes(primeroCreado)),
+      'con la busqueda aplicada el testigo ya estaba en la primera pagina');
+    await irASiguiente('usuarios', '/admin/users');
+    await esperarA(async () => (await filas()).some((f) => f.includes(primeroCreado)),
+      `el testigo ${primeroCreado} no aparecio en la pagina 2 de la busqueda`, 20_000);
+    assert(await siguiente('usuarios').isDisabled(),
+      'en la ultima pagina «Siguiente» tendria que estar deshabilitado');
+
+    // Cero resultados: pagina 1 de 1, sin filas y sin navegacion.
+    await buscador.fill(`${marca} no existe ninguno`);
+    await page.getByRole('button', { name: 'Buscar usuarios' }).click();
+    await esperarA(async () => (await pieCompleto()).includes('Total: 0 usuarios'),
+      `una busqueda sin resultados no dio cero: «${await pieCompleto()}»`, 20_000);
+    assert((await paginaQueDice()) === 'Página 1 de 1',
+      `sin resultados la pantalla dice «${await paginaQueDice()}»`);
+    assert((await filas()).length === 0, 'sin resultados igual dibujo filas');
+    assert(await anterior('usuarios').isDisabled() && await siguiente('usuarios').isDisabled(),
+      'sin resultados la navegacion sigue habilitada');
+
+    // Rol y estado, cada uno contra lo que muestra la fila.
+    await buscador.fill('');
+    await page.getByRole('button', { name: 'Buscar usuarios' }).click();
+    await esperarA(async () => (await pieCompleto()).includes(`Total: ${usuarios.total} usuarios`),
+      'vaciar la busqueda no devolvio la lista completa', 20_000);
+
+    await page.getByLabel('Filtrar usuarios por rol').selectOption('admin');
+    await esperarA(async () => {
+      const datos = await enLaApi('/admin/users', { role: 'admin' });
+      return (await pieCompleto()).includes(`Total: ${datos.total} usuarios`);
+    }, 'el filtro por rol no coincide con el total del servidor', 20_000);
+    assert((await paginaQueDice()).startsWith('Página 1 de'),
+      `filtrar por rol no volvio a la primera pagina: «${await paginaQueDice()}»`);
+    const rolesVisibles = await page.locator('tbody tr select[aria-label="Rol del usuario"]')
+      .evaluateAll((nodos) => nodos.map((n) => n.value));
+    assert(rolesVisibles.length > 0 && rolesVisibles.every((r) => r === 'admin'),
+      `el filtro por rol dejo filas que no son admin: ${JSON.stringify(rolesVisibles)}`);
+    await page.getByLabel('Filtrar usuarios por rol').selectOption('');
+
+    await page.getByLabel('Filtrar usuarios por estado').selectOption('false');
+    await esperarA(async () => {
+      const datos = await enLaApi('/admin/users', { is_active: 'false' });
+      return (await pieCompleto()).includes(`Total: ${datos.total} usuarios`);
+    }, 'el filtro por estado no coincide con el total del servidor', 20_000);
+    for (const fila of await filas()) {
+      assert(/Inactivo/.test(fila),
+        `«Solo inactivos» dejo una fila activa: «${fila}»`);
+    }
+    await page.getByLabel('Filtrar usuarios por estado').selectOption('');
+
+    // --- C. Productos y Ordenes: el filtro por estado ----------------------
+    await solapa('Productos');
+    assert((await paginaQueDice()).startsWith('Página 2 de'),
+      `Productos no conservo su propia pagina: «${await paginaQueDice()}»`);
+    await page.getByLabel('Filtrar publicaciones por estado').selectOption('paused');
+    await esperarA(async () => {
+      const datos = await enLaApi('/admin/products', { status: 'paused' });
+      return (await pieCompleto()).includes(`Total: ${datos.total} productos`);
+    }, 'el filtro de publicaciones no coincide con el total del servidor', 20_000);
+    assert((await paginaQueDice()).startsWith('Página 1 de'),
+      `filtrar publicaciones no volvio a la primera pagina: «${await paginaQueDice()}»`);
+    for (const fila of await filas()) {
+      // El distintivo imprime el estado crudo, y las ordenes lo muestran en
+      // mayusculas: se compara sin distinguir may/min, que es lo que importa.
+      assert(/paused/i.test(fila), `el filtro «Pausadas» dejo otra cosa: «${fila}»`);
+    }
+    await page.getByLabel('Filtrar publicaciones por estado').selectOption('');
+
+    await solapa('Órdenes');
+    assert((await paginaQueDice()).startsWith('Página 2 de'),
+      `Órdenes no conservo su propia pagina: «${await paginaQueDice()}»`);
+    await page.getByLabel('Filtrar órdenes por estado').selectOption('awaiting_transfer_receipt');
+    await esperarA(async () => {
+      const datos = await enLaApi('/admin/orders', { status: 'awaiting_transfer_receipt' });
+      return (await pieCompleto()).includes(`Total: ${datos.total} órdenes`);
+    }, 'el filtro de ordenes no coincide con el total del servidor', 20_000);
+    assert((await paginaQueDice()).startsWith('Página 1 de'),
+      `filtrar ordenes no volvio a la primera pagina: «${await paginaQueDice()}»`);
+    for (const fila of await filas()) {
+      assert(/awaiting_transfer_receipt/i.test(fila),
+        `el filtro de ordenes dejo otro estado: «${fila}»`);
+    }
+
+    await contexto.close();
+    return `con ${usuarios.total} usuarios, ${productos.total} publicaciones y `
+      + `${ordenes.total} ordenes, las tres listas dicen «Página 1 de N» del total del `
+      + `servidor y pasan de la fila veinte: al usar «Siguiente» piden ${usuarios.pedido} `
+      + `y aparecen los testigos ${usuarios.testigo}, «${productos.testigo}» y `
+      + `${ordenes.testigo}; buscar por «${marca}» deja ${FILAS} usuarios en 2 paginas y `
+      + 'vuelve a la primera, sin resultados dice «Página 1 de 1» con la navegacion '
+      + 'apagada, y los filtros de rol, estado y estado de publicacion/orden no dejan '
+      + 'ninguna fila que los contradiga';
+  } finally {
+    await browser.close();
+    await apiRequest('/cart', { method: 'DELETE', token: tokenComprador });
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 
