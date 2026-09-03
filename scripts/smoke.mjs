@@ -12011,8 +12011,65 @@ await runCase(121, 'Se puede publicar sin fotografía, y el sistema lo dice en v
     "SELECT id::text, 'fin' FROM users WHERE email = 'vendedor@ejemplo.com'");
 
   const nombre = `Producto Smoke Sin Foto ${Date.now()}`;
+  let demora = 'sin medir';
   const browser = await chromium.launch({ headless: true });
   const erroresDePagina = [];
+
+  // Qué se ve DE VERDAD donde tiene que estar la placa.
+  //
+  // El caso decía «no pinta la placa» y nada más, así que un rojo en la corrida
+  // completa no se podía distinguir de otro: ni si el fondo estaba vacío, ni si
+  // la hoja de estilos con la regla había llegado, ni si sólo faltaba un
+  // instante. Esto conserva ese estado en el propio mensaje del fallo.
+  const describirPlaca = (placa) => placa.evaluate((nodo) => {
+    const estilo = getComputedStyle(nodo);
+    let reglas = 0;
+    let conLaPlaca = 0;
+    for (const hoja of Array.from(document.styleSheets)) {
+      let lista = [];
+      try {
+        lista = Array.from(hoja.cssRules || []);
+      } catch {
+        continue; // hoja de otro origen: no se puede leer y no es la nuestra
+      }
+      reglas += lista.length;
+      conLaPlaca += lista.filter((r) => (r.cssText || '').includes('no-photo.svg')).length;
+    }
+    return {
+      fondo: estilo.backgroundImage,
+      conectado: nodo.isConnected,
+      colorDeFondo: estilo.backgroundColor,
+      clases: nodo.className,
+      estado: nodo.getAttribute('data-estado'),
+      alto: Math.round(nodo.getBoundingClientRect().height),
+      hojas: document.styleSheets.length,
+      reglas,
+      reglasConLaPlaca: conLaPlaca,
+      html: nodo.outerHTML.slice(0, 200),
+    };
+  });
+
+  // Se espera a la condición, no a un instante fijo, y se devuelve cuánto
+  // tardó: si tarda algo, es una carrera y queda medida en el resultado.
+  const esperarLaPlaca = async (placa, quien) => {
+    const empezo = Date.now();
+    let visto = null;
+    let primera = null;
+    let intentos = 0;
+    while (Date.now() - empezo < 10_000) {
+      intentos += 1;
+      visto = await describirPlaca(placa);
+      if (primera === null) primera = visto;
+      if (/estados\/no-photo\.svg/.test(visto.fondo)) {
+        return { tardo: Date.now() - empezo, intentos, primera };
+      }
+      await new Promise((seguir) => { setTimeout(seguir, 100); });
+    }
+    throw new Error(`${quien} no pinta la placa de «sin registro fotográfico»; `
+      + `despues de ${intentos} lecturas en 10 s lo que hay es `
+      + `${JSON.stringify(visto)}`);
+  };
+
 
   try {
     const contexto = await browser.newContext();
@@ -12065,16 +12122,24 @@ await runCase(121, 'Se puede publicar sin fotografía, y el sistema lo dice en v
     const publica = await comprador.newPage();
     await publica.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await publica.getByLabel('Buscar en el mercado').fill(nombre);
-    await publica.getByLabel('Buscar en el mercado').press('Enter');
+    // La publicación es la más nueva, así que el catálogo YA la muestra antes
+    // de buscar: si se mira el DOM apenas aparece el título, se puede estar
+    // mirando el dibujo anterior a la búsqueda, que React reemplaza cuando
+    // llega la respuesta filtrada. Sobre un nodo que quedó fuera del documento
+    // `getComputedStyle` devuelve "", y de ahí salía «no pinta la placa». Se
+    // espera la respuesta de ESA búsqueda antes de tocar nada.
+    await Promise.all([
+      publica.waitForResponse((r) => r.url().includes('/catalog/products')
+        && r.url().includes('search=') && r.status() === 200, { timeout: 20_000 }),
+      publica.getByLabel('Buscar en el mercado').press('Enter'),
+    ]);
 
     const titulo = publica.getByRole('heading', { name: nombre, exact: true, level: 3 });
     await titulo.waitFor({ state: 'visible', timeout: 20_000 });
     const tarjeta = titulo.locator('xpath=ancestor::*[contains(@class,"card")]');
     const placaTarjeta = tarjeta.getByRole('img', { name: /^Sin registro fotográfico\./ }).first();
     await placaTarjeta.waitFor({ state: 'visible' });
-    assert(/estados\/no-photo\.svg/.test(
-      await placaTarjeta.evaluate((n) => getComputedStyle(n).backgroundImage)),
-      'la tarjeta no pinta la placa de «sin registro fotográfico»');
+    const laTarjeta = await esperarLaPlaca(placaTarjeta, 'la tarjeta');
     assert(await tarjeta.getByText('No pudimos cargar la imagen').count() === 0,
       'la tarjeta confunde «no hay foto» con «la foto falló»');
 
@@ -12084,9 +12149,12 @@ await runCase(121, 'Se puede publicar sin fotografía, y el sistema lo dice en v
     await ficha.waitFor({ timeout: 20_000 });
     const placaFicha = ficha.getByRole('img', { name: /^Sin registro fotográfico\./ }).first();
     await placaFicha.waitFor({ state: 'visible' });
-    assert(/estados\/no-photo\.svg/.test(
-      await placaFicha.evaluate((n) => getComputedStyle(n).backgroundImage)),
-      'la ficha no pinta la placa de «sin registro fotográfico»');
+    const laFicha = await esperarLaPlaca(placaFicha, 'la ficha');
+    demora = `${laTarjeta.intentos} lectura(s) en la tarjeta y ${laFicha.intentos} en la ficha`;
+    if (laTarjeta.intentos > 1 || laFicha.intentos > 1) {
+      demora += `; la primera lectura de la tarjeta decia `
+        + `${JSON.stringify(laTarjeta.primera)}`;
+    }
     assert(await ficha.getByText('No pudimos cargar la imagen').count() === 0,
       'la ficha confunde «no hay foto» con «la foto falló»');
 
@@ -12099,7 +12167,8 @@ await runCase(121, 'Se puede publicar sin fotografía, y el sistema lo dice en v
 
   return 'el alta publica sin adjuntar ninguna imagen y rotula las fotos como '
     + 'opcionales; la publicación queda con 0 imágenes en la base, y el catálogo '
-    + 'y la ficha dicen «Sin registro fotográfico» en vez de inventar un dibujo';
+    + 'y la ficha dicen «Sin registro fotográfico» en vez de inventar un dibujo '
+    + `(la placa apareció con ${demora})`;
 });
 
 await runCase(122, 'Sin conexión se dice sin conexión, y una caída del servidor no se disfraza de red', async () => {
