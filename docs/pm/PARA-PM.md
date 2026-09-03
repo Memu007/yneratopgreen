@@ -2,157 +2,169 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ADMIN-ACTIONS-1S — el caso 121: qué encontré, qué no, y qué cambié
+## ADMIN-PAGE-1 — las tres listas del panel pasan de la fila veinte
 
-Hecho, **sin cambio de producto**. `edf3cb5` y `6441a49` quedan intactos.
+Hecho. Producto/regresión e informe en commits separados. **No desplegué.**
 
-- Corrección de regresión: `446bb30` — «ADMIN-ACTIONS-1S: el caso 121 espera la
-  búsqueda y dice qué vio»
-- La suite sigue en **144 casos**.
-
-Antes que nada, lo que **no** puedo afirmar: **no reproduje el rojo del 121 en
-mi entorno**. Corrí la suite completa cuatro veces desde base limpia después de
-tu devolución y el 121 pasó las cuatro. Así que lo que traigo no es «lo
-arreglé»: es el mecanismo, medido, y una regresión que ya no puede fallar por
-él y que, si vuelve a fallar, dice qué había.
+- Producto y regresión: `fe2b151` — «ADMIN-PAGE-1: las tres listas del panel
+  pasan de la fila veinte»
+- Regresión nueva: caso **145**. La suite pasa a **145 casos**.
 
 ---
 
-### 1. El mecanismo, medido en el navegador
+### 1. El estado anterior, medido antes de tocar nada
 
-La afirmación del caso era una lectura de **un solo instante**:
-
-```js
-await placaTarjeta.waitFor({ state: 'visible' });
-assert(/estados\/no-photo\.svg/.test(
-  await placaTarjeta.evaluate((n) => getComputedStyle(n).backgroundImage)), …);
-```
-
-Le pregunté al propio navegador qué devuelve esa lectura cuando el nodo ya no
-está en el documento:
+Con la base cargada, abrí el panel y miré las tres listas y lo que pedían:
 
 ```
-en el documento : url("http://localhost:5173/estados/no-photo.svg")
-fuera de él     : ""      (isConnected=false)
+lista       en la base   filas dibujadas   pie                        controles
+Usuarios         61            20          «Total: 61 usuarios»          ninguno
+Productos       164            20          «Total: 164 productos»        ninguno
+Órdenes          72            20          «Total: 72 órdenes»           ninguno
+
+lo que pidió la pantalla:
+  /admin/users
+  /admin/products
+  /admin/orders
 ```
 
-Cadena vacía. `/estados\/no-photo\.svg/.test("")` es falso, y el mensaje que
-sale es **exactamente** el que informaste: «la tarjeta no pinta la placa de
-«sin registro fotográfico»».
+Ni `page` ni `page_size` en ninguna de las tres. El pie decía el total entero
+—o sea que el dato existía— y no había un solo control para llegar a la fila
+21. De 164 publicaciones se administraban 20.
 
-### 2. Por qué el nodo puede no estar en el documento
-
-La publicación que crea el caso es la **más nueva**, y el catálogo ordena por
-fecha: ya está en la grilla **antes** de buscarla. El caso escribe el nombre,
-manda Enter y mira el DOM apenas ve el título; ese título puede ser el del
-dibujo anterior a la búsqueda. Cuando llega la respuesta filtrada, React
-reemplaza la grilla entera y el nodo anterior queda suelto.
-
-Que esa ventana existe lo vi en una medición: justo después de mandar la
-búsqueda, la página no tenía **ninguna** tarjeta viva, y la cadena de ancestros
-del título que había resuelto el localizador terminaba en la grilla, sin llegar
-al documento:
+Y el rojo del caso 145 contra `1ac4191`, con esas mismas palabras:
 
 ```
-<h3 class="_titulo_1775f_105">
-<div class="_cuerpo_1775f_49">
-<article class="_card_1775f_10 _insumo_1775f_28 ">
-<div class="_grilla_1pfj8_72">      ← y acá se corta: ya no cuelga del documento
+[FAIL] 145 … — usuarios: no hay ningun control para pasar de pagina,
+  y hay 187 filas; el pie dice «Total: 187 usuarios»
 ```
 
-Eso explica las tres cosas que viste: pasa aislado (menos publicaciones,
-respuesta más rápida, ventana más chica), pasa en 1–60 + 121 por lo mismo, y
-falla en la corrida completa, que es la que llega con la base más cargada.
-
-### 3. Lo que no pude cerrar
-
-Intenté forzarlo y **no lo conseguí**:
+### 2. Después
 
 ```
-75 lecturas de un instante (25 con CPU x1, 25 x6, 25 x20)   0 rojos
-8 vigilancias del nodo tras resolverlo, CPU x20             0 reemplazos
-5 corridas con la respuesta de la búsqueda demorada 900 ms  0 rojos
-4 suites completas desde base limpia                        121 verde las 4
+lista       pie
+Usuarios    «Total: 61 usuarios · Anterior · Página 1 de 4 · Siguiente»
+Productos   «Total: 164 productos · Anterior · Página 1 de 9 · Siguiente»
+Órdenes     «Total: 72 órdenes · Anterior · Página 1 de 4 · Siguiente»
+
+lo que pide la pantalla:
+  /admin/users?page=1&page_size=20
+  /admin/products?page=1&page_size=20
+  /admin/orders?page=1&page_size=20
 ```
 
-Playwright vuelve a resolver el localizador en cada acción, así que la ventana
-es de microsegundos: la ves vos y no yo. Por eso **no declaro reproducido** el
-rojo y no te pido que lo des por cerrado: te pido la próxima corrida tuya con
-esta regresión, que ahora conserva la evidencia.
-
-### 4. Lo que cambié, sólo en el arnés
-
-1. **Se espera la respuesta de la búsqueda** —la que lleva `search=`— antes de
-   tocar el DOM. Con eso el caso no puede estar midiendo el dibujo anterior.
-2. **La lectura del fondo deja de ser de un instante**: vuelve a mirar hasta 10 s
-   y el resultado dice con cuántas lecturas apareció. Si algún día tarda, se ve
-   en el verde en vez de taparse:
+### 3. Lo que cambió
 
 ```
-[PASS] 121 … (la placa apareció con 1 lectura(s) en la tarjeta y 1 en la ficha)
+ src/components/AdminPanel/AdminPanel.tsx        | 222 ++++++++++++++--
+ src/components/AdminPanel/AdminPanel.module.css |  39 ++-
+ scripts/smoke.mjs                               | 321 ++++++++++++++++++++++++
 ```
 
-3. **Si no aparece, el rojo ya no dice sólo que falta.** Informa el fondo
-   calculado, las clases, `data-estado`, el alto, cuántas hojas de estilo hay,
-   si la regla de la placa existe en alguna, y el HTML del nodo. Ejemplo real de
-   una lectura buena, para que se vea qué vas a recibir si falla:
+**Sin Backend**: la paginación y los filtros ya estaban en la API; lo que
+faltaba era pedirlos. Sin ruta nueva, sin migración, sin dependencia y sin
+tocar el seed.
+
+- Cada lista tiene **su propia página**. Se pueden dejar Usuarios en la 2,
+  pasear por Productos y volver: sigue en la 2. El caso lo comprueba.
+- El tamaño es **explícito**: veinte. El servidor ya usaba ese valor por
+  omisión, pero la pantalla no puede deducir cuántas páginas hay de algo que no
+  pidió.
+- El pie es **un solo componente** para las tres listas, así no pueden
+  divergir. «Anterior» y «Siguiente» dicen de qué lista son —«Página siguiente
+  de órdenes»— y se deshabilitan en los extremos.
+- **Cero resultados es «Página 1 de 1»** con la navegación apagada: la lista
+  está vacía, que no es lo mismo que rota, y con «de 0» no habría dónde pararse.
+- **Si la página queda fuera del total** —se filtró, se borró una fila, entró
+  otro administrador— la carga cae a la última página que existe en vez de
+  dibujar un vacío falso.
+
+Controles mínimos, con el contrato que ya existía:
 
 ```
-{"fondo":"url(\"http://localhost:5173/estados/no-photo.svg\")","conectado":true,
- "colorDeFondo":"rgb(240, 239, 233)","clases":"_fallback_8y1l5_8 ",
- "estado":"sin-foto","alto":416,"hojas":22,"reglas":1240,"reglasConLaPlaca":1,
- "html":"<div class=\"_fallback_8y1l5_8 \" data-estado=\"sin-foto\" role=\"img\"
- aria-label=\"Sin registro fotográfico. Producto Smoke Sin Foto …\"></div>"}
+Usuarios    buscar por nombre o email · rol · activo/inactivo
+Productos   estado
+Órdenes     estado
 ```
 
-Con eso, si el rojo vuelve, se distingue solo entre las tres causas posibles:
-nodo fuera del documento (`conectado:false`), hoja de estilos que no llegó
-(`reglasConLaPlaca:0`) o placa equivocada (`estado` o `clases` distintos).
+Buscar es una acción y no cada tecla: se aplica con el botón «Buscar» o con
+Enter. Cualquiera de los cuatro controles vuelve a la página 1, porque la que
+se estaba mirando era de otra lista.
 
-### 5. Por qué no toqué producto
+### 4. Lo que comprueba el caso 145
 
-Ninguna medición apunta a producto: la regla existe, la clase se aplica, el
-fondo es el correcto y la placa se dibuja. Lo que falla —cuando falla— es la
-forma de mirarla. Tal como pediste, si la evidencia hubiera mostrado un defecto
-real, freno y traigo la reproducción; no es el caso.
-
-### 6. Puertas
+Arma sus propias filas por las rutas de siempre —21 usuarios por
+`POST /admin/users`, 21 publicaciones por el alta del vendedor y 21 órdenes por
+el checkout de transferencia— y después:
 
 ```
-base limpia + SMOKE_CASOS=121                   1/1
-base limpia + SMOKE_CASOS=144                   1/1
-base limpia + suite completa                    143/144   (131 rojo)
-base limpia + suite completa, otra vez          143/144   (131 rojo)
+en la red        «Siguiente» pide /admin/users?page=2&page_size=20 (y sus dos hermanas)
+contra la API    «Total: N» y «Página 1 de M» salen del total del servidor
+contra la base   el total de usuarios coincide con SELECT COUNT(*)
+la fila testigo  no está en la primera página y aparece en la segunda, en las tres listas
+página propia    Usuarios vuelve a su página 2 después de pasear por las otras dos
+los controles    buscar deja 21 filas en 2 páginas y vuelve a la página 1
+cero resultados  «Página 1 de 1», sin filas y con los dos botones deshabilitados
+los extremos     «Anterior» apagado en la 1, «Siguiente» apagado en la última
+sin contradecir  ninguna fila visible contradice el rol, el estado o la búsqueda
+```
+
+Una nota sobre cómo se mide el paso de página, porque me costó un rojo: el
+rótulo «Página 2 de N» cambia con el estado, apenas se hace clic, y las filas
+cambian cuando **llega** la respuesta. El caso espera la respuesta —que es
+además lo que hay que demostrar— y no el rótulo.
+
+### 5. Puertas
+
+```
+base limpia + SMOKE_CASOS=145                   1/1
+base limpia + suite completa                    144/145   (131 rojo)
+base limpia + suite completa, otra vez          144/145   (131 rojo)
 npm run build                                   ok
 npm run lint                                    ok (--max-warnings 0)
 node --check scripts/smoke.mjs                  ok
 python -m compileall backend/app                ok
 python -m pip check                             ok
 git -c core.whitespace=cr-at-eol diff --check   limpio
+npm run a11y -- --todas                         sin violaciones bloqueantes
+npm run contraste                               TODO OK, cobertura completa
 ```
 
-Cada una de las cuatro corridas arrancó con su **propia** base limpia. Lo
-aclaro porque me pasó lo contrario y vale como advertencia: encadené 121 y 144
-aislados **antes** de la suite sobre la misma base y la suite dio 137/144, con
-cinco casos cayendo en «Stock insuficiente. Disponible: 0». Las publicaciones
-que dejan los casos aislados corren la selección de los siguientes. No es un
-defecto: es que una corrida oficial no admite nada antes.
+Cada corrida arrancó con su propia base limpia. El **131** es el de siempre
+—acá no hay demonio de Docker— y no lo declaro yo: en tu Mac esto tiene que dar
+**145/145**. Los casos 114, 121 y 144 pasaron en las dos corridas.
 
-El **131** es el de siempre —acá no hay demonio de Docker— y no lo declaro yo.
-En tu Mac la corrida tiene que dar **144/144**.
-
-### 7. Hash
+### 6. Hashes
 
 ```
-scripts/smoke.mjs   8083fed3fbccf9d6
+src/components/AdminPanel/AdminPanel.tsx        654982ec528d6d78
+src/components/AdminPanel/AdminPanel.module.css 0994e1efe027e073
+scripts/smoke.mjs                               9503d98bc1c143fe
 ```
 
-(SHA-256 truncado a 16, del árbol en el commit de regresión.)
+(SHA-256 truncado a 16, del árbol en el commit de producto.)
+
+### 7. Riesgos residuales
+
+1. **Veinte filas es fijo y no se puede cambiar desde la pantalla.** Es lo que
+   pediste; lo anoto porque con listas grandes alguien va a querer 50.
+2. **La página no viaja en la URL.** Recargar la aplicación vuelve a la página
+   1 de cada lista. No lo abrí: el panel es un modal y no tiene ruta propia.
+3. **Las acciones de una fila no conservan la posición del scroll**, aunque sí
+   la página: al desactivar un usuario de la página 3 la lista se recarga en la
+   página 3, pero arriba.
+4. **Órdenes filtra por estado con los diez valores del contrato.** Si mañana
+   se agrega uno, hay que sumarlo a la lista de opciones; no se generan solos.
+5. **El caso 145 deja 21 usuarios, 21 publicaciones y 21 órdenes** en la base
+   de la corrida. Corre último y no ensucia a nadie, pero engorda la base
+   efímera; si querés que limpie al final, lo agrego.
 
 ### 8. Frenos
 
-No toqué producto ni reescribí `edf3cb5` ni `6441a49`. No abrí `ADMIN-PAGE-1`.
-No cambié datos, seed, pagos ni BOEDA. No desplegué. `PRE_FIRMA.md` sigue fuera
-del versionado y lo confirmé antes de empujar.
+No toqué Backend, dashboard, categorías, documentación, estados traducidos,
+navegación global, el modal, responsive, BOEDA, pagos ni Railway. No agregué
+buscador de catálogo ni endpoints. No hay migración ni dependencia nueva. No
+desplegué. `PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de
+empujar.
 
-Freno acá y te pido la revisión.
+Freno acá y te pido revisión.
