@@ -12,6 +12,55 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-03 — ADMIN-ACTIONS-1R: regresión 144 corregida, suite completa todavía roja
+
+Revisé `6441a49` y el informe `9ae1cec`. La corrección pedida del caso 144 está
+bien acotada y no toca producto: eliminó el `|| true`, recarga y vuelve a leer
+categoría y opción desde la UI, y enumera las 12 acciones de los seis bloques.
+El caso 144 pasó **1/1** desde base limpia en mi Mac.
+
+La entrega todavía **no queda aceptada**. Ejecuté dos suites oficiales completas,
+cada una desde una base limpia, y ambas terminaron **143/144** con el único rojo
+en el caso 121. El caso 131 pasó en las dos; por lo tanto, el rojo que informa tu
+entorno no explica estas corridas.
+
+Controles discriminantes desde bases nuevas:
+
+- caso 121 aislado: **1/1**;
+- casos 118–121: **4/4**;
+- casos 1–60 más 121: **61/61**;
+- el tramo 61–117 más 121 no es evidencia válida: quedó esperando
+  precondiciones omitidas por el filtro y PM lo interrumpió sin resultado.
+
+Esto demuestra un fallo reproducible dependiente del orden de la suite, pero
+todavía no demuestra si la causa es estado residual, recursos del navegador o
+un defecto de producto. La evidencia completa queda en
+`docs/pm/REPRODUCCION-ADMIN-ACTIONS-1-2026-09-03.md`.
+
+### Corrección única: diagnosticar y cerrar el caso 121 en corrida completa
+
+1. Reproducí la suite completa desde base limpia con `SMOKE_STACK=1` y conservá
+   el mensaje y stack exactos del caso 121, junto con el paso, respuesta/DOM y
+   dato de base que contradicen la expectativa. No alcanza con volver a correr
+   121 aislado.
+2. Encontrá la mínima secuencia anterior que provoca el rojo o una causa
+   equivalente verificable. El caso 121 afirma ser autónomo; debe poder ejecutarse
+   dentro de la suite sin depender de residuos ni del orden.
+3. Si la causa está en el arnés, tocá solamente la regresión y su documentación.
+   No cambies `edf3cb5` ni reescribas `6441a49`.
+4. Si la evidencia demuestra un defecto real del producto, frená antes de
+   corregirlo y traé la reproducción y una alternativa mínima. Esta devolución
+   no autoriza cambios nuevos de producto.
+5. Después de la corrección, ejecutá el caso 121 aislado, el 144 aislado y **dos
+   suites completas consecutivas 144/144**, cada una desde base limpia. Build,
+   lint, compileall, `pip check` y `diff-check` también deben quedar verdes.
+
+No abras ADMIN-PAGE-1, no despliegues y no cambies datos, seed, pagos, BOEDA ni
+otras pruebas. Producto/informe en commits separados sólo si corresponde; la
+respuesta completa va a `PARA-PM.md`. Frená después de empujar.
+
+---
+
 ## 2026-09-02 — REVISIÓN DE ADMIN-ACTIONS-1: producto plausible, evidencia aún no aceptada
 
 Revisé `edf3cb5` y el informe `c657c47`. La corrección está bien acotada y el

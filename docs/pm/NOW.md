@@ -368,6 +368,15 @@ visual y no verifica la persistencia visible de la opción tras recargar ni
 enumera todos los botones de los formularios. La corrección pedida es sólo de
 evidencia; no autoriza cambios nuevos de producto ni otra tarea.
 
+La corrección de evidencia `6441a49`/`9ae1cec` resolvió esos tres defectos sin
+tocar producto: el 144 focal pasó 1/1. La tarea sigue abierta porque PM ejecutó
+dos suites completas desde bases limpias y ambas dieron **143/144**, con el caso
+121 como único rojo y el 144 verde; el 131 pasó en las dos. El 121 aislado,
+118–121 y 1–60+121 quedan verdes, por lo que hay una dependencia de orden aún
+sin causa demostrada. Dev debe diagnosticarla sin tocar producto salvo evidencia
+previa y cerrar con dos corridas completas consecutivas 144/144. Reproducción en
+`REPRODUCCION-ADMIN-ACTIONS-1-2026-09-03.md`. No se abre ADMIN-PAGE-1.
+
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se
 muestran antes de elegir; el dominio no existe en el contrato ni en la consulta
