@@ -16706,6 +16706,22 @@ await runCase(145, 'Las tres listas de Administracion pasan de la fila veinte', 
     assert(alta.status < 400, `no se pudo publicar ${n}: HTTP ${alta.status}`);
   }
 
+  // Un producto de cada estado del modelo, para que el filtro tenga qué
+  // mostrar en todas sus opciones. Se usan los del propio caso —el 01 queda
+  // intacto porque es el testigo de la pagina 2— y se cambian por la ruta real.
+  const paraTenerEstado = queryRows(`
+    SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${marca} publicacion 0%`)}
+    ORDER BY name OFFSET 1 LIMIT 3`).map(([id]) => id);
+  assert(paraTenerEstado.length === 3, 'no quedaron publicaciones del caso para dar estados');
+  const estadosSembrados = ['paused', 'sold_out', 'deleted'];
+  for (let i = 0; i < estadosSembrados.length; i += 1) {
+    const cambio = await apiRequest(`/admin/products/${paraTenerEstado[i]}/status`, {
+      method: 'PATCH', token, body: { status: estadosSembrados[i] },
+    });
+    assert(cambio.status < 400,
+      `no se pudo dejar una publicacion en ${estadosSembrados[i]}: HTTP ${cambio.status}`);
+  }
+
   // 21 ordenes por transferencia: dos llamadas cada una, por el camino real.
   const productoParaComprar = productoConStock(vendedor.id, FILAS + 1);
   await apiRequest('/cart', { method: 'DELETE', token: tokenComprador });
@@ -16768,6 +16784,10 @@ await runCase(145, 'Las tres listas de Administracion pasan de la fila veinte', 
       .replace(/\s+/g, ' ').trim();
     const filas = async () => (await page.locator('tbody tr').allInnerTexts())
       .map((t) => t.replace(/\s+/g, ' ').trim());
+    // La columna «Estado» de Publicaciones: es la sexta y trae el distintivo
+    // con el estado crudo, sin los rotulos del selector de la fila.
+    const estadoDeCadaFila = async () => (await page
+      .locator('tbody tr td:nth-child(6)').allInnerTexts()).map((c) => c.trim());
     const anterior = (etiqueta) => page.getByRole('button', { name: `Página anterior de ${etiqueta}` });
     const siguiente = (etiqueta) => page.getByRole('button', { name: `Página siguiente de ${etiqueta}` });
 
@@ -16917,19 +16937,48 @@ await runCase(145, 'Las tres listas de Administracion pasan de la fila veinte', 
     await solapa('Productos');
     assert((await paginaQueDice()).startsWith('Página 2 de'),
       `Productos no conservo su propia pagina: «${await paginaQueDice()}»`);
-    await page.getByLabel('Filtrar publicaciones por estado').selectOption('paused');
-    await esperarA(async () => {
-      const datos = await enLaApi('/admin/products', { status: 'paused' });
-      return (await pieCompleto()).includes(`Total: ${datos.total} productos`);
-    }, 'el filtro de publicaciones no coincide con el total del servidor', 20_000);
-    assert((await paginaQueDice()).startsWith('Página 1 de'),
-      `filtrar publicaciones no volvio a la primera pagina: «${await paginaQueDice()}»`);
-    for (const fila of await filas()) {
-      // El distintivo imprime el estado crudo, y las ordenes lo muestran en
-      // mayusculas: se compara sin distinguir may/min, que es lo que importa.
-      assert(/paused/i.test(fila), `el filtro «Pausadas» dejo otra cosa: «${fila}»`);
+
+    // Se recorren TODAS las opciones que ofrece el selector, no una elegida a
+    // mano: una opcion que el dominio no admite es una accion falsa, y hasta
+    // ahora ofrecia «Borradores», que el servidor contesta con un error.
+    const selectorDeEstado = page.getByLabel('Filtrar publicaciones por estado');
+    const ofrecidos = await selectorDeEstado.locator('option')
+      .evaluateAll((nodos) => nodos.map((n) => n.value));
+    assert(ofrecidos.length >= 2, `el selector no ofrece estados: ${JSON.stringify(ofrecidos)}`);
+    for (const estado of ofrecidos) {
+      const respuesta = await pedirCrudo(
+        `/admin/products?page=1&page_size=20${estado ? `&status=${estado}` : ''}`,
+        { header: token });
+      assert(respuesta.status === 200,
+        `el servidor contesto ${respuesta.status} al estado «${estado}» que ofrece la `
+        + `pantalla: ${JSON.stringify(respuesta.datos).slice(0, 140)}`);
+      // Se espera LA respuesta de ese estado y no un total: dos estados pueden
+      // tener la misma cantidad de filas, y entonces el total no distingue si
+      // las filas ya se cambiaron o son todavia las anteriores.
+      await Promise.all([
+        page.waitForResponse((r) => r.url().includes('/admin/products')
+          && (estado ? r.url().includes(`status=${estado}`) : !r.url().includes('status='))
+          && r.status() === 200, { timeout: 20_000 }),
+        selectorDeEstado.selectOption(estado),
+      ]);
+      await esperarA(async () => (await pieCompleto())
+        .includes(`Total: ${respuesta.datos.total} productos`),
+      `el estado «${estado || 'todos'}» no coincide con el total del servidor `
+      + `(${respuesta.datos.total})`, 20_000);
+      assert((await paginaQueDice()).startsWith('Página 1 de'),
+        `filtrar publicaciones no volvio a la primera pagina: «${await paginaQueDice()}»`);
+      if (estado) {
+        // Se mira la celda del estado y no la fila entera: la fila trae ademas
+        // los rotulos del selector de cada publicacion —«Activo Pausado…»—, y
+        // con eso cualquier filtro pareceria cumplirse.
+        await esperarA(async () => {
+          const celdas = await estadoDeCadaFila();
+          return celdas.length > 0 && celdas.every((c) => c.toLowerCase() === estado);
+        }, `el filtro «${estado}» dejo filas con otro estado: `
+          + `${JSON.stringify(await estadoDeCadaFila())}`, 20_000);
+      }
     }
-    await page.getByLabel('Filtrar publicaciones por estado').selectOption('');
+    await selectorDeEstado.selectOption('');
 
     await solapa('Órdenes');
     assert((await paginaQueDice()).startsWith('Página 2 de'),
@@ -16946,6 +16995,49 @@ await runCase(145, 'Las tres listas de Administracion pasan de la fila veinte', 
         `el filtro de ordenes dejo otro estado: «${fila}»`);
     }
 
+    // --- D. una respuesta vieja no puede pisar el filtro vigente ----------
+    // Al volver a una pestaña se siguen viendo las filas anteriores, asi que se
+    // puede filtrar antes de que termine la carga que arranco al entrar. Se
+    // retiene esa carga SIN filtro, se aplica el filtro, se deja terminar la
+    // filtrada, y recien entonces se libera la vieja: si la vieja escribe,
+    // vuelven el total y las filas de algo que ya nadie pidio.
+    let liberarLaVieja = () => {};
+    const laVieja = new Promise((seguir) => { liberarLaVieja = seguir; });
+    let retenida = false;
+    await page.route('**/api/admin/products*', async (ruta) => {
+      if (!retenida && !ruta.request().url().includes('status=')) {
+        retenida = true;
+        await laVieja;
+      }
+      await ruta.continue();
+    });
+
+    await solapa('Usuarios');
+    await page.getByRole('button', { name: 'Productos', exact: true }).click();
+    await esperarA(async () => retenida,
+      'no se llego a retener la carga sin filtro de publicaciones', 20_000);
+
+    const pausadas = (await enLaApi('/admin/products', { status: 'paused' })).total;
+    const respuestaVieja = page.waitForResponse((r) => r.url().includes('/admin/products')
+      && !r.url().includes('status='), { timeout: 30_000 });
+    await page.getByLabel('Filtrar publicaciones por estado').selectOption('paused');
+    await esperarA(async () => (await pieCompleto()).includes(`Total: ${pausadas} productos`),
+      'la respuesta filtrada no llego a la pantalla', 20_000);
+
+    liberarLaVieja();
+    await respuestaVieja;
+    // Se le da a la vieja la oportunidad de escribir: si va a pisar, pisa ahora.
+    await page.waitForTimeout(1500);
+    const pieDespues = await pieCompleto();
+    assert(pieDespues.includes(`Total: ${pausadas} productos`),
+      `una respuesta vieja sin filtro piso lo que estaba pedido: «${pieDespues}»`);
+    const estadosDespues = await estadoDeCadaFila();
+    assert(estadosDespues.length > 0
+      && estadosDespues.every((c) => c.toLowerCase() === 'paused'),
+    `una respuesta vieja trajo filas que el filtro vigente no pidio: `
+    + JSON.stringify(estadosDespues));
+    await page.unroute('**/api/admin/products*');
+
     await contexto.close();
     return `con ${usuarios.total} usuarios, ${productos.total} publicaciones y `
       + `${ordenes.total} ordenes, las tres listas dicen «Página 1 de N» del total del `
@@ -16954,7 +17046,9 @@ await runCase(145, 'Las tres listas de Administracion pasan de la fila veinte', 
       + `${ordenes.testigo}; buscar por «${marca}» deja ${FILAS} usuarios en 2 paginas y `
       + 'vuelve a la primera, sin resultados dice «Página 1 de 1» con la navegacion '
       + 'apagada, y los filtros de rol, estado y estado de publicacion/orden no dejan '
-      + 'ninguna fila que los contradiga';
+      + `ninguna fila que los contradiga; las ${ofrecidos.length} opciones del selector de `
+      + 'publicaciones existen en el dominio y responden 200; y una respuesta vieja sin '
+      + 'filtro, liberada despues de la filtrada, no pisa ni el total ni las filas';
   } finally {
     await browser.close();
     await apiRequest('/cart', { method: 'DELETE', token: tokenComprador });

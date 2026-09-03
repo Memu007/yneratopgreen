@@ -230,6 +230,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   // Users
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [usersTotal, setUsersTotal] = useState(0);
+  // Qué pidió cada lista la última vez. Al volver a una pestaña se siguen
+  // viendo las filas anteriores, así que se puede filtrar o pasar de página
+  // antes de que termine la carga que arrancó al entrar; esa carga vieja puede
+  // llegar DESPUÉS y escribir filas y total de algo que ya no se pidió. Sólo la
+  // respuesta de la combinación vigente —página más filtros— escribe.
+  const pedidoVigente = useRef({ usuarios: '', productos: '', ordenes: '' });
   const [userRoleFilter, setUserRoleFilter] = useState<string>('');
   // Activo/inactivo viaja como 'true'/'false' o vacío para «todos»: el
   // servidor distingue el filtro ausente de `is_active=false`.
@@ -401,8 +407,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       if (userRoleFilter) params.set('role', userRoleFilter);
       if (userActiveFilter) params.set('is_active', userActiveFilter);
       if (userSearchAplicada) params.set('search', userSearchAplicada);
+      const clave = params.toString();
+      pedidoVigente.current.usuarios = clave;
       const data = await apiGet<{ users: AdminUser[]; total: number }>(
-        `/admin/users?${params.toString()}`);
+        `/admin/users?${clave}`);
+      if (pedidoVigente.current.usuarios !== clave) return;
       // La página puede haber quedado fuera del total: se filtró, se borró
       // una fila, o entró otro administrador. Se cae a la última que
       // existe en vez de dibujar un vacío que no es cierto.
@@ -428,8 +437,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         page_size: String(FILAS_POR_PAGINA),
       });
       if (productStatusFilter) params.set('status', productStatusFilter);
+      const clave = params.toString();
+      pedidoVigente.current.productos = clave;
       const data = await apiGet<{ products: AdminProduct[]; total: number }>(
-        `/admin/products?${params.toString()}`);
+        `/admin/products?${clave}`);
+      if (pedidoVigente.current.productos !== clave) return;
       const ultima = paginasDe(data.total);
       if (productsPage > ultima) {
         setProductsPage(ultima);
@@ -452,8 +464,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         page_size: String(FILAS_POR_PAGINA),
       });
       if (orderStatusFilter) params.set('status', orderStatusFilter);
+      const clave = params.toString();
+      pedidoVigente.current.ordenes = clave;
       const data = await apiGet<{ orders: AdminOrder[]; total: number }>(
-        `/admin/orders?${params.toString()}`);
+        `/admin/orders?${clave}`);
+      if (pedidoVigente.current.ordenes !== clave) return;
       const ultima = paginasDe(data.total);
       if (ordersPage > ultima) {
         setOrdersPage(ultima);
@@ -1208,7 +1223,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   <option value="">Todos los estados</option>
                   <option value="active">Activas</option>
                   <option value="paused">Pausadas</option>
-                  <option value="draft">Borradores</option>
+                  <option value="sold_out">Agotadas</option>
                   <option value="deleted">Eliminadas</option>
                 </select>
               </div>
