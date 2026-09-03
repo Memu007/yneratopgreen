@@ -12,6 +12,57 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-03 — ADMIN-PAGE-1R: estados reales y ninguna respuesta vieja puede pisar un filtro
+
+Revisé `fe2b151` y el informe `f25a57c`. La arquitectura general queda bien
+acotada: pagina en el servidor, conserva una página por lista, reutiliza un solo
+paginador y no toca Backend. El caso 145 aislado pasó **1/1** desde base limpia;
+lint, `node --check`, compileall, `pip check` y `diff-check` también quedaron
+verdes.
+
+La entrega **no queda aceptada**. Mi suite oficial completa, desde otra base
+limpia, terminó **144/145**. El 131 pasó; el único rojo fue el 145 al aplicar
+«Pausadas»: el total filtrado de Productos no llegó a coincidir con el servidor.
+La evidencia queda en
+`docs/pm/REPRODUCCION-ADMIN-PAGE-1-2026-09-03.md`.
+
+Además hay un defecto determinista que la regresión no cubre. El selector de
+Productos ofrece `draft`, que no existe en `ProductStatus`, y omite `sold_out`,
+que sí existe. Lo comprobé contra el Backend levantado: `active`, `paused` y
+`sold_out` respondieron 200; `draft` respondió **500**. «Borradores» es una
+acción falsa para la administradora.
+
+### Corrección única
+
+1. Alineá el selector de publicaciones exactamente con los cuatro estados del
+   modelo: `active`, `paused`, `sold_out` y `deleted`. Retirá `draft` y mostrale
+   a `sold_out` un rótulo es-AR coherente.
+2. Reproducí el rojo del filtro conservando orden y URL de las respuestas que
+   actualizan Productos. La hipótesis a confirmar es una respuesta vieja: al
+   volver a una pestaña, sus filas retenidas permiten seguir antes de que
+   termine la carga; luego el pedido sin filtro puede llegar detrás del pedido
+   filtrado y pisar filas/total.
+3. Hacé determinista la puerta: retené una carga anterior sin filtro, aplicá el
+   filtro, dejá terminar primero la respuesta filtrada y liberá última la vieja.
+   La pantalla debe conservar página, total y filas del filtro vigente.
+4. La misma vulnerabilidad está en los tres cargadores. Usá una solución mínima
+   compartida en criterio —sólo la respuesta correspondiente a la última
+   combinación página/filtros puede escribir filas y total— para Usuarios,
+   Productos y Órdenes. No hace falta crear un framework ni reescribir el panel.
+5. Ampliá el caso 145 para enumerar **todos** los valores ofrecidos por el
+   selector de publicaciones, exigir respuesta 200 y comprobar que ninguna fila
+   visible contradice cada estado. Asegurá en su base efímera los estados que
+   hagan falta; no cambies el seed.
+
+Después corré 145 aislado y la suite completa esperada en **145/145** desde base
+limpia, más las puertas estáticas. Si el 131 vuelve a fallar, conservá su
+evidencia pero no lo cambies sin causa: en la corrida de PM pasó. No abras la
+siguiente tarea, no toques Backend, dashboard, navegación, BOEDA, pagos ni
+Railway y no despliegues. Producto/regresión e informe en commits separados;
+subí y frená para revisión.
+
+---
+
 ## 2026-09-03 — TAREA VIGENTE: ADMIN-PAGE-1, las tres listas deben pasar de veinte filas
 
 ADMIN-ACTIONS-1 queda **aceptada** en producto `edf3cb5`, corrección de

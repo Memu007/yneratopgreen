@@ -371,6 +371,14 @@ debe probar las tres listas con más de veinte registros. No abre dashboard,
 rediseño, navegación global, BOEDA, pagos ni despliegue. Alcance y puertas en
 `PARA-DEV.md`.
 
+La entrega `fe2b151`/`f25a57c` queda **devuelta, no aceptada**. PM verificó el
+145 aislado en 1/1 y las puertas estáticas, pero la suite completa dio 144/145:
+el 131 pasó y el 145 perdió el filtro de publicaciones. Los cargadores no
+impiden que una respuesta anterior pise página/filtros más nuevos. Además el
+selector ofrece `draft`, que no existe y devuelve 500, y omite `sold_out`, que
+sí existe. ADMIN-PAGE-1R debe corregir esos dos puntos y cerrar 145/145; evidencia
+en `REPRODUCCION-ADMIN-PAGE-1-2026-09-03.md`.
+
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se
 muestran antes de elegir; el dominio no existe en el contrato ni en la consulta

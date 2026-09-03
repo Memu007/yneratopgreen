@@ -41,6 +41,10 @@ final, como acordó Emi.
   `c657c47`/`9ae1cec`/`1ac4191`: PM verificó 121 y 144 aislados y dos suites
   completas consecutivas **144/144** desde bases limpias, más puertas estáticas.
 - Tarea única vigente: **ADMIN-PAGE-1**, detallada en `PARA-DEV.md`.
+- La primera entrega de ADMIN-PAGE-1 (`fe2b151`/`f25a57c`) está devuelta: PM
+  obtuvo 145 focal en 1/1 pero suite completa en 144/145 por pérdida del filtro;
+  además `draft` es una opción inexistente y `sold_out` falta. La corrección
+  ADMIN-PAGE-1R no cambia el orden del roadmap ni abre otra pieza.
 - ORD-SELF-1 no cierra ningún hallazgo de las tres auditorías; era la tarea P1
   anterior y las auditorías la excluyeron expresamente.
 - La historia de las devoluciones del arnés y su cierre reproducido queda en
