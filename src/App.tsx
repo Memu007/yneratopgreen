@@ -26,6 +26,8 @@ import {
   getProvinces,
   convertBackendProductToFrontend,
 } from './utils/catalogService';
+import { ContextoDeNavegacion, useNavegacion } from './navegacion/navegacion';
+import type { Seccion } from './navegacion/politica';
 import type { NewProductData, Product } from './types';
 import type {
   CategoryResponse,
@@ -34,10 +36,17 @@ import type {
 } from './utils/catalogService';
 
 type AuthModalType = 'login' | 'register' | null;
-type PageSection = 'home' | 'marketplace' | 'about' | 'services' | 'contact' | 'payment-success' | 'payment-failure' | 'payment-pending' | 'verificar-correo';
+// La lista de secciones vive en la política de navegación y no acá: el tipo
+// que se usa en las pantallas y el que se lee de la barra tienen que ser uno.
+type PageSection = Seccion;
 
 function App() {
   const { user } = useAuth();
+  // La única navegación del producto: qué sección declara la barra, qué capa
+  // hay abierta encima y cómo se escribe el historial. Nadie más lo toca.
+  const navegacion = useNavegacion();
+  const currentSection = navegacion.seccion;
+  const handleNavigate = navegacion.navegar;
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [provinces, setProvinces] = useState<ProvinceResponse[]>([]);
@@ -77,7 +86,11 @@ function App() {
     setMinRating,
     filteredProducts,
     resetFilters,
-  } = useProductFilters({ products });
+  } = useProductFilters({
+    products,
+    escribeEnLaBarra: currentSection === 'marketplace',
+    versionDeLaBarra: navegacion.version,
+  });
 
   const [authModal, setAuthModal] = useState<AuthModalType>(null);
   // Adónde volver cuando el Login se cierre, se complete o se cancele. Lo usa
@@ -102,7 +115,6 @@ function App() {
     setAuthModal('login');
   };
 
-
   const cerrarAutenticacion = () => {
     setAuthModal(null);
     if (volverDespuesDeIngresar) {
@@ -115,19 +127,6 @@ function App() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
-  const [currentSection, setCurrentSection] = useState<PageSection>(() => {
-    // Detectar rutas de pago desde URL al cargar
-    const path = window.location.pathname;
-    // El enlace del correo de confirmación entra por acá.
-    if (path === '/verificar-correo') return 'verificar-correo';
-    if (path === '/payment/success') return 'payment-success';
-    if (path === '/payment/failure') return 'payment-failure';
-    if (path === '/payment/pending') return 'payment-pending';
-    if (new URLSearchParams(window.location.search).get('section') === 'marketplace') {
-      return 'marketplace';
-    }
-    return 'home';
-  });
 
   const selectedProvinceId =
     provinces.find((province) => province.name === selectedProvince)?.id || '';
@@ -307,22 +306,8 @@ function App() {
   const handleAddProduct = (productData: NewProductData) => {
     console.log('Nuevo producto agregado:', productData);
     // Navegar al marketplace y recargar productos
-    setCurrentSection('marketplace');
+    handleNavigate('marketplace');
     setProductsRevision((revision) => revision + 1);
-  };
-
-  const handleNavigate = (section: PageSection) => {
-    const params = new URLSearchParams(window.location.search);
-    if (section === 'marketplace') params.set('section', 'marketplace');
-    else params.delete('section');
-    const query = params.toString();
-    window.history.replaceState(
-      window.history.state,
-      '',
-      `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
-    );
-    setCurrentSection(section);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Ir al mercado con el filtro de servicios puesto.
@@ -439,10 +424,7 @@ function App() {
           <PaymentResultPage 
             status="success" 
             onGoToOrders={() => handleNavigate('marketplace')} 
-            onGoHome={() => {
-              window.history.pushState({}, '', '/');
-              handleNavigate('home');
-            }} 
+            onGoHome={() => handleNavigate('home')}
           />
         );
       case 'payment-failure':
@@ -450,10 +432,7 @@ function App() {
           <PaymentResultPage 
             status="failure" 
             onGoToOrders={() => handleNavigate('marketplace')} 
-            onGoHome={() => {
-              window.history.pushState({}, '', '/');
-              handleNavigate('home');
-            }} 
+            onGoHome={() => handleNavigate('home')}
           />
         );
       case 'payment-pending':
@@ -461,10 +440,7 @@ function App() {
           <PaymentResultPage 
             status="pending" 
             onGoToOrders={() => handleNavigate('marketplace')} 
-            onGoHome={() => {
-              window.history.pushState({}, '', '/');
-              handleNavigate('home');
-            }} 
+            onGoHome={() => handleNavigate('home')}
           />
         );
       default:
@@ -479,66 +455,71 @@ function App() {
     }
   };
 
+  // Una sola política de navegación para todo el árbol: la tarjeta de una
+  // publicación abre y cierra su detalle por acá, sin escuchar el historial
+  // por su cuenta.
   return (
-    <div className={styles.app}>
-      <Header 
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onSearchSubmit={handleSearchSubmit}
-        onLoginClick={abrirLogin}
-        onCartClick={() => setIsCartOpen(true)}
-        onSellClick={() => setIsAddProductOpen(true)}
-        onAdminClick={() => setIsAdminPanelOpen(true)}
-        currentSection={currentSection}
-        onNavigate={handleNavigate}
-      />
-
-      {renderContent()}
-
-      <Footer onNavigate={(section) => handleNavigate(section as PageSection)} />
-
-      {/* Modales de autenticación */}
-      {authModal === 'login' && (
-        <LoginModal
-          onClose={cerrarAutenticacion}
-          onSwitchToRegister={() => setAuthModal('register')}
+    <ContextoDeNavegacion.Provider value={navegacion}>
+      <div className={styles.app}>
+        <Header
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onSearchSubmit={handleSearchSubmit}
+          onLoginClick={abrirLogin}
+          onCartClick={() => setIsCartOpen(true)}
+          onSellClick={() => setIsAddProductOpen(true)}
+          onAdminClick={() => setIsAdminPanelOpen(true)}
+          currentSection={currentSection}
+          onNavigate={handleNavigate}
         />
-      )}
 
-      {/* Saltar entre Login y Registro es el mismo trámite: la continuidad se
-          conserva, así que estos dos NO usan `abrirLogin`/`abrirRegistro`, que
-          la borran. */}
-      {authModal === 'register' && (
-        <RegisterModal
-          onClose={cerrarAutenticacion}
-          onSwitchToLogin={() => setAuthModal('login')}
+        {renderContent()}
+
+        <Footer onNavigate={(section) => handleNavigate(section as PageSection)} />
+
+        {/* Modales de autenticación */}
+        {authModal === 'login' && (
+          <LoginModal
+            onClose={cerrarAutenticacion}
+            onSwitchToRegister={() => setAuthModal('register')}
+          />
+        )}
+
+        {/* Saltar entre Login y Registro es el mismo trámite: la continuidad se
+            conserva, así que estos dos NO usan `abrirLogin`/`abrirRegistro`, que
+            la borran. */}
+        {authModal === 'register' && (
+          <RegisterModal
+            onClose={cerrarAutenticacion}
+            onSwitchToLogin={() => setAuthModal('login')}
+          />
+        )}
+
+        {/* Modal del carrito */}
+        <CartModal
+          isOpen={isCartOpen}
+          onClose={() => setIsCartOpen(false)}
+          onCheckout={handleCheckout}
         />
-      )}
 
-      {/* Modal del carrito */}
-      <CartModal
-        isOpen={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-        onCheckout={handleCheckout}
-      />
+        {/* Modal de Checkout */}
+        {isCheckoutOpen && (
+          <CheckoutModal onClose={() => setIsCheckoutOpen(false)} />
+        )}
 
-      {/* Modal de Checkout */}
-      {isCheckoutOpen && (
-        <CheckoutModal onClose={() => setIsCheckoutOpen(false)} />
-      )}
+        {/* Modal para agregar producto */}
+        <AddProductModal
+          isOpen={isAddProductOpen}
+          onClose={() => setIsAddProductOpen(false)}
+          onSubmit={handleAddProduct}
+        />
 
-      {/* Modal para agregar producto */}
-      <AddProductModal
-        isOpen={isAddProductOpen}
-        onClose={() => setIsAddProductOpen(false)}
-        onSubmit={handleAddProduct}
-      />
-
-      {/* Panel de Administración - solo visible para admins */}
-      {isAdminPanelOpen && user?.role === 'admin' && (
-        <AdminPanel onClose={() => setIsAdminPanelOpen(false)} />
-      )}
-    </div>
+        {/* Panel de Administración - solo visible para admins */}
+        {isAdminPanelOpen && user?.role === 'admin' && (
+          <AdminPanel onClose={() => setIsAdminPanelOpen(false)} />
+        )}
+      </div>
+    </ContextoDeNavegacion.Provider>
   );
 }
 

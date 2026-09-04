@@ -11,21 +11,37 @@ const normalizeText = (text: string): string => {
 
 interface UseProductFiltersProps {
   products: Product[];
+  /** Sólo el Mercado escribe sus filtros en la barra: en las otras cuatro
+      secciones estos parámetros no significan nada. */
+  escribeEnLaBarra: boolean;
+  /** Cuántas veces movió la barra el historial. Cuando cambia hay que releer
+      los filtros de la URL: volver a una entrada tiene que devolver también
+      sus controles, no sólo su dirección. */
+  versionDeLaBarra: number;
 }
 
-export const useProductFilters = ({ products }: UseProductFiltersProps) => {
+const numeroDeLaBarra = (parametros: URLSearchParams, clave: string, porOmision: number) => {
+  const crudo = parametros.get(clave);
+  if (crudo === null || crudo === '') return porOmision;
+  const valor = Number(crudo);
+  return Number.isFinite(valor) && valor >= 0 ? valor : porOmision;
+};
+
+const tipoDeLaBarra = (valor: string | null): 'todos' | 'productos' | 'servicios' =>
+  (valor === 'productos' || valor === 'servicios' ? valor : 'todos');
+
+export const useProductFilters = ({
+  products,
+  escribeEnLaBarra,
+  versionDeLaBarra,
+}: UseProductFiltersProps) => {
   const initialParams = useMemo(() => new URLSearchParams(window.location.search), []);
-  const initialNumber = (key: string, fallback: number) => {
-    const rawValue = initialParams.get(key);
-    if (rawValue === null || rawValue === '') return fallback;
-    const parsedValue = Number(rawValue);
-    return Number.isFinite(parsedValue) && parsedValue >= 0 ? parsedValue : fallback;
-  };
+  const initialNumber = (key: string, fallback: number) =>
+    numeroDeLaBarra(initialParams, key, fallback);
 
   const [searchQuery, setSearchQuery] = useState(initialParams.get('q') || '');
   const [selectedType, setSelectedType] = useState<'todos' | 'productos' | 'servicios'>(() => {
-    const value = initialParams.get('type');
-    return value === 'productos' || value === 'servicios' ? value : 'todos';
+    return tipoDeLaBarra(initialParams.get('type'));
   });
   const [selectedCategory, setSelectedCategory] = useState(
     initialParams.get('category') || 'Todas las categorías'
@@ -46,7 +62,26 @@ export const useProductFilters = ({ products }: UseProductFiltersProps) => {
   const [inStockOnly, setInStockOnly] = useState(initialParams.get('in_stock') === 'true');
   const [minRating, setMinRating] = useState(() => initialNumber('min_rating', 0));
 
+  // Volver a una entrada del Mercado tiene que devolver sus filtros. El estado
+  // se leyó una sola vez, al montar; desde que Atrás y Adelante existen de
+  // verdad, la barra puede cambiar sin que esta pantalla se vuelva a montar.
   useEffect(() => {
+    if (versionDeLaBarra === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    setSearchQuery(params.get('q') || '');
+    setSelectedType(tipoDeLaBarra(params.get('type')));
+    setSelectedCategory(params.get('category') || 'Todas las categorías');
+    setSelectedSubcategory(params.get('subcategory') || 'Todas');
+    setSelectedProvince(params.get('province') || 'Todas las provincias');
+    setSelectedLocalityId(params.get('locality_id') || '');
+    setPriceMin(numeroDeLaBarra(params, 'min_price', 0));
+    setPriceMax(numeroDeLaBarra(params, 'max_price', Number.MAX_SAFE_INTEGER));
+    setInStockOnly(params.get('in_stock') === 'true');
+    setMinRating(numeroDeLaBarra(params, 'min_rating', 0));
+  }, [versionDeLaBarra]);
+
+  useEffect(() => {
+    if (!escribeEnLaBarra) return;
     const params = new URLSearchParams(window.location.search);
     const updateParam = (key: string, value: string | null) => {
       if (value) params.set(key, value);
@@ -87,6 +122,7 @@ export const useProductFilters = ({ products }: UseProductFiltersProps) => {
     priceMax,
     inStockOnly,
     minRating,
+    escribeEnLaBarra,
   ]);
 
   const filteredProducts = useMemo(() => {

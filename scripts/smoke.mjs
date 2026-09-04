@@ -17260,6 +17260,278 @@ await runCase(146, 'El estado de una publicacion se cambia desde el panel y pers
   }
 });
 
+await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde estaba', async () => {
+  // Toda navegacion se escribia con `replaceState`, sólo el Mercado se
+  // serializaba, las pantallas de llegada conservaban su `pathname` y nadie
+  // escuchaba `popstate`. Medido contra `49445fc`: cuatro clics en la cabecera
+  // dejaban UNA sola entrada —el primer Atras salia del sitio—,
+  // `?section=services|about|contact` dibujaba Inicio, el filtro del Mercado se
+  // colaba en la URL de otra seccion y no volvia con Atras, salir de
+  // /payment/* o de /verificar-correo por la cabecera dejaba el `pathname`
+  // puesto —recargar revivia la pantalla— y el detalle no tenia entrada propia.
+  //
+  // Este caso recorre las cinco secciones por la interfaz y contrasta AL MISMO
+  // TIEMPO lo que dice la barra, lo que marca la cabecera y lo que hay dibujado.
+
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const sello = Date.now();
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const [categoriaDeServicio] = queryRows(`
+    SELECT id, 'fin' FROM categories
+    WHERE is_service = true AND is_active = true ORDER BY name LIMIT 1`);
+  const [categoriaDeProducto] = queryRows(`
+    SELECT id, 'fin' FROM categories
+    WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
+
+  // Dos publicaciones propias: la de servicio encabeza la vista previa de
+  // Servicios y la de producto —creada ultima— encabeza la de Inicio y es el
+  // unico resultado de su propia busqueda en el Mercado.
+  const servicio = `Nav147 servicio ${sello}`;
+  const publicacion = `Nav147 publicacion ${sello}`;
+  const altaDelServicio = await apiRequest('/products', {
+    method: 'POST', token: vendedor.token,
+    body: {
+      name: servicio,
+      description: 'Servicio efimero del caso 147, para abrir su detalle desde Servicios.',
+      category_id: categoriaDeServicio[0],
+      price: 0,
+      unit: 'servicio',
+      locality_id: localidad,
+      publication_type: 'servicio',
+      operation_kind: 'servicio',
+      pricing_type: 'a_convenir',
+    },
+  });
+  assert(altaDelServicio.status < 400, `no se pudo publicar el servicio: HTTP ${altaDelServicio.status}`);
+  const altaDelProducto = await apiRequest('/products', {
+    method: 'POST', token: vendedor.token,
+    body: {
+      name: publicacion,
+      description: 'Publicacion efimera del caso 147, para abrir su detalle y filtrar por ella.',
+      category_id: categoriaDeProducto[0],
+      price: 1470,
+      stock: 4,
+      unit: 'kg',
+      locality_id: localidad,
+      publication_type: 'producto',
+      operation_kind: 'insumo',
+    },
+  });
+  assert(altaDelProducto.status < 400, `no se pudo publicar: HTTP ${altaDelProducto.status}`);
+
+  const TITULO_DE = {
+    home: /Equipos, insumos y servicios/,
+    marketplace: /Operaciones disponibles/,
+    services: /Encontrá quién resuelve/,
+    about: /Información/,
+    contact: /^Contacto$/,
+  };
+  const CELDA_DE = {
+    home: 'Inicio',
+    marketplace: 'Mercado',
+    services: 'Servicios',
+    about: 'Quiénes somos',
+    contact: 'Contacto',
+  };
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
+    const page = await contexto.newPage();
+
+    const barra = () => {
+      const u = new URL(page.url());
+      return `${u.pathname}${u.search}`;
+    };
+    const tituloVisible = async () => (await page.locator('h1').first().innerText()
+      .catch(() => '')).replace(/\s+/g, ' ').trim();
+    const celdaMarcada = async () => (await page
+      .locator('nav[aria-label="Secciones del sitio"] [aria-current="page"]').allInnerTexts())
+      .map((t) => t.trim());
+
+    // Las tres cosas juntas: lo que hay dibujado, lo que marca la cabecera y lo
+    // que dice la barra. Mirar una sola dejaria pasar justo lo que falla.
+    const enLaSeccion = async (seccion, url, momento) => {
+      await esperarA(async () => TITULO_DE[seccion].test(await tituloVisible()),
+        `${momento}: se esperaba ${seccion} y hay «${await tituloVisible()}» con la barra `
+        + `en «${barra()}»`, 20_000);
+      assert(barra() === url,
+        `${momento}: la pantalla es ${seccion} y la barra dice «${barra()}» en vez de «${url}»`);
+      const marcada = await celdaMarcada();
+      assert(marcada.length === 1 && marcada[0] === CELDA_DE[seccion],
+        `${momento}: la cabecera marca ${JSON.stringify(marcada)} y la pantalla es ${seccion}`);
+    };
+    const celda = (texto) => page.getByRole('button', { name: texto, exact: true }).first();
+    const irA = async (seccion, url, momento) => {
+      await celda(CELDA_DE[seccion]).click();
+      await enLaSeccion(seccion, url, momento);
+    };
+
+    // --- A. las cinco secciones, ida y vuelta -----------------------------
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await enLaSeccion('home', '/', 'al entrar');
+    const RECORRIDO = [
+      ['marketplace', '/?section=marketplace'],
+      ['services', '/?section=services'],
+      ['about', '/?section=about'],
+      ['contact', '/?section=contact'],
+    ];
+    for (const [seccion, url] of RECORRIDO) await irA(seccion, url, `recorrido a ${seccion}`);
+
+    // Elegir la seccion que ya esta no agrega una entrada: si agregara, el
+    // Atras siguiente se quedaria en Contacto en vez de volver.
+    await irA('contact', '/?section=contact', 'Contacto de nuevo');
+    const vuelta = [
+      ['about', '/?section=about'],
+      ['services', '/?section=services'],
+      ['marketplace', '/?section=marketplace'],
+      ['home', '/'],
+    ];
+    for (const [seccion, url] of vuelta) {
+      await page.goBack();
+      await enLaSeccion(seccion, url, `Atras hasta ${seccion}`);
+    }
+    await page.goForward();
+    await enLaSeccion('marketplace', '/?section=marketplace', 'Adelante');
+
+    // --- B. las cinco URL canonicas, abiertas y recargadas -----------------
+    for (const [seccion, url] of [['home', '/'], ...RECORRIDO]) {
+      await page.goto(`${FRONTEND_URL}${url}`, { waitUntil: 'domcontentloaded' });
+      await enLaSeccion(seccion, url, `enlace directo a ${url}`);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await enLaSeccion(seccion, url, `recarga de ${url}`);
+    }
+
+    // --- C. los filtros del Mercado vuelven con su entrada -----------------
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await enLaSeccion('marketplace', '/?section=marketplace', 'Mercado sin filtros');
+
+    const titulosDeLasTarjetas = async () => (await page.locator('article h3').allInnerTexts())
+      .map((t) => t.replace(/\s+/g, ' ').trim());
+    const buscador = page.getByLabel('Buscar en el mercado');
+    const tipo = page.locator('#catalog-type');
+
+    await buscador.fill(publicacion);
+    await buscador.press('Enter');
+    await tipo.selectOption('productos');
+    const conFiltros = `/?${new URLSearchParams({
+      section: 'marketplace', q: publicacion, type: 'productos',
+    }).toString()}`;
+    await esperarA(async () => barra() === conFiltros,
+      `los filtros no llegaron a la barra: «${barra()}»`, 20_000);
+    await esperarA(async () => {
+      const titulos = await titulosDeLasTarjetas();
+      return titulos.length === 1 && titulos[0] === publicacion;
+    }, `el filtro no dejo sola a «${publicacion}»: ${JSON.stringify(await titulosDeLasTarjetas())}`,
+    20_000);
+
+    await irA('services', '/?section=services', 'salir del Mercado filtrado');
+    await page.goBack();
+    await enLaSeccion('marketplace', conFiltros, 'volver al Mercado filtrado');
+    // No alcanza con la direccion: los controles y los resultados tambien.
+    await esperarA(async () => (await buscador.inputValue()) === publicacion,
+      `al volver, el buscador dice «${await buscador.inputValue()}»`, 20_000);
+    assert((await tipo.inputValue()) === 'productos',
+      `al volver, el tipo quedo en «${await tipo.inputValue()}»`);
+    await esperarA(async () => {
+      const titulos = await titulosDeLasTarjetas();
+      return titulos.length === 1 && titulos[0] === publicacion;
+    }, `al volver, la lista es ${JSON.stringify(await titulosDeLasTarjetas())}`, 20_000);
+
+    // --- D. las pantallas de llegada no reviven ----------------------------
+    const LLEGADAS = [
+      ['/payment/success', 'cabecera'],
+      ['/payment/failure', 'cabecera'],
+      ['/payment/pending', 'CTA'],
+      ['/verificar-correo', 'CTA'],
+    ];
+    for (const [ruta, salida] of LLEGADAS) {
+      await page.goto(`${FRONTEND_URL}${ruta}`, { waitUntil: 'domcontentloaded' });
+      await esperarA(async () => (await tituloVisible()).length > 0
+        && !TITULO_DE.home.test(await tituloVisible()),
+      `${ruta} no dibujo su pantalla`, 20_000);
+      assert(barra() === ruta, `${ruta}: la barra dice «${barra()}»`);
+      assert((await celdaMarcada()).length === 0,
+        `${ruta}: la cabecera marca ${JSON.stringify(await celdaMarcada())} y esto no es una seccion`);
+
+      if (salida === 'cabecera') await celda('Inicio').click();
+      else await celda('Volver al inicio').click();
+      await enLaSeccion('home', '/', `salir de ${ruta} por ${salida}`);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await enLaSeccion('home', '/', `recargar despues de salir de ${ruta}`);
+    }
+
+    // --- E. el detalle es una capa, no una ubicacion ------------------------
+    const detalleAbierto = async () => (await page.locator('#detalle-titulo').count()) > 0;
+    const tituloDelDetalle = async () => (await page.locator('#detalle-titulo').innerText()
+      .catch(() => '(cerrado)')).trim();
+    const abrirDetalleDe = async (nombre) => {
+      const tarjeta = page.locator('article').filter({ hasText: nombre }).first();
+      await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
+      await tarjeta.click();
+      await esperarA(async () => (await tituloDelDetalle()) === nombre,
+        `no se abrio el detalle de «${nombre}»: ${await tituloDelDetalle()}`, 20_000);
+    };
+
+    // Desde Inicio y desde Servicios, sobre las vistas previas.
+    for (const [seccion, url, nombre] of [
+      ['home', '/', publicacion],
+      ['services', '/?section=services', servicio],
+    ]) {
+      await page.goto(`${FRONTEND_URL}${url}`, { waitUntil: 'domcontentloaded' });
+      await enLaSeccion(seccion, url, `${seccion} antes del detalle`);
+      await abrirDetalleDe(nombre);
+      assert(barra() === url,
+        `abrir el detalle en ${seccion} cambio la barra a «${barra()}»`);
+      await page.goBack();
+      await esperarA(async () => !(await detalleAbierto()),
+        `en ${seccion}, el primer Atras no cerro el detalle`, 20_000);
+      await enLaSeccion(seccion, url, `${seccion} despues de cerrar con Atras`);
+    }
+
+    // Desde el Mercado filtrado: el primer Atras cierra el detalle y deja
+    // intactos filtros y listado.
+    await page.goto(`${FRONTEND_URL}${conFiltros}`, { waitUntil: 'domcontentloaded' });
+    await enLaSeccion('marketplace', conFiltros, 'Mercado filtrado antes del detalle');
+    await abrirDetalleDe(publicacion);
+    await page.goBack();
+    await esperarA(async () => !(await detalleAbierto()),
+      'en el Mercado, el primer Atras no cerro el detalle', 20_000);
+    await enLaSeccion('marketplace', conFiltros, 'Mercado despues de cerrar con Atras');
+    assert((await buscador.inputValue()) === publicacion,
+      `cerrar el detalle con Atras perdio el filtro: «${await buscador.inputValue()}»`);
+    const trasElDetalle = await titulosDeLasTarjetas();
+    assert(trasElDetalle.length === 1 && trasElDetalle[0] === publicacion,
+      `cerrar el detalle con Atras cambio el listado: ${JSON.stringify(trasElDetalle)}`);
+
+    // Y cerrar con la propia interfaz no deja una entrada fantasma: despues de
+    // cerrar con Escape, UN Atras tiene que llevar a la seccion anterior.
+    await irA('services', '/?section=services', 'ir a Servicios para el fantasma');
+    await irA('marketplace', conFiltros, 'volver al Mercado para el fantasma');
+    await abrirDetalleDe(publicacion);
+    await page.keyboard.press('Escape');
+    await esperarA(async () => !(await detalleAbierto()),
+      'el detalle no se cerro con Escape', 20_000);
+    await enLaSeccion('marketplace', conFiltros, 'Mercado despues de cerrar con Escape');
+    await page.goBack();
+    await enLaSeccion('services', '/?section=services',
+      'un Atras despues de cerrar con la interfaz');
+
+    await contexto.close();
+    return 'las cinco secciones publicas se dicen en la barra —«/» y «?section=…»—, el '
+      + 'recorrido por la cabecera deja cuatro entradas de verdad que Atras y Adelante '
+      + 'recorren con la pantalla y la celda marcada, elegir la seccion activa no agrega '
+      + 'ninguna, las cinco URL canonicas abren y recargan en su seccion, el Mercado '
+      + `filtrado vuelve con Atras a «${conFiltros}» con el buscador, el tipo y su unico `
+      + 'resultado, las cuatro pantallas de llegada normalizan el pathname al salir y no '
+      + 'reviven al recargar, y el detalle abierto desde Inicio, Servicios y el Mercado se '
+      + 'cierra con el primer Atras sin perder seccion ni filtros, sin dejar entrada '
+      + 'fantasma cuando se cierra con Escape';
+  } finally {
+    await browser.close();
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

@@ -11,6 +11,7 @@ import {
 import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
 import { ProductDetailModal } from '../ProductDetail/ProductDetailModal';
+import { useNavegacionActual } from '../../navegacion/navegacion';
 import { ProductImage } from '../ProductImage/ProductImage';
 
 interface ProductCardProps {
@@ -49,7 +50,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const { addItem } = useCart();
   const { isAuthenticated, user } = useAuth();
-  const [showDetail, setShowDetail] = useState(false);
+  // El detalle no es estado privado de la tarjeta: es una capa sobre la
+  // sección, con su propia entrada en el historial. Abrirlo y cerrarlo pasa por
+  // la única política de navegación, así el primer Atrás lo cierra y cerrarlo
+  // con la interfaz no deja una entrada colgada.
+  const { capa, abrirCapa, cerrarCapa } = useNavegacionActual();
+  const showDetail = capa === product.id;
   const [cantidad, setCantidad] = useState(1);
 
   const anatomia = normalizarAnatomia(product.operationKind);
@@ -65,7 +71,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     .filter(Boolean)
     .join(', ');
 
-  const abrirDetalle = () => setShowDetail(true);
+  const abrirDetalle = () => abrirCapa(product.id);
 
   // La tarjeta y el detalle hacen lo mismo, así que sin sesión tienen que hacer
   // lo mismo. Antes la tarjeta agregaba al carrito en silencio —ni siquiera
@@ -208,13 +214,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       {showDetail && (
         <ProductDetailModal
           product={product}
-          onClose={() => setShowDetail(false)}
+          onClose={cerrarCapa}
           onSolicitarCotizacion={onSolicitarCotizacion}
           onRequiereIngreso={
             onSolicitarIngreso
               ? () => {
-                  setShowDetail(false);
-                  onSolicitarIngreso(() => setShowDetail(true));
+                  cerrarCapa();
+                  onSolicitarIngreso(() => abrirCapa(product.id));
                 }
               : undefined
           }

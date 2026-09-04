@@ -106,12 +106,9 @@ export function VerifyEmailPage({ onGoToLogin, onGoHome }: VerifyEmailPageProps)
     }
   };
 
-  // Al salir de esta pantalla la barra vuelve a la raíz: si quedara
-  // /verificar-correo, recargar volvería a abrir la confirmación.
-  const salirA = (accion: () => void) => () => {
-    window.history.replaceState(null, '', '/');
-    accion();
-  };
+  // Salir de acá ya no escribe el historial: la política de navegación
+  // normaliza el `pathname` al irse de una pantalla de llegada, y hacerlo
+  // además desde esta página dejaba dos escrituras para el mismo paso.
 
   return (
     <div className={styles.container}>
@@ -153,10 +150,10 @@ export function VerifyEmailPage({ onGoToLogin, onGoHome }: VerifyEmailPageProps)
         )}
 
         <div className={styles.actions}>
-          <button type="button" className={styles.primaryButton} onClick={salirA(onGoToLogin)}>
+          <button type="button" className={styles.primaryButton} onClick={onGoToLogin}>
             Iniciar sesión
           </button>
-          <button type="button" className={styles.secondaryButton} onClick={salirA(onGoHome)}>
+          <button type="button" className={styles.secondaryButton} onClick={onGoHome}>
             Volver al inicio
           </button>
         </div>
