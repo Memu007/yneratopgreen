@@ -12,6 +12,65 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-04 — TAREA VIGENTE: MODAL-LIFECYCLE-1, cerrar la capa correcta sin perder el lugar
+
+NAV-URL-1 queda **aceptada** en producto/regresión `bcdd448` e informe
+`aeafc13`. Revisé el diff completo. Desde bases limpias ejecuté el caso 147
+aislado en **1/1** y la suite oficial completa en **147/147**; el 131 pasó.
+Lint, `node --check`, compileall, `pip check` y `diff-check` quedaron verdes.
+La evidencia está en `docs/pm/REPRODUCCION-NAV-URL-1-2026-09-04.md`.
+
+La siguiente pieza es **MODAL-LIFECYCLE-1**. Hay dos bordes, no una invitación
+a reescribir todos los diálogos. C1 fue hallado antes de que existiera
+`useCapaModal` y puede estar ya cerrado: primero se mide. ADM-8 sí está visible
+en el código actual: el detalle de orden no es un diálogo ni entra en la pila,
+por lo que Escape lo atraviesa y cierra el panel completo.
+
+### Resultado obligatorio
+
+1. Reproducí primero C1 en Inicio, Mercado y Servicios abriendo el detalle con
+   el botón real. Al cerrar con Escape, X y fondo, el foco debe volver al mismo
+   disparador que lo abrió. Si ya pasa con `useCapaModal`, documentalo y no
+   cambies ProductCard/ProductDetail por cumplir una cuota de código.
+2. En Administración → Órdenes, convertí el detalle de orden en la capa superior
+   accesible: `role="dialog"`, `aria-modal="true"`, nombre accesible, foco
+   inicial adentro, trampa de Tab y scroll de fondo bloqueado. Reutilizá
+   `useCapaModal` y su pila; no crees otro administrador de modales.
+3. Con el detalle de orden abierto, el primer Escape cierra sólo ese detalle.
+   El panel sigue abierto en Órdenes, con el mismo filtro, página y posición de
+   scroll, y el foco vuelve al botón «Ver» exacto de esa fila. El segundo Escape
+   puede cerrar el panel y debe devolver el foco al botón Admin del Header.
+4. X y clic en el fondo del detalle cierran sólo la capa superior y conservan
+   el mismo contexto. Tab y Shift+Tab no pueden saltar a controles del panel
+   que queda detrás.
+5. Como control de la pila existente, Detalle de publicación → Perfil del
+   vendedor debe cerrar un nivel por Escape y devolver foco nivel por nivel,
+   sin dos diálogos reaccionando al mismo Escape.
+
+### Regresión discriminante
+
+Agregá un caso 148 autónomo que mida los cinco puntos sobre la interfaz real:
+
+- identifica el disparador por publicación/fila, no por «primer botón»;
+- contrasta `document.activeElement` después de cada cierre;
+- afirma cuántos `role=dialog` quedan tras cada Escape y cuál tiene el foco;
+- en Administración registra antes y después pestaña, filtro, página y
+  `scrollTop`, y demuestra que la orden seleccionada no se perdió ni cambió;
+- usa Tab/Shift+Tab en los extremos de la capa superior para probar la trampa;
+- conserva evidencia roja contra `bcdd448`. Si C1 ya está verde, el rojo puede
+  ser sólo ADM-8, pero debe quedar explícito.
+
+No uses esperas fijas. Después corré 148 aislado y la suite completa esperada
+en **148/148** desde bases limpias, más build, lint, `node --check`, compileall,
+`pip check`, a11y, contraste y `diff-check` real contra `bcdd448`.
+
+No cambies navegación/History API, formularios, Backend, modelos, migraciones,
+seed, pagos, BOEDA, estilos generales, Railway ni datos remotos; no despliegues.
+Producto/regresión e informe en commits separados, subí y frená para revisión
+PM.
+
+---
+
 ## 2026-09-04 — TAREA VIGENTE: NAV-URL-1, una sola política de navegación e historial
 
 ADMIN-STATE-1 queda **aceptada** en producto/regresión `49445fc` e informes

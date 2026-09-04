@@ -48,32 +48,32 @@ PM corrigió tres conclusiones importantes:
 
 ### A1 — navegación del navegador no participa de la aplicación
 
-**Dictamen PM:** confirmado, P1 dentro de un único cierre de navegación.  
+**Dictamen PM:** cerrado en `bcdd448`/`aeafc13`.  
 **Recorrido:** Inicio → Mercado → Servicios → Atrás.  
 **Actual:** `handleNavigate` usa `replaceState` para todas las secciones y no
 existe un listener de `popstate`; Atrás puede sacar a la persona de TopGreen en
 vez de regresar a la sección anterior.  
 **Evidencia:** `src/App.tsx`, `src/hooks/useProductFilters.ts`.  
-**Cierre mínimo:** historial coherente, restauración de sección desde URL y una
-regresión con `goBack()`.
+**Cierre:** una política con History API nativa restaura sección, URL y filtros;
+PM verificó el caso 147 aislado y la suite completa en **147/147**.
 
 ### A2 — pathname especial sobrevive al abandonar pago o verificación
 
-**Dictamen PM:** confirmado por código; P1 en el mismo cierre que A1.  
+**Dictamen PM:** cerrado en `bcdd448`/`aeafc13`.  
 **Recorrido:** entrar en `/payment/*` o `/verificar-correo`, usar la cabecera
 para ir al Mercado y recargar.  
 **Actual:** `handleNavigate` conserva `window.location.pathname`; la recarga
 prioriza la ruta especial y devuelve a pago/verificación.  
-**Cierre mínimo:** normalizar a `/` al abandonar una ruta especial y probar
-navegación más recarga.
+**Cierre:** las cuatro rutas de llegada se reemplazan al salir, normalizan `/`
+y no reviven al recargar; PM lo reprodujo en el caso 147.
 
 ### A3 — Servicios, Quiénes somos y Contacto no tienen URL persistente
 
-**Dictamen PM:** confirmado por código; P1 en el mismo cierre que A1.  
+**Dictamen PM:** cerrado en `bcdd448`/`aeafc13`.  
 **Actual:** sólo Mercado escribe `section=marketplace`; las demás secciones
 borran `section`, por lo que recargar o compartir vuelve a Inicio.  
-**Cierre mínimo:** serializar y leer todas las secciones válidas; enlaces
-directos y recarga deben conservar la vista.
+**Cierre:** las cinco secciones tienen URL canónica, enlace directo y recarga;
+PM lo reprodujo en el caso 147.
 
 ### A4 — Contacto declara éxito sin saber si abrió un cliente de correo
 
@@ -106,7 +106,7 @@ de volver a Inicio, pero no se impone sin la aprobación de Emi.
 
 ### A8 — resultado de pago, Atrás y URL quedan desincronizados
 
-**Dictamen PM:** confirmado por código, duplicado de la raíz A1.  
+**Dictamen PM:** cerrado en `bcdd448`/`aeafc13`.  
 **Actual:** `onGoHome` hace `pushState('/')`, pero no hay `popstate`; Atrás puede
 cambiar la URL sin cambiar la pantalla. Se cierra y prueba junto con A1/A2.
 
@@ -132,8 +132,10 @@ Debe quitarse la acción/promesa o darle una conducta real, sin inventar planes.
 - Con más de cien publicaciones, el conteo móvil y el ordenamiento del cliente
   pueden describir sólo la página descargada. Se cierra con
   `ux2c/DEUDA-PAGINACION.md`, no como parche aislado.
-- B4 (detalle e historial), C1 (foco al cerrar), C2 (N+1 de imágenes) y C3
-  (doble fuente de ubicación) ya estaban en el inventario `acbf3b6`.
+- B4 (detalle e historial) quedó cerrado en NAV-URL-1: el primer Atrás cierra
+  el detalle y conserva sección/filtros. C1 (foco al cerrar), C2 (N+1 de
+  imágenes) y C3 (doble fuente de ubicación) siguen en el inventario
+  `acbf3b6`.
 
 ## Auditoría 2 — formularios y recorridos operativos
 

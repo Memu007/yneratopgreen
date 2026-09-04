@@ -47,8 +47,11 @@ final, como acordó Emi.
   `2f721cc`/`3dac058`: PM verificó el caso 146 aislado en **1/1** y la suite
   completa en **146/146**, más puertas estáticas. La traducción visual de
   `sold_out` y las referencias muertas a `draft` quedan separadas.
-- Tarea única vigente: **NAV-URL-1**, detallada en `PARA-DEV.md`. Cierra en una
-  sola política A1, A2, A3, A8 y B4; no abre modal, formularios ni rediseño.
+- NAV-URL-1 quedó aceptada en `bcdd448`/`aeafc13`: PM verificó el caso 147
+  aislado en **1/1** y la suite completa en **147/147**, más puertas estáticas.
+  A1, A2, A3, A8 y B4 quedan cerrados sin librería de routing.
+- Tarea única vigente: **MODAL-LIFECYCLE-1**, detallada en `PARA-DEV.md`.
+  Reproduce C1 antes de tocarlo y cierra ADM-8 con la pila modal ya existente.
 - ORD-SELF-1 no cierra ningún hallazgo de las tres auditorías; era la tarea P1
   anterior y las auditorías la excluyeron expresamente.
 - La historia de las devoluciones del arnés y su cierre reproducido queda en
@@ -100,8 +103,8 @@ edición, no a inventar una migración destructiva.
 
 | Orden | Pieza | Auditoría cubierta | Cierre mínimo |
 |---:|---|---|---|
-| 7 | **NAV-URL-1 — vigente** | A1, A2, A3, A8 y B4 | URL compartible por sección, `popstate`, rutas especiales normalizadas y Atrás coherente incluso con detalle abierto. |
-| 8 | **MODAL-LIFECYCLE-1** | C1 y ADM-8 | Cierra primero la capa superior, restaura foco al disparador y conserva pestaña/posición del panel. |
+| 7 | **NAV-URL-1 — cerrada** | A1, A2, A3, A8 y B4 | Aceptada en `bcdd448`/`aeafc13`: cinco URL estables, `popstate`, rutas especiales y detalle coherentes; PM cerró 147/147. |
+| 8 | **MODAL-LIFECYCLE-1 — vigente** | C1 y ADM-8 | Cierra primero la capa superior, restaura foco al disparador y conserva pestaña/posición del panel. |
 | 9 | **FORM-DIRTY-1** | F3 general | Formularios largos sucios confirman antes de perderse; los intactos cierran sin fricción. |
 
 No se corrige cada síntoma con otro `pushState` o listener local: NAV-URL-1

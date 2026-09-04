@@ -8,30 +8,35 @@ Actualizado: 2026-09-04.
   editó `docs/pm/`; no escribió código de producto, no desplegó y no tocó
   Railway, pagos ni datos remotos.
 - **Git al cerrar la revisión:** `main` y `origin/main` estaban limpios e
-  iguales en `3dac058`, última entrega de Dev antes de la aceptación PM. La
+  iguales en `aeafc13`, última entrega de Dev antes de la aceptación PM. La
   próxima PM debe volver a comprobar estado y actualizar antes de actuar, como
   exige `ONBOARDING-PM.md`.
 - **Calendario contractual:** el 04/09 empieza la semana 3 y la Fase 2 —
   Desarrollo base—, prevista hasta el 24/09. El producto sigue adelantado
   funcionalmente; eso no autoriza producción ni adelanta el hito final.
-- **Última aceptación:** ADMIN-STATE-1 quedó aceptada en producto/regresión
-  `49445fc`, con informes `2f721cc`/`3dac058`. PM revisó los diffs, reprodujo el
-  caso 146 aislado en **1/1** y la suite oficial completa en **146/146** desde
+- **Última aceptación:** NAV-URL-1 quedó aceptada en producto/regresión
+  `bcdd448`, con informe `aeafc13`. PM revisó los siete archivos, reprodujo el
+  caso 147 aislado en **1/1** y la suite oficial completa en **147/147** desde
   bases limpias. El caso 131 pasó; lint, sintaxis, compileall, `pip check` y
   `diff-check` también. La evidencia está en
-  `REPRODUCCION-ADMIN-STATE-1-2026-09-04.md`.
-- **Única tarea activa de Dev:** NAV-URL-1, escrita al comienzo de
-  `PARA-DEV.md`. Unifica la política de URL e historial, hace compartibles las
-  cinco secciones, restaura sección/filtros con Atrás y Adelante, normaliza la
-  salida de rutas especiales y hace que Atrás cierre primero un detalle.
+  `REPRODUCCION-NAV-URL-1-2026-09-04.md`.
+- **Única tarea activa de Dev:** MODAL-LIFECYCLE-1, escrita al comienzo de
+  `PARA-DEV.md`. Primero mide si C1 ya quedó resuelto por `useCapaModal`; cierra
+  ADM-8 haciendo que el detalle de una orden sea la capa superior real, que
+  Escape cierre primero y que foco, pestaña y posición sobrevivan.
 - **Deuda separada, no vigente:** la celda administrativa todavía muestra
   `sold_out` crudo y sin color propio; además quedan dos referencias muertas a
   `draft`. Se incorpora a la futura claridad/estados en español y no invalida
   la corrección operativa ya aceptada.
+- **Deuda de NAV-URL-1, no bloqueante:** tres limpiezas legítimas todavía usan
+  `replaceState` fuera del módulo de navegación —filtros, resultado MP y token
+  de correo—, por lo que algunos comentarios dicen «único escritor» con más
+  amplitud de la real. No hay desvío funcional ni dependencia nueva; se corrige
+  cuando se toque esa documentación, sin abrir otra tarea.
 - **Próxima acción:** esperar la respuesta de Dev. Cuando Emi diga
-  «respondió», actualizar, revisar primero la evidencia roja de NAV-URL-1 y los
-  diffs, ejecutar el caso 147 aislado y luego la suite completa esperada en
-  **147/147**. No desplegar.
+  «respondió», actualizar, revisar evidencia roja y diff de
+  MODAL-LIFECYCLE-1, ejecutar el caso 148 aislado y después la suite completa
+  esperada en **148/148**. No desplegar.
 
 ## Relevo inmediato — leer primero
 
