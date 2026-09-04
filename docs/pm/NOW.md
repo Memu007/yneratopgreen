@@ -41,6 +41,11 @@ Actualizado: 2026-09-04.
   «respondió», actualizar, revisar evidencia roja y diff de FORM-DIRTY-1,
   reproducir el caso 149 y, por afectar cinco recorridos, repetir una suite
   completa. No desplegar.
+- **Red-team futuro ya documentado:** `PLAN-RED-TEAM-CIERRE-MVP.md` fija la
+  auditoría independiente con Astra Alto, los activos autorizados, límites y
+  criterios de salida. `FORM-DIRTY-1` cerrado es necesario pero no suficiente:
+  también deben congelarse los recorridos, homologarse MP en prueba y fijarse
+  el SHA de Docker/Railway. La PM debe avisarle a Emi al cerrar esas puertas.
 
 ## Relevo inmediato — leer primero
 

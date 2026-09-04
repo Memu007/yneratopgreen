@@ -162,7 +162,8 @@ recursos de Railway se ajustan después con métricas.
    transportista y admin en medidas acordadas, incluidos táctil y teclado.
 3. **QA y red-team:** suite desde base limpia y la matriz completa de seguridad
    de `CRONOGRAMA.md`; ningún crítico/alto abierto. Railway y MP sólo reciben
-   pruebas pasivas o flujos de prueba autorizados.
+   pruebas pasivas o flujos de prueba autorizados. Momento, alcance, límites y
+   evidencia exigida quedan fijados en `PLAN-RED-TEAM-CIERRE-MVP.md`.
 4. **Operación productiva:** persistencia de imágenes, backups con restauración,
    secretos/accesos, logs, métricas, dominio/HTTPS y mismo SHA en GitHub,
    Frontend y Backend.
