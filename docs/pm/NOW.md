@@ -1,6 +1,33 @@
 # Estado actual
 
-Actualizado: 2026-09-03.
+Actualizado: 2026-09-04.
+
+## Relevo operativo para la próxima PM — 2026-09-04
+
+- **Rol:** la sesión saliente actuó como PM adversarial e independiente. Sólo
+  editó `docs/pm/`; no escribió código de producto, no desplegó y no tocó
+  Railway, pagos ni datos remotos.
+- **Git al cerrar la revisión:** `main` y `origin/main` estaban limpios e
+  iguales en `4ad44a2`, commit que dejó la aceptación y la tarea siguiente. La
+  próxima PM debe volver a comprobar estado y actualizar antes de actuar, como
+  exige `ONBOARDING-PM.md`.
+- **Calendario contractual:** el 04/09 empieza la semana 3 y la Fase 2 —
+  Desarrollo base—, prevista hasta el 24/09. El producto sigue adelantado
+  funcionalmente; eso no autoriza producción ni adelanta el hito final.
+- **Última aceptación:** ADMIN-PAGE-1 quedó aceptada en `fe2b151`/`6cc67b7`,
+  con informes `f25a57c`/`3b13271`. PM revisó los diffs y reprodujo desde bases
+  limpias el caso 145 aislado en **1/1** y la suite completa en **145/145**. El
+  caso 131 pasó; lint, sintaxis, compileall, `pip check` y `diff-check` también.
+  La evidencia está en `REPRODUCCION-ADMIN-PAGE-1-2026-09-03.md`.
+- **Única tarea activa de Dev:** ADMIN-STATE-1, escrita al comienzo de
+  `PARA-DEV.md`. Corrige sólo el selector de estado por fila que ofrece
+  `draft` —el Backend lo rechaza— y omite `sold_out`; agrega el caso 146 sobre
+  el control real. No abre Backend, navegación, BOEDA, pagos ni despliegue.
+- **Próxima acción:** esperar la respuesta de Dev. Cuando Emi diga
+  «respondió», actualizar, leer el último `PARA-PM.md`, revisar los commits y
+  reproducir primero el caso 146 y después la suite completa esperada en
+  **146/146**. Si cruza la puerta, aceptar ADMIN-STATE-1 y recién entonces abrir
+  NAV-URL-1 según `ROADMAP-CIERRE-MVP-2026-08-31.md`.
 
 ## Relevo inmediato — leer primero
 
