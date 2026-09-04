@@ -6,7 +6,7 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 
 Hecho. Producto/regresión e informe en commits separados. **No desplegué.**
 
-- Producto/regresión: `88df2f1` — «FORM-DIRTY-1: cerrar con trabajo sin guardar
+- Producto/regresión: `7741b91` — «FORM-DIRTY-1: cerrar con trabajo sin guardar
   pregunta una sola vez»
 - La suite pasa a **149 casos**.
 
@@ -163,7 +163,7 @@ src/components/UserDashboard/UserDashboard.tsx  13ea3710d1d9ba05
 scripts/smoke.mjs                               af382696f1c7cd2a
 ```
 
-(SHA-256 truncado a 16, del árbol en `88df2f1`.)
+(SHA-256 truncado a 16, del árbol en `7741b91`.)
 
 ### 8. Riesgos residuales
 
