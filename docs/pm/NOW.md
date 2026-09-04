@@ -364,20 +364,21 @@ lectura posible del nodo anterior a la respuesta filtrada; la prueba ahora
 espera la respuesta `search=` y conserva diagnóstico discriminante. Cierre en
 `REPRODUCCION-ADMIN-ACTIONS-1-2026-09-03.md`.
 
-**La tarea activa de Dev es ADMIN-PAGE-1:** hacer accesibles desde el panel las
-filas 21+ de Usuarios, Productos y Órdenes mediante paginación real del servidor,
-total/página coherentes y los filtros mínimos que ya admite la API. El caso 145
-debe probar las tres listas con más de veinte registros. No abre dashboard,
-rediseño, navegación global, BOEDA, pagos ni despliegue. Alcance y puertas en
-`PARA-DEV.md`.
+ADMIN-PAGE-1 queda **aceptada** en producto/regresión `fe2b151`, corrección
+`6cc67b7` e informes `f25a57c`/`3b13271`. PM revisó los diffs y ejecutó desde
+bases limpias el caso 145 aislado en **1/1** y la suite oficial completa en
+**145/145**; el 131 pasó. Lint, sintaxis, compileall, `pip check` y `diff-check`
+quedaron verdes. La paginación real, los filtros y la protección contra una
+respuesta vieja quedan cerrados. Evidencia en
+`REPRODUCCION-ADMIN-PAGE-1-2026-09-03.md`.
 
-La entrega `fe2b151`/`f25a57c` queda **devuelta, no aceptada**. PM verificó el
-145 aislado en 1/1 y las puertas estáticas, pero la suite completa dio 144/145:
-el 131 pasó y el 145 perdió el filtro de publicaciones. Los cargadores no
-impiden que una respuesta anterior pise página/filtros más nuevos. Además el
-selector ofrece `draft`, que no existe y devuelve 500, y omite `sold_out`, que
-sí existe. ADMIN-PAGE-1R debe corregir esos dos puntos y cerrar 145/145; evidencia
-en `REPRODUCCION-ADMIN-PAGE-1-2026-09-03.md`.
+**La tarea activa de Dev es ADMIN-STATE-1:** corregir el selector de estado de
+cada fila de publicaciones. Todavía ofrece `draft` («Borrador»), que el Backend
+rechaza con 400, y omite `sold_out`. Es una pieza separada de la paginación ya
+aceptada, pero bloquea el cierre de la puerta administrativa. Debe limitarse a
+ese selector y a un caso 146 que accione todas sus opciones reales. No abre
+dashboard, navegación global, BOEDA, pagos ni despliegue. Alcance en
+`PARA-DEV.md`.
 
 Los datos logísticos validados quedan **aceptados**: producto `0395d67`, cierre
 de normalización `4a57722` e informe final `580f254`. Marca/modelo y cargas se

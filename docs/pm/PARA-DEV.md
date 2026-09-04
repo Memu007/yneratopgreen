@@ -12,6 +12,44 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-04 — TAREA VIGENTE: ADMIN-STATE-1, ninguna acción de estado puede ser falsa
+
+ADMIN-PAGE-1 queda **aceptada** en producto/regresión `fe2b151`, corrección
+`6cc67b7` e informes `f25a57c`/`3b13271`. Revisé ambos diffs. Desde bases
+limpias ejecuté el caso 145 aislado en **1/1** y después la suite oficial
+completa en **145/145**; el caso 131 también pasó. Lint, `node --check`,
+compileall, `pip check` y `diff-check` quedaron verdes. La guarda conserva el
+último pedido de cada lista y la regresión ya invierte las respuestas de forma
+determinista. No hubo Backend ni despliegue.
+
+No cierro todavía la puerta administrativa. El selector de estado de **cada
+fila** sigue ofreciendo `draft` («Borrador»), que el Backend rechaza con 400, y
+omite `sold_out`, que sí pertenece a `ProductStatus`. Esto no es parte de la
+paginación ya aceptada: se abre como una corrección separada y mínima antes de
+NAV-URL-1.
+
+### Resultado obligatorio
+
+1. En el selector `Estado del producto`, reemplazá `draft` por `sold_out` y
+   usá el rótulo «Agotado». Sus valores deben quedar exactamente en
+   `active`, `paused`, `sold_out` y `deleted`, igual que el modelo y el filtro.
+2. Agregá un caso 146 autónomo que enumere **todas** las opciones del selector
+   por fila y falle si aparece una opción fuera del dominio o falta una válida.
+3. El mismo caso debe accionar el control real sobre publicaciones efímeras,
+   observar cada `PATCH`, exigir respuesta exitosa y comprobar tras recargar
+   que el estado persistido se ve en la celda correcta. No alcanza con leer el
+   HTML ni llamar la API por fuera del control.
+4. La prueba no modifica el seed y no usa esperas fijas. Debe dejar claro que
+   antes `draft` producía 400 y que `sold_out` no era elegible.
+
+Corré 146 aislado y la suite completa esperada en **146/146** desde bases
+limpias, más build, lint, `node --check`, compileall, `pip check` y `diff-check`
+real contra `6cc67b7`. No cambies Backend, paginación, filtros, dashboard,
+navegación, BOEDA, pagos ni Railway; no despliegues. Producto/regresión e
+informe en commits separados, subí y frená para revisión PM.
+
+---
+
 ## 2026-09-03 — ADMIN-PAGE-1R: estados reales y ninguna respuesta vieja puede pisar un filtro
 
 Revisé `fe2b151` y el informe `f25a57c`. La arquitectura general queda bien

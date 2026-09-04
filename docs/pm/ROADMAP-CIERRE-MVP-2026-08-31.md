@@ -1,6 +1,6 @@
 # Roadmap operativo para cerrar el MVP
 
-Actualizado: 2026-09-03.  
+Actualizado: 2026-09-04.
 Fuentes: `CRONOGRAMA.md`, `ALCANCE-Y-LIMITES.md`, `NOW.md` y
 `AUDITORIAS-UX-CLAUDE-2026-08-30.md`.
 
@@ -40,11 +40,12 @@ final, como acordó Emi.
 - ADMIN-ACTIONS-1 quedó aceptada en `edf3cb5`/`6441a49`/`446bb30`, con informes
   `c657c47`/`9ae1cec`/`1ac4191`: PM verificó 121 y 144 aislados y dos suites
   completas consecutivas **144/144** desde bases limpias, más puertas estáticas.
-- Tarea única vigente: **ADMIN-PAGE-1**, detallada en `PARA-DEV.md`.
-- La primera entrega de ADMIN-PAGE-1 (`fe2b151`/`f25a57c`) está devuelta: PM
-  obtuvo 145 focal en 1/1 pero suite completa en 144/145 por pérdida del filtro;
-  además `draft` es una opción inexistente y `sold_out` falta. La corrección
-  ADMIN-PAGE-1R no cambia el orden del roadmap ni abre otra pieza.
+- ADMIN-PAGE-1 quedó aceptada en `fe2b151`/`6cc67b7`, con informes
+  `f25a57c`/`3b13271`: PM verificó el caso 145 aislado y la suite completa en
+  **145/145**, más puertas estáticas.
+- Tarea única vigente: **ADMIN-STATE-1**, detallada en `PARA-DEV.md`. Corrige
+  el selector de estado por fila que todavía ofrece `draft` —rechazado por el
+  Backend— y omite `sold_out`; no reabre la paginación.
 - ORD-SELF-1 no cierra ningún hallazgo de las tres auditorías; era la tarea P1
   anterior y las auditorías la excluyeron expresamente.
 - La historia de las devoluciones del arnés y su cierre reproducido queda en
@@ -85,7 +86,8 @@ habilitada como puerta de las tareas de producto.
 | 3 | **CART-RECOVERY-1 — cerrada** | R2 | Aceptada en `ebb2b20`/`8c29f47`: copia dañada acotada, copia válida conservada y carrito servidor intacto; PM cerró 142/142. |
 | 4 | **SERVICE-STATE-1 — cerrada** | F1 | Aceptada en `a038b56`/`bad5a1b`: mapeador único, servicio estable y control de producto agotado; PM cerró 143/143. |
 | 5 | **ADMIN-ACTIONS-1 — cerrada** | ADM-1, ADM-5; ADM-R1/R2/R3 | Aceptada en `edf3cb5`/`6441a49`/`446bb30`: PUT real, acciones con nombre y tres mutaciones peligrosas bloqueadas; PM cerró con dos repeticiones 144/144. |
-| 6 | **ADMIN-PAGE-1 — vigente** | ADM-2 | Usuarios, publicaciones y órdenes tienen paginación y búsqueda/filtros mínimos; el registro 21 es alcanzable y el total es honesto. |
+| 6 | **ADMIN-PAGE-1 — cerrada** | ADM-2 | Aceptada en `fe2b151`/`6cc67b7`: las tres listas paginan en servidor, filtran sin carreras y PM cerró 145/145. |
+| 6B | **ADMIN-STATE-1 — vigente** | Borde operativo de ADM-1 | El selector por fila ofrece exactamente los cuatro estados reales y cada acción persiste sin error. |
 
 Esta puerta va antes del pulido: transferencia y administración forman parte de
 la operación prometida. Los riesgos ADM-R1/R2/R3 pueden obligar a bloquear una

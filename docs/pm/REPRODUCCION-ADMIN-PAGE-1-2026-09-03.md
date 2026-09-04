@@ -68,3 +68,30 @@ respuestas en orden inverso antes de declarar la causa cerrada.
 
 No se modificó producto desde PM, no se desplegó y no se tocaron Railway ni
 datos remotos.
+
+## Cierre de la corrección — 2026-09-04
+
+Base revisada: corrección `6cc67b7`, informe `3b13271`.
+
+La corrección del alcance de ADMIN-PAGE-1 queda aceptada. PM reprodujo desde
+bases limpias:
+
+| Control | Resultado |
+| --- | ---: |
+| caso 145 aislado | 1/1 |
+| suite oficial completa | 145/145 |
+| caso 131 dentro de la suite | pasa |
+| lint, `node --check`, compileall, `pip check`, `diff-check` | pasan |
+
+El filtro ofrece ahora `active`, `paused`, `sold_out` y `deleted`. El caso 145
+recorre todas sus opciones y la carrera retiene el pedido sin filtro, deja
+terminar el filtrado y libera último el viejo; filas y total conservan el pedido
+vigente. La suite completa cerró con salida 0.
+
+Hallazgo separado: el selector de estado **por fila**, anterior a esta tarea,
+todavía ofrece `draft` y omite `sold_out`. El código y la medición de Dev
+coinciden: `draft` devuelve 400 en `PATCH`, mientras `sold_out` devuelve 200.
+ADMIN-PAGE-1 no se reabre, pero la puerta administrativa queda detenida en la
+tarea mínima ADMIN-STATE-1 antes de avanzar a NAV-URL-1.
+
+PM no modificó producto, no desplegó y no tocó datos remotos.
