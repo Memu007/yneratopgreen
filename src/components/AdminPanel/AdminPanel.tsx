@@ -786,6 +786,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   // scroll del fondo. Ninguna capa del producto hacía nada de esto.
   const capa = useCapaModal<HTMLDivElement>(onClose);
 
+  // El detalle de una orden es otra capa encima del panel, no un div suelto:
+  // sin esto Escape lo atravesaba y cerraba Administración entera —con su
+  // pestaña, su filtro, su página y su scroll— y Tab se paseaba por la tabla
+  // de atrás. Es la MISMA pila de `useCapaModal`: sólo responde la última.
+  const cerrarDetalleDeOrden = useCallback(() => setSelectedOrder(null), []);
+  const capaDeLaOrden = useCapaModal<HTMLDivElement>(
+    cerrarDetalleDeOrden,
+    selectedOrder !== null,
+  );
+
   return (
     <div className={styles.overlay}>
       <div className={styles.panel}
@@ -1332,6 +1342,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         <td>
                           <button
                             className={styles.viewBtn}
+                            aria-label={`Ver la orden ${order.order_number}`}
                             onClick={() => setSelectedOrder(order)}
                           >
                             Ver
@@ -1354,11 +1365,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       
       {/* Modal de detalle de orden */}
       {selectedOrder && (
-        <div className={styles.orderDetailOverlay} onClick={() => setSelectedOrder(null)}>
-          <div className={styles.orderDetailModal} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.orderDetailOverlay} onClick={cerrarDetalleDeOrden}>
+          <div className={styles.orderDetailModal}
+            ref={capaDeLaOrden}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-de-la-orden"
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className={styles.orderDetailHeader}>
-              <h2> Orden {selectedOrder.order_number}</h2>
-              <button className={styles.closeButton} aria-label="Cerrar" onClick={() => setSelectedOrder(null)}>×</button>
+              <h2 id="titulo-de-la-orden"> Orden {selectedOrder.order_number}</h2>
+              <button className={styles.closeButton} aria-label="Cerrar" onClick={cerrarDetalleDeOrden}>×</button>
             </div>
             
             <div className={styles.orderDetailContent}>

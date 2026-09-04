@@ -17532,6 +17532,357 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
   }
 });
 
+await runCase(148, 'Cada capa se cierra sola y devuelve el foco a su disparador', async () => {
+  // Dos bordes distintos.
+  //
+  // C1 —el foco vuelve al disparador del detalle— ya lo cerraba `useCapaModal`
+  // cuando se escribio ese hook; se mide igual, porque una regresion que no
+  // cubre lo que ya anda no avisa el dia que se rompe.
+  //
+  // ADM-8 estaba abierto: el detalle de una orden era un `div` suelto, sin
+  // `role="dialog"` y fuera de la pila de capas. Medido contra `bcdd448`: con
+  // el detalle abierto habia UN solo dialogo, el foco se quedaba afuera —en el
+  // boton «Ver»—, Tab caminaba por la tabla de atras y el primer Escape cerraba
+  // Administracion entera, con su pestaña, su filtro, su pagina y su scroll.
+
+  const admin = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'admin@topgreen.com', password: 'admin123' },
+  });
+  const token = admin.data.access_token;
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const comprador = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'cliente@ejemplo.com', password: 'cliente123' },
+  });
+  const tokenComprador = comprador.data.access_token;
+
+  const sello = Date.now();
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+
+  // Un servicio y un activo propios: los dos dibujan el boton «Ver detalle» en
+  // su tarjeta —un insumo a la venta no lo dibuja—, y creados en este orden el
+  // activo encabeza la vista previa de Inicio y el servicio la de Servicios.
+  const [categoriaDeServicio] = queryRows(`
+    SELECT id, 'fin' FROM categories
+    WHERE is_service = true AND is_active = true ORDER BY name LIMIT 1`);
+  const [categoriaDeActivos] = queryRows(`
+    SELECT id, 'fin' FROM categories WHERE slug = 'maquinaria-agricola'`);
+  const [categoriaDeProductos] = queryRows(`
+    SELECT id, 'fin' FROM categories
+    WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
+  assert(categoriaDeActivos, 'no esta la categoria de maquinaria para publicar un activo');
+
+  const servicio = `Capa148 servicio ${sello}`;
+  const activo = `Capa148 activo ${sello}`;
+  const altaDelServicio = await apiRequest('/products', {
+    method: 'POST', token: vendedor.token,
+    body: {
+      name: servicio,
+      description: 'Servicio efimero del caso 148, para abrir su detalle desde Servicios.',
+      category_id: categoriaDeServicio[0],
+      price: 0,
+      unit: 'servicio',
+      locality_id: localidad,
+      publication_type: 'servicio',
+      operation_kind: 'servicio',
+      pricing_type: 'a_convenir',
+    },
+  });
+  assert(altaDelServicio.status < 400,
+    `no se pudo publicar el servicio: HTTP ${altaDelServicio.status}`);
+  const altaDelActivo = await apiRequest('/products', {
+    method: 'POST', token: vendedor.token,
+    body: {
+      name: activo,
+      description: 'Publicacion efimera del caso 148, para abrir su detalle desde Inicio.',
+      category_id: categoriaDeActivos[0],
+      price: 14800,
+      stock: 1,
+      unit: 'unidad',
+      locality_id: localidad,
+      publication_type: 'producto',
+      operation_kind: 'activo',
+    },
+  });
+  assert(altaDelActivo.status < 400, `no se pudo publicar el activo: HTTP ${altaDelActivo.status}`);
+
+  // Ordenes por transferencia, para que Administracion tenga un filtro con dos
+  // paginas LLENAS: sin la segunda no se puede demostrar que la pagina se
+  // conserva, y sin filas suficientes la tabla no se desplaza y no hay scroll
+  // que conservar. Se cuenta lo que ya hay y se completa lo que falte.
+  const ESTADO_DE_ORDEN = 'awaiting_transfer_receipt';
+  const HACEN_FALTA = 41;
+  const { data: yaHabia } = await apiRequest(
+    `/admin/orders?page=1&page_size=1&status=${ESTADO_DE_ORDEN}`, { token });
+  const ORDENES = Math.max(0, HACEN_FALTA - (yaHabia.total || 0));
+
+  // El insumo del que se compra es del caso: asi no depende de que el seed
+  // tenga una publicacion con stock suficiente.
+  const insumo = `Capa148 insumo ${sello}`;
+  const altaDelInsumo = await apiRequest('/products', {
+    method: 'POST', token: vendedor.token,
+    body: {
+      name: insumo,
+      description: 'Insumo efimero del caso 148, para armar las ordenes que llenan la tabla.',
+      category_id: categoriaDeProductos[0],
+      price: 148,
+      stock: HACEN_FALTA + 5,
+      unit: 'kg',
+      locality_id: localidad,
+      publication_type: 'producto',
+      operation_kind: 'insumo',
+    },
+  });
+  assert(altaDelInsumo.status < 400 && altaDelInsumo.data?.id,
+    `no se pudo publicar el insumo: HTTP ${altaDelInsumo.status}`);
+  const productoParaComprar = altaDelInsumo.data.id;
+
+  await apiRequest('/cart', { method: 'DELETE', token: tokenComprador });
+  const ordenesDelCaso = [];
+  for (let i = 1; i <= ORDENES; i += 1) {
+    await apiRequest('/cart/items', {
+      method: 'POST', token: tokenComprador,
+      body: { product_id: productoParaComprar, quantity: 1 },
+    });
+    const checkout = await apiRequest('/orders/checkout/transfer', {
+      method: 'POST', token: tokenComprador,
+      body: {
+        shipping_address: `Ruta 148 km ${i}`,
+        shipping_locality_id: localidad,
+        shipping_postal_code: '2700',
+        shipping_decisions: [{ seller_id: vendedor.id, mode: 'self' }],
+      },
+    });
+    const [orden] = checkout.data.orders;
+    assert(orden?.order_number, `la orden ${i} no salio: ${JSON.stringify(checkout.data)}`);
+    ordenesDelCaso.push(orden.order_number);
+  }
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
+    await contexto.addInitScript(({ a, r }) => {
+      window.localStorage.setItem('access_token', a);
+      window.localStorage.setItem('refresh_token', r);
+    }, { a: token, r: admin.data.refresh_token });
+    const page = await contexto.newPage();
+
+    const dialogos = () => page.locator('[role="dialog"]').count();
+    const focoEn = (locator) => locator.evaluate((el) => el === document.activeElement);
+    const focoDentroDe = (locator) => locator.evaluate((el) => el.contains(document.activeElement));
+    const dondeEstaElFoco = () => page.evaluate(() => {
+      const activo = document.activeElement;
+      if (!activo || activo === document.body) return '(el documento)';
+      const nombre = activo.getAttribute('aria-label')
+        || (activo.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+      return `<${activo.tagName.toLowerCase()}> «${nombre}»`;
+    });
+
+    // --- A. C1: el detalle devuelve el foco a SU disparador -----------------
+    // El disparador se identifica por publicacion —la tarjeta que lo dibuja—,
+    // no por «el primer boton que aparezca».
+    const cerradas = [];
+    const revisarElDetalle = async (pantalla, url, nombre) => {
+      for (const forma of ['Escape', 'X', 'fondo']) {
+        await page.goto(`${FRONTEND_URL}${url}`, { waitUntil: 'domcontentloaded' });
+        const tarjeta = page.locator('article').filter({ hasText: nombre }).first();
+        await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
+        const disparador = tarjeta.getByRole('button', { name: 'Ver detalle' });
+        // Se espera a que la tarjeta termine de dibujarse: en el Mercado la
+        // grilla se rehace cuando llega la respuesta filtrada, y entre un
+        // dibujo y el otro el boton no esta.
+        await esperarA(async () => (await disparador.count()) === 1,
+          `${pantalla}: la tarjeta de «${nombre}» no dibuja «Ver detalle»`, 20_000);
+
+        await disparador.click();
+        await esperarA(async () => (await page.locator('#detalle-titulo').count()) === 1,
+          `${pantalla}: no se abrio el detalle de «${nombre}»`, 20_000);
+        const capa = page.locator('[role="dialog"]').first();
+        assert(await dialogos() === 1,
+          `${pantalla}: con el detalle abierto hay ${await dialogos()} dialogos`);
+        assert(await focoDentroDe(capa),
+          `${pantalla}: el foco no entro en la capa, esta en ${await dondeEstaElFoco()}`);
+
+        if (forma === 'Escape') await page.keyboard.press('Escape');
+        else if (forma === 'X') await capa.getByRole('button', { name: 'Cerrar' }).click();
+        else await page.mouse.click(5, 5);
+
+        await esperarA(async () => (await dialogos()) === 0,
+          `${pantalla}: cerrar con ${forma} no cerro la capa`, 20_000);
+        await esperarA(() => focoEn(disparador),
+          `${pantalla}: cerrar con ${forma} dejo el foco en ${await dondeEstaElFoco()} y no en el `
+          + `«Ver detalle» de «${nombre}»`, 20_000);
+        cerradas.push(`${pantalla}/${forma}`);
+      }
+    };
+    await revisarElDetalle('Inicio', '/', activo);
+    await revisarElDetalle('Mercado', `/?section=marketplace&q=${encodeURIComponent(activo)}`, activo);
+    await revisarElDetalle('Servicios', '/?section=services', servicio);
+
+    // --- B. la pila: detalle -> perfil del vendedor -------------------------
+    // Control de lo que ya existia: un Escape cierra UN nivel, y el foco vuelve
+    // nivel por nivel.
+    await page.goto(`${FRONTEND_URL}/?section=services`, { waitUntil: 'domcontentloaded' });
+    const tarjetaDelServicio = page.locator('article').filter({ hasText: servicio }).first();
+    await tarjetaDelServicio.waitFor({ state: 'visible', timeout: 20_000 });
+    const verDetalle = tarjetaDelServicio.getByRole('button', { name: 'Ver detalle' });
+    await verDetalle.click();
+    await esperarA(async () => (await page.locator('#detalle-titulo').count()) === 1,
+      'no se abrio el detalle para la pila', 20_000);
+    const verPerfil = page.getByRole('button', { name: 'Ver perfil del vendedor' });
+    assert(await verPerfil.count() === 1, 'el detalle no ofrece el perfil del vendedor');
+    await verPerfil.click();
+    await esperarA(async () => (await dialogos()) === 2,
+      `con el perfil abierto hay ${await dialogos()} dialogos y tendria que haber 2`, 20_000);
+    const capaDelPerfil = page.locator('[role="dialog"]').last();
+    assert(await focoDentroDe(capaDelPerfil),
+      `el foco no entro en el perfil, esta en ${await dondeEstaElFoco()}`);
+    await page.keyboard.press('Escape');
+    await esperarA(async () => (await dialogos()) === 1,
+      'el primer Escape no cerro solo el perfil', 20_000);
+    await esperarA(() => focoEn(verPerfil),
+      `cerrar el perfil dejo el foco en ${await dondeEstaElFoco()}`, 20_000);
+    await page.keyboard.press('Escape');
+    await esperarA(async () => (await dialogos()) === 0,
+      'el segundo Escape no cerro el detalle', 20_000);
+    await esperarA(() => focoEn(verDetalle),
+      `cerrar el detalle dejo el foco en ${await dondeEstaElFoco()}`, 20_000);
+
+    // --- C. ADM-8: el detalle de orden es una capa y no atraviesa nada ------
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    const botonAdmin = page.getByRole('button', { name: 'Admin' });
+    await botonAdmin.click();
+    await page.getByRole('heading', { name: 'Panel de Administración' })
+      .waitFor({ timeout: 20_000 });
+    await page.getByRole('button', { name: 'Órdenes', exact: true }).click();
+    await page.locator('tbody tr').first().waitFor({ state: 'visible', timeout: 20_000 });
+
+    const pestanaActiva = async () => (await page
+      .locator('button[class*="_tab_"][class*="_active_"]').innerText()).replace(/\s+/g, ' ').trim();
+    const filtroDeOrdenes = page.getByLabel('Filtrar órdenes por estado');
+    const paginaQueDice = async () => (await page.locator('[class*="paginaActual"]').innerText())
+      .replace(/\s+/g, ' ').trim();
+    const contenido = page.locator('[class*="_content_"]').first();
+    const scrollDelPanel = () => contenido.evaluate((el) => el.scrollTop);
+    const numerosVisibles = async () => (await page.locator('tbody tr td:nth-child(1)')
+      .allInnerTexts()).map((t) => t.trim());
+
+    await filtroDeOrdenes.selectOption(ESTADO_DE_ORDEN);
+    const { data: filtradas } = await apiRequest(
+      `/admin/orders?page=1&page_size=20&status=${ESTADO_DE_ORDEN}`, { token });
+    assert(filtradas.total > 20,
+      `el caso necesita mas de una pagina con el filtro y hay ${filtradas.total} ordenes`);
+    await esperarA(async () => (await page.locator('[class*="pagination"]').innerText())
+      .includes(`Total: ${filtradas.total} órdenes`),
+    'el filtro de ordenes no llego a la pantalla', 20_000);
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/admin/orders')
+        && r.url().includes('page=2') && r.status() === 200, { timeout: 20_000 }),
+      page.getByRole('button', { name: 'Página siguiente de órdenes' }).click(),
+    ]);
+    await esperarA(async () => (await paginaQueDice()).startsWith('Página 2 de'),
+      'Órdenes no paso a la pagina 2', 20_000);
+
+    // Un desplazamiento real, con la rueda, para tener qué conservar.
+    await contenido.hover();
+    await page.mouse.wheel(0, 400);
+    await esperarA(async () => (await scrollDelPanel()) > 0,
+      'el panel no llego a desplazarse', 20_000);
+
+    const antes = {
+      pestana: await pestanaActiva(),
+      filtro: await filtroDeOrdenes.inputValue(),
+      pagina: await paginaQueDice(),
+      scroll: await scrollDelPanel(),
+      numeros: await numerosVisibles(),
+    };
+    assert(antes.numeros.length > 1,
+      `la pagina 2 del filtro trae ${antes.numeros.length} fila(s) y el caso necesita elegir una`);
+    // La fila del medio, identificada por SU numero de orden y no por posicion.
+    const laOrden = antes.numeros[Math.floor(antes.numeros.length / 2)];
+    const fila = page.locator('tbody tr').filter({ hasText: laOrden });
+    const verLaOrden = fila.getByRole('button', { name: /^Ver/ });
+
+    const revisarElDetalleDeOrden = async (forma) => {
+      await verLaOrden.click();
+      await esperarA(async () => (await dialogos()) === 2,
+        `con el detalle de la orden abierto hay ${await dialogos()} dialogo(s) y tendria que `
+        + 'haber 2: el panel y el detalle', 20_000);
+      const capaDeLaOrden = page.locator('[role="dialog"][aria-labelledby="titulo-de-la-orden"]');
+      assert(await capaDeLaOrden.count() === 1,
+        'el detalle de la orden no es una capa con nombre accesible');
+      const nombreAccesible = (await capaDeLaOrden.locator('#titulo-de-la-orden').innerText())
+        .replace(/\s+/g, ' ').trim();
+      assert(nombreAccesible.includes(laOrden),
+        `la capa se llama «${nombreAccesible}» y la orden abierta es ${laOrden}`);
+      assert((await capaDeLaOrden.getAttribute('aria-modal')) === 'true',
+        'el detalle de la orden no se declara modal');
+      assert((await page.evaluate(() => document.body.style.overflow)) === 'hidden',
+        'el fondo no quedo trabado con el detalle de la orden abierto');
+      assert(await focoDentroDe(capaDeLaOrden),
+        `el foco no entro en el detalle de la orden, esta en ${await dondeEstaElFoco()}`);
+
+      // La trampa: en los dos extremos el foco se queda adentro de la capa.
+      await page.keyboard.press('Tab');
+      assert(await focoDentroDe(capaDeLaOrden),
+        `Tab se escapo del detalle de la orden a ${await dondeEstaElFoco()}`);
+      await page.keyboard.press('Shift+Tab');
+      assert(await focoDentroDe(capaDeLaOrden),
+        `Shift+Tab se escapo del detalle de la orden a ${await dondeEstaElFoco()}`);
+
+      if (forma === 'Escape') await page.keyboard.press('Escape');
+      else if (forma === 'X') await capaDeLaOrden.getByRole('button', { name: 'Cerrar' }).click();
+      else await page.mouse.click(5, 5);
+
+      await esperarA(async () => (await dialogos()) === 1,
+        `cerrar con ${forma} dejo ${await dialogos()} dialogo(s): tenia que cerrar solo el `
+        + 'detalle de la orden', 20_000);
+      assert(await page.getByRole('heading', { name: 'Panel de Administración' }).count() === 1,
+        `cerrar el detalle con ${forma} cerro tambien Administracion`);
+      await esperarA(() => focoEn(verLaOrden),
+        `cerrar con ${forma} dejo el foco en ${await dondeEstaElFoco()} y no en el «Ver» de la `
+        + `orden ${laOrden}`, 20_000);
+
+      // Y el lugar donde estaba: pestaña, filtro, pagina, scroll y las filas.
+      assert((await pestanaActiva()) === antes.pestana,
+        `cerrar con ${forma} cambio la pestaña a «${await pestanaActiva()}»`);
+      assert((await filtroDeOrdenes.inputValue()) === antes.filtro,
+        `cerrar con ${forma} cambio el filtro a «${await filtroDeOrdenes.inputValue()}»`);
+      assert((await paginaQueDice()) === antes.pagina,
+        `cerrar con ${forma} cambio la pagina a «${await paginaQueDice()}»`);
+      assert((await scrollDelPanel()) === antes.scroll,
+        `cerrar con ${forma} movio el scroll de ${antes.scroll} a ${await scrollDelPanel()}`);
+      const ahora = await numerosVisibles();
+      assert(JSON.stringify(ahora) === JSON.stringify(antes.numeros),
+        `cerrar con ${forma} cambio las filas: ${JSON.stringify(ahora)}`);
+      assert(ahora.includes(laOrden),
+        `la orden ${laOrden} ya no esta en la lista despues de cerrar con ${forma}`);
+    };
+
+    for (const forma of ['Escape', 'X', 'fondo']) await revisarElDetalleDeOrden(forma);
+
+    // El segundo Escape —sin detalle abierto— sí cierra el panel, y el foco
+    // vuelve al boton que lo abrio.
+    await page.keyboard.press('Escape');
+    await esperarA(async () => (await dialogos()) === 0,
+      'el Escape sobre el panel sin capas encima no lo cerro', 20_000);
+    await esperarA(() => focoEn(botonAdmin),
+      `cerrar Administracion dejo el foco en ${await dondeEstaElFoco()}`, 20_000);
+
+    await contexto.close();
+    return `el detalle de una publicacion devuelve el foco a SU «Ver detalle» en las `
+      + `${cerradas.length} combinaciones de pantalla y forma de cerrar (${cerradas.join(', ')}); `
+      + 'la pila del perfil del vendedor cierra un nivel por Escape y devuelve el foco nivel por '
+      + `nivel; y el detalle de la orden ${laOrden} es la segunda capa —con nombre accesible, `
+      + 'foco adentro y Tab/Shift+Tab que no se escapan—, se cierra sola con Escape, X y fondo '
+      + `dejando Administracion abierta en «${antes.pestana}» con el filtro «${antes.filtro}», `
+      + `«${antes.pagina}», scroll ${antes.scroll} y las mismas ${antes.numeros.length} filas, y `
+      + 'recien el Escape siguiente cierra el panel y devuelve el foco al boton Admin';
+  } finally {
+    await browser.close();
+    await apiRequest('/cart', { method: 'DELETE', token: tokenComprador });
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 
