@@ -308,6 +308,37 @@ Reglas para aprovechar el modelo sin gastar de más:
 - si contradice a PM con evidencia, se evalúa la evidencia: no se fuerza la
   orden original por jerarquía.
 
+### Verificación proporcional al riesgo — regla permanente
+
+Calidad no significa repetir toda la suite dos veces después de cada cambio.
+La Dev y la PM tienen responsabilidades distintas:
+
+- **Dev, en cada entrega de producto:** conserva rojo previo, agrega regresión
+  discriminante, ejecuta los casos focales y una sola suite completa desde base
+  limpia, corre las puertas proporcionales y entrega SHA, salida y riesgos.
+- **PM, en cada entrega:** revisa informe y diff completo, reproduce el caso
+  nuevo desde base limpia y corre puertas estáticas rápidas. Elige además una
+  regresión vecina cuando el diff pueda afectarla. Esto sigue siendo revisión
+  independiente; dos corridas hechas sólo por Dev no lo serían.
+- **PM repite la suite completa** cuando hay dinero, autenticación, permisos,
+  órdenes, stock, migraciones, datos, seguridad, un cambio transversal de tres
+  o más recorridos, un rojo inesperado, cierre de fase/hito o preparación de
+  despliegue. También la repite al acumular tres entregas aceptadas desde su
+  última corrida completa.
+- **Cambio visual o UX aislado:** focal independiente, build/lint y puerta
+  visual pertinente. La suite completa de PM se amortiza al cerrar el lote.
+- Si la suite de Dev deja un único rojo atribuible al entorno y la base previa
+  ya estaba verde, PM puede ejecutar sólo ese caso y el caso nuevo. Debe
+  documentar la evidencia combinada y nunca afirmar que corrió una suite
+  completa que no corrió.
+- No se repite una puerta ya demostrada en el mismo SHA sin cambio relevante.
+  Ante evidencia ambigua, alcance transversal o riesgo alto, gana profundidad,
+  no ahorro.
+
+La comunicación a Emi se concentra en resultado, bloqueo o decisión. No se
+usan mensajes para narrar cada comando ni se pide confirmación entre pasos
+reversibles del mismo encargo.
+
 No usar elogios, personajes ni frases vagas como “mejoralo”, “pensalo bien” o
 “hacelo completo”. Opus responde mejor a una tarea específica con contexto y
 criterios verificables. El razonamiento alto ya está habilitado; no hace falta

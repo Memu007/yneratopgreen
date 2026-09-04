@@ -12,6 +12,77 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-04 — TAREA VIGENTE: FORM-DIRTY-1, cerrar no puede borrar trabajo sin aviso
+
+MODAL-LIFECYCLE-1 queda **aceptada** en producto/regresión `b07ebce` e informe
+`83f6985`. Revisé el diff. Dev obtuvo 147/148 con único rojo ambiental en 131;
+desde bases limpias PM reprodujo 148 y 131 en **1/1** cada uno. Build, lint,
+sintaxis, compileall, `pip check` dentro de la imagen real y `diff-check`
+quedaron verdes. La evidencia está en
+`docs/pm/REPRODUCCION-MODAL-LIFECYCLE-1-2026-09-04.md`.
+
+La siguiente pieza es **FORM-DIRTY-1**. La auditoría F3 confirmó que cinco
+recorridos pueden perder cambios por Escape, fondo, X, Cancelar, cambio de
+pestaña o cierre del panel: perfil de transportista, alta de publicación,
+edición de publicación, checkout y calificación. No es autosave ni persistencia
+de borradores; es una protección común contra cierres accidentales.
+
+### Resultado obligatorio
+
+1. Medí primero los cinco recorridos contra `b07ebce` y conservá evidencia roja
+   de al menos un cierre accidental real por recorrido. No supongas que todos
+   fallan de la misma forma.
+2. Definí suciedad contra el retrato inicial de cada formulario. Valores
+   precargados no cuentan como cambios; cambiar y volver exactamente al valor
+   inicial deja el formulario limpio. Imágenes/archivos agregados o retirados,
+   selecciones, checks y datos logísticos sí cuentan.
+3. Un formulario limpio cierra inmediatamente por todos sus caminos existentes,
+   sin confirmación. Uno sucio abre una única confirmación propia, accesible y
+   superior a la capa actual. No uses `window.confirm`, no crees otro gestor de
+   modales y no dupliques cinco implementaciones de la misma política.
+4. La confirmación ofrece dos decisiones inequívocas: seguir editando o
+   descartar cambios. Escape, X o fondo de esa confirmación equivalen a seguir
+   editando: cierran sólo la confirmación, conservan todos los valores y
+   devuelven foco al control que pidió cerrar. Descartar cierra la capa original
+   y devuelve foco a su disparador según la pila ya aceptada.
+5. Cubrí todos los caminos destructivos reales, incluidos Cancelar y cierre del
+   panel/cambio de pestaña cuando el formulario vive dentro de Mi cuenta. Una
+   acción en curso no puede terminar en doble envío ni estado parcial por una
+   confirmación tardía.
+6. En checkout distinguí estado local de estado persistido: antes de crear las
+   órdenes, dirección, traslado y medio elegidos son trabajo descartable y se
+   protegen. Después de crear una orden no la llames «cambios sin guardar» ni la
+   ocultes; sólo un archivo local todavía no enviado sigue siendo pérdida real.
+   La recuperación de transferencia ya aceptada debe conservarse.
+
+### Regresión discriminante
+
+Agregá un caso 149 autónomo sobre la UI real que:
+
+- recorra los cinco formularios limpios y demuestre que cierran sin diálogo;
+- haga un cambio real distinto en cada uno y reparta entre ellos Escape, X,
+  fondo, Cancelar, cambio de pestaña y cierre del panel;
+- compruebe que la confirmación es la capa superior, atrapa foco y que cancelar
+  el descarte conserva valores y devuelve foco al intento de cierre;
+- confirme el descarte, compruebe que cierra una sola capa y que al reabrir no
+  reaparece el borrador descartado;
+- cambie y revierta un valor para demostrar que el estado vuelve a limpio;
+- en checkout cubra antes y después de crear la orden sin crear duplicados ni
+  perder la salida recuperable de transferencia.
+
+No uses esperas fijas. Corré 149 aislado y una sola suite completa esperada en
+**149/149** desde base limpia, más build, lint, `node --check`, compileall,
+`pip check`, a11y, contraste y `diff-check` real contra `b07ebce`.
+
+No cambies validaciones de alta/edición, fuente de ubicación, estrellas,
+persistencia de calificaciones, navegación/History API, Backend, modelos,
+migraciones, seed, pagos, BOEDA, estilos generales, Railway ni datos remotos;
+no despliegues. Si proteger checkout exige cambiar el contrato de una orden ya
+creada, frená y consultá. Producto/regresión e informe en commits separados,
+subí y frená para revisión PM.
+
+---
+
 ## 2026-09-04 — TAREA VIGENTE: MODAL-LIFECYCLE-1, cerrar la capa correcta sin perder el lugar
 
 NAV-URL-1 queda **aceptada** en producto/regresión `bcdd448` e informe

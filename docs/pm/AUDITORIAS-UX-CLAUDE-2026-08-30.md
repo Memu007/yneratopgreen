@@ -133,9 +133,10 @@ Debe quitarse la acción/promesa o darle una conducta real, sin inventar planes.
   pueden describir sólo la página descargada. Se cierra con
   `ux2c/DEUDA-PAGINACION.md`, no como parche aislado.
 - B4 (detalle e historial) quedó cerrado en NAV-URL-1: el primer Atrás cierra
-  el detalle y conserva sección/filtros. C1 (foco al cerrar), C2 (N+1 de
-  imágenes) y C3 (doble fuente de ubicación) siguen en el inventario
-  `acbf3b6`.
+  el detalle y conserva sección/filtros. C1 quedó cerrado en
+  MODAL-LIFECYCLE-1: el detalle devuelve foco al disparador exacto en las tres
+  superficies y por las tres formas de cierre. C2 (N+1 de imágenes) y C3
+  (doble fuente de ubicación) siguen en el inventario `acbf3b6`.
 
 ## Auditoría 2 — formularios y recorridos operativos
 
@@ -354,10 +355,11 @@ propia sin cambiar reglas de eliminación; cancelar no debe escribir.
 
 ### ADM-8 — Escape en detalle de orden cierra el panel completo
 
-**Dictamen PM:** respaldado por jerarquía de capas, P2 a reproducir.  
-El panel tiene `useCapaModal`, pero el detalle de orden no; Escape alcanza el
-cierre global. El primer Escape debe cerrar sólo la capa superior y conservar
-la pestaña/posición; el segundo puede cerrar el panel.
+**Dictamen PM:** cerrado en `b07ebce`/`83f6985`.  
+El detalle de orden reutiliza `useCapaModal` como segunda capa. PM reprodujo el
+caso 148 en 1/1: primer Escape conserva panel, filtro, página y scroll y devuelve
+foco a la fila exacta; segundo Escape cierra el panel. Evidencia en
+`REPRODUCCION-MODAL-LIFECYCLE-1-2026-09-04.md`.
 
 ### ADM-9 — el reset manual documentado no es operable desde el panel
 

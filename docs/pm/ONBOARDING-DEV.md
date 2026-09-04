@@ -103,11 +103,27 @@ lo podés resolver sola: si está apagado, avisale a Emi.
 npm run smoke
 ```
 
-Veinte casos contra arranque limpio: API, base de datos y navegador real
-con Chromium. **Es la red de seguridad del proyecto.** Verificamos que
-falla de verdad rompiendo un caso a propósito.
+La suite vigente contra arranque limpio cubre API, base de datos y navegador
+real con Chromium. **Es la red de seguridad del proyecto.** El total crece con
+cada regresión; no copies un número fijo desde este onboarding.
 
 Regla: **si tocaste algo y no corriste el smoke, no terminaste.**
+
+Por cada entrega de producto:
+
+1. conservá el rojo previo que distingue el defecto;
+2. corré el caso nuevo aislado durante el desarrollo;
+3. hacé una auto-revisión del diff completo contra el SHA base y retirá
+   cambios fuera de alcance;
+4. al final corré una sola suite completa desde base limpia y las puertas
+   proporcionales; no dupliques la corrida para aparentar independencia;
+5. informá SHA, focal, total, únicos rojos y entorno. Si un caso falla por el
+   entorno, no lo ocultes ni repitas todo sin diagnóstico: aislalo y dejá a PM
+   la reproducción independiente.
+
+La PM siempre revisa el diff y reproduce el caso nuevo. Repite toda la suite
+según riesgo, hitos y cadencia; esa separación conserva independencia sin
+gastar dos corridas completas en cada cambio aislado.
 
 ---
 

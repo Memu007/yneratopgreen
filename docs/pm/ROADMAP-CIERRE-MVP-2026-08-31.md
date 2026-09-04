@@ -50,8 +50,11 @@ final, como acordó Emi.
 - NAV-URL-1 quedó aceptada en `bcdd448`/`aeafc13`: PM verificó el caso 147
   aislado en **1/1** y la suite completa en **147/147**, más puertas estáticas.
   A1, A2, A3, A8 y B4 quedan cerrados sin librería de routing.
-- Tarea única vigente: **MODAL-LIFECYCLE-1**, detallada en `PARA-DEV.md`.
-  Reproduce C1 antes de tocarlo y cierra ADM-8 con la pila modal ya existente.
+- MODAL-LIFECYCLE-1 quedó aceptada en `b07ebce`/`83f6985`: Dev obtuvo 147/148
+  con único rojo ambiental en 131; PM reprodujo 148 y 131 por separado en
+  **1/1** cada uno, más puertas estáticas. C1 ya estaba cerrado y ADM-8 entra en
+  la pila modal existente.
+- Tarea única vigente: **FORM-DIRTY-1**, detallada en `PARA-DEV.md`.
 - ORD-SELF-1 no cierra ningún hallazgo de las tres auditorías; era la tarea P1
   anterior y las auditorías la excluyeron expresamente.
 - La historia de las devoluciones del arnés y su cierre reproducido queda en
@@ -64,7 +67,9 @@ final, como acordó Emi.
 1. Una sola tarea de producto activa. Nada de entregar la auditoría completa a
    Dev como megaterea.
 2. Cada bloque necesita defecto reproducido o prueba roja, corrección mínima,
-   regresión discriminante, suite completa y revisión adversarial de PM.
+   regresión discriminante, suite completa de Dev y revisión adversarial de PM.
+   La repetición completa de PM sigue el riesgo y la cadencia definidos en
+   `ONBOARDING-PM.md`; la PM siempre reproduce el caso nuevo.
 3. Un informe o una prueba que no mida su afirmación no habilita aceptación.
 4. No se despliega una mejora por estar verde en local. Railway descartable,
    homologación MP y producción tienen puertas propias.
@@ -104,8 +109,8 @@ edición, no a inventar una migración destructiva.
 | Orden | Pieza | Auditoría cubierta | Cierre mínimo |
 |---:|---|---|---|
 | 7 | **NAV-URL-1 — cerrada** | A1, A2, A3, A8 y B4 | Aceptada en `bcdd448`/`aeafc13`: cinco URL estables, `popstate`, rutas especiales y detalle coherentes; PM cerró 147/147. |
-| 8 | **MODAL-LIFECYCLE-1 — vigente** | C1 y ADM-8 | Cierra primero la capa superior, restaura foco al disparador y conserva pestaña/posición del panel. |
-| 9 | **FORM-DIRTY-1** | F3 general | Formularios largos sucios confirman antes de perderse; los intactos cierran sin fricción. |
+| 8 | **MODAL-LIFECYCLE-1 — cerrada** | C1 y ADM-8 | Aceptada en `b07ebce`/`83f6985`: cierra primero la capa superior, restaura foco al disparador y conserva pestaña/posición del panel. |
+| 9 | **FORM-DIRTY-1 — vigente** | F3 general | Formularios largos sucios confirman antes de perderse; los intactos cierran sin fricción. |
 
 No se corrige cada síntoma con otro `pushState` o listener local: NAV-URL-1
 tiene una sola política de navegación y una sola regresión matriz.
