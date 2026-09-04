@@ -12,6 +12,71 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-04 — TAREA VIGENTE: NAV-URL-1, una sola política de navegación e historial
+
+ADMIN-STATE-1 queda **aceptada** en producto/regresión `49445fc` e informes
+`2f721cc`/`3dac058`. Revisé el cambio y el caso 146. Desde bases limpias ejecuté
+el caso aislado en **1/1** y la suite oficial completa en **146/146**; el 131
+pasó. Lint, `node --check`, compileall, `pip check` y `diff-check` quedaron
+verdes. La evidencia está en
+`docs/pm/REPRODUCCION-ADMIN-STATE-1-2026-09-04.md`.
+
+La siguiente pieza es **NAV-URL-1**. Hoy `handleNavigate` usa `replaceState`
+para toda navegación, sólo serializa Mercado y conserva el `pathname` de rutas
+especiales; no existe una escucha global de `popstate`. Por eso una sección no
+siempre se puede compartir/recargar, Atrás puede salir del sitio o desincronizar
+URL y vista, y con un detalle abierto no cierra primero la capa visible.
+
+### Resultado obligatorio
+
+1. Definí una sola política canónica y mínima para leer, escribir y restaurar
+   navegación con la History API nativa. No agregues una librería de routing ni
+   listeners aislados por componente.
+2. Las cinco secciones públicas deben tener representación estable:
+   `/` para Inicio y `?section=marketplace|services|about|contact` para las
+   otras cuatro. Un enlace directo, una recarga y Atrás/Adelante deben mostrar
+   la misma sección que declara la URL.
+3. La navegación deliberada entre ubicaciones lógicas distintas usa historial
+   real y no crea duplicados al elegir la ubicación ya activa. Al restaurar una
+   entrada de Mercado, deben restaurarse también sus filtros desde la URL; no
+   alcanza con cambiar la pestaña o el buscador dibujado.
+4. Al salir mediante Header o CTA de `/payment/success`, `/payment/failure`,
+   `/payment/pending` o `/verificar-correo`, normalizá el `pathname` a `/` y la
+   sección elegida. Recargar después no debe revivir la pantalla especial.
+5. Abrir el detalle de una publicación desde Inicio, Mercado o Servicios debe
+   crear una entrada coherente: el primer Atrás cierra el detalle y conserva
+   sección, filtros y listado. Cerrar con la propia UI no debe dejar una entrada
+   fantasma que obligue a cerrar dos veces o saque después al usuario del sitio.
+6. Conservá intactos los significados actuales de filtros y resultados de
+   Mercado Pago. Esta tarea no corrige foco de modal, formularios sucios,
+   estilos, copy, estados administrativos ni responsive.
+
+### Regresión discriminante
+
+Agregá un caso 147 autónomo que, usando la UI y no sólo funciones internas:
+
+- recorra Inicio → Mercado → Servicios → Quiénes somos → Contacto, use
+  `goBack()`/`goForward()` y contraste simultáneamente sección visible y URL;
+- abra directamente y recargue las cinco URL canónicas;
+- aplique filtros reales en Mercado, salga y vuelva con Atrás, y compruebe URL,
+  controles y resultados restaurados;
+- entre a cada ruta especial, salga por navegación real, recargue y confirme
+  que no reaparece;
+- abra un detalle desde Inicio, Mercado y Servicios y compruebe que el primer
+  Atrás cierra sólo el detalle sin perder el contexto.
+
+Antes de corregir, conservá en `PARA-PM.md` evidencia roja contra `49445fc` de
+los cinco bordes. La prueba espera condiciones de URL/DOM/red; no usa pausas
+fijas. Después corré 147 aislado y la suite completa esperada en **147/147**
+desde bases limpias, más build, lint, `node --check`, compileall, `pip check` y
+`diff-check` real contra `49445fc`.
+
+No cambies Backend, modelos, migraciones, seed, autenticación, pagos, BOEDA,
+Railway ni datos remotos; no despliegues. Producto/regresión e informe en
+commits separados, subí y frená para revisión PM.
+
+---
+
 ## 2026-09-04 — TAREA VIGENTE: ADMIN-STATE-1, ninguna acción de estado puede ser falsa
 
 ADMIN-PAGE-1 queda **aceptada** en producto/regresión `fe2b151`, corrección

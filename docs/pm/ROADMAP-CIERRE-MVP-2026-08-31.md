@@ -43,9 +43,12 @@ final, como acordó Emi.
 - ADMIN-PAGE-1 quedó aceptada en `fe2b151`/`6cc67b7`, con informes
   `f25a57c`/`3b13271`: PM verificó el caso 145 aislado y la suite completa en
   **145/145**, más puertas estáticas.
-- Tarea única vigente: **ADMIN-STATE-1**, detallada en `PARA-DEV.md`. Corrige
-  el selector de estado por fila que todavía ofrece `draft` —rechazado por el
-  Backend— y omite `sold_out`; no reabre la paginación.
+- ADMIN-STATE-1 quedó aceptada en `49445fc`, con informes
+  `2f721cc`/`3dac058`: PM verificó el caso 146 aislado en **1/1** y la suite
+  completa en **146/146**, más puertas estáticas. La traducción visual de
+  `sold_out` y las referencias muertas a `draft` quedan separadas.
+- Tarea única vigente: **NAV-URL-1**, detallada en `PARA-DEV.md`. Cierra en una
+  sola política A1, A2, A3, A8 y B4; no abre modal, formularios ni rediseño.
 - ORD-SELF-1 no cierra ningún hallazgo de las tres auditorías; era la tarea P1
   anterior y las auditorías la excluyeron expresamente.
 - La historia de las devoluciones del arnés y su cierre reproducido queda en
@@ -87,7 +90,7 @@ habilitada como puerta de las tareas de producto.
 | 4 | **SERVICE-STATE-1 — cerrada** | F1 | Aceptada en `a038b56`/`bad5a1b`: mapeador único, servicio estable y control de producto agotado; PM cerró 143/143. |
 | 5 | **ADMIN-ACTIONS-1 — cerrada** | ADM-1, ADM-5; ADM-R1/R2/R3 | Aceptada en `edf3cb5`/`6441a49`/`446bb30`: PUT real, acciones con nombre y tres mutaciones peligrosas bloqueadas; PM cerró con dos repeticiones 144/144. |
 | 6 | **ADMIN-PAGE-1 — cerrada** | ADM-2 | Aceptada en `fe2b151`/`6cc67b7`: las tres listas paginan en servidor, filtran sin carreras y PM cerró 145/145. |
-| 6B | **ADMIN-STATE-1 — vigente** | Borde operativo de ADM-1 | El selector por fila ofrece exactamente los cuatro estados reales y cada acción persiste sin error. |
+| 6B | **ADMIN-STATE-1 — cerrada** | Borde operativo de ADM-1 | Aceptada en `49445fc`/`2f721cc`/`3dac058`: selector exacto, acciones reales y persistencia; PM cerró 146/146. |
 
 Esta puerta va antes del pulido: transferencia y administración forman parte de
 la operación prometida. Los riesgos ADM-R1/R2/R3 pueden obligar a bloquear una
@@ -97,7 +100,7 @@ edición, no a inventar una migración destructiva.
 
 | Orden | Pieza | Auditoría cubierta | Cierre mínimo |
 |---:|---|---|---|
-| 7 | **NAV-URL-1** | A1, A2, A3, A8 y B4 | URL compartible por sección, `popstate`, rutas especiales normalizadas y Atrás coherente incluso con detalle abierto. |
+| 7 | **NAV-URL-1 — vigente** | A1, A2, A3, A8 y B4 | URL compartible por sección, `popstate`, rutas especiales normalizadas y Atrás coherente incluso con detalle abierto. |
 | 8 | **MODAL-LIFECYCLE-1** | C1 y ADM-8 | Cierra primero la capa superior, restaura foco al disparador y conserva pestaña/posición del panel. |
 | 9 | **FORM-DIRTY-1** | F3 general | Formularios largos sucios confirman antes de perderse; los intactos cierran sin fricción. |
 
@@ -125,7 +128,7 @@ manual ya prevista; no se abre un módulo de tokens nuevo.
 |---:|---|---|---|
 | 16 | **QUOTE-CONTACT-1** | A4 y A5 | Contacto no afirma un envío que no conoce y una cotización conserva publicación/vendedor en asunto y texto. |
 | 17 | **FILTER-INTENT-1** | A6, A9 y, si se reproduce, R6 | Filtros URL inválidos no simulan cero resultados; Login retoma publicar/comprar con la puerta existente. |
-| 18 | **COPY-CLEAR-1** | A7, A10, F4 y F12 | Emi decide wordmark→Inicio; Buscar hace algo real o desaparece; se retiran planes inexistentes, se unifica voseo y se informa soporte sin prometer recuperación automática. |
+| 18 | **COPY-CLEAR-1** | A7, A10, F4 y F12; deuda ADMIN-STATE-1 | Emi decide wordmark→Inicio; Buscar hace algo real o desaparece; se retiran planes inexistentes, se unifica voseo, se informa soporte sin prometer recuperación automática y los estados visibles quedan en es-AR sin ramas `draft` muertas. |
 
 Son mejoras de claridad, no autorización para mensajería, planes, suscripciones
 o un rediseño nuevo.

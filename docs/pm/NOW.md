@@ -8,26 +8,30 @@ Actualizado: 2026-09-04.
   editó `docs/pm/`; no escribió código de producto, no desplegó y no tocó
   Railway, pagos ni datos remotos.
 - **Git al cerrar la revisión:** `main` y `origin/main` estaban limpios e
-  iguales en `4ad44a2`, commit que dejó la aceptación y la tarea siguiente. La
+  iguales en `3dac058`, última entrega de Dev antes de la aceptación PM. La
   próxima PM debe volver a comprobar estado y actualizar antes de actuar, como
   exige `ONBOARDING-PM.md`.
 - **Calendario contractual:** el 04/09 empieza la semana 3 y la Fase 2 —
   Desarrollo base—, prevista hasta el 24/09. El producto sigue adelantado
   funcionalmente; eso no autoriza producción ni adelanta el hito final.
-- **Última aceptación:** ADMIN-PAGE-1 quedó aceptada en `fe2b151`/`6cc67b7`,
-  con informes `f25a57c`/`3b13271`. PM revisó los diffs y reprodujo desde bases
-  limpias el caso 145 aislado en **1/1** y la suite completa en **145/145**. El
-  caso 131 pasó; lint, sintaxis, compileall, `pip check` y `diff-check` también.
-  La evidencia está en `REPRODUCCION-ADMIN-PAGE-1-2026-09-03.md`.
-- **Única tarea activa de Dev:** ADMIN-STATE-1, escrita al comienzo de
-  `PARA-DEV.md`. Corrige sólo el selector de estado por fila que ofrece
-  `draft` —el Backend lo rechaza— y omite `sold_out`; agrega el caso 146 sobre
-  el control real. No abre Backend, navegación, BOEDA, pagos ni despliegue.
+- **Última aceptación:** ADMIN-STATE-1 quedó aceptada en producto/regresión
+  `49445fc`, con informes `2f721cc`/`3dac058`. PM revisó los diffs, reprodujo el
+  caso 146 aislado en **1/1** y la suite oficial completa en **146/146** desde
+  bases limpias. El caso 131 pasó; lint, sintaxis, compileall, `pip check` y
+  `diff-check` también. La evidencia está en
+  `REPRODUCCION-ADMIN-STATE-1-2026-09-04.md`.
+- **Única tarea activa de Dev:** NAV-URL-1, escrita al comienzo de
+  `PARA-DEV.md`. Unifica la política de URL e historial, hace compartibles las
+  cinco secciones, restaura sección/filtros con Atrás y Adelante, normaliza la
+  salida de rutas especiales y hace que Atrás cierre primero un detalle.
+- **Deuda separada, no vigente:** la celda administrativa todavía muestra
+  `sold_out` crudo y sin color propio; además quedan dos referencias muertas a
+  `draft`. Se incorpora a la futura claridad/estados en español y no invalida
+  la corrección operativa ya aceptada.
 - **Próxima acción:** esperar la respuesta de Dev. Cuando Emi diga
-  «respondió», actualizar, leer el último `PARA-PM.md`, revisar los commits y
-  reproducir primero el caso 146 y después la suite completa esperada en
-  **146/146**. Si cruza la puerta, aceptar ADMIN-STATE-1 y recién entonces abrir
-  NAV-URL-1 según `ROADMAP-CIERRE-MVP-2026-08-31.md`.
+  «respondió», actualizar, revisar primero la evidencia roja de NAV-URL-1 y los
+  diffs, ejecutar el caso 147 aislado y luego la suite completa esperada en
+  **147/147**. No desplegar.
 
 ## Relevo inmediato — leer primero
 
