@@ -2,168 +2,230 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ADMIN-STATE-1 — el selector de cada fila ofrece los estados que existen
+## NAV-URL-1 — una sola política de navegación, y la barra dice qué se mira
 
 Hecho. Producto/regresión e informe en commits separados. **No desplegué.**
 
-- Producto/regresión: `49445fc` — «ADMIN-STATE-1: el selector de cada fila
-  ofrece los estados que existen»
-- La suite pasa a **146 casos**.
-
-El producto es una línea. Lo que llevó trabajo fue que el caso 146 no se pueda
-cumplir de casualidad, así que empiezo por ahí.
+- Producto/regresión: `bcdd448` — «NAV-URL-1: una sola politica de navegacion,
+  y la barra dice que se mira»
+- La suite pasa a **147 casos**.
 
 ---
 
-### 1. El cambio
+### 1. El rojo primero: los cinco bordes contra `49445fc`
 
-```diff
--                            <option value="draft">Borrador</option>
-+                            <option value="sold_out">Agotado</option>
-```
-
-Los cuatro valores del selector de fila quedan `active`, `paused`, `sold_out`,
-`deleted`: los mismos del modelo y los mismos del filtro de la barra.
-
-### 2. El caso 146, parte por parte
-
-**El dominio no está escrito a mano.** Lo saco de dos lugares que tienen que
-coincidir, y si no coinciden el caso se planta antes de medir nada:
+Antes de tocar nada medí el estado con una sonda de cinco bloques
+independientes —cada uno con su propio `try/catch`, porque el caso 147 se
+detiene en el primer rojo y vos pediste los cinco—. Son las mismas
+comprobaciones que después quedaron en el caso. Contra el producto de
+`49445fc`:
 
 ```
-ProductStatus (backend/app/models/product.py) → active, paused, sold_out, deleted
-pg_enum 'productstatus' (la base)             → ACTIVE, PAUSED, SOLD_OUT, DELETED
+[ROJO] 1. las cinco secciones y el historial
+       recorrido a services: la pantalla es services y la barra dice «/» en vez
+       de «/?section=services»
+[ROJO] 2. las cinco URL canonicas, abiertas y recargadas
+       enlace directo a /?section=services: se esperaba services y hay «Equipos,
+       insumos y servicios para seguir produciendo.» con la barra en
+       «/?section=services»
+[ROJO] 3. los filtros del Mercado vuelven con su entrada
+       salir del Mercado filtrado: la pantalla es services y la barra dice
+       «/?q=trigo&type=productos» en vez de «/?section=services»
+[ROJO] 4. las pantallas de llegada no reviven
+       salir de /payment/success por la cabecera: la pantalla es home y la barra
+       dice «/payment/success» en vez de «/»
+[ROJO] 5. el detalle es una capa y no una ubicacion
+       home despues de cerrar con Atras: la barra dice «/?section=contact» en
+       vez de «/»
 ```
 
-**Enumera todo, no una opción elegida a mano.** Recorre las opciones de *cada*
-selector de *cada* fila dibujada —veinte filas— y falla en las dos direcciones:
-por una opción que el dominio no admite y por una del dominio que falte. Si
-mañana alguien agrega una opción inventada, o borra una válida, el caso la
-encuentra solo.
-
-**Acciona el control real.** Cuatro publicaciones efímeras propias, una por
-estado. Por cada cambio: se elige la opción en el selector de la fila, se espera
-**ese** `PATCH`, se comprueba que el cuerpo que salió pide el estado que se
-eligió y que la respuesta es 200, y recién después se espera —por condición, no
-por tiempo— a que la celda de Estado cambie. Son cinco cambios y no cuatro: la
-publicación que tiene que terminar activa ya nace activa, y elegir el valor que
-ya tiene no dispara nada, así que pasa por otro estado y vuelve.
-
-**Y después recarga.** Vuelve a entrar al panel desde cero —`goto`, Admin,
-Productos— y para cada publicación compara tres cosas que tienen que decir lo
-mismo: la celda de Estado, el valor del selector de esa fila y `products.status`
-en la base.
-
-**Por qué «Borrador» no podía estar.** Medido contra el servidor levantado,
-sobre una publicación del propio caso:
+El borde 1 se entiende mejor con el recorrido crudo, medido antes de corregir:
 
 ```
-PATCH /admin/products/{id}/status  {"status":"draft"}  -> 400 «Estado inválido: draft»
-   y products.status queda igual: ACTIVE antes, ACTIVE después
+click «Mercado»          url=/?section=marketplace   pantalla=marketplace
+click «Servicios»        url=/                       pantalla=services
+click «Quiénes somos»    url=/                       pantalla=about
+click «Contacto»         url=/                       pantalla=contact
+goBack 1                 url=about:blank             (fuera del sitio)
+goBack 2                 url=about:blank
 ```
 
-### 3. Rojo y verde
+Cuatro clics y **una sola entrada**: como todo se escribía con `replaceState`,
+el primer Atrás no volvía a la sección anterior, se iba del sitio.
 
-El rojo natural, con el caso nuevo sobre el árbol de `6cc67b7`:
+Y el 5, en palabras: el detalle no tenía entrada propia, así que el primer Atrás
+no lo cerraba —se iba a la entrada anterior, que en la sonda es
+`/?section=contact`— y se llevaba puestos sección, filtros y listado. Que el
+detalle «se cerrara» era un efecto de que la página entera se desmontaba.
 
-```
-[FAIL] 146 … — el selector de la fila ofrece estados que ProductStatus no tiene:
-  ["draft"] (ofrece ["active","paused","draft","deleted"],
-  el dominio es ["active","paused","sold_out","deleted"])
-```
+### 2. La política, en tres reglas
 
-Ese rojo prueba una sola de las dos direcciones, así que rompí a propósito las
-otras dos comprobaciones. Las tres mutaciones son locales, ya revertidas, y
-ninguna está en el commit:
-
-| Mutación | Resultado |
-| --- | --- |
-| dejar `draft` en el selector (el estado anterior) | rojo: «ofrece estados que ProductStatus no tiene: ["draft"]» |
-| sacar la opción `sold_out` del selector | rojo: «no ofrece estados del dominio: ["sold_out"]» |
-| en el Backend, `update_product_status` sin `db.commit()` | rojo a los 22 s: «la celda de Estado de «Est146 … active» no quedó en «paused» tras accionar el control; muestra «active»» |
-
-La tercera es la que me importaba: con ella el `PATCH` **contesta 200 igual**, y
-el caso se pone rojo lo mismo porque no quedó nada guardado. O sea que la parte
-de persistencia no se cumple con una respuesta exitosa: se cumple si la base
-cambió.
-
-Con la corrección puesta, verde:
+Dos archivos nuevos y ningún router:
 
 ```
-[PASS] 146 … — cada fila de Publicaciones ofrece exactamente los 4 estados de
-  ProductStatus (active, paused, sold_out, deleted), los mismos que el tipo de la
-  base, y ninguna ofrece «draft», que el servidor rechaza con 400 sin cambiar
-  nada; los 5 cambios se hicieron con el control real —un PATCH por vez, todos
-  200— y tras volver a entrar al panel las 4 publicaciones muestran en su celda
-  de Estado lo que guardó la base: active, paused, sold_out, deleted
+src/navegacion/politica.ts     funciones puras: qué dice la barra y cómo se escribe
+src/navegacion/navegacion.ts   el ÚNICO que escribe historial y el ÚNICO `popstate`
 ```
 
+1. **Ir a otra ubicación es una entrada de verdad** (`pushState`). Elegir la que
+   ya está no agrega nada.
+2. **Salir de una pantalla de llegada reemplaza su entrada.** `/payment/*` y
+   `/verificar-correo` son resultados de un trámite: se llega, se leen y se
+   sale. Como la URL canónica siempre cuelga de `/`, el `pathname` se normaliza
+   solo, sin que ninguna pantalla tenga que acordarse.
+3. **Una capa visible no es una ubicación.** El detalle abre una entrada más
+   sobre la misma URL, marcada en el estado de la entrada. Por eso el primer
+   Atrás lo cierra sin llevarse nada, y cerrarlo con la interfaz **consume** esa
+   entrada —`history.back()`— en vez de dejarla colgada.
+
+La gramática de la barra: `/` para Inicio y
+`?section=marketplace|services|about|contact` para las otras cuatro. Los filtros
+viajan **sólo** con el Mercado y en orden fijo, así la misma búsqueda da siempre
+la misma URL.
+
+Lo que cambió alrededor:
+
+- `useProductFilters` **relee la barra** cuando la mueve el historial —antes la
+  leía una sola vez, al montar— y **escribe sólo desde el Mercado**: `q=trigo`
+  ya no se cuela en la URL de Contacto.
+- `ProductCard` dejó de guardar su propio `showDetail`: pide abrir y cerrar la
+  capa. No escucha nada; el oyente sigue siendo uno solo.
+- `VerifyEmailPage` dejó de escribir el historial al salir: eran dos escrituras
+  para el mismo paso. Su otra escritura —sacar el token de la barra apenas se
+  lee— se queda, porque eso no es navegación: es no dejar un secreto a la vista.
+
+### 3. Tres decisiones que tomé yo, para que las revises
+
+1. **El detalle no va en la URL.** Pediste representación estable para las cinco
+   secciones; el detalle es una capa sobre una de ellas. Ponerle
+   `?publicacion=<id>` prometería un enlace profundo que hoy no se puede
+   cumplir: Inicio y Servicios sólo tienen cargadas las publicaciones de su
+   vista previa, así que buena parte de esos enlaces abriría la sección sin el
+   detalle. Si querés enlaces al detalle es otra tarea, y necesita traer la
+   publicación por id.
+2. **Salir de una pantalla de llegada la saca del historial.** Pediste que
+   recargar no la reviva; elegí además que Atrás tampoco vuelva a ella, porque
+   es un resultado ya leído y volver a anunciarlo confunde. Si lo querés al
+   revés, es una línea.
+3. **Los filtros siguen escribiéndose con `replaceState`.** Una entrada por
+   tecla haría inusable el Atrás. La entrada del Mercado guarda los filtros que
+   había al irse, que es exactamente lo que hay que restaurar al volver.
+
+### 4. El verde
+
+La misma sonda, con la corrección puesta:
+
 ```
- scripts/smoke.mjs                        | 205 +++++++++++++++++++++++++++
- src/components/AdminPanel/AdminPanel.tsx |   2 +-
+[VERDE] 1. las cinco secciones y el historial
+[VERDE] 2. las cinco URL canonicas, abiertas y recargadas
+[VERDE] 3. los filtros del Mercado vuelven con su entrada
+[VERDE] 4. las pantallas de llegada no reviven
+[VERDE] 5. el detalle es una capa y no una ubicacion
 ```
 
-### 4. Puertas
+Y el caso 147, que es lo que queda versionado. Contrasta **al mismo tiempo** las
+tres cosas que pueden discrepar —lo dibujado, la celda que marca la cabecera y
+la barra—, porque mirar una sola dejaba pasar justo lo que fallaba: con el
+producto viejo, la pantalla decía Servicios y la barra decía `/`.
 
 ```
-base limpia + SMOKE_CASOS=146                   1/1
-base limpia + suite completa                    145/146   (131 rojo)
+[PASS] 147 — las cinco secciones publicas se dicen en la barra —«/» y
+  «?section=…»—, el recorrido por la cabecera deja cuatro entradas de verdad que
+  Atras y Adelante recorren con la pantalla y la celda marcada, elegir la
+  seccion activa no agrega ninguna, las cinco URL canonicas abren y recargan en
+  su seccion, el Mercado filtrado vuelve con Atras a
+  «/?section=marketplace&q=Nav147+publicacion+…&type=productos» con el buscador,
+  el tipo y su unico resultado, las cuatro pantallas de llegada normalizan el
+  pathname al salir y no reviven al recargar, y el detalle abierto desde Inicio,
+  Servicios y el Mercado se cierra con el primer Atras sin perder seccion ni
+  filtros, sin dejar entrada fantasma cuando se cierra con Escape
+```
+
+Dos detalles del caso que conviene que sepas: se publica un producto y un
+servicio propios, así el detalle se abre sobre publicaciones conocidas en las
+tres pantallas y el filtro del Mercado deja un único resultado que se puede
+nombrar; y de las cuatro pantallas de llegada, dos se abandonan por la cabecera
+y dos por el CTA, que son los dos caminos que pediste.
+
+```
+ scripts/smoke.mjs                          | 272 +++++++++++++++++++++++++
+ src/App.tsx                                | 169 ++++++++----------
+ src/components/Pages/VerifyEmailPage.tsx   |  13 +-
+ src/components/ProductCard/ProductCard.tsx |  24 ++-
+ src/hooks/useProductFilters.ts             |  54 +++++-
+ src/navegacion/navegacion.ts               | 136 +++++++++++++
+ src/navegacion/politica.ts                 | 116 ++++++++++++
+```
+
+### 5. Puertas
+
+```
+base limpia + SMOKE_CASOS=147                   1/1
+base limpia + suite completa                    146/147   (131 rojo)
 npm run build                                   ok
 npm run lint                                    ok (--max-warnings 0)
 node --check scripts/smoke.mjs                  ok
 python -m compileall backend/app                ok
 python -m pip check                             ok
 git -c core.whitespace=cr-at-eol diff --check   limpio
+npm run a11y -- --todas                         64/64 pantallas, 0 bloqueantes
+npm run contraste                               52 mediciones, ninguna por debajo
+npm run hito                                    6/6 pasos encadenados
 ```
+
+Las tres últimas no las pediste; las corrí igual porque esto toca el armazón de
+la aplicación y las tres pantallas que dibujan tarjetas.
 
 El **131** volvió a fallar acá por lo de siempre: el puente de mi entorno sólo
 traduce `docker exec` y esa receta necesita `docker run` sobre `alpine:3`. Es la
 limitación de mi máquina y no lo toqué. En la tuya pasó, así que esto tiene que
-dar **146/146**.
+dar **147/147**.
 
-### 5. Hashes
+Una nota de método: la primera corrida completa la descarté a mitad de camino
+porque toqué dos detalles de formato mientras corría —el servidor de desarrollo
+recarga en caliente y la corrida habría medido un árbol mezclado—. La que
+informo arrancó con el árbol final y base recreada.
+
+### 6. Hashes
 
 ```
-src/components/AdminPanel/AdminPanel.tsx  2f3805fbe20036ca
-scripts/smoke.mjs                         fc16523c0cdfd046
+src/navegacion/politica.ts                  7b86a9226bbb9d28
+src/navegacion/navegacion.ts                10ce3dab501ecacf
+src/App.tsx                                 0ac7e73138d3b420
+src/hooks/useProductFilters.ts              6b06cf21d146b84b
+src/components/ProductCard/ProductCard.tsx  82604890eb858a98
+src/components/Pages/VerifyEmailPage.tsx    5a0b93fbe93cdc16
+scripts/smoke.mjs                           4b8854acb5c513a7
 ```
 
-(SHA-256 truncado a 16, del árbol en `49445fc`.)
-
-### 6. Tres cosas que dejo anotadas y NO toqué
-
-1. **La celda de Estado no tiene rótulo en castellano ni color para
-   «Agotado».** `getStatusBadge` dibuja el valor crudo —ahora una publicación
-   agotada dice `sold_out`— y su tabla de colores todavía tiene una entrada
-   `draft`, que ya no puede aparecer, y ninguna para `sold_out`, así que sale en
-   el gris de descarte. Es cosmético y viene de antes; no lo metí en una
-   corrección que pediste mínima.
-2. **`draft` sobrevive en el panel del vendedor.** `UserDashboard.tsx:344` tiene
-   `p.status === 'draft' || p.status === 'paused'`: la primera mitad está muerta
-   porque el Backend nunca devuelve `draft`. Es dashboard, que me frenaste
-   explícitamente, así que queda acá.
-3. **El tipo no iba a atajar esto nunca.** `AdminProduct.status` es `string`, no
-   una unión de los cuatro estados. Ningún compilador iba a ver «Borrador»; lo
-   que lo ve ahora es el caso.
+(SHA-256 truncado a 16, del árbol en `bcdd448`.)
 
 ### 7. Riesgos residuales
 
-1. **El caso 146 deja cuatro publicaciones efímeras en la base**, igual que el
-   145 deja las suyas. Base efímera, pero se acumulan entre corridas.
-2. **El dominio lo leo del código y del tipo de la base.** Si mañana alguien
-   agrega un estado al modelo y migra, el caso 146 se pone rojo hasta que el
-   panel lo ofrezca. Es a propósito —esa es la comprobación—, pero conviene que
-   lo sepas antes de que pase.
-3. Siguen en pie los de la entrega anterior: veinte filas fijo, la página no
-   viaja en la URL, el scroll vuelve arriba al recargar una lista, y la guarda
-   de respuestas viejas descarta pero no cancela el pedido.
+1. **Dos listas de nombres de filtro que tienen que coincidir.** La política
+   declara cuáles son los parámetros del Mercado —para leerlos y para armar la
+   URL canónica—; el hook de filtros los escribe con esos mismos nombres, uno
+   por uno. Si alguien agrega un filtro en el hook y no en la lista, se va a
+   escribir en la barra pero no va a viajar en la URL canónica. Lo dejo así
+   porque unificarlo pide reescribir el hook entero con una tabla, y eso ya no
+   es mínimo; si querés cerrarlo, va como tarea propia.
+2. **Una URL escrita a mano con los parámetros en otro orden** se ordena sola en
+   la primera navegación: no duplica entrada, pero la barra cambia sola.
+3. **`?section=` con un valor que no existe** dibuja Inicio, en silencio. Es lo
+   mismo que hacía antes con cualquier `pathname` desconocido.
+4. **El carrito, el checkout, el alta y el panel de Administración siguen sin
+   entrada propia**: se cierran con Escape o con su botón, y Atrás no los cierra.
+   Esta tarea era la navegación entre secciones y el detalle.
+5. **La capa restaurada al recargar** sólo se vuelve a abrir si esa publicación
+   está entre las cargadas; si no, queda la sección sola, que es coherente con
+   lo que dice la barra.
+6. El caso 147 deja dos publicaciones efímeras en la base, como el 145 y el 146.
 
 ### 8. Frenos
 
-No toqué paginación, filtros, dashboard, navegación, BOEDA, pagos ni Railway. La
-única mutación del Backend fue local, para probar el caso, y está revertida: el
-árbol no tiene una sola línea de Backend cambiada. No abrí NAV-URL-1. No
-desplegué. `PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de
-empujar.
+No toqué Backend, modelos, migraciones, seed, autenticación, pagos, BOEDA,
+Railway ni datos remotos. No cambié foco de modales, formularios, estilos, copy,
+estados administrativos ni responsive. No desplegué. `PRE_FIRMA.md` sigue fuera
+del versionado y lo confirmé antes de empujar.
 
 Freno acá y te pido revisión.
