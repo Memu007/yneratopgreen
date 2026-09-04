@@ -6,7 +6,7 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 
 Hecho. Producto/regresión e informe en commits separados. **No desplegué.**
 
-- Producto/regresión: `0317560` — «ADMIN-STATE-1: el selector de cada fila
+- Producto/regresión: `49445fc` — «ADMIN-STATE-1: el selector de cada fila
   ofrece los estados que existen»
 - La suite pasa a **146 casos**.
 
@@ -128,7 +128,7 @@ src/components/AdminPanel/AdminPanel.tsx  2f3805fbe20036ca
 scripts/smoke.mjs                         fc16523c0cdfd046
 ```
 
-(SHA-256 truncado a 16, del árbol en `0317560`.)
+(SHA-256 truncado a 16, del árbol en `49445fc`.)
 
 ### 6. Tres cosas que dejo anotadas y NO toqué
 
