@@ -2,88 +2,112 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ADMIN-PAGE-1R — estados que existen y ninguna respuesta vieja que pise
+## ADMIN-STATE-1 — el selector de cada fila ofrece los estados que existen
 
 Hecho. Producto/regresión e informe en commits separados. **No desplegué.**
 
-- Corrección: `6cc67b7` — «ADMIN-PAGE-1R: estados que existen y ninguna
-  respuesta vieja que pise»
-- La suite sigue en **145 casos**.
+- Producto/regresión: `0317560` — «ADMIN-STATE-1: el selector de cada fila
+  ofrece los estados que existen»
+- La suite pasa a **146 casos**.
 
-Las dos son mías y las dos son ciertas. El `draft` lo copié del selector que ya
-tenía cada fila de la tabla, sin comprobarlo contra el modelo; y tu hipótesis de
-la respuesta vieja era la correcta.
+El producto es una línea. Lo que llevó trabajo fue que el caso 146 no se pueda
+cumplir de casualidad, así que empiezo por ahí.
 
 ---
 
-### 1. «Borradores» era una acción falsa
+### 1. El cambio
 
-`ProductStatus` declara cuatro: `active`, `paused`, `sold_out`, `deleted`. El
-selector que agregué ofrecía `draft` y omitía `sold_out`. Lo medí como vos:
-
-```
-GET /admin/products?status=draft     -> 500
-GET /admin/products?status=sold_out  -> 200
+```diff
+-                            <option value="draft">Borrador</option>
++                            <option value="sold_out">Agotado</option>
 ```
 
-Ahora ofrece los cuatro del modelo, con **«Agotadas»** para `sold_out`.
+Los cuatro valores del selector de fila quedan `active`, `paused`, `sold_out`,
+`deleted`: los mismos del modelo y los mismos del filtro de la barra.
 
-Y el caso ya no comprueba un estado elegido a mano: **recorre todas las opciones
-que el selector ofrezca**, exige 200 en cada una y comprueba que ninguna fila la
-contradiga. Si alguien vuelve a agregar una opción inventada, el caso la
-encuentra sola.
+### 2. El caso 146, parte por parte
 
-Un detalle del que me di cuenta corrigiendo esto: la comprobación tiene que
-mirar la **celda de estado** y no la fila entera. La fila trae además los
-rótulos del selector de cada publicación —«Activo Pausado Borrador Eliminado»—,
-así que buscando en la fila cualquier filtro parece cumplirse. Con eso, el
-primer intento me dio un verde que no valía nada.
-
-### 2. La carrera: tenías razón, y ahora es determinista
-
-El caso retiene la carga sin filtro, aplica el filtro, deja llegar primero la
-respuesta filtrada y libera última la vieja. **Sin la guarda**, así queda la
-pantalla:
+**El dominio no está escrito a mano.** Lo saco de dos lugares que tienen que
+coincidir, y si no coinciden el caso se planta antes de medir nada:
 
 ```
-[FAIL] 145 … — una respuesta vieja sin filtro piso lo que estaba pedido:
-  «Total: 248 productos Anterior Página 1 de 13 Siguiente»
+ProductStatus (backend/app/models/product.py) → active, paused, sold_out, deleted
+pg_enum 'productstatus' (la base)             → ACTIVE, PAUSED, SOLD_OUT, DELETED
 ```
 
-Con «Pausadas» pedido y aplicado, la pantalla vuelve a las 248 publicaciones sin
-filtro. Con la guarda puesta, el mismo recorrido queda en el total del filtro.
+**Enumera todo, no una opción elegida a mano.** Recorre las opciones de *cada*
+selector de *cada* fila dibujada —veinte filas— y falla en las dos direcciones:
+por una opción que el dominio no admite y por una del dominio que falte. Si
+mañana alguien agrega una opción inventada, o borra una válida, el caso la
+encuentra solo.
 
-La corrección es la que pediste, la misma en las tres listas: cada una anota qué
-pidió la última vez —página más filtros— y **sólo la respuesta de esa
-combinación escribe filas y total**. Tres líneas por cargador y una referencia
-compartida; sin framework y sin reescribir el panel.
+**Acciona el control real.** Cuatro publicaciones efímeras propias, una por
+estado. Por cada cambio: se elige la opción en el selector de la fila, se espera
+**ese** `PATCH`, se comprueba que el cuerpo que salió pide el estado que se
+eligió y que la respuesta es 200, y recién después se espera —por condición, no
+por tiempo— a que la celda de Estado cambie. Son cinco cambios y no cuatro: la
+publicación que tiene que terminar activa ya nace activa, y elegir el valor que
+ya tiene no dispara nada, así que pasa por otro estado y vuelve.
+
+**Y después recarga.** Vuelve a entrar al panel desde cero —`goto`, Admin,
+Productos— y para cada publicación compara tres cosas que tienen que decir lo
+mismo: la celda de Estado, el valor del selector de esa fila y `products.status`
+en la base.
+
+**Por qué «Borrador» no podía estar.** Medido contra el servidor levantado,
+sobre una publicación del propio caso:
 
 ```
- src/components/AdminPanel/AdminPanel.tsx |  23 ++++--
- scripts/smoke.mjs                        | 120 +++++++++++++++++++++++++++----
+PATCH /admin/products/{id}/status  {"status":"draft"}  -> 400 «Estado inválido: draft»
+   y products.status queda igual: ACTIVE antes, ACTIVE después
 ```
 
-### 3. Un hallazgo que dejo anotado y NO toqué
+### 3. Rojo y verde
 
-El selector de estado **de cada fila** de la tabla de publicaciones —el que ya
-existía antes de esta tarea— tiene el mismo problema que corregí en el filtro:
-ofrece «Borrador» y no ofrece «Agotado». Medido contra el Backend:
+El rojo natural, con el caso nuevo sobre el árbol de `6cc67b7`:
 
 ```
-PATCH /admin/products/{id}/status  {"status":"draft"}     -> 400 «Estado inválido: draft»
-PATCH /admin/products/{id}/status  {"status":"sold_out"}  -> 200
+[FAIL] 146 … — el selector de la fila ofrece estados que ProductStatus no tiene:
+  ["draft"] (ofrece ["active","paused","draft","deleted"],
+  el dominio es ["active","paused","sold_out","deleted"])
 ```
 
-O sea: la administradora puede elegir «Borrador» en cualquier fila y siempre le
-va a fallar, y no tiene forma de marcar una publicación como agotada desde el
-panel. Es la misma familia y son cuatro líneas, pero es producto que no me
-pediste cambiar en esta corrección, así que lo dejo acá para que decidas.
+Ese rojo prueba una sola de las dos direcciones, así que rompí a propósito las
+otras dos comprobaciones. Las tres mutaciones son locales, ya revertidas, y
+ninguna está en el commit:
+
+| Mutación | Resultado |
+| --- | --- |
+| dejar `draft` en el selector (el estado anterior) | rojo: «ofrece estados que ProductStatus no tiene: ["draft"]» |
+| sacar la opción `sold_out` del selector | rojo: «no ofrece estados del dominio: ["sold_out"]» |
+| en el Backend, `update_product_status` sin `db.commit()` | rojo a los 22 s: «la celda de Estado de «Est146 … active» no quedó en «paused» tras accionar el control; muestra «active»» |
+
+La tercera es la que me importaba: con ella el `PATCH` **contesta 200 igual**, y
+el caso se pone rojo lo mismo porque no quedó nada guardado. O sea que la parte
+de persistencia no se cumple con una respuesta exitosa: se cumple si la base
+cambió.
+
+Con la corrección puesta, verde:
+
+```
+[PASS] 146 … — cada fila de Publicaciones ofrece exactamente los 4 estados de
+  ProductStatus (active, paused, sold_out, deleted), los mismos que el tipo de la
+  base, y ninguna ofrece «draft», que el servidor rechaza con 400 sin cambiar
+  nada; los 5 cambios se hicieron con el control real —un PATCH por vez, todos
+  200— y tras volver a entrar al panel las 4 publicaciones muestran en su celda
+  de Estado lo que guardó la base: active, paused, sold_out, deleted
+```
+
+```
+ scripts/smoke.mjs                        | 205 +++++++++++++++++++++++++++
+ src/components/AdminPanel/AdminPanel.tsx |   2 +-
+```
 
 ### 4. Puertas
 
 ```
-base limpia + SMOKE_CASOS=145                   1/1
-base limpia + suite completa                    144/145   (131 rojo)
+base limpia + SMOKE_CASOS=146                   1/1
+base limpia + suite completa                    145/146   (131 rojo)
 npm run build                                   ok
 npm run lint                                    ok (--max-warnings 0)
 node --check scripts/smoke.mjs                  ok
@@ -92,35 +116,54 @@ python -m pip check                             ok
 git -c core.whitespace=cr-at-eol diff --check   limpio
 ```
 
-Sobre el **131**: en esta corrida volvió a fallar acá, con el mismo mensaje de
-siempre —el puente de mi entorno sólo traduce `docker exec` y la receta CSP
-necesita `docker run` sobre `alpine:3`—, así que es la limitación de mi máquina
-y no lo toqué. En la tuya pasó y esto tiene que dar **145/145**.
+El **131** volvió a fallar acá por lo de siempre: el puente de mi entorno sólo
+traduce `docker exec` y esa receta necesita `docker run` sobre `alpine:3`. Es la
+limitación de mi máquina y no lo toqué. En la tuya pasó, así que esto tiene que
+dar **146/146**.
 
 ### 5. Hashes
 
 ```
-src/components/AdminPanel/AdminPanel.tsx  371d1da5a09cbb1b
-scripts/smoke.mjs                         7726ab2fe6d7741b
+src/components/AdminPanel/AdminPanel.tsx  2f3805fbe20036ca
+scripts/smoke.mjs                         fc16523c0cdfd046
 ```
 
-(SHA-256 truncado a 16, del árbol en el commit de corrección.)
+(SHA-256 truncado a 16, del árbol en `0317560`.)
 
-### 6. Riesgos residuales
+### 6. Tres cosas que dejo anotadas y NO toqué
 
-1. **La guarda descarta la respuesta vieja, no la cancela.** El pedido igual
-   viaja y el servidor igual trabaja. Cancelarlo pide `AbortController` en
-   `apiGet`, que es tocar el cliente HTTP de todo el producto; no me pareció
-   parte de esto.
-2. **Sigue el selector de fila con «Borrador»**, arriba.
-3. Los cuatro riesgos que informé en la entrega anterior siguen en pie: veinte
-   filas fijo, la página no viaja en la URL, el scroll vuelve arriba al recargar
-   una lista, y el caso 145 deja sus 63 filas en la base efímera.
+1. **La celda de Estado no tiene rótulo en castellano ni color para
+   «Agotado».** `getStatusBadge` dibuja el valor crudo —ahora una publicación
+   agotada dice `sold_out`— y su tabla de colores todavía tiene una entrada
+   `draft`, que ya no puede aparecer, y ninguna para `sold_out`, así que sale en
+   el gris de descarte. Es cosmético y viene de antes; no lo metí en una
+   corrección que pediste mínima.
+2. **`draft` sobrevive en el panel del vendedor.** `UserDashboard.tsx:344` tiene
+   `p.status === 'draft' || p.status === 'paused'`: la primera mitad está muerta
+   porque el Backend nunca devuelve `draft`. Es dashboard, que me frenaste
+   explícitamente, así que queda acá.
+3. **El tipo no iba a atajar esto nunca.** `AdminProduct.status` es `string`, no
+   una unión de los cuatro estados. Ningún compilador iba a ver «Borrador»; lo
+   que lo ve ahora es el caso.
 
-### 7. Frenos
+### 7. Riesgos residuales
 
-No toqué Backend, dashboard, navegación, BOEDA, pagos ni Railway. No abrí la
-tarea siguiente. No desplegué. `PRE_FIRMA.md` sigue fuera del versionado y lo
-confirmé antes de empujar.
+1. **El caso 146 deja cuatro publicaciones efímeras en la base**, igual que el
+   145 deja las suyas. Base efímera, pero se acumulan entre corridas.
+2. **El dominio lo leo del código y del tipo de la base.** Si mañana alguien
+   agrega un estado al modelo y migra, el caso 146 se pone rojo hasta que el
+   panel lo ofrezca. Es a propósito —esa es la comprobación—, pero conviene que
+   lo sepas antes de que pase.
+3. Siguen en pie los de la entrega anterior: veinte filas fijo, la página no
+   viaja en la URL, el scroll vuelve arriba al recargar una lista, y la guarda
+   de respuestas viejas descarta pero no cancela el pedido.
+
+### 8. Frenos
+
+No toqué paginación, filtros, dashboard, navegación, BOEDA, pagos ni Railway. La
+única mutación del Backend fue local, para probar el caso, y está revertida: el
+árbol no tiene una sola línea de Backend cambiada. No abrí NAV-URL-1. No
+desplegué. `PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de
+empujar.
 
 Freno acá y te pido revisión.
