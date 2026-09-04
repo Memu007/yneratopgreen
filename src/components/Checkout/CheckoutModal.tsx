@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './CheckoutModal.module.css';
 import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
@@ -11,6 +11,7 @@ import {
   ProvinceResponse,
 } from '../../utils/catalogService';
 import { useCapaModal } from '../../hooks/useCapaModal';
+import { huboCambios, useSalidaProtegida } from '../../formularios/salidaProtegida';
 
 interface CheckoutModalProps {
   onClose: () => void;
@@ -424,6 +425,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         order.order_id === orderId ? { ...order, ...data } : order
       ));
       setMensajes(current => ({ ...current, [orderId]: 'Comprobante enviado' }));
+      // El archivo ya viajó: deja de ser trabajo local sin guardar. Sin esto,
+      // cerrar después de subirlo seguiría avisando de una pérdida que no hay.
+      setComprobantes(current => {
+        const resto = { ...current };
+        delete resto[orderId];
+        return resto;
+      });
     } catch (err) {
       setMensajes(current => ({
         ...current,
@@ -1077,7 +1085,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
           {mensajes[orden.order_id] && <p>{mensajes[orden.order_id]}</p>}
         </div>
       ))}
-      <button type="button" className={styles.finishButton} onClick={onClose}>
+      <button type="button" className={styles.finishButton} onClick={pedirCierre}>
         Finalizar
       </button>
     </div>
@@ -1119,12 +1127,34 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     </div>
   );
 
+  // Qué se pierde al cerrar. ANTES de crear las órdenes, todo lo elegido es
+  // trabajo local: destino, traslado y medio de pago. DESPUÉS, las órdenes ya
+  // están creadas y no son «cambios sin guardar»: lo único que todavía se
+  // puede perder es un comprobante elegido que aún no se envió.
+  const retratoInicial = useRef({
+    envio: shippingData,
+    decisiones: {} as Record<string, DecisionDeTraslado>,
+    medios: {} as Record<string, MedioDePago>,
+  });
+  const hayTrabajoSinGuardar = ordenes.length > 0
+    ? Object.keys(comprobantes).length > 0
+    : huboCambios(retratoInicial.current,
+      { envio: shippingData, decisiones, medios: mediosElegidos });
+  const hayTrabajoRef = useRef(hayTrabajoSinGuardar);
+  hayTrabajoRef.current = hayTrabajoSinGuardar;
+
+  const salida = useSalidaProtegida();
+  const pedirCierre = useCallback(
+    () => salida.alSalir(hayTrabajoRef.current, onClose),
+    [salida, onClose],
+  );
+
   // Atrapa el foco, lo devuelve al cerrar, cierra con Escape y traba el
   // scroll del fondo. Ninguna capa del producto hacía nada de esto.
-  const capa = useCapaModal<HTMLDivElement>(onClose);
+  const capa = useCapaModal<HTMLDivElement>(pedirCierre);
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div className={styles.overlay} onClick={pedirCierre}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}
         ref={capa}
         role="dialog"
@@ -1132,7 +1162,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         aria-label="Checkout"
         tabIndex={-1}
       >
-        <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
+        <button className={styles.closeButton} aria-label="Cerrar" onClick={pedirCierre}>
           ×
         </button>
 
@@ -1163,6 +1193,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
           {currentStep !== 'orders' && renderOrderSummary()}
         </div>
       </div>
+      {salida.pregunta}
     </div>
   );
 };

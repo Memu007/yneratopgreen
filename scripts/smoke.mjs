@@ -3752,7 +3752,9 @@ await runCase(40, 'El perfil no inventa datos y guardar sin cambios no pisa nada
     await page.locator('#perfil-telefono').fill('+54 11 0000 0000');
     await page.locator('#perfil-ubicacion').fill('Ubicación abandonada');
     await page.getByRole('button', { name: 'Cancelar' }).click();
-    await page.locator('#perfil-nombre').waitFor({ state: 'detached' });
+    await descartarSiPregunta(page,
+      async () => (await page.locator('#perfil-nombre').count()) === 0,
+      'cancelar la edición del perfil');
 
     await page.getByRole('button', { name: 'Editar' }).click();
     const telefono = await page.locator('#perfil-telefono').inputValue();
@@ -4432,8 +4434,9 @@ await runCase(45, 'La escritura de un carrito abandonado no puede quedar última
     // 2. con esa escritura en vuelo se cierra el checkout, se cambia el
     //    carrito visible de A a B y se vuelve a abrir.
     await cerrar();
-    await page.getByRole('heading', { name: /Datos de env/i })
-      .waitFor({ state: 'hidden', timeout: 15_000 });
+    await descartarSiPregunta(page,
+      async () => (await page.getByRole('heading', { name: /Datos de env/i }).count()) === 0,
+      'cerrar el checkout con el destino elegido');
 
     await page.getByRole('button', { name: /Carrito/ }).click();
     await page.getByRole('heading', { name: /Mi carrito/i }).waitFor({ timeout: 15_000 });
@@ -4651,6 +4654,9 @@ await runCase(47, 'Un login nuevo no hereda el "ya sincronizado" del anterior', 
 
     // Cerrar sesión y entrar con otra cuenta, sin recargar la página.
     await page.locator('button[aria-label="Cerrar"]:visible').first().click();
+    await descartarSiPregunta(page,
+      async () => (await page.getByRole('heading', { name: /Datos de env/i }).count()) === 0,
+      'cerrar el checkout de la primera cuenta');
     await page.getByRole('button', { name: 'Salir' }).click();
     await page.getByRole('button', { name: 'Ingresar', exact: true }).waitFor({ timeout: 15_000 });
     await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
@@ -4785,7 +4791,14 @@ await runCase(48, 'Un turno encolado no sale con las credenciales de la sesión 
       await elegirDestino(page, 'Pergamino');
     };
 
-    const cerrarModal = () => page.locator('button[aria-label="Cerrar"]:visible').first().click();
+    // Cerrar el checkout con el destino ya elegido pregunta por los cambios sin
+    // guardar: este caso los descarta a propósito, que es lo que hacía antes.
+    const cerrarModal = async () => {
+      await page.locator('button[aria-label="Cerrar"]:visible').first().click();
+      await descartarSiPregunta(page,
+        async () => (await page.getByRole('heading', { name: /Datos de env/i }).count()) === 0,
+        'cerrar el checkout');
+    };
 
     await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
@@ -7119,6 +7132,22 @@ async function reconciliar() {
 // Espera a que una condición se cumpla sin navegador de por medio. Sirve para
 // saber que la otra punta de una carrera ya llegó al punto que importa, en vez
 // de dormir un rato y confiar.
+/**
+ * Cierra una capa que puede tener trabajo sin guardar.
+ *
+ * Desde FORM-DIRTY-1 un formulario sucio no se cierra en silencio: pregunta. Los
+ * casos que cerraban con algo escrito ahora dicen explícitamente que descartan,
+ * que es lo que hacían antes sin que nadie se lo preguntara. Se espera a que
+ * pase UNA de las dos cosas —la pregunta o el cierre—, sin pausas fijas.
+ */
+async function descartarSiPregunta(page, seCerro, mensaje) {
+  const descartar = page.getByRole('button', { name: 'Descartar cambios' });
+  await esperarA(async () => (await descartar.count()) > 0 || (await seCerro()),
+    `${mensaje}: no se cerró ni preguntó por los cambios sin guardar`, 20_000);
+  if ((await descartar.count()) > 0) await descartar.click();
+  await esperarA(seCerro, `${mensaje}: descartar no cerró la capa`, 20_000);
+}
+
 async function esperarA(condicion, mensaje, limite = 20_000) {
   const hasta = Date.now() + limite;
   while (Date.now() < hasta) {
@@ -17877,6 +17906,427 @@ await runCase(148, 'Cada capa se cierra sola y devuelve el foco a su disparador'
       + `dejando Administracion abierta en «${antes.pestana}» con el filtro «${antes.filtro}», `
       + `«${antes.pagina}», scroll ${antes.scroll} y las mismas ${antes.numeros.length} filas, y `
       + 'recien el Escape siguiente cierra el panel y devuelve el foco al boton Admin';
+  } finally {
+    await browser.close();
+    await apiRequest('/cart', { method: 'DELETE', token: tokenComprador });
+  }
+});
+
+await runCase(149, 'Cerrar un formulario con trabajo sin guardar pregunta una sola vez', async () => {
+  // Medido contra `b07ebce`, y no falla igual en los cinco:
+  //
+  //   perfil de transportista + Escape  -> cerraba Mi Panel sin avisar y el
+  //                                        radio volvia al ultimo guardado
+  //   alta + clic en el fondo           -> cerraba sin avisar y el borrador
+  //                                        REAPARECIA al volver a abrir
+  //   edicion + X                       -> cerraba sin avisar y la descripcion
+  //                                        volvia a la guardada
+  //   checkout + Escape                 -> cerraba sin avisar y la direccion
+  //                                        escrita se perdia
+  //   calificacion + clic en el fondo   -> cerraba la calificacion Y Mi Panel
+  //                                        entero, y el comentario se perdia
+  //
+  // Ahora los cinco pasan por la misma politica: limpio cierra derecho, sucio
+  // pregunta una vez, y la pregunta es la capa de arriba.
+
+  const sello = Date.now();
+  const ingresoDelVendedor = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  });
+  const vendedor = {
+    token: ingresoDelVendedor.data.access_token,
+    id: ingresoDelVendedor.data.user.id,
+    datos: ingresoDelVendedor.data,
+  };
+  const comprador = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'cliente@ejemplo.com', password: 'cliente123' },
+  });
+  const tokenComprador = comprador.data.access_token;
+
+  // Un transportista propio: el perfil con los datos de transporte es uno de
+  // los cinco formularios y el seed no trae ninguno.
+  const correoDelTransportista = `transportista.149.${sello}@example.com`;
+  const claveDelTransportista = 'smoke149';
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  await registrarYVerificar({
+    email: correoDelTransportista,
+    password: claveDelTransportista,
+    full_name: 'Transportista Del Caso 149',
+    is_carrier: true,
+    carrier_base_locality_id: localidad,
+    carrier_transport: 'Camion del caso 149',
+    carrier_transport_certified: true,
+    carrier_certification_detail: 'RUTA, cargas generales, N.° 149',
+    carrier_coverage_radius_km: 100,
+  });
+  const transportista = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: correoDelTransportista, password: claveDelTransportista },
+  });
+  assert(transportista.data?.user?.is_carrier === true, 'el transportista del caso no quedó marcado');
+
+  // Una publicación propia para editar y un insumo con stock para comprar.
+  const [categoriaDeProductos] = queryRows(`
+    SELECT id, 'fin' FROM categories
+    WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
+  const publicable = async (nombre, stock) => {
+    const alta = await apiRequest('/products', {
+      method: 'POST', token: vendedor.token,
+      body: {
+        name: nombre,
+        description: `Publicacion efimera del caso 149 (${nombre}).`,
+        category_id: categoriaDeProductos[0],
+        price: 1490,
+        stock,
+        unit: 'kg',
+        locality_id: localidad,
+        publication_type: 'producto',
+        operation_kind: 'insumo',
+      },
+    });
+    assert(alta.status < 400 && alta.data?.id, `no se pudo publicar «${nombre}»: HTTP ${alta.status}`);
+    return alta.data.id;
+  };
+  const paraEditar = `Form149 para editar ${sello}`;
+  const paraComprar = `Form149 para comprar ${sello}`;
+  await publicable(paraEditar, 5);
+  const idParaComprar = await publicable(paraComprar, 20);
+
+  // Una orden entregada, para que exista «Calificar Vendedor». Se llega por las
+  // rutas reales: transferencia aprobada, confirmada, despachada y recibida.
+  await apiRequest('/cart', { method: 'DELETE', token: tokenComprador });
+  await apiRequest('/cart/items', {
+    method: 'POST', token: tokenComprador, body: { product_id: idParaComprar, quantity: 1 },
+  });
+  const checkoutDelCaso = await apiRequest('/orders/checkout/transfer', {
+    method: 'POST', token: tokenComprador,
+    body: {
+      shipping_address: 'Ruta 149 km 1',
+      shipping_locality_id: localidad,
+      shipping_postal_code: '2700',
+      shipping_decisions: [{ seller_id: vendedor.id, mode: 'self' }],
+    },
+  });
+  const [ordenParaCalificar] = checkoutDelCaso.data.orders;
+  assert(ordenParaCalificar?.order_id, 'no salió la orden que se va a calificar');
+  const aprobacion = await apiRequest(`/orders/${ordenParaCalificar.order_id}/transfer-receipt`, {
+    method: 'PATCH', token: vendedor.token, body: { decision: 'approve' },
+  });
+  assert(aprobacion.status < 400, `no se pudo aprobar la transferencia: HTTP ${aprobacion.status}`);
+  for (const [estado, token] of [
+    ['confirmed', vendedor.token], ['shipped', vendedor.token], ['delivered', tokenComprador],
+  ]) {
+    const paso = await apiRequest(`/orders/${ordenParaCalificar.order_id}/status`, {
+      method: 'PATCH', token, body: { status: estado },
+    });
+    assert(paso.status < 400, `la orden no pasó a «${estado}»: HTTP ${paso.status}`);
+  }
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const sesion = async (datos) => {
+      const contexto = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
+      await contexto.addInitScript(({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+      }, { a: datos.access_token, r: datos.refresh_token });
+      return contexto.newPage();
+    };
+    const pregunta = (page) => page.locator('[aria-labelledby="titulo-cambios-sin-guardar"]');
+    const hayPregunta = async (page) => (await pregunta(page).count()) === 1;
+    const dialogos = (page) => page.locator('[role="dialog"]').count();
+    const seguirEditando = (page) => page.getByRole('button', { name: 'Seguir editando' }).click();
+    const descartar = (page) => page.getByRole('button', { name: 'Descartar cambios' }).click();
+    const panelAbierto = async (page) =>
+      (await page.getByRole('heading', { name: 'Mi Panel' }).count()) === 1;
+    const abrirPanel = async (page) => {
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Mi cuenta' }).click();
+      await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+    };
+    const equisDelPanel = (page) =>
+      page.locator('[aria-label="Mi cuenta"] > button[aria-label="Cerrar"]');
+    const sinPregunta = async (page, momento) => {
+      await esperarA(async () => !(await hayPregunta(page)),
+        `${momento}: quedó una pregunta abierta`, 20_000);
+    };
+    const preguntoUnaSolaVez = async (page, momento) => {
+      await esperarA(() => hayPregunta(page),
+        `${momento}: no preguntó nada antes de cerrar`, 20_000);
+      assert((await pregunta(page).count()) === 1,
+        `${momento}: se abrieron ${await pregunta(page).count()} preguntas`);
+    };
+    const cerrados = [];
+
+    // --- 1. PERFIL DE TRANSPORTISTA: limpio cierra; sucio pregunta ----------
+    {
+      const page = await sesion(transportista.data);
+      await abrirPanel(page);
+      // Limpio: entrar en edición y cerrar el panel no pregunta nada.
+      await page.getByRole('button', { name: /editar/i }).first().click();
+      const radio = page.locator('#perfil-radio');
+      await radio.waitFor({ state: 'visible', timeout: 20_000 });
+      const original = await radio.inputValue();
+      await equisDelPanel(page).click();
+      await esperarA(async () => !(await panelAbierto(page)),
+        'perfil limpio: la X del panel no cerró', 20_000);
+      await sinPregunta(page, 'perfil limpio');
+      cerrados.push('perfil limpio/X del panel');
+
+      // Sucio: el mismo camino pregunta, y «seguir editando» conserva todo.
+      await abrirPanel(page);
+      await page.getByRole('button', { name: /editar/i }).first().click();
+      await radio.waitFor({ state: 'visible', timeout: 20_000 });
+      await radio.fill('777');
+      await equisDelPanel(page).click();
+      await preguntoUnaSolaVez(page, 'perfil sucio + X del panel');
+      assert(await panelAbierto(page), 'preguntar cerró el panel igual');
+      assert((await dialogos(page)) === 2,
+        `con la pregunta arriba hay ${await dialogos(page)} diálogos y tendrían que ser 2`);
+      assert(await pregunta(page).evaluate((el) => el.contains(document.activeElement)),
+        'el foco no entró en la pregunta');
+      await seguirEditando(page);
+      await sinPregunta(page, 'perfil: seguir editando');
+      assert(await panelAbierto(page), 'seguir editando cerró el panel');
+      assert((await radio.inputValue()) === '777',
+        `seguir editando perdió lo escrito: «${await radio.inputValue()}»`);
+      await esperarA(async () => (await equisDelPanel(page).evaluate(
+        (el) => el === document.activeElement)),
+      'seguir editando no devolvió el foco a la X que pidió cerrar', 20_000);
+
+      // Cambiar de pestaña con el perfil sucio NO es un cierre: el formulario
+      // sigue vivo y no se pierde nada, así que no pregunta. Lo que sí tiene
+      // que seguir preguntando después es cerrar el panel.
+      await page.getByRole('button', { name: /notificaciones/i }).first().click();
+      await esperarA(async () => (await radio.count()) === 0,
+        'la pestaña no cambió', 20_000);
+      await sinPregunta(page, 'perfil sucio + cambio de pestaña');
+      await page.getByRole('button', { name: 'Mi Perfil' }).first().click();
+      await esperarA(async () => (await radio.count()) === 1,
+        'no volvió el formulario del perfil', 20_000);
+      assert((await radio.inputValue()) === '777',
+        `cambiar de pestaña perdió lo escrito: «${await radio.inputValue()}»`);
+      cerrados.push('perfil sucio/cambio de pestaña (no cierra: no pregunta)');
+
+      // Cambiar y volver al valor original deja el formulario limpio otra vez.
+      await radio.fill(original);
+      await equisDelPanel(page).click();
+      await esperarA(async () => !(await panelAbierto(page)),
+        'con el valor revertido la X no cerró', 20_000);
+      await sinPregunta(page, 'perfil revertido');
+      cerrados.push('perfil revertido/X del panel');
+      await page.context().close();
+    }
+
+    // --- 2. ALTA DE PUBLICACIÓN: fondo, y descartar limpia el borrador ------
+    {
+      const page = await sesion(vendedor.datos);
+      const abrirAlta = async () => {
+        await page.getByRole('button', { name: 'Vender' }).click();
+        await page.locator('input[name="name"]').first()
+          .waitFor({ state: 'visible', timeout: 20_000 });
+      };
+      const nombre = page.locator('input[name="name"]').first();
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await abrirAlta();
+      await page.mouse.click(5, 5);
+      await esperarA(async () => (await nombre.count()) === 0,
+        'alta limpia: el fondo no cerró', 20_000);
+      await sinPregunta(page, 'alta limpia');
+      cerrados.push('alta limpia/fondo');
+
+      await abrirAlta();
+      const borrador = `Borrador del caso 149 ${sello}`;
+      await nombre.fill(borrador);
+      await page.mouse.click(5, 5);
+      await preguntoUnaSolaVez(page, 'alta sucia + fondo');
+      assert((await nombre.count()) === 1, 'preguntar cerró el alta igual');
+      await descartar(page);
+      await esperarA(async () => (await nombre.count()) === 0,
+        'descartar no cerró el alta', 20_000);
+      await abrirAlta();
+      assert((await nombre.inputValue()) === '',
+        `el borrador descartado volvió a aparecer: «${await nombre.inputValue()}»`);
+      cerrados.push('alta sucia/fondo');
+      await page.context().close();
+    }
+
+    // --- 3. EDICIÓN DE PUBLICACIÓN: Cancelar, y una sola capa se cierra -----
+    {
+      const page = await sesion(vendedor.datos);
+      await abrirPanel(page);
+      await page.getByRole('button', { name: /publicaciones/i }).first().click();
+      const fila = page.locator('[class*="_productCard_"], article, li')
+        .filter({ hasText: paraEditar }).first();
+      await fila.waitFor({ state: 'visible', timeout: 20_000 });
+      const editar = fila.getByRole('button', { name: /editar/i }).first();
+      const descripcion = page.locator('textarea').first();
+      const cancelar = page.getByRole('button', { name: 'Cancelar', exact: true }).first();
+
+      await editar.click();
+      await descripcion.waitFor({ state: 'visible', timeout: 20_000 });
+      const guardada = await descripcion.inputValue();
+      await cancelar.click();
+      await esperarA(async () => (await page.locator('textarea').count()) === 0,
+        'edición limpia: Cancelar no cerró', 20_000);
+      await sinPregunta(page, 'edición limpia');
+      cerrados.push('edición limpia/Cancelar');
+
+      await editar.click();
+      await descripcion.waitFor({ state: 'visible', timeout: 20_000 });
+      await descripcion.fill(`Descripcion cambiada por el caso 149 ${sello}`);
+      await cancelar.click();
+      await preguntoUnaSolaVez(page, 'edición sucia + Cancelar');
+      assert(await panelAbierto(page), 'preguntar cerró Mi Panel');
+      await descartar(page);
+      await esperarA(async () => (await page.locator('textarea').count()) === 0,
+        'descartar no cerró la edición', 20_000);
+      assert(await panelAbierto(page),
+        'descartar cerró Mi Panel además de la edición: son dos capas y se pidió una');
+      await editar.click();
+      await descripcion.waitFor({ state: 'visible', timeout: 20_000 });
+      assert((await descripcion.inputValue()) === guardada,
+        `al reabrir quedó el borrador descartado: «${await descripcion.inputValue()}»`);
+      cerrados.push('edición sucia/Cancelar');
+      await page.context().close();
+    }
+
+    // --- 4. CALIFICACIÓN: el fondo, que antes se llevaba el panel entero ----
+    {
+      const page = await sesion(comprador.data);
+      await abrirPanel(page);
+      await page.getByRole('button', { name: /compras/i }).first().click();
+      const calificar = page.getByRole('button', { name: 'Calificar Vendedor' }).first();
+      await calificar.waitFor({ state: 'visible', timeout: 20_000 });
+      const comentario = page.locator('textarea').first();
+
+      await calificar.click();
+      await comentario.waitFor({ state: 'visible', timeout: 20_000 });
+      await page.mouse.click(5, 5);
+      await esperarA(async () => (await page.locator('textarea').count()) === 0,
+        'calificación limpia: el fondo no cerró', 20_000);
+      await sinPregunta(page, 'calificación limpia');
+      assert(await panelAbierto(page),
+        'cerrar la calificación limpia se llevó puesto Mi Panel');
+      cerrados.push('calificación limpia/fondo');
+
+      await calificar.click();
+      await comentario.waitFor({ state: 'visible', timeout: 20_000 });
+      await comentario.fill('Comentario del caso 149');
+      await page.mouse.click(5, 5);
+      await preguntoUnaSolaVez(page, 'calificación sucia + fondo');
+      assert(await panelAbierto(page), 'preguntar cerró Mi Panel');
+      // Escape sobre la pregunta es «seguir editando»: cierra sólo la pregunta.
+      await page.keyboard.press('Escape');
+      await sinPregunta(page, 'calificación: Escape sobre la pregunta');
+      assert((await comentario.inputValue()) === 'Comentario del caso 149',
+        'Escape sobre la pregunta perdió el comentario');
+      assert(await panelAbierto(page), 'Escape sobre la pregunta cerró el panel');
+      await page.mouse.click(5, 5);
+      await preguntoUnaSolaVez(page, 'calificación sucia + fondo, otra vez');
+      await descartar(page);
+      await esperarA(async () => (await page.locator('textarea').count()) === 0,
+        'descartar no cerró la calificación', 20_000);
+      assert(await panelAbierto(page), 'descartar la calificación cerró Mi Panel');
+      cerrados.push('calificación sucia/fondo');
+      await page.context().close();
+    }
+
+    // --- 5. CHECKOUT: antes y después de crear la orden ---------------------
+    let ordenesDelCheckout = 0;
+    {
+      const page = await sesion(comprador.data);
+      const abrirCheckout = async () => {
+        await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(paraComprar)}`,
+          { waitUntil: 'domcontentloaded' });
+        const agregar = page.getByRole('button', { name: /Agregar|Contratar/ }).first();
+        await agregar.waitFor({ state: 'visible', timeout: 20_000 });
+        await agregar.click();
+        await page.getByRole('button', { name: /carrito/i }).first().click();
+        await page.getByRole('button', { name: 'Continuar compra' }).click();
+        await direccion.waitFor({ state: 'visible', timeout: 20_000 });
+      };
+      const direccion = page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B');
+
+      await abrirCheckout();
+      await page.keyboard.press('Escape');
+      await esperarA(async () => (await direccion.count()) === 0,
+        'checkout limpio: Escape no cerró', 20_000);
+      await sinPregunta(page, 'checkout limpio');
+      cerrados.push('checkout limpio/Escape');
+
+      await abrirCheckout();
+      await direccion.fill('Calle del caso 149');
+      await page.keyboard.press('Escape');
+      await preguntoUnaSolaVez(page, 'checkout sucio + Escape');
+      assert((await direccion.count()) === 1, 'preguntar cerró el checkout igual');
+      await seguirEditando(page);
+      await sinPregunta(page, 'checkout: seguir editando');
+      assert((await direccion.inputValue()) === 'Calle del caso 149',
+        'seguir editando perdió la dirección');
+      cerrados.push('checkout sucio/Escape');
+
+      // Y ahora la orden se crea de verdad. Lo que ya está guardado no es
+      // «trabajo sin guardar»: cerrar no puede volver a preguntar por eso.
+      const ordenesAntes = queryCount(
+        `SELECT COUNT(*) FROM orders WHERE buyer_id = ${sqlLiteral(comprador.data.user.id)}`);
+      await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 11 5555 0149');
+      await page.getByLabel('Provincia *').selectOption({ index: 1 });
+      await esperarA(async () => (await page.getByLabel('Localidad *')
+        .locator('option').count()) > 1, 'no cargaron las localidades del destino', 20_000);
+      await page.getByLabel('Localidad *').selectOption({ index: 1 });
+      await page.getByPlaceholder('2000').fill('2700');
+      await page.locator('form:has(h2) button[type="submit"]').click();
+      await page.getByRole('heading', { name: /Traslado|Env[íi]o/i }).first()
+        .waitFor({ timeout: 20_000 });
+      await resolverTrasladoPropio(page);
+      await page.locator('form:has(h2) button[type="submit"]').click();
+      await elegirTransferencia(page);
+      await page.getByRole('button', { name: /Confirmar y crear las órdenes/ }).click();
+      await page.getByRole('heading', { name: /Tus órdenes/ }).waitFor({ timeout: 20_000 });
+      ordenesDelCheckout = queryCount(
+        `SELECT COUNT(*) FROM orders WHERE buyer_id = ${sqlLiteral(comprador.data.user.id)}`)
+        - ordenesAntes;
+      assert(ordenesDelCheckout === 1,
+        `el checkout creó ${ordenesDelCheckout} órdenes y tenía que crear 1`);
+
+      // Un comprobante elegido y todavía no enviado SÍ es trabajo local que se
+      // pierde: cerrar ahí pregunta, aunque la orden ya esté creada.
+      await page.locator('input[type="file"]').first().setInputFiles({
+        name: 'comprobante-149.png', mimeType: 'image/png', buffer: RECIBO_PNG,
+      });
+      await page.keyboard.press('Escape');
+      await preguntoUnaSolaVez(page, 'checkout con comprobante elegido + Escape');
+      await seguirEditando(page);
+      await sinPregunta(page, 'checkout: seguir editando con el comprobante elegido');
+      cerrados.push('checkout con comprobante sin enviar/Escape');
+
+      // Y una vez enviado deja de serlo: el archivo ya viajó.
+      await page.getByRole('button', { name: 'Adjuntar comprobante' }).first().click();
+      await esperarA(async () => ((await page.locator('body').innerText())
+        .includes('Comprobante enviado')),
+      'el comprobante no llegó a enviarse', 20_000);
+
+      // Con la orden creada y el comprobante enviado, cerrar no pregunta.
+      await page.getByRole('button', { name: 'Finalizar' }).click();
+      await esperarA(async () => (await page.getByRole('heading', { name: /Tus órdenes/ })
+        .count()) === 0, 'con la orden creada, «Finalizar» no cerró', 20_000);
+      await sinPregunta(page, 'checkout con la orden creada');
+      cerrados.push('checkout con orden creada/Finalizar');
+      const despues = queryCount(
+        `SELECT COUNT(*) FROM orders WHERE buyer_id = ${sqlLiteral(comprador.data.user.id)}`);
+      assert(despues - ordenesAntes === 1,
+        `cerrar el checkout dejó ${despues - ordenesAntes} órdenes: se duplicó algo`);
+      await page.context().close();
+    }
+
+    return `los cinco formularios comparten una sola política, recorrida en `
+      + `${cerrados.length} caminos de cierre (${cerrados.join(', ')}): limpios cierran derecho `
+      + 'y sucios preguntan una sola vez, con la '
+      + 'pregunta como capa de arriba —dos diálogos, foco adentro—; «seguir editando» y Escape '
+      + 'sobre la pregunta conservan todo y devuelven el foco al control que pidió cerrar; '
+      + 'descartar cierra UNA sola capa —Mi Panel queda abierto— y no revive el borrador; '
+      + 'cambiar y revertir un valor deja el formulario limpio otra vez; y con la orden ya '
+      + `creada el checkout cierra sin preguntar y sin duplicar (${ordenesDelCheckout} orden)`;
   } finally {
     await browser.close();
     await apiRequest('/cart', { method: 'DELETE', token: tokenComprador });

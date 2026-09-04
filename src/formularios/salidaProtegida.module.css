@@ -1,0 +1,66 @@
+/* La pregunta de cierre. Usa los mismos tokens que el resto del producto: no
+   introduce color propio ni tipografía propia. */
+
+.fondo {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  /* Por encima de cualquier capa del producto: es la que decide si esa capa
+     se cierra. */
+  z-index: 12000;
+}
+
+.tarjeta {
+  background: var(--tg-color-surface, #ffffff);
+  color: var(--tg-color-text, #1a1a1a);
+  border-radius: 12px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+}
+
+.encabezado {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.titulo {
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.3;
+}
+
+.cerrar {
+  background: none;
+  border: none;
+  color: var(--tg-color-text, #1a1a1a);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  /* El área de toque mínima, igual que el resto de los cierres. */
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.detalle {
+  margin: 12px 0 20px;
+  color: var(--tg-color-text-secondary, #4a4a4a);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.accion {
+  flex: 1 1 160px;
+  min-height: 44px;
+}

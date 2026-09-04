@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './UserDashboard.module.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
@@ -30,6 +30,7 @@ import {
   precioVisible,
 } from '../../utils/formatters';
 import { useCapaModal } from '../../hooks/useCapaModal';
+import { huboCambios, useSalidaProtegida } from '../../formularios/salidaProtegida';
 
 type TabType = 'profile' | 'notifications' | 'purchases' | 'sales' | 'products'
   | 'operations';
@@ -363,6 +364,12 @@ const aPublicacionDelPanel = (p: BackendProduct): UserProduct => {
 // Único armador del formulario de perfil. Sale de la cuenta y de nada más: lo
 // que no está guardado empieza vacío, nunca con un dato de ejemplo. Hidratar y
 // cancelar usan esta misma función, así no pueden divergir.
+/** El retrato de una edición. Los archivos nuevos entran por nombre: un
+ *  `File` no se puede serializar y lo que importa es cuáles se agregaron. */
+const retratoDeLaEdicion = (edicion: EditFormData | null) => (edicion
+  ? { ...edicion, newImages: edicion.newImages.map((imagen) => imagen.file.name) }
+  : null);
+
 const formularioDesde = (cuenta: User | null) => ({
   name: cuenta?.name || '',
   phone: cuenta?.phone || '',
@@ -413,6 +420,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   
   // Estado para modal de edición
   const [editingProduct, setEditingProduct] = useState<EditFormData | null>(null);
+  // Con qué abrió la edición. Se compara contra esto para saber si hay algo
+  // sin guardar; se escribe al abrir y no en un efecto, para que no dependa de
+  // en qué orden dibuje React.
+  const retratoInicialDeLaEdicion = useRef('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Vinculo con Mercado Pago. `mpVinculo` es lo unico que decide que se ve:
@@ -936,6 +947,35 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   // Cancelar sale de la edición; la rehidratación de arriba devuelve todos los
   // campos al último estado guardado. Una edición abandonada no puede
   // reaparecer en el guardado siguiente.
+  // --- Cerrar sin perder trabajo ------------------------------------------
+  // Tres formularios viven en este panel y comparten una sola política. La
+  // suciedad se mide contra el retrato con el que cada uno abrió: un valor
+  // precargado no es un cambio, y volver un campo a su valor original deja el
+  // formulario limpio otra vez.
+  const perfilSucio = isEditing && (
+    huboCambios(formularioDesde(user), editForm)
+    || carrierProvinceId !== (user?.carrierBaseProvinceId || '')
+  );
+  const edicionSucia = editingProduct !== null
+    && JSON.stringify(retratoDeLaEdicion(editingProduct)) !== retratoInicialDeLaEdicion.current;
+  const calificacionSucia = ratingModal !== null && (ratingScore !== 5 || ratingComment !== '');
+  const hayTrabajoSinGuardar = perfilSucio || edicionSucia || calificacionSucia;
+  const trabajoRef = useRef(hayTrabajoSinGuardar);
+  trabajoRef.current = hayTrabajoSinGuardar;
+
+  const salida = useSalidaProtegida();
+  // Cerrar el panel entero: lo pide la X, el fondo y Escape, y arrastra
+  // cualquiera de los tres formularios que esté sucio.
+  const pedirCierreDelPanel = useCallback(
+    () => salida.alSalir(trabajoRef.current, onClose),
+    [salida, onClose],
+  );
+  const cerrarLaEdicion = useCallback(() => setEditingProduct(null), []);
+  const pedirCierreDeLaEdicion = () => salida.alSalir(edicionSucia, cerrarLaEdicion);
+  const cerrarLaCalificacion = useCallback(() => setRatingModal(null), []);
+  const pedirCierreDeLaCalificacion = () =>
+    salida.alSalir(calificacionSucia, cerrarLaCalificacion);
+
   const handleCancelEdit = () => {
     setEditForm(formularioDesde(user));
     setCarrierProvinceId(user?.carrierBaseProvinceId || '');
@@ -1251,6 +1291,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       
       showToast('¡Gracias por tu calificación!', 'success');
       setRatedOrders(prev => new Set(prev).add(ratingModal.orderId));
+      // Ya se guardó: no hay nada sin guardar que preguntar.
       setRatingModal(null);
     } catch (error: unknown) {
       console.error('Error al enviar calificación:', error);
@@ -1351,7 +1392,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     const isService = product.publication_type === 'servicio';
     
     // Abrir modal de edición con los datos del producto
-    setEditingProduct({
+    const edicion: EditFormData = {
       id: product.id,
       name: product.name,
       description: product.description || '',
@@ -1377,7 +1418,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       experience_years: product.experience_years?.toString() || '',
       has_equipment: product.has_equipment ?? true,
       coverage_zones: product.coverage_zones || [],
-    });
+    };
+    retratoInicialDeLaEdicion.current = JSON.stringify(retratoDeLaEdicion(edicion));
+    setEditingProduct(edicion);
   };
   
   const handleSaveEditProduct = async () => {
@@ -1589,7 +1632,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             </button>
             <button
               className={styles.cancelButton}
-              onClick={handleCancelEdit}
+              onClick={() => salida.alSalir(perfilSucio, handleCancelEdit)}
               disabled={isSavingProfile}
             >
               Cancelar
@@ -3103,10 +3146,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
 
   // Atrapa el foco, lo devuelve al cerrar, cierra con Escape y traba el
   // scroll del fondo. Ninguna capa del producto hacía nada de esto.
-  const capa = useCapaModal<HTMLDivElement>(onClose);
+  const capa = useCapaModal<HTMLDivElement>(pedirCierreDelPanel);
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div className={styles.overlay} onClick={pedirCierreDelPanel}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}
         ref={capa}
         role="dialog"
@@ -3114,7 +3157,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         aria-label="Mi cuenta"
         tabIndex={-1}
       >
-        <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
+        <button className={styles.closeButton} aria-label="Cerrar" onClick={pedirCierreDelPanel}>
           ×
         </button>
 
@@ -3203,13 +3246,21 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       
       {/* Modal de Edición de Producto */}
       {editingProduct && (
-        <div className={styles.editModalOverlay} onClick={() => setEditingProduct(null)}>
+        <div
+          className={styles.editModalOverlay}
+          onClick={(evento) => {
+            // El clic no sube al fondo del panel, que también cierra: sin esto,
+            // cerrar la edición cerraba además Mi Panel entero.
+            evento.stopPropagation();
+            pedirCierreDeLaEdicion();
+          }}
+        >
           <div className={styles.editModal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.editModalHeader}>
               <h2> Editar {editingProduct.publication_type === 'servicio' ? 'Servicio' : 'Producto'}</h2>
               <button 
                 className={styles.closeButton}
-                onClick={() => setEditingProduct(null)}
+                onClick={pedirCierreDeLaEdicion}
               >
                 ×
               </button>
@@ -3576,7 +3627,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             <div className={styles.editModalActions}>
               <button
                 className={styles.cancelBtn}
-                onClick={() => setEditingProduct(null)}
+                onClick={pedirCierreDeLaEdicion}
               >
                 Cancelar
               </button>
@@ -3607,7 +3658,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             justifyContent: 'center',
             zIndex: 10000
           }}
-          onClick={() => setRatingModal(null)}
+          onClick={(evento) => {
+            // Igual que la edición: el fondo de la calificación no puede
+            // cerrar además el panel que está debajo.
+            evento.stopPropagation();
+            pedirCierreDeLaCalificacion();
+          }}
         >
           <div 
             style={{
@@ -3692,7 +3748,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setRatingModal(null);
+                  pedirCierreDeLaCalificacion();
                 }}
                 style={{
                   padding: '12px 24px',
@@ -3730,6 +3786,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           </div>
         </div>
       )}
+      {salida.pregunta}
     </div>
   );
 };

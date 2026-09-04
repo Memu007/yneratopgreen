@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { NewProductData } from '../../types';
@@ -7,6 +7,7 @@ import styles from './AddProductModal.module.css';
 import { ProductImage } from '../ProductImage/ProductImage';
 import { Condition, OperationKind, ETIQUETA_DE_ANATOMIA, ETIQUETA_DE_CONDICION } from '../../utils/anatomia';
 import { useCapaModal } from '../../hooks/useCapaModal';
+import { huboCambios, useSalidaProtegida } from '../../formularios/salidaProtegida';
 
 interface AddProductModalProps {
   isOpen: boolean;
@@ -77,10 +78,47 @@ interface LocalityOption {
   longitude: number;
 }
 
+// Con qué valores abre el formulario. Se usan para arrancar y para volver a
+// dejarlo vacío, así «vacío» significa lo mismo en los dos lados.
+const FORMULARIO_VACIO = (): NewProductData => ({
+  name: '',
+  category: '',
+  subcategory: '',
+  localityId: '',
+  price: 0,
+  description: '',
+  image: '',
+  location: { province: '', city: '' },
+  stock: 0,
+  unit: 'kg',
+  features: {},
+  tags: [],
+});
+
+const SERVICIO_VACIO = () => ({
+  pricingType: 'por_hora',
+  availability: 'inmediata',
+  coverageZones: [] as string[],
+  experienceYears: '',
+  hasEquipment: true,
+  responseTime: '24hs',
+});
+
+const RETRATO_VACIO = {
+  publicationType: 'producto',
+  operationKind: 'insumo',
+  condition: '',
+  formData: FORMULARIO_VACIO(),
+  serviceData: SERVICIO_VACIO(),
+  selectedProvinceId: '',
+  zoneInput: '',
+  featureKey: '',
+  featureValue: '',
+  tagInput: '',
+  imagenes: [] as string[],
+};
+
 export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSubmit }) => {
-  // Antes de cualquier `return` temprano: un hook se llama siempre y en
-  // el mismo orden. El interruptor es el que decide si hace algo.
-  const capa = useCapaModal<HTMLDivElement>(onClose, isOpen);
 
   const { user, isAuthenticated } = useAuth();
   const { showToast } = useToast();
@@ -112,38 +150,69 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   // elegir uno haría que el vendedor conteste cualquier cosa para publicar.
   const [condition, setCondition] = useState<Condition | ''>('');
   
-  const [formData, setFormData] = useState<NewProductData>({
-    name: '',
-    category: '',
-    subcategory: '',
-    localityId: '',
-    price: 0,
-    description: '',
-    image: '',
-    location: {
-      province: '',
-      city: '',
-    },
-    stock: 0,
-    unit: 'kg',
-    features: {},
-    tags: [],
-  });
+  const [formData, setFormData] = useState<NewProductData>(FORMULARIO_VACIO);
 
   // Datos específicos de servicios
-  const [serviceData, setServiceData] = useState({
-    pricingType: 'por_hora',
-    availability: 'inmediata',
-    coverageZones: [] as string[],
-    experienceYears: '',
-    hasEquipment: true,
-    responseTime: '24hs',
-  });
+  const [serviceData, setServiceData] = useState(SERVICIO_VACIO);
   const [zoneInput, setZoneInput] = useState('');
 
   const [featureKey, setFeatureKey] = useState('');
   const [featureValue, setFeatureValue] = useState('');
   const [tagInput, setTagInput] = useState('');
+
+  // El retrato de lo que hay escrito. Se compara contra el del formulario
+  // recién abierto, así un valor precargado no cuenta como cambio y volver un
+  // campo a su valor original deja el formulario limpio otra vez. Las imágenes
+  // entran por nombre: un archivo no se puede serializar.
+  const hayBorrador = huboCambios(RETRATO_VACIO, {
+    publicationType,
+    operationKind,
+    condition,
+    formData,
+    serviceData,
+    selectedProvinceId,
+    zoneInput,
+    featureKey,
+    featureValue,
+    tagInput,
+    imagenes: images.map((imagen) => imagen.file?.name ?? ''),
+  });
+  // El cierre protegido se dispara desde `useCapaModal`, que se queda con la
+  // función que le pasan: por eso el borrador viaja por referencia.
+  const hayBorradorRef = useRef(hayBorrador);
+  hayBorradorRef.current = hayBorrador;
+
+  const limpiarFormulario = useCallback(() => {
+    setFormData(FORMULARIO_VACIO());
+    setServiceData(SERVICIO_VACIO());
+    setPublicationType('producto');
+    setOperationKind('insumo');
+    setCondition('');
+    setSelectedProvinceId('');
+    setLocalities([]);
+    setImages([]);
+    setZoneInput('');
+    setFeatureKey('');
+    setFeatureValue('');
+    setTagInput('');
+  }, []);
+
+  // Un solo camino de salida para los cuatro cierres del alta: Escape, la X,
+  // el fondo y «Cancelar». Descartar limpia el borrador: si no, el alta
+  // siguiente se abriría con lo que la persona acababa de descartar.
+  const salida = useSalidaProtegida();
+  const cerrarYLimpiar = useCallback(() => {
+    limpiarFormulario();
+    onClose();
+  }, [limpiarFormulario, onClose]);
+  const pedirCierre = useCallback(
+    () => salida.alSalir(hayBorradorRef.current, cerrarYLimpiar),
+    [salida, cerrarYLimpiar],
+  );
+
+  // Antes de cualquier `return` temprano: un hook se llama siempre y en el
+  // mismo orden. El interruptor es el que decide si hace algo.
+  const capa = useCapaModal<HTMLDivElement>(pedirCierre, isOpen);
 
   // Cargar categorías y opciones del backend
   React.useEffect(() => {
@@ -577,35 +646,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
       // Cerrar el modal
       onClose();
       
-      // Resetear formulario
-      setFormData({
-        name: '',
-        category: '',
-        subcategory: '',
-        localityId: '',
-        price: 0,
-        description: '',
-        image: '',
-        location: {
-          province: '',
-          city: '',
-        },
-        stock: 0,
-        unit: 'kg',
-        features: {},
-        tags: [],
-      });
-      setSelectedProvinceId('');
-      setLocalities([]);
-      setImages([]);
-      setServiceData({
-        pricingType: 'por_hora',
-        availability: 'inmediata',
-        coverageZones: [],
-        experienceYears: '',
-        hasEquipment: true,
-        responseTime: '24hs',
-      });
+      // El formulario vuelve a cero por el mismo camino que usa «descartar».
+      limpiarFormulario();
 
     } catch (error) {
       console.error('Error al crear producto:', error);
@@ -617,7 +659,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   };
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div className={styles.modalOverlay} onClick={pedirCierre}>
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}
         ref={capa}
         role="dialog"
@@ -627,7 +669,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
       >
         <div className={styles.modalHeader}>
           <h2>{publicationType === 'producto' ? 'Publicar un producto' : 'Publicar un servicio'}</h2>
-          <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>✕</button>
+          <button className={styles.closeButton} aria-label="Cerrar" onClick={pedirCierre}>✕</button>
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
@@ -1183,7 +1225,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
           </div>
 
           <div className={styles.formActions}>
-            <button type="button" onClick={onClose} className={styles.cancelButton} disabled={isSubmitting}>
+            <button type="button" onClick={pedirCierre} className={styles.cancelButton} disabled={isSubmitting}>
               Cancelar
             </button>
             <button type="submit" className={styles.submitButton} disabled={isSubmitting}>
@@ -1192,6 +1234,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
           </div>
         </form>
       </div>
+      {salida.pregunta}
     </div>
   );
 };
