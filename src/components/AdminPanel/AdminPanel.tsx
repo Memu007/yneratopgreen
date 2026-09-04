@@ -1266,7 +1266,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                           >
                             <option value="active">Activo</option>
                             <option value="paused">Pausado</option>
-                            <option value="draft">Borrador</option>
+                            <option value="sold_out">Agotado</option>
                             <option value="deleted">Eliminado</option>
                           </select>
                         </td>

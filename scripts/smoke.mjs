@@ -17055,6 +17055,211 @@ await runCase(145, 'Las tres listas de Administracion pasan de la fila veinte', 
   }
 });
 
+await runCase(146, 'El estado de una publicacion se cambia desde el panel y persiste', async () => {
+  // El selector de estado de CADA FILA de Publicaciones ofrecia «Borrador»
+  // —`draft`, que `ProductStatus` no tiene— y no ofrecia «Agotado». Elegir
+  // «Borrador» era una accion falsa: el servidor contesta 400 y la publicacion
+  // queda igual; y no habia forma de dejar una publicacion agotada desde
+  // Administracion.
+  //
+  // El caso no lleva los estados escritos a mano: los saca del modelo y los
+  // confronta con el tipo de la base. Despues exige que cada fila ofrezca
+  // exactamente eso, ACCIONA el control real sobre publicaciones propias
+  // mirando cada PATCH, y vuelve a entrar al panel para ver lo persistido.
+
+  // --- el dominio, sacado de donde vive -----------------------------------
+  const fuenteDelModelo = readFileSync('backend/app/models/product.py', 'utf8');
+  const cuerpoDelEnum = (fuenteDelModelo.split(/^class\s+ProductStatus\b.*$/m)[1] || '')
+    .split(/^class\s/m)[0];
+  const dominio = [...cuerpoDelEnum.matchAll(/^\s+[A-Z_]+\s*=\s*['"]([a-z_]+)['"]/gm)]
+    .map(([, valor]) => valor);
+  assert(dominio.length >= 3,
+    `no se pudo leer ProductStatus del modelo: ${JSON.stringify(dominio)}`);
+  const enLaBase = queryRows(`
+    SELECT e.enumlabel FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'productstatus'
+    ORDER BY e.enumsortorder`).map(([etiqueta]) => etiqueta.toLowerCase());
+  const ordenados = (lista) => [...lista].sort().join(',');
+  assert(ordenados(dominio) === ordenados(enLaBase),
+    `el modelo dice ${JSON.stringify(dominio)} y el tipo de la base `
+    + `${JSON.stringify(enLaBase)}: el caso no sabria contra que dominio medir`);
+
+  // --- las publicaciones del caso, por la ruta real -----------------------
+  const admin = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'admin@topgreen.com', password: 'admin123' },
+  });
+  const token = admin.data.access_token;
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+
+  const sello = Date.now();
+  const [categoria] = queryRows(`
+    SELECT id, 'fin' FROM categories
+    WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+
+  // Una publicacion por estado del dominio: cada una tiene que terminar en el
+  // suyo, y se llega ahi por el control del panel y nunca por la API.
+  const publicaciones = [];
+  for (const estado of dominio) {
+    const nombre = `Est146 ${sello} ${estado}`;
+    const alta = await apiRequest('/products', {
+      method: 'POST', token: vendedor.token,
+      body: {
+        name: nombre,
+        description: 'Publicacion efimera del caso 146, para accionar su estado desde el panel.',
+        category_id: categoria[0],
+        price: 1460,
+        stock: 2,
+        unit: 'kg',
+        locality_id: localidad,
+        publication_type: 'producto',
+        operation_kind: 'insumo',
+      },
+    });
+    assert(alta.status < 400 && alta.data?.id,
+      `no se pudo publicar «${nombre}»: HTTP ${alta.status} ${JSON.stringify(alta.data)}`);
+    publicaciones.push({ nombre, estado, id: alta.data.id });
+  }
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
+    await contexto.addInitScript(({ a, r }) => {
+      window.localStorage.setItem('access_token', a);
+      window.localStorage.setItem('refresh_token', r);
+    }, { a: token, r: admin.data.refresh_token });
+    const page = await contexto.newPage();
+
+    const abrirPublicaciones = async () => {
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Admin' }).click();
+      await page.getByRole('heading', { name: 'Panel de Administración' })
+        .waitFor({ timeout: 20_000 });
+      await page.getByRole('button', { name: 'Productos', exact: true }).click();
+      await page.locator('tbody tr').first().waitFor({ state: 'visible', timeout: 20_000 });
+    };
+    const filaDe = (nombre) => page.locator('tbody tr').filter({ hasText: nombre });
+    const selectorDe = (nombre) => filaDe(nombre)
+      .locator('select[aria-label="Estado del producto"]');
+    // La columna «Estado» es la sexta y trae el distintivo con el estado crudo;
+    // el CSS lo dibuja en mayusculas, asi que se compara en minusculas.
+    const celdaDe = async (nombre) => (await filaDe(nombre).locator('td:nth-child(6)')
+      .innerText()).trim().toLowerCase();
+    const esperarLaFila = async (nombre) => esperarA(
+      async () => (await filaDe(nombre).count()) === 1,
+      `«${nombre}» no aparecio en la primera pagina de Publicaciones`, 20_000);
+
+    await abrirPublicaciones();
+    for (const publicacion of publicaciones) await esperarLaFila(publicacion.nombre);
+
+    // --- A. lo que ofrece el selector de cada fila -------------------------
+    // No se comprueba una opcion elegida a mano: se enumeran TODAS las de TODAS
+    // las filas dibujadas. Una opcion que el dominio no admite es una accion
+    // falsa, y una del dominio que falta es una accion imposible.
+    const porFila = await page.locator('tbody tr select[aria-label="Estado del producto"]')
+      .evaluateAll((nodos) => nodos.map((nodo) => [...nodo.options].map((o) => o.value)));
+    assert(porFila.length > 0, 'ninguna fila de Publicaciones ofrece el selector de estado');
+    for (const ofrecidas of porFila) {
+      const sobran = ofrecidas.filter((valor) => !dominio.includes(valor));
+      const faltan = dominio.filter((valor) => !ofrecidas.includes(valor));
+      assert(sobran.length === 0,
+        `el selector de la fila ofrece estados que ProductStatus no tiene: `
+        + `${JSON.stringify(sobran)} (ofrece ${JSON.stringify(ofrecidas)}, el dominio es `
+        + `${JSON.stringify(dominio)})`);
+      assert(faltan.length === 0,
+        `el selector de la fila no ofrece estados del dominio: ${JSON.stringify(faltan)} `
+        + `(ofrece ${JSON.stringify(ofrecidas)})`);
+    }
+
+    // --- B. por que «Borrador» no podia estar ------------------------------
+    // Esto no reemplaza al control: es la medida del limite del dominio contra
+    // el servidor real. El valor que la pantalla ofrecia hasta ahora es
+    // rechazado, y la publicacion no cambia.
+    const testigo = publicaciones[0];
+    const antesDelRechazo = queryRows(
+      `SELECT status::text FROM products WHERE id = ${sqlLiteral(testigo.id)}`)[0][0];
+    const conDraft = await pedirCrudo(`/admin/products/${testigo.id}/status`, {
+      method: 'PATCH', header: token, body: { status: 'draft' },
+    });
+    assert(conDraft.status === 400,
+      `el servidor contesto ${conDraft.status} al estado «draft» que la pantalla ofrecia: `
+      + `${JSON.stringify(conDraft.datos).slice(0, 140)}`);
+    const despuesDelRechazo = queryRows(
+      `SELECT status::text FROM products WHERE id = ${sqlLiteral(testigo.id)}`)[0][0];
+    assert(antesDelRechazo === despuesDelRechazo,
+      `«draft» fue rechazado pero la publicacion paso de ${antesDelRechazo} a ${despuesDelRechazo}`);
+
+    // --- C. accionar el control real, un PATCH por vez ---------------------
+    const cambiarDesdeElPanel = async (publicacion, estado) => {
+      const [respuesta] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes(`/admin/products/${publicacion.id}/status`)
+          && r.request().method() === 'PATCH', { timeout: 20_000 }),
+        selectorDe(publicacion.nombre).selectOption(estado),
+      ]);
+      const enviado = JSON.parse(respuesta.request().postData() || '{}');
+      assert(enviado.status === estado,
+        `se eligio «${estado}» en la fila de «${publicacion.nombre}» y el panel pidio `
+        + `«${enviado.status}»`);
+      assert(respuesta.status() === 200,
+        `«${estado}» desde el control contesto ${respuesta.status()}: `
+        + `${(await respuesta.text().catch(() => '')).slice(0, 140)}`);
+      // La lista se vuelve a pedir sola: se espera a que la celda cambie, no un
+      // tiempo fijo.
+      await esperarA(async () => (await celdaDe(publicacion.nombre)) === estado,
+        `la celda de Estado de «${publicacion.nombre}» no quedo en «${estado}» tras accionar `
+        + `el control; muestra «${await celdaDe(publicacion.nombre)}»`, 20_000);
+    };
+
+    const accionados = [];
+    for (const publicacion of publicaciones) {
+      // Nace `active`: elegir el valor que ya tiene no dispara nada, asi que la
+      // que tiene que terminar activa pasa antes por otro estado y vuelve.
+      const inicial = await selectorDe(publicacion.nombre).inputValue();
+      const pasos = inicial === publicacion.estado
+        ? [dominio.find((estado) => estado !== publicacion.estado), publicacion.estado]
+        : [publicacion.estado];
+      for (const paso of pasos) {
+        await cambiarDesdeElPanel(publicacion, paso);
+        accionados.push(paso);
+      }
+    }
+    for (const estado of dominio) {
+      assert(accionados.includes(estado),
+        `el caso no llego a accionar «${estado}» desde el control de la fila`);
+    }
+
+    // --- D. recargar y mirar lo persistido ---------------------------------
+    await abrirPublicaciones();
+    for (const publicacion of publicaciones) {
+      await esperarLaFila(publicacion.nombre);
+      const celda = await celdaDe(publicacion.nombre);
+      assert(celda === publicacion.estado,
+        `tras recargar, «${publicacion.nombre}» muestra «${celda}» en la celda de Estado y no `
+        + `«${publicacion.estado}»`);
+      const enElSelector = await selectorDe(publicacion.nombre).inputValue();
+      assert(enElSelector === publicacion.estado,
+        `tras recargar, el selector de «${publicacion.nombre}» quedo en «${enElSelector}»`);
+      const enBase = queryRows(
+        `SELECT status::text FROM products WHERE id = ${sqlLiteral(publicacion.id)}`)[0][0]
+        .toLowerCase();
+      assert(enBase === publicacion.estado,
+        `en la base «${publicacion.nombre}» quedo en «${enBase}» y la pantalla dice «${celda}»`);
+    }
+
+    await contexto.close();
+    return `cada fila de Publicaciones ofrece exactamente los ${dominio.length} estados de `
+      + `ProductStatus (${dominio.join(', ')}), los mismos que el tipo de la base, y ninguna `
+      + `ofrece «draft», que el servidor rechaza con ${conDraft.status} sin cambiar nada; los `
+      + `${accionados.length} cambios se hicieron con el control real —un PATCH por vez, todos `
+      + `200— y tras volver a entrar al panel las ${publicaciones.length} publicaciones muestran `
+      + `en su celda de Estado lo que guardo la base: ${publicaciones
+        .map((p) => p.estado).join(', ')}`;
+  } finally {
+    await browser.close();
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 
