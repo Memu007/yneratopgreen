@@ -2,201 +2,184 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## FORM-DIRTY-1R — escribir no puede expulsar el foco
+## FORM-CONSISTENCY-1 — un formulario no se contradice ni esconde su error
 
 Hecho. Producto/regresión e informe en commits separados. **No desplegué.**
 
-- Producto/regresión: `83dba0a` — «FORM-DIRTY-1R: escribir en un formulario no
-  puede expulsar el foco»
-- La suite pasa a **150 casos**.
+- Producto/regresión: `6837af1` — «FORM-CONSISTENCY-1: un formulario no se
+  contradice ni esconde su error»
+- La suite pasa a **151 casos**.
 
-Tenías razón y el defecto era mío. Lo reproduje en la UI real antes de tocar
-nada, y en la aplicación es un poco peor que en tu reproducción aislada.
+Los cinco bordes existían los cinco. Los medí uno por uno sobre la interfaz
+real antes de tocar nada.
 
 ---
 
-### 1. El rojo, en la interfaz real
-
-Escritura tecla por tecla con `pressSequentially`, una actualización de React
-por tecla, contra `7741b91`:
+### 1. El rojo, medido contra `83dba0a`
 
 ```
-1. ALTA     valor="a"               foco="Cerrar"
-2. CHECKOUT valor="a"               foco="Cerrar"
-3. MI PANEL valor="Juan Vendedora"  foco="Cerrar"   (el campo traía «Juan Vendedor»)
+B1 label «Email»       -> el clic no enfoca nada; htmlFor=null en los dos labels
+B1 label «Contraseña»  -> idem
+B2 error del registro  -> role=null, top=-381 en una ventana de 400 de alto
+                          (fuera de vista), foco en «Crear cuenta»;
+                          los valores escritos sí quedaban intactos
+B3 edición del precio  -> guardó precio=0 en un servicio con pricing_type
+                          «por_hora»; el alta no deja publicar eso
+B4 imagen rechazada    -> 1 subida rechazada con 413 y el aviso fue
+                          «Producto actualizado exitosamente»;
+                          0 imágenes, 1 publicación, metadatos guardados
+B5 tipos de carga      -> 1 pedido fallido; el grupo «Cargas que transportás»
+                          quedó con 0 casillas, texto vacío y sin reintento
 ```
 
-Los tres contenedores que la política de salida toca, los tres iguales: entra
-la primera letra y el foco se va al botón Cerrar de la capa. Con el caso nuevo
-puesto y el producto devuelto, el corte es más temprano de lo que suponía tu
-informe:
+Y el caso 151 completo, contra el mismo árbol:
 
 ```
-[FAIL] 150 … — alta de publicación: en la tecla 1 de 7 («A») el foco se fue del
-             campo a <button> «Cerrar»
+[FAIL] 151 … — el clic en el label «Email» dejo el foco en <div> «Ingresar»
 ```
 
-Es decir: la letra entra, y el render que provoca esa misma letra ya expulsa el
-foco. En un campo vacío el defecto aparece en la primera tecla, no en la
-segunda.
+### 2. Lo que cambié, por borde
 
-### 2. La raíz, medida antes de tocarla
+**Login (B1).** `id`/`htmlFor` en Email y Contraseña. Nada más: no toqué el
+copy ni abrí recuperación de contraseña.
 
-El efecto de `useCapaModal` dependía de `onClose`. Ese efecto hace cuatro cosas
-—empujar la capa a la pila, atrapar el foco, oír Escape y trabar el scroll— y
-las cuatro pertenecen a **la apertura de la capa**, no a la identidad de la
-función que cierra. Con `onClose` en las dependencias, cualquier capa cuyo
-cierre se vuelva a crear en cada render se desmonta y se vuelve a montar con
-cada tecla, y montar significa volver a enfocar el primer control.
+**Registro (B2).** El error —propio o de la API— se anuncia con `role="alert"`,
+se lleva a la vista y **recibe el foco**. Elegí enfocar la caja del error y no
+el campo responsable: el error vive arriba del formulario y enfocar el campo lo
+volvería a sacar de la pantalla, que es justo el defecto. Con la alerta enfocada
+se ve y se anuncia, y de ahí se tabula al formulario. Lo escrito no se toca:
+medido, nombre y contraseña siguen ahí.
 
-Antes de tocar el hook conté sus consumidores y separé cuáles estaban en riesgo:
-
-```
-capa                                    onClose                     ¿se recreaba?
-Pregunta                                useCallback []               no
-AdminPanel (panel)                      prop de App                  no*
-AdminPanel (detalle de orden)           useCallback []               no
-LoginModal / RegisterModal              prop de App                  no*
-ProductDetailModal / SellerProfile      prop / estado del detalle    no*
-CartModal                               prop de App                  no*
-AddProductModal    ← mío                dependía de `salida`         SÍ
-CheckoutModal      ← mío                dependía de `salida`         SÍ
-UserDashboard      ← mío                dependía de `salida`         SÍ
-```
-
-(*) esas capas reciben una flecha en línea desde `App`, así que su `onClose` sí
-cambia **cuando `App` vuelve a dibujar**. Lo que las salvaba es que escribir
-adentro de ellas no vuelve a dibujar `App`. O sea: no estaban sanas, estaban
-**a salvo por casualidad**. Por eso corregí la raíz y no sólo mis tres.
-
-**La corrección.** El cierre viaja por referencia y deja de ser dependencia: el
-efecto corre una vez por apertura, y Escape llama siempre a la versión más
-reciente. Son doce líneas en `src/hooks/useCapaModal.ts`; no hay otro gestor de
-modales, no hay oyentes locales nuevos y la pila es la misma.
-
-**El impacto sobre las capas ajenas, medido antes y después.** Misma sonda,
-mismo orden, sobre la aplicación real:
+**Precio (B3).** Una sola regla, en `src/publicaciones/precio.ts`:
 
 ```
-                                     antes (7741b91)             después (83dba0a)
-LOGIN     escritura secuencial       valor="abc", foco=campo      idéntico
-  Escape                             cierra, foco en Ingresar     idéntico
-REGISTRO  escritura secuencial       valor="abc", foco=campo      idéntico
-  Escape                             cierra, foco al anterior     idéntico
-CARRITO   abrir                      1 diálogo, foco en Cerrar    idéntico
-  +1 (vuelve a dibujar el carrito)   el foco sigue en «+»         idéntico
-  Escape                             cierra, foco en el carrito   idéntico
+producto                    -> precio explícito, mayor a cero
+servicio (no «a convenir»)  -> precio explícito, mayor a cero
+servicio «a convenir»       -> puede ir vacío o en cero
 ```
 
-Las capas sin campos de texto las cubre el **caso 148**, que pasa: detalle de
-publicación en Inicio/Mercado/Servicios por Escape, X y fondo; la pila detalle →
-perfil del vendedor; y el detalle de orden de Administración con pestaña,
-filtro, página y scroll conservados. Ninguna capa dependía de que el efecto se
-reinstalara: no hay ninguna a la que este cambio le altere el cierre.
+La aplican el alta y la edición, y el mensaje es uno solo para que no digan
+cosas distintas por lo mismo. No cambié el contrato del Backend ni toqué la
+doble fuente de ubicación de F6.
 
-### 3. Los tres consumidores
+Una precisión honesta: en el **alta** el navegador llega primero. El campo de
+precio es `type="number"` con `required`, así que un servicio «por hora» sin
+precio ni siquiera envía el formulario, y `value={formData.price || ''}` hace
+que un cero se dibuje vacío. La regla compartida es la segunda línea, y es la
+que decide de verdad en la **edición**, donde el campo es `type="text"` y sin
+`required`. Lo que el caso 151 comprueba es **la decisión** —publica / no
+publica, guarda / no guarda—, no qué capa la tomó.
 
-Además desprendí `alSalir` —que ya era estable— del objeto que devuelve
-`useSalidaProtegida`, para no volver a armar la trampa desde afuera:
-
-```
-const salida = useSalidaProtegida();
-const { alSalir } = salida;
-```
-
-No alcanzaba con poner `salida.alSalir` en las dependencias:
-`react-hooks/exhaustive-deps` exige el objeto entero y `npm run lint` corre con
-`--max-warnings 0`. Desprenderlo es la forma que la regla acepta y la que deja
-el cierre realmente estable.
-
-**No toqué la detección de suciedad**, ni el copy, ni los estilos, ni los
-formularios más allá de esas dos líneas por archivo.
-
-### 4. El caso 150
-
-Autónomo, sobre la interfaz real, y **discrimina los tres contenedores**: si
-falla, el mensaje dice cuál, en qué tecla y adónde se fue el foco.
-
-- Escribe **una letra por vez** y, después de **cada una**, contrasta el valor
-  del campo y `document.activeElement`. Nada de `fill()`: ahí la edición entra
-  de una sola vez y el defecto no se ve. Eso es exactamente lo que el 149 no
-  detectaba.
-- Comprueba además que la capa siguió siendo la misma: un solo `role="dialog"`
-  y el scroll de fondo todavía trabado.
-- Y que escribir no desarmó la protección: con lo escrito adentro, cerrar
-  pregunta una sola vez y «seguir editando» conserva el texto y **devuelve el
-  foco a ese mismo campo**.
-- Se arma lo suyo: entra por la API y publica su propio insumo con stock para
-  abrir el checkout, así no depende de lo que otro caso haya dejado.
-
-### 5. La semántica del 149 quedó intacta
-
-El 149 pasa sin tocarlo, con sus trece caminos de cierre: limpio cierra derecho,
-sucio pregunta una vez, seguir editando conserva, descartar cierra una sola capa
-y no revive el borrador, cambiar y revertir vuelve a limpio, y el checkout sigue
-distinguiendo el estado local de la orden ya creada —una orden, sin duplicar—.
-
-### 6. Puertas
+**Imagen parcial (B4).** El alta ya lo hacía bien —el caso 10 lo cerró— y la
+edición no miraba `response.ok`. No inventé un criterio nuevo: moví el del alta
+a `src/publicaciones/imagenes.ts` y ahora las dos pantallas usan el mismo
+código y dan el mismo motivo. La edición informa:
 
 ```
-base limpia + SMOKE_CASOS=150                   1/1
-base limpia + SMOKE_CASOS=149                   1/1
-base limpia + suite completa                    149/150   (131 rojo)
+La publicación se actualizó, pero no se pudo subir la imagen:
+consistencia-151.png: La imagen supera el tamaño permitido.
+Los demás cambios quedaron guardados.
+```
+
+No dice «exitosamente», no crea otra publicación y no revierte lo que ya se
+persistió: medido, la descripción nueva quedó guardada, con cero imágenes y una
+sola publicación.
+
+**Tipos de carga (B5).** Sigue siendo opcional, pero el fallo se explica con el
+motivo que devolvió el servidor y ofrece **Reintentar**. El grupo ya no se
+dibuja rotulado y vacío. Con la API recuperada, un clic trae las opciones sin
+cerrar ni reiniciar el registro: medido, 7 casillas y el nombre escrito seguía
+ahí.
+
+### 3. Un agregado que no me pediste
+
+En la edición, una imagen **que no se pudo quitar** entraba a un
+`console.error` y el aviso seguía siendo «actualizado exitosamente». Es la
+misma mentira que la del punto anterior, así que entra en el mismo aviso
+parcial. El caso 151 no lo mide —vos pediste el borde de la imagen nueva— y te
+lo marco para que decidas si querés una regresión propia.
+
+### 4. El caso 151
+
+Autónomo, sobre la UI real, sin esperas fijas, y cubre los cinco bordes:
+
+- clic en cada label del Login y contraste de `document.activeElement`;
+- registro en una ventana de 1200×400: enviar desde el final deja el error
+  anunciado, **dentro de la ventana**, enfocado y con los valores intactos;
+- misma decisión de precio en las dos pantallas: la edición rechaza el cero
+  «por hora» y lo acepta con «a convenir»; el alta no publica el servicio «por
+  hora» sin precio y sí lo publica con «a convenir»;
+- subida de imagen interceptada con 413: el aviso trae el motivo, no dice
+  «exitosamente», y en la base quedan una publicación, cero imágenes y la
+  descripción nueva;
+- `/logistics/cargo-types` interceptado con 503: no hay grupo rotulado y vacío,
+  la pantalla explica el motivo, hay Reintentar, y con la API sana el reintento
+  trae las casillas sin perder lo escrito.
+
+Para probar que el alta **no** publica sin esperar «a que no pase nada», el
+caso espera una señal positiva: el foco que el navegador deja en el campo que
+falta, y después comprueba en SQL que no se creó la publicación.
+
+### 5. Puertas
+
+```
+base limpia + SMOKE_CASOS=151                   1/1
+base limpia + suite completa                    150/151   (131 rojo)
+  controles                                     10, 22 y 113 en verde
 npm run build                                   ok
 npm run lint                                    ok (--max-warnings 0)
 node --check scripts/smoke.mjs                  ok
 python -m compileall backend/app                ok
 python -m pip check                             ok
 npm run a11y -- --todas                         64/64 pantallas, 0 bloqueantes
-npm run contraste                               52 mediciones, ninguna por debajo
 git -c core.whitespace=cr-at-eol diff --check   limpio
 ```
 
-El **131** es el de siempre, y su mensaje lo dice entero: mi puente traduce
-`docker exec` y esa receta necesita `docker run --rm -v … alpine:3`. En tu
-máquina esto tiene que dar **150/150**; yo no lo declaro.
+**Contraste no lo corrí**, como pediste: no cambié colores ni estilos. La caja
+de error del registro reutiliza la clase `error` que ya existía y ya estaba
+medida; no agregué ni un token nuevo.
 
-Sobre tu Docker: por lo que describís, el binario de Compose que trae Docker
-Desktop 4.41.2 quedó con firma inválida y Docker aborta al leer sus metadatos.
-Eso no lo puedo verificar desde acá y no me meto con tu máquina, pero para
-correr la suite no hace falta Docker: `./scripts/entorno_nativo.sh --recrear`
-levanta base, migraciones, seed, API y frontend nativos, que es lo que uso yo.
-El único caso que igual queda rojo por ese camino es el 131.
+El **131** es el ambiental de siempre: mi puente traduce `docker exec` y esa
+receta necesita `docker run --rm -v … alpine:3`.
 
-### 7. Hashes
+### 6. Hashes
 
 ```
-src/hooks/useCapaModal.ts                       db9c1416108ac58f
-src/components/AddProduct/AddProductModal.tsx   253288bbf2467488
-src/components/Checkout/CheckoutModal.tsx       8367817de78e20d7
-src/components/UserDashboard/UserDashboard.tsx  057f71f677eb2edc
-scripts/smoke.mjs                               c8d76f82387b45bd
+src/publicaciones/precio.ts                     7e9ba7ed6fb397bb
+src/publicaciones/imagenes.ts                   9b2c429679ae557e
+src/components/Auth/LoginModal.tsx              e96862d58564a68b
+src/components/Auth/RegisterModal.tsx           64e1d014f0c88e79
+src/components/AddProduct/AddProductModal.tsx   8988c62dcc8ab1e6
+src/components/UserDashboard/UserDashboard.tsx  3cd06953151d31f8
+scripts/smoke.mjs                               072c11954abdeaf3
 ```
 
-(SHA-256 truncado a 16, del árbol en `83dba0a`.)
+(SHA-256 truncado a 16, del árbol en `6837af1`.)
 
-### 8. Riesgos residuales
+### 7. Riesgos residuales
 
-1. **El efecto ya no reacciona a un cambio de `onClose`.** Es lo que se buscaba,
-   pero deja una consecuencia: una capa que quisiera reinstalar su trampa de
-   foco a propósito tendría que hacerlo por `activa`, la única dependencia que
-   queda. Ninguna lo hace hoy.
-2. **`activa` sigue siendo dependencia**, así que una capa que la haga oscilar
-   por render volvería a tener el mismo síntoma. Las once actuales pasan una
-   constante o un booleano de apertura.
-3. **El caso 150 mide siete y ocho teclas por contenedor.** Alcanza para este
-   defecto —que aparece en la primera— pero no es una prueba de escritura larga.
-4. Sigue en pie lo que ya te dije del 149: la suciedad se compara serializando,
-   el cambio de pestaña no pregunta porque no pierde nada, y la pregunta no
-   distingue entre formularios.
-5. El caso 150 deja una publicación del vendedor en la base, como el 145, el
-   147, el 148 y el 149 dejan las suyas.
+1. **El foco va a la alerta y no al campo.** Es deliberado por lo que expliqué,
+   pero significa un Tab más para volver al formulario. Si preferís el campo
+   responsable cuando es inequívoco, es un cambio chico y el 151 lo mediría
+   igual con otro control esperado.
+2. **La matriz de precio no valida moneda ni máximos.** Sólo decide obligatorio
+   contra opcional y mayor a cero. Un precio absurdo sigue siendo posible.
+3. **El Backend no está atado a esta matriz.** No lo toqué, como pediste; si
+   mañana la API aceptara un servicio «por hora» en cero por otra vía, la UI ya
+   no lo dejaría pasar pero la regla seguiría viviendo sólo en el Frontend.
+4. **El reintento de cargas depende de que el catálogo vuelva.** No hay
+   reintento automático ni límite de intentos: es un botón y nada más.
+5. El caso 151 deja tres publicaciones del vendedor en la base —el servicio, el
+   producto y el servicio publicado desde el alta—, como el 145, el 147, el 148,
+   el 149 y el 150 dejan las suyas.
 
-### 9. Frenos
+### 8. Frenos
 
-No cambié la detección de suciedad, copy, estilos, formularios más allá de las
-dos líneas por archivo, Backend, modelos, migraciones, seed, pagos, BOEDA,
-navegación/History API, Railway ni datos remotos. No desplegué. `PRE_FIRMA.md`
-sigue fuera del versionado y lo confirmé antes de empujar.
+No toqué F6/ubicación, rechazo de comprobante, rating, copy general,
+recuperación de contraseña, Backend, API, modelos, migraciones, seed, pagos,
+navegación, la política de suciedad/capas, BOEDA, Railway ni datos remotos. No
+desplegué. No agregué librería de formularios, ni otro sistema de alertas, ni
+puertas traseras de prueba. `PRE_FIRMA.md` sigue fuera del versionado y lo
+confirmé antes de empujar.
 
 Freno acá y te pido revisión.
