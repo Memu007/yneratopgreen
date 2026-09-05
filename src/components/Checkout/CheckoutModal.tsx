@@ -1143,10 +1143,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
   const hayTrabajoRef = useRef(hayTrabajoSinGuardar);
   hayTrabajoRef.current = hayTrabajoSinGuardar;
 
+  // `alSalir` se desprende del objeto: el objeto se vuelve a crear en cada
+  // render y `alSalir` no. Con el cierre estable, la capa no se vuelve a
+  // montar mientras se escribe.
   const salida = useSalidaProtegida();
+  const { alSalir } = salida;
   const pedirCierre = useCallback(
-    () => salida.alSalir(hayTrabajoRef.current, onClose),
-    [salida, onClose],
+    () => alSalir(hayTrabajoRef.current, onClose),
+    [alSalir, onClose],
   );
 
   // Atrapa el foco, lo devuelve al cerrar, cierra con Escape y traba el

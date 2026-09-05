@@ -200,14 +200,18 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   // Un solo camino de salida para los cuatro cierres del alta: Escape, la X,
   // el fondo y «Cancelar». Descartar limpia el borrador: si no, el alta
   // siguiente se abriría con lo que la persona acababa de descartar.
+  // `alSalir` se desprende del objeto: el objeto se vuelve a crear en cada
+  // render y `alSalir` no. Con el cierre estable, la capa no se vuelve a
+  // montar mientras se escribe.
   const salida = useSalidaProtegida();
+  const { alSalir } = salida;
   const cerrarYLimpiar = useCallback(() => {
     limpiarFormulario();
     onClose();
   }, [limpiarFormulario, onClose]);
   const pedirCierre = useCallback(
-    () => salida.alSalir(hayBorradorRef.current, cerrarYLimpiar),
-    [salida, cerrarYLimpiar],
+    () => alSalir(hayBorradorRef.current, cerrarYLimpiar),
+    [alSalir, cerrarYLimpiar],
   );
 
   // Antes de cualquier `return` temprano: un hook se llama siempre y en el

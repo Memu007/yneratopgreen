@@ -35,6 +35,24 @@ const FOCALIZABLES = [
 export function useCapaModal<T extends HTMLElement>(onClose: () => void, activa = true) {
   const contenedor = useRef<T>(null);
 
+  // El cierre viaja por referencia y NO es dependencia del efecto de abajo.
+  //
+  // Lo que ese efecto hace —empujar la capa a la pila, atrapar el foco, oír
+  // Escape y trabar el scroll— pertenece a la apertura de la capa, no a la
+  // identidad de la función que cierra. Si fuera dependencia, cualquier capa
+  // cuyo `onClose` se vuelva a crear en cada render —un formulario cuyo cierre
+  // depende de lo que hay escrito, por ejemplo— desmontaría y volvería a montar
+  // el efecto con cada tecla, y volver a montarlo significa volver a enfocar el
+  // primer control: escribir expulsaría el foco al primer botón de la capa y
+  // sólo entraría la primera letra.
+  //
+  // La referencia conserva las dos cosas: el efecto corre una vez por apertura
+  // y Escape llama siempre a la versión más reciente del cierre.
+  const cierre = useRef(onClose);
+  useEffect(() => {
+    cierre.current = onClose;
+  });
+
   useEffect(() => {
     // El interruptor no es un lujo: un hook tiene que llamarse siempre y en el
     // mismo orden, así que la capa que todavía no se abrió lo llama igual. Sin
@@ -56,7 +74,7 @@ export function useCapaModal<T extends HTMLElement>(onClose: () => void, activa 
       if (PILA[PILA.length - 1] !== propia) return;
       if (e.key === 'Escape') {
         e.stopPropagation();
-        onClose();
+        cierre.current();
         return;
       }
       if (e.key !== 'Tab' || !contenedor.current) return;
@@ -89,7 +107,7 @@ export function useCapaModal<T extends HTMLElement>(onClose: () => void, activa 
       document.body.style.overflow = overflowPrevio;
       previo?.focus?.();
     };
-  }, [onClose, activa]);
+  }, [activa]);
 
   return contenedor;
 }

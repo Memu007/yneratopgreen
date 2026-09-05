@@ -18333,6 +18333,185 @@ await runCase(149, 'Cerrar un formulario con trabajo sin guardar pregunta una so
   }
 });
 
+await runCase(150, 'Escribir en un formulario no mueve el foco de su campo', async () => {
+  // Medido contra `7741b91`: escribir «abc» tecla por tecla dejaba
+  //
+  //   alta de publicacion   valor="a"               foco="Cerrar"
+  //   checkout              valor="a"               foco="Cerrar"
+  //   Mi Panel (perfil)     valor="Juan Vendedora"  foco="Cerrar"
+  //
+  // La causa era una sola y estaba en la capa, no en los formularios: el
+  // cierre que recibia `useCapaModal` cambiaba de identidad en cada render, su
+  // efecto se desmontaba y volvia a montar con cada tecla, y montarlo significa
+  // volver a enfocar el primer control de la capa. La primera letra entraba, la
+  // segunda ya iba al boton Cerrar.
+  //
+  // Por eso este caso escribe TECLA POR TECLA y, despues de cada una, contrasta
+  // el valor del campo y `document.activeElement`. Con `fill()` la edicion entra
+  // de una sola vez y el defecto no se ve: por eso el 149 no lo detectaba.
+  const sello = Date.now();
+  const ingresoDelVendedor = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  });
+  const vendedor = ingresoDelVendedor.data;
+  assert(vendedor?.access_token, 'no se pudo entrar como vendedor');
+  const ingresoDelComprador = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'cliente@ejemplo.com', password: 'cliente123' },
+  });
+  const comprador = ingresoDelComprador.data;
+  assert(comprador?.access_token, 'no se pudo entrar como comprador');
+
+  // Una publicacion propia con stock: el checkout necesita algo que comprar y
+  // el caso no puede depender de lo que otro haya dejado en la base.
+  const [categoria] = queryRows(`
+    SELECT id, 'fin' FROM categories
+    WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const paraComprar = `Foco150 para comprar ${sello}`;
+  const alta = await apiRequest('/products', {
+    method: 'POST', token: vendedor.access_token,
+    body: {
+      name: paraComprar,
+      description: 'Publicacion efimera del caso 150, para abrir el checkout.',
+      category_id: categoria[0],
+      price: 1500,
+      stock: 20,
+      unit: 'kg',
+      locality_id: localidad,
+      publication_type: 'producto',
+      operation_kind: 'insumo',
+    },
+  });
+  assert(alta.status < 400 && alta.data?.id,
+    `no se pudo publicar el insumo del caso: HTTP ${alta.status}`);
+
+  const browser = await chromium.launch({ headless: true });
+  const recorridos = [];
+  try {
+    const sesion = async (datos) => {
+      const contexto = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
+      await contexto.addInitScript(({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+      }, { a: datos.access_token, r: datos.refresh_token });
+      return contexto.newPage();
+    };
+    const dondeEstaElFoco = (page) => page.evaluate(() => {
+      const activo = document.activeElement;
+      if (!activo || activo === document.body) return '(el documento)';
+      const nombre = activo.getAttribute('aria-label')
+        || activo.getAttribute('id')
+        || activo.getAttribute('name')
+        || (activo.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+      return `<${activo.tagName.toLowerCase()}> «${nombre}»`;
+    });
+    const esElActivo = (campo) => campo.evaluate((el) => el === document.activeElement);
+    const pregunta = (page) => page.locator('[aria-labelledby="titulo-cambios-sin-guardar"]');
+
+    // Una letra por vez, y despues de CADA una las dos cosas que el defecto
+    // rompia: que la letra entro y que el foco sigue en el mismo campo.
+    const escribirTeclaPorTecla = async (page, campo, texto, contenedor) => {
+      await campo.click();
+      // El cursor al final: `click()` lo deja donde cayo el clic y un campo
+      // precargado —el nombre del perfil— no arranca vacio.
+      await page.keyboard.press('End');
+      const inicial = await campo.inputValue();
+      let esperado = inicial;
+      for (const letra of texto) {
+        await page.keyboard.type(letra);
+        esperado += letra;
+        const numero = esperado.length - inicial.length;
+        if (!(await esElActivo(campo))) {
+          assert(false, `${contenedor}: en la tecla ${numero} de ${texto.length} («${letra}») el `
+            + `foco se fue del campo a ${await dondeEstaElFoco(page)}`);
+        }
+        const ahora = await campo.inputValue();
+        assert(ahora === esperado,
+          `${contenedor}: tras la tecla ${numero} de ${texto.length} el campo dice «${ahora}» y `
+          + `tendria que decir «${esperado}»`);
+      }
+      // Y la capa siguio siendo la misma capa: ni se duplico ni solto el fondo.
+      const dialogos = await page.locator('[role="dialog"]').count();
+      assert(dialogos === 1, `${contenedor}: escribir dejo ${dialogos} dialogo(s) y tendria que `
+        + 'haber exactamente 1');
+      assert((await page.evaluate(() => document.body.style.overflow)) === 'hidden',
+        `${contenedor}: escribir solto la traba del scroll de fondo`);
+      recorridos.push(`${contenedor}: ${texto.length} teclas`);
+      return esperado;
+    };
+
+    // Escribir no puede haber desarmado la proteccion: con lo escrito, cerrar
+    // pregunta una vez y «seguir editando» devuelve el foco al mismo campo.
+    const preguntaYVuelve = async (page, campo, contenedor, esperado) => {
+      await page.keyboard.press('Escape');
+      await esperarA(async () => (await pregunta(page).count()) === 1,
+        `${contenedor}: con lo escrito, Escape no pregunto nada antes de cerrar`, 20_000);
+      await page.getByRole('button', { name: 'Seguir editando' }).click();
+      await esperarA(async () => (await pregunta(page).count()) === 0,
+        `${contenedor}: «seguir editando» no cerro la pregunta`, 20_000);
+      assert((await campo.inputValue()) === esperado,
+        `${contenedor}: «seguir editando» dejo el campo en «${await campo.inputValue()}» y tenia `
+        + `que conservar «${esperado}»`);
+      await esperarA(() => esElActivo(campo),
+        `${contenedor}: «seguir editando» dejo el foco en ${await dondeEstaElFoco(page)} y no en `
+        + 'el campo que pidio cerrar', 20_000);
+    };
+
+    // --- A. alta de publicacion --------------------------------------------
+    {
+      const page = await sesion(vendedor);
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Vender' }).click();
+      const nombre = page.locator('input[name="name"]').first();
+      await nombre.waitFor({ state: 'visible', timeout: 20_000 });
+      const escrito = await escribirTeclaPorTecla(page, nombre, 'Alta150', 'alta de publicación');
+      await preguntaYVuelve(page, nombre, 'alta de publicación', escrito);
+      await page.context().close();
+    }
+
+    // --- B. checkout --------------------------------------------------------
+    {
+      const page = await sesion(comprador);
+      await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(paraComprar)}`,
+        { waitUntil: 'domcontentloaded' });
+      const agregar = page.getByRole('button', { name: /Agregar|Contratar/ }).first();
+      await agregar.waitFor({ state: 'visible', timeout: 20_000 });
+      await agregar.click();
+      await page.getByRole('button', { name: /carrito/i }).first().click();
+      await page.getByRole('button', { name: 'Continuar compra' }).click();
+      const direccion = page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B');
+      await direccion.waitFor({ state: 'visible', timeout: 20_000 });
+      const escrito = await escribirTeclaPorTecla(page, direccion, 'Ruta150', 'checkout');
+      await preguntaYVuelve(page, direccion, 'checkout', escrito);
+      await page.context().close();
+    }
+
+    // --- C. Mi Panel: el perfil, que vive DENTRO de la capa del panel -------
+    {
+      const page = await sesion(vendedor);
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Mi cuenta' }).click();
+      await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+      await page.locator('[class*="sectionHeader"]').filter({ hasText: 'Mi Perfil' })
+        .getByRole('button', { name: 'Editar' }).click();
+      const campo = page.locator('#perfil-nombre');
+      await campo.waitFor({ state: 'visible', timeout: 20_000 });
+      const escrito = await escribirTeclaPorTecla(page, campo, 'Panel150', 'Mi Panel (perfil)');
+      await preguntaYVuelve(page, campo, 'Mi Panel (perfil)', escrito);
+      await page.context().close();
+    }
+
+    return `escribir tecla por tecla conserva el texto y el foco en los tres contenedores que la `
+      + `política de cierre toca (${recorridos.join('; ')}): cada letra entra donde se escribió, `
+      + '`document.activeElement` sigue siendo el mismo campo después de cada una, la capa no se '
+      + 'duplica ni suelta la traba del scroll, y con lo escrito adentro cerrar sigue preguntando '
+      + 'una sola vez y «seguir editando» devuelve el foco a ese campo';
+  } finally {
+    await browser.close();
+    await apiRequest('/cart', { method: 'DELETE', token: comprador.access_token });
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

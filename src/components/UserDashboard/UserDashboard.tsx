@@ -963,18 +963,22 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   const trabajoRef = useRef(hayTrabajoSinGuardar);
   trabajoRef.current = hayTrabajoSinGuardar;
 
+  // `alSalir` se desprende del objeto: el objeto se vuelve a crear en cada
+  // render y `alSalir` no. Con el cierre estable, la capa no se vuelve a
+  // montar mientras se escribe.
   const salida = useSalidaProtegida();
+  const { alSalir } = salida;
   // Cerrar el panel entero: lo pide la X, el fondo y Escape, y arrastra
   // cualquiera de los tres formularios que esté sucio.
   const pedirCierreDelPanel = useCallback(
-    () => salida.alSalir(trabajoRef.current, onClose),
-    [salida, onClose],
+    () => alSalir(trabajoRef.current, onClose),
+    [alSalir, onClose],
   );
   const cerrarLaEdicion = useCallback(() => setEditingProduct(null), []);
-  const pedirCierreDeLaEdicion = () => salida.alSalir(edicionSucia, cerrarLaEdicion);
+  const pedirCierreDeLaEdicion = () => alSalir(edicionSucia, cerrarLaEdicion);
   const cerrarLaCalificacion = useCallback(() => setRatingModal(null), []);
   const pedirCierreDeLaCalificacion = () =>
-    salida.alSalir(calificacionSucia, cerrarLaCalificacion);
+    alSalir(calificacionSucia, cerrarLaCalificacion);
 
   const handleCancelEdit = () => {
     setEditForm(formularioDesde(user));
@@ -1632,7 +1636,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             </button>
             <button
               className={styles.cancelButton}
-              onClick={() => salida.alSalir(perfilSucio, handleCancelEdit)}
+              onClick={() => alSalir(perfilSucio, handleCancelEdit)}
               disabled={isSavingProfile}
             >
               Cancelar
