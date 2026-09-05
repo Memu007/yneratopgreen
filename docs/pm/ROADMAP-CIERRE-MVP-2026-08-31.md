@@ -1,6 +1,6 @@
 # Roadmap operativo para cerrar el MVP
 
-Actualizado: 2026-09-04.
+Actualizado: 2026-09-05.
 Fuentes: `CRONOGRAMA.md`, `ALCANCE-Y-LIMITES.md`, `NOW.md` y
 `AUDITORIAS-UX-CLAUDE-2026-08-30.md`.
 
@@ -54,7 +54,9 @@ final, como acordó Emi.
   con único rojo ambiental en 131; PM reprodujo 148 y 131 por separado en
   **1/1** cada uno, más puertas estáticas. C1 ya estaba cerrado y ADM-8 entra en
   la pila modal existente.
-- Tarea única vigente: **FORM-DIRTY-1**, detallada en `PARA-DEV.md`.
+- FORM-DIRTY-1 fue devuelta sobre `7741b91`: los callbacks de cierre cambian
+  en cada render y expulsan el foco del campo después de la primera tecla. La
+  tarea única vigente es **FORM-DIRTY-1R**, detallada en `PARA-DEV.md`.
 - ORD-SELF-1 no cierra ningún hallazgo de las tres auditorías; era la tarea P1
   anterior y las auditorías la excluyeron expresamente.
 - La historia de las devoluciones del arnés y su cierre reproducido queda en
@@ -110,7 +112,7 @@ edición, no a inventar una migración destructiva.
 |---:|---|---|---|
 | 7 | **NAV-URL-1 — cerrada** | A1, A2, A3, A8 y B4 | Aceptada en `bcdd448`/`aeafc13`: cinco URL estables, `popstate`, rutas especiales y detalle coherentes; PM cerró 147/147. |
 | 8 | **MODAL-LIFECYCLE-1 — cerrada** | C1 y ADM-8 | Aceptada en `b07ebce`/`83f6985`: cierra primero la capa superior, restaura foco al disparador y conserva pestaña/posición del panel. |
-| 9 | **FORM-DIRTY-1 — vigente** | F3 general | Formularios largos sucios confirman antes de perderse; los intactos cierran sin fricción. |
+| 9 | **FORM-DIRTY-1R — vigente** | F3 general | Corregir la regresión de foco de `7741b91`; después, formularios largos sucios confirman antes de perderse y los intactos cierran sin fricción. |
 
 No se corrige cada síntoma con otro `pushState` o listener local: NAV-URL-1
 tiene una sola política de navegación y una sola regresión matriz.

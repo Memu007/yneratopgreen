@@ -1,6 +1,25 @@
 # Estado actual
 
-Actualizado: 2026-09-04.
+Actualizado: 2026-09-05.
+
+## Estado inmediato — 2026-09-05
+
+- **FORM-DIRTY-1 devuelta:** producto/regresión `7741b91`, informe `52b7add`
+  corregido en `ddcdc35`. PM reprodujo que escribir `abc` conserva sólo `a` y
+  mueve el foco a Cerrar: los callbacks de alta, checkout y Mi Panel cambian en
+  cada render y reinician `useCapaModal`.
+- Build, lint y `diff --check` están verdes, pero no compensan la regresión
+  funcional. Evidencia en
+  `REPRODUCCION-FORM-DIRTY-1-2026-09-05.md`.
+- La corrida PM del 149 anterior a la reanudación quedó sin salida recuperable
+  y cuenta como desconocida. Docker Desktop 4.41.2 no reinicia porque su
+  binario incluido de Compose tiene firma inválida; no se reseteó Docker ni se
+  tocaron volúmenes o entornos remotos.
+- **Única tarea activa:** FORM-DIRTY-1R, en `PARA-DEV.md`. Dev corrige la
+  estabilidad del cierre y agrega el caso 150 con escritura secuencial. PM
+  repetirá 150, 149 y la suite completa desde base limpia antes de aceptar.
+- El red-team sigue cerrado: esta devolución no cumple las cinco condiciones
+  de entrada y no habilita despliegue.
 
 ## Relevo operativo para la próxima PM — 2026-09-04
 

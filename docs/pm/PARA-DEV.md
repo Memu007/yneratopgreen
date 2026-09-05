@@ -12,6 +12,44 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-05 — DEVOLUCIÓN VIGENTE: FORM-DIRTY-1R, escribir no puede expulsar el foco
+
+Revisé producto/regresión `7741b91` e informe `52b7add`, corregido en
+`ddcdc35`. FORM-DIRTY-1 **no queda aceptada**. La política de descarte está
+bien encaminada, pero los callbacks de cierre que reciben las capas cambian en
+cada render porque dependen del objeto completo `salida`. `useCapaModal`
+reinstala entonces su efecto y enfoca otra vez el primer control.
+
+Reproducción PM con los mismos hooks y el mismo patrón de dependencia: al
+escribir `abc` en secuencia, el campo terminó con `a` y el foco en Cerrar. La
+evidencia completa está en
+`docs/pm/REPRODUCCION-FORM-DIRTY-1-2026-09-05.md`. El caso 149 no lo detecta
+porque usa `fill()` y no comprueba la permanencia del foco después del render.
+
+### Corrección única
+
+1. Conservá evidencia roja contra `7741b91` en la UI real: escritura tecla por
+   tecla en un campo de alta, uno de checkout y uno dentro de Mi Panel. Después
+   de cada secuencia deben quedar el texto completo y el foco en el mismo
+   control.
+2. Corregí la raíz una sola vez o estabilizá de forma coherente los tres
+   consumidores. No agregues otro gestor de modales ni listeners locales.
+3. Conservá intacta la semántica aceptable del 149: limpio cierra directo;
+   sucio pregunta una vez; seguir editando conserva; descartar cierra una capa;
+   checkout distingue estado local de orden persistida.
+4. Agregá una regresión autónoma 150 sobre la UI real que discrimine los tres
+   contenedores, use escritura secuencial y contraste valor y
+   `document.activeElement`. No alcanza con `fill()`.
+5. Corré 149 y 150 aislados, luego una suite completa esperada en **150/150**
+   desde base limpia, más build, lint, `node --check`, compileall, `pip check`
+   y `diff-check` contra `7741b91`.
+
+No cambies la detección de suciedad, copy, estilos, formularios, Backend,
+modelos, migraciones, seed, pagos, BOEDA, Railway ni datos remotos. Si la
+corrección exige cambiar `useCapaModal` para todas sus capas, medí primero el
+impacto y frená si altera cierres ajenos a estos tres consumidores. Producto y
+regresión en un commit; informe separado; subí y frená para revisión PM.
+
 ## 2026-09-04 — TAREA VIGENTE: FORM-DIRTY-1, cerrar no puede borrar trabajo sin aviso
 
 MODAL-LIFECYCLE-1 queda **aceptada** en producto/regresión `b07ebce` e informe
