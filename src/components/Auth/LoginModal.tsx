@@ -104,11 +104,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSwitchToRegis
           )}
 
           <div className={styles.formGroup}>
-            <label className={styles.label}>
+            <label className={styles.label} htmlFor="login-email">
               Email <span className={styles.required}>*</span>
             </label>
             <input
               type="email"
+              id="login-email"
               className={styles.input}
               placeholder="tu@email.com"
               value={email}
@@ -118,12 +119,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSwitchToRegis
           </div>
 
           <div className={styles.formGroup}>
-            <label className={styles.label}>
+            <label className={styles.label} htmlFor="login-clave">
               Contraseña <span className={styles.required}>*</span>
             </label>
             <div className={styles.passwordGroup}>
               <input
                 type={showPassword ? 'text' : 'password'}
+                id="login-clave"
                 className={styles.input}
                 placeholder="••••••••"
                 value={password}

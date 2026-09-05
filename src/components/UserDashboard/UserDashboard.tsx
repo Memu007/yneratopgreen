@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './UserDashboard.module.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
-import { apiGet, apiPatch, apiDelete, apiPost, apiUpload, apiBlob, tokenStorage, API_BASE_URL } from '../../utils/api';
+import { apiGet, apiPatch, apiDelete, apiPost, apiUpload, apiBlob } from '../../utils/api';
+import { revisarElPrecio } from '../../publicaciones/precio';
+import {
+  fraseDeImagenesFallidas,
+  subirImagenDePublicacion,
+} from '../../publicaciones/imagenes';
 import { explicarMP, type VinculoMP } from '../../utils/mercadoPago';
 import { ETIQUETA_DE_ESTADO, type MiDocumentacion } from '../../utils/documentacion';
 import { type TipoDeCarga } from '../../utils/logistica';
@@ -1434,9 +1439,15 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     const stock = parseInt(editingProduct.stock) || 0;
     const isService = editingProduct.publication_type === 'servicio';
     
-    // Validaciones según tipo
-    if (!isService && price <= 0) {
-      showToast('El precio debe ser mayor a 0', 'warning');
+    // El precio lo decide la misma regla que el alta. Sin ella, un servicio
+    // por hora podía quedar guardado en cero editándolo y era imposible
+    // publicarlo así: la misma publicación recibía dos respuestas.
+    const problemaDelPrecio = revisarElPrecio(editingProduct.price, {
+      publicationType: editingProduct.publication_type,
+      pricingType: editingProduct.pricing_type,
+    });
+    if (problemaDelPrecio) {
+      showToast(problemaDelPrecio, 'warning');
       return;
     }
     if (!isService && stock < 0) {
@@ -1484,39 +1495,47 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       // 1. Actualizar datos del producto
       await apiPatch(`/products/${editingProduct.id}`, payload);
       
-      // 2. Eliminar imágenes marcadas para eliminar
+      // 2. Eliminar imágenes marcadas para eliminar. Una que no se pudo quitar
+      // sigue estando: decirlo es parte de no declarar un éxito que no fue.
+      const problemas: string[] = [];
       for (const imageId of editingProduct.imagesToDelete) {
         try {
           await apiDelete(`/products/${editingProduct.id}/images/${imageId}`);
         } catch (err) {
-          console.error('Error al eliminar imagen:', err);
+          problemas.push(err instanceof Error
+            ? `no se pudo quitar una imagen: ${err.message}`
+            : 'no se pudo quitar una imagen');
         }
       }
-      
-      // 3. Subir nuevas imágenes
-      const token = tokenStorage.getAccessToken();
-      const headers: HeadersInit = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
+
+      // 3. Subir nuevas imágenes, por el mismo camino que el alta. Una imagen
+      // rechazada NO puede terminar en «actualizado exitosamente»: lo que se
+      // guardó se informa como guardado, y la que no entró, con su motivo.
+      const imagenesFallidas: string[] = [];
       for (let i = 0; i < editingProduct.newImages.length; i++) {
         const image = editingProduct.newImages[i];
-        const imageFormData = new FormData();
-        imageFormData.append('files', image.file);
         // La primera imagen nueva es primaria solo si no hay imágenes existentes
         const isPrimary = editingProduct.existingImages.length === 0 && i === 0;
-        imageFormData.append('is_primary', isPrimary.toString());
-        
-        await fetch(`${API_BASE_URL}/products/${editingProduct.id}/images`, {
-          method: 'POST',
-          body: imageFormData,
-          credentials: 'include',
-          headers,
-        });
+        const motivo = await subirImagenDePublicacion(
+          editingProduct.id, image.file, isPrimary,
+        );
+        if (motivo) {
+          imagenesFallidas.push(`${image.file.name}: ${motivo}`);
+        }
       }
-      
-      showToast('Producto actualizado exitosamente', 'success');
+      if (imagenesFallidas.length > 0) {
+        problemas.push(fraseDeImagenesFallidas(imagenesFallidas));
+      }
+
+      if (problemas.length > 0) {
+        showToast(
+          `La publicación se actualizó, pero ${problemas.join('; ')}. Los demás `
+          + 'cambios quedaron guardados.',
+          'warning',
+        );
+      } else {
+        showToast('Producto actualizado exitosamente', 'success');
+      }
       setEditingProduct(null);
       
       // Recargar productos

@@ -18512,6 +18512,340 @@ await runCase(150, 'Escribir en un formulario no mueve el foco de su campo', asy
   }
 });
 
+await runCase(151, 'Un formulario no se contradice ni esconde su error', async () => {
+  // Cinco bordes medidos contra `83dba0a`, uno por cada cosa que el formulario
+  // hacia mal:
+  //
+  //   labels del Login   htmlFor=null en Email y Contrasena: el clic no enfocaba
+  //   error del registro role=null, top=-381 en un alto de 400 (fuera de vista)
+  //                      y el foco quedaba en «Crear cuenta»
+  //   matriz de precio   la edicion guardo precio=0 en un servicio «por hora»,
+  //                      que el alta no deja publicar
+  //   imagen rechazada   413 en la subida y el aviso fue «Producto actualizado
+  //                      exitosamente»
+  //   tipos de carga     el catalogo fallo y el grupo quedo rotulado y vacio,
+  //                      sin causa ni reintento
+  const sello = Date.now();
+  const ingreso = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  });
+  const vendedor = ingreso.data;
+  assert(vendedor?.access_token, 'no se pudo entrar como vendedor');
+
+  const [categoriaDeServicios] = queryRows(`
+    SELECT id, name FROM categories
+    WHERE is_service = true AND is_active = true ORDER BY name LIMIT 1`);
+  const [categoriaDeProductos] = queryRows(`
+    SELECT id, name FROM categories
+    WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const [provincia] = queryRows(`
+    SELECT province_id::text, province_name FROM localities
+    WHERE id = ${sqlLiteral(localidad)}`);
+
+  const publicar = async (cuerpo) => {
+    const alta = await apiRequest('/products', {
+      method: 'POST', token: vendedor.access_token, body: cuerpo,
+    });
+    assert(alta.status < 400 && alta.data?.id,
+      `no se pudo publicar «${cuerpo.name}»: HTTP ${alta.status}`);
+    return alta.data.id;
+  };
+  const servicioPorHora = `Consistencia151 servicio ${sello}`;
+  const productoConImagen = `Consistencia151 producto ${sello}`;
+  const idDelServicio = await publicar({
+    name: servicioPorHora,
+    description: 'Servicio efimero del caso 151, para la matriz de precio.',
+    category_id: categoriaDeServicios[0],
+    price: 5000, stock: 0, locality_id: localidad,
+    publication_type: 'servicio', operation_kind: 'servicio',
+    pricing_type: 'por_hora', availability: 'inmediata',
+  });
+  await publicar({
+    name: productoConImagen,
+    description: 'Publicacion efimera del caso 151, para el guardado parcial.',
+    category_id: categoriaDeProductos[0],
+    price: 900, stock: 4, unit: 'kg', locality_id: localidad,
+    publication_type: 'producto', operation_kind: 'insumo',
+  });
+
+  const precioEnLaBase = (id) => queryRows(
+    `SELECT price::text, COALESCE(pricing_type::text, '-') FROM products WHERE id = ${sqlLiteral(id)}`)[0];
+
+  const browser = await chromium.launch({ headless: true });
+  const medidos = [];
+  try {
+    const sesionDelVendedor = async (viewport) => {
+      const contexto = await browser.newContext({ viewport });
+      await contexto.addInitScript(({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+      }, { a: vendedor.access_token, r: vendedor.refresh_token });
+      return contexto;
+    };
+    const dondeEstaElFoco = (page) => page.evaluate(() => {
+      const activo = document.activeElement;
+      if (!activo || activo === document.body) return '(el documento)';
+      const nombre = activo.getAttribute('id')
+        || activo.getAttribute('aria-label')
+        || (activo.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 30);
+      return `<${activo.tagName.toLowerCase()}> «${nombre}»`;
+    });
+    const esElActivo = (locator) => locator.evaluate((el) => el === document.activeElement);
+    const abrirElRegistro = async (page) => {
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Ingresar' }).first().click();
+      await page.getByRole('button', { name: 'Regístrate aquí' }).click();
+      await page.locator('#registro-nombre').waitFor({ state: 'visible', timeout: 20_000 });
+    };
+    const abrirMisPublicaciones = async (page) => {
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Mi cuenta' }).click();
+      await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+      await page.getByRole('button', { name: /publicaciones/i }).first().click();
+    };
+    const editar = async (page, nombre) => {
+      const tarjeta = page.locator('[class*="productCard"], [class*="publicacion"]')
+        .filter({ hasText: nombre }).first();
+      await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
+      await tarjeta.getByRole('button', { name: /editar/i }).first().click();
+    };
+
+    // --- A. los labels del Login enfocan SU campo ---------------------------
+    {
+      const contexto = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+      const page = await contexto.newPage();
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Ingresar' }).first().click();
+      const correo = page.getByPlaceholder('tu@email.com');
+      await correo.waitFor({ state: 'visible', timeout: 20_000 });
+      const clave = page.locator('input[type="password"]').first();
+      for (const [texto, campo] of [['Email', correo], ['Contraseña', clave]]) {
+        const etiqueta = page.locator('form label')
+          .filter({ hasText: new RegExp(`^${texto}`) }).first();
+        assert(await etiqueta.count() === 1, `el Login no tiene un label «${texto}»`);
+        await etiqueta.click();
+        await esperarA(() => esElActivo(campo),
+          `el clic en el label «${texto}» dejo el foco en ${await dondeEstaElFoco(page)}`, 20_000);
+        medidos.push(`label «${texto}» del Login`);
+      }
+      await contexto.close();
+    }
+
+    // --- B. el error del registro se ve, se anuncia y recibe el foco --------
+    {
+      // Una ventana baja: enviando desde el final, el aviso de arriba quedaba
+      // fuera de la pantalla y nada avisaba que estaba.
+      const contexto = await browser.newContext({ viewport: { width: 1200, height: 400 } });
+      const page = await contexto.newPage();
+      await abrirElRegistro(page);
+      const nombre = page.locator('#registro-nombre');
+      await nombre.fill('Consistencia Del Caso 151');
+      await page.locator('#registro-email').fill(`consistencia.151.${sello}@example.com`);
+      await page.locator('#registro-clave').fill('clave151');
+      await page.locator('#registro-clave-2').fill('otra-clave');
+      const enviar = page.getByRole('button', { name: 'Crear cuenta' });
+      await enviar.scrollIntoViewIfNeeded();
+      await enviar.click();
+
+      const aviso = page.locator('[role="alert"]').filter({ hasText: /no coinciden/i });
+      await esperarA(async () => (await aviso.count()) === 1,
+        'el error del registro no se anuncia como alerta', 20_000);
+      await esperarA(async () => aviso.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return r.top >= 0 && r.bottom <= window.innerHeight;
+      }), 'el error del registro quedo fuera de la ventana', 20_000);
+      await esperarA(() => esElActivo(aviso),
+        `el error del registro no recibio el foco: esta en ${await dondeEstaElFoco(page)}`, 20_000);
+      assert((await nombre.inputValue()) === 'Consistencia Del Caso 151',
+        'avisar del error borro el nombre escrito');
+      assert((await page.locator('#registro-clave').inputValue()) === 'clave151',
+        'avisar del error borro la contraseña escrita');
+      medidos.push('error del registro anunciado, a la vista y con el foco');
+      await contexto.close();
+    }
+
+    // --- C. la misma matriz de precio en el alta y en la edicion ------------
+    {
+      const contexto = await sesionDelVendedor({ width: 1500, height: 1000 });
+      const page = await contexto.newPage();
+
+      // C1. La edicion de un servicio «por hora» no puede guardar precio cero.
+      await abrirMisPublicaciones(page);
+      await editar(page, servicioPorHora);
+      const precioDelServicio = page.locator('#edit-precio-servicio');
+      await precioDelServicio.waitFor({ state: 'visible', timeout: 20_000 });
+      assert((await page.locator('#edit-tipo-precio').inputValue()) === 'por_hora',
+        'la edicion no abrio con el tipo de precio «por hora»');
+      await precioDelServicio.fill('0');
+      await page.getByRole('button', { name: /^Guardar/i }).first().click();
+      const rechazo = page.getByText(/Indicá un precio mayor a cero/i);
+      await esperarA(async () => (await rechazo.count()) > 0,
+        'la edicion acepto precio cero en un servicio «por hora» sin decir nada', 20_000);
+      assert((await precioDelServicio.count()) === 1,
+        'la edicion se cerro pese a rechazar el precio');
+      const [precioGuardado] = precioEnLaBase(idDelServicio);
+      assert(Number(precioGuardado) === 5000,
+        `la edicion guardo ${precioGuardado} y tenia que dejar 5000 intacto`);
+      medidos.push('edición: servicio «por hora» con precio 0 rechazado');
+
+      // C2. Con «a convenir» ese mismo cero es valido, y se guarda.
+      await page.locator('#edit-tipo-precio').selectOption('a_convenir');
+      await page.getByRole('button', { name: /^Guardar/i }).first().click();
+      await esperarA(async () => {
+        const [precio, tipo] = precioEnLaBase(idDelServicio);
+        return Number(precio) === 0 && tipo === 'a_convenir';
+      }, 'con «a convenir» la edicion tampoco guardo el precio cero', 20_000);
+      medidos.push('edición: el mismo cero aceptado con «a convenir»');
+
+      // C3. El alta decide igual: sin precio no publica un servicio «por hora»,
+      // y con «a convenir» sí.
+      const servicioDelAlta = `Consistencia151 alta ${sello}`;
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: /Vender/i }).first().click();
+      await page.getByRole('heading', { name: /Publicar un producto/i })
+        .waitFor({ state: 'visible', timeout: 20_000 });
+      await page.getByRole('button', { name: 'Servicio', exact: true }).click();
+      await page.getByRole('heading', { name: /Publicar un servicio/i })
+        .waitFor({ state: 'visible', timeout: 20_000 });
+      await page.locator('#name').fill(servicioDelAlta);
+      await esperarA(async () => (await page.locator('#category option').count()) > 1,
+        'el alta no cargo las categorias de servicio', 20_000);
+      await page.locator('#category').selectOption({ label: categoriaDeServicios[1] });
+      await page.locator('#description')
+        .fill('Servicio publicado por el caso 151 para comparar la matriz de precio.');
+      await page.locator('#province').selectOption(provincia[0]);
+      await esperarA(async () => (await page.locator('#locality option').count()) > 1,
+        'el alta no cargo las localidades', 20_000);
+      await page.locator('#locality').selectOption(localidad);
+      assert((await page.locator('#pricingType').inputValue()) === 'por_hora',
+        'el alta no abrio con el tipo de precio «por hora»');
+      await page.locator('form button[type="submit"]').click();
+      // Sin precio no publica: el formulario sigue abierto y el foco queda en
+      // el campo que falta. No hace falta esperar «a que no pase nada».
+      await esperarA(() => esElActivo(page.locator('#price')),
+        `el alta acepto el servicio «por hora» sin precio: el foco quedo en `
+        + `${await dondeEstaElFoco(page)}`, 20_000);
+      assert(queryCount(
+        `SELECT COUNT(*) FROM products WHERE name = ${sqlLiteral(servicioDelAlta)}`) === 0,
+      'el alta publico el servicio «por hora» sin precio');
+      medidos.push('alta: servicio «por hora» sin precio rechazado');
+
+      await page.locator('#pricingType').selectOption('a_convenir');
+      await page.locator('form button[type="submit"]').click();
+      await esperarA(() => queryCount(
+        `SELECT COUNT(*) FROM products WHERE name = ${sqlLiteral(servicioDelAlta)}`) === 1,
+      'con «a convenir» y sin precio el alta tampoco publico', 20_000);
+      medidos.push('alta: el mismo servicio publicado con «a convenir»');
+      await contexto.close();
+    }
+
+    // --- D. una imagen rechazada al editar no es un exito ------------------
+    {
+      const contexto = await sesionDelVendedor({ width: 1500, height: 1000 });
+      const page = await contexto.newPage();
+      const motivo = 'La imagen supera el tamaño permitido (prueba controlada)';
+      let intercepto = false;
+      await page.route('**/api/products/*/images', async (ruta) => {
+        if (ruta.request().method() !== 'POST') return ruta.continue();
+        intercepto = true;
+        await ruta.fulfill({
+          status: 413, contentType: 'application/json', body: JSON.stringify({ detail: motivo }),
+        });
+      });
+
+      await abrirMisPublicaciones(page);
+      await editar(page, productoConImagen);
+      const descripcion = page.locator('textarea').first();
+      await descripcion.waitFor({ state: 'visible', timeout: 20_000 });
+      const nuevaDescripcion = `Descripcion cambiada por el caso 151 ${sello}`;
+      await descripcion.fill(nuevaDescripcion);
+      await page.locator('input[type="file"]').first().setInputFiles({
+        name: 'consistencia-151.png', mimeType: 'image/png', buffer: RECIBO_PNG,
+      });
+      await page.getByRole('button', { name: /^Guardar/i }).first().click();
+
+      const parcial = page.getByText(/se actualizó, pero/i);
+      await esperarA(async () => (await parcial.count()) > 0,
+        'la edicion no informo el resultado parcial de la imagen', 20_000);
+      const texto = (await parcial.first().innerText()).replace(/\s+/g, ' ').trim();
+      assert(texto.includes(motivo), `el aviso no trae el motivo HTTP: «${texto}»`);
+      assert(!/exitosamente/i.test(texto), `el aviso sigue diciendo que salio todo bien: «${texto}»`);
+      assert(intercepto, 'Playwright no llego a interceptar la subida');
+
+      // Lo guardado quedo guardado, la imagen no entro y no se duplico nada.
+      const [fila] = queryRows(`
+        SELECT p.description, COUNT(pi.id)::text
+        FROM products p LEFT JOIN product_images pi ON pi.product_id = p.id
+        WHERE p.name = ${sqlLiteral(productoConImagen)}
+        GROUP BY p.id, p.description`);
+      assert(fila, 'la publicacion del caso desaparecio de la base');
+      assert(fila[0] === nuevaDescripcion,
+        `los metadatos no quedaron guardados: «${fila[0]}»`);
+      assert(Number(fila[1]) === 0, `quedaron ${fila[1]} imagenes y no tenia que entrar ninguna`);
+      assert(queryCount(
+        `SELECT COUNT(*) FROM products WHERE name = ${sqlLiteral(productoConImagen)}`) === 1,
+      'la edicion creo una segunda publicacion');
+      medidos.push('edición: imagen rechazada informada como resultado parcial');
+      await contexto.close();
+    }
+
+    // --- E. el catalogo de cargas que falla se explica y se reintenta -------
+    {
+      const contexto = await browser.newContext({ viewport: { width: 1300, height: 900 } });
+      const page = await contexto.newPage();
+      let pedidos = 0;
+      let caido = true;
+      await page.route('**/api/logistics/cargo-types', async (ruta) => {
+        pedidos += 1;
+        if (!caido) return ruta.continue();
+        await ruta.fulfill({
+          status: 503, contentType: 'application/json',
+          body: JSON.stringify({ detail: 'catalogo de cargas no disponible' }),
+        });
+      });
+
+      await abrirElRegistro(page);
+      const nombre = page.locator('#registro-nombre');
+      await nombre.fill('Transportista Del Caso 151');
+      await page.getByText('Quiero registrarme como transportista').click();
+
+      const grupo = page.locator('[role="group"][aria-labelledby="registro-cargas"]');
+      const explicacion = page.getByText(/No pudimos traer las cargas/i);
+      await esperarA(async () => (await explicacion.count()) > 0,
+        'el catalogo fallo y la pantalla no dijo nada', 20_000);
+      assert((await explicacion.first().innerText()).includes('catalogo de cargas no disponible'),
+        'la explicacion no trae el motivo que devolvio el servidor');
+      assert((await grupo.count()) === 0,
+        'el grupo de cargas quedo rotulado y vacio en vez de explicar el fallo');
+      const reintentar = page.getByRole('button', { name: 'Reintentar' });
+      assert((await reintentar.count()) === 1, 'no hay reintento');
+
+      // Con la API recuperada, el reintento trae las opciones sin reiniciar nada.
+      caido = false;
+      await reintentar.click();
+      await esperarA(async () => (await grupo.locator('input[type="checkbox"]').count()) > 0,
+        'reintentar con la API sana no trajo las cargas', 20_000);
+      assert(pedidos >= 2, `el reintento no volvio a pedir el catalogo (${pedidos} pedido/s)`);
+      assert((await explicacion.count()) === 0, 'el aviso del fallo quedo despues de recuperarse');
+      assert((await nombre.inputValue()) === 'Transportista Del Caso 151',
+        'reintentar reinicio el registro y perdio lo escrito');
+      medidos.push('registro: catálogo de cargas caído, explicado y reintentado');
+      await contexto.close();
+    }
+
+    return `los cinco bordes quedaron cerrados sobre la interfaz real (${medidos.join('; ')}): `
+      + 'los labels del Login enfocan su campo, el error del registro se anuncia como alerta y '
+      + 'llega a la vista y al foco sin borrar lo escrito, el alta y la edición aplican la misma '
+      + 'matriz de precio —explícito mayor a cero, «a convenir» puede ir en cero—, una imagen '
+      + 'rechazada se informa con su motivo HTTP y sin declarar éxito total ni duplicar la '
+      + 'publicación, y el catálogo de cargas caído explica el fallo y se reintenta sin reiniciar '
+      + 'el registro';
+  } finally {
+    await browser.close();
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

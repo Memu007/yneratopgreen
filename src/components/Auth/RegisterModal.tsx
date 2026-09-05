@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import styles from './AuthModal.module.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
@@ -52,6 +52,13 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  // Un error que nadie ve no informa nada: cuando aparece se lo lleva a la
+  // vista y al foco. Lo escrito no se toca.
+  const cajaDelError = useRef<HTMLDivElement>(null);
+  // El catálogo de cargas es opcional, pero su fallo no puede ser invisible:
+  // sin esto el grupo quedaba rotulado y vacío, como si no hubiera cargas.
+  const [fallaDeCargas, setFallaDeCargas] = useState('');
+  const [intentoDeCargas, setIntentoDeCargas] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   // Mientras haya un registro pendiente, el formulario deja lugar al aviso de
   // "revisá tu correo": el alta ya no inicia sesión.
@@ -70,10 +77,30 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   // opcionales, así que no se traba el alta por no poder ofrecerlas.
   useEffect(() => {
     if (!formData.isCarrier || tiposDeCarga.length > 0) return;
+    let vigente = true;
+    setFallaDeCargas('');
     void apiGet<{ types: TipoDeCarga[] }>('/logistics/cargo-types')
-      .then((r) => setTiposDeCarga(r.types))
-      .catch(() => setTiposDeCarga([]));
-  }, [formData.isCarrier, tiposDeCarga.length]);
+      .then((r) => { if (vigente) setTiposDeCarga(r.types); })
+      .catch((err: unknown) => {
+        if (!vigente) return;
+        setTiposDeCarga([]);
+        setFallaDeCargas(err instanceof Error && err.message
+          ? err.message
+          : 'No se pudo cargar el catálogo de cargas.');
+      });
+    return () => { vigente = false; };
+  }, [formData.isCarrier, tiposDeCarga.length, intentoDeCargas]);
+
+  // Enviar desde el final del formulario dejaba el aviso arriba, fuera de la
+  // pantalla: el error se lleva a la vista y recibe el foco. No borra nada de
+  // lo escrito, y `role="alert"` hace que además se anuncie.
+  useEffect(() => {
+    if (!error) return;
+    const caja = cajaDelError.current;
+    if (!caja) return;
+    caja.scrollIntoView({ block: 'center' });
+    caja.focus();
+  }, [error]);
 
   useEffect(() => {
     if (!provinceId) {
@@ -199,7 +226,16 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           </div>
         ) : (
         <form className={styles.form} onSubmit={handleSubmit}>
-          {error && <div className={styles.error}>{error}</div>}
+          {error && (
+            <div
+              className={styles.error}
+              role="alert"
+              tabIndex={-1}
+              ref={cajaDelError}
+            >
+              {error}
+            </div>
+          )}
 
           <div className={styles.formGroup}>
             <label className={styles.label} htmlFor="registro-nombre">
@@ -359,6 +395,20 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                 <span className={styles.label} id="registro-cargas">
                   Cargas que transportás
                 </span>
+                {fallaDeCargas && (
+                  <div className={styles.error} role="status">
+                    No pudimos traer las cargas: {fallaDeCargas} Podés seguir sin
+                    elegirlas.{' '}
+                    <button
+                      type="button"
+                      className={styles.switchLink}
+                      onClick={() => setIntentoDeCargas((n) => n + 1)}
+                    >
+                      Reintentar
+                    </button>
+                  </div>
+                )}
+                {tiposDeCarga.length > 0 && (
                 <div
                   className={styles.cargasGrilla}
                   role="group"
@@ -381,6 +431,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                     </label>
                   ))}
                 </div>
+                )}
                 {formData.carrierCargoTypes?.includes('otra') && (
                   <div className={styles.formGroup}>
                     <label className={styles.label} htmlFor="registro-carga-otra">

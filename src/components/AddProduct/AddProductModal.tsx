@@ -2,7 +2,12 @@ import React, { useCallback, useState, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { NewProductData } from '../../types';
-import { apiPost, apiGet, API_BASE_URL, tokenStorage } from '../../utils/api';
+import { apiPost, apiGet } from '../../utils/api';
+import { revisarElPrecio } from '../../publicaciones/precio';
+import {
+  fraseDeImagenesFallidas,
+  subirImagenDePublicacion,
+} from '../../publicaciones/imagenes';
 import styles from './AddProductModal.module.css';
 import { ProductImage } from '../ProductImage/ProductImage';
 import { Condition, OperationKind, ETIQUETA_DE_ANATOMIA, ETIQUETA_DE_CONDICION } from '../../utils/anatomia';
@@ -502,7 +507,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     
     // Validaciones básicas según tipo de publicación
     if (publicationType === 'producto') {
-      if (!formData.name || !formData.category || !formData.price || formData.stock === undefined) {
+      if (!formData.name || !formData.category || formData.stock === undefined) {
         showToast('Por favor completa todos los campos obligatorios', 'warning');
         return;
       }
@@ -511,11 +516,17 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
         showToast('Por favor completa el nombre y la categoría', 'warning');
         return;
       }
-      // Para servicios "a convenir", el precio es opcional
-      if (serviceData.pricingType !== 'a_convenir' && !formData.price) {
-        showToast('Por favor indica el precio del servicio', 'warning');
-        return;
-      }
+    }
+
+    // El precio lo decide una sola regla, la misma que aplica la edición: si
+    // no es «a convenir», tiene que estar y ser mayor a cero.
+    const problemaDelPrecio = revisarElPrecio(formData.price, {
+      publicationType,
+      pricingType: serviceData.pricingType,
+    });
+    if (problemaDelPrecio) {
+      showToast(problemaDelPrecio, 'warning');
+      return;
     }
 
     if (!formData.description || formData.description.length < 10) {
@@ -591,45 +602,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
       for (let i = 0; i < images.length; i++) {
         const image = images[i];
         if (image.file) {
-          const imageFormData = new FormData();
-          imageFormData.append('files', image.file);
-          imageFormData.append('is_primary', (i === 0).toString());
-
-          // Construir la URL correcta usando API_BASE_URL y agregar token de autorización
-          const token = tokenStorage.getAccessToken();
-          const headers: HeadersInit = {};
-          if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-          }
-
-          try {
-            const imageResponse = await fetch(`${API_BASE_URL}/products/${productId}/images`, {
-              method: 'POST',
-              body: imageFormData,
-              credentials: 'include',
-              headers,
-            });
-
-            if (!imageResponse.ok) {
-              let reason = `HTTP ${imageResponse.status}`;
-              const responseBody = await imageResponse.text();
-
-              if (responseBody) {
-                try {
-                  const parsedBody = JSON.parse(responseBody) as { detail?: unknown };
-                  if (typeof parsedBody.detail === 'string') {
-                    reason = parsedBody.detail;
-                  }
-                } catch {
-                  reason = responseBody;
-                }
-              }
-
-              imageUploadErrors.push(`${image.file.name}: ${reason}`);
-            }
-          } catch (error) {
-            const reason = error instanceof Error ? error.message : 'error de red';
-            imageUploadErrors.push(`${image.file.name}: ${reason}`);
+          // La subida y el motivo del fallo son los mismos que usa la edición.
+          const motivo = await subirImagenDePublicacion(productId, image.file, i === 0);
+          if (motivo) {
+            imageUploadErrors.push(`${image.file.name}: ${motivo}`);
           }
         }
       }
@@ -637,7 +613,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
       const tipoMsg = publicationType === 'producto' ? 'Producto' : 'Servicio';
       if (imageUploadErrors.length > 0) {
         showToast(
-          `${tipoMsg} "${formData.name}" publicado, pero no se pudo subir ${imageUploadErrors.length === 1 ? 'la imagen' : `${imageUploadErrors.length} imágenes`}: ${imageUploadErrors.join('; ')}`,
+          `${tipoMsg} "${formData.name}" publicado, pero ${fraseDeImagenesFallidas(imageUploadErrors)}`,
           'warning',
         );
       } else {
