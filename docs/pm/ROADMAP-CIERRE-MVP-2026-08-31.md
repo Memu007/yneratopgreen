@@ -54,9 +54,11 @@ final, como acordó Emi.
   con único rojo ambiental en 131; PM reprodujo 148 y 131 por separado en
   **1/1** cada uno, más puertas estáticas. C1 ya estaba cerrado y ADM-8 entra en
   la pila modal existente.
-- FORM-DIRTY-1 fue devuelta sobre `7741b91`: los callbacks de cierre cambian
-  en cada render y expulsan el foco del campo después de la primera tecla. La
-  tarea única vigente es **FORM-DIRTY-1R**, detallada en `PARA-DEV.md`.
+- FORM-DIRTY-1R quedó aceptada en `83dba0a`/`db1bb10`: la capa conserva foco y
+  texto al escribir y los cinco formularios comparten una sola protección de
+  salida. PM reprodujo 149 y 150 aislados y dentro de la suite completa; la
+  evidencia combinada, sin atribuir 150/150, está en
+  `REPRODUCCION-FORM-DIRTY-1R-2026-09-05.md`.
 - ORD-SELF-1 no cierra ningún hallazgo de las tres auditorías; era la tarea P1
   anterior y las auditorías la excluyeron expresamente.
 - La historia de las devoluciones del arnés y su cierre reproducido queda en
@@ -112,7 +114,7 @@ edición, no a inventar una migración destructiva.
 |---:|---|---|---|
 | 7 | **NAV-URL-1 — cerrada** | A1, A2, A3, A8 y B4 | Aceptada en `bcdd448`/`aeafc13`: cinco URL estables, `popstate`, rutas especiales y detalle coherentes; PM cerró 147/147. |
 | 8 | **MODAL-LIFECYCLE-1 — cerrada** | C1 y ADM-8 | Aceptada en `b07ebce`/`83f6985`: cierra primero la capa superior, restaura foco al disparador y conserva pestaña/posición del panel. |
-| 9 | **FORM-DIRTY-1R — vigente** | F3 general | Corregir la regresión de foco de `7741b91`; después, formularios largos sucios confirman antes de perderse y los intactos cierran sin fricción. |
+| 9 | **FORM-DIRTY-1R — cerrada** | F3 general | Aceptada en `83dba0a`/`db1bb10`: cinco formularios protegidos, foco estable al escribir y regresiones 149/150 reproducidas por PM. |
 
 No se corrige cada síntoma con otro `pushState` o listener local: NAV-URL-1
 tiene una sola política de navegación y una sola regresión matriz.
@@ -121,7 +123,7 @@ tiene una sola política de navegación y una sola regresión matriz.
 
 | Orden | Pieza | Auditoría cubierta | Cierre mínimo |
 |---:|---|---|---|
-| 10 | **FORM-CONSISTENCY-1** | F5, F7 y F13 | Alta/edición comparten validación, imágenes verifican `response.ok`, errores reciben foco/alerta y catálogos fallidos muestran error/reintento. |
+| 10 | **FORM-CONSISTENCY-1 — vigente** | F5, F7 y F13 | Alta/edición comparten validación, la imagen fallida al editar no declara éxito total, errores reciben foco/alerta y tipos de carga fallidos muestran error/reintento. |
 | 11 | **LOCATION-SOURCE-1** | F6 y C3 | Edición escribe la ubicación oficial del padrón; se elimina o retira el campo legado engañoso. |
 | 12 | **TRANSFER-REVIEW-1** | F8 | Rechazo de comprobante usa capa propia, motivo obligatorio y resultado visible; sin `window.prompt`. |
 | 13 | **ADMIN-TRUTH-1** | ADM-3, ADM-4, ADM-10 y ADM-11 | Métricas y rótulos corresponden a la API, estados están en es-AR y cada carga distingue error, vacío y reintento. |

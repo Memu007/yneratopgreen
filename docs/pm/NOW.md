@@ -4,22 +4,26 @@ Actualizado: 2026-09-05.
 
 ## Estado inmediato — 2026-09-05
 
-- **FORM-DIRTY-1 devuelta:** producto/regresión `7741b91`, informe `52b7add`
-  corregido en `ddcdc35`. PM reprodujo que escribir `abc` conserva sólo `a` y
-  mueve el foco a Cerrar: los callbacks de alta, checkout y Mi Panel cambian en
-  cada render y reinician `useCapaModal`.
-- Build, lint y `diff --check` están verdes, pero no compensan la regresión
-  funcional. Evidencia en
-  `REPRODUCCION-FORM-DIRTY-1-2026-09-05.md`.
-- La corrida PM del 149 anterior a la reanudación quedó sin salida recuperable
-  y cuenta como desconocida. Docker Desktop 4.41.2 no reinicia porque su
-  binario incluido de Compose tiene firma inválida; no se reseteó Docker ni se
-  tocaron volúmenes o entornos remotos.
-- **Única tarea activa:** FORM-DIRTY-1R, en `PARA-DEV.md`. Dev corrige la
-  estabilidad del cierre y agrega el caso 150 con escritura secuencial. PM
-  repetirá 150, 149 y la suite completa desde base limpia antes de aceptar.
-- El red-team sigue cerrado: esta devolución no cumple las cinco condiciones
-  de entrada y no habilita despliegue.
+- **FORM-DIRTY-1R aceptada:** producto/regresión `83dba0a`, informe `db1bb10`.
+  PM revisó el diff y reprodujo 150 y 149 aislados en **1/1** cada uno; ambos
+  pasaron también dentro de la suite completa actual.
+- La suite PM actual fue **142/150**, no 150/150. Los seis rojos de
+  documentación se reprodujeron después con sus prerrequisitos en **10/10** y
+  130 en **1/1**; 131 exige Alpine/Docker. Su bloque y todos los archivos que
+  mide no cambiaron desde `b07ebce`, donde PM lo había corrido **1/1**. Evidencia
+  combinada y salvedades en
+  `REPRODUCCION-FORM-DIRTY-1R-2026-09-05.md`.
+- Build, lint, sintaxis, compileall y `diff-check` están verdes. El `pip check`
+  del Conda global no es representativo; Dev lo obtuvo verde y no hay cambios
+  de Backend, requirements o imagen.
+- **Única tarea activa:** FORM-CONSISTENCY-1, en `PARA-DEV.md`. Cierra F5, los
+  bordes todavía vivos de F7 y F13 sin reabrir la subida de imágenes del alta,
+  que ya cubre el caso 10.
+- Docker Desktop sigue sin arrancar y no fue reseteado ni reemplazado. No se
+  tocaron volúmenes de proyecto, Railway, datos remotos ni pagos reales.
+- El red-team profundo sigue cerrado: faltan el cierre funcional, la
+  homologación MP de prueba y el SHA operativo congelado; esta aceptación no
+  habilita despliegue.
 
 ## Relevo operativo para la próxima PM — 2026-09-04
 

@@ -12,6 +12,86 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-05 — TAREA VIGENTE: FORM-CONSISTENCY-1, un formulario no puede contradecirse ni ocultar su error
+
+FORM-DIRTY-1R queda **aceptada** en producto/regresión `83dba0a` e informe
+`db1bb10`. Revisé el diff. PM reprodujo 150 y 149 aislados en **1/1** cada uno;
+en la suite completa actual ambos pasaron. Esa corrida fue **142/150**, no
+150/150: 101–106 vencieron por la duración del stack nativo y luego pasaron
+con sus prerrequisitos en **10/10**; 130 pasó **1/1** al corregir una
+inconsistencia del lanzador PM; 131 no pudo ejecutar Alpine. El bloque 131,
+Backend y los archivos Railway que mide son idénticos a `b07ebce`, donde PM lo
+había reproducido **1/1**. La evidencia y las puertas están en
+`REPRODUCCION-FORM-DIRTY-1R-2026-09-05.md`.
+
+La pieza siguiente es **FORM-CONSISTENCY-1**. Antes de tocar código leé F5, F7
+y F13 en `AUDITORIAS-UX-CLAUDE-2026-08-30.md` y contrastalos contra
+`LoginModal.tsx`, `RegisterModal.tsx`, `AddProductModal.tsx` y la edición de
+publicaciones en `UserDashboard.tsx`. La subida fallida del **alta** ya está
+cerrada por el caso 10: no la reabras. Siguen vivos estos bordes:
+
+1. los labels de Email y Contraseña del Login no están asociados a sus campos;
+2. un error propio del registro aparece arriba del formulario sin alerta ni
+   llevar vista/foco, así que puede quedar invisible al enviar desde abajo;
+3. alta y edición no aplican la misma regla de precio: la edición puede aceptar
+   un servicio no «a convenir» con precio cero;
+4. una imagen nueva rechazada al editar no comprueba `response.ok` y se anuncia
+   éxito total después de un guardado parcial;
+5. si falla `/logistics/cargo-types`, el alta de transportista deja un grupo
+   rotulado y vacío, sin causa ni reintento.
+
+### Resultado obligatorio
+
+- Login: cada label activa su input mediante `id`/`htmlFor`; no cambies todavía
+  el copy general ni abras recuperación de contraseña.
+- Registro: todo error de validación propio o de API se anuncia como alerta y
+  se lleva a la vista/foco sin borrar lo escrito. El control enfocado debe ser
+  el error o, cuando sea inequívoco, el primer campo responsable.
+- Alta y edición aplican la misma matriz mínima: producto y servicio con precio
+  explícito requieren un valor mayor a cero; sólo «a convenir» admite precio
+  vacío/cero. No cambies el contrato del Backend ni mezcles la doble fuente de
+  ubicación de F6.
+- Si la edición guarda metadatos pero falla una imagen nueva, informa que la
+  publicación se actualizó **sin esa imagen**, con el motivo HTTP legible. No
+  muestra «actualizado exitosamente» como si todo hubiera salido bien, no crea
+  otra publicación y no revierte silenciosamente metadatos ya persistidos.
+- El catálogo de tipos de carga sigue siendo opcional, pero su fallo es visible
+  y ofrece un reintento real. Al reintentar con la API recuperada aparecen las
+  opciones sin cerrar ni reiniciar el registro.
+
+No agregues una librería de formularios, otro sistema de alertas ni una puerta
+trasera de prueba. Compartí reglas sólo donde evite la contradicción real; no es
+una reescritura de todos los formularios.
+
+### Regresión discriminante
+
+Agregá un caso 151 autónomo sobre la UI real que conserve rojo contra
+`83dba0a` y mida los cinco bordes:
+
+- clic en ambos labels del Login enfoca el campo correcto;
+- en un viewport bajo, enviar el registro desde el final deja el error visible,
+  anunciado y enfocado, con valores intactos;
+- la misma publicación/servicio recibe la misma decisión de precio en alta y
+  edición, distinguiendo precio explícito de «a convenir»;
+- interceptar una subida de imagen de edición con un no-2xx conserva una sola
+  publicación y los metadatos guardados, deja cero imágenes nuevas y muestra
+  el resultado parcial real;
+- el primer pedido de tipos de carga falla, la pantalla explica el fallo y un
+  clic en Reintentar carga las opciones.
+
+No uses esperas fijas. Corré 151 aislado y una suite completa desde base limpia
+sin rojos de producto; conservá 10, 22 y 113 verdes como controles dentro de la
+suite. Sumá build, lint, `node --check`, compileall, `pip check`, a11y completa y
+`diff-check`; contraste sólo si cambiás colores o estilos visuales.
+
+Fuera de alcance: F6/ubicación, rechazo de comprobante, rating, copy general,
+recuperación de contraseña, Backend, API, modelos, migraciones, seed, pagos,
+navegación, la política de suciedad/capas, BOEDA, Railway, datos remotos y
+despliegue. Si la API contradice la matriz de precio, si corregirla exige tocar
+Backend o si el bloque deja de caber como una sola pieza vertical, frená con la
+evidencia antes de ampliar alcance. Producto/regresión en un commit, informe
+separado con rojo/verde, suite, riesgos y SHA; subí y frená para revisión PM.
+
 ## 2026-09-05 — DEVOLUCIÓN VIGENTE: FORM-DIRTY-1R, escribir no puede expulsar el foco
 
 Revisé producto/regresión `7741b91` e informe `52b7add`, corregido en

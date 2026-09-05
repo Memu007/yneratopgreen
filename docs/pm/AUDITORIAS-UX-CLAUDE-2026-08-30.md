@@ -174,8 +174,9 @@ los datos y pasar a «Comprobante a revisar» al adjuntar.
 
 ### F3 — formularios largos se pierden por overlay o Escape
 
-**Dictamen PM:** confirmado. P2 general; P1 sólo para el último paso del
-checkout mientras F2 siga abierto.  
+**Dictamen PM:** cerrado en `83dba0a`/`db1bb10`. PM reprodujo 149 y 150
+aislados y dentro de la suite completa actual; evidencia combinada en
+`REPRODUCCION-FORM-DIRTY-1R-2026-09-05.md`.  
 **Afecta:** registro de transportista, publicar, editar, checkout y calificar.  
 **Cierre mínimo:** cuando el formulario esté sucio, confirmar antes de cerrar;
 en la pantalla de orden/transferencia no permitir un cierre accidental que deje
