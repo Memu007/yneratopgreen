@@ -2,142 +2,146 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## FORM-DIRTY-1 — cerrar con trabajo sin guardar pregunta una sola vez
+## FORM-DIRTY-1R — escribir no puede expulsar el foco
 
 Hecho. Producto/regresión e informe en commits separados. **No desplegué.**
 
-- Producto/regresión: `7741b91` — «FORM-DIRTY-1: cerrar con trabajo sin guardar
-  pregunta una sola vez»
-- La suite pasa a **149 casos**.
+- Producto/regresión: `83dba0a` — «FORM-DIRTY-1R: escribir en un formulario no
+  puede expulsar el foco»
+- La suite pasa a **150 casos**.
 
-Tenías razón en que no fallaban igual. Empiezo por la medición, porque cambió
-lo que había que hacer en dos de los cinco.
+Tenías razón y el defecto era mío. Lo reproduje en la UI real antes de tocar
+nada, y en la aplicación es un poco peor que en tu reproducción aislada.
 
 ---
 
-### 1. Los cinco recorridos, medidos contra `b07ebce`
+### 1. El rojo, en la interfaz real
 
-Cada uno: abrir, hacer un cambio real, cerrar por un camino accidental y volver
-a abrir para ver qué quedó.
-
-| Recorrido | Cierre accidental | Qué pasaba |
-| --- | --- | --- |
-| Perfil de transportista | Escape | cerraba **Mi Panel entero** sin avisar; el radio volvía de `777` a `125.5` |
-| Alta de publicación | clic en el fondo | cerraba sin avisar, pero el borrador **no se perdía: reaparecía** al volver a abrir |
-| Edición de publicación | X | cerraba sin avisar; la descripción volvía a la guardada |
-| Checkout | Escape | cerraba sin avisar; la dirección escrita se perdía |
-| Calificación | clic en el fondo | cerraba la calificación **y Mi Panel entero**; el comentario se perdía |
-
-Dos que no entraban en el molde:
-
-- **El alta no perdía nada.** Su modal queda montado, así que el borrador
-  sobrevive al cierre. El problema es el otro: un borrador que la persona dejó
-  vuelve a aparecer solo. Por eso, acá, **descartar además limpia el
-  formulario**: sin eso, «descartar cambios» no descartaba nada.
-- **La calificación se llevaba el panel puesto.** Su fondo no frenaba el clic,
-  que subía al fondo de Mi Panel —que también cierra—. Medido:
-  `panel=1 textareas=1` antes del clic, `panel=0 textareas=0` después.
-
-Y una que **medí y no protegí**: el **cambio de pestaña**. Con el perfil sucio,
-cambiar a Notificaciones y volver deja el formulario en edición y el radio en
-`777`. No se pierde nada, así que preguntar ahí sería una alarma falsa. Lo que
-sí sigue preguntando después es cerrar el panel, y el caso 149 lo comprueba en
-ese orden. Si igual la querés, es una línea.
-
-### 2. La política, una sola
+Escritura tecla por tecla con `pressSequentially`, una actualización de React
+por tecla, contra `7741b91`:
 
 ```
-src/formularios/salidaProtegida.tsx    useSalidaProtegida: envuelve un cierre
-src/formularios/Pregunta.tsx           la confirmación, en la pila de capas
-src/formularios/salidaProtegida.module.css
+1. ALTA     valor="a"               foco="Cerrar"
+2. CHECKOUT valor="a"               foco="Cerrar"
+3. MI PANEL valor="Juan Vendedora"  foco="Cerrar"   (el campo traía «Juan Vendedor»)
 ```
 
-- **Suciedad contra el retrato inicial.** Cada formulario se compara con los
-  valores con los que abrió: un valor precargado no es un cambio, y volver un
-  campo a su valor original deja el formulario limpio otra vez. Las imágenes y
-  archivos entran por nombre —un `File` no se serializa—, y las selecciones,
-  casillas y datos logísticos entran como cualquier otro campo.
-- **Limpio cierra derecho.** Sin diálogo, por todos los caminos que ya tenía.
-- **Sucio pregunta una vez.** La pregunta usa `useCapaModal`, así que es la capa
-  de arriba de la pila ya aceptada: foco adentro, trampa de Tab, fondo trabado.
-  **No hay `window.confirm`, no hay otro gestor de modales y no hay cinco
-  implementaciones**: hay una y la usan los cinco.
-- **Escape, X y fondo de la pregunta = seguir editando.** Cierran sólo la
-  pregunta, conservan todo y devuelven el foco al control que pidió cerrar.
-  Descartar cierra la capa original y el foco vuelve por la pila.
-- **Un cierre en curso no se puede pedir dos veces**: mientras la pregunta está
-  arriba, un segundo pedido no encola otro cierre.
-
-En el checkout, lo local y lo guardado son cosas distintas:
+Los tres contenedores que la política de salida toca, los tres iguales: entra
+la primera letra y el foco se va al botón Cerrar de la capa. Con el caso nuevo
+puesto y el producto devuelto, el corte es más temprano de lo que suponía tu
+informe:
 
 ```
-antes de crear las órdenes  -> destino, traslado y medio elegido son trabajo
-                               descartable: se protegen
-después                     -> las órdenes existen y NO son «cambios sin
-                               guardar»: cerrar no pregunta
-                               salvo que haya un comprobante elegido y todavía
-                               no enviado, que sí es pérdida real
+[FAIL] 150 … — alta de publicación: en la tecla 1 de 7 («A») el foco se fue del
+             campo a <button> «Cerrar»
 ```
 
-Para que eso último sea cierto tuve que corregir una cosa: el comprobante ya
-enviado quedaba igual en la lista de archivos elegidos, así que «hay un archivo
-sin mandar» habría sido verdad para siempre. Ahora el envío exitoso lo saca. **No
-toqué el contrato de ninguna orden creada.**
+Es decir: la letra entra, y el render que provoca esa misma letra ya expulsa el
+foco. En un campo vacío el defecto aparece en la primera tecla, no en la
+segunda.
 
-### 3. Dos agregados que no me pediste
+### 2. La raíz, medida antes de tocarla
 
-1. **El fondo de la edición y el de la calificación ya no propagan el clic** al
-   fondo de Mi Panel. Sin esto, mi propia protección quedaba incoherente: un
-   cierre sucio cerraba una capa y uno limpio cerraba dos.
-2. **El alta limpia el formulario al descartar**, por lo del borrador que
-   reaparecía. Es lo que hace que «descartar» signifique algo ahí.
+El efecto de `useCapaModal` dependía de `onClose`. Ese efecto hace cuatro cosas
+—empujar la capa a la pila, atrapar el foco, oír Escape y trabar el scroll— y
+las cuatro pertenecen a **la apertura de la capa**, no a la identidad de la
+función que cierra. Con `onClose` en las dependencias, cualquier capa cuyo
+cierre se vuelva a crear en cada render se desmonta y se vuelve a montar con
+cada tecla, y montar significa volver a enfocar el primer control.
 
-### 4. Cuatro casos viejos que se rompieron, y por qué
-
-Con la corrección puesta, la suite completa dio **144/149**: los casos **40,
-45, 47 y 48** cerraban formularios **con datos escritos** y esperaban que se
-cerraran en silencio. Eso es exactamente lo que esta tarea cambió.
+Antes de tocar el hook conté sus consumidores y separé cuáles estaban en riesgo:
 
 ```
-[FAIL] 40 — waiting for locator('#perfil-nombre') to be detached
-[FAIL] 45 — waiting for heading /Datos de env/i to be hidden
-[FAIL] 47 — waiting for button «Salir» … intercepts pointer events
-[FAIL] 48 — waiting for button «Agregar» … intercepts pointer events
+capa                                    onClose                     ¿se recreaba?
+Pregunta                                useCallback []               no
+AdminPanel (panel)                      prop de App                  no*
+AdminPanel (detalle de orden)           useCallback []               no
+LoginModal / RegisterModal              prop de App                  no*
+ProductDetailModal / SellerProfile      prop / estado del detalle    no*
+CartModal                               prop de App                  no*
+AddProductModal    ← mío                dependía de `salida`         SÍ
+CheckoutModal      ← mío                dependía de `salida`         SÍ
+UserDashboard      ← mío                dependía de `salida`         SÍ
 ```
 
-Los corregí para que **descarten explícitamente**, que es lo que hacían antes
-sin que nadie se lo preguntara, con un ayudante compartido que espera a que
-pase una de las dos cosas —la pregunta o el cierre— y no usa pausas fijas. No
-cambié lo que cada caso mide.
+(*) esas capas reciben una flecha en línea desde `App`, así que su `onClose` sí
+cambia **cuando `App` vuelve a dibujar**. Lo que las salvaba es que escribir
+adentro de ellas no vuelve a dibujar `App`. O sea: no estaban sanas, estaban
+**a salvo por casualidad**. Por eso corregí la raíz y no sólo mis tres.
 
-### 5. Rojo y verde del caso 149
+**La corrección.** El cierre viaja por referencia y deja de ser dependencia: el
+efecto corre una vez por apertura, y Escape llama siempre a la versión más
+reciente. Son doce líneas en `src/hooks/useCapaModal.ts`; no hay otro gestor de
+modales, no hay oyentes locales nuevos y la pila es la misma.
 
-Rojo, con el caso final contra `b07ebce`:
-
-```
-[FAIL] 149 … — perfil sucio + X del panel: no preguntó nada antes de cerrar
-```
-
-Verde, con trece caminos de cierre recorridos:
+**El impacto sobre las capas ajenas, medido antes y después.** Misma sonda,
+mismo orden, sobre la aplicación real:
 
 ```
-[PASS] 149 … — perfil limpio/X del panel, perfil sucio/cambio de pestaña (no
-  cierra: no pregunta), perfil revertido/X del panel, alta limpia/fondo, alta
-  sucia/fondo, edición limpia/Cancelar, edición sucia/Cancelar, calificación
-  limpia/fondo, calificación sucia/fondo, checkout limpio/Escape, checkout
-  sucio/Escape, checkout con comprobante sin enviar/Escape, checkout con orden
-  creada/Finalizar
+                                     antes (7741b91)             después (83dba0a)
+LOGIN     escritura secuencial       valor="abc", foco=campo      idéntico
+  Escape                             cierra, foco en Ingresar     idéntico
+REGISTRO  escritura secuencial       valor="abc", foco=campo      idéntico
+  Escape                             cierra, foco al anterior     idéntico
+CARRITO   abrir                      1 diálogo, foco en Cerrar    idéntico
+  +1 (vuelve a dibujar el carrito)   el foco sigue en «+»         idéntico
+  Escape                             cierra, foco en el carrito   idéntico
 ```
 
-El caso arma lo suyo: un transportista propio —el seed no trae ninguno—, dos
-publicaciones y una orden llevada a entregada por las rutas reales, para que
-exista «Calificar Vendedor».
+Las capas sin campos de texto las cubre el **caso 148**, que pasa: detalle de
+publicación en Inicio/Mercado/Servicios por Escape, X y fondo; la pila detalle →
+perfil del vendedor; y el detalle de orden de Administración con pestaña,
+filtro, página y scroll conservados. Ninguna capa dependía de que el efecto se
+reinstalara: no hay ninguna a la que este cambio le altere el cierre.
+
+### 3. Los tres consumidores
+
+Además desprendí `alSalir` —que ya era estable— del objeto que devuelve
+`useSalidaProtegida`, para no volver a armar la trampa desde afuera:
+
+```
+const salida = useSalidaProtegida();
+const { alSalir } = salida;
+```
+
+No alcanzaba con poner `salida.alSalir` en las dependencias:
+`react-hooks/exhaustive-deps` exige el objeto entero y `npm run lint` corre con
+`--max-warnings 0`. Desprenderlo es la forma que la regla acepta y la que deja
+el cierre realmente estable.
+
+**No toqué la detección de suciedad**, ni el copy, ni los estilos, ni los
+formularios más allá de esas dos líneas por archivo.
+
+### 4. El caso 150
+
+Autónomo, sobre la interfaz real, y **discrimina los tres contenedores**: si
+falla, el mensaje dice cuál, en qué tecla y adónde se fue el foco.
+
+- Escribe **una letra por vez** y, después de **cada una**, contrasta el valor
+  del campo y `document.activeElement`. Nada de `fill()`: ahí la edición entra
+  de una sola vez y el defecto no se ve. Eso es exactamente lo que el 149 no
+  detectaba.
+- Comprueba además que la capa siguió siendo la misma: un solo `role="dialog"`
+  y el scroll de fondo todavía trabado.
+- Y que escribir no desarmó la protección: con lo escrito adentro, cerrar
+  pregunta una sola vez y «seguir editando» conserva el texto y **devuelve el
+  foco a ese mismo campo**.
+- Se arma lo suyo: entra por la API y publica su propio insumo con stock para
+  abrir el checkout, así no depende de lo que otro caso haya dejado.
+
+### 5. La semántica del 149 quedó intacta
+
+El 149 pasa sin tocarlo, con sus trece caminos de cierre: limpio cierra derecho,
+sucio pregunta una vez, seguir editando conserva, descartar cierra una sola capa
+y no revive el borrador, cambiar y revertir vuelve a limpio, y el checkout sigue
+distinguiendo el estado local de la orden ya creada —una orden, sin duplicar—.
 
 ### 6. Puertas
 
 ```
+base limpia + SMOKE_CASOS=150                   1/1
 base limpia + SMOKE_CASOS=149                   1/1
-base limpia + suite completa                    148/149   (131 rojo)
+base limpia + suite completa                    149/150   (131 rojo)
 npm run build                                   ok
 npm run lint                                    ok (--max-warnings 0)
 node --check scripts/smoke.mjs                  ok
@@ -148,45 +152,51 @@ npm run contraste                               52 mediciones, ninguna por debaj
 git -c core.whitespace=cr-at-eol diff --check   limpio
 ```
 
-El **131** es el de siempre: mi puente sólo traduce `docker exec` y esa receta
-necesita `docker run`. En tu máquina esto tiene que dar **149/149**.
+El **131** es el de siempre, y su mensaje lo dice entero: mi puente traduce
+`docker exec` y esa receta necesita `docker run --rm -v … alpine:3`. En tu
+máquina esto tiene que dar **150/150**; yo no lo declaro.
+
+Sobre tu Docker: por lo que describís, el binario de Compose que trae Docker
+Desktop 4.41.2 quedó con firma inválida y Docker aborta al leer sus metadatos.
+Eso no lo puedo verificar desde acá y no me meto con tu máquina, pero para
+correr la suite no hace falta Docker: `./scripts/entorno_nativo.sh --recrear`
+levanta base, migraciones, seed, API y frontend nativos, que es lo que uso yo.
+El único caso que igual queda rojo por ese camino es el 131.
 
 ### 7. Hashes
 
 ```
-src/formularios/salidaProtegida.tsx             8c36c669346e122b
-src/formularios/Pregunta.tsx                    d436a072ed7ffe27
-src/formularios/salidaProtegida.module.css      1c423f7ee18fc634
-src/components/AddProduct/AddProductModal.tsx   d46cb13b3aaf03c4
-src/components/Checkout/CheckoutModal.tsx       864292720df99bc9
-src/components/UserDashboard/UserDashboard.tsx  13ea3710d1d9ba05
-scripts/smoke.mjs                               af382696f1c7cd2a
+src/hooks/useCapaModal.ts                       db9c1416108ac58f
+src/components/AddProduct/AddProductModal.tsx   253288bbf2467488
+src/components/Checkout/CheckoutModal.tsx       8367817de78e20d7
+src/components/UserDashboard/UserDashboard.tsx  057f71f677eb2edc
+scripts/smoke.mjs                               c8d76f82387b45bd
 ```
 
-(SHA-256 truncado a 16, del árbol en `7741b91`.)
+(SHA-256 truncado a 16, del árbol en `83dba0a`.)
 
 ### 8. Riesgos residuales
 
-1. **La suciedad se compara serializando.** Es suficiente para estos cinco
-   formularios —texto, números, listas y casillas— pero no distingue el orden
-   de una lista reordenada ni dos archivos con el mismo nombre.
-2. **El cambio de pestaña no pregunta**, por lo medido arriba. Si mañana algo
-   descarta el formulario al cambiar de pestaña, esto pasa a ser un agujero; el
-   caso 149 lo dejaría ver porque comprueba que el valor sigue ahí al volver.
-3. **La pregunta no distingue entre formularios.** Dice «tenés cambios sin
-   guardar» y nada más. Con un solo formulario abierto por vez alcanza.
-4. **El alta sigue conservando su borrador si se guarda y se vuelve a abrir**
-   por otros caminos que no son el cierre —por ejemplo publicar y reabrir—; eso
-   ya se limpiaba y no lo toqué.
-5. El caso 149 deja dos publicaciones, una cuenta de transportista y dos órdenes
-   en la base, como el 145, el 147 y el 148 dejan las suyas.
+1. **El efecto ya no reacciona a un cambio de `onClose`.** Es lo que se buscaba,
+   pero deja una consecuencia: una capa que quisiera reinstalar su trampa de
+   foco a propósito tendría que hacerlo por `activa`, la única dependencia que
+   queda. Ninguna lo hace hoy.
+2. **`activa` sigue siendo dependencia**, así que una capa que la haga oscilar
+   por render volvería a tener el mismo síntoma. Las once actuales pasan una
+   constante o un booleano de apertura.
+3. **El caso 150 mide siete y ocho teclas por contenedor.** Alcanza para este
+   defecto —que aparece en la primera— pero no es una prueba de escritura larga.
+4. Sigue en pie lo que ya te dije del 149: la suciedad se compara serializando,
+   el cambio de pestaña no pregunta porque no pierde nada, y la pregunta no
+   distingue entre formularios.
+5. El caso 150 deja una publicación del vendedor en la base, como el 145, el
+   147, el 148 y el 149 dejan las suyas.
 
 ### 9. Frenos
 
-No toqué validaciones de alta ni de edición, fuente de ubicación, estrellas,
-persistencia de calificaciones, navegación/History API, Backend, modelos,
-migraciones, seed, pagos, BOEDA, estilos generales, Railway ni datos remotos. No
-desplegué. `PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de
-empujar.
+No cambié la detección de suciedad, copy, estilos, formularios más allá de las
+dos líneas por archivo, Backend, modelos, migraciones, seed, pagos, BOEDA,
+navegación/History API, Railway ni datos remotos. No desplegué. `PRE_FIRMA.md`
+sigue fuera del versionado y lo confirmé antes de empujar.
 
 Freno acá y te pido revisión.
