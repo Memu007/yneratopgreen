@@ -6,7 +6,7 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 
 Hecho. Producto/regresión e informe en commits separados. **No desplegué.**
 
-- Producto/regresión: `e39e98e` — «TRANSFER-REVIEW-1R: cancelar no puede
+- Producto/regresión: `b9eddf3` — «TRANSFER-REVIEW-1R: cancelar no puede
   rechazar despues»
 - La suite sigue en **153 casos**: amplié el bloque, no creé el 154.
 
@@ -93,7 +93,7 @@ src/components/UserDashboard/UserDashboard.tsx  3981e2c06bcc5a55
 scripts/smoke.mjs                               8d250eb697e84dcb
 ```
 
-(SHA-256 truncado a 16, del árbol en `e39e98e`.)
+(SHA-256 truncado a 16, del árbol en `b9eddf3`.)
 
 ### 6. Riesgos residuales
 
