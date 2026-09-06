@@ -6,7 +6,7 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 
 Hecho. Producto/regresión e informe en commits separados. **No desplegué.**
 
-- Producto/regresión: `348fa3f` — «TRANSFER-REVIEW-1: rechazar una transferencia
+- Producto/regresión: `0878bd4` — «TRANSFER-REVIEW-1: rechazar una transferencia
   se decide dentro del producto»
 - La suite pasa a **153 casos**.
 
@@ -121,7 +121,7 @@ src/components/UserDashboard/UserDashboard.tsx  39548738f63f10e5
 scripts/smoke.mjs                               073d11db03a8d8f3
 ```
 
-(SHA-256 truncado a 16, del árbol en `348fa3f`.)
+(SHA-256 truncado a 16, del árbol en `0878bd4`.)
 
 ### 7. Riesgos residuales
 
