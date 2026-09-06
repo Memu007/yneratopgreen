@@ -5,6 +5,18 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-09-06 — Sol Alto por defecto; la PM avisa cada cambio de razonamiento
+
+Emi convierte en regla permanente la selección de esfuerzo de la PM. Se usa
+GPT-5.6 Sol en Alto para el trabajo normal y Muy alto/XHigh sólo en bloques
+puntuales con evidencia contradictoria, riesgo material o cierre complejo. La
+PM debe avisar antes con motivo, alcance y condición de regreso, y recomendar
+volver a Alto al terminar.
+
+No se escala por ansiedad, longitud o uso disponible. El red-team profundo
+mantiene su decisión separada de Astra Alto. Disparadores completos en
+`ONBOARDING-PM.md`, sección «Cuándo cambiar el razonamiento de la PM».
+
 ## 2026-09-06 — Mercado tendrá dos vistas explícitas y Registro debe alcanzar la base profesional
 
 Emi rechazó la geometría variable del catálogo y la calidad visual del alta a

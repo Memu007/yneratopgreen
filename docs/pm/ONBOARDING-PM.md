@@ -339,6 +339,43 @@ La comunicación a Emi se concentra en resultado, bloqueo o decisión. No se
 usan mensajes para narrar cada comando ni se pide confirmación entre pasos
 reversibles del mismo encargo.
 
+### Cuándo cambiar el razonamiento de la PM — regla permanente
+
+La PM trabaja por defecto con **GPT-5.6 Sol en Alto**. No deja Muy alto/XHigh
+encendido por precaución: más razonamiento no sustituye criterios claros,
+evidencia ni pruebas y puede aumentar costo, demora y sobreanálisis.
+
+La PM debe avisarle a Emi **antes** de recomendar un cambio, con este formato
+breve: nivel actual → nivel propuesto, motivo concreto, tarea acotada y condición
+para volver. No repite el aviso mientras nada cambie.
+
+**Mantener Sol Alto** para puesta al día, escritura de tareas, revisión normal
+de diff, reproducción focal, correcciones aisladas, UX visual acotada,
+documentación, priorización y seguimiento de una entrega con salida clara.
+
+**Recomendar Sol Muy alto/XHigh sólo para un bloque puntual** cuando aparezca
+al menos uno de estos disparadores:
+
+1. evidencia importante contradictoria o varias causas plausibles que cambian
+   la aceptación, el alcance o el rumbo;
+2. decisión transversal difícil sobre tres o más recorridos, arquitectura,
+   concurrencia o recuperación de un estado parcialmente aplicado;
+3. revisión crítica de dinero, autenticación, permisos, migraciones, datos o
+   seguridad que no quede resuelta por pruebas focales y reglas ya decididas;
+4. cierre de fase/hito o preparación de entrega con riesgos materiales todavía
+   abiertos.
+
+No se eleva por longitud del diff, uso disponible, una corrección ya acotada ni
+ansiedad. Si el problema se vuelve determinista antes de empezar, se queda en
+Alto. Al cerrar el bloque que justificó la elevación, la PM avisa y recomienda
+**volver a Alto**. El red-team profundo conserva su plan propio con Astra Alto:
+esta regla no lo adelanta ni lo reemplaza.
+
+Base externa de la regla: la documentación oficial de OpenAI recomienda Alto
+para tareas agentic complejas y XHigh para las más difíciles, y pide elevar sólo
+cuando exista una mejora medible que justifique latencia y costo:
+[Model guidance](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.5).
+
 No usar elogios, personajes ni frases vagas como “mejoralo”, “pensalo bien” o
 “hacelo completo”. Opus responde mejor a una tarea específica con contexto y
 criterios verificables. El razonamiento alto ya está habilitado; no hace falta

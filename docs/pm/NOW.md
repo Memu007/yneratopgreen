@@ -1137,6 +1137,12 @@ informarle y pedirle decisiones —resultado primero, commit y evidencia,
 opciones con recomendación y sin repetir contexto— está en la sección 5 de
 `ONBOARDING-DEV.md`.
 
+El esfuerzo de la PM también tiene regla propia: **Sol Alto por defecto** y
+Muy alto/XHigh sólo para un bloque difícil con disparador material. La PM le
+avisa a Emi antes de recomendar subir, dice cuándo volver y confirma el regreso
+al cerrar. La matriz está en «Cuándo cambiar el razonamiento de la PM» de
+`ONBOARDING-PM.md`; no altera el red-team futuro con Astra Alto.
+
 El rol de PM cambió dos veces: la primera PM pasó a dev el 2026-08-04, Sol
 la sucedió, y hay PM nueva desde el 2026-08-06. **La dev es la misma desde
 el 04/08**, así que la continuidad del código no se cortó.
