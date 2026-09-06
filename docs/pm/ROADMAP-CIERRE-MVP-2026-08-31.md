@@ -1,6 +1,6 @@
 # Roadmap operativo para cerrar el MVP
 
-Actualizado: 2026-09-05.
+Actualizado: 2026-09-06.
 Fuentes: `CRONOGRAMA.md`, `ALCANCE-Y-LIMITES.md`, `NOW.md` y
 `AUDITORIAS-UX-CLAUDE-2026-08-30.md`.
 
@@ -59,6 +59,10 @@ final, como acordó Emi.
   salida. PM reprodujo 149 y 150 aislados y dentro de la suite completa; la
   evidencia combinada, sin atribuir 150/150, está en
   `REPRODUCCION-FORM-DIRTY-1R-2026-09-05.md`.
+- FORM-CONSISTENCY-1R quedó aceptada en `042a3e3`/`0922fc9`: PM reprodujo el
+  segundo envío rojo contra `6837af1` y verde contra la corrección; el caso 151
+  conserva los cinco bordes y a11y cerró 64/64. Evidencia en
+  `REPRODUCCION-FORM-CONSISTENCY-1R-2026-09-06.md`.
 - ORD-SELF-1 no cierra ningún hallazgo de las tres auditorías; era la tarea P1
   anterior y las auditorías la excluyeron expresamente.
 - La historia de las devoluciones del arnés y su cierre reproducido queda en
@@ -123,8 +127,8 @@ tiene una sola política de navegación y una sola regresión matriz.
 
 | Orden | Pieza | Auditoría cubierta | Cierre mínimo |
 |---:|---|---|---|
-| 10 | **FORM-CONSISTENCY-1 — vigente** | F5, F7 y F13 | Alta/edición comparten validación, la imagen fallida al editar no declara éxito total, errores reciben foco/alerta y tipos de carga fallidos muestran error/reintento. |
-| 11 | **LOCATION-SOURCE-1** | F6 y C3 | Edición escribe la ubicación oficial del padrón; se elimina o retira el campo legado engañoso. |
+| 10 | **FORM-CONSISTENCY-1R — cerrada** | F5, F7 y F13 | Aceptada en `042a3e3`/`0922fc9`: alta/edición comparten validación, imagen fallida informa resultado parcial, errores repetidos reciben foco/alerta y cargas fallidas muestran error/reintento. |
+| 11 | **LOCATION-SOURCE-1 — vigente** | F6 y C3 | Edición lee/escribe la ubicación oficial del padrón; texto legado y ubicación del vendedor dejan de gobernar o simular la ubicación publicada. |
 | 12 | **TRANSFER-REVIEW-1** | F8 | Rechazo de comprobante usa capa propia, motivo obligatorio y resultado visible; sin `window.prompt`. |
 | 13 | **ADMIN-TRUTH-1** | ADM-3, ADM-4, ADM-10 y ADM-11 | Métricas y rótulos corresponden a la API, estados están en es-AR y cada carga distingue error, vacío y reintento. |
 | 14 | **ADMIN-SAFETY-1** | ADM-6, ADM-7, ADM-9; reproduce ADM-R4/R5 | Confirmaciones propias para acciones sensibles y reset manual acotado. Antes se mide categoría desactivada y Provincias legado. |

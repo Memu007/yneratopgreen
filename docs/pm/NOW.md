@@ -1,8 +1,8 @@
 # Estado actual
 
-Actualizado: 2026-09-05.
+Actualizado: 2026-09-06.
 
-## Estado inmediato — 2026-09-05
+## Estado inmediato — 2026-09-06
 
 - **FORM-DIRTY-1R aceptada:** producto/regresión `83dba0a`, informe `db1bb10`.
   PM revisó el diff y reprodujo 150 y 149 aislados en **1/1** cada uno; ambos
@@ -16,18 +16,18 @@ Actualizado: 2026-09-05.
 - Build, lint, sintaxis, compileall y `diff-check` están verdes. El `pip check`
   del Conda global no es representativo; Dev lo obtuvo verde y no hay cambios
   de Backend, requirements o imagen.
-- **FORM-CONSISTENCY-1 devuelta:** producto/regresión `6837af1`, informe
-  `15cc665`. PM revisó el diff y reprodujo el caso 151 aislado en **1/1**, pero
-  halló un rojo que la regresión no mide: si se envía dos veces el mismo error
-  de contraseñas, el segundo intento deja el foco en «Crear cuenta» y la alerta
-  fuera del viewport (`top=-381`). Build, lint y `diff-check` quedaron verdes.
-  Evidencia en `REPRODUCCION-FORM-CONSISTENCY-1-2026-09-05.md`.
-- PM no corrió la suite completa de esta entrega porque ya existe un rojo de
-  aceptación reproducido. No se atribuye la 150/151 informada por Dev como
-  suite independiente de PM.
-- **Única tarea activa y responsable:** FORM-CONSISTENCY-1R, Dev. Debe hacer
-  que cada intento fallido vuelva a llevar el error vigente a vista/foco,
-  ampliar el bloque B del 151 sin crear otro caso y conservar los demás bordes.
+- **FORM-CONSISTENCY-1R aceptada:** producto/regresión `042a3e3`, informe
+  `0922fc9`. PM revisó el diff, reprodujo rojo contra `6837af1` en **0/1** y
+  verde en **1/1** desde bases limpias. Build, lint, sintaxis, compileall, a11y
+  **64/64** y `diff-check` quedaron verdes. Evidencia en
+  `REPRODUCCION-FORM-CONSISTENCY-1R-2026-09-06.md`.
+- PM no atribuye una suite completa propia: la bandera MP permaneció en
+  `false`. Dev informó 150/151 con único rojo ambiental en 131; la corrección
+  sólo toca Registro y el bloque B del caso 151.
+- **Única tarea activa y responsable:** LOCATION-SOURCE-1, Dev. La edición de
+  publicaciones debe leer y escribir `locality_id` del padrón, dejar de tratar
+  texto libre o la ubicación del vendedor como ubicación publicada y conservar
+  la protección de cambios.
 - Docker Desktop sigue sin arrancar y no fue reseteado ni reemplazado. No se
   tocaron volúmenes de proyecto, Railway, datos remotos ni pagos reales.
 - El red-team profundo sigue cerrado: faltan el cierre funcional, la

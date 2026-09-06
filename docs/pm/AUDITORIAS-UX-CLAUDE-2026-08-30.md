@@ -191,9 +191,9 @@ agregarse en Login una instrucción honesta para contactar soporte.
 
 ### F5 — error de registro fuera de vista y labels de Login
 
-**Dictamen PM:** confirmado por código, P2 de accesibilidad.  
-**Cierre mínimo:** `role="alert"`, llevar el error a la vista/foco e IDs con
-`htmlFor` en Login.
+**Dictamen PM:** cerrado en `042a3e3`/`0922fc9`. PM reprodujo el segundo envío
+rojo contra `6837af1` y verde contra la corrección; Login asocia sus labels y
+los errores repetidos del registro vuelven a vista/foco sin borrar valores.
 
 ### F6 — editar Provincia/Ciudad no cambia la ubicación oficial
 
@@ -204,11 +204,9 @@ selects del padrón que escriban `locality_id` o retiro de campos engañosos.
 
 ### F7 — alta y edición validan distinto; imágenes fallidas parecen exitosas
 
-**Dictamen PM:** probable y respaldado por código, P2 alto.  
-**Casos:** precio cero con mensajes contradictorios, servicio por hora sin
-precio aceptado al editar y subida de imágenes sin comprobar `response.ok`.  
-**Cierre mínimo:** compartir reglas de alta/edición, verificar la respuesta de
-imagen y no declarar éxito parcial como total.
+**Dictamen PM:** cerrado en `6837af1`/`15cc665`, incluido en la aceptación final
+`042a3e3`/`0922fc9`. Alta y edición comparten la matriz mínima de precio y la
+subida rechazada al editar informa el resultado parcial y su motivo.
 
 ### F8 — rechazo de comprobante usa `window.prompt`
 
@@ -243,9 +241,9 @@ correctos sin revisión humana.
 
 ### F13 — tipos de carga vacíos sin aviso
 
-**Dictamen PM:** plausible, P3.  
-Si falla el catálogo, el grupo no debe quedar rotulado y vacío; mostrar error y
-reintento.
+**Dictamen PM:** cerrado en `6837af1`/`15cc665`, incluido en la aceptación final
+`042a3e3`/`0922fc9`. El fallo es visible y el reintento recupera las opciones
+sin reiniciar el registro.
 
 ## Riesgos de la segunda auditoría
 

@@ -12,6 +12,80 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-06 — TAREA VIGENTE: LOCATION-SOURCE-1, la ubicación publicada tiene una sola verdad
+
+FORM-CONSISTENCY-1R queda **aceptada** en producto/regresión `042a3e3` e
+informe `0922fc9`. PM revisó el diff, reprodujo el rojo contra `6837af1` en
+**0/1** y el verde contra la corrección en **1/1** desde bases locales limpias.
+Build, lint, sintaxis, compileall, a11y **64/64** y `diff-check` quedaron verdes.
+La suite completa no se atribuye a PM: Dev informó 150/151 con el único rojo
+ambiental en 131. Evidencia y límites en
+`REPRODUCCION-FORM-CONSISTENCY-1R-2026-09-06.md`.
+
+La siguiente pieza es **LOCATION-SOURCE-1**. Antes de tocar código leé F6 y C3
+en `AUDITORIAS-UX-CLAUDE-2026-08-30.md` y contrastá el recorrido real de
+`/products/my`, `handleEditProduct`, el formulario de edición, el PATCH de
+productos y `catalogService.ts`. Hoy la edición parte el texto legado
+`product.location`, ofrece una provincia fija y una ciudad libre, y vuelve a
+mandar `location`; el catálogo filtra y representa por `locality_id`. Cambiar
+lo que la pantalla llama ubicación puede no cambiar la ubicación publicada.
+
+### Resultado obligatorio
+
+1. La edición obtiene la ubicación oficial actual de cada publicación por su
+   `locality_id`; `/products/my` debe exponer el identificador y los datos
+   mínimos necesarios sin obligar al Frontend a partir `location` por comas.
+2. Provincia y localidad usan el padrón y los ayudantes de catálogo ya
+   existentes. La localidad visible y seleccionada corresponde al ID oficial;
+   no queda un campo libre llamado Ciudad que parezca gobernar el catálogo.
+3. Guardar un cambio manda `locality_id`. El Backend ya valida ese ID y deriva
+   el texto compatible: no vuelvas a aceptar desde la UI un `location` escrito
+   a mano ni dupliques esa derivación en React.
+4. Después de guardar y recargar, editor, tarjeta, detalle, filtros y logística
+   describen la misma localidad. El lugar del perfil del vendedor sigue siendo
+   un dato distinto y nunca se usa como ubicación de una publicación.
+5. Una fila heredada sin `locality_id` se presenta como **sin ubicación
+   oficial**: no adivines un ID desde texto libre ni desde `seller.location`.
+   Elegir una localidad oficial puede sanearla; guardar otro campo no puede
+   fabricar una ubicación silenciosa.
+6. Conservá la política de suciedad aceptada: cambiar y volver al ID inicial
+   deja limpio; cambiar realmente la localidad queda protegido antes de cerrar.
+
+No elimines columnas ni abras una migración sólo por limpiar el nombre legado:
+`Product.location` puede quedar como valor derivado de compatibilidad. No
+toques la ubicación libre del perfil, radio/base del transportista, algoritmo
+de fletes, filtros generales, geodistancias, pagos, comprobantes, rating,
+navegación, estilos, BOEDA, Railway o datos remotos.
+
+### Regresión discriminante
+
+Agregá un caso 152 autónomo sobre la UI real que conserve rojo contra
+`042a3e3` y demuestre:
+
+- una publicación oficial en una localidad y un vendedor con otra ubicación
+  abre el editor preseleccionando la **publicación**, nunca el perfil;
+- cambiar provincia/localidad con los selects reales envía el ID elegido; en
+  base quedan ese `locality_id` y el texto derivado por el Backend;
+- tras recargar, el editor conserva el ID y tarjeta/detalle muestran la nueva
+  localidad; el filtro nuevo la incluye y el anterior la excluye;
+- una publicación sin `locality_id` no muestra ni preselecciona la ubicación
+  del vendedor como si fuera propia;
+- cambiar y revertir la selección vuelve a limpio, mientras un cambio real
+  conserva la confirmación de descarte de FORM-DIRTY-1.
+
+No uses esperas fijas ni una lista nueva de provincias. Corré 152 aislado y una
+suite completa esperada en **152/152** desde base limpia; preservá 137, 149,
+150 y 151 como controles. Sumá build, lint, `node --check`, compileall, `pip
+check`, a11y completa y `diff-check` real contra `042a3e3`; contraste sólo si
+cambiás estilos.
+
+El cambio de API permitido es únicamente completar la lectura de
+`/products/my` para esta verdad oficial. Si hace falta cambiar modelos,
+migraciones, consultas/filtros del catálogo o contrato de logística, frená con
+evidencia antes de ampliar; retirar el fallback visual a `seller.location` sí
+forma parte de esta pieza. Producto/regresión en un commit, informe separado
+con rojo/verde, suite, riesgos y SHA; subí y frená. No despliegues.
+
 ## 2026-09-05 — DEVOLUCIÓN VIGENTE: FORM-CONSISTENCY-1R, el mismo error también tiene que volver a la vista
 
 Revisé producto/regresión `6837af1` e informe `15cc665`.
