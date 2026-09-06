@@ -128,8 +128,8 @@ tiene una sola política de navegación y una sola regresión matriz.
 | Orden | Pieza | Auditoría cubierta | Cierre mínimo |
 |---:|---|---|---|
 | 10 | **FORM-CONSISTENCY-1R — cerrada** | F5, F7 y F13 | Aceptada en `042a3e3`/`0922fc9`: alta/edición comparten validación, imagen fallida informa resultado parcial, errores repetidos reciben foco/alerta y cargas fallidas muestran error/reintento. |
-| 11 | **LOCATION-SOURCE-1R — vigente** | F6 y C3 | Devuelve `9bb56ac`/`06ea083`: edición lee/escribe la ubicación oficial, pero debe impedir que una provincia sin localidad se declare guardada conservando el ID anterior. |
-| 12 | **TRANSFER-REVIEW-1** | F8 | Rechazo de comprobante usa capa propia, motivo obligatorio y resultado visible; sin `window.prompt`. |
+| 11 | **LOCATION-SOURCE-1R — cerrada** | F6 y C3 | Aceptada en `9bb56ac`/`06ea083` + `025753c`/`266c434`: edición lee/escribe el ID oficial, no inventa otra fuente y una selección incompleta no guarda ni declara éxito. |
+| 12 | **TRANSFER-REVIEW-1 — vigente** | F8 | Rechazo de comprobante usa capa propia, motivo obligatorio y resultado visible; sin `window.prompt`. |
 | 13 | **ADMIN-TRUTH-1** | ADM-3, ADM-4, ADM-10 y ADM-11 | Métricas y rótulos corresponden a la API, estados están en es-AR y cada carga distingue error, vacío y reintento. |
 | 14 | **ADMIN-SAFETY-1** | ADM-6, ADM-7, ADM-9; reproduce ADM-R4/R5 | Confirmaciones propias para acciones sensibles y reset manual acotado. Antes se mide categoría desactivada y Provincias legado. |
 | 15 | **RATING-UX-1** | F9, F10 y F11 | Estrellas visibles y accesibles; después de recargar no reaparece una calificación ya enviada. |

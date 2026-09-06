@@ -12,6 +12,65 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-06 — TAREA VIGENTE: TRANSFER-REVIEW-1, rechazar sin salir del producto
+
+LOCATION-SOURCE-1R queda **aceptada**: pieza base `9bb56ac`/`06ea083`,
+corrección `025753c` e informe `266c434`. PM revisó el diff, verificó hashes y
+puertas estáticas, y reprodujo el caso 152 corregido en **1/1** desde base
+limpia. El rojo anterior ya estaba reproducido por PM y no se repitió. Dev
+informó 151/152 con único rojo ambiental en 131; esa suite no se atribuye a PM.
+Evidencia final en `REPRODUCCION-LOCATION-SOURCE-1-2026-09-06.md`.
+
+La siguiente pieza es **TRANSFER-REVIEW-1**, cierre de F8. Hoy
+`handleTransferDecision` llama `window.prompt` para pedir el motivo del rechazo.
+Eso saca la decisión del sistema modal de BOEDA, no ofrece validación ni error
+propio y deja un resultado pobre cuando la API falla.
+
+### Resultado obligatorio
+
+1. «Rechazar comprobante» abre una capa propia dentro del panel, con título,
+   contexto suficiente de la orden y un `textarea` rotulado para el motivo.
+   No queda ninguna llamada a `window.prompt`/`prompt` en este recorrido.
+2. Motivo vacío o sólo espacios no envía nada. El error es inline, visible y
+   accesible, conserva lo escrito y lleva el foco al campo que hay que corregir.
+3. Cancelar, X, fondo y Escape cierran sólo esa capa, no mutan la orden y
+   devuelven el foco al botón exacto que la abrió. Tab queda dentro de la capa;
+   reutilizá `useCapaModal` y la pila ya aceptada.
+4. Confirmar con motivo válido manda una sola vez `{ decision: "reject",
+   reason }`, con el motivo recortado. Mientras trabaja no admite doble envío.
+5. Éxito cierra la capa, recarga la fuente real y deja visibles el estado
+   rechazado y el motivo. Un fallo de API mantiene la capa y el motivo, muestra
+   el error dentro de ella y permite reintentar; no declara rechazo exitoso.
+6. Aprobar transferencia/comprobante no cambia. Conservá el aviso de verificar
+   el dinero, los dos estados desde los que el vendedor puede decidir y las
+   validaciones del Backend.
+
+No generalices `ToastContext` para un único formulario ni abras un constructor
+de modales. La solución mínima puede vivir en `UserDashboard` y reutilizar
+hooks/clases existentes. No cambies Backend, estados de orden, stock, reservas,
+archivos, pagos, datos bancarios, navegación, BOEDA, Railway ni datos remotos.
+
+### Regresión discriminante
+
+Agregá el caso 153, autónomo y sobre la UI real. Creá por rutas reales una
+transferencia pendiente del vendedor y medí, dentro de la tarjeta correcta:
+
+- el botón de rechazo no abre diálogo nativo y sí abre la capa BOEDA;
+- blanco/espacios no produce PATCH, anuncia el error y conserva campo/foco;
+- cerrar por las cuatro vías no muta la orden y restaura el disparador;
+- un primer PATCH fallido deja capa, motivo y error visibles; el reintento sano
+  produce un único rechazo real con el motivo recortado;
+- después de recargar, estado y motivo coinciden con API/base, y aprobación
+  sigue disponible en otra orden pendiente.
+
+No uses esperas fijas ni fabriques una ruta de prueba. Corré 153 aislado, los
+controles 18, 19, 24 y 148, y una suite completa esperada en **153/153**. Sumá
+build, lint, `tsc --noEmit`, `node --check`, a11y y `diff-check`; contraste sólo
+si cambiás estilos. Backend/`pip check` sólo si contrariando el alcance tocás
+Backend, caso en el que primero debés frenar con evidencia. Producto/regresión
+en un commit, informe separado con rojo/verde, suite, riesgos y SHA; subí y
+frená. No despliegues.
+
 ## 2026-09-06 — DEVOLUCIÓN VIGENTE: LOCATION-SOURCE-1R, una provincia incompleta no está guardada
 
 Revisé producto/regresión `9bb56ac` e informe `06ea083`. El rumbo y el diff son

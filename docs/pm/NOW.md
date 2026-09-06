@@ -24,19 +24,16 @@ Actualizado: 2026-09-06.
 - PM no atribuye una suite completa propia: la bandera MP permaneció en
   `false`. Dev informó 150/151 con único rojo ambiental en 131; la corrección
   sólo toca Registro y el bloque B del caso 151.
-- **LOCATION-SOURCE-1 devuelta:** producto/regresión `9bb56ac`, informe
-  `06ea083`. PM revisó el diff, reprodujo el 152 rojo contra `042a3e3` en
-  **0/1** y verde contra la entrega en **1/1**. También reprodujo un borde no
-  cubierto: cambiar sólo Provincia, dejar Localidad vacía y guardar manda un
-  PATCH sin `locality_id`, recibe 200, muestra éxito y conserva silenciosamente
-  la localidad anterior. Evidencia en
-  `REPRODUCCION-LOCATION-SOURCE-1-2026-09-06.md`.
-- PM no corrió la suite completa ni repitió puertas ya informadas porque el
-  rojo de aceptación ya decide la devolución. Dev informó 151/152 con único
-  rojo ambiental en 131.
-- **Única tarea activa y responsable:** LOCATION-SOURCE-1R, Dev. Debe impedir
-  ese guardado incompleto y ampliar el mismo caso 152, sin abrir otro caso ni
-  cambiar API, Backend o alcance.
+- **LOCATION-SOURCE-1R aceptada:** pieza base `9bb56ac`/`06ea083`, corrección
+  `025753c` e informe `266c434`. PM revisó el diff y reprodujo el 152 corregido
+  en **1/1** desde base limpia; el rojo anterior ya había sido reproducido por
+  PM y no se repitió. Build, lint, sintaxis y `diff-check` están verdes.
+  Evidencia final en `REPRODUCCION-LOCATION-SOURCE-1-2026-09-06.md`.
+- PM no atribuye una suite completa propia. Dev informó 151/152 con único rojo
+  ambiental en 131; no cambió Backend, API, pagos ni estilos en la corrección.
+- **Única tarea activa y responsable:** TRANSFER-REVIEW-1, Dev. Debe reemplazar
+  `window.prompt` al rechazar una transferencia por una capa propia con motivo
+  obligatorio, resultados visibles y ciclo modal correcto; Backend no cambia.
 - Docker Desktop sigue sin arrancar y no fue reseteado ni reemplazado. No se
   tocaron volúmenes de proyecto, Railway, datos remotos ni pagos reales.
 - El red-team profundo sigue cerrado: faltan el cierre funcional, la

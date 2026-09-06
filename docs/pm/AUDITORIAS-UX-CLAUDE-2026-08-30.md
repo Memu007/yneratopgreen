@@ -135,8 +135,9 @@ Debe quitarse la acción/promesa o darle una conducta real, sin inventar planes.
 - B4 (detalle e historial) quedó cerrado en NAV-URL-1: el primer Atrás cierra
   el detalle y conserva sección/filtros. C1 quedó cerrado en
   MODAL-LIFECYCLE-1: el detalle devuelve foco al disparador exacto en las tres
-  superficies y por las tres formas de cierre. C2 (N+1 de imágenes) y C3
-  (doble fuente de ubicación) siguen en el inventario `acbf3b6`.
+  superficies y por las tres formas de cierre. C2 (N+1 de imágenes) sigue en
+  el inventario `acbf3b6`; C3 (doble fuente de ubicación) quedó cerrado en
+  `9bb56ac`/`06ea083` + `025753c`/`266c434`.
 
 ## Auditoría 2 — formularios y recorridos operativos
 
@@ -197,10 +198,9 @@ los errores repetidos del registro vuelven a vista/foco sin borrar valores.
 
 ### F6 — editar Provincia/Ciudad no cambia la ubicación oficial
 
-**Dictamen PM:** efecto real, pero pertenece a C3.  
-La edición modifica el `location` legado mientras catálogo usa
-`locality_id/publication_location`. Se cierra al eliminar la doble fuente:
-selects del padrón que escriban `locality_id` o retiro de campos engañosos.
+**Dictamen PM:** cerrado en `9bb56ac`/`06ea083` + `025753c`/`266c434`.
+Edición y catálogo usan `locality_id/publication_location`; el texto legado
+queda derivado y una selección incompleta no guarda ni declara éxito.
 
 ### F7 — alta y edición validan distinto; imágenes fallidas parecen exitosas
 

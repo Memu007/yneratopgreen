@@ -2,11 +2,13 @@
 
 ## Decisión
 
-**Devuelta.** Producto/regresión `9bb56ac`, informe `06ea083`.
+**Aceptada después de corrección.** Pieza base `9bb56ac`, informe `06ea083`;
+corrección `025753c`, informe `266c434`.
 
-La solución reemplaza el texto libre por el identificador oficial y cierra el
-recorrido principal, pero permite declarar guardada una selección incompleta
-sin modificar la ubicación persistida.
+La pieza inicial reemplazó el texto libre por el identificador oficial y cerró
+el recorrido principal, pero permitió declarar guardada una selección
+incompleta sin modificar la ubicación persistida. LOCATION-SOURCE-1R cerró ese
+borde y habilitó la aceptación final.
 
 ## Diff y procedencia
 
@@ -79,3 +81,50 @@ las demás puertas verdes; esa evidencia sigue siendo de Dev, no de PM.
 
 No hubo despliegue, pagos, secretos ni datos remotos. La base, los servicios y
 los checkouts usados por PM fueron locales y descartables.
+
+## Cierre de LOCATION-SOURCE-1R
+
+La corrección queda limitada a `UserDashboard.tsx` y al caso 152: 88
+inserciones y 4 eliminaciones. Guarda el par inicial provincia/localidad y, si
+la ubicación fue tocada pero quedó sin localidad, frena antes del PATCH, deja
+el error persistente como alerta, marca el select inválido y lo enfoca. La fila
+heredada intacta sigue pudiendo guardar otros campos.
+
+Hashes SHA-256 reproducidos por PM:
+
+```text
+fd3313b7ba631ac7cc92a2c54adda71718548ed0075c0ac13b1513e3a98218fb  src/components/UserDashboard/UserDashboard.tsx
+6ffb298a5f0c80be2b5a18d6cbf449ecc975dac7a103041af1d0436e71780ad4  scripts/smoke.mjs
+```
+
+PM no volvió a pagar el rojo contra `9bb56ac`: ya estaba reproducido y
+persistido arriba. Desde una base PostgreSQL local limpia reprodujo el verde:
+
+```text
+[PASS] 152 — media selección de ubicación no guarda ni declara éxito; el resto
+del recorrido oficial, heredado y de suciedad continúa verde
+1/1 pasaron; 0 fallaron
+```
+
+Puertas independientes de PM:
+
+```text
+npm run build                                             OK (incluye tsc)
+npm run lint                                              OK
+node --check scripts/smoke.mjs                            OK
+git -c core.whitespace=cr-at-eol diff --check             OK
+```
+
+No se repitieron Backend, `pip check`, contraste, a11y completa ni la suite
+completa porque la corrección no los toca y Dev ya ejecutó una sola corrida:
+151/152, con el único rojo ambiental conocido en 131. Esa suite sigue siendo
+evidencia de Dev.
+
+Riesgo menor aceptado: si se vacía también Provincia, Localidad queda
+deshabilitada y no puede recibir el foco inmediato; la alerta viva igual
+anuncia el bloqueo y no sale ninguna escritura. No se reabre sin evidencia de
+daño real.
+
+La base sintética, el correo de prueba y los servicios locales fueron
+eliminados. Mercado Pago permaneció en `false`; no participaron Railway, datos
+remotos ni pagos.
