@@ -55,6 +55,15 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   // Un error que nadie ve no informa nada: cuando aparece se lo lleva a la
   // vista y al foco. Lo escrito no se toca.
   const cajaDelError = useRef<HTMLDivElement>(null);
+  // Y cada intento fallido cuenta como un aviso nuevo, aunque diga lo mismo:
+  // el segundo envío con el mismo error deja el estado igual que antes, así
+  // que sin este contador el efecto no volvería a correr y la alerta se
+  // quedaría donde estaba —arriba, fuera de la pantalla—.
+  const [avisoDelError, setAvisoDelError] = useState(0);
+  const avisarDelError = (mensaje: string) => {
+    setError(mensaje);
+    setAvisoDelError((n) => n + 1);
+  };
   // El catálogo de cargas es opcional, pero su fallo no puede ser invisible:
   // sin esto el grupo quedaba rotulado y vacío, como si no hubiera cargas.
   const [fallaDeCargas, setFallaDeCargas] = useState('');
@@ -68,7 +77,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   useEffect(() => {
     if (formData.isCarrier && provinces.length === 0) {
       void getProvinces().then(setProvinces).catch(() => {
-        setError('No se pudo cargar el padrón de localidades.');
+        avisarDelError('No se pudo cargar el padrón de localidades.');
       });
     }
   }, [formData.isCarrier, provinces.length]);
@@ -100,7 +109,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     if (!caja) return;
     caja.scrollIntoView({ block: 'center' });
     caja.focus();
-  }, [error]);
+  }, [error, avisoDelError]);
 
   useEffect(() => {
     if (!provinceId) {
@@ -108,7 +117,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       return;
     }
     void getLocalities(provinceId).then(setLocalities).catch(() => {
-      setError('No se pudieron cargar las localidades.');
+      avisarDelError('No se pudieron cargar las localidades.');
     });
   }, [provinceId]);
 
@@ -117,12 +126,12 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     setError('');
 
     if (formData.password !== confirmPassword) {
-      setError('Las contraseñas no coinciden');
+      avisarDelError('Las contraseñas no coinciden');
       return;
     }
 
     if (formData.password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+      avisarDelError('La contraseña debe tener al menos 6 caracteres');
       return;
     }
 
@@ -144,7 +153,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       // "Error al crear la cuenta", y ahora el alta puede fallar porque el
       // correo no salió, que es algo distinto y se resuelve reintentando.
       const errorMessage = err instanceof Error ? err.message : '';
-      setError(errorMessage || 'Error al crear la cuenta. Intenta nuevamente.');
+      avisarDelError(errorMessage || 'Error al crear la cuenta. Intenta nuevamente.');
     } finally {
       setIsLoading(false);
     }

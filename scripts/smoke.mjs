@@ -18649,19 +18649,44 @@ await runCase(151, 'Un formulario no se contradice ni esconde su error', async (
       await enviar.click();
 
       const aviso = page.locator('[role="alert"]').filter({ hasText: /no coinciden/i });
-      await esperarA(async () => (await aviso.count()) === 1,
-        'el error del registro no se anuncia como alerta', 20_000);
-      await esperarA(async () => aviso.evaluate((el) => {
+      const dentroDeLaVentana = () => aviso.evaluate((el) => {
         const r = el.getBoundingClientRect();
         return r.top >= 0 && r.bottom <= window.innerHeight;
-      }), 'el error del registro quedo fuera de la ventana', 20_000);
+      });
+      await esperarA(async () => (await aviso.count()) === 1,
+        'el error del registro no se anuncia como alerta', 20_000);
+      await esperarA(dentroDeLaVentana,
+        'el error del registro quedo fuera de la ventana', 20_000);
       await esperarA(() => esElActivo(aviso),
         `el error del registro no recibio el foco: esta en ${await dondeEstaElFoco(page)}`, 20_000);
       assert((await nombre.inputValue()) === 'Consistencia Del Caso 151',
         'avisar del error borro el nombre escrito');
       assert((await page.locator('#registro-clave').inputValue()) === 'clave151',
         'avisar del error borro la contraseña escrita');
-      medidos.push('error del registro anunciado, a la vista y con el foco');
+
+      // Y otra vez, sin cambiar un solo valor. El texto del error es el mismo,
+      // asi que el estado queda igual que antes: si el aviso dependiera solo de
+      // el, el segundo intento no moveria nada y la alerta se quedaria arriba,
+      // fuera de la pantalla. Primero se la saca de la vista a proposito, para
+      // que volver a verla signifique algo.
+      await enviar.scrollIntoViewIfNeeded();
+      await enviar.focus();
+      await esperarA(async () => !(await dentroDeLaVentana()),
+        'no se pudo dejar la alerta fuera de la ventana antes del segundo intento', 20_000);
+      assert(await esElActivo(enviar),
+        `antes del segundo intento el foco estaba en ${await dondeEstaElFoco(page)}`);
+      await enviar.click();
+      await esperarA(dentroDeLaVentana,
+        'el segundo intento con el mismo error dejo la alerta fuera de la ventana', 20_000);
+      await esperarA(() => esElActivo(aviso),
+        `el segundo intento con el mismo error dejo el foco en `
+        + `${await dondeEstaElFoco(page)}`, 20_000);
+      assert((await aviso.count()) === 1, 'el segundo intento duplico la alerta');
+      assert((await nombre.inputValue()) === 'Consistencia Del Caso 151',
+        'el segundo intento borro el nombre escrito');
+      assert((await page.locator('#registro-clave').inputValue()) === 'clave151',
+        'el segundo intento borro la contraseña escrita');
+      medidos.push('error del registro anunciado, a la vista y con el foco en los dos intentos');
       await contexto.close();
     }
 
