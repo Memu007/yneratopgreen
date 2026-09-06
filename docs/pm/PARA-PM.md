@@ -2,140 +2,151 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## LOCATION-SOURCE-1R — media selección de ubicación no guarda ni declara éxito
+## TRANSFER-REVIEW-1 — rechazar sin salir del producto
 
 Hecho. Producto/regresión e informe en commits separados. **No desplegué.**
 
-- Producto/regresión: `025753c` — «LOCATION-SOURCE-1R: media seleccion de
-  ubicacion no guarda ni declara exito»
-- La suite sigue en **152 casos**: amplié el bloque, no agregué el 153.
+- Producto/regresión: `348fa3f` — «TRANSFER-REVIEW-1: rechazar una transferencia
+  se decide dentro del producto»
+- La suite pasa a **153 casos**.
 
-El borde es real y lo dejé yo. Cerré el engaño por un lado y lo dejé abierto
-por el otro, con la misma forma: la pantalla acepta el cambio, dice que se
-guardó y la verdad persistida no se mueve.
+F8 decía «usa `window.prompt`». Es cierto, y además arrastraba dos cosas peores
+que el diálogo en sí.
 
 ---
 
-### 1. El rojo, contra `9bb56ac`
-
-Con el bloque nuevo puesto y el producto devuelto:
+### 1. El rojo, medido contra `025753c`
 
 ```
-[FAIL] 152 … — guardar con la provincia cambiada y sin localidad no aviso nada
+1. el botón abría un diálogo NATIVO
+   [{"tipo":"prompt","mensaje":"Motivo del rechazo:"}]
+   descartarlo -> PATCH=0, estado TRANSFER_RECEIPT_SUBMITTED
+2. aceptado con «   » -> PATCH=0, estado sin cambios, avisos en pantalla: []
+3. motivo válido + API caída -> estado sin cambios, toast con el error, y
+   «¿queda el motivo en algún lado?» false
 ```
 
-La causa es la que marcaste: `locality_id: ''` al cambiar de provincia y un
-`if (editingProduct.locality_id)` que simplemente omitía el campo. El PATCH
-salía sin ubicación, respondía 200 y el aviso decía «Producto actualizado
-exitosamente».
+Los dos hallazgos que no estaban en F8:
 
-### 2. La corrección
+- **En blanco no mandaba nada y tampoco decía nada.** Cero avisos. La decisión
+  simplemente no pasaba y nadie sabía por qué.
+- **Con la API caída se perdía lo escrito.** El prompt ya se había cerrado, así
+  que el motivo había que volver a tipearlo desde cero.
 
-La ubicación se elige entera o no se toca. Al abrir la edición se guarda el par
-`{province_id, locality_id}`; si la selección cambió respecto de ese par y no
-hay localidad, **Guardar frena antes del PATCH**. Una sola condición cubre los
-cuatro casos:
+Con el caso 153 puesto y el producto devuelto:
 
 ```
-publicación oficial, ubicación sin tocar        guarda como antes
-publicación oficial, provincia cambiada
-  y localidad vacía                             frena, no manda nada
-fila heredada, ubicación sin tocar              guarda otro campo sin
-                                                fabricarle ubicación
-fila heredada, sólo provincia elegida           frena, no manda nada
+[FAIL] 153 … — el boton de rechazo no abrio la capa del producto
 ```
 
-Incluye el caso de vaciar la provincia de una publicación oficial: eso también
-es «tocada», así que frena en vez de guardar en silencio la localidad anterior.
-No agregué modo de borrar la ubicación, ni otra fuente, ni otra lista.
+### 2. La capa
 
-### 3. Por qué el aviso no es un toast
+Vive en `UserDashboard` y usa `useCapaModal` con la pila ya aceptada:
+`role="dialog"`, `aria-modal`, nombre accesible, foco adentro, trampa de Tab, y
+Escape / X / fondo / Cancelar que cierran **sólo esa capa**, no tocan la orden y
+devuelven el foco al botón exacto que la abrió. Muestra de qué venta se trata,
+a quién y por cuánto.
 
-En este formulario las otras validaciones —precio, stock— usan `showToast`, y
-lo miré primero. No lo usé, y te digo por qué: el contenedor de toasts es
-`role="status"` con `aria-live="polite"` y **se desvanece**. Un error que
-bloquea el guardado y que la persona tiene que corregir no puede irse mientras
-lo está corrigiendo: es exactamente el modo de fallo que cerramos en
-FORM-CONSISTENCY-1R con el registro.
+- **Motivo vacío o de sólo espacios no envía nada**, y lo dice: error
+  `role="alert"` **dentro de la capa**, que no se desvanece, con `aria-invalid`
+  en el `textarea` y el foco puesto ahí. Lo escrito queda intacto.
+- **Confirmar manda una sola vez** `{ decision: "reject", reason }` con el
+  motivo recortado, y mientras trabaja el botón no vuelve a disparar.
+- **Un fallo de API conserva capa, motivo y error adentro**, permite reintentar
+  sin volver a escribir y no declara un rechazo que no ocurrió.
 
-Así que el aviso va **al lado de los dos selects**, con `role="alert"`, y se
-queda hasta que se elige la localidad. Además la localidad queda con
-`aria-invalid="true"` y recibe el foco, que es el control que hay que
-completar. No es otro sistema de alertas: es el mismo patrón inline que ya usa
-esa sección para «sin ubicación oficial», y reutiliza la clase `ayudaCampo`
-—no agregué ni un selector nuevo—.
+No generalicé `ToastContext`, no construí un gestor de modales y no toqué el
+Backend. Reutilicé las clases CSS que ya existían —`editModalOverlay`,
+`editModal`, `editModalHeader`, `editModalContent`, `editModalActions`,
+`ayudaCampo`—: **no agregué ni un selector**, así que contraste no corresponde.
 
-Si preferís el toast por consistencia con el precio y el stock, es un cambio
-chico, pero te dejo la objeción registrada.
+### 3. Dos agregados, y por qué
 
-### 4. El bloque del caso 152
+1. **La venta rechazada muestra el motivo en la tarjeta del vendedor.** Tu
+   resultado 5 pide que el motivo quede visible después de recargar, y sólo
+   estaba del lado del comprador: el vendedor rechazaba y no veía lo que había
+   escrito. Son seis líneas y reutilizan el bloque que ya existía en Mis
+   Compras.
+2. **Un motivo a medio escribir cuenta como trabajo sin guardar.** Cerrar el
+   panel entero con la capa abierta y texto adentro lo perdía sin preguntar. Es
+   exactamente el caso que FORM-DIRTY-1 vino a cubrir, así que entró en la
+   misma cuenta que los otros tres formularios. Cerrar la capa **sola** sigue
+   sin preguntar, como pediste.
 
-Ampliado donde pediste, entre cambiar de provincia y elegir la localidad:
+### 4. El caso 153
 
-- intenta guardar con media selección;
-- **no sale ningún PATCH** —se escuchan las peticiones y se cuentan—;
-- **no aparece** ningún «actualizado exitosamente»;
-- el error se anuncia como `alert`, la localidad queda `aria-invalid` y **el
-  foco va ahí**;
-- la provincia elegida sigue elegida y el nombre del formulario sigue intacto;
-- la publicación sigue en su localidad anterior en la base;
-- después elige la localidad, la marca de inválida se levanta y continúa el
-  recorrido verde que ya existía.
+Autónomo: arma dos transferencias pendientes por rutas reales —una con
+comprobante subido para rechazar, otra sin comprobante para comprobar que
+aprobar sigue estando—. Y **falla si aparece cualquier diálogo nativo** en todo
+el recorrido, no sólo al principio.
 
-El bloque heredado quedó como estaba, y no fabriqué esa fila en la base.
+Mide, dentro de la tarjeta correcta: la capa en lugar del diálogo; blanco y
+espacios sin PATCH, con error anunciado, campo y foco conservados; las cuatro
+salidas sin mutar la orden y con el foco restaurado; el primer PATCH fallido con
+capa, motivo y error a la vista; el reintento sano con **un solo** rechazo y el
+motivo recortado; y después de recargar, estado y motivo iguales en la tarjeta,
+en `/orders/my?as_role=seller` y en la base.
 
 ### 5. Puertas
 
 ```
-base limpia + SMOKE_CASOS=152                   1/1
-base limpia + SMOKE_CASOS=149,150               2/2
-base limpia + suite completa                    151/152   (131 rojo)
-  controles                                     137, 149, 150 y 151 en verde
+base limpia + SMOKE_CASOS=153                   1/1
+base limpia + suite completa                    152/153   (131 rojo)
+  controles                                     18, 19, 24 y 148 en verde
 npm run build                                   ok
 npm run lint                                    ok (--max-warnings 0)
 npx tsc --noEmit                                ok
 node --check scripts/smoke.mjs                  ok
+npm run a11y -- --todas                         64/64 pantallas, 0 bloqueantes
 git -c core.whitespace=cr-at-eol diff --check   limpio
 ```
 
-El diff quedó limitado a Frontend y regresión, así que —como indicaste— no
-repetí Backend, `pip check`, contraste ni la auditoría a11y completa. La
-accesibilidad del error nuevo queda medida dentro del 152: rol, foco y
-`aria-invalid`.
+**Una aclaración sobre los controles.** Filtrados sueltos, 18, 19 y 24 **no
+corren**: dependen del estado que arman casos anteriores —18 y 24 fallan en
+0 ms con «Cannot read properties of undefined (reading 'id')» y 19 se queda sin
+la orden que necesita—. Es la misma condición que vos registraste con 101–106.
+Los verifiqué **dentro de la suite completa**, donde los tres pasan. El 148 sí
+corre suelto y pasa.
 
-El **131** es el ambiental de siempre; **152/152 es lo que tiene que dar en tu
+Contraste no corresponde: no cambié estilos. Backend y `pip check` tampoco: no
+toqué Backend.
+
+El **131** es el ambiental de siempre; **153/153 es lo que tiene que dar en tu
 máquina**.
 
 ### 6. Hashes
 
 ```
-src/components/UserDashboard/UserDashboard.tsx  fd3313b7ba631ac7
-scripts/smoke.mjs                               6ffb298a5f0c80be
+src/components/UserDashboard/UserDashboard.tsx  39548738f63f10e5
+scripts/smoke.mjs                               073d11db03a8d8f3
 ```
 
-(SHA-256 truncado a 16, del árbol en `025753c`.)
+(SHA-256 truncado a 16, del árbol en `348fa3f`.)
 
 ### 7. Riesgos residuales
 
-1. **La regla mira el par, no cada campo.** Si mañana se agrega una tercera
-   parte a la ubicación, hay que sumarla a la comparación o volvería a existir
-   una selección incompleta que pasa.
-2. **El aviso se levanta al elegir localidad, no al deshacer el cambio de
-   provincia.** Volver a la provincia original y elegir la localidad original
-   lo limpia igual, pero el aviso queda visible mientras tanto. Es correcto
-   —sigue faltando la localidad— aunque puede leerse como insistente.
-3. **El freno vive en el Frontend.** El Backend nunca fue el problema acá —él
-   valida el ID que le llega—, pero si otro cliente manda un PATCH sin
-   `locality_id` la publicación se queda donde está, en silencio, como antes.
-4. Sigue en pie lo del informe anterior: las filas heredadas no se sanean solas,
-   `Product.location` sigue existiendo como derivado y el editor no ofrece
-   reintento si el padrón no responde.
+1. **El motivo no tiene mínimo de longitud.** Una letra alcanza. El Backend
+   pide lo mismo —sólo que no esté vacío—, así que no inventé una regla que él
+   no tiene; si querés un mínimo, decidilo vos y lo aplico en los dos lados.
+2. **Cerrar la capa mientras el envío está en curso** no cancela la petición: si
+   llega bien, la orden queda rechazada aunque la capa ya no esté. Es lo que
+   pasa hoy con cualquier envío del panel; lo marco porque acá la capa se puede
+   cerrar con Escape.
+3. **El aviso de éxito sigue siendo un toast** («Comprobante rechazado»), como
+   antes. No lo toqué porque el éxito no es algo que haya que corregir; el
+   error, que sí lo es, quedó inline.
+4. **La capa dice «Rechazar el comprobante» o «Rechazar la transferencia»**
+   según el estado, igual que el botón. Si mañana aparece un tercer estado
+   decidible, hay que sumarlo en los dos lugares.
+5. El caso 153 deja dos publicaciones y dos órdenes en la base, como los casos
+   145, 147, 148, 149, 150, 151 y 152 dejan las suyas.
 
 ### 8. Frenos
 
-No toqué Backend, API, modelos, migraciones, seed, pagos, BOEDA, Railway,
-datos remotos ni estilos. No agregué un caso nuevo ni otra fuente de ubicación.
-No desplegué. `PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de
-empujar.
+No cambié Backend, estados de orden, stock, reservas, archivos, pagos, datos
+bancarios, navegación, BOEDA, Railway ni datos remotos. No generalicé
+`ToastContext` ni abrí un constructor de modales. Aprobar quedó igual, con su
+aviso de verificar el dinero y sus dos estados. No desplegué. `PRE_FIRMA.md`
+sigue fuera del versionado y lo confirmé antes de empujar.
 
 Freno acá y te pido revisión.
