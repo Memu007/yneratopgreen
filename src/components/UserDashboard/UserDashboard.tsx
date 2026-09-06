@@ -496,6 +496,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   const [motivoDelRechazo, setMotivoDelRechazo] = useState('');
   const [errorDelRechazo, setErrorDelRechazo] = useState('');
   const [enviandoElRechazo, setEnviandoElRechazo] = useState(false);
+  // El envío en curso, por referencia: el cierre protegido lo consulta desde
+  // `useCapaModal`, que se queda con una sola versión de la función.
+  const enviandoElRechazoRef = useRef(false);
+  enviandoElRechazoRef.current = enviandoElRechazo;
   const motivoDelRechazoRef = useRef<HTMLTextAreaElement>(null);
   const [ratingScore, setRatingScore] = useState(5);
   const [ratingComment, setRatingComment] = useState('');
@@ -1055,11 +1059,21 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   const cerrarLaEdicion = useCallback(() => setEditingProduct(null), []);
   // Cerrar la capa del rechazo no toca la orden: sólo suelta lo que se estaba
   // por mandar. El foco vuelve al botón que la abrió por la pila de capas.
-  const cerrarElRechazo = useCallback(() => {
+  const soltarElRechazo = useCallback(() => {
     setRechazoDeTransferencia(null);
     setMotivoDelRechazo('');
     setErrorDelRechazo('');
   }, []);
+  // El cierre que piden las cuatro vías —Escape, X, Cancelar y fondo— es uno
+  // solo, y está protegido: mientras el rechazo viaja, cerrar sería mentir.
+  // La petición no se cancela, así que la orden se rechazaría igual y la
+  // persona se quedaría sin ver su propio resultado. La capa se queda hasta
+  // que haya una respuesta: si sale bien cierra sola, y si falla vuelve a
+  // dejarse cerrar con el motivo intacto.
+  const cerrarElRechazo = useCallback(() => {
+    if (enviandoElRechazoRef.current) return;
+    soltarElRechazo();
+  }, [soltarElRechazo]);
   const pedirCierreDeLaEdicion = () => alSalir(edicionSucia, cerrarLaEdicion);
   const cerrarLaCalificacion = useCallback(() => setRatingModal(null), []);
   const pedirCierreDeLaCalificacion = () =>
@@ -1242,6 +1256,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   };
 
   const abrirElRechazo = (order: Order) => {
+    if (enviandoElRechazoRef.current) return;
     setMotivoDelRechazo('');
     setErrorDelRechazo('');
     setRechazoDeTransferencia({
@@ -1271,7 +1286,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         decision: 'reject',
         reason: motivo,
       });
-      cerrarElRechazo();
+      soltarElRechazo();
       showToast('Comprobante rechazado', 'warning');
       await reloadOrders('seller');
     } catch (error) {
@@ -3441,6 +3456,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             role="dialog"
             aria-modal="true"
             aria-labelledby="titulo-del-rechazo"
+            aria-busy={enviandoElRechazo || undefined}
             tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
           >
@@ -3455,6 +3471,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 className={styles.closeButton}
                 aria-label="Cerrar"
                 onClick={cerrarElRechazo}
+                disabled={enviandoElRechazo}
               >
                 ×
               </button>
@@ -3504,6 +3521,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 type="button"
                 className={styles.cancelButton}
                 onClick={cerrarElRechazo}
+                disabled={enviandoElRechazo}
               >
                 Cancelar
               </button>

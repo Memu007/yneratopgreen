@@ -19336,7 +19336,9 @@ await runCase(153, 'Rechazar una transferencia se decide dentro del producto', a
     const disparador = () => tarjeta(numeroDelRechazo).getByRole('button', { name: /^Rechazar/ });
     const laCapa = page.locator('[role="dialog"][aria-labelledby="titulo-del-rechazo"]');
     const motivo = page.locator('#motivo-del-rechazo');
-    const confirmar = page.getByRole('button', { name: 'Confirmar rechazo' });
+    // El boton cambia de rotulo mientras trabaja, asi que se lo ubica por los
+    // dos: si no, buscarlo por «Confirmar rechazo» falla justo cuando manda.
+    const confirmar = page.getByRole('button', { name: /Confirmar rechazo|Rechazando/ });
 
     await abrirVentas();
 
@@ -19409,9 +19411,19 @@ await runCase(153, 'Rechazar una transferencia se decide dentro del producto', a
     // --- D. la API falla: la capa, el motivo y el error se quedan ----------
     const elMotivo = '  El importe acreditado no coincide con el total.  ';
     const elMotivoRecortado = elMotivo.trim();
-    let caida = true;
+    // El primer PATCH se RETIENE: la respuesta no llega hasta que el caso la
+    // suelta. Es el unico modo de mirar la ventana en la que la peticion ya
+    // salio y todavia no hay resultado, que es donde cerrar la capa mentia:
+    // el pedido no se cancela, asi que la orden se rechazaba igual y la
+    // persona se quedaba sin ver su propio resultado.
+    let soltarElPrimero;
+    const elPrimeroRetenido = new Promise((resolver) => { soltarElPrimero = resolver; });
+    let primerIntento = true;
     await page.route('**/api/orders/*/transfer-receipt', async (ruta) => {
-      if (ruta.request().method() !== 'PATCH' || !caida) return ruta.continue();
+      if (ruta.request().method() !== 'PATCH') return ruta.continue();
+      if (!primerIntento) return ruta.continue();
+      primerIntento = false;
+      await elPrimeroRetenido;
       await ruta.fulfill({
         status: 500, contentType: 'application/json',
         body: JSON.stringify({ detail: 'la base no responde (prueba controlada)' }),
@@ -19421,7 +19433,36 @@ await runCase(153, 'Rechazar una transferencia se decide dentro del producto', a
     await esperarA(async () => (await laCapa.count()) === 1,
       'no se pudo reabrir la capa para el fallo de API', 20_000);
     await motivo.fill(elMotivo);
+    const patchesAntesDeConfirmar = patches.length;
     await confirmar.click();
+
+    // Mientras el rechazo viaja: la capa dice que trabaja y ninguna de las
+    // cuatro salidas la cierra ni manda un segundo pedido.
+    await esperarA(async () => (await confirmar.innerText()).includes('Rechazando'),
+      'la capa no avisa que esta trabajando', 20_000);
+    // Primero las dos salidas que SIEMPRE se pueden intentar, que son las que
+    // cerraban la capa dejando el rechazo en camino.
+    await page.keyboard.press('Escape');
+    await page.mouse.click(5, 5);
+    assert((await laCapa.count()) === 1,
+      'Escape o el fondo cerraron la capa con el rechazo en vuelo');
+    // Y las dos que directamente no se ofrecen mientras trabaja.
+    assert(await laCapa.getByRole('button', { name: 'Cancelar' }).isDisabled(),
+      'Cancelar sigue habilitado mientras el rechazo viaja');
+    assert(await laCapa.getByRole('button', { name: 'Cerrar' }).isDisabled(),
+      'la X sigue habilitada mientras el rechazo viaja');
+    assert((await laCapa.getAttribute('aria-busy')) === 'true',
+      'la capa no se declara ocupada mientras manda el rechazo');
+    assert((await motivo.inputValue()) === elMotivo,
+      'la capa perdio el motivo mientras el rechazo viajaba');
+    assert(patches.length - patchesAntesDeConfirmar === 1,
+      `con el rechazo en vuelo salieron ${patches.length - patchesAntesDeConfirmar} PATCH`);
+    assert(enLaBase(paraRechazar).estado === 'TRANSFER_RECEIPT_SUBMITTED',
+      'la orden se movio antes de que llegara la respuesta');
+    recorridos.push('con el rechazo en vuelo no hay salida ni segundo pedido');
+
+    // Y ahora sí: el pedido retenido vuelve como fallo.
+    soltarElPrimero();
     await esperarA(async () => (await laCapa.getByRole('alert').count()) === 1,
       'el fallo de la API no se conto dentro de la capa', 20_000);
     assert((await laCapa.getByRole('alert').innerText()).includes('la base no responde'),
@@ -19435,7 +19476,6 @@ await runCase(153, 'Rechazar una transferencia se decide dentro del producto', a
     recorridos.push('fallo de API: capa, motivo y error se quedan');
 
     // --- E. el reintento sano rechaza una sola vez, con el motivo recortado -
-    caida = false;
     const patchesAntes = patches.length;
     await confirmar.click();
     await esperarA(async () => (await laCapa.count()) === 0,
