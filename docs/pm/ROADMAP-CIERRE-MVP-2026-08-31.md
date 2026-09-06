@@ -129,7 +129,7 @@ tiene una sola política de navegación y una sola regresión matriz.
 |---:|---|---|---|
 | 10 | **FORM-CONSISTENCY-1R — cerrada** | F5, F7 y F13 | Aceptada en `042a3e3`/`0922fc9`: alta/edición comparten validación, imagen fallida informa resultado parcial, errores repetidos reciben foco/alerta y cargas fallidas muestran error/reintento. |
 | 11 | **LOCATION-SOURCE-1R — cerrada** | F6 y C3 | Aceptada en `9bb56ac`/`06ea083` + `025753c`/`266c434`: edición lee/escribe el ID oficial, no inventa otra fuente y una selección incompleta no guarda ni declara éxito. |
-| 12 | **TRANSFER-REVIEW-1 — vigente** | F8 | Rechazo de comprobante usa capa propia, motivo obligatorio y resultado visible; sin `window.prompt`. |
+| 12 | **TRANSFER-REVIEW-1R — devuelta** | F8 | `0878bd4` cierra el recorrido principal y PM reprodujo 153 en 1/1, pero la capa puede cerrarse durante el PATCH y la orden rechazarse después sin resultado visible. Debe bloquear las cuatro salidas sólo mientras envía. |
 | 12A | **REGISTER-POLISH-1 — en cola** | Feedback visual Emi 06/09 | Registro alineado, compacto y profesional sobre el sistema B; conserva contrato, datos, correo, errores y accesibilidad. Caso 154. |
 | 12B | **MARKET-VIEWS-1 — en cola** | Feedback visual Emi 06/09; handoff grilla/lista | Selector explícito Cuadrícula/Lista; geometría uniforme por modo y ningún activo de fila completa. Ordenar no cambia vista. Caso 155. |
 | 13 | **ADMIN-TRUTH-1** | ADM-3, ADM-4, ADM-10 y ADM-11 | Métricas y rótulos corresponden a la API, estados están en es-AR y cada carga distingue error, vacío y reintento. |

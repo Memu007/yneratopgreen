@@ -12,6 +12,45 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-06 — DEVOLUCIÓN VIGENTE: TRANSFER-REVIEW-1R, cancelar no puede rechazar después
+
+Revisé producto/regresión `0878bd4`, informe `5f82093` y corrección de SHA
+`5423a86`. El diff está bien acotado y los hashes coinciden. PM reprodujo el
+caso 153 actual en **1/1** desde una base PostgreSQL local nueva: capa propia,
+blanco, error, foco, cuatro cierres en reposo, fallo, reintento, persistencia y
+aprobación disponible quedan cubiertos.
+
+La pieza vuelve por un borde que tu propio informe dejó como riesgo residual y
+que PM ya reprodujo. Retuve el PATCH después de confirmar el rechazo. Mientras
+la capa decía `Rechazando…`, X y Cancelar seguían habilitados; Escape cerró la
+capa antes de la respuesta. Al liberar la petición, la orden terminó
+`rejected`. La pantalla permitió cancelar visualmente una decisión que igual se
+ejecutó y dejó a la persona sin su resultado.
+
+### Corrección única
+
+1. Mientras `enviandoElRechazo` sea verdadero, Escape, X, Cancelar y fondo no
+   cierran la capa ni permiten abrir otro rechazo. La capa conserva contexto y
+   motivo y comunica que está trabajando.
+2. El éxito sí cierra, recarga y muestra el resultado real. El fallo deja capa,
+   motivo y error; recién ahí vuelve a habilitar cierre y reintento.
+3. Usá un único cierre protegido para las cuatro vías y `useCapaModal`. No
+   canceles HTTP, no cambies el hook global y no agregues un gestor modal.
+4. Ampliá el mismo caso 153: retené el primer PATCH, intentá las cuatro salidas
+   mientras está pendiente y exigí capa/motivo presentes y un solo PATCH.
+   Liberalo como fallo y seguí con el bloque actual de error, reintento sano y
+   persistencia. No crees el 154: queda reservado para Registro.
+5. Conservá todo lo ya verde, incluida aprobación y el cierre normal por las
+   cuatro vías cuando no hay envío.
+
+Corré 153 aislado, 148 y una suite completa. Si el diff queda en
+Frontend/regresión, sumá sólo build, lint, `tsc --noEmit`, `node --check` y
+`diff-check`; no repitas Backend, `pip check`, contraste ni a11y completa.
+Producto/regresión en un commit, informe separado con SHA y resultados; subí y
+frená. No mezcles `REGISTER-POLISH-1`, no despliegues.
+
+Evidencia completa en `REPRODUCCION-TRANSFER-REVIEW-1-2026-09-06.md`.
+
 ## 2026-09-06 — TAREA VIGENTE: TRANSFER-REVIEW-1, rechazar sin salir del producto
 
 LOCATION-SOURCE-1R queda **aceptada**: pieza base `9bb56ac`/`06ea083`,

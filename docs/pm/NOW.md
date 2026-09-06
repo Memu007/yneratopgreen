@@ -31,13 +31,19 @@ Actualizado: 2026-09-06.
   Evidencia final en `REPRODUCCION-LOCATION-SOURCE-1-2026-09-06.md`.
 - PM no atribuye una suite completa propia. Dev informó 151/152 con único rojo
   ambiental en 131; no cambió Backend, API, pagos ni estilos en la corrección.
-- **Única tarea activa y responsable:** TRANSFER-REVIEW-1, Dev. Debe reemplazar
-  `window.prompt` al rechazar una transferencia por una capa propia con motivo
-  obligatorio, resultados visibles y ciclo modal correcto; Backend no cambia.
+- **TRANSFER-REVIEW-1 devuelta:** producto/regresión `0878bd4`, informe
+  `5f82093` y corrección de SHA `5423a86`. PM revisó el diff y reprodujo el 153
+  en **1/1**, pero confirmó un rojo adicional: durante `Rechazando…`, Escape,
+  X, fondo y Cancelar todavía cierran la capa; la respuesta posterior puede
+  dejar la orden rechazada sin resultado visible. Evidencia en
+  `REPRODUCCION-TRANSFER-REVIEW-1-2026-09-06.md`.
+- **Única tarea activa y responsable:** TRANSFER-REVIEW-1R, Dev. Debe bloquear
+  las cuatro salidas sólo mientras el PATCH está pendiente y ampliar el mismo
+  caso 153; Backend no cambia.
 - **Feedback visual de Emi registrado sin interrumpir la tarea activa:** el
   código actual confirma que Mercado mezcla tarjetas de columna con activos de
   fila completa y que el grupo de contraseña del Registro queda desalineado.
-  Tras `TRANSFER-REVIEW-1` siguen `REGISTER-POLISH-1` y `MARKET-VIEWS-1`: alta
+  Tras `TRANSFER-REVIEW-1R` siguen `REGISTER-POLISH-1` y `MARKET-VIEWS-1`: alta
   profesional acotada y exactamente dos vistas uniformes, Cuadrícula/Lista.
   Criterios y límites en `FEEDBACK-VISUAL-EMI-2026-09-06.md`.
 - Docker Desktop sigue sin arrancar y no fue reseteado ni reemplazado. No se
