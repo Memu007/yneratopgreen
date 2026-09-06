@@ -2,178 +2,140 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## LOCATION-SOURCE-1 — la ubicación publicada tiene una sola verdad
+## LOCATION-SOURCE-1R — media selección de ubicación no guarda ni declara éxito
 
 Hecho. Producto/regresión e informe en commits separados. **No desplegué.**
 
-- Producto/regresión: `9bb56ac` — «LOCATION-SOURCE-1: la ubicacion publicada
-  tiene una sola verdad»
-- La suite pasa a **152 casos**.
+- Producto/regresión: `025753c` — «LOCATION-SOURCE-1R: media seleccion de
+  ubicacion no guarda ni declara exito»
+- La suite sigue en **152 casos**: amplié el bloque, no agregué el 153.
 
-F6 se quedaba corto: no es que la edición modificara el texto legado. Es que
-**no modificaba nada**.
+El borde es real y lo dejé yo. Cerré el engaño por un lado y lo dejé abierto
+por el otro, con la misma forma: la pantalla acepta el cambio, dice que se
+guardó y la verdad persistida no se mueve.
 
 ---
 
-### 1. El rojo, medido contra `042a3e3`
+### 1. El rojo, contra `9bb56ac`
+
+Con el bloque nuevo puesto y el producto devuelto:
 
 ```
-/products/my traía        ["location"]  -> location=«Pergamino, Buenos Aires»
-                          locality_id: no viene
-la edición preseleccionaba provincia=«Buenos Aires» ciudad=«Pergamino»
-   partiendo ese texto por comas; 25 opciones de una lista fija escrita en el
-   componente, y la ciudad como campo de texto libre
-el PATCH mandaba          location="Rosario, Santa Fe"   locality_id=undefined
-después de guardar        locality_id=06623100  location=«Pergamino, Buenos Aires»
-el catálogo seguía en     {"locality":"Pergamino","province":"Buenos Aires"}
-fila heredada             provincia=«» ciudad=«Un lugar viejo»
+[FAIL] 152 … — guardar con la provincia cambiada y sin localidad no aviso nada
 ```
 
-El detalle que cambia el diagnóstico: `ProductUpdateRequest` **no acepta
-`location`**. Sólo acepta `locality_id`. Así que el texto escrito a mano no
-llegaba ni siquiera a la columna legada: Pydantic lo descartaba entero y el
-aviso decía «actualizado exitosamente». Cambiar provincia y ciudad en la
-pantalla no cambiaba absolutamente nada.
+La causa es la que marcaste: `locality_id: ''` al cambiar de provincia y un
+`if (editingProduct.locality_id)` que simplemente omitía el campo. El PATCH
+salía sin ubicación, respondía 200 y el aviso decía «Producto actualizado
+exitosamente».
 
-Con el caso 152 puesto y el producto devuelto:
+### 2. La corrección
+
+La ubicación se elige entera o no se toca. Al abrir la edición se guarda el par
+`{province_id, locality_id}`; si la selección cambió respecto de ese par y no
+hay localidad, **Guardar frena antes del PATCH**. Una sola condición cubre los
+cuatro casos:
 
 ```
-[FAIL] 152 … — el editor no ofrece un select de localidad del padron
+publicación oficial, ubicación sin tocar        guarda como antes
+publicación oficial, provincia cambiada
+  y localidad vacía                             frena, no manda nada
+fila heredada, ubicación sin tocar              guarda otro campo sin
+                                                fabricarle ubicación
+fila heredada, sólo provincia elegida           frena, no manda nada
 ```
 
-### 2. Lo que cambié
+Incluye el caso de vaciar la provincia de una publicación oficial: eso también
+es «tocada», así que frena en vez de guardar en silencio la localidad anterior.
+No agregué modo de borrar la ubicación, ni otra fuente, ni otra lista.
 
-**Backend — el único cambio de API, y de lectura.** `/products/my` expone
-`locality_id` y la localidad con su provincia, con `joinedload` para no sumar
-consultas por fila. `location` queda como el texto derivado que ya era.
+### 3. Por qué el aviso no es un toast
 
-**Frontend.** La edición abre con el identificador oficial de la publicación,
-ofrece provincia y localidad del **padrón** —con `getProvinces`/`getLocalities`,
-los mismos ayudantes que usan el alta y el registro— y guarda mandando
-`locality_id`. Se fueron la lista fija de 24 provincias escrita en el
-componente y el campo libre «Ciudad». El texto compatible lo sigue derivando el
-Backend, que ya validaba el ID: no dupliqué esa derivación en React.
+En este formulario las otras validaciones —precio, stock— usan `showToast`, y
+lo miré primero. No lo usé, y te digo por qué: el contenedor de toasts es
+`role="status"` con `aria-live="polite"` y **se desvanece**. Un error que
+bloquea el guardado y que la persona tiene que corregir no puede irse mientras
+lo está corrigiendo: es exactamente el modo de fallo que cerramos en
+FORM-CONSISTENCY-1R con el registro.
 
-**Una fila sin ubicación oficial lo dice.** No se adivina un ID desde texto
-libre ni desde el perfil, y guardar otro campo no le fabrica una: el PATCH de
-una publicación así no lleva `locality_id` ni `location`.
+Así que el aviso va **al lado de los dos selects**, con `role="alert"`, y se
+queda hasta que se elige la localidad. Además la localidad queda con
+`aria-invalid="true"` y recibe el foco, que es el control que hay que
+completar. No es otro sistema de alertas: es el mismo patrón inline que ya usa
+esa sección para «sin ubicación oficial», y reutiliza la clase `ayudaCampo`
+—no agregué ni un selector nuevo—.
 
-**La suciedad se mide por el identificador.** Cambiar de provincia y volver a la
-localidad inicial deja el formulario limpio; un cambio real conserva la
-confirmación de descarte de FORM-DIRTY-1, y descartar no mueve la ubicación
-publicada.
+Si preferís el toast por consistencia con el precio y el stock, es un cambio
+chico, pero te dejo la objeción registrada.
 
-### 3. Un hallazgo que contradice parte del encargo
+### 4. El bloque del caso 152
 
-Dijiste que retirar el fallback visual a `seller.location` formaba parte de la
-pieza. **Lo busqué y no existe.** Medido:
+Ampliado donde pediste, entre cambiar de provincia y elegir la localidad:
 
-- la tarjeta y el detalle ya leen `publication_location` desde UX-COH-1, y el
-  caso **137** lo vigila —sigue verde—;
-- el editor nunca tomó el perfil: partía el texto de la propia publicación. Con
-  el perfil de la vendedora en «Villa María, Córdoba» y la publicación en
-  Pergamino, el editor mostraba Pergamino.
+- intenta guardar con media selección;
+- **no sale ningún PATCH** —se escuchan las peticiones y se cuentan—;
+- **no aparece** ningún «actualizado exitosamente»;
+- el error se anuncia como `alert`, la localidad queda `aria-invalid` y **el
+  foco va ahí**;
+- la provincia elegida sigue elegida y el nombre del formulario sigue intacto;
+- la publicación sigue en su localidad anterior en la base;
+- después elige la localidad, la marca de inválida se levanta y continúa el
+  recorrido verde que ya existía.
 
-Así que no retiré nada que no estuviera: lo que quedaba era el **texto legado
-gobernando la pantalla**, y eso sí lo cerré. El caso 152 igual lo comprueba en
-las dos direcciones: el editor abre con la localidad de la publicación y en la
-fila sin ubicación oficial no aparece ni «Villa María» ni «Córdoba» ni el texto
-libre.
+El bloque heredado quedó como estaba, y no fabriqué esa fila en la base.
 
-### 4. Un límite del caso, explícito
-
-**No pude construir la fila heredada por una ruta real.** El alta exige
-`locality_id` —`ProductCreateRequest` lo tiene como obligatorio—, así que una
-publicación sin ubicación oficial sólo puede existir heredada. Y
-`scripts/lib/sql.mjs` dice, en su propio encabezado, que es lectura de
-contraste y que ninguna puerta debería fabricar su escenario con eso.
-
-Empecé escribiéndola con un `UPDATE` y lo saqué. La fila heredada se simula
-**donde importa**: interceptando `/products/my` y quitándole la ubicación
-oficial a esa publicación. Lo que se mide es lo mismo —qué hace la pantalla
-cuando la API dice que no hay ubicación— sin escribir en la base ni agregar
-una puerta trasera al producto. Si querés que además exista una fila así en la
-base, hace falta o un `UPDATE` en la regresión o una ruta que permita publicar
-sin localidad, y las dos cosas son decisiones tuyas.
-
-El domicilio del perfil de la vendedora del caso sí se pone por su ruta real
-(`PATCH /auth/me`).
-
-### 5. El caso 152
-
-Autónomo, sobre la UI real, sin esperas fijas:
-
-- el editor de una publicación de Pergamino, con el perfil en Córdoba,
-  preselecciona **Pergamino** y no ofrece ningún campo libre «Ciudad»;
-- cambiar provincia y localidad manda `locality_id=82084270` y **ningún**
-  `location`; en la base quedan ese ID y «Rosario, Santa Fe» derivado;
-- al reabrir, el editor conserva el ID; la tarjeta y el detalle del Mercado
-  dicen Rosario; el filtro de Santa Fe la incluye y el de Buenos Aires la
-  excluye;
-- la fila sin ubicación oficial abre con los dos selects vacíos, lo declara, y
-  guardar el nombre no le manda ubicación ni le mueve la que tenía;
-- cambiar de provincia y volver a la localidad inicial cierra sin preguntar;
-  un cambio real pregunta, y descartar no lo guarda.
-
-### 6. Puertas
+### 5. Puertas
 
 ```
 base limpia + SMOKE_CASOS=152                   1/1
+base limpia + SMOKE_CASOS=149,150               2/2
 base limpia + suite completa                    151/152   (131 rojo)
   controles                                     137, 149, 150 y 151 en verde
 npm run build                                   ok
 npm run lint                                    ok (--max-warnings 0)
 npx tsc --noEmit                                ok
 node --check scripts/smoke.mjs                  ok
-python -m compileall backend/app                ok
-python -m pip check                             ok
-npm run a11y -- --todas                         64/64 pantallas, 0 bloqueantes
 git -c core.whitespace=cr-at-eol diff --check   limpio
 ```
 
-Contraste no lo corrí: no cambié estilos. El aviso de «sin ubicación oficial»
-reutiliza la clase `ayudaCampo` que ya existía y ya estaba medida; no agregué
-ni un selector nuevo.
+El diff quedó limitado a Frontend y regresión, así que —como indicaste— no
+repetí Backend, `pip check`, contraste ni la auditoría a11y completa. La
+accesibilidad del error nuevo queda medida dentro del 152: rol, foco y
+`aria-invalid`.
 
-El **131** es el ambiental de siempre —mi puente traduce `docker exec` y esa
-receta necesita `docker run --rm -v … alpine:3`—, así que **152/152 es lo que
-tiene que dar en tu máquina**; yo no lo declaro.
+El **131** es el ambiental de siempre; **152/152 es lo que tiene que dar en tu
+máquina**.
 
-### 7. Hashes
+### 6. Hashes
 
 ```
-backend/app/api/products.py                     551a38d90b159aba
-src/components/UserDashboard/UserDashboard.tsx  b4f316e96f65ee7f
-scripts/smoke.mjs                               28bd4719d3bdbc81
+src/components/UserDashboard/UserDashboard.tsx  fd3313b7ba631ac7
+scripts/smoke.mjs                               6ffb298a5f0c80be
 ```
 
-(SHA-256 truncado a 16, del árbol en `9bb56ac`.)
+(SHA-256 truncado a 16, del árbol en `025753c`.)
 
-### 8. Riesgos residuales
+### 7. Riesgos residuales
 
-1. **Las filas heredadas siguen ahí y nadie las sanea solo.** La pantalla ahora
-   las declara, pero hace falta que alguien entre a cada una y elija localidad.
-   No hice migración ni barrido: eso lo frenaste explícitamente y estoy de
-   acuerdo, pero conviene contarlas antes de entregar.
-2. **`Product.location` sigue existiendo como derivado.** Mientras alguien lo
-   lea, sigue habiendo dos columnas que hablan del mismo lugar; ahora una manda
-   y la otra la copia, pero la copia se puede desincronizar si algún día se
-   escribe directo.
-3. **El editor pide el padrón cada vez que se abre una edición.** Provincias una
-   vez por sesión de panel y localidades por provincia elegida. Es el mismo
-   patrón del alta; si el padrón queda lento, se nota acá también.
-4. **Si el padrón no responde**, el editor avisa pero no ofrece reintento: el
-   camino es cerrar y volver a abrir. Lo dejo marcado porque en el registro sí
-   pusimos reintento y acá no lo pediste.
-5. El caso 152 deja dos publicaciones y una cuenta de vendedora en la base, como
-   los casos 145, 147, 148, 149, 150 y 151 dejan las suyas.
+1. **La regla mira el par, no cada campo.** Si mañana se agrega una tercera
+   parte a la ubicación, hay que sumarla a la comparación o volvería a existir
+   una selección incompleta que pasa.
+2. **El aviso se levanta al elegir localidad, no al deshacer el cambio de
+   provincia.** Volver a la provincia original y elegir la localidad original
+   lo limpia igual, pero el aviso queda visible mientras tanto. Es correcto
+   —sigue faltando la localidad— aunque puede leerse como insistente.
+3. **El freno vive en el Frontend.** El Backend nunca fue el problema acá —él
+   valida el ID que le llega—, pero si otro cliente manda un PATCH sin
+   `locality_id` la publicación se queda donde está, en silencio, como antes.
+4. Sigue en pie lo del informe anterior: las filas heredadas no se sanean solas,
+   `Product.location` sigue existiendo como derivado y el editor no ofrece
+   reintento si el padrón no responde.
 
-### 9. Frenos
+### 8. Frenos
 
-No toqué modelos, migraciones, consultas ni filtros del catálogo, contrato de
-logística, la ubicación libre del perfil, radio/base del transportista, fletes,
-geodistancias, pagos, comprobantes, rating, navegación, estilos, BOEDA, Railway
-ni datos remotos. No eliminé columnas. No desplegué. `PRE_FIRMA.md` sigue fuera
-del versionado y lo confirmé antes de empujar.
+No toqué Backend, API, modelos, migraciones, seed, pagos, BOEDA, Railway,
+datos remotos ni estilos. No agregué un caso nuevo ni otra fuente de ubicación.
+No desplegué. `PRE_FIRMA.md` sigue fuera del versionado y lo confirmé antes de
+empujar.
 
 Freno acá y te pido revisión.
