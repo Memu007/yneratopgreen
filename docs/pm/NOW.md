@@ -16,9 +16,18 @@ Actualizado: 2026-09-05.
 - Build, lint, sintaxis, compileall y `diff-check` están verdes. El `pip check`
   del Conda global no es representativo; Dev lo obtuvo verde y no hay cambios
   de Backend, requirements o imagen.
-- **Única tarea activa:** FORM-CONSISTENCY-1, en `PARA-DEV.md`. Cierra F5, los
-  bordes todavía vivos de F7 y F13 sin reabrir la subida de imágenes del alta,
-  que ya cubre el caso 10.
+- **FORM-CONSISTENCY-1 devuelta:** producto/regresión `6837af1`, informe
+  `15cc665`. PM revisó el diff y reprodujo el caso 151 aislado en **1/1**, pero
+  halló un rojo que la regresión no mide: si se envía dos veces el mismo error
+  de contraseñas, el segundo intento deja el foco en «Crear cuenta» y la alerta
+  fuera del viewport (`top=-381`). Build, lint y `diff-check` quedaron verdes.
+  Evidencia en `REPRODUCCION-FORM-CONSISTENCY-1-2026-09-05.md`.
+- PM no corrió la suite completa de esta entrega porque ya existe un rojo de
+  aceptación reproducido. No se atribuye la 150/151 informada por Dev como
+  suite independiente de PM.
+- **Única tarea activa y responsable:** FORM-CONSISTENCY-1R, Dev. Debe hacer
+  que cada intento fallido vuelva a llevar el error vigente a vista/foco,
+  ampliar el bloque B del 151 sin crear otro caso y conservar los demás bordes.
 - Docker Desktop sigue sin arrancar y no fue reseteado ni reemplazado. No se
   tocaron volúmenes de proyecto, Railway, datos remotos ni pagos reales.
 - El red-team profundo sigue cerrado: faltan el cierre funcional, la

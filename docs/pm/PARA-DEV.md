@@ -12,6 +12,42 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-05 — DEVOLUCIÓN VIGENTE: FORM-CONSISTENCY-1R, el mismo error también tiene que volver a la vista
+
+Revisé producto/regresión `6837af1` e informe `15cc665`.
+**FORM-CONSISTENCY-1 no queda aceptada.** PM reprodujo el caso 151 aislado en
+**1/1**, pero ese caso sólo envía una vez. Al repetir exactamente el mismo
+error de contraseñas sin cambiar valores, el foco quedó en «Crear cuenta» y la
+alerta quedó completamente fuera del viewport 1200 × 400 (`top=-381`,
+`bottom=-333.390625`). La evidencia y las puertas están en
+`REPRODUCCION-FORM-CONSISTENCY-1-2026-09-05.md`.
+
+La raíz está acotada: el efecto que mueve vista/foco depende sólo de `error`;
+el envío fija vacío y luego el mismo texto dentro del mismo evento, por lo que
+el estado final no cambia y el efecto no vuelve a correr.
+
+### Corrección única
+
+1. Conservá rojo contra `6837af1` sobre la UI real: en viewport bajo, provocá
+   un error propio del registro, comprobá el primer foco, volvé al botón y
+   enviá otra vez sin cambiar valores. El segundo intento también debe dejar
+   la alerta visible, anunciada y enfocada, con todos los valores intactos.
+2. Corregí la raíz mínima para que **cada intento fallido** lleve el error
+   vigente a vista/foco aunque su texto no cambie. No agregues otro sistema de
+   alertas ni reescribas el formulario.
+3. Extendé el bloque B del caso 151 con ese segundo envío; no sumes un caso
+   nuevo sólo para inflar la suite. No uses esperas fijas.
+4. Conservá verdes los otros bordes del 151. No amplíes el agregado de borrado
+   de imágenes ni abras nuevos bordes de precio, carga o Login.
+5. Corré 151 aislado y la suite completa esperada en **151/151** desde base
+   limpia, más build, lint, `node --check`, compileall, `pip check`, a11y y
+   `diff-check` contra `6837af1`. Contraste sigue innecesario si no tocás
+   estilos.
+
+Producto/regresión en un commit, informe separado con rojo/verde, suite,
+riesgos y SHA; subí y frená. No despliegues ni toques Backend, API, modelos,
+migraciones, seed, pagos, BOEDA, Railway o datos remotos.
+
 ## 2026-09-05 — TAREA VIGENTE: FORM-CONSISTENCY-1, un formulario no puede contradecirse ni ocultar su error
 
 FORM-DIRTY-1R queda **aceptada** en producto/regresión `83dba0a` e informe
