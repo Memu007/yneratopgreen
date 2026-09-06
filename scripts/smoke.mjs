@@ -19209,6 +19209,286 @@ await runCase(152, 'La ubicación publicada tiene una sola verdad: el padrón', 
   }
 });
 
+await runCase(153, 'Rechazar una transferencia se decide dentro del producto', async () => {
+  // Medido contra `025753c`, sobre la interfaz real:
+  //
+  //   el boton abria un dialogo NATIVO
+  //     {"tipo":"prompt","mensaje":"Motivo del rechazo:"}
+  //   aceptarlo con espacios no mandaba nada Y no decia nada: PATCH=0, sin un
+  //     solo aviso en pantalla
+  //   con un motivo valido y la API caida, el motivo escrito se perdia: habia
+  //     que volver a tipearlo desde cero
+  //
+  // Ahora la decision vive en una capa del panel, con la pila ya aceptada.
+  const sello = Date.now();
+  const ingresoDelVendedor = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  });
+  const vendedor = ingresoDelVendedor.data;
+  const ingresoDelComprador = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'cliente@ejemplo.com', password: 'cliente123' },
+  });
+  const comprador = ingresoDelComprador.data;
+  assert(vendedor?.access_token && comprador?.access_token, 'no se pudo entrar con las dos cuentas');
+
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const [categoria] = queryRows(`
+    SELECT id FROM categories
+    WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
+  const publicar = async (nombre) => {
+    const alta = await apiRequest('/products', {
+      method: 'POST', token: vendedor.access_token,
+      body: {
+        name: nombre, description: 'Insumo efimero del caso 153, para decidir una transferencia.',
+        category_id: categoria[0], price: 1530, stock: 6, unit: 'kg',
+        locality_id: localidad, publication_type: 'producto', operation_kind: 'insumo',
+      },
+    });
+    assert(alta.status < 400 && alta.data?.id, `no se pudo publicar «${nombre}»: HTTP ${alta.status}`);
+    return alta.data.id;
+  };
+  // Dos transferencias pendientes por las rutas reales: una para rechazar y
+  // otra para comprobar que aprobar sigue estando.
+  const comprarPorTransferencia = async (productoId) => {
+    await apiRequest('/cart', { method: 'DELETE', token: comprador.access_token });
+    const agregado = await apiRequest('/cart/items', {
+      method: 'POST', token: comprador.access_token,
+      body: { product_id: productoId, quantity: 1 },
+    });
+    assert(agregado.status < 400, `no se pudo agregar al carrito: HTTP ${agregado.status}`);
+    const checkout = await apiRequest('/orders/checkout/transfer', {
+      method: 'POST', token: comprador.access_token,
+      body: {
+        shipping_address: 'Ruta 153 km 1', shipping_locality_id: localidad,
+        shipping_postal_code: '2700',
+        shipping_decisions: [{ seller_id: vendedor.user.id, mode: 'self' }],
+      },
+    });
+    const [orden] = checkout.data?.orders || [];
+    assert(orden?.order_id, `el checkout por transferencia no dejo orden: HTTP ${checkout.status}`);
+    return orden.order_id;
+  };
+  const paraRechazar = await comprarPorTransferencia(await publicar(`Rechazo153 A ${sello}`));
+  await apiUpload(`/orders/${paraRechazar}/transfer-receipt`, {
+    token: comprador.access_token,
+    filename: 'comprobante-153.png',
+    content: RECIBO_PNG,
+    contentType: 'image/png',
+  });
+  const paraAprobar = await comprarPorTransferencia(await publicar(`Rechazo153 B ${sello}`));
+
+  const enLaBase = (id) => {
+    const [fila] = queryRows(`
+      SELECT status::text, COALESCE(cancellation_reason, ''), order_number
+      FROM orders WHERE id = ${sqlLiteral(id)}`);
+    assert(fila, 'la orden del caso desaparecio de la base');
+    return { estado: fila[0], motivo: fila[1], numero: fila[2] };
+  };
+  assert(enLaBase(paraRechazar).estado === 'TRANSFER_RECEIPT_SUBMITTED',
+    `la orden a rechazar quedo en ${enLaBase(paraRechazar).estado}`);
+  assert(enLaBase(paraAprobar).estado === 'AWAITING_TRANSFER_RECEIPT',
+    `la orden a aprobar quedo en ${enLaBase(paraAprobar).estado}`);
+  const numeroDelRechazo = enLaBase(paraRechazar).numero;
+  const numeroDeLaAprobacion = enLaBase(paraAprobar).numero;
+
+  const browser = await chromium.launch({ headless: true });
+  const recorridos = [];
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
+    await contexto.addInitScript(({ a, r }) => {
+      window.localStorage.setItem('access_token', a);
+      window.localStorage.setItem('refresh_token', r);
+    }, { a: vendedor.access_token, r: vendedor.refresh_token });
+    const page = await contexto.newPage();
+
+    // Ningun dialogo nativo puede aparecer en todo el recorrido.
+    const nativos = [];
+    page.on('dialog', async (dialogo) => {
+      nativos.push(`${dialogo.type()}: ${dialogo.message()}`);
+      await dialogo.dismiss();
+    });
+    const patches = [];
+    page.on('request', (peticion) => {
+      if (peticion.url().includes('/transfer-receipt') && peticion.method() === 'PATCH') {
+        patches.push(peticion.postData() || '');
+      }
+    });
+
+    const dondeEstaElFoco = () => page.evaluate(() => {
+      const activo = document.activeElement;
+      if (!activo || activo === document.body) return '(el documento)';
+      const nombre = activo.getAttribute('id')
+        || activo.getAttribute('aria-label')
+        || (activo.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 30);
+      return `<${activo.tagName.toLowerCase()}> «${nombre}»`;
+    });
+    const esElActivo = (locator) => locator.evaluate((el) => el === document.activeElement);
+    const abrirVentas = async () => {
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Mi cuenta' }).click();
+      await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+      await page.getByRole('button', { name: 'Mis Ventas' }).click();
+      await esperarA(async () => (await page.locator('[class*="orderCard"]')
+        .filter({ hasText: numeroDelRechazo }).count()) === 1,
+      'no aparecio la venta a rechazar en Mis Ventas', 20_000);
+    };
+    const tarjeta = (numero) => page.locator('[class*="orderCard"]').filter({ hasText: numero });
+    const disparador = () => tarjeta(numeroDelRechazo).getByRole('button', { name: /^Rechazar/ });
+    const laCapa = page.locator('[role="dialog"][aria-labelledby="titulo-del-rechazo"]');
+    const motivo = page.locator('#motivo-del-rechazo');
+    const confirmar = page.getByRole('button', { name: 'Confirmar rechazo' });
+
+    await abrirVentas();
+
+    // --- A. el boton abre una capa del producto, no un dialogo del navegador -
+    assert((await disparador().count()) === 1,
+      `la venta ${numeroDelRechazo} no ofrece un boton de rechazo`);
+    await disparador().click();
+    await esperarA(async () => (await laCapa.count()) === 1,
+      'el boton de rechazo no abrio la capa del producto', 20_000);
+    assert(nativos.length === 0, `el recorrido abrio un dialogo nativo: ${nativos.join(' | ')}`);
+    assert((await laCapa.getAttribute('aria-modal')) === 'true',
+      'la capa del rechazo no se declara modal');
+    assert((await laCapa.locator('#titulo-del-rechazo').innerText()).includes('Rechazar'),
+      'la capa del rechazo no tiene nombre accesible');
+    assert((await laCapa.innerText()).includes(numeroDelRechazo),
+      'la capa no dice de que venta se trata');
+    assert(await laCapa.evaluate((el) => el.contains(document.activeElement)),
+      `el foco no entro en la capa: esta en ${await dondeEstaElFoco()}`);
+    // La trampa de Tab, en los dos extremos.
+    await page.keyboard.press('Tab');
+    assert(await laCapa.evaluate((el) => el.contains(document.activeElement)),
+      `Tab se escapo de la capa a ${await dondeEstaElFoco()}`);
+    await page.keyboard.press('Shift+Tab');
+    assert(await laCapa.evaluate((el) => el.contains(document.activeElement)),
+      `Shift+Tab se escapo de la capa a ${await dondeEstaElFoco()}`);
+    recorridos.push('la capa del producto reemplaza al diálogo nativo');
+
+    // --- B. blanco y espacios: no manda nada, y lo dice ---------------------
+    await motivo.fill('   ');
+    await confirmar.click();
+    const avisoDelMotivo = laCapa.getByRole('alert');
+    await esperarA(async () => (await avisoDelMotivo.count()) === 1,
+      'confirmar con el motivo en blanco no dijo nada', 20_000);
+    assert(patches.length === 0, `se mando ${patches.length} PATCH con el motivo en blanco`);
+    assert((await motivo.inputValue()) === '   ', 'el aviso borro lo escrito');
+    await esperarA(() => esElActivo(motivo),
+      `el aviso no llevo el foco al motivo: quedo en ${await dondeEstaElFoco()}`, 20_000);
+    assert((await motivo.getAttribute('aria-invalid')) === 'true',
+      'el motivo no queda marcado como invalido');
+    assert(enLaBase(paraRechazar).estado === 'TRANSFER_RECEIPT_SUBMITTED',
+      'la orden se movio con el motivo en blanco');
+    recorridos.push('motivo en blanco: sin PATCH, con error anunciado y foco en el campo');
+
+    // --- C. las cuatro salidas cierran solo la capa y devuelven el foco -----
+    for (const forma of ['Escape', 'Cancelar', 'X', 'fondo']) {
+      if ((await laCapa.count()) === 0) {
+        await disparador().click();
+        await esperarA(async () => (await laCapa.count()) === 1,
+          `no se pudo reabrir la capa para probar ${forma}`, 20_000);
+      }
+      await motivo.fill(`Motivo tentativo ${forma}`);
+      if (forma === 'Escape') await page.keyboard.press('Escape');
+      else if (forma === 'Cancelar') await laCapa.getByRole('button', { name: 'Cancelar' }).click();
+      else if (forma === 'X') await laCapa.getByRole('button', { name: 'Cerrar' }).click();
+      else await page.mouse.click(5, 5);
+
+      await esperarA(async () => (await laCapa.count()) === 0,
+        `cerrar con ${forma} no cerro la capa`, 20_000);
+      assert((await page.getByRole('heading', { name: 'Mi Panel' }).count()) === 1,
+        `cerrar con ${forma} cerro tambien Mi Panel`);
+      await esperarA(() => esElActivo(disparador()),
+        `cerrar con ${forma} dejo el foco en ${await dondeEstaElFoco()} y no en el boton que `
+        + 'abrio la capa', 20_000);
+      assert(patches.length === 0, `cerrar con ${forma} mando un PATCH`);
+      assert(enLaBase(paraRechazar).estado === 'TRANSFER_RECEIPT_SUBMITTED',
+        `cerrar con ${forma} movio la orden`);
+      recorridos.push(`cerrar con ${forma}`);
+    }
+
+    // --- D. la API falla: la capa, el motivo y el error se quedan ----------
+    const elMotivo = '  El importe acreditado no coincide con el total.  ';
+    const elMotivoRecortado = elMotivo.trim();
+    let caida = true;
+    await page.route('**/api/orders/*/transfer-receipt', async (ruta) => {
+      if (ruta.request().method() !== 'PATCH' || !caida) return ruta.continue();
+      await ruta.fulfill({
+        status: 500, contentType: 'application/json',
+        body: JSON.stringify({ detail: 'la base no responde (prueba controlada)' }),
+      });
+    });
+    await disparador().click();
+    await esperarA(async () => (await laCapa.count()) === 1,
+      'no se pudo reabrir la capa para el fallo de API', 20_000);
+    await motivo.fill(elMotivo);
+    await confirmar.click();
+    await esperarA(async () => (await laCapa.getByRole('alert').count()) === 1,
+      'el fallo de la API no se conto dentro de la capa', 20_000);
+    assert((await laCapa.getByRole('alert').innerText()).includes('la base no responde'),
+      `el error de la capa no trae el motivo real: «${await laCapa.getByRole('alert').innerText()}»`);
+    assert((await laCapa.count()) === 1, 'el fallo cerro la capa igual');
+    assert((await motivo.inputValue()) === elMotivo, 'el fallo perdio el motivo escrito');
+    assert((await page.getByText(/Comprobante rechazado/i).count()) === 0,
+      'con la API caida igual dijo que se habia rechazado');
+    assert(enLaBase(paraRechazar).estado === 'TRANSFER_RECEIPT_SUBMITTED',
+      'la orden se movio pese al fallo');
+    recorridos.push('fallo de API: capa, motivo y error se quedan');
+
+    // --- E. el reintento sano rechaza una sola vez, con el motivo recortado -
+    caida = false;
+    const patchesAntes = patches.length;
+    await confirmar.click();
+    await esperarA(async () => (await laCapa.count()) === 0,
+      'el reintento sano no cerro la capa', 20_000);
+    await esperarA(() => enLaBase(paraRechazar).estado === 'REJECTED',
+      'el reintento sano no dejo la orden rechazada', 20_000);
+    const guardada = enLaBase(paraRechazar);
+    assert(guardada.motivo === elMotivoRecortado,
+      `en la base quedo «${guardada.motivo}» y el motivo recortado era «${elMotivoRecortado}»`);
+    const enviados = patches.slice(patchesAntes)
+      .map((cuerpo) => JSON.parse(cuerpo || '{}'))
+      .filter((cuerpo) => cuerpo.decision === 'reject');
+    assert(enviados.length === 1,
+      `el reintento mando ${enviados.length} rechazos y tenia que mandar 1`);
+    assert(enviados[0].reason === elMotivoRecortado,
+      `el PATCH mando «${enviados[0].reason}» sin recortar`);
+    recorridos.push('un solo rechazo real, con el motivo recortado');
+
+    // --- F. despues de recargar: estado y motivo a la vista, y aprobar sigue -
+    await page.unroute('**/api/orders/*/transfer-receipt');
+    await abrirVentas();
+    const rechazada = tarjeta(numeroDelRechazo);
+    await esperarA(async () => (await rechazada.innerText()).includes(elMotivoRecortado),
+      'despues de recargar la venta no muestra el motivo del rechazo', 20_000);
+    assert(/rechazad/i.test(await rechazada.innerText()),
+      'despues de recargar la venta no se muestra como rechazada');
+    const desdeLaApi = await apiRequest('/orders/my?as_role=seller', {
+      token: vendedor.access_token,
+    });
+    const laOrden = (desdeLaApi.data || [])
+      .find((o) => o.order_number === numeroDelRechazo);
+    assert(laOrden?.status === 'rejected' && laOrden?.rejection_reason === elMotivoRecortado,
+      `la API dice ${laOrden?.status}/${JSON.stringify(laOrden?.rejection_reason)}`);
+    assert((await tarjeta(numeroDeLaAprobacion)
+      .getByRole('button', { name: /^Aprobar/ }).count()) === 1,
+    'la otra transferencia pendiente perdio el boton de aprobar');
+    assert(nativos.length === 0,
+      `el recorrido abrio un dialogo nativo: ${nativos.join(' | ')}`);
+    recorridos.push('estado y motivo coinciden con la API, y aprobar sigue disponible');
+
+    await contexto.close();
+    return `rechazar una transferencia se decide dentro del producto (${recorridos.join('; ')}): `
+      + 'ningún diálogo nativo en todo el recorrido, motivo obligatorio con error anunciado y '
+      + 'foco en el campo, las cuatro salidas cierran sólo la capa sin tocar la orden y devuelven '
+      + 'el foco a su disparador, un fallo de API conserva capa y motivo sin declarar un rechazo '
+      + `que no ocurrió, y el reintento manda un único rechazo con «${elMotivoRecortado}» que la `
+      + 'API, la base y la tarjeta cuentan igual';
+  } finally {
+    await browser.close();
+    await apiRequest('/cart', { method: 'DELETE', token: comprador.access_token });
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

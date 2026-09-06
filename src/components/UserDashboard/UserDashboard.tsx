@@ -482,6 +482,21 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   
   // Estado para calificaciones
   const [ratingModal, setRatingModal] = useState<{ orderId: string; sellerName: string } | null>(null);
+  // Rechazar una transferencia es una decisión con motivo obligatorio que el
+  // comprador va a leer, así que vive en su propia capa del panel. Era un
+  // `window.prompt`: fuera del sistema de capas, sin validación propia, sin
+  // error visible —en blanco no pasaba nada y nadie decía por qué— y
+  // perdiendo lo escrito cuando la API fallaba.
+  const [rechazoDeTransferencia, setRechazoDeTransferencia] = useState<{
+    orderId: string;
+    comprador: string;
+    total: number;
+    conComprobante: boolean;
+  } | null>(null);
+  const [motivoDelRechazo, setMotivoDelRechazo] = useState('');
+  const [errorDelRechazo, setErrorDelRechazo] = useState('');
+  const [enviandoElRechazo, setEnviandoElRechazo] = useState(false);
+  const motivoDelRechazoRef = useRef<HTMLTextAreaElement>(null);
   const [ratingScore, setRatingScore] = useState(5);
   const [ratingComment, setRatingComment] = useState('');
   const [submittingRating, setSubmittingRating] = useState(false);
@@ -1017,7 +1032,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   const edicionSucia = editingProduct !== null
     && JSON.stringify(retratoDeLaEdicion(editingProduct)) !== retratoInicialDeLaEdicion.current;
   const calificacionSucia = ratingModal !== null && (ratingScore !== 5 || ratingComment !== '');
-  const hayTrabajoSinGuardar = perfilSucio || edicionSucia || calificacionSucia;
+  // Un motivo de rechazo a medio escribir es trabajo sin guardar como
+  // cualquier otro: cerrar el panel entero con eso adentro tiene que
+  // preguntar, igual que con los otros tres formularios.
+  const rechazoSucio = rechazoDeTransferencia !== null && motivoDelRechazo.trim() !== '';
+  const hayTrabajoSinGuardar = perfilSucio || edicionSucia || calificacionSucia
+    || rechazoSucio;
   const trabajoRef = useRef(hayTrabajoSinGuardar);
   trabajoRef.current = hayTrabajoSinGuardar;
 
@@ -1033,6 +1053,13 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     [alSalir, onClose],
   );
   const cerrarLaEdicion = useCallback(() => setEditingProduct(null), []);
+  // Cerrar la capa del rechazo no toca la orden: sólo suelta lo que se estaba
+  // por mandar. El foco vuelve al botón que la abrió por la pila de capas.
+  const cerrarElRechazo = useCallback(() => {
+    setRechazoDeTransferencia(null);
+    setMotivoDelRechazo('');
+    setErrorDelRechazo('');
+  }, []);
   const pedirCierreDeLaEdicion = () => alSalir(edicionSucia, cerrarLaEdicion);
   const cerrarLaCalificacion = useCallback(() => setRatingModal(null), []);
   const pedirCierreDeLaCalificacion = () =>
@@ -1203,18 +1230,59 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     }
   };
 
-  const handleTransferDecision = async (orderId: string, decision: 'approve' | 'reject') => {
-    const reason = decision === 'reject' ? window.prompt('Motivo del rechazo:')?.trim() : undefined;
-    if (decision === 'reject' && !reason) return;
+  // Aprobar no cambió: sigue siendo un clic, con su aviso y su recarga.
+  const handleTransferDecision = async (orderId: string) => {
     try {
-      await apiPatch(`/orders/${orderId}/transfer-receipt`, { decision, reason });
-      showToast(
-        decision === 'approve' ? 'Comprobante aprobado' : 'Comprobante rechazado',
-        decision === 'approve' ? 'success' : 'warning',
-      );
+      await apiPatch(`/orders/${orderId}/transfer-receipt`, { decision: 'approve' });
+      showToast('Comprobante aprobado', 'success');
       await reloadOrders('seller');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'No se pudo validar el comprobante', 'error');
+    }
+  };
+
+  const abrirElRechazo = (order: Order) => {
+    setMotivoDelRechazo('');
+    setErrorDelRechazo('');
+    setRechazoDeTransferencia({
+      orderId: order.id,
+      comprador: order.buyer?.name || 'el comprador',
+      total: order.total,
+      conComprobante: order.status === 'transfer-receipt-submitted',
+    });
+  };
+
+  const confirmarElRechazo = async () => {
+    // Mientras hay un envío en curso el botón no vuelve a disparar: una
+    // decisión de este tamaño no se manda dos veces por un doble clic.
+    if (!rechazoDeTransferencia || enviandoElRechazo) return;
+    const motivo = motivoDelRechazo.trim();
+    if (!motivo) {
+      // Antes, un motivo en blanco no mandaba nada Y no decía nada: la
+      // decisión simplemente no pasaba y nadie sabía por qué.
+      setErrorDelRechazo('Escribí el motivo del rechazo: el comprador lo va a leer.');
+      motivoDelRechazoRef.current?.focus();
+      return;
+    }
+    setEnviandoElRechazo(true);
+    setErrorDelRechazo('');
+    try {
+      await apiPatch(`/orders/${rechazoDeTransferencia.orderId}/transfer-receipt`, {
+        decision: 'reject',
+        reason: motivo,
+      });
+      cerrarElRechazo();
+      showToast('Comprobante rechazado', 'warning');
+      await reloadOrders('seller');
+    } catch (error) {
+      // El fallo se queda DENTRO de la capa: lo escrito no se pierde y se
+      // puede reintentar sin volver a tipearlo. Y no se declara un rechazo
+      // que no ocurrió.
+      setErrorDelRechazo(error instanceof Error && error.message.trim()
+        ? error.message
+        : 'No se pudo rechazar el comprobante. Probá de nuevo.');
+    } finally {
+      setEnviandoElRechazo(false);
     }
   };
 
@@ -2929,6 +2997,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 </div>
               )}
 
+              {/* El motivo que el propio vendedor escribio al rechazar, a la
+                  vista en su venta: la decision y su razon viven juntas. */}
+              {order.rejectionReason && (
+                <div className={styles.contactInfo}>
+                  <strong>Motivo del rechazo:</strong> {order.rejectionReason}
+                </div>
+              )}
+
               {order.transferReceiptUrl && (
                 <div className={styles.contactInfo}>
                   <div className={styles.unlocked}> Comprobante de transferencia</div>
@@ -2982,7 +3058,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                     </p>
                     <button
                       className={styles.confirmButton}
-                      onClick={() => handleTransferDecision(order.id, 'approve')}
+                      onClick={() => handleTransferDecision(order.id)}
                     >
                       {order.status === 'transfer-receipt-submitted'
                         ? ' Aprobar comprobante'
@@ -2990,7 +3066,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                     </button>
                     <button
                       className={styles.rejectButton}
-                      onClick={() => handleTransferDecision(order.id, 'reject')}
+                      onClick={() => abrirElRechazo(order)}
                     >
                       {order.status === 'transfer-receipt-submitted'
                         ? ' Rechazar comprobante'
@@ -3247,6 +3323,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   // Atrapa el foco, lo devuelve al cerrar, cierra con Escape y traba el
   // scroll del fondo. Ninguna capa del producto hacía nada de esto.
   const capa = useCapaModal<HTMLDivElement>(pedirCierreDelPanel);
+  // La capa del rechazo usa la pila ya aceptada: foco adentro, trampa de Tab,
+  // Escape que cierra sólo la de arriba y foco de vuelta a su disparador.
+  const capaDelRechazo = useCapaModal<HTMLDivElement>(
+    cerrarElRechazo, rechazoDeTransferencia !== null,
+  );
 
   return (
     <div className={styles.overlay} onClick={pedirCierreDelPanel}>
@@ -3344,6 +3425,101 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         </div>
       </div>
       
+      {/* Rechazo de una transferencia: capa propia, con motivo obligatorio. */}
+      {rechazoDeTransferencia && (
+        <div
+          className={styles.editModalOverlay}
+          onClick={(evento) => {
+            // El clic no sube al fondo del panel, que también cierra.
+            evento.stopPropagation();
+            cerrarElRechazo();
+          }}
+        >
+          <div
+            className={styles.editModal}
+            ref={capaDelRechazo}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-del-rechazo"
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.editModalHeader}>
+              <h2 id="titulo-del-rechazo">
+                {rechazoDeTransferencia.conComprobante
+                  ? 'Rechazar el comprobante'
+                  : 'Rechazar la transferencia'}
+              </h2>
+              <button
+                type="button"
+                className={styles.closeButton}
+                aria-label="Cerrar"
+                onClick={cerrarElRechazo}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={styles.editModalContent}>
+              <p className={styles.ayudaCampo}>
+                Venta #{rechazoDeTransferencia.orderId} a{' '}
+                <strong>{rechazoDeTransferencia.comprador}</strong> por{' '}
+                {formatPrice(rechazoDeTransferencia.total)}.
+                {rechazoDeTransferencia.conComprobante
+                  ? ' El comprobante que adjuntó queda rechazado.'
+                  : ' La orden queda rechazada por falta de acreditación.'}
+              </p>
+
+              <div className={styles.editFormGroup}>
+                <label htmlFor="motivo-del-rechazo">
+                  Motivo del rechazo
+                </label>
+                <textarea
+                  id="motivo-del-rechazo"
+                  ref={motivoDelRechazoRef}
+                  value={motivoDelRechazo}
+                  onChange={(e) => {
+                    setErrorDelRechazo('');
+                    setMotivoDelRechazo(e.target.value);
+                  }}
+                  aria-invalid={errorDelRechazo ? true : undefined}
+                  rows={4}
+                  maxLength={500}
+                  placeholder="Ej: el importe acreditado no coincide con el total de la orden."
+                />
+                <p className={styles.ayudaCampo}>
+                  Lo lee el comprador. Sin motivo no se puede rechazar.
+                </p>
+              </div>
+
+              {errorDelRechazo && (
+                // El error vive acá adentro y no se desvanece: mientras se
+                // corrige tiene que seguir a la vista.
+                <p className={styles.ayudaCampo} role="alert">{errorDelRechazo}</p>
+              )}
+            </div>
+
+            <div className={styles.editModalActions}>
+              <button
+                type="button"
+                className={styles.cancelButton}
+                onClick={cerrarElRechazo}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={styles.rejectButton}
+                onClick={confirmarElRechazo}
+                disabled={enviandoElRechazo}
+              >
+                {enviandoElRechazo ? 'Rechazando…' : 'Confirmar rechazo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de Edición de Producto */}
       {editingProduct && (
         <div
