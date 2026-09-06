@@ -18871,6 +18871,297 @@ await runCase(151, 'Un formulario no se contradice ni esconde su error', async (
   }
 });
 
+await runCase(152, 'La ubicación publicada tiene una sola verdad: el padrón', async () => {
+  // Medido contra `042a3e3`, sobre la interfaz real:
+  //
+  //   /products/my traia location y NO locality_id, asi que la edicion partia
+  //   ese texto por comas para adivinar de donde era la publicacion
+  //   la provincia salia de una lista fija en el componente y la ciudad era un
+  //   campo de texto libre
+  //   el PATCH mandaba location="Rosario, Santa Fe" y NINGUN locality_id; el
+  //   esquema de la edicion no acepta `location`, asi que se descartaba entero:
+  //   despues de guardar la fila seguia con locality_id=06623100 y
+  //   location=«Pergamino, Buenos Aires»
+  //
+  // O sea: cambiar lo que la pantalla llamaba ubicacion no cambiaba la
+  // ubicacion publicada, y el aviso decia que se habia guardado.
+  const sello = Date.now();
+  const localidadPorNombre = (nombre, provincia) => {
+    const [fila] = queryRows(`
+      SELECT id, province_id, province_name FROM localities
+      WHERE name = ${sqlLiteral(nombre)} AND province_name = ${sqlLiteral(provincia)} LIMIT 1`);
+    assert(fila, `el padron no tiene ${nombre}, ${provincia}`);
+    return { id: fila[0], provinciaId: fila[1], provincia: fila[2], nombre };
+  };
+  const pergamino = localidadPorNombre('Pergamino', 'Buenos Aires');
+  const rosario = localidadPorNombre('Rosario', 'Santa Fe');
+
+  // Un vendedor propio, cuyo PERFIL dice otra cosa que sus publicaciones: es
+  // lo unico que permite distinguir de donde sale lo que muestra el editor.
+  const correo = `ubicacion.152.${sello}@example.com`;
+  const clave = 'smoke152';
+  await registrarYVerificar({
+    email: correo, password: clave, full_name: 'Vendedora Del Caso 152',
+  });
+  const ingreso = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: correo, password: clave },
+  });
+  const vendedora = ingreso.data;
+  assert(vendedora?.access_token, 'no se pudo entrar como la vendedora del caso');
+  // El domicilio del PERFIL, por la ruta real del perfil. Dice otra cosa que
+  // sus publicaciones: es lo único que permite distinguir de dónde sale lo que
+  // muestra el editor.
+  const perfil = await apiRequest('/auth/me', {
+    method: 'PATCH', token: vendedora.access_token,
+    body: { location: 'Villa María, Córdoba' },
+  });
+  assert(perfil.status < 400 && perfil.data?.location === 'Villa María, Córdoba',
+    `no se pudo dejar el domicilio del perfil: HTTP ${perfil.status}`);
+
+  const [categoria] = queryRows(`
+    SELECT id FROM categories
+    WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
+  const publicar = async (nombre, localityId) => {
+    const alta = await apiRequest('/products', {
+      method: 'POST', token: vendedora.access_token,
+      body: {
+        name: nombre,
+        description: 'Publicacion efimera del caso 152, para la ubicacion oficial.',
+        category_id: categoria[0], price: 1520, stock: 3, unit: 'kg',
+        locality_id: localityId, publication_type: 'producto', operation_kind: 'insumo',
+      },
+    });
+    assert(alta.status < 400 && alta.data?.id,
+      `no se pudo publicar «${nombre}»: HTTP ${alta.status}`);
+    return alta.data.id;
+  };
+  const conUbicacion = `Ubicacion152 oficial ${sello}`;
+  const heredada = `Ubicacion152 heredada ${sello}`;
+  const idOficial = await publicar(conUbicacion, pergamino.id);
+  const idHeredada = await publicar(heredada, pergamino.id);
+
+  const ubicacionEnLaBase = (id) => {
+    const [fila] = queryRows(`
+      SELECT COALESCE(locality_id, ''), COALESCE(location, '') FROM products
+      WHERE id = ${sqlLiteral(id)}`);
+    return { localityId: fila[0], texto: fila[1] };
+  };
+
+  const browser = await chromium.launch({ headless: true });
+  const comprobados = [];
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
+    await contexto.addInitScript(({ a, r }) => {
+      window.localStorage.setItem('access_token', a);
+      window.localStorage.setItem('refresh_token', r);
+    }, { a: vendedora.access_token, r: vendedora.refresh_token });
+    const page = await contexto.newPage();
+
+    const provincia = page.locator('#edit-provincia');
+    const localidad = page.locator('#edit-localidad');
+    const abrirLaEdicion = async (nombre) => {
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Mi cuenta' }).click();
+      await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+      await page.getByRole('button', { name: /publicaciones/i }).first().click();
+      const tarjeta = page.locator('[class*="productCard"], [class*="publicacion"]')
+        .filter({ hasText: nombre }).first();
+      await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
+      await tarjeta.getByRole('button', { name: /editar/i }).first().click();
+      await provincia.waitFor({ state: 'visible', timeout: 20_000 });
+      await esperarA(async () => (await provincia.locator('option').count()) > 1,
+        'el editor no cargo el padron de provincias', 20_000);
+      // La localidad es un select del padron, no un campo libre: si no esta,
+      // la ubicacion se sigue escribiendo a mano y no hay mas que medir.
+      assert((await localidad.count()) === 1,
+        'el editor no ofrece un select de localidad del padron');
+    };
+    const guardar = () => page.getByRole('button', { name: /^Guardar/i }).first().click();
+
+    // --- A. el editor abre con la ubicacion DE LA PUBLICACION ---------------
+    await abrirLaEdicion(conUbicacion);
+    await esperarA(async () => (await localidad.locator('option').count()) > 1,
+      'el editor no cargo las localidades de la provincia de la publicacion', 20_000);
+    assert((await provincia.inputValue()) === pergamino.provinciaId,
+      `el editor abrio en la provincia «${await provincia.inputValue()}» y la publicacion es de `
+      + `${pergamino.provincia} (${pergamino.provinciaId}); el perfil dice Córdoba`);
+    assert((await localidad.inputValue()) === pergamino.id,
+      `el editor abrio en la localidad «${await localidad.inputValue()}» y la publicacion es de `
+      + `${pergamino.nombre} (${pergamino.id})`);
+    // Y no quedo ningun campo libre que parezca gobernar el catalogo.
+    assert((await page.locator('#edit-ciudad').count()) === 0,
+      'sigue habiendo un campo libre «Ciudad» en la edicion');
+    const formulario = (await page.locator('[class*="editForm"], form').first().innerText())
+      .replace(/\s+/g, ' ');
+    assert(!/Villa María|Córdoba/i.test(formulario),
+      'el editor muestra la ubicacion del perfil de quien publica');
+    comprobados.push('el editor abre con la localidad de la publicación, no con la del perfil');
+
+    // --- B. cambiar la seleccion manda el ID, y el Backend deriva el texto ---
+    await provincia.selectOption(rosario.provinciaId);
+    await esperarA(async () => (await localidad.locator('option').count()) > 1,
+      'el editor no cargo las localidades de la provincia nueva', 20_000);
+    await localidad.selectOption(rosario.id);
+    const elPatch = page.waitForRequest(
+      (r) => r.url().includes(`/products/${idOficial}`) && r.method() === 'PATCH',
+      { timeout: 20_000 });
+    await guardar();
+    const cuerpo = JSON.parse((await elPatch).postData() || '{}');
+    assert(cuerpo.locality_id === rosario.id,
+      `el PATCH mando locality_id=${JSON.stringify(cuerpo.locality_id)} y se eligio ${rosario.id}`);
+    assert(!('location' in cuerpo),
+      `el PATCH sigue mandando un texto de ubicacion escrito a mano: ${JSON.stringify(cuerpo.location)}`);
+    await esperarA(() => ubicacionEnLaBase(idOficial).localityId === rosario.id,
+      'la base no quedo con la localidad elegida', 20_000);
+    const guardada = ubicacionEnLaBase(idOficial);
+    assert(guardada.texto === `${rosario.nombre}, ${rosario.provincia}`,
+      `el texto derivado quedo «${guardada.texto}» y el Backend tenia que armar `
+      + `«${rosario.nombre}, ${rosario.provincia}»`);
+    comprobados.push('guardar manda el ID y el texto lo deriva el Backend');
+
+    // --- C. recargar: editor, tarjeta, detalle y filtros dicen lo mismo -----
+    await abrirLaEdicion(conUbicacion);
+    await esperarA(async () => (await localidad.locator('option').count()) > 1,
+      'al reabrir, el editor no cargo las localidades', 20_000);
+    assert((await provincia.inputValue()) === rosario.provinciaId
+      && (await localidad.inputValue()) === rosario.id,
+    `al reabrir el editor quedo en ${await provincia.inputValue()}/${await localidad.inputValue()}`);
+
+    await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(conUbicacion)}`,
+      { waitUntil: 'domcontentloaded' });
+    const tarjeta = page.locator('article').filter({ hasText: conUbicacion }).first();
+    await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
+    await esperarA(async () => (await tarjeta.innerText()).includes(rosario.nombre),
+      `la tarjeta del Mercado no dice ${rosario.nombre}`, 20_000);
+    await tarjeta.getByRole('button', { name: 'Ver detalle' }).click();
+    await esperarA(async () => (await page.locator('#detalle-titulo').count()) === 1,
+      'no se abrio el detalle de la publicacion', 20_000);
+    const textoDelDetalle = (await page.locator('[role="dialog"]').first().innerText())
+      .replace(/\s+/g, ' ');
+    assert(textoDelDetalle.includes(rosario.nombre) && textoDelDetalle.includes(rosario.provincia),
+      `el detalle no describe ${rosario.nombre}, ${rosario.provincia}`);
+    await page.keyboard.press('Escape');
+
+    // El filtro nuevo la incluye y el anterior la excluye.
+    const filtro = page.locator('#catalog-province');
+    await filtro.waitFor({ state: 'visible', timeout: 20_000 });
+    await esperarA(async () => (await filtro.locator('option').count()) > 1,
+      'el filtro de provincia no cargo el padron', 20_000);
+    await filtro.selectOption(rosario.provinciaId);
+    await esperarA(async () => (await page.locator('article')
+      .filter({ hasText: conUbicacion }).count()) === 1,
+    `filtrando por ${rosario.provincia} la publicacion no aparece`, 20_000);
+    await filtro.selectOption(pergamino.provinciaId);
+    await esperarA(async () => (await page.locator('article')
+      .filter({ hasText: conUbicacion }).count()) === 0,
+    `filtrando por ${pergamino.provincia} la publicacion sigue apareciendo`, 20_000);
+    comprobados.push('editor, tarjeta, detalle y filtros describen la misma localidad');
+
+    // --- D. una fila heredada no hereda la ubicacion de su vendedora --------
+    //
+    // El alta EXIGE `locality_id`, asi que una publicacion sin ubicacion
+    // oficial no se puede crear por ninguna ruta real: solo existe heredada.
+    // Y `scripts/lib/sql.mjs` dice que no fabrica escenarios. Entonces la fila
+    // heredada se simula donde importa —en lo que el panel lee—: se intercepta
+    // /products/my y se le quita la ubicacion oficial a ESA publicacion. Lo
+    // que se mide es lo mismo: que la pantalla no invente una ubicacion cuando
+    // la API dice que no hay.
+    const ubicacionDelHeredado = { locality_id: null, locality: null, location: 'Un lugar viejo' };
+    await page.route('**/api/products/my', async (ruta) => {
+      const respuesta = await ruta.fetch();
+      const cuerpoReal = await respuesta.json();
+      const productos = (cuerpoReal.products || []).map((p) => (
+        p.name === heredada ? { ...p, ...ubicacionDelHeredado } : p
+      ));
+      await ruta.fulfill({
+        response: respuesta,
+        contentType: 'application/json',
+        body: JSON.stringify({ ...cuerpoReal, products: productos }),
+      });
+    });
+
+    await abrirLaEdicion(heredada);
+    assert((await provincia.inputValue()) === '',
+      `la fila heredada abrio con la provincia «${await provincia.inputValue()}» preseleccionada`);
+    assert((await localidad.inputValue()) === '',
+      `la fila heredada abrio con la localidad «${await localidad.inputValue()}» preseleccionada`);
+    const formularioHeredado = (await page.locator('[class*="editForm"], form').first().innerText())
+      .replace(/\s+/g, ' ');
+    assert(!/Villa María|Córdoba|Un lugar viejo/i.test(formularioHeredado),
+      'la fila heredada muestra el texto libre o la ubicacion del perfil como si fuera suya');
+    assert((await page.getByText(/no tiene ubicación oficial/i).count()) === 1,
+      'la fila heredada no dice que no tiene ubicacion oficial');
+
+    // Guardar OTRO campo no puede fabricarle una ubicacion por el costado.
+    const antesDelHeredado = ubicacionEnLaBase(idHeredada);
+    await page.locator('#edit-nombre').fill(`${heredada} corregida`);
+    const patchDelHeredado = page.waitForRequest(
+      (r) => r.url().includes(`/products/${idHeredada}`) && r.method() === 'PATCH',
+      { timeout: 20_000 });
+    await guardar();
+    const cuerpoHeredado = JSON.parse((await patchDelHeredado).postData() || '{}');
+    assert(!('locality_id' in cuerpoHeredado),
+      `guardar otro campo le mando una ubicacion: ${JSON.stringify(cuerpoHeredado.locality_id)}`);
+    assert(!('location' in cuerpoHeredado),
+      `guardar otro campo le mando un texto de ubicacion: ${JSON.stringify(cuerpoHeredado.location)}`);
+    await esperarA(() => queryRows(
+      `SELECT name FROM products WHERE id = ${sqlLiteral(idHeredada)}`)[0][0]
+      === `${heredada} corregida`, 'el cambio de nombre no llego a la base', 20_000);
+    const despuesDelHeredado = ubicacionEnLaBase(idHeredada);
+    assert(despuesDelHeredado.localityId === antesDelHeredado.localityId
+      && despuesDelHeredado.texto === antesDelHeredado.texto,
+    `guardar otro campo movio la ubicacion de ${antesDelHeredado.localityId} a `
+      + `${despuesDelHeredado.localityId}`);
+    await page.unroute('**/api/products/my');
+    comprobados.push('la fila heredada se declara sin ubicación oficial y guardar otro campo no le inventa una');
+
+    // --- E. la politica de suciedad sigue midiendo por el ID ---------------
+    // Cambiar y volver deja limpio: cerrar no pregunta nada.
+    await abrirLaEdicion(conUbicacion);
+    await esperarA(async () => (await localidad.locator('option').count()) > 1,
+      'el editor no cargo las localidades para la prueba de suciedad', 20_000);
+    await provincia.selectOption(pergamino.provinciaId);
+    await esperarA(async () => (await localidad.locator('option').count()) > 1,
+      'no cargaron las localidades de la provincia intermedia', 20_000);
+    await provincia.selectOption(rosario.provinciaId);
+    await esperarA(async () => (await localidad.locator('option').count()) > 1,
+      'no volvieron a cargar las localidades de la provincia original', 20_000);
+    await localidad.selectOption(rosario.id);
+    const pregunta = page.locator('[aria-labelledby="titulo-cambios-sin-guardar"]');
+    await page.getByRole('button', { name: 'Cancelar', exact: true }).first().click();
+    await esperarA(async () => (await provincia.count()) === 0,
+      'volver a la localidad inicial dejo el formulario sucio: preguntó al cerrar', 20_000);
+    assert((await pregunta.count()) === 0, 'cambiar y revertir la localidad no volvio a limpio');
+    comprobados.push('cambiar y revertir la localidad vuelve a limpio');
+
+    // Un cambio real sí queda protegido por la confirmación de FORM-DIRTY-1.
+    await abrirLaEdicion(conUbicacion);
+    await esperarA(async () => (await localidad.locator('option').count()) > 1,
+      'el editor no cargo las localidades para el cambio real', 20_000);
+    await provincia.selectOption(pergamino.provinciaId);
+    await esperarA(async () => (await localidad.locator('option').count()) > 1,
+      'no cargaron las localidades del cambio real', 20_000);
+    await localidad.selectOption(pergamino.id);
+    await page.getByRole('button', { name: 'Cancelar', exact: true }).first().click();
+    await esperarA(async () => (await pregunta.count()) === 1,
+      'cambiar la localidad de verdad no pidio confirmacion antes de cerrar', 20_000);
+    await page.getByRole('button', { name: 'Descartar cambios' }).click();
+    await esperarA(async () => (await provincia.count()) === 0,
+      'descartar no cerro la edicion', 20_000);
+    assert(ubicacionEnLaBase(idOficial).localityId === rosario.id,
+      'descartar el cambio igual movio la ubicacion publicada');
+    comprobados.push('un cambio real de localidad queda protegido y descartarlo no lo guarda');
+
+    await contexto.close();
+    return `la ubicación publicada sale del padrón y de ningún otro lado (${comprobados.join('; ')}); `
+      + `«${conUbicacion}» pasó de ${pergamino.nombre} a ${rosario.nombre} mandando el `
+      + `identificador ${rosario.id}, el Backend derivó «${guardada.texto}» y el catálogo, el `
+      + 'detalle y los dos filtros coinciden';
+  } finally {
+    await browser.close();
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

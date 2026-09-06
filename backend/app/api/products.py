@@ -537,7 +537,11 @@ async def get_my_products(
     products = db.query(Product).options(
         joinedload(Product.images),
         joinedload(Product.category),
-        joinedload(Product.subcategory)
+        joinedload(Product.subcategory),
+        # La localidad viaja con la publicacion: sin esto el panel tendria que
+        # partir el texto de `location` por comas para adivinar de donde es, y
+        # ese texto es un derivado de compatibilidad, no la fuente.
+        joinedload(Product.locality),
     ).filter(
         Product.seller_id == current_user.id,
         Product.status != ProductStatus.DELETED  # Excluir productos eliminados
@@ -555,7 +559,18 @@ async def get_my_products(
             "currency": product.currency,
             "stock": product.stock,
             "unit": product.unit,
+            # `location` queda como texto derivado, para lo que ya lo lee.
             "location": product.location,
+            # La ubicacion oficial, que es la que el catalogo filtra y muestra.
+            # Una fila heredada sin localidad manda `None` en los dos campos: no
+            # se adivina un identificador desde texto libre.
+            "locality_id": product.locality_id,
+            "locality": {
+                "id": product.locality.id,
+                "name": product.locality.name,
+                "province_id": product.locality.province_id,
+                "province_name": product.locality.province_name,
+            } if product.locality else None,
             "status": product.status.value if hasattr(product.status, 'value') else product.status,
             "views_count": product.views_count,
             "likes_count": product.likes_count,

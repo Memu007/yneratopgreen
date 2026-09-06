@@ -263,7 +263,18 @@ interface BackendProduct {
   stock: number;
   unit?: string;
   description?: string;
+  // `location` es el texto derivado que el Backend arma a partir de la
+  // localidad. Se conserva para lo que ya lo lee, pero NO es la fuente.
   location?: string;
+  // La ubicación oficial de la publicación: su identificador del padrón y lo
+  // mínimo para dibujar los selects. Una fila heredada las trae en null.
+  locality_id?: string | null;
+  locality?: {
+    id: string;
+    name: string;
+    province_id: string;
+    province_name: string;
+  } | null;
   images?: Array<{ id: string; url: string; is_primary: boolean }>;
   status: string;
   views_count: number;
@@ -293,8 +304,12 @@ interface EditFormData {
   category_name: string;
   subcategory_id: string;
   subcategory_name: string;
-  location_province: string;
-  location_city: string;
+  /** La ubicación oficial de la publicación. Vacío quiere decir que no
+   *  tiene: no se adivina una desde texto libre ni desde el perfil. */
+  locality_id: string;
+  /** Sólo gobierna qué localidades se ofrecen. Lo que se guarda es la
+   *  localidad, nunca la provincia sola. */
+  province_id: string;
   existingImages: Array<{ id: string; url: string; is_primary: boolean }>;
   newImages: Array<{ file: File; preview: string }>;
   imagesToDelete: string[];
@@ -471,14 +486,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   
   // Estado para categorías (para edición)
   const [categories, setCategories] = useState<CategoryFromBackend[]>([]);
-
-  // Lista de provincias argentinas
-  const PROVINCES = [
-    "Buenos Aires", "Ciudad Autónoma de Buenos Aires", "Catamarca", "Chaco", "Chubut",
-    "Córdoba", "Corrientes", "Entre Ríos", "Formosa", "Jujuy", "La Pampa", "La Rioja",
-    "Mendoza", "Misiones", "Neuquén", "Río Negro", "Salta", "San Juan", "San Luis",
-    "Santa Cruz", "Santa Fe", "Santiago del Estero", "Tierra del Fuego", "Tucumán"
-  ];
 
   // Helper para mapear status del backend al frontend
   const mapBackendStatus = (status: string): Order['status'] => {
@@ -949,6 +956,46 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     };
   }, [isEditing, esTransportista, carrierProvinceId]);
 
+  // El padrón para editar la ubicación de una publicación. Son los mismos
+  // ayudantes que usan el alta y el registro: una sola lista de provincias en
+  // todo el producto, y las localidades que el catálogo reconoce.
+  const [provinciasDeLaEdicion, setProvinciasDeLaEdicion] = useState<ProvinceResponse[]>([]);
+  const [localidadesDeLaEdicion, setLocalidadesDeLaEdicion] = useState<LocalityResponse[]>([]);
+  const [padronDeLaEdicion, setPadronDeLaEdicion] = useState('');
+  const provinciaDeLaEdicion = editingProduct?.province_id || '';
+
+  useEffect(() => {
+    if (!editingProduct || provinciasDeLaEdicion.length > 0) return;
+    void getProvinces()
+      .then((data) => {
+        setProvinciasDeLaEdicion(data);
+        setPadronDeLaEdicion('');
+      })
+      .catch(() => setPadronDeLaEdicion('No se pudo cargar el padrón de provincias.'));
+  }, [editingProduct, provinciasDeLaEdicion.length]);
+
+  useEffect(() => {
+    if (!provinciaDeLaEdicion) {
+      setLocalidadesDeLaEdicion([]);
+      return;
+    }
+    // Si se cambia de provincia con una consulta en vuelo, la respuesta vieja
+    // no puede pisar a la nueva.
+    let vigente = true;
+    void getLocalities(provinciaDeLaEdicion)
+      .then((data) => {
+        if (!vigente) return;
+        setLocalidadesDeLaEdicion(data);
+        setPadronDeLaEdicion('');
+      })
+      .catch(() => {
+        if (vigente) setPadronDeLaEdicion('No se pudieron cargar las localidades.');
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [provinciaDeLaEdicion]);
+
   // Cancelar sale de la edición; la rehidratación de arriba devuelve todos los
   // campos al último estado guardado. Una edición abandonada no puede
   // reaparecer en el guardado siguiente.
@@ -1392,10 +1439,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       is_primary: img.is_primary
     }));
     
-    // Parsear ubicación (formato: "ciudad, provincia")
-    const locationParts = (product.location || '').split(',').map(s => s.trim());
-    const location_city = locationParts[0] || '';
-    const location_province = locationParts[1] || '';
+    // La ubicación oficial entra por su identificador. Partir `location` por
+    // comas era adivinar: ese texto es un derivado de compatibilidad y una
+    // fila heredada puede tener cualquier cosa escrita ahí. Sin localidad,
+    // los dos campos quedan vacíos y la pantalla lo dice.
+    const locality_id = product.locality_id || '';
+    const province_id = product.locality?.province_id || '';
     
     // Determinar tipo de publicación
     const isService = product.publication_type === 'servicio';
@@ -1412,8 +1461,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       category_name: product.category?.name || '',
       subcategory_id: product.subcategory_id || '',
       subcategory_name: product.subcategory?.name || '',
-      location_province,
-      location_city,
+      locality_id,
+      province_id,
       existingImages,
       newImages: [],
       imagesToDelete: [],
@@ -1457,17 +1506,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     
     setIsSavingEdit(true);
     try {
-      // Construir ubicación
-      const location = editingProduct.location_city && editingProduct.location_province
-        ? `${editingProduct.location_city}, ${editingProduct.location_province}`
-        : '';
-      
       // Construir payload base
       const payload: Record<string, unknown> = {
         name: editingProduct.name,
         description: editingProduct.description,
         price: price,
-        location: location,
         operation_kind: editingProduct.operation_kind,
         condition: editingProduct.operation_kind === 'activo' && editingProduct.condition
           ? editingProduct.condition
@@ -1492,6 +1535,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         payload.unit = editingProduct.unit;
       }
       
+      // La ubicación viaja por su identificador oficial. Mandar un `location`
+      // escrito a mano no cambiaba nada —el esquema de la edición ni siquiera
+      // lo acepta— y derivar acá el texto sería tener la misma regla dos veces:
+      // el Backend valida el ID y arma el texto compatible.
+      if (editingProduct.locality_id) {
+        payload.locality_id = editingProduct.locality_id;
+      }
+
       // 1. Actualizar datos del producto
       await apiPatch(`/products/${editingProduct.id}`, payload);
       
@@ -3555,39 +3606,59 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 </>
               )}
               
-              {/* Ubicación */}
+              {/* Ubicación de la publicación, del padrón oficial. No es la del
+                  perfil de quien publica: ese es otro dato y vive en Mi Perfil. */}
               <div className={styles.editFormRow}>
                 <div className={styles.editFormGroup}>
                   <label htmlFor="edit-provincia">Provincia</label>
                   <select
                     id="edit-provincia"
-                    value={editingProduct.location_province}
+                    value={editingProduct.province_id}
                     onChange={(e) => setEditingProduct({
                       ...editingProduct,
-                      location_province: e.target.value
+                      province_id: e.target.value,
+                      // Cambiar de provincia deja la localidad sin elegir: la
+                      // anterior ya no pertenece a lo que se está ofreciendo.
+                      locality_id: '',
                     })}
                   >
                     <option value="">Seleccionar...</option>
-                    {PROVINCES.map(prov => (
-                      <option key={prov} value={prov}>{prov}</option>
+                    {provinciasDeLaEdicion.map((provincia) => (
+                      <option key={provincia.id} value={provincia.id}>{provincia.name}</option>
                     ))}
                   </select>
                 </div>
-                
+
                 <div className={styles.editFormGroup}>
-                  <label htmlFor="edit-ciudad">Ciudad</label>
-                  <input
-                    id="edit-ciudad"
-                    type="text"
-                    value={editingProduct.location_city}
+                  <label htmlFor="edit-localidad">Localidad</label>
+                  <select
+                    id="edit-localidad"
+                    value={editingProduct.locality_id}
                     onChange={(e) => setEditingProduct({
                       ...editingProduct,
-                      location_city: e.target.value
+                      locality_id: e.target.value,
                     })}
-                    placeholder="Ej: Rosario"
-                  />
+                    disabled={!editingProduct.province_id}
+                  >
+                    <option value="">Seleccionar...</option>
+                    {localidadesDeLaEdicion.map((localidad) => (
+                      <option key={localidad.id} value={localidad.id}>{localidad.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
+              {padronDeLaEdicion && (
+                <p className={styles.ayudaCampo} role="status">{padronDeLaEdicion}</p>
+              )}
+              {!editingProduct.locality_id && (
+                // Una publicación heredada puede no tener localidad oficial. Se
+                // dice tal cual: elegir una la sanea, y no elegirla no fabrica
+                // ninguna por el costado.
+                <p className={styles.ayudaCampo} role="status">
+                  Esta publicación no tiene ubicación oficial. Elegí provincia y
+                  localidad para que aparezca en los filtros del Mercado.
+                </p>
+              )}
               
               {/* Sección de Imágenes */}
               <div className={styles.editFormGroup}>
