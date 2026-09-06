@@ -5,6 +5,23 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-09-06 — Mercado tendrá dos vistas explícitas y Registro debe alcanzar la base profesional
+
+Emi rechazó la geometría variable del catálogo y la calidad visual del alta a
+partir de cuatro capturas del entorno descartable. La inspección de `7ff8c8a`
+confirma ambas raíces: los activos toman automáticamente la fila completa y el
+grupo de contraseña no ocupa su contenedor.
+
+Mercado queda con exactamente dos modos elegibles: **Cuadrícula**, de tarjetas
+uniformes con lectura cuadrada, y **Lista**, de rectángulos horizontales
+uniformes. La anatomía cambia datos y señal, no el tamaño exterior; ordenar no
+cambia la presentación. El alta recibe una pasada profesional acotada sobre el
+sistema visual vigente, sin alterar su contrato ni abrir funciones nuevas.
+
+`TRANSFER-REVIEW-1` continúa como única tarea activa. Después se ejecutan
+`REGISTER-POLISH-1` y `MARKET-VIEWS-1`, en ese orden. Alcance, pruebas y no
+objetivos en `FEEDBACK-VISUAL-EMI-2026-09-06.md`.
+
 ## 2026-08-31 — BOEDA reemplaza a TopGreen como marca pública
 
 La cliente entregó la identidad BOEDA y confirmó que el producto ya no debe

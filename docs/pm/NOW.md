@@ -34,6 +34,12 @@ Actualizado: 2026-09-06.
 - **Única tarea activa y responsable:** TRANSFER-REVIEW-1, Dev. Debe reemplazar
   `window.prompt` al rechazar una transferencia por una capa propia con motivo
   obligatorio, resultados visibles y ciclo modal correcto; Backend no cambia.
+- **Feedback visual de Emi registrado sin interrumpir la tarea activa:** el
+  código actual confirma que Mercado mezcla tarjetas de columna con activos de
+  fila completa y que el grupo de contraseña del Registro queda desalineado.
+  Tras `TRANSFER-REVIEW-1` siguen `REGISTER-POLISH-1` y `MARKET-VIEWS-1`: alta
+  profesional acotada y exactamente dos vistas uniformes, Cuadrícula/Lista.
+  Criterios y límites en `FEEDBACK-VISUAL-EMI-2026-09-06.md`.
 - Docker Desktop sigue sin arrancar y no fue reseteado ni reemplazado. No se
   tocaron volúmenes de proyecto, Railway, datos remotos ni pagos reales.
 - El red-team profundo sigue cerrado: faltan el cierre funcional, la

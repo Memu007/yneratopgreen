@@ -71,6 +71,20 @@ Backend, caso en el que primero debés frenar con evidencia. Producto/regresión
 en un commit, informe separado con rojo/verde, suite, riesgos y SHA; subí y
 frená. No despliegues.
 
+### Cola decidida por Emi — no iniciar mientras siga vigente TRANSFER-REVIEW-1
+
+Las capturas revisadas el 06/09 abren dos piezas posteriores, en este orden:
+
+1. `REGISTER-POLISH-1` (caso reservado 154): corregir el alta genérica y el
+   grupo de contraseña desalineado sin cambiar lógica, Backend ni contrato.
+2. `MARKET-VIEWS-1` (caso reservado 155): exactamente dos vistas elegibles,
+   Cuadrícula uniforme y Lista horizontal uniforme; la anatomía no vuelve a
+   imponer tamaño y ordenar no cambia la geometría.
+
+No adelantes trabajo de esa cola ni la mezcles con el commit 153. Los criterios,
+límites y evidencia están en `FEEDBACK-VISUAL-EMI-2026-09-06.md`; PM emitirá una
+tarea completa después de aceptar o devolver la entrega vigente.
+
 ## 2026-09-06 — DEVOLUCIÓN VIGENTE: LOCATION-SOURCE-1R, una provincia incompleta no está guardada
 
 Revisé producto/regresión `9bb56ac` e informe `06ea083`. El rumbo y el diff son
