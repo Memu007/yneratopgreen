@@ -444,6 +444,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   // sin guardar; se escribe al abrir y no en un efecto, para que no dependa de
   // en qué orden dibuje React.
   const retratoInicialDeLaEdicion = useRef('');
+  // La ubicación con la que abrió la edición. Sirve para distinguir «no la
+  // tocó» de «la tocó y la dejó a medias», que son cosas distintas: la
+  // primera puede guardar el resto y la segunda no.
+  const ubicacionInicialDeLaEdicion = useRef({ province_id: '', locality_id: '' });
+  const [ubicacionIncompleta, setUbicacionIncompleta] = useState(false);
+  const localidadDeLaEdicion = useRef<HTMLSelectElement>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Vinculo con Mercado Pago. `mpVinculo` es lo unico que decide que se ve:
@@ -1478,6 +1484,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       coverage_zones: product.coverage_zones || [],
     };
     retratoInicialDeLaEdicion.current = JSON.stringify(retratoDeLaEdicion(edicion));
+    ubicacionInicialDeLaEdicion.current = { province_id, locality_id };
+    setUbicacionIncompleta(false);
     setEditingProduct(edicion);
   };
   
@@ -1504,6 +1512,24 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       return;
     }
     
+    // La ubicación se elige entera o no se toca. Cambiar de provincia vacía
+    // la localidad, y guardar así omitía `locality_id`: el PATCH respondía
+    // 200, el aviso decía «actualizado exitosamente» y la publicación seguía
+    // donde estaba. Media selección no es un cambio guardado; es el mismo
+    // engaño que esta pieza vino a cerrar, con otra ropa.
+    const ubicacionTocada =
+      editingProduct.province_id !== ubicacionInicialDeLaEdicion.current.province_id
+      || editingProduct.locality_id !== ubicacionInicialDeLaEdicion.current.locality_id;
+    if (ubicacionTocada && !editingProduct.locality_id) {
+      // El aviso queda a la vista mientras se corrige —no se desvanece— y el
+      // foco va al control que falta. No se manda nada: lo elegido y lo
+      // escrito quedan intactos.
+      setUbicacionIncompleta(true);
+      localidadDeLaEdicion.current?.focus();
+      return;
+    }
+    setUbicacionIncompleta(false);
+
     setIsSavingEdit(true);
     try {
       // Construir payload base
@@ -3633,11 +3659,16 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   <label htmlFor="edit-localidad">Localidad</label>
                   <select
                     id="edit-localidad"
+                    ref={localidadDeLaEdicion}
+                    aria-invalid={ubicacionIncompleta || undefined}
                     value={editingProduct.locality_id}
-                    onChange={(e) => setEditingProduct({
-                      ...editingProduct,
-                      locality_id: e.target.value,
-                    })}
+                    onChange={(e) => {
+                      setUbicacionIncompleta(false);
+                      setEditingProduct({
+                        ...editingProduct,
+                        locality_id: e.target.value,
+                      });
+                    }}
                     disabled={!editingProduct.province_id}
                   >
                     <option value="">Seleccionar...</option>
@@ -3647,6 +3678,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                   </select>
                 </div>
               </div>
+              {ubicacionIncompleta && (
+                <p className={styles.ayudaCampo} role="alert">
+                  Elegí también la localidad: la ubicación se guarda entera. Hasta
+                  que la elijas, la publicación queda donde estaba.
+                </p>
+              )}
               {padronDeLaEdicion && (
                 <p className={styles.ayudaCampo} role="status">{padronDeLaEdicion}</p>
               )}

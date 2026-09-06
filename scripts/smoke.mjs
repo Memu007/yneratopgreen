@@ -18977,6 +18977,15 @@ await runCase(152, 'La ubicación publicada tiene una sola verdad: el padrón', 
         'el editor no ofrece un select de localidad del padron');
     };
     const guardar = () => page.getByRole('button', { name: /^Guardar/i }).first().click();
+    const esElActivo = (locator) => locator.evaluate((el) => el === document.activeElement);
+    const dondeEstaElFoco = () => page.evaluate(() => {
+      const activo = document.activeElement;
+      if (!activo || activo === document.body) return '(el documento)';
+      const nombre = activo.getAttribute('id')
+        || activo.getAttribute('aria-label')
+        || (activo.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 30);
+      return `<${activo.tagName.toLowerCase()}> «${nombre}»`;
+    });
 
     // --- A. el editor abre con la ubicacion DE LA PUBLICACION ---------------
     await abrirLaEdicion(conUbicacion);
@@ -19001,7 +19010,45 @@ await runCase(152, 'La ubicación publicada tiene una sola verdad: el padrón', 
     await provincia.selectOption(rosario.provinciaId);
     await esperarA(async () => (await localidad.locator('option').count()) > 1,
       'el editor no cargo las localidades de la provincia nueva', 20_000);
+
+    // B1. Media seleccion no guarda. Cambiar de provincia vacia la localidad, y
+    // guardar asi omitia `locality_id`: el PATCH respondia 200, aparecia
+    // «Producto actualizado exitosamente» y la publicacion seguia en su
+    // localidad anterior. Aceptar un cambio de ubicacion, declarar exito y no
+    // cambiar nada es el mismo engaño que esta pieza vino a cerrar.
+    const patchesEnVano = [];
+    const anotarPatch = (r) => {
+      if (r.url().includes(`/products/${idOficial}`) && r.method() === 'PATCH') {
+        patchesEnVano.push(r.url());
+      }
+    };
+    page.on('request', anotarPatch);
+    await guardar();
+    const avisoIncompleto = page.getByRole('alert')
+      .filter({ hasText: /Elegí también la localidad/i });
+    await esperarA(async () => (await avisoIncompleto.count()) === 1,
+      'guardar con la provincia cambiada y sin localidad no aviso nada', 20_000);
+    await esperarA(() => esElActivo(localidad),
+      `el aviso no llevo el foco a la localidad: quedo en ${await dondeEstaElFoco()}`, 20_000);
+    assert((await localidad.getAttribute('aria-invalid')) === 'true',
+      'la localidad no queda marcada como invalida');
+    assert(patchesEnVano.length === 0,
+      `se mando ${patchesEnVano.length} PATCH con la ubicacion a medias`);
+    assert((await page.getByText(/actualizad[oa] exitosamente/i).count()) === 0,
+      'con la ubicacion a medias igual dijo que se habia actualizado');
+    assert((await provincia.inputValue()) === rosario.provinciaId,
+      `el aviso perdio la provincia elegida: quedo en «${await provincia.inputValue()}»`);
+    assert((await page.locator('#edit-nombre').inputValue()) === conUbicacion,
+      'el aviso toco los demas valores del formulario');
+    assert(ubicacionEnLaBase(idOficial).localityId === pergamino.id,
+      'la publicacion se movio pese a no haber elegido localidad');
+    page.off('request', anotarPatch);
+    comprobados.push('media selección de ubicación no guarda ni declara éxito');
+
+    // Y con la localidad elegida, el recorrido sigue como estaba.
     await localidad.selectOption(rosario.id);
+    assert((await localidad.getAttribute('aria-invalid')) === null,
+      'elegir la localidad no levanto la marca de invalida');
     const elPatch = page.waitForRequest(
       (r) => r.url().includes(`/products/${idOficial}`) && r.method() === 'PATCH',
       { timeout: 20_000 });
