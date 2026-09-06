@@ -12,6 +12,56 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-06 — DEVOLUCIÓN VIGENTE: LOCATION-SOURCE-1R, una provincia incompleta no está guardada
+
+Revisé producto/regresión `9bb56ac` e informe `06ea083`. El rumbo y el diff son
+correctos: `/products/my` expone la localidad oficial, el editor usa el padrón,
+el PATCH manda el ID elegido y el texto compatible lo deriva el Backend. PM
+reprodujo el caso 152 rojo contra `042a3e3` en **0/1** y verde contra la entrega
+en **1/1**. Los hashes informados coinciden y el `diff-check` real está limpio.
+
+La pieza vuelve por un borde concreto. Partiendo de una publicación guardada en
+Rosario:
+
+1. en el editor elegí Provincia «Buenos Aires»;
+2. el cambio vació correctamente Localidad;
+3. pulsé Guardar sin elegir otra localidad;
+4. el Frontend omitió `locality_id`, el PATCH respondió 200, apareció «Producto
+   actualizado exitosamente» y la publicación siguió guardada en Rosario.
+
+La causa está en la combinación de `locality_id: ''` al cambiar provincia y el
+`if (editingProduct.locality_id)` que simplemente omite el campo al guardar. Es
+la misma clase de engaño que la tarea debía cerrar: la pantalla acepta un cambio
+de ubicación, declara éxito y no cambia la verdad persistida.
+
+### Corrección mínima obligatoria
+
+- Si la selección de ubicación fue tocada y no forma un par válido de provincia
+  y localidad, Guardar debe frenarse antes del PATCH con un error visible y
+  accesible; la selección y los demás valores quedan intactos para corregirla.
+- Una publicación oficial no puede limpiar/cambiar provincia y obtener éxito
+  conservando silenciosamente su localidad anterior.
+- La fila heredada que abre sin provincia ni localidad debe seguir pudiendo
+  guardar otro campo sin fabricar ubicación. Si empieza a elegir ubicación,
+  tampoco puede guardar sólo media selección.
+- Elegir una localidad válida conserva el comportamiento entregado: manda su
+  `locality_id` y el Backend deriva el texto. No agregues un modo para borrar la
+  ubicación, otra fuente ni otra lista.
+
+Ampliá el **mismo caso 152**, sin crear el 153. En el bloque donde se cambia de
+Santa Fe a Buenos Aires, intentá guardar antes de elegir la localidad y probá:
+no sale PATCH, no aparece éxito, el error se anuncia y la provincia elegida
+permanece. Después elegí la localidad y continuá el recorrido verde existente.
+Conservá también el bloque heredado actual; no hace falta fabricar esa fila en
+base para esta devolución.
+
+Corré 152 aislado, los controles 149 y 150 y una sola suite completa. Si el diff
+queda limitado a Frontend/regresión, alcanzan build, lint, `tsc --noEmit`,
+`node --check` y `diff-check`; no repitas Backend, `pip check`, contraste ni la
+auditoría a11y completa. La accesibilidad del nuevo error sí queda medida dentro
+del 152. Producto/regresión en un commit, informe separado con SHA y resultados;
+subí y frená. No despliegues.
+
 ## 2026-09-06 — TAREA VIGENTE: LOCATION-SOURCE-1, la ubicación publicada tiene una sola verdad
 
 FORM-CONSISTENCY-1R queda **aceptada** en producto/regresión `042a3e3` e
