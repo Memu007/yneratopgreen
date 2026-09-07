@@ -52,6 +52,13 @@ Actualizado: 2026-09-07.
   ofrecer exactamente dos vistas elegibles y uniformes —Cuadrícula y Lista—;
   anatomía y orden dejan de imponer geometría. Caso nuevo 155, tres viewports.
   Criterios y límites en `FEEDBACK-VISUAL-EMI-2026-09-06.md`.
+- **Marca pública corregida por Emi:** el nombre exacto es **AgroBoeda**, no
+  BOEDA ni TopGreen. El PNG oficial quedó preservado, sin modificar, en
+  `docs/pm/originales/AGROBOEDA-LOGO-FUENTE.png` con SHA-256
+  `5606077c429b20edecb62986d6b7500c7142c6a6230c006fdfb33c4978b206cf`.
+  `BRAND-AGROBOEDA-1` queda inmediatamente después de MARKET-VIEWS-1; no se
+  mezcla con la tarea activa ni autoriza despliegue. Decisión y limitaciones
+  del PNG en `IDENTIDAD-AGROBOEDA-CLIENTE-2026-09-07.md`.
 - Docker Desktop sigue sin arrancar y no fue reseteado ni reemplazado. No se
   tocaron volúmenes de proyecto, Railway, datos remotos ni pagos reales.
 - El red-team profundo sigue cerrado: faltan el cierre funcional, la
@@ -393,15 +400,17 @@ Actualizado: 2026-09-07.
   auditorías hasta MP-D, red-team y producción. No altera
   `CRONOGRAMA.md`, no convierte cortesías en contrato y mantiene una sola tarea
   de producto activa.
-- **Nueva identidad recibida y triada:** la marca pública deja de ser TopGreen
-  y pasa a ser **BOEDA**. La lámina de cliente gobierna nombre, paleta,
+- **Nueva identidad recibida y triada:** la decisión inicial del 31/08 cambió
+  TopGreen por BOEDA; Emi precisó el 07/09 que el nombre exacto es
+  **AgroBoeda** y entregó el monograma oficial. La lámina de cliente gobierna
+  paleta,
   fotografía y voz; los manuales son visión, no ampliación contractual. La
   separación entre identidad aplicable, funciones posteriores y nombres
   técnicos que no deben migrarse está en
-  `docs/pm/IDENTIDAD-BOEDA-CLIENTE-2026-08-31.md`. No cambia la tarea activa:
-  `BRAND-BOEDA-1` queda en cola después de `TEST-HARNESS-MAC-1S` y
-  `TRANSFER-REC-1`, antes del cierre visual/responsive, y requiere el logo
-  vectorial/PNG transparente de la cliente.
+  `docs/pm/IDENTIDAD-BOEDA-CLIENTE-2026-08-31.md`, actualizado por
+  `IDENTIDAD-AGROBOEDA-CLIENTE-2026-09-07.md`. No cambia la tarea activa:
+  `BRAND-AGROBOEDA-1` queda después de MARKET-VIEWS-1. El PNG fuente ya está
+  resguardado; sus derivados de producción se resuelven en esa pieza.
 - Seguridad operativa: nunca pagar si el checkout muestra la cuenta real,
   tarjetas reales o el nombre Emiliano. Encender la bandera sólo para una orden
   controlada; al terminar dejarla en `false`, esperar `SUCCESS`, comprobar

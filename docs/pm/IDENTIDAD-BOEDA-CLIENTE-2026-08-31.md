@@ -2,6 +2,11 @@
 
 Fecha: 2026-08-31.
 
+Estado: **antecedente histórico**. El 2026-09-07 Emi fijó el nombre público
+exacto **AgroBoeda** y entregó el monograma AB. Para implementación manda
+`IDENTIDAD-AGROBOEDA-CLIENTE-2026-09-07.md`; donde este documento diga BOEDA o
+`BRAND-BOEDA-1`, léase la decisión anterior ya sustituida, no una tarea vigente.
+
 Fuentes revisadas completas:
 
 - `AgroMarket_Manual_Producto_AGM-08_v1.1.docx`;

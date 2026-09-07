@@ -31,6 +31,15 @@ columnas. El catálogo parece cambiar de diseño al ordenar. La decisión cerrad
 en `DECISIONS.md` y `FEEDBACK-VISUAL-EMI-2026-09-06.md` es exactamente dos
 modos elegibles: **Cuadrícula** y **Lista**.
 
+### Decisión de marca recibida — no mezclar en este commit
+
+Emi fijó el nombre público exacto **AgroBoeda** y entregó el monograma AB. La
+fuente quedó resguardada en
+`docs/pm/originales/AGROBOEDA-LOGO-FUENTE.png`; contrato y límites en
+`IDENTIDAD-AGROBOEDA-CLIENTE-2026-09-07.md`. No cambies todavía nombre, logo,
+favicon, metadatos ni emails dentro de MARKET-VIEWS-1. Después de su revisión,
+PM emitirá `BRAND-AGROBOEDA-1` como pieza separada e inmediata.
+
 ### Resultado obligatorio
 
 1. Junto a `Ordenar por` aparece un selector visible con las dos opciones
@@ -101,7 +110,7 @@ sin repetirlos aparte si ya quedaron identificables. Sumá build, lint,
 antes de hacerlo.
 
 No entran un tercer modo, preferencia persistente, rediseño del detalle, fotos
-nuevas, paginación, algoritmo de relevancia, Backend, API, marca BOEDA,
+nuevas, paginación, algoritmo de relevancia, Backend, API, marca AgroBoeda,
 Railway, pagos ni datos remotos. Producto/regresión en un commit; informe
 separado con rojo/verde, suite, puertas, capturas, riesgos y SHA. Subí y frená.
 

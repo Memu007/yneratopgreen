@@ -5,6 +5,25 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-09-07 — La marca pública exacta es AgroBoeda y el monograma AB es la fuente oficial
+
+Emi corrigió la decisión anterior: el nombre público no es `BOEDA` a secas,
+sino **AgroBoeda**, con A y B mayúsculas y sin espacio. `TopGreen` queda como
+nombre viejo. La sustitución visible se hará en `BRAND-AGROBOEDA-1`; no se
+renombran en masa repo, base, contenedores, variables, servicios ni la
+aplicación externa de Mercado Pago.
+
+La fuente oficial recibida es el PNG `AGROBOEDA-LOGO-FUENTE.png`, monograma AB
+sobre fondo verde. Se conserva sin modificar y fuera de `public/` en
+`docs/pm/originales/`; SHA-256
+`5606077c429b20edecb62986d6b7500c7142c6a6230c006fdfb33c4978b206cf`.
+Mide 1536 × 1024, es RGB y no tiene transparencia. Como no contiene el nombre
+completo, el producto debe acompañarlo con `AgroBoeda` visible o con nombre
+accesible según la superficie; no se lo presenta falsamente como wordmark.
+
+`MARKET-VIEWS-1` sigue como única tarea activa. La marca se ejecuta inmediatamente
+después, en pieza separada, para no mezclar geometría de catálogo con identidad.
+
 ## 2026-09-06 — Sol Alto por defecto; la PM avisa cada cambio de razonamiento
 
 Emi convierte en regla permanente la selección de esfuerzo de la PM. Se usa
