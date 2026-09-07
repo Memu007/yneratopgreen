@@ -135,6 +135,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSwitchToRegis
               <button
                 type="button"
                 className={styles.togglePassword}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? 'Ocultar' : 'Mostrar'}

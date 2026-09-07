@@ -22,12 +22,19 @@
 }
 
 .modal {
-  background: white;
+  background: var(--tg-color-surface);
+  color: var(--tg-color-text);
+  font-family: var(--tg-font-ui);
   border-radius: var(--tg-radius-sm);
-  padding: 2rem;
-  max-width: 450px;
+  /* El cereal entra como senal —filete—, que es para lo unico que el
+     sistema lo admite: no es texto ni estado. */
+  border-top: var(--tg-border-strong) solid var(--tg-color-signal);
+  padding: var(--tg-space-6);
+  max-width: 480px;
   width: 90%;
-  max-height: 90vh;
+  /* Casi toda la ventana: con 90vh el alta base no entraba en 1440x900 por
+     unos pocos pixeles y obligaba a desplazar una pantalla que cabe. */
+  max-height: calc(100vh - var(--tg-space-8));
   overflow-y: auto;
   box-shadow: var(--tg-shadow-overlay);
   animation: slideUp 0.3s ease-out;
@@ -47,27 +54,57 @@
 .modalHeader {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 2px solid var(--tg-color-border);
+  align-items: flex-start;
+  gap: var(--tg-space-4);
+  margin-bottom: var(--tg-space-3);
+  padding-bottom: var(--tg-space-3);
+  border-bottom: var(--tg-border-hairline) solid var(--tg-color-border);
 }
 
 .modalTitle {
-  font-size: 1.75rem;
-  font-weight: bold;
+  font-family: var(--tg-font-display);
+  font-size: 1.5rem;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--tg-color-text);
 }
 
+/* Dos lineas antes del formulario: que hace esta pantalla y que pasa
+   despues. El alta no inicia sesion, y decirlo aca evita que el aviso de
+   correo pendiente parezca un error. */
+.intro {
+  margin: 0 0 var(--tg-space-2);
+  color: var(--tg-color-text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.leyenda {
+  margin: 0 0 var(--tg-space-4);
+  color: var(--tg-color-text-secondary);
+  font-size: 0.82rem;
+}
+
 .closeButton {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tg-control-min);
+  min-height: var(--tg-control-min);
+  /* Se recuesta sobre el margen de la capa para no empujar al titulo:
+     el blanco tactil crece, la composicion no se mueve. */
+  margin: calc(-1 * var(--tg-space-2)) calc(-1 * var(--tg-space-2)) 0 0;
   background: none;
   border: none;
+  border-radius: var(--tg-radius-sm);
   font-size: 1.5rem;
   cursor: pointer;
   color: var(--tg-color-text-secondary);
-  padding: 0.25rem 0.5rem;
+  padding: 0;
   line-height: 1;
-  transition: color 0.2s;
+  transition: color var(--tg-duration-fast) var(--tg-ease-standard);
 }
 
 .closeButton:hover {
@@ -77,41 +114,70 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: var(--tg-space-4);
 }
 
 .formGroup {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--tg-space-2);
+  min-width: 0;
 }
 
 .checkboxLabel {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: var(--tg-space-2);
+  min-height: var(--tg-control-min);
   color: var(--tg-color-brand);
   font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.checkboxLabel input[type='checkbox'] {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--tg-color-brand);
+  cursor: pointer;
 }
 
 .label {
   font-weight: 600;
   color: var(--tg-color-brand);
   font-size: 0.95rem;
+  line-height: 1.35;
 }
 
 .required {
   color: var(--tg-color-error);
-  margin-left: 0.25rem;
+  margin-left: var(--tg-space-1);
+}
+
+/* Lo opcional se dice, no se deduce por la ausencia del asterisco. */
+.opcional {
+  margin-left: var(--tg-space-1);
+  color: var(--tg-color-text-secondary);
+  font-weight: 500;
+  font-size: 0.82rem;
 }
 
 .input,
 .select {
-  padding: 0.75rem 1rem;
-  border: 2px solid var(--tg-color-success-bg);
-  border-radius: var(--tg-radius-lg);
+  /* El ancho es explicito: un `input` no llena su contenedor solo, y ese
+     es el origen de que el campo de contrasena quedara mas corto que
+     todos los demas y el boton de Mostrar terminara flotando afuera. */
+  width: 100%;
+  min-height: var(--tg-control-min);
+  padding: var(--tg-space-3) var(--tg-space-4);
+  background-color: var(--tg-color-surface);
+  color: var(--tg-color-text);
+  border: var(--tg-border-hairline) solid var(--tg-color-border-control);
+  border-radius: var(--tg-radius-md);
+  font-family: inherit;
   font-size: 0.95rem;
-  transition: all 0.2s;
+  transition: border-color var(--tg-duration-fast) var(--tg-ease-standard);
 }
 
 .input:focus,
@@ -128,70 +194,101 @@
   color: var(--tg-color-border-control);
 }
 
+/* El ancho del boton se declara una sola vez y el campo reserva
+   exactamente ese espacio: asi el texto nunca queda debajo del control y
+   el control nunca sale del campo. Antes `right: 1rem` medía contra el
+   grupo entero mientras el input quedaba corto, y el boton aparecia
+   flotando a 38 px del campo en escritorio y encima del texto en 390 px. */
 .passwordGroup {
+  --tg-toggle-ancho: 92px;
   position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.passwordGroup .input {
+  padding-right: calc(var(--tg-toggle-ancho) + var(--tg-space-3));
 }
 
 .togglePassword {
   position: absolute;
-  right: 1rem;
   top: 50%;
+  right: var(--tg-space-1);
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tg-toggle-ancho);
+  height: var(--tg-control-min);
   background: none;
   border: none;
+  border-radius: var(--tg-radius-sm);
   cursor: pointer;
-  color: var(--tg-color-text-secondary);
-  font-size: 1.1rem;
-  padding: 0.25rem;
+  color: var(--tg-color-brand);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0;
 }
 
 .togglePassword:hover {
-  color: var(--tg-color-brand);
+  color: var(--tg-color-action-hover);
 }
 
 .submitButton {
-  padding: 0.875rem;
-  background-color: var(--tg-color-brand);
-  color: white;
+  width: 100%;
+  min-height: var(--tg-control-min);
+  padding: var(--tg-space-3) var(--tg-space-4);
+  background-color: var(--tg-color-action);
+  color: var(--tg-color-text-inverse);
   border: none;
-  border-radius: var(--tg-radius-lg);
+  border-radius: var(--tg-radius-md);
+  font-family: inherit;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
-  margin-top: 0.5rem;
+  transition: background-color var(--tg-duration-fast) var(--tg-ease-standard);
+  margin-top: var(--tg-space-2);
 }
 
 .submitButton:hover:not(:disabled) {
-  background-color: var(--tg-color-text);
-  box-shadow: var(--tg-shadow-none);
+  background-color: var(--tg-color-action-hover);
 }
 
+/* Deshabilitado con color propio y no con opacidad heredada: el sistema
+   tiene los dos tokens justamente para que el rotulo se siga leyendo
+   (4,63:1 medido). Antes quedaba identico al habilitado. */
 .submitButton:disabled {
-  background-color: var(--tg-color-brand);
+  background-color: var(--tg-color-disabled-bg);
+  color: var(--tg-color-disabled-text);
   cursor: not-allowed;
 }
 
 .error {
   background-color: var(--tg-color-error-bg);
   color: var(--tg-color-error);
-  padding: 0.75rem 1rem;
-  border-radius: var(--tg-radius-lg);
+  padding: var(--tg-space-3) var(--tg-space-4);
+  border-radius: var(--tg-radius-md);
   font-size: 0.9rem;
-  border: 1px solid var(--tg-color-error-bg);
+  line-height: 1.5;
+  border: var(--tg-border-hairline) solid var(--tg-color-error);
 }
 
 .success {
   background-color: var(--tg-color-success-bg);
   color: var(--tg-color-brand);
-  padding: 0.75rem 1rem;
-  border-radius: var(--tg-radius-lg);
+  padding: var(--tg-space-3) var(--tg-space-4);
+  border-radius: var(--tg-radius-md);
   font-size: 0.9rem;
-  border: 1px solid var(--tg-color-success-bg);
+  line-height: 1.5;
+  border: var(--tg-border-hairline) solid var(--tg-color-success);
 }
 
 .switchText {
   text-align: center;
-  margin-top: 1.5rem;
+  margin-top: var(--tg-space-5);
+  padding-top: var(--tg-space-4);
+  border-top: var(--tg-border-hairline) solid var(--tg-color-border);
   color: var(--tg-color-text-secondary);
   font-size: 0.95rem;
 }
@@ -227,6 +324,35 @@
   color: var(--tg-color-text-secondary);
   font-size: 0.78rem;
   line-height: 1.45;
+}
+
+/* La ampliacion de transportista. Agrupa sin encajonar: una regla y un
+   titulo alcanzan, y todo lo de adentro conserva el mismo ancho interior y
+   el mismo margen izquierdo que el alta base. Un recuadro con relleno
+   propio habria creado un segundo ancho, que es justo lo que esta pieza
+   vino a terminar. */
+.ampliacion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tg-space-5);
+  min-width: 0;
+  padding-top: var(--tg-space-5);
+  border-top: var(--tg-border-strong) solid var(--tg-color-signal);
+}
+
+.ampliacionTitulo {
+  margin: 0;
+  font-family: var(--tg-font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--tg-color-brand);
+}
+
+.ampliacionIntro {
+  margin: calc(-1 * var(--tg-space-3)) 0 0;
+  color: var(--tg-color-text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.5;
 }
 
 /* Las cargas declaradas: en escritorio entran en dos columnas y en 390px

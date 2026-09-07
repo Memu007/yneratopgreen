@@ -153,7 +153,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       // "Error al crear la cuenta", y ahora el alta puede fallar porque el
       // correo no salió, que es algo distinto y se resuelve reintentando.
       const errorMessage = err instanceof Error ? err.message : '';
-      avisarDelError(errorMessage || 'Error al crear la cuenta. Intenta nuevamente.');
+      avisarDelError(errorMessage || 'No pudimos crear la cuenta. Probá de nuevo.');
     } finally {
       setIsLoading(false);
     }
@@ -201,11 +201,24 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         tabIndex={-1}
       >
         <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Crear Cuenta</h2>
+          <h2 className={styles.modalTitle}>Crear cuenta</h2>
           <button className={styles.closeButton} aria-label="Cerrar" onClick={onClose}>
             ×
           </button>
         </div>
+
+        {!pendiente && (
+          <>
+            <p className={styles.intro}>
+              Para publicar, comprar y contratar transporte. Vas a confirmar el
+              correo antes del primer ingreso.
+            </p>
+            <p className={styles.leyenda}>
+              Los campos con <span className={styles.required}>*</span> son
+              obligatorios.
+            </p>
+          </>
+        )}
 
         {pendiente ? (
           <div className={styles.form}>
@@ -227,7 +240,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               onClick={handleReenviar}
               disabled={isLoading}
             >
-              {isLoading ? 'Reenviando...' : 'Reenviar el correo'}
+              {isLoading ? 'Reenviando…' : 'Reenviar el correo'}
             </button>
             <button type="button" className={styles.switchLink} onClick={onSwitchToLogin}>
               Ir a iniciar sesión
@@ -279,7 +292,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           </div>
 
           <div className={styles.formGroup}>
-            <label className={styles.label} htmlFor="registro-telefono">Teléfono</label>
+            <label className={styles.label} htmlFor="registro-telefono">
+              Teléfono <span className={styles.opcional}>(opcional)</span>
+            </label>
             <input
               type="tel"
               id="registro-telefono"
@@ -304,13 +319,25 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           </label>
 
           {formData.isCarrier && (
-            <>
+            <div
+              className={styles.ampliacion}
+              role="group"
+              aria-labelledby="registro-ampliacion"
+            >
+              <h3 className={styles.ampliacionTitulo} id="registro-ampliacion">
+                Datos de transportista
+              </h3>
+              <p className={styles.ampliacionIntro}>
+                Se suman al alta: sin esto tu cuenta funciona igual para comprar y
+                vender. Si desmarcás la casilla, lo que escribiste queda guardado
+                por si volvés.
+              </p>
               <div className={styles.formGroup}>
-                <label className={styles.label}>
+                <label className={styles.label} htmlFor="registro-provincia">
                   Provincia base <span className={styles.required}>*</span>
                 </label>
                 <select
-                  aria-label="Provincia base"
+                  id="registro-provincia"
                   className={styles.select}
                   value={provinceId}
                   onChange={(e) => {
@@ -330,11 +357,11 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               </div>
 
               <div className={styles.formGroup}>
-                <label className={styles.label}>
+                <label className={styles.label} htmlFor="registro-localidad">
                   Localidad base <span className={styles.required}>*</span>
                 </label>
                 <select
-                  aria-label="Localidad base"
+                  id="registro-localidad"
                   className={styles.select}
                   value={formData.carrierBaseLocalityId}
                   onChange={(e) => setFormData((current) => ({
@@ -371,7 +398,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                   pueden completar después: pedirlos como obligatorios en el
                   alta ahuyentaría a quien sólo quiere empezar. */}
               <div className={styles.formGroup}>
-                <label className={styles.label} htmlFor="registro-modelo">Marca y modelo</label>
+                <label className={styles.label} htmlFor="registro-modelo">
+                  Marca y modelo <span className={styles.opcional}>(opcional)</span>
+                </label>
                 <input
                   type="text"
                   id="registro-modelo"
@@ -384,7 +413,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               </div>
 
               <div className={styles.formGroup}>
-                <label className={styles.label} htmlFor="registro-dominio">Dominio</label>
+                <label className={styles.label} htmlFor="registro-dominio">
+                  Dominio <span className={styles.opcional}>(opcional)</span>
+                </label>
                 <input
                   type="text"
                   id="registro-dominio"
@@ -403,6 +434,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               <div className={styles.formGroup}>
                 <span className={styles.label} id="registro-cargas">
                   Cargas que transportás
+                  <span className={styles.opcional}>(opcional)</span>
                 </span>
                 {fallaDeCargas && (
                   <div className={styles.error} role="status">
@@ -521,7 +553,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               </div>
 
               <div className={styles.formGroup}>
-                <label className={styles.label} htmlFor="registro-capacidad">Capacidad de carga (opcional)</label>
+                <label className={styles.label} htmlFor="registro-capacidad">
+                  Capacidad de carga <span className={styles.opcional}>(opcional)</span>
+                </label>
                 <input
                   type="text"
                   id="registro-capacidad"
@@ -532,7 +566,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                   onChange={handleChange}
                 />
               </div>
-            </>
+            </div>
           )}
 
           <div className={styles.formGroup}>
@@ -553,6 +587,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               <button
                 type="button"
                 className={styles.togglePassword}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? 'Ocultar' : 'Mostrar'}
@@ -568,7 +603,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               type={showPassword ? 'text' : 'password'}
               className={styles.input}
               id="registro-clave-2"
-              placeholder="Repite tu contraseña"
+              placeholder="Repetí tu contraseña"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
@@ -576,16 +611,16 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           </div>
 
           <button type="submit" className={styles.submitButton} disabled={isLoading}>
-            {isLoading ? 'Creando cuenta...' : 'Crear cuenta'}
+            {isLoading ? 'Creando la cuenta…' : 'Crear cuenta'}
           </button>
         </form>
         )}
 
         {!pendiente && (
         <div className={styles.switchText}>
-          ¿Ya tienes cuenta?{' '}
+          ¿Ya tenés cuenta?{' '}
           <button type="button" className={styles.switchLink} onClick={onSwitchToLogin}>
-            Inicia sesión aquí
+            Iniciá sesión
           </button>
         </div>
         )}

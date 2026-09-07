@@ -1,6 +1,8 @@
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash, createHmac } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
 
@@ -15053,7 +15055,8 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
             .first().waitFor({ timeout: 20_000 });
           assert(await page.getByRole('dialog').count() === 1,
             'el salto a Registro apilo un dialogo mas');
-          await page.getByRole('button', { name: 'Inicia sesión aquí' }).first().click();
+          // El rótulo lo fija REGISTER-POLISH-1: «Iniciá sesión», en es-AR.
+          await page.getByRole('button', { name: 'Iniciá sesión' }).first().click();
           await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
         }
 
@@ -19526,6 +19529,328 @@ await runCase(153, 'Rechazar una transferencia se decide dentro del producto', a
   } finally {
     await browser.close();
     await apiRequest('/cart', { method: 'DELETE', token: comprador.access_token });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 154. REGISTER-POLISH-1 — el alta se lee y se opera en los dos anchos.
+//
+// La devolución fue visual, pero lo que estaba roto se puede medir: `input` no
+// llena su contenedor por sí solo, así que el campo de contraseña quedaba más
+// corto que todos los demás y el botón absoluto —posicionado contra el grupo,
+// no contra el campo— aparecía a 38 px del campo en escritorio y encima del
+// texto en 390 px. Este caso no fotografía: mide cajas, blanco táctil, nombre
+// accesible, desborde y persistencia. Las capturas son para revisión humana y
+// van aparte.
+//
+// No hay ruta de prueba ni espera fija: todo se afirma sobre la UI real, y lo
+// asincrónico —padrón, catálogo de cargas, alerta— se espera por condición.
+// ---------------------------------------------------------------------------
+await runCase(154, 'El alta de cuenta tiene un solo ancho y controles operables', async () => {
+  const CAPTURAS = process.env.SMOKE_CAPTURAS || 'docs/pm/capturas-registro';
+  mkdirSync(CAPTURAS, { recursive: true });
+  const capturas = [];
+  const medidos = [];
+  const correo = `registro.154.${Date.now()}@example.com`;
+  const browser = await chromium.launch({ headless: true });
+
+  try {
+    for (const medida of [
+      { n: 'escritorio', width: 1440, height: 900 },
+      { n: 'movil', width: 390, height: 844 },
+    ]) {
+      const contexto = await browser.newContext({
+        viewport: { width: medida.width, height: medida.height },
+      });
+      const page = await contexto.newPage();
+      const donde = `${medida.n} ${medida.width}x${medida.height}`;
+      const foto = async (nombre) => {
+        const ruta = `${CAPTURAS}/${nombre}-${medida.width}x${medida.height}.png`;
+        await page.screenshot({ path: ruta });
+        capturas.push(`${ruta} (${medida.width}x${medida.height})`);
+      };
+
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Ingresar' }).first().click();
+      await page.getByRole('button', { name: 'Regístrate aquí' }).click();
+      await page.locator('#registro-nombre').waitFor({ state: 'visible', timeout: 20_000 });
+
+      const capa = page.getByRole('dialog');
+      const enviar = page.getByRole('button', { name: 'Crear cuenta' });
+      const casilla = page.getByRole('checkbox', {
+        name: /Quiero registrarme como transportista/,
+      });
+
+      // Todos los controles que llevan un dato comparten borde izquierdo y
+      // ancho. Se mide sobre el elemento real, con medio pixel de holgura para
+      // el redondeo del navegador; más que eso ya se ve.
+      const anchoUnico = async (etapa) => {
+        const cajas = await page.evaluate(() => {
+          const form = document.querySelector('[role="dialog"] form');
+          const piezas = [...form.querySelectorAll('input, select, button[type="submit"]')]
+            .filter((el) => el.type !== 'checkbox');
+          const grupo = form.querySelector('#registro-clave')?.parentElement;
+          if (grupo) piezas.push(grupo);
+          return piezas.map((el) => {
+            const r = el.getBoundingClientRect();
+            return {
+              que: el.id || el.name || el.type || el.tagName.toLowerCase(),
+              x: r.x,
+              w: r.width,
+            };
+          });
+        });
+        assert(cajas.length >= 6, `${donde}, ${etapa}: sólo se encontraron ${cajas.length} controles`);
+        const fuera = cajas.filter((c) => Math.abs(c.x - cajas[0].x) > 0.5
+          || Math.abs(c.w - cajas[0].w) > 0.5);
+        assert(fuera.length === 0,
+          `${donde}, ${etapa}: ${fuera.map((c) => `«${c.que}» en x=${Math.round(c.x)} `
+            + `de ${Math.round(c.w)}px`).join(', ')} contra el ancho interior `
+            + `x=${Math.round(cajas[0].x)} de ${Math.round(cajas[0].w)}px`);
+        return `${cajas.length} controles en ${Math.round(cajas[0].w)}px`;
+      };
+
+      // Ni el documento ni la capa desbordan a lo ancho, y la acción final se
+      // puede alcanzar y tocar: no alcanza con que exista en el DOM.
+      const sinDesborde = async (etapa) => {
+        const sobra = await page.evaluate(() => {
+          const m = document.querySelector('[role="dialog"]');
+          return {
+            doc: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+            capa: m.scrollWidth - m.clientWidth,
+          };
+        });
+        assert(sobra.doc <= 0, `${donde}, ${etapa}: el documento desborda ${sobra.doc}px a lo ancho`);
+        assert(sobra.capa <= 0, `${donde}, ${etapa}: la capa desborda ${sobra.capa}px a lo ancho`);
+      };
+      const accionAlcanzable = async (etapa) => {
+        await enviar.scrollIntoViewIfNeeded();
+        const estorbo = await enviar.evaluate((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.top < 0 || r.bottom > window.innerHeight) return 'queda fuera de la ventana';
+          const encima = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+          return el.contains(encima) ? '' : `la tapa <${encima?.tagName.toLowerCase()}>`;
+        });
+        assert(estorbo === '', `${donde}, ${etapa}: la acción final no es alcanzable, ${estorbo}`);
+      };
+
+      // --- A. el alta base: un ancho, sin desborde y con la acción a mano ---
+      medidos.push(`${donde} base: ${await anchoUnico('alta base')}`);
+      await sinDesborde('alta base');
+      await accionAlcanzable('alta base');
+
+      // El fondo no se mueve aunque se ruede sobre la capa: la ampliación se
+      // desplaza adentro, no arrastra el documento.
+      const fondoAntes = await page.evaluate(() => window.scrollY);
+      await page.mouse.move(medida.width / 2, medida.height / 2);
+      await page.mouse.wheel(0, 900);
+      await page.waitForTimeout(150);
+      assert((await page.evaluate(() => window.scrollY)) === fondoAntes,
+        `${donde}: rodar sobre la capa movió el documento de atrás`);
+
+      // --- B. Mostrar/Ocultar pertenece al campo -----------------------------
+      const clave = page.locator('#registro-clave');
+      const alternar = capa.getByRole('button', { name: /contraseña/i });
+      assert((await alternar.count()) === 1,
+        `${donde}: el campo de contraseña no ofrece un botón cuyo nombre accesible diga qué controla`);
+      const geometria = await page.evaluate(() => {
+        const campo = document.querySelector('#registro-clave');
+        const boton = campo.parentElement.querySelector('button');
+        const rc = campo.getBoundingClientRect();
+        const rb = boton.getBoundingClientRect();
+        const h = 1;
+        return {
+          dentro: rb.left >= rc.left - h && rb.right <= rc.right + h
+            && rb.top >= rc.top - h && rb.bottom <= rc.bottom + h,
+          w: rb.width,
+          alto: rb.height,
+          reserva: parseFloat(getComputedStyle(campo).paddingRight),
+          dibujo: `campo ${Math.round(rc.left)}..${Math.round(rc.right)} × `
+            + `${Math.round(rc.top)}..${Math.round(rc.bottom)}; `
+            + `botón ${Math.round(rb.left)}..${Math.round(rb.right)} × `
+            + `${Math.round(rb.top)}..${Math.round(rb.bottom)}`,
+        };
+      });
+      assert(geometria.dentro,
+        `${donde}: Mostrar/Ocultar quedó fuera del campo de contraseña — ${geometria.dibujo}`);
+      assert(geometria.w >= 44 && geometria.alto >= 44,
+        `${donde}: Mostrar/Ocultar mide ${Math.round(geometria.w)}×${Math.round(geometria.alto)} `
+        + 'y el blanco táctil mínimo es 44×44');
+      assert(geometria.reserva >= geometria.w,
+        `${donde}: el campo reserva ${Math.round(geometria.reserva)}px y el botón ocupa `
+        + `${Math.round(geometria.w)}px, así que el texto queda debajo del control`);
+
+      await clave.fill('clave154');
+      assert((await clave.getAttribute('type')) === 'password',
+        `${donde}: la contraseña arranca a la vista`);
+      assert(/^mostrar/i.test((await alternar.getAttribute('aria-label')) || ''),
+        `${donde}: con la contraseña oculta el botón se llama `
+        + `«${await alternar.getAttribute('aria-label')}»`);
+      await alternar.click();
+      await esperarA(async () => (await clave.getAttribute('type')) === 'text',
+        `${donde}: Mostrar no reveló la contraseña`);
+      assert(/^ocultar/i.test((await alternar.getAttribute('aria-label')) || ''),
+        `${donde}: con la contraseña a la vista el botón se sigue llamando `
+        + `«${await alternar.getAttribute('aria-label')}»`);
+      await alternar.click();
+      await esperarA(async () => (await clave.getAttribute('type')) === 'password',
+        `${donde}: Ocultar no volvió a esconder la contraseña`);
+      assert((await clave.inputValue()) === 'clave154',
+        `${donde}: alternar Mostrar/Ocultar perdió lo escrito`);
+      medidos.push(`${donde} Mostrar/Ocultar: ${Math.round(geometria.w)}×`
+        + `${Math.round(geometria.alto)} dentro del campo`);
+
+      if (medida.n === 'escritorio') {
+        await capa.evaluate((el) => { el.scrollTop = 0; });
+        await foto('alta-base');
+      }
+
+      // --- C. la ampliación de transportista ---------------------------------
+      const altoBase = await page.locator('[role="dialog"] form')
+        .evaluate((el) => el.getBoundingClientRect().height);
+      assert((await page.locator('input[name="carrierPlate"]').count()) === 0,
+        `${donde}: con la casilla sin tildar la ampliación ya está en el documento`);
+      assert((await page.locator('[class*="ampliacion"]').count()) === 0,
+        `${donde}: con la casilla sin tildar la ampliación deja su contenedor puesto`);
+
+      await casilla.check();
+      const grupo = page.getByRole('group', { name: 'Datos de transportista' });
+      await esperarA(async () => (await grupo.count()) === 1,
+        `${donde}: la ampliación no se presenta como un grupo con nombre propio`);
+      const provincia = page.locator('#registro-provincia');
+      await esperarA(async () => (await provincia.locator('option').count()) > 1,
+        `${donde}: la ampliación no trajo el padrón de provincias`);
+      const cargas = page.getByRole('group', { name: 'Cargas que transportás' });
+      await esperarA(async () => (await cargas.getByRole('checkbox').count()) > 1,
+        `${donde}: la ampliación no trajo el catálogo real de cargas`);
+      assert((await grupo.getByText(/Privado: no aparece en el listado/).count()) === 1,
+        `${donde}: la ampliación perdió la ayuda privada del dominio`);
+
+      await provincia.selectOption({ index: 1 });
+      const localidad = page.locator('#registro-localidad');
+      await esperarA(async () => (await localidad.locator('option').count()) > 1,
+        `${donde}: elegir provincia no trajo sus localidades`);
+      await localidad.selectOption({ index: 1 });
+      const laCarga = cargas.getByRole('checkbox').first();
+      await laCarga.check();
+      await page.locator('input[name="carrierTransport"]').fill('Camión con acoplado');
+      await page.locator('#registro-modelo').fill('Scania R450');
+      await page.locator('#registro-dominio').fill('AB 154 CD');
+      await page.getByRole('checkbox', { name: 'Declaro que el transporte está habilitado' })
+        .check();
+      await page.locator('input[name="carrierCertificationDetail"]')
+        .fill('RUTA, cargas generales, N.° 154');
+      await page.locator('input[name="carrierCoverageRadiusKm"]').fill('125.5');
+      await page.locator('input[name="carrierCapacity"]').fill('Hasta 40 toneladas');
+      const escrito = {
+        provincia: await provincia.inputValue(),
+        localidad: await localidad.inputValue(),
+        transporte: await page.locator('input[name="carrierTransport"]').inputValue(),
+        modelo: await page.locator('#registro-modelo').inputValue(),
+        dominio: await page.locator('#registro-dominio').inputValue(),
+        detalle: await page.locator('input[name="carrierCertificationDetail"]').inputValue(),
+        radio: await page.locator('input[name="carrierCoverageRadiusKm"]').inputValue(),
+        capacidad: await page.locator('input[name="carrierCapacity"]').inputValue(),
+      };
+      assert(escrito.provincia && escrito.localidad,
+        `${donde}: el padrón no dejó elegir provincia y localidad base`);
+
+      medidos.push(`${donde} ampliada: ${await anchoUnico('ampliación abierta')}`);
+      await sinDesborde('ampliación abierta');
+      await accionAlcanzable('ampliación abierta');
+      // Y los controles del medio también se alcanzan: si la capa no desplazara,
+      // el catálogo de cargas quedaría fuera de todo alcance.
+      await laCarga.scrollIntoViewIfNeeded();
+      assert(await laCarga.isVisible(), `${donde}: el catálogo de cargas no se puede alcanzar`);
+      // La captura se toma con el título de la ampliación a la vista: es lo que
+      // hay que mirar para juzgar si agrupa, no el punto donde quedó el scroll.
+      await page.locator('#registro-ampliacion').scrollIntoViewIfNeeded();
+      await foto('transportista');
+
+      // Se cierra y se vuelve a abrir en la misma alta: no puede perder nada ni
+      // dejar lugar ocupado.
+      await casilla.uncheck();
+      await page.locator('input[name="carrierPlate"]')
+        .waitFor({ state: 'detached', timeout: 20_000 });
+      assert((await page.locator('[class*="ampliacion"]').count()) === 0,
+        `${donde}: cerrada, la ampliación deja su contenedor en el documento`);
+      const altoCerrada = await page.locator('[role="dialog"] form')
+        .evaluate((el) => el.getBoundingClientRect().height);
+      assert(Math.abs(altoCerrada - altoBase) <= 1,
+        `${donde}: cerrada, la ampliación deja ${Math.round(altoCerrada - altoBase)}px de espacio`);
+
+      await casilla.check();
+      await esperarA(async () => (await page.locator('#registro-localidad').count()) === 1,
+        `${donde}: volver a abrir la ampliación no la devolvió`);
+      await esperarA(async () => (await page.locator('#registro-provincia').locator('option').count()) > 1,
+        `${donde}: al reabrir, el padrón volvió vacío`);
+      const devuelto = {
+        provincia: await page.locator('#registro-provincia').inputValue(),
+        localidad: await page.locator('#registro-localidad').inputValue(),
+        transporte: await page.locator('input[name="carrierTransport"]').inputValue(),
+        modelo: await page.locator('#registro-modelo').inputValue(),
+        dominio: await page.locator('#registro-dominio').inputValue(),
+        detalle: await page.locator('input[name="carrierCertificationDetail"]').inputValue(),
+        radio: await page.locator('input[name="carrierCoverageRadiusKm"]').inputValue(),
+        capacidad: await page.locator('input[name="carrierCapacity"]').inputValue(),
+      };
+      const perdidos = Object.keys(escrito).filter((k) => escrito[k] !== devuelto[k]);
+      assert(perdidos.length === 0,
+        `${donde}: cerrar y reabrir la ampliación perdió ${perdidos
+          .map((k) => `${k} («${escrito[k]}» → «${devuelto[k]}»)`).join(', ')}`);
+      assert(await laCarga.isChecked(),
+        `${donde}: cerrar y reabrir la ampliación destildó la carga elegida`);
+      // Las validaciones tampoco se aflojan al reabrir.
+      for (const obligatorio of ['carrierTransport', 'carrierCertificationDetail',
+        'carrierCoverageRadiusKm']) {
+        assert((await page.locator(`input[name="${obligatorio}"]`)
+          .getAttribute('required')) !== null,
+        `${donde}: al reabrir, «${obligatorio}» dejó de ser obligatorio`);
+      }
+      medidos.push(`${donde} ampliación: 8 valores y la carga elegida sobreviven al cierre`);
+
+      // --- D. el error de validación -----------------------------------------
+      await casilla.uncheck();
+      await page.locator('input[name="carrierPlate"]')
+        .waitFor({ state: 'detached', timeout: 20_000 });
+      await page.locator('#registro-nombre').fill('Registro Pulido 154');
+      await page.locator('#registro-email').fill(correo);
+      await page.locator('#registro-clave').fill('clave154');
+      await page.locator('#registro-clave-2').fill('otra-clave');
+      await enviar.scrollIntoViewIfNeeded();
+      await enviar.click();
+
+      const aviso = page.locator('[role="alert"]').filter({ hasText: /no coinciden/i });
+      await esperarA(async () => (await aviso.count()) === 1,
+        `${donde}: el error de validación no se anuncia como alerta`);
+      await esperarA(() => aviso.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return r.top >= 0 && r.bottom <= window.innerHeight;
+      }), `${donde}: el error de validación quedó fuera de la ventana`);
+      await esperarA(() => aviso.evaluate((el) => el === document.activeElement),
+        `${donde}: el error de validación no recibió el foco`);
+      assert((await page.locator('#registro-nombre').inputValue()) === 'Registro Pulido 154',
+        `${donde}: avisar del error borró el nombre`);
+      assert((await page.locator('#registro-email').inputValue()) === correo,
+        `${donde}: avisar del error borró el correo`);
+      assert((await page.locator('#registro-clave').inputValue()) === 'clave154',
+        `${donde}: avisar del error borró la contraseña`);
+      await sinDesborde('con el error a la vista');
+      medidos.push(`${donde} error: anunciado, a la vista, con el foco y sin borrar datos`);
+
+      if (medida.n === 'movil') await foto('alta-base-con-error');
+
+      await contexto.close();
+    }
+
+    assert(capturas.length === 4, `se guardaron ${capturas.length} capturas y tenían que ser 4`);
+    return `el alta se sostiene en los dos anchos (${medidos.join('; ')}): un solo ancho interior `
+      + 'para campos, selects y acción, Mostrar/Ocultar dentro del campo que gobierna, el error '
+      + 'anunciado y con el foco sin perder lo escrito, y la ampliación de transportista que no '
+      + 'deja lugar cerrada ni pierde valores, catálogo, padrón ni validaciones al reabrirla; '
+      + `capturas: ${capturas.join(', ')}`;
+  } finally {
+    await browser.close();
   }
 });
 
