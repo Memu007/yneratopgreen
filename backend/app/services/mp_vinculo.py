@@ -15,11 +15,11 @@ Tres reglas que no se negocian:
    que no abre— no se vincula y no se pisa lo que había.
 2. **Ningún secreto sale.** Ni token, ni `client_secret`, ni el cuerpo crudo de
    un error de Mercado Pago. Al navegador van códigos de un enum nuestro.
-3. **Una cuenta de Mercado Pago, un vendedor.** Si dos cuentas de TopGreen
+3. **Una cuenta de Mercado Pago, un vendedor.** Si dos cuentas de AgroBoeda
    pudieran cobrar en la misma cuenta de MP, «quién cobra» dejaría de tener
    respuesta única.
 
-TopGreen no recibe ni redistribuye fondos: el vendedor cobra directo en su
+AgroBoeda no recibe ni redistribuye fondos: el vendedor cobra directo en su
 cuenta. Este módulo no crea preferencias, no toca importes y no sabe de
 comisiones.
 """
@@ -313,7 +313,7 @@ def _vencimiento(cuerpo: dict) -> datetime:
 
 
 def cuenta_tomada_por_otro(db: Session, mp_user_id: str, user_id: str) -> bool:
-    """¿Esa cuenta de Mercado Pago ya cobra para otro vendedor de TopGreen?"""
+    """¿Esa cuenta de Mercado Pago ya cobra para otro vendedor de AgroBoeda?"""
     return (
         db.query(User.id)
         .filter(User.mp_user_id == mp_user_id, User.id != user_id)

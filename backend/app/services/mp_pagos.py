@@ -13,7 +13,7 @@ Lo que se le pide a Mercado Pago, entero:
   la única forma oficial de apagar un link que ya viajó.
 
 Y lo que **no** se le pide, a propósito: ningún reembolso, ninguna captura,
-ninguna transferencia. TopGreen no mueve dinero de terceros.
+ninguna transferencia. AgroBoeda no mueve dinero de terceros.
 
 Los errores salen como código nuestro. Ninguno lleva el cuerpo de Mercado Pago:
 ahí adentro hay datos del pagador cuando sale bien y detalles del token cuando

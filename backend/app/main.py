@@ -1,5 +1,5 @@
 """
-Aplicación principal FastAPI - TopGreen Marketplace Backend
+Aplicación principal FastAPI - AgroBoeda Marketplace Backend
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -158,7 +158,7 @@ async def health_check():
     """Endpoint para verificar que el servidor está funcionando"""
     return {
         "status": "ok",
-        "service": "TopGreen Marketplace API",
+        "service": "AgroBoeda Marketplace API",
         "version": settings.VERSION,
         "environment": settings.ENV,
         # Qué commit es esto, para poder comparar Frontend, Backend y `main`.
@@ -171,7 +171,7 @@ async def health_check():
 async def root():
     """Root endpoint - redirige a docs"""
     return {
-        "message": "TopGreen Marketplace API",
+        "message": "AgroBoeda Marketplace API",
         "docs": f"{settings.API_PREFIX}/docs"
     }
 

@@ -68,6 +68,26 @@
   height: 40px;
 }
 
+/* El monograma es una placa opaca con su propio verde —el del archivo oficial,
+   que no es el de la banda—, así que se presenta como placa y no como un
+   parche: esquina apenas redondeada y su lugar reservado antes de que cargue,
+   para que la cabecera no salte. */
+.monograma {
+  flex: none;
+  border-radius: var(--tg-radius-sm);
+  background-color: var(--tg-color-brand);
+}
+
+.nombre {
+  margin-left: var(--tg-space-3);
+  color: var(--tg-color-text-inverse);
+  font-family: var(--tg-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
 /* En el documento la navegación va después de las acciones —el orden de lectura
    es identidad y sesión, destinos, búsqueda, igual en los tres anchos—. En
    escritorio la banda entra en un solo renglón y ahí los destinos se dibujan en
@@ -272,6 +292,11 @@
 
   .marca img {
     height: 30px;
+  }
+
+  .nombre {
+    margin-left: var(--tg-space-2);
+    font-size: 18px;
   }
 
   /* Con cuatro o cinco celdas de sesión —el caso de administración— la fila no

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Suite integral de smoke tests de TopGreen.
+# Suite integral de smoke tests de AgroBoeda.
 # ADVERTENCIA: elimina los volúmenes locales de Docker antes de ejecutarse.
 
 set -Eeuo pipefail

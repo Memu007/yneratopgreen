@@ -250,7 +250,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <h3>Datos informados por el vendedor</h3>
               <p className={styles.descripcion}>{product.description}</p>
               <p className="tg-small">
-                TopGreen presenta la información cargada en la publicación. No implica inspección.
+                AgroBoeda presenta la información cargada en la publicación. No implica inspección.
               </p>
             </section>
 
@@ -305,7 +305,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <div className="tg-eyebrow">Logística</div>
                 <h3>El traslado se define en el checkout</h3>
                 <p>
-                  Después de indicar el destino, TopGreen consulta transportistas
+                  Después de indicar el destino, AgroBoeda consulta transportistas
                   compatibles con la carga y la cobertura declarada.
                 </p>
                 <p className="tg-small" id="ayuda-transportistas">

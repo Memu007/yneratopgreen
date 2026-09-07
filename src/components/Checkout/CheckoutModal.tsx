@@ -577,7 +577,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         Declara: {carrier.certification_detail}
         {' ('}declarado el {fechaDeDeclaracion(carrier.certification_declared_at)}
         {'). '}
-        TopGreen no verifica esta habilitación.
+        AgroBoeda no verifica esta habilitación.
       </p>
       <p className={styles.fleteSinContacto}>
         Los datos de contacto aparecen cuando lo seleccionás.
@@ -628,7 +628,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
         Declara: {elegido.certification_detail}
         {' ('}declarado el {fechaDeDeclaracion(elegido.certification_declared_at)}
         {'). '}
-        TopGreen no verifica esta habilitación.
+        AgroBoeda no verifica esta habilitación.
       </p>
       <p className={styles.fleteNota}>
         La coordinación y el precio del flete se acuerdan directamente.
@@ -912,7 +912,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
       )}
 
       <p className={styles.pagoNota}>
-        TopGreen no recibe ni retiene el dinero. Cada pago va a la cuenta del vendedor.
+        AgroBoeda no recibe ni retiene el dinero. Cada pago va a la cuenta del vendedor.
       </p>
 
       {cargandoOpciones ? (
@@ -1071,7 +1071,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
           : `Se crearon ${ordenes.length} órdenes, una por vendedor. Cada una se paga por separado.`}
       </p>
       <p>
-        TopGreen no recibe ni retiene el dinero. Cada pago va a la cuenta del vendedor.
+        AgroBoeda no recibe ni retiene el dinero. Cada pago va a la cuenta del vendedor.
       </p>
       {ordenes.map(orden => (
         <div key={orden.order_id} className={styles.infoCard}>

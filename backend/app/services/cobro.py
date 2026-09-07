@@ -1,4 +1,4 @@
-"""Qué le pasó al dinero de una orden, y qué hace TopGreen con esa noticia.
+"""Qué le pasó al dinero de una orden, y qué hace AgroBoeda con esa noticia.
 
 Este módulo es el único lugar donde una orden pasa a estar pagada. Y hay una
 sola manera de que eso ocurra: que Mercado Pago, consultado con el token del

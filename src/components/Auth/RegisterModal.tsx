@@ -526,7 +526,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                   required
                 />
                 <p className={styles.helpText}>
-                  Es tu declaración. TopGreen no la verifica y guarda la fecha en que la hacés.
+                  Es tu declaración. AgroBoeda no la verifica y guarda la fecha en que la hacés.
                 </p>
               </div>
 

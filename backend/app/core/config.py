@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     # API
     API_PREFIX: str = "/api"
-    PROJECT_NAME: str = "TopGreen Marketplace"
+    PROJECT_NAME: str = "AgroBoeda Marketplace"
     VERSION: str = "1.0.0"
     
     # Base de datos
@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     # Correo saliente. "outbox" escribe el mensaje en una carpeta local y es lo
     # que usan desarrollo y la suite; "smtp" es el productivo.
     EMAIL_TRANSPORT: str = "outbox"
-    EMAIL_FROM: str = "TopGreen <no-responder@topgreen.local>"
+    EMAIL_FROM: str = "AgroBoeda <no-responder@topgreen.local>"
     EMAIL_OUTBOX_DIR: str = "outbox"
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
@@ -89,7 +89,7 @@ class Settings(BaseSettings):
     MP_ACCESS_TOKEN: str = ""
     
     # Mercado Pago - OAuth para vincular la cuenta de cada vendedor.
-    # El vendedor cobra en su cuenta: TopGreen no recibe ni redistribuye
+    # El vendedor cobra en su cuenta: AgroBoeda no recibe ni redistribuye
     # fondos de terceros. Sin estas tres —o sin la clave de cifrado de acá
     # abajo— la integración se ofrece apagada.
     MP_APP_ID: str = ""  # Application ID del marketplace

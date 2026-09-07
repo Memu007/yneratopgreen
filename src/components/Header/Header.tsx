@@ -21,9 +21,10 @@ interface HeaderProps {
 }
 
 // Las secciones que existen de verdad. No se agregan destinos inventados: la
-// navegación es un contrato con lo que la aplicación sabe abrir. «Mercado» es
-// nueva en la barra pero no es un destino nuevo: hasta ahora la única forma de
-// volver al catálogo era hacer clic en la marca.
+// navegación es un contrato con lo que la aplicación sabe abrir. «Mercado» fue
+// nueva en la barra pero no es un destino nuevo: antes la única forma de volver
+// al catálogo era hacer clic en la marca. Desde que ese destino tiene su propia
+// celda, la marca hace lo que hace en cualquier sitio: vuelve a Inicio.
 const SECCIONES: [PageSection, string][] = [
   ['home', 'Inicio'],
   ['marketplace', 'Mercado'],
@@ -133,12 +134,21 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className={styles.header}>
       <div className={`tg-sobre-marca ${styles.masthead}`}>
-        {/* El wordmark es un archivo, no letras compuestas a mano: su dibujo
-            está convertido a contornos, así que no depende de que la fuente
-            haya cargado. Sobre la banda verde va la versión monocroma clara;
-            el nombre accesible es «TopGreen» y nada más. */}
-        <button className={styles.marca} onClick={() => onNavigate('marketplace')}>
-          <img src="/marca/topgreen-mono-light.svg" alt="TopGreen" width={555} height={110} />
+        {/* El activo oficial es el MONOGRAMA AB, no el nombre completo, así que
+            va acompañado por «AgroBoeda» escrito. La imagen lleva `alt` vacío a
+            propósito: al lado del nombre es decorativa, y con texto alternativo
+            el botón se llamaría «AgroBoeda AgroBoeda». El monograma es opaco,
+            sobre su propio verde: no se le finge transparencia ni se le
+            recolorea el fondo. */}
+        <button className={styles.marca} onClick={() => onNavigate('home')}>
+          <img
+            className={styles.monograma}
+            src="/marca/agroboeda-monograma.png"
+            alt=""
+            width={320}
+            height={197}
+          />
+          <span className={styles.nombre}>AgroBoeda</span>
         </button>
 
         {/* La sesión crece por celdas: cada acción que suma el rol entra como

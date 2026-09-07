@@ -22,14 +22,19 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
     <footer className={styles.footer}>
       <div className={`tg-container ${styles.grilla}`}>
         <div>
-          {/* La versión monocroma clara: la única autorizada sobre índigo. */}
-          <img
-            className={styles.marca}
-            src="/marca/topgreen-mono-light.svg"
-            alt="TopGreen"
-            width={896}
-            height={112}
-          />
+          {/* El monograma oficial con el nombre al lado, igual que en la
+              cabecera: el archivo dice AB y el nombre lo dice entero. La imagen
+              va con `alt` vacío porque el nombre está escrito a su lado. */}
+          <div className={styles.marca}>
+            <img
+              className={styles.monograma}
+              src="/marca/agroboeda-monograma.png"
+              alt=""
+              width={320}
+              height={197}
+            />
+            <span className={styles.nombre}>AgroBoeda</span>
+          </div>
           <p className={styles.bajada}>Mercado agro: productos, servicios y logística.</p>
         </div>
 
@@ -42,7 +47,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         </div>
 
         <div>
-          <div className={styles.titulo}>TopGreen</div>
+          <div className={styles.titulo}>AgroBoeda</div>
           <ul className={styles.lista}>
             <li><a href="#" onClick={handleNavigate('home')}>Inicio</a></li>
             <li><a href="#" onClick={handleNavigate('about')}>Quiénes somos</a></li>
@@ -62,7 +67,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
         {/* Acá había tres enlaces a «redes»: apuntaban a twitter.com,
             linkedin.com e instagram.com, o sea a las plataformas y no a una
-            cuenta de TopGreen. Un enlace que no lleva a nuestro perfil no es
+            cuenta de AgroBoeda. Un enlace que no lleva a nuestro perfil no es
             una red social nuestra: es un botón que promete algo que no existe.
             Cuando haya URLs reales, vuelven.
 
@@ -72,7 +77,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
       </div>
 
       <div className={`tg-container ${styles.legal}`}>
-        <p>© {currentYear} TopGreen. Todos los derechos reservados.</p>
+        <p>© {currentYear} AgroBoeda. Todos los derechos reservados.</p>
       </div>
     </footer>
   );

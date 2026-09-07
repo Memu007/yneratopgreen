@@ -652,7 +652,7 @@ async def _terminar_el_cobro(db: Session, order: Order) -> None:
     # Con esa excepción, comprador o vendedor dejaban la orden en un estado
     # terminal y devolvían la mercadería al catálogo mientras la plata seguía
     # en la cuenta del vendedor. Deshacer un cobro no es una operación que
-    # tenga esta plataforma: TopGreen no administra fondos de terceros.
+    # tenga esta plataforma: AgroBoeda no administra fondos de terceros.
     if cobro.hay_cobro(db, order):
         raise HTTPException(status_code=409, detail=ORDEN_YA_COBRADA)
 
@@ -792,7 +792,7 @@ async def update_order_status(
         
         # Acá había una llamada de reembolso al módulo heredado de cobro. No
         # existe más: ese módulo devolvía dinero con el token del marketplace
-        # cuando el del vendedor no estaba, y TopGreen no administra plata de
+        # cuando el del vendedor no estaba, y AgroBoeda no administra plata de
         # terceros. Hoy no hay ninguna orden pagada por la plataforma, así que
         # no hay nada que devolver; cuando exista el cobro confirmado (MP-C),
         # la devolución se diseña con su propia regla.
@@ -895,7 +895,7 @@ async def cancel_order(
     
     # Cancelar no devuelve dinero, y lo dice en vez de aparentarlo.
     #
-    # Por transferencia el dinero fue de cuenta a cuenta y TopGreen no lo
+    # Por transferencia el dinero fue de cuenta a cuenta y AgroBoeda no lo
     # administra: el reintegro lo arreglan comprador y vendedor. Por Mercado
     # Pago, si el pago se acreditó la cancelación no llega hasta acá —sale el
     # 409 de arriba—, y si no se acreditó no hay nada que devolver. Devolver

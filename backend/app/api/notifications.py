@@ -295,6 +295,6 @@ def notify_welcome(db: Session, user_id: str, user_name: str):
         db=db,
         user_id=user_id,
         notification_type=NotificationType.WELCOME,
-        title="¡Bienvenido a TopGreen!",
+        title="¡Bienvenido a AgroBoeda!",
         message=f"Hola {user_name}, tu cuenta fue creada exitosamente. Explorá el marketplace y comenzá a comprar o vender productos agrícolas."
     )

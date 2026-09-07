@@ -1147,7 +1147,7 @@ await runCase(9, 'Publicar producto como vendedor desde la interfaz', async () =
 
     await page
       .locator('#description')
-      .fill('Producto creado por la suite integral de smoke tests de TopGreen.');
+      .fill('Producto creado por la suite integral de smoke tests de AgroBoeda.');
     await page.locator('input[type="file"]').setInputFiles({
       name: 'smoke-product.png',
       mimeType: 'image/png',
@@ -1745,7 +1745,7 @@ await runCase(19, 'Transferencia completa desde la interfaz', async () => {
 
     await elegirTransferencia(page);
     await page
-      .getByText(/TopGreen no recibe ni retiene el dinero/)
+      .getByText(/AgroBoeda no recibe ni retiene el dinero/)
       .waitFor({ state: 'visible' });
     await page.getByText(new RegExp(databaseBank[1])).waitFor({ state: 'visible' });
     const bankDetails = await page.locator('form:has(h2)').textContent();
@@ -4224,7 +4224,7 @@ await runCase(43, 'Fletes compatibles por futura orden, con PostGIS y sin contac
       assert(enServidor.length === 1 && enServidor[0] === productoB,
         `el carrito del servidor no se sincronizó: ${JSON.stringify(enServidor)}`);
 
-      assert(/TopGreen no verifica esta habilitación/.test(visto),
+      assert(/AgroBoeda no verifica esta habilitación/.test(visto),
         'la pantalla no aclara que la habilitación es una declaración');
       for (const prohibido of ['@example.com', '+54', 'CBU', 'cbu', 'alias']) {
         assert(!visto.includes(prohibido), `la pantalla muestra «${prohibido}»`);
@@ -4616,7 +4616,9 @@ await runCase(47, 'Un login nuevo no hereda el "ya sincronizado" del anterior', 
     // Sin recargar nunca: recargar rearmaría cola y sesión por su cuenta.
     const asegurarCatalogo = async () => {
       if (await page.locator('#catalog-category').count() === 0) {
-        await page.getByRole('button', { name: 'TopGreen', exact: true }).first().click();
+        // Por el destino «Mercado» y no por la marca: desde BRAND-AGROBOEDA-1
+        // la marca lleva a Inicio, como en cualquier sitio.
+        await page.getByRole('button', { name: 'Mercado', exact: true }).first().click();
       }
       await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
     };
@@ -4768,7 +4770,9 @@ await runCase(48, 'Un turno encolado no sale con las credenciales de la sesión 
     // Sin recargar nunca: recargar rearmaría cola y sesión por su cuenta.
     const asegurarCatalogo = async () => {
       if (await page.locator('#catalog-category').count() === 0) {
-        await page.getByRole('button', { name: 'TopGreen', exact: true }).first().click();
+        // Por el destino «Mercado» y no por la marca: desde BRAND-AGROBOEDA-1
+        // la marca lleva a Inicio, como en cualquier sitio.
+        await page.getByRole('button', { name: 'Mercado', exact: true }).first().click();
       }
       await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
     };
@@ -6935,7 +6939,7 @@ await runCase(74, 'El descarte de credenciales en claro sólo lo autoriza un 1',
 // --- cobro por Mercado Pago (pieza MP-B) -------------------------------------
 // Contra el mismo doble local: no hay credenciales reales y no se cobra nada de
 // verdad. Lo que se prueba es que crear la intención de pago no invente plata,
-// no duplique órdenes ni pagos, y no le mande a Mercado Pago nada que TopGreen
+// no duplique órdenes ni pagos, y no le mande a Mercado Pago nada que AgroBoeda
 // no deba mandar.
 
 // Una publicación de ese vendedor que de verdad se pueda comprar hoy.
@@ -7603,7 +7607,7 @@ await runCase(79, 'Lo que viaja a Mercado Pago: el importe de la orden, sin comi
       'algún ítem viajó sin moneda o en otra moneda');
 
     // 2. Nada de comisión. Ni el 5 % que había antes, ni un cero: lo que no se
-    //    manda no se discute, y TopGreen no recibe ese dinero.
+    //    manda no se discute, y AgroBoeda no recibe ese dinero.
     assert(!('marketplace_fee' in cuerpo),
       `el cuerpo lleva marketplace_fee = ${JSON.stringify(cuerpo.marketplace_fee)}`);
     assert(!JSON.stringify(cuerpo).includes('marketplace_fee'),
@@ -12409,11 +12413,11 @@ await runCase(123, 'Al 200 % de zoom las cinco pantallas siguen siendo usables',
 });
 
 await runCase(124, 'Inicio muestra operaciones reales, con el total de la API y sin claims', async () => {
-  // La portada era una placa índigo con «Bienvenido a TopGreen», tres
+  // La portada era una placa índigo con «Bienvenido a AgroBoeda», tres
   // beneficios con iconos y tres claims —inteligencia artificial, mecanización
   // y confianza respaldada por alianzas— que el producto no demuestra.
   const CLAIMS = [
-    /Bienvenido a TopGreen/i,
+    /Bienvenido a AgroBoeda/i,
     /inteligencia artificial/i,
     /MECANIZACIÓN/,
     /CONFIANZA/,
@@ -12976,7 +12980,7 @@ await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Servicios, y s�
         // la sesión, después los cinco destinos. Se comprueba en el documento,
         // que es lo que recorren el teclado y un lector de pantalla, y no en la
         // posición dibujada, que cambia con el ancho.
-        assert(retrato.celdas[0] === 'TopGreen',
+        assert(retrato.celdas[0] === 'AgroBoeda',
           `${nombreAncho}/${nombre}: la banda no arranca por la marca: ${retrato.celdas[0]}`);
         assert(JSON.stringify(retrato.celdas.slice(-5)) === JSON.stringify(SECCIONES),
           `${nombreAncho}/${nombre}: los cinco destinos no cierran la banda en orden: `
@@ -14549,7 +14553,7 @@ await runCase(136, 'Backend y Frontend dicen de que commit son, y lo dicen igual
     `el valor sin revision podria confundirse con un commit: ${revisionLocal}`);
 
   // Y el health no perdio nada de lo que ya decia.
-  for (const [clave, valor] of [['status', 'ok'], ['service', 'TopGreen Marketplace API']]) {
+  for (const [clave, valor] of [['status', 'ok'], ['service', 'AgroBoeda Marketplace API']]) {
     assert(saludLocal.data[clave] === valor,
       `el health cambio ${clave}: ${JSON.stringify(saludLocal.data[clave])}`);
   }
@@ -20369,6 +20373,353 @@ await runCase(155, 'El Mercado tiene dos vistas elegibles y ninguna geometría a
         await apiRequest(`/products/${id}`, { method: 'DELETE', token: vendedor });
       } catch { /* la limpieza no tapa el motivo real */ }
     }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 156. BRAND-AGROBOEDA-1 — la identidad pública deja de ser la vieja.
+//
+// Una migración de marca se mide en dos lados y no en uno: lo que se ve —barra,
+// pie, páginas, formularios, paneles, pestaña— y lo que se emite —el correo de
+// verificación, la notificación, el nombre del administrador sembrado—. Y se
+// mide contra una lista de apariciones técnicas permitidas, porque las dos
+// formas de fallar son opuestas: dejar el nombre viejo donde lo ve una persona,
+// o renombrar un identificador estable —una referencia de Mercado Pago, una
+// carpeta de archivos ya subidos, un correo de ingreso— y romper algo que nunca
+// fue marca.
+// ---------------------------------------------------------------------------
+await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no es marca', async () => {
+  const CAPTURAS = process.env.SMOKE_CAPTURAS
+    || mkdtempSync(`${tmpdir()}/topgreen-marca-`);
+  mkdirSync(CAPTURAS, { recursive: true });
+  const capturas = [];
+  const medidos = [];
+  const VIEJO = /TopGreen|(?<!Agro)BOEDA/;
+
+  // Las apariciones en minúscula que SÍ se conservan, y dónde. Renombrarlas
+  // rompería algo que no es la marca: una referencia externa de Mercado Pago,
+  // la carpeta de los archivos ya subidos, una credencial de ingreso demo o una
+  // dirección operativa heredada que no se puede reemplazar por una cuenta que
+  // todavía no existe. Cualquier otra aparición hace fallar el caso.
+  const TECNICAS_PERMITIDAS = [
+    ['backend/app/core/config.py', 'no-responder@topgreen.local'],
+    ['backend/app/seed.py', 'admin@topgreen.com'],
+    ['backend/app/seed.py', 'demo.topgreen.admin'],
+    ['backend/app/seed.py', 'demo.topgreen.juanv'],
+    ['backend/app/services/cobro.py', 'topgreen-'],
+    ['backend/app/services/mp_preferencia.py', 'topgreen-'],
+    ['backend/app/services/storage.py', 'topgreen/'],
+    ['src/components/Footer/Footer.tsx', 'info@topgreen.com.ar'],
+    ['src/components/Pages/AboutPage.tsx', 'video-topgreen.mp4'],
+    ['src/components/Pages/ContactPage.tsx', 'service_topgreen'],
+    ['src/components/Pages/ContactPage.tsx', 'info@topgreen.com.ar'],
+    // Las plantillas de entorno: el remitente VISIBLE se migra, pero el nombre
+    // de la base, su usuario y la casilla heredada son infraestructura.
+    ['.env.example', 'DB_NAME=topgreen'],
+    ['.env.example', 'DB_USER=topgreen'],
+    ['backend/.env.example', 'no-responder@topgreen.local'],
+    ['backend/.env.example', 'postgresql+psycopg://topgreen:'],
+    ['backend/.env.example', ':5432/topgreen'],
+    ['backend/.env.production.example', ':5432/topgreen'],
+  ];
+
+  // --- A. el código de producto: ni una aparición sin clasificar -------------
+  const archivosDeProducto = [];
+  const recorrer = (carpeta) => {
+    for (const entrada of readdirSync(carpeta, { withFileTypes: true })) {
+      const ruta = `${carpeta}/${entrada.name}`;
+      if (entrada.isDirectory()) recorrer(ruta);
+      else archivosDeProducto.push(ruta);
+    }
+  };
+  recorrer('src');
+  recorrer('backend/app');
+  // `index.html` y las plantillas de entorno entran: el título de la pestaña y
+  // el remitente visible del correo son superficie, aunque no sean código.
+  archivosDeProducto.push('index.html', '.env.example', 'backend/.env.example',
+    'backend/.env.production.example');
+  const deTexto = archivosDeProducto
+    .filter((r) => /\.(tsx?|css|py|html)$/.test(r) || r.endsWith('.example'));
+  assert(deTexto.length > 100,
+    `sólo se encontraron ${deTexto.length} archivos de producto para revisar`);
+
+  const sinClasificar = [];
+  for (const ruta of deTexto) {
+    const contenido = readFileSync(ruta, 'utf8');
+    for (const [numero, linea] of contenido.split('\n').entries()) {
+      if (!/topgreen/i.test(linea) && !/BOEDA/.test(linea)) continue;
+      if (VIEJO.test(linea)) {
+        sinClasificar.push(`${ruta}:${numero + 1} dice el nombre viejo: `
+          + linea.trim().slice(0, 90));
+        continue;
+      }
+      const permitida = TECNICAS_PERMITIDAS
+        .some(([archivo, marca]) => ruta === archivo && linea.includes(marca));
+      if (!permitida) {
+        sinClasificar.push(`${ruta}:${numero + 1} aparición técnica no declarada: `
+          + linea.trim().slice(0, 90));
+      }
+    }
+  }
+  assert(sinClasificar.length === 0,
+    `${sinClasificar.length} apariciones del nombre viejo sin clasificar:\n  `
+    + sinClasificar.slice(0, 8).join('\n  '));
+
+  // Y al revés: las declaradas tienen que seguir existiendo. Si alguna
+  // desapareció, se renombró un identificador estable.
+  const desaparecidas = TECNICAS_PERMITIDAS.filter(([archivo, marca]) => {
+    try {
+      return !readFileSync(archivo, 'utf8').includes(marca);
+    } catch {
+      return true;
+    }
+  });
+  assert(desaparecidas.length === 0,
+    'se renombraron identificadores estables que no son marca: '
+    + desaparecidas.map(([a, m]) => `${m} en ${a}`).join(', '));
+  medidos.push(`${deTexto.length} archivos de producto sin el nombre viejo, con `
+    + `${TECNICAS_PERMITIDAS.length} apariciones técnicas declaradas y todas presentes`);
+
+  // --- B. los archivos de marca existen y son los derivados ------------------
+  for (const archivo of ['public/marca/agroboeda-monograma.png',
+    'public/marca/agroboeda-favicon.png']) {
+    assert(existsSync(archivo), `falta el archivo de marca ${archivo}`);
+    assert(readFileSync(archivo).subarray(0, 8).equals(
+      Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])),
+    `${archivo} no es un PNG`);
+  }
+  const cabeceraHtml = readFileSync('index.html', 'utf8');
+  for (const esperado of [
+    '<title>AgroBoeda — Mercado agro</title>',
+    'href="/marca/agroboeda-favicon.png"',
+    'property="og:site_name" content="AgroBoeda"',
+    'content="/marca/agroboeda-monograma.png"',
+  ]) {
+    assert(cabeceraHtml.includes(esperado), `index.html no declara ${esperado}`);
+  }
+  for (const referencia of cabeceraHtml.matchAll(/(?:href|content)="(\/marca\/[^"]+)"/g)) {
+    assert(existsSync(`public${referencia[1]}`),
+      `index.html apunta a ${referencia[1]}, que no existe en public/`);
+  }
+  medidos.push('index.html: título, favicon y metadatos sociales apuntan a archivos que existen');
+
+  // --- C. el seed: nombre visible nuevo, credencial y rol intactos -----------
+  const [elAdmin] = queryRows(`
+    SELECT full_name, email, role::text, 'fin' FROM users WHERE email = 'admin@topgreen.com'`);
+  assert(elAdmin, 'el seed dejó de tener el usuario administrador de siempre');
+  assert(elAdmin[0] === 'Administrador AgroBoeda',
+    `el administrador sembrado se llama «${elAdmin[0]}»`);
+  assert(elAdmin[1] === 'admin@topgreen.com' && elAdmin[2].toLowerCase() === 'admin',
+    `cambió la credencial o el rol del administrador: ${elAdmin[1]} / ${elAdmin[2]}`);
+  const ingresoDelAdmin = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'admin@topgreen.com', password: 'admin123' },
+  });
+  assert(ingresoDelAdmin.status === 200 && ingresoDelAdmin.data?.access_token,
+    `la credencial del administrador dejó de servir: HTTP ${ingresoDelAdmin.status}`);
+  medidos.push('el administrador sembrado se llama AgroBoeda y su credencial sigue entrando');
+
+  // --- D. lo que se emite: correo de verificación y notificación -------------
+  const correoDelCaso = `marca.156.${Date.now()}@example.com`;
+  const correosAntes = contarCorreos();
+  const alta = await apiRequest('/auth/register', {
+    method: 'POST',
+    body: { email: correoDelCaso, password: 'marca156', full_name: 'Marca Del Caso 156' },
+  });
+  assert(alta.status < 400, `el alta del caso no entró: HTTP ${alta.status}`);
+  assert(contarCorreos() === correosAntes + 1, 'el alta no dejó un correo en el outbox');
+  const mensaje = ultimoCorreo();
+  if (VIEJO.test(mensaje)) {
+    // El remitente sale de `backend/.env`, que es estado local y no se versiona:
+    // si la plantilla ya dice AgroBoeda y el mensaje no, lo que quedó viejo es
+    // el archivo de la máquina, no el producto. Vale la pena decirlo, porque el
+    // rojo se arregla de otra manera.
+    const plantilla = readFileSync('backend/.env.example', 'utf8');
+    const local = existsSync('backend/.env') ? readFileSync('backend/.env', 'utf8') : '';
+    const remitente = (texto) => (texto.match(/^EMAIL_FROM=.*$/m) || [''])[0].trim();
+    assert(remitente(plantilla) === remitente(local),
+      `el correo salió con el nombre viejo porque backend/.env quedó atrasado: `
+      + `la plantilla dice «${remitente(plantilla)}» y el archivo local `
+      + `«${remitente(local)}». Recreá el entorno o actualizá esa línea.`);
+    assert(false,
+      `el correo de verificación sigue diciendo el nombre viejo:\n${mensaje.slice(0, 400)}`);
+  }
+  assert(/AgroBoeda/.test(mensaje),
+    `el correo de verificación no nombra a AgroBoeda:\n${mensaje.slice(0, 300)}`);
+  assert(mensaje.includes(correoDelCaso), 'el correo de verificación cambió de destinatario');
+  assert(/verificar-correo#token=/.test(mensaje),
+    'el correo perdió su enlace: eso sería cambiar el contrato, no la marca');
+  await apiRequest('/auth/verify-email', {
+    method: 'POST', body: { token: tokenDeVerificacion() },
+  });
+  const sesion = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: correoDelCaso, password: 'marca156' },
+  });
+  assert(sesion.status === 200, `la cuenta del caso no pudo ingresar: HTTP ${sesion.status}`);
+  const avisos = await apiRequest('/notifications', { token: sesion.data.access_token });
+  const lista = avisos.data?.notifications || avisos.data?.items || avisos.data || [];
+  const bienvenida = (Array.isArray(lista) ? lista : [])
+    .find((a) => /bienvenid/i.test(a.title || ''));
+  assert(bienvenida,
+    `no llegó la notificación de bienvenida: ${JSON.stringify(avisos.data).slice(0, 220)}`);
+  assert(!VIEJO.test(`${bienvenida.title} ${bienvenida.message}`),
+    `la notificación de bienvenida dice el nombre viejo: «${bienvenida.title}»`);
+  assert(bienvenida.title.includes('AgroBoeda'),
+    `la notificación de bienvenida no nombra a AgroBoeda: «${bienvenida.title}»`);
+  medidos.push('el correo de verificación y la notificación de bienvenida dicen AgroBoeda, '
+    + 'con el mismo destinatario y el mismo enlace');
+
+  // --- E. la interfaz, en los tres anchos ------------------------------------
+  const MEDIDAS = [
+    { n: 'escritorio', width: 1440, height: 900 },
+    { n: 'tablet', width: 768, height: 1024 },
+    { n: 'movil', width: 390, height: 844 },
+  ];
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const rastroDelViejo = async (page) => {
+      const texto = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
+      const encontrado = texto.match(/.{0,60}(TopGreen|(?<!Agro)BOEDA).{0,60}/);
+      return encontrado ? encontrado[0] : '';
+    };
+    const desborde = (page) => page.evaluate(() => (
+      document.documentElement.scrollWidth - document.documentElement.clientWidth));
+
+    for (const medida of MEDIDAS) {
+      const contexto = await browser.newContext({
+        viewport: { width: medida.width, height: medida.height },
+      });
+      const page = await contexto.newPage();
+      const donde = `${medida.n} ${medida.width}x${medida.height}`;
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: /seguir produciendo/ })
+        .waitFor({ timeout: 25_000 });
+
+      const marca = page.getByRole('button', { name: 'AgroBoeda', exact: true }).first();
+      assert((await marca.count()) === 1,
+        `${donde}: la cabecera no ofrece un control de marca llamado «AgroBoeda»`);
+      const dibujo = await marca.locator('img').evaluate((el) => ({
+        src: el.getAttribute('src'),
+        cargada: el.complete && el.naturalWidth > 0,
+        ancho: Math.round(el.getBoundingClientRect().width),
+        alto: Math.round(el.getBoundingClientRect().height),
+      }));
+      assert(dibujo.cargada, `${donde}: el monograma de la cabecera no cargó (${dibujo.src})`);
+      assert(dibujo.ancho > 0 && dibujo.alto > 0,
+        `${donde}: el monograma de la cabecera no tiene superficie`);
+      assert((await marca.innerText()).trim() === 'AgroBoeda',
+        `${donde}: la cabecera no escribe el nombre al lado del monograma`);
+      assert((await rastroDelViejo(page)) === '',
+        `${donde}, Inicio sigue mostrando el nombre viejo: «${await rastroDelViejo(page)}»`);
+      assert((await desborde(page)) <= 0,
+        `${donde}: Inicio desborda ${await desborde(page)}px a lo ancho`);
+      const rutaCabecera = `${CAPTURAS}/cabecera-${medida.width}x${medida.height}.png`;
+      await page.locator('header').screenshot({ path: rutaCabecera });
+      capturas.push(`${rutaCabecera} (${medida.width}x${medida.height})`);
+
+      const pie = page.locator('footer');
+      await pie.scrollIntoViewIfNeeded();
+      assert((await pie.innerText()).includes('AgroBoeda'), `${donde}: el pie no dice AgroBoeda`);
+      assert(await pie.locator('img').first()
+        .evaluate((el) => el.complete && el.naturalWidth > 0),
+      `${donde}: el monograma del pie no cargó`);
+      const rutaPie = `${CAPTURAS}/pie-${medida.width}x${medida.height}.png`;
+      await pie.screenshot({ path: rutaPie });
+      capturas.push(`${rutaPie} (${medida.width}x${medida.height})`);
+
+      // La marca lleva a Inicio, con el teclado y con el foco a la vista.
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.getByRole('button', { name: 'Mercado', exact: true }).first().click();
+      await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+      // Se llega tabulando y no con `focus()`: el anillo del sistema es
+      // `:focus-visible`, que Chromium no enciende cuando el foco lo mueve un
+      // script. Tabular es además lo que hace una persona con teclado.
+      // Se vuelve hacia atrás desde el destino recién usado: en el documento la
+      // marca va antes que la sesión y que los destinos, así que Shift+Tab
+      // llega. Se hace con el teclado y no con `focus()` porque el anillo del
+      // sistema es `:focus-visible`, y Chromium no lo enciende cuando el foco
+      // lo mueve un script.
+      let alcanzada = await marca.evaluate((el) => el === document.activeElement);
+      for (let i = 0; i < 12 && !alcanzada; i += 1) {
+        await page.keyboard.press('Shift+Tab');
+        alcanzada = await marca.evaluate((el) => el === document.activeElement);
+      }
+      assert(alcanzada, `${donde}: no se llega a la marca con el teclado desde los destinos`);
+      const anillo = await marca.evaluate((el) => {
+        const c = getComputedStyle(el);
+        return `${c.outlineStyle} ${c.outlineWidth}`;
+      });
+      assert(!/none/.test(anillo) && !/^\S+ 0px$/.test(anillo),
+        `${donde}: la marca enfocada con el teclado no muestra foco (${anillo})`);
+      await page.keyboard.press('Enter');
+      await esperarA(async () => (await page.getByRole('heading', { name: /seguir produciendo/ })
+        .count()) > 0, `${donde}: la marca no lleva a Inicio con el teclado`, 20_000);
+
+      for (const seccion of ['Mercado', 'Servicios', 'Quiénes somos', 'Contacto']) {
+        const destino = page.getByRole('button', { name: seccion, exact: true }).first();
+        await destino.click();
+        // La sección llegó cuando su celda queda marcada como la actual: es el
+        // propio producto diciéndolo, y sirve igual para las cuatro.
+        await esperarA(async () => (await destino.getAttribute('aria-current')) === 'page',
+          `${donde}: no se llegó a ${seccion}`, 25_000);
+        await page.getByRole('heading').first().waitFor({ state: 'visible', timeout: 25_000 });
+        assert((await rastroDelViejo(page)) === '',
+          `${donde}, ${seccion} sigue mostrando el nombre viejo: «${await rastroDelViejo(page)}»`);
+      }
+
+      await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+      await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+      assert((await rastroDelViejo(page)) === '',
+        `${donde}, Ingresar sigue mostrando el nombre viejo: «${await rastroDelViejo(page)}»`);
+      await page.getByRole('button', { name: /Reg[íi]strate aqu[íi]/i }).first().click();
+      await page.getByRole('heading', { name: /Crear cuenta/i }).waitFor({ timeout: 20_000 });
+      await page.getByRole('checkbox', { name: /Quiero registrarme como transportista/ }).check();
+      await page.locator('input[name="carrierPlate"]').waitFor({ timeout: 20_000 });
+      assert((await rastroDelViejo(page)) === '',
+        `${donde}, Registro sigue mostrando el nombre viejo: «${await rastroDelViejo(page)}»`);
+      const rutaAuth = `${CAPTURAS}/registro-${medida.width}x${medida.height}.png`;
+      await page.screenshot({ path: rutaAuth });
+      capturas.push(`${rutaAuth} (${medida.width}x${medida.height})`);
+
+      await contexto.close();
+      medidos.push(`${donde}: barra, pie, cuatro públicas y autenticación sin nombre viejo`);
+    }
+
+    // --- F. los paneles: vendedor y administración --------------------------
+    for (const [quien, credenciales, abrir] of [
+      ['panel del vendedor', { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+        async (page) => {
+          await page.getByRole('button', { name: 'Mi cuenta' }).click();
+          await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 25_000 });
+        }],
+      ['administración', { email: 'admin@topgreen.com', password: 'admin123' },
+        async (page) => {
+          await page.getByRole('button', { name: 'Admin' }).click();
+          await page.getByRole('heading', { name: /Administraci/ }).waitFor({ timeout: 25_000 });
+        }],
+    ]) {
+      const acceso = await apiRequest('/auth/login', { method: 'POST', body: credenciales });
+      assert(acceso.status === 200, `no se pudo entrar como ${quien}: HTTP ${acceso.status}`);
+      const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      await contexto.addInitScript(({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+      }, { a: acceso.data.access_token, r: acceso.data.refresh_token });
+      const page = await contexto.newPage();
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await abrir(page);
+      const texto = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
+      const encontrado = texto.match(/.{0,60}(TopGreen|(?<!Agro)BOEDA).{0,60}/);
+      assert(!encontrado,
+        `${quien} sigue mostrando el nombre viejo: «${encontrado && encontrado[0]}»`);
+      await contexto.close();
+      medidos.push(`${quien}: sin nombre viejo`);
+    }
+
+    assert(capturas.length === 9, `se guardaron ${capturas.length} capturas y tenían que ser 9`);
+    return `la identidad pública es AgroBoeda de punta a punta (${medidos.join('; ')}); `
+      + `capturas: ${capturas.join(', ')}`;
+  } finally {
+    await browser.close();
   }
 });
 

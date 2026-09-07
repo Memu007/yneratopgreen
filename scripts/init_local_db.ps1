@@ -1,4 +1,4 @@
-# Inicializa la base de datos local de TopGreen
+# Inicializa la base de datos local de AgroBoeda
 # Levanta Docker, espera healthcheck, corre migraciones y seed.
 #
 # Uso (desde la raíz del proyecto):

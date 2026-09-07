@@ -47,7 +47,7 @@ SIN_PRESENTACION = "sin_presentacion"
 
 class MiDocumentacion(BaseModel):
     """Lo que ve el titular. Sin identidad de quien revisó: la decisión es de
-    TopGreen como plataforma, no de una persona a la que reclamarle."""
+    AgroBoeda como plataforma, no de una persona a la que reclamarle."""
 
     estado: str
     cuit: Optional[str] = None

@@ -49,7 +49,7 @@ class CarrierCandidate(BaseModel):
     # El dominio NO está en este esquema, y esa ausencia es la que lo mantiene
     # fuera del directorio. No es que las rutas se acuerden de no ponerlo: no
     # tienen dónde.
-    # Declaración del transportista, nunca una verificación de TopGreen.
+    # Declaración del transportista, nunca una verificación de AgroBoeda.
     certification_detail: str
     certification_declared_at: datetime
     coverage_radius_km: float

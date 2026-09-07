@@ -10,7 +10,7 @@ Tres cosas que no se negocian acá:
    publicación, no de una cuenta hecha en el momento. Si el vendedor cambia el
    precio después de confirmar, la orden y el pago siguen diciendo lo mismo.
 2. **`marketplace_fee` no se manda.** Ni en cero: lo que no se manda no se
-   discute. TopGreen no cobra comisión por venta y no recibe ese dinero.
+   discute. AgroBoeda no cobra comisión por venta y no recibe ese dinero.
 3. **Reintentar no duplica.** La orden tiene una sola intención de pago, y la
    clave de idempotencia se deriva de la orden, así que un doble clic o un
    timeout con la respuesta perdida terminan en la misma preferencia.
@@ -155,7 +155,7 @@ def _cuerpo_de_la_preferencia(orden: Order, hasta: datetime) -> dict:
         "payment_methods": {
             "excluded_payment_types": [{"id": "ticket"}, {"id": "atm"}]
         },
-        # Nada de `marketplace_fee`: ni el 5 % de antes ni un cero. TopGreen no
+        # Nada de `marketplace_fee`: ni el 5 % de antes ni un cero. AgroBoeda no
         # cobra comisión por venta.
     }
 

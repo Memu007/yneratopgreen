@@ -33,7 +33,7 @@ export const ContactPage: React.FC = () => {
       'ventas': 'Consultas sobre Ventas',
       'compras': 'Consultas sobre Compras',
       'tecnico': 'Soporte Técnico',
-      'servicios': 'Servicios TopGreen',
+      'servicios': 'Servicios AgroBoeda',
       'facturacion': 'Facturación',
       'otro': 'Otro'
     };
@@ -66,7 +66,7 @@ export const ContactPage: React.FC = () => {
       */
 
       // Opción 2: Abrir cliente de email del usuario (funciona siempre)
-      const subject = encodeURIComponent(`[TopGreen] ${getSubjectText(formData.subject)}`);
+      const subject = encodeURIComponent(`[AgroBoeda] ${getSubjectText(formData.subject)}`);
       const body = encodeURIComponent(
         `Nombre: ${formData.name}\n` +
         `Email: ${formData.email}\n` +
@@ -91,7 +91,7 @@ export const ContactPage: React.FC = () => {
 
   const handleWhatsApp = () => {
     const message = encodeURIComponent(
-      `Hola TopGreen! Me gustaría hacer una consulta:\n\n` +
+      `Hola AgroBoeda! Me gustaría hacer una consulta:\n\n` +
       `Nombre: ${formData.name || '(completar)'}\n` +
       `Email: ${formData.email || '(completar)'}\n` +
       `Asunto: ${formData.subject ? getSubjectText(formData.subject) : '(completar)'}\n\n` +
@@ -176,7 +176,7 @@ export const ContactPage: React.FC = () => {
                     <option value="">Seleccionar...</option>
                     <option value="ventas">Consultas sobre Ventas</option>
                     <option value="compras">Consultas sobre Compras</option>
-                    <option value="servicios">Servicios TopGreen</option>
+                    <option value="servicios">Servicios AgroBoeda</option>
                     <option value="tecnico">Soporte Técnico</option>
                     <option value="facturacion">Facturación</option>
                     <option value="otro">Otro</option>
@@ -253,7 +253,7 @@ export const ContactPage: React.FC = () => {
               </div>
 
               {/* Acá había tres enlaces a twitter.com, linkedin.com e instagram.com:
-                  los dominios pelados, no perfiles de TopGreen. Un enlace que promete
+                  los dominios pelados, no perfiles de AgroBoeda. Un enlace que promete
                   una cuenta que no existe es contenido falso, así que se retiran. El
                   día que haya perfiles reales, vuelven con su URL. */}
             </div>

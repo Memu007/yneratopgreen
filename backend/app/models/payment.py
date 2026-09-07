@@ -60,7 +60,7 @@ class Payment(Base):
     # Monto. Uno solo, y sale del total ya congelado en la orden.
     #
     # Acá vivían `commission_amount`, `commission_percent` y `seller_amount`.
-    # Se fueron porque mentían: TopGreen no cobra comisión por venta, y
+    # Se fueron porque mentían: AgroBoeda no cobra comisión por venta, y
     # `seller_amount` guardaba el 100 % del total, que no es lo que el vendedor
     # cobra —Mercado Pago le descuenta la suya—. Un número que nadie puede
     # sostener es peor que ningún número.
@@ -94,7 +94,7 @@ class Payment(Base):
     paid_at = Column(DateTime, nullable=True)  # Cuando se confirmó el pago
     
     # Devolución. Estos dos campos **registran lo que Mercado Pago informa**,
-    # no una acción nuestra: TopGreen no ejecuta reembolsos. `refund_id` se
+    # no una acción nuestra: AgroBoeda no ejecuta reembolsos. `refund_id` se
     # fue con el módulo heredado, que era el que devolvía dinero.
     refunded_at = Column(DateTime, nullable=True)  # Cuando MP informó la devolución
     refund_amount = Column(Numeric(14, 2), nullable=True)  # Monto devuelto según MP

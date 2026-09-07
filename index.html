@@ -2,14 +2,33 @@
 <html lang="es-AR">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/topG.png" />
+    <!-- El monograma AB derivado de la fuente oficial. Va cuadrado y opaco: un
+         favicon no admite una placa apaisada sin que el navegador la encoja
+         hasta que deje de leerse. -->
+    <link rel="icon" type="image/png" sizes="64x64" href="/marca/agroboeda-favicon.png" />
+    <link rel="apple-touch-icon" href="/marca/agroboeda-favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Decía «de forma segura». TopGreen no custodia el dinero ni garantiza la
+    <!-- Decía «de forma segura». AgroBoeda no custodia el dinero ni garantiza la
          operación, así que prometerlo en la descripción del sitio es
          exactamente el claim que el sistema tiene prohibido. -->
-    <meta name="description" content="TopGreen, mercado agro argentino: productos, servicios y logística con precio o modalidad, ubicación y responsable." />
+    <meta name="description" content="AgroBoeda, mercado agro argentino: productos, servicios y logística con precio o modalidad, ubicación y responsable." />
     <meta name="theme-color" content="#1e4a34" />
-    <title>TopGreen — Mercado agro</title>
+    <title>AgroBoeda — Mercado agro</title>
+
+    <!-- Lo que se ve cuando alguien comparte un enlace. Sin dominio inventado:
+         se declara el nombre, el texto y una imagen que existe en este sitio.
+         La URL absoluta la resuelve quien despliegue; acá no se afirma una que
+         todavía no es de nadie. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="AgroBoeda" />
+    <meta property="og:title" content="AgroBoeda — Mercado agro" />
+    <meta property="og:description" content="AgroBoeda, mercado agro argentino: productos, servicios y logística con precio o modalidad, ubicación y responsable." />
+    <meta property="og:image" content="/marca/agroboeda-monograma.png" />
+    <meta property="og:image:alt" content="Monograma AB de AgroBoeda" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="AgroBoeda — Mercado agro" />
+    <meta name="twitter:description" content="AgroBoeda, mercado agro argentino: productos, servicios y logística con precio o modalidad, ubicación y responsable." />
+    <meta name="twitter:image" content="/marca/agroboeda-monograma.png" />
     <!-- Las dos familias se sirven desde el propio sitio y se precargan acá:
          sin esto el navegador las descubre recién al parsear el CSS y el
          primer pintado sale con la tipografía de respaldo. No hay pedido a

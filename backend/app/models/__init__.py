@@ -1,5 +1,5 @@
 """
-Modelos de base de datos - TopGreen Marketplace
+Modelos de base de datos - AgroBoeda Marketplace
 Importar todos los modelos aquí para que Alembic los detecte
 """
 from app.models.user import User, UserRole

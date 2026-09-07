@@ -80,7 +80,7 @@ class User(Base):
         nullable=False,
     )
     # La habilitación es una DECLARACIÓN del transportista, no una
-    # verificación de TopGreen: el detalle lo escribe él y la fecha la pone el
+    # verificación de AgroBoeda: el detalle lo escribe él y la fecha la pone el
     # servidor cuando la declara o la cambia.
     carrier_certification_detail = Column(String(500), nullable=True)
     carrier_certification_declared_at = Column(DateTime, nullable=True)

@@ -52,13 +52,13 @@ def _armar_enlace(token: str) -> str:
 def _cuerpo_del_mensaje(nombre: str, enlace: str) -> str:
     return (
         f"Hola {nombre},\n\n"
-        "Creaste una cuenta en TopGreen. Para poder ingresar, confirmá tu correo "
+        "Creaste una cuenta en AgroBoeda. Para poder ingresar, confirmá tu correo "
         "entrando en este enlace:\n\n"
         f"{enlace}\n\n"
         f"El enlace vence en {HORAS_DE_VIGENCIA} horas y sirve una sola vez.\n\n"
         "Si no fuiste vos, ignorá este mensaje: sin confirmar, la cuenta no se "
         "puede usar.\n\n"
-        "TopGreen\n"
+        "AgroBoeda\n"
     )
 
 
@@ -102,7 +102,7 @@ def emitir_y_enviar(db: Session, usuario: User) -> None:
 
     obtener_transporte().enviar(
         destinatario=usuario.email,
-        asunto="Confirmá tu correo en TopGreen",
+        asunto="Confirmá tu correo en AgroBoeda",
         cuerpo=_cuerpo_del_mensaje(usuario.full_name, _armar_enlace(token)),
     )
 

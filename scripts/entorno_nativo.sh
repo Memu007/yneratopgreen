@@ -51,13 +51,13 @@ paso "Puente de docker exec"
 PUENTE="$HOME/.local/bin/docker"
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   nota "hay un Docker que funciona: no se instala el puente"
-elif [ -x "$PUENTE" ] && grep -q 'Puente local de TopGreen' "$PUENTE" 2>/dev/null; then
+elif [ -x "$PUENTE" ] && grep -q 'Puente local de AgroBoeda' "$PUENTE" 2>/dev/null; then
   nota "el puente ya estaba instalado"
 else
   mkdir -p "$HOME/.local/bin"
   cat > "$PUENTE" <<'PUENTE_FIN'
 #!/usr/bin/env bash
-# Puente local de TopGreen: esta máquina no tiene demonio de Docker, pero las
+# Puente local de AgroBoeda: esta máquina no tiene demonio de Docker, pero las
 # puertas del repositorio hablan con la base y con la aplicación por
 # `docker exec`. Se traducen SÓLO los tres casos que el repositorio usa;
 # cualquier otra cosa falla a la vista en vez de fingir que anduvo.

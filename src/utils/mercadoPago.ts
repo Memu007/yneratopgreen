@@ -31,7 +31,7 @@ export const MOTIVOS_MP: Record<string, string> = {
   estado_invalido: 'El pedido de conexión venció o ya se había usado. Empezalo de nuevo.',
   sin_sesion: 'Se cerró tu sesión durante la conexión. Entrá de nuevo y volvé a intentar.',
   sesion_distinta: 'Esa conexión se había iniciado desde otra sesión. Empezala de nuevo desde acá.',
-  cuenta_en_uso: 'Esa cuenta de Mercado Pago ya está vinculada a otro usuario de TopGreen.',
+  cuenta_en_uso: 'Esa cuenta de Mercado Pago ya está vinculada a otro usuario de AgroBoeda.',
   mp_rechazo: 'Mercado Pago rechazó la conexión. Probá de nuevo en unos minutos.',
   mp_sin_respuesta: 'Mercado Pago no respondió a tiempo. Probá de nuevo en unos minutos.',
   respuesta_invalida: 'Mercado Pago respondió algo inesperado. Probá de nuevo en unos minutos.',

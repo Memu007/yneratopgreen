@@ -2,7 +2,7 @@
  * Formato de moneda, cantidad y fecha.
  *
  * Todo pasa por `Intl` con un locale explícito y no por concatenación de
- * símbolos: cuando TopGreen abra otra plaza, lo que cambia es el parámetro y
+ * símbolos: cuando AgroBoeda abra otra plaza, lo que cambia es el parámetro y
  * no cada componente que imprime un precio.
  */
 const LOCALE = 'es-AR';

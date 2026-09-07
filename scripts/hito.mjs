@@ -115,7 +115,7 @@ async function main() {
 
     // ---------------------------------------------------------------- 1
     await paso('catálogo filtrado por categoría y ubicación oficial', async () => {
-      await page.getByRole('button', { name: 'TopGreen', exact: true }).first().click();
+      await page.getByRole('button', { name: 'AgroBoeda', exact: true }).first().click();
       await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: ESPERA });
 
       // El conteo dejó de ser un número suelto: ahora es «N operaciones», que

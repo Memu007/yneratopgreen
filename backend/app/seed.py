@@ -87,7 +87,7 @@ def create_seed_data():
             admin = User(
                 email="admin@topgreen.com",
                 password_hash=hash_password("admin123"),
-                full_name="Administrador TopGreen",
+                full_name="Administrador AgroBoeda",
                 role=UserRole.ADMIN,
                 is_active=True,
                 is_verified=True,

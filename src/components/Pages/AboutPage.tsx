@@ -27,14 +27,14 @@ export const AboutPage: React.FC<AboutPageProps> = ({
 
   return (
     <div className={styles.aboutPage}>
-      {/* Hero Section - Información TopGreen */}
+      {/* Hero Section - Información AgroBoeda */}
       <section className={styles.infoSection}>
         <div className={styles.container}>
           <div className={styles.infoGrid}>
             <div className={styles.infoText}>
               <h1 className={styles.infoTitle}>
                 Información<br />
-                <span className={styles.brandName}>TopGreen</span>
+                <span className={styles.brandName}>AgroBoeda</span>
               </h1>
               <p className={styles.infoDescription}>
                 Contamos con un equipo de expertos altamente capacitados en las 
@@ -77,7 +77,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({
               <div className={styles.cardAccent}></div>
               <h2>Misión</h2>
               <p>
-                En TopGreen, nuestra misión es impulsar la innovación en la producción 
+                En AgroBoeda, nuestra misión es impulsar la innovación en la producción
                 agropecuaria a través de la mecanización avanzada y el uso de tecnologías 
                 de vanguardia. Nos comprometemos a ofrecer soluciones eficientes, 
                 sostenibles y adaptadas a las necesidades de nuestros clientes, mejorando 
@@ -136,7 +136,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({
       <section className={styles.ctaSection}>
         <div className={styles.container}>
           <h2>¿Listo para transformar tu producción?</h2>
-          <p>Únete a TopGreen y accede a las mejores soluciones tecnológicas para el agro</p>
+          <p>Únete a AgroBoeda y accede a las mejores soluciones tecnológicas para el agro</p>
           <div className={styles.ctaButtons}>
             <button className={styles.ctaPrimary} onClick={handleStartSelling}>
               Comenzar a Vender

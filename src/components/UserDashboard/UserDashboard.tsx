@@ -897,7 +897,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   const desvincularMercadoPago = async () => {
     const confirmado = await showConfirm({
       title: 'Desvincular Mercado Pago',
-      message: 'Se borran de TopGreen las credenciales de tu cuenta.\n\n'
+      message: 'Se borran de AgroBoeda las credenciales de tu cuenta.\n\n'
         + 'Para retirarle el permiso a la aplicación también del lado de Mercado Pago, '
         + 'hacelo desde tu cuenta.',
       confirmText: 'Desvincular',
@@ -2267,8 +2267,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 <p className={styles.carrierNota}>
                   {user?.carrierCertificationDeclaredAt
                     ? `Declarado el ${new Date(user.carrierCertificationDeclaredAt)
-                        .toLocaleDateString('es-AR')}. TopGreen no verifica esta habilitación.`
-                    : 'Es tu declaración. TopGreen no la verifica y guarda la fecha en que la hacés.'}
+                        .toLocaleDateString('es-AR')}. AgroBoeda no verifica esta habilitación.`
+                    : 'Es tu declaración. AgroBoeda no la verifica y guarda la fecha en que la hacés.'}
                 </p>
               </div>
             </>
@@ -2281,7 +2281,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       </div>
 
       {/* Mercado Pago: dónde cobra el vendedor. El dinero va a su cuenta,
-          TopGreen no lo recibe ni lo reparte. */}
+          AgroBoeda no lo recibe ni lo reparte. */}
       <div className={styles.mpSection}>
         <div className={styles.sectionHeader}>
           <h2> Mercado Pago — dónde cobrás</h2>
@@ -2295,7 +2295,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
               <p>Cuenta de Mercado Pago: <strong>{mpVinculo.mp_user_id}</strong></p>
               <p className={styles.mpInfo}>
                 Cuando el cobro con Mercado Pago esté disponible, los pagos de tus
-                ventas van a entrar directamente en tu cuenta. TopGreen no los recibe
+                ventas van a entrar directamente en tu cuenta. AgroBoeda no los recibe
                 ni los reparte, y no te cobra comisión por vender; Mercado Pago te
                 descuenta la suya, como en cualquier venta tuya.
               </p>
@@ -2327,7 +2327,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 <strong>Hay que reconectar tu cuenta</strong>
               </div>
               <p>
-                El permiso que le diste a TopGreen sobre tu cuenta
+                El permiso que le diste a AgroBoeda sobre tu cuenta
                 {mpVinculo.mp_user_id ? <> <strong>{mpVinculo.mp_user_id}</strong></> : null}
                 {' '}dejó de estar disponible. Reconectala para dejar tu cobro por
                 Mercado Pago en condiciones.
@@ -2362,7 +2362,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 <h4>Qué pasa cuando la vinculás:</h4>
                 <ul>
                   <li> Cobrás vos, en tu propia cuenta</li>
-                  <li> TopGreen no recibe ni retiene ese dinero</li>
+                  <li> AgroBoeda no recibe ni retiene ese dinero</li>
                   <li> Podés desvincularla cuando quieras</li>
                 </ul>
               </div>
@@ -2374,7 +2374,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                 {mpTrabajando ? 'Abriendo Mercado Pago…' : ' Vincular Mercado Pago'}
               </button>
               <p className={styles.mpHelp}>
-                Te lleva a Mercado Pago para que autorices la conexión. TopGreen nunca
+                Te lleva a Mercado Pago para que autorices la conexión. AgroBoeda nunca
                 ve ni te pide tu contraseña.
               </p>
             </div>
@@ -2615,7 +2615,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             Declara: {traslado.carrier_certification_detail}
             {traslado.carrier_certification_declared_at
               && ` (declarado el ${fechaDeclarada(traslado.carrier_certification_declared_at)})`}
-            . TopGreen no verifica esta habilitación.
+            . AgroBoeda no verifica esta habilitación.
           </p>
         )}
         <p className={styles.trasladoDeclaracion}>
