@@ -5,6 +5,19 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-09-07 — Cuenta AgroBoeda de evaluación, común y sólo sembrada en local
+
+Emi pidió las credenciales exactas `pruba@agroboeda.com` / `@agroboeda` para
+recorrer las áreas autenticadas y simular el alta de una publicación. Se
+conserva `pruba` tal como fue escrito. La cuenta es una identidad de demo
+conocida: rol `user`, activa y verificada, sin administración, transportista,
+órdenes, publicaciones iniciales, datos bancarios ni Mercado Pago.
+
+Se implementará en `DEMO-USER-1`, después de `BRAND-AGROBOEDA-1`, mediante el
+seed idempotente que ya corta antes de abrir la base salvo `ENV=local`. No se
+habilita una excepción, un endpoint oculto, el seed en Railway ni un despliegue.
+Contrato completo en `CUENTA-DEMO-AGROBOEDA-CLIENTE-2026-09-07.md`.
+
 ## 2026-09-07 — La marca pública exacta es AgroBoeda y el monograma AB es la fuente oficial
 
 Emi corrigió la decisión anterior: el nombre público no es `BOEDA` a secas,

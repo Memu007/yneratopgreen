@@ -40,6 +40,15 @@ fuente quedó resguardada en
 favicon, metadatos ni emails dentro de MARKET-VIEWS-1. Después de su revisión,
 PM emitirá `BRAND-AGROBOEDA-1` como pieza separada e inmediata.
 
+### Cuenta de demostración recibida — tampoco mezclar
+
+Emi pidió además `pruba@agroboeda.com` / `@agroboeda` para recorrer como
+usuario común y simular el alta real de una publicación. El contrato está en
+`CUENTA-DEMO-AGROBOEDA-CLIENTE-2026-09-07.md`. No la agregues a este commit:
+queda como `DEMO-USER-1`, pieza corta posterior a `BRAND-AGROBOEDA-1`, sólo en
+el seed local protegido y sin privilegios de administración. No ejecutes seed
+ni escribas esa cuenta en Railway.
+
 ### Resultado obligatorio
 
 1. Junto a `Ordenar por` aparece un selector visible con las dos opciones

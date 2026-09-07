@@ -59,6 +59,12 @@ Actualizado: 2026-09-07.
   `BRAND-AGROBOEDA-1` queda inmediatamente después de MARKET-VIEWS-1; no se
   mezcla con la tarea activa ni autoriza despliegue. Decisión y limitaciones
   del PNG en `IDENTIDAD-AGROBOEDA-CLIENTE-2026-09-07.md`.
+- **Cuenta demo pedida por Emi:** `pruba@agroboeda.com` / `@agroboeda`, con
+  rol común verificado para recorrer la sesión y crear una publicación real.
+  `DEMO-USER-1` queda después de `BRAND-AGROBOEDA-1`; debe usar únicamente el
+  seed local ya bloqueado a `ENV=local`. No es admin, no toca Railway y no se
+  mezcla con Mercado ni marca. Contrato en
+  `CUENTA-DEMO-AGROBOEDA-CLIENTE-2026-09-07.md`.
 - Docker Desktop sigue sin arrancar y no fue reseteado ni reemplazado. No se
   tocaron volúmenes de proyecto, Railway, datos remotos ni pagos reales.
 - El red-team profundo sigue cerrado: faltan el cierre funcional, la
