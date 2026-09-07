@@ -1,7 +1,7 @@
 # Feedback visual de Emi — Mercado y Registro
 
 Fecha: 2026-09-06.
-Estado: **`REGISTER-POLISH-1R` aceptada; `MARKET-VIEWS-1` activa.**
+Estado: **`REGISTER-POLISH-1R` y `MARKET-VIEWS-1` aceptadas.**
 
 ## Evidencia recibida
 
@@ -20,8 +20,8 @@ también existen en el código actual `7ff8c8a`:
   con el sistema visual aprobado.
 
 La marca `TopGreen` visible en las capturas corresponde a ese entorno. La
-decisión vigente de marca pública BOEDA se mantiene, pero su migración no se
-mezcla con estas dos correcciones ni se infiere un estado de despliegue.
+decisión posterior fija **AgroBoeda** como nombre público exacto; su migración
+no se mezcla con estas dos correcciones ni se infiere un estado de despliegue.
 
 ## Decisión de producto
 
@@ -99,8 +99,9 @@ lote salvo que el diff cruce navegación o recorridos fuera de Mercado.
 
 1. `TRANSFER-REVIEW-1R`: aceptada el 07/09.
 2. `REGISTER-POLISH-1R`: aceptada el 07/09.
-3. Ejecutar `MARKET-VIEWS-1` — tarea activa.
-4. Retomar `ADMIN-TRUTH-1` y el resto del roadmap.
+3. `MARKET-VIEWS-1`: aceptada el 07/09.
+4. Ejecutar `BRAND-AGROBOEDA-1` y luego `DEMO-USER-1`.
+5. Retomar `ADMIN-TRUTH-1` y el resto del roadmap.
 
 Las dos piezas son correcciones de calidad del MVP ya existente. No habilitan
 Railway, Mercado Pago, datos remotos ni red-team profundo.

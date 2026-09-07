@@ -1,8 +1,7 @@
 # Identidad AgroBoeda y custodia del logo oficial
 
 Fecha: 2026-09-07.
-Estado: **decisión vigente; implementación en cola inmediata después de
-`MARKET-VIEWS-1`.**
+Estado: **decisión vigente; `BRAND-AGROBOEDA-1` activa.**
 
 ## Autoridad recibida
 
@@ -48,10 +47,10 @@ derivar sólo los tamaños/cortes necesarios para producto, sin hacer una
 eliminación de fondo automática que deje halos. Una variante opaca sobre la
 misma familia de verde es válida si resulta más fiel que fingir transparencia.
 
-## Próxima pieza: BRAND-AGROBOEDA-1
+## Pieza activa: BRAND-AGROBOEDA-1
 
-La migración será una pieza propia después de aceptar `MARKET-VIEWS-1`. Antes
-de tocar producto, Dev inventariará con `rg` las apariciones y clasificará cada
+La migración es una pieza propia tras aceptar `MARKET-VIEWS-1`. Antes de tocar
+producto, Dev inventariará con `rg` las apariciones y clasificará cada
 una como visible, emitida o técnica.
 
 Debe cambiar lo que ve o recibe una persona:
@@ -80,7 +79,7 @@ Emi antes de cualquier despliegue.
 
 ## Orden de trabajo
 
-1. Terminar y revisar `MARKET-VIEWS-1` sin mezclar identidad.
-2. Activar `BRAND-AGROBOEDA-1` como única tarea Dev.
+1. `MARKET-VIEWS-1`: aceptada el 07/09.
+2. Ejecutar `BRAND-AGROBOEDA-1` como única tarea Dev.
 3. Revisar fidelidad del monograma, nombre visible y superficies emitidas.
-4. Sólo después continuar el resto del roadmap.
+4. Ejecutar después `DEMO-USER-1` y continuar el roadmap.

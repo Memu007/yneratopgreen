@@ -12,6 +12,84 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-07 — TAREA VIGENTE: BRAND-AGROBOEDA-1, la identidad pública deja de ser TopGreen
+
+`MARKET-VIEWS-1` queda **aceptada**: producto/regresión `b5ee28d`, informe
+`afbfb95` y corrección del SHA informado `931a063`. PM revisó el diff y los
+hashes, inspeccionó las seis capturas, reprodujo 155 y 131 en **1/1** cada uno y
+cerró build, lint, sintaxis y `diff-check`. La suite PM fue **154/155** por un
+timeout transitorio de 122; 122 pasó después aislado en **1/1**. La cobertura
+combinada alcanza los 155 casos, pero no se atribuye una suite PM 155/155.
+Evidencia en `REPRODUCCION-MARKET-VIEWS-1-2026-09-07.md`.
+
+La única tarea activa pasa a **BRAND-AGROBOEDA-1**. Emi fijó el nombre público
+exacto **AgroBoeda** y entregó como fuente oficial el PNG preservado en
+`docs/pm/originales/AGROBOEDA-LOGO-FUENTE.png`, SHA-256
+`5606077c429b20edecb62986d6b7500c7142c6a6230c006fdfb33c4978b206cf`.
+Leé completo `IDENTIDAD-AGROBOEDA-CLIENTE-2026-09-07.md` antes de editar.
+
+### Resultado obligatorio
+
+1. Inventariá con `rg` cada `TopGreen`, `topgreen`, `BOEDA` y variante; en el
+   informe clasificá las apariciones restantes como visibles/emitidas o
+   técnicas. No hagas reemplazo masivo.
+2. Toda superficie que ve o recibe una persona debe decir **AgroBoeda**: Header,
+   Footer, Inicio, Quiénes somos, Contacto, autenticación, detalle, carrito,
+   checkout, paneles y administración; avisos, notificaciones y correo de
+   verificación; título, descripción, favicon y metadatos sociales. Cambiá
+   también nombres demo visibles como `Administrador TopGreen` en el seed.
+3. Derivá desde el PNG oficial sólo los archivos necesarios para producto.
+   Conservá formas, proporción y colores; recortá el margen sólo para que el
+   monograma no quede diminuto. No redibujes, no uses generación, no finjas
+   transparencia con halos y no modifiques la fuente en `docs/pm/originales/`.
+   Entregá dimensiones y SHA-256 de cada derivado.
+4. En Header y Footer, el monograma AB va acompañado por `AgroBoeda` visible.
+   En favicon puede ir solo, con nombre accesible donde corresponda. Imagen,
+   fallback y enlace a Inicio deben seguir funcionando con teclado y sin salto
+   de diseño en 1440×900, 768×1024 y 390×844.
+5. No inventes un dominio, correo, red social ni perfil. Direcciones operativas
+   heredadas como `info@topgreen.com.ar` pueden seguir como destino técnico,
+   pero no deben presentarse como la marca nueva ni reemplazarse por una cuenta
+   inexistente. Enumeralas como deuda operativa si siguen expuestas.
+6. Conservá nombres internos que cambiar rompería compatibilidad: repo,
+   paquetes, base, contenedores, red, variables, rutas de storage, claves de
+   idempotencia/referencias MP, servicio Railway, correos de ingreso demo y
+   nombre de la aplicación externa de Mercado Pago. Comentarios e historia no
+   son una migración de producto.
+
+### Regresión discriminante — caso 156
+
+Agregá un único caso 156. Contra `b5ee28d` debe fallar por el nombre/logo viejo.
+En verde debe demostrar, mediante las rutas reales:
+
+- Header y Footer muestran monograma y nombre accesible/visible `AgroBoeda`,
+  enlazan a Inicio y no exponen `TopGreen`/`BOEDA` en los tres viewports;
+- las páginas públicas, Registro/Login y al menos los paneles de usuario y
+  administración no muestran el nombre viejo;
+- `index.html`, título, descripción, favicon y metadatos sociales apuntan a la
+  identidad nueva y a archivos que existen;
+- el correo real de verificación y una notificación visible usan AgroBoeda en
+  asunto/cuerpo/nombre, sin cambiar destinatario ni contrato;
+- el seed limpio muestra `Administrador AgroBoeda`, mientras las credenciales,
+  roles e IDs técnicos siguen iguales;
+- una lista de apariciones técnicas permitidas evita tanto falsos verdes como
+  renombrar identificadores estables; cualquier aparición visible o emitida no
+  clasificada hace fallar el caso;
+- no hay imagen rota, overflow, pérdida de foco ni contraste bloqueante.
+
+Generá capturas recuperables de Header/Footer y autenticación en los tres
+viewports, fuera de Git por defecto. Corré 156 aislado, los controles que el
+diff afecte y una suite completa esperada en **156/156**, además de build,
+lint, TypeScript, `node --check`, contraste, a11y completa y `diff-check`.
+`compileall` y `pip check` corresponden si tocás Backend para textos emitidos.
+
+No entra rediseñar páginas, paleta completa o copy ajeno a la marca; tampoco la
+cuenta `pruba@agroboeda.com`, que sigue como `DEMO-USER-1` posterior. No
+despliegues, no ejecutes seed contra Railway, no cambies datos remotos, pagos,
+secretos ni la aplicación externa de MP. Producto/regresión en un commit;
+informe separado con inventario, rojo/verde, suite, puertas, capturas, hashes y
+riesgos. Subí y frená.
+
 ## 2026-09-07 — TAREA VIGENTE: MARKET-VIEWS-1, dos geometrías elegidas y ninguna accidental
 
 REGISTER-POLISH-1 queda **aceptada**: producto/regresión `7ca4fc7`, informe

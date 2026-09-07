@@ -4,6 +4,17 @@ Actualizado: 2026-09-07.
 
 ## Estado inmediato — 2026-09-07
 
+- **MARKET-VIEWS-1 aceptada:** producto/regresión `b5ee28d`, informe `afbfb95`
+  y corrección de SHA `931a063`. PM revisó diff/hashes y seis capturas,
+  reprodujo 155 y 131 en **1/1**, y cerró build, lint, sintaxis y `diff-check`.
+  Su suite completa dio **154/155** por timeout transitorio de 122; el 122 pasó
+  después aislado en **1/1**. Hay cobertura combinada de 155 casos, no una suite
+  PM 155/155. Evidencia en
+  `REPRODUCCION-MARKET-VIEWS-1-2026-09-07.md`.
+- **Única tarea activa y responsable:** `BRAND-AGROBOEDA-1`, Dev. Sustituye la
+  identidad pública visible/emitida, integra derivados fieles del PNG oficial y
+  preserva identificadores técnicos. Caso 156; sin despliegue ni datos remotos.
+
 - **FORM-DIRTY-1R aceptada:** producto/regresión `83dba0a`, informe `db1bb10`.
   PM revisó el diff y reprodujo 150 y 149 aislados en **1/1** cada uno; ambos
   pasaron también dentro de la suite completa actual.
@@ -48,7 +59,7 @@ Actualizado: 2026-09-07.
   `diff-check` quedaron verdes. No hubo suite completa PM; Dev informó 153/154
   con único rojo ambiental conocido en 131 antes de la corrección, que no tocó
   producto. Evidencia en `REPRODUCCION-REGISTER-POLISH-1-2026-09-07.md`.
-- **Única tarea activa y responsable:** `MARKET-VIEWS-1`, Dev. Mercado debe
+- **Tarea anterior, ya cerrada:** `MARKET-VIEWS-1`. Mercado debe
   ofrecer exactamente dos vistas elegibles y uniformes —Cuadrícula y Lista—;
   anatomía y orden dejan de imponer geometría. Caso nuevo 155, tres viewports.
   Criterios y límites en `FEEDBACK-VISUAL-EMI-2026-09-06.md`.
@@ -56,8 +67,7 @@ Actualizado: 2026-09-07.
   BOEDA ni TopGreen. El PNG oficial quedó preservado, sin modificar, en
   `docs/pm/originales/AGROBOEDA-LOGO-FUENTE.png` con SHA-256
   `5606077c429b20edecb62986d6b7500c7142c6a6230c006fdfb33c4978b206cf`.
-  `BRAND-AGROBOEDA-1` queda inmediatamente después de MARKET-VIEWS-1; no se
-  mezcla con la tarea activa ni autoriza despliegue. Decisión y limitaciones
+  `BRAND-AGROBOEDA-1` está activa; no autoriza despliegue. Decisión y limitaciones
   del PNG en `IDENTIDAD-AGROBOEDA-CLIENTE-2026-09-07.md`.
 - **Cuenta demo pedida por Emi:** `pruba@agroboeda.com` / `@agroboeda`, con
   rol común verificado para recorrer la sesión y crear una publicación real.
@@ -65,8 +75,9 @@ Actualizado: 2026-09-07.
   seed local ya bloqueado a `ENV=local`. No es admin, no toca Railway y no se
   mezcla con Mercado ni marca. Contrato en
   `CUENTA-DEMO-AGROBOEDA-CLIENTE-2026-09-07.md`.
-- Docker Desktop sigue sin arrancar y no fue reseteado ni reemplazado. No se
-  tocaron volúmenes de proyecto, Railway, datos remotos ni pagos reales.
+- Docker Desktop volvió a responder el 07/09. Las reproducciones eliminaron y
+  recrearon sólo contenedores/volúmenes locales descartables de TopGreen; el
+  lanzador los retiró al terminar. No se tocó Railway, datos remotos ni pagos.
 - El red-team profundo sigue cerrado: faltan el cierre funcional, la
   homologación MP de prueba y el SHA operativo congelado; esta aceptación no
   habilita despliegue.

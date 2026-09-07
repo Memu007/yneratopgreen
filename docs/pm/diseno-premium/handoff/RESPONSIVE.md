@@ -6,9 +6,9 @@ Las capturas son consecuencias de estas reglas; no son la especificación.
 
 - Contenedor máximo 1320 px, gutter exterior 48 px.
 - Header sticky completo: wordmark, buscador, acciones y navegación.
-- Catálogo: filtro lateral de 268 px sticky; resultados al lado.
-- Activo de alto valor ocupa ancho completo de resultados; las otras anatomías
-  forman tres columnas sólo cuando caben sin bajar de 280 px.
+- Catálogo: filtro lateral de 268 px sticky; resultados al lado. La persona
+  elige Cuadrícula de tres columnas uniformes o Lista de un renglón horizontal;
+  ninguna anatomía decide su huella exterior.
 - Detalle: galería/cuerpo a la izquierda y resumen de operación sticky a la
   derecha. Nada tapa el footer.
 - Orden de teclado sigue DOM: marca, búsqueda, sesión, navegación, filtros,
@@ -20,7 +20,8 @@ Las capturas son consecuencias de estas reglas; no son la especificación.
 - Header en dos líneas: marca/acciones y búsqueda completa; navegación visible.
 - Filtro lateral se reemplaza por `details`/drawer sobre el flujo. No consume
   una columna permanente.
-- Catálogo de dos columnas; activo de alto valor ocupa ambas.
+- Cuadrícula de dos columnas uniformes o Lista de un renglón horizontal;
+  ninguna anatomía ocupa columnas por sí sola.
 - Detalle: galería, resumen y cuerpo en una columna. El resumen deja de ser
   sticky para evitar saltos y superposición.
 
@@ -31,7 +32,8 @@ Las capturas son consecuencias de estas reglas; no son la especificación.
 - Nunca se ocultan búsqueda, precio, ubicación, condición, vendedor ni CTA.
 - Filtros cerrados por defecto; al abrirse son parte del flujo y terminan con
   `Ver N resultados`. No bloquean resultados de forma permanente.
-- Catálogo en una columna. No hay dependencia de hover.
+- Cuadrícula y Lista usan una columna, pero Lista conserva composición
+  rectangular diferenciada. No hay dependencia de hover.
 - Detalle: título, imagen/fallback, precio, condición, acción, vendedor,
   logística y especificaciones en ese orden.
 - Tabla técnica se transforma a pares etiqueta/valor; no hay scroll horizontal.
@@ -40,7 +42,7 @@ Las capturas son consecuencias de estas reglas; no son la especificación.
 
 | Contenido | Catálogo | Detalle |
 |---|---|---|
-| Título | 3 líneas visuales; nombre completo accesible | Sin truncado |
+| Título | 2 líneas visuales; nombre completo en detalle | Sin truncado |
 | Precio | Línea propia; no ellipsis | Línea propia; puede bajar a 40 px |
 | Ubicación | 2 líneas | Sin truncado razonable |
 | Vendedor | 2 líneas | Sin truncado |
