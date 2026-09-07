@@ -19868,6 +19868,510 @@ await runCase(154, 'El alta de cuenta tiene un solo ancho y controles operables'
   }
 });
 
+// ---------------------------------------------------------------------------
+// 155. MARKET-VIEWS-1 — dos geometrías elegidas y ninguna accidental.
+//
+// Hasta acá `.activo` traía `grid-column: 1 / -1` y su propia composición
+// horizontal: una máquina ocupaba la fila entera y el resto quedaba en
+// columnas. Ordenar cambiaba qué anatomía caía arriba, así que ordenar cambiaba
+// el diseño de la pantalla. Este caso mide la huella exterior —no el color ni
+// el contenido— en las dos vistas y en tres anchos, y exige que la elija la
+// persona con el selector y nunca la anatomía de lo que está mirando.
+//
+// Los datos que el seed no tiene —foto de verdad y título larguísimo— se crean
+// por las rutas reales del producto. La foto rota se simula donde de verdad se
+// rompe: en la respuesta HTTP de la imagen.
+// ---------------------------------------------------------------------------
+await runCase(155, 'El Mercado tiene dos vistas elegibles y ninguna geometría accidental', async () => {
+  const CAPTURAS = process.env.SMOKE_CAPTURAS
+    || mkdtempSync(`${tmpdir()}/topgreen-mercado-`);
+  mkdirSync(CAPTURAS, { recursive: true });
+  const capturas = [];
+  const medidos = [];
+  const sello = Date.now();
+
+  const vendedor = (await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  })).data.access_token;
+  const [categoriaDeProductos] = queryRows(`
+    SELECT id, 'fin' FROM categories WHERE is_service = false AND is_active = true
+    ORDER BY name LIMIT 1`);
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const publicar = async (cuerpo) => {
+    const alta = await apiRequest('/products', {
+      method: 'POST', token: vendedor, body: cuerpo,
+    });
+    assert(alta.status < 400 && alta.data?.id, `no se pudo publicar: HTTP ${alta.status}`);
+    return alta.data.id;
+  };
+
+  // La mezcla de las cuatro anatomías se CREA y no se busca en el catálogo.
+  //
+  // Medido: corriendo la suite entera, cuando le toca a este caso el mercado ya
+  // tiene más de cien publicaciones nuevas del 126 y en la primera página no
+  // queda ninguna de logística. Depender de qué anatomías entraron en la página
+  // es depender del orden de la suite, que es exactamente lo que una regresión
+  // no puede hacer. Las cuatro llevan la misma marca en el título y se las
+  // convoca con el buscador.
+  const marca = `Mercado155 ${sello}`;
+  // Un título que no entra en ninguna tarjeta. Si la tarjeta creciera para
+  // alojarlo, rompería la huella común de toda la pantalla.
+  const tituloLargo = `${marca} conjunto integral de implementos de laboreo `
+    + 'profundo con rastra de discos, cincel descompactador, rolo desterronador y '
+    + 'kit completo de repuestos originales para campaña gruesa';
+  const conTituloLargo = await publicar({
+    name: tituloLargo,
+    description: 'Publicación efímera del caso 155, para el título largo.',
+    category_id: categoriaDeProductos[0],
+    price: 1234567, stock: 3, unit: 'unidad', locality_id: localidad,
+    publication_type: 'producto', operation_kind: 'insumo',
+  });
+
+  // Y una con foto de verdad: el seed no trae ninguna, así que sin esto la
+  // pantalla sólo se mediría con el reemplazo de «sin registro fotográfico».
+  const nombreConFoto = `${marca} con foto`;
+  const conFoto = await publicar({
+    name: nombreConFoto,
+    description: 'Publicación efímera del caso 155, para la foto válida.',
+    category_id: categoriaDeProductos[0],
+    price: 890000, stock: 5, unit: 'unidad', locality_id: localidad,
+    publication_type: 'producto', operation_kind: 'activo', condition: 'usado',
+  });
+
+  // Servicio y logística van en una categoría de servicio: la anatomía no puede
+  // contradecir a `is_service`, que es lo que decide cobro y stock.
+  const [categoriaDeServicios] = queryRows(`
+    SELECT id, 'fin' FROM categories WHERE is_service = true AND is_active = true
+    ORDER BY name LIMIT 1`);
+  const elServicio = await publicar({
+    name: `${marca} servicio de muestreo`,
+    description: 'Publicación efímera del caso 155, para la anatomía servicio.',
+    category_id: categoriaDeServicios[0],
+    price: 75000, stock: 0, locality_id: localidad,
+    publication_type: 'servicio', operation_kind: 'servicio',
+    pricing_type: 'por_hectarea', availability: 'inmediata',
+  });
+  const laLogistica = await publicar({
+    name: `${marca} flete de campaña`,
+    description: 'Publicación efímera del caso 155, para la anatomía logística.',
+    category_id: categoriaDeServicios[0],
+    price: 48000, stock: 0, locality_id: localidad,
+    publication_type: 'servicio', operation_kind: 'logistica',
+    pricing_type: 'por_km', availability: 'inmediata',
+  });
+  // `POST /products/{id}/images` recibe una LISTA en el campo `files`, que no
+  // es el campo que usa `apiUpload` para los comprobantes.
+  const subida = await subirCrudo(`/products/${conFoto}/images`, {
+    header: vendedor,
+    archivo: {
+      campo: 'files', nombre: 'mercado-155.png', contenido: RECIBO_PNG, tipo: 'image/png',
+    },
+  });
+  assert(subida.status < 400 && subida.datos?.images?.length === 1,
+    `la publicación con foto no quedó con su imagen: HTTP ${subida.status} `
+    + `${JSON.stringify(subida.datos)}`);
+
+  const ANATOMIAS = [
+    ['activo', 'Activo de alto valor'],
+    ['insumo', 'Insumo estandarizado'],
+    ['servicio', 'Servicio'],
+    ['logistica', 'Logística'],
+  ];
+  const MEDIDAS = [
+    { n: 'escritorio', width: 1440, height: 900, porFila: 3 },
+    { n: 'tablet', width: 768, height: 1024, porFila: 2 },
+    { n: 'movil', width: 390, height: 844, porFila: 1 },
+  ];
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    // Lo que se mide de cada tarjeta: la caja exterior, si se reservó columnas
+    // y qué anatomía declara. Nada de esto se lee de una hoja de estilo: se lee
+    // de lo que el navegador terminó dibujando.
+    const cajas = (page) => page.evaluate(() => {
+      const cual = (el) => ['activo', 'insumo', 'servicio', 'logistica']
+        .find((a) => [...el.classList].some((c) => c.startsWith(`_${a}_`))) || '?';
+      return [...document.querySelectorAll('article[class*="card"]')].map((el) => {
+        const r = el.getBoundingClientRect();
+        const media = el.querySelector('[class*="media"]');
+        const h3 = el.querySelector('h3');
+        return {
+          que: cual(el),
+          x: Math.round(r.x), y: Math.round(r.y),
+          w: Math.round(r.width), h: Math.round(r.height),
+          columna: getComputedStyle(el).gridColumn,
+          titulo: (h3?.textContent || '').trim(),
+          // El recorte no se ve en el texto —`textContent` trae el título
+          // entero— sino en la caja: lo que no entra queda afuera del alto.
+          tituloRecortado: h3 ? h3.scrollHeight > h3.clientHeight + 1 : false,
+          // Cuánto del ancho de la tarjeta ocupa la banda de la foto: en
+          // cuadrícula es toda; en renglón es una franja al costado. Es la
+          // diferencia de composición que se ve, medida.
+          foto: media ? Math.round((media.getBoundingClientRect().width / r.width) * 100) : null,
+        };
+      });
+    });
+
+    const abrirMercado = async (page) => {
+      await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+      await page.locator('article[class*="card"]').first()
+        .waitFor({ state: 'visible', timeout: 25_000 });
+      await esperarA(async () => (await page.getByRole('radio').count()) === 2,
+        'el Mercado no ofrece el selector de vista');
+    };
+    const radioDe = (page, rotulo) => page.getByRole('radio', { name: rotulo, exact: true });
+    // Se elige como elige una persona: haciendo clic en el rótulo visible. El
+    // radio está a la vista del teclado pero no del ratón, que es lo que hace
+    // que el control se vea como un control y no como dos puntitos.
+    const elegirVista = async (page, rotulo) => {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.getByText(rotulo, { exact: true }).click();
+      await esperarA(() => radioDe(page, rotulo).isChecked(),
+        `elegir «${rotulo}» no dejó marcado su control`);
+    };
+    const vistaActual = async (page) => (
+      (await radioDe(page, 'Lista').isChecked()) ? 'Lista' : 'Cuadrícula');
+    const desborde = (page) => page.evaluate(() => (
+      document.documentElement.scrollWidth - document.documentElement.clientWidth));
+    const dosCuadros = (page) => page.evaluate(() => new Promise((seguir) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => seguir()));
+    }));
+
+    for (const medida of MEDIDAS) {
+      const contexto = await browser.newContext({
+        viewport: { width: medida.width, height: medida.height },
+      });
+      const page = await contexto.newPage();
+      const donde = `${medida.n} ${medida.width}x${medida.height}`;
+      await abrirMercado(page);
+
+      // --- A. exactamente dos controles, con nombre y con estado ------------
+      const radios = page.getByRole('radio');
+      assert((await radios.count()) === 2,
+        `${donde}: el Mercado ofrece ${await radios.count()} vistas y tienen que ser dos`);
+      const nombres = [];
+      for (let i = 0; i < 2; i += 1) {
+        nombres.push(await radios.nth(i).evaluate((el) => (
+          el.labels?.[0]?.textContent?.trim() || el.getAttribute('aria-label') || '')));
+      }
+      assert(JSON.stringify(nombres) === JSON.stringify(['Cuadrícula', 'Lista']),
+        `${donde}: los controles de vista se llaman ${JSON.stringify(nombres)}`);
+      assert((await page.getByRole('radiogroup').count()) === 1,
+        `${donde}: los dos controles no forman un grupo con nombre`);
+      assert(await radioDe(page, 'Cuadrícula').isChecked()
+        && !(await radioDe(page, 'Lista').isChecked()),
+      `${donde}: el Mercado no arranca en Cuadrícula`);
+
+      // Y se elige con el teclado, no sólo con el ratón.
+      await radioDe(page, 'Cuadrícula').focus();
+      await page.keyboard.press('ArrowRight');
+      await esperarA(() => radioDe(page, 'Lista').isChecked(),
+        `${donde}: la flecha derecha no pasó a Lista`);
+      const anillo = await radioDe(page, 'Lista').evaluate((el) => {
+        const pintado = getComputedStyle(el.parentElement.querySelector('span'));
+        return `${pintado.outlineStyle} ${pintado.outlineWidth}`;
+      });
+      assert(!/none/.test(anillo) && !/^0px|\s0px$/.test(anillo),
+        `${donde}: el control elegido con el teclado no muestra foco (${anillo})`);
+      await page.keyboard.press('ArrowLeft');
+      await esperarA(() => radioDe(page, 'Cuadrícula').isChecked(),
+        `${donde}: la flecha izquierda no volvió a Cuadrícula`);
+
+      // --- B. Cuadrícula: una sola huella, sin columnas privilegiadas -------
+      const enCuadricula = await cajas(page);
+      assert(enCuadricula.length >= 8,
+        `${donde}: el Mercado dibujó ${enCuadricula.length} operaciones y no alcanzan para comparar`);
+      const privilegiadas = enCuadricula.filter((c) => c.columna !== 'auto');
+      assert(privilegiadas.length === 0,
+        `${donde}: ${privilegiadas.length} tarjetas se reservan columnas propias `
+        + `(${[...new Set(privilegiadas.map((c) => `${c.que}: ${c.columna}`))].join(', ')})`);
+      const huella = (lista) => ({
+        anchos: [...new Set(lista.map((c) => c.w))],
+        altos: [...new Set(lista.map((c) => c.h))],
+      });
+      const huellaCuadricula = huella(enCuadricula);
+      assert(huellaCuadricula.anchos.length === 1 && huellaCuadricula.altos.length === 1,
+        `${donde}, Cuadrícula: hay ${huellaCuadricula.anchos.length} anchos `
+        + `(${huellaCuadricula.anchos.join(', ')}) y ${huellaCuadricula.altos.length} altos `
+        + `(${huellaCuadricula.altos.join(', ')}) entre ${enCuadricula.length} operaciones`);
+      const porFila = Math.max(...Object.values(enCuadricula.reduce((acc, c) => {
+        acc[c.y] = (acc[c.y] || 0) + 1;
+        return acc;
+      }, {})));
+      assert(porFila === medida.porFila,
+        `${donde}, Cuadrícula: ${porFila} operaciones por fila y correspondían ${medida.porFila}`);
+      assert((await desborde(page)) <= 0,
+        `${donde}, Cuadrícula: la página desborda ${await desborde(page)}px a lo ancho`);
+      medidos.push(`${donde} cuadrícula ${enCuadricula.length}×`
+        + `${huellaCuadricula.anchos[0]}x${huellaCuadricula.altos[0]}, ${porFila} por fila`);
+
+      // La acción de una tarjeta se puede tocar de verdad, no sólo existe.
+      const alcanzable = async (indice, vista) => {
+        const tarjeta = page.locator('article[class*="card"]').nth(indice);
+        const accion = tarjeta.getByRole('button').first();
+        await accion.scrollIntoViewIfNeeded();
+        const estorbo = await accion.evaluate((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return 'no tiene superficie';
+          if (r.top < 0 || r.bottom > window.innerHeight) return 'queda fuera de la ventana';
+          const encima = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+          return el.contains(encima) || el === encima
+            ? '' : `la tapa <${encima?.tagName.toLowerCase()}>`;
+        });
+        assert(estorbo === '',
+          `${donde}, ${vista}: la acción de la tarjeta ${indice + 1} no es alcanzable, ${estorbo}`);
+      };
+      for (const i of [0, 1, 4]) await alcanzable(i, 'Cuadrícula');
+
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await dosCuadros(page);
+      const rutaCuadricula = `${CAPTURAS}/cuadricula-${medida.width}x${medida.height}.png`;
+      await page.screenshot({ path: rutaCuadricula });
+      capturas.push(`${rutaCuadricula} (${medida.width}x${medida.height})`);
+
+      // --- C. Lista: una operación por renglón, y se ve distinta ------------
+      await elegirVista(page, 'Lista');
+      await dosCuadros(page);
+      const enLista = await cajas(page);
+      const huellaLista = huella(enLista);
+      assert(huellaLista.anchos.length === 1 && huellaLista.altos.length === 1,
+        `${donde}, Lista: hay ${huellaLista.anchos.length} anchos `
+        + `(${huellaLista.anchos.join(', ')}) y ${huellaLista.altos.length} altos `
+        + `(${huellaLista.altos.join(', ')}) entre ${enLista.length} operaciones`);
+      const compartenRenglon = Math.max(...Object.values(enLista.reduce((acc, c) => {
+        acc[c.y] = (acc[c.y] || 0) + 1;
+        return acc;
+      }, {})));
+      assert(compartenRenglon === 1,
+        `${donde}, Lista: ${compartenRenglon} operaciones comparten renglón`);
+      assert((await desborde(page)) <= 0,
+        `${donde}, Lista: la página desborda ${await desborde(page)}px a lo ancho`);
+
+      // La diferencia de composición se mide donde se ve: en cuadrícula la
+      // banda de la foto ocupa todo el ancho de la tarjeta; en renglón es una
+      // franja al costado. Sirve igual en 390 px, donde las dos vistas tienen
+      // el mismo ancho exterior y la diferencia no se puede leer del tamaño.
+      const fotoEnCuadricula = enCuadricula.find((c) => c.foto !== null)?.foto;
+      const fotoEnLista = enLista.find((c) => c.foto !== null)?.foto;
+      assert(fotoEnCuadricula >= 95,
+        `${donde}, Cuadrícula: la foto ocupa ${fotoEnCuadricula}% del ancho de la tarjeta`);
+      assert(fotoEnLista !== undefined && fotoEnLista <= 50,
+        `${donde}, Lista: la foto ocupa ${fotoEnLista}% del ancho y no llega a leerse como renglón`);
+      for (const i of [0, 1, 4]) await alcanzable(i, 'Lista');
+      medidos.push(`${donde} lista ${enLista.length}×`
+        + `${huellaLista.anchos[0]}x${huellaLista.altos[0]}, foto ${fotoEnLista}% `
+        + `contra ${fotoEnCuadricula}% en cuadrícula`);
+
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await dosCuadros(page);
+      const rutaLista = `${CAPTURAS}/lista-${medida.width}x${medida.height}.png`;
+      await page.screenshot({ path: rutaLista });
+      capturas.push(`${rutaLista} (${medida.width}x${medida.height})`);
+
+      // --- D. las cuatro anatomías, en las dos vistas -----------------------
+      //
+      // Sobre la mezcla creada por este caso, convocada con el buscador: así la
+      // medición no depende de qué anatomías entraron en la primera página del
+      // catálogo, que cambia con lo que hayan publicado los casos anteriores.
+      const buscador = page.locator('#buscar-mercado');
+      await buscador.fill(marca);
+      await buscador.press('Enter');
+      await esperarA(async () => (await page.locator('article[class*="card"]').count()) === 4,
+        `${donde}: buscar «${marca}» no dejó las cuatro anatomías del caso a la vista`);
+      for (const vista of ['Cuadrícula', 'Lista']) {
+        await elegirVista(page, vista);
+        await dosCuadros(page);
+        const laMezcla = await cajas(page);
+        assert([...new Set(laMezcla.map((c) => `${c.w}x${c.h}`))].length === 1,
+          `${donde}, ${vista}: las cuatro anatomías dan huellas distintas: `
+          + `${laMezcla.map((c) => `${c.que} ${c.w}x${c.h}`).join(' contra ')}`);
+        for (const [clave, rotulo] of ANATOMIAS) {
+          const tarjeta = page.locator(`article[class*="_${clave}_"]`).first();
+          assert((await tarjeta.count()) > 0,
+            `${donde}, ${vista}: no hay ninguna operación de anatomía «${clave}»`);
+          const texto = (await tarjeta.innerText()).replace(/\s+/g, ' ');
+          assert(texto.toUpperCase().includes(rotulo.toUpperCase()),
+            `${donde}, ${vista}: la tarjeta «${clave}» no dice «${rotulo}»`);
+          assert(/\$|convenir|consultar/i.test(texto),
+            `${donde}, ${vista}: la tarjeta «${clave}» no muestra su precio ni su modalidad`);
+          assert((await tarjeta.getByRole('button').count()) > 0,
+            `${donde}, ${vista}: la tarjeta «${clave}» se quedó sin acción`);
+        }
+      }
+      await buscador.fill('');
+      await buscador.press('Enter');
+      await esperarA(async () => (await page.locator('article[class*="card"]').count()) > 4,
+        `${donde}: limpiar la búsqueda no devolvió el catálogo entero`);
+      medidos.push(`${donde}: las cuatro anatomías comparten huella y conservan rótulo, `
+        + 'dato y acción en las dos vistas');
+
+      // --- E. permanencia de la vista elegida -------------------------------
+      await elegirVista(page, 'Lista');
+      const sigueEnLista = async (queHice) => {
+        await esperarA(async () => (await page.locator('article[class*="card"]').count()) > 0
+          || (await page.getByText(/No hay operaciones/).count()) > 0,
+        `${donde}: la grilla no volvió después de ${queHice}`);
+        assert((await vistaActual(page)) === 'Lista',
+          `${donde}: ${queHice} cambió la vista elegida`);
+      };
+      const orden = page.locator('#catalog-sort');
+      for (const valor of ['price-asc', 'price-desc', 'newest', 'rating', 'relevance']) {
+        await orden.selectOption(valor);
+        await sigueEnLista(`ordenar por «${valor}»`);
+      }
+
+      await buscador.fill('riego');
+      await buscador.press('Enter');
+      await sigueEnLista('buscar «riego»');
+      await buscador.fill('');
+      await buscador.press('Enter');
+      await sigueEnLista('limpiar la búsqueda');
+
+      // El panel de filtros se pliega debajo de 1024 px: se abre como se abre.
+      const plegado = page.getByRole('button', { name: /^Filtros/ });
+      if (await plegado.count()
+        && (await plegado.getAttribute('aria-expanded')) === 'false') {
+        await plegado.click();
+        await esperarA(async () => (await plegado.getAttribute('aria-expanded')) === 'true',
+          `${donde}: no se pudo abrir el panel de filtros`);
+      }
+      await page.locator('#catalog-type').selectOption('servicios');
+      await sigueEnLista('filtrar por servicios');
+      await page.getByRole('button', { name: 'Limpiar filtros' }).click();
+      await sigueEnLista('limpiar los filtros');
+
+      // Se abre por el título y no por «Ver detalle»: un insumo comprable no
+      // ofrece ese botón —lleva el selector de cantidad—, así que buscarlo
+      // dependería de qué anatomía quedó primera.
+      await page.locator('article[class*="card"]').first().scrollIntoViewIfNeeded();
+      await page.locator('article[class*="card"]').first().locator('h3').click();
+      await page.locator('#detalle-titulo').waitFor({ state: 'visible', timeout: 20_000 });
+      await page.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).first().click();
+      await page.locator('#detalle-titulo').waitFor({ state: 'detached', timeout: 20_000 });
+      await sigueEnLista('abrir y cerrar un detalle');
+      medidos.push(`${donde}: los cinco órdenes, la búsqueda, el filtro con limpieza y `
+        + 'el detalle conservan la vista elegida');
+
+      // --- F. orden de teclado -----------------------------------------------
+      await elegirVista(page, 'Cuadrícula');
+      await orden.focus();
+      await page.keyboard.press('Tab');
+      const despuesDelOrden = await page.evaluate(() => document.activeElement?.name || '');
+      assert(despuesDelOrden === 'vista-del-mercado',
+        `${donde}: después de «Ordenar por» el teclado fue a «${despuesDelOrden}» y no a la vista`);
+      await page.keyboard.press('Tab');
+      const dentroDeLaGrilla = await page.evaluate(() => (
+        !!document.activeElement?.closest('article[class*="card"]')));
+      assert(dentroDeLaGrilla,
+        `${donde}: después del selector el teclado no entra en la primera operación`);
+
+      await contexto.close();
+    }
+
+    // --- G. foto válida, ausente, rota y título largo -----------------------
+    {
+      const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const page = await contexto.newPage();
+      await abrirMercado(page);
+      await page.locator('#buscar-mercado').fill(marca);
+      await page.locator('#buscar-mercado').press('Enter');
+      await esperarA(async () => (await page.locator('article[class*="card"]').count()) === 4,
+        'la búsqueda no dejó a la vista las cuatro publicaciones del caso');
+
+      const conLasCuatro = await cajas(page);
+      assert([...new Set(conLasCuatro.map((c) => `${c.w}x${c.h}`))].length === 1,
+        'la foto, la ausencia de foto y el título largo dan huellas distintas: '
+        + `${conLasCuatro.map((c) => `${c.que} ${c.w}x${c.h}`).join(' contra ')}`);
+      const larga = conLasCuatro.find((c) => c.titulo === tituloLargo);
+      assert(larga, 'no se encontró la publicación de título largo en la pantalla');
+      assert(larga.tituloRecortado,
+        'la tarjeta estira su caja para alojar el título entero en vez de recortarlo');
+
+      // La foto que sí existe se dibuja, y el detalle conserva el título entero
+      // aunque la tarjeta lo recorte.
+      const conImagen = page.locator('article[class*="card"]')
+        .filter({ hasText: nombreConFoto }).first();
+      assert((await conImagen.locator('img').count()) === 1,
+        'la publicación con foto no dibuja su imagen');
+      const laLarga = page.locator('article[class*="card"]')
+        .filter({ hasText: tituloLargo.slice(0, 60) }).first();
+      await laLarga.locator('h3').click();
+      await page.locator('#detalle-titulo').waitFor({ state: 'visible', timeout: 20_000 });
+      assert((await page.locator('#detalle-titulo').innerText()).trim() === tituloLargo,
+        'el detalle perdió el título completo que la tarjeta recorta');
+      await page.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).first().click();
+      await page.locator('#detalle-titulo').waitFor({ state: 'detached', timeout: 20_000 });
+
+      // Y la foto rota: se rompe donde de verdad se rompe, en la respuesta.
+      await page.route('**/uploads/**', (ruta) => ruta.fulfill({
+        status: 404, contentType: 'text/plain', body: 'no está',
+      }));
+      await abrirMercado(page);
+      await page.locator('#buscar-mercado').fill(marca);
+      await page.locator('#buscar-mercado').press('Enter');
+      await esperarA(async () => (await page.locator('article[class*="card"]').count()) === 4,
+        'con la foto rota la búsqueda no devolvió las cuatro publicaciones');
+      await esperarA(async () => {
+        const rotas = await cajas(page);
+        return [...new Set(rotas.map((c) => `${c.w}x${c.h}`))].length === 1;
+      }, 'con la foto rota las publicaciones dejan de compartir huella');
+      const conLaRota = await cajas(page);
+      assert(`${conLaRota[0].w}x${conLaRota[0].h}` === `${conLasCuatro[0].w}x${conLasCuatro[0].h}`,
+        `la foto rota cambió la huella: ${conLaRota[0].w}x${conLaRota[0].h} contra `
+        + `${conLasCuatro[0].w}x${conLasCuatro[0].h} con la foto sana`);
+      assert(conLaRota.filter((c) => c.foto !== null).every((c) => c.foto >= 95),
+        'con la foto rota la banda dejó de reservar su lugar');
+      await page.unroute('**/uploads/**');
+      medidos.push('foto válida, ausente, rota y título largo comparten huella; '
+        + 'el detalle conserva el título entero');
+      await contexto.close();
+    }
+
+    // --- H. Inicio y Servicios siguen con su previa ------------------------
+    {
+      const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const page = await contexto.newPage();
+      for (const [seccion, url] of [['Inicio', `${FRONTEND_URL}/`],
+        ['Servicios', `${FRONTEND_URL}/services`]]) {
+        await page.goto(url, { waitUntil: 'domcontentloaded' });
+        await page.locator('article[class*="card"]').first()
+          .waitFor({ state: 'visible', timeout: 25_000 });
+        const previa = await page.evaluate(() => {
+          const tarjetas = [...document.querySelectorAll('article[class*="card"]')];
+          const tiene = (el, marca) => [...el.classList].some((c) => c.startsWith(`_${marca}_`));
+          return {
+            tarjetas: tarjetas.length,
+            compactas: tarjetas.filter((el) => tiene(el, 'compacta')).length,
+            enRenglon: tarjetas.filter((el) => tiene(el, 'lista')).length,
+            selectores: document.querySelectorAll('input[name="vista-del-mercado"]').length,
+          };
+        });
+        assert(previa.tarjetas === previa.compactas && previa.tarjetas > 0,
+          `${seccion}: ${previa.compactas} de ${previa.tarjetas} tarjetas usan la previa compacta`);
+        assert(previa.enRenglon === 0,
+          `${seccion}: ${previa.enRenglon} tarjetas tomaron la geometría de Lista`);
+        assert(previa.selectores === 0,
+          `${seccion}: aparecieron ${previa.selectores} controles de vista, que son del Mercado`);
+        medidos.push(`${seccion}: ${previa.tarjetas} previas compactas y ningún selector`);
+      }
+      await contexto.close();
+    }
+
+    assert(capturas.length === 6, `se guardaron ${capturas.length} capturas y tenían que ser 6`);
+    return `el Mercado elige su geometría y no la hereda de la anatomía (${medidos.join('; ')}); `
+      + `capturas: ${capturas.join(', ')}`;
+  } finally {
+    await browser.close();
+    // Las dos publicaciones del caso se dan de baja por la ruta real: quedan
+    // fuera del catálogo sin tocar la base a mano.
+    for (const id of [conTituloLargo, conFoto, elServicio, laLogistica]) {
+      try {
+        await apiRequest(`/products/${id}`, { method: 'DELETE', token: vendedor });
+      } catch { /* la limpieza no tapa el motivo real */ }
+    }
+  }
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

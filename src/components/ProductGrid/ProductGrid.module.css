@@ -4,8 +4,11 @@
 
 .resultados { min-width: 0; }
 
+/* Envuelve siempre: con el conteo, el orden y la vista en la misma banda, a
+   768 px la fila no entra y sin esto la página desbordaba 28 px a lo ancho. */
 .barra {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: var(--tg-space-4);
@@ -44,11 +47,19 @@
   text-transform: uppercase;
 }
 
+.controles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tg-space-3) var(--tg-space-5);
+}
+
 .orden {
   display: flex;
   align-items: center;
   gap: var(--tg-space-3);
   width: auto;
+  min-width: 0;
 }
 
 .orden label {
@@ -62,18 +73,115 @@
 
 .orden select {
   width: 220px;
+  max-width: 100%;
+  min-width: 0;
   border-width: 1.5px;
   border-color: var(--tg-color-border);
   font-size: 13.5px;
 }
 
-/* Tres columnas en escritorio, dos en tablet, una en celular; el activo de
-   alto valor ocupa la fila entera y eso lo decide su propia hoja. */
+/* --- El selector de vista ------------------------------------------------
+   Va al lado de «Ordenar por» porque son la misma decisión sobre la misma
+   lista: cómo se ordena y cómo se ve. */
+
+.vista {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-3);
+}
+
+.vistaRotulo {
+  color: var(--tg-color-steel);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.opciones {
+  display: inline-flex;
+  background-color: var(--tg-color-surface);
+  border: 1.5px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-sm);
+  overflow: hidden;
+}
+
+/* Posicionada para que el radio escondido quede adentro de SU rótulo: sin
+   esto, el `position: absolute` se resuelve contra el documento y enfocarlo con
+   las flechas manda la página al ángulo superior. */
+.opcionDeVista {
+  position: relative;
+  display: inline-flex;
+}
+
+.opcionDeVista + .opcionDeVista .opcionTexto {
+  border-left: 1px solid var(--tg-color-border);
+}
+
+.opcionTexto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding-inline: var(--tg-space-4);
+  color: var(--tg-color-text-secondary);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--tg-duration-fast) var(--tg-ease-standard),
+    color var(--tg-duration-fast) var(--tg-ease-standard);
+}
+
+/* El radio sigue existiendo, enfocable y operable con flechas: sólo se lo saca
+   del dibujo. Con `display: none` se iría también del teclado y del árbol de
+   accesibilidad, y entonces no habría control, habría una decoración. */
+.opcionDeVista input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.opcionDeVista input:checked + .opcionTexto {
+  background-color: var(--tg-color-brand);
+  color: var(--tg-color-text-inverse);
+}
+
+.opcionDeVista input:focus-visible + .opcionTexto {
+  outline: 2px solid var(--tg-color-focus);
+  outline-offset: -3px;
+}
+
+.opcionDeVista input:not(:checked) + .opcionTexto:hover {
+  background-color: var(--tg-color-selection);
+  color: var(--tg-color-text);
+}
+
+/* Tres columnas en escritorio, dos en tablet, una en celular. Las filas miden
+   todas lo mismo —`1fr` sobre filas implícitas iguala a la más alta— para que
+   ninguna operación tenga una huella distinta de las demás. Ninguna anatomía
+   decide su tamaño: eso ahora lo elige la persona con el selector. */
 .grilla {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
   gap: var(--tg-grid-gap-desktop);
-  align-items: start;
+}
+
+/* Una operación por renglón. Mismo criterio de altura pareja. */
+.renglones {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: 1fr;
+  gap: var(--tg-space-3);
 }
 
 .vacio {
@@ -126,11 +234,24 @@
     padding-block: var(--tg-space-4);
   }
 
+  .controles {
+    flex-wrap: wrap;
+    gap: var(--tg-space-3);
+    width: 100%;
+  }
+
   .orden { width: 100%; }
   .orden select { width: 100%; }
+
+  .vista { width: 100%; }
+  .opciones { flex: 1; }
+  .opcionDeVista { flex: 1; }
+  .opcionTexto { width: 100%; }
 
   .grilla {
     grid-template-columns: 1fr;
     gap: var(--tg-grid-gap-mobile);
   }
+
+  .renglones { gap: var(--tg-grid-gap-mobile); }
 }

@@ -27,6 +27,16 @@ interface ProductGridProps {
 
 type SortOption = 'relevance' | 'price-asc' | 'price-desc' | 'newest' | 'rating';
 
+/** Las dos presentaciones del Mercado, y no hay una tercera. El «destacado»
+ *  implícito —el activo que se quedaba con la fila entera— dejó de existir:
+ *  la geometría la elige quien mira, no la anatomía de lo que está mirando. */
+type Vista = 'cuadricula' | 'lista';
+
+const VISTAS: { valor: Vista; rotulo: string }[] = [
+  { valor: 'cuadricula', rotulo: 'Cuadrícula' },
+  { valor: 'lista', rotulo: 'Lista' },
+];
+
 export const ProductGrid: React.FC<ProductGridProps> = ({
   products,
   total,
@@ -37,6 +47,10 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
   onSolicitarIngreso,
 }) => {
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
+  // La vista vive acá y sólo acá: ordenar, buscar, filtrar o abrir un detalle
+  // no la tocan, porque ninguno de esos desmonta esta grilla. Salir del Mercado
+  // sí la reinicia, y está bien: es una preferencia de la visita, no del perfil.
+  const [vista, setVista] = useState<Vista>('cuadricula');
 
   const sortedProducts = useMemo(() => {
     const sorted = [...products];
@@ -119,19 +133,47 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
           <span>{disponibles === 1 ? 'operación' : 'operaciones'}</span>
         </h2>
 
-        <div className={`tg-field ${styles.orden}`}>
-          <label htmlFor="catalog-sort">Ordenar por</label>
-          <select
-            id="catalog-sort"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-          >
-            <option value="relevance">Más relevantes</option>
-            <option value="price-asc">Menor precio</option>
-            <option value="price-desc">Mayor precio</option>
-            <option value="newest">Más recientes</option>
-            <option value="rating">Mejor calificados</option>
-          </select>
+        <div className={styles.controles}>
+          <div className={`tg-field ${styles.orden}`}>
+            <label htmlFor="catalog-sort">Ordenar por</label>
+            <select
+              id="catalog-sort"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+            >
+              <option value="relevance">Más relevantes</option>
+              <option value="price-asc">Menor precio</option>
+              <option value="price-desc">Mayor precio</option>
+              <option value="newest">Más recientes</option>
+              <option value="rating">Mejor calificados</option>
+            </select>
+          </div>
+
+          {/* Dos radios de verdad y no un par de iconos: el rótulo se lee, el
+              estado lo anuncia el navegador y las flechas alternan sin ratón.
+              El radio queda escondido a la vista pero no del teclado ni del
+              árbol de accesibilidad. */}
+          <div className={styles.vista}>
+            <span className={styles.vistaRotulo} id="rotulo-de-la-vista">Vista</span>
+            <div
+              className={styles.opciones}
+              role="radiogroup"
+              aria-labelledby="rotulo-de-la-vista"
+            >
+              {VISTAS.map(({ valor, rotulo }) => (
+                <label key={valor} className={styles.opcionDeVista}>
+                  <input
+                    type="radio"
+                    name="vista-del-mercado"
+                    value={valor}
+                    checked={vista === valor}
+                    onChange={() => setVista(valor)}
+                  />
+                  <span className={styles.opcionTexto}>{rotulo}</span>
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -141,11 +183,12 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
           <p className="tg-small">Probá con menos filtros, otra provincia u otras palabras.</p>
         </div>
       ) : (
-        <div className={styles.grilla}>
+        <div className={vista === 'lista' ? styles.renglones : styles.grilla}>
           {sortedProducts.map((product) => (
             <ProductCard
               key={product.id}
               product={product}
+              variante={vista === 'lista' ? 'lista' : 'catalogo'}
               onSolicitarCotizacion={onSolicitarCotizacion}
               onSolicitarIngreso={onSolicitarIngreso}
             />

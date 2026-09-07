@@ -60,6 +60,10 @@
   justify-content: space-between;
   align-items: center;
   gap: var(--tg-space-3);
+  /* La altura de la caja de condición, esté o no: sin esto, la tarjeta que
+     lleva «NUEVO» empujaba su título 13 px más abajo que las vecinas de la
+     misma fila y los datos dejaban de alinearse. */
+  min-height: 24px;
 }
 
 /* El rótulo de la anatomía lleva marca cuadrada, no filete: el filete es del
@@ -106,9 +110,15 @@
   font-size: 18px;
   line-height: 1.2;
   letter-spacing: -0.01em;
-  /* Alto mínimo para que los precios de una fila queden a la misma altura
-     aunque los títulos midan distinto; y corte por palabra, no por carácter. */
+  /* Dos renglones exactos: el mínimo alinea los precios de una fila aunque los
+     títulos midan distinto, y el recorte impide que un título largo agrande
+     una sola tarjeta y rompa la huella común. El título entero sigue estando
+     en el detalle, que es donde se lee completo. */
   min-height: 2.4em;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   overflow-wrap: anywhere;
 }
 
@@ -228,61 +238,25 @@
   font-size: 13.5px;
 }
 
-/* --- Activo de alto valor ------------------------------------------------
-   Ocupa el ancho completo de los resultados. No es un destacado pagado: es la
-   forma de la anatomía, porque lo que hay que leer de una máquina —condición,
-   precio, ubicación, vendedor— no entra en una columna de 300 px sin quedar
-   apilado en una tira. Está fijado en `handoff/RESPONSIVE.md`, que en el orden
-   de precedencia de UX-2D manda sobre la lámina de referencia. */
-.activo {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr);
-}
+/* --- La anatomía ya no elige el tamaño exterior ---------------------------
+   Hasta MARKET-VIEWS-1, `.activo` traía `grid-column: 1 / -1` y su propia
+   composición horizontal: una máquina ocupaba la fila entera y el catálogo
+   cambiaba de diseño al ordenar, porque el orden cambia qué anatomía queda
+   arriba. La forma exterior pasa a ser una decisión de quien mira —Cuadrícula
+   o Lista— y las cuatro anatomías la comparten. Lo que sigue siendo propio de
+   cada una es lo de adentro: la regla de color, los datos comparables y la
+   acción.
 
-.activo .media {
-  height: 100%;
-  border-bottom: 0;
-  border-right: 1px solid var(--tg-color-border);
-}
-
-.activo .cuerpo { padding: var(--tg-space-8); }
-
-.activo .titulo {
-  min-height: 0;
-  font-size: clamp(28px, 2.6vw, 38px);
-  line-height: 1.05;
-}
-
-.activo .cifra { font-size: clamp(26px, 2.2vw, 32px); }
+   `handoff/RESPONSIVE.md` todavía dice «el activo de alto valor ocupa ambas
+   columnas»; queda contradicho por esta decisión y avisado en el informe. */
 
 /* --- Variante compacta ---------------------------------------------------
-   La vista previa de Inicio y de Servicios muestra tres operaciones en tres
-   columnas iguales. El activo conserva su anatomia -condicion, precio, accion-
-   pero no su privilegio de fila completa, que ahi no existe. */
-.compacta.activo {
-  grid-column: auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.compacta.activo .media {
-  height: 112px;
-  border-right: 0;
-  border-bottom: 1px solid var(--tg-color-border);
-}
-
-.compacta.activo .cuerpo {
-  padding: var(--tg-space-4) 18px 18px;
-}
-
-.compacta.activo .titulo {
-  min-height: 2.4em;
-  font-size: 18px;
-  line-height: 1.2;
-}
-
-.compacta.activo .cifra { font-size: 21px; }
+   La vista previa de Inicio y de Servicios. Ya no tiene que neutralizar nada,
+   porque no queda privilegio que neutralizar: la previa y la cuadrícula del
+   Mercado dibujan igual. Se conserva como presentación declarada —quien dibuja
+   dice cuál usa— y como punto de anclaje si mañana la previa necesita una
+   diferencia real. */
+.compacta { min-width: 0; }
 
 /* --- Servicio y logística ------------------------------------------------
    Sin imagen: lo que hay que comparar de un servicio es su alcance, no una
@@ -292,18 +266,118 @@
   height: 100%;
 }
 
-@media (max-width: 700px) {
-  .activo { display: flex; flex-direction: column; }
+/* --- Presentación en renglón --------------------------------------------
+   La misma tarjeta acostada. Todas comparten el rectángulo exterior; sólo
+   cambia el reparto de adentro, en tres columnas: qué es y dónde, cuánto y de
+   quién, y qué se puede hacer. */
+.lista {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 168px;
+}
 
-  .activo .media {
-    height: 160px;
-    border-right: 0;
-    border-bottom: 1px solid var(--tg-color-border);
+/* La banda de la foto se reserva por llevar foto, no por ser un activo.
+   Servicio y logística no la tienen —eso no cambia acá— y usan todo el ancho
+   para sus datos en vez de dejar un hueco vacío que no promete nada. */
+.lista.conFoto { grid-template-columns: minmax(180px, 232px) minmax(0, 1fr); }
+
+.lista .media {
+  height: 100%;
+  border-bottom: 0;
+  border-right: 1px solid var(--tg-color-border);
+}
+
+.lista .cuerpo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 200px) minmax(0, 196px);
+  grid-template-rows: auto auto auto auto;
+  align-content: center;
+  gap: var(--tg-space-2) var(--tg-space-5);
+  padding: var(--tg-space-4) var(--tg-space-5);
+}
+
+/* En el renglón la condición no se va al otro extremo de la fila: queda al
+   lado del rótulo de la anatomía, que es lo que califica. */
+.lista .encabezado {
+  grid-area: 1 / 1 / 2 / 2;
+  justify-content: flex-start;
+}
+
+/* El mínimo de dos renglones es de la cuadrícula, donde alinea los precios de
+   una fila. Acá el precio tiene columna propia y el mínimo sólo abriría un
+   hueco. El recorte a dos renglones sigue puesto. */
+.lista .titulo {
+  grid-area: 2 / 1 / 3 / 2;
+  min-height: 0;
+}
+.lista .ubicacion { grid-area: 3 / 1 / 4 / 2; }
+.lista .datosDeServicio { grid-area: 4 / 1 / 5 / 2; }
+.lista .precio { grid-area: 1 / 2 / 3 / 3; align-self: center; }
+.lista .stock { grid-area: 3 / 2 / 4 / 3; }
+.lista .vendedor { grid-area: 4 / 2 / 5 / 3; }
+
+.lista .acciones,
+.lista .cantidad {
+  grid-area: 1 / 3 / 5 / 4;
+  align-self: center;
+  margin-top: 0;
+}
+
+/* En una columna de 196 px los dos botones en línea no entran con su texto. */
+.lista .acciones { display: grid; }
+.lista .cantidad { grid-template-columns: auto 72px; }
+.lista .cantidad button { grid-column: 1 / -1; }
+
+/* La regla del vendedor cruza la tarjeta entera en cuadrícula; en un renglón
+   cruzaría una columna sola y leería como un corte arbitrario. */
+.lista .vendedor {
+  padding-top: 0;
+  border-top: 0;
+}
+
+@media (max-width: 1180px) {
+  /* Con menos ancho, la acción baja a su propia franja y los datos se quedan
+     con las dos columnas de arriba. */
+  .lista .cuerpo {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 190px);
+    grid-template-rows: auto auto auto auto auto;
   }
 
-  .activo .cuerpo { padding: var(--tg-space-4) 18px 18px; }
-  .activo .titulo { font-size: 26px; }
-  .activo .cifra { font-size: 24px; }
+  .lista .acciones,
+  .lista .cantidad { grid-area: 5 / 1 / 6 / 3; }
+  .lista .acciones { display: flex; }
+  .lista .cantidad { grid-template-columns: auto 72px 1fr; }
+  .lista .cantidad button { grid-column: auto; }
+}
+
+@media (max-width: 700px) {
+  /* En 390 px el renglón sigue siendo un renglón —foto al costado y datos al
+     lado—, que es lo que lo distingue de la cuadrícula, donde la foto va
+     arriba y ocupa todo el ancho. */
+  .lista { min-height: 0; }
+  .lista.conFoto { grid-template-columns: 112px minmax(0, 1fr); }
+
+  .lista .cuerpo {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    align-content: start;
+    gap: var(--tg-space-2);
+    padding: var(--tg-space-3) var(--tg-space-4);
+  }
+
+  .lista .encabezado,
+  .lista .titulo,
+  .lista .ubicacion,
+  .lista .datosDeServicio,
+  .lista .precio,
+  .lista .stock,
+  .lista .vendedor,
+  .lista .acciones,
+  .lista .cantidad { grid-area: auto; }
+
+  .lista .acciones { display: grid; }
+  .lista .cantidad { grid-template-columns: auto 72px; }
+  .lista .cantidad button { grid-column: 1 / -1; }
 }
 
 @media (max-width: 599px) {

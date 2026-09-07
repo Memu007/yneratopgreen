@@ -19,11 +19,13 @@ interface ProductCardProps {
   /** Adónde mandar a quien pide una cotización. Sin esto el botón no aparece:
       prometer una solicitud que no existe es peor que no ofrecerla. */
   onSolicitarCotizacion?: () => void;
-  /** `compacta` es la misma tarjeta en una columna angosta —la vista previa de
-      Inicio y de Servicios—. No es otra tarjeta: mismos datos, misma anatomía,
-      misma acción; lo único que cambia es que el activo deja de ocupar la fila
-      entera, porque en una grilla de tres columnas no hay fila entera. */
-  variante?: 'catalogo' | 'compacta';
+  /** Cómo se PRESENTA esta misma tarjeta. `catalogo` es la cuadrícula del
+      Mercado, `lista` es la misma operación en un renglón horizontal y
+      `compacta` es la vista previa de Inicio y de Servicios. No son cuatro
+      tarjetas ni cuatro componentes: mismos datos, misma anatomía, misma
+      acción. Y la presentación la elige quien dibuja la grilla —en el Mercado,
+      la persona con el selector—, nunca la anatomía de la publicación. */
+  variante?: 'catalogo' | 'compacta' | 'lista';
   /** Abre el Login de la aplicación y avisa cuando se cierra —se complete o se
       cancele—. La tarjeta lo usa para el detalle: cierra el detalle mientras el
       Login está arriba y lo vuelve a abrir después, con la misma publicación.
@@ -104,7 +106,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   return (
     <>
       <article
-        className={`${styles.card} ${styles[anatomia]} ${variante === 'compacta' ? styles.compacta : ''}`}
+        className={[
+          styles.card,
+          styles[anatomia],
+          variante === 'compacta' ? styles.compacta : '',
+          variante === 'lista' ? styles.lista : '',
+          // Que la tarjeta lleve foto no es lo mismo que ser un activo: es que
+          // la operación se mira con una foto. La presentación en renglón
+          // reserva la banda por esto y no por la anatomía.
+          esServicio ? '' : styles.conFoto,
+        ].filter(Boolean).join(' ')}
         onClick={abrirDetalle}
       >
         {/* Servicio y logística no llevan imagen: lo que hay que comparar de un
