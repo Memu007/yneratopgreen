@@ -1,7 +1,7 @@
 # Feedback visual de Emi — Mercado y Registro
 
 Fecha: 2026-09-06.
-Estado: **decidido y en cola; no interrumpe `TRANSFER-REVIEW-1`.**
+Estado: **`REGISTER-POLISH-1` activa; `MARKET-VIEWS-1` sigue en cola.**
 
 ## Evidencia recibida
 
@@ -97,8 +97,8 @@ lote salvo que el diff cruce navegación o recorridos fuera de Mercado.
 
 ## Orden y límites
 
-1. Terminar y revisar `TRANSFER-REVIEW-1`.
-2. Ejecutar `REGISTER-POLISH-1`.
+1. `TRANSFER-REVIEW-1R`: aceptada el 07/09.
+2. Ejecutar `REGISTER-POLISH-1` — tarea activa.
 3. Ejecutar `MARKET-VIEWS-1`.
 4. Retomar `ADMIN-TRUTH-1` y el resto del roadmap.
 

@@ -12,6 +12,91 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-07 — TAREA VIGENTE: REGISTER-POLISH-1, el alta tiene que transmitir confianza
+
+TRANSFER-REVIEW-1R queda **aceptada**: producto/regresión `b9eddf3`, informe
+`ee42e62` y corrección de SHA `317379c`. PM revisó el diff y los hashes y
+reprodujo el 153 ampliado en **1/1** desde una base local nueva. Durante el
+PATCH retenido, Escape, fondo, X y Cancelar no cerraron ni duplicaron la
+decisión; fallo y reintento conservaron el resultado. Build, lint, sintaxis y
+`diff-check` quedaron verdes. PM no corrió una suite completa; Dev informó
+152/153 con único rojo ambiental conocido en 131. Evidencia final en
+`REPRODUCCION-TRANSFER-REVIEW-1-2026-09-06.md`.
+
+La única tarea activa pasa a **REGISTER-POLISH-1**. Emi rechazó visualmente el
+Registro actual: no transmite la calidad de una plataforma profesional y el
+control Mostrar flota fuera del campo. La raíz visible está confirmada en
+`AuthModal.module.css`: inputs/selects y `passwordGroup` no tienen una regla de
+ancho coherente, mientras el botón absoluto toma como referencia un grupo
+encogido. La composición tampoco distingue con intención el alta básica de la
+ampliación para transportistas. Leé primero
+`FEEDBACK-VISUAL-EMI-2026-09-06.md` y contrastá esta tarea con el modal real.
+
+### Resultado obligatorio
+
+1. Todos los campos, selects, grupos y acción principal se alinean con un ancho
+   interior común. Mostrar/Ocultar pertenece al campo de contraseña: queda
+   dentro de sus límites, no tapa texto, tiene nombre accesible que comunica el
+   estado y un blanco táctil mínimo de 44 × 44 px. El input reserva ese espacio.
+2. El alta base recibe una jerarquía deliberada y sobria con los tokens ya
+   aprobados de Mesa de negocios / Mercado nacional B: encabezado, introducción
+   breve, etiquetas, requeridos/opcionales, espacios, error y acción se leen
+   como una sola superficie de confianza. No copies una landing dentro del
+   modal ni inventes otro sistema visual.
+3. La opción transportista se presenta como ampliación progresiva. Cerrada no
+   deja espacio ni grupos ocultos; abierta agrupa sus datos y permite recorrerlos
+   sin perder ayudas privadas, catálogo real de cargas, validaciones ni valores.
+   Si se cierra y vuelve a abrir en la misma alta, lo ya escrito sigue ahí.
+4. En 1440 × 900 y 390 × 844 el alta base entra y se entiende. La ampliación
+   puede desplazarse **dentro de la capa**, sin overflow horizontal, fondo que
+   se mueva, pie inaccesible ni controles cortados. Conservá teclado, foco
+   visible, zoom 200 %, contraste y el ciclo de `useCapaModal` ya aceptado.
+5. Corregí sólo el texto visible de esta superficie a es-AR coherente. Como
+   mínimo: `Crear cuenta`, `¿Ya tenés cuenta?`, `Iniciá sesión`; placeholders y
+   estados de carga tampoco deben volver al tuteo neutro. No abras la pasada
+   global de `COPY-CLEAR-1` ni migres la marca en esta pieza.
+6. El contrato de registro y el comportamiento no cambian: mismos datos,
+   requisitos de transportista, POST, confirmación por correo, reenvío,
+   preservación de valores, errores de API y prohibición de login automático.
+   Si modificás estilos compartidos con Login, verificá visual y funcionalmente
+   que Login mantiene ancho, foco, Mostrar/Ocultar y ciclo modal.
+
+La decisión fina de espaciado y composición es tuya dentro del sistema B, pero
+la aceptación no se decide por una descripción: se revisará el resultado
+renderizado. Evitá dependencias, ilustraciones y abstracciones nuevas; CSS y la
+estructura existente alcanzan si resuelven la raíz.
+
+### Regresión discriminante — caso 154
+
+Agregá un único caso 154 sobre la UI real, sin ruta de prueba ni esperas fijas.
+Debe medir, no sólo fotografiar:
+
+- alta base en 1440 × 900 y 390 × 844: campos y grupos quedan dentro del ancho
+  útil común, no hay overflow horizontal y la acción final es alcanzable;
+- Mostrar/Ocultar queda dentro del grupo, mide al menos 44 × 44, cambia el tipo
+  del input y conserva un nombre accesible correcto en ambos estados;
+- un error de validación queda visible/anunciado, recibe foco y no borra datos;
+- al abrir transportista aparecen los grupos reales; cargá valores
+  representativos, cerrá y reabrí la ampliación y exigí que se conserven;
+- la versión expandida mantiene controles, ayuda y acción final alcanzables en
+  ambos viewports, sin mover el documento detrás de la capa.
+
+Guardá cuatro capturas recuperables para revisión visual: alta base en desktop,
+alta base con error en móvil, transportista expandido en desktop y expandido en
+móvil. Informá rutas y dimensiones; no las tomes del Railway ni despliegues.
+
+Usá 148, 150 y 151 como controles. Corré 154 aislado y una suite completa
+esperada en **154/154** desde base limpia. Como hay estilos y accesibilidad,
+sumá build, lint, `node --check`, contraste, a11y completa y `diff-check` real.
+Backend, compileall y `pip check` sólo corresponden si contrariando el alcance
+tocás Backend; en ese caso frená antes con evidencia.
+
+No entran OAuth, pasos múltiples, páginas legales, ilustraciones, dependencia,
+Backend, API, modelos, migraciones, navegación, Mercado, BOEDA, Railway, pagos
+ni datos remotos. `MARKET-VIEWS-1` sigue en cola y no se mezcla. Producto y
+regresión en un commit; informe separado con rojo contra `b9eddf3`, verde,
+suite, puertas, capturas, riesgos y SHA. Subí y frená.
+
 ## 2026-09-06 — DEVOLUCIÓN VIGENTE: TRANSFER-REVIEW-1R, cancelar no puede rechazar después
 
 Revisé producto/regresión `0878bd4`, informe `5f82093` y corrección de SHA

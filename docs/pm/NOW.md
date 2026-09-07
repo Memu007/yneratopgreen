@@ -1,8 +1,8 @@
 # Estado actual
 
-Actualizado: 2026-09-06.
+Actualizado: 2026-09-07.
 
-## Estado inmediato — 2026-09-06
+## Estado inmediato — 2026-09-07
 
 - **FORM-DIRTY-1R aceptada:** producto/regresión `83dba0a`, informe `db1bb10`.
   PM revisó el diff y reprodujo 150 y 149 aislados en **1/1** cada uno; ambos
@@ -31,21 +31,23 @@ Actualizado: 2026-09-06.
   Evidencia final en `REPRODUCCION-LOCATION-SOURCE-1-2026-09-06.md`.
 - PM no atribuye una suite completa propia. Dev informó 151/152 con único rojo
   ambiental en 131; no cambió Backend, API, pagos ni estilos en la corrección.
-- **TRANSFER-REVIEW-1 devuelta:** producto/regresión `0878bd4`, informe
-  `5f82093` y corrección de SHA `5423a86`. PM revisó el diff y reprodujo el 153
-  en **1/1**, pero confirmó un rojo adicional: durante `Rechazando…`, Escape,
-  X, fondo y Cancelar todavía cierran la capa; la respuesta posterior puede
-  dejar la orden rechazada sin resultado visible. Evidencia en
-  `REPRODUCCION-TRANSFER-REVIEW-1-2026-09-06.md`.
-- **Única tarea activa y responsable:** TRANSFER-REVIEW-1R, Dev. Debe bloquear
-  las cuatro salidas sólo mientras el PATCH está pendiente y ampliar el mismo
-  caso 153; Backend no cambia.
-- **Feedback visual de Emi registrado sin interrumpir la tarea activa:** el
-  código actual confirma que Mercado mezcla tarjetas de columna con activos de
-  fila completa y que el grupo de contraseña del Registro queda desalineado.
-  Tras `TRANSFER-REVIEW-1R` siguen `REGISTER-POLISH-1` y `MARKET-VIEWS-1`: alta
-  profesional acotada y exactamente dos vistas uniformes, Cuadrícula/Lista.
-  Criterios y límites en `FEEDBACK-VISUAL-EMI-2026-09-06.md`.
+- **TRANSFER-REVIEW-1R aceptada:** producto/regresión `b9eddf3`, informe
+  `ee42e62` y corrección de SHA `317379c`. PM revisó el diff, verificó hashes y
+  reprodujo el caso 153 corregido en **1/1** desde una base PostgreSQL local
+  nueva. Escape, fondo, X y Cancelar ya no cierran ni duplican la decisión
+  mientras el PATCH está pendiente; fallo y reintento conservan su resultado.
+  Build —incluido TypeScript—, lint, sintaxis y `diff-check` quedaron verdes.
+  Evidencia final en `REPRODUCCION-TRANSFER-REVIEW-1-2026-09-06.md`.
+- PM no atribuye una suite completa propia. Dev informó **152/153**, con único
+  rojo ambiental conocido en 131; también informó 153 y 148 aislados en 1/1.
+  La corrección sólo toca `UserDashboard.tsx` y el bloque del caso 153.
+- **Única tarea activa y responsable:** `REGISTER-POLISH-1`, Dev. Debe convertir
+  el alta en una superficie alineada y profesional del sistema B, corregir el
+  control de contraseña, ordenar la expansión de transportista y conservar
+  contrato, correo, errores y accesibilidad. Caso nuevo 154.
+- `MARKET-VIEWS-1` sigue después, sin empezar: exactamente dos vistas uniformes,
+  Cuadrícula y Lista. Criterios y límites de ambas piezas en
+  `FEEDBACK-VISUAL-EMI-2026-09-06.md`.
 - Docker Desktop sigue sin arrancar y no fue reseteado ni reemplazado. No se
   tocaron volúmenes de proyecto, Railway, datos remotos ni pagos reales.
 - El red-team profundo sigue cerrado: faltan el cierre funcional, la

@@ -100,3 +100,50 @@ Frontend/regresión, bastan build, lint, `tsc --noEmit`, `node --check` y
 
 No hubo despliegue, datos remotos, secretos ni pagos. La base y archivos
 sintéticos se eliminan al cerrar la revisión.
+
+## Corrección TRANSFER-REVIEW-1R — aceptación 2026-09-07
+
+**Aceptada.** Producto/regresión `b9eddf3`; informe `ee42e62`, con corrección
+del SHA en `317379c`.
+
+El diff correctivo queda limitado a `UserDashboard.tsx` y `scripts/smoke.mjs`:
+64 inserciones y 6 eliminaciones. `cerrarElRechazo` es el único cierre que
+reciben `useCapaModal`, fondo, X y Cancelar, y consulta el envío vigente antes
+de actuar. El éxito usa la liberación directa; el fallo conserva capa, motivo y
+error. X y Cancelar quedan deshabilitados, la capa expone `aria-busy` y no se
+puede abrir otro rechazo durante el pedido. No hay Backend, estilos, pagos,
+infraestructura ni abstracción modal nueva.
+
+PM reprodujo los hashes completos del árbol entregado:
+
+```text
+3981e2c06bcc5a557d672da650cb71e8e45ed3883d7a63c32430f1b4e9788347  src/components/UserDashboard/UserDashboard.tsx
+8d250eb697e84dcbe7a571647b6d70df1a9fc81ff216b4dd3c23213a47eebae5  scripts/smoke.mjs
+```
+
+Desde otra base PostgreSQL local nueva, con migraciones, seed y
+`MP_CHECKOUT_HABILITADO=false`, PM ejecutó el 153 ampliado:
+
+```text
+PASS 153 Rechazar una transferencia se decide dentro del producto
+1/1 pasaron; 0 fallaron
+```
+
+La petición se retuvo de verdad. Mientras estuvo pendiente, Escape y fondo no
+cerraron; X y Cancelar quedaron deshabilitados; `aria-busy`, motivo y capa se
+conservaron; salió un solo PATCH y la orden no se movió antes de la respuesta.
+Al liberar el fallo, el error quedó visible y el reintento sano persistió el
+único rechazo real. El log recuperable quedó en
+`/private/tmp/boeda-pm-transfer-153r-20260907.log`.
+
+Puertas independientes PM: build con TypeScript, lint sin avisos,
+`node --check` y `diff-check` con `core.whitespace=cr-at-eol`, todas verdes. PM
+no repitió 148 ni la suite completa: el diff correctivo es mínimo, 148 ya fue
+reproducido por Dev y la suite Dev fue **152/153**, con el único rojo ambiental
+conocido en 131. Esa corrida no se atribuye a PM.
+
+Los dos riesgos declarados —recarga del navegador o respuesta que nunca llega—
+requieren cancelación/timeout y quedaron expresamente fuera de esta corrección;
+la propia pantalla ya no puede fingir que canceló la decisión. Se eliminaron la
+base, el archivo sintético y el puente local. La base habitual `topgreen` quedó
+intacta. No hubo despliegue, Railway, datos remotos, secretos ni pagos.
