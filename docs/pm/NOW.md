@@ -41,15 +41,17 @@ Actualizado: 2026-09-07.
 - PM no atribuye una suite completa propia. Dev informó **152/153**, con único
   rojo ambiental conocido en 131; también informó 153 y 148 aislados en 1/1.
   La corrección sólo toca `UserDashboard.tsx` y el bloque del caso 153.
-- **Única tarea activa y responsable:** `REGISTER-POLISH-1R`, Dev. El alta ya
-  quedó alineada y profesional dentro del sistema B. Producto
-  `7ca4fc7` e informe `dd84ee0` quedan conformes en diseño y comportamiento, pero
-  la entrega vuelve como `REGISTER-POLISH-1R`: el caso 154 sobrescribe cuatro
-  PNG rastreados por defecto y contiene una espera fija que su comentario niega.
-  Dev corrige sólo arnés/README; CSS y React no se reabren.
-- `MARKET-VIEWS-1` sigue después, sin empezar: exactamente dos vistas uniformes,
-  Cuadrícula y Lista. Criterios y límites de ambas piezas en
-  `FEEDBACK-VISUAL-EMI-2026-09-06.md`.
+- **REGISTER-POLISH-1 aceptada:** producto/regresión `7ca4fc7`, informe
+  `dd84ee0`, corrección de arnés/README `7268958` e informe `64aaf6c`. PM
+  reprodujo el 154 final en **1/1** sin destino explícito: las cuatro capturas
+  fueron a una carpeta temporal y el árbol siguió limpio. `node --check` y
+  `diff-check` quedaron verdes. No hubo suite completa PM; Dev informó 153/154
+  con único rojo ambiental conocido en 131 antes de la corrección, que no tocó
+  producto. Evidencia en `REPRODUCCION-REGISTER-POLISH-1-2026-09-07.md`.
+- **Única tarea activa y responsable:** `MARKET-VIEWS-1`, Dev. Mercado debe
+  ofrecer exactamente dos vistas elegibles y uniformes —Cuadrícula y Lista—;
+  anatomía y orden dejan de imponer geometría. Caso nuevo 155, tres viewports.
+  Criterios y límites en `FEEDBACK-VISUAL-EMI-2026-09-06.md`.
 - Docker Desktop sigue sin arrancar y no fue reseteado ni reemplazado. No se
   tocaron volúmenes de proyecto, Railway, datos remotos ni pagos reales.
 - El red-team profundo sigue cerrado: faltan el cierre funcional, la

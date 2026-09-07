@@ -1,7 +1,7 @@
 # Feedback visual de Emi — Mercado y Registro
 
 Fecha: 2026-09-06.
-Estado: **`REGISTER-POLISH-1R` devuelta sólo por arnés; `MARKET-VIEWS-1` sigue en cola.**
+Estado: **`REGISTER-POLISH-1R` aceptada; `MARKET-VIEWS-1` activa.**
 
 ## Evidencia recibida
 
@@ -98,8 +98,8 @@ lote salvo que el diff cruce navegación o recorridos fuera de Mercado.
 ## Orden y límites
 
 1. `TRANSFER-REVIEW-1R`: aceptada el 07/09.
-2. Cerrar `REGISTER-POLISH-1R` — devolución mínima de arnés activa.
-3. Ejecutar `MARKET-VIEWS-1`.
+2. `REGISTER-POLISH-1R`: aceptada el 07/09.
+3. Ejecutar `MARKET-VIEWS-1` — tarea activa.
 4. Retomar `ADMIN-TRUTH-1` y el resto del roadmap.
 
 Las dos piezas son correcciones de calidad del MVP ya existente. No habilitan

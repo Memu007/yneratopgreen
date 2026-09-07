@@ -12,6 +12,99 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-07 — TAREA VIGENTE: MARKET-VIEWS-1, dos geometrías elegidas y ninguna accidental
+
+REGISTER-POLISH-1 queda **aceptada**: producto/regresión `7ca4fc7`, informe
+`dd84ee0`, corrección de arnés/README `7268958` e informe `64aaf6c`. PM revisó
+ambos diffs y hashes, inspeccionó las cuatro capturas y reprodujo el 154 final
+en **1/1** desde base local nueva, sin `SMOKE_CAPTURAS`: generó cuatro PNG en
+una carpeta temporal única y `git status --short` siguió vacío. `node --check`
+y `diff-check` quedaron verdes. PM no repitió suite completa; Dev informó
+153/154 con único rojo ambiental conocido en 131 antes de la corrección, que no
+tocó producto. Evidencia final en
+`REPRODUCCION-REGISTER-POLISH-1-2026-09-07.md`.
+
+La única tarea activa pasa a **MARKET-VIEWS-1**. Emi rechazó que la geometría
+del Mercado dependa de la anatomía o del orden: hoy `.activo` toma toda la fila
+y se vuelve horizontal, mientras insumo, servicio y logística quedan en
+columnas. El catálogo parece cambiar de diseño al ordenar. La decisión cerrada
+en `DECISIONS.md` y `FEEDBACK-VISUAL-EMI-2026-09-06.md` es exactamente dos
+modos elegibles: **Cuadrícula** y **Lista**.
+
+### Resultado obligatorio
+
+1. Junto a `Ordenar por` aparece un selector visible con las dos opciones
+   `Cuadrícula` y `Lista`. Debe comunicar cuál está activa, funcionar con
+   teclado y exponer estado accesible —grupo con botones presionados o radios
+   reales—; no alcanza un par de iconos sin nombre. Cuadrícula es el inicio por
+   defecto. No agregues un tercer modo destacado.
+2. En **Cuadrícula**, todas las operaciones visibles usan la misma huella
+   exterior en el mismo breakpoint. Desktop conserva columnas iguales, tablet
+   reduce columnas y móvil usa una; ningún activo ocupa toda la fila. Títulos,
+   precio, vendedor y acciones se alinean y un título largo no agranda una sola
+   tarjeta ni tapa controles.
+3. En **Lista**, cada operación ocupa un renglón y todas comparten el mismo
+   rectángulo horizontal exterior. La composición se distingue de Cuadrícula
+   también en `390 × 844`, sin forzar una relación 1:1, esconder la acción o
+   producir overflow. No dupliques `ProductCard`: una presentación explícita
+   del mismo componente alcanza.
+4. Activo, insumo, servicio y logística conservan señal, datos comparables y
+   acción propios, pero ya no eligen tamaño exterior. Foto válida, ausente o
+   rota conserva el espacio previsto por cada modo; no inventes fotografías
+   para servicio/logística ni conviertas una ausencia en promesa. El detalle
+   mantiene todo el contenido aunque la tarjeta recorte texto largo.
+5. Ordenar por cualquiera de las cinco opciones, buscar, filtrar, limpiar
+   filtros y abrir/cerrar detalle no cambia la vista elegida mientras la persona
+   permanece en Mercado. No hace falta persistirla en URL, cuenta,
+   `localStorage` ni entre dispositivos; al volver a entrar puede iniciar en
+   Cuadrícula.
+6. Inicio y Servicios conservan sus previews `compacta`: mismas tres tarjetas,
+   acciones y anatomías, sin selector ni geometría de Lista. Tampoco cambian
+   conteo, API, paginación, relevancia, filtros, búsqueda, carrito, cotización,
+   ingreso, detalle o navegación.
+
+Usá los tokens y breakpoints del sistema B. Retirá del catálogo la regla
+implícita de `.activo` que hoy gobierna `grid-column`, pero conservá la variante
+compacta y cualquier diferencia semántica interna necesaria. CSS nativo y el
+estado local de `ProductGrid` alcanzan; no agregues dependencia ni otra familia
+de tarjetas.
+
+### Regresión discriminante — caso 155
+
+Agregá un único caso 155 sobre la UI real y con mezcla de las cuatro anatomías.
+Si necesitás datos controlados, crealos por rutas reales. Contra `7268958` debe
+fallar porque no existe selector y porque el activo impone una geometría
+distinta. En verde debe demostrar en **1440 × 900, 768 × 1024 y 390 × 844**:
+
+- exactamente dos controles con nombre y estado; selección por clic y teclado;
+- Cuadrícula sin `grid-column` privilegiado, con ancho/alto exterior uniforme
+  para las tarjetas comparadas y acciones alcanzables;
+- Lista con una operación por renglón, rectángulos horizontales uniformes y
+  diferencia visible respecto de Cuadrícula;
+- las cuatro anatomías conservan su rótulo/dato/acción, y foto válida, ausente,
+  rota y título largo no deforman una tarjeta aislada ni pierden el detalle;
+- recorrer los cinco órdenes y al menos una búsqueda, un filtro con limpieza y
+  un detalle conserva la vista elegida;
+- no hay overflow horizontal, el orden de teclado es lógico y el foco es
+  visible en ambas vistas;
+- Inicio y Servicios siguen usando sólo `compacta` y no muestran el selector.
+
+Generá seis capturas recuperables —dos modos por viewport— en una carpeta
+temporal fuera de Git y dejá las rutas en el resultado/informe. No sobrescribas
+binarios rastreados por defecto ni uses esperas fijas.
+
+Corré 155 aislado y una suite completa esperada en **155/155** desde base
+limpia; dentro de esa suite prestá atención a 123, 124, 125, 127, 138 y 139,
+sin repetirlos aparte si ya quedaron identificables. Sumá build, lint,
+`node --check`, contraste, a11y completa y `diff-check`. Backend, compileall y
+`pip check` sólo corresponden si contrariando el alcance tocás Backend; frená
+antes de hacerlo.
+
+No entran un tercer modo, preferencia persistente, rediseño del detalle, fotos
+nuevas, paginación, algoritmo de relevancia, Backend, API, marca BOEDA,
+Railway, pagos ni datos remotos. Producto/regresión en un commit; informe
+separado con rojo/verde, suite, puertas, capturas, riesgos y SHA. Subí y frená.
+
 ## 2026-09-07 — DEVOLUCIÓN VIGENTE: REGISTER-POLISH-1R, la prueba no ensucia el producto
 
 Revisé producto/regresión `7ca4fc7` e informe `dd84ee0`. La superficie queda

@@ -71,3 +71,41 @@ build, lint, contraste, a11y ni Backend.
 
 La base aislada y los auxiliares se eliminaron; la base habitual `topgreen`
 quedó intacta. No hubo despliegue, datos remotos, secretos ni pagos.
+
+## Corrección REGISTER-POLISH-1R — aceptación final
+
+**Aceptada.** Regresión/README `7268958`; informe `64aaf6c`. El producto visual
+permanece exactamente en `7ca4fc7`.
+
+El diff correctivo queda limitado a `scripts/smoke.mjs` y el README de las
+capturas. Sin `SMOKE_CAPTURAS`, el caso usa `mkdtempSync` bajo el temporal del
+sistema; con un destino explícito lo respeta. La espera fija de 150 ms fue
+reemplazada por dos cuadros de animación y la aserción de fondo inmóvil no se
+aflojó. Las cuatro capturas versionadas quedan como evidencia estática del SHA
+visual, no como salida mutable de cada suite.
+
+PM reprodujo los hashes completos:
+
+```text
+1270bf3e271cc0dbbd06c107eb146a3d7bf78dd445035df5d738c8f904d05d97  scripts/smoke.mjs
+cbe8a9145335b652438d4f34387844b09bf2480ac71890ed8367c147faf9340f  docs/pm/capturas-registro/README.md
+```
+
+Desde otra base local nueva, PM ejecutó el caso sin definir destino:
+
+```text
+PASS 154 El alta de cuenta tiene un solo ancho y controles operables
+1/1 pasaron; 0 fallaron
+git status --short: vacío
+```
+
+Las cuatro imágenes quedaron en
+`/var/folders/w7/htn5pr8s03b65qlsf7903w8c0000gp/T/topgreen-registro-0Ry77q/`
+y el log en `/private/tmp/boeda-pm-register-154r-20260907.log`. `node --check`
+y `diff-check` están verdes. Conforme a la devolución, PM no repitió build,
+lint, contraste, a11y ni suite completa. Dev tampoco los repitió; su evidencia
+anterior permanece 153/154 con único rojo ambiental conocido en 131 y no se
+atribuye a PM.
+
+Se eliminaron base y auxiliares aislados; `topgreen` quedó intacta. No hubo
+despliegue, Railway, datos remotos, secretos ni pagos.
