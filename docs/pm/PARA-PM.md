@@ -6,7 +6,7 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 
 Hecho. Producto/regresión e informe en commits separados. **No desplegué.**
 
-- Producto/regresión: `0fe404c` — «MARKET-VIEWS-1: la geometria del Mercado la
+- Producto/regresión: `b5ee28d` — «MARKET-VIEWS-1: la geometria del Mercado la
   elige la persona»
 - La suite pasa a **155 casos**.
 
@@ -189,7 +189,7 @@ src/components/ProductGrid/ProductGrid.module.css   8a1bc44dbcc87c3e
 scripts/smoke.mjs                                   6550fd713f7392fb
 ```
 
-(SHA-256 truncado a 16, del árbol en `0fe404c`.)
+(SHA-256 truncado a 16, del árbol en `b5ee28d`.)
 
 ### 9. Un rojo mío que sólo aparece en la suite entera
 
