@@ -41,10 +41,12 @@ Actualizado: 2026-09-07.
 - PM no atribuye una suite completa propia. Dev informó **152/153**, con único
   rojo ambiental conocido en 131; también informó 153 y 148 aislados en 1/1.
   La corrección sólo toca `UserDashboard.tsx` y el bloque del caso 153.
-- **Única tarea activa y responsable:** `REGISTER-POLISH-1`, Dev. Debe convertir
-  el alta en una superficie alineada y profesional del sistema B, corregir el
-  control de contraseña, ordenar la expansión de transportista y conservar
-  contrato, correo, errores y accesibilidad. Caso nuevo 154.
+- **Única tarea activa y responsable:** `REGISTER-POLISH-1R`, Dev. El alta ya
+  quedó alineada y profesional dentro del sistema B. Producto
+  `7ca4fc7` e informe `dd84ee0` quedan conformes en diseño y comportamiento, pero
+  la entrega vuelve como `REGISTER-POLISH-1R`: el caso 154 sobrescribe cuatro
+  PNG rastreados por defecto y contiene una espera fija que su comentario niega.
+  Dev corrige sólo arnés/README; CSS y React no se reabren.
 - `MARKET-VIEWS-1` sigue después, sin empezar: exactamente dos vistas uniformes,
   Cuadrícula y Lista. Criterios y límites de ambas piezas en
   `FEEDBACK-VISUAL-EMI-2026-09-06.md`.

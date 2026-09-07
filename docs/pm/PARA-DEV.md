@@ -12,6 +12,53 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-07 — DEVOLUCIÓN VIGENTE: REGISTER-POLISH-1R, la prueba no ensucia el producto
+
+Revisé producto/regresión `7ca4fc7` e informe `dd84ee0`. La superficie queda
+**conforme visual y funcionalmente**: el alta tiene un ancho común, jerarquía
+sobria, copy es-AR y expansión clara; Mostrar/Ocultar está dentro del campo con
+92 × 44 px y nombre por estado. Los extras declarados —Cerrar y casillas con
+blanco táctil, borde de controles, estado deshabilitado y labels reales— son
+correcciones de accesibilidad dentro del alcance y se conservan.
+
+PM verificó hashes y diff, inspeccionó las cuatro capturas y reprodujo el caso
+154 en **1/1** sobre base local nueva, guardando su salida en `/private/tmp`.
+Build con TypeScript, lint, `node --check` y `diff-check` quedaron verdes. PM no
+corrió suite completa; Dev informó 153/154 con único rojo ambiental en 131.
+Evidencia en `REPRODUCCION-REGISTER-POLISH-1-2026-09-07.md`.
+
+La pieza vuelve sólo por dos defectos del arnés:
+
+1. Sin `SMOKE_CAPTURAS`, el 154 escribe por defecto en
+   `docs/pm/capturas-registro/` y sobrescribe cuatro PNG rastreados. El correo
+   usa `Date.now()` y PM obtuvo cuatro hashes distintos al generar la misma
+   evidencia en `/private/tmp`; una corrida normal dejaría el árbol sucio y
+   mezclaría evidencia binaria con la próxima entrega.
+2. El bloque afirma «sin espera fija», pero después de la rueda ejecuta
+   `page.waitForTimeout(150)`. Ese muestreo puede pasar antes de un scroll
+   tardío y contradice el contrato escrito.
+
+### Corrección única
+
+- Conservá las cuatro capturas versionadas como evidencia estática de
+  `7ca4fc7`, o retiralas si tenés una razón mejor, pero **ninguna corrida por
+  defecto puede reescribir archivos rastreados**. Sin variable, creá una
+  carpeta temporal única con `mkdtempSync`/`tmpdir()` y reportá su ruta; con
+  `SMOKE_CAPTURAS`, seguí respetando el destino explícito. Ajustá el README para
+  que no prometa sobrescritura automática de binarios versionados.
+- Sustituí los 150 ms por sincronización del navegador sin tiempo fijo —por
+  ejemplo, dos cuadros de animación— antes de afirmar que el fondo no se movió.
+  No aflojes ni retires la aserción.
+- Con el árbol limpio y sin `SMOKE_CAPTURAS`, corré 154 y comprobá que sigue
+  limpio inmediatamente después. Informá la carpeta temporal y los cuatro
+  archivos generados.
+
+No cambies CSS, React, copy, Login ni las capturas visuales salvo que el ajuste
+de documentación lo exija. No crees el 155: queda reservado para Mercado. Para
+esta corrección alcanzan 154 aislado, `node --check` y `diff-check`; no repitas
+suite completa, build, lint, contraste, a11y ni Backend. Commit de
+regresión/README, informe separado con SHA; subí y frená. No despliegues.
+
 ## 2026-09-07 — TAREA VIGENTE: REGISTER-POLISH-1, el alta tiene que transmitir confianza
 
 TRANSFER-REVIEW-1R queda **aceptada**: producto/regresión `b9eddf3`, informe
