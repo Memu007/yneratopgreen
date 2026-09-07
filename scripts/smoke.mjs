@@ -19547,7 +19547,15 @@ await runCase(153, 'Rechazar una transferencia se decide dentro del producto', a
 // asincrónico —padrón, catálogo de cargas, alerta— se espera por condición.
 // ---------------------------------------------------------------------------
 await runCase(154, 'El alta de cuenta tiene un solo ancho y controles operables', async () => {
-  const CAPTURAS = process.env.SMOKE_CAPTURAS || 'docs/pm/capturas-registro';
+  // Una corrida por defecto NO puede tocar un archivo rastreado. Sin la
+  // variable, las capturas van a una carpeta temporal nueva y el caso informa
+  // cuál: si escribieran sobre las versionadas, cada corrida dejaría el árbol
+  // sucio en cuatro binarios y mezclaría evidencia con la entrega siguiente.
+  // Y no alcanzaría con fijar el correo: medido, hasta la captura que no lo
+  // muestra cambia de hash entre corridas, así que un PNG generado acá nunca
+  // va a ser un artefacto reproducible.
+  const CAPTURAS = process.env.SMOKE_CAPTURAS
+    || mkdtempSync(`${tmpdir()}/topgreen-registro-`);
   mkdirSync(CAPTURAS, { recursive: true });
   const capturas = [];
   const medidos = [];
@@ -19644,7 +19652,13 @@ await runCase(154, 'El alta de cuenta tiene un solo ancho y controles operables'
       const fondoAntes = await page.evaluate(() => window.scrollY);
       await page.mouse.move(medida.width / 2, medida.height / 2);
       await page.mouse.wheel(0, 900);
-      await page.waitForTimeout(150);
+      // Dos cuadros de animación en vez de un tiempo fijo: el desplazamiento se
+      // aplica antes del cuadro siguiente, y el segundo garantiza que ya se
+      // pintó. Un `waitForTimeout` puede muestrear antes de un scroll tardío y
+      // dar por buena una capa que sí movió el fondo.
+      await page.evaluate(() => new Promise((seguir) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => seguir()));
+      }));
       assert((await page.evaluate(() => window.scrollY)) === fondoAntes,
         `${donde}: rodar sobre la capa movió el documento de atrás`);
 
