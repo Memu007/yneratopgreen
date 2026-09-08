@@ -21135,6 +21135,199 @@ await runCase(157, 'La cuenta de prueba entra, publica y sobrevive a un segundo 
     + 'base local descartable';
 });
 
+// ---------------------------------------------------------------------------
+// 158. FOOTER-FOCUS-1 — el foco se ve en todo el pie, no sólo en la marca.
+//
+// El pie se pinta con `--tg-color-brand` (#1e4a34) y sus enlaces heredaban el
+// anillo global `--tg-color-focus`, que es EXACTAMENTE el mismo color: 1,0:1.
+// El anillo existía —ancho, estilo y offset correctos— y no se veía. Un foco
+// que no se ve es un teclado sin cursor: se sigue navegando a ciegas.
+//
+// Este caso no pregunta si hay contorno. Pregunta si el contorno SE VE, y lo
+// mide contra el fondo real del pie, en los tres anchos.
+//
+// Los controles no vienen de una lista escrita acá: se descubren del DOM. Una
+// lista a mano se olvida del enlace que alguien agregue mañana, y este defecto
+// nació justamente así —la marca se arregló sola en `21526bb` y los otros ocho
+// enlaces quedaron atrás—.
+// ---------------------------------------------------------------------------
+await runCase(158, 'Todo el pie muestra el foco de teclado, y el pie no se mueve al recibirlo', async () => {
+  const MEDIDAS = [
+    { n: 'escritorio', width: 1440, height: 900 },
+    { n: 'tablet', width: 768, height: 1024 },
+    { n: 'movil', width: 390, height: 844 },
+  ];
+
+  // Relación de contraste WCAG entre dos colores calculados del navegador.
+  const contraste = (frente, fondo) => {
+    const canal = (css) => (css.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+    const luz = (color) => {
+      const [r, v, a] = canal(color).map((valor) => {
+        const s = valor / 255;
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * v + 0.0722 * a;
+    };
+    const [claro, oscuro] = [luz(frente), luz(fondo)].sort((x, y) => y - x);
+    return (claro + 0.05) / (oscuro + 0.05);
+  };
+
+  // Qué es «enfocable» se le pregunta al documento, no a una lista.
+  const ENFOCABLES = 'a[href], button, [tabindex]:not([tabindex="-1"]), '
+    + 'input:not([type="hidden"]), select, textarea';
+
+  const medidos = [];
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const medida of MEDIDAS) {
+      const contexto = await browser.newContext({
+        viewport: { width: medida.width, height: medida.height },
+      });
+      const page = await contexto.newPage();
+      const donde = `${medida.n} ${medida.width}x${medida.height}`;
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.locator('footer').waitFor({ state: 'visible', timeout: 25_000 });
+      await page.locator('footer').scrollIntoViewIfNeeded();
+      await page.waitForTimeout(500);
+
+      // --- A. Qué controles hay, en orden de documento ---------------------
+      const inventario = await page.evaluate((selector) => {
+        const pie = document.querySelector('footer');
+        return [...pie.querySelectorAll(selector)]
+          .filter((el) => {
+            const caja = el.getBoundingClientRect();
+            return caja.width > 0 && caja.height > 0
+              && getComputedStyle(el).visibility !== 'hidden';
+          })
+          .map((el, indice) => {
+            el.setAttribute('data-foco-158', String(indice));
+            return {
+              indice,
+              etiqueta: el.tagName.toLowerCase(),
+              href: el.getAttribute('href') || '',
+              nombre: (el.textContent || '').replace(/\s+/g, ' ').trim()
+                || el.getAttribute('aria-label') || '(sin nombre)',
+            };
+          });
+      }, ENFOCABLES);
+      assert(inventario.length >= 8,
+        `${donde}: el pie sólo ofrece ${inventario.length} controles enfocables; `
+        + 'el barrido estaría mirando el elemento equivocado');
+
+      // --- B. La geometría de antes, para comparar después -----------------
+      // Las cajas se miden RELATIVAS al pie, no a la ventana: tabular hace que
+      // el navegador desplace la página para traer el control a la vista, y con
+      // coordenadas de ventana ese desplazamiento se leería como si el pie se
+      // hubiera movido. Lo que hay que medir es si el foco corre algo de lugar
+      // DENTRO del pie, y para eso el origen tiene que ser el pie.
+      const geometria = () => page.evaluate(() => {
+        const pie = document.querySelector('footer');
+        const origen = pie.getBoundingClientRect();
+        const caja = (el) => {
+          const r = el.getBoundingClientRect();
+          return [Math.round(r.x - origen.x), Math.round(r.y - origen.y),
+            Math.round(r.width), Math.round(r.height)];
+        };
+        return {
+          pie: [Math.round(origen.width), Math.round(origen.height)],
+          controles: [...pie.querySelectorAll('[data-foco-158]')].map(caja),
+          desborde: document.documentElement.scrollWidth
+            - document.documentElement.clientWidth,
+        };
+      });
+      const antes = await geometria();
+      assert(antes.desborde <= 0,
+        `${donde}: la página ya desborda ${antes.desborde}px antes de tocar el foco`);
+
+      // --- C. Uno por uno, con el teclado ----------------------------------
+      // Con `focus()` el anillo del sistema no se enciende: `:focus-visible` no
+      // considera visible un foco que movió un script. Se tabula, que además es
+      // lo que hace una persona.
+      const peores = [];
+      for (const control of inventario) {
+        const objetivo = page.locator(`footer [data-foco-158="${control.indice}"]`);
+        let puesto = await objetivo.evaluate((el) => el === document.activeElement);
+        for (let intento = 0; intento < 40 && !puesto; intento += 1) {
+          await page.keyboard.press('Tab');
+          puesto = await objetivo.evaluate((el) => el === document.activeElement);
+        }
+        assert(puesto,
+          `${donde}: no se llega con el teclado a «${control.nombre}» del pie`);
+
+        const anillo = await objetivo.evaluate((el) => {
+          const propio = getComputedStyle(el);
+          return {
+            estilo: propio.outlineStyle,
+            ancho: propio.outlineWidth,
+            color: propio.outlineColor,
+            desplazamiento: propio.outlineOffset,
+            fondo: getComputedStyle(el.closest('footer')).backgroundColor,
+          };
+        });
+        assert(anillo.estilo !== 'none',
+          `${donde}: «${control.nombre}» no dibuja contorno al recibir el foco`);
+        assert(parseFloat(anillo.ancho) > 0,
+          `${donde}: el contorno de «${control.nombre}» mide ${anillo.ancho}`);
+        const razon = contraste(anillo.color, anillo.fondo);
+        assert(razon >= 3,
+          `${donde}: el foco de «${control.nombre}» queda en ${razon.toFixed(2)}:1 contra el `
+          + `fondo del pie (${anillo.color} sobre ${anillo.fondo}): no se ve`);
+        peores.push(razon);
+
+        // Y recibir el foco no puede mover nada de lugar.
+        const ahora = await geometria();
+        assert(JSON.stringify(ahora.controles) === JSON.stringify(antes.controles)
+          && JSON.stringify(ahora.pie) === JSON.stringify(antes.pie),
+          `${donde}: enfocar «${control.nombre}» movió la geometría del pie`);
+        assert(ahora.desborde <= 0,
+          `${donde}: enfocar «${control.nombre}» hizo desbordar ${ahora.desborde}px`);
+      }
+      medidos.push(`${donde}: ${inventario.length} controles, peor foco `
+        + `${Math.min(...peores).toFixed(1)}:1`);
+
+      // --- D. La marca sigue teniendo un solo nombre -----------------------
+      const marca = page.locator('footer')
+        .getByRole('button', { name: 'AgroBoeda', exact: true });
+      assert((await marca.count()) === 1,
+        `${donde}: el pie tiene ${await marca.count()} controles llamados «AgroBoeda»`);
+
+      // --- E. Los destinos siguen siendo los mismos ------------------------
+      // De contacto se lee el `href` y no se abre: un `mailto:` abriría un
+      // cliente de correo y un `wa.me` saldría del entorno.
+      const contacto = inventario.filter((c) => /^(mailto:|tel:|https:\/\/wa\.me\/)/.test(c.href));
+      assert(contacto.length >= 1,
+        `${donde}: el pie no ofrece ningún enlace de contacto que revisar`);
+      for (const enlace of contacto) {
+        const href = await page.locator(`footer [data-foco-158="${enlace.indice}"]`)
+          .getAttribute('href');
+        assert(href === enlace.href && /^(mailto:|tel:|https:\/\/wa\.me\/)\S+/.test(href),
+          `${donde}: el enlace de contacto «${enlace.nombre}» quedó apuntando a ${href}`);
+      }
+
+      // Y uno interno se ejerce de verdad: la regla es de color, no puede
+      // haberle cambiado el destino.
+      const interno = page.locator('footer').getByRole('link', { name: 'Quiénes somos' }).first();
+      assert((await interno.count()) === 1, `${donde}: el pie perdió el enlace a Quiénes somos`);
+      await interno.click();
+      await esperarA(async () => (await page.locator('header').first()
+        .getByRole('button', { name: 'Quiénes somos', exact: true }).first()
+        .getAttribute('aria-current')) === 'page',
+      `${donde}: el enlace del pie a Quiénes somos dejó de llevar ahí`, 25_000);
+
+      await contexto.close();
+    }
+  } finally {
+    await browser.close();
+  }
+
+  return `en el pie, cada control enfocable descubierto del DOM recibe el foco con el teclado y `
+    + `su contorno se ve contra el fondo real: ${medidos.join('; ')}. El anillo conserva ancho, `
+    + 'estilo y desplazamiento globales, así que ningún foco mueve la geometría del pie ni hace '
+    + 'desbordar la página. La marca sigue teniendo un único nombre «AgroBoeda», los enlaces de '
+    + 'contacto conservan su mailto/tel/wa.me sin abrirlos y el enlace interno a Quiénes somos '
+    + 'sigue llevando ahí';
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

@@ -31,8 +31,13 @@
 /* El anillo de foco del sistema es `--tg-color-focus`, que es el mismo verde
    que el fondo del pie: ahí no se ve. No es otro sistema de foco, es el mismo
    anillo con el único color que se ve sobre el verde, el que la banda de la
-   cabecera ya usa por la misma razón. */
-.marca:focus-visible {
+   cabecera ya usa por la misma razón.
+
+   Va por descendencia y no control por control: los enlaces del pie cambian
+   —hoy son ocho, ayer eran once— y una lista de selectores se olvida del que
+   viene. Se toca sólo el color: el ancho, el estilo y el `outline-offset`
+   siguen siendo los globales, así que el foco no mueve nada de lugar. */
+.footer :focus-visible {
   outline-color: var(--tg-color-focus-sobre-marca);
 }
 
