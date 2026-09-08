@@ -12,7 +12,7 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
-## 2026-09-08 — INTEGRACIÓN VIGENTE: FOOTER-FOCUS-1 está conforme pero fuera de main
+## 2026-09-08 — CIERRE: FOOTER-FOCUS-1 aceptada
 
 Revisé directamente la rama `origin/claude/dev-role-repo-3l0kp3`: producto
 `5d3958a` e informe `26eb47f`. El cambio funcional está acotado a
@@ -22,19 +22,9 @@ El foco de los nueve controles reales del pie mide como mínimo 3,9:1 en los
 tres viewports y no cambia geometría, overflow ni destinos. Evidencia en
 `REPRODUCCION-FOOTER-FOCUS-1-2026-09-08.md`.
 
-La pieza no está cerrada porque la rama parte de `fc032e9` y los dos commits no
-pertenecen al `main` actual `e759225`, que contiene además el feedback del logo.
-Integrá **sin modificar** `5d3958a` y `26eb47f` sobre el `origin/main` vigente,
-preservando toda la documentación PM incorporada en `e759225`. Un merge de la
-rama sobre `main` es válido; si aparece un conflicto documental, conservá la
-versión de PM vigente y el informe nuevo de `PARA-PM.md`. No rehagas producto,
-regresión ni informe.
-
-No repitas smoke, build ni lint: PM ya verificó los SHA exactos. Comprobá sólo
-que ambos SHA sean ancestros de `origin/main`, que el árbol quede limpio y
-respondé con el nuevo HEAD. Subí y frená; **no empieces todavía
-`LOGO-INTEGRATION-1`**. No despliegues ni toques Railway, datos remotos, pagos o
-secretos.
+La integración `0cbc3c6` y el cierre Dev `1c3aecc` dejaron ambos SHA exactos en
+la historia de `main`, preservaron la documentación PM y no alteraron producto.
+`FOOTER-FOCUS-1` queda **aceptada** sin repetir pruebas.
 
 ## 2026-09-08 — ESPECIFICACIÓN IMPLEMENTADA: FOOTER-FOCUS-1, foco visible en todos los enlaces del pie
 
@@ -45,7 +35,7 @@ corrección `d9b4ab7` e informe `ba66943`. PM revisó ambos diffs y reprodujo el
 único rojo ambiental conocido en 131; la corrección documental no justificó
 repetirla. Evidencia en `REPRODUCCION-DEMO-USER-1-2026-09-08.md`.
 
-La única tarea activa pasa a **FOOTER-FOCUS-1**. El Footer usa fondo
+En esa entrega, la tarea activa pasó a **FOOTER-FOCUS-1**. El Footer usa fondo
 `--tg-color-brand` (`#1e4a34`) y sus enlaces textuales heredan el anillo global
 `--tg-color-focus`, que tiene el mismo color: contraste **1,0:1**. La marca AB
 ya quedó corregida en `21526bb` con `--tg-color-focus-sobre-marca` y mide
@@ -83,19 +73,19 @@ a11y total ni Backend: esta pieza sólo corrige el color del contorno. Producto
 y regresión en un commit; informe separado con rojo/verde y hashes. No
 despliegues ni toques Railway, datos remotos, pagos o secretos. Subí y frená.
 
-## 2026-09-08 — SIGUIENTE INMEDIATA: LOGO-INTEGRATION-1, el monograma deja de verse pegado
+## 2026-09-08 — TAREA VIGENTE: LOGO-INTEGRATION-1, el monograma deja de verse pegado
 
 Emi revisó la marca en el Mercado y rechazó la placa rectangular: el PNG
 `agroboeda-monograma.png` conserva el fondo opaco `#08281e` y se ve como una
 imagen pegada sobre las bandas `#1e4a34` de Header y Footer. Captura y decisión
 en `FEEDBACK-VISUAL-LOGO-AGROBOEDA-2026-09-08.md`.
 
-No mezcles esta pieza con `FOOTER-FOCUS-1`. Cuando la PM cierre la tarea activa,
-ésta será la siguiente. La solución elegida es un monograma AB con **fondo
-realmente transparente**, derivado de la fuente oficial sin redibujar letras,
-cambiar proporción ni sustituir el logo.
+`FOOTER-FOCUS-1` queda aceptada. La única tarea activa pasa a esta pieza. La
+solución elegida es un monograma AB con **fondo realmente transparente**,
+derivado de la fuente oficial sin redibujar letras, cambiar proporción ni
+sustituir el logo.
 
-### Resultado obligatorio futuro
+### Resultado obligatorio
 
 1. Extendé `scripts/derivar_marca.py` para producir de forma determinista un
    PNG RGBA transparente para Header y Footer. La fuente oficial permanece
@@ -103,9 +93,10 @@ cambiar proporción ni sustituir el logo.
    que el verde oscuro anterior no deje halo; conservá los núcleos blanco/marfil
    y lima, su sombreado útil y la silueta AB.
 2. Usá un nombre de archivo nuevo que haga explícita la transparencia y evite
-   caché vieja. Actualizá sólo Header/Footer y eliminá el monograma opaco si
-   queda sin consumidores. **El favicon no cambia:** su placa cuadrada es
-   intencional y funciona sobre una superficie propia.
+   caché vieja. Actualizá sólo las referencias de Header/Footer. El monograma
+   opaco actual puede seguir como imagen social de `index.html`; no amplíes el
+   alcance para cambiar metadatos. **El favicon no cambia:** su placa cuadrada
+   es intencional y funciona sobre una superficie propia.
 3. Conservá tamaño reservado, alineación, texto visible `AgroBoeda`, nombre
    accesible, navegación, foco y alturas actuales. No agregues borde, tarjeta,
    sombra CSS, resplandor, filtro, `mix-blend-mode` ni retoque generativo para
@@ -114,12 +105,30 @@ cambiar proporción ni sustituir el logo.
    dentado ni letras comidas— en Header y Footer, a 1440×900, 768×1024 y
    390×844. Generá seis capturas recuperables fuera de Git para revisión PM.
 
-La regresión se numerará al activar la pieza, sin reutilizar el caso 158 ya
-reservado. Debe fallar hoy porque el monograma es RGB opaco y, en verde,
-verificar RGBA, esquinas transparentes, contenido visible, archivo nuevo sin
-referencias viejas, imagen cargada, ausencia del rectángulo al componer sobre
-ambas bandas y geometría estable en los tres viewports. Sin dependencia nueva,
-rediseño, favicon nuevo, cambios de paleta, despliegue o datos remotos.
+### Regresión discriminante — caso 159
+
+Agregá un único caso 159. Contra `1c3aecc` debe fallar porque Header/Footer aún
+usan un PNG RGB opaco. En verde debe verificar:
+
+- fuente oficial y SHA intactos; derivación reproducible sin dependencia nueva;
+- archivo nuevo PNG RGBA, con transparencia efectiva en las esquinas y margen,
+  píxeles visibles suficientes y bordes semitransparentes sin contaminación
+  dominante del fondo oscuro original;
+- Header y Footer cargan el archivo nuevo y ya no referencian el monograma
+  opaco; el favicon conserva bytes y SHA. El uso social del opaco en
+  `index.html` queda permitido y fuera de esta corrección;
+- en 1440×900, 768×1024 y 390×844, la composición real no muestra placa ni
+  halo y conserva cajas, alineación, nombre accesible, navegación, foco y
+  ausencia de overflow. Guardá seis capturas recuperables fuera de Git: Header
+  y Footer por viewport.
+
+Corré 159 y 156 aislados, build, lint, `node --check`, verificación del script
+de derivación y `diff-check`. No corras suite completa, contraste, a11y total
+ni Backend: no agregan señal a este cambio de activo. Producto/regresión en un
+commit e informe separado con rojo, verde, hashes, dimensiones y rutas de las
+seis capturas. No mezcles rediseño, favicon, metadatos, paleta, despliegue o
+datos remotos. Si la fuente raster no permite un recorte limpio, frená con
+captura en vez de improvisar otro logo. Subí y frená.
 
 ## 2026-09-08 — DEVOLUCIÓN VIGENTE: DEMO-USER-1R, todas las guías locales dicen la verdad
 

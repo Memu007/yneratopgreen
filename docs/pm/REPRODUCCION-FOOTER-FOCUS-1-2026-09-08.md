@@ -4,12 +4,14 @@ Fecha: 2026-09-08.
 
 ## Estado
 
-Implementación técnicamente conforme, pendiente de integración a `main`.
+Aceptada e integrada a `main`.
 
 - Base de la entrega: `fc032e9`.
 - Producto/regresión revisado: `5d3958a`.
 - Informe Dev: `26eb47f`.
 - `main` durante la revisión: `e759225`.
+- Merge de integración: `0cbc3c6`.
+- Informe final de integración: `1c3aecc`.
 
 ## Revisión del delta
 
@@ -49,9 +51,9 @@ No se ejecutó suite completa, contraste general, a11y total ni Backend: la
 pieza sólo cambia un color de contorno acotado al Footer. No se desplegó ni se
 tocaron Railway, datos remotos, pagos o secretos.
 
-## Pendiente de cierre
+## Cierre
 
-`5d3958a` y `26eb47f` están en una rama que parte de `fc032e9`, no en el
-`main` vigente `e759225`. La Dev debe integrarlos sin cambios, preservar la
-documentación PM más nueva y demostrar que ambos SHA quedaron en la historia
-de `origin/main`. No hacen falta nuevas pruebas para esa integración.
+La Dev integró por merge sobre la documentación PM vigente. PM comprobó que
+`5d3958a` y `26eb47f` son ancestros de `main`, que el producto integrado es
+idéntico al revisado y que el árbol está limpio. No se repitieron pruebas para
+el merge. `FOOTER-FOCUS-1` queda aceptada.

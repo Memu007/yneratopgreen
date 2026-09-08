@@ -19,17 +19,16 @@ Actualizado: 2026-09-08.
   corrección `d9b4ab7` e informe `ba66943`. PM reprodujo 157 final en **1/1**;
   la cuenta local entra, publica, sobrevive al segundo seed y sus siete listas
   explican que la credencial es pública/local. No se desplegó ni tocó Railway.
-- **Única tarea activa y responsable:** integración de `FOOTER-FOCUS-1`, Dev.
-  Producto `5d3958a` e informe `26eb47f` quedaron técnicamente conformes en su
-  rama: PM revisó el diff y reprodujo 156+158 en **2/2**, con build, lint,
-  sintaxis y `diff-check` verdes. Falta integrarlos sin cambios al `main`
-  `e759225`; no se repiten pruebas. Evidencia en
+- **FOOTER-FOCUS-1 aceptada:** producto `5d3958a`, informe `26eb47f`, merge
+  `0cbc3c6` y cierre `1c3aecc`. PM revisó el diff y reprodujo 156+158 en
+  **2/2**, con build, lint, sintaxis y `diff-check` verdes. Ambos SHA exactos
+  quedaron en `main` sin cambios. Evidencia en
   `REPRODUCCION-FOOTER-FOCUS-1-2026-09-08.md`.
-- **Feedback visual nuevo, siguiente inmediato:** `LOGO-INTEGRATION-1`. Emi
+- **Única tarea activa y responsable:** `LOGO-INTEGRATION-1`, Dev. Emi
   rechazó el rectángulo verde oscuro del monograma porque parece una imagen
   pegada sobre Header/Footer. La Dev debe derivar desde la fuente oficial un
   PNG RGBA con transparencia real y bordes sin halo, conservar el glifo AB y el
-  favicon, y no redibujar ni generar otro logo. No se mezcla con la tarea 158.
+  favicon, y no redibujar ni generar otro logo. Caso 159; seis capturas.
 
 - **FORM-DIRTY-1R aceptada:** producto/regresión `83dba0a`, informe `db1bb10`.
   PM revisó el diff y reprodujo 150 y 149 aislados en **1/1** cada uno; ambos
