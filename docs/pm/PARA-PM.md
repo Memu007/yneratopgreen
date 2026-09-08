@@ -2,162 +2,195 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## BRAND-AGROBOEDA-1R — la marca del pie también vuelve a Inicio
+## DEMO-USER-1 — la cuenta de prueba de Emi
 
-**Resultado: terminado.** Tenías razón y el falso verde era mío de leer: el
-caso 156 comprobaba el pie con los ojos —texto e imagen— y después activaba el
-primer botón `AgroBoeda` de la página, que es el de la cabecera. Con eso, un
-pie sin control pasaba igual.
+Hecho. Producto/regresión e informe en commits separados. **No desplegué y no
+corrí el seed contra Railway.**
 
-- Producto/regresión: `21526bb`
-- Alcance real: `src/components/Footer/Footer.tsx`,
-  `src/components/Footer/Footer.module.css` y el bloque del 156 en
-  `scripts/smoke.mjs`. Nada más. No rehice activos, inventario, copy, Backend
-  ni derivación del logo, como pediste. **No desplegué ni toqué Railway, datos
-  remotos, pagos ni secretos.**
+- Producto/regresión: `53a9635` — «DEMO-USER-1: la cuenta de prueba entra,
+  publica y sobrevive al seed»
+- La suite pasa a **157 casos**.
 
 ---
 
-### 1. La corrección
-
-El bloque de monograma y nombre pasó de `div` a `button` y usa
-`handleNavigate('home')`, que es **la navegación que el pie ya tenía** en su
-columna de enlaces y que además deja la página arriba. La imagen sigue con
-`alt` vacío y el nombre sigue escrito al lado, así que el control se anuncia
-`AgroBoeda` una sola vez.
-
-El CSS hace dos cosas y ninguna más:
-
-1. Le saca al botón los adornos del control —`padding`, `background`, `border`,
-   `color`, `text-align`— para que la composición se vea igual que cuando era
-   una caja.
-2. Le da al anillo de foco el único color que se ve sobre el verde del pie.
-
-**Lo segundo no es cosmética, y lo medí.** El anillo del sistema usa
-`--tg-color-focus`, que vale `#1e4a34`; el fondo del pie es
-`--tg-color-brand`, que vale **el mismo `#1e4a34`**. Un anillo de ese color
-sobre ese fondo da 1,0:1: existe y no se ve. El caso no se conforma con que el
-contorno exista: mide el contraste del color del contorno contra el fondo real
-del pie y exige 3:1. Con `--tg-color-focus-sobre-marca` —el mismo color que la
-banda de la cabecera ya usa, por esta misma razón— queda en **3,9:1**.
-
-### 2. El rojo, contra `f0913a7`
-
-Con el caso ampliado y el producto sin corregir:
+### 1. Alcance: qué toqué y qué no
 
 ```
-[FAIL] 156 La identidad pública es AgroBoeda, sin renombrar lo que no es marca
-       — escritorio 1440x900: el pie no ofrece exactamente un control de marca
-         «AgroBoeda» (hay 0)
+backend/app/seed.py            la cuenta, y el resumen de credenciales
+scripts/smoke.mjs              caso 157 + la lista de credenciales del 132
+scripts/entorno_nativo.sh      el cartel de cuentas del entorno local
+scripts/init_local_db.sh       ídem, camino Docker
+scripts/init_local_db.ps1      ídem, camino Docker en Windows
+README.md                      tabla de credenciales demo
+README_LOCAL_SETUP.md          tabla de datos de prueba
 ```
 
-El bloque nuevo no puede reutilizar el control de la cabecera ni el enlace
-`Inicio` de la otra columna: busca **dentro de `footer`**, por rol y nombre
-exacto, y exige que haya **exactamente uno**. Y empieza en «Quiénes somos»,
-porque volver a Inicio desde Inicio no demuestra que se vuelva.
+No toqué el modelo, ni las migraciones, ni la autenticación, ni el alta, ni el
+catálogo. **No hay migración, ni endpoint, ni alta automática al arrancar, ni
+variable de escape.** La cuenta entra por donde ya entraban las otras cuatro.
 
-### 3. El verde
+### 2. El rojo, contra `d63158c`
 
-```
-[PASS] 147 La barra dice que seccion se mira, y Atras vuelve adonde estaba
-[PASS] 156 La identidad pública es AgroBoeda, sin renombrar lo que no es marca
-2/2 pasaron; 0 fallaron
-```
-
-Lo que agrega el 156, en los tres anchos:
+Con el `seed.py` de `d63158c` —el resto del árbol igual, base local recreada—:
 
 ```
-escritorio 1440x900: la marca del pie vuelve a Inicio con el teclado,
-                     deja la página arriba y su foco se ve en 3.9:1
-tablet     768x1024: idem
-movil       390x844: idem
+[FAIL] 157 La cuenta de prueba entra, publica y sobrevive a un segundo seed —
+  el seed dejó 0 filas para pruba@agroboeda.com y tiene que dejar exactamente una
+0/1 pasaron; 1 fallaron
 ```
 
-Cada ancho comprueba, en este orden: que en el pie haya **un solo** control
-`AgroBoeda`; que escriba el nombre una sola vez; que su imagen sea decorativa;
-que la página esté abajo antes de activarlo —si no, «deja la página arriba» no
-probaría nada—; que se llegue **tabulando** y no con `focus()`, porque el
-anillo es `:focus-visible` y Chromium no lo enciende cuando el foco lo mueve un
-script; que el contorno se vea contra el fondo; y que al activarlo con Enter
-aparezca Inicio y `window.scrollY` vuelva a 0.
+Falla donde tiene que fallar: en la primera lectura, porque la cuenta no
+existe. No es un rojo de pantalla ni de locator.
 
-### 4. Lo que corrí y lo que no
-
-**Corrido, con salida.**
+### 3. La cuenta: qué es, y sobre todo qué no
 
 ```
-SMOKE_CASOS=147,156 (base limpia)               2/2
-node --check scripts/smoke.mjs                  verde
-npm run build                                   verde
-npm run lint                                    verde, 0 avisos
+correo      pruba@agroboeda.com      la grafía es la que entregó Emi
+clave       @agroboeda               guardada con bcrypt, nunca en claro
+nombre      Prueba AgroBoeda
+rol         user                     no admin, no transportista
+estado      activa y verificada
+```
+
+Verificada **desde el seed** y no por un atajo del producto: el correo no
+existe, así que sin eso el ingreso se traba en una confirmación que no va a
+llegar nunca. Es exactamente lo que ya hacen las otras cuatro cuentas demo.
+
+Y arranca vacía. No le puse teléfono, ni ubicación, ni biografía, ni CBU, ni
+alias, ni vínculo de Mercado Pago: **ni un dato de más**. Lo único que tiene es
+lo que hace falta para entrar.
+
+### 4. El seed repetido
+
+La rama de creación es `if not prueba:` y **no hay `else` que escriba**: cuando
+la cuenta está, el seed imprime que está y sigue de largo. No repone la clave,
+no reacomoda el rol, no completa campos vacíos —que es lo que sí hace, a
+propósito, con el transportista demo— y no borra nada.
+
+El caso lo mide de la única forma que vale: publica algo con la cuenta, corre
+el seed **de verdad** —el mismo `python -m app.seed`— y después compara los 17
+campos uno por uno y busca la publicación por su id.
+
+```
+antes  → recorrido real: entra, publica, la ve en su cuenta y en el Mercado
+seed   → «Cuenta de prueba ya existe, no se toca»
+después→ 17/17 campos idénticos, la publicación intacta y el ingreso funciona
+```
+
+Si algún día alguien le agrega un `else` que "arregla" la cuenta, el caso dice
+qué campo se movió, con el valor de antes y el de después.
+
+### 5. El caso 157
+
+Ocho tramos, todos por rutas reales:
+
+- **la fila**: una sola, con el correo tal cual —normalizado, sin espacios—,
+  nombre, rol `user`, activa, verificada, no transportista, y la clave con la
+  forma de bcrypt y distinta del texto plano;
+- **arranca limpia**: sin CBU, alias, ni ninguna de las cinco columnas de
+  Mercado Pago; sin publicaciones, órdenes, calificaciones, documentación ni
+  ítems en el carrito. Todo **preguntado por esta cuenta**, nunca por un total
+  del seed: un conteo fijo lo rompe cualquier caso que corra antes;
+- **la clave que tiene Emi es la que entra**: `/auth/login` con las credenciales
+  exactas y `/auth/me` diciendo `user`;
+- **no tiene permisos de más**: no basta con que no aparezca el botón, así que
+  el caso le pide `/admin/users` y exige **403**;
+- **entra por el formulario real** —no inyectando el token—, y la barra no le
+  muestra un solo control de administración;
+- **publica**: abre Vender, completa el alta mínima y el caso mira **la
+  respuesta del POST**, no el cartel de la pantalla, que lo podría pintar
+  cualquiera. La fila queda con su `seller_id`;
+- **la ve como propia** en Mis publicaciones, y **cualquiera la encuentra** en
+  el Mercado buscándola por un título único de la corrida —no se depende del
+  orden del catálogo—;
+- **el segundo seed no la pisa**: los 17 campos idénticos uno por uno, la
+  publicación intacta y el ingreso funcionando después; y `ENV=production`
+  sigue saliendo con 2 sin abrir conexión.
+
+Categoría y localidad salen de la base, no de una constante: el caso se para
+solo aunque cambie el catálogo.
+
+### 6. Lo que declaro
+
+**Un control que extendí.** El caso 132 —el freno de entorno de `SEC-4`—
+comprobaba que el mensaje de rechazo no nombrara **ocho** credenciales demo.
+Ahora hay diez: le agregué `pruba@agroboeda.com` y `@agroboeda`. Sin eso el
+control seguía verde mientras dejaba de cubrir la credencial nueva.
+
+**Un detalle del esquema que me costó dos corridas y conviene que quede
+escrito.** La columna `users.role` guarda el **nombre** del enum —`USER`— y la
+API devuelve su **valor** —`user`—. Mi primera aserción comparaba contra `user`
+en SQL y salía roja con la cuenta bien creada. Ahora compara sin distinguir
+mayúsculas y el comentario dice por qué: lo que se afirma es que el rol no es
+el de administración, no la forma en que Postgres lo almacena.
+
+**Y una del arnés.** Al volver del alta, la publicación recién creada está
+dibujada dos veces: en el panel y en el catálogo de atrás. Buscar el título en
+la página entera encontraba dos y además no probaba nada sobre «Mis
+publicaciones». El caso ahora busca **dentro del panel**, por su rol y su
+nombre accesible.
+
+### 7. Puertas
+
+```
+base limpia + SMOKE_CASOS=157                   1/1
+base limpia + SMOKE_CASOS=41,132,133            3/3
+base limpia + suite completa                    156/157 (rojo: 131)
+npm run build                                   ok
+npm run lint                                    ok (--max-warnings 0)
+npx tsc --noEmit                                ok
+node --check scripts/smoke.mjs                  ok
+python -m compileall backend/app                ok
+python -m pip check                             ok
 git -c core.whitespace=cr-at-eol diff --check   limpio
 ```
 
-Capturas del 156 en `/tmp/cap1r`: `cabecera-`, `pie-` y `registro-` en
-1440×900, 768×1024 y 390×844. Fuera de Git; `git status --short` quedó sin
-novedades. Aparte, para mirar la corrección a ojo, dejé una del pie con el foco
-puesto en la marca.
+No corrí `contraste` ni `a11y`: no toqué una sola línea de interfaz, así que no
+agregan señal. Lo dijiste vos y coincido.
 
-**No corrido, y lo digo.**
+El **131** es el ambiental de siempre: mi entorno no tiene demonio de Docker.
+**157/157 es lo que tiene que dar en tu máquina.**
 
-- **No repetí la suite completa, ni `contraste`, ni `a11y` total, ni Backend,
-  ni la derivación del logo**, porque lo pediste así y porque la corrección no
-  los toca: es un `div` que pasa a `button` en un solo archivo.
-- No desplegué, no corrí seed contra Railway, no toqué datos remotos, pagos,
-  secretos ni la aplicación externa de Mercado Pago.
-- No empecé `DEMO-USER-1`.
-
-### 5. Hallazgo fuera de la corrección
-
-**Los demás enlaces del pie tienen el mismo anillo invisible.** `Publicaciones`,
-`Servicios`, `Inicio`, `Quiénes somos`, `Contacto`, el correo, el teléfono y
-WhatsApp reciben el `:focus-visible` global, que es `#1e4a34` sobre un fondo
-`#1e4a34`: **1,0:1**. No es un problema que traiga esta tarea; ya estaba, y lo
-encontré midiendo el anillo de la marca.
-
-Lo dejé **sin arreglar** porque tu alcance era el control de la marca y porque
-el arreglo obvio —ponerle `tg-sobre-marca` al `<footer>`— cambia el
-`outline-offset` de todos esos controles y eso ya es tocar la composición
-aprobada.
-
-**Arreglo propuesto**, si lo querés como pieza corta: una regla en
-`Footer.module.css` que le dé a los enlaces del pie el mismo
-`--tg-color-focus-sobre-marca` que ahora tiene la marca, más un caso que mida
-el contraste del anillo de cada control del pie —derivado del DOM, no de una
-lista escrita a mano—. Esfuerzo: chico. Riesgo: bajo, es sólo color de
-contorno. Fase: cuando digas; no bloquea nada.
-
-### 6. Nota sobre esta rama
-
-Esta corrección salió de `f2f4ecc`. Antes de tu devolución, esta rama tenía una
-implementación **paralela** de `BRAND-AGROBOEDA-1` —commits `0940660` y
-`b1d8838`— que nunca se mergeó, porque `main` tomó `f0913a7`. La rama se
-reinició sobre `main` para que 1R fuera el delta que pediste y no una segunda
-migración compitiendo con la aceptada. Los dos commits viejos siguen existiendo
-en el remoto por su SHA; no hay nada de ellos en esta entrega.
-
----
-
-## Integración de BRAND-AGROBOEDA-1R a main
-
-Hecha. **Nuevo HEAD de `origin/main`: `1286ed2`.**
-
-Se integró con un merge y no con un rebase a propósito: pediste comprobar que
-`21526bb` y `879d79f` estuvieran **en la historia de `origin/main`**, y un
-rebase les cambia el SHA, así que esa comprobación habría dado que no. Con el
-merge quedan los dos commits tal cual, en su orden producto → informe.
+### 8. Hashes
 
 ```
-git rev-parse origin/main                          1286ed2e57a76487b8ee6f3890b385b3917f8d17
-git merge-base --is-ancestor 21526bb origin/main   sí
-git merge-base --is-ancestor 879d79f origin/main   sí
-git status --short                                 vacío
+backend/app/seed.py              a69e8ce189e4b7ac
+scripts/smoke.mjs                44bd6f2ea990b08d
+scripts/entorno_nativo.sh        d7ce9ab8a2cef00b
+scripts/init_local_db.sh         bbc30e2b218fd969
+scripts/init_local_db.ps1        5e5f05e290b3e86c
+README.md                        15343aa9fef55053
+README_LOCAL_SETUP.md            9a60056f10b1d33c
 ```
 
-El merge no tocó ningún archivo en común con `ef3152e`: vos escribiste en
-`docs/pm/` y la corrección vive en `Footer.tsx`, `Footer.module.css` y el
-bloque del 156. No rehice la corrección, no agregué cambios y no repetí
-pruebas, como pediste.
+(SHA-256 truncado a 16.)
 
-`FOOTER-FOCUS-1` queda anotado como deuda, detrás de `DEMO-USER-1`. No arranqué
-ninguna de las dos.
+### 9. Riesgos residuales
+
+1. **La credencial es pública y está escrita en el repositorio.** Es lo que
+   pediste y es lo que ya pasa con las otras cuatro, pero conviene decirlo con
+   todas las letras: `pruba@agroboeda.com` / `@agroboeda` sirve para cualquiera
+   que tenga el código. Por eso el seed sigue corriendo sólo con `ENV=local` y
+   por eso las cuatro listas del setup ahora lo dicen al lado de la tabla.
+2. **Llevarla a Railway es otra operación y no está hecha.** No corrí el seed
+   contra el entorno remoto, no cambié datos remotos y no autorizo yo esa
+   migración: es una decisión tuya y de Emi, limitada a esa cuenta.
+3. **La cuenta acumula lo que Emi haga.** Es idempotente, no es reversible: el
+   seed no le borra publicaciones ni órdenes, así que la base local se va a ir
+   ensuciando con las pruebas. Se limpia recreando la base, no volviendo a
+   sembrar.
+4. **`pruba` es una errata deliberada.** Si algún día alguien la "corrige", la
+   clave de ingreso de Emi deja de funcionar y el caso 157 se pone rojo. Eso es
+   exactamente lo que tiene que pasar, pero que quede escrito.
+5. Sigue en pie: `FOOTER-FOCUS-1` —el anillo de foco del pie— y la decisión
+   pendiente sobre el copy del Login, `COPY-CLEAR-1`.
+
+### 10. Frenos
+
+No mezclé `FOOTER-FOCUS-1`. No desplegué, no corrí seed contra Railway, no
+cambié datos remotos, pagos, secretos ni la configuración externa de Mercado
+Pago. No agregué endpoint administrativo, migración, auto-seed de arranque ni
+variable de escape. No toqué la fuente en `docs/pm/originales/`. `PRE_FIRMA.md`
+sigue fuera del versionado y lo confirmé antes de empujar.
+
+Freno acá y te pido revisión.
