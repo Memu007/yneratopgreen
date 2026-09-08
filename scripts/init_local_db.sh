@@ -89,6 +89,10 @@ cat <<EOF
        admin@topgreen.com / admin123
        vendedor@ejemplo.com / vendedor123
        cliente@ejemplo.com / cliente123
+       pruba@agroboeda.com / @agroboeda   (cuenta de prueba, rol usuario)
+
+   Son publicas y estan escritas en el repositorio: valen sobre esta base
+   local descartable y en ningun otro lado.
 
 Backend  : http://localhost:8000/api/docs
 Frontend : npm install ; npm run dev    (luego http://localhost:5173)

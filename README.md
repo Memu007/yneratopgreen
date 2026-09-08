@@ -127,6 +127,7 @@ translucidas y opacidad heredada. Detalle de cada una en la cabecera de
 | Admin | `admin@topgreen.com` | `admin123` |
 | Vendedor | `vendedor@ejemplo.com` | `vendedor123` |
 | Cliente | `cliente@ejemplo.com` | `cliente123` |
+| Prueba (usuario) | `pruba@agroboeda.com` | `@agroboeda` |
 
 **⚠️ Cambiar antes de producción.**
 

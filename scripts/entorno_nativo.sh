@@ -339,6 +339,10 @@ cat <<EOF
     admin@topgreen.com    / admin123
     vendedor@ejemplo.com  / vendedor123
     cliente@ejemplo.com   / cliente123
+    pruba@agroboeda.com   / @agroboeda      (cuenta de prueba, rol usuario)
+
+  Las cuatro son públicas: están escritas acá y en el repositorio. Sirven
+  sobre esta base local descartable y en ningún otro lado.
 
   Antes de la suite, base limpia:
     ./scripts/entorno_nativo.sh --recrear && node scripts/smoke.mjs

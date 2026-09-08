@@ -13854,8 +13854,8 @@ await runCase(132, 'El seed de demostracion se niega a correr fuera de un entorn
   // puede repetir, porque va a parar a la consola de un servicio desplegado.
   const todo = produccion.salida + produccion.error;
   for (const credencial of ['admin@topgreen.com', 'vendedor@ejemplo.com',
-    'cliente@ejemplo.com', 'transportista@ejemplo.com',
-    'admin123', 'vendedor123', 'cliente123', 'transportista123']) {
+    'cliente@ejemplo.com', 'transportista@ejemplo.com', 'pruba@agroboeda.com',
+    'admin123', 'vendedor123', 'cliente123', 'transportista123', '@agroboeda']) {
     assert(!todo.includes(credencial),
       `el rechazo nombra la credencial demo ${credencial}`);
   }
@@ -13917,7 +13917,7 @@ print(json.dumps(resultado))
 
   return `ENV=production: salida 2, sin abrir conexion —la base apuntaba a un puerto muerto y `
     + `no hubo ni un error de conexion—, sin escribir en la salida normal y sin nombrar `
-    + `ninguna de las ocho credenciales demo. Tambien rechaza ${rechazados.join(', ')}. `
+    + `ninguna de las diez credenciales demo. Tambien rechaza ${rechazados.join(', ')}. `
     + `La lista dice donde SI: admitidos = ${JSON.stringify(permitidos.admitidos)}, y local `
     + `pasa con mayusculas y con espacios. Sin ALLOW_/FORCE_/SKIP_ ni lectura suelta del entorno`;
 });
@@ -20801,6 +20801,293 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
   } finally {
     await browser.close();
   }
+});
+
+// ---------------------------------------------------------------------------
+// DEMO-USER-1. Emi pidió una cuenta estable para recorrer el producto
+// autenticado sin poner una identidad personal, con estas credenciales exactas
+// y la grafía `pruba` tal como la entregó.
+//
+// El caso mide las dos formas de arruinar esto, que son opuestas. Una es que la
+// cuenta no exista o exista a medias: sin verificar, con otro rol, con permisos
+// de más. La otra es que exista pero el seed la pise: si repetir el seed le
+// repone la clave, le cambia el rol o le borra lo que publicó, la cuenta deja
+// de ser estable, que es lo único que se le pidió.
+// ---------------------------------------------------------------------------
+await runCase(157, 'La cuenta de prueba entra, publica y sobrevive a un segundo seed', async () => {
+  const CORREO = 'pruba@agroboeda.com';
+  const CLAVE = '@agroboeda';
+  const NOMBRE = 'Prueba AgroBoeda';
+
+  // Todo lo que define a la cuenta, en una sola lectura: se compara consigo
+  // misma después del segundo seed y cualquier campo que se mueva sale con
+  // nombre en el mensaje del fallo.
+  const CAMPOS = [
+    'id', 'correo', 'nombre', 'rol', 'hash de la clave', 'activa', 'verificada',
+    'transportista', 'CBU', 'alias bancario', 'id de Mercado Pago',
+    'token de acceso de MP', 'token de refresco de MP', 'fecha de vínculo con MP',
+    'reconexión de MP', 'calificaciones', 'ventas', 'compras',
+  ];
+  const retrato = () => queryRows(`
+    SELECT
+      u.id::text, u.email, u.full_name, u.role::text, u.password_hash,
+      u.is_active::text, u.is_verified::text, u.is_carrier::text,
+      COALESCE(u.cbu, ''), COALESCE(u.alias_bancario, ''),
+      COALESCE(u.mp_user_id::text, ''), COALESCE(u.mp_access_token_cifrado, ''),
+      COALESCE(u.mp_refresh_token_cifrado, ''), COALESCE(u.mp_linked_at::text, ''),
+      u.mp_requiere_reconexion::text,
+      u.rating_count::text, u.sales_count::text, u.purchases_count::text,
+      'fin'
+    FROM users u
+    WHERE lower(btrim(u.email)) = ${sqlLiteral(CORREO)}
+  `);
+
+  // --- A. Una sola fila, y la que se pidió ----------------------------------
+  const antes = retrato();
+  assert(antes.length === 1,
+    `el seed dejó ${antes.length} filas para ${CORREO} y tiene que dejar exactamente una`);
+  const [
+    id, correo, nombre, rol, hash, activa, verificada, transportista,
+    cbu, alias, mpUsuario, mpAcceso, mpRefresco, mpVinculo, mpReconexion,
+    calificaciones, ventas, compras,
+  ] = antes[0];
+
+  assert(correo === CORREO,
+    `el correo quedó guardado como ${JSON.stringify(correo)}: no está normalizado`);
+  assert(nombre === NOMBRE,
+    `el nombre visible es ${JSON.stringify(nombre)} y tenía que ser ${JSON.stringify(NOMBRE)}`);
+  // La columna guarda el NOMBRE del enum —`USER`— y la API devuelve su valor
+  // —`user`—. Se comparan sin distinguir mayúsculas para no atarse a la forma
+  // de almacenamiento: lo que se afirma es que el rol no es el de administración.
+  assert(rol.toLowerCase() === 'user',
+    `el rol de la cuenta de prueba es «${rol}» y tiene que ser «user»`);
+  assert(activa === 'true' && verificada === 'true',
+    `la cuenta no quedó activa y verificada (activa=${activa}, verificada=${verificada}): `
+    + 'con un correo que no existe, sin eso el ingreso se traba en una confirmación que no llega');
+  assert(transportista === 'false', 'la cuenta de prueba quedó marcada como transportista');
+
+  // La clave se guarda hasheada, y no alcanza con «no es el texto plano»: se
+  // exige la forma de bcrypt, que es la que usa el resto del producto.
+  assert(hash !== CLAVE, 'la contraseña de la cuenta de prueba quedó guardada en claro');
+  assert(/^\$2[aby]\$/.test(hash),
+    `la contraseña no está hasheada con bcrypt: empieza con ${JSON.stringify(hash.slice(0, 7))}`);
+
+  // Y arranca limpia. Se pregunta POR ESTA CUENTA y nunca por un total del
+  // seed: un conteo fijo de usuarios o de productos lo rompe cualquier caso
+  // que corra antes.
+  for (const [que, valor] of [
+    ['CBU', cbu], ['alias bancario', alias], ['id de Mercado Pago', mpUsuario],
+    ['token de acceso de MP', mpAcceso], ['token de refresco de MP', mpRefresco],
+    ['fecha de vínculo con MP', mpVinculo],
+  ]) {
+    assert(valor === '',
+      `la cuenta de prueba arranca con ${que} cargado: ${JSON.stringify(valor)}`);
+  }
+  assert(mpReconexion === 'false', 'la cuenta de prueba arranca pidiendo reconectar Mercado Pago');
+  for (const [que, valor] of [
+    ['calificaciones', calificaciones], ['ventas', ventas], ['compras', compras],
+  ]) {
+    assert(valor === '0', `la cuenta de prueba arranca con ${valor} ${que}`);
+  }
+
+  const propias = (tabla, columna) => queryCount(
+    `SELECT COUNT(*) FROM ${tabla} WHERE ${columna} = ${sqlLiteral(id)}`);
+  assert(propias('products', 'seller_id') === 0, 'la cuenta de prueba arranca con publicaciones');
+  assert(propias('orders', 'buyer_id') === 0 && propias('orders', 'seller_id') === 0,
+    'la cuenta de prueba arranca con órdenes');
+  assert(propias('ratings', 'reviewed_id') === 0, 'la cuenta de prueba arranca calificada');
+  assert(propias('documentacion_de_vendedores', 'user_id') === 0,
+    'la cuenta de prueba arranca con documentación presentada');
+  const enElCarrito = queryCount(`
+    SELECT COUNT(*) FROM cart_items ci
+    JOIN carts c ON c.id = ci.cart_id
+    WHERE c.user_id = ${sqlLiteral(id)}
+  `);
+  assert(enElCarrito === 0,
+    `la cuenta de prueba arranca con ${enElCarrito} ítem(s) en el carrito`);
+
+  // --- B. La clave que Emi tiene es la que entra, y no da permisos de más ----
+  const sesion = (await apiRequest('/auth/login', {
+    method: 'POST', body: { email: CORREO, password: CLAVE },
+  })).data;
+  assert(sesion.access_token && sesion.refresh_token,
+    'el ingreso con las credenciales exactas no devolvió la sesión completa');
+  const yo = (await apiRequest('/auth/me', { token: sesion.access_token })).data;
+  assert(yo.role === 'user', `la API dice que la cuenta de prueba es «${yo.role}»`);
+  assert(yo.full_name === NOMBRE,
+    `la API devuelve el nombre ${JSON.stringify(yo.full_name)}`);
+  // No tener el botón no es no tener el permiso. Lo que decide es el servidor.
+  await expectApiError(403, () => apiRequest('/admin/users', { token: sesion.access_token }));
+
+  // Lo que hace falta para completar el formulario de alta sale de la base, no
+  // de una constante: el caso se para solo aunque cambien las categorías.
+  const [categoria] = queryRows(`
+    SELECT name, 'fin' FROM categories
+    WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1
+  `);
+  const [ubicacion] = queryRows(`
+    SELECT l.province_id, l.id, l.name, l.province_name, 'fin' FROM localities l
+    WHERE l.name = 'Pergamino' AND l.province_name = 'Buenos Aires' LIMIT 1
+  `);
+  assert(categoria && ubicacion, 'faltan categoría o localidad para completar el formulario');
+
+  // Título único de ESTA corrida: no se depende del orden del catálogo ni de
+  // que la publicación quede primera en ninguna lista.
+  const TITULO = `Prueba de Emi ${Date.now()}`;
+  let publicado = null;
+  const erroresDePagina = [];
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext();
+    const page = await contexto.newPage();
+    page.on('pageerror', (error) => erroresDePagina.push(error.message));
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+
+    // --- C. Se entra por el formulario real, con esas credenciales ----------
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+    await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    await page.getByPlaceholder('tu@email.com').fill(CORREO);
+    await page.getByPlaceholder('••••••••').fill(CLAVE);
+    await page.locator('[class*="_submitButton_"][type="submit"]').click();
+    await page.getByRole('button', { name: 'Mi cuenta' })
+      .first().waitFor({ state: 'visible', timeout: 25_000 });
+
+    // Y no aparece una sola superficie de administración.
+    const conAdmin = await page.getByRole('button', { name: 'Admin', exact: true }).count();
+    assert(conAdmin === 0,
+      `la cuenta de prueba ve ${conAdmin} control(es) de administración en la barra`);
+
+    // --- D. Publica por el recorrido de siempre -----------------------------
+    await page.getByRole('button', { name: /Vender/ }).first().click();
+    await page.getByRole('heading', { name: /Publicar un producto/i })
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    await page.locator('#name').fill(TITULO);
+    await page.locator('#category option').filter({ hasText: categoria[0] })
+      .first().waitFor({ state: 'attached', timeout: 10_000 });
+    await page.locator('#category').selectOption({ label: categoria[0] });
+    await page.locator('#description')
+      .fill('Publicación mínima creada con la cuenta de prueba, por el formulario real.');
+    await page.locator('#price').fill('12345');
+    await page.locator('#stock').fill('3');
+    await page.locator('#province').selectOption(ubicacion[0]);
+    await page.locator('#locality').selectOption(ubicacion[1]);
+
+    // El alta tiene que pasar por la API de verdad: se mira la respuesta del
+    // POST, no el cartel de la pantalla, que lo podría pintar cualquiera.
+    const [respuesta] = await Promise.all([
+      page.waitForResponse(
+        (r) => new URL(r.url()).pathname.endsWith('/products')
+          && r.request().method() === 'POST',
+        { timeout: 30_000 },
+      ),
+      page.locator('form button[type="submit"]').click(),
+    ]);
+    assert(respuesta.ok(),
+      `el alta respondió HTTP ${respuesta.status()}: ${(await respuesta.text()).slice(0, 200)}`);
+    publicado = await respuesta.json();
+    assert(publicado && publicado.id, `la respuesta del alta no trae id: ${JSON.stringify(publicado).slice(0, 200)}`);
+    await page.getByText(/publicado exitosamente!/i).waitFor({ state: 'visible', timeout: 20_000 });
+
+    // La fila es suya y de nadie más.
+    const [enLaBase] = queryRows(`
+      SELECT p.seller_id::text, u.full_name, p.name, 'fin'
+      FROM products p JOIN users u ON u.id = p.seller_id
+      WHERE p.id = ${sqlLiteral(publicado.id)}
+    `);
+    assert(enLaBase, 'la publicación no quedó en la base');
+    assert(enLaBase[0] === id,
+      `la publicación quedó a nombre de ${enLaBase[1]} y no de ${NOMBRE}`);
+    assert(enLaBase[2] === TITULO, `el título guardado es ${JSON.stringify(enLaBase[2])}`);
+
+    // --- E. La ve como propia en su cuenta ---------------------------------
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
+    // Todo adentro del panel: al volver del alta, la publicación recién creada
+    // también está dibujada en el catálogo de atrás, así que buscar el título
+    // en la página entera encuentra dos y no dice nada de «Mis publicaciones».
+    const panel = page.getByRole('dialog', { name: 'Mi cuenta' });
+    await panel.waitFor({ state: 'visible', timeout: 20_000 });
+    await panel.getByRole('button', { name: 'Mis publicaciones' }).click();
+    await panel.getByRole('heading', { name: 'Mis publicaciones' }).waitFor({ timeout: 20_000 });
+    await panel.getByRole('heading', { name: TITULO, exact: true, level: 3 })
+      .waitFor({ state: 'visible', timeout: 20_000 });
+
+    // --- F. Y cualquiera la encuentra en el Mercado -------------------------
+    const anonimo = await browser.newContext();
+    const publica = await anonimo.newPage();
+    await publica.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await publica.getByLabel('Buscar en el mercado').fill(TITULO);
+    await Promise.all([
+      publica.waitForResponse((r) => r.url().includes('/catalog/products')
+        && r.url().includes('search=') && r.status() === 200, { timeout: 20_000 }),
+      publica.getByLabel('Buscar en el mercado').press('Enter'),
+    ]);
+    await publica.getByRole('heading', { name: TITULO, exact: true, level: 3 })
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    await anonimo.close();
+
+    assert(erroresDePagina.length === 0, `errores JS: ${erroresDePagina.join(' | ')}`);
+    await contexto.close();
+  } finally {
+    await browser.close();
+  }
+
+  // --- G. El segundo seed no la pisa ni le borra lo que hizo ----------------
+  const salida = correrSeed();
+  assert(/Seed completado/i.test(salida),
+    `el segundo seed no terminó bien: ${salida.slice(-200)}`);
+
+  const despues = retrato();
+  assert(despues.length === 1,
+    `repetir el seed dejó ${despues.length} filas para ${CORREO}`);
+  for (let i = 0; i < antes[0].length - 1; i += 1) {
+    assert(antes[0][i] === despues[0][i],
+      `repetir el seed cambió ${CAMPOS[i]} de la cuenta de prueba:\n`
+      + `  antes:   ${JSON.stringify(antes[0][i])}\n`
+      + `  después: ${JSON.stringify(despues[0][i])}`);
+  }
+  const sigue = queryRows(`
+    SELECT p.name, p.seller_id::text, 'fin' FROM products p
+    WHERE p.id = ${sqlLiteral(publicado.id)}
+  `);
+  assert(sigue.length === 1 && sigue[0][0] === TITULO && sigue[0][1] === id,
+    'el segundo seed se llevó puesta la publicación que había creado la cuenta de prueba');
+  // Y la clave sigue siendo la misma: el hash no se movió, pero lo que importa
+  // es que Emi pueda volver a entrar.
+  await apiRequest('/auth/login', { method: 'POST', body: { email: CORREO, password: CLAVE } });
+
+  // --- H. El freno de entorno sigue donde estaba ---------------------------
+  // Es la puerta de SEC-4, no un mecanismo nuevo: se le pasa una base que no
+  // existe, así que si el freno fallara el único daño posible sería un error de
+  // conexión —y ese error, si aparece, delata que llegó a intentarlo—.
+  const BASE_INEXISTENTE = 'postgresql+psycopg://nadie:nada@127.0.0.1:59999/no_existe';
+  const conEntorno = spawnSync('docker', [
+    'exec', '-i', '-e', 'ENV=production', '-e', `DATABASE_URL=${BASE_INEXISTENTE}`,
+    'topgreen-api', 'python', '-m', 'app.seed',
+  ], { encoding: 'utf8' });
+  assert(conEntorno.status === 2,
+    `con ENV=production el seed salió con ${conEntorno.status} y tiene que salir con 2`);
+  const dicho = (conEntorno.stdout || '') + (conEntorno.stderr || '');
+  assert(/no corre con ENV/.test(dicho),
+    `el rechazo no explica qué pasó: ${JSON.stringify(dicho.slice(0, 200))}`);
+  for (const rastro of ['connection', 'could not connect', 'OperationalError', '59999']) {
+    assert(!new RegExp(rastro, 'i').test(dicho),
+      `el seed llegó a tocar la base antes de frenar: aparece "${rastro}"`);
+  }
+  // Y la credencial nueva tampoco se filtra por el mensaje de rechazo, que va a
+  // parar a la consola de un servicio desplegado.
+  for (const credencial of [CORREO, CLAVE]) {
+    assert(!dicho.includes(credencial),
+      `el rechazo nombra la credencial de la cuenta de prueba: ${credencial}`);
+  }
+
+  return `${CORREO} existe una sola vez, normalizada, con bcrypt, rol user, activa, `
+    + 'verificada, sin transportista, sin datos bancarios ni de Mercado Pago y sin '
+    + `publicaciones, órdenes ni calificaciones propias; entra por el formulario real, `
+    + `no ve administración —403 en /admin/users—, publica «${TITULO}» por la API `
+    + `(${publicado.id}) en ${ubicacion[2]}, ${ubicacion[3]}, la ve en Mis publicaciones y `
+    + 'aparece en el Mercado; el segundo seed deja los 17 campos idénticos y conserva la '
+    + 'publicación, y ENV=production sigue saliendo con 2 sin abrir conexión';
 });
 
 const passed = results.filter((result) => result.passed).length;

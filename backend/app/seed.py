@@ -205,6 +205,40 @@ def create_seed_data():
                 print("  ⏭️  Transportista ya existe")
 
 
+        # === CUENTA DE PRUEBA PARA RECORRER EL PRODUCTO === #
+        # Emi pidio una cuenta estable para caminar las pantallas autenticadas
+        # sin poner una identidad personal. La grafia `pruba` es la que entrego
+        # y se conserva tal cual: corregirla seria devolverle un dato que no
+        # pidio, y ademas la clave de ingreso dejaria de ser la que tiene.
+        #
+        # Es una persona registrada mas y nada mas que eso: rol `user`, sin
+        # transportista, sin administracion, sin publicaciones, sin datos
+        # bancarios y sin vinculo de Mercado Pago. No se le agrega un solo
+        # atajo para "facilitar la prueba": una cuenta con permisos de mas no
+        # recorre el producto que va a usar quien entre despues.
+        #
+        # Queda activa y verificada porque el correo no existe: sin eso el
+        # ingreso se traba en una confirmacion que no va a llegar nunca.
+        #
+        # Y si ya esta, no se toca -ni la clave, ni el rol, ni el nombre-.
+        # Para cuando el seed vuelva a correr, esta cuenta puede tener adentro
+        # lo que Emi haya publicado.
+        prueba = db.query(User).filter(User.email == "pruba@agroboeda.com").first()
+        if not prueba:
+            prueba = User(
+                email="pruba@agroboeda.com",
+                password_hash=hash_password("@agroboeda"),
+                full_name="Prueba AgroBoeda",
+                role=UserRole.USER,
+                is_active=True,
+                is_verified=True,
+                is_carrier=False,
+            )
+            db.add(prueba)
+            print("  \u2705 Cuenta de prueba creada: pruba@agroboeda.com / @agroboeda")
+        else:
+            print("  \u23ED\uFE0F  Cuenta de prueba ya existe, no se toca")
+
         # === DATOS BANCARIOS DEMO === #
         # Sin CBU ni alias, una instalacion limpia no puede usar la
         # transferencia: los dos usuarios que publican en el catalogo demo
@@ -1233,6 +1267,10 @@ def create_seed_data():
         print("  Admin:    admin@topgreen.com / admin123")
         print("  Vendedor: vendedor@ejemplo.com / vendedor123")
         print("  Cliente:  cliente@ejemplo.com / cliente123")
+        print("  Prueba:   pruba@agroboeda.com / @agroboeda")
+        # Estan escritas en el repositorio: son publicas y no son un
+        # secreto. Sirven en una base local descartable y en ninguna otra.
+        print("  (credenciales publicas: solo para esta base local descartable)")
         print(f"\n📦 {len(productos)} productos de ejemplo disponibles")
         
     except Exception as e:

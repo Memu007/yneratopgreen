@@ -266,6 +266,11 @@ críticas son:
 | `admin@topgreen.com` | `admin123` | Admin |
 | `vendedor@ejemplo.com` | `vendedor123` | Vendedor |
 | `cliente@ejemplo.com` | `cliente123` | Cliente |
+| `pruba@agroboeda.com` | `@agroboeda` | Usuario (cuenta de prueba) |
+
+Las cuatro credenciales están escritas en este repositorio: son **públicas**,
+no son un secreto y sólo sirven sobre una base local descartable. No las lleves
+a un entorno remoto ni las trates como una cuenta real.
 
 El seed también crea ~8 categorías (Semillas, Fertilizantes, Herramientas,
 Maquinaria, Agroquímicos, etc.) y productos demo con URLs de imágenes
