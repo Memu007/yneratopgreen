@@ -21328,6 +21328,295 @@ await runCase(158, 'Todo el pie muestra el foco de teclado, y el pie no se mueve
     + 'sigue llevando ahí';
 });
 
+// ---------------------------------------------------------------------------
+// 159. LOGO-INTEGRATION-1 — el monograma deja de ser una placa pegada.
+//
+// El derivado de Header y Footer era PNG RGB: se llevaba puesto el fondo
+// `#08281e` de la fuente y lo apoyaba sobre la banda `#1e4a34` del sitio. Emi
+// lo vio y lo dijo con una palabra: «pegado».
+//
+// Un alfa técnicamente presente no alcanzaría. Este caso mide tres cosas
+// distintas y ninguna es «el archivo tiene canal alfa»:
+//
+//  1. el archivo: esquinas y marco realmente transparentes, glifo con cuerpo, y
+//     bordes semitransparentes DESCONTAMINADOS —si el borde conserva el verde
+//     oscuro del original, la transparencia deja halo y el recorte se sigue
+//     viendo pegado—;
+//  2. la composición real: el monograma dibujado sobre el color de banda que el
+//     navegador reporta, sin un solo píxel más oscuro que la banda. Cualquier
+//     placa y cualquier halo son, por definición, más oscuros que el fondo del
+//     sitio, porque el glifo es marfil y lima y el fondo viejo era casi negro;
+//  3. que no se haya movido nada más: cajas, alturas, nombre accesible,
+//     navegación, foco y ausencia de desborde.
+//
+// La derivación se comprueba corriendo el script real en modo verificación, que
+// no escribe: si el archivo del repositorio no es el que sale de la fuente, se
+// nota acá y no en la próxima entrega.
+// ---------------------------------------------------------------------------
+await runCase(159, 'El monograma se integra con la banda: sin placa, sin halo y sin mover nada', async () => {
+  const CAPTURAS = process.env.SMOKE_CAPTURAS
+    || mkdtempSync(`${tmpdir()}/agroboeda-logo-`);
+  mkdirSync(CAPTURAS, { recursive: true });
+  const capturas = [];
+  const medidos = [];
+
+  const NUEVO = '/marca/agroboeda-monograma-alfa.png';
+  const OPACO = '/marca/agroboeda-monograma.png';
+  const sha256 = (ruta) => createHash('sha256').update(readFileSync(ruta)).digest('hex');
+
+  // --- A. La fuente no se tocó y el derivado sale de ella ------------------
+  const FUENTE = 'docs/pm/originales/AGROBOEDA-LOGO-FUENTE.png';
+  const SHA_FUENTE = '5606077c429b20edecb62986d6b7500c7142c6a6230c006fdfb33c4978b206cf';
+  assert(sha256(FUENTE) === SHA_FUENTE, `la fuente oficial cambió: ${sha256(FUENTE)}`);
+
+  // El favicon no entra en esta pieza: su placa cuadrada es intencional. Se
+  // comprueba que siga siendo byte por byte el que ya estaba en `1c3aecc`.
+  const SHA_FAVICON = '1e1da0e55abf72cdd99aedd3882d67bf649ae1603807ef6d0d7b5bcf7237b96f';
+  assert(sha256('public/marca/agroboeda-favicon.png') === SHA_FAVICON,
+    `el favicon cambió y esta pieza no lo toca: ${sha256('public/marca/agroboeda-favicon.png')}`);
+
+  // La derivación se vuelve a correr, en el modo que no escribe. Si lo que hay
+  // en el repositorio no es lo que produce la fuente, el script lo dice.
+  const verificacion = spawnSync('python3', ['scripts/derivar_marca.py', '--verificar'],
+    { encoding: 'utf8' });
+  assert(verificacion.status === 0,
+    `la verificación de la derivación falló: ${(verificacion.stderr || '').slice(0, 300)}`);
+  const dicho = verificacion.stdout || '';
+  for (const archivo of ['agroboeda-monograma.png', 'agroboeda-monograma-alfa.png',
+    'agroboeda-favicon.png']) {
+    const linea = dicho.split('\n').find((l) => l.includes(archivo));
+    assert(linea, `la derivación no informa ${archivo}:\n${dicho}`);
+    assert(linea.includes(sha256(`public/marca/${archivo}`)),
+      `el ${archivo} del repositorio no es el que produce la fuente:\n  ${linea}`);
+  }
+  assert(/RGBA/.test(dicho.split('\n').find((l) => l.includes('monograma-alfa.png')) || ''),
+    'la derivación no declara RGBA para el monograma nuevo');
+
+  // Y sigue sin dependencias: el script lee y escribe PNG con la biblioteca
+  // estándar. Una dependencia nueva convertiría «reproducible» en «reproducible
+  // si además instalás algo».
+  const ESTANDAR = new Set(['hashlib', 'struct', 'sys', 'zlib', 'collections', 'pathlib',
+    'math', 'os', 'itertools', 'functools', 'argparse']);
+  const importados = [...readFileSync('scripts/derivar_marca.py', 'utf8')
+    .matchAll(/^(?:import|from)\s+([A-Za-z_][\w.]*)/gm)].map((m) => m[1].split('.')[0]);
+  const ajenos = importados.filter((mod) => !ESTANDAR.has(mod));
+  assert(ajenos.length === 0,
+    `la derivación incorporó dependencias fuera de la biblioteca estándar: ${ajenos.join(', ')}`);
+
+  // --- B. Referencias: quién usa cuál -------------------------------------
+  const html = await (await fetch(FRONTEND_URL)).text();
+  assert(html.includes(OPACO),
+    'index.html dejó de usar el monograma opaco como imagen social, y esta pieza no lo toca');
+  for (const componente of ['src/components/Header/Header.tsx',
+    'src/components/Footer/Footer.tsx']) {
+    const fuente = readFileSync(componente, 'utf8');
+    assert(fuente.includes(NUEVO), `${componente} no usa ${NUEVO}`);
+    assert(!fuente.includes(`"${OPACO}"`), `${componente} sigue usando el monograma opaco`);
+  }
+
+  // --- C. El archivo, píxel por píxel --------------------------------------
+  const MEDIDAS = [
+    { n: 'escritorio', width: 1440, height: 900, altoCabecera: 40 },
+    { n: 'tablet', width: 768, height: 1024, altoCabecera: 40 },
+    { n: 'movil', width: 390, height: 844, altoCabecera: 30 },
+  ];
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contextoPixeles = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const hoja = await contextoPixeles.newPage();
+    await hoja.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    const archivo = await hoja.evaluate(async (ruta) => {
+      const imagen = new Image();
+      imagen.src = ruta;
+      await imagen.decode();
+      const lienzo = document.createElement('canvas');
+      lienzo.width = imagen.naturalWidth;
+      lienzo.height = imagen.naturalHeight;
+      const cx = lienzo.getContext('2d');
+      cx.drawImage(imagen, 0, 0);
+      const { data, width, height } = cx.getImageData(0, 0, lienzo.width, lienzo.height);
+      const FONDO_VIEJO = [8, 40, 30];
+      const NUCLEOS = [[247, 242, 233], [172, 204, 57]];
+      const lejos = (p, q) => Math.abs(p[0] - q[0]) + Math.abs(p[1] - q[1]) + Math.abs(p[2] - q[2]);
+      let transparentes = 0; let opacos = 0; let borde = 0; let contaminados = 0;
+      let alfaEnElMarco = 0;
+      const esquinas = [];
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const i = (y * width + x) * 4;
+          const a = data[i + 3];
+          if (a === 0) transparentes += 1;
+          else if (a >= 250) opacos += 1;
+          if (a > 12 && a < 243) {
+            borde += 1;
+            const p = [data[i], data[i + 1], data[i + 2]];
+            const aFondo = lejos(p, FONDO_VIEJO);
+            if (aFondo < Math.min(...NUCLEOS.map((n) => lejos(p, n)))) contaminados += 1;
+          }
+          if (x < 3 || y < 3 || x >= width - 3 || y >= height - 3) {
+            alfaEnElMarco = Math.max(alfaEnElMarco, a);
+          }
+        }
+      }
+      for (const [x, y] of [[0, 0], [width - 1, 0], [0, height - 1], [width - 1, height - 1]]) {
+        esquinas.push(data[(y * width + x) * 4 + 3]);
+      }
+      return {
+        width, height, total: width * height, transparentes, opacos, borde, contaminados,
+        alfaEnElMarco, esquinas,
+      };
+    }, NUEVO);
+
+    assert(archivo.width === 320 && archivo.height === 197,
+      `el monograma nuevo mide ${archivo.width}x${archivo.height} y tiene que conservar 320x197`);
+    assert(archivo.esquinas.every((a) => a === 0),
+      `las esquinas no son transparentes: alfa ${JSON.stringify(archivo.esquinas)}`);
+    assert(archivo.alfaEnElMarco === 0,
+      `el marco de 3 px conserva alfa ${archivo.alfaEnElMarco}: quedó un resto de placa`);
+    assert(archivo.transparentes / archivo.total > 0.4,
+      `sólo el ${(100 * archivo.transparentes / archivo.total).toFixed(1)}% del archivo es `
+      + 'transparente: el fondo no se separó');
+    assert(archivo.opacos / archivo.total > 0.2,
+      `sólo el ${(100 * archivo.opacos / archivo.total).toFixed(1)}% del archivo es opaco: `
+      + 'la separación se comió el glifo');
+    assert(archivo.borde > 500,
+      `el archivo tiene ${archivo.borde} píxeles de borde: sin semitransparencia el recorte `
+      + 'quedaría serruchado');
+    assert(archivo.contaminados === 0,
+      `${archivo.contaminados} de ${archivo.borde} píxeles del borde siguen más cerca del verde `
+      + 'oscuro de la fuente que del glifo: eso es el halo');
+    medidos.push(`archivo ${archivo.width}x${archivo.height}: `
+      + `${(100 * archivo.transparentes / archivo.total).toFixed(0)}% transparente, `
+      + `${(100 * archivo.opacos / archivo.total).toFixed(0)}% opaco, `
+      + `${archivo.borde} píxeles de borde y ninguno contaminado`);
+    await contextoPixeles.close();
+
+    // --- D. La composición real, en los tres anchos ------------------------
+    for (const medida of MEDIDAS) {
+      const contexto = await browser.newContext({
+        viewport: { width: medida.width, height: medida.height },
+      });
+      const page = await contexto.newPage();
+      const donde = `${medida.n} ${medida.width}x${medida.height}`;
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.locator('header').first().waitFor({ state: 'visible', timeout: 25_000 });
+      await page.waitForTimeout(600);
+
+      // El monograma dibujado sobre el color de banda que reporta el navegador.
+      // Todo el glifo es marfil y lima: más claro que la banda. Un píxel más
+      // oscuro que la banda sólo puede venir de la placa vieja o de su halo.
+      const componer = (selector) => page.evaluate(async (sel) => {
+        const banda = document.querySelector(sel);
+        const img = banda.querySelector('img');
+        const fondo = getComputedStyle(banda).backgroundColor;
+        const [fr, fg, fb] = fondo.match(/\d+/g).slice(0, 3).map(Number);
+        const caja = img.getBoundingClientRect();
+        const an = Math.round(caja.width);
+        const al = Math.round(caja.height);
+        const lienzo = document.createElement('canvas');
+        lienzo.width = an; lienzo.height = al;
+        const cx = lienzo.getContext('2d');
+        cx.fillStyle = fondo;
+        cx.fillRect(0, 0, an, al);
+        const bruto = new Image();
+        bruto.src = img.currentSrc;
+        await bruto.decode();
+        cx.drawImage(bruto, 0, 0, an, al);
+        const { data } = cx.getImageData(0, 0, an, al);
+        const luz = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        const luzBanda = luz(fr, fg, fb);
+        let masOscuros = 0; let peor = 0; let marcoDistinto = 0;
+        for (let y = 0; y < al; y += 1) {
+          for (let x = 0; x < an; x += 1) {
+            const i = (y * an + x) * 4;
+            const l = luz(data[i], data[i + 1], data[i + 2]);
+            if (l < luzBanda - 4) { masOscuros += 1; peor = Math.max(peor, luzBanda - l); }
+            if ((x < 2 || y < 2 || x >= an - 2 || y >= al - 2)
+              && (data[i] !== fr || data[i + 1] !== fg || data[i + 2] !== fb)) marcoDistinto += 1;
+          }
+        }
+        return {
+          src: img.getAttribute('src'), an, al, fondo, total: an * al,
+          masOscuros, peor: Math.round(peor), marcoDistinto,
+          proporcion: Number((an / al).toFixed(2)),
+        };
+      }, selector);
+
+      for (const [banda, selector, altoEsperado] of [
+        ['cabecera', 'header', medida.altoCabecera],
+        ['pie', 'footer', 44],
+      ]) {
+        if (selector === 'footer') await page.locator('footer').scrollIntoViewIfNeeded();
+        const visto = await componer(selector);
+        assert(visto.src === NUEVO, `${donde}/${banda}: dibuja ${visto.src}`);
+        assert(visto.al === altoEsperado,
+          `${donde}/${banda}: el monograma mide ${visto.al}px de alto y tenía ${altoEsperado}`);
+        assert(Math.abs(visto.proporcion - 320 / 197) < 0.03,
+          `${donde}/${banda}: la proporción quedó en ${visto.proporcion} y el archivo es `
+          + `${(320 / 197).toFixed(2)}`);
+        assert(visto.marcoDistinto === 0,
+          `${donde}/${banda}: el borde del monograma no es el color de la banda en `
+          + `${visto.marcoDistinto} píxeles: hay placa`);
+        assert(visto.masOscuros === 0,
+          `${donde}/${banda}: ${visto.masOscuros} píxeles quedan más oscuros que la banda `
+          + `(hasta ${visto.peor} de luminancia): eso es placa o halo`);
+        medidos.push(`${donde}/${banda}: ${visto.an}x${visto.al} sobre ${visto.fondo}, `
+          + '0 píxeles más oscuros que la banda');
+
+        const ruta = `${CAPTURAS}/159-${banda}-${medida.width}x${medida.height}.png`;
+        await page.locator(selector).first().screenshot({ path: ruta });
+        capturas.push(ruta);
+      }
+
+      // Nombre accesible, navegación, foco y desborde: lo que no tenía que
+      // moverse.
+      for (const [banda, selector] of [['cabecera', 'header'], ['pie', 'footer']]) {
+        const control = page.locator(selector).first()
+          .getByRole('button', { name: 'AgroBoeda', exact: true });
+        assert((await control.count()) === 1,
+          `${donde}/${banda}: hay ${await control.count()} controles llamados «AgroBoeda»`);
+        const alt = await page.locator(`${selector} img`).first().getAttribute('alt');
+        assert(alt === '', `${donde}/${banda}: la imagen dejó de ser decorativa (alt=${alt})`);
+      }
+      const desborde = await page.evaluate(() => document.documentElement.scrollWidth
+        - document.documentElement.clientWidth);
+      assert(desborde <= 0, `${donde}: la página desborda ${desborde}px a lo ancho`);
+
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.getByRole('button', { name: 'Mercado', exact: true }).first().click();
+      await page.locator('#buscar-mercado').waitFor({ state: 'visible', timeout: 25_000 });
+      const marca = page.locator('header').first()
+        .getByRole('button', { name: 'AgroBoeda', exact: true });
+      let enLaMarca = await marca.evaluate((el) => el === document.activeElement);
+      for (let intento = 0; intento < 12 && !enLaMarca; intento += 1) {
+        await page.keyboard.press('Shift+Tab');
+        enLaMarca = await marca.evaluate((el) => el === document.activeElement);
+      }
+      assert(enLaMarca, `${donde}: no se llega con el teclado a la marca de la cabecera`);
+      const anillo = await marca.evaluate((el) => {
+        const c = getComputedStyle(el);
+        return `${c.outlineStyle} ${c.outlineWidth}`;
+      });
+      assert(!/none/.test(anillo) && !/ 0px$/.test(anillo),
+        `${donde}: la marca enfocada no muestra foco (${anillo})`);
+      await page.keyboard.press('Enter');
+      await esperarA(async () => (await page.getByRole('heading', { name: /seguir produciendo/ })
+        .count()) > 0, `${donde}: la marca dejó de llevar a Inicio`, 20_000);
+
+      await contexto.close();
+    }
+  } finally {
+    await browser.close();
+  }
+
+  return `la fuente sigue en ${SHA_FUENTE.slice(0, 12)}… y el favicon en `
+    + `${SHA_FAVICON.slice(0, 12)}…; \`derivar_marca.py --verificar\` reproduce los tres `
+    + 'archivos con la biblioteca estándar y declara RGBA para el nuevo; '
+    + `${medidos.join('; ')}. La marca conserva su único nombre accesible, la imagen sigue `
+    + 'siendo decorativa, el foco se ve, Enter lleva a Inicio y ninguna medida desborda. '
+    + `Seis capturas en ${CAPTURAS}`;
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

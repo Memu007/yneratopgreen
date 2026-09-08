@@ -82,7 +82,7 @@ def leer_png(ruta):
     return ancho, alto, filas
 
 
-def escribir_png(ruta, ancho, alto, filas):
+def escribir_png(ruta, ancho, alto, filas, con_alfa=False):
     crudo = bytearray()
     for linea in filas:
         crudo.append(0)
@@ -92,9 +92,11 @@ def escribir_png(ruta, ancho, alto, filas):
         return (struct.pack('>I', len(cuerpo)) + tipo + cuerpo
                 + struct.pack('>I', zlib.crc32(tipo + cuerpo) & 0xFFFFFFFF))
 
+    # Tipo de color 6 = RGBA; 2 = RGB. Es lo único que cambia entre los dos.
+    tipo_de_color = 6 if con_alfa else 2
     ruta.write_bytes(
         b'\x89PNG\r\n\x1a\n'
-        + trozo(b'IHDR', struct.pack('>IIBBBBB', ancho, alto, 8, 2, 0, 0, 0))
+        + trozo(b'IHDR', struct.pack('>IIBBBBB', ancho, alto, 8, tipo_de_color, 0, 0, 0))
         + trozo(b'IDAT', zlib.compress(bytes(crudo), 9))
         + trozo(b'IEND', b''))
 
@@ -144,6 +146,136 @@ def encuadrar(filas, ancho, alto, fondo):
     return lado, salida
 
 
+def colores_del_glifo(ancho, alto, filas, fondo, cuantos=2):
+    """Los colores del monograma, contados en la fuente y no elegidos a mano.
+
+    Se agrupan en cubos de 16 para que el grano de compresión no cuente cada
+    matiz como un color distinto, y se devuelven los más repetidos entre los que
+    están claramente lejos del fondo.
+    """
+    cuenta = Counter()
+    for y in range(0, alto, 2):
+        fila = filas[y]
+        for x in range(0, ancho, 2):
+            p = (fila[x * 3], fila[x * 3 + 1], fila[x * 3 + 2])
+            if abs(p[0] - fondo[0]) + abs(p[1] - fondo[1]) + abs(p[2] - fondo[2]) > 200:
+                cuenta[(p[0] // 16, p[1] // 16, p[2] // 16)] += 1
+    nucleos = []
+    for cubo, _ in cuenta.most_common():
+        color = (cubo[0] * 16 + 8, cubo[1] * 16 + 8, cubo[2] * 16 + 8)
+        if all(sum(abs(color[i] - otro[i]) for i in range(3)) > 120 for otro in nucleos):
+            nucleos.append(color)
+        if len(nucleos) == cuantos:
+            break
+    return nucleos
+
+
+def alfa_y_color(p, fondo, nucleos):
+    """Cuánto de este píxel es monograma, y de qué color sería sin el fondo.
+
+    La fuente es el monograma dibujado SOBRE un fondo opaco conocido, así que
+    cada píxel del borde es una mezcla: `p = a*F + (1-a)*fondo`. Con el fondo
+    medido y los dos colores del glifo también medidos, `a` sale de proyectar el
+    píxel sobre la recta que va del fondo al color del glifo, y el color limpio
+    sale de despejar `F`.
+
+    Eso es lo que descontamina el borde. Sin despejar, un borde semitransparente
+    se lleva puesto el verde oscuro del original y, sobre otra banda, se ve como
+    un halo: transparencia con halo sigue pareciendo un recorte pegado.
+    """
+    mejor_residuo, mejor_alfa = None, 0.0
+    for nucleo in nucleos:
+        eje = [nucleo[i] - fondo[i] for i in range(3)]
+        largo2 = sum(v * v for v in eje)
+        desde = [p[i] - fondo[i] for i in range(3)]
+        a = sum(desde[i] * eje[i] for i in range(3)) / largo2
+        a = 0.0 if a < 0.0 else (1.0 if a > 1.0 else a)
+        residuo = sum((p[i] - (fondo[i] + a * eje[i])) ** 2 for i in range(3))
+        if mejor_residuo is None or residuo < mejor_residuo:
+            mejor_residuo, mejor_alfa = residuo, a
+    if mejor_alfa <= 0.0:
+        return 0.0, fondo
+    limpio = []
+    for i in range(3):
+        valor = (p[i] - (1.0 - mejor_alfa) * fondo[i]) / mejor_alfa
+        limpio.append(0 if valor < 0 else (255 if valor > 255 else int(round(valor))))
+    return mejor_alfa, tuple(limpio)
+
+
+def piso_de_alfa(ancho, alto, filas, fondo, nucleos, banda=30):
+    """Cuánto alfa levanta el grano del fondo. Se mide, no se supone.
+
+    El fondo de la fuente no es un color plano perfecto: la compresión le dejó
+    grano, y ese grano da un alfa chiquito pero distinto de cero en TODO el
+    fondo. Sin restarlo, el PNG sale con un velo verde en vez de con fondo
+    transparente. Se mide sobre el marco exterior, que es fondo y nada más.
+    """
+    techo = 0.0
+    for y in list(range(banda)) + list(range(alto - banda, alto)):
+        fila = filas[y]
+        for x in range(ancho):
+            a, _ = alfa_y_color((fila[x * 3], fila[x * 3 + 1], fila[x * 3 + 2]), fondo, nucleos)
+            techo = max(techo, a)
+    return techo
+
+
+def separar_fondo(filas, ancho, alto, fondo, nucleos, piso):
+    """Devuelve filas RGBA con el fondo afuera y el borde descontaminado."""
+    salida = []
+    for y in range(alto):
+        fila = filas[y]
+        linea = bytearray(ancho * 4)
+        for x in range(ancho):
+            a, limpio = alfa_y_color(
+                (fila[x * 3], fila[x * 3 + 1], fila[x * 3 + 2]), fondo, nucleos)
+            # El grano del fondo se descuenta y lo que queda se reestira, para
+            # que el borde siga llegando a opaco y no se adelgace el glifo.
+            a = 0.0 if a <= piso else (a - piso) / (1.0 - piso)
+            linea[x * 4] = limpio[0]
+            linea[x * 4 + 1] = limpio[1]
+            linea[x * 4 + 2] = limpio[2]
+            linea[x * 4 + 3] = int(round(a * 255))
+        salida.append(linea)
+    return salida
+
+
+def reducir_rgba(filas, ancho, alto, nuevo_ancho, nuevo_alto):
+    """Promedio de caja en alfa PREMULTIPLICADO.
+
+    Promediar el color y el alfa por separado mezcla el color de los píxeles
+    transparentes —que no se ven— con el de los opacos, y eso vuelve a manchar
+    el borde. Premultiplicar es lo que hace que un píxel invisible no aporte
+    color.
+    """
+    salida = []
+    for ny in range(nuevo_alto):
+        y0 = ny * alto // nuevo_alto
+        y1 = max(y0 + 1, (ny + 1) * alto // nuevo_alto)
+        linea = bytearray(nuevo_ancho * 4)
+        for nx in range(nuevo_ancho):
+            x0 = nx * ancho // nuevo_ancho
+            x1 = max(x0 + 1, (nx + 1) * ancho // nuevo_ancho)
+            r = g = b = a = n = 0
+            for y in range(y0, y1):
+                fila = filas[y]
+                for x in range(x0, x1):
+                    alfa = fila[x * 4 + 3]
+                    r += fila[x * 4] * alfa
+                    g += fila[x * 4 + 1] * alfa
+                    b += fila[x * 4 + 2] * alfa
+                    a += alfa
+                    n += 1
+            alfa_medio = a / n
+            if alfa_medio <= 0:
+                continue  # queda en ceros: transparente y sin color que aporte
+            linea[nx * 4] = min(255, int(round(r / a)))
+            linea[nx * 4 + 1] = min(255, int(round(g / a)))
+            linea[nx * 4 + 2] = min(255, int(round(b / a)))
+            linea[nx * 4 + 3] = int(round(alfa_medio))
+        salida.append(linea)
+    return salida
+
+
 def reducir(filas, ancho, alto, nuevo_ancho, nuevo_alto):
     """Promedio de caja: cada píxel de salida es el promedio de los que cubre."""
     salida = []
@@ -186,8 +318,21 @@ def main():
     margen = round((x1 - x0) * 0.08)
     a0, b0 = max(0, x0 - margen), max(0, y0 - margen)
     a1, b1 = min(ancho, x1 + margen), min(alto, y1 + margen)
-    marca = recortar(filas, a0, b0, a1, b1)
-    marca = reducir(marca, a1 - a0, b1 - b0, 320, 197)
+    recorte = recortar(filas, a0, b0, a1, b1)
+    marca = reducir(recorte, a1 - a0, b1 - b0, 320, 197)
+
+    # El mismo recorte y la misma medida, pero con el fondo afuera. Es el que
+    # usan Header y Footer: ahí el monograma va sobre la banda verde del sitio y
+    # la placa oscura de la fuente se veía como una imagen pegada encima. La
+    # medida no cambia -320x197- para que la caja que la interfaz ya reserva sea
+    # exactamente la misma.
+    nucleos = colores_del_glifo(ancho, alto, filas, fondo)
+    piso = piso_de_alfa(ancho, alto, filas, fondo, nucleos)
+    print('glifo      ' + '  '.join(f'#{c[0]:02X}{c[1]:02X}{c[2]:02X}' for c in nucleos)
+          + f'   piso de alfa {piso:.4f}')
+    transparente = reducir_rgba(
+        separar_fondo(recorte, a1 - a0, b1 - b0, fondo, nucleos, piso),
+        a1 - a0, b1 - b0, 320, 197)
 
     # El del favicon va más ajustado y encuadrado con el fondo propio: en 64 px
     # el margen de la fuente se comería el monograma.
@@ -199,15 +344,17 @@ def main():
     favicon = reducir(cuadro, lado, lado, 64, 64)
 
     salidas = [
-        (DESTINO / 'agroboeda-monograma.png', 320, 197, marca),
-        (DESTINO / 'agroboeda-favicon.png', 64, 64, favicon),
+        (DESTINO / 'agroboeda-monograma.png', 320, 197, marca, False),
+        (DESTINO / 'agroboeda-monograma-alfa.png', 320, 197, transparente, True),
+        (DESTINO / 'agroboeda-favicon.png', 64, 64, favicon, False),
     ]
-    for ruta, an, al, datos in salidas:
+    for ruta, an, al, datos, con_alfa in salidas:
         if not solo_verificar:
             DESTINO.mkdir(parents=True, exist_ok=True)
-            escribir_png(ruta, an, al, datos)
+            escribir_png(ruta, an, al, datos, con_alfa=con_alfa)
         actual = hashlib.sha256(ruta.read_bytes()).hexdigest() if ruta.exists() else '(no existe)'
-        print(f'{ruta.relative_to(RAIZ)}  {an}x{al}  sha256 {actual}')
+        canal = 'RGBA' if con_alfa else 'RGB '
+        print(f'{ruta.relative_to(RAIZ)}  {an}x{al}  {canal}  sha256 {actual}')
 
 
 if __name__ == '__main__':

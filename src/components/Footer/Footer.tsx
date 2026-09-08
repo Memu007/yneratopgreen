@@ -35,7 +35,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           <button type="button" className={styles.marca} onClick={handleNavigate('home')}>
             <img
               className={styles.monograma}
-              src="/marca/agroboeda-monograma.png"
+              src="/marca/agroboeda-monograma-alfa.png"
               alt=""
               width={320}
               height={197}
