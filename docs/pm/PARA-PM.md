@@ -131,3 +131,62 @@ del panel no cambió de forma.
   Anotado desde `FOOTER-FOCUS-1`.
 - Categorías y Configuración siguen avisando por toast, como dejaste dicho. No
   las toqué.
+
+---
+
+## CONTACTO-MARCA-1 — la landing deja de escribir la dirección vieja
+
+**Pieza corta pedida por Emi, fuera de la tarea activa.** La informo acá para
+que la veas antes de aceptar `ADMIN-TRUTH-1`; si preferís que espere o que se
+revise aparte, decilo y la separo.
+
+- Producto/regresión: `69e9eaf`
+- La suite pasa a **161 casos**.
+- Alcance: `Footer.tsx`, `ContactPage.tsx` y el caso 161. **En la rama, no en
+  `main`.** No desplegué ni toqué nada remoto.
+
+### Qué pidió y qué le contesté
+
+Emi vio `info@topgreen.com.ar` en el pie y pidió que dijera
+`info@agroboeda.com`. **Frené antes de hacerlo** y le pregunté una sola cosa: si
+esa casilla existe. No existe.
+
+Por eso no la puse, y no es una interpretación mía: es lo que ya decía
+`IDENTIDAD-AGROBOEDA-CLIENTE`, que las direcciones heredadas «no deben
+reemplazarse por una cuenta inexistente». Medido, además, hay un motivo más
+concreto: el formulario de Contacto **abre el cliente de correo con
+`destinationEmail`**, así que apuntarlo a una casilla que no recibe convertiría
+el formulario en un buzón roto sin que nadie se entere.
+
+Consultado, Emi eligió **ocultar la dirección sin tocar el canal**.
+
+### Qué quedó
+
+El pie y Contacto dicen «Escribinos». El `mailto:` sigue llevando a la casilla
+que funciona y el destino del formulario no se toca. El visitante deja de leer
+la marca vieja; la dirección aparece recién en su propio cliente al hacer clic.
+
+El día que exista `info@agroboeda.com` se cambian los dos `mailto:` y el
+destino, y esta vuelta atrás sobra. **La deuda no se cierra: cambia de forma.**
+Sigue anotada.
+
+### El caso 161
+
+No fija ninguna dirección, a propósito: fijarla obligaría a editar la prueba el
+día que la casilla cambie. Fija dos propiedades que valen antes y después:
+
+1. ninguna pantalla pública **escribe** una dirección de correo a la vista;
+2. la del enlace es **exactamente la misma** a la que manda el formulario. Si
+   alguien cambia una y olvida la otra, la página diría una cosa y el correo
+   iría a otra.
+
+```
+rojo contra 21aa17e   escritorio/Inicio: la pantalla escribe la dirección
+                      «info@topgreen.com.ar» a la vista
+verde                 SMOKE_CASOS=156,161 → 2/2
+```
+
+Corrí el **156** además del focal porque su lista de apariciones técnicas nombra
+esos dos archivos: el `mailto:` conserva la dirección, así que sigue verde. No
+repetí la suite completa: es un cambio de copy en dos nodos, y el 160 y el resto
+no lo tocan. Build, lint, tsc, `node --check` y `diff-check`, verdes.
