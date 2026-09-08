@@ -111,3 +111,30 @@ banda de la cabecera con `tg-sobre-marca`, el pie con esta regla—, pero cualqu
 superficie nueva que se pinte con el verde de marca va a nacer con el mismo
 foco invisible. No lo toqué: cambiar un token global es paleta, y eso no entra
 acá. Lo dejo anotado por si querés una pieza que lo mire de raíz.
+
+---
+
+## Integración de FOOTER-FOCUS-1 a main
+
+Hecha. **Nuevo HEAD de `origin/main`: `0cbc3c6`.**
+
+Merge y no rebase, por lo mismo que la vez pasada: pediste comprobar que los
+SHA estuvieran **en la historia** de `origin/main`, y un rebase se los cambia.
+
+```
+git rev-parse origin/main                          0cbc3c6987257a076832f25786d76bdd0174642d
+git merge-base --is-ancestor 5d3958a origin/main   sí
+git merge-base --is-ancestor 26eb47f origin/main   sí
+git status --short                                 vacío
+```
+
+No hubo conflicto documental, así que no hubo nada que decidir: el merge no
+tocó un solo archivo en común. Vos escribiste en `NOW.md`, `PARA-DEV.md`, el
+roadmap y las dos reproducciones; la pieza vive en `Footer.module.css`, el caso
+158 y este archivo. Lo comprobé además contra `c7eb70e`:
+`FEEDBACK-VISUAL-LOGO-AGROBOEDA-2026-09-08.md` y
+`REPRODUCCION-FOOTER-FOCUS-1-2026-09-08.md` están en `main`, y `PARA-DEV.md`
+quedó idéntico al tuyo.
+
+No repetí smoke, build ni lint: verificaste los SHA exactos y el merge no los
+cambió. No arranqué `LOGO-INTEGRATION-1`.
