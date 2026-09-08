@@ -137,9 +137,10 @@ export const Header: React.FC<HeaderProps> = ({
         {/* El activo oficial es el MONOGRAMA AB, no el nombre completo, así que
             va acompañado por «AgroBoeda» escrito. La imagen lleva `alt` vacío a
             propósito: al lado del nombre es decorativa, y con texto alternativo
-            el botón se llamaría «AgroBoeda AgroBoeda». El monograma es opaco,
-            sobre su propio verde: no se le finge transparencia ni se le
-            recolorea el fondo. */}
+            el botón se llamaría «AgroBoeda AgroBoeda». El monograma viene
+            con fondo transparente de verdad: no se le finge con una máscara ni
+            se le recolorea nada, el fondo de la fuente se separa despejando la
+            mezcla en `scripts/derivar_marca.py`. */}
         <button className={styles.marca} onClick={() => onNavigate('home')}>
           <img
             className={styles.monograma}

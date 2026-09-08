@@ -21382,15 +21382,57 @@ await runCase(159, 'El monograma se integra con la banda: sin placa, sin halo y 
   assert(verificacion.status === 0,
     `la verificación de la derivación falló: ${(verificacion.stderr || '').slice(0, 300)}`);
   const dicho = verificacion.stdout || '';
-  for (const archivo of ['agroboeda-monograma.png', 'agroboeda-monograma-alfa.png',
-    'agroboeda-favicon.png']) {
+  const ARCHIVOS = ['agroboeda-monograma.png', 'agroboeda-monograma-alfa.png',
+    'agroboeda-favicon.png'];
+  for (const archivo of ARCHIVOS) {
     const linea = dicho.split('\n').find((l) => l.includes(archivo));
     assert(linea, `la derivación no informa ${archivo}:\n${dicho}`);
     assert(linea.includes(sha256(`public/marca/${archivo}`)),
-      `el ${archivo} del repositorio no es el que produce la fuente:\n  ${linea}`);
+      `la derivación informa un hash que no es el del archivo leído:\n  ${linea}`);
   }
   assert(/RGBA/.test(dicho.split('\n').find((l) => l.includes('monograma-alfa.png')) || ''),
     'la derivación no declara RGBA para el monograma nuevo');
+
+  // Que salga con cero no prueba nada por sí solo: hasta acá el modo
+  // verificación podía estar leyendo el archivo e informando su propio hash, y
+  // un PNG sustituido pasaba igual. Así que se lo pone rojo a propósito.
+  //
+  // Se hace sobre una COPIA mínima y temporal —el script, la fuente y los tres
+  // derivados—, nunca sobre el árbol de trabajo, y ahí se sustituye el
+  // monograma alfa por el opaco: un PNG válido, de la misma medida, con otro
+  // contenido. Es exactamente el caso que la verificación tiene que detectar.
+  const copia = mkdtempSync(`${tmpdir()}/agroboeda-derivacion-`);
+  try {
+    for (const carpeta of ['scripts', 'public/marca', 'docs/pm/originales']) {
+      mkdirSync(`${copia}/${carpeta}`, { recursive: true });
+    }
+    for (const archivo of ['scripts/derivar_marca.py',
+      'docs/pm/originales/AGROBOEDA-LOGO-FUENTE.png',
+      ...ARCHIVOS.map((n2) => `public/marca/${n2}`)]) {
+      writeFileSync(`${copia}/${archivo}`, readFileSync(archivo));
+    }
+    writeFileSync(`${copia}/public/marca/agroboeda-monograma-alfa.png`,
+      readFileSync('public/marca/agroboeda-monograma.png'));
+
+    const enRojo = spawnSync('python3', [`${copia}/scripts/derivar_marca.py`, '--verificar'],
+      { encoding: 'utf8' });
+    assert(enRojo.status !== 0,
+      'con el monograma alfa sustituido la verificación siguió saliendo con 0: '
+      + 'no verifica nada');
+    const queja = (enRojo.stderr || '') + (enRojo.stdout || '');
+    assert(/ERROR[^\n]*agroboeda-monograma-alfa\.png/.test(queja),
+      `la verificación falló pero no nombró el archivo sustituido:\n${queja.slice(-400)}`);
+    for (const intacto of ['agroboeda-monograma.png', 'agroboeda-favicon.png']) {
+      assert(!new RegExp(`ERROR[^\n]*${intacto.replace('.', '\\.')}`).test(queja),
+        `la verificación también acusó a ${intacto}, que no se tocó:\n${queja.slice(-400)}`);
+    }
+    // Y no escribió producto: la copia sigue con el archivo sustituido.
+    assert(readFileSync(`${copia}/public/marca/agroboeda-monograma-alfa.png`)
+      .equals(readFileSync('public/marca/agroboeda-monograma.png')),
+      '`--verificar` reescribió el archivo en vez de sólo verificarlo');
+  } finally {
+    rmSync(copia, { recursive: true, force: true });
+  }
 
   // Y sigue sin dependencias: el script lee y escribe PNG con la biblioteca
   // estándar. Una dependencia nueva convertiría «reproducible» en «reproducible
@@ -21610,8 +21652,10 @@ await runCase(159, 'El monograma se integra con la banda: sin placa, sin halo y 
   }
 
   return `la fuente sigue en ${SHA_FUENTE.slice(0, 12)}… y el favicon en `
-    + `${SHA_FAVICON.slice(0, 12)}…; \`derivar_marca.py --verificar\` reproduce los tres `
-    + 'archivos con la biblioteca estándar y declara RGBA para el nuevo; '
+    + `${SHA_FAVICON.slice(0, 12)}…; \`derivar_marca.py --verificar\` compara los tres `
+    + 'archivos versionados contra la derivación y sale con 0, declara RGBA para el nuevo y '
+    + 'usa sólo la biblioteca estándar; sobre una copia temporal con el alfa sustituido por el '
+    + 'opaco sale distinto de cero y nombra ese archivo, y sólo ese; '
     + `${medidos.join('; ')}. La marca conserva su único nombre accesible, la imagen sigue `
     + 'siendo decorativa, el foco se ve, Enter lleva a Inicio y ninguna medida desborda. '
     + `Seis capturas en ${CAPTURAS}`;
