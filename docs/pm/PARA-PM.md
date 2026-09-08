@@ -146,3 +146,100 @@ No corrí suite completa, contraste, a11y total ni Backend, como pediste.
 El token global `--tg-color-focus` sigue valiendo `#1e4a34`, el mismo color que
 `--tg-color-brand`. Cualquier superficie nueva pintada con el verde de marca va
 a nacer con el foco invisible. Está anotado desde `FOOTER-FOCUS-1`.
+
+---
+
+## DECISIÓN SOLICITADA — la cuenta de prueba en el sitio publicado
+
+Emi quiere entrar con `pruba@agroboeda.com` **en la página, no en local**. Antes
+de nada, tres hechos medidos, porque el pedido tiene una premisa que no se
+cumple sola:
+
+1. **La cuenta ya está en el repositorio.** Está en `main` desde `53a9635`, en
+   el seed y en las siete guías. Subir algo más no agrega nada por ese lado.
+2. **Desplegar no la crea.** El servicio corre `alembic upgrade head` y el seed
+   no se ejecuta solo (`RAILWAY.md:74`). Y si alguien lo corriera a mano, con
+   `ENV=production` termina con estado 2 sin abrir la base (`RAILWAY.md:81-95`).
+3. **Un cambio en el seed ni siquiera redespliega.** Los `watchPatterns` de
+   `railway.toml` son `src/**`, `public/**`, `index.html`, los configs del build
+   y el Dockerfile. `backend/**` no está.
+
+Para que exista en el sitio hay que **crear esa fila en la base remota**. Eso es
+producción y no lo hago desde acá.
+
+### La objeción, antes de la operación
+
+El candado de `ENV=local` no es burocracia: existe porque estas credenciales
+están escritas en el repositorio. Poner `pruba@agroboeda.com` / `@agroboeda` en
+el sitio publicado es, literalmente, **publicar un acceso**: cualquiera que lea
+el repositorio entra. Con rol `user` el alcance es acotado —no ve
+administración— pero puede publicar en el Mercado, comprar y aparecer como
+vendedor ante otras personas.
+
+**Recomendación: en el remoto, otra contraseña.** El correo y el nombre visible
+quedan iguales, así que el recorrido de Emi es el mismo; lo único que cambia es
+que la clave no está escrita en ningún archivo público. La clave local sigue
+siendo `@agroboeda` porque ahí la base es descartable.
+
+Alternativa, si Emi prefiere la clave tal cual: que la cuenta viva sólo mientras
+dure la demostración y se borre después, con fecha puesta.
+
+### La operación, lista para quien tenga producción
+
+Va limitada a esa cuenta. **No abre el seed, no relaja el candado de `ENV`, no
+agrega variable de escape, endpoint ni alta automática**, y es idempotente: si
+la cuenta ya está, no la toca. Se corre en el servicio desplegado, donde vive la
+aplicación y su `DATABASE_URL`:
+
+```python
+# CLAVE_DEMO='<la que decidan>' python -
+import os
+from app.db.base import SessionLocal
+from app.models.user import User, UserRole
+from app.core.security import hash_password
+
+db = SessionLocal()
+try:
+    ya = db.query(User).filter(User.email == 'pruba@agroboeda.com').first()
+    if ya:
+        print('ya existe, no se toca:', ya.email, ya.role)
+    else:
+        db.add(User(
+            email='pruba@agroboeda.com',
+            password_hash=hash_password(os.environ['CLAVE_DEMO']),
+            full_name='Prueba AgroBoeda',
+            role=UserRole.USER,
+            is_active=True,
+            is_verified=True,
+            is_carrier=False,
+        ))
+        db.commit()
+        print('creada pruba@agroboeda.com con rol user')
+finally:
+    db.close()
+```
+
+La clave entra por variable de entorno y no por el archivo, así que si eligen
+una distinta no queda escrita en ningún lado del repositorio.
+
+### Qué necesito
+
+Autorización de Emi y una pieza tuya que diga: qué contraseña va en el remoto,
+si la cuenta se borra después de la demostración y quién corre la operación.
+**Yo no la corro**: `CLAUDE.md` dice que desde el desarrollo no se despliega y
+que producción no es nuestra, y el contrato de la cuenta pide autorización y una
+operación separada.
+
+### Nota sobre el logo, para que no te sorprenda
+
+A pedido de Emi integré `LOGO-INTEGRATION-1` a `main` (`712f98b`) para que la
+página publicada muestre el monograma sin la placa. **Tu revisión sigue
+pendiente**: la integración no la reemplaza, y si devolvés la pieza se corrige
+como cualquier otra. Lo aviso porque esta vez la integración no salió de una
+devolución tuya.
+
+Y algo que recién veo con el `railway.toml` delante: como `src/**` y `public/**`
+están en los `watchPatterns`, **toda integración a `main` que toque el frontend
+dispara un redespliegue**. Las tres anteriores lo hicieron. No fue una decisión
+de desplegar —eran integraciones que pediste— pero el efecto es ese y prefiero
+que esté escrito.
