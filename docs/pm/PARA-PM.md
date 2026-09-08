@@ -2,6 +2,83 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## CATALOG-PHOTOS-1 — BLOQUEADA, y no por la licencia
+
+**Resultado: no se puede hacer desde este entorno. Nada entregado, nada en la
+rama, nada en `main`.**
+
+### El bloqueo
+
+La tarea pide 30 fotografías descargadas y servidas desde el repositorio. **La
+política de egreso de este entorno rechaza todos los bancos de imágenes.**
+Medido, no supuesto:
+
+```text
+403 en el CONNECT   commons.wikimedia.org · upload.wikimedia.org
+403 en el CONNECT   api.openverse.org · images.pexels.com
+403 en el CONNECT   unsplash.com · pixabay.com · cdnjs.cloudflare.com
+EGRESS_BLOCKED      commons.wikimedia.org · www.publicdomainpictures.net
+```
+
+Las primeras son `curl`; las últimas, la herramienta de traído de páginas, que
+rutea por otro lado y choca con el mismo proxy. Lo único que alcanzo es GitHub y
+los registros de paquetes.
+
+Dos aclaraciones, porque las dos preguntas ya aparecieron:
+
+- **no es un problema de licencia.** Una foto gratis está tan bloqueada como una
+  paga: lo que no puedo es descargar el archivo. La búsqueda web sí funciona y
+  devuelve dónde están, pero eso no pone un byte en el repositorio;
+- **no se rodea.** Ni con otro cliente, ni con un MCP instalado acá, ni con un
+  túnel. La regla del proyecto y la del propio entorno dicen lo mismo: se
+  informa. Esto es lo que estoy haciendo.
+
+Y hay un segundo impedimento, independiente del primero: **no hay `cwebp`,
+ImageMagick ni Pillow** en la máquina. Aunque llegaran los originales, no puedo
+normalizarlos a WebP acá como pide el punto 3.
+
+### Lo que sí queda comprobado del enunciado
+
+- El diagnóstico es correcto: las 30 filas apuntan a `picsum.photos` y el
+  producto hace bien en tratarlas como relleno. No toqué esa protección.
+- Los 30 slugs están enumerados y verificados contra la base.
+- `public/**` está en los `watchPatterns` de Railway, así que cuando existan los
+  archivos, integrarlos redespliega el sitio.
+
+### Qué la destraba
+
+Cualquiera de estas tres, y la primera es la más rápida:
+
+1. **Emi sube las fotos al repositorio** —propias o de donde él decida—. Con los
+   archivos adentro hago el resto: recorte a proporción común, tabla por slug
+   acotada al inventario demo, tarjetas y detalle de servicio/logística, y el
+   caso 162. La prioridad de la foto real del vendedor y el respaldo honesto
+   para un slug ajeno se conservan.
+2. **Habilitar los dominios en la configuración del entorno** (Wikimedia
+   Commons, Openverse, Pixabay). Desde esta misma sesión las bajo.
+3. **Correr la sesión en la máquina de Emi**, donde la red es la suya.
+
+### Lo que hice y deshice, para que conste
+
+Probé una salida sin red: 30 ilustraciones propias, una por aviso, generadas por
+un script del repositorio. Funcionaban —las miré en las dos vistas y en el
+detalle— pero **no son fotografías**, que es lo que la tarea pide, y Emi las
+rechazó. Las borré junto con los cambios de producto que sólo existían para
+mostrarlas: sin imágenes, agregarle la banda a servicio y logística habría
+dejado una placa vacía en cada tarjeta, que es peor que el estado actual.
+
+Dos cosas que sí aprendí y valen para cuando esto se retome:
+
+- el caso 155 detecta la regresión: al darle columna de foto a servicio y
+  logística en la vista Lista, en 768×1024 el renglón crecía a 366 px y la
+  acción terminaba justo en el borde inferior de la ventana. La columna de
+  imagen tiene que ceder ancho por debajo de 1180 px;
+- el detalle de servicio no dibuja galería hoy —`ProductDetailModal` la saltea
+  para servicio y logística—, así que el punto 5 toca ese archivo y no sólo la
+  tarjeta.
+
+**ACCOUNT-PAGE-1** no la empecé: va después de ésta.
+
 ## ADMIN-TRUTH-1R — el caso 160 se sostiene solo
 
 **Resultado: terminado.**
