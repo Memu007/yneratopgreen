@@ -63,9 +63,14 @@ class DashboardStats(BaseModel):
     total_products: int
     active_products: int
     total_orders: int
-    pending_orders: int
+    # Antes se llamaba `pending_orders` y contaba dos estados de diez. Ahora
+    # dice lo que cuenta: las ordenes que siguen en curso.
+    orders_in_process: int
     completed_orders: int
-    total_revenue: float
+    # Antes se llamaba `total_revenue` y la pantalla lo rotulaba «Ingresos».
+    # No es un ingreso de AgroBoeda: la plata va de comprador a vendedor y la
+    # plataforma no cobra comision. Es el volumen que se vendio.
+    sold_volume: float
 
 
 # ==================== USUARIOS ====================
@@ -403,16 +408,31 @@ def get_dashboard_stats(
     
     # Órdenes
     total_orders = db.query(Order).count()
-    pending_orders = db.query(Order).filter(
-        Order.status.in_([OrderStatus.PLACED, OrderStatus.CONFIRMED])
+    # En curso es todo lo que todavia puede moverse. `draft` no entra porque no
+    # llego a ser un pedido, y `delivered`, `cancelled` y `rejected` no entran
+    # porque ya terminaron. Con los dos estados de antes, las cuatro ordenes
+    # esperando o revisando comprobante y las pagadas y enviadas quedaban
+    # invisibles para quien mira el panel para saber que tiene pendiente.
+    ORDENES_EN_CURSO = [
+        OrderStatus.PLACED,
+        OrderStatus.CONFIRMED,
+        OrderStatus.AWAITING_TRANSFER_RECEIPT,
+        OrderStatus.TRANSFER_RECEIPT_SUBMITTED,
+        OrderStatus.PAID,
+        OrderStatus.SHIPPED,
+    ]
+    orders_in_process = db.query(Order).filter(
+        Order.status.in_(ORDENES_EN_CURSO)
     ).count()
     completed_orders = db.query(Order).filter(Order.status == OrderStatus.DELIVERED).count()
     
-    # Revenue
-    revenue_result = db.query(func.sum(Order.total_amount)).filter(
+    # Volumen vendido: la suma de lo que efectivamente se vendio. Se calcula
+    # igual que antes -pagadas, enviadas y entregadas-; lo que cambia es como
+    # se llama y como se rotula.
+    volumen = db.query(func.sum(Order.total_amount)).filter(
         Order.status.in_([OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED])
     ).scalar()
-    total_revenue = float(revenue_result) if revenue_result else 0.0
+    sold_volume = float(volumen) if volumen else 0.0
     
     return DashboardStats(
         total_users=total_users,
@@ -421,9 +441,9 @@ def get_dashboard_stats(
         total_products=total_products,
         active_products=active_products,
         total_orders=total_orders,
-        pending_orders=pending_orders,
+        orders_in_process=orders_in_process,
         completed_orders=completed_orders,
-        total_revenue=total_revenue
+        sold_volume=sold_volume
     )
 
 

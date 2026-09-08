@@ -876,6 +876,50 @@
   border-radius: var(--tg-radius-sm);
 }
 
+/* Un fallo de carga no se parece a un vacío: tiene el color del error, dice qué
+   no cargó y trae con qué volver a intentarlo. Sin esto, un 500 se leía igual
+   que «no hay resultados». */
+.avisoDeFallo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tg-space-4);
+  padding: var(--tg-space-6);
+  color: var(--tg-color-error);
+  background: var(--tg-color-error-bg);
+  border: 1px solid var(--tg-color-error);
+  border-radius: var(--tg-radius-sm);
+}
+
+.avisoDeFalloTexto {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Lo que hay que corregir en el alta, dicho adentro del formulario y no en un
+   aviso que se va solo. */
+.altaError {
+  margin: 0 0 var(--tg-space-4);
+  padding: var(--tg-space-3) var(--tg-space-4);
+  color: var(--tg-color-error);
+  font-weight: 600;
+  background: var(--tg-color-error-bg);
+  border-left: 3px solid var(--tg-color-error);
+  border-radius: var(--tg-radius-sm);
+}
+
+.avisoDeFalloBoton {
+  padding: 8px 16px;
+  color: var(--tg-color-text-inverse);
+  font: inherit;
+  font-weight: 600;
+  background: var(--tg-color-error);
+  border: 0;
+  border-radius: var(--tg-radius-sm);
+  cursor: pointer;
+}
+
 .categoryCard {
   background: white;
   border-radius: var(--tg-radius-sm);

@@ -7154,6 +7154,25 @@ async function descartarSiPregunta(page, seCerro, mensaje) {
   await esperarA(seCerro, `${mensaje}: descartar no cerró la capa`, 20_000);
 }
 
+// Las traducciones de estado que usa la pantalla, leídas del propio producto.
+//
+// Los casos que miran un badge no pueden traer su propia lista: si la copiaran,
+// el día que el producto cambie un texto la prueba seguiría verde contra una
+// verdad vieja. Se lee `src/utils/estados.ts`, que es de donde sale lo que se
+// dibuja.
+function textosDeEstado(nombre) {
+  const fuente = readFileSync('src/utils/estados.ts', 'utf8');
+  const bloque = fuente.split(`export const ${nombre}`)[1];
+  assert(bloque, `no está ${nombre} en src/utils/estados.ts`);
+  const cuerpo = bloque.slice(0, bloque.indexOf('};'));
+  const entradas = {};
+  for (const [, token, texto] of cuerpo.matchAll(/(\w+):\s*\{\s*texto:\s*'([^']+)'/g)) {
+    entradas[token] = texto;
+  }
+  assert(Object.keys(entradas).length > 0, `${nombre} quedó vacío al leerlo`);
+  return entradas;
+}
+
 async function esperarA(condicion, mensaje, limite = 20_000) {
   const hasta = Date.now() + limite;
   while (Date.now() < hasta) {
@@ -17009,7 +17028,11 @@ await runCase(145, 'Las tres listas de Administracion pasan de la fila veinte', 
         // con eso cualquier filtro pareceria cumplirse.
         await esperarA(async () => {
           const celdas = await estadoDeCadaFila();
-          return celdas.length > 0 && celdas.every((c) => c.toLowerCase() === estado);
+          // El badge dice el estado en castellano —«Activa», no `active`—
+          // desde ADMIN-TRUTH-1. Se compara contra el diccionario del
+          // producto, no contra el token del filtro.
+          const esperado = textosDeEstado('ESTADOS_DE_PRODUCTO')[estado].toLowerCase();
+          return celdas.length > 0 && celdas.every((c) => c.toLowerCase() === esperado);
         }, `el filtro «${estado}» dejo filas con otro estado: `
           + `${JSON.stringify(await estadoDeCadaFila())}`, 20_000);
       }
@@ -17026,8 +17049,11 @@ await runCase(145, 'Las tres listas de Administracion pasan de la fila veinte', 
     }, 'el filtro de ordenes no coincide con el total del servidor', 20_000);
     assert((await paginaQueDice()).startsWith('Página 1 de'),
       `filtrar ordenes no volvio a la primera pagina: «${await paginaQueDice()}»`);
+    // Desde ADMIN-TRUTH-1 la fila dice «Esperando comprobante» y no el token:
+    // se compara contra el diccionario del producto.
+    const esperandoComprobante = textosDeEstado('ESTADOS_DE_ORDEN').awaiting_transfer_receipt;
     for (const fila of await filas()) {
-      assert(/awaiting_transfer_receipt/i.test(fila),
+      assert(fila.toLowerCase().includes(esperandoComprobante.toLowerCase()),
         `el filtro de ordenes dejo otro estado: «${fila}»`);
     }
 
@@ -17068,8 +17094,9 @@ await runCase(145, 'Las tres listas de Administracion pasan de la fila veinte', 
     assert(pieDespues.includes(`Total: ${pausadas} productos`),
       `una respuesta vieja sin filtro piso lo que estaba pedido: «${pieDespues}»`);
     const estadosDespues = await estadoDeCadaFila();
+    const pausadaDice = textosDeEstado('ESTADOS_DE_PRODUCTO').paused.toLowerCase();
     assert(estadosDespues.length > 0
-      && estadosDespues.every((c) => c.toLowerCase() === 'paused'),
+      && estadosDespues.every((c) => c.toLowerCase() === pausadaDice),
     `una respuesta vieja trajo filas que el filtro vigente no pidio: `
     + JSON.stringify(estadosDespues));
     await page.unroute('**/api/admin/products*');
@@ -17242,8 +17269,12 @@ await runCase(146, 'El estado de una publicacion se cambia desde el panel y pers
         + `${(await respuesta.text().catch(() => '')).slice(0, 140)}`);
       // La lista se vuelve a pedir sola: se espera a que la celda cambie, no un
       // tiempo fijo.
-      await esperarA(async () => (await celdaDe(publicacion.nombre)) === estado,
-        `la celda de Estado de «${publicacion.nombre}» no quedo en «${estado}» tras accionar `
+      // La celda muestra el estado traducido desde ADMIN-TRUTH-1: se compara
+      // contra el diccionario del producto y no contra el token.
+      const dibujado = textosDeEstado('ESTADOS_DE_PRODUCTO')[estado];
+      await esperarA(async () => (await celdaDe(publicacion.nombre)).toLowerCase()
+        === dibujado.toLowerCase(),
+      `la celda de Estado de «${publicacion.nombre}» no quedo en «${dibujado}» tras accionar `
         + `el control; muestra «${await celdaDe(publicacion.nombre)}»`, 20_000);
     };
 
@@ -17270,9 +17301,12 @@ await runCase(146, 'El estado de una publicacion se cambia desde el panel y pers
     for (const publicacion of publicaciones) {
       await esperarLaFila(publicacion.nombre);
       const celda = await celdaDe(publicacion.nombre);
-      assert(celda === publicacion.estado,
+      // La celda dibuja el estado traducido; el selector de al lado sigue
+      // teniendo el token, y eso se comprueba dos líneas más abajo.
+      const enCastellano = textosDeEstado('ESTADOS_DE_PRODUCTO')[publicacion.estado];
+      assert(celda.toLowerCase() === enCastellano.toLowerCase(),
         `tras recargar, «${publicacion.nombre}» muestra «${celda}» en la celda de Estado y no `
-        + `«${publicacion.estado}»`);
+        + `«${enCastellano}»`);
       const enElSelector = await selectorDe(publicacion.nombre).inputValue();
       assert(enElSelector === publicacion.estado,
         `tras recargar, el selector de «${publicacion.nombre}» quedo en «${enElSelector}»`);
@@ -21659,6 +21693,329 @@ await runCase(159, 'El monograma se integra con la banda: sin placa, sin halo y 
     + `${medidos.join('; ')}. La marca conserva su único nombre accesible, la imagen sigue `
     + 'siendo decorativa, el foco se ve, Enter lleva a Inicio y ninguna medida desborda. '
     + `Seis capturas en ${CAPTURAS}`;
+});
+
+// ---------------------------------------------------------------------------
+// 160. ADMIN-TRUTH-1 — el panel dice lo que pasa.
+//
+// Administración mentía de cuatro maneras distintas, y ninguna se veía como una
+// falla:
+//
+//  1. pedía `total_sellers` y `total_customers`, que el servidor nunca mandó:
+//     dos tarjetas dibujaban `undefined`. «Pendientes» contaba dos estados de
+//     diez —las cuatro órdenes esperando o revisando comprobante, las pagadas y
+//     las enviadas no existían para el panel— y al volumen vendido lo llamaba
+//     «Ingresos», que es plata que AgroBoeda no cobra;
+//  2. los badges imprimían el token interno —`sold_out`,
+//     `awaiting_transfer_receipt`— y pintaban de gris cualquier estado que su
+//     mapa no tuviera, mientras el filtro de al lado ya lo decía en castellano;
+//  3. cinco cargas convertían un 500 en una tabla vacía: un fallo se leía igual
+//     que «no hay resultados»;
+//  4. el alta de usuario reemplazaba el detalle del servidor —«El email ya está
+//     registrado»— por «Error al crear usuario», que no se puede accionar.
+//
+// Este caso mide las cuatro. Los números del panel se contrastan contra SQL, no
+// contra constantes: un número escrito a mano envejece con el seed. Los estados
+// se derivan de los enum de la base y del diccionario del producto, así que
+// agregar un estado y no traducirlo hace fallar esto y no la demo. Los fallos de
+// red son lo único que se finge, y se finge en la red: la respuesta 500 la da un
+// doble de ruta, no un interruptor en el producto.
+// ---------------------------------------------------------------------------
+await runCase(160, 'Administración dice la verdad: números reales, estados en castellano y fallos visibles', async () => {
+  const medidos = [];
+
+  // --- Los estados reales, leídos de la base ------------------------------
+  const enumDe = (tipo) => queryRows(`
+    SELECT lower(enumlabel) FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = ${sqlLiteral(tipo)}
+    ORDER BY e.enumsortorder
+  `).map(([token]) => token);
+  const ESTADOS_ORDEN = enumDe('orderstatus');
+  const ESTADOS_PRODUCTO = enumDe('productstatus');
+  assert(ESTADOS_ORDEN.length === 10 && ESTADOS_PRODUCTO.length === 4,
+    `la base tiene ${ESTADOS_ORDEN.length} estados de orden y ${ESTADOS_PRODUCTO.length} de `
+    + 'producto: el barrido estaría leyendo el tipo equivocado');
+
+  // --- El diccionario del producto, leído del código ----------------------
+  // No se copia acá la lista de traducciones: se lee la que usa la pantalla. Si
+  // alguien agrega un estado al modelo y no lo traduce, esto se cae.
+  const TEXTO_DE_ORDEN = textosDeEstado('ESTADOS_DE_ORDEN');
+  const TEXTO_DE_PRODUCTO = textosDeEstado('ESTADOS_DE_PRODUCTO');
+  for (const [que, tokens, textos] of [
+    ['orden', ESTADOS_ORDEN, TEXTO_DE_ORDEN],
+    ['producto', ESTADOS_PRODUCTO, TEXTO_DE_PRODUCTO],
+  ]) {
+    const sinTraducir = tokens.filter((token) => !textos[token]);
+    assert(sinTraducir.length === 0,
+      `estados de ${que} sin traducción en el diccionario: ${sinTraducir.join(', ')}`);
+    for (const token of tokens) {
+      assert(!/_/.test(textos[token]) && textos[token] !== token,
+        `la traducción de ${token} es ${JSON.stringify(textos[token])}: sigue siendo el token`);
+    }
+  }
+  medidos.push(`${ESTADOS_ORDEN.length} estados de orden y ${ESTADOS_PRODUCTO.length} de `
+    + 'producto, todos traducidos');
+
+  // --- A. Una orden por estado, por la ruta real y con el estado puesto ----
+  // El checkout es real; el estado se pone en la base descartable, que es donde
+  // el arranque dice que se fabrican los estados que la API no ofrece. Sin las
+  // diez, el contraste del panel no probaría la exclusión de los terminales.
+  const sello = Date.now();
+  const buyerAnterior = { token: state.buyerToken, id: state.buyerId };
+  const correo = `admin.verdad.${sello}@ejemplo.com`;
+  await registrarYVerificar({
+    email: correo, password: 'verdad12345', full_name: `Compradora Verdad ${sello}`,
+    role: 'user',
+  });
+  const ingreso = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: correo, password: 'verdad12345' },
+  });
+  state.buyerToken = ingreso.data.access_token;
+  state.buyerId = ingreso.data.user.id;
+
+  const [vendedor] = queryRows(
+    "SELECT id FROM users WHERE email = 'vendedor@ejemplo.com'");
+  assert(vendedor, 'el seed no dejó el vendedor demo');
+
+  const creadas = [];
+  try {
+    for (const estado of ESTADOS_ORDEN) {
+      const producto = productoConStock(vendedor[0], 2);
+      await armarCarrito([{ product_id: producto, quantity: 1 }]);
+      const creado = await apiRequest('/orders/checkout', {
+        method: 'POST',
+        token: state.buyerToken,
+        body: sobreDePago([{ seller_id: vendedor[0], method: 'transfer' }]),
+      });
+      const [orden] = creado.data.orders;
+      assert(orden?.order_id, `no se pudo crear la orden para ${estado}`);
+      querySql(`UPDATE orders SET status = ${sqlLiteral(estado.toUpperCase())}
+                WHERE id = ${sqlLiteral(orden.order_id)}`);
+      creadas.push({ estado, id: orden.order_id });
+    }
+  } finally {
+    state.buyerToken = buyerAnterior.token;
+    state.buyerId = buyerAnterior.id;
+  }
+  medidos.push(`${creadas.length} órdenes reales, una por estado`);
+
+  // --- B. El dashboard contra la base -------------------------------------
+  const admin = (await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'admin@topgreen.com', password: 'admin123' },
+  })).data.access_token;
+  const panel = (await apiRequest('/admin/dashboard', { token: admin })).data;
+
+  const numero = (sql) => Number(queryRows(sql)[0][0]);
+  const EN_CURSO = ['PLACED', 'CONFIRMED', 'AWAITING_TRANSFER_RECEIPT',
+    'TRANSFER_RECEIPT_SUBMITTED', 'PAID', 'SHIPPED'];
+  const TERMINALES = ['DRAFT', 'DELIVERED', 'CANCELLED', 'REJECTED'];
+  const listaSql = (tokens) => tokens.map((t) => `'${t}'`).join(', ');
+  const esperado = {
+    total_users: numero('SELECT COUNT(*) FROM users'),
+    total_normal_users: numero("SELECT COUNT(*) FROM users WHERE role = 'USER'"),
+    total_admins: numero("SELECT COUNT(*) FROM users WHERE role = 'ADMIN'"),
+    total_products: numero("SELECT COUNT(*) FROM products WHERE status <> 'DELETED'"),
+    active_products: numero("SELECT COUNT(*) FROM products WHERE status = 'ACTIVE'"),
+    total_orders: numero('SELECT COUNT(*) FROM orders'),
+    orders_in_process: numero(
+      `SELECT COUNT(*) FROM orders WHERE status IN (${listaSql(EN_CURSO)})`),
+    completed_orders: numero("SELECT COUNT(*) FROM orders WHERE status = 'DELIVERED'"),
+  };
+  for (const [clave, valor] of Object.entries(esperado)) {
+    assert(panel[clave] === valor,
+      `el panel dice ${clave}=${JSON.stringify(panel[clave])} y la base dice ${valor}`);
+  }
+  const volumenSql = Number(queryRows(
+    "SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status IN ('PAID', 'SHIPPED', 'DELIVERED')")[0][0]);
+  assert(Math.abs(panel.sold_volume - volumenSql) < 0.01,
+    `el volumen vendido dice ${panel.sold_volume} y la base ${volumenSql}`);
+
+  // Y los terminales quedan afuera de verdad: hay órdenes en esos estados.
+  const enTerminales = numero(
+    `SELECT COUNT(*) FROM orders WHERE status IN (${listaSql(TERMINALES)})`);
+  assert(enTerminales >= TERMINALES.length,
+    `hay ${enTerminales} órdenes terminales: sin ellas, excluirlas no probaría nada`);
+  assert(panel.orders_in_process + enTerminales === panel.total_orders,
+    `en curso (${panel.orders_in_process}) + terminales (${enTerminales}) no da el total `
+    + `(${panel.total_orders}): algún estado se cuenta dos veces o ninguna`);
+  assert(!('total_sellers' in panel) && !('total_customers' in panel)
+    && !('pending_orders' in panel) && !('total_revenue' in panel),
+    `el contrato viejo sigue en la respuesta: ${Object.keys(panel).join(', ')}`);
+  medidos.push(`dashboard contra SQL: ${panel.orders_in_process} en curso, ${enTerminales} `
+    + `terminales, volumen ${volumenSql}`);
+
+  // --- C, D y E: la pantalla ----------------------------------------------
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    const abrirAdmin = async () => {
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+      await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+      await page.getByPlaceholder('tu@email.com').fill('admin@topgreen.com');
+      await page.getByPlaceholder('••••••••').fill('admin123');
+      await page.locator('[class*="_submitButton_"][type="submit"]').click();
+      await page.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 20_000 });
+      await page.getByRole('button', { name: 'Admin' }).first().click();
+      await page.getByRole('heading', { name: 'Panel de Administración' })
+        .waitFor({ timeout: 20_000 });
+    };
+    const solapa = async (nombre) => {
+      await page.getByRole('button', { name: nombre, exact: true }).first().click();
+      await page.waitForTimeout(700);
+    };
+    await abrirAdmin();
+
+    // --- C1. El dashboard dibujado ----------------------------------------
+    await esperarA(async () => (await page.locator('[class*="_dashboard_"]').count()) > 0,
+      'el dashboard no se dibujó', 20_000);
+    const textoPanel = await page.locator('[class*="_dashboard_"]').innerText();
+    for (const rotulo of ['Total de usuarios', 'Usuarios comunes', 'Administradores',
+      'Órdenes en proceso', 'Volumen vendido']) {
+      assert(textoPanel.includes(rotulo), `el dashboard no dice «${rotulo}»:\n${textoPanel}`);
+    }
+    for (const mentira of ['undefined', 'Vendedores', 'Clientes', 'Ingresos']) {
+      assert(!textoPanel.includes(mentira),
+        `el dashboard sigue diciendo «${mentira}»:\n${textoPanel}`);
+    }
+    const valorJunto = (rotulo) => {
+      const lineas = textoPanel.split('\n');
+      const donde = lineas.indexOf(rotulo);
+      return donde > 0 ? lineas[donde - 1].trim() : null;
+    };
+    for (const [rotulo, valor] of [
+      ['Total de usuarios', String(esperado.total_users)],
+      ['Usuarios comunes', String(esperado.total_normal_users)],
+      ['Administradores', String(esperado.total_admins)],
+      ['Órdenes en proceso', String(esperado.orders_in_process)],
+    ]) {
+      assert(valorJunto(rotulo) === valor,
+        `la tarjeta «${rotulo}» muestra ${JSON.stringify(valorJunto(rotulo))} y la base dice ${valor}`);
+    }
+    medidos.push('el dashboard dibuja los cinco rótulos nuevos con los valores de la base');
+
+    // --- C2. Los badges, estado por estado --------------------------------
+    const badgesDe = async (etiquetaDelFiltro, token) => {
+      await page.getByLabel(etiquetaDelFiltro).selectOption(token);
+      await page.waitForTimeout(900);
+      return page.locator('table [class*="_badge_"]').allInnerTexts();
+    };
+    const revisados = [];
+    for (const [etiqueta, solapaNombre, tokens, textos] of [
+      ['Filtrar publicaciones por estado', 'Productos', ESTADOS_PRODUCTO, TEXTO_DE_PRODUCTO],
+      ['Filtrar órdenes por estado', 'Órdenes', ESTADOS_ORDEN.filter((t) => t !== 'draft'),
+        TEXTO_DE_ORDEN],
+    ]) {
+      await solapa(solapaNombre);
+      const opciones = await page.getByLabel(etiqueta).locator('option').allInnerTexts();
+      for (const token of tokens) {
+        assert(opciones.includes(textos[token]),
+          `el filtro de ${solapaNombre} no ofrece «${textos[token]}»: ${opciones.join(' | ')}`);
+        const badges = await badgesDe(etiqueta, token);
+        for (const badge of badges) {
+          assert(badge.trim().toLowerCase() === textos[token].toLowerCase(),
+            `filtrando por ${token} un badge dice «${badge}» y el diccionario dice `
+            + `«${textos[token]}»`);
+          assert(!/_/.test(badge), `un badge imprime el token interno: «${badge}»`);
+        }
+        if (badges.length) revisados.push(`${token}=${badges.length}`);
+      }
+      await page.getByLabel(etiqueta).selectOption('');
+      await page.waitForTimeout(700);
+    }
+    assert(revisados.length >= 10,
+      `sólo se vieron badges de ${revisados.length} estados: ${revisados.join(', ')}`);
+    medidos.push(`badges verificados en ${revisados.length} estados (${revisados.join(', ')})`);
+
+    // --- D. Las cinco cargas: 500, aviso, reintento y dato ----------------
+    const CARGAS = [
+      ['Dashboard', 'Dashboard', '**/api/admin/dashboard', 'el resumen del panel'],
+      ['Usuarios', 'Usuarios', '**/api/admin/users?*', 'la lista de usuarios'],
+      ['Publicaciones', 'Productos', '**/api/admin/products*', 'la lista de publicaciones'],
+      ['Órdenes', 'Órdenes', '**/api/admin/orders*', 'la lista de órdenes'],
+      ['Documentación', 'Documentación', '**/api/admin/documentacion*', 'la cola de documentación'],
+    ];
+    for (const [nombre, solapaNombre, patron, recurso] of CARGAS) {
+      let rompiendo = true;
+      await page.route(patron, (ruta) => {
+        if (rompiendo && ruta.request().method() === 'GET') {
+          return ruta.fulfill({ status: 500, contentType: 'application/json',
+            body: '{"detail":"caida a proposito"}' });
+        }
+        return ruta.continue();
+      });
+      await solapa(solapaNombre);
+
+      const aviso = page.locator('[role="alert"]').filter({ hasText: 'No se pudo cargar' });
+      await esperarA(async () => (await aviso.count()) > 0,
+        `${nombre}: un 500 no mostró ningún aviso`, 20_000);
+      const dicho = await aviso.first().innerText();
+      assert(dicho.includes(recurso),
+        `${nombre}: el aviso no dice qué recurso falló: ${JSON.stringify(dicho)}`);
+      const reintentar = aviso.first().getByRole('button', { name: 'Reintentar' });
+      assert((await reintentar.count()) === 1, `${nombre}: el aviso no ofrece Reintentar`);
+      // Y el fallo no se disfraza de vacío: mientras hay aviso no hay tabla ni
+      // el texto de «no hay resultados».
+      const cuerpo = await page.locator('[class*="_content_"], [class*="_tabContent_"]')
+        .first().innerText().catch(() => page.locator('body').innerText());
+      assert(!/No hay .* que coincidan|no devolvió datos|No hay documentación/.test(cuerpo),
+        `${nombre}: el error se está mostrando junto con un vacío: ${JSON.stringify(cuerpo.slice(0, 200))}`);
+
+      rompiendo = false;
+      await reintentar.click();
+      await esperarA(async () => (await aviso.count()) === 0,
+        `${nombre}: el reintento no reemplazó el aviso`, 20_000);
+      await page.unroute(patron);
+      medidos.push(`${nombre}: 500 → aviso con «${recurso}» y reintento`);
+    }
+
+    // --- E. El alta de usuario --------------------------------------------
+    await solapa('Usuarios');
+    const altas = [];
+    page.on('request', (pedido) => {
+      if (pedido.method() === 'POST' && /\/api\/admin\/users$/.test(pedido.url())) {
+        altas.push(pedido.url());
+      }
+    });
+    await page.getByRole('button', { name: /Crear Usuario|Nuevo Usuario|\+ Usuario/i })
+      .first().click();
+    await page.getByPlaceholder('Email *').waitFor({ timeout: 15_000 });
+
+    // Contraseña corta: no puede salir un pedido.
+    await page.getByPlaceholder('Email *').fill(`corta.${sello}@ejemplo.com`);
+    await page.getByPlaceholder('Contraseña *').fill('abc');
+    await page.getByPlaceholder('Nombre Completo *').fill('Clave Corta');
+    await page.getByRole('button', { name: 'Crear Usuario', exact: true }).last().click();
+    await page.waitForTimeout(1200);
+    assert(altas.length === 0,
+      `con la contraseña corta salieron ${altas.length} pedidos de alta: la validación no frena`);
+    const avisoAlta = page.locator('[role="alert"]').first();
+    assert((await avisoAlta.count()) === 1 && /6 caracteres/.test(await avisoAlta.innerText()),
+      `el alta no explica el mínimo de la contraseña: ${await avisoAlta.innerText().catch(() => '(sin aviso)')}`);
+
+    // Email duplicado: sale el pedido y vuelve el detalle del servidor.
+    await page.getByPlaceholder('Email *').fill('admin@topgreen.com');
+    await page.getByPlaceholder('Contraseña *').fill('claveLarga123');
+    await page.getByRole('button', { name: 'Crear Usuario', exact: true }).last().click();
+    await esperarA(async () => altas.length === 1,
+      'el alta con email duplicado no llegó a pedir nada al servidor', 20_000);
+    await esperarA(async () => /ya está registrado/i.test(
+      await page.locator('[role="alert"]').first().innerText().catch(() => '')),
+    'el alta no muestra el detalle del servidor', 20_000);
+    assert(await page.getByPlaceholder('Email *').inputValue() === 'admin@topgreen.com'
+      && await page.getByPlaceholder('Nombre Completo *').inputValue() === 'Clave Corta',
+      'el formulario se limpió: no se puede corregir lo que se escribió');
+    medidos.push('alta: la clave corta no sale al servidor y el duplicado vuelve con su detalle');
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+  }
+
+  return `los estados salen de los enum de la base y las traducciones del diccionario del `
+    + `producto, no de una lista escrita en la prueba; ${medidos.join('; ')}`;
 });
 
 const passed = results.filter((result) => result.passed).length;
