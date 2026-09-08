@@ -24,8 +24,15 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         <div>
           {/* El monograma oficial con el nombre al lado, igual que en la
               cabecera: el archivo dice AB y el nombre lo dice entero. La imagen
-              va con `alt` vacío porque el nombre está escrito a su lado. */}
-          <div className={styles.marca}>
+              va con `alt` vacío porque el nombre está escrito a su lado, así el
+              control se anuncia «AgroBoeda» una sola vez.
+
+              Es un botón y no un `div`: acá la marca vuelve a Inicio igual que
+              la de la cabecera, y una marca que navega tiene que poder
+              activarse con el teclado. Usa `handleNavigate`, la misma
+              navegación que el resto del pie, que además deja la página
+              arriba. */}
+          <button type="button" className={styles.marca} onClick={handleNavigate('home')}>
             <img
               className={styles.monograma}
               src="/marca/agroboeda-monograma.png"
@@ -34,7 +41,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               height={197}
             />
             <span className={styles.nombre}>AgroBoeda</span>
-          </div>
+          </button>
           <p className={styles.bajada}>Mercado agro: productos, servicios y logística.</p>
         </div>
 
