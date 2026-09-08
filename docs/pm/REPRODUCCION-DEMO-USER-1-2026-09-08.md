@@ -3,7 +3,24 @@
 Fecha: 2026-09-08
 Producto/regresión: `53a9635`
 Informe Dev: `bf31919`
-Resultado: **devuelta como DEMO-USER-1R**
+Resultado: **aceptada**
+
+## Revisión de DEMO-USER-1R
+
+La corrección `d9b4ab7` y su informe `ba66943` actualizaron únicamente
+`README.md`, `docs/DATABASE.md`, `docs/USER_MANUAL.md` y el bloque documental
+del caso 157. Las siete listas reales muestran la cuenta y explican en su
+contexto que las credenciales son públicas y sólo sirven sobre una base local
+descartable.
+
+PM revisó el diff y ejecutó el 157 corregido desde base Docker local nueva:
+**1/1**. El log recuperable quedó en
+`/private/tmp/topgreen-pm-demo-user-1r-157.log`. Build/TypeScript fueron parte
+del recorrido; `node --check` y `diff-check` quedaron verdes. No se repitió
+suite completa ni puertas ajenas al delta documental.
+
+Se acepta `DEMO-USER-1R`. La cuenta permanece exclusivamente en el seed local;
+no existe por esta entrega en Railway ni en otra base remota.
 
 ## Evidencia funcional
 

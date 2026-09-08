@@ -15,12 +15,14 @@ Actualizado: 2026-09-08.
   `21526bb`/`879d79f`, merge `1286ed2` y cierre `d63158c`. Ambos SHA quedaron
   integrados sin cambios. PM reprodujo 147+156 en **2/2** y verificó las puertas
   focales; no repitió suite completa.
-- **Única tarea activa y responsable:** `DEMO-USER-1R`, Dev. La entrega en `main`
-  `53a9635`/`bf31919` queda funcionalmente conforme: PM reprodujo 157 en
-  **1/1** desde base local nueva. Vuelve sólo porque `docs/DATABASE.md` y
-  `docs/USER_MANUAL.md` omiten la cuenta, README no explicita allí el límite
-  local y el caso 157 no controla las listas. Las tres salidas locales y los
-  hashes están conformes. Corrección documental focal, sin suite completa.
+- **DEMO-USER-1R aceptada:** producto base `53a9635`, informe `bf31919`,
+  corrección `d9b4ab7` e informe `ba66943`. PM reprodujo 157 final en **1/1**;
+  la cuenta local entra, publica, sobrevive al segundo seed y sus siete listas
+  explican que la credencial es pública/local. No se desplegó ni tocó Railway.
+- **Única tarea activa y responsable:** `FOOTER-FOCUS-1`, Dev. Los enlaces
+  textuales del Footer tienen foco 1,0:1 porque contorno y fondo usan el mismo
+  verde. Deben reutilizar el color visible ya aplicado a la marca, sin tocar
+  layout ni navegación. Caso 158; sin suite completa.
 
 - **FORM-DIRTY-1R aceptada:** producto/regresión `83dba0a`, informe `db1bb10`.
   PM revisó el diff y reprodujo 150 y 149 aislados en **1/1** cada uno; ambos

@@ -12,6 +12,53 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-08 — TAREA VIGENTE: FOOTER-FOCUS-1, foco visible en todos los enlaces del pie
+
+`DEMO-USER-1R` queda **aceptada**: producto base `53a9635`, informe `bf31919`,
+corrección `d9b4ab7` e informe `ba66943`. PM revisó ambos diffs y reprodujo el
+157 final en **1/1** desde base Docker local nueva; build incluido,
+`node --check` y `diff-check` verdes. Dev informó suite base **156/157**, con
+único rojo ambiental conocido en 131; la corrección documental no justificó
+repetirla. Evidencia en `REPRODUCCION-DEMO-USER-1-2026-09-08.md`.
+
+La única tarea activa pasa a **FOOTER-FOCUS-1**. El Footer usa fondo
+`--tg-color-brand` (`#1e4a34`) y sus enlaces textuales heredan el anillo global
+`--tg-color-focus`, que tiene el mismo color: contraste **1,0:1**. La marca AB
+ya quedó corregida en `21526bb` con `--tg-color-focus-sobre-marca` y mide
+3,9:1; no la rehagas.
+
+### Resultado obligatorio
+
+1. Aplicá a todos los enlaces interactivos del Footer el color de contorno
+   existente `--tg-color-focus-sobre-marca` cuando reciben `:focus-visible`.
+   Reutilizá la regla/token actual; no agregues color, componente ni sistema.
+2. Conservá el ancho, estilo y `outline-offset` globales. El foco no debe mover
+   contenido ni cambiar la apariencia sin foco. No alteres navegación, textos,
+   destinos, hover, layout ni el botón de marca ya aceptado.
+3. Acotá la regla al Footer: ningún control de Header, modal, formulario o
+   panel debe cambiar.
+
+### Regresión discriminante — caso 158
+
+Agregá un único caso 158. Contra `ba66943` debe fallar porque los enlaces del
+pie dibujan foco 1,0:1. En verde, en 1440×900, 768×1024 y 390×844:
+
+- descubrí desde el DOM todos los `a[href]` y botones enfocables del Footer, sin
+  una lista manual que pueda omitir un enlace futuro;
+- llegá por teclado a cada control, no mediante `focus()`, y comprobá contorno
+  visible, ancho positivo y contraste mínimo 3:1 contra el fondo real;
+- verificá que la marca conserve su único nombre `AgroBoeda`, y que ningún foco
+  produzca desplazamiento de geometría ni overflow horizontal;
+- ejercé al menos un enlace interno y uno de contacto para confirmar que la
+  regla no cambió sus destinos. No navegues fuera del entorno: para `mailto:`,
+  `tel:` o WhatsApp alcanza comprobar el `href` real y evitar abrirlo.
+
+Alcance esperado: `Footer.module.css` y el bloque 158. Corré 158 y 156 aislados,
+build, lint, `node --check` y `diff-check`. No corras suite completa, contraste,
+a11y total ni Backend: esta pieza sólo corrige el color del contorno. Producto
+y regresión en un commit; informe separado con rojo/verde y hashes. No
+despliegues ni toques Railway, datos remotos, pagos o secretos. Subí y frená.
+
 ## 2026-09-08 — DEVOLUCIÓN VIGENTE: DEMO-USER-1R, todas las guías locales dicen la verdad
 
 Revisé en `main` el producto/regresión `53a9635` y el informe `bf31919`. La
