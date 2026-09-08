@@ -7160,17 +7160,61 @@ async function descartarSiPregunta(page, seCerro, mensaje) {
 // el día que el producto cambie un texto la prueba seguiría verde contra una
 // verdad vieja. Se lee `src/utils/estados.ts`, que es de donde sale lo que se
 // dibuja.
-function textosDeEstado(nombre) {
+// El cuerpo de una constante exportada del diccionario, tal como está escrito.
+function cuerpoDelDiccionario(nombre) {
   const fuente = readFileSync('src/utils/estados.ts', 'utf8');
   const bloque = fuente.split(`export const ${nombre}`)[1];
   assert(bloque, `no está ${nombre} en src/utils/estados.ts`);
-  const cuerpo = bloque.slice(0, bloque.indexOf('};'));
+  return bloque.slice(0, bloque.indexOf('};'));
+}
+
+function textosDeEstado(nombre) {
+  const cuerpo = cuerpoDelDiccionario(nombre);
   const entradas = {};
   for (const [, token, texto] of cuerpo.matchAll(/(\w+):\s*\{\s*texto:\s*'([^']+)'/g)) {
     entradas[token] = texto;
   }
   assert(Object.keys(entradas).length > 0, `${nombre} quedó vacío al leerlo`);
   return entradas;
+}
+
+// El tono que cada estado declara.
+//
+// El texto solo no alcanza para saber si la pantalla distingue los estados:
+// catorce badges bien escritos pueden salir todos del mismo gris y la prueba
+// que sólo lee texto seguiría verde. Eso era, justamente, la falla.
+function tonosDeEstado(nombre) {
+  const cuerpo = cuerpoDelDiccionario(nombre);
+  const entradas = {};
+  for (const [, token, tono] of cuerpo.matchAll(/(\w+):\s*\{[^}]*?tono:\s*'([^']+)'/g)) {
+    entradas[token] = tono;
+  }
+  assert(Object.keys(entradas).length > 0, `${nombre} quedó sin tonos al leerlo`);
+  return entradas;
+}
+
+// El color que el producto declara para cada tono, SIN resolver: son tokens de
+// la paleta, y quien los resuelve es el navegador y no esta prueba. Si se
+// copiara acá el `#1e4a34`, cambiar la paleta dejaría la prueba mintiendo.
+function coloresDeTono() {
+  const cuerpo = cuerpoDelDiccionario('COLOR_DEL_TONO');
+  const entradas = {};
+  for (const [, tono, valor] of cuerpo.matchAll(/(\w+):\s*'([^']+)'/g)) {
+    entradas[tono] = valor;
+  }
+  assert(Object.keys(entradas).length > 0, 'COLOR_DEL_TONO quedó vacío al leerlo');
+  return entradas;
+}
+
+// A qué tono cae un estado que el diccionario NO conoce. Es el tratamiento de
+// respaldo: ningún estado conocido puede compartirlo, salvo el que lo declara a
+// propósito. Se lee del producto porque suponerlo sería volver a la lista
+// escrita a mano que esta pieza vino a sacar.
+function tonoDeRespaldo() {
+  const fuente = readFileSync('src/utils/estados.ts', 'utf8');
+  const hallado = fuente.match(/SIN_TRADUCCION[^=]*=\s*\{[^}]*tono:\s*'([^']+)'/);
+  assert(hallado, 'no se pudo leer el tono de respaldo en src/utils/estados.ts');
+  return hallado[1];
 }
 
 async function esperarA(condicion, mensaje, limite = 20_000) {
@@ -21720,6 +21764,27 @@ await runCase(159, 'El monograma se integra con la banda: sin placa, sin halo y 
 // agregar un estado y no traducirlo hace fallar esto y no la demo. Los fallos de
 // red son lo único que se finge, y se finge en la red: la respuesta 500 la da un
 // doble de ruta, no un interruptor en el producto.
+//
+// CORRECCIÓN (ADMIN-TRUTH-1R). La primera versión de este caso daba 1/1 sin
+// probar lo que decía probar, y la PM lo vio en la propia salida: «badges
+// verificados en 10 estados (active=20 y los 9 estados de orden distintos de
+// draft)». Faltaban `paused`, `sold_out`, `deleted` y `draft`, y los diez que sí
+// miraba salían de filas que podían venir de casos anteriores. Dos defectos, no
+// uno:
+//
+//  - el bloque de badges filtraba y miraba «lo que hubiera». El catálogo
+//    sembrado es todo `active` y `draft` no se ofrece como filtro, así que para
+//    cuatro de los catorce estados el bucle corría sobre cero filas. Un bucle
+//    vacío siempre pasa;
+//  - y sólo comparaba el TEXTO. Los catorce badges podían caer al mismo gris
+//    —que es exactamente el defecto que el producto vino a arreglar— y el caso
+//    seguía verde.
+//
+// Ahora el caso fabrica sus catorce filas —cuatro publicaciones y diez órdenes—
+// y busca cada una por identidad propia, recorriendo páginas si hace falta; y de
+// cada badge exige el texto del diccionario Y el color computado del tono que
+// ese mismo diccionario declara, distinto del tratamiento de respaldo salvo en
+// el único estado que lo declara a propósito.
 // ---------------------------------------------------------------------------
 await runCase(160, 'Administración dice la verdad: números reales, estados en castellano y fallos visibles', async () => {
   const medidos = [];
@@ -21742,22 +21807,32 @@ await runCase(160, 'Administración dice la verdad: números reales, estados en 
   // alguien agrega un estado al modelo y no lo traduce, esto se cae.
   const TEXTO_DE_ORDEN = textosDeEstado('ESTADOS_DE_ORDEN');
   const TEXTO_DE_PRODUCTO = textosDeEstado('ESTADOS_DE_PRODUCTO');
-  for (const [que, tokens, textos] of [
-    ['orden', ESTADOS_ORDEN, TEXTO_DE_ORDEN],
-    ['producto', ESTADOS_PRODUCTO, TEXTO_DE_PRODUCTO],
+  const TONO_DE_ORDEN = tonosDeEstado('ESTADOS_DE_ORDEN');
+  const TONO_DE_PRODUCTO = tonosDeEstado('ESTADOS_DE_PRODUCTO');
+  const COLOR_DECLARADO = coloresDeTono();
+  const TONO_DE_RESPALDO = tonoDeRespaldo();
+  for (const [que, tokens, textos, tonos] of [
+    ['orden', ESTADOS_ORDEN, TEXTO_DE_ORDEN, TONO_DE_ORDEN],
+    ['producto', ESTADOS_PRODUCTO, TEXTO_DE_PRODUCTO, TONO_DE_PRODUCTO],
   ]) {
     const sinTraducir = tokens.filter((token) => !textos[token]);
     assert(sinTraducir.length === 0,
       `estados de ${que} sin traducción en el diccionario: ${sinTraducir.join(', ')}`);
+    const sinTono = tokens.filter((token) => !tonos[token]);
+    assert(sinTono.length === 0,
+      `estados de ${que} sin tono declarado en el diccionario: ${sinTono.join(', ')}`);
     for (const token of tokens) {
       assert(!/_/.test(textos[token]) && textos[token] !== token,
         `la traducción de ${token} es ${JSON.stringify(textos[token])}: sigue siendo el token`);
+      assert(COLOR_DECLARADO[tonos[token]],
+        `el tono «${tonos[token]}» de ${token} no tiene color en COLOR_DEL_TONO: `
+        + `hay ${Object.keys(COLOR_DECLARADO).join(', ')}`);
     }
   }
   medidos.push(`${ESTADOS_ORDEN.length} estados de orden y ${ESTADOS_PRODUCTO.length} de `
-    + 'producto, todos traducidos');
+    + `producto, todos traducidos y con tono; respaldo «${TONO_DE_RESPALDO}»`);
 
-  // --- A. Una orden por estado, por la ruta real y con el estado puesto ----
+  // --- A1. Una orden por estado, por la ruta real y con el estado puesto ---
   // El checkout es real; el estado se pone en la base descartable, que es donde
   // el arranque dice que se fabrican los estados que la API no ofrece. Sin las
   // diez, el contraste del panel no probaría la exclusión de los terminales.
@@ -21799,6 +21874,77 @@ await runCase(160, 'Administración dice la verdad: números reales, estados en 
     state.buyerId = buyerAnterior.id;
   }
   medidos.push(`${creadas.length} órdenes reales, una por estado`);
+
+  // El número que la orden muestra en la tabla. Es la identidad con la que
+  // después se busca ESTA fila y no la de otro caso: la tabla del panel viene
+  // ordenada por fecha y paginada, así que «la primera que aparezca» no es una
+  // identidad, es una suposición.
+  for (const creada of creadas) {
+    const [fila] = queryRows(
+      `SELECT order_number FROM orders WHERE id = ${sqlLiteral(creada.id)}`);
+    assert(fila && fila[0], `la orden de ${creada.estado} no quedó con número`);
+    creada.numero = fila[0];
+  }
+  const numerosDeOrden = new Set(creadas.map((c) => c.numero));
+  assert(numerosDeOrden.size === creadas.length,
+    'dos órdenes de esta prueba comparten número: la identidad no las distingue');
+
+  // --- A2. Una publicación por estado, creada acá y reconocible ------------
+  // Sin esto, el bloque de badges era una prueba que no podía ponerse roja: el
+  // catálogo sembrado es TODO `active`, así que filtrar por «Pausada»,
+  // «Agotada» o «Eliminada» no devolvía ninguna fila, y un bucle sobre cero
+  // filas no comprueba nada. El caso pasaba sin haber visto tres de los cuatro
+  // estados de publicación.
+  //
+  // Se publican por la ruta real del vendedor —la que usa una persona— y el
+  // estado se pone en la base descartable, que es donde el arranque dice que se
+  // fabrican los estados que la API no ofrece. La categoría y la localidad se
+  // copian de una publicación existente del mismo vendedor para no inventar
+  // referencias que el padrón no tenga.
+  const tokenVendedor = (await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  })).data.access_token;
+  const [molde] = queryRows(`
+    SELECT p.category_id, p.locality_id FROM products p
+    JOIN categories c ON c.id = p.category_id
+    WHERE p.seller_id = ${sqlLiteral(vendedor[0])} AND c.is_service = false
+      AND p.locality_id IS NOT NULL
+    LIMIT 1
+  `);
+  assert(molde, 'el seed no dejó una publicación del vendedor de la que copiar categoría y localidad');
+
+  const publicaciones = [];
+  for (const estado of ESTADOS_PRODUCTO) {
+    const identidad = `Verdad 160 ${sello} ${estado}`;
+    const creada = await apiRequest('/products', {
+      method: 'POST',
+      token: tokenVendedor,
+      body: {
+        name: identidad,
+        description: 'Publicación de la prueba 160: una fila por estado de publicación.',
+        category_id: molde[0],
+        price: 1234.56,
+        stock: 3,
+        unit: 'unidad',
+        locality_id: molde[1],
+        publication_type: 'producto',
+        operation_kind: 'insumo',
+      },
+    });
+    assert(creada.data?.id, `no se pudo publicar la fila de ${estado}`);
+    querySql(`UPDATE products SET status = ${sqlLiteral(estado.toUpperCase())}
+              WHERE id = ${sqlLiteral(creada.data.id)}`);
+    publicaciones.push({ estado, id: creada.data.id, identidad });
+  }
+  const puestos = queryRows(`
+    SELECT lower(status::text), 'fin' FROM products
+    WHERE id IN (${publicaciones.map((x) => sqlLiteral(x.id)).join(', ')})
+    ORDER BY 1
+  `).map(([estado]) => estado);
+  assert(JSON.stringify(puestos) === JSON.stringify([...ESTADOS_PRODUCTO].sort()),
+    `las publicaciones quedaron en ${puestos.join(', ')} y hacían falta `
+    + `${[...ESTADOS_PRODUCTO].sort().join(', ')}`);
+  medidos.push(`${publicaciones.length} publicaciones reales, una por estado`);
 
   // --- B. El dashboard contra la base -------------------------------------
   const admin = (await apiRequest('/auth/login', {
@@ -21896,38 +22042,205 @@ await runCase(160, 'Administración dice la verdad: números reales, estados en 
     }
     medidos.push('el dashboard dibuja los cinco rótulos nuevos con los valores de la base');
 
-    // --- C2. Los badges, estado por estado --------------------------------
-    const badgesDe = async (etiquetaDelFiltro, token) => {
-      await page.getByLabel(etiquetaDelFiltro).selectOption(token);
-      await page.waitForTimeout(900);
-      return page.locator('table [class*="_badge_"]').allInnerTexts();
-    };
-    const revisados = [];
-    for (const [etiqueta, solapaNombre, tokens, textos] of [
-      ['Filtrar publicaciones por estado', 'Productos', ESTADOS_PRODUCTO, TEXTO_DE_PRODUCTO],
-      ['Filtrar órdenes por estado', 'Órdenes', ESTADOS_ORDEN.filter((t) => t !== 'draft'),
-        TEXTO_DE_ORDEN],
-    ]) {
-      await solapa(solapaNombre);
-      const opciones = await page.getByLabel(etiqueta).locator('option').allInnerTexts();
-      for (const token of tokens) {
-        assert(opciones.includes(textos[token]),
-          `el filtro de ${solapaNombre} no ofrece «${textos[token]}»: ${opciones.join(' | ')}`);
-        const badges = await badgesDe(etiqueta, token);
-        for (const badge of badges) {
-          assert(badge.trim().toLowerCase() === textos[token].toLowerCase(),
-            `filtrando por ${token} un badge dice «${badge}» y el diccionario dice `
-            + `«${textos[token]}»`);
-          assert(!/_/.test(badge), `un badge imprime el token interno: «${badge}»`);
-        }
-        if (badges.length) revisados.push(`${token}=${badges.length}`);
-      }
-      await page.getByLabel(etiqueta).selectOption('');
-      await page.waitForTimeout(700);
+    // --- C2. Los catorce badges: cada uno en SU fila, con texto y color ---
+    //
+    // La versión anterior de este bloque filtraba y miraba lo que hubiera. Con
+    // el catálogo sembrado todo en `active` y `draft` sin filtro que lo pida,
+    // «lo que hubiera» eran cero filas para tres estados de publicación y para
+    // el borrador, y los estados de orden que sí veía podían venir de filas
+    // dejadas por casos anteriores. Pasaba en 1/1 sin haber visto la mitad de
+    // lo que decía cubrir: un verde que no se podía poner rojo.
+    //
+    // Ahora cada uno de los catorce se busca por la fila que ESTA prueba creó
+    // —el nombre de la publicación, el número de la orden—, recorriendo las
+    // páginas si hace falta, y de esa fila se exige:
+    //
+    //   - el texto del diccionario, no el token interno;
+    //   - el color que el diccionario declara para el tono de ESE estado,
+    //     resuelto por el navegador y no copiado acá;
+    //   - que no sea el tratamiento de respaldo, salvo el estado que lo declara
+    //     a propósito.
+    //
+    // Sin la tercera comprobación los catorce podrían caer al mismo gris —el
+    // defecto que el producto vino a arreglar— y el caso seguiría verde.
+    const colorResuelto = (expresion) => page.evaluate((valor) => {
+      const sonda = document.createElement('span');
+      sonda.style.backgroundColor = valor;
+      document.body.appendChild(sonda);
+      const visto = getComputedStyle(sonda).backgroundColor;
+      sonda.remove();
+      return visto;
+    }, expresion);
+
+    const SIN_FONDO = /^(transparent$|rgba\([^)]*,\s*0\)$)/;
+    const COLOR_RESUELTO = {};
+    for (const [tono, expresion] of Object.entries(COLOR_DECLARADO)) {
+      COLOR_RESUELTO[tono] = await colorResuelto(expresion);
+      assert(!SIN_FONDO.test(COLOR_RESUELTO[tono]),
+        `el tono «${tono}» declara ${expresion} y el navegador lo deja en `
+        + `${JSON.stringify(COLOR_RESUELTO[tono])}: un tono sin fondo no distingue nada`);
     }
-    assert(revisados.length >= 10,
-      `sólo se vieron badges de ${revisados.length} estados: ${revisados.join(', ')}`);
-    medidos.push(`badges verificados en ${revisados.length} estados (${revisados.join(', ')})`);
+    const COLOR_DE_RESPALDO = COLOR_RESUELTO[TONO_DE_RESPALDO];
+
+    // La página que muestra el paginador de la sección abierta.
+    const paginaVisible = async () => (
+      await page.locator('[class*="_paginaActual_"]').first().innerText()).trim();
+
+    // Cuántas filas tiene la base para este estado. El panel las pide paginadas,
+    // así que el total que muestra el paginador es contrastable contra SQL.
+    const totalEnBase = (tabla, estado) => Number(queryRows(
+      `SELECT COUNT(*) FROM ${tabla}`
+      + (estado ? ` WHERE status = ${sqlLiteral(estado.toUpperCase())}` : ''))[0][0]);
+
+    // Esperar a que la tabla en pantalla sea LA que se pidió.
+    //
+    // Este fue el primer rojo de la corrección, y era mío: esperar «que haya
+    // filas» después de cambiar el filtro se cumple al instante con la tabla
+    // anterior, que sigue dibujada mientras llega la nueva. El caso leía el
+    // filtro viejo y no encontraba su fila. Se espera la conjunción de dos
+    // cosas que la tabla anterior no puede cumplir a la vez: el total que
+    // declara la base para este estado, y que todo lo dibujado sea de ese
+    // estado. Con el filtro sin poner, sólo el total.
+    const esperarTabla = async (etiquetaPaginador, tabla, estado, textoEsperado, contexto) => {
+      const totalEsperado = totalEnBase(tabla, estado);
+      let visto = '(sin paginador)';
+      try {
+        await esperarA(async () => {
+          visto = await page.locator('[class*="_pagination_"]').first().innerText()
+            .catch(() => '(sin paginador)');
+          if (!visto.includes(`Total: ${totalEsperado} ${etiquetaPaginador}`)) return false;
+          if (!textoEsperado) return true;
+          const badges = await page.locator('table tbody [class*="_badge_"]').allInnerTexts();
+          return badges.length > 0 && badges.every(
+            (texto) => texto.trim().toLowerCase() === textoEsperado.toLowerCase());
+        }, `${contexto}: la tabla no llegó a ${totalEsperado} ${etiquetaPaginador}`
+           + (textoEsperado ? ` todas «${textoEsperado}»` : ' sin filtro'), 25_000);
+      } catch (error) {
+        throw new Error(`${error.message}; el paginador dice «${visto.replace(/\s+/g, ' ')}»`);
+      }
+      return totalEsperado;
+    };
+
+    // Buscar LA fila de esta prueba sin suponer en qué página cayó.
+    const filaConIdentidad = async (etiquetaPaginador, identidad, contexto) => {
+      let numero = 1;
+      for (;;) {
+        const fila = page.locator('table tbody tr').filter({ hasText: identidad });
+        if ((await fila.count()) > 0) {
+          assert((await fila.count()) === 1,
+            `${contexto}: «${identidad}» aparece en ${await fila.count()} filas`);
+          return fila.first();
+        }
+        const siguiente = page.getByRole('button',
+          { name: `Página siguiente de ${etiquetaPaginador}` });
+        assert((await siguiente.count()) === 1,
+          `${contexto}: no está el paginador de ${etiquetaPaginador}`);
+        if (await siguiente.isDisabled()) {
+          throw new Error(`${contexto}: la fila «${identidad}» no está en ninguna de las `
+            + `${numero} página(s) (${await paginaVisible()})`);
+        }
+        numero += 1;
+        await siguiente.click();
+        await esperarA(async () => new RegExp(`Página ${numero} de `).test(await paginaVisible()),
+          `${contexto}: no se llegó a la página ${numero} de ${etiquetaPaginador}`, 20_000);
+      }
+    };
+
+    // Lo que se le exige a un badge: qué dice y cómo se ve.
+    const mirarBadge = async (fila, token, textos, tonos, contexto) => {
+      const badge = fila.locator('[class*="_badge_"]');
+      const cuantos = await badge.count();
+      assert(cuantos === 1, `${contexto}: la fila de ${token} tiene ${cuantos} badges`);
+      const dicho = (await badge.innerText()).trim();
+      assert(dicho.toLowerCase() === textos[token].toLowerCase(),
+        `${contexto}: el badge de ${token} dice «${dicho}» y el diccionario dice `
+        + `«${textos[token]}»`);
+      assert(!/_/.test(dicho), `${contexto}: el badge imprime el token interno: «${dicho}»`);
+
+      const pintado = await badge.evaluate((el) => getComputedStyle(el).backgroundColor);
+      const tono = tonos[token];
+      assert(!SIN_FONDO.test(pintado),
+        `${contexto}: el badge de ${token} no tiene fondo (${pintado}): sin tratamiento, `
+        + 'los estados no se distinguen');
+      assert(pintado === COLOR_RESUELTO[tono],
+        `${contexto}: el badge de ${token} se pinta ${pintado} y su tono «${tono}» declara `
+        + `${COLOR_DECLARADO[tono]} = ${COLOR_RESUELTO[tono]}`);
+      if (tono !== TONO_DE_RESPALDO) {
+        assert(pintado !== COLOR_DE_RESPALDO,
+          `${contexto}: ${token} se ve igual que un estado sin traducir (${pintado}): un `
+          + 'estado conocido no puede caer al tratamiento de respaldo');
+      }
+      return `${token}→«${dicho}»/${tono}/${pintado}`;
+    };
+
+    const vistos = [];
+
+    // C2.a — Publicaciones: los cuatro estados, cada uno en su propia fila.
+    await solapa('Productos');
+    const ETIQUETA_PRODUCTO = 'Filtrar publicaciones por estado';
+    const opcionesProducto = await page.getByLabel(ETIQUETA_PRODUCTO)
+      .locator('option').allInnerTexts();
+    for (const { estado, identidad } of publicaciones) {
+      assert(opcionesProducto.includes(TEXTO_DE_PRODUCTO[estado]),
+        `el filtro de Publicaciones no ofrece «${TEXTO_DE_PRODUCTO[estado]}»: `
+        + opcionesProducto.join(' | '));
+      await page.getByLabel(ETIQUETA_PRODUCTO).selectOption(estado);
+      await esperarTabla('productos', 'products', estado, TEXTO_DE_PRODUCTO[estado],
+        `publicaciones/${estado}`);
+      const fila = await filaConIdentidad('productos', identidad, `publicaciones/${estado}`);
+      vistos.push(await mirarBadge(fila, estado, TEXTO_DE_PRODUCTO, TONO_DE_PRODUCTO,
+        `publicaciones/${estado}`));
+    }
+    await page.getByLabel(ETIQUETA_PRODUCTO).selectOption('');
+    await esperarTabla('productos', 'products', null, null, 'publicaciones/sin filtro');
+
+    // C2.b — Órdenes: los nueve que el filtro ofrece, cada uno en su fila.
+    await solapa('Órdenes');
+    const ETIQUETA_ORDEN = 'Filtrar órdenes por estado';
+    const opcionesOrden = await page.getByLabel(ETIQUETA_ORDEN).locator('option').allInnerTexts();
+    for (const { estado, numero } of creadas.filter((c) => c.estado !== 'draft')) {
+      assert(opcionesOrden.includes(TEXTO_DE_ORDEN[estado]),
+        `el filtro de Órdenes no ofrece «${TEXTO_DE_ORDEN[estado]}»: ${opcionesOrden.join(' | ')}`);
+      await page.getByLabel(ETIQUETA_ORDEN).selectOption(estado);
+      await esperarTabla('órdenes', 'orders', estado, TEXTO_DE_ORDEN[estado],
+        `órdenes/${estado}`);
+      const fila = await filaConIdentidad('órdenes', numero, `órdenes/${estado}`);
+      vistos.push(await mirarBadge(fila, estado, TEXTO_DE_ORDEN, TONO_DE_ORDEN,
+        `órdenes/${estado}`));
+    }
+
+    // C2.c — `draft`, desde la vista sin filtro.
+    //
+    // El producto no lo ofrece como filtro a propósito: una orden en borrador
+    // todavía no es un pedido. Pero si aparece en la tabla tiene que estar
+    // traducida igual, así que se la busca donde sí puede salir. Si algún día
+    // se ofreciera como filtro, la primera afirmación se cae y hay que exigirlo
+    // por filtro como a los otros nueve.
+    assert(!opcionesOrden.includes(TEXTO_DE_ORDEN.draft),
+      `el filtro de Órdenes ahora ofrece «${TEXTO_DE_ORDEN.draft}»: exigilo por filtro `
+      + 'como a los otros, no por la vista sin filtro');
+    await page.getByLabel(ETIQUETA_ORDEN).selectOption('');
+    const totalSinFiltro = await esperarTabla('órdenes', 'orders', null, null,
+      'órdenes/sin filtro');
+    assert(totalSinFiltro >= ESTADOS_ORDEN.length,
+      `la vista sin filtro trae ${totalSinFiltro} órdenes y hacen falta al menos `
+      + `${ESTADOS_ORDEN.length}: el borrador no tendría dónde aparecer`);
+    const borrador = creadas.find((c) => c.estado === 'draft');
+    assert(borrador?.numero, 'no se preparó la orden en borrador');
+    const filaBorrador = await filaConIdentidad('órdenes', borrador.numero, 'órdenes/draft');
+    vistos.push(await mirarBadge(filaBorrador, 'draft', TEXTO_DE_ORDEN, TONO_DE_ORDEN,
+      'órdenes/sin filtro'));
+
+    // Y el recuento no se declara: se cuenta contra los enum de la base.
+    const exigidos = ESTADOS_PRODUCTO.length + ESTADOS_ORDEN.length;
+    assert(vistos.length === exigidos,
+      `se miraron ${vistos.length} badges y la base declara ${exigidos} estados: `
+      + vistos.join(', '));
+    const conRespaldo = vistos.filter((v) => v.endsWith(`/${COLOR_DE_RESPALDO}`));
+    medidos.push(`${vistos.length} badges mirados de a uno, en la fila que esta prueba creó, `
+      + `con texto y color computado: ${vistos.join(', ')}; el tratamiento de respaldo `
+      + `(${COLOR_DE_RESPALDO}) lo comparten sólo los ${conRespaldo.length} que declaran el `
+      + `tono «${TONO_DE_RESPALDO}»`);
 
     // --- D. Las cinco cargas: 500, aviso, reintento y dato ----------------
     const CARGAS = [
@@ -22014,8 +22327,9 @@ await runCase(160, 'Administración dice la verdad: números reales, estados en 
     await browser.close();
   }
 
-  return `los estados salen de los enum de la base y las traducciones del diccionario del `
-    + `producto, no de una lista escrita en la prueba; ${medidos.join('; ')}`;
+  return `los catorce estados salen de los enum de la base y sus textos, tonos y colores del `
+    + `diccionario del producto, no de una lista escrita en la prueba, y cada badge se mira en `
+    + `la fila que este caso creó; ${medidos.join('; ')}`;
 });
 
 // ---------------------------------------------------------------------------
