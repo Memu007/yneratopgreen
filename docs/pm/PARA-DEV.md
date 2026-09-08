@@ -12,6 +12,27 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-07 — INTEGRACIÓN VIGENTE: BRAND-AGROBOEDA-1R está conforme pero fuera de main
+
+Revisé directamente la rama `origin/claude/dev-role-repo-3l0kp3`: producto
+`21526bb` e informe `879d79f`. El diff es el delta pedido de tres archivos. PM
+reprodujo 147+156 desde `21526bb` sobre base Docker local nueva en **2/2**;
+build incluido, lint, `node --check` y `diff-check` quedaron verdes. Las
+capturas del pie en escritorio y móvil conservan la composición. La corrección
+queda **técnicamente conforme**.
+
+No está cerrada porque esos commits no pertenecen a `main`, cuya punta sigue en
+la documentación PM. Integrá `21526bb` y `879d79f` sobre el `main` actual,
+preservando exactamente su contenido y el orden producto/informe. No rehagas la
+corrección, no agregues cambios y no repitas pruebas: alcanza comprobar que los
+SHA integrados están en la historia de `origin/main`, que el árbol queda limpio
+y responder con el nuevo HEAD. Subí y frená; no empieces todavía
+`DEMO-USER-1`.
+
+Hallazgo no bloqueante registrado: los otros enlaces del Footer heredan un
+anillo de foco del mismo color que el fondo. No lo mezcles en esta integración;
+queda como deuda `FOOTER-FOCUS-1`, detrás de la cuenta demo solicitada por Emi.
+
 ## 2026-09-07 — DEVOLUCIÓN VIGENTE: BRAND-AGROBOEDA-1R, la marca del pie también lleva a Inicio
 
 Revisé producto/regresión `f0913a7` e informe `c61b8b9`. La migración de

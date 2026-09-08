@@ -11,13 +11,12 @@ Actualizado: 2026-09-07.
   después aislado en **1/1**. Hay cobertura combinada de 155 casos, no una suite
   PM 155/155. Evidencia en
   `REPRODUCCION-MARKET-VIEWS-1-2026-09-07.md`.
-- **Única tarea activa y responsable:** `BRAND-AGROBOEDA-1R`, Dev. La entrega
-  base `f0913a7`/`c61b8b9` queda devuelta sólo porque la marca del Footer es un
-  `div` sin acción; debe ser un control accesible que lleve a Inicio y el caso
-  156 debe probar específicamente ese control. PM reprodujo 156 en **1/1**,
-  verificó hashes/derivación e inspeccionó las nueve capturas: identidad,
-  registro y responsive son conformes. No repetir suite completa ni rehacer
-  activos. Sin despliegue ni datos remotos.
+- **Única tarea activa y responsable:** integración de
+  `BRAND-AGROBOEDA-1R`, Dev. La corrección `21526bb` y su informe `879d79f`
+  quedaron en `origin/claude/dev-role-repo-3l0kp3`, no en `main`. PM revisó el
+  delta de tres archivos y reprodujo 147+156 en **2/2** desde base local nueva;
+  build incluido, lint, sintaxis y `diff-check` verdes. Está técnicamente
+  conforme; falta integrar esos dos commits sin cambios. No repetir pruebas.
 
 - **FORM-DIRTY-1R aceptada:** producto/regresión `83dba0a`, informe `db1bb10`.
   PM revisó el diff y reprodujo 150 y 149 aislados en **1/1** cada uno; ambos
@@ -79,6 +78,10 @@ Actualizado: 2026-09-07.
   seed local ya bloqueado a `ENV=local`. No es admin, no toca Railway y no se
   mezcla con Mercado ni marca. Contrato en
   `CUENTA-DEMO-AGROBOEDA-CLIENTE-2026-09-07.md`.
+- **Deuda nueva no bloqueante:** los enlaces textuales del Footer conservan un
+  anillo de foco `#1e4a34` sobre fondo `#1e4a34`; la marca corregida ya usa el
+  color visible. `FOOTER-FOCUS-1` queda detrás de `DEMO-USER-1`, sin mezclarlo
+  con la integración ni retrasar la cuenta solicitada por Emi.
 - Docker Desktop volvió a responder el 07/09. Las reproducciones eliminaron y
   recrearon sólo contenedores/volúmenes locales descartables de TopGreen; el
   lanzador los retiró al terminar. No se tocó Railway, datos remotos ni pagos.

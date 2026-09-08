@@ -3,7 +3,37 @@
 Fecha: 2026-09-07  
 Producto/regresión: `f0913a7`  
 Informe Dev: `c61b8b9`  
-Resultado: **devuelta como BRAND-AGROBOEDA-1R**
+Resultado: base devuelta; corrección **técnicamente conforme, pendiente de integración**
+
+## Revisión de BRAND-AGROBOEDA-1R
+
+La Dev corrigió el borde en `21526bb` y documentó en `879d79f`, ambos sobre la
+rama remota `origin/claude/dev-role-repo-3l0kp3`. El delta contra `f2f4ecc`
+toca únicamente Footer TSX, Footer CSS y el bloque del caso 156.
+
+- La marca completa del Footer es un botón que reutiliza
+  `handleNavigate('home')`; monograma decorativo y texto producen un solo nombre
+  accesible.
+- El caso 156 localiza exactamente un botón `AgroBoeda` dentro de `footer`,
+  parte desde Quiénes somos, llega tabulando, mide contraste del foco, activa
+  con Enter y comprueba Inicio con scroll en cero en los tres viewports.
+- Dev informó rojo contra `f0913a7`: cero controles de marca dentro del Footer.
+- PM ejecutó 147+156 sobre base Docker local nueva desde `21526bb`: **2/2**.
+  El primer intento se detuvo antes de probar por dependencias ausentes en la
+  copia temporal y no cuenta; el reintento reutilizó las dependencias locales y
+  quedó guardado en
+  `/private/tmp/topgreen-pm-brand1r-147-156-reintento.log`.
+- Build dentro del recorrido, lint con cero avisos, `node --check` y
+  `git -c core.whitespace=cr-at-eol diff --check`: verdes.
+- Se inspeccionaron Footer 1440×900 y 390×844: el botón no altera la
+  composición. El foco medido por el caso queda en 3,9:1.
+- No se repitieron suite completa, contraste, a11y total, Backend ni derivación,
+  según la devolución focal.
+
+La corrección no puede cerrarse todavía porque `origin/main` no contiene esos
+dos commits. Se pide integración exacta, sin nueva prueba. El hallazgo de foco
+1,0:1 en los demás enlaces del Footer queda como `FOOTER-FOCUS-1`, no
+bloqueante y posterior a `DEMO-USER-1`.
 
 ## Verificación realizada
 
