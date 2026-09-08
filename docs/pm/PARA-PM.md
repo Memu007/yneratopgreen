@@ -2,191 +2,165 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ADMIN-TRUTH-1 — el panel dice lo que pasa
+## ADMIN-TRUTH-1R — el caso 160 se sostiene solo
 
 **Resultado: terminado.**
 
-- Producto/regresión: `aaa51ce`
-- La suite pasa a **160 casos**.
-- Alcance real: `backend/app/api/admin.py` (contrato del dashboard),
-  `src/utils/estados.ts` (nuevo, el diccionario compartido),
-  `AdminPanel.tsx` + su CSS, y los casos 160, 145 y 146 en `scripts/smoke.mjs`.
+- Corrección de regresión: `21cd4d1`
+- Alcance real: **sólo `scripts/smoke.mjs`**. El producto no se tocó: el diff
+  contra `src/` y `backend/` sale vacío. La prueba no reveló ningún fallo real
+  del producto, así que no rehice producto, como pediste.
+- La suite sigue en **161 casos**.
 - **En mi rama, no en `main`.** No integré, no desplegué y no toqué Railway,
-  datos remotos, pagos ni secretos. Sin migración, dependencia, rediseño,
-  confirmaciones, reset de clave ni paginación nueva.
+  datos remotos, pagos ni secretos.
 
 ---
 
-### 1. Los cuatro puntos
+### 1. Tenías razón, y era peor de lo que decía la salida
 
-**El contrato.** La pantalla pedía `total_sellers` y `total_customers`, que el
-servidor nunca mandó: dos tarjetas dibujaban `undefined`, y TypeScript no se
-entera porque cree lo que dice la interfaz y la respuesta no se valida. Ahora
-las claves son las reales y las tarjetas dicen Total de usuarios, Usuarios
-comunes y Administradores.
+No hay nada que discutir acá: el 160 daba 1/1 sin probar lo que decía probar.
+Lo que encontraste eran **dos** defectos, no uno.
 
-`pending_orders` → `orders_in_process`, con los seis estados abiertos y los
-cuatro terminales afuera. Contaba dos de diez: las que esperan o revisan
-comprobante, las pagadas y las enviadas quedaban invisibles **justo para quien
-mira el panel para saber qué tiene pendiente**.
+**El bucle vacío.** El bloque de badges filtraba y miraba «lo que hubiera». El
+catálogo sembrado es todo `active` y `draft` no se ofrece como filtro, así que
+para cuatro de los catorce estados el bucle corría sobre **cero filas**. Un
+bucle vacío siempre pasa. Y los diez que sí veía podían venir de filas dejadas
+por casos anteriores: en la suite completa el informe enumeraba más estados no
+porque el caso los hubiera preparado, sino porque los heredaba.
 
-`total_revenue` → `sold_volume`. Se calcula igual —pagadas, enviadas,
-entregadas—; lo que cambia es que ya no se rotula «Ingresos», que decía que
-AgroBoeda cobra algo que no cobra.
+**El color que no se miraba.** El caso sólo comparaba el texto. Los catorce
+badges podían caer al mismo gris —que es exactamente el defecto que el producto
+vino a arreglar— y el caso seguía verde. Era una prueba que no podía ponerse
+roja por la falla que motivó la pieza.
 
-**Los estados.** Un diccionario en `src/utils/estados.ts` con los catorce, y lo
-leen la fila **y** el filtro, así que no pueden discrepar. No tiene rama
-«otros»: si mañana aparece un estado sin traducir, el badge lo dice en vez de
-disimularlo en gris. Los cinco tonos son los colores que el panel ya usaba; no
-agregué ninguno.
+### 2. Qué hace ahora
 
-**Las cinco cargas.** El fallo es un estado por sección; mientras está puesto no
-se dibujan filas. El aviso lleva `role="alert"`, dice qué recurso no cargó y
-trae `Reintentar`, que repite la consulta con los filtros vigentes porque la
-función de carga los lee del estado.
+**Fabrica sus catorce filas.**
 
-**El alta.** Frena antes del POST si falta un requerido o la clave no llega a
-seis —el mínimo es del Backend, `Field(..., min_length=6)`— y muestra el detalle
-real del servidor al lado del formulario, que conserva lo escrito.
+- Cuatro publicaciones por la ruta real del vendedor —`POST /products`, la que
+  usa una persona—, una por estado, y el estado se pone en la base descartable,
+  que es donde el arranque dice que se fabrican los estados que la API no
+  ofrece. Categoría y localidad se copian de una publicación existente del mismo
+  vendedor: no invento referencias que el padrón no tenga.
+- Las diez órdenes que ya creaba, ahora con su `order_number` leído de la base.
+- Después comprueba contra SQL que las cuatro publicaciones quedaron en los
+  cuatro estados, y que los diez números de orden son distintos entre sí.
 
-### 2. Una corrección de diseño a mitad de camino, que me marcó el 145
+**Busca cada fila por identidad propia.** Nombre de la publicación
+(`Verdad 160 <sello> <estado>`) o número de orden, recorriendo páginas mientras
+«Siguiente» no esté deshabilitado. Ni el orden del catálogo ni la página son una
+identidad; si la fila no aparece en ninguna página, el caso lo dice con el
+número de páginas que recorrió y lo que muestra el paginador.
 
-Mi primera versión **reemplazaba** la tabla por el mensaje de vacío. El caso 145
-se puso rojo, y tenía razón: con cero resultados el pie ya decía la verdad
-—«Total: 0 usuarios», «Página 1 de 1», navegación deshabilitada— y sacarlo
-perdía información en vez de sumarla. Ahora el vacío **acompaña** a la tabla.
+**Exige tres cosas de cada badge**, no una:
 
-Lo cuento porque es la parte de la pieza que no salió del enunciado sino de una
-prueba vieja que sabía algo que yo no.
+1. el texto del diccionario, sin guion bajo;
+2. el color **computado** del tono que ese mismo diccionario declara. El color
+   no se copia acá: se lee `COLOR_DEL_TONO` del producto —que son tokens de la
+   paleta— y lo resuelve el navegador. Si mañana cambia `--tg-color-warning`, la
+   prueba sigue diciendo la verdad en vez de quedar mintiendo con un `#79520f`
+   escrito a mano;
+3. que no sea el tratamiento de respaldo. El tono de respaldo también se lee del
+   producto (`SIN_TRADUCCION`), no se supone. La única excepción es el estado
+   que declara ese tono a propósito, y el informe dice cuántos son: uno,
+   `draft`.
 
-### 3. El rojo, contra `3370284`, en dos pasos
+Además se rechaza el fondo vacío o transparente, tanto en el color declarado por
+el tono como en el badge dibujado.
 
-```
-1. sin el diccionario ni el panel nuevo
-   [FAIL] 160 … — ENOENT: no such file or directory, open 'src/utils/estados.ts'
-2. con el diccionario puesto y el panel y el Backend viejos
-   [FAIL] 160 … — el panel dice orders_in_process=undefined y la base dice 6
-```
+**`draft` sale de la vista sin filtro**, que es donde puede aparecer. Y el caso
+afirma primero que el filtro *no* lo ofrece: si algún día se ofreciera, esa
+afirmación se cae y avisa que hay que exigirlo por filtro como a los otros nueve,
+en vez de seguir mirándolo por la puerta de atrás.
 
-El segundo es el que importa: es el contrato roto, medido contra SQL.
+**El recuento no se declara.** Antes decía `revisados.length >= 10`, un número
+escrito a mano que envejece. Ahora exige
+`ESTADOS_PRODUCTO.length + ESTADOS_ORDEN.length` leídos de los enum de la base:
+agregar un estado al modelo rompe el caso hasta que se lo prepare y se lo mire.
 
-### 4. El verde
+Y la comprobación temprana del diccionario ahora también exige que cada estado
+declare un tono y que ese tono tenga color, no sólo que tenga texto.
 
-```
-[PASS] 160 … 10 estados de orden y 4 de producto, todos traducidos; 10 órdenes
-reales, una por estado; dashboard contra SQL: 86 en curso, 21 terminales,
-volumen 1621491.5; el dashboard dibuja los cinco rótulos nuevos con los valores
-de la base; badges verificados en 13 estados (active=20, paused=2, sold_out=2,
-deleted=13, placed=17, confirmed=2, paid=15, shipped=1, delivered=2,
-cancelled=10, rejected=8, awaiting_transfer_receipt=20,
-transfer_receipt_submitted=5); Dashboard: 500 → aviso con «el resumen del
-panel» y reintento; Usuarios: 500 → aviso con «la lista de usuarios» y
-reintento; Publicaciones: 500 → aviso con «la lista de publicaciones» y
-reintento; Órdenes: 500 → aviso con «la lista de órdenes» y reintento;
-Documentación: 500 → aviso con «la cola de documentación» y reintento; alta:
-la clave corta no sale al servidor y el duplicado vuelve con su detalle
-```
+### 3. El rojo, tres veces
 
-Las diez órdenes se crean por el checkout real y sólo el estado se pone en la
-base descartable, que es donde el arranque dice que se fabrica lo que la API no
-ofrece. Sin las diez, «excluye los terminales» no probaría nada: el caso exige
-que haya órdenes terminales y que en curso + terminales dé el total.
+No te traigo un verde sin haber visto el rojo. Los tres negativos son temporales
+y quedaron revertidos; el árbol entregado sólo tiene `scripts/smoke.mjs`.
 
-### 5. Los casos 145 y 146
+| Negativo | Qué se rompió a propósito | Qué dijo el caso |
+|---|---|---|
+| 1 | `COLOR_DEL_TONO.curso` → el color del respaldo | `publicaciones/sold_out: sold_out se ve igual que un estado sin traducir (rgb(76, 84, 75))` |
+| 2 | Todos los badges con un solo color en `AdminPanel.tsx` | `el badge de paused se pinta rgb(30, 74, 52) y su tono «espera» declara var(--tg-color-warning) = rgb(121, 82, 15)` |
+| 3 | Preparar **una** publicación en vez de cuatro, como la versión que rechazaste | `se miraron 11 badges y la base declara 14 estados: …` |
 
-Los rompió mi cambio, y era esperable: los dos comparaban el badge contra el
-token crudo (`active`, `awaiting_transfer_receipt`, `paused`). Los actualicé en
-cuatro lugares, pero **no copiándoles el texto nuevo**: saqué un lector
-`textosDeEstado()` que lee `src/utils/estados.ts`, así que los tres casos
-comparan contra el mismo diccionario que dibuja la pantalla. Si mañana cambia un
-texto, cambia en un lugar.
+El tercero es el que importa para tu devolución: reproduce el falso verde y
+ahora es rojo.
 
-### 6. Lo que corrí y lo que no
+### 4. Un defecto mío que apareció al medir
 
-```
-SMOKE_CASOS=160 contra 3370284                  rojo, en dos pasos
-SMOKE_CASOS=145,146,160 desde base limpia       3/3
-suite completa desde base limpia                159/160
-npm run build                                   verde
-npm run lint                                    verde, 0 avisos
-npx tsc --noEmit                                verde
-node --check scripts/smoke.mjs                  verde
-python -m compileall backend/app                verde
-python -m pip check                             No broken requirements found
-git -c core.whitespace=cr-at-eol diff --check   limpio
-```
+El primer intento se cayó en `órdenes/draft`: la fila no aparecía «en ninguna de
+las 1 página(s)». No era el producto. Esperar «que haya filas» después de
+cambiar el filtro **se cumple al instante con la tabla anterior**, que sigue
+dibujada mientras llega la nueva: el caso leía el filtro viejo.
 
-**El único rojo de la suite es el 131**, el ambiental conocido: pide `alpine:3`
-por el puente de Docker, que este contenedor no tiene. No lo toqué y no lo trae
-esta pieza. **No declaro 160/160: declaro 159/160 con ese rojo nombrado.**
+Lo arreglé con una condición que la tabla vieja no puede cumplir a la vez: el
+total que declara la base para ese estado —contrastado contra SQL, así que de
+paso comprueba que el filtro filtra— y que todo lo dibujado sea de ese estado.
+Con el filtro sin poner, sólo el total. El mensaje de error incluye lo que
+mostraba el paginador cuando se agotó el tiempo.
 
-No corrí `a11y` ni `contraste` totales, como pediste: el 160 cubre la
-accesibilidad de los avisos —`role="alert"` y el botón de reintento— y el resto
-del panel no cambió de forma.
+Lo digo porque es la clase de espera que produce verdes que no valen, y estaba
+en mi código.
 
-### 7. Deuda que sigue abierta, sin tocar
+### 5. Lo que corrí
 
-- `--tg-color-focus` sigue valiendo `#1e4a34`, el mismo que `--tg-color-brand`:
-  cualquier superficie nueva con el verde de marca nace con el foco invisible.
-  Anotado desde `FOOTER-FOCUS-1`.
-- Categorías y Configuración siguen avisando por toast, como dejaste dicho. No
-  las toqué.
+- `./scripts/entorno_nativo.sh --recrear` y `SMOKE_CASOS=160`: **1/1**, desde
+  base limpia, con los catorce estados enumerados en la salida —cada uno con su
+  texto y su color computado— y `el tratamiento de respaldo (rgb(76, 84, 75)) lo
+  comparten sólo los 1 que declaran el tono «neutro»`.
+- `node --check scripts/smoke.mjs` y
+  `git -c core.whitespace=cr-at-eol diff --check`: limpios.
+- No corrí suite completa, 145/146, build separado, a11y, contraste ni Backend,
+  como pediste.
+
+**Una excepción, y la aviso.** Factoricé los lectores del diccionario, que 145 y
+146 también usan. Tu instrucción de no correr 145/146 suponía que el diff no los
+tocaba, y dejó de ser cierto por mi cambio. En vez de correrlos, medí lo que
+importa directamente: ejecuté la implementación vieja —sacada de
+`git show HEAD:`— y la nueva sobre el mismo archivo, y devuelven **exactamente
+lo mismo** en los dos diccionarios. `textosDeEstado` no cambió de
+comportamiento, así que la premisa de 145 y 146 no cambió. Si preferís la
+corrida igual, decímelo.
+
+### 6. Sin rojo, sin intermitente, sin pendiente
+
+No quedó nada rojo ni sin verificar en esta corrección. El 131 ambiental no
+entra acá: no corrí la suite completa.
 
 ---
 
-## CONTACTO-MARCA-1 — la landing deja de escribir la dirección vieja
+## Lo que sigue en cola, y no empecé
 
-**Pieza corta pedida por Emi, fuera de la tarea activa.** La informo acá para
-que la veas antes de aceptar `ADMIN-TRUTH-1`; si preferís que espere o que se
-revise aparte, decilo y la separo.
+- **`CATALOG-PHOTOS-1`**: leído. No lo empecé, porque dijiste que cerrara esta
+  corrección y frenara. Queda esperando que la actives.
+- **`ACCOUNT-PAGE-1`**: leído. Va después de las fotos; no lo mezclo.
 
-- Producto/regresión: `69e9eaf`
-- La suite pasa a **161 casos**.
-- Alcance: `Footer.tsx`, `ContactPage.tsx` y el caso 161. **En la rama, no en
-  `main`.** No desplegué ni toqué nada remoto.
+## Deuda anterior, sin tocar
 
-### Qué pidió y qué le contesté
+- **`--tg-color-focus` es igual a `--tg-color-brand` (`#1e4a34`)**: cualquier
+  superficie verde marca nace con el anillo de foco invisible. Sigue abierto.
+- **El monograma transparente es para fondos oscuros**, no para claros.
+- **La cuenta publicada**: registro tu decisión: la creaste y verificaste vos en
+  una operación aparte, y no requiere acción mía. Le avisé a Emi que la vio con
+  sesión iniciada en el sitio publicado.
 
-Emi vio `info@topgreen.com.ar` en el pie y pidió que dijera
-`info@agroboeda.com`. **Frené antes de hacerlo** y le pregunté una sola cosa: si
-esa casilla existe. No existe.
+## Y una cosa que hice fuera de tu canal, y te la digo
 
-Por eso no la puse, y no es una interpretación mía: es lo que ya decía
-`IDENTIDAD-AGROBOEDA-CLIENTE`, que las direcciones heredadas «no deben
-reemplazarse por una cuenta inexistente». Medido, además, hay un motivo más
-concreto: el formulario de Contacto **abre el cliente de correo con
-`destinationEmail`**, así que apuntarlo a una casilla que no recibe convertiría
-el formulario en un buzón roto sin que nadie se entere.
+Emi pidió en el chat que la landing dejara de mostrar `info@topgreen.com.ar` y
+comprobó que en el sitio publicado seguía apareciendo. Con su autorización
+explícita llevé a `main` **sólo** `CONTACTO-MARCA-1` (`1c1fc45`): el pie, la
+página de Contacto y su caso 161. Nada de `ADMIN-TRUTH-1` ni de
+`LOGO-INTEGRATION-1R` fue integrado; siguen retenidos en la rama, como pediste.
 
-Consultado, Emi eligió **ocultar la dirección sin tocar el canal**.
-
-### Qué quedó
-
-El pie y Contacto dicen «Escribinos». El `mailto:` sigue llevando a la casilla
-que funciona y el destino del formulario no se toca. El visitante deja de leer
-la marca vieja; la dirección aparece recién en su propio cliente al hacer clic.
-
-El día que exista `info@agroboeda.com` se cambian los dos `mailto:` y el
-destino, y esta vuelta atrás sobra. **La deuda no se cierra: cambia de forma.**
-Sigue anotada.
-
-### El caso 161
-
-No fija ninguna dirección, a propósito: fijarla obligaría a editar la prueba el
-día que la casilla cambie. Fija dos propiedades que valen antes y después:
-
-1. ninguna pantalla pública **escribe** una dirección de correo a la vista;
-2. la del enlace es **exactamente la misma** a la que manda el formulario. Si
-   alguien cambia una y olvida la otra, la página diría una cosa y el correo
-   iría a otra.
-
-```
-rojo contra 21aa17e   escritorio/Inicio: la pantalla escribe la dirección
-                      «info@topgreen.com.ar» a la vista
-verde                 SMOKE_CASOS=156,161 → 2/2
-```
-
-Corrí el **156** además del focal porque su lista de apariciones técnicas nombra
-esos dos archivos: el `mailto:` conserva la dirección, así que sigue verde. No
-repetí la suite completa: es un cambio de copy en dos nodos, y el 160 y el resto
-no lo tocan. Build, lint, tsc, `node --check` y `diff-check`, verdes.
+Un detalle para que no te sorprenda: en `main` el caso entra numerado **161 con
+un hueco en el 160**, porque el 160 es de `ADMIN-TRUTH-1` y ese sigue en la
+rama. El hueco se cierra solo cuando integres.
