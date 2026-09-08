@@ -12,7 +12,82 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
-## 2026-09-08 — DEVOLUCIÓN VIGENTE: LOGO-INTEGRATION-1R, la verificación debe verificar
+## 2026-09-08 — TAREA VIGENTE: ADMIN-TRUTH-1, el panel muestra datos y fallos reales
+
+`LOGO-INTEGRATION-1R` queda **técnicamente aceptada en rama**: corrección
+`3370284`, informe `79a8494`. PM revisó el delta, ejecutó 159 en **1/1** y
+comprobó `--verificar`, lint, sintaxis y `diff-check`; el negativo temporal
+detecta el PNG sustituido y los activos conservan sus hashes. La base visual ya
+había cerrado 156+159 en 2/2 y seis capturas. La integración queda retenida para
+no disparar Railway. Evidencia en
+`REPRODUCCION-LOGO-INTEGRATION-1-2026-09-08.md`.
+
+La única tarea activa pasa a **ADMIN-TRUTH-1**, sobre la misma rama. El panel
+actual pide `total_sellers`/`total_customers`, pero `/admin/dashboard` entrega
+`total_normal_users`/`total_admins`; muestra estados internos sin traducir,
+llama “Ingresos” al volumen vendido y convierte varios fallos de carga en tablas
+vacías. Crear usuario también reemplaza el detalle accionable del Backend por
+un mensaje genérico.
+
+### Resultado obligatorio
+
+1. Alineá el contrato del dashboard. Debe mostrar Total de usuarios, Usuarios
+   comunes y Administradores con las claves reales. Renombrá en API y UI
+   `pending_orders` a Órdenes en proceso y contá exactamente `placed`,
+   `confirmed`, `awaiting_transfer_receipt`, `transfer_receipt_submitted`,
+   `paid` y `shipped`; excluí `draft`, `delivered`, `cancelled` y `rejected`.
+   Renombrá `total_revenue` a Volumen vendido: sigue sumando órdenes pagadas,
+   enviadas y entregadas, sin presentarlo como ingreso o comisión de AgroBoeda.
+2. Usá una única traducción es-AR para todos los estados reales que aparecen en
+   las tablas administrativas. Producto: activa, pausada, agotada y eliminada.
+   Orden: borrador, pedido realizado, confirmada, esperando comprobante,
+   comprobante a revisar, pagada, enviada, entregada, cancelada y rechazada.
+   Ningún badge imprime el token interno ni cae a gris por falta de tratamiento;
+   filtros y tablas deben decir lo mismo. Reutilizá significado existente; no
+   armes otro sistema visual.
+3. Dashboard, Usuarios, Productos, Órdenes y Documentación deben distinguir
+   carga, error y vacío exitoso. Un fallo visible lleva `role="alert"`, explica
+   qué recurso no cargó y ofrece `Reintentar`; el reintento usa la consulta y
+   filtros vigentes y reemplaza el error al resolver. No muestres datos viejos o
+   cero como si fueran respuesta válida. Categorías y Configuración, que ya
+   muestran error por toast, quedan fuera de esta pieza.
+4. En Crear usuario, validá antes del POST los requeridos y contraseña mínima de
+   seis caracteres. Si el Backend rechaza email duplicado u otro dato, mostrá su
+   detalle accionable y conservá el formulario para corregirlo. No cambies rutas,
+   permisos, roles ni el flujo de alta.
+
+### Regresión discriminante — caso 160
+
+Contra `3370284` debe fallar por claves vacías, estados crudos y cargas
+silenciosas. En verde, usando API/UI reales y dobles sólo para fallos de red:
+
+- fijá órdenes representativas de cada estado y contrastá `/admin/dashboard`
+  con la base: seis estados abiertos, terminales excluidos y volumen vendido
+  exacto; verificá rótulos y valores renderizados, sin `undefined`,
+  “Vendedores”, “Clientes” ni “Ingresos”;
+- enumerá badges de productos y órdenes, incluido `sold_out` y los estados de
+  transferencia, y exigí texto es-AR y tratamiento visual explícito, sin tokens
+  con guion bajo;
+- para cada una de las cinco cargas auditadas, forzá una respuesta 500, comprobá
+  alerta y reintento, dejá pasar luego una respuesta válida y comprobá datos o
+  vacío honesto. El error no puede confundirse con cero resultados;
+- intentá contraseña corta y comprobá que no hubo POST; después provocá email
+  duplicado y exigí el detalle real del Backend con los campos conservados.
+
+Alcance esperado: panel/CSS, contrato del dashboard Backend, una traducción
+compartida si hace falta y el caso 160. Sin migración, dependencia, rediseño,
+confirmaciones, reset de clave, paginación nueva ni cambios de datos. Corré 160,
+145 y 146 aislados; luego **una sola suite completa 160/160** por tocar cinco
+cargas y contrato Backend. Sumá build, lint, `node --check`, `compileall`,
+`pip check` en entorno representativo y `diff-check`; el caso 160 cubre la
+accesibilidad básica de alertas/reintentos, así que no corras a11y o contraste
+totales. Informá cualquier rojo real sin repetir la suite a ciegas.
+
+Producto/regresión e informe separados en tu rama, continuando desde
+`79a8494`. No integres a `main`: `src/**` dispara Railway. No despliegues ni
+toques datos remotos, pagos o secretos. Subí la rama y frená.
+
+## 2026-09-08 — CIERRE TÉCNICO: LOGO-INTEGRATION-1R, la verificación ahora verifica
 
 Revisé en `main` producto/regresión `d252a0c`, informe `e2b5dbc` e integración
 `712f98b`. La imagen queda **visualmente aprobada**: PM reprodujo 156+159 en

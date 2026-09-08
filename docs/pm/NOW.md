@@ -24,15 +24,18 @@ Actualizado: 2026-09-08.
   **2/2**, con build, lint, sintaxis y `diff-check` verdes. Ambos SHA exactos
   quedaron en `main` sin cambios. Evidencia en
   `REPRODUCCION-FOOTER-FOCUS-1-2026-09-08.md`.
-- **Única tarea activa y responsable:** `LOGO-INTEGRATION-1R`, Dev. Base
-  `d252a0c`/`e2b5dbc`, integrada en `712f98b`: imagen visualmente aprobada por
-  PM tras 156+159 en **2/2** y seis capturas propias. Vuelve sólo porque
-  `--verificar` imprime el hash del archivo existente sin compararlo con los
-  bytes derivados, y `Header.tsx` aún dice que el nuevo RGBA es opaco. No se
-  modifica otra vez el activo, CSS ni layout. Se entrega en rama porque un
-  cambio en `src/**` sobre `main` dispara Railway y no hay autorización de
-  despliegue. Evidencia en
+- **LOGO-INTEGRATION-1R aceptada en rama:** base `d252a0c`/`e2b5dbc`, integrada
+  previamente en `712f98b`; corrección `3370284`, informe `79a8494`. PM cerró
+  la base visual con 156+159 en **2/2** y seis capturas, y reprodujo el 159
+  corregido en **1/1**: la verificación ahora detecta un PNG sustituido y los
+  activos mantienen hashes. Integración retenida para no disparar Railway.
+  Evidencia en
   `REPRODUCCION-LOGO-INTEGRATION-1-2026-09-08.md`.
+- **Única tarea activa y responsable:** `ADMIN-TRUTH-1`, Dev, en la misma rama.
+  Alinea métricas/API, traduce estados administrativos, diferencia error de
+  vacío con reintento en cinco cargas y conserva el detalle al crear usuario.
+  Caso 160; una suite completa Dev por contrato Backend y alcance transversal.
+  No se integra a `main` ni se despliega.
 - **Cuenta de prueba publicada: no autorizada.** `pruba@agroboeda.com` permanece
   sólo en la base local descartable. No se crea fila remota ni se elige clave de
   producción en esta continuación.
