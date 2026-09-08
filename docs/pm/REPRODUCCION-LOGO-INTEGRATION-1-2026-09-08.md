@@ -4,13 +4,15 @@ Fecha: 2026-09-08.
 
 ## Estado
 
-Resultado visual aprobado. Entrega devuelta por una puerta de reproducibilidad
-falsa y un comentario de producto obsoleto.
+Aceptada técnicamente en rama. Integración retenida para no disparar el
+despliegue automático de Railway.
 
 - Base PM: `8a0d28c`.
 - Producto/regresión: `d252a0c`.
 - Informe Dev: `e2b5dbc`.
 - Integración en `main`: `712f98b`.
+- Corrección en rama: `3370284`.
+- Informe de corrección: `79a8494`.
 
 ## Evidencia funcional y visual PM
 
@@ -51,3 +53,26 @@ y niega la transparencia que carga la línea siguiente. La corrección debe hace
 real la comparación, demostrar un negativo con una copia temporal alterada y
 actualizar ese comentario. El activo visual ya aprobado no cambia y no se
 repiten sus capturas.
+
+## Cierre de la corrección
+
+PM revisó `3370284`: `--verificar` compara cada archivo contra bytes derivados,
+sale distinto de cero si falta o difiere y no escribe producto. El caso 159
+sustituye el alfa por el opaco sólo en una copia temporal, exige el error sobre
+ese archivo y comprueba que los otros dos no sean acusados. El comentario de
+Header quedó coherente y los tres PNG conservaron exactamente sus hashes.
+
+PM ejecutó desde el informe `79a8494`:
+
+```text
+PASS 159 El monograma se integra con la banda: sin placa, sin halo y sin mover nada
+1/1 pasaron; 0 fallaron
+```
+
+También quedaron verdes el `--verificar` positivo, lint, `node --check` y
+`diff-check`. Log persistente:
+`/private/tmp/topgreen-pm-logo-1r-159.log`.
+
+No se repitieron 156, suite completa ni inspección visual: el activo no cambió.
+La corrección queda aceptada en la rama Dev y no se integra a `main` mientras
+esa acción implique un despliegue no autorizado.
