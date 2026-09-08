@@ -12,6 +12,46 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-08 — DEVOLUCIÓN VIGENTE: DEMO-USER-1R, todas las guías locales dicen la verdad
+
+Revisé en `main` el producto/regresión `53a9635` y el informe `bf31919`. La
+cuenta y el recorrido principal quedan
+**funcionalmente conformes**: PM reprodujo 157 en **1/1** desde base Docker
+local nueva; entró como usuario común, publicó por la UI, encontró lo suyo y el
+segundo seed conservó cuenta y publicación. Build incluido, `node --check` y
+`diff-check` quedaron verdes. Dev informó suite **156/157**, con único rojo
+ambiental conocido en 131; PM no atribuye esa suite como propia.
+
+La entrega vuelve sólo por dos omisiones documentales acotadas:
+
+1. `docs/DATABASE.md` y `docs/USER_MANUAL.md` ya tienen listas de cuentas del
+   seed, pero omiten `pruba@agroboeda.com`. La primera tampoco advierte en esa
+   sección que las credenciales son públicas y sólo válidas para una base local
+   descartable. `README.md` sí lista la cuenta, pero su único aviso —«Cambiar
+   antes de producción»— tampoco expresa ese límite local.
+2. El caso 157 final no controla ninguna de esas guías, por lo que queda verde
+   con documentación contradictoria. Las salidas `entorno_nativo` e
+   `init_local_db.sh/.ps1` sí quedaron completas y no se devuelven.
+
+### Corrección única
+
+- Agregá la cuenta exacta a `docs/DATABASE.md` y `docs/USER_MANUAL.md`, y dejá
+  junto a cada lista la advertencia breve de credenciales públicas, sólo para
+  una base local descartable. Completá el mismo aviso en `README.md`; no
+  reescribas las guías.
+- Sumá al final del caso 157 una comprobación estática mínima sobre las listas
+  reales de README, setup, DATABASE, USER_MANUAL y las tres salidas locales: la
+  cuenta debe figurar y el contexto debe decir pública/local/descartable.
+  Contra `53a9635` debe fallar por las guías omitidas; no reescribas el recorrido
+  funcional.
+
+No agregues ahora el transportista a las listas: es deuda anterior y no forma
+parte de la cuenta solicitada. Corré 157 aislado una vez, `node --check` y
+`diff-check`; no repitas suite completa, build, lint, Backend, contraste ni
+a11y. Producto/regresión e informe separados, directamente sobre `main`; no
+despliegues, no corras seed
+contra Railway y no toques datos remotos, pagos ni secretos. Subí y frená.
+
 ## 2026-09-07 — TAREA VIGENTE: DEMO-USER-1, cuenta local estable para probar como usuario
 
 `BRAND-AGROBOEDA-1R` queda **aceptada**: base `f0913a7`/`c61b8b9`, corrección

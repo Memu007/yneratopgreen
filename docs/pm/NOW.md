@@ -1,8 +1,8 @@
 # Estado actual
 
-Actualizado: 2026-09-07.
+Actualizado: 2026-09-08.
 
-## Estado inmediato — 2026-09-07
+## Estado inmediato — 2026-09-08
 
 - **MARKET-VIEWS-1 aceptada:** producto/regresión `b5ee28d`, informe `afbfb95`
   y corrección de SHA `931a063`. PM revisó diff/hashes y seis capturas,
@@ -15,10 +15,12 @@ Actualizado: 2026-09-07.
   `21526bb`/`879d79f`, merge `1286ed2` y cierre `d63158c`. Ambos SHA quedaron
   integrados sin cambios. PM reprodujo 147+156 en **2/2** y verificó las puertas
   focales; no repitió suite completa.
-- **Única tarea activa y responsable:** `DEMO-USER-1`, Dev. Agrega al seed
-  descartable local `pruba@agroboeda.com` / `@agroboeda` como usuario común,
-  activo y verificado, sin datos ni privilegios previos. Debe iniciar sesión y
-  publicar por el recorrido real; caso 157. Sin Railway ni seed remoto.
+- **Única tarea activa y responsable:** `DEMO-USER-1R`, Dev. La entrega en `main`
+  `53a9635`/`bf31919` queda funcionalmente conforme: PM reprodujo 157 en
+  **1/1** desde base local nueva. Vuelve sólo porque `docs/DATABASE.md` y
+  `docs/USER_MANUAL.md` omiten la cuenta, README no explicita allí el límite
+  local y el caso 157 no controla las listas. Las tres salidas locales y los
+  hashes están conformes. Corrección documental focal, sin suite completa.
 
 - **FORM-DIRTY-1R aceptada:** producto/regresión `83dba0a`, informe `db1bb10`.
   PM revisó el diff y reprodujo 150 y 149 aislados en **1/1** cada uno; ambos
