@@ -131,6 +131,10 @@ translucidas y opacidad heredada. Detalle de cada una en la cabecera de
 
 **⚠️ Cambiar antes de producción.**
 
+Las cuatro credenciales están escritas en este repositorio: son **públicas**,
+no son un secreto y sólo sirven sobre una base local descartable. No las lleves
+a un entorno remoto ni las trates como una cuenta real.
+
 ---
 
 ## Versión

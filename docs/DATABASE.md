@@ -96,8 +96,12 @@ Crea (idempotente — no duplica):
 | Admin | `admin@topgreen.com` / `admin123` (rol `admin`) |
 | Vendedor | `vendedor@ejemplo.com` / `vendedor123` |
 | Cliente | `cliente@ejemplo.com` / `cliente123` |
+| Prueba (usuario) | `pruba@agroboeda.com` / `@agroboeda` (rol `user`, sin publicaciones ni datos bancarios) |
 | Categorías | 8 categorías (Semillas, Fertilizantes, Herramientas, Maquinaria, Agroquímicos, Servicios, etc.) |
 | Productos | ~10–15 productos con imágenes públicas (Unsplash) |
+
+Las cuatro credenciales están escritas en este repositorio: son **públicas**,
+no son un secreto y sólo sirven sobre una base local descartable.
 
 ---
 

@@ -21081,13 +21081,58 @@ await runCase(157, 'La cuenta de prueba entra, publica y sobrevive a un segundo 
       `el rechazo nombra la credencial de la cuenta de prueba: ${credencial}`);
   }
 
+  // --- Las guías locales dicen la verdad, y dicen hasta dónde vale ---------
+  //
+  // La cuenta figuraba en las salidas de los tres arranques pero faltaba en dos
+  // guías, así que el caso quedaba verde con documentación que se contradecía a
+  // sí misma. No alcanza con que el correo aparezca: al lado tiene que decir que
+  // la credencial es pública y que sólo vale sobre una base local descartable.
+  // Sin eso, una lista de accesos escrita en el repositorio se lee como si
+  // fueran cuentas de verdad.
+  //
+  // Se mide sobre el CONTEXTO de la mención, no sobre el archivo entero: que la
+  // palabra «local» aparezca cien líneas más abajo, hablando de otra cosa, no es
+  // una advertencia. Y se compara sin acentos, porque dos de las tres salidas
+  // están escritas en ASCII a propósito.
+  const GUIAS = [
+    'README.md',
+    'README_LOCAL_SETUP.md',
+    'docs/DATABASE.md',
+    'docs/USER_MANUAL.md',
+    'scripts/entorno_nativo.sh',
+    'scripts/init_local_db.sh',
+    'scripts/init_local_db.ps1',
+  ];
+  const sinAcentos = (texto) => texto.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+  const CONCEPTOS = [['pública', /public/], ['local', /local/], ['descartable', /descartable/]];
+  const faltantes = [];
+  for (const guia of GUIAS) {
+    const lineas = readFileSync(guia, 'utf8').split(/\r?\n/);
+    const donde = lineas.findIndex((linea) => linea.includes(CORREO));
+    if (donde === -1) {
+      faltantes.push(`${guia}: no nombra ${CORREO}`);
+      continue;
+    }
+    // La advertencia puede ir antes de la tabla o después: se mira alrededor.
+    const contexto = sinAcentos(lineas.slice(Math.max(0, donde - 12), donde + 16).join('\n'));
+    const ausentes = CONCEPTOS.filter(([, patron]) => !patron.test(contexto)).map(([que]) => que);
+    if (ausentes.length) {
+      faltantes.push(`${guia}:${donde + 1}: nombra la cuenta pero no dice ${ausentes.join(' ni ')}`);
+    }
+  }
+  assert(faltantes.length === 0,
+    `las guías locales no acompañan a la cuenta:\n  ${faltantes.join('\n  ')}`);
+
   return `${CORREO} existe una sola vez, normalizada, con bcrypt, rol user, activa, `
     + 'verificada, sin transportista, sin datos bancarios ni de Mercado Pago y sin '
     + `publicaciones, órdenes ni calificaciones propias; entra por el formulario real, `
     + `no ve administración —403 en /admin/users—, publica «${TITULO}» por la API `
     + `(${publicado.id}) en ${ubicacion[2]}, ${ubicacion[3]}, la ve en Mis publicaciones y `
     + 'aparece en el Mercado; el segundo seed deja los 17 campos idénticos y conserva la '
-    + 'publicación, y ENV=production sigue saliendo con 2 sin abrir conexión';
+    + 'publicación, y ENV=production sigue saliendo con 2 sin abrir conexión; las siete '
+    + 'guías locales —README, setup, DATABASE, USER_MANUAL y las tres salidas de arranque— '
+    + 'nombran la cuenta y dicen, al lado, que la credencial es pública y sólo vale sobre una '
+    + 'base local descartable';
 });
 
 const passed = results.filter((result) => result.passed).length;

@@ -16,8 +16,12 @@ URL local de desarrollo: **http://localhost:5173**
 | Administrador | `admin@topgreen.com` | `admin123` |
 | Vendedor | `vendedor@ejemplo.com` | `vendedor123` |
 | Cliente | `cliente@ejemplo.com` | `cliente123` |
+| Prueba (usuario) | `pruba@agroboeda.com` | `@agroboeda` |
 
 > **Cambiar antes de cualquier deploy productivo.**
+>
+> Las cuatro credenciales están escritas en este repositorio: son **públicas**,
+> no son un secreto y sólo sirven sobre una base local descartable.
 
 ---
 
