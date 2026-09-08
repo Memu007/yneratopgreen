@@ -22018,6 +22018,83 @@ await runCase(160, 'Administración dice la verdad: números reales, estados en 
     + `producto, no de una lista escrita en la prueba; ${medidos.join('; ')}`;
 });
 
+// ---------------------------------------------------------------------------
+// 161. La landing no escribe la dirección de la marca vieja.
+//
+// Emi la vio en el pie: `info@topgreen.com.ar`, a la vista, en un sitio que se
+// llama AgroBoeda. Reemplazarla por `info@agroboeda.com` no se puede todavía:
+// esa casilla no existe, y una dirección que no recibe es peor que una vieja
+// que sí —el contrato de identidad lo dice con todas las letras—.
+//
+// Así que se oculta la dirección, no el canal: el enlace sigue llevando a la
+// casilla que funciona y el visitante deja de leer la marca vieja.
+//
+// Este caso no fija ninguna dirección. Fija dos propiedades que valen ahora y
+// el día que exista la casilla propia:
+//
+//  - ninguna pantalla pública ESCRIBE una dirección de correo a la vista;
+//  - la que sí está, en el `mailto:`, es exactamente la misma a la que el
+//    formulario de Contacto manda. Si alguien cambia una y olvida la otra, la
+//    página diría una cosa y el correo iría a otra.
+// ---------------------------------------------------------------------------
+await runCase(161, 'Ninguna pantalla pública escribe la dirección de correo, y el canal sigue abierto', async () => {
+  // A dónde manda el formulario, leído del producto y no escrito acá.
+  const fuenteContacto = readFileSync('src/components/Pages/ContactPage.tsx', 'utf8');
+  const destino = (fuenteContacto.match(/destinationEmail:\s*'([^']+)'/) || [])[1];
+  assert(destino && destino.includes('@'),
+    `no se pudo leer el destino del formulario de Contacto: ${JSON.stringify(destino)}`);
+
+  const CORREO_A_LA_VISTA = /[\w.+-]+@[\w-]+\.[\w.]+/;
+  const medidos = [];
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [nombre, width, height] of [['escritorio', 1440, 900], ['movil', 390, 844]]) {
+      const contexto = await browser.newContext({ viewport: { width, height } });
+      const page = await contexto.newPage();
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.locator('footer').waitFor({ state: 'visible', timeout: 25_000 });
+
+      for (const seccion of ['Inicio', 'Contacto']) {
+        await page.locator('header').first()
+          .getByRole('button', { name: seccion, exact: true }).first().click();
+        await esperarA(async () => (await page.locator('header').first()
+          .getByRole('button', { name: seccion, exact: true }).first()
+          .getAttribute('aria-current')) === 'page',
+        `${nombre}: no se llegó a ${seccion}`, 25_000);
+        await page.locator('footer').scrollIntoViewIfNeeded();
+        await page.waitForTimeout(500);
+
+        const texto = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
+        const escrito = texto.match(CORREO_A_LA_VISTA);
+        assert(!escrito,
+          `${nombre}/${seccion}: la pantalla escribe la dirección «${escrito && escrito[0]}» a la `
+          + 'vista; el enlace tiene que decir qué hace, no cuál es la casilla');
+
+        // El canal sigue abierto y va a donde dice el producto.
+        const enlaces = page.locator('a[href^="mailto:"]');
+        const cuantos = await enlaces.count();
+        assert(cuantos >= 1, `${nombre}/${seccion}: no quedó ningún enlace de correo`);
+        for (let i = 0; i < cuantos; i += 1) {
+          const href = await enlaces.nth(i).getAttribute('href');
+          const rotulo = (await enlaces.nth(i).innerText()).trim();
+          assert(href === `mailto:${destino}`,
+            `${nombre}/${seccion}: un enlace de correo va a «${href}» y el formulario manda a `
+            + `«${destino}»: la página diría una cosa y el correo iría a otra`);
+          assert(rotulo && !CORREO_A_LA_VISTA.test(rotulo),
+            `${nombre}/${seccion}: el enlace de correo se rotula «${rotulo}»`);
+        }
+        medidos.push(`${nombre}/${seccion}: ${cuantos} enlace(s) a ${destino}, ninguno escrito`);
+      }
+      await contexto.close();
+    }
+  } finally {
+    await browser.close();
+  }
+
+  return `ninguna pantalla pública escribe una dirección de correo y todos los enlaces llevan a `
+    + `la misma casilla a la que manda el formulario (${destino}); ${medidos.join('; ')}`;
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

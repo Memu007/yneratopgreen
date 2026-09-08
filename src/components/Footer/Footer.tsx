@@ -65,7 +65,14 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         <div>
           <div className={styles.titulo}>Contacto</div>
           <ul className={styles.lista}>
-            <li><a href="mailto:info@topgreen.com.ar">info@topgreen.com.ar</a></li>
+            {/* La dirección no se muestra, pero el canal sigue abierto.
+                `info@topgreen.com.ar` es la casilla heredada y es la que
+                funciona: `info@agroboeda.com` todavía no existe, y poner una
+                dirección que no recibe es peor que no poner ninguna. Mientras
+                tanto el visitante no lee la marca vieja en el pie. El día que
+                exista la casilla propia, se cambia el `mailto:` de acá y el de
+                `ContactPage`, y esta vuelta atrás sobra. */}
+            <li><a href="mailto:info@topgreen.com.ar">Escribinos</a></li>
             <li><a href="tel:+5492233485801">+54 9 223 348 5801</a></li>
             <li><a href="https://wa.me/5492233485801" target="_blank" rel="noopener noreferrer">WhatsApp</a></li>
             <li className={styles.dato}>Mar del Plata, Argentina</li>
