@@ -12,6 +12,42 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-07 — DEVOLUCIÓN VIGENTE: BRAND-AGROBOEDA-1R, la marca del pie también lleva a Inicio
+
+Revisé producto/regresión `f0913a7` e informe `c61b8b9`. La migración de
+identidad queda **conforme salvo un incumplimiento puntual**: Header sí expone
+la marca `AgroBoeda` como control que vuelve a Inicio, pero Footer renderiza el
+bloque de monograma y nombre como un `div` sin acción. El requisito 4 y el caso
+156 pedían explícitamente que **Header y Footer** enlazaran a Inicio.
+
+El caso 156 actual queda falsamente verde en ese borde: verifica nombre e imagen
+del Footer, pero la navegación sólo la ejerce sobre el primer botón accesible
+`AgroBoeda`, que pertenece al Header. PM reprodujo 156 en **1/1**, confirmó
+hashes y derivación, e inspeccionó las nueve capturas en 1440×900, 768×1024 y
+390×844. La marca, el registro y el responsive son visualmente conformes. No
+hay que rehacer activos, inventario ni copy. Evidencia en
+`REPRODUCCION-BRAND-AGROBOEDA-1-2026-09-07.md`.
+
+### Corrección única
+
+1. Convertí monograma + `AgroBoeda` del Footer en **un solo control semántico y
+   accesible** que use la navegación existente hacia `home`. Debe poder
+   activarse por teclado, tener foco visible, llevar a Inicio y dejar la página
+   arriba, sin duplicar el nombre accesible ni alterar la composición aprobada.
+2. Extendé el bloque del caso 156 para empezar fuera de Inicio, localizar la
+   marca **dentro de `footer`** por rol/nombre, activarla y demostrar que volvió
+   a Inicio. La aserción debe fallar contra `f0913a7`; no alcanza reutilizar el
+   control del Header ni el enlace textual `Inicio` que ya existe en otra
+   columna del Footer.
+
+Alcance mínimo: Footer y bloque 156; CSS sólo si hace falta conservar foco y
+apariencia. Corré 156 aislado y el control de navegación 147, más build, lint,
+`node --check` y `diff-check`. **No repitas la suite completa**, contraste,
+a11y total, Backend ni derivación del logo: la corrección no los afecta y la
+entrega base ya dejó esa evidencia. Producto/regresión e informe separados;
+subí y frená. No empieces `DEMO-USER-1`, no despliegues y no toques Railway,
+datos remotos, pagos ni secretos.
+
 ## 2026-09-07 — TAREA VIGENTE: BRAND-AGROBOEDA-1, la identidad pública deja de ser TopGreen
 
 `MARKET-VIEWS-1` queda **aceptada**: producto/regresión `b5ee28d`, informe

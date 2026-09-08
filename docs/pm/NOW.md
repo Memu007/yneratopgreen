@@ -11,9 +11,13 @@ Actualizado: 2026-09-07.
   después aislado en **1/1**. Hay cobertura combinada de 155 casos, no una suite
   PM 155/155. Evidencia en
   `REPRODUCCION-MARKET-VIEWS-1-2026-09-07.md`.
-- **Única tarea activa y responsable:** `BRAND-AGROBOEDA-1`, Dev. Sustituye la
-  identidad pública visible/emitida, integra derivados fieles del PNG oficial y
-  preserva identificadores técnicos. Caso 156; sin despliegue ni datos remotos.
+- **Única tarea activa y responsable:** `BRAND-AGROBOEDA-1R`, Dev. La entrega
+  base `f0913a7`/`c61b8b9` queda devuelta sólo porque la marca del Footer es un
+  `div` sin acción; debe ser un control accesible que lleve a Inicio y el caso
+  156 debe probar específicamente ese control. PM reprodujo 156 en **1/1**,
+  verificó hashes/derivación e inspeccionó las nueve capturas: identidad,
+  registro y responsive son conformes. No repetir suite completa ni rehacer
+  activos. Sin despliegue ni datos remotos.
 
 - **FORM-DIRTY-1R aceptada:** producto/regresión `83dba0a`, informe `db1bb10`.
   PM revisó el diff y reprodujo 150 y 149 aislados en **1/1** cada uno; ambos
