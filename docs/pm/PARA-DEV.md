@@ -12,6 +12,78 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-07 — TAREA VIGENTE: DEMO-USER-1, cuenta local estable para probar como usuario
+
+`BRAND-AGROBOEDA-1R` queda **aceptada**: base `f0913a7`/`c61b8b9`, corrección
+`21526bb`/`879d79f`, merge `1286ed2` y cierre de integración `d63158c`. PM
+revisó el delta, reprodujo 147+156 en **2/2** desde base local nueva y verificó
+build, lint, sintaxis, `diff-check` e integración de ambos SHA en `main`. No se
+declara otra suite completa. Evidencia en
+`REPRODUCCION-BRAND-AGROBOEDA-1-2026-09-07.md`.
+
+La única tarea activa pasa a **DEMO-USER-1**. Leé completo
+`CUENTA-DEMO-AGROBOEDA-CLIENTE-2026-09-07.md`. Emi pidió estas credenciales
+exactas —la grafía `pruba` es deliberada—:
+
+```text
+usuario: pruba@agroboeda.com
+clave:   @agroboeda
+nombre:  Prueba AgroBoeda
+```
+
+### Resultado obligatorio
+
+1. Agregá esa cuenta al seed local existente, como `UserRole.USER`, activa y
+   verificada. Debe poder comprar y vender por los recorridos normales, pero no
+   ser admin ni transportista.
+2. El estado inicial es limpio: sin publicaciones, órdenes, calificaciones,
+   carrito, datos bancarios ni vínculo/credenciales de Mercado Pago. No agregues
+   permisos, datos o atajos para facilitar la prueba.
+3. Conservá la seguridad vigente: el seed sólo corre con `ENV=local` y corta
+   antes de abrir la base en cualquier otro entorno. No agregues escape,
+   endpoint, auto-seed de arranque ni migración.
+4. La segunda corrida del seed debe encontrar la cuenta y **no modificarla ni
+   borrar lo que la persona haya creado**. No resetees clave, rol, perfil,
+   publicaciones ni relaciones existentes.
+5. Si la lista de cuentas del setup local está documentada, agregá esta cuenta
+   con una advertencia clara de que sus credenciales son públicas y sólo sirven
+   en una base descartable local. No la expongas en la interfaz ni la trates
+   como secreto.
+
+### Regresión discriminante — caso 157
+
+Agregá un único caso 157. Contra `d63158c` debe fallar porque el login exacto no
+existe. Desde base local limpia, en verde debe demostrar por rutas reales:
+
+- el seed crea **una sola** fila para `pruba@agroboeda.com`, normalizada, con
+  contraseña hasheada que valida `@agroboeda`, rol `user`, activa, verificada,
+  no admin y no transportista;
+- antes del recorrido no tiene publicaciones ni datos financieros/MP; no uses
+  un conteo fijo de usuarios o productos del seed;
+- la UI inicia sesión con esas credenciales, no muestra superficies de Admin,
+  abre `Vender`, completa una publicación mínima válida y la crea por la API
+  real;
+- la publicación queda asociada a `Prueba AgroBoeda`, aparece como propia en su
+  cuenta y es localizable en Mercado. Usá un título único de la corrida y no
+  dependas del orden del catálogo;
+- una segunda ejecución real del seed no duplica la cuenta, no eleva permisos,
+  no agrega datos bancarios/MP y conserva la publicación recién creada;
+- una invocación con entorno no permitido conserva el freno anterior a la
+  conexión. Reutilizá la puerta existente de SEC-4 en vez de inventar otro
+  mecanismo.
+
+No hace falta diseñar pantallas ni tomar capturas: es una cuenta y un recorrido,
+no una pieza visual. Corré 157 aislado, los controles de seed/autenticación que
+el diff afecte y **una sola suite completa esperada en 157/157**, además de
+build, lint, TypeScript, `node --check`, `compileall`, `pip check` dentro del
+entorno representativo y `diff-check`. No corras contraste ni a11y total si no
+tocás UI, porque no agregan señal.
+
+Producto/regresión en un commit e informe separado con rojo/verde, doble seed,
+suite, puertas, hashes y alcance. No mezcles `FOOTER-FOCUS-1`, no despliegues,
+no ejecutes seed contra Railway y no cambies datos remotos, pagos, secretos ni
+la configuración externa de Mercado Pago. Subí y frená.
+
 ## 2026-09-07 — INTEGRACIÓN VIGENTE: BRAND-AGROBOEDA-1R está conforme pero fuera de main
 
 Revisé directamente la rama `origin/claude/dev-role-repo-3l0kp3`: producto

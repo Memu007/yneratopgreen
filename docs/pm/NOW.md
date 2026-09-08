@@ -11,12 +11,14 @@ Actualizado: 2026-09-07.
   después aislado en **1/1**. Hay cobertura combinada de 155 casos, no una suite
   PM 155/155. Evidencia en
   `REPRODUCCION-MARKET-VIEWS-1-2026-09-07.md`.
-- **Única tarea activa y responsable:** integración de
-  `BRAND-AGROBOEDA-1R`, Dev. La corrección `21526bb` y su informe `879d79f`
-  quedaron en `origin/claude/dev-role-repo-3l0kp3`, no en `main`. PM revisó el
-  delta de tres archivos y reprodujo 147+156 en **2/2** desde base local nueva;
-  build incluido, lint, sintaxis y `diff-check` verdes. Está técnicamente
-  conforme; falta integrar esos dos commits sin cambios. No repetir pruebas.
+- **BRAND-AGROBOEDA-1R aceptada:** base `f0913a7`/`c61b8b9`, corrección
+  `21526bb`/`879d79f`, merge `1286ed2` y cierre `d63158c`. Ambos SHA quedaron
+  integrados sin cambios. PM reprodujo 147+156 en **2/2** y verificó las puertas
+  focales; no repitió suite completa.
+- **Única tarea activa y responsable:** `DEMO-USER-1`, Dev. Agrega al seed
+  descartable local `pruba@agroboeda.com` / `@agroboeda` como usuario común,
+  activo y verificado, sin datos ni privilegios previos. Debe iniciar sesión y
+  publicar por el recorrido real; caso 157. Sin Railway ni seed remoto.
 
 - **FORM-DIRTY-1R aceptada:** producto/regresión `83dba0a`, informe `db1bb10`.
   PM revisó el diff y reprodujo 150 y 149 aislados en **1/1** cada uno; ambos

@@ -3,7 +3,7 @@
 Fecha: 2026-09-07  
 Producto/regresión: `f0913a7`  
 Informe Dev: `c61b8b9`  
-Resultado: base devuelta; corrección **técnicamente conforme, pendiente de integración**
+Resultado: **aceptada**
 
 ## Revisión de BRAND-AGROBOEDA-1R
 
@@ -30,10 +30,13 @@ toca únicamente Footer TSX, Footer CSS y el bloque del caso 156.
 - No se repitieron suite completa, contraste, a11y total, Backend ni derivación,
   según la devolución focal.
 
-La corrección no puede cerrarse todavía porque `origin/main` no contiene esos
-dos commits. Se pide integración exacta, sin nueva prueba. El hallazgo de foco
-1,0:1 en los demás enlaces del Footer queda como `FOOTER-FOCUS-1`, no
-bloqueante y posterior a `DEMO-USER-1`.
+La integración quedó cerrada mediante merge `1286ed2` y confirmación
+`d63158c`. `git merge-base --is-ancestor` verificó que `21526bb` y `879d79f`
+pertenecen a la historia de `origin/main`; el árbol quedó limpio y no se
+repitieron pruebas. Se acepta `BRAND-AGROBOEDA-1R`.
+
+El hallazgo de foco 1,0:1 en los demás enlaces del Footer queda como
+`FOOTER-FOCUS-1`, no bloqueante y posterior a `DEMO-USER-1`.
 
 ## Verificación realizada
 
