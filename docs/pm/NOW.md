@@ -47,6 +47,13 @@ Actualizado: 2026-09-08.
   Picsum, seed ni escritura en Railway. Caso 162 y seis capturas; sin suite
   completa. La tarea todavía no está activa y no se mezcla con la entrega en
   curso.
+- **Segunda mejora de demo en cola:** `ACCOUNT-PAGE-1`. Emi rechazó que el área
+  completa de cuenta siga siendo un popup. Después de las fotos, Dev deberá
+  convertir `Mi Panel` en una página privada con URL e historial reales,
+  Header/Footer y scroll normal; las decisiones internas breves conservan sus
+  diálogos. Debe mantener `FORM-DIRTY-1` al cambiar pestaña, navegar, volver o
+  salir. Caso 163, focales 147–149 y seis capturas; sin suite completa. No está
+  activa todavía por riesgo de navegación y no se mezcla antes de la demo.
 - **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
   `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
   y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como

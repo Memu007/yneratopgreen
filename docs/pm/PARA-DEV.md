@@ -12,6 +12,66 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-08 — SOLICITUD DE DEMO EN COLA 2: ACCOUNT-PAGE-1, Mi cuenta es una página
+
+Emi rechazó la presentación actual de `Mi Panel` como popup: contiene perfil,
+notificaciones, compras, ventas, operaciones y publicaciones, por lo que debe
+sentirse como un área privada estable y ordenada, al nivel de un marketplace
+serio. Esta pieza queda **después de `CATALOG-PHOTOS-1`**. No la empieces ni la
+mezcles mientras `ADMIN-TRUTH-1R` o la tarea de fotos estén abiertas.
+
+### Resultado obligatorio
+
+1. Convertí el contenedor general de `UserDashboard` en una página real dentro
+   del shell de AgroBoeda: Header arriba, Footer abajo, ancho de lectura propio
+   y scroll normal del documento. Retirá overlay oscuro, caja flotante, X,
+   `role="dialog"`, trampa de foco, cierre con Escape/fondo y bloqueo del scroll
+   **sólo del contenedor general**. Las decisiones breves que sí son capas —por
+   ejemplo editar una publicación, calificar o rechazar una transferencia—
+   pueden seguir como diálogos.
+2. El botón `Mi cuenta`/nombre de la cabecera debe navegar mediante la política
+   central existente a una sección canónica y recargable, coherente con las
+   demás URLs del sitio. Debe quedar marcado como página actual. Atrás vuelve a
+   la sección anterior, Adelante regresa a la cuenta y recargar conserva la
+   pantalla cuando hay sesión; no agregues React Router ni otro escritor de
+   `history`.
+3. La entrada directa sin sesión abre el ingreso y, si autentica, vuelve a Mi
+   cuenta; si cancela queda en una sección pública válida. Salir desde Mi cuenta
+   termina sesión y vuelve a Inicio. La vuelta de vinculación de Mercado Pago
+   debe aterrizar otra vez en el área de cuenta, no intentar abrir el modal
+   retirado.
+4. Conservá las pestañas, datos, permisos, cargas, errores, acciones y API
+   actuales. Reordená sólo lo imprescindible para que perfil y estadísticas no
+   se compriman ni corten —incluido «Sin calificaciones aún»— y para que las
+   pestañas sean utilizables sin overflow en 1440×900, 768×1024 y 390×844. No
+   rediseñes cada sección interna ni agregues sidebar, rutas por pestaña o
+   funciones nuevas.
+5. Adaptá `FORM-DIRTY-1` al nuevo límite de página. Perfil, edición,
+   calificación y rechazo intactos navegan sin pregunta; con cambios locales,
+   cambiar pestaña, usar Header/Footer, Atrás o Salir pregunta una sola vez. Al
+   seguir editando se conserva pantalla, URL y contenido; al descartar se
+   ejecuta exactamente el destino pedido. No confundas órdenes ya persistidas
+   con trabajo local.
+
+### Regresión y evidencia — caso 163
+
+- Desde Mercado, abrí Mi cuenta: exigí URL propia, `h1` único, Header y Footer
+  visibles, scroll de documento y ausencia de backdrop, X y diálogo general.
+  Recargá, usá Atrás y Adelante y comprobá la pantalla correcta. Cubrí además
+  entrada directa anónima, ingreso con retorno, salida a Inicio y retorno MP.
+- Repetí los bordes de suciedad del punto 5, incluyendo cancelar y descartar la
+  navegación. Las capas internas siguen cerrando de a una y devolviendo foco.
+- Capturá Perfil y una pestaña operativa en 1440×900, 768×1024 y 390×844; sin
+  overflow, texto partido de forma absurda ni controles fuera de pantalla.
+- Corré 147, 148, 149 y 163 aislados, build, lint, `node --check` y
+  `diff-check`. Sin suite completa, Backend, a11y o contraste totales salvo que
+  el diff salga del shell/navegación/panel acotados.
+
+Producto/regresión e informe separados, en tu rama. No integres a `main`, no
+despliegues y no toques Railway, datos, pagos o secretos. Alcance cerrado: la
+cuenta pasa de modal general a página; autenticación, `Vender`, carrito,
+checkout, administración y diálogos transaccionales no se convierten ahora.
+
 ## 2026-09-08 — PRIORIDAD DE DEMO EN COLA: CATALOG-PHOTOS-1, fotografía pertinente para las 30 operaciones
 
 Emi pidió que mañana el catálogo deje de verse vacío: cada artículo y cada
