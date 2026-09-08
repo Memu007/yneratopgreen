@@ -31,14 +31,28 @@ Actualizado: 2026-09-08.
   activos mantienen hashes. Integración retenida para no disparar Railway.
   Evidencia en
   `REPRODUCCION-LOGO-INTEGRATION-1-2026-09-08.md`.
-- **Única tarea activa y responsable:** `ADMIN-TRUTH-1`, Dev, en la misma rama.
-  Alinea métricas/API, traduce estados administrativos, diferencia error de
-  vacío con reintento en cinco cargas y conserva el detalle al crear usuario.
-  Caso 160; una suite completa Dev por contrato Backend y alcance transversal.
-  No se integra a `main` ni se despliega.
-- **Cuenta de prueba publicada: no autorizada.** `pruba@agroboeda.com` permanece
-  sólo en la base local descartable. No se crea fila remota ni se elige clave de
-  producción en esta continuación.
+- **Única tarea activa y responsable:** `ADMIN-TRUTH-1R`, Dev, en la misma
+  rama. Producto `aaa51ce` e informe `21aa17e`: diff técnicamente conforme y
+  suite Dev **159/160**, con único rojo ambiental en 131. PM reprodujo el 160
+  en **1/1** desde base limpia, pero lo devolvió porque aislado sólo ejercita
+  `active` para publicaciones y 9 estados de orden; no ve los otros tres
+  estados de publicación ni `draft`, y no mide el color computado. Corrección
+  sólo del arnés; sin otra suite completa. Log PM:
+  `/private/tmp/topgreen-pm-admin-160.log`.
+- **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
+  `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
+  y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como
+  usuario común funcionó y dejó disponible `Vender`. No se ejecutó seed, no se
+  desplegó y no se tocaron otras filas. La credencial elegida es pública en el
+  repositorio: la cuenta debe considerarse temporal y borrarse o rotarse al
+  terminar la demostración.
+- **Cambio directo de contacto pendiente de revisión PM:** mientras se cerraba
+  esta devolución, Dev subió a `main` `CONTACTO-MARCA-1` (`1c1fc45`) por una
+  elección directa de Emi: oculta la dirección TopGreen visible pero conserva
+  el `mailto:` operativo y agrega el caso 161. No se mezcla con
+  `ADMIN-TRUTH-1R` ni se considera aceptado en esta revisión. Al tocar `src/**`,
+  el push puede haber disparado el despliegue automático de Railway; PM no
+  desplegó ni modificó esos archivos.
 
 - **FORM-DIRTY-1R aceptada:** producto/regresión `83dba0a`, informe `db1bb10`.
   PM revisó el diff y reprodujo 150 y 149 aislados en **1/1** cada uno; ambos

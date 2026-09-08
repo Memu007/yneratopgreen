@@ -12,6 +12,55 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-08 — DEVOLUCIÓN: ADMIN-TRUTH-1R, el caso 160 debe sostenerse aislado
+
+Revisé producto/regresión `aaa51ce` e informe `21aa17e`. El cambio de producto
+queda **técnicamente conforme** con el alcance: contrato del dashboard,
+traducciones, cinco estados de carga y alta administrativa están acotados y no
+vi un defecto funcional en el diff. Dev informó suite **159/160**, con único
+rojo en el 131 ambiental conocido.
+
+PM ejecutó `SMOKE_CASOS=160` desde base limpia sobre `aaa51ce` y obtuvo **1/1**.
+La propia salida mostró el borde que impide aceptar la regresión:
+
+```text
+badges verificados en 10 estados
+(active=20 y los 9 estados de orden distintos de draft)
+```
+
+El caso pasó sin ver `paused`, `sold_out` ni `deleted` y sin ver `draft` en la
+tabla. El informe de la suite completa sí enumera más estados porque heredó
+filas producidas por casos anteriores: el 160 no es independiente. Además sólo
+compara el texto del badge; no inspecciona su tratamiento visual, por lo que
+todos podrían caer al mismo gris y el caso seguiría verde. Eso contradice el
+contrato explícito del 160: incluir `sold_out` y estados de transferencia,
+enumerar los estados reales y exigir tratamiento visual explícito.
+
+### Corrección única
+
+- En el propio 160, prepará en la base descartable una publicación por cada
+  estado (`active`, `paused`, `sold_out`, `deleted`) y conservá la orden por cada
+  uno de los diez estados. Localizá las filas creadas por identidad propia; no
+  dependas de datos dejados por casos anteriores, orden del catálogo o página.
+- Exigí en UI los **4 badges de publicación y 10 de orden**, incluido `draft`
+  desde la vista sin filtro si no se ofrece como filtro. Cada uno debe tener el
+  texto del diccionario y el color computado del tono que ese mismo diccionario
+  declara. Ningún estado conocido salvo el neutro intencional puede coincidir
+  con el tratamiento de respaldo; fondo vacío/transparente tampoco vale.
+- Conservá las comprobaciones actuales de dashboard, cinco cargas y alta. No
+  rehagas producto salvo que la prueba revele un fallo real.
+
+Corré **sólo el 160 aislado** desde base limpia, `node --check` y
+`diff-check`. No repitas suite completa, 145/146, build separado, a11y,
+contraste ni Backend: el smoke ya construye y el producto pasó la reproducción
+PM. Entregá corrección de regresión e informe separados en la misma rama. No
+integres a `main`, no despliegues y no toques Railway, pagos, secretos o datos
+remotos.
+
+La cuenta publicada solicitada por Emi ya fue creada y verificada por PM en una
+operación separada y acotada; no forma parte de esta corrección y no requiere
+acción tuya.
+
 ## 2026-09-08 — TAREA VIGENTE: ADMIN-TRUTH-1, el panel muestra datos y fallos reales
 
 `LOGO-INTEGRATION-1R` queda **técnicamente aceptada en rama**: corrección
