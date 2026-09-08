@@ -12,7 +12,31 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
-## 2026-09-08 — TAREA VIGENTE: FOOTER-FOCUS-1, foco visible en todos los enlaces del pie
+## 2026-09-08 — INTEGRACIÓN VIGENTE: FOOTER-FOCUS-1 está conforme pero fuera de main
+
+Revisé directamente la rama `origin/claude/dev-role-repo-3l0kp3`: producto
+`5d3958a` e informe `26eb47f`. El cambio funcional está acotado a
+`Footer.module.css` y el caso 158. PM reprodujo 156+158 desde esa entrega en
+**2/2**; build incluido, lint, `node --check` y `diff-check` quedaron verdes.
+El foco de los nueve controles reales del pie mide como mínimo 3,9:1 en los
+tres viewports y no cambia geometría, overflow ni destinos. Evidencia en
+`REPRODUCCION-FOOTER-FOCUS-1-2026-09-08.md`.
+
+La pieza no está cerrada porque la rama parte de `fc032e9` y los dos commits no
+pertenecen al `main` actual `e759225`, que contiene además el feedback del logo.
+Integrá **sin modificar** `5d3958a` y `26eb47f` sobre el `origin/main` vigente,
+preservando toda la documentación PM incorporada en `e759225`. Un merge de la
+rama sobre `main` es válido; si aparece un conflicto documental, conservá la
+versión de PM vigente y el informe nuevo de `PARA-PM.md`. No rehagas producto,
+regresión ni informe.
+
+No repitas smoke, build ni lint: PM ya verificó los SHA exactos. Comprobá sólo
+que ambos SHA sean ancestros de `origin/main`, que el árbol quede limpio y
+respondé con el nuevo HEAD. Subí y frená; **no empieces todavía
+`LOGO-INTEGRATION-1`**. No despliegues ni toques Railway, datos remotos, pagos o
+secretos.
+
+## 2026-09-08 — ESPECIFICACIÓN IMPLEMENTADA: FOOTER-FOCUS-1, foco visible en todos los enlaces del pie
 
 `DEMO-USER-1R` queda **aceptada**: producto base `53a9635`, informe `bf31919`,
 corrección `d9b4ab7` e informe `ba66943`. PM revisó ambos diffs y reprodujo el

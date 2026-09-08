@@ -19,10 +19,12 @@ Actualizado: 2026-09-08.
   corrección `d9b4ab7` e informe `ba66943`. PM reprodujo 157 final en **1/1**;
   la cuenta local entra, publica, sobrevive al segundo seed y sus siete listas
   explican que la credencial es pública/local. No se desplegó ni tocó Railway.
-- **Única tarea activa y responsable:** `FOOTER-FOCUS-1`, Dev. Los enlaces
-  textuales del Footer tienen foco 1,0:1 porque contorno y fondo usan el mismo
-  verde. Deben reutilizar el color visible ya aplicado a la marca, sin tocar
-  layout ni navegación. Caso 158; sin suite completa.
+- **Única tarea activa y responsable:** integración de `FOOTER-FOCUS-1`, Dev.
+  Producto `5d3958a` e informe `26eb47f` quedaron técnicamente conformes en su
+  rama: PM revisó el diff y reprodujo 156+158 en **2/2**, con build, lint,
+  sintaxis y `diff-check` verdes. Falta integrarlos sin cambios al `main`
+  `e759225`; no se repiten pruebas. Evidencia en
+  `REPRODUCCION-FOOTER-FOCUS-1-2026-09-08.md`.
 - **Feedback visual nuevo, siguiente inmediato:** `LOGO-INTEGRATION-1`. Emi
   rechazó el rectángulo verde oscuro del monograma porque parece una imagen
   pegada sobre Header/Footer. La Dev debe derivar desde la fuente oficial un
