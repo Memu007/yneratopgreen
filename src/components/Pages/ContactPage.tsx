@@ -225,7 +225,10 @@ export const ContactPage: React.FC = () => {
               <div className={styles.infoCard}>
                 <div>
                   <h3>Email</h3>
-                  <a href="mailto:info@topgreen.com.ar">info@topgreen.com.ar</a>
+                  {/* Idem el pie: el enlace lleva a la casilla que recibe, pero
+                      no se escribe la dirección, que todavía es la de la marca
+                      vieja. */}
+                  <a href="mailto:info@topgreen.com.ar">Escribinos</a>
                 </div>
               </div>
 
