@@ -68,14 +68,14 @@
   height: 40px;
 }
 
-/* El monograma es una placa opaca con su propio verde —el del archivo oficial,
-   que no es el de la banda—, así que se presenta como placa y no como un
-   parche: esquina apenas redondeada y su lugar reservado antes de que cargue,
-   para que la cabecera no salte. */
+/* El monograma ya no es una placa: el archivo trae fondo transparente, así que
+   el glifo AB se apoya directamente sobre la banda. Por eso se fueron de acá la
+   esquina redondeada y el color de relleno: eran la presentación de un
+   rectángulo que ya no existe, y dejarlos sería documentar una caja que no está.
+   El lugar reservado antes de que cargue no dependía de ellos: sale del alto de
+   `.marca img` y de las medidas declaradas en la etiqueta. */
 .monograma {
   flex: none;
-  border-radius: var(--tg-radius-sm);
-  background-color: var(--tg-color-brand);
 }
 
 .nombre {

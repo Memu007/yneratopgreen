@@ -41,12 +41,12 @@
   outline-color: var(--tg-color-focus-sobre-marca);
 }
 
-/* Placa opaca con el verde del archivo oficial, igual que en la cabecera. */
+/* Glifo sobre la banda, sin placa, igual que en la cabecera: el archivo trae
+   fondo transparente y la esquina redondeada ya no tiene qué redondear. */
 .monograma {
   flex: none;
   width: auto;
   height: 44px;
-  border-radius: var(--tg-radius-sm);
 }
 
 .nombre {

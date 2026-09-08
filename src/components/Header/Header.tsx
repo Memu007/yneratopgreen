@@ -143,7 +143,7 @@ export const Header: React.FC<HeaderProps> = ({
         <button className={styles.marca} onClick={() => onNavigate('home')}>
           <img
             className={styles.monograma}
-            src="/marca/agroboeda-monograma.png"
+            src="/marca/agroboeda-monograma-alfa.png"
             alt=""
             width={320}
             height={197}

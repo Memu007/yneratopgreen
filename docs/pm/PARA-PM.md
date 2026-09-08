@@ -2,139 +2,147 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## FOOTER-FOCUS-1 — el foco se ve en todo el pie
+## LOGO-INTEGRATION-1 — el monograma se apoya en la banda
 
-**Resultado: terminado.**
+**Resultado: terminado.** La fuente raster sí permitió un recorte limpio, así
+que no hubo que frenar.
 
-- Producto/regresión: `5d3958a`
-- Alcance real: `src/components/Footer/Footer.module.css` (siete líneas, de las
-  cuales cuatro son comentario) y el bloque del caso 158 en `scripts/smoke.mjs`.
-  **No desplegué, no toqué Railway, datos remotos, pagos ni secretos.**
-- La suite pasa a **158 casos**.
+- Producto/regresión: `d252a0c`
+- La suite pasa a **159 casos**.
+- **No desplegué, no toqué Railway, datos remotos, pagos ni secretos.** No
+  cambié favicon, metadatos, paleta ni texto.
 
 ---
 
-### 1. Qué cambié, y por qué así
-
-La regla que ya existía para la marca se **amplía por descendencia** en vez de
-repetirse control por control:
-
-```css
-.footer :focus-visible {
-  outline-color: var(--tg-color-focus-sobre-marca);
-}
-```
-
-Antes decía `.marca:focus-visible`. Es el mismo token, el mismo color y la misma
-regla: lo único que cambia es a quién alcanza.
-
-Lo hice así y no con una lista de selectores por una razón concreta: **este
-defecto nació de una lista**. En `21526bb` arreglé el anillo de la marca y los
-otros ocho enlaces quedaron atrás, porque la regla nombraba un control. Una
-lista de selectores se olvida del enlace que alguien agregue mañana; la
-descendencia no.
-
-Se toca **sólo el color**. El ancho, el estilo y el `outline-offset` siguen
-siendo los globales, así que el foco no mueve nada de lugar y la apariencia sin
-foco no cambia. La regla vive en `Footer.module.css`, así que el alcance es el
-pie: ni la cabecera, ni un modal, ni un formulario, ni un panel cambian.
-
-### 2. El rojo, contra `ba66943`
+### 1. El archivo nuevo
 
 ```
-[FAIL] 158 Todo el pie muestra el foco de teclado, y el pie no se mueve al
-recibirlo — escritorio 1440x900: el foco de «Publicaciones» queda en 1.00:1
-contra el fondo del pie (rgb(30, 74, 52) sobre rgb(30, 74, 52)): no se ve
+public/marca/agroboeda-monograma-alfa.png   320x197  RGBA
+sha256 837bb0feb7b2531694c605e2885931c3bc58c0e6033add133e1118d468c70958
 ```
 
-Falla en el **primer enlace después de la marca**, que es exactamente el borde
-que describiste: la marca ya estaba en 3,9:1 y pasó; el siguiente control es el
-que se cae.
+Mide lo mismo que el opaco —320×197— a propósito: la caja que Header y Footer
+ya reservaban es exactamente la misma, y las alturas renderizadas siguen siendo
+40 px en escritorio y tablet, 30 en celular y 44 en el pie. El nombre del
+archivo dice `alfa` para que ninguna caché vieja lo confunda con el otro.
 
-### 3. El verde
-
-```
-[PASS] 158 … en el pie, cada control enfocable descubierto del DOM recibe el
-foco con el teclado y su contorno se ve contra el fondo real: escritorio
-1440x900: 9 controles, peor foco 3.9:1; tablet 768x1024: 9 controles, peor foco
-3.9:1; movil 390x844: 9 controles, peor foco 3.9:1. El anillo conserva ancho,
-estilo y desplazamiento globales, así que ningún foco mueve la geometría del
-pie ni hace desbordar la página. La marca sigue teniendo un único nombre
-«AgroBoeda», los enlaces de contacto conservan su mailto/tel/wa.me sin abrirlos
-y el enlace interno a Quiénes somos sigue llevando ahí
-```
-
-Y el **156 sigue verde**, con la marca del pie en 3,9:1 en los tres anchos: la
-regla ampliada no le cambió nada al control que ya habías aceptado.
-
-### 4. Dos decisiones del caso que conviene que sepas
-
-- **Los controles se descubren del DOM**, con un selector de enfocables, y el
-  caso exige encontrar al menos ocho. Si mañana el barrido apuntara al elemento
-  equivocado y encontrara dos, el caso se cae en vez de dar un verde vacío.
-- **La geometría se mide relativa al pie, no a la ventana.** Esto lo aprendí
-  midiendo: la primera versión del caso falló con «enfocar AgroBoeda movió la
-  geometría del pie», y no era el producto: al tabular, el navegador desplaza la
-  página para traer el control a la vista, y con coordenadas de ventana ese
-  desplazamiento se lee como si el pie se hubiera movido. Con el pie como origen,
-  lo que se mide es lo que importa: si el foco corre algo de lugar adentro.
-
-### 5. Lo que corrí y lo que no
-
-**Corrido, con salida.**
+Lo que **no** cambió, y lo verifica el caso:
 
 ```
-SMOKE_CASOS=158 contra ba66943                  rojo, 1.00:1 en «Publicaciones»
-SMOKE_CASOS=156,158                             2/2
+docs/pm/originales/AGROBOEDA-LOGO-FUENTE.png  5606077c429b…  intacta
+public/marca/agroboeda-favicon.png            1e1da0e55abf…  intacto
+public/marca/agroboeda-monograma.png          697178b4873d…  intacto
+```
+
+El opaco sigue siendo la imagen social de `index.html`, como dijiste.
+
+### 2. Cómo se separó el fondo, y por qué no alcanzaba con borrar un color
+
+`derivar_marca.py` no borra el verde: **resuelve la mezcla**. Cada píxel del
+borde de la fuente es el glifo dibujado sobre un fondo opaco conocido,
+`p = a·F + (1−a)·fondo`. Con el fondo medido y los dos colores del glifo también
+medidos, el alfa sale de proyectar el píxel sobre la recta fondo→glifo, y el
+color limpio sale de **despejar `F`**.
+
+Ese despeje es la descontaminación. Sin él, el semitransparente conserva el
+verde oscuro del original y sobre otra banda se ve como halo —y transparencia
+con halo, como escribiste, sigue pareciendo un recorte pegado—.
+
+Dos cosas que sin medir salen mal, y que están en el commit:
+
+- **El grano del fondo.** La fuente no tiene un fondo plano perfecto: la
+  compresión le dejó grano, y ese grano da un alfa chico pero distinto de cero
+  en *todo* el fondo. El piso se **mide** sobre el marco exterior —que es fondo
+  y nada más— y dio `0,0190`; se descuenta y lo que queda se reestira. Sin eso,
+  el PNG sale con un velo verde en vez de con fondo transparente.
+- **El reescalado.** Promedia en alfa **premultiplicado**. Promediar color y
+  alfa por separado mezcla el color de los píxeles invisibles con el de los
+  visibles, y eso vuelve a manchar el borde después de haberlo limpiado.
+
+El script sigue **sin dependencias**: lee y escribe PNG con la biblioteca
+estándar, y el caso comprueba que todos sus `import` sigan siendo de ahí.
+
+### 3. El rojo, contra `1c3aecc`, en dos pasos
+
+```
+1. tal cual está 1c3aecc
+   [FAIL] 159 … — la derivación no informa agroboeda-monograma-alfa.png
+2. con el archivo nuevo ya derivado, pero Header y Footer todavía apuntando al opaco
+   [FAIL] 159 … — src/components/Header/Header.tsx no usa /marca/agroboeda-monograma-alfa.png
+```
+
+Y la medición que explica la pieza entera, hecha con la misma cuenta del caso
+sobre la misma caja de 65×40 de la cabecera:
+
+| | píxeles más oscuros que la banda | peor caída de luminancia | píxeles del marco distintos de la banda |
+|---|---|---|---|
+| monograma opaco | **1510** de 2600 | 32 | **404** de 404 |
+| monograma nuevo | **0** | 0 | **0** |
+
+Eso es la placa, medida. Todo el glifo es marfil y lima, más claro que el fondo
+del sitio: cualquier placa y cualquier halo son, por definición, más oscuros que
+la banda. Por eso el caso puede exigir **cero**.
+
+### 4. El verde
+
+```
+[PASS] 159 … archivo 320x197: 62% transparente, 34% opaco, 1652 píxeles de
+borde y ninguno contaminado; escritorio 1440x900/cabecera: 65x40 sobre rgb(30,
+74, 52), 0 píxeles más oscuros que la banda; escritorio 1440x900/pie: 71x44 …;
+tablet 768x1024/cabecera: 65x40 …; tablet 768x1024/pie: 71x44 …; movil
+390x844/cabecera: 49x30 …; movil 390x844/pie: 71x44 …. La marca conserva su
+único nombre accesible, la imagen sigue siendo decorativa, el foco se ve, Enter
+lleva a Inicio y ninguna medida desborda
+```
+
+Y el **156 sigue verde**: la identidad, el nombre accesible y el recorrido no se
+movieron.
+
+### 5. Las seis capturas
+
+En `/tmp/cap159`, fuera de Git:
+
+```
+159-cabecera-1440x900.png   159-pie-1440x900.png
+159-cabecera-768x1024.png   159-pie-768x1024.png
+159-cabecera-390x844.png    159-pie-390x844.png
+```
+
+El caso las escribe en una carpeta temporal única salvo que se le pase
+`SMOKE_CAPTURAS`, así que reproducirlo no ensucia el árbol.
+
+### 6. Lo que corrí y lo que no
+
+```
+SMOKE_CASOS=159 contra 1c3aecc                  rojo, en dos pasos
+SMOKE_CASOS=156,159                             2/2
 npm run build                                   verde
 npm run lint                                    verde, 0 avisos
 node --check scripts/smoke.mjs                  verde
+python3 scripts/derivar_marca.py --verificar    verde, sin escribir
 git -c core.whitespace=cr-at-eol diff --check   limpio
 ```
 
-**No corrido, y lo digo.** No repetí la suite completa, ni contraste, ni a11y
-total, ni Backend, porque pediste que no y porque la pieza sólo cambia el color
-de un contorno. No desplegué ni toqué nada remoto.
+No corrí suite completa, contraste, a11y total ni Backend, como pediste.
 
-### 6. Una nota sobre el contraste que el caso mide
+### 7. Dos cosas que quiero que sepas antes de aceptar
 
-El 158 mide el contorno contra el fondo real del pie y exige **3:1**, que es el
-mínimo de contraste no textual. Lo aclaro para que no se confunda con `npm run
-contraste`, que mide parejas de texto y fondo con 4,5:1: son dos cosas
-distintas y esta pieza no toca la segunda.
+- **Quité del CSS el borde redondeado y el relleno verde del monograma.** Eran
+  la presentación de la placa: la esquina redondeada ya no tiene qué redondear y
+  el relleno pintaba un rectángulo del color de la banda detrás de un glifo que
+  ahora es transparente. No cambian tamaño ni alineación —el alto sale de
+  `.marca img` y de las medidas declaradas en la etiqueta— y no agregué borde,
+  sombra, filtro ni `mix-blend-mode`. Si preferís que vuelvan, se revierten en
+  dos líneas, pero dejarlos sería documentar una caja que ya no está.
+- **El monograma transparente es para fondo oscuro.** Sobre blanco, la «A»
+  marfil casi desaparece: es el color que tiene en el original, no algo que haya
+  hecho la separación. Hoy no importa —Header y Footer son la banda verde y el
+  social sigue siendo el opaco—, pero si alguna vez se usa sobre una superficie
+  clara, hay que usar el opaco o pedir una variante a la clienta. Lo dejo dicho
+  para que no se descubra en producción.
 
-### 7. Deuda que sigue abierta
+### 8. Deuda que sigue abierta, sin tocar
 
-El anillo global `--tg-color-focus` sigue valiendo `#1e4a34`, el mismo color que
-`--tg-color-brand`. Eso hoy se nota en dos lugares y los dos están cubiertos —la
-banda de la cabecera con `tg-sobre-marca`, el pie con esta regla—, pero cualquier
-superficie nueva que se pinte con el verde de marca va a nacer con el mismo
-foco invisible. No lo toqué: cambiar un token global es paleta, y eso no entra
-acá. Lo dejo anotado por si querés una pieza que lo mire de raíz.
-
----
-
-## Integración de FOOTER-FOCUS-1 a main
-
-Hecha. **Nuevo HEAD de `origin/main`: `0cbc3c6`.**
-
-Merge y no rebase, por lo mismo que la vez pasada: pediste comprobar que los
-SHA estuvieran **en la historia** de `origin/main`, y un rebase se los cambia.
-
-```
-git rev-parse origin/main                          0cbc3c6987257a076832f25786d76bdd0174642d
-git merge-base --is-ancestor 5d3958a origin/main   sí
-git merge-base --is-ancestor 26eb47f origin/main   sí
-git status --short                                 vacío
-```
-
-No hubo conflicto documental, así que no hubo nada que decidir: el merge no
-tocó un solo archivo en común. Vos escribiste en `NOW.md`, `PARA-DEV.md`, el
-roadmap y las dos reproducciones; la pieza vive en `Footer.module.css`, el caso
-158 y este archivo. Lo comprobé además contra `c7eb70e`:
-`FEEDBACK-VISUAL-LOGO-AGROBOEDA-2026-09-08.md` y
-`REPRODUCCION-FOOTER-FOCUS-1-2026-09-08.md` están en `main`, y `PARA-DEV.md`
-quedó idéntico al tuyo.
-
-No repetí smoke, build ni lint: verificaste los SHA exactos y el merge no los
-cambió. No arranqué `LOGO-INTEGRATION-1`.
+El token global `--tg-color-focus` sigue valiendo `#1e4a34`, el mismo color que
+`--tg-color-brand`. Cualquier superficie nueva pintada con el verde de marca va
+a nacer con el foco invisible. Está anotado desde `FOOTER-FOCUS-1`.
