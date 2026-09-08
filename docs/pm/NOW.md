@@ -39,6 +39,14 @@ Actualizado: 2026-09-08.
   estados de publicación ni `draft`, y no mide el color computado. Corrección
   sólo del arnés; sin otra suite completa. Log PM:
   `/private/tmp/topgreen-pm-admin-160.log`.
+- **Prioridad de demo siguiente, solicitada por Emi:** `CATALOG-PHOTOS-1` queda
+  especificada y en cola para mañana, inmediatamente después de cerrar la
+  corrección corta `ADMIN-TRUTH-1R`. Dev deberá buscar una foto licenciada y
+  pertinente para cada uno de los 30 slugs del seed, optimizarla y servirla
+  localmente; artículos, servicios y logística tendrán imagen sin hotlinks,
+  Picsum, seed ni escritura en Railway. Caso 162 y seis capturas; sin suite
+  completa. La tarea todavía no está activa y no se mezcla con la entrega en
+  curso.
 - **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
   `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
   y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como

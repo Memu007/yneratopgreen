@@ -12,6 +12,71 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-08 — PRIORIDAD DE DEMO EN COLA: CATALOG-PHOTOS-1, fotografía pertinente para las 30 operaciones
+
+Emi pidió que mañana el catálogo deje de verse vacío: cada artículo y cada
+servicio debe mostrar una fotografía acorde con lo ofrecido. Esta pieza queda
+como **siguiente tarea urgente**, no como permiso para mezclar entregas. Cerrá
+primero `ADMIN-TRUTH-1R` con su commit e informe separados y frená; PM revisará
+esa corrección corta y activará esta pieza inmediatamente.
+
+El problema ya está identificado. Las 30 filas del seed apuntan a
+`picsum.photos`; el producto hace bien en tratarlas como relleno porque son
+aleatorias. No retires esa protección ni vuelvas a pedir Picsum. La solución
+debe reemplazar sólo el material demostrativo conocido por activos pertinentes
+y locales; una publicación real sin foto debe seguir diciendo «Sin registro
+fotográfico».
+
+### Resultado obligatorio
+
+1. Buscá y seleccioná **una fotografía principal pertinente para cada uno de
+   los 30 slugs del seed**, incluidos servicios y logística. Debe representar
+   claramente el bien o trabajo nombrado: campo, maquinaria, insumo, ganado,
+   transporte, acopio, asesoramiento, reparación, muestreo, alambrado, etc. No
+   uses la misma foto para avisos distintos ni una imagen agrícola genérica que
+   contradiga el título.
+2. Usá sólo material con licencia reutilizable verificable —dominio público,
+   CC0 o banco con licencia comercial clara—. Guardá junto a la entrega un
+   inventario con slug, archivo, página fuente, autor y licencia. Sin Google
+   Images como fuente, marcas de agua, texto incrustado, caras reconocibles ni
+   logos ajenos protagonistas. En modelos o marcas específicas, preferí una
+   toma representativa sin afirmar que es la unidad exacta publicada.
+3. Descargá y serví los activos desde el repositorio: **cero hotlinks y cero
+   dependencia en runtime de terceros**. Normalizalos a una proporción común,
+   WebP, ancho suficiente para el detalle y peso razonable; conservá encuadre
+   útil con `object-fit: cover`. No agregues dependencia ni metas originales
+   enormes al historial.
+4. Hacé que los 30 registros demostrativos existentes resuelvan esas fotos sin
+   seed ni escritura remota. Una tabla explícita por slug en Frontend es válida
+   si queda acotada al inventario demo: la foto real subida por un vendedor
+   siempre tiene prioridad, y cualquier slug ajeno sin foto conserva el
+   fallback honesto. No cambies la base publicada.
+5. Mostrá fotografía también en las tarjetas y el detalle de servicio/logística,
+   manteniendo sus datos de cobertura, modalidad y respuesta. Cuadrícula y
+   Lista siguen siendo las únicas dos vistas y todas sus tarjetas conservan una
+   huella uniforme; la foto no puede reintroducir tamaños distintos, corte
+   horizontal ni ocultar acciones.
+
+### Regresión y evidencia — caso 162
+
+- Enumerá los 30 slugs del seed y comprobá que cada uno resuelve a un archivo
+  local existente, decodificable, no repetido y libre de `picsum`, `http:` o
+  `https:`. Comprobá además que un slug ajeno sin foto mantiene el fallback y
+  que una foto real subida prevalece sobre el mapa demo.
+- En 1440×900, capturá Mercado en Cuadrícula y Lista, más el detalle de un
+  artículo y de un servicio; en 390×844, capturá Cuadrícula y el detalle de un
+  servicio. Elegí ejemplos que demuestren correspondencia entre título y foto.
+  Verificá ausencia de overflow y alturas uniformes por vista.
+- Corré 155 y 162 aislados, build, lint, `node --check` y `diff-check`. No corras
+  suite completa, Backend, a11y o contraste totales salvo que cambies algo fuera
+  del recorrido visual acotado.
+
+Entregá activos/código/regresión en un commit e informe en otro, en tu rama. No
+integres a `main`, no despliegues, no ejecutes seed y no toques Railway, pagos,
+secretos o datos remotos. Alcance cerrado: fotografía del catálogo demo y el
+ajuste mínimo para presentarla; sin rediseñar marca, navegación, filtros,
+registro, copy, administración o checkout.
+
 ## 2026-09-08 — DEVOLUCIÓN: ADMIN-TRUTH-1R, el caso 160 debe sostenerse aislado
 
 Revisé producto/regresión `aaa51ce` e informe `21aa17e`. El cambio de producto
