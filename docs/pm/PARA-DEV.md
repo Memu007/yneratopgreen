@@ -59,6 +59,44 @@ a11y total ni Backend: esta pieza sólo corrige el color del contorno. Producto
 y regresión en un commit; informe separado con rojo/verde y hashes. No
 despliegues ni toques Railway, datos remotos, pagos o secretos. Subí y frená.
 
+## 2026-09-08 — SIGUIENTE INMEDIATA: LOGO-INTEGRATION-1, el monograma deja de verse pegado
+
+Emi revisó la marca en el Mercado y rechazó la placa rectangular: el PNG
+`agroboeda-monograma.png` conserva el fondo opaco `#08281e` y se ve como una
+imagen pegada sobre las bandas `#1e4a34` de Header y Footer. Captura y decisión
+en `FEEDBACK-VISUAL-LOGO-AGROBOEDA-2026-09-08.md`.
+
+No mezcles esta pieza con `FOOTER-FOCUS-1`. Cuando la PM cierre la tarea activa,
+ésta será la siguiente. La solución elegida es un monograma AB con **fondo
+realmente transparente**, derivado de la fuente oficial sin redibujar letras,
+cambiar proporción ni sustituir el logo.
+
+### Resultado obligatorio futuro
+
+1. Extendé `scripts/derivar_marca.py` para producir de forma determinista un
+   PNG RGBA transparente para Header y Footer. La fuente oficial permanece
+   intacta. Separá el fondo y descontaminá los píxeles semitransparentes para
+   que el verde oscuro anterior no deje halo; conservá los núcleos blanco/marfil
+   y lima, su sombreado útil y la silueta AB.
+2. Usá un nombre de archivo nuevo que haga explícita la transparencia y evite
+   caché vieja. Actualizá sólo Header/Footer y eliminá el monograma opaco si
+   queda sin consumidores. **El favicon no cambia:** su placa cuadrada es
+   intencional y funciona sobre una superficie propia.
+3. Conservá tamaño reservado, alineación, texto visible `AgroBoeda`, nombre
+   accesible, navegación, foco y alturas actuales. No agregues borde, tarjeta,
+   sombra CSS, resplandor, filtro, `mix-blend-mode` ni retoque generativo para
+   disimular el rectángulo.
+4. El resultado debe verse como glifo integrado —sin caja, halo oscuro, borde
+   dentado ni letras comidas— en Header y Footer, a 1440×900, 768×1024 y
+   390×844. Generá seis capturas recuperables fuera de Git para revisión PM.
+
+La regresión se numerará al activar la pieza, sin reutilizar el caso 158 ya
+reservado. Debe fallar hoy porque el monograma es RGB opaco y, en verde,
+verificar RGBA, esquinas transparentes, contenido visible, archivo nuevo sin
+referencias viejas, imagen cargada, ausencia del rectángulo al componer sobre
+ambas bandas y geometría estable en los tres viewports. Sin dependencia nueva,
+rediseño, favicon nuevo, cambios de paleta, despliegue o datos remotos.
+
 ## 2026-09-08 — DEVOLUCIÓN VIGENTE: DEMO-USER-1R, todas las guías locales dicen la verdad
 
 Revisé en `main` el producto/regresión `53a9635` y el informe `bf31919`. La

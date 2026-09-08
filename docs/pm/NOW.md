@@ -23,6 +23,11 @@ Actualizado: 2026-09-08.
   textuales del Footer tienen foco 1,0:1 porque contorno y fondo usan el mismo
   verde. Deben reutilizar el color visible ya aplicado a la marca, sin tocar
   layout ni navegación. Caso 158; sin suite completa.
+- **Feedback visual nuevo, siguiente inmediato:** `LOGO-INTEGRATION-1`. Emi
+  rechazó el rectángulo verde oscuro del monograma porque parece una imagen
+  pegada sobre Header/Footer. La Dev debe derivar desde la fuente oficial un
+  PNG RGBA con transparencia real y bordes sin halo, conservar el glifo AB y el
+  favicon, y no redibujar ni generar otro logo. No se mezcla con la tarea 158.
 
 - **FORM-DIRTY-1R aceptada:** producto/regresión `83dba0a`, informe `db1bb10`.
   PM revisó el diff y reprodujo 150 y 149 aislados en **1/1** cada uno; ambos
