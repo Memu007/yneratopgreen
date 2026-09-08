@@ -18,6 +18,22 @@
   display: flex;
   align-items: center;
   gap: var(--tg-space-3);
+  /* Ahora es un botón: se le sacan los adornos del control para que la marca se
+     siga viendo exactamente igual que cuando era una caja. */
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* El anillo de foco del sistema es `--tg-color-focus`, que es el mismo verde
+   que el fondo del pie: ahí no se ve. No es otro sistema de foco, es el mismo
+   anillo con el único color que se ve sobre el verde, el que la banda de la
+   cabecera ya usa por la misma razón. */
+.marca:focus-visible {
+  outline-color: var(--tg-color-focus-sobre-marca);
 }
 
 /* Placa opaca con el verde del archivo oficial, igual que en la cabecera. */

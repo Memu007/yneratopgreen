@@ -20584,6 +20584,21 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
     const desborde = (page) => page.evaluate(() => (
       document.documentElement.scrollWidth - document.documentElement.clientWidth));
 
+    // El anillo de foco no alcanza con existir: sobre el verde del pie, el
+    // verde del foco es invisible. Se mide, no se supone.
+    const contraste = (frente, fondo) => {
+      const canal = (css) => (css.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+      const luz = (color) => {
+        const [r, v, a] = canal(color).map((valor) => {
+          const s = valor / 255;
+          return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * r + 0.7152 * v + 0.0722 * a;
+      };
+      const [claro, oscuro] = [luz(frente), luz(fondo)].sort((x, y) => y - x);
+      return (claro + 0.05) / (oscuro + 0.05);
+    };
+
     for (const medida of MEDIDAS) {
       const contexto = await browser.newContext({
         viewport: { width: medida.width, height: medida.height },
@@ -20625,6 +20640,71 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
       const rutaPie = `${CAPTURAS}/pie-${medida.width}x${medida.height}.png`;
       await pie.screenshot({ path: rutaPie });
       capturas.push(`${rutaPie} (${medida.width}x${medida.height})`);
+
+      // La marca del PIE también vuelve a Inicio, y hay que probarla en el pie.
+      //
+      // Se busca DENTRO de `footer` y por rol: el control de la cabecera se
+      // llama igual, así que un locator de página entera se queda con aquel y
+      // este bloque daría verde sin que el pie tenga nada. Tampoco sirve el
+      // enlace «Inicio» que ya vive en otra columna del pie: lo que se prueba
+      // es la marca. Y se empieza fuera de Inicio, porque volver a donde ya se
+      // está no demuestra que se vuelva.
+      const enQuienesSomos = page
+        .getByRole('button', { name: 'Quiénes somos', exact: true }).first();
+      await enQuienesSomos.click();
+      await esperarA(async () => (await enQuienesSomos.getAttribute('aria-current')) === 'page',
+        `${donde}: no se llegó a Quiénes somos para probar la marca del pie`, 25_000);
+
+      const marcaDelPie = pie.getByRole('button', { name: 'AgroBoeda', exact: true });
+      const cuantas = await marcaDelPie.count();
+      assert(cuantas === 1,
+        `${donde}: el pie no ofrece exactamente un control de marca «AgroBoeda» (hay ${cuantas})`);
+      assert((await marcaDelPie.innerText()).trim() === 'AgroBoeda',
+        `${donde}: el control de marca del pie no escribe el nombre una sola vez: `
+        + `«${(await marcaDelPie.innerText()).trim()}»`);
+      assert(await marcaDelPie.locator('img').evaluate((el) => el.getAttribute('alt') === ''),
+        `${donde}: la imagen del pie no es decorativa y el nombre se anunciaría dos veces`);
+
+      await marcaDelPie.scrollIntoViewIfNeeded();
+      await esperarA(async () => (await page.evaluate(() => window.scrollY)) > 0,
+        `${donde}: no se pudo bajar hasta el pie, así que no se puede probar que la marca `
+        + 'deje la página arriba', 10_000);
+
+      // Se llega tabulando y no con `focus()`: el anillo del sistema es
+      // `:focus-visible`, que Chromium no enciende cuando el foco lo mueve un
+      // script. Tabular es además lo que hace una persona con teclado.
+      let enLaMarcaDelPie = await marcaDelPie.evaluate((el) => el === document.activeElement);
+      for (let intento = 0; intento < 80 && !enLaMarcaDelPie; intento += 1) {
+        await page.keyboard.press('Tab');
+        enLaMarcaDelPie = await marcaDelPie.evaluate((el) => el === document.activeElement);
+      }
+      assert(enLaMarcaDelPie,
+        `${donde}: no se llega con el teclado a la marca del pie en 80 tabulaciones`);
+
+      const focoDelPie = await marcaDelPie.evaluate((el) => {
+        const propio = getComputedStyle(el);
+        return {
+          estilo: propio.outlineStyle,
+          ancho: propio.outlineWidth,
+          color: propio.outlineColor,
+          fondo: getComputedStyle(el.closest('footer')).backgroundColor,
+        };
+      });
+      assert(focoDelPie.estilo !== 'none' && parseFloat(focoDelPie.ancho) > 0,
+        `${donde}: la marca del pie enfocada no dibuja contorno `
+        + `(${focoDelPie.estilo} ${focoDelPie.ancho})`);
+      const razonDelFoco = contraste(focoDelPie.color, focoDelPie.fondo);
+      assert(razonDelFoco >= 3,
+        `${donde}: el contorno de foco de la marca del pie queda en ${razonDelFoco.toFixed(2)}:1 `
+        + `contra el fondo (${focoDelPie.color} sobre ${focoDelPie.fondo}): no se ve`);
+
+      await page.keyboard.press('Enter');
+      await esperarA(async () => (await page.getByRole('heading', { name: /seguir produciendo/ })
+        .count()) > 0, `${donde}: la marca del pie no lleva a Inicio con el teclado`, 20_000);
+      await esperarA(async () => (await page.evaluate(() => window.scrollY)) === 0,
+        `${donde}: la marca del pie lleva a Inicio pero no deja la página arriba`, 10_000);
+      medidos.push(`${donde}: la marca del pie vuelve a Inicio con el teclado, deja la página `
+        + `arriba y su foco se ve en ${razonDelFoco.toFixed(1)}:1`);
 
       // La marca lleva a Inicio, con el teclado y con el foco a la vista.
       await page.evaluate(() => window.scrollTo(0, 0));
