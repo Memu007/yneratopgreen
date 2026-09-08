@@ -52,8 +52,18 @@ activo visual:
 Corré 159 aislado una vez —su smoke ya incluye build—, lint, `node --check`, el
 `--verificar` positivo y `diff-check`. No repitas 156, suite completa, capturas,
 contraste, a11y ni Backend: la parte visual ya está aceptada. Producto/regresión
-e informe separados, directamente sobre `main`. No despliegues ni toques
-Railway, datos remotos, pagos o secretos. Subí y frená.
+e informe separados **en tu rama**, no en `main`: `src/**` activa un despliegue
+automático de Railway y esta continuación no lo autoriza. Subí la rama y frená;
+no integres, despliegues ni toques Railway, datos remotos, pagos o secretos.
+
+## 2026-09-08 — DECISIÓN PM: la cuenta de prueba permanece local
+
+No se autoriza crear `pruba@agroboeda.com` en la base publicada ni ejecutar la
+operación propuesta. La cuenta solicitada y aceptada sigue limitada a la base
+local descartable. No hay contraseña remota que decidir ni datos de producción
+que tocar en esta continuación. Si Emi pide expresamente una cuenta publicada,
+será una tarea separada con clave no versionada, duración y responsable
+definidos; no se mezcla con `LOGO-INTEGRATION-1R`.
 
 ## 2026-09-08 — CIERRE: FOOTER-FOCUS-1 aceptada
 

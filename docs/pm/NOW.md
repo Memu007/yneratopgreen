@@ -29,8 +29,13 @@ Actualizado: 2026-09-08.
   PM tras 156+159 en **2/2** y seis capturas propias. Vuelve sólo porque
   `--verificar` imprime el hash del archivo existente sin compararlo con los
   bytes derivados, y `Header.tsx` aún dice que el nuevo RGBA es opaco. No se
-  modifica otra vez el activo, CSS ni layout. Evidencia en
+  modifica otra vez el activo, CSS ni layout. Se entrega en rama porque un
+  cambio en `src/**` sobre `main` dispara Railway y no hay autorización de
+  despliegue. Evidencia en
   `REPRODUCCION-LOGO-INTEGRATION-1-2026-09-08.md`.
+- **Cuenta de prueba publicada: no autorizada.** `pruba@agroboeda.com` permanece
+  sólo en la base local descartable. No se crea fila remota ni se elige clave de
+  producción en esta continuación.
 
 - **FORM-DIRTY-1R aceptada:** producto/regresión `83dba0a`, informe `db1bb10`.
   PM revisó el diff y reprodujo 150 y 149 aislados en **1/1** cada uno; ambos
