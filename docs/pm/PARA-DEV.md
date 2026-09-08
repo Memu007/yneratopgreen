@@ -12,6 +12,49 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-08 — DEVOLUCIÓN VIGENTE: LOGO-INTEGRATION-1R, la verificación debe verificar
+
+Revisé en `main` producto/regresión `d252a0c`, informe `e2b5dbc` e integración
+`712f98b`. La imagen queda **visualmente aprobada**: PM reprodujo 156+159 en
+**2/2** e inspeccionó las seis capturas propias; no hay placa ni halo en Header
+o Footer, el glifo conserva proporción y la composición responde bien en los
+tres anchos. Build incluido, lint, `node --check`, derivación y `diff-check`
+quedaron verdes. Evidencia en
+`REPRODUCCION-LOGO-INTEGRATION-1-2026-09-08.md`.
+
+La entrega vuelve por dos inconsistencias pequeñas, sin tocar otra vez el
+activo visual:
+
+1. `python3 scripts/derivar_marca.py --verificar` **no verifica
+   reproducibilidad**. El script deriva bytes en memoria, pero en ese modo sólo
+   lee el archivo ya versionado e imprime su propio hash; nunca compara esos
+   bytes con la derivación. El caso 159 vuelve a leer la misma línea y comparar
+   contra el mismo archivo, por lo que un PNG sustituido también podría pasar.
+2. El comentario encima de la marca en `Header.tsx` todavía afirma que el
+   monograma “es opaco, sobre su propio verde” y que no se le da transparencia.
+   El código inmediatamente debajo carga el nuevo RGBA. La documentación del
+   producto quedó contradicha.
+
+### Corrección única
+
+- Hacé que la función de codificación PNG produzca los bytes esperados y que
+  `--verificar` compare cada archivo versionado contra esos bytes, sin escribir
+  producto. Si falta o difiere uno, debe salir distinto de cero y nombrarlo; en
+  positivo conserva hashes y salida actuales.
+- Extendé el 159 con una prueba funcional negativa en una copia temporal mínima:
+  alterá allí el monograma alfa, ejecutá `--verificar` de esa copia y exigí que
+  falle nombrando el archivo. No alcanza inspeccionar texto del script ni
+  comparar dos veces el mismo archivo.
+- Actualizá sólo el comentario obsoleto de `Header.tsx`. Conservá byte por byte
+  `agroboeda-monograma-alfa.png` (`837bb0f…`), fuente, favicon y opaco; no toques
+  CSS, referencias, geometría, metadatos ni copy visible.
+
+Corré 159 aislado una vez —su smoke ya incluye build—, lint, `node --check`, el
+`--verificar` positivo y `diff-check`. No repitas 156, suite completa, capturas,
+contraste, a11y ni Backend: la parte visual ya está aceptada. Producto/regresión
+e informe separados, directamente sobre `main`. No despliegues ni toques
+Railway, datos remotos, pagos o secretos. Subí y frená.
+
 ## 2026-09-08 — CIERRE: FOOTER-FOCUS-1 aceptada
 
 Revisé directamente la rama `origin/claude/dev-role-repo-3l0kp3`: producto
@@ -73,7 +116,7 @@ a11y total ni Backend: esta pieza sólo corrige el color del contorno. Producto
 y regresión en un commit; informe separado con rojo/verde y hashes. No
 despliegues ni toques Railway, datos remotos, pagos o secretos. Subí y frená.
 
-## 2026-09-08 — TAREA VIGENTE: LOGO-INTEGRATION-1, el monograma deja de verse pegado
+## 2026-09-08 — ENTREGA BASE: LOGO-INTEGRATION-1, el monograma deja de verse pegado
 
 Emi revisó la marca en el Mercado y rechazó la placa rectangular: el PNG
 `agroboeda-monograma.png` conserva el fondo opaco `#08281e` y se ve como una

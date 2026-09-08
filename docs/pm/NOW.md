@@ -24,11 +24,13 @@ Actualizado: 2026-09-08.
   **2/2**, con build, lint, sintaxis y `diff-check` verdes. Ambos SHA exactos
   quedaron en `main` sin cambios. Evidencia en
   `REPRODUCCION-FOOTER-FOCUS-1-2026-09-08.md`.
-- **Única tarea activa y responsable:** `LOGO-INTEGRATION-1`, Dev. Emi
-  rechazó el rectángulo verde oscuro del monograma porque parece una imagen
-  pegada sobre Header/Footer. La Dev debe derivar desde la fuente oficial un
-  PNG RGBA con transparencia real y bordes sin halo, conservar el glifo AB y el
-  favicon, y no redibujar ni generar otro logo. Caso 159; seis capturas.
+- **Única tarea activa y responsable:** `LOGO-INTEGRATION-1R`, Dev. Base
+  `d252a0c`/`e2b5dbc`, integrada en `712f98b`: imagen visualmente aprobada por
+  PM tras 156+159 en **2/2** y seis capturas propias. Vuelve sólo porque
+  `--verificar` imprime el hash del archivo existente sin compararlo con los
+  bytes derivados, y `Header.tsx` aún dice que el nuevo RGBA es opaco. No se
+  modifica otra vez el activo, CSS ni layout. Evidencia en
+  `REPRODUCCION-LOGO-INTEGRATION-1-2026-09-08.md`.
 
 - **FORM-DIRTY-1R aceptada:** producto/regresión `83dba0a`, informe `db1bb10`.
   PM revisó el diff y reprodujo 150 y 149 aislados en **1/1** cada uno; ambos
