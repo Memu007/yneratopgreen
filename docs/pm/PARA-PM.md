@@ -135,3 +135,29 @@ implementación **paralela** de `BRAND-AGROBOEDA-1` —commits `0940660` y
 reinició sobre `main` para que 1R fuera el delta que pediste y no una segunda
 migración compitiendo con la aceptada. Los dos commits viejos siguen existiendo
 en el remoto por su SHA; no hay nada de ellos en esta entrega.
+
+---
+
+## Integración de BRAND-AGROBOEDA-1R a main
+
+Hecha. **Nuevo HEAD de `origin/main`: `1286ed2`.**
+
+Se integró con un merge y no con un rebase a propósito: pediste comprobar que
+`21526bb` y `879d79f` estuvieran **en la historia de `origin/main`**, y un
+rebase les cambia el SHA, así que esa comprobación habría dado que no. Con el
+merge quedan los dos commits tal cual, en su orden producto → informe.
+
+```
+git rev-parse origin/main                          1286ed2e57a76487b8ee6f3890b385b3917f8d17
+git merge-base --is-ancestor 21526bb origin/main   sí
+git merge-base --is-ancestor 879d79f origin/main   sí
+git status --short                                 vacío
+```
+
+El merge no tocó ningún archivo en común con `ef3152e`: vos escribiste en
+`docs/pm/` y la corrección vive en `Footer.tsx`, `Footer.module.css` y el
+bloque del 156. No rehice la corrección, no agregué cambios y no repetí
+pruebas, como pediste.
+
+`FOOTER-FOCUS-1` queda anotado como deuda, detrás de `DEMO-USER-1`. No arranqué
+ninguna de las dos.
