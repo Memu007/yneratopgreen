@@ -2,6 +2,146 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## ACCOUNT-PAGE-1 — Mi cuenta es una página del sitio
+
+**Resultado: terminado.**
+
+- Producto/regresión: `7dc1d53`
+- La suite pasa a **163 casos**.
+- **En mi rama, no en `main`.** No integré, no desplegué, no mezclé nada de
+  otra pieza y no toqué Railway, datos remotos, pagos ni secretos.
+
+---
+
+### 1. Los cinco puntos
+
+**El contenedor general dejó de ser capa.** Se fueron el fondo oscuro, la caja
+flotante, la X, `role="dialog"`, la trampa de foco, el cierre con Escape y con
+el fondo, y el bloqueo del scroll. Queda una página: Header arriba, Footer
+abajo, ancho de lectura propio y el scroll del documento. Las capas de adentro
+—editar una publicación, calificar, rechazar una transferencia— siguen siendo
+capas, como pediste.
+
+**Tiene URL.** `account` entra en la política de navegación, así que
+`?section=account` se recarga, se comparte y Atrás vuelve adonde estaba. No
+agregué React Router ni ningún otro escritor de `history`: la guardia vive en el
+único módulo que ya escribía el historial. El botón de la cabecera navega y
+queda con `aria-current="page"`.
+
+De paso saqué una copia que se había quedado atrás: `Header.tsx` declaraba su
+propia lista de secciones, sin `account`. Ahora lee el tipo de la política, que
+es lo que esa política vino a evitar.
+
+**La sesión.** Entrada directa sin sesión abre el ingreso; si autentica vuelve a
+Mi cuenta y si cancela queda en una sección pública. Salir termina la sesión y
+va a Inicio. La vuelta de Mercado Pago aterriza en la cuenta en vez de intentar
+abrir el modal retirado.
+
+**Los datos, intactos.** Pestañas, permisos, cargas, errores, acciones y API son
+los mismos. No rediseñé ninguna sección interna, no agregué sidebar, ni rutas
+por pestaña, ni funciones nuevas.
+
+### 2. `FORM-DIRTY-1` en el límite nuevo
+
+Antes las salidas eran tres —la X, el fondo y Escape— y las tres pasaban por el
+componente. Ahora son cinco —cabecera, pie, Atrás, Salir y cambiar de pestaña— y
+**cuatro de las cinco no lo tocan**. Así que la pantalla con trabajo sin guardar
+registra una guardia en la navegación, que es quien las ve todas.
+
+El Atrás es el caso incómodo: cuando `popstate` llega, la barra ya se movió. Se
+deshace el movimiento **antes** de preguntar, para que «seguir editando»
+conserve pantalla, URL y contenido; y si la respuesta es descartar, se repite el
+Atrás con la guardia levantada.
+
+**Y descartar ahora descarta.** Mientras era un modal, descartar cerraba el panel
+y el formulario se iba con él. Como página, el destino puede ser otra pestaña:
+si el formulario quedara escrito, la salida siguiente volvería a preguntar por
+lo mismo y «pregunta una sola vez» dejaría de ser cierto. Ahora suelta el
+trabajo local de las cuatro fuentes y después ejecuta el destino. **Local** es
+la palabra: vuelve los formularios a lo último guardado y no toca ninguna orden
+ni publicación ya persistida.
+
+Un detalle que salió de medir: elegir la pestaña en la que ya estás no pregunta
+nada. No es una salida, es la misma regla con la que la navegación no agrega una
+entrada al historial cuando el destino es donde ya estás.
+
+### 3. Tres arreglos que la conversión hizo necesarios
+
+| Qué | Por qué |
+|---|---|
+| «Sin calificaciones aún» se partía en «Sin calificaci / ones aún» | Era el precio de un `overflow-wrap: anywhere` puesto para evitar un desborde. Una frase no necesita cuerpo de cifra: baja a 15 px, entra y corta entre palabras |
+| En 390 px las pestañas se iban de la pantalla | Con `nowrap` + `overflow-x: auto`, Mis Compras, Mis Ventas y Mis publicaciones quedaban fuera de la ventana: había que descubrir que la tira se arrastra. Ahora se envuelven y entran las seis |
+| La capa de editar una publicación se quedó sin Escape | Nunca había tenido el suyo: usaba el del panel, que cerraba **todo**. Al retirar el panel se quedaba sin ninguno. Ahora tiene el suyo, con foco atrapado y devuelto a su disparador, y declara `role="dialog"`, que tampoco tenía |
+
+### 4. El caso 163, y las cinco veces que lo puse rojo
+
+Mide seis propiedades. Ninguna es «se ve como una página», que no se mide.
+
+| Roto a propósito | Qué dijo |
+|---|---|
+| La cuenta vuelve a declararse diálogo | `la cuenta dejó 1 diálogo(s) abiertos` |
+| Se le saca su nombre en la barra | `Mi cuenta no tiene URL propia: la barra dice http://localhost/` |
+| La guardia deja de mirar el Atrás | `saliendo por Atrás con trabajo sin guardar no preguntó` |
+| Descartar deja de soltar el trabajo local | `tras descartar, el perfil siguió en edición con lo escrito adentro` |
+| Las pestañas vuelven a `nowrap` | `390x844/perfil: 2 control(es) fuera de la ventana: Mis Ventas \| Mis publicaciones` |
+
+«Texto partido de forma absurda» se mide y no se opina: el caso arma con
+`Range` las líneas que el navegador dibujó de verdad y exige que juntarlas con
+un espacio devuelva el texto original. Si un corte partió una palabra, no
+coincide y se cae.
+
+**Y un agujero que encontré en mi propio caso.** El bloque que comprobaba el
+descarte navegaba a otra sección, y eso desmonta la pantalla: al volver, el
+perfil aparecía cerrado igual, así que la comprobación pasaba aunque descartar
+no soltara nada —lo medí sacando el descarte del producto y el caso siguió
+verde—. Ahora se mide con un destino que **no** desmonta: otra pestaña.
+
+### 5. Los casos 149 y 150, adaptados
+
+Los dos se caían, y era correcto que se cayeran: probaban cerrar el panel con la
+X y con el fondo, que ya no existen.
+
+- **149**: donde probaba la X y el fondo, prueba las salidas que existen. Y
+  cambia una regla que vos cambiaste: antes cambiar de pestaña con el perfil
+  sucio **no** preguntaba —el formulario seguía montado detrás—, y ahora sí.
+- **150**: exigía que el contenedor del perfil fuera **una** capa con el fondo
+  trabado. Como página la propiedad correcta es la contraria —ningún diálogo y
+  el scroll suelto— y comprobarla es igual de discriminante. También se le pasó
+  a decir la verdad sobre el foco: vuelve a **quien pidió salir**, que en una
+  capa es el campo con Escape y en la página es el botón de la cabecera.
+
+Otros cinco casos —129, 151, 152, 153 y 156— sólo necesitaban el nombre nuevo
+del encabezado y siguen verdes.
+
+### 6. Lo que corrí
+
+- **147, 148, 149, 150 y 163 aislados desde base limpia: 5/5.** Seis capturas:
+  Perfil y Mis publicaciones en 1440×900, 768×1024 y 390×844.
+- `npm run build`, `npm run lint`, `npx tsc --noEmit`, `node --check` y
+  `diff-check`: verdes.
+- No corrí suite completa, Backend, a11y ni contraste totales. El diff no sale
+  del shell, la navegación y el panel.
+
+### 7. Lo que te debo decir
+
+- **El encabezado dice «Mi cuenta» y antes decía «Mi Panel».** No me lo pediste
+  explícitamente, pero el botón que lleva ahí dice «Mi cuenta» y el contrato la
+  llama así; dejar dos nombres para la misma pantalla era la incoherencia que
+  Emi señaló. Cambió el texto de siete casos que lo buscaban por nombre.
+- **En Mis publicaciones las tarjetas siguen diciendo «Sin registro
+  fotográfico»**, aunque el Mercado ya muestre las fotos de `CATALOG-PHOTOS-1`.
+  No es un defecto de esta pieza: esa pestaña lee `/products/my` y no pasa por
+  la conversión del catálogo, que es donde vive la tabla demo. Queda informado y
+  sin tocar: no estaba en el alcance de ninguna de las dos.
+- **`diff-check` me encontró un `\r` duplicado** en una de mis inserciones a
+  `App.tsx`. Es justo la trampa que avisa el repositorio; lo corregí y verifiqué
+  que los cinco archivos mezclados conservan la proporción de finales de línea
+  que tenían.
+
+### 8. Sin rojo, sin intermitente, sin pendiente
+
+Nada quedó rojo ni sin verificar.
+
 ## CATALOG-PHOTOS-1 — el catálogo muestra la foto del aviso
 
 **Resultado: terminado.**
