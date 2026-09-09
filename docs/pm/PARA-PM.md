@@ -2,6 +2,102 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## ACCOUNT-PAGE-1R — La marca de página actual en Mi cuenta
+
+**Resultado: corregido.**
+
+- Producto/regresión: `958c11c`
+- La suite sigue en **163 casos**.
+- **En mi rama, no en `main`.** No integré, no desplegué y no toqué Railway,
+  datos remotos, pagos ni secretos.
+
+---
+
+### 1. Tenías razón, y el mecanismo es el que decís
+
+El botón recibía `aria-current="page"` y no se veía actual. El CSS dibujaba
+sólo `.navLink[aria-current='page']`, y el acceso de cuenta no es un
+`.navLink`: es una celda de sesión, `.celda .cuenta`. Se anunciaba página
+actual y se veía como una acción más.
+
+Mi caso 163 daba verde porque miraba el atributo y nada más. Es el mismo tipo
+de falso verde que ya me habías marcado en el 160: comprobar el anuncio en vez
+de la cosa anunciada.
+
+### 2. La corrección
+
+Mi cuenta entra en la **misma regla**, no en una copia suya:
+
+```css
+.navLink[aria-current='page'],
+.cuenta[aria-current='page'] { … }
+```
+
+No hay componente nuevo, ni color nuevo, ni un segundo lugar donde el fondo, el
+color o el peso puedan quedar viejos. Es una sección del sitio desde
+`ACCOUNT-PAGE-1`; que se dibuje entre las acciones de la sesión es dónde vive,
+no qué es.
+
+Producto tocado: **una regla de CSS**. Nada de navegación, guardias, layout,
+textos ni otras regresiones.
+
+### 3. La prueba, y dos cosas que salieron de medirla
+
+El 163 ahora lee el estilo computado de una sección pública activa —el Mercado,
+en vivo— **antes** de entrar a la cuenta, y exige que el acceso use ese mismo
+fondo, color y peso al quedar actual. No hay hexadecimales escritos en la
+prueba: la referencia es la navegación viva, así que si mañana cambia el
+tratamiento, la prueba lo sigue sola.
+
+Dos cosas me mordieron y las arreglé porque medí, no porque las supusiera:
+
+- **`index.css` transiciona `background-color` en los botones.** Una lectura
+  suelta agarra la animación a mitad de camino: la primera versión de mi
+  comparación falló con `rgba(255, 255, 255, 0.914)` donde el token dice
+  `#ffffff`. Habría sido una prueba intermitente.
+- **Esperar a que el valor «se repita» no alcanza.** Dos lecturas dentro del
+  mismo cuadro dan el mismo valor aunque la transición siga corriendo: mi
+  primer intento dio por firme un `rgba(255, 255, 255, 0.435)`. Ahora cada
+  lectura se toma en un cuadro distinto y además se exige que no quede ninguna
+  animación viva. Sin esperas fijas.
+
+También saco al puntero de encima antes de mirar: el botón queda hovereado
+después del clic y `:hover` pinta la celda, así que las dos lecturas se toman
+en el mismo estado.
+
+### 4. Los dos rojos
+
+1. **Sin `.cuenta[aria-current='page']` en el selector** —el estado que me
+   marcaste—: *«Mi cuenta actual no se ve como una sección activa: fondo es
+   `rgba(0, 0, 0, 0)` y la sección activa usa `rgb(255, 255, 255)`»*.
+2. **Con la regla de sección activa vaciada**: *«la sección activa no se
+   distingue de una celda común»*. Es la comprobación de que la referencia
+   sirva: si el sitio dejara de marcar sus secciones, la comparación pasaría
+   por vacía en vez de avisar.
+
+### 5. Una cosa que pediste y no puse, con el motivo
+
+Pediste exigir además que no coincida con una celda común, *«si eso fuera
+necesario para evitar otro falso verde»*. **No es necesario, y no se puede
+poner rojo.** La comparación del punto 4.1 obliga a que las tres propiedades
+sean las de la sección activa, y la del 4.2 obliga a que la sección activa
+difiera de la celda común en alguna de esas tres. Una tercera comparación sale
+verde por construcción, siempre. La dejé escrita como comentario con la
+derivación, en vez de dejar una línea que no puede fallar: acá una prueba que
+no se puede romper no prueba nada.
+
+Si preferís que esté igual como red de seguridad, decímelo y la agrego.
+
+### 6. Puertas
+
+Corrí lo que pediste y nada más: **163 desde base limpia (1/1)**, `lint`,
+`node --check` y `diff-check`, los tres verdes. El smoke incluye build. No
+repetí 147–150 ni suite completa, Backend, a11y ni contraste. Seis capturas
+nuevas; en la de 1440×900 se ve la celda de «Juan Vendedor» blanca con texto
+oscuro, igual que una sección activa.
+
+---
+
 ## ACCOUNT-PAGE-1 — Mi cuenta es una página del sitio
 
 **Resultado: terminado.**
