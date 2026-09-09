@@ -4,6 +4,15 @@ Actualizado: 2026-09-09.
 
 ## Estado inmediato — 2026-09-09
 
+- **ACCOUNT-PAGE-1 devuelta como `ACCOUNT-PAGE-1R`:** producto/regresión
+  `7dc1d53`, informe `968efbc`. PM revisó el delta, reprodujo 149+150+163 desde
+  base limpia en **3/3** e inspeccionó seis capturas. La página, navegación,
+  sesión, foco, suciedad y tres anchos están conformes. Falta sólo que el botón
+  de Mi cuenta se vea como página actual: hoy tiene `aria-current`, pero el CSS
+  activo sólo alcanza a `.navLink`, y el 163 no detecta la omisión. Dev debe
+  reutilizar el tratamiento existente y fortalecer sólo el 163. Evidencia en
+  `REPRODUCCION-ACCOUNT-PAGE-1-2026-09-09.md`.
+
 - **CATALOG-PHOTOS-1 aceptada:** producto/regresión `e3c277e`, informe
   `b414cfb` e integración exacta en `main` `b26d8ad`. PM revisó el delta,
   reprodujo 155+162 desde base limpia en **2/2** e inspeccionó las seis
@@ -48,12 +57,11 @@ Actualizado: 2026-09-09.
   `/private/tmp/topgreen-pm-admin-160r.log`; un intento anterior que murió por
   `EPERM` antes del smoke no cuenta. Evidencia en
   `REPRODUCCION-ADMIN-TRUTH-1-2026-09-09.md`.
-- **Única tarea activa y responsable:** `ACCOUNT-PAGE-1`, Dev. Emi rechazó que
-  el área completa de cuenta siga siendo un popup. Dev debe convertir Mi cuenta
-  en una página privada con URL e historial reales, Header/Footer y scroll
-  normal; las decisiones internas breves conservan sus diálogos. Debe mantener
-  `FORM-DIRTY-1` al cambiar pestaña, navegar, volver o salir. Caso 163, focales
-  147–149 y seis capturas; sin suite completa salvo expansión de alcance.
+- **Única tarea activa y responsable:** `ACCOUNT-PAGE-1R`, Dev. Corrección
+  estrictamente visual y de regresión: aplicar al acceso de Mi cuenta el estado
+  actual ya usado por la navegación y hacer que el 163 lo mida por estilo
+  computado. Sólo caso 163 y puertas estáticas; sin reabrir la página ni
+  repetir los focales ya verdes.
 - **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
   `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
   y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como

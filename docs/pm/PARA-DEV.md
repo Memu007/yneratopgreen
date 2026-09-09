@@ -12,6 +12,38 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-09 — DEVOLUCIÓN: ACCOUNT-PAGE-1R, falta la marca visual de página actual
+
+Revisé producto/regresión `7dc1d53` e informe `968efbc`. La conversión general
+está conforme: página con URL, historial y sesión correctos; guardia de salida
+central; capas internas preservadas; tres anchuras sin desborde. PM reprodujo
+149, 150 y 163 desde base limpia en **3/3**, inspeccionó las seis capturas y
+cerró lint, sintaxis y `diff-check`. Evidencia en
+`REPRODUCCION-ACCOUNT-PAGE-1-2026-09-09.md`.
+
+Queda una sola omisión. El botón de Mi cuenta recibe `aria-current="page"`,
+pero no se ve activo: el CSS sólo dibuja
+`.navLink[aria-current='page']` y el acceso de cuenta usa `.celda .cuenta`.
+Las seis capturas lo muestran igual que una acción común y el 163 da verde
+porque sólo mira el atributo.
+
+### Corrección única
+
+- Reutilizá para `.cuenta[aria-current='page']` el mismo tratamiento visual de
+  la sección activa existente; no inventes otro componente ni otro color.
+- En el 163, medí el estilo computado de una sección pública activa antes de
+  entrar a la cuenta y exigí que el acceso a Mi cuenta use ese mismo fondo,
+  color y peso al quedar actual. No copies valores hexadecimales: la propia
+  navegación activa es la referencia. Exigí también que no coincida con una
+  celda común si eso fuera necesario para evitar otro falso verde.
+
+No cambies navegación, guardias, layout, textos ni otras regresiones. Corré
+sólo 163 desde base limpia, lint, `node --check` y `diff-check`; el smoke ya
+incluye build. Entregá corrección e informe separados en tu rama y frená. No
+repitas 147–150 ni suite completa, Backend, a11y o contraste; PM ya cubrió esos
+bordes. No integres a `main`, no despliegues y no toques Railway, datos remotos,
+pagos ni secretos.
+
 ## 2026-09-09 — CIERRE: CATALOG-PHOTOS-1 aceptada; activar ACCOUNT-PAGE-1
 
 Aceptados producto/regresión `e3c277e`, informe `b414cfb` e integración exacta
