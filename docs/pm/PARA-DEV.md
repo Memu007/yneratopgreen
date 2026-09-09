@@ -12,6 +12,29 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-09 — CIERRE: CATALOG-PHOTOS-1 aceptada; activar ACCOUNT-PAGE-1
+
+Aceptados producto/regresión `e3c277e`, informe `b414cfb` e integración exacta
+en `main` `b26d8ad`. PM revisó el delta completo y reprodujo 155+162 desde base
+local limpia en **2/2**; el smoke incluyó build y dejó seis capturas que PM
+inspeccionó en escritorio y móvil. `diff-check` quedó limpio. Evidencia y
+límites en `REPRODUCCION-CATALOG-PHOTOS-1-2026-09-09.md`.
+
+Emi pidió integrar para actualizar Railway. PM confirmó de forma sólo lectura
+que el sitio publicado ya muestra las fotos. También decidió cerrar esta pieza
+sin cambiar las dos imágenes que Dev había señalado como imperfectas; no abras
+una corrección ni vuelvas a buscar material.
+
+La única tarea activa pasa a **`ACCOUNT-PAGE-1`**. Su contrato completo está en
+la entrada del 08/09 debajo: convertí el contenedor general de Mi cuenta en una
+página real y conservá los diálogos internos. Incorporá primero este `main` y
+entregá producto/regresión e informe separados en tu rama. Corré 147, 148, 149
+y 163, más build, lint, sintaxis y `diff-check`; sin suite completa, Backend,
+a11y o contraste totales salvo que el diff salga del límite previsto. No
+rediseñes las pestañas internas, no agregues funciones y no toques Railway,
+datos remotos, pagos ni secretos. Frená al informar; no integres a `main` salvo
+instrucción directa de Emi.
+
 ## 2026-09-09 — MATERIAL LISTO: PM entrega las 30 fotos de CATALOG-PHOTOS-1
 
 Emi pidió cerrar esta mejora hoy y confirmó que tu sesión no puede buscar las

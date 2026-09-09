@@ -4,13 +4,13 @@ Actualizado: 2026-09-09.
 
 ## Estado inmediato — 2026-09-09
 
-- **Paquete de fotos entregado por PM para `CATALOG-PHOTOS-1`:** 30 WebP
-  pertinentes y locales en `docs/pm/originales/catalogo-demo/`, uno por slug,
-  todos 1600 × 1000 y con hashes distintos. El inventario versionado registra
-  autor, licencia y página fuente. Dev ya no debe buscar material: sólo integrar
-  el paquete, mantener prioridad de fotos reales/fallback y entregar caso 162,
-  focal 155, seis capturas y puertas acotadas. No hubo cambios de producto,
-  despliegue, seed ni datos remotos.
+- **CATALOG-PHOTOS-1 aceptada:** producto/regresión `e3c277e`, informe
+  `b414cfb` e integración exacta en `main` `b26d8ad`. PM revisó el delta,
+  reprodujo 155+162 desde base limpia en **2/2** e inspeccionó las seis
+  capturas. Railway ya sirve las fotos; se verificó de forma sólo lectura. Emi
+  decidió cerrar sin sustituir las dos imágenes imperfectas señaladas por Dev.
+  No hubo suite completa PM. Evidencia en
+  `REPRODUCCION-CATALOG-PHOTOS-1-2026-09-09.md`.
 
 - **MARKET-VIEWS-1 aceptada:** producto/regresión `b5ee28d`, informe `afbfb95`
   y corrección de SHA `931a063`. PM revisó diff/hashes y seis capturas,
@@ -48,18 +48,12 @@ Actualizado: 2026-09-09.
   `/private/tmp/topgreen-pm-admin-160r.log`; un intento anterior que murió por
   `EPERM` antes del smoke no cuenta. Evidencia en
   `REPRODUCCION-ADMIN-TRUTH-1-2026-09-09.md`.
-- **Única tarea activa y responsable:** `CATALOG-PHOTOS-1`, Dev. PM ya entregó
-  las 30 fotos licenciadas, pertinentes, normalizadas y trazadas por slug. Dev
-  debe integrarlas y servirlas localmente; artículos, servicios y logística
-  tendrán imagen sin hotlinks, Picsum, seed ni escritura en Railway. Caso 162 y
-  seis capturas; sin suite completa.
-- **Segunda mejora de demo en cola:** `ACCOUNT-PAGE-1`. Emi rechazó que el área
-  completa de cuenta siga siendo un popup. Después de las fotos, Dev deberá
-  convertir `Mi Panel` en una página privada con URL e historial reales,
-  Header/Footer y scroll normal; las decisiones internas breves conservan sus
-  diálogos. Debe mantener `FORM-DIRTY-1` al cambiar pestaña, navegar, volver o
-  salir. Caso 163, focales 147–149 y seis capturas; sin suite completa. No está
-  activa todavía por riesgo de navegación y no se mezcla con las fotos.
+- **Única tarea activa y responsable:** `ACCOUNT-PAGE-1`, Dev. Emi rechazó que
+  el área completa de cuenta siga siendo un popup. Dev debe convertir Mi cuenta
+  en una página privada con URL e historial reales, Header/Footer y scroll
+  normal; las decisiones internas breves conservan sus diálogos. Debe mantener
+  `FORM-DIRTY-1` al cambiar pestaña, navegar, volver o salir. Caso 163, focales
+  147–149 y seis capturas; sin suite completa salvo expansión de alcance.
 - **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
   `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
   y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como
