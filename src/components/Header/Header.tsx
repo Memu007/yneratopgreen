@@ -2,11 +2,15 @@ import React, { useEffect, useState } from 'react';
 import styles from './Header.module.css';
 import { useAuth } from '../../hooks/useAuth';
 import { CartButton } from '../Cart/CartModal';
-import { UserDashboard } from '../UserDashboard/UserDashboard';
+import { useNavegacionActual } from '../../navegacion/navegacion';
+import type { Seccion } from '../../navegacion/politica';
 import { useToast } from '../../hooks/useToast';
 import { explicarMP, resultadoDeMercadoPago } from '../../utils/mercadoPago';
 
-type PageSection = 'home' | 'marketplace' | 'about' | 'services' | 'contact' | 'payment-success' | 'payment-failure' | 'payment-pending' | 'verificar-correo';
+// El tipo de secciones sale de la política y no se copia acá: esta lista
+// paralela ya se quedó atrás una vez —no tenía `account`— y una copia que
+// envejece es exactamente lo que la política vino a evitar.
+type PageSection = Seccion;
 
 interface HeaderProps {
   searchQuery: string;
@@ -71,7 +75,9 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user, isAuthenticated, logout } = useAuth();
   const { showToast } = useToast();
-  const [showDashboard, setShowDashboard] = useState(false);
+  // Salir de la sesión no es ir a una sección, pero es una salida igual: pasa
+  // por la misma guardia que la cabecera y el pie.
+  const { pedirSalida } = useNavegacionActual();
   const [vueltaDeMP, setVueltaDeMP] = useState(false);
   const esMovil = useEsMovil();
 
@@ -101,9 +107,12 @@ export const Header: React.FC<HeaderProps> = ({
   // panel sin usuario no tiene qué mostrar; el aviso ya dijo qué hacer.
   useEffect(() => {
     if (!vueltaDeMP || !isAuthenticated) return;
-    setShowDashboard(true);
+    // Antes esto abría el modal. El modal ya no está: se navega al área de
+    // cuenta, que es una sección con URL propia, así que la vuelta de Mercado
+    // Pago queda en un lugar que se puede recargar y compartir.
+    onNavigate('account');
     setVueltaDeMP(false);
-  }, [vueltaDeMP, isAuthenticated]);
+  }, [vueltaDeMP, isAuthenticated, onNavigate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,12 +190,22 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 className={`${styles.celda} ${styles.cuenta}`}
                 aria-label="Mi cuenta"
-                onClick={() => setShowDashboard(true)}
+                aria-current={currentSection === 'account' ? 'page' : undefined}
+                onClick={() => onNavigate('account')}
               >
                 <span className={styles.soloEscritorio}>{user?.name}</span>
                 <span className={styles.soloMovil}>Cuenta</span>
               </button>
-              <button className={styles.celda} onClick={logout}>
+              {/* Se navega ANTES de cerrar la sesión: si se hiciera al revés,
+                  Mi cuenta se quedaría un instante sin usuario y el guardián
+                  de la sección mandaría a ingresar a quien acaba de salir. */}
+              <button
+                className={styles.celda}
+                onClick={() => pedirSalida(() => {
+                  onNavigate('home');
+                  logout();
+                })}
+              >
                 Salir
               </button>
             </>
@@ -229,15 +248,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      {showDashboard && (
-        <UserDashboard
-          onClose={() => setShowDashboard(false)}
-          onPublishClick={() => {
-            setShowDashboard(false);
-            onSellClick();
-          }}
-        />
-      )}
     </header>
   );
 };

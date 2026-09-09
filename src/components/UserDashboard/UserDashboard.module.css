@@ -1,41 +1,6 @@
-.overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: var(--tg-color-overlay);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 2000;
-  padding: 20px;
-  overflow-y: auto;
-}
-
-.modal {
-  background: white;
-  border-radius: var(--tg-radius-sm);
-  max-width: 1000px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-  position: relative;
-  box-shadow: var(--tg-shadow-overlay);
-  animation: slideUp 0.3s ease-out;
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
+/* La X y la animación de entrada se quedan: las usan las capas de adentro
+   —editar una publicación, rechazar una transferencia—, que siguen siendo
+   capas. Lo que se fue es el uso que hacía de ellas el contenedor general. */
 .closeButton {
   position: absolute;
   top: 20px;
@@ -58,6 +23,41 @@
 .closeButton:hover {
   background-color: var(--tg-color-surface-muted);
   transform: scale(1.1);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Mi cuenta es una página del sitio, no una caja flotante encima.
+   Se fue el `position: fixed` con su fondo oscuro, el `max-height: 90vh` con
+   su scroll propio, la sombra de capa, la animación de entrada y el botón de
+   cerrar. Lo que queda es lo mismo que cualquier otra sección: ancho de
+   lectura, aire alrededor y el scroll del documento.
+
+   El `min-height` no es decorativo: sin él, una pestaña con poco contenido
+   —Notificaciones vacías— dejaba el pie subido a media pantalla. */
+.pagina {
+  display: block;
+  padding: var(--tg-space-6) var(--tg-space-5) var(--tg-space-8);
+  background-color: var(--tg-color-canvas);
+  min-height: 60vh;
+}
+
+.lienzo {
+  max-width: 1000px;
+  margin: 0 auto;
+  background: white;
+  border: 1px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-sm);
+  overflow: hidden;
 }
 
 /* Header */
@@ -625,13 +625,21 @@
     grid-template-columns: 1fr;
   }
 
+  /* Las pestañas se acomodan en varias filas en vez de irse de la pantalla.
+     Con `nowrap` y `overflow-x: auto` las tres últimas —Mis Compras, Mis
+     Ventas, Mis publicaciones— quedaban fuera de la ventana en 390 px: había
+     que descubrir que la tira se arrastra para llegar a ellas, y una pestaña
+     que no se ve no se usa. Envueltas entran las seis y ninguna desborda. */
   .tabs {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+    overflow-x: visible;
   }
 
   .tab {
+    flex: 1 1 44%;
+    justify-content: center;
     font-size: 13px;
-    padding: 12px 16px;
+    padding: 12px 10px;
   }
 
   .orderItem {
@@ -694,10 +702,6 @@
   margin: 0 0 4px 0;
 }
 
-/* «Sin calificaciones aún» a 24 px no entra en la columna de un contador, y
-   sin punto de corte la palabra se salía de la tarjeta y quedaba tapada por
-   la de al lado: se leía «Sin calificacione aún». Es un texto, no una cifra,
-   así que corta como texto. */
 .statValue {
   font-size: 24px;
   font-weight: 700;
@@ -705,6 +709,21 @@
   color: var(--tg-color-brand);
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+/* Cuando el valor es una FRASE y no una cifra.
+   «Sin calificaciones aún» a 24 px no entra en la columna de un contador. La
+   corrección anterior fue `overflow-wrap: anywhere`, que evitó que se saliera
+   de la tarjeta pero la partía en «Sin calificaci / ones aún», que se lee
+   peor que el desborde. Una frase no necesita cuerpo de cifra: baja a 15 px,
+   entra en el ancho y corta entre palabras como cualquier texto. */
+.statValueFrase {
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.35;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
 }
 
 /* Filtros */

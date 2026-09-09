@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import styles from './App.module.css';
 import { Header } from './components/Header/Header';
 import { Footer } from './components/Footer/Footer';
+import { UserDashboard } from './components/UserDashboard/UserDashboard';
 import { useAuth } from './hooks/useAuth';
 import { FilterSidebar } from './components/FilterSidebar/FilterSidebar';
 import { ProductGrid } from './components/ProductGrid/ProductGrid';
@@ -41,7 +42,7 @@ type AuthModalType = 'login' | 'register' | null;
 type PageSection = Seccion;
 
 function App() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   // La única navegación del producto: qué sección declara la barra, qué capa
   // hay abierta encima y cómo se escribe el historial. Nadie más lo toca.
   const navegacion = useNavegacion();
@@ -114,6 +115,38 @@ function App() {
     setVolverDespuesDeIngresar(null);
     setAuthModal('login');
   };
+
+  // Mi cuenta pide sesión. Entrar directo a `?section=account` sin ella no
+  // muestra una pantalla vacía ni redirige en silencio: abre el ingreso, y
+  // decide DESPUÉS, cuando el ingreso se cerró y el resultado ya se sabe.
+  //
+  // Dos intentos fallaron acá y los dos por lo mismo: leer la sesión demasiado
+  // temprano.
+  //
+  //  - leerla DENTRO del callback de cierre decía siempre «no autenticó»,
+  //    porque el modal cierra en el mismo paso en que la sesión se guarda;
+  //  - deducir «canceló» de «el modal ya no está y yo lo había pedido» se cae
+  //    con `StrictMode`, que en desarrollo corre cada efecto dos veces: la
+  //    segunda vuelta veía la bandera puesta y el modal todavía sin abrir, y
+  //    mandaba a Inicio antes de que nadie escribiera nada.
+  //
+  // Así que la decisión se toma cuando el ingreso se cerró de verdad, en el
+  // paso siguiente, con el estado ya asentado. `AuthProvider` no dibuja nada
+  // mientras restaura la sesión, así que para entonces `isAuthenticated` es una
+  // respuesta y no un «todavía no sé».
+  const situacion = useRef({ autenticado: isAuthenticated, seccion: currentSection });
+  situacion.current = { autenticado: isAuthenticated, seccion: currentSection };
+  useEffect(() => {
+    if (currentSection !== 'account' || isAuthenticated) return;
+    abrirLoginYVolver(() => {
+      setTimeout(() => {
+        const ahora = situacion.current;
+        if (ahora.seccion === 'account' && !ahora.autenticado) handleNavigate('home');
+      }, 0);
+    });
+    // `handleNavigate` viene memorizado de la navegación; `abrirLoginYVolver`
+    // sólo escribe estado y volver a crearlo no cambia cuándo corre esto.
+  }, [currentSection, isAuthenticated, handleNavigate]);
 
   const cerrarAutenticacion = () => {
     setAuthModal(null);
@@ -417,6 +450,13 @@ function App() {
             vistaPrevia={vistaPreviaDeServicios}
           />
         );
+      case 'account':
+        // Mi cuenta es una página del sitio, no una capa sobre él.
+        // Quien entra sin sesión no ve nada: el efecto de más abajo
+        // le abre el ingreso y lo trae de vuelta si autentica.
+        return isAuthenticated ? (
+          <UserDashboard onPublishClick={() => setIsAddProductOpen(true)} />
+        ) : null;
       case 'contact':
         return <ContactPage />;
       case 'payment-success':

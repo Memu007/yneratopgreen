@@ -35,6 +35,7 @@ import {
   precioVisible,
 } from '../../utils/formatters';
 import { useCapaModal } from '../../hooks/useCapaModal';
+import { useNavegacionActual } from '../../navegacion/navegacion';
 import { huboCambios, useSalidaProtegida } from '../../formularios/salidaProtegida';
 
 type TabType = 'profile' | 'notifications' | 'purchases' | 'sales' | 'products'
@@ -417,11 +418,10 @@ const formularioDesde = (cuenta: User | null) => ({
 });
 
 interface UserDashboardProps {
-  onClose: () => void;
   onPublishClick?: () => void;
 }
 
-export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublishClick }) => {
+export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) => {
   const { user, updateProfile } = useAuth();
   const { showToast, showConfirm } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('profile');
@@ -1050,12 +1050,17 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   // montar mientras se escribe.
   const salida = useSalidaProtegida();
   const { alSalir } = salida;
-  // Cerrar el panel entero: lo pide la X, el fondo y Escape, y arrastra
-  // cualquiera de los tres formularios que esté sucio.
-  const pedirCierreDelPanel = useCallback(
-    () => alSalir(trabajoRef.current, onClose),
-    [alSalir, onClose],
-  );
+  // Quien ve las salidas que no pasan por acá: la cabecera, el pie, Salir y el
+  // Atrás del navegador.
+  const { registrarGuardia } = useNavegacionActual();
+  // Mi cuenta ya no se cierra: se sale de ella. Las salidas son la cabecera,
+  // el pie, Salir, el Atrás del navegador y cambiar de pestaña, y ninguna de
+  // las cuatro primeras pasa por este componente. Así que la política de
+  // `FORM-DIRTY-1` se registra en la navegación, que es quien las ve todas.
+  //
+  // La quinta —cambiar de pestaña— sí es de acá, y usa la misma política: un
+  // perfil a medio editar no se pierde por tocar «Mis compras».
+
   const cerrarLaEdicion = useCallback(() => setEditingProduct(null), []);
   // Cerrar la capa del rechazo no toca la orden: sólo suelta lo que se estaba
   // por mandar. El foco vuelve al botón que la abrió por la pila de capas.
@@ -1064,6 +1069,51 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     setMotivoDelRechazo('');
     setErrorDelRechazo('');
   }, []);
+
+  // Descartar tiene que descartar de verdad.
+  //
+  // Mientras Mi cuenta era un modal, descartar cerraba el panel y el formulario
+  // se iba con él. Como página, el destino puede ser otra pestaña: si el
+  // formulario quedara escrito, la salida siguiente volvería a preguntar por lo
+  // mismo y «pregunta una sola vez» dejaría de ser cierto. Así que descartar
+  // suelta el trabajo local de las cuatro fuentes y recién después ejecuta el
+  // destino pedido.
+  //
+  // «Local» es la palabra importante: esto vuelve los formularios a lo último
+  // guardado. No toca ninguna orden ni ninguna publicación ya persistida.
+  const soltarTrabajoLocal = useCallback(() => {
+    setEditForm(formularioDesde(user));
+    setCarrierProvinceId(user?.carrierBaseProvinceId || '');
+    setCarrierPadronError('');
+    setIsEditing(false);
+    setEditingProduct(null);
+    setRatingModal(null);
+    soltarElRechazo();
+  }, [user, soltarElRechazo]);
+
+  const pedirSalidaDeLaPagina = useCallback(
+    (seguir: () => void) => alSalir(trabajoRef.current, () => {
+      soltarTrabajoLocal();
+      seguir();
+    }),
+    [alSalir, soltarTrabajoLocal],
+  );
+
+  useEffect(() => registrarGuardia({
+    hayTrabajoSinGuardar: () => trabajoRef.current,
+    preguntar: pedirSalidaDeLaPagina,
+  }), [registrarGuardia, pedirSalidaDeLaPagina]);
+
+  const cambiarDePestana = useCallback(
+    (destino: TabType) => {
+      // Elegir la pestaña en la que ya se está no es irse a ningún lado, así
+      // que no pregunta: es la misma regla con la que la navegación no agrega
+      // una entrada al historial cuando el destino es la ubicación actual.
+      if (destino === activeTab) return;
+      pedirSalidaDeLaPagina(() => setActiveTab(destino));
+    },
+    [activeTab, pedirSalidaDeLaPagina],
+  );
   // El cierre que piden las cuatro vías —Escape, X, Cancelar y fondo— es uno
   // solo, y está protegido: mientras el rechazo viaja, cerrar sería mentir.
   // La petición no se cancela, así que la orden se rechazaría igual y la
@@ -1835,7 +1885,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           </div>
           <div className={styles.statInfo}>
             <p className={styles.statLabel}>Reputación</p>
-            <p className={styles.statValue}>
+            <p className={`${styles.statValue} ${
+              (user?.ratingCount ?? 0) > 0 ? '' : styles.statValueFrase
+            }`}>
               {/* Con palabras y no con una raya: «—» obliga a adivinar si es
                   cero, si falta el dato o si se rompió algo. */}
               {(user?.ratingCount ?? 0) > 0
@@ -3335,37 +3387,40 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     </div>
   );
 
-  // Atrapa el foco, lo devuelve al cerrar, cierra con Escape y traba el
-  // scroll del fondo. Ninguna capa del producto hacía nada de esto.
-  const capa = useCapaModal<HTMLDivElement>(pedirCierreDelPanel);
+  // El contenedor general ya NO es una capa: no atrapa el foco, no traba el
+  // scroll del documento y no cierra con Escape. Es una página, y una página
+  // no hace nada de eso. Las capas de adentro —editar, calificar, rechazar—
+  // siguen siendo capas y conservan la pila.
+  //
   // La capa del rechazo usa la pila ya aceptada: foco adentro, trampa de Tab,
   // Escape que cierra sólo la de arriba y foco de vuelta a su disparador.
   const capaDelRechazo = useCapaModal<HTMLDivElement>(
     cerrarElRechazo, rechazoDeTransferencia !== null,
   );
+  // La edición de una publicación ahora también tiene la suya.
+  //
+  // Nunca la había tenido: mientras Mi cuenta era un modal, Escape adentro de
+  // la edición disparaba el oyente del PANEL y cerraba todo de un saque —lo que
+  // el caso 149 registró como «edición + X: cerraba sin avisar»—. Al retirar la
+  // capa general se quedó sin ningún Escape, que es peor. Con la suya cierra de
+  // a una, atrapa el foco mientras está arriba y lo devuelve al «Editar» que la
+  // abrió, que es lo que el contrato pide de las capas de adentro.
+  const capaDeLaEdicion = useCapaModal<HTMLDivElement>(
+    pedirCierreDeLaEdicion, editingProduct !== null,
+  );
 
   return (
-    <div className={styles.overlay} onClick={pedirCierreDelPanel}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}
-        ref={capa}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Mi cuenta"
-        tabIndex={-1}
-      >
-        <button className={styles.closeButton} aria-label="Cerrar" onClick={pedirCierreDelPanel}>
-          ×
-        </button>
-
+    <main className={styles.pagina} aria-labelledby="cuenta-titulo">
+      <div className={styles.lienzo}>
         <div className={styles.header}>
-          <h1>Mi Panel</h1>
-          <p>Gestiona tu perfil, compras y ventas</p>
+          <h1 id="cuenta-titulo">Mi cuenta</h1>
+          <p>Tu perfil, tus compras y tus ventas</p>
         </div>
 
         <div className={styles.tabs}>
           <button
             className={`${styles.tab} ${activeTab === 'profile' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('profile')}
+            onClick={() => cambiarDePestana('profile')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3375,7 +3430,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           </button>
           <button
             className={`${styles.tab} ${activeTab === 'notifications' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('notifications')}
+            onClick={() => cambiarDePestana('notifications')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3386,7 +3441,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           </button>
           <button
             className={`${styles.tab} ${activeTab === 'purchases' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('purchases')}
+            onClick={() => cambiarDePestana('purchases')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <circle cx="9" cy="21" r="1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3397,7 +3452,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           </button>
           <button
             className={`${styles.tab} ${activeTab === 'sales' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('sales')}
+            onClick={() => cambiarDePestana('sales')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <line x1="12" y1="1" x2="12" y2="23" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3408,7 +3463,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           {esTransportista && (
             <button
               className={`${styles.tab} ${activeTab === 'operations' ? styles.tabActive : ''}`}
-              onClick={() => setActiveTab('operations')}
+              onClick={() => cambiarDePestana('operations')}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path d="M1 3h15v13H1z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3421,7 +3476,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           )}
           <button
             className={`${styles.tab} ${activeTab === 'products' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('products')}
+            onClick={() => cambiarDePestana('products')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3549,9 +3604,20 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             pedirCierreDeLaEdicion();
           }}
         >
-          <div className={styles.editModal} onClick={(e) => e.stopPropagation()}>
+          <div
+            className={styles.editModal}
+            ref={capaDeLaEdicion}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-de-la-edicion"
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className={styles.editModalHeader}>
-              <h2> Editar {editingProduct.publication_type === 'servicio' ? 'Servicio' : 'Producto'}</h2>
+              <h2 id="titulo-de-la-edicion">
+                {' '}
+                Editar {editingProduct.publication_type === 'servicio' ? 'Servicio' : 'Producto'}
+              </h2>
               <button 
                 className={styles.closeButton}
                 onClick={pedirCierreDeLaEdicion}
@@ -4112,6 +4178,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         </div>
       )}
       {salida.pregunta}
-    </div>
+    </main>
   );
 };

@@ -13283,7 +13283,7 @@ await runCase(129, 'El ingreso no deja la credencial escrita en la consola del n
 
     // --- 2. La sesión sirve: una pantalla protegida carga ----------------
     await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
-    await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+    await page.getByRole('heading', { name: 'Mi cuenta' }).waitFor({ timeout: 20_000 });
 
     // --- 3. El refresh automático sigue vivo ------------------------------
     //     Se rompe el access token guardado y se pide algo protegido que no
@@ -13296,7 +13296,7 @@ await runCase(129, 'El ingreso no deja la credencial escrita en la consola del n
     const accesoRenovado = await guardado(page, 'access_token');
     assert(accesoRenovado && accesoRenovado !== roto,
       'el access token roto no se renovó: el refresh automático dejó de funcionar');
-    assert(await page.getByRole('heading', { name: 'Mi Panel' }).isVisible(),
+    assert(await page.getByRole('heading', { name: 'Mi cuenta' }).isVisible(),
       'la sesión se cayó al renovar el token');
 
     // Y la renovación tampoco se imprime.
@@ -18122,14 +18122,17 @@ await runCase(149, 'Cerrar un formulario con trabajo sin guardar pregunta una so
     const seguirEditando = (page) => page.getByRole('button', { name: 'Seguir editando' }).click();
     const descartar = (page) => page.getByRole('button', { name: 'Descartar cambios' }).click();
     const panelAbierto = async (page) =>
-      (await page.getByRole('heading', { name: 'Mi Panel' }).count()) === 1;
+      (await page.getByRole('heading', { name: 'Mi cuenta' }).count()) === 1;
     const abrirPanel = async (page) => {
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: 'Mi cuenta' }).click();
-      await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+      await page.getByRole('heading', { name: 'Mi cuenta' }).waitFor({ timeout: 20_000 });
     };
-    const equisDelPanel = (page) =>
-      page.locator('[aria-label="Mi cuenta"] > button[aria-label="Cerrar"]');
+    // Mi cuenta ya no tiene X ni fondo que la cierre: desde ACCOUNT-PAGE-1 es
+    // una página, y se sale de ella yéndose a otra sección. La salida que se
+    // usa acá es la cabecera, que es la que tiene una persona a mano.
+    const salirDeLaCuenta = (page) => page.locator('header').first()
+      .getByRole('button', { name: 'Inicio', exact: true });
     const sinPregunta = async (page, momento) => {
       await esperarA(async () => !(await hayPregunta(page)),
         `${momento}: quedó una pregunta abierta`, 20_000);
@@ -18151,54 +18154,78 @@ await runCase(149, 'Cerrar un formulario con trabajo sin guardar pregunta una so
       const radio = page.locator('#perfil-radio');
       await radio.waitFor({ state: 'visible', timeout: 20_000 });
       const original = await radio.inputValue();
-      await equisDelPanel(page).click();
+      await salirDeLaCuenta(page).click();
       await esperarA(async () => !(await panelAbierto(page)),
-        'perfil limpio: la X del panel no cerró', 20_000);
+        'perfil limpio: irse por la cabecera no salió de la cuenta', 20_000);
       await sinPregunta(page, 'perfil limpio');
-      cerrados.push('perfil limpio/X del panel');
+      cerrados.push('perfil limpio/cabecera');
 
       // Sucio: el mismo camino pregunta, y «seguir editando» conserva todo.
       await abrirPanel(page);
       await page.getByRole('button', { name: /editar/i }).first().click();
       await radio.waitFor({ state: 'visible', timeout: 20_000 });
       await radio.fill('777');
-      await equisDelPanel(page).click();
-      await preguntoUnaSolaVez(page, 'perfil sucio + X del panel');
-      assert(await panelAbierto(page), 'preguntar cerró el panel igual');
-      assert((await dialogos(page)) === 2,
-        `con la pregunta arriba hay ${await dialogos(page)} diálogos y tendrían que ser 2`);
+      await salirDeLaCuenta(page).click();
+      await preguntoUnaSolaVez(page, 'perfil sucio + cabecera');
+      assert(await panelAbierto(page), 'preguntar sacó de la cuenta igual');
+      // Una sola capa arriba: la pregunta. La página de abajo no es un diálogo.
+      assert((await dialogos(page)) === 1,
+        `con la pregunta arriba hay ${await dialogos(page)} diálogos y tendría que ser 1`);
       assert(await pregunta(page).evaluate((el) => el.contains(document.activeElement)),
         'el foco no entró en la pregunta');
       await seguirEditando(page);
       await sinPregunta(page, 'perfil: seguir editando');
-      assert(await panelAbierto(page), 'seguir editando cerró el panel');
+      assert(await panelAbierto(page), 'seguir editando sacó de la cuenta');
       assert((await radio.inputValue()) === '777',
         `seguir editando perdió lo escrito: «${await radio.inputValue()}»`);
-      await esperarA(async () => (await equisDelPanel(page).evaluate(
+      // Y no movió la barra: seguir editando conserva pantalla, URL y contenido.
+      assert(new URL(page.url()).searchParams.get('section') === 'account',
+        `seguir editando movió la barra a ${page.url()}`);
+      await esperarA(async () => (await salirDeLaCuenta(page).evaluate(
         (el) => el === document.activeElement)),
-      'seguir editando no devolvió el foco a la X que pidió cerrar', 20_000);
+      'seguir editando no devolvió el foco a quien pidió salir', 20_000);
 
-      // Cambiar de pestaña con el perfil sucio NO es un cierre: el formulario
-      // sigue vivo y no se pierde nada, así que no pregunta. Lo que sí tiene
-      // que seguir preguntando después es cerrar el panel.
+      // Cambiar de pestaña SÍ pregunta ahora, y es un cambio deliberado de
+      // ACCOUNT-PAGE-1. Mientras Mi cuenta era un modal, el formulario del
+      // perfil seguía montado detrás de la otra pestaña y no se perdía nada.
+      // Como página, cambiar de pestaña es irse de la pantalla que se está
+      // editando: se pregunta, como con la cabecera.
       await page.getByRole('button', { name: /notificaciones/i }).first().click();
+      await preguntoUnaSolaVez(page, 'perfil sucio + cambio de pestaña');
+      await seguirEditando(page);
+      await sinPregunta(page, 'pestaña: seguir editando');
+      assert((await radio.count()) === 1 && (await radio.inputValue()) === '777',
+        'seguir editando desde la pestaña perdió el formulario o lo escrito');
+      cerrados.push('perfil sucio/cambio de pestaña (pregunta y se queda)');
+
+      // Y descartando, la pestaña pedida es exactamente la que se abre, y el
+      // trabajo local se suelta de verdad: si quedara escrito, la salida
+      // siguiente volvería a preguntar por lo mismo y «una sola vez» sería
+      // mentira.
+      await page.getByRole('button', { name: /notificaciones/i }).first().click();
+      await preguntoUnaSolaVez(page, 'perfil sucio + pestaña, descartando');
+      await descartar(page);
       await esperarA(async () => (await radio.count()) === 0,
-        'la pestaña no cambió', 20_000);
-      await sinPregunta(page, 'perfil sucio + cambio de pestaña');
+        'descartar no llevó a la pestaña que se había pedido', 20_000);
+      assert(await panelAbierto(page), 'descartar la pestaña sacó de la cuenta');
       await page.getByRole('button', { name: 'Mi Perfil' }).first().click();
-      await esperarA(async () => (await radio.count()) === 1,
-        'no volvió el formulario del perfil', 20_000);
-      assert((await radio.inputValue()) === '777',
-        `cambiar de pestaña perdió lo escrito: «${await radio.inputValue()}»`);
-      cerrados.push('perfil sucio/cambio de pestaña (no cierra: no pregunta)');
+      await sinPregunta(page, 'tras descartar, volver al perfil');
+      await esperarA(async () => (await page.locator('#perfil-radio').count()) === 0,
+        'tras descartar, el perfil siguió en edición', 20_000);
+      cerrados.push('perfil sucio/descartar abre la pestaña pedida y suelta lo escrito');
 
       // Cambiar y volver al valor original deja el formulario limpio otra vez.
+      await page.getByRole('button', { name: /editar/i }).first().click();
+      await radio.waitFor({ state: 'visible', timeout: 20_000 });
+      assert((await radio.inputValue()) === original,
+        `descartar no devolvió el radio a «${original}»: dice «${await radio.inputValue()}»`);
+      await radio.fill('888');
       await radio.fill(original);
-      await equisDelPanel(page).click();
+      await salirDeLaCuenta(page).click();
       await esperarA(async () => !(await panelAbierto(page)),
-        'con el valor revertido la X no cerró', 20_000);
+        'con el valor revertido irse por la cabecera preguntó o no salió', 20_000);
       await sinPregunta(page, 'perfil revertido');
-      cerrados.push('perfil revertido/X del panel');
+      cerrados.push('perfil revertido/cabecera');
       await page.context().close();
     }
 
@@ -18495,7 +18522,13 @@ await runCase(150, 'Escribir en un formulario no mueve el foco de su campo', asy
 
     // Una letra por vez, y despues de CADA una las dos cosas que el defecto
     // rompia: que la letra entro y que el foco sigue en el mismo campo.
-    const escribirTeclaPorTecla = async (page, campo, texto, contenedor) => {
+    // `comoCapa` distingue los dos límites que existen ahora. Los formularios
+    // que viven en una capa —alta, checkout, edición— tienen que seguir siendo
+    // UNA capa con el fondo trabado. El perfil vive en Mi cuenta, que desde
+    // ACCOUNT-PAGE-1 es una página: ahí la propiedad correcta es la contraria
+    // —ningún diálogo y el scroll del documento suelto— y comprobarla es igual
+    // de discriminante: si el contenedor volviera a ser un modal, esto se cae.
+    const escribirTeclaPorTecla = async (page, campo, texto, contenedor, comoCapa = true) => {
       await campo.click();
       // El cursor al final: `click()` lo deja donde cayo el clic y un campo
       // precargado —el nombre del perfil— no arranca vacio.
@@ -18515,31 +18548,45 @@ await runCase(150, 'Escribir en un formulario no mueve el foco de su campo', asy
           `${contenedor}: tras la tecla ${numero} de ${texto.length} el campo dice «${ahora}» y `
           + `tendria que decir «${esperado}»`);
       }
-      // Y la capa siguio siendo la misma capa: ni se duplico ni solto el fondo.
+      // Y el contenedor siguio siendo el mismo: ni se duplico ni cambio de clase.
       const dialogos = await page.locator('[role="dialog"]').count();
-      assert(dialogos === 1, `${contenedor}: escribir dejo ${dialogos} dialogo(s) y tendria que `
-        + 'haber exactamente 1');
-      assert((await page.evaluate(() => document.body.style.overflow)) === 'hidden',
-        `${contenedor}: escribir solto la traba del scroll de fondo`);
+      const trabado = (await page.evaluate(() => document.body.style.overflow)) === 'hidden';
+      if (comoCapa) {
+        assert(dialogos === 1, `${contenedor}: escribir dejo ${dialogos} dialogo(s) y tendria que `
+          + 'haber exactamente 1');
+        assert(trabado, `${contenedor}: escribir solto la traba del scroll de fondo`);
+      } else {
+        assert(dialogos === 0, `${contenedor}: es una pagina y escribir dejo ${dialogos} `
+          + 'dialogo(s) abierto(s)');
+        assert(!trabado, `${contenedor}: es una pagina y tiene trabado el scroll del documento`);
+      }
       recorridos.push(`${contenedor}: ${texto.length} teclas`);
       return esperado;
     };
 
     // Escribir no puede haber desarmado la proteccion: con lo escrito, cerrar
     // pregunta una vez y «seguir editando» devuelve el foco al mismo campo.
-    const preguntaYVuelve = async (page, campo, contenedor, esperado) => {
-      await page.keyboard.press('Escape');
+    const preguntaYVuelve = async (page, campo, contenedor, esperado, salir, volverA) => {
+      // Cada límite se abandona por donde se abandona de verdad: una capa con
+      // Escape, una página yéndose por la cabecera.
+      if (salir) await salir();
+      else await page.keyboard.press('Escape');
       await esperarA(async () => (await pregunta(page).count()) === 1,
-        `${contenedor}: con lo escrito, Escape no pregunto nada antes de cerrar`, 20_000);
+        `${contenedor}: con lo escrito, salir no pregunto nada antes de irse`, 20_000);
       await page.getByRole('button', { name: 'Seguir editando' }).click();
       await esperarA(async () => (await pregunta(page).count()) === 0,
         `${contenedor}: «seguir editando» no cerro la pregunta`, 20_000);
       assert((await campo.inputValue()) === esperado,
         `${contenedor}: «seguir editando» dejo el campo en «${await campo.inputValue()}» y tenia `
         + `que conservar «${esperado}»`);
-      await esperarA(() => esElActivo(campo),
+      // El foco vuelve a QUIEN PIDIO SALIR, que es la misma regla en los dos
+      // limites y no la misma cosa: en una capa lo pide el campo con Escape, y
+      // en la pagina lo pide el boton de la cabecera. Confundirlas seria exigir
+      // que la pagina devuelva el foco a un campo que nadie uso para irse.
+      const destinoDelFoco = volverA || campo;
+      await esperarA(() => esElActivo(destinoDelFoco),
         `${contenedor}: «seguir editando» dejo el foco en ${await dondeEstaElFoco(page)} y no en `
-        + 'el campo que pidio cerrar', 20_000);
+        + 'quien pidio salir', 20_000);
     };
 
     // --- A. alta de publicacion --------------------------------------------
@@ -18571,18 +18618,25 @@ await runCase(150, 'Escribir en un formulario no mueve el foco de su campo', asy
       await page.context().close();
     }
 
-    // --- C. Mi Panel: el perfil, que vive DENTRO de la capa del panel -------
+    // --- C. El perfil, que desde ACCOUNT-PAGE-1 vive en una PAGINA ---------
     {
       const page = await sesion(vendedor);
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: 'Mi cuenta' }).click();
-      await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+      await page.getByRole('heading', { name: 'Mi cuenta' }).waitFor({ timeout: 20_000 });
       await page.locator('[class*="sectionHeader"]').filter({ hasText: 'Mi Perfil' })
         .getByRole('button', { name: 'Editar' }).click();
       const campo = page.locator('#perfil-nombre');
       await campo.waitFor({ state: 'visible', timeout: 20_000 });
-      const escrito = await escribirTeclaPorTecla(page, campo, 'Panel150', 'Mi Panel (perfil)');
-      await preguntaYVuelve(page, campo, 'Mi Panel (perfil)', escrito);
+      const escrito = await escribirTeclaPorTecla(
+        page, campo, 'Panel150', 'Mi cuenta (perfil)', false);
+      const irAInicio = page.locator('header').first()
+        .getByRole('button', { name: 'Inicio', exact: true });
+      await preguntaYVuelve(page, campo, 'Mi cuenta (perfil)', escrito,
+        () => irAInicio.click(), irAInicio);
+      // Y no se movio de la pantalla: la URL sigue siendo la de la cuenta.
+      assert(new URL(page.url()).searchParams.get('section') === 'account',
+        `«seguir editando» movio la barra a ${page.url()}`);
       await page.context().close();
     }
 
@@ -18686,7 +18740,7 @@ await runCase(151, 'Un formulario no se contradice ni esconde su error', async (
     const abrirMisPublicaciones = async (page) => {
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: 'Mi cuenta' }).click();
-      await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+      await page.getByRole('heading', { name: 'Mi cuenta' }).waitFor({ timeout: 20_000 });
       await page.getByRole('button', { name: /publicaciones/i }).first().click();
     };
     const editar = async (page, nombre) => {
@@ -19047,7 +19101,7 @@ await runCase(152, 'La ubicación publicada tiene una sola verdad: el padrón', 
     const abrirLaEdicion = async (nombre) => {
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: 'Mi cuenta' }).click();
-      await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+      await page.getByRole('heading', { name: 'Mi cuenta' }).waitFor({ timeout: 20_000 });
       await page.getByRole('button', { name: /publicaciones/i }).first().click();
       const tarjeta = page.locator('[class*="productCard"], [class*="publicacion"]')
         .filter({ hasText: nombre }).first();
@@ -19411,7 +19465,7 @@ await runCase(153, 'Rechazar una transferencia se decide dentro del producto', a
     const abrirVentas = async () => {
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: 'Mi cuenta' }).click();
-      await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+      await page.getByRole('heading', { name: 'Mi cuenta' }).waitFor({ timeout: 20_000 });
       await page.getByRole('button', { name: 'Mis Ventas' }).click();
       await esperarA(async () => (await page.locator('[class*="orderCard"]')
         .filter({ hasText: numeroDelRechazo }).count()) === 1,
@@ -19482,7 +19536,7 @@ await runCase(153, 'Rechazar una transferencia se decide dentro del producto', a
 
       await esperarA(async () => (await laCapa.count()) === 0,
         `cerrar con ${forma} no cerro la capa`, 20_000);
-      assert((await page.getByRole('heading', { name: 'Mi Panel' }).count()) === 1,
+      assert((await page.getByRole('heading', { name: 'Mi cuenta' }).count()) === 1,
         `cerrar con ${forma} cerro tambien Mi Panel`);
       await esperarA(() => esElActivo(disparador()),
         `cerrar con ${forma} dejo el foco en ${await dondeEstaElFoco()} y no en el boton que `
@@ -20847,7 +20901,7 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
       ['panel del vendedor', { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
         async (page) => {
           await page.getByRole('button', { name: 'Mi cuenta' }).click();
-          await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 25_000 });
+          await page.getByRole('heading', { name: 'Mi cuenta' }).waitFor({ timeout: 25_000 });
         }],
       ['administración', { email: 'admin@topgreen.com', password: 'admin123' },
         async (page) => {
@@ -22818,6 +22872,408 @@ await runCase(162, 'El catálogo demostrativo resuelve la foto del aviso, con cr
     + 'común y sin salida a la red; la ficha de cada una coincide con el inventario de la PM '
     + 'y su crédito se imprime donde se ve la obra; la foto real del vendedor conserva '
     + `prioridad y un aviso ajeno sin foto conserva el respaldo; ${medidos.join('; ')}. `
+    + `${capturas.length} capturas en ${CAPTURAS}`;
+});
+
+
+// ---------------------------------------------------------------------------
+// 163. ACCOUNT-PAGE-1 — Mi cuenta es una página, no un popup.
+//
+// Mi cuenta tenía adentro el perfil, las notificaciones, las compras, las
+// ventas, las operaciones y las publicaciones, y se presentaba como una caja
+// flotante: fondo oscuro, `role="dialog"`, X, trampa de foco, cierre con
+// Escape y el scroll del documento trabado. Emi la rechazó, y con razón: un
+// área privada que se abre encima del sitio no se puede compartir, no se puede
+// recargar, y el primer Atrás se va del sitio en vez de volver.
+//
+// Lo que este caso mide no es que «se vea como una página», que no se mide,
+// sino las seis propiedades que lo hacen cierto:
+//
+//  1. tiene URL propia, canónica y recargable, y el botón que lleva a ella
+//     queda marcado como página actual;
+//  2. no queda nada de la capa: ni backdrop, ni X del contenedor general, ni
+//     `role="dialog"`, ni scroll trabado. Header y Footer se ven;
+//  3. Atrás vuelve a la sección anterior, Adelante regresa a la cuenta y
+//     recargar conserva la pantalla;
+//  4. sin sesión la entrada directa abre el ingreso: si autentica vuelve a Mi
+//     cuenta y si cancela queda en una sección pública. Salir termina la sesión
+//     y vuelve a Inicio. La vuelta de Mercado Pago aterriza en la cuenta;
+//  5. `FORM-DIRTY-1` vale en el límite NUEVO. Las salidas ya no son la X y el
+//     fondo: son la cabecera, el pie, Atrás, Salir y cambiar de pestaña. Con
+//     trabajo sin guardar cada una pregunta UNA vez; seguir editando conserva
+//     pantalla, URL y contenido; descartar ejecuta exactamente el destino
+//     pedido. Las capas de adentro siguen siendo capas;
+//  6. y entra en las tres anchuras sin desbordar, sin controles fuera de la
+//     ventana y sin partir palabras por la mitad —incluida «Sin calificaciones
+//     aún», que era el ejemplo que se partía.
+// ---------------------------------------------------------------------------
+await runCase(163, 'Mi cuenta es una página del sitio: URL propia, historial, sesión y trabajo sin guardar', async () => {
+  const CAPTURAS = process.env.SMOKE_CAPTURAS
+    || mkdtempSync(`${tmpdir()}/topgreen-cuenta-`);
+  mkdirSync(CAPTURAS, { recursive: true });
+  const capturas = [];
+  const medidos = [];
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const seccionDe = (page) =>
+      new URL(page.url()).searchParams.get('section') || 'home';
+
+    const ingresar = async (page, email, clave) => {
+      await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+      await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+      await page.getByPlaceholder('tu@email.com').fill(email);
+      await page.getByPlaceholder('••••••••').fill(clave);
+      await page.locator('[class*="_submitButton_"][type="submit"]').click();
+      await page.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 25_000 });
+    };
+    const conSesion = async (ancho = 1440, alto = 900) => {
+      const contexto = await browser.newContext({ viewport: { width: ancho, height: alto } });
+      const page = await contexto.newPage();
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await ingresar(page, 'vendedor@ejemplo.com', 'vendedor123');
+      return { contexto, page };
+    };
+    const enLaCuenta = async (page) => {
+      await page.getByRole('heading', { name: 'Mi cuenta', level: 1 })
+        .waitFor({ state: 'visible', timeout: 25_000 });
+    };
+    const irALaCuenta = async (page) => {
+      await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
+      await enLaCuenta(page);
+    };
+    const pregunta = (page) =>
+      page.getByRole('dialog').filter({ hasText: 'Tenés cambios sin guardar' });
+
+    // --- A. Es una página, y no queda nada de la capa ----------------------
+    const { contexto, page } = await conSesion();
+    await page.locator('header').first()
+      .getByRole('button', { name: 'Mercado', exact: true }).click();
+    await esperarA(async () => seccionDe(page) === 'marketplace',
+      'no se llegó al Mercado', 25_000);
+    await irALaCuenta(page);
+
+    assert(seccionDe(page) === 'account',
+      `Mi cuenta no tiene URL propia: la barra dice ${page.url()}`);
+    const botonDeCuenta = page.getByRole('button', { name: 'Mi cuenta' }).first();
+    assert((await botonDeCuenta.getAttribute('aria-current')) === 'page',
+      'el botón de la cabecera no queda marcado como página actual');
+
+    const titulos = await page.locator('h1').allInnerTexts();
+    assert(titulos.length === 1 && titulos[0].trim() === 'Mi cuenta',
+      `la página declara ${titulos.length} h1: ${JSON.stringify(titulos)}`);
+    assert(await page.locator('header').first().isVisible()
+      && await page.locator('footer').first().isVisible(),
+    'la cuenta no está dentro del shell: falta la cabecera o el pie');
+
+    // Nada de capa: ni diálogo, ni fondo oscuro, ni X del contenedor general.
+    assert((await page.getByRole('dialog').count()) === 0,
+      `la cuenta dejó ${await page.getByRole('dialog').count()} diálogo(s) abiertos`);
+    assert((await page.locator('[aria-label="Mi cuenta"][role="dialog"]').count()) === 0,
+      'el contenedor general sigue siendo un diálogo');
+    const conFondoFijo = await page.evaluate(() => Array.from(document.querySelectorAll('div'))
+      .filter((el) => {
+        const e = getComputedStyle(el);
+        return e.position === 'fixed' && el.getBoundingClientRect().height > window.innerHeight * 0.8
+          && e.backgroundColor !== 'rgba(0, 0, 0, 0)' && el.offsetParent !== null;
+      }).length);
+    assert(conFondoFijo === 0, `quedaron ${conFondoFijo} capas de fondo cubriendo la pantalla`);
+    assert((await page.evaluate(() => document.body.style.overflow)) !== 'hidden',
+      'la cuenta sigue trabando el scroll del documento');
+
+    // Y el scroll es el del documento, no el de una caja interna.
+    const scrollDelDocumento = await page.evaluate(async () => {
+      const antes = window.scrollY;
+      window.scrollTo(0, 400);
+      await new Promise((seguir) => { setTimeout(seguir, 120); });
+      const despues = window.scrollY;
+      window.scrollTo(0, antes);
+      return { alto: document.documentElement.scrollHeight, movio: despues > antes };
+    });
+    assert(scrollDelDocumento.movio,
+      `el documento no se desplaza (alto ${scrollDelDocumento.alto}): el scroll sigue siendo `
+      + 'de una caja interna');
+    medidos.push('página con URL propia, un solo h1, shell completo, sin diálogo, sin backdrop '
+      + 'y con el scroll del documento');
+
+    // --- B. Historial: Atrás, Adelante y recargar --------------------------
+    await page.goBack();
+    await esperarA(async () => seccionDe(page) === 'marketplace',
+      'Atrás no volvió a la sección anterior', 25_000);
+    await page.goForward();
+    await esperarA(async () => seccionDe(page) === 'account',
+      'Adelante no regresó a la cuenta', 25_000);
+    await enLaCuenta(page);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await enLaCuenta(page);
+    assert(seccionDe(page) === 'account', 'recargar no conservó la pantalla');
+    medidos.push('Atrás vuelve al Mercado, Adelante regresa a la cuenta y recargar la conserva');
+
+    // --- C. Las capas de adentro siguen siendo capas -----------------------
+    // Se espera por «Pausar», que existe SÓLO en esta pestaña. Esperar por
+    // «Editar» no sirve: el perfil también tiene uno, así que la espera se
+    // cumplía antes de que la pestaña cambiara y el clic caía en el otro.
+    await page.getByRole('button', { name: 'Mis publicaciones' }).first().click();
+    await esperarA(async () => (await page.getByRole('button', { name: 'Pausar' }).count()) > 0,
+      'no se llegó a Mis publicaciones', 25_000);
+    const editarPublicacion = page.getByRole('button', { name: 'Editar', exact: true }).first();
+    // La capa de edición se mide como capa: un diálogo, que cierra con Escape
+    // de a uno y devuelve el foco a su disparador.
+    const capaDeEdicion = page.getByRole('dialog');
+    await editarPublicacion.click();
+    await esperarA(async () => (await capaDeEdicion.count()) === 1,
+      'editar una publicación no abrió una capa', 20_000);
+    await page.keyboard.press('Escape');
+    await esperarA(async () => (await capaDeEdicion.count()) === 0,
+      'Escape no cerró la capa de edición', 20_000);
+    assert(seccionDe(page) === 'account', 'cerrar la capa interna se llevó la página entera');
+    await esperarA(async () => editarPublicacion.evaluate((el) => el === document.activeElement),
+      'la capa interna no devolvió el foco a su disparador', 20_000);
+    medidos.push('las capas de adentro cierran de a una y devuelven el foco');
+
+    // --- D. FORM-DIRTY-1 en el límite nuevo --------------------------------
+    // El «Editar» del perfil se toma por su encabezado y no por su nombre: la
+    // pestaña de publicaciones tiene otro con el mismo texto, y tomar «el
+    // primero» hacía clic en el de la otra pestaña antes de que cambiara.
+    const editarElPerfil = () => page.locator('[class*="sectionHeader"]')
+      .filter({ hasText: 'Mi Perfil' }).getByRole('button', { name: 'Editar' });
+    const abrirMiPerfil = async (donde) => {
+      await page.getByRole('button', { name: 'Mi Perfil' }).first().click();
+      await esperarA(async () => (await editarElPerfil().count()) === 1,
+        `${donde}: no se llegó a Mi Perfil`, 20_000);
+    };
+    // El perfil puede venir YA en edición: cuando la vuelta anterior terminó en
+    // «seguir editando», el formulario sigue abierto y en el encabezado no hay
+    // «Editar» que tocar, sino «Cancelar» y «Guardar».
+    const campoDelPerfil = () => page.locator('#perfil-nombre');
+    const ensuciarElPerfil = async (valor) => {
+      await page.getByRole('button', { name: 'Mi Perfil' }).first().click();
+      await esperarA(async () => (await campoDelPerfil().count()) === 1
+        || (await editarElPerfil().count()) === 1,
+      `ensuciar para «${valor}»: no se llegó a Mi Perfil`, 20_000);
+      if ((await campoDelPerfil().count()) === 0) await editarElPerfil().click();
+      const campo = campoDelPerfil();
+      await campo.waitFor({ state: 'visible', timeout: 20_000 });
+      await campo.fill(valor);
+      return campo;
+    };
+
+    // D1. Limpio no pregunta.
+    await abrirMiPerfil('D1 limpio');
+    await page.getByRole('button', { name: 'Notificaciones' }).first().click();
+    await page.waitForTimeout(500);
+    assert((await pregunta(page).count()) === 0,
+      'cambiar de pestaña sin nada escrito preguntó igual');
+
+    // D2. Sucio: cada salida pregunta una vez y «seguir editando» no mueve nada.
+    const salidas = [
+      ['cabecera', async () => page.locator('header').first()
+        .getByRole('button', { name: 'Inicio', exact: true }).click()],
+      ['pie', async () => {
+        // En el pie los destinos son enlaces, no botones.
+        await page.locator('footer').scrollIntoViewIfNeeded();
+        await page.locator('footer').getByRole('link', { name: 'Inicio', exact: true })
+          .first().click();
+      }],
+      ['Atrás', async () => page.goBack()],
+      ['Salir', async () => page.getByRole('button', { name: 'Salir' }).click()],
+      ['cambio de pestaña', async () =>
+        page.getByRole('button', { name: 'Mis Compras' }).first().click()],
+    ];
+    for (const [comoSeVa, irse] of salidas) {
+      const campo = await ensuciarElPerfil(`Sucio ${comoSeVa}`);
+      await irse();
+      await esperarA(async () => (await pregunta(page).count()) === 1,
+        `saliendo por ${comoSeVa} con trabajo sin guardar no preguntó`, 20_000);
+      assert((await pregunta(page).count()) === 1,
+        `saliendo por ${comoSeVa} preguntó ${await pregunta(page).count()} veces`);
+      await page.getByRole('button', { name: 'Seguir editando' }).click();
+      await esperarA(async () => (await pregunta(page).count()) === 0,
+        `${comoSeVa}: «seguir editando» no cerró la pregunta`, 20_000);
+      assert(seccionDe(page) === 'account',
+        `${comoSeVa}: «seguir editando» movió la barra a ${page.url()}`);
+      assert((await campo.inputValue()) === `Sucio ${comoSeVa}`,
+        `${comoSeVa}: «seguir editando» perdió lo escrito: «${await campo.inputValue()}»`);
+      medidos.push(`${comoSeVa}: preguntó una vez y se quedó`);
+    }
+
+    // D3. Descartar ejecuta EXACTAMENTE el destino pedido, y descarta de verdad.
+    //
+    // Lo segundo se mide con un destino que NO desmonta la pantalla: otra
+    // pestaña. Con un destino de otra sección, `UserDashboard` se desmonta y al
+    // volver el perfil aparece cerrado de todos modos, así que la comprobación
+    // pasaría aunque descartar no soltara nada. Medido: sacando el descarte del
+    // producto, la versión anterior de este bloque seguía en verde.
+    const nombreGuardado = await (await ensuciarElPerfil('Para descartar')).inputValue();
+    assert(nombreGuardado === 'Para descartar', 'no se pudo ensuciar el perfil');
+    await page.getByRole('button', { name: 'Mis Compras' }).first().click();
+    await esperarA(async () => (await pregunta(page).count()) === 1,
+      'la salida a Mis Compras no preguntó', 20_000);
+    await page.getByRole('button', { name: 'Descartar cambios' }).click();
+    await esperarA(async () => (await campoDelPerfil().count()) === 0,
+      'descartar no fue a la pestaña pedida', 20_000);
+    assert(seccionDe(page) === 'account', 'descartar una pestaña sacó de la cuenta');
+    // Y soltó el trabajo: el perfil ya no está en edición ni conserva lo escrito.
+    await page.getByRole('button', { name: 'Mi Perfil' }).first().click();
+    await esperarA(async () => (await editarElPerfil().count()) === 1,
+      'tras descartar, el perfil siguió en edición con lo escrito adentro', 20_000);
+    assert((await pregunta(page).count()) === 0,
+      'tras descartar, volver al perfil volvió a preguntar por lo mismo');
+
+    // Y con un destino de otra sección, el destino también es exacto.
+    await ensuciarElPerfil('Para descartar a otra sección');
+    await page.locator('header').first()
+      .getByRole('button', { name: 'Servicios', exact: true }).click();
+    await esperarA(async () => (await pregunta(page).count()) === 1,
+      'la salida a Servicios no preguntó', 20_000);
+    await page.getByRole('button', { name: 'Descartar cambios' }).click();
+    await esperarA(async () => seccionDe(page) === 'services',
+      `descartar no fue al destino pedido: quedó en ${seccionDe(page)}`, 20_000);
+    await irALaCuenta(page);
+    medidos.push('descartar va al destino pedido —pestaña o sección— y suelta el trabajo local');
+
+    // D4. Y una orden ya persistida NO es trabajo local: no inventa suciedad.
+    await page.getByRole('button', { name: 'Mis publicaciones' }).first().click();
+    await esperarA(async () => (await page.getByRole('button', { name: 'Pausar' }).count()) > 0,
+      'no se llegó a Mis publicaciones', 25_000);
+    await page.locator('header').first()
+      .getByRole('button', { name: 'Mercado', exact: true }).click();
+    await esperarA(async () => seccionDe(page) === 'marketplace',
+      'mirar una pestaña con datos guardados preguntó como si hubiera trabajo sin guardar',
+      20_000);
+    medidos.push('mirar datos ya guardados no cuenta como trabajo sin guardar');
+    await contexto.close();
+
+    // --- E. Sesión: entrada anónima, ingreso con retorno, salida y MP ------
+    const anonimo = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const sinSesion = await anonimo.newPage();
+    await sinSesion.goto(`${FRONTEND_URL}/?section=account`, { waitUntil: 'domcontentloaded' });
+    await sinSesion.getByRole('heading', { name: 'Iniciar Sesión' })
+      .waitFor({ timeout: 25_000 });
+    assert(seccionDe(sinSesion) === 'account',
+      'la entrada directa sin sesión ya se había ido de la cuenta antes de preguntar');
+    await sinSesion.getByPlaceholder('tu@email.com').fill('vendedor@ejemplo.com');
+    await sinSesion.getByPlaceholder('••••••••').fill('vendedor123');
+    await sinSesion.locator('[class*="_submitButton_"][type="submit"]').click();
+    await enLaCuenta(sinSesion);
+    assert(seccionDe(sinSesion) === 'account', 'ingresar no devolvió a Mi cuenta');
+    await anonimo.close();
+
+    const cancela = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const pageCancela = await cancela.newPage();
+    await pageCancela.goto(`${FRONTEND_URL}/?section=account`, { waitUntil: 'domcontentloaded' });
+    await pageCancela.getByRole('heading', { name: 'Iniciar Sesión' })
+      .waitFor({ timeout: 25_000 });
+    await pageCancela.getByRole('button', { name: 'Cerrar' }).first().click();
+    await esperarA(async () => seccionDe(pageCancela) !== 'account',
+      'cancelar el ingreso dejó a la persona mirando una cuenta que no puede ver', 20_000);
+    assert((await pageCancela.locator('h1').count()) >= 1,
+      `cancelar dejó una sección sin contenido: ${pageCancela.url()}`);
+    await cancela.close();
+
+    const salir = await conSesion();
+    await irALaCuenta(salir.page);
+    await salir.page.getByRole('button', { name: 'Salir' }).click();
+    await esperarA(async () => seccionDe(salir.page) === 'home',
+      `Salir desde Mi cuenta dejó la barra en ${seccionDe(salir.page)}`, 20_000);
+    await esperarA(async () => (await salir.page
+      .getByRole('button', { name: 'Ingresar', exact: true }).count()) === 1,
+    'Salir no terminó la sesión', 20_000);
+    await salir.contexto.close();
+
+    const mp = await conSesion();
+    await mp.page.goto(`${FRONTEND_URL}/?mp=vinculado`, { waitUntil: 'domcontentloaded' });
+    await enLaCuenta(mp.page);
+    assert(seccionDe(mp.page) === 'account',
+      `la vuelta de Mercado Pago aterrizó en ${seccionDe(mp.page)}`);
+    assert(new URL(mp.page.url()).searchParams.get('mp') === null,
+      'la vuelta de Mercado Pago dejó su parámetro en la barra');
+    await mp.contexto.close();
+    medidos.push('entrada anónima con retorno, cancelación a sección pública, Salir a Inicio y '
+      + 'vuelta de Mercado Pago a la cuenta');
+
+    // --- F. Las tres anchuras ----------------------------------------------
+    // «Partido de forma absurda» se mide: se arman las líneas que el navegador
+    // dibujó de verdad y se exige que ninguna corte una palabra por la mitad.
+    const lineasQueParten = (page) => page.evaluate(() => {
+      const partidos = [];
+      const textos = document.querySelectorAll(
+        'main [class*="_statValue_"], main [class*="_statLabel_"], main [class*="_tab_"], main h1');
+      for (const el of textos) {
+        const nodo = Array.from(el.childNodes).find((n) => n.nodeType === 3 && n.textContent.trim());
+        if (!nodo) continue;
+        const texto = nodo.textContent;
+        const rango = document.createRange();
+        const lineas = [];
+        let actual = { arriba: null, letras: '' };
+        for (let i = 0; i < texto.length; i += 1) {
+          rango.setStart(nodo, i);
+          rango.setEnd(nodo, i + 1);
+          const caja = rango.getBoundingClientRect();
+          if (actual.arriba === null || Math.abs(caja.top - actual.arriba) < 2) {
+            actual.arriba = actual.arriba === null ? caja.top : actual.arriba;
+            actual.letras += texto[i];
+          } else {
+            lineas.push(actual.letras);
+            actual = { arriba: caja.top, letras: texto[i] };
+          }
+        }
+        lineas.push(actual.letras);
+        // Si el corte fue siempre en un espacio, juntar las líneas con un
+        // espacio devuelve el texto original. Si partió una palabra, no.
+        const rearmado = lineas.map((l) => l.trim()).filter(Boolean).join(' ');
+        if (rearmado.replace(/\s+/g, ' ') !== texto.trim().replace(/\s+/g, ' ')) {
+          partidos.push({ texto: texto.trim(), lineas });
+        }
+      }
+      return partidos;
+    });
+
+    const fueraDePantalla = (page) => page.evaluate(() => Array.from(
+      document.querySelectorAll('main button, main input, main select, main a'))
+      .filter((el) => el.offsetParent !== null)
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && (r.left < -1 || r.right > window.innerWidth + 1);
+      })
+      .map((el) => (el.textContent || el.getAttribute('aria-label') || el.tagName).trim().slice(0, 40)));
+
+    for (const [ancho, alto] of [[1440, 900], [768, 1024], [390, 844]]) {
+      const medida = `${ancho}x${alto}`;
+      const sesion = await conSesion(ancho, alto);
+      await irALaCuenta(sesion.page);
+
+      for (const [pestana, nombre] of [['Mi Perfil', 'perfil'], ['Mis publicaciones', 'publicaciones']]) {
+        await sesion.page.getByRole('button', { name: pestana }).first().click();
+        await sesion.page.waitForTimeout(900);
+        const desborde = await sesion.page.evaluate(
+          () => document.documentElement.scrollWidth - window.innerWidth);
+        assert(desborde <= 1, `${medida}/${nombre}: la página desborda ${desborde}px a lo ancho`);
+        const partidos = await lineasQueParten(sesion.page);
+        assert(partidos.length === 0,
+          `${medida}/${nombre}: hay texto partido en medio de una palabra: `
+          + JSON.stringify(partidos));
+        const sueltos = await fueraDePantalla(sesion.page);
+        assert(sueltos.length === 0,
+          `${medida}/${nombre}: ${sueltos.length} control(es) fuera de la ventana: `
+          + sueltos.join(' | '));
+        const ruta = `cuenta-${nombre}-${medida}.png`;
+        capturas.push(ruta);
+        await sesion.page.screenshot({ path: `${CAPTURAS}/${ruta}`, fullPage: true });
+      }
+      await sesion.contexto.close();
+      medidos.push(`${medida}: perfil y publicaciones sin desborde, sin palabras partidas y sin `
+        + 'controles fuera de la ventana');
+    }
+  } finally {
+    await browser.close();
+  }
+
+  return 'Mi cuenta dejó de ser una capa y pasó a ser una sección: tiene URL canónica y '
+    + 'recargable, queda marcada como página actual, vive dentro del shell con el scroll del '
+    + 'documento y sin backdrop, X ni diálogo general; el historial la trata como a cualquier '
+    + 'otra sección; la sesión entra, vuelve y sale por donde corresponde; y `FORM-DIRTY-1` vale '
+    + `en el límite nuevo, que son cinco salidas y no dos; ${medidos.join('; ')}. `
     + `${capturas.length} capturas en ${CAPTURAS}`;
 });
 
