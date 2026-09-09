@@ -1,8 +1,8 @@
 # Estado actual
 
-Actualizado: 2026-09-08.
+Actualizado: 2026-09-09.
 
-## Estado inmediato — 2026-09-08
+## Estado inmediato — 2026-09-09
 
 - **MARKET-VIEWS-1 aceptada:** producto/regresión `b5ee28d`, informe `afbfb95`
   y corrección de SHA `931a063`. PM revisó diff/hashes y seis capturas,
@@ -31,29 +31,27 @@ Actualizado: 2026-09-08.
   activos mantienen hashes. Integración retenida para no disparar Railway.
   Evidencia en
   `REPRODUCCION-LOGO-INTEGRATION-1-2026-09-08.md`.
-- **Única tarea activa y responsable:** `ADMIN-TRUTH-1R`, Dev, en la misma
-  rama. Producto `aaa51ce` e informe `21aa17e`: diff técnicamente conforme y
-  suite Dev **159/160**, con único rojo ambiental en 131. PM reprodujo el 160
-  en **1/1** desde base limpia, pero lo devolvió porque aislado sólo ejercita
-  `active` para publicaciones y 9 estados de orden; no ve los otros tres
-  estados de publicación ni `draft`, y no mide el color computado. Corrección
-  sólo del arnés; sin otra suite completa. Log PM:
-  `/private/tmp/topgreen-pm-admin-160.log`.
-- **Prioridad de demo siguiente, solicitada por Emi:** `CATALOG-PHOTOS-1` queda
-  especificada y en cola para mañana, inmediatamente después de cerrar la
-  corrección corta `ADMIN-TRUTH-1R`. Dev deberá buscar una foto licenciada y
-  pertinente para cada uno de los 30 slugs del seed, optimizarla y servirla
-  localmente; artículos, servicios y logística tendrán imagen sin hotlinks,
-  Picsum, seed ni escritura en Railway. Caso 162 y seis capturas; sin suite
-  completa. La tarea todavía no está activa y no se mezcla con la entrega en
-  curso.
+- **ADMIN-TRUTH-1R aceptada en rama:** producto `aaa51ce`, informe `21aa17e`,
+  corrección `21cd4d1` e informe `638e1b9`. PM revisó el diff final y reprodujo
+  el 160 desde base Docker limpia en **1/1**: el caso creó y localizó sus 14
+  estados y verificó texto y color computado; `draft` fue el único tratamiento
+  neutro. Build incluido, sintaxis y `diff-check` verdes. No se repitió suite
+  completa ni 145/146. Log válido:
+  `/private/tmp/topgreen-pm-admin-160r.log`; un intento anterior que murió por
+  `EPERM` antes del smoke no cuenta. Evidencia en
+  `REPRODUCCION-ADMIN-TRUTH-1-2026-09-09.md`.
+- **Única tarea activa y responsable:** `CATALOG-PHOTOS-1`, Dev. Debe buscar
+  una foto licenciada y pertinente para cada uno de los 30 slugs del seed,
+  optimizarla y servirla localmente; artículos, servicios y logística tendrán
+  imagen sin hotlinks, Picsum, seed ni escritura en Railway. Caso 162 y seis
+  capturas; sin suite completa.
 - **Segunda mejora de demo en cola:** `ACCOUNT-PAGE-1`. Emi rechazó que el área
   completa de cuenta siga siendo un popup. Después de las fotos, Dev deberá
   convertir `Mi Panel` en una página privada con URL e historial reales,
   Header/Footer y scroll normal; las decisiones internas breves conservan sus
   diálogos. Debe mantener `FORM-DIRTY-1` al cambiar pestaña, navegar, volver o
   salir. Caso 163, focales 147–149 y seis capturas; sin suite completa. No está
-  activa todavía por riesgo de navegación y no se mezcla antes de la demo.
+  activa todavía por riesgo de navegación y no se mezcla con las fotos.
 - **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
   `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
   y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como

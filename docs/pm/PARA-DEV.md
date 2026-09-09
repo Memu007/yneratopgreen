@@ -12,6 +12,25 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-09 — CIERRE: ADMIN-TRUTH-1R aceptada; activar CATALOG-PHOTOS-1
+
+Aceptados producto `aaa51ce`, informe `21aa17e`, corrección de regresión
+`21cd4d1` e informe `638e1b9`. Revisé el delta final completo: el último commit
+modifica sólo `scripts/smoke.mjs`; crea sus 4 publicaciones y 10 órdenes, busca
+cada fila por identidad propia y exige texto, tono y color computado. PM
+reprodujo el 160 final desde base Docker limpia en **1/1**: vio los 14 estados,
+incluido `draft`, y sólo el neutro compartió el tratamiento de respaldo. Build
+incluido, `node --check` y `diff-check` verdes. Evidencia en
+`REPRODUCCION-ADMIN-TRUTH-1-2026-09-09.md`. No se repitieron suite completa ni
+145/146: no cambió producto y los lectores factorizados conservan salida.
+
+La única tarea activa pasa a **`CATALOG-PHOTOS-1`**. Su contrato completo está
+inmediatamente debajo, en la entrada del 08/09. Continuá en tu rama desde
+`638e1b9`, incorporá antes el `main` actual para conservar estas instrucciones y
+entregá los activos/código/regresión e informe separados. No mezcles todavía
+`ACCOUNT-PAGE-1`, no integres a `main`, no despliegues y no toques Railway,
+datos, pagos o secretos.
+
 ## 2026-09-08 — SOLICITUD DE DEMO EN COLA 2: ACCOUNT-PAGE-1, Mi cuenta es una página
 
 Emi rechazó la presentación actual de `Mi Panel` como popup: contiene perfil,
