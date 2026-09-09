@@ -12,6 +12,199 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-09 — CIERRE: ADMIN-TRUTH-1R aceptada; activar CATALOG-PHOTOS-1
+
+Aceptados producto `aaa51ce`, informe `21aa17e`, corrección de regresión
+`21cd4d1` e informe `638e1b9`. Revisé el delta final completo: el último commit
+modifica sólo `scripts/smoke.mjs`; crea sus 4 publicaciones y 10 órdenes, busca
+cada fila por identidad propia y exige texto, tono y color computado. PM
+reprodujo el 160 final desde base Docker limpia en **1/1**: vio los 14 estados,
+incluido `draft`, y sólo el neutro compartió el tratamiento de respaldo. Build
+incluido, `node --check` y `diff-check` verdes. Evidencia en
+`REPRODUCCION-ADMIN-TRUTH-1-2026-09-09.md`. No se repitieron suite completa ni
+145/146: no cambió producto y los lectores factorizados conservan salida.
+
+La única tarea activa pasa a **`CATALOG-PHOTOS-1`**. Su contrato completo está
+inmediatamente debajo, en la entrada del 08/09. Continuá en tu rama desde
+`638e1b9`, incorporá antes el `main` actual para conservar estas instrucciones y
+entregá los activos/código/regresión e informe separados. No mezcles todavía
+`ACCOUNT-PAGE-1`, no integres a `main`, no despliegues y no toques Railway,
+datos, pagos o secretos.
+
+## 2026-09-08 — SOLICITUD DE DEMO EN COLA 2: ACCOUNT-PAGE-1, Mi cuenta es una página
+
+Emi rechazó la presentación actual de `Mi Panel` como popup: contiene perfil,
+notificaciones, compras, ventas, operaciones y publicaciones, por lo que debe
+sentirse como un área privada estable y ordenada, al nivel de un marketplace
+serio. Esta pieza queda **después de `CATALOG-PHOTOS-1`**. No la empieces ni la
+mezcles mientras `ADMIN-TRUTH-1R` o la tarea de fotos estén abiertas.
+
+### Resultado obligatorio
+
+1. Convertí el contenedor general de `UserDashboard` en una página real dentro
+   del shell de AgroBoeda: Header arriba, Footer abajo, ancho de lectura propio
+   y scroll normal del documento. Retirá overlay oscuro, caja flotante, X,
+   `role="dialog"`, trampa de foco, cierre con Escape/fondo y bloqueo del scroll
+   **sólo del contenedor general**. Las decisiones breves que sí son capas —por
+   ejemplo editar una publicación, calificar o rechazar una transferencia—
+   pueden seguir como diálogos.
+2. El botón `Mi cuenta`/nombre de la cabecera debe navegar mediante la política
+   central existente a una sección canónica y recargable, coherente con las
+   demás URLs del sitio. Debe quedar marcado como página actual. Atrás vuelve a
+   la sección anterior, Adelante regresa a la cuenta y recargar conserva la
+   pantalla cuando hay sesión; no agregues React Router ni otro escritor de
+   `history`.
+3. La entrada directa sin sesión abre el ingreso y, si autentica, vuelve a Mi
+   cuenta; si cancela queda en una sección pública válida. Salir desde Mi cuenta
+   termina sesión y vuelve a Inicio. La vuelta de vinculación de Mercado Pago
+   debe aterrizar otra vez en el área de cuenta, no intentar abrir el modal
+   retirado.
+4. Conservá las pestañas, datos, permisos, cargas, errores, acciones y API
+   actuales. Reordená sólo lo imprescindible para que perfil y estadísticas no
+   se compriman ni corten —incluido «Sin calificaciones aún»— y para que las
+   pestañas sean utilizables sin overflow en 1440×900, 768×1024 y 390×844. No
+   rediseñes cada sección interna ni agregues sidebar, rutas por pestaña o
+   funciones nuevas.
+5. Adaptá `FORM-DIRTY-1` al nuevo límite de página. Perfil, edición,
+   calificación y rechazo intactos navegan sin pregunta; con cambios locales,
+   cambiar pestaña, usar Header/Footer, Atrás o Salir pregunta una sola vez. Al
+   seguir editando se conserva pantalla, URL y contenido; al descartar se
+   ejecuta exactamente el destino pedido. No confundas órdenes ya persistidas
+   con trabajo local.
+
+### Regresión y evidencia — caso 163
+
+- Desde Mercado, abrí Mi cuenta: exigí URL propia, `h1` único, Header y Footer
+  visibles, scroll de documento y ausencia de backdrop, X y diálogo general.
+  Recargá, usá Atrás y Adelante y comprobá la pantalla correcta. Cubrí además
+  entrada directa anónima, ingreso con retorno, salida a Inicio y retorno MP.
+- Repetí los bordes de suciedad del punto 5, incluyendo cancelar y descartar la
+  navegación. Las capas internas siguen cerrando de a una y devolviendo foco.
+- Capturá Perfil y una pestaña operativa en 1440×900, 768×1024 y 390×844; sin
+  overflow, texto partido de forma absurda ni controles fuera de pantalla.
+- Corré 147, 148, 149 y 163 aislados, build, lint, `node --check` y
+  `diff-check`. Sin suite completa, Backend, a11y o contraste totales salvo que
+  el diff salga del shell/navegación/panel acotados.
+
+Producto/regresión e informe separados, en tu rama. No integres a `main`, no
+despliegues y no toques Railway, datos, pagos o secretos. Alcance cerrado: la
+cuenta pasa de modal general a página; autenticación, `Vender`, carrito,
+checkout, administración y diálogos transaccionales no se convierten ahora.
+
+## 2026-09-08 — PRIORIDAD DE DEMO EN COLA: CATALOG-PHOTOS-1, fotografía pertinente para las 30 operaciones
+
+Emi pidió que mañana el catálogo deje de verse vacío: cada artículo y cada
+servicio debe mostrar una fotografía acorde con lo ofrecido. Esta pieza queda
+como **siguiente tarea urgente**, no como permiso para mezclar entregas. Cerrá
+primero `ADMIN-TRUTH-1R` con su commit e informe separados y frená; PM revisará
+esa corrección corta y activará esta pieza inmediatamente.
+
+El problema ya está identificado. Las 30 filas del seed apuntan a
+`picsum.photos`; el producto hace bien en tratarlas como relleno porque son
+aleatorias. No retires esa protección ni vuelvas a pedir Picsum. La solución
+debe reemplazar sólo el material demostrativo conocido por activos pertinentes
+y locales; una publicación real sin foto debe seguir diciendo «Sin registro
+fotográfico».
+
+### Resultado obligatorio
+
+1. Buscá y seleccioná **una fotografía principal pertinente para cada uno de
+   los 30 slugs del seed**, incluidos servicios y logística. Debe representar
+   claramente el bien o trabajo nombrado: campo, maquinaria, insumo, ganado,
+   transporte, acopio, asesoramiento, reparación, muestreo, alambrado, etc. No
+   uses la misma foto para avisos distintos ni una imagen agrícola genérica que
+   contradiga el título.
+2. Usá sólo material con licencia reutilizable verificable —dominio público,
+   CC0 o banco con licencia comercial clara—. Guardá junto a la entrega un
+   inventario con slug, archivo, página fuente, autor y licencia. Sin Google
+   Images como fuente, marcas de agua, texto incrustado, caras reconocibles ni
+   logos ajenos protagonistas. En modelos o marcas específicas, preferí una
+   toma representativa sin afirmar que es la unidad exacta publicada.
+3. Descargá y serví los activos desde el repositorio: **cero hotlinks y cero
+   dependencia en runtime de terceros**. Normalizalos a una proporción común,
+   WebP, ancho suficiente para el detalle y peso razonable; conservá encuadre
+   útil con `object-fit: cover`. No agregues dependencia ni metas originales
+   enormes al historial.
+4. Hacé que los 30 registros demostrativos existentes resuelvan esas fotos sin
+   seed ni escritura remota. Una tabla explícita por slug en Frontend es válida
+   si queda acotada al inventario demo: la foto real subida por un vendedor
+   siempre tiene prioridad, y cualquier slug ajeno sin foto conserva el
+   fallback honesto. No cambies la base publicada.
+5. Mostrá fotografía también en las tarjetas y el detalle de servicio/logística,
+   manteniendo sus datos de cobertura, modalidad y respuesta. Cuadrícula y
+   Lista siguen siendo las únicas dos vistas y todas sus tarjetas conservan una
+   huella uniforme; la foto no puede reintroducir tamaños distintos, corte
+   horizontal ni ocultar acciones.
+
+### Regresión y evidencia — caso 162
+
+- Enumerá los 30 slugs del seed y comprobá que cada uno resuelve a un archivo
+  local existente, decodificable, no repetido y libre de `picsum`, `http:` o
+  `https:`. Comprobá además que un slug ajeno sin foto mantiene el fallback y
+  que una foto real subida prevalece sobre el mapa demo.
+- En 1440×900, capturá Mercado en Cuadrícula y Lista, más el detalle de un
+  artículo y de un servicio; en 390×844, capturá Cuadrícula y el detalle de un
+  servicio. Elegí ejemplos que demuestren correspondencia entre título y foto.
+  Verificá ausencia de overflow y alturas uniformes por vista.
+- Corré 155 y 162 aislados, build, lint, `node --check` y `diff-check`. No corras
+  suite completa, Backend, a11y o contraste totales salvo que cambies algo fuera
+  del recorrido visual acotado.
+
+Entregá activos/código/regresión en un commit e informe en otro, en tu rama. No
+integres a `main`, no despliegues, no ejecutes seed y no toques Railway, pagos,
+secretos o datos remotos. Alcance cerrado: fotografía del catálogo demo y el
+ajuste mínimo para presentarla; sin rediseñar marca, navegación, filtros,
+registro, copy, administración o checkout.
+
+## 2026-09-08 — DEVOLUCIÓN: ADMIN-TRUTH-1R, el caso 160 debe sostenerse aislado
+
+Revisé producto/regresión `aaa51ce` e informe `21aa17e`. El cambio de producto
+queda **técnicamente conforme** con el alcance: contrato del dashboard,
+traducciones, cinco estados de carga y alta administrativa están acotados y no
+vi un defecto funcional en el diff. Dev informó suite **159/160**, con único
+rojo en el 131 ambiental conocido.
+
+PM ejecutó `SMOKE_CASOS=160` desde base limpia sobre `aaa51ce` y obtuvo **1/1**.
+La propia salida mostró el borde que impide aceptar la regresión:
+
+```text
+badges verificados en 10 estados
+(active=20 y los 9 estados de orden distintos de draft)
+```
+
+El caso pasó sin ver `paused`, `sold_out` ni `deleted` y sin ver `draft` en la
+tabla. El informe de la suite completa sí enumera más estados porque heredó
+filas producidas por casos anteriores: el 160 no es independiente. Además sólo
+compara el texto del badge; no inspecciona su tratamiento visual, por lo que
+todos podrían caer al mismo gris y el caso seguiría verde. Eso contradice el
+contrato explícito del 160: incluir `sold_out` y estados de transferencia,
+enumerar los estados reales y exigir tratamiento visual explícito.
+
+### Corrección única
+
+- En el propio 160, prepará en la base descartable una publicación por cada
+  estado (`active`, `paused`, `sold_out`, `deleted`) y conservá la orden por cada
+  uno de los diez estados. Localizá las filas creadas por identidad propia; no
+  dependas de datos dejados por casos anteriores, orden del catálogo o página.
+- Exigí en UI los **4 badges de publicación y 10 de orden**, incluido `draft`
+  desde la vista sin filtro si no se ofrece como filtro. Cada uno debe tener el
+  texto del diccionario y el color computado del tono que ese mismo diccionario
+  declara. Ningún estado conocido salvo el neutro intencional puede coincidir
+  con el tratamiento de respaldo; fondo vacío/transparente tampoco vale.
+- Conservá las comprobaciones actuales de dashboard, cinco cargas y alta. No
+  rehagas producto salvo que la prueba revele un fallo real.
+
+Corré **sólo el 160 aislado** desde base limpia, `node --check` y
+`diff-check`. No repitas suite completa, 145/146, build separado, a11y,
+contraste ni Backend: el smoke ya construye y el producto pasó la reproducción
+PM. Entregá corrección de regresión e informe separados en la misma rama. No
+integres a `main`, no despliegues y no toques Railway, pagos, secretos o datos
+remotos.
+
+La cuenta publicada solicitada por Emi ya fue creada y verificada por PM en una
+operación separada y acotada; no forma parte de esta corrección y no requiere
+acción tuya.
+
 ## 2026-09-08 — TAREA VIGENTE: ADMIN-TRUTH-1, el panel muestra datos y fallos reales
 
 `LOGO-INTEGRATION-1R` queda **técnicamente aceptada en rama**: corrección
