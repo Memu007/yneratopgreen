@@ -259,11 +259,13 @@
 .compacta { min-width: 0; }
 
 /* --- Servicio y logística ------------------------------------------------
-   Sin imagen: lo que hay que comparar de un servicio es su alcance, no una
-   foto de alguien trabajando. */
+   Ahora también llevan banda de imagen, así que el cuerpo NO estira al alto de
+   la tarjeta: si lo hiciera, sumaría los 112 px de la banda a un cuerpo que ya
+   ocupa todo y la tarjeta de servicio quedaría más alta que la de al lado. Lo
+   que comparten las cuatro es exactamente el rectángulo exterior. */
 .servicio .cuerpo,
 .logistica .cuerpo {
-  height: 100%;
+  min-height: 0;
 }
 
 /* --- Presentación en renglón --------------------------------------------
@@ -276,9 +278,9 @@
   min-height: 168px;
 }
 
-/* La banda de la foto se reserva por llevar foto, no por ser un activo.
-   Servicio y logística no la tienen —eso no cambia acá— y usan todo el ancho
-   para sus datos en vez de dejar un hueco vacío que no promete nada. */
+/* La banda de la foto se reserva por llevar foto, no por ser un activo. Desde
+   que las cuatro anatomías la llevan, la reservan las cuatro: en el renglón,
+   una fila sin columna de foto rompía la grilla vertical de la lista. */
 .lista.conFoto { grid-template-columns: minmax(180px, 232px) minmax(0, 1fr); }
 
 .lista .media {
@@ -336,6 +338,13 @@
 }
 
 @media (max-width: 1180px) {
+  /* Desde que la foto va en las cuatro anatomías, la columna de la imagen es lo
+     primero que cede ancho. Con los 232 px de escritorio, en 768 el renglón se
+     estiraba a 366 px de alto y la acción terminaba justo en el borde inferior
+     de la ventana —el caso 155 lo detectó: el botón cerraba en 1024 de 1024—.
+     Los datos y la acción valen más que sesenta píxeles de foto. */
+  .lista.conFoto { grid-template-columns: minmax(132px, 172px) minmax(0, 1fr); }
+
   /* Con menos ancho, la acción baja a su propia franja y los datos se quedan
      con las dos columnas de arriba. */
   .lista .cuerpo {

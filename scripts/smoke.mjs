@@ -21694,6 +21694,418 @@ await runCase(161, 'Ninguna pantalla pública escribe la dirección de correo, y
     + `la misma casilla a la que manda el formulario (${destino}); ${medidos.join('; ')}`;
 });
 
+
+// ---------------------------------------------------------------------------
+// 162. CATALOG-PHOTOS-1 — el catálogo demostrativo muestra la foto del aviso.
+//
+// El seed dejó las 30 publicaciones apuntando a `picsum.photos`, que devuelve
+// una foto AL AZAR. El producto ya reconoce ese origen y lo trata como «sin
+// fotografía» —una foto de un gato al lado de «Cosechadora John Deere 9750» es
+// peor que ninguna—, y eso no se toca. Lo que cambia es que ahora hay una foto
+// real y pertinente por aviso, del paquete que cerró la PM.
+//
+// Este caso no juzga si la foto es linda: eso no se mide. Mide las seis
+// propiedades que sí importan y que se rompen en silencio:
+//
+//  1. cada uno de los 30 avisos del seed resuelve a un archivo LOCAL que
+//     existe, decodifica como WebP, mide lo que el inventario dice y no se
+//     repite entre avisos;
+//  2. ninguna imagen sale a la red: ni `picsum`, ni `http:`, ni `https:`;
+//  3. la tabla del producto y el inventario de la PM dicen lo mismo. La
+//     atribución no puede envejecer por separado de la foto que atribuye;
+//  4. el crédito se ve donde se ve la obra. Veinticinco de las treinta son
+//     CC BY o CC BY-SA: la licencia no se cumple con un archivo en `docs/`;
+//  5. la foto REAL de un vendedor le gana a la tabla, y un slug ajeno sin foto
+//     conserva el respaldo honesto. Sin esto la tabla habría dejado de ser un
+//     relleno de demostración para pisar el producto;
+//  6. la banda mide lo mismo en las cuatro anatomías y en las dos vistas.
+//     Servicio y logística no la llevaban: si ahora la llevan y midiera
+//     distinto, la cuadrícula tendría dos alturas de la misma cosa.
+// ---------------------------------------------------------------------------
+await runCase(162, 'El catálogo demostrativo resuelve la foto del aviso, con crédito, sin pisar la del vendedor', async () => {
+  const CAPTURAS = process.env.SMOKE_CAPTURAS
+    || mkdtempSync(`${tmpdir()}/topgreen-catalogo-`);
+  mkdirSync(CAPTURAS, { recursive: true });
+  const capturas = [];
+  const medidos = [];
+  const sello = Date.now();
+
+  // --- A. La tabla del producto y el inventario de la PM ------------------
+  // No se copia acá ninguna de las dos listas: se leen las dos y se contrastan.
+  const INVENTARIO = 'docs/pm/INVENTARIO-FOTOS-CATALOGO-2026-09-09.md';
+  const fuenteTabla = readFileSync('src/utils/fotosDemo.ts', 'utf8');
+  const TABLA = {};
+  for (const [, slug, cuerpo] of fuenteTabla.matchAll(
+    /'([\w-]+)':\s*\{([^}]*)\},/g)) {
+    const campo = (nombre) => (cuerpo.match(new RegExp(`${nombre}: '([^']*)'`)) || [])[1];
+    TABLA[slug] = {
+      archivo: campo('archivo'),
+      obra: campo('obra'),
+      autor: campo('autor'),
+      licencia: campo('licencia'),
+      licenciaVisible: campo('licenciaVisible'),
+      urlLicencia: campo('urlLicencia'),
+      fuente: campo('fuente'),
+    };
+  }
+  assert(Object.keys(TABLA).length === 30,
+    `la tabla del producto tiene ${Object.keys(TABLA).length} entradas y el paquete son 30`);
+
+  const fuenteInventario = readFileSync(INVENTARIO, 'utf8');
+  const DEL_INVENTARIO = {};
+  for (const [, cuerpo] of fuenteInventario.matchAll(/^\|\s*\d+\s*\|(.+)\|\s*$/gm)) {
+    const campos = cuerpo.split('|').map((c) => c.trim());
+    assert(campos.length === 4, `fila del inventario con ${campos.length} columnas: ${cuerpo}`);
+    const marcados = [...campos[0].matchAll(/`([^`]+)`/g)].map(([, v]) => v);
+    const enlace = (celda) => {
+      const m = celda.match(/^\[([^\]]+)\]\((.+)\)$/);
+      return m ? [m[1], m[2]] : [celda, ''];
+    };
+    const [obra, , autorCrudo] = campos[1].split(/(—)/);
+    const [autor] = enlace((autorCrudo || '').trim());
+    const [licencia, urlLicencia] = enlace(campos[2]);
+    const [, fuente] = enlace(campos[3]);
+    DEL_INVENTARIO[marcados[1]] = {
+      archivo: marcados[0], obra: obra.trim(), autor, licencia, urlLicencia, fuente,
+    };
+  }
+  assert(Object.keys(DEL_INVENTARIO).length === 30,
+    `el inventario de la PM lista ${Object.keys(DEL_INVENTARIO).length} filas y son 30`);
+
+  for (const [slug, ficha] of Object.entries(DEL_INVENTARIO)) {
+    const enTabla = TABLA[slug];
+    assert(enTabla, `«${slug}» está en el inventario y no en la tabla del producto`);
+    assert(enTabla.archivo === `/catalogo/${ficha.archivo}`,
+      `«${slug}»: la tabla apunta a ${enTabla.archivo} y el inventario a ${ficha.archivo}`);
+    for (const campo of ['obra', 'autor', 'licencia', 'urlLicencia', 'fuente']) {
+      assert(enTabla[campo] === ficha[campo],
+        `«${slug}»: ${campo} dice «${enTabla[campo]}» en el producto y «${ficha[campo]}» en `
+        + 'el inventario de la PM');
+    }
+    assert(enTabla.licenciaVisible && /^(CC|Dominio)/.test(enTabla.licenciaVisible),
+      `«${slug}»: la licencia se leería «${enTabla.licenciaVisible}»`);
+  }
+  medidos.push('las 30 fichas del producto coinciden con el inventario de la PM');
+
+  // --- B. Los avisos del seed y sus archivos ------------------------------
+  const delSeed = queryRows(`
+    SELECT DISTINCT p.slug FROM products p
+    JOIN product_images i ON i.product_id = p.id
+    WHERE i.url LIKE '%picsum.photos%'
+    ORDER BY p.slug
+  `).map(([slug]) => slug);
+  assert(delSeed.length === 30,
+    `el seed dejó ${delSeed.length} publicaciones con foto de relleno y el paquete cubre 30`);
+
+  // El alto y el ancho salen de la cabecera del WebP, no de una constante: un
+  // archivo truncado o de otra medida se ve acá y no en la demo.
+  const medirWebp = (bytes) => {
+    if (bytes.slice(0, 4).toString('latin1') !== 'RIFF'
+      || bytes.slice(8, 12).toString('latin1') !== 'WEBP') return null;
+    let i = 12;
+    while (i + 8 <= bytes.length) {
+      const tag = bytes.slice(i, i + 4).toString('latin1');
+      const largo = bytes.readUInt32LE(i + 4);
+      const cuerpo = bytes.slice(i + 8, i + 8 + largo);
+      if (tag === 'VP8 ') {
+        if (cuerpo.slice(3, 6).toString('hex') !== '9d012a') return null;
+        return [cuerpo.readUInt16LE(6) & 0x3fff, cuerpo.readUInt16LE(8) & 0x3fff];
+      }
+      if (tag === 'VP8L') {
+        const bits = cuerpo.readUInt32LE(1);
+        return [(bits & 0x3fff) + 1, ((bits >> 14) & 0x3fff) + 1];
+      }
+      if (tag === 'VP8X') {
+        return [cuerpo.readUIntLE(4, 3) + 1, cuerpo.readUIntLE(7, 3) + 1];
+      }
+      i += 8 + largo + (largo & 1);
+    }
+    return null;
+  };
+
+  const huellas = new Map();
+  const medidas = new Set();
+  let peso = 0;
+  for (const slug of delSeed) {
+    const ficha = TABLA[slug];
+    assert(ficha, `el aviso «${slug}» del seed no tiene foto en la tabla del producto`);
+    assert(ficha.archivo.startsWith('/catalogo/'),
+      `«${slug}» resuelve a «${ficha.archivo}», que no lo sirve esta aplicación`);
+    assert(!/^https?:|picsum/i.test(ficha.archivo),
+      `«${slug}» resuelve a una URL remota: ${ficha.archivo}`);
+    const archivo = `public${ficha.archivo}`;
+    assert(existsSync(archivo), `«${slug}» apunta a ${archivo} y ese archivo no está`);
+    const bytes = readFileSync(archivo);
+    peso += bytes.length;
+    const medida = medirWebp(bytes);
+    assert(medida, `${archivo} no decodifica como WebP`);
+    medidas.add(medida.join('x'));
+    const huella = createHash('sha256').update(bytes).digest('hex');
+    assert(!huellas.has(huella),
+      `«${slug}» y «${huellas.get(huella)}» son la misma foto: dos avisos distintos no `
+      + 'pueden compartirla');
+    huellas.set(huella, slug);
+  }
+  assert(medidas.size === 1,
+    `las fotos no comparten proporción: ${[...medidas].join(', ')}`);
+  medidos.push(`${delSeed.length} fotos locales distintas, todas ${[...medidas][0]}, `
+    + `${(peso / 1048576).toFixed(2)} MiB en total`);
+
+  // Y la aplicación las sirve de verdad.
+  for (const slug of delSeed) {
+    const respuesta = await fetch(`${FRONTEND_URL}${TABLA[slug].archivo}`);
+    const tipo = respuesta.headers.get('content-type') || '';
+    assert(respuesta.status === 200 && /image\/webp/.test(tipo),
+      `${TABLA[slug].archivo} respondió ${respuesta.status} ${tipo}`);
+  }
+
+  // --- C. El orden de precedencia, fabricado en la base descartable -------
+  const conFotoReal = 'semillas-maiz-dk-premium';
+  const FOTO_REAL = '/images/categories/semillas.jpg';
+  const [urlAnterior] = queryRows(`
+    SELECT i.url FROM product_images i JOIN products p ON p.id = i.product_id
+    WHERE p.slug = ${sqlLiteral(conFotoReal)} AND i.is_primary = true LIMIT 1`);
+  assert(urlAnterior, `el seed no dejó imagen principal en «${conFotoReal}»`);
+
+  const vendedor = (await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  })).data.access_token;
+  const [molde] = queryRows(`
+    SELECT p.category_id, p.locality_id FROM products p
+    JOIN categories c ON c.id = p.category_id
+    WHERE c.is_service = false AND p.locality_id IS NOT NULL LIMIT 1`);
+  const nombreAjeno = `Publicacion ajena sin foto ${sello}`;
+  const ajena = await apiRequest('/products', {
+    method: 'POST',
+    token: vendedor,
+    body: {
+      name: nombreAjeno,
+      description: 'Publicación ajena al inventario demostrativo: no tiene que recibir foto.',
+      category_id: molde[0],
+      price: 4321,
+      stock: 5,
+      unit: 'unidad',
+      locality_id: molde[1],
+      publication_type: 'producto',
+      operation_kind: 'insumo',
+    },
+  });
+  assert(ajena.data?.id, 'no se pudo publicar la publicación ajena');
+  const [slugAjeno] = queryRows(
+    `SELECT slug FROM products WHERE id = ${sqlLiteral(ajena.data.id)}`);
+  assert(slugAjeno && !TABLA[slugAjeno[0]],
+    `el slug ajeno «${slugAjeno && slugAjeno[0]}» está en la tabla: no probaría nada`);
+
+  querySql(`UPDATE product_images SET url = ${sqlLiteral(FOTO_REAL)}
+            WHERE is_primary = true AND product_id =
+              (SELECT id FROM products WHERE slug = ${sqlLiteral(conFotoReal)})`);
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const leerTarjetas = (pagina) => pagina.locator('article').evaluateAll((tarjetas) => tarjetas
+      .map((tarjeta) => {
+        const banda = tarjeta.querySelector('[class*="_media_"]');
+        const imagen = banda && banda.querySelector('img');
+        const placa = banda && banda.querySelector('[role="img"]');
+        const titulo = tarjeta.querySelector('h3, h2, [class*="_titulo_"]');
+        const anatomia = tarjeta.querySelector('[class*="_anatomia_"]');
+        return {
+          titulo: titulo ? titulo.textContent.trim() : '',
+          anatomia: anatomia ? anatomia.textContent.trim() : '',
+          alto: Math.round(tarjeta.getBoundingClientRect().height),
+          ancho: Math.round(tarjeta.getBoundingClientRect().width),
+          banda: banda ? Math.round(banda.getBoundingClientRect().height) : null,
+          src: imagen ? imagen.getAttribute('src') : null,
+          placa: placa ? placa.getAttribute('data-estado') : null,
+        };
+      }));
+
+    const sinDesborde = async (pagina, donde) => {
+      const visto = await pagina.evaluate(() => ({
+        documento: document.documentElement.scrollWidth,
+        ventana: window.innerWidth,
+      }));
+      assert(visto.documento <= visto.ventana + 1,
+        `${donde}: la página desborda a lo ancho (${visto.documento} > ${visto.ventana})`);
+    };
+
+    const irAlMercado = async (pagina) => {
+      await pagina.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await pagina.locator('header').first()
+        .getByRole('button', { name: 'Mercado', exact: true }).first().click();
+      await esperarA(async () => (await pagina.locator('article').count()) > 4,
+        'el Mercado no dibujó tarjetas', 30_000);
+      await esperarA(async () => {
+        const vistas = await leerTarjetas(pagina);
+        return vistas.length > 0 && vistas.every((t) => t.banda !== null);
+      }, 'quedaron tarjetas sin banda de imagen', 30_000);
+    };
+
+    // El buscador no se rotula igual en las dos anchuras —«Buscar producto,
+    // servicio o ubicación» en escritorio, «Buscar» en 390— ni ofrece el mismo
+    // botón. Se lo toma por lo que comparten.
+    const buscarEn = async (pagina, texto) => {
+      const campo = pagina.getByPlaceholder(/^Buscar/i).first();
+      await campo.fill(texto);
+      const boton = pagina.getByRole('button', { name: 'Buscar', exact: true });
+      if (await boton.count()) await boton.first().click();
+      else await campo.press('Enter');
+      await esperarA(async () => {
+        const vistas = await leerTarjetas(pagina);
+        return vistas.length > 0 && vistas.length < 10;
+      }, `la búsqueda de «${texto}» no acotó el listado`, 20_000);
+      return leerTarjetas(pagina);
+    };
+
+    // --- C1. Escritorio, Cuadrícula --------------------------------------
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    await irAlMercado(page);
+
+    const cuadricula = await leerTarjetas(page);
+    const bandas = [...new Set(cuadricula.map((t) => t.banda))];
+    assert(bandas.length === 1,
+      `en Cuadrícula las bandas miden ${bandas.join(', ')} px: la foto introdujo alturas `
+      + 'distintas');
+    const anchos = [...new Set(cuadricula.map((t) => t.ancho))];
+    assert(anchos.length === 1,
+      `en Cuadrícula las tarjetas miden ${anchos.join(', ')} px de ancho`);
+    const anatomias = new Set(cuadricula.map((t) => t.anatomia).filter(Boolean));
+    assert(anatomias.size >= 3,
+      `sólo se vieron las anatomías ${[...anatomias].join(', ')}: no alcanza para comparar `
+      + 'servicio contra activo');
+    const conFoto = cuadricula.filter((t) => (t.src || '').includes('/catalogo/'));
+    assert(conFoto.length >= 5,
+      `sólo ${conFoto.length} tarjetas resolvieron una foto del catálogo demostrativo`);
+    await sinDesborde(page, 'escritorio/Cuadrícula');
+    capturas.push('mercado-cuadricula-1440x900.png');
+    await page.screenshot({ path: `${CAPTURAS}/mercado-cuadricula-1440x900.png` });
+    medidos.push(`Cuadrícula: ${cuadricula.length} tarjetas, banda de ${bandas[0]} px en las `
+      + `${anatomias.size} anatomías visibles, ${conFoto.length} con foto del catálogo`);
+
+    // --- C2. La foto real gana; el aviso ajeno conserva el respaldo -------
+    const [conReal] = (await buscarEn(page, 'Semillas de Maíz'))
+      .filter((t) => /Ma[íi]z/i.test(t.titulo));
+    assert(conReal, 'no apareció la publicación con foto real');
+    assert(conReal.src && conReal.src.endsWith(FOTO_REAL),
+      `la publicación con foto real muestra «${conReal.src}» y tenía que mostrar «${FOTO_REAL}»: `
+      + 'la tabla de la demostración le está pisando la foto al vendedor');
+
+    const [sinNada] = (await buscarEn(page, nombreAjeno))
+      .filter((t) => t.titulo === nombreAjeno);
+    assert(sinNada, `no apareció «${nombreAjeno}» en el listado`);
+    assert(sinNada.src === null && sinNada.placa === 'sin-foto',
+      `la publicación ajena muestra «${sinNada.src}» en vez del respaldo honesto: la tabla `
+      + 'le inventó una foto a un aviso que no es de la demostración');
+    medidos.push('la foto real del vendedor gana y el aviso ajeno conserva «Sin registro '
+      + 'fotográfico»');
+
+    // --- C3. El detalle, y el crédito donde se ve la obra -----------------
+    const abrirDetalle = async (texto, slugEsperado) => {
+      await buscarEn(page, texto);
+      await page.locator('article').first().click();
+      await esperarA(async () => (await page.locator('#detalle-titulo').count()) > 0,
+        `no abrió el detalle de «${texto}»`, 20_000);
+      const imagen = page.locator('[class*="_imagenPrincipal_"] img');
+      await esperarA(async () => (await imagen.count()) === 1,
+        `el detalle de «${texto}» no dibujó imagen`, 20_000);
+      const src = await imagen.first().getAttribute('src');
+      assert(src === TABLA[slugEsperado].archivo,
+        `el detalle de «${texto}» muestra ${src} y le corresponde ${TABLA[slugEsperado].archivo}`);
+
+      // El crédito: la licencia lo exige donde se ve la obra, no en `docs/`.
+      const credito = page.locator('[class*="_credito_"]').first();
+      assert((await credito.count()) === 1, `el detalle de «${texto}» no acredita la foto`);
+      const dicho = (await credito.innerText()).replace(/\s+/g, ' ');
+      const ficha = TABLA[slugEsperado];
+      for (const parte of [ficha.obra, ficha.autor, ficha.licenciaVisible]) {
+        assert(dicho.includes(parte),
+          `el crédito de «${texto}» no dice «${parte}»: ${JSON.stringify(dicho)}`);
+      }
+      const enlace = credito.locator('a');
+      assert((await enlace.count()) === 1
+        && (await enlace.first().getAttribute('href')) === ficha.urlLicencia,
+      `el crédito de «${texto}» no enlaza la licencia (${ficha.urlLicencia})`);
+      assert(/adaptad|recorte/i.test(dicho),
+        `el crédito de «${texto}» no menciona la adaptación: ${JSON.stringify(dicho)}`);
+      return src;
+    };
+    await abrirDetalle('Cosechadora John Deere', 'cosechadora-john-deere-9750');
+    await sinDesborde(page, 'escritorio/detalle de artículo');
+    capturas.push('detalle-articulo-1440x900.png');
+    await page.screenshot({ path: `${CAPTURAS}/detalle-articulo-1440x900.png` });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+
+    await abrirDetalle('Recepción, Secado', 'recepcion-secado-acopio-granos');
+    await sinDesborde(page, 'escritorio/detalle de servicio');
+    capturas.push('detalle-servicio-1440x900.png');
+    await page.screenshot({ path: `${CAPTURAS}/detalle-servicio-1440x900.png` });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    medidos.push('el detalle resuelve la foto del artículo y la del servicio, y las dos '
+      + 'llevan obra, autor, licencia enlazada y la adaptación');
+
+    // --- C4. Escritorio, Lista -------------------------------------------
+    await irAlMercado(page);
+    await page.getByText('Lista', { exact: true }).first().click();
+    await esperarA(async () => {
+      const vistas = await leerTarjetas(page);
+      return vistas.length > 0 && vistas.every((t) => t.banda !== null);
+    }, 'en Lista quedaron filas sin banda de imagen', 25_000);
+    const lista = await leerTarjetas(page);
+    const anchosLista = [...new Set(lista.map((t) => t.ancho))];
+    assert(anchosLista.length === 1,
+      `en Lista las filas miden ${anchosLista.join(', ')} px de ancho`);
+    await sinDesborde(page, 'escritorio/Lista');
+    capturas.push('mercado-lista-1440x900.png');
+    await page.screenshot({ path: `${CAPTURAS}/mercado-lista-1440x900.png` });
+    medidos.push(`Lista: ${lista.length} filas, todas con banda`);
+    await contexto.close();
+
+    // --- C5. Móvil --------------------------------------------------------
+    const movil = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const chico = await movil.newPage();
+    await irAlMercado(chico);
+    const enMovil = await leerTarjetas(chico);
+    const bandasMovil = [...new Set(enMovil.map((t) => t.banda))];
+    assert(bandasMovil.length === 1,
+      `en móvil las bandas miden ${bandasMovil.join(', ')} px`);
+    await sinDesborde(chico, 'móvil/Cuadrícula');
+    capturas.push('mercado-cuadricula-390x844.png');
+    await chico.screenshot({ path: `${CAPTURAS}/mercado-cuadricula-390x844.png` });
+
+    const enBusqueda = await buscarEn(chico, 'Recepción, Secado');
+    assert(enBusqueda.some((t) => /Recepci/i.test(t.titulo)),
+      `la búsqueda del servicio en móvil trajo ${enBusqueda.map((t) => t.titulo).join(' | ')}`);
+    await chico.locator('article').first().click();
+    await esperarA(async () => (await chico.locator('#detalle-titulo').count()) > 0,
+      'no abrió el detalle del servicio en móvil', 20_000);
+    await esperarA(async () => (await chico.locator('[class*="_credito_"]').count()) === 1,
+      'en móvil el detalle del servicio no acredita la foto', 20_000);
+    await chico.waitForTimeout(500);
+    await sinDesborde(chico, 'móvil/detalle de servicio');
+    capturas.push('detalle-servicio-390x844.png');
+    await chico.screenshot({ path: `${CAPTURAS}/detalle-servicio-390x844.png` });
+    medidos.push(`móvil: banda de ${bandasMovil[0]} px, detalle de servicio con crédito y `
+      + 'sin desborde');
+    await movil.close();
+  } finally {
+    await browser.close();
+    // La base es descartable, pero dejarla cambiada le movería el piso a los
+    // casos que corren después en la suite completa.
+    querySql(`UPDATE product_images SET url = ${sqlLiteral(urlAnterior[0])}
+              WHERE is_primary = true AND product_id =
+                (SELECT id FROM products WHERE slug = ${sqlLiteral(conFotoReal)})`);
+  }
+
+  return 'las 30 publicaciones del seed resuelven una foto local, distinta, de proporción '
+    + 'común y sin salida a la red; la ficha de cada una coincide con el inventario de la PM '
+    + 'y su crédito se imprime donde se ve la obra; la foto real del vendedor conserva '
+    + `prioridad y un aviso ajeno sin foto conserva el respaldo; ${medidos.join('; ')}. `
+    + `${capturas.length} capturas en ${CAPTURAS}`;
+});
+
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

@@ -114,17 +114,21 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           // Que la tarjeta lleve foto no es lo mismo que ser un activo: es que
           // la operación se mira con una foto. La presentación en renglón
           // reserva la banda por esto y no por la anatomía.
-          esServicio ? '' : styles.conFoto,
+          styles.conFoto,
         ].filter(Boolean).join(' ')}
         onClick={abrirDetalle}
       >
-        {/* Servicio y logística no llevan imagen: lo que hay que comparar de un
-            servicio es su alcance, no una foto de alguien trabajando. */}
-        {!esServicio && (
-          <div className={styles.media}>
-            <ProductImage src={product.image} alt={product.name} loading="lazy" />
-          </div>
-        )}
+        {/* La banda va en las cuatro anatomías.
+            Antes servicio y logística no la llevaban, y el argumento era bueno
+            mientras no hubiera imagen: sin foto, el hueco no prometía nada y el
+            ancho rendía más en los datos. Ahora hay foto para las cuatro, y una
+            cuadrícula donde la mitad de las tarjetas arranca con imagen y la
+            otra mitad no tiene dos alturas de la misma cosa. Cobertura,
+            modalidad y respuesta siguen abajo, completas: la banda no les saca
+            lugar. */}
+        <div className={styles.media}>
+          <ProductImage src={product.image} alt={product.name} loading="lazy" />
+        </div>
 
         <div className={styles.cuerpo}>
           <div className={styles.encabezado}>

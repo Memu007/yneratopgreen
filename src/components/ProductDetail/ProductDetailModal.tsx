@@ -19,6 +19,7 @@ import { useCapaModal } from '../../hooks/useCapaModal';
 import { SellerProfileModal } from '../SellerProfile/SellerProfileModal';
 import styles from './ProductDetailModal.module.css';
 import { ProductImage } from '../ProductImage/ProductImage';
+import { ADAPTACION_DEMO, fotoDemoDeArchivo } from '../../utils/fotosDemo';
 
 interface ProductDetailModalProps {
   product: Product;
@@ -65,6 +66,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // miniaturas de la MISMA foto, que al hacer clic no cambiaban nada. Una
   // galería que no lleva a ningún lado es una acción falsa.
   const imagen = product.image;
+
+  // Si la que se está mostrando es una foto del catálogo demostrativo, hay que
+  // acreditarla. Veinticinco de las treinta son CC BY o CC BY-SA, y esas
+  // licencias piden autor, licencia y mención de la adaptación DONDE SE MUESTRA
+  // la obra: un inventario en `docs/` no cumple con quien mira la página. La
+  // foto de un vendedor no lleva crédito porque es suya.
+  const creditoDeLaFoto = fotoDemoDeArchivo(imagen);
 
   // Sin sesión, el botón no promete lo que no puede hacer: dice que el paso
   // siguiente es ingresar. El rótulo y la acción tienen que decir lo mismo.
@@ -137,16 +145,27 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </button>
         </div>
 
-        <div className={`${styles.cuerpo} ${esServicio ? styles.sinGaleria : ''}`}>
-          {/* Servicio y logística no llevan galería: lo que hay que leer es su
-              alcance. Un servicio sin foto no es un servicio incompleto. */}
-          {!esServicio && (
-            <section className={styles.galeria} aria-label="Imagen de la publicación">
-              <div className={styles.imagenPrincipal}>
-                <ProductImage src={imagen} alt={product.name} />
-              </div>
-            </section>
-          )}
+        <div className={styles.cuerpo}>
+          {/* La galería va en las cuatro anatomías.
+              Antes servicio y logística no la llevaban, y el argumento era bueno
+              mientras no hubiera imagen: un servicio sin foto no es un servicio
+              incompleto. Ahora hay foto para las cuatro, y el alcance
+              —cobertura, modalidad, respuesta— sigue completo en el resumen,
+              que es donde se lee. */}
+          <section className={styles.galeria} aria-label="Imagen de la publicación">
+            <div className={styles.imagenPrincipal}>
+              <ProductImage src={imagen} alt={product.name} />
+            </div>
+            {creditoDeLaFoto && (
+              <p className={styles.credito}>
+                {`${creditoDeLaFoto.obra} — ${creditoDeLaFoto.autor} · `}
+                <a href={creditoDeLaFoto.urlLicencia} target="_blank" rel="noreferrer noopener">
+                  {creditoDeLaFoto.licenciaVisible}
+                </a>
+                {` · foto ilustrativa del catálogo de demostración, ${ADAPTACION_DEMO}`}
+              </p>
+            )}
+          </section>
 
           {/* El resumen de la operación: precio, dónde, en qué condición y qué
               se puede hacer. Es lo que decide, y por eso va junto y arriba. */}

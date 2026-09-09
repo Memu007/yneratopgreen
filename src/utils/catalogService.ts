@@ -4,6 +4,8 @@
 import { apiGet } from './api';
 import { Product } from '../types';
 import { normalizarAnatomia, normalizarCondicion } from './anatomia';
+import { esFotoDeRelleno } from './fotos';
+import { fotoDemoDe } from './fotosDemo';
 
 // Base URL para imágenes - usar variable de entorno o ruta relativa (vacía para producción)
 const IMAGES_BASE_URL = import.meta.env.VITE_IMAGES_URL || '';
@@ -239,7 +241,17 @@ export const convertBackendProductToFrontend = (backendProduct: ProductFromBacke
     price: backendProduct.price,
     currency: backendProduct.currency,
     description: backendProduct.description,
-    image: getImageUrl(primaryImageUrl),
+    // La foto de la publicacion, y si no hay, la del catalogo demostrativo.
+    //
+    // El orden es el unico que no miente: primero lo que subio quien
+    // publica. Solo cuando eso no existe -o es una URL de relleno, que para
+    // el sistema visual es lo mismo que no existir- se mira la tabla de la
+    // demostracion. Un slug ajeno sin foto no encuentra nada ahi y conserva
+    // el respaldo honesto: no hay imagen generica de reemplazo.
+    image: fotoDemoDe(
+      backendProduct.slug,
+      !esFotoDeRelleno(getImageUrl(primaryImageUrl)),
+    )?.archivo ?? getImageUrl(primaryImageUrl),
     location: {
       province: ubicacion?.province || '',
       city: ubicacion?.locality || '',

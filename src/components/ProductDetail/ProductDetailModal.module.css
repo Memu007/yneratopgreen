@@ -104,11 +104,19 @@
   border-top: 4px solid var(--tg-color-accent);
 }
 
-/* Sin galería no queda una columna vacía de 700 px: el cuerpo sube y ocupa
-   la izquierda, y el resumen se queda donde estaba. */
-.sinGaleria {
-  grid-template-areas: 'detalle resumen';
+/* El crédito de una foto del catálogo de demostración. Va debajo de la imagen
+   y no encima: sobre la foto no se puede garantizar contraste, y una licencia
+   que no se lee no cumple con nadie. Cuerpo chico porque no compite con el
+   precio, pero no gris sobre blanco: tiene que poder leerse. */
+.credito {
+  margin: var(--tg-space-2) 0 0;
+  color: var(--tg-color-text-secondary);
+  font-size: 11.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
+
+.credito a { color: inherit; }
 
 .precio { display: grid; gap: var(--tg-space-1); }
 
