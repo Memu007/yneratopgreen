@@ -22951,13 +22951,80 @@ await runCase(163, 'Mi cuenta es una página del sitio: URL propia, historial, s
       .getByRole('button', { name: 'Mercado', exact: true }).click();
     await esperarA(async () => seccionDe(page) === 'marketplace',
       'no se llegó al Mercado', 25_000);
+
+    // Cómo se ve «estás acá» en esta cabecera. No se escribe acá ningún color:
+    // la referencia es la propia navegación activa, medida en vivo sobre una
+    // sección pública. Si mañana cambia el tratamiento, esto lo sigue.
+    //
+    // Dos cuidados, los dos medidos y no supuestos. Uno: `index.css` le pone
+    // transición de `background-color` a los botones, así que una sola lectura
+    // agarra la animación a mitad de camino —se vio `rgba(255,255,255,0.914)`
+    // donde el token dice `#ffffff`— y la comparación sería intermitente; se
+    // espera a que el valor se repita en vez de dormir un rato fijo. Dos: el
+    // puntero queda encima del botón recién clickeado y `:hover` pinta la
+    // celda, así que se lo saca antes de mirar y las dos lecturas se toman en
+    // el mismo estado.
+    const comoSeVe = async (locator) => {
+      await page.mouse.move(0, 0);
+      // Cada lectura se toma en un cuadro distinto y declara si además quedó
+      // alguna animación viva. Dos lecturas seguidas dentro del MISMO cuadro
+      // dan el mismo valor aunque la transición esté a mitad de camino —lo
+      // midió este caso: dio por firme `rgba(255,255,255,0.435)`—, así que
+      // repetirse no alcanza como señal de quieto.
+      const leer = () => locator.evaluate(async (el) => {
+        await new Promise((seguir) => { requestAnimationFrame(() => seguir()); });
+        const e = getComputedStyle(el);
+        return {
+          quieto: el.getAnimations().length === 0,
+          estilo: { fondo: e.backgroundColor, color: e.color, peso: e.fontWeight },
+        };
+      });
+      let previo = null;
+      let estable = null;
+      try {
+        await esperarA(async () => {
+          const { quieto, estilo } = await leer();
+          const texto = JSON.stringify(estilo);
+          if (quieto && texto === previo) { estable = estilo; return true; }
+          previo = texto;
+          return false;
+        }, 'el estilo de la celda nunca se quedó quieto', 10_000);
+      } catch {
+        assert(false, `el estilo de la celda nunca se quedó quieto: lo último que se vio fue ${previo}`);
+      }
+      return estable;
+    };
+    const botonDeCuenta = page.getByRole('button', { name: 'Mi cuenta' }).first();
+    const seccionActiva = await comoSeVe(page.locator('header').first()
+      .getByRole('button', { name: 'Mercado', exact: true }));
+    // Y cómo se ve una celda común: el MISMO botón, todavía sin ser el actual.
+    const celdaComun = await comoSeVe(botonDeCuenta);
+    // Sin esto el caso sería vacío: si ambas se vieran igual, cualquier CSS
+    // pasaría la comparación de abajo.
+    assert(JSON.stringify(seccionActiva) !== JSON.stringify(celdaComun),
+      `la sección activa no se distingue de una celda común: ${JSON.stringify(seccionActiva)}`);
+
     await irALaCuenta(page);
 
     assert(seccionDe(page) === 'account',
       `Mi cuenta no tiene URL propia: la barra dice ${page.url()}`);
-    const botonDeCuenta = page.getByRole('button', { name: 'Mi cuenta' }).first();
     assert((await botonDeCuenta.getAttribute('aria-current')) === 'page',
       'el botón de la cabecera no queda marcado como página actual');
+    // El atributo solo no alcanza: se anuncia página actual y se ve como una
+    // acción más. Tiene que quedar con el mismo tratamiento que una sección.
+    const cuentaActual = await comoSeVe(botonDeCuenta);
+    for (const [propiedad, esperado] of Object.entries(seccionActiva)) {
+      assert(cuentaActual[propiedad] === esperado,
+        `Mi cuenta actual no se ve como una sección activa: ${propiedad} es `
+        + `${cuentaActual[propiedad]} y la sección activa usa ${esperado}`);
+    }
+    // Que además no se vea como una celda común no se comprueba por separado:
+    // no se puede poner rojo. La comparación de arriba ya obliga a que las tres
+    // propiedades sean las de la sección activa, y la de más arriba obliga a
+    // que la sección activa difiera de la celda común en alguna de esas tres.
+    // Una tercera comparación sería siempre verde por construcción, y una
+    // prueba que no puede fallar acá no prueba nada: lo que evita el falso
+    // verde es la primera, que sí se midió roja.
 
     const titulos = await page.locator('h1').allInnerTexts();
     assert(titulos.length === 1 && titulos[0].trim() === 'Mi cuenta',

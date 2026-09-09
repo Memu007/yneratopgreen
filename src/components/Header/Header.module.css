@@ -122,8 +122,15 @@
 
 /* La sección actual se marca invirtiendo la celda: sobre una banda de celdas,
    un filete inferior de 2 px no se ve y una píldora rellena sería un botón
-   más. La celda blanca dice «estás acá» sin agregar una forma nueva. */
-.navLink[aria-current='page'] {
+   más. La celda blanca dice «estás acá» sin agregar una forma nueva.
+ *
+ * Mi cuenta entra en la misma regla y no en una copia suya. Es una sección del
+ * sitio desde `ACCOUNT-PAGE-1`, así que se marca igual que las otras cinco;
+ * que viva entre las acciones de la sesión es dónde se dibuja, no qué es. Y
+ * compartir el selector es lo que evita que las dos marcas se separen: no hay
+ * un segundo lugar donde el fondo, el color o el peso puedan quedar viejos. */
+.navLink[aria-current='page'],
+.cuenta[aria-current='page'] {
   background-color: var(--tg-color-surface);
   color: var(--tg-color-text);
   font-weight: 650;
