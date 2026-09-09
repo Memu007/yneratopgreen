@@ -2,82 +2,162 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## CATALOG-PHOTOS-1 — BLOQUEADA, y no por la licencia
+## CATALOG-PHOTOS-1 — el catálogo muestra la foto del aviso
 
-**Resultado: no se puede hacer desde este entorno. Nada entregado, nada en la
-rama, nada en `main`.**
+**Resultado: terminado.**
 
-### El bloqueo
+- Producto/regresión: `e3c277e`
+- La suite pasa a **162 casos**.
+- **En mi rama, no en `main`.** No integré, no desplegué, no corrí seed y no
+  toqué Railway, datos, pagos ni secretos. No mezclé `ACCOUNT-PAGE-1`.
 
-La tarea pide 30 fotografías descargadas y servidas desde el repositorio. **La
-política de egreso de este entorno rechaza todos los bancos de imágenes.**
-Medido, no supuesto:
+Tu paquete destrabó la tarea. Lo que estaba bloqueado era la búsqueda y descarga
+—la política de egreso de este entorno rechaza todos los bancos de imágenes— y
+eso lo resolviste vos. El resto era mío y está hecho.
 
-```text
-403 en el CONNECT   commons.wikimedia.org · upload.wikimedia.org
-403 en el CONNECT   api.openverse.org · images.pexels.com
-403 en el CONNECT   unsplash.com · pixabay.com · cdnjs.cloudflare.com
-EGRESS_BLOCKED      commons.wikimedia.org · www.publicdomainpictures.net
-```
+---
 
-Las primeras son `curl`; las últimas, la herramienta de traído de páginas, que
-rutea por otro lado y choca con el mismo proxy. Lo único que alcanzo es GitHub y
-los registros de paquetes.
+### 1. Antes de usarlas, las verifiqué
 
-Dos aclaraciones, porque las dos preguntas ya aparecieron:
+No por desconfianza: porque un paquete que dice «30, 1:1, todas distintas» y no
+lo es rompe la demo en el peor momento. **Todo lo que afirmás se comprueba:**
 
-- **no es un problema de licencia.** Una foto gratis está tan bloqueada como una
-  paga: lo que no puedo es descargar el archivo. La búsqueda web sí funciona y
-  devuelve dónde están, pero eso no pone un byte en el repositorio;
-- **no se rodea.** Ni con otro cliente, ni con un MCP instalado acá, ni con un
-  túnel. La regla del proyecto y la del propio entorno dicen lo mismo: se
-  informa. Esto es lo que estoy haciendo.
+| Lo que decías | Lo que medí |
+|---|---|
+| 30 archivos | 30 |
+| relación 1:1 con los slugs del seed | 30 y 30, sin sobrantes ni faltantes |
+| 30 hashes distintos | 30 |
+| todos decodificables | 30, leyendo la cabecera WebP |
+| 1600 × 1000 | 1600 × 1000, las treinta |
+| 5.4 MiB | 5.33 MiB |
 
-Y hay un segundo impedimento, independiente del primero: **no hay `cwebp`,
-ImageMagick ni Pillow** en la máquina. Aunque llegaran los originales, no puedo
-normalizarlos a WebP acá como pide el punto 3.
+Las copié a `public/catalogo/` **sin recomprimir**: este entorno no tiene
+`cwebp`, ImageMagick ni Pillow, así que optimizar no lo puedo hacer acá. El peso
+está abajo, en lo que te debo.
 
-### Lo que sí queda comprobado del enunciado
+### 2. Lo que cambié en el producto, y por qué tan poco
 
-- El diagnóstico es correcto: las 30 filas apuntan a `picsum.photos` y el
-  producto hace bien en tratarlas como relleno. No toqué esa protección.
-- Los 30 slugs están enumerados y verificados contra la base.
-- `public/**` está en los `watchPatterns` de Railway, así que cuando existan los
-  archivos, integrarlos redespliega el sitio.
+**La resolución de la imagen, en un solo punto.** Donde el catálogo arma la
+publicación. El orden es el único que no miente:
 
-### Qué la destraba
+1. la foto que subió quien publica;
+2. si no hay —o si es de relleno, que para el sistema visual es lo mismo que no
+   haber—, la tabla de la demostración;
+3. si el slug no es de la demostración, **«Sin registro fotográfico»**. No hay
+   foto genérica de reemplazo.
 
-Cualquiera de estas tres, y la primera es la más rápida:
+**La tabla, derivada de tu inventario.** `src/utils/fotosDemo.ts` no se escribió
+a mano: sale de `INVENTARIO-FOTOS-CATALOGO-2026-09-09.md` y lleva la atribución
+adentro. El caso 162 vuelve a leer tu archivo y se cae si dejaron de coincidir:
+la atribución no puede envejecer por separado de la foto que atribuye.
 
-1. **Emi sube las fotos al repositorio** —propias o de donde él decida—. Con los
-   archivos adentro hago el resto: recorte a proporción común, tabla por slug
-   acotada al inventario demo, tarjetas y detalle de servicio/logística, y el
-   caso 162. La prioridad de la foto real del vendedor y el respaldo honesto
-   para un slug ajeno se conservan.
-2. **Habilitar los dominios en la configuración del entorno** (Wikimedia
-   Commons, Openverse, Pixabay). Desde esta misma sesión las bajo.
-3. **Correr la sesión en la máquina de Emi**, donde la red es la suya.
+**La banda pasa a las cuatro anatomías**, en tarjeta y en detalle. Servicio y
+logística no la llevaban, con un argumento que era bueno mientras no hubiera
+foto: sin imagen, el hueco no prometía nada. Ahora la hay, y una cuadrícula
+donde la mitad de las tarjetas arranca con foto y la otra mitad no tiene dos
+alturas de la misma cosa. Cobertura, modalidad y respuesta siguen completas: la
+banda no les sacó lugar.
 
-### Lo que hice y deshice, para que conste
+### 3. Una cosa que agregué y no me pediste explícitamente
 
-Probé una salida sin red: 30 ilustraciones propias, una por aviso, generadas por
-un script del repositorio. Funcionaban —las miré en las dos vistas y en el
-detalle— pero **no son fotografías**, que es lo que la tarea pide, y Emi las
-rechazó. Las borré junto con los cambios de producto que sólo existían para
-mostrarlas: sin imágenes, agregarle la banda a servicio y logística habría
-dejado una placa vacía en cada tarjeta, que es peor que el estado actual.
+**El crédito de la foto, debajo de la imagen en el detalle.**
 
-Dos cosas que sí aprendí y valen para cuando esto se retome:
+Tu propio inventario lo dice: «Para CC BY/CC BY-SA, mantener crédito, enlace a
+la licencia e indicar la adaptación». Conté las licencias del paquete:
 
-- el caso 155 detecta la regresión: al darle columna de foto a servicio y
-  logística en la vista Lista, en 768×1024 el renglón crecía a 366 px y la
-  acción terminaba justo en el borde inferior de la ventana. La columna de
-  imagen tiene que ceder ancho por debajo de 1180 px;
-- el detalle de servicio no dibuja galería hoy —`ProductDetailModal` la saltea
-  para servicio y logística—, así que el punto 5 toca ese archivo y no sólo la
-  tarjeta.
+| Licencia | Fotos |
+|---|---:|
+| CC BY 2.0 | 16 |
+| CC BY-SA (2.0, 3.0, 4.0) | 9 |
+| CC0 1.0 | 3 |
+| Dominio público (PDM 1.0) | 2 |
 
-**ACCOUNT-PAGE-1** no la empecé: va después de ésta.
+**Veinticinco de las treinta exigen atribución**, y esas licencias piden el
+crédito donde se muestra la obra. Un archivo en `docs/` no cumple con la persona
+que mira la página. Son tres líneas de datos que ya venían en tu inventario y un
+párrafo bajo la imagen; me pareció peor entregarlo sin eso que ampliar el
+alcance por mi cuenta. **Si preferís que salga, se saca en un commit.**
+
+Detalle menor de presentación: tu inventario mezcla `by 2.0`, `cc0 1.0` y
+`CC BY-SA 4.0`. El dato crudo se conserva tal cual lo escribiste —el caso lo
+contrasta contra tu archivo— y lo que cambia es cómo se lee en pantalla:
+«CC BY 2.0», «CC0 1.0», «Dominio público (PDM 1.0)».
+
+### 4. Un rojo que me encontró el 155
+
+Al darle columna de foto a servicio y logística en la vista **Lista**, en
+768 × 1024 el renglón creció a 366 px y la acción terminaba **justo** en el borde
+inferior de la ventana: el botón cerraba en 1024 de 1024. El caso 155 lo detectó
+y tenía razón.
+
+Arreglado: por debajo de 1180 px la columna de imagen cede ancho antes que los
+datos (de 232 px a 172). Los datos y la acción valen más que sesenta píxeles de
+foto.
+
+### 5. El caso 162, y las cuatro veces que lo puse rojo
+
+Mide seis propiedades que se rompen en silencio, ninguna de ellas «la foto es
+linda», que no se mide:
+
+1. cada uno de los 30 avisos resuelve un archivo local existente, decodificable,
+   de medida común y **no repetido**;
+2. ninguna imagen sale a la red;
+3. la tabla del producto y tu inventario dicen lo mismo, campo por campo;
+4. el crédito se ve, con la licencia enlazada y la adaptación mencionada;
+5. la foto real del vendedor le gana a la tabla, y un slug ajeno conserva el
+   respaldo;
+6. la banda mide lo mismo en las cuatro anatomías y en las dos vistas.
+
+| Roto a propósito | Qué dijo |
+|---|---|
+| Dos avisos con la misma foto | `«tractor-pauny-280a…» y «cosechadora-john-deere-9750» son la misma foto` |
+| La atribución se despega del inventario | `autor dice «Otro Autor» en el producto y «Wilson Hui» en el inventario` |
+| Se retira el crédito | `el detalle de «Cosechadora John Deere» no acredita la foto` |
+| El producto ignora la foto real del vendedor | `muestra «/catalogo/semillas-maiz…» y tenía que mostrar «/images/categories/semillas.jpg»` |
+
+### 6. Lo que corrí
+
+- **155 y 162 aislados desde base limpia: 2/2.** Seis capturas: Mercado en
+  Cuadrícula y Lista y detalle de artículo y de servicio en 1440×900; Cuadrícula
+  y detalle de servicio en 390×844.
+- `npm run build`, `npm run lint`, `npx tsc --noEmit`, `node --check` y
+  `diff-check`: verdes. Las 30 llegan a `dist/catalogo/`.
+- No corrí suite completa, Backend, a11y ni contraste totales, como pediste. El
+  diff no sale del recorrido visual acotado.
+
+### 7. Lo que te debo decir, aunque no me lo preguntes
+
+**Dos fotos no representan lo que dice el aviso.** No las reemplacé —pediste no
+sustituir por criterio propio— y las entrego tal cual, pero las marco:
+
+- **`manga-ganadera-balanza-electronica`**: la foto es una balanza de ganado
+  **de museo**. Tu propio inventario lo dice en el título de la obra: «Scale for
+  large livestock (Waage für Großvieh), **Museum Waake**». Se ve un artefacto
+  antiguo de madera bajo techo, no una manga con balanza electrónica. Es la que
+  más se aleja del título del aviso.
+- **`dron-pulverizador-agricola-20l`**: el dron es excelente y protagonista,
+  pero al fondo hay una jornada a campo con carpas, banderas y **texto incrustado
+  de terceros** en los banners. Tu contrato pide «sin texto incrustado». En el
+  recorte de la tarjeta no se ve; en el detalle sí.
+
+Otras cuatro son defendibles pero indirectas —muestran la aplicación en vez del
+producto—: `herbicida-glifosato-20l` y `urea-granulada-46-nitrogeno` muestran
+una pulverizadora y una fertilizadora trabajando, no el bidón ni la bolsa;
+`insecticida-lambda-cihalotrina-1l` muestra un avión aplicador. Para una demo
+funcionan; lo digo por si querés afinarlas después.
+
+**El peso.** 5,33 MiB en 30 archivos, promedio 182 KB, la más pesada 695 KB
+(`equipo-riego-goteo`). Las tarjetas cargan con `loading="lazy"`, así que en la
+primera pantalla bajan tres o cuatro, no las treinta. Aun así son originales de
+1600 px sirviendo una banda de 112 px de alto: hay margen para bajar a la mitad
+sin que se note. **No lo puedo hacer acá**: no hay `cwebp`, ImageMagick ni
+Pillow en la máquina, y no voy a agregar una dependencia por esto sin que lo
+decidas.
+
+### 8. Sin rojo, sin intermitente, sin pendiente
+
+Nada quedó rojo ni sin verificar. **ACCOUNT-PAGE-1** no la empecé: va después de
+ésta y no la mezclo.
 
 ## ADMIN-TRUTH-1R — el caso 160 se sostiene solo
 
