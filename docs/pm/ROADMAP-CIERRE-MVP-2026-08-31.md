@@ -137,9 +137,9 @@ tiene una sola política de navegación y una sola regresión matriz.
 | 12E | **FOOTER-FOCUS-1 — aceptada** | Hallazgo Dev/PM durante BRAND-1R | Producto `5d3958a`, informe `26eb47f`, merge `0cbc3c6` y cierre `1c3aecc`. PM reprodujo 156+158 en 2/2; ambos SHA quedaron en main sin cambios. |
 | 12F | **LOGO-INTEGRATION-1R — aceptada en rama** | Feedback visual Emi 08/09 | Base `d252a0c`/`e2b5dbc`/`712f98b`; corrección `3370284` e informe `79a8494`. PM: base 156+159 en 2/2 y corrección 159 en 1/1. Integración retenida para no disparar Railway. |
 | 13 | **ADMIN-TRUTH-1R — aceptada en rama** | ADM-3, ADM-4, ADM-10 y ADM-11 | `aaa51ce`/`21aa17e` + `21cd4d1`/`638e1b9`. PM reprodujo 160 final en 1/1: 14 estados propios, texto y color computado; sin suite completa nueva. |
-| 13A | **CATALOG-PHOTOS-1 — activa** | Feedback visual Emi 08/09 | Una foto local, pertinente y licenciada por cada uno de los 30 slugs demo; incluye servicios/logística, conserva las dos vistas y no toca datos remotos. |
-| 13B | **ACCOUNT-PAGE-1 — en cola** | Feedback visual Emi 08/09 | Mi cuenta deja de ser modal general: página privada con URL/historial, shell normal y protección de cambios; después de las fotos. |
-| 14 | **ADMIN-SAFETY-1** | ADM-6, ADM-7, ADM-9; reproduce ADM-R4/R5 | Confirmaciones propias para acciones sensibles y reset manual acotado. Antes se mide categoría desactivada y Provincias legado. |
+| 13A | **CATALOG-PHOTOS-1 — cerrada** | Feedback visual Emi 08/09 | Aceptada en `e3c277e`/`b414cfb`, integrada en `b26d8ad`; PM reprodujo 155+162 en 2/2 y Emi cerró las dos fotos imperfectas sin reemplazo. |
+| 13B | **ACCOUNT-PAGE-1R — cerrada** | Feedback visual Emi 08/09 | Base `7dc1d53`/`968efbc`, corrección `958c11c`/`16008a1`; PM cerró 149+150+163 en 3/3 y la corrección visual con 163 en 1/1. |
+| 14 | **ADMIN-SAFETY-1 — activa** | ADM-6, ADM-7, ADM-9; reproduce ADM-R4/R5 | Confirmaciones propias para acciones sensibles y reset manual acotado. Antes se mide categoría desactivada y Provincias legado. |
 | 15 | **RATING-UX-1** | F9, F10 y F11 | Estrellas visibles y accesibles; después de recargar no reaparece una calificación ya enviada. |
 
 La recuperación automática de contraseña F4 sigue fuera del MVP. Sólo puede

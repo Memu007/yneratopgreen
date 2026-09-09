@@ -2,7 +2,7 @@
 
 ## Resultado
 
-Devuelta como `ACCOUNT-PAGE-1R` por una única omisión visual.
+Aceptada tras `ACCOUNT-PAGE-1R`.
 
 - Producto/regresión Dev: `7dc1d53`.
 - Informe Dev: `968efbc`.
@@ -13,6 +13,21 @@ Devuelta como `ACCOUNT-PAGE-1R` por una única omisión visual.
 - Log persistente: `/private/tmp/topgreen-pm-account-149-150-163.log`.
 - PM inspeccionó las seis capturas recuperables de Perfil y Mis publicaciones
   en 1440 × 900, 768 × 1024 y 390 × 844.
+- `npm run lint`, `node --check scripts/smoke.mjs` y `diff-check`: verdes.
+
+Corrección final:
+
+- Producto/regresión: `958c11c`.
+- Informe Dev: `16008a1`.
+- El delta contra `7dc1d53` queda en una regla de
+  `Header.module.css`, el bloque del caso 163 y el informe. La cuenta comparte
+  el selector visual de la sección pública activa; no se copiaron colores ni
+  se tocó navegación, guardias o layout.
+- PM reprodujo el 163 desde otra base Docker local limpia: **1/1**, 0 fallos.
+  Log persistente: `/private/tmp/topgreen-pm-account-163r.log`.
+- PM inspeccionó las capturas corregidas de 1440 × 900 y 390 × 844: el acceso
+  de cuenta queda blanco, con texto oscuro y peso activo, igual que una sección
+  actual; el resto del shell y la página no cambió.
 - `npm run lint`, `node --check scripts/smoke.mjs` y `diff-check`: verdes.
 
 No hubo suite completa independiente de PM, Backend, a11y ni contraste total;
@@ -34,7 +49,7 @@ foco, navegación y presentación.
 - Las tres anchuras no presentan desborde, controles fuera de pantalla ni
   palabras partidas.
 
-## Omisión que impide aceptar
+## Omisión inicial y cierre
 
 El contrato exige que el acceso a Mi cuenta quede marcado como página actual.
 El botón lleva `aria-current="page"`, pero el único selector que dibuja el
@@ -43,7 +58,8 @@ estado activo es `.navLink[aria-current='page']`; el botón usa las clases
 una acción común de sesión. El caso 163 sólo comprueba el atributo ARIA, por lo
 que queda verde aunque se retire toda señal visual.
 
-La corrección debe reutilizar el tratamiento activo existente y hacer que el
-163 compare el estilo computado del acceso a Mi cuenta con el de una sección
-activa real, sin copiar colores duros. No se reabre ninguna otra decisión.
-
+`958c11c` reutiliza el mismo selector para `.navLink` y `.cuenta`. El 163 ahora
+mide fondo, color y peso computados de una sección pública activa, prueba que
+ese tratamiento difiere de una celda común y exige la misma salida en Mi
+cuenta. PM reprodujo el cierre y la pieza queda aceptada sin reabrir ninguna
+otra decisión.
