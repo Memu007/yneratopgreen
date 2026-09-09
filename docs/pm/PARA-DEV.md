@@ -12,6 +12,123 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-09 — CIERRE: ACCOUNT-PAGE-1R aceptada; activar ADMIN-SAFETY-1
+
+Aceptados base producto/regresión `7dc1d53`, informe `968efbc`, corrección
+`958c11c` e informe `16008a1`. PM revisó el delta final: una regla compartida
+de Header y el refuerzo del 163, sin navegación, guardias, layout ni Backend.
+Reprodujo el 163 desde otra base Docker limpia en **1/1**, inspeccionó el estado
+activo en escritorio y móvil y cerró lint, sintaxis y `diff-check`. Sumado a la
+revisión base, PM obtuvo 149+150+163 en **3/3** y la corrección en **1/1**. No
+hubo suite completa PM. Evidencia en
+`REPRODUCCION-ACCOUNT-PAGE-1-2026-09-09.md`.
+
+La única tarea activa pasa a **`ADMIN-SAFETY-1`**. Traé `main` a tu rama para
+leer este contrato, pero no integres tu rama a `main` ni despliegues.
+
+### Medí primero dos riesgos; no supongas la corrección
+
+1. **Categoría desactivada (`ADM-R4`).** Prepará una categoría con una
+   publicación activa, desactivala por la ruta administrativa real y contrastá
+   API, catálogo y filtros. Si la publicación sigue visible mientras su
+   categoría desaparece de los filtros, queda confirmado: bloqueá en UI y
+   Backend la desactivación mientras exista una publicación activa y devolvé un
+   motivo accionable. No pauses publicaciones, no migres datos y no amplíes la
+   guarda a casos que el rojo no exija.
+2. **Provincias legado (`ADM-R5`).** Rastreá consumidores reales de las opciones
+   `province` contra el padrón oficial de localidades. Si, como indica la
+   evidencia actual, producto, registro, transportista, filtros y edición usan
+   `/catalog/localities`, retirale a Configuración la opción de administrar
+   Provincias y dejá las filas/API existentes intactas por compatibilidad. Sin
+   migración, borrado ni segunda fuente. Si encontrás un consumidor real,
+   informalo y frená ese punto antes de modificarlo.
+
+Guardá ambos resultados rojos o el descarte demostrable dentro del caso nuevo;
+la lectura estática sola no cierra ninguno.
+
+### Resultado obligatorio
+
+1. Reutilizá la confirmación propia del producto para:
+   - cambiar el rol de un usuario;
+   - activar o desactivar una cuenta;
+   - cambiar el estado de una publicación;
+   - eliminar categoría, subcategoría u opción de formulario.
+   Eliminá `window.confirm` de esos recorridos. Cada decisión debe nombrar el
+   objeto, el cambio exacto y la consecuencia; cancelar no escribe ni deja el
+   selector mintiendo. Confirmar envía una sola mutación y éxito o error quedan
+   visibles.
+2. La confirmación común debe comportarse como una capa real: nombre accesible,
+   foco inicial contenido, Tab contenido, Escape/fondo/Cancelar equivalentes y
+   foco devuelto al control que la abrió. No crees seis modales distintos. Si
+   para cumplirlo tocás el componente compartido, conservá sus consumidores
+   actuales.
+3. Agregá por usuario la acción **Restablecer contraseña** usando el endpoint
+   existente. Requiere confirmación concreta y produce una contraseña temporal
+   fuerte, visible una sola vez después del éxito, con guía breve para
+   transmitirla por un canal seguro. No la registres en consola, toast, URL,
+   captura ni almacenamiento del navegador. Al cerrar el resultado no debe
+   poder recuperarse. Sin correo, tokens de recuperación, dependencia ni flujo
+   automático; F4 sigue fuera del MVP.
+4. Conservá las guardas ya cerradas: el admin no puede degradarse ni
+   desactivarse a sí mismo; valor interno de opción, tipo de categoría usada y
+   subcategoría referenciada siguen protegidos. No rediseñes el panel ni abras
+   permisos, estados, paginación o copy ajenos.
+
+### Regresión y puertas — caso 164
+
+- Contra la base de entrada, hacelo rojo por mutación inmediata/
+  `window.confirm`, reset ausente y por los riesgos R4/R5 según el resultado
+  medido. En verde, contá solicitudes: cancelar por botón, Escape y fondo hace
+  **cero**; confirmar hace **una** y deja UI/API/base coherentes. Comprobá nombre
+  de la capa, foco contenido y retorno al disparador.
+- Para el reset, creá un usuario sólo en la base local, confirmá que la clave
+  anterior deja de entrar y la temporal entra, y que cerrar la pantalla elimina
+  su único texto visible. No imprimas ni captures la credencial.
+- Corré 144, 148, 160 y 164 aislados y después **una sola suite completa** desde
+  base limpia por tocar acciones administrativas y la confirmación compartida.
+  Sumá lint, `node --check`, `compileall`, `pip check` en entorno representativo
+  y `diff-check`; el smoke incluye build y el 164 cubre foco/accesibilidad de la
+  capa, así que no corras auditorías a11y o contraste totales salvo que el diff
+  salga de este límite.
+
+Producto/regresión en un commit e informe separado en `PARA-PM.md`. Informá
+rojo y verde por SHA, resultados de R4/R5, focales, suite y puertas sin repetir
+una corrida fallida a ciegas. No integres a `main`, no despliegues, no ejecutes
+seed contra Railway y no toques datos remotos, pagos o secretos. Frená al
+entregar.
+
+## 2026-09-09 — DEVOLUCIÓN: ACCOUNT-PAGE-1R, falta la marca visual de página actual
+
+Revisé producto/regresión `7dc1d53` e informe `968efbc`. La conversión general
+está conforme: página con URL, historial y sesión correctos; guardia de salida
+central; capas internas preservadas; tres anchuras sin desborde. PM reprodujo
+149, 150 y 163 desde base limpia en **3/3**, inspeccionó las seis capturas y
+cerró lint, sintaxis y `diff-check`. Evidencia en
+`REPRODUCCION-ACCOUNT-PAGE-1-2026-09-09.md`.
+
+Queda una sola omisión. El botón de Mi cuenta recibe `aria-current="page"`,
+pero no se ve activo: el CSS sólo dibuja
+`.navLink[aria-current='page']` y el acceso de cuenta usa `.celda .cuenta`.
+Las seis capturas lo muestran igual que una acción común y el 163 da verde
+porque sólo mira el atributo.
+
+### Corrección única
+
+- Reutilizá para `.cuenta[aria-current='page']` el mismo tratamiento visual de
+  la sección activa existente; no inventes otro componente ni otro color.
+- En el 163, medí el estilo computado de una sección pública activa antes de
+  entrar a la cuenta y exigí que el acceso a Mi cuenta use ese mismo fondo,
+  color y peso al quedar actual. No copies valores hexadecimales: la propia
+  navegación activa es la referencia. Exigí también que no coincida con una
+  celda común si eso fuera necesario para evitar otro falso verde.
+
+No cambies navegación, guardias, layout, textos ni otras regresiones. Corré
+sólo 163 desde base limpia, lint, `node --check` y `diff-check`; el smoke ya
+incluye build. Entregá corrección e informe separados en tu rama y frená. No
+repitas 147–150 ni suite completa, Backend, a11y o contraste; PM ya cubrió esos
+bordes. No integres a `main`, no despliegues y no toques Railway, datos remotos,
+pagos ni secretos.
+
 ## 2026-09-09 — CIERRE: CATALOG-PHOTOS-1 aceptada; activar ACCOUNT-PAGE-1
 
 Aceptados producto/regresión `e3c277e`, informe `b414cfb` e integración exacta
