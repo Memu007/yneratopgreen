@@ -12,6 +12,34 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-09 — MATERIAL LISTO: PM entrega las 30 fotos de CATALOG-PHOTOS-1
+
+Emi pidió cerrar esta mejora hoy y confirmó que tu sesión no puede buscar las
+fotos. PM hizo la búsqueda, verificó visualmente la selección y deja el paquete
+cerrado en `main`. Esto **reemplaza sólo la búsqueda y preparación de activos**
+de los puntos 1–3 del contrato; la integración de producto, el caso 162, las
+capturas y el informe siguen a tu cargo.
+
+Antes de continuar, incorporá `main` y usá exactamente:
+
+- 30 WebP locales en `docs/pm/originales/catalogo-demo/`;
+- mapeo slug → archivo, autor, licencia y fuente en
+  `docs/pm/INVENTARIO-FOTOS-CATALOGO-2026-09-09.md`;
+- una relación 1:1 ya comprobada: 30 archivos, 30 hashes distintos, todos
+  decodificables y de 1600 × 1000; peso total del paquete fuente, 5.4 MiB.
+
+No vuelvas a buscar ni reemplaces imágenes por criterio propio. Copialas al
+destino de producto que elijas y, si necesitás bajar peso, optimizá sin cambiar
+encuadre ni slug. Conservá el inventario de atribución y la prioridad de fotos
+reales subidas por vendedores. La imagen demo se resuelve sólo para los 30
+slugs conocidos; un slug ajeno sin foto conserva el fallback honesto.
+
+Completá ahora `CATALOG-PHOTOS-1` con el cambio mínimo de resolución y
+presentación, caso 162, focal 155, seis capturas, build, lint, sintaxis y
+`diff-check`. Producto/regresión e informe separados, en tu rama. No mezcles
+`ACCOUNT-PAGE-1`, no integres a `main`, no despliegues, no ejecutes seed y no
+toques Railway, datos, pagos ni secretos.
+
 ## 2026-09-09 — CIERRE: ADMIN-TRUTH-1R aceptada; activar CATALOG-PHOTOS-1
 
 Aceptados producto `aaa51ce`, informe `21aa17e`, corrección de regresión

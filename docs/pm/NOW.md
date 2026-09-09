@@ -4,6 +4,14 @@ Actualizado: 2026-09-09.
 
 ## Estado inmediato — 2026-09-09
 
+- **Paquete de fotos entregado por PM para `CATALOG-PHOTOS-1`:** 30 WebP
+  pertinentes y locales en `docs/pm/originales/catalogo-demo/`, uno por slug,
+  todos 1600 × 1000 y con hashes distintos. El inventario versionado registra
+  autor, licencia y página fuente. Dev ya no debe buscar material: sólo integrar
+  el paquete, mantener prioridad de fotos reales/fallback y entregar caso 162,
+  focal 155, seis capturas y puertas acotadas. No hubo cambios de producto,
+  despliegue, seed ni datos remotos.
+
 - **MARKET-VIEWS-1 aceptada:** producto/regresión `b5ee28d`, informe `afbfb95`
   y corrección de SHA `931a063`. PM revisó diff/hashes y seis capturas,
   reprodujo 155 y 131 en **1/1**, y cerró build, lint, sintaxis y `diff-check`.
@@ -40,11 +48,11 @@ Actualizado: 2026-09-09.
   `/private/tmp/topgreen-pm-admin-160r.log`; un intento anterior que murió por
   `EPERM` antes del smoke no cuenta. Evidencia en
   `REPRODUCCION-ADMIN-TRUTH-1-2026-09-09.md`.
-- **Única tarea activa y responsable:** `CATALOG-PHOTOS-1`, Dev. Debe buscar
-  una foto licenciada y pertinente para cada uno de los 30 slugs del seed,
-  optimizarla y servirla localmente; artículos, servicios y logística tendrán
-  imagen sin hotlinks, Picsum, seed ni escritura en Railway. Caso 162 y seis
-  capturas; sin suite completa.
+- **Única tarea activa y responsable:** `CATALOG-PHOTOS-1`, Dev. PM ya entregó
+  las 30 fotos licenciadas, pertinentes, normalizadas y trazadas por slug. Dev
+  debe integrarlas y servirlas localmente; artículos, servicios y logística
+  tendrán imagen sin hotlinks, Picsum, seed ni escritura en Railway. Caso 162 y
+  seis capturas; sin suite completa.
 - **Segunda mejora de demo en cola:** `ACCOUNT-PAGE-1`. Emi rechazó que el área
   completa de cuenta siga siendo un popup. Después de las fotos, Dev deberá
   convertir `Mi Panel` en una página privada con URL e historial reales,
