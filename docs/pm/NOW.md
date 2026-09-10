@@ -4,6 +4,16 @@ Actualizado: 2026-09-10.
 
 ## Estado inmediato — 2026-09-10
 
+- **QUOTE-CONTACT-1 devuelta como `QUOTE-CONTACT-1R`:** producto/regresión
+  `612b57f`, informe `9493ba0`. Dev informó focales **4/4** y suite completa
+  **165/166**, con único rojo 131 ambiental. PM revisó el delta y reprodujo el
+  166 desde base limpia en **1/1**, pero el verde no mide tres requisitos: el
+  asunto no nombra publicación/vendedor, una aserción con `\b` deja pasar «se
+  abrió» por la `ó`, y la intención usa sólo el título como identidad. También
+  hay ruido de finales de línea en `src/types/index.ts`. Corrección mínima y
+  puertas focales en `PARA-DEV.md`; evidencia en
+  `REPRODUCCION-QUOTE-CONTACT-1-2026-09-10.md`.
+
 - **TEST-SUITE-164SR aceptada:** arnés `6d20ecf` + `4319623`, informe `819cead`,
   corrección `4182275` e informe `f6cade7`, todos en rama Dev. Dev obtuvo suite
   completa **163/164**, con único rojo 131 ambiental. PM revisó el delta y
@@ -83,10 +93,9 @@ Actualizado: 2026-09-10.
   de capturas. La versión final mide diálogo móvil, envío retenido, fallo y
   reintento; no hubo suite completa PM. Evidencia en
   `REPRODUCCION-RATING-UX-1-2026-09-10.md`.
-- **Única tarea activa y responsable:** `QUOTE-CONTACT-1`, Dev. Conserva
-  publicación/vendedor desde tarjeta y detalle, prepara asunto/mensaje y cambia
-  el correo a una apertura honesta que no borra texto ni declara éxito. Sin API,
-  Backend, mensajería ni rediseño. Caso 166 y contrato en `PARA-DEV.md`.
+- **Única tarea activa y responsable:** `QUOTE-CONTACT-1R`, Dev. Debe completar
+  asunto, ayuda neutral e identidad estable y corregir el falso verde del 166,
+  sin ampliar producto ni repetir la suite completa.
 - **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
   `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
   y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como
