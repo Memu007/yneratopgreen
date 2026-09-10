@@ -2,6 +2,83 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## QUOTE-CONTACT-1R — asunto, ayuda, identidad y un diff que había ensuciado
+
+**Resultado: corregido, con una salvedad que te debo decir (punto 5).**
+
+- Producto/regresión: `1a01854`
+- **En mi rama, no en `main`.** No integré, no desplegué.
+
+---
+
+### 1. Asunto completo
+
+El asunto precargado —el visible y el `subject` codificado del `mailto:`— nombra
+la publicación y al vendedor. Antes decía «Solicitud de cotización» a secas y
+los nombres vivían sólo en el cuerpo: del otro lado había que abrir el mensaje
+para saber de qué se trataba. La opción del selector se dibuja **únicamente**
+cuando hay cotización; sin ella no hay nada que nombrar.
+
+Medido rojo: *«el asunto visible no nombra publicación y vendedor: "Solicitud de
+cotización"»*.
+
+### 2. La ayuda, neutral de verdad — y el falso negativo era mío
+
+Se fueron las dos frases. Tenés razón en las dos cosas, y la segunda es peor que
+la primera.
+
+`/\bse abrió\b/i` **no detecta nada**: en una expresión regular de JavaScript
+`\b` se apoya en `\w`, que es ASCII, así que después de una «ó» no hay borde de
+palabra y el patrón no casa jamás. Mi caso decía prohibir una frase que no podía
+ver, y por eso la frase entró igual. Ahora la comparación es textual, sobre el
+texto en minúsculas, con las variantes con y sin acento.
+
+Medido rojo volviendo a poner la frase: *«la pantalla afirma un resultado que no
+puede conocer: dice "se abrió"»*.
+
+### 3. Identidad estable
+
+La intención y la `key` identifican la publicación por su **ID interno**. Un
+título no es un identificador: el mismo servicio ofrecido por dos personas
+existe y es normal. El ID no se muestra en el mensaje.
+
+### 4. El diff que había ensuciado
+
+Al agregar el tipo reescribí `src/types/index.ts` **entero en modo texto** y
+convertí **217 CRLF a LF**, así que el commit anterior presentaba casi todo el
+archivo como reemplazado. Restaurado byte a byte desde `612b57f~1` y reaplicado
+sólo el bloque: contra el original son **17 líneas** y ninguna otra.
+
+Es exactamente la trampa que avisa el repositorio, y la pisé de la manera más
+tonta: leer y escribir en modo texto.
+
+### 5. Lo que NO puedo probar, y prefiero decirlo
+
+El caso recorre dos publicaciones con el mismo nombre y distinto vendedor, y
+exige que la segunda reemplace al primero. **Esa afirmación pasa igual con
+identidad por ID o por nombre**, así que no distingue el punto 3. Lo medí: puse
+la `key` de vuelta en el nombre y el caso quedó verde.
+
+El motivo es que todo camino hacia Contacto pasa por otra sección, y eso
+desmonta la pantalla de por sí. La `key` sólo interviene cuando ya se está en
+Contacto —el caso del pie, que **sí** está medido: sin `key` el 166 da rojo con
+«entrando por el pie el mensaje vino cargado»—. Para distinguir ID de nombre
+haría falta un camino que cambie la intención sin desmontar Contacto, y hoy no
+existe.
+
+Sostengo el ID por corrección y porque lo pediste, no porque mi caso lo
+demuestre. Lo que el bloque nuevo sí mide es que el vendedor de la segunda
+publicación reemplaza al de la primera de punta a punta.
+
+### 6. Puertas
+
+Corrí lo que pediste: **166 desde base limpia, 1/1**, más `lint`, `node --check`
+y `diff-check`, verdes. El smoke incluye build. Se conservan las comprobaciones
+que ya estaban: tarjeta y detalle, Contacto genérico, un solo `mailto:`, valores
+intactos, WhatsApp y cero `POST /contact`.
+
+---
+
 ## QUOTE-CONTACT-1 — la cotización llega con su publicación, y el correo no miente
 
 **Resultado: terminado. Suite completa 165/166, único rojo el 131 ambiental.**
