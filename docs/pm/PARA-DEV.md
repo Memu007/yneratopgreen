@@ -12,6 +12,87 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-10 — CIERRE: QUOTE-CONTACT-1R aceptada; activar FILTER-INTENT-1
+
+Aceptados producto/regresión base `612b57f`, informe `9493ba0`, corrección
+`1a01854` e informe `e363408`, todos en tu rama. PM revisó el delta semántico:
+el asunto visible y el `mailto:` nombran publicación/vendedor, la ayuda queda
+en una instrucción neutral, la intención conserva el ID y
+`src/types/index.ts` vuelve a un diff de 17 líneas contra su original. El 166
+corregido pasó desde otra base Docker limpia en **1/1**, salida 0 y build
+incluido. Dev conserva su suite base **165/166**, con único rojo 131 ambiental;
+no hubo suite completa PM. Log final:
+`/private/tmp/topgreen-pm-quote-166r.log`. Evidencia cerrada en
+`REPRODUCCION-QUOTE-CONTACT-1-2026-09-10.md`.
+
+La salvedad informada por Dev no bloquea: hoy no existe un camino que cambie la
+intención sin desmontar Contacto, por lo que el escenario homónimo comprueba el
+reemplazo de vendedor pero no discrimina por sí solo ID frente a nombre. El ID
+sí viaja y queda como identidad correcta; no agregues una ruta artificial sólo
+para probar la `key`.
+
+La única tarea activa pasa a **`FILTER-INTENT-1`**, sobre `1a01854`. Cubre A6,
+A9 y sólo si se reproduce R6 de `AUDITORIAS-UX-CLAUDE-2026-08-30.md`.
+
+### Resultado obligatorio
+
+1. **URL inválida sin vacío falso.** Al entrar al Mercado con una categoría o
+   provincia inexistente en la URL, esperá a conocer los catálogos auxiliares
+   antes de decidir. Descartá únicamente el filtro inválido, limpiá ese
+   parámetro mediante la navegación/History API existente y hacé la consulta
+   válida; no muestres «sin resultados» antes de recibir respuesta. Conservá
+   los demás filtros válidos. Si no se pudo cargar el catálogo necesario para
+   validar, mostrá fallo y reintento, no un vacío atribuido al mercado.
+2. **Publicar retoma después de ingresar.** Desde cada CTA de publicación de
+   Inicio y Servicios, una persona sin sesión abre el Login real. Un ingreso
+   correcto abre directamente el formulario de publicación solicitado, sin
+   segundo clic; cancelar o fallar el ingreso vuelve a la pantalla sin abrirlo
+   ni ejecutar nada. Cambiar Login↔Registro no pierde la intención, pero el alta
+   no abre sesión ni debe abrir el publicador por sí sola. El aviso pasa a
+   voseo: «Iniciá sesión…».
+3. **La intención no queda pegada.** Un Login genérico posterior —por ejemplo,
+   desde Header— no puede heredar una publicación cancelada. Tampoco se publica,
+   crea orden, reserva stock ni agrega al carrito por completar el ingreso: sólo
+   se abre la pantalla protegida que la persona pidió.
+4. **R6 primero se mide.** Reproducí una sesión que deja de ser válida con un
+   carrito persistido y luego intenta «Continuar compra». Si el borde existe,
+   usá esta misma puerta: ofrecer Login y, tras ingresar bien, volver al carrito
+   y abrir Checkout con sus ítems intactos; cancelar queda en el carrito. Si no
+   se reproduce, informá el recorrido y no agregues producto ni afirmaciones al
+   caso para R6.
+
+Reutilizá la continuidad y las capas existentes. No agregues router,
+dependencia, almacenamiento de intenciones, Auth nuevo, Backend, endpoint ni
+rediseño. No cambies la política de expiración de tokens, el contenido del
+formulario de publicación, el checkout ni la persistencia del carrito salvo el
+cableado mínimo que el rojo de R6 demuestre necesario.
+
+### Regresión y puertas — caso 167
+
+- Contra `1a01854`, dejá rojo por A6 y A9: URL con categoría inválida y luego
+  con provincia inválida no puede terminar en un vacío sin consulta; publicar
+  desde Inicio/Servicios no retoma después del Login.
+- En verde, comprobá que cada parámetro inválido desaparece, los válidos quedan,
+  sale una consulta válida y la grilla refleja su respuesta. Forzá también el
+  fallo del catálogo auxiliar y exigí error/reintento sin cartel de cero.
+- Recorré al menos un CTA de publicación por cada página. Cancelación, credencial
+  fallida y alta sin sesión no abren el publicador; el ingreso correcto sí lo
+  abre una vez. Después de cancelar, un ingreso desde Header queda genérico.
+- Incorporá R6 al 167 sólo si el rojo independiente confirma el borde. En ese
+  caso comprobá carrito conservado, Login único, cancelación segura, reanudación
+  en Checkout y cero orden/stock alterados antes de confirmar.
+
+Corré 138, 139, 147 y 167 aislados y después **una sola suite completa** desde
+base limpia; informá total exacto y cada rojo. Se admite únicamente el 131 si
+vuelve a ser la limitación ambiental conocida. Sumá lint, `node --check` y
+`diff-check`; el smoke incluye build. Sin `compileall`, `pip check`, a11y,
+contraste ni capturas si no tocás Backend o presentación.
+
+Producto/regresión en un commit e informe separado en `PARA-PM.md`, con rojo,
+verde, resultado de la reproducción R6 y límites. No integres a `main`, no
+despliegues, no ejecutes seed contra Railway y no toques datos remotos, pagos o
+secretos. Frená al entregar.
+
 ## 2026-09-10 — DEVOLUCIÓN: QUOTE-CONTACT-1R, el 166 da verde sin medir el contrato completo
 
 Revisé producto/regresión `612b57f` e informe `9493ba0`. El flujo base está

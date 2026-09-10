@@ -4,14 +4,13 @@ Actualizado: 2026-09-10.
 
 ## Estado inmediato — 2026-09-10
 
-- **QUOTE-CONTACT-1 devuelta como `QUOTE-CONTACT-1R`:** producto/regresión
-  `612b57f`, informe `9493ba0`. Dev informó focales **4/4** y suite completa
-  **165/166**, con único rojo 131 ambiental. PM revisó el delta y reprodujo el
-  166 desde base limpia en **1/1**, pero el verde no mide tres requisitos: el
-  asunto no nombra publicación/vendedor, una aserción con `\b` deja pasar «se
-  abrió» por la `ó`, y la intención usa sólo el título como identidad. También
-  hay ruido de finales de línea en `src/types/index.ts`. Corrección mínima y
-  puertas focales en `PARA-DEV.md`; evidencia en
+- **QUOTE-CONTACT-1R aceptada:** base `612b57f`/`9493ba0`, corrección
+  `1a01854`/`e363408`, todos en rama Dev. Dev informó suite base **165/166** con
+  único rojo 131 ambiental y corrección focal 166 en **1/1**. PM revisó ambos
+  deltas y reprodujo el 166 base y corregido desde bases limpias en **1/1** cada
+  uno. El asunto y cuerpo nombran publicación/vendedor, la ayuda no afirma qué
+  hizo el cliente de correo, la intención conserva ID y el diff de tipos vuelve
+  a ser revisable. No hubo suite completa PM. Evidencia en
   `REPRODUCCION-QUOTE-CONTACT-1-2026-09-10.md`.
 
 - **TEST-SUITE-164SR aceptada:** arnés `6d20ecf` + `4319623`, informe `819cead`,
@@ -93,9 +92,10 @@ Actualizado: 2026-09-10.
   de capturas. La versión final mide diálogo móvil, envío retenido, fallo y
   reintento; no hubo suite completa PM. Evidencia en
   `REPRODUCCION-RATING-UX-1-2026-09-10.md`.
-- **Única tarea activa y responsable:** `QUOTE-CONTACT-1R`, Dev. Debe completar
-  asunto, ayuda neutral e identidad estable y corregir el falso verde del 166,
-  sin ampliar producto ni repetir la suite completa.
+- **Única tarea activa y responsable:** `FILTER-INTENT-1`, Dev. Debe impedir
+  vacíos falsos por filtros URL inválidos, retomar Publicar después del Login y
+  medir R6 antes de incluir la continuidad del carrito. Caso 167 y límites en
+  `PARA-DEV.md`.
 - **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
   `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
   y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como
