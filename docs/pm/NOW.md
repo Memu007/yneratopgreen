@@ -1,8 +1,17 @@
 # Estado actual
 
-Actualizado: 2026-09-09.
+Actualizado: 2026-09-10.
 
-## Estado inmediato — 2026-09-09
+## Estado inmediato — 2026-09-10
+
+- **TEST-SUITE-164S devuelta como `TEST-SUITE-164SR`:** arnés `6d20ecf` +
+  `4319623`, informe `819cead`. Dev obtuvo suite completa **163/164**, con único
+  rojo 131 ambiental. PM revisó el diff y reprodujo 21+54+57+125+157+162 desde
+  base limpia en **6/6**; sintaxis y `diff-check` verdes. Falta sólo corregir la
+  salida del 125, que todavía afirma que los servicios «no ganan foto» aunque
+  ahora acepta correctamente foto local del catálogo o fallback. No se repite
+  Docker ni suite. Evidencia en
+  `REPRODUCCION-TEST-SUITE-164S-2026-09-10.md`.
 
 - **ADMIN-SAFETY-1R aceptada:** base producto/regresión `79f3219`, informe
   `c26db85`; corrección `871ce7b`, informe `775818c`. PM revisó ambos deltas y
@@ -66,11 +75,10 @@ Actualizado: 2026-09-09.
   `/private/tmp/topgreen-pm-admin-160r.log`; un intento anterior que murió por
   `EPERM` antes del smoke no cuenta. Evidencia en
   `REPRODUCCION-ADMIN-TRUTH-1-2026-09-09.md`.
-- **Única tarea activa y responsable:** `TEST-SUITE-164S`, Dev. Antes de abrir
-  otra mejora de producto debe volver a dejar la suite reproducible: aislar y
-  corregir sólo el arnés de 21, 54, 57, 125, 157 y 162; 131 se conserva como
-  ambiental si vuelve a demostrarlo. Si algún rojo revela producto real, Dev lo
-  informa y frena en vez de mezclar una corrección. Contrato en `PARA-DEV.md`.
+- **Única tarea activa y responsable:** `TEST-SUITE-164SR`, Dev. Corrección de
+  una sola frase de salida del caso 125; sin comportamiento ni pruebas Docker.
+  Después de verificar el diff, PM podrá restaurar la puerta y activar
+  `RATING-UX-1`. Contrato en `PARA-DEV.md`.
 - **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
   `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
   y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como

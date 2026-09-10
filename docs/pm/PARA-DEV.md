@@ -12,6 +12,27 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-10 — DEVOLUCIÓN: TEST-SUITE-164SR, una frase quedó en la regla vieja
+
+Revisé arnés `6d20ecf` + `4319623` e informe `819cead`. El delta toca sólo
+`scripts/smoke.mjs` y las preparaciones conservan el significado de los seis
+casos. PM reprodujo 21, 54, 57, 125, 157 y 162 juntos desde otra base Docker
+limpia: **6/6**, salida 0. `node --check` y `diff-check` verdes. Dev informó
+suite completa **163/164**, con único rojo 131 ambiental. Evidencia en
+`REPRODUCCION-TEST-SUITE-164S-2026-09-10.md`.
+
+Queda una sola línea. La salida verde del 125 todavía informa que las
+publicaciones de servicio «no ganan foto», aunque el caso ahora acepta —bien—
+foto local de `/catalogo/` o `/estados/no-photo.svg`, y `CATALOG-PHOTOS-1`
+exige fotos también para servicios. Cambiá únicamente esa frase para decir que
+usan foto local del catálogo o el respaldo honesto, sin imágenes externas o
+aleatorias.
+
+Un commit sólo de `scripts/smoke.mjs` y un informe breve separado. Corré
+únicamente `node --check` y `diff-check`: no repitas ningún smoke, suite, build,
+lint, Backend, a11y, contraste o captura. No toques producto, no integres a
+`main`, no despliegues y frená al informar.
+
 ## 2026-09-09 — CIERRE: ADMIN-SAFETY-1R aceptada; activar TEST-SUITE-164S
 
 Aceptados base producto/regresión `79f3219`, informe `c26db85`, corrección
