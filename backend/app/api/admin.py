@@ -790,6 +790,30 @@ def update_subcategory(
     subcategory = db.query(Subcategory).filter(Subcategory.id == subcategory_id).first()
     if not subcategory:
         raise HTTPException(status_code=404, detail="Subcategoría no encontrada")
+
+    # Desactivar una subcategoría la saca de los filtros del catálogo, pero NO
+    # esconde las publicaciones que la usan: siguen visibles, siguen diciendo
+    # que son de ella y ya no hay forma de llegar a ellas filtrando. Se midió:
+    # la subcategoría desapareció de las 8 que ofrecía su categoría y su
+    # publicación siguió en el catálogo, con su nombre.
+    #
+    # Se frena antes de dejar ese estado. El resto de la subcategoría —nombre,
+    # orden— se sigue editando.
+    if subcategory_data.is_active is False and subcategory.is_active:
+        activas = db.query(Product).filter(
+            Product.subcategory_id == subcategory.id,
+            Product.status == ProductStatus.ACTIVE
+        ).count()
+        if activas > 0:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"No se puede desactivar '{subcategory.name}': tiene {activas} "
+                    "publicación(es) activa(s) que quedarían visibles en el catálogo "
+                    "pero fuera de los filtros. Movelas a otra subcategoría o "
+                    "pausalas antes de desactivarla."
+                )
+            )
     
     if subcategory_data.name and subcategory_data.name != subcategory.name:
         # Verificar nombre único en la categoría

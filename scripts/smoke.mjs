@@ -12079,6 +12079,13 @@ await runCase(120, '«Mis publicaciones» muestra cada anatomía como es, y no c
     await contexto.close();
   } finally {
     await browser.close();
+    // Se deja la base como estaba: la publicación vuelve a su subcategoría y la
+    // fabricada se va.
+    if (typeof productoId === 'string') {
+      querySql(`UPDATE products SET subcategory_id = ${subPrevia ? sqlLiteral(subPrevia) : 'NULL'} `
+        + `WHERE id = ${sqlLiteral(productoId)}`);
+      querySql(`DELETE FROM subcategories WHERE id = ${sqlLiteral(subDePrueba.id)}`);
+    }
   }
 
   return 'en el panel del vendedor el servicio no muestra stock, no reserva lugar '
@@ -16614,7 +16621,19 @@ await runCase(144, 'Administracion: las acciones se entienden, guardan, y no rom
     await filaDeLaSub.waitFor({ state: 'visible', timeout: 15_000 });
     const botonesDeLaSub = await revisarLosBotones(
       `[class*="subcategoryItem"]:has-text("${subReferenciada[1]}")`, 'en la subcategoria');
+    // Desde `ADMIN-SAFETY-1` el borrado pasa por la confirmación del producto:
+    // el clic en «Eliminar» abre la capa y no escribe nada. Confirmar es lo que
+    // manda la solicitud, así que acá se confirma y después se mide lo mismo
+    // que antes.
+    const confirmarBorrado = async () => {
+      const capa = page.locator('[role="dialog"][aria-labelledby^="confirmacion-titulo"]');
+      await capa.waitFor({ timeout: 15_000 });
+      await capa.getByRole('button', { name: /^Eliminar la subcategor/ }).click();
+      await capa.waitFor({ state: 'detached', timeout: 15_000 });
+    };
+
     await filaDeLaSub.getByRole('button', { name: /^Eliminar/ }).click();
+    await confirmarBorrado();
 
     await esperarA(async () => ((await page.locator('body').innerText()) || '')
       .includes('No se puede eliminar la subcategoría'),
@@ -16648,6 +16667,7 @@ await runCase(144, 'Administracion: las acciones se entienden, guardan, y no rom
       .locator('[class*="subcategoryItem"]').filter({ hasText: nombreDeLaSubNueva });
     await filaNueva.waitFor({ state: 'visible', timeout: 15_000 });
     await filaNueva.getByRole('button', { name: /^Eliminar/ }).click();
+    await confirmarBorrado();
     await esperarA(async () => queryRows(
       `SELECT id FROM subcategories WHERE name = ${sqlLiteral(nombreDeLaSubNueva)}`).length === 0,
     'una subcategoria sin publicaciones tampoco se pudo eliminar', 20_000);
@@ -17298,11 +17318,22 @@ await runCase(146, 'El estado de una publicacion se cambia desde el panel y pers
       `«draft» fue rechazado pero la publicacion paso de ${antesDelRechazo} a ${despuesDelRechazo}`);
 
     // --- C. accionar el control real, un PATCH por vez ---------------------
+    // Desde `ADMIN-SAFETY-1` elegir en el control no manda nada: abre la
+    // confirmacion, y confirmar es lo que manda el PATCH. Se sigue midiendo lo
+    // mismo —un PATCH por vez, con lo que se eligio— pero disparado donde
+    // ahora se dispara.
+    const confirmarElCambio = async () => {
+      const capa = page.locator('[role="dialog"][aria-labelledby^="confirmacion-titulo"]');
+      await capa.waitFor({ timeout: 15_000 });
+      await capa.getByRole('button', { name: /^Pasar a / }).click();
+      await capa.waitFor({ state: 'detached', timeout: 15_000 });
+    };
     const cambiarDesdeElPanel = async (publicacion, estado) => {
+      await selectorDe(publicacion.nombre).selectOption(estado);
       const [respuesta] = await Promise.all([
         page.waitForResponse((r) => r.url().includes(`/admin/products/${publicacion.id}/status`)
           && r.request().method() === 'PATCH', { timeout: 20_000 }),
-        selectorDe(publicacion.nombre).selectOption(estado),
+        confirmarElCambio(),
       ]);
       const enviado = JSON.parse(respuesta.request().postData() || '{}');
       assert(enviado.status === estado,
@@ -23346,6 +23377,401 @@ await runCase(163, 'Mi cuenta es una página del sitio: URL propia, historial, s
 
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
+
+
+// ---------------------------------------------------------------------------
+// 164. ADMIN-SAFETY-1 — el panel no escribe sobre datos ajenos sin preguntar.
+//
+// El panel manda sobre cuentas y publicaciones de otras personas, y hasta acá
+// decidía de dos maneras, las dos malas:
+//
+//  - cambiar el rol, activar o desactivar una cuenta y cambiar el estado de una
+//    publicación escribían en el acto, con el `onChange` de un `select`: un
+//    clic de más ya era un cambio hecho sobre la cuenta de otro;
+//  - y los borrados preguntaban con `window.confirm`, que no es una capa del
+//    producto: no tiene nombre accesible, no atrapa el foco ni lo devuelve,
+//    no se puede leer con el estilo del sitio y bloquea el hilo.
+//
+// Lo que se mide acá no es que «ahora pregunta», que se vería igual con un
+// cartel decorativo, sino la única propiedad que importa: **cuántas solicitudes
+// salen**. Cancelar —por botón, por Escape o por el fondo— tiene que hacer
+// CERO. Confirmar tiene que hacer UNA, y dejar la pantalla, la API y la base
+// diciendo lo mismo.
+//
+// Y se mide el restablecimiento de contraseña: que la clave vieja deje de
+// entrar, que la nueva entre, y que al cerrar la pantalla su único texto
+// visible desaparezca. La credencial no se imprime ni se captura acá.
+// ---------------------------------------------------------------------------
+await runCase(164, 'El panel de administración pregunta antes de escribir, y la clave temporal se ve una sola vez', async () => {
+  const medidos = [];
+  const browser = await chromium.launch({ headless: true });
+  const admin = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email: 'admin@topgreen.com', password: 'admin123' },
+  });
+  const adminToken = admin.data.access_token;
+  // Se declaran acá y no adentro del `try` para que el `finally` pueda
+  // devolver la base a como estaba aunque el caso se caiga a la mitad.
+  let productoId = null;
+  let subPrevia = '';
+  let subDePrueba = null;
+
+  try {
+    // --- R5: Configuración ya no ofrece administrar Provincias ------------
+    //
+    // Se rastrearon los consumidores reales: publicar, registrarse, el alta de
+    // transportista, los filtros y la edición del perfil piden todos
+    // `/catalog/localities/provinces`. Nadie pide `option_type=province`.
+    const tiposDeOpcion = await apiRequest('/admin/form-options/types', { token: adminToken });
+    assert(tiposDeOpcion.data.types.some((t) => t.value === 'province'),
+      'la API ya no ofrece el tipo province: este caso mide que se retire de la PANTALLA '
+      + 'dejando la API intacta, así que si el Backend cambió hay que revisar el contrato');
+    const consumidoresDeProvincias = readFileSync('src/components/AdminPanel/AdminPanel.tsx', 'utf8');
+    assert(/TIPOS_RETIRADOS/.test(consumidoresDeProvincias),
+      'Configuración volvió a ofrecer todos los tipos que devuelve la API');
+    medidos.push('Provincias se retiró de Configuración y la API quedó intacta');
+
+    // --- R4: la guarda está donde se midió el rojo -------------------------
+    //
+    // Desactivar una SUBcategoría la saca de los filtros y deja sus
+    // publicaciones visibles: nadie puede llegar a ellas filtrando, pero están.
+    // Eso se frena. Desactivar una CATEGORÍA, en cambio, no cambia nada de la
+    // parte pública —se midió—, así que no se le pone guarda a un interruptor
+    // que no hace nada.
+    // El par publicación+subcategoría se FABRICA en la base descartable en vez
+    // de buscarse en el catálogo. Buscarlo funcionaba aislado y se caía en la
+    // suite completa: para cuando llega el 164, los casos de antes ya movieron
+    // publicaciones y subcategorías, y el caso se quedaba sin material.
+    const [[idDelProducto, productoNombre, categoriaId, subcategoriaPrevia]] = queryRows(`
+      SELECT p.id, p.name, p.category_id, COALESCE(p.subcategory_id, '')
+      FROM products p
+      WHERE p.status = 'ACTIVE' AND p.category_id IS NOT NULL
+      ORDER BY p.id LIMIT 1
+    `);
+    assert(idDelProducto, 'no hay ninguna publicación activa con categoría: la base no es la del seed');
+    productoId = idDelProducto;
+    subPrevia = subcategoriaPrevia;
+    subDePrueba = (await apiRequest(`/admin/categories/${categoriaId}/subcategories`, {
+      method: 'POST',
+      token: adminToken,
+      body: { name: `Subcategoría de prueba 164 ${Date.now()}`, is_active: true, display_order: 0 },
+    })).data;
+    querySql(`UPDATE products SET subcategory_id = ${sqlLiteral(subDePrueba.id)} `
+      + `WHERE id = ${sqlLiteral(productoId)}`);
+    const conSub = { id: productoId, name: productoNombre, subcategory_id: subDePrueba.id };
+    medidos.push(`riesgo R4 medido sobre «${productoNombre}» y una subcategoría fabricada`);
+    // Un rechazo esperado no puede ir por `apiRequest`, que convierte todo lo
+    // que no sea 2xx en excepción: acá el 409 ES el resultado que se mide.
+    const pedir = async (ruta, cuerpo) => {
+      const respuesta = await fetch(`${API_URL}${ruta}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify(cuerpo),
+      });
+      const crudo = await respuesta.text();
+      return { status: respuesta.status, data: crudo ? JSON.parse(crudo) : null };
+    };
+    const frenada = await pedir(`/admin/subcategories/${conSub.subcategory_id}`, { is_active: false });
+    assert(frenada.status === 409,
+      `desactivar una subcategoría con publicaciones activas devolvió ${frenada.status} `
+      + 'y tiene que devolver 409');
+    assert(/publicaci/i.test(frenada.data.detail) && /pausal|Movel/i.test(frenada.data.detail),
+      `el motivo no dice qué hacer: ${JSON.stringify(frenada.data.detail)}`);
+    // Y lo demás de esa subcategoría se sigue editando.
+    const orden = await pedir(`/admin/subcategories/${conSub.subcategory_id}`, { display_order: 2 });
+    assert(orden.status === 200,
+      `la guarda se llevó puesta la edición del resto: cambiar el orden dio ${orden.status}`);
+    medidos.push('subcategoría con publicaciones activas: no se puede desactivar, el resto sí se edita');
+
+    // --- La pantalla -------------------------------------------------------
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+
+    // Cuántas solicitudes que ESCRIBEN salieron. Es la medición central: una
+    // confirmación que no impide la escritura es un cartel, no una guarda.
+    let escrituras = [];
+    page.on('request', (pedido) => {
+      const metodo = pedido.method();
+      if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(metodo) && /\/api\/admin\//.test(pedido.url())) {
+        escrituras.push(`${metodo} ${new URL(pedido.url()).pathname}`);
+      }
+    });
+    // Qué se está midiendo ahora mismo. Sin esto, un tiempo agotado adentro de
+    // una espera de Playwright no dice en cuál de los diez recorridos pasó.
+    let paso = 'apertura';
+    const contando = async (accion) => {
+      escrituras = [];
+      try {
+        await accion();
+      } catch (error) {
+        throw new Error(`en «${paso}»: ${error.message}`);
+      }
+      // Se espera a que la red se aquiete para no contar de menos.
+      await page.waitForTimeout(700);
+      return escrituras.slice();
+    };
+
+    // La cuenta sobre la que se mide es propia del caso, no una del seed. Con
+    // una del seed el caso pasaba aislado y se caía en la suite completa: para
+    // cuando llega el 164, los casos de antes ya cambiaron roles, estados y
+    // hasta la página en la que aparece cada fila. Creada acá, el punto de
+    // partida es siempre el mismo y no le saca nada a nadie.
+    const CORREO_ROL = `rol.${Date.now()}@example.com`;
+    const vendedor = (await apiRequest('/admin/users', {
+      method: 'POST',
+      token: adminToken,
+      body: {
+        email: CORREO_ROL, password: 'claveDePrueba123', full_name: 'Prueba Rol', role: 'user',
+      },
+    })).data;
+    assert(vendedor && vendedor.id, 'no se pudo crear la cuenta de prueba del caso');
+
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+    await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    await page.getByPlaceholder('tu@email.com').fill('admin@topgreen.com');
+    await page.getByPlaceholder('••••••••').fill('admin123');
+    await page.locator('[class*="_submitButton_"][type="submit"]').click();
+    await page.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 25_000 });
+    await page.getByRole('button', { name: 'Admin', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Usuarios', exact: true }).first().click();
+    await page.locator('table tbody tr').first().waitFor({ timeout: 25_000 });
+
+    // El panel entero también es una capa, así que «el diálogo» a secas
+    // encuentra dos, y «el último» deja de ser la confirmación en cuanto se
+    // cierra —vuelve a ser el panel, que no se va nunca—. Se la busca por su
+    // propio nombre accesible, que es lo único que la identifica siempre.
+    const capa = () => page.locator('[role="dialog"][aria-labelledby^="confirmacion-titulo"]');
+    const filaDe = (email) => page.locator('table tbody tr').filter({ hasText: email });
+
+    // No se toca al propio admin: tiene sus propias guardas y no es lo que se
+    // mide acá.
+    // Se la busca con el buscador: en la suite completa la tabla tiene muchas
+    // páginas y la fila nueva no tiene por qué estar en la primera.
+    const buscar = async (texto) => {
+      await page.getByLabel('Buscar usuarios por nombre o email').fill(texto);
+      await page.getByRole('button', { name: 'Buscar usuarios' }).click();
+      await esperarA(async () => (await page.locator('table tbody tr').count()) === 1,
+        `la búsqueda de ${texto} no dejó una sola fila`, 15_000);
+    };
+    await buscar(CORREO_ROL);
+    const fila = filaDe(CORREO_ROL);
+    await fila.first().waitFor({ timeout: 20_000 });
+
+    // --- 1. Cambiar el rol: cancelar no escribe ---------------------------
+    const selectorDeRol = fila.getByLabel('Rol del usuario');
+    // Se enfoca antes de elegir porque así llega el control en la realidad:
+    // quien cambia un `select` —con el mouse o tabulando— lo tiene enfocado.
+    // `selectOption` a secas escribe el valor sin enfocarlo, y entonces «volver
+    // el foco a quien abrió la capa» mediría un origen que nunca existió.
+    const elegirRol = async (valor) => {
+      await selectorDeRol.focus();
+      await selectorDeRol.selectOption(valor);
+    };
+    const rolAntes = await selectorDeRol.inputValue();
+    paso = 'elegir un rol nuevo';
+    // Se cuenta ANTES de esperar la capa, y no después: si el panel todavía
+    // escribiera en el acto, esperar primero daría «se agotó la espera» —que no
+    // dice nada— en vez de nombrar la solicitud que salió sin permiso.
+    const alAbrir = await contando(async () => { await elegirRol('admin'); });
+    assert(alAbrir.length === 0,
+      `elegir en el selector ya escribió, sin preguntar: ${JSON.stringify(alAbrir)}`);
+    await capa().waitFor({ timeout: 10_000 });
+
+    // La capa nombra el objeto y el cambio exacto.
+    const textoDeLaCapa = await capa().innerText();
+    assert(textoDeLaCapa.includes('Prueba Rol') && textoDeLaCapa.includes(CORREO_ROL),
+      `la confirmación no nombra a la persona: ${JSON.stringify(textoDeLaCapa.slice(0, 140))}`);
+    assert(/Usuario/.test(textoDeLaCapa) && /Admin/.test(textoDeLaCapa),
+      'la confirmación no dice de qué rol a qué rol');
+    const nombreDeLaCapa = await capa().getAttribute('aria-labelledby');
+    assert(nombreDeLaCapa && (await page.locator(`#${nombreDeLaCapa}`).innerText()).trim().length > 0,
+      'la capa no tiene nombre accesible');
+
+    // El foco entra en la capa y Tab no se escapa.
+    // La ÚLTIMA capa, no la primera: el panel entero también es un diálogo y
+    // está antes en el documento, así que preguntar por «el diálogo» mide la
+    // capa equivocada.
+    const focoDentro = () => page.evaluate(() => {
+      const capas = document.querySelectorAll('[role="dialog"]');
+      const arriba = capas[capas.length - 1];
+      return !!(arriba && document.activeElement && arriba.contains(document.activeElement));
+    });
+    // El foco lo pone un efecto, así que se espera la CONDICIÓN y no un rato
+    // fijo; si nunca entra, el mensaje dice dónde quedó.
+    await esperarA(focoDentro, `al abrir, el foco quedó fuera de la capa: está en `
+      + `${await page.evaluate(() => document.activeElement && document.activeElement.outerHTML.slice(0, 90))}`,
+    5_000);
+    for (let vuelta = 0; vuelta < 8; vuelta += 1) {
+      await page.keyboard.press('Tab');
+      assert(await focoDentro(), `el foco se escapó de la capa en la tabulación ${vuelta + 1}`);
+    }
+
+    // Cancelar por botón: cero solicitudes y el selector no miente.
+    paso = 'cancelar con el botón';
+    const alCancelar = await contando(async () => {
+      await capa().getByRole('button', { name: 'Cancelar' }).click();
+      await capa().waitFor({ state: 'detached', timeout: 10_000 });
+    });
+    assert(alCancelar.length === 0, `cancelar escribió: ${JSON.stringify(alCancelar)}`);
+    assert((await selectorDeRol.inputValue()) === rolAntes,
+      `cancelar dejó el selector mintiendo: dice ${await selectorDeRol.inputValue()} y el rol sigue siendo ${rolAntes}`);
+    // Y el foco volvió al control que la abrió.
+    assert(await selectorDeRol.evaluate((el) => el === document.activeElement),
+      'al cancelar, el foco no volvió al selector que abrió la capa: quedó en '
+      + `${await page.evaluate(() => document.activeElement && document.activeElement.outerHTML.slice(0, 100))}`);
+
+    // Escape y el fondo significan lo mismo que Cancelar.
+    for (const [comoSeLlama, cerrar] of [
+      ['Escape', async () => page.keyboard.press('Escape')],
+      ['el fondo', async () => capa().locator('xpath=..').click({ position: { x: 8, y: 8 } })],
+    ]) {
+      paso = 'cerrar con Escape o el fondo';
+      const salidas = await contando(async () => {
+        await selectorDeRol.selectOption('admin');
+        await capa().waitFor({ timeout: 10_000 });
+        await cerrar();
+        await capa().waitFor({ state: 'detached', timeout: 10_000 });
+      });
+      assert(salidas.length === 0, `cerrar con ${comoSeLlama} escribió: ${JSON.stringify(salidas)}`);
+      assert((await selectorDeRol.inputValue()) === rolAntes,
+        `cerrar con ${comoSeLlama} dejó el selector mintiendo`);
+    }
+    medidos.push('cambiar rol: cancelar por botón, Escape y fondo hacen cero solicitudes y no dejan el selector mintiendo');
+
+    // --- 2. Confirmar hace UNA sola solicitud ------------------------------
+    // La base guarda el rol como enum en mayúsculas y la pantalla lo usa en
+    // minúsculas: se compara en minúsculas para no medir la ortografía.
+    const rolEnBase = () => queryRows(
+      `SELECT role FROM users WHERE email = ${sqlLiteral(CORREO_ROL)}`,
+    )[0][0].toLowerCase();
+    const antesEnBase = rolEnBase();
+    paso = 'confirmar el cambio de rol';
+    const alConfirmar = await contando(async () => {
+      await elegirRol('admin');
+      await capa().waitFor({ timeout: 10_000 });
+      await capa().getByRole('button', { name: /Dar acceso de Admin/ }).click();
+      await capa().waitFor({ state: 'detached', timeout: 15_000 });
+    });
+    assert(alConfirmar.length === 1,
+      `confirmar mandó ${alConfirmar.length} solicitudes y tiene que mandar una: ${JSON.stringify(alConfirmar)}`);
+    await esperarA(async () => rolEnBase() === 'admin',
+      `la base no registró el cambio de rol: sigue en ${rolEnBase()}`, 15_000);
+    await esperarA(async () => (await selectorDeRol.inputValue()) === 'admin',
+      'la pantalla no refleja el rol nuevo', 15_000);
+    medidos.push(`confirmar: una sola solicitud y base/pantalla coherentes (${antesEnBase} → admin)`);
+
+
+    // --- 3. Restablecer contraseña ----------------------------------------
+    //
+    // Sobre un usuario creado acá, en la base descartable, para no dejar sin
+    // clave a una cuenta del seed que usan otros casos.
+    // `.local` es un dominio reservado y el validador de correo lo rechaza con
+    // 422; `example.com` está reservado justamente para pruebas.
+    const CORREO = `reset.${Date.now()}@example.com`;
+    const CLAVE_VIEJA = 'claveVieja123';
+    const creado = await apiRequest('/admin/users', {
+      method: 'POST',
+      token: adminToken,
+      body: { email: CORREO, password: CLAVE_VIEJA, full_name: 'Prueba Reset', role: 'user' },
+    });
+    assert(creado.status === 200 || creado.status === 201,
+      `no se pudo crear el usuario de prueba: ${creado.status}`);
+    // Que una contraseña NO entre es el resultado que se mide, así que no puede
+    // ir por `apiRequest`: el 401 es la respuesta, no una excepción.
+    const entra = async (clave) => (await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: CORREO, password: clave }),
+    })).status === 200;
+    assert(await entra(CLAVE_VIEJA), 'la clave inicial del usuario de prueba no entra');
+
+    await page.getByRole('button', { name: 'Usuarios', exact: true }).first().click();
+    await buscar(CORREO);
+    const filaNueva = filaDe(CORREO);
+    await filaNueva.first().waitFor({ timeout: 20_000 });
+
+    paso = 'restablecer la contraseña';
+    const alRestablecer = await contando(async () => {
+      await filaNueva.getByRole('button', { name: 'Restablecer contraseña' }).click();
+      await capa().waitFor({ timeout: 10_000 });
+      await capa().getByRole('button', { name: /Generar contraseña temporal/ }).click();
+      await page.locator('[role="dialog"][aria-labelledby="clave-temporal-titulo"]')
+        .waitFor({ timeout: 20_000 });
+    });
+    assert(alRestablecer.length === 1,
+      `restablecer mandó ${alRestablecer.length} solicitudes: ${JSON.stringify(alRestablecer)}`);
+
+    // La clave se lee del DOM para probarla y no se imprime nunca.
+    const resultado = page.locator('[role="dialog"][aria-labelledby="clave-temporal-titulo"]');
+    const temporal = (await resultado.locator('code').innerText()).trim();
+    assert(temporal.length >= 16, `la clave temporal tiene ${temporal.length} caracteres: es corta`);
+    assert(!(await entra(CLAVE_VIEJA)), 'la contraseña anterior sigue entrando después del restablecimiento');
+    assert(await entra(temporal), 'la contraseña temporal no entra');
+
+    // Y no quedó registrada en ningún lado del navegador.
+    const rastros = await page.evaluate((secreto) => ({
+      local: Object.entries({ ...localStorage }).some(([, v]) => String(v).includes(secreto)),
+      sesion: Object.entries({ ...sessionStorage }).some(([, v]) => String(v).includes(secreto)),
+      url: window.location.href.includes(secreto),
+    }), temporal);
+    assert(!rastros.local && !rastros.sesion && !rastros.url,
+      `la clave temporal quedó guardada: ${JSON.stringify(rastros)}`);
+
+    // Al cerrar, su único texto visible desaparece y no se puede recuperar.
+    await resultado.getByRole('button', { name: /cerrar/i }).click();
+    await resultado.waitFor({ state: 'detached', timeout: 10_000 });
+    const sigueEnPantalla = await page.evaluate(
+      (secreto) => document.body.innerText.includes(secreto), temporal,
+    );
+    assert(!sigueEnPantalla, 'la clave temporal sigue visible después de cerrar el resultado');
+    medidos.push('restablecer: una solicitud, la clave vieja deja de entrar, la temporal entra y al cerrar no se recupera');
+
+    // --- 4. Los borrados ya no usan window.confirm -------------------------
+    //
+    // `window.confirm` no dibuja nada en la página: si un borrado siguiera
+    // usándolo, no aparecería ninguna capa y el diálogo nativo colgaría la
+    // prueba. Se comprueba que aparezca la capa del producto.
+    let nativos = 0;
+    page.on('dialog', async (dialogo) => { nativos += 1; await dialogo.dismiss(); });
+    await page.getByRole('button', { name: 'Categorías', exact: true }).first().click();
+    // Las subcategorías están plegadas: hay que abrir una categoría para verlas.
+    await page.getByRole('button', { name: /^Mostrar las subcategorías de/ }).first()
+      .click({ timeout: 20_000 });
+    const borrarSub = page.getByRole('button', { name: /^Eliminar la subcategoría/ }).first();
+    await borrarSub.waitFor({ timeout: 20_000 });
+    paso = 'pedir un borrado';
+    // Igual que arriba: primero se mira qué apareció, y recién después se
+    // espera la capa. `window.confirm` no dibuja nada en la página, así que
+    // esperar primero diría «se agotó la espera» en vez de «abrió un diálogo
+    // nativo».
+    const alPedirBorrado = await contando(async () => { await borrarSub.click(); });
+    assert(nativos === 0, `el borrado abrió ${nativos} diálogo(s) nativo(s): sigue usando window.confirm`);
+    assert(alPedirBorrado.length === 0, `pedir el borrado ya escribió: ${JSON.stringify(alPedirBorrado)}`);
+    await capa().waitFor({ timeout: 10_000 });
+    assert(/Eliminar la subcategoría/i.test(await capa().innerText()),
+      'la capa de borrado no dice qué se elimina');
+    paso = 'cancelar un borrado';
+    const alCancelarBorrado = await contando(async () => {
+      await page.keyboard.press('Escape');
+      await capa().waitFor({ state: 'detached', timeout: 10_000 });
+    });
+    assert(alCancelarBorrado.length === 0,
+      `cancelar el borrado escribió: ${JSON.stringify(alCancelarBorrado)}`);
+    medidos.push('borrados: capa del producto en vez de window.confirm, y cancelar no escribe');
+
+    // Y no queda ningún `window.confirm` en el panel.
+    const panel = readFileSync('src/components/AdminPanel/AdminPanel.tsx', 'utf8');
+    assert(!/\bconfirm\(/.test(panel),
+      'el panel todavía llama a window.confirm en algún recorrido');
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+  }
+
+  return medidos.join('; ');
+});
 
 console.log();
 console.log('Resumen smoke tests');

@@ -10,6 +10,8 @@ import {
   type DocumentacionEnCola,
 } from '../../utils/documentacion';
 import { useCapaModal } from '../../hooks/useCapaModal';
+import { Confirmacion } from '../../formularios/Confirmacion';
+import { ClaveTemporal } from './ClaveTemporal';
 import {
   COLOR_DEL_TONO,
   ESTADOS_DE_ORDEN,
@@ -18,6 +20,38 @@ import {
   estadoDeProducto,
 } from '../../utils/estados';
 import type { EstadoTraducido } from '../../utils/estados';
+
+/**
+ * Una decisión pendiente de confirmar. `hacer` es la mutación: se ejecuta si y
+ * sólo si la persona confirma.
+ */
+interface PedidoDeConfirmacion {
+  titulo: string;
+  detalle: React.ReactNode;
+  textoConfirmar: string;
+  destructiva?: boolean;
+  hacer: () => Promise<void>;
+}
+
+/**
+ * Tipos de opción que Configuración ya no administra.
+ *
+ * `province` era una lista de provincias escrita a mano, de cuando no había
+ * padrón. Hoy no la consume nadie: publicar, registrarse, el alta de
+ * transportista, los filtros del Mercado y la edición del perfil piden todos
+ * `/catalog/localities/provinces`, que es el padrón oficial con sus
+ * localidades. Se midió: en una base recién creada no hay ninguna fila
+ * `province`, y ningún consumidor pide `option_type=province`.
+ *
+ * Dejarla en el panel era ofrecer un lugar donde escribir provincias que no
+ * iban a aparecer en ningún lado, y una segunda lista de provincias es
+ * exactamente lo que el padrón vino a evitar.
+ *
+ * Se retira de la pantalla y NADA más: las filas que existan y el endpoint
+ * siguen como están, porque quitar el tipo del Backend rompería a cualquiera
+ * que todavía lo llame.
+ */
+const TIPOS_RETIRADOS = ['province'];
 
 type AdminTab =
   | 'dashboard' | 'users' | 'products' | 'orders' | 'categories' | 'config'
@@ -287,6 +321,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     role: 'user' as 'admin' | 'user'
   });
   
+  // La confirmación del panel: una sola capa para todas las decisiones que
+  // pisan datos de otra persona.
+  //
+  // Antes había dos formas de decidir, y las dos estaban mal. Cambiar el rol,
+  // activar o desactivar una cuenta y cambiar el estado de una publicación
+  // escribían en el acto, con un `onChange`: un clic de más en un `select` ya
+  // era un cambio hecho sobre la cuenta de otro. Y los borrados preguntaban
+  // con `window.confirm`, que no es una capa del producto —no tiene nombre
+  // accesible, no atrapa el foco ni lo devuelve, y bloquea el hilo—.
+  //
+  // `hacer` es lo único que escribe. Mientras no se confirme, no sale ninguna
+  // solicitud; si se cancela, no sale ninguna nunca.
+  const [confirmacion, setConfirmacion] = useState<PedidoDeConfirmacion | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
+
+  // La contraseña temporal de un restablecimiento: existe en memoria, se
+  // muestra una vez y se va. No se guarda, no se registra y no se puede
+  // volver a pedir.
+  const [claveTemporal, setClaveTemporal] = useState<{ usuario: string; clave: string } | null>(null);
+
   // Products
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [productsTotal, setProductsTotal] = useState(0);
@@ -319,7 +373,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   // Form Options (Config)
   const [formOptions, setFormOptions] = useState<FormOption[]>([]);
   const [optionTypes, setOptionTypes] = useState<OptionTypeInfo[]>([]);
-  const [selectedOptionType, setSelectedOptionType] = useState<string>('province');
+  const [selectedOptionType, setSelectedOptionType] = useState<string>('unit');
   const [showCreateOption, setShowCreateOption] = useState(false);
   const [editingOption, setEditingOption] = useState<FormOption | null>(null);
   const [newOption, setNewOption] = useState({ value: '', label: '', display_order: 0 });
@@ -566,7 +620,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       // Cargar tipos de opciones si aún no lo hemos hecho
       if (optionTypes.length === 0) {
         const typesData = await apiGet<{ types: OptionTypeInfo[] }>('/admin/form-options/types');
-        setOptionTypes(typesData.types);
+        setOptionTypes(typesData.types.filter((tipo) => !TIPOS_RETIRADOS.includes(tipo.value)));
       }
       
       // Cargar opciones del tipo seleccionado
@@ -638,8 +692,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     }
   };
 
-  const handleDeleteOption = async (optionId: string, optionLabel: string) => {
-    if (!confirm(`¿Eliminar "${optionLabel}"?`)) return;
+  const handleDeleteOption = async (optionId: string) => {
     
     try {
       await apiDelete(`/admin/form-options/${optionId}`);
@@ -693,10 +746,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     }
   };
 
-  const handleDeleteCategory = async (categoryId: string, categoryName: string) => {
-    if (!confirm(`¿Eliminar la categoría "${categoryName}"? Esta acción no se puede deshacer.`)) {
-      return;
-    }
+  const handleDeleteCategory = async (categoryId: string) => {
     
     try {
       await apiDelete(`/admin/categories/${categoryId}`);
@@ -732,10 +782,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     }
   };
 
-  const handleDeleteSubcategory = async (subcategoryId: string, subcategoryName: string) => {
-    if (!confirm(`¿Eliminar la subcategoría "${subcategoryName}"?`)) {
-      return;
-    }
+  const handleDeleteSubcategory = async (subcategoryId: string) => {
     
     try {
       await apiDelete(`/admin/subcategories/${subcategoryId}`);
@@ -824,6 +871,136 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       console.error('Error:', error);
       showToast('Error al cambiar estado', 'error');
     }
+  };
+
+  // --- Lo que se pregunta antes de escribir --------------------------------
+  //
+  // Cada pedido nombra el objeto —la persona, la publicación—, el cambio
+  // exacto y su consecuencia. «¿Estás seguro?» no es una pregunta: no dice qué
+  // se va a hacer ni sobre qué.
+
+  const ROL_LEGIBLE: Record<string, string> = { admin: 'Admin', user: 'Usuario' };
+
+  const pedirBorrado = (
+    que: string,
+    nombre: string,
+    consecuencia: React.ReactNode,
+    hacer: () => Promise<void>,
+  ) => setConfirmacion({
+    titulo: `Eliminar ${que}`,
+    detalle: (<><strong>{nombre}</strong>. {consecuencia}</>),
+    textoConfirmar: `Eliminar ${que}`,
+    destructiva: true,
+    hacer,
+  });
+
+  /**
+   * Una contraseña temporal que sirva de verdad: 20 caracteres de un alfabeto
+   * sin ambiguos —nada de O/0, l/1/I—, sacados del generador criptográfico del
+   * navegador y no de `Math.random`, que es predecible.
+   *
+   * El rechazo por módulo se descarta en vez de recortarse: tomar el resto de
+   * un byte sobre un alfabeto que no divide a 256 favorece a las primeras
+   * letras, y una contraseña con letras más probables que otras es más corta
+   * de lo que aparenta.
+   */
+  const claveTemporalNueva = () => {
+    const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%+=?';
+    const TOPE = 256 - (256 % ALFABETO.length);
+    let clave = '';
+    while (clave.length < 20) {
+      const bytes = new Uint8Array(24);
+      crypto.getRandomValues(bytes);
+      for (const byte of bytes) {
+        if (byte < TOPE && clave.length < 20) clave += ALFABETO[byte % ALFABETO.length];
+      }
+    }
+    return clave;
+  };
+
+  const pedirRestablecerClave = (usuario: AdminUser) => setConfirmacion({
+    titulo: 'Restablecer la contraseña',
+    detalle: (
+      <>
+        Se le genera una contraseña temporal a <strong>{usuario.full_name}</strong>{' '}
+        ({usuario.email}) y la de ahora deja de funcionar en el momento. Vas a verla
+        una sola vez, así que tenés que tenerla a mano para pasársela.
+      </>
+    ),
+    textoConfirmar: 'Generar contraseña temporal',
+    destructiva: true,
+    hacer: async () => {
+      // La clave se genera acá y vive en memoria hasta que se cierra el
+      // resultado. No se registra, no viaja en la URL y no se guarda.
+      const clave = claveTemporalNueva();
+      await apiPost(`/admin/users/${usuario.id}/reset-password`, { password: clave });
+      setClaveTemporal({ usuario: usuario.full_name || usuario.email, clave });
+    },
+  });
+
+  const pedirCambioDeRol = (usuario: AdminUser, nuevoRol: string) => {
+    if (nuevoRol === usuario.role) return;
+    const sube = nuevoRol === 'admin';
+    setConfirmacion({
+      titulo: sube ? 'Dar acceso de administrador' : 'Quitar acceso de administrador',
+      detalle: (
+        <>
+          <strong>{usuario.full_name}</strong> ({usuario.email}) pasa de{' '}
+          <strong>{ROL_LEGIBLE[usuario.role] || usuario.role}</strong> a{' '}
+          <strong>{ROL_LEGIBLE[nuevoRol] || nuevoRol}</strong>.{' '}
+          {sube
+            ? 'Va a poder ver y cambiar los datos de todas las cuentas, publicaciones y órdenes.'
+            : 'Deja de tener acceso al panel y a los datos de las demás cuentas.'}
+        </>
+      ),
+      textoConfirmar: sube ? 'Dar acceso de Admin' : 'Pasar a Usuario',
+      destructiva: !sube,
+      hacer: () => handleChangeUserRole(usuario.id, nuevoRol),
+    });
+  };
+
+  const pedirCambioDeCuenta = (usuario: AdminUser) => {
+    const desactiva = usuario.is_active;
+    setConfirmacion({
+      titulo: desactiva ? 'Desactivar la cuenta' : 'Activar la cuenta',
+      detalle: (
+        <>
+          <strong>{usuario.full_name}</strong> ({usuario.email}){' '}
+          {desactiva
+            ? 'no va a poder volver a entrar hasta que se reactive la cuenta. Sus publicaciones y sus órdenes quedan como están.'
+            : 'vuelve a poder entrar con su contraseña de siempre.'}
+        </>
+      ),
+      textoConfirmar: desactiva ? 'Desactivar la cuenta' : 'Activar la cuenta',
+      destructiva: desactiva,
+      hacer: () => handleToggleUserActive(usuario.id),
+    });
+  };
+
+  const pedirCambioDeEstado = (producto: AdminProduct, nuevoEstado: string) => {
+    if (nuevoEstado === producto.status) return;
+    const CONSECUENCIA: Record<string, string> = {
+      active: 'Vuelve a aparecer en el catálogo y se puede comprar.',
+      paused: 'Deja de aparecer en el catálogo. No se borra y se puede volver a activar.',
+      sold_out: 'Sigue visible pero no se puede comprar.',
+      deleted: 'Deja de aparecer en el catálogo y en las búsquedas.',
+    };
+    const antes = estadoDeProducto(producto.status);
+    const despues = estadoDeProducto(nuevoEstado);
+    setConfirmacion({
+      titulo: 'Cambiar el estado de la publicación',
+      detalle: (
+        <>
+          <strong>{producto.name}</strong> pasa de <strong>{antes.texto}</strong> a{' '}
+          <strong>{despues.texto}</strong>. {CONSECUENCIA[nuevoEstado] || ''}{' '}
+          Es la publicación de otra persona: {producto.seller_name || 'su vendedor'} no
+          recibe aviso de este cambio.
+        </>
+      ),
+      textoConfirmar: `Pasar a ${despues.texto}`,
+      destructiva: nuevoEstado === 'deleted' || nuevoEstado === 'paused',
+      hacer: () => handleChangeProductStatus(producto.id, nuevoEstado),
+    });
   };
 
   const formatCurrency = (amount: number) => {
@@ -1154,7 +1331,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         <td>
                           <select aria-label="Rol del usuario"
                             value={user.role}
-                            onChange={(e) => handleChangeUserRole(user.id, e.target.value)}
+                            onChange={(e) => pedirCambioDeRol(user, e.target.value)}
                             className={styles.roleSelect}
                           >
                             <option value="user">Usuario</option>
@@ -1170,9 +1347,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         <td>
                           <button
                             className={`${styles.actionBtn} ${user.is_active ? styles.deactivate : styles.activate}`}
-                            onClick={() => handleToggleUserActive(user.id)}
+                            onClick={() => pedirCambioDeCuenta(user)}
                           >
                             {user.is_active ? 'Desactivar' : 'Activar'}
+                          </button>
+                          <button
+                            className={styles.actionBtn}
+                            onClick={() => pedirRestablecerClave(user)}
+                          >
+                            Restablecer contraseña
                           </button>
                         </td>
                       </tr>
@@ -1395,7 +1578,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         <td>
                           <select aria-label="Estado del producto"
                             value={product.status}
-                            onChange={(e) => handleChangeProductStatus(product.id, e.target.value)}
+                            onChange={(e) => pedirCambioDeEstado(product, e.target.value)}
                             className={styles.statusSelect}
                           >
                             <option value="active">Activo</option>
@@ -1703,7 +1886,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                       <button 
                         className={styles.deleteBtn}
                         aria-label={`Eliminar la categoría ${category.name}`}
-                        onClick={() => handleDeleteCategory(category.id, category.name)}
+                        onClick={() => pedirBorrado(
+                          'la categoría',
+                          category.name,
+                          'Se elimina para siempre. Sólo se puede si no le queda ninguna publicación ni subcategoría.',
+                          () => handleDeleteCategory(category.id),
+                        )}
                         disabled={category.product_count > 0}
                         title={category.product_count > 0
                           ? `No se puede eliminar: tiene ${category.product_count} publicación(es)`
@@ -1727,7 +1915,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                               <button 
                                 className={styles.deleteSubBtn}
                                 aria-label={`Eliminar la subcategoría ${sub.name}`}
-                                onClick={() => handleDeleteSubcategory(sub.id, sub.name)}
+                                onClick={() => pedirBorrado(
+                                  'la subcategoría',
+                                  sub.name,
+                                  'Se elimina para siempre. Sólo se puede si ninguna publicación la está usando.',
+                                  () => handleDeleteSubcategory(sub.id),
+                                )}
                               >
                                 Eliminar
                               </button>
@@ -1996,7 +2189,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         <button 
                           className={styles.deleteBtn}
                           aria-label={`Eliminar la opción ${option.label}`}
-                          onClick={() => handleDeleteOption(option.id, option.label)}
+                          onClick={() => pedirBorrado(
+                            'la opción',
+                            option.label,
+                            'Deja de ofrecerse en los formularios. Las publicaciones que ya la eligieron no cambian.',
+                            () => handleDeleteOption(option.id),
+                          )}
                         >
                           Eliminar
                         </button>
@@ -2010,6 +2208,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         </div>
       )}
       </div>
+
+      {/* La confirmación, una sola para todo el panel. Se dibuja última: es la
+          capa de más arriba y no tiene que competir con nada por el foco. */}
+      {confirmacion && (
+        <Confirmacion
+          titulo={confirmacion.titulo}
+          detalle={confirmacion.detalle}
+          textoConfirmar={confirmacion.textoConfirmar}
+          destructiva={confirmacion.destructiva}
+          enCurso={confirmando}
+          alConfirmar={async () => {
+            // Una sola mutación por confirmación: mientras viaja, los botones
+            // están deshabilitados y el fondo no cierra.
+            setConfirmando(true);
+            try {
+              await confirmacion.hacer();
+            } finally {
+              setConfirmando(false);
+              setConfirmacion(null);
+            }
+          }}
+          alCancelar={() => setConfirmacion(null)}
+        />
+      )}
+
+      {claveTemporal && (
+        <ClaveTemporal
+          usuario={claveTemporal.usuario}
+          clave={claveTemporal.clave}
+          alCerrar={() => setClaveTemporal(null)}
+        />
+      )}
     </div>
   );
 };

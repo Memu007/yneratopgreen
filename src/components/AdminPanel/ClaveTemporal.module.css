@@ -1,0 +1,67 @@
+.fondo {
+  position: fixed;
+  z-index: var(--tg-z-modal);
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--tg-space-4);
+  background-color: rgba(0, 0, 0, 0.55);
+}
+
+.tarjeta {
+  width: min(520px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: var(--tg-space-6);
+  border-radius: var(--tg-radius-lg);
+  background-color: var(--tg-color-surface);
+}
+
+.titulo {
+  margin: 0 0 var(--tg-space-3);
+  color: var(--tg-color-text);
+  font-family: var(--tg-font-display);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.detalle {
+  margin: 0 0 var(--tg-space-4);
+  color: var(--tg-color-text);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+/* La clave se lee y se dicta: monoespaciada para que no se confundan los
+   caracteres parecidos, con espacio entre letras y con la selección fácil. */
+.clave {
+  margin: 0 0 var(--tg-space-4);
+  padding: var(--tg-space-4);
+  border: 1px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-md);
+  background-color: var(--tg-color-surface-alt, #f5f5f0);
+  text-align: center;
+}
+
+.clave code {
+  color: var(--tg-color-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  user-select: all;
+  word-break: break-all;
+}
+
+.aviso {
+  margin: 0 0 var(--tg-space-5);
+  color: var(--tg-color-text-muted, #5a615c);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.acciones {
+  display: flex;
+  justify-content: flex-end;
+}
