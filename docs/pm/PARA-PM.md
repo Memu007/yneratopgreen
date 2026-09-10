@@ -2,6 +2,78 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## RATING-UX-1R — el 165 mide las tres cosas que antes sólo narraba
+
+**Resultado: corregido.**
+
+- Arnés: `c88b7ea` (sólo `scripts/smoke.mjs`)
+- **En mi rama, no en `main`.** No toqué producto, no integré, no desplegué.
+
+---
+
+### 1. Tenías razón, y la primera es la más fea
+
+El `else` guardaba igual un archivo **llamado** `calificacion-dialogo-390x844.png`
+—con Mis compras a medio cargar— y lo contaba como una de las tres capturas. Eso
+no es una prueba débil: es evidencia fabricada. Un informe que dice «tres
+capturas» y una es de otra cosa vale menos que no adjuntar ninguna.
+
+Ahora el diálogo en 390 px se abre **sobre la orden del propio caso** y **antes**
+de calificarla, que es lo que lo hace medible —después no hay botón ni capa que
+abrir—. Se exige `role="dialog"`, nombre visible, cero desborde del documento y
+que la tarjeta entre en los 390 px. Si no abre, el caso falla.
+
+### 2. El envío retenido, y una comprobación mía que no discriminaba
+
+El envío se retiene con un interceptor. Con la solicitud en vuelo: Escape y el
+fondo no cierran, Cerrar/Cancelar/Enviar quedan deshabilitados y no sale una
+segunda solicitud. Tenías razón en que un clic y esperar a que la capa
+desaparezca no prueba nada: la ventana dura milisegundos.
+
+**Y encontré que mi primera versión de esa comprobación daba verde con el
+producto roto.** La medí contra el producto sin la guarda del envío: pasó. El
+motivo es que, con el comentario escrito, Escape abre la pregunta de cambios sin
+guardar y la capa de calificación **sigue visible detrás**, así que «la capa
+sigue visible» se cumplía por el motivo equivocado. Ahora se exige además que la
+salida no llegue siquiera a esa pregunta. Con eso, el negativo da rojo.
+
+Lo cuento porque es exactamente el falso verde que vos me marcaste en el 160 y
+en el 125: la aserción que se satisface por otra cosa.
+
+### 3. El fallo y el reintento
+
+El primer intento se contesta con un fallo controlado: la capa sigue abierta, el
+`role="alert"` queda a la vista, el puntaje y el comentario se conservan y los
+controles vuelven a estar disponibles. Recién después se deja pasar **un**
+reintento real.
+
+El conteo distingue las dos solicitudes deliberadas —una fallada y un reintento—
+de una duplicación, y se exige que el intento fallado **no** haya dejado fila: la
+base queda con una sola. Se conservan las comprobaciones que ya estaban:
+promedio y cantidad, veredicto del servidor en falso y ausencia del botón tras
+recargar.
+
+### 4. Los tres rojos
+
+1. **Sin la guarda del envío**: «con la calificación en vuelo, Escape llegó
+   hasta la pregunta de salida».
+2. **Sin el aviso de error**: el `role="alert"` nunca aparece y la espera se
+   agota.
+3. **Con la fila de la orden apuntando a un número que no existe**: el bloque de
+   390 px falla en vez de capturar cualquier cosa.
+
+### 5. Puertas
+
+Corrí sólo lo que pediste: **165 desde base limpia, 1/1**, `node --check` y
+`diff-check`, verdes. Las tres capturas se regeneraron; la de 390 px ahora
+muestra el diálogo abierto con sus cinco estrellas. No repetí 149, 150, suite
+completa, lint, Backend, a11y ni contraste.
+
+Ninguna aserción nueva reveló un rojo de producto: las tres pasan contra
+`96ac68b` sin tocarlo.
+
+---
+
 ## RATING-UX-1 — la reputación se ve y calificar es una decisión operable
 
 **Resultado: terminado. Suite completa 164/165, único rojo el 131 ambiental.**
