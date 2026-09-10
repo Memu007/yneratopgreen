@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import styles from './ProductCard.module.css';
-import { Product } from '../../types';
+import { Product, CotizacionPedida } from '../../types';
 import { precioVisible, formatCantidad, etiquetaDeCatalogo, formatRating } from '../../utils/formatters';
 import {
   accionDe,
@@ -17,8 +17,12 @@ import { ProductImage } from '../ProductImage/ProductImage';
 interface ProductCardProps {
   product: Product;
   /** Adónde mandar a quien pide una cotización. Sin esto el botón no aparece:
-      prometer una solicitud que no existe es peor que no ofrecerla. */
-  onSolicitarCotizacion?: () => void;
+      prometer una solicitud que no existe es peor que no ofrecerla.
+
+      Lleva QUÉ se cotiza y a QUIÉN: antes no llevaba nada, así que Contacto
+      empezaba en blanco y la persona tenía que volver a escribir de qué
+      publicación estaba hablando —o mandar una consulta que no se entiende—. */
+  onSolicitarCotizacion?: (pedido: CotizacionPedida) => void;
   /** Cómo se PRESENTA esta misma tarjeta. `catalogo` es la cuadrícula del
       Mercado, `lista` es la misma operación en un renglón horizontal y
       `compacta` es la vista previa de Inicio y de Servicios. No son cuatro
@@ -98,7 +102,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       addItem(product, esServicio ? 1 : cantidad);
       return;
     }
-    if (accion.tipo === 'cotizar' && onSolicitarCotizacion) onSolicitarCotizacion();
+    if (accion.tipo === 'cotizar' && onSolicitarCotizacion) {
+      onSolicitarCotizacion({ publicacion: product.name, vendedor: product.seller.name });
+      return;
+    }
   };
 
   const cobertura = product.coverageZones?.length ? product.coverageZones.join(', ') : '';

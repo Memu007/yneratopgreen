@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { CotizacionPedida } from '../../types';
 import styles from './ContactPage.module.css';
 
 // Configuración de EmailJS - CAMBIAR ESTOS VALORES
@@ -12,16 +13,43 @@ const EMAILJS_CONFIG = {
   whatsappNumber: '+5492233485801'
 };
 
-export const ContactPage: React.FC = () => {
+interface ContactPageProps {
+  /**
+   * La publicación desde la que se pidió una cotización, si se llegó por ahí.
+   *
+   * Entrar por la cabecera o el pie la deja en `null`, y entonces esta pantalla
+   * es la de siempre: una consulta genérica no hereda el asunto ni el mensaje
+   * de una publicación que alguien miró antes.
+   */
+  cotizacion?: CotizacionPedida | null;
+}
+
+/**
+ * El texto con el que arranca una cotización.
+ *
+ * Nombra la publicación y a quien la publicó, que es lo que hace que del otro
+ * lado se entienda de qué se está hablando. Lo que NO trae son los datos de
+ * quien escribe: el nombre, el correo y el teléfono los pone ella. Completarlos
+ * por su cuenta sería inventar quién es.
+ */
+const mensajeDeCotizacion = ({ publicacion, vendedor }: CotizacionPedida) =>
+  `Hola, quiero pedir una cotización por «${publicacion}», publicada por ${vendedor}.`
+  + '\n\nContame precio, disponibilidad y cómo seguimos.';
+
+export const ContactPage: React.FC<ContactPageProps> = ({ cotizacion = null }) => {
+  // El formulario nace con la cotización adentro si se llegó por una
+  // publicación. Es estado inicial y no un efecto: la pantalla se monta de nuevo
+  // en cada entrada a Contacto, así que una publicación nueva reemplaza a la
+  // anterior sin que quede nada mezclado de la vez pasada.
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
-    subject: '',
-    message: '',
+    subject: cotizacion ? 'cotizacion' : '',
+    message: cotizacion ? mensajeDeCotizacion(cotizacion) : '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'preparado'>('idle');
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -30,6 +58,7 @@ export const ContactPage: React.FC = () => {
 
   const getSubjectText = (value: string) => {
     const subjects: Record<string, string> = {
+      'cotizacion': 'Solicitud de cotización',
       'ventas': 'Consultas sobre Ventas',
       'compras': 'Consultas sobre Compras',
       'tecnico': 'Soporte Técnico',
@@ -40,53 +69,38 @@ export const ContactPage: React.FC = () => {
     return subjects[value] || value;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  /**
+   * Prepara el correo y lo abre en la aplicación de la persona. Nada más, y
+   * eso es exactamente lo que dice el botón.
+   *
+   * Antes esto decía «Enviar por Email», llamaba a `window.open` con un
+   * `mailto:`, declaraba ÉXITO y vaciaba el formulario. Ninguna de esas tres
+   * cosas se podía sostener: `window.open` con un `mailto:` no informa si se
+   * abrió un cliente —devuelve `null` en casos perfectamente normales, y el
+   * navegador puede no tener ninguno configurado—, así que la pantalla afirmaba
+   * un envío que nadie vio y, de paso, borraba lo que la persona había escrito.
+   * Si el correo no se abría, el texto ya no estaba.
+   *
+   * Ahora no se afirma nada sobre el resultado y NO se limpia el formulario: lo
+   * escrito queda para copiar, corregir, reintentar o mandarlo por WhatsApp.
+   */
+  const abrirEnElCorreo = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setSubmitStatus('idle');
-
-    try {
-      // Opción 1: Enviar por EmailJS (requiere configuración)
-      // Si EmailJS está configurado, descomentar esto:
-      /*
-      const emailjs = await import('@emailjs/browser');
-      await emailjs.send(
-        EMAILJS_CONFIG.serviceId,
-        EMAILJS_CONFIG.templateId,
-        {
-          from_name: formData.name,
-          from_email: formData.email,
-          phone: formData.phone || 'No proporcionado',
-          subject: getSubjectText(formData.subject),
-          message: formData.message,
-          to_email: EMAILJS_CONFIG.destinationEmail,
-        },
-        EMAILJS_CONFIG.publicKey
-      );
-      */
-
-      // Opción 2: Abrir cliente de email del usuario (funciona siempre)
-      const subject = encodeURIComponent(`[AgroBoeda] ${getSubjectText(formData.subject)}`);
-      const body = encodeURIComponent(
-        `Nombre: ${formData.name}\n` +
-        `Email: ${formData.email}\n` +
-        `Teléfono: ${formData.phone || 'No proporcionado'}\n` +
-        `Asunto: ${getSubjectText(formData.subject)}\n\n` +
-        `Mensaje:\n${formData.message}`
-      );
-      
-      // Abre el cliente de email con los datos pre-llenados
-      window.open(`mailto:${EMAILJS_CONFIG.destinationEmail}?subject=${subject}&body=${body}`, '_blank');
-
-      setSubmitStatus('success');
-      setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
-      
-    } catch (error) {
-      console.error('Error al enviar:', error);
-      setSubmitStatus('error');
-    } finally {
-      setIsSubmitting(false);
-    }
+    // La codificación segura del asunto y del cuerpo se conserva: sin esto, un
+    // salto de línea o un `&` en el mensaje cortan el `mailto:` por la mitad.
+    const asunto = encodeURIComponent(`[AgroBoeda] ${getSubjectText(formData.subject)}`);
+    const cuerpo = encodeURIComponent(
+      `Nombre: ${formData.name}\n`
+      + `Email: ${formData.email}\n`
+      + `Teléfono: ${formData.phone || 'No proporcionado'}\n`
+      + `Asunto: ${getSubjectText(formData.subject)}\n\n`
+      + `Mensaje:\n${formData.message}`,
+    );
+    window.open(`mailto:${EMAILJS_CONFIG.destinationEmail}?subject=${asunto}&body=${cuerpo}`, '_blank');
+    // Una instrucción neutral, no un resultado: decimos qué hacer, no qué pasó.
+    setSubmitStatus('preparado');
+    setIsSubmitting(false);
   };
 
   const handleWhatsApp = () => {
@@ -116,19 +130,17 @@ export const ContactPage: React.FC = () => {
             <div className={styles.formContainer}>
               <h2>Envianos tu Consulta</h2>
               
-              {submitStatus === 'success' && (
-                <div className={styles.successMessage}>
-                  Se abrió tu cliente de correo con el mensaje. Enviálo para contactarnos.
-                </div>
-              )}
-              
-              {submitStatus === 'error' && (
-                <div className={styles.errorMessage}>
-                  No pudimos abrir tu cliente de correo. Intentá de nuevo o escribinos por WhatsApp.
+              {/* Una instrucción, no un resultado. No sabemos si se abrió el
+                  correo —nadie puede saberlo desde acá—, así que decimos qué
+                  falta hacer y no qué pasó. El texto sigue abajo, intacto. */}
+              {submitStatus === 'preparado' && (
+                <div className={styles.successMessage} role="status">
+                  Preparamos el mensaje en tu aplicación de correo. Revisalo y enviálo desde ahí.
+                  Si no se abrió, podés copiar el texto de abajo o escribirnos por WhatsApp.
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className={styles.form}>
+              <form onSubmit={abrirEnElCorreo} className={styles.form}>
                 <div className={styles.formGroup}>
                   <label htmlFor="name">Nombre Completo *</label>
                   <input
@@ -174,6 +186,7 @@ export const ContactPage: React.FC = () => {
                     required
                   >
                     <option value="">Seleccionar...</option>
+                    <option value="cotizacion">Solicitud de cotización</option>
                     <option value="ventas">Consultas sobre Ventas</option>
                     <option value="compras">Consultas sobre Compras</option>
                     <option value="servicios">Servicios AgroBoeda</option>
@@ -201,7 +214,7 @@ export const ContactPage: React.FC = () => {
                     className={styles.submitButton}
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? 'Enviando...' : 'Enviar por Email'}
+                    {isSubmitting ? 'Preparando…' : 'Abrir en mi correo'}
                   </button>
                   
                   <button 

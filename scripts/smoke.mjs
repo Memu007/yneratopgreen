@@ -24575,6 +24575,238 @@ await runCase(165, 'La reputación se ve, el servidor decide si se puede calific
     + `${capturas.length} capturas en ${CAPTURAS}`;
 });
 
+// ---------------------------------------------------------------------------
+// 166. QUOTE-CONTACT-1 — la cotización llega con su publicación, y el correo
+// no miente.
+//
+// Dos cosas rotas, y las dos de la misma familia: el producto afirmaba algo que
+// no era cierto.
+//
+//  1. «Solicitar cotización» llevaba a Contacto y NADA más. La persona llegaba
+//     a un formulario en blanco y tenía que volver a explicar de qué
+//     publicación estaba hablando —o mandar una consulta que del otro lado no
+//     se entiende—. El CTA prometía continuidad y no la daba.
+//  2. Y el botón decía «Enviar por Email»: llamaba a `window.open` con un
+//     `mailto:`, declaraba ÉXITO y vaciaba el formulario. `window.open` con un
+//     `mailto:` no informa si se abrió un cliente, así que la pantalla afirmaba
+//     un envío que nadie vio; y si no se abría, el texto ya no estaba.
+//
+// Lo que se mide es eso: que el asunto y el mensaje lleguen nombrando la
+// publicación y al vendedor exactos, que una entrada genérica NO herede nada, y
+// que preparar el correo no declare resultado ni borre lo escrito.
+// ---------------------------------------------------------------------------
+await runCase(166, 'La cotización llega a Contacto con su publicación, y preparar el correo no declara un envío', async () => {
+  const medidos = [];
+
+  // Una publicación sin precio publicado es la que ofrece «Solicitar
+  // cotización»: se lee de la base para no escribir su nombre a mano.
+  const [aCotizar] = queryRows(`
+    SELECT p.name, u.full_name
+    FROM products p JOIN users u ON u.id = p.seller_id
+    WHERE p.status = 'ACTIVE' AND (p.price IS NULL OR p.price = 0)
+    ORDER BY p.name LIMIT 1
+  `);
+  assert(aCotizar, 'no hay ninguna publicación a cotizar: el caso no se puede medir');
+  const [otraACotizar] = queryRows(`
+    SELECT p.name, u.full_name
+    FROM products p JOIN users u ON u.id = p.seller_id
+    WHERE p.status = 'ACTIVE' AND (p.price IS NULL OR p.price = 0)
+      AND p.name <> ${sqlLiteral(aCotizar[0])}
+    ORDER BY p.name LIMIT 1
+  `);
+  assert(otraACotizar, 'hace falta una segunda publicación a cotizar para probar el reemplazo');
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+
+    // Ni `window.open` ni ningún envío se dan por hecho: se registran.
+    const aperturas = [];
+    await page.addInitScript(() => {
+      window.__aperturas = [];
+      const original = window.open;
+      window.open = (url, ...resto) => {
+        window.__aperturas.push(String(url));
+        // Se devuelve `null` a propósito: es lo que devuelve un navegador sin
+        // cliente de correo configurado, que es justamente el caso en el que la
+        // pantalla no puede saber nada y antes afirmaba éxito igual.
+        void original;
+        void resto;
+        return null;
+      };
+    });
+    const leerAperturas = () => page.evaluate(() => window.__aperturas.slice());
+    const enviosAlBackend = [];
+    page.on('request', (pedido) => {
+      if (pedido.method() === 'POST' && /\/api\/contact/.test(pedido.url())) {
+        enviosAlBackend.push(pedido.url());
+      }
+    });
+
+    const irAlMercado = async () => {
+      await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+      await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 20_000 });
+    };
+    const buscar = async (nombre) => {
+      await page.getByLabel('Buscar en el mercado').fill(nombre);
+      await page.getByLabel('Buscar en el mercado').press('Enter');
+      await page.getByRole('heading', { name: nombre, exact: true, level: 3 })
+        .first().waitFor({ state: 'visible', timeout: 25_000 });
+    };
+    const seccion = () => new URL(page.url()).searchParams.get('section') || 'home';
+    const asunto = () => page.getByLabel('Asunto *').inputValue();
+    const mensaje = () => page.getByLabel(/Mensaje/).inputValue();
+    const enContacto = async () => {
+      await esperarA(async () => seccion() === 'contact',
+        `no se llegó a Contacto: la barra dice ${page.url()}`, 20_000);
+      await page.getByRole('heading', { name: /Envianos tu Consulta/i })
+        .waitFor({ state: 'visible', timeout: 20_000 });
+    };
+
+    // --- A. Desde la TARJETA ------------------------------------------------
+    await irAlMercado();
+    await buscar(aCotizar[0]);
+    const tarjeta = page.getByRole('heading', { name: aCotizar[0], exact: true, level: 3 })
+      .first().locator('xpath=ancestor::*[contains(@class,"card")]');
+    await tarjeta.getByRole('button', { name: 'Solicitar cotización' }).click();
+    await enContacto();
+
+    assert((await asunto()) === 'cotizacion',
+      `el asunto quedó en ${JSON.stringify(await asunto())} y tenía que ser el de cotización`);
+    const desdeLaTarjeta = await mensaje();
+    assert(desdeLaTarjeta.includes(aCotizar[0]),
+      `el mensaje no nombra la publicación: ${JSON.stringify(desdeLaTarjeta)}`);
+    assert(desdeLaTarjeta.includes(aCotizar[1]),
+      `el mensaje no nombra al vendedor «${aCotizar[1]}»: ${JSON.stringify(desdeLaTarjeta)}`);
+    // Y NO se completan los datos de quien escribe: inventarlos sería peor que
+    // dejarlos vacíos.
+    for (const campo of ['Nombre Completo *', 'Email *']) {
+      assert((await page.getByLabel(campo).inputValue()) === '',
+        `Contacto completó «${campo}» sin que la persona lo escribiera`);
+    }
+    medidos.push('desde la tarjeta, Contacto llega con asunto de cotización y el mensaje '
+      + 'nombrando publicación y vendedor, y sin inventar los datos de quien escribe');
+
+    // --- B. Desde el DETALLE ------------------------------------------------
+    await irAlMercado();
+    await buscar(aCotizar[0]);
+    await page.getByRole('heading', { name: aCotizar[0], exact: true, level: 3 }).first().click();
+    const detalle = page.getByRole('heading', { name: aCotizar[0], exact: true, level: 2 });
+    await detalle.waitFor({ state: 'visible', timeout: 20_000 });
+    // Acotado al detalle: la tarjeta que quedó DEBAJO tiene su propio botón con
+    // el mismo nombre, y «el primero» encontraba ése —tapado por la capa, así
+    // que el clic no llegaba nunca—.
+    const capaDelDetalle = detalle.locator('xpath=ancestor::div[contains(@class,"modal")]');
+    await capaDelDetalle.getByRole('button', { name: 'Solicitar cotización' }).click();
+    await enContacto();
+    const desdeElDetalle = await mensaje();
+    assert(desdeElDetalle.includes(aCotizar[0]) && desdeElDetalle.includes(aCotizar[1]),
+      `desde el detalle el mensaje no nombra publicación y vendedor: ${JSON.stringify(desdeElDetalle)}`);
+    assert(desdeElDetalle === desdeLaTarjeta,
+      'la tarjeta y el detalle preparan mensajes distintos para la misma publicación');
+    medidos.push('desde el detalle llega el mismo mensaje que desde la tarjeta');
+
+    // --- C. Contacto genérico sigue genérico --------------------------------
+    //
+    // Entrar por el pie después de haber pedido una cotización no puede heredar
+    // nada: una consulta de otro tema no arranca hablando de una publicación
+    // que la persona miró hace diez minutos.
+    await page.locator('footer').getByRole('link', { name: /Contacto/i }).first().click();
+    await enContacto();
+    assert((await asunto()) === '',
+      `entrando por el pie el asunto vino cargado: ${JSON.stringify(await asunto())}`);
+    assert((await mensaje()) === '',
+      `entrando por el pie el mensaje vino cargado: ${JSON.stringify(await mensaje())}`);
+    medidos.push('entrar a Contacto por el pie no hereda la cotización anterior');
+
+    // --- D. Una publicación nueva reemplaza a la anterior -------------------
+    await irAlMercado();
+    await buscar(otraACotizar[0]);
+    const otraTarjeta = page.getByRole('heading', { name: otraACotizar[0], exact: true, level: 3 })
+      .first().locator('xpath=ancestor::*[contains(@class,"card")]');
+    await otraTarjeta.getByRole('button', { name: 'Solicitar cotización' }).click();
+    await enContacto();
+    const segundoMensaje = await mensaje();
+    assert(segundoMensaje.includes(otraACotizar[0]),
+      `el mensaje no nombra la segunda publicación: ${JSON.stringify(segundoMensaje)}`);
+    assert(!segundoMensaje.includes(aCotizar[0]),
+      `el mensaje mezcla las dos publicaciones: ${JSON.stringify(segundoMensaje)}`);
+    medidos.push('una publicación nueva reemplaza a la anterior, sin mezclarlas');
+
+    // --- E. Abrir en mi correo: prepara, y no afirma nada -------------------
+    assert((await page.getByRole('button', { name: 'Abrir en mi correo' }).count()) === 1,
+      'el botón no dice «Abrir en mi correo»');
+    await page.getByLabel('Nombre Completo *').fill('Ana Prueba');
+    await page.getByLabel('Email *').fill('ana@example.com');
+
+    const antesDeAbrir = {
+      nombre: await page.getByLabel('Nombre Completo *').inputValue(),
+      email: await page.getByLabel('Email *').inputValue(),
+      asunto: await asunto(),
+      mensaje: await mensaje(),
+    };
+    await page.getByRole('button', { name: 'Abrir en mi correo' }).click();
+    await esperarA(async () => (await leerAperturas()).length === 1,
+      'no se preparó ningún correo', 15_000);
+
+    const [correo] = await leerAperturas();
+    assert(correo.startsWith('mailto:'), `lo que se abrió no es un correo: ${correo}`);
+    // Codificado de verdad: sin esto un salto de línea o un `&` cortan el
+    // `mailto:` por la mitad.
+    const url = new URL(correo);
+    const cuerpo = new URLSearchParams(url.search).get('body') || '';
+    assert(cuerpo.includes(otraACotizar[0]) && cuerpo.includes(otraACotizar[1]),
+      `el correo no lleva publicación y vendedor: ${JSON.stringify(cuerpo.slice(0, 160))}`);
+    assert(!/[\n\r]/.test(url.search),
+      'el asunto o el cuerpo viajan sin codificar: un salto de línea corta el mailto');
+
+    // No se afirma que se envió ni que se abrió: no se puede saber.
+    const textoDeLaPantalla = await page.locator('main, body').first().innerText();
+    for (const mentira of [/\bse abrió\b/i, /\benviado\b/i, /\bse envió\b/i, /Enviar por Email/i]) {
+      assert(!mentira.test(textoDeLaPantalla),
+        `la pantalla afirma un resultado que no puede conocer: coincide con ${mentira}`);
+    }
+    // Y lo escrito sigue ahí, que es lo que permite copiarlo o reintentar.
+    assert((await page.getByLabel('Nombre Completo *').inputValue()) === antesDeAbrir.nombre
+      && (await page.getByLabel('Email *').inputValue()) === antesDeAbrir.email
+      && (await asunto()) === antesDeAbrir.asunto
+      && (await mensaje()) === antesDeAbrir.mensaje,
+    'preparar el correo se llevó puesto lo que la persona había escrito');
+    medidos.push('«Abrir en mi correo» prepara UN mailto codificado con publicación y vendedor, '
+      + 'no declara envío y no borra lo escrito');
+
+    // --- F. WhatsApp hereda el mismo contexto -------------------------------
+    await page.getByRole('button', { name: /WhatsApp/i }).first().click();
+    await esperarA(async () => (await leerAperturas()).length === 2,
+      'WhatsApp no preparó nada', 15_000);
+    const [, porWhatsApp] = await leerAperturas();
+    assert(/wa\.me/.test(porWhatsApp), `lo segundo que se abrió no es WhatsApp: ${porWhatsApp}`);
+    const textoDeWhatsApp = decodeURIComponent(
+      new URL(porWhatsApp).searchParams.get('text') || '');
+    assert(textoDeWhatsApp.includes(otraACotizar[0]) && textoDeWhatsApp.includes(otraACotizar[1]),
+      `WhatsApp no hereda la cotización: ${JSON.stringify(textoDeWhatsApp.slice(0, 160))}`);
+    assert((await mensaje()) === antesDeAbrir.mensaje,
+      'WhatsApp se llevó puesto el mensaje escrito');
+    medidos.push('WhatsApp reutiliza el mismo contexto y tampoco borra nada');
+
+    // --- G. Y no se abrió ningún canal que no existe ------------------------
+    assert(enviosAlBackend.length === 0,
+      `salieron ${enviosAlBackend.length} envíos a /contact: ese canal no está conectado `
+      + 'en esta pieza y prometerlo sería peor que no ofrecerlo');
+    medidos.push('no sale ningún POST a /contact: el canal público sigue sin conectarse');
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+  }
+
+  return `desde la tarjeta y desde el detalle, «Solicitar cotización» llega a Contacto con `
+    + `la publicación y el vendedor nombrados; una entrada genérica no hereda nada y una `
+    + `publicación nueva reemplaza a la anterior; preparar el correo abre un solo mailto `
+    + `codificado, no declara envío y conserva lo escrito; ${medidos.join('; ')}`;
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

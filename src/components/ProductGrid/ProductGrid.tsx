@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import styles from './ProductGrid.module.css';
-import { Product } from '../../types';
+import { Product, CotizacionPedida } from '../../types';
 import { ProductCard } from '../ProductCard/ProductCard';
 
 interface ProductGridProps {
@@ -18,7 +18,7 @@ interface ProductGridProps {
   /** Adónde va quien pide una cotización. Se pasa hacia abajo hasta la tarjeta
       y el detalle: sin destino, el botón queda deshabilitado en vez de
       prometer una solicitud que no existe. */
-  onSolicitarCotizacion?: () => void;
+  onSolicitarCotizacion?: (pedido: CotizacionPedida) => void;
   /** Se pasa hacia abajo igual que la cotización: la tarjeta la necesita para
       que el detalle, sin sesión, ofrezca ingresar en vez de un aviso sin
       salida. */

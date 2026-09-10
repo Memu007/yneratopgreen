@@ -235,3 +235,16 @@ export interface NewProductData {
   };
   tags: string[];
 }
+
+/**
+ * Lo que viaja cuando alguien pide una cotización desde una publicación.
+ *
+ * Es lo mínimo que hace falta para que Contacto no empiece en blanco: qué se
+ * está cotizando y a quién. No lleva precio ni identificadores internos —el
+ * mensaje lo lee una persona— y NO lleva datos de quien escribe: esos los pone
+ * ella, o no están.
+ */
+export interface CotizacionPedida {
+  publicacion: string;
+  vendedor: string;
+}

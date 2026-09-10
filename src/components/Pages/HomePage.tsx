@@ -1,4 +1,5 @@
 import React from 'react';
+import type { CotizacionPedida } from '../../types';
 import styles from './HomePage.module.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
@@ -7,7 +8,9 @@ import type { VistaPrevia } from '../../hooks/useVistaPrevia';
 
 interface HomePageProps {
   onNavigateToMarketplace: () => void;
-  onNavigateToContact?: () => void;
+  /** Pedir una cotización desde una tarjeta de esta pantalla. Lleva qué se
+      cotiza y a quién: sin eso, Contacto empieza en blanco. */
+  onSolicitarCotizacion?: (pedido: CotizacionPedida) => void;
   onNavigateToServices?: () => void;
   onPublishClick?: () => void;
   onLoginClick?: () => void;
@@ -45,7 +48,7 @@ const DECISION: [string, string][] = [
 
 export const HomePage: React.FC<HomePageProps> = ({
   onNavigateToMarketplace,
-  onNavigateToContact,
+  onSolicitarCotizacion,
   onPublishClick,
   onLoginClick,
   onSolicitarIngreso,
@@ -180,7 +183,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 key={operacion.id}
                 product={operacion}
                 variante="compacta"
-                onSolicitarCotizacion={onNavigateToContact}
+                onSolicitarCotizacion={onSolicitarCotizacion}
                 onSolicitarIngreso={onSolicitarIngreso}
               />
             ))}

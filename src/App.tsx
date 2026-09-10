@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import styles from './App.module.css';
 import { Header } from './components/Header/Header';
 import { Footer } from './components/Footer/Footer';
@@ -29,7 +29,7 @@ import {
 } from './utils/catalogService';
 import { ContextoDeNavegacion, useNavegacion } from './navegacion/navegacion';
 import type { Seccion } from './navegacion/politica';
-import type { NewProductData, Product } from './types';
+import type { NewProductData, Product, CotizacionPedida } from './types';
 import type {
   CategoryResponse,
   LocalityResponse,
@@ -47,7 +47,37 @@ function App() {
   // hay abierta encima y cómo se escribe el historial. Nadie más lo toca.
   const navegacion = useNavegacion();
   const currentSection = navegacion.seccion;
-  const handleNavigate = navegacion.navegar;
+  /**
+   * La cotización que se está pidiendo, si se llegó a Contacto desde una
+   * publicación.
+   *
+   * Vive acá porque es de la navegación, no de Contacto: dura lo que dura el
+   * viaje desde la tarjeta o el detalle hasta la pantalla, y se pierde en
+   * cuanto se entra a Contacto por cualquier otro lado. No se guarda en el
+   * navegador a propósito —recargar Contacto no tiene por qué revivir una
+   * consulta de otro momento— y por eso tampoco viaja en la URL.
+   */
+  const [cotizacionPedida, setCotizacionPedida] = useState<CotizacionPedida | null>(null);
+
+  /**
+   * Navegar. Entrar a Contacto por la cabecera, el pie o cualquier llamada
+   * común limpia la cotización: si no, una consulta genérica heredaría el
+   * asunto y el mensaje de la publicación que alguien miró hace diez minutos.
+   */
+  const handleNavigate = useCallback((destino: Seccion) => {
+    if (destino === 'contact') setCotizacionPedida(null);
+    navegacion.navegar(destino);
+  }, [navegacion]);
+
+  /**
+   * Pedir una cotización: deja la intención y va. No pasa por `handleNavigate`
+   * justamente para no borrarse a sí misma, y por eso una publicación nueva
+   * reemplaza a la anterior en vez de mezclarse con ella.
+   */
+  const pedirCotizacion = useCallback((pedido: CotizacionPedida) => {
+    setCotizacionPedida(pedido);
+    navegacion.navegar('contact');
+  }, [navegacion]);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [provinces, setProvinces] = useState<ProvinceResponse[]>([]);
@@ -364,7 +394,7 @@ function App() {
       case 'home':
         return <HomePage 
           onNavigateToMarketplace={() => handleNavigate('marketplace')} 
-          onNavigateToContact={() => handleNavigate('contact')}
+          onSolicitarCotizacion={pedirCotizacion}
           onNavigateToServices={() => handleNavigate('services')}
           onPublishClick={() => setIsAddProductOpen(true)}
           onLoginClick={abrirLogin}
@@ -423,7 +453,7 @@ function App() {
                 isLoading={loadingProducts}
                 error={errorDeCatalogo}
                 onReintentar={() => setProductsRevision((intento) => intento + 1)}
-                onSolicitarCotizacion={() => handleNavigate('contact')}
+                onSolicitarCotizacion={pedirCotizacion}
                 onSolicitarIngreso={abrirLoginYVolver}
               />
             </div>
@@ -433,16 +463,16 @@ function App() {
         return (
           <AboutPage 
             onNavigateToMarketplace={() => handleNavigate('marketplace')}
+            onNavigateToContact={() => handleNavigate('contact')}
             onOpenSellModal={() => setIsAddProductOpen(true)}
             isLoggedIn={!!user}
             onOpenLogin={abrirLogin}
-            onNavigateToContact={() => handleNavigate('contact')}
-          />
+            />
         );
       case 'services':
         return (
           <ServicesPage
-            onNavigateToContact={() => handleNavigate('contact')}
+              onSolicitarCotizacion={pedirCotizacion}
             onVerServiciosPublicados={verServiciosPublicados}
             onPublishClick={() => setIsAddProductOpen(true)}
             onLoginClick={abrirLogin}
@@ -458,7 +488,21 @@ function App() {
           <UserDashboard onPublishClick={() => setIsAddProductOpen(true)} />
         ) : null;
       case 'contact':
-        return <ContactPage />;
+        // La `key` cuelga de la intención a propósito.
+        //
+        // El formulario nace con la cotización adentro, y eso sólo alcanza si
+        // la pantalla se monta de nuevo. Estando YA en Contacto no se monta:
+        // volver a entrar por el pie deja la misma instancia viva y el
+        // formulario seguía mostrando la publicación anterior aunque la
+        // intención ya se hubiera limpiado. Con la `key`, cambiar de intención
+        // —o dejar de tenerla— es otra pantalla, y una publicación nueva
+        // reemplaza a la anterior en vez de convivir con ella.
+        return (
+          <ContactPage
+            key={cotizacionPedida ? `cotizacion:${cotizacionPedida.publicacion}` : 'generico'}
+            cotizacion={cotizacionPedida}
+          />
+        );
       case 'payment-success':
         return (
           <PaymentResultPage 
@@ -486,7 +530,6 @@ function App() {
       default:
         return <HomePage 
           onNavigateToMarketplace={() => handleNavigate('marketplace')}
-          onNavigateToContact={() => handleNavigate('contact')}
           onPublishClick={() => setIsAddProductOpen(true)}
           onLoginClick={abrirLogin}
           onSolicitarIngreso={abrirLoginYVolver}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Product } from '../../types';
+import { Product, CotizacionPedida } from '../../types';
 import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
@@ -24,7 +24,7 @@ import { ADAPTACION_DEMO, fotoDemoDeArchivo } from '../../utils/fotosDemo';
 interface ProductDetailModalProps {
   product: Product;
   onClose: () => void;
-  onSolicitarCotizacion?: () => void;
+  onSolicitarCotizacion?: (pedido: CotizacionPedida) => void;
   /** Qué hacer cuando falta la sesión. Sin esto el botón sólo avisaba con un
       toast: detectaba bien el requisito y dejaba a la persona sin salida,
       aunque el Login ya existe y la cabecera sabe abrirlo. */
@@ -81,7 +81,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const ejecutar = () => {
     if (accion.tipo === 'cotizar') {
-      onSolicitarCotizacion?.();
+      // La publicación y el vendedor viajan con el pedido: es lo que hace que
+      // Contacto sepa de qué se está hablando.
+      onSolicitarCotizacion?.({ publicacion: product.name, vendedor: product.seller.name });
       onClose();
       return;
     }

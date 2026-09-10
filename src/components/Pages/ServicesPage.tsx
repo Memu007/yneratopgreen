@@ -1,4 +1,5 @@
 import React from 'react';
+import type { CotizacionPedida } from '../../types';
 import styles from './ServicesPage.module.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
@@ -6,7 +7,9 @@ import { ProductCard } from '../ProductCard/ProductCard';
 import type { VistaPrevia } from '../../hooks/useVistaPrevia';
 
 interface ServicesPageProps {
-  onNavigateToContact?: () => void;
+  /** Pedir una cotización desde una tarjeta de esta pantalla. Lleva qué se
+      cotiza y a quién: sin eso, Contacto empieza en blanco. */
+  onSolicitarCotizacion?: (pedido: CotizacionPedida) => void;
   /** Lleva al mercado con el filtro de servicios ya puesto. */
   onVerServiciosPublicados?: () => void;
   onPublishClick?: () => void;
@@ -35,7 +38,7 @@ const PRUEBA: [string, string][] = [
 ];
 
 export const ServicesPage: React.FC<ServicesPageProps> = ({
-  onNavigateToContact,
+  onSolicitarCotizacion,
   onVerServiciosPublicados,
   onPublishClick,
   onLoginClick,
@@ -152,7 +155,7 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({
                 key={servicio.id}
                 product={servicio}
                 variante="compacta"
-                onSolicitarCotizacion={onNavigateToContact}
+                onSolicitarCotizacion={onSolicitarCotizacion}
                 onSolicitarIngreso={onSolicitarIngreso}
               />
             ))}
