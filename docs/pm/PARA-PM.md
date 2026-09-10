@@ -2,6 +2,200 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## ADMIN-SAFETY-1 — el panel no escribe sobre datos ajenos sin preguntar
+
+**Resultado: entregado, con una devolución tuya adentro.**
+
+- Producto/regresión: `79f3219`
+- La suite pasa a **164 casos**.
+- **En mi rama, no en `main`.** No integré, no desplegué, no ejecuté seed contra
+  Railway y no toqué datos remotos, pagos ni secretos.
+
+---
+
+### 1. R4: la premisa no se sostiene, y lo que hay es peor de otra manera
+
+Preparé la categoría con publicaciones activas, la desactivé por la ruta
+administrativa real (`PUT /admin/categories/{id}` con `is_active: false`,
+aceptada con 200) y contrasté los tres lados. Medido:
+
+| | antes | después |
+|---|---|---|
+| categorías en los filtros | 12 | **12** |
+| filtrar por esa categoría | 4 resultados | **4 resultados** |
+| catálogo general | 30 | **30** |
+| detalle de una de ellas | abre | **abre, y dice su categoría** |
+
+La condición que pusiste —«la publicación sigue visible **mientras su categoría
+desaparece de los filtros**»— **no se cumple**: la categoría no desaparece de
+ningún lado. `/catalog/categories` no filtra por `is_active` y ni siquiera lo
+expone, así que la pantalla no puede saber que está inactiva.
+
+Lo que hay es distinto: **`Estado: Inactiva` es un interruptor que no hace
+nada**. Se acepta, se guarda, se dibuja «• Inactiva» en el panel, y la parte
+pública queda idéntica. Quien lo usa cree que sacó una categoría de
+circulación y no sacó nada.
+
+Por eso **no le puse la guarda que pediste**: bloquear la desactivación de una
+categoría sería proteger una acción sin efecto, y de paso confirmaría que
+significa algo.
+
+**Pero el síntoma que describiste existe: está en la subcategoría.** Medido:
+desactivarla la sacó de las 8 que ofrecía su categoría —quedaron 7— y su
+publicación siguió en el catálogo, diciendo que era de ella. Nadie puede llegar
+a esa publicación filtrando, y ahí está.
+
+Ahí puse la guarda, que es donde estaba el rojo: 409 con motivo accionable
+(«tiene 1 publicación(es) activa(s) que quedarían visibles en el catálogo pero
+fuera de los filtros. Movelas a otra subcategoría o pausalas»). Sólo frena la
+desactivación: el nombre y el orden se siguen editando —medido— y una
+subcategoría sin publicaciones activas se desactiva sin problema —medido—.
+
+En UI no hay nada que bloquear: **el panel no ofrece desactivar subcategorías**,
+sólo eliminarlas. El camino es la API.
+
+**Lo que queda para vos:** decidir qué es `is_active` en una categoría. O
+significa algo —y entonces el catálogo tiene que respetarlo, que es un cambio
+de alcance propio— o no significa nada y el selector debería irse. No lo toqué:
+no es lo que pediste y no quiero decidirlo yo.
+
+### 2. R5: confirmado, y retirado
+
+Rastreé los consumidores reales. Los cinco que nombraste —publicar, registro,
+alta de transportista, filtros del Mercado y edición del perfil— piden todos
+`/catalog/localities/provinces`. **Ninguno** pide `option_type=province`, ni en
+el frontend ni en el Backend. Y en una base recién creada no hay **ninguna**
+fila `province`: las únicas son `unit`, `pricing_type`, `availability` y
+`response_time`.
+
+Así que Configuración ofrecía un lugar para escribir provincias que no iban a
+aparecer en ningún lado. Se retira de la pantalla y nada más: las filas y el
+endpoint quedan intactos, y `/admin/form-options/types` sigue devolviendo los
+cinco tipos. El caso 164 lo comprueba en los dos sentidos.
+
+### 3. La confirmación: una, no seis
+
+`Pregunta` —el cartel de «tenés cambios sin guardar»— ya era una capa correcta,
+pero tenía el texto adentro. La abrí en dos: `Confirmacion` es la capa, y
+`Pregunta` pasó a ser **un uso de ella** con su texto. Sus consumidores no se
+enteraron: mismo título, mismo detalle, mismos botones y el mismo orden.
+
+Los seis recorridos usan esa capa. Se fueron los tres `window.confirm` y, más
+importante, las **tres mutaciones que escribían sin preguntar nada**: el rol, el
+estado de la cuenta y el estado de la publicación salían con el `onChange` de un
+`select`. Un clic de más sobre la cuenta de otra persona ya era un cambio hecho.
+
+Cada decisión nombra el objeto, el cambio exacto y la consecuencia. En las
+destructivas la salida segura va primero.
+
+### 4. Restablecer contraseña
+
+20 caracteres de un alfabeto sin ambiguos, del generador criptográfico del
+navegador —no `Math.random`—, descartando el sesgo por módulo en vez de
+recortarlo. Se muestra una vez, en su propia capa, y se va con ella: no entra
+en consola, ni en un toast, ni en la URL, ni en el almacenamiento del
+navegador.
+
+**No hay botón de copiar, a propósito**: el portapapeles deja la clave
+disponible para cualquier otra aplicación y sobrevive a cerrar la pantalla, que
+es justo lo que esta capa promete que no pasa.
+
+### 5. El caso 164, y los rojos
+
+Contra la **base de entrada**, cinco rojos, uno por motivo, cada uno medido
+desactivando el anterior:
+
+1. `Configuración volvió a ofrecer todos los tipos que devuelve la API` (R5).
+2. `desactivar una subcategoría con publicaciones activas devolvió 200 y tiene
+   que devolver 409` (R4).
+3. `elegir en el selector ya escribió, sin preguntar:
+   ["PATCH /api/admin/users/…"]`.
+4. el botón `Restablecer contraseña` no existe.
+5. `el borrado abrió 1 diálogo(s) nativo(s): sigue usando window.confirm`.
+
+Dos de esos rojos primero salieron como «se agotó la espera», que no dice nada:
+reordené el caso para que **cuente las solicitudes antes** de esperar la capa, y
+para que mire si apareció un diálogo nativo antes de buscar el del producto.
+Ahora el rojo nombra la causa.
+
+Y dos negativos sobre el código nuevo: hacer que **cancelar ejecute la
+mutación** (dio `cancelar escribió: ["PATCH /api/admin/users/…"]`) y **guardar
+la clave temporal** en el navegador (dio `la clave temporal quedó guardada:
+{"local":true,…}`). Sin eso, «cancelar hace cero» y «no queda rastro» podrían
+ser verdes vacíos.
+
+En verde el caso cuenta solicitudes: cancelar por botón, Escape y fondo hacen
+**cero** y no dejan el selector mintiendo; confirmar hace **una**, y base y
+pantalla quedan diciendo lo mismo. Comprueba el nombre accesible de la capa, que
+el foco entre, que ocho tabulaciones no se escapen y que vuelva al control que
+la abrió.
+
+### 6. Dos correcciones a mí mismo, durante la medición
+
+- Mi primera comprobación de foco miraba **el primer** `[role="dialog"]` del
+  documento, que es el panel entero. El foco estaba bien; medía la capa
+  equivocada.
+- Y buscaba la confirmación como «la última capa», que deja de serlo apenas se
+  cierra. La busco por su propio nombre accesible.
+
+También enfoco el `select` antes de elegir: `selectOption` escribe el valor sin
+enfocarlo, y entonces «devolver el foco a quien abrió la capa» habría medido un
+origen que nunca existió. Quien cambia un `select` de verdad siempre lo tiene
+enfocado.
+
+### 7. Tres cosas que rompí, y cómo las encontré
+
+La suite completa las encontró; aisladas desde base limpia las confirmé.
+
+1. **`FORM-DIRTY-1` dejó de ser reconocible (149 y 150).** Al factorizar la
+   capa, la pregunta de «tenés cambios sin guardar» pasó a nombrarse sola y
+   perdió su `titulo-cambios-sin-guardar`. Seguía apareciendo y seguía
+   funcionando, pero quien la busca por ese nombre —que es como se la
+   identifica desde que existe— ya no la encontraba, y el síntoma era el peor
+   posible: *«no preguntó nada antes de cerrar»*. Le devolví el nombre con una
+   propiedad explícita, y dejé escrito por qué es contrato y no un detalle.
+   Es exactamente lo que pediste al decir «conservá sus consumidores
+   actuales»; me lo salteé y la suite me lo cobró.
+2. **Los casos 144 y 146** accionaban el control y esperaban la solicitud. Ahora
+   el control abre la capa y confirmar es lo que escribe. Adaptados: confirman y
+   después miden lo mismo que antes. Son pruebas ajenas, por eso lo digo.
+3. **Mi propio 164 dependía del seed.** Buscaba una publicación con subcategoría
+   y una cuenta del seed: aislado andaba, y en la suite completa llegaba cuando
+   los casos anteriores ya habían movido todo. Ahora **fabrica** su cuenta y su
+   subcategoría, y las devuelve al terminar.
+
+Y al escribir `Pregunta.tsx` byte a byte dejé los comentarios con mojibake
+—`polM-CM-^CM-BM--tica`—. Los textos visibles estaban bien, pero el archivo quedaba
+ilegible. Reescrito.
+
+### 8. Puertas, y lo que quedó rojo
+
+**Suite completa desde base limpia: 156/164.** El 164 pasa **dentro de la suite
+completa**, no sólo aislado. Focales 144, 148, 160 y 164: 4/4.
+
+Quedaron **7 rojos, y ninguno es mío**. No lo supongo: corrí los mismos casos
+**sin mis cambios**, sobre la base de entrada, y fallan igual y con el mismo
+mensaje.
+
+- **21, 54, 57, 125, 131 y 157** — rojos en la base de entrada. Medido, no
+  deducido. `54` y `57` mueren en `DELETE /cart` con 401; `21` con un
+  `Cannot read properties of undefined`; `157` esperando un locator. No los
+  toqué: están fuera de alcance y arreglarlos sería ampliarlo solo.
+- **162** —la pieza de fotos que ya aceptaste— **pasa aislado desde base limpia
+  y falla dentro de la suite completa**, con «sólo 0 tarjetas resolvieron una
+  foto». No se rompió: para cuando le toca, los casos anteriores le dejaron el
+  catálogo sin las publicaciones que mira. Es el mismo problema que tenía mi
+  164 y que resolví fabricando lo propio; el 162 se arregla igual, pero es
+  prueba de otra pieza ya cerrada y no la toco sin que me lo pidas.
+
+Esos 7 estaban antes de esta tarea y siguen después. Lo digo porque un informe
+que esconde un rojo vale menos que no informar.
+
+`lint`, `node --check`, `tsc`, `compileall`, `pip check` y `diff-check`, todos
+verdes. El smoke incluye build.
+
+---
+
 ## ACCOUNT-PAGE-1R — La marca de página actual en Mi cuenta
 
 **Resultado: corregido.**
