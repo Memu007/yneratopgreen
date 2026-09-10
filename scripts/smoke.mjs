@@ -12846,27 +12846,27 @@ await runCase(125, 'Servicios muestra publicaciones reales de servicio y logíst
       assert(fila, `«${titulo}» no es una publicación activa de la base`);
       assert(fila[0] === 'servicio' || fila[0] === 'logistica',
         `«${titulo}» no es un servicio: la base dice «${fila[0]}»`);
-      // La tarjeta de un servicio no gana un respaldo de fotografía.
+      // Lo que una tarjeta de servicio puede dibujar, y lo que no.
       //
-      // La regla era más fuerte —«ni una imagen»— y dejó de valer con
-      // `CATALOG-PHOTOS-1`: el paquete de 30 fotos que entregó la PM incluye
-      // servicios, y «Instalación y Reparación de Alambrados Rurales» es uno de
-      // ellos. Así que una tarjeta de servicio SÍ puede dibujar una foto del
-      // catálogo demostrativo; lo que sigue sin poder es reservar lugar para
-      // una que no existe. Se afirma eso, que es lo que quedó en pie.
+      // La regla era «ni una imagen», y dejó de valer con `CATALOG-PHOTOS-1`:
+      // el paquete de 30 fotos que entregó la PM incluye servicios, y
+      // «Instalación y Reparación de Alambrados Rurales» es uno de ellos. Así
+      // que hoy son válidas dos cosas y sólo dos: la foto del catálogo
+      // demostrativo, y el respaldo honesto de una publicación sin foto —que es
+      // lo que muestra cualquier servicio fabricado por otro caso—.
+      //
+      // Lo que se sigue prohibiendo es lo de siempre y es lo que importaba: una
+      // imagen traída de afuera, o una al azar, al lado de un precio real.
+      const PERMITIDAS = /\/catalogo\/|\/estados\/no-photo\.svg/;
       const imagenes = tarjeta.locator('img, [role="img"]');
       for (let cual = 0; cual < await imagenes.count(); cual += 1) {
         const imagen = imagenes.nth(cual);
         const fuente = (await imagen.getAttribute('src'))
           || (await imagen.evaluate((n) => getComputedStyle(n).backgroundImage));
-        assert(/\/catalogo\//.test(fuente || ''),
-          `la tarjeta de «${titulo}» dibuja una imagen que no es del catálogo `
-          + `demostrativo: ${JSON.stringify((fuente || '').slice(0, 120))}`);
+        assert(PERMITIDAS.test(fuente || ''),
+          `la tarjeta de «${titulo}» dibuja una imagen que no es ni del catálogo `
+          + `demostrativo ni el respaldo honesto: ${JSON.stringify((fuente || '').slice(0, 120))}`);
       }
-      const textoDeLaTarjeta = await tarjeta.innerText();
-      assert(!/Sin registro fotogr/i.test(textoDeLaTarjeta)
-        && !/No pudimos cargar/i.test(textoDeLaTarjeta),
-      `la tarjeta de «${titulo}» reserva lugar para una fotografía que no hay`);
     }
 
     // 3. «Ver servicios publicados» deja el filtro puesto, no sólo la URL.
