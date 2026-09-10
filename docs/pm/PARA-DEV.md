@@ -12,6 +12,76 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-10 — CIERRE: RATING-UX-1R aceptada; activar QUOTE-CONTACT-1
+
+Aceptados producto/regresión `96ac68b` + `08256c8`, informe `50d4875`,
+corrección de arnés `c88b7ea` e informe `263a88a`, todos en tu rama. El último
+delta toca sólo `scripts/smoke.mjs` y cierra exactamente la devolución. PM
+reprodujo el 165 corregido desde otra base Docker limpia en **1/1**, salida 0:
+el diálogo móvil real entra a 390 px, la solicitud retenida no cierra ni se
+duplica, el fallo conserva capa/valores y el reintento deja una sola fila.
+Inspeccioné las tres capturas; `node --check` y `diff-check` quedaron cubiertos
+por la ejecución y el delta. Dev conserva su suite completa **164/165**, con
+único rojo 131 ambiental; no hubo suite completa PM. Evidencia final en
+`REPRODUCCION-RATING-UX-1-2026-09-10.md`.
+
+La única tarea activa pasa a **`QUOTE-CONTACT-1`**, sobre `c88b7ea`. Cubre sólo
+A4 y A5 de `AUDITORIAS-UX-CLAUDE-2026-08-30.md`.
+
+### Resultado obligatorio
+
+1. **Continuidad desde cotización.** Los CTA «Solicitar cotización» de la
+   tarjeta y del detalle deben llevar a Contacto conservando la publicación y
+   el vendedor de origen. Precargá un asunto de cotización y un mensaje que
+   nombren explícitamente a ambos; no completes nombre, email ni teléfono de la
+   persona sin que ella los ingrese. El destino sigue siendo la sección
+   canónica `contact` mediante la navegación existente.
+2. **Contacto genérico sigue genérico.** Entrar a Contacto desde Header, Footer
+   u otra llamada común no puede heredar una cotización anterior. Al cambiar
+   entre publicaciones, la intención nueva reemplaza a la anterior sin mezclar
+   datos.
+3. **Correo honesto.** El botón debe decir **«Abrir en mi correo»**. Prepará el
+   `mailto:` con los campos actuales, pero no afirmes que se abrió o envió, no
+   marques éxito/error a partir de `window.open` y no vacíes el formulario. El
+   texto debe permanecer para que la persona pueda copiarlo, corregirlo,
+   reintentar o usar WhatsApp. Si mostrás ayuda posterior, sólo puede ser una
+   instrucción neutral: revisar y enviar desde su aplicación de correo.
+4. Conservá validación nativa y codificación segura del asunto/cuerpo. WhatsApp
+   debe heredar el asunto/mensaje precargados sin prometer envío. No cambies la
+   casilla `mailto:` operativa, el teléfono ni la ubicación en esta pieza.
+
+Usá estado y props mínimos ya existentes entre `App`, `ProductGrid`, tarjeta,
+detalle y `ContactPage`; no agregues router, dependencia, almacenamiento,
+mensaje interno, correo automático ni API nueva. Aunque `/contact` exista, no
+lo conectes: abrir ese canal público, su operación y su protección contra abuso
+es otra decisión. No rediseñes Contacto ni mezcles A6–A10, F4 o copy general.
+
+### Regresión y puertas — caso 166
+
+- Contra `c88b7ea`, dejá rojo porque el CTA llega vacío y porque enviar por
+  correo declara éxito y borra lo escrito sin poder saber si se abrió un cliente.
+- En verde, elegí una publicación «A cotizar» y comprobá desde **tarjeta y
+  detalle**: URL/sección Contacto, asunto y mensaje precargados con nombre de
+  publicación y vendedor exactos. Luego entrá por Contacto genérico y exigí
+  que no quede esa intención; probá también que una segunda publicación
+  reemplaza a la primera.
+- Interceptá `window.open` sin suponer resultado. Completá los campos requeridos,
+  activá «Abrir en mi correo» y verificá un solo `mailto:` correctamente
+  codificado con publicación/vendedor, ausencia de mensaje de éxito o envío y
+  todos los valores intactos. Verificá que WhatsApp reutiliza el contexto y que
+  no sale ningún `POST /contact`.
+
+Corré 125, 147, 155 y 166 aislados y después **una sola suite completa** desde
+base limpia; informá total exacto y cada rojo. Se admite únicamente el 131 si
+vuelve a ser la limitación ambiental conocida. Sumá lint, `node --check` y
+`diff-check`; el smoke incluye build. Sin Backend, `compileall`, `pip check`,
+a11y/contraste totales ni capturas salvo que el diff salga del límite previsto.
+
+Producto/regresión en un commit e informe separado en `PARA-PM.md`, con rojo,
+verde, resultados y límites. No integres a `main`, no despliegues, no ejecutes
+seed contra Railway y no toques datos remotos, pagos o secretos. Frená al
+entregar.
+
 ## 2026-09-10 — DEVOLUCIÓN: RATING-UX-1R, el producto pasa pero el 165 no mide tres afirmaciones
 
 Revisé producto/regresión `96ac68b` + `08256c8` e informe `50d4875`. El delta

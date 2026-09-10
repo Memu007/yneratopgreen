@@ -75,15 +75,18 @@ Actualizado: 2026-09-10.
   `/private/tmp/topgreen-pm-admin-160r.log`; un intento anterior que murió por
   `EPERM` antes del smoke no cuenta. Evidencia en
   `REPRODUCCION-ADMIN-TRUTH-1-2026-09-09.md`.
-- **RATING-UX-1 devuelta como `RATING-UX-1R`:** producto/regresión `96ac68b` +
-  `08256c8`, informe `50d4875`. Dev informó focales 149+150+165 en **3/3** dos
-  veces y suite **164/165**, con único rojo 131 ambiental. PM revisó el diff y
-  reprodujo 165 desde base limpia en **1/1**. El producto está dentro del
-  alcance, pero el caso no retiene el POST ni fuerza su error y la supuesta
-  captura móvil del diálogo muestra la lista cargando. La única tarea activa y
-  responsable sigue en Dev: corregir sólo el 165 y repetirlo, sin suite ni
-  producto salvo rojo real. Contrato en `PARA-DEV.md`; evidencia en
+- **RATING-UX-1R aceptada:** producto/regresión `96ac68b` + `08256c8`, informe
+  `50d4875`, corrección de arnés `c88b7ea` e informe `263a88a`, todos en rama
+  Dev. Dev informó focales 149+150+165 en **3/3** dos veces y suite **164/165**,
+  con único rojo 131 ambiental. PM revisó el delta completo, reprodujo 165 base
+  y corregido desde bases limpias en **1/1** cada uno e inspeccionó ambas tandas
+  de capturas. La versión final mide diálogo móvil, envío retenido, fallo y
+  reintento; no hubo suite completa PM. Evidencia en
   `REPRODUCCION-RATING-UX-1-2026-09-10.md`.
+- **Única tarea activa y responsable:** `QUOTE-CONTACT-1`, Dev. Conserva
+  publicación/vendedor desde tarjeta y detalle, prepara asunto/mensaje y cambia
+  el correo a una apertura honesta que no borra texto ni declara éxito. Sin API,
+  Backend, mensajería ni rediseño. Caso 166 y contrato en `PARA-DEV.md`.
 - **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
   `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
   y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como

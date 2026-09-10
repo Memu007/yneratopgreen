@@ -141,7 +141,7 @@ tiene una sola política de navegación y una sola regresión matriz.
 | 13B | **ACCOUNT-PAGE-1R — cerrada** | Feedback visual Emi 08/09 | Base `7dc1d53`/`968efbc`, corrección `958c11c`/`16008a1`; PM cerró 149+150+163 en 3/3 y la corrección visual con 163 en 1/1. |
 | 14 | **ADMIN-SAFETY-1R — cerrada** | ADM-6, ADM-7, ADM-9; reproduce ADM-R4/R5 | Base `79f3219`/`c26db85`, corrección `871ce7b`/`775818c`; PM cerró 149+150+164 en 3/3, más puertas estáticas. |
 | 14S | **TEST-SUITE-164SR — cerrada** | Puerta de calidad | `6d20ecf` + `4319623` + `4182275`; informes `819cead` + `f6cade7`. Dev 163/164 con único rojo 131 ambiental; PM 6/6. El 125 ya informa la regla que mide. |
-| 15 | **RATING-UX-1R — activa** | F9, F10 y F11 | `96ac68b` + `08256c8` en revisión: producto focal verde; falta que el 165 mida envío retenido/error y capture el diálogo móvil real. |
+| 15 | **RATING-UX-1R — cerrada** | F9, F10 y F11 | `96ac68b` + `08256c8` + `c88b7ea`; informes `50d4875` + `263a88a`. Dev 164/165 con único rojo 131 ambiental; PM reprodujo 165 base y corregido en 1/1 cada uno. |
 
 La recuperación automática de contraseña F4 sigue fuera del MVP. Sólo puede
 cerrarse con una instrucción honesta de soporte y la herramienta administrativa
@@ -156,7 +156,7 @@ anatomías ni el detalle. Su contrato completo y la evidencia de raíz están en
 
 | Orden | Pieza | Auditoría cubierta | Cierre mínimo |
 |---:|---|---|---|
-| 16 | **QUOTE-CONTACT-1** | A4 y A5 | Contacto no afirma un envío que no conoce y una cotización conserva publicación/vendedor en asunto y texto. |
+| 16 | **QUOTE-CONTACT-1 — activa** | A4 y A5 | Contacto no afirma un envío que no conoce y una cotización conserva publicación/vendedor en asunto y texto. |
 | 17 | **FILTER-INTENT-1** | A6, A9 y, si se reproduce, R6 | Filtros URL inválidos no simulan cero resultados; Login retoma publicar/comprar con la puerta existente. |
 | 18 | **COPY-CLEAR-1** | A7, A10, F4 y F12; deuda ADMIN-STATE-1 | Emi decide wordmark→Inicio; Buscar hace algo real o desaparece; se retiran planes inexistentes, se unifica voseo, se informa soporte sin prometer recuperación automática y los estados visibles quedan en es-AR sin ramas `draft` muertas. |
 
