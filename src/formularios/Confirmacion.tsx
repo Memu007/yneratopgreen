@@ -81,7 +81,16 @@ export const Confirmacion: React.FC<ConfirmacionProps> = ({
 
   // Escape cierra ESTA capa —la última de la pila— y significa cancelar, igual
   // que el fondo y que el botón. Cancelar no escribe nunca.
-  const capa = useCapaModal<HTMLDivElement>(alCancelar);
+  //
+  // Con la mutación en vuelo, ninguna de las cuatro salidas cierra. Los botones
+  // y el fondo ya lo respetaban; Escape no, y era la peor de las cuatro: la capa
+  // desaparecía mientras la solicitud seguía viajando, así que la pantalla decía
+  // «no pasó nada» y el cambio se aplicaba igual, sin que se viera el resultado.
+  // El cierre que recibe la capa mira el mismo estado que los botones.
+  const cerrar = React.useCallback(() => {
+    if (!enCurso) alCancelar();
+  }, [enCurso, alCancelar]);
+  const capa = useCapaModal<HTMLDivElement>(cerrar);
 
   const botonConfirmar = (
     <button

@@ -23375,8 +23375,6 @@ await runCase(163, 'Mi cuenta es una página del sitio: URL propia, historial, s
     + `${capturas.length} capturas en ${CAPTURAS}`;
 });
 
-const passed = results.filter((result) => result.passed).length;
-const failed = results.length - passed;
 
 
 // ---------------------------------------------------------------------------
@@ -23490,10 +23488,16 @@ await runCase(164, 'El panel de administración pregunta antes de escribir, y la
     // Cuántas solicitudes que ESCRIBEN salieron. Es la medición central: una
     // confirmación que no impide la escritura es un cartel, no una guarda.
     let escrituras = [];
+    let ultimoCuerpoEnviado = null;
     page.on('request', (pedido) => {
       const metodo = pedido.method();
       if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(metodo) && /\/api\/admin\//.test(pedido.url())) {
         escrituras.push(`${metodo} ${new URL(pedido.url()).pathname}`);
+        try {
+          ultimoCuerpoEnviado = JSON.parse(pedido.postData() || 'null');
+        } catch {
+          ultimoCuerpoEnviado = null;
+        }
       }
     });
     // Qué se está midiendo ahora mismo. Sin esto, un tiempo agotado adentro de
@@ -23662,6 +23666,53 @@ await runCase(164, 'El panel de administración pregunta antes de escribir, y la
     medidos.push(`confirmar: una sola solicitud y base/pantalla coherentes (${antesEnBase} → admin)`);
 
 
+    // --- 2 bis. Con la mutación en vuelo, no hay salida que cierre --------
+    //
+    // Entre confirmar y la respuesta hay una ventana. Si una salida cerrara la
+    // capa ahí, la pantalla diría «no pasó nada» mientras el cambio se aplica
+    // igual: el peor resultado posible, porque no se ve ni el éxito ni el error.
+    // Se retiene la respuesta a propósito y se prueban las cuatro salidas.
+    let soltar = null;
+    await page.route('**/api/admin/users/*', async (ruta) => {
+      if (ruta.request().method() !== 'PATCH') return ruta.fallback();
+      await new Promise((seguir) => { soltar = seguir; });
+      return ruta.fallback();
+    });
+
+    // Se vuelve para el otro lado: la cuenta quedó en Admin en el paso anterior,
+    // así que el cambio que abre la capa ahora es el de vuelta a Usuario.
+    paso = 'confirmar con la respuesta retenida';
+    const enVuelo = await contando(async () => {
+      await elegirRol('user');
+      await capa().waitFor({ timeout: 10_000 });
+      await capa().getByRole('button', { name: /Pasar a Usuario/ }).click();
+      await esperarA(async () => soltar !== null, 'la mutación nunca salió', 15_000);
+    });
+    assert(enVuelo.length === 1,
+      `confirmar con la respuesta retenida mandó ${enVuelo.length} solicitudes`);
+
+    const intentosDeSalida = [
+      ['Escape', async () => page.keyboard.press('Escape')],
+      ['el fondo', async () => capa().locator('xpath=..').click({ position: { x: 8, y: 8 }, force: true })],
+      ['la X', async () => capa().getByRole('button', { name: 'Cerrar' }).click({ force: true })],
+      ['Cancelar', async () => capa().getByRole('button', { name: 'Cancelar' }).click({ force: true })],
+    ];
+    for (const [comoSeLlama, salir] of intentosDeSalida) {
+      const extra = await contando(salir);
+      assert(await capa().isVisible(),
+        `con la mutación en vuelo, ${comoSeLlama} cerró la capa: la pantalla diría que no pasó nada`);
+      assert(extra.length === 0,
+        `con la mutación en vuelo, ${comoSeLlama} mandó otra solicitud: ${JSON.stringify(extra)}`);
+    }
+
+    // Al soltarla, el resultado queda a la vista y la capa se va sola.
+    soltar();
+    await capa().waitFor({ state: 'detached', timeout: 20_000 });
+    await esperarA(async () => (await page.locator('body').innerText()).includes('Rol actualizado'),
+      'liberada la respuesta, el éxito no quedó visible', 20_000);
+    await page.unroute('**/api/admin/users/*');
+    medidos.push('con la mutación en vuelo, Escape, fondo, X y Cancelar no cierran, no duplican y el resultado queda visible');
+
     // --- 3. Restablecer contraseña ----------------------------------------
     //
     // Sobre un usuario creado acá, en la base descartable, para no dejar sin
@@ -23695,12 +23746,21 @@ await runCase(164, 'El panel de administración pregunta antes de escribir, y la
     const alRestablecer = await contando(async () => {
       await filaNueva.getByRole('button', { name: 'Restablecer contraseña' }).click();
       await capa().waitFor({ timeout: 10_000 });
-      await capa().getByRole('button', { name: /Generar contraseña temporal/ }).click();
+      await capa().getByRole('button', { name: /Generar contraseña nueva/ }).click();
       await page.locator('[role="dialog"][aria-labelledby="clave-temporal-titulo"]')
         .waitFor({ timeout: 20_000 });
     });
     assert(alRestablecer.length === 1,
       `restablecer mandó ${alRestablecer.length} solicitudes: ${JSON.stringify(alRestablecer)}`);
+    // La clave que se entrega no se anuncia como temporal: nada la hace caducar
+    // —no hay rotación ni pantalla para cambiarla al entrar—, así que llamarla
+    // así prometía un vencimiento inexistente.
+    const textoDelResultado = await page
+      .locator('[role="dialog"][aria-labelledby="clave-temporal-titulo"]').innerText();
+    assert(!/temporal/i.test(textoDelResultado),
+      `el resultado sigue llamando temporal a la contraseña: ${JSON.stringify(textoDelResultado.slice(0, 160))}`);
+    assert(/restablezca/i.test(textoDelResultado),
+      'el resultado no dice hasta cuándo rige la contraseña nueva');
 
     // La clave se lee del DOM para probarla y no se imprime nunca.
     const resultado = page.locator('[role="dialog"][aria-labelledby="clave-temporal-titulo"]');
@@ -23726,6 +23786,31 @@ await runCase(164, 'El panel de administración pregunta antes de escribir, y la
     );
     assert(!sigueEnPantalla, 'la clave temporal sigue visible después de cerrar el resultado');
     medidos.push('restablecer: una solicitud, la clave vieja deja de entrar, la temporal entra y al cerrar no se recupera');
+
+    // --- 3 bis. El panel no ofrece la acción sin efecto --------------------
+    //
+    // Desactivar una categoría se guardaba y no cambiaba nada de la parte
+    // pública. Se retiró de la pantalla; el campo, la API y los datos quedan.
+    await page.getByRole('button', { name: 'Categorías', exact: true }).first().click();
+    await page.getByRole('button', { name: /^Editar la categoría/ }).first()
+      .click({ timeout: 20_000 });
+    const formularioDeCategoria = page.locator('form, [class*="editForm"], [class*="categoryCard"]')
+      .filter({ has: page.getByLabel('Nombre', { exact: false }) }).first();
+    await esperarA(async () => (await page.getByLabel('Estado', { exact: true }).count()) === 0,
+      'el panel sigue ofreciendo el Estado de una categoría, que no tiene efecto', 15_000);
+    void formularioDeCategoria;
+    // Y guardar no manda `is_active`, aunque el control ya no esté.
+    const alGuardarCategoria = await contando(async () => {
+      await page.getByRole('button', { name: /^Guardar/ }).first().click();
+      await esperarA(async () => (await page.getByRole('button', { name: /^Guardar/ }).count()) === 0,
+        'el formulario de la categoría no se cerró al guardar', 15_000);
+    });
+    assert(alGuardarCategoria.length === 1,
+      `guardar la categoría mandó ${alGuardarCategoria.length} solicitudes`);
+    const cuerpoDeLaCategoria = ultimoCuerpoEnviado;
+    assert(cuerpoDeLaCategoria && !('is_active' in cuerpoDeLaCategoria),
+      `editar una categoría sigue mandando is_active: ${JSON.stringify(cuerpoDeLaCategoria)}`);
+    medidos.push('categoría: el panel no ofrece el Estado y editar no manda is_active');
 
     // --- 4. Los borrados ya no usan window.confirm -------------------------
     //
@@ -23772,6 +23857,15 @@ await runCase(164, 'El panel de administración pregunta antes de escribir, y la
 
   return medidos.join('; ');
 });
+
+// La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
+// archivo. Estaba calculada antes de que corriera el último caso, así que ese
+// caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un
+// solo caso, el resumen decía «0/1 pasaron; 0 fallaron» —ni sumaba ni restaba—
+// y en la suite entera el total quedaba corrido en uno. Un resumen que no
+// cierra aritméticamente es peor que no tenerlo.
+const passed = results.filter((result) => result.passed).length;
+const failed = results.length - passed;
 
 console.log();
 console.log('Resumen smoke tests');

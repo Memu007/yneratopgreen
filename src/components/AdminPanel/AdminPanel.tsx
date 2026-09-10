@@ -733,7 +733,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         description: editingCategory.description,
         icon: editingCategory.icon,
         is_service: editingCategory.is_service,
-        is_active: editingCategory.is_active,
+        // `is_active` NO viaja, y no es un olvido.
+        //
+        // Se midió: guardarlo en `false` se acepta, se persiste y no cambia
+        // nada de la parte pública —la categoría sigue en los filtros, filtrar
+        // por ella devuelve lo mismo, el catálogo queda igual y el detalle abre
+        // normal—. `/catalog/categories` ni siquiera expone el campo. Era un
+        // interruptor que decía «Inactiva» y no sacaba nada de circulación.
+        //
+        // Así que el panel dejó de ofrecerlo. La columna, la API y los datos
+        // quedan como están por compatibilidad: lo que se retira es la acción,
+        // no el campo. Si algún día `is_active` significa algo para el
+        // catálogo, vuelve con su semántica escrita.
         display_order: editingCategory.display_order
       });
       showToast('Categoría actualizada', 'success');
@@ -895,7 +906,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   });
 
   /**
-   * Una contraseña temporal que sirva de verdad: 20 caracteres de un alfabeto
+   * Una contraseña nueva que sirva de verdad: 20 caracteres de un alfabeto
    * sin ambiguos —nada de O/0, l/1/I—, sacados del generador criptográfico del
    * navegador y no de `Math.random`, que es predecible.
    *
@@ -904,7 +915,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
    * letras, y una contraseña con letras más probables que otras es más corta
    * de lo que aparenta.
    */
-  const claveTemporalNueva = () => {
+  const claveNueva = () => {
     const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%+=?';
     const TOPE = 256 - (256 % ALFABETO.length);
     let clave = '';
@@ -922,17 +933,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     titulo: 'Restablecer la contraseña',
     detalle: (
       <>
-        Se le genera una contraseña temporal a <strong>{usuario.full_name}</strong>{' '}
+        Se le genera una contraseña nueva a <strong>{usuario.full_name}</strong>{' '}
         ({usuario.email}) y la de ahora deja de funcionar en el momento. Vas a verla
-        una sola vez, así que tenés que tenerla a mano para pasársela.
+        una sola vez, así que tenés que tenerla a mano para pasársela. Queda vigente
+        hasta que un administrador la restablezca otra vez.
       </>
     ),
-    textoConfirmar: 'Generar contraseña temporal',
+    textoConfirmar: 'Generar contraseña nueva',
     destructiva: true,
     hacer: async () => {
       // La clave se genera acá y vive en memoria hasta que se cierra el
       // resultado. No se registra, no viaja en la URL y no se guarda.
-      const clave = claveTemporalNueva();
+      const clave = claveNueva();
       await apiPost(`/admin/users/${usuario.id}/reset-password`, { password: clave });
       setClaveTemporal({ usuario: usuario.full_name || usuario.email, clave });
     },
@@ -2003,16 +2015,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                               ya se publicaron bajo esta categoría. El resto sí se edita.
                             </p>
                           )}
-                        </div>
-                        <div className={styles.formGroup}>
-                          <label htmlFor="categoria-edita-estado">Estado</label>
-                          <select id="categoria-edita-estado"
-                            value={editingCategory.is_active ? 'active' : 'inactive'}
-                            onChange={(e) => setEditingCategory({...editingCategory, is_active: e.target.value === 'active'})}
-                          >
-                            <option value="active">Activa</option>
-                            <option value="inactive">Inactiva</option>
-                          </select>
                         </div>
                       </div>
                       <div className={styles.formGroup}>

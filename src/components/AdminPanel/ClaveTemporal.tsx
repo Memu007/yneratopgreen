@@ -1,5 +1,11 @@
 /**
- * La contraseña temporal, una sola vez.
+ * La contraseña nueva, una sola vez.
+ *
+ * No se llama «temporal», y el nombre importa: nada la hace caducar. No hay
+ * rotación forzada ni pantalla para cambiarla al entrar, así que llamarla
+ * temporal prometía un vencimiento que el producto no tiene y hacía creer que
+ * el problema se resolvía solo. Queda vigente hasta que un administrador la
+ * vuelva a restablecer.
  *
  * Restablecer la contraseña de otra persona deja un secreto en manos de quien
  * lo hizo, y ese secreto tiene que llegar a su dueño sin quedar por el camino.
@@ -42,24 +48,25 @@ export const ClaveTemporal: React.FC<ClaveTemporalProps> = ({ usuario, clave, al
         onClick={(evento) => evento.stopPropagation()}
       >
         <h2 id="clave-temporal-titulo" className={styles.titulo}>
-          Contraseña temporal de {usuario}
+          Contraseña nueva de {usuario}
         </h2>
 
         <p id="clave-temporal-detalle" className={styles.detalle}>
           Esta es la única vez que se muestra. Al cerrar no se puede volver a verla;
-          si se pierde, hay que restablecerla otra vez.
+          si se pierde, hay que restablecerla otra vez. Queda vigente hasta que un
+          administrador la restablezca de nuevo: no vence sola.
         </p>
 
         {/* La clave se marca como texto para leer y dictar: espaciada, en una
             tipografía donde no se confundan los caracteres parecidos. */}
-        <p className={styles.clave} aria-label={`Contraseña temporal: ${clave}`}>
+        <p className={styles.clave} aria-label={`Contraseña nueva: ${clave}`}>
           <code>{clave}</code>
         </p>
 
         <p className={styles.aviso}>
           Pasásela por un canal donde puedas confirmar con quién estás hablando —en
-          persona, o una llamada— y pedile que la cambie al entrar. No la mandes por
-          un canal que quede escrito y compartido.
+          persona, o una llamada—. No la mandes por un canal que quede escrito y
+          compartido.
         </p>
 
         <div className={styles.acciones}>
