@@ -2,6 +2,192 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## FILTER-INTENT-1 — el vacío que nadie midió, y la intención que se perdía en el Login
+
+**Resultado: A6 y A9 cerrados. R6 NO se reproduce y por eso no está en el caso
+167 — está medido en el punto 4.**
+
+- Producto/regresión: `0a6cbd4`
+- **En mi rama, no en `main`.** No integré, no desplegué, no toqué Railway,
+  datos remotos, pagos ni secretos. No agregué router, dependencia,
+  almacenamiento de intenciones, Auth, Backend ni endpoint.
+
+---
+
+### 1. La URL inválida ya no inventa un mercado vacío (A6)
+
+Reproducido primero, antes de tocar nada, contra `1a01854`:
+
+| URL | consultas al catálogo | qué se veía | barra |
+| --- | --- | --- | --- |
+| `?section=marketplace&category=NoExiste` | **0** | «No hay operaciones con estos filtros» | el parámetro inválido se quedaba |
+| `?section=marketplace&province=Narnia` | **0** | idem | idem |
+| `+ type=servicios&in_stock=true` | **0** | idem | los válidos también se quedaban, sin usarse |
+
+Cero consultas. La pantalla contestaba por una API a la que nadie preguntó, y
+recargar o compartir el enlace repetía la mentira.
+
+Ahora el Mercado espera a saber qué filtros existen, suelta **sólo** el que no
+existe —lo que además lo borra de la barra, porque el hook de filtros serializa
+su estado; no hay un segundo escritor del historial—, conserva los válidos y
+consulta:
+
+| URL de entrada | barra al terminar | resultado |
+| --- | --- | --- |
+| `category=NoExiste&province=<real>&in_stock=true` | `province=<real>&in_stock=true` | la respuesta real de la API |
+| `province=Narnia&category=<real>&type=<real>` | `category=<real>&type=<real>` | idem |
+
+La localidad se va con su provincia, y quiero que quede dicho por qué, porque es
+lo único que descarto de más: no es un filtro aparte, es un lugar **adentro** de
+la provincia que se descartó. Sin provincia el selector de localidades no tiene
+nada que ofrecer, así que `locality_id` quedaría filtrando por algo que no se ve
+y no se puede sacar —peor que el vacío falso—. Es exactamente lo que ya hace
+cambiar de provincia a mano.
+
+**Con el catálogo auxiliar caído** no se valida nada: sale el aviso «No pudimos
+cargar los filtros del mercado…» con Reintentar, el filtro **no** se descarta
+—no se descarta lo que no se pudo validar— y no sale ninguna consulta. Antes las
+listas quedaban vacías en silencio, así que *todo* filtro parecía inexistente y
+la pantalla mostraba un mercado sin filtrar como si fuera lo que se pidió.
+
+**Y hay algo que mi propia sonda no vio.** Mi primera versión enumeraba los
+momentos de espera —catálogos en camino, filtro en descarte—. El caso 167 la
+puso roja: entre soltar el filtro y salir la consulta hay **un render** donde ya
+no se está decidiendo nada y todavía no se está cargando nada, porque los
+efectos corren después de dibujar, y ahí la lista vacía volvía a leerse como «no
+hay». Mi sonda con esperas de cuatro segundos no lo veía; el observador de
+mutaciones del caso sí. Ya no se enumeran momentos: se compara la consulta
+vigente con la contestada, así que cualquier hueco nuevo es espera por
+construcción.
+
+### 2. Publicar retoma después de ingresar (A9)
+
+Los CTA de publicación de Inicio y de Servicios usan **la misma puerta** que ya
+usaban la tarjeta y el detalle. No hay un segundo Login ni un segundo camino al
+formulario: la página dejó de decidir entre «abrí el formulario» y «abrí el
+Login» —eso no lo sabe la página, lo sabe la sesión, y lo sabría un instante
+antes de que el ingreso la cambie—.
+
+Medido, para **cada** CTA de cada pantalla —el caso los cuenta y los recorre a
+todos, así que si mañana aparece otro entra solo—:
+
+- sin sesión abre el Login real, con el aviso en voseo: **«Iniciá sesión para
+  publicar una oferta»** / **«…un servicio»**;
+- cancelar vuelve a la pantalla, no abre el publicador **y no dice nada**;
+- credencial fallida: no abre el publicador y el Login queda;
+- credencial buena, en el mismo Login: el publicador se abre **una vez**, sin un
+  segundo clic;
+- ir a Registro y volver conserva la intención;
+- el alta de verdad no abre sesión ni el publicador por sí sola;
+- después de cancelar, un ingreso genérico desde la cabecera queda genérico.
+
+Y del lado de los efectos: ingresar no publica, no crea órdenes, no reserva
+stock y no toca el carrito. Comparado contra la base —publicaciones, órdenes,
+suma de stock— y contra todo pedido de escritura que salió del navegador.
+
+### 3. Los negativos: cada aserción se vio roja
+
+| Se rompió | El 167 dijo |
+| --- | --- |
+| vuelve el `return` sin consultar | «no salió ninguna consulta al catálogo» |
+| el filtro inválido no se descarta | «no salió ninguna consulta al catálogo» |
+| el descarte se lleva también los válidos | «se perdió el filtro válido category=Insumos agrícolas» |
+| el catálogo caído se toma por catálogo vacío | el aviso de fallo nunca aparece |
+| publicar vuelve al Login sin continuidad | el publicador nunca se abre |
+| se retoma sin mirar si la persona entró | «cancelar el ingreso en home dijo algo» |
+| el aviso vuelve al tuteo | «no es "Iniciá sesión para publicar una oferta"» |
+| la intención queda pegada | «un ingreso genérico posterior heredó la publicación cancelada» |
+
+**Uno de esos negativos me costó el caso dos veces**, y es el mismo error que ya
+cometí antes: dar por bueno un verde sin haberlo visto rojo.
+
+Quitarle a mi propia pieza la condición de «sólo si entró» daba **VERDE**.
+Primero porque miraba el publicador cuando a mí se me ocurría mirar, y
+`AddProductModal` tiene su **propia** guarda: sin sesión avisa y se cierra sola,
+así que un publicador abierto indebidamente aparece y desaparece en el mismo
+suspiro. Puse un observador de mutaciones sobre el publicador: **seguía verde**,
+porque esa guarda decide **durante su render** y no deja ni un nodo en el
+documento. Lo único que queda es el aviso que tira al cerrarse. Con los avisos
+vigilados —y con el aviso anterior sacado de pantalla antes de contar, porque
+mientras sigue dibujado cada mutación lo vuelve a registrar— el negativo quedó
+rojo: *«cancelar el ingreso en home dijo algo: ["ATENCIÓN Debes iniciar sesión
+para publicar productos ×"]»*.
+
+### 4. R6 no se reproduce, y no le agregué nada al caso
+
+Lo medí en este mismo entorno, por los dos caminos posibles:
+
+**a) La sesión deja de valer y se recarga.** `/auth/me` responde 401 y el
+reintento con refresh se saltea para `/auth/`, así que los tokens se limpian y
+la sesión queda cerrada. **El carrito sobrevive** —`agromarket_cart`, un ítem
+antes y un ítem después—. Pero sin sesión la cabecera no dibuja la celda
+«Carrito»: quedan «AgroBoeda», «Ingresar» y las cinco secciones. **No hay
+carrito que abrir ni «Continuar compra» que apretar**, y el borde descrito
+necesita ese botón.
+
+**b) La sesión deja de valer con el carrito ABIERTO, sin recargar.** Nada
+revalida el token, así que `isAuthenticated` sigue en verdadero y «Continuar
+compra» **abre el Checkout** como siempre. Ni aviso sin salida ni Login
+faltante: lo que hay ahí es otra cosa —el Checkout después falla con «Sesión
+expirada»—, y no es lo que R6 describe.
+
+Es decir: la rama sin sesión de `CartModal.handleCheckout` —la que avisa «Debes
+iniciar sesión para continuar con la compra» y no ofrece nada— **no se alcanza
+hoy por ningún camino del producto**. No la toqué: no hay rojo que lo
+justifique, y agregarle al 167 aserciones sobre un borde que no reproduje sería
+exactamente lo que no hay que hacer. Queda informado como deuda, con su
+mecanismo.
+
+### 5. Lo que el caso 167 NO distingue
+
+La intención se limpia en dos lugares: `cerrarAutenticacion` la borra antes de
+llamarla, y `abrirLogin` la borra al abrir un ingreso genérico. **Cada uno solo
+alcanza.** Lo medí: saqué uno, verde; saqué el otro, verde; saqué los dos, rojo.
+Así que el caso comprueba que la propiedad se sostiene, pero **no distingue cuál
+de las dos limpiezas la sostiene**: si mañana alguien saca una, el 167 no se va
+a enterar. Sostengo las dos por corrección —una cubre cancelar, la otra cubre
+entrar por otro lado— y no porque mi caso las separe.
+
+### 6. Puertas, con el número exacto
+
+- 138, 139, 147 y 167 aislados: **4/4**.
+- Suite completa desde base limpia, **dos veces**:
+  - primera: **165/167**, rojos 131 y 143;
+  - segunda: **166/167**, único rojo 131.
+- `lint`, `tsc --noEmit`, `node --check scripts/smoke.mjs` y
+  `git -c core.whitespace=cr-at-eol diff --check`: verdes. El smoke incluye
+  build. Sin `compileall`, `pip check`, a11y ni contraste: no toqué Backend ni
+  presentación.
+
+**El 143 es intermitente y te lo digo con el mecanismo, no como «se destrabó».**
+Rojo en la primera corrida, verde en la segunda y verde aislado. No toqué
+`UserDashboard` ni `/products/my`. La causa está en el caso: pausar hace
+`PATCH /products/{id}` y **después** `GET /products/my` para redibujar, y el 143
+espera a que **la base** diga `PAUSED` y lee la tarjeta enseguida. La base
+cambia con el PATCH; la tarjeta, recién con el GET. Con la suite entera
+corriendo el segundo viaje llega más tarde y el caso lee el texto viejo:
+*«despues de pausar: la tarjeta no dice «Pausado»: "Activo SERVICIO …"»*. El
+arreglo es esperar la **condición que se afirma** —que la tarjeta diga
+«Pausado»— con la base como precondición, no en lugar de ella. No lo hice acá
+porque es otro caso y otra pieza; decime si lo querés y lo cierro.
+
+### 7. Fuera de alcance: lo informo, no lo arreglo
+
+- **`AboutPage` tiene el mismo defecto de A9 que acabo de arreglar.** Su CTA de
+  vender hace `isLoggedIn ? onOpenSellModal() : onOpenLogin()` —el Login sin
+  continuidad— y encima sin aviso. Pediste Inicio y Servicios y no lo amplío: el
+  arreglo es pasarle `pedirPublicar` en lugar del par
+  `onOpenSellModal`/`onOpenLogin`, una línea, y sumarlo al recorrido del 167.
+- **Queda un aviso en tuteo en el producto**: `AddProductModal` dice «Debes
+  iniciar sesión para publicar productos» en su guarda defensiva. Con esta pieza
+  ya no se alcanza desde Inicio ni Servicios —la puerta no abre el publicador
+  sin sesión—, pero el texto sigue ahí y es el único tuteo que queda en este
+  camino.
+- Siguen abiertas: la deuda de paginación mayor a cien, `--tg-color-focus` igual
+  a `--tg-color-brand`, y el 131 como limitación ambiental conocida.
+
+---
+
 ## QUOTE-CONTACT-1R — asunto, ayuda, identidad y un diff que había ensuciado
 
 **Resultado: corregido, con una salvedad que te debo decir (punto 5).**
