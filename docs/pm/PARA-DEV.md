@@ -12,6 +12,45 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-10 — DEVOLUCIÓN: RATING-UX-1R, el producto pasa pero el 165 no mide tres afirmaciones
+
+Revisé producto/regresión `96ac68b` + `08256c8` e informe `50d4875`. El delta
+de producto está dentro del alcance: reutiliza el endpoint por UUID,
+`useCapaModal` y radios nativos; no toca Backend ni agrega dependencias. Dev
+informó focales 149+150+165 en **3/3** dos veces y suite completa **164/165**,
+con único rojo 131 ambiental. PM reprodujo el 165 desde otra base Docker limpia
+en **1/1**, salida 0, e inspeccionó las tres capturas. Log:
+`/private/tmp/topgreen-pm-rating-165.log`. Evidencia en
+`REPRODUCCION-RATING-UX-1-2026-09-10.md`.
+
+No rehagas producto. Corregí únicamente el bloque del caso 165 para que mida
+estas tres afirmaciones que hoy sólo narra:
+
+1. **Diálogo móvil real.** Abrí la calificación de la orden propia a 390 × 844
+   antes de calificarla, exigí `role="dialog"`, nombre visible y cero desborde,
+   y recién ahí guardá `calificacion-dialogo-390x844.png`. La corrida PM actual
+   entró por el `else`, capturó Mis compras todavía cargando y aun así guardó el
+   archivo con nombre de diálogo y contó tres capturas. Eliminá ese fallback:
+   si no abre la capa, el caso debe fallar.
+2. **Envío retenido.** Interceptá un intento de POST y retenelo. Mientras está
+   pendiente, comprobá que Escape y fondo no cierran, que X, Cancelar y Enviar
+   están deshabilitados, y que no aparece una segunda solicitud. No alcanza con
+   hacer un clic y esperar a que la capa desaparezca.
+3. **Error visible y reintento.** Liberá ese primer intento con un fallo
+   controlado: la capa debe seguir abierta, el `role="alert"` debe quedar
+   visible, puntaje/comentario deben conservarse y los controles volver a estar
+   disponibles. Después dejá pasar un único reintento real y conservá las
+   comprobaciones actuales: una fila en base, promedio/cantidad correctos,
+   veredicto servidor en falso y ausencia del botón tras recargar. Diferenciá
+   en el conteo el intento fallido y el reintento deliberado de una duplicación.
+
+Un commit sólo de `scripts/smoke.mjs` y un informe breve separado. Corré
+únicamente el 165 desde base limpia, `node --check` y `diff-check`; el smoke ya
+construye y regenera las tres capturas. No repitas 149, 150, suite completa,
+lint, Backend, a11y o contraste. Si alguna aserción nueva revela un rojo real de
+producto, no lo arregles dentro de este commit: frená y reportá. No integres a
+`main`, no despliegues y no toques Railway, datos remotos, pagos o secretos.
+
 ## 2026-09-10 — CIERRE: TEST-SUITE-164SR aceptada; activar RATING-UX-1
 
 Aceptados arnés `6d20ecf` + `4319623`, informe `819cead`, corrección

@@ -141,7 +141,7 @@ tiene una sola política de navegación y una sola regresión matriz.
 | 13B | **ACCOUNT-PAGE-1R — cerrada** | Feedback visual Emi 08/09 | Base `7dc1d53`/`968efbc`, corrección `958c11c`/`16008a1`; PM cerró 149+150+163 en 3/3 y la corrección visual con 163 en 1/1. |
 | 14 | **ADMIN-SAFETY-1R — cerrada** | ADM-6, ADM-7, ADM-9; reproduce ADM-R4/R5 | Base `79f3219`/`c26db85`, corrección `871ce7b`/`775818c`; PM cerró 149+150+164 en 3/3, más puertas estáticas. |
 | 14S | **TEST-SUITE-164SR — cerrada** | Puerta de calidad | `6d20ecf` + `4319623` + `4182275`; informes `819cead` + `f6cade7`. Dev 163/164 con único rojo 131 ambiental; PM 6/6. El 125 ya informa la regla que mide. |
-| 15 | **RATING-UX-1 — activa** | F9, F10 y F11 | Estrellas visibles y accesibles; después de recargar no reaparece una calificación ya enviada. |
+| 15 | **RATING-UX-1R — activa** | F9, F10 y F11 | `96ac68b` + `08256c8` en revisión: producto focal verde; falta que el 165 mida envío retenido/error y capture el diálogo móvil real. |
 
 La recuperación automática de contraseña F4 sigue fuera del MVP. Sólo puede
 cerrarse con una instrucción honesta de soporte y la herramienta administrativa
