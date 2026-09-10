@@ -12,6 +12,81 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-10 — CIERRE: TEST-SUITE-164SR aceptada; activar RATING-UX-1
+
+Aceptados arnés `6d20ecf` + `4319623`, informe `819cead`, corrección
+`4182275` e informe `f6cade7`, todos en tu rama. PM revisó el delta final: sólo
+cambia la salida verde del 125 para describir la regla que ya mide; no modifica
+ninguna comprobación. `node --check` y `diff-check` verdes según Dev, que era
+exactamente la puerta pedida. No se repitió Docker. La evidencia combinada se
+mantiene en **163/164** de suite completa informada por Dev, con único rojo 131
+ambiental, y **6/6** focales independientes de PM; no se declara 164/164 PM.
+Detalle en `REPRODUCCION-TEST-SUITE-164S-2026-09-10.md`.
+
+La única tarea activa pasa a **`RATING-UX-1`**, sobre `4182275`. Cubre sólo F9,
+F10 y F11 de `AUDITORIAS-UX-CLAUDE-2026-08-30.md`.
+
+### Resultado obligatorio
+
+1. **Perfil legible y accesible.** Reemplazá el `''.repeat(...)` por estrellas
+   visibles que representen el promedio y conserven una única descripción
+   accesible del tipo «X de 5, N calificaciones». No dupliques ese significado
+   para lector de pantalla. Si no hay calificaciones, mantené un estado vacío
+   honesto. Retirá los espacios heredados sólo de los rótulos que toques.
+2. **El servidor decide si se puede calificar.** `ratedOrders` en memoria no
+   puede seguir siendo la fuente. Al cargar Mis compras, consultá únicamente
+   para las órdenes entregadas el endpoint existente
+   `/ratings/order/{order_id}/can-rate`, usando el UUID `orderId`, no el número
+   visible de orden. Hacelo en paralelo y sin crear otra API. Mostrá
+   «Calificar vendedor» sólo cuando la respuesta vigente diga `can_rate=true`.
+   Si la comprobación falla, no adivines: dejá una explicación visible y una
+   forma de reintentar. Después de enviar, refrescá ese estado desde el servidor;
+   una recarga o nueva sesión no debe volver a ofrecer la misma calificación.
+3. **Selector y capa reales.** Cambiá los `span onClick` por un grupo nativo de
+   radios 1–5 con nombre, selección y rótulo accesibles; teclado y flechas deben
+   funcionar sin JavaScript especial. Integrá la calificación con
+   `useCapaModal`, `role="dialog"`, nombre/descripción y el ciclo ya aceptado:
+   foco contenido y devuelto, Escape/fondo/X/Cancelar equivalentes y todos
+   pasando por la guarda de `FORM-DIRTY-1`. Mientras se envía no puede cerrarse
+   ni duplicar el POST; éxito o error queda visible. Conservá puntaje inicial 5
+   y comentario máximo 500.
+
+Reutilizá el endpoint, hook y guardas existentes. No agregues dependencia,
+otra API, esquema, migración, selector artesanal, calificación de comprador por
+vendedor ni rediseño del panel. No toques Backend salvo que el rojo demuestre
+que el endpoint existente no puede cumplir; si ocurre, frená ese punto y
+reportá antes de ampliar alcance.
+
+### Regresión y puertas — caso 165
+
+- Contra `4182275`, dejá rojo por los tres defectos reales: estrellas vacías,
+  control sin semántica/capa y botón que reaparece después de recargar.
+- En verde, prepará una orden entregada sin calificación y verificá que la
+  consulta usa su UUID, que el botón aparece, que el diálogo tiene nombre,
+  foco contenido/retornado y radios 1–5 operables por teclado con estado
+  comprobable. Cambiar puntaje o comentario debe activar la guarda; un formulario
+  intacto cierra directo. Continuar editando conserva valores y descartar
+  cierra una vez.
+- Enviá una sola calificación y comprobá API/base, promedio y cantidad. Recargá
+  la página o reingresá, abrí de nuevo Mis compras y exigí que el botón siga
+  ausente por la respuesta del servidor, sin descubrirlo con otro POST ni con
+  el error «Ya has calificado».
+- Verificá el estado de fallo/reintento de `can-rate` y que no se ofrezca una
+  acción cuya elegibilidad es desconocida. Guardá tres capturas: perfil y
+  diálogo en escritorio, y diálogo en 390 px, sin corte ni desborde.
+
+Corré 149, 150 y 165 aislados y después **una sola suite completa** desde base
+limpia; informá total exacto y cada rojo. Se admite únicamente el 131 si vuelve
+a ser la limitación ambiental conocida. Sumá lint, `node --check` y
+`diff-check`; el smoke incluye build. No corras a11y o contraste totales: el
+165 mide teclado, semántica, foco y las dos anchuras. Si no tocás Backend, no
+corras `compileall` ni `pip check`.
+
+Producto/regresión en un commit e informe separado en `PARA-PM.md`, con rojo y
+verde por SHA, resultados, capturas y límites. No integres a `main`, no
+despliegues, no ejecutes seed contra Railway y no toques datos remotos, pagos o
+secretos. Frená al entregar.
+
 ## 2026-09-10 — DEVOLUCIÓN: TEST-SUITE-164SR, una frase quedó en la regla vieja
 
 Revisé arnés `6d20ecf` + `4319623` e informe `819cead`. El delta toca sólo
