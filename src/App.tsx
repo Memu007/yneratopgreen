@@ -93,6 +93,23 @@ function App() {
   // en la lista vacía y el cartel «No hay operaciones con estos filtros», que
   // es mentira: no es que no haya, es que no pudimos preguntar.
   const [errorDeCatalogo, setErrorDeCatalogo] = useState<string | null>(null);
+  /**
+   * Qué se sabe de los catálogos auxiliares: categorías y provincias.
+   *
+   * Son los que dicen si un filtro que viene en la URL existe, así que
+   * decidir antes de tenerlos es decidir sin saber. Con una categoría
+   * inexistente el mercado hacía `return` sin consultar nada, y la grilla
+   * afirmaba «No hay operaciones con estos filtros»: la respuesta de una API
+   * a la que nadie preguntó.
+   *
+   * Tres estados y no un booleano. «Todavía no llegaron» y «no se pudieron
+   * traer» terminan en pantallas distintas —esperar y fallar— y un booleano
+   * las confunde; deducirlo de que la lista esté vacía las confunde también,
+   * porque una lista vacía es lo que dejan las dos.
+   */
+  const [catalogosAuxiliares, setCatalogosAuxiliares] =
+    useState<'pendiente' | 'listos' | 'falló'>('pendiente');
+  const [revisionDeCatalogos, setRevisionDeCatalogos] = useState(0);
   
   const {
     searchQuery,
@@ -191,6 +208,37 @@ function App() {
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
 
+  /**
+   * Publicar.
+   *
+   * Es la misma puerta que ya usan la tarjeta y el detalle: sin sesión se
+   * abre el Login de verdad y, si la persona entra, se abre el formulario
+   * que había pedido. Antes el aviso y el Login eran todo el trámite: al
+   * volver había que encontrar otra vez el botón, así que la intención se
+   * perdía justo donde la persona ya había dicho qué quería hacer.
+   *
+   * La sesión se lee DESPUÉS de que el ingreso se cerró, y del `ref` y no de
+   * la variable capturada: el modal cierra en el mismo paso en que la sesión
+   * se guarda, así que leerla dentro del callback dice siempre «no entró».
+   * Es el mismo desfasaje que ya resolvió Mi cuenta y usa su misma lectura.
+   *
+   * Cancelar, equivocar la contraseña o darse de alta dejan esto en nada: el
+   * alta no abre sesión, así que no hay nada que retomar. Y lo único que se
+   * retoma es abrir la pantalla: ingresar no publica, no crea una orden, no
+   * reserva stock y no toca el carrito.
+   */
+  const pedirPublicar = () => {
+    if (situacion.current.autenticado) {
+      setIsAddProductOpen(true);
+      return;
+    }
+    abrirLoginYVolver(() => {
+      setTimeout(() => {
+        if (situacion.current.autenticado) setIsAddProductOpen(true);
+      }, 0);
+    });
+  };
+
   const selectedProvinceId =
     provinces.find((province) => province.name === selectedProvince)?.id || '';
 
@@ -213,23 +261,30 @@ function App() {
     if (currentSection !== 'marketplace') return;
 
     let cancelled = false;
+    setCatalogosAuxiliares('pendiente');
     Promise.all([getCategories(), getProvinces()])
       .then(([categoryData, provinceData]) => {
         if (cancelled) return;
         setCategories(categoryData);
         setProvinces(provinceData);
+        setCatalogosAuxiliares('listos');
       })
       .catch((error) => {
         if (cancelled) return;
         console.error('Error al cargar filtros del catálogo:', error);
         setCategories([]);
         setProvinces([]);
+        // Vaciar las listas y callarse dejaba TODO filtro pareciendo
+        // inexistente, así que un filtro legítimo se descartaba solo y la
+        // pantalla mostraba un mercado sin filtrar como si fuera la
+        // respuesta pedida. Sin catálogos no se valida nada: se dice.
+        setCatalogosAuxiliares('falló');
       });
 
     return () => {
       cancelled = true;
     };
-  }, [currentSection]);
+  }, [currentSection, revisionDeCatalogos]);
 
   // Cargar las localidades con el ID corto de provincia.
   useEffect(() => {
@@ -260,16 +315,111 @@ function App() {
     };
   }, [currentSection, selectedProvinceId]);
 
+  // Qué filtros de la URL no existen. Sólo se sabe con los catálogos en la
+  // mano: mientras están en camino `false` no significa «es válido» sino
+  // «todavía no se sabe», y confundir las dos cosas es de dónde salía el
+  // vacío falso.
+  const categoriaInvalida = catalogosAuxiliares === 'listos'
+    && selectedCategory !== 'Todas las categorías'
+    && !categories.some((category) => category.name === selectedCategory);
+  const provinciaInvalida = catalogosAuxiliares === 'listos'
+    && selectedProvince !== 'Todas las provincias'
+    && !provinces.some((province) => province.name === selectedProvince);
+
+  /**
+   * El filtro que no existe se suelta, y se va de la barra con él.
+   *
+   * Se suelta ese y nada más: una URL con una categoría inventada y una
+   * provincia real sigue siendo una consulta por esa provincia. La
+   * localidad es la excepción, y no por ampliar el descarte: no es un
+   * filtro aparte, es un lugar ADENTRO de la provincia que se descartó. Sin
+   * provincia el selector de localidades no tiene nada que ofrecer, así que
+   * quedaría filtrando por algo que no se ve y no se puede sacar. Es lo
+   * mismo que ya hace cambiar de provincia a mano.
+   *
+   * La barra no se escribe acá. El hook de filtros serializa su estado en
+   * cada cambio, así que soltar el filtro es lo que borra el parámetro; un
+   * segundo escritor del historial sería justo lo que la navegación central
+   * existe para evitar.
+   */
+  useEffect(() => {
+    if (categoriaInvalida) setSelectedCategory('Todas las categorías');
+    if (provinciaInvalida) {
+      setSelectedProvince('Todas las provincias');
+      setSelectedLocalityId('');
+    }
+  }, [
+    categoriaInvalida,
+    provinciaInvalida,
+    setSelectedCategory,
+    setSelectedProvince,
+    setSelectedLocalityId,
+  ]);
+
+  /**
+   * Qué consulta describe lo que se está mirando, y cuál fue la última que
+   * volvió con respuesta. Mientras no coinciden, la grilla espera.
+   *
+   * Enumerar los momentos de espera —catálogos en camino, filtro inválido en
+   * descarte— no alcanzaba, y el caso 167 lo encontró: entre soltar el
+   * filtro y salir la consulta hay un render donde ya no se está decidiendo
+   * nada y todavía no se está cargando nada, porque los efectos corren
+   * DESPUÉS de dibujar. En ese render la lista vacía volvía a leerse como
+   * «no hay», y el vacío falso reaparecía por un cuadro.
+   *
+   * Así que no se enumeran momentos: se compara la consulta vigente con la
+   * contestada. Cualquier hueco nuevo entre las dos es espera por
+   * construcción, sin que nadie se acuerde de agregarlo.
+   *
+   * La subcategoría y la calificación mínima no entran en la firma a
+   * propósito: no viajan a la consulta, así que la respuesta que hay sigue
+   * siendo la respuesta a lo que se pidió.
+   */
+  const consultaVigente = JSON.stringify([
+    searchQuery,
+    selectedType,
+    selectedCategory,
+    selectedProvince,
+    selectedProvinceId,
+    selectedLocalityId,
+    priceMin,
+    priceMax,
+    inStockOnly,
+    productsRevision,
+  ]);
+  const [consultaContestada, setConsultaContestada] = useState<string | null>(null);
+
+  // Que falten los catálogos es la única espera que no termina en respuesta:
+  // ahí lo que corresponde es decirlo, y por eso sale de la espera.
+  const laPantallaEspera = currentSection === 'marketplace'
+    && catalogosAuxiliares !== 'falló'
+    && consultaContestada !== consultaVigente;
+
+  // Que no se pudieran traer los catálogos no es un mercado vacío ni un
+  // mercado caído: es que no se pudo validar lo que pide la URL. Se dice y
+  // se ofrece reintentar, en vez de atribuirle al mercado un cero que nadie
+  // midió.
+  const errorDeLaPantalla = catalogosAuxiliares === 'falló'
+    ? 'No pudimos cargar los filtros del mercado. Volvé a intentarlo en un momento.'
+    : errorDeCatalogo;
+  const reintentarElMercado = () => {
+    if (catalogosAuxiliares === 'falló') {
+      setRevisionDeCatalogos((intento) => intento + 1);
+      return;
+    }
+    setProductsRevision((intento) => intento + 1);
+  };
+
   // Filtrar en la API para usar la ubicación real de la publicación.
   useEffect(() => {
     if (currentSection !== 'marketplace') return;
-    if (selectedProvince !== 'Todas las provincias' && !selectedProvinceId) return;
-    if (
-      selectedCategory !== 'Todas las categorías'
-      && !categories.some((category) => category.name === selectedCategory)
-    ) {
-      return;
-    }
+    // Sin catálogos no se consulta, y no porque falte un dato de la
+    // consulta: es que todavía no se sabe si lo que pide la URL existe. Con
+    // un filtro inválido tampoco, porque el descarte ya está en camino y
+    // preguntar acá sería preguntar por algo que se acaba de soltar. Las dos
+    // esperas se ven como espera y no como catálogo vacío.
+    if (catalogosAuxiliares !== 'listos') return;
+    if (categoriaInvalida || provinciaInvalida) return;
 
     let cancelled = false;
     setLoadingProducts(true);
@@ -322,7 +472,12 @@ function App() {
         );
       })
       .finally(() => {
-        if (!cancelled) setLoadingProducts(false);
+        if (cancelled) return;
+        setLoadingProducts(false);
+        // Contestada quiere decir «volvió», no «volvió con resultados»: un
+        // cero de la API es una respuesta y se dibuja como tal. Lo que no
+        // puede pasar es dibujarlo antes de que vuelva.
+        setConsultaContestada(consultaVigente);
       });
 
     return () => {
@@ -342,7 +497,11 @@ function App() {
     priceMax,
     inStockOnly,
     categories,
+    catalogosAuxiliares,
+    categoriaInvalida,
+    provinciaInvalida,
     productsRevision,
+    consultaVigente,
   ]);
 
   // El conteo visible sale del total de la API. Dos filtros no viajan a la
@@ -396,8 +555,7 @@ function App() {
           onNavigateToMarketplace={() => handleNavigate('marketplace')} 
           onSolicitarCotizacion={pedirCotizacion}
           onNavigateToServices={() => handleNavigate('services')}
-          onPublishClick={() => setIsAddProductOpen(true)}
-          onLoginClick={abrirLogin}
+          onSolicitarPublicar={pedirPublicar}
           onSolicitarIngreso={abrirLoginYVolver}
           vistaPrevia={vistaPreviaDeInicio}
         />;
@@ -450,9 +608,9 @@ function App() {
               <ProductGrid
                 products={filteredProducts}
                 total={totalDeResultados}
-                isLoading={loadingProducts}
-                error={errorDeCatalogo}
-                onReintentar={() => setProductsRevision((intento) => intento + 1)}
+                isLoading={loadingProducts || laPantallaEspera}
+                error={errorDeLaPantalla}
+                onReintentar={reintentarElMercado}
                 onSolicitarCotizacion={pedirCotizacion}
                 onSolicitarIngreso={abrirLoginYVolver}
               />
@@ -474,8 +632,7 @@ function App() {
           <ServicesPage
               onSolicitarCotizacion={pedirCotizacion}
             onVerServiciosPublicados={verServiciosPublicados}
-            onPublishClick={() => setIsAddProductOpen(true)}
-            onLoginClick={abrirLogin}
+            onSolicitarPublicar={pedirPublicar}
             onSolicitarIngreso={abrirLoginYVolver}
             vistaPrevia={vistaPreviaDeServicios}
           />
@@ -535,8 +692,7 @@ function App() {
       default:
         return <HomePage 
           onNavigateToMarketplace={() => handleNavigate('marketplace')}
-          onPublishClick={() => setIsAddProductOpen(true)}
-          onLoginClick={abrirLogin}
+          onSolicitarPublicar={pedirPublicar}
           onSolicitarIngreso={abrirLoginYVolver}
           vistaPrevia={vistaPreviaDeInicio}
         />;

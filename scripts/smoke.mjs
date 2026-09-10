@@ -24921,6 +24921,534 @@ await runCase(166, 'La cotización llega a Contacto con su publicación, y prepa
     + `codificado, no declara envío y conserva lo escrito; ${medidos.join('; ')}`;
 });
 
+// ---------------------------------------------------------------------------
+// 167. FILTER-INTENT-1 — la URL que no existe no inventa un mercado vacío, y
+// la intención de publicar sobrevive al ingreso.
+//
+// Dos afirmaciones falsas y una intención perdida:
+//
+//  1. Con una categoría o una provincia inexistente en la URL, el Mercado
+//     hacía `return` ANTES de consultar y la grilla decía «No hay operaciones
+//     con estos filtros». Nadie preguntó nada: la pantalla contestaba por la
+//     API. El parámetro inválido además se quedaba en la barra, así que
+//     recargar y compartir repetían la mentira.
+//  2. Ese mismo `return` corría mientras los catálogos venían en camino, así
+//     que una URL con filtros VÁLIDOS también pasaba por el cartel de cero
+//     antes de mostrar sus resultados.
+//  3. Publicar sin sesión avisaba y abría el Login, y ahí terminaba: al
+//     volver había que encontrar otra vez el botón. La intención se perdía
+//     justo donde la persona ya había dicho qué quería hacer.
+//
+// Lo que se mide: que el filtro inválido se descarte SOLO y se vaya de la
+// barra, que los válidos queden, que salga una consulta y que la grilla
+// dibuje su respuesta; que un catálogo auxiliar caído se diga y se pueda
+// reintentar en vez de atribuirle al mercado un cero que nadie midió; y que
+// cada CTA de publicación de Inicio y Servicios abra el Login real y retome el
+// formulario si —y sólo si— la persona entra, sin escribir nada por el camino.
+//
+// R6 NO está acá y no es un olvido: el borde no se reproduce. Está medido y
+// explicado al final del caso.
+// ---------------------------------------------------------------------------
+await runCase(167, 'Un filtro inexistente en la URL se descarta sin inventar un vacío, y publicar retoma después de ingresar', async () => {
+  const medidos = [];
+  const FRASE_DE_CERO = 'No hay operaciones con estos filtros';
+
+  // Los nombres válidos salen del MISMO catálogo que mira la aplicación: una
+  // lista escrita a mano acá envejece con la base y termina probando otra cosa.
+  const categorias = await apiRequest('/catalog/categories?include_empty=true');
+  const provincias = await apiRequest('/catalog/localities/provinces');
+  assert(Array.isArray(categorias.data) && categorias.data.length,
+    'no hay categorías en el catálogo: el caso no se puede medir');
+  assert(Array.isArray(provincias.data) && provincias.data.length,
+    'no hay provincias en el catálogo: el caso no se puede medir');
+  // La categoría válida y el tipo que la acompaña salen de la base y juntos: la
+  // primera de la lista puede no tener ninguna publicación del tipo que se pida,
+  // y entonces el caso mediría un cero legítimo creyendo que mide el falso.
+  const [conCategoria] = queryRows(`
+    SELECT c.name, p.publication_type::text, COUNT(*)::text
+    FROM products p JOIN categories c ON c.id = p.category_id
+    WHERE p.status = 'ACTIVE'
+    GROUP BY c.name, p.publication_type
+    ORDER BY COUNT(*) DESC, c.name LIMIT 1
+  `);
+  assert(conCategoria, 'ninguna publicación activa tiene categoría: el caso no se puede medir');
+  const categoriaValida = conCategoria[0];
+  const tipoValido = conCategoria[1] === 'servicio' ? 'servicios' : 'productos';
+  assert(categorias.data.some((categoria) => categoria.name === categoriaValida),
+    `la categoría con más publicaciones («${categoriaValida}») no está en el catálogo`);
+  // Una provincia que tenga publicaciones, para que su consulta se distinga de
+  // la consulta sin filtrar y no dé lo mismo mirar una u otra.
+  const [conPublicaciones] = queryRows(`
+    SELECT l.province_name, COUNT(*)::text
+    FROM products p JOIN localities l ON l.id = p.locality_id
+    WHERE p.status = 'ACTIVE'
+    GROUP BY l.province_name ORDER BY COUNT(*) DESC, l.province_name LIMIT 1
+  `);
+  assert(conPublicaciones, 'ninguna publicación activa tiene provincia: el caso no se puede medir');
+  const provinciaValida = conPublicaciones[0];
+  assert(provincias.data.some((provincia) => provincia.name === provinciaValida),
+    `la provincia con más publicaciones («${provinciaValida}») no está en el catálogo de provincias`);
+
+  const CATEGORIA_INVENTADA = 'Categoría Que No Existe 167';
+  const PROVINCIA_INVENTADA = 'Provincia Que No Existe 167';
+  assert(!categorias.data.some((categoria) => categoria.name === CATEGORIA_INVENTADA)
+    && !provincias.data.some((provincia) => provincia.name === PROVINCIA_INVENTADA),
+  'los nombres inventados del caso existen de verdad en el catálogo');
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    // === A. La URL inválida ================================================
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+
+    // El cartel de cero se vigila en CADA mutación del documento y no al final:
+    // el vacío falso que esta pieza vino a sacar dura lo que tarda una consulta,
+    // y mirar una sola vez, después, lo deja pasar entero.
+    await page.addInitScript((frase) => {
+      window.__cerosVistos = 0;
+      const mirar = () => {
+        if (document.body && document.body.innerText.includes(frase)) window.__cerosVistos += 1;
+      };
+      const arrancar = () => {
+        mirar();
+        new MutationObserver(mirar)
+          .observe(document.body, { childList: true, subtree: true, characterData: true });
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', arrancar);
+      } else {
+        arrancar();
+      }
+    }, FRASE_DE_CERO);
+
+    const consultas = [];
+    page.on('request', (pedido) => {
+      if (/\/catalog\/products\?/.test(pedido.url())) {
+        consultas.push(new URL(pedido.url()).searchParams);
+      }
+    });
+
+    const filtrosDeLaBarra = () => {
+      const parametros = new URL(page.url()).searchParams;
+      const filtros = {};
+      for (const [clave, valor] of parametros) {
+        if (clave !== 'section') filtros[clave] = valor;
+      }
+      return filtros;
+    };
+    const cerosVistos = () => page.evaluate(() => window.__cerosVistos);
+    const tarjetas = () => page.locator('article[class*="card"]').count();
+
+    const entrarAlMercado = async (consulta) => {
+      consultas.length = 0;
+      await page.goto(`${FRONTEND_URL}/?section=marketplace&${consulta}`,
+        { waitUntil: 'domcontentloaded' });
+      await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 25_000 });
+    };
+
+    for (const escenario of [
+      {
+        nombre: 'categoría inexistente',
+        consulta: `category=${encodeURIComponent(CATEGORIA_INVENTADA)}`
+          + `&province=${encodeURIComponent(provinciaValida)}&in_stock=true`,
+        seVa: 'category',
+        quedan: { province: provinciaValida, in_stock: 'true' },
+      },
+      {
+        nombre: 'provincia inexistente',
+        consulta: `province=${encodeURIComponent(PROVINCIA_INVENTADA)}`
+          + `&category=${encodeURIComponent(categoriaValida)}&type=${tipoValido}`,
+        seVa: 'province',
+        quedan: { category: categoriaValida, type: tipoValido },
+      },
+    ]) {
+      await entrarAlMercado(escenario.consulta);
+
+      // La consulta sale. Antes no salía ninguna, que es de donde venía el cero.
+      await esperarA(async () => consultas.length > 0,
+        `con ${escenario.nombre} no salió ninguna consulta al catálogo`, 25_000);
+      await esperarA(async () => (await tarjetas()) > 0,
+        `con ${escenario.nombre} la grilla no dibujó la respuesta de la API`, 25_000);
+
+      // El parámetro inválido se fue de la barra y los válidos quedaron.
+      const enLaBarra = filtrosDeLaBarra();
+      assert(!(escenario.seVa in enLaBarra),
+        `el filtro inválido siguió en la barra: ${JSON.stringify(enLaBarra)}`);
+      for (const [clave, valor] of Object.entries(escenario.quedan)) {
+        assert(enLaBarra[clave] === valor,
+          `con ${escenario.nombre} se perdió el filtro válido ${clave}=${valor}: `
+          + JSON.stringify(enLaBarra));
+      }
+
+      // Y NINGUNA de las consultas llevó lo inventado.
+      for (const parametros of consultas) {
+        assert(parametros.get('category') !== CATEGORIA_INVENTADA
+          && parametros.get('province') !== PROVINCIA_INVENTADA,
+        `una consulta viajó con el filtro inventado: ${parametros.toString()}`);
+      }
+
+      // La última consulta es la que describe lo que se está mirando, y la
+      // grilla dibuja exactamente esa respuesta: no una versión recortada de
+      // otra consulta anterior.
+      const ultima = consultas[consultas.length - 1];
+      const respuesta = await apiRequest(`/catalog/products?${ultima.toString()}`);
+      const dibujadas = await tarjetas();
+      assert(dibujadas === respuesta.data.items.length,
+        `la grilla dibuja ${dibujadas} tarjetas y la API contestó `
+        + `${respuesta.data.items.length} para la misma consulta`);
+
+      // Y en ningún momento —ni un render— se afirmó que no hay nada.
+      assert(await cerosVistos() === 0,
+        `con ${escenario.nombre} la pantalla afirmó «${FRASE_DE_CERO}» sin respuesta de la API`);
+      medidos.push(`con ${escenario.nombre} en la URL se descarta sólo ese filtro, los válidos `
+        + 'quedan, sale una consulta y la grilla dibuja su respuesta, sin cartel de cero');
+    }
+
+    // Y una URL con filtros VÁLIDOS tampoco pasa por el cartel de cero mientras
+    // los catálogos vienen: era el mismo `return`, con el filtro bueno.
+    await entrarAlMercado(`category=${encodeURIComponent(categoriaValida)}`);
+    await esperarA(async () => consultas.length > 0,
+      'con una categoría válida no salió consulta', 25_000);
+    assert(await cerosVistos() === 0,
+      'con filtros válidos la pantalla pasó por «' + FRASE_DE_CERO + '» antes de la respuesta');
+    assert(filtrosDeLaBarra().category === categoriaValida,
+      'una categoría válida no sobrevivió a la validación');
+    medidos.push('una URL con filtros válidos no pasa por el cartel de cero mientras se validan');
+
+    // --- El catálogo auxiliar caído -----------------------------------------
+    // Sin catálogos no se puede saber si el filtro existe. Antes las listas
+    // quedaban vacías en silencio: TODO filtro parecía inexistente. Ahora se
+    // dice y se puede reintentar.
+    await page.route('**/catalog/categories*', (ruta) => ruta.abort());
+    await entrarAlMercado(`category=${encodeURIComponent(categoriaValida)}`);
+    const aviso = page.getByRole('alert');
+    await aviso.waitFor({ state: 'visible', timeout: 25_000 });
+    const textoDelAviso = (await aviso.innerText()).trim();
+    assert(/filtros del mercado/i.test(textoDelAviso),
+      `el fallo del catálogo auxiliar no se explica: ${JSON.stringify(textoDelAviso)}`);
+    assert(await cerosVistos() === 0,
+      `con el catálogo auxiliar caído la pantalla afirmó «${FRASE_DE_CERO}»`);
+    assert(await page.getByRole('button', { name: 'Reintentar' }).count() === 1,
+      'el fallo del catálogo auxiliar no ofrece reintentar');
+    assert(consultas.length === 0,
+      `sin catálogos salieron ${consultas.length} consultas: no se puede validar lo que se pide`);
+    // Y el filtro NO se descartó: no se descarta lo que no se pudo validar.
+    assert(filtrosDeLaBarra().category === categoriaValida,
+      'sin catálogos el filtro se descartó igual: eso es validar sin catálogo');
+
+    await page.unroute('**/catalog/categories*');
+    await page.getByRole('button', { name: 'Reintentar' }).click();
+    await esperarA(async () => (await tarjetas()) > 0,
+      'reintentar no trajo el mercado de vuelta', 25_000);
+    assert(await cerosVistos() === 0,
+      `reintentar pasó por «${FRASE_DE_CERO}»`);
+    medidos.push('un catálogo auxiliar caído se dice, no descarta filtros y se puede reintentar');
+    await contexto.close();
+
+    // === B. Publicar retoma después de ingresar ============================
+    const publicacionesAntes = queryCount("SELECT COUNT(*) FROM products");
+    const ordenesAntes = queryCount('SELECT COUNT(*) FROM orders');
+    const stockAntes = queryCount("SELECT COALESCE(SUM(stock), 0) FROM products WHERE status = 'ACTIVE'");
+
+    const enElCarrito = (pagina) => pagina.evaluate(() => {
+      for (const clave of Object.keys(window.localStorage)) {
+        if (!/cart|carrito/i.test(clave)) continue;
+        try {
+          const guardado = JSON.parse(window.localStorage.getItem(clave) || 'null');
+          if (Array.isArray(guardado)) return guardado.length;
+          if (guardado && Array.isArray(guardado.items)) return guardado.items.length;
+        } catch { /* si no es JSON no es el carrito */ }
+      }
+      return 0;
+    });
+
+    const escrituras = [];
+    const vigilarEscrituras = (pagina) => {
+      pagina.on('request', (pedido) => {
+        if (pedido.method() === 'GET' || !/\/api\//.test(pedido.url())) return;
+        if (/\/auth\//.test(pedido.url())) return;
+        escrituras.push(`${pedido.method()} ${new URL(pedido.url()).pathname}`);
+      });
+    };
+
+    const publicador = (pagina) => pagina.getByRole('dialog', { name: 'Publicar' });
+    const login = (pagina) => pagina.getByRole('dialog', { name: 'Ingresar' });
+
+    // El publicador se cuenta en cada mutación del documento, y no mirando si
+    // está ahí cuando a este caso se le ocurre mirar.
+    //
+    // Mirar después no alcanza, y está medido: `AddProductModal` tiene su
+    // propia guarda —sin sesión avisa y se cierra sola—, así que un publicador
+    // abierto indebidamente aparece y desaparece en el mismo suspiro. Con una
+    // sola lectura, quitarle a esta pieza la condición de «sólo si entró» daba
+    // VERDE igual: el caso no probaba nada de lo que dice probar.
+    const vigilarElPublicador = (pagina) => pagina.addInitScript(() => {
+      window.__publicadorAbierto = 0;
+      const mirar = () => {
+        if (document.querySelector('[role="dialog"][aria-label="Publicar"]')) {
+          window.__publicadorAbierto += 1;
+        }
+      };
+      const arrancar = () => {
+        mirar();
+        new MutationObserver(mirar).observe(document.body, { childList: true, subtree: true });
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', arrancar);
+      } else {
+        arrancar();
+      }
+    });
+    const vecesQueSeAbrio = (pagina) => pagina.evaluate(() => window.__publicadorAbierto);
+    const olvidarAperturas = (pagina) => pagina.evaluate(() => { window.__publicadorAbierto = 0; });
+
+    // Y los avisos, igual: se juntan todos los que pasaron, no el que esté en
+    // pantalla cuando este caso mire.
+    //
+    // Hace falta porque el vigía del publicador NO alcanza, y también está
+    // medido: `AddProductModal` decide sin sesión ANTES de dibujar nada —se
+    // cierra durante su propio render—, así que abrirlo indebidamente no deja
+    // ni un nodo en el documento. Lo único que queda es el aviso que tira al
+    // cerrarse. Quitarle a esta pieza la condición de «sólo si entró» daba
+    // VERDE con el vigía del publicador puesto; con esto, no.
+    const vigilarLosAvisos = (pagina) => pagina.addInitScript(() => {
+      window.__avisos = [];
+      const mirar = () => {
+        for (const nodo of document.querySelectorAll('[role="status"]')) {
+          const texto = (nodo.innerText || '').replace(/\s+/g, ' ').trim();
+          if (texto && !window.__avisos.includes(texto)) window.__avisos.push(texto);
+        }
+      };
+      const arrancar = () => {
+        mirar();
+        new MutationObserver(mirar)
+          .observe(document.body, { childList: true, subtree: true, characterData: true });
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', arrancar);
+      } else {
+        arrancar();
+      }
+    });
+    const avisosVistos = (pagina) => pagina.evaluate(() => window.__avisos.slice());
+    const olvidarAvisos = (pagina) => pagina.evaluate(() => { window.__avisos = []; });
+    const ingresar = async (pagina, clave) => {
+      await login(pagina).getByLabel(/^Email/).fill('vendedor@ejemplo.com');
+      await login(pagina).getByLabel(/^Contraseña/).fill(clave);
+      await login(pagina).getByRole('button', { name: 'Ingresar', exact: true }).click();
+    };
+
+    for (const pantalla of [
+      { seccion: 'home', cta: 'Publicar una oferta', aviso: 'Iniciá sesión para publicar una oferta' },
+      { seccion: 'services', cta: 'Publicar un servicio', aviso: 'Iniciá sesión para publicar un servicio' },
+    ]) {
+      // Todos los CTA de publicación de la pantalla, no uno elegido a mano: si
+      // mañana aparece otro por un camino distinto, este caso lo recorre solo.
+      const cuantosCta = await (async () => {
+        const contextoContado = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+        const pagina = await contextoContado.newPage();
+        await pagina.goto(`${FRONTEND_URL}/?section=${pantalla.seccion}`,
+          { waitUntil: 'domcontentloaded' });
+        await pagina.getByRole('button', { name: pantalla.cta }).first()
+          .waitFor({ state: 'visible', timeout: 25_000 });
+        const cuantos = await pagina.getByRole('button', { name: pantalla.cta }).count();
+        await contextoContado.close();
+        return cuantos;
+      })();
+      assert(cuantosCta > 0, `en ${pantalla.seccion} no hay ningún CTA «${pantalla.cta}»`);
+
+      for (let indice = 0; indice < cuantosCta; indice += 1) {
+        const suContexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+        const pagina = await suContexto.newPage();
+        vigilarEscrituras(pagina);
+        await vigilarElPublicador(pagina);
+        await vigilarLosAvisos(pagina);
+        await pagina.goto(`${FRONTEND_URL}/?section=${pantalla.seccion}`,
+          { waitUntil: 'domcontentloaded' });
+        const ctas = pagina.getByRole('button', { name: pantalla.cta });
+        await ctas.nth(indice).waitFor({ state: 'visible', timeout: 25_000 });
+        await ctas.nth(indice).click();
+
+        // Sin sesión: el Login REAL de la aplicación, con su aviso en voseo.
+        await login(pagina).waitFor({ state: 'visible', timeout: 20_000 });
+        const avisoVisible = (await avisosVistos(pagina)).join(' | ');
+        assert(avisoVisible.includes(pantalla.aviso),
+          `el aviso del CTA ${indice + 1} de ${pantalla.seccion} no es «${pantalla.aviso}»: `
+          + JSON.stringify(avisoVisible));
+        assert(await vecesQueSeAbrio(pagina) === 0,
+          `el CTA ${indice + 1} de ${pantalla.seccion} abrió el publicador sin sesión`);
+
+        // Cancelar: vuelve a la pantalla, no abre nada y NO DICE NADA. Que no
+        // diga nada es lo que se puede ver desde afuera: quien cancela un
+        // ingreso que pidió no necesita que le expliquen su propia decisión, y
+        // cualquier aviso acá delata que algo intentó seguir sin sesión.
+        //
+        // El aviso anterior se saca de pantalla antes de poner el contador en
+        // cero: mientras siga dibujado, cada mutación del documento lo vuelve a
+        // registrar y el cero no dura. Se cierra por su propio botón —no se
+        // espera a que caduque— y se comprueba que efectivamente se fue.
+        for (const cerrarAviso of await pagina.locator('[role="status"] button').all()) {
+          await cerrarAviso.click();
+        }
+        await esperarA(async () => (await pagina.locator('[role="status"] button').count()) === 0,
+          'el aviso anterior no se fue de la pantalla', 15_000);
+        await olvidarAvisos(pagina);
+        await login(pagina).getByRole('button', { name: 'Cerrar' }).click();
+        await esperarA(async () => (await pagina.getByRole('dialog').count()) === 0,
+          `cancelar el ingreso dejó una capa abierta en ${pantalla.seccion}`, 15_000);
+        assert(await vecesQueSeAbrio(pagina) === 0,
+          `cancelar el ingreso abrió el publicador en ${pantalla.seccion}`);
+        const dichoAlCancelar = await avisosVistos(pagina);
+        assert(dichoAlCancelar.length === 0,
+          `cancelar el ingreso en ${pantalla.seccion} dijo algo: ${JSON.stringify(dichoAlCancelar)}`);
+
+        // Y la intención NO queda pegada: un ingreso genérico desde la cabecera
+        // no puede heredar una publicación que se canceló.
+        await olvidarAperturas(pagina);
+        await pagina.locator('header').getByRole('button', { name: 'Ingresar', exact: true }).click();
+        await ingresar(pagina, 'vendedor123');
+        await esperarA(async () => (await pagina.locator('header')
+          .getByRole('button', { name: 'Vender' }).count()) === 1,
+        'el ingreso genérico no llegó a abrir sesión', 25_000);
+        assert(await vecesQueSeAbrio(pagina) === 0,
+          `en ${pantalla.seccion}, un ingreso genérico posterior heredó la publicación cancelada`);
+        await suContexto.close();
+      }
+      medidos.push(`los ${cuantosCta} CTA de publicación de ${pantalla.seccion} abren el Login real `
+        + `con el aviso «${pantalla.aviso}»; cancelar no abre nada y el ingreso genérico posterior `
+        + 'no hereda la intención');
+
+      // --- Credencial fallida, y después la buena ---------------------------
+      const conFallo = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const paginaFallo = await conFallo.newPage();
+      vigilarEscrituras(paginaFallo);
+      await vigilarElPublicador(paginaFallo);
+      await vigilarLosAvisos(paginaFallo);
+      const carritoAlEmpezar = await (async () => {
+        await paginaFallo.goto(`${FRONTEND_URL}/?section=${pantalla.seccion}`,
+          { waitUntil: 'domcontentloaded' });
+        return enElCarrito(paginaFallo);
+      })();
+      await paginaFallo.getByRole('button', { name: pantalla.cta }).first().click();
+      await login(paginaFallo).waitFor({ state: 'visible', timeout: 20_000 });
+      await ingresar(paginaFallo, 'esta-clave-no-es-la-de-nadie');
+      await login(paginaFallo).getByRole('alert').waitFor({ state: 'visible', timeout: 20_000 });
+      assert(await vecesQueSeAbrio(paginaFallo) === 0,
+        `una credencial fallida abrió el publicador en ${pantalla.seccion}`);
+      const dichoAlFallar = (await avisosVistos(paginaFallo)).join(' | ');
+      assert(!/sesi[oó]n para publicar|Debes iniciar sesi/i.test(dichoAlFallar.slice(
+        dichoAlFallar.indexOf(pantalla.aviso) + pantalla.aviso.length)),
+      `tras la credencial fallida ${pantalla.seccion} volvió a pedir sesión para publicar: `
+      + JSON.stringify(dichoAlFallar));
+      assert(await login(paginaFallo).count() === 1,
+        `una credencial fallida cerró el ingreso en ${pantalla.seccion}`);
+
+      // Sin cerrar el ingreso, la credencial buena: el publicador se abre solo,
+      // sin un segundo clic en el CTA.
+      await login(paginaFallo).getByLabel(/^Contraseña/).fill('vendedor123');
+      await login(paginaFallo).getByRole('button', { name: 'Ingresar', exact: true }).click();
+      await publicador(paginaFallo).waitFor({ state: 'visible', timeout: 25_000 });
+      assert(await publicador(paginaFallo).count() === 1,
+        `el publicador se abrió ${await publicador(paginaFallo).count()} veces en ${pantalla.seccion}`);
+      // Y se abrió PORQUE entró, no desde antes: hasta el ingreso bueno, cero.
+      assert(await vecesQueSeAbrio(paginaFallo) > 0,
+        `el publicador está en pantalla pero el vigía no lo vio abrirse en ${pantalla.seccion}`);
+      assert(await login(paginaFallo).count() === 0,
+        `el ingreso quedó apilado debajo del publicador en ${pantalla.seccion}`);
+      assert(await enElCarrito(paginaFallo) === carritoAlEmpezar,
+        `ingresar cambió el carrito en ${pantalla.seccion}`);
+      await conFallo.close();
+      medidos.push(`en ${pantalla.seccion} una credencial fallida no abre el publicador y la buena `
+        + 'lo abre una sola vez, sin un segundo clic');
+
+      // --- Login ↔ Registro no pierde la intención; el alta no la ejecuta ----
+      const conSalto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const paginaSalto = await conSalto.newPage();
+      vigilarEscrituras(paginaSalto);
+      await vigilarElPublicador(paginaSalto);
+      await vigilarLosAvisos(paginaSalto);
+      await paginaSalto.goto(`${FRONTEND_URL}/?section=${pantalla.seccion}`,
+        { waitUntil: 'domcontentloaded' });
+      await paginaSalto.getByRole('button', { name: pantalla.cta }).first().click();
+      await login(paginaSalto).waitFor({ state: 'visible', timeout: 20_000 });
+      await paginaSalto.getByRole('button', { name: 'Regístrate aquí' }).click();
+      await paginaSalto.getByRole('heading', { name: 'Crear Cuenta' })
+        .waitFor({ state: 'visible', timeout: 20_000 });
+      assert(await paginaSalto.getByRole('dialog').count() === 1,
+        'el salto a Registro apiló una capa más');
+
+      // El alta de verdad: no abre sesión, así que tampoco abre el publicador.
+      const correoNuevo = `publicar.167.${Date.now()}@example.com`;
+      await paginaSalto.locator('input[name="name"]').fill('Alta Sin Sesión 167');
+      await paginaSalto.locator('input[name="email"]').fill(correoNuevo);
+      await paginaSalto.locator('input[name="phone"]').fill('+54 11 5555 1670');
+      await paginaSalto.locator('input[name="password"]').fill('Clave167Inventada');
+      await paginaSalto.locator('form input[type="password"]').nth(1).fill('Clave167Inventada');
+      await paginaSalto.getByRole('button', { name: 'Crear cuenta' }).click();
+      await esperarA(async () => (await paginaSalto.locator('[role="status"]').allInnerTexts())
+        .join(' ').includes(correoNuevo),
+      'el alta no llegó a confirmarse', 25_000);
+      assert(await vecesQueSeAbrio(paginaSalto) === 0,
+        `el alta abrió el publicador sola en ${pantalla.seccion}`);
+      assert(await paginaSalto.locator('header')
+        .getByRole('button', { name: 'Vender' }).count() === 0,
+      'el alta abrió sesión: no es lo que declara el producto');
+
+      // Y volviendo al ingreso, la intención sigue viva. El rótulo es el de la
+      // pantalla de alta hecha: «Iniciá sesión» es el del formulario, y después
+      // del alta ese formulario ya no está.
+      await paginaSalto.getByRole('button', { name: 'Ir a iniciar sesión' }).click();
+      await login(paginaSalto).waitFor({ state: 'visible', timeout: 20_000 });
+      await ingresar(paginaSalto, 'vendedor123');
+      await publicador(paginaSalto).waitFor({ state: 'visible', timeout: 25_000 });
+      medidos.push(`en ${pantalla.seccion}, ir a Registro y volver no pierde la intención, y el `
+        + 'alta no abre sesión ni el publicador por sí sola');
+      await conSalto.close();
+    }
+
+    // Ingresar abre una pantalla y NADA más. Ni una publicación, ni una orden,
+    // ni una reserva de stock: eso lo decide la persona después, no el ingreso.
+    const indebidas = escrituras.filter((escritura) =>
+      /\/(products|orders|cart|payments)/.test(escritura));
+    assert(indebidas.length === 0,
+      `ingresar escribió sin que nadie lo pidiera: ${JSON.stringify(indebidas)}`);
+    assert(queryCount('SELECT COUNT(*) FROM products') === publicacionesAntes,
+      'ingresar creó o borró publicaciones');
+    assert(queryCount('SELECT COUNT(*) FROM orders') === ordenesAntes,
+      'ingresar creó o borró órdenes');
+    assert(queryCount("SELECT COALESCE(SUM(stock), 0) FROM products WHERE status = 'ACTIVE'")
+      === stockAntes, 'ingresar movió stock');
+    medidos.push('ingresar no publica, no crea órdenes, no reserva stock y no toca el carrito: '
+      + 'sólo abre la pantalla protegida que la persona pidió');
+
+  } finally {
+    await browser.close();
+  }
+
+  // R6 no entra al caso porque el borde NO se reproduce, y agregar aserciones
+  // sobre él sería afirmar algo que no se midió. Los dos recorridos posibles,
+  // medidos en este mismo entorno:
+  //
+  //  a) Sesión inválida detectada al cargar: `/auth/me` responde 401, y como el
+  //     reintento con refresh se saltea para `/auth/`, los tokens se limpian y
+  //     la sesión queda cerrada. El carrito sobrevive en `agromarket_cart` —se
+  //     midió: un ítem antes y un ítem después—, pero SIN sesión la cabecera no
+  //     dibuja la celda «Carrito»: no hay carrito que abrir ni «Continuar
+  //     compra» que apretar. El borde descrito necesita ese botón.
+  //  b) La sesión deja de valer con el carrito ABIERTO y sin recargar: nada
+  //     revalida el token, `isAuthenticated` sigue en verdadero y «Continuar
+  //     compra» abre el Checkout como siempre. Tampoco hay aviso sin salida.
+  //
+  // Es decir: la rama sin sesión de `CartModal.handleCheckout` no se alcanza
+  // hoy por ningún camino del producto. Queda informado en `PARA-PM.md`; no se
+  // toca acá porque no hay rojo que lo justifique.
+
+  return 'una categoría o una provincia inexistente en la URL se descartan solas, sin llevarse '
+    + 'los filtros válidos, sin quedarse en la barra y sin afirmar un mercado vacío; el catálogo '
+    + 'auxiliar caído se dice y se reintenta; y cada CTA de publicación de Inicio y Servicios '
+    + `retoma el formulario después de un ingreso correcto y sólo después; ${medidos.join('; ')}`;
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un
