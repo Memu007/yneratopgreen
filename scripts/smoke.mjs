@@ -789,6 +789,11 @@ async function asegurarSesiones() {
     state.buyerToken = sesion.token;
     state.buyerRefreshToken = sesion.refresco;
     state.buyerId = state.buyerId || sesion.id;
+    // También las credenciales: hay casos que necesitan ingresar por la
+    // pantalla, no sólo tener el token, y el caso 2 es quien normalmente las
+    // deja.
+    state.buyerCredentials = state.buyerCredentials
+      || { email: 'cliente@ejemplo.com', password: 'cliente123' };
   }
   if (!state.sellerToken) {
     const sesion = await sesionDe('vendedor@ejemplo.com', 'vendedor123');
@@ -24092,6 +24097,337 @@ await runCase(164, 'El panel de administración pregunta antes de escribir, y la
   }
 
   return medidos.join('; ');
+});
+
+// ---------------------------------------------------------------------------
+// 165. RATING-UX-1 — la reputación se ve, y calificar es una decisión operable.
+//
+// Tres cosas estaban rotas, y cada una lo estaba de una manera distinta:
+//
+//  1. El perfil dibujaba las estrellas con `''.repeat(n)`: una cadena VACÍA
+//     repetida. O sea, nada. La reputación se anunciaba con un número suelto al
+//     lado de un hueco.
+//  2. Si se podía calificar o no lo decidía un `Set` en memoria de esta
+//     pantalla. Recargar lo vaciaba, así que «Calificar vendedor» volvía a
+//     aparecer para una orden ya calificada, y el segundo intento moría contra
+//     el servidor con «Ya has calificado».
+//  3. El selector eran cinco `span` con `onClick`. Un `span` no recibe foco, no
+//     tiene estado y no se anuncia: elegir cuántas estrellas darle a alguien era
+//     imposible sin mouse. Y la capa no era una capa —sin `role`, sin nombre,
+//     sin trampa de foco, sin Escape—.
+//
+// Lo que se mide acá es eso, y no que «se vea mejor»: que las estrellas existan
+// en el documento, que el veredicto venga del servidor y sobreviva a recargar,
+// y que el selector se opere con el teclado.
+// ---------------------------------------------------------------------------
+await runCase(165, 'La reputación se ve, el servidor decide si se puede calificar y las estrellas se eligen con el teclado', async () => {
+  const CAPTURAS = process.env.SMOKE_CAPTURAS
+    || mkdtempSync(`${tmpdir()}/topgreen-calificacion-`);
+  mkdirSync(CAPTURAS, { recursive: true });
+  const capturas = [];
+  const medidos = [];
+  const guardarCaptura = async (pagina, carpeta, nombre) => {
+    const ruta = `${carpeta}/${nombre}.png`;
+    await pagina.screenshot({ path: ruta, fullPage: true });
+    return ruta;
+  };
+  await asegurarProducto();
+
+  // --- Una orden entregada y sin calificar, fabricada acá ------------------
+  //
+  // La base limpia no tiene ninguna: el seed no deja órdenes entregadas. Se
+  // crea una de verdad —por el carrito y el checkout— y se la lleva a entregada
+  // en la base descartable, que es donde se fabrica un estado que la API no
+  // ofrece.
+  const orden = await crearOrdenTransferencia('Ruta 9 km 100');
+  querySql(`UPDATE orders SET status = 'DELIVERED' WHERE id = ${sqlLiteral(orden.order_id || orden.id)}`);
+  const ordenId = orden.order_id || orden.id;
+  const [[numeroVisible]] = queryRows(
+    `SELECT order_number FROM orders WHERE id = ${sqlLiteral(ordenId)}`);
+
+  // El endpoint responde por UUID y NO por el número visible. Si el producto
+  // preguntara con el número, escondería el botón siempre y por el motivo
+  // equivocado.
+  const porUuid = await apiRequest(`/ratings/order/${ordenId}/can-rate`, { token: state.buyerToken });
+  assert(porUuid.data.can_rate === true,
+    `la orden fabricada no es calificable: ${JSON.stringify(porUuid.data)}`);
+  const porNumero = await fetch(`${API_URL}/ratings/order/${encodeURIComponent(numeroVisible)}/can-rate`, {
+    headers: { Authorization: `Bearer ${state.buyerToken}` },
+  });
+  assert(porNumero.status === 404,
+    `can-rate con el número visible devolvió ${porNumero.status}: si algún día lo acepta, `
+    + 'este caso deja de distinguir el identificador correcto del equivocado');
+  medidos.push('la elegibilidad se pregunta por UUID; con el número visible el servidor da 404');
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    let posts = [];
+    const abrirCuenta = async (ancho = 1440, alto = 900) => {
+      const contexto = await browser.newContext({ viewport: { width: ancho, height: alto } });
+      const page = await contexto.newPage();
+      page.on('request', (pedido) => {
+        if (pedido.method() === 'POST' && /\/api\/ratings\/?$/.test(pedido.url())) {
+          posts.push(pedido.url());
+        }
+      });
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+      await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+      await page.getByPlaceholder('tu@email.com').fill(state.buyerCredentials.email);
+      await page.getByPlaceholder('••••••••').fill(state.buyerCredentials.password);
+      await page.locator('[class*="_submitButton_"][type="submit"]').click();
+      await page.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 25_000 });
+      await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
+      await page.getByRole('heading', { name: 'Mi cuenta', level: 1 })
+        .waitFor({ state: 'visible', timeout: 25_000 });
+      return { contexto, page };
+    };
+    const irAMisCompras = async (page) => {
+      await page.getByRole('button', { name: 'Mis Compras' }).click();
+      await page.getByRole('heading', { name: 'Mis Compras' }).waitFor({ timeout: 20_000 });
+    };
+    const botonDeCalificar = (page) => page.getByRole('button', { name: /Calificar Vendedor/i });
+    const capa = (page) => page.locator('[role="dialog"][aria-labelledby="calificacion-titulo"]');
+
+    const { contexto, page } = await abrirCuenta();
+
+    // --- A. El perfil dibuja la reputación --------------------------------
+    //
+    // Con calificaciones o sin ellas, la pantalla tiene que decir algo. Primero
+    // el estado vacío honesto, que es lo que corresponde ahora.
+    const vacio = page.getByText('Sin calificaciones aún').first();
+    await vacio.waitFor({ state: 'visible', timeout: 20_000 });
+    medidos.push('sin calificaciones, el perfil lo dice en vez de dibujar cinco huecos');
+
+    // --- B. El botón aparece porque el servidor lo permite -----------------
+    await irAMisCompras(page);
+    await botonDeCalificar(page).first().waitFor({ state: 'visible', timeout: 25_000 });
+
+    // --- C. La capa es una capa -------------------------------------------
+    const disparador = botonDeCalificar(page).first();
+    await disparador.click();
+    await capa(page).waitFor({ state: 'visible', timeout: 15_000 });
+
+    const nombre = await capa(page).getAttribute('aria-labelledby');
+    assert(nombre && (await page.locator(`#${nombre}`).innerText()).includes('Calificar'),
+      'la capa de calificación no tiene nombre accesible');
+    const focoDentro = () => page.evaluate(() => {
+      const capas = document.querySelectorAll('[role="dialog"]');
+      const arriba = capas[capas.length - 1];
+      return !!(arriba && document.activeElement && arriba.contains(document.activeElement));
+    });
+    await esperarA(focoDentro, 'al abrir, el foco quedó fuera de la capa', 5_000);
+    for (let vuelta = 0; vuelta < 10; vuelta += 1) {
+      await page.keyboard.press('Tab');
+      assert(await focoDentro(), `el foco se escapó de la capa en la tabulación ${vuelta + 1}`);
+    }
+
+    // --- D. Las estrellas son radios, y se eligen con el teclado -----------
+    const radios = capa(page).locator('input[type="radio"]');
+    assert(await radios.count() === 5,
+      `el selector tiene ${await radios.count()} controles y tienen que ser 5 radios`);
+    const nombresDelGrupo = await radios.evaluateAll((nodos) => [...new Set(nodos.map((n) => n.name))]);
+    assert(nombresDelGrupo.length === 1 && nombresDelGrupo[0],
+      `los radios no comparten un nombre de grupo: ${JSON.stringify(nombresDelGrupo)}`);
+    const elegido = () => capa(page).locator('input[type="radio"]:checked').inputValue();
+    assert(await elegido() === '5', `el puntaje inicial es ${await elegido()} y tiene que ser 5`);
+
+    // Las flechas mueven la selección: es lo que un `span` no puede hacer.
+    await capa(page).locator('input[type="radio"]:checked').focus();
+    await page.keyboard.press('ArrowLeft');
+    await esperarA(async () => (await elegido()) === '4',
+      `con la flecha izquierda el puntaje quedó en ${await elegido()}`, 5_000);
+    await page.keyboard.press('ArrowLeft');
+    await esperarA(async () => (await elegido()) === '3',
+      `con la segunda flecha el puntaje quedó en ${await elegido()}`, 5_000);
+    medidos.push('cinco radios con nombre de grupo, puntaje inicial 5 y flechas que cambian la elección');
+
+    capturas.push(await guardarCaptura(page, CAPTURAS, 'calificacion-dialogo-1440x900'));
+
+    // --- E. FORM-DIRTY-1 en el límite de la capa ---------------------------
+    //
+    // Con algo cambiado, cerrar pregunta. Seguir editando conserva lo elegido.
+    const pregunta = () => page.getByRole('dialog').filter({ hasText: 'Tenés cambios sin guardar' });
+    await page.keyboard.press('Escape');
+    await pregunta().waitFor({ state: 'visible', timeout: 10_000 });
+    await pregunta().getByRole('button', { name: 'Seguir editando' }).click();
+    await pregunta().waitFor({ state: 'detached', timeout: 10_000 });
+    assert(await capa(page).isVisible(), 'seguir editando cerró la calificación igual');
+    assert(await elegido() === '3', `seguir editando no conservó el puntaje: quedó ${await elegido()}`);
+    medidos.push('con el puntaje cambiado, Escape pregunta y seguir editando conserva lo elegido');
+
+    // Y descartar cierra, una sola vez.
+    await page.keyboard.press('Escape');
+    await pregunta().waitFor({ state: 'visible', timeout: 10_000 });
+    await pregunta().getByRole('button', { name: 'Descartar cambios' }).click();
+    await capa(page).waitFor({ state: 'detached', timeout: 10_000 });
+    assert((await pregunta().count()) === 0, 'la pregunta quedó abierta después de descartar');
+    // El foco vuelve a quien abrió la capa.
+    assert(await disparador.evaluate((el) => el === document.activeElement),
+      'al cerrar, el foco no volvió al botón que abrió la calificación');
+
+    // Un formulario intacto cierra directo, sin preguntar.
+    await disparador.click();
+    await capa(page).waitFor({ state: 'visible', timeout: 15_000 });
+    await page.keyboard.press('Escape');
+    await capa(page).waitFor({ state: 'detached', timeout: 10_000 });
+    assert((await pregunta().count()) === 0,
+      'sin nada escrito, cerrar preguntó igual: la guarda estaría preguntando de más');
+    medidos.push('descartar cierra una vez y devuelve el foco; sin cambios cierra directo');
+
+    // --- F. Enviar: una sola solicitud, y el resultado se ve ---------------
+    posts = [];
+    await disparador.click();
+    await capa(page).waitFor({ state: 'visible', timeout: 15_000 });
+    await capa(page).getByLabel('Comentario (opcional)').fill('Todo bien, llegó en fecha.');
+    await capa(page).getByRole('button', { name: /Enviar calificación/i }).click();
+    await capa(page).waitFor({ state: 'detached', timeout: 25_000 });
+    assert(posts.length === 1,
+      `enviar mandó ${posts.length} calificaciones y tiene que mandar una`);
+
+    const [[cuantas, promedio]] = queryRows(`
+      SELECT COUNT(*)::text, COALESCE(ROUND(AVG(score)::numeric, 2), 0)::text
+      FROM ratings WHERE order_id = ${sqlLiteral(ordenId)}
+    `);
+    assert(cuantas === '1', `la base guardó ${cuantas} calificaciones para esa orden`);
+    assert(promedio === '5.00', `el puntaje guardado es ${promedio} y se envió 5`);
+    medidos.push('una sola calificación enviada, y la base la registra con su puntaje');
+
+    // --- G. Y no se puede volver a calificar, ni recargando ---------------
+    //
+    // Éste es el defecto que se veía: el botón volvía porque la memoria se iba
+    // con el montaje. Ahora lo decide el servidor.
+    const yaNo = await apiRequest(`/ratings/order/${ordenId}/can-rate`, { token: state.buyerToken });
+    assert(yaNo.data.can_rate === false,
+      `el servidor sigue diciendo que se puede calificar: ${JSON.stringify(yaNo.data)}`);
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByRole('heading', { name: 'Mi cuenta', level: 1 })
+      .waitFor({ state: 'visible', timeout: 25_000 });
+    await irAMisCompras(page);
+    // La ausencia se afirma sobre LA orden calificada, no sobre la pantalla.
+    //
+    // Corriendo solo, la única compra entregada es la de este caso y mirar toda
+    // la página daba lo mismo. Con otros casos antes hay más compras entregadas
+    // y sin calificar, que muestran el botón con todo derecho: la afirmación
+    // global se caía por el motivo equivocado.
+    const filaDeLaOrden = page.locator('[class*="orderCard"]')
+      .filter({ hasText: numeroVisible }).first();
+    await filaDeLaOrden.waitFor({ state: 'visible', timeout: 25_000 });
+    await esperarA(async () => (await filaDeLaOrden.getByRole('button', { name: /Calificar Vendedor/i })
+      .count()) === 0,
+    'después de recargar, «Calificar vendedor» volvió a aparecer para la orden ya calificada',
+    15_000);
+    medidos.push('recargada la página, el botón no vuelve: lo decide el servidor y no una memoria');
+
+    // Y el perfil ahora sí muestra estrellas de verdad —las del vendedor—.
+    await contexto.close();
+
+    // --- G bis. Si no se sabe, no se ofrece --------------------------------
+    //
+    // Con la consulta caída, la pantalla no puede ofrecer «Calificar vendedor»:
+    // sería prometer una acción que el servidor puede rechazar. Dice que no
+    // pudo comprobarlo y ofrece reintentar.
+    const caido = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const paginaCaida = await caido.newPage();
+    // Un interruptor adentro del interceptor, en vez de quitarlo después:
+    // `unroute` no garantiza que la próxima consulta ya pase, y este caso
+    // necesita saber exactamente cuándo la red vuelve.
+    let consultaCaida = true;
+    await paginaCaida.route('**/api/ratings/order/**/can-rate',
+      (ruta) => (consultaCaida ? ruta.abort() : ruta.continue()));
+    await paginaCaida.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await paginaCaida.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+    await paginaCaida.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    await paginaCaida.getByPlaceholder('tu@email.com').fill(state.buyerCredentials.email);
+    await paginaCaida.getByPlaceholder('••••••••').fill(state.buyerCredentials.password);
+    await paginaCaida.locator('[class*="_submitButton_"][type="submit"]').click();
+    await paginaCaida.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 25_000 });
+    await paginaCaida.getByRole('button', { name: 'Mi cuenta' }).first().click();
+    await paginaCaida.getByRole('heading', { name: 'Mi cuenta', level: 1 })
+      .waitFor({ state: 'visible', timeout: 25_000 });
+    await irAMisCompras(paginaCaida);
+    await paginaCaida.getByText(/No pudimos comprobar si podés calificar/)
+      .first().waitFor({ state: 'visible', timeout: 25_000 });
+    assert((await botonDeCalificar(paginaCaida).count()) === 0,
+      'con la consulta caída se ofrece calificar igual: se estaría adivinando la elegibilidad');
+    const reintentos = paginaCaida.getByRole('button', { name: 'Reintentar' });
+    await reintentos.first().waitFor({ timeout: 10_000 });
+    // Y al reintentar con la consulta viva, resuelve.
+    //
+    // Se reintenta CADA orden que quedó sin saber, no la primera. Corriendo
+    // solo hay una sola compra entregada y alcanzaba con una; con otros casos
+    // antes hay varias, y entonces «ya no queda ninguna sin saber» no se
+    // cumplía nunca. Era un caso que pasaba aislado y fallaba acompañado.
+    consultaCaida = false;
+    await esperarA(async () => {
+      const sinSaber = await reintentos.count();
+      if (sinSaber === 0) return true;
+      await reintentos.first().click();
+      return false;
+    }, 'el reintento no resolvió el estado desconocido', 30_000);
+    medidos.push('con la consulta caída no se ofrece calificar: se dice que no se pudo y el reintento resuelve');
+    await caido.close();
+
+    // --- H. El perfil del vendedor dibuja las estrellas -------------------
+    const vendedor = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const paginaVendedor = await vendedor.newPage();
+    await paginaVendedor.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await paginaVendedor.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+    await paginaVendedor.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    await paginaVendedor.getByPlaceholder('tu@email.com').fill('vendedor@ejemplo.com');
+    await paginaVendedor.getByPlaceholder('••••••••').fill('vendedor123');
+    await paginaVendedor.locator('[class*="_submitButton_"][type="submit"]').click();
+    await paginaVendedor.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 25_000 });
+    await paginaVendedor.getByRole('button', { name: 'Mi cuenta' }).first().click();
+    await paginaVendedor.getByRole('heading', { name: 'Mi cuenta', level: 1 })
+      .waitFor({ state: 'visible', timeout: 25_000 });
+
+    const reputacion = paginaVendedor.locator('[role="img"][aria-label*="de 5"]').first();
+    await reputacion.waitFor({ state: 'visible', timeout: 20_000 });
+    const dibujo = (await reputacion.innerText()).trim();
+    assert(/[★☆]/.test(dibujo),
+      `la reputación no dibuja ninguna estrella: ${JSON.stringify(dibujo)}`);
+    assert((dibujo.match(/[★☆]/g) || []).length === 5,
+      `la reputación dibuja ${(dibujo.match(/[★☆]/g) || []).length} estrellas y tienen que ser 5`);
+    const etiqueta = await reputacion.getAttribute('aria-label');
+    assert(/de 5/.test(etiqueta) && /calificaci/i.test(etiqueta),
+      `la descripción accesible no dice promedio y cantidad: ${JSON.stringify(etiqueta)}`);
+    // Y no se dice dos veces: lo de adentro está marcado como decorativo.
+    const repetido = await reputacion.locator(':scope > *:not([aria-hidden="true"])').count();
+    assert(repetido === 0,
+      `la reputación tiene ${repetido} partes que el lector diría además de la descripción`);
+    capturas.push(await guardarCaptura(paginaVendedor, CAPTURAS, 'perfil-reputacion-1440x900'));
+    medidos.push('el perfil dibuja cinco estrellas y una sola descripción «X de 5, N calificaciones»');
+    await vendedor.close();
+
+    // --- I. En 390 la capa entra sin desbordar ----------------------------
+    const angosto = await abrirCuenta(390, 844);
+    await irAMisCompras(angosto.page);
+    // Esta orden ya está calificada; se abre la capa de otra compra entregada si
+    // la hubiera, y si no, se mide el estado sin botón, que también es correcto.
+    const hayOtra = await botonDeCalificar(angosto.page).count();
+    if (hayOtra > 0) {
+      await botonDeCalificar(angosto.page).first().click();
+      await capa(angosto.page).waitFor({ state: 'visible', timeout: 15_000 });
+      const desborde = await angosto.page.evaluate(() =>
+        document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      assert(desborde <= 0, `en 390 px la pantalla desborda ${desborde} px a lo ancho`);
+      capturas.push(await guardarCaptura(angosto.page, CAPTURAS, 'calificacion-dialogo-390x844'));
+      medidos.push('en 390 px la capa entra sin desbordar');
+    } else {
+      capturas.push(await guardarCaptura(angosto.page, CAPTURAS, 'calificacion-dialogo-390x844'));
+      medidos.push('en 390 px se midió la lista sin botón: la única orden entregada ya está calificada');
+    }
+    await angosto.contexto.close();
+  } finally {
+    await browser.close();
+  }
+
+  return 'la reputación se dibuja y se anuncia una sola vez; la elegibilidad la decide el '
+    + 'servidor por UUID y sobrevive a recargar; el selector son radios operables con el '
+    + `teclado dentro de una capa con nombre, foco y guarda; ${medidos.join('; ')}. `
+    + `${capturas.length} capturas en ${CAPTURAS}`;
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del

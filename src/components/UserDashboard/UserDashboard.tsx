@@ -482,6 +482,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
   
   // Estado para calificaciones
   const [ratingModal, setRatingModal] = useState<{ orderId: string; sellerName: string } | null>(null);
+  /** El motivo del último envío que falló, visible en la capa. */
+  const [errorDeCalificacion, setErrorDeCalificacion] = useState('');
   // Rechazar una transferencia es una decisión con motivo obligatorio que el
   // comprador va a leer, así que vive en su propia capa del panel. Era un
   // `window.prompt`: fuera del sistema de capas, sin validación propia, sin
@@ -504,7 +506,20 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
   const [ratingScore, setRatingScore] = useState(5);
   const [ratingComment, setRatingComment] = useState('');
   const [submittingRating, setSubmittingRating] = useState(false);
-  const [ratedOrders, setRatedOrders] = useState<Set<string>>(new Set());
+  /**
+   * Qué dice el SERVIDOR sobre calificar cada orden entregada, por UUID.
+   *
+   * Antes esto era un `Set` en memoria de las órdenes calificadas en esta
+   * pantalla, y por eso «Calificar vendedor» volvía a aparecer al recargar o al
+   * entrar de nuevo: la memoria se iba con el montaje y nadie le preguntaba a
+   * nadie. La pregunta la contesta `/ratings/order/{id}/can-rate`, que es quien
+   * sabe si la orden es tuya, si está entregada y si ya la calificaste.
+   *
+   * `'error'` no es `'no'`: si la consulta falla no se sabe, y no se ofrece una
+   * acción cuya elegibilidad se desconoce. Se dice que no se pudo y se ofrece
+   * reintentar.
+   */
+  const [puedeCalificar, setPuedeCalificar] = useState<Record<string, 'si' | 'no' | 'error'>>({});
   
   // Referencia a los productos originales del backend para edición
   const [backendProducts, setBackendProducts] = useState<BackendProduct[]>([]);
@@ -644,6 +659,53 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
     return () => { vigente = false; };
   }, [activeTab]);
 
+  /**
+   * Le pregunta al servidor, por cada orden entregada, si esta persona puede
+   * calificarla. En paralelo: son varias órdenes y esperar una por una haría
+   * que la lista tardara en decidirse.
+   *
+   * Va con el UUID y no con el número visible. Se midió: `can-rate` con
+   * `ORD-2026...` devuelve 404 «Orden no encontrada», así que preguntar con el
+   * número habría escondido el botón siempre, por el motivo equivocado.
+   */
+  const preguntarSiSePuedeCalificar = useCallback(async (ordenes: Order[]) => {
+    const entregadas = ordenes.filter((orden) => orden.status === 'delivered');
+    if (entregadas.length === 0) return;
+    setPuedeCalificar((antes) => {
+      const ahora = { ...antes };
+      for (const orden of entregadas) if (!ahora[orden.orderId]) ahora[orden.orderId] = 'no';
+      return ahora;
+    });
+    const respuestas = await Promise.all(entregadas.map(async (orden) => {
+      try {
+        const veredicto = await apiGet<{ can_rate: boolean }>(
+          `/ratings/order/${orden.orderId}/can-rate`);
+        return [orden.orderId, veredicto.can_rate ? 'si' : 'no'] as const;
+      } catch {
+        return [orden.orderId, 'error'] as const;
+      }
+    }));
+    setPuedeCalificar((antes) => {
+      const ahora = { ...antes };
+      for (const [id, veredicto] of respuestas) ahora[id] = veredicto;
+      return ahora;
+    });
+  }, []);
+
+  /** Volver a preguntar por una sola orden: el reintento, y lo que corre
+   *  después de calificar para que el botón desaparezca por decisión del
+   *  servidor y no porque nos acordamos de haberlo hecho. */
+  const volverAPreguntar = useCallback(async (orderId: string) => {
+    setPuedeCalificar((antes) => ({ ...antes, [orderId]: 'no' }));
+    try {
+      const veredicto = await apiGet<{ can_rate: boolean }>(
+        `/ratings/order/${orderId}/can-rate`);
+      setPuedeCalificar((antes) => ({ ...antes, [orderId]: veredicto.can_rate ? 'si' : 'no' }));
+    } catch {
+      setPuedeCalificar((antes) => ({ ...antes, [orderId]: 'error' }));
+    }
+  }, []);
+
   // Cargar órdenes (compras y ventas) cuando cambia de pestaña
   useEffect(() => {
     const loadOrders = async () => {
@@ -687,6 +749,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
             shipping: o.shipping,
           }));
           setPurchases(mappedOrders);
+          void preguntarSiSePuedeCalificar(mappedOrders);
         } else if (activeTab === 'sales') {
           const response = await apiGet<BackendOrder[]>('/orders/my?as_role=seller');
           const mappedOrders: Order[] = response.map(o => ({
@@ -721,7 +784,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
     };
 
     loadOrders();
-  }, [activeTab, recargaDeOrdenes]);
+  }, [activeTab, recargaDeOrdenes, preguntarSiSePuedeCalificar]);
 
   // Cargar productos del usuario cuando se monta el componente
   useEffect(() => {
@@ -1126,8 +1189,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
   }, [soltarElRechazo]);
   const pedirCierreDeLaEdicion = () => alSalir(edicionSucia, cerrarLaEdicion);
   const cerrarLaCalificacion = useCallback(() => setRatingModal(null), []);
-  const pedirCierreDeLaCalificacion = () =>
-    alSalir(calificacionSucia, cerrarLaCalificacion);
+  // Estable entre renders: la capa de la calificación lo toma como dependencia,
+  // y una función nueva en cada render volvería a montar el efecto de la capa
+  // —que es el que atrapa el foco—, así que escribir en el comentario expulsaría
+  // el foco al primer control. Es la misma trampa que documenta `useCapaModal`.
+  const pedirCierreDeLaCalificacion = useCallback(
+    () => alSalir(calificacionSucia, cerrarLaCalificacion),
+    [alSalir, calificacionSucia, cerrarLaCalificacion],
+  );
 
   const handleCancelEdit = () => {
     setEditForm(formularioDesde(user));
@@ -1470,6 +1539,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
     setRatingModal({ orderId, sellerName });
     setRatingScore(5);
     setRatingComment('');
+    setErrorDeCalificacion('');
   };
 
   // Función para enviar la calificación
@@ -1477,6 +1547,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
     if (!ratingModal) return;
     
     setSubmittingRating(true);
+    setErrorDeCalificacion('');
     try {
       await apiPost('/ratings/', {
         order_id: ratingModal.orderId,
@@ -1485,7 +1556,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
       });
       
       showToast('¡Gracias por tu calificación!', 'success');
-      setRatedOrders(prev => new Set(prev).add(ratingModal.orderId));
+      // El botón se va porque el servidor dice que ya no se puede, no porque
+      // nos acordemos de haber calificado: eso es lo que sobrevive a recargar.
+      void volverAPreguntar(ratingModal.orderId);
       // Ya se guardó: no hay nada sin guardar que preguntar.
       setRatingModal(null);
     } catch (error: unknown) {
@@ -1495,10 +1568,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
         : 'Error al enviar la calificación';
       if (errorMessage?.includes('Ya has calificado')) {
         showToast('Ya calificaste esta orden', 'info');
-        setRatedOrders(prev => new Set(prev).add(ratingModal.orderId));
+        void volverAPreguntar(ratingModal.orderId);
         setRatingModal(null);
       } else {
         showToast('Error al enviar la calificación', 'error');
+        setErrorDeCalificacion(
+          'No se pudo enviar la calificación. Revisá la conexión y probá de nuevo.');
       }
     } finally {
       setSubmittingRating(false);
@@ -1945,10 +2020,28 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
           </div>
           <div className={styles.userRating}>
             {(user?.ratingCount ?? 0) > 0 ? (
-              <>
-                <span className={styles.stars}>{''.repeat(Math.round(user?.ratingAverage ?? 0))}</span>
-                <span className={styles.ratingValue}>{(user?.ratingAverage ?? 0).toFixed(1)}</span>
-              </>
+              /* Una sola descripción para quien no ve la pantalla, y el dibujo
+                 marcado como decorativo.
+
+                 Acá había `''.repeat(n)`: una cadena VACÍA repetida, que dibuja
+                 exactamente nada. La reputación se anunciaba con un número
+                 suelto al lado de un hueco. Y si se leyera con lector de
+                 pantalla estrella por estrella, más el número, más la cantidad,
+                 el mismo dato se diría tres veces. */
+              <span
+                className={styles.calificacion}
+                role="img"
+                aria-label={`${(user?.ratingAverage ?? 0).toFixed(1)} de 5, `
+                  + `${user?.ratingCount ?? 0} calificaciones`}
+              >
+                <span className={styles.stars} aria-hidden="true">
+                  {'★'.repeat(Math.round(user?.ratingAverage ?? 0))}
+                  {'☆'.repeat(5 - Math.round(user?.ratingAverage ?? 0))}
+                </span>
+                <span className={styles.ratingValue} aria-hidden="true">
+                  {(user?.ratingAverage ?? 0).toFixed(1)}
+                </span>
+              </span>
             ) : (
               <span className={styles.noRating}>Sin calificaciones aún</span>
             )}
@@ -2989,13 +3082,31 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                       Confirmar Recepción
                     </button>
                   )}
-                  {order.status === 'delivered' && !ratedOrders.has(order.id) && (
+                  {/* El UUID y no `order.id`, que es el número visible: la
+                      calificación se guarda contra la orden, no contra su
+                      rótulo. */}
+                  {order.status === 'delivered' && puedeCalificar[order.orderId] === 'si' && (
                     <button 
                       className={styles.confirmButton}
-                      onClick={() => openRatingModal(order.id, order.seller?.name || 'Vendedor')}
+                      onClick={() => openRatingModal(order.orderId, order.seller?.name || 'Vendedor')}
                     >
                       Calificar Vendedor
                     </button>
+                  )}
+                  {/* No se sabe si se puede: se dice, y se ofrece reintentar.
+                      Ofrecer el botón a ciegas sería prometer algo que el
+                      servidor puede rechazar. */}
+                  {order.status === 'delivered' && puedeCalificar[order.orderId] === 'error' && (
+                    <span className={styles.calificarSinSaber}>
+                      No pudimos comprobar si podés calificar esta compra.{' '}
+                      <button
+                        type="button"
+                        className={styles.reintentar}
+                        onClick={() => volverAPreguntar(order.orderId)}
+                      >
+                        Reintentar
+                      </button>
+                    </span>
                   )}
                 </div>
               </div>
@@ -3407,6 +3518,22 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
   // abrió, que es lo que el contrato pide de las capas de adentro.
   const capaDeLaEdicion = useCapaModal<HTMLDivElement>(
     pedirCierreDeLaEdicion, editingProduct !== null,
+  );
+
+  /**
+   * La calificación también es una capa de verdad, y no lo era: se dibujaba con
+   * estilos en línea, sin `role`, sin nombre, sin trampa de foco y sin Escape.
+   * Tabular desde adentro recorría el panel tapado de atrás.
+   *
+   * Mientras la calificación viaja no cierra por ninguna vía: si se fuera a
+   * mitad del envío, la pantalla diría que no pasó nada y la calificación se
+   * guardaría igual.
+   */
+  const cerrarLaCapaDeCalificacion = useCallback(() => {
+    if (!submittingRating) pedirCierreDeLaCalificacion();
+  }, [submittingRating, pedirCierreDeLaCalificacion]);
+  const capaDeLaCalificacion = useCapaModal<HTMLDivElement>(
+    cerrarLaCapaDeCalificacion, ratingModal !== null,
   );
 
   return (
@@ -4034,144 +4161,125 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
         </div>
       )}
 
-      {/* Modal de Calificación */}
+      {/* La calificación: una capa real, con un selector real.
+
+          Antes era un `div` con estilos en línea y cinco `span` con `onClick`.
+          Un `span` no es un control: no recibe foco, no tiene estado, no se
+          opera con el teclado y no se anuncia. Elegir cuántas estrellas darle a
+          alguien era, literalmente, imposible sin mouse.
+
+          Ahora son cinco radios nativos con un nombre común. Las flechas, la
+          selección y el anuncio los hace el navegador; nosotros sólo los
+          dibujamos. */}
       {ratingModal && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10000
-          }}
+        <div
+          className={styles.fondoCalificacion}
           onClick={(evento) => {
-            // Igual que la edición: el fondo de la calificación no puede
-            // cerrar además el panel que está debajo.
+            // El fondo de la calificación no puede cerrar además el panel de
+            // atrás.
             evento.stopPropagation();
-            pedirCierreDeLaCalificacion();
+            cerrarLaCapaDeCalificacion();
           }}
         >
-          <div 
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '16px',
-              padding: '30px',
-              width: '90%',
-              maxWidth: '450px',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.3)'
-            }}
-            onClick={(e) => e.stopPropagation()}
+          <div
+            className={styles.tarjetaCalificacion}
+            ref={capaDeLaCalificacion}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="calificacion-titulo"
+            aria-describedby="calificacion-detalle"
+            tabIndex={-1}
+            onClick={(evento) => evento.stopPropagation()}
           >
-            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <h2 style={{ margin: 0, color: 'var(--tg-color-brand)', fontSize: '1.5rem' }}>
-                Calificar a {ratingModal.sellerName}
-              </h2>
+            <div className={styles.encabezadoCalificacion}>
+              <h2 id="calificacion-titulo">Calificar a {ratingModal.sellerName}</h2>
+              <button
+                type="button"
+                className={styles.cerrarCalificacion}
+                aria-label="Cerrar"
+                onClick={cerrarLaCapaDeCalificacion}
+                disabled={submittingRating}
+              >
+                ×
+              </button>
             </div>
-            
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', marginBottom: '12px', fontWeight: '600', color: 'var(--tg-color-text)' }}>
-                Tu calificación
-              </label>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', fontSize: '2.5rem' }}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <span
-                    key={star}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setRatingScore(star);
-                    }}
-                    style={{ 
-                      color: star <= ratingScore ? 'var(--tg-color-warning)' : 'var(--tg-color-text-secondary)',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s, color 0.2s',
-                      userSelect: 'none'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.2)'}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+
+            <p id="calificacion-detalle" className={styles.detalleCalificacion}>
+              Tu calificación queda pública en el perfil de quien te vendió.
+            </p>
+
+            {/* Un grupo de verdad: `fieldset` con `legend` es lo que hace que
+                un lector de pantalla anuncie «Tu calificación, 5 de 5» y no
+                cinco casillas sueltas sin contexto. */}
+            <fieldset className={styles.grupoDeEstrellas} disabled={submittingRating}>
+              <legend>Tu calificación</legend>
+              <div className={styles.estrellas}>
+                {[1, 2, 3, 4, 5].map((puntaje) => (
+                  <label
+                    key={puntaje}
+                    className={`${styles.estrella} ${puntaje <= ratingScore ? styles.elegida : ''}`}
                   >
-                    {star <= ratingScore ? '★' : '☆'}
-                  </span>
+                    <input
+                      type="radio"
+                      name="calificacion-puntaje"
+                      value={puntaje}
+                      checked={ratingScore === puntaje}
+                      onChange={() => setRatingScore(puntaje)}
+                    />
+                    {/* El dibujo es decorativo: lo que se anuncia es el rótulo
+                       del radio, y decir «estrella» además lo diría dos veces. */}
+                    <span aria-hidden="true">{puntaje <= ratingScore ? '★' : '☆'}</span>
+                    <span className={styles.rotuloDeEstrella}>{puntaje} de 5</span>
+                  </label>
                 ))}
               </div>
-              <p style={{ textAlign: 'center', marginTop: '12px', color: 'var(--tg-color-text-secondary)', fontSize: '1.1rem' }}>
-                {ratingScore === 1 && ' Muy malo'}
-                {ratingScore === 2 && ' Malo'}
-                {ratingScore === 3 && ' Regular'}
-                {ratingScore === 4 && ' Bueno'}
-                {ratingScore === 5 && ' Excelente'}
-              </p>
-            </div>
-            
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: 'var(--tg-color-text)' }}>
-                Comentario (opcional)
-              </label>
+            </fieldset>
+
+            <p className={styles.significado} aria-hidden="true">
+              {ratingScore === 1 && 'Muy malo'}
+              {ratingScore === 2 && 'Malo'}
+              {ratingScore === 3 && 'Regular'}
+              {ratingScore === 4 && 'Bueno'}
+              {ratingScore === 5 && 'Excelente'}
+            </p>
+
+            <div className={styles.comentarioCalificacion}>
+              <label htmlFor="calificacion-comentario">Comentario (opcional)</label>
               <textarea
+                id="calificacion-comentario"
                 value={ratingComment}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  setRatingComment(e.target.value);
-                }}
-                onClick={(e) => e.stopPropagation()}
-                onFocus={(e) => e.stopPropagation()}
-                placeholder="Cuéntanos tu experiencia con el vendedor..."
-                rows={4}
+                onChange={(evento) => setRatingComment(evento.target.value)}
                 maxLength={500}
-                style={{ 
-                  width: '100%', 
-                  padding: '12px', 
-                  borderRadius: '8px', 
-                  border: '2px solid #ddd',
-                  fontSize: '1rem',
-                  resize: 'vertical',
-                  boxSizing: 'border-box'
-                }}
+                rows={4}
+                disabled={submittingRating}
+                placeholder="Contá cómo fue la compra"
               />
-              <small style={{ color: 'var(--tg-color-text-secondary)' }}>{ratingComment.length}/500 caracteres</small>
+              <small>{ratingComment.length}/500 caracteres</small>
             </div>
-            
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+
+            {/* El error se ve acá y no sólo en un aviso que se va solo: si el
+                envío falla, quien está mirando tiene que enterarse sin haber
+                estado mirando otra cosa. */}
+            {errorDeCalificacion && (
+              <p className={styles.errorCalificacion} role="alert">{errorDeCalificacion}</p>
+            )}
+
+            <div className={styles.accionesCalificacion}>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  pedirCierreDeLaCalificacion();
-                }}
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '8px',
-                  border: '2px solid #ddd',
-                  backgroundColor: 'white',
-                  color: 'var(--tg-color-text-secondary)',
-                  cursor: 'pointer',
-                  fontSize: '1rem',
-                  fontWeight: '600'
-                }}
+                type="button"
+                className="tg-button tg-button--secondary"
+                onClick={cerrarLaCapaDeCalificacion}
+                disabled={submittingRating}
               >
                 Cancelar
               </button>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSubmitRating();
-                }}
+                type="button"
+                className="tg-button tg-button--primary"
+                onClick={handleSubmitRating}
                 disabled={submittingRating}
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  backgroundColor: submittingRating ? 'var(--tg-color-border-control)' : 'var(--tg-color-brand)',
-                  color: 'white',
-                  cursor: submittingRating ? 'not-allowed' : 'pointer',
-                  fontSize: '1rem',
-                  fontWeight: '600'
-                }}
               >
-                {submittingRating ? 'Enviando...' : '✓ Enviar Calificación'}
+                {submittingRating ? 'Enviando…' : 'Enviar calificación'}
               </button>
             </div>
           </div>

@@ -197,8 +197,18 @@
   gap: 4px;
 }
 
+/* Las estrellas y el número son una sola cosa: la reputación. Se dibujan en
+   renglón y el color del cereal es el que ya usa la marca para lo destacado. */
+.calificacion {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tg-space-2);
+}
+
 .stars {
+  color: var(--tg-color-signal);
   font-size: 20px;
+  letter-spacing: 0.06em;
 }
 
 .ratingValue {
@@ -1864,4 +1874,205 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 4px 14px;
+}
+
+/* --- La calificación: capa propia, selector de estrellas real -------------- */
+
+.fondoCalificacion {
+  position: fixed;
+  z-index: var(--tg-z-modal);
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--tg-space-4);
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+.tarjetaCalificacion {
+  width: min(460px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: var(--tg-space-6);
+  border-radius: var(--tg-radius-lg);
+  background-color: var(--tg-color-surface);
+}
+
+.encabezadoCalificacion {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--tg-space-3);
+  margin-bottom: var(--tg-space-2);
+}
+
+.encabezadoCalificacion h2 {
+  margin: 0;
+  color: var(--tg-color-brand);
+  font-family: var(--tg-font-display);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.cerrarCalificacion {
+  flex: none;
+  width: var(--tg-control-min);
+  height: var(--tg-control-min);
+  border: 0;
+  border-radius: var(--tg-radius-md);
+  background: none;
+  color: var(--tg-color-text-secondary);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.detalleCalificacion {
+  margin: 0 0 var(--tg-space-5);
+  color: var(--tg-color-text-secondary);
+  font-size: 14px;
+}
+
+.grupoDeEstrellas {
+  margin: 0 0 var(--tg-space-2);
+  padding: 0;
+  border: 0;
+}
+
+.grupoDeEstrellas legend {
+  padding: 0;
+  margin-bottom: var(--tg-space-3);
+  color: var(--tg-color-text);
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.estrellas {
+  display: flex;
+  justify-content: center;
+  gap: var(--tg-space-2);
+}
+
+/* Cada estrella es un radio de verdad con su rótulo. El control nativo se
+   esconde a la vista pero NO del teclado ni del lector: sigue recibiendo foco
+   y sigue anunciándose, que es lo que lo hace operable con flechas. */
+.estrella {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tg-control-min);
+  min-height: var(--tg-control-min);
+  border-radius: var(--tg-radius-md);
+  color: var(--tg-color-text-secondary);
+  font-size: 34px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.estrella input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* La elegida y TODAS las anteriores van pintadas: son las que se dibujan
+   llenas. Pintar sólo la elegida dejaba «3 de 5» con dos estrellas llenas de
+   color apagado, que se lee como si valieran menos que la tercera. */
+.elegida {
+  color: var(--tg-color-signal);
+}
+
+/* El foco tiene que verse: es el único indicio de dónde está parado quien
+   navega con teclado, y sin él las flechas mueven algo invisible. */
+.estrella:has(input:focus-visible) {
+  outline: 3px solid var(--tg-color-focus);
+  outline-offset: 2px;
+}
+
+/* El rótulo existe para el lector de pantalla; en pantalla lo dice el dibujo. */
+.rotuloDeEstrella {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.significado {
+  margin: 0 0 var(--tg-space-5);
+  color: var(--tg-color-text-secondary);
+  font-size: 15px;
+  text-align: center;
+}
+
+.comentarioCalificacion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tg-space-2);
+  margin-bottom: var(--tg-space-5);
+}
+
+.comentarioCalificacion label {
+  color: var(--tg-color-text);
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.comentarioCalificacion textarea {
+  width: 100%;
+  padding: var(--tg-space-3);
+  border: 1px solid var(--tg-color-border-control);
+  border-radius: var(--tg-radius-md);
+  font-family: inherit;
+  font-size: 15px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.comentarioCalificacion small {
+  color: var(--tg-color-text-secondary);
+  font-size: 13px;
+}
+
+.errorCalificacion {
+  margin: 0 0 var(--tg-space-4);
+  padding: var(--tg-space-3);
+  border-left: 3px solid var(--tg-color-danger, #a4342a);
+  background-color: var(--tg-color-danger-soft, #fbeceb);
+  color: var(--tg-color-text);
+  font-size: 14px;
+}
+
+.accionesCalificacion {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tg-space-3);
+}
+
+/* Cuando no se sabe si se puede calificar: se dice y se ofrece reintentar, en
+   vez de ofrecer una acción que el servidor puede rechazar. */
+.calificarSinSaber {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--tg-space-2);
+  color: var(--tg-color-text-secondary);
+  font-size: 13.5px;
+}
+
+.reintentar {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tg-color-brand);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
 }
