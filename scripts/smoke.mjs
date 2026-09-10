@@ -24139,9 +24139,53 @@ await runCase(165, 'La reputación se ve, el servidor decide si se puede calific
   // crea una de verdad —por el carrito y el checkout— y se la lleva a entregada
   // en la base descartable, que es donde se fabrica un estado que la API no
   // ofrece.
-  const orden = await crearOrdenTransferencia('Ruta 9 km 100');
-  querySql(`UPDATE orders SET status = 'DELIVERED' WHERE id = ${sqlLiteral(orden.order_id || orden.id)}`);
+  //
+  // La orden se arma con material propio y decidiendo el traslado a mano. Los
+  // ayudantes compartidos leen el carrito por `state.buyerId`, que en la suite
+  // completa ya no es el mismo comprador que `state.buyerToken` —otros casos lo
+  // reasignan—, y entonces el checkout se caía con «Falta decidir cómo se
+  // traslada el pedido»: pasaba aislado y fallaba acompañado.
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  const [[categoriaParaCalificar]] = queryRows(`
+    SELECT id FROM categories
+    WHERE is_active = true AND is_service = false
+    ORDER BY name LIMIT 1
+  `);
+  const publicacionParaCalificar = (await apiRequest('/products', {
+    method: 'POST',
+    token: state.sellerToken,
+    body: {
+      name: `Smoke calificacion ${Date.now()}`,
+      description: 'Publicación de este caso: se compra, se entrega y se califica.',
+      category_id: categoriaParaCalificar,
+      price: 5400,
+      stock: 3,
+      unit: 'unidad',
+      locality_id: localidadDeEnvio(),
+      publication_type: 'producto',
+    },
+  })).data;
+  await apiRequest('/cart/items', {
+    method: 'POST',
+    token: state.buyerToken,
+    body: { product_id: publicacionParaCalificar.id, quantity: 1 },
+  });
+  const [[vendedorDeLaOrden]] = queryRows(
+    `SELECT seller_id FROM products WHERE id = ${sqlLiteral(publicacionParaCalificar.id)}`);
+  const checkoutDeLaCalificacion = await apiRequest('/orders/checkout/transfer', {
+    method: 'POST',
+    token: state.buyerToken,
+    body: {
+      shipping_address: 'Ruta 9 km 100',
+      shipping_locality_id: localidadDeEnvio(),
+      shipping_postal_code: '2000',
+      shipping_decisions: [{ seller_id: vendedorDeLaOrden, mode: 'self' }],
+    },
+  });
+  const orden = checkoutDeLaCalificacion.data.orders[0];
+  assert(orden?.order_id || orden?.id, 'no se pudo crear la orden del caso');
   const ordenId = orden.order_id || orden.id;
+  querySql(`UPDATE orders SET status = 'DELIVERED' WHERE id = ${sqlLiteral(ordenId)}`);
   const [[numeroVisible]] = queryRows(
     `SELECT order_number FROM orders WHERE id = ${sqlLiteral(ordenId)}`);
 
