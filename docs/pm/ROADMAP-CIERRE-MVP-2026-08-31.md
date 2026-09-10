@@ -140,7 +140,7 @@ tiene una sola política de navegación y una sola regresión matriz.
 | 13A | **CATALOG-PHOTOS-1 — cerrada** | Feedback visual Emi 08/09 | Aceptada en `e3c277e`/`b414cfb`, integrada en `b26d8ad`; PM reprodujo 155+162 en 2/2 y Emi cerró las dos fotos imperfectas sin reemplazo. |
 | 13B | **ACCOUNT-PAGE-1R — cerrada** | Feedback visual Emi 08/09 | Base `7dc1d53`/`968efbc`, corrección `958c11c`/`16008a1`; PM cerró 149+150+163 en 3/3 y la corrección visual con 163 en 1/1. |
 | 14 | **ADMIN-SAFETY-1R — cerrada** | ADM-6, ADM-7, ADM-9; reproduce ADM-R4/R5 | Base `79f3219`/`c26db85`, corrección `871ce7b`/`775818c`; PM cerró 149+150+164 en 3/3, más puertas estáticas. |
-| 14S | **TEST-SUITE-164S — activa** | Puerta de calidad | Restaurar aislamiento de 21, 54, 57, 125, 157 y 162; clasificar 131. Sin cambios de producto ni caso nuevo salvo defecto real devuelto a PM. |
+| 14S | **TEST-SUITE-164SR — activa** | Puerta de calidad | Arnés `6d20ecf` + `4319623`, informe `819cead`: Dev 163/164 con único rojo 131 ambiental; PM 6/6. Falta una frase honesta en la salida del 125. |
 | 15 | **RATING-UX-1** | F9, F10 y F11 | Estrellas visibles y accesibles; después de recargar no reaparece una calificación ya enviada. |
 
 La recuperación automática de contraseña F4 sigue fuera del MVP. Sólo puede
