@@ -488,7 +488,12 @@ function App() {
           <UserDashboard onPublishClick={() => setIsAddProductOpen(true)} />
         ) : null;
       case 'contact':
-        // La `key` cuelga de la intención a propósito.
+        // La `key` cuelga del ID de la publicación, no de su nombre.
+        //
+        // Dos publicaciones pueden llamarse igual —el mismo servicio ofrecido
+        // por dos vendedores es el caso típico—, y con el nombre por identidad
+        // pasar de una a otra no remontaba nada: la pantalla seguía mostrando
+        // al vendedor de la primera.
         //
         // El formulario nace con la cotización adentro, y eso sólo alcanza si
         // la pantalla se monta de nuevo. Estando YA en Contacto no se monta:
@@ -499,7 +504,7 @@ function App() {
         // reemplaza a la anterior en vez de convivir con ella.
         return (
           <ContactPage
-            key={cotizacionPedida ? `cotizacion:${cotizacionPedida.publicacion}` : 'generico'}
+            key={cotizacionPedida ? `cotizacion:${cotizacionPedida.id}` : 'generico'}
             cotizacion={cotizacionPedida}
           />
         );

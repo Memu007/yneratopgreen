@@ -83,7 +83,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     if (accion.tipo === 'cotizar') {
       // La publicación y el vendedor viajan con el pedido: es lo que hace que
       // Contacto sepa de qué se está hablando.
-      onSolicitarCotizacion?.({ publicacion: product.name, vendedor: product.seller.name });
+      onSolicitarCotizacion?.({
+        id: product.id, publicacion: product.name, vendedor: product.seller.name,
+      });
       onClose();
       return;
     }

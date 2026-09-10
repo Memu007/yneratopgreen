@@ -240,11 +240,15 @@ export interface NewProductData {
  * Lo que viaja cuando alguien pide una cotización desde una publicación.
  *
  * Es lo mínimo que hace falta para que Contacto no empiece en blanco: qué se
- * está cotizando y a quién. No lleva precio ni identificadores internos —el
- * mensaje lo lee una persona— y NO lleva datos de quien escribe: esos los pone
- * ella, o no están.
+ * está cotizando y a quién. No lleva precio ni datos de quien escribe: esos los
+ * pone ella, o no están.
+ *
+ * El `id` está porque dos publicaciones pueden llamarse igual. Si la identidad
+ * fuera el nombre, pasar de una a otra homónima no reemplazaría nada: la
+ * pantalla seguiría mostrando el vendedor de la primera.
  */
 export interface CotizacionPedida {
+  id: string;
   publicacion: string;
   vendedor: string;
 }

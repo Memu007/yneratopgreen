@@ -24672,8 +24672,18 @@ await runCase(166, 'La cotización llega a Contacto con su publicación, y prepa
     await tarjeta.getByRole('button', { name: 'Solicitar cotización' }).click();
     await enContacto();
 
-    assert((await asunto()) === 'cotizacion',
-      `el asunto quedó en ${JSON.stringify(await asunto())} y tenía que ser el de cotización`);
+    // El asunto no alcanza con que sea «el de cotización»: tiene que NOMBRAR la
+    // publicación y al vendedor. Es lo primero que se lee del otro lado, y un
+    // rótulo genérico obliga a abrir el cuerpo para saber de qué se trata.
+    const textoDelAsunto = async () => {
+      const elegido = await page.getByLabel('Asunto *').inputValue();
+      if (!elegido) return '';
+      return (await page.getByLabel('Asunto *')
+        .locator(`option[value="${elegido}"]`).innerText()).trim();
+    };
+    const asuntoVisible = await textoDelAsunto();
+    assert(asuntoVisible.includes(aCotizar[0]) && asuntoVisible.includes(aCotizar[1]),
+      `el asunto visible no nombra publicación y vendedor: ${JSON.stringify(asuntoVisible)}`);
     const desdeLaTarjeta = await mensaje();
     assert(desdeLaTarjeta.includes(aCotizar[0]),
       `el mensaje no nombra la publicación: ${JSON.stringify(desdeLaTarjeta)}`);
@@ -24734,6 +24744,90 @@ await runCase(166, 'La cotización llega a Contacto con su publicación, y prepa
       `el mensaje mezcla las dos publicaciones: ${JSON.stringify(segundoMensaje)}`);
     medidos.push('una publicación nueva reemplaza a la anterior, sin mezclarlas');
 
+    // --- D bis. Dos publicaciones que se llaman IGUAL -----------------------
+    //
+    // Es el caso que rompe identificar por nombre: el mismo servicio ofrecido
+    // por dos personas distintas. Si la identidad fuera el título, pasar de una
+    // a la otra no reemplazaría nada y la pantalla seguiría nombrando al
+    // vendedor de la primera. Se fabrican las dos, con el mismo nombre y
+    // vendedores distintos.
+    const gemela = `Servicio homónimo ${Date.now()}`;
+    const [[categoriaGemela]] = queryRows(`
+      SELECT id FROM categories WHERE is_active = true ORDER BY name LIMIT 1
+    `);
+    const [[localidadGemela]] = queryRows('SELECT id FROM localities ORDER BY id LIMIT 1');
+    await asegurarSesiones();
+    const publicarGemela = async (token) => (await apiRequest('/products', {
+      method: 'POST',
+      token,
+      body: {
+        name: gemela,
+        description: 'Dos publicaciones con el mismo nombre y distinto vendedor.',
+        category_id: categoriaGemela,
+        price: 0,
+        stock: 0,
+        unit: 'servicio',
+        locality_id: localidadGemela,
+        publication_type: 'servicio',
+        operation_kind: 'servicio',
+        pricing_type: 'a_convenir',
+        availability: 'inmediata',
+        response_time: '24h',
+        coverage_zones: ['Buenos Aires'],
+      },
+    })).data;
+    const gemelaA = await publicarGemela(state.sellerToken);
+    const gemelaB = await publicarGemela(state.buyerToken);
+    const nombreDe = (id) => queryRows(
+      `SELECT u.full_name FROM products p JOIN users u ON u.id = p.seller_id
+       WHERE p.id = ${sqlLiteral(id)}`)[0][0];
+    const vendedorA = nombreDe(gemelaA.id);
+    const vendedorB = nombreDe(gemelaB.id);
+    assert(vendedorA !== vendedorB,
+      `las dos publicaciones homónimas quedaron del mismo vendedor (${vendedorA})`);
+
+    try {
+      const pedirDesde = async (cual) => {
+        await irAlMercado();
+        await buscar(gemela);
+        const tarjetaGemela = page.locator('article, [class*="card"]')
+          .filter({ hasText: gemela })
+          .filter({ hasText: cual })
+          .first();
+        await tarjetaGemela.waitFor({ state: 'visible', timeout: 25_000 });
+        await tarjetaGemela.getByRole('button', { name: 'Solicitar cotización' }).click();
+        await enContacto();
+      };
+
+      await pedirDesde(vendedorA);
+      const conA = await mensaje();
+      assert(conA.includes(vendedorA),
+        `la primera homónima no nombra a ${vendedorA}: ${JSON.stringify(conA)}`);
+
+      await pedirDesde(vendedorB);
+      const conB = await mensaje();
+      assert(conB.includes(vendedorB),
+        `la segunda homónima no reemplazó al vendedor: sigue diciendo `
+        + `${JSON.stringify(conB.slice(0, 140))}`);
+      assert(!conB.includes(vendedorA),
+        `con dos publicaciones del mismo nombre quedó el vendedor de la primera: `
+        + `${JSON.stringify(conB.slice(0, 140))}`);
+      medidos.push('dos publicaciones con el mismo nombre y distinto vendedor: la segunda '
+        + 'reemplaza a la primera, así que la identidad no es el título');
+    } finally {
+      for (const [id, token] of [[gemelaA.id, state.sellerToken], [gemelaB.id, state.buyerToken]]) {
+        await apiRequest(`/products/${id}`, { method: 'DELETE', token }).catch(() => {});
+      }
+    }
+
+    // Se vuelve a la publicación con la que sigue el resto del caso.
+    await irAlMercado();
+    await buscar(otraACotizar[0]);
+    await page.getByRole('heading', { name: otraACotizar[0], exact: true, level: 3 })
+      .first().locator('xpath=ancestor::*[contains(@class,"card")]')
+      .getByRole('button', { name: 'Solicitar cotización' }).click();
+    await enContacto();
+
     // --- E. Abrir en mi correo: prepara, y no afirma nada -------------------
     assert((await page.getByRole('button', { name: 'Abrir en mi correo' }).count()) === 1,
       'el botón no dice «Abrir en mi correo»');
@@ -24755,18 +24849,38 @@ await runCase(166, 'La cotización llega a Contacto con su publicación, y prepa
     // Codificado de verdad: sin esto un salto de línea o un `&` cortan el
     // `mailto:` por la mitad.
     const url = new URL(correo);
-    const cuerpo = new URLSearchParams(url.search).get('body') || '';
+    const parametros = new URLSearchParams(url.search);
+    const cuerpo = parametros.get('body') || '';
+    const asuntoDelCorreo = parametros.get('subject') || '';
     assert(cuerpo.includes(otraACotizar[0]) && cuerpo.includes(otraACotizar[1]),
-      `el correo no lleva publicación y vendedor: ${JSON.stringify(cuerpo.slice(0, 160))}`);
+      `el correo no lleva publicación y vendedor en el cuerpo: ${JSON.stringify(cuerpo.slice(0, 160))}`);
+    assert(asuntoDelCorreo.includes(otraACotizar[0]) && asuntoDelCorreo.includes(otraACotizar[1]),
+      `el ASUNTO del correo no nombra publicación y vendedor: ${JSON.stringify(asuntoDelCorreo)}`);
     assert(!/[\n\r]/.test(url.search),
       'el asunto o el cuerpo viajan sin codificar: un salto de línea corta el mailto');
 
     // No se afirma que se envió ni que se abrió: no se puede saber.
-    const textoDeLaPantalla = await page.locator('main, body').first().innerText();
-    for (const mentira of [/\bse abrió\b/i, /\benviado\b/i, /\bse envió\b/i, /Enviar por Email/i]) {
-      assert(!mentira.test(textoDeLaPantalla),
-        `la pantalla afirma un resultado que no puede conocer: coincide con ${mentira}`);
+    const textoDeLaPantalla = (await page.locator('main, body').first().innerText())
+      .replace(/\s+/g, ' ');
+    // Comparación textual, sin `\b`.
+    //
+    // La versión anterior usaba `/\bse abrió\b/i` y NO detectaba nada: en una
+    // expresión regular de JavaScript `\b` se apoya en `\w`, que es ASCII, así
+    // que después de una «ó» no hay borde de palabra y el patrón no casa jamás.
+    // Decía prohibir una frase que no podía ver.
+    const FRASES_PROHIBIDAS = [
+      'se abrió', 'se abrio', 'enviado', 'se envió', 'se envio',
+      'Enviar por Email', 'Preparamos el mensaje', 'Si no se abrió',
+    ];
+    const enMinusculas = textoDeLaPantalla.toLowerCase();
+    for (const mentira of FRASES_PROHIBIDAS) {
+      assert(!enMinusculas.includes(mentira.toLowerCase()),
+        `la pantalla afirma un resultado que no puede conocer: dice «${mentira}»`);
     }
+    // Y la ayuda que sí corresponde está.
+    assert(enMinusculas.includes('revisá y enviá el mensaje desde tu aplicación de correo')
+      || enMinusculas.includes('revisa y envia el mensaje desde tu aplicacion de correo'),
+    `no quedó la instrucción neutral: ${JSON.stringify(textoDeLaPantalla.slice(0, 200))}`);
     // Y lo escrito sigue ahí, que es lo que permite copiarlo o reintentar.
     assert((await page.getByLabel('Nombre Completo *').inputValue()) === antesDeAbrir.nombre
       && (await page.getByLabel('Email *').inputValue()) === antesDeAbrir.email

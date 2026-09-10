@@ -103,7 +103,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       return;
     }
     if (accion.tipo === 'cotizar' && onSolicitarCotizacion) {
-      onSolicitarCotizacion({ publicacion: product.name, vendedor: product.seller.name });
+      onSolicitarCotizacion({
+        id: product.id, publicacion: product.name, vendedor: product.seller.name,
+      });
       return;
     }
   };

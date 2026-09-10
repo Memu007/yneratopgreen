@@ -32,6 +32,9 @@ interface ContactPageProps {
  * quien escribe: el nombre, el correo y el teléfono los pone ella. Completarlos
  * por su cuenta sería inventar quién es.
  */
+const asuntoDeCotizacion = ({ publicacion, vendedor }: CotizacionPedida) =>
+  `Solicitud de cotización — ${publicacion} (${vendedor})`;
+
 const mensajeDeCotizacion = ({ publicacion, vendedor }: CotizacionPedida) =>
   `Hola, quiero pedir una cotización por «${publicacion}», publicada por ${vendedor}.`
   + '\n\nContame precio, disponibilidad y cómo seguimos.';
@@ -57,8 +60,12 @@ export const ContactPage: React.FC<ContactPageProps> = ({ cotizacion = null }) =
   };
 
   const getSubjectText = (value: string) => {
+    // El asunto de una cotización nombra la publicación y al vendedor: es lo
+    // primero que se lee del otro lado, y un «Solicitud de cotización» a secas
+    // obliga a abrir el cuerpo para saber de qué se trata.
+    if (value === 'cotizacion' && cotizacion) return asuntoDeCotizacion(cotizacion);
     const subjects: Record<string, string> = {
-      'cotizacion': 'Solicitud de cotización',
+
       'ventas': 'Consultas sobre Ventas',
       'compras': 'Consultas sobre Compras',
       'tecnico': 'Soporte Técnico',
@@ -130,13 +137,15 @@ export const ContactPage: React.FC<ContactPageProps> = ({ cotizacion = null }) =
             <div className={styles.formContainer}>
               <h2>Envianos tu Consulta</h2>
               
-              {/* Una instrucción, no un resultado. No sabemos si se abrió el
-                  correo —nadie puede saberlo desde acá—, así que decimos qué
-                  falta hacer y no qué pasó. El texto sigue abajo, intacto. */}
+              {/* Una instrucción, y NADA sobre el resultado.
+                  La versión anterior decía «Preparamos el mensaje en tu
+                  aplicación de correo» y «Si no se abrió»: las dos afirman algo
+                  sobre lo que hizo el cliente local, que es exactamente lo que
+                  no se puede saber desde acá. Queda lo único que sí es cierto y
+                  útil: qué falta hacer. El texto sigue abajo, intacto. */}
               {submitStatus === 'preparado' && (
                 <div className={styles.successMessage} role="status">
-                  Preparamos el mensaje en tu aplicación de correo. Revisalo y enviálo desde ahí.
-                  Si no se abrió, podés copiar el texto de abajo o escribirnos por WhatsApp.
+                  Revisá y enviá el mensaje desde tu aplicación de correo.
                 </div>
               )}
 
@@ -186,7 +195,12 @@ export const ContactPage: React.FC<ContactPageProps> = ({ cotizacion = null }) =
                     required
                   >
                     <option value="">Seleccionar...</option>
-                    <option value="cotizacion">Solicitud de cotización</option>
+                    {/* Sólo existe cuando se llegó desde una publicación: sin
+                        cotización no hay nada que nombrar, y ofrecer un asunto
+                        vacío de contenido sería peor que no ofrecerlo. */}
+                    {cotizacion && (
+                      <option value="cotizacion">{asuntoDeCotizacion(cotizacion)}</option>
+                    )}
                     <option value="ventas">Consultas sobre Ventas</option>
                     <option value="compras">Consultas sobre Compras</option>
                     <option value="servicios">Servicios AgroBoeda</option>
