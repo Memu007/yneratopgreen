@@ -2,6 +2,105 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## QUOTE-CONTACT-1 — la cotización llega con su publicación, y el correo no miente
+
+**Resultado: terminado. Suite completa 165/166, único rojo el 131 ambiental.**
+
+- Producto/regresión: `612b57f`
+- La suite pasa a **166 casos**.
+- **En mi rama, no en `main`.** No integré, no desplegué, no ejecuté seed contra
+  Railway y no toqué datos remotos, pagos ni secretos. **No toqué Backend.**
+
+---
+
+### 1. Los dos defectos eran el mismo defecto
+
+En los dos casos el producto afirmaba algo que no era cierto.
+
+**El CTA prometía continuidad y no la daba.** «Solicitar cotización» llamaba a
+`handleNavigate('contact')` y nada más. La persona llegaba a un formulario en
+blanco y tenía que volver a explicar de qué publicación estaba hablando, o
+mandar una consulta que del otro lado no se entiende.
+
+**Y el botón decía «Enviar por Email».** Llamaba a `window.open` con un
+`mailto:`, declaraba **éxito** y **vaciaba el formulario**. Las tres cosas eran
+insostenibles a la vez: `window.open` con un `mailto:` no informa si se abrió un
+cliente —devuelve `null` en casos perfectamente normales, y el navegador puede
+no tener ninguno configurado—, así que la pantalla afirmaba un envío que nadie
+vio y, de paso, borraba lo que la persona había escrito. Si el correo no se
+abría, el texto ya no estaba.
+
+### 2. Lo que hace ahora
+
+**La cotización viaja.** El pedido lleva qué se cotiza y a quién, desde la
+tarjeta y desde el detalle, en el Mercado, en Inicio y en Servicios. Contacto
+nace con el asunto de cotización y un mensaje que nombra a los dos.
+
+Lo que **no** se completa son el nombre, el correo ni el teléfono de quien
+escribe. Inventar quién es sería peor que dejarlos vacíos.
+
+**Y el genérico sigue genérico.** Entrar por la cabecera, el pie o cualquier
+llamada común limpia la intención; una publicación nueva reemplaza a la anterior
+sin mezclarse.
+
+**El correo es honesto.** El botón dice **«Abrir en mi correo»**, prepara el
+`mailto:` con la codificación segura de siempre y no afirma nada sobre el
+resultado. Lo escrito queda para copiar, corregir, reintentar o mandarlo por
+WhatsApp, que hereda el mismo contexto. El cartel posterior es una instrucción
+neutral —revisar y enviar desde su aplicación—, no un resultado.
+
+### 3. Un hueco propio que encontró el caso
+
+La primera versión sólo cargaba el formulario al montarse. Estando **ya** en
+Contacto la pantalla no se vuelve a montar, así que volver a entrar por el pie
+seguía mostrando la publicación anterior aunque la intención ya estuviera
+limpia: el punto 2 fallaba por dentro aunque el estado fuera correcto.
+
+Lo encontró el propio caso 166, con el mensaje «entrando por el pie el asunto
+vino cargado: "cotizacion"». La `key` de `ContactPage` cuelga ahora de la
+intención: cambiar de intención —o dejar de tenerla— es otra pantalla.
+
+### 4. Los cuatro rojos, contra `c88b7ea`
+
+1. `el asunto quedó en "" y tenía que ser el de cotización` — el CTA llega vacío.
+2. `el botón no dice «Abrir en mi correo»`.
+3. `la pantalla afirma un resultado que no puede conocer: coincide con
+   /Enviar por Email/i`.
+4. `preparar el correo se llevó puesto lo que la persona había escrito`.
+
+Los tres últimos se midieron salteando de a uno el anterior, para que cada
+afirmación se viera fallar por su propio motivo y no por el de más arriba.
+
+### 5. Lo que exige el verde
+
+Desde tarjeta **y** detalle: sección `contact`, asunto de cotización y mensaje
+con los nombres exactos leídos de la base —no escritos a mano en la prueba—; los
+datos personales vacíos; el mismo mensaje por los dos caminos. Entrada genérica
+por el pie: sin herencia. Segunda publicación: reemplaza y no mezcla.
+`window.open` interceptado **devolviendo `null`** a propósito, que es el caso en
+el que antes se afirmaba éxito igual: un solo `mailto:`, codificado, con
+publicación y vendedor; ninguna frase de envío en pantalla; los cuatro campos
+intactos. WhatsApp hereda el contexto y tampoco borra nada. Y cero `POST` a
+`/contact`.
+
+### 6. Un límite que respeté
+
+No conecté `/contact` aunque exista. Abrir ese canal, operarlo y protegerlo
+contra abuso es otra decisión, y el caso 166 lo fija: exige que **no** salga
+ningún `POST`. Si alguien lo conecta sin decidirlo, la prueba avisa.
+
+### 7. Puertas
+
+- **Suite completa desde base limpia: 165/166.** Único rojo el **131**: sigue
+  necesitando `docker run` y este entorno sólo tiene el puente de `docker exec`.
+  No lo toqué ni lo simulé.
+- Focales 125, 147, 155 y 166 aislados: **4/4**.
+- `lint`, `node --check`, `tsc` y `diff-check`, verdes. El smoke incluye build.
+- Sin Backend, `compileall`, `pip check`, a11y/contraste totales ni capturas: el
+  diff no salió del límite previsto.
+
+---
+
 ## RATING-UX-1R — el 165 mide las tres cosas que antes sólo narraba
 
 **Resultado: corregido.**
