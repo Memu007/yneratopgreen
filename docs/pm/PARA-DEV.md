@@ -12,6 +12,60 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-09 — CIERRE: ADMIN-SAFETY-1R aceptada; activar TEST-SUITE-164S
+
+Aceptados base producto/regresión `79f3219`, informe `c26db85`, corrección
+`871ce7b` e informe `775818c`. PM revisó el delta final y reprodujo 149, 150 y
+164 juntos desde otra base Docker limpia: **3/3**, salida 0 y resumen 3/3. La
+mutación retenida no se cerró ni duplicó por Escape, fondo, X o Cancelar; al
+liberarla dejó el resultado visible. Reset, categoría y cancelaciones de
+cuenta/publicación también quedaron medidos. Lint, sintaxis, `compileall` y
+`diff-check` verdes. Evidencia en
+`REPRODUCCION-ADMIN-SAFETY-1-2026-09-09.md`.
+
+La pieza de producto queda aceptada. No abras todavía `RATING-UX-1`: tu suite
+completa terminó en **157/164** y una puerta que nace roja ya no distingue la
+próxima regresión. La única tarea activa pasa a **`TEST-SUITE-164S`**, sólo
+arnés y evidencia.
+
+### Objetivo acotado
+
+Sobre `871ce7b`, reproducí una vez cada rojo aislado y contrastalo con su fallo
+dentro del orden completo:
+
+- 21: eliminá la dependencia que termina en `undefined` y hacé que prepare su
+  propio estado o falle con diagnóstico accionable.
+- 54 y 57: corregí propiedad de sesión/token/carrito en el test; no relajes el
+  401 ni cambies autenticación o `/cart`.
+- 125: informá primero el mensaje exacto y hacelo independiente de filas o
+  estado dejado por casos anteriores.
+- 157: la cuenta demo y el locator deben tener precondición propia; no dependas
+  de página, rol o datos mutados antes.
+- 162: debe fabricar o restaurar de forma acotada el catálogo demostrativo que
+  mide y limpiar después; no puede depender de que los 161 casos anteriores
+  dejen visibles los 30 slugs. Conservá la verificación 1:1 de activos y la
+  prioridad de fotos reales.
+- 131: reproducilo aislado en el entorno representativo. Si vuelve a ser la
+  incompatibilidad ambiental ya documentada, no cambies producto ni simules un
+  verde; informá la condición exacta. Si aparece otro motivo, frená y reportá.
+
+No agregues un caso 165 ni cambies `src/`, `backend/`, migraciones, seed o
+contratos API. Si cualquiera de los seis primeros revela un defecto real de
+producto en vez de una precondición del test, no lo arregles dentro de esta
+tarea: entregá reproducción y pedí decisión PM.
+
+### Puerta y costo
+
+Después de los focales, corré **una sola suite completa** desde base limpia. La
+meta es 164/164; se admite únicamente 163/164 si el único rojo es el 131
+ambiental reproducido y todos los demás pasan dentro de la corrida. Sumá
+`node --check` y `diff-check`; el smoke ya construye. Sin lint, TypeScript,
+Backend, a11y, contraste o capturas porque no hay producto.
+
+Entregá un commit sólo de `scripts/smoke.mjs` y un informe separado con rojo,
+verde, total y salida. No integres a `main`, no despliegues, no ejecutes seed
+contra Railway y no toques datos remotos, pagos o secretos. Frená al entregar.
+
 ## 2026-09-09 — DEVOLUCIÓN: ADMIN-SAFETY-1R, el caso nuevo no determina la salida
 
 Revisé producto/regresión `79f3219` e informe `c26db85`. El alcance general está
