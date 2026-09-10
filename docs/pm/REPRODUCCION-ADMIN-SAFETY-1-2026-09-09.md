@@ -2,7 +2,7 @@
 
 ## Resultado
 
-Devuelta como `ADMIN-SAFETY-1R`.
+Aceptada tras `ADMIN-SAFETY-1R`.
 
 - Producto/regresión Dev: `79f3219`.
 - Informe Dev: `c26db85`.
@@ -57,3 +57,26 @@ los sostiene tiene un falso verde y quedan tres bordes de producto.
 
 La corrección queda acotada al arnés, ciclo pendiente, retiro del selector sin
 efecto y texto honesto. No se reabre la arquitectura entregada.
+
+## Corrección final
+
+- Corrección Dev: `871ce7b`.
+- Informe Dev: `775818c`.
+- PM revisó el delta final: sólo `Confirmacion`, `AdminPanel`, el resultado de
+  nueva contraseña y el caso 164; no vuelve a tocar Backend ni amplía alcance.
+- PM reprodujo 149, 150 y 164 juntos desde otra base Docker limpia: **3/3**, 0
+  fallos, salida 0 y resumen aritméticamente correcto. Log persistente:
+  `/private/tmp/topgreen-pm-admin-safety-149-150-164r.log`.
+- El 164 retuvo una mutación real: Escape, fondo, X y Cancelar conservaron la
+  capa, no duplicaron la solicitud y el resultado quedó visible al liberarla.
+  También verificó cancelación sin escritura en rol, cuenta y publicación;
+  reset real; retiro de Estado de categoría y ausencia de `is_active` en el
+  PUT; y ausencia de `window.confirm`.
+- Lint, sintaxis, `compileall` y `diff-check`: verdes.
+
+Dev ejecutó una suite completa y obtuvo **157/164**, con siete rojos heredados:
+21, 54, 57, 125, 131, 157 y 162. Informó haberlos reproducido también contra la
+base de entrada; el 162 pasa aislado y falla por dependencia de orden. PM no
+atribuye una suite completa propia. La pieza de producto queda aceptada por
+delta y focales, pero la próxima tarea debe restaurar la puerta de suite antes
+de abrir otra mejora de producto.

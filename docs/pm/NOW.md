@@ -4,15 +4,15 @@ Actualizado: 2026-09-09.
 
 ## Estado inmediato — 2026-09-09
 
-- **ADMIN-SAFETY-1 devuelta como `ADMIN-SAFETY-1R`:** producto/regresión
-  `79f3219`, informe `c26db85`. PM revisó el delta y reprodujo el 164 desde base
-  limpia: el recorrido imprimió PASS, pero resumió **0/1** porque los contadores
-  se calculan antes de ejecutar el caso; un 164 rojo tampoco afectaría la
-  salida. Además Escape puede desmontar una confirmación mientras la mutación
-  sigue en curso, el selector de categoría Inactiva permanece aunque Dev probó
-  que no tiene efecto público, y la clave se llama temporal aunque no existe
-  cambio al ingresar. No se gastó una suite PM con el arnés inválido. Evidencia
-  en `REPRODUCCION-ADMIN-SAFETY-1-2026-09-09.md`.
+- **ADMIN-SAFETY-1R aceptada:** base producto/regresión `79f3219`, informe
+  `c26db85`; corrección `871ce7b`, informe `775818c`. PM revisó ambos deltas y
+  reprodujo 149+150+164 desde base limpia en **3/3**: el resumen ya cierra, la
+  confirmación no puede desaparecer con una escritura en curso, se retiró el
+  estado de categoría sin efecto y el reset informa honestamente la vigencia
+  de la contraseña nueva. Lint, sintaxis, `compileall` y `diff-check` verdes.
+  Dev obtuvo suite completa **157/164** con siete rojos heredados; no hay suite
+  completa PM. Evidencia en
+  `REPRODUCCION-ADMIN-SAFETY-1-2026-09-09.md`.
 
 - **ACCOUNT-PAGE-1R aceptada:** base producto/regresión `7dc1d53`, informe
   `968efbc`; corrección `958c11c`, informe `16008a1`. PM había reproducido
@@ -66,11 +66,11 @@ Actualizado: 2026-09-09.
   `/private/tmp/topgreen-pm-admin-160r.log`; un intento anterior que murió por
   `EPERM` antes del smoke no cuenta. Evidencia en
   `REPRODUCCION-ADMIN-TRUTH-1-2026-09-09.md`.
-- **Única tarea activa y responsable:** `ADMIN-SAFETY-1R`, Dev. Corrección
-  focal: hacer que el 164 cuente y determine la salida real, bloquear toda
-  salida mientras la mutación está en curso, retirar de la UI el estado de
-  categoría sin efecto y describir el reset como contraseña nueva —no temporal—
-  mientras no exista rotación al ingresar. Contrato en `PARA-DEV.md`.
+- **Única tarea activa y responsable:** `TEST-SUITE-164S`, Dev. Antes de abrir
+  otra mejora de producto debe volver a dejar la suite reproducible: aislar y
+  corregir sólo el arnés de 21, 54, 57, 125, 157 y 162; 131 se conserva como
+  ambiental si vuelve a demostrarlo. Si algún rojo revela producto real, Dev lo
+  informa y frena en vez de mezclar una corrección. Contrato en `PARA-DEV.md`.
 - **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
   `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
   y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como
