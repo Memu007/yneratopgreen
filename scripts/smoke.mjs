@@ -24319,23 +24319,143 @@ await runCase(165, 'La reputación se ve, el servidor decide si se puede calific
       'sin nada escrito, cerrar preguntó igual: la guarda estaría preguntando de más');
     medidos.push('descartar cierra una vez y devuelve el foco; sin cambios cierra directo');
 
-    // --- F. Enviar: una sola solicitud, y el resultado se ve ---------------
+    // --- E bis. La capa en 390 px, sobre esta misma orden ------------------
+    //
+    // Va ANTES de calificar y no después, que es lo que la hacía inmedible: una
+    // vez calificada, la orden ya no ofrece el botón y no hay capa que abrir.
+    // La versión anterior de este caso resolvía eso con un `else` que guardaba
+    // igual un archivo llamado `calificacion-dialogo-390x844.png` —capturando
+    // Mis compras a medio cargar— y lo contaba como captura. Eso no es medir:
+    // es fabricar evidencia. Si acá no abre la capa, el caso falla.
+    const angosto = await abrirCuenta(390, 844);
+    await irAMisCompras(angosto.page);
+    const filaAngosta = angosto.page.locator('[class*="orderCard"]')
+      .filter({ hasText: numeroVisible }).first();
+    await filaAngosta.waitFor({ state: 'visible', timeout: 25_000 });
+    await filaAngosta.getByRole('button', { name: /Calificar Vendedor/i })
+      .click({ timeout: 20_000 });
+    await capa(angosto.page).waitFor({ state: 'visible', timeout: 15_000 });
+
+    const nombreAngosto = await capa(angosto.page).getAttribute('aria-labelledby');
+    assert(nombreAngosto,
+      'en 390 px la capa no declara nombre accesible');
+    const tituloAngosto = (await angosto.page.locator(`#${nombreAngosto}`).innerText()).trim();
+    assert(tituloAngosto.includes('Calificar'),
+      `en 390 px el nombre de la capa es ${JSON.stringify(tituloAngosto)}`);
+    assert(await angosto.page.locator(`#${nombreAngosto}`).isVisible(),
+      'en 390 px el nombre de la capa no se ve');
+    const desborde = await angosto.page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert(desborde <= 0, `en 390 px la pantalla desborda ${desborde} px a lo ancho`);
+    // Y la capa entra en la ventana: no alcanza con que el documento no
+    // desborde si la tarjeta se sale por un costado.
+    const caja = await capa(angosto.page).boundingBox();
+    assert(caja && caja.x >= 0 && caja.x + caja.width <= 390,
+      `en 390 px la capa ocupa de ${caja && Math.round(caja.x)} a `
+      + `${caja && Math.round(caja.x + caja.width)} px`);
+    capturas.push(await guardarCaptura(angosto.page, CAPTURAS, 'calificacion-dialogo-390x844'));
+    medidos.push('en 390 px la capa abre sobre la orden propia, con nombre visible y sin desborde');
+    await angosto.contexto.close();
+
+    // --- F. Enviar: mientras viaja no se puede cerrar ni repetir -----------
+    //
+    // Entre el clic y la respuesta hay una ventana. Si algo cerrara la capa ahí,
+    // la pantalla diría que no pasó nada y la calificación se guardaría igual.
+    // La única forma de medirlo es RETENER la solicitud: un clic y esperar a que
+    // la capa desaparezca no prueba nada, porque la ventana dura milisegundos.
+    let intentos = 0;
+    let soltarElPrimerIntento = null;
+    await page.route('**/api/ratings/', async (ruta) => {
+      if (ruta.request().method() !== 'POST') return ruta.fallback();
+      intentos += 1;
+      if (intentos === 1) {
+        // El primero se retiene y después se contesta con un fallo controlado.
+        await new Promise((seguir) => { soltarElPrimerIntento = seguir; });
+        return ruta.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'Fallo simulado por smoke' }),
+        });
+      }
+      // El reintento sí llega al servidor de verdad.
+      return ruta.continue();
+    });
+
     posts = [];
     await disparador.click();
     await capa(page).waitFor({ state: 'visible', timeout: 15_000 });
     await capa(page).getByLabel('Comentario (opcional)').fill('Todo bien, llegó en fecha.');
-    await capa(page).getByRole('button', { name: /Enviar calificación/i }).click();
-    await capa(page).waitFor({ state: 'detached', timeout: 25_000 });
+    const botonEnviar = capa(page).getByRole('button', { name: /Enviar|Enviando/i });
+    await botonEnviar.click();
+    await esperarA(async () => soltarElPrimerIntento !== null,
+      'la calificación nunca salió', 15_000);
+
+    // Con la solicitud en vuelo: ninguna salida cierra y nada se puede repetir.
+    for (const [comoSeLlama, salir] of [
+      ['Escape', async () => page.keyboard.press('Escape')],
+      ['el fondo', async () => capa(page).locator('xpath=..')
+        .click({ position: { x: 8, y: 8 }, force: true })],
+    ]) {
+      await salir();
+      await page.waitForTimeout(300);
+      assert(await capa(page).isVisible(),
+        `con la calificación en vuelo, ${comoSeLlama} cerró la capa`);
+      // Y no alcanza con que siga visible: con algo escrito, una salida que NO
+      // respetara el envío en curso abriría la pregunta de cambios sin guardar
+      // y la capa seguiría ahí detrás, así que mirar sólo si está visible daría
+      // verde por el motivo equivocado —se midió—. Con el envío en vuelo la
+      // salida no tiene que hacer nada en absoluto.
+      assert((await page.getByRole('dialog')
+        .filter({ hasText: 'Tenés cambios sin guardar' }).count()) === 0,
+      `con la calificación en vuelo, ${comoSeLlama} llegó hasta la pregunta de salida`);
+    }
+    for (const cual of ['Cerrar', 'Cancelar']) {
+      assert(await capa(page).getByRole('button', { name: cual }).isDisabled(),
+        `con la calificación en vuelo, «${cual}» sigue habilitado`);
+    }
+    assert(await botonEnviar.isDisabled(),
+      'con la calificación en vuelo, el botón de enviar sigue habilitado: se podría duplicar');
     assert(posts.length === 1,
-      `enviar mandó ${posts.length} calificaciones y tiene que mandar una`);
+      `con una sola en vuelo ya salieron ${posts.length} solicitudes: ${JSON.stringify(posts)}`);
+    medidos.push('con la calificación en vuelo no cierra por Escape ni por el fondo, '
+      + 'Cerrar/Cancelar/Enviar quedan deshabilitados y no sale una segunda solicitud');
+
+    // --- F bis. El fallo se ve, y no se lleva lo escrito -------------------
+    soltarElPrimerIntento();
+    const aviso = capa(page).locator('[role="alert"]');
+    await aviso.waitFor({ state: 'visible', timeout: 20_000 });
+    assert(await capa(page).isVisible(), 'con el envío fallado la capa se cerró igual');
+    assert((await aviso.innerText()).trim().length > 0, 'el aviso de error está vacío');
+    assert(await capa(page).locator('input[type="radio"]:checked').inputValue() === '5',
+      'el fallo se llevó puesto el puntaje elegido');
+    assert((await capa(page).getByLabel('Comentario (opcional)').inputValue())
+      === 'Todo bien, llegó en fecha.', 'el fallo se llevó puesto el comentario escrito');
+    for (const cual of ['Cerrar', 'Cancelar']) {
+      assert(!(await capa(page).getByRole('button', { name: cual }).isDisabled()),
+        `después del fallo, «${cual}» quedó deshabilitado`);
+    }
+    assert(!(await botonEnviar.isDisabled()), 'después del fallo no se puede reintentar');
+    medidos.push('el envío fallado deja la capa abierta, el error a la vista, lo escrito intacto '
+      + 'y los controles otra vez disponibles');
+
+    // --- F ter. El reintento deliberado, que sí guarda ---------------------
+    await botonEnviar.click();
+    await capa(page).waitFor({ state: 'detached', timeout: 25_000 });
+    assert(posts.length === 2,
+      `salieron ${posts.length} solicitudes: una fallada y un reintento son dos, `
+      + `y cualquier otra cosa es una duplicación: ${JSON.stringify(posts)}`);
+    assert(intentos === 2, `el interceptor vio ${intentos} intentos y tienen que ser dos`);
+    await page.unroute('**/api/ratings/');
 
     const [[cuantas, promedio]] = queryRows(`
       SELECT COUNT(*)::text, COALESCE(ROUND(AVG(score)::numeric, 2), 0)::text
       FROM ratings WHERE order_id = ${sqlLiteral(ordenId)}
     `);
-    assert(cuantas === '1', `la base guardó ${cuantas} calificaciones para esa orden`);
+    assert(cuantas === '1',
+      `la base guardó ${cuantas} calificaciones para esa orden: el intento fallado no puede `
+      + 'haber dejado fila');
     assert(promedio === '5.00', `el puntaje guardado es ${promedio} y se envió 5`);
-    medidos.push('una sola calificación enviada, y la base la registra con su puntaje');
+    medidos.push('dos intentos —uno fallado y un reintento— dejan UNA sola fila con su puntaje');
 
     // --- G. Y no se puede volver a calificar, ni recargando ---------------
     //
@@ -24445,25 +24565,6 @@ await runCase(165, 'La reputación se ve, el servidor decide si se puede calific
     medidos.push('el perfil dibuja cinco estrellas y una sola descripción «X de 5, N calificaciones»');
     await vendedor.close();
 
-    // --- I. En 390 la capa entra sin desbordar ----------------------------
-    const angosto = await abrirCuenta(390, 844);
-    await irAMisCompras(angosto.page);
-    // Esta orden ya está calificada; se abre la capa de otra compra entregada si
-    // la hubiera, y si no, se mide el estado sin botón, que también es correcto.
-    const hayOtra = await botonDeCalificar(angosto.page).count();
-    if (hayOtra > 0) {
-      await botonDeCalificar(angosto.page).first().click();
-      await capa(angosto.page).waitFor({ state: 'visible', timeout: 15_000 });
-      const desborde = await angosto.page.evaluate(() =>
-        document.documentElement.scrollWidth - document.documentElement.clientWidth);
-      assert(desborde <= 0, `en 390 px la pantalla desborda ${desborde} px a lo ancho`);
-      capturas.push(await guardarCaptura(angosto.page, CAPTURAS, 'calificacion-dialogo-390x844'));
-      medidos.push('en 390 px la capa entra sin desbordar');
-    } else {
-      capturas.push(await guardarCaptura(angosto.page, CAPTURAS, 'calificacion-dialogo-390x844'));
-      medidos.push('en 390 px se midió la lista sin botón: la única orden entregada ya está calificada');
-    }
-    await angosto.contexto.close();
   } finally {
     await browser.close();
   }
