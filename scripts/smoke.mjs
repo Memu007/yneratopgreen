@@ -12900,7 +12900,8 @@ await runCase(125, 'Servicios muestra publicaciones reales de servicio y logíst
 
   return 'Servicios no tiene video, ni lista escrita a mano, ni claims de IA, satélites, IoT o '
     + 'sustentabilidad; el hero usa el derivado interino autorizado; las publicaciones son '
-    + 'servicios o logística de la base y no ganan foto; «Ver servicios publicados» deja el '
+    + 'servicios o logística de la base y usan foto local del catálogo o el respaldo honesto, '
+    + 'sin imágenes externas ni al azar; «Ver servicios publicados» deja el '
     + 'filtro puesto y el error tiene su propio texto';
 });
 
