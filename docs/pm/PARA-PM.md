@@ -2,6 +2,114 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## TEST-SUITE-164S — la puerta deja de nacer rota
+
+**Resultado: 163/164, y el único rojo es el 131 ambiental.**
+
+- Arnés: `6d20ecf` y `4319623` (sólo `scripts/smoke.mjs`)
+- **En mi rama, no en `main`.** No integré, no desplegué, no ejecuté seed contra
+  Railway y no toqué datos remotos, pagos ni secretos. No abrí un caso 165 ni
+  toqué `src/`, `backend/`, migraciones, seed ni contratos.
+
+---
+
+### 1. Ninguno de los seis era una rotura de producto
+
+Reproduje cada rojo aislado antes de tocarlo, y en cinco de los seis el aislado
+falló distinto que dentro de la suite. Ese contraste es lo que dio el
+diagnóstico:
+
+| caso | aislado | dentro del orden completo |
+|---|---|---|
+| 21 | `Cannot read properties of undefined (reading 'name')` | espera de locator |
+| 54 | `DELETE /cart` HTTP 401 | espera de locator |
+| 57 | `DELETE /cart` HTTP 401 | espera de locator |
+| 125 | la tarjeta dibuja una imagen | la tarjeta dibuja una imagen |
+| 157 | espera de locator | espera de locator |
+| 162 | **pasa** | «sólo 0 tarjetas resolvieron una foto» |
+
+### 2. Qué encontré, uno por uno
+
+**21 — dos problemas, uno adentro del otro.** Usaba el producto que deja el caso
+6, así que aislado moría con un `undefined` que no señalaba a nada. Al darle
+estado propio apareció el de fondo: desde `CATALOG-PHOTOS-1` el catálogo le
+resuelve foto a los 30 slugs del seed, y este caso mide justamente el cartel
+«Sin registro fotográfico». Estaba midiendo sobre material que dejó de servir.
+Y el otro tramo intercepta `/uploads/**` cuando las fotos demostrativas se
+sirven desde `/catalogo/`: rompía algo que ya no existía. Ahora fabrica dos
+publicaciones propias —una sin imágenes, otra con una foto subida de verdad— y
+las borra al terminar.
+
+**54, 57 y 157 — rastros de mi propio `ACCOUNT-PAGE-1`.** Buscaban Mi cuenta
+como `[class*="overlay"]` y como `getByRole('dialog', { name: 'Mi cuenta' })`.
+Yo la convertí en página; esos locators quedaron apuntando a algo que ya no
+existe. Ahora se la pide por lo que es: `main[aria-labelledby="cuenta-titulo"]`.
+Lo digo así de directo porque es mío: la tarea de Mi cuenta no corrió suite
+completa, y esto es lo que costó.
+
+54 y 57 además morían en `DELETE /cart` con un 401 que parecía un problema de
+permisos y era, simplemente, no haber ingresado.
+
+**157 — se ensuciaba a sí mismo.** Afirma que la cuenta de prueba arranca sin
+publicaciones, y el propio caso le publica una. Bastaba con haberlo corrido una
+vez para que la siguiente arrancara roja. Ahora limpia lo que dejó una corrida
+anterior, y el mensaje distingue eso de que el seed le siembre historia —que
+sería otra cosa y sí importaría—.
+
+**125 — una regla derogada por tu propia entrega.** Afirmaba que la tarjeta de
+un servicio no dibuja ninguna imagen. El paquete de 30 fotos que entregaste
+incluye servicios: «Instalación y Reparación de Alambrados Rurales» es uno, y
+está en tu inventario. Así que la regla vieja y tu entrega no podían ser las dos
+verdad. Conservé lo que sigue en pie y ajusté lo que no.
+
+Y acá me equivoqué una vez: la dejé demasiado estricta, exigiendo que toda
+imagen fuera del catálogo demostrativo. La suite completa lo encontró con un
+servicio fabricado por otro caso que dibuja `/estados/no-photo.svg` —el respaldo
+honesto, que es lo correcto—. Corregido en `4319623`: valen dos cosas y sólo
+dos, y se sigue prohibiendo lo que motivó el caso, que es una imagen traída de
+afuera al lado de un precio real.
+
+**162 — no se rompía.** Para cuando le toca, 161 casos ya publicaron, pausaron y
+borraron, y la primera página del Mercado está llena de publicaciones fabricadas
+por ellos. Ahora devuelve al aire las 30 que mide, aparta el resto **mientras
+mide**, y en el `finally` restaura fila por fila el estado exacto que cada una
+tenía —no uno supuesto—. La publicación ajena que el propio caso crea queda
+afuera del barrido: es parte de lo que mide. La verificación 1:1 de activos y la
+prioridad de la foto real del vendedor quedan intactas.
+
+### 3. El 131: la condición exacta, sin simular nada
+
+No lo toqué. La receta corre dentro de `alpine:3` y necesita `docker run`. En
+este entorno no hay demonio Docker: el `docker` del `PATH` es el puente que
+instala `scripts/entorno_nativo.sh`, y en su línea 94 dice literalmente
+
+```
+puente docker: sólo se traduce 'docker exec'; 'run --rm ...' no tiene equivalente
+```
+
+Lo reproduje a mano fuera de la suite: `docker run --rm alpine:3 echo hola`
+devuelve ese mismo mensaje. Es la incompatibilidad ambiental ya documentada. No
+cambié producto ni fabriqué un verde.
+
+### 4. Además: una preparación compartida
+
+`asegurarSesiones` y `asegurarProducto`, idempotentes. Si el estado ya está
+—corrida completa— no tocan nada y el orden sigue siendo el mismo; si no está,
+lo arman con las cuentas públicas del seed. No reemplazan a los casos que
+construyen ese estado: los suplen cuando no corrieron.
+
+### 5. Puertas
+
+- **Suite completa desde base limpia: 163/164, salida 1.** Único rojo: 131.
+- `node --check` y `diff-check`, verdes.
+- Sin lint, TypeScript, Backend, a11y, contraste ni capturas: no hay producto.
+
+Una nota de método: la primera suite dio 162/164 y la corregí; ésta es la que
+informo. Y en el medio el contenedor se reinició con la corrida en 138/164, así
+que la volví a largar entera en vez de dar por bueno un tramo.
+
+---
+
 ## ADMIN-SAFETY-1R — el resumen cierra, la capa aguanta, y se retira lo que no tiene efecto
 
 **Resultado: corregido, las cuatro.**
