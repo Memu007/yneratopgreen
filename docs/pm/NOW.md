@@ -75,11 +75,15 @@ Actualizado: 2026-09-10.
   `/private/tmp/topgreen-pm-admin-160r.log`; un intento anterior que murió por
   `EPERM` antes del smoke no cuenta. Evidencia en
   `REPRODUCCION-ADMIN-TRUTH-1-2026-09-09.md`.
-- **Única tarea activa y responsable:** `RATING-UX-1`, Dev. Estrellas visibles
-  y accesibles, elegibilidad de calificación persistida por servidor y selector
-  dentro de la capa común. Reutiliza `/ratings/order/{order_id}/can-rate`,
-  `useCapaModal` y radios nativos; no abre Backend ni rediseño. Caso 165,
-  focales 149+150 y una suite completa Dev. Contrato en `PARA-DEV.md`.
+- **RATING-UX-1 devuelta como `RATING-UX-1R`:** producto/regresión `96ac68b` +
+  `08256c8`, informe `50d4875`. Dev informó focales 149+150+165 en **3/3** dos
+  veces y suite **164/165**, con único rojo 131 ambiental. PM revisó el diff y
+  reprodujo 165 desde base limpia en **1/1**. El producto está dentro del
+  alcance, pero el caso no retiene el POST ni fuerza su error y la supuesta
+  captura móvil del diálogo muestra la lista cargando. La única tarea activa y
+  responsable sigue en Dev: corregir sólo el 165 y repetirlo, sin suite ni
+  producto salvo rojo real. Contrato en `PARA-DEV.md`; evidencia en
+  `REPRODUCCION-RATING-UX-1-2026-09-10.md`.
 - **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
   `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
   y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como
