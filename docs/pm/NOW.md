@@ -4,13 +4,13 @@ Actualizado: 2026-09-10.
 
 ## Estado inmediato — 2026-09-10
 
-- **TEST-SUITE-164S devuelta como `TEST-SUITE-164SR`:** arnés `6d20ecf` +
-  `4319623`, informe `819cead`. Dev obtuvo suite completa **163/164**, con único
-  rojo 131 ambiental. PM revisó el diff y reprodujo 21+54+57+125+157+162 desde
-  base limpia en **6/6**; sintaxis y `diff-check` verdes. Falta sólo corregir la
-  salida del 125, que todavía afirma que los servicios «no ganan foto» aunque
-  ahora acepta correctamente foto local del catálogo o fallback. No se repite
-  Docker ni suite. Evidencia en
+- **TEST-SUITE-164SR aceptada:** arnés `6d20ecf` + `4319623`, informe `819cead`,
+  corrección `4182275` e informe `f6cade7`, todos en rama Dev. Dev obtuvo suite
+  completa **163/164**, con único rojo 131 ambiental. PM revisó el delta y
+  reprodujo 21+54+57+125+157+162 desde base limpia en **6/6**; sintaxis y
+  `diff-check` verdes. La corrección final cambia sólo la frase obsoleta del
+  125 y Dev ejecutó las dos puertas estáticas pedidas; no se repitió Docker ni
+  se atribuye una suite PM 164/164. Evidencia en
   `REPRODUCCION-TEST-SUITE-164S-2026-09-10.md`.
 
 - **ADMIN-SAFETY-1R aceptada:** base producto/regresión `79f3219`, informe
@@ -75,10 +75,11 @@ Actualizado: 2026-09-10.
   `/private/tmp/topgreen-pm-admin-160r.log`; un intento anterior que murió por
   `EPERM` antes del smoke no cuenta. Evidencia en
   `REPRODUCCION-ADMIN-TRUTH-1-2026-09-09.md`.
-- **Única tarea activa y responsable:** `TEST-SUITE-164SR`, Dev. Corrección de
-  una sola frase de salida del caso 125; sin comportamiento ni pruebas Docker.
-  Después de verificar el diff, PM podrá restaurar la puerta y activar
-  `RATING-UX-1`. Contrato en `PARA-DEV.md`.
+- **Única tarea activa y responsable:** `RATING-UX-1`, Dev. Estrellas visibles
+  y accesibles, elegibilidad de calificación persistida por servidor y selector
+  dentro de la capa común. Reutiliza `/ratings/order/{order_id}/can-rate`,
+  `useCapaModal` y radios nativos; no abre Backend ni rediseño. Caso 165,
+  focales 149+150 y una suite completa Dev. Contrato en `PARA-DEV.md`.
 - **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
   `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
   y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como
