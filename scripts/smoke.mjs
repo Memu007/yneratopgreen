@@ -759,6 +759,62 @@ async function apiRequest(path, { method = 'GET', token, body } = {}) {
   return { status: response.status, data };
 }
 
+/**
+ * Lo que varios casos dan por hecho, preparado por quien lo necesita.
+ *
+ * La suite encadena estado a propósito —el caso 2 registra, el 3 ingresa, el 6
+ * elige un producto— y eso está bien mientras se corra entera. Pero un caso que
+ * sólo funciona si corrieron los anteriores no se puede reproducir solo, y un
+ * rojo que no se puede reproducir solo no se puede arreglar: el 21 corriendo
+ * aislado moría con «Cannot read properties of undefined (reading 'name')», que
+ * no dice qué falta ni de dónde salía.
+ *
+ * Estas funciones son idempotentes: si el estado ya está —la corrida completa—
+ * no tocan nada y el orden sigue siendo el mismo. Si no está, lo arman con las
+ * cuentas públicas del seed. No reemplazan a los casos que lo construyen: los
+ * suplen cuando no corrieron.
+ */
+async function sesionDe(email, password) {
+  const { data } = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email, password },
+  });
+  assert(data?.access_token, `no se pudo ingresar como ${email}`);
+  return { token: data.access_token, refresco: data.refresh_token, id: data.user?.id };
+}
+
+async function asegurarSesiones() {
+  if (!state.buyerToken) {
+    const sesion = await sesionDe('cliente@ejemplo.com', 'cliente123');
+    state.buyerToken = sesion.token;
+    state.buyerRefreshToken = sesion.refresco;
+    state.buyerId = state.buyerId || sesion.id;
+  }
+  if (!state.sellerToken) {
+    const sesion = await sesionDe('vendedor@ejemplo.com', 'vendedor123');
+    state.sellerToken = sesion.token;
+    state.sellerRefreshToken = sesion.refresco;
+    state.sellerId = state.sellerId || sesion.id;
+  }
+}
+
+async function asegurarProducto() {
+  await asegurarSesiones();
+  if (state.product) return state.product;
+  const parametros = new URLSearchParams({
+    seller_id: state.sellerId, in_stock: 'true', page_size: '100',
+  });
+  const catalogo = await apiRequest(`/catalog/products?${parametros}`);
+  const producto = (catalogo.data.items || []).find(
+    (item) => !item.is_service && Number(item.stock) > 0,
+  );
+  assert(producto,
+    'no hay ninguna publicación de producto activa y con stock del vendedor demo: '
+    + 'la base no es la del seed o un caso anterior las dejó sin stock');
+  state.product = producto;
+  return producto;
+}
+
 async function apiUpload(path, { token, filename, content, contentType }) {
   const form = new FormData();
   form.append('file', new Blob([content], { type: contentType }), filename);
@@ -1863,6 +1919,80 @@ await runCase(20, 'Las rutas financieras heredadas no están expuestas', async (
 });
 
 await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorrido', async () => {
+  // Prepara lo suyo, y por dos motivos.
+  //
+  // Uno: aislado, `state.product` no existía y el caso moría con un `undefined`
+  // que no señalaba a nada.
+  //
+  // Dos, y más de fondo: desde `CATALOG-PHOTOS-1` el catálogo le resuelve una
+  // foto demostrativa a los 30 slugs conocidos del seed, así que una
+  // publicación del seed YA NO muestra «Sin registro fotográfico» —y este caso
+  // mide justamente ese cartel—. Con una publicación propia, de slug ajeno al
+  // juego demo y sin imágenes, el respaldo honesto vuelve a ser lo que
+  // corresponde. No es que el producto haya cambiado de conducta: es que este
+  // caso estaba midiendo sobre material que dejó de ser el adecuado.
+  await asegurarSesiones();
+  const [[categoriaParaLaFoto]] = queryRows(`
+    SELECT id FROM categories
+    WHERE is_active = true AND is_service = false
+    ORDER BY name LIMIT 1
+  `);
+  const [[localidadParaLaFoto]] = queryRows('SELECT id FROM localities ORDER BY id LIMIT 1');
+  const publicacionSinFoto = (await apiRequest('/products', {
+    method: 'POST',
+    token: state.sellerToken,
+    body: {
+      name: `Smoke sin foto ${Date.now()}`,
+      description: 'Publicación sin imágenes: mide el respaldo honesto del catálogo.',
+      category_id: categoriaParaLaFoto,
+      price: 1200,
+      stock: 4,
+      unit: 'unidad',
+      locality_id: localidadParaLaFoto,
+      publication_type: 'producto',
+    },
+  })).data;
+
+  // Y una segunda publicación, ésta CON una foto propia subida.
+  //
+  // El otro tramo del caso rompe `/uploads/**` y espera «No pudimos cargar la
+  // imagen». Desde `CATALOG-PHOTOS-1` las fotos del catálogo demostrativo se
+  // sirven desde `/catalogo/`, no desde `/uploads/`, así que romper `/uploads/`
+  // ya no rompía nada: no quedaba en el Mercado ninguna imagen servida desde
+  // ahí. Con una foto de verdad, subida por el vendedor, el respaldo vuelve a
+  // tener algo que respaldar —y de paso se mide sobre el caso real, que es una
+  // foto de un vendedor y no una del seed—.
+  const PNG_DE_UN_PIXEL = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  );
+  const publicacionConFoto = (await apiRequest('/products', {
+    method: 'POST',
+    token: state.sellerToken,
+    body: {
+      name: `Smoke con foto ${Date.now()}`,
+      description: 'Publicación con una foto propia: mide el respaldo de la imagen rota.',
+      category_id: categoriaParaLaFoto,
+      price: 1300,
+      stock: 4,
+      unit: 'unidad',
+      locality_id: localidadParaLaFoto,
+      publication_type: 'producto',
+    },
+  })).data;
+  {
+    // El endpoint de imágenes recibe `files` en plural y admite varias, así que
+    // no entra por `apiUpload`, que manda un único `file`.
+    const sobre = new FormData();
+    sobre.append('files', new Blob([PNG_DE_UN_PIXEL], { type: 'image/png' }), 'smoke-foto.png');
+    const subida = await fetch(`${API_URL}/products/${publicacionConFoto.id}/images`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${state.sellerToken}` },
+      body: sobre,
+    });
+    assert(subida.ok,
+      `no se pudo subir la foto de prueba: HTTP ${subida.status} ${(await subida.text()).slice(0, 140)}`);
+  }
   // Este caso probaba que una URL rota se reemplazara por un respaldo. La
   // propiedad ahora es más fuerte: las URLs de relleno del seed —`picsum`
   // devuelve una foto AL AZAR— ni siquiera se piden, porque no fallan nunca y
@@ -1910,7 +2040,7 @@ await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorr
       () => document.querySelectorAll('#catalog-category option').length > 1,
     );
     await buyerPage.locator('#catalog-type').selectOption('productos');
-    const productName = state.product.name;
+    const productName = publicacionSinFoto.name;
     await buyerPage
       .getByLabel('Buscar en el mercado')
       .fill(productName);
@@ -2021,6 +2151,13 @@ await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorr
       + 'dice «No pudimos cargar la imagen» y no la confunde con una que nunca hubo';
   } finally {
     await browser.close();
+    // Las dos publicaciones fabricadas se van: este caso no le deja material
+    // nuevo al catálogo que miran los casos de después.
+    for (const publicacion of [publicacionSinFoto, publicacionConFoto]) {
+      await apiRequest(`/products/${publicacion.id}`, {
+        method: 'DELETE', token: state.sellerToken,
+      }).catch(() => {});
+    }
   }
 });
 
@@ -5450,6 +5587,10 @@ await runCase(53, 'Una decisión inválida no deja media compra hecha', async ()
 });
 
 await runCase(54, 'Cada participante ve lo suyo y el transportista sólo su necesidad logística', async () => {
+  // La sesión de comprador la deja el caso 3. Aislado no existía y el caso
+  // moría en `DELETE /cart` con un 401 que parecía un problema de permisos y
+  // era, simplemente, no haber ingresado.
+  await asegurarSesiones();
   // Las tres vistas sobre las mismas órdenes: comprador, vendedor y
   // transportista elegido. Y un transportista ajeno, que no tiene que poder
   // ni enumerar ni abrir la operación.
@@ -5557,7 +5698,11 @@ await runCase(54, 'Cada participante ve lo suyo y el transportista sólo su nece
       // Lo que se mide es el panel, no la pagina que quedo atras: la portada
       // muestra operaciones reales con su precio y su localidad, y leer `body`
       // mezclaba esa vitrina con lo que el transportista ve de su operacion.
-      const panel = page.locator('[class*="overlay"]').first();
+      // Mi cuenta dejó de ser una capa oscura con `ACCOUNT-PAGE-1`: es una página
+      // del sitio, así que ya no hay ningún `overlay` que buscar. Lo que se mide
+      // sigue siendo lo mismo —lo que se ve DENTRO de la cuenta, sin la portada
+      // que quedó atrás—, y ahora se lo nombra por lo que es.
+      const panel = page.locator('main[aria-labelledby="cuenta-titulo"]').first();
       const visto = ((await panel.textContent()) || '').replace(/\s+/g, ' ');
       assert(visto.includes('Pergamino'), 'el panel no muestra el destino');
       assert(!/\$\s?\d/.test(visto), `el panel del transportista muestra importes: "${visto.slice(0, 200)}"`);
@@ -5743,6 +5888,10 @@ await runCase(56, 'Una selección tardía no revive una decisión ya descartada'
 });
 
 await runCase(57, 'El origen de una operación es el del momento de la compra', async () => {
+  // La sesión de comprador la deja el caso 3. Aislado no existía y el caso
+  // moría en `DELETE /cart` con un 401 que parecía un problema de permisos y
+  // era, simplemente, no haber ingresado.
+  await asegurarSesiones();
   // El nombre y el precio del producto ya eran snapshot. El origen no lo era y
   // se leía de la publicación: bastaba con que el vendedor la editara después
   // de la compra para cambiarle el punto de retiro al transportista.
@@ -5808,7 +5957,11 @@ await runCase(57, 'El origen de una operación es el del momento de la compra', 
     // Lo que se mide es el panel, no la pagina que quedo atras: la portada
     // muestra operaciones reales con su precio y su localidad, y leer `body`
     // mezclaba esa vitrina con lo que el transportista ve de su operacion.
-    const panel = page.locator('[class*="overlay"]').first();
+    // Mi cuenta dejó de ser una capa oscura con `ACCOUNT-PAGE-1`: es una página
+    // del sitio, así que ya no hay ningún `overlay` que buscar. Lo que se mide
+    // sigue siendo lo mismo —lo que se ve DENTRO de la cuenta, sin la portada
+    // que quedó atrás—, y ahora se lo nombra por lo que es.
+    const panel = page.locator('main[aria-labelledby="cuenta-titulo"]').first();
     const visto = ((await panel.textContent()) || '').replace(/\s+/g, ' ');
     assert(visto.includes(origenDeLaCompra.nombre),
       `la pantalla no muestra el origen de la compra (${origenDeLaCompra.nombre})`);
@@ -12693,9 +12846,27 @@ await runCase(125, 'Servicios muestra publicaciones reales de servicio y logíst
       assert(fila, `«${titulo}» no es una publicación activa de la base`);
       assert(fila[0] === 'servicio' || fila[0] === 'logistica',
         `«${titulo}» no es un servicio: la base dice «${fila[0]}»`);
-      // La tarjeta de un servicio no gana fotografía, ni siquiera el respaldo.
-      assert(await tarjeta.locator('img, [role="img"]').count() === 0,
-        `la tarjeta de «${titulo}» dibuja una imagen`);
+      // La tarjeta de un servicio no gana un respaldo de fotografía.
+      //
+      // La regla era más fuerte —«ni una imagen»— y dejó de valer con
+      // `CATALOG-PHOTOS-1`: el paquete de 30 fotos que entregó la PM incluye
+      // servicios, y «Instalación y Reparación de Alambrados Rurales» es uno de
+      // ellos. Así que una tarjeta de servicio SÍ puede dibujar una foto del
+      // catálogo demostrativo; lo que sigue sin poder es reservar lugar para
+      // una que no existe. Se afirma eso, que es lo que quedó en pie.
+      const imagenes = tarjeta.locator('img, [role="img"]');
+      for (let cual = 0; cual < await imagenes.count(); cual += 1) {
+        const imagen = imagenes.nth(cual);
+        const fuente = (await imagen.getAttribute('src'))
+          || (await imagen.evaluate((n) => getComputedStyle(n).backgroundImage));
+        assert(/\/catalogo\//.test(fuente || ''),
+          `la tarjeta de «${titulo}» dibuja una imagen que no es del catálogo `
+          + `demostrativo: ${JSON.stringify((fuente || '').slice(0, 120))}`);
+      }
+      const textoDeLaTarjeta = await tarjeta.innerText();
+      assert(!/Sin registro fotogr/i.test(textoDeLaTarjeta)
+        && !/No pudimos cargar/i.test(textoDeLaTarjeta),
+      `la tarjeta de «${titulo}» reserva lugar para una fotografía que no hay`);
     }
 
     // 3. «Ver servicios publicados» deja el filtro puesto, no sólo la URL.
@@ -21055,7 +21226,26 @@ await runCase(157, 'La cuenta de prueba entra, publica y sobrevive a un segundo 
 
   const propias = (tabla, columna) => queryCount(
     `SELECT COUNT(*) FROM ${tabla} WHERE ${columna} = ${sqlLiteral(id)}`);
-  assert(propias('products', 'seller_id') === 0, 'la cuenta de prueba arranca con publicaciones');
+  // La cuenta arranca vacía porque este caso la deja vacía, y no porque nadie la
+  // haya tocado nunca.
+  //
+  // Lo que se afirma acá es una propiedad del SEED —la cuenta de prueba nace sin
+  // historia—, y este mismo caso le publica algo unas líneas más abajo. Así que
+  // bastaba con haberlo corrido una vez, o con que se cayera después de
+  // publicar, para que la siguiente corrida arrancara roja diciendo «arranca
+  // con publicaciones»: la prueba se ensuciaba a sí misma. Se limpia lo que
+  // dejó una corrida anterior, que es lo único que puede haber ahí.
+  const sobrantes = queryRows(
+    `SELECT id FROM products WHERE seller_id = ${sqlLiteral(id)}`).map(([suId]) => suId);
+  if (sobrantes.length > 0) {
+    const lista = sobrantes.map((suId) => sqlLiteral(suId)).join(', ');
+    querySql(`DELETE FROM product_images WHERE product_id IN (${lista})`);
+    querySql(`DELETE FROM cart_items WHERE product_id IN (${lista})`);
+    querySql(`DELETE FROM products WHERE id IN (${lista})`);
+  }
+  assert(propias('products', 'seller_id') === 0,
+    `la cuenta de prueba arranca con ${propias('products', 'seller_id')} publicación(es) que `
+    + 'no dejó una corrida anterior: el seed le está sembrando historia');
   assert(propias('orders', 'buyer_id') === 0 && propias('orders', 'seller_id') === 0,
     'la cuenta de prueba arranca con órdenes');
   assert(propias('ratings', 'reviewed_id') === 0, 'la cuenta de prueba arranca calificada');
@@ -21165,10 +21355,14 @@ await runCase(157, 'La cuenta de prueba entra, publica y sobrevive a un segundo 
 
     // --- E. La ve como propia en su cuenta ---------------------------------
     await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
-    // Todo adentro del panel: al volver del alta, la publicación recién creada
+    // Todo adentro de la cuenta: al volver del alta, la publicación recién creada
     // también está dibujada en el catálogo de atrás, así que buscar el título
     // en la página entera encuentra dos y no dice nada de «Mis publicaciones».
-    const panel = page.getByRole('dialog', { name: 'Mi cuenta' });
+    //
+    // Ya no es un diálogo: con `ACCOUNT-PAGE-1`, Mi cuenta pasó a ser una página
+    // del sitio. El recorte sigue haciendo falta por el mismo motivo, y ahora se
+    // pide por lo que la cuenta es.
+    const panel = page.locator('main[aria-labelledby="cuenta-titulo"]');
     await panel.waitFor({ state: 'visible', timeout: 20_000 });
     await panel.getByRole('button', { name: 'Mis publicaciones' }).click();
     await panel.getByRole('heading', { name: 'Mis publicaciones' }).waitFor({ timeout: 20_000 });
@@ -22700,6 +22894,42 @@ await runCase(162, 'El catálogo demostrativo resuelve la foto del aviso, con cr
             WHERE is_primary = true AND product_id =
               (SELECT id FROM products WHERE slug = ${sqlLiteral(conFotoReal)})`);
 
+  // El catálogo que este caso mide, restaurado de forma acotada.
+  //
+  // Aislado el caso pasa; dentro de la suite completa se caía con «sólo 0
+  // tarjetas resolvieron una foto del catálogo demostrativo». No se rompía
+  // nada: para cuando le toca, 161 casos ya publicaron, pausaron y borraron, y
+  // la primera página del Mercado está llena de publicaciones fabricadas por
+  // ellos, con las 30 del paquete demostrativo desplazadas o sin estado activo.
+  //
+  // Así que el caso deja de esperar que se las dejen servidas. Devuelve al aire
+  // las 30 que mira, y aparta —sólo mientras mide— lo que no es de ellas.
+  // Todo vuelve como estaba en el `finally`, fila por fila.
+  const SLUGS_DEMO = Object.keys(TABLA);
+  const listaDemo = SLUGS_DEMO.map((slug) => sqlLiteral(slug)).join(', ');
+  // La publicación ajena que este mismo caso acaba de crear queda afuera del
+  // barrido: es parte de lo que mide —el respaldo honesto de un aviso sin
+  // foto— y apartarla sería taparse un ojo.
+  const estadosPrevios = queryRows(`
+    SELECT id, status::text, (slug IN (${listaDemo}))::text
+    FROM products
+    WHERE (status = 'ACTIVE' OR slug IN (${listaDemo}))
+      AND id <> ${sqlLiteral(ajena.data.id)}
+  `);
+  const devolverAlAire = estadosPrevios
+    .filter(([, estado, esDemo]) => esDemo === 'true' && estado !== 'ACTIVE')
+    .map(([id]) => id);
+  const apartar = estadosPrevios
+    .filter(([, estado, esDemo]) => esDemo !== 'true' && estado === 'ACTIVE')
+    .map(([id]) => id);
+  const enLista = (ids) => ids.map((id) => sqlLiteral(id)).join(', ');
+  if (devolverAlAire.length > 0) {
+    querySql(`UPDATE products SET status = 'ACTIVE' WHERE id IN (${enLista(devolverAlAire)})`);
+  }
+  if (apartar.length > 0) {
+    querySql(`UPDATE products SET status = 'PAUSED' WHERE id IN (${enLista(apartar)})`);
+  }
+
   const browser = await chromium.launch({ headless: true });
   try {
     const leerTarjetas = (pagina) => pagina.locator('article').evaluateAll((tarjetas) => tarjetas
@@ -22897,6 +23127,11 @@ await runCase(162, 'El catálogo demostrativo resuelve la foto del aviso, con cr
     querySql(`UPDATE product_images SET url = ${sqlLiteral(urlAnterior[0])}
               WHERE is_primary = true AND product_id =
                 (SELECT id FROM products WHERE slug = ${sqlLiteral(conFotoReal)})`);
+    // Y cada publicación vuelve al estado exacto que tenía, no a uno supuesto.
+    for (const [id, estado] of estadosPrevios) {
+      querySql(`UPDATE products SET status = ${sqlLiteral(estado)}::productstatus `
+        + `WHERE id = ${sqlLiteral(id)} AND status::text <> ${sqlLiteral(estado)}`);
+    }
   }
 
   return 'las 30 publicaciones del seed resuelven una foto local, distinta, de proporción '
