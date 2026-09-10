@@ -12,6 +12,55 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-09 — DEVOLUCIÓN: ADMIN-SAFETY-1R, el caso nuevo no determina la salida
+
+Revisé producto/regresión `79f3219` e informe `c26db85`. El alcance general está
+bien encaminado y no se rehace: Provincias legado quedó fuera de Configuración,
+la guarda real se ubicó en subcategorías, las seis familias usan una capa común
+y el reset manual funciona. PM ejecutó el 164 desde base Docker limpia; el
+recorrido imprimió `[PASS]`, pero el resumen dio **0/1**. Evidencia en
+`REPRODUCCION-ADMIN-SAFETY-1-2026-09-09.md`.
+
+Hay cuatro correcciones acotadas.
+
+1. Mové la ejecución del 164 antes del cálculo de `passed`/`failed` y del
+   resumen. Demostrá ambos sentidos: rompiendo temporalmente una condición del
+   propio 164 debe resumir 0/1 y salir distinto de cero; restaurado debe resumir
+   1/1 y salir cero. En la suite, el total y la lista de rojos deben cerrar
+   aritméticamente.
+2. Mientras `enCurso=true`, Escape tampoco puede cancelar ni desmontar
+   `Confirmacion`. Botones y fondo ya están cubiertos; pasale a `useCapaModal`
+   un cierre que respete el mismo estado. En el 164 retené una mutación después
+   de confirmar y probá que Escape, fondo, X y Cancelar no cierran, no duplican
+   y no hacen creer que se canceló; al liberar la respuesta, éxito o error debe
+   quedar visible.
+3. Tu medición decidió el borde de categoría: `is_active=false` se guarda, pero
+   no cambia catálogo, filtro ni detalle. Retirá **sólo de la UI** el selector
+   Estado y dejá de enviar `is_active` al editar una categoría. Conservá campo,
+   API y datos por compatibilidad, igual que en Provincias. El 164 debe comprobar
+   que el panel no ofrece esa acción sin efecto. La guarda de subcategoría se
+   conserva; no cambies ahora la semántica pública de categorías.
+4. El reset no fuerza rotación ni hay interfaz para cambiar contraseña al
+   ingresar. Renombrá el resultado y acciones como **nueva contraseña**, no
+   temporal, y explicá que queda vigente hasta que un administrador la
+   restablezca otra vez. Retirá «pedile que la cambie al entrar». No agregues
+   cambio de clave, migración, correo, token ni recuperación automática.
+
+Fortalecé el 164 sin convertirlo en otra megaprueba: además del cambio de rol,
+recorré cancelación sin escritura en activación de cuenta y estado de
+publicación; para los tres borrados alcanza la capa común más la comprobación
+estática de que no queda `window.confirm`. Conservá la verificación real del
+reset sin imprimir la clave.
+
+Corré 149, 150 y 164 aislados. Después, una sola suite completa desde base
+limpia: informá total exacto y cada rojo; si reaparecen únicamente los heredados,
+no los corrijas ni repitas la suite. Sumá lint, `node --check`, `compileall`,
+`pip check` representativo y `diff-check`; el smoke incluye build. No abras
+otros casos, a11y o contraste totales.
+
+Entregá corrección e informe separados en tu rama y frená. No integres a
+`main`, no despliegues y no toques Railway, datos remotos, pagos o secretos.
+
 ## 2026-09-09 — CIERRE: ACCOUNT-PAGE-1R aceptada; activar ADMIN-SAFETY-1
 
 Aceptados base producto/regresión `7dc1d53`, informe `968efbc`, corrección
