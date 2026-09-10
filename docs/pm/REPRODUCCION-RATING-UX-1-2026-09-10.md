@@ -2,8 +2,7 @@
 
 ## Resultado
 
-Devuelta como `RATING-UX-1R` por evidencia incompleta del caso 165; no por un
-defecto de producto reproducido.
+Aceptada tras `RATING-UX-1R`.
 
 - Producto/regresión Dev: `96ac68b` y `08256c8`.
 - Informe Dev: `50d4875`.
@@ -15,6 +14,10 @@ defecto de producto reproducido.
 - Capturas inspeccionadas en
   `/private/tmp/topgreen-pm-rating-165-capturas/`.
 - No hubo suite completa PM.
+- Corrección Dev `c88b7ea` e informe `263a88a`: sólo arnés. PM reprodujo el
+  165 corregido desde otra base Docker limpia en **1/1**, salida 0. Log:
+  `/private/tmp/topgreen-pm-rating-165r.log`; capturas:
+  `/private/tmp/topgreen-pm-rating-165r-capturas/`.
 
 ## Producto conforme hasta esta puerta
 
@@ -30,7 +33,7 @@ defecto de producto reproducido.
   descripción accesible; el estado sin calificaciones sigue siendo explícito.
 - No hay cambios de Backend, contratos, migraciones ni dependencias.
 
-## Tres afirmaciones todavía no medidas
+## Huecos detectados en la entrega base
 
 1. La captura `calificacion-dialogo-390x844.png` no contiene un diálogo. La
    propia salida del caso dice «en 390 px se midió la lista sin botón» y la
@@ -43,6 +46,19 @@ defecto de producto reproducido.
    los valores sobrevivan, que el error quede visible ni que un reintento
    deliberado produzca una sola fila.
 
-La corrección queda limitada al arnés. Como el producto no cambia, no se
-repiten suite, focales vecinos ni puertas totales. PM reproducirá sólo el 165
-corregido y revisará sus tres capturas.
+## Corrección cerrada
+
+`c88b7ea` eliminó el fallback que fabricaba una captura móvil y abre la capa
+real sobre la orden propia antes de calificar. El caso exige nombre visible,
+ancho contenido y ausencia de desborde a 390 px; PM inspeccionó la captura y la
+capa aparece completa con cinco estrellas, comentario y acciones.
+
+También retiene el primer POST: Escape y fondo no cierran ni abren la pregunta
+de salida, los tres controles quedan deshabilitados y no sale otra solicitud.
+El fallo controlado deja alerta, puntaje y comentario; el reintento real termina
+con dos intentos deliberados y una única fila. Luego conserva el veredicto del
+servidor y la ausencia del botón tras recargar.
+
+La evidencia final combina la suite Dev **164/165**, con único rojo 131
+ambiental, y dos ejecuciones focales independientes PM del 165 en **1/1** cada
+una. No se declara suite completa PM 165/165.
