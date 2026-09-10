@@ -156,7 +156,7 @@ anatomías ni el detalle. Su contrato completo y la evidencia de raíz están en
 
 | Orden | Pieza | Auditoría cubierta | Cierre mínimo |
 |---:|---|---|---|
-| 16 | **QUOTE-CONTACT-1 — activa** | A4 y A5 | Contacto no afirma un envío que no conoce y una cotización conserva publicación/vendedor en asunto y texto. |
+| 16 | **QUOTE-CONTACT-1R — devuelta** | A4 y A5 | Base `612b57f`/`9493ba0`: Dev 165/166 y PM 166 en 1/1, pero el verde no exige publicación/vendedor en el asunto, deja pasar «se abrió» por un falso negativo Unicode y no distingue títulos duplicados. |
 | 17 | **FILTER-INTENT-1** | A6, A9 y, si se reproduce, R6 | Filtros URL inválidos no simulan cero resultados; Login retoma publicar/comprar con la puerta existente. |
 | 18 | **COPY-CLEAR-1** | A7, A10, F4 y F12; deuda ADMIN-STATE-1 | Emi decide wordmark→Inicio; Buscar hace algo real o desaparece; se retiran planes inexistentes, se unifica voseo, se informa soporte sin prometer recuperación automática y los estados visibles quedan en es-AR sin ramas `draft` muertas. |
 

@@ -12,6 +12,52 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-10 — DEVOLUCIÓN: QUOTE-CONTACT-1R, el 166 da verde sin medir el contrato completo
+
+Revisé producto/regresión `612b57f` e informe `9493ba0`. El flujo base está
+dentro del alcance y Dev informó focales 125+147+155+166 en **4/4**, suite
+completa **165/166** con único rojo 131 ambiental, lint, sintaxis y
+`diff-check` verdes. PM reprodujo el 166 desde otra base Docker limpia en
+**1/1**, salida 0; el smoke incluyó build. Log válido:
+`/private/tmp/topgreen-pm-quote-166.log`. Una corrida anterior que no llegó a
+Playwright por `EPERM` no cuenta. Evidencia en
+`REPRODUCCION-QUOTE-CONTACT-1-2026-09-10.md`.
+
+El verde actual es insuficiente. Corregí sólo estos cuatro puntos sobre
+`612b57f`:
+
+1. **Asunto completo.** La publicación y el vendedor deben estar nombrados en
+   el asunto precargado visible y en el `subject` codificado del `mailto:`, no
+   sólo en el cuerpo. El 166 actual acepta el valor genérico `cotizacion` y
+   comprueba ambos nombres únicamente en el cuerpo, contradiciendo el contrato.
+2. **Ayuda neutral de verdad.** Retirá «Preparamos el mensaje en tu aplicación
+   de correo» y «Si no se abrió»: no sabemos qué hizo el cliente local y la
+   única ayuda admitida es indicar que revise y envíe desde su aplicación. El
+   arnés usa `\bse abrió\b`; ese borde no reconoce la `ó` final y deja pasar
+   literalmente la frase que dice prohibir. Usá comparación textual exacta o
+   una aserción que no dependa de `\b` junto a caracteres acentuados.
+3. **Identidad estable.** La intención y la clave de remontaje no pueden
+   identificar una publicación sólo por su nombre. Dos publicaciones pueden
+   compartir título: al pasar de una a otra, la segunda debe reemplazar
+   publicación y vendedor aunque el texto visible coincida. Conservá el ID
+   interno para esa identidad; no hace falta mostrarlo en el mensaje.
+4. **Diff revisable.** Restaurá los finales de línea originales de
+   `src/types/index.ts`: el cambio semántico allí es pequeño, pero el commit
+   actual presenta casi todo el archivo como reemplazado.
+
+Extendé el 166 para exigir los nombres en asunto visible y `mailto:`, detectar
+las frases anteriores sin el falso negativo Unicode y cambiar entre dos
+publicaciones con igual nombre pero identidad/vendedor distintos. Conservá las
+comprobaciones ya verdes: tarjeta y detalle, Contacto genérico, un solo
+`mailto:`, valores intactos, WhatsApp y cero `POST /contact`.
+
+Producto/regresión en un commit e informe separado. Corré únicamente el 166
+desde base limpia, lint, `node --check` y `diff-check`; el smoke incluye build.
+No repitas 125, 147, 155 ni suite completa: la evidencia de base ya alcanza y
+la corrección es focal. Sin Backend, API, dependencia, rediseño, capturas,
+Railway, datos remotos, pagos o secretos. No integres a `main`; frená al
+entregar.
+
 ## 2026-09-10 — CIERRE: RATING-UX-1R aceptada; activar QUOTE-CONTACT-1
 
 Aceptados producto/regresión `96ac68b` + `08256c8`, informe `50d4875`,
