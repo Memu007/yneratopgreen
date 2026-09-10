@@ -2,6 +2,34 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## TEST-SUITE-164SR — la frase de salida del 125
+
+**Resultado: corregido.**
+
+- Arnés: `4182275`
+- **En mi rama, no en `main`.** No toqué producto, no integré, no desplegué.
+
+---
+
+Tenías razón y era exactamente una línea. El caso 125 ya aceptaba foto local de
+`/catalogo/` o el respaldo honesto de `/estados/no-photo.svg`, y seguía
+anunciando en su salida verde que las publicaciones de servicio «no ganan foto».
+Describía lo que el caso dejó de medir.
+
+Importa más de lo que parece: quien lee ese verde se lleva una regla que
+`CATALOG-PHOTOS-1` derogó. Un informe que dice otra cosa que la prueba vale
+menos que no informar.
+
+Ahora dice que usan foto local del catálogo o el respaldo honesto, sin imágenes
+externas ni al azar, que es lo que la prueba comprueba.
+
+**Sólo esa frase.** El diff es de dos líneas y no toca ninguna comprobación.
+
+Corrí únicamente lo que pediste: `node --check` y `diff-check`, los dos verdes.
+No repetí smoke, suite, build, lint, Backend, a11y, contraste ni capturas.
+
+---
+
 ## TEST-SUITE-164S — la puerta deja de nacer rota
 
 **Resultado: 163/164, y el único rojo es el 131 ambiental.**
