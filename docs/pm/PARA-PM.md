@@ -2,6 +2,119 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## RATING-UX-1 — la reputación se ve y calificar es una decisión operable
+
+**Resultado: terminado. Suite completa 164/165, único rojo el 131 ambiental.**
+
+- Producto/regresión: `96ac68b`, más `08256c8` (el caso, ver punto 6)
+- La suite pasa a **165 casos**.
+- **En mi rama, no en `main`.** No integré, no desplegué, no ejecuté seed contra
+  Railway y no toqué datos remotos, pagos ni secretos. **No toqué Backend**: el
+  endpoint existente alcanzó.
+
+---
+
+### 1. Los tres defectos, medidos rojos primero
+
+Contra `4182275`:
+
+1. **`la reputación no dibuja ninguna estrella: "5.0"`** — `''.repeat(n)` es una
+   cadena **vacía** repetida. La reputación se anunciaba con un número suelto al
+   lado de un hueco.
+2. **`el selector tiene 0 controles y tienen que ser 5 radios`** — eran cinco
+   `span` con `onClick`. Un `span` no recibe foco, no tiene estado y no se
+   anuncia: elegir cuántas estrellas darle a alguien era imposible sin mouse.
+3. **`después de recargar, «Calificar vendedor» volvió a aparecer`** — el
+   veredicto vivía en un `Set` en memoria que se iba con el montaje.
+
+### 2. El identificador: una medición que cambia el diagnóstico
+
+Antes de escribir nada probé los dos identificadores contra el servidor:
+
+| | `can-rate` | `POST /ratings` |
+|---|---|---|
+| UUID (`orderId`) | 200, `can_rate: true` | 200 |
+| número visible (`order_number`) | **404 «Orden no encontrada»** | **200** |
+
+O sea: el POST acepta el número y lo resuelve solo —por eso calificar funcionaba
+igual, con el identificador equivocado—, pero `can-rate` **no**. Preguntar con
+`order.id`, que es el número visible, habría escondido el botón siempre y por el
+motivo equivocado. Va con el UUID, y el caso 165 lo fija: exige que el número
+visible siga dando 404, para que el día que eso cambie la prueba avise en vez de
+dejar de distinguir.
+
+### 3. Lo que hace ahora
+
+**Perfil.** Cinco estrellas y **una sola** descripción accesible —«X de 5, N
+calificaciones»—. El dibujo y el número quedan marcados como decorativos: sin
+eso el mismo dato se diría tres veces. Sin calificaciones, el estado vacío
+honesto se conserva.
+
+**Elegibilidad.** Se consulta `/ratings/order/{uuid}/can-rate` en paralelo para
+las órdenes entregadas. `'error'` **no es** `'no'`: si la consulta falla no se
+sabe, y no se ofrece una acción cuya elegibilidad se desconoce —se dice que no
+se pudo comprobar y se ofrece reintentar—. Después de enviar se vuelve a
+preguntar al servidor, que es lo que sobrevive a recargar.
+
+**Selector y capa.** Cinco radios nativos con nombre de grupo dentro de un
+`fieldset` con `legend`: las flechas, la selección y el anuncio los hace el
+navegador. La capa tiene `role="dialog"`, nombre y descripción, `useCapaModal`
+—foco contenido y devuelto, Escape—, fondo y X equivalentes a Cancelar, y todas
+las salidas pasan por `FORM-DIRTY-1`. Mientras el envío viaja no cierra por
+ninguna vía ni duplica el POST, y el error queda visible **en la capa**, no sólo
+en un aviso que se va solo. Puntaje inicial 5 y comentario máximo 500,
+conservados.
+
+### 4. Un error visual que encontré mirando la captura
+
+La primera versión pintaba de color sólo la estrella elegida, así que «3 de 5»
+mostraba dos estrellas llenas apagadas y una dorada: se leía como si las dos
+primeras valieran menos. Ahora se pinta la elegida y todas las anteriores, que
+son las que se dibujan llenas.
+
+### 5. Lo verde, y lo que exige
+
+Orden entregada fabricada por el caso; el botón aparece; la capa tiene nombre;
+el foco entra y diez tabulaciones no se escapan; cinco radios con nombre de
+grupo, puntaje inicial 5 y flechas que mueven la elección; con el puntaje
+cambiado Escape pregunta y **seguir editando conserva lo elegido**; descartar
+cierra una vez y devuelve el foco al botón que abrió; **sin cambios cierra
+directo**; enviar manda **una** sola calificación y la base la registra con su
+puntaje; el servidor pasa a decir `can_rate: false`; **recargada la página el
+botón no vuelve**; con la consulta caída no se ofrece calificar y el reintento
+resuelve. Tres capturas: perfil y diálogo en 1440×900 y diálogo en 390×844.
+
+### 6. Tres agujeros en mi propio caso, y son míos
+
+El 165 pasó aislado y falló acompañado **tres veces**, cada una por un motivo
+distinto. Lo anoto entero porque es el patrón, no el incidente:
+
+1. Afirmaba «no hay botón de calificar» y «no queda nada sin saber» mirando
+   **toda la pantalla**. Otros casos dejan más compras entregadas que muestran
+   ese botón con todo derecho.
+2. Reintentaba **una sola** orden de varias en estado desconocido.
+3. Y armaba la orden con los ayudantes compartidos, que leen el carrito por
+   `state.buyerId` —que en la suite completa ya no es el mismo comprador que
+   `state.buyerToken`, porque otros casos lo reasignan—. Checkout con HTTP 400,
+   «Falta decidir cómo se traslada el pedido».
+
+Los tres tenían la misma raíz: dar por hecho un estado que no fabriqué. Ahora el
+caso se hace su publicación, su orden y sus decisiones de traslado, y acota cada
+afirmación a lo suyo. Después de eso: **dos corridas del set focal desde base
+limpia, 3/3 las dos**, y la suite completa en 164/165.
+
+### 7. Puertas
+
+- **Suite completa desde base limpia: 164/165.** Único rojo, el **131**: sigue
+  necesitando `docker run` y este entorno sólo tiene el puente de `docker exec`.
+  Es la limitación ambiental de siempre; no la toqué ni la simulé.
+- Focales 149, 150 y 165 aislados: **3/3**, dos veces.
+- `lint`, `node --check`, `tsc` y `diff-check`, verdes. El smoke incluye build.
+- Sin a11y ni contraste totales —el 165 mide teclado, semántica, foco y las dos
+  anchuras— y sin `compileall` ni `pip check`, porque no toqué Backend.
+
+---
+
 ## TEST-SUITE-164SR — la frase de salida del 125
 
 **Resultado: corregido.**
