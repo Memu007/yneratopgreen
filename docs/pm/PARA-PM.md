@@ -2,6 +2,97 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## ADMIN-SAFETY-1R — el resumen cierra, la capa aguanta, y se retira lo que no tiene efecto
+
+**Resultado: corregido, las cuatro.**
+
+- Corrección: `871ce7b`
+- La suite sigue en **164 casos**.
+- **En mi rama, no en `main`.** No integré, no desplegué y no toqué Railway,
+  datos remotos, pagos ni secretos.
+
+---
+
+### 1. El resumen no cerraba, y eso invalida un número que te informé
+
+Tenías razón y es lo más grave de la entrega anterior. `passed` y `failed` se
+calculaban **antes** de que corriera el último caso: el 164 alcanzaba a
+imprimir su `[PASS]` y no entraba en la cuenta.
+
+Con un solo caso pedido daba «0/1 pasaron; 0 fallaron» —ni sumaba ni restaba—.
+Y en la suite entera el total quedaba corrido en uno: **el 156/164 que te
+informé estaba mal**. El número real de aquella corrida era 157.
+
+La cuenta pasa a hacerse después del último `runCase`. Los dos sentidos,
+medidos:
+
+| | resumen | salida |
+|---|---|---|
+| con una condición del 164 rota a propósito | `0/1 pasaron; 1 fallaron` | **1** |
+| restaurada | `1/1 pasaron; 0 fallaron` | **0** |
+
+Y en la suite completa la aritmética cierra: **157 + 7 = 164**.
+
+### 2. Escape con la mutación en vuelo
+
+También tenías razón, y era la peor de las cuatro salidas: la capa desaparecía
+mientras la solicitud seguía viajando, así que la pantalla decía «no pasó nada»
+y el cambio se aplicaba igual, sin que se viera ni el éxito ni el error. Los
+botones y el fondo ya lo respetaban porque miraban `enCurso`; el cierre que
+recibía `useCapaModal` no lo miraba. Ahora mira el mismo estado.
+
+El 164 lo prueba **reteniendo la respuesta** con `page.route`: confirmado el
+cambio y con el PATCH en vuelo, Escape, el fondo, la X y Cancelar no cierran la
+capa y no mandan ninguna solicitud más. Al soltar la respuesta, la capa se va
+sola y el éxito queda visible.
+
+Negativo: quitándole el `enCurso` al cierre, el caso dice *«con la mutación en
+vuelo, Escape cerró la capa: la pantalla diría que no pasó nada»*.
+
+### 3. El selector Estado de categoría
+
+Retirado de la UI, y `is_active` dejó de viajar al editar. Campo, API y datos
+quedan como están, igual que con Provincias. La guarda de subcategoría se
+conserva y la semántica pública de categorías no se toca.
+
+El 164 comprueba las dos cosas: que el panel ya no ofrezca el control, y que
+guardar una categoría mande **una** solicitud sin `is_active`. Negativo:
+volviendo a mandarlo, dice *«editar una categoría sigue mandando is_active»* y
+muestra el cuerpo.
+
+### 4. Nueva contraseña, no temporal
+
+Renombrado en la confirmación, en el resultado y en el código. El texto ahora
+dice que **queda vigente hasta que un administrador la restablezca otra vez**, y
+se fue «pedile que la cambie al entrar»: prometía un vencimiento que el producto
+no tiene. No agregué cambio de clave, migración, correo, token ni recuperación.
+
+El caso exige que la palabra «temporal» no aparezca en el resultado y que sí
+aparezca hasta cuándo rige.
+
+### 5. Lo que sumé al 164 sin agrandarlo
+
+Cancelación sin escritura en **activación de cuenta** y en **estado de
+publicación**, además del rol. Para los tres borrados, la capa común más la
+comprobación estática de que no quede `window.confirm`. La verificación real del
+reset sigue igual: la clave anterior deja de entrar, la nueva entra, y al cerrar
+no se recupera. Nunca se imprime.
+
+### 6. Puertas
+
+- **149, 150 y 164 aislados desde base limpia: 3/3.**
+- **Suite completa desde base limpia: 157/164**, con el 164 verde **dentro** de
+  la corrida completa.
+- `lint`, `node --check`, `tsc`, `compileall`, `pip check` y `diff-check`,
+  verdes. El smoke incluye build.
+
+Los **7 rojos son los mismos heredados** que ya te informé —21, 54, 57, 125,
+131, 157 (rojos en la base de entrada, medido corriéndolos sin mis cambios) y el
+162, que pasa aislado y se queda sin material dentro de la suite—. Como
+indicaste, no los corregí ni repetí la suite.
+
+---
+
 ## ADMIN-SAFETY-1 — el panel no escribe sobre datos ajenos sin preguntar
 
 **Resultado: entregado, con una devolución tuya adentro.**
