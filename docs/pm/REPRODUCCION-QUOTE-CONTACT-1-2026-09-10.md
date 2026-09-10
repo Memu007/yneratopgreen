@@ -2,7 +2,7 @@
 
 ## Resultado
 
-Devuelta como `QUOTE-CONTACT-1R`.
+Aceptada tras `QUOTE-CONTACT-1R`.
 
 - Producto/regresión Dev: `612b57f`.
 - Informe Dev: `9493ba0`.
@@ -14,6 +14,9 @@ Devuelta como `QUOTE-CONTACT-1R`.
 - Una ejecución anterior terminó antes de Playwright por `EPERM` sobre su caché
   y no cuenta como resultado.
 - No hubo suite completa PM.
+- Corrección Dev `1a01854` e informe `e363408`. PM reprodujo el 166 corregido
+  desde otra base Docker limpia en **1/1**, salida 0. Log:
+  `/private/tmp/topgreen-pm-quote-166r.log`.
 
 ## Producto conforme hasta esta puerta
 
@@ -25,7 +28,7 @@ Devuelta como `QUOTE-CONTACT-1R`.
 - WhatsApp reutiliza el contexto y el flujo no hace `POST /contact`.
 - No hay cambios de Backend, contratos remotos ni dependencias.
 
-## Huecos que invalida el verde
+## Huecos que invalidaban el verde base
 
 1. El asunto visible sigue siendo genérico y el `subject` del `mailto:` queda
    en «Solicitud de cotización». Publicación y vendedor aparecen sólo en el
@@ -50,3 +53,21 @@ La devolución pide una corrección focal y una extensión del 166: nombres en e
 asunto visible y codificado, copia neutral comprobada sin el falso negativo,
 e identidad estable ante títulos iguales. No se repiten focales anteriores ni
 suite completa; la evidencia base de Dev queda conservada.
+
+## Corrección cerrada
+
+`1a01854` hace que la opción visible y el `subject` del `mailto:` nombren la
+publicación y al vendedor; la ayuda queda únicamente en «Revisá y enviá el
+mensaje desde tu aplicación de correo». El arnés compara texto sin depender de
+bordes ASCII y exige ambos nombres en el asunto codificado.
+
+La intención transporta el ID y `ContactPage` lo usa en su clave. El 166 crea
+dos publicaciones homónimas de vendedores distintos y comprueba el reemplazo
+de punta a punta. Como Dev informó correctamente, el recorrido actual desmonta
+Contacto entre ambas y por eso esa escena no discrimina por sí sola ID frente a
+nombre; el ID queda verificado estáticamente y no se crea una ruta artificial.
+
+Los finales de línea de `src/types/index.ts` fueron restaurados: contra el
+archivo original el cambio semántico son 17 líneas. La evidencia final combina
+la suite Dev **165/166**, con único rojo 131 ambiental, y dos ejecuciones
+focales PM del 166 en **1/1** cada una. No se declara suite completa PM 166/166.
