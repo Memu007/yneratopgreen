@@ -27,6 +27,7 @@ import {
   getProvinces,
   convertBackendProductToFrontend,
 } from './utils/catalogService';
+import { asegurarSesion, tokenStorage } from './utils/api';
 import { ContextoDeNavegacion, useNavegacion } from './navegacion/navegacion';
 import type { Seccion } from './navegacion/politica';
 import type { NewProductData, Product, CotizacionPedida } from './types';
@@ -520,9 +521,43 @@ function App() {
     console.log('Búsqueda realizada:', searchQuery);
   };
 
-  const handleCheckout = () => {
+  /**
+   * Continuar compra.
+   *
+   * La sesión se comprueba ACÁ y no en el Checkout, y el lugar es el punto.
+   * Tener un token guardado no es tener sesión: `isAuthenticated` se queda con
+   * lo que sabía al entrar, así que con la credencial ya vencida este botón
+   * abría el Checkout igual. La persona completaba nombre, teléfono, provincia
+   * y localidad, apretaba «Continuar al pago» y recién ahí aparecía «Sesión
+   * expirada», sin Login y sin salida. Que el error llegue una pantalla después
+   * no lo hace más chico: lo hace más caro, porque llega con el trabajo hecho.
+   *
+   * Si el access token venció pero el refresh sirve, se renueva por el camino
+   * de siempre y no se interrumpe nada: la persona no tiene por qué enterarse
+   * de la mecánica de sus tokens.
+   *
+   * Y si no se puede recuperar, es la MISMA puerta de siempre —la de la
+   * tarjeta, el detalle y publicar—: se ofrece ingresar. Cancelar devuelve al
+   * carrito con lo que había; nada se compra, se reserva ni se paga por
+   * ingresar.
+   *
+   * Que entró se lee del token y no de `isAuthenticated`, que es justo lo que
+   * acabamos de probar que miente: `asegurarSesion` tira la credencial muerta,
+   * así que un token acá es uno nuevo, de alguien que acaba de entrar.
+   */
+  const handleCheckout = async () => {
+    if (await asegurarSesion()) {
+      setIsCartOpen(false);
+      setIsCheckoutOpen(true);
+      return;
+    }
     setIsCartOpen(false);
-    setIsCheckoutOpen(true);
+    abrirLoginYVolver(() => {
+      setTimeout(() => {
+        if (tokenStorage.getAccessToken()) setIsCheckoutOpen(true);
+        else setIsCartOpen(true);
+      }, 0);
+    });
   };
 
   const handleAddProduct = (productData: NewProductData) => {
@@ -622,9 +657,7 @@ function App() {
           <AboutPage 
             onNavigateToMarketplace={() => handleNavigate('marketplace')}
             onNavigateToContact={() => handleNavigate('contact')}
-            onOpenSellModal={() => setIsAddProductOpen(true)}
-            isLoggedIn={!!user}
-            onOpenLogin={abrirLogin}
+            onSolicitarPublicar={pedirPublicar}
             />
         );
       case 'services':

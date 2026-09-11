@@ -24946,10 +24946,15 @@ await runCase(166, 'La cotización llega a Contacto con su publicación, y prepa
 // cada CTA de publicación de Inicio y Servicios abra el Login real y retome el
 // formulario si —y sólo si— la persona entra, sin escribir nada por el camino.
 //
-// R6 NO está acá y no es un olvido: el borde no se reproduce. Está medido y
-// explicado al final del caso.
+// R6 SÍ está acá, y la primera versión de este caso no lo tenía por un error
+// mío: informé que el borde no se reproducía porque medí «¿aparece el aviso sin
+// Login?» —el mecanismo que me había imaginado— en vez de «¿queda la persona en
+// un callejón?», que es lo que R6 describe. La respuesta a la segunda era que
+// sí, y estaba escrita en mi propio informe: el Checkout abre igual y falla una
+// pantalla después. Que el fallo llegue más tarde no lo hace más chico; llega
+// con el trabajo ya hecho.
 // ---------------------------------------------------------------------------
-await runCase(167, 'Un filtro inexistente en la URL se descarta sin inventar un vacío, y publicar retoma después de ingresar', async () => {
+await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o comprar retoman después de ingresar', async () => {
   const medidos = [];
   const FRASE_DE_CERO = 'No hay operaciones con estos filtros';
 
@@ -25173,6 +25178,23 @@ await runCase(167, 'Un filtro inexistente en la URL se descarta sin inventar un 
 
     const publicador = (pagina) => pagina.getByRole('dialog', { name: 'Publicar' });
     const login = (pagina) => pagina.getByRole('dialog', { name: 'Ingresar' });
+    const carrito = (pagina) => pagina.getByRole('dialog', { name: 'Mi carrito' });
+    const checkout = (pagina) => pagina.getByRole('dialog', { name: 'Checkout' });
+    // Qué capa hay arriba. Un `waitFor` que se vence dice «se venció» y nada
+    // más; acá lo que hace falta saber cuando algo no aparece es QUÉ apareció
+    // en su lugar, que es exactamente el defecto que se está midiendo.
+    const capasAbiertas = async (pagina) => {
+      const nombres = [];
+      for (const capa of await pagina.getByRole('dialog').all()) {
+        nombres.push((await capa.getAttribute('aria-label')) ?? '(sin nombre)');
+      }
+      return nombres;
+    };
+    const esperarLaCapa = async (pagina, cual, porQue) => {
+      await esperarA(async () => (await cual(pagina).count()) === 1,
+        `${porQue}; lo que hay abierto es ${JSON.stringify(await capasAbiertas(pagina))}`,
+        25_000);
+    };
 
     // El publicador se cuenta en cada mutación del documento, y no mirando si
     // está ahí cuando a este caso se le ocurre mirar.
@@ -25241,6 +25263,10 @@ await runCase(167, 'Un filtro inexistente en la URL se descarta sin inventar un 
     for (const pantalla of [
       { seccion: 'home', cta: 'Publicar una oferta', aviso: 'Iniciá sesión para publicar una oferta' },
       { seccion: 'services', cta: 'Publicar un servicio', aviso: 'Iniciá sesión para publicar un servicio' },
+      // Quiénes somos entró después: era la pantalla que había quedado con el
+      // Login sin continuidad —y sin aviso— cuando las otras dos ya lo habían
+      // dejado. Está en la lista para que no vuelva a quedarse atrás sola.
+      { seccion: 'about', cta: 'Comenzar a Vender', aviso: 'Iniciá sesión para publicar una oferta' },
     ]) {
       // Todos los CTA de publicación de la pantalla, no uno elegido a mano: si
       // mañana aparece otro por un camino distinto, este caso lo recorre solo.
@@ -25406,6 +25432,131 @@ await runCase(167, 'Un filtro inexistente en la URL se descarta sin inventar un 
       await conSalto.close();
     }
 
+    // === C. R6: la sesión se comprueba ANTES de abrir el Checkout ==========
+    //
+    // Informé que R6 no se reproducía y me equivoqué: refuté el mecanismo que
+    // me había imaginado —«el aviso sin Login»— en vez del síntoma que R6
+    // describe. El callejón existe y es peor por dónde aparece. Con la sesión
+    // ya vencida, «Continuar compra» abría el Checkout igual, porque
+    // `isAuthenticated` se quedó con lo que sabía al entrar; la persona
+    // completaba nombre, teléfono, provincia y localidad, apretaba «Continuar
+    // al pago» y recién ahí se encontraba con «Sesión expirada», sin Login.
+    //
+    // Se miden los dos casos por separado, porque son dos respuestas
+    // distintas: la sesión que se puede renovar no tiene que interrumpir nada,
+    // y la que no, tiene que ofrecer ingresar.
+    {
+      const conSesion = async (pagina) => {
+        await pagina.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+        await pagina.locator('header').getByRole('button', { name: 'Ingresar', exact: true }).click();
+        await login(pagina).getByLabel(/^Email/).fill('cliente@ejemplo.com');
+        await login(pagina).getByLabel(/^Contraseña/).fill('cliente123');
+        await login(pagina).getByRole('button', { name: 'Ingresar', exact: true }).click();
+        await pagina.locator('header').getByRole('button', { name: /Carrito/ })
+          .waitFor({ state: 'visible', timeout: 25_000 });
+      };
+      const conElCarritoAbierto = async (pagina) => {
+        await pagina.locator('article[class*="card"]')
+          .getByRole('button', { name: 'Agregar al carrito' }).first().click({ timeout: 25_000 });
+        await esperarA(async () => (await enElCarrito(pagina)) > 0,
+          'no se pudo dejar nada en el carrito', 20_000);
+        await pagina.locator('header').getByRole('button', { name: /Carrito/ }).click();
+        await carrito(pagina).waitFor({ state: 'visible', timeout: 20_000 });
+      };
+      // Vencer la sesión es escribirle encima al token, que es lo que hace el
+      // tiempo. El refresh se deja bueno o se rompe según lo que se mida.
+      const vencerLaSesion = (pagina, tambienElRefresh) => pagina.evaluate((romperRefresh) => {
+        localStorage.setItem('access_token', 'este.token.ya.no.vale');
+        if (romperRefresh) localStorage.setItem('refresh_token', 'este.tampoco.vale');
+      }, tambienElRefresh);
+
+      // --- C1. El access venció, pero el refresh sirve: no se interrumpe ----
+      const recuperable = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const paginaRecuperable = await recuperable.newPage();
+      vigilarEscrituras(paginaRecuperable);
+      await conSesion(paginaRecuperable);
+      await conElCarritoAbierto(paginaRecuperable);
+      await vencerLaSesion(paginaRecuperable, false);
+      const itemsRecuperable = await enElCarrito(paginaRecuperable);
+      await carrito(paginaRecuperable).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarLaCapa(paginaRecuperable, checkout,
+        'con el access vencido y el refresh válido no se llegó al Checkout: la sesión se podía '
+        + 'renovar sin molestar a nadie');
+      assert(await login(paginaRecuperable).count() === 0,
+        'con el refresh todavía válido se pidió ingresar de nuevo: eso es interrumpir por '
+        + 'la mecánica de los tokens, que no es asunto de quien compra');
+      assert(await enElCarrito(paginaRecuperable) === itemsRecuperable,
+        'renovar la sesión cambió el carrito');
+      await recuperable.close();
+      medidos.push('con el access vencido y el refresh válido, «Continuar compra» renueva y abre '
+        + 'el Checkout sin pedir nada');
+
+      // --- C2. La sesión no se puede recuperar: se ofrece ingresar ----------
+      const perdida = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const paginaPerdida = await perdida.newPage();
+      vigilarEscrituras(paginaPerdida);
+      await conSesion(paginaPerdida);
+      await conElCarritoAbierto(paginaPerdida);
+      await vencerLaSesion(paginaPerdida, true);
+      const itemsPerdida = await enElCarrito(paginaPerdida);
+      assert(itemsPerdida > 0, 'el caso no puede medir R6 sin un carrito con algo adentro');
+
+      await carrito(paginaPerdida).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarLaCapa(paginaPerdida, login,
+        'con la sesión vencida no se ofreció ingresar');
+      // Y lo que NO pasa: no se abre el Checkout. Es el callejón entero: sin
+      // esto la persona llega a completar sus datos antes de descubrirlo.
+      assert(await checkout(paginaPerdida).count() === 0,
+        'con la sesión vencida se abrió el Checkout igual: ahí adentro se completan datos '
+        + 'y recién después aparece «Sesión expirada», sin salida');
+      assert(await paginaPerdida.getByRole('dialog').count() === 1,
+        `se abrieron ${await paginaPerdida.getByRole('dialog').count()} capas a la vez`);
+
+      // Cancelar devuelve al carrito, con lo que había.
+      await login(paginaPerdida).getByRole('button', { name: 'Cerrar' }).click();
+      await carrito(paginaPerdida).waitFor({ state: 'visible', timeout: 20_000 });
+      assert(await enElCarrito(paginaPerdida) === itemsPerdida,
+        'cancelar el ingreso se llevó puesto el carrito');
+      assert(await carrito(paginaPerdida).getByRole('button', { name: /^Quitar/ }).count()
+        === itemsPerdida,
+      'el carrito volvió vacío a la vista aunque lo guardado siga ahí');
+      assert(await checkout(paginaPerdida).count() === 0,
+        'cancelar el ingreso abrió el Checkout');
+
+      // Una credencial fallida no avanza, y el motivo sigue siendo el de la
+      // credencial: renovar la sesión no tiene nada que ver con equivocarse la
+      // contraseña, y confundir las dos cosas manda a la persona a otro lado.
+      await carrito(paginaPerdida).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarLaCapa(paginaPerdida, login,
+        'el segundo intento no volvió a ofrecer ingresar');
+      await login(paginaPerdida).getByLabel(/^Email/).fill('cliente@ejemplo.com');
+      await login(paginaPerdida).getByLabel(/^Contraseña/).fill('esta-clave-no-es-la-de-nadie');
+      await login(paginaPerdida).getByRole('button', { name: 'Ingresar', exact: true }).click();
+      const motivo = login(paginaPerdida).getByRole('alert');
+      await motivo.waitFor({ state: 'visible', timeout: 20_000 });
+      const textoDelMotivo = (await motivo.innerText()).trim();
+      assert(/contrase/i.test(textoDelMotivo) && !/expirad/i.test(textoDelMotivo),
+        `la credencial fallida se explicó como sesión vencida: ${JSON.stringify(textoDelMotivo)}`);
+      assert(await checkout(paginaPerdida).count() === 0,
+        'una credencial fallida abrió el Checkout');
+
+      // Y la buena lo abre UNA vez, sin volver a apretar «Continuar compra».
+      await login(paginaPerdida).getByLabel(/^Contraseña/).fill('cliente123');
+      await login(paginaPerdida).getByRole('button', { name: 'Ingresar', exact: true }).click();
+      await esperarLaCapa(paginaPerdida, checkout,
+        'un ingreso correcto no reanudó la compra: hubo que volver a apretar «Continuar compra»');
+      assert(await checkout(paginaPerdida).count() === 1,
+        `el Checkout se abrió ${await checkout(paginaPerdida).count()} veces`);
+      assert(await login(paginaPerdida).count() === 0,
+        'el ingreso quedó apilado debajo del Checkout');
+      assert(await enElCarrito(paginaPerdida) === itemsPerdida,
+        'reanudar la compra cambió el carrito');
+      await perdida.close();
+      medidos.push('con la sesión irrecuperable, «Continuar compra» ofrece ingresar y no abre el '
+        + 'Checkout; cancelar vuelve al carrito con sus ítems, la credencial fallida no avanza y '
+        + 'la buena reanuda en el Checkout una sola vez');
+    }
+
     // Ingresar abre una pantalla y NADA más. Ni una publicación, ni una orden,
     // ni una reserva de stock: eso lo decide la persona después, no el ingreso.
     const indebidas = escrituras.filter((escritura) =>
@@ -25425,28 +25576,18 @@ await runCase(167, 'Un filtro inexistente en la URL se descarta sin inventar un 
     await browser.close();
   }
 
-  // R6 no entra al caso porque el borde NO se reproduce, y agregar aserciones
-  // sobre él sería afirmar algo que no se midió. Los dos recorridos posibles,
-  // medidos en este mismo entorno:
-  //
-  //  a) Sesión inválida detectada al cargar: `/auth/me` responde 401, y como el
-  //     reintento con refresh se saltea para `/auth/`, los tokens se limpian y
-  //     la sesión queda cerrada. El carrito sobrevive en `agromarket_cart` —se
-  //     midió: un ítem antes y un ítem después—, pero SIN sesión la cabecera no
-  //     dibuja la celda «Carrito»: no hay carrito que abrir ni «Continuar
-  //     compra» que apretar. El borde descrito necesita ese botón.
-  //  b) La sesión deja de valer con el carrito ABIERTO y sin recargar: nada
-  //     revalida el token, `isAuthenticated` sigue en verdadero y «Continuar
-  //     compra» abre el Checkout como siempre. Tampoco hay aviso sin salida.
-  //
-  // Es decir: la rama sin sesión de `CartModal.handleCheckout` no se alcanza
-  // hoy por ningún camino del producto. Queda informado en `PARA-PM.md`; no se
-  // toca acá porque no hay rojo que lo justifique.
+  // Queda una puerta sin usar y vale decirlo acá: la rama sin sesión de
+  // `CartModal.handleCheckout` —la que avisa y no ofrece nada— sigue sin
+  // alcanzarse, porque sin sesión la cabecera ni siquiera dibuja la celda del
+  // carrito. No se toca: no hay rojo que lo justifique, y ahora tampoco hay
+  // callejón que dependa de ella.
 
   return 'una categoría o una provincia inexistente en la URL se descartan solas, sin llevarse '
     + 'los filtros válidos, sin quedarse en la barra y sin afirmar un mercado vacío; el catálogo '
-    + 'auxiliar caído se dice y se reintenta; y cada CTA de publicación de Inicio y Servicios '
-    + `retoma el formulario después de un ingreso correcto y sólo después; ${medidos.join('; ')}`;
+    + 'auxiliar caído se dice y se reintenta; cada CTA de publicación de Inicio, Servicios y '
+    + 'Quiénes somos retoma el formulario después de un ingreso correcto y sólo después; y la '
+    + 'sesión se comprueba ANTES de abrir el Checkout, así que la que se puede renovar no '
+    + `interrumpe y la que no, ofrece ingresar en vez de un callejón; ${medidos.join('; ')}`;
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del

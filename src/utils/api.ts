@@ -43,6 +43,34 @@ const getDefaultHeaders = (): HeadersInit => {
   return headers;
 };
 
+/**
+ * Los pedidos cuyo 401 NO habla de la sesión, y que por eso no se reintentan
+ * renovándola.
+ *
+ * `login` y `register` contestan por la credencial que se acaba de escribir;
+ * `refresh` es el que renueva —reintentarlo sería morderse la cola—; y los de
+ * verificación se piden justamente sin sesión. En todos, renovar no cambia la
+ * respuesta, y reintentar sólo cambiaría el mensaje: «Email o contraseña
+ * incorrectos» se convertiría en «Sesión expirada», que no es lo que pasó.
+ *
+ * Antes la regla era «ningún `/auth/`», y se llevaba puesto a `/auth/me`, que
+ * es el ÚNICO de la familia que sí lleva sesión. Con eso, un access token
+ * vencido y un refresh perfectamente válido terminaban en sesión cerrada:
+ * `loadCurrentUser` pedía `/auth/me`, recibía 401, no reintentaba, y tiraba
+ * los dos tokens. Está medido: entrar, vencer sólo el access y recargar dejaba
+ * la cabecera en «Ingresar» con el refresh bueno todavía guardado.
+ */
+const SIN_REINTENTO = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/refresh',
+  '/auth/verify-email',
+  '/auth/resend-verification',
+];
+
+const sePuedeReintentar = (endpoint: string) =>
+  !SIN_REINTENTO.some((ruta) => endpoint.startsWith(ruta));
+
 // Flag para evitar múltiples refresh simultáneos
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
@@ -177,7 +205,7 @@ export async function apiFetch<T = unknown>(
     const response = await fetch(url, config);
 
     // Si recibimos 401, intentar refresh del token
-    if (response.status === 401 && retry && !endpoint.includes('/auth/')) {
+    if (response.status === 401 && retry && sePuedeReintentar(endpoint)) {
       // Evitar múltiples refresh simultáneos
       if (!isRefreshing) {
         isRefreshing = true;
@@ -276,6 +304,37 @@ export async function apiBlob(endpoint: string): Promise<Blob> {
   }
 
   return response.blob();
+}
+
+/**
+ * ¿Se puede seguir con esta sesión, ahora?
+ *
+ * Existe porque tener un token guardado no es tener sesión. Entre que alguien
+ * entra y que aprieta un botón puede pasar una tarde entera, y nada en la
+ * pantalla se entera de que la credencial dejó de valer: `isAuthenticated`
+ * sigue diciendo que sí hasta que se recarga. Lo caro de esa distancia no es
+ * el error, es DÓNDE aparece: en el carrito abría el Checkout, la persona
+ * completaba nombre, teléfono, provincia y localidad, y recién ahí se topaba
+ * con «Sesión expirada» y sin salida.
+ *
+ * Se pregunta por el único pedido que describe a la sesión y a nada más. Si
+ * el access token venció pero el refresh sigue valiendo, `apiFetch` lo renueva
+ * por el camino de siempre y la persona no se entera: eso también es «sí», y
+ * es la razón de que acá no se mire el token sino que se pregunte.
+ *
+ * Y si no hay forma de recuperarla, se tiran las credenciales muertas. Por eso
+ * se llama «asegurar» y no «consultar»: guardar un token que ya probamos que
+ * no sirve sólo alcanza para que el siguiente que lo lea crea que hay sesión.
+ */
+export async function asegurarSesion(): Promise<boolean> {
+  if (!tokenStorage.getAccessToken()) return false;
+  try {
+    await apiGet('/auth/me');
+    return true;
+  } catch {
+    tokenStorage.clearTokens();
+    return false;
+  }
 }
 
 /**

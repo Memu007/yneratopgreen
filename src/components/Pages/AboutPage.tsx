@@ -1,28 +1,37 @@
 import React from 'react';
 import styles from './AboutPage.module.css';
+import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../hooks/useToast';
 import { ProductImage } from '../ProductImage/ProductImage';
 
 interface AboutPageProps {
   onNavigateToMarketplace?: () => void;
-  onOpenSellModal?: () => void;
-  isLoggedIn?: boolean;
-  onOpenLogin?: () => void;
+  /** Publicar desde esta pantalla.
+   *
+      Una sola función y no el par «abrí el formulario» / «abrí el Login»: quién
+      de los dos corresponde lo decide la sesión, no la página. Sin sesión abre
+      el ingreso y retoma el formulario recién si la persona entra; cancelar o
+      fallar no abre nada. Es la MISMA puerta que usan Inicio, Servicios y una
+      tarjeta sin sesión.
+
+      Acá llegó último: esta pantalla conservaba el ingreso sin continuidad —y
+      sin decir por qué aparecía— cuando las otras dos ya lo habían dejado. */
+  onSolicitarPublicar?: () => void;
   onNavigateToContact?: () => void;
 }
 
 export const AboutPage: React.FC<AboutPageProps> = ({ 
   onNavigateToMarketplace, 
-  onOpenSellModal,
-  isLoggedIn,
-  onOpenLogin,
+  onSolicitarPublicar,
   onNavigateToContact
 }) => {
+  const { user } = useAuth();
+  const { showToast } = useToast();
+
   const handleStartSelling = () => {
-    if (isLoggedIn) {
-      onOpenSellModal?.();
-    } else {
-      onOpenLogin?.();
-    }
+    // El aviso explica por qué apareció el ingreso; esta pantalla no lo tenía.
+    if (!user) showToast('Iniciá sesión para publicar una oferta', 'warning');
+    onSolicitarPublicar?.();
   };
 
   return (

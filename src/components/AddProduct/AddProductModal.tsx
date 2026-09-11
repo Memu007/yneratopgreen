@@ -246,7 +246,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   // Si no está autenticado, no mostrar el modal
   if (!isAuthenticated || !user) {
     if (isOpen) {
-      showToast('Debes iniciar sesión para publicar productos', 'warning');
+      // La misma frase que la puerta, en la misma lengua. Esta guarda ya no
+      // se alcanza desde ningún CTA de publicación —la puerta no abre el
+      // formulario sin sesión—, pero era el único tuteo que quedaba del
+      // camino, y dejarlo escrito lo dejaba listo para volver.
+      showToast('Iniciá sesión para publicar una oferta', 'warning');
       onClose();
     }
     return null;
