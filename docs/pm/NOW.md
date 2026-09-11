@@ -4,6 +4,13 @@ Actualizado: 2026-09-11.
 
 ## Estado inmediato — 2026-09-11
 
+- **TEST-SUITE-167S aceptada en rama:** arnés `d7e17f9`, informe `40131de`.
+  Dev demostró los rojos viejos y negativos nuevos y obtuvo 139+143 en **2/2**.
+  PM revisó el único archivo modificado y reprodujo ambos juntos desde otra
+  base Docker limpia en **2/2**, salida 0 y build incluido. Sintaxis y
+  `diff-check` verdes; `src/` y `backend/` no cambiaron. No hubo suite completa
+  PM. Evidencia en `REPRODUCCION-TEST-SUITE-167S-2026-09-11.md`.
+
 - **FILTER-INTENT-1R3 aceptada en rama:** base `0a6cbd4`/`89db3fe`, R1
   `fbdd88f`/`71976e9`, R2 `a834ec3`/`d21cf78` y R3
   `fa4446a`/`50f63b6`. Dev y PM reprodujeron el 167 R3 desde bases limpias en
@@ -101,9 +108,10 @@ Actualizado: 2026-09-11.
   de capturas. La versión final mide diálogo móvil, envío retenido, fallo y
   reintento; no hubo suite completa PM. Evidencia en
   `REPRODUCCION-RATING-UX-1-2026-09-10.md`.
-- **Única tarea activa y responsable:** `TEST-SUITE-167S`, Dev. Sólo estabiliza
-  los casos 139 y 143 para que fabriquen/esperen su propio estado; no toca
-  producto ni corre suite completa. Detalles en `PARA-DEV.md`.
+- **Única tarea activa y responsable:** `COPY-CLEAR-1`, Dev. Cierra búsqueda
+  real, planes inexistentes, soporte honesto sin recovery, voseo y estados
+  visibles es-AR; conserva marca→Inicio ya aceptada y no abre funciones ni
+  rediseño. Detalles en `PARA-DEV.md`.
 - **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
   `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
   y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como

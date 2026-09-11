@@ -158,8 +158,8 @@ anatomías ni el detalle. Su contrato completo y la evidencia de raíz están en
 |---:|---|---|---|
 | 16 | **QUOTE-CONTACT-1R — cerrada** | A4 y A5 | `612b57f` + `1a01854`; informes `9493ba0` + `e363408`. Dev 165/166 con único rojo 131 ambiental; PM reprodujo 166 base y corregido en 1/1 cada uno. |
 | 17 | **FILTER-INTENT-1R3 — cerrada en rama** | A6, A9 y R6 | `0a6cbd4` + `fbdd88f` + `a834ec3` + `fa4446a`; informes `89db3fe` + `71976e9` + `d21cf78` + `50f63b6`. Dev y PM reprodujeron 167 R3 en 1/1 cada uno; sin suite completa PM ni despliegue. |
-| 17S | **TEST-SUITE-167S — activa** | Estabilidad de 139 y 143 | El 139 fabrica y localiza sus publicaciones comprables; el 143 espera el estado visible posterior al PATCH/GET. Sólo arnés, sin suite completa. |
-| 18 | **COPY-CLEAR-1** | A7, A10, F4 y F12; deuda ADMIN-STATE-1 | Emi decide wordmark→Inicio; Buscar hace algo real o desaparece; se retiran planes inexistentes, se unifica voseo, se informa soporte sin prometer recuperación automática y los estados visibles quedan en es-AR sin ramas `draft` muertas. |
+| 17S | **TEST-SUITE-167S — cerrada** | Estabilidad de 139 y 143 | `d7e17f9`/`40131de`. Dev y PM reprodujeron 139+143 juntos en 2/2 cada uno; sólo arnés, sin suite completa PM. |
+| 18 | **COPY-CLEAR-1 — activa** | A7, A10, F4 y F12; deuda ADMIN-STATE-1 | Marca→Inicio ya aceptada se conserva; Buscar ejecuta la consulta; se retiran planes inexistentes, se unifica voseo, se informa soporte sin recovery y los estados visibles quedan en es-AR sin ramas `draft` muertas. |
 
 Son mejoras de claridad, no autorización para mensajería, planes, suscripciones
 o un rediseño nuevo.
