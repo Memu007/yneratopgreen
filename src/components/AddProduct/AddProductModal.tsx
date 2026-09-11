@@ -442,7 +442,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     }
 
     if (imageFiles.length > availableSlots) {
-      showToast(`Solo puedes agregar ${availableSlots} imagen(es) más`, 'warning');
+      showToast(`Sólo podés agregar ${availableSlots} imagen(es) más`, 'warning');
     }
 
     // Tomar solo las imágenes que caben

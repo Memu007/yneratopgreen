@@ -2195,7 +2195,7 @@ await runCase(22, 'Registro de transportista desde la interfaz, con los tres dat
     const page = await browser.newPage();
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
-    await page.getByText('Regístrate aquí').click();
+    await page.getByText('Registrate acá').click();
     await page.getByRole('heading', { name: 'Crear Cuenta' }).waitFor();
 
     await page.locator('input[name="name"]').fill('Transportista Smoke');
@@ -3362,7 +3362,7 @@ await runCase(37, 'Registro, correo y confirmación desde el navegador', async (
 
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
-    await page.getByText('Regístrate aquí').click();
+    await page.getByText('Registrate acá').click();
     await page.getByRole('heading', { name: 'Crear Cuenta' }).waitFor();
     await page.locator('input[name="name"]').fill('Nav Smoke');
     await page.locator('input[name="email"]').fill(email);
@@ -3519,7 +3519,7 @@ await runCase(38, 'Un error de validación se lee, no dice [object Object]', asy
     // --- 1. detalle ESTRUCTURADO: registro con un correo que el backend rechaza
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
-    await page.getByText('Regístrate aquí').click();
+    await page.getByText('Registrate acá').click();
     await page.getByRole('heading', { name: 'Crear Cuenta' }).waitFor();
     await page.locator('input[name="name"]').fill('Detalle Estructurado');
     await page.locator('input[name="email"]').fill(invalido);
@@ -15089,10 +15089,17 @@ print(json.dumps(medida))
         assert(/locality_id=/.test(page.url()), 'elegir una localidad no quedo en la URL');
       }
     }
+    // El caso entra con `q=` en la URL y acá suelta esa consulta para que el
+    // cambio de provincia se mida sobre el catálogo entero. Vaciar el campo ya
+    // no alcanza: desde COPY-CLEAR-1 buscar es una acción, así que hay que
+    // aplicar el vacío —el mismo Enter que aprieta una persona— y esperar a que
+    // «q» se vaya de la barra en vez de contar hasta 1200.
     const buscador = page.locator('input[type="search"], input[placeholder*="Busc" i]').first();
     if (await buscador.count()) {
       await buscador.fill('');
-      await page.waitForTimeout(1200);
+      await buscador.press('Enter');
+      await esperarA(async () => !/[?&]q=/.test(page.url()),
+        `soltar la búsqueda dejó la consulta en la barra: ${page.url()}`, 20_000);
     }
     await page.locator('#catalog-province').selectOption({ label: otra });
     await page.waitForTimeout(2500);
@@ -15409,7 +15416,7 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
         // entre los dos formularios es el mismo tramite y no puede perder la
         // continuidad. Se hace aca y no en las tres para no repetir lo mismo.
         if (seccion === 'Mercado') {
-          await page.getByRole('button', { name: 'Regístrate aquí' }).first().click();
+          await page.getByRole('button', { name: 'Registrate acá' }).first().click();
           await page.getByRole('heading', { name: /Crear cuenta|Regist/i })
             .first().waitFor({ timeout: 20_000 });
           assert(await page.getByRole('dialog').count() === 1,
@@ -19090,7 +19097,7 @@ await runCase(151, 'Un formulario no se contradice ni esconde su error', async (
     const abrirElRegistro = async (page) => {
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: 'Ingresar' }).first().click();
-      await page.getByRole('button', { name: 'Regístrate aquí' }).click();
+      await page.getByRole('button', { name: 'Registrate acá' }).click();
       await page.locator('#registro-nombre').waitFor({ state: 'visible', timeout: 20_000 });
     };
     const abrirMisPublicaciones = async (page) => {
@@ -20072,7 +20079,7 @@ await runCase(154, 'El alta de cuenta tiene un solo ancho y controles operables'
 
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: 'Ingresar' }).first().click();
-      await page.getByRole('button', { name: 'Regístrate aquí' }).click();
+      await page.getByRole('button', { name: 'Registrate acá' }).click();
       await page.locator('#registro-nombre').waitFor({ state: 'visible', timeout: 20_000 });
 
       const capa = page.getByRole('dialog');
@@ -21238,7 +21245,7 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
       await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
       assert((await rastroDelViejo(page)) === '',
         `${donde}, Ingresar sigue mostrando el nombre viejo: «${await rastroDelViejo(page)}»`);
-      await page.getByRole('button', { name: /Reg[íi]strate aqu[íi]/i }).first().click();
+      await page.getByRole('button', { name: /Registrate ac[áa]/i }).first().click();
       await page.getByRole('heading', { name: /Crear cuenta/i }).waitFor({ timeout: 20_000 });
       await page.getByRole('checkbox', { name: /Quiero registrarme como transportista/ }).check();
       await page.locator('input[name="carrierPlate"]').waitFor({ timeout: 20_000 });
@@ -22579,12 +22586,24 @@ await runCase(160, 'Administración dice la verdad: números reales, estados en 
       }
     };
 
+    // Lo que la PANTALLA dijo de cada estado, para poder fijarlo después. El
+    // bloque de abajo contrasta el badge contra el diccionario del producto, o
+    // sea que comprueba que los dos están de acuerdo —no que lo que dicen esté
+    // en castellano—. Con `active: 'Active'` los catorce seguirían de acuerdo.
+    const DICHO_PRODUCTO = {};
+    const DICHO_ORDEN = {};
+
     // Lo que se le exige a un badge: qué dice y cómo se ve.
-    const mirarBadge = async (fila, token, textos, tonos, contexto) => {
+    const mirarBadge = async (fila, token, textos, tonos, contexto, dichos) => {
       const badge = fila.locator('[class*="_badge_"]');
       const cuantos = await badge.count();
       assert(cuantos === 1, `${contexto}: la fila de ${token} tiene ${cuantos} badges`);
       const dicho = (await badge.innerText()).trim();
+      // Lo que se anota para fijar el rótulo sale de `textContent` y no de
+      // `innerText`: el badge se dibuja con `text-transform: uppercase`, así que
+      // `innerText` vuelve ya transformado —«ACTIVA»— y con eso no se puede
+      // afirmar cómo está escrito el rótulo, sólo cómo se lo pinta.
+      dichos[token] = (await badge.evaluate((el) => el.textContent || '')).trim();
       assert(dicho.toLowerCase() === textos[token].toLowerCase(),
         `${contexto}: el badge de ${token} dice «${dicho}» y el diccionario dice `
         + `«${textos[token]}»`);
@@ -22622,7 +22641,7 @@ await runCase(160, 'Administración dice la verdad: números reales, estados en 
         `publicaciones/${estado}`);
       const fila = await filaConIdentidad('productos', identidad, `publicaciones/${estado}`);
       vistos.push(await mirarBadge(fila, estado, TEXTO_DE_PRODUCTO, TONO_DE_PRODUCTO,
-        `publicaciones/${estado}`));
+        `publicaciones/${estado}`, DICHO_PRODUCTO));
     }
     await page.getByLabel(ETIQUETA_PRODUCTO).selectOption('');
     await esperarTabla('productos', 'products', null, null, 'publicaciones/sin filtro');
@@ -22639,7 +22658,7 @@ await runCase(160, 'Administración dice la verdad: números reales, estados en 
         `órdenes/${estado}`);
       const fila = await filaConIdentidad('órdenes', numero, `órdenes/${estado}`);
       vistos.push(await mirarBadge(fila, estado, TEXTO_DE_ORDEN, TONO_DE_ORDEN,
-        `órdenes/${estado}`));
+        `órdenes/${estado}`, DICHO_ORDEN));
     }
 
     // C2.c — `draft`, desde la vista sin filtro.
@@ -22662,7 +22681,7 @@ await runCase(160, 'Administración dice la verdad: números reales, estados en 
     assert(borrador?.numero, 'no se preparó la orden en borrador');
     const filaBorrador = await filaConIdentidad('órdenes', borrador.numero, 'órdenes/draft');
     vistos.push(await mirarBadge(filaBorrador, 'draft', TEXTO_DE_ORDEN, TONO_DE_ORDEN,
-      'órdenes/sin filtro'));
+      'órdenes/sin filtro', DICHO_ORDEN));
 
     // Y el recuento no se declara: se cuenta contra los enum de la base.
     const exigidos = ESTADOS_PRODUCTO.length + ESTADOS_ORDEN.length;
@@ -22674,6 +22693,139 @@ await runCase(160, 'Administración dice la verdad: números reales, estados en 
       + `con texto y color computado: ${vistos.join(', ')}; el tratamiento de respaldo `
       + `(${COLOR_DE_RESPALDO}) lo comparten sólo los ${conRespaldo.length} que declaran el `
       + `tono «${TONO_DE_RESPALDO}»`);
+
+
+    // --- C3. Los rótulos exactos, en es-AR y no sólo «no es el token» -------
+    //
+    // Lo de arriba compara la pantalla contra el diccionario del producto: si
+    // alguien escribiera `active: 'Active'`, los catorce badges seguirían de
+    // acuerdo entre sí y el caso seguiría verde. Acá se fija qué dice cada uno,
+    // y la lista no puede envejecer en silencio: se exige que cubra
+    // exactamente los estados que declara la base, así que un estado nuevo sin
+    // rótulo pone esto en rojo igual que la falta de traducción.
+    const ROTULO_DE_PRODUCTO = {
+      active: 'Activa',
+      paused: 'Pausada',
+      sold_out: 'Agotada',
+      deleted: 'Eliminada',
+    };
+    const ROTULO_DE_ORDEN = {
+      draft: 'Borrador',
+      placed: 'Pedido realizado',
+      confirmed: 'Confirmada',
+      paid: 'Pagada',
+      shipped: 'Enviada',
+      delivered: 'Entregada',
+      cancelled: 'Cancelada',
+      rejected: 'Rechazada',
+      awaiting_transfer_receipt: 'Esperando comprobante',
+      transfer_receipt_submitted: 'Comprobante a revisar',
+    };
+    for (const [que, tokens, rotulos, dichos] of [
+      ['publicación', ESTADOS_PRODUCTO, ROTULO_DE_PRODUCTO, DICHO_PRODUCTO],
+      ['orden', ESTADOS_ORDEN, ROTULO_DE_ORDEN, DICHO_ORDEN],
+    ]) {
+      const exigidos = Object.keys(rotulos).sort();
+      assert(JSON.stringify(exigidos) === JSON.stringify([...tokens].sort()),
+        `los rótulos exigidos para ${que} son ${exigidos.join(', ')} y la base declara `
+        + `${[...tokens].sort().join(', ')}: la lista de esta prueba quedó vieja`);
+      for (const token of tokens) {
+        assert(dichos[token] === rotulos[token],
+          `en pantalla el estado ${token} de ${que} dice ${JSON.stringify(dichos[token])} y en `
+          + `es-AR es ${JSON.stringify(rotulos[token])}`);
+      }
+    }
+    medidos.push(`los ${ESTADOS_PRODUCTO.length + ESTADOS_ORDEN.length} rótulos en pantalla son `
+      + 'exactamente los de es-AR, no sólo «algo que no es el token»');
+
+    // --- C4. El castellano es de la pantalla; el token sigue viajando ------
+    //
+    // Traducir la vista y traducir el protocolo son dos cosas distintas, y la
+    // segunda rompe el Backend. El selector de cada fila tiene que ofrecer los
+    // textos en castellano con el token adentro del `value`, y el PATCH que
+    // sale al confirmar tiene que llevar ese token y no el rótulo.
+    await solapa('Productos');
+    await page.getByLabel(ETIQUETA_PRODUCTO).selectOption('paused');
+    await esperarTabla('productos', 'products', 'paused', TEXTO_DE_PRODUCTO.paused,
+      'publicaciones/selector');
+    const laPausada = publicaciones.find((p) => p.estado === 'paused');
+    const filaPausada = await filaConIdentidad('productos', laPausada.identidad,
+      'publicaciones/selector');
+    const selector = filaPausada.getByLabel('Estado del producto');
+    assert(await selector.count() === 1,
+      'la fila de la publicación pausada no tiene el selector de estado');
+
+    const opciones = await selector.locator('option').evaluateAll(
+      (lista) => lista.map((o) => [o.value, (o.textContent || '').trim()]));
+    const valores = opciones.map(([valor]) => valor).sort();
+    assert(JSON.stringify(valores) === JSON.stringify([...ESTADOS_PRODUCTO].sort()),
+      `el selector ofrece ${JSON.stringify(valores)} y la base declara `
+      + `${JSON.stringify([...ESTADOS_PRODUCTO].sort())}`);
+    for (const [valor, texto] of opciones) {
+      assert(texto === ROTULO_DE_PRODUCTO[valor],
+        `la opción con value «${valor}» se lee «${texto}» y en es-AR es `
+        + `«${ROTULO_DE_PRODUCTO[valor]}»`);
+    }
+    assert(await selector.inputValue() === 'paused',
+      `el selector de una publicación pausada muestra el valor `
+      + `${JSON.stringify(await selector.inputValue())} y el token del Backend es «paused»`);
+
+    // Y lo que sale al confirmar. Se mira el cuerpo del PATCH, no el resultado:
+    // que la base termine bien no dice con qué palabra se lo pidieron.
+    const patches = [];
+    const anotarPatch = (pedido) => {
+      if (pedido.method() === 'PATCH' && /\/admin\/products\/[^/]+\/status$/.test(pedido.url())) {
+        patches.push(pedido.postData());
+      }
+    };
+    page.on('request', anotarPatch);
+    try {
+      await selector.selectOption('sold_out');
+      // La confirmación del panel es `formularios/Confirmacion`, que se
+      // identifica por su título y no por una clase: es otra capa que la del
+      // `ToastProvider`, y buscarla por `confirmModal` no la encontraba nunca.
+      const confirmar = page.getByRole('dialog',
+        { name: 'Cambiar el estado de la publicación' });
+      try {
+        await confirmar.waitFor({ state: 'visible', timeout: 15_000 });
+      } catch {
+        const capas = [];
+        for (const capa of await page.getByRole('dialog').all()) {
+          capas.push((await capa.getAttribute('aria-label'))
+            || (await capa.innerText()).replace(/\s+/g, ' ').slice(0, 60));
+        }
+        throw new Error('cambiar el estado desde el selector no abrió la confirmación; '
+          + `las capas abiertas son ${JSON.stringify(capas)}`);
+      }
+      const preguntado = await confirmar.innerText();
+      assert(preguntado.includes(ROTULO_DE_PRODUCTO.paused)
+        && preguntado.includes(ROTULO_DE_PRODUCTO.sold_out),
+      `la confirmación no nombra el cambio en castellano: ${JSON.stringify(preguntado)}`);
+      // El nombre de la publicación se saca antes de buscar tokens: lo fabricó
+      // este mismo caso y termina en «paused», así que buscar la palabra sobre
+      // el texto entero acusaría de imprimir el token a una pantalla que sólo
+      // está repitiendo el título que le pusimos.
+      const sinElNombre = preguntado.split(laPausada.identidad).join('…');
+      assert(!/\bactive\b|\bpaused\b|\bsold_out\b|\bdeleted\b/.test(sinElNombre),
+        `la confirmación imprime el token interno: ${JSON.stringify(preguntado)}`);
+      await confirmar.getByRole('button', { name: `Pasar a ${ROTULO_DE_PRODUCTO.sold_out}` })
+        .click();
+      await esperarA(async () => patches.length === 1,
+        'confirmar el cambio de estado no le pidió nada al servidor', 20_000);
+    } finally {
+      page.off('request', anotarPatch);
+    }
+    const cuerpo = JSON.parse(patches[0] || '{}');
+    assert(cuerpo.status === 'sold_out',
+      `el PATCH mandó ${JSON.stringify(cuerpo)} y el Backend espera el token «sold_out»: `
+      + 'traducir la vista no puede traducir el protocolo');
+    await esperarA(async () => {
+      const [fila] = queryRows(
+        `SELECT lower(status::text) FROM products WHERE id = ${sqlLiteral(laPausada.id)}`);
+      return fila && fila[0] === 'sold_out';
+    }, 'el cambio de estado no llegó a la base', 20_000);
+    medidos.push(`el selector ofrece ${opciones.map(([v, t]) => `${v}→«${t}»`).join(', ')} y el `
+      + `PATCH mandó ${JSON.stringify(cuerpo)}`);
 
     // --- D. Las cinco cargas: 500, aviso, reintento y dato ----------------
     const CARGAS = [
@@ -25551,7 +25703,7 @@ await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o com
         { waitUntil: 'domcontentloaded' });
       await paginaSalto.getByRole('button', { name: pantalla.cta }).first().click();
       await login(paginaSalto).waitFor({ state: 'visible', timeout: 20_000 });
-      await paginaSalto.getByRole('button', { name: 'Regístrate aquí' }).click();
+      await paginaSalto.getByRole('button', { name: 'Registrate acá' }).click();
       await paginaSalto.getByRole('heading', { name: 'Crear Cuenta' })
         .waitFor({ state: 'visible', timeout: 20_000 });
       assert(await paginaSalto.getByRole('dialog').count() === 1,
@@ -25997,6 +26149,363 @@ await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o com
     + 'Quiénes somos retoma el formulario después de un ingreso correcto y sólo después; y la '
     + 'sesión se comprueba ANTES de abrir el Checkout, así que la que se puede renovar no '
     + `interrumpe y la que no, ofrece ingresar en vez de un callejón; ${medidos.join('; ')}`;
+});
+
+// ---------------------------------------------------------------------------
+// 168. Lo que la pantalla promete es lo que la pantalla hace.
+//
+// Cuatro familias que no tienen nada que ver entre sí salvo esto: cada una
+// decía algo que no era cierto.
+//
+//  - Buscar prometía una acción y no la tenía. Escribir disparaba la búsqueda
+//    en cada tecla —cambiaba `q`, salía a la API, redibujaba la grilla— y el
+//    botón «Buscar» imprimía una línea por consola. Dos búsquedas distintas:
+//    la que el control promete y la que ocurre.
+//  - Contacto prometía planes de comisión que no existen.
+//  - El Login no tenía salida para quien olvidó la contraseña: probar, fallar,
+//    volver a probar.
+//  - Y media aplicación tuteaba en un sitio que vosea.
+//
+// El caso no lee el código para ninguna de las cuatro: recorre las pantallas.
+// La única lectura de fuente que hay —la de la consola— es justamente para no
+// creerle a la fuente: que el `console.log` ya no esté se comprueba mirando lo
+// que el navegador imprime, no lo que el archivo dice.
+// ---------------------------------------------------------------------------
+await runCase(168, 'Buscar es una acción, Contacto no promete planes, el Login tiene salida y el sitio vosea', async () => {
+  const medidos = [];
+  const sello = Date.now();
+
+  // Una publicación con identidad propia, para que la búsqueda tenga un
+  // resultado que este caso pueda nombrar. Sin esto habría que buscar «trigo»
+  // y confiar en que el seed lo tenga: una prueba apoyada en lo que no puso.
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const [categoria] = queryRows(`
+    SELECT id, 'fin' FROM categories
+    WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const laBuscada = `Zarandaja168 ${sello}`;
+  const alta = await apiRequest('/products', {
+    method: 'POST', token: vendedor.token,
+    body: {
+      name: laBuscada,
+      description: 'Publicación del caso 168: el único resultado de una búsqueda con nombre propio.',
+      category_id: categoria[0],
+      price: 31500,
+      stock: 7,
+      unit: 'kg',
+      locality_id: localidad,
+      publication_type: 'producto',
+      operation_kind: 'insumo',
+    },
+  });
+  assert(alta.data?.id, 'no se pudo publicar la fila que la búsqueda tiene que encontrar');
+  const idDeLaBuscada = alta.data.id;
+  const [cuantas] = queryRows(`
+    SELECT COUNT(*)::text, 'fin' FROM products
+    WHERE status = 'ACTIVE' AND name ILIKE ${sqlLiteral(`%${laBuscada}%`)}`);
+  assert(cuantas[0] === '1',
+    `hay ${cuantas[0]} publicaciones activas con ese nombre: la búsqueda no tendría un resultado único`);
+
+  // Las frases que esta pieza sacó. No es una puerta sobre palabras sueltas
+  // —«Vuelve a aparecer en el catálogo» es tercera persona y está bien—: son
+  // las formas exactas que se reemplazaron, y se buscan sobre el texto que la
+  // pantalla dibujó, no sobre el archivo.
+  const TUTEO_RETIRADO = [
+    '¿No tienes cuenta?', 'Regístrate aquí', 'Contáctanos',
+    '¿Estás seguro de que quieres vaciar el carrito?', 'Agrega productos',
+    'Completa tus datos', 'Aún no tienes', 'Explora el marketplace',
+    'Publica productos', 'No tienes notificaciones', 'puedes agregar',
+    'Consultá nuestros planes',
+  ];
+  const sinTuteo = (donde, texto) => {
+    const quedan = TUTEO_RETIRADO.filter((frase) => texto.includes(frase));
+    assert(quedan.length === 0,
+      `${donde}: quedó tuteo que esta pieza retiró: ${JSON.stringify(quedan)}`);
+  };
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    // --- A. Buscar es una acción -----------------------------------------
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    const consultas = [];
+    page.on('request', (pedido) => {
+      if (pedido.url().includes('/catalog/products')) consultas.push(pedido.url());
+    });
+    // El `console.log` se retiró: se comprueba que el navegador no lo imprima.
+    const porConsola = [];
+    page.on('console', (mensaje) => porConsola.push(mensaje.text()));
+
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+    const laTarjeta = () => page.getByRole('heading', { name: laBuscada, exact: true, level: 3 });
+    await esperarA(async () => (await laTarjeta().count()) === 1,
+      `la publicación «${laBuscada}» no aparece en el mercado sin filtros`, 25_000);
+    const tarjetas = () => page.locator('article[class*="card"]').count();
+    const alPrincipio = await tarjetas();
+    assert(alPrincipio > 1,
+      `el mercado dibuja ${alPrincipio} tarjeta(s): con una sola, filtrar no se distingue de no filtrar`);
+    const buscador = page.getByLabel('Buscar en el mercado');
+    const boton = page.locator('form[role="search"]').getByRole('button', { name: 'Buscar' });
+    assert(await boton.count() === 1, 'la banda de búsqueda no tiene un botón «Buscar»');
+
+    // A1. Escribir no busca. Ni consulta, ni barra, ni grilla.
+    const consultasAntes = consultas.length;
+    await buscador.fill(`  ${laBuscada}  `);
+    // Se espera a que la aplicación tenga oportunidad de reaccionar: la
+    // consulta anterior salía en el mismo tecleo, así que si va a salir, sale
+    // acá. Se espera una CONDICIÓN observable —que la grilla haya cambiado— y
+    // se acepta el silencio recién cuando se venció.
+    let reaccionó = true;
+    try {
+      await esperarA(async () => consultas.length > consultasAntes || await tarjetas() !== alPrincipio,
+        'nada', 3_000);
+    } catch {
+      reaccionó = false;
+    }
+    assert(!reaccionó,
+      `escribir disparó la búsqueda sola: ${consultas.length - consultasAntes} consulta(s) nuevas `
+      + `y la grilla pasó de ${alPrincipio} a ${await tarjetas()} tarjetas`);
+    assert(!/[?&]q=/.test(page.url()),
+      `escribir ya escribió la consulta en la barra: ${page.url()}`);
+    assert(await tarjetas() === alPrincipio,
+      `escribir cambió la grilla de ${alPrincipio} a ${await tarjetas()} tarjetas`);
+
+    // A2. El clic sí busca, con la consulta recortada.
+    await boton.click();
+    await esperarA(async () => consultas.length > consultasAntes,
+      'el clic en «Buscar» no le pidió nada al catálogo', 20_000);
+    // El valor se lee del parámetro, no del texto de la URL: un espacio viaja
+    // como «+» y no como «%20», así que comparar cadenas acusaba al producto de
+    // no recortar cuando había recortado bien.
+    const parametro = (url, clave) => new URL(url).searchParams.get(clave);
+    const laConsulta = consultas[consultas.length - 1];
+    assert(parametro(laConsulta, 'search') === laBuscada,
+      `la consulta que salió pidió ${JSON.stringify(parametro(laConsulta, 'search'))} y lo `
+      + `escrito, recortado, es ${JSON.stringify(laBuscada)}: ${laConsulta}`);
+    await esperarA(async () => await tarjetas() === 1,
+      `buscar «${laBuscada}» dejó ${await tarjetas()} tarjetas y hay una sola publicación así`,
+      20_000);
+    assert(await laTarjeta().count() === 1,
+      'la única tarjeta que quedó no es la que se buscó');
+    assert(parametro(page.url(), 'q') === laBuscada,
+      `la barra quedó con q=${JSON.stringify(parametro(page.url(), 'q'))} y lo aplicado es `
+      + `${JSON.stringify(laBuscada)}`);
+    assert(await buscador.inputValue() === laBuscada,
+      `el campo quedó en ${JSON.stringify(await buscador.inputValue())} y lo aplicado es `
+      + `${JSON.stringify(laBuscada)}: el campo y la grilla dirían cosas distintas`);
+    medidos.push(`escribir no consultó nada y el clic consultó una vez, recortado (${alPrincipio} `
+      + '→ 1 tarjeta)');
+
+    // A3. Enter hace lo mismo que el botón, sobre otra consulta.
+    const consultasAntesDeEnter = consultas.length;
+    await buscador.fill(` ${laBuscada.slice(0, 11)} `);
+    await buscador.press('Enter');
+    await esperarA(async () => consultas.length > consultasAntesDeEnter,
+      'Enter no le pidió nada al catálogo', 20_000);
+    const recortada = laBuscada.slice(0, 11);
+    assert(parametro(consultas[consultas.length - 1], 'search') === recortada,
+      `Enter pidió ${JSON.stringify(parametro(consultas[consultas.length - 1], 'search'))} y lo `
+      + `escrito, recortado, es ${JSON.stringify(recortada)}`);
+    assert(parametro(page.url(), 'q') === recortada,
+      `Enter dejó q=${JSON.stringify(parametro(page.url(), 'q'))} en la barra`);
+
+    // A4. Una consulta vacía limpia el filtro.
+    await buscador.fill('   ');
+    await buscador.press('Enter');
+    await esperarA(async () => !/[?&]q=/.test(page.url()),
+      `vaciar la búsqueda dejó la consulta en la barra: ${page.url()}`, 20_000);
+    await esperarA(async () => await tarjetas() === alPrincipio,
+      `vaciar la búsqueda dejó ${await tarjetas()} tarjetas y antes de filtrar había ${alPrincipio}`,
+      20_000);
+    medidos.push('Enter aplica lo mismo que el botón y una consulta vacía limpia el filtro');
+
+    // A5. «Limpiar filtros» limpia las DOS cosas.
+    //
+    // Lo escrito y lo aplicado son dos estados desde esta pieza, y el único
+    // lugar donde tienen que moverse juntos sin que nadie apriete «Buscar» es
+    // éste: si limpiar filtros dejara el texto en el campo, el campo diría que
+    // hay una búsqueda puesta y la grilla mostraría el catálogo entero.
+    await buscador.fill(laBuscada);
+    await boton.click();
+    await esperarA(async () => parametro(page.url(), 'q') === laBuscada,
+      'no se pudo dejar una búsqueda aplicada antes de limpiar los filtros', 20_000);
+    await page.getByRole('button', { name: 'Limpiar filtros' }).first().click();
+    await esperarA(async () => !/[?&]q=/.test(page.url()) && await buscador.inputValue() === '',
+      `limpiar filtros dejó q=${JSON.stringify(parametro(page.url(), 'q'))} y el campo en `
+      + `${JSON.stringify(await buscador.inputValue())}`, 20_000);
+    await esperarA(async () => await tarjetas() === alPrincipio,
+      `limpiar filtros dejó ${await tarjetas()} tarjetas y sin filtrar había ${alPrincipio}`,
+      20_000);
+    medidos.push('«Limpiar filtros» limpia el campo, la barra y la grilla a la vez');
+
+    // A6. Y nada de esto se cuenta por consola.
+    const rastro = porConsola.filter((linea) => /Búsqueda realizada/i.test(linea));
+    assert(rastro.length === 0,
+      `el buscador sigue contando por consola: ${JSON.stringify(rastro.slice(0, 3))}`);
+
+    // --- B. Contacto no promete planes ------------------------------------
+    await page.locator('header').first()
+      .getByRole('button', { name: 'Contacto', exact: true }).first().click();
+    await page.getByRole('heading', { name: 'Preguntas Frecuentes' }).waitFor({ timeout: 20_000 });
+    const faq = await page.locator('section').filter({
+      has: page.getByRole('heading', { name: 'Preguntas Frecuentes' }),
+    }).first().innerText();
+    assert(/¿Hay comisiones por venta\?/.test(faq),
+      `la FAQ ya no trae la pregunta de comisiones:\n${faq}`);
+    for (const promesa of [/planes/i, /suscripci/i, /competitivas/i]) {
+      assert(!promesa.test(faq),
+        `la FAQ sigue prometiendo algo que no existe (${promesa}):\n${faq}`);
+    }
+    assert(/no cobra comisión por la venta/i.test(faq) && /el pago va al vendedor/i.test(faq),
+      `la FAQ no dice la regla vigente —sin comisión, el pago al vendedor—:\n${faq}`);
+    sinTuteo('Contacto/FAQ', faq);
+    medidos.push('la FAQ dice la regla vigente y no menciona planes ni suscripciones');
+
+    // --- C. El Login tiene salida, y no arrastra lo que quedó atrás --------
+    //
+    // Se abre desde una TARJETA a propósito: por ahí el ingreso lleva una
+    // continuidad pendiente —volver a esa publicación— y lo que se mide es que
+    // irse a pedir ayuda la descarte. Si volviera, Contacto aparecería con el
+    // detalle de una publicación encima.
+    await page.locator('header').first()
+      .getByRole('button', { name: 'Mercado', exact: true }).first().click();
+    await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+    await page.locator('article[class*="card"]')
+      .getByRole('button', { name: 'Ingresar para continuar' }).first().click();
+    await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    const login = await page.getByRole('dialog').first().innerText();
+    assert(/¿No tenés cuenta\?/.test(login) && /Registrate acá/.test(login),
+      `el Login no vosea la invitación a registrarse: ${JSON.stringify(login)}`);
+    assert(/¿Olvidaste tu contraseña\?/.test(login),
+      `el Login no dice nada para quien olvidó la contraseña: ${JSON.stringify(login)}`);
+    assert(/no hay recuperación automática/i.test(login),
+      `el Login no aclara que la recuperación no es automática: ${JSON.stringify(login)}`);
+    // Y no promete lo que no puede cumplir.
+    for (const promesa of [/te enviamos/i, /te mandamos/i, /revisá tu correo/i,
+      /en 24|en 48|en las próximas/i, /restablec(er|é) tu contraseña/i]) {
+      assert(!promesa.test(login),
+        `el Login promete algo que no existe (${promesa}): ${JSON.stringify(login)}`);
+    }
+    sinTuteo('Login', login);
+
+    await page.getByRole('button', { name: 'Escribinos por Contacto' }).click();
+    await esperarA(async () => page.url().includes('section=contact'),
+      `la salida de soporte no llevó a Contacto: ${page.url()}`, 20_000);
+    await page.getByRole('heading', { name: 'Preguntas Frecuentes' }).waitFor({ timeout: 20_000 });
+    assert(await page.getByRole('dialog').count() === 0,
+      `irse a Contacto dejó ${await page.getByRole('dialog').count()} capa(s) abiertas`);
+    // La continuidad se descartó: no reaparece la publicación de la que venía.
+    await page.waitForTimeout(600);
+    assert(await page.locator('#detalle-titulo').count() === 0
+      && await page.getByRole('dialog').count() === 0,
+    'la continuidad del ingreso se ejecutó igual y reabrió lo que había atrás');
+    medidos.push('la salida de soporte cierra el ingreso, va a Contacto y descarta la continuidad');
+
+    // --- D. El voseo, en las pantallas que esta pieza tocó ----------------
+    // D1. Quiénes somos.
+    await page.locator('header').first()
+      .getByRole('button', { name: 'Quiénes somos', exact: true }).first().click();
+    await esperarA(async () => (await page.getByRole('button', { name: 'Contactanos' }).count()) === 1,
+      'Quiénes somos no dice «Contactanos»', 20_000);
+    sinTuteo('Quiénes somos', await page.locator('main, body').first().innerText());
+
+    // D2. El carrito vacío, y el carrito con algo adentro.
+    const compradora = `voseo.${sello}@ejemplo.com`;
+    await registrarYVerificar({
+      email: compradora, password: 'voseo12345',
+      full_name: `Compradora Voseo ${sello}`, role: 'user',
+    });
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+    await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    await page.getByPlaceholder('tu@email.com').fill(compradora);
+    await page.getByPlaceholder('••••••••').fill('voseo12345');
+    await page.locator('[class*="_submitButton_"][type="submit"]').click();
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().waitFor({ timeout: 25_000 });
+
+    await page.getByRole('button', { name: /Carrito/ }).first().click();
+    const carrito = page.getByRole('dialog', { name: 'Mi carrito' });
+    await carrito.waitFor({ timeout: 20_000 });
+    const vacio = await carrito.innerText();
+    assert(/Agregá productos para empezar tu compra/.test(vacio),
+      `el carrito vacío no vosea: ${JSON.stringify(vacio)}`);
+    sinTuteo('Carrito vacío', vacio);
+    await carrito.getByRole('button', { name: 'Cerrar' }).first().click();
+    await esperarA(async () => (await carrito.count()) === 0, 'el carrito no se cerró', 15_000);
+
+    // Con algo adentro: «Vaciar carrito» pregunta, y pregunta en voseo.
+    await page.getByLabel('Buscar en el mercado').fill(laBuscada);
+    await page.getByLabel('Buscar en el mercado').press('Enter');
+    await esperarA(async () => (await laTarjeta().count()) === 1,
+      `no se encontró «${laBuscada}» para cargar el carrito`, 20_000);
+    await accionDeLaTarjeta(page, laBuscada).click();
+    await page.getByRole('button', { name: /Carrito/ }).first().click();
+    await carrito.waitFor({ timeout: 20_000 });
+    await esperarA(async () => (await carrito.getByRole('button', { name: 'Vaciar carrito' })
+      .count()) === 1, 'el carrito con una compra no ofrece vaciarse', 20_000);
+    await carrito.getByRole('button', { name: 'Vaciar carrito' }).click();
+    const confirmacion = page.locator('[class*="confirmModal"]');
+    await confirmacion.waitFor({ state: 'visible', timeout: 15_000 });
+    const preguntado = await confirmacion.innerText();
+    assert(/¿Seguro que querés vaciar el carrito\?/.test(preguntado),
+      `la confirmación de vaciar no vosea: ${JSON.stringify(preguntado)}`);
+    sinTuteo('Confirmación de vaciar', preguntado);
+    await confirmacion.getByRole('button', { name: 'Cancelar' }).click();
+    await confirmacion.waitFor({ state: 'hidden', timeout: 15_000 });
+
+    // D3. El Checkout, que es la pantalla siguiente del mismo recorrido.
+    await carrito.getByRole('button', { name: /Continuar compra|Continuar/ }).first().click();
+    const checkout = page.getByRole('dialog', { name: 'Checkout' });
+    await checkout.waitFor({ timeout: 25_000 });
+    const datos = await checkout.innerText();
+    assert(/Completá tus datos para recibir el pedido/.test(datos),
+      `el Checkout no vosea el pedido de datos: ${JSON.stringify(datos.slice(0, 200))}`);
+    sinTuteo('Checkout', datos);
+    await checkout.getByRole('button', { name: 'Cerrar' }).first().click();
+    await esperarA(async () => (await checkout.count()) === 0, 'el Checkout no se cerró', 15_000);
+
+    // D4. Mi cuenta: compras, ventas y notificaciones, las tres vacías porque
+    // esta cuenta es nueva. Es justo donde vivía el tuteo.
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
+    // El rótulo de la solapa no es exacto a propósito: «Notificaciones» lleva
+    // un contador al lado cuando hay sin leer, así que el nombre accesible es
+    // «Notificaciones 1» y un `exact` acusaba de faltante una solapa que estaba.
+    const solaparse = async (solapa) => {
+      const boton = page.getByRole('button', { name: new RegExp(`^${solapa}`) }).first();
+      try {
+        await boton.click({ timeout: 20_000 });
+      } catch {
+        const hay = await page.locator('button').allInnerTexts();
+        throw new Error(`no se pudo abrir la solapa «${solapa}»; los botones a la vista son `
+          + JSON.stringify(hay.map((t) => t.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 14)));
+      }
+    };
+    for (const [solapa, esperado] of [
+      ['Mis Compras', 'Todavía no tenés compras'],
+      ['Mis Ventas', 'Todavía no tenés ventas'],
+      ['Notificaciones', 'No tenés notificaciones'],
+    ]) {
+      await solaparse(solapa);
+      await esperarA(async () => (await page.getByText(esperado, { exact: true }).count()) > 0,
+        `«${solapa}» no dice «${esperado}»`, 20_000);
+      sinTuteo(`Mi cuenta/${solapa}`, await page.locator('main, body').first().innerText());
+    }
+    medidos.push('Login, Quiénes somos, carrito, confirmación, Checkout y las tres solapas '
+      + 'vacías de Mi cuenta vosean, y ninguna conserva las formas retiradas');
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+    // El caso no le deja residuo a nadie: su publicación se retira.
+    await apiRequest(`/products/${idDeLaBuscada}`, {
+      method: 'DELETE', token: vendedor.token,
+    }).catch(() => {});
+  }
+
+  return `escribir en el buscador no consulta, no toca la barra y no redibuja; el clic y Enter `
+    + `aplican la consulta recortada, la escriben en «q» y dejan sólo «${laBuscada}»; una `
+    + `consulta vacía limpia el filtro y nada se cuenta por consola; ${medidos.join('; ')}`;
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del

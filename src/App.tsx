@@ -114,6 +114,7 @@ function App() {
   
   const {
     searchQuery,
+    textoBuscado,
     selectedType,
     selectedCategory,
     selectedSubcategory,
@@ -123,7 +124,8 @@ function App() {
     priceMax,
     inStockOnly,
     minRating,
-    setSearchQuery,
+    setTextoBuscado,
+    aplicarBusqueda,
     setSelectedType,
     setSelectedCategory,
     setSelectedSubcategory,
@@ -195,6 +197,21 @@ function App() {
     // `handleNavigate` viene memorizado de la navegación; `abrirLoginYVolver`
     // sólo escribe estado y volver a crearlo no cambia cuándo corre esto.
   }, [currentSection, isAuthenticated, handleNavigate]);
+
+  /**
+   * Salir del ingreso hacia Contacto, para quien olvidó la contraseña.
+   *
+   * NO pasa por `cerrarAutenticacion`, y el motivo es el mismo que el de
+   * `abrirLogin`: esa función ejecuta la continuidad pendiente, así que al
+   * volver reabriría el carrito o la publicación de la que se venía, encima
+   * de Contacto. Quien va a pedir ayuda no vuelve a lo que estaba haciendo:
+   * la continuidad se descarta acá, a propósito.
+   */
+  const irASoporteDesdeElIngreso = () => {
+    setVolverDespuesDeIngresar(null);
+    setAuthModal(null);
+    handleNavigate('contact');
+  };
 
   const cerrarAutenticacion = () => {
     setAuthModal(null);
@@ -520,8 +537,29 @@ function App() {
     ? totalDeCatalogo
     : filteredProducts.length;
 
+  /**
+   * Buscar es una acción, no cada tecla.
+   *
+   * Lo que se escribe y lo que está aplicado eran la misma variable, así que
+   * cada tecla cambiaba `q`, salía a la API y redibujaba la grilla. El botón
+   * «Buscar» y Enter, mientras tanto, no hacían nada: `handleSearchSubmit`
+   * imprimía una línea por consola. Es decir que escribir ejecutaba una
+   * búsqueda distinta de la que el control promete, y el control prometía una
+   * acción que no existía.
+   *
+   * Ahora son dos cosas distintas: `textoBuscado` es lo que hay en el campo y
+   * `searchQuery` es lo que está aplicado. Sólo la acción —clic o Enter— pasa
+   * de una a la otra, recortada; y una consulta vacía limpia el filtro, que es
+   * exactamente lo mismo que aplicar «nada». Es el patrón que el buscador de
+   * usuarios de Administración ya usaba.
+   *
+   * Los dos estados viven en `useProductFilters`, que es donde ya vivían los
+   * filtros y su sincronía con la barra: volver atrás tiene que devolver
+   * también el texto que produjo ese resultado, y ese es el único otro momento
+   * en que el campo cambia solo.
+   */
   const handleSearchSubmit = () => {
-    console.log('Búsqueda realizada:', searchQuery);
+    aplicarBusqueda();
   };
 
   /**
@@ -764,8 +802,8 @@ function App() {
     <ContextoDeNavegacion.Provider value={navegacion}>
       <div className={styles.app}>
         <Header
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
+          searchQuery={textoBuscado}
+          onSearchChange={setTextoBuscado}
           onSearchSubmit={handleSearchSubmit}
           onLoginClick={abrirLogin}
           onCartClick={() => setIsCartOpen(true)}
@@ -784,6 +822,7 @@ function App() {
           <LoginModal
             onClose={cerrarAutenticacion}
             onSwitchToRegister={() => setAuthModal('register')}
+            onIrASoporte={irASoporteDesdeElIngreso}
           />
         )}
 

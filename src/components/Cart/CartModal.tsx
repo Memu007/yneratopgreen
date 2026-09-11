@@ -59,7 +59,7 @@ export const CartModal: React.FC<CartModalProps> = ({
   const handleClearCart = async () => {
     const confirmed = await showConfirm({
       title: 'Vaciar carrito',
-      message: '¿Estás seguro de que quieres vaciar el carrito?',
+      message: '¿Seguro que querés vaciar el carrito?',
       confirmText: 'Sí, vaciar',
       cancelText: 'Cancelar',
       type: 'warning'
@@ -93,7 +93,7 @@ export const CartModal: React.FC<CartModalProps> = ({
             <div className={styles.emptyCart}>
               <p className={styles.emptyText}>Tu carrito está vacío</p>
               <p className={styles.emptySubtext}>
-                Agrega productos para comenzar tu compra
+                Agregá productos para empezar tu compra
               </p>
             </div>
           ) : (

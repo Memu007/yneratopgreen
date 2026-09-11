@@ -57,7 +57,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({
                 className={styles.contactButton}
                 onClick={onNavigateToContact}
               >
-                Contáctanos
+                Contactanos
               </button>
             </div>
             <div className={styles.infoMedia}>

@@ -360,10 +360,16 @@ const aPublicacionDelPanel = (p: BackendProduct): UserProduct => {
   // reserva stock —lo decide su anatomía— y sin embargo la fila guarda 0,
   // porque la columna tiene ese valor por omisión y el alta le pasa NULL. En
   // una publicación de servicio manda su estado real: activo o pausado.
+  //
+  // Y `draft` no se pregunta más. `ProductStatus` tiene cuatro valores —ACTIVE,
+  // PAUSED, SOLD_OUT, DELETED, tanto en el modelo como en el tipo de la base—,
+  // así que una publicación en borrador no existe y esa rama no podía
+  // ejecutarse nunca. Una condición muerta no es inofensiva: dice que hay un
+  // estado que el producto tendría que saber dibujar, y no lo hay.
   const usaStock = !esDeServicio(normalizarAnatomia(p.operation_kind));
   let status: UserProduct['status'] = 'active';
   if (usaStock && p.stock === 0) status = 'sold-out';
-  else if (p.status === 'draft' || p.status === 'paused') status = 'paused';
+  else if (p.status === 'paused') status = 'paused';
 
   return {
     id: p.id,
@@ -2862,8 +2868,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
         ) : purchases.length === 0 ? (
           <div className={styles.emptyState}>
             <div className={styles.emptyIcon}></div>
-            <h3>Aún no tienes compras</h3>
-            <p>Explora el marketplace y realiza tu primera compra</p>
+            <h3>Todavía no tenés compras</h3>
+            <p>Explorá el mercado y hacé tu primera compra</p>
           </div>
         ) : (
           <>
@@ -3133,8 +3139,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
       ) : sales.length === 0 ? (
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}></div>
-          <h3>Aún no tienes ventas</h3>
-          <p>Publica productos y espera a que los compradores te encuentren</p>
+          <h3>Todavía no tenés ventas</h3>
+          <p>Publicá productos y esperá a que los compradores te encuentren</p>
         </div>
       ) : (
         <div className={styles.ordersList}>
@@ -3458,7 +3464,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
       ) : notifications.length === 0 ? (
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}></div>
-          <h3>No tienes notificaciones</h3>
+          <h3>No tenés notificaciones</h3>
           <p>Cuando ocurran eventos importantes, las verás aquí</p>
         </div>
       ) : (

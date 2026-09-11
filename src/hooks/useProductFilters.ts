@@ -39,7 +39,25 @@ export const useProductFilters = ({
   const initialNumber = (key: string, fallback: number) =>
     numeroDeLaBarra(initialParams, key, fallback);
 
+  /**
+   * Lo aplicado y lo tecleado son dos cosas.
+   *
+   * `searchQuery` es la consulta que está aplicada: la que viaja al catálogo,
+   * la que filtra acá y la que se escribe en `q`. `textoBuscado` es lo que hay
+   * en el campo. Sólo la acción del buscador —el clic o Enter— pasa de uno al
+   * otro, recortado.
+   *
+   * Viven los dos acá, y no repartidos entre `App` y este módulo, porque el
+   * único otro momento en que lo tecleado tiene que cambiar solo es cuando la
+   * barra manda: volver atrás devuelve los filtros de esa entrada, y el campo
+   * tiene que devolver el texto que produjo ese resultado. Con un efecto en
+   * `App` que copiara lo aplicado sobre lo tecleado, ese efecto llegaba tarde
+   * y pisaba lo que la persona acababa de escribir: medido, el caso 168 se
+   * quedó con la consulta anterior aplicada porque su tecleo se perdió entre
+   * el `setSearchQuery` de la búsqueda anterior y el efecto que lo seguía.
+   */
   const [searchQuery, setSearchQuery] = useState(initialParams.get('q') || '');
+  const [textoBuscado, setTextoBuscado] = useState(initialParams.get('q') || '');
   const [selectedType, setSelectedType] = useState<'todos' | 'productos' | 'servicios'>(() => {
     return tipoDeLaBarra(initialParams.get('type'));
   });
@@ -69,6 +87,7 @@ export const useProductFilters = ({
     if (versionDeLaBarra === 0) return;
     const params = new URLSearchParams(window.location.search);
     setSearchQuery(params.get('q') || '');
+    setTextoBuscado(params.get('q') || '');
     setSelectedType(tipoDeLaBarra(params.get('type')));
     setSelectedCategory(params.get('category') || 'Todas las categorías');
     setSelectedSubcategory(params.get('subcategory') || 'Todas');
@@ -162,8 +181,18 @@ export const useProductFilters = ({
   }, [products, searchQuery, selectedType, selectedCategory, selectedSubcategory,
       priceMin, priceMax, inStockOnly, minRating]);
 
+  /** Aplicar lo que hay escrito. Vacío limpia el filtro, que es lo mismo que
+      aplicar «nada»: `q` desaparece de la barra y la consulta deja de llevar
+      `search`. */
+  const aplicarBusqueda = () => {
+    const recortado = textoBuscado.trim();
+    setTextoBuscado(recortado);
+    setSearchQuery(recortado);
+  };
+
   const resetFilters = () => {
     setSearchQuery('');
+    setTextoBuscado('');
     setSelectedType('todos');
     setSelectedCategory('Todas las categorías');
     setSelectedSubcategory('Todas');
@@ -178,6 +207,7 @@ export const useProductFilters = ({
   return {
     // Estado
     searchQuery,
+    textoBuscado,
     selectedType,
     selectedCategory,
     selectedSubcategory,
@@ -188,7 +218,8 @@ export const useProductFilters = ({
     inStockOnly,
     minRating,
     // Setters
-    setSearchQuery,
+    setTextoBuscado,
+    aplicarBusqueda,
     setSelectedType,
     setSelectedCategory,
     setSelectedSubcategory,

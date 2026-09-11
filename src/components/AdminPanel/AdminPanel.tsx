@@ -1593,10 +1593,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                             onChange={(e) => pedirCambioDeEstado(product, e.target.value)}
                             className={styles.statusSelect}
                           >
-                            <option value="active">Activo</option>
-                            <option value="paused">Pausado</option>
-                            <option value="sold_out">Agotado</option>
-                            <option value="deleted">Eliminado</option>
+                            {/* Del mismo diccionario que el badge de al lado y
+                                que el filtro de arriba. Estaban escritas acá a
+                                mano y en masculino —«Activo», «Pausado»—,
+                                mientras el badge de la MISMA fila decía
+                                «Activa» y «Pausada»: el mismo estado con dos
+                                nombres, a dos centímetros. El `value` sigue
+                                siendo el token del Backend, que es lo que
+                                viaja en el PATCH. */}
+                            {Object.entries(ESTADOS_DE_PRODUCTO).map(([token, estado]) => (
+                              <option key={token} value={token}>{estado.texto}</option>
+                            ))}
                           </select>
                         </td>
                       </tr>

@@ -354,7 +354,7 @@ for (const medida of MEDIDAS) {
     const page = await ctx.newPage();
     await page.goto(WEB, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Ingresar' }).first().click();
-    await page.getByRole('button', { name: /Reg[íi]strate aqu[íi]/i }).first().click();
+    await page.getByRole('button', { name: /Registrate ac[áa]/i }).first().click();
     await page.getByRole('checkbox', { name: /Quiero registrarme como transportista/ })
       .check();
     await revisar(page, `${medida.n} alta de transportista`,

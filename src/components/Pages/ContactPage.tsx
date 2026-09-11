@@ -298,7 +298,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({ cotizacion = null }) =
           <div className={styles.faqGrid}>
             <div className={styles.faqCard}>
               <h3>¿Cómo empiezo a vender?</h3>
-              <p>Registrate como vendedor, completa tu perfil y comenzá a publicar productos de inmediato.</p>
+              <p>Registrate como vendedor, completá tu perfil y empezá a publicar productos.</p>
             </div>
             <div className={styles.faqCard}>
               <h3>¿Cuáles son las formas de pago?</h3>
@@ -309,8 +309,20 @@ export const ContactPage: React.FC<ContactPageProps> = ({ cotizacion = null }) =
               <p>Sí, trabajamos con logística nacional para llegar a todas las provincias argentinas.</p>
             </div>
             <div className={styles.faqCard}>
+              {/* Decía «nuestras comisiones son transparentes y competitivas,
+                  consultá nuestros planes»: dos promesas sobre algo que no
+                  existe. No hay planes, no hay suscripción y no hay comisión.
+                  Lo que sí hay está escrito en el producto —la preferencia de
+                  Mercado Pago no manda `marketplace_fee`, ni siquiera en cero,
+                  y el modelo de pago no guarda comisión— y es lo que dice
+                  ahora. Mercado Pago sí cobra lo suyo: callarlo sería la misma
+                  clase de promesa al revés. */}
               <h3>¿Hay comisiones por venta?</h3>
-              <p>Nuestras comisiones son transparentes y competitivas. Consultá nuestros planes para más detalles.</p>
+              <p>
+                AgroBoeda no cobra comisión por la venta en este MVP: el pago va al vendedor.
+                Lo que cobre el medio de pago que elijas —Mercado Pago, por ejemplo— corre por
+                cuenta de ese medio y no pasa por AgroBoeda.
+              </p>
             </div>
           </div>
         </div>

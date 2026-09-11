@@ -152,7 +152,7 @@ async function publicas(page, medida) {
   await revisar(page, 'ingreso', medida,
     page.getByRole('heading', { name: 'Iniciar Sesión' }));
 
-  await page.getByRole('button', { name: /Reg[íi]strate aqu[íi]/i }).first().click();
+  await page.getByRole('button', { name: /Registrate ac[áa]/i }).first().click();
   await revisar(page, 'registro', medida,
     page.getByRole('heading', { name: 'Crear Cuenta' }));
 

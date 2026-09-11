@@ -280,7 +280,7 @@ export async function apiFetch<T = unknown>(
         );
       }
       throw new ErrorDeLaApi(
-        'Sesión expirada. Por favor, inicia sesión nuevamente.',
+        'Sesión expirada. Volvé a iniciar sesión.',
         'sesion-vencida',
         401,
       );
@@ -315,7 +315,7 @@ export async function apiFetch<T = unknown>(
     // ningún token y aparecía el Login. El 503 estaba cubierto y la red no, que
     // es el caso más común de los dos.
     if (error instanceof ErrorDeLaApi) throw error;
-    throw new ErrorDeLaApi('Error de red. Por favor, verifica tu conexión.', 'indisponible');
+    throw new ErrorDeLaApi('No pudimos conectarnos. Revisá tu conexión y probá de nuevo.', 'indisponible');
   }
 }
 
