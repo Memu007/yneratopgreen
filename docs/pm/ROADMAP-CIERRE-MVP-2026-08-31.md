@@ -157,7 +157,7 @@ anatomías ni el detalle. Su contrato completo y la evidencia de raíz están en
 | Orden | Pieza | Auditoría cubierta | Cierre mínimo |
 |---:|---|---|---|
 | 16 | **QUOTE-CONTACT-1R — cerrada** | A4 y A5 | `612b57f` + `1a01854`; informes `9493ba0` + `e363408`. Dev 165/166 con único rojo 131 ambiental; PM reprodujo 166 base y corregido en 1/1 cada uno. |
-| 17 | **FILTER-INTENT-1 — activa** | A6, A9 y, si se reproduce, R6 | Filtros URL inválidos no simulan cero resultados; Login retoma publicar/comprar con la puerta existente. |
+| 17 | **FILTER-INTENT-1R — devuelta** | A6, A9 y R6 | Base `0a6cbd4`/`89db3fe`: A6/A9 y 167 verdes, pero la sesión vencida abre Checkout y luego deja «Sesión expirada» sin Login; falta también el CTA homólogo de About. |
 | 18 | **COPY-CLEAR-1** | A7, A10, F4 y F12; deuda ADMIN-STATE-1 | Emi decide wordmark→Inicio; Buscar hace algo real o desaparece; se retiran planes inexistentes, se unifica voseo, se informa soporte sin prometer recuperación automática y los estados visibles quedan en es-AR sin ramas `draft` muertas. |
 
 Son mejoras de claridad, no autorización para mensajería, planes, suscripciones
