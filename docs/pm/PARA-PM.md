@@ -2,6 +2,302 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## COPY-CLEAR-1 — lo que la pantalla promete y lo que la pantalla hace
+
+**Resultado: los seis puntos entregados. Dos correcciones a tu inventario del
+punto 6, con la medición. Y un hallazgo fuera de alcance que te importa: `a11y`
+está roja en la base aceptada, no por esta pieza.**
+
+- Producto/regresión: `9f25d59`
+- **En mi rama, no en `main`.** No integré, no desplegué, no toqué Backend,
+  schema, dependencia, pagos, datos remotos, Railway, activos de marca,
+  mensajería ni recuperación automática.
+
+---
+
+### 1. La marca vuelve a Inicio (A7): conservado
+
+No lo toqué. El 156 sigue verde —lo corrí— y lo único que le cambié es el
+rótulo del enlace a Registro, que esta misma pieza reescribió: buscaba
+`/Reg[íi]strate aqu[íi]/i` y ahora dice «Registrate acá». Lo mismo en
+`a11y.mjs` y en `contraste.mjs`, que lo buscaban igual.
+
+### 2. Buscar tiene una acción real
+
+Medido antes de tocar nada: `searchQuery` era una sola variable para lo
+tecleado y lo aplicado, así que **cada tecla** cambiaba `q`, salía a la API y
+redibujaba la grilla; y `handleSearchSubmit` era `console.log('Búsqueda
+realizada:', searchQuery)`. Las dos mitades del defecto que describiste.
+
+Ahora hay dos estados y **una sola forma de pasar de uno al otro**: el clic o
+Enter aplican lo escrito, recortado. Vacío limpia el filtro. Es el patrón que
+el buscador de usuarios de Administración ya usaba, y viven los dos en
+`useProductFilters`, que es donde ya vivían los filtros y su sincronía con la
+barra.
+
+Sin motor, sin fuzzy, sin índice, sin endpoint y sin paginación: la consulta
+que sale es la misma `search=` del servidor que ya existía.
+
+**Acá me equivoqué y lo cuento porque importa.** Mi primera versión dejaba el
+texto tecleado en `App` y lo sincronizaba con un efecto sobre lo aplicado. El
+168 lo puso rojo dos corridas seguidas: `vaciar la búsqueda dejó la consulta en
+la barra: …&q=Zarandaja16`. El efecto llegaba tarde y **pisaba lo que la
+persona acababa de escribir**. Lo moví al hook, donde lo aplicado y lo tecleado
+cambian en el mismo commit, y la carrera deja de existir por construcción.
+
+Lo que no puedo decirte es que el caso atrape esa carrera siempre: **la
+atrapaba de manera intermitente** —la primera corrida con el defecto pasó— y
+cuando reproduje el efecto adentro del hook, no la atrapó (2/2 verde). Así que
+lo que hay es una prueba determinista de la propiedad vecina —«Limpiar filtros»
+limpia el campo, la barra y la grilla a la vez— y no una prueba de la carrera.
+Lo digo en vez de venderte un negativo que no tengo.
+
+### 3. Contacto no promete planes
+
+Verifiqué la regla contra el producto antes de escribirla, porque es una
+afirmación sobre dinero:
+
+- `mp_preferencia.py:158` — «Nada de `marketplace_fee`: ni el 5 % de antes ni un
+  cero. AgroBoeda no cobra comisión por venta.»
+- `models/payment.py:62` — `commission_amount`, `commission_percent` y
+  `seller_amount` se fueron del modelo.
+
+La FAQ dice ahora que AgroBoeda no cobra comisión por la venta en este MVP y
+que el pago va al vendedor. **Y agrega una frase que no me pediste:** que lo que
+cobre el medio de pago corre por cuenta de ese medio. El propio comentario del
+modelo dice que Mercado Pago le descuenta lo suyo al vendedor; callarlo sería la
+misma clase de promesa, al revés.
+
+De paso, en la FAQ de al lado quedaba «completa tu perfil» en una oración que ya
+voseaba dos veces.
+
+### 4. Contraseña: salida honesta
+
+El Login no tenía **ninguna** salida: probar, fallar, volver a probar. Ahora
+dice «¿Olvidaste tu contraseña? Todavía no hay recuperación automática» y ofrece
+«Escribinos por Contacto». Sin token, sin correo, sin endpoint, sin modal, sin
+formulario y sin plazo. La herramienta manual de administración no se tocó.
+
+Un detalle que no es cosmético: la salida **no** pasa por `cerrarAutenticacion`.
+Esa función ejecuta la continuidad pendiente, así que si el ingreso venía de una
+tarjeta, al volver reabriría esa publicación encima de Contacto. Quien va a
+pedir ayuda no vuelve a lo que estaba haciendo: la continuidad se descarta, y el
+caso lo comprueba abriendo el Login **desde una tarjeta** a propósito.
+
+### 5. Voseo es-AR
+
+Reemplacé sólo formas verbales de segunda persona, revisadas una por una, y
+sobre pantallas que el caso después visita:
+
+| Dónde | Antes | Ahora |
+| --- | --- | --- |
+| Login | ¿No tienes cuenta? / Regístrate aquí | ¿No tenés cuenta? / Registrate acá |
+| Quiénes somos | Contáctanos | Contactanos |
+| Carrito vacío | Agrega productos para comenzar tu compra | Agregá productos para empezar tu compra |
+| Vaciar carrito | ¿Estás seguro de que quieres vaciar el carrito? | ¿Seguro que querés vaciar el carrito? |
+| Checkout | Completa tus datos para recibir el pedido | Completá tus datos… |
+| Mi cuenta | Aún no tienes compras / Explora el marketplace y realiza tu primera compra | Todavía no tenés compras / Explorá el mercado y hacé tu primera compra |
+| Mi cuenta | Aún no tienes ventas / Publica productos y espera… | Todavía no tenés ventas / Publicá productos y esperá… |
+| Mi cuenta | No tienes notificaciones | No tenés notificaciones |
+| Alta de publicación | Solo puedes agregar N imagen(es) más | Sólo podés agregar N imagen(es) más |
+| Error visible | Sesión expirada. Por favor, inicia sesión nuevamente. | Sesión expirada. Volvé a iniciar sesión. |
+| Error visible | Error de red. Por favor, verifica tu conexión. | No pudimos conectarnos. Revisá tu conexión y probá de nuevo. |
+
+No toqué sustantivos («tu cuenta» queda) ni coincidencias correctas: en
+`AdminPanel` hay «Vuelve a aparecer en el catálogo», que es tercera persona —la
+publicación vuelve— y está bien escrita. Una regex la habría marcado.
+
+### 6. Estados en español: dos correcciones a tu inventario
+
+Acá vengo con la medición, porque lo que pediste no coincide del todo con lo
+que hay.
+
+**a. `getStatusBadge` no tiene ninguna rama `draft`.** Busqué `draft` en todo
+`src/`: aparece en cuatro lugares y ninguno es ése. Lo que `getStatusBadge` sí
+tiene es un mapa completo para su propio tipo, y nunca imprime un token: recibe
+un estado ya traducido por `mapBackendStatus`, que además cae a `'pending'` ante
+cualquier valor desconocido.
+
+**b. De las dos referencias a `draft`, sólo una está muerta.**
+
+| Dónde | ¿Muerta? | Medición |
+| --- | --- | --- |
+| `aPublicacionDelPanel` | **Sí** | `ProductStatus` tiene cuatro valores en el modelo, y el tipo de la base también: `["ACTIVE","PAUSED","SOLD_OUT","DELETED"]`. Una publicación en borrador no existe. **Eliminada.** |
+| `ESTADOS_DE_ORDEN.draft` + el `.filter(token !== 'draft')` de Administración | **No** | `OrderStatus` sí tiene `DRAFT`, y la base también. El filtro la excluye a propósito —una orden en borrador todavía no es un pedido— pero la traduce si aparece en la tabla, y el 160 la busca en la vista sin filtro justamente por eso. Sacarla dejaría sin nombre a un estado real. **No la toqué.** |
+
+**c. Lo que sí estaba mal, y lo encontró la aserción nueva.** El selector de
+estado de cada fila tenía sus opciones escritas a mano y **en masculino**
+—«Activo», «Pausado», «Agotado», «Eliminado»— mientras el badge de la MISMA
+fila decía «Activa» y «Pausada». El mismo estado con dos nombres a dos
+centímetros. Ahora las opciones salen del mismo diccionario que el badge y que
+el filtro; el `value` sigue siendo el token del Backend.
+
+Ninguna celda ni badge muestra un token crudo: `estados.ts` no devuelve el
+token ni siquiera cuando no conoce el estado —dice «Estado sin traducir»— y eso
+ya estaba y lo conservé.
+
+### 7. Las pruebas
+
+**Caso 160, extendido** con lo que pediste:
+
+- Los catorce rótulos se fijan **exactos**, uno por uno. Lo que había comparaba
+  la pantalla contra el diccionario del producto: comprueba que los dos están
+  de acuerdo, no que lo que dicen esté en castellano. Con `active: 'Active'`
+  los catorce seguían de acuerdo. La lista nueva no puede envejecer en
+  silencio: se exige que cubra exactamente los estados que declara la base.
+  (Detalle medido: lo que se fija sale de `textContent` y no de `innerText`,
+  porque el badge se dibuja con `text-transform: uppercase` y `innerText` vuelve
+  «ACTIVA».)
+- El selector ofrece castellano con el token adentro del `value`, y el **cuerpo
+  del PATCH** lleva el token. Se mira el pedido, no el resultado: que la base
+  termine bien no dice con qué palabra se lo pidieron.
+
+**Caso 168, nuevo**: búsqueda por clic y por Enter con la consulta recortada,
+`q` puesta y limpiada, «Limpiar filtros», el rastro por consola medido en el
+navegador y no leído del archivo, la FAQ sin planes, la salida de soporte desde
+un Login abierto desde una tarjeta, y el voseo sobre siete superficies que el
+caso **visita** —Login, Quiénes somos, carrito vacío, confirmación de vaciar,
+Checkout y las tres solapas vacías de Mi cuenta—. La puerta de tuteo no es
+sobre palabras sueltas: son las frases exactas que esta pieza retiró, buscadas
+sobre el texto que la pantalla dibujó.
+
+**Los rojos.** Contra la base anterior, revirtiendo un archivo por vez para que
+cada familia caiga sola:
+
+| Familia | Base anterior | Rojo |
+| --- | --- | --- |
+| Buscar | `App.tsx` | escribir disparó la búsqueda sola: 1 consulta(s) nuevas y la grilla pasó de 46 a 0 tarjetas |
+| Planes | `ContactPage.tsx` | la FAQ sigue prometiendo algo que no existe (/planes/i) |
+| Voseo del Login | `LoginModal.tsx` | el Login no vosea la invitación a registrarse: «…¿No tienes cuenta? Regístrate aquí» |
+| Voseo del carrito | `CartModal.tsx` | el carrito vacío no vosea: «…Agrega productos para comenzar tu compra» |
+| Voseo del panel | `UserDashboard.tsx` | «Mis Compras» no dice «Todavía no tenés compras» |
+| Estados | base anterior entera | la opción con value «active» se lee «Activo» y en es-AR es «Activa» |
+
+Ese último no es un sabotaje: es el defecto real que la aserción nueva
+encontró en la base aceptada.
+
+Y los que no podían salir de la base anterior, porque ahí ya estaban bien, con
+el producto roto a propósito:
+
+| Sabotaje | Rojo |
+| --- | --- |
+| Login sin la salida de soporte, el voseo intacto | el Login no dice nada para quien olvidó la contraseña |
+| «Limpiar filtros» limpia lo aplicado y no el campo | limpiar filtros dejó q=null y el campo en «Zarandaja168 …» |
+| El PATCH manda el rótulo en vez del token | el PATCH mandó `{"status":"agotada"}` y el Backend espera el token «sold_out» |
+
+### 8. Compuertas
+
+- 156 + 160 + 168 focales desde base limpia: **3/3**.
+- **Suite completa desde base limpia: 165/168.** Rojos: el 131 de siempre, y el
+  **167 y el 168 por el límite antifuerza-bruta del Backend**. El punto 9 lo
+  explica: no es de esta pieza, y lo medí.
+- `npm run lint`, `npx tsc --noEmit`, `node --check scripts/smoke.mjs` y
+  `diff-check`: verdes.
+- Contraste y capturas: no los corrí. No estrené ningún estilo —la salida de
+  soporte usa `helpText`, que ya existía y ya usa el registro—.
+
+**Corrí la suite completa tres veces, no una, y te digo por qué.** La primera la
+mandé con la salida canalizada a `tail` y me quedé sin los mensajes de los
+rojos: una corrida que no puedo leer no es una medición. La segunda es la que
+informo. La tercera fue sobre la base anterior, para el punto 9.
+
+En la primera corrida también cayó el **137**, y ése sí era mío: entra al
+mercado con `q=` en la URL y después hacía `buscador.fill('')` esperando que
+vaciar el campo soltara la búsqueda. Desde esta pieza eso ya no alcanza —buscar
+es una acción—, así que ahora aplica el vacío con Enter y espera a que `q` se
+vaya de la barra, en vez de contar hasta 1200. Verde.
+
+### 9. El 167 y el 168 caen por el límite de ingresos, y no es de esta pieza
+
+`POST /auth/login` contesta **429 «Demasiados intentos de ingreso»**. El 168 ni
+llega a arrancar: se lo come en 8 ms, en su primera llamada.
+
+El mecanismo, medido sobre `logs/api.log` de la corrida:
+
+- `limite_de_intentos.py` permite **30 fallos de credencial por IP en 10
+  minutos**. Sólo cuentan los 401 de credencial; un ingreso correcto devuelve la
+  marca.
+- El caso **134**, que prueba justamente ese límite, gasta **24 de los 30** en
+  un solo minuto, desde `127.0.0.1`.
+- Del 134 al 167 pasan **seis minutos**, o sea que el 167 llega adentro de la
+  misma ventana, con seis fallos de margen que se van repartiendo los casos del
+  medio. El fallo número 31 es el 429, y el que lo recibe es el 167.
+- El 168 corre justo después y hereda la ventana agotada.
+
+**Y esto ya pasaba.** Corrí la suite completa **sobre la base anterior**, sin
+nada mío:
+
+```
+base anterior : 164/167 — FAIL 114, FAIL 131, FAIL 167
+esta entrega  : 165/168 — FAIL 131, FAIL 167, FAIL 168
+```
+
+El 167 falla en las dos con **el mismo mensaje**: «un ingreso correcto no
+reanudó la compra: hubo que volver a apretar "Continuar compra"». Lo que agrega
+esta entrega es el 168, que muere por la misma ventana gastada.
+
+Dicho de frente: **hace tres entregas que nadie corre la suite entera**, y el
+167 —que escribí yo— nunca se había medido adentro de una. Es exactamente la
+deuda que venís haciéndome cerrar: un caso que depende de un recurso que no
+reservó. Acá el recurso no es una fila, es el presupuesto de ingresos fallidos.
+
+**No lo arreglé** y te digo por qué. El arreglo honesto no está en el 167: está
+en que el 134 no se lleve 24 de 30 justo antes. Y las salidas que se me ocurren
+—que el 134 haga sus fallos por correo detrás de un `X-Forwarded-For`, que caen
+en la bolsa «identidad-no-confiable» y no en la de `127.0.0.1`; o separar el 134
+del 167 más de diez minutos— tocan el diseño del 134 o el orden de la suite, que
+es una decisión tuya y una pieza propia. Meterla acá sería ampliar el alcance de
+una pasada editorial hasta el limitador antifuerza-bruta.
+
+El 114 cayó sólo en la corrida de la base anterior («el titular no ve sus cargas
+declaradas») y pasó en la mía: es otro arnés intermitente, y lo dejo anotado.
+
+### 10. `npm run a11y -- --todas` está ROJA, y tampoco es de esta pieza
+
+Esto es lo que más me importa que leas.
+
+```
+[serious] color-contrast — 6 elementos en:
+  escritorio/panel del comprador, del vendedor, del transportista
+  celular/panel del comprador, del vendedor, del transportista
+  · <span class="_soloEscritorio_…">María Cliente</span>
+```
+
+Lo medí con axe directamente: **`#1e2420` sobre `#355c48` = 2,08:1**, con 4,5:1
+exigido, en 13,5 px normal.
+
+**Y da idéntica contra la base anterior**: guardé mis cambios de `src/`, corrí
+`a11y` sobre `HEAD` y salieron las mismas seis. No la trae COPY-CLEAR-1.
+
+El mecanismo, hasta donde llegué sin tocar nada: la celda «Mi cuenta» lleva
+`aria-current="page"` cuando la sección activa es la cuenta, y
+`Header.module.css:132-137` le pone `background-color: var(--tg-color-surface)`
+con `color: var(--tg-color-text)`. Ese par funciona en el resto del sitio, pero
+la cabecera vive adentro de `tg-sobre-marca`, donde los tokens no valen lo
+mismo: queda el texto oscuro sobre el verde de la banda. Sólo se ve estando en
+Mi cuenta, que es exactamente el estado que `a11y` mide y que la suite no.
+
+**No lo arreglé**: me dijiste que no rehaga marca, navegación ni estilos, y un
+hallazgo fuera de alcance se informa. El arreglo propuesto es de una línea:
+darle a esa regla el par de la banda —el mismo `--tg-color-text-inverse` que ya
+usa `.celda`— o re-escopar `--tg-color-text` adentro de `tg-sobre-marca`. Decime
+si lo abro como pieza propia.
+
+### 11. Lo demás que queda dicho
+
+- El caso 131 sigue rojo por entorno, como siempre.
+- El caso 143 sigue dejando residuo —su servicio y su producto con stock 0
+  quedan publicados—, como te dije en la entrega anterior.
+- La FAQ de «¿Cuáles son las formas de pago?» dice «Aceptamos transferencias
+  bancarias directas al vendedor» y el producto también cobra por Mercado Pago.
+  Es una afirmación incompleta en la misma grilla que acabo de corregir. No la
+  toqué: no estaba en el alcance y es una decisión tuya.
+- Sigue esperando tu palabra lo del carrito sin sesión.
+
+`CAT-PAGE-1` no lo empecé.
+
+---
+
 ## TEST-SUITE-167S — dos verdes que afirmaban sobre un estado que no fabricaron
 
 **Resultado: los dos puntos cerrados, cada uno con su rojo viejo reproducido y
