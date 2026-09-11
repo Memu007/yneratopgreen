@@ -4,6 +4,18 @@ Actualizado: 2026-09-11.
 
 ## Estado inmediato — 2026-09-11
 
+- **Incidente CORS de Railway corregido y verificado:** el Backend conservaba
+  únicamente el dominio histórico `https://ynerav.up.railway.app`, por lo que
+  el frontend vigente mostraba `Failed to fetch` aunque API y base estuvieran
+  sanas. Con autorización expresa de Emi, PM agregó
+  `https://yneratopgreen-production.up.railway.app` a `CORS_ORIGINS`, conservó
+  el origen anterior y desplegó sólo ese cambio de configuración. Railway quedó
+  `Online`; el preflight de Login devolvió 200 con el origen exacto, el catálogo
+  público volvió a mostrar 32 operaciones y el ingreso con la cuenta demo abrió
+  `Vender`, `Carrito` y `Mi cuenta`. No se cambió código, datos, secretos ni
+  pagos; `MP_CHECKOUT_HABILITADO` no se tocó. Evidencia en
+  `INCIDENTE-CORS-RAILWAY-2026-09-11.md`.
+
 - **TEST-SUITE-167S aceptada en rama:** arnés `d7e17f9`, informe `40131de`.
   Dev demostró los rojos viejos y negativos nuevos y obtuvo 139+143 en **2/2**.
   PM revisó el único archivo modificado y reprodujo ambos juntos desde otra
