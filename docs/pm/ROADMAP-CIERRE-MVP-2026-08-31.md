@@ -157,7 +157,7 @@ anatomías ni el detalle. Su contrato completo y la evidencia de raíz están en
 | Orden | Pieza | Auditoría cubierta | Cierre mínimo |
 |---:|---|---|---|
 | 16 | **QUOTE-CONTACT-1R — cerrada** | A4 y A5 | `612b57f` + `1a01854`; informes `9493ba0` + `e363408`. Dev 165/166 con único rojo 131 ambiental; PM reprodujo 166 base y corregido en 1/1 cada uno. |
-| 17 | **FILTER-INTENT-1R2 — devuelta** | A6, A9 y R6 | `0a6cbd4` + `fbdd88f`; informes `89db3fe` + `71976e9`. Flujo central y 167 verdes; falta no confundir red/5xx con sesión inválida y bajar la identidad visible sin vaciar el carrito cuando la invalidez sí se confirma. |
+| 17 | **FILTER-INTENT-1R3 — devuelta** | A6, A9 y R6 | `0a6cbd4` + `fbdd88f` + `a834ec3`; informes `89db3fe` + `71976e9` + `d21cf78`. Flujo, 503 e identidad verdes; falta clasificar como indisponible el rechazo real de `fetch` y no borrar tokens al arrancar sin red. |
 | 18 | **COPY-CLEAR-1** | A7, A10, F4 y F12; deuda ADMIN-STATE-1 | Emi decide wordmark→Inicio; Buscar hace algo real o desaparece; se retiran planes inexistentes, se unifica voseo, se informa soporte sin prometer recuperación automática y los estados visibles quedan en es-AR sin ramas `draft` muertas. |
 
 Son mejoras de claridad, no autorización para mensajería, planes, suscripciones

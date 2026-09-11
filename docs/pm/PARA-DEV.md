@@ -12,6 +12,47 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-11 — DEVOLUCIÓN: FILTER-INTENT-1R3, 503 no cubre una caída real de red
+
+Revisé producto/regresión `a834ec3` e informe `d21cf78`. El 503 de
+`/auth/me`, el 503 del refresh y la baja de identidad están bien cubiertos:
+Dev obtuvo 167 en **1/1** y PM revisó el diff y lo reprodujo desde otra base
+Docker limpia en **1/1**, salida 0 y build incluido. Log PM:
+`/private/tmp/topgreen-pm-filter-intent-167r2.log`. No hubo suite completa PM.
+
+La entrega vuelve porque el contrato decía red/timeout/5xx y el caso sólo midió
+5xx. El camino de red sigue clasificando mal:
+
+1. **`fetch` rechaza con un `TypeError`, que también es `Error`.** El `catch` de
+   `apiFetch` relanza hoy cualquier `Error` antes de construir
+   `ErrorDeLaApi('indisponible')`. `asegurarSesion()` recibe entonces un error
+   sin causa, lo toma por `sin-sesion`, limpia tokens y abre Login. Un 503 está
+   verde; una conexión abortada conserva el defecto que se pidió cerrar.
+2. **Sólo la causa `sesion-vencida` confirma invalidez.** En
+   `asegurarSesion`, no conviertas un error genérico o una causa `respuesta` en
+   sesión vencida. En `refreshAccessToken`, sólo una respuesta que realmente
+   rechaza la credencial —401/403 con el Backend actual— puede devolver
+   `rechazado`; 408, 429 y otros estados no confirman que el token no valga.
+3. **El arranque conserva el mismo borrado destructivo.** `loadCurrentUser` en
+   `AuthContext` todavía limpia tokens ante cualquier error de `/auth/me`.
+   Reutilizá la causa tipada: ante indisponibilidad conservá las credenciales;
+   sólo una sesión confirmadamente vencida las elimina. No hace falta rediseñar
+   el arranque ni agregar una dependencia.
+
+Extendé sólo R6 del 167 con una interrupción real (`route.abort()` o
+equivalente), no otro status HTTP. Al pulsar «Continuar compra» debe conservar
+carrito, tokens e identidad, explicar indisponibilidad y no abrir Login ni
+Checkout; al retirar la interrupción, el mismo botón reintenta. Sumá una
+comprobación mínima de arranque con `/auth/me` interrumpido: los tokens no se
+destruyen. Los negativos deben fallar contra `a834ec3` por comportamiento.
+
+No rehagas los 503, la sesión inválida, A6, A9 ni About. Corré sólo el 167 desde
+base limpia, lint, `node --check` y `diff-check`; el smoke incluye build. **No
+repitas suite completa ni otros casos.** Sin Backend, endpoint, router,
+dependencia, rediseño, Railway, datos remotos, pagos o secretos. Un commit de
+producto/regresión y otro de informe; no integres a `main`, no despliegues y
+frená al entregar.
+
 ## 2026-09-11 — DEVOLUCIÓN: FILTER-INTENT-1R2, una caída transitoria no es una sesión vencida
 
 Revisé producto/regresión `fbdd88f` e informe `71976e9`. La corrección central

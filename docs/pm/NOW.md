@@ -4,17 +4,15 @@ Actualizado: 2026-09-11.
 
 ## Estado inmediato — 2026-09-11
 
-- **FILTER-INTENT-1R devuelta como `FILTER-INTENT-1R2`:** base
-  `0a6cbd4`/`89db3fe`, corrección `fbdd88f`/`71976e9`. Dev obtuvo 138+139+167
-  en **3/3** para la corrección; PM revisó el diff y reprodujo el 167 desde otra
-  base limpia en **1/1**, salida 0 y build incluido. Refresh recuperable,
-  sesión irrecuperable, carrito, Login y About quedan medidos. Falta distinguir
-  una sesión inválida de una caída transitoria: hoy cualquier error de
-  `/auth/me` borra credenciales y abre Login; además, la invalidez confirmada
-  deja el nombre viejo en la cabecera. La corrección final debe conservar
-  sesión/carrito ante red o 5xx y sincronizar la identidad sólo al confirmar
-  invalidez, sin repetir suite completa. El 143 intermitente sigue como próximo
-  cierre corto de arnés. Evidencia en
+- **FILTER-INTENT-1R2 devuelta como `FILTER-INTENT-1R3`:** base
+  `0a6cbd4`/`89db3fe`, correcciones `fbdd88f`/`71976e9` y
+  `a834ec3`/`d21cf78`. Dev y PM obtuvieron el 167 R2 en **1/1** desde bases
+  limpias; PM confirmó salida 0 y build incluido. Los 503 y la identidad quedan
+  bien resueltos, pero una caída real de `fetch` produce `TypeError` y todavía
+  se convierte en sesión vencida; el arranque también borra tokens ante toda
+  falla. La R3 cierra sólo esa clasificación con una interrupción real, sin
+  repetir suite completa. El 143 intermitente sigue como próximo cierre corto
+  de arnés. Evidencia en
   `REPRODUCCION-FILTER-INTENT-1-2026-09-11.md`.
 
 - **QUOTE-CONTACT-1R aceptada:** base `612b57f`/`9493ba0`, corrección
@@ -105,9 +103,9 @@ Actualizado: 2026-09-11.
   de capturas. La versión final mide diálogo móvil, envío retenido, fallo y
   reintento; no hubo suite completa PM. Evidencia en
   `REPRODUCCION-RATING-UX-1-2026-09-10.md`.
-- **Única tarea activa y responsable:** `FILTER-INTENT-1R2`, Dev. Debe separar
-  invalidez confirmada de red/5xx y sincronizar la identidad visible sin vaciar
-  el carrito. Sólo caso 167 y puertas estáticas; detalles en `PARA-DEV.md`.
+- **Única tarea activa y responsable:** `FILTER-INTENT-1R3`, Dev. Debe tratar
+  el rechazo real de red y el arranque indisponible sin destruir credenciales.
+  Sólo caso 167 y puertas estáticas; detalles en `PARA-DEV.md`.
 - **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
   `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
   y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como
