@@ -12,6 +12,54 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-11 — DEVOLUCIÓN: FILTER-INTENT-1R2, una caída transitoria no es una sesión vencida
+
+Revisé producto/regresión `fbdd88f` e informe `71976e9`. La corrección central
+está bien encaminada: Dev obtuvo 138+139+167 en **3/3** desde base limpia y PM
+revisó el diff y reprodujo el 167 desde otra base Docker limpia en **1/1**, con
+salida 0 y build incluido. El caso distingue refresh recuperable, sesión
+irrecuperable, cancelación, credencial fallida, ingreso correcto, carrito
+intacto, cero escrituras y el CTA de About. Log PM:
+`/private/tmp/topgreen-pm-filter-intent-167r.log`. No hubo suite completa PM ni
+correspondía repetirla.
+
+Vuelve por un único problema de clasificación introducido por la corrección y
+por la inconsistencia de sesión que el propio informe dejó declarada:
+
+1. **Un error de red o 5xx no prueba que la sesión venció.** `asegurarSesion()`
+   hoy atrapa cualquier error de `/auth/me`, borra ambos tokens y devuelve
+   `false`; `handleCheckout` abre Login. Una caída temporal del Backend o de la
+   conexión termina cerrando a una persona con sesión potencialmente válida.
+   Distinguí tres resultados: sesión vigente/renovada, sesión confirmadamente
+   irrecuperable y comprobación temporalmente indisponible. Sólo el segundo
+   puede borrar credenciales y abrir Login.
+2. **Indisponible conserva y explica.** Ante red/timeout/5xx, mantené el carrito
+   abierto con sus ítems, conservá tokens y usuario, no abras Login ni Checkout
+   y mostrale una explicación breve con posibilidad de volver a intentar desde
+   el mismo botón. No inventes que la sesión expiró.
+3. **Irrecuperable debe bajar también la identidad visible, sin vaciar el
+   carrito.** El informe declara que hoy se borran tokens pero React conserva
+   el usuario y la cabecera sigue mostrando su nombre. Sin duplicar Auth,
+   sincronizá el contexto local cuando la invalidez esté confirmada; no uses el
+   `logout()` actual si eso dispara el borrado de `agromarket_cart`. Cancelar el
+   Login sigue devolviendo al carrito con sus ítems; un ingreso correcto retoma
+   Checkout una sola vez.
+
+Extendé únicamente el bloque R6 del 167. Forzá `/auth/me` a responder 503 (o
+una caída equivalente) y exigí carrito visible/intacto, tokens e identidad
+conservados, mensaje honesto y ausencia de Login/Checkout; al retirar la falla,
+el mismo botón debe poder reintentar. En el escenario irrecuperable, después de
+cancelar exigí que la cabecera ya no afirme una sesión activa y que el carrito
+persista. El negativo debe fallar contra `fbdd88f` por comportamiento, no sólo
+por inspección estática.
+
+No rehagas A6, A9, About ni los recorridos R6 ya verdes. Corré sólo el 167 desde
+base limpia, lint, `node --check` y `diff-check`; el smoke incluye build. **No
+repitas 138, 139 ni suite completa.** Sin Backend, endpoint, router, dependencia,
+rediseño, Railway, datos remotos, pagos o secretos. Producto/regresión en un
+commit e informe separado en `PARA-PM.md`; no integres a `main`, no despliegues
+y frená al entregar.
+
 ## 2026-09-11 — DEVOLUCIÓN: FILTER-INTENT-1R, R6 quedó cortado antes del callejón real
 
 Revisé producto/regresión `0a6cbd4` e informe `89db3fe`. A6 y A9 están bien

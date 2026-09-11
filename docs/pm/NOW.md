@@ -4,14 +4,16 @@ Actualizado: 2026-09-11.
 
 ## Estado inmediato — 2026-09-11
 
-- **FILTER-INTENT-1 devuelta como `FILTER-INTENT-1R`:** producto/regresión
-  `0a6cbd4`, informe `89db3fe`. Dev obtuvo focales **4/4**, una suite
-  **165/167** con rojos 131 y 143, otra **166/167** con único rojo 131, y 143
-  aislado verde. PM revisó el delta y reprodujo el 167 desde base limpia en
-  **1/1**. A6 y A9 de Inicio/Servicios quedan conformes, pero la evidencia corta
-  R6 al abrir Checkout: después aparece «Sesión expirada» sin Login, que es el
-  callejón auditado. La corrección incorpora esa continuidad y el CTA homólogo
-  de About; no repite suite completa. El 143 intermitente queda como siguiente
+- **FILTER-INTENT-1R devuelta como `FILTER-INTENT-1R2`:** base
+  `0a6cbd4`/`89db3fe`, corrección `fbdd88f`/`71976e9`. Dev obtuvo 138+139+167
+  en **3/3** para la corrección; PM revisó el diff y reprodujo el 167 desde otra
+  base limpia en **1/1**, salida 0 y build incluido. Refresh recuperable,
+  sesión irrecuperable, carrito, Login y About quedan medidos. Falta distinguir
+  una sesión inválida de una caída transitoria: hoy cualquier error de
+  `/auth/me` borra credenciales y abre Login; además, la invalidez confirmada
+  deja el nombre viejo en la cabecera. La corrección final debe conservar
+  sesión/carrito ante red o 5xx y sincronizar la identidad sólo al confirmar
+  invalidez, sin repetir suite completa. El 143 intermitente sigue como próximo
   cierre corto de arnés. Evidencia en
   `REPRODUCCION-FILTER-INTENT-1-2026-09-11.md`.
 
@@ -103,10 +105,9 @@ Actualizado: 2026-09-11.
   de capturas. La versión final mide diálogo móvil, envío retenido, fallo y
   reintento; no hubo suite completa PM. Evidencia en
   `REPRODUCCION-RATING-UX-1-2026-09-10.md`.
-- **Única tarea activa y responsable:** `FILTER-INTENT-1R`, Dev. Debe validar
-  sesión antes de Checkout, retomar el carrito sólo tras un Login real y sumar
-  el CTA equivalente de About, conservando A6/A9 ya verdes. Caso 167 y límites
-  en `PARA-DEV.md`.
+- **Única tarea activa y responsable:** `FILTER-INTENT-1R2`, Dev. Debe separar
+  invalidez confirmada de red/5xx y sincronizar la identidad visible sin vaciar
+  el carrito. Sólo caso 167 y puertas estáticas; detalles en `PARA-DEV.md`.
 - **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
   `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
   y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como
