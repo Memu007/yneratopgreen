@@ -15231,6 +15231,73 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
   //
   // Ademas «Iniciar operacion» prometia un inicio de operacion que no existe:
   // lo que hace es agregar al carrito, y ahora lo dice.
+  //
+  // El caso fabrica sus propias filas y las busca por titulo exacto. Antes
+  // tomaba «la primera tarjeta que ofreciera ingresar» de cada pantalla, y eso
+  // no es una precondicion: es lo que haya quedado. Inicio y Servicios dibujan
+  // las TRES publicaciones mas nuevas —`useVistaPrevia` pide `page_size: 3`
+  // con `created_at desc`—, asi que tres servicios a convenir publicados por
+  // otra prueba dejan a Servicios sin una sola tarjeta comprable y este caso
+  // acusaba al producto de no ofrecer ingresar. Medido: con tres «Residuo a
+  // convenir» mas nuevos que el seed, el arnes viejo daba «en Servicios
+  // ninguna tarjeta ofrece ingresar; los botones son ["Solicitar
+  // cotización","Ver detalle", …]» y el producto estaba intacto. Los casos
+  // 120, 147, 148 y 166 publican servicios a convenir, asi que el residuo
+  // aparece solo con correr la suite dos veces sobre la misma base.
+
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const [categoriaDeServicio] = queryRows(
+    "SELECT id, 'fin' FROM categories WHERE slug = 'acopio'");
+  const [categoriaDeActivos] = queryRows(
+    "SELECT id, 'fin' FROM categories WHERE slug = 'maquinaria-agricola'");
+  assert(categoriaDeServicio && categoriaDeActivos,
+    'faltan las categorias de servicio y de maquinaria para armar el caso');
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const sello = Date.now();
+
+  const publicar = async (que, cuerpo) => {
+    const { status, data } = await apiRequest('/products', {
+      method: 'POST', token: vendedor.token,
+      body: { locality_id: localidad, ...cuerpo },
+    });
+    assert(status < 400, `no se pudo publicar el ${que} del caso: HTTP ${status}`);
+    return data.id;
+  };
+
+  // El servicio primero y el activo despues: asi los dos quedan entre las tres
+  // publicaciones mas nuevas que dibuja Inicio, y el servicio entre los tres
+  // servicios mas nuevos que dibuja Servicios. Los dos son comprables —precio
+  // publicado, y el activo ademas con stock—, que es la unica condicion que
+  // este caso necesita de sus filas.
+  const nombreDelServicio = `Puerta139 servicio ${sello}`;
+  const idDelServicio = await publicar('servicio', {
+    name: nombreDelServicio,
+    description: 'Servicio comprable del caso 139, para probar la puerta de ingreso en Servicios.',
+    category_id: categoriaDeServicio[0],
+    price: 52000,
+    unit: 'hectárea',
+    publication_type: 'servicio',
+    operation_kind: 'servicio',
+    pricing_type: 'por_hectarea',
+  });
+  const nombreDelActivo = `Puerta139 activo ${sello}`;
+  const idDelActivo = await publicar('activo', {
+    name: nombreDelActivo,
+    description: 'Activo comprable del caso 139, para probar la puerta de ingreso en Inicio y Mercado.',
+    category_id: categoriaDeActivos[0],
+    price: 14800,
+    stock: 3,
+    unit: 'unidad',
+    publication_type: 'producto',
+    operation_kind: 'activo',
+  });
+  // Cual de las dos recorre cada pantalla. Servicios solo dibuja servicios, y
+  // las otras dos dibujan el catalogo entero.
+  const laPublicacionDe = {
+    Inicio: nombreDelActivo,
+    Mercado: nombreDelActivo,
+    Servicios: nombreDelServicio,
+  };
 
   const browser = await chromium.launch({ headless: true });
   const enElCarrito = (page) => page.evaluate(() => {
@@ -15244,27 +15311,68 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
     }
     return 0;
   });
+  // La tarjeta de ESA publicacion, por identidad y no por posicion.
+  const tarjetaDe = (page, nombre) => page
+    .getByRole('heading', { name: nombre, exact: true, level: 3 })
+    .locator('xpath=ancestor::article[contains(@class,"card")]');
+  // Y si no aparece, el rojo tiene que decir que fallo la pantalla —no un
+  // `Timeout` pelado, que no nombra ningun defecto.
+  const esperarLaTarjeta = async (page, seccion, nombre) => {
+    const donde = tarjetaDe(page, nombre).first();
+    try {
+      await donde.waitFor({ timeout: 25_000 });
+    } catch {
+      const titulos = await page.locator('article[class*="card"] h3').allInnerTexts();
+      throw new Error(
+        `en ${seccion} no se dibujo «${nombre}», que este mismo caso acaba de publicar; `
+        + `las tarjetas a la vista son ${JSON.stringify(titulos)}`);
+    }
+    return donde;
+  };
   const recorridas = [];
+
+  // La otra mitad de la misma deuda: este caso tampoco le deja residuo a
+  // nadie. Retira sus dos publicaciones al terminar —baja logica, `status`
+  // DELETED— asi que la base queda como estaba y ninguna prueba posterior
+  // hereda una publicacion «mas nueva» que no pidio. Corre pase lo que pase,
+  // sin tirar: un problema al retirar no puede tapar el error del recorrido,
+  // asi que se guarda y se afirma despues.
+  let retiro = 'no se llego a retirarlas';
+  const retirarLasPublicaciones = async () => {
+    const restos = [];
+    for (const [que, id] of [['servicio', idDelServicio], ['activo', idDelActivo]]) {
+      try {
+        await apiRequest(`/products/${id}`, { method: 'DELETE', token: vendedor.token });
+      } catch (fallo) {
+        restos.push(`${que}: ${fallo instanceof Error ? fallo.message : String(fallo)}`);
+      }
+    }
+    if (restos.length) return restos.join('; ');
+    const [vivas] = queryRows(`
+      SELECT COUNT(*)::text, 'fin' FROM products
+      WHERE id IN (${sqlLiteral(idDelServicio)}, ${sqlLiteral(idDelActivo)})
+        AND status <> 'DELETED'`);
+    return vivas[0] === '0' ? 'retiradas' : `${vivas[0]} siguieron publicadas`;
+  };
 
   try {
     // --- C. Las tres pantallas, desde la tarjeta y desde el detalle ---------
     for (const seccion of ['Inicio', 'Mercado', 'Servicios']) {
+      const nombre = laPublicacionDe[seccion];
       const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       const page = await context.newPage();
       try {
         await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
         await page.locator('header').first()
           .getByRole('button', { name: seccion, exact: true }).first().click();
-        await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+        const laTarjeta = await esperarLaTarjeta(page, seccion, nombre);
         const tarjetasAlPrincipio = await page.locator('article[class*="card"]').count();
 
         // Desde la TARJETA: ofrece ingresar, no agrega en silencio.
-        const enLaTarjeta = page.locator('article[class*="card"]')
-          .getByRole('button', { name: 'Ingresar para continuar' }).first();
-        assert(await enLaTarjeta.count(),
-          `en ${seccion} ninguna tarjeta ofrece ingresar; los botones son `
-          + JSON.stringify((await page.locator('article[class*="card"]')
-            .getByRole('button').allInnerTexts()).slice(0, 6)));
+        const enLaTarjeta = laTarjeta.getByRole('button', { name: 'Ingresar para continuar' });
+        assert(await enLaTarjeta.count() === 1,
+          `en ${seccion} la tarjeta de «${nombre}» no ofrece ingresar; sus botones son `
+          + JSON.stringify(await laTarjeta.getByRole('button').allInnerTexts()));
         await enLaTarjeta.click();
         await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
         assert(await page.getByRole('dialog').count() === 1,
@@ -15274,7 +15382,7 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
 
         // Cancelar deja la persona donde estaba, sin efectos.
         await page.getByRole('button', { name: 'Cerrar' }).first().click();
-        await page.locator('article[class*="card"]').first().waitFor({ timeout: 20_000 });
+        await esperarLaTarjeta(page, `${seccion} despues de cancelar`, nombre);
         assert(await page.getByRole('dialog').count() === 0,
           `en ${seccion} quedo un dialogo abierto tras cancelar`);
         assert(await page.locator('article[class*="card"]').count() === tarjetasAlPrincipio,
@@ -15282,12 +15390,12 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
         assert(await enElCarrito(page) === 0,
           `cancelar en ${seccion} dejo algo en el carrito`);
 
-        // Desde el DETALLE de una publicacion comprable de esa misma pagina.
-        const tarjetaComprable = page.locator('article[class*="card"]')
-          .filter({ has: page.getByRole('button', { name: 'Ingresar para continuar' }) }).first();
-        await tarjetaComprable.locator('h3').click();
+        // Desde el DETALLE de esa misma publicacion.
+        await laTarjeta.locator('h3').click();
         await page.locator('#detalle-titulo').waitFor({ timeout: 20_000 });
         const publicacion = (await page.locator('#detalle-titulo').innerText()).trim();
+        assert(publicacion === nombre,
+          `en ${seccion} el detalle abrio «${publicacion}» y no «${nombre}»`);
         const enElDetalle = page.getByRole('dialog')
           .getByRole('button', { name: 'Ingresar para continuar' }).first();
         assert(await enElDetalle.count(),
@@ -15316,7 +15424,7 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
         await page.getByPlaceholder('••••••••').fill('cliente123');
         await page.locator('[class*="_submitButton_"][type="submit"]').click();
         await page.locator('#detalle-titulo').waitFor({ timeout: 25_000 });
-        assert((await page.locator('#detalle-titulo').innerText()).trim() === publicacion,
+        assert((await page.locator('#detalle-titulo').innerText()).trim() === nombre,
           `en ${seccion} se volvio a otra publicacion`);
         assert(await enElCarrito(page) === 0,
           `en ${seccion} ingresar agrego la publicacion al carrito sin pedirlo`);
@@ -15361,14 +15469,13 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
     const page = await context.newPage();
     try {
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-      await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+      const laTarjeta = await esperarLaTarjeta(page, 'Inicio', nombreDelActivo);
       // Se pide ingresar desde una tarjeta y se cancela: la continuidad tiene
       // que morir ahi.
-      await page.locator('article[class*="card"]')
-        .getByRole('button', { name: 'Ingresar para continuar' }).first().click();
+      await laTarjeta.getByRole('button', { name: 'Ingresar para continuar' }).click();
       await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
       await page.getByRole('button', { name: 'Cerrar' }).first().click();
-      await page.locator('article[class*="card"]').first().waitFor({ timeout: 20_000 });
+      await esperarLaTarjeta(page, 'Inicio despues de cancelar', nombreDelActivo);
       // Y ahora se ingresa desde la cabecera, que no viene de ninguna publicacion.
       await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
       await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
@@ -15385,7 +15492,12 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
     }
   } finally {
     await browser.close();
+    retiro = await retirarLasPublicaciones();
   }
+
+  assert(retiro === 'retiradas',
+    `el caso no pudo retirar las publicaciones que fabrico y se las deja a las `
+    + `pruebas siguientes (${retiro})`);
 
   // --- E. Y recien ahora, la forma del codigo ------------------------------
   // Va al final a proposito: lo que tiene que fallar primero es el recorrido
@@ -15425,12 +15537,15 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
 
 
   return `ProductCard se dibuja en ${dondeSeDibujanTarjetas.length} pantallas y las tres reciben la `
-    + 'misma continuidad de App. En Inicio, Mercado y Servicios, sin sesion tanto la tarjeta como '
+    + 'misma continuidad de App. Sobre dos publicaciones propias del caso '
+    + `(«${nombreDelActivo}» en Inicio y Mercado, «${nombreDelServicio}» en Servicios, `
+    + 'buscadas por titulo exacto y no por posicion), sin sesion tanto la tarjeta como '
     + 'el detalle ofrecen «Ingresar para continuar» y abren el Login real con un solo dialogo a la '
     + 'vez; cancelar deja la pagina como estaba y completar vuelve a la misma publicacion, siempre '
     + `con el carrito en cero. Recien el clic siguiente agrega (${recorridas.join(', ')}). Un `
     + 'ingreso desde la cabecera no reabre nada. El activo dice «Agregar al carrito» y las otras '
-    + 'anatomias conservan su rotulo';
+    + 'anatomias conservan su rotulo. Las dos publicaciones quedan retiradas: el caso no le deja '
+    + 'residuo a la suite';
 });
 
 await runCase(140, 'Nadie compra su propia publicacion, ni por la API ni por la pantalla', async () => {
@@ -16510,6 +16625,37 @@ await runCase(143, 'Pausar, reactivar o editar no le cambian la anatomia a una p
       await dialogo.waitFor({ state: 'hidden', timeout: 15_000 });
     };
 
+    // La base es la PRECONDICION, no la evidencia. El PATCH la deja escrita
+    // antes de que termine el GET de `/products/my` que redibuja la tarjeta, y
+    // `reloadUserProducts` no marca nada como cargando: la lista vieja se queda
+    // en pantalla mientras el pedido viaja. Leer la tarjeta apenas la base
+    // cambia es leer el render anterior. Medido: con la respuesta del GET
+    // demorada 4 s, el arnes viejo daba «despues de pausar: la tarjeta no dice
+    // «Pausado»: «Activo SERVICIO … Editar Pausar»» —la base ya decia PAUSED.
+    //
+    // Asi que despues de la base se espera la CONDICION que el caso va a
+    // afirmar: el rotulo del estado y la accion inversa, que es justamente el
+    // boton que el defecto original se comia. Sin esperas fijas: `esperarA`
+    // pregunta cada 50 ms y se rinde a los 20 s con lo ultimo que vio.
+    const esperarLaTarjeta = async (momento, estadoEsperado) => {
+      const rotulo = estadoEsperado === 'paused' ? 'Pausado' : 'Activo';
+      const inversa = estadoEsperado === 'paused' ? 'Activar' : 'Pausar';
+      let ultimo = '(la tarjeta no llego a dibujarse)';
+      try {
+        await esperarA(async () => {
+          ultimo = await textoDe(nombreDelServicio);
+          if (!new RegExp(`(^|\\s)${rotulo}(\\s|$)`).test(ultimo)) return false;
+          return await tarjeta(nombreDelServicio)
+            .getByRole('button', { name: inversa, exact: false }).count() === 1;
+        }, `la tarjeta ${momento}`, 20_000);
+      } catch {
+        throw new Error(
+          `${momento}: la tarjeta no llego a decir «${rotulo}» con su boton `
+          + `«${inversa}» en 20 s, con la base ya en ${enLaBase().estado}; `
+          + `lo ultimo que mostro fue «${ultimo}»`);
+      }
+    };
+
     // Lo que tiene que valer SIEMPRE para el servicio, mire cuando mire.
     const revisarElServicio = async (momento, estadoEsperado) => {
       const visto = await textoDe(nombreDelServicio);
@@ -16563,6 +16709,7 @@ await runCase(143, 'Pausar, reactivar o editar no le cambian la anatomia a una p
     await confirmar('Pausar');
     await esperarA(async () => enLaBase().estado === 'PAUSED',
       'el servicio no quedo pausado en la base', 20_000);
+    await esperarLaTarjeta('despues de pausar', 'paused');
     const pausado = await revisarElServicio('despues de pausar', 'paused');
     await revisarElControl('despues de pausar');
 
@@ -16571,6 +16718,7 @@ await runCase(143, 'Pausar, reactivar o editar no le cambian la anatomia a una p
     await confirmar('Activar');
     await esperarA(async () => enLaBase().estado === 'ACTIVE',
       'el servicio no volvio a activo en la base', 20_000);
+    await esperarLaTarjeta('despues de reactivar', 'active');
     await revisarElServicio('despues de reactivar', 'active');
 
     // --- D. editar (recarga posterior a editar) -----------------------------
