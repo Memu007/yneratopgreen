@@ -1,8 +1,19 @@
 # Estado actual
 
-Actualizado: 2026-09-10.
+Actualizado: 2026-09-11.
 
-## Estado inmediato — 2026-09-10
+## Estado inmediato — 2026-09-11
+
+- **FILTER-INTENT-1 devuelta como `FILTER-INTENT-1R`:** producto/regresión
+  `0a6cbd4`, informe `89db3fe`. Dev obtuvo focales **4/4**, una suite
+  **165/167** con rojos 131 y 143, otra **166/167** con único rojo 131, y 143
+  aislado verde. PM revisó el delta y reprodujo el 167 desde base limpia en
+  **1/1**. A6 y A9 de Inicio/Servicios quedan conformes, pero la evidencia corta
+  R6 al abrir Checkout: después aparece «Sesión expirada» sin Login, que es el
+  callejón auditado. La corrección incorpora esa continuidad y el CTA homólogo
+  de About; no repite suite completa. El 143 intermitente queda como siguiente
+  cierre corto de arnés. Evidencia en
+  `REPRODUCCION-FILTER-INTENT-1-2026-09-11.md`.
 
 - **QUOTE-CONTACT-1R aceptada:** base `612b57f`/`9493ba0`, corrección
   `1a01854`/`e363408`, todos en rama Dev. Dev informó suite base **165/166** con
@@ -92,10 +103,10 @@ Actualizado: 2026-09-10.
   de capturas. La versión final mide diálogo móvil, envío retenido, fallo y
   reintento; no hubo suite completa PM. Evidencia en
   `REPRODUCCION-RATING-UX-1-2026-09-10.md`.
-- **Única tarea activa y responsable:** `FILTER-INTENT-1`, Dev. Debe impedir
-  vacíos falsos por filtros URL inválidos, retomar Publicar después del Login y
-  medir R6 antes de incluir la continuidad del carrito. Caso 167 y límites en
-  `PARA-DEV.md`.
+- **Única tarea activa y responsable:** `FILTER-INTENT-1R`, Dev. Debe validar
+  sesión antes de Checkout, retomar el carrito sólo tras un Login real y sumar
+  el CTA equivalente de About, conservando A6/A9 ya verdes. Caso 167 y límites
+  en `PARA-DEV.md`.
 - **Cuenta de prueba publicada creada por pedido expreso de Emi.** PM registró
   `pruba@agroboeda.com` en el sitio publicado, comprobó una única fila pendiente
   y actualizó sólo `is_verified=true` en PostGIS (`UPDATE 1`). El ingreso como

@@ -12,6 +12,56 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-11 — DEVOLUCIÓN: FILTER-INTENT-1R, R6 quedó cortado antes del callejón real
+
+Revisé producto/regresión `0a6cbd4` e informe `89db3fe`. A6 y A9 están bien
+encaminados: el delta espera/valida los catálogos, deriva la espera de la
+consulta vigente y reutiliza la continuidad de Login. Dev obtuvo 138, 139, 147
+y 167 en **4/4**; sus suites completas fueron **165/167** —rojos 131 y 143— y
+**166/167** —único rojo 131—, más 143 aislado verde. PM revisó el diff y
+reprodujo el 167 desde otra base Docker limpia en **1/1**, salida 0 y build
+incluido. Log: `/private/tmp/topgreen-pm-filter-intent-167.log`. No hubo suite
+completa PM. Evidencia en
+`REPRODUCCION-FILTER-INTENT-1-2026-09-11.md`.
+
+La entrega vuelve por un solo defecto funcional y dos cierres mínimos del mismo
+camino:
+
+1. **R6 sí se reproduce al terminar el recorrido.** Con el carrito ya abierto,
+   si la sesión deja de valer, `isAuthenticated` queda viejo y «Continuar
+   compra» abre Checkout. La propia evidencia informa que luego Checkout falla
+   con «Sesión expirada» sin ofrecer Login. Que el fallo aparezca una pantalla
+   después no refuta R6: la persona ya pudo completar datos antes de descubrir
+   el callejón.
+2. **Validá antes de abrir Checkout.** Al pulsar «Continuar compra», comprobá la
+   sesión con el mecanismo/refresh existente. Si el access token venció pero el
+   refresh sigue válido, continuá sin interrupción. Si la sesión realmente no
+   puede recuperarse, abrí el Login real: cancelar devuelve al carrito con sus
+   ítems; una credencial fallida no avanza; un ingreso correcto abre Checkout
+   una sola vez, sin otro clic y sin crear orden, reserva ni pago.
+3. **Cerrá el mismo A9 visible.** Dev detectó que el CTA de vender en
+   `AboutPage` conserva exactamente el Login sin continuidad. Pasalo por
+   `pedirPublicar` y sumalo al recorrido del 167. Cambiá también a voseo la
+   guarda defensiva «Debes iniciar sesión…» de `AddProductModal`; no dejes el
+   único tuteo del camino para otra pieza.
+
+No rehagas A6 ni la continuidad ya verde. Extendé el 167 con R6 de punta a
+punta y `AboutPage`; conservá sus aserciones actuales. Para R6 medí por separado
+refresh recuperable y sesión irrecuperable, carrito intacto, un solo Login,
+cancelación, fallo, éxito y cero escrituras comerciales antes de confirmar.
+La prueba debe fallar contra `0a6cbd4` por el callejón de Checkout y por el CTA
+de About, no por inspección estática solamente.
+
+Corré únicamente 138, 139 y 167 aislados, lint, `node --check` y `diff-check`;
+el smoke incluye build. **No repitas suite completa**: Dev ya hizo dos y PM no
+necesita una tercera. No arregles todavía el 143 dentro de esta pieza; queda
+registrado como arnés intermitente y será el siguiente cierre corto. Sin
+Backend, endpoint, router, dependencia, almacenamiento nuevo, rediseño,
+capturas, Railway, datos remotos, pagos o secretos.
+
+Producto/regresión en un commit e informe separado en `PARA-PM.md`. No
+integres a `main`, no despliegues y frená al entregar.
+
 ## 2026-09-10 — CIERRE: QUOTE-CONTACT-1R aceptada; activar FILTER-INTENT-1
 
 Aceptados producto/regresión base `612b57f`, informe `9493ba0`, corrección
