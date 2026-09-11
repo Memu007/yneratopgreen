@@ -2,6 +2,103 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## FILTER-INTENT-1R3 — dije «red, timeout y 5xx» y sólo había medido 5xx
+
+**Resultado: los tres puntos corregidos. El primero desmiente algo que escribí
+en el informe anterior, y esa parte es lo que más me importa dejar anotado.**
+
+- Producto/regresión: `fa4446a`
+- **En mi rama, no en `main`.** No integré, no desplegué, no toqué Backend,
+  endpoint, router, dependencia, rediseño, Railway, datos remotos, pagos ni
+  secretos.
+
+---
+
+### 1. La afirmación era mía y no estaba medida
+
+En el informe de R2 escribí que `indisponible` cubría «5xx, red, timeout». Medí
+5xx. La red no la medí nunca, y no funcionaba:
+
+| Escenario | tokens antes | tokens después | capas |
+| --- | --- | --- | --- |
+| `/auth/me` abortado al apretar «Continuar compra» | `["access_token","refresh_token"]` | **`[]`** | **`["Ingresar"]`** |
+| access vencido + `/auth/refresh` en 429 | `[...]` | **`[]`** | **`["Ingresar"]`** |
+| arranque con `/auth/me` interrumpido | `[...]` | **`[]`** | — |
+
+El mecanismo: `fetch` rechaza con un `TypeError`, que **también** es un `Error`,
+y el `catch` de `apiFetch` relanzaba cualquier `Error` sin tocarlo. El motivo se
+perdía por el camino y más adelante se leía como sesión vencida. Es el defecto
+que la pieza vino a cerrar, sobreviviendo por el camino que no probé — y es el
+más común de los dos: en el campo la conexión se corta bastante más seguido que
+lo que se cae un servidor.
+
+Va como regla y no como caso: **el contrato lo fija la medición, no el
+comentario.** Si escribo tres palabras en una lista, las tres tienen que tener
+su rojo.
+
+### 2. Decidir por el «sí» explícito, no por descarte
+
+`asegurarSesion` contaba como sesión vencida **todo lo que no fuera**
+`indisponible`. Con esa forma, alcanza con que un error se escape sin clasificar
+—uno solo, en cualquier rama futura— para volver a cerrar sesiones que estaban
+bien. Ahora hay que decirlo para que cuente, y lo único que lo dice es el
+servidor:
+
+- `sesion-vencida` → tira credenciales. Nada más lo hace.
+- cualquier otra causa, o un error sin causa → `indisponible`.
+
+Y `refreshAccessToken` rechaza **sólo** ante 401/403. La regla anterior era «del
+500 para arriba es una caída», así que **408 y 429 tiraban las credenciales**, y
+son justamente los dos estados que aparecen cuando el otro lado está
+sobrecargado, no cuando la sesión venció.
+
+### 3. El arranque, que es el peor momento
+
+`loadCurrentUser` borraba ante cualquier error. Abrir el sitio con la conexión
+floja, o con el Backend todavía levantando, dejaba a alguien afuera de su propia
+sesión sin haber hecho nada, y con el refresh bueno tirado a la basura. Ahora usa
+la misma causa tipada.
+
+Medí además una cosa que la PM no pidió, porque conservar credenciales sólo vale
+si sirven: **con la conexión de vuelta, la sesión se recupera sola** —cabecera
+con «Vender», «Carrito (1)», el nombre y «Salir»— y el carrito queda intacto.
+Eso está en el caso, con su propio mensaje.
+
+### 4. Los negativos: rojos por comportamiento contra `a834ec3`
+
+| Se devolvió al estado de `a834ec3` | El 167 dijo |
+| --- | --- |
+| el `TypeError` de la red vuelve sin causa | «la conexión cortada terminó ofreciendo ingresar: que no haya respuesta no dice nada de la sesión, y tratarlo como un vencimiento cierra sesiones que estaban bien» |
+| sólo del 500 para arriba es indisponible | «un 429 del refresh terminó ofreciendo ingresar, con el refresh token todavía bueno: sólo un rechazo explícito de la credencial es un rechazo» |
+| el arranque borra ante cualquier error | «arrancar sin conexión destruyó las credenciales: ["access_token","refresh_token"] -> []» |
+
+**El segundo daba verde al principio, y el motivo vale la pena.** Mi escenario
+del refresh usaba 503, que es `>= 500` y por lo tanto «indisponible» **en las dos
+versiones**: el caso no distinguía la regla vieja de la nueva. Ahora prueba dos
+estados, y el que discrimina es el 429 —un servidor pidiendo que esperes, no una
+credencial rechazada—. Es la segunda vez en esta pieza que un negativo mío no
+separaba las dos versiones; la lección es la misma que arriba: elegir el
+escenario donde las dos reglas **difieren**, no uno donde ambas aciertan.
+
+### 5. Puertas
+
+- **167 desde base limpia: 1/1.**
+- `lint`, `tsc --noEmit`, `node --check scripts/smoke.mjs` y
+  `git -c core.whitespace=cr-at-eol diff --check`: verdes. El smoke incluye
+  build. Sin otros casos y sin suite completa, como pediste.
+
+### 6. Sigue abierto
+
+- Lo que ya informé y no cambió: sin sesión la cabecera no dibuja la celda
+  «Carrito», así que quien cierre el carrito sin ingresar no tiene desde dónde
+  reabrirlo. Mostrarlo sin sesión es decisión de producto y sigue esperando tu
+  palabra.
+- El **143** y el **139** como arneses frágiles —dependen de un estado que no
+  fabricaron—, el 131 ambiental, la deuda de paginación mayor a cien y
+  `--tg-color-focus` igual a `--tg-color-brand`.
+
+---
+
 ## FILTER-INTENT-1R2 — el arreglo anterior era peor que el defecto
 
 **Resultado: los tres puntos corregidos. El primero lo introduje yo la vuelta
