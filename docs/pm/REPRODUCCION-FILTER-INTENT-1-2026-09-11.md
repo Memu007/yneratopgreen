@@ -50,3 +50,42 @@ El caso 143 espera el estado de base después del PATCH y lee la tarjeta antes
 de que termine el GET que la redibuja. Fue rojo en una suite, verde en la otra y
 verde aislado. No se mezcla con esta corrección de producto; queda como
 siguiente estabilización corta del arnés.
+
+## Corrección `FILTER-INTENT-1R` revisada
+
+- Producto/regresión Dev: `fbdd88f`.
+- Informe Dev: `71976e9`.
+- Dev informó 138+139+167 desde base limpia en **3/3**, más lint, TypeScript,
+  sintaxis y `diff-check` verdes; no repitió suite completa, como se pidió.
+- PM revisó el diff y reprodujo el 167 desde otra base Docker limpia en
+  **1/1**, salida 0 y build incluido.
+- Log persistente: `/private/tmp/topgreen-pm-filter-intent-167r.log`.
+- Un intento previo con `entorno_nativo.sh --recrear` no llegó al smoke porque
+  el arnés eligió `sudo -u postgres` en esta Mac; quedó como intento ambiental
+  fallido en `/private/tmp/topgreen-pm-filter-intent-167r-entorno.log` y no
+  cuenta como prueba.
+
+### Conforme en la corrección
+
+- Un access vencido con refresh válido se renueva y abre Checkout sin pedir
+  credenciales.
+- Una sesión irrecuperable abre un único Login antes de Checkout; cancelar
+  vuelve al carrito, una credencial fallida no avanza y una correcta retoma una
+  sola vez.
+- El CTA de About comparte la continuidad de Inicio y Servicios y la guarda de
+  publicación quedó en voseo.
+- El 167 comprueba carrito intacto y ausencia de órdenes, reservas y pagos.
+
+### Motivo de segunda devolución
+
+`asegurarSesion()` convierte cualquier excepción de `/auth/me` en sesión
+inválida: limpia tokens y `handleCheckout` abre Login también ante red, timeout
+o 5xx. Eso cierra una sesión potencialmente válida por una indisponibilidad
+transitoria. A la inversa, cuando la invalidez sí está confirmada, se borran los
+tokens pero el contexto React conserva el usuario y la cabecera sigue afirmando
+que está conectado.
+
+`FILTER-INTENT-1R2` debe separar vigente/renovada, inválida e indisponible. La
+indisponibilidad conserva tokens, usuario y carrito y permite reintentar; la
+invalidez abre Login y sincroniza la identidad visible sin borrar el carrito.
+Se extiende sólo R6 del caso 167 y no se repite la suite completa.
