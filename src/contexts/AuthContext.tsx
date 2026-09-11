@@ -1,7 +1,7 @@
 import React, { useState, useEffect, ReactNode } from 'react';
 import { AuthContext } from './contextos';
 import { User, AuthContextType, RegisterData, RegistroPendiente } from '../types';
-import { apiGet, apiPost, apiPatch, tokenStorage } from '../utils/api';
+import { apiGet, apiPost, apiPatch, tokenStorage, ErrorDeLaApi } from '../utils/api';
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -120,8 +120,17 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
         const backendUser = await apiGet<BackendUser>('/auth/me');
         setUser(mapBackendUserToFrontend(backendUser));
       } catch (error) {
-        // Token inválido o expirado, limpiar
-        tokenStorage.clearTokens();
+        // Sólo una sesión CONFIRMADA vencida se lleva las credenciales.
+        //
+        // Antes cualquier tropiezo las borraba, y el arranque es donde más
+        // duele: abrir el sitio con la conexión floja, o con el Backend todavía
+        // levantando, dejaba a alguien afuera de su propia sesión y con el
+        // refresh bueno tirado a la basura. Conservarlas no muestra a nadie
+        // —sin la respuesta no hay usuario que dibujar— pero deja que la
+        // próxima vez se recupere sola.
+        if (error instanceof ErrorDeLaApi && error.causa === 'sesion-vencida') {
+          tokenStorage.clearTokens();
+        }
         setUser(null);
       } finally {
         setLoading(false);

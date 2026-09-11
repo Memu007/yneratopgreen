@@ -25587,6 +25587,13 @@ await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o com
       // tropiezo —incluido ese—, así que el refresh perfectamente válido se
       // perdía por una caída de dos segundos. No se alcanza desde C1b, que
       // interrumpe antes: hace falta su propio recorrido.
+      //
+      // Se prueban DOS estados y no uno, y el segundo es el que importa acá: el
+      // 503 ya pasaba con la regla vieja —«del 500 para arriba es una caída»—,
+      // así que un caso con 503 solo no distinguía nada. El 429 es un servidor
+      // pidiendo que esperes, no una credencial rechazada, y con la regla vieja
+      // tiraba los tokens igual. Sólo un rechazo explícito es un rechazo.
+      for (const estadoDelRefresco of [503, 429]) {
       const refrescoCaido = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       const paginaRefresco = await refrescoCaido.newPage();
       vigilarEscrituras(paginaRefresco);
@@ -25598,9 +25605,9 @@ await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o com
       let refrescoRoto = true;
       await paginaRefresco.route('**/auth/refresh', (ruta) => (refrescoRoto
         ? ruta.fulfill({
-          status: 503,
+          status: estadoDelRefresco,
           contentType: 'application/json',
-          body: JSON.stringify({ detail: 'Service Unavailable' }),
+          body: JSON.stringify({ detail: 'no ahora' }),
         })
         : ruta.continue()));
       // El access vence de verdad; el refresh guardado sigue siendo el bueno.
@@ -25611,26 +25618,128 @@ await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o com
       await esperarA(async () => (await explicacionDelRefresco.count()) === 1
         || (await login(paginaRefresco).count()) === 1
         || (await checkout(paginaRefresco).count()) === 1,
-      'con el refresh caído el carrito no hizo nada', 25_000);
+      `con el refresh en ${estadoDelRefresco} el carrito no hizo nada`, 25_000);
       assert(await login(paginaRefresco).count() === 0,
-        'un 503 del refresh terminó ofreciendo ingresar, con el refresh token todavía bueno');
+        `un ${estadoDelRefresco} del refresh terminó ofreciendo ingresar, con el refresh token `
+        + 'todavía bueno: sólo un rechazo explícito de la credencial es un rechazo');
       assert(await explicacionDelRefresco.count() === 1,
-        'un 503 del refresh no se explicó');
+        `un ${estadoDelRefresco} del refresh no se explicó`);
       const trasElRefresco = await credencialesGuardadas(paginaRefresco);
       assert(JSON.stringify(trasElRefresco) === JSON.stringify(tokensDelRefresco),
-        `un 503 del refresh tiró las credenciales: ${JSON.stringify(tokensDelRefresco)} -> `
-        + JSON.stringify(trasElRefresco));
+        `un ${estadoDelRefresco} del refresh tiró las credenciales: `
+        + `${JSON.stringify(tokensDelRefresco)} -> ${JSON.stringify(trasElRefresco)}`);
 
       // Y con el refresh de vuelta, el mismo botón renueva y sigue.
       refrescoRoto = false;
       await carrito(paginaRefresco).getByRole('button', { name: 'Continuar compra' }).click();
       await esperarLaCapa(paginaRefresco, checkout,
-        'con el refresh de vuelta, el mismo botón no pudo renovar y seguir');
+        `con el refresh de vuelta del ${estadoDelRefresco}, el mismo botón no pudo renovar`);
       assert(await enElCarrito(paginaRefresco) === itemsDelRefresco,
         'la caída del refresh cambió el carrito');
       await refrescoCaido.close();
-      medidos.push('un 503 del refresh tampoco cierra la sesión: conserva las credenciales, '
-        + 'explica, y al volver el servidor el mismo botón renueva y sigue');
+      }
+      medidos.push('ni un 503 ni un 429 del refresh cierran la sesión: conservan las '
+        + 'credenciales, explican, y al volver el servidor el mismo botón renueva y sigue');
+
+      // --- C1d. La conexión se corta de verdad ------------------------------
+      //
+      // No es otro código de estado: es que no hay respuesta ninguna. `fetch`
+      // rechaza con un `TypeError`, que también es un `Error`, así que se
+      // relanzaba sin causa y más adelante se leía como sesión vencida. El 503
+      // estaba cubierto y esto no, que es el caso más común de los dos: en el
+      // campo la conexión se corta bastante más seguido que lo que se cae un
+      // servidor. Medido contra `a834ec3`: `localStorage` quedaba sin ningún
+      // token y aparecía el Login.
+      const sinRed = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const paginaSinRed = await sinRed.newPage();
+      vigilarEscrituras(paginaSinRed);
+      await conSesion(paginaSinRed);
+      await conElCarritoAbierto(paginaSinRed);
+      const tokensConRed = await credencialesGuardadas(paginaSinRed);
+      const identidadConRed = await laCabeceraDice(paginaSinRed);
+      const itemsSinRed = await enElCarrito(paginaSinRed);
+
+      let conexionCortada = true;
+      await paginaSinRed.route('**/auth/me', (ruta) => (conexionCortada
+        ? ruta.abort('connectionaborted')
+        : ruta.continue()));
+
+      const explicacionSinRed = carrito(paginaSinRed).getByRole('alert');
+      await carrito(paginaSinRed).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarA(async () => (await explicacionSinRed.count()) === 1
+        || (await login(paginaSinRed).count()) === 1
+        || (await checkout(paginaSinRed).count()) === 1,
+      'con la conexión cortada el carrito no hizo nada', 25_000);
+
+      assert(await login(paginaSinRed).count() === 0,
+        'la conexión cortada terminó ofreciendo ingresar: que no haya respuesta no dice '
+        + 'nada de la sesión, y tratarlo como un vencimiento cierra sesiones que estaban bien');
+      assert(await checkout(paginaSinRed).count() === 0,
+        'la conexión cortada abrió el Checkout');
+      assert(await carrito(paginaSinRed).count() === 1,
+        `la conexión cortada cerró el carrito; lo que hay abierto es ${JSON.stringify(await capasAbiertas(paginaSinRed))}`);
+      assert(await explicacionSinRed.count() === 1,
+        'con la conexión cortada el carrito no explicó por qué no se pudo seguir');
+      const textoSinRed = (await explicacionSinRed.innerText()).trim();
+      assert(!/expir|venci|venció/i.test(textoSinRed),
+        'la conexión cortada se explicó como sesión vencida: ' + JSON.stringify(textoSinRed));
+      const tokensSinRed = await credencialesGuardadas(paginaSinRed);
+      assert(JSON.stringify(tokensSinRed) === JSON.stringify(tokensConRed),
+        `la conexión cortada tiró las credenciales: ${JSON.stringify(tokensConRed)} -> `
+        + JSON.stringify(tokensSinRed));
+      assert(JSON.stringify(await laCabeceraDice(paginaSinRed)) === JSON.stringify(identidadConRed),
+        'la conexión cortada bajó la identidad de alguien que sigue teniendo sesión');
+      assert(await carrito(paginaSinRed).getByRole('button', { name: /^Quitar/ }).count()
+        === itemsSinRed, 'la conexión cortada se llevó puesto lo que había en el carrito');
+
+      // Y cuando vuelve, el MISMO botón alcanza.
+      conexionCortada = false;
+      await carrito(paginaSinRed).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarLaCapa(paginaSinRed, checkout,
+        'con la conexión de vuelta, el mismo botón no pudo reintentar');
+      await sinRed.close();
+      medidos.push('una conexión cortada —no otro código de estado— conserva carrito, '
+        + 'credenciales e identidad, explica sin afirmar que la sesión venció, y el mismo botón '
+        + 'reintenta cuando vuelve');
+
+      // --- C1e. Y el arranque tampoco destruye nada -------------------------
+      //
+      // Es el mismo borrado, en el peor momento: abrir el sitio con la conexión
+      // floja, o con el Backend todavía levantando, tiraba las credenciales de
+      // alguien que no había hecho nada. Se mide lo mínimo que pidió la PM —que
+      // no se destruyan— y una cosa más, porque conservarlas sólo vale si
+      // sirven: que al volver la conexión la sesión se recupere sola.
+      const arranque = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const paginaArranque = await arranque.newPage();
+      await conSesion(paginaArranque);
+      await conElCarritoAbierto(paginaArranque);
+      const tokensAlArrancar = await credencialesGuardadas(paginaArranque);
+      const itemsAlArrancar = await enElCarrito(paginaArranque);
+
+      let arranqueCortado = true;
+      await paginaArranque.route('**/auth/me', (ruta) => (arranqueCortado
+        ? ruta.abort('connectionaborted')
+        : ruta.continue()));
+      await paginaArranque.reload({ waitUntil: 'domcontentloaded' });
+      await paginaArranque.locator('header').getByRole('button', { name: 'Inicio', exact: true })
+        .waitFor({ state: 'visible', timeout: 25_000 });
+      const tokensTrasArrancar = await credencialesGuardadas(paginaArranque);
+      assert(JSON.stringify(tokensTrasArrancar) === JSON.stringify(tokensAlArrancar),
+        `arrancar sin conexión destruyó las credenciales: ${JSON.stringify(tokensAlArrancar)} -> `
+        + JSON.stringify(tokensTrasArrancar));
+
+      arranqueCortado = false;
+      await paginaArranque.reload({ waitUntil: 'domcontentloaded' });
+      await esperarA(async () => (await paginaArranque.locator('header')
+        .getByRole('button', { name: /Carrito/ }).count()) === 1,
+      'con la conexión de vuelta la sesión no se recuperó sola, así que conservar las '
+      + `credenciales no sirvió de nada; la cabecera dice ${JSON.stringify(await laCabeceraDice(paginaArranque))}`,
+      25_000);
+      assert(await enElCarrito(paginaArranque) === itemsAlArrancar,
+        'recuperar la sesión cambió el carrito');
+      await arranque.close();
+      medidos.push('arrancar con `/auth/me` interrumpido no destruye las credenciales, y al '
+        + 'volver la conexión la sesión se recupera sola con el carrito intacto');
 
       // --- C2. La sesión no se puede recuperar: se ofrece ingresar ----------
       const perdida = await browser.newContext({ viewport: { width: 1440, height: 900 } });

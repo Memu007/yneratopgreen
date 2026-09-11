@@ -124,11 +124,16 @@ async function refreshAccessToken(): Promise<ResultadoDeRenovacion> {
     return 'indisponible';
   }
 
-  // Del 500 para arriba el problema es del otro lado.
-  if (response.status >= 500) return 'indisponible';
-
-  tokenStorage.clearTokens();
-  return 'rechazado';
+  // Sólo un rechazo explícito de la credencial es un rechazo. Un 408, un 429 o
+  // un 500 no dicen que el token no valga: dicen que ahora no se pudo. Antes la
+  // regla era «del 500 para arriba», así que 408 y 429 tiraban las
+  // credenciales, y son justamente los dos estados que aparecen cuando el otro
+  // lado está sobrecargado, no cuando la sesión se venció.
+  if (response.status === 401 || response.status === 403) {
+    tokenStorage.clearTokens();
+    return 'rechazado';
+  }
+  return 'indisponible';
 }
 
 /**
@@ -300,9 +305,16 @@ export async function apiFetch<T = unknown>(
 
     return await response.json();
   } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
+    // Vuelve tal cual SÓLO lo que ya sabe por qué falló. Todo lo demás llega
+    // acá sin causa, empezando por el `TypeError` con el que `fetch` rechaza
+    // cuando la conexión se corta —y un `TypeError` también es un `Error`—.
+    //
+    // Antes se relanzaba cualquier `Error` sin tocarlo, así que la red cortada
+    // perdía su motivo por el camino y, más adelante, se leía como sesión
+    // vencida. Está medido: con `/auth/me` abortado, `localStorage` quedaba sin
+    // ningún token y aparecía el Login. El 503 estaba cubierto y la red no, que
+    // es el caso más común de los dos.
+    if (error instanceof ErrorDeLaApi) throw error;
     throw new ErrorDeLaApi('Error de red. Por favor, verifica tu conexión.', 'indisponible');
   }
 }
@@ -400,11 +412,16 @@ export async function asegurarSesion(): Promise<EstadoDeLaSesion> {
     await apiGet('/auth/me');
     return 'vigente';
   } catch (error) {
-    if (error instanceof ErrorDeLaApi && error.causa === 'indisponible') {
-      return 'indisponible';
+    // El que decide es el «sí» explícito, no el descarte. Antes cualquier cosa
+    // que no fuera `indisponible` contaba como sesión vencida, y eso incluía a
+    // los errores que llegan sin causa: alcanzaba con que uno se escapara sin
+    // clasificar para volver a cerrar sesiones que estaban bien. Ahora hay que
+    // decirlo para que cuente, y lo único que lo dice es el servidor.
+    if (error instanceof ErrorDeLaApi && error.causa === 'sesion-vencida') {
+      tokenStorage.clearTokens();
+      return 'sin-sesion';
     }
-    tokenStorage.clearTokens();
-    return 'sin-sesion';
+    return 'indisponible';
   }
 }
 
