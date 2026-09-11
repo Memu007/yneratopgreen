@@ -2,6 +2,142 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## FILTER-INTENT-1R — tenías razón: R6 se reproduce, y yo medí la pregunta equivocada
+
+**Resultado: los tres puntos corregidos. El primero es un error mío de método y
+quiero empezar por ahí.**
+
+- Producto/regresión: `fbdd88f`
+- **En mi rama, no en `main`.** No integré, no desplegué, no toqué Backend,
+  endpoint, router, dependencia, almacenamiento nuevo, rediseño, capturas,
+  Railway, datos remotos, pagos ni secretos.
+
+---
+
+### 1. Me equivoqué, y no en el dato: en la pregunta
+
+R6 dice «sesión vencida con carrito abierto no ofrece Login». Yo medí **el
+mecanismo que me había imaginado** —«¿aparece el aviso de `CartModal` sin
+Login?»— comprobé que esa rama no se alcanza, y declaré refutado el borde. Pero
+el síntoma que R6 describe no es esa rama: es que la persona quede en un
+callejón. Y eso lo tenía **escrito en mi propio informe** —«el Checkout después
+falla con "Sesión expirada"»— y lo clasifiqué como «otra cosa».
+
+No era otra cosa. Era R6 una pantalla más tarde, que es peor: llega con el
+trabajo ya hecho. Lo reproduje de punta a punta:
+
+> Con el carrito abierto y la sesión ya vencida, «Continuar compra» abre el
+> Checkout. Adentro: **Envío → Pago → Órdenes**, con Nombre, Teléfono,
+> Provincia y Localidad para completar, y un botón «Continuar al pago». Ninguna
+> capa de ingreso. El «Sesión expirada» aparece recién después.
+
+Tu frase —«que el fallo aparezca una pantalla después no refuta R6»— es
+exactamente lo que yo no vi. Anotado como regla, no como caso: **refutar un
+borde es refutar su síntoma, no el mecanismo que uno le supuso.**
+
+### 2. Y buscando el arreglo apareció algo peor, que también está medido
+
+Para comprobar la sesión con el mecanismo existente encontré que **el refresh
+recuperable no se recupera nunca**. La regla del reintento era «ningún
+`/auth/`», y se lleva puesto a `/auth/me`, que es el **único** de esa familia
+que lleva sesión. Resultado, medido:
+
+> Entrar, vencer **sólo** el access token —el refresh sigue siendo el bueno— y
+> recargar: la cabecera queda en «Ingresar» y `localStorage` sólo conserva
+> `agromarket_cart`. Los dos tokens se tiraron, con el refresh válido adentro.
+
+Es decir: cada vez que a alguien se le vencía el access token, se le cerraba la
+sesión aunque tuviera con qué renovarla. Ahora la lista dice cuáles no se
+reintentan **y por qué**: `login` y `register` contestan por la credencial que
+se acaba de escribir, `refresh` sería morderse la cola, y los de verificación se
+piden sin sesión. En todos ésos, renovar no cambia la respuesta —y reintentar sí
+cambiaría el mensaje: «Email o contraseña incorrectos» se volvería «Sesión
+expirada», que no es lo que pasó. Eso está medido aparte, en el punto 3.
+
+Después de eso: entrar, vencer sólo el access y recargar deja la cabecera con
+«Vender», «Carrito» y el nombre. La persona no se entera.
+
+### 3. La puerta, medida en los dos casos por separado
+
+`asegurarSesion()` pregunta por la sesión en vez de mirar el token —tener un
+token guardado no es tener sesión— y si no se puede recuperar tira las
+credenciales muertas. Se llama «asegurar» y no «consultar» porque escribe.
+
+| Escenario | Qué hace | Carrito |
+| --- | --- | --- |
+| access vencido, refresh válido | renueva y abre el Checkout, **sin pedir nada** | intacto |
+| sesión irrecuperable | abre el Login real, **no** abre el Checkout | intacto |
+| cancelar | vuelve al carrito, con su ítem a la vista | intacto |
+| credencial fallida | no avanza; el motivo sigue siendo «Email o contraseña incorrectos», **no** «Sesión expirada» | intacto |
+| credencial buena | abre el Checkout **una vez**, sin volver a apretar «Continuar compra» | intacto |
+
+Escrituras comerciales durante todo el recorrido: **ninguna**. Ni orden, ni
+reserva, ni pago. El caso lo mira por pedido saliente, no por confianza.
+
+Que la persona entró se lee del token y no de `isAuthenticated`, que es
+justamente lo que acabamos de probar que miente.
+
+### 4. El mismo A9, cerrado donde faltaba
+
+- **`AboutPage`** entra por `pedirPublicar`, como Inicio y Servicios, y ahora
+  además **dice por qué aparece el ingreso**: no tenía aviso ninguno. Está en el
+  recorrido del 167, así que no puede volver a quedarse atrás sola.
+- **`AddProductModal`** deja el último tuteo del camino.
+
+### 5. Los negativos: el caso falla contra `0a6cbd4`, y por lo que tiene que fallar
+
+| Se devolvió al estado de `0a6cbd4` | El 167 dijo |
+| --- | --- |
+| el Checkout abre sin comprobar la sesión | «con la sesión vencida no se ofreció ingresar; lo que hay abierto es ["Checkout"]» |
+| `/auth/me` vuelve a quedar fuera del reintento | «con el access vencido y el refresh válido no se llegó al Checkout: la sesión se podía renovar sin molestar a nadie» |
+| Quiénes somos vuelve al Login sin continuidad | «el aviso del CTA 1 de about no es "Iniciá sesión para publicar una oferta": ""» |
+
+Los dos primeros rojos empezaron siendo un `locator.waitFor: Timeout` pelado,
+que dice «se venció» y nada más. Lo cambié: cuando una capa no aparece, el
+mensaje ahora dice **qué apareció en su lugar**, que es justamente el defecto
+que se está midiendo. Un rojo que no nombra lo que vio no sirve para arreglar
+nada.
+
+### 6. Puertas
+
+- **138, 139 y 167 aislados: 3/3**, desde base limpia.
+- `lint`, `tsc --noEmit`, `node --check scripts/smoke.mjs` y
+  `git -c core.whitespace=cr-at-eol diff --check`: verdes. El smoke incluye
+  build. Sin suite completa, como pediste.
+
+**Un aviso sobre esos aislados**, porque la primera corrida me dio 139 en rojo y
+no quiero que te pase sin explicación: *«en Servicios ninguna tarjeta ofrece
+ingresar; los botones son ["Solicitar cotización", …]»*. No era mi cambio: era
+la base arrastrada de la suite anterior. Los cuatro servicios activos más nuevos
+—los que dejaron los casos 147, 148 y 151— tienen precio `0.00`, así que la
+vista previa de Servicios mostraba tres publicaciones a cotizar y ninguna
+comprable. Recreé la base y quedó verde. Es el mismo defecto de fondo que el
+143: **un caso que da por hecho un estado que no fabricó**. No lo toco: el 143
+ya quedó para el cierre corto siguiente y éste es su vecino.
+
+### 7. Límite conocido de lo que entregué
+
+Cuando la sesión resulta irrecuperable, tiro las credenciales pero **no bajo el
+usuario de React**: la cabecera sigue mostrando el nombre hasta que la persona
+ingresa de nuevo o recarga. Lo elegí así a propósito, porque el camino que sí
+baja el usuario —`logout()`— **vacía el carrito**, y vos pediste explícitamente
+que cancelar devuelva al carrito con sus ítems. Que la presencia de sesión tenga
+una sola fuente es un cambio más grande que esta pieza; lo dejo dicho y no lo
+hago acá.
+
+### 8. Sigue abierto
+
+- El **143** como arnés intermitente, con su mecanismo ya descripto: espera a la
+  base y lee la pantalla, y la pantalla necesita un segundo viaje.
+- El **139** con la misma familia de fragilidad, recién medida.
+- La rama sin sesión de `CartModal.handleCheckout` sigue sin alcanzarse —sin
+  sesión la cabecera ni dibuja la celda del carrito—, pero ya no hay callejón
+  que dependa de ella.
+- El 131 ambiental, la deuda de paginación mayor a cien y `--tg-color-focus`
+  igual a `--tg-color-brand`.
+
+---
+
 ## FILTER-INTENT-1 — el vacío que nadie midió, y la intención que se perdía en el Login
 
 **Resultado: A6 y A9 cerrados. R6 NO se reproduce y por eso no está en el caso
