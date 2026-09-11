@@ -89,3 +89,35 @@ que está conectado.
 indisponibilidad conserva tokens, usuario y carrito y permite reintentar; la
 invalidez abre Login y sincroniza la identidad visible sin borrar el carrito.
 Se extiende sólo R6 del caso 167 y no se repite la suite completa.
+
+## Corrección `FILTER-INTENT-1R2` revisada
+
+- Producto/regresión Dev: `a834ec3`.
+- Informe Dev: `d21cf78`.
+- Dev informó el 167 desde base limpia en **1/1**, más lint, TypeScript,
+  sintaxis y `diff-check` verdes.
+- PM revisó el diff y reprodujo el 167 desde otra base Docker limpia en
+  **1/1**, salida 0 y build incluido.
+- Log persistente: `/private/tmp/topgreen-pm-filter-intent-167r2.log`.
+- No hubo suite completa PM ni correspondía repetirla.
+
+### Conforme en R2
+
+- Un 503 directo de `/auth/me` conserva carrito, tokens e identidad, informa la
+  indisponibilidad y permite reintentar desde el mismo botón.
+- Un 503 del refresh conserva también el refresh válido y permite reanudar.
+- Una invalidez confirmada baja la identidad visible sin vaciar el carrito; el
+  Login conserva cancelación, error y continuidad ya verdes.
+
+### Motivo de tercera devolución
+
+El caso sólo fuerza respuestas HTTP 503. Una caída real de `fetch` rechaza la
+promesa con un `TypeError`, que cumple `instanceof Error`; el `catch` actual de
+`apiFetch` lo relanza antes de asignarle causa `indisponible`.
+`asegurarSesion()` interpreta cualquier error que no tenga esa causa como
+`sin-sesion`, limpia credenciales y abre Login. Además, `loadCurrentUser` sigue
+limpiando tokens ante cualquier error durante el arranque.
+
+`FILTER-INTENT-1R3` debe envolver el rechazo real como indisponibilidad, tratar
+únicamente `sesion-vencida` como invalidez y conservar tokens al arrancar sin
+red. Se agrega sólo ese negativo al 167; no se repite suite completa.
