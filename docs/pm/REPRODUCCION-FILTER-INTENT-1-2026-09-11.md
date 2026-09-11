@@ -121,3 +121,24 @@ limpiando tokens ante cualquier error durante el arranque.
 `FILTER-INTENT-1R3` debe envolver el rechazo real como indisponibilidad, tratar
 únicamente `sesion-vencida` como invalidez y conservar tokens al arrancar sin
 red. Se agrega sólo ese negativo al 167; no se repite suite completa.
+
+## Corrección `FILTER-INTENT-1R3` aceptada
+
+- Producto/regresión Dev: `fa4446a`.
+- Informe Dev: `50f63b6`.
+- Dev informó el 167 desde base limpia en **1/1**, más lint, TypeScript,
+  sintaxis y `diff-check` verdes.
+- PM revisó el delta y reprodujo el 167 desde otra base Docker limpia en
+  **1/1**, salida 0 y build incluido.
+- Log persistente: `/private/tmp/topgreen-pm-filter-intent-167r3.log`.
+- No hubo suite completa PM ni correspondía repetirla.
+
+La versión final clasifica como indisponibles el rechazo real de `fetch`, 503,
+429 y cualquier error no confirmado; sólo `sesion-vencida` elimina
+credenciales. El arranque sin red conserva los tokens y se recupera al volver
+la conexión. La sesión realmente inválida baja la identidad sin vaciar el
+carrito y mantiene la continuidad hacia Login/Checkout.
+
+`FILTER-INTENT-1R3` queda aceptada en rama Dev. No se integró a `main` ni se
+desplegó producto. La siguiente tarea es `TEST-SUITE-167S`, acotada a estabilizar
+los casos 139 y 143 antes de continuar con `COPY-CLEAR-1`.

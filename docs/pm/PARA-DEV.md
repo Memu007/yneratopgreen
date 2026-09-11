@@ -12,6 +12,49 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-11 — CIERRE: FILTER-INTENT-1R3 aceptada; activar TEST-SUITE-167S
+
+Aceptados en rama Dev: base `0a6cbd4`/`89db3fe`, R1
+`fbdd88f`/`71976e9`, R2 `a834ec3`/`d21cf78` y R3
+`fa4446a`/`50f63b6`. Dev obtuvo el 167 R3 desde base limpia en **1/1**; PM
+revisó el delta y lo reprodujo desde otra base Docker limpia en **1/1**, salida
+0 y build incluido. Log PM:
+`/private/tmp/topgreen-pm-filter-intent-167r3.log`. La interrupción real de
+red, 503, 429, refresh, arranque, sesión inválida, carrito e identidad quedan
+distinguidos. No hubo suite completa PM ni se integra/despliega producto.
+Evidencia consolidada en
+`REPRODUCCION-FILTER-INTENT-1-2026-09-11.md`.
+
+La única tarea activa pasa a **`TEST-SUITE-167S`**. Es sólo arnés y cierra
+juntos los dos estados frágiles que FILTER dejó demostrados:
+
+1. **Caso 139 autosuficiente.** Hoy elige la primera tarjeta comprable de cada
+   pantalla y puede quedarse sin ninguna en Servicios si casos anteriores
+   dejaron servicios más nuevos a convenir/precio cero. Fabricá por API un
+   producto y un servicio comprables con nombres únicos del caso y buscá esas
+   tarjetas por identidad exacta en Inicio, Mercado y Servicios. No dependas
+   del orden del seed, de la primera tarjeta ni del residuo de otra prueba.
+2. **Caso 143 espera la condición que afirma.** Después de pausar o reactivar,
+   la base cambia con el PATCH antes de que termine el GET que redibuja la
+   tarjeta. Conservá la base como precondición y esperá además que la tarjeta
+   muestre «Pausado»/«Activo» y la acción inversa antes de evaluarla. No agregues
+   esperas fijas ni aflojes las aserciones de anatomía, modalidad, stock y
+   control agotado.
+3. **Demostrá la estabilización.** Para 139, reproducí el rojo viejo con
+   publicaciones más nuevas no comprables y mostrá que el caso nuevo usa sus
+   propias filas. Para 143, demorá de forma controlada la respuesta de
+   `/products/my` posterior al PATCH: el arnés viejo debe leer demasiado pronto
+   y el nuevo esperar el texto real. Los negativos son del arnés, no justifican
+   tocar producto.
+
+Alcance estricto: `scripts/smoke.mjs` y `PARA-PM.md`; diff de `src/` y
+`backend/` vacío. Corré 139+143 juntos desde base limpia, más
+`node --check scripts/smoke.mjs` y `diff-check`. **No corras suite completa,
+build separado, lint, Backend, a11y, contraste ni capturas.** Sin Railway,
+datos remotos, pagos o secretos. Un commit de arnés y otro de informe; no
+integres a `main`, no despliegues y frená al entregar. `COPY-CLEAR-1` espera
+esta estabilización y no se empieza todavía.
+
 ## 2026-09-11 — DEVOLUCIÓN: FILTER-INTENT-1R3, 503 no cubre una caída real de red
 
 Revisé producto/regresión `a834ec3` e informe `d21cf78`. El 503 de
