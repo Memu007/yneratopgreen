@@ -2,6 +2,144 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## FILTER-INTENT-1R2 — el arreglo anterior era peor que el defecto
+
+**Resultado: los tres puntos corregidos. El primero lo introduje yo la vuelta
+pasada, y era peor que lo que venía a arreglar.**
+
+- Producto/regresión: `a834ec3`
+- **En mi rama, no en `main`.** No integré, no desplegué, no toqué Backend,
+  endpoint, router, dependencia, rediseño, Railway, datos remotos, pagos ni
+  secretos.
+
+---
+
+### 1. Lo que rompí, medido
+
+`asegurarSesion()` atrapaba **cualquier** error de `/auth/me`. Con el Backend
+respondiendo 503:
+
+| | antes de apretar | después de apretar |
+| --- | --- | --- |
+| capas | `["Mi carrito"]` | **`["Ingresar"]`** |
+| tokens en `localStorage` | `["access_token","refresh_token"]` | **`[]`** |
+| carrito | 1 ítem | 1 ítem |
+
+Una caída de dos segundos le cerraba la sesión a alguien que la tenía
+perfectamente válida, y encima con un diagnóstico inventado. Peor que el
+callejón que la pieza venía a arreglar, porque parece deliberado.
+
+**Y el mismo defecto estaba un nivel más abajo, por otro camino.** Con el access
+vencido —legítimo— y `/auth/refresh` respondiendo 503, `refreshAccessToken`
+también tiraba los dos tokens: se perdía un refresh perfectamente bueno.
+Medido igual, y arreglado en el mismo lugar.
+
+### 2. Tres resultados, no dos
+
+| Estado | Qué pasó | Qué hace |
+| --- | --- | --- |
+| `vigente` | contestó que sí, o se renovó en el camino | sigue al Checkout |
+| `sin-sesion` | **confirmado**: el servidor dijo que no vale | tira credenciales, baja identidad, ofrece ingresar |
+| `indisponible` | no se pudo preguntar (5xx, red, timeout) | **no toca nada** y lo explica |
+
+El motivo ahora viaja **aparte del texto** del error (`ErrorDeLaApi.causa`).
+Antes había que buscarle frases al mensaje para distinguirlos, que es justo el
+riesgo que la auditoría dejó anotado: una pantalla que decide leyendo cómo está
+redactado un mensaje se rompe el día que alguien lo mejora.
+
+Las credenciales se tiran **sólo** cuando el servidor contestó que no valen.
+
+### 3. Indisponible conserva y explica
+
+Medido con el Backend caído de verdad —la respuesta se reemplaza en el
+navegador—, no rompiendo el token, porque el punto es que un token bueno no se
+toque:
+
+- el carrito sigue abierto, con su ítem a la vista;
+- `access_token` y `refresh_token` quedan **iguales**, comparados antes y después;
+- la cabecera queda **igual**: no se baja a nadie;
+- no se abre ni Login ni Checkout;
+- el aviso dice *«No pudimos comprobar tu sesión en este momento. Tus productos
+  siguen acá: probá de nuevo en unos segundos.»* — el caso exige que **no**
+  diga «expiró» ni «venció»;
+- y al volver el servidor, **el mismo botón** alcanza: reintenta y sigue.
+
+Lo mismo, por separado, para la caída del refresh.
+
+El aviso vive en la capa y no en un cartel que se va solo: quien lo necesita
+leer está mirando justo eso, y el botón que reintenta está al lado. Contraste
+medido: 5,64:1.
+
+### 4. Irrecuperable baja la identidad, sin vaciar el carrito
+
+`sesionInvalidada()` baja identidad y credenciales y **no toca el carrito**. No
+reusa `logout()` a propósito, y no es duplicar Auth: `logout` es *irse* —avisa
+al servidor y vacía el carrito, que es lo que corresponde cuando alguien cierra
+su sesión—. Acá no se fue nadie: la credencial venció mientras la persona miraba
+lo que había elegido.
+
+Tras cancelar el Login, la cabecera pasa de
+`["Vender","Carrito (1)","María Cliente","Salir"]` a `["Ingresar"]`, y el
+carrito conserva su ítem.
+
+**Esto me obligó a un cambio que no había previsto y lo digo porque importa.**
+`CartModal` tenía su propia guarda con `isAuthenticated`: sin sesión avisaba y
+no hacía nada. Nunca se alcanzaba —sin sesión la cabecera ni dibuja la celda del
+carrito—, pero apenas la identidad empezó a bajarse, pasó a alcanzarse **justo
+en el peor momento**: después de cancelar el ingreso, «Continuar compra» habría
+dejado de funcionar para siempre en vez de poder reintentarse. La saqué: quién
+decide si se puede seguir es una sola pieza, y no es el carrito. Además miraba
+el dato equivocado —`isAuthenticated` dice lo que se sabía al entrar—.
+
+### 5. Los negativos: rojos por comportamiento contra `fbdd88f`
+
+| Se devolvió al estado de `fbdd88f` | El 167 dijo |
+| --- | --- |
+| cualquier error de `/auth/me` se toma por sesión vencida | «una caída del servidor terminó ofreciendo ingresar: un 503 no dice nada de la sesión, y tratarlo como un vencimiento cierra sesiones que estaban bien» |
+| el refresh tira los tokens ante un 503 | «un 503 del refresh terminó ofreciendo ingresar, con el refresh token todavía bueno» |
+| se tiran las credenciales y la cabecera sigue afirmando sesión | «con la sesión confirmada inválida la cabecera sigue afirmando que hay una: "AgroBoeda \| Vender \| Carrito (1) \| María Cliente \| Salir…"» |
+
+**Dos cosas que me obligaron a corregir el caso, no el producto:**
+
+El segundo negativo **daba verde**. Mi escenario tumbaba `/auth/me` directamente,
+así que el camino del refresh no se ejercía nunca: hacía falta su propio
+recorrido —access vencido de verdad y `/auth/refresh` en 503—. Sin eso, el caso
+no veía la mitad del defecto que dice cubrir.
+
+Y el primero era rojo pero **nombraba mal el defecto**: decía «el carrito no
+explicó nada» cuando lo que había pasado era que ofreció ingresar. Yo esperaba
+sólo la explicación, así que «decidió mal» se leía como «no decidió». Ahora se
+espera a que el producto decida **algo** y recién ahí se mira **qué** decidió.
+Un rojo que nombra mal el defecto manda a arreglar lo que no es.
+
+### 6. Puertas
+
+- **167 desde base limpia: 1/1.**
+- `lint`, `tsc --noEmit`, `node --check scripts/smoke.mjs` y
+  `git -c core.whitespace=cr-at-eol diff --check`: verdes. El smoke incluye
+  build. Sin 138, sin 139 y sin suite completa, como pediste.
+- `src/types/index.ts`: 10 líneas de diff, sin tocar terminadores.
+
+### 7. Consecuencia conocida de bajar la identidad
+
+Cuando la sesión se confirma inválida, la cabecera deja de dibujar la celda
+«Carrito». El carrito abierto **no** se cierra —por eso cancelar devuelve a él
+con sus ítems, y por eso el botón reintenta—, pero si la persona lo cierra sin
+ingresar, no tiene desde dónde reabrirlo hasta que ingrese. Es el mismo
+comportamiento que ya tenía cualquiera sin sesión, así que no inventé una
+inconsistencia nueva; pero antes esa persona no existía y ahora sí. Mostrar el
+carrito sin sesión es una decisión de producto, no un arreglo, y no la tomo
+sola: decime si la querés y la hago.
+
+### 8. Sigue abierto
+
+- El **143** como arnés intermitente y el **139** con la misma fragilidad
+  —dependen de un estado que no fabricaron—, ya medidos y registrados.
+- El 131 ambiental, la deuda de paginación mayor a cien y `--tg-color-focus`
+  igual a `--tg-color-brand`.
+
+---
+
 ## FILTER-INTENT-1R — tenías razón: R6 se reproduce, y yo medí la pregunta equivocada
 
 **Resultado: los tres puntos corregidos. El primero es un error mío de método y
