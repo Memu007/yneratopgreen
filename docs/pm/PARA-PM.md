@@ -2,6 +2,163 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## TEST-SUITE-167S — dos verdes que afirmaban sobre un estado que no fabricaron
+
+**Resultado: los dos puntos cerrados, cada uno con su rojo viejo reproducido y
+su rojo nuevo medido. Sólo arnés: el diff de `src/` y `backend/` está vacío.**
+
+- Arnés: `d7e17f9`
+- **En mi rama, no en `main`.** No integré, no desplegué, no toqué Backend,
+  endpoint, router, dependencia, rediseño, Railway, datos remotos, pagos ni
+  secretos. No corrí suite completa, build, lint, a11y, contraste ni capturas.
+
+Antes de tocar nada reproduje las dos premisas. Las dos se sostienen, y las dos
+son la misma falla de método: **el caso afirmaba sobre un estado que no había
+puesto él.** Lo anoto así porque no son dos arreglos distintos.
+
+---
+
+### 1. Caso 139 — «la primera tarjeta que ofreciera ingresar» no es una precondición
+
+Inicio y Servicios no dibujan el catálogo: dibujan las **tres publicaciones más
+nuevas**. `useVistaPrevia` pide `page_size: 3` con `created_at desc`, y
+Servicios filtra por tipo antes de contar. Así que **tres** servicios a
+convenir más nuevos que el seed alcanzan para que Servicios no tenga una sola
+tarjeta comprable, y el caso acusaba al producto de no ofrecer la puerta.
+
+Reproducción del rojo viejo. Publiqué por API tres servicios a convenir y
+después un producto comprable —así Inicio conserva una tarjeta comprable entre
+las tres más nuevas y el rojo cae sólo donde caía de verdad:
+
+```
+los cuatro servicios mas nuevos:
+  [["Residuo a convenir 3 …","0.00"],["Residuo a convenir 2 …","0.00"],
+   ["Residuo a convenir 1 …","0.00"],["Smoke servicio de estado …","48000.00"]]
+
+[FAIL] 139 — en Servicios ninguna tarjeta ofrece ingresar; los botones son
+  ["Solicitar cotización","Ver detalle","Solicitar cotización","Ver detalle",
+   "Solicitar cotización","Ver detalle"]
+```
+
+El producto estaba intacto. Y el residuo no es hipotético: los casos **120,
+147, 148 y 166** publican servicios a convenir, así que aparece con sólo correr
+la suite dos veces sobre la misma base.
+
+Ahora el caso publica por API un activo y un servicio comprables con nombres
+únicos suyos —`Puerta139 activo <sello>` y `Puerta139 servicio <sello>`— y
+busca **esas** tarjetas por título exacto en las tres pantallas: el activo en
+Inicio y Mercado, el servicio en Servicios. No mira posiciones. Con exactamente
+el mismo residuo que ponía rojo al arnés viejo:
+
+```
+[PASS] 139 — … Sobre dos publicaciones propias del caso («Puerta139 activo …»
+  en Inicio y Mercado, «Puerta139 servicio …» en Servicios, buscadas por título
+  exacto y no por posición) … (Inicio:«Agregar al carrito»,
+  Mercado:«Agregar al carrito», Servicios:«Contratar»)
+```
+
+Los rótulos que recorre el navegador son los mismos que antes, porque publiqué
+el producto como **activo** y no como insumo: si lo hubiera publicado insumo, el
+caso habría dejado de ejercitar «Agregar al carrito» en pantalla sin que
+ninguna aserción lo dijera.
+
+**Agregué algo que no me pediste, y te digo por qué.** El caso ahora **retira
+sus dos publicaciones al terminar** (baja lógica, `status` DELETED), corra bien
+o mal. El motivo: dejarlas vivas le cambia a las pruebas siguientes cuál es la
+publicación más nueva, y eso no lo puedo verificar sin correr la suite completa,
+que me pediste no correr. Retirándolas la base queda **igual que antes**, que es
+el único estado sobre el que puedo afirmar algo sin esa corrida. Medido después
+del verde desde base limpia:
+
+```
+Puerta139 servicio … -> DELETED
+Puerta139 activo   … -> DELETED
+activos más nuevos: ["Smoke producto agotado …","Smoke servicio de estado …",
+                     "Campo Agrícola de 120 Hectáreas"]
+```
+
+Es además la otra mitad de la misma deuda: un caso que no quiere heredar
+residuo tampoco debería dejarlo.
+
+### 2. Caso 143 — la base es la precondición, no la evidencia
+
+El PATCH deja el estado escrito en la base **antes** de que termine el GET de
+`/products/my` que redibuja la tarjeta, y `reloadUserProducts` no marca nada
+como cargando: la lista vieja se queda en pantalla mientras el pedido viaja.
+Esperar la base y leer la tarjeta enseguida es leer el render anterior.
+
+Reproducción del rojo, con la respuesta de `/products/my` posterior al PATCH
+demorada 4 s de forma controlada:
+
+```
+[FAIL] 143 — despues de pausar: la tarjeta no dice «Pausado»:
+  «Activo SERVICIO Smoke servicio de estado … $ 48.000 Por hectárea 0 0
+   Editar Pausar»   (2251 ms)
+```
+
+La base ya decía `PAUSED`. El arnés leyó 2,2 s después de empezar: no esperó
+nada, llegó antes que el producto.
+
+La base queda como precondición y ahora se espera además **la condición que el
+caso va a afirmar**: que la tarjeta diga «Pausado»/«Activo» **y** ofrezca la
+acción inversa —que es justamente el botón que se comía el defecto original—.
+Con `esperarA`, que pregunta cada 50 ms y se rinde a los 20 s: sin esperas
+fijas. No aflojé ninguna aserción de anatomía, modalidad, stock ni el control
+agotado. Con la misma demora de 4 s:
+
+```
+[PASS] 143 — … (16855 ms)
+```
+
+Los 16,9 s contra los 2,2 s del rojo son la demora esperada dos veces, una por
+pausar y otra por reactivar: esperó de verdad.
+
+### 3. Que los verdes nuevos todavía puedan ponerse rojos
+
+Un arnés que ya no se rompe con el residuo podría no romperse tampoco con el
+defecto. Rompí el producto a propósito, en el árbol de trabajo y sin commitear:
+
+| Sabotaje del producto | Lo que dijo el caso nuevo |
+| --- | --- |
+| `ProductCard` sin el rótulo sin sesión | **`[FAIL] 139`** en Inicio la tarjeta de «Puerta139 activo …» no ofrece ingresar; sus botones son `["Agregar al carrito","Ver detalle"]` |
+| botón de activar escondido en lo pausado | **`[FAIL] 143`** la tarjeta no llegó a decir «Pausado» con su botón «Activar» en 20 s, con la base ya en PAUSED; lo último que mostró fue «Pausado SERVICIO … Editar» |
+
+El segundo es el defecto original textual —la publicación pausada sin forma de
+reactivarse— y el mensaje lo nombra. Los dos sabotajes están revertidos: el
+diff de `src/` y `backend/` está vacío.
+
+### Compuertas
+
+- **139 + 143 juntos desde base limpia (`--recrear`): 2/2**, salida 0.
+- `node --check scripts/smoke.mjs`: verde.
+- `git -c core.whitespace=cr-at-eol diff --check`: verde.
+- Diff de `src/` y `backend/`: vacío. Un solo archivo tocado, `scripts/smoke.mjs`.
+- No corrí suite completa, otros casos, build, lint, a11y, contraste ni
+  capturas, como pediste.
+
+### Lo que queda dicho y no arreglado
+
+- **No medí el efecto sobre los otros 165 casos**, porque la corrida completa
+  no estaba en el alcance. El retiro de las dos publicaciones es exactamente
+  para que ese efecto sea nulo por construcción y no por confianza: la base
+  queda como estaba. Si querés la prueba y no el argumento, la suite completa
+  desde base limpia es la única forma, y te la corro cuando digas.
+- **El caso 143 sigue dejando residuo**: su servicio comprable y su producto
+  con stock 0 quedan publicados. El producto con stock 0 es residuo del mismo
+  tipo que el que rompía al 139. Lo informo y no lo toco: estabilizar el 143 era
+  la espera, no su limpieza, y hacerle lo mismo que al 139 es una decisión tuya.
+- **Hay más casos que toman «la primera tarjeta»** después del 139 —140, 155,
+  156, 166, 167—. No los medí ni los toqué: no estaban en el alcance. Nombro
+  dónde está la familia, no afirmo que estén rotos.
+- Sigue en pie el 131, rojo permanente por entorno.
+- Y sigue esperando tu palabra lo del carrito sin sesión: hoy, alguien con la
+  sesión confirmada inválida pierde la celda «Carrito» de la cabecera y no
+  puede reabrir un carrito que cerró.
+
+`COPY-CLEAR-1` no lo empecé.
+
+---
+
 ## FILTER-INTENT-1R3 — dije «red, timeout y 5xx» y sólo había medido 5xx
 
 **Resultado: los tres puntos corregidos. El primero desmiente algo que escribí
