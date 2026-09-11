@@ -12,6 +12,80 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
+## 2026-09-11 — CIERRE: TEST-SUITE-167S aceptada; activar COPY-CLEAR-1
+
+Aceptados en rama Dev el arnés `d7e17f9` y el informe `40131de`. Dev demostró
+los rojos viejos, los negativos nuevos y 139+143 en **2/2** desde base limpia.
+PM revisó el diff completo —sólo `scripts/smoke.mjs`, con `src/` y `backend/`
+vacíos— y reprodujo 139+143 juntos desde otra base Docker limpia en **2/2**,
+salida 0 y build incluido. Sintaxis y `diff-check` quedaron verdes. No hubo
+suite completa PM ni correspondía repetirla. Log PM:
+`/private/tmp/topgreen-pm-test-suite-167s.log`. Evidencia en
+`REPRODUCCION-TEST-SUITE-167S-2026-09-11.md`.
+
+La única tarea activa pasa a **`COPY-CLEAR-1`**. Es una pasada editorial y de
+claridad funcional; no autoriza rediseño ni funciones nuevas.
+
+1. **La marca vuelve a Inicio y no se reabre.** A7 ya está resuelto en el
+   producto aceptado: los controles de marca de Header y Footer llevan a Inicio
+   y el 156 lo prueba con teclado. Conservá ese comportamiento; no rehagas
+   marca, activos, navegación ni estilos.
+2. **Buscar tiene una acción real.** En Mercado, escribir no debe ejecutar una
+   búsqueda distinta de la que promete el botón. El clic en «Buscar» y Enter
+   aplican la consulta actual recortada, actualizan `q`, consultan el catálogo y
+   muestran el resultado; una consulta vacía limpia el filtro. Retirá el
+   `console.log`. No agregues motor, fuzzy search, índice, endpoint ni
+   paginación: se conserva la búsqueda existente del servidor.
+3. **No se prometen planes ni comisiones inventadas.** En Contacto, retirá la
+   referencia a planes inexistentes y explicá con precisión la regla vigente:
+   AgroBoeda no cobra comisión por la venta en este MVP y el pago va al
+   vendedor. No crees planes, suscripciones ni cobros.
+4. **Contraseña: salida honesta, no recovery.** Login debe ofrecer una
+   instrucción visible para quien olvidó la contraseña y llevar a la sección
+   Contacto. No prometas envío, recuperación automática ni plazo; no agregues
+   token, email, endpoint, modal o formulario de reset. La herramienta manual
+   de administración ya existente no se modifica.
+5. **Voseo es-AR, con revisión humana.** Corregí las frases visibles que aún
+   mezclan tuteo en Login, registro, carrito, alta/edición, panel y errores. La
+   base actual contiene, entre otras, «¿No tienes cuenta?», «Regístrate aquí»,
+   «Debes iniciar sesión», «¿... quieres ...?», «Agrega/Explora/Publica»,
+   «Aún/No tienes», «Gestiona» y «Cuéntanos». Usá voseo rioplatense natural
+   —«tenés», «Registrate», «Iniciá», «querés», «Agregá», «Explorá»,
+   «Publicá», «Gestioná», «Contanos»— sin cambiar sustantivos como «tu cuenta»
+   ni marcar coincidencias correctas por regex. Revisá también los mensajes de
+   error realmente visibles que toque el mismo recorrido.
+6. **Estados visibles en español; valores de API intactos.** Centralizá los
+   rótulos del panel administrativo para publicaciones y órdenes: ninguna
+   celda/badge muestra `active`, `paused`, `sold_out`, `deleted`, `placed`,
+   `awaiting_transfer_receipt`, `transfer_receipt_submitted`, `paid`,
+   `confirmed`, `shipped`, `delivered` o `cancelled` crudo. Los `value` de los
+   selectores y los cuerpos PATCH siguen usando el token de Backend. Eliminá
+   las dos ramas muertas de `draft` ya inventariadas en `getStatusBadge` y
+   `aPublicacionDelPanel`; no cambies el enum ni aceptes `draft`.
+
+### Prueba y entrega
+
+- Conservá el 156 verde. Extendé el 160 para comprobar rótulos es-AR exactos
+  sobre sus estados fabricados y que selector/PATCH mantienen los tokens del
+  Backend. Agregá el caso 168 para recorrer búsqueda por clic y Enter, limpieza
+  de `q`, FAQ sin planes, salida de soporte desde Login y una muestra
+  representativa de voseo en las superficies tocadas. No hagas una puerta
+  estática ingenua sobre palabras sueltas.
+- Mostrá rojo contra la base anterior para cada familia que el caso nuevo dice
+  cubrir y un negativo discriminante para búsqueda y estados. No alcanza con
+  snapshots de texto ni lectura de fuente.
+- Corré 156+160+168 focales y después **una sola suite completa desde base
+  limpia**. Es cambio transversal y además corresponde por cadencia. Con el
+  total nuevo, el único rojo tolerable en tu entorno sigue siendo el 131 por la
+  limitación Docker Alpine ya documentada; no lo repitas por separado.
+- Corré lint, `node --check scripts/smoke.mjs`, a11y y `diff-check`; el smoke ya
+  incluye build, no lo repitas por separado. Contraste/capturas sólo si
+  realmente cambiás estilos, que no debería hacer falta.
+- Producto/regresión en un commit e informe `PARA-PM.md` aparte. Sin Backend,
+  schema, dependencia, pagos, datos remotos, Railway, despliegue, activos de
+  marca, mensajería ni recuperación automática. No integres a `main` y frená
+  al entregar. `CAT-PAGE-1` espera.
+
 ## 2026-09-11 — CIERRE: FILTER-INTENT-1R3 aceptada; activar TEST-SUITE-167S
 
 Aceptados en rama Dev: base `0a6cbd4`/`89db3fe`, R1
