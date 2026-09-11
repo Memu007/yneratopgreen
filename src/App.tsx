@@ -43,7 +43,7 @@ type AuthModalType = 'login' | 'register' | null;
 type PageSection = Seccion;
 
 function App() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, sesionInvalidada } = useAuth();
   // La única navegación del producto: qué sección declara la barra, qué capa
   // hay abierta encima y cómo se escribe el historial. Nadie más lo toca.
   const navegacion = useNavegacion();
@@ -205,6 +205,9 @@ function App() {
     }
   };
   const [isCartOpen, setIsCartOpen] = useState(false);
+  // Lo que el carrito tiene que explicar cuando no se pudo comprobar la
+  // sesión. Vive acá porque lo produce la comprobación, no el carrito.
+  const [avisoDelCarrito, setAvisoDelCarrito] = useState<string | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
@@ -546,11 +549,33 @@ function App() {
    * así que un token acá es uno nuevo, de alguien que acaba de entrar.
    */
   const handleCheckout = async () => {
-    if (await asegurarSesion()) {
+    const estado = await asegurarSesion();
+
+    if (estado === 'vigente') {
+      setAvisoDelCarrito(null);
       setIsCartOpen(false);
       setIsCheckoutOpen(true);
       return;
     }
+
+    // No se pudo preguntar. Eso no es una sesión vencida y no se trata como
+    // tal: no se cierra el carrito, no se tocan las credenciales, no se baja a
+    // nadie y no se abre nada. Se dice lo único que sabemos, y el mismo botón
+    // sirve para volver a intentar cuando el otro lado vuelva.
+    if (estado === 'indisponible') {
+      setAvisoDelCarrito(
+        'No pudimos comprobar tu sesión en este momento. Tus productos siguen acá: '
+        + 'probá de nuevo en unos segundos.',
+      );
+      return;
+    }
+
+    // Confirmada inválida. Recién acá se baja la identidad: la cabecera estaba
+    // mostrando un nombre y unas acciones que ya no eran ciertas. El carrito NO
+    // se toca —lo que hay adentro lo eligió una persona— y por eso esto no pasa
+    // por `logout()`, que sí lo vacía.
+    setAvisoDelCarrito(null);
+    sesionInvalidada();
     setIsCartOpen(false);
     abrirLoginYVolver(() => {
       setTimeout(() => {
@@ -775,8 +800,9 @@ function App() {
         {/* Modal del carrito */}
         <CartModal
           isOpen={isCartOpen}
-          onClose={() => setIsCartOpen(false)}
+          onClose={() => { setAvisoDelCarrito(null); setIsCartOpen(false); }}
           onCheckout={handleCheckout}
+          avisoDeSesion={avisoDelCarrito}
         />
 
         {/* Modal de Checkout */}

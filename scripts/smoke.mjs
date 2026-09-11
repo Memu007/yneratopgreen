@@ -25190,6 +25190,12 @@ await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o com
       }
       return nombres;
     };
+    // Qué credenciales hay guardadas, y qué dice de la sesión la cabecera. Las
+    // dos cosas se miran igual antes y después: lo que se mide es que NO
+    // cambien cuando el motivo del tropiezo no fue la sesión.
+    const credencialesGuardadas = (pagina) => pagina.evaluate(() =>
+      Object.keys(localStorage).filter((clave) => /token/i.test(clave)).sort());
+    const laCabeceraDice = (pagina) => pagina.locator('header button').allInnerTexts();
     const esperarLaCapa = async (pagina, cual, porQue) => {
       await esperarA(async () => (await cual(pagina).count()) === 1,
         `${porQue}; lo que hay abierto es ${JSON.stringify(await capasAbiertas(pagina))}`,
@@ -25491,6 +25497,141 @@ await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o com
       medidos.push('con el access vencido y el refresh válido, «Continuar compra» renueva y abre '
         + 'el Checkout sin pedir nada');
 
+      // --- C1b. No se pudo comprobar: eso NO es una sesión vencida ----------
+      //
+      // La primera corrección metió un defecto peor que el que arreglaba:
+      // `asegurarSesion` atrapaba CUALQUIER error de `/auth/me`, borraba los dos
+      // tokens y ofrecía ingresar. Medido: con `/auth/me` en 503, `localStorage`
+      // quedaba sin ningún token y aparecía el Login. Una caída de dos segundos
+      // le cerraba la sesión a alguien que la tenía perfectamente válida.
+      //
+      // Se mide con el Backend caído de verdad —la respuesta se reemplaza en el
+      // navegador— y no rompiendo el token, porque el punto es justamente que un
+      // token bueno no se toque.
+      const caido = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const paginaCaida = await caido.newPage();
+      vigilarEscrituras(paginaCaida);
+      await conSesion(paginaCaida);
+      await conElCarritoAbierto(paginaCaida);
+      const tokensAntes = await credencialesGuardadas(paginaCaida);
+      const itemsCaida = await enElCarrito(paginaCaida);
+      const identidadAntes = await laCabeceraDice(paginaCaida);
+      assert(tokensAntes.length > 0 && itemsCaida > 0,
+        'el caso no puede medir la caída sin sesión ni carrito');
+
+      let backendCaido = true;
+      await paginaCaida.route('**/auth/me', (ruta) => {
+        if (!backendCaido) return ruta.continue();
+        return ruta.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'Service Unavailable' }),
+        });
+      });
+
+      const explicacion = carrito(paginaCaida).getByRole('alert');
+      // Se espera a que el producto decida ALGO y recién ahí se mira QUÉ decidió.
+      // Esperar sólo la explicación estaba mal: cuando la decisión era la
+      // equivocada —ofrecer ingresar— el caso igual se vencía, y el rojo decía
+      // «no explicó nada» en vez de «ofreció ingresar por un 503», que es otra
+      // cosa. Un rojo que nombra mal el defecto manda a arreglar lo que no es.
+      const yaDecidio = async (pagina) => (await explicacion.count()) === 1
+        || (await login(pagina).count()) === 1
+        || (await checkout(pagina).count()) === 1;
+
+      await carrito(paginaCaida).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarA(() => yaDecidio(paginaCaida),
+        'con el servidor caído el carrito no hizo nada: ni explicó, ni ofreció ingresar, '
+        + 'ni siguió', 25_000);
+
+      // Lo que NO tiene que pasar, primero: es lo que estaba roto.
+      assert(await login(paginaCaida).count() === 0,
+        'una caída del servidor terminó ofreciendo ingresar: un 503 no dice nada de la '
+        + 'sesión, y tratarlo como un vencimiento cierra sesiones que estaban bien');
+      assert(await checkout(paginaCaida).count() === 0,
+        'una caída del servidor abrió el Checkout');
+      assert(await carrito(paginaCaida).count() === 1,
+        `la caída cerró el carrito; lo que hay abierto es ${JSON.stringify(await capasAbiertas(paginaCaida))}`);
+
+      // Y lo que sí: decir que no se pudo comprobar. NO que venció.
+      assert(await explicacion.count() === 1,
+        'con el servidor caído el carrito no explicó por qué no se pudo seguir');
+      const textoDeLaCaida = (await explicacion.innerText()).trim();
+      assert(!/expir|venci|venció/i.test(textoDeLaCaida),
+        'la caída se explicó como sesión vencida, que es un diagnóstico inventado: '
+        + JSON.stringify(textoDeLaCaida));
+      assert(await carrito(paginaCaida).getByRole('button', { name: /^Quitar/ }).count()
+        === itemsCaida, 'la caída se llevó puesto lo que había en el carrito');
+      const tokensDespues = await credencialesGuardadas(paginaCaida);
+      assert(JSON.stringify(tokensDespues) === JSON.stringify(tokensAntes),
+        `la caída tocó las credenciales: ${JSON.stringify(tokensAntes)} -> `
+        + JSON.stringify(tokensDespues));
+      assert(JSON.stringify(await laCabeceraDice(paginaCaida)) === JSON.stringify(identidadAntes),
+        'la caída bajó la identidad de alguien que sigue teniendo sesión');
+
+      // Y cuando el otro lado vuelve, el MISMO botón alcanza.
+      backendCaido = false;
+      await carrito(paginaCaida).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarLaCapa(paginaCaida, checkout,
+        'con el servidor de vuelta, el mismo botón no pudo reintentar');
+      await caido.close();
+      medidos.push('un 503 al comprobar la sesión conserva carrito, credenciales e identidad, '
+        + 'explica sin afirmar que venció, no abre nada, y el mismo botón reintenta cuando el '
+        + 'servidor vuelve');
+
+      // --- C1c. El que se cae es el refresh, no `/auth/me` ------------------
+      //
+      // El mismo defecto, un nivel más abajo y por otro camino: el access token
+      // vencido es legítimo, se sale a renovar, y el que contesta 503 es
+      // `/auth/refresh`. `refreshAccessToken` tiraba los tokens ante CUALQUIER
+      // tropiezo —incluido ese—, así que el refresh perfectamente válido se
+      // perdía por una caída de dos segundos. No se alcanza desde C1b, que
+      // interrumpe antes: hace falta su propio recorrido.
+      const refrescoCaido = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const paginaRefresco = await refrescoCaido.newPage();
+      vigilarEscrituras(paginaRefresco);
+      await conSesion(paginaRefresco);
+      await conElCarritoAbierto(paginaRefresco);
+      const tokensDelRefresco = await credencialesGuardadas(paginaRefresco);
+      const itemsDelRefresco = await enElCarrito(paginaRefresco);
+
+      let refrescoRoto = true;
+      await paginaRefresco.route('**/auth/refresh', (ruta) => (refrescoRoto
+        ? ruta.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'Service Unavailable' }),
+        })
+        : ruta.continue()));
+      // El access vence de verdad; el refresh guardado sigue siendo el bueno.
+      await vencerLaSesion(paginaRefresco, false);
+
+      const explicacionDelRefresco = carrito(paginaRefresco).getByRole('alert');
+      await carrito(paginaRefresco).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarA(async () => (await explicacionDelRefresco.count()) === 1
+        || (await login(paginaRefresco).count()) === 1
+        || (await checkout(paginaRefresco).count()) === 1,
+      'con el refresh caído el carrito no hizo nada', 25_000);
+      assert(await login(paginaRefresco).count() === 0,
+        'un 503 del refresh terminó ofreciendo ingresar, con el refresh token todavía bueno');
+      assert(await explicacionDelRefresco.count() === 1,
+        'un 503 del refresh no se explicó');
+      const trasElRefresco = await credencialesGuardadas(paginaRefresco);
+      assert(JSON.stringify(trasElRefresco) === JSON.stringify(tokensDelRefresco),
+        `un 503 del refresh tiró las credenciales: ${JSON.stringify(tokensDelRefresco)} -> `
+        + JSON.stringify(trasElRefresco));
+
+      // Y con el refresh de vuelta, el mismo botón renueva y sigue.
+      refrescoRoto = false;
+      await carrito(paginaRefresco).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarLaCapa(paginaRefresco, checkout,
+        'con el refresh de vuelta, el mismo botón no pudo renovar y seguir');
+      assert(await enElCarrito(paginaRefresco) === itemsDelRefresco,
+        'la caída del refresh cambió el carrito');
+      await refrescoCaido.close();
+      medidos.push('un 503 del refresh tampoco cierra la sesión: conserva las credenciales, '
+        + 'explica, y al volver el servidor el mismo botón renueva y sigue');
+
       // --- C2. La sesión no se puede recuperar: se ofrece ingresar ----------
       const perdida = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       const paginaPerdida = await perdida.newPage();
@@ -25522,6 +25663,17 @@ await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o com
       'el carrito volvió vacío a la vista aunque lo guardado siga ahí');
       assert(await checkout(paginaPerdida).count() === 0,
         'cancelar el ingreso abrió el Checkout');
+      // Y la cabecera deja de afirmar una sesión que ya sabemos que no existe.
+      // Informé esto como límite conocido de la corrección anterior: se tiraban
+      // las credenciales y el nombre seguía arriba, con «Vender» y «Salir» al
+      // lado. Una pantalla que ofrece salir de una sesión que no está es peor
+      // que una que no dice nada.
+      const cabeceraTrasCancelar = (await laCabeceraDice(paginaPerdida)).join(' | ');
+      assert(/Ingresar/.test(cabeceraTrasCancelar) && !/Salir/.test(cabeceraTrasCancelar),
+        'con la sesión confirmada inválida la cabecera sigue afirmando que hay una: '
+        + JSON.stringify(cabeceraTrasCancelar));
+      assert(await enElCarrito(paginaPerdida) === itemsPerdida,
+        'bajar la identidad se llevó puesto el carrito');
 
       // Una credencial fallida no avanza, y el motivo sigue siendo el de la
       // credencial: renovar la sesión no tiene nada que ver con equivocarse la

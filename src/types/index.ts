@@ -147,6 +147,16 @@ export interface AuthContextType {
   reenviarVerificacion: (email: string) => Promise<string>;
   verificarCorreo: (token: string) => Promise<string>;
   logout: () => void;
+  /**
+   * La sesión resultó inválida sin que nadie pidiera salir.
+   *
+   * Es distinto de `logout`: nadie se fue, la credencial dejó de valer. Baja
+   * la identidad y las credenciales, y NO toca el carrito —lo que había en el
+   * carrito lo eligió una persona, y que su sesión venza no es motivo para
+   * tirarlo—. Se llama sólo con la invalidez CONFIRMADA: un servidor caído no
+   * es una sesión vencida.
+   */
+  sesionInvalidada: () => void;
   updateProfile: (userData: Partial<User>) => Promise<void>;
 }
 

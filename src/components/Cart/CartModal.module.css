@@ -260,6 +260,19 @@
   background-color: var(--tg-color-surface);
 }
 
+/* El aviso va donde está la decisión, arriba del total y del botón que
+   reintenta, y con el peso de una advertencia y no el de un error: que no se
+   haya podido comprobar la sesión no es culpa de nadie que esté mirando esto. */
+.avisoDeSesion {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--tg-color-warning);
+  background-color: var(--tg-color-warning-bg);
+  color: var(--tg-color-warning);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 .totalSection {
   display: flex;
   justify-content: space-between;

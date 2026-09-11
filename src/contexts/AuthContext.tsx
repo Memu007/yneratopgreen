@@ -236,6 +236,23 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
     }
   };
 
+  /**
+   * La sesión dejó de valer, y nadie pidió salir.
+   *
+   * No se reusa `logout()` a propósito, y no es una duplicación: `logout` es
+   * irse —avisa al servidor y vacía el carrito, que es lo que corresponde
+   * cuando alguien cierra su sesión—. Acá no se fue nadie: la credencial venció
+   * mientras la persona miraba lo que había elegido. Vaciarle el carrito por
+   * eso sería castigarla por un vencimiento que no controla.
+   *
+   * Y se llama SÓLO con la invalidez confirmada. Un 503 no es una sesión
+   * vencida: eso lo decide `asegurarSesion`, no esto.
+   */
+  const sesionInvalidada = () => {
+    tokenStorage.clearTokens();
+    setUser(null);
+  };
+
   const updateProfile = async (userData: Partial<User>) => {
     try {
       if (!user) throw new Error('Usuario no autenticado');
@@ -280,6 +297,7 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
     reenviarVerificacion,
     verificarCorreo,
     logout,
+    sesionInvalidada,
     updateProfile,
   };
 

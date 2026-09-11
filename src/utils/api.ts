@@ -73,19 +73,35 @@ const sePuedeReintentar = (endpoint: string) =>
 
 // Flag para evitar múltiples refresh simultáneos
 let isRefreshing = false;
-let refreshPromise: Promise<boolean> | null = null;
+let refreshPromise: Promise<ResultadoDeRenovacion> | null = null;
 
 /**
- * Intenta renovar el access token usando el refresh token
+ * Qué pasó al intentar renovar. Tres resultados y no dos, porque «no se pudo»
+ * y «no, esta credencial no vale» son cosas distintas y terminan distinto.
  */
-async function refreshAccessToken(): Promise<boolean> {
+type ResultadoDeRenovacion = 'renovado' | 'rechazado' | 'indisponible';
+
+/**
+ * Intenta renovar el access token usando el refresh token.
+ *
+ * Las credenciales se tiran SÓLO cuando el servidor contestó que no valen.
+ * Antes se tiraban ante cualquier tropiezo —un 503, un timeout, la red
+ * cortada—, así que una caída de dos segundos le cerraba la sesión a alguien
+ * que la tenía perfectamente válida, y encima se la cerraba sin decírselo.
+ * Está medido: con `/auth/refresh` respondiendo 503, `localStorage` quedaba
+ * sin ningún token.
+ */
+async function refreshAccessToken(): Promise<ResultadoDeRenovacion> {
+  const refreshToken = tokenStorage.getRefreshToken();
+  if (!refreshToken) {
+    // No hay con qué renovar. Eso no es una caída: es una respuesta.
+    tokenStorage.clearTokens();
+    return 'rechazado';
+  }
+
+  let response: Response;
   try {
-    const refreshToken = tokenStorage.getRefreshToken();
-    if (!refreshToken) {
-      return false;
-    }
-    
-    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    response = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -93,22 +109,26 @@ async function refreshAccessToken(): Promise<boolean> {
       },
       credentials: 'include',
     });
-    
-    if (response.ok) {
-      const data = await response.json();
-      if (data.access_token) {
-        tokenStorage.setTokens(data.access_token, data.refresh_token);
-        return true;
-      }
-    }
-    
-    // Si el refresh falla, limpiar tokens
-    tokenStorage.clearTokens();
-    return false;
   } catch {
-    tokenStorage.clearTokens();
-    return false;
+    // No se pudo ni preguntar: la sesión no dijo nada, así que no se toca.
+    return 'indisponible';
   }
+
+  if (response.ok) {
+    const data = await response.json().catch(() => null);
+    if (data?.access_token) {
+      tokenStorage.setTokens(data.access_token, data.refresh_token);
+      return 'renovado';
+    }
+    // Un 200 sin token es un servidor raro, no un rechazo a la credencial.
+    return 'indisponible';
+  }
+
+  // Del 500 para arriba el problema es del otro lado.
+  if (response.status >= 500) return 'indisponible';
+
+  tokenStorage.clearTokens();
+  return 'rechazado';
 }
 
 /**
@@ -175,6 +195,32 @@ function mensajeDeError(detail: unknown, response: { status: number; statusText?
 }
 
 /**
+ * Por qué falló un pedido, dicho de una forma que no haya que adivinar.
+ *
+ * Antes el motivo sólo vivía en el texto del error, así que distinguirlos
+ * obligaba a buscarle frases —justo lo que ya está anotado como riesgo: una
+ * pantalla que decide leyendo cómo está redactado un mensaje se rompe el día
+ * que alguien lo mejora—. Acá el motivo viaja aparte del texto.
+ *
+ * La distinción que importa: `indisponible` es «no se pudo preguntar», y no
+ * dice NADA sobre la sesión. Confundirla con `sesion-vencida` es cerrarle la
+ * sesión a alguien porque el servidor se cayó dos segundos.
+ */
+export type CausaDeFalla = 'sesion-vencida' | 'indisponible' | 'respuesta';
+
+export class ErrorDeLaApi extends Error {
+  readonly causa: CausaDeFalla;
+  readonly estado?: number;
+
+  constructor(mensaje: string, causa: CausaDeFalla, estado?: number) {
+    super(mensaje);
+    this.name = 'ErrorDeLaApi';
+    this.causa = causa;
+    this.estado = estado;
+  }
+}
+
+/**
  * Fetch wrapper con manejo de errores, cookies y refresh automático
  */
 export async function apiFetch<T = unknown>(
@@ -212,23 +258,39 @@ export async function apiFetch<T = unknown>(
         refreshPromise = refreshAccessToken();
       }
 
-      const refreshed = await refreshPromise;
+      const renovacion = await refreshPromise;
       isRefreshing = false;
       refreshPromise = null;
 
-      if (refreshed) {
+      if (renovacion === 'renovado') {
         // Reintentar la request original
         return apiFetch<T>(endpoint, options, false);
-      } else {
-        // Refresh falló, lanzar error de autenticación
-        throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
       }
+      if (renovacion === 'indisponible') {
+        // No sabemos si la sesión vale: no se pudo preguntar. Decir
+        // «expiró» acá sería inventar un diagnóstico.
+        throw new ErrorDeLaApi(
+          'No pudimos comprobar tu sesión. Volvé a intentarlo en un momento.',
+          'indisponible',
+        );
+      }
+      throw new ErrorDeLaApi(
+        'Sesión expirada. Por favor, inicia sesión nuevamente.',
+        'sesion-vencida',
+        401,
+      );
     }
 
     // Manejar errores HTTP
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ detail: response.statusText }));
-      throw new Error(mensajeDeError(errorData?.detail, response));
+      throw new ErrorDeLaApi(
+        mensajeDeError(errorData?.detail, response),
+        // Del 500 para arriba el servidor no contestó por lo que se le pidió:
+        // se cayó. Eso se reintenta; lo demás es una respuesta.
+        response.status >= 500 ? 'indisponible' : 'respuesta',
+        response.status,
+      );
     }
 
     // Si no hay contenido (204 No Content), retornar undefined
@@ -241,7 +303,7 @@ export async function apiFetch<T = unknown>(
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Error de red. Por favor, verifica tu conexión.');
+    throw new ErrorDeLaApi('Error de red. Por favor, verifica tu conexión.', 'indisponible');
   }
 }
 
@@ -307,33 +369,42 @@ export async function apiBlob(endpoint: string): Promise<Blob> {
 }
 
 /**
- * ¿Se puede seguir con esta sesión, ahora?
+ * En qué estado está la sesión, ahora.
  *
- * Existe porque tener un token guardado no es tener sesión. Entre que alguien
- * entra y que aprieta un botón puede pasar una tarde entera, y nada en la
- * pantalla se entera de que la credencial dejó de valer: `isAuthenticated`
- * sigue diciendo que sí hasta que se recarga. Lo caro de esa distancia no es
- * el error, es DÓNDE aparece: en el carrito abría el Checkout, la persona
- * completaba nombre, teléfono, provincia y localidad, y recién ahí se topaba
- * con «Sesión expirada» y sin salida.
+ * Tres respuestas, y la tercera es la que faltaba. Existe porque tener un
+ * token guardado no es tener sesión: entre que alguien entra y que aprieta un
+ * botón puede pasar una tarde entera, y `isAuthenticated` sigue diciendo que
+ * sí hasta que se recarga. Lo caro de esa distancia no es el error, es DÓNDE
+ * aparece: en el carrito abría el Checkout, la persona completaba nombre,
+ * teléfono, provincia y localidad, y recién ahí se topaba con «Sesión
+ * expirada» y sin salida.
  *
- * Se pregunta por el único pedido que describe a la sesión y a nada más. Si
- * el access token venció pero el refresh sigue valiendo, `apiFetch` lo renueva
- * por el camino de siempre y la persona no se entera: eso también es «sí», y
- * es la razón de que acá no se mire el token sino que se pregunte.
- *
- * Y si no hay forma de recuperarla, se tiran las credenciales muertas. Por eso
- * se llama «asegurar» y no «consultar»: guardar un token que ya probamos que
- * no sirve sólo alcanza para que el siguiente que lo lea crea que hay sesión.
+ *  - `vigente`: la sesión sirve. Si el access token había vencido y el refresh
+ *    servía, se renovó por el camino de siempre y nadie se enteró; por eso acá
+ *    no se mira el token, se pregunta.
+ *  - `sin-sesion`: está CONFIRMADO que no vale. Recién ahí se tiran las
+ *    credenciales muertas —por eso esto se llama «asegurar» y no «consultar»:
+ *    escribe—, porque un token que ya probamos que no sirve sólo alcanza para
+ *    que el siguiente que lo lea crea que hay sesión.
+ *  - `indisponible`: no se pudo preguntar. Un 503 o la red cortada no dicen
+ *    nada de la sesión, y la primera versión de esto los trataba igual que un
+ *    rechazo: borraba los dos tokens y ofrecía ingresar. Cerrarle la sesión a
+ *    alguien porque el servidor se cayó dos segundos es peor que el defecto
+ *    que esta pieza vino a arreglar, porque encima parece deliberado.
  */
-export async function asegurarSesion(): Promise<boolean> {
-  if (!tokenStorage.getAccessToken()) return false;
+export type EstadoDeLaSesion = 'vigente' | 'sin-sesion' | 'indisponible';
+
+export async function asegurarSesion(): Promise<EstadoDeLaSesion> {
+  if (!tokenStorage.getAccessToken()) return 'sin-sesion';
   try {
     await apiGet('/auth/me');
-    return true;
-  } catch {
+    return 'vigente';
+  } catch (error) {
+    if (error instanceof ErrorDeLaApi && error.causa === 'indisponible') {
+      return 'indisponible';
+    }
     tokenStorage.clearTokens();
-    return false;
+    return 'sin-sesion';
   }
 }
 
