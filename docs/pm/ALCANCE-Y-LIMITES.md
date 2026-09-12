@@ -1,14 +1,14 @@
 # Alcance y limites contractuales
 
-Actualizado: 2026-08-05.
+Actualizado: 2026-09-11.
 
 Fuente primaria: *Documento de Especificacion Funcional y Propuesta
 Comercial - Marketplace del Sector Agropecuario (Fase Nacional)*, revision
-visual completa de sus cinco paginas el 2026-08-05.
+visual completa de sus cinco paginas.
 
 Este archivo convierte el PDF en guardas operativas para la PM y la dev.
-No agrega alcance. Si este archivo, `PROJECT.md` o un plan interno se
-contradicen con el PDF, gana el PDF y se corrige el documento interno.
+No agrega alcance. Si este archivo o un plan interno contradicen el PDF,
+gana el PDF y se corrige el documento interno.
 
 Las cifras comerciales, porcentajes y montos permanecen en el PDF original
 y no se versionan en el repositorio que se entregara a la clienta.
@@ -18,7 +18,7 @@ y no se versionan en el repositorio que se entregara a la clienta.
 ## 1. Regla de control de alcance
 
 Una funcion pertenece al MVP contractual solamente si puede trazarse a una
-frase del PDF. Una decision posterior del dueño puede entrar al producto,
+frase del PDF. Una decision posterior del Owner puede entrar al producto,
 pero no entra automaticamente en el precio, el cronograma ni los hitos del
 PDF.
 
@@ -118,10 +118,10 @@ documentacion ARCA/Carta de Porte ni verificacion oficial de certificados.
 **Limite:** TopGreen no recibe, retiene, divide ni gira dinero de las ventas
 entre terceros. No entran comision de marketplace, conciliacion bancaria ni
 reembolsos automaticos de transferencias. El PDF no menciona OAuth ni define
-el destinatario de Mercado Pago. La revisión técnica confirmó que OAuth por
-vendedor, con comisión de marketplace cero, es infraestructura necesaria para
-el checkout ya vendido: el vendedor cobra directo y paga la comisión normal de
-Mercado Pago. No agrega una comisión ni una función comercial de TopGreen.
+el destinatario de Mercado Pago. La revision tecnica confirmo que OAuth por
+vendedor, con comision de marketplace cero, es infraestructura necesaria para
+el checkout ya vendido: el vendedor cobra directo y paga la comision normal de
+Mercado Pago. No agrega una comision ni una funcion comercial de TopGreen.
 
 El comprobante es opcional como evidencia; el vendedor valida contra su
 cuenta bancaria. La referencia de la orden debe permitir identificar el
@@ -169,11 +169,11 @@ MVP contractual.
 
 ---
 
-## 4. Decisiones cerradas por Emi el 2026-08-05
+## 4. Decisiones cerradas por Emi
 
 ### Inicio contractual
 
-La semana 1 comienza el viernes 2026-08-07.
+La semana 1 comienza el viernes **2026-08-21**, de acuerdo con `CRONOGRAMA.md`.
 
 ### Registro con validacion
 
