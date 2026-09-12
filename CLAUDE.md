@@ -1,79 +1,52 @@
 # Cómo se trabaja en TopGreen
 
-## 1. Adversarial cuando hace falta
+Este archivo contiene reglas estables para desarrollo. La tarea concreta y sus compuertas viven en `docs/pm/PARA-DEV.md`; no se duplican acá.
 
-**Esta es la regla principal y está primero por algo.**
+## 1. Verificar antes de implementar
 
-El rol del desarrollo acá no es obedecer: es **verificar**. Una tarea que llega
-—de la PM, de la clienta, de una auditoría, de otro agente— se lee entera y se
-comprueba antes de implementarla. Si la premisa está mal, se dice **antes**, con
-la medición que lo demuestra, no después de haber construido encima.
+El rol Dev no es obedecer ciegamente: es comprobar la premisa de la tarea.
 
-Qué significa en concreto:
+- Contradecir con evidencia, no con opinión.
+- Intentar romper la propia solución antes de declararla verde.
+- Una prueba que no puede distinguir el defecto no demuestra la corrección.
+- Si una objeción de PM/QA es correcta, se reconoce y se corrige.
+- Una vez resuelta una objeción y tomada la decisión, se ejecuta sin reabrirla por costumbre.
 
-- **Contradecir con evidencia, no con opinión.** «Creo que esto está mal» no
-  sirve. «Corrí esto y respondió esto otro» sí. Una premisa equivocada se
-  refuta con una reproducción, no con un argumento.
-- **Buscar activamente el propio error.** Antes de decir que algo funciona, hay
-  que intentar romperlo: el caso que falla primero, el rol equivocado, la URL
-  directa, el carrito viejo, la llamada a mano, la máquina lenta.
-- **No aceptar un verde por su color.** Una prueba que no puede ponerse roja no
-  prueba nada. Si el rojo no se vio, no hay verde: hay una prueba sin medir.
-- **Aceptar la corrección con la misma vara.** Si la objeción que llega es
-  correcta, se reconoce sin adornos, se corrige y se sigue. Ser adversarial no
-  es tener razón; es que la razón se demuestre.
-- **Y cuando la decisión ya se tomó**, con la objeción registrada, se ejecuta
-  completa. Adversarial es antes de construir, no un freno permanente.
+Adversarial no significa ampliar alcance ni discutir por deporte.
 
-Lo que **no** es: discutir por deporte, ampliar el alcance porque a uno le
-parece, rehacer decisiones ya cerradas, ni convertir cada tarea en una
-negociación.
+## 2. Evidencia
 
-## 2. Medir en vez de suponer
+- Si no se corrió, se declara como no corrido.
+- No usar esperas fijas para forzar verdes cuando se puede esperar una condición observable.
+- Una afirmación general debe sostenerse con código/pruebas, no con una lista manual que envejece.
+- Un rojo intermitente o de entorno se diagnostica y se informa; no se oculta repitiendo hasta obtener verde.
 
-- Lo que se afirma en un informe tiene que estar medido. Si dice «no usé
-  esperas», hay que haber mirado el archivo.
-- Nada de esperas fijas para forzar un verde: se espera la **condición**, con un
-  tope y un mensaje que diga qué se observó.
-- Las afirmaciones generales («todas las pantallas», «ningún camino») se derivan
-  del código, no de una lista escrita a mano que envejece.
+## 3. Seguridad y alcance
 
-## 3. Lo que no se hace, nunca
+- No rodear políticas de seguridad del entorno.
+- No dejar puertas traseras o bypasses de prueba en producto.
+- No publicar secretos, tokens, credenciales ni datos de cobro reales.
+- No copiar código, texto, marca o diseño distintivo de terceros.
+- No agregar funcionalidad fuera de la tarea: se propone a PM.
+- No desplegar ni cambiar Railway salvo tarea explícita.
+- No debilitar controles de producción para hacer pasar el arnés de pruebas.
 
-- **No se rodea una política de seguridad del entorno.** Ni con otro navegador,
-  ni con un túnel, ni con una herramienta de depuración. Se informa.
-- **No se dejan puertas traseras de prueba en el producto.** Si un estado no se
-  puede fabricar por la API, se fabrica en la base descartable o en el proceso
-  de la aplicación —nunca con un interruptor que quede.
-- **No se publican secretos reales.** Credenciales, tokens y datos de cobro
-  reales no entran ni al repositorio ni a un informe. En local van valores
-  inventados.
-- **No se copia** código, texto, marca ni diseño de terceros.
-- **No se despliega** desde acá. Producción no es del desarrollo.
+Dinero, autenticación, permisos, órdenes, stock, migraciones, datos y seguridad requieren una revisión más fuerte.
 
 ## 4. Entrega
 
-- **Producto e informe van en commits separados.** Siempre.
-- Antes de empujar: la suite completa desde base limpia, dos veces, más
-  `npm run build`, `npm run lint`, `npm run a11y -- --todas`, `npm run contraste`,
-  `npm run hito`, `python -m compileall backend/app`, `python -m pip check` y
-  `git -c core.whitespace=cr-at-eol diff --check`.
-- Un hallazgo fuera de alcance **se informa, no se arregla**: con su mecanismo,
-  su frecuencia medida y el arreglo propuesto.
-- Si algo quedó rojo, intermitente o sin verificar, **se dice**. Un informe que
-  esconde un problema vale menos que no informar.
+- Producto/regresión e informe van en commits separados cuando la tarea lo exige.
+- La tarea define focales y puertas. Ejecutar pruebas proporcionales al riesgo; no repetir toda la suite dos veces por regla general.
+- Cuando corresponde suite completa, correrla desde base limpia y sobre el SHA que se entrega.
+- Auto-revisar el diff completo contra la base y retirar cambios fuera de alcance.
+- Informar SHA, pruebas, resultado, rojos, qué no se corrió y riesgos.
 
-## 5. Detalles del repositorio que muerden
+La revisión independiente la hace PM/QA sobre la misma composición cuando corresponda. Dos corridas de Dev no sustituyen independencia.
 
-- **Muchos archivos mezclan CRLF y LF adentro del mismo archivo.** Hay que
-  parchear byte a byte conservando el terminador de cada región, y comparar
-  contra `git show HEAD:` después de editar. También muerde al leer: un
-  `grep '^CLAVE=.+'` sobre un `.env` con CRLF da positivo aunque el valor esté
-  vacío, porque el `.+` matchea el retorno de carro. Hay que sacarlo con
-  `tr -d '\r'` antes de comparar.
-- **El entorno se arma con `./scripts/entorno_nativo.sh`** —sin Docker— y con
-  `--recrear` para la base limpia que exige la suite. En los contenedores
-  remotos lo corre solo el hook de `.claude/hooks/session-start.sh`.
-- El canal con la PM vive en `docs/pm/`: ella escribe en `PARA-DEV.md`, el
-  desarrollo responde **sólo** en `PARA-PM.md` y no toca el archivo de ella.
-- `docs/PROJECT_STATUS.md` no es fuente de verdad.
+## 5. Detalles del repositorio
+
+- Hay archivos que mezclan CRLF y LF. Al tocar esas zonas, conservar terminadores y usar `git -c core.whitespace=cr-at-eol diff --check` cuando la tarea lo requiera.
+- El entorno local canónico se documenta en `README_LOCAL_SETUP.md`; no inventar un flujo alternativo en este archivo.
+- PM escribe `docs/pm/PARA-DEV.md`; Dev responde en `docs/pm/PARA-PM.md`. Ningún rol edita el canal del otro durante el flujo normal.
+- `docs/PROJECT_STATUS.md` es un tombstone histórico, no fuente de verdad.
+- Estado, prioridades y restricciones vigentes viven en `docs/pm/NOW.md`.
