@@ -7,8 +7,9 @@
 # efímeros de Claude Code en la web, donde todo lo que no esté versionado se
 # pierde entre sesión y sesión—.
 #
-#   ./scripts/entorno_nativo.sh              prepara lo que falte y nada más
-#   ./scripts/entorno_nativo.sh --recrear    ADEMÁS borra y rehace la base
+#   ./scripts/entorno_nativo.sh                 prepara lo que falte y nada más
+#   ./scripts/entorno_nativo.sh --recrear       ADEMÁS borra y rehace la base
+#   ./scripts/entorno_nativo.sh --reiniciar-api SÓLO reinicia la API y sale
 #
 # Sin `--recrear` es idempotente y NO destruye nada: crea lo que no está y deja
 # como está lo que ya estaba. Correrlo dos veces seguidas da el mismo resultado.
@@ -22,9 +23,11 @@ RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$RAIZ"
 
 RECREAR=false
+REINICIAR_API=false
 for argumento in "$@"; do
   case "$argumento" in
     --recrear) RECREAR=true ;;
+    --reiniciar-api) REINICIAR_API=true ;;
     -h|--help) sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0 ;;
     *) echo "argumento desconocido: $argumento" >&2; exit 2 ;;
   esac
@@ -36,6 +39,58 @@ nota() { printf '     %s\n' "$1"; }
 # Puerto de la API y del frontend. Son los que esperan la suite y las puertas.
 PUERTO_API=8000
 PUERTO_FRONT=5173
+
+# Matar los servidores de la API. Se miran sólo procesos de Python: cualquier
+# shell que tenga esta misma cadena en su línea de comandos —esta, sin ir más
+# lejos— no es un servidor.
+uvicorns() { ps -eo pid,comm,args | awk '$2 ~ /python/ && /uvicorn app.main:app/ {print $1}'; }
+matar_la_api() {
+  for pid in $(uvicorns); do kill "$pid" 2>/dev/null || true; done
+  sleep 2
+  for pid in $(uvicorns); do kill -9 "$pid" 2>/dev/null || true; done
+  sleep 1
+}
+levantar_la_api() {
+  mkdir -p logs
+  (cd backend && setsid --fork ./.venv/bin/python -m uvicorn app.main:app \
+    --host 127.0.0.1 --port "$PUERTO_API" \
+    >> "$RAIZ/logs/api.log" 2>&1 < /dev/null &) ; disown -a 2>/dev/null || true
+  for _ in $(seq 1 30); do
+    curl --fail --silent --noproxy '*' \
+      "http://127.0.0.1:$PUERTO_API/api/health" >/dev/null 2>&1 && return 0
+    sleep 1
+  done
+  return 1
+}
+
+# `--reiniciar-api`: sólo eso, y sale.
+#
+# El límite antifuerza-bruta del ingreso vive EN MEMORIA del proceso de la API
+# —treinta fallos por origen en diez minutos, `limite_de_intentos.py`—, así que
+# es un recurso compartido por toda la suite: el caso que lo prueba a propósito
+# se lleva veinticuatro y los casos que ingresan después se comen el 429 sin
+# tener nada que ver. Reiniciar el proceso vacía ese contador sin tocar el
+# límite, sin subir ningún TTL y sin puertas de prueba en el producto: es lo
+# mismo que un despliegue. La base, el frontend y el resto del entorno no se
+# tocan.
+if [ "$REINICIAR_API" = true ]; then
+  if [ "$RECREAR" = true ]; then
+    echo "ERROR: --reiniciar-api y --recrear no van juntos." >&2
+    exit 2
+  fi
+  paso "Reiniciando la API"
+  matar_la_api
+  if [ -n "$(uvicorns)" ]; then
+    echo "ERROR: quedó un uvicorn vivo; la API no se reinició." >&2
+    exit 1
+  fi
+  if levantar_la_api; then
+    nota "arriba de nuevo en http://localhost:$PUERTO_API/api/docs"
+    exit 0
+  fi
+  echo "ERROR: la API no volvió; mirá logs/api.log" >&2
+  exit 1
+fi
 
 # --------------------------------------------------------------------------
 # 1. El puente de `docker exec`
@@ -239,14 +294,10 @@ if [ "$RECREAR" = true ]; then
     exit 1
   fi
   paso "Recreando la base (--recrear)"
-  # La API tiene que soltar la conexión. Se miran sólo procesos de Python:
-  # cualquier shell que tenga esta misma cadena en su línea de comandos —esta,
-  # sin ir más lejos— no es un servidor.
-  uvicorns() { ps -eo pid,comm,args | awk '$2 ~ /python/ && /uvicorn app.main:app/ {print $1}'; }
-  for pid in $(uvicorns); do kill "$pid" 2>/dev/null || true; done
-  sleep 2
-  for pid in $(uvicorns); do kill -9 "$pid" 2>/dev/null || true; done
-  sleep 1
+  # La API tiene que soltar la conexión. `matar_la_api` mira sólo procesos de
+  # Python: cualquier shell que tenga esta misma cadena en su línea de comandos
+  # —esta, sin ir más lejos— no es un servidor.
+  matar_la_api
   if [ -n "$(uvicorns)" ]; then
     echo "ERROR: quedó un uvicorn vivo; la base limpia no estaría limpia." >&2
     exit 1

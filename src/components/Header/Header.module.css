@@ -164,6 +164,25 @@
   background-color: var(--celda-hover);
 }
 
+/* La celda de la sección actual ya está invertida, y el hover no puede
+   devolverle el fondo de la banda dejándole el texto oscuro encima.
+ *
+ * Medido con axe sobre «Mi cuenta» dentro de la cuenta: al apoyar el puntero
+ * quedaba #1e2420 sobre #355c48 —el verde de la banda con el 10 % de blanco
+ * del hover— y eso es 2,08:1 contra los 4,5:1 exigidos. No hacía falta
+ * inventar el caso: `a11y` lo mide así porque hace clic y deja el puntero
+ * donde una persona lo deja.
+ *
+ * Le pasaba sólo a «Mi cuenta». `.navLink:hover` está declarado ANTES de la
+ * marca de sección, así que las otras cinco celdas conservaban la inversión;
+ * `.celda:hover` está declarado DESPUÉS y con la misma especificidad, y por
+ * eso le ganaba. La celda donde ya se está no cambia al pasarle por encima:
+ * es el cambio más chico que arregla el par, y no estrena ningún color. */
+.navLink[aria-current='page']:hover,
+.cuenta[aria-current='page']:hover {
+  background-color: var(--tg-color-surface);
+}
+
 /* El cereal es la acción comercial del rol y nada más: publicar. No marca
    éxito, no marca advertencia y no se reparte entre las otras celdas. */
 .celdaVender {

@@ -783,6 +783,84 @@ async function sesionDe(email, password) {
   return { token: data.access_token, refresco: data.refresh_token, id: data.user?.id };
 }
 
+/**
+ * Cuándo vence un JWT, leído del propio token y sin biblioteca.
+ *
+ * No hace falta verificar la firma: acá no se está autenticando a nadie, se
+ * está preguntando cuánto le queda a una credencial que el servidor ya emitió.
+ */
+function venceElToken(token) {
+  try {
+    const crudo = String(token).split('.')[1];
+    const carga = JSON.parse(Buffer.from(crudo, 'base64url').toString('utf8'));
+    return typeof carga.exp === 'number' ? carga.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Renovar la sesión guardada si está por vencer.
+ *
+ * `backend/.env` emite el access token con ACCESS_TOKEN_MINUTES=15 y la suite
+ * entera tarda más de treinta minutos: los casos del final heredaban una
+ * credencial vencida y fallaban por lo que TARDÓ la corrida, no por el
+ * producto. Medido: en la corrida completa de PM, 165 y 166 en rojo; los
+ * mismos casos aislados, verdes.
+ *
+ * Se renueva por donde renueva la aplicación —`/auth/refresh` con el refresh
+ * token, que dura 30 días—, y si no hay con qué, se vuelve a ingresar con las
+ * credenciales que el arnés ya tiene anotadas. No se toca el TTL, no se afloja
+ * ningún límite y el producto no se entera: es el mismo camino que recorre una
+ * persona que deja la pestaña abierta.
+ *
+ * Y se comprueba la identidad después de renovar. Si el token y el refresco
+ * guardados fueran de cuentas distintas, renovar cambiaría de persona en
+ * silencio y el caso siguiente mediría a otro: eso se dice, no se arregla solo.
+ */
+const MARGEN_DEL_TOKEN = 3 * 60 * 1000;
+
+async function renovarSesion(cual, credencialesDeRespaldo) {
+  const claveToken = `${cual}Token`;
+  const claveRefresco = `${cual}RefreshToken`;
+  const claveId = `${cual}Id`;
+  const token = state[claveToken];
+  if (!token) return;
+  const vence = venceElToken(token);
+  if (vence !== null && vence - Date.now() > MARGEN_DEL_TOKEN) return;
+
+  const quienEra = state[claveId];
+  let renovado = null;
+  if (state[claveRefresco]) {
+    try {
+      const { data } = await apiRequest('/auth/refresh', {
+        method: 'POST', token: state[claveRefresco],
+      });
+      if (data?.access_token) {
+        renovado = data.access_token;
+        if (data.refresh_token) state[claveRefresco] = data.refresh_token;
+      }
+    } catch { /* el refresco no sirvió: queda el ingreso con credenciales */ }
+  }
+  if (!renovado && credencialesDeRespaldo) {
+    const sesion = await sesionDe(credencialesDeRespaldo.email, credencialesDeRespaldo.password);
+    renovado = sesion.token;
+    state[claveRefresco] = sesion.refresco;
+  }
+  assert(renovado,
+    `la sesión de ${cual} venció y no hubo forma de renovarla: `
+    + `${state[claveRefresco] ? 'el refresco no sirvió' : 'no había refresco guardado'} `
+    + 'y tampoco hay credenciales anotadas');
+
+  const { data: quienEs } = await apiRequest('/auth/me', { token: renovado });
+  assert(!quienEra || quienEs?.id === quienEra,
+    `renovar la sesión de ${cual} devolvió otra cuenta: el arnés tenía ${quienEra} y `
+    + `la credencial renovada es de ${quienEs?.id}. El token y el refresco guardados no `
+    + 'son del mismo dueño');
+  state[claveToken] = renovado;
+  state[claveId] = quienEs?.id || quienEra;
+}
+
 async function asegurarSesiones() {
   if (!state.buyerToken) {
     const sesion = await sesionDe('cliente@ejemplo.com', 'cliente123');
@@ -801,6 +879,11 @@ async function asegurarSesiones() {
     state.sellerRefreshToken = sesion.refresco;
     state.sellerId = state.sellerId || sesion.id;
   }
+
+  // Y lo que ya estaba, renovado si le queda poco. Es la parte que hace que un
+  // caso del final no dependa de cuánto tardó la suite en llegar hasta él.
+  await renovarSesion('buyer', state.buyerCredentials);
+  await renovarSesion('seller', { email: 'vendedor@ejemplo.com', password: 'vendedor123' });
 }
 
 async function asegurarProducto() {
@@ -7191,6 +7274,9 @@ async function comprador() {
     method: 'POST', body: MP_COMPRADOR,
   });
   state.buyerToken = data.access_token;
+  // El refresco va con su token: guardar uno sin el otro deja un par de cuentas
+  // distintas, y renovar más adelante cambiaría de persona en silencio.
+  state.buyerRefreshToken = data.refresh_token;
   state.buyerId = data.user.id;
   return data.user.id;
 }
@@ -14644,6 +14730,38 @@ print(json.dumps(salida))
     + 'limpieza deja 0 claves de 300; con ocho pedidos simultaneos pasan 0 en el limite y '
     + 'exactamente 1 a un fallo del limite';
 });
+
+// ---------------------------------------------------------------------------
+// El presupuesto de intentos de ingreso es de la SUITE, no del caso 134.
+//
+// `limite_de_intentos.py` cuenta treinta fallos de credencial por origen en una
+// ventana de diez minutos, y ese contador vive en memoria del proceso de la
+// API. El 134 prueba ese límite a propósito y, medido en `logs/api.log` de una
+// corrida completa, se lleva **24 de los 30** desde 127.0.0.1; los seis que
+// faltan los ponen los casos siguientes y el que ingrese después se come un 429
+// que no tiene nada que ver con lo que está midiendo. Así cayeron el 167 y el
+// 168 en la corrida completa —el 168 ni llegó a arrancar: 429 en 8 ms—, y el
+// mismo par pasa aislado.
+//
+// Reiniciar el proceso vacía el contador. No sube ningún TTL, no afloja ni
+// desactiva el límite y no le pide al producto ninguna puerta de prueba: es lo
+// mismo que le pasa a la API en cada despliegue. La base, el frontend y el
+// resto del entorno quedan como están.
+//
+// Va acá, entre casos, porque el recurso es compartido: no es del 134 devolver
+// lo que gastó, es de la suite no arrastrarlo.
+if (results.some((resultado) => resultado.number === 134)
+    && /(localhost|127\.0\.0\.1)/.test(API_URL)) {
+  try {
+    execFileSync('./scripts/entorno_nativo.sh', ['--reiniciar-api'], { stdio: 'pipe' });
+    console.log('[----] la API se reinició: el caso 134 acababa de gastar el presupuesto de '
+      + 'intentos de ingreso, y ese contador es de todos');
+  } catch (error) {
+    console.log('[----] AVISO: no se pudo reiniciar la API despues del 134 '
+      + `(${error instanceof Error ? error.message.split('\n')[0] : error}); los casos que `
+      + 'ingresen en los proximos diez minutos pueden recibir 429');
+  }
+}
 
 await runCase(135, 'Una caida de la base no gasta el cupo de ingresos de nadie', async () => {
   // El limite de SEC-6 reserva la marca ANTES de saber como termina el intento,

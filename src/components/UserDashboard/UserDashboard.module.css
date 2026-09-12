@@ -198,7 +198,13 @@
 }
 
 /* Las estrellas y el número son una sola cosa: la reputación. Se dibujan en
-   renglón y el color del cereal es el que ya usa la marca para lo destacado. */
+   renglón y en el cereal de la marca.
+ *
+ * Pero en el cereal QUE SE LEE. Una estrella es un glifo, o sea texto, y
+ * `tokens.css` ya dice cuál va: `--tg-color-signal` es para las formas
+ * —filete, cuadro, regla— porque no llega a 4,5:1 contra el canvas, y
+ * `--tg-color-accent` es el profundo que se usa como texto. Acá estaba el
+ * de las formas: medido, #c49a43 sobre #f0efe9 da 2,26:1 en 20 px. */
 .calificacion {
   display: inline-flex;
   align-items: center;
@@ -206,7 +212,7 @@
 }
 
 .stars {
-  color: var(--tg-color-signal);
+  color: var(--tg-color-accent);
   font-size: 20px;
   letter-spacing: 0.06em;
 }
