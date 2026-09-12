@@ -7273,11 +7273,17 @@ async function comprador() {
   const { data } = await apiRequest('/auth/login', {
     method: 'POST', body: MP_COMPRADOR,
   });
+  // Las cuatro cosas del comprador se mueven juntas: token, refresco, identidad
+  // y credenciales. Guardar unas sin las otras deja un comprador partido —el
+  // token de una cuenta y la contraseña de otra— y los casos que fabrican por
+  // API y después ingresan por pantalla terminan mirando a dos personas
+  // distintas. Medido: con sólo el token y el refresco puestos acá, el 165
+  // fabricaba la orden de un comprador y el navegador entraba como otro, así
+  // que «Calificar Vendedor» no aparecía nunca.
   state.buyerToken = data.access_token;
-  // El refresco va con su token: guardar uno sin el otro deja un par de cuentas
-  // distintas, y renovar más adelante cambiaría de persona en silencio.
   state.buyerRefreshToken = data.refresh_token;
   state.buyerId = data.user.id;
+  state.buyerCredentials = { ...MP_COMPRADOR };
   return data.user.id;
 }
 
@@ -21730,15 +21736,35 @@ await runCase(157, 'La cuenta de prueba entra, publica y sobrevive a un segundo 
   // palabra «local» aparezca cien líneas más abajo, hablando de otra cosa, no es
   // una advertencia. Y se compara sin acentos, porque dos de las tres salidas
   // están escritas en ASCII a propósito.
-  const GUIAS = [
-    'README.md',
-    'README_LOCAL_SETUP.md',
-    'docs/DATABASE.md',
-    'docs/USER_MANUAL.md',
-    'scripts/entorno_nativo.sh',
-    'scripts/init_local_db.sh',
-    'scripts/init_local_db.ps1',
-  ];
+  // La lista de guías NO se escribe a mano: se deriva.
+  //
+  // Estaba escrita, con `README.md` adentro, y el 2026-09-11 la PM reescribió
+  // ese archivo entero: dejó de nombrar la cuenta y el caso se puso rojo
+  // pidiendo una advertencia al lado de una mención que ya no existe. La lista
+  // envejeció, que es exactamente lo que una lista escrita a mano hace.
+  //
+  // Ahora se recorren las guías que sigue una persona —los `.md` de la raíz y
+  // de `docs/`, y los arranques de `scripts/`— y se exige la advertencia sólo
+  // donde la cuenta EFECTIVAMENTE se nombra. Así una guía nueva queda cubierta
+  // sola y una que deja de nombrarla sale sola. Queda afuera `docs/pm/`: es el
+  // canal con la PM, no una guía de instalación.
+  //
+  // Y para que «donde se nombra» no pueda quedar en cero sin que nadie se
+  // entere, se exige que las tres salidas de arranque sigan estando.
+  const CANDIDATAS = execFileSync('git', ['ls-files'], { encoding: 'utf8' })
+    .split('\n')
+    .filter((camino) => camino
+      && !camino.startsWith('docs/pm/')
+      && ((/^[^/]+\.md$/.test(camino))
+        || (camino.startsWith('docs/') && camino.endsWith('.md'))
+        || (camino.startsWith('scripts/') && /\.(sh|ps1)$/.test(camino))));
+  const GUIAS = CANDIDATAS.filter((camino) => readFileSync(camino, 'utf8').includes(CORREO));
+  const ARRANQUES = ['scripts/entorno_nativo.sh', 'scripts/init_local_db.sh',
+    'scripts/init_local_db.ps1'];
+  const arranquesAusentes = ARRANQUES.filter((camino) => !GUIAS.includes(camino));
+  assert(arranquesAusentes.length === 0,
+    `los arranques dejaron de nombrar la cuenta de prueba: ${arranquesAusentes.join(', ')}; `
+    + `las guías que la nombran son ${JSON.stringify(GUIAS)}`);
   const sinAcentos = (texto) => texto.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
   const CONCEPTOS = [['pública', /public/], ['local', /local/], ['descartable', /descartable/]];
   const faltantes = [];
@@ -23150,7 +23176,18 @@ await runCase(162, 'El catálogo demostrativo resuelve la foto del aviso, con cr
 
   // --- A. La tabla del producto y el inventario de la PM ------------------
   // No se copia acá ninguna de las dos listas: se leen las dos y se contrastan.
-  const INVENTARIO = 'docs/pm/INVENTARIO-FOTOS-CATALOGO-2026-09-09.md';
+  // El inventario es un documento de la PM y la PM lo archiva cuando lo cierra:
+  // el 2026-09-11 pasó a `docs/pm/archivo/cerrados/` y este caso se cayó con un
+  // ENOENT que no decía nada del producto. Se busca donde puede estar en vez de
+  // fijar una ruta que envejece, y si no está en ninguna se dice cuáles se
+  // miraron.
+  const DONDE_PUEDE_ESTAR = [
+    'docs/pm/INVENTARIO-FOTOS-CATALOGO-2026-09-09.md',
+    'docs/pm/archivo/cerrados/INVENTARIO-FOTOS-CATALOGO-2026-09-09.md',
+  ];
+  const INVENTARIO = DONDE_PUEDE_ESTAR.find((camino) => existsSync(camino));
+  assert(INVENTARIO,
+    `no está el inventario de fotos en ninguna de ${JSON.stringify(DONDE_PUEDE_ESTAR)}`);
   const fuenteTabla = readFileSync('src/utils/fotosDemo.ts', 'utf8');
   const TABLA = {};
   for (const [, slug, cuerpo] of fuenteTabla.matchAll(
