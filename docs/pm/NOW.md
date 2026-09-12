@@ -7,7 +7,7 @@ Actualizado: 2026-09-12.
 ## Resumen ejecutivo
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 4. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
-- **`main`:** `6d33962`; contiene la aceptación de COPY y la apertura de la candidata. Sigue conectado al auto-deploy de Railway, por lo que no se integra producto ahí todavía.
+- **`main`:** sin cambios de producto desde `3064f10`; el delta actual es sólo documentación PM. Sigue conectado al auto-deploy de Railway, por lo que no se integra producto ahí todavía.
 - **Rama Dev:** `claude/dev-role-repo-3l0kp3`, HEAD de informe `696f933`; primera candidata de producto `fcea099`, no integrada ni desplegada.
 - **Última decisión PM:** `INTEGRATION-CANDIDATE-1` **DEVUELTA** en primera revisión. `COPY-CLEAR-1` permanece aceptada.
 - **Tarea activa:** `INTEGRATION-CANDIDATE-1`, responsable Dev, devolución 1. Debe corregir las diferencias reales entre el arnés nativo y Docker, el falso emparejamiento de la respuesta del caso 168, el rojo repetido del 114, el contraste conocido del selector de estrellas y el informe vivo; no autoriza despliegue.
@@ -100,38 +100,17 @@ Falta demostrar, con **vendedor de prueba correcto + comprador de prueba**:
 
 Adquirir las cuentas/credenciales de prueba es dependencia humana. No enlazar OAuth, habilitar la bandera ni ejecutar pagos hasta que la PM abra formalmente esa ejecución y Emi autorice el paso correspondiente.
 
-## Alcance contractual vivo
-
-Fuente vinculante: `CONTRATO.md`. Guardas: `ALCANCE-Y-LIMITES.md`.
-
-Puntos que no deben volver a inferirse desde roadmaps históricos:
-
-- comprador y vendedor/prestador son los roles contractuales; transportista es un tipo especial de proveedor;
-- búsqueda por categoría y ubicación;
-- logística por cercanía, con cobertura/capacidad y selección o contacto directo;
-- Mercado Pago checkout básico como resultado contractual;
-- transferencia directa al vendedor con CBU/Alias, comprobante y validación manual;
-- TopGreen/AgroBoeda no recibe, retiene, divide ni gira fondos de terceros;
-- OAuth de vendedor con comisión marketplace cero es mecanismo técnico, no una feature comercial adicional;
-- PostgreSQL + PostGIS;
-- QA, despliegue, accesos administrativos, capacitación y documentación de despliegue forman parte del cierre contractual.
-
-Suscripciones, planes, mensajería interna, tierras/parcelas, chatbot/IA y otras ampliaciones no bloquean el MVP salvo que código ya existente introduzca riesgo real.
-
 ## Producción — puertas pendientes
 
-Antes de una publicación final deben quedar demostrados, como mínimo:
+De la puerta contractual completa, hoy siguen vivos estos bloqueos:
 
-- composición candidata integrada y doble suite independiente sobre el mismo SHA;
-- inventario Railway y política de ramas/deploy resuelta;
-- backups y persistencia;
+- composición candidata aceptada sobre un mismo SHA por Dev y PM, y luego política de ramas/deploy resuelta;
+- backups con restauración ensayada; la persistencia ya existe pero no sustituye backup;
 - SMTP real para el flujo de validación por correo; `outbox` no satisface producción;
-- secretos/configuración revisados;
-- homologación Mercado Pago real;
-- auditoría general + red-team de seguridad final;
-- datos/demo/credenciales públicas retirados o rotados;
-- documentación de despliegue, capacitación y accesos administrativos;
-- propiedad/pago de Railway y dominio acordados para el cierre.
+- configuración y secretos revisados sin exponer valores;
+- homologación Mercado Pago con cuentas de prueba correctas;
+- red-team final, retiro/rotación de datos y credenciales demo, y convergencia de Frontend/Backend en el SHA de release;
+- documentación de despliegue, capacitación, accesos administrativos y propiedad/pago de Railway y dominio acordados.
 
 Después de una migración de esquema no se hace rollback ciego sólo de código. La recuperación normal es forward-fix; un downgrade necesita procedimiento probado y backup recuperable.
 
@@ -139,6 +118,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 - PM sólo modifica `docs/pm/` durante el flujo normal; no implementa producto.
 - Dev no integra ni despliega sin tarea explícita.
+- El alcance y sus límites se consultan en `CONTRATO.md`, `ALCANCE-Y-LIMITES.md` y `DECISIONS.md`; no se duplican en este estado vivo.
 - Auditorías externas son consultivas; la PM decide qué adopta.
 - Un documento de auditoría no se convierte en una fuente de verdad paralela.
 - `docs/PROJECT_STATUS.md` es histórico y no se usa como estado.
