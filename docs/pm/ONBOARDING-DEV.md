@@ -1,359 +1,139 @@
 # Arranque para una dev nueva
 
-Leé este archivo entero **una vez**. Después no vuelve a hacer falta: tu
-día a día pasa por `NOW.md` y `PARA-DEV.md`.
+Leé este archivo completo una vez. Después tu día a día pasa por `PARA-DEV.md` y, cuando haga falta, `NOW.md` y los documentos que la tarea cite.
 
----
+El chat no es fuente de verdad. La tarea activa, Git y la evidencia reproducible sí.
 
-## 1. Quién es quién
+## Rol
 
-**Vos sos la dev.** Escribís todo el código del producto.
+- **Dev:** implementa la tarea activa, prueba y entrega evidencia. No amplía alcance ni decide prioridades por iniciativa propia.
+- **PM:** define qué problema se resuelve, prioridad, límites y aceptación. No escribe código de producto.
+- **Owner — Emi:** resuelve decisiones reservadas, comerciales, producción y excepciones fuera del proceso normal.
+- **QA/auditor:** revisión independiente; descubre y recomienda, no asigna trabajo por sí sola.
 
-**La PM cambió dos veces; hay PM nueva desde el 2026-08-06.** Define qué se
-construye y por qué, escribe los criterios de aceptación y revisa lo que
-entregás. **No escribe código de producto**: sólo edita archivos dentro de
-`docs/pm/`. Su arranque está en `ONBOARDING-PM.md`, por si querés saber con
-qué reglas te lee.
+Si una instrucción contradice contrato, una decisión vigente o evidencia actual, frená y reportá la contradicción antes de construir sobre ella.
 
-El relevo del rol no cambia el calendario ni lo que ya está en
-`DECISIONS.md`. Si una instrucción nueva contradice algo decidido, **frená y
-preguntá** en vez de rehacerlo.
-
-**Emi es el dueño del proyecto.** Es quien habla con la clienta y quien
-toma las decisiones comerciales. Cuando algo depende de la clienta, va por
-él.
-
-### Somos adversariales, en las dos direcciones
-
-Esto no es una formalidad, es cómo trabajamos.
-
-**Si te pido algo técnicamente mal, decilo antes de hacerlo.** No lo
-implementes "porque lo pidió la PM". Ya pasó: te voy a dar instrucciones
-con errores, y frenar fue lo correcto. Hace poco mandé a cargar "las 43
-subcategorías tal como figuran en el análisis" y el análisis sólo tenía
-las cantidades, no los nombres. La dev anterior frenó en vez de
-inventarlas. Tenía razón y el error era mío.
-
-**Yo verifico lo que entregás contra el código.** No por desconfianza
-personal: porque este repositorio vino con ocho afirmaciones falsas en su
-documentación y aprendimos por las malas. Si decís que algo funciona, voy
-a mirar si funciona.
-
----
-
-## 2. El proyecto, en un minuto
-
-**TopGreen** es un marketplace agrícola argentino. Se construye para una
-clienta real, con contrato a precio cerrado.
-
-Junta a **productores, proveedores y transportistas**. La diferencia con
-un marketplace común son dos cosas: **filtrado por ubicación real** —con
-el padrón oficial de localidades del Estado argentino— y un **módulo de
-logística** que conecta compradores y vendedores con transportistas de la
-zona.
-
-**Fechas que importan:**
-
-- **Martes 28 de julio de 2026: la clienta aprobó el proyecto.**
-- **Viernes 21 de agosto de 2026: firma programada y comienzo de la semana 1.**
-- **Plazo: 12 a 14 semanas.** Las doce cierran el **12 de noviembre** y el
-  colchon llega al **26 de noviembre**.
-- **Al 14 de agosto estamos antes del inicio contractual.**
-
-Las cinco fases con sus fechas están en **`CRONOGRAMA.md`**. Salen del PDF
-que aprobó la clienta, así que no son negociables por conveniencia
-nuestra.
-
----
-
-## 3. Cómo levantar el proyecto
-
-El repositorio es **privado**. Emi te da el acceso.
-
-```bash
-git clone https://github.com/Memu007/yneratopgreen.git
-cd yneratopgreen
-```
-
-Guía completa en `README_LOCAL_SETUP.md`. El camino corto, con Docker:
-
-```bash
-cp .env.example .env
-cp backend/.env.example backend/.env
-# editar los placeholders CAMBIAR_* con valores locales inventados
-
-docker compose up -d
-docker exec topgreen-api alembic upgrade head
-docker exec topgreen-api python -m app.seed
-
-npm install
-npm run dev
-```
-
-Frontend en `http://localhost:5173`, API en `http://localhost:8000/api`,
-Swagger en `/api/docs`. Usuario de prueba: `admin@topgreen.com` /
-`admin123`.
-
-**Docker Desktop tiene que estar prendido.** Es el bloqueo más común y no
-lo podés resolver sola: si está apagado, avisale a Emi.
-
-### La suite de humo
-
-```bash
-npm run smoke
-```
-
-La suite vigente contra arranque limpio cubre API, base de datos y navegador
-real con Chromium. **Es la red de seguridad del proyecto.** El total crece con
-cada regresión; no copies un número fijo desde este onboarding.
-
-Regla: **si tocaste algo y no corriste el smoke, no terminaste.**
-
-Por cada entrega de producto:
-
-1. conservá el rojo previo que distingue el defecto;
-2. corré el caso nuevo aislado durante el desarrollo;
-3. hacé una auto-revisión del diff completo contra el SHA base y retirá
-   cambios fuera de alcance;
-4. al final corré una sola suite completa desde base limpia y las puertas
-   proporcionales; no dupliques la corrida para aparentar independencia;
-5. informá SHA, focal, total, únicos rojos y entorno. Si un caso falla por el
-   entorno, no lo ocultes ni repitas todo sin diagnóstico: aislalo y dejá a PM
-   la reproducción independiente.
-
-La PM siempre revisa el diff y reproduce el caso nuevo. Repite toda la suite
-según riesgo, hitos y cadencia; esa separación conserva independencia sin
-gastar dos corridas completas en cada cambio aislado.
-
----
-
-## 4. El stack real, y las trampas conocidas
-
-| Capa | Qué es |
-|---|---|
-| Backend | Python 3.11 + FastAPI + SQLAlchemy + Alembic |
-| Base | PostgreSQL 16 + PostGIS 3.4.3 |
-| Frontend | React 18 + TypeScript + Vite |
-| Pruebas | Playwright + Chromium |
-
-**Trampas que ya nos costaron tiempo. No las redescubras:**
-
-- **No hay react-router.** La navegación es `useState` sobre
-  `currentSection` en `App.tsx`. Si buscás rutas, no existen.
-- **Vite tiene que correr en el puerto 5173.** El backend sólo acepta
-  5173 y 5174 por CORS. Si el puerto está ocupado, Vite se corre solo a
-  otro y todo falla con errores que no dicen nada.
-- **`docs/PROJECT_STATUS.md` tiene ocho afirmaciones verificadas como
-  falsas.** No lo leas y no lo edites. Se reescribe entero más adelante.
-- **Endpoints de catálogo, cuidado con id contra nombre:**
-  `GET /catalog/localities/provinces` devuelve `{id, name}` con `id` de
-  dos caracteres, pero `GET /catalog/products` filtra por
-  `province=<nombre>` y `locality_id=<id>`. Mezclarlos da resultados
-  vacíos sin error.
-- **Las cuatro subcategorías "Otros"** de Riego, Insumos, Ganadería y
-  Repuestos son registros distintos. Cualquier búsqueda por nombre tiene
-  que ser `category_id + slug`, nunca sólo el nombre.
-
----
-
-## 5. Cómo nos comunicamos
-
-**No hay chat entre vos y yo. Hablamos por archivos, en el repositorio.**
-
-| Archivo | Quién escribe | Para qué |
-|---|---|---|
-| `docs/pm/PARA-DEV.md` | Sólo la PM | Tu tarea actual y sus criterios |
-| `docs/pm/PARA-PM.md` | Sólo vos | Tus informes |
-
-**Antes de cada tarea:**
+## Antes de cada tarea
 
 ```bash
 git pull origin main
 cat docs/pm/PARA-DEV.md
 ```
 
-**Al terminar**: commit, push, y escribís tu informe en `PARA-PM.md`.
+Luego:
 
-`PARA-PM.md` es tuyo: podés reescribirlo entero cada vez. Ya pasó dos
-veces que quedó desactualizado y la PM se enteró leyendo el código en vez
-de tu informe. **Pisalo apenas termines una pieza.**
+1. confirmá rama y SHA base;
+2. leé sólo las rutas/decisiones citadas por la tarea;
+3. inspeccioná el flujo real antes de editar;
+4. si el árbol no está limpio, no pises cambios ajenos;
+5. no empieces otra tarea en paralelo.
 
-### Qué tiene que decir un informe
+## Desarrollo local
 
-1. Qué hiciste.
-2. **Qué corriste, con la salida pegada.** Consultas SQL, salida del
-   seed, resultado del smoke.
-3. Qué **no** corriste, dicho explícitamente.
-4. Qué encontraste que no esperabas.
-5. Qué necesitás de mí para seguir.
+La guía canónica es `README_LOCAL_SETUP.md`.
 
-### Cómo escribirle a esta PM — regla permanente del rol dev
+Stack actual:
 
-La PM trabaja con **GPT-5.6 Sol en razonamiento alto**. Usala como decisora y
-revisora autónoma, no como una terminal a la que hay que narrarle cada paso.
-Puede inspeccionar el repositorio, contrastar evidencia, correr verificaciones
-y mantener `docs/pm/`; no escribe código de producto.
+| Capa | Tecnología |
+|---|---|
+| Frontend | React 18 + TypeScript + Vite |
+| Backend | FastAPI + Python |
+| Base | PostgreSQL + PostGIS |
+| Migraciones | Alembic |
+| Pruebas end-to-end | Playwright/Chromium mediante `scripts/smoke.mjs` |
 
-Cada informe en `PARA-PM.md` debe ser breve y autosuficiente, en este orden:
+No copies números fijos de casos desde este onboarding: la suite crece. Usá la tarea y el estado actual del repo.
+
+## Calidad mínima de una entrega
+
+Para una pieza de producto:
+
+1. reproducí el defecto o propiedad discriminante cuando corresponda;
+2. implementá sólo el alcance pedido;
+3. auto-revisá el diff completo contra el SHA base;
+4. corré focales y puertas proporcionales;
+5. cuando la tarea lo pida o el riesgo lo justifique, corré una suite completa desde base limpia;
+6. informá SHA exacto, qué corriste, resultado, únicos rojos, qué no corriste y riesgos.
+
+No repitas una prueba hasta obtener verde sin explicar por qué falló antes. Un rojo de entorno se diagnostica y se declara; no se oculta.
+
+## Canal PM ↔ Dev
+
+| Archivo | Quién escribe | Uso |
+|---|---|---|
+| `docs/pm/PARA-DEV.md` | PM | tarea activa y devoluciones de esa misma pieza |
+| `docs/pm/PARA-PM.md` | Dev | entrega pendiente y evidencia |
+
+Al terminar una pieza: commit, push y después informe. No dejes producto terminado sólo en local.
+
+### Informe Dev → PM
+
+Debe ser breve y autosuficiente:
 
 1. resultado: terminado, parcial o bloqueado;
-2. commit exacto y alcance real del cambio;
-3. evidencia reproducible y resultado, diferenciando lo corrido de lo no
-   corrido;
-4. desvíos, riesgos o hallazgos fuera de la tarea;
-5. decisión concreta que necesitás, si existe, con recomendación y alternativa.
+2. commit exacto y alcance real;
+3. evidencia reproducible y resultado;
+4. qué no se corrió;
+5. desvíos o riesgos;
+6. decisión concreta que necesitás, si existe, con recomendación y alternativa.
 
-Reglas para aprovechar el modelo sin gastar de más:
+No copies historia del proyecto ni archivos enteros. Citá rutas, commits y decisiones.
 
-- enlazá rutas, commits y salidas relevantes; no repitas la historia del
-  proyecto ni pegues archivos enteros;
-- encabezá una consulta con `DECISIÓN SOLICITADA` y explicá impacto, opciones,
-  recomendación y qué queda bloqueado; evitá preguntas vagas;
-- para aceptar una entrega, pedí aceptación o rechazo contra criterios
-  enumerados; no pidas una opinión general;
-- separá hechos comprobados, inferencias y propuestas;
-- una mejora no solicitada se propone con beneficio, esfuerzo, riesgo y fase;
-  no se mezcla con la entrega ni se implementa sin aprobación;
-- no pidas que “piense mucho”, que revele razonamiento interno ni que haga un
-  plan extenso. El modo alto ya está configurado;
-- no repitas límites que ya están en `DECISIONS.md`; citá la decisión;
-- si querés una respuesta corta, decí qué debe conservar: decisión, motivo,
-  objeción material y próxima acción.
+## Cuándo frenar
 
-La PM es proactiva dentro de su rol: puede leer, diagnosticar y verificar sin
-que le enumeres comandos. Señalá explícitamente cuando sólo pedís análisis y
-cuando pedís una decisión. Cualquier cambio comercial, destructivo, externo o
-que amplíe el alcance sigue requiriendo autorización de Emi.
+Frená y entregá el estado actual si:
 
-Este protocolo sigue la guía oficial de OpenAI para GPT-5.6: prompts más
-livianos, cada instrucción una sola vez, contexto de dominio, límites de
-autonomía y criterios de éxito verificables:
-[Model guidance — GPT-5.6](https://developers.openai.com/api/docs/guides/latest-model).
+- un criterio no se puede cumplir sin cambiar alcance;
+- aparece un error que exige tocar algo fuera de la tarea;
+- haría falta decidir arquitectura, datos, permisos, dinero o una migración no autorizizada;
+- una regresión previa aparece roja;
+- la tarea es ambigua de una forma que cambia el resultado;
+- necesitarías un secreto, credencial real o acción externa no autorizada.
 
----
+No improvises para “destrabar”.
 
-## 6. Reglas permanentes
+## Reglas permanentes
 
-1. **Si no lo corriste, decí que no lo corriste.** Un "debería funcionar"
-   cuenta como no hecho. Un "probado" sin salida pegada cuenta como no
-   probado. Declararlo nunca es problema; ocultarlo sí.
-2. **Una tarea por vez.** Terminás, commiteás, pusheás, informás.
-3. **Commit y push apenas termina cada pieza**, antes del informe. Ya se
-   perdió trabajo por dejarlo sin subir.
-4. **Cuando la documentación y el código se contradigan, gana el código.**
-   Y avisá, porque hay un documento para corregir.
-5. **Empezar no necesita permiso.** Lo que está en `PARA-DEV.md` ya está
-   aprobado. No preguntes si arrancás: arrancá.
+- Si no lo corriste, decí que no lo corriste.
+- Una tarea activa a la vez.
+- No agregar features no pedidas.
+- No subir secretos ni credenciales reales.
+- No copiar código, textos, marca o diseño distintivo de terceros.
+- El contrato es a precio fijo: una mejora opcional se propone, no se implementa sola.
+- `docs/PROJECT_STATUS.md` es histórico y no se usa como estado.
+- Cuando documentación y código se contradicen, reportá la discrepancia; para comportamiento técnico manda la evidencia actual, y para alcance manda el contrato/decisiones vigentes.
 
-### Cuándo parás y me esperás
+## Particularidades del repo
 
-1. Un criterio de aceptación no se cumple y no sabés por qué.
-2. Aparece un error que te obliga a cambiar algo fuera de la tarea.
-3. Tendrías que tomar una decisión de diseño.
-4. Algo que ya funcionaba dejó de funcionar.
-5. Tendrías que tocar algo de la lista de abajo.
+- No hay que asumir un router tradicional: verificá la navegación real antes de tocarla.
+- Los filtros geográficos, catálogo, estados y permisos tienen contratos de datos específicos; no adivines ids/nombres/tokens: inspeccioná Backend y pruebas.
+- No debilites controles de producción para hacer pasar una prueba. Si un test contamina otro —por ejemplo rate-limit—, primero corregí aislamiento/reset del arnés.
+- Cambios de schema, dinero, autenticación, permisos, órdenes, stock, datos o seguridad necesitan revisión mayor y evidencia más fuerte.
 
-En cualquiera de esos casos: **commit de lo hecho, escribilo y frená. No
-improvises para destrabarte.**
+## Producción y Railway
 
-### Qué no tocar nunca
+La Dev no despliega ni cambia Railway salvo tarea explícita. Antes de una publicación deben conocerse rama/SHA por servicio, auto-deploy, PostGIS, backups, volumen persistente y configuración relevante.
 
-- El esquema de la base, modelos y migraciones, sin aprobación previa.
-- **Funcionalidad que no se pidió**, por obvia que parezca. El contrato es
-  a precio cerrado: lo que construimos de más lo pagamos nosotros.
-- **Credenciales reales de Mercado Pago.** Para local, valores
-  inventados. Nunca subas un secreto real al repositorio.
-- **Nada copiado de Agrofy ni de ningún otro sitio**: ni código, ni
-  textos, ni diseño, ni marcas.
-- `docs/PROJECT_STATUS.md`.
+Runtime no es sólo código: CORS, SMTP, variables y dominios pueden romper una composición con SHA correcto. No copies valores secretos a documentación.
 
-### Cómo escribo los criterios de aceptación
+Después de una migración de esquema no se hace rollback ciego sólo de código; un downgrade requiere procedimiento probado y backup recuperable.
 
-**Relacionales, no absolutos.** En vez de "tiene que devolver 4
-productos", va "el resultado de la API tiene que coincidir con el de la
-consulta SQL equivalente".
+## Alcance y fuentes
 
-Le pasé a una dev números fijos que habían quedado viejos cuando el seed
-creció. Ella reportó los reales en lugar de acomodarse al número que yo
-esperaba, y así se detectó el error. **Si un criterio mío no cierra con lo
-que ves, el sospechoso soy yo.**
+Abrí bajo demanda:
 
-Cuando el número **es** la especificación —como "43 subcategorías"— ahí sí
-va fijo, y lo aclaro.
-
----
-
-## 7. Qué está hecho y qué no
-
-Estado honesto. El detalle requisito por requisito está en `MATRIZ.md`.
-
-La ultima medicion heredada fue **~53%**, pero ya no se usa como control.
-Las puertas contractuales vigentes estan en `CRONOGRAMA.md` y el desglose
-por requisito en `MATRIZ.md`.
-
-**Funciona y está verificado:**
-
-- Arranque desde cero con un comando: PostgreSQL 16 + PostGIS 3.4.3,
-  migraciones, seed idempotente, build en verde.
-- Recorrido de compra completo probado en navegador: registro, ingreso
-  con tres perfiles, catálogo con filtros, detalle, carrito, checkout
-  hasta el botón de pago, publicación, panel de vendedor y las cuatro
-  vistas de administración.
-- Geolocalización: 4.028 localidades del padrón oficial,
-  `Geography(POINT,4326)` con índice GIST.
-- Filtro por provincia y localidad de punta a punta, con estado en la URL.
-- Taxonomía de la clienta cargada: 7 categorías con 43 subcategorías, más
-  Bienes y Ganado, más 4 servicios. 30 publicaciones en 12 categorías y
-  9 provincias.
-- **Pago por transferencia bancaria**: CBU y alias con snapshot, comprobante
-  opcional, referencia, cancelacion/decision completa y atomicidad.
-- **Suite de 25 casos de humo**, con navegador real y rojo previo para los
-  cuatro casos que cerraron la orden inmortal.
-
-**Pendientes operativos de lo ya entregado:**
-
-- **El seed no carga CBU ni alias de nadie**, así que sobre instalación
-  limpia la transferencia no se puede usar. La suite no lo detecta porque
-  el caso 13 configura los datos bancarios él mismo.
-- **El camino de instalación sin Docker no funciona** siguiendo la guía.
-
-**Falta, y es lo grande:**
-
-- **Módulo de transportistas.** Es el diferencial del producto. La Pieza A
-  —registro y campos— está hecha con dos objeciones abiertas; las Piezas B
-  y C, en cero.
-- **Suscripciones con Mercado Pago**, dos planes y mensajería premium.
-  Alcance nuevo de Fase 6; no compite con el MVP contractual.
-- **Mercado Pago para compras**: el código heredado está desmontado
-  —tenía split con comisión de marketplace, que el contrato no pide— y se
-  reconstruye sin split cuando haya credenciales.
-- **Despliegue**: hay preparación de Railway subida, nadie lo levantó en
-  un servidor real.
-- **Vista en celular**: relevada en 36 pantallas, sin corregir. Aparcada a
-  propósito.
-
----
-
-## 8. Dónde está el resto del contexto
-
-Todo en `docs/pm/`. **No los leas todos ahora.**
-
-| Archivo | Cuándo abrirlo |
+| Archivo | Uso |
 |---|---|
-| `NOW.md` | **Siempre primero.** Estado y prioridades |
-| `PARA-DEV.md` | Tu tarea actual |
-| `CRONOGRAMA.md` | Las fases y fechas comprometidas con la clienta |
-| `CONTRATO.md` | El alcance. Si algo no está ahí, no es requisito |
-| `PAGOS-TRANSFERENCIA.md` | La transferencia y sus cuatro arreglos |
-| `archivo/PARA-DEV-historico.md` | Por qué se decidió algo de julio |
-| `MATRIZ.md` | Qué está verificado y con qué evidencia |
-| `REPO_MAP.md` | Dónde está cada cosa en el código |
-| `TAXONOMIA-CLIENTE.md` | Las categorías y subcategorías, con sus nombres |
-| `DECISIONS.md` | Por qué se decidió cada cosa |
-| `PROJECT.md` | Qué se construye y qué queda afuera |
+| `PARA-DEV.md` | tarea actual |
+| `NOW.md` | estado/bloqueos si la tarea depende de ellos |
+| `CONTRATO.md` | alcance contractual |
+| `ALCANCE-Y-LIMITES.md` | guardas de alcance |
+| `DECISIONS.md` | decisión citada por la tarea |
+| `CRONOGRAMA.md` | sólo si la pieza depende de fase/hito |
+| `MATRIZ.md` | trazabilidad de requisitos |
+| `REPO_MAP.md` | mapa técnico |
+| `TAXONOMIA-CLIENTE.md` | categorías/subcategorías |
+| `PAGOS-TRANSFERENCIA.md` | transferencia bancaria |
+| `RAILWAY.md` | despliegue, sólo cuando corresponda |
 
----
-
-## 9. Tu primera tarea
-
-Está en `docs/pm/PARA-DEV.md`. Andá para allá.
+La primera tarea siempre está en `docs/pm/PARA-DEV.md`.
