@@ -1,29 +1,24 @@
 # Documento histórico — no usar como estado del proyecto
 
-**Este archivo describía el estado de la Fase I al 2026-06-04, tal como lo
-dejó el equipo anterior. No se mantiene y no refleja el proyecto actual.**
+Este archivo se conserva únicamente como **tombstone** porque documentación antigua todavía puede enlazarlo.
 
-Una revisión del 2026-07 encontró **ocho afirmaciones verificadas como
-falsas** en su contenido, sobre despliegue, integraciones y alcance. Se
-conserva el archivo porque es parte de la historia del proyecto y porque otros
-documentos lo citan, pero **no se debe tomar ninguna decisión a partir de él**.
+No refleja el proyecto actual y no debe usarse para decidir alcance, avance, despliegue ni aceptación. Una revisión de 2026-07 encontró ocho afirmaciones verificadas como falsas en su versión histórica.
 
-## Dónde está el estado real
+## Fuentes vigentes
 
-| Qué buscabas acá | Dónde está ahora |
+| Tema | Fuente |
 |---|---|
-| Estado y avance del proyecto | [`docs/pm/NOW.md`](pm/NOW.md) |
-| Decisiones tomadas y sus motivos | [`docs/pm/DECISIONS.md`](pm/DECISIONS.md) |
-| Fases, semanas y fechas | [`docs/pm/CRONOGRAMA.md`](pm/CRONOGRAMA.md) |
-| Alcance contractual y sus límites | [`docs/pm/ALCANCE-Y-LIMITES.md`](pm/ALCANCE-Y-LIMITES.md) |
-| Cómo levantar el proyecto | [`README_LOCAL_SETUP.md`](../README_LOCAL_SETUP.md) |
-| Despliegue en Railway | [`RAILWAY.md`](../RAILWAY.md) |
-| Problemas conocidos | [`docs/KNOWN_ISSUES.md`](KNOWN_ISSUES.md) |
+| Estado operativo | [`docs/pm/NOW.md`](pm/NOW.md) |
+| Alcance contractual | [`docs/pm/CONTRATO.md`](pm/CONTRATO.md) |
+| Límites e interpretación de alcance | [`docs/pm/ALCANCE-Y-LIMITES.md`](pm/ALCANCE-Y-LIMITES.md) |
+| Fases y fechas | [`docs/pm/CRONOGRAMA.md`](pm/CRONOGRAMA.md) |
+| Decisiones | [`docs/pm/DECISIONS.md`](pm/DECISIONS.md) |
+| Puesta al día PM | [`AGENTS.md`](../AGENTS.md) |
+| Desarrollo local | [`README_LOCAL_SETUP.md`](../README_LOCAL_SETUP.md) |
+| Railway | [`RAILWAY.md`](../RAILWAY.md) |
 
-## Por qué no se reescribió
+El contenido original permanece recuperable en Git con:
 
-Reescribirlo sería inventar un segundo documento de estado que competiría con
-`NOW.md` y volvería a envejecer igual. El estado vive en un solo lugar.
-
-El contenido original está en el historial de Git: `git log --follow -p
-docs/PROJECT_STATUS.md`.
+```bash
+git log --follow -p docs/PROJECT_STATUS.md
+```
