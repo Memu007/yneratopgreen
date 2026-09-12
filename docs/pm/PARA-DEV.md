@@ -13,31 +13,31 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
-## 2026-09-11 — COPY-CLEAR-1
+## 2026-09-12 — INTEGRATION-CANDIDATE-1
 
-Es una pasada editorial y de claridad funcional; no autoriza rediseño ni funciones nuevas.
+`COPY-CLEAR-1` queda **aceptada** en `9f25d59`, con informe `ee166b4`. Se abre una tarea de integración, no una función nueva.
 
-1. **La marca vuelve a Inicio y no se reabre.** Los controles de marca de Header y Footer llevan a Inicio y el 156 lo prueba con teclado. Conservá ese comportamiento; no rehagas marca, activos, navegación ni estilos.
-2. **Buscar tiene una acción real.** En Mercado, escribir no debe ejecutar una búsqueda distinta de la que promete el botón. Clic en «Buscar» y Enter aplican la consulta actual recortada, actualizan `q`, consultan el catálogo y muestran el resultado; una consulta vacía limpia el filtro. Retirá el `console.log`. No agregues motor, fuzzy search, índice, endpoint ni paginación.
-3. **No se prometen planes ni comisiones inventadas.** En Contacto, retirá la referencia a planes inexistentes y explicá con precisión la regla vigente: AgroBoeda no cobra comisión por la venta en este MVP y el pago va al vendedor. No crees planes, suscripciones ni cobros.
-4. **Contraseña: salida honesta, no recovery.** Login debe ofrecer una instrucción visible para quien olvidó la contraseña y llevar a Contacto. No prometas envío, recuperación automática ni plazo; no agregues token, email, endpoint, modal o formulario de reset. La herramienta manual de administración no se modifica.
-5. **Voseo es-AR, con revisión humana.** Corregí frases visibles que mezclan tuteo en Login, registro, carrito, alta/edición, panel y errores. Usá voseo rioplatense natural sin alterar sustantivos correctos ni marcar coincidencias por regex sin contexto.
-6. **Estados visibles en español; valores de API intactos.** Centralizá rótulos del panel administrativo para publicaciones y órdenes. Ninguna celda/badge muestra tokens crudos. Los `value` de selectores y cuerpos PATCH siguen usando tokens de Backend. No cambies enums ni inventes estados.
+La PM reprodujo 156+160+168 en 3/3, 134+167+168 en 3/3 y 165+166 en 2/2, todos desde bases Docker limpias. La a11y dio el mismo rojo heredado en entrega y padre: 64/64 pantallas y seis violaciones `serious` de contraste en paneles. La suite completa PM dio 163/168; los cinco rojos quedaron separados de COPY por las focales y por el agotamiento/caducidad de recursos del arnés. Lint, TypeScript, sintaxis y `diff-check` quedaron verdes.
 
-### Prueba y entrega
+### Objetivo
 
-- Conservá el 156 verde. Extendé el 160 para comprobar rótulos es-AR exactos y que selector/PATCH mantienen tokens del Backend. Agregá el 168 para búsqueda por clic/Enter, limpieza de `q`, FAQ sin planes, salida de soporte desde Login y una muestra representativa de voseo.
-- Mostrá rojo contra la base anterior para cada familia que el caso nuevo cubre y un negativo discriminante para búsqueda y estados.
-- Corré 156+160+168 focales y después una suite completa desde base limpia.
-- Corré lint, `node --check scripts/smoke.mjs`, a11y y `diff-check`; el smoke ya incluye build. Contraste/capturas sólo si realmente cambiás estilos.
-- Producto/regresión en un commit e informe `PARA-PM.md` aparte.
+En `claude/dev-role-repo-3l0kp3`, incorporá el `main` vigente a tu rama y prepará una única composición candidata que conserve todo el producto aceptado de tu HEAD `ee166b4` y los documentos canónicos podados de `main`. No resetees ni reescribas `main`, no hagas un push a `main` y no reintroduzcas historia en `NOW.md`, `PARA-DEV.md` o auditorías. Tu nuevo `PARA-PM.md` debe ser un informe corto de esta entrega.
 
-### Fuera de alcance
+El merge en seco no mostró conflictos textuales, pero eso no prueba compatibilidad funcional. Revisá especialmente contrato Backend/Frontend de Administración, navegación/continuaciones, fotos, cuenta, calificaciones, cotización, filtros y COPY.
 
-Sin Backend, schema, dependencia, pagos, datos remotos, Railway, despliegue, activos de marca, mensajería ni recuperación automática.
+### Dos correcciones de puerta dentro de la candidata
 
-No integres a `main` ni despliegues. Frená al entregar.
+1. Corregí las seis violaciones heredadas de contraste en los paneles con el cambio visual mínimo. `a11y` y contraste deben quedar verdes; no rediseñes.
+2. Aislá el arnés para que 165/166 no dependan de un JWT vencido por la duración de la suite y 167/168 no hereden el presupuesto antifuerza-bruta consumido por otros casos. La corrección vive en el arnés o en su orquestación: **no aumentes TTL, no relajes ni desactives el rate-limit de producción, no agregues bypass de test al producto**.
 
-### Estado del hilo
+Si 114, 131, 143 u otro caso queda rojo, reproducilo aislado y clasificá con evidencia; no lo tapes como «conocido» ni cambies producto sólo para silenciarlo.
 
-Dev informó entrega en su rama con producto/regresión `9f25d59`; la PM todavía debe revisar y aceptar o devolver esa entrega. Hasta esa decisión no se abre una tarea nueva.
+### Entrega y puertas
+
+- Commits separados cuando corresponda: composición, corrección visual/arnés e informe.
+- Entregá un **SHA final único**. Desde base Docker limpia corré la suite completa de 168 casos sobre ese SHA y guardá log recuperable.
+- Corré lint, TypeScript, `node --check scripts/smoke.mjs`, a11y, contraste y `diff-check`.
+- Informá base exacta, commits incluidos, diff final, resultados y cualquier rojo con su reproducción focal.
+- No desplegues, no toques Railway, datos remotos, secretos o pagos y no empieces `CAT-PAGE-1`. Frená al entregar: la PM repetirá la suite completa desde otra base limpia sobre el mismo SHA.
+
+Railway queda fuera de esta tarea: hoy Frontend y Backend siguen `main` con auto-deploy y sin esperar CI, publican SHAs distintos y no tienen backups. Por eso la candidata no puede subir a `main` todavía.

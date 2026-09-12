@@ -1,39 +1,39 @@
 # Estado actual
 
-Actualizado: 2026-09-11.
+Actualizado: 2026-09-12.
 
 `NOW.md` contiene sólo estado vigente, restricciones vivas, bloqueos y próxima acción. La historia anterior permanece en Git; la instantánea previa a esta poda está en `ab4165fc`.
 
 ## Resumen ejecutivo
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 4. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
-- **`main`:** contiene la poda documental de 2026-09-11; esos commits no cambian la composición de producto.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, diverge de `main` desde merge-base `2877d2a0` y conserva 65 commits propios de trabajo Dev. `main` acumuló además commits documentales de limpieza; no interpretar esos commits documentales como cambios de producto ni usar el contador de “behind” como señal de recomposición funcional.
-- **Tarea/hilo vigente:** `COPY-CLEAR-1` entregada por Dev en su rama, **pendiente de revisión PM**. Producto/regresión: `9f25d59`. No está integrada ni desplegada.
-- **No abrir una tarea nueva** hasta aceptar o devolver `COPY-CLEAR-1`.
+- **`main`:** `a5daf44` al comenzar esta revisión; contiene la poda documental de 2026-09-11 y no cambia la composición de producto.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, HEAD `ee166b4`; entrega de producto/regresión `9f25d59`, todavía no integrada ni desplegada.
+- **Última decisión PM:** `COPY-CLEAR-1` **ACEPTADA** en rama Dev.
+- **Tarea activa:** `INTEGRATION-CANDIDATE-1`, responsable Dev. Debe componer `main` vigente con el trabajo aceptado, corregir las dos deudas de puerta y entregar un único SHA para suite completa Dev y PM; no autoriza despliegue.
 
-## Entrega pendiente — COPY-CLEAR-1
+## Aceptación vigente — COPY-CLEAR-1
 
-Dev informa los seis puntos entregados: búsqueda por acción, FAQ sin planes/comisiones inventadas, salida honesta para contraseña olvidada, voseo es-AR, estados visibles traducidos y conservación de marca→Inicio.
+Producto/regresión `9f25d59`; informe Dev `ee166b4`. La PM revisó el diff exacto del commit: 14 archivos, sin Backend, schema, pagos, Railway ni dependencias. Los seis puntos quedan dentro del alcance: búsqueda por acción, FAQ sin planes/comisiones inventadas, salida honesta para contraseña olvidada, voseo es-AR, estados visibles traducidos con tokens API intactos y conservación de marca→Inicio.
 
-Evidencia informada por Dev:
+Evidencia independiente PM sobre checkouts temporales aislados:
 
-- focales 156 + 160 + 168: **3/3**;
-- suite completa: **165/168**;
-- rojos: 131 ambiental conocido y 167/168 afectados por interacción con el límite antifuerza-bruta;
-- lint, TypeScript, sintaxis y `diff-check`: verdes;
-- sin Backend, schema, pagos, Railway ni despliegue.
+- 156 + 160 + 168 desde base Docker limpia: **3/3**;
+- 134 + 167 + 168 desde otra base limpia: **3/3**;
+- 165 + 166 desde otra base limpia: **2/2**;
+- suite completa PM: **163/168**; rojos 114, 165, 166, 167 y 168, todos clasificados fuera de la pieza por reproducciones focales o por el mecanismo del arnés;
+- a11y en entrega y en su padre `fe822d0`: mismo resultado, 64/64 pantallas y las mismas seis violaciones `serious` de contraste en paneles;
+- lint, TypeScript, sintaxis y `diff-check`: verdes.
 
-La PM debe revisar el diff y reproducir de manera independiente antes de aceptar.
+Los 165/166 de la suite completa fallaron con token vencido tras la corrida larga y pasaron 2/2 aislados. El 167/168 heredó el presupuesto de intentos consumido por la suite; ambos pasan aislados junto al 134. No se cambió ni se debe debilitar el límite antifuerza-bruta de producción. El 114 es intermitencia heredada del arnés y no toca ningún archivo de la entrega.
 
-### Dos hallazgos que no se deben mezclar con la pieza
+Logs persistentes: `/private/tmp/topgreen-pm-copy-focal.log`, `/private/tmp/topgreen-pm-copy-a11y-delivery.log`, `/private/tmp/topgreen-pm-copy-a11y-base.log`, `/private/tmp/topgreen-pm-copy-ratelimit-134-167-168.log`, `/private/tmp/topgreen-pm-copy-suite.log` y `/private/tmp/topgreen-pm-copy-165-166.log`.
 
-1. **A11y/contraste:** Dev reporta que `npm run a11y` está rojo también sobre la base previa aceptada, en seis elementos de paneles con contraste medido 2.08:1 frente al requisito 4.5:1. No atribuirlo a `COPY-CLEAR-1` hasta reproducción PM. Si se confirma, abrir corrección separada y mínima.
-2. **Aislamiento de suite:** los casos 167/168 pueden heredar el presupuesto de rate-limit consumido por el caso 134. La corrección esperada es aislamiento/reset del arnés; **no debilitar el rate-limit de producción para hacer pasar pruebas**.
+Hallazgos vivos separados: corregir el contraste heredado de los paneles y aislar el presupuesto temporal/antifuerza-bruta del arnés antes de exigir una doble suite 168/168 sobre la composición candidata. Ninguno invalida `COPY-CLEAR-1`; ambos sí bloquean declarar verde integral.
 
 ## Última aceptación PM relevante
 
-`TEST-SUITE-167S` quedó aceptada en rama Dev: arnés `d7e17f9`, informe `40131de`. PM reprodujo 139+143 juntos desde otra base limpia en 2/2; no cambió producto.
+`COPY-CLEAR-1` quedó aceptada en rama Dev: producto/regresión `9f25d59`, informe `ee166b4`. No está integrada ni desplegada.
 
 Las aceptaciones anteriores y sus reproducciones son historia consultable en Git y en los documentos de evidencia; no se vuelven a transcribir en este archivo.
 
@@ -51,25 +51,24 @@ Reglas para cerrar esa deuda:
 - si un rojo aparece sólo en un entorno, reproducirlo aislado en ambos antes de clasificarlo;
 - hasta resolver diferencias, el candidato no está aceptado.
 
-La arquitectura `main = integración aceptada` / `release = producción` es una recomendación auditada, todavía no se ejecuta sin inventario de Railway y decisión PM/Owner. Si se adopta, `release` sólo puede avanzar a un SHA ya contenido en `main`; no lleva commits exclusivos.
+El inventario confirmó que `main` es hoy la rama de producción de ambos servicios y que el auto-deploy está activo sin esperar CI. Por eso **no se adopta todavía** `main = integración`: la composición candidata se prepara y prueba en la rama Dev. La migración recomendada a `main = integración aceptada` / `release = producción` queda retenida hasta resolver backups y ejecutar un cambio operativo controlado; si se adopta, `release` sólo puede avanzar a un SHA ya contenido en `main` y no lleva commits exclusivos.
 
-## Railway — estado y deuda viva
+## Railway — inventario 2026-09-12 y deuda viva
 
-El 2026-09-11 se corrigió un incidente CORS de configuración: Backend sólo admitía el dominio histórico y el frontend vigente fallaba con `Failed to fetch`. Con autorización de Emi se agregó el dominio actual, se reinició Backend y se verificaron preflight, catálogo e ingreso demo. No cambió código, datos ni pagos.
+Inventario de sólo lectura del proyecto `strong-playfulness`, entorno `production`:
 
-Antes de cambiar ramas de despliegue o tratar un entorno como producción aceptada falta inventariar de forma explícita:
+- servicios en línea: Frontend `yneratopgreen`, Backend `Backend` y base `PostGIS`;
+- Frontend y Backend toman `Memu007/yneratopgreen`, rama `main`, con auto-deploy activo y `Wait for CI` apagado;
+- Frontend público `https://yneratopgreen-production.up.railway.app`, desplegado desde `b26d8ad`; Backend público `https://backend-production-ba84.up.railway.app`, desplegado y reportado por `/api/health` en `2877d2a`;
+- los watch paths son separados (`src/public/...` para Frontend y `backend/**` para Backend), por lo que Railway publica composiciones parciales: el entorno actual **no converge en un único SHA**;
+- `VITE_API_URL` y `VITE_IMAGES_URL` apuntan al Backend vigente;
+- CORS contiene el dominio histórico y el dominio público actual, pero `FRONTEND_URL` todavía apunta al dominio histórico `ynerav.up.railway.app`; queda como deuda de configuración, sin corregir en este inventario;
+- Backend usa almacenamiento local con volumen `backend-volume` de 5 GB montado en `/data`; `UPLOAD_DIR=/data/uploads` y `EMAIL_OUTBOX_DIR=/data/outbox` quedan persistentes allí;
+- PostGIS tiene `postgis-volume` de 5 GB montado en `/var/lib/postgresql/data`;
+- no hay backups/PITR activos ni restauración ejercitada. Railway los presenta como función de plan superior; esto bloquea tratar el entorno como producción aceptada y cualquier migración riesgosa;
+- `MP_CHECKOUT_HABILITADO=false`, verificado sin exponer secretos.
 
-- proyecto Railway de Frontend y Backend;
-- rama configurada por servicio;
-- auto-deploy;
-- SHA realmente publicado en cada servicio;
-- Backend consumido por Frontend;
-- PostGIS asociado;
-- backups activos y, idealmente, restauración ejercitada;
-- volumen persistente para imágenes/outbox cuando corresponda;
-- variables operativas relevantes sin copiar secretos.
-
-`MP_CHECKOUT_HABILITADO` debe permanecer en `false` hasta la ejecución controlada de homologación de Mercado Pago.
+El 2026-09-11 se corrigió el incidente CORS que producía `Failed to fetch`; el inventario confirma que el dominio actual sigue permitido. No se cambió Railway, código, datos ni pagos durante esta revisión.
 
 Runtime no es sólo SHA: CORS, SMTP, dominios y variables pueden romper una composición correcta. Todo cambio operativo debe quedar registrado sin secretos.
 
@@ -136,9 +135,9 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. **PM revisa `COPY-CLEAR-1`** sobre la rama Dev: diff, focales y hallazgos.
-2. PM reproduce `a11y` y el problema de contaminación de 167/168 para separarlos de la entrega.
-3. PM acepta o devuelve `COPY-CLEAR-1`.
-4. Sin nueva tarea de producto, inventariar Railway antes de cambiar arquitectura de ramas/deploy.
-5. Preparar la composición excepcional `main + trabajo Dev aceptado` y probar el mismo SHA de forma independiente.
+1. Dev prepara `INTEGRATION-CANDIDATE-1` en su rama, sin tocar `main` ni Railway.
+2. En la candidata corrige el contraste heredado y el aislamiento/caducidad del arnés, sin debilitar seguridad.
+3. Dev corre suite completa desde base limpia sobre el SHA candidato.
+4. PM corre otra suite completa independiente sobre **el mismo SHA**.
+5. Resolver backups y después ejecutar de forma controlada la separación `main`/`release`; hasta entonces no desplegar la candidata.
 6. Después de converger integración, continuar el roadmap contractual; Mercado Pago/red-team/producción permanecen al final de la secuencia acordada, sin esperar artificialmente a una fecha si las dependencias ya están listas.
