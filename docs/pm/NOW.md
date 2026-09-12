@@ -7,8 +7,8 @@ Actualizado: 2026-09-11.
 ## Resumen ejecutivo
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 4. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
-- **`main`:** `fd183d4` tras la poda documental. Estos commits son sólo documentación y no cambian la composición de producto.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, diverge de `main`: 65 commits adelante y 21 atrás; merge-base `2877d2a0`. El aumento de commits “atrás” proviene de la poda documental de `main`, no de cambios de producto.
+- **`main`:** contiene la poda documental de 2026-09-11; esos commits no cambian la composición de producto.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, diverge de `main` desde merge-base `2877d2a0` y conserva 65 commits propios de trabajo Dev. `main` acumuló además commits documentales de limpieza; no interpretar esos commits documentales como cambios de producto ni usar el contador de “behind” como señal de recomposición funcional.
 - **Tarea/hilo vigente:** `COPY-CLEAR-1` entregada por Dev en su rama, **pendiente de revisión PM**. Producto/regresión: `9f25d59`. No está integrada ni desplegada.
 - **No abrir una tarea nueva** hasta aceptar o devolver `COPY-CLEAR-1`.
 
