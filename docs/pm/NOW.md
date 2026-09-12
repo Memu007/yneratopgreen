@@ -7,10 +7,10 @@ Actualizado: 2026-09-12.
 ## Resumen ejecutivo
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 4. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
-- **`main`:** `a5daf44` al comenzar esta revisión; contiene la poda documental de 2026-09-11 y no cambia la composición de producto.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, HEAD `ee166b4`; entrega de producto/regresión `9f25d59`, todavía no integrada ni desplegada.
-- **Última decisión PM:** `COPY-CLEAR-1` **ACEPTADA** en rama Dev.
-- **Tarea activa:** `INTEGRATION-CANDIDATE-1`, responsable Dev. Debe componer `main` vigente con el trabajo aceptado, corregir las dos deudas de puerta y entregar un único SHA para suite completa Dev y PM; no autoriza despliegue.
+- **`main`:** `6d33962`; contiene la aceptación de COPY y la apertura de la candidata. Sigue conectado al auto-deploy de Railway, por lo que no se integra producto ahí todavía.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, HEAD de informe `696f933`; primera candidata de producto `fcea099`, no integrada ni desplegada.
+- **Última decisión PM:** `INTEGRATION-CANDIDATE-1` **DEVUELTA** en primera revisión. `COPY-CLEAR-1` permanece aceptada.
+- **Tarea activa:** `INTEGRATION-CANDIDATE-1`, responsable Dev, devolución 1. Debe corregir las diferencias reales entre el arnés nativo y Docker, el falso emparejamiento de la respuesta del caso 168, el rojo repetido del 114, el contraste conocido del selector de estrellas y el informe vivo; no autoriza despliegue.
 
 ## Aceptación vigente — COPY-CLEAR-1
 
@@ -38,6 +38,18 @@ Hallazgos vivos separados: corregir el contraste heredado de los paneles y aisla
 Las aceptaciones anteriores y sus reproducciones son historia consultable en Git y en los documentos de evidencia; no se vuelven a transcribir en este archivo.
 
 ## Estado de integración
+
+La primera candidata `fcea099` quedó **devuelta**. El merge `c0f42ac` preservó el producto anterior de `ee166b4` byte por byte en `src/`, `backend/`, `scripts/` y `public/`; los cambios propios quedaron acotados a contraste y arnés. La suite completa independiente PM, desde una base Docker aislada, dio **165/168**: 114, 167 y 168 rojos.
+
+La evidencia discriminante separó tres causas:
+
+- después del 134, el arnés anunció que reinició la API, pero el contenedor conservó ID, `StartedAt` y `RestartCount=0`; el 167 perdió la continuación y el 168 recibió 429;
+- sin ejecutar el 134 y desde otra base limpia, el 167 pasó, mientras el 168 falló porque su espera de `/notifications` aceptó también `/notifications/unread-count` y validó el cuerpo equivocado;
+- el 114 repitió en suite y focal el mismo rojo: «el titular no ve sus cargas declaradas»; ya no se clasifica como intermitente sin diagnóstico adicional.
+
+Además, la propia Dev informó que `.elegida` mantiene texto de estrellas a 2,61:1 y que las puertas actuales no visitan ese estado. Es la misma deuda de contraste y debe entrar en esta devolución mínima. `PARA-PM.md` tampoco quedó como canal vivo: acumuló el informe nuevo sobre 245 líneas anteriores pese a declarar que las retiró.
+
+Logs PM persistentes: `/private/tmp/topgreen-pm-integration-suite-fcea099.log` y `/private/tmp/topgreen-pm-integration-focal-114-167-168.log`.
 
 La rama Dev acumuló trabajo aceptado y pendiente sin integrar porque históricamente `main` también se usó como fuente de despliegue. El resultado es una divergencia grande y una composición que debe tratarse explícitamente.
 
