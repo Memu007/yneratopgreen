@@ -6,14 +6,12 @@ TopGreen conserva su propia fuente de verdad para contrato, estado, código y de
 
 1. Revisá `git status`, rama y commit. Si el árbol está limpio, actualizá `main`; si no, preservá cambios y reportalos.
 2. Leé completo `docs/pm/ONBOARDING-PM.md`.
-3. Leé, en este orden:
-   - `docs/pm/NOW.md`;
-   - `docs/pm/CRONOGRAMA.md`;
-   - la entrega pendiente en `docs/pm/PARA-PM.md`;
-   - la tarea/hilo activo en `docs/pm/PARA-DEV.md`.
-4. Abrí `CONTRATO.md`, `ALCANCE-Y-LIMITES.md`, `DECISIONS.md` u otra evidencia sólo cuando la situación actual los cite o una decisión dependa de ellos.
-5. Contrastá afirmaciones importantes con Git y evidencia reproducible.
-6. Respondé con un parte corto: commit/rama, semana-fase, tarea y responsable, última aceptación, bloqueo/decisión pendiente y próxima acción.
+3. Leé `docs/pm/NOW.md` y `docs/pm/CRONOGRAMA.md`.
+4. `NOW.md` indica dónde vive la entrega pendiente. Si está en una rama Dev todavía no integrada, leé `PARA-PM.md` **desde esa rama**, no asumas que la copia de `main` es la última.
+5. Leé la tarea/hilo activo en `docs/pm/PARA-DEV.md`.
+6. Abrí `CONTRATO.md`, `ALCANCE-Y-LIMITES.md`, `DECISIONS.md` u otra evidencia sólo cuando la situación actual los cite o una decisión dependa de ellos.
+7. Contrastá afirmaciones importantes con Git y evidencia reproducible.
+8. Respondé con un parte corto: commit/rama, semana-fase, tarea y responsable, última aceptación, bloqueo/decisión pendiente y próxima acción.
 
 Ponerse al día no autoriza a iniciar una tarea nueva.
 
