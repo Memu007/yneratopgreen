@@ -41,3 +41,26 @@ Si 114, 131, 143 u otro caso queda rojo, reproducilo aislado y clasificá con ev
 - No desplegues, no toques Railway, datos remotos, secretos o pagos y no empieces `CAT-PAGE-1`. Frená al entregar: la PM repetirá la suite completa desde otra base limpia sobre el mismo SHA.
 
 Railway queda fuera de esta tarea: hoy Frontend y Backend siguen `main` con auto-deploy y sin esperar CI, publican SHAs distintos y no tienen backups. Por eso la candidata no puede subir a `main` todavía.
+
+---
+
+## 2026-09-12 — DEVOLUCIÓN 1
+
+**Decisión: DEVOLVER `INTEGRATION-CANDIDATE-1` en `fcea099`.** No integres ni despliegues. El merge sí preservó el producto de `ee166b4`; la devolución se limita a cuatro defectos de puerta y al canal de entrega.
+
+### Evidencia PM
+
+- Suite completa independiente desde base Docker aislada: **165/168**. Rojos 114, 167 y 168. Log: `/private/tmp/topgreen-pm-integration-suite-fcea099.log`.
+- Después del 134, la salida afirmó «la API se reinició», pero `topgreen-api` conservó el mismo ID y `StartedAt=2026-09-12T20:14:56.246290658Z`, con `RestartCount=0`. En ese estado el 167 perdió la continuación de compra y el 168 recibió HTTP 429.
+- Focal 114+167+168 desde otra base limpia, sin correr el 134: **1/3**. El 167 pasó; el 168 recibió una respuesta sin `notifications`; el 114 repitió «el titular no ve sus cargas declaradas». Log: `/private/tmp/topgreen-pm-integration-focal-114-167-168.log`.
+- `PARA-PM.md` en `696f933` tiene 396 líneas: agregó el informe nuevo sobre las 245 de `main`, aunque el propio texto afirma que los informes anteriores salieron.
+
+### Correcciones requeridas
+
+1. **Reinicio real y verificable.** El aislamiento posterior al 134 debe funcionar tanto con API nativa como con la API Docker del lanzador oficial. No alcanza que un `curl` encuentre viva la API anterior: si el proceso/servicio que conserva el contador no cambió, el comando debe fallar y la suite no puede anunciar éxito. No subas TTL, no relajes el rate-limit y no agregues bypass de prueba al producto.
+2. **Caso 168 sin carrera.** La espera de la lista de notificaciones debe distinguir exactamente su request de `/notifications/unread-count`, validar la forma real de la respuesta y conservar el negativo que evita aceptar el vacío transitorio. No aflojes la afirmación.
+3. **Caso 114.** Reproducí el rojo repetido y explicá la causa. Corregí producto o arnés según corresponda; no lo clasifiques como «intermitente» sin evidencia discriminante.
+4. **Contraste del selector.** Corregí `.elegida`, que hoy queda en 2,61:1, y extendé la puerta para visitar el selector con estrellas elegidas. Es la misma causa de contraste ya trabajada, no un rediseño.
+5. **Canal vivo.** Reemplazá todo el cuerpo anterior de `PARA-PM.md`; no agregues otro informe arriba. Debe quedar únicamente el encabezado del canal y el informe breve de esta devolución. LOGO, cuenta de prueba e informes anteriores permanecen en Git y no van en la entrega vigente.
+
+Primero corré focales discriminantes. Después entregá un nuevo SHA candidato único y repetí la suite completa Dev desde base limpia más las compuertas ya pedidas. Si tu entorno no tiene Docker, decilo de forma explícita; la PM repetirá la ruta Docker sobre el mismo SHA. No empieces `CAT-PAGE-1` ni otra tarea.
