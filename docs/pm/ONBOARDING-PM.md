@@ -8,11 +8,12 @@ El chat no es fuente de verdad. Git, contrato, decisiones y evidencia reproducib
 
 1. Revisá `git status` y el commit actual. Si el árbol está limpio, actualizá `main`; si no, preservá los cambios y reportalos.
 2. Leé `NOW.md` y `CRONOGRAMA.md`.
-3. Leé la entrega pendiente en `PARA-PM.md` y la tarea/hilo activo en `PARA-DEV.md`.
-4. Abrí sólo las decisiones o documentos que esa situación cite.
-5. Contrastá afirmaciones importantes con Git, código y pruebas.
-6. Devolvé un parte corto: commit, semana/fase, tarea y responsable, última aceptación, bloqueo/decisión pendiente y próxima acción.
-7. Recién después revisá una entrega o emití una nueva tarea.
+3. `NOW.md` identifica la rama/SHA de la entrega pendiente. Si Dev todavía no está integrada, leé `PARA-PM.md` desde esa rama; no asumas que la copia de `main` es la última.
+4. Leé la tarea/hilo activo en `PARA-DEV.md`.
+5. Abrí sólo las decisiones o documentos que esa situación cite.
+6. Contrastá afirmaciones importantes con Git, código y pruebas.
+7. Devolvé un parte corto: commit, semana/fase, tarea y responsable, última aceptación, bloqueo/decisión pendiente y próxima acción.
+8. Recién después revisá una entrega o emití una nueva tarea.
 
 `AGENTS.md` resume este procedimiento para una sesión nueva.
 
@@ -135,7 +136,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 |---|---|
 | `NOW.md` | siempre: estado, bloqueos y próxima acción |
 | `CRONOGRAMA.md` | fases, fechas, puertas e hitos |
-| `PARA-PM.md` | entrega pendiente |
+| `PARA-PM.md` | entrega pendiente, en la rama que `NOW.md` indique |
 | `PARA-DEV.md` | tarea/hilo activo |
 | `CONTRATO.md` | alcance contractual |
 | `ALCANCE-Y-LIMITES.md` | límites e interpretaciones operativas |
