@@ -8,7 +8,8 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 rojo es el 131, el de Docker Alpine.** `a11y` y `contraste` quedaron verdes.
 
 - Base: `main` en `6d33962`; mi HEAD anterior, `ee166b4`.
-- Composición: `c0f42ac` · Puertas: `da9fbaf` · Compatibilidad: `3edef43`
+- Composición: `c0f42ac` · Puertas: `da9fbaf` · Compatibilidad: `3edef43` ·
+  Caso 168: `fcea099`
 - **En mi rama, no en `main`.** No reseteé ni reescribí `main`, no empujé nada
   ahí, no desplegué y no toqué Railway, datos remotos, secretos ni pagos.
 
@@ -98,21 +99,36 @@ prueba en el producto: es exactamente lo que le pasa a la API en cada despliegue
 `entorno_nativo.sh` estrena `--reiniciar-api` para no duplicar el comando de
 arranque, y la suite lo llama sólo si el 134 corrió y si la API es local.
 
-### 4. Un error mío, encontrado por la corrida completa
+### 4. Dos errores míos, encontrados por la corrida completa
 
-Al guardar el refresco del comprador de Mercado Pago sin sus credenciales, la
-renovación pasaba el token a una cuenta mientras el navegador seguía entrando
-con otra. El 165 fabricaba la orden de un comprador y miraba la de otro, así que
-«Calificar Vendedor» no aparecía nunca. Las cuatro cosas del comprador —token,
-refresco, identidad y credenciales— se mueven juntas desde ahora. Lo encontré
-porque el 165 pasó a rojo entre mi primera corrida completa y la segunda, no
-porque lo hubiera previsto.
+**El primero.** Al guardar el refresco del comprador de Mercado Pago sin sus
+credenciales, la renovación pasaba el token a una cuenta mientras el navegador
+seguía entrando con otra. El 165 fabricaba la orden de un comprador y miraba la
+de otro, así que «Calificar Vendedor» no aparecía nunca. Las cuatro cosas del
+comprador —token, refresco, identidad y credenciales— se mueven juntas desde
+ahora. Lo encontré porque el 165 pasó a rojo entre mi primera corrida completa y
+la segunda, no porque lo hubiera previsto.
+
+**El segundo, y es peor, porque era un verde que no medía nada.** El 168 —mi
+caso nuevo— afirmaba «No tenés notificaciones» sobre una bandeja que **nunca**
+está vacía: toda cuenta nueva nace con una notificación de bienvenida, y lo
+verifiqué en la base, una fila por cada cuenta que el caso creó. Pasaba igual
+porque el panel dibuja el vacío **mientras** pide la lista, y la espera lo
+pescaba en ese suspiro. En la corrida completa sobre el SHA final la respuesta
+volvió más rápido y el caso se cayó: el rojo tenía razón.
+
+Ahora el vacío se **fabrica** —se borra la bienvenida en la base descartable— y
+se espera la **respuesta** del GET de cada solapa antes de mirar la pantalla,
+contrastando además contra lo que contestó el servidor. Negativo: con una
+notificación metida a mano, antes seguía **verde**; ahora dice «la API devolvió 1
+notificaciones: la bandeja que este caso fabricó vacía no lo está».
 
 ### 5. Compuertas
 
 | Puerta | Resultado |
 | --- | --- |
 | Suite completa desde base limpia | **167/168**; sólo el 131 |
+| Corridas completas hechas | cuatro: dos para encontrar los rojos, una para confirmar y la del SHA final |
 | `npm run a11y -- --todas` | 64/64 pantallas, 0 violaciones |
 | `npm run contraste` | 0 incumplimientos, cobertura completa |
 | `npm run lint` · `npx tsc --noEmit` · `node --check scripts/smoke.mjs` · `diff-check` | verdes |
