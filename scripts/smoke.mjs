@@ -26579,6 +26579,26 @@ await runCase(168, 'Buscar es una acción, Contacto no promete planes, el Login 
     await page.locator('[class*="_submitButton_"][type="submit"]').click();
     await page.getByRole('button', { name: 'Mi cuenta' }).first().waitFor({ timeout: 25_000 });
 
+    // La bandeja vacía hay que FABRICARLA, no suponerla.
+    //
+    // Toda cuenta nueva nace con una notificación de bienvenida —medido:
+    // `notifications` tiene una fila «¡Bienvenido a AgroBoeda!» por cada cuenta
+    // que este caso creó—, así que «No tenés notificaciones» no es el estado de
+    // una cuenta recién registrada. El caso lo daba por verde igual porque el
+    // panel dibuja el vacío MIENTRAS pide la lista, y `esperarA` lo pescaba en
+    // ese suspiro: un verde que no medía nada, y que se cayó en la corrida
+    // completa cuando la respuesta volvió más rápido.
+    //
+    // Se borra la bienvenida en la base descartable, que es donde el arranque
+    // dice que se fabrican los estados que la API no ofrece.
+    const [cuentaNueva] = queryRows(
+      `SELECT id FROM users WHERE email = ${sqlLiteral(compradora)}`);
+    assert(cuentaNueva, 'la cuenta que este caso registró no quedó en la base');
+    querySql(`DELETE FROM notifications WHERE user_id = ${sqlLiteral(cuentaNueva[0])}`);
+    const [quedan] = queryRows(
+      `SELECT COUNT(*)::text, 'fin' FROM notifications WHERE user_id = ${sqlLiteral(cuentaNueva[0])}`);
+    assert(quedan[0] === '0', `la cuenta quedó con ${quedan[0]} notificaciones`);
+
     await page.getByRole('button', { name: /Carrito/ }).first().click();
     const carrito = page.getByRole('dialog', { name: 'Mi carrito' });
     await carrito.waitFor({ timeout: 20_000 });
@@ -26626,6 +26646,11 @@ await runCase(168, 'Buscar es una acción, Contacto no promete planes, el Login 
     // El rótulo de la solapa no es exacto a propósito: «Notificaciones» lleva
     // un contador al lado cuando hay sin leer, así que el nombre accesible es
     // «Notificaciones 1» y un `exact` acusaba de faltante una solapa que estaba.
+    const RUTA_DE_LA_SOLAPA = {
+      'Mis Compras': '/orders',
+      'Mis Ventas': '/orders',
+      Notificaciones: '/notifications',
+    };
     const solaparse = async (solapa) => {
       const boton = page.getByRole('button', { name: new RegExp(`^${solapa}`) }).first();
       try {
@@ -26641,9 +26666,35 @@ await runCase(168, 'Buscar es una acción, Contacto no promete planes, el Login 
       ['Mis Ventas', 'Todavía no tenés ventas'],
       ['Notificaciones', 'No tenés notificaciones'],
     ]) {
-      await solaparse(solapa);
-      await esperarA(async () => (await page.getByText(esperado, { exact: true }).count()) > 0,
-        `«${solapa}» no dice «${esperado}»`, 20_000);
+      // Se espera la RESPUESTA, no el dibujo.
+      //
+      // El panel pinta el vacío mientras pide la lista, así que preguntar «¿ya
+      // dice que no hay nada?» se cumple al instante con una bandeja que
+      // todavía no llegó. Medido: con una notificación metida a mano en la base,
+      // el caso seguía verde. Se espera el GET de esa solapa y recién ahí se
+      // mira, y para las notificaciones se contrasta además contra lo que el
+      // servidor contestó: la pantalla y la API tienen que decir lo mismo.
+      const pedido = RUTA_DE_LA_SOLAPA[solapa];
+      const [respuesta] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes(pedido)
+          && r.request().method() === 'GET' && r.status() === 200, { timeout: 25_000 }),
+        solaparse(solapa),
+      ]);
+      if (solapa === 'Notificaciones') {
+        const cuerpo = await respuesta.json().catch(() => null);
+        assert(cuerpo && Array.isArray(cuerpo.notifications) && cuerpo.notifications.length === 0,
+          `la API devolvió ${cuerpo?.notifications?.length} notificaciones: la bandeja que este `
+          + 'caso fabricó vacía no lo está, así que el vacío en pantalla no probaría nada');
+      }
+      // Y el rojo dice qué mostró la solapa, no sólo que se venció la espera.
+      try {
+        await esperarA(async () => (await page.getByText(esperado, { exact: true }).count()) > 0,
+          esperado, 20_000);
+      } catch {
+        const visto = (await page.locator('main, body').first().innerText())
+          .replace(/\s+/g, ' ').slice(0, 260);
+        throw new Error(`«${solapa}» no dice «${esperado}»; lo que muestra es «${visto}»`);
+      }
       sinTuteo(`Mi cuenta/${solapa}`, await page.locator('main, body').first().innerText());
     }
     medidos.push('Login, Quiénes somos, carrito, confirmación, Checkout y las tres solapas '
