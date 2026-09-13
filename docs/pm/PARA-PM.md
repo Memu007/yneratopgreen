@@ -2,161 +2,140 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## BACKUP-RESTORE-1 R2
+## BACKUP-RESTORE-1 R3
 
 | | |
 | --- | --- |
 | **Rama** | `claude/dev-role-repo-3l0kp3` |
-| **SHA base** | `24dcca8` |
-| **SHA candidato** | `b9d0036` |
-| **SHA R1, que no reescribí** | `79af761` (producto/arnés) y `2ffb08a` (informe) |
-| **HEAD de este informe** | el commit que trae este archivo |
-| **Diff total desde `24dcca8`** | `scripts/respaldo.sh`, `docs/RESPALDO_Y_RESTAURACION.md` y tres líneas de `.gitignore`. **No toca producto** |
-| **Estado** | en mi rama. No integré, no desplegué, no toqué Railway, datos remotos ni secretos. No abrí otra tarea |
+| **SHA base** | `24dcca8`; `origin/main` (`bd04587`) incorporado por merge, sin reescribir nada |
+| **SHA candidato** | `f3e9d54` |
+| **SHA anteriores, intactos** | `79af761`/`2ffb08a` (R1) y `b9d0036`/`6f02c32` (R2) |
+| **Diff total desde `24dcca8`** | `scripts/respaldo.sh`, `docs/RESPALDO_Y_RESTAURACION.md`, tres líneas de `.gitignore` y este canal. **No toca producto** |
+| **Estado** | en mi rama. No integré, no desplegué, no toqué Railway ni datos remotos. No abrí otra tarea |
+
+**Los cuatro defectos eran míos, y por la misma causa: escribí esa rama sin
+poder correrla.** Van corregidos de raíz, no parcheados.
 
 ---
 
-### Antes que nada: la devolución no es sobre mi entrega
+### 1. Nada se adivina
 
-La revisión R1 dice que revisó la candidata `5ae5572` y el informe `4636b23`.
-Esos dos commits **no son míos**:
+Tenías razón y lo confirmé contra el `docker-compose.yml`: los volúmenes se
+declaran `uploads_data` y `documentos_data`, y Compose les pone el prefijo del
+proyecto, así que esos nombres **no existen**. Montarlos habría creado volúmenes
+vacíos y los habría respaldado como si fueran el origen.
 
-```
-$ git branch -r --contains 5ae5572   → origin/codex/backup-restore-1
-$ git branch -r --contains 4636b23   → origin/codex/backup-restore-1
-$ git branch -r --contains 79af761   → origin/claude/dev-role-repo-3l0kp3
-```
-
-Hay otra entrega de `BACKUP-RESTORE-1`, en `origin/codex/backup-restore-1`, y es
-la que revisaste. Los identificadores que cita la devolución lo confirman:
-`data_roots` y `cleanup` no existen en mi guión —los míos son `respaldar`,
-`restaurar`, `verificar` y `limpiar`—; `grep -c 'data_roots\|cleanup'` sobre
-`scripts/respaldo.sh` da **0**.
-
-**Decidí vos cuál sigue.** Yo trabajé sobre la mía porque es la que puedo
-sostener con evidencia, pero tener dos implementaciones de la misma pieza es un
-problema de coordinación, no técnico.
-
-### Punto 1 del retorno: ya estaba
-
-`outbox` está en el bundle **desde R1**, no lo agregué ahora. En `79af761`:
-`CARPETAS_NATIVAS` incluye `backend/outbox`, la rama Docker lo copia aparte, y
-el positivo de R1 ya llevaba un marcador en las tres raíces. La huella de esta
-corrida lo muestra:
+**Ya no se nombra ningún volumen de origen.** Usuario, base, imagen y las tres
+rutas del almacenamiento salen de `docker inspect` sobre los contenedores en
+marcha:
 
 ```
-documentos/marcador-respaldo.txt
-outbox/marcador-respaldo.txt
-uploads/marcador-respaldo.txt
+POSTGRES_USER, POSTGRES_DB   ← inspect topgreen-db
+Config.Image                 ← inspect topgreen-db
+UPLOAD_DIR, DOCUMENTOS_DIR,
+EMAIL_OUTBOX_DIR             ← inspect topgreen-api
 ```
 
-Lo que sí agregué es decir **de dónde sale en cada entorno**, que era lo otro
-que pedías: en el lanzador local el outbox no es un volumen sino el montaje
-`./backend/outbox → /app/outbox`, así que se copia del anfitrión; en producción
-vive dentro del volumen de `/data` (`EMAIL_OUTBOX_DIR=/data/outbox`) y entra por
-la copia de volúmenes. Está en el comentario del código y en el procedimiento.
-No toqué el compose ni el producto para acomodar la prueba.
+Y una ruta relativa se resuelve contra el `WorkingDir` del contenedor, que es
+justo el caso del outbox: `EMAIL_OUTBOX_DIR=outbox` sobre `/app`. Por eso la
+misma pieza sirve en un entorno donde el outbox está en el volumen de `/data`:
+la ruta la dice la aplicación, no yo.
 
-### Punto 2 del retorno: tenías razón, y valía para la mía también
+### 2. El destino ya no vive dentro del origen
 
-Mi `limpiar` se apoyaba en el patrón del nombre. Eso no prueba propiedad, tal
-cual lo escribiste. Corregido:
+Crear `topgreen_restore_*` adentro de `topgreen-db` escribía en el volumen que
+esta pieza tiene que proteger. Ahora el destino es **otro contenedor sobre otro
+volumen**: `topgreen-restore-<sello>-db` y `topgreen-restore-<sello>-datos`.
+Y la verificación suma una comprobación nueva: que dentro de `topgreen-db` **no
+haya aparecido ninguna base de restauración**.
 
-- al restaurar, cada destino queda **firmado** con un identificador de
-  ejecución: una fila en `respaldo_meta.propiedad` dentro de la base y un
-  archivo `.propiedad` en el directorio. El esquema es aparte de `public` a
-  propósito, para no ensuciar los datos restaurados ni la comparación;
-- `limpiar` exige **las dos firmas y que coincidan entre sí**. Si falta una, si
-  está vacía o si la base no lleva la ejecución que dice el directorio, frena y
-  no borra nada. El patrón del nombre sigue, pero ahora es lo primero de tres,
-  no lo único.
+### 3. Usuario, imagen y credencial
 
-**Negativo de propiedad, medido.** Creé a mano una base `topgreen_restore_
-20260101_000000` con datos adentro y un directorio con el nombre que la pieza
-usaría:
+El usuario es el que declara `POSTGRES_USER` —nunca más `postgres`—, y el
+clúster de destino se levanta con **la misma imagen que ya sirve el origen**,
+leída del contenedor real: por definición está en la máquina. La credencial de
+ese contenedor se genera en la corrida, es local y efímera, y no se escribe en
+el bundle, ni en el manifiesto, ni acá.
 
-```
-a) sin firma:
-   ERROR: respaldos/destino-20260101_000000 no lleva la firma de esta pieza.
-          No se borra nada.
-b) con firma FALSIFICADA en el directorio y base sin firmar:
-   ERROR: la base topgreen_restore_20260101_000000 no lleva la firma
-          deadbeefdeadbeefdeadbeef: no la creó esta ejecución. No se borra nada.
-¿sobrevivió?  «esto no es de la pieza» y no-es-mio.txt, intactos
-```
+### 4. Sin imagen auxiliar
 
-Después lo retiré con un comando explícito y acotado: `DROP DATABASE
-"topgreen_restore_20260101_000000"` y `rm -rf` de ese único directorio. Y el
-destino legítimo, el firmado, sí se limpia: «borrados … los dos firmados con
-`f908a60a…`; nada más se tocó».
+`alpine:3` desapareció. Los archivos se copian con `docker cp`, que no necesita
+herramientas adentro del contenedor. **La ruta no dispara ninguna descarga.**
 
-### Un tercer defecto, que encontré yo y era el que te iba a romper la corrida
+### 5. Etiquetas, no nombres
 
-Al comprobar `sh -n` me puse a mirar qué herramientas usa el guión, y la huella
-dependía de **utilidades que en macOS no existen**: `sha256sum` —ahí es `shasum
--a 256`—, `find -printf`, `stat -c` y `xargs -r`, todas GNU. Con Docker el
-`docker run` corre en el contenedor, pero la huella de los archivos se calcula
-en tu anfitrión: te habría fallado la primera vez. Ahora se resuelve una sola
-vez al arrancar y el resto del guión no se entera; los tamaños salen de `wc -c`
-en lotes, que es POSIX. Misma huella, sobre los mismos 2836 archivos.
+Cada contenedor y cada volumen que crea la pieza llevan `topgreen.respaldo=pieza`
+y `topgreen.respaldo.ejecucion=<id>`, y `limpiar` comprueba la etiqueta de
+**cada** recurso antes de borrarlo, además de las firmas que ya tenía.
 
-Sobre `sh -n`: el guión declara `#!/usr/bin/env bash` y usa arreglos, así que
-`sh -n` marca la línea 110 —igual que marcaría cualquier bash con arreglos—. La
-compuerta que corresponde es **`bash -n`, y está verde**. Si querés que sea
-POSIX puro se puede, pero hay que sacar los arreglos; decime.
+### 6. Un defecto más, que encontré yo
 
-### Positivo completo, sobre `b9d0036`
+Una restauración que se caía a la mitad dejaba el contenedor y el volumen
+colgados, y el próximo intento chocaba con ellos. Ahora se retiran solos. Ahí no
+se comprueban etiquetas a propósito: se borra exactamente lo que esa misma
+ejecución acaba de crear y anotó.
+
+---
+
+## Lo que pude probar, y lo que no
+
+**No tengo demonio de Docker.** No pude correr la evidencia 2 a 5 que pedís
+contra los contenedores reales, y no la voy a declarar corrida.
+
+Lo que sí hice, para no entregarte otra vez código que no vi funcionar: **armé
+un doble del demonio** —fuera del repositorio, en mi carpeta de trabajo— que
+responde `inspect`, `cp`, `run`, `exec`, `volume` y `rm` con la forma real, y
+apoya las bases del «contenedor» de destino en el PostgreSQL nativo. Con eso
+corrí el ciclo Docker entero:
 
 ```
-$ ./scripts/respaldo.sh respaldar          → respaldos/20260913_201105
-     2836 archivos y 23 tablas en la huella
-$ ./scripts/respaldo.sh restaurar …        → destino 20260913_201108
-$ ./scripts/respaldo.sh verificar … 
-  ✓ el bundle coincide con sus checksums
-  ✓ la base restaurada coincide con la del respaldo
-  ✓ los archivos restaurados coinciden con los del respaldo
-  ✓ el origen conserva la identidad que tenía al respaldar
-  ✓ la API de origen sigue contestando          (código 0)
+respaldar  → bundle con "entorno_de_origen": "docker", los tres marcadores adentro
+restaurar  → contenedor topgreen-restore-<sello>-db · volumen …-datos
+verificar  → ✓ checksums · ✓ base · ✓ archivos · ✓ origen sin moverse
+             ✓ topgreen-db y topgreen-api en marcha
+             ✓ topgreen-db no tiene ninguna base de restauración adentro
+integridad → rojo con la ruta y los dos sha256
+propiedad  → contenedor y volumen homónimos SIN etiqueta: «no lleva la etiqueta
+             topgreen.respaldo.ejecucion=… (dice «nada»). No se borra nada.»
+             y los dos sobreviven
+limpiar    → borra los dos, etiquetados, y nada más
+rescate    → con pg_isready roto a propósito: «la restauración quedó a medias;
+             se retira lo que había creado» y no queda nada colgado
 ```
 
-Y del otro lado, las tres filas del marcador —con la ñ y los acentos— y los
-tres `marcador-respaldo.txt`, uno por raíz.
+**Qué prueba eso y qué no.** Prueba el flujo, los argumentos, el orden de las
+llamadas y toda la lógica que no es Docker —descubrimiento, huella, comparación,
+firmas, etiquetas, rescate—. **No prueba la semántica real de Docker**: si
+`docker cp -a` no le gusta a tu versión, si el `postgis/postgis` de destino
+tarda distinto o si `docker inspect -f` devuelve otra cosa, lo vas a ver vos y
+no yo. El doble encontró dos cosas igual: un mensaje que decía «base
+topgreen_restore_…» cuando en Docker el destino es un contenedor, y el defecto
+del punto 6.
 
-### Negativos de integridad, otra vez sobre este SHA
-
-| Sabotaje | Resultado |
-| --- | --- |
-| archivo alterado | rojo, con ruta, tamaño 38 → 25 y otro sha256 |
-| archivo ausente | rojo, con la línea que falta |
-| fila cambiada, misma cantidad | rojo: `respaldo_marcador 3 cfb39a0…` → `3 dddf39f…` |
-| bundle adulterado | `restaurar` se niega: «no coincide con sus checksums» |
-
-### Origen, antes y después
-
-Idéntico: la huella del origen al terminar es la misma que guardó el bundle, la
-única base que queda es `topgreen`, la API contesta 200 y los tres directorios
-tienen los archivos que tenían. Retiré los marcadores y el destino de prueba.
+**La ruta nativa, que comparte casi todo el código, sí la corrí entera** después
+de la corrección: positivo verde, negativo de integridad rojo, negativo de
+propiedad frenando sin borrar, limpieza y origen idéntico. Era la condición que
+pusiste para no repetirla.
 
 ### Compuertas
 
 | Puerta | Resultado |
 | --- | --- |
-| Positivo completo | verde |
-| Cuatro negativos de integridad | rojos |
-| Negativo de propiedad, dos variantes | frena sin borrar; el ajeno sobrevive |
 | `bash -n` · `diff-check` | verdes |
-| `sh -n` | marca un arreglo de bash en la línea 110; el guión es bash |
-| Suite funcional completa | **no corrida**, como pediste |
+| Ciclo nativo completo tras la corrección | verde, con sus dos negativos |
+| Ciclo Docker contra un doble del demonio | verde, con integridad, propiedad y rescate |
+| Ciclo Docker contra Docker real | **no corrido**: acá no hay demonio |
+| Suite funcional | no corrida, como pediste |
 
-### Lo que sigue sin correr
+### Lo que te pido
 
-La ruta Docker. Acá el `docker` del PATH es el puente del repositorio y no hay
-demonio, así que no pude crear el contenedor ni los volúmenes de destino. Con la
-corrección de portabilidad tiene bastante menos superficie para romperse, pero
-**no la ejecuté**: la tenés que demostrar vos sobre este SHA. Y sigue en pie la
-pregunta de R1: la copia de volúmenes usa `docker run --rm -v <volumen>:/origen:
-ro` sobre `alpine:3`; si no querés que se baje esa imagen, lo cambio por
-`docker cp`.
+Una de dos, la que prefieras:
+
+1. **Corrés vos la evidencia 2 a 5** sobre `f3e9d54` y me devolvés lo que falle;
+   o
+2. **me das un entorno con demonio de Docker** y la corro yo. Es la tercera
+   vuelta de la misma pieza y las tres devoluciones fueron por lo mismo: escribo
+   una ruta que no puedo ejecutar. Mientras eso no cambie, el ciclo se repite.
 
 ### Lo que sigue esperando tu palabra
 
