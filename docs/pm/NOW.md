@@ -10,7 +10,7 @@ Actualizado: 2026-09-13.
 - **`main`:** sin cambios de producto desde `3064f10`; el delta actual es sólo documentación PM. Sigue conectado al auto-deploy de Railway, por lo que no se integra producto ahí todavía.
 - **Rama Dev:** `claude/dev-role-repo-3l0kp3`, HEAD de informe `ad914a3`; candidata de producto/arnés `c565e6e`, aceptada en rama y no integrada ni desplegada.
 - **Última decisión PM:** `INTEGRATION-CANDIDATE-1` **ACEPTADA** en revisión 3. La composición queda congelada en `c565e6e`; no autoriza integración ni despliegue.
-- **Tarea activa:** `BACKUP-RESTORE-1`, responsable Dev. Debe dejar un mecanismo reproducible de backup/restauración de PostGIS y `/data`, demostrarlo sobre datos locales descartables y documentar la ejecución en Railway sin tocar el entorno remoto. No autoriza integración, despliegue ni gasto.
+- **Tarea activa:** `AGENTS-CONSOLIDATION-1`, responsable Dev. Debe preparar desde `main` una pieza exclusivamente documental que lleve el disparador consolidado de `c565e6e` y preserve la sección local de eficiencia de chats. No autoriza producto, integración de la candidata ni despliegue.
 
 ## Última aceptación PM relevante
 
@@ -28,7 +28,10 @@ La composición candidata queda **aceptada** en `c565e6e`. La evidencia independ
 - focal 169 PM sobre `c565e6e`, desde otra base Docker limpia: **1/1**. Los tres negativos rechazaron identidad sin cambio, servicio no identificable y puerto servido por otro proceso; el camino real cambió `topgreen-api` de PID `45076` a `45360` y también cambió `StartedAt`;
 - sintaxis de `smoke.mjs` y `diff-check`: verdes. A11y y contraste ya habían quedado verdes en `e0cdfe9` y no se repitieron porque el delta R3 sólo toca el caso 169.
 
-La suma de la corrida completa y el focal sobre el único delta cubre los **169 casos** de la candidata final. Log de la suite completa PM: `/Users/Emi/.codex/visualizations/2026/09/12/01a097e2-a20d-77a1-b8f3-970edbda5495/topgreen-pm-integration-r2-suite-e0cdfe9.log`.
+La suma de la corrida completa y el focal sobre el único delta cubre los **169
+casos** de la candidata final. La evidencia durable son los SHA, resultados y
+negativos anteriores; los logs locales fueron apoyo de revisión y no son una
+dependencia recuperable del cierre.
 
 La deuda de composición quedó cerrada: `c565e6e` incorpora `main` y el trabajo
 aceptado, y ya no hay diferencias de prueba sin clasificar. El SHA queda
@@ -36,6 +39,22 @@ congelado; un commit documental nuevo en `main` no lo invalida, pero cualquier
 cambio de producto exige recomposición y prueba antes de integrar.
 
 El inventario confirmó que `main` es hoy la rama de producción de ambos servicios y que el auto-deploy está activo sin esperar CI. Por eso **no se adopta todavía** `main = integración`: la composición candidata se prepara y prueba en la rama Dev. La migración recomendada a `main = integración aceptada` / `release = producción` queda retenida hasta resolver backups y ejecutar un cambio operativo controlado; si se adopta, `release` sólo puede avanzar a un SHA ya contenido en `main` y no lleva commits exclusivos.
+
+## Pendientes canónicos adoptados
+
+- **Relevo:** `main` todavía conserva el `AGENTS.md` anterior y la consolidación
+  vive sólo en `c565e6e`. Además, el árbol de Emi tiene una sección local sin
+  commit sobre eficiencia de chats. `AGENTS-CONSOLIDATION-1` debe producir desde
+  `main` un archivo único que combine ambos cambios sin tocar producto.
+- **Carrito conservado:** si una sesión inválida deja ítems locales, la persona
+  debe poder reabrir el carrito sin sesión; continuar compra abre el Login y
+  conserva la intención. Decisión registrada en `DECISIONS.md` y ejecución en
+  `POST-INTEGRATION-CLEAR-1`, después de integrar la candidata.
+- **FAQ de pagos:** «¿Cuáles son las formas de pago?» debe mencionar
+  transferencia directa y Mercado Pago cuando el vendedor lo tenga habilitado.
+  Se corrige en la misma pieza posterior, sin reabrir `c565e6e`.
+- **Backup/restauración:** `BACKUP-RESTORE-1` queda en cola inmediatamente
+  después de la consolidación de `AGENTS.md`.
 
 ## Railway — inventario 2026-09-12 y deuda viva
 
@@ -99,9 +118,10 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Mantener congelada `c565e6e`: no integrar ni desplegar mientras `main` siga conectado al auto-deploy sin backups.
-2. Dev entrega `BACKUP-RESTORE-1`; PM reproduce una restauración local completa y clasifica cualquier dependencia externa.
-3. Emi autoriza la opción de backup administrado/costo y la operación remota; se ensaya una restauración recuperable antes de usar datos reales.
-4. Ejecutar de forma controlada la separación `main`/`release` e integrar exactamente la candidata aceptada; cualquier cambio de producto exige recomposición y prueba.
-5. Con la integración convergida, abrir `CAT-PAGE-1` y continuar el roadmap contractual.
-6. Mercado Pago, red-team y producción permanecen al final de la secuencia acordada, sin esperar artificialmente a una fecha si las dependencias ya están listas.
+1. Dev entrega `AGENTS-CONSOLIDATION-1` desde `main`; PM revisa el diff y recién entonces autoriza su integración documental.
+2. Mantener congelada `c565e6e`: no integrar ni desplegar mientras `main` siga conectado al auto-deploy sin backups.
+3. Dev entrega `BACKUP-RESTORE-1`; PM reproduce una restauración local completa y clasifica cualquier dependencia externa.
+4. Emi autoriza la opción de backup administrado/costo y la operación remota; se ensaya una restauración recuperable antes de usar datos reales.
+5. Ejecutar de forma controlada la separación `main`/`release` e integrar exactamente la candidata aceptada; cualquier cambio de producto exige recomposición y prueba.
+6. Ejecutar `POST-INTEGRATION-CLEAR-1` y después abrir `CAT-PAGE-1` para continuar el roadmap contractual.
+7. Mercado Pago, red-team y producción permanecen al final de la secuencia acordada, sin esperar artificialmente a una fecha si las dependencias ya están listas.

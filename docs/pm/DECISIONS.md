@@ -5,6 +5,22 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-09-13 — El carrito conservado sigue accesible y la FAQ enumera los medios reales
+
+Cuando una sesión se confirma inválida, el carrito local conserva sus ítems. Si
+la persona cierra esa capa, la cabecera debe seguir ofreciendo **Carrito**
+mientras tenga contenido, aunque ya no haya sesión. Esto no habilita checkout
+anónimo: continuar la compra abre el ingreso existente y, al autenticar, vuelve
+al mismo carrito. Una salida explícita conserva la regla vigente de vaciarlo.
+
+La FAQ «¿Cuáles son las formas de pago?» debe nombrar las dos posibilidades
+reales: transferencia directa al vendedor y Mercado Pago cuando ese vendedor lo
+tenga habilitado. No promete que todos los vendedores ofrezcan ambos medios ni
+inventa comisiones, planes o custodia de fondos por AgroBoeda.
+
+Ambos ajustes quedan en `POST-INTEGRATION-CLEAR-1`, después de integrar la
+candidata congelada. No modifican `c565e6e` ni interrumpen la puerta operativa.
+
 ## 2026-09-07 — Cuenta AgroBoeda de evaluación, común y sólo sembrada en local
 
 Emi pidió las credenciales exactas `pruba@agroboeda.com` / `@agroboeda` para

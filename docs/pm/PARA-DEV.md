@@ -13,99 +13,70 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
-## 2026-09-13 — BACKUP-RESTORE-1
+## 2026-09-13 — AGENTS-CONSOLIDATION-1
 
 `INTEGRATION-CANDIDATE-1` quedó **aceptada** en `c565e6e`, con informe
-`ad914a3`. Ese SHA queda congelado y no se integra todavía. La siguiente puerta
-es demostrar que los datos pueden recuperarse antes de cambiar ramas o publicar
-la composición.
+`ad914a3`. Después de tu informe, `main` avanzó y tu rama remota todavía no
+incorporó las decisiones PM nuevas. Primero actualizá referencias y leé este
+archivo desde `origin/main`. Si tu copia dice «sin tarea activa», está vieja.
 
 ### Problema y prioridad
 
-Railway conserva hoy PostGIS y `/data` en volúmenes, pero no tiene backups/PITR
-activos ni una restauración ensayada. Persistencia no es backup. Sin una copia
-recuperable, una migración, un error operativo o la pérdida de un volumen puede
-dejar el entorno sin vuelta segura. Esta puerta precede a la separación
-`main`/`release` y a la integración de `c565e6e`.
-
-### Objetivo
-
-Dejá en el repositorio un mecanismo pequeño y reproducible para:
-
-1. generar un backup lógico de PostgreSQL/PostGIS y una copia íntegra de los
-   archivos persistentes de `/data`;
-2. restaurarlos en un entorno local descartable y separado;
-3. verificar que base, extensión PostGIS, revisión Alembic y archivos coinciden;
-4. documentar el procedimiento equivalente para Railway y señalar exactamente
-   qué paso requiere plan, credenciales o autorización de Emi.
+La consolidación de `AGENTS.md` que ya preparaste vive sólo dentro de la
+candidata congelada. `main` conserva el disparador anterior y duplica una
+precedencia que contradice la autoridad por tipo de pregunta fijada en
+`ONBOARDING-PM.md`. Además, el árbol de Emi agrega una sección de eficiencia de
+chats que no se puede perder. Cada rol nuevo lee este archivo antes de llegar al
+onboarding, por eso se cierra antes de la pieza de backups.
 
 ### Alcance
 
-- Usá herramientas estándar de PostgreSQL (`pg_dump`/`pg_restore` o equivalente
-  justificado) y formatos verificables. No agregues una dependencia de aplicación.
-- Incluí todo `/data`: imágenes públicas, documentos privados y outbox actual.
-- Generá un manifiesto sin secretos con fecha, formato, versión de PostgreSQL,
-  revisión Alembic, archivos incluidos y hashes necesarios para detectar una
-  copia incompleta o corrupta.
-- Los artefactos de backup contienen datos sensibles: deben quedar fuera de Git,
-  con permisos locales restrictivos y una ruta de salida explícita. Agregá las
-  exclusiones mínimas que falten.
-- La clave `MP_TOKEN_KEY` y las demás variables no viajan dentro del backup.
-  El runbook debe enumerar qué secretos externos hacen falta para que una
-  restauración sea operativa, sin copiar valores ni mostrarlos en logs.
-- Corregí únicamente documentación de backup que hoy contradiga el stack real.
-  En particular, no perpetúes las instrucciones SQL Server obsoletas de
-  `docs/DATABASE.md`.
+Prepará una rama/commit documental limpio **desde `origin/main` vigente**, no
+desde la composición de producto. El `AGENTS.md` resultante debe:
+
+1. conservar la versión consolidada de `c565e6e`: disparador breve, enlaces a
+   `ONBOARDING-PM.md` y `ONBOARDING-DEV.md`, sin duplicar procedimiento ni una
+   precedencia única;
+2. conservar al final, sin cambiar su sentido, esta regla local de Emi:
+
+   > Avisale a Emi cuando convenga continuar en un chat nuevo para no cargar
+   > contexto innecesario, especialmente al cerrar una tarea, cambiar de rol o
+   > empezar un bloque que ya no necesita el historial actual. No interrumpas
+   > una tarea activa sólo por la longitud del chat. Antes de recomendar el
+   > cambio, dejá el estado vigente guardado en el repositorio y entregá un
+   > relevo breve listo para retomar.
+
+3. no tocar ningún otro archivo salvo el informe breve en `PARA-PM.md`.
 
 ### Fuera de alcance
 
-- No tocar Railway, GitHub settings, dominios, servicios, volúmenes remotos,
-  datos remotos, planes ni facturación.
-- No integrar ni desplegar `c565e6e`, no crear todavía `release` y no cambiar el
-  auto-deploy.
-- No hacer una migración de esquema, no cambiar producto y no empezar
-  `CAT-PAGE-1`.
-- No guardar dumps, archivos reales, secretos, tokens ni datos personales en Git.
+- No mezclar ni integrar `c565e6e`, no tocar producto, scripts, dependencias,
+  Railway, GitHub settings ni ramas de despliegue.
+- No empezar `BACKUP-RESTORE-1`, `POST-INTEGRATION-CLEAR-1` ni `CAT-PAGE-1`.
+- No hacer push a `main`. Esta entrega es una candidata documental para revisión
+  PM; la autorización de integración viene después.
 
-### Criterios de aceptación ejecutables
+### Criterios de aceptación
 
-1. Desde una base local descartable con PostGIS y datos conocidos, el backup
-   termina con salida 0 y produce DB, archivos y manifiesto fuera del repositorio.
-2. La restauración se hace en un destino local limpio y distinto del origen; no
-   vale restaurar encima y leer los mismos volúmenes.
-3. La evidencia compara antes/después: revisión Alembic, extensión PostGIS, al
-   menos conteos de tablas representativas y hashes de un archivo público y uno
-   privado. Todo coincide.
-4. Un backup incompleto o con hash alterado da rojo antes de declarar éxito.
-5. Ningún comando imprime contraseñas, URLs con credenciales, claves ni contenido
-   sensible. Los artefactos quedan con acceso restringido y Git no los ofrece.
-6. La documentación distingue: backup lógico, snapshot/backup administrado del
-   proveedor y copia del volumen `/data`. No presenta uno como sustituto de los
-   otros y contiene pasos de restauración, no sólo de creación.
-7. El árbol queda limpio salvo los archivos intencionales; `diff-check`, sintaxis
-   de los scripts y cualquier prueba focal agregada quedan verdes.
-
-### Evidencia que tenés que leer
-
-- `docs/pm/NOW.md`, sección Railway y próxima secuencia.
-- `docs/pm/ALCANCE-Y-LIMITES.md`, infraestructura y hosting.
-- `docs/pm/DECISIONS.md`, decisión de Railway y condiciones de producción.
-- `RAILWAY.md`, `docker-compose.yml`, `backend/app/core/cifrado.py` y
-  `docs/DATABASE.md`.
+1. El commit candidato tiene como base el `origin/main` vigente y el diff total
+   fuera de `AGENTS.md` y `docs/pm/PARA-PM.md` está vacío.
+2. `AGENTS.md` no contiene el procedimiento numerado viejo ni una lista global
+   de precedencia; sí enlaza los dos onboardings y conserva las tres reglas
+   mínimas de la consolidación.
+3. La sección de eficiencia anterior queda presente y no obliga a cambiar de
+   chat por rutina: sólo se recomienda cuando conviene y con estado ya guardado.
+4. Todos los enlaces locales del archivo existen y `diff-check` queda limpio.
 
 ### Frená y consultá si
 
-- el mecanismo exige una credencial real, acceso remoto, compra o cambio en
-  Railway;
-- para restaurar necesitás destruir un volumen que no creaste vos como
-  descartable;
-- encontrás datos o credenciales reales en el repositorio o en la evidencia;
-- la restauración exige cambiar esquema o producto.
+- no podés construir la pieza desde `origin/main` sin arrastrar producto de la
+  candidata;
+- `origin/main` contiene otra edición ya comprometida de `AGENTS.md` que no esté
+  descripta en esta tarea;
+- el diff incluye cualquier archivo no autorizado.
 
 ### Entrega
 
-Trabajá después de `ad914a3`, preservando `c565e6e` como candidata aceptada.
-Entregá un SHA único y reemplazá `PARA-PM.md` con un informe breve: cambio,
-comandos reproducibles, rojo discriminante, verde de backup→destrucción del
-destino→restore→comparación, riesgos pendientes y commit. No integres ni
-despliegues; frená al entregar para que la PM repita la restauración.
+Entregá rama, base exacta, SHA candidato, diff completo y `diff-check`.
+Reemplazá `PARA-PM.md` en esa misma rama con un informe breve. No integres ni
+despliegues; frená para revisión PM.
