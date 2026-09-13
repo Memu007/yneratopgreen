@@ -8,9 +8,9 @@ Actualizado: 2026-09-13.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 4. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
 - **`main`:** `24dcca8`; producto integrado en `b8447a3` y cierre PM documental posterior. Incluye el `AGENTS.md` consolidado y preserva la regla local de eficiencia de chats.
-- **Rama Dev:** `codex/backup-restore-1`, informe `4636b23`; candidata R1 `5ae5572`, devuelta para corrección y no integrada.
-- **Última decisión PM:** `BACKUP-RESTORE-1` R1 **DEVUELTA**. El bundle omite `/data/outbox` y `cleanup` demostró que puede borrar un volumen ajeno sin etiqueta sólo por coincidir el nombre.
-- **Tarea activa:** `BACKUP-RESTORE-1` R2, responsable Dev. Debe cubrir todas las raíces persistentes y demostrar propiedad de cada recurso antes de limpiarlo, sin tocar Railway ni datos remotos.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, informe R2 `6f02c32`; candidata `b9d0036`, devuelta y no integrada. La rama paralela `codex/backup-restore-1` queda descartada por duplicación.
+- **Última decisión PM:** `BACKUP-RESTORE-1` R2 **DEVUELTA**. `outbox` y la guarda de propiedad avanzaron, pero Docker apunta a volúmenes inexistentes, usa un rol ausente y restaura dentro del clúster de origen en vez de aislar el destino.
+- **Tarea activa:** `BACKUP-RESTORE-1` R3, responsable Dev. Debe corregir y ejecutar la ruta Docker en contenedores/volúmenes nuevos, sin tocar Railway ni datos remotos.
 
 ## Última aceptación PM relevante
 

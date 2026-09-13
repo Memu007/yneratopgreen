@@ -136,3 +136,64 @@ estas dos raíces sobre la misma rama:
 
 No corras suite funcional completa. No integres, no despliegues y no abras otra
 tarea. Entregá nuevos SHA de producto/arnés e informe; no reescribas los SHA R1.
+
+---
+
+## Revisión PM R2 — DEVOLVER
+
+Tomo como candidata canónica la rama histórica
+`claude/dev-role-repo-3l0kp3`: `b9d0036`, informe `6f02c32`. La entrega paralela
+`codex/backup-restore-1` fue un error de coordinación PM y queda descartada; no
+mezcles código de esa rama.
+
+Quedan **aceptadas dentro de la pieza**, sin pedir otra reescritura por sí
+solas, la inclusión de `outbox`, la portabilidad macOS/Linux, los negativos de
+integridad y el principio de comprobar propiedad antes de limpiar.
+
+La ruta Docker sigue bloqueada y no se acepta por inspección reproducible:
+
+1. `VOLUMENES_DOCKER=(uploads_data ... documentos_data ...)` no identifica los
+   volúmenes reales. PM verificó que esos nombres no existen; los montajes de
+   `topgreen-api` llevan el prefijo del proyecto Compose. Ejecutar el código
+   actual crearía volúmenes vacíos con esos nombres y los respaldaría como si
+   fueran el origen.
+2. `restaurar` crea `topgreen_restore_*` **dentro de `topgreen-db`**. Eso
+   modifica el clúster y volumen de origen y contradice el criterio explícito de
+   contenedor y volumen nuevos y aislados. `limpiar` luego vuelve a operar sobre
+   ese mismo origen.
+3. La ruta usa `psql -U postgres`, pero PM comprobó que el contenedor real tiene
+   `POSTGRES_USER=topgreen` y que el rol `postgres` no existe. La restauración
+   falla antes de poder verificarse.
+4. `alpine:3` no es una dependencia necesaria y puede provocar un pull. Usá
+   `docker exec`/`docker cp`/`tar` o las imágenes locales ya presentes; no
+   descargues una imagen auxiliar.
+
+### Corrección R3
+
+- Incorporá `origin/main` sin reescribir los SHA anteriores y preservá completo
+  este canal PM.
+- En modo Docker descubrí el origen desde los contenedores/montajes reales o
+  copiá las tres raíces por el contenedor; no adivines nombres de volumen.
+- Restaurá PostgreSQL/PostGIS en **otro contenedor con otro volumen** y los tres
+  árboles en recursos de destino separados del origen. Tomá imagen, usuario y
+  nombre de base del contenedor real; la credencial del destino debe ser local
+  y efímera, no escrita en bundle ni informe.
+- Etiquetá cada contenedor/volumen creado con una marca estable de la pieza y un
+  id de ejecución. `limpiar` debe validar esas etiquetas antes de cada borrado.
+- Corregí requisitos/documentación para reflejar las herramientas realmente
+  admitidas (`shasum` o `sha256sum`) y que la ruta no hace pulls.
+
+### Evidencia R3 exigida
+
+1. `bash -n` y `diff-check` verdes.
+2. Corrida Docker completa sobre los contenedores actuales: backup, restore,
+   verify, negativo de integridad y cleanup.
+3. Los tres marcadores (`uploads`, `documentos`, `outbox`) aparecen restaurados.
+4. Un recurso homónimo sin etiquetas sobrevive y `cleanup` falla sin borrar
+   ningún recurso.
+5. IDs, montajes/fingerprint y salud de `topgreen-db` y `topgreen-api` coinciden
+   antes/después; no queda ninguna base extra dentro de `topgreen-db` ni ningún
+   destino de prueba.
+
+No repitas la suite funcional ni la ruta nativa salvo que la corrección comparta
+lógica y la rompa. No integres, no despliegues y no abras otra tarea.
