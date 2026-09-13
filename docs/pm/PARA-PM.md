@@ -2,26 +2,24 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## INTEGRATION-CANDIDATE-1 R2 — las cuatro correcciones
+## INTEGRATION-CANDIDATE-1 R2
 
-**Resultado: suite completa 168/169 desde base limpia; el único rojo es el 131,
-el de Docker Alpine.** `a11y` 64/64 pantallas sin violaciones bloqueantes y
-`contraste` 54/54 mediciones con 0 incumplimientos. 114, 167 y 168 pasan en la
-corrida completa y también aislados.
+| | |
+| --- | --- |
+| **Rama** | `claude/dev-role-repo-3l0kp3` |
+| **HEAD de este informe** | el commit que trae este archivo, o sea la punta de la rama |
+| **SHA candidato — producto y arnés** | `e0cdfe9` |
+| **SHA efectivamente probado** | `e0cdfe9` |
+| **Resultado** | suite completa **168/169** desde base limpia; único rojo, el 131 (Docker). `a11y` 68/68 pantallas, 0 bloqueantes. `contraste` 76/76 mediciones, 0 incumplimientos |
+| **Delta posterior al SHA probado** | sólo este documento: `git diff --stat e0cdfe9 HEAD -- . ':!docs/'` sale vacío |
+| **Base** | `main` en `c10edbc`, ya incorporado |
+| **Estado** | en mi rama. No integré, no desplegué, no toqué Railway, datos remotos, secretos ni pagos. No empecé `CAT-PAGE-1` |
 
-- Base: `main` en `3064f10`, ya incorporado a mi rama. Candidata devuelta:
-  `fcea099`.
-- Commits: contraste `d888969` · arnés `abdf23a` · este informe.
-- **En mi rama, no en `main`.** No integré, no desplegué y no toqué Railway,
-  datos remotos, secretos ni pagos. No empecé `CAT-PAGE-1`.
-- **La suite pasó de 168 a 169 casos.** El 169 es la regresión del punto 1.
-- **Acá no hay demonio de Docker**: el puente del repositorio traduce
-  `docker exec` y nada más. Todo lo que informo corrió sobre la API nativa. La
-  ruta Docker de punta a punta la tenés que correr vos sobre este mismo SHA; lo
-  que sí probé de esa ruta está en el punto 1.
+**La suite pasó de 168 a 169 casos**: el 169 es la regresión del reinicio.
 
-Este archivo queda con este informe y nada más, como pediste. LOGO, la cuenta de
-prueba y los informes anteriores siguen en Git.
+**Acá no hay demonio de Docker**: el puente del repositorio traduce `docker
+exec` y nada más. Todo lo que informo corrió sobre la API nativa; la ruta Docker
+de punta a punta la corrés vos sobre este mismo SHA.
 
 ---
 
@@ -47,8 +45,8 @@ proceso, o falla:
   justamente el caso que anunciaba éxito.
 
 La suite ya no anuncia el aislamiento por su cuenta: informa lo que el comando
-devolvió, y cuando falla imprime su motivo textual. En esta corrida la línea
-dice `uvicorn: [7381] -> [12712]`.
+devolvió, y cuando falla imprime su motivo. En esta corrida la línea dice
+`uvicorn: [30829] -> [3754]`.
 
 **Caso 169, nuevo.** Le arma al comando esos tres entornos con dobles en el
 PATH y exige el rojo; el cuarto escenario es el reinicio real, que tiene que
@@ -68,8 +66,7 @@ descartable que el propio caso creó— y el caso lo comprueba antes de seguir.
 
 **Lo que no corrí acá:** `docker restart` contra un demonio de Docker de verdad.
 El doble prueba que una identidad que no cambia da rojo; que el reinicio real
-del contenedor cambie `Pid` y `StartedAt` lo va a demostrar tu corrida, no la
-mía.
+del contenedor cambie `Pid` y `StartedAt` lo demuestra tu corrida.
 
 ### 2. El 168 esperaba una respuesta y aceptaba otra
 
@@ -116,8 +113,7 @@ carrito»; sin él, «Ingresar para continuar». Ahora pide la sesión en vez de
 heredarla, y `accionDeLaTarjeta` dice qué botones ofrece la tarjeta en vez de
 vencerse en silencio.
 
-Con las dos correcciones, **114 pasa aislado** desde base limpia y en la corrida
-completa.
+Con las dos correcciones, **114 pasa aislado** y en la corrida completa.
 
 ### 4. El selector de estrellas, y la puerta que no lo veía
 
@@ -125,22 +121,51 @@ completa.
 estrella llena es un glifo: va el cereal profundo. Medido sobre la capa de
 calificación: **#c49a43 sobre #ffffff = 2,61:1 → #8a671c = 5,20:1**.
 
-Extender la puerta era necesario **y no alcanzaba**. La hice visitar la pantalla
-—fabrica una orden recibida por las rutas reales y abre el selector, que abre en
-5 estrellas elegidas— y con el token viejo **seguía dando verde**. Causa: cada
-estrella es un radio nativo con `opacity: 0` **encima** de su glifo, y ese radio
-tiene el fondo blanco de la hoja del navegador, así que el medidor lo daba por
-«texto tapado». Lo invisible no tapa: ahora un elemento con `opacity: 0` o
-`visibility: hidden` no cuenta como tapando.
+Visitar la pantalla era necesario **y no alcanzaba**. Hice que `contraste` la
+abriera y con el token viejo **seguía dando verde**: cada estrella es un radio
+nativo con `opacity: 0` **encima** de su glifo, y ese radio tiene el fondo
+blanco de la hoja del navegador, así que el medidor lo daba por «texto tapado».
+Lo invisible no tapa: ahora un elemento con `opacity: 0` o `visibility: hidden`
+no cuenta como tapando.
 
-Con el medidor corregido y el token viejo la puerta da rojo con la pareja
-exacta: `2.61:1 (mín 3) span — #c49a43 sobre #ffffff — 34px — "★"`. Con el token
-nuevo, 0 incumplimientos. Destapar no escondió otro problema: los textos medidos
-pasaron de 11 510 a 12 367 y siguen todos por encima del mínimo.
+### 5. Las dos puertas comparten la lista de superficies
 
-### 5. El canal
+`scripts/lib/superficies.mjs` es ahora la única lista. Agregar una pantalla ahí
+la vuelve obligatoria en las dos puertas; una superficie que sólo una puede
+medir tiene que declararlo con el motivo al lado, y hoy son cuatro: las
+sustituciones de foto por blanco y negro puros, que son técnica de contraste
+—axe no resuelve el fondo de una imagen—.
 
-Reemplacé el cuerpo entero. Queda el encabezado y este informe.
+Convergieron: `contraste` sumó ingreso, registro, correo pendiente, panel del
+comprador, edición de perfil, mis compras, mis productos, operaciones del
+transportista y las tres pestañas de administración que le faltaban; `a11y` sumó
+el catálogo con el puntero encima y el selector de estrellas. La orden recibida
+que hace existir ese selector se fabrica una sola vez, en el módulo compartido y
+por las rutas reales de la API.
+
+**El negativo, medido con las dos puertas.** Con el token viejo:
+
+| Puerta | Con `--tg-color-signal` | Con `--tg-color-accent` |
+| --- | --- | --- |
+| `contraste` | **sale con 1**: `2.61:1 (mín 3) span — #c49a43 sobre #ffffff — 34px — "★"` | 0 incumplimientos |
+| `a11y` | **verde**: axe no marca esa pareja ni visitando la pantalla | verde |
+
+O sea que las dos puertas no son redundantes: sin `contraste` esa pareja no la
+encuentra nadie. Y las once superficies que `contraste` sumó no destaparon
+ningún incumplimiento nuevo: pasó de 12 367 a 19 250 textos medidos, todos por
+encima del mínimo.
+
+### 6. `AGENTS.md`
+
+Quedó como disparador de relevo y enlace al onboarding que corresponda. No
+duplica el procedimiento ni la precedencia. Lo único que sigue afirmando son
+tres reglas que no viven en otro lado: el chat no es fuente de verdad,
+`PARA-PM.md` se lee desde la rama Dev cuando la entrega no está integrada, y
+cuando un documento y Git se contradicen sobre lo implementado manda Git.
+
+### 7. El canal
+
+Reemplacé el cuerpo entero y el informe abre con la ficha fija.
 
 ---
 
@@ -148,24 +173,21 @@ Reemplacé el cuerpo entero. Queda el encabezado y este informe.
 
 | Puerta | Resultado |
 | --- | --- |
-| Suite completa desde base limpia | **168/169**; sólo el 131 |
-| `npm run a11y -- --todas` | 64/64 pantallas, 0 bloqueantes |
-| `npm run contraste` | 54/54 mediciones, 0 incumplimientos |
+| Suite completa desde base limpia sobre `e0cdfe9` | **168/169**; sólo el 131 |
+| `npm run a11y -- --todas` | 68/68 pantallas, 0 bloqueantes |
+| `npm run contraste` | 76/76 mediciones, 0 incumplimientos |
 | `npm run lint` · `npx tsc --noEmit` · `node --check` · `diff-check` | verdes |
 
 **El 131**, reproducido: `la receta falló con variables válidas dentro de
 alpine:3: puente docker: sólo se traduce 'docker exec'`. Es la limitación de
-entorno de siempre —acá no hay demonio de Docker— y no cambia con esta entrega.
-En tu ruta Docker debería pasar.
+entorno de siempre y no cambia con esta entrega. En tu ruta Docker debería
+pasar.
 
-Log de la suite: `logs/suite-integration-candidate-1-r2-abdf23a.log`. `logs/`
-está fuera de Git; si lo querés en el repositorio, decímelo.
+Log de la suite: `logs/suite-integration-candidate-1-r2-e0cdfe9.log`. `logs/`
+está fuera de Git; si lo querés adentro, decímelo.
 
 ### Lo que queda dicho
 
 - La FAQ de Contacto dice «Aceptamos transferencias bancarias directas al
   vendedor» y el producto también cobra por Mercado Pago. Sigue sin tocar.
 - Sigue esperando tu palabra lo del carrito sin sesión.
-- `a11y` no mira el selector de estrellas: axe nunca marcó esa pareja. Que las
-  dos puertas recorran la misma lista de pantallas es una tarea aparte; te la
-  propongo, no la hago por mi cuenta.
