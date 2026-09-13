@@ -197,3 +197,56 @@ La ruta Docker sigue bloqueada y no se acepta por inspección reproducible:
 
 No repitas la suite funcional ni la ruta nativa salvo que la corrección comparta
 lógica y la rompa. No integres, no despliegues y no abras otra tarea.
+
+---
+
+## Revisión PM R3 — DEVOLVER
+
+Revisé `f3e9d54` y el informe `5e84385`. Quedan aceptados dentro de la pieza el
+descubrimiento de rutas/usuario/imagen desde los contenedores, la copia de las
+tres raíces sin adivinar volúmenes, el contenedor y volumen de destino aislados,
+la eliminación de `alpine` y la incorporación de `origin/main` sin reescribir
+los SHA anteriores.
+
+La corrida con Docker real falló en el primer paso:
+
+```text
+Respaldo desde el origen (docker)
+pg_restore: error: unsupported version (1.15) in file header
+ERROR: el volcado no es un archivo de pg_restore válido
+```
+
+PM verificó la raíz: el dump sale de PostgreSQL/`pg_restore` **16.4** dentro de
+`topgreen-db`, pero `pg_restore --list` se ejecuta con la versión **14.20** del
+Mac. En modo Docker, tanto la lectura del índice como la versión declarada en
+el manifiesto deben ejecutarse con las herramientas del contenedor que creó el
+dump; no dependas de `pg_dump`/`pg_restore` del anfitrión.
+
+Antes de la R4 cerrá además estas dos guardas ya exigidas:
+
+1. La espera del destino no puede aceptar el PostgreSQL temporal del entrypoint.
+   Exigí servidor definitivo —PID 1 `postgres`— además de `pg_isready` antes de
+   crear extensiones o restaurar.
+2. `limpiar` valida sólo `topgreen.respaldo.ejecucion`; debe validar también
+   `topgreen.respaldo=pieza` en contenedor y volumen. El rescate de una
+   restauración incompleta también ejecuta `docker rm`/`docker volume rm`: antes
+   de cada borrado debe comprobar ambas etiquetas. Haber anotado el nombre no
+   sustituye la propiedad si una creación falló o hubo una carrera.
+
+La reproducción PM dejó `topgreen-db` y `topgreen-api` con los mismos IDs y
+salud `healthy`; no creó bases, contenedores ni volúmenes de restore y retiró
+los marcadores sembrados. El bundle incompleto se retirará junto con el
+worktree temporal de revisión.
+
+### Evidencia R4
+
+- `bash -n` y `diff-check` del HEAD final;
+- Docker real completo: marcadores DB + `uploads` + `documentos` + `outbox`,
+  backup, restore, verify, negativo de integridad y cleanup;
+- negativo homónimo sin etiquetas y negativo de rescate sin etiquetas: ambos
+  sobreviven y el comando falla sin borrar;
+- origen con IDs, salud y fingerprint iguales; sin base extra en
+  `topgreen-db` y sin recursos de prueba al terminar.
+
+No repitas ruta nativa ni suite funcional salvo regresión compartida. No
+integres, no despliegues y no abras otra tarea.

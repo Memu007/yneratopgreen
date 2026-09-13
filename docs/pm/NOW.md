@@ -8,9 +8,9 @@ Actualizado: 2026-09-13.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 4. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
 - **`main`:** `24dcca8`; producto integrado en `b8447a3` y cierre PM documental posterior. Incluye el `AGENTS.md` consolidado y preserva la regla local de eficiencia de chats.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, informe R2 `6f02c32`; candidata `b9d0036`, devuelta y no integrada. La rama paralela `codex/backup-restore-1` queda descartada por duplicación.
-- **Última decisión PM:** `BACKUP-RESTORE-1` R2 **DEVUELTA**. `outbox` y la guarda de propiedad avanzaron, pero Docker apunta a volúmenes inexistentes, usa un rol ausente y restaura dentro del clúster de origen en vez de aislar el destino.
-- **Tarea activa:** `BACKUP-RESTORE-1` R3, responsable Dev. Debe corregir y ejecutar la ruta Docker en contenedores/volúmenes nuevos, sin tocar Railway ni datos remotos.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, informe R3 `5e84385`; candidata `f3e9d54`, devuelta y no integrada. La rama paralela `codex/backup-restore-1` queda descartada por duplicación.
+- **Última decisión PM:** `BACKUP-RESTORE-1` R3 **DEVUELTA**. La arquitectura Docker ya aísla el destino, pero la corrida real falla porque valida un dump PostgreSQL 16 con `pg_restore` 14 del anfitrión; faltan además las guardas finales de servidor definitivo y etiquetas en todo borrado.
+- **Tarea activa:** `BACKUP-RESTORE-1` R4, responsable Dev. Debe cerrar compatibilidad PostgreSQL y guardas de limpieza, y dejar lista la misma ruta para reproducción Docker real, sin tocar Railway ni datos remotos.
 
 ## Última aceptación PM relevante
 
