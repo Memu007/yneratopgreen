@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-09-12.
+Actualizado: 2026-09-13.
 
 `NOW.md` contiene sólo estado vigente, restricciones vivas, bloqueos y próxima acción. La historia anterior permanece en Git; la instantánea previa a esta poda está en `ab4165fc`.
 
@@ -8,9 +8,9 @@ Actualizado: 2026-09-12.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 4. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
 - **`main`:** sin cambios de producto desde `3064f10`; el delta actual es sólo documentación PM. Sigue conectado al auto-deploy de Railway, por lo que no se integra producto ahí todavía.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, HEAD de informe `696f933`; primera candidata de producto `fcea099`, no integrada ni desplegada.
-- **Última decisión PM:** `INTEGRATION-CANDIDATE-1` **DEVUELTA** en primera revisión. `COPY-CLEAR-1` permanece aceptada.
-- **Tarea activa:** `INTEGRATION-CANDIDATE-1`, responsable Dev, devolución 1. Debe corregir las diferencias reales entre el arnés nativo y Docker, el falso emparejamiento de la respuesta del caso 168, el rojo repetido del 114, el contraste conocido del selector de estrellas y el informe vivo; no autoriza despliegue.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, HEAD de informe `29327b6`; candidata R2 de producto/arnés `e0cdfe9`, no integrada ni desplegada.
+- **Última decisión PM:** `INTEGRATION-CANDIDATE-1` **DEVUELTA** en revisión 2 por un único defecto del caso 169. `COPY-CLEAR-1` permanece aceptada.
+- **Tarea activa:** `INTEGRATION-CANDIDATE-1`, responsable Dev, devolución 2. Debe hacer que el caso 169 corra tanto con la API Docker del lanzador oficial como con API nativa, sin tocar producto ni reabrir los casos 1–168; no autoriza despliegue.
 
 ## Aceptación vigente — COPY-CLEAR-1
 
@@ -39,17 +39,14 @@ Las aceptaciones anteriores y sus reproducciones son historia consultable en Git
 
 ## Estado de integración
 
-La primera candidata `fcea099` quedó **devuelta**. El merge `c0f42ac` preservó el producto anterior de `ee166b4` byte por byte en `src/`, `backend/`, `scripts/` y `public/`; los cambios propios quedaron acotados a contraste y arnés. La suite completa independiente PM, desde una base Docker aislada, dio **165/168**: 114, 167 y 168 rojos.
+La candidata R2 `e0cdfe9` corrigió los defectos de la primera revisión. La suite completa independiente PM corrió desde base Docker limpia y dio **168/169**:
 
-La evidencia discriminante separó tres causas:
+- 114, 131, 167 y 168 pasaron dentro de la corrida completa;
+- después del 134, `topgreen-api` cambió de PID `65908` a `89335` y de `StartedAt=2026-09-13T12:49:48.468708656Z` a `2026-09-13T13:02:32.238270514Z`; el reinicio Docker fue real y los casos posteriores no heredaron el presupuesto antifuerza-bruta;
+- el único rojo fue el nuevo caso 169: abortó con «este caso necesita una API nativa en marcha para comprobar que no la tocan». El lanzador oficial usa la API Docker, por lo que el propio caso exige un entorno incompatible con la suite que debe integrar;
+- el informe `29327b6` es sólo documental respecto de `e0cdfe9`.
 
-- después del 134, el arnés anunció que reinició la API, pero el contenedor conservó ID, `StartedAt` y `RestartCount=0`; el 167 perdió la continuación y el 168 recibió 429;
-- sin ejecutar el 134 y desde otra base limpia, el 167 pasó, mientras el 168 falló porque su espera de `/notifications` aceptó también `/notifications/unread-count` y validó el cuerpo equivocado;
-- el 114 repitió en suite y focal el mismo rojo: «el titular no ve sus cargas declaradas»; ya no se clasifica como intermitente sin diagnóstico adicional.
-
-Además, la propia Dev informó que `.elegida` mantiene texto de estrellas a 2,61:1 y que las puertas actuales no visitan ese estado. Es la misma deuda de contraste y debe entrar en esta devolución mínima. `PARA-PM.md` tampoco quedó como canal vivo: acumuló el informe nuevo sobre 245 líneas anteriores pese a declarar que las retiró.
-
-Logs PM persistentes: `/private/tmp/topgreen-pm-integration-suite-fcea099.log` y `/private/tmp/topgreen-pm-integration-focal-114-167-168.log`.
+La devolución 2 queda limitada al caso 169. Si el nuevo delta está acotado a ese caso y al informe, Dev no repite 1–168 ni las puertas ya verdes; PM reproduce el 169 en Docker sobre el SHA final. Log PM: `/Users/Emi/.codex/visualizations/2026/09/12/01a097e2-a20d-77a1-b8f3-970edbda5495/topgreen-pm-integration-r2-suite-e0cdfe9.log`.
 
 La rama Dev acumuló trabajo aceptado y pendiente sin integrar porque históricamente `main` también se usó como fuente de despliegue. El resultado es una divergencia grande y una composición que debe tratarse explícitamente.
 

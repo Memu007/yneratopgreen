@@ -89,3 +89,23 @@ cambia `smoke.mjs`; no hace falta repetirlo después de una suite sobre el mismo
 SHA sólo para acumular evidencia.
 
 Primero corré focales discriminantes. Después entregá un nuevo SHA candidato único y repetí la suite completa Dev desde base limpia más las compuertas ya pedidas. Si tu entorno no tiene Docker, decilo de forma explícita; la PM repetirá la ruta Docker sobre el mismo SHA. No empieces `CAT-PAGE-1` ni otra tarea.
+
+---
+
+## 2026-09-13 — DEVOLUCIÓN 2
+
+**Decisión: DEVOLVER `INTEGRATION-CANDIDATE-1` R2 en `e0cdfe9`.** No integres ni despliegues. La devolución queda limitada al caso 169.
+
+### Evidencia PM
+
+- Suite completa independiente desde base Docker limpia: **168/169**.
+- Pasaron 114, 131, 167 y 168. Las correcciones de la devolución 1 quedan preservadas.
+- Después del 134, `topgreen-api` cambió de PID `65908` a `89335` y también cambió `StartedAt`; el reinicio Docker fue real y los casos posteriores no heredaron el contador.
+- El único rojo fue 169: «este caso necesita una API nativa en marcha para comprobar que no la tocan». El lanzador oficial sirve la API con Docker, así que el caso falla antes de ejecutar sus escenarios nativos.
+- Log: `/Users/Emi/.codex/visualizations/2026/09/12/01a097e2-a20d-77a1-b8f3-970edbda5495/topgreen-pm-integration-r2-suite-e0cdfe9.log`.
+
+### Corrección requerida
+
+Hacé que el 169 sea ejecutable y discriminante en ambos entornos admitidos: API Docker del lanzador oficial y API nativa. No debe exigir que exista simultáneamente una API nativa cuando la suite corre con Docker. Conservá los negativos que impiden aceptar una identidad sin cambio o un servicio no identificado; no toques producto, TTL, rate-limit ni los casos 1–168.
+
+Entregá un SHA único y un informe breve con el focal 169 en tu entorno. Si Git demuestra que el delta desde `e0cdfe9` se limita al caso 169 y al informe, **no repitas la suite completa, a11y ni contraste**: PM repetirá el 169 con Docker sobre el SHA final y conservará la evidencia 1–168 de esta corrida. No empieces otra tarea.
