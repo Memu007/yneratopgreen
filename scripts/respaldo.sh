@@ -57,6 +57,12 @@ PATRON_BASE="^${PREFIJO_BASE}[0-9]{8}_[0-9]{6}$"
 ESQUEMA_MARCA="respaldo_meta"
 ARCHIVO_MARCA=".propiedad"
 
+# Etiquetas de los recursos Docker que crea la pieza. Van en el contenedor y en
+# el volumen de destino, y `limpiar` las exige antes de cada borrado: un nombre
+# que coincide no prueba nada, una etiqueta puesta por esta ejecución sí.
+ETIQUETA_PIEZA="topgreen.respaldo=pieza"
+ETIQUETA_EJECUCION="topgreen.respaldo.ejecucion"
+
 # El origen, que nunca se toca.
 BASE_ORIGEN="${TOPGREEN_DB_NOMBRE:-topgreen}"
 USUARIO_ORIGEN="${TOPGREEN_DB_USUARIO:-topgreen}"
@@ -64,6 +70,16 @@ CLAVE_ORIGEN="${TOPGREEN_DB_PASSWORD:-topgreen_local}"
 HOST_ORIGEN="${TOPGREEN_DB_HOST:-127.0.0.1}"
 CONTENEDOR_DB="topgreen-db"
 CONTENEDOR_API="topgreen-api"
+IMAGEN_DESTINO=""   # se descubre del contenedor real, no se elige acá
+
+# Coordenadas del destino para un sello dado. Con Docker el destino es un
+# contenedor y un volumen propios, y la base adentro se llama como la de origen
+# porque es una copia; sin Docker es una base nueva en el clúster local.
+contenedor_de() { echo "topgreen-restore-$1-db"; }
+volumen_de() { echo "topgreen-restore-$1-datos"; }
+base_de() {
+  if [ "$ENTORNO" = docker ]; then echo "$BASE_ORIGEN"; else echo "${PREFIJO_BASE}$1"; fi
+}
 
 paso() { printf '\n===> %s\n' "$1"; }
 nota() { printf '     %s\n' "$1"; }
@@ -71,6 +87,52 @@ fatal() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
 
 hay_docker() { docker info >/dev/null 2>&1; }
 ENTORNO="nativo"; hay_docker && ENTORNO="docker"
+
+# --------------------------------------------------------------------------
+# Con Docker, NADA se adivina: usuario, base, imagen y rutas del almacenamiento
+# salen de los contenedores que están corriendo.
+#
+# Adivinarlos fue el defecto de la entrega anterior: los volúmenes se llamaban
+# `uploads_data` en el compose, pero Compose les pone el prefijo del proyecto,
+# así que ese nombre NO existe. Montarlo habría creado un volumen vacío y lo
+# habría respaldado como si fuera el origen. Y el usuario no es `postgres`: es
+# el que diga `POSTGRES_USER` del contenedor.
+# --------------------------------------------------------------------------
+variable_del_contenedor() {  # variable_del_contenedor <contenedor> <nombre>
+  docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$1" 2>/dev/null \
+    | sed -n "s/^$2=//p" | head -1
+}
+
+descubrir_el_origen_docker() {
+  docker inspect -f '{{.State.Running}}' "$CONTENEDOR_DB" 2>/dev/null | grep -q true \
+    || fatal "el contenedor $CONTENEDOR_DB no está en marcha"
+  docker inspect -f '{{.State.Running}}' "$CONTENEDOR_API" 2>/dev/null | grep -q true \
+    || fatal "el contenedor $CONTENEDOR_API no está en marcha"
+
+  USUARIO_ORIGEN="$(variable_del_contenedor "$CONTENEDOR_DB" POSTGRES_USER)"
+  BASE_ORIGEN="$(variable_del_contenedor "$CONTENEDOR_DB" POSTGRES_DB)"
+  IMAGEN_DESTINO="$(docker inspect -f '{{.Config.Image}}' "$CONTENEDOR_DB")"
+  [ -n "$USUARIO_ORIGEN" ] || fatal "$CONTENEDOR_DB no declara POSTGRES_USER"
+  [ -n "$BASE_ORIGEN" ] || fatal "$CONTENEDOR_DB no declara POSTGRES_DB"
+  [ -n "$IMAGEN_DESTINO" ] || fatal "no pude leer la imagen de $CONTENEDOR_DB"
+
+  # Las rutas del almacenamiento, tal como las ve la aplicación. Una ruta
+  # relativa se resuelve contra el directorio de trabajo del contenedor, que es
+  # el caso del outbox: `EMAIL_OUTBOX_DIR=outbox` sobre `/app`.
+  local trabajo; trabajo="$(docker inspect -f '{{.Config.WorkingDir}}' "$CONTENEDOR_API")"
+  [ -n "$trabajo" ] || trabajo="/"
+  RAICES_DOCKER=""
+  local par nombre variable ruta
+  for par in "uploads:UPLOAD_DIR" "documentos:DOCUMENTOS_DIR" "outbox:EMAIL_OUTBOX_DIR"; do
+    nombre="${par%%:*}"; variable="${par##*:}"
+    ruta="$(variable_del_contenedor "$CONTENEDOR_API" "$variable")"
+    [ -n "$ruta" ] || fatal "$CONTENEDOR_API no declara $variable: no sé de dónde copiar «$nombre»"
+    case "$ruta" in /*) ;; *) ruta="$trabajo/$ruta" ;; esac
+    RAICES_DOCKER="$RAICES_DOCKER$nombre:$ruta
+"
+  done
+}
+[ "$ENTORNO" = docker ] && descubrir_el_origen_docker
 
 # Herramientas que no se llaman igual en todas partes. La PM corre macOS y el
 # lanzador oficial usa Docker desde ese anfitrión: ahí `sha256sum` no existe
@@ -88,9 +150,30 @@ else
   exit 1
 fi
 
-# Archivos intermedios de la huella. Se limpian al salir, pase lo que pase.
+# Archivos intermedios de la huella, y el rescate de una restauración a medias.
+#
+# Si `restaurar` se cae después de crear el contenedor y el volumen —o la base—
+# esos recursos quedan colgados y el próximo intento choca con ellos. Se anotan
+# apenas se crean y se retiran solos si la restauración no llega al final. Acá
+# no hace falta comprobar etiquetas: se borra exactamente lo que ESTA ejecución
+# acaba de crear, anotado por ella misma.
 TMP_HUELLA="$(mktemp -u)"
-limpiar_temporales() { rm -f "$TMP_HUELLA".* 2>/dev/null || true; }
+DESTINO_INCOMPLETO=""
+limpiar_temporales() {
+  rm -f "$TMP_HUELLA".* 2>/dev/null || true
+  [ -n "$DESTINO_INCOMPLETO" ] || return 0
+  local sello="$DESTINO_INCOMPLETO"; DESTINO_INCOMPLETO=""
+  printf 'AVISO: la restauración quedó a medias; se retira lo que había creado (%s)\n' \
+    "$sello" >&2
+  if [ "$ENTORNO" = docker ]; then
+    docker rm -f "$(contenedor_de "$sello")" >/dev/null 2>&1 || true
+    docker volume rm "$(volumen_de "$sello")" >/dev/null 2>&1 || true
+  else
+    sudo -u postgres psql -tAc \
+      "DROP DATABASE IF EXISTS \"${PREFIJO_BASE}${sello}\"" >/dev/null 2>&1 || true
+  fi
+  rm -rf "${DIR_RESPALDOS:?}/${PREFIJO_DIR}${sello}"
+}
 trap limpiar_temporales EXIT
 
 # --------------------------------------------------------------------------
@@ -104,11 +187,13 @@ trap limpiar_temporales EXIT
 #    consulta: psql imprime el rótulo «SET» de cada sentencia que no devuelve
 #    filas, y esa línea se colaba en la lista de tablas.
 OPCIONES_PG="-c timezone=UTC -c extra_float_digits=3"
-sql() {  # sql <base> <consulta>
-  local base="$1" consulta="$2"
+#    Con Docker hay DOS clústeres: el de origen y el del destino, que es otro
+#    contenedor. `$3` dice a cuál se le pregunta; sin él, al de origen.
+sql() {  # sql <base> <consulta> [contenedor]
+  local base="$1" consulta="$2" donde="${3:-$CONTENEDOR_DB}"
   if [ "$ENTORNO" = docker ]; then
-    docker exec -e PGPASSWORD="$CLAVE_ORIGEN" -e PGOPTIONS="$OPCIONES_PG" -i \
-      "$CONTENEDOR_DB" psql -U "$USUARIO_ORIGEN" -d "$base" -tAc "$consulta"
+    docker exec -e PGOPTIONS="$OPCIONES_PG" -i "$donde" \
+      psql -U "$USUARIO_ORIGEN" -d "$base" -tAc "$consulta"
   else
     PGPASSWORD="$CLAVE_ORIGEN" PGOPTIONS="$OPCIONES_PG" \
       psql -h "$HOST_ORIGEN" -U "$USUARIO_ORIGEN" -d "$base" -tAc "$consulta"
@@ -119,7 +204,7 @@ sql() {  # sql <base> <consulta>
 #    `pg_restore` valide el formato en vez de ejecutar SQL a ciegas.
 volcar_la_base() {  # volcar_la_base <archivo>
   if [ "$ENTORNO" = docker ]; then
-    docker exec -e PGPASSWORD="$CLAVE_ORIGEN" -i "$CONTENEDOR_DB" \
+    docker exec -i "$CONTENEDOR_DB" \
       pg_dump -U "$USUARIO_ORIGEN" -d "$BASE_ORIGEN" -Fc > "$1"
   else
     PGPASSWORD="$CLAVE_ORIGEN" pg_dump -h "$HOST_ORIGEN" -U "$USUARIO_ORIGEN" \
@@ -134,32 +219,28 @@ volcar_la_base() {  # volcar_la_base <archivo>
 #    `outbox` entra porque es lo que hoy sustituye al correo real: perderlo es
 #    perder la evidencia de qué se mandó.
 declare -a CARPETAS_NATIVAS=(backend/uploads backend/documentos backend/outbox)
-declare -a VOLUMENES_DOCKER=(uploads_data:uploads documentos_data:documentos)
 
 copiar_el_almacenamiento() {  # copiar_el_almacenamiento <directorio destino>
   local destino="$1"
   mkdir -p "$destino"
   if [ "$ENTORNO" = docker ]; then
-    for par in "${VOLUMENES_DOCKER[@]}"; do
-      local volumen="${par%%:*}" nombre="${par##*:}"
+    # `docker cp` y nada más: no monta volúmenes, no necesita herramientas
+    # adentro del contenedor y NO baja ninguna imagen auxiliar. Las rutas son
+    # las que declara la aplicación, descubiertas al arrancar; los nombres de
+    # los volúmenes no se usan ni se adivinan.
+    local linea nombre ruta
+    while IFS= read -r linea; do
+      [ -n "$linea" ] || continue
+      nombre="${linea%%:*}"; ruta="${linea#*:}"
       mkdir -p "$destino/$nombre"
-      # Sólo lectura sobre el volumen de origen: no se monta para escribir.
-      docker run --rm -v "$volumen":/origen:ro -v "$PWD/$destino":/copia \
-        alpine:3 sh -c "cp -a /origen/. /copia/$nombre/"
-    done
-    # El outbox va en el bundle igual que las otras dos raíces, pero NO sale de
-    # un volumen: el lanzador local lo monta desde el repositorio —`./backend/
-    # outbox` hacia `/app/outbox`—, así que se copia desde el anfitrión. En
-    # producción vive dentro del volumen de `/data` (`EMAIL_OUTBOX_DIR=/data/
-    # outbox`); cuando se respalde ese entorno, el outbox entra por la rama de
-    # volúmenes de arriba y no por acá. No se cambia el compose ni el producto
-    # para acomodar la prueba: se copia de donde está.
-    if [ -d backend/outbox ]; then
-      mkdir -p "$destino/outbox"; cp -a backend/outbox/. "$destino/outbox/"
-    fi
+      docker cp -a "$CONTENEDOR_API:$ruta/." "$destino/$nombre/" 2>/dev/null \
+        || docker cp "$CONTENEDOR_API:$ruta/." "$destino/$nombre/" \
+        || fatal "no pude copiar $ruta desde $CONTENEDOR_API"
+    done <<< "$RAICES_DOCKER"
   else
+    local carpeta nombre
     for carpeta in "${CARPETAS_NATIVAS[@]}"; do
-      local nombre; nombre="$(basename "$carpeta")"
+      nombre="$(basename "$carpeta")"
       mkdir -p "$destino/$nombre"
       [ -d "$carpeta" ] && cp -a "$carpeta/." "$destino/$nombre/"
     done
@@ -176,18 +257,18 @@ copiar_el_almacenamiento() {  # copiar_el_almacenamiento <directorio destino>
 #
 # Del almacenamiento, ruta relativa, tamaño y sha256 de cada archivo.
 # --------------------------------------------------------------------------
-huella_de_la_base() {  # huella_de_la_base <base>
-  local base="$1"
-  sql "$base" "select coalesce(extversion,'-') from pg_extension where extname='postgis'" \
+huella_de_la_base() {  # huella_de_la_base <base> [contenedor]
+  local base="$1" donde="${2:-}"
+  sql "$base" "select coalesce(extversion,'-') from pg_extension where extname='postgis'" "$donde" \
     | sed 's/^/extension\tpostgis\t/'
   local tablas; tablas="$(sql "$base" \
-    "select tablename from pg_tables where schemaname='public' order by 1")"
+    "select tablename from pg_tables where schemaname='public' order by 1" "$donde")"
   local tabla
   for tabla in $tablas; do
     local fila
     fila="$(sql "$base" "select count(*)::text || E'\t' ||
       coalesce(md5(string_agg(x, '|' order by x)), 'sin-filas')
-      from (select t::text as x from public.\"$tabla\" t) s")"
+      from (select t::text as x from public.\"$tabla\" t) s" "$donde")"
     printf 'tabla\t%s\t%s\n' "$tabla" "$fila"
   done
 }
@@ -288,23 +369,66 @@ comando_restaurar() {
   [ "$base_destino" = "$BASE_ORIGEN" ] && fatal "el destino no puede ser el origen"
 
   paso "Restauración en un destino nuevo ($ENTORNO)"
-  nota "base $base_destino · archivos $dir_destino"
+  if [ "$ENTORNO" = docker ]; then
+    nota "contenedor $(contenedor_de "$sello") · volumen $(volumen_de "$sello") · archivos $dir_destino"
+  else
+    nota "base $base_destino · archivos $dir_destino"
+  fi
 
   # El destino se crea de cero. Si ya existiera, se frena: no se pisa nada.
   if [ -e "$dir_destino" ]; then fatal "$dir_destino ya existe"; fi
   mkdir -p "$dir_destino"
   tar -C "$dir_destino" -xzf "$bundle/datos.tar.gz"
 
+  # La firma de esta ejecución. Se genera acá porque en Docker también etiqueta
+  # el contenedor y el volumen que se crean.
+  local ejecucion; ejecucion="$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+
   if [ "$ENTORNO" = docker ]; then
-    docker exec -i "$CONTENEDOR_DB" psql -U postgres -tAc \
-      "CREATE DATABASE \"$base_destino\"" >/dev/null \
-      || fatal "no se pudo crear la base de destino"
-    docker exec -i "$CONTENEDOR_DB" psql -U postgres -d "$base_destino" -tAc \
-      "CREATE EXTENSION IF NOT EXISTS postgis" >/dev/null
-    docker exec -i "$CONTENEDOR_DB" pg_restore -U postgres -d "$base_destino" \
-      --no-owner --no-privileges < "$bundle/base.dump" \
+    # Otro contenedor y otro volumen. NO se toca el clúster de origen: crear la
+    # base de destino adentro de `topgreen-db` modificaba su volumen, que es
+    # justo lo que este aislamiento tiene que evitar.
+    local contenedor_destino="topgreen-restore-${sello}-db"
+    local volumen_destino="topgreen-restore-${sello}-datos"
+    docker inspect "$contenedor_destino" >/dev/null 2>&1 \
+      && fatal "ya existe el contenedor $contenedor_destino"
+    docker volume inspect "$volumen_destino" >/dev/null 2>&1 \
+      && fatal "ya existe el volumen $volumen_destino"
+
+    # Credencial del destino: local, efímera y de esta corrida. No se escribe
+    # en el bundle, ni en el manifiesto, ni en el informe.
+    local clave_efimera; clave_efimera="$(head -c 18 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+
+    DESTINO_INCOMPLETO="$sello"
+    docker volume create --label "$ETIQUETA_PIEZA" \
+      --label "$ETIQUETA_EJECUCION=$ejecucion" "$volumen_destino" >/dev/null \
+      || fatal "no pude crear el volumen de destino"
+    # La imagen es la MISMA que sirve el origen, leída del contenedor real: ya
+    # está en la máquina, así que esto no dispara ninguna descarga.
+    docker run -d --name "$contenedor_destino" \
+      --label "$ETIQUETA_PIEZA" --label "$ETIQUETA_EJECUCION=$ejecucion" \
+      -e POSTGRES_USER="$USUARIO_ORIGEN" -e POSTGRES_DB="$BASE_ORIGEN" \
+      -e POSTGRES_PASSWORD="$clave_efimera" \
+      -v "$volumen_destino":/var/lib/postgresql/data \
+      "$IMAGEN_DESTINO" >/dev/null \
+      || fatal "no pude levantar el contenedor de destino con $IMAGEN_DESTINO"
+
+    local intento=0
+    until docker exec "$contenedor_destino" \
+        pg_isready -U "$USUARIO_ORIGEN" -d "$BASE_ORIGEN" >/dev/null 2>&1; do
+      intento=$((intento + 1))
+      [ "$intento" -gt 60 ] && fatal "el contenedor de destino no llegó a estar listo"
+      sleep 1
+    done
+
+    docker exec -i "$contenedor_destino" psql -U "$USUARIO_ORIGEN" -d "$BASE_ORIGEN" \
+      -qtAc "CREATE EXTENSION IF NOT EXISTS postgis" >/dev/null
+    docker exec -i "$contenedor_destino" pg_restore -U "$USUARIO_ORIGEN" \
+      -d "$BASE_ORIGEN" --no-owner --no-privileges < "$bundle/base.dump" \
       || nota "pg_restore informó avisos; se verifican abajo"
+    nota "destino: contenedor $contenedor_destino sobre el volumen $volumen_destino"
   else
+    DESTINO_INCOMPLETO="$sello"
     sudo -u postgres psql -tAc "CREATE DATABASE \"$base_destino\" OWNER \"$USUARIO_ORIGEN\"" \
       >/dev/null || fatal "no se pudo crear la base de destino"
     sudo -u postgres psql -d "$base_destino" -tAc "CREATE EXTENSION IF NOT EXISTS postgis" \
@@ -315,9 +439,8 @@ comando_restaurar() {
       "GRANT ALL ON ALL TABLES IN SCHEMA public TO \"$USUARIO_ORIGEN\"" >/dev/null
   fi
 
-  # La firma. Sin esto, `limpiar` no tendría con qué distinguir este destino de
-  # cualquier otra base o carpeta que se llame igual.
-  local ejecucion; ejecucion="$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  # La firma dentro de la base restaurada, en su propio esquema para no
+  # ensuciar los datos ni la comparación, que sólo mira `public`.
   local marca_sql="
     CREATE SCHEMA IF NOT EXISTS $ESQUEMA_MARCA;
     CREATE TABLE IF NOT EXISTS $ESQUEMA_MARCA.propiedad (
@@ -325,13 +448,15 @@ comando_restaurar() {
     INSERT INTO $ESQUEMA_MARCA.propiedad VALUES
       ('$ejecucion', now(), '$(basename "$bundle")');"
   if [ "$ENTORNO" = docker ]; then
-    docker exec -i "$CONTENEDOR_DB" psql -U postgres -d "$base_destino" -qtAc "$marca_sql" >/dev/null
+    docker exec -i "$(contenedor_de "$sello")" psql -U "$USUARIO_ORIGEN" \
+      -d "$BASE_ORIGEN" -qtAc "$marca_sql" >/dev/null
   else
     sudo -u postgres psql -d "$base_destino" -qtAc "$marca_sql" >/dev/null
   fi
-  printf 'ejecucion=%s\nsello=%s\nbundle=%s\n' \
-    "$ejecucion" "$sello" "$(basename "$bundle")" > "$dir_destino/$ARCHIVO_MARCA"
+  printf 'ejecucion=%s\nsello=%s\nbundle=%s\nentorno=%s\n' \
+    "$ejecucion" "$sello" "$(basename "$bundle")" "$ENTORNO" > "$dir_destino/$ARCHIVO_MARCA"
 
+  DESTINO_INCOMPLETO=""   # llegó al final: el destino ya es responsabilidad de `limpiar`
   nota "restaurado sin tocar $BASE_ORIGEN ni $CONTENEDOR_DB"
   nota "firmado con la ejecución $ejecucion; sin esa firma no se borra"
   echo "$sello"
@@ -344,7 +469,9 @@ comando_verificar() {
   local bundle="${1:-}" sello="${2:-}"
   [ -d "$bundle" ] || fatal "no encuentro el bundle «$bundle»"
   [ -n "$sello" ] || fatal "falta el sello del destino"
-  local base_destino="${PREFIJO_BASE}${sello}"
+  local base_destino; base_destino="$(base_de "$sello")"
+  local contenedor_destino=""
+  [ "$ENTORNO" = docker ] && contenedor_destino="$(contenedor_de "$sello")"
   local dir_destino="$DIR_RESPALDOS/${PREFIJO_DIR}${sello}/datos"
   local fallos=0
   local tmp; tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' RETURN
@@ -371,7 +498,7 @@ comando_verificar() {
   fi
 
   # 2. El destino tiene lo que decía el bundle.
-  huella_de_la_base "$base_destino" > "$tmp/base-destino.tsv" 2>/dev/null \
+  huella_de_la_base "$base_destino" "$contenedor_destino" > "$tmp/base-destino.tsv" 2>/dev/null \
     || fatal "no pude leer la base de destino $base_destino"
   comparar "la base restaurada coincide con la del respaldo" \
     "$bundle/huella-base.tsv" "$tmp/base-destino.tsv"
@@ -391,6 +518,12 @@ comando_verificar() {
     local vivos; vivos="$(docker inspect -f '{{.State.Running}}' "$CONTENEDOR_DB" "$CONTENEDOR_API" 2>/dev/null | tr '\n' ' ')"
     if [ "$vivos" = "true true " ]; then printf '  ✓ %s y %s siguen en marcha\n' "$CONTENEDOR_DB" "$CONTENEDOR_API"
     else printf '  ✗ los contenedores de origen no están los dos en marcha: %s\n' "$vivos"; fallos=$((fallos + 1)); fi
+    # Y el clúster de origen no ganó ninguna base: la restauración va a otro
+    # contenedor, así que acá no puede aparecer nada nuevo.
+    local intrusas; intrusas="$(sql "$BASE_ORIGEN" \
+      "select count(*) from pg_database where datname like '${PREFIJO_BASE}%'")"
+    if [ "${intrusas:-0}" = "0" ]; then printf '  ✓ %s no tiene ninguna base de restauración adentro\n' "$CONTENEDOR_DB"
+    else printf '  ✗ %s tiene %s base(s) %s* adentro: el destino no estuvo aislado\n' "$CONTENEDOR_DB" "$intrusas" "$PREFIJO_BASE"; fallos=$((fallos + 1)); fi
   else
     if curl --fail --silent --noproxy '*' http://127.0.0.1:8000/api/health >/dev/null 2>&1; then
       printf '  ✓ la API de origen sigue contestando\n'
@@ -411,13 +544,14 @@ comando_verificar() {
 comando_limpiar() {
   local sello="${1:-}"
   [ -n "$sello" ] || fatal "falta el sello del destino"
-  local base_destino="${PREFIJO_BASE}${sello}"
+  local base_destino; base_destino="$(base_de "$sello")"
   local dir_destino="$DIR_RESPALDOS/${PREFIJO_DIR}${sello}"
 
-  # Las dos guardas que hacen que esto sea seguro de correr.
-  [[ "$base_destino" =~ $PATRON_BASE ]] \
-    || fatal "«$base_destino» no tiene la forma de un destino de esta pieza"
-  [ "$base_destino" = "$BASE_ORIGEN" ] && fatal "eso es el origen, no un destino"
+  # La forma del nombre es la primera guarda, no la única.
+  [[ "${PREFIJO_BASE}${sello}" =~ $PATRON_BASE ]] \
+    || fatal "«$sello» no tiene la forma de un destino de esta pieza"
+  [ "$base_destino" = "$BASE_ORIGEN" ] && [ "$ENTORNO" != docker ] \
+    && fatal "eso es el origen, no un destino"
 
   paso "Limpieza del destino $sello"
 
@@ -427,29 +561,41 @@ comando_limpiar() {
   local ejecucion; ejecucion="$(sed -n 's/^ejecucion=//p' "$dir_destino/$ARCHIVO_MARCA")"
   [ -n "$ejecucion" ] || fatal "la firma de $dir_destino está vacía. No se borra nada."
 
-  # Y la base tiene que llevar la MISMA. Una base que se llama igual pero que
-  # esta pieza no creó no tiene el esquema de marca, y ahí se frena: el nombre
-  # no prueba propiedad.
-  local firmada
   if [ "$ENTORNO" = docker ]; then
-    firmada="$(docker exec -i "$CONTENEDOR_DB" psql -U postgres -d "$base_destino" -tAc \
-      "select count(*) from $ESQUEMA_MARCA.propiedad where ejecucion='$ejecucion'" 2>/dev/null || echo 0)"
+    # Cada recurso se borra sólo si LLEVA LA ETIQUETA de esta ejecución. Un
+    # contenedor o un volumen homónimo que la pieza no creó no la tiene, y ahí
+    # se frena: el nombre no prueba propiedad.
+    local contenedor_destino volumen_destino etiqueta
+    contenedor_destino="$(contenedor_de "$sello")"; volumen_destino="$(volumen_de "$sello")"
+
+    etiqueta="$(docker inspect -f "{{index .Config.Labels \"$ETIQUETA_EJECUCION\"}}" \
+      "$contenedor_destino" 2>/dev/null || true)"
+    [ "$etiqueta" = "$ejecucion" ] \
+      || fatal "el contenedor $contenedor_destino no lleva la etiqueta $ETIQUETA_EJECUCION=$ejecucion (dice «${etiqueta:-nada}»). No se borra nada."
+
+    etiqueta="$(docker volume inspect -f "{{index .Labels \"$ETIQUETA_EJECUCION\"}}" \
+      "$volumen_destino" 2>/dev/null || true)"
+    [ "$etiqueta" = "$ejecucion" ] \
+      || fatal "el volumen $volumen_destino no lleva la etiqueta $ETIQUETA_EJECUCION=$ejecucion (dice «${etiqueta:-nada}»). No se borra nada."
+
+    docker rm -f "$contenedor_destino" >/dev/null
+    docker volume rm "$volumen_destino" >/dev/null
+    nota "borrados el contenedor $contenedor_destino y el volumen $volumen_destino,"
+    nota "los dos etiquetados con $ejecucion"
   else
+    # Sin Docker el destino es una base del clúster local, y la firma vive
+    # adentro de esa base.
+    local firmada
     firmada="$(sudo -u postgres psql -d "$base_destino" -tAc \
       "select count(*) from $ESQUEMA_MARCA.propiedad where ejecucion='$ejecucion'" 2>/dev/null || echo 0)"
-  fi
-  [ "${firmada:-0}" = "1" ] \
-    || fatal "la base $base_destino no lleva la firma $ejecucion: no la creó esta ejecución. No se borra nada."
-
-  if [ "$ENTORNO" = docker ]; then
-    docker exec -i "$CONTENEDOR_DB" psql -U postgres -tAc \
-      "DROP DATABASE IF EXISTS \"$base_destino\"" >/dev/null
-  else
+    [ "${firmada:-0}" = "1" ] \
+      || fatal "la base $base_destino no lleva la firma $ejecucion: no la creó esta ejecución. No se borra nada."
     sudo -u postgres psql -tAc "DROP DATABASE IF EXISTS \"$base_destino\"" >/dev/null
+    nota "borrada la base $base_destino, firmada con $ejecucion"
   fi
+
   rm -rf "$dir_destino"
-  nota "borrados la base $base_destino y $dir_destino, los dos firmados con $ejecucion"
-  nota "nada más se tocó"
+  nota "borrado $dir_destino; nada más se tocó"
 }
 
 # --------------------------------------------------------------------------

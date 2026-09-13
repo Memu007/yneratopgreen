@@ -14,15 +14,24 @@ Railway, no baja datos remotos, no contrata nada y no escribe secretos.
 
 | Origen | Con Docker | Sin Docker |
 |---|---|---|
-| Base PostgreSQL/PostGIS | `pg_dump -Fc` dentro de `topgreen-db` | `pg_dump -Fc` contra `127.0.0.1:5432` |
-| Imágenes subidas | volumen `uploads_data` | `backend/uploads` |
-| Documentación fiscal | volumen `documentos_data` | `backend/documentos` |
-| Correo sin enviar | `backend/outbox` (el lanzador lo monta desde el repositorio hacia `/app/outbox`) | `backend/outbox` |
+| Base PostgreSQL/PostGIS | `pg_dump -Fc` por `docker exec` en `topgreen-db` | `pg_dump -Fc` contra `127.0.0.1:5432` |
+| Imágenes subidas | `docker cp` desde `$UPLOAD_DIR` de `topgreen-api` | `backend/uploads` |
+| Documentación fiscal | `docker cp` desde `$DOCUMENTOS_DIR` | `backend/documentos` |
+| Correo sin enviar | `docker cp` desde `$EMAIL_OUTBOX_DIR` | `backend/outbox` |
 
-En producción el correo sin enviar vive dentro del volumen de `/data`
-—`EMAIL_OUTBOX_DIR=/data/outbox`—; cuando se respalde ese entorno entra por la
-copia de volúmenes, no desde el anfitrión. No se cambia el compose ni el
-producto para acomodar la prueba: se copia de donde está en cada entorno.
+**Con Docker no se adivina nada.** Usuario, base, imagen y las tres rutas del
+almacenamiento se leen de los contenedores que están corriendo
+(`docker inspect`), no del `docker-compose.yml` ni de un nombre de volumen. Los
+nombres de volumen del compose llevan el prefijo del proyecto, así que usarlos
+tal cual crearía volúmenes vacíos y los respaldaría como si fueran el origen; y
+el usuario de la base es el que diga `POSTGRES_USER`, que no es `postgres`.
+
+Por eso también sirve igual en un entorno donde el correo sin enviar vive dentro
+del volumen de `/data` —`EMAIL_OUTBOX_DIR=/data/outbox`— y en el lanzador local,
+donde es un montaje del repositorio en `/app/outbox`: la ruta sale de la
+aplicación, no de una suposición. Una ruta relativa se resuelve contra el
+directorio de trabajo del contenedor. No se cambia el compose ni el producto
+para acomodar la prueba.
 
 El `outbox` entra porque hoy sustituye al correo real: perderlo es perder la
 evidencia de qué se mandó.
@@ -34,13 +43,20 @@ remotos y quedan fuera de esta pieza por decisión de la tarea.
 
 ## Requisitos
 
-- `pg_dump`, `pg_restore`, `psql`, `tar`, `gzip`, `sha256sum`.
-- Con Docker: el demonio en marcha y los contenedores del lanzador oficial.
-- Sin Docker: PostgreSQL nativo y `sudo -u postgres` para crear la base de
-  destino y su extensión PostGIS —el rol `topgreen` no es superusuario—.
+- `tar`, `gzip` y **`sha256sum` o `shasum -a 256`**: se usa el que haya, así que
+  funciona igual en Linux y en macOS. Nada de `find -printf`, `stat -c` ni
+  `xargs -r`, que son de GNU.
+- Con Docker: el demonio en marcha y los contenedores del lanzador oficial. Las
+  herramientas de PostgreSQL salen de los contenedores; en el anfitrión no hace
+  falta ninguna. **Esta ruta no descarga ninguna imagen**: el destino se levanta
+  con la misma imagen que ya está sirviendo el origen, leída del contenedor
+  real, y los archivos se copian con `docker cp`, sin imagen auxiliar.
+- Sin Docker: PostgreSQL nativo con `pg_dump`, `pg_restore` y `psql`, y
+  `sudo -u postgres` para crear la base de destino y su extensión PostGIS —el
+  rol `topgreen` no es superusuario—.
 
-El comando detecta el entorno solo: si hay demonio de Docker usa los
-contenedores y volúmenes; si no, la base nativa y los directorios del backend.
+El comando detecta el entorno solo: si hay demonio de Docker trabaja con los
+contenedores; si no, con la base nativa y los directorios del backend.
 
 ## Los cuatro pasos
 
@@ -85,7 +101,9 @@ Cinco cosas, y cualquiera que falle corta con código distinto de cero:
 3. los archivos restaurados coinciden en ruta, tamaño y sha256;
 4. el origen conserva la identidad que tenía al respaldar: un respaldo que
    altera lo que copia no es un respaldo;
-5. el origen sigue arriba: los contenedores en marcha, o la API contestando.
+5. el origen sigue arriba: los contenedores en marcha, o la API contestando; y
+   con Docker, que dentro de `topgreen-db` no haya aparecido ninguna base de
+   restauración, porque el destino es otro contenedor.
 
 La comparación es contra **el bundle**, no contra el origen vivo: si el origen
 cambió después del respaldo, eso lo dice el punto 4 y no se confunde con una
@@ -93,10 +111,19 @@ restauración incompleta.
 
 ## Aislamiento y seguridad de la limpieza
 
-El destino se crea siempre nuevo:
+El destino se crea siempre nuevo, y **fuera del origen**:
 
-- base `topgreen_restore_<AAAAMMDD_HHMMSS>`, nunca `topgreen`;
-- archivos en `respaldos/destino-<sello>/`.
+- con Docker, **otro contenedor sobre otro volumen**:
+  `topgreen-restore-<sello>-db` y `topgreen-restore-<sello>-datos`. No se crea
+  ninguna base adentro de `topgreen-db`: eso escribiría en el volumen que se
+  está tratando de proteger. La credencial de ese contenedor se genera en la
+  corrida, es local y efímera, y no se escribe en el bundle ni en ningún
+  informe;
+- sin Docker, la base `topgreen_restore_<AAAAMMDD_HHMMSS>`, nunca `topgreen`;
+- en los dos casos, los tres árboles de archivos en `respaldos/destino-<sello>/`.
+
+Si la restauración se cae a la mitad, lo que alcanzó a crear se retira solo: no
+quedan contenedores ni volúmenes colgados esperando al próximo intento.
 
 **El nombre no prueba propiedad.** Cualquiera puede crear una base o una carpeta
 que se llame igual, y borrar por patrón es borrar lo que otro dejó ahí. Por eso
@@ -104,9 +131,12 @@ cada destino queda firmado, al restaurarlo, con un identificador de ejecución:
 
 - en la base, una fila en `respaldo_meta.propiedad` —un esquema aparte, para no
   ensuciar los datos restaurados ni la comparación, que sólo mira `public`—;
-- en el directorio, un archivo `.propiedad` con esa misma ejecución.
+- en el directorio, un archivo `.propiedad` con esa misma ejecución;
+- con Docker, además, **el contenedor y el volumen llevan etiquetas**:
+  `topgreen.respaldo=pieza` y `topgreen.respaldo.ejecucion=<id>`.
 
-`limpiar` exige las dos firmas y que coincidan entre sí. Si falta una, si están
+`limpiar` exige las firmas y que coincidan entre sí; con Docker comprueba la
+etiqueta de **cada** recurso antes de borrarlo. Si falta una, si están
 vacías o si la base no lleva la ejecución que dice el directorio, **frena sin
 borrar nada**. Y antes de eso sigue exigiendo que el sello tenga la forma
 exacta. Un destino ajeno con el nombre correcto sobrevive: comprobado, con y sin
