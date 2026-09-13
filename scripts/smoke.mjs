@@ -26848,29 +26848,85 @@ await runCase(169, 'El reinicio de la API prueba que cambió el proceso, o falla
   // API VIEJA a `/api/health`. Contestar no es haberse reiniciado.
   //
   // Acá se le arma al comando el entorno que lo engañaba, con dobles en el
-  // PATH, y se exige que falle. Los tres escenarios son deterministas y
-  // ninguno toca el producto, el TTL ni el límite.
+  // PATH, y se exige que falle. Ninguno toca el producto, el TTL ni el límite.
+  //
+  // Y los escenarios no pueden depender de CÓMO se sirva la API acá: el
+  // lanzador oficial la sirve con Docker y la ruta nativa la sirve con un
+  // uvicorn. Este caso corría sólo con la nativa —exigía que hubiera una— y en
+  // la corrida Docker de la PM se caía antes de probar nada. Ahora los dobles
+  // fijan el escenario en vez de heredarlo: cuando hace falta la rama nativa,
+  // el doble de `docker` dice que no hay contenedor, y el «quién sirve la API»
+  // se mide igual en los dos entornos.
   const psReal = ['/bin/ps', '/usr/bin/ps'].find((ruta) => existsSync(ruta));
   assert(psReal, 'no se encontró el `ps` del sistema para armar el doble');
   const taller = mkdtempSync(`${tmpdir()}/reinicio-169-`);
-  const doble = (nombre, cuerpo) => {
-    const carpeta = `${taller}/${nombre}`;
+  let cuantosDobles = 0;
+  /** Una carpeta con uno o más ejecutables falsos, para poner al frente del PATH. */
+  const dobles = (programas) => {
+    cuantosDobles += 1;
+    const carpeta = `${taller}/caso-${cuantosDobles}`;
     mkdirSync(carpeta, { recursive: true });
-    writeFileSync(`${carpeta}/${nombre.split('-')[0]}`, cuerpo, { mode: 0o755 });
+    for (const [nombre, cuerpo] of Object.entries(programas)) {
+      writeFileSync(`${carpeta}/${nombre}`, `${cuerpo}\n`, { mode: 0o755 });
+    }
     return carpeta;
   };
   const reiniciar = (carpeta) => spawnSync('./scripts/entorno_nativo.sh', ['--reiniciar-api'], {
     encoding: 'utf8',
     env: { ...process.env, PATH: `${carpeta}:${process.env.PATH}` },
   });
-  const uvicornsVivos = () => execFileSync(psReal, ['-eo', 'pid,comm,args'], { encoding: 'utf8' })
-    .split('\n')
+
+  // `-Ao` y no `-eo`: en BSD —la máquina de la PM— `-e` no significa «todos los
+  // procesos». Se pide todo explícitamente para que el caso mida lo mismo en
+  // las dos plataformas.
+  const psTodos = (formato) => {
+    try {
+      return execFileSync(psReal, ['-Ao', formato], { encoding: 'utf8' }).split('\n');
+    } catch { return []; }
+  };
+  const uvicornsVivos = () => psTodos('pid,comm,args')
     .filter((linea) => /uvicorn app\.main:app/.test(linea) && !/awk|grep/.test(linea))
     .map((linea) => linea.trim().split(/\s+/)[0]);
+  /** Vivo y no zombi: un `<defunct>` que nadie cosechó todavía no sirve nada. */
+  const vivoDeVerdad = (pid) => psTodos('pid,stat').some((linea) => {
+    const [suPid, estado] = linea.trim().split(/\s+/);
+    return suPid === String(pid) && estado && !estado.startsWith('Z');
+  });
+
+  /**
+   * Quién sirve la API, en cualquiera de los dos entornos admitidos. Se compara
+   * como cadena: si después de un intento fallido es la misma, el intento no
+   * tocó nada; si después del reinicio real es otra, el proceso cambió.
+   */
+  const quienSirveLaApi = () => {
+    const contenedor = spawnSync('docker', [
+      'inspect', '-f', '{{.State.Running}} {{.State.Pid}} {{.State.StartedAt}}', 'topgreen-api',
+    ], { encoding: 'utf8' });
+    const linea = `${contenedor.stdout || ''}`.trim();
+    if (contenedor.status === 0 && linea.startsWith('true ')) {
+      return { donde: 'contenedor topgreen-api', quien: linea };
+    }
+    const pids = uvicornsVivos();
+    if (pids.length) return { donde: 'uvicorn nativo', quien: pids.join(',') };
+    return { donde: 'nadie identificable', quien: '' };
+  };
   const laApiContesta = async () => {
     const respuesta = await fetch(`${API_URL}/health`).catch(() => null);
     return respuesta?.ok === true;
   };
+
+  const SIN_CONTENEDOR = [
+    '#!/usr/bin/env bash',
+    '# No hay contenedor: obliga al comando a tomar su rama nativa, corra donde corra.',
+    'if [ "${1:-}" = "inspect" ]; then exit 1; fi',
+    'exit 127',
+  ].join('\n');
+
+  const servicio = quienSirveLaApi();
+  assert(servicio.donde !== 'nadie identificable',
+    'no encontré quién sirve la API: ni contenedor `topgreen-api` ni uvicorn nativo. '
+    + 'Sin eso no hay reinicio real que comprobar');
+  assert(await laApiContesta(), 'la API no contesta antes de empezar');
 
   const medidos = [];
   let fantasma = null;
@@ -26878,99 +26934,98 @@ await runCase(169, 'El reinicio de la API prueba que cambió el proceso, o falla
     // 1. La forma exacta del entorno de la PM: la API la sirve un contenedor y
     //    el reinicio no lo mueve. `docker restart` contesta que sí, y la
     //    identidad del contenedor sigue siendo la misma.
-    const conContenedorQuieto = doble('docker-quieto', [
-      '#!/usr/bin/env bash',
-      'if [ "${1:-}" = "inspect" ]; then echo "true 4242 2026-09-12T20:14:56.246290658Z"; exit 0; fi',
-      'if [ "${1:-}" = "restart" ]; then exit 0; fi',
-      'exit 127',
-      '',
-    ].join('\n'));
-    const quieto = reiniciar(conContenedorQuieto);
+    const quieto = reiniciar(dobles({
+      docker: [
+        '#!/usr/bin/env bash',
+        'if [ "${1:-}" = "inspect" ]; then echo "true 4242 2026-09-12T20:14:56.246290658Z"; exit 0; fi',
+        'if [ "${1:-}" = "restart" ]; then exit 0; fi',
+        'exit 127',
+      ].join('\n'),
+    }));
     assert(quieto.status !== 0,
       `con un topgreen-api que no se reinicia, el comando salió con ${quieto.status} y anunció `
       + `éxito:\n${quieto.stdout}`);
     assert(/misma identidad/.test(quieto.stderr),
       `el rojo no dice que la identidad del contenedor no cambió:\n${quieto.stderr}`);
+    assert(quienSirveLaApi().quien === servicio.quien,
+      `el intento fallido movió el ${servicio.donde}: era [${servicio.quien}] y quedó `
+      + `[${quienSirveLaApi().quien}]`);
     medidos.push('un contenedor que contesta pero no se reinicia da rojo, no verde');
 
-    // 2. Sin contenedor y sin uvicorn a la vista: no se sabe quién atiende el
+    // 2. Ni contenedor ni uvicorn a la vista: no se sabe quién atiende el
     //    puerto. Antes acá se levantaba un proceso al lado y se anunciaba
     //    éxito; ahora se frena sin tocar nada.
-    const antesDelCiego = uvicornsVivos();
-    assert(antesDelCiego.length > 0,
-      'este caso necesita una API nativa en marcha para comprobar que no la tocan');
-    const conApiInvisible = doble('ps-ciego', [
-      '#!/usr/bin/env bash',
-      `${psReal} "$@" | grep -v 'uvicorn app.main:app'`,
-      '',
-    ].join('\n'));
-    const ciego = reiniciar(conApiInvisible);
+    const ciego = reiniciar(dobles({
+      docker: SIN_CONTENEDOR,
+      ps: ['#!/usr/bin/env bash', `${psReal} "$@" | grep -v 'uvicorn app.main:app'`].join('\n'),
+    }));
     assert(ciego.status !== 0,
       `sin poder identificar quién sirve la API, el comando salió con ${ciego.status}:\n`
       + `${ciego.stdout}`);
     assert(/no se identifica|no hay contenedor/.test(ciego.stderr),
       `el rojo no explica que no pudo identificar el servicio:\n${ciego.stderr}`);
-    assert(uvicornsVivos().join(',') === antesDelCiego.join(','),
-      'el intento fallido movió la API que estaba corriendo');
+    assert(quienSirveLaApi().quien === servicio.quien,
+      `el intento fallido movió el ${servicio.donde}: era [${servicio.quien}] y quedó `
+      + `[${quienSirveLaApi().quien}]`);
     medidos.push('sin saber quién sirve la API, frena y deja la que había en paz');
 
     // 3. El puerto lo atiende otro. Se le da al comando un proceso descartable
-    //    disfrazado de uvicorn —y se le esconde el de verdad—: lo mata, y el
-    //    puerto sigue contestando. Ese silencio que no llega es la prueba de
-    //    que el contador quedó donde estaba.
+    //    disfrazado de uvicorn —y se le esconde el que hubiera de verdad—: lo
+    //    mata, y el puerto sigue contestando. Ese silencio que no llega es la
+    //    prueba de que el contador quedó donde estaba.
+    //
+    //    El doble no reescribe una línea del `ps` real: agrega la suya mientras
+    //    el descartable siga vivo y no sea un zombi. Así el escenario no
+    //    depende de que `ps` liste un proceso sin terminal ni de cuándo Node
+    //    coseche al hijo que acaba de morir.
     fantasma = spawn('sleep', ['300'], { detached: true, stdio: 'ignore' });
     fantasma.unref();
-    // Un zombi no es un servidor: el `sleep` es hijo de este proceso y, hasta
-    // que Node lo coseche, sigue apareciendo en `ps` como `<defunct>`. Mientras
-    // la suite está bloqueada en `spawnSync` eso no pasa, así que el estado
-    // «Z» se cuenta como muerto acá y también en el doble de `ps`.
-    const fantasmaALaVista = () => execFileSync(psReal, ['-eo', 'pid,stat'], { encoding: 'utf8' })
-      .split('\n')
-      .some((linea) => linea.trim().split(/\s+/)[0] === String(fantasma.pid)
-        && !linea.trim().split(/\s+/)[1]?.startsWith('Z'));
-    await esperarA(async () => fantasmaALaVista(),
+    await esperarA(async () => vivoDeVerdad(fantasma.pid),
       'el proceso descartable que hace de uvicorn no llegó a existir', 10_000);
-    const conFantasma = doble('ps-fantasma', [
-      '#!/usr/bin/env bash',
-      `${psReal} "$@" | awk -v pid=${fantasma.pid} '`,
-      '  /uvicorn app.main:app/ { next }',
-      '  /<defunct>/ { print; next }',
-      '  $1 == pid { print pid " python /usr/bin/python -m uvicorn app.main:app"; next }',
-      '  { print }',
-      "'",
-      '',
-    ].join('\n'));
-    const suplantado = reiniciar(conFantasma);
+    const suplantado = reiniciar(dobles({
+      docker: SIN_CONTENEDOR,
+      ps: [
+        '#!/usr/bin/env bash',
+        `${psReal} "$@" | grep -v 'uvicorn app.main:app'`,
+        `estado="$(${psReal} -o stat= -p ${fantasma.pid} 2>/dev/null | tr -d ' ')"`,
+        'if [ -n "$estado" ] && [ "${estado#Z}" = "$estado" ]; then',
+        `  echo "${fantasma.pid} python /usr/bin/python -m uvicorn app.main:app"`,
+        'fi',
+      ].join('\n'),
+    }));
     assert(suplantado.status !== 0,
       `matando a otro proceso, el comando salió con ${suplantado.status}:\n${suplantado.stdout}`);
     assert(/sigue contestando/.test(suplantado.stderr),
       `el rojo no dice que el puerto lo atiende otro servicio:\n${suplantado.stderr}`);
-    assert(!fantasmaALaVista(),
+    assert(!vivoDeVerdad(fantasma.pid),
       'el comando ni siquiera mató lo que creía que era la API: el escenario no probó nada');
     assert(await laApiContesta(), 'el escenario del suplantado se llevó puesta la API de verdad');
     medidos.push('si el puerto sigue vivo después de matar lo que creía la API, da rojo');
 
-    // 4. Y el camino bueno: la API nativa se reinicia de verdad, con otros
-    //    procesos y contestando.
-    const antes = uvicornsVivos();
+    // 4. Y el camino bueno, con el entorno tal cual es: la identidad de quien
+    //    sirve la API tiene que cambiar. Con contenedor eso es `Pid` y
+    //    `StartedAt`; con uvicorn nativo, los PID.
+    const antes = quienSirveLaApi();
     const bueno = spawnSync('./scripts/entorno_nativo.sh', ['--reiniciar-api'], {
       encoding: 'utf8',
     });
     assert(bueno.status === 0,
       `el reinicio real falló:\n${bueno.stdout}\n${bueno.stderr}`);
-    const despues = uvicornsVivos();
-    assert(despues.length > 0, 'después del reinicio no quedó ningún uvicorn');
-    assert(despues.every((pid) => !antes.includes(pid)),
-      `el reinicio dejó los mismos procesos: antes ${antes.join(',')}, después ${despues.join(',')}`);
+    const despues = quienSirveLaApi();
+    assert(despues.donde === antes.donde,
+      `antes la API la servía ${antes.donde} y después ${despues.donde}`);
+    assert(despues.quien && despues.quien !== antes.quien,
+      `el reinicio dejó la misma identidad: [${antes.quien}]`);
     assert(await laApiContesta(), 'la API no contesta después del reinicio real');
-    medidos.push(`el reinicio real cambió el proceso (${antes.join(',')} → ${despues.join(',')})`);
+    medidos.push(`el reinicio real cambió el ${antes.donde}: [${antes.quien}] → `
+      + `[${despues.quien}]`);
   } finally {
     if (fantasma?.pid) { try { process.kill(fantasma.pid, 'SIGKILL'); } catch { /* ya no está */ } }
     rmSync(taller, { recursive: true, force: true });
   }
 
   return `el reinicio que aísla el presupuesto de intentos verifica identidad y no se conforma `
-    + `con que /api/health conteste: ${medidos.join('; ')}`;
+    + `con que /api/health conteste, con la API en ${servicio.donde}: ${medidos.join('; ')}`;
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
