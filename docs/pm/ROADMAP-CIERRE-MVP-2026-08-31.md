@@ -161,6 +161,7 @@ anatomías ni el detalle. Su contrato completo y la evidencia de raíz están en
 | 17S | **TEST-SUITE-167S — cerrada** | Estabilidad de 139 y 143 | `d7e17f9`/`40131de`. Dev y PM reprodujeron 139+143 juntos en 2/2 cada uno; sólo arnés, sin suite completa PM. |
 | 18 | **COPY-CLEAR-1 — cerrada en rama** | A7, A10, F4 y F12; deuda ADMIN-STATE-1 | `9f25d59`/`ee166b4`. PM revisó diff, reprodujo focales 3/3 + 3/3 + 2/2 y separó los rojos heredados de a11y, caducidad y rate-limit sin debilitar seguridad. |
 | 18I | **INTEGRATION-CANDIDATE-1 — aceptada en rama** | Composición de todo el trabajo aceptado | `c565e6e`/`ad914a3`. PM obtuvo 168/169 sobre `e0cdfe9` y 169 en 1/1 sobre el único delta de `c565e6e`; los 169 casos quedan cubiertos. A11y y contraste verdes. Integración y despliegue retenidos por backups y política de ramas. |
+| 18O | **BACKUP-RESTORE-1 — activa** | Puerta operativa previa a integración | Backup lógico de PostGIS y copia de `/data`, restaurados y comparados en un destino local limpio. Sin tocar Railway; la activación administrada y el gasto requieren decisión de Emi. |
 
 Son mejoras de claridad, no autorización para mensajería, planes, suscripciones
 o un rediseño nuevo.

@@ -10,7 +10,7 @@ Actualizado: 2026-09-13.
 - **`main`:** sin cambios de producto desde `3064f10`; el delta actual es sólo documentación PM. Sigue conectado al auto-deploy de Railway, por lo que no se integra producto ahí todavía.
 - **Rama Dev:** `claude/dev-role-repo-3l0kp3`, HEAD de informe `ad914a3`; candidata de producto/arnés `c565e6e`, aceptada en rama y no integrada ni desplegada.
 - **Última decisión PM:** `INTEGRATION-CANDIDATE-1` **ACEPTADA** en revisión 3. La composición queda congelada en `c565e6e`; no autoriza integración ni despliegue.
-- **Tarea activa:** ninguna para Dev. La próxima puerta es operativa: Emi/PM deben resolver backups con restauración ensayada y el cambio controlado de ramas/deploy antes de integrar la candidata o abrir `CAT-PAGE-1`.
+- **Tarea activa:** `BACKUP-RESTORE-1`, responsable Dev. Debe dejar un mecanismo reproducible de backup/restauración de PostGIS y `/data`, demostrarlo sobre datos locales descartables y documentar la ejecución en Railway sin tocar el entorno remoto. No autoriza integración, despliegue ni gasto.
 
 ## Última aceptación PM relevante
 
@@ -100,7 +100,8 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 ## Próxima secuencia
 
 1. Mantener congelada `c565e6e`: no integrar ni desplegar mientras `main` siga conectado al auto-deploy sin backups.
-2. Emi/PM resuelven backups con restauración ensayada y autorizan el cambio operativo de ramas/deploy.
-3. Ejecutar de forma controlada la separación `main`/`release` e integrar exactamente la candidata aceptada; cualquier cambio de producto exige recomposición y prueba.
-4. Con la integración convergida, abrir `CAT-PAGE-1` y continuar el roadmap contractual.
-5. Mercado Pago, red-team y producción permanecen al final de la secuencia acordada, sin esperar artificialmente a una fecha si las dependencias ya están listas.
+2. Dev entrega `BACKUP-RESTORE-1`; PM reproduce una restauración local completa y clasifica cualquier dependencia externa.
+3. Emi autoriza la opción de backup administrado/costo y la operación remota; se ensaya una restauración recuperable antes de usar datos reales.
+4. Ejecutar de forma controlada la separación `main`/`release` e integrar exactamente la candidata aceptada; cualquier cambio de producto exige recomposición y prueba.
+5. Con la integración convergida, abrir `CAT-PAGE-1` y continuar el roadmap contractual.
+6. Mercado Pago, red-team y producción permanecen al final de la secuencia acordada, sin esperar artificialmente a una fecha si las dependencias ya están listas.
