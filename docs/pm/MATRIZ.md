@@ -1,7 +1,7 @@
 # Matriz requisito contractual → evidencia → estado
 
-Contrastada contra `CONTRATO.md`. Actualizada el 2026-08-14 después del cierre
-de MP-C contra el doble local.
+Contrastada contra `CONTRATO.md`. Actualizada el 2026-09-13 después de aceptar
+la composición candidata de integración.
 
 **Estados:** ✅ verificado con evidencia de ejecución · 🟡 existe en
 código, sin verificar · ⚪ parcial · ❌ inexistente
@@ -87,7 +87,7 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 
 | Requisito | Estado |
 |-----------|--------|
-| Pruebas integrales | ✅ Dev informa 99/99 desde base limpia y hito 6/6; PM verificó build, sintaxis y regresiones MP-C por código. Pendiente repetir la suite oficial con Docker desde PM antes del lanzamiento |
+| Pruebas integrales | ✅ Candidata `c565e6e` aceptada en rama. PM corrió 168/169 desde base Docker limpia sobre `e0cdfe9`; el único rojo fue el nuevo caso 169. Git demuestra que el delta final sólo cambia ese caso, que PM reprodujo 1/1 con Docker real sobre `c565e6e`. Quedan cubiertos los 169 casos; a11y y contraste verdes. No equivale a despliegue productivo. |
 | Carga inicial de datos | ✅ Seed idempotente con 30 publicaciones en 12 categorías y 9 provincias, más 4.028 localidades. Verificado corriéndolo dos veces sin duplicar |
 | Despliegue en producción | ❌ |
 | Capacitación del panel de administración | ❌ |

@@ -8,57 +8,32 @@ Actualizado: 2026-09-13.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 4. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
 - **`main`:** sin cambios de producto desde `3064f10`; el delta actual es sólo documentación PM. Sigue conectado al auto-deploy de Railway, por lo que no se integra producto ahí todavía.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, HEAD de informe `29327b6`; candidata R2 de producto/arnés `e0cdfe9`, no integrada ni desplegada.
-- **Última decisión PM:** `INTEGRATION-CANDIDATE-1` **DEVUELTA** en revisión 2 por un único defecto del caso 169. `COPY-CLEAR-1` permanece aceptada.
-- **Tarea activa:** `INTEGRATION-CANDIDATE-1`, responsable Dev, devolución 2. Debe hacer que el caso 169 corra tanto con la API Docker del lanzador oficial como con API nativa, sin tocar producto ni reabrir los casos 1–168; no autoriza despliegue.
-
-## Aceptación vigente — COPY-CLEAR-1
-
-Producto/regresión `9f25d59`; informe Dev `ee166b4`. La PM revisó el diff exacto del commit: 14 archivos, sin Backend, schema, pagos, Railway ni dependencias. Los seis puntos quedan dentro del alcance: búsqueda por acción, FAQ sin planes/comisiones inventadas, salida honesta para contraseña olvidada, voseo es-AR, estados visibles traducidos con tokens API intactos y conservación de marca→Inicio.
-
-Evidencia independiente PM sobre checkouts temporales aislados:
-
-- 156 + 160 + 168 desde base Docker limpia: **3/3**;
-- 134 + 167 + 168 desde otra base limpia: **3/3**;
-- 165 + 166 desde otra base limpia: **2/2**;
-- suite completa PM: **163/168**; rojos 114, 165, 166, 167 y 168, todos clasificados fuera de la pieza por reproducciones focales o por el mecanismo del arnés;
-- a11y en entrega y en su padre `fe822d0`: mismo resultado, 64/64 pantallas y las mismas seis violaciones `serious` de contraste en paneles;
-- lint, TypeScript, sintaxis y `diff-check`: verdes.
-
-Los 165/166 de la suite completa fallaron con token vencido tras la corrida larga y pasaron 2/2 aislados. El 167/168 heredó el presupuesto de intentos consumido por la suite; ambos pasan aislados junto al 134. No se cambió ni se debe debilitar el límite antifuerza-bruta de producción. El 114 es intermitencia heredada del arnés y no toca ningún archivo de la entrega.
-
-Logs persistentes: `/private/tmp/topgreen-pm-copy-focal.log`, `/private/tmp/topgreen-pm-copy-a11y-delivery.log`, `/private/tmp/topgreen-pm-copy-a11y-base.log`, `/private/tmp/topgreen-pm-copy-ratelimit-134-167-168.log`, `/private/tmp/topgreen-pm-copy-suite.log` y `/private/tmp/topgreen-pm-copy-165-166.log`.
-
-Hallazgos vivos separados: corregir el contraste heredado de los paneles y aislar el presupuesto temporal/antifuerza-bruta del arnés antes de exigir una doble suite 168/168 sobre la composición candidata. Ninguno invalida `COPY-CLEAR-1`; ambos sí bloquean declarar verde integral.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, HEAD de informe `ad914a3`; candidata de producto/arnés `c565e6e`, aceptada en rama y no integrada ni desplegada.
+- **Última decisión PM:** `INTEGRATION-CANDIDATE-1` **ACEPTADA** en revisión 3. La composición queda congelada en `c565e6e`; no autoriza integración ni despliegue.
+- **Tarea activa:** ninguna para Dev. La próxima puerta es operativa: Emi/PM deben resolver backups con restauración ensayada y el cambio controlado de ramas/deploy antes de integrar la candidata o abrir `CAT-PAGE-1`.
 
 ## Última aceptación PM relevante
 
-`COPY-CLEAR-1` quedó aceptada en rama Dev: producto/regresión `9f25d59`, informe `ee166b4`. No está integrada ni desplegada.
+`INTEGRATION-CANDIDATE-1` quedó aceptada en rama Dev: producto/arnés `c565e6e`, informe `ad914a3`. No está integrada ni desplegada.
 
 Las aceptaciones anteriores y sus reproducciones son historia consultable en Git y en los documentos de evidencia; no se vuelven a transcribir en este archivo.
 
 ## Estado de integración
 
-La candidata R2 `e0cdfe9` corrigió los defectos de la primera revisión. La suite completa independiente PM corrió desde base Docker limpia y dio **168/169**:
+La composición candidata queda **aceptada** en `c565e6e`. La evidencia independiente PM se compone sin ocultar los SHA:
 
-- 114, 131, 167 y 168 pasaron dentro de la corrida completa;
-- después del 134, `topgreen-api` cambió de PID `65908` a `89335` y de `StartedAt=2026-09-13T12:49:48.468708656Z` a `2026-09-13T13:02:32.238270514Z`; el reinicio Docker fue real y los casos posteriores no heredaron el presupuesto antifuerza-bruta;
-- el único rojo fue el nuevo caso 169: abortó con «este caso necesita una API nativa en marcha para comprobar que no la tocan». El lanzador oficial usa la API Docker, por lo que el propio caso exige un entorno incompatible con la suite que debe integrar;
-- el informe `29327b6` es sólo documental respecto de `e0cdfe9`.
+- suite completa desde base Docker limpia sobre `e0cdfe9`: **168/169**; 114, 131, 167 y 168 pasaron, y el único rojo fue el caso 169 por exigir una API nativa simultánea;
+- durante esa suite, después del 134, `topgreen-api` cambió de PID `65908` a `89335` y de `StartedAt=2026-09-13T12:49:48.468708656Z` a `2026-09-13T13:02:32.238270514Z`; el reinicio Docker fue real;
+- Git demuestra que `c565e6e` sólo cambia el caso 169 respecto de `e0cdfe9`; no toca producto ni los casos 1–168. `ad914a3` agrega únicamente el informe;
+- focal 169 PM sobre `c565e6e`, desde otra base Docker limpia: **1/1**. Los tres negativos rechazaron identidad sin cambio, servicio no identificable y puerto servido por otro proceso; el camino real cambió `topgreen-api` de PID `45076` a `45360` y también cambió `StartedAt`;
+- sintaxis de `smoke.mjs` y `diff-check`: verdes. A11y y contraste ya habían quedado verdes en `e0cdfe9` y no se repitieron porque el delta R3 sólo toca el caso 169.
 
-La devolución 2 queda limitada al caso 169. Si el nuevo delta está acotado a ese caso y al informe, Dev no repite 1–168 ni las puertas ya verdes; PM reproduce el 169 en Docker sobre el SHA final. Log PM: `/Users/Emi/.codex/visualizations/2026/09/12/01a097e2-a20d-77a1-b8f3-970edbda5495/topgreen-pm-integration-r2-suite-e0cdfe9.log`.
+La suma de la corrida completa y el focal sobre el único delta cubre los **169 casos** de la candidata final. Log de la suite completa PM: `/Users/Emi/.codex/visualizations/2026/09/12/01a097e2-a20d-77a1-b8f3-970edbda5495/topgreen-pm-integration-r2-suite-e0cdfe9.log`.
 
-La rama Dev acumuló trabajo aceptado y pendiente sin integrar porque históricamente `main` también se usó como fuente de despliegue. El resultado es una divergencia grande y una composición que debe tratarse explícitamente.
-
-Reglas para cerrar esa deuda:
-
-- no integrar la rama Dev completa “porque sí”;
-- construir una **composición candidata** que incorpore `main` actual y el trabajo Dev aceptado;
-- un commit documental nuevo en `main` no invalida por sí solo una composición de producto previamente probada; un cambio de producto sí exige recomposición/retest;
-- Dev corre suite completa sobre el SHA candidato desde base limpia;
-- PM corre suite completa independiente sobre **el mismo SHA** desde otra base limpia;
-- si un rojo aparece sólo en un entorno, reproducirlo aislado en ambos antes de clasificarlo;
-- hasta resolver diferencias, el candidato no está aceptado.
+La deuda de composición quedó cerrada: `c565e6e` incorpora `main` y el trabajo
+aceptado, y ya no hay diferencias de prueba sin clasificar. El SHA queda
+congelado; un commit documental nuevo en `main` no lo invalida, pero cualquier
+cambio de producto exige recomposición y prueba antes de integrar.
 
 El inventario confirmó que `main` es hoy la rama de producción de ambos servicios y que el auto-deploy está activo sin esperar CI. Por eso **no se adopta todavía** `main = integración`: la composición candidata se prepara y prueba en la rama Dev. La migración recomendada a `main = integración aceptada` / `release = producción` queda retenida hasta resolver backups y ejecutar un cambio operativo controlado; si se adopta, `release` sólo puede avanzar a un SHA ya contenido en `main` y no lleva commits exclusivos.
 
@@ -101,7 +76,7 @@ Adquirir las cuentas/credenciales de prueba es dependencia humana. No enlazar OA
 
 De la puerta contractual completa, hoy siguen vivos estos bloqueos:
 
-- composición candidata aceptada sobre un mismo SHA por Dev y PM, y luego política de ramas/deploy resuelta;
+- política de ramas/deploy resuelta e integración controlada de la candidata ya aceptada `c565e6e`;
 - backups con restauración ensayada; la persistencia ya existe pero no sustituye backup;
 - SMTP real para el flujo de validación por correo; `outbox` no satisface producción;
 - configuración y secretos revisados sin exponer valores;
@@ -124,9 +99,8 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev prepara `INTEGRATION-CANDIDATE-1` en su rama, sin tocar `main` ni Railway.
-2. En la candidata corrige el contraste heredado y el aislamiento/caducidad del arnés, sin debilitar seguridad.
-3. Dev corre suite completa desde base limpia sobre el SHA candidato.
-4. PM corre otra suite completa independiente sobre **el mismo SHA**.
-5. Resolver backups y después ejecutar de forma controlada la separación `main`/`release`; hasta entonces no desplegar la candidata.
-6. Después de converger integración, continuar el roadmap contractual; Mercado Pago/red-team/producción permanecen al final de la secuencia acordada, sin esperar artificialmente a una fecha si las dependencias ya están listas.
+1. Mantener congelada `c565e6e`: no integrar ni desplegar mientras `main` siga conectado al auto-deploy sin backups.
+2. Emi/PM resuelven backups con restauración ensayada y autorizan el cambio operativo de ramas/deploy.
+3. Ejecutar de forma controlada la separación `main`/`release` e integrar exactamente la candidata aceptada; cualquier cambio de producto exige recomposición y prueba.
+4. Con la integración convergida, abrir `CAT-PAGE-1` y continuar el roadmap contractual.
+5. Mercado Pago, red-team y producción permanecen al final de la secuencia acordada, sin esperar artificialmente a una fecha si las dependencias ya están listas.

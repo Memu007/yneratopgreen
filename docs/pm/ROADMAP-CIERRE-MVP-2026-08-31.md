@@ -160,6 +160,7 @@ anatomías ni el detalle. Su contrato completo y la evidencia de raíz están en
 | 17 | **FILTER-INTENT-1R3 — cerrada en rama** | A6, A9 y R6 | `0a6cbd4` + `fbdd88f` + `a834ec3` + `fa4446a`; informes `89db3fe` + `71976e9` + `d21cf78` + `50f63b6`. Dev y PM reprodujeron 167 R3 en 1/1 cada uno; sin suite completa PM ni despliegue. |
 | 17S | **TEST-SUITE-167S — cerrada** | Estabilidad de 139 y 143 | `d7e17f9`/`40131de`. Dev y PM reprodujeron 139+143 juntos en 2/2 cada uno; sólo arnés, sin suite completa PM. |
 | 18 | **COPY-CLEAR-1 — cerrada en rama** | A7, A10, F4 y F12; deuda ADMIN-STATE-1 | `9f25d59`/`ee166b4`. PM revisó diff, reprodujo focales 3/3 + 3/3 + 2/2 y separó los rojos heredados de a11y, caducidad y rate-limit sin debilitar seguridad. |
+| 18I | **INTEGRATION-CANDIDATE-1 — aceptada en rama** | Composición de todo el trabajo aceptado | `c565e6e`/`ad914a3`. PM obtuvo 168/169 sobre `e0cdfe9` y 169 en 1/1 sobre el único delta de `c565e6e`; los 169 casos quedan cubiertos. A11y y contraste verdes. Integración y despliegue retenidos por backups y política de ramas. |
 
 Son mejoras de claridad, no autorización para mensajería, planes, suscripciones
 o un rediseño nuevo.
