@@ -1986,9 +1986,16 @@
 
 /* La elegida y TODAS las anteriores van pintadas: son las que se dibujan
    llenas. Pintar sólo la elegida dejaba «3 de 5» con dos estrellas llenas de
-   color apagado, que se lee como si valieran menos que la tercera. */
+   color apagado, que se lee como si valieran menos que la tercera.
+
+   El color es el cereal PROFUNDO, no el claro: una estrella llena es un
+   glifo, o sea texto, y el claro es la señal que tokens.css reserva para
+   formas —filete, cuadro, regla— justamente porque no llega a 4,5:1. Medido
+   sobre el fondo de la capa: #c49a43 sobre blanco da 2,61:1 y #8a671c da
+   5,20:1. Es la misma corrección que ya se hizo en las estrellas de la
+   reputación. */
 .elegida {
-  color: var(--tg-color-signal);
+  color: var(--tg-color-accent);
 }
 
 /* El foco tiene que verse: es el único indicio de dónde está parado quien

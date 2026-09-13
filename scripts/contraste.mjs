@@ -47,6 +47,7 @@ const ESPERADAS = [
   'checkout traslado',
   'checkout transportista elegido',
   'checkout pago',
+  'calificación (estrellas elegidas)',
   'perfil vendedor',
   'documentación fiscal',
   'mis ventas',
@@ -121,6 +122,12 @@ const MEDIR = () => {
     for (let i = 0; i < desde; i += 1) {
       if (el.contains(pila[i])) continue;
       const e = getComputedStyle(pila[i]);
+      /* Lo que no se pinta no tapa. Un control nativo escondido con
+         `opacity: 0` sigue teniendo el fondo blanco de la hoja del navegador y
+         sigue estando encima: así el selector de estrellas —cada estrella es un
+         radio invisible sobre su glifo— se declaraba «texto tapado» y esta
+         puerta no lo medía nunca, ni con el color equivocado. */
+      if (parseFloat(e.opacity) === 0 || e.visibility === 'hidden') continue;
       if ((e.backgroundImage && e.backgroundImage !== 'none') || rgbDe(e.backgroundColor)) {
         return { tapado: true };
       }
@@ -240,6 +247,65 @@ async function sesion(ctxOpts, tokens) {
   }
   return ctx;
 }
+
+/* El selector de estrellas es la única pantalla donde vive `.elegida`, la clase
+   que pinta las estrellas llenas, y no existe sin una compra recibida: hay que
+   fabricarla. Se llega por las rutas reales —transferencia aprobada,
+   confirmada, despachada, recibida— y no se califica, así que la misma orden
+   sirve para la medida de escritorio y para la de móvil.
+
+   Sin esta pantalla la puerta declaraba cobertura completa y el selector
+   quedaba en 2,61:1 sin que nadie lo viera. */
+async function api(ruta, { token, method = 'GET', body } = {}) {
+  const r = await fetch(`${API}${ruta}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const texto = await r.text();
+  let datos = null;
+  try { datos = JSON.parse(texto); } catch { /* algunas salidas no traen cuerpo */ }
+  if (!r.ok) throw new Error(`${method} ${ruta} respondió HTTP ${r.status}: ${texto.slice(0, 200)}`);
+  return datos;
+}
+
+async function fabricarOrdenRecibida() {
+  const catalogo = await api('/catalog/products?search=Fertilizante%20Triple%2015&page_size=1');
+  const producto = catalogo?.items?.[0];
+  if (!producto) throw new Error('no está la publicación con la que se arma la orden a calificar');
+  await api('/cart', { token: comprador.access, method: 'DELETE' });
+  await api('/cart/items', {
+    token: comprador.access, method: 'POST',
+    body: { product_id: producto.id, quantity: 1 },
+  });
+  const checkout = await api('/orders/checkout/transfer', {
+    token: comprador.access, method: 'POST',
+    body: {
+      shipping_address: 'Ruta 8 km 220',
+      shipping_locality_id: producto.publication_location.locality_id,
+      shipping_postal_code: '2700',
+      shipping_decisions: [{ seller_id: producto.seller.id, mode: 'self' }],
+    },
+  });
+  const orden = checkout?.orders?.[0]?.order_id;
+  if (!orden) throw new Error('el checkout no devolvió la orden que hay que calificar');
+  await api(`/orders/${orden}/transfer-receipt`, {
+    token: vendedor.access, method: 'PATCH', body: { decision: 'approve' },
+  });
+  for (const [estado, token] of [
+    ['confirmed', vendedor.access], ['shipped', vendedor.access], ['delivered', comprador.access],
+  ]) {
+    await api(`/orders/${orden}/status`, { token, method: 'PATCH', body: { status: estado } });
+  }
+  await api('/cart', { token: comprador.access, method: 'DELETE' });
+  return orden;
+}
+
+const ordenSinCalificar = await fabricarOrdenRecibida();
+console.log(`  · orden recibida y sin calificar para el selector: ${ordenSinCalificar}`);
 
 /* Texto sobre foto: el medidor no puede resolver el fondo. Lo acoto sustituyendo
    la foto por blanco puro y por negro puro. Cualquier foto real queda entre esos
@@ -454,6 +520,20 @@ for (const medida of MEDIDAS) {
     await page.locator('form:has(h2) button[type="submit"]').click();
     await revisar(page, `${medida.n} checkout pago`,
       page.getByRole('heading', { name: /Medio de pago/i }));
+
+    // El selector de estrellas, con las cinco elegidas: el formulario abre en 5
+    // y `.elegida` pinta la elegida y todas las anteriores, así que abrirlo ya
+    // deja el estado que hay que medir.
+    await page.goto(WEB, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
+    await page.getByRole('heading', { name: 'Mi Perfil' })
+      .waitFor({ state: 'visible', timeout: ESPERA });
+    await page.getByRole('button', { name: /^Mis Compras/ }).first().click();
+    const calificar = page.getByRole('button', { name: /Calificar Vendedor/i }).first();
+    await calificar.waitFor({ state: 'visible', timeout: ESPERA });
+    await calificar.click();
+    await revisar(page, `${medida.n} calificación (estrellas elegidas)`,
+      page.getByRole('heading', { name: /^Calificar a / }));
 
     await ctx.close();
   }
