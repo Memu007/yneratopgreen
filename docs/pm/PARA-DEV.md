@@ -99,3 +99,40 @@ dependencia. Los artefactos de backup y datos de prueba no se versionan.
 Entregá rama, SHA base, SHA candidato, diff completo, comandos exactos y
 resultados del positivo y del negativo. Reemplazá `PARA-PM.md` con un informe
 breve. No integres ni despliegues; frená para revisión PM.
+
+---
+
+## Revisión PM R1 — DEVOLVER
+
+Revisé la candidata `5ae5572` y el informe `4636b23`. La sintaxis y el
+`diff-check` quedan verdes, pero la pieza no se acepta todavía. Corregí sólo
+estas dos raíces sobre la misma rama:
+
+1. **El bundle omite una raíz persistente.** `NOW.md` registra el volumen de
+   producción montado en `/data` y `EMAIL_OUTBOX_DIR=/data/outbox`. La candidata
+   fija `data_roots=uploads,documentos` y archiva únicamente esas dos carpetas.
+   Incluí `outbox` en backup, restore, inventario, fingerprints, manifiesto,
+   documentación y positivo discriminante. Adaptá el doble local de forma
+   explícita si hoy monta el outbox en `/app/outbox`; no cambies producto ni
+   Docker/Railway para acomodar la prueba.
+2. **`cleanup` puede borrar recursos ajenos por nombre.** PM creó un volumen
+   descartable sin etiquetas llamado `topgreen-restore-pm-unowned-db`; ejecutar
+   `cleanup topgreen-restore-pm-unowned` lo eliminó con exit 0. El prefijo no
+   demuestra propiedad. Marcá todos los contenedores y volúmenes creados por la
+   pieza con una etiqueta estable más un identificador de ejecución, y antes de
+   cada `rm` exigí que esas etiquetas coincidan. Si falta o difiere, frená sin
+   borrar nada. No alcanza con ampliar o endurecer el patrón del nombre.
+
+### Evidencia R2 exigida
+
+- positivo completo con marcador DB y un marcador en cada raíz persistente,
+  incluido `outbox`;
+- negativo de integridad ya existente;
+- negativo de propiedad: un contenedor o volumen sin etiqueta y con nombre que
+  coincida debe sobrevivir, `cleanup` debe fallar y la prueba debe retirarlo
+  luego por un comando explícito limitado al recurso que ella misma creó;
+- origen con mismas identidades, fingerprints y salud antes/después;
+- `sh -n`, `diff-check` y diff total desde `24dcca8`.
+
+No corras suite funcional completa. No integres, no despliegues y no abras otra
+tarea. Entregá nuevos SHA de producto/arnés e informe; no reescribas los SHA R1.

@@ -7,10 +7,10 @@ Actualizado: 2026-09-13.
 ## Resumen ejecutivo
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 4. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
-- **`main`:** `b8447a3`, merge de la candidata aceptada `c565e6e` y su informe `ad914a3` sobre el estado PM `2e752cb`. Incluye el `AGENTS.md` consolidado y preserva la regla local de eficiencia de chats.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, HEAD de informe `ad914a3`; su candidata `c565e6e` ya es ancestro de `main`.
-- **Última decisión owner/PM:** Emi autorizó integrar y desplegar `b8447a3` antes de contar con backup ensayado. La excepción publica el trabajo aceptado, pero no levanta la puerta de backup ni convierte el entorno en producción aceptada.
-- **Tarea activa:** `BACKUP-RESTORE-1`, responsable Dev. Debe producir y ensayar una copia lógica de PostGIS y de los datos persistentes en un destino local aislado, sin tocar Railway ni datos remotos.
+- **`main`:** `24dcca8`; producto integrado en `b8447a3` y cierre PM documental posterior. Incluye el `AGENTS.md` consolidado y preserva la regla local de eficiencia de chats.
+- **Rama Dev:** `codex/backup-restore-1`, informe `4636b23`; candidata R1 `5ae5572`, devuelta para corrección y no integrada.
+- **Última decisión PM:** `BACKUP-RESTORE-1` R1 **DEVUELTA**. El bundle omite `/data/outbox` y `cleanup` demostró que puede borrar un volumen ajeno sin etiqueta sólo por coincidir el nombre.
+- **Tarea activa:** `BACKUP-RESTORE-1` R2, responsable Dev. Debe cubrir todas las raíces persistentes y demostrar propiedad de cada recurso antes de limpiarlo, sin tocar Railway ni datos remotos.
 
 ## Última aceptación PM relevante
 
