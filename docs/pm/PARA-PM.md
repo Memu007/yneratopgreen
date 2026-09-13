@@ -2,144 +2,165 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## BACKUP-RESTORE-1
+## BACKUP-RESTORE-1 R2
 
 | | |
 | --- | --- |
-| **Rama** | `claude/dev-role-repo-3l0kp3`, reiniciada desde `main` porque la candidata anterior ya está integrada |
+| **Rama** | `claude/dev-role-repo-3l0kp3` |
 | **SHA base** | `24dcca8` |
-| **SHA candidato** | `79af761` |
-| **HEAD de este informe** | el commit que trae este archivo, o sea la punta de la rama |
-| **Diff del candidato** | `scripts/respaldo.sh` (nuevo), `docs/RESPALDO_Y_RESTAURACION.md` (nuevo) y tres líneas de `.gitignore`. **No toca producto**: nada de `src/`, `backend/`, `public/` ni el arnés |
-| **Delta posterior al SHA candidato** | sólo este documento |
-| **Estado** | en mi rama. No integré, no desplegué, no toqué Railway, datos remotos, secretos ni Mercado Pago. No empecé `POST-INTEGRATION-CLEAR-1` ni `CAT-PAGE-1` |
-
-**Acá no hay demonio de Docker**, así que todo lo que informo corrió por la ruta
-nativa. Lo digo ahora porque es la limitación de esta entrega, y está detallada
-al final.
+| **SHA candidato** | `b9d0036` |
+| **SHA R1, que no reescribí** | `79af761` (producto/arnés) y `2ffb08a` (informe) |
+| **HEAD de este informe** | el commit que trae este archivo |
+| **Diff total desde `24dcca8`** | `scripts/respaldo.sh`, `docs/RESPALDO_Y_RESTAURACION.md` y tres líneas de `.gitignore`. **No toca producto** |
+| **Estado** | en mi rama. No integré, no desplegué, no toqué Railway, datos remotos ni secretos. No abrí otra tarea |
 
 ---
 
-### Lo que hay
+### Antes que nada: la devolución no es sobre mi entrega
 
-Un comando, `scripts/respaldo.sh`, con cuatro verbos, y el procedimiento escrito
-en `docs/RESPALDO_Y_RESTAURACION.md`:
-
-```
-respaldar              → respaldos/<sello>/  (imprime la ruta)
-restaurar  <bundle>    → base y archivos nuevos (imprime el sello del destino)
-verificar  <bundle> <sello>
-limpiar    <sello>
-```
-
-El bundle lleva `base.dump` (`pg_dump -Fc`), su índice legible, `datos.tar.gz`
-con el almacenamiento persistente, `manifiesto.json`, las dos huellas y
-`SHA256SUMS`. **El manifiesto no tiene ni una credencial**: nombre de base,
-versiones, formato y totales.
-
-### La huella, que es de lo que depende todo
-
-- **Base**: por tabla, cantidad de filas **y** un resumen `md5` del contenido
-  ordenado. Contar filas no distingue una fila cambiada de una intacta, y esta
-  pieza existe para demostrar que la recuperación conserva los datos.
-- **Archivos**: ruta relativa, tamaño y `sha256` de cada uno.
-- Las consultas fijan `timezone=UTC` y `extra_float_digits=3` por `PGOPTIONS`,
-  para que la huella dé lo mismo en tu máquina y en la mía.
-
-### Aislamiento
-
-El destino se crea siempre nuevo: base `topgreen_restore_<AAAAMMDD_HHMMSS>` y
-directorio `respaldos/destino-<sello>`. Nunca sobre `topgreen`, `topgreen-db`,
-`topgreen-api` ni sus volúmenes. `limpiar` sólo acepta un sello con esa forma
-exacta.
-
-### Evidencia
-
-**Positivo.** Sembré marcadores no sensibles —una tabla `respaldo_marcador` con
-tres filas, una con acento y ñ, y un `marcador-respaldo.txt` en cada uno de los
-tres almacenamientos—, respaldé, restauré y verifiqué:
+La revisión R1 dice que revisó la candidata `5ae5572` y el informe `4636b23`.
+Esos dos commits **no son míos**:
 
 ```
-$ ./scripts/respaldo.sh respaldar
-     base: 404K · datos: 244K
+$ git branch -r --contains 5ae5572   → origin/codex/backup-restore-1
+$ git branch -r --contains 4636b23   → origin/codex/backup-restore-1
+$ git branch -r --contains 79af761   → origin/claude/dev-role-repo-3l0kp3
+```
+
+Hay otra entrega de `BACKUP-RESTORE-1`, en `origin/codex/backup-restore-1`, y es
+la que revisaste. Los identificadores que cita la devolución lo confirman:
+`data_roots` y `cleanup` no existen en mi guión —los míos son `respaldar`,
+`restaurar`, `verificar` y `limpiar`—; `grep -c 'data_roots\|cleanup'` sobre
+`scripts/respaldo.sh` da **0**.
+
+**Decidí vos cuál sigue.** Yo trabajé sobre la mía porque es la que puedo
+sostener con evidencia, pero tener dos implementaciones de la misma pieza es un
+problema de coordinación, no técnico.
+
+### Punto 1 del retorno: ya estaba
+
+`outbox` está en el bundle **desde R1**, no lo agregué ahora. En `79af761`:
+`CARPETAS_NATIVAS` incluye `backend/outbox`, la rama Docker lo copia aparte, y
+el positivo de R1 ya llevaba un marcador en las tres raíces. La huella de esta
+corrida lo muestra:
+
+```
+documentos/marcador-respaldo.txt
+outbox/marcador-respaldo.txt
+uploads/marcador-respaldo.txt
+```
+
+Lo que sí agregué es decir **de dónde sale en cada entorno**, que era lo otro
+que pedías: en el lanzador local el outbox no es un volumen sino el montaje
+`./backend/outbox → /app/outbox`, así que se copia del anfitrión; en producción
+vive dentro del volumen de `/data` (`EMAIL_OUTBOX_DIR=/data/outbox`) y entra por
+la copia de volúmenes. Está en el comentario del código y en el procedimiento.
+No toqué el compose ni el producto para acomodar la prueba.
+
+### Punto 2 del retorno: tenías razón, y valía para la mía también
+
+Mi `limpiar` se apoyaba en el patrón del nombre. Eso no prueba propiedad, tal
+cual lo escribiste. Corregido:
+
+- al restaurar, cada destino queda **firmado** con un identificador de
+  ejecución: una fila en `respaldo_meta.propiedad` dentro de la base y un
+  archivo `.propiedad` en el directorio. El esquema es aparte de `public` a
+  propósito, para no ensuciar los datos restaurados ni la comparación;
+- `limpiar` exige **las dos firmas y que coincidan entre sí**. Si falta una, si
+  está vacía o si la base no lleva la ejecución que dice el directorio, frena y
+  no borra nada. El patrón del nombre sigue, pero ahora es lo primero de tres,
+  no lo único.
+
+**Negativo de propiedad, medido.** Creé a mano una base `topgreen_restore_
+20260101_000000` con datos adentro y un directorio con el nombre que la pieza
+usaría:
+
+```
+a) sin firma:
+   ERROR: respaldos/destino-20260101_000000 no lleva la firma de esta pieza.
+          No se borra nada.
+b) con firma FALSIFICADA en el directorio y base sin firmar:
+   ERROR: la base topgreen_restore_20260101_000000 no lleva la firma
+          deadbeefdeadbeefdeadbeef: no la creó esta ejecución. No se borra nada.
+¿sobrevivió?  «esto no es de la pieza» y no-es-mio.txt, intactos
+```
+
+Después lo retiré con un comando explícito y acotado: `DROP DATABASE
+"topgreen_restore_20260101_000000"` y `rm -rf` de ese único directorio. Y el
+destino legítimo, el firmado, sí se limpia: «borrados … los dos firmados con
+`f908a60a…`; nada más se tocó».
+
+### Un tercer defecto, que encontré yo y era el que te iba a romper la corrida
+
+Al comprobar `sh -n` me puse a mirar qué herramientas usa el guión, y la huella
+dependía de **utilidades que en macOS no existen**: `sha256sum` —ahí es `shasum
+-a 256`—, `find -printf`, `stat -c` y `xargs -r`, todas GNU. Con Docker el
+`docker run` corre en el contenedor, pero la huella de los archivos se calcula
+en tu anfitrión: te habría fallado la primera vez. Ahora se resuelve una sola
+vez al arrancar y el resto del guión no se entera; los tamaños salen de `wc -c`
+en lotes, que es POSIX. Misma huella, sobre los mismos 2836 archivos.
+
+Sobre `sh -n`: el guión declara `#!/usr/bin/env bash` y usa arreglos, así que
+`sh -n` marca la línea 110 —igual que marcaría cualquier bash con arreglos—. La
+compuerta que corresponde es **`bash -n`, y está verde**. Si querés que sea
+POSIX puro se puede, pero hay que sacar los arreglos; decime.
+
+### Positivo completo, sobre `b9d0036`
+
+```
+$ ./scripts/respaldo.sh respaldar          → respaldos/20260913_201105
      2836 archivos y 23 tablas en la huella
-$ ./scripts/respaldo.sh restaurar respaldos/20260913_193743   → 20260913_193746
-$ ./scripts/respaldo.sh verificar respaldos/20260913_193743 20260913_193746
+$ ./scripts/respaldo.sh restaurar …        → destino 20260913_201108
+$ ./scripts/respaldo.sh verificar … 
   ✓ el bundle coincide con sus checksums
   ✓ la base restaurada coincide con la del respaldo
   ✓ los archivos restaurados coinciden con los del respaldo
   ✓ el origen conserva la identidad que tenía al respaldar
-  ✓ la API de origen sigue contestando
-RECUPERACIÓN VERIFICADA                                        (código 0)
+  ✓ la API de origen sigue contestando          (código 0)
 ```
 
-Y los marcadores están del otro lado, leídos en la base de destino y en sus
-archivos: las tres filas —con la ñ y los acentos intactos— y los tres
-`marcador-respaldo.txt`.
+Y del otro lado, las tres filas del marcador —con la ñ y los acentos— y los
+tres `marcador-respaldo.txt`, uno por raíz.
 
-**Los negativos, cinco, todos medidos.**
+### Negativos de integridad, otra vez sobre este SHA
 
-| Sabotaje | Qué hizo la verificación |
+| Sabotaje | Resultado |
 | --- | --- |
-| un archivo alterado en el destino | rojo, y nombra la ruta: `uploads/marcador-respaldo.txt`, 64 → 31 bytes y otro sha256. Código 1 |
-| un archivo ausente | rojo, con la línea que falta y «1 línea(s) de diferencia» |
-| **una fila cambiada, sin cambiar la cantidad** | rojo: `respaldo_marcador 3 d32ce83…` → `3 3fe70e4…`. Esto es justo lo que el conteo solo no ve |
-| un byte agregado al `base.dump` del bundle | `restaurar` **se niega**: «el bundle no coincide con sus checksums: no se restaura» |
-| `limpiar topgreen`, vacío, o un sello mal formado | se niega en los tres: «no tiene la forma de un destino de esta pieza» |
+| archivo alterado | rojo, con ruta, tamaño 38 → 25 y otro sha256 |
+| archivo ausente | rojo, con la línea que falta |
+| fila cambiada, misma cantidad | rojo: `respaldo_marcador 3 cfb39a0…` → `3 dddf39f…` |
+| bundle adulterado | `restaurar` se niega: «no coincide con sus checksums» |
 
-Después de reponer cada sabotaje desde el bundle, la verificación vuelve a
-verde.
+### Origen, antes y después
 
-**El origen no se movió.** La huella del origen después de todo el ejercicio es
-idéntica a la que quedó guardada en el bundle, y la API siguió contestando en
-las cinco verificaciones. Los tres directorios quedaron con los archivos que
-tenían.
-
-**Repetible.** Corrí el ciclo entero una segunda vez, ya sin marcadores y con el
-destino anterior borrado: respaldar → restaurar → verificar verde → limpiar. Los
-dos bundles conviven sin pisarse.
-
-**Limpieza.** Borré el destino de prueba y retiré los marcadores del origen. Los
-bundles quedan en `respaldos/`, que agregué al `.gitignore`.
+Idéntico: la huella del origen al terminar es la misma que guardó el bundle, la
+única base que queda es `topgreen`, la API contesta 200 y los tres directorios
+tienen los archivos que tenían. Retiré los marcadores y el destino de prueba.
 
 ### Compuertas
 
 | Puerta | Resultado |
 | --- | --- |
-| Ciclo completo positivo | verde, dos veces |
-| Los cinco negativos | rojos, cada uno con su mensaje |
-| `bash -n scripts/respaldo.sh` · `node --check` · `diff-check` | verdes |
-| Focales 157 y 162 | 2/2 — son los casos que enumeran documentos y guiones del repositorio, y esta pieza agrega dos archivos a esas listas |
-| Suite completa, `a11y`, `contraste` | **no corridas**, y lo declaro: el diff no toca producto ni arnés |
+| Positivo completo | verde |
+| Cuatro negativos de integridad | rojos |
+| Negativo de propiedad, dos variantes | frena sin borrar; el ajeno sobrevive |
+| `bash -n` · `diff-check` | verdes |
+| `sh -n` | marca un arreglo de bash en la línea 110; el guión es bash |
+| Suite funcional completa | **no corrida**, como pediste |
 
-### Lo que no pude correr, y es la limitación de esta entrega
+### Lo que sigue sin correr
 
-**La ruta Docker.** Acá el `docker` del PATH es el puente del repositorio, que
-sólo traduce `docker exec`: no hay demonio, así que no pude crear el contenedor
-ni los volúmenes de destino. El código de esa ruta está escrito y es chico a
-propósito —son tres funciones: consultar, volcar y copiar el almacenamiento; el
-resto del procedimiento es el mismo—, pero **no lo ejecuté**. Que funcione con
-`topgreen-db`, `uploads_data` y `documentos_data` lo tenés que demostrar vos
-sobre este mismo SHA.
-
-Ahí hay un supuesto mío que conviene mirar primero: en la ruta Docker copio los
-volúmenes con `docker run --rm -v <volumen>:/origen:ro` sobre `alpine:3`. Si esa
-imagen no está en tu máquina, se baja sola; si preferís que no se baje nada, hay
-que cambiarlo por `docker cp` desde el contenedor. Decime y lo cambio.
-
-### Dos cosas dichas antes de que confíes en esto
-
-- **No es la puerta de producción.** Demuestra que el estado local se recupera.
-  Falta decidir dónde se guardan las copias, con qué frecuencia y con qué
-  retención, y ejercitar la restauración contra el entorno real. Esa decisión y
-  su gasto son de Emi, y quedaron fuera de alcance por tu tarea.
-- **Lo que el respaldo no cubre**, escrito también en el procedimiento: los
-  `.env` —tienen secretos, no se versionan y no se copian—, el estado en memoria
-  de la API y los datos remotos de Railway.
+La ruta Docker. Acá el `docker` del PATH es el puente del repositorio y no hay
+demonio, así que no pude crear el contenedor ni los volúmenes de destino. Con la
+corrección de portabilidad tiene bastante menos superficie para romperse, pero
+**no la ejecuté**: la tenés que demostrar vos sobre este SHA. Y sigue en pie la
+pregunta de R1: la copia de volúmenes usa `docker run --rm -v <volumen>:/origen:
+ro` sobre `alpine:3`; si no querés que se baje esa imagen, lo cambio por
+`docker cp`.
 
 ### Lo que sigue esperando tu palabra
 
 - el carrito sin sesión;
 - la FAQ de Contacto dice «Aceptamos transferencias bancarias directas al
   vendedor» y el producto también cobra por Mercado Pago
-  (`src/components/Pages/ContactPage.tsx:305`). Sin tocar.
+  (`src/components/Pages/ContactPage.tsx:305`).
