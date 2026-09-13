@@ -759,6 +759,150 @@ async function apiRequest(path, { method = 'GET', token, body } = {}) {
   return { status: response.status, data };
 }
 
+/**
+ * Lo que varios casos dan por hecho, preparado por quien lo necesita.
+ *
+ * La suite encadena estado a propósito —el caso 2 registra, el 3 ingresa, el 6
+ * elige un producto— y eso está bien mientras se corra entera. Pero un caso que
+ * sólo funciona si corrieron los anteriores no se puede reproducir solo, y un
+ * rojo que no se puede reproducir solo no se puede arreglar: el 21 corriendo
+ * aislado moría con «Cannot read properties of undefined (reading 'name')», que
+ * no dice qué falta ni de dónde salía.
+ *
+ * Estas funciones son idempotentes: si el estado ya está —la corrida completa—
+ * no tocan nada y el orden sigue siendo el mismo. Si no está, lo arman con las
+ * cuentas públicas del seed. No reemplazan a los casos que lo construyen: los
+ * suplen cuando no corrieron.
+ */
+async function sesionDe(email, password) {
+  const { data } = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email, password },
+  });
+  assert(data?.access_token, `no se pudo ingresar como ${email}`);
+  return { token: data.access_token, refresco: data.refresh_token, id: data.user?.id };
+}
+
+/**
+ * Cuándo vence un JWT, leído del propio token y sin biblioteca.
+ *
+ * No hace falta verificar la firma: acá no se está autenticando a nadie, se
+ * está preguntando cuánto le queda a una credencial que el servidor ya emitió.
+ */
+function venceElToken(token) {
+  try {
+    const crudo = String(token).split('.')[1];
+    const carga = JSON.parse(Buffer.from(crudo, 'base64url').toString('utf8'));
+    return typeof carga.exp === 'number' ? carga.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Renovar la sesión guardada si está por vencer.
+ *
+ * `backend/.env` emite el access token con ACCESS_TOKEN_MINUTES=15 y la suite
+ * entera tarda más de treinta minutos: los casos del final heredaban una
+ * credencial vencida y fallaban por lo que TARDÓ la corrida, no por el
+ * producto. Medido: en la corrida completa de PM, 165 y 166 en rojo; los
+ * mismos casos aislados, verdes.
+ *
+ * Se renueva por donde renueva la aplicación —`/auth/refresh` con el refresh
+ * token, que dura 30 días—, y si no hay con qué, se vuelve a ingresar con las
+ * credenciales que el arnés ya tiene anotadas. No se toca el TTL, no se afloja
+ * ningún límite y el producto no se entera: es el mismo camino que recorre una
+ * persona que deja la pestaña abierta.
+ *
+ * Y se comprueba la identidad después de renovar. Si el token y el refresco
+ * guardados fueran de cuentas distintas, renovar cambiaría de persona en
+ * silencio y el caso siguiente mediría a otro: eso se dice, no se arregla solo.
+ */
+const MARGEN_DEL_TOKEN = 3 * 60 * 1000;
+
+async function renovarSesion(cual, credencialesDeRespaldo) {
+  const claveToken = `${cual}Token`;
+  const claveRefresco = `${cual}RefreshToken`;
+  const claveId = `${cual}Id`;
+  const token = state[claveToken];
+  if (!token) return;
+  const vence = venceElToken(token);
+  if (vence !== null && vence - Date.now() > MARGEN_DEL_TOKEN) return;
+
+  const quienEra = state[claveId];
+  let renovado = null;
+  if (state[claveRefresco]) {
+    try {
+      const { data } = await apiRequest('/auth/refresh', {
+        method: 'POST', token: state[claveRefresco],
+      });
+      if (data?.access_token) {
+        renovado = data.access_token;
+        if (data.refresh_token) state[claveRefresco] = data.refresh_token;
+      }
+    } catch { /* el refresco no sirvió: queda el ingreso con credenciales */ }
+  }
+  if (!renovado && credencialesDeRespaldo) {
+    const sesion = await sesionDe(credencialesDeRespaldo.email, credencialesDeRespaldo.password);
+    renovado = sesion.token;
+    state[claveRefresco] = sesion.refresco;
+  }
+  assert(renovado,
+    `la sesión de ${cual} venció y no hubo forma de renovarla: `
+    + `${state[claveRefresco] ? 'el refresco no sirvió' : 'no había refresco guardado'} `
+    + 'y tampoco hay credenciales anotadas');
+
+  const { data: quienEs } = await apiRequest('/auth/me', { token: renovado });
+  assert(!quienEra || quienEs?.id === quienEra,
+    `renovar la sesión de ${cual} devolvió otra cuenta: el arnés tenía ${quienEra} y `
+    + `la credencial renovada es de ${quienEs?.id}. El token y el refresco guardados no `
+    + 'son del mismo dueño');
+  state[claveToken] = renovado;
+  state[claveId] = quienEs?.id || quienEra;
+}
+
+async function asegurarSesiones() {
+  if (!state.buyerToken) {
+    const sesion = await sesionDe('cliente@ejemplo.com', 'cliente123');
+    state.buyerToken = sesion.token;
+    state.buyerRefreshToken = sesion.refresco;
+    state.buyerId = state.buyerId || sesion.id;
+    // También las credenciales: hay casos que necesitan ingresar por la
+    // pantalla, no sólo tener el token, y el caso 2 es quien normalmente las
+    // deja.
+    state.buyerCredentials = state.buyerCredentials
+      || { email: 'cliente@ejemplo.com', password: 'cliente123' };
+  }
+  if (!state.sellerToken) {
+    const sesion = await sesionDe('vendedor@ejemplo.com', 'vendedor123');
+    state.sellerToken = sesion.token;
+    state.sellerRefreshToken = sesion.refresco;
+    state.sellerId = state.sellerId || sesion.id;
+  }
+
+  // Y lo que ya estaba, renovado si le queda poco. Es la parte que hace que un
+  // caso del final no dependa de cuánto tardó la suite en llegar hasta él.
+  await renovarSesion('buyer', state.buyerCredentials);
+  await renovarSesion('seller', { email: 'vendedor@ejemplo.com', password: 'vendedor123' });
+}
+
+async function asegurarProducto() {
+  await asegurarSesiones();
+  if (state.product) return state.product;
+  const parametros = new URLSearchParams({
+    seller_id: state.sellerId, in_stock: 'true', page_size: '100',
+  });
+  const catalogo = await apiRequest(`/catalog/products?${parametros}`);
+  const producto = (catalogo.data.items || []).find(
+    (item) => !item.is_service && Number(item.stock) > 0,
+  );
+  assert(producto,
+    'no hay ninguna publicación de producto activa y con stock del vendedor demo: '
+    + 'la base no es la del seed o un caso anterior las dejó sin stock');
+  state.product = producto;
+  return producto;
+}
+
 async function apiUpload(path, { token, filename, content, contentType }) {
   const form = new FormData();
   form.append('file', new Blob([content], { type: contentType }), filename);
@@ -860,7 +1004,25 @@ async function runCase(number, name, callback) {
 function accionDeLaTarjeta(page, nombre) {
   const titulo = page.getByRole('heading', { name: nombre, exact: true, level: 3 });
   const tarjeta = titulo.locator('xpath=ancestor::*[contains(@class,"card")]');
-  return tarjeta.getByRole('button', { name: /Agregar|Agregar al carrito|Contratar/ }).first();
+  const boton = tarjeta.getByRole('button', { name: /Agregar|Agregar al carrito|Contratar/ }).first();
+  /* No devuelve el localizador pelado: si el botón no está, el rojo tiene que
+     decir QUÉ ofrece la tarjeta. «Timeout 30000ms exceeded» no distingue una
+     tarjeta que dice «Ingresar para continuar» —no hay sesión— de una que dice
+     «Solicitar cotización» —no hay precio— ni de una publicación propia, y las
+     tres son causas distintas con arreglos distintos. */
+  return {
+    async click(opciones) {
+      try {
+        await boton.click(opciones);
+      } catch (error) {
+        const botones = await tarjeta.getByRole('button').allInnerTexts().catch(() => null);
+        if (!botones) throw error;
+        throw new Error(`la tarjeta de «${nombre}» no ofrece agregar ni contratar; sus botones `
+          + `son ${JSON.stringify(botones.map((t) => t.replace(/\s+/g, ' ').trim()))}`);
+      }
+    },
+    count: () => boton.count(),
+  };
 }
 
 await runCase(1, 'Salud del servicio', async () => {
@@ -1863,6 +2025,80 @@ await runCase(20, 'Las rutas financieras heredadas no están expuestas', async (
 });
 
 await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorrido', async () => {
+  // Prepara lo suyo, y por dos motivos.
+  //
+  // Uno: aislado, `state.product` no existía y el caso moría con un `undefined`
+  // que no señalaba a nada.
+  //
+  // Dos, y más de fondo: desde `CATALOG-PHOTOS-1` el catálogo le resuelve una
+  // foto demostrativa a los 30 slugs conocidos del seed, así que una
+  // publicación del seed YA NO muestra «Sin registro fotográfico» —y este caso
+  // mide justamente ese cartel—. Con una publicación propia, de slug ajeno al
+  // juego demo y sin imágenes, el respaldo honesto vuelve a ser lo que
+  // corresponde. No es que el producto haya cambiado de conducta: es que este
+  // caso estaba midiendo sobre material que dejó de ser el adecuado.
+  await asegurarSesiones();
+  const [[categoriaParaLaFoto]] = queryRows(`
+    SELECT id FROM categories
+    WHERE is_active = true AND is_service = false
+    ORDER BY name LIMIT 1
+  `);
+  const [[localidadParaLaFoto]] = queryRows('SELECT id FROM localities ORDER BY id LIMIT 1');
+  const publicacionSinFoto = (await apiRequest('/products', {
+    method: 'POST',
+    token: state.sellerToken,
+    body: {
+      name: `Smoke sin foto ${Date.now()}`,
+      description: 'Publicación sin imágenes: mide el respaldo honesto del catálogo.',
+      category_id: categoriaParaLaFoto,
+      price: 1200,
+      stock: 4,
+      unit: 'unidad',
+      locality_id: localidadParaLaFoto,
+      publication_type: 'producto',
+    },
+  })).data;
+
+  // Y una segunda publicación, ésta CON una foto propia subida.
+  //
+  // El otro tramo del caso rompe `/uploads/**` y espera «No pudimos cargar la
+  // imagen». Desde `CATALOG-PHOTOS-1` las fotos del catálogo demostrativo se
+  // sirven desde `/catalogo/`, no desde `/uploads/`, así que romper `/uploads/`
+  // ya no rompía nada: no quedaba en el Mercado ninguna imagen servida desde
+  // ahí. Con una foto de verdad, subida por el vendedor, el respaldo vuelve a
+  // tener algo que respaldar —y de paso se mide sobre el caso real, que es una
+  // foto de un vendedor y no una del seed—.
+  const PNG_DE_UN_PIXEL = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  );
+  const publicacionConFoto = (await apiRequest('/products', {
+    method: 'POST',
+    token: state.sellerToken,
+    body: {
+      name: `Smoke con foto ${Date.now()}`,
+      description: 'Publicación con una foto propia: mide el respaldo de la imagen rota.',
+      category_id: categoriaParaLaFoto,
+      price: 1300,
+      stock: 4,
+      unit: 'unidad',
+      locality_id: localidadParaLaFoto,
+      publication_type: 'producto',
+    },
+  })).data;
+  {
+    // El endpoint de imágenes recibe `files` en plural y admite varias, así que
+    // no entra por `apiUpload`, que manda un único `file`.
+    const sobre = new FormData();
+    sobre.append('files', new Blob([PNG_DE_UN_PIXEL], { type: 'image/png' }), 'smoke-foto.png');
+    const subida = await fetch(`${API_URL}/products/${publicacionConFoto.id}/images`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${state.sellerToken}` },
+      body: sobre,
+    });
+    assert(subida.ok,
+      `no se pudo subir la foto de prueba: HTTP ${subida.status} ${(await subida.text()).slice(0, 140)}`);
+  }
   // Este caso probaba que una URL rota se reemplazara por un respaldo. La
   // propiedad ahora es más fuerte: las URLs de relleno del seed —`picsum`
   // devuelve una foto AL AZAR— ni siquiera se piden, porque no fallan nunca y
@@ -1910,7 +2146,7 @@ await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorr
       () => document.querySelectorAll('#catalog-category option').length > 1,
     );
     await buyerPage.locator('#catalog-type').selectOption('productos');
-    const productName = state.product.name;
+    const productName = publicacionSinFoto.name;
     await buyerPage
       .getByLabel('Buscar en el mercado')
       .fill(productName);
@@ -2021,6 +2257,13 @@ await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorr
       + 'dice «No pudimos cargar la imagen» y no la confunde con una que nunca hubo';
   } finally {
     await browser.close();
+    // Las dos publicaciones fabricadas se van: este caso no le deja material
+    // nuevo al catálogo que miran los casos de después.
+    for (const publicacion of [publicacionSinFoto, publicacionConFoto]) {
+      await apiRequest(`/products/${publicacion.id}`, {
+        method: 'DELETE', token: state.sellerToken,
+      }).catch(() => {});
+    }
   }
 });
 
@@ -2053,7 +2296,7 @@ await runCase(22, 'Registro de transportista desde la interfaz, con los tres dat
     const page = await browser.newPage();
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
-    await page.getByText('Regístrate aquí').click();
+    await page.getByText('Registrate acá').click();
     await page.getByRole('heading', { name: 'Crear Cuenta' }).waitFor();
 
     await page.locator('input[name="name"]').fill('Transportista Smoke');
@@ -3220,7 +3463,7 @@ await runCase(37, 'Registro, correo y confirmación desde el navegador', async (
 
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
-    await page.getByText('Regístrate aquí').click();
+    await page.getByText('Registrate acá').click();
     await page.getByRole('heading', { name: 'Crear Cuenta' }).waitFor();
     await page.locator('input[name="name"]').fill('Nav Smoke');
     await page.locator('input[name="email"]').fill(email);
@@ -3377,7 +3620,7 @@ await runCase(38, 'Un error de validación se lee, no dice [object Object]', asy
     // --- 1. detalle ESTRUCTURADO: registro con un correo que el backend rechaza
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
-    await page.getByText('Regístrate aquí').click();
+    await page.getByText('Registrate acá').click();
     await page.getByRole('heading', { name: 'Crear Cuenta' }).waitFor();
     await page.locator('input[name="name"]').fill('Detalle Estructurado');
     await page.locator('input[name="email"]').fill(invalido);
@@ -5450,6 +5693,10 @@ await runCase(53, 'Una decisión inválida no deja media compra hecha', async ()
 });
 
 await runCase(54, 'Cada participante ve lo suyo y el transportista sólo su necesidad logística', async () => {
+  // La sesión de comprador la deja el caso 3. Aislado no existía y el caso
+  // moría en `DELETE /cart` con un 401 que parecía un problema de permisos y
+  // era, simplemente, no haber ingresado.
+  await asegurarSesiones();
   // Las tres vistas sobre las mismas órdenes: comprador, vendedor y
   // transportista elegido. Y un transportista ajeno, que no tiene que poder
   // ni enumerar ni abrir la operación.
@@ -5557,7 +5804,11 @@ await runCase(54, 'Cada participante ve lo suyo y el transportista sólo su nece
       // Lo que se mide es el panel, no la pagina que quedo atras: la portada
       // muestra operaciones reales con su precio y su localidad, y leer `body`
       // mezclaba esa vitrina con lo que el transportista ve de su operacion.
-      const panel = page.locator('[class*="overlay"]').first();
+      // Mi cuenta dejó de ser una capa oscura con `ACCOUNT-PAGE-1`: es una página
+      // del sitio, así que ya no hay ningún `overlay` que buscar. Lo que se mide
+      // sigue siendo lo mismo —lo que se ve DENTRO de la cuenta, sin la portada
+      // que quedó atrás—, y ahora se lo nombra por lo que es.
+      const panel = page.locator('main[aria-labelledby="cuenta-titulo"]').first();
       const visto = ((await panel.textContent()) || '').replace(/\s+/g, ' ');
       assert(visto.includes('Pergamino'), 'el panel no muestra el destino');
       assert(!/\$\s?\d/.test(visto), `el panel del transportista muestra importes: "${visto.slice(0, 200)}"`);
@@ -5743,6 +5994,10 @@ await runCase(56, 'Una selección tardía no revive una decisión ya descartada'
 });
 
 await runCase(57, 'El origen de una operación es el del momento de la compra', async () => {
+  // La sesión de comprador la deja el caso 3. Aislado no existía y el caso
+  // moría en `DELETE /cart` con un 401 que parecía un problema de permisos y
+  // era, simplemente, no haber ingresado.
+  await asegurarSesiones();
   // El nombre y el precio del producto ya eran snapshot. El origen no lo era y
   // se leía de la publicación: bastaba con que el vendedor la editara después
   // de la compra para cambiarle el punto de retiro al transportista.
@@ -5808,7 +6063,11 @@ await runCase(57, 'El origen de una operación es el del momento de la compra', 
     // Lo que se mide es el panel, no la pagina que quedo atras: la portada
     // muestra operaciones reales con su precio y su localidad, y leer `body`
     // mezclaba esa vitrina con lo que el transportista ve de su operacion.
-    const panel = page.locator('[class*="overlay"]').first();
+    // Mi cuenta dejó de ser una capa oscura con `ACCOUNT-PAGE-1`: es una página
+    // del sitio, así que ya no hay ningún `overlay` que buscar. Lo que se mide
+    // sigue siendo lo mismo —lo que se ve DENTRO de la cuenta, sin la portada
+    // que quedó atrás—, y ahora se lo nombra por lo que es.
+    const panel = page.locator('main[aria-labelledby="cuenta-titulo"]').first();
     const visto = ((await panel.textContent()) || '').replace(/\s+/g, ' ');
     assert(visto.includes(origenDeLaCompra.nombre),
       `la pantalla no muestra el origen de la compra (${origenDeLaCompra.nombre})`);
@@ -7032,8 +7291,17 @@ async function comprador() {
   const { data } = await apiRequest('/auth/login', {
     method: 'POST', body: MP_COMPRADOR,
   });
+  // Las cuatro cosas del comprador se mueven juntas: token, refresco, identidad
+  // y credenciales. Guardar unas sin las otras deja un comprador partido —el
+  // token de una cuenta y la contraseña de otra— y los casos que fabrican por
+  // API y después ingresan por pantalla terminan mirando a dos personas
+  // distintas. Medido: con sólo el token y el refresco puestos acá, el 165
+  // fabricaba la orden de un comprador y el navegador entraba como otro, así
+  // que «Calificar Vendedor» no aparecía nunca.
   state.buyerToken = data.access_token;
+  state.buyerRefreshToken = data.refresh_token;
   state.buyerId = data.user.id;
+  state.buyerCredentials = { ...MP_COMPRADOR };
   return data.user.id;
 }
 
@@ -7152,6 +7420,69 @@ async function descartarSiPregunta(page, seCerro, mensaje) {
     `${mensaje}: no se cerró ni preguntó por los cambios sin guardar`, 20_000);
   if ((await descartar.count()) > 0) await descartar.click();
   await esperarA(seCerro, `${mensaje}: descartar no cerró la capa`, 20_000);
+}
+
+// Las traducciones de estado que usa la pantalla, leídas del propio producto.
+//
+// Los casos que miran un badge no pueden traer su propia lista: si la copiaran,
+// el día que el producto cambie un texto la prueba seguiría verde contra una
+// verdad vieja. Se lee `src/utils/estados.ts`, que es de donde sale lo que se
+// dibuja.
+// El cuerpo de una constante exportada del diccionario, tal como está escrito.
+function cuerpoDelDiccionario(nombre) {
+  const fuente = readFileSync('src/utils/estados.ts', 'utf8');
+  const bloque = fuente.split(`export const ${nombre}`)[1];
+  assert(bloque, `no está ${nombre} en src/utils/estados.ts`);
+  return bloque.slice(0, bloque.indexOf('};'));
+}
+
+function textosDeEstado(nombre) {
+  const cuerpo = cuerpoDelDiccionario(nombre);
+  const entradas = {};
+  for (const [, token, texto] of cuerpo.matchAll(/(\w+):\s*\{\s*texto:\s*'([^']+)'/g)) {
+    entradas[token] = texto;
+  }
+  assert(Object.keys(entradas).length > 0, `${nombre} quedó vacío al leerlo`);
+  return entradas;
+}
+
+// El tono que cada estado declara.
+//
+// El texto solo no alcanza para saber si la pantalla distingue los estados:
+// catorce badges bien escritos pueden salir todos del mismo gris y la prueba
+// que sólo lee texto seguiría verde. Eso era, justamente, la falla.
+function tonosDeEstado(nombre) {
+  const cuerpo = cuerpoDelDiccionario(nombre);
+  const entradas = {};
+  for (const [, token, tono] of cuerpo.matchAll(/(\w+):\s*\{[^}]*?tono:\s*'([^']+)'/g)) {
+    entradas[token] = tono;
+  }
+  assert(Object.keys(entradas).length > 0, `${nombre} quedó sin tonos al leerlo`);
+  return entradas;
+}
+
+// El color que el producto declara para cada tono, SIN resolver: son tokens de
+// la paleta, y quien los resuelve es el navegador y no esta prueba. Si se
+// copiara acá el `#1e4a34`, cambiar la paleta dejaría la prueba mintiendo.
+function coloresDeTono() {
+  const cuerpo = cuerpoDelDiccionario('COLOR_DEL_TONO');
+  const entradas = {};
+  for (const [, tono, valor] of cuerpo.matchAll(/(\w+):\s*'([^']+)'/g)) {
+    entradas[tono] = valor;
+  }
+  assert(Object.keys(entradas).length > 0, 'COLOR_DEL_TONO quedó vacío al leerlo');
+  return entradas;
+}
+
+// A qué tono cae un estado que el diccionario NO conoce. Es el tratamiento de
+// respaldo: ningún estado conocido puede compartirlo, salvo el que lo declara a
+// propósito. Se lee del producto porque suponerlo sería volver a la lista
+// escrita a mano que esta pieza vino a sacar.
+function tonoDeRespaldo() {
+  const fuente = readFileSync('src/utils/estados.ts', 'utf8');
+  const hallado = fuente.match(/SIN_TRADUCCION[^=]*=\s*\{[^}]*tono:\s*'([^']+)'/);
+  assert(hallado, 'no se pudo leer el tono de respaldo en src/utils/estados.ts');
+  return hallado[1];
 }
 
 async function esperarA(condicion, mensaje, limite = 20_000) {
@@ -11109,6 +11440,16 @@ await runCase(113, 'Los tres datos se guardan como se escriben, con límites exp
 });
 
 await runCase(114, 'En pantalla: se comparan marca y cargas, el dominio recién al elegir', async () => {
+  // La sesión del comprador se pide, no se hereda.
+  //
+  // Este caso le inyecta `state.buyerToken` al navegador, y ese valor lo dejan
+  // casos anteriores: corriéndolo solo —como se reproduce un rojo— viajaba la
+  // cadena «undefined», la pantalla trataba al visitante como anónimo y la
+  // tarjeta ofrecía «Ingresar para continuar» en vez de «Agregar al carrito».
+  // Medido: con token válido la tarjeta dice «Agregar al carrito»; sin él,
+  // «Ingresar para continuar». El caso moría esperando un botón que la
+  // pantalla tenía razón en no dibujar.
+  await asegurarSesiones();
   const escenario = await prepararEscenarioDeFletes();
   const { destino, pedidoA, transportistas } = escenario;
 
@@ -11131,6 +11472,21 @@ await runCase(114, 'En pantalla: se comparan marca y cargas, el dominio recién 
     // --- 1. El titular ve y edita sus tres datos en su panel ---
     const ctxTransportista = await browser.newContext();
     const pt = await ctxTransportista.newPage();
+    // El panel guarda CLAVES —`maquinaria`— y los rótulos los trae aparte
+    // `GET /logistics/cargo-types`. Hasta que esa respuesta llega, la línea de
+    // cargas dibuja la clave cruda: medido, «maquinaria · Otra: Bidones de 200
+    // litros», y con el catálogo puesto «Maquinaria agrícola · Otra: …». Este
+    // caso leía el panel apenas aparecía «Mi Perfil», así que en una máquina
+    // cargada acusaba al producto de no mostrar las cargas —el rojo que la PM
+    // repitió dos veces—. Se demora el catálogo A PROPÓSITO para que la carrera
+    // pase siempre, y lo que se exige es el rótulo resuelto, esperándolo.
+    await pt.route(
+      (url) => url.pathname.endsWith('/api/logistics/cargo-types'),
+      async (ruta) => {
+        await new Promise((seguir) => { setTimeout(seguir, 1_500); });
+        await ruta.continue();
+      },
+    );
     await pt.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await pt.getByRole('button', { name: 'Ingresar', exact: true }).click();
     await pt.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 15_000 });
@@ -11143,12 +11499,22 @@ await runCase(114, 'En pantalla: se comparan marca y cargas, el dominio recién 
 
     const suPanel = await pt.locator('[class*="_profileSection_"], form, main').first().innerText()
       .catch(async () => pt.locator('body').innerText());
+    // La única de las cinco afirmaciones que depende de una segunda respuesta.
+    // Las otras cuatro salen de la sesión y ya están dibujadas.
+    try {
+      await esperarA(async () => /Maquinaria agrícola/.test(await pt.locator('body').innerText()),
+        'el rótulo', 20_000);
+    } catch {
+      const linea = (await pt.locator('body').innerText()).split('\n')
+        .find((l) => /maquinaria/i.test(l) || /Bidones/.test(l));
+      throw new Error('el titular no ve sus cargas declaradas con su rótulo; la línea de cargas '
+        + `dice ${JSON.stringify(linea ?? '(no está)')}`);
+    }
     const textoPanel = await pt.locator('body').innerText();
     assert(textoPanel.includes('Scania R450'), 'el titular no ve su marca y modelo');
     assert(textoPanel.includes(DOMINIO), 'el titular no ve su propio dominio');
     assert(/Privado/i.test(textoPanel),
       'el panel no le avisa al titular que el dominio no se muestra en el listado');
-    assert(/Maquinaria agrícola/.test(textoPanel), 'el titular no ve sus cargas declaradas');
     assert(/Bidones de 200 litros/.test(textoPanel), 'el detalle de «Otra» no se muestra');
     observado.panel = true;
     await ctxTransportista.close();
@@ -12016,6 +12382,13 @@ await runCase(120, '«Mis publicaciones» muestra cada anatomía como es, y no c
     await contexto.close();
   } finally {
     await browser.close();
+    // Se deja la base como estaba: la publicación vuelve a su subcategoría y la
+    // fabricada se va.
+    if (typeof productoId === 'string') {
+      querySql(`UPDATE products SET subcategory_id = ${subPrevia ? sqlLiteral(subPrevia) : 'NULL'} `
+        + `WHERE id = ${sqlLiteral(productoId)}`);
+      querySql(`DELETE FROM subcategories WHERE id = ${sqlLiteral(subDePrueba.id)}`);
+    }
   }
 
   return 'en el panel del vendedor el servicio no muestra stock, no reserva lugar '
@@ -12623,9 +12996,27 @@ await runCase(125, 'Servicios muestra publicaciones reales de servicio y logíst
       assert(fila, `«${titulo}» no es una publicación activa de la base`);
       assert(fila[0] === 'servicio' || fila[0] === 'logistica',
         `«${titulo}» no es un servicio: la base dice «${fila[0]}»`);
-      // La tarjeta de un servicio no gana fotografía, ni siquiera el respaldo.
-      assert(await tarjeta.locator('img, [role="img"]').count() === 0,
-        `la tarjeta de «${titulo}» dibuja una imagen`);
+      // Lo que una tarjeta de servicio puede dibujar, y lo que no.
+      //
+      // La regla era «ni una imagen», y dejó de valer con `CATALOG-PHOTOS-1`:
+      // el paquete de 30 fotos que entregó la PM incluye servicios, y
+      // «Instalación y Reparación de Alambrados Rurales» es uno de ellos. Así
+      // que hoy son válidas dos cosas y sólo dos: la foto del catálogo
+      // demostrativo, y el respaldo honesto de una publicación sin foto —que es
+      // lo que muestra cualquier servicio fabricado por otro caso—.
+      //
+      // Lo que se sigue prohibiendo es lo de siempre y es lo que importaba: una
+      // imagen traída de afuera, o una al azar, al lado de un precio real.
+      const PERMITIDAS = /\/catalogo\/|\/estados\/no-photo\.svg/;
+      const imagenes = tarjeta.locator('img, [role="img"]');
+      for (let cual = 0; cual < await imagenes.count(); cual += 1) {
+        const imagen = imagenes.nth(cual);
+        const fuente = (await imagen.getAttribute('src'))
+          || (await imagen.evaluate((n) => getComputedStyle(n).backgroundImage));
+        assert(PERMITIDAS.test(fuente || ''),
+          `la tarjeta de «${titulo}» dibuja una imagen que no es ni del catálogo `
+          + `demostrativo ni el respaldo honesto: ${JSON.stringify((fuente || '').slice(0, 120))}`);
+      }
     }
 
     // 3. «Ver servicios publicados» deja el filtro puesto, no sólo la URL.
@@ -12659,7 +13050,8 @@ await runCase(125, 'Servicios muestra publicaciones reales de servicio y logíst
 
   return 'Servicios no tiene video, ni lista escrita a mano, ni claims de IA, satélites, IoT o '
     + 'sustentabilidad; el hero usa el derivado interino autorizado; las publicaciones son '
-    + 'servicios o logística de la base y no ganan foto; «Ver servicios publicados» deja el '
+    + 'servicios o logística de la base y usan foto local del catálogo o el respaldo honesto, '
+    + 'sin imágenes externas ni al azar; «Ver servicios publicados» deja el '
     + 'filtro puesto y el error tiene su propio texto';
 });
 
@@ -13220,7 +13612,7 @@ await runCase(129, 'El ingreso no deja la credencial escrita en la consola del n
 
     // --- 2. La sesión sirve: una pantalla protegida carga ----------------
     await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
-    await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+    await page.getByRole('heading', { name: 'Mi cuenta' }).waitFor({ timeout: 20_000 });
 
     // --- 3. El refresh automático sigue vivo ------------------------------
     //     Se rompe el access token guardado y se pide algo protegido que no
@@ -13233,7 +13625,7 @@ await runCase(129, 'El ingreso no deja la credencial escrita en la consola del n
     const accesoRenovado = await guardado(page, 'access_token');
     assert(accesoRenovado && accesoRenovado !== roto,
       'el access token roto no se renovó: el refresh automático dejó de funcionar');
-    assert(await page.getByRole('heading', { name: 'Mi Panel' }).isVisible(),
+    assert(await page.getByRole('heading', { name: 'Mi cuenta' }).isVisible(),
       'la sesión se cayó al renovar el token');
 
     // Y la renovación tampoco se imprime.
@@ -14398,6 +14790,47 @@ print(json.dumps(salida))
     + 'exactamente 1 a un fallo del limite';
 });
 
+// ---------------------------------------------------------------------------
+// El presupuesto de intentos de ingreso es de la SUITE, no del caso 134.
+//
+// `limite_de_intentos.py` cuenta treinta fallos de credencial por origen en una
+// ventana de diez minutos, y ese contador vive en memoria del proceso de la
+// API. El 134 prueba ese límite a propósito y, medido en `logs/api.log` de una
+// corrida completa, se lleva **24 de los 30** desde 127.0.0.1; los seis que
+// faltan los ponen los casos siguientes y el que ingrese después se come un 429
+// que no tiene nada que ver con lo que está midiendo. Así cayeron el 167 y el
+// 168 en la corrida completa —el 168 ni llegó a arrancar: 429 en 8 ms—, y el
+// mismo par pasa aislado.
+//
+// Reiniciar el proceso vacía el contador. No sube ningún TTL, no afloja ni
+// desactiva el límite y no le pide al producto ninguna puerta de prueba: es lo
+// mismo que le pasa a la API en cada despliegue. La base, el frontend y el
+// resto del entorno quedan como están.
+//
+// Va acá, entre casos, porque el recurso es compartido: no es del 134 devolver
+// lo que gastó, es de la suite no arrastrarlo.
+if (results.some((resultado) => resultado.number === 134)
+    && /(localhost|127\.0\.0\.1)/.test(API_URL)) {
+  const reinicio = spawnSync('./scripts/entorno_nativo.sh', ['--reiniciar-api'], {
+    encoding: 'utf8',
+  });
+  if (reinicio.status === 0) {
+    // El comando sólo sale con 0 cuando comprobó que cambió el proceso —o el
+    // contenedor— que sirve la API. El caso 169 sostiene esa promesa.
+    console.log('[----] la API se reinició: el caso 134 acababa de gastar el presupuesto de '
+      + 'intentos de ingreso, y ese contador es de todos');
+    const identidad = `${reinicio.stdout}`.match(/^\s*(uvicorn|topgreen-api):.*$/m);
+    if (identidad) console.log(`[----] ${identidad[0].trim()}`);
+  } else {
+    console.log('[----] AVISO: la API NO se reinició, así que el presupuesto de intentos que '
+      + 'gastó el 134 sigue gastado y los casos que ingresen en los próximos diez minutos '
+      + 'pueden recibir 429. El comando dijo:');
+    for (const linea of `${reinicio.stderr}`.split('\n').filter(Boolean)) {
+      console.log(`[----]   ${linea}`);
+    }
+  }
+}
+
 await runCase(135, 'Una caida de la base no gasta el cupo de ingresos de nadie', async () => {
   // El limite de SEC-6 reserva la marca ANTES de saber como termina el intento,
   // porque si no dos pedidos simultaneos cruzan el umbral por una carrera. Pero
@@ -14842,10 +15275,17 @@ print(json.dumps(medida))
         assert(/locality_id=/.test(page.url()), 'elegir una localidad no quedo en la URL');
       }
     }
+    // El caso entra con `q=` en la URL y acá suelta esa consulta para que el
+    // cambio de provincia se mida sobre el catálogo entero. Vaciar el campo ya
+    // no alcanza: desde COPY-CLEAR-1 buscar es una acción, así que hay que
+    // aplicar el vacío —el mismo Enter que aprieta una persona— y esperar a que
+    // «q» se vaya de la barra en vez de contar hasta 1200.
     const buscador = page.locator('input[type="search"], input[placeholder*="Busc" i]').first();
     if (await buscador.count()) {
       await buscador.fill('');
-      await page.waitForTimeout(1200);
+      await buscador.press('Enter');
+      await esperarA(async () => !/[?&]q=/.test(page.url()),
+        `soltar la búsqueda dejó la consulta en la barra: ${page.url()}`, 20_000);
     }
     await page.locator('#catalog-province').selectOption({ label: otra });
     await page.waitForTimeout(2500);
@@ -14984,6 +15424,73 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
   //
   // Ademas «Iniciar operacion» prometia un inicio de operacion que no existe:
   // lo que hace es agregar al carrito, y ahora lo dice.
+  //
+  // El caso fabrica sus propias filas y las busca por titulo exacto. Antes
+  // tomaba «la primera tarjeta que ofreciera ingresar» de cada pantalla, y eso
+  // no es una precondicion: es lo que haya quedado. Inicio y Servicios dibujan
+  // las TRES publicaciones mas nuevas —`useVistaPrevia` pide `page_size: 3`
+  // con `created_at desc`—, asi que tres servicios a convenir publicados por
+  // otra prueba dejan a Servicios sin una sola tarjeta comprable y este caso
+  // acusaba al producto de no ofrecer ingresar. Medido: con tres «Residuo a
+  // convenir» mas nuevos que el seed, el arnes viejo daba «en Servicios
+  // ninguna tarjeta ofrece ingresar; los botones son ["Solicitar
+  // cotización","Ver detalle", …]» y el producto estaba intacto. Los casos
+  // 120, 147, 148 y 166 publican servicios a convenir, asi que el residuo
+  // aparece solo con correr la suite dos veces sobre la misma base.
+
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const [categoriaDeServicio] = queryRows(
+    "SELECT id, 'fin' FROM categories WHERE slug = 'acopio'");
+  const [categoriaDeActivos] = queryRows(
+    "SELECT id, 'fin' FROM categories WHERE slug = 'maquinaria-agricola'");
+  assert(categoriaDeServicio && categoriaDeActivos,
+    'faltan las categorias de servicio y de maquinaria para armar el caso');
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const sello = Date.now();
+
+  const publicar = async (que, cuerpo) => {
+    const { status, data } = await apiRequest('/products', {
+      method: 'POST', token: vendedor.token,
+      body: { locality_id: localidad, ...cuerpo },
+    });
+    assert(status < 400, `no se pudo publicar el ${que} del caso: HTTP ${status}`);
+    return data.id;
+  };
+
+  // El servicio primero y el activo despues: asi los dos quedan entre las tres
+  // publicaciones mas nuevas que dibuja Inicio, y el servicio entre los tres
+  // servicios mas nuevos que dibuja Servicios. Los dos son comprables —precio
+  // publicado, y el activo ademas con stock—, que es la unica condicion que
+  // este caso necesita de sus filas.
+  const nombreDelServicio = `Puerta139 servicio ${sello}`;
+  const idDelServicio = await publicar('servicio', {
+    name: nombreDelServicio,
+    description: 'Servicio comprable del caso 139, para probar la puerta de ingreso en Servicios.',
+    category_id: categoriaDeServicio[0],
+    price: 52000,
+    unit: 'hectárea',
+    publication_type: 'servicio',
+    operation_kind: 'servicio',
+    pricing_type: 'por_hectarea',
+  });
+  const nombreDelActivo = `Puerta139 activo ${sello}`;
+  const idDelActivo = await publicar('activo', {
+    name: nombreDelActivo,
+    description: 'Activo comprable del caso 139, para probar la puerta de ingreso en Inicio y Mercado.',
+    category_id: categoriaDeActivos[0],
+    price: 14800,
+    stock: 3,
+    unit: 'unidad',
+    publication_type: 'producto',
+    operation_kind: 'activo',
+  });
+  // Cual de las dos recorre cada pantalla. Servicios solo dibuja servicios, y
+  // las otras dos dibujan el catalogo entero.
+  const laPublicacionDe = {
+    Inicio: nombreDelActivo,
+    Mercado: nombreDelActivo,
+    Servicios: nombreDelServicio,
+  };
 
   const browser = await chromium.launch({ headless: true });
   const enElCarrito = (page) => page.evaluate(() => {
@@ -14997,27 +15504,68 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
     }
     return 0;
   });
+  // La tarjeta de ESA publicacion, por identidad y no por posicion.
+  const tarjetaDe = (page, nombre) => page
+    .getByRole('heading', { name: nombre, exact: true, level: 3 })
+    .locator('xpath=ancestor::article[contains(@class,"card")]');
+  // Y si no aparece, el rojo tiene que decir que fallo la pantalla —no un
+  // `Timeout` pelado, que no nombra ningun defecto.
+  const esperarLaTarjeta = async (page, seccion, nombre) => {
+    const donde = tarjetaDe(page, nombre).first();
+    try {
+      await donde.waitFor({ timeout: 25_000 });
+    } catch {
+      const titulos = await page.locator('article[class*="card"] h3').allInnerTexts();
+      throw new Error(
+        `en ${seccion} no se dibujo «${nombre}», que este mismo caso acaba de publicar; `
+        + `las tarjetas a la vista son ${JSON.stringify(titulos)}`);
+    }
+    return donde;
+  };
   const recorridas = [];
+
+  // La otra mitad de la misma deuda: este caso tampoco le deja residuo a
+  // nadie. Retira sus dos publicaciones al terminar —baja logica, `status`
+  // DELETED— asi que la base queda como estaba y ninguna prueba posterior
+  // hereda una publicacion «mas nueva» que no pidio. Corre pase lo que pase,
+  // sin tirar: un problema al retirar no puede tapar el error del recorrido,
+  // asi que se guarda y se afirma despues.
+  let retiro = 'no se llego a retirarlas';
+  const retirarLasPublicaciones = async () => {
+    const restos = [];
+    for (const [que, id] of [['servicio', idDelServicio], ['activo', idDelActivo]]) {
+      try {
+        await apiRequest(`/products/${id}`, { method: 'DELETE', token: vendedor.token });
+      } catch (fallo) {
+        restos.push(`${que}: ${fallo instanceof Error ? fallo.message : String(fallo)}`);
+      }
+    }
+    if (restos.length) return restos.join('; ');
+    const [vivas] = queryRows(`
+      SELECT COUNT(*)::text, 'fin' FROM products
+      WHERE id IN (${sqlLiteral(idDelServicio)}, ${sqlLiteral(idDelActivo)})
+        AND status <> 'DELETED'`);
+    return vivas[0] === '0' ? 'retiradas' : `${vivas[0]} siguieron publicadas`;
+  };
 
   try {
     // --- C. Las tres pantallas, desde la tarjeta y desde el detalle ---------
     for (const seccion of ['Inicio', 'Mercado', 'Servicios']) {
+      const nombre = laPublicacionDe[seccion];
       const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       const page = await context.newPage();
       try {
         await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
         await page.locator('header').first()
           .getByRole('button', { name: seccion, exact: true }).first().click();
-        await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+        const laTarjeta = await esperarLaTarjeta(page, seccion, nombre);
         const tarjetasAlPrincipio = await page.locator('article[class*="card"]').count();
 
         // Desde la TARJETA: ofrece ingresar, no agrega en silencio.
-        const enLaTarjeta = page.locator('article[class*="card"]')
-          .getByRole('button', { name: 'Ingresar para continuar' }).first();
-        assert(await enLaTarjeta.count(),
-          `en ${seccion} ninguna tarjeta ofrece ingresar; los botones son `
-          + JSON.stringify((await page.locator('article[class*="card"]')
-            .getByRole('button').allInnerTexts()).slice(0, 6)));
+        const enLaTarjeta = laTarjeta.getByRole('button', { name: 'Ingresar para continuar' });
+        assert(await enLaTarjeta.count() === 1,
+          `en ${seccion} la tarjeta de «${nombre}» no ofrece ingresar; sus botones son `
+          + JSON.stringify(await laTarjeta.getByRole('button').allInnerTexts()));
         await enLaTarjeta.click();
         await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
         assert(await page.getByRole('dialog').count() === 1,
@@ -15027,7 +15575,7 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
 
         // Cancelar deja la persona donde estaba, sin efectos.
         await page.getByRole('button', { name: 'Cerrar' }).first().click();
-        await page.locator('article[class*="card"]').first().waitFor({ timeout: 20_000 });
+        await esperarLaTarjeta(page, `${seccion} despues de cancelar`, nombre);
         assert(await page.getByRole('dialog').count() === 0,
           `en ${seccion} quedo un dialogo abierto tras cancelar`);
         assert(await page.locator('article[class*="card"]').count() === tarjetasAlPrincipio,
@@ -15035,12 +15583,12 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
         assert(await enElCarrito(page) === 0,
           `cancelar en ${seccion} dejo algo en el carrito`);
 
-        // Desde el DETALLE de una publicacion comprable de esa misma pagina.
-        const tarjetaComprable = page.locator('article[class*="card"]')
-          .filter({ has: page.getByRole('button', { name: 'Ingresar para continuar' }) }).first();
-        await tarjetaComprable.locator('h3').click();
+        // Desde el DETALLE de esa misma publicacion.
+        await laTarjeta.locator('h3').click();
         await page.locator('#detalle-titulo').waitFor({ timeout: 20_000 });
         const publicacion = (await page.locator('#detalle-titulo').innerText()).trim();
+        assert(publicacion === nombre,
+          `en ${seccion} el detalle abrio «${publicacion}» y no «${nombre}»`);
         const enElDetalle = page.getByRole('dialog')
           .getByRole('button', { name: 'Ingresar para continuar' }).first();
         assert(await enElDetalle.count(),
@@ -15054,7 +15602,7 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
         // entre los dos formularios es el mismo tramite y no puede perder la
         // continuidad. Se hace aca y no en las tres para no repetir lo mismo.
         if (seccion === 'Mercado') {
-          await page.getByRole('button', { name: 'Regístrate aquí' }).first().click();
+          await page.getByRole('button', { name: 'Registrate acá' }).first().click();
           await page.getByRole('heading', { name: /Crear cuenta|Regist/i })
             .first().waitFor({ timeout: 20_000 });
           assert(await page.getByRole('dialog').count() === 1,
@@ -15069,7 +15617,7 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
         await page.getByPlaceholder('••••••••').fill('cliente123');
         await page.locator('[class*="_submitButton_"][type="submit"]').click();
         await page.locator('#detalle-titulo').waitFor({ timeout: 25_000 });
-        assert((await page.locator('#detalle-titulo').innerText()).trim() === publicacion,
+        assert((await page.locator('#detalle-titulo').innerText()).trim() === nombre,
           `en ${seccion} se volvio a otra publicacion`);
         assert(await enElCarrito(page) === 0,
           `en ${seccion} ingresar agrego la publicacion al carrito sin pedirlo`);
@@ -15114,14 +15662,13 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
     const page = await context.newPage();
     try {
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-      await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+      const laTarjeta = await esperarLaTarjeta(page, 'Inicio', nombreDelActivo);
       // Se pide ingresar desde una tarjeta y se cancela: la continuidad tiene
       // que morir ahi.
-      await page.locator('article[class*="card"]')
-        .getByRole('button', { name: 'Ingresar para continuar' }).first().click();
+      await laTarjeta.getByRole('button', { name: 'Ingresar para continuar' }).click();
       await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
       await page.getByRole('button', { name: 'Cerrar' }).first().click();
-      await page.locator('article[class*="card"]').first().waitFor({ timeout: 20_000 });
+      await esperarLaTarjeta(page, 'Inicio despues de cancelar', nombreDelActivo);
       // Y ahora se ingresa desde la cabecera, que no viene de ninguna publicacion.
       await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
       await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
@@ -15138,7 +15685,12 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
     }
   } finally {
     await browser.close();
+    retiro = await retirarLasPublicaciones();
   }
+
+  assert(retiro === 'retiradas',
+    `el caso no pudo retirar las publicaciones que fabrico y se las deja a las `
+    + `pruebas siguientes (${retiro})`);
 
   // --- E. Y recien ahora, la forma del codigo ------------------------------
   // Va al final a proposito: lo que tiene que fallar primero es el recorrido
@@ -15178,12 +15730,15 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
 
 
   return `ProductCard se dibuja en ${dondeSeDibujanTarjetas.length} pantallas y las tres reciben la `
-    + 'misma continuidad de App. En Inicio, Mercado y Servicios, sin sesion tanto la tarjeta como '
+    + 'misma continuidad de App. Sobre dos publicaciones propias del caso '
+    + `(«${nombreDelActivo}» en Inicio y Mercado, «${nombreDelServicio}» en Servicios, `
+    + 'buscadas por titulo exacto y no por posicion), sin sesion tanto la tarjeta como '
     + 'el detalle ofrecen «Ingresar para continuar» y abren el Login real con un solo dialogo a la '
     + 'vez; cancelar deja la pagina como estaba y completar vuelve a la misma publicacion, siempre '
     + `con el carrito en cero. Recien el clic siguiente agrega (${recorridas.join(', ')}). Un `
     + 'ingreso desde la cabecera no reabre nada. El activo dice «Agregar al carrito» y las otras '
-    + 'anatomias conservan su rotulo';
+    + 'anatomias conservan su rotulo. Las dos publicaciones quedan retiradas: el caso no le deja '
+    + 'residuo a la suite';
 });
 
 await runCase(140, 'Nadie compra su propia publicacion, ni por la API ni por la pantalla', async () => {
@@ -16263,6 +16818,37 @@ await runCase(143, 'Pausar, reactivar o editar no le cambian la anatomia a una p
       await dialogo.waitFor({ state: 'hidden', timeout: 15_000 });
     };
 
+    // La base es la PRECONDICION, no la evidencia. El PATCH la deja escrita
+    // antes de que termine el GET de `/products/my` que redibuja la tarjeta, y
+    // `reloadUserProducts` no marca nada como cargando: la lista vieja se queda
+    // en pantalla mientras el pedido viaja. Leer la tarjeta apenas la base
+    // cambia es leer el render anterior. Medido: con la respuesta del GET
+    // demorada 4 s, el arnes viejo daba «despues de pausar: la tarjeta no dice
+    // «Pausado»: «Activo SERVICIO … Editar Pausar»» —la base ya decia PAUSED.
+    //
+    // Asi que despues de la base se espera la CONDICION que el caso va a
+    // afirmar: el rotulo del estado y la accion inversa, que es justamente el
+    // boton que el defecto original se comia. Sin esperas fijas: `esperarA`
+    // pregunta cada 50 ms y se rinde a los 20 s con lo ultimo que vio.
+    const esperarLaTarjeta = async (momento, estadoEsperado) => {
+      const rotulo = estadoEsperado === 'paused' ? 'Pausado' : 'Activo';
+      const inversa = estadoEsperado === 'paused' ? 'Activar' : 'Pausar';
+      let ultimo = '(la tarjeta no llego a dibujarse)';
+      try {
+        await esperarA(async () => {
+          ultimo = await textoDe(nombreDelServicio);
+          if (!new RegExp(`(^|\\s)${rotulo}(\\s|$)`).test(ultimo)) return false;
+          return await tarjeta(nombreDelServicio)
+            .getByRole('button', { name: inversa, exact: false }).count() === 1;
+        }, `la tarjeta ${momento}`, 20_000);
+      } catch {
+        throw new Error(
+          `${momento}: la tarjeta no llego a decir «${rotulo}» con su boton `
+          + `«${inversa}» en 20 s, con la base ya en ${enLaBase().estado}; `
+          + `lo ultimo que mostro fue «${ultimo}»`);
+      }
+    };
+
     // Lo que tiene que valer SIEMPRE para el servicio, mire cuando mire.
     const revisarElServicio = async (momento, estadoEsperado) => {
       const visto = await textoDe(nombreDelServicio);
@@ -16316,6 +16902,7 @@ await runCase(143, 'Pausar, reactivar o editar no le cambian la anatomia a una p
     await confirmar('Pausar');
     await esperarA(async () => enLaBase().estado === 'PAUSED',
       'el servicio no quedo pausado en la base', 20_000);
+    await esperarLaTarjeta('despues de pausar', 'paused');
     const pausado = await revisarElServicio('despues de pausar', 'paused');
     await revisarElControl('despues de pausar');
 
@@ -16324,6 +16911,7 @@ await runCase(143, 'Pausar, reactivar o editar no le cambian la anatomia a una p
     await confirmar('Activar');
     await esperarA(async () => enLaBase().estado === 'ACTIVE',
       'el servicio no volvio a activo en la base', 20_000);
+    await esperarLaTarjeta('despues de reactivar', 'active');
     await revisarElServicio('despues de reactivar', 'active');
 
     // --- D. editar (recarga posterior a editar) -----------------------------
@@ -16551,7 +17139,19 @@ await runCase(144, 'Administracion: las acciones se entienden, guardan, y no rom
     await filaDeLaSub.waitFor({ state: 'visible', timeout: 15_000 });
     const botonesDeLaSub = await revisarLosBotones(
       `[class*="subcategoryItem"]:has-text("${subReferenciada[1]}")`, 'en la subcategoria');
+    // Desde `ADMIN-SAFETY-1` el borrado pasa por la confirmación del producto:
+    // el clic en «Eliminar» abre la capa y no escribe nada. Confirmar es lo que
+    // manda la solicitud, así que acá se confirma y después se mide lo mismo
+    // que antes.
+    const confirmarBorrado = async () => {
+      const capa = page.locator('[role="dialog"][aria-labelledby^="confirmacion-titulo"]');
+      await capa.waitFor({ timeout: 15_000 });
+      await capa.getByRole('button', { name: /^Eliminar la subcategor/ }).click();
+      await capa.waitFor({ state: 'detached', timeout: 15_000 });
+    };
+
     await filaDeLaSub.getByRole('button', { name: /^Eliminar/ }).click();
+    await confirmarBorrado();
 
     await esperarA(async () => ((await page.locator('body').innerText()) || '')
       .includes('No se puede eliminar la subcategoría'),
@@ -16585,6 +17185,7 @@ await runCase(144, 'Administracion: las acciones se entienden, guardan, y no rom
       .locator('[class*="subcategoryItem"]').filter({ hasText: nombreDeLaSubNueva });
     await filaNueva.waitFor({ state: 'visible', timeout: 15_000 });
     await filaNueva.getByRole('button', { name: /^Eliminar/ }).click();
+    await confirmarBorrado();
     await esperarA(async () => queryRows(
       `SELECT id FROM subcategories WHERE name = ${sqlLiteral(nombreDeLaSubNueva)}`).length === 0,
     'una subcategoria sin publicaciones tampoco se pudo eliminar', 20_000);
@@ -17009,7 +17610,11 @@ await runCase(145, 'Las tres listas de Administracion pasan de la fila veinte', 
         // con eso cualquier filtro pareceria cumplirse.
         await esperarA(async () => {
           const celdas = await estadoDeCadaFila();
-          return celdas.length > 0 && celdas.every((c) => c.toLowerCase() === estado);
+          // El badge dice el estado en castellano —«Activa», no `active`—
+          // desde ADMIN-TRUTH-1. Se compara contra el diccionario del
+          // producto, no contra el token del filtro.
+          const esperado = textosDeEstado('ESTADOS_DE_PRODUCTO')[estado].toLowerCase();
+          return celdas.length > 0 && celdas.every((c) => c.toLowerCase() === esperado);
         }, `el filtro «${estado}» dejo filas con otro estado: `
           + `${JSON.stringify(await estadoDeCadaFila())}`, 20_000);
       }
@@ -17026,8 +17631,11 @@ await runCase(145, 'Las tres listas de Administracion pasan de la fila veinte', 
     }, 'el filtro de ordenes no coincide con el total del servidor', 20_000);
     assert((await paginaQueDice()).startsWith('Página 1 de'),
       `filtrar ordenes no volvio a la primera pagina: «${await paginaQueDice()}»`);
+    // Desde ADMIN-TRUTH-1 la fila dice «Esperando comprobante» y no el token:
+    // se compara contra el diccionario del producto.
+    const esperandoComprobante = textosDeEstado('ESTADOS_DE_ORDEN').awaiting_transfer_receipt;
     for (const fila of await filas()) {
-      assert(/awaiting_transfer_receipt/i.test(fila),
+      assert(fila.toLowerCase().includes(esperandoComprobante.toLowerCase()),
         `el filtro de ordenes dejo otro estado: «${fila}»`);
     }
 
@@ -17068,8 +17676,9 @@ await runCase(145, 'Las tres listas de Administracion pasan de la fila veinte', 
     assert(pieDespues.includes(`Total: ${pausadas} productos`),
       `una respuesta vieja sin filtro piso lo que estaba pedido: «${pieDespues}»`);
     const estadosDespues = await estadoDeCadaFila();
+    const pausadaDice = textosDeEstado('ESTADOS_DE_PRODUCTO').paused.toLowerCase();
     assert(estadosDespues.length > 0
-      && estadosDespues.every((c) => c.toLowerCase() === 'paused'),
+      && estadosDespues.every((c) => c.toLowerCase() === pausadaDice),
     `una respuesta vieja trajo filas que el filtro vigente no pidio: `
     + JSON.stringify(estadosDespues));
     await page.unroute('**/api/admin/products*');
@@ -17227,11 +17836,22 @@ await runCase(146, 'El estado de una publicacion se cambia desde el panel y pers
       `«draft» fue rechazado pero la publicacion paso de ${antesDelRechazo} a ${despuesDelRechazo}`);
 
     // --- C. accionar el control real, un PATCH por vez ---------------------
+    // Desde `ADMIN-SAFETY-1` elegir en el control no manda nada: abre la
+    // confirmacion, y confirmar es lo que manda el PATCH. Se sigue midiendo lo
+    // mismo —un PATCH por vez, con lo que se eligio— pero disparado donde
+    // ahora se dispara.
+    const confirmarElCambio = async () => {
+      const capa = page.locator('[role="dialog"][aria-labelledby^="confirmacion-titulo"]');
+      await capa.waitFor({ timeout: 15_000 });
+      await capa.getByRole('button', { name: /^Pasar a / }).click();
+      await capa.waitFor({ state: 'detached', timeout: 15_000 });
+    };
     const cambiarDesdeElPanel = async (publicacion, estado) => {
+      await selectorDe(publicacion.nombre).selectOption(estado);
       const [respuesta] = await Promise.all([
         page.waitForResponse((r) => r.url().includes(`/admin/products/${publicacion.id}/status`)
           && r.request().method() === 'PATCH', { timeout: 20_000 }),
-        selectorDe(publicacion.nombre).selectOption(estado),
+        confirmarElCambio(),
       ]);
       const enviado = JSON.parse(respuesta.request().postData() || '{}');
       assert(enviado.status === estado,
@@ -17242,8 +17862,12 @@ await runCase(146, 'El estado de una publicacion se cambia desde el panel y pers
         + `${(await respuesta.text().catch(() => '')).slice(0, 140)}`);
       // La lista se vuelve a pedir sola: se espera a que la celda cambie, no un
       // tiempo fijo.
-      await esperarA(async () => (await celdaDe(publicacion.nombre)) === estado,
-        `la celda de Estado de «${publicacion.nombre}» no quedo en «${estado}» tras accionar `
+      // La celda muestra el estado traducido desde ADMIN-TRUTH-1: se compara
+      // contra el diccionario del producto y no contra el token.
+      const dibujado = textosDeEstado('ESTADOS_DE_PRODUCTO')[estado];
+      await esperarA(async () => (await celdaDe(publicacion.nombre)).toLowerCase()
+        === dibujado.toLowerCase(),
+      `la celda de Estado de «${publicacion.nombre}» no quedo en «${dibujado}» tras accionar `
         + `el control; muestra «${await celdaDe(publicacion.nombre)}»`, 20_000);
     };
 
@@ -17270,9 +17894,12 @@ await runCase(146, 'El estado de una publicacion se cambia desde el panel y pers
     for (const publicacion of publicaciones) {
       await esperarLaFila(publicacion.nombre);
       const celda = await celdaDe(publicacion.nombre);
-      assert(celda === publicacion.estado,
+      // La celda dibuja el estado traducido; el selector de al lado sigue
+      // teniendo el token, y eso se comprueba dos líneas más abajo.
+      const enCastellano = textosDeEstado('ESTADOS_DE_PRODUCTO')[publicacion.estado];
+      assert(celda.toLowerCase() === enCastellano.toLowerCase(),
         `tras recargar, «${publicacion.nombre}» muestra «${celda}» en la celda de Estado y no `
-        + `«${publicacion.estado}»`);
+        + `«${enCastellano}»`);
       const enElSelector = await selectorDe(publicacion.nombre).inputValue();
       assert(enElSelector === publicacion.estado,
         `tras recargar, el selector de «${publicacion.nombre}» quedo en «${enElSelector}»`);
@@ -18044,14 +18671,17 @@ await runCase(149, 'Cerrar un formulario con trabajo sin guardar pregunta una so
     const seguirEditando = (page) => page.getByRole('button', { name: 'Seguir editando' }).click();
     const descartar = (page) => page.getByRole('button', { name: 'Descartar cambios' }).click();
     const panelAbierto = async (page) =>
-      (await page.getByRole('heading', { name: 'Mi Panel' }).count()) === 1;
+      (await page.getByRole('heading', { name: 'Mi cuenta' }).count()) === 1;
     const abrirPanel = async (page) => {
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: 'Mi cuenta' }).click();
-      await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+      await page.getByRole('heading', { name: 'Mi cuenta' }).waitFor({ timeout: 20_000 });
     };
-    const equisDelPanel = (page) =>
-      page.locator('[aria-label="Mi cuenta"] > button[aria-label="Cerrar"]');
+    // Mi cuenta ya no tiene X ni fondo que la cierre: desde ACCOUNT-PAGE-1 es
+    // una página, y se sale de ella yéndose a otra sección. La salida que se
+    // usa acá es la cabecera, que es la que tiene una persona a mano.
+    const salirDeLaCuenta = (page) => page.locator('header').first()
+      .getByRole('button', { name: 'Inicio', exact: true });
     const sinPregunta = async (page, momento) => {
       await esperarA(async () => !(await hayPregunta(page)),
         `${momento}: quedó una pregunta abierta`, 20_000);
@@ -18073,54 +18703,78 @@ await runCase(149, 'Cerrar un formulario con trabajo sin guardar pregunta una so
       const radio = page.locator('#perfil-radio');
       await radio.waitFor({ state: 'visible', timeout: 20_000 });
       const original = await radio.inputValue();
-      await equisDelPanel(page).click();
+      await salirDeLaCuenta(page).click();
       await esperarA(async () => !(await panelAbierto(page)),
-        'perfil limpio: la X del panel no cerró', 20_000);
+        'perfil limpio: irse por la cabecera no salió de la cuenta', 20_000);
       await sinPregunta(page, 'perfil limpio');
-      cerrados.push('perfil limpio/X del panel');
+      cerrados.push('perfil limpio/cabecera');
 
       // Sucio: el mismo camino pregunta, y «seguir editando» conserva todo.
       await abrirPanel(page);
       await page.getByRole('button', { name: /editar/i }).first().click();
       await radio.waitFor({ state: 'visible', timeout: 20_000 });
       await radio.fill('777');
-      await equisDelPanel(page).click();
-      await preguntoUnaSolaVez(page, 'perfil sucio + X del panel');
-      assert(await panelAbierto(page), 'preguntar cerró el panel igual');
-      assert((await dialogos(page)) === 2,
-        `con la pregunta arriba hay ${await dialogos(page)} diálogos y tendrían que ser 2`);
+      await salirDeLaCuenta(page).click();
+      await preguntoUnaSolaVez(page, 'perfil sucio + cabecera');
+      assert(await panelAbierto(page), 'preguntar sacó de la cuenta igual');
+      // Una sola capa arriba: la pregunta. La página de abajo no es un diálogo.
+      assert((await dialogos(page)) === 1,
+        `con la pregunta arriba hay ${await dialogos(page)} diálogos y tendría que ser 1`);
       assert(await pregunta(page).evaluate((el) => el.contains(document.activeElement)),
         'el foco no entró en la pregunta');
       await seguirEditando(page);
       await sinPregunta(page, 'perfil: seguir editando');
-      assert(await panelAbierto(page), 'seguir editando cerró el panel');
+      assert(await panelAbierto(page), 'seguir editando sacó de la cuenta');
       assert((await radio.inputValue()) === '777',
         `seguir editando perdió lo escrito: «${await radio.inputValue()}»`);
-      await esperarA(async () => (await equisDelPanel(page).evaluate(
+      // Y no movió la barra: seguir editando conserva pantalla, URL y contenido.
+      assert(new URL(page.url()).searchParams.get('section') === 'account',
+        `seguir editando movió la barra a ${page.url()}`);
+      await esperarA(async () => (await salirDeLaCuenta(page).evaluate(
         (el) => el === document.activeElement)),
-      'seguir editando no devolvió el foco a la X que pidió cerrar', 20_000);
+      'seguir editando no devolvió el foco a quien pidió salir', 20_000);
 
-      // Cambiar de pestaña con el perfil sucio NO es un cierre: el formulario
-      // sigue vivo y no se pierde nada, así que no pregunta. Lo que sí tiene
-      // que seguir preguntando después es cerrar el panel.
+      // Cambiar de pestaña SÍ pregunta ahora, y es un cambio deliberado de
+      // ACCOUNT-PAGE-1. Mientras Mi cuenta era un modal, el formulario del
+      // perfil seguía montado detrás de la otra pestaña y no se perdía nada.
+      // Como página, cambiar de pestaña es irse de la pantalla que se está
+      // editando: se pregunta, como con la cabecera.
       await page.getByRole('button', { name: /notificaciones/i }).first().click();
+      await preguntoUnaSolaVez(page, 'perfil sucio + cambio de pestaña');
+      await seguirEditando(page);
+      await sinPregunta(page, 'pestaña: seguir editando');
+      assert((await radio.count()) === 1 && (await radio.inputValue()) === '777',
+        'seguir editando desde la pestaña perdió el formulario o lo escrito');
+      cerrados.push('perfil sucio/cambio de pestaña (pregunta y se queda)');
+
+      // Y descartando, la pestaña pedida es exactamente la que se abre, y el
+      // trabajo local se suelta de verdad: si quedara escrito, la salida
+      // siguiente volvería a preguntar por lo mismo y «una sola vez» sería
+      // mentira.
+      await page.getByRole('button', { name: /notificaciones/i }).first().click();
+      await preguntoUnaSolaVez(page, 'perfil sucio + pestaña, descartando');
+      await descartar(page);
       await esperarA(async () => (await radio.count()) === 0,
-        'la pestaña no cambió', 20_000);
-      await sinPregunta(page, 'perfil sucio + cambio de pestaña');
+        'descartar no llevó a la pestaña que se había pedido', 20_000);
+      assert(await panelAbierto(page), 'descartar la pestaña sacó de la cuenta');
       await page.getByRole('button', { name: 'Mi Perfil' }).first().click();
-      await esperarA(async () => (await radio.count()) === 1,
-        'no volvió el formulario del perfil', 20_000);
-      assert((await radio.inputValue()) === '777',
-        `cambiar de pestaña perdió lo escrito: «${await radio.inputValue()}»`);
-      cerrados.push('perfil sucio/cambio de pestaña (no cierra: no pregunta)');
+      await sinPregunta(page, 'tras descartar, volver al perfil');
+      await esperarA(async () => (await page.locator('#perfil-radio').count()) === 0,
+        'tras descartar, el perfil siguió en edición', 20_000);
+      cerrados.push('perfil sucio/descartar abre la pestaña pedida y suelta lo escrito');
 
       // Cambiar y volver al valor original deja el formulario limpio otra vez.
+      await page.getByRole('button', { name: /editar/i }).first().click();
+      await radio.waitFor({ state: 'visible', timeout: 20_000 });
+      assert((await radio.inputValue()) === original,
+        `descartar no devolvió el radio a «${original}»: dice «${await radio.inputValue()}»`);
+      await radio.fill('888');
       await radio.fill(original);
-      await equisDelPanel(page).click();
+      await salirDeLaCuenta(page).click();
       await esperarA(async () => !(await panelAbierto(page)),
-        'con el valor revertido la X no cerró', 20_000);
+        'con el valor revertido irse por la cabecera preguntó o no salió', 20_000);
       await sinPregunta(page, 'perfil revertido');
-      cerrados.push('perfil revertido/X del panel');
+      cerrados.push('perfil revertido/cabecera');
       await page.context().close();
     }
 
@@ -18417,7 +19071,13 @@ await runCase(150, 'Escribir en un formulario no mueve el foco de su campo', asy
 
     // Una letra por vez, y despues de CADA una las dos cosas que el defecto
     // rompia: que la letra entro y que el foco sigue en el mismo campo.
-    const escribirTeclaPorTecla = async (page, campo, texto, contenedor) => {
+    // `comoCapa` distingue los dos límites que existen ahora. Los formularios
+    // que viven en una capa —alta, checkout, edición— tienen que seguir siendo
+    // UNA capa con el fondo trabado. El perfil vive en Mi cuenta, que desde
+    // ACCOUNT-PAGE-1 es una página: ahí la propiedad correcta es la contraria
+    // —ningún diálogo y el scroll del documento suelto— y comprobarla es igual
+    // de discriminante: si el contenedor volviera a ser un modal, esto se cae.
+    const escribirTeclaPorTecla = async (page, campo, texto, contenedor, comoCapa = true) => {
       await campo.click();
       // El cursor al final: `click()` lo deja donde cayo el clic y un campo
       // precargado —el nombre del perfil— no arranca vacio.
@@ -18437,31 +19097,45 @@ await runCase(150, 'Escribir en un formulario no mueve el foco de su campo', asy
           `${contenedor}: tras la tecla ${numero} de ${texto.length} el campo dice «${ahora}» y `
           + `tendria que decir «${esperado}»`);
       }
-      // Y la capa siguio siendo la misma capa: ni se duplico ni solto el fondo.
+      // Y el contenedor siguio siendo el mismo: ni se duplico ni cambio de clase.
       const dialogos = await page.locator('[role="dialog"]').count();
-      assert(dialogos === 1, `${contenedor}: escribir dejo ${dialogos} dialogo(s) y tendria que `
-        + 'haber exactamente 1');
-      assert((await page.evaluate(() => document.body.style.overflow)) === 'hidden',
-        `${contenedor}: escribir solto la traba del scroll de fondo`);
+      const trabado = (await page.evaluate(() => document.body.style.overflow)) === 'hidden';
+      if (comoCapa) {
+        assert(dialogos === 1, `${contenedor}: escribir dejo ${dialogos} dialogo(s) y tendria que `
+          + 'haber exactamente 1');
+        assert(trabado, `${contenedor}: escribir solto la traba del scroll de fondo`);
+      } else {
+        assert(dialogos === 0, `${contenedor}: es una pagina y escribir dejo ${dialogos} `
+          + 'dialogo(s) abierto(s)');
+        assert(!trabado, `${contenedor}: es una pagina y tiene trabado el scroll del documento`);
+      }
       recorridos.push(`${contenedor}: ${texto.length} teclas`);
       return esperado;
     };
 
     // Escribir no puede haber desarmado la proteccion: con lo escrito, cerrar
     // pregunta una vez y «seguir editando» devuelve el foco al mismo campo.
-    const preguntaYVuelve = async (page, campo, contenedor, esperado) => {
-      await page.keyboard.press('Escape');
+    const preguntaYVuelve = async (page, campo, contenedor, esperado, salir, volverA) => {
+      // Cada límite se abandona por donde se abandona de verdad: una capa con
+      // Escape, una página yéndose por la cabecera.
+      if (salir) await salir();
+      else await page.keyboard.press('Escape');
       await esperarA(async () => (await pregunta(page).count()) === 1,
-        `${contenedor}: con lo escrito, Escape no pregunto nada antes de cerrar`, 20_000);
+        `${contenedor}: con lo escrito, salir no pregunto nada antes de irse`, 20_000);
       await page.getByRole('button', { name: 'Seguir editando' }).click();
       await esperarA(async () => (await pregunta(page).count()) === 0,
         `${contenedor}: «seguir editando» no cerro la pregunta`, 20_000);
       assert((await campo.inputValue()) === esperado,
         `${contenedor}: «seguir editando» dejo el campo en «${await campo.inputValue()}» y tenia `
         + `que conservar «${esperado}»`);
-      await esperarA(() => esElActivo(campo),
+      // El foco vuelve a QUIEN PIDIO SALIR, que es la misma regla en los dos
+      // limites y no la misma cosa: en una capa lo pide el campo con Escape, y
+      // en la pagina lo pide el boton de la cabecera. Confundirlas seria exigir
+      // que la pagina devuelva el foco a un campo que nadie uso para irse.
+      const destinoDelFoco = volverA || campo;
+      await esperarA(() => esElActivo(destinoDelFoco),
         `${contenedor}: «seguir editando» dejo el foco en ${await dondeEstaElFoco(page)} y no en `
-        + 'el campo que pidio cerrar', 20_000);
+        + 'quien pidio salir', 20_000);
     };
 
     // --- A. alta de publicacion --------------------------------------------
@@ -18493,18 +19167,25 @@ await runCase(150, 'Escribir en un formulario no mueve el foco de su campo', asy
       await page.context().close();
     }
 
-    // --- C. Mi Panel: el perfil, que vive DENTRO de la capa del panel -------
+    // --- C. El perfil, que desde ACCOUNT-PAGE-1 vive en una PAGINA ---------
     {
       const page = await sesion(vendedor);
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: 'Mi cuenta' }).click();
-      await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+      await page.getByRole('heading', { name: 'Mi cuenta' }).waitFor({ timeout: 20_000 });
       await page.locator('[class*="sectionHeader"]').filter({ hasText: 'Mi Perfil' })
         .getByRole('button', { name: 'Editar' }).click();
       const campo = page.locator('#perfil-nombre');
       await campo.waitFor({ state: 'visible', timeout: 20_000 });
-      const escrito = await escribirTeclaPorTecla(page, campo, 'Panel150', 'Mi Panel (perfil)');
-      await preguntaYVuelve(page, campo, 'Mi Panel (perfil)', escrito);
+      const escrito = await escribirTeclaPorTecla(
+        page, campo, 'Panel150', 'Mi cuenta (perfil)', false);
+      const irAInicio = page.locator('header').first()
+        .getByRole('button', { name: 'Inicio', exact: true });
+      await preguntaYVuelve(page, campo, 'Mi cuenta (perfil)', escrito,
+        () => irAInicio.click(), irAInicio);
+      // Y no se movio de la pantalla: la URL sigue siendo la de la cuenta.
+      assert(new URL(page.url()).searchParams.get('section') === 'account',
+        `«seguir editando» movio la barra a ${page.url()}`);
       await page.context().close();
     }
 
@@ -18602,13 +19283,13 @@ await runCase(151, 'Un formulario no se contradice ni esconde su error', async (
     const abrirElRegistro = async (page) => {
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: 'Ingresar' }).first().click();
-      await page.getByRole('button', { name: 'Regístrate aquí' }).click();
+      await page.getByRole('button', { name: 'Registrate acá' }).click();
       await page.locator('#registro-nombre').waitFor({ state: 'visible', timeout: 20_000 });
     };
     const abrirMisPublicaciones = async (page) => {
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: 'Mi cuenta' }).click();
-      await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+      await page.getByRole('heading', { name: 'Mi cuenta' }).waitFor({ timeout: 20_000 });
       await page.getByRole('button', { name: /publicaciones/i }).first().click();
     };
     const editar = async (page, nombre) => {
@@ -18969,7 +19650,7 @@ await runCase(152, 'La ubicación publicada tiene una sola verdad: el padrón', 
     const abrirLaEdicion = async (nombre) => {
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: 'Mi cuenta' }).click();
-      await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+      await page.getByRole('heading', { name: 'Mi cuenta' }).waitFor({ timeout: 20_000 });
       await page.getByRole('button', { name: /publicaciones/i }).first().click();
       const tarjeta = page.locator('[class*="productCard"], [class*="publicacion"]')
         .filter({ hasText: nombre }).first();
@@ -19333,7 +20014,7 @@ await runCase(153, 'Rechazar una transferencia se decide dentro del producto', a
     const abrirVentas = async () => {
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: 'Mi cuenta' }).click();
-      await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 20_000 });
+      await page.getByRole('heading', { name: 'Mi cuenta' }).waitFor({ timeout: 20_000 });
       await page.getByRole('button', { name: 'Mis Ventas' }).click();
       await esperarA(async () => (await page.locator('[class*="orderCard"]')
         .filter({ hasText: numeroDelRechazo }).count()) === 1,
@@ -19404,7 +20085,7 @@ await runCase(153, 'Rechazar una transferencia se decide dentro del producto', a
 
       await esperarA(async () => (await laCapa.count()) === 0,
         `cerrar con ${forma} no cerro la capa`, 20_000);
-      assert((await page.getByRole('heading', { name: 'Mi Panel' }).count()) === 1,
+      assert((await page.getByRole('heading', { name: 'Mi cuenta' }).count()) === 1,
         `cerrar con ${forma} cerro tambien Mi Panel`);
       await esperarA(() => esElActivo(disparador()),
         `cerrar con ${forma} dejo el foco en ${await dondeEstaElFoco()} y no en el boton que `
@@ -19584,7 +20265,7 @@ await runCase(154, 'El alta de cuenta tiene un solo ancho y controles operables'
 
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: 'Ingresar' }).first().click();
-      await page.getByRole('button', { name: 'Regístrate aquí' }).click();
+      await page.getByRole('button', { name: 'Registrate acá' }).click();
       await page.locator('#registro-nombre').waitFor({ state: 'visible', timeout: 20_000 });
 
       const capa = page.getByRole('dialog');
@@ -20750,7 +21431,7 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
       await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
       assert((await rastroDelViejo(page)) === '',
         `${donde}, Ingresar sigue mostrando el nombre viejo: «${await rastroDelViejo(page)}»`);
-      await page.getByRole('button', { name: /Reg[íi]strate aqu[íi]/i }).first().click();
+      await page.getByRole('button', { name: /Registrate ac[áa]/i }).first().click();
       await page.getByRole('heading', { name: /Crear cuenta/i }).waitFor({ timeout: 20_000 });
       await page.getByRole('checkbox', { name: /Quiero registrarme como transportista/ }).check();
       await page.locator('input[name="carrierPlate"]').waitFor({ timeout: 20_000 });
@@ -20769,7 +21450,7 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
       ['panel del vendedor', { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
         async (page) => {
           await page.getByRole('button', { name: 'Mi cuenta' }).click();
-          await page.getByRole('heading', { name: 'Mi Panel' }).waitFor({ timeout: 25_000 });
+          await page.getByRole('heading', { name: 'Mi cuenta' }).waitFor({ timeout: 25_000 });
         }],
       ['administración', { email: 'admin@topgreen.com', password: 'admin123' },
         async (page) => {
@@ -20892,7 +21573,26 @@ await runCase(157, 'La cuenta de prueba entra, publica y sobrevive a un segundo 
 
   const propias = (tabla, columna) => queryCount(
     `SELECT COUNT(*) FROM ${tabla} WHERE ${columna} = ${sqlLiteral(id)}`);
-  assert(propias('products', 'seller_id') === 0, 'la cuenta de prueba arranca con publicaciones');
+  // La cuenta arranca vacía porque este caso la deja vacía, y no porque nadie la
+  // haya tocado nunca.
+  //
+  // Lo que se afirma acá es una propiedad del SEED —la cuenta de prueba nace sin
+  // historia—, y este mismo caso le publica algo unas líneas más abajo. Así que
+  // bastaba con haberlo corrido una vez, o con que se cayera después de
+  // publicar, para que la siguiente corrida arrancara roja diciendo «arranca
+  // con publicaciones»: la prueba se ensuciaba a sí misma. Se limpia lo que
+  // dejó una corrida anterior, que es lo único que puede haber ahí.
+  const sobrantes = queryRows(
+    `SELECT id FROM products WHERE seller_id = ${sqlLiteral(id)}`).map(([suId]) => suId);
+  if (sobrantes.length > 0) {
+    const lista = sobrantes.map((suId) => sqlLiteral(suId)).join(', ');
+    querySql(`DELETE FROM product_images WHERE product_id IN (${lista})`);
+    querySql(`DELETE FROM cart_items WHERE product_id IN (${lista})`);
+    querySql(`DELETE FROM products WHERE id IN (${lista})`);
+  }
+  assert(propias('products', 'seller_id') === 0,
+    `la cuenta de prueba arranca con ${propias('products', 'seller_id')} publicación(es) que `
+    + 'no dejó una corrida anterior: el seed le está sembrando historia');
   assert(propias('orders', 'buyer_id') === 0 && propias('orders', 'seller_id') === 0,
     'la cuenta de prueba arranca con órdenes');
   assert(propias('ratings', 'reviewed_id') === 0, 'la cuenta de prueba arranca calificada');
@@ -21002,10 +21702,14 @@ await runCase(157, 'La cuenta de prueba entra, publica y sobrevive a un segundo 
 
     // --- E. La ve como propia en su cuenta ---------------------------------
     await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
-    // Todo adentro del panel: al volver del alta, la publicación recién creada
+    // Todo adentro de la cuenta: al volver del alta, la publicación recién creada
     // también está dibujada en el catálogo de atrás, así que buscar el título
     // en la página entera encuentra dos y no dice nada de «Mis publicaciones».
-    const panel = page.getByRole('dialog', { name: 'Mi cuenta' });
+    //
+    // Ya no es un diálogo: con `ACCOUNT-PAGE-1`, Mi cuenta pasó a ser una página
+    // del sitio. El recorte sigue haciendo falta por el mismo motivo, y ahora se
+    // pide por lo que la cuenta es.
+    const panel = page.locator('main[aria-labelledby="cuenta-titulo"]');
     await panel.waitFor({ state: 'visible', timeout: 20_000 });
     await panel.getByRole('button', { name: 'Mis publicaciones' }).click();
     await panel.getByRole('heading', { name: 'Mis publicaciones' }).waitFor({ timeout: 20_000 });
@@ -21094,15 +21798,35 @@ await runCase(157, 'La cuenta de prueba entra, publica y sobrevive a un segundo 
   // palabra «local» aparezca cien líneas más abajo, hablando de otra cosa, no es
   // una advertencia. Y se compara sin acentos, porque dos de las tres salidas
   // están escritas en ASCII a propósito.
-  const GUIAS = [
-    'README.md',
-    'README_LOCAL_SETUP.md',
-    'docs/DATABASE.md',
-    'docs/USER_MANUAL.md',
-    'scripts/entorno_nativo.sh',
-    'scripts/init_local_db.sh',
-    'scripts/init_local_db.ps1',
-  ];
+  // La lista de guías NO se escribe a mano: se deriva.
+  //
+  // Estaba escrita, con `README.md` adentro, y el 2026-09-11 la PM reescribió
+  // ese archivo entero: dejó de nombrar la cuenta y el caso se puso rojo
+  // pidiendo una advertencia al lado de una mención que ya no existe. La lista
+  // envejeció, que es exactamente lo que una lista escrita a mano hace.
+  //
+  // Ahora se recorren las guías que sigue una persona —los `.md` de la raíz y
+  // de `docs/`, y los arranques de `scripts/`— y se exige la advertencia sólo
+  // donde la cuenta EFECTIVAMENTE se nombra. Así una guía nueva queda cubierta
+  // sola y una que deja de nombrarla sale sola. Queda afuera `docs/pm/`: es el
+  // canal con la PM, no una guía de instalación.
+  //
+  // Y para que «donde se nombra» no pueda quedar en cero sin que nadie se
+  // entere, se exige que las tres salidas de arranque sigan estando.
+  const CANDIDATAS = execFileSync('git', ['ls-files'], { encoding: 'utf8' })
+    .split('\n')
+    .filter((camino) => camino
+      && !camino.startsWith('docs/pm/')
+      && ((/^[^/]+\.md$/.test(camino))
+        || (camino.startsWith('docs/') && camino.endsWith('.md'))
+        || (camino.startsWith('scripts/') && /\.(sh|ps1)$/.test(camino))));
+  const GUIAS = CANDIDATAS.filter((camino) => readFileSync(camino, 'utf8').includes(CORREO));
+  const ARRANQUES = ['scripts/entorno_nativo.sh', 'scripts/init_local_db.sh',
+    'scripts/init_local_db.ps1'];
+  const arranquesAusentes = ARRANQUES.filter((camino) => !GUIAS.includes(camino));
+  assert(arranquesAusentes.length === 0,
+    `los arranques dejaron de nombrar la cuenta de prueba: ${arranquesAusentes.join(', ')}; `
+    + `las guías que la nombran son ${JSON.stringify(GUIAS)}`);
   const sinAcentos = (texto) => texto.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
   const CONCEPTOS = [['pública', /public/], ['local', /local/], ['descartable', /descartable/]];
   const faltantes = [];
@@ -21382,15 +22106,57 @@ await runCase(159, 'El monograma se integra con la banda: sin placa, sin halo y 
   assert(verificacion.status === 0,
     `la verificación de la derivación falló: ${(verificacion.stderr || '').slice(0, 300)}`);
   const dicho = verificacion.stdout || '';
-  for (const archivo of ['agroboeda-monograma.png', 'agroboeda-monograma-alfa.png',
-    'agroboeda-favicon.png']) {
+  const ARCHIVOS = ['agroboeda-monograma.png', 'agroboeda-monograma-alfa.png',
+    'agroboeda-favicon.png'];
+  for (const archivo of ARCHIVOS) {
     const linea = dicho.split('\n').find((l) => l.includes(archivo));
     assert(linea, `la derivación no informa ${archivo}:\n${dicho}`);
     assert(linea.includes(sha256(`public/marca/${archivo}`)),
-      `el ${archivo} del repositorio no es el que produce la fuente:\n  ${linea}`);
+      `la derivación informa un hash que no es el del archivo leído:\n  ${linea}`);
   }
   assert(/RGBA/.test(dicho.split('\n').find((l) => l.includes('monograma-alfa.png')) || ''),
     'la derivación no declara RGBA para el monograma nuevo');
+
+  // Que salga con cero no prueba nada por sí solo: hasta acá el modo
+  // verificación podía estar leyendo el archivo e informando su propio hash, y
+  // un PNG sustituido pasaba igual. Así que se lo pone rojo a propósito.
+  //
+  // Se hace sobre una COPIA mínima y temporal —el script, la fuente y los tres
+  // derivados—, nunca sobre el árbol de trabajo, y ahí se sustituye el
+  // monograma alfa por el opaco: un PNG válido, de la misma medida, con otro
+  // contenido. Es exactamente el caso que la verificación tiene que detectar.
+  const copia = mkdtempSync(`${tmpdir()}/agroboeda-derivacion-`);
+  try {
+    for (const carpeta of ['scripts', 'public/marca', 'docs/pm/originales']) {
+      mkdirSync(`${copia}/${carpeta}`, { recursive: true });
+    }
+    for (const archivo of ['scripts/derivar_marca.py',
+      'docs/pm/originales/AGROBOEDA-LOGO-FUENTE.png',
+      ...ARCHIVOS.map((n2) => `public/marca/${n2}`)]) {
+      writeFileSync(`${copia}/${archivo}`, readFileSync(archivo));
+    }
+    writeFileSync(`${copia}/public/marca/agroboeda-monograma-alfa.png`,
+      readFileSync('public/marca/agroboeda-monograma.png'));
+
+    const enRojo = spawnSync('python3', [`${copia}/scripts/derivar_marca.py`, '--verificar'],
+      { encoding: 'utf8' });
+    assert(enRojo.status !== 0,
+      'con el monograma alfa sustituido la verificación siguió saliendo con 0: '
+      + 'no verifica nada');
+    const queja = (enRojo.stderr || '') + (enRojo.stdout || '');
+    assert(/ERROR[^\n]*agroboeda-monograma-alfa\.png/.test(queja),
+      `la verificación falló pero no nombró el archivo sustituido:\n${queja.slice(-400)}`);
+    for (const intacto of ['agroboeda-monograma.png', 'agroboeda-favicon.png']) {
+      assert(!new RegExp(`ERROR[^\n]*${intacto.replace('.', '\\.')}`).test(queja),
+        `la verificación también acusó a ${intacto}, que no se tocó:\n${queja.slice(-400)}`);
+    }
+    // Y no escribió producto: la copia sigue con el archivo sustituido.
+    assert(readFileSync(`${copia}/public/marca/agroboeda-monograma-alfa.png`)
+      .equals(readFileSync('public/marca/agroboeda-monograma.png')),
+      '`--verificar` reescribió el archivo en vez de sólo verificarlo');
+  } finally {
+    rmSync(copia, { recursive: true, force: true });
+  }
 
   // Y sigue sin dependencias: el script lee y escribe PNG con la biblioteca
   // estándar. Una dependencia nueva convertiría «reproducible» en «reproducible
@@ -21610,11 +22376,751 @@ await runCase(159, 'El monograma se integra con la banda: sin placa, sin halo y 
   }
 
   return `la fuente sigue en ${SHA_FUENTE.slice(0, 12)}… y el favicon en `
-    + `${SHA_FAVICON.slice(0, 12)}…; \`derivar_marca.py --verificar\` reproduce los tres `
-    + 'archivos con la biblioteca estándar y declara RGBA para el nuevo; '
+    + `${SHA_FAVICON.slice(0, 12)}…; \`derivar_marca.py --verificar\` compara los tres `
+    + 'archivos versionados contra la derivación y sale con 0, declara RGBA para el nuevo y '
+    + 'usa sólo la biblioteca estándar; sobre una copia temporal con el alfa sustituido por el '
+    + 'opaco sale distinto de cero y nombra ese archivo, y sólo ese; '
     + `${medidos.join('; ')}. La marca conserva su único nombre accesible, la imagen sigue `
     + 'siendo decorativa, el foco se ve, Enter lleva a Inicio y ninguna medida desborda. '
     + `Seis capturas en ${CAPTURAS}`;
+});
+
+// ---------------------------------------------------------------------------
+// 160. ADMIN-TRUTH-1 — el panel dice lo que pasa.
+//
+// Administración mentía de cuatro maneras distintas, y ninguna se veía como una
+// falla:
+//
+//  1. pedía `total_sellers` y `total_customers`, que el servidor nunca mandó:
+//     dos tarjetas dibujaban `undefined`. «Pendientes» contaba dos estados de
+//     diez —las cuatro órdenes esperando o revisando comprobante, las pagadas y
+//     las enviadas no existían para el panel— y al volumen vendido lo llamaba
+//     «Ingresos», que es plata que AgroBoeda no cobra;
+//  2. los badges imprimían el token interno —`sold_out`,
+//     `awaiting_transfer_receipt`— y pintaban de gris cualquier estado que su
+//     mapa no tuviera, mientras el filtro de al lado ya lo decía en castellano;
+//  3. cinco cargas convertían un 500 en una tabla vacía: un fallo se leía igual
+//     que «no hay resultados»;
+//  4. el alta de usuario reemplazaba el detalle del servidor —«El email ya está
+//     registrado»— por «Error al crear usuario», que no se puede accionar.
+//
+// Este caso mide las cuatro. Los números del panel se contrastan contra SQL, no
+// contra constantes: un número escrito a mano envejece con el seed. Los estados
+// se derivan de los enum de la base y del diccionario del producto, así que
+// agregar un estado y no traducirlo hace fallar esto y no la demo. Los fallos de
+// red son lo único que se finge, y se finge en la red: la respuesta 500 la da un
+// doble de ruta, no un interruptor en el producto.
+//
+// CORRECCIÓN (ADMIN-TRUTH-1R). La primera versión de este caso daba 1/1 sin
+// probar lo que decía probar, y la PM lo vio en la propia salida: «badges
+// verificados en 10 estados (active=20 y los 9 estados de orden distintos de
+// draft)». Faltaban `paused`, `sold_out`, `deleted` y `draft`, y los diez que sí
+// miraba salían de filas que podían venir de casos anteriores. Dos defectos, no
+// uno:
+//
+//  - el bloque de badges filtraba y miraba «lo que hubiera». El catálogo
+//    sembrado es todo `active` y `draft` no se ofrece como filtro, así que para
+//    cuatro de los catorce estados el bucle corría sobre cero filas. Un bucle
+//    vacío siempre pasa;
+//  - y sólo comparaba el TEXTO. Los catorce badges podían caer al mismo gris
+//    —que es exactamente el defecto que el producto vino a arreglar— y el caso
+//    seguía verde.
+//
+// Ahora el caso fabrica sus catorce filas —cuatro publicaciones y diez órdenes—
+// y busca cada una por identidad propia, recorriendo páginas si hace falta; y de
+// cada badge exige el texto del diccionario Y el color computado del tono que
+// ese mismo diccionario declara, distinto del tratamiento de respaldo salvo en
+// el único estado que lo declara a propósito.
+// ---------------------------------------------------------------------------
+await runCase(160, 'Administración dice la verdad: números reales, estados en castellano y fallos visibles', async () => {
+  const medidos = [];
+
+  // --- Los estados reales, leídos de la base ------------------------------
+  const enumDe = (tipo) => queryRows(`
+    SELECT lower(enumlabel) FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = ${sqlLiteral(tipo)}
+    ORDER BY e.enumsortorder
+  `).map(([token]) => token);
+  const ESTADOS_ORDEN = enumDe('orderstatus');
+  const ESTADOS_PRODUCTO = enumDe('productstatus');
+  assert(ESTADOS_ORDEN.length === 10 && ESTADOS_PRODUCTO.length === 4,
+    `la base tiene ${ESTADOS_ORDEN.length} estados de orden y ${ESTADOS_PRODUCTO.length} de `
+    + 'producto: el barrido estaría leyendo el tipo equivocado');
+
+  // --- El diccionario del producto, leído del código ----------------------
+  // No se copia acá la lista de traducciones: se lee la que usa la pantalla. Si
+  // alguien agrega un estado al modelo y no lo traduce, esto se cae.
+  const TEXTO_DE_ORDEN = textosDeEstado('ESTADOS_DE_ORDEN');
+  const TEXTO_DE_PRODUCTO = textosDeEstado('ESTADOS_DE_PRODUCTO');
+  const TONO_DE_ORDEN = tonosDeEstado('ESTADOS_DE_ORDEN');
+  const TONO_DE_PRODUCTO = tonosDeEstado('ESTADOS_DE_PRODUCTO');
+  const COLOR_DECLARADO = coloresDeTono();
+  const TONO_DE_RESPALDO = tonoDeRespaldo();
+  for (const [que, tokens, textos, tonos] of [
+    ['orden', ESTADOS_ORDEN, TEXTO_DE_ORDEN, TONO_DE_ORDEN],
+    ['producto', ESTADOS_PRODUCTO, TEXTO_DE_PRODUCTO, TONO_DE_PRODUCTO],
+  ]) {
+    const sinTraducir = tokens.filter((token) => !textos[token]);
+    assert(sinTraducir.length === 0,
+      `estados de ${que} sin traducción en el diccionario: ${sinTraducir.join(', ')}`);
+    const sinTono = tokens.filter((token) => !tonos[token]);
+    assert(sinTono.length === 0,
+      `estados de ${que} sin tono declarado en el diccionario: ${sinTono.join(', ')}`);
+    for (const token of tokens) {
+      assert(!/_/.test(textos[token]) && textos[token] !== token,
+        `la traducción de ${token} es ${JSON.stringify(textos[token])}: sigue siendo el token`);
+      assert(COLOR_DECLARADO[tonos[token]],
+        `el tono «${tonos[token]}» de ${token} no tiene color en COLOR_DEL_TONO: `
+        + `hay ${Object.keys(COLOR_DECLARADO).join(', ')}`);
+    }
+  }
+  medidos.push(`${ESTADOS_ORDEN.length} estados de orden y ${ESTADOS_PRODUCTO.length} de `
+    + `producto, todos traducidos y con tono; respaldo «${TONO_DE_RESPALDO}»`);
+
+  // --- A1. Una orden por estado, por la ruta real y con el estado puesto ---
+  // El checkout es real; el estado se pone en la base descartable, que es donde
+  // el arranque dice que se fabrican los estados que la API no ofrece. Sin las
+  // diez, el contraste del panel no probaría la exclusión de los terminales.
+  const sello = Date.now();
+  const buyerAnterior = { token: state.buyerToken, id: state.buyerId };
+  const correo = `admin.verdad.${sello}@ejemplo.com`;
+  await registrarYVerificar({
+    email: correo, password: 'verdad12345', full_name: `Compradora Verdad ${sello}`,
+    role: 'user',
+  });
+  const ingreso = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: correo, password: 'verdad12345' },
+  });
+  state.buyerToken = ingreso.data.access_token;
+  state.buyerId = ingreso.data.user.id;
+
+  const [vendedor] = queryRows(
+    "SELECT id FROM users WHERE email = 'vendedor@ejemplo.com'");
+  assert(vendedor, 'el seed no dejó el vendedor demo');
+
+  const creadas = [];
+  try {
+    for (const estado of ESTADOS_ORDEN) {
+      const producto = productoConStock(vendedor[0], 2);
+      await armarCarrito([{ product_id: producto, quantity: 1 }]);
+      const creado = await apiRequest('/orders/checkout', {
+        method: 'POST',
+        token: state.buyerToken,
+        body: sobreDePago([{ seller_id: vendedor[0], method: 'transfer' }]),
+      });
+      const [orden] = creado.data.orders;
+      assert(orden?.order_id, `no se pudo crear la orden para ${estado}`);
+      querySql(`UPDATE orders SET status = ${sqlLiteral(estado.toUpperCase())}
+                WHERE id = ${sqlLiteral(orden.order_id)}`);
+      creadas.push({ estado, id: orden.order_id });
+    }
+  } finally {
+    state.buyerToken = buyerAnterior.token;
+    state.buyerId = buyerAnterior.id;
+  }
+  medidos.push(`${creadas.length} órdenes reales, una por estado`);
+
+  // El número que la orden muestra en la tabla. Es la identidad con la que
+  // después se busca ESTA fila y no la de otro caso: la tabla del panel viene
+  // ordenada por fecha y paginada, así que «la primera que aparezca» no es una
+  // identidad, es una suposición.
+  for (const creada of creadas) {
+    const [fila] = queryRows(
+      `SELECT order_number FROM orders WHERE id = ${sqlLiteral(creada.id)}`);
+    assert(fila && fila[0], `la orden de ${creada.estado} no quedó con número`);
+    creada.numero = fila[0];
+  }
+  const numerosDeOrden = new Set(creadas.map((c) => c.numero));
+  assert(numerosDeOrden.size === creadas.length,
+    'dos órdenes de esta prueba comparten número: la identidad no las distingue');
+
+  // --- A2. Una publicación por estado, creada acá y reconocible ------------
+  // Sin esto, el bloque de badges era una prueba que no podía ponerse roja: el
+  // catálogo sembrado es TODO `active`, así que filtrar por «Pausada»,
+  // «Agotada» o «Eliminada» no devolvía ninguna fila, y un bucle sobre cero
+  // filas no comprueba nada. El caso pasaba sin haber visto tres de los cuatro
+  // estados de publicación.
+  //
+  // Se publican por la ruta real del vendedor —la que usa una persona— y el
+  // estado se pone en la base descartable, que es donde el arranque dice que se
+  // fabrican los estados que la API no ofrece. La categoría y la localidad se
+  // copian de una publicación existente del mismo vendedor para no inventar
+  // referencias que el padrón no tenga.
+  const tokenVendedor = (await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  })).data.access_token;
+  const [molde] = queryRows(`
+    SELECT p.category_id, p.locality_id FROM products p
+    JOIN categories c ON c.id = p.category_id
+    WHERE p.seller_id = ${sqlLiteral(vendedor[0])} AND c.is_service = false
+      AND p.locality_id IS NOT NULL
+    LIMIT 1
+  `);
+  assert(molde, 'el seed no dejó una publicación del vendedor de la que copiar categoría y localidad');
+
+  const publicaciones = [];
+  for (const estado of ESTADOS_PRODUCTO) {
+    const identidad = `Verdad 160 ${sello} ${estado}`;
+    const creada = await apiRequest('/products', {
+      method: 'POST',
+      token: tokenVendedor,
+      body: {
+        name: identidad,
+        description: 'Publicación de la prueba 160: una fila por estado de publicación.',
+        category_id: molde[0],
+        price: 1234.56,
+        stock: 3,
+        unit: 'unidad',
+        locality_id: molde[1],
+        publication_type: 'producto',
+        operation_kind: 'insumo',
+      },
+    });
+    assert(creada.data?.id, `no se pudo publicar la fila de ${estado}`);
+    querySql(`UPDATE products SET status = ${sqlLiteral(estado.toUpperCase())}
+              WHERE id = ${sqlLiteral(creada.data.id)}`);
+    publicaciones.push({ estado, id: creada.data.id, identidad });
+  }
+  const puestos = queryRows(`
+    SELECT lower(status::text), 'fin' FROM products
+    WHERE id IN (${publicaciones.map((x) => sqlLiteral(x.id)).join(', ')})
+    ORDER BY 1
+  `).map(([estado]) => estado);
+  assert(JSON.stringify(puestos) === JSON.stringify([...ESTADOS_PRODUCTO].sort()),
+    `las publicaciones quedaron en ${puestos.join(', ')} y hacían falta `
+    + `${[...ESTADOS_PRODUCTO].sort().join(', ')}`);
+  medidos.push(`${publicaciones.length} publicaciones reales, una por estado`);
+
+  // --- B. El dashboard contra la base -------------------------------------
+  const admin = (await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'admin@topgreen.com', password: 'admin123' },
+  })).data.access_token;
+  const panel = (await apiRequest('/admin/dashboard', { token: admin })).data;
+
+  const numero = (sql) => Number(queryRows(sql)[0][0]);
+  const EN_CURSO = ['PLACED', 'CONFIRMED', 'AWAITING_TRANSFER_RECEIPT',
+    'TRANSFER_RECEIPT_SUBMITTED', 'PAID', 'SHIPPED'];
+  const TERMINALES = ['DRAFT', 'DELIVERED', 'CANCELLED', 'REJECTED'];
+  const listaSql = (tokens) => tokens.map((t) => `'${t}'`).join(', ');
+  const esperado = {
+    total_users: numero('SELECT COUNT(*) FROM users'),
+    total_normal_users: numero("SELECT COUNT(*) FROM users WHERE role = 'USER'"),
+    total_admins: numero("SELECT COUNT(*) FROM users WHERE role = 'ADMIN'"),
+    total_products: numero("SELECT COUNT(*) FROM products WHERE status <> 'DELETED'"),
+    active_products: numero("SELECT COUNT(*) FROM products WHERE status = 'ACTIVE'"),
+    total_orders: numero('SELECT COUNT(*) FROM orders'),
+    orders_in_process: numero(
+      `SELECT COUNT(*) FROM orders WHERE status IN (${listaSql(EN_CURSO)})`),
+    completed_orders: numero("SELECT COUNT(*) FROM orders WHERE status = 'DELIVERED'"),
+  };
+  for (const [clave, valor] of Object.entries(esperado)) {
+    assert(panel[clave] === valor,
+      `el panel dice ${clave}=${JSON.stringify(panel[clave])} y la base dice ${valor}`);
+  }
+  const volumenSql = Number(queryRows(
+    "SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status IN ('PAID', 'SHIPPED', 'DELIVERED')")[0][0]);
+  assert(Math.abs(panel.sold_volume - volumenSql) < 0.01,
+    `el volumen vendido dice ${panel.sold_volume} y la base ${volumenSql}`);
+
+  // Y los terminales quedan afuera de verdad: hay órdenes en esos estados.
+  const enTerminales = numero(
+    `SELECT COUNT(*) FROM orders WHERE status IN (${listaSql(TERMINALES)})`);
+  assert(enTerminales >= TERMINALES.length,
+    `hay ${enTerminales} órdenes terminales: sin ellas, excluirlas no probaría nada`);
+  assert(panel.orders_in_process + enTerminales === panel.total_orders,
+    `en curso (${panel.orders_in_process}) + terminales (${enTerminales}) no da el total `
+    + `(${panel.total_orders}): algún estado se cuenta dos veces o ninguna`);
+  assert(!('total_sellers' in panel) && !('total_customers' in panel)
+    && !('pending_orders' in panel) && !('total_revenue' in panel),
+    `el contrato viejo sigue en la respuesta: ${Object.keys(panel).join(', ')}`);
+  medidos.push(`dashboard contra SQL: ${panel.orders_in_process} en curso, ${enTerminales} `
+    + `terminales, volumen ${volumenSql}`);
+
+  // --- C, D y E: la pantalla ----------------------------------------------
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    const abrirAdmin = async () => {
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+      await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+      await page.getByPlaceholder('tu@email.com').fill('admin@topgreen.com');
+      await page.getByPlaceholder('••••••••').fill('admin123');
+      await page.locator('[class*="_submitButton_"][type="submit"]').click();
+      await page.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 20_000 });
+      await page.getByRole('button', { name: 'Admin' }).first().click();
+      await page.getByRole('heading', { name: 'Panel de Administración' })
+        .waitFor({ timeout: 20_000 });
+    };
+    const solapa = async (nombre) => {
+      await page.getByRole('button', { name: nombre, exact: true }).first().click();
+      await page.waitForTimeout(700);
+    };
+    await abrirAdmin();
+
+    // --- C1. El dashboard dibujado ----------------------------------------
+    await esperarA(async () => (await page.locator('[class*="_dashboard_"]').count()) > 0,
+      'el dashboard no se dibujó', 20_000);
+    const textoPanel = await page.locator('[class*="_dashboard_"]').innerText();
+    for (const rotulo of ['Total de usuarios', 'Usuarios comunes', 'Administradores',
+      'Órdenes en proceso', 'Volumen vendido']) {
+      assert(textoPanel.includes(rotulo), `el dashboard no dice «${rotulo}»:\n${textoPanel}`);
+    }
+    for (const mentira of ['undefined', 'Vendedores', 'Clientes', 'Ingresos']) {
+      assert(!textoPanel.includes(mentira),
+        `el dashboard sigue diciendo «${mentira}»:\n${textoPanel}`);
+    }
+    const valorJunto = (rotulo) => {
+      const lineas = textoPanel.split('\n');
+      const donde = lineas.indexOf(rotulo);
+      return donde > 0 ? lineas[donde - 1].trim() : null;
+    };
+    for (const [rotulo, valor] of [
+      ['Total de usuarios', String(esperado.total_users)],
+      ['Usuarios comunes', String(esperado.total_normal_users)],
+      ['Administradores', String(esperado.total_admins)],
+      ['Órdenes en proceso', String(esperado.orders_in_process)],
+    ]) {
+      assert(valorJunto(rotulo) === valor,
+        `la tarjeta «${rotulo}» muestra ${JSON.stringify(valorJunto(rotulo))} y la base dice ${valor}`);
+    }
+    medidos.push('el dashboard dibuja los cinco rótulos nuevos con los valores de la base');
+
+    // --- C2. Los catorce badges: cada uno en SU fila, con texto y color ---
+    //
+    // La versión anterior de este bloque filtraba y miraba lo que hubiera. Con
+    // el catálogo sembrado todo en `active` y `draft` sin filtro que lo pida,
+    // «lo que hubiera» eran cero filas para tres estados de publicación y para
+    // el borrador, y los estados de orden que sí veía podían venir de filas
+    // dejadas por casos anteriores. Pasaba en 1/1 sin haber visto la mitad de
+    // lo que decía cubrir: un verde que no se podía poner rojo.
+    //
+    // Ahora cada uno de los catorce se busca por la fila que ESTA prueba creó
+    // —el nombre de la publicación, el número de la orden—, recorriendo las
+    // páginas si hace falta, y de esa fila se exige:
+    //
+    //   - el texto del diccionario, no el token interno;
+    //   - el color que el diccionario declara para el tono de ESE estado,
+    //     resuelto por el navegador y no copiado acá;
+    //   - que no sea el tratamiento de respaldo, salvo el estado que lo declara
+    //     a propósito.
+    //
+    // Sin la tercera comprobación los catorce podrían caer al mismo gris —el
+    // defecto que el producto vino a arreglar— y el caso seguiría verde.
+    const colorResuelto = (expresion) => page.evaluate((valor) => {
+      const sonda = document.createElement('span');
+      sonda.style.backgroundColor = valor;
+      document.body.appendChild(sonda);
+      const visto = getComputedStyle(sonda).backgroundColor;
+      sonda.remove();
+      return visto;
+    }, expresion);
+
+    const SIN_FONDO = /^(transparent$|rgba\([^)]*,\s*0\)$)/;
+    const COLOR_RESUELTO = {};
+    for (const [tono, expresion] of Object.entries(COLOR_DECLARADO)) {
+      COLOR_RESUELTO[tono] = await colorResuelto(expresion);
+      assert(!SIN_FONDO.test(COLOR_RESUELTO[tono]),
+        `el tono «${tono}» declara ${expresion} y el navegador lo deja en `
+        + `${JSON.stringify(COLOR_RESUELTO[tono])}: un tono sin fondo no distingue nada`);
+    }
+    const COLOR_DE_RESPALDO = COLOR_RESUELTO[TONO_DE_RESPALDO];
+
+    // La página que muestra el paginador de la sección abierta.
+    const paginaVisible = async () => (
+      await page.locator('[class*="_paginaActual_"]').first().innerText()).trim();
+
+    // Cuántas filas tiene la base para este estado. El panel las pide paginadas,
+    // así que el total que muestra el paginador es contrastable contra SQL.
+    const totalEnBase = (tabla, estado) => Number(queryRows(
+      `SELECT COUNT(*) FROM ${tabla}`
+      + (estado ? ` WHERE status = ${sqlLiteral(estado.toUpperCase())}` : ''))[0][0]);
+
+    // Esperar a que la tabla en pantalla sea LA que se pidió.
+    //
+    // Este fue el primer rojo de la corrección, y era mío: esperar «que haya
+    // filas» después de cambiar el filtro se cumple al instante con la tabla
+    // anterior, que sigue dibujada mientras llega la nueva. El caso leía el
+    // filtro viejo y no encontraba su fila. Se espera la conjunción de dos
+    // cosas que la tabla anterior no puede cumplir a la vez: el total que
+    // declara la base para este estado, y que todo lo dibujado sea de ese
+    // estado. Con el filtro sin poner, sólo el total.
+    const esperarTabla = async (etiquetaPaginador, tabla, estado, textoEsperado, contexto) => {
+      const totalEsperado = totalEnBase(tabla, estado);
+      let visto = '(sin paginador)';
+      try {
+        await esperarA(async () => {
+          visto = await page.locator('[class*="_pagination_"]').first().innerText()
+            .catch(() => '(sin paginador)');
+          if (!visto.includes(`Total: ${totalEsperado} ${etiquetaPaginador}`)) return false;
+          if (!textoEsperado) return true;
+          const badges = await page.locator('table tbody [class*="_badge_"]').allInnerTexts();
+          return badges.length > 0 && badges.every(
+            (texto) => texto.trim().toLowerCase() === textoEsperado.toLowerCase());
+        }, `${contexto}: la tabla no llegó a ${totalEsperado} ${etiquetaPaginador}`
+           + (textoEsperado ? ` todas «${textoEsperado}»` : ' sin filtro'), 25_000);
+      } catch (error) {
+        throw new Error(`${error.message}; el paginador dice «${visto.replace(/\s+/g, ' ')}»`);
+      }
+      return totalEsperado;
+    };
+
+    // Buscar LA fila de esta prueba sin suponer en qué página cayó.
+    const filaConIdentidad = async (etiquetaPaginador, identidad, contexto) => {
+      let numero = 1;
+      for (;;) {
+        const fila = page.locator('table tbody tr').filter({ hasText: identidad });
+        if ((await fila.count()) > 0) {
+          assert((await fila.count()) === 1,
+            `${contexto}: «${identidad}» aparece en ${await fila.count()} filas`);
+          return fila.first();
+        }
+        const siguiente = page.getByRole('button',
+          { name: `Página siguiente de ${etiquetaPaginador}` });
+        assert((await siguiente.count()) === 1,
+          `${contexto}: no está el paginador de ${etiquetaPaginador}`);
+        if (await siguiente.isDisabled()) {
+          throw new Error(`${contexto}: la fila «${identidad}» no está en ninguna de las `
+            + `${numero} página(s) (${await paginaVisible()})`);
+        }
+        numero += 1;
+        await siguiente.click();
+        await esperarA(async () => new RegExp(`Página ${numero} de `).test(await paginaVisible()),
+          `${contexto}: no se llegó a la página ${numero} de ${etiquetaPaginador}`, 20_000);
+      }
+    };
+
+    // Lo que la PANTALLA dijo de cada estado, para poder fijarlo después. El
+    // bloque de abajo contrasta el badge contra el diccionario del producto, o
+    // sea que comprueba que los dos están de acuerdo —no que lo que dicen esté
+    // en castellano—. Con `active: 'Active'` los catorce seguirían de acuerdo.
+    const DICHO_PRODUCTO = {};
+    const DICHO_ORDEN = {};
+
+    // Lo que se le exige a un badge: qué dice y cómo se ve.
+    const mirarBadge = async (fila, token, textos, tonos, contexto, dichos) => {
+      const badge = fila.locator('[class*="_badge_"]');
+      const cuantos = await badge.count();
+      assert(cuantos === 1, `${contexto}: la fila de ${token} tiene ${cuantos} badges`);
+      const dicho = (await badge.innerText()).trim();
+      // Lo que se anota para fijar el rótulo sale de `textContent` y no de
+      // `innerText`: el badge se dibuja con `text-transform: uppercase`, así que
+      // `innerText` vuelve ya transformado —«ACTIVA»— y con eso no se puede
+      // afirmar cómo está escrito el rótulo, sólo cómo se lo pinta.
+      dichos[token] = (await badge.evaluate((el) => el.textContent || '')).trim();
+      assert(dicho.toLowerCase() === textos[token].toLowerCase(),
+        `${contexto}: el badge de ${token} dice «${dicho}» y el diccionario dice `
+        + `«${textos[token]}»`);
+      assert(!/_/.test(dicho), `${contexto}: el badge imprime el token interno: «${dicho}»`);
+
+      const pintado = await badge.evaluate((el) => getComputedStyle(el).backgroundColor);
+      const tono = tonos[token];
+      assert(!SIN_FONDO.test(pintado),
+        `${contexto}: el badge de ${token} no tiene fondo (${pintado}): sin tratamiento, `
+        + 'los estados no se distinguen');
+      assert(pintado === COLOR_RESUELTO[tono],
+        `${contexto}: el badge de ${token} se pinta ${pintado} y su tono «${tono}» declara `
+        + `${COLOR_DECLARADO[tono]} = ${COLOR_RESUELTO[tono]}`);
+      if (tono !== TONO_DE_RESPALDO) {
+        assert(pintado !== COLOR_DE_RESPALDO,
+          `${contexto}: ${token} se ve igual que un estado sin traducir (${pintado}): un `
+          + 'estado conocido no puede caer al tratamiento de respaldo');
+      }
+      return `${token}→«${dicho}»/${tono}/${pintado}`;
+    };
+
+    const vistos = [];
+
+    // C2.a — Publicaciones: los cuatro estados, cada uno en su propia fila.
+    await solapa('Productos');
+    const ETIQUETA_PRODUCTO = 'Filtrar publicaciones por estado';
+    const opcionesProducto = await page.getByLabel(ETIQUETA_PRODUCTO)
+      .locator('option').allInnerTexts();
+    for (const { estado, identidad } of publicaciones) {
+      assert(opcionesProducto.includes(TEXTO_DE_PRODUCTO[estado]),
+        `el filtro de Publicaciones no ofrece «${TEXTO_DE_PRODUCTO[estado]}»: `
+        + opcionesProducto.join(' | '));
+      await page.getByLabel(ETIQUETA_PRODUCTO).selectOption(estado);
+      await esperarTabla('productos', 'products', estado, TEXTO_DE_PRODUCTO[estado],
+        `publicaciones/${estado}`);
+      const fila = await filaConIdentidad('productos', identidad, `publicaciones/${estado}`);
+      vistos.push(await mirarBadge(fila, estado, TEXTO_DE_PRODUCTO, TONO_DE_PRODUCTO,
+        `publicaciones/${estado}`, DICHO_PRODUCTO));
+    }
+    await page.getByLabel(ETIQUETA_PRODUCTO).selectOption('');
+    await esperarTabla('productos', 'products', null, null, 'publicaciones/sin filtro');
+
+    // C2.b — Órdenes: los nueve que el filtro ofrece, cada uno en su fila.
+    await solapa('Órdenes');
+    const ETIQUETA_ORDEN = 'Filtrar órdenes por estado';
+    const opcionesOrden = await page.getByLabel(ETIQUETA_ORDEN).locator('option').allInnerTexts();
+    for (const { estado, numero } of creadas.filter((c) => c.estado !== 'draft')) {
+      assert(opcionesOrden.includes(TEXTO_DE_ORDEN[estado]),
+        `el filtro de Órdenes no ofrece «${TEXTO_DE_ORDEN[estado]}»: ${opcionesOrden.join(' | ')}`);
+      await page.getByLabel(ETIQUETA_ORDEN).selectOption(estado);
+      await esperarTabla('órdenes', 'orders', estado, TEXTO_DE_ORDEN[estado],
+        `órdenes/${estado}`);
+      const fila = await filaConIdentidad('órdenes', numero, `órdenes/${estado}`);
+      vistos.push(await mirarBadge(fila, estado, TEXTO_DE_ORDEN, TONO_DE_ORDEN,
+        `órdenes/${estado}`, DICHO_ORDEN));
+    }
+
+    // C2.c — `draft`, desde la vista sin filtro.
+    //
+    // El producto no lo ofrece como filtro a propósito: una orden en borrador
+    // todavía no es un pedido. Pero si aparece en la tabla tiene que estar
+    // traducida igual, así que se la busca donde sí puede salir. Si algún día
+    // se ofreciera como filtro, la primera afirmación se cae y hay que exigirlo
+    // por filtro como a los otros nueve.
+    assert(!opcionesOrden.includes(TEXTO_DE_ORDEN.draft),
+      `el filtro de Órdenes ahora ofrece «${TEXTO_DE_ORDEN.draft}»: exigilo por filtro `
+      + 'como a los otros, no por la vista sin filtro');
+    await page.getByLabel(ETIQUETA_ORDEN).selectOption('');
+    const totalSinFiltro = await esperarTabla('órdenes', 'orders', null, null,
+      'órdenes/sin filtro');
+    assert(totalSinFiltro >= ESTADOS_ORDEN.length,
+      `la vista sin filtro trae ${totalSinFiltro} órdenes y hacen falta al menos `
+      + `${ESTADOS_ORDEN.length}: el borrador no tendría dónde aparecer`);
+    const borrador = creadas.find((c) => c.estado === 'draft');
+    assert(borrador?.numero, 'no se preparó la orden en borrador');
+    const filaBorrador = await filaConIdentidad('órdenes', borrador.numero, 'órdenes/draft');
+    vistos.push(await mirarBadge(filaBorrador, 'draft', TEXTO_DE_ORDEN, TONO_DE_ORDEN,
+      'órdenes/sin filtro', DICHO_ORDEN));
+
+    // Y el recuento no se declara: se cuenta contra los enum de la base.
+    const exigidos = ESTADOS_PRODUCTO.length + ESTADOS_ORDEN.length;
+    assert(vistos.length === exigidos,
+      `se miraron ${vistos.length} badges y la base declara ${exigidos} estados: `
+      + vistos.join(', '));
+    const conRespaldo = vistos.filter((v) => v.endsWith(`/${COLOR_DE_RESPALDO}`));
+    medidos.push(`${vistos.length} badges mirados de a uno, en la fila que esta prueba creó, `
+      + `con texto y color computado: ${vistos.join(', ')}; el tratamiento de respaldo `
+      + `(${COLOR_DE_RESPALDO}) lo comparten sólo los ${conRespaldo.length} que declaran el `
+      + `tono «${TONO_DE_RESPALDO}»`);
+
+
+    // --- C3. Los rótulos exactos, en es-AR y no sólo «no es el token» -------
+    //
+    // Lo de arriba compara la pantalla contra el diccionario del producto: si
+    // alguien escribiera `active: 'Active'`, los catorce badges seguirían de
+    // acuerdo entre sí y el caso seguiría verde. Acá se fija qué dice cada uno,
+    // y la lista no puede envejecer en silencio: se exige que cubra
+    // exactamente los estados que declara la base, así que un estado nuevo sin
+    // rótulo pone esto en rojo igual que la falta de traducción.
+    const ROTULO_DE_PRODUCTO = {
+      active: 'Activa',
+      paused: 'Pausada',
+      sold_out: 'Agotada',
+      deleted: 'Eliminada',
+    };
+    const ROTULO_DE_ORDEN = {
+      draft: 'Borrador',
+      placed: 'Pedido realizado',
+      confirmed: 'Confirmada',
+      paid: 'Pagada',
+      shipped: 'Enviada',
+      delivered: 'Entregada',
+      cancelled: 'Cancelada',
+      rejected: 'Rechazada',
+      awaiting_transfer_receipt: 'Esperando comprobante',
+      transfer_receipt_submitted: 'Comprobante a revisar',
+    };
+    for (const [que, tokens, rotulos, dichos] of [
+      ['publicación', ESTADOS_PRODUCTO, ROTULO_DE_PRODUCTO, DICHO_PRODUCTO],
+      ['orden', ESTADOS_ORDEN, ROTULO_DE_ORDEN, DICHO_ORDEN],
+    ]) {
+      const exigidos = Object.keys(rotulos).sort();
+      assert(JSON.stringify(exigidos) === JSON.stringify([...tokens].sort()),
+        `los rótulos exigidos para ${que} son ${exigidos.join(', ')} y la base declara `
+        + `${[...tokens].sort().join(', ')}: la lista de esta prueba quedó vieja`);
+      for (const token of tokens) {
+        assert(dichos[token] === rotulos[token],
+          `en pantalla el estado ${token} de ${que} dice ${JSON.stringify(dichos[token])} y en `
+          + `es-AR es ${JSON.stringify(rotulos[token])}`);
+      }
+    }
+    medidos.push(`los ${ESTADOS_PRODUCTO.length + ESTADOS_ORDEN.length} rótulos en pantalla son `
+      + 'exactamente los de es-AR, no sólo «algo que no es el token»');
+
+    // --- C4. El castellano es de la pantalla; el token sigue viajando ------
+    //
+    // Traducir la vista y traducir el protocolo son dos cosas distintas, y la
+    // segunda rompe el Backend. El selector de cada fila tiene que ofrecer los
+    // textos en castellano con el token adentro del `value`, y el PATCH que
+    // sale al confirmar tiene que llevar ese token y no el rótulo.
+    await solapa('Productos');
+    await page.getByLabel(ETIQUETA_PRODUCTO).selectOption('paused');
+    await esperarTabla('productos', 'products', 'paused', TEXTO_DE_PRODUCTO.paused,
+      'publicaciones/selector');
+    const laPausada = publicaciones.find((p) => p.estado === 'paused');
+    const filaPausada = await filaConIdentidad('productos', laPausada.identidad,
+      'publicaciones/selector');
+    const selector = filaPausada.getByLabel('Estado del producto');
+    assert(await selector.count() === 1,
+      'la fila de la publicación pausada no tiene el selector de estado');
+
+    const opciones = await selector.locator('option').evaluateAll(
+      (lista) => lista.map((o) => [o.value, (o.textContent || '').trim()]));
+    const valores = opciones.map(([valor]) => valor).sort();
+    assert(JSON.stringify(valores) === JSON.stringify([...ESTADOS_PRODUCTO].sort()),
+      `el selector ofrece ${JSON.stringify(valores)} y la base declara `
+      + `${JSON.stringify([...ESTADOS_PRODUCTO].sort())}`);
+    for (const [valor, texto] of opciones) {
+      assert(texto === ROTULO_DE_PRODUCTO[valor],
+        `la opción con value «${valor}» se lee «${texto}» y en es-AR es `
+        + `«${ROTULO_DE_PRODUCTO[valor]}»`);
+    }
+    assert(await selector.inputValue() === 'paused',
+      `el selector de una publicación pausada muestra el valor `
+      + `${JSON.stringify(await selector.inputValue())} y el token del Backend es «paused»`);
+
+    // Y lo que sale al confirmar. Se mira el cuerpo del PATCH, no el resultado:
+    // que la base termine bien no dice con qué palabra se lo pidieron.
+    const patches = [];
+    const anotarPatch = (pedido) => {
+      if (pedido.method() === 'PATCH' && /\/admin\/products\/[^/]+\/status$/.test(pedido.url())) {
+        patches.push(pedido.postData());
+      }
+    };
+    page.on('request', anotarPatch);
+    try {
+      await selector.selectOption('sold_out');
+      // La confirmación del panel es `formularios/Confirmacion`, que se
+      // identifica por su título y no por una clase: es otra capa que la del
+      // `ToastProvider`, y buscarla por `confirmModal` no la encontraba nunca.
+      const confirmar = page.getByRole('dialog',
+        { name: 'Cambiar el estado de la publicación' });
+      try {
+        await confirmar.waitFor({ state: 'visible', timeout: 15_000 });
+      } catch {
+        const capas = [];
+        for (const capa of await page.getByRole('dialog').all()) {
+          capas.push((await capa.getAttribute('aria-label'))
+            || (await capa.innerText()).replace(/\s+/g, ' ').slice(0, 60));
+        }
+        throw new Error('cambiar el estado desde el selector no abrió la confirmación; '
+          + `las capas abiertas son ${JSON.stringify(capas)}`);
+      }
+      const preguntado = await confirmar.innerText();
+      assert(preguntado.includes(ROTULO_DE_PRODUCTO.paused)
+        && preguntado.includes(ROTULO_DE_PRODUCTO.sold_out),
+      `la confirmación no nombra el cambio en castellano: ${JSON.stringify(preguntado)}`);
+      // El nombre de la publicación se saca antes de buscar tokens: lo fabricó
+      // este mismo caso y termina en «paused», así que buscar la palabra sobre
+      // el texto entero acusaría de imprimir el token a una pantalla que sólo
+      // está repitiendo el título que le pusimos.
+      const sinElNombre = preguntado.split(laPausada.identidad).join('…');
+      assert(!/\bactive\b|\bpaused\b|\bsold_out\b|\bdeleted\b/.test(sinElNombre),
+        `la confirmación imprime el token interno: ${JSON.stringify(preguntado)}`);
+      await confirmar.getByRole('button', { name: `Pasar a ${ROTULO_DE_PRODUCTO.sold_out}` })
+        .click();
+      await esperarA(async () => patches.length === 1,
+        'confirmar el cambio de estado no le pidió nada al servidor', 20_000);
+    } finally {
+      page.off('request', anotarPatch);
+    }
+    const cuerpo = JSON.parse(patches[0] || '{}');
+    assert(cuerpo.status === 'sold_out',
+      `el PATCH mandó ${JSON.stringify(cuerpo)} y el Backend espera el token «sold_out»: `
+      + 'traducir la vista no puede traducir el protocolo');
+    await esperarA(async () => {
+      const [fila] = queryRows(
+        `SELECT lower(status::text) FROM products WHERE id = ${sqlLiteral(laPausada.id)}`);
+      return fila && fila[0] === 'sold_out';
+    }, 'el cambio de estado no llegó a la base', 20_000);
+    medidos.push(`el selector ofrece ${opciones.map(([v, t]) => `${v}→«${t}»`).join(', ')} y el `
+      + `PATCH mandó ${JSON.stringify(cuerpo)}`);
+
+    // --- D. Las cinco cargas: 500, aviso, reintento y dato ----------------
+    const CARGAS = [
+      ['Dashboard', 'Dashboard', '**/api/admin/dashboard', 'el resumen del panel'],
+      ['Usuarios', 'Usuarios', '**/api/admin/users?*', 'la lista de usuarios'],
+      ['Publicaciones', 'Productos', '**/api/admin/products*', 'la lista de publicaciones'],
+      ['Órdenes', 'Órdenes', '**/api/admin/orders*', 'la lista de órdenes'],
+      ['Documentación', 'Documentación', '**/api/admin/documentacion*', 'la cola de documentación'],
+    ];
+    for (const [nombre, solapaNombre, patron, recurso] of CARGAS) {
+      let rompiendo = true;
+      await page.route(patron, (ruta) => {
+        if (rompiendo && ruta.request().method() === 'GET') {
+          return ruta.fulfill({ status: 500, contentType: 'application/json',
+            body: '{"detail":"caida a proposito"}' });
+        }
+        return ruta.continue();
+      });
+      await solapa(solapaNombre);
+
+      const aviso = page.locator('[role="alert"]').filter({ hasText: 'No se pudo cargar' });
+      await esperarA(async () => (await aviso.count()) > 0,
+        `${nombre}: un 500 no mostró ningún aviso`, 20_000);
+      const dicho = await aviso.first().innerText();
+      assert(dicho.includes(recurso),
+        `${nombre}: el aviso no dice qué recurso falló: ${JSON.stringify(dicho)}`);
+      const reintentar = aviso.first().getByRole('button', { name: 'Reintentar' });
+      assert((await reintentar.count()) === 1, `${nombre}: el aviso no ofrece Reintentar`);
+      // Y el fallo no se disfraza de vacío: mientras hay aviso no hay tabla ni
+      // el texto de «no hay resultados».
+      const cuerpo = await page.locator('[class*="_content_"], [class*="_tabContent_"]')
+        .first().innerText().catch(() => page.locator('body').innerText());
+      assert(!/No hay .* que coincidan|no devolvió datos|No hay documentación/.test(cuerpo),
+        `${nombre}: el error se está mostrando junto con un vacío: ${JSON.stringify(cuerpo.slice(0, 200))}`);
+
+      rompiendo = false;
+      await reintentar.click();
+      await esperarA(async () => (await aviso.count()) === 0,
+        `${nombre}: el reintento no reemplazó el aviso`, 20_000);
+      await page.unroute(patron);
+      medidos.push(`${nombre}: 500 → aviso con «${recurso}» y reintento`);
+    }
+
+    // --- E. El alta de usuario --------------------------------------------
+    await solapa('Usuarios');
+    const altas = [];
+    page.on('request', (pedido) => {
+      if (pedido.method() === 'POST' && /\/api\/admin\/users$/.test(pedido.url())) {
+        altas.push(pedido.url());
+      }
+    });
+    await page.getByRole('button', { name: /Crear Usuario|Nuevo Usuario|\+ Usuario/i })
+      .first().click();
+    await page.getByPlaceholder('Email *').waitFor({ timeout: 15_000 });
+
+    // Contraseña corta: no puede salir un pedido.
+    await page.getByPlaceholder('Email *').fill(`corta.${sello}@ejemplo.com`);
+    await page.getByPlaceholder('Contraseña *').fill('abc');
+    await page.getByPlaceholder('Nombre Completo *').fill('Clave Corta');
+    await page.getByRole('button', { name: 'Crear Usuario', exact: true }).last().click();
+    await page.waitForTimeout(1200);
+    assert(altas.length === 0,
+      `con la contraseña corta salieron ${altas.length} pedidos de alta: la validación no frena`);
+    const avisoAlta = page.locator('[role="alert"]').first();
+    assert((await avisoAlta.count()) === 1 && /6 caracteres/.test(await avisoAlta.innerText()),
+      `el alta no explica el mínimo de la contraseña: ${await avisoAlta.innerText().catch(() => '(sin aviso)')}`);
+
+    // Email duplicado: sale el pedido y vuelve el detalle del servidor.
+    await page.getByPlaceholder('Email *').fill('admin@topgreen.com');
+    await page.getByPlaceholder('Contraseña *').fill('claveLarga123');
+    await page.getByRole('button', { name: 'Crear Usuario', exact: true }).last().click();
+    await esperarA(async () => altas.length === 1,
+      'el alta con email duplicado no llegó a pedir nada al servidor', 20_000);
+    await esperarA(async () => /ya está registrado/i.test(
+      await page.locator('[role="alert"]').first().innerText().catch(() => '')),
+    'el alta no muestra el detalle del servidor', 20_000);
+    assert(await page.getByPlaceholder('Email *').inputValue() === 'admin@topgreen.com'
+      && await page.getByPlaceholder('Nombre Completo *').inputValue() === 'Clave Corta',
+      'el formulario se limpió: no se puede corregir lo que se escribió');
+    medidos.push('alta: la clave corta no sale al servidor y el duplicado vuelve con su detalle');
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+  }
+
+  return `los catorce estados salen de los enum de la base y sus textos, tonos y colores del `
+    + `diccionario del producto, no de una lista escrita en la prueba, y cada badge se mira en `
+    + `la fila que este caso creó; ${medidos.join('; ')}`;
 });
 
 // ---------------------------------------------------------------------------
@@ -21732,7 +23238,18 @@ await runCase(162, 'El catálogo demostrativo resuelve la foto del aviso, con cr
 
   // --- A. La tabla del producto y el inventario de la PM ------------------
   // No se copia acá ninguna de las dos listas: se leen las dos y se contrastan.
-  const INVENTARIO = 'docs/pm/INVENTARIO-FOTOS-CATALOGO-2026-09-09.md';
+  // El inventario es un documento de la PM y la PM lo archiva cuando lo cierra:
+  // el 2026-09-11 pasó a `docs/pm/archivo/cerrados/` y este caso se cayó con un
+  // ENOENT que no decía nada del producto. Se busca donde puede estar en vez de
+  // fijar una ruta que envejece, y si no está en ninguna se dice cuáles se
+  // miraron.
+  const DONDE_PUEDE_ESTAR = [
+    'docs/pm/INVENTARIO-FOTOS-CATALOGO-2026-09-09.md',
+    'docs/pm/archivo/cerrados/INVENTARIO-FOTOS-CATALOGO-2026-09-09.md',
+  ];
+  const INVENTARIO = DONDE_PUEDE_ESTAR.find((camino) => existsSync(camino));
+  assert(INVENTARIO,
+    `no está el inventario de fotos en ninguna de ${JSON.stringify(DONDE_PUEDE_ESTAR)}`);
   const fuenteTabla = readFileSync('src/utils/fotosDemo.ts', 'utf8');
   const TABLA = {};
   for (const [, slug, cuerpo] of fuenteTabla.matchAll(
@@ -21899,6 +23416,42 @@ await runCase(162, 'El catálogo demostrativo resuelve la foto del aviso, con cr
   querySql(`UPDATE product_images SET url = ${sqlLiteral(FOTO_REAL)}
             WHERE is_primary = true AND product_id =
               (SELECT id FROM products WHERE slug = ${sqlLiteral(conFotoReal)})`);
+
+  // El catálogo que este caso mide, restaurado de forma acotada.
+  //
+  // Aislado el caso pasa; dentro de la suite completa se caía con «sólo 0
+  // tarjetas resolvieron una foto del catálogo demostrativo». No se rompía
+  // nada: para cuando le toca, 161 casos ya publicaron, pausaron y borraron, y
+  // la primera página del Mercado está llena de publicaciones fabricadas por
+  // ellos, con las 30 del paquete demostrativo desplazadas o sin estado activo.
+  //
+  // Así que el caso deja de esperar que se las dejen servidas. Devuelve al aire
+  // las 30 que mira, y aparta —sólo mientras mide— lo que no es de ellas.
+  // Todo vuelve como estaba en el `finally`, fila por fila.
+  const SLUGS_DEMO = Object.keys(TABLA);
+  const listaDemo = SLUGS_DEMO.map((slug) => sqlLiteral(slug)).join(', ');
+  // La publicación ajena que este mismo caso acaba de crear queda afuera del
+  // barrido: es parte de lo que mide —el respaldo honesto de un aviso sin
+  // foto— y apartarla sería taparse un ojo.
+  const estadosPrevios = queryRows(`
+    SELECT id, status::text, (slug IN (${listaDemo}))::text
+    FROM products
+    WHERE (status = 'ACTIVE' OR slug IN (${listaDemo}))
+      AND id <> ${sqlLiteral(ajena.data.id)}
+  `);
+  const devolverAlAire = estadosPrevios
+    .filter(([, estado, esDemo]) => esDemo === 'true' && estado !== 'ACTIVE')
+    .map(([id]) => id);
+  const apartar = estadosPrevios
+    .filter(([, estado, esDemo]) => esDemo !== 'true' && estado === 'ACTIVE')
+    .map(([id]) => id);
+  const enLista = (ids) => ids.map((id) => sqlLiteral(id)).join(', ');
+  if (devolverAlAire.length > 0) {
+    querySql(`UPDATE products SET status = 'ACTIVE' WHERE id IN (${enLista(devolverAlAire)})`);
+  }
+  if (apartar.length > 0) {
+    querySql(`UPDATE products SET status = 'PAUSED' WHERE id IN (${enLista(apartar)})`);
+  }
 
   const browser = await chromium.launch({ headless: true });
   try {
@@ -22097,6 +23650,11 @@ await runCase(162, 'El catálogo demostrativo resuelve la foto del aviso, con cr
     querySql(`UPDATE product_images SET url = ${sqlLiteral(urlAnterior[0])}
               WHERE is_primary = true AND product_id =
                 (SELECT id FROM products WHERE slug = ${sqlLiteral(conFotoReal)})`);
+    // Y cada publicación vuelve al estado exacto que tenía, no a uno supuesto.
+    for (const [id, estado] of estadosPrevios) {
+      querySql(`UPDATE products SET status = ${sqlLiteral(estado)}::productstatus `
+        + `WHERE id = ${sqlLiteral(id)} AND status::text <> ${sqlLiteral(estado)}`);
+    }
   }
 
   return 'las 30 publicaciones del seed resuelven una foto local, distinta, de proporción '
@@ -22106,6 +23664,3376 @@ await runCase(162, 'El catálogo demostrativo resuelve la foto del aviso, con cr
     + `${capturas.length} capturas en ${CAPTURAS}`;
 });
 
+
+// ---------------------------------------------------------------------------
+// 163. ACCOUNT-PAGE-1 — Mi cuenta es una página, no un popup.
+//
+// Mi cuenta tenía adentro el perfil, las notificaciones, las compras, las
+// ventas, las operaciones y las publicaciones, y se presentaba como una caja
+// flotante: fondo oscuro, `role="dialog"`, X, trampa de foco, cierre con
+// Escape y el scroll del documento trabado. Emi la rechazó, y con razón: un
+// área privada que se abre encima del sitio no se puede compartir, no se puede
+// recargar, y el primer Atrás se va del sitio en vez de volver.
+//
+// Lo que este caso mide no es que «se vea como una página», que no se mide,
+// sino las seis propiedades que lo hacen cierto:
+//
+//  1. tiene URL propia, canónica y recargable, y el botón que lleva a ella
+//     queda marcado como página actual;
+//  2. no queda nada de la capa: ni backdrop, ni X del contenedor general, ni
+//     `role="dialog"`, ni scroll trabado. Header y Footer se ven;
+//  3. Atrás vuelve a la sección anterior, Adelante regresa a la cuenta y
+//     recargar conserva la pantalla;
+//  4. sin sesión la entrada directa abre el ingreso: si autentica vuelve a Mi
+//     cuenta y si cancela queda en una sección pública. Salir termina la sesión
+//     y vuelve a Inicio. La vuelta de Mercado Pago aterriza en la cuenta;
+//  5. `FORM-DIRTY-1` vale en el límite NUEVO. Las salidas ya no son la X y el
+//     fondo: son la cabecera, el pie, Atrás, Salir y cambiar de pestaña. Con
+//     trabajo sin guardar cada una pregunta UNA vez; seguir editando conserva
+//     pantalla, URL y contenido; descartar ejecuta exactamente el destino
+//     pedido. Las capas de adentro siguen siendo capas;
+//  6. y entra en las tres anchuras sin desbordar, sin controles fuera de la
+//     ventana y sin partir palabras por la mitad —incluida «Sin calificaciones
+//     aún», que era el ejemplo que se partía.
+// ---------------------------------------------------------------------------
+await runCase(163, 'Mi cuenta es una página del sitio: URL propia, historial, sesión y trabajo sin guardar', async () => {
+  const CAPTURAS = process.env.SMOKE_CAPTURAS
+    || mkdtempSync(`${tmpdir()}/topgreen-cuenta-`);
+  mkdirSync(CAPTURAS, { recursive: true });
+  const capturas = [];
+  const medidos = [];
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const seccionDe = (page) =>
+      new URL(page.url()).searchParams.get('section') || 'home';
+
+    const ingresar = async (page, email, clave) => {
+      await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+      await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+      await page.getByPlaceholder('tu@email.com').fill(email);
+      await page.getByPlaceholder('••••••••').fill(clave);
+      await page.locator('[class*="_submitButton_"][type="submit"]').click();
+      await page.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 25_000 });
+    };
+    const conSesion = async (ancho = 1440, alto = 900) => {
+      const contexto = await browser.newContext({ viewport: { width: ancho, height: alto } });
+      const page = await contexto.newPage();
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await ingresar(page, 'vendedor@ejemplo.com', 'vendedor123');
+      return { contexto, page };
+    };
+    const enLaCuenta = async (page) => {
+      await page.getByRole('heading', { name: 'Mi cuenta', level: 1 })
+        .waitFor({ state: 'visible', timeout: 25_000 });
+    };
+    const irALaCuenta = async (page) => {
+      await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
+      await enLaCuenta(page);
+    };
+    const pregunta = (page) =>
+      page.getByRole('dialog').filter({ hasText: 'Tenés cambios sin guardar' });
+
+    // --- A. Es una página, y no queda nada de la capa ----------------------
+    const { contexto, page } = await conSesion();
+    await page.locator('header').first()
+      .getByRole('button', { name: 'Mercado', exact: true }).click();
+    await esperarA(async () => seccionDe(page) === 'marketplace',
+      'no se llegó al Mercado', 25_000);
+
+    // Cómo se ve «estás acá» en esta cabecera. No se escribe acá ningún color:
+    // la referencia es la propia navegación activa, medida en vivo sobre una
+    // sección pública. Si mañana cambia el tratamiento, esto lo sigue.
+    //
+    // Dos cuidados, los dos medidos y no supuestos. Uno: `index.css` le pone
+    // transición de `background-color` a los botones, así que una sola lectura
+    // agarra la animación a mitad de camino —se vio `rgba(255,255,255,0.914)`
+    // donde el token dice `#ffffff`— y la comparación sería intermitente; se
+    // espera a que el valor se repita en vez de dormir un rato fijo. Dos: el
+    // puntero queda encima del botón recién clickeado y `:hover` pinta la
+    // celda, así que se lo saca antes de mirar y las dos lecturas se toman en
+    // el mismo estado.
+    const comoSeVe = async (locator) => {
+      await page.mouse.move(0, 0);
+      // Cada lectura se toma en un cuadro distinto y declara si además quedó
+      // alguna animación viva. Dos lecturas seguidas dentro del MISMO cuadro
+      // dan el mismo valor aunque la transición esté a mitad de camino —lo
+      // midió este caso: dio por firme `rgba(255,255,255,0.435)`—, así que
+      // repetirse no alcanza como señal de quieto.
+      const leer = () => locator.evaluate(async (el) => {
+        await new Promise((seguir) => { requestAnimationFrame(() => seguir()); });
+        const e = getComputedStyle(el);
+        return {
+          quieto: el.getAnimations().length === 0,
+          estilo: { fondo: e.backgroundColor, color: e.color, peso: e.fontWeight },
+        };
+      });
+      let previo = null;
+      let estable = null;
+      try {
+        await esperarA(async () => {
+          const { quieto, estilo } = await leer();
+          const texto = JSON.stringify(estilo);
+          if (quieto && texto === previo) { estable = estilo; return true; }
+          previo = texto;
+          return false;
+        }, 'el estilo de la celda nunca se quedó quieto', 10_000);
+      } catch {
+        assert(false, `el estilo de la celda nunca se quedó quieto: lo último que se vio fue ${previo}`);
+      }
+      return estable;
+    };
+    const botonDeCuenta = page.getByRole('button', { name: 'Mi cuenta' }).first();
+    const seccionActiva = await comoSeVe(page.locator('header').first()
+      .getByRole('button', { name: 'Mercado', exact: true }));
+    // Y cómo se ve una celda común: el MISMO botón, todavía sin ser el actual.
+    const celdaComun = await comoSeVe(botonDeCuenta);
+    // Sin esto el caso sería vacío: si ambas se vieran igual, cualquier CSS
+    // pasaría la comparación de abajo.
+    assert(JSON.stringify(seccionActiva) !== JSON.stringify(celdaComun),
+      `la sección activa no se distingue de una celda común: ${JSON.stringify(seccionActiva)}`);
+
+    await irALaCuenta(page);
+
+    assert(seccionDe(page) === 'account',
+      `Mi cuenta no tiene URL propia: la barra dice ${page.url()}`);
+    assert((await botonDeCuenta.getAttribute('aria-current')) === 'page',
+      'el botón de la cabecera no queda marcado como página actual');
+    // El atributo solo no alcanza: se anuncia página actual y se ve como una
+    // acción más. Tiene que quedar con el mismo tratamiento que una sección.
+    const cuentaActual = await comoSeVe(botonDeCuenta);
+    for (const [propiedad, esperado] of Object.entries(seccionActiva)) {
+      assert(cuentaActual[propiedad] === esperado,
+        `Mi cuenta actual no se ve como una sección activa: ${propiedad} es `
+        + `${cuentaActual[propiedad]} y la sección activa usa ${esperado}`);
+    }
+    // Que además no se vea como una celda común no se comprueba por separado:
+    // no se puede poner rojo. La comparación de arriba ya obliga a que las tres
+    // propiedades sean las de la sección activa, y la de más arriba obliga a
+    // que la sección activa difiera de la celda común en alguna de esas tres.
+    // Una tercera comparación sería siempre verde por construcción, y una
+    // prueba que no puede fallar acá no prueba nada: lo que evita el falso
+    // verde es la primera, que sí se midió roja.
+
+    const titulos = await page.locator('h1').allInnerTexts();
+    assert(titulos.length === 1 && titulos[0].trim() === 'Mi cuenta',
+      `la página declara ${titulos.length} h1: ${JSON.stringify(titulos)}`);
+    assert(await page.locator('header').first().isVisible()
+      && await page.locator('footer').first().isVisible(),
+    'la cuenta no está dentro del shell: falta la cabecera o el pie');
+
+    // Nada de capa: ni diálogo, ni fondo oscuro, ni X del contenedor general.
+    assert((await page.getByRole('dialog').count()) === 0,
+      `la cuenta dejó ${await page.getByRole('dialog').count()} diálogo(s) abiertos`);
+    assert((await page.locator('[aria-label="Mi cuenta"][role="dialog"]').count()) === 0,
+      'el contenedor general sigue siendo un diálogo');
+    const conFondoFijo = await page.evaluate(() => Array.from(document.querySelectorAll('div'))
+      .filter((el) => {
+        const e = getComputedStyle(el);
+        return e.position === 'fixed' && el.getBoundingClientRect().height > window.innerHeight * 0.8
+          && e.backgroundColor !== 'rgba(0, 0, 0, 0)' && el.offsetParent !== null;
+      }).length);
+    assert(conFondoFijo === 0, `quedaron ${conFondoFijo} capas de fondo cubriendo la pantalla`);
+    assert((await page.evaluate(() => document.body.style.overflow)) !== 'hidden',
+      'la cuenta sigue trabando el scroll del documento');
+
+    // Y el scroll es el del documento, no el de una caja interna.
+    const scrollDelDocumento = await page.evaluate(async () => {
+      const antes = window.scrollY;
+      window.scrollTo(0, 400);
+      await new Promise((seguir) => { setTimeout(seguir, 120); });
+      const despues = window.scrollY;
+      window.scrollTo(0, antes);
+      return { alto: document.documentElement.scrollHeight, movio: despues > antes };
+    });
+    assert(scrollDelDocumento.movio,
+      `el documento no se desplaza (alto ${scrollDelDocumento.alto}): el scroll sigue siendo `
+      + 'de una caja interna');
+    medidos.push('página con URL propia, un solo h1, shell completo, sin diálogo, sin backdrop '
+      + 'y con el scroll del documento');
+
+    // --- B. Historial: Atrás, Adelante y recargar --------------------------
+    await page.goBack();
+    await esperarA(async () => seccionDe(page) === 'marketplace',
+      'Atrás no volvió a la sección anterior', 25_000);
+    await page.goForward();
+    await esperarA(async () => seccionDe(page) === 'account',
+      'Adelante no regresó a la cuenta', 25_000);
+    await enLaCuenta(page);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await enLaCuenta(page);
+    assert(seccionDe(page) === 'account', 'recargar no conservó la pantalla');
+    medidos.push('Atrás vuelve al Mercado, Adelante regresa a la cuenta y recargar la conserva');
+
+    // --- C. Las capas de adentro siguen siendo capas -----------------------
+    // Se espera por «Pausar», que existe SÓLO en esta pestaña. Esperar por
+    // «Editar» no sirve: el perfil también tiene uno, así que la espera se
+    // cumplía antes de que la pestaña cambiara y el clic caía en el otro.
+    await page.getByRole('button', { name: 'Mis publicaciones' }).first().click();
+    await esperarA(async () => (await page.getByRole('button', { name: 'Pausar' }).count()) > 0,
+      'no se llegó a Mis publicaciones', 25_000);
+    const editarPublicacion = page.getByRole('button', { name: 'Editar', exact: true }).first();
+    // La capa de edición se mide como capa: un diálogo, que cierra con Escape
+    // de a uno y devuelve el foco a su disparador.
+    const capaDeEdicion = page.getByRole('dialog');
+    await editarPublicacion.click();
+    await esperarA(async () => (await capaDeEdicion.count()) === 1,
+      'editar una publicación no abrió una capa', 20_000);
+    await page.keyboard.press('Escape');
+    await esperarA(async () => (await capaDeEdicion.count()) === 0,
+      'Escape no cerró la capa de edición', 20_000);
+    assert(seccionDe(page) === 'account', 'cerrar la capa interna se llevó la página entera');
+    await esperarA(async () => editarPublicacion.evaluate((el) => el === document.activeElement),
+      'la capa interna no devolvió el foco a su disparador', 20_000);
+    medidos.push('las capas de adentro cierran de a una y devuelven el foco');
+
+    // --- D. FORM-DIRTY-1 en el límite nuevo --------------------------------
+    // El «Editar» del perfil se toma por su encabezado y no por su nombre: la
+    // pestaña de publicaciones tiene otro con el mismo texto, y tomar «el
+    // primero» hacía clic en el de la otra pestaña antes de que cambiara.
+    const editarElPerfil = () => page.locator('[class*="sectionHeader"]')
+      .filter({ hasText: 'Mi Perfil' }).getByRole('button', { name: 'Editar' });
+    const abrirMiPerfil = async (donde) => {
+      await page.getByRole('button', { name: 'Mi Perfil' }).first().click();
+      await esperarA(async () => (await editarElPerfil().count()) === 1,
+        `${donde}: no se llegó a Mi Perfil`, 20_000);
+    };
+    // El perfil puede venir YA en edición: cuando la vuelta anterior terminó en
+    // «seguir editando», el formulario sigue abierto y en el encabezado no hay
+    // «Editar» que tocar, sino «Cancelar» y «Guardar».
+    const campoDelPerfil = () => page.locator('#perfil-nombre');
+    const ensuciarElPerfil = async (valor) => {
+      await page.getByRole('button', { name: 'Mi Perfil' }).first().click();
+      await esperarA(async () => (await campoDelPerfil().count()) === 1
+        || (await editarElPerfil().count()) === 1,
+      `ensuciar para «${valor}»: no se llegó a Mi Perfil`, 20_000);
+      if ((await campoDelPerfil().count()) === 0) await editarElPerfil().click();
+      const campo = campoDelPerfil();
+      await campo.waitFor({ state: 'visible', timeout: 20_000 });
+      await campo.fill(valor);
+      return campo;
+    };
+
+    // D1. Limpio no pregunta.
+    await abrirMiPerfil('D1 limpio');
+    await page.getByRole('button', { name: 'Notificaciones' }).first().click();
+    await page.waitForTimeout(500);
+    assert((await pregunta(page).count()) === 0,
+      'cambiar de pestaña sin nada escrito preguntó igual');
+
+    // D2. Sucio: cada salida pregunta una vez y «seguir editando» no mueve nada.
+    const salidas = [
+      ['cabecera', async () => page.locator('header').first()
+        .getByRole('button', { name: 'Inicio', exact: true }).click()],
+      ['pie', async () => {
+        // En el pie los destinos son enlaces, no botones.
+        await page.locator('footer').scrollIntoViewIfNeeded();
+        await page.locator('footer').getByRole('link', { name: 'Inicio', exact: true })
+          .first().click();
+      }],
+      ['Atrás', async () => page.goBack()],
+      ['Salir', async () => page.getByRole('button', { name: 'Salir' }).click()],
+      ['cambio de pestaña', async () =>
+        page.getByRole('button', { name: 'Mis Compras' }).first().click()],
+    ];
+    for (const [comoSeVa, irse] of salidas) {
+      const campo = await ensuciarElPerfil(`Sucio ${comoSeVa}`);
+      await irse();
+      await esperarA(async () => (await pregunta(page).count()) === 1,
+        `saliendo por ${comoSeVa} con trabajo sin guardar no preguntó`, 20_000);
+      assert((await pregunta(page).count()) === 1,
+        `saliendo por ${comoSeVa} preguntó ${await pregunta(page).count()} veces`);
+      await page.getByRole('button', { name: 'Seguir editando' }).click();
+      await esperarA(async () => (await pregunta(page).count()) === 0,
+        `${comoSeVa}: «seguir editando» no cerró la pregunta`, 20_000);
+      assert(seccionDe(page) === 'account',
+        `${comoSeVa}: «seguir editando» movió la barra a ${page.url()}`);
+      assert((await campo.inputValue()) === `Sucio ${comoSeVa}`,
+        `${comoSeVa}: «seguir editando» perdió lo escrito: «${await campo.inputValue()}»`);
+      medidos.push(`${comoSeVa}: preguntó una vez y se quedó`);
+    }
+
+    // D3. Descartar ejecuta EXACTAMENTE el destino pedido, y descarta de verdad.
+    //
+    // Lo segundo se mide con un destino que NO desmonta la pantalla: otra
+    // pestaña. Con un destino de otra sección, `UserDashboard` se desmonta y al
+    // volver el perfil aparece cerrado de todos modos, así que la comprobación
+    // pasaría aunque descartar no soltara nada. Medido: sacando el descarte del
+    // producto, la versión anterior de este bloque seguía en verde.
+    const nombreGuardado = await (await ensuciarElPerfil('Para descartar')).inputValue();
+    assert(nombreGuardado === 'Para descartar', 'no se pudo ensuciar el perfil');
+    await page.getByRole('button', { name: 'Mis Compras' }).first().click();
+    await esperarA(async () => (await pregunta(page).count()) === 1,
+      'la salida a Mis Compras no preguntó', 20_000);
+    await page.getByRole('button', { name: 'Descartar cambios' }).click();
+    await esperarA(async () => (await campoDelPerfil().count()) === 0,
+      'descartar no fue a la pestaña pedida', 20_000);
+    assert(seccionDe(page) === 'account', 'descartar una pestaña sacó de la cuenta');
+    // Y soltó el trabajo: el perfil ya no está en edición ni conserva lo escrito.
+    await page.getByRole('button', { name: 'Mi Perfil' }).first().click();
+    await esperarA(async () => (await editarElPerfil().count()) === 1,
+      'tras descartar, el perfil siguió en edición con lo escrito adentro', 20_000);
+    assert((await pregunta(page).count()) === 0,
+      'tras descartar, volver al perfil volvió a preguntar por lo mismo');
+
+    // Y con un destino de otra sección, el destino también es exacto.
+    await ensuciarElPerfil('Para descartar a otra sección');
+    await page.locator('header').first()
+      .getByRole('button', { name: 'Servicios', exact: true }).click();
+    await esperarA(async () => (await pregunta(page).count()) === 1,
+      'la salida a Servicios no preguntó', 20_000);
+    await page.getByRole('button', { name: 'Descartar cambios' }).click();
+    await esperarA(async () => seccionDe(page) === 'services',
+      `descartar no fue al destino pedido: quedó en ${seccionDe(page)}`, 20_000);
+    await irALaCuenta(page);
+    medidos.push('descartar va al destino pedido —pestaña o sección— y suelta el trabajo local');
+
+    // D4. Y una orden ya persistida NO es trabajo local: no inventa suciedad.
+    await page.getByRole('button', { name: 'Mis publicaciones' }).first().click();
+    await esperarA(async () => (await page.getByRole('button', { name: 'Pausar' }).count()) > 0,
+      'no se llegó a Mis publicaciones', 25_000);
+    await page.locator('header').first()
+      .getByRole('button', { name: 'Mercado', exact: true }).click();
+    await esperarA(async () => seccionDe(page) === 'marketplace',
+      'mirar una pestaña con datos guardados preguntó como si hubiera trabajo sin guardar',
+      20_000);
+    medidos.push('mirar datos ya guardados no cuenta como trabajo sin guardar');
+    await contexto.close();
+
+    // --- E. Sesión: entrada anónima, ingreso con retorno, salida y MP ------
+    const anonimo = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const sinSesion = await anonimo.newPage();
+    await sinSesion.goto(`${FRONTEND_URL}/?section=account`, { waitUntil: 'domcontentloaded' });
+    await sinSesion.getByRole('heading', { name: 'Iniciar Sesión' })
+      .waitFor({ timeout: 25_000 });
+    assert(seccionDe(sinSesion) === 'account',
+      'la entrada directa sin sesión ya se había ido de la cuenta antes de preguntar');
+    await sinSesion.getByPlaceholder('tu@email.com').fill('vendedor@ejemplo.com');
+    await sinSesion.getByPlaceholder('••••••••').fill('vendedor123');
+    await sinSesion.locator('[class*="_submitButton_"][type="submit"]').click();
+    await enLaCuenta(sinSesion);
+    assert(seccionDe(sinSesion) === 'account', 'ingresar no devolvió a Mi cuenta');
+    await anonimo.close();
+
+    const cancela = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const pageCancela = await cancela.newPage();
+    await pageCancela.goto(`${FRONTEND_URL}/?section=account`, { waitUntil: 'domcontentloaded' });
+    await pageCancela.getByRole('heading', { name: 'Iniciar Sesión' })
+      .waitFor({ timeout: 25_000 });
+    await pageCancela.getByRole('button', { name: 'Cerrar' }).first().click();
+    await esperarA(async () => seccionDe(pageCancela) !== 'account',
+      'cancelar el ingreso dejó a la persona mirando una cuenta que no puede ver', 20_000);
+    assert((await pageCancela.locator('h1').count()) >= 1,
+      `cancelar dejó una sección sin contenido: ${pageCancela.url()}`);
+    await cancela.close();
+
+    const salir = await conSesion();
+    await irALaCuenta(salir.page);
+    await salir.page.getByRole('button', { name: 'Salir' }).click();
+    await esperarA(async () => seccionDe(salir.page) === 'home',
+      `Salir desde Mi cuenta dejó la barra en ${seccionDe(salir.page)}`, 20_000);
+    await esperarA(async () => (await salir.page
+      .getByRole('button', { name: 'Ingresar', exact: true }).count()) === 1,
+    'Salir no terminó la sesión', 20_000);
+    await salir.contexto.close();
+
+    const mp = await conSesion();
+    await mp.page.goto(`${FRONTEND_URL}/?mp=vinculado`, { waitUntil: 'domcontentloaded' });
+    await enLaCuenta(mp.page);
+    assert(seccionDe(mp.page) === 'account',
+      `la vuelta de Mercado Pago aterrizó en ${seccionDe(mp.page)}`);
+    assert(new URL(mp.page.url()).searchParams.get('mp') === null,
+      'la vuelta de Mercado Pago dejó su parámetro en la barra');
+    await mp.contexto.close();
+    medidos.push('entrada anónima con retorno, cancelación a sección pública, Salir a Inicio y '
+      + 'vuelta de Mercado Pago a la cuenta');
+
+    // --- F. Las tres anchuras ----------------------------------------------
+    // «Partido de forma absurda» se mide: se arman las líneas que el navegador
+    // dibujó de verdad y se exige que ninguna corte una palabra por la mitad.
+    const lineasQueParten = (page) => page.evaluate(() => {
+      const partidos = [];
+      const textos = document.querySelectorAll(
+        'main [class*="_statValue_"], main [class*="_statLabel_"], main [class*="_tab_"], main h1');
+      for (const el of textos) {
+        const nodo = Array.from(el.childNodes).find((n) => n.nodeType === 3 && n.textContent.trim());
+        if (!nodo) continue;
+        const texto = nodo.textContent;
+        const rango = document.createRange();
+        const lineas = [];
+        let actual = { arriba: null, letras: '' };
+        for (let i = 0; i < texto.length; i += 1) {
+          rango.setStart(nodo, i);
+          rango.setEnd(nodo, i + 1);
+          const caja = rango.getBoundingClientRect();
+          if (actual.arriba === null || Math.abs(caja.top - actual.arriba) < 2) {
+            actual.arriba = actual.arriba === null ? caja.top : actual.arriba;
+            actual.letras += texto[i];
+          } else {
+            lineas.push(actual.letras);
+            actual = { arriba: caja.top, letras: texto[i] };
+          }
+        }
+        lineas.push(actual.letras);
+        // Si el corte fue siempre en un espacio, juntar las líneas con un
+        // espacio devuelve el texto original. Si partió una palabra, no.
+        const rearmado = lineas.map((l) => l.trim()).filter(Boolean).join(' ');
+        if (rearmado.replace(/\s+/g, ' ') !== texto.trim().replace(/\s+/g, ' ')) {
+          partidos.push({ texto: texto.trim(), lineas });
+        }
+      }
+      return partidos;
+    });
+
+    const fueraDePantalla = (page) => page.evaluate(() => Array.from(
+      document.querySelectorAll('main button, main input, main select, main a'))
+      .filter((el) => el.offsetParent !== null)
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && (r.left < -1 || r.right > window.innerWidth + 1);
+      })
+      .map((el) => (el.textContent || el.getAttribute('aria-label') || el.tagName).trim().slice(0, 40)));
+
+    for (const [ancho, alto] of [[1440, 900], [768, 1024], [390, 844]]) {
+      const medida = `${ancho}x${alto}`;
+      const sesion = await conSesion(ancho, alto);
+      await irALaCuenta(sesion.page);
+
+      for (const [pestana, nombre] of [['Mi Perfil', 'perfil'], ['Mis publicaciones', 'publicaciones']]) {
+        await sesion.page.getByRole('button', { name: pestana }).first().click();
+        await sesion.page.waitForTimeout(900);
+        const desborde = await sesion.page.evaluate(
+          () => document.documentElement.scrollWidth - window.innerWidth);
+        assert(desborde <= 1, `${medida}/${nombre}: la página desborda ${desborde}px a lo ancho`);
+        const partidos = await lineasQueParten(sesion.page);
+        assert(partidos.length === 0,
+          `${medida}/${nombre}: hay texto partido en medio de una palabra: `
+          + JSON.stringify(partidos));
+        const sueltos = await fueraDePantalla(sesion.page);
+        assert(sueltos.length === 0,
+          `${medida}/${nombre}: ${sueltos.length} control(es) fuera de la ventana: `
+          + sueltos.join(' | '));
+        const ruta = `cuenta-${nombre}-${medida}.png`;
+        capturas.push(ruta);
+        await sesion.page.screenshot({ path: `${CAPTURAS}/${ruta}`, fullPage: true });
+      }
+      await sesion.contexto.close();
+      medidos.push(`${medida}: perfil y publicaciones sin desborde, sin palabras partidas y sin `
+        + 'controles fuera de la ventana');
+    }
+  } finally {
+    await browser.close();
+  }
+
+  return 'Mi cuenta dejó de ser una capa y pasó a ser una sección: tiene URL canónica y '
+    + 'recargable, queda marcada como página actual, vive dentro del shell con el scroll del '
+    + 'documento y sin backdrop, X ni diálogo general; el historial la trata como a cualquier '
+    + 'otra sección; la sesión entra, vuelve y sale por donde corresponde; y `FORM-DIRTY-1` vale '
+    + `en el límite nuevo, que son cinco salidas y no dos; ${medidos.join('; ')}. `
+    + `${capturas.length} capturas en ${CAPTURAS}`;
+});
+
+
+
+// ---------------------------------------------------------------------------
+// 164. ADMIN-SAFETY-1 — el panel no escribe sobre datos ajenos sin preguntar.
+//
+// El panel manda sobre cuentas y publicaciones de otras personas, y hasta acá
+// decidía de dos maneras, las dos malas:
+//
+//  - cambiar el rol, activar o desactivar una cuenta y cambiar el estado de una
+//    publicación escribían en el acto, con el `onChange` de un `select`: un
+//    clic de más ya era un cambio hecho sobre la cuenta de otro;
+//  - y los borrados preguntaban con `window.confirm`, que no es una capa del
+//    producto: no tiene nombre accesible, no atrapa el foco ni lo devuelve,
+//    no se puede leer con el estilo del sitio y bloquea el hilo.
+//
+// Lo que se mide acá no es que «ahora pregunta», que se vería igual con un
+// cartel decorativo, sino la única propiedad que importa: **cuántas solicitudes
+// salen**. Cancelar —por botón, por Escape o por el fondo— tiene que hacer
+// CERO. Confirmar tiene que hacer UNA, y dejar la pantalla, la API y la base
+// diciendo lo mismo.
+//
+// Y se mide el restablecimiento de contraseña: que la clave vieja deje de
+// entrar, que la nueva entre, y que al cerrar la pantalla su único texto
+// visible desaparezca. La credencial no se imprime ni se captura acá.
+// ---------------------------------------------------------------------------
+await runCase(164, 'El panel de administración pregunta antes de escribir, y la clave temporal se ve una sola vez', async () => {
+  const medidos = [];
+  const browser = await chromium.launch({ headless: true });
+  const admin = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email: 'admin@topgreen.com', password: 'admin123' },
+  });
+  const adminToken = admin.data.access_token;
+  // Se declaran acá y no adentro del `try` para que el `finally` pueda
+  // devolver la base a como estaba aunque el caso se caiga a la mitad.
+  let productoId = null;
+  let subPrevia = '';
+  let subDePrueba = null;
+
+  try {
+    // --- R5: Configuración ya no ofrece administrar Provincias ------------
+    //
+    // Se rastrearon los consumidores reales: publicar, registrarse, el alta de
+    // transportista, los filtros y la edición del perfil piden todos
+    // `/catalog/localities/provinces`. Nadie pide `option_type=province`.
+    const tiposDeOpcion = await apiRequest('/admin/form-options/types', { token: adminToken });
+    assert(tiposDeOpcion.data.types.some((t) => t.value === 'province'),
+      'la API ya no ofrece el tipo province: este caso mide que se retire de la PANTALLA '
+      + 'dejando la API intacta, así que si el Backend cambió hay que revisar el contrato');
+    const consumidoresDeProvincias = readFileSync('src/components/AdminPanel/AdminPanel.tsx', 'utf8');
+    assert(/TIPOS_RETIRADOS/.test(consumidoresDeProvincias),
+      'Configuración volvió a ofrecer todos los tipos que devuelve la API');
+    medidos.push('Provincias se retiró de Configuración y la API quedó intacta');
+
+    // --- R4: la guarda está donde se midió el rojo -------------------------
+    //
+    // Desactivar una SUBcategoría la saca de los filtros y deja sus
+    // publicaciones visibles: nadie puede llegar a ellas filtrando, pero están.
+    // Eso se frena. Desactivar una CATEGORÍA, en cambio, no cambia nada de la
+    // parte pública —se midió—, así que no se le pone guarda a un interruptor
+    // que no hace nada.
+    // El par publicación+subcategoría se FABRICA en la base descartable en vez
+    // de buscarse en el catálogo. Buscarlo funcionaba aislado y se caía en la
+    // suite completa: para cuando llega el 164, los casos de antes ya movieron
+    // publicaciones y subcategorías, y el caso se quedaba sin material.
+    const [[idDelProducto, productoNombre, categoriaId, subcategoriaPrevia]] = queryRows(`
+      SELECT p.id, p.name, p.category_id, COALESCE(p.subcategory_id, '')
+      FROM products p
+      WHERE p.status = 'ACTIVE' AND p.category_id IS NOT NULL
+      ORDER BY p.id LIMIT 1
+    `);
+    assert(idDelProducto, 'no hay ninguna publicación activa con categoría: la base no es la del seed');
+    productoId = idDelProducto;
+    subPrevia = subcategoriaPrevia;
+    subDePrueba = (await apiRequest(`/admin/categories/${categoriaId}/subcategories`, {
+      method: 'POST',
+      token: adminToken,
+      body: { name: `Subcategoría de prueba 164 ${Date.now()}`, is_active: true, display_order: 0 },
+    })).data;
+    querySql(`UPDATE products SET subcategory_id = ${sqlLiteral(subDePrueba.id)} `
+      + `WHERE id = ${sqlLiteral(productoId)}`);
+    const conSub = { id: productoId, name: productoNombre, subcategory_id: subDePrueba.id };
+    medidos.push(`riesgo R4 medido sobre «${productoNombre}» y una subcategoría fabricada`);
+    // Un rechazo esperado no puede ir por `apiRequest`, que convierte todo lo
+    // que no sea 2xx en excepción: acá el 409 ES el resultado que se mide.
+    const pedir = async (ruta, cuerpo) => {
+      const respuesta = await fetch(`${API_URL}${ruta}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify(cuerpo),
+      });
+      const crudo = await respuesta.text();
+      return { status: respuesta.status, data: crudo ? JSON.parse(crudo) : null };
+    };
+    const frenada = await pedir(`/admin/subcategories/${conSub.subcategory_id}`, { is_active: false });
+    assert(frenada.status === 409,
+      `desactivar una subcategoría con publicaciones activas devolvió ${frenada.status} `
+      + 'y tiene que devolver 409');
+    assert(/publicaci/i.test(frenada.data.detail) && /pausal|Movel/i.test(frenada.data.detail),
+      `el motivo no dice qué hacer: ${JSON.stringify(frenada.data.detail)}`);
+    // Y lo demás de esa subcategoría se sigue editando.
+    const orden = await pedir(`/admin/subcategories/${conSub.subcategory_id}`, { display_order: 2 });
+    assert(orden.status === 200,
+      `la guarda se llevó puesta la edición del resto: cambiar el orden dio ${orden.status}`);
+    medidos.push('subcategoría con publicaciones activas: no se puede desactivar, el resto sí se edita');
+
+    // --- La pantalla -------------------------------------------------------
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+
+    // Cuántas solicitudes que ESCRIBEN salieron. Es la medición central: una
+    // confirmación que no impide la escritura es un cartel, no una guarda.
+    let escrituras = [];
+    let ultimoCuerpoEnviado = null;
+    page.on('request', (pedido) => {
+      const metodo = pedido.method();
+      if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(metodo) && /\/api\/admin\//.test(pedido.url())) {
+        escrituras.push(`${metodo} ${new URL(pedido.url()).pathname}`);
+        try {
+          ultimoCuerpoEnviado = JSON.parse(pedido.postData() || 'null');
+        } catch {
+          ultimoCuerpoEnviado = null;
+        }
+      }
+    });
+    // Qué se está midiendo ahora mismo. Sin esto, un tiempo agotado adentro de
+    // una espera de Playwright no dice en cuál de los diez recorridos pasó.
+    let paso = 'apertura';
+    const contando = async (accion) => {
+      escrituras = [];
+      try {
+        await accion();
+      } catch (error) {
+        throw new Error(`en «${paso}»: ${error.message}`);
+      }
+      // Se espera a que la red se aquiete para no contar de menos.
+      await page.waitForTimeout(700);
+      return escrituras.slice();
+    };
+
+    // La cuenta sobre la que se mide es propia del caso, no una del seed. Con
+    // una del seed el caso pasaba aislado y se caía en la suite completa: para
+    // cuando llega el 164, los casos de antes ya cambiaron roles, estados y
+    // hasta la página en la que aparece cada fila. Creada acá, el punto de
+    // partida es siempre el mismo y no le saca nada a nadie.
+    const CORREO_ROL = `rol.${Date.now()}@example.com`;
+    const vendedor = (await apiRequest('/admin/users', {
+      method: 'POST',
+      token: adminToken,
+      body: {
+        email: CORREO_ROL, password: 'claveDePrueba123', full_name: 'Prueba Rol', role: 'user',
+      },
+    })).data;
+    assert(vendedor && vendedor.id, 'no se pudo crear la cuenta de prueba del caso');
+
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+    await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    await page.getByPlaceholder('tu@email.com').fill('admin@topgreen.com');
+    await page.getByPlaceholder('••••••••').fill('admin123');
+    await page.locator('[class*="_submitButton_"][type="submit"]').click();
+    await page.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 25_000 });
+    await page.getByRole('button', { name: 'Admin', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Usuarios', exact: true }).first().click();
+    await page.locator('table tbody tr').first().waitFor({ timeout: 25_000 });
+
+    // El panel entero también es una capa, así que «el diálogo» a secas
+    // encuentra dos, y «el último» deja de ser la confirmación en cuanto se
+    // cierra —vuelve a ser el panel, que no se va nunca—. Se la busca por su
+    // propio nombre accesible, que es lo único que la identifica siempre.
+    const capa = () => page.locator('[role="dialog"][aria-labelledby^="confirmacion-titulo"]');
+    const filaDe = (email) => page.locator('table tbody tr').filter({ hasText: email });
+
+    // No se toca al propio admin: tiene sus propias guardas y no es lo que se
+    // mide acá.
+    // Se la busca con el buscador: en la suite completa la tabla tiene muchas
+    // páginas y la fila nueva no tiene por qué estar en la primera.
+    const buscar = async (texto) => {
+      await page.getByLabel('Buscar usuarios por nombre o email').fill(texto);
+      await page.getByRole('button', { name: 'Buscar usuarios' }).click();
+      await esperarA(async () => (await page.locator('table tbody tr').count()) === 1,
+        `la búsqueda de ${texto} no dejó una sola fila`, 15_000);
+    };
+    await buscar(CORREO_ROL);
+    const fila = filaDe(CORREO_ROL);
+    await fila.first().waitFor({ timeout: 20_000 });
+
+    // --- 1. Cambiar el rol: cancelar no escribe ---------------------------
+    const selectorDeRol = fila.getByLabel('Rol del usuario');
+    // Se enfoca antes de elegir porque así llega el control en la realidad:
+    // quien cambia un `select` —con el mouse o tabulando— lo tiene enfocado.
+    // `selectOption` a secas escribe el valor sin enfocarlo, y entonces «volver
+    // el foco a quien abrió la capa» mediría un origen que nunca existió.
+    const elegirRol = async (valor) => {
+      await selectorDeRol.focus();
+      await selectorDeRol.selectOption(valor);
+    };
+    const rolAntes = await selectorDeRol.inputValue();
+    paso = 'elegir un rol nuevo';
+    // Se cuenta ANTES de esperar la capa, y no después: si el panel todavía
+    // escribiera en el acto, esperar primero daría «se agotó la espera» —que no
+    // dice nada— en vez de nombrar la solicitud que salió sin permiso.
+    const alAbrir = await contando(async () => { await elegirRol('admin'); });
+    assert(alAbrir.length === 0,
+      `elegir en el selector ya escribió, sin preguntar: ${JSON.stringify(alAbrir)}`);
+    await capa().waitFor({ timeout: 10_000 });
+
+    // La capa nombra el objeto y el cambio exacto.
+    const textoDeLaCapa = await capa().innerText();
+    assert(textoDeLaCapa.includes('Prueba Rol') && textoDeLaCapa.includes(CORREO_ROL),
+      `la confirmación no nombra a la persona: ${JSON.stringify(textoDeLaCapa.slice(0, 140))}`);
+    assert(/Usuario/.test(textoDeLaCapa) && /Admin/.test(textoDeLaCapa),
+      'la confirmación no dice de qué rol a qué rol');
+    const nombreDeLaCapa = await capa().getAttribute('aria-labelledby');
+    assert(nombreDeLaCapa && (await page.locator(`#${nombreDeLaCapa}`).innerText()).trim().length > 0,
+      'la capa no tiene nombre accesible');
+
+    // El foco entra en la capa y Tab no se escapa.
+    // La ÚLTIMA capa, no la primera: el panel entero también es un diálogo y
+    // está antes en el documento, así que preguntar por «el diálogo» mide la
+    // capa equivocada.
+    const focoDentro = () => page.evaluate(() => {
+      const capas = document.querySelectorAll('[role="dialog"]');
+      const arriba = capas[capas.length - 1];
+      return !!(arriba && document.activeElement && arriba.contains(document.activeElement));
+    });
+    // El foco lo pone un efecto, así que se espera la CONDICIÓN y no un rato
+    // fijo; si nunca entra, el mensaje dice dónde quedó.
+    await esperarA(focoDentro, `al abrir, el foco quedó fuera de la capa: está en `
+      + `${await page.evaluate(() => document.activeElement && document.activeElement.outerHTML.slice(0, 90))}`,
+    5_000);
+    for (let vuelta = 0; vuelta < 8; vuelta += 1) {
+      await page.keyboard.press('Tab');
+      assert(await focoDentro(), `el foco se escapó de la capa en la tabulación ${vuelta + 1}`);
+    }
+
+    // Cancelar por botón: cero solicitudes y el selector no miente.
+    paso = 'cancelar con el botón';
+    const alCancelar = await contando(async () => {
+      await capa().getByRole('button', { name: 'Cancelar' }).click();
+      await capa().waitFor({ state: 'detached', timeout: 10_000 });
+    });
+    assert(alCancelar.length === 0, `cancelar escribió: ${JSON.stringify(alCancelar)}`);
+    assert((await selectorDeRol.inputValue()) === rolAntes,
+      `cancelar dejó el selector mintiendo: dice ${await selectorDeRol.inputValue()} y el rol sigue siendo ${rolAntes}`);
+    // Y el foco volvió al control que la abrió.
+    assert(await selectorDeRol.evaluate((el) => el === document.activeElement),
+      'al cancelar, el foco no volvió al selector que abrió la capa: quedó en '
+      + `${await page.evaluate(() => document.activeElement && document.activeElement.outerHTML.slice(0, 100))}`);
+
+    // Escape y el fondo significan lo mismo que Cancelar.
+    for (const [comoSeLlama, cerrar] of [
+      ['Escape', async () => page.keyboard.press('Escape')],
+      ['el fondo', async () => capa().locator('xpath=..').click({ position: { x: 8, y: 8 } })],
+    ]) {
+      paso = 'cerrar con Escape o el fondo';
+      const salidas = await contando(async () => {
+        await selectorDeRol.selectOption('admin');
+        await capa().waitFor({ timeout: 10_000 });
+        await cerrar();
+        await capa().waitFor({ state: 'detached', timeout: 10_000 });
+      });
+      assert(salidas.length === 0, `cerrar con ${comoSeLlama} escribió: ${JSON.stringify(salidas)}`);
+      assert((await selectorDeRol.inputValue()) === rolAntes,
+        `cerrar con ${comoSeLlama} dejó el selector mintiendo`);
+    }
+    medidos.push('cambiar rol: cancelar por botón, Escape y fondo hacen cero solicitudes y no dejan el selector mintiendo');
+
+    // --- 2. Confirmar hace UNA sola solicitud ------------------------------
+    // La base guarda el rol como enum en mayúsculas y la pantalla lo usa en
+    // minúsculas: se compara en minúsculas para no medir la ortografía.
+    const rolEnBase = () => queryRows(
+      `SELECT role FROM users WHERE email = ${sqlLiteral(CORREO_ROL)}`,
+    )[0][0].toLowerCase();
+    const antesEnBase = rolEnBase();
+    paso = 'confirmar el cambio de rol';
+    const alConfirmar = await contando(async () => {
+      await elegirRol('admin');
+      await capa().waitFor({ timeout: 10_000 });
+      await capa().getByRole('button', { name: /Dar acceso de Admin/ }).click();
+      await capa().waitFor({ state: 'detached', timeout: 15_000 });
+    });
+    assert(alConfirmar.length === 1,
+      `confirmar mandó ${alConfirmar.length} solicitudes y tiene que mandar una: ${JSON.stringify(alConfirmar)}`);
+    await esperarA(async () => rolEnBase() === 'admin',
+      `la base no registró el cambio de rol: sigue en ${rolEnBase()}`, 15_000);
+    await esperarA(async () => (await selectorDeRol.inputValue()) === 'admin',
+      'la pantalla no refleja el rol nuevo', 15_000);
+    medidos.push(`confirmar: una sola solicitud y base/pantalla coherentes (${antesEnBase} → admin)`);
+
+
+    // --- 2 bis. Con la mutación en vuelo, no hay salida que cierre --------
+    //
+    // Entre confirmar y la respuesta hay una ventana. Si una salida cerrara la
+    // capa ahí, la pantalla diría «no pasó nada» mientras el cambio se aplica
+    // igual: el peor resultado posible, porque no se ve ni el éxito ni el error.
+    // Se retiene la respuesta a propósito y se prueban las cuatro salidas.
+    let soltar = null;
+    await page.route('**/api/admin/users/*', async (ruta) => {
+      if (ruta.request().method() !== 'PATCH') return ruta.fallback();
+      await new Promise((seguir) => { soltar = seguir; });
+      return ruta.fallback();
+    });
+
+    // Se vuelve para el otro lado: la cuenta quedó en Admin en el paso anterior,
+    // así que el cambio que abre la capa ahora es el de vuelta a Usuario.
+    paso = 'confirmar con la respuesta retenida';
+    const enVuelo = await contando(async () => {
+      await elegirRol('user');
+      await capa().waitFor({ timeout: 10_000 });
+      await capa().getByRole('button', { name: /Pasar a Usuario/ }).click();
+      await esperarA(async () => soltar !== null, 'la mutación nunca salió', 15_000);
+    });
+    assert(enVuelo.length === 1,
+      `confirmar con la respuesta retenida mandó ${enVuelo.length} solicitudes`);
+
+    const intentosDeSalida = [
+      ['Escape', async () => page.keyboard.press('Escape')],
+      ['el fondo', async () => capa().locator('xpath=..').click({ position: { x: 8, y: 8 }, force: true })],
+      ['la X', async () => capa().getByRole('button', { name: 'Cerrar' }).click({ force: true })],
+      ['Cancelar', async () => capa().getByRole('button', { name: 'Cancelar' }).click({ force: true })],
+    ];
+    for (const [comoSeLlama, salir] of intentosDeSalida) {
+      const extra = await contando(salir);
+      assert(await capa().isVisible(),
+        `con la mutación en vuelo, ${comoSeLlama} cerró la capa: la pantalla diría que no pasó nada`);
+      assert(extra.length === 0,
+        `con la mutación en vuelo, ${comoSeLlama} mandó otra solicitud: ${JSON.stringify(extra)}`);
+    }
+
+    // Al soltarla, el resultado queda a la vista y la capa se va sola.
+    soltar();
+    await capa().waitFor({ state: 'detached', timeout: 20_000 });
+    await esperarA(async () => (await page.locator('body').innerText()).includes('Rol actualizado'),
+      'liberada la respuesta, el éxito no quedó visible', 20_000);
+    await page.unroute('**/api/admin/users/*');
+    medidos.push('con la mutación en vuelo, Escape, fondo, X y Cancelar no cierran, no duplican y el resultado queda visible');
+
+    // --- 3. Restablecer contraseña ----------------------------------------
+    //
+    // Sobre un usuario creado acá, en la base descartable, para no dejar sin
+    // clave a una cuenta del seed que usan otros casos.
+    // `.local` es un dominio reservado y el validador de correo lo rechaza con
+    // 422; `example.com` está reservado justamente para pruebas.
+    const CORREO = `reset.${Date.now()}@example.com`;
+    const CLAVE_VIEJA = 'claveVieja123';
+    const creado = await apiRequest('/admin/users', {
+      method: 'POST',
+      token: adminToken,
+      body: { email: CORREO, password: CLAVE_VIEJA, full_name: 'Prueba Reset', role: 'user' },
+    });
+    assert(creado.status === 200 || creado.status === 201,
+      `no se pudo crear el usuario de prueba: ${creado.status}`);
+    // Que una contraseña NO entre es el resultado que se mide, así que no puede
+    // ir por `apiRequest`: el 401 es la respuesta, no una excepción.
+    const entra = async (clave) => (await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: CORREO, password: clave }),
+    })).status === 200;
+    assert(await entra(CLAVE_VIEJA), 'la clave inicial del usuario de prueba no entra');
+
+    await page.getByRole('button', { name: 'Usuarios', exact: true }).first().click();
+    await buscar(CORREO);
+    const filaNueva = filaDe(CORREO);
+    await filaNueva.first().waitFor({ timeout: 20_000 });
+
+    paso = 'restablecer la contraseña';
+    const alRestablecer = await contando(async () => {
+      await filaNueva.getByRole('button', { name: 'Restablecer contraseña' }).click();
+      await capa().waitFor({ timeout: 10_000 });
+      await capa().getByRole('button', { name: /Generar contraseña nueva/ }).click();
+      await page.locator('[role="dialog"][aria-labelledby="clave-temporal-titulo"]')
+        .waitFor({ timeout: 20_000 });
+    });
+    assert(alRestablecer.length === 1,
+      `restablecer mandó ${alRestablecer.length} solicitudes: ${JSON.stringify(alRestablecer)}`);
+    // La clave que se entrega no se anuncia como temporal: nada la hace caducar
+    // —no hay rotación ni pantalla para cambiarla al entrar—, así que llamarla
+    // así prometía un vencimiento inexistente.
+    const textoDelResultado = await page
+      .locator('[role="dialog"][aria-labelledby="clave-temporal-titulo"]').innerText();
+    assert(!/temporal/i.test(textoDelResultado),
+      `el resultado sigue llamando temporal a la contraseña: ${JSON.stringify(textoDelResultado.slice(0, 160))}`);
+    assert(/restablezca/i.test(textoDelResultado),
+      'el resultado no dice hasta cuándo rige la contraseña nueva');
+
+    // La clave se lee del DOM para probarla y no se imprime nunca.
+    const resultado = page.locator('[role="dialog"][aria-labelledby="clave-temporal-titulo"]');
+    const temporal = (await resultado.locator('code').innerText()).trim();
+    assert(temporal.length >= 16, `la clave temporal tiene ${temporal.length} caracteres: es corta`);
+    assert(!(await entra(CLAVE_VIEJA)), 'la contraseña anterior sigue entrando después del restablecimiento');
+    assert(await entra(temporal), 'la contraseña temporal no entra');
+
+    // Y no quedó registrada en ningún lado del navegador.
+    const rastros = await page.evaluate((secreto) => ({
+      local: Object.entries({ ...localStorage }).some(([, v]) => String(v).includes(secreto)),
+      sesion: Object.entries({ ...sessionStorage }).some(([, v]) => String(v).includes(secreto)),
+      url: window.location.href.includes(secreto),
+    }), temporal);
+    assert(!rastros.local && !rastros.sesion && !rastros.url,
+      `la clave temporal quedó guardada: ${JSON.stringify(rastros)}`);
+
+    // Al cerrar, su único texto visible desaparece y no se puede recuperar.
+    await resultado.getByRole('button', { name: /cerrar/i }).click();
+    await resultado.waitFor({ state: 'detached', timeout: 10_000 });
+    const sigueEnPantalla = await page.evaluate(
+      (secreto) => document.body.innerText.includes(secreto), temporal,
+    );
+    assert(!sigueEnPantalla, 'la clave temporal sigue visible después de cerrar el resultado');
+    medidos.push('restablecer: una solicitud, la clave vieja deja de entrar, la temporal entra y al cerrar no se recupera');
+
+    // --- 3 bis. El panel no ofrece la acción sin efecto --------------------
+    //
+    // Desactivar una categoría se guardaba y no cambiaba nada de la parte
+    // pública. Se retiró de la pantalla; el campo, la API y los datos quedan.
+    await page.getByRole('button', { name: 'Categorías', exact: true }).first().click();
+    await page.getByRole('button', { name: /^Editar la categoría/ }).first()
+      .click({ timeout: 20_000 });
+    const formularioDeCategoria = page.locator('form, [class*="editForm"], [class*="categoryCard"]')
+      .filter({ has: page.getByLabel('Nombre', { exact: false }) }).first();
+    await esperarA(async () => (await page.getByLabel('Estado', { exact: true }).count()) === 0,
+      'el panel sigue ofreciendo el Estado de una categoría, que no tiene efecto', 15_000);
+    void formularioDeCategoria;
+    // Y guardar no manda `is_active`, aunque el control ya no esté.
+    const alGuardarCategoria = await contando(async () => {
+      await page.getByRole('button', { name: /^Guardar/ }).first().click();
+      await esperarA(async () => (await page.getByRole('button', { name: /^Guardar/ }).count()) === 0,
+        'el formulario de la categoría no se cerró al guardar', 15_000);
+    });
+    assert(alGuardarCategoria.length === 1,
+      `guardar la categoría mandó ${alGuardarCategoria.length} solicitudes`);
+    const cuerpoDeLaCategoria = ultimoCuerpoEnviado;
+    assert(cuerpoDeLaCategoria && !('is_active' in cuerpoDeLaCategoria),
+      `editar una categoría sigue mandando is_active: ${JSON.stringify(cuerpoDeLaCategoria)}`);
+    medidos.push('categoría: el panel no ofrece el Estado y editar no manda is_active');
+
+    // --- 4. Los borrados ya no usan window.confirm -------------------------
+    //
+    // `window.confirm` no dibuja nada en la página: si un borrado siguiera
+    // usándolo, no aparecería ninguna capa y el diálogo nativo colgaría la
+    // prueba. Se comprueba que aparezca la capa del producto.
+    let nativos = 0;
+    page.on('dialog', async (dialogo) => { nativos += 1; await dialogo.dismiss(); });
+    await page.getByRole('button', { name: 'Categorías', exact: true }).first().click();
+    // Las subcategorías están plegadas: hay que abrir una categoría para verlas.
+    await page.getByRole('button', { name: /^Mostrar las subcategorías de/ }).first()
+      .click({ timeout: 20_000 });
+    const borrarSub = page.getByRole('button', { name: /^Eliminar la subcategoría/ }).first();
+    await borrarSub.waitFor({ timeout: 20_000 });
+    paso = 'pedir un borrado';
+    // Igual que arriba: primero se mira qué apareció, y recién después se
+    // espera la capa. `window.confirm` no dibuja nada en la página, así que
+    // esperar primero diría «se agotó la espera» en vez de «abrió un diálogo
+    // nativo».
+    const alPedirBorrado = await contando(async () => { await borrarSub.click(); });
+    assert(nativos === 0, `el borrado abrió ${nativos} diálogo(s) nativo(s): sigue usando window.confirm`);
+    assert(alPedirBorrado.length === 0, `pedir el borrado ya escribió: ${JSON.stringify(alPedirBorrado)}`);
+    await capa().waitFor({ timeout: 10_000 });
+    assert(/Eliminar la subcategoría/i.test(await capa().innerText()),
+      'la capa de borrado no dice qué se elimina');
+    paso = 'cancelar un borrado';
+    const alCancelarBorrado = await contando(async () => {
+      await page.keyboard.press('Escape');
+      await capa().waitFor({ state: 'detached', timeout: 10_000 });
+    });
+    assert(alCancelarBorrado.length === 0,
+      `cancelar el borrado escribió: ${JSON.stringify(alCancelarBorrado)}`);
+    medidos.push('borrados: capa del producto en vez de window.confirm, y cancelar no escribe');
+
+    // Y no queda ningún `window.confirm` en el panel.
+    const panel = readFileSync('src/components/AdminPanel/AdminPanel.tsx', 'utf8');
+    assert(!/\bconfirm\(/.test(panel),
+      'el panel todavía llama a window.confirm en algún recorrido');
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+  }
+
+  return medidos.join('; ');
+});
+
+// ---------------------------------------------------------------------------
+// 165. RATING-UX-1 — la reputación se ve, y calificar es una decisión operable.
+//
+// Tres cosas estaban rotas, y cada una lo estaba de una manera distinta:
+//
+//  1. El perfil dibujaba las estrellas con `''.repeat(n)`: una cadena VACÍA
+//     repetida. O sea, nada. La reputación se anunciaba con un número suelto al
+//     lado de un hueco.
+//  2. Si se podía calificar o no lo decidía un `Set` en memoria de esta
+//     pantalla. Recargar lo vaciaba, así que «Calificar vendedor» volvía a
+//     aparecer para una orden ya calificada, y el segundo intento moría contra
+//     el servidor con «Ya has calificado».
+//  3. El selector eran cinco `span` con `onClick`. Un `span` no recibe foco, no
+//     tiene estado y no se anuncia: elegir cuántas estrellas darle a alguien era
+//     imposible sin mouse. Y la capa no era una capa —sin `role`, sin nombre,
+//     sin trampa de foco, sin Escape—.
+//
+// Lo que se mide acá es eso, y no que «se vea mejor»: que las estrellas existan
+// en el documento, que el veredicto venga del servidor y sobreviva a recargar,
+// y que el selector se opere con el teclado.
+// ---------------------------------------------------------------------------
+await runCase(165, 'La reputación se ve, el servidor decide si se puede calificar y las estrellas se eligen con el teclado', async () => {
+  const CAPTURAS = process.env.SMOKE_CAPTURAS
+    || mkdtempSync(`${tmpdir()}/topgreen-calificacion-`);
+  mkdirSync(CAPTURAS, { recursive: true });
+  const capturas = [];
+  const medidos = [];
+  const guardarCaptura = async (pagina, carpeta, nombre) => {
+    const ruta = `${carpeta}/${nombre}.png`;
+    await pagina.screenshot({ path: ruta, fullPage: true });
+    return ruta;
+  };
+  await asegurarProducto();
+
+  // --- Una orden entregada y sin calificar, fabricada acá ------------------
+  //
+  // La base limpia no tiene ninguna: el seed no deja órdenes entregadas. Se
+  // crea una de verdad —por el carrito y el checkout— y se la lleva a entregada
+  // en la base descartable, que es donde se fabrica un estado que la API no
+  // ofrece.
+  //
+  // La orden se arma con material propio y decidiendo el traslado a mano. Los
+  // ayudantes compartidos leen el carrito por `state.buyerId`, que en la suite
+  // completa ya no es el mismo comprador que `state.buyerToken` —otros casos lo
+  // reasignan—, y entonces el checkout se caía con «Falta decidir cómo se
+  // traslada el pedido»: pasaba aislado y fallaba acompañado.
+  await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  const [[categoriaParaCalificar]] = queryRows(`
+    SELECT id FROM categories
+    WHERE is_active = true AND is_service = false
+    ORDER BY name LIMIT 1
+  `);
+  const publicacionParaCalificar = (await apiRequest('/products', {
+    method: 'POST',
+    token: state.sellerToken,
+    body: {
+      name: `Smoke calificacion ${Date.now()}`,
+      description: 'Publicación de este caso: se compra, se entrega y se califica.',
+      category_id: categoriaParaCalificar,
+      price: 5400,
+      stock: 3,
+      unit: 'unidad',
+      locality_id: localidadDeEnvio(),
+      publication_type: 'producto',
+    },
+  })).data;
+  await apiRequest('/cart/items', {
+    method: 'POST',
+    token: state.buyerToken,
+    body: { product_id: publicacionParaCalificar.id, quantity: 1 },
+  });
+  const [[vendedorDeLaOrden]] = queryRows(
+    `SELECT seller_id FROM products WHERE id = ${sqlLiteral(publicacionParaCalificar.id)}`);
+  const checkoutDeLaCalificacion = await apiRequest('/orders/checkout/transfer', {
+    method: 'POST',
+    token: state.buyerToken,
+    body: {
+      shipping_address: 'Ruta 9 km 100',
+      shipping_locality_id: localidadDeEnvio(),
+      shipping_postal_code: '2000',
+      shipping_decisions: [{ seller_id: vendedorDeLaOrden, mode: 'self' }],
+    },
+  });
+  const orden = checkoutDeLaCalificacion.data.orders[0];
+  assert(orden?.order_id || orden?.id, 'no se pudo crear la orden del caso');
+  const ordenId = orden.order_id || orden.id;
+  querySql(`UPDATE orders SET status = 'DELIVERED' WHERE id = ${sqlLiteral(ordenId)}`);
+  const [[numeroVisible]] = queryRows(
+    `SELECT order_number FROM orders WHERE id = ${sqlLiteral(ordenId)}`);
+
+  // El endpoint responde por UUID y NO por el número visible. Si el producto
+  // preguntara con el número, escondería el botón siempre y por el motivo
+  // equivocado.
+  const porUuid = await apiRequest(`/ratings/order/${ordenId}/can-rate`, { token: state.buyerToken });
+  assert(porUuid.data.can_rate === true,
+    `la orden fabricada no es calificable: ${JSON.stringify(porUuid.data)}`);
+  const porNumero = await fetch(`${API_URL}/ratings/order/${encodeURIComponent(numeroVisible)}/can-rate`, {
+    headers: { Authorization: `Bearer ${state.buyerToken}` },
+  });
+  assert(porNumero.status === 404,
+    `can-rate con el número visible devolvió ${porNumero.status}: si algún día lo acepta, `
+    + 'este caso deja de distinguir el identificador correcto del equivocado');
+  medidos.push('la elegibilidad se pregunta por UUID; con el número visible el servidor da 404');
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    let posts = [];
+    const abrirCuenta = async (ancho = 1440, alto = 900) => {
+      const contexto = await browser.newContext({ viewport: { width: ancho, height: alto } });
+      const page = await contexto.newPage();
+      page.on('request', (pedido) => {
+        if (pedido.method() === 'POST' && /\/api\/ratings\/?$/.test(pedido.url())) {
+          posts.push(pedido.url());
+        }
+      });
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+      await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+      await page.getByPlaceholder('tu@email.com').fill(state.buyerCredentials.email);
+      await page.getByPlaceholder('••••••••').fill(state.buyerCredentials.password);
+      await page.locator('[class*="_submitButton_"][type="submit"]').click();
+      await page.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 25_000 });
+      await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
+      await page.getByRole('heading', { name: 'Mi cuenta', level: 1 })
+        .waitFor({ state: 'visible', timeout: 25_000 });
+      return { contexto, page };
+    };
+    const irAMisCompras = async (page) => {
+      await page.getByRole('button', { name: 'Mis Compras' }).click();
+      await page.getByRole('heading', { name: 'Mis Compras' }).waitFor({ timeout: 20_000 });
+    };
+    const botonDeCalificar = (page) => page.getByRole('button', { name: /Calificar Vendedor/i });
+    const capa = (page) => page.locator('[role="dialog"][aria-labelledby="calificacion-titulo"]');
+
+    const { contexto, page } = await abrirCuenta();
+
+    // --- A. El perfil dibuja la reputación --------------------------------
+    //
+    // Con calificaciones o sin ellas, la pantalla tiene que decir algo. Primero
+    // el estado vacío honesto, que es lo que corresponde ahora.
+    const vacio = page.getByText('Sin calificaciones aún').first();
+    await vacio.waitFor({ state: 'visible', timeout: 20_000 });
+    medidos.push('sin calificaciones, el perfil lo dice en vez de dibujar cinco huecos');
+
+    // --- B. El botón aparece porque el servidor lo permite -----------------
+    await irAMisCompras(page);
+    await botonDeCalificar(page).first().waitFor({ state: 'visible', timeout: 25_000 });
+
+    // --- C. La capa es una capa -------------------------------------------
+    const disparador = botonDeCalificar(page).first();
+    await disparador.click();
+    await capa(page).waitFor({ state: 'visible', timeout: 15_000 });
+
+    const nombre = await capa(page).getAttribute('aria-labelledby');
+    assert(nombre && (await page.locator(`#${nombre}`).innerText()).includes('Calificar'),
+      'la capa de calificación no tiene nombre accesible');
+    const focoDentro = () => page.evaluate(() => {
+      const capas = document.querySelectorAll('[role="dialog"]');
+      const arriba = capas[capas.length - 1];
+      return !!(arriba && document.activeElement && arriba.contains(document.activeElement));
+    });
+    await esperarA(focoDentro, 'al abrir, el foco quedó fuera de la capa', 5_000);
+    for (let vuelta = 0; vuelta < 10; vuelta += 1) {
+      await page.keyboard.press('Tab');
+      assert(await focoDentro(), `el foco se escapó de la capa en la tabulación ${vuelta + 1}`);
+    }
+
+    // --- D. Las estrellas son radios, y se eligen con el teclado -----------
+    const radios = capa(page).locator('input[type="radio"]');
+    assert(await radios.count() === 5,
+      `el selector tiene ${await radios.count()} controles y tienen que ser 5 radios`);
+    const nombresDelGrupo = await radios.evaluateAll((nodos) => [...new Set(nodos.map((n) => n.name))]);
+    assert(nombresDelGrupo.length === 1 && nombresDelGrupo[0],
+      `los radios no comparten un nombre de grupo: ${JSON.stringify(nombresDelGrupo)}`);
+    const elegido = () => capa(page).locator('input[type="radio"]:checked').inputValue();
+    assert(await elegido() === '5', `el puntaje inicial es ${await elegido()} y tiene que ser 5`);
+
+    // Las flechas mueven la selección: es lo que un `span` no puede hacer.
+    await capa(page).locator('input[type="radio"]:checked').focus();
+    await page.keyboard.press('ArrowLeft');
+    await esperarA(async () => (await elegido()) === '4',
+      `con la flecha izquierda el puntaje quedó en ${await elegido()}`, 5_000);
+    await page.keyboard.press('ArrowLeft');
+    await esperarA(async () => (await elegido()) === '3',
+      `con la segunda flecha el puntaje quedó en ${await elegido()}`, 5_000);
+    medidos.push('cinco radios con nombre de grupo, puntaje inicial 5 y flechas que cambian la elección');
+
+    capturas.push(await guardarCaptura(page, CAPTURAS, 'calificacion-dialogo-1440x900'));
+
+    // --- E. FORM-DIRTY-1 en el límite de la capa ---------------------------
+    //
+    // Con algo cambiado, cerrar pregunta. Seguir editando conserva lo elegido.
+    const pregunta = () => page.getByRole('dialog').filter({ hasText: 'Tenés cambios sin guardar' });
+    await page.keyboard.press('Escape');
+    await pregunta().waitFor({ state: 'visible', timeout: 10_000 });
+    await pregunta().getByRole('button', { name: 'Seguir editando' }).click();
+    await pregunta().waitFor({ state: 'detached', timeout: 10_000 });
+    assert(await capa(page).isVisible(), 'seguir editando cerró la calificación igual');
+    assert(await elegido() === '3', `seguir editando no conservó el puntaje: quedó ${await elegido()}`);
+    medidos.push('con el puntaje cambiado, Escape pregunta y seguir editando conserva lo elegido');
+
+    // Y descartar cierra, una sola vez.
+    await page.keyboard.press('Escape');
+    await pregunta().waitFor({ state: 'visible', timeout: 10_000 });
+    await pregunta().getByRole('button', { name: 'Descartar cambios' }).click();
+    await capa(page).waitFor({ state: 'detached', timeout: 10_000 });
+    assert((await pregunta().count()) === 0, 'la pregunta quedó abierta después de descartar');
+    // El foco vuelve a quien abrió la capa.
+    assert(await disparador.evaluate((el) => el === document.activeElement),
+      'al cerrar, el foco no volvió al botón que abrió la calificación');
+
+    // Un formulario intacto cierra directo, sin preguntar.
+    await disparador.click();
+    await capa(page).waitFor({ state: 'visible', timeout: 15_000 });
+    await page.keyboard.press('Escape');
+    await capa(page).waitFor({ state: 'detached', timeout: 10_000 });
+    assert((await pregunta().count()) === 0,
+      'sin nada escrito, cerrar preguntó igual: la guarda estaría preguntando de más');
+    medidos.push('descartar cierra una vez y devuelve el foco; sin cambios cierra directo');
+
+    // --- E bis. La capa en 390 px, sobre esta misma orden ------------------
+    //
+    // Va ANTES de calificar y no después, que es lo que la hacía inmedible: una
+    // vez calificada, la orden ya no ofrece el botón y no hay capa que abrir.
+    // La versión anterior de este caso resolvía eso con un `else` que guardaba
+    // igual un archivo llamado `calificacion-dialogo-390x844.png` —capturando
+    // Mis compras a medio cargar— y lo contaba como captura. Eso no es medir:
+    // es fabricar evidencia. Si acá no abre la capa, el caso falla.
+    const angosto = await abrirCuenta(390, 844);
+    await irAMisCompras(angosto.page);
+    const filaAngosta = angosto.page.locator('[class*="orderCard"]')
+      .filter({ hasText: numeroVisible }).first();
+    await filaAngosta.waitFor({ state: 'visible', timeout: 25_000 });
+    await filaAngosta.getByRole('button', { name: /Calificar Vendedor/i })
+      .click({ timeout: 20_000 });
+    await capa(angosto.page).waitFor({ state: 'visible', timeout: 15_000 });
+
+    const nombreAngosto = await capa(angosto.page).getAttribute('aria-labelledby');
+    assert(nombreAngosto,
+      'en 390 px la capa no declara nombre accesible');
+    const tituloAngosto = (await angosto.page.locator(`#${nombreAngosto}`).innerText()).trim();
+    assert(tituloAngosto.includes('Calificar'),
+      `en 390 px el nombre de la capa es ${JSON.stringify(tituloAngosto)}`);
+    assert(await angosto.page.locator(`#${nombreAngosto}`).isVisible(),
+      'en 390 px el nombre de la capa no se ve');
+    const desborde = await angosto.page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert(desborde <= 0, `en 390 px la pantalla desborda ${desborde} px a lo ancho`);
+    // Y la capa entra en la ventana: no alcanza con que el documento no
+    // desborde si la tarjeta se sale por un costado.
+    const caja = await capa(angosto.page).boundingBox();
+    assert(caja && caja.x >= 0 && caja.x + caja.width <= 390,
+      `en 390 px la capa ocupa de ${caja && Math.round(caja.x)} a `
+      + `${caja && Math.round(caja.x + caja.width)} px`);
+    capturas.push(await guardarCaptura(angosto.page, CAPTURAS, 'calificacion-dialogo-390x844'));
+    medidos.push('en 390 px la capa abre sobre la orden propia, con nombre visible y sin desborde');
+    await angosto.contexto.close();
+
+    // --- F. Enviar: mientras viaja no se puede cerrar ni repetir -----------
+    //
+    // Entre el clic y la respuesta hay una ventana. Si algo cerrara la capa ahí,
+    // la pantalla diría que no pasó nada y la calificación se guardaría igual.
+    // La única forma de medirlo es RETENER la solicitud: un clic y esperar a que
+    // la capa desaparezca no prueba nada, porque la ventana dura milisegundos.
+    let intentos = 0;
+    let soltarElPrimerIntento = null;
+    await page.route('**/api/ratings/', async (ruta) => {
+      if (ruta.request().method() !== 'POST') return ruta.fallback();
+      intentos += 1;
+      if (intentos === 1) {
+        // El primero se retiene y después se contesta con un fallo controlado.
+        await new Promise((seguir) => { soltarElPrimerIntento = seguir; });
+        return ruta.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'Fallo simulado por smoke' }),
+        });
+      }
+      // El reintento sí llega al servidor de verdad.
+      return ruta.continue();
+    });
+
+    posts = [];
+    await disparador.click();
+    await capa(page).waitFor({ state: 'visible', timeout: 15_000 });
+    await capa(page).getByLabel('Comentario (opcional)').fill('Todo bien, llegó en fecha.');
+    const botonEnviar = capa(page).getByRole('button', { name: /Enviar|Enviando/i });
+    await botonEnviar.click();
+    await esperarA(async () => soltarElPrimerIntento !== null,
+      'la calificación nunca salió', 15_000);
+
+    // Con la solicitud en vuelo: ninguna salida cierra y nada se puede repetir.
+    for (const [comoSeLlama, salir] of [
+      ['Escape', async () => page.keyboard.press('Escape')],
+      ['el fondo', async () => capa(page).locator('xpath=..')
+        .click({ position: { x: 8, y: 8 }, force: true })],
+    ]) {
+      await salir();
+      await page.waitForTimeout(300);
+      assert(await capa(page).isVisible(),
+        `con la calificación en vuelo, ${comoSeLlama} cerró la capa`);
+      // Y no alcanza con que siga visible: con algo escrito, una salida que NO
+      // respetara el envío en curso abriría la pregunta de cambios sin guardar
+      // y la capa seguiría ahí detrás, así que mirar sólo si está visible daría
+      // verde por el motivo equivocado —se midió—. Con el envío en vuelo la
+      // salida no tiene que hacer nada en absoluto.
+      assert((await page.getByRole('dialog')
+        .filter({ hasText: 'Tenés cambios sin guardar' }).count()) === 0,
+      `con la calificación en vuelo, ${comoSeLlama} llegó hasta la pregunta de salida`);
+    }
+    for (const cual of ['Cerrar', 'Cancelar']) {
+      assert(await capa(page).getByRole('button', { name: cual }).isDisabled(),
+        `con la calificación en vuelo, «${cual}» sigue habilitado`);
+    }
+    assert(await botonEnviar.isDisabled(),
+      'con la calificación en vuelo, el botón de enviar sigue habilitado: se podría duplicar');
+    assert(posts.length === 1,
+      `con una sola en vuelo ya salieron ${posts.length} solicitudes: ${JSON.stringify(posts)}`);
+    medidos.push('con la calificación en vuelo no cierra por Escape ni por el fondo, '
+      + 'Cerrar/Cancelar/Enviar quedan deshabilitados y no sale una segunda solicitud');
+
+    // --- F bis. El fallo se ve, y no se lleva lo escrito -------------------
+    soltarElPrimerIntento();
+    const aviso = capa(page).locator('[role="alert"]');
+    await aviso.waitFor({ state: 'visible', timeout: 20_000 });
+    assert(await capa(page).isVisible(), 'con el envío fallado la capa se cerró igual');
+    assert((await aviso.innerText()).trim().length > 0, 'el aviso de error está vacío');
+    assert(await capa(page).locator('input[type="radio"]:checked').inputValue() === '5',
+      'el fallo se llevó puesto el puntaje elegido');
+    assert((await capa(page).getByLabel('Comentario (opcional)').inputValue())
+      === 'Todo bien, llegó en fecha.', 'el fallo se llevó puesto el comentario escrito');
+    for (const cual of ['Cerrar', 'Cancelar']) {
+      assert(!(await capa(page).getByRole('button', { name: cual }).isDisabled()),
+        `después del fallo, «${cual}» quedó deshabilitado`);
+    }
+    assert(!(await botonEnviar.isDisabled()), 'después del fallo no se puede reintentar');
+    medidos.push('el envío fallado deja la capa abierta, el error a la vista, lo escrito intacto '
+      + 'y los controles otra vez disponibles');
+
+    // --- F ter. El reintento deliberado, que sí guarda ---------------------
+    await botonEnviar.click();
+    await capa(page).waitFor({ state: 'detached', timeout: 25_000 });
+    assert(posts.length === 2,
+      `salieron ${posts.length} solicitudes: una fallada y un reintento son dos, `
+      + `y cualquier otra cosa es una duplicación: ${JSON.stringify(posts)}`);
+    assert(intentos === 2, `el interceptor vio ${intentos} intentos y tienen que ser dos`);
+    await page.unroute('**/api/ratings/');
+
+    const [[cuantas, promedio]] = queryRows(`
+      SELECT COUNT(*)::text, COALESCE(ROUND(AVG(score)::numeric, 2), 0)::text
+      FROM ratings WHERE order_id = ${sqlLiteral(ordenId)}
+    `);
+    assert(cuantas === '1',
+      `la base guardó ${cuantas} calificaciones para esa orden: el intento fallado no puede `
+      + 'haber dejado fila');
+    assert(promedio === '5.00', `el puntaje guardado es ${promedio} y se envió 5`);
+    medidos.push('dos intentos —uno fallado y un reintento— dejan UNA sola fila con su puntaje');
+
+    // --- G. Y no se puede volver a calificar, ni recargando ---------------
+    //
+    // Éste es el defecto que se veía: el botón volvía porque la memoria se iba
+    // con el montaje. Ahora lo decide el servidor.
+    const yaNo = await apiRequest(`/ratings/order/${ordenId}/can-rate`, { token: state.buyerToken });
+    assert(yaNo.data.can_rate === false,
+      `el servidor sigue diciendo que se puede calificar: ${JSON.stringify(yaNo.data)}`);
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByRole('heading', { name: 'Mi cuenta', level: 1 })
+      .waitFor({ state: 'visible', timeout: 25_000 });
+    await irAMisCompras(page);
+    // La ausencia se afirma sobre LA orden calificada, no sobre la pantalla.
+    //
+    // Corriendo solo, la única compra entregada es la de este caso y mirar toda
+    // la página daba lo mismo. Con otros casos antes hay más compras entregadas
+    // y sin calificar, que muestran el botón con todo derecho: la afirmación
+    // global se caía por el motivo equivocado.
+    const filaDeLaOrden = page.locator('[class*="orderCard"]')
+      .filter({ hasText: numeroVisible }).first();
+    await filaDeLaOrden.waitFor({ state: 'visible', timeout: 25_000 });
+    await esperarA(async () => (await filaDeLaOrden.getByRole('button', { name: /Calificar Vendedor/i })
+      .count()) === 0,
+    'después de recargar, «Calificar vendedor» volvió a aparecer para la orden ya calificada',
+    15_000);
+    medidos.push('recargada la página, el botón no vuelve: lo decide el servidor y no una memoria');
+
+    // Y el perfil ahora sí muestra estrellas de verdad —las del vendedor—.
+    await contexto.close();
+
+    // --- G bis. Si no se sabe, no se ofrece --------------------------------
+    //
+    // Con la consulta caída, la pantalla no puede ofrecer «Calificar vendedor»:
+    // sería prometer una acción que el servidor puede rechazar. Dice que no
+    // pudo comprobarlo y ofrece reintentar.
+    const caido = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const paginaCaida = await caido.newPage();
+    // Un interruptor adentro del interceptor, en vez de quitarlo después:
+    // `unroute` no garantiza que la próxima consulta ya pase, y este caso
+    // necesita saber exactamente cuándo la red vuelve.
+    let consultaCaida = true;
+    await paginaCaida.route('**/api/ratings/order/**/can-rate',
+      (ruta) => (consultaCaida ? ruta.abort() : ruta.continue()));
+    await paginaCaida.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await paginaCaida.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+    await paginaCaida.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    await paginaCaida.getByPlaceholder('tu@email.com').fill(state.buyerCredentials.email);
+    await paginaCaida.getByPlaceholder('••••••••').fill(state.buyerCredentials.password);
+    await paginaCaida.locator('[class*="_submitButton_"][type="submit"]').click();
+    await paginaCaida.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 25_000 });
+    await paginaCaida.getByRole('button', { name: 'Mi cuenta' }).first().click();
+    await paginaCaida.getByRole('heading', { name: 'Mi cuenta', level: 1 })
+      .waitFor({ state: 'visible', timeout: 25_000 });
+    await irAMisCompras(paginaCaida);
+    await paginaCaida.getByText(/No pudimos comprobar si podés calificar/)
+      .first().waitFor({ state: 'visible', timeout: 25_000 });
+    assert((await botonDeCalificar(paginaCaida).count()) === 0,
+      'con la consulta caída se ofrece calificar igual: se estaría adivinando la elegibilidad');
+    const reintentos = paginaCaida.getByRole('button', { name: 'Reintentar' });
+    await reintentos.first().waitFor({ timeout: 10_000 });
+    // Y al reintentar con la consulta viva, resuelve.
+    //
+    // Se reintenta CADA orden que quedó sin saber, no la primera. Corriendo
+    // solo hay una sola compra entregada y alcanzaba con una; con otros casos
+    // antes hay varias, y entonces «ya no queda ninguna sin saber» no se
+    // cumplía nunca. Era un caso que pasaba aislado y fallaba acompañado.
+    consultaCaida = false;
+    await esperarA(async () => {
+      const sinSaber = await reintentos.count();
+      if (sinSaber === 0) return true;
+      await reintentos.first().click();
+      return false;
+    }, 'el reintento no resolvió el estado desconocido', 30_000);
+    medidos.push('con la consulta caída no se ofrece calificar: se dice que no se pudo y el reintento resuelve');
+    await caido.close();
+
+    // --- H. El perfil del vendedor dibuja las estrellas -------------------
+    const vendedor = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const paginaVendedor = await vendedor.newPage();
+    await paginaVendedor.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await paginaVendedor.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+    await paginaVendedor.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    await paginaVendedor.getByPlaceholder('tu@email.com').fill('vendedor@ejemplo.com');
+    await paginaVendedor.getByPlaceholder('••••••••').fill('vendedor123');
+    await paginaVendedor.locator('[class*="_submitButton_"][type="submit"]').click();
+    await paginaVendedor.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 25_000 });
+    await paginaVendedor.getByRole('button', { name: 'Mi cuenta' }).first().click();
+    await paginaVendedor.getByRole('heading', { name: 'Mi cuenta', level: 1 })
+      .waitFor({ state: 'visible', timeout: 25_000 });
+
+    const reputacion = paginaVendedor.locator('[role="img"][aria-label*="de 5"]').first();
+    await reputacion.waitFor({ state: 'visible', timeout: 20_000 });
+    const dibujo = (await reputacion.innerText()).trim();
+    assert(/[★☆]/.test(dibujo),
+      `la reputación no dibuja ninguna estrella: ${JSON.stringify(dibujo)}`);
+    assert((dibujo.match(/[★☆]/g) || []).length === 5,
+      `la reputación dibuja ${(dibujo.match(/[★☆]/g) || []).length} estrellas y tienen que ser 5`);
+    const etiqueta = await reputacion.getAttribute('aria-label');
+    assert(/de 5/.test(etiqueta) && /calificaci/i.test(etiqueta),
+      `la descripción accesible no dice promedio y cantidad: ${JSON.stringify(etiqueta)}`);
+    // Y no se dice dos veces: lo de adentro está marcado como decorativo.
+    const repetido = await reputacion.locator(':scope > *:not([aria-hidden="true"])').count();
+    assert(repetido === 0,
+      `la reputación tiene ${repetido} partes que el lector diría además de la descripción`);
+    capturas.push(await guardarCaptura(paginaVendedor, CAPTURAS, 'perfil-reputacion-1440x900'));
+    medidos.push('el perfil dibuja cinco estrellas y una sola descripción «X de 5, N calificaciones»');
+    await vendedor.close();
+
+  } finally {
+    await browser.close();
+  }
+
+  return 'la reputación se dibuja y se anuncia una sola vez; la elegibilidad la decide el '
+    + 'servidor por UUID y sobrevive a recargar; el selector son radios operables con el '
+    + `teclado dentro de una capa con nombre, foco y guarda; ${medidos.join('; ')}. `
+    + `${capturas.length} capturas en ${CAPTURAS}`;
+});
+
+// ---------------------------------------------------------------------------
+// 166. QUOTE-CONTACT-1 — la cotización llega con su publicación, y el correo
+// no miente.
+//
+// Dos cosas rotas, y las dos de la misma familia: el producto afirmaba algo que
+// no era cierto.
+//
+//  1. «Solicitar cotización» llevaba a Contacto y NADA más. La persona llegaba
+//     a un formulario en blanco y tenía que volver a explicar de qué
+//     publicación estaba hablando —o mandar una consulta que del otro lado no
+//     se entiende—. El CTA prometía continuidad y no la daba.
+//  2. Y el botón decía «Enviar por Email»: llamaba a `window.open` con un
+//     `mailto:`, declaraba ÉXITO y vaciaba el formulario. `window.open` con un
+//     `mailto:` no informa si se abrió un cliente, así que la pantalla afirmaba
+//     un envío que nadie vio; y si no se abría, el texto ya no estaba.
+//
+// Lo que se mide es eso: que el asunto y el mensaje lleguen nombrando la
+// publicación y al vendedor exactos, que una entrada genérica NO herede nada, y
+// que preparar el correo no declare resultado ni borre lo escrito.
+// ---------------------------------------------------------------------------
+await runCase(166, 'La cotización llega a Contacto con su publicación, y preparar el correo no declara un envío', async () => {
+  const medidos = [];
+
+  // Una publicación sin precio publicado es la que ofrece «Solicitar
+  // cotización»: se lee de la base para no escribir su nombre a mano.
+  const [aCotizar] = queryRows(`
+    SELECT p.name, u.full_name
+    FROM products p JOIN users u ON u.id = p.seller_id
+    WHERE p.status = 'ACTIVE' AND (p.price IS NULL OR p.price = 0)
+    ORDER BY p.name LIMIT 1
+  `);
+  assert(aCotizar, 'no hay ninguna publicación a cotizar: el caso no se puede medir');
+  const [otraACotizar] = queryRows(`
+    SELECT p.name, u.full_name
+    FROM products p JOIN users u ON u.id = p.seller_id
+    WHERE p.status = 'ACTIVE' AND (p.price IS NULL OR p.price = 0)
+      AND p.name <> ${sqlLiteral(aCotizar[0])}
+    ORDER BY p.name LIMIT 1
+  `);
+  assert(otraACotizar, 'hace falta una segunda publicación a cotizar para probar el reemplazo');
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+
+    // Ni `window.open` ni ningún envío se dan por hecho: se registran.
+    const aperturas = [];
+    await page.addInitScript(() => {
+      window.__aperturas = [];
+      const original = window.open;
+      window.open = (url, ...resto) => {
+        window.__aperturas.push(String(url));
+        // Se devuelve `null` a propósito: es lo que devuelve un navegador sin
+        // cliente de correo configurado, que es justamente el caso en el que la
+        // pantalla no puede saber nada y antes afirmaba éxito igual.
+        void original;
+        void resto;
+        return null;
+      };
+    });
+    const leerAperturas = () => page.evaluate(() => window.__aperturas.slice());
+    const enviosAlBackend = [];
+    page.on('request', (pedido) => {
+      if (pedido.method() === 'POST' && /\/api\/contact/.test(pedido.url())) {
+        enviosAlBackend.push(pedido.url());
+      }
+    });
+
+    const irAlMercado = async () => {
+      await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+      await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 20_000 });
+    };
+    const buscar = async (nombre) => {
+      await page.getByLabel('Buscar en el mercado').fill(nombre);
+      await page.getByLabel('Buscar en el mercado').press('Enter');
+      await page.getByRole('heading', { name: nombre, exact: true, level: 3 })
+        .first().waitFor({ state: 'visible', timeout: 25_000 });
+    };
+    const seccion = () => new URL(page.url()).searchParams.get('section') || 'home';
+    const asunto = () => page.getByLabel('Asunto *').inputValue();
+    const mensaje = () => page.getByLabel(/Mensaje/).inputValue();
+    const enContacto = async () => {
+      await esperarA(async () => seccion() === 'contact',
+        `no se llegó a Contacto: la barra dice ${page.url()}`, 20_000);
+      await page.getByRole('heading', { name: /Envianos tu Consulta/i })
+        .waitFor({ state: 'visible', timeout: 20_000 });
+    };
+
+    // --- A. Desde la TARJETA ------------------------------------------------
+    await irAlMercado();
+    await buscar(aCotizar[0]);
+    const tarjeta = page.getByRole('heading', { name: aCotizar[0], exact: true, level: 3 })
+      .first().locator('xpath=ancestor::*[contains(@class,"card")]');
+    await tarjeta.getByRole('button', { name: 'Solicitar cotización' }).click();
+    await enContacto();
+
+    // El asunto no alcanza con que sea «el de cotización»: tiene que NOMBRAR la
+    // publicación y al vendedor. Es lo primero que se lee del otro lado, y un
+    // rótulo genérico obliga a abrir el cuerpo para saber de qué se trata.
+    const textoDelAsunto = async () => {
+      const elegido = await page.getByLabel('Asunto *').inputValue();
+      if (!elegido) return '';
+      return (await page.getByLabel('Asunto *')
+        .locator(`option[value="${elegido}"]`).innerText()).trim();
+    };
+    const asuntoVisible = await textoDelAsunto();
+    assert(asuntoVisible.includes(aCotizar[0]) && asuntoVisible.includes(aCotizar[1]),
+      `el asunto visible no nombra publicación y vendedor: ${JSON.stringify(asuntoVisible)}`);
+    const desdeLaTarjeta = await mensaje();
+    assert(desdeLaTarjeta.includes(aCotizar[0]),
+      `el mensaje no nombra la publicación: ${JSON.stringify(desdeLaTarjeta)}`);
+    assert(desdeLaTarjeta.includes(aCotizar[1]),
+      `el mensaje no nombra al vendedor «${aCotizar[1]}»: ${JSON.stringify(desdeLaTarjeta)}`);
+    // Y NO se completan los datos de quien escribe: inventarlos sería peor que
+    // dejarlos vacíos.
+    for (const campo of ['Nombre Completo *', 'Email *']) {
+      assert((await page.getByLabel(campo).inputValue()) === '',
+        `Contacto completó «${campo}» sin que la persona lo escribiera`);
+    }
+    medidos.push('desde la tarjeta, Contacto llega con asunto de cotización y el mensaje '
+      + 'nombrando publicación y vendedor, y sin inventar los datos de quien escribe');
+
+    // --- B. Desde el DETALLE ------------------------------------------------
+    await irAlMercado();
+    await buscar(aCotizar[0]);
+    await page.getByRole('heading', { name: aCotizar[0], exact: true, level: 3 }).first().click();
+    const detalle = page.getByRole('heading', { name: aCotizar[0], exact: true, level: 2 });
+    await detalle.waitFor({ state: 'visible', timeout: 20_000 });
+    // Acotado al detalle: la tarjeta que quedó DEBAJO tiene su propio botón con
+    // el mismo nombre, y «el primero» encontraba ése —tapado por la capa, así
+    // que el clic no llegaba nunca—.
+    const capaDelDetalle = detalle.locator('xpath=ancestor::div[contains(@class,"modal")]');
+    await capaDelDetalle.getByRole('button', { name: 'Solicitar cotización' }).click();
+    await enContacto();
+    const desdeElDetalle = await mensaje();
+    assert(desdeElDetalle.includes(aCotizar[0]) && desdeElDetalle.includes(aCotizar[1]),
+      `desde el detalle el mensaje no nombra publicación y vendedor: ${JSON.stringify(desdeElDetalle)}`);
+    assert(desdeElDetalle === desdeLaTarjeta,
+      'la tarjeta y el detalle preparan mensajes distintos para la misma publicación');
+    medidos.push('desde el detalle llega el mismo mensaje que desde la tarjeta');
+
+    // --- C. Contacto genérico sigue genérico --------------------------------
+    //
+    // Entrar por el pie después de haber pedido una cotización no puede heredar
+    // nada: una consulta de otro tema no arranca hablando de una publicación
+    // que la persona miró hace diez minutos.
+    await page.locator('footer').getByRole('link', { name: /Contacto/i }).first().click();
+    await enContacto();
+    assert((await asunto()) === '',
+      `entrando por el pie el asunto vino cargado: ${JSON.stringify(await asunto())}`);
+    assert((await mensaje()) === '',
+      `entrando por el pie el mensaje vino cargado: ${JSON.stringify(await mensaje())}`);
+    medidos.push('entrar a Contacto por el pie no hereda la cotización anterior');
+
+    // --- D. Una publicación nueva reemplaza a la anterior -------------------
+    await irAlMercado();
+    await buscar(otraACotizar[0]);
+    const otraTarjeta = page.getByRole('heading', { name: otraACotizar[0], exact: true, level: 3 })
+      .first().locator('xpath=ancestor::*[contains(@class,"card")]');
+    await otraTarjeta.getByRole('button', { name: 'Solicitar cotización' }).click();
+    await enContacto();
+    const segundoMensaje = await mensaje();
+    assert(segundoMensaje.includes(otraACotizar[0]),
+      `el mensaje no nombra la segunda publicación: ${JSON.stringify(segundoMensaje)}`);
+    assert(!segundoMensaje.includes(aCotizar[0]),
+      `el mensaje mezcla las dos publicaciones: ${JSON.stringify(segundoMensaje)}`);
+    medidos.push('una publicación nueva reemplaza a la anterior, sin mezclarlas');
+
+    // --- D bis. Dos publicaciones que se llaman IGUAL -----------------------
+    //
+    // Es el caso que rompe identificar por nombre: el mismo servicio ofrecido
+    // por dos personas distintas. Si la identidad fuera el título, pasar de una
+    // a la otra no reemplazaría nada y la pantalla seguiría nombrando al
+    // vendedor de la primera. Se fabrican las dos, con el mismo nombre y
+    // vendedores distintos.
+    const gemela = `Servicio homónimo ${Date.now()}`;
+    const [[categoriaGemela]] = queryRows(`
+      SELECT id FROM categories WHERE is_active = true ORDER BY name LIMIT 1
+    `);
+    const [[localidadGemela]] = queryRows('SELECT id FROM localities ORDER BY id LIMIT 1');
+    await asegurarSesiones();
+    const publicarGemela = async (token) => (await apiRequest('/products', {
+      method: 'POST',
+      token,
+      body: {
+        name: gemela,
+        description: 'Dos publicaciones con el mismo nombre y distinto vendedor.',
+        category_id: categoriaGemela,
+        price: 0,
+        stock: 0,
+        unit: 'servicio',
+        locality_id: localidadGemela,
+        publication_type: 'servicio',
+        operation_kind: 'servicio',
+        pricing_type: 'a_convenir',
+        availability: 'inmediata',
+        response_time: '24h',
+        coverage_zones: ['Buenos Aires'],
+      },
+    })).data;
+    const gemelaA = await publicarGemela(state.sellerToken);
+    const gemelaB = await publicarGemela(state.buyerToken);
+    const nombreDe = (id) => queryRows(
+      `SELECT u.full_name FROM products p JOIN users u ON u.id = p.seller_id
+       WHERE p.id = ${sqlLiteral(id)}`)[0][0];
+    const vendedorA = nombreDe(gemelaA.id);
+    const vendedorB = nombreDe(gemelaB.id);
+    assert(vendedorA !== vendedorB,
+      `las dos publicaciones homónimas quedaron del mismo vendedor (${vendedorA})`);
+
+    try {
+      const pedirDesde = async (cual) => {
+        await irAlMercado();
+        await buscar(gemela);
+        const tarjetaGemela = page.locator('article, [class*="card"]')
+          .filter({ hasText: gemela })
+          .filter({ hasText: cual })
+          .first();
+        await tarjetaGemela.waitFor({ state: 'visible', timeout: 25_000 });
+        await tarjetaGemela.getByRole('button', { name: 'Solicitar cotización' }).click();
+        await enContacto();
+      };
+
+      await pedirDesde(vendedorA);
+      const conA = await mensaje();
+      assert(conA.includes(vendedorA),
+        `la primera homónima no nombra a ${vendedorA}: ${JSON.stringify(conA)}`);
+
+      await pedirDesde(vendedorB);
+      const conB = await mensaje();
+      assert(conB.includes(vendedorB),
+        `la segunda homónima no reemplazó al vendedor: sigue diciendo `
+        + `${JSON.stringify(conB.slice(0, 140))}`);
+      assert(!conB.includes(vendedorA),
+        `con dos publicaciones del mismo nombre quedó el vendedor de la primera: `
+        + `${JSON.stringify(conB.slice(0, 140))}`);
+      medidos.push('dos publicaciones con el mismo nombre y distinto vendedor: la segunda '
+        + 'reemplaza a la primera, así que la identidad no es el título');
+    } finally {
+      for (const [id, token] of [[gemelaA.id, state.sellerToken], [gemelaB.id, state.buyerToken]]) {
+        await apiRequest(`/products/${id}`, { method: 'DELETE', token }).catch(() => {});
+      }
+    }
+
+    // Se vuelve a la publicación con la que sigue el resto del caso.
+    await irAlMercado();
+    await buscar(otraACotizar[0]);
+    await page.getByRole('heading', { name: otraACotizar[0], exact: true, level: 3 })
+      .first().locator('xpath=ancestor::*[contains(@class,"card")]')
+      .getByRole('button', { name: 'Solicitar cotización' }).click();
+    await enContacto();
+
+    // --- E. Abrir en mi correo: prepara, y no afirma nada -------------------
+    assert((await page.getByRole('button', { name: 'Abrir en mi correo' }).count()) === 1,
+      'el botón no dice «Abrir en mi correo»');
+    await page.getByLabel('Nombre Completo *').fill('Ana Prueba');
+    await page.getByLabel('Email *').fill('ana@example.com');
+
+    const antesDeAbrir = {
+      nombre: await page.getByLabel('Nombre Completo *').inputValue(),
+      email: await page.getByLabel('Email *').inputValue(),
+      asunto: await asunto(),
+      mensaje: await mensaje(),
+    };
+    await page.getByRole('button', { name: 'Abrir en mi correo' }).click();
+    await esperarA(async () => (await leerAperturas()).length === 1,
+      'no se preparó ningún correo', 15_000);
+
+    const [correo] = await leerAperturas();
+    assert(correo.startsWith('mailto:'), `lo que se abrió no es un correo: ${correo}`);
+    // Codificado de verdad: sin esto un salto de línea o un `&` cortan el
+    // `mailto:` por la mitad.
+    const url = new URL(correo);
+    const parametros = new URLSearchParams(url.search);
+    const cuerpo = parametros.get('body') || '';
+    const asuntoDelCorreo = parametros.get('subject') || '';
+    assert(cuerpo.includes(otraACotizar[0]) && cuerpo.includes(otraACotizar[1]),
+      `el correo no lleva publicación y vendedor en el cuerpo: ${JSON.stringify(cuerpo.slice(0, 160))}`);
+    assert(asuntoDelCorreo.includes(otraACotizar[0]) && asuntoDelCorreo.includes(otraACotizar[1]),
+      `el ASUNTO del correo no nombra publicación y vendedor: ${JSON.stringify(asuntoDelCorreo)}`);
+    assert(!/[\n\r]/.test(url.search),
+      'el asunto o el cuerpo viajan sin codificar: un salto de línea corta el mailto');
+
+    // No se afirma que se envió ni que se abrió: no se puede saber.
+    const textoDeLaPantalla = (await page.locator('main, body').first().innerText())
+      .replace(/\s+/g, ' ');
+    // Comparación textual, sin `\b`.
+    //
+    // La versión anterior usaba `/\bse abrió\b/i` y NO detectaba nada: en una
+    // expresión regular de JavaScript `\b` se apoya en `\w`, que es ASCII, así
+    // que después de una «ó» no hay borde de palabra y el patrón no casa jamás.
+    // Decía prohibir una frase que no podía ver.
+    const FRASES_PROHIBIDAS = [
+      'se abrió', 'se abrio', 'enviado', 'se envió', 'se envio',
+      'Enviar por Email', 'Preparamos el mensaje', 'Si no se abrió',
+    ];
+    const enMinusculas = textoDeLaPantalla.toLowerCase();
+    for (const mentira of FRASES_PROHIBIDAS) {
+      assert(!enMinusculas.includes(mentira.toLowerCase()),
+        `la pantalla afirma un resultado que no puede conocer: dice «${mentira}»`);
+    }
+    // Y la ayuda que sí corresponde está.
+    assert(enMinusculas.includes('revisá y enviá el mensaje desde tu aplicación de correo')
+      || enMinusculas.includes('revisa y envia el mensaje desde tu aplicacion de correo'),
+    `no quedó la instrucción neutral: ${JSON.stringify(textoDeLaPantalla.slice(0, 200))}`);
+    // Y lo escrito sigue ahí, que es lo que permite copiarlo o reintentar.
+    assert((await page.getByLabel('Nombre Completo *').inputValue()) === antesDeAbrir.nombre
+      && (await page.getByLabel('Email *').inputValue()) === antesDeAbrir.email
+      && (await asunto()) === antesDeAbrir.asunto
+      && (await mensaje()) === antesDeAbrir.mensaje,
+    'preparar el correo se llevó puesto lo que la persona había escrito');
+    medidos.push('«Abrir en mi correo» prepara UN mailto codificado con publicación y vendedor, '
+      + 'no declara envío y no borra lo escrito');
+
+    // --- F. WhatsApp hereda el mismo contexto -------------------------------
+    await page.getByRole('button', { name: /WhatsApp/i }).first().click();
+    await esperarA(async () => (await leerAperturas()).length === 2,
+      'WhatsApp no preparó nada', 15_000);
+    const [, porWhatsApp] = await leerAperturas();
+    assert(/wa\.me/.test(porWhatsApp), `lo segundo que se abrió no es WhatsApp: ${porWhatsApp}`);
+    const textoDeWhatsApp = decodeURIComponent(
+      new URL(porWhatsApp).searchParams.get('text') || '');
+    assert(textoDeWhatsApp.includes(otraACotizar[0]) && textoDeWhatsApp.includes(otraACotizar[1]),
+      `WhatsApp no hereda la cotización: ${JSON.stringify(textoDeWhatsApp.slice(0, 160))}`);
+    assert((await mensaje()) === antesDeAbrir.mensaje,
+      'WhatsApp se llevó puesto el mensaje escrito');
+    medidos.push('WhatsApp reutiliza el mismo contexto y tampoco borra nada');
+
+    // --- G. Y no se abrió ningún canal que no existe ------------------------
+    assert(enviosAlBackend.length === 0,
+      `salieron ${enviosAlBackend.length} envíos a /contact: ese canal no está conectado `
+      + 'en esta pieza y prometerlo sería peor que no ofrecerlo');
+    medidos.push('no sale ningún POST a /contact: el canal público sigue sin conectarse');
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+  }
+
+  return `desde la tarjeta y desde el detalle, «Solicitar cotización» llega a Contacto con `
+    + `la publicación y el vendedor nombrados; una entrada genérica no hereda nada y una `
+    + `publicación nueva reemplaza a la anterior; preparar el correo abre un solo mailto `
+    + `codificado, no declara envío y conserva lo escrito; ${medidos.join('; ')}`;
+});
+
+// ---------------------------------------------------------------------------
+// 167. FILTER-INTENT-1 — la URL que no existe no inventa un mercado vacío, y
+// la intención de publicar sobrevive al ingreso.
+//
+// Dos afirmaciones falsas y una intención perdida:
+//
+//  1. Con una categoría o una provincia inexistente en la URL, el Mercado
+//     hacía `return` ANTES de consultar y la grilla decía «No hay operaciones
+//     con estos filtros». Nadie preguntó nada: la pantalla contestaba por la
+//     API. El parámetro inválido además se quedaba en la barra, así que
+//     recargar y compartir repetían la mentira.
+//  2. Ese mismo `return` corría mientras los catálogos venían en camino, así
+//     que una URL con filtros VÁLIDOS también pasaba por el cartel de cero
+//     antes de mostrar sus resultados.
+//  3. Publicar sin sesión avisaba y abría el Login, y ahí terminaba: al
+//     volver había que encontrar otra vez el botón. La intención se perdía
+//     justo donde la persona ya había dicho qué quería hacer.
+//
+// Lo que se mide: que el filtro inválido se descarte SOLO y se vaya de la
+// barra, que los válidos queden, que salga una consulta y que la grilla
+// dibuje su respuesta; que un catálogo auxiliar caído se diga y se pueda
+// reintentar en vez de atribuirle al mercado un cero que nadie midió; y que
+// cada CTA de publicación de Inicio y Servicios abra el Login real y retome el
+// formulario si —y sólo si— la persona entra, sin escribir nada por el camino.
+//
+// R6 SÍ está acá, y la primera versión de este caso no lo tenía por un error
+// mío: informé que el borde no se reproducía porque medí «¿aparece el aviso sin
+// Login?» —el mecanismo que me había imaginado— en vez de «¿queda la persona en
+// un callejón?», que es lo que R6 describe. La respuesta a la segunda era que
+// sí, y estaba escrita en mi propio informe: el Checkout abre igual y falla una
+// pantalla después. Que el fallo llegue más tarde no lo hace más chico; llega
+// con el trabajo ya hecho.
+// ---------------------------------------------------------------------------
+await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o comprar retoman después de ingresar', async () => {
+  const medidos = [];
+  const FRASE_DE_CERO = 'No hay operaciones con estos filtros';
+
+  // Los nombres válidos salen del MISMO catálogo que mira la aplicación: una
+  // lista escrita a mano acá envejece con la base y termina probando otra cosa.
+  const categorias = await apiRequest('/catalog/categories?include_empty=true');
+  const provincias = await apiRequest('/catalog/localities/provinces');
+  assert(Array.isArray(categorias.data) && categorias.data.length,
+    'no hay categorías en el catálogo: el caso no se puede medir');
+  assert(Array.isArray(provincias.data) && provincias.data.length,
+    'no hay provincias en el catálogo: el caso no se puede medir');
+  // La categoría válida y el tipo que la acompaña salen de la base y juntos: la
+  // primera de la lista puede no tener ninguna publicación del tipo que se pida,
+  // y entonces el caso mediría un cero legítimo creyendo que mide el falso.
+  const [conCategoria] = queryRows(`
+    SELECT c.name, p.publication_type::text, COUNT(*)::text
+    FROM products p JOIN categories c ON c.id = p.category_id
+    WHERE p.status = 'ACTIVE'
+    GROUP BY c.name, p.publication_type
+    ORDER BY COUNT(*) DESC, c.name LIMIT 1
+  `);
+  assert(conCategoria, 'ninguna publicación activa tiene categoría: el caso no se puede medir');
+  const categoriaValida = conCategoria[0];
+  const tipoValido = conCategoria[1] === 'servicio' ? 'servicios' : 'productos';
+  assert(categorias.data.some((categoria) => categoria.name === categoriaValida),
+    `la categoría con más publicaciones («${categoriaValida}») no está en el catálogo`);
+  // Una provincia que tenga publicaciones, para que su consulta se distinga de
+  // la consulta sin filtrar y no dé lo mismo mirar una u otra.
+  const [conPublicaciones] = queryRows(`
+    SELECT l.province_name, COUNT(*)::text
+    FROM products p JOIN localities l ON l.id = p.locality_id
+    WHERE p.status = 'ACTIVE'
+    GROUP BY l.province_name ORDER BY COUNT(*) DESC, l.province_name LIMIT 1
+  `);
+  assert(conPublicaciones, 'ninguna publicación activa tiene provincia: el caso no se puede medir');
+  const provinciaValida = conPublicaciones[0];
+  assert(provincias.data.some((provincia) => provincia.name === provinciaValida),
+    `la provincia con más publicaciones («${provinciaValida}») no está en el catálogo de provincias`);
+
+  const CATEGORIA_INVENTADA = 'Categoría Que No Existe 167';
+  const PROVINCIA_INVENTADA = 'Provincia Que No Existe 167';
+  assert(!categorias.data.some((categoria) => categoria.name === CATEGORIA_INVENTADA)
+    && !provincias.data.some((provincia) => provincia.name === PROVINCIA_INVENTADA),
+  'los nombres inventados del caso existen de verdad en el catálogo');
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    // === A. La URL inválida ================================================
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+
+    // El cartel de cero se vigila en CADA mutación del documento y no al final:
+    // el vacío falso que esta pieza vino a sacar dura lo que tarda una consulta,
+    // y mirar una sola vez, después, lo deja pasar entero.
+    await page.addInitScript((frase) => {
+      window.__cerosVistos = 0;
+      const mirar = () => {
+        if (document.body && document.body.innerText.includes(frase)) window.__cerosVistos += 1;
+      };
+      const arrancar = () => {
+        mirar();
+        new MutationObserver(mirar)
+          .observe(document.body, { childList: true, subtree: true, characterData: true });
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', arrancar);
+      } else {
+        arrancar();
+      }
+    }, FRASE_DE_CERO);
+
+    const consultas = [];
+    page.on('request', (pedido) => {
+      if (/\/catalog\/products\?/.test(pedido.url())) {
+        consultas.push(new URL(pedido.url()).searchParams);
+      }
+    });
+
+    const filtrosDeLaBarra = () => {
+      const parametros = new URL(page.url()).searchParams;
+      const filtros = {};
+      for (const [clave, valor] of parametros) {
+        if (clave !== 'section') filtros[clave] = valor;
+      }
+      return filtros;
+    };
+    const cerosVistos = () => page.evaluate(() => window.__cerosVistos);
+    const tarjetas = () => page.locator('article[class*="card"]').count();
+
+    const entrarAlMercado = async (consulta) => {
+      consultas.length = 0;
+      await page.goto(`${FRONTEND_URL}/?section=marketplace&${consulta}`,
+        { waitUntil: 'domcontentloaded' });
+      await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 25_000 });
+    };
+
+    for (const escenario of [
+      {
+        nombre: 'categoría inexistente',
+        consulta: `category=${encodeURIComponent(CATEGORIA_INVENTADA)}`
+          + `&province=${encodeURIComponent(provinciaValida)}&in_stock=true`,
+        seVa: 'category',
+        quedan: { province: provinciaValida, in_stock: 'true' },
+      },
+      {
+        nombre: 'provincia inexistente',
+        consulta: `province=${encodeURIComponent(PROVINCIA_INVENTADA)}`
+          + `&category=${encodeURIComponent(categoriaValida)}&type=${tipoValido}`,
+        seVa: 'province',
+        quedan: { category: categoriaValida, type: tipoValido },
+      },
+    ]) {
+      await entrarAlMercado(escenario.consulta);
+
+      // La consulta sale. Antes no salía ninguna, que es de donde venía el cero.
+      await esperarA(async () => consultas.length > 0,
+        `con ${escenario.nombre} no salió ninguna consulta al catálogo`, 25_000);
+      await esperarA(async () => (await tarjetas()) > 0,
+        `con ${escenario.nombre} la grilla no dibujó la respuesta de la API`, 25_000);
+
+      // El parámetro inválido se fue de la barra y los válidos quedaron.
+      const enLaBarra = filtrosDeLaBarra();
+      assert(!(escenario.seVa in enLaBarra),
+        `el filtro inválido siguió en la barra: ${JSON.stringify(enLaBarra)}`);
+      for (const [clave, valor] of Object.entries(escenario.quedan)) {
+        assert(enLaBarra[clave] === valor,
+          `con ${escenario.nombre} se perdió el filtro válido ${clave}=${valor}: `
+          + JSON.stringify(enLaBarra));
+      }
+
+      // Y NINGUNA de las consultas llevó lo inventado.
+      for (const parametros of consultas) {
+        assert(parametros.get('category') !== CATEGORIA_INVENTADA
+          && parametros.get('province') !== PROVINCIA_INVENTADA,
+        `una consulta viajó con el filtro inventado: ${parametros.toString()}`);
+      }
+
+      // La última consulta es la que describe lo que se está mirando, y la
+      // grilla dibuja exactamente esa respuesta: no una versión recortada de
+      // otra consulta anterior.
+      const ultima = consultas[consultas.length - 1];
+      const respuesta = await apiRequest(`/catalog/products?${ultima.toString()}`);
+      const dibujadas = await tarjetas();
+      assert(dibujadas === respuesta.data.items.length,
+        `la grilla dibuja ${dibujadas} tarjetas y la API contestó `
+        + `${respuesta.data.items.length} para la misma consulta`);
+
+      // Y en ningún momento —ni un render— se afirmó que no hay nada.
+      assert(await cerosVistos() === 0,
+        `con ${escenario.nombre} la pantalla afirmó «${FRASE_DE_CERO}» sin respuesta de la API`);
+      medidos.push(`con ${escenario.nombre} en la URL se descarta sólo ese filtro, los válidos `
+        + 'quedan, sale una consulta y la grilla dibuja su respuesta, sin cartel de cero');
+    }
+
+    // Y una URL con filtros VÁLIDOS tampoco pasa por el cartel de cero mientras
+    // los catálogos vienen: era el mismo `return`, con el filtro bueno.
+    await entrarAlMercado(`category=${encodeURIComponent(categoriaValida)}`);
+    await esperarA(async () => consultas.length > 0,
+      'con una categoría válida no salió consulta', 25_000);
+    assert(await cerosVistos() === 0,
+      'con filtros válidos la pantalla pasó por «' + FRASE_DE_CERO + '» antes de la respuesta');
+    assert(filtrosDeLaBarra().category === categoriaValida,
+      'una categoría válida no sobrevivió a la validación');
+    medidos.push('una URL con filtros válidos no pasa por el cartel de cero mientras se validan');
+
+    // --- El catálogo auxiliar caído -----------------------------------------
+    // Sin catálogos no se puede saber si el filtro existe. Antes las listas
+    // quedaban vacías en silencio: TODO filtro parecía inexistente. Ahora se
+    // dice y se puede reintentar.
+    await page.route('**/catalog/categories*', (ruta) => ruta.abort());
+    await entrarAlMercado(`category=${encodeURIComponent(categoriaValida)}`);
+    const aviso = page.getByRole('alert');
+    await aviso.waitFor({ state: 'visible', timeout: 25_000 });
+    const textoDelAviso = (await aviso.innerText()).trim();
+    assert(/filtros del mercado/i.test(textoDelAviso),
+      `el fallo del catálogo auxiliar no se explica: ${JSON.stringify(textoDelAviso)}`);
+    assert(await cerosVistos() === 0,
+      `con el catálogo auxiliar caído la pantalla afirmó «${FRASE_DE_CERO}»`);
+    assert(await page.getByRole('button', { name: 'Reintentar' }).count() === 1,
+      'el fallo del catálogo auxiliar no ofrece reintentar');
+    assert(consultas.length === 0,
+      `sin catálogos salieron ${consultas.length} consultas: no se puede validar lo que se pide`);
+    // Y el filtro NO se descartó: no se descarta lo que no se pudo validar.
+    assert(filtrosDeLaBarra().category === categoriaValida,
+      'sin catálogos el filtro se descartó igual: eso es validar sin catálogo');
+
+    await page.unroute('**/catalog/categories*');
+    await page.getByRole('button', { name: 'Reintentar' }).click();
+    await esperarA(async () => (await tarjetas()) > 0,
+      'reintentar no trajo el mercado de vuelta', 25_000);
+    assert(await cerosVistos() === 0,
+      `reintentar pasó por «${FRASE_DE_CERO}»`);
+    medidos.push('un catálogo auxiliar caído se dice, no descarta filtros y se puede reintentar');
+    await contexto.close();
+
+    // === B. Publicar retoma después de ingresar ============================
+    const publicacionesAntes = queryCount("SELECT COUNT(*) FROM products");
+    const ordenesAntes = queryCount('SELECT COUNT(*) FROM orders');
+    const stockAntes = queryCount("SELECT COALESCE(SUM(stock), 0) FROM products WHERE status = 'ACTIVE'");
+
+    const enElCarrito = (pagina) => pagina.evaluate(() => {
+      for (const clave of Object.keys(window.localStorage)) {
+        if (!/cart|carrito/i.test(clave)) continue;
+        try {
+          const guardado = JSON.parse(window.localStorage.getItem(clave) || 'null');
+          if (Array.isArray(guardado)) return guardado.length;
+          if (guardado && Array.isArray(guardado.items)) return guardado.items.length;
+        } catch { /* si no es JSON no es el carrito */ }
+      }
+      return 0;
+    });
+
+    const escrituras = [];
+    const vigilarEscrituras = (pagina) => {
+      pagina.on('request', (pedido) => {
+        if (pedido.method() === 'GET' || !/\/api\//.test(pedido.url())) return;
+        if (/\/auth\//.test(pedido.url())) return;
+        escrituras.push(`${pedido.method()} ${new URL(pedido.url()).pathname}`);
+      });
+    };
+
+    const publicador = (pagina) => pagina.getByRole('dialog', { name: 'Publicar' });
+    const login = (pagina) => pagina.getByRole('dialog', { name: 'Ingresar' });
+    const carrito = (pagina) => pagina.getByRole('dialog', { name: 'Mi carrito' });
+    const checkout = (pagina) => pagina.getByRole('dialog', { name: 'Checkout' });
+    // Qué capa hay arriba. Un `waitFor` que se vence dice «se venció» y nada
+    // más; acá lo que hace falta saber cuando algo no aparece es QUÉ apareció
+    // en su lugar, que es exactamente el defecto que se está midiendo.
+    const capasAbiertas = async (pagina) => {
+      const nombres = [];
+      for (const capa of await pagina.getByRole('dialog').all()) {
+        nombres.push((await capa.getAttribute('aria-label')) ?? '(sin nombre)');
+      }
+      return nombres;
+    };
+    // Qué credenciales hay guardadas, y qué dice de la sesión la cabecera. Las
+    // dos cosas se miran igual antes y después: lo que se mide es que NO
+    // cambien cuando el motivo del tropiezo no fue la sesión.
+    const credencialesGuardadas = (pagina) => pagina.evaluate(() =>
+      Object.keys(localStorage).filter((clave) => /token/i.test(clave)).sort());
+    const laCabeceraDice = (pagina) => pagina.locator('header button').allInnerTexts();
+    const esperarLaCapa = async (pagina, cual, porQue) => {
+      await esperarA(async () => (await cual(pagina).count()) === 1,
+        `${porQue}; lo que hay abierto es ${JSON.stringify(await capasAbiertas(pagina))}`,
+        25_000);
+    };
+
+    // El publicador se cuenta en cada mutación del documento, y no mirando si
+    // está ahí cuando a este caso se le ocurre mirar.
+    //
+    // Mirar después no alcanza, y está medido: `AddProductModal` tiene su
+    // propia guarda —sin sesión avisa y se cierra sola—, así que un publicador
+    // abierto indebidamente aparece y desaparece en el mismo suspiro. Con una
+    // sola lectura, quitarle a esta pieza la condición de «sólo si entró» daba
+    // VERDE igual: el caso no probaba nada de lo que dice probar.
+    const vigilarElPublicador = (pagina) => pagina.addInitScript(() => {
+      window.__publicadorAbierto = 0;
+      const mirar = () => {
+        if (document.querySelector('[role="dialog"][aria-label="Publicar"]')) {
+          window.__publicadorAbierto += 1;
+        }
+      };
+      const arrancar = () => {
+        mirar();
+        new MutationObserver(mirar).observe(document.body, { childList: true, subtree: true });
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', arrancar);
+      } else {
+        arrancar();
+      }
+    });
+    const vecesQueSeAbrio = (pagina) => pagina.evaluate(() => window.__publicadorAbierto);
+    const olvidarAperturas = (pagina) => pagina.evaluate(() => { window.__publicadorAbierto = 0; });
+
+    // Y los avisos, igual: se juntan todos los que pasaron, no el que esté en
+    // pantalla cuando este caso mire.
+    //
+    // Hace falta porque el vigía del publicador NO alcanza, y también está
+    // medido: `AddProductModal` decide sin sesión ANTES de dibujar nada —se
+    // cierra durante su propio render—, así que abrirlo indebidamente no deja
+    // ni un nodo en el documento. Lo único que queda es el aviso que tira al
+    // cerrarse. Quitarle a esta pieza la condición de «sólo si entró» daba
+    // VERDE con el vigía del publicador puesto; con esto, no.
+    const vigilarLosAvisos = (pagina) => pagina.addInitScript(() => {
+      window.__avisos = [];
+      const mirar = () => {
+        for (const nodo of document.querySelectorAll('[role="status"]')) {
+          const texto = (nodo.innerText || '').replace(/\s+/g, ' ').trim();
+          if (texto && !window.__avisos.includes(texto)) window.__avisos.push(texto);
+        }
+      };
+      const arrancar = () => {
+        mirar();
+        new MutationObserver(mirar)
+          .observe(document.body, { childList: true, subtree: true, characterData: true });
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', arrancar);
+      } else {
+        arrancar();
+      }
+    });
+    const avisosVistos = (pagina) => pagina.evaluate(() => window.__avisos.slice());
+    const olvidarAvisos = (pagina) => pagina.evaluate(() => { window.__avisos = []; });
+    const ingresar = async (pagina, clave) => {
+      await login(pagina).getByLabel(/^Email/).fill('vendedor@ejemplo.com');
+      await login(pagina).getByLabel(/^Contraseña/).fill(clave);
+      await login(pagina).getByRole('button', { name: 'Ingresar', exact: true }).click();
+    };
+
+    for (const pantalla of [
+      { seccion: 'home', cta: 'Publicar una oferta', aviso: 'Iniciá sesión para publicar una oferta' },
+      { seccion: 'services', cta: 'Publicar un servicio', aviso: 'Iniciá sesión para publicar un servicio' },
+      // Quiénes somos entró después: era la pantalla que había quedado con el
+      // Login sin continuidad —y sin aviso— cuando las otras dos ya lo habían
+      // dejado. Está en la lista para que no vuelva a quedarse atrás sola.
+      { seccion: 'about', cta: 'Comenzar a Vender', aviso: 'Iniciá sesión para publicar una oferta' },
+    ]) {
+      // Todos los CTA de publicación de la pantalla, no uno elegido a mano: si
+      // mañana aparece otro por un camino distinto, este caso lo recorre solo.
+      const cuantosCta = await (async () => {
+        const contextoContado = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+        const pagina = await contextoContado.newPage();
+        await pagina.goto(`${FRONTEND_URL}/?section=${pantalla.seccion}`,
+          { waitUntil: 'domcontentloaded' });
+        await pagina.getByRole('button', { name: pantalla.cta }).first()
+          .waitFor({ state: 'visible', timeout: 25_000 });
+        const cuantos = await pagina.getByRole('button', { name: pantalla.cta }).count();
+        await contextoContado.close();
+        return cuantos;
+      })();
+      assert(cuantosCta > 0, `en ${pantalla.seccion} no hay ningún CTA «${pantalla.cta}»`);
+
+      for (let indice = 0; indice < cuantosCta; indice += 1) {
+        const suContexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+        const pagina = await suContexto.newPage();
+        vigilarEscrituras(pagina);
+        await vigilarElPublicador(pagina);
+        await vigilarLosAvisos(pagina);
+        await pagina.goto(`${FRONTEND_URL}/?section=${pantalla.seccion}`,
+          { waitUntil: 'domcontentloaded' });
+        const ctas = pagina.getByRole('button', { name: pantalla.cta });
+        await ctas.nth(indice).waitFor({ state: 'visible', timeout: 25_000 });
+        await ctas.nth(indice).click();
+
+        // Sin sesión: el Login REAL de la aplicación, con su aviso en voseo.
+        await login(pagina).waitFor({ state: 'visible', timeout: 20_000 });
+        const avisoVisible = (await avisosVistos(pagina)).join(' | ');
+        assert(avisoVisible.includes(pantalla.aviso),
+          `el aviso del CTA ${indice + 1} de ${pantalla.seccion} no es «${pantalla.aviso}»: `
+          + JSON.stringify(avisoVisible));
+        assert(await vecesQueSeAbrio(pagina) === 0,
+          `el CTA ${indice + 1} de ${pantalla.seccion} abrió el publicador sin sesión`);
+
+        // Cancelar: vuelve a la pantalla, no abre nada y NO DICE NADA. Que no
+        // diga nada es lo que se puede ver desde afuera: quien cancela un
+        // ingreso que pidió no necesita que le expliquen su propia decisión, y
+        // cualquier aviso acá delata que algo intentó seguir sin sesión.
+        //
+        // El aviso anterior se saca de pantalla antes de poner el contador en
+        // cero: mientras siga dibujado, cada mutación del documento lo vuelve a
+        // registrar y el cero no dura. Se cierra por su propio botón —no se
+        // espera a que caduque— y se comprueba que efectivamente se fue.
+        for (const cerrarAviso of await pagina.locator('[role="status"] button').all()) {
+          await cerrarAviso.click();
+        }
+        await esperarA(async () => (await pagina.locator('[role="status"] button').count()) === 0,
+          'el aviso anterior no se fue de la pantalla', 15_000);
+        await olvidarAvisos(pagina);
+        await login(pagina).getByRole('button', { name: 'Cerrar' }).click();
+        await esperarA(async () => (await pagina.getByRole('dialog').count()) === 0,
+          `cancelar el ingreso dejó una capa abierta en ${pantalla.seccion}`, 15_000);
+        assert(await vecesQueSeAbrio(pagina) === 0,
+          `cancelar el ingreso abrió el publicador en ${pantalla.seccion}`);
+        const dichoAlCancelar = await avisosVistos(pagina);
+        assert(dichoAlCancelar.length === 0,
+          `cancelar el ingreso en ${pantalla.seccion} dijo algo: ${JSON.stringify(dichoAlCancelar)}`);
+
+        // Y la intención NO queda pegada: un ingreso genérico desde la cabecera
+        // no puede heredar una publicación que se canceló.
+        await olvidarAperturas(pagina);
+        await pagina.locator('header').getByRole('button', { name: 'Ingresar', exact: true }).click();
+        await ingresar(pagina, 'vendedor123');
+        await esperarA(async () => (await pagina.locator('header')
+          .getByRole('button', { name: 'Vender' }).count()) === 1,
+        'el ingreso genérico no llegó a abrir sesión', 25_000);
+        assert(await vecesQueSeAbrio(pagina) === 0,
+          `en ${pantalla.seccion}, un ingreso genérico posterior heredó la publicación cancelada`);
+        await suContexto.close();
+      }
+      medidos.push(`los ${cuantosCta} CTA de publicación de ${pantalla.seccion} abren el Login real `
+        + `con el aviso «${pantalla.aviso}»; cancelar no abre nada y el ingreso genérico posterior `
+        + 'no hereda la intención');
+
+      // --- Credencial fallida, y después la buena ---------------------------
+      const conFallo = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const paginaFallo = await conFallo.newPage();
+      vigilarEscrituras(paginaFallo);
+      await vigilarElPublicador(paginaFallo);
+      await vigilarLosAvisos(paginaFallo);
+      const carritoAlEmpezar = await (async () => {
+        await paginaFallo.goto(`${FRONTEND_URL}/?section=${pantalla.seccion}`,
+          { waitUntil: 'domcontentloaded' });
+        return enElCarrito(paginaFallo);
+      })();
+      await paginaFallo.getByRole('button', { name: pantalla.cta }).first().click();
+      await login(paginaFallo).waitFor({ state: 'visible', timeout: 20_000 });
+      await ingresar(paginaFallo, 'esta-clave-no-es-la-de-nadie');
+      await login(paginaFallo).getByRole('alert').waitFor({ state: 'visible', timeout: 20_000 });
+      assert(await vecesQueSeAbrio(paginaFallo) === 0,
+        `una credencial fallida abrió el publicador en ${pantalla.seccion}`);
+      const dichoAlFallar = (await avisosVistos(paginaFallo)).join(' | ');
+      assert(!/sesi[oó]n para publicar|Debes iniciar sesi/i.test(dichoAlFallar.slice(
+        dichoAlFallar.indexOf(pantalla.aviso) + pantalla.aviso.length)),
+      `tras la credencial fallida ${pantalla.seccion} volvió a pedir sesión para publicar: `
+      + JSON.stringify(dichoAlFallar));
+      assert(await login(paginaFallo).count() === 1,
+        `una credencial fallida cerró el ingreso en ${pantalla.seccion}`);
+
+      // Sin cerrar el ingreso, la credencial buena: el publicador se abre solo,
+      // sin un segundo clic en el CTA.
+      await login(paginaFallo).getByLabel(/^Contraseña/).fill('vendedor123');
+      await login(paginaFallo).getByRole('button', { name: 'Ingresar', exact: true }).click();
+      await publicador(paginaFallo).waitFor({ state: 'visible', timeout: 25_000 });
+      assert(await publicador(paginaFallo).count() === 1,
+        `el publicador se abrió ${await publicador(paginaFallo).count()} veces en ${pantalla.seccion}`);
+      // Y se abrió PORQUE entró, no desde antes: hasta el ingreso bueno, cero.
+      assert(await vecesQueSeAbrio(paginaFallo) > 0,
+        `el publicador está en pantalla pero el vigía no lo vio abrirse en ${pantalla.seccion}`);
+      assert(await login(paginaFallo).count() === 0,
+        `el ingreso quedó apilado debajo del publicador en ${pantalla.seccion}`);
+      assert(await enElCarrito(paginaFallo) === carritoAlEmpezar,
+        `ingresar cambió el carrito en ${pantalla.seccion}`);
+      await conFallo.close();
+      medidos.push(`en ${pantalla.seccion} una credencial fallida no abre el publicador y la buena `
+        + 'lo abre una sola vez, sin un segundo clic');
+
+      // --- Login ↔ Registro no pierde la intención; el alta no la ejecuta ----
+      const conSalto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const paginaSalto = await conSalto.newPage();
+      vigilarEscrituras(paginaSalto);
+      await vigilarElPublicador(paginaSalto);
+      await vigilarLosAvisos(paginaSalto);
+      await paginaSalto.goto(`${FRONTEND_URL}/?section=${pantalla.seccion}`,
+        { waitUntil: 'domcontentloaded' });
+      await paginaSalto.getByRole('button', { name: pantalla.cta }).first().click();
+      await login(paginaSalto).waitFor({ state: 'visible', timeout: 20_000 });
+      await paginaSalto.getByRole('button', { name: 'Registrate acá' }).click();
+      await paginaSalto.getByRole('heading', { name: 'Crear Cuenta' })
+        .waitFor({ state: 'visible', timeout: 20_000 });
+      assert(await paginaSalto.getByRole('dialog').count() === 1,
+        'el salto a Registro apiló una capa más');
+
+      // El alta de verdad: no abre sesión, así que tampoco abre el publicador.
+      const correoNuevo = `publicar.167.${Date.now()}@example.com`;
+      await paginaSalto.locator('input[name="name"]').fill('Alta Sin Sesión 167');
+      await paginaSalto.locator('input[name="email"]').fill(correoNuevo);
+      await paginaSalto.locator('input[name="phone"]').fill('+54 11 5555 1670');
+      await paginaSalto.locator('input[name="password"]').fill('Clave167Inventada');
+      await paginaSalto.locator('form input[type="password"]').nth(1).fill('Clave167Inventada');
+      await paginaSalto.getByRole('button', { name: 'Crear cuenta' }).click();
+      await esperarA(async () => (await paginaSalto.locator('[role="status"]').allInnerTexts())
+        .join(' ').includes(correoNuevo),
+      'el alta no llegó a confirmarse', 25_000);
+      assert(await vecesQueSeAbrio(paginaSalto) === 0,
+        `el alta abrió el publicador sola en ${pantalla.seccion}`);
+      assert(await paginaSalto.locator('header')
+        .getByRole('button', { name: 'Vender' }).count() === 0,
+      'el alta abrió sesión: no es lo que declara el producto');
+
+      // Y volviendo al ingreso, la intención sigue viva. El rótulo es el de la
+      // pantalla de alta hecha: «Iniciá sesión» es el del formulario, y después
+      // del alta ese formulario ya no está.
+      await paginaSalto.getByRole('button', { name: 'Ir a iniciar sesión' }).click();
+      await login(paginaSalto).waitFor({ state: 'visible', timeout: 20_000 });
+      await ingresar(paginaSalto, 'vendedor123');
+      await publicador(paginaSalto).waitFor({ state: 'visible', timeout: 25_000 });
+      medidos.push(`en ${pantalla.seccion}, ir a Registro y volver no pierde la intención, y el `
+        + 'alta no abre sesión ni el publicador por sí sola');
+      await conSalto.close();
+    }
+
+    // === C. R6: la sesión se comprueba ANTES de abrir el Checkout ==========
+    //
+    // Informé que R6 no se reproducía y me equivoqué: refuté el mecanismo que
+    // me había imaginado —«el aviso sin Login»— en vez del síntoma que R6
+    // describe. El callejón existe y es peor por dónde aparece. Con la sesión
+    // ya vencida, «Continuar compra» abría el Checkout igual, porque
+    // `isAuthenticated` se quedó con lo que sabía al entrar; la persona
+    // completaba nombre, teléfono, provincia y localidad, apretaba «Continuar
+    // al pago» y recién ahí se encontraba con «Sesión expirada», sin Login.
+    //
+    // Se miden los dos casos por separado, porque son dos respuestas
+    // distintas: la sesión que se puede renovar no tiene que interrumpir nada,
+    // y la que no, tiene que ofrecer ingresar.
+    {
+      const conSesion = async (pagina) => {
+        await pagina.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+        await pagina.locator('header').getByRole('button', { name: 'Ingresar', exact: true }).click();
+        await login(pagina).getByLabel(/^Email/).fill('cliente@ejemplo.com');
+        await login(pagina).getByLabel(/^Contraseña/).fill('cliente123');
+        await login(pagina).getByRole('button', { name: 'Ingresar', exact: true }).click();
+        await pagina.locator('header').getByRole('button', { name: /Carrito/ })
+          .waitFor({ state: 'visible', timeout: 25_000 });
+      };
+      const conElCarritoAbierto = async (pagina) => {
+        await pagina.locator('article[class*="card"]')
+          .getByRole('button', { name: 'Agregar al carrito' }).first().click({ timeout: 25_000 });
+        await esperarA(async () => (await enElCarrito(pagina)) > 0,
+          'no se pudo dejar nada en el carrito', 20_000);
+        await pagina.locator('header').getByRole('button', { name: /Carrito/ }).click();
+        await carrito(pagina).waitFor({ state: 'visible', timeout: 20_000 });
+      };
+      // Vencer la sesión es escribirle encima al token, que es lo que hace el
+      // tiempo. El refresh se deja bueno o se rompe según lo que se mida.
+      const vencerLaSesion = (pagina, tambienElRefresh) => pagina.evaluate((romperRefresh) => {
+        localStorage.setItem('access_token', 'este.token.ya.no.vale');
+        if (romperRefresh) localStorage.setItem('refresh_token', 'este.tampoco.vale');
+      }, tambienElRefresh);
+
+      // --- C1. El access venció, pero el refresh sirve: no se interrumpe ----
+      const recuperable = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const paginaRecuperable = await recuperable.newPage();
+      vigilarEscrituras(paginaRecuperable);
+      await conSesion(paginaRecuperable);
+      await conElCarritoAbierto(paginaRecuperable);
+      await vencerLaSesion(paginaRecuperable, false);
+      const itemsRecuperable = await enElCarrito(paginaRecuperable);
+      await carrito(paginaRecuperable).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarLaCapa(paginaRecuperable, checkout,
+        'con el access vencido y el refresh válido no se llegó al Checkout: la sesión se podía '
+        + 'renovar sin molestar a nadie');
+      assert(await login(paginaRecuperable).count() === 0,
+        'con el refresh todavía válido se pidió ingresar de nuevo: eso es interrumpir por '
+        + 'la mecánica de los tokens, que no es asunto de quien compra');
+      assert(await enElCarrito(paginaRecuperable) === itemsRecuperable,
+        'renovar la sesión cambió el carrito');
+      await recuperable.close();
+      medidos.push('con el access vencido y el refresh válido, «Continuar compra» renueva y abre '
+        + 'el Checkout sin pedir nada');
+
+      // --- C1b. No se pudo comprobar: eso NO es una sesión vencida ----------
+      //
+      // La primera corrección metió un defecto peor que el que arreglaba:
+      // `asegurarSesion` atrapaba CUALQUIER error de `/auth/me`, borraba los dos
+      // tokens y ofrecía ingresar. Medido: con `/auth/me` en 503, `localStorage`
+      // quedaba sin ningún token y aparecía el Login. Una caída de dos segundos
+      // le cerraba la sesión a alguien que la tenía perfectamente válida.
+      //
+      // Se mide con el Backend caído de verdad —la respuesta se reemplaza en el
+      // navegador— y no rompiendo el token, porque el punto es justamente que un
+      // token bueno no se toque.
+      const caido = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const paginaCaida = await caido.newPage();
+      vigilarEscrituras(paginaCaida);
+      await conSesion(paginaCaida);
+      await conElCarritoAbierto(paginaCaida);
+      const tokensAntes = await credencialesGuardadas(paginaCaida);
+      const itemsCaida = await enElCarrito(paginaCaida);
+      const identidadAntes = await laCabeceraDice(paginaCaida);
+      assert(tokensAntes.length > 0 && itemsCaida > 0,
+        'el caso no puede medir la caída sin sesión ni carrito');
+
+      let backendCaido = true;
+      await paginaCaida.route('**/auth/me', (ruta) => {
+        if (!backendCaido) return ruta.continue();
+        return ruta.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'Service Unavailable' }),
+        });
+      });
+
+      const explicacion = carrito(paginaCaida).getByRole('alert');
+      // Se espera a que el producto decida ALGO y recién ahí se mira QUÉ decidió.
+      // Esperar sólo la explicación estaba mal: cuando la decisión era la
+      // equivocada —ofrecer ingresar— el caso igual se vencía, y el rojo decía
+      // «no explicó nada» en vez de «ofreció ingresar por un 503», que es otra
+      // cosa. Un rojo que nombra mal el defecto manda a arreglar lo que no es.
+      const yaDecidio = async (pagina) => (await explicacion.count()) === 1
+        || (await login(pagina).count()) === 1
+        || (await checkout(pagina).count()) === 1;
+
+      await carrito(paginaCaida).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarA(() => yaDecidio(paginaCaida),
+        'con el servidor caído el carrito no hizo nada: ni explicó, ni ofreció ingresar, '
+        + 'ni siguió', 25_000);
+
+      // Lo que NO tiene que pasar, primero: es lo que estaba roto.
+      assert(await login(paginaCaida).count() === 0,
+        'una caída del servidor terminó ofreciendo ingresar: un 503 no dice nada de la '
+        + 'sesión, y tratarlo como un vencimiento cierra sesiones que estaban bien');
+      assert(await checkout(paginaCaida).count() === 0,
+        'una caída del servidor abrió el Checkout');
+      assert(await carrito(paginaCaida).count() === 1,
+        `la caída cerró el carrito; lo que hay abierto es ${JSON.stringify(await capasAbiertas(paginaCaida))}`);
+
+      // Y lo que sí: decir que no se pudo comprobar. NO que venció.
+      assert(await explicacion.count() === 1,
+        'con el servidor caído el carrito no explicó por qué no se pudo seguir');
+      const textoDeLaCaida = (await explicacion.innerText()).trim();
+      assert(!/expir|venci|venció/i.test(textoDeLaCaida),
+        'la caída se explicó como sesión vencida, que es un diagnóstico inventado: '
+        + JSON.stringify(textoDeLaCaida));
+      assert(await carrito(paginaCaida).getByRole('button', { name: /^Quitar/ }).count()
+        === itemsCaida, 'la caída se llevó puesto lo que había en el carrito');
+      const tokensDespues = await credencialesGuardadas(paginaCaida);
+      assert(JSON.stringify(tokensDespues) === JSON.stringify(tokensAntes),
+        `la caída tocó las credenciales: ${JSON.stringify(tokensAntes)} -> `
+        + JSON.stringify(tokensDespues));
+      assert(JSON.stringify(await laCabeceraDice(paginaCaida)) === JSON.stringify(identidadAntes),
+        'la caída bajó la identidad de alguien que sigue teniendo sesión');
+
+      // Y cuando el otro lado vuelve, el MISMO botón alcanza.
+      backendCaido = false;
+      await carrito(paginaCaida).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarLaCapa(paginaCaida, checkout,
+        'con el servidor de vuelta, el mismo botón no pudo reintentar');
+      await caido.close();
+      medidos.push('un 503 al comprobar la sesión conserva carrito, credenciales e identidad, '
+        + 'explica sin afirmar que venció, no abre nada, y el mismo botón reintenta cuando el '
+        + 'servidor vuelve');
+
+      // --- C1c. El que se cae es el refresh, no `/auth/me` ------------------
+      //
+      // El mismo defecto, un nivel más abajo y por otro camino: el access token
+      // vencido es legítimo, se sale a renovar, y el que contesta 503 es
+      // `/auth/refresh`. `refreshAccessToken` tiraba los tokens ante CUALQUIER
+      // tropiezo —incluido ese—, así que el refresh perfectamente válido se
+      // perdía por una caída de dos segundos. No se alcanza desde C1b, que
+      // interrumpe antes: hace falta su propio recorrido.
+      //
+      // Se prueban DOS estados y no uno, y el segundo es el que importa acá: el
+      // 503 ya pasaba con la regla vieja —«del 500 para arriba es una caída»—,
+      // así que un caso con 503 solo no distinguía nada. El 429 es un servidor
+      // pidiendo que esperes, no una credencial rechazada, y con la regla vieja
+      // tiraba los tokens igual. Sólo un rechazo explícito es un rechazo.
+      for (const estadoDelRefresco of [503, 429]) {
+      const refrescoCaido = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const paginaRefresco = await refrescoCaido.newPage();
+      vigilarEscrituras(paginaRefresco);
+      await conSesion(paginaRefresco);
+      await conElCarritoAbierto(paginaRefresco);
+      const tokensDelRefresco = await credencialesGuardadas(paginaRefresco);
+      const itemsDelRefresco = await enElCarrito(paginaRefresco);
+
+      let refrescoRoto = true;
+      await paginaRefresco.route('**/auth/refresh', (ruta) => (refrescoRoto
+        ? ruta.fulfill({
+          status: estadoDelRefresco,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'no ahora' }),
+        })
+        : ruta.continue()));
+      // El access vence de verdad; el refresh guardado sigue siendo el bueno.
+      await vencerLaSesion(paginaRefresco, false);
+
+      const explicacionDelRefresco = carrito(paginaRefresco).getByRole('alert');
+      await carrito(paginaRefresco).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarA(async () => (await explicacionDelRefresco.count()) === 1
+        || (await login(paginaRefresco).count()) === 1
+        || (await checkout(paginaRefresco).count()) === 1,
+      `con el refresh en ${estadoDelRefresco} el carrito no hizo nada`, 25_000);
+      assert(await login(paginaRefresco).count() === 0,
+        `un ${estadoDelRefresco} del refresh terminó ofreciendo ingresar, con el refresh token `
+        + 'todavía bueno: sólo un rechazo explícito de la credencial es un rechazo');
+      assert(await explicacionDelRefresco.count() === 1,
+        `un ${estadoDelRefresco} del refresh no se explicó`);
+      const trasElRefresco = await credencialesGuardadas(paginaRefresco);
+      assert(JSON.stringify(trasElRefresco) === JSON.stringify(tokensDelRefresco),
+        `un ${estadoDelRefresco} del refresh tiró las credenciales: `
+        + `${JSON.stringify(tokensDelRefresco)} -> ${JSON.stringify(trasElRefresco)}`);
+
+      // Y con el refresh de vuelta, el mismo botón renueva y sigue.
+      refrescoRoto = false;
+      await carrito(paginaRefresco).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarLaCapa(paginaRefresco, checkout,
+        `con el refresh de vuelta del ${estadoDelRefresco}, el mismo botón no pudo renovar`);
+      assert(await enElCarrito(paginaRefresco) === itemsDelRefresco,
+        'la caída del refresh cambió el carrito');
+      await refrescoCaido.close();
+      }
+      medidos.push('ni un 503 ni un 429 del refresh cierran la sesión: conservan las '
+        + 'credenciales, explican, y al volver el servidor el mismo botón renueva y sigue');
+
+      // --- C1d. La conexión se corta de verdad ------------------------------
+      //
+      // No es otro código de estado: es que no hay respuesta ninguna. `fetch`
+      // rechaza con un `TypeError`, que también es un `Error`, así que se
+      // relanzaba sin causa y más adelante se leía como sesión vencida. El 503
+      // estaba cubierto y esto no, que es el caso más común de los dos: en el
+      // campo la conexión se corta bastante más seguido que lo que se cae un
+      // servidor. Medido contra `a834ec3`: `localStorage` quedaba sin ningún
+      // token y aparecía el Login.
+      const sinRed = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const paginaSinRed = await sinRed.newPage();
+      vigilarEscrituras(paginaSinRed);
+      await conSesion(paginaSinRed);
+      await conElCarritoAbierto(paginaSinRed);
+      const tokensConRed = await credencialesGuardadas(paginaSinRed);
+      const identidadConRed = await laCabeceraDice(paginaSinRed);
+      const itemsSinRed = await enElCarrito(paginaSinRed);
+
+      let conexionCortada = true;
+      await paginaSinRed.route('**/auth/me', (ruta) => (conexionCortada
+        ? ruta.abort('connectionaborted')
+        : ruta.continue()));
+
+      const explicacionSinRed = carrito(paginaSinRed).getByRole('alert');
+      await carrito(paginaSinRed).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarA(async () => (await explicacionSinRed.count()) === 1
+        || (await login(paginaSinRed).count()) === 1
+        || (await checkout(paginaSinRed).count()) === 1,
+      'con la conexión cortada el carrito no hizo nada', 25_000);
+
+      assert(await login(paginaSinRed).count() === 0,
+        'la conexión cortada terminó ofreciendo ingresar: que no haya respuesta no dice '
+        + 'nada de la sesión, y tratarlo como un vencimiento cierra sesiones que estaban bien');
+      assert(await checkout(paginaSinRed).count() === 0,
+        'la conexión cortada abrió el Checkout');
+      assert(await carrito(paginaSinRed).count() === 1,
+        `la conexión cortada cerró el carrito; lo que hay abierto es ${JSON.stringify(await capasAbiertas(paginaSinRed))}`);
+      assert(await explicacionSinRed.count() === 1,
+        'con la conexión cortada el carrito no explicó por qué no se pudo seguir');
+      const textoSinRed = (await explicacionSinRed.innerText()).trim();
+      assert(!/expir|venci|venció/i.test(textoSinRed),
+        'la conexión cortada se explicó como sesión vencida: ' + JSON.stringify(textoSinRed));
+      const tokensSinRed = await credencialesGuardadas(paginaSinRed);
+      assert(JSON.stringify(tokensSinRed) === JSON.stringify(tokensConRed),
+        `la conexión cortada tiró las credenciales: ${JSON.stringify(tokensConRed)} -> `
+        + JSON.stringify(tokensSinRed));
+      assert(JSON.stringify(await laCabeceraDice(paginaSinRed)) === JSON.stringify(identidadConRed),
+        'la conexión cortada bajó la identidad de alguien que sigue teniendo sesión');
+      assert(await carrito(paginaSinRed).getByRole('button', { name: /^Quitar/ }).count()
+        === itemsSinRed, 'la conexión cortada se llevó puesto lo que había en el carrito');
+
+      // Y cuando vuelve, el MISMO botón alcanza.
+      conexionCortada = false;
+      await carrito(paginaSinRed).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarLaCapa(paginaSinRed, checkout,
+        'con la conexión de vuelta, el mismo botón no pudo reintentar');
+      await sinRed.close();
+      medidos.push('una conexión cortada —no otro código de estado— conserva carrito, '
+        + 'credenciales e identidad, explica sin afirmar que la sesión venció, y el mismo botón '
+        + 'reintenta cuando vuelve');
+
+      // --- C1e. Y el arranque tampoco destruye nada -------------------------
+      //
+      // Es el mismo borrado, en el peor momento: abrir el sitio con la conexión
+      // floja, o con el Backend todavía levantando, tiraba las credenciales de
+      // alguien que no había hecho nada. Se mide lo mínimo que pidió la PM —que
+      // no se destruyan— y una cosa más, porque conservarlas sólo vale si
+      // sirven: que al volver la conexión la sesión se recupere sola.
+      const arranque = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const paginaArranque = await arranque.newPage();
+      await conSesion(paginaArranque);
+      await conElCarritoAbierto(paginaArranque);
+      const tokensAlArrancar = await credencialesGuardadas(paginaArranque);
+      const itemsAlArrancar = await enElCarrito(paginaArranque);
+
+      let arranqueCortado = true;
+      await paginaArranque.route('**/auth/me', (ruta) => (arranqueCortado
+        ? ruta.abort('connectionaborted')
+        : ruta.continue()));
+      await paginaArranque.reload({ waitUntil: 'domcontentloaded' });
+      await paginaArranque.locator('header').getByRole('button', { name: 'Inicio', exact: true })
+        .waitFor({ state: 'visible', timeout: 25_000 });
+      const tokensTrasArrancar = await credencialesGuardadas(paginaArranque);
+      assert(JSON.stringify(tokensTrasArrancar) === JSON.stringify(tokensAlArrancar),
+        `arrancar sin conexión destruyó las credenciales: ${JSON.stringify(tokensAlArrancar)} -> `
+        + JSON.stringify(tokensTrasArrancar));
+
+      arranqueCortado = false;
+      await paginaArranque.reload({ waitUntil: 'domcontentloaded' });
+      await esperarA(async () => (await paginaArranque.locator('header')
+        .getByRole('button', { name: /Carrito/ }).count()) === 1,
+      'con la conexión de vuelta la sesión no se recuperó sola, así que conservar las '
+      + `credenciales no sirvió de nada; la cabecera dice ${JSON.stringify(await laCabeceraDice(paginaArranque))}`,
+      25_000);
+      assert(await enElCarrito(paginaArranque) === itemsAlArrancar,
+        'recuperar la sesión cambió el carrito');
+      await arranque.close();
+      medidos.push('arrancar con `/auth/me` interrumpido no destruye las credenciales, y al '
+        + 'volver la conexión la sesión se recupera sola con el carrito intacto');
+
+      // --- C2. La sesión no se puede recuperar: se ofrece ingresar ----------
+      const perdida = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const paginaPerdida = await perdida.newPage();
+      vigilarEscrituras(paginaPerdida);
+      await conSesion(paginaPerdida);
+      await conElCarritoAbierto(paginaPerdida);
+      await vencerLaSesion(paginaPerdida, true);
+      const itemsPerdida = await enElCarrito(paginaPerdida);
+      assert(itemsPerdida > 0, 'el caso no puede medir R6 sin un carrito con algo adentro');
+
+      await carrito(paginaPerdida).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarLaCapa(paginaPerdida, login,
+        'con la sesión vencida no se ofreció ingresar');
+      // Y lo que NO pasa: no se abre el Checkout. Es el callejón entero: sin
+      // esto la persona llega a completar sus datos antes de descubrirlo.
+      assert(await checkout(paginaPerdida).count() === 0,
+        'con la sesión vencida se abrió el Checkout igual: ahí adentro se completan datos '
+        + 'y recién después aparece «Sesión expirada», sin salida');
+      assert(await paginaPerdida.getByRole('dialog').count() === 1,
+        `se abrieron ${await paginaPerdida.getByRole('dialog').count()} capas a la vez`);
+
+      // Cancelar devuelve al carrito, con lo que había.
+      await login(paginaPerdida).getByRole('button', { name: 'Cerrar' }).click();
+      await carrito(paginaPerdida).waitFor({ state: 'visible', timeout: 20_000 });
+      assert(await enElCarrito(paginaPerdida) === itemsPerdida,
+        'cancelar el ingreso se llevó puesto el carrito');
+      assert(await carrito(paginaPerdida).getByRole('button', { name: /^Quitar/ }).count()
+        === itemsPerdida,
+      'el carrito volvió vacío a la vista aunque lo guardado siga ahí');
+      assert(await checkout(paginaPerdida).count() === 0,
+        'cancelar el ingreso abrió el Checkout');
+      // Y la cabecera deja de afirmar una sesión que ya sabemos que no existe.
+      // Informé esto como límite conocido de la corrección anterior: se tiraban
+      // las credenciales y el nombre seguía arriba, con «Vender» y «Salir» al
+      // lado. Una pantalla que ofrece salir de una sesión que no está es peor
+      // que una que no dice nada.
+      const cabeceraTrasCancelar = (await laCabeceraDice(paginaPerdida)).join(' | ');
+      assert(/Ingresar/.test(cabeceraTrasCancelar) && !/Salir/.test(cabeceraTrasCancelar),
+        'con la sesión confirmada inválida la cabecera sigue afirmando que hay una: '
+        + JSON.stringify(cabeceraTrasCancelar));
+      assert(await enElCarrito(paginaPerdida) === itemsPerdida,
+        'bajar la identidad se llevó puesto el carrito');
+
+      // Una credencial fallida no avanza, y el motivo sigue siendo el de la
+      // credencial: renovar la sesión no tiene nada que ver con equivocarse la
+      // contraseña, y confundir las dos cosas manda a la persona a otro lado.
+      await carrito(paginaPerdida).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarLaCapa(paginaPerdida, login,
+        'el segundo intento no volvió a ofrecer ingresar');
+      await login(paginaPerdida).getByLabel(/^Email/).fill('cliente@ejemplo.com');
+      await login(paginaPerdida).getByLabel(/^Contraseña/).fill('esta-clave-no-es-la-de-nadie');
+      await login(paginaPerdida).getByRole('button', { name: 'Ingresar', exact: true }).click();
+      const motivo = login(paginaPerdida).getByRole('alert');
+      await motivo.waitFor({ state: 'visible', timeout: 20_000 });
+      const textoDelMotivo = (await motivo.innerText()).trim();
+      assert(/contrase/i.test(textoDelMotivo) && !/expirad/i.test(textoDelMotivo),
+        `la credencial fallida se explicó como sesión vencida: ${JSON.stringify(textoDelMotivo)}`);
+      assert(await checkout(paginaPerdida).count() === 0,
+        'una credencial fallida abrió el Checkout');
+
+      // Y la buena lo abre UNA vez, sin volver a apretar «Continuar compra».
+      await login(paginaPerdida).getByLabel(/^Contraseña/).fill('cliente123');
+      await login(paginaPerdida).getByRole('button', { name: 'Ingresar', exact: true }).click();
+      await esperarLaCapa(paginaPerdida, checkout,
+        'un ingreso correcto no reanudó la compra: hubo que volver a apretar «Continuar compra»');
+      assert(await checkout(paginaPerdida).count() === 1,
+        `el Checkout se abrió ${await checkout(paginaPerdida).count()} veces`);
+      assert(await login(paginaPerdida).count() === 0,
+        'el ingreso quedó apilado debajo del Checkout');
+      assert(await enElCarrito(paginaPerdida) === itemsPerdida,
+        'reanudar la compra cambió el carrito');
+      await perdida.close();
+      medidos.push('con la sesión irrecuperable, «Continuar compra» ofrece ingresar y no abre el '
+        + 'Checkout; cancelar vuelve al carrito con sus ítems, la credencial fallida no avanza y '
+        + 'la buena reanuda en el Checkout una sola vez');
+    }
+
+    // Ingresar abre una pantalla y NADA más. Ni una publicación, ni una orden,
+    // ni una reserva de stock: eso lo decide la persona después, no el ingreso.
+    const indebidas = escrituras.filter((escritura) =>
+      /\/(products|orders|cart|payments)/.test(escritura));
+    assert(indebidas.length === 0,
+      `ingresar escribió sin que nadie lo pidiera: ${JSON.stringify(indebidas)}`);
+    assert(queryCount('SELECT COUNT(*) FROM products') === publicacionesAntes,
+      'ingresar creó o borró publicaciones');
+    assert(queryCount('SELECT COUNT(*) FROM orders') === ordenesAntes,
+      'ingresar creó o borró órdenes');
+    assert(queryCount("SELECT COALESCE(SUM(stock), 0) FROM products WHERE status = 'ACTIVE'")
+      === stockAntes, 'ingresar movió stock');
+    medidos.push('ingresar no publica, no crea órdenes, no reserva stock y no toca el carrito: '
+      + 'sólo abre la pantalla protegida que la persona pidió');
+
+  } finally {
+    await browser.close();
+  }
+
+  // Queda una puerta sin usar y vale decirlo acá: la rama sin sesión de
+  // `CartModal.handleCheckout` —la que avisa y no ofrece nada— sigue sin
+  // alcanzarse, porque sin sesión la cabecera ni siquiera dibuja la celda del
+  // carrito. No se toca: no hay rojo que lo justifique, y ahora tampoco hay
+  // callejón que dependa de ella.
+
+  return 'una categoría o una provincia inexistente en la URL se descartan solas, sin llevarse '
+    + 'los filtros válidos, sin quedarse en la barra y sin afirmar un mercado vacío; el catálogo '
+    + 'auxiliar caído se dice y se reintenta; cada CTA de publicación de Inicio, Servicios y '
+    + 'Quiénes somos retoma el formulario después de un ingreso correcto y sólo después; y la '
+    + 'sesión se comprueba ANTES de abrir el Checkout, así que la que se puede renovar no '
+    + `interrumpe y la que no, ofrece ingresar en vez de un callejón; ${medidos.join('; ')}`;
+});
+
+// ---------------------------------------------------------------------------
+// 168. Lo que la pantalla promete es lo que la pantalla hace.
+//
+// Cuatro familias que no tienen nada que ver entre sí salvo esto: cada una
+// decía algo que no era cierto.
+//
+//  - Buscar prometía una acción y no la tenía. Escribir disparaba la búsqueda
+//    en cada tecla —cambiaba `q`, salía a la API, redibujaba la grilla— y el
+//    botón «Buscar» imprimía una línea por consola. Dos búsquedas distintas:
+//    la que el control promete y la que ocurre.
+//  - Contacto prometía planes de comisión que no existen.
+//  - El Login no tenía salida para quien olvidó la contraseña: probar, fallar,
+//    volver a probar.
+//  - Y media aplicación tuteaba en un sitio que vosea.
+//
+// El caso no lee el código para ninguna de las cuatro: recorre las pantallas.
+// La única lectura de fuente que hay —la de la consola— es justamente para no
+// creerle a la fuente: que el `console.log` ya no esté se comprueba mirando lo
+// que el navegador imprime, no lo que el archivo dice.
+// ---------------------------------------------------------------------------
+await runCase(168, 'Buscar es una acción, Contacto no promete planes, el Login tiene salida y el sitio vosea', async () => {
+  const medidos = [];
+  const sello = Date.now();
+
+  // Una publicación con identidad propia, para que la búsqueda tenga un
+  // resultado que este caso pueda nombrar. Sin esto habría que buscar «trigo»
+  // y confiar en que el seed lo tenga: una prueba apoyada en lo que no puso.
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const [categoria] = queryRows(`
+    SELECT id, 'fin' FROM categories
+    WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const laBuscada = `Zarandaja168 ${sello}`;
+  const alta = await apiRequest('/products', {
+    method: 'POST', token: vendedor.token,
+    body: {
+      name: laBuscada,
+      description: 'Publicación del caso 168: el único resultado de una búsqueda con nombre propio.',
+      category_id: categoria[0],
+      price: 31500,
+      stock: 7,
+      unit: 'kg',
+      locality_id: localidad,
+      publication_type: 'producto',
+      operation_kind: 'insumo',
+    },
+  });
+  assert(alta.data?.id, 'no se pudo publicar la fila que la búsqueda tiene que encontrar');
+  const idDeLaBuscada = alta.data.id;
+  const [cuantas] = queryRows(`
+    SELECT COUNT(*)::text, 'fin' FROM products
+    WHERE status = 'ACTIVE' AND name ILIKE ${sqlLiteral(`%${laBuscada}%`)}`);
+  assert(cuantas[0] === '1',
+    `hay ${cuantas[0]} publicaciones activas con ese nombre: la búsqueda no tendría un resultado único`);
+
+  // Las frases que esta pieza sacó. No es una puerta sobre palabras sueltas
+  // —«Vuelve a aparecer en el catálogo» es tercera persona y está bien—: son
+  // las formas exactas que se reemplazaron, y se buscan sobre el texto que la
+  // pantalla dibujó, no sobre el archivo.
+  const TUTEO_RETIRADO = [
+    '¿No tienes cuenta?', 'Regístrate aquí', 'Contáctanos',
+    '¿Estás seguro de que quieres vaciar el carrito?', 'Agrega productos',
+    'Completa tus datos', 'Aún no tienes', 'Explora el marketplace',
+    'Publica productos', 'No tienes notificaciones', 'puedes agregar',
+    'Consultá nuestros planes',
+  ];
+  const sinTuteo = (donde, texto) => {
+    const quedan = TUTEO_RETIRADO.filter((frase) => texto.includes(frase));
+    assert(quedan.length === 0,
+      `${donde}: quedó tuteo que esta pieza retiró: ${JSON.stringify(quedan)}`);
+  };
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    // --- A. Buscar es una acción -----------------------------------------
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    const consultas = [];
+    page.on('request', (pedido) => {
+      if (pedido.url().includes('/catalog/products')) consultas.push(pedido.url());
+    });
+    // El `console.log` se retiró: se comprueba que el navegador no lo imprima.
+    const porConsola = [];
+    page.on('console', (mensaje) => porConsola.push(mensaje.text()));
+
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+    const laTarjeta = () => page.getByRole('heading', { name: laBuscada, exact: true, level: 3 });
+    await esperarA(async () => (await laTarjeta().count()) === 1,
+      `la publicación «${laBuscada}» no aparece en el mercado sin filtros`, 25_000);
+    const tarjetas = () => page.locator('article[class*="card"]').count();
+    const alPrincipio = await tarjetas();
+    assert(alPrincipio > 1,
+      `el mercado dibuja ${alPrincipio} tarjeta(s): con una sola, filtrar no se distingue de no filtrar`);
+    const buscador = page.getByLabel('Buscar en el mercado');
+    const boton = page.locator('form[role="search"]').getByRole('button', { name: 'Buscar' });
+    assert(await boton.count() === 1, 'la banda de búsqueda no tiene un botón «Buscar»');
+
+    // A1. Escribir no busca. Ni consulta, ni barra, ni grilla.
+    const consultasAntes = consultas.length;
+    await buscador.fill(`  ${laBuscada}  `);
+    // Se espera a que la aplicación tenga oportunidad de reaccionar: la
+    // consulta anterior salía en el mismo tecleo, así que si va a salir, sale
+    // acá. Se espera una CONDICIÓN observable —que la grilla haya cambiado— y
+    // se acepta el silencio recién cuando se venció.
+    let reaccionó = true;
+    try {
+      await esperarA(async () => consultas.length > consultasAntes || await tarjetas() !== alPrincipio,
+        'nada', 3_000);
+    } catch {
+      reaccionó = false;
+    }
+    assert(!reaccionó,
+      `escribir disparó la búsqueda sola: ${consultas.length - consultasAntes} consulta(s) nuevas `
+      + `y la grilla pasó de ${alPrincipio} a ${await tarjetas()} tarjetas`);
+    assert(!/[?&]q=/.test(page.url()),
+      `escribir ya escribió la consulta en la barra: ${page.url()}`);
+    assert(await tarjetas() === alPrincipio,
+      `escribir cambió la grilla de ${alPrincipio} a ${await tarjetas()} tarjetas`);
+
+    // A2. El clic sí busca, con la consulta recortada.
+    await boton.click();
+    await esperarA(async () => consultas.length > consultasAntes,
+      'el clic en «Buscar» no le pidió nada al catálogo', 20_000);
+    // El valor se lee del parámetro, no del texto de la URL: un espacio viaja
+    // como «+» y no como «%20», así que comparar cadenas acusaba al producto de
+    // no recortar cuando había recortado bien.
+    const parametro = (url, clave) => new URL(url).searchParams.get(clave);
+    const laConsulta = consultas[consultas.length - 1];
+    assert(parametro(laConsulta, 'search') === laBuscada,
+      `la consulta que salió pidió ${JSON.stringify(parametro(laConsulta, 'search'))} y lo `
+      + `escrito, recortado, es ${JSON.stringify(laBuscada)}: ${laConsulta}`);
+    await esperarA(async () => await tarjetas() === 1,
+      `buscar «${laBuscada}» dejó ${await tarjetas()} tarjetas y hay una sola publicación así`,
+      20_000);
+    assert(await laTarjeta().count() === 1,
+      'la única tarjeta que quedó no es la que se buscó');
+    assert(parametro(page.url(), 'q') === laBuscada,
+      `la barra quedó con q=${JSON.stringify(parametro(page.url(), 'q'))} y lo aplicado es `
+      + `${JSON.stringify(laBuscada)}`);
+    assert(await buscador.inputValue() === laBuscada,
+      `el campo quedó en ${JSON.stringify(await buscador.inputValue())} y lo aplicado es `
+      + `${JSON.stringify(laBuscada)}: el campo y la grilla dirían cosas distintas`);
+    medidos.push(`escribir no consultó nada y el clic consultó una vez, recortado (${alPrincipio} `
+      + '→ 1 tarjeta)');
+
+    // A3. Enter hace lo mismo que el botón, sobre otra consulta.
+    const consultasAntesDeEnter = consultas.length;
+    await buscador.fill(` ${laBuscada.slice(0, 11)} `);
+    await buscador.press('Enter');
+    await esperarA(async () => consultas.length > consultasAntesDeEnter,
+      'Enter no le pidió nada al catálogo', 20_000);
+    const recortada = laBuscada.slice(0, 11);
+    assert(parametro(consultas[consultas.length - 1], 'search') === recortada,
+      `Enter pidió ${JSON.stringify(parametro(consultas[consultas.length - 1], 'search'))} y lo `
+      + `escrito, recortado, es ${JSON.stringify(recortada)}`);
+    assert(parametro(page.url(), 'q') === recortada,
+      `Enter dejó q=${JSON.stringify(parametro(page.url(), 'q'))} en la barra`);
+
+    // A4. Una consulta vacía limpia el filtro.
+    await buscador.fill('   ');
+    await buscador.press('Enter');
+    await esperarA(async () => !/[?&]q=/.test(page.url()),
+      `vaciar la búsqueda dejó la consulta en la barra: ${page.url()}`, 20_000);
+    await esperarA(async () => await tarjetas() === alPrincipio,
+      `vaciar la búsqueda dejó ${await tarjetas()} tarjetas y antes de filtrar había ${alPrincipio}`,
+      20_000);
+    medidos.push('Enter aplica lo mismo que el botón y una consulta vacía limpia el filtro');
+
+    // A5. «Limpiar filtros» limpia las DOS cosas.
+    //
+    // Lo escrito y lo aplicado son dos estados desde esta pieza, y el único
+    // lugar donde tienen que moverse juntos sin que nadie apriete «Buscar» es
+    // éste: si limpiar filtros dejara el texto en el campo, el campo diría que
+    // hay una búsqueda puesta y la grilla mostraría el catálogo entero.
+    await buscador.fill(laBuscada);
+    await boton.click();
+    await esperarA(async () => parametro(page.url(), 'q') === laBuscada,
+      'no se pudo dejar una búsqueda aplicada antes de limpiar los filtros', 20_000);
+    await page.getByRole('button', { name: 'Limpiar filtros' }).first().click();
+    await esperarA(async () => !/[?&]q=/.test(page.url()) && await buscador.inputValue() === '',
+      `limpiar filtros dejó q=${JSON.stringify(parametro(page.url(), 'q'))} y el campo en `
+      + `${JSON.stringify(await buscador.inputValue())}`, 20_000);
+    await esperarA(async () => await tarjetas() === alPrincipio,
+      `limpiar filtros dejó ${await tarjetas()} tarjetas y sin filtrar había ${alPrincipio}`,
+      20_000);
+    medidos.push('«Limpiar filtros» limpia el campo, la barra y la grilla a la vez');
+
+    // A6. Y nada de esto se cuenta por consola.
+    const rastro = porConsola.filter((linea) => /Búsqueda realizada/i.test(linea));
+    assert(rastro.length === 0,
+      `el buscador sigue contando por consola: ${JSON.stringify(rastro.slice(0, 3))}`);
+
+    // --- B. Contacto no promete planes ------------------------------------
+    await page.locator('header').first()
+      .getByRole('button', { name: 'Contacto', exact: true }).first().click();
+    await page.getByRole('heading', { name: 'Preguntas Frecuentes' }).waitFor({ timeout: 20_000 });
+    const faq = await page.locator('section').filter({
+      has: page.getByRole('heading', { name: 'Preguntas Frecuentes' }),
+    }).first().innerText();
+    assert(/¿Hay comisiones por venta\?/.test(faq),
+      `la FAQ ya no trae la pregunta de comisiones:\n${faq}`);
+    for (const promesa of [/planes/i, /suscripci/i, /competitivas/i]) {
+      assert(!promesa.test(faq),
+        `la FAQ sigue prometiendo algo que no existe (${promesa}):\n${faq}`);
+    }
+    assert(/no cobra comisión por la venta/i.test(faq) && /el pago va al vendedor/i.test(faq),
+      `la FAQ no dice la regla vigente —sin comisión, el pago al vendedor—:\n${faq}`);
+    sinTuteo('Contacto/FAQ', faq);
+    medidos.push('la FAQ dice la regla vigente y no menciona planes ni suscripciones');
+
+    // --- C. El Login tiene salida, y no arrastra lo que quedó atrás --------
+    //
+    // Se abre desde una TARJETA a propósito: por ahí el ingreso lleva una
+    // continuidad pendiente —volver a esa publicación— y lo que se mide es que
+    // irse a pedir ayuda la descarte. Si volviera, Contacto aparecería con el
+    // detalle de una publicación encima.
+    await page.locator('header').first()
+      .getByRole('button', { name: 'Mercado', exact: true }).first().click();
+    await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+    await page.locator('article[class*="card"]')
+      .getByRole('button', { name: 'Ingresar para continuar' }).first().click();
+    await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    const login = await page.getByRole('dialog').first().innerText();
+    assert(/¿No tenés cuenta\?/.test(login) && /Registrate acá/.test(login),
+      `el Login no vosea la invitación a registrarse: ${JSON.stringify(login)}`);
+    assert(/¿Olvidaste tu contraseña\?/.test(login),
+      `el Login no dice nada para quien olvidó la contraseña: ${JSON.stringify(login)}`);
+    assert(/no hay recuperación automática/i.test(login),
+      `el Login no aclara que la recuperación no es automática: ${JSON.stringify(login)}`);
+    // Y no promete lo que no puede cumplir.
+    for (const promesa of [/te enviamos/i, /te mandamos/i, /revisá tu correo/i,
+      /en 24|en 48|en las próximas/i, /restablec(er|é) tu contraseña/i]) {
+      assert(!promesa.test(login),
+        `el Login promete algo que no existe (${promesa}): ${JSON.stringify(login)}`);
+    }
+    sinTuteo('Login', login);
+
+    await page.getByRole('button', { name: 'Escribinos por Contacto' }).click();
+    await esperarA(async () => page.url().includes('section=contact'),
+      `la salida de soporte no llevó a Contacto: ${page.url()}`, 20_000);
+    await page.getByRole('heading', { name: 'Preguntas Frecuentes' }).waitFor({ timeout: 20_000 });
+    assert(await page.getByRole('dialog').count() === 0,
+      `irse a Contacto dejó ${await page.getByRole('dialog').count()} capa(s) abiertas`);
+    // La continuidad se descartó: no reaparece la publicación de la que venía.
+    await page.waitForTimeout(600);
+    assert(await page.locator('#detalle-titulo').count() === 0
+      && await page.getByRole('dialog').count() === 0,
+    'la continuidad del ingreso se ejecutó igual y reabrió lo que había atrás');
+    medidos.push('la salida de soporte cierra el ingreso, va a Contacto y descarta la continuidad');
+
+    // --- D. El voseo, en las pantallas que esta pieza tocó ----------------
+    // D1. Quiénes somos.
+    await page.locator('header').first()
+      .getByRole('button', { name: 'Quiénes somos', exact: true }).first().click();
+    await esperarA(async () => (await page.getByRole('button', { name: 'Contactanos' }).count()) === 1,
+      'Quiénes somos no dice «Contactanos»', 20_000);
+    sinTuteo('Quiénes somos', await page.locator('main, body').first().innerText());
+
+    // D2. El carrito vacío, y el carrito con algo adentro.
+    const compradora = `voseo.${sello}@ejemplo.com`;
+    await registrarYVerificar({
+      email: compradora, password: 'voseo12345',
+      full_name: `Compradora Voseo ${sello}`, role: 'user',
+    });
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+    await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    await page.getByPlaceholder('tu@email.com').fill(compradora);
+    await page.getByPlaceholder('••••••••').fill('voseo12345');
+    await page.locator('[class*="_submitButton_"][type="submit"]').click();
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().waitFor({ timeout: 25_000 });
+
+    // La bandeja vacía hay que FABRICARLA, no suponerla.
+    //
+    // Toda cuenta nueva nace con una notificación de bienvenida —medido:
+    // `notifications` tiene una fila «¡Bienvenido a AgroBoeda!» por cada cuenta
+    // que este caso creó—, así que «No tenés notificaciones» no es el estado de
+    // una cuenta recién registrada. El caso lo daba por verde igual porque el
+    // panel dibuja el vacío MIENTRAS pide la lista, y `esperarA` lo pescaba en
+    // ese suspiro: un verde que no medía nada, y que se cayó en la corrida
+    // completa cuando la respuesta volvió más rápido.
+    //
+    // Se borra la bienvenida en la base descartable, que es donde el arranque
+    // dice que se fabrican los estados que la API no ofrece.
+    const [cuentaNueva] = queryRows(
+      `SELECT id FROM users WHERE email = ${sqlLiteral(compradora)}`);
+    assert(cuentaNueva, 'la cuenta que este caso registró no quedó en la base');
+    querySql(`DELETE FROM notifications WHERE user_id = ${sqlLiteral(cuentaNueva[0])}`);
+    const [quedan] = queryRows(
+      `SELECT COUNT(*)::text, 'fin' FROM notifications WHERE user_id = ${sqlLiteral(cuentaNueva[0])}`);
+    assert(quedan[0] === '0', `la cuenta quedó con ${quedan[0]} notificaciones`);
+
+    await page.getByRole('button', { name: /Carrito/ }).first().click();
+    const carrito = page.getByRole('dialog', { name: 'Mi carrito' });
+    await carrito.waitFor({ timeout: 20_000 });
+    const vacio = await carrito.innerText();
+    assert(/Agregá productos para empezar tu compra/.test(vacio),
+      `el carrito vacío no vosea: ${JSON.stringify(vacio)}`);
+    sinTuteo('Carrito vacío', vacio);
+    await carrito.getByRole('button', { name: 'Cerrar' }).first().click();
+    await esperarA(async () => (await carrito.count()) === 0, 'el carrito no se cerró', 15_000);
+
+    // Con algo adentro: «Vaciar carrito» pregunta, y pregunta en voseo.
+    await page.getByLabel('Buscar en el mercado').fill(laBuscada);
+    await page.getByLabel('Buscar en el mercado').press('Enter');
+    await esperarA(async () => (await laTarjeta().count()) === 1,
+      `no se encontró «${laBuscada}» para cargar el carrito`, 20_000);
+    await accionDeLaTarjeta(page, laBuscada).click();
+    await page.getByRole('button', { name: /Carrito/ }).first().click();
+    await carrito.waitFor({ timeout: 20_000 });
+    await esperarA(async () => (await carrito.getByRole('button', { name: 'Vaciar carrito' })
+      .count()) === 1, 'el carrito con una compra no ofrece vaciarse', 20_000);
+    await carrito.getByRole('button', { name: 'Vaciar carrito' }).click();
+    const confirmacion = page.locator('[class*="confirmModal"]');
+    await confirmacion.waitFor({ state: 'visible', timeout: 15_000 });
+    const preguntado = await confirmacion.innerText();
+    assert(/¿Seguro que querés vaciar el carrito\?/.test(preguntado),
+      `la confirmación de vaciar no vosea: ${JSON.stringify(preguntado)}`);
+    sinTuteo('Confirmación de vaciar', preguntado);
+    await confirmacion.getByRole('button', { name: 'Cancelar' }).click();
+    await confirmacion.waitFor({ state: 'hidden', timeout: 15_000 });
+
+    // D3. El Checkout, que es la pantalla siguiente del mismo recorrido.
+    await carrito.getByRole('button', { name: /Continuar compra|Continuar/ }).first().click();
+    const checkout = page.getByRole('dialog', { name: 'Checkout' });
+    await checkout.waitFor({ timeout: 25_000 });
+    const datos = await checkout.innerText();
+    assert(/Completá tus datos para recibir el pedido/.test(datos),
+      `el Checkout no vosea el pedido de datos: ${JSON.stringify(datos.slice(0, 200))}`);
+    sinTuteo('Checkout', datos);
+    await checkout.getByRole('button', { name: 'Cerrar' }).first().click();
+    await esperarA(async () => (await checkout.count()) === 0, 'el Checkout no se cerró', 15_000);
+
+    // D4. Mi cuenta: compras, ventas y notificaciones, las tres vacías porque
+    // esta cuenta es nueva. Es justo donde vivía el tuteo.
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
+    // El rótulo de la solapa no es exacto a propósito: «Notificaciones» lleva
+    // un contador al lado cuando hay sin leer, así que el nombre accesible es
+    // «Notificaciones 1» y un `exact` acusaba de faltante una solapa que estaba.
+    // Cada solapa espera SU respuesta, no una que se le parezca.
+    //
+    // `/notifications` con `includes` también dice que sí a
+    // `/notifications/unread-count`, y ese contador sale en cada cambio de
+    // solapa: el panel lo pide cuando la solapa NO es la de notificaciones. Así
+    // que la espera de la lista podía resolverse con la respuesta del contador
+    // —un objeto sin `notifications`— según cuál llegara primero. La PM lo vio:
+    // «el 168 recibió una respuesta sin notifications». Lo mismo entre compras
+    // y ventas, que se distinguen sólo por `as_role`.
+    const RESPUESTA_DE_LA_SOLAPA = {
+      'Mis Compras': { ruta: '/api/orders/my', parametros: { as_role: 'buyer' } },
+      'Mis Ventas': { ruta: '/api/orders/my', parametros: { as_role: 'seller' } },
+      Notificaciones: { ruta: '/api/notifications', parametros: {} },
+    };
+    const esLaRespuesta = (respuesta, cual) => {
+      if (respuesta.request().method() !== 'GET' || respuesta.status() !== 200) return false;
+      let url;
+      try { url = new URL(respuesta.url()); } catch { return false; }
+      if (!url.pathname.endsWith(cual.ruta)) return false;
+      // `endsWith` no alcanza sola: `/api/notifications/unread-count` no
+      // termina en `/api/notifications`, pero un futuro `/mis-orders/my` sí
+      // terminaría en `/orders/my`. Se exige que lo que sobre sea un origen.
+      if (!/^https?:\/\/[^/]+$/.test(url.origin + url.pathname.slice(0, -cual.ruta.length))) {
+        return false;
+      }
+      return Object.entries(cual.parametros)
+        .every(([clave, valor]) => url.searchParams.get(clave) === valor);
+    };
+
+    // El peligro se fabrica, no se espera a que aparezca.
+    //
+    // Se retiene el contador de no leídas hasta que la solapa de
+    // notificaciones ya esté pedida, y se demora la lista: así la respuesta
+    // del contador cae SIEMPRE en medio de la espera de la lista, que es la
+    // carrera que la PM se comió. Con la espera vieja esto es rojo todas las
+    // veces; con la nueva, la respuesta del contador se ignora.
+    const contadoresRetenidos = [];
+    let retenerElContador = true;
+    await page.route(
+      (url) => url.pathname.endsWith('/api/notifications/unread-count'),
+      async (ruta) => {
+        if (retenerElContador) {
+          await new Promise((seguir) => { contadoresRetenidos.push(seguir); });
+        }
+        await ruta.continue();
+      },
+    );
+    await page.route(
+      (url) => url.pathname.endsWith('/api/notifications'),
+      async (ruta) => {
+        await new Promise((seguir) => { setTimeout(seguir, 1_500); });
+        await ruta.continue();
+      },
+    );
+    const solaparse = async (solapa) => {
+      const boton = page.getByRole('button', { name: new RegExp(`^${solapa}`) }).first();
+      try {
+        await boton.click({ timeout: 20_000 });
+      } catch {
+        const hay = await page.locator('button').allInnerTexts();
+        throw new Error(`no se pudo abrir la solapa «${solapa}»; los botones a la vista son `
+          + JSON.stringify(hay.map((t) => t.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 14)));
+      }
+    };
+    for (const [solapa, esperado] of [
+      ['Mis Compras', 'Todavía no tenés compras'],
+      ['Mis Ventas', 'Todavía no tenés ventas'],
+      ['Notificaciones', 'No tenés notificaciones'],
+    ]) {
+      // Se espera la RESPUESTA, no el dibujo.
+      //
+      // El panel pinta el vacío mientras pide la lista, así que preguntar «¿ya
+      // dice que no hay nada?» se cumple al instante con una bandeja que
+      // todavía no llegó. Medido: con una notificación metida a mano en la base,
+      // el caso seguía verde. Se espera el GET de esa solapa y recién ahí se
+      // mira, y para las notificaciones se contrasta además contra lo que el
+      // servidor contestó: la pantalla y la API tienen que decir lo mismo.
+      const cual = RESPUESTA_DE_LA_SOLAPA[solapa];
+      const [respuesta] = await Promise.all([
+        page.waitForResponse((r) => esLaRespuesta(r, cual), { timeout: 30_000 }),
+        (async () => {
+          await solaparse(solapa);
+          if (solapa === 'Notificaciones') {
+            // Ya se pidió la lista: se sueltan los contadores retenidos para
+            // que contesten primero. Si la espera confundiera una respuesta con
+            // la otra, se confundiría acá.
+            retenerElContador = false;
+            for (const seguir of contadoresRetenidos.splice(0)) seguir();
+          }
+        })(),
+      ]);
+      if (solapa === 'Notificaciones') {
+        assert(new URL(respuesta.url()).pathname.endsWith('/api/notifications'),
+          `la espera se resolvió con ${respuesta.url()}, que no es la lista de notificaciones`);
+        const cuerpo = await respuesta.json().catch(() => null);
+        assert(cuerpo && Array.isArray(cuerpo.notifications) && cuerpo.notifications.length === 0,
+          `la API devolvió ${JSON.stringify(cuerpo)}: o no es la lista, o la bandeja que este `
+          + 'caso fabricó vacía no lo está, así que el vacío en pantalla no probaría nada');
+      }
+      // Y el rojo dice qué mostró la solapa, no sólo que se venció la espera.
+      try {
+        await esperarA(async () => (await page.getByText(esperado, { exact: true }).count()) > 0,
+          esperado, 20_000);
+      } catch {
+        const visto = (await page.locator('main, body').first().innerText())
+          .replace(/\s+/g, ' ').slice(0, 260);
+        throw new Error(`«${solapa}» no dice «${esperado}»; lo que muestra es «${visto}»`);
+      }
+      sinTuteo(`Mi cuenta/${solapa}`, await page.locator('main, body').first().innerText());
+    }
+    medidos.push('Login, Quiénes somos, carrito, confirmación, Checkout y las tres solapas '
+      + 'vacías de Mi cuenta vosean, y ninguna conserva las formas retiradas');
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+    // El caso no le deja residuo a nadie: su publicación se retira.
+    await apiRequest(`/products/${idDeLaBuscada}`, {
+      method: 'DELETE', token: vendedor.token,
+    }).catch(() => {});
+  }
+
+  return `escribir en el buscador no consulta, no toca la barra y no redibuja; el clic y Enter `
+    + `aplican la consulta recortada, la escriben en «q» y dejan sólo «${laBuscada}»; una `
+    + `consulta vacía limpia el filtro y nada se cuenta por consola; ${medidos.join('; ')}`;
+});
+
+await runCase(169, 'El reinicio de la API prueba que cambió el proceso, o falla', async () => {
+  // Este caso existe por un verde falso.
+  //
+  // El aislamiento del presupuesto antifuerza-bruta se apoya en reiniciar la
+  // API entre el 134 y el 135. En el entorno Docker de la PM ese reinicio
+  // ANUNCIÓ ÉXITO sin haber reiniciado nada: `topgreen-api` quedó con el mismo
+  // ID, `RestartCount=0` y `StartedAt` sin mover, y el 167 y el 168 se cayeron
+  // igual. La causa es que el modo miraba procesos del anfitrión —donde no hay
+  // ninguno cuando la API vive en un contenedor—, no mataba nada, levantaba un
+  // uvicorn que no podía tomar el puerto y daba por buena la respuesta de la
+  // API VIEJA a `/api/health`. Contestar no es haberse reiniciado.
+  //
+  // Acá se le arma al comando el entorno que lo engañaba, con dobles en el
+  // PATH, y se exige que falle. Ninguno toca el producto, el TTL ni el límite.
+  //
+  // Y los escenarios no pueden depender de CÓMO se sirva la API acá: el
+  // lanzador oficial la sirve con Docker y la ruta nativa la sirve con un
+  // uvicorn. Este caso corría sólo con la nativa —exigía que hubiera una— y en
+  // la corrida Docker de la PM se caía antes de probar nada. Ahora los dobles
+  // fijan el escenario en vez de heredarlo: cuando hace falta la rama nativa,
+  // el doble de `docker` dice que no hay contenedor, y el «quién sirve la API»
+  // se mide igual en los dos entornos.
+  const psReal = ['/bin/ps', '/usr/bin/ps'].find((ruta) => existsSync(ruta));
+  assert(psReal, 'no se encontró el `ps` del sistema para armar el doble');
+  const taller = mkdtempSync(`${tmpdir()}/reinicio-169-`);
+  let cuantosDobles = 0;
+  /** Una carpeta con uno o más ejecutables falsos, para poner al frente del PATH. */
+  const dobles = (programas) => {
+    cuantosDobles += 1;
+    const carpeta = `${taller}/caso-${cuantosDobles}`;
+    mkdirSync(carpeta, { recursive: true });
+    for (const [nombre, cuerpo] of Object.entries(programas)) {
+      writeFileSync(`${carpeta}/${nombre}`, `${cuerpo}\n`, { mode: 0o755 });
+    }
+    return carpeta;
+  };
+  const reiniciar = (carpeta) => spawnSync('./scripts/entorno_nativo.sh', ['--reiniciar-api'], {
+    encoding: 'utf8',
+    env: { ...process.env, PATH: `${carpeta}:${process.env.PATH}` },
+  });
+
+  // `-Ao` y no `-eo`: en BSD —la máquina de la PM— `-e` no significa «todos los
+  // procesos». Se pide todo explícitamente para que el caso mida lo mismo en
+  // las dos plataformas.
+  const psTodos = (formato) => {
+    try {
+      return execFileSync(psReal, ['-Ao', formato], { encoding: 'utf8' }).split('\n');
+    } catch { return []; }
+  };
+  const uvicornsVivos = () => psTodos('pid,comm,args')
+    .filter((linea) => /uvicorn app\.main:app/.test(linea) && !/awk|grep/.test(linea))
+    .map((linea) => linea.trim().split(/\s+/)[0]);
+  /** Vivo y no zombi: un `<defunct>` que nadie cosechó todavía no sirve nada. */
+  const vivoDeVerdad = (pid) => psTodos('pid,stat').some((linea) => {
+    const [suPid, estado] = linea.trim().split(/\s+/);
+    return suPid === String(pid) && estado && !estado.startsWith('Z');
+  });
+
+  /**
+   * Quién sirve la API, en cualquiera de los dos entornos admitidos. Se compara
+   * como cadena: si después de un intento fallido es la misma, el intento no
+   * tocó nada; si después del reinicio real es otra, el proceso cambió.
+   */
+  const quienSirveLaApi = () => {
+    const contenedor = spawnSync('docker', [
+      'inspect', '-f', '{{.State.Running}} {{.State.Pid}} {{.State.StartedAt}}', 'topgreen-api',
+    ], { encoding: 'utf8' });
+    const linea = `${contenedor.stdout || ''}`.trim();
+    if (contenedor.status === 0 && linea.startsWith('true ')) {
+      return { donde: 'contenedor topgreen-api', quien: linea };
+    }
+    const pids = uvicornsVivos();
+    if (pids.length) return { donde: 'uvicorn nativo', quien: pids.join(',') };
+    return { donde: 'nadie identificable', quien: '' };
+  };
+  const laApiContesta = async () => {
+    const respuesta = await fetch(`${API_URL}/health`).catch(() => null);
+    return respuesta?.ok === true;
+  };
+
+  const SIN_CONTENEDOR = [
+    '#!/usr/bin/env bash',
+    '# No hay contenedor: obliga al comando a tomar su rama nativa, corra donde corra.',
+    'if [ "${1:-}" = "inspect" ]; then exit 1; fi',
+    'exit 127',
+  ].join('\n');
+
+  const servicio = quienSirveLaApi();
+  assert(servicio.donde !== 'nadie identificable',
+    'no encontré quién sirve la API: ni contenedor `topgreen-api` ni uvicorn nativo. '
+    + 'Sin eso no hay reinicio real que comprobar');
+  assert(await laApiContesta(), 'la API no contesta antes de empezar');
+
+  const medidos = [];
+  let fantasma = null;
+  try {
+    // 1. La forma exacta del entorno de la PM: la API la sirve un contenedor y
+    //    el reinicio no lo mueve. `docker restart` contesta que sí, y la
+    //    identidad del contenedor sigue siendo la misma.
+    const quieto = reiniciar(dobles({
+      docker: [
+        '#!/usr/bin/env bash',
+        'if [ "${1:-}" = "inspect" ]; then echo "true 4242 2026-09-12T20:14:56.246290658Z"; exit 0; fi',
+        'if [ "${1:-}" = "restart" ]; then exit 0; fi',
+        'exit 127',
+      ].join('\n'),
+    }));
+    assert(quieto.status !== 0,
+      `con un topgreen-api que no se reinicia, el comando salió con ${quieto.status} y anunció `
+      + `éxito:\n${quieto.stdout}`);
+    assert(/misma identidad/.test(quieto.stderr),
+      `el rojo no dice que la identidad del contenedor no cambió:\n${quieto.stderr}`);
+    assert(quienSirveLaApi().quien === servicio.quien,
+      `el intento fallido movió el ${servicio.donde}: era [${servicio.quien}] y quedó `
+      + `[${quienSirveLaApi().quien}]`);
+    medidos.push('un contenedor que contesta pero no se reinicia da rojo, no verde');
+
+    // 2. Ni contenedor ni uvicorn a la vista: no se sabe quién atiende el
+    //    puerto. Antes acá se levantaba un proceso al lado y se anunciaba
+    //    éxito; ahora se frena sin tocar nada.
+    const ciego = reiniciar(dobles({
+      docker: SIN_CONTENEDOR,
+      ps: ['#!/usr/bin/env bash', `${psReal} "$@" | grep -v 'uvicorn app.main:app'`].join('\n'),
+    }));
+    assert(ciego.status !== 0,
+      `sin poder identificar quién sirve la API, el comando salió con ${ciego.status}:\n`
+      + `${ciego.stdout}`);
+    assert(/no se identifica|no hay contenedor/.test(ciego.stderr),
+      `el rojo no explica que no pudo identificar el servicio:\n${ciego.stderr}`);
+    assert(quienSirveLaApi().quien === servicio.quien,
+      `el intento fallido movió el ${servicio.donde}: era [${servicio.quien}] y quedó `
+      + `[${quienSirveLaApi().quien}]`);
+    medidos.push('sin saber quién sirve la API, frena y deja la que había en paz');
+
+    // 3. El puerto lo atiende otro. Se le da al comando un proceso descartable
+    //    disfrazado de uvicorn —y se le esconde el que hubiera de verdad—: lo
+    //    mata, y el puerto sigue contestando. Ese silencio que no llega es la
+    //    prueba de que el contador quedó donde estaba.
+    //
+    //    El doble no reescribe una línea del `ps` real: agrega la suya mientras
+    //    el descartable siga vivo y no sea un zombi. Así el escenario no
+    //    depende de que `ps` liste un proceso sin terminal ni de cuándo Node
+    //    coseche al hijo que acaba de morir.
+    fantasma = spawn('sleep', ['300'], { detached: true, stdio: 'ignore' });
+    fantasma.unref();
+    await esperarA(async () => vivoDeVerdad(fantasma.pid),
+      'el proceso descartable que hace de uvicorn no llegó a existir', 10_000);
+    const suplantado = reiniciar(dobles({
+      docker: SIN_CONTENEDOR,
+      ps: [
+        '#!/usr/bin/env bash',
+        `${psReal} "$@" | grep -v 'uvicorn app.main:app'`,
+        `estado="$(${psReal} -o stat= -p ${fantasma.pid} 2>/dev/null | tr -d ' ')"`,
+        'if [ -n "$estado" ] && [ "${estado#Z}" = "$estado" ]; then',
+        `  echo "${fantasma.pid} python /usr/bin/python -m uvicorn app.main:app"`,
+        'fi',
+      ].join('\n'),
+    }));
+    assert(suplantado.status !== 0,
+      `matando a otro proceso, el comando salió con ${suplantado.status}:\n${suplantado.stdout}`);
+    assert(/sigue contestando/.test(suplantado.stderr),
+      `el rojo no dice que el puerto lo atiende otro servicio:\n${suplantado.stderr}`);
+    assert(!vivoDeVerdad(fantasma.pid),
+      'el comando ni siquiera mató lo que creía que era la API: el escenario no probó nada');
+    assert(await laApiContesta(), 'el escenario del suplantado se llevó puesta la API de verdad');
+    medidos.push('si el puerto sigue vivo después de matar lo que creía la API, da rojo');
+
+    // 4. Y el camino bueno, con el entorno tal cual es: la identidad de quien
+    //    sirve la API tiene que cambiar. Con contenedor eso es `Pid` y
+    //    `StartedAt`; con uvicorn nativo, los PID.
+    const antes = quienSirveLaApi();
+    const bueno = spawnSync('./scripts/entorno_nativo.sh', ['--reiniciar-api'], {
+      encoding: 'utf8',
+    });
+    assert(bueno.status === 0,
+      `el reinicio real falló:\n${bueno.stdout}\n${bueno.stderr}`);
+    const despues = quienSirveLaApi();
+    assert(despues.donde === antes.donde,
+      `antes la API la servía ${antes.donde} y después ${despues.donde}`);
+    assert(despues.quien && despues.quien !== antes.quien,
+      `el reinicio dejó la misma identidad: [${antes.quien}]`);
+    assert(await laApiContesta(), 'la API no contesta después del reinicio real');
+    medidos.push(`el reinicio real cambió el ${antes.donde}: [${antes.quien}] → `
+      + `[${despues.quien}]`);
+  } finally {
+    if (fantasma?.pid) { try { process.kill(fantasma.pid, 'SIGKILL'); } catch { /* ya no está */ } }
+    rmSync(taller, { recursive: true, force: true });
+  }
+
+  return `el reinicio que aísla el presupuesto de intentos verifica identidad y no se conforma `
+    + `con que /api/health conteste, con la API en ${servicio.donde}: ${medidos.join('; ')}`;
+});
+
+// La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
+// archivo. Estaba calculada antes de que corriera el último caso, así que ese
+// caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un
+// solo caso, el resumen decía «0/1 pasaron; 0 fallaron» —ni sumaba ni restaba—
+// y en la suite entera el total quedaba corrido en uno. Un resumen que no
+// cierra aritméticamente es peor que no tenerlo.
 const passed = results.filter((result) => result.passed).length;
 const failed = results.length - passed;
 

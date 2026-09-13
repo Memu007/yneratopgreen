@@ -10,21 +10,67 @@ import {
   type DocumentacionEnCola,
 } from '../../utils/documentacion';
 import { useCapaModal } from '../../hooks/useCapaModal';
+import { Confirmacion } from '../../formularios/Confirmacion';
+import { ClaveTemporal } from './ClaveTemporal';
+import {
+  COLOR_DEL_TONO,
+  ESTADOS_DE_ORDEN,
+  ESTADOS_DE_PRODUCTO,
+  estadoDeOrden,
+  estadoDeProducto,
+} from '../../utils/estados';
+import type { EstadoTraducido } from '../../utils/estados';
+
+/**
+ * Una decisión pendiente de confirmar. `hacer` es la mutación: se ejecuta si y
+ * sólo si la persona confirma.
+ */
+interface PedidoDeConfirmacion {
+  titulo: string;
+  detalle: React.ReactNode;
+  textoConfirmar: string;
+  destructiva?: boolean;
+  hacer: () => Promise<void>;
+}
+
+/**
+ * Tipos de opción que Configuración ya no administra.
+ *
+ * `province` era una lista de provincias escrita a mano, de cuando no había
+ * padrón. Hoy no la consume nadie: publicar, registrarse, el alta de
+ * transportista, los filtros del Mercado y la edición del perfil piden todos
+ * `/catalog/localities/provinces`, que es el padrón oficial con sus
+ * localidades. Se midió: en una base recién creada no hay ninguna fila
+ * `province`, y ningún consumidor pide `option_type=province`.
+ *
+ * Dejarla en el panel era ofrecer un lugar donde escribir provincias que no
+ * iban a aparecer en ningún lado, y una segunda lista de provincias es
+ * exactamente lo que el padrón vino a evitar.
+ *
+ * Se retira de la pantalla y NADA más: las filas que existan y el endpoint
+ * siguen como están, porque quitar el tipo del Backend rompería a cualquiera
+ * que todavía lo llame.
+ */
+const TIPOS_RETIRADOS = ['province'];
 
 type AdminTab =
   | 'dashboard' | 'users' | 'products' | 'orders' | 'categories' | 'config'
   | 'documentacion';
 
+// Las claves son las que devuelve `/admin/dashboard`. Antes esta interfaz
+// pedía `total_sellers` y `total_customers`, que el servidor nunca mandó: la
+// pantalla dibujaba `undefined` en dos tarjetas y nadie se enteraba, porque
+// TypeScript cree lo que dice la interfaz y la respuesta no se valida.
 interface DashboardStats {
   total_users: number;
-  total_sellers: number;
-  total_customers: number;
+  total_normal_users: number;
+  total_admins: number;
   total_products: number;
   active_products: number;
   total_orders: number;
-  pending_orders: number;
+  orders_in_process: number;
   completed_orders: number;
-  total_revenue: number;
+  sold_volume: number;
 }
 
 interface AdminUser {
@@ -223,6 +269,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [loading, setLoading] = useState(false);
+
+  // Qué se rompió y dónde. Antes cada carga hacía `console.error` y seguía: la
+  // pantalla mostraba la tabla vacía o los datos de la consulta anterior, y un
+  // 500 se leía igual que «no hay resultados». Acá el fallo es un estado más,
+  // por sección, y mientras está puesto NO se dibujan filas: se dibuja el aviso.
+  type SeccionAuditada = 'dashboard' | 'usuarios' | 'productos' | 'ordenes' | 'documentacion';
+  const [fallos, setFallos] = useState<Partial<Record<SeccionAuditada, string>>>({});
+  const limpiarFallo = useCallback((seccion: SeccionAuditada) => {
+    setFallos((previos) => {
+      if (!(seccion in previos)) return previos;
+      const restantes = { ...previos };
+      delete restantes[seccion];
+      return restantes;
+    });
+  }, []);
+  const anotarFallo = useCallback((seccion: SeccionAuditada, recurso: string) => {
+    setFallos((previos) => ({ ...previos, [seccion]: recurso }));
+  }, []);
   
   // Dashboard
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -246,6 +310,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [userSearchAplicada, setUserSearchAplicada] = useState('');
   const [usersPage, setUsersPage] = useState(1);
   const [showCreateUser, setShowCreateUser] = useState(false);
+  // Lo que hay que corregir en el alta, dicho donde se corrige. Un aviso
+  // que se desvanece no sirve para arreglar un formulario.
+  const [altaError, setAltaError] = useState('');
   const [newUser, setNewUser] = useState({
     email: '',
     password: '',
@@ -254,6 +321,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     role: 'user' as 'admin' | 'user'
   });
   
+  // La confirmación del panel: una sola capa para todas las decisiones que
+  // pisan datos de otra persona.
+  //
+  // Antes había dos formas de decidir, y las dos estaban mal. Cambiar el rol,
+  // activar o desactivar una cuenta y cambiar el estado de una publicación
+  // escribían en el acto, con un `onChange`: un clic de más en un `select` ya
+  // era un cambio hecho sobre la cuenta de otro. Y los borrados preguntaban
+  // con `window.confirm`, que no es una capa del producto —no tiene nombre
+  // accesible, no atrapa el foco ni lo devuelve, y bloquea el hilo—.
+  //
+  // `hacer` es lo único que escribe. Mientras no se confirme, no sale ninguna
+  // solicitud; si se cancela, no sale ninguna nunca.
+  const [confirmacion, setConfirmacion] = useState<PedidoDeConfirmacion | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
+
+  // La contraseña temporal de un restablecimiento: existe en memoria, se
+  // muestra una vez y se va. No se guarda, no se registra y no se puede
+  // volver a pedir.
+  const [claveTemporal, setClaveTemporal] = useState<{ usuario: string; clave: string } | null>(null);
+
   // Products
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [productsTotal, setProductsTotal] = useState(0);
@@ -286,7 +373,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   // Form Options (Config)
   const [formOptions, setFormOptions] = useState<FormOption[]>([]);
   const [optionTypes, setOptionTypes] = useState<OptionTypeInfo[]>([]);
-  const [selectedOptionType, setSelectedOptionType] = useState<string>('province');
+  const [selectedOptionType, setSelectedOptionType] = useState<string>('unit');
   const [showCreateOption, setShowCreateOption] = useState(false);
   const [editingOption, setEditingOption] = useState<FormOption | null>(null);
   const [newOption, setNewOption] = useState({ value: '', label: '', display_order: 0 });
@@ -309,15 +396,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
+    limpiarFallo('dashboard');
     try {
       const data = await apiGet<DashboardStats>('/admin/dashboard');
       setStats(data);
     } catch (error) {
       console.error('Error cargando dashboard:', error);
+      // Los números viejos no se dejan puestos: serían una respuesta que el
+      // servidor no dio.
+      setStats(null);
+      anotarFallo('dashboard', 'el resumen del panel');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [limpiarFallo, anotarFallo]);
 
   // Cargar dashboard stats
   useEffect(() => {
@@ -328,6 +420,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
   const loadDocumentacion = useCallback(async () => {
     setLoading(true);
+    limpiarFallo('documentacion');
     try {
       const query = docFiltro ? `?estado=${docFiltro}` : '';
       const data = await apiGet<ColaDeDocumentacion>(`/admin/documentacion${query}`);
@@ -335,10 +428,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       setDocPendientes(data.pendientes);
     } catch (error) {
       console.error('Error cargando documentación:', error);
+      setDocumentacion([]);
+      anotarFallo('documentacion', 'la cola de documentación');
     } finally {
       setLoading(false);
     }
-  }, [docFiltro]);
+  }, [docFiltro, limpiarFallo, anotarFallo]);
 
   const verConstancia = async (fila: DocumentacionEnCola) => {
     try {
@@ -399,6 +494,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
+    limpiarFallo('usuarios');
     try {
       const params = new URLSearchParams({
         page: String(usersPage),
@@ -424,13 +520,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       setUsersTotal(data.total);
     } catch (error) {
       console.error('Error cargando usuarios:', error);
+      // Sin filas y con aviso: una tabla vacía después de un 500 se lee
+      // como «no hay resultados», que es otra cosa.
+      setUsers([]);
+      setUsersTotal(0);
+      anotarFallo('usuarios', 'la lista de usuarios');
     } finally {
       setLoading(false);
     }
-  }, [usersPage, userRoleFilter, userActiveFilter, userSearchAplicada]);
+  }, [usersPage, userRoleFilter, userActiveFilter, userSearchAplicada,
+    limpiarFallo, anotarFallo]);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
+    limpiarFallo('productos');
     try {
       const params = new URLSearchParams({
         page: String(productsPage),
@@ -451,13 +554,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       setProductsTotal(data.total);
     } catch (error) {
       console.error('Error cargando productos:', error);
+      // Sin filas y con aviso: una tabla vacía después de un 500 se lee
+      // como «no hay resultados», que es otra cosa.
+      setProducts([]);
+      setProductsTotal(0);
+      anotarFallo('productos', 'la lista de publicaciones');
     } finally {
       setLoading(false);
     }
-  }, [productsPage, productStatusFilter]);
+  }, [productsPage, productStatusFilter, limpiarFallo, anotarFallo]);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
+    limpiarFallo('ordenes');
     try {
       const params = new URLSearchParams({
         page: String(ordersPage),
@@ -478,10 +587,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       setOrdersTotal(data.total);
     } catch (error) {
       console.error('Error cargando órdenes:', error);
+      // Sin filas y con aviso: una tabla vacía después de un 500 se lee
+      // como «no hay resultados», que es otra cosa.
+      setOrders([]);
+      setOrdersTotal(0);
+      anotarFallo('ordenes', 'la lista de órdenes');
     } finally {
       setLoading(false);
     }
-  }, [ordersPage, orderStatusFilter]);
+  }, [ordersPage, orderStatusFilter, limpiarFallo, anotarFallo]);
 
   const loadCategories = useCallback(async () => {
     setLoading(true);
@@ -506,7 +620,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       // Cargar tipos de opciones si aún no lo hemos hecho
       if (optionTypes.length === 0) {
         const typesData = await apiGet<{ types: OptionTypeInfo[] }>('/admin/form-options/types');
-        setOptionTypes(typesData.types);
+        setOptionTypes(typesData.types.filter((tipo) => !TIPOS_RETIRADOS.includes(tipo.value)));
       }
       
       // Cargar opciones del tipo seleccionado
@@ -578,8 +692,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     }
   };
 
-  const handleDeleteOption = async (optionId: string, optionLabel: string) => {
-    if (!confirm(`¿Eliminar "${optionLabel}"?`)) return;
+  const handleDeleteOption = async (optionId: string) => {
     
     try {
       await apiDelete(`/admin/form-options/${optionId}`);
@@ -620,7 +733,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         description: editingCategory.description,
         icon: editingCategory.icon,
         is_service: editingCategory.is_service,
-        is_active: editingCategory.is_active,
+        // `is_active` NO viaja, y no es un olvido.
+        //
+        // Se midió: guardarlo en `false` se acepta, se persiste y no cambia
+        // nada de la parte pública —la categoría sigue en los filtros, filtrar
+        // por ella devuelve lo mismo, el catálogo queda igual y el detalle abre
+        // normal—. `/catalog/categories` ni siquiera expone el campo. Era un
+        // interruptor que decía «Inactiva» y no sacaba nada de circulación.
+        //
+        // Así que el panel dejó de ofrecerlo. La columna, la API y los datos
+        // quedan como están por compatibilidad: lo que se retira es la acción,
+        // no el campo. Si algún día `is_active` significa algo para el
+        // catálogo, vuelve con su semántica escrita.
         display_order: editingCategory.display_order
       });
       showToast('Categoría actualizada', 'success');
@@ -633,10 +757,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     }
   };
 
-  const handleDeleteCategory = async (categoryId: string, categoryName: string) => {
-    if (!confirm(`¿Eliminar la categoría "${categoryName}"? Esta acción no se puede deshacer.`)) {
-      return;
-    }
+  const handleDeleteCategory = async (categoryId: string) => {
     
     try {
       await apiDelete(`/admin/categories/${categoryId}`);
@@ -672,10 +793,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     }
   };
 
-  const handleDeleteSubcategory = async (subcategoryId: string, subcategoryName: string) => {
-    if (!confirm(`¿Eliminar la subcategoría "${subcategoryName}"?`)) {
-      return;
-    }
+  const handleDeleteSubcategory = async (subcategoryId: string) => {
     
     try {
       await apiDelete(`/admin/subcategories/${subcategoryId}`);
@@ -700,12 +818,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     });
   };
 
+  // El mínimo de la contraseña es del Backend: `UserCreateRequest` pide seis.
+  // Se comprueba acá también para no gastar un viaje ni un 422 en algo que la
+  // pantalla ya sabe.
+  const MINIMO_DE_CLAVE = 6;
+
   const handleCreateUser = async () => {
-    if (!newUser.email || !newUser.password || !newUser.full_name) {
-      showToast('Complete todos los campos requeridos', 'warning');
+    if (!newUser.email.trim() || !newUser.password || !newUser.full_name.trim()) {
+      setAltaError('Completá el email, la contraseña y el nombre: son obligatorios.');
       return;
     }
-    
+    if (newUser.password.length < MINIMO_DE_CLAVE) {
+      setAltaError(`La contraseña necesita al menos ${MINIMO_DE_CLAVE} caracteres.`);
+      return;
+    }
+
+    setAltaError('');
     try {
       await apiPost('/admin/users', newUser);
       showToast('Usuario creado exitosamente', 'success');
@@ -714,7 +842,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       loadUsers();
     } catch (error) {
       console.error('Error creando usuario:', error);
-      showToast('Error al crear usuario', 'error');
+      // El detalle del servidor es lo único accionable que hay: dice si el
+      // email ya existe o qué campo no pasó. Reemplazarlo por «Error al crear
+      // usuario» era tirar la única información útil. El formulario queda como
+      // está, con lo escrito, para corregir y reintentar.
+      setAltaError(error instanceof Error && error.message
+        ? error.message
+        : 'No se pudo crear el usuario.');
     }
   };
 
@@ -750,6 +884,137 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     }
   };
 
+  // --- Lo que se pregunta antes de escribir --------------------------------
+  //
+  // Cada pedido nombra el objeto —la persona, la publicación—, el cambio
+  // exacto y su consecuencia. «¿Estás seguro?» no es una pregunta: no dice qué
+  // se va a hacer ni sobre qué.
+
+  const ROL_LEGIBLE: Record<string, string> = { admin: 'Admin', user: 'Usuario' };
+
+  const pedirBorrado = (
+    que: string,
+    nombre: string,
+    consecuencia: React.ReactNode,
+    hacer: () => Promise<void>,
+  ) => setConfirmacion({
+    titulo: `Eliminar ${que}`,
+    detalle: (<><strong>{nombre}</strong>. {consecuencia}</>),
+    textoConfirmar: `Eliminar ${que}`,
+    destructiva: true,
+    hacer,
+  });
+
+  /**
+   * Una contraseña nueva que sirva de verdad: 20 caracteres de un alfabeto
+   * sin ambiguos —nada de O/0, l/1/I—, sacados del generador criptográfico del
+   * navegador y no de `Math.random`, que es predecible.
+   *
+   * El rechazo por módulo se descarta en vez de recortarse: tomar el resto de
+   * un byte sobre un alfabeto que no divide a 256 favorece a las primeras
+   * letras, y una contraseña con letras más probables que otras es más corta
+   * de lo que aparenta.
+   */
+  const claveNueva = () => {
+    const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%+=?';
+    const TOPE = 256 - (256 % ALFABETO.length);
+    let clave = '';
+    while (clave.length < 20) {
+      const bytes = new Uint8Array(24);
+      crypto.getRandomValues(bytes);
+      for (const byte of bytes) {
+        if (byte < TOPE && clave.length < 20) clave += ALFABETO[byte % ALFABETO.length];
+      }
+    }
+    return clave;
+  };
+
+  const pedirRestablecerClave = (usuario: AdminUser) => setConfirmacion({
+    titulo: 'Restablecer la contraseña',
+    detalle: (
+      <>
+        Se le genera una contraseña nueva a <strong>{usuario.full_name}</strong>{' '}
+        ({usuario.email}) y la de ahora deja de funcionar en el momento. Vas a verla
+        una sola vez, así que tenés que tenerla a mano para pasársela. Queda vigente
+        hasta que un administrador la restablezca otra vez.
+      </>
+    ),
+    textoConfirmar: 'Generar contraseña nueva',
+    destructiva: true,
+    hacer: async () => {
+      // La clave se genera acá y vive en memoria hasta que se cierra el
+      // resultado. No se registra, no viaja en la URL y no se guarda.
+      const clave = claveNueva();
+      await apiPost(`/admin/users/${usuario.id}/reset-password`, { password: clave });
+      setClaveTemporal({ usuario: usuario.full_name || usuario.email, clave });
+    },
+  });
+
+  const pedirCambioDeRol = (usuario: AdminUser, nuevoRol: string) => {
+    if (nuevoRol === usuario.role) return;
+    const sube = nuevoRol === 'admin';
+    setConfirmacion({
+      titulo: sube ? 'Dar acceso de administrador' : 'Quitar acceso de administrador',
+      detalle: (
+        <>
+          <strong>{usuario.full_name}</strong> ({usuario.email}) pasa de{' '}
+          <strong>{ROL_LEGIBLE[usuario.role] || usuario.role}</strong> a{' '}
+          <strong>{ROL_LEGIBLE[nuevoRol] || nuevoRol}</strong>.{' '}
+          {sube
+            ? 'Va a poder ver y cambiar los datos de todas las cuentas, publicaciones y órdenes.'
+            : 'Deja de tener acceso al panel y a los datos de las demás cuentas.'}
+        </>
+      ),
+      textoConfirmar: sube ? 'Dar acceso de Admin' : 'Pasar a Usuario',
+      destructiva: !sube,
+      hacer: () => handleChangeUserRole(usuario.id, nuevoRol),
+    });
+  };
+
+  const pedirCambioDeCuenta = (usuario: AdminUser) => {
+    const desactiva = usuario.is_active;
+    setConfirmacion({
+      titulo: desactiva ? 'Desactivar la cuenta' : 'Activar la cuenta',
+      detalle: (
+        <>
+          <strong>{usuario.full_name}</strong> ({usuario.email}){' '}
+          {desactiva
+            ? 'no va a poder volver a entrar hasta que se reactive la cuenta. Sus publicaciones y sus órdenes quedan como están.'
+            : 'vuelve a poder entrar con su contraseña de siempre.'}
+        </>
+      ),
+      textoConfirmar: desactiva ? 'Desactivar la cuenta' : 'Activar la cuenta',
+      destructiva: desactiva,
+      hacer: () => handleToggleUserActive(usuario.id),
+    });
+  };
+
+  const pedirCambioDeEstado = (producto: AdminProduct, nuevoEstado: string) => {
+    if (nuevoEstado === producto.status) return;
+    const CONSECUENCIA: Record<string, string> = {
+      active: 'Vuelve a aparecer en el catálogo y se puede comprar.',
+      paused: 'Deja de aparecer en el catálogo. No se borra y se puede volver a activar.',
+      sold_out: 'Sigue visible pero no se puede comprar.',
+      deleted: 'Deja de aparecer en el catálogo y en las búsquedas.',
+    };
+    const antes = estadoDeProducto(producto.status);
+    const despues = estadoDeProducto(nuevoEstado);
+    setConfirmacion({
+      titulo: 'Cambiar el estado de la publicación',
+      detalle: (
+        <>
+          <strong>{producto.name}</strong> pasa de <strong>{antes.texto}</strong> a{' '}
+          <strong>{despues.texto}</strong>. {CONSECUENCIA[nuevoEstado] || ''}{' '}
+          Es la publicación de otra persona: {producto.seller_name || 'su vendedor'} no
+          recibe aviso de este cambio.
+        </>
+      ),
+      textoConfirmar: `Pasar a ${despues.texto}`,
+      destructiva: nuevoEstado === 'deleted' || nuevoEstado === 'paused',
+      hacer: () => handleChangeProductStatus(producto.id, nuevoEstado),
+    });
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
@@ -763,28 +1028,58 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     return new Date(dateStr).toLocaleDateString('es-AR');
   };
 
-  const getStatusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      active: 'var(--tg-color-brand)',
-      paused: 'var(--tg-color-warning)',
-      draft: 'var(--tg-color-text-secondary)',
-      deleted: 'var(--tg-color-error)',
-      placed: 'var(--tg-color-info)',
-      confirmed: 'var(--tg-color-info)',
-      shipped: 'var(--tg-color-warning)',
-      delivered: 'var(--tg-color-brand)',
-      cancelled: 'var(--tg-color-error)'
-    };
-    return (
-      <span className={styles.badge} style={{ backgroundColor: colors[status] || 'var(--tg-color-text-secondary)' }}>
-        {status}
-      </span>
-    );
-  };
+  // El badge dice el estado en castellano y con el tono que le corresponde.
+  // Antes imprimía el token del Backend —`sold_out`, `awaiting_transfer_receipt`—
+  // y pintaba de gris cualquier estado que su mapa no tuviera, que eran cuatro
+  // de los catorce. El diccionario vive en `utils/estados`, así que la fila y
+  // el filtro leen lo mismo.
+  const badgeDeEstado = ({ texto, tono }: EstadoTraducido) => (
+    <span className={styles.badge} style={{ backgroundColor: COLOR_DEL_TONO[tono] }}>
+      {texto}
+    </span>
+  );
 
   // Atrapa el foco, lo devuelve al cerrar, cierra con Escape y traba el
   // scroll del fondo. Ninguna capa del producto hacía nada de esto.
   const capa = useCapaModal<HTMLDivElement>(onClose);
+
+  // Carga, error y vacío son tres cosas distintas y hasta acá se veían igual.
+  //
+  // Con un fallo puesto NO se dibuja la tabla: se dibuja el aviso, con
+  // `role="alert"` para que un lector de pantalla lo anuncie, diciendo QUÉ no
+  // cargó y con un botón que vuelve a pedir lo mismo —la misma consulta y los
+  // mismos filtros, porque la función de carga los lee del estado vigente—.
+  // Mientras se está cargando se conserva lo que ya estaba, que es lo que hacía
+  // antes; lo que cambia es que un vacío ahora se dice con todas las letras en
+  // vez de ser una tabla sin filas.
+  const bloqueAuditado = (
+    seccion: SeccionAuditada,
+    recargar: () => void,
+    vacio: string,
+    hayContenido: boolean,
+    contenido: React.ReactNode,
+  ): React.ReactNode => {
+    const recurso = fallos[seccion];
+    if (recurso) {
+      return (
+        <div role="alert" className={styles.avisoDeFallo}>
+          <p className={styles.avisoDeFalloTexto}>No se pudo cargar {recurso}.</p>
+          <button type="button" className={styles.avisoDeFalloBoton} onClick={recargar}>
+            Reintentar
+          </button>
+        </div>
+      );
+    }
+    // El vacío se DICE, pero no reemplaza a la tabla ni al pie: ese pie ya
+    // decía la verdad —«Total: 0 usuarios», «Página 1 de 1», navegación
+    // deshabilitada— y sacarlo perdería información en vez de sumarla.
+    return (
+      <>
+        {contenido}
+        {!hayContenido && !loading && <p className={styles.noData}>{vacio}</p>}
+      </>
+    );
+  };
 
   // El detalle de una orden es otra capa encima del panel, no un div suelto:
   // sin esto Escape lo atravesaba y cerraba Administración entera —con su
@@ -859,28 +1154,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {loading && <div className={styles.loading}>Cargando...</div>}
 
           {/* DASHBOARD */}
-          {activeTab === 'dashboard' && stats && (
+          {activeTab === 'dashboard' && bloqueAuditado(
+            'dashboard', loadDashboard, 'El resumen no devolvió datos.', stats !== null,
+            stats && (
             <div className={styles.dashboard}>
               <div className={styles.statsGrid}>
                 <div className={styles.statCard}>
                   <div className={styles.statIcon}></div>
                   <div className={styles.statInfo}>
                     <span className={styles.statValue}>{stats.total_users}</span>
-                    <span className={styles.statLabel}>Usuarios Totales</span>
+                    <span className={styles.statLabel}>Total de usuarios</span>
                   </div>
                 </div>
                 <div className={styles.statCard}>
                   <div className={styles.statIcon}></div>
                   <div className={styles.statInfo}>
-                    <span className={styles.statValue}>{stats.total_sellers}</span>
-                    <span className={styles.statLabel}>Vendedores</span>
+                    <span className={styles.statValue}>{stats.total_normal_users}</span>
+                    <span className={styles.statLabel}>Usuarios comunes</span>
                   </div>
                 </div>
                 <div className={styles.statCard}>
                   <div className={styles.statIcon}></div>
                   <div className={styles.statInfo}>
-                    <span className={styles.statValue}>{stats.total_customers}</span>
-                    <span className={styles.statLabel}>Clientes</span>
+                    <span className={styles.statValue}>{stats.total_admins}</span>
+                    <span className={styles.statLabel}>Administradores</span>
                   </div>
                 </div>
                 <div className={styles.statCard}>
@@ -900,8 +1197,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 <div className={styles.statCard}>
                   <div className={styles.statIcon}></div>
                   <div className={styles.statInfo}>
-                    <span className={styles.statValue}>{stats.pending_orders}</span>
-                    <span className={styles.statLabel}>Pendientes</span>
+                    <span className={styles.statValue}>{stats.orders_in_process}</span>
+                    <span className={styles.statLabel}>Órdenes en proceso</span>
                   </div>
                 </div>
                 <div className={styles.statCard}>
@@ -914,12 +1211,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 <div className={styles.statCard} style={{ gridColumn: 'span 2', background: 'var(--gradient-primary)' }}>
                   <div className={styles.statIcon} style={{ color: 'white' }}></div>
                   <div className={styles.statInfo}>
-                    <span className={styles.statValue} style={{ color: 'white' }}>{formatCurrency(stats.total_revenue)}</span>
-                    <span className={styles.statLabel} style={{ color: 'var(--tg-color-surface)' }}>Ingresos</span>
+                    <span className={styles.statValue} style={{ color: 'white' }}>{formatCurrency(stats.sold_volume)}</span>
+                    <span className={styles.statLabel} style={{ color: 'var(--tg-color-surface)' }}>Volumen vendido</span>
                   </div>
                 </div>
               </div>
             </div>
+            ),
           )}
 
           {/* USERS */}
@@ -972,6 +1270,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               {showCreateUser && (
                 <div className={styles.createForm}>
                   <h3>Crear Nuevo Usuario</h3>
+                  {altaError && (
+                    <p role="alert" className={styles.altaError}>{altaError}</p>
+                  )}
                   <div className={styles.formGrid}>
                     <input
                       type="email"
@@ -1009,13 +1310,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                     <button className={styles.saveBtn} onClick={handleCreateUser}>
                       Crear Usuario
                     </button>
-                    <button className={styles.cancelBtn} onClick={() => setShowCreateUser(false)}>
+                    <button
+                      className={styles.cancelBtn}
+                      onClick={() => { setShowCreateUser(false); setAltaError(''); }}
+                    >
                       Cancelar
                     </button>
                   </div>
                 </div>
               )}
 
+              {bloqueAuditado('usuarios', loadUsers,
+                'No hay usuarios que coincidan con el filtro.', users.length > 0, (
+                <>
               <TablaDesplazable etiqueta="Usuarios registrados">
                 <table className={styles.table}>
                   <thead>
@@ -1036,7 +1343,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         <td>
                           <select aria-label="Rol del usuario"
                             value={user.role}
-                            onChange={(e) => handleChangeUserRole(user.id, e.target.value)}
+                            onChange={(e) => pedirCambioDeRol(user, e.target.value)}
                             className={styles.roleSelect}
                           >
                             <option value="user">Usuario</option>
@@ -1052,9 +1359,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         <td>
                           <button
                             className={`${styles.actionBtn} ${user.is_active ? styles.deactivate : styles.activate}`}
-                            onClick={() => handleToggleUserActive(user.id)}
+                            onClick={() => pedirCambioDeCuenta(user)}
                           >
                             {user.is_active ? 'Desactivar' : 'Activar'}
+                          </button>
+                          <button
+                            className={styles.actionBtn}
+                            onClick={() => pedirRestablecerClave(user)}
+                          >
+                            Restablecer contraseña
                           </button>
                         </td>
                       </tr>
@@ -1068,6 +1381,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 total={usersTotal}
                 alCambiar={setUsersPage}
               />
+                </>
+              ))}
             </div>
           )}
 
@@ -1100,6 +1415,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 publicar, vender o cobrar.
               </p>
 
+              {bloqueAuditado('documentacion', loadDocumentacion,
+                'No hay documentación con ese estado.', documentacion.length > 0, (
               <TablaDesplazable etiqueta="Documentación presentada por vendedores">
                 <table className={styles.table}>
                   <thead>
@@ -1215,9 +1532,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   </tbody>
                 </table>
               </TablaDesplazable>
-              {documentacion.length === 0 && !loading && (
-                <p className={styles.noData}>No hay documentación con ese estado.</p>
-              )}
+              ))}
             </div>
           )}
 
@@ -1231,12 +1546,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   className={styles.filterSelect}
                 >
                   <option value="">Todos los estados</option>
-                  <option value="active">Activas</option>
-                  <option value="paused">Pausadas</option>
-                  <option value="sold_out">Agotadas</option>
-                  <option value="deleted">Eliminadas</option>
+                  {/* Del mismo diccionario que el badge de la fila: si el filtro
+                      y la tabla no leyeran lo mismo, volverían a discrepar. */}
+                  {Object.entries(ESTADOS_DE_PRODUCTO).map(([token, estado]) => (
+                    <option key={token} value={token}>{estado.texto}</option>
+                  ))}
                 </select>
               </div>
+              {bloqueAuditado('productos', loadProducts,
+                'No hay publicaciones que coincidan con el filtro.', products.length > 0, (
+                <>
               <TablaDesplazable etiqueta="Publicaciones del catálogo">
                 <table className={styles.table}>
                   <thead>
@@ -1267,17 +1586,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         <td>{formatCurrency(product.price)}</td>
                         <td>{product.stock}</td>
                         <td>{product.seller_name || '-'}</td>
-                        <td>{getStatusBadge(product.status)}</td>
+                        <td>{badgeDeEstado(estadoDeProducto(product.status))}</td>
                         <td>
                           <select aria-label="Estado del producto"
                             value={product.status}
-                            onChange={(e) => handleChangeProductStatus(product.id, e.target.value)}
+                            onChange={(e) => pedirCambioDeEstado(product, e.target.value)}
                             className={styles.statusSelect}
                           >
-                            <option value="active">Activo</option>
-                            <option value="paused">Pausado</option>
-                            <option value="sold_out">Agotado</option>
-                            <option value="deleted">Eliminado</option>
+                            {/* Del mismo diccionario que el badge de al lado y
+                                que el filtro de arriba. Estaban escritas acá a
+                                mano y en masculino —«Activo», «Pausado»—,
+                                mientras el badge de la MISMA fila decía
+                                «Activa» y «Pausada»: el mismo estado con dos
+                                nombres, a dos centímetros. El `value` sigue
+                                siendo el token del Backend, que es lo que
+                                viaja en el PATCH. */}
+                            {Object.entries(ESTADOS_DE_PRODUCTO).map(([token, estado]) => (
+                              <option key={token} value={token}>{estado.texto}</option>
+                            ))}
                           </select>
                         </td>
                       </tr>
@@ -1291,6 +1617,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 total={productsTotal}
                 alCambiar={setProductsPage}
               />
+                </>
+              ))}
             </div>
           )}
 
@@ -1304,17 +1632,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   className={styles.filterSelect}
                 >
                   <option value="">Todos los estados</option>
-                  <option value="placed">Pedido realizado</option>
-                  <option value="confirmed">Confirmada</option>
-                  <option value="paid">Pagada</option>
-                  <option value="awaiting_transfer_receipt">Esperando comprobante</option>
-                  <option value="transfer_receipt_submitted">Comprobante a revisar</option>
-                  <option value="shipped">Enviada</option>
-                  <option value="delivered">Entregada</option>
-                  <option value="cancelled">Cancelada</option>
-                  <option value="rejected">Rechazada</option>
+                  {/* Idem Publicaciones: un solo diccionario para el filtro y la
+                      fila. `draft` no se ofrece como filtro porque una orden en
+                      borrador todavía no es un pedido, pero sí se traduce si
+                      alguna aparece en la tabla. */}
+                  {Object.entries(ESTADOS_DE_ORDEN)
+                    .filter(([token]) => token !== 'draft')
+                    .map(([token, estado]) => (
+                      <option key={token} value={token}>{estado.texto}</option>
+                    ))}
                 </select>
               </div>
+              {bloqueAuditado('ordenes', loadOrders,
+                'No hay órdenes que coincidan con el filtro.', orders.length > 0, (
+                <>
               <TablaDesplazable etiqueta="Órdenes de compra">
                 <table className={styles.table}>
                   <thead>
@@ -1337,7 +1668,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         <td>{order.seller_name || '-'}</td>
                         <td>{order.items_count}</td>
                         <td>{formatCurrency(order.total_amount)}</td>
-                        <td>{getStatusBadge(order.status)}</td>
+                        <td>{badgeDeEstado(estadoDeOrden(order.status))}</td>
                         <td>{formatDate(order.created_at)}</td>
                         <td>
                           <button
@@ -1359,6 +1690,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 total={ordersTotal}
                 alCambiar={setOrdersPage}
               />
+                </>
+              ))}
             </div>
           )}
         </div>
@@ -1383,7 +1716,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               <div className={styles.orderDetailGrid}>
                 <div className={styles.orderDetailSection}>
                   <h3>Información General</h3>
-                  <p><strong>Estado:</strong> {getStatusBadge(selectedOrder.status)}</p>
+                  <p><strong>Estado:</strong> {badgeDeEstado(estadoDeOrden(selectedOrder.status))}</p>
                   <p><strong>Fecha:</strong> {formatDate(selectedOrder.created_at)}</p>
                 </div>
                 
@@ -1572,7 +1905,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                       <button 
                         className={styles.deleteBtn}
                         aria-label={`Eliminar la categoría ${category.name}`}
-                        onClick={() => handleDeleteCategory(category.id, category.name)}
+                        onClick={() => pedirBorrado(
+                          'la categoría',
+                          category.name,
+                          'Se elimina para siempre. Sólo se puede si no le queda ninguna publicación ni subcategoría.',
+                          () => handleDeleteCategory(category.id),
+                        )}
                         disabled={category.product_count > 0}
                         title={category.product_count > 0
                           ? `No se puede eliminar: tiene ${category.product_count} publicación(es)`
@@ -1596,7 +1934,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                               <button 
                                 className={styles.deleteSubBtn}
                                 aria-label={`Eliminar la subcategoría ${sub.name}`}
-                                onClick={() => handleDeleteSubcategory(sub.id, sub.name)}
+                                onClick={() => pedirBorrado(
+                                  'la subcategoría',
+                                  sub.name,
+                                  'Se elimina para siempre. Sólo se puede si ninguna publicación la está usando.',
+                                  () => handleDeleteSubcategory(sub.id),
+                                )}
                               >
                                 Eliminar
                               </button>
@@ -1679,16 +2022,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                               ya se publicaron bajo esta categoría. El resto sí se edita.
                             </p>
                           )}
-                        </div>
-                        <div className={styles.formGroup}>
-                          <label htmlFor="categoria-edita-estado">Estado</label>
-                          <select id="categoria-edita-estado"
-                            value={editingCategory.is_active ? 'active' : 'inactive'}
-                            onChange={(e) => setEditingCategory({...editingCategory, is_active: e.target.value === 'active'})}
-                          >
-                            <option value="active">Activa</option>
-                            <option value="inactive">Inactiva</option>
-                          </select>
                         </div>
                       </div>
                       <div className={styles.formGroup}>
@@ -1865,7 +2198,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         <button 
                           className={styles.deleteBtn}
                           aria-label={`Eliminar la opción ${option.label}`}
-                          onClick={() => handleDeleteOption(option.id, option.label)}
+                          onClick={() => pedirBorrado(
+                            'la opción',
+                            option.label,
+                            'Deja de ofrecerse en los formularios. Las publicaciones que ya la eligieron no cambian.',
+                            () => handleDeleteOption(option.id),
+                          )}
                         >
                           Eliminar
                         </button>
@@ -1879,6 +2217,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         </div>
       )}
       </div>
+
+      {/* La confirmación, una sola para todo el panel. Se dibuja última: es la
+          capa de más arriba y no tiene que competir con nada por el foco. */}
+      {confirmacion && (
+        <Confirmacion
+          titulo={confirmacion.titulo}
+          detalle={confirmacion.detalle}
+          textoConfirmar={confirmacion.textoConfirmar}
+          destructiva={confirmacion.destructiva}
+          enCurso={confirmando}
+          alConfirmar={async () => {
+            // Una sola mutación por confirmación: mientras viaja, los botones
+            // están deshabilitados y el fondo no cierra.
+            setConfirmando(true);
+            try {
+              await confirmacion.hacer();
+            } finally {
+              setConfirmando(false);
+              setConfirmacion(null);
+            }
+          }}
+          alCancelar={() => setConfirmacion(null)}
+        />
+      )}
+
+      {claveTemporal && (
+        <ClaveTemporal
+          usuario={claveTemporal.usuario}
+          clave={claveTemporal.clave}
+          alCerrar={() => setClaveTemporal(null)}
+        />
+      )}
     </div>
   );
 };

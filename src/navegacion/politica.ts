@@ -14,20 +14,29 @@ export type Seccion =
   | 'services'
   | 'about'
   | 'contact'
+  | 'account'
   | 'payment-success'
   | 'payment-failure'
   | 'payment-pending'
   | 'verificar-correo';
 
 /**
- * Cómo se nombra cada sección pública en la barra. Inicio es la raíz y no
- * escribe nada: `/` es su representación, no una ausencia.
+ * Cómo se nombra cada sección en la barra. Inicio es la raíz y no escribe
+ * nada: `/` es su representación, no una ausencia.
+ *
+ * `account` es la única que pide sesión, y aun así se nombra igual que las
+ * demás: acá vive la POLÍTICA de nombres, no el permiso. Que se pueda estar
+ * ahí lo decide quien dibuja; que se pueda recargar, compartir y volver con
+ * Atrás lo decide esta tabla, y no hay motivo para que Mi cuenta sea la
+ * excepción. Antes no estaba, y por eso el panel no tenía URL: se abría con un
+ * estado local que Atrás no veía y recargar borraba.
  */
 const NOMBRE_EN_LA_BARRA: Partial<Record<Seccion, string>> = {
   marketplace: 'marketplace',
   services: 'services',
   about: 'about',
   contact: 'contact',
+  account: 'account',
 };
 
 const SECCION_DEL_NOMBRE: Record<string, Seccion> = {
@@ -35,6 +44,7 @@ const SECCION_DEL_NOMBRE: Record<string, Seccion> = {
   services: 'services',
   about: 'about',
   contact: 'contact',
+  account: 'account',
 };
 
 /**

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, ReactNode } from 'react';
 import { AuthContext } from './contextos';
 import { User, AuthContextType, RegisterData, RegistroPendiente } from '../types';
-import { apiGet, apiPost, apiPatch, tokenStorage } from '../utils/api';
+import { apiGet, apiPost, apiPatch, tokenStorage, ErrorDeLaApi } from '../utils/api';
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -120,8 +120,17 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
         const backendUser = await apiGet<BackendUser>('/auth/me');
         setUser(mapBackendUserToFrontend(backendUser));
       } catch (error) {
-        // Token inválido o expirado, limpiar
-        tokenStorage.clearTokens();
+        // Sólo una sesión CONFIRMADA vencida se lleva las credenciales.
+        //
+        // Antes cualquier tropiezo las borraba, y el arranque es donde más
+        // duele: abrir el sitio con la conexión floja, o con el Backend todavía
+        // levantando, dejaba a alguien afuera de su propia sesión y con el
+        // refresh bueno tirado a la basura. Conservarlas no muestra a nadie
+        // —sin la respuesta no hay usuario que dibujar— pero deja que la
+        // próxima vez se recupere sola.
+        if (error instanceof ErrorDeLaApi && error.causa === 'sesion-vencida') {
+          tokenStorage.clearTokens();
+        }
         setUser(null);
       } finally {
         setLoading(false);
@@ -236,6 +245,23 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
     }
   };
 
+  /**
+   * La sesión dejó de valer, y nadie pidió salir.
+   *
+   * No se reusa `logout()` a propósito, y no es una duplicación: `logout` es
+   * irse —avisa al servidor y vacía el carrito, que es lo que corresponde
+   * cuando alguien cierra su sesión—. Acá no se fue nadie: la credencial venció
+   * mientras la persona miraba lo que había elegido. Vaciarle el carrito por
+   * eso sería castigarla por un vencimiento que no controla.
+   *
+   * Y se llama SÓLO con la invalidez confirmada. Un 503 no es una sesión
+   * vencida: eso lo decide `asegurarSesion`, no esto.
+   */
+  const sesionInvalidada = () => {
+    tokenStorage.clearTokens();
+    setUser(null);
+  };
+
   const updateProfile = async (userData: Partial<User>) => {
     try {
       if (!user) throw new Error('Usuario no autenticado');
@@ -280,6 +306,7 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
     reenviarVerificacion,
     verificarCorreo,
     logout,
+    sesionInvalidada,
     updateProfile,
   };
 

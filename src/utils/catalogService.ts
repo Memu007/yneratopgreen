@@ -241,11 +241,11 @@ export const convertBackendProductToFrontend = (backendProduct: ProductFromBacke
     price: backendProduct.price,
     currency: backendProduct.currency,
     description: backendProduct.description,
-    // La foto de la publicacion, y si no hay, la del catalogo demostrativo.
+    // La foto de la publicación, y si no hay, la del catálogo demostrativo.
     //
-    // El orden es el unico que no miente: primero lo que subio quien
-    // publica. Solo cuando eso no existe -o es una URL de relleno, que para
-    // el sistema visual es lo mismo que no existir- se mira la tabla de la
+    // El orden es el único que no miente: primero lo que subió quien
+    // publica. Sólo cuando eso no existe —o es una URL de relleno, que para
+    // el sistema visual es lo mismo que no existir— se mira la tabla de la
     // demostracion. Un slug ajeno sin foto no encuentra nada ahi y conserva
     // el respaldo honesto: no hay imagen generica de reemplazo.
     image: fotoDemoDe(

@@ -35,6 +35,7 @@ import {
   precioVisible,
 } from '../../utils/formatters';
 import { useCapaModal } from '../../hooks/useCapaModal';
+import { useNavegacionActual } from '../../navegacion/navegacion';
 import { huboCambios, useSalidaProtegida } from '../../formularios/salidaProtegida';
 
 type TabType = 'profile' | 'notifications' | 'purchases' | 'sales' | 'products'
@@ -359,10 +360,16 @@ const aPublicacionDelPanel = (p: BackendProduct): UserProduct => {
   // reserva stock —lo decide su anatomía— y sin embargo la fila guarda 0,
   // porque la columna tiene ese valor por omisión y el alta le pasa NULL. En
   // una publicación de servicio manda su estado real: activo o pausado.
+  //
+  // Y `draft` no se pregunta más. `ProductStatus` tiene cuatro valores —ACTIVE,
+  // PAUSED, SOLD_OUT, DELETED, tanto en el modelo como en el tipo de la base—,
+  // así que una publicación en borrador no existe y esa rama no podía
+  // ejecutarse nunca. Una condición muerta no es inofensiva: dice que hay un
+  // estado que el producto tendría que saber dibujar, y no lo hay.
   const usaStock = !esDeServicio(normalizarAnatomia(p.operation_kind));
   let status: UserProduct['status'] = 'active';
   if (usaStock && p.stock === 0) status = 'sold-out';
-  else if (p.status === 'draft' || p.status === 'paused') status = 'paused';
+  else if (p.status === 'paused') status = 'paused';
 
   return {
     id: p.id,
@@ -417,11 +424,10 @@ const formularioDesde = (cuenta: User | null) => ({
 });
 
 interface UserDashboardProps {
-  onClose: () => void;
   onPublishClick?: () => void;
 }
 
-export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublishClick }) => {
+export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) => {
   const { user, updateProfile } = useAuth();
   const { showToast, showConfirm } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('profile');
@@ -482,6 +488,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   
   // Estado para calificaciones
   const [ratingModal, setRatingModal] = useState<{ orderId: string; sellerName: string } | null>(null);
+  /** El motivo del último envío que falló, visible en la capa. */
+  const [errorDeCalificacion, setErrorDeCalificacion] = useState('');
   // Rechazar una transferencia es una decisión con motivo obligatorio que el
   // comprador va a leer, así que vive en su propia capa del panel. Era un
   // `window.prompt`: fuera del sistema de capas, sin validación propia, sin
@@ -504,7 +512,20 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   const [ratingScore, setRatingScore] = useState(5);
   const [ratingComment, setRatingComment] = useState('');
   const [submittingRating, setSubmittingRating] = useState(false);
-  const [ratedOrders, setRatedOrders] = useState<Set<string>>(new Set());
+  /**
+   * Qué dice el SERVIDOR sobre calificar cada orden entregada, por UUID.
+   *
+   * Antes esto era un `Set` en memoria de las órdenes calificadas en esta
+   * pantalla, y por eso «Calificar vendedor» volvía a aparecer al recargar o al
+   * entrar de nuevo: la memoria se iba con el montaje y nadie le preguntaba a
+   * nadie. La pregunta la contesta `/ratings/order/{id}/can-rate`, que es quien
+   * sabe si la orden es tuya, si está entregada y si ya la calificaste.
+   *
+   * `'error'` no es `'no'`: si la consulta falla no se sabe, y no se ofrece una
+   * acción cuya elegibilidad se desconoce. Se dice que no se pudo y se ofrece
+   * reintentar.
+   */
+  const [puedeCalificar, setPuedeCalificar] = useState<Record<string, 'si' | 'no' | 'error'>>({});
   
   // Referencia a los productos originales del backend para edición
   const [backendProducts, setBackendProducts] = useState<BackendProduct[]>([]);
@@ -644,6 +665,53 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     return () => { vigente = false; };
   }, [activeTab]);
 
+  /**
+   * Le pregunta al servidor, por cada orden entregada, si esta persona puede
+   * calificarla. En paralelo: son varias órdenes y esperar una por una haría
+   * que la lista tardara en decidirse.
+   *
+   * Va con el UUID y no con el número visible. Se midió: `can-rate` con
+   * `ORD-2026...` devuelve 404 «Orden no encontrada», así que preguntar con el
+   * número habría escondido el botón siempre, por el motivo equivocado.
+   */
+  const preguntarSiSePuedeCalificar = useCallback(async (ordenes: Order[]) => {
+    const entregadas = ordenes.filter((orden) => orden.status === 'delivered');
+    if (entregadas.length === 0) return;
+    setPuedeCalificar((antes) => {
+      const ahora = { ...antes };
+      for (const orden of entregadas) if (!ahora[orden.orderId]) ahora[orden.orderId] = 'no';
+      return ahora;
+    });
+    const respuestas = await Promise.all(entregadas.map(async (orden) => {
+      try {
+        const veredicto = await apiGet<{ can_rate: boolean }>(
+          `/ratings/order/${orden.orderId}/can-rate`);
+        return [orden.orderId, veredicto.can_rate ? 'si' : 'no'] as const;
+      } catch {
+        return [orden.orderId, 'error'] as const;
+      }
+    }));
+    setPuedeCalificar((antes) => {
+      const ahora = { ...antes };
+      for (const [id, veredicto] of respuestas) ahora[id] = veredicto;
+      return ahora;
+    });
+  }, []);
+
+  /** Volver a preguntar por una sola orden: el reintento, y lo que corre
+   *  después de calificar para que el botón desaparezca por decisión del
+   *  servidor y no porque nos acordamos de haberlo hecho. */
+  const volverAPreguntar = useCallback(async (orderId: string) => {
+    setPuedeCalificar((antes) => ({ ...antes, [orderId]: 'no' }));
+    try {
+      const veredicto = await apiGet<{ can_rate: boolean }>(
+        `/ratings/order/${orderId}/can-rate`);
+      setPuedeCalificar((antes) => ({ ...antes, [orderId]: veredicto.can_rate ? 'si' : 'no' }));
+    } catch {
+      setPuedeCalificar((antes) => ({ ...antes, [orderId]: 'error' }));
+    }
+  }, []);
+
   // Cargar órdenes (compras y ventas) cuando cambia de pestaña
   useEffect(() => {
     const loadOrders = async () => {
@@ -687,6 +755,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             shipping: o.shipping,
           }));
           setPurchases(mappedOrders);
+          void preguntarSiSePuedeCalificar(mappedOrders);
         } else if (activeTab === 'sales') {
           const response = await apiGet<BackendOrder[]>('/orders/my?as_role=seller');
           const mappedOrders: Order[] = response.map(o => ({
@@ -721,7 +790,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     };
 
     loadOrders();
-  }, [activeTab, recargaDeOrdenes]);
+  }, [activeTab, recargaDeOrdenes, preguntarSiSePuedeCalificar]);
 
   // Cargar productos del usuario cuando se monta el componente
   useEffect(() => {
@@ -1050,12 +1119,17 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   // montar mientras se escribe.
   const salida = useSalidaProtegida();
   const { alSalir } = salida;
-  // Cerrar el panel entero: lo pide la X, el fondo y Escape, y arrastra
-  // cualquiera de los tres formularios que esté sucio.
-  const pedirCierreDelPanel = useCallback(
-    () => alSalir(trabajoRef.current, onClose),
-    [alSalir, onClose],
-  );
+  // Quien ve las salidas que no pasan por acá: la cabecera, el pie, Salir y el
+  // Atrás del navegador.
+  const { registrarGuardia } = useNavegacionActual();
+  // Mi cuenta ya no se cierra: se sale de ella. Las salidas son la cabecera,
+  // el pie, Salir, el Atrás del navegador y cambiar de pestaña, y ninguna de
+  // las cuatro primeras pasa por este componente. Así que la política de
+  // `FORM-DIRTY-1` se registra en la navegación, que es quien las ve todas.
+  //
+  // La quinta —cambiar de pestaña— sí es de acá, y usa la misma política: un
+  // perfil a medio editar no se pierde por tocar «Mis compras».
+
   const cerrarLaEdicion = useCallback(() => setEditingProduct(null), []);
   // Cerrar la capa del rechazo no toca la orden: sólo suelta lo que se estaba
   // por mandar. El foco vuelve al botón que la abrió por la pila de capas.
@@ -1064,6 +1138,51 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     setMotivoDelRechazo('');
     setErrorDelRechazo('');
   }, []);
+
+  // Descartar tiene que descartar de verdad.
+  //
+  // Mientras Mi cuenta era un modal, descartar cerraba el panel y el formulario
+  // se iba con él. Como página, el destino puede ser otra pestaña: si el
+  // formulario quedara escrito, la salida siguiente volvería a preguntar por lo
+  // mismo y «pregunta una sola vez» dejaría de ser cierto. Así que descartar
+  // suelta el trabajo local de las cuatro fuentes y recién después ejecuta el
+  // destino pedido.
+  //
+  // «Local» es la palabra importante: esto vuelve los formularios a lo último
+  // guardado. No toca ninguna orden ni ninguna publicación ya persistida.
+  const soltarTrabajoLocal = useCallback(() => {
+    setEditForm(formularioDesde(user));
+    setCarrierProvinceId(user?.carrierBaseProvinceId || '');
+    setCarrierPadronError('');
+    setIsEditing(false);
+    setEditingProduct(null);
+    setRatingModal(null);
+    soltarElRechazo();
+  }, [user, soltarElRechazo]);
+
+  const pedirSalidaDeLaPagina = useCallback(
+    (seguir: () => void) => alSalir(trabajoRef.current, () => {
+      soltarTrabajoLocal();
+      seguir();
+    }),
+    [alSalir, soltarTrabajoLocal],
+  );
+
+  useEffect(() => registrarGuardia({
+    hayTrabajoSinGuardar: () => trabajoRef.current,
+    preguntar: pedirSalidaDeLaPagina,
+  }), [registrarGuardia, pedirSalidaDeLaPagina]);
+
+  const cambiarDePestana = useCallback(
+    (destino: TabType) => {
+      // Elegir la pestaña en la que ya se está no es irse a ningún lado, así
+      // que no pregunta: es la misma regla con la que la navegación no agrega
+      // una entrada al historial cuando el destino es la ubicación actual.
+      if (destino === activeTab) return;
+      pedirSalidaDeLaPagina(() => setActiveTab(destino));
+    },
+    [activeTab, pedirSalidaDeLaPagina],
+  );
   // El cierre que piden las cuatro vías —Escape, X, Cancelar y fondo— es uno
   // solo, y está protegido: mientras el rechazo viaja, cerrar sería mentir.
   // La petición no se cancela, así que la orden se rechazaría igual y la
@@ -1076,8 +1195,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
   }, [soltarElRechazo]);
   const pedirCierreDeLaEdicion = () => alSalir(edicionSucia, cerrarLaEdicion);
   const cerrarLaCalificacion = useCallback(() => setRatingModal(null), []);
-  const pedirCierreDeLaCalificacion = () =>
-    alSalir(calificacionSucia, cerrarLaCalificacion);
+  // Estable entre renders: la capa de la calificación lo toma como dependencia,
+  // y una función nueva en cada render volvería a montar el efecto de la capa
+  // —que es el que atrapa el foco—, así que escribir en el comentario expulsaría
+  // el foco al primer control. Es la misma trampa que documenta `useCapaModal`.
+  const pedirCierreDeLaCalificacion = useCallback(
+    () => alSalir(calificacionSucia, cerrarLaCalificacion),
+    [alSalir, calificacionSucia, cerrarLaCalificacion],
+  );
 
   const handleCancelEdit = () => {
     setEditForm(formularioDesde(user));
@@ -1420,6 +1545,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     setRatingModal({ orderId, sellerName });
     setRatingScore(5);
     setRatingComment('');
+    setErrorDeCalificacion('');
   };
 
   // Función para enviar la calificación
@@ -1427,6 +1553,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     if (!ratingModal) return;
     
     setSubmittingRating(true);
+    setErrorDeCalificacion('');
     try {
       await apiPost('/ratings/', {
         order_id: ratingModal.orderId,
@@ -1435,7 +1562,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       });
       
       showToast('¡Gracias por tu calificación!', 'success');
-      setRatedOrders(prev => new Set(prev).add(ratingModal.orderId));
+      // El botón se va porque el servidor dice que ya no se puede, no porque
+      // nos acordemos de haber calificado: eso es lo que sobrevive a recargar.
+      void volverAPreguntar(ratingModal.orderId);
       // Ya se guardó: no hay nada sin guardar que preguntar.
       setRatingModal(null);
     } catch (error: unknown) {
@@ -1445,10 +1574,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         : 'Error al enviar la calificación';
       if (errorMessage?.includes('Ya has calificado')) {
         showToast('Ya calificaste esta orden', 'info');
-        setRatedOrders(prev => new Set(prev).add(ratingModal.orderId));
+        void volverAPreguntar(ratingModal.orderId);
         setRatingModal(null);
       } else {
         showToast('Error al enviar la calificación', 'error');
+        setErrorDeCalificacion(
+          'No se pudo enviar la calificación. Revisá la conexión y probá de nuevo.');
       }
     } finally {
       setSubmittingRating(false);
@@ -1835,7 +1966,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           </div>
           <div className={styles.statInfo}>
             <p className={styles.statLabel}>Reputación</p>
-            <p className={styles.statValue}>
+            <p className={`${styles.statValue} ${
+              (user?.ratingCount ?? 0) > 0 ? '' : styles.statValueFrase
+            }`}>
               {/* Con palabras y no con una raya: «—» obliga a adivinar si es
                   cero, si falta el dato o si se rompió algo. */}
               {(user?.ratingCount ?? 0) > 0
@@ -1893,10 +2026,28 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           </div>
           <div className={styles.userRating}>
             {(user?.ratingCount ?? 0) > 0 ? (
-              <>
-                <span className={styles.stars}>{''.repeat(Math.round(user?.ratingAverage ?? 0))}</span>
-                <span className={styles.ratingValue}>{(user?.ratingAverage ?? 0).toFixed(1)}</span>
-              </>
+              /* Una sola descripción para quien no ve la pantalla, y el dibujo
+                 marcado como decorativo.
+
+                 Acá había `''.repeat(n)`: una cadena VACÍA repetida, que dibuja
+                 exactamente nada. La reputación se anunciaba con un número
+                 suelto al lado de un hueco. Y si se leyera con lector de
+                 pantalla estrella por estrella, más el número, más la cantidad,
+                 el mismo dato se diría tres veces. */
+              <span
+                className={styles.calificacion}
+                role="img"
+                aria-label={`${(user?.ratingAverage ?? 0).toFixed(1)} de 5, `
+                  + `${user?.ratingCount ?? 0} calificaciones`}
+              >
+                <span className={styles.stars} aria-hidden="true">
+                  {'★'.repeat(Math.round(user?.ratingAverage ?? 0))}
+                  {'☆'.repeat(5 - Math.round(user?.ratingAverage ?? 0))}
+                </span>
+                <span className={styles.ratingValue} aria-hidden="true">
+                  {(user?.ratingAverage ?? 0).toFixed(1)}
+                </span>
+              </span>
             ) : (
               <span className={styles.noRating}>Sin calificaciones aún</span>
             )}
@@ -2717,8 +2868,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         ) : purchases.length === 0 ? (
           <div className={styles.emptyState}>
             <div className={styles.emptyIcon}></div>
-            <h3>Aún no tienes compras</h3>
-            <p>Explora el marketplace y realiza tu primera compra</p>
+            <h3>Todavía no tenés compras</h3>
+            <p>Explorá el mercado y hacé tu primera compra</p>
           </div>
         ) : (
           <>
@@ -2937,13 +3088,31 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
                       Confirmar Recepción
                     </button>
                   )}
-                  {order.status === 'delivered' && !ratedOrders.has(order.id) && (
+                  {/* El UUID y no `order.id`, que es el número visible: la
+                      calificación se guarda contra la orden, no contra su
+                      rótulo. */}
+                  {order.status === 'delivered' && puedeCalificar[order.orderId] === 'si' && (
                     <button 
                       className={styles.confirmButton}
-                      onClick={() => openRatingModal(order.id, order.seller?.name || 'Vendedor')}
+                      onClick={() => openRatingModal(order.orderId, order.seller?.name || 'Vendedor')}
                     >
                       Calificar Vendedor
                     </button>
+                  )}
+                  {/* No se sabe si se puede: se dice, y se ofrece reintentar.
+                      Ofrecer el botón a ciegas sería prometer algo que el
+                      servidor puede rechazar. */}
+                  {order.status === 'delivered' && puedeCalificar[order.orderId] === 'error' && (
+                    <span className={styles.calificarSinSaber}>
+                      No pudimos comprobar si podés calificar esta compra.{' '}
+                      <button
+                        type="button"
+                        className={styles.reintentar}
+                        onClick={() => volverAPreguntar(order.orderId)}
+                      >
+                        Reintentar
+                      </button>
+                    </span>
                   )}
                 </div>
               </div>
@@ -2970,8 +3139,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       ) : sales.length === 0 ? (
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}></div>
-          <h3>Aún no tienes ventas</h3>
-          <p>Publica productos y espera a que los compradores te encuentren</p>
+          <h3>Todavía no tenés ventas</h3>
+          <p>Publicá productos y esperá a que los compradores te encuentren</p>
         </div>
       ) : (
         <div className={styles.ordersList}>
@@ -3295,7 +3464,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
       ) : notifications.length === 0 ? (
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}></div>
-          <h3>No tienes notificaciones</h3>
+          <h3>No tenés notificaciones</h3>
           <p>Cuando ocurran eventos importantes, las verás aquí</p>
         </div>
       ) : (
@@ -3335,37 +3504,56 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
     </div>
   );
 
-  // Atrapa el foco, lo devuelve al cerrar, cierra con Escape y traba el
-  // scroll del fondo. Ninguna capa del producto hacía nada de esto.
-  const capa = useCapaModal<HTMLDivElement>(pedirCierreDelPanel);
+  // El contenedor general ya NO es una capa: no atrapa el foco, no traba el
+  // scroll del documento y no cierra con Escape. Es una página, y una página
+  // no hace nada de eso. Las capas de adentro —editar, calificar, rechazar—
+  // siguen siendo capas y conservan la pila.
+  //
   // La capa del rechazo usa la pila ya aceptada: foco adentro, trampa de Tab,
   // Escape que cierra sólo la de arriba y foco de vuelta a su disparador.
   const capaDelRechazo = useCapaModal<HTMLDivElement>(
     cerrarElRechazo, rechazoDeTransferencia !== null,
   );
+  // La edición de una publicación ahora también tiene la suya.
+  //
+  // Nunca la había tenido: mientras Mi cuenta era un modal, Escape adentro de
+  // la edición disparaba el oyente del PANEL y cerraba todo de un saque —lo que
+  // el caso 149 registró como «edición + X: cerraba sin avisar»—. Al retirar la
+  // capa general se quedó sin ningún Escape, que es peor. Con la suya cierra de
+  // a una, atrapa el foco mientras está arriba y lo devuelve al «Editar» que la
+  // abrió, que es lo que el contrato pide de las capas de adentro.
+  const capaDeLaEdicion = useCapaModal<HTMLDivElement>(
+    pedirCierreDeLaEdicion, editingProduct !== null,
+  );
+
+  /**
+   * La calificación también es una capa de verdad, y no lo era: se dibujaba con
+   * estilos en línea, sin `role`, sin nombre, sin trampa de foco y sin Escape.
+   * Tabular desde adentro recorría el panel tapado de atrás.
+   *
+   * Mientras la calificación viaja no cierra por ninguna vía: si se fuera a
+   * mitad del envío, la pantalla diría que no pasó nada y la calificación se
+   * guardaría igual.
+   */
+  const cerrarLaCapaDeCalificacion = useCallback(() => {
+    if (!submittingRating) pedirCierreDeLaCalificacion();
+  }, [submittingRating, pedirCierreDeLaCalificacion]);
+  const capaDeLaCalificacion = useCapaModal<HTMLDivElement>(
+    cerrarLaCapaDeCalificacion, ratingModal !== null,
+  );
 
   return (
-    <div className={styles.overlay} onClick={pedirCierreDelPanel}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}
-        ref={capa}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Mi cuenta"
-        tabIndex={-1}
-      >
-        <button className={styles.closeButton} aria-label="Cerrar" onClick={pedirCierreDelPanel}>
-          ×
-        </button>
-
+    <main className={styles.pagina} aria-labelledby="cuenta-titulo">
+      <div className={styles.lienzo}>
         <div className={styles.header}>
-          <h1>Mi Panel</h1>
-          <p>Gestiona tu perfil, compras y ventas</p>
+          <h1 id="cuenta-titulo">Mi cuenta</h1>
+          <p>Tu perfil, tus compras y tus ventas</p>
         </div>
 
         <div className={styles.tabs}>
           <button
             className={`${styles.tab} ${activeTab === 'profile' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('profile')}
+            onClick={() => cambiarDePestana('profile')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3375,7 +3563,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           </button>
           <button
             className={`${styles.tab} ${activeTab === 'notifications' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('notifications')}
+            onClick={() => cambiarDePestana('notifications')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3386,7 +3574,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           </button>
           <button
             className={`${styles.tab} ${activeTab === 'purchases' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('purchases')}
+            onClick={() => cambiarDePestana('purchases')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <circle cx="9" cy="21" r="1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3397,7 +3585,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           </button>
           <button
             className={`${styles.tab} ${activeTab === 'sales' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('sales')}
+            onClick={() => cambiarDePestana('sales')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <line x1="12" y1="1" x2="12" y2="23" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3408,7 +3596,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           {esTransportista && (
             <button
               className={`${styles.tab} ${activeTab === 'operations' ? styles.tabActive : ''}`}
-              onClick={() => setActiveTab('operations')}
+              onClick={() => cambiarDePestana('operations')}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path d="M1 3h15v13H1z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3421,7 +3609,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
           )}
           <button
             className={`${styles.tab} ${activeTab === 'products' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('products')}
+            onClick={() => cambiarDePestana('products')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3549,9 +3737,20 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
             pedirCierreDeLaEdicion();
           }}
         >
-          <div className={styles.editModal} onClick={(e) => e.stopPropagation()}>
+          <div
+            className={styles.editModal}
+            ref={capaDeLaEdicion}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-de-la-edicion"
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className={styles.editModalHeader}>
-              <h2> Editar {editingProduct.publication_type === 'servicio' ? 'Servicio' : 'Producto'}</h2>
+              <h2 id="titulo-de-la-edicion">
+                {' '}
+                Editar {editingProduct.publication_type === 'servicio' ? 'Servicio' : 'Producto'}
+              </h2>
               <button 
                 className={styles.closeButton}
                 onClick={pedirCierreDeLaEdicion}
@@ -3968,150 +4167,131 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onClose, onPublish
         </div>
       )}
 
-      {/* Modal de Calificación */}
+      {/* La calificación: una capa real, con un selector real.
+
+          Antes era un `div` con estilos en línea y cinco `span` con `onClick`.
+          Un `span` no es un control: no recibe foco, no tiene estado, no se
+          opera con el teclado y no se anuncia. Elegir cuántas estrellas darle a
+          alguien era, literalmente, imposible sin mouse.
+
+          Ahora son cinco radios nativos con un nombre común. Las flechas, la
+          selección y el anuncio los hace el navegador; nosotros sólo los
+          dibujamos. */}
       {ratingModal && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10000
-          }}
+        <div
+          className={styles.fondoCalificacion}
           onClick={(evento) => {
-            // Igual que la edición: el fondo de la calificación no puede
-            // cerrar además el panel que está debajo.
+            // El fondo de la calificación no puede cerrar además el panel de
+            // atrás.
             evento.stopPropagation();
-            pedirCierreDeLaCalificacion();
+            cerrarLaCapaDeCalificacion();
           }}
         >
-          <div 
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '16px',
-              padding: '30px',
-              width: '90%',
-              maxWidth: '450px',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.3)'
-            }}
-            onClick={(e) => e.stopPropagation()}
+          <div
+            className={styles.tarjetaCalificacion}
+            ref={capaDeLaCalificacion}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="calificacion-titulo"
+            aria-describedby="calificacion-detalle"
+            tabIndex={-1}
+            onClick={(evento) => evento.stopPropagation()}
           >
-            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <h2 style={{ margin: 0, color: 'var(--tg-color-brand)', fontSize: '1.5rem' }}>
-                Calificar a {ratingModal.sellerName}
-              </h2>
+            <div className={styles.encabezadoCalificacion}>
+              <h2 id="calificacion-titulo">Calificar a {ratingModal.sellerName}</h2>
+              <button
+                type="button"
+                className={styles.cerrarCalificacion}
+                aria-label="Cerrar"
+                onClick={cerrarLaCapaDeCalificacion}
+                disabled={submittingRating}
+              >
+                ×
+              </button>
             </div>
-            
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', marginBottom: '12px', fontWeight: '600', color: 'var(--tg-color-text)' }}>
-                Tu calificación
-              </label>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', fontSize: '2.5rem' }}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <span
-                    key={star}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setRatingScore(star);
-                    }}
-                    style={{ 
-                      color: star <= ratingScore ? 'var(--tg-color-warning)' : 'var(--tg-color-text-secondary)',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s, color 0.2s',
-                      userSelect: 'none'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.2)'}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+
+            <p id="calificacion-detalle" className={styles.detalleCalificacion}>
+              Tu calificación queda pública en el perfil de quien te vendió.
+            </p>
+
+            {/* Un grupo de verdad: `fieldset` con `legend` es lo que hace que
+                un lector de pantalla anuncie «Tu calificación, 5 de 5» y no
+                cinco casillas sueltas sin contexto. */}
+            <fieldset className={styles.grupoDeEstrellas} disabled={submittingRating}>
+              <legend>Tu calificación</legend>
+              <div className={styles.estrellas}>
+                {[1, 2, 3, 4, 5].map((puntaje) => (
+                  <label
+                    key={puntaje}
+                    className={`${styles.estrella} ${puntaje <= ratingScore ? styles.elegida : ''}`}
                   >
-                    {star <= ratingScore ? '★' : '☆'}
-                  </span>
+                    <input
+                      type="radio"
+                      name="calificacion-puntaje"
+                      value={puntaje}
+                      checked={ratingScore === puntaje}
+                      onChange={() => setRatingScore(puntaje)}
+                    />
+                    {/* El dibujo es decorativo: lo que se anuncia es el rótulo
+                       del radio, y decir «estrella» además lo diría dos veces. */}
+                    <span aria-hidden="true">{puntaje <= ratingScore ? '★' : '☆'}</span>
+                    <span className={styles.rotuloDeEstrella}>{puntaje} de 5</span>
+                  </label>
                 ))}
               </div>
-              <p style={{ textAlign: 'center', marginTop: '12px', color: 'var(--tg-color-text-secondary)', fontSize: '1.1rem' }}>
-                {ratingScore === 1 && ' Muy malo'}
-                {ratingScore === 2 && ' Malo'}
-                {ratingScore === 3 && ' Regular'}
-                {ratingScore === 4 && ' Bueno'}
-                {ratingScore === 5 && ' Excelente'}
-              </p>
-            </div>
-            
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: 'var(--tg-color-text)' }}>
-                Comentario (opcional)
-              </label>
+            </fieldset>
+
+            <p className={styles.significado} aria-hidden="true">
+              {ratingScore === 1 && 'Muy malo'}
+              {ratingScore === 2 && 'Malo'}
+              {ratingScore === 3 && 'Regular'}
+              {ratingScore === 4 && 'Bueno'}
+              {ratingScore === 5 && 'Excelente'}
+            </p>
+
+            <div className={styles.comentarioCalificacion}>
+              <label htmlFor="calificacion-comentario">Comentario (opcional)</label>
               <textarea
+                id="calificacion-comentario"
                 value={ratingComment}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  setRatingComment(e.target.value);
-                }}
-                onClick={(e) => e.stopPropagation()}
-                onFocus={(e) => e.stopPropagation()}
-                placeholder="Cuéntanos tu experiencia con el vendedor..."
-                rows={4}
+                onChange={(evento) => setRatingComment(evento.target.value)}
                 maxLength={500}
-                style={{ 
-                  width: '100%', 
-                  padding: '12px', 
-                  borderRadius: '8px', 
-                  border: '2px solid #ddd',
-                  fontSize: '1rem',
-                  resize: 'vertical',
-                  boxSizing: 'border-box'
-                }}
+                rows={4}
+                disabled={submittingRating}
+                placeholder="Contá cómo fue la compra"
               />
-              <small style={{ color: 'var(--tg-color-text-secondary)' }}>{ratingComment.length}/500 caracteres</small>
+              <small>{ratingComment.length}/500 caracteres</small>
             </div>
-            
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+
+            {/* El error se ve acá y no sólo en un aviso que se va solo: si el
+                envío falla, quien está mirando tiene que enterarse sin haber
+                estado mirando otra cosa. */}
+            {errorDeCalificacion && (
+              <p className={styles.errorCalificacion} role="alert">{errorDeCalificacion}</p>
+            )}
+
+            <div className={styles.accionesCalificacion}>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  pedirCierreDeLaCalificacion();
-                }}
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '8px',
-                  border: '2px solid #ddd',
-                  backgroundColor: 'white',
-                  color: 'var(--tg-color-text-secondary)',
-                  cursor: 'pointer',
-                  fontSize: '1rem',
-                  fontWeight: '600'
-                }}
+                type="button"
+                className="tg-button tg-button--secondary"
+                onClick={cerrarLaCapaDeCalificacion}
+                disabled={submittingRating}
               >
                 Cancelar
               </button>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSubmitRating();
-                }}
+                type="button"
+                className="tg-button tg-button--primary"
+                onClick={handleSubmitRating}
                 disabled={submittingRating}
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  backgroundColor: submittingRating ? 'var(--tg-color-border-control)' : 'var(--tg-color-brand)',
-                  color: 'white',
-                  cursor: submittingRating ? 'not-allowed' : 'pointer',
-                  fontSize: '1rem',
-                  fontWeight: '600'
-                }}
               >
-                {submittingRating ? 'Enviando...' : '✓ Enviar Calificación'}
+                {submittingRating ? 'Enviando…' : 'Enviar calificación'}
               </button>
             </div>
           </div>
         </div>
       )}
       {salida.pregunta}
-    </div>
+    </main>
   );
 };

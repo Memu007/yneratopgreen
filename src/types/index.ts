@@ -147,6 +147,16 @@ export interface AuthContextType {
   reenviarVerificacion: (email: string) => Promise<string>;
   verificarCorreo: (token: string) => Promise<string>;
   logout: () => void;
+  /**
+   * La sesión resultó inválida sin que nadie pidiera salir.
+   *
+   * Es distinto de `logout`: nadie se fue, la credencial dejó de valer. Baja
+   * la identidad y las credenciales, y NO toca el carrito —lo que había en el
+   * carrito lo eligió una persona, y que su sesión venza no es motivo para
+   * tirarlo—. Se llama sólo con la invalidez CONFIRMADA: un servidor caído no
+   * es una sesión vencida.
+   */
+  sesionInvalidada: () => void;
   updateProfile: (userData: Partial<User>) => Promise<void>;
 }
 
@@ -234,4 +244,21 @@ export interface NewProductData {
     [key: string]: string;
   };
   tags: string[];
+}
+
+/**
+ * Lo que viaja cuando alguien pide una cotización desde una publicación.
+ *
+ * Es lo mínimo que hace falta para que Contacto no empiece en blanco: qué se
+ * está cotizando y a quién. No lleva precio ni datos de quien escribe: esos los
+ * pone ella, o no están.
+ *
+ * El `id` está porque dos publicaciones pueden llamarse igual. Si la identidad
+ * fuera el nombre, pasar de una a otra homónima no reemplazaría nada: la
+ * pantalla seguiría mostrando el vendedor de la primera.
+ */
+export interface CotizacionPedida {
+  id: string;
+  publicacion: string;
+  vendedor: string;
 }

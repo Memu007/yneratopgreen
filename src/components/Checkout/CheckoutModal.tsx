@@ -761,7 +761,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     <form onSubmit={handleShippingSubmit} className={styles.form}>
       <div className={styles.stepHeader}>
         <h2>Datos de envío</h2>
-        <p>Completa tus datos para recibir el pedido</p>
+        <p>Completá tus datos para recibir el pedido</p>
       </div>
 
       <div className={styles.formGrid}>

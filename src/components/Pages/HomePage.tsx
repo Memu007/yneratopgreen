@@ -1,4 +1,5 @@
 import React from 'react';
+import type { CotizacionPedida } from '../../types';
 import styles from './HomePage.module.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
@@ -7,10 +8,19 @@ import type { VistaPrevia } from '../../hooks/useVistaPrevia';
 
 interface HomePageProps {
   onNavigateToMarketplace: () => void;
-  onNavigateToContact?: () => void;
+  /** Pedir una cotización desde una tarjeta de esta pantalla. Lleva qué se
+      cotiza y a quién: sin eso, Contacto empieza en blanco. */
+  onSolicitarCotizacion?: (pedido: CotizacionPedida) => void;
   onNavigateToServices?: () => void;
-  onPublishClick?: () => void;
-  onLoginClick?: () => void;
+  /** Publicar desde esta pantalla.
+   *
+      Es una sola función y no el par «abrí el formulario» / «abrí el Login»,
+      porque quién de los dos corresponde no lo decide la página: lo decide la
+      sesión, y la página lo sabría un instante antes de que el ingreso la
+      cambie. Sin sesión abre el ingreso y retoma el formulario recién si la
+      persona entra; cancelar o fallar no abre nada. Es la MISMA puerta que usa
+      una tarjeta sin sesión. */
+  onSolicitarPublicar?: () => void;
   /** Abre el Login de la aplicación y avisa cuando se cierra, se complete o se
       cancele. Se pasa hasta la tarjeta: sin sesión, una acción de compra ofrece
       ingresar en vez de agregar en silencio, y al volver se queda en esta misma
@@ -45,9 +55,8 @@ const DECISION: [string, string][] = [
 
 export const HomePage: React.FC<HomePageProps> = ({
   onNavigateToMarketplace,
-  onNavigateToContact,
-  onPublishClick,
-  onLoginClick,
+  onSolicitarCotizacion,
+  onSolicitarPublicar,
   onSolicitarIngreso,
   vistaPrevia,
 }) => {
@@ -55,12 +64,11 @@ export const HomePage: React.FC<HomePageProps> = ({
   const { showToast } = useToast();
 
   const handlePublishClick = () => {
-    if (!user) {
-      showToast('Debes iniciar sesión para publicar productos', 'warning');
-      onLoginClick?.();
-      return;
-    }
-    onPublishClick?.();
+    // El aviso sólo explica por qué apareció el ingreso; lo que pasa después no
+    // se decide acá. Y lo dice en la lengua del sitio: «Debes iniciar sesión»
+    // era el tuteo que quedaba en este camino, con el resto ya en voseo.
+    if (!user) showToast('Iniciá sesión para publicar una oferta', 'warning');
+    onSolicitarPublicar?.();
   };
 
   const { operaciones, total, cargando, error, reintentar } = vistaPrevia;
@@ -180,7 +188,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 key={operacion.id}
                 product={operacion}
                 variante="compacta"
-                onSolicitarCotizacion={onNavigateToContact}
+                onSolicitarCotizacion={onSolicitarCotizacion}
                 onSolicitarIngreso={onSolicitarIngreso}
               />
             ))}

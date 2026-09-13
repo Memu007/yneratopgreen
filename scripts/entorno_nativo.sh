@@ -7,8 +7,9 @@
 # efímeros de Claude Code en la web, donde todo lo que no esté versionado se
 # pierde entre sesión y sesión—.
 #
-#   ./scripts/entorno_nativo.sh              prepara lo que falte y nada más
-#   ./scripts/entorno_nativo.sh --recrear    ADEMÁS borra y rehace la base
+#   ./scripts/entorno_nativo.sh                 prepara lo que falte y nada más
+#   ./scripts/entorno_nativo.sh --recrear       ADEMÁS borra y rehace la base
+#   ./scripts/entorno_nativo.sh --reiniciar-api SÓLO reinicia la API y sale
 #
 # Sin `--recrear` es idempotente y NO destruye nada: crea lo que no está y deja
 # como está lo que ya estaba. Correrlo dos veces seguidas da el mismo resultado.
@@ -22,9 +23,11 @@ RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$RAIZ"
 
 RECREAR=false
+REINICIAR_API=false
 for argumento in "$@"; do
   case "$argumento" in
     --recrear) RECREAR=true ;;
+    --reiniciar-api) REINICIAR_API=true ;;
     -h|--help) sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0 ;;
     *) echo "argumento desconocido: $argumento" >&2; exit 2 ;;
   esac
@@ -36,6 +39,133 @@ nota() { printf '     %s\n' "$1"; }
 # Puerto de la API y del frontend. Son los que esperan la suite y las puertas.
 PUERTO_API=8000
 PUERTO_FRONT=5173
+
+# Matar los servidores de la API. Se miran sólo procesos de Python: cualquier
+# shell que tenga esta misma cadena en su línea de comandos —esta, sin ir más
+# lejos— no es un servidor.
+uvicorns() { ps -eo pid,comm,args | awk '$2 ~ /python/ && /uvicorn app.main:app/ {print $1}'; }
+matar_la_api() {
+  for pid in $(uvicorns); do kill "$pid" 2>/dev/null || true; done
+  sleep 2
+  for pid in $(uvicorns); do kill -9 "$pid" 2>/dev/null || true; done
+  sleep 1
+}
+salud_responde() {
+  curl --fail --silent --noproxy '*' \
+    "http://127.0.0.1:$PUERTO_API/api/health" >/dev/null 2>&1
+}
+esperar_la_salud() {
+  for _ in $(seq 1 "${1:-30}"); do salud_responde && return 0; sleep 1; done
+  return 1
+}
+esperar_el_silencio() {
+  for _ in $(seq 1 "${1:-10}"); do salud_responde || return 0; sleep 1; done
+  return 1
+}
+levantar_la_api() {
+  mkdir -p logs
+  (cd backend && setsid --fork ./.venv/bin/python -m uvicorn app.main:app \
+    --host 127.0.0.1 --port "$PUERTO_API" \
+    >> "$RAIZ/logs/api.log" 2>&1 < /dev/null &) ; disown -a 2>/dev/null || true
+  esperar_la_salud 30
+}
+
+# Quién sirve la API cuando la sirve un contenedor. Se pide identidad, no un
+# «está viva»: `Pid` y `StartedAt` son lo único que distingue un reinicio de
+# verdad de un contenedor al que nadie tocó. Si acá no hay demonio de Docker
+# —el puente del repositorio sólo traduce `docker exec`—, esto falla y el
+# reinicio sigue por el camino nativo.
+identidad_del_contenedor() {
+  docker inspect -f '{{.State.Running}} {{.State.Pid}} {{.State.StartedAt}}' \
+    topgreen-api 2>/dev/null
+}
+
+# `--reiniciar-api`: sólo eso, y sale.
+#
+# El límite antifuerza-bruta del ingreso vive EN MEMORIA del proceso de la API
+# —treinta fallos por origen en diez minutos, `limite_de_intentos.py`—, así que
+# es un recurso compartido por toda la suite: el caso que lo prueba a propósito
+# se lleva veinticuatro y los casos que ingresan después se comen el 429 sin
+# tener nada que ver. Reiniciar el proceso vacía ese contador sin tocar el
+# límite, sin subir ningún TTL y sin puertas de prueba en el producto: es lo
+# mismo que un despliegue. La base, el frontend y el resto del entorno no se
+# tocan.
+#
+# Lo que hay que demostrar es que cambió EL PROCESO que guarda el contador, no
+# que el puerto conteste. Contestar es justamente lo que hace la API vieja: en
+# el entorno Docker de la PM este modo mataba uvicorns nativos que no existían,
+# levantaba uno que no podía tomar el puerto, encontraba viva la API del
+# contenedor y anunciaba éxito con `topgreen-api` intacto —mismo ID,
+# `RestartCount=0`, `StartedAt` sin mover— y el contador entero. Así que ahora
+# hay dos caminos con identidad verificada, y ninguno anuncia éxito sin ella.
+if [ "$REINICIAR_API" = true ]; then
+  if [ "$RECREAR" = true ]; then
+    echo "ERROR: --reiniciar-api y --recrear no van juntos." >&2
+    exit 2
+  fi
+  paso "Reiniciando la API"
+
+  # Camino A: la sirve el contenedor del lanzador oficial.
+  antes_del_contenedor="$(identidad_del_contenedor || true)"
+  if [ "${antes_del_contenedor%% *}" = "true" ]; then
+    nota "la sirve el contenedor topgreen-api"
+    if ! docker restart topgreen-api >/dev/null 2>&1; then
+      echo "ERROR: 'docker restart topgreen-api' falló; la API no se reinició." >&2
+      exit 1
+    fi
+    if ! esperar_la_salud 60; then
+      echo "ERROR: topgreen-api no volvió a contestar /api/health." >&2
+      exit 1
+    fi
+    despues_del_contenedor="$(identidad_del_contenedor || true)"
+    if [ -z "$despues_del_contenedor" ] \
+       || [ "$despues_del_contenedor" = "$antes_del_contenedor" ]; then
+      echo "ERROR: topgreen-api quedó con la misma identidad que antes" >&2
+      echo "       ($antes_del_contenedor)." >&2
+      echo "       El proceso que guarda el contador de intentos NO cambió." >&2
+      exit 1
+    fi
+    nota "topgreen-api: [$antes_del_contenedor] -> [$despues_del_contenedor]"
+    exit 0
+  fi
+
+  # Camino B: la sirve un uvicorn nativo. Si no hay ninguno, no se sabe quién
+  # atiende el puerto, y levantar otro al lado no reinicia nada.
+  antes_de_los_uvicorns="$(uvicorns | tr '\n' ' ')"
+  if [ -z "${antes_de_los_uvicorns// /}" ]; then
+    echo "ERROR: no hay contenedor topgreen-api en marcha ni uvicorn nativo de" >&2
+    echo "       app.main:app. No se puede reiniciar lo que no se identifica," >&2
+    echo "       y levantar otro proceso al lado deja el contador intacto." >&2
+    exit 1
+  fi
+  matar_la_api
+  if [ -n "$(uvicorns)" ]; then
+    echo "ERROR: quedó un uvicorn vivo; la API no se reinició." >&2
+    exit 1
+  fi
+  # El puerto tiene que quedarse mudo. Si sigue contestando con todos los
+  # uvicorns muertos, lo contesta otro servicio —un contenedor, otra máquina
+  # detrás del mismo nombre— y ese es el que guarda el contador.
+  if ! esperar_el_silencio 10; then
+    echo "ERROR: /api/health sigue contestando con todos los uvicorns nativos" >&2
+    echo "       muertos: al puerto $PUERTO_API lo atiende otro servicio y su" >&2
+    echo "       contador de intentos sigue entero." >&2
+    exit 1
+  fi
+  if ! levantar_la_api; then
+    echo "ERROR: la API no volvió; mirá logs/api.log" >&2
+    exit 1
+  fi
+  despues_de_los_uvicorns="$(uvicorns | tr '\n' ' ')"
+  if [ -z "${despues_de_los_uvicorns// /}" ]; then
+    echo "ERROR: /api/health contesta pero no hay ningún uvicorn de app.main:app:" >&2
+    echo "       lo que contesta no es el proceso que este comando levantó." >&2
+    exit 1
+  fi
+  nota "uvicorn: [${antes_de_los_uvicorns% }] -> [${despues_de_los_uvicorns% }]"
+  nota "arriba de nuevo en http://localhost:$PUERTO_API/api/docs"
+  exit 0
+fi
 
 # --------------------------------------------------------------------------
 # 1. El puente de `docker exec`
@@ -239,14 +369,10 @@ if [ "$RECREAR" = true ]; then
     exit 1
   fi
   paso "Recreando la base (--recrear)"
-  # La API tiene que soltar la conexión. Se miran sólo procesos de Python:
-  # cualquier shell que tenga esta misma cadena en su línea de comandos —esta,
-  # sin ir más lejos— no es un servidor.
-  uvicorns() { ps -eo pid,comm,args | awk '$2 ~ /python/ && /uvicorn app.main:app/ {print $1}'; }
-  for pid in $(uvicorns); do kill "$pid" 2>/dev/null || true; done
-  sleep 2
-  for pid in $(uvicorns); do kill -9 "$pid" 2>/dev/null || true; done
-  sleep 1
+  # La API tiene que soltar la conexión. `matar_la_api` mira sólo procesos de
+  # Python: cualquier shell que tenga esta misma cadena en su línea de comandos
+  # —esta, sin ir más lejos— no es un servidor.
+  matar_la_api
   if [ -n "$(uvicorns)" ]; then
     echo "ERROR: quedó un uvicorn vivo; la base limpia no estaría limpia." >&2
     exit 1

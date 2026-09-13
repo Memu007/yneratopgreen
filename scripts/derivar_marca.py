@@ -31,27 +31,35 @@ DESTINO = RAIZ / 'public/marca'
 
 # --- PNG mínimo: RGB de 8 bits, sin entrelazado -----------------------------
 
-def leer_png(ruta):
+def leer_png_crudo(ruta):
+    """Decodifica un PNG de 8 bits sin entrelazar, RGB o RGBA.
+
+    Devuelve `(ancho, alto, filas, con_alfa)`, con las filas ya sin filtrar, en
+    la misma forma que produce el resto del script. Sirve para dos cosas: leer
+    la fuente y, en la verificación, poder distinguir un archivo sustituido de
+    uno que sólo se recomprimió distinto.
+    """
     datos = ruta.read_bytes()
     if datos[:8] != b'\x89PNG\r\n\x1a\n':
-        raise SystemExit(f'{ruta} no es un PNG')
-    i, ancho, alto, idat = 8, None, None, bytearray()
+        raise ValueError(f'{ruta} no es un PNG')
+    i, ancho, alto, color, idat = 8, None, None, None, bytearray()
     while i < len(datos):
         (largo,) = struct.unpack('>I', datos[i:i + 4])
         tipo = datos[i + 4:i + 8]
         cuerpo = datos[i + 8:i + 8 + largo]
         if tipo == b'IHDR':
             ancho, alto, prof, color, _, _, entre = struct.unpack('>IIBBBBB', cuerpo)
-            if (prof, color, entre) != (8, 2, 0):
-                raise SystemExit('la fuente dejó de ser PNG RGB de 8 bits sin entrelazar')
+            if (prof, entre) != (8, 0) or color not in (2, 6):
+                raise ValueError(f'{ruta}: sólo se leen PNG de 8 bits, RGB o RGBA, sin entrelazar')
         elif tipo == b'IDAT':
             idat += cuerpo
         elif tipo == b'IEND':
             break
         i += 12 + largo
 
+    bpp = 3 if color == 2 else 4
     crudo = zlib.decompress(bytes(idat))
-    paso, bpp = ancho * 3, 3
+    paso = ancho * bpp
     filas, anterior, p = [], bytearray(paso), 0
     for _ in range(alto):
         filtro, p = crudo[p], p + 1
@@ -76,13 +84,28 @@ def leer_png(ruta):
                 pr = a if (pa <= pb and pa <= pc) else (b if pb <= pc else c)
                 linea[x] = (linea[x] + pr) & 0xFF
         elif filtro != 0:
-            raise SystemExit(f'filtro PNG desconocido: {filtro}')
+            raise ValueError(f'{ruta}: filtro PNG desconocido: {filtro}')
         filas.append(linea)
         anterior = linea
+    return ancho, alto, filas, color == 6
+
+
+def leer_png(ruta):
+    """La fuente oficial, que es y tiene que seguir siendo RGB sin alfa."""
+    try:
+        ancho, alto, filas, con_alfa = leer_png_crudo(ruta)
+    except ValueError as error:
+        raise SystemExit(str(error))
+    if con_alfa:
+        raise SystemExit('la fuente dejó de ser PNG RGB de 8 bits sin entrelazar')
     return ancho, alto, filas
 
 
-def escribir_png(ruta, ancho, alto, filas, con_alfa=False):
+def codificar_png(ancho, alto, filas, con_alfa=False):
+    """Los bytes del PNG. Devolverlos en vez de escribirlos es lo que permite
+    comparar el archivo versionado contra la derivación: mientras esta función
+    escribía directo, `--verificar` no tenía con qué comparar y terminaba
+    leyendo el archivo para informar su propio hash. Eso no verificaba nada."""
     crudo = bytearray()
     for linea in filas:
         crudo.append(0)
@@ -94,11 +117,14 @@ def escribir_png(ruta, ancho, alto, filas, con_alfa=False):
 
     # Tipo de color 6 = RGBA; 2 = RGB. Es lo único que cambia entre los dos.
     tipo_de_color = 6 if con_alfa else 2
-    ruta.write_bytes(
-        b'\x89PNG\r\n\x1a\n'
-        + trozo(b'IHDR', struct.pack('>IIBBBBB', ancho, alto, 8, tipo_de_color, 0, 0, 0))
-        + trozo(b'IDAT', zlib.compress(bytes(crudo), 9))
-        + trozo(b'IEND', b''))
+    return (b'\x89PNG\r\n\x1a\n'
+            + trozo(b'IHDR', struct.pack('>IIBBBBB', ancho, alto, 8, tipo_de_color, 0, 0, 0))
+            + trozo(b'IDAT', zlib.compress(bytes(crudo), 9))
+            + trozo(b'IEND', b''))
+
+
+def escribir_png(ruta, ancho, alto, filas, con_alfa=False):
+    ruta.write_bytes(codificar_png(ancho, alto, filas, con_alfa=con_alfa))
 
 
 # --- Operaciones: recortar, rellenar con el fondo propio, promediar ---------
@@ -348,13 +374,36 @@ def main():
         (DESTINO / 'agroboeda-monograma-alfa.png', 320, 197, transparente, True),
         (DESTINO / 'agroboeda-favicon.png', 64, 64, favicon, False),
     ]
+    problemas = []
     for ruta, an, al, datos, con_alfa in salidas:
+        esperado = codificar_png(an, al, datos, con_alfa=con_alfa)
         if not solo_verificar:
             DESTINO.mkdir(parents=True, exist_ok=True)
-            escribir_png(ruta, an, al, datos, con_alfa=con_alfa)
+            ruta.write_bytes(esperado)
+        # En modo verificación se compara el archivo versionado CONTRA LA
+        # DERIVACIÓN, no contra sí mismo. Un PNG sustituido tiene que hacer
+        # fallar esto: si no, la verificación es un verde de adorno.
+        if not ruta.exists():
+            problemas.append(f'{ruta.relative_to(RAIZ)}: no existe')
+        elif ruta.read_bytes() != esperado:
+            # Distinguir sustitución de recompresión: los píxeles son el activo;
+            # los bytes además dependen del zlib de quien corra el script.
+            try:
+                mismos = leer_png_crudo(ruta) == (an, al, list(datos), con_alfa)
+            except Exception:
+                mismos = False
+            motivo = ('mismos píxeles pero distinta compresión; volvé a correr el script '
+                      'sin --verificar para normalizarlo' if mismos
+                      else 'el archivo no es el que produce la fuente')
+            problemas.append(f'{ruta.relative_to(RAIZ)}: {motivo}')
         actual = hashlib.sha256(ruta.read_bytes()).hexdigest() if ruta.exists() else '(no existe)'
         canal = 'RGBA' if con_alfa else 'RGB '
         print(f'{ruta.relative_to(RAIZ)}  {an}x{al}  {canal}  sha256 {actual}')
+
+    if problemas:
+        for problema in problemas:
+            print(f'ERROR {problema}', file=sys.stderr)
+        raise SystemExit(1)
 
 
 if __name__ == '__main__':

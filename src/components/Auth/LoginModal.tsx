@@ -7,9 +7,18 @@ import { useCapaModal } from '../../hooks/useCapaModal';
 interface LoginModalProps {
   onClose: () => void;
   onSwitchToRegister: () => void;
+  /** Salida para quien no puede entrar: lleva a Contacto, que es donde hay
+      una persona. No hay recuperación automática todavía, así que el Login no
+      puede prometer un correo, un enlace ni un plazo: lo único honesto es
+      decir por dónde se sigue. */
+  onIrASoporte: () => void;
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSwitchToRegister }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({
+  onClose,
+  onSwitchToRegister,
+  onIrASoporte,
+}) => {
   const { login, reenviarVerificacion } = useAuth();
   const { showToast } = useToast();
   const [email, setEmail] = useState('');
@@ -148,10 +157,24 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSwitchToRegis
           </button>
         </form>
 
+        {/* Quien olvidó la contraseña no tenía ninguna salida acá: probaba,
+            fallaba y volvía a probar. No hay restablecimiento automático y no
+            se inventa uno; se dice que no lo hay y se ofrece el canal que sí
+            existe. Sin promesa de correo ni de plazo. */}
+        {/* `helpText` ya existe y ya la usa el registro: mismo par de colores
+            que el resto de los textos secundarios, así que esta salida no
+            estrena ningún estilo. */}
+        <p className={styles.helpText}>
+          ¿Olvidaste tu contraseña? Todavía no hay recuperación automática.{' '}
+          <button type="button" className={styles.switchLink} onClick={onIrASoporte}>
+            Escribinos por Contacto
+          </button>
+        </p>
+
         <div className={styles.switchText}>
-          ¿No tienes cuenta?{' '}
+          ¿No tenés cuenta?{' '}
           <button type="button" className={styles.switchLink} onClick={onSwitchToRegister}>
-            Regístrate aquí
+            Registrate acá
           </button>
         </div>
       </div>

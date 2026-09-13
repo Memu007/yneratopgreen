@@ -14,8 +14,25 @@
  *    Así el primer Atrás cierra el detalle y deja intacto lo de atrás, y
  *    cerrarlo con la propia interfaz consume esa entrada en vez de dejarla
  *    colgada.
+ *
+ * Y una guardia, que llegó con Mi cuenta.
+ *
+ * Mientras Mi cuenta era un modal, `FORM-DIRTY-1` alcanzaba con proteger su
+ * cierre: la X, el fondo y Escape eran las únicas salidas. Como página, las
+ * salidas son la cabecera, el pie, Salir y el Atrás del navegador, y ninguna
+ * de esas pasa por el componente. Así que la pantalla que tiene trabajo sin
+ * guardar registra acá una guardia, y esas salidas preguntan una sola vez
+ * antes de irse.
+ *
+ * El Atrás es el caso incómodo: cuando `popstate` llega, la barra YA se movió.
+ * Se deshace el movimiento antes de preguntar —se vuelve a escribir la
+ * ubicación que se estaba mirando— y recién ahí se pregunta, para que «seguir
+ * editando» conserve pantalla, URL y contenido. Si la respuesta es descartar,
+ * se repite el Atrás con la guardia levantada.
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
+} from 'react';
 
 import {
   esPantallaDeLlegada,
@@ -27,6 +44,18 @@ import {
 
 interface EstadoDeLaEntrada {
   capa: string | null;
+}
+
+/**
+ * Lo que una pantalla con trabajo sin guardar le pide a la navegación: que
+ * antes de irse le pregunte. Es la misma política de `FORM-DIRTY-1`, aplicada
+ * al límite de la página en vez del de un modal.
+ */
+export interface GuardiaDeSalida {
+  /** ¿Hay algo escrito y sin guardar ahora mismo? */
+  hayTrabajoSinGuardar: () => boolean;
+  /** Preguntar y, si la persona descarta, ejecutar `seguir`. */
+  preguntar: (seguir: () => void) => void;
 }
 
 export interface Navegacion {
@@ -43,6 +72,15 @@ export interface Navegacion {
   navegar: (destino: Seccion) => void;
   abrirCapa: (id: string) => void;
   cerrarCapa: () => void;
+  /**
+   * Una salida que no es una sección —Salir de la sesión— pasando por la misma
+   * guardia. Sin esto, cerrar sesión con un perfil a medio editar se llevaría
+   * el trabajo sin avisar.
+   */
+  pedirSalida: (seguir: () => void) => void;
+  /** La pantalla que tiene trabajo sin guardar se anuncia acá, y se da de baja
+   *  al desmontarse. Devuelve la función de baja, para usarla en el efecto. */
+  registrarGuardia: (guardia: GuardiaDeSalida) => () => void;
 }
 
 const barraActual = () => `${window.location.pathname}${window.location.search}`;
@@ -60,10 +98,51 @@ export function useNavegacion(): Navegacion {
   const [capa, setCapa] = useState<string | null>(capaDeLaEntrada);
   const [version, setVersion] = useState(0);
 
+  const guardia = useRef<GuardiaDeSalida | null>(null);
+  // Dónde estábamos antes del último movimiento. Hace falta para deshacer un
+  // Atrás: cuando llega `popstate` la barra ya cambió, y esto es lo único que
+  // recuerda qué decía.
+  const ubicacionMirada = useRef({ barra: '', estado: null as EstadoDeLaEntrada | null });
+  // Un Atrás ya consentido no se vuelve a preguntar.
+  const salidaConsentida = useRef(false);
+
+  useEffect(() => {
+    ubicacionMirada.current = { barra: barraActual(), estado: window.history.state };
+  }, []);
+
+  const registrarGuardia = useCallback((nueva: GuardiaDeSalida) => {
+    guardia.current = nueva;
+    return () => {
+      if (guardia.current === nueva) guardia.current = null;
+    };
+  }, []);
+
+  // El único filtro: si hay guardia y hay trabajo, pregunta; si no, sigue.
+  const conGuardia = useCallback((seguir: () => void) => {
+    const actual = guardia.current;
+    if (actual && actual.hayTrabajoSinGuardar()) actual.preguntar(seguir);
+    else seguir();
+  }, []);
+
   useEffect(() => {
     // El ÚNICO oyente de `popstate`. Antes no había ninguno: Atrás movía la
     // barra y la pantalla se quedaba donde estaba.
     const alMoverElHistorial = () => {
+      const actual = guardia.current;
+      if (actual && actual.hayTrabajoSinGuardar() && !salidaConsentida.current) {
+        // La barra ya se movió. Se la devuelve a donde estaba ANTES de
+        // preguntar: si la respuesta es seguir editando, la URL y la pantalla
+        // tienen que quedar exactamente como estaban.
+        const { barra, estado } = ubicacionMirada.current;
+        window.history.pushState(estado, '', barra);
+        actual.preguntar(() => {
+          salidaConsentida.current = true;
+          window.history.back();
+        });
+        return;
+      }
+      salidaConsentida.current = false;
+      ubicacionMirada.current = { barra: barraActual(), estado: window.history.state };
       setSeccion(seccionActual());
       setCapa(capaDeLaEntrada());
       setVersion((cuantas) => cuantas + 1);
@@ -72,7 +151,7 @@ export function useNavegacion(): Navegacion {
     return () => window.removeEventListener('popstate', alMoverElHistorial);
   }, []);
 
-  const navegar = useCallback((destino: Seccion) => {
+  const navegarDeVerdad = useCallback((destino: Seccion) => {
     const desde = seccionActual();
     const filtros = filtrosDeLaBarra(window.location.search);
 
@@ -96,13 +175,27 @@ export function useNavegacion(): Navegacion {
       window.history.replaceState({ capa: null }, '', url);
     }
 
+    ubicacionMirada.current = { barra: barraActual(), estado: window.history.state };
     setSeccion(destino);
     setCapa(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  // Ir a otra sección pasa por la guardia: la cabecera y el pie son dos de las
+  // salidas de una página que puede tener formularios adentro.
+  const navegar = useCallback(
+    (destino: Seccion) => conGuardia(() => navegarDeVerdad(destino)),
+    [conGuardia, navegarDeVerdad],
+  );
+
+  const pedirSalida = useCallback(
+    (seguir: () => void) => conGuardia(seguir),
+    [conGuardia],
+  );
+
   const abrirCapa = useCallback((id: string) => {
     window.history.pushState({ capa: id }, '', barraActual());
+    ubicacionMirada.current = { barra: barraActual(), estado: window.history.state };
     setCapa(id);
   }, []);
 
@@ -110,13 +203,20 @@ export function useNavegacion(): Navegacion {
     // Se cierra volviendo atrás, que es lo que consume la entrada. Cerrar sin
     // volver dejaría una entrada fantasma: el primer Atrás no haría nada
     // visible y el segundo sacaría del sitio.
-    if (capaDeLaEntrada() !== null) window.history.back();
-    else setCapa(null);
+    //
+    // Este Atrás lo pide la propia interfaz, así que no lo filtra la guardia:
+    // cerrar el detalle de una publicación no es salir de la pantalla.
+    if (capaDeLaEntrada() !== null) {
+      salidaConsentida.current = true;
+      window.history.back();
+    } else setCapa(null);
   }, []);
 
   return useMemo(
-    () => ({ seccion, capa, version, navegar, abrirCapa, cerrarCapa }),
-    [seccion, capa, version, navegar, abrirCapa, cerrarCapa],
+    () => ({
+      seccion, capa, version, navegar, abrirCapa, cerrarCapa, pedirSalida, registrarGuardia,
+    }),
+    [seccion, capa, version, navegar, abrirCapa, cerrarCapa, pedirSalida, registrarGuardia],
   );
 }
 
