@@ -1004,7 +1004,25 @@ async function runCase(number, name, callback) {
 function accionDeLaTarjeta(page, nombre) {
   const titulo = page.getByRole('heading', { name: nombre, exact: true, level: 3 });
   const tarjeta = titulo.locator('xpath=ancestor::*[contains(@class,"card")]');
-  return tarjeta.getByRole('button', { name: /Agregar|Agregar al carrito|Contratar/ }).first();
+  const boton = tarjeta.getByRole('button', { name: /Agregar|Agregar al carrito|Contratar/ }).first();
+  /* No devuelve el localizador pelado: si el botón no está, el rojo tiene que
+     decir QUÉ ofrece la tarjeta. «Timeout 30000ms exceeded» no distingue una
+     tarjeta que dice «Ingresar para continuar» —no hay sesión— de una que dice
+     «Solicitar cotización» —no hay precio— ni de una publicación propia, y las
+     tres son causas distintas con arreglos distintos. */
+  return {
+    async click(opciones) {
+      try {
+        await boton.click(opciones);
+      } catch (error) {
+        const botones = await tarjeta.getByRole('button').allInnerTexts().catch(() => null);
+        if (!botones) throw error;
+        throw new Error(`la tarjeta de «${nombre}» no ofrece agregar ni contratar; sus botones `
+          + `son ${JSON.stringify(botones.map((t) => t.replace(/\s+/g, ' ').trim()))}`);
+      }
+    },
+    count: () => boton.count(),
+  };
 }
 
 await runCase(1, 'Salud del servicio', async () => {
@@ -11422,6 +11440,16 @@ await runCase(113, 'Los tres datos se guardan como se escriben, con límites exp
 });
 
 await runCase(114, 'En pantalla: se comparan marca y cargas, el dominio recién al elegir', async () => {
+  // La sesión del comprador se pide, no se hereda.
+  //
+  // Este caso le inyecta `state.buyerToken` al navegador, y ese valor lo dejan
+  // casos anteriores: corriéndolo solo —como se reproduce un rojo— viajaba la
+  // cadena «undefined», la pantalla trataba al visitante como anónimo y la
+  // tarjeta ofrecía «Ingresar para continuar» en vez de «Agregar al carrito».
+  // Medido: con token válido la tarjeta dice «Agregar al carrito»; sin él,
+  // «Ingresar para continuar». El caso moría esperando un botón que la
+  // pantalla tenía razón en no dibujar.
+  await asegurarSesiones();
   const escenario = await prepararEscenarioDeFletes();
   const { destino, pedidoA, transportistas } = escenario;
 
@@ -11444,6 +11472,21 @@ await runCase(114, 'En pantalla: se comparan marca y cargas, el dominio recién 
     // --- 1. El titular ve y edita sus tres datos en su panel ---
     const ctxTransportista = await browser.newContext();
     const pt = await ctxTransportista.newPage();
+    // El panel guarda CLAVES —`maquinaria`— y los rótulos los trae aparte
+    // `GET /logistics/cargo-types`. Hasta que esa respuesta llega, la línea de
+    // cargas dibuja la clave cruda: medido, «maquinaria · Otra: Bidones de 200
+    // litros», y con el catálogo puesto «Maquinaria agrícola · Otra: …». Este
+    // caso leía el panel apenas aparecía «Mi Perfil», así que en una máquina
+    // cargada acusaba al producto de no mostrar las cargas —el rojo que la PM
+    // repitió dos veces—. Se demora el catálogo A PROPÓSITO para que la carrera
+    // pase siempre, y lo que se exige es el rótulo resuelto, esperándolo.
+    await pt.route(
+      (url) => url.pathname.endsWith('/api/logistics/cargo-types'),
+      async (ruta) => {
+        await new Promise((seguir) => { setTimeout(seguir, 1_500); });
+        await ruta.continue();
+      },
+    );
     await pt.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await pt.getByRole('button', { name: 'Ingresar', exact: true }).click();
     await pt.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 15_000 });
@@ -11456,12 +11499,22 @@ await runCase(114, 'En pantalla: se comparan marca y cargas, el dominio recién 
 
     const suPanel = await pt.locator('[class*="_profileSection_"], form, main').first().innerText()
       .catch(async () => pt.locator('body').innerText());
+    // La única de las cinco afirmaciones que depende de una segunda respuesta.
+    // Las otras cuatro salen de la sesión y ya están dibujadas.
+    try {
+      await esperarA(async () => /Maquinaria agrícola/.test(await pt.locator('body').innerText()),
+        'el rótulo', 20_000);
+    } catch {
+      const linea = (await pt.locator('body').innerText()).split('\n')
+        .find((l) => /maquinaria/i.test(l) || /Bidones/.test(l));
+      throw new Error('el titular no ve sus cargas declaradas con su rótulo; la línea de cargas '
+        + `dice ${JSON.stringify(linea ?? '(no está)')}`);
+    }
     const textoPanel = await pt.locator('body').innerText();
     assert(textoPanel.includes('Scania R450'), 'el titular no ve su marca y modelo');
     assert(textoPanel.includes(DOMINIO), 'el titular no ve su propio dominio');
     assert(/Privado/i.test(textoPanel),
       'el panel no le avisa al titular que el dominio no se muestra en el listado');
-    assert(/Maquinaria agrícola/.test(textoPanel), 'el titular no ve sus cargas declaradas');
     assert(/Bidones de 200 litros/.test(textoPanel), 'el detalle de «Otra» no se muestra');
     observado.panel = true;
     await ctxTransportista.close();
@@ -14758,14 +14811,23 @@ print(json.dumps(salida))
 // lo que gastó, es de la suite no arrastrarlo.
 if (results.some((resultado) => resultado.number === 134)
     && /(localhost|127\.0\.0\.1)/.test(API_URL)) {
-  try {
-    execFileSync('./scripts/entorno_nativo.sh', ['--reiniciar-api'], { stdio: 'pipe' });
+  const reinicio = spawnSync('./scripts/entorno_nativo.sh', ['--reiniciar-api'], {
+    encoding: 'utf8',
+  });
+  if (reinicio.status === 0) {
+    // El comando sólo sale con 0 cuando comprobó que cambió el proceso —o el
+    // contenedor— que sirve la API. El caso 169 sostiene esa promesa.
     console.log('[----] la API se reinició: el caso 134 acababa de gastar el presupuesto de '
       + 'intentos de ingreso, y ese contador es de todos');
-  } catch (error) {
-    console.log('[----] AVISO: no se pudo reiniciar la API despues del 134 '
-      + `(${error instanceof Error ? error.message.split('\n')[0] : error}); los casos que `
-      + 'ingresen en los proximos diez minutos pueden recibir 429');
+    const identidad = `${reinicio.stdout}`.match(/^\s*(uvicorn|topgreen-api):.*$/m);
+    if (identidad) console.log(`[----] ${identidad[0].trim()}`);
+  } else {
+    console.log('[----] AVISO: la API NO se reinició, así que el presupuesto de intentos que '
+      + 'gastó el 134 sigue gastado y los casos que ingresen en los próximos diez minutos '
+      + 'pueden recibir 429. El comando dijo:');
+    for (const linea of `${reinicio.stderr}`.split('\n').filter(Boolean)) {
+      console.log(`[----]   ${linea}`);
+    }
   }
 }
 
@@ -26646,11 +26708,60 @@ await runCase(168, 'Buscar es una acción, Contacto no promete planes, el Login 
     // El rótulo de la solapa no es exacto a propósito: «Notificaciones» lleva
     // un contador al lado cuando hay sin leer, así que el nombre accesible es
     // «Notificaciones 1» y un `exact` acusaba de faltante una solapa que estaba.
-    const RUTA_DE_LA_SOLAPA = {
-      'Mis Compras': '/orders',
-      'Mis Ventas': '/orders',
-      Notificaciones: '/notifications',
+    // Cada solapa espera SU respuesta, no una que se le parezca.
+    //
+    // `/notifications` con `includes` también dice que sí a
+    // `/notifications/unread-count`, y ese contador sale en cada cambio de
+    // solapa: el panel lo pide cuando la solapa NO es la de notificaciones. Así
+    // que la espera de la lista podía resolverse con la respuesta del contador
+    // —un objeto sin `notifications`— según cuál llegara primero. La PM lo vio:
+    // «el 168 recibió una respuesta sin notifications». Lo mismo entre compras
+    // y ventas, que se distinguen sólo por `as_role`.
+    const RESPUESTA_DE_LA_SOLAPA = {
+      'Mis Compras': { ruta: '/api/orders/my', parametros: { as_role: 'buyer' } },
+      'Mis Ventas': { ruta: '/api/orders/my', parametros: { as_role: 'seller' } },
+      Notificaciones: { ruta: '/api/notifications', parametros: {} },
     };
+    const esLaRespuesta = (respuesta, cual) => {
+      if (respuesta.request().method() !== 'GET' || respuesta.status() !== 200) return false;
+      let url;
+      try { url = new URL(respuesta.url()); } catch { return false; }
+      if (!url.pathname.endsWith(cual.ruta)) return false;
+      // `endsWith` no alcanza sola: `/api/notifications/unread-count` no
+      // termina en `/api/notifications`, pero un futuro `/mis-orders/my` sí
+      // terminaría en `/orders/my`. Se exige que lo que sobre sea un origen.
+      if (!/^https?:\/\/[^/]+$/.test(url.origin + url.pathname.slice(0, -cual.ruta.length))) {
+        return false;
+      }
+      return Object.entries(cual.parametros)
+        .every(([clave, valor]) => url.searchParams.get(clave) === valor);
+    };
+
+    // El peligro se fabrica, no se espera a que aparezca.
+    //
+    // Se retiene el contador de no leídas hasta que la solapa de
+    // notificaciones ya esté pedida, y se demora la lista: así la respuesta
+    // del contador cae SIEMPRE en medio de la espera de la lista, que es la
+    // carrera que la PM se comió. Con la espera vieja esto es rojo todas las
+    // veces; con la nueva, la respuesta del contador se ignora.
+    const contadoresRetenidos = [];
+    let retenerElContador = true;
+    await page.route(
+      (url) => url.pathname.endsWith('/api/notifications/unread-count'),
+      async (ruta) => {
+        if (retenerElContador) {
+          await new Promise((seguir) => { contadoresRetenidos.push(seguir); });
+        }
+        await ruta.continue();
+      },
+    );
+    await page.route(
+      (url) => url.pathname.endsWith('/api/notifications'),
+      async (ruta) => {
+        await new Promise((seguir) => { setTimeout(seguir, 1_500); });
+        await ruta.continue();
+      },
+    );
     const solaparse = async (solapa) => {
       const boton = page.getByRole('button', { name: new RegExp(`^${solapa}`) }).first();
       try {
@@ -26674,16 +26785,26 @@ await runCase(168, 'Buscar es una acción, Contacto no promete planes, el Login 
       // el caso seguía verde. Se espera el GET de esa solapa y recién ahí se
       // mira, y para las notificaciones se contrasta además contra lo que el
       // servidor contestó: la pantalla y la API tienen que decir lo mismo.
-      const pedido = RUTA_DE_LA_SOLAPA[solapa];
+      const cual = RESPUESTA_DE_LA_SOLAPA[solapa];
       const [respuesta] = await Promise.all([
-        page.waitForResponse((r) => r.url().includes(pedido)
-          && r.request().method() === 'GET' && r.status() === 200, { timeout: 25_000 }),
-        solaparse(solapa),
+        page.waitForResponse((r) => esLaRespuesta(r, cual), { timeout: 30_000 }),
+        (async () => {
+          await solaparse(solapa);
+          if (solapa === 'Notificaciones') {
+            // Ya se pidió la lista: se sueltan los contadores retenidos para
+            // que contesten primero. Si la espera confundiera una respuesta con
+            // la otra, se confundiría acá.
+            retenerElContador = false;
+            for (const seguir of contadoresRetenidos.splice(0)) seguir();
+          }
+        })(),
       ]);
       if (solapa === 'Notificaciones') {
+        assert(new URL(respuesta.url()).pathname.endsWith('/api/notifications'),
+          `la espera se resolvió con ${respuesta.url()}, que no es la lista de notificaciones`);
         const cuerpo = await respuesta.json().catch(() => null);
         assert(cuerpo && Array.isArray(cuerpo.notifications) && cuerpo.notifications.length === 0,
-          `la API devolvió ${cuerpo?.notifications?.length} notificaciones: la bandeja que este `
+          `la API devolvió ${JSON.stringify(cuerpo)}: o no es la lista, o la bandeja que este `
           + 'caso fabricó vacía no lo está, así que el vacío en pantalla no probaría nada');
       }
       // Y el rojo dice qué mostró la solapa, no sólo que se venció la espera.
@@ -26712,6 +26833,144 @@ await runCase(168, 'Buscar es una acción, Contacto no promete planes, el Login 
   return `escribir en el buscador no consulta, no toca la barra y no redibuja; el clic y Enter `
     + `aplican la consulta recortada, la escriben en «q» y dejan sólo «${laBuscada}»; una `
     + `consulta vacía limpia el filtro y nada se cuenta por consola; ${medidos.join('; ')}`;
+});
+
+await runCase(169, 'El reinicio de la API prueba que cambió el proceso, o falla', async () => {
+  // Este caso existe por un verde falso.
+  //
+  // El aislamiento del presupuesto antifuerza-bruta se apoya en reiniciar la
+  // API entre el 134 y el 135. En el entorno Docker de la PM ese reinicio
+  // ANUNCIÓ ÉXITO sin haber reiniciado nada: `topgreen-api` quedó con el mismo
+  // ID, `RestartCount=0` y `StartedAt` sin mover, y el 167 y el 168 se cayeron
+  // igual. La causa es que el modo miraba procesos del anfitrión —donde no hay
+  // ninguno cuando la API vive en un contenedor—, no mataba nada, levantaba un
+  // uvicorn que no podía tomar el puerto y daba por buena la respuesta de la
+  // API VIEJA a `/api/health`. Contestar no es haberse reiniciado.
+  //
+  // Acá se le arma al comando el entorno que lo engañaba, con dobles en el
+  // PATH, y se exige que falle. Los tres escenarios son deterministas y
+  // ninguno toca el producto, el TTL ni el límite.
+  const psReal = ['/bin/ps', '/usr/bin/ps'].find((ruta) => existsSync(ruta));
+  assert(psReal, 'no se encontró el `ps` del sistema para armar el doble');
+  const taller = mkdtempSync(`${tmpdir()}/reinicio-169-`);
+  const doble = (nombre, cuerpo) => {
+    const carpeta = `${taller}/${nombre}`;
+    mkdirSync(carpeta, { recursive: true });
+    writeFileSync(`${carpeta}/${nombre.split('-')[0]}`, cuerpo, { mode: 0o755 });
+    return carpeta;
+  };
+  const reiniciar = (carpeta) => spawnSync('./scripts/entorno_nativo.sh', ['--reiniciar-api'], {
+    encoding: 'utf8',
+    env: { ...process.env, PATH: `${carpeta}:${process.env.PATH}` },
+  });
+  const uvicornsVivos = () => execFileSync(psReal, ['-eo', 'pid,comm,args'], { encoding: 'utf8' })
+    .split('\n')
+    .filter((linea) => /uvicorn app\.main:app/.test(linea) && !/awk|grep/.test(linea))
+    .map((linea) => linea.trim().split(/\s+/)[0]);
+  const laApiContesta = async () => {
+    const respuesta = await fetch(`${API_URL}/health`).catch(() => null);
+    return respuesta?.ok === true;
+  };
+
+  const medidos = [];
+  let fantasma = null;
+  try {
+    // 1. La forma exacta del entorno de la PM: la API la sirve un contenedor y
+    //    el reinicio no lo mueve. `docker restart` contesta que sí, y la
+    //    identidad del contenedor sigue siendo la misma.
+    const conContenedorQuieto = doble('docker-quieto', [
+      '#!/usr/bin/env bash',
+      'if [ "${1:-}" = "inspect" ]; then echo "true 4242 2026-09-12T20:14:56.246290658Z"; exit 0; fi',
+      'if [ "${1:-}" = "restart" ]; then exit 0; fi',
+      'exit 127',
+      '',
+    ].join('\n'));
+    const quieto = reiniciar(conContenedorQuieto);
+    assert(quieto.status !== 0,
+      `con un topgreen-api que no se reinicia, el comando salió con ${quieto.status} y anunció `
+      + `éxito:\n${quieto.stdout}`);
+    assert(/misma identidad/.test(quieto.stderr),
+      `el rojo no dice que la identidad del contenedor no cambió:\n${quieto.stderr}`);
+    medidos.push('un contenedor que contesta pero no se reinicia da rojo, no verde');
+
+    // 2. Sin contenedor y sin uvicorn a la vista: no se sabe quién atiende el
+    //    puerto. Antes acá se levantaba un proceso al lado y se anunciaba
+    //    éxito; ahora se frena sin tocar nada.
+    const antesDelCiego = uvicornsVivos();
+    assert(antesDelCiego.length > 0,
+      'este caso necesita una API nativa en marcha para comprobar que no la tocan');
+    const conApiInvisible = doble('ps-ciego', [
+      '#!/usr/bin/env bash',
+      `${psReal} "$@" | grep -v 'uvicorn app.main:app'`,
+      '',
+    ].join('\n'));
+    const ciego = reiniciar(conApiInvisible);
+    assert(ciego.status !== 0,
+      `sin poder identificar quién sirve la API, el comando salió con ${ciego.status}:\n`
+      + `${ciego.stdout}`);
+    assert(/no se identifica|no hay contenedor/.test(ciego.stderr),
+      `el rojo no explica que no pudo identificar el servicio:\n${ciego.stderr}`);
+    assert(uvicornsVivos().join(',') === antesDelCiego.join(','),
+      'el intento fallido movió la API que estaba corriendo');
+    medidos.push('sin saber quién sirve la API, frena y deja la que había en paz');
+
+    // 3. El puerto lo atiende otro. Se le da al comando un proceso descartable
+    //    disfrazado de uvicorn —y se le esconde el de verdad—: lo mata, y el
+    //    puerto sigue contestando. Ese silencio que no llega es la prueba de
+    //    que el contador quedó donde estaba.
+    fantasma = spawn('sleep', ['300'], { detached: true, stdio: 'ignore' });
+    fantasma.unref();
+    // Un zombi no es un servidor: el `sleep` es hijo de este proceso y, hasta
+    // que Node lo coseche, sigue apareciendo en `ps` como `<defunct>`. Mientras
+    // la suite está bloqueada en `spawnSync` eso no pasa, así que el estado
+    // «Z» se cuenta como muerto acá y también en el doble de `ps`.
+    const fantasmaALaVista = () => execFileSync(psReal, ['-eo', 'pid,stat'], { encoding: 'utf8' })
+      .split('\n')
+      .some((linea) => linea.trim().split(/\s+/)[0] === String(fantasma.pid)
+        && !linea.trim().split(/\s+/)[1]?.startsWith('Z'));
+    await esperarA(async () => fantasmaALaVista(),
+      'el proceso descartable que hace de uvicorn no llegó a existir', 10_000);
+    const conFantasma = doble('ps-fantasma', [
+      '#!/usr/bin/env bash',
+      `${psReal} "$@" | awk -v pid=${fantasma.pid} '`,
+      '  /uvicorn app.main:app/ { next }',
+      '  /<defunct>/ { print; next }',
+      '  $1 == pid { print pid " python /usr/bin/python -m uvicorn app.main:app"; next }',
+      '  { print }',
+      "'",
+      '',
+    ].join('\n'));
+    const suplantado = reiniciar(conFantasma);
+    assert(suplantado.status !== 0,
+      `matando a otro proceso, el comando salió con ${suplantado.status}:\n${suplantado.stdout}`);
+    assert(/sigue contestando/.test(suplantado.stderr),
+      `el rojo no dice que el puerto lo atiende otro servicio:\n${suplantado.stderr}`);
+    assert(!fantasmaALaVista(),
+      'el comando ni siquiera mató lo que creía que era la API: el escenario no probó nada');
+    assert(await laApiContesta(), 'el escenario del suplantado se llevó puesta la API de verdad');
+    medidos.push('si el puerto sigue vivo después de matar lo que creía la API, da rojo');
+
+    // 4. Y el camino bueno: la API nativa se reinicia de verdad, con otros
+    //    procesos y contestando.
+    const antes = uvicornsVivos();
+    const bueno = spawnSync('./scripts/entorno_nativo.sh', ['--reiniciar-api'], {
+      encoding: 'utf8',
+    });
+    assert(bueno.status === 0,
+      `el reinicio real falló:\n${bueno.stdout}\n${bueno.stderr}`);
+    const despues = uvicornsVivos();
+    assert(despues.length > 0, 'después del reinicio no quedó ningún uvicorn');
+    assert(despues.every((pid) => !antes.includes(pid)),
+      `el reinicio dejó los mismos procesos: antes ${antes.join(',')}, después ${despues.join(',')}`);
+    assert(await laApiContesta(), 'la API no contesta después del reinicio real');
+    medidos.push(`el reinicio real cambió el proceso (${antes.join(',')} → ${despues.join(',')})`);
+  } finally {
+    if (fantasma?.pid) { try { process.kill(fantasma.pid, 'SIGKILL'); } catch { /* ya no está */ } }
+    rmSync(taller, { recursive: true, force: true });
+  }
+
+  return `el reinicio que aísla el presupuesto de intentos verifica identidad y no se conforma `
+    + `con que /api/health conteste: ${medidos.join('; ')}`;
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
