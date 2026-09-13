@@ -99,3 +99,101 @@ dependencia. Los artefactos de backup y datos de prueba no se versionan.
 Entregá rama, SHA base, SHA candidato, diff completo, comandos exactos y
 resultados del positivo y del negativo. Reemplazá `PARA-PM.md` con un informe
 breve. No integres ni despliegues; frená para revisión PM.
+
+---
+
+## Revisión PM R1 — DEVOLVER
+
+Revisé la candidata `5ae5572` y el informe `4636b23`. La sintaxis y el
+`diff-check` quedan verdes, pero la pieza no se acepta todavía. Corregí sólo
+estas dos raíces sobre la misma rama:
+
+1. **El bundle omite una raíz persistente.** `NOW.md` registra el volumen de
+   producción montado en `/data` y `EMAIL_OUTBOX_DIR=/data/outbox`. La candidata
+   fija `data_roots=uploads,documentos` y archiva únicamente esas dos carpetas.
+   Incluí `outbox` en backup, restore, inventario, fingerprints, manifiesto,
+   documentación y positivo discriminante. Adaptá el doble local de forma
+   explícita si hoy monta el outbox en `/app/outbox`; no cambies producto ni
+   Docker/Railway para acomodar la prueba.
+2. **`cleanup` puede borrar recursos ajenos por nombre.** PM creó un volumen
+   descartable sin etiquetas llamado `topgreen-restore-pm-unowned-db`; ejecutar
+   `cleanup topgreen-restore-pm-unowned` lo eliminó con exit 0. El prefijo no
+   demuestra propiedad. Marcá todos los contenedores y volúmenes creados por la
+   pieza con una etiqueta estable más un identificador de ejecución, y antes de
+   cada `rm` exigí que esas etiquetas coincidan. Si falta o difiere, frená sin
+   borrar nada. No alcanza con ampliar o endurecer el patrón del nombre.
+
+### Evidencia R2 exigida
+
+- positivo completo con marcador DB y un marcador en cada raíz persistente,
+  incluido `outbox`;
+- negativo de integridad ya existente;
+- negativo de propiedad: un contenedor o volumen sin etiqueta y con nombre que
+  coincida debe sobrevivir, `cleanup` debe fallar y la prueba debe retirarlo
+  luego por un comando explícito limitado al recurso que ella misma creó;
+- origen con mismas identidades, fingerprints y salud antes/después;
+- `sh -n`, `diff-check` y diff total desde `24dcca8`.
+
+No corras suite funcional completa. No integres, no despliegues y no abras otra
+tarea. Entregá nuevos SHA de producto/arnés e informe; no reescribas los SHA R1.
+
+---
+
+## Revisión PM R2 — DEVOLVER
+
+Tomo como candidata canónica la rama histórica
+`claude/dev-role-repo-3l0kp3`: `b9d0036`, informe `6f02c32`. La entrega paralela
+`codex/backup-restore-1` fue un error de coordinación PM y queda descartada; no
+mezcles código de esa rama.
+
+Quedan **aceptadas dentro de la pieza**, sin pedir otra reescritura por sí
+solas, la inclusión de `outbox`, la portabilidad macOS/Linux, los negativos de
+integridad y el principio de comprobar propiedad antes de limpiar.
+
+La ruta Docker sigue bloqueada y no se acepta por inspección reproducible:
+
+1. `VOLUMENES_DOCKER=(uploads_data ... documentos_data ...)` no identifica los
+   volúmenes reales. PM verificó que esos nombres no existen; los montajes de
+   `topgreen-api` llevan el prefijo del proyecto Compose. Ejecutar el código
+   actual crearía volúmenes vacíos con esos nombres y los respaldaría como si
+   fueran el origen.
+2. `restaurar` crea `topgreen_restore_*` **dentro de `topgreen-db`**. Eso
+   modifica el clúster y volumen de origen y contradice el criterio explícito de
+   contenedor y volumen nuevos y aislados. `limpiar` luego vuelve a operar sobre
+   ese mismo origen.
+3. La ruta usa `psql -U postgres`, pero PM comprobó que el contenedor real tiene
+   `POSTGRES_USER=topgreen` y que el rol `postgres` no existe. La restauración
+   falla antes de poder verificarse.
+4. `alpine:3` no es una dependencia necesaria y puede provocar un pull. Usá
+   `docker exec`/`docker cp`/`tar` o las imágenes locales ya presentes; no
+   descargues una imagen auxiliar.
+
+### Corrección R3
+
+- Incorporá `origin/main` sin reescribir los SHA anteriores y preservá completo
+  este canal PM.
+- En modo Docker descubrí el origen desde los contenedores/montajes reales o
+  copiá las tres raíces por el contenedor; no adivines nombres de volumen.
+- Restaurá PostgreSQL/PostGIS en **otro contenedor con otro volumen** y los tres
+  árboles en recursos de destino separados del origen. Tomá imagen, usuario y
+  nombre de base del contenedor real; la credencial del destino debe ser local
+  y efímera, no escrita en bundle ni informe.
+- Etiquetá cada contenedor/volumen creado con una marca estable de la pieza y un
+  id de ejecución. `limpiar` debe validar esas etiquetas antes de cada borrado.
+- Corregí requisitos/documentación para reflejar las herramientas realmente
+  admitidas (`shasum` o `sha256sum`) y que la ruta no hace pulls.
+
+### Evidencia R3 exigida
+
+1. `bash -n` y `diff-check` verdes.
+2. Corrida Docker completa sobre los contenedores actuales: backup, restore,
+   verify, negativo de integridad y cleanup.
+3. Los tres marcadores (`uploads`, `documentos`, `outbox`) aparecen restaurados.
+4. Un recurso homónimo sin etiquetas sobrevive y `cleanup` falla sin borrar
+   ningún recurso.
+5. IDs, montajes/fingerprint y salud de `topgreen-db` y `topgreen-api` coinciden
+   antes/después; no queda ninguna base extra dentro de `topgreen-db` ni ningún
+   destino de prueba.
+
+No repitas la suite funcional ni la ruta nativa salvo que la corrección comparta
+lógica y la rompa. No integres, no despliegues y no abras otra tarea.

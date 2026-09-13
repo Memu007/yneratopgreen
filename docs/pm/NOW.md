@@ -7,10 +7,10 @@ Actualizado: 2026-09-13.
 ## Resumen ejecutivo
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 4. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
-- **`main`:** `b8447a3`, merge de la candidata aceptada `c565e6e` y su informe `ad914a3` sobre el estado PM `2e752cb`. Incluye el `AGENTS.md` consolidado y preserva la regla local de eficiencia de chats.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, HEAD de informe `ad914a3`; su candidata `c565e6e` ya es ancestro de `main`.
-- **Última decisión owner/PM:** Emi autorizó integrar y desplegar `b8447a3` antes de contar con backup ensayado. La excepción publica el trabajo aceptado, pero no levanta la puerta de backup ni convierte el entorno en producción aceptada.
-- **Tarea activa:** `BACKUP-RESTORE-1`, responsable Dev. Debe producir y ensayar una copia lógica de PostGIS y de los datos persistentes en un destino local aislado, sin tocar Railway ni datos remotos.
+- **`main`:** `24dcca8`; producto integrado en `b8447a3` y cierre PM documental posterior. Incluye el `AGENTS.md` consolidado y preserva la regla local de eficiencia de chats.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, informe R2 `6f02c32`; candidata `b9d0036`, devuelta y no integrada. La rama paralela `codex/backup-restore-1` queda descartada por duplicación.
+- **Última decisión PM:** `BACKUP-RESTORE-1` R2 **DEVUELTA**. `outbox` y la guarda de propiedad avanzaron, pero Docker apunta a volúmenes inexistentes, usa un rol ausente y restaura dentro del clúster de origen en vez de aislar el destino.
+- **Tarea activa:** `BACKUP-RESTORE-1` R3, responsable Dev. Debe corregir y ejecutar la ruta Docker en contenedores/volúmenes nuevos, sin tocar Railway ni datos remotos.
 
 ## Última aceptación PM relevante
 
