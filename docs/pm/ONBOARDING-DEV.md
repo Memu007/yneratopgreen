@@ -55,6 +55,12 @@ Para una pieza de producto:
 5. cuando la tarea lo pida o el riesgo lo justifique, corré una suite completa desde base limpia;
 6. informá SHA exacto, qué corriste, resultado, únicos rojos, qué no corriste y riesgos.
 
+Si un caso nuevo o modificado podría dar verde sin observar el estado real,
+entregá también su negativo discriminante: el sabotaje que lo hace rojo por la
+razón correcta. Cuando toques CSS o tokens, corré contraste; a11y y contraste
+deben partir de la misma lista de superficies y sumar los estados interactivos
+que correspondan.
+
 No repitas una prueba hasta obtener verde sin explicar por qué falló antes. Un rojo de entorno se diagnostica y se declara; no se oculta.
 
 ## Canal PM ↔ Dev
@@ -79,13 +85,20 @@ Debe ser breve y autosuficiente:
 
 No copies historia del proyecto ni archivos enteros. Citá rutas, commits y decisiones.
 
+Reemplazá todo el cuerpo anterior de `PARA-PM.md`; no agregues el informe nuevo
+arriba. Conservá sólo el encabezado del canal y la entrega vigente.
+
+El SHA probado puede ser el último commit de producto/arnés. Si el informe va
+en un commit posterior, demostrá que el delta entre ambos SHA es exclusivamente
+documental; no repitas una suite completa sólo porque cambió `PARA-PM.md`.
+
 ## Cuándo frenar
 
 Frená y entregá el estado actual si:
 
 - un criterio no se puede cumplir sin cambiar alcance;
 - aparece un error que exige tocar algo fuera de la tarea;
-- haría falta decidir arquitectura, datos, permisos, dinero o una migración no autorizizada;
+- haría falta decidir arquitectura, datos, permisos, dinero o una migración no autorizada;
 - una regresión previa aparece roja;
 - la tarea es ambigua de una forma que cambia el resultado;
 - necesitarías un secreto, credencial real o acción externa no autorizada.
@@ -102,6 +115,9 @@ No improvises para “destrabar”.
 - El contrato es a precio fijo: una mejora opcional se propone, no se implementa sola.
 - `docs/PROJECT_STATUS.md` es histórico y no se usa como estado.
 - Cuando documentación y código se contradicen, reportá la discrepancia; para comportamiento técnico manda la evidencia actual, y para alcance manda el contrato/decisiones vigentes.
+- En una corrección visual, reasignar un elemento a un token existente cuya
+  semántica ya corresponde es un arreglo acotado. Cambiar el valor global de un
+  token o crear una dirección visual nueva requiere alcance explícito.
 
 ## Particularidades del repo
 
@@ -113,6 +129,11 @@ No improvises para “destrabar”.
 ## Producción y Railway
 
 La Dev no despliega ni cambia Railway salvo tarea explícita. Antes de una publicación deben conocerse rama/SHA por servicio, auto-deploy, PostGIS, backups, volumen persistente y configuración relevante.
+
+Mientras `main` siga conectado al auto-deploy, cualquier push que toque producto
+o configuración se trata como una acción de producción. No lo hagas por llamar
+al cambio «integración» ni deduzcas el efecto desde watch paths viejos: verificá
+la configuración actual y esperá autorización explícita.
 
 Runtime no es sólo código: CORS, SMTP, variables y dominios pueden romper una composición con SHA correcto. No copies valores secretos a documentación.
 

@@ -1,6 +1,9 @@
 # Cronograma — el plan, con fechas reales
 
-Actualizado: 2026-08-22.
+Vigencia contractual confirmada: 2026-08-21. Este archivo cambia sólo si cambia
+una fecha, una puerta o un hito contractual. La semana y el estado operativo
+actuales viven en `NOW.md`; la trazabilidad de lo implementado vive en
+`MATRIZ.md` y el orden interno de cierre en `ROADMAP-CIERRE-MVP-2026-08-31.md`.
 
 **Fuente única: la sección 5 del PDF** *Documento de Especificación
 Funcional y Propuesta Comercial*, el que armó el socio y que la clienta
@@ -34,10 +37,6 @@ consume el plazo contractual. Esta ancla reemplaza la del 07/08 registrada el
 | 3 — Buscador y catálogo | Motor de búsqueda y **módulo de geolocalización de fletes** | 6–8 | 25/09 | 15/10 |
 | 4 — Pagos y checkout | Mercado Pago y validación de transferencias | 9–10 | 16/10 | 29/10 |
 | 5 — QA y lanzamiento | Pruebas, usabilidad, carga inicial, **despliegue en producción** | 11–12 | 30/10 | 12/11 |
-
-**Hoy es sábado 2026-08-22: semana 1 en curso.** La puerta de Fase 1 se cerró
-anticipadamente; el ensayo Railway es evidencia temprana de Fase 5, no un
-despliegue productivo ni un adelanto del hito final.
 
 ### El colchón de dos semanas
 
@@ -73,40 +72,7 @@ repositorio se entrega a la clienta.
 
 ---
 
-## 4. El cuadro no coincide con la realidad, y hay que decirlo
-
-Esta es la parte que la PM tiene que mirar de frente. **Las fases del PDF
-suponen que se arranca de cero, y no se arrancó de cero.** Se heredó un
-repositorio a medias y se trabajó tres semanas antes de la aprobación.
-
-Contraste fase por fase, contra lo verificado en `MATRIZ.md`:
-
-| Fase | Semanas | Estado real al 2026-08-05 |
-|---|---|---|
-| 1 — Diseño y UX/UI | 1–2 | **Puerta cerrada el 06/08, antes del inicio contractual.** Comprador, vendedor y logística tienen flujo navegable y evidencia responsive. El prototipo logístico fue aceptado en `823c3fe`. |
-| 2 — Desarrollo base | 3–5 | **Puerta funcional cerrada por trabajo previo.** Arquitectura, PostgreSQL + PostGIS, migraciones, seed, correo y perfiles editables incluidos transportistas tienen evidencia. |
-| 3 — Buscador y catálogo | 6–8 | **Puerta cerrada anticipadamente el 12/08.** Catálogo, búsqueda y geolocalización están encadenados en una evidencia reproducible; el hito intermedio queda habilitado. |
-| 4 — Pagos y checkout | 9–10 | **Código funcional cerrado contra dobles.** Transferencia, exactitud monetaria, OAuth, preferencias, Webhook, estados y stock aceptados. Falta homologación contra Mercado Pago de prueba, URL pública y reconciliador programado; todavía no se habilitan cobros reales. |
-| 5 — QA y lanzamiento | 11–12 | **Empezada fuera de orden.** Hay 25 casos de humo ejecutados desde base limpia y preparacion de Railway, sin despliegue ni revision de seguridad. |
-
-**Tres consecuencias, y son de la PM:**
-
-1. **El trabajo previo adelantó y cerró el hito intermedio.** Catálogo,
-   búsquedas y geolocalización de productos y fletes quedaron demostrados en
-   conjunto el 12/08. El entregable ya puede presentarse y cobrarse; esto no
-   convierte el ensayo Railway en producción ni habilita el hito final.
-2. **El orden de trabajo real no sigue el orden de las fases**, y está
-   bien que no lo siga. Lo que no puede pasar es reportarle avance a la
-   clienta con las fases del PDF mientras internamente se trabaja en otro
-   orden. Cuando se reporte hacia afuera, **se reporta con estas cinco
-   fases**.
-3. **Lo que queda no esta distribuido como el cuadro supone.** Logística ya
-   cerró; el faltante funcional grande es Mercado Pago y después el cierre de
-   producción. Las funciones de Fase 6 no compiten con ninguno de los dos.
-
----
-
-## 5. Puertas contractuales por fase
+## 4. Puertas contractuales por fase
 
 Una fase no se cierra por fecha ni por porcentaje. Se cierra cuando toda su
 puerta tiene evidencia reproducible.
@@ -161,79 +127,19 @@ usen Mercado Pago.
 ### Fase 5 - hasta el 12/11
 
 - Suite integral desde base limpia, responsive y usabilidad verificados.
-- `npm run lint` cerrado y finales de línea normalizados mediante una política
-  versionada, en un cambio mecánico separado de cualquier función.
 - Datos iniciales cargados sin credenciales demo inseguras.
-- Seguridad, backups, persistencia de imagenes y HTTPS revisados.
-- Puerta final **red-team**, posterior al cierre funcional y anterior al
-  despliegue productivo. Se ejecuta contra una instalación Docker descartable,
-  con datos sintéticos y sin credenciales ni servicios reales. Debe cubrir, al
-  menos: XSS reflejado, almacenado y DOM; CSP y almacenamiento de sesión;
-  autenticación, autorización e IDOR/BOLA; CSRF/CORS; enumeración, fuerza bruta
-  y límites de abuso; inyección y SSRF; cargas de archivos; exposición en
-  respuestas y logs; webhooks, replay e idempotencia de Mercado Pago; carreras
-  de stock/órdenes; dependencias y contenedor. La evidencia debe ser
-  reproducible desde base limpia y asociada al SHA auditado.
-- La puerta red-team no cierra mientras exista un hallazgo crítico o alto sin
-  corregir. Los medios requieren decisión y riesgo residual escrito; después
-  de cada corrección se repite la regresión afectada y la suite integral. En
-  Railway y Mercado Pago sólo se permiten comprobaciones pasivas y flujos de
-  prueba autorizados: nada destructivo ni contra cuentas o datos reales.
-- La revisión de infraestructura incluye Railway de punta a punta: accesos al
-  proyecto y segundo factor; mínimo privilegio; inventario y alcance de
-  variables sin revelar sus valores; ausencia de secretos en repositorio,
-  imagen, frontend y logs; rotación documentada; servicios y base de datos sin
-  exposición pública innecesaria; TLS, dominios, CORS, cabeceras y healthcheck
-  observados en ejecución; volúmenes y persistencia; backups con una
-  restauración ensayada; límites, métricas y alertas básicas; retención y
-  saneamiento de logs; imagen y dependencias escaneadas; y despliegue
-  reproducible donde GitHub, Backend y Frontend informen el mismo SHA. La
-  configuración productiva debe mantener pagos deshabilitados hasta que cierre
-  su homologación y no puede reutilizar datos, usuarios ni credenciales demo.
+- Seguridad, backups, persistencia de imágenes, dominio/HTTPS y configuración
+  productiva revisados. La puerta técnica detallada está en
+  `PLAN-RED-TEAM-CIERRE-MVP.md` y no se abre antes del cierre funcional.
 - Despliegue real en produccion y accesos administrativos entregados.
-- Documentación técnica contrastada contra el producto; afirmaciones viejas o
-  falsas retiradas antes de capacitar.
-- Capacitacion basica y documentacion tecnica del despliegue listas.
+- Capacitación básica y documentación técnica del despliegue listas.
 - Acta de lanzamiento que fija el inicio de los 90 dias de garantia.
-- Cortesía de primera clienta, después de las funciones contractuales pendientes
-  y antes de cerrar la puerta de lanzamiento:
-  revisión manual de CUIT, razón social y una constancia fiscal; estados de
-  revisión, trazabilidad administrativa y distintivo «Documentación revisada».
-  La clienta decide; TopGreen no certifica identidad ni garantiza ausencia de
-  fraude. Sin RENAPER/ARCA, DNI, biometría ni validación automática.
 
 **Limite:** Dockerfiles o archivos de Railway no prueban despliegue.
 
-### Control inmediato
-
-- 05/08, antes del reloj: orden de transferencia inmortal cerrada en
-  `0039e00`, sin mezclar vencimiento ni reserva de stock.
-- ~~07-20/08, Fase 1: cerrar el flujo UX/UI de logística y registrar su
-  evidencia.~~ **Cerrado el 06/08** en `823c3fe`, antes del inicio contractual.
-- 12/08: logística A–C y demostración conjunta aceptadas; hito intermedio
-  habilitado. La aritmética monetaria también cerró; antes de abrir Mercado
-  Pago, la Dev contrasta sin código el flujo de cobro directo por vendedor.
-- 04/09: entrar a Fase 2 con la puerta de Fase 1 cerrada o con desvio
-  explicito.
-
-Los limites funcionales completos estan en `ALCANCE-Y-LIMITES.md`.
-
 ---
 
-## 6. Decisión de plazo y alcance posterior
-
-- Trabajo contractual restante estimado: **7 a 9 semanas**.
-- Plazo contractual desde el 21/08: **12 semanas**, 14 con contingencia.
-- El trabajo previo deja margen, pero no habilita ampliar el MVP.
-
-Emi decidio el 2026-08-05 que **primero se cumple entero el cronograma del
-PDF**. Suscripciones recurrentes, planes, mensajeria y tierras pasan a una
-**Fase 6 posterior al lanzamiento**. No consumen las fases 1 a 5, el
-colchon ni los hitos del MVP contractual.
-
----
-
-## 7. El colchon no es una fase
+## 5. El colchón no es una fase
 
 Las semanas 13 y 14 son contingencia para completar o estabilizar lo ya
 comprometido. No son una fase 6 y no habilitan funciones nuevas. Consumir
@@ -241,36 +147,12 @@ una semana del colchon requiere registrar motivo, impacto y nueva fecha.
 
 ---
 
-## 8. Aceleradores técnicos reservados por fase
-
-Estos recursos externos quedan anotados para usarlos cuando corresponda. Son
-referencias de implementación, no autorización para cambiar arquitectura,
-agregar alcance ni adelantar fases.
-
-| Momento | Recurso | Parte que se reutiliza | Límite |
-|---|---|---|---|
-| Después de la corrección de contraste | [axe-core-npm](https://github.com/dequelabs/axe-core-npm) | `@axe-core/playwright` como control automático de accesibilidad sobre el Playwright existente. | Pieza mínima separada; no reemplaza la revisión visual ni se instala durante la corrección activa. |
-| Fase 2 | [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) | Patrones y pruebas de verificación de correo, recuperación de contraseña, Docker y CI. | No copiar el proyecto ni migrar a SQLModel, Tailwind u otra arquitectura. |
-| Fase 3 | [GeoAlchemy2](https://github.com/geoalchemy/geoalchemy2) | Consultas PostGIS por radio y distancia con la dependencia que TopGreen ya tiene. | Directorio por origen, destino y radio; sin ruteo ni motor por peso. |
-| Fase 3 | [Georef Argentina](https://github.com/datosgobar/georef-ar-api) | API oficial para normalizar localidades y guardar sus coordenadas. | Consumir la API; no levantar ni copiar el repositorio completo. |
-| Fase 4 | [SDK oficial de Mercado Pago](https://github.com/mercadopago/sdk-python) | OAuth, preferencias, idempotencia, validación de notificaciones y pruebas. | Pago 1:1 al vendedor, comisión de marketplace cero y sin suscripciones; la versión se decide y prueba en una pieza aislada. |
-
-**No usar:** FastAPI Users mientras siga en mantenimiento; `fastapi-mail`
-si no es compatible con las versiones fijadas; otro marketplace completo;
-React Leaflet, mapas o motores de ruteo antes de que el contrato los exija.
-
-**Ahorro orientativo total:** 6 a 10 días hábiles de desarrollo y prueba,
-principalmente en correo, consultas geográficas, regresión de accesibilidad y
-Mercado Pago. Es margen interno: no modifica fechas ni amplía el MVP.
-
----
-
-## 9. Cómo se mantiene este archivo
+## 6. Cómo se mantiene este archivo
 
 - Se actualiza **cuando cambia una fecha**, no semanalmente por rutina.
 - Cada corrimiento se anota con **motivo y semana**, en la tabla de abajo.
-- Las fechas del PDF **no se reescriben**. Si la realidad se aparta, se
-  registra el apartamiento; el compromiso original queda visible.
+- Las fechas del PDF **no se reescriben**. El estado real se registra en
+  `NOW.md`, `MATRIZ.md` y el roadmap, no acá.
 
 ### Corrimientos registrados
 

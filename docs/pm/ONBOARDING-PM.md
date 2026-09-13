@@ -8,7 +8,10 @@ El chat no es fuente de verdad. Git, contrato, decisiones y evidencia reproducib
 
 1. Revisá `git status` y el commit actual. Si el árbol está limpio, actualizá `main`; si no, preservá los cambios y reportalos.
 2. Leé `NOW.md` y `CRONOGRAMA.md`.
-3. `NOW.md` identifica la rama/SHA de la entrega pendiente. Si Dev todavía no está integrada, leé `PARA-PM.md` desde esa rama; no asumas que la copia de `main` es la última.
+3. `NOW.md` identifica la rama/SHA registrada de la entrega pendiente. Verificala
+   contra Git: `NOW.md` es un puntero operativo y puede haber envejecido. Si Dev
+   todavía no está integrada, leé `PARA-PM.md` desde esa rama; no asumas que la
+   copia de `main` es la última.
 4. Leé la tarea/hilo activo en `PARA-DEV.md`.
 5. Abrí sólo las decisiones o documentos que esa situación cite.
 6. Contrastá afirmaciones importantes con Git, código y pruebas.
@@ -28,44 +31,33 @@ La separación importante es construcción versus aceptación: quien implementa 
 
 ## Fuentes de verdad
 
-Orden práctico:
+No hay una sola precedencia para preguntas distintas:
 
-1. `CONTRATO.md` — alcance contractual vinculante.
-2. `CRONOGRAMA.md` — fases y fechas vigentes.
-3. `ALCANCE-Y-LIMITES.md` — guardas e interpretaciones operativas aprobadas.
-4. `DECISIONS.md` — decisiones durables y su motivo.
-5. `NOW.md` — estado operativo actual, bloqueos y próxima acción.
-6. Git, código y pruebas — evidencia de implementación.
-7. planes internos, auditorías y documentación histórica — contexto, nunca autoridad por sí solos.
+- **Alcance y autoridad:** `CONTRATO.md`, decisiones explícitas y
+  `ALCANCE-Y-LIMITES.md` mandan sobre planes, auditorías y código accidental.
+- **Fechas y puertas contractuales:** manda `CRONOGRAMA.md`.
+- **Rama, SHA, contenido y comportamiento implementado:** mandan Git, código,
+  pruebas y runtime observados. Si contradicen `NOW.md`, se corrige `NOW.md`;
+  no se fuerza la evidencia para sostener la prosa.
+- **Prioridad y próximo paso:** los decide la PM y se registran en `NOW.md` y
+  `PARA-DEV.md`.
 
-Si dos documentos internos se contradicen, no se resuelve por antigüedad: se contrasta contra contrato, decisiones vigentes y evidencia actual.
+Los planes, auditorías y documentos históricos aportan contexto; no cambian
+alcance, prioridad ni aceptación por sí solos.
 
 ## Calendario contractual
 
-La semana 1 comienza el **2026-08-21**. Las cinco fases y sus puertas viven en `CRONOGRAMA.md`.
+La semana 1 comienza el **2026-08-21**. Fases, fechas, hitos, puertas y colchón
+viven únicamente en `CRONOGRAMA.md`. `NOW.md` calcula la semana vigente y el
+proyecto puede adelantar piezas, pero no cambiar alcance ni puertas sin una
+decisión explícita.
 
-- Fase 1 — Diseño y UX/UI: 21/08–03/09.
-- Fase 2 — Desarrollo base: 04/09–24/09.
-- Fase 3 — Buscador, catálogo y geolocalización: 25/09–15/10.
-- Fase 4 — Pagos y checkout: 16/10–29/10.
-- Fase 5 — QA y lanzamiento: 30/10–12/11.
-- Colchón contractual: hasta 26/11.
+## Alcance
 
-El proyecto puede terminar piezas antes de la ventana contractual. Lo que no se cambia sin decisión explícita es el alcance, las puertas de cierre y el orden de dependencias críticas.
-
-## Reglas de alcance que no se reabren por costumbre
-
-- Precio fijo: si algo no se traza al contrato, no entra automáticamente al MVP.
-- El transportista es un tipo especial de proveedor; el MVP usa directorio por geolocalización, no motor de ruteo.
-- PostgreSQL + PostGIS es requisito técnico vigente.
-- Railway está aprobado como destino; configuración no equivale a despliegue aceptado.
-- Mercado Pago debe cobrar al vendedor mediante el mecanismo técnico aprobado, sin comisión de marketplace de TopGreen/AgroBoeda.
-- La transferencia bancaria es directa comprador → vendedor, con comprobante y validación manual.
-- La plataforma no recibe, retiene, divide ni gira fondos de terceros.
-- Suscripciones, planes, mensajería premium, tierras y otras ampliaciones quedan fuera del MVP contractual salvo decisión explícita nueva.
-- La revisión de seguridad final es puerta de producción, pero un agujero descubierto antes se corrige cuando se detecta.
-
-Para detalle y matices, abrir `ALCANCE-Y-LIMITES.md` y `DECISIONS.md`; no duplicarlos acá.
+No reconstruyas alcance desde memoria, chat, roadmap ni código existente. Abrí
+`CONTRATO.md`, `ALCANCE-Y-LIMITES.md` y `DECISIONS.md` cuando la tarea dependa
+de ellos. Precio fijo significa que una mejora no trazada se propone y decide;
+no entra al MVP por costumbre.
 
 ## Canal PM ↔ Dev
 
@@ -75,6 +67,9 @@ Para detalle y matices, abrir `ALCANCE-Y-LIMITES.md` y `DECISIONS.md`; no duplic
 | `PARA-PM.md` | Dev | una entrega pendiente y su evidencia |
 
 Una pieza cerrada sale de los canales vivos. La historia permanece en Git y, cuando haga falta una referencia estable, en `docs/pm/archivo/`.
+
+`PARA-PM.md` se reemplaza: conserva el encabezado del canal y una sola entrega
+vigente. No se agrega un informe nuevo arriba de los anteriores.
 
 ### Una tarea PM → Dev debe contener
 
@@ -93,11 +88,26 @@ La PM no acepta por cortesía ni porque el informe diga “verde”. Revisa diff
 
 - Dev conserva un rojo discriminante cuando corresponde, corre focales y puertas proporcionales y entrega SHA exacto.
 - PM reproduce de forma independiente lo que define la aceptación.
+- Un caso nuevo o modificado que pueda dar verde sin observar el estado real
+  debe demostrar su negativo discriminante; la PM reproduce ese sabotaje antes
+  de confiar en el verde.
 - Suite completa de PM cuando hay dinero, autenticación, permisos, órdenes, stock, migraciones, datos, seguridad, cambio transversal, cierre de fase/hito, rojo inesperado o preparación de despliegue; también por cadencia cuando se acumulan entregas.
 - No repetir puertas sobre el mismo SHA sin cambio relevante sólo para “hacer volumen”.
 - Si Dev y PM obtienen resultados distintos, el candidato no se acepta hasta reproducir y clasificar la diferencia.
 
 Para una integración excepcional, ambos deben probar la **misma composición y el mismo SHA** desde bases limpias.
+
+El SHA probado puede ser el último commit de producto/arnés. El informe puede
+ir después si el delta hasta el HEAD entregado es exclusivamente documental y
+esa condición se demuestra con Git; un `.md` no obliga a repetir una suite.
+
+Los logs temporales ayudan durante una revisión, pero no son evidencia durable.
+La decisión canónica debe conservar SHA, resultado y la parte discriminante;
+las rutas de `/private/tmp` se retiran de `NOW.md` cuando la pieza se cierra.
+
+En correcciones visuales, cambiar qué token ya existente usa un elemento para
+cumplir la semántica declarada es un arreglo acotado. Cambiar el valor global de
+un token o introducir una nueva dirección visual requiere alcance explícito.
 
 ## Auditorías externas
 
@@ -118,6 +128,11 @@ Antes de cambiar arquitectura de ramas o publicar una composición, inventariar:
 - variables de entorno relevantes sin copiar secretos.
 
 El estado de runtime incluye configuración, no sólo SHA. Cambios de CORS, SMTP, variables o dominios deben quedar registrados sin secretos.
+
+Mientras Railway siga conectado a `main` con auto-deploy, cualquier push que
+toque producto o configuración se trata como una acción de producción y exige
+autorización explícita. No se confía en una lista eterna de watch paths: primero
+se verifica la configuración vigente.
 
 Después de una migración de esquema no se hace rollback ciego sólo de código. La recuperación normal es forward-fix; un downgrade de esquema requiere procedimiento probado y backup recuperable.
 
@@ -142,6 +157,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 | `ALCANCE-Y-LIMITES.md` | límites e interpretaciones operativas |
 | `DECISIONS.md` | decisiones durables y alternativas descartadas |
 | `MATRIZ.md` | trazabilidad de requisitos y evidencia |
+| `ROADMAP-CIERRE-MVP-2026-08-31.md` | orden de cierre e índice de piezas aceptadas con sus SHA |
 | `REPO_MAP.md` | mapa técnico del código |
 | `TAXONOMIA-CLIENTE.md` | categorías/subcategorías |
 | `PAGOS-TRANSFERENCIA.md` | detalle de transferencia cuando la tarea lo requiera |

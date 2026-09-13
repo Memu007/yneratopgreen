@@ -63,4 +63,29 @@ Railway queda fuera de esta tarea: hoy Frontend y Backend siguen `main` con auto
 4. **Contraste del selector.** Corregí `.elegida`, que hoy queda en 2,61:1, y extendé la puerta para visitar el selector con estrellas elegidas. Es la misma causa de contraste ya trabajada, no un rediseño.
 5. **Canal vivo.** Reemplazá todo el cuerpo anterior de `PARA-PM.md`; no agregues otro informe arriba. Debe quedar únicamente el encabezado del canal y el informe breve de esta devolución. LOGO, cuenta de prueba e informes anteriores permanecen en Git y no van en la entrega vigente.
 
+### Consolidación de proceso incluida en esta devolución
+
+Esto no abre otra tarea ni amplía producto. La PM ya consolidó `CRONOGRAMA.md`,
+`ONBOARDING-PM.md`, `ONBOARDING-DEV.md` y `NOW.md`. En esta misma candidata te
+corresponden sólo estos deltas:
+
+1. **`AGENTS.md`:** dejalo como disparador breve de relevo y enlace al
+   onboarding PM completo. No dupliques ahí el orden de precedencia ni el
+   procedimiento: la autoridad ya está separada por tipo de pregunta en
+   `ONBOARDING-PM.md`.
+2. **Puertas de accesibilidad:** hacé que `scripts/a11y.mjs` y
+   `scripts/contraste.mjs` compartan una única lista/base de superficies. Sumá
+   los estados interactivos pertinentes y, en particular, el selector con
+   estrellas elegidas. El negativo debe detectar el 2,61:1 actual y quedar verde
+   con la corrección mínima. Sin dependencia nueva ni refactor amplio.
+3. **`PARA-PM.md`:** reemplazá el cuerpo y abrí el informe con una ficha fija:
+   rama, HEAD del informe, SHA candidato de producto/arnés, SHA efectivamente
+   probado, resultado y prueba Git de que cualquier delta posterior al SHA
+   probado es sólo documental. Un informe `.md` posterior no exige repetir la
+   suite.
+
+No edites otros documentos PM. `node --check` es un preflight barato cuando
+cambia `smoke.mjs`; no hace falta repetirlo después de una suite sobre el mismo
+SHA sólo para acumular evidencia.
+
 Primero corré focales discriminantes. Después entregá un nuevo SHA candidato único y repetí la suite completa Dev desde base limpia más las compuertas ya pedidas. Si tu entorno no tiene Docker, decilo de forma explícita; la PM repetirá la ruta Docker sobre el mismo SHA. No empieces `CAT-PAGE-1` ni otra tarea.
