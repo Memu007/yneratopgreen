@@ -17,7 +17,12 @@ Railway, no baja datos remotos, no contrata nada y no escribe secretos.
 | Base PostgreSQL/PostGIS | `pg_dump -Fc` dentro de `topgreen-db` | `pg_dump -Fc` contra `127.0.0.1:5432` |
 | Imágenes subidas | volumen `uploads_data` | `backend/uploads` |
 | Documentación fiscal | volumen `documentos_data` | `backend/documentos` |
-| Correo sin enviar | `backend/outbox` | `backend/outbox` |
+| Correo sin enviar | `backend/outbox` (el lanzador lo monta desde el repositorio hacia `/app/outbox`) | `backend/outbox` |
+
+En producción el correo sin enviar vive dentro del volumen de `/data`
+—`EMAIL_OUTBOX_DIR=/data/outbox`—; cuando se respalde ese entorno entra por la
+copia de volúmenes, no desde el anfitrión. No se cambia el compose ni el
+producto para acomodar la prueba: se copia de donde está en cada entorno.
 
 El `outbox` entra porque hoy sustituye al correo real: perderlo es perder la
 evidencia de qué se mandó.
@@ -93,9 +98,19 @@ El destino se crea siempre nuevo:
 - base `topgreen_restore_<AAAAMMDD_HHMMSS>`, nunca `topgreen`;
 - archivos en `respaldos/destino-<sello>/`.
 
-`limpiar` sólo acepta un sello con esa forma exacta y se niega a cualquier otra
-cosa; comprobado con `topgreen`, con vacío y con un sello mal formado. Nunca
-borra volúmenes ni contenedores que no haya creado esta pieza.
+**El nombre no prueba propiedad.** Cualquiera puede crear una base o una carpeta
+que se llame igual, y borrar por patrón es borrar lo que otro dejó ahí. Por eso
+cada destino queda firmado, al restaurarlo, con un identificador de ejecución:
+
+- en la base, una fila en `respaldo_meta.propiedad` —un esquema aparte, para no
+  ensuciar los datos restaurados ni la comparación, que sólo mira `public`—;
+- en el directorio, un archivo `.propiedad` con esa misma ejecución.
+
+`limpiar` exige las dos firmas y que coincidan entre sí. Si falta una, si están
+vacías o si la base no lleva la ejecución que dice el directorio, **frena sin
+borrar nada**. Y antes de eso sigue exigiendo que el sello tenga la forma
+exacta. Un destino ajeno con el nombre correcto sobrevive: comprobado, con y sin
+una firma falsificada en el directorio.
 
 ## Cuando falla
 

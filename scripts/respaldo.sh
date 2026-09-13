@@ -25,6 +25,16 @@
 # —manifiesto, huella, comparación, negativo, limpieza— es el mismo código.
 set -euo pipefail
 
+# `xargs` no puede llamar a una función del guión, así que la huella lo invoca a
+# él con este modo interno. Va ANTES del `cd` de abajo: las rutas que le pasa
+# `xargs` son relativas a la carpeta que se está midiendo, no a la raíz del
+# repositorio. No es un comando de la pieza y no se usa a mano.
+if [ "${1:-}" = "--sha256" ]; then
+  shift
+  if command -v sha256sum >/dev/null 2>&1; then exec sha256sum "$@"; fi
+  exec shasum -a 256 "$@"
+fi
+
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$RAIZ"
 
@@ -37,6 +47,15 @@ DIR_RESPALDOS="${TOPGREEN_RESPALDOS:-respaldos}"
 PREFIJO_BASE="topgreen_restore_"
 PREFIJO_DIR="destino-"
 PATRON_BASE="^${PREFIJO_BASE}[0-9]{8}_[0-9]{6}$"
+
+# La marca de propiedad. El prefijo del nombre NO demuestra nada: cualquiera
+# puede crear una base o una carpeta que se llame igual, y borrar por patrón es
+# borrar lo que otro dejó ahí. Cada recurso que crea esta pieza queda firmado
+# con un identificador de ejecución, y `limpiar` no borra nada que no lleve su
+# firma. La firma vive en un esquema aparte —`respaldo_meta`— para no ensuciar
+# los datos restaurados ni la comparación, que sólo mira `public`.
+ESQUEMA_MARCA="respaldo_meta"
+ARCHIVO_MARCA=".propiedad"
 
 # El origen, que nunca se toca.
 BASE_ORIGEN="${TOPGREEN_DB_NOMBRE:-topgreen}"
@@ -52,6 +71,22 @@ fatal() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
 
 hay_docker() { docker info >/dev/null 2>&1; }
 ENTORNO="nativo"; hay_docker && ENTORNO="docker"
+
+# Herramientas que no se llaman igual en todas partes. La PM corre macOS y el
+# lanzador oficial usa Docker desde ese anfitrión: ahí `sha256sum` no existe
+# —es `shasum -a 256`—, y `find -printf`, `stat -c` y `xargs -r` son de GNU. Se
+# resuelve una sola vez acá y el resto del guión no se entera.
+GUION="$RAIZ/scripts/respaldo.sh"
+if command -v sha256sum >/dev/null 2>&1; then
+  sha256() { sha256sum "$@"; }
+  verificar_sha256() { sha256sum --quiet -c "$1"; }
+elif command -v shasum >/dev/null 2>&1; then
+  sha256() { shasum -a 256 "$@"; }
+  verificar_sha256() { shasum -a 256 -c "$1" > /dev/null; }
+else
+  echo "ERROR: no hay sha256sum ni shasum; sin checksums esta pieza no sirve" >&2
+  exit 1
+fi
 
 # Archivos intermedios de la huella. Se limpian al salir, pase lo que pase.
 TMP_HUELLA="$(mktemp -u)"
@@ -112,7 +147,13 @@ copiar_el_almacenamiento() {  # copiar_el_almacenamiento <directorio destino>
       docker run --rm -v "$volumen":/origen:ro -v "$PWD/$destino":/copia \
         alpine:3 sh -c "cp -a /origen/. /copia/$nombre/"
     done
-    # El outbox del lanzador es un montaje del repositorio, no un volumen.
+    # El outbox va en el bundle igual que las otras dos raíces, pero NO sale de
+    # un volumen: el lanzador local lo monta desde el repositorio —`./backend/
+    # outbox` hacia `/app/outbox`—, así que se copia desde el anfitrión. En
+    # producción vive dentro del volumen de `/data` (`EMAIL_OUTBOX_DIR=/data/
+    # outbox`); cuando se respalde ese entorno, el outbox entra por la rama de
+    # volúmenes de arriba y no por acá. No se cambia el compose ni el producto
+    # para acomodar la prueba: se copia de donde está.
     if [ -d backend/outbox ]; then
       mkdir -p "$destino/outbox"; cp -a backend/outbox/. "$destino/outbox/"
     fi
@@ -158,14 +199,20 @@ huella_de_los_archivos() {  # huella_de_los_archivos <directorio>
   # hace en una sola pasada y se pega con los tamaños por ruta. Las rutas con
   # tabulador romperían ese pegado, así que se comprueba que no haya.
   ( cd "$raiz"
-    if find . -type f -name '*	*' -print -quit | grep -q .; then
+    if find . -type f -name '*	*' -print | head -1 | grep -q .; then
       echo "ERROR: hay rutas con tabulador; la huella no las puede representar" >&2
       return 1
     fi
-    find . -type f -printf '%P\t%s\n' | LC_ALL=C sort > "$TMP_HUELLA.tam"
-    find . -type f -print0 | xargs -0 -r sha256sum | sed 's|^\([0-9a-f]*\)  \./|\1\t|' \
+    # Sin `-printf` y sin `stat`, que son de GNU: `wc -c` en lotes da tamaño y
+    # ruta, y es POSIX. Las líneas «total» que agrega cada lote se descartan.
+    find . -type f -print0 | xargs -0 wc -c 2>/dev/null \
+      | awk '{ tam=$1; $1=""; sub(/^ +/, ""); if ($0 != "total" && $0 != "") \
+               { sub(/^\.\//, ""); print $0 "\t" tam } }' \
+      | LC_ALL=C sort > "$TMP_HUELLA.tam"
+    find . -type f -print0 | xargs -0 "$GUION" --sha256 \
+      | sed 's|^\([0-9a-f]*\)  *\./|\1	|' \
       | awk -F'\t' '{print $2 "\t" $1}' | LC_ALL=C sort > "$TMP_HUELLA.sha"
-    LC_ALL=C join -t$'\t' "$TMP_HUELLA.tam" "$TMP_HUELLA.sha" \
+    LC_ALL=C join -t"$(printf '\t')" "$TMP_HUELLA.tam" "$TMP_HUELLA.sha" \
       | awk -F'\t' '{print "archivo\t" $1 "\t" $2 "\t" $3}' )
 }
 
@@ -218,7 +265,7 @@ comando_respaldar() {
 }
 FIN
 
-  ( cd "$bundle" && sha256sum base.dump datos.tar.gz huella-base.tsv \
+  ( cd "$bundle" && sha256 base.dump datos.tar.gz huella-base.tsv \
       huella-archivos.tsv manifiesto.json > SHA256SUMS )
   nota "base: $(du -h "$bundle/base.dump" | cut -f1) · datos: $(du -h "$bundle/datos.tar.gz" | cut -f1)"
   nota "$archivos archivos y $(grep -c '^tabla' "$bundle/huella-base.tsv") tablas en la huella"
@@ -231,7 +278,7 @@ FIN
 comando_restaurar() {
   local bundle="${1:-}"
   [ -d "$bundle" ] || fatal "no encuentro el bundle «$bundle»"
-  ( cd "$bundle" && sha256sum --quiet -c SHA256SUMS ) \
+  ( cd "$bundle" && verificar_sha256 SHA256SUMS ) \
     || fatal "el bundle no coincide con sus checksums: no se restaura"
 
   local sello; sello="$(date -u +%Y%m%d_%H%M%S)"
@@ -268,7 +315,25 @@ comando_restaurar() {
       "GRANT ALL ON ALL TABLES IN SCHEMA public TO \"$USUARIO_ORIGEN\"" >/dev/null
   fi
 
+  # La firma. Sin esto, `limpiar` no tendría con qué distinguir este destino de
+  # cualquier otra base o carpeta que se llame igual.
+  local ejecucion; ejecucion="$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  local marca_sql="
+    CREATE SCHEMA IF NOT EXISTS $ESQUEMA_MARCA;
+    CREATE TABLE IF NOT EXISTS $ESQUEMA_MARCA.propiedad (
+      ejecucion text primary key, creado timestamptz not null, bundle text not null);
+    INSERT INTO $ESQUEMA_MARCA.propiedad VALUES
+      ('$ejecucion', now(), '$(basename "$bundle")');"
+  if [ "$ENTORNO" = docker ]; then
+    docker exec -i "$CONTENEDOR_DB" psql -U postgres -d "$base_destino" -qtAc "$marca_sql" >/dev/null
+  else
+    sudo -u postgres psql -d "$base_destino" -qtAc "$marca_sql" >/dev/null
+  fi
+  printf 'ejecucion=%s\nsello=%s\nbundle=%s\n' \
+    "$ejecucion" "$sello" "$(basename "$bundle")" > "$dir_destino/$ARCHIVO_MARCA"
+
   nota "restaurado sin tocar $BASE_ORIGEN ni $CONTENEDOR_DB"
+  nota "firmado con la ejecución $ejecucion; sin esa firma no se borra"
   echo "$sello"
 }
 
@@ -299,7 +364,7 @@ comando_verificar() {
   }
 
   # 1. El bundle es el que se escribió.
-  if ( cd "$bundle" && sha256sum --quiet -c SHA256SUMS ); then
+  if ( cd "$bundle" && verificar_sha256 SHA256SUMS ); then
     printf '  ✓ el bundle coincide con sus checksums\n'
   else
     printf '  ✗ el bundle NO coincide con sus checksums\n'; fallos=$((fallos + 1))
@@ -355,14 +420,36 @@ comando_limpiar() {
   [ "$base_destino" = "$BASE_ORIGEN" ] && fatal "eso es el origen, no un destino"
 
   paso "Limpieza del destino $sello"
+
+  # La firma del directorio manda: dice qué ejecución creó este destino.
+  [ -f "$dir_destino/$ARCHIVO_MARCA" ] \
+    || fatal "$dir_destino no lleva la firma de esta pieza. No se borra nada."
+  local ejecucion; ejecucion="$(sed -n 's/^ejecucion=//p' "$dir_destino/$ARCHIVO_MARCA")"
+  [ -n "$ejecucion" ] || fatal "la firma de $dir_destino está vacía. No se borra nada."
+
+  # Y la base tiene que llevar la MISMA. Una base que se llama igual pero que
+  # esta pieza no creó no tiene el esquema de marca, y ahí se frena: el nombre
+  # no prueba propiedad.
+  local firmada
+  if [ "$ENTORNO" = docker ]; then
+    firmada="$(docker exec -i "$CONTENEDOR_DB" psql -U postgres -d "$base_destino" -tAc \
+      "select count(*) from $ESQUEMA_MARCA.propiedad where ejecucion='$ejecucion'" 2>/dev/null || echo 0)"
+  else
+    firmada="$(sudo -u postgres psql -d "$base_destino" -tAc \
+      "select count(*) from $ESQUEMA_MARCA.propiedad where ejecucion='$ejecucion'" 2>/dev/null || echo 0)"
+  fi
+  [ "${firmada:-0}" = "1" ] \
+    || fatal "la base $base_destino no lleva la firma $ejecucion: no la creó esta ejecución. No se borra nada."
+
   if [ "$ENTORNO" = docker ]; then
     docker exec -i "$CONTENEDOR_DB" psql -U postgres -tAc \
       "DROP DATABASE IF EXISTS \"$base_destino\"" >/dev/null
   else
     sudo -u postgres psql -tAc "DROP DATABASE IF EXISTS \"$base_destino\"" >/dev/null
   fi
-  [ -d "$dir_destino" ] && rm -rf "$dir_destino"
-  nota "borrados la base $base_destino y $dir_destino; nada más"
+  rm -rf "$dir_destino"
+  nota "borrados la base $base_destino y $dir_destino, los dos firmados con $ejecucion"
+  nota "nada más se tocó"
 }
 
 # --------------------------------------------------------------------------
