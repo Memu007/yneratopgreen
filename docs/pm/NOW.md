@@ -7,14 +7,14 @@ Actualizado: 2026-09-13.
 ## Resumen ejecutivo
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 4. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
-- **`main`:** sin cambios de producto desde `3064f10`; el delta actual es sólo documentación PM. Sigue conectado al auto-deploy de Railway, por lo que no se integra producto ahí todavía.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, HEAD de informe `ad914a3`; candidata de producto/arnés `c565e6e`, aceptada en rama y no integrada ni desplegada.
-- **Última decisión PM:** `INTEGRATION-CANDIDATE-1` **ACEPTADA** en revisión 3. La composición queda congelada en `c565e6e`; no autoriza integración ni despliegue.
-- **Tarea activa:** `AGENTS-CONSOLIDATION-1`, responsable Dev. Debe preparar desde `main` una pieza exclusivamente documental que lleve el disparador consolidado de `c565e6e` y preserve la sección local de eficiencia de chats. No autoriza producto, integración de la candidata ni despliegue.
+- **`main`:** `b8447a3`, merge de la candidata aceptada `c565e6e` y su informe `ad914a3` sobre el estado PM `2e752cb`. Incluye el `AGENTS.md` consolidado y preserva la regla local de eficiencia de chats.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, HEAD de informe `ad914a3`; su candidata `c565e6e` ya es ancestro de `main`.
+- **Última decisión owner/PM:** Emi autorizó integrar y desplegar `b8447a3` antes de contar con backup ensayado. La excepción publica el trabajo aceptado, pero no levanta la puerta de backup ni convierte el entorno en producción aceptada.
+- **Tarea activa:** `BACKUP-RESTORE-1`, responsable Dev. Debe producir y ensayar una copia lógica de PostGIS y de los datos persistentes en un destino local aislado, sin tocar Railway ni datos remotos.
 
 ## Última aceptación PM relevante
 
-`INTEGRATION-CANDIDATE-1` quedó aceptada en rama Dev: producto/arnés `c565e6e`, informe `ad914a3`. No está integrada ni desplegada.
+`INTEGRATION-CANDIDATE-1` quedó aceptada en rama Dev y se integró a `main` mediante `b8447a3`: producto/arnés `c565e6e`, informe `ad914a3`. El despliegue automático fue autorizado expresamente por Emi el 2026-09-13; Frontend y Backend ya fueron verificados en esa misma revisión.
 
 Las aceptaciones anteriores y sus reproducciones son historia consultable en Git y en los documentos de evidencia; no se vuelven a transcribir en este archivo.
 
@@ -33,19 +33,20 @@ casos** de la candidata final. La evidencia durable son los SHA, resultados y
 negativos anteriores; los logs locales fueron apoyo de revisión y no son una
 dependencia recuperable del cierre.
 
-La deuda de composición quedó cerrada: `c565e6e` incorpora `main` y el trabajo
-aceptado, y ya no hay diferencias de prueba sin clasificar. El SHA queda
-congelado; un commit documental nuevo en `main` no lo invalida, pero cualquier
-cambio de producto exige recomposición y prueba antes de integrar.
+La deuda de composición quedó cerrada: `c565e6e` incorpora el trabajo aceptado y
+`b8447a3` lo combina con la documentación PM vigente sin cambiar ese producto.
+El `diff-check` y el build de producción quedaron verdes antes del push.
 
-El inventario confirmó que `main` es hoy la rama de producción de ambos servicios y que el auto-deploy está activo sin esperar CI. Por eso **no se adopta todavía** `main = integración`: la composición candidata se prepara y prueba en la rama Dev. La migración recomendada a `main = integración aceptada` / `release = producción` queda retenida hasta resolver backups y ejecutar un cambio operativo controlado; si se adopta, `release` sólo puede avanzar a un SHA ya contenido en `main` y no lleva commits exclusivos.
+`main` continúa conectado al auto-deploy de ambos servicios sin esperar CI. Emi
+autorizó esta publicación como excepción consciente aun sin backup ensayado. La
+migración recomendada a `main = integración aceptada` / `release = producción`
+sigue pendiente: publicar no equivale a aceptar la operación productiva ni
+resuelve backups, SMTP, secretos, pagos o recuperación.
 
 ## Pendientes canónicos adoptados
 
-- **Relevo:** `main` todavía conserva el `AGENTS.md` anterior y la consolidación
-  vive sólo en `c565e6e`. Además, el árbol de Emi tiene una sección local sin
-  commit sobre eficiencia de chats. `AGENTS-CONSOLIDATION-1` debe producir desde
-  `main` un archivo único que combine ambos cambios sin tocar producto.
+- **Relevo:** cerrado en `b8447a3`; `main` contiene el disparador consolidado y
+  la regla local de eficiencia de chats.
 - **Carrito conservado:** si una sesión inválida deja ítems locales, la persona
   debe poder reabrir el carrito sin sesión; continuar compra abre el Login y
   conserva la intención. Decisión registrada en `DECISIONS.md` y ejecución en
@@ -53,17 +54,17 @@ El inventario confirmó que `main` es hoy la rama de producción de ambos servic
 - **FAQ de pagos:** «¿Cuáles son las formas de pago?» debe mencionar
   transferencia directa y Mercado Pago cuando el vendedor lo tenga habilitado.
   Se corrige en la misma pieza posterior, sin reabrir `c565e6e`.
-- **Backup/restauración:** `BACKUP-RESTORE-1` queda en cola inmediatamente
-  después de la consolidación de `AGENTS.md`.
+- **Backup/restauración:** `BACKUP-RESTORE-1` es la tarea activa. La publicación
+  autorizada no reduce esta deuda ni habilita migraciones riesgosas.
 
-## Railway — inventario 2026-09-12 y deuda viva
+## Railway — inventario actualizado 2026-09-13 y deuda viva
 
 Inventario de sólo lectura del proyecto `strong-playfulness`, entorno `production`:
 
 - servicios en línea: Frontend `yneratopgreen`, Backend `Backend` y base `PostGIS`;
 - Frontend y Backend toman `Memu007/yneratopgreen`, rama `main`, con auto-deploy activo y `Wait for CI` apagado;
-- Frontend público `https://yneratopgreen-production.up.railway.app`, desplegado desde `b26d8ad`; Backend público `https://backend-production-ba84.up.railway.app`, desplegado y reportado por `/api/health` en `2877d2a`;
-- los watch paths son separados (`src/public/...` para Frontend y `backend/**` para Backend), por lo que Railway publica composiciones parciales: el entorno actual **no converge en un único SHA**;
+- Frontend público `https://yneratopgreen-production.up.railway.app` y Backend público `https://backend-production-ba84.up.railway.app` convergen en `b8447a3`; se verificaron el metadato HTML y `/api/health` después del despliegue;
+- los watch paths siguen separados (`src/public/...` para Frontend y `backend/**` para Backend), por lo que Railway puede publicar composiciones parciales en cambios futuros aunque esta publicación haya convergido;
 - `VITE_API_URL` y `VITE_IMAGES_URL` apuntan al Backend vigente;
 - CORS contiene el dominio histórico y el dominio público actual, pero `FRONTEND_URL` todavía apunta al dominio histórico `ynerav.up.railway.app`; queda como deuda de configuración, sin corregir en este inventario;
 - Backend usa almacenamiento local con volumen `backend-volume` de 5 GB montado en `/data`; `UPLOAD_DIR=/data/uploads` y `EMAIL_OUTBOX_DIR=/data/outbox` quedan persistentes allí;
@@ -95,7 +96,7 @@ Adquirir las cuentas/credenciales de prueba es dependencia humana. No enlazar OA
 
 De la puerta contractual completa, hoy siguen vivos estos bloqueos:
 
-- política de ramas/deploy resuelta e integración controlada de la candidata ya aceptada `c565e6e`;
+- política de ramas/deploy que separe integración aceptada de producción;
 - backups con restauración ensayada; la persistencia ya existe pero no sustituye backup;
 - SMTP real para el flujo de validación por correo; `outbox` no satisface producción;
 - configuración y secretos revisados sin exponer valores;
@@ -118,10 +119,8 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev entrega `AGENTS-CONSOLIDATION-1` desde `main`; PM revisa el diff y recién entonces autoriza su integración documental.
-2. Mantener congelada `c565e6e`: no integrar ni desplegar mientras `main` siga conectado al auto-deploy sin backups.
-3. Dev entrega `BACKUP-RESTORE-1`; PM reproduce una restauración local completa y clasifica cualquier dependencia externa.
-4. Emi autoriza la opción de backup administrado/costo y la operación remota; se ensaya una restauración recuperable antes de usar datos reales.
-5. Ejecutar de forma controlada la separación `main`/`release` e integrar exactamente la candidata aceptada; cualquier cambio de producto exige recomposición y prueba.
-6. Ejecutar `POST-INTEGRATION-CLEAR-1` y después abrir `CAT-PAGE-1` para continuar el roadmap contractual.
-7. Mercado Pago, red-team y producción permanecen al final de la secuencia acordada, sin esperar artificialmente a una fecha si las dependencias ya están listas.
+1. Dev entrega `BACKUP-RESTORE-1`; PM reproduce una restauración local completa y clasifica cualquier dependencia externa.
+2. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
+3. Ejecutar `POST-INTEGRATION-CLEAR-1` sobre `main` y después abrir `CAT-PAGE-1` para continuar el roadmap contractual.
+4. Separar de forma controlada integración y producción; cualquier cambio de producto exige nueva aceptación antes de publicar.
+5. Mercado Pago, SMTP, red-team y producción aceptada permanecen al final de la secuencia acordada, sin esperar artificialmente a una fecha si las dependencias ya están listas.

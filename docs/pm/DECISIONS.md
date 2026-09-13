@@ -5,6 +5,20 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-09-13 — Integrar y desplegar la candidata aceptada antes del backup
+
+Emi autorizó expresamente publicar en `main` la composición ya aceptada
+`c565e6e`, aun sabiendo que Railway despliega automáticamente y que todavía no
+hay backup/restauración ensayados. La integración quedó en el merge `b8447a3`,
+que además consolida `AGENTS.md` y preserva la regla local de eficiencia de
+chats; el producto fuera de documentación y de ese disparador coincide con la
+candidata aceptada.
+
+Esta es una excepción de publicación, no una aceptación de producción ni una
+renuncia a la puerta operativa. `BACKUP-RESTORE-1` pasa a ser la tarea activa;
+siguen pendientes la separación integración/producción, SMTP, configuración,
+homologación de pagos, red-team y demás puertas registradas en `NOW.md`.
+
 ## 2026-09-13 — El carrito conservado sigue accesible y la FAQ enumera los medios reales
 
 Cuando una sesión se confirma inválida, el carrito local conserva sus ítems. Si

@@ -13,70 +13,89 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
-## 2026-09-13 — AGENTS-CONSOLIDATION-1
+## 2026-09-13 — BACKUP-RESTORE-1
 
-`INTEGRATION-CANDIDATE-1` quedó **aceptada** en `c565e6e`, con informe
-`ad914a3`. Después de tu informe, `main` avanzó y tu rama remota todavía no
-incorporó las decisiones PM nuevas. Primero actualizá referencias y leé este
-archivo desde `origin/main`. Si tu copia dice «sin tarea activa», está vieja.
+`INTEGRATION-CANDIDATE-1` y `AGENTS-CONSOLIDATION-1` quedaron integradas en
+`b8447a3`. Emi autorizó expresamente el despliegue automático aun sin backup
+ensayado; esa excepción no levanta la puerta operativa. Ésta es ahora la única
+tarea activa.
 
-### Problema y prioridad
+### Problema
 
-La consolidación de `AGENTS.md` que ya preparaste vive sólo dentro de la
-candidata congelada. `main` conserva el disparador anterior y duplica una
-precedencia que contradice la autoridad por tipo de pregunta fijada en
-`ONBOARDING-PM.md`. Además, el árbol de Emi agrega una sección de eficiencia de
-chats que no se puede perder. Cada rol nuevo lee este archivo antes de llegar al
-onboarding, por eso se cierra antes de la pieza de backups.
+PostGIS y el volumen persistente `/data` conservan estado, pero persistencia no
+es backup. Hoy no existe un procedimiento reproducible que copie ambos, los
+restaure en un destino limpio y demuestre que la recuperación conserva datos y
+archivos. No se puede aceptar producción ni hacer una migración riesgosa con
+esa incertidumbre.
 
 ### Alcance
 
-Prepará una rama/commit documental limpio **desde `origin/main` vigente**, no
-desde la composición de producto. El `AGENTS.md` resultante debe:
+Construí la pieza mínima, repetible y documentada para entorno local Docker:
 
-1. conservar la versión consolidada de `c565e6e`: disparador breve, enlaces a
-   `ONBOARDING-PM.md` y `ONBOARDING-DEV.md`, sin duplicar procedimiento ni una
-   precedencia única;
-2. conservar al final, sin cambiar su sentido, esta regla local de Emi:
+1. generar un bundle de backup con un dump lógico restaurable de PostgreSQL /
+   PostGIS y una copia de los datos persistentes equivalentes a `/data`;
+2. incluir manifiesto, fecha, versión/formato y checksums sin copiar secretos;
+3. restaurar el bundle en contenedores y volúmenes locales **nuevos y
+   aislados**, sin reemplazar ni modificar `topgreen-db`, `topgreen-api` ni sus
+   volúmenes de origen;
+4. comparar de forma automática el origen y el destino: esquema/extensión
+   PostGIS, tablas y cantidades relevantes, más rutas, tamaños y checksums de
+   archivos;
+5. dejar un único procedimiento claro de backup, restore, verificación y
+   limpieza segura del destino de prueba.
 
-   > Avisale a Emi cuando convenga continuar en un chat nuevo para no cargar
-   > contexto innecesario, especialmente al cerrar una tarea, cambiar de rol o
-   > empezar un bloque que ya no necesita el historial actual. No interrumpas
-   > una tarea activa sólo por la longitud del chat. Antes de recomendar el
-   > cambio, dejá el estado vigente guardado en el repositorio y entregá un
-   > relevo breve listo para retomar.
+Podés agregar scripts acotados y documentación operativa. Reutilizá Docker,
+`pg_dump`/`pg_restore` y utilidades estándar disponibles antes de sumar una
+dependencia. Los artefactos de backup y datos de prueba no se versionan.
 
-3. no tocar ningún otro archivo salvo el informe breve en `PARA-PM.md`.
+### Evidencia exigida
+
+- Sembrá marcadores no sensibles en base y almacenamiento locales, tomá el
+  backup y restauralo en el destino aislado.
+- Demostrá que los marcadores y los fingerprints coinciden después del restore.
+- Demostrá el negativo: un archivo alterado o ausente, o una base que no
+  coincide, debe hacer fallar la verificación.
+- Probá que el origen conserva antes y después la misma identidad/fingerprint y
+  que los contenedores vigentes siguen saludables.
+- Corré `diff-check` y las verificaciones focales de la pieza. No hace falta la
+  suite funcional completa si el diff no toca producto; declaralo.
 
 ### Fuera de alcance
 
-- No mezclar ni integrar `c565e6e`, no tocar producto, scripts, dependencias,
-  Railway, GitHub settings ni ramas de despliegue.
-- No empezar `BACKUP-RESTORE-1`, `POST-INTEGRATION-CLEAR-1` ni `CAT-PAGE-1`.
-- No hacer push a `main`. Esta entrega es una candidata documental para revisión
-  PM; la autorización de integración viene después.
+- No acceder ni cambiar Railway, GitHub settings, ramas de despliegue, datos
+  remotos, secretos, dominios, SMTP o Mercado Pago.
+- No comprar ni activar backups administrados; esa decisión y el gasto son de
+  Emi.
+- No descargar una copia de producción ni usar datos personales reales.
+- No empezar `POST-INTEGRATION-CLEAR-1` ni `CAT-PAGE-1`.
+- No borrar ni sobrescribir volúmenes o contenedores existentes. Toda limpieza
+  queda limitada a recursos de destino creados por esta pieza e identificados
+  de forma inequívoca.
 
 ### Criterios de aceptación
 
-1. El commit candidato tiene como base el `origin/main` vigente y el diff total
-   fuera de `AGENTS.md` y `docs/pm/PARA-PM.md` está vacío.
-2. `AGENTS.md` no contiene el procedimiento numerado viejo ni una lista global
-   de precedencia; sí enlaza los dos onboardings y conserva las tres reglas
-   mínimas de la consolidación.
-3. La sección de eficiencia anterior queda presente y no obliga a cambiar de
-   chat por rutina: sólo se recomienda cuando conviene y con estado ya guardado.
-4. Todos los enlaces locales del archivo existen y `diff-check` queda limpio.
+1. Desde un origen Docker local saludable se obtiene un bundle autocontenido
+   para base y almacenamiento persistente, con manifiesto y checksums.
+2. Un destino local limpio recupera el estado sin depender del origen durante
+   la restauración.
+3. La comparación automática queda verde para una copia íntegra y roja ante
+   una alteración discriminante.
+4. El origen no cambia, los destinos no colisionan con los nombres actuales y
+   una falla corta sin borrar recursos ajenos.
+5. El procedimiento documenta requisitos, comandos, ubicación de artefactos,
+   verificación y limpieza, sin valores secretos ni pasos remotos implícitos.
 
 ### Frená y consultá si
 
-- no podés construir la pieza desde `origin/main` sin arrastrar producto de la
-  candidata;
-- `origin/main` contiene otra edición ya comprometida de `AGENTS.md` que no esté
-  descripta en esta tarea;
-- el diff incluye cualquier archivo no autorizado.
+- la única forma de avanzar toca Railway o datos remotos;
+- necesitás elegir un servicio pago, una política de retención o un destino
+  externo;
+- no podés aislar el restore de los contenedores/volúmenes actuales;
+- el inventario real de `/data` contradice `NOW.md` o exige decidir qué dato es
+  recuperable.
 
 ### Entrega
 
-Entregá rama, base exacta, SHA candidato, diff completo y `diff-check`.
-Reemplazá `PARA-PM.md` en esa misma rama con un informe breve. No integres ni
-despliegues; frená para revisión PM.
+Entregá rama, SHA base, SHA candidato, diff completo, comandos exactos y
+resultados del positivo y del negativo. Reemplazá `PARA-PM.md` con un informe
+breve. No integres ni despliegues; frená para revisión PM.

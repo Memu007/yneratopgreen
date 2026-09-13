@@ -87,7 +87,7 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 
 | Requisito | Estado |
 |-----------|--------|
-| Pruebas integrales | ✅ Candidata `c565e6e` aceptada en rama. PM corrió 168/169 desde base Docker limpia sobre `e0cdfe9`; el único rojo fue el nuevo caso 169. Git demuestra que el delta final sólo cambia ese caso, que PM reprodujo 1/1 con Docker real sobre `c565e6e`. Quedan cubiertos los 169 casos; a11y y contraste verdes. No equivale a despliegue productivo. |
+| Pruebas integrales | ✅ Candidata `c565e6e` aceptada e integrada mediante `b8447a3`. PM corrió 168/169 desde base Docker limpia sobre `e0cdfe9`; el único rojo fue el nuevo caso 169. Git demuestra que el delta final sólo cambia ese caso, que PM reprodujo 1/1 con Docker real sobre `c565e6e`. Quedan cubiertos los 169 casos; a11y, contraste, diff-check y build verdes. El despliegue fue autorizado por Emi antes del backup; no equivale a producción aceptada. |
 | Carga inicial de datos | ✅ Seed idempotente con 30 publicaciones en 12 categorías y 9 provincias, más 4.028 localidades. Verificado corriéndolo dos veces sin duplicar |
 | Despliegue en producción | ❌ |
 | Capacitación del panel de administración | ❌ |
