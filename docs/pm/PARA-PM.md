@@ -2,86 +2,95 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## INTEGRATION-CANDIDATE-1 R3 — el caso 169 en los dos entornos
+## BACKUP-RESTORE-1 — entrega para revisión
 
 | | |
 | --- | --- |
-| **Rama** | `claude/dev-role-repo-3l0kp3` |
-| **HEAD de este informe** | el commit que trae este archivo, o sea la punta de la rama |
-| **SHA candidato — producto y arnés** | `c565e6e` |
-| **SHA efectivamente probado** | `c565e6e` (focal 169; el resto lo conserva tu corrida sobre `e0cdfe9`) |
-| **Resultado** | focal **169 verde** en los dos entornos: API nativa y contenedor emulado. Y rojo con el comando anterior en los dos |
-| **Delta desde `e0cdfe9`** | un solo hunk, dentro del caso 169: `git diff e0cdfe9 c565e6e -- . ':!docs/'` toca sólo `scripts/smoke.mjs` y sólo ese caso. Después de `c565e6e`, sólo este documento |
-| **Base** | `main` en `7a898ef`, ya incorporado |
-| **Estado** | en mi rama. No integré, no desplegué, no toqué Railway, datos remotos, secretos ni pagos. No empecé otra tarea |
+| **Resultado** | Terminado |
+| **Rama** | `codex/backup-restore-1` |
+| **SHA base** | `24dcca8` |
+| **SHA candidato probado** | `5ae5572` |
+| **Alcance** | Backup lógico PostgreSQL/PostGIS, copia de `/data/uploads` y `/data/documentos`, restore local aislado, fingerprints, negativo y limpieza segura |
+| **Estado** | Pusheado para revisión PM; no integrado ni desplegado |
 
-Como pediste, **no repetí la suite completa, ni `a11y`, ni `contraste`**: el
-delta es el caso 169 y este informe.
+### Cambios
 
----
+- `scripts/backup_restore.sh`: un único comando con `backup`, `restore`,
+  `verify`, `cleanup` y `self-test`.
+- `docs/operations/BACKUP_RESTORE_LOCAL.md`: requisitos y procedimiento único.
+- `.gitignore`: excluye `backups/`; ningún bundle ni dato de prueba se versiona.
 
-### Qué estaba mal
+El bundle incluye dump custom de `pg_dump`, archivo de los dos volúmenes,
+manifiesto con fecha UTC y versión/formato, inventarios y SHA-256. El restore
+usa únicamente el bundle y las imágenes locales registradas, crea dos
+contenedores y tres volúmenes con prefijo `topgreen-restore-`, no publica
+puertos y usa `--pull=never`.
 
-El caso exigía una API nativa en marcha —«este caso necesita una API nativa en
-marcha para comprobar que no la tocan»— antes de armar sus dos escenarios de la
-rama nativa. Con el lanzador oficial la API vive en un contenedor y no hay
-ningún uvicorn de anfitrión, así que el caso se caía en esa línea sin llegar a
-probar nada. El error es mío y es del mismo tipo que los otros tres de esta
-tarea: el caso heredaba una condición del entorno en vez de fabricarla.
+### Evidencia reproducible
 
-### Qué hace ahora
+Comando focal final, sobre el SHA candidato:
 
-El escenario lo fijan los dobles, no la máquina:
+```bash
+./scripts/backup_restore.sh self-test
+```
 
-1. **Contenedor que contesta y no se reinicia** — ya era independiente del
-   entorno: el doble de `docker` informa una identidad fija, `restart` dice que
-   sí, y el comando tiene que ver que `Pid`/`StartedAt` no se movieron.
-2. **Nadie identificable** — el doble de `docker` ahora dice **que no hay
-   contenedor**, así el comando toma su rama nativa corra donde corra, y el
-   doble de `ps` le esconde cualquier uvicorn.
-3. **El puerto lo atiende otro** — mismo doble de `docker`, y el de `ps` le
-   presenta un proceso descartable como si fuera la API. El comando lo mata, el
-   puerto sigue contestando, y eso es el rojo.
-4. **El reinicio real**, con el entorno tal cual es: tiene que **cambiar la
-   identidad de quien sirva la API** —`Pid` y `StartedAt` si es contenedor, los
-   PID si es uvicorn nativo—.
+Resultado:
 
-«No tocó nada» también se mide así ahora: contra quien sirva la API, y no contra
-una lista de PID que en Docker está vacía por definición.
+```text
+Backup creado: backups/self-test-20260913194204-43557
+Restore creado con prefijo: topgreen-restore-test-20260913194204-43557
+Verificación íntegra: esquema, extensiones, tablas, filas y archivos coinciden
+Positivo: marcador DB y archivo incluidos en fingerprints restaurados
+Negativo: archivo alterado rechazado por la verificación
+Destino aislado eliminado: topgreen-restore-test-20260913194204-43557
+Origen intacto: identidades, fingerprints y salud coinciden antes/después
+Self-test completo. Bundle conservado: backups/self-test-20260913194204-43557
+```
 
-Dos detalles de portabilidad que estaban mal para tu máquina: el doble de `ps`
-**agrega** su línea mientras el descartable siga vivo y no sea zombi, en vez de
-reescribir una línea del `ps` real —así no depende de que `ps` liste un proceso
-sin terminal—, y las lecturas piden `-Ao` y no `-eo`, porque en BSD `-e` no
-significa «todos los procesos».
+El positivo compara esquema y extensiones —incluida PostGIS—, todas las tablas
+con cantidad y huella de filas, secuencias y cada archivo por ruta, tamaño y
+SHA-256. El negativo altera el marcador restaurado y `verify` falla. Al final
+no quedaron contenedores, volúmenes, schemas ni archivos marcador de prueba.
 
-### Lo medido
+Guardas adicionales:
 
-| Entorno | Comando nuevo | Comando anterior |
-| --- | --- | --- |
-| API nativa | **verde**; el reinicio real pasó de `[647]` a `[1116]` | **rojo**: «salió con 0 y anunció éxito» |
-| Contenedor (emulado) | **verde**; informa «con la API en contenedor topgreen-api» y ve la identidad pasar de `[true 1000 …]` a `[true 1001 …]` | **rojo**: mismo síntoma |
+```text
+sh -n scripts/backup_restore.sh                         → verde
+git diff --check 24dcca8..5ae5572                     → verde
+./scripts/backup_restore.sh cleanup topgreen-db        → rechazado por prefijo
+búsqueda de password/secret/JWT/SMTP/MP en manifiesto → sin coincidencias
+topgreen-db y topgreen-api                             → mismos IDs, healthy
+```
 
-**Qué es «emulado» y qué no prueba.** Acá no hay demonio de Docker, así que puse
-en el PATH un `docker` que responde `inspect` y `restart` como un contenedor real
-—la identidad cambia sólo cuando se lo reinicia— y delega todo lo demás en el
-puente del repositorio. Eso prueba que el caso **se ejecuta y discrimina** cuando
-quien sirve la API es un contenedor, que es lo que se rompía. **No** prueba que
-`docker restart topgreen-api` mueva `Pid` y `StartedAt` de verdad: eso ya lo
-demostró tu corrida sobre `e0cdfe9`, con `65908 → 89335`.
+El manifiesto inspeccionado contiene sólo formato, fecha, nombres de base y
+usuario, imágenes locales y raíces de datos; no contiene valores de entorno ni
+contraseñas.
 
-### Compuertas
+### Rojos durante desarrollo
 
-| Puerta | Resultado |
-| --- | --- |
-| Focal 169, API nativa | verde |
-| Focal 169, contenedor emulado | verde |
-| Focal 169 contra el comando anterior, en los dos | rojo, con el síntoma exacto |
-| `node --check scripts/smoke.mjs` · `diff-check` | verdes |
-| Suite completa, `a11y`, `contraste` | **no las repetí**, por tu instrucción; valen las de `e0cdfe9` |
+1. Un primer intento no llegó a ejecutarse porque venció la revisión automática
+   del permiso local; comprobé que no dejó recursos ni marcadores y no lo conté
+   como evidencia.
+2. La primera corrida efectiva detectó que `pg_isready` veía el PostgreSQL
+   temporal del entrypoint. Se corrigió esperando que PID 1 sea `postgres`.
+3. La siguiente corrida restauró pero falló la comparación de esquema: la
+   imagen PostGIS inicializaba extensiones auxiliares ausentes en el origen. Se
+   corrigió restaurando el dump sobre una base limpia creada desde `template0`.
+4. Después de ambas correcciones, la corrida final anterior quedó verde de
+   punta a punta.
 
-### Lo que queda dicho
+### No corrido / límites respetados
 
-- La FAQ de Contacto dice «Aceptamos transferencias bancarias directas al
-  vendedor» y el producto también cobra por Mercado Pago. Sigue sin tocar.
-- Sigue esperando tu palabra lo del carrito sin sesión.
+- No corrí la suite funcional completa, build, a11y ni contraste: el diff no
+  toca producto.
+- No toqué Railway, datos remotos, secretos, ramas de despliegue, Mercado Pago,
+  `POST-INTEGRATION-CLEAR-1` ni `CAT-PAGE-1`.
+- No integré a `main`.
+
+### Riesgo residual
+
+La huella de tablas materializa filas en PostgreSQL para obtener una comparación
+genérica y determinista. Es adecuada para el volumen local actual; si el dataset
+crece de forma importante, convendrá reemplazarla por fingerprints por lotes.
+No hace falta resolver retención, cifrado externo ni backups administrados en
+esta pieza: siguen siendo decisiones operativas de Emi.
