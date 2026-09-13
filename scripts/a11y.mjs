@@ -24,6 +24,8 @@
 import { chromium } from 'playwright';
 import AxeBuilder from '@axe-core/playwright';
 
+import { exigidasDe, ordenRecibidaSinCalificar } from './lib/superficies.mjs';
+
 const API = process.env.A11Y_API_URL || 'http://127.0.0.1:8000/api';
 const WEB = process.env.A11Y_WEB_URL || 'http://localhost:5173';
 const VERTODAS = process.argv.includes('--todas');
@@ -34,42 +36,11 @@ const MEDIDAS = [
   { nombre: 'celular', width: 390, height: 844 },
 ];
 
-/* Inventario exigido, parte de la especificación de esta puerta y no del seed.
-   Si falta una, sobra una o se repite, el comando falla. */
-const ESPERADAS = [
-  'inicio',
-  'ingreso',
-  'registro',
-  'registro: alta de transportista',
-  'registro: correo pendiente',
-  'verificación de correo',
-  'vuelta de Mercado Pago',
-  'quienes somos',
-  'servicios',
-  'contacto',
-  'catálogo',
-  'detalle de producto',
-  'carrito',
-  'checkout: envío',
-  'checkout: traslado del pedido',
-  'checkout: transportista elegido',
-  'checkout: pago',
-  'panel del comprador',
-  'panel: edición de perfil',
-  'panel: mis compras',
-  'panel del vendedor',
-  'panel: documentación fiscal',
-  'panel: mis ventas',
-  'panel: mis productos',
-  'panel del transportista',
-  'panel: edición de transportista',
-  'panel: operaciones del transportista',
-  'administración',
-  'administración: usuarios',
-  'administración: productos',
-  'administración: órdenes',
-  'administración: documentación',
-];
+/* Inventario exigido: sale de `lib/superficies.mjs`, que es la misma lista que
+   usa `contraste`. No se escribe acá; agregar una pantalla en ese archivo la
+   vuelve obligatoria en las dos puertas. Si falta una, sobra una o se repite,
+   el comando falla. */
+const ESPERADAS = exigidasDe('a11y');
 
 const ESPERA = 20000;
 const hallazgos = [];
@@ -223,6 +194,13 @@ async function comprador(page, medida) {
   await page.goto(`${WEB}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
   await revisar(page, 'catálogo', medida, page.locator('#catalog-category'));
 
+  // Con el puntero encima: el estado de hover es el que nadie revisa a mano y
+  // el que ya escondió una inversión de colores en la banda de navegación.
+  const enlace = page.locator('a').first();
+  await enlace.waitFor({ state: 'visible', timeout: ESPERA });
+  await enlace.hover();
+  await revisar(page, 'catálogo (hover)', medida, page.locator('#catalog-category'));
+
   // el detalle se abre haciendo clic en la tarjeta, no en un boton: no existe
   // ningun "Ver detalle". Antes esto lo tapaba un catch vacio y esta pantalla
   // se declaraba medida sin haberse abierto nunca.
@@ -299,6 +277,18 @@ async function comprador(page, medida) {
   await page.getByRole('button', { name: 'Mis Compras' }).click();
   await revisar(page, 'panel: mis compras', medida,
     page.getByRole('heading', { name: 'Mis Compras' }));
+
+  // El selector de estrellas. Abre en 5 y `.elegida` pinta la elegida y todas
+  // las anteriores, así que abrirlo ya deja el estado que hay que medir: los
+  // cinco glifos llenos. Sin la orden recibida que fabrica el arranque, este
+  // botón no existiría.
+  const calificar = page.getByRole('button', { name: /Calificar Vendedor/i }).first();
+  await calificar.waitFor({ state: 'visible', timeout: ESPERA });
+  await calificar.click();
+  await revisar(page, 'panel: calificación (estrellas elegidas)', medida,
+    page.getByRole('heading', { name: /^Calificar a / }));
+  await page.getByRole('dialog', { name: /^Calificar a / })
+    .getByRole('button', { name: 'Cerrar' }).click();
 }
 
 async function vendedor(page, medida) {
@@ -382,6 +372,12 @@ try {
     transportista: await ingresar('transportista@ejemplo.com', 'transportista123'),
     admin: await ingresar('admin@topgreen.com', 'admin123'),
   };
+
+  const orden = await ordenRecibidaSinCalificar(API, {
+    comprador: cuentas.comprador.access,
+    vendedor: cuentas.vendedor.access,
+  });
+  console.log(`  · orden recibida y sin calificar para el selector: ${orden}`);
 
   for (const medida of MEDIDAS) {
     console.log(`\n=== ${medida.nombre} ${medida.width}x${medida.height} ===`);

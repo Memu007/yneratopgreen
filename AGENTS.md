@@ -1,36 +1,35 @@
 # Relevo de roles en TopGreen
 
-TopGreen conserva su propia fuente de verdad para contrato, estado, código y decisiones locales. El contexto institucional de Inera vive en `Memu007/ynerasecondbrain` y nunca reemplaza estas reglas.
+Este archivo es el disparador del relevo y nada más. El procedimiento, la
+autoridad de cada fuente y las reglas de trabajo viven en los documentos que se
+enlazan acá, y no se copian: una regla escrita en dos lugares envejece en uno.
 
-## Cuando Emi diga “ponete al día” y asigne PM
+TopGreen conserva su propia fuente de verdad para contrato, estado, código y
+decisiones locales. El contexto institucional de Inera vive en
+`Memu007/ynerasecondbrain` y nunca reemplaza estas reglas.
 
-1. Revisá `git status`, rama y commit. Si el árbol está limpio, actualizá `main`; si no, preservá cambios y reportalos.
-2. Leé completo `docs/pm/ONBOARDING-PM.md`.
-3. Leé `docs/pm/NOW.md` y `docs/pm/CRONOGRAMA.md`.
-4. `NOW.md` indica dónde vive la entrega pendiente. Si está en una rama Dev todavía no integrada, leé `PARA-PM.md` **desde esa rama**, no asumas que la copia de `main` es la última.
-5. Leé la tarea/hilo activo en `docs/pm/PARA-DEV.md`.
-6. Abrí `CONTRATO.md`, `ALCANCE-Y-LIMITES.md`, `DECISIONS.md` u otra evidencia sólo cuando la situación actual los cite o una decisión dependa de ellos.
-7. Contrastá afirmaciones importantes con Git y evidencia reproducible.
-8. Respondé con un parte corto: commit/rama, semana-fase, tarea y responsable, última aceptación, bloqueo/decisión pendiente y próxima acción.
+## Si el rol es PM
+
+Leé completo `docs/pm/ONBOARDING-PM.md`. Ahí está el «ponete al día» paso a
+paso, qué manda para cada tipo de pregunta y qué documento abrir en cada caso.
 
 Ponerse al día no autoriza a iniciar una tarea nueva.
 
-La PM sólo modifica `docs/pm/` durante el flujo normal; no escribe código de producto. No reabre decisiones cerradas ni cambia la tarea antes de completar el relevo.
+## Si el rol es Dev
 
-## Cuando el rol sea Dev
+Leé `CLAUDE.md` y, una vez, `docs/pm/ONBOARDING-DEV.md`. Después, la tarea
+activa en `docs/pm/PARA-DEV.md`. Dev responde en `docs/pm/PARA-PM.md` y no
+edita el canal de la PM.
 
-Leé `CLAUDE.md`, `docs/pm/ONBOARDING-DEV.md` una vez y después la tarea activa en `docs/pm/PARA-DEV.md`. Dev responde en `PARA-PM.md` y no edita el canal de PM.
+## Si el rol es auditoría externa
 
-## Auditorías externas
+Una auditora lee, cuestiona y propone. Su informe no cambia prioridad, alcance
+ni aceptación por sí solo: la PM contrasta los hallazgos y decide qué adopta.
 
-Una auditora externa puede leer, cuestionar y proponer. Su informe no cambia prioridad, alcance ni aceptación por sí solo: la PM contrasta los hallazgos y decide qué adoptar.
+## Lo único que este archivo afirma
 
-## Precedencia
-
-1. contrato y decisiones explícitas del proyecto;
-2. reglas locales del repositorio;
-3. evidencia actual de Git/código/pruebas;
-4. estado operativo en `NOW.md`;
-5. contexto institucional general.
-
-Los documentos históricos y auditorías no ganan una contradicción contra estas fuentes.
+- El chat no es fuente de verdad.
+- Cuando la entrega pendiente vive en una rama Dev sin integrar, se lee
+  `PARA-PM.md` **desde esa rama**; la copia de `main` puede no ser la última.
+- Cuando un documento y Git se contradicen sobre qué está implementado, manda
+  Git y se corrige el documento.

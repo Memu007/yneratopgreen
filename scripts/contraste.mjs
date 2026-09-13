@@ -22,40 +22,16 @@
  */
 import { chromium } from 'playwright';
 
+import { exigidasDe, ordenRecibidaSinCalificar } from './lib/superficies.mjs';
+
 const API = process.env.A11Y_API_URL || 'http://127.0.0.1:8000/api';
 const WEB = process.env.A11Y_WEB_URL || 'http://localhost:5173';
 
-/* Inventario exigido, parte de la especificación de esta puerta y no del seed.
-   Si falta una medición, sobra o se repite, el comando falla. */
-const ESPERADAS = [
-  'portada',
-  'portada (foto blanca)',
-  'portada (foto negra)',
-  'about',
-  'services',
-  'contact',
-  'about (foto blanca)',
-  'about (foto negra)',
-  'verificación de correo',
-  'vuelta de Mercado Pago',
-  'alta de transportista',
-  'catálogo',
-  'catálogo (hover)',
-  'detalle',
-  'carrito',
-  'checkout envío',
-  'checkout traslado',
-  'checkout transportista elegido',
-  'checkout pago',
-  'calificación (estrellas elegidas)',
-  'perfil vendedor',
-  'documentación fiscal',
-  'mis ventas',
-  'perfil transportista',
-  'perfil transportista (edición)',
-  'administración',
-  'administración documentación',
-];
+/* Inventario exigido: sale de `lib/superficies.mjs`, que es la misma lista que
+   usa `a11y`. No se escribe acá; agregar una pantalla en ese archivo la vuelve
+   obligatoria en las dos puertas. Si falta una medición, sobra o se repite, el
+   comando falla. */
+const ESPERADAS = exigidasDe('contraste');
 const ESPERA = 20000;
 const MEDIDAS = [
   { n: 'escritorio', width: 1440, height: 900 },
@@ -248,63 +224,13 @@ async function sesion(ctxOpts, tokens) {
   return ctx;
 }
 
-/* El selector de estrellas es la única pantalla donde vive `.elegida`, la clase
-   que pinta las estrellas llenas, y no existe sin una compra recibida: hay que
-   fabricarla. Se llega por las rutas reales —transferencia aprobada,
-   confirmada, despachada, recibida— y no se califica, así que la misma orden
-   sirve para la medida de escritorio y para la de móvil.
-
-   Sin esta pantalla la puerta declaraba cobertura completa y el selector
-   quedaba en 2,61:1 sin que nadie lo viera. */
-async function api(ruta, { token, method = 'GET', body } = {}) {
-  const r = await fetch(`${API}${ruta}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-  const texto = await r.text();
-  let datos = null;
-  try { datos = JSON.parse(texto); } catch { /* algunas salidas no traen cuerpo */ }
-  if (!r.ok) throw new Error(`${method} ${ruta} respondió HTTP ${r.status}: ${texto.slice(0, 200)}`);
-  return datos;
-}
-
-async function fabricarOrdenRecibida() {
-  const catalogo = await api('/catalog/products?search=Fertilizante%20Triple%2015&page_size=1');
-  const producto = catalogo?.items?.[0];
-  if (!producto) throw new Error('no está la publicación con la que se arma la orden a calificar');
-  await api('/cart', { token: comprador.access, method: 'DELETE' });
-  await api('/cart/items', {
-    token: comprador.access, method: 'POST',
-    body: { product_id: producto.id, quantity: 1 },
-  });
-  const checkout = await api('/orders/checkout/transfer', {
-    token: comprador.access, method: 'POST',
-    body: {
-      shipping_address: 'Ruta 8 km 220',
-      shipping_locality_id: producto.publication_location.locality_id,
-      shipping_postal_code: '2700',
-      shipping_decisions: [{ seller_id: producto.seller.id, mode: 'self' }],
-    },
-  });
-  const orden = checkout?.orders?.[0]?.order_id;
-  if (!orden) throw new Error('el checkout no devolvió la orden que hay que calificar');
-  await api(`/orders/${orden}/transfer-receipt`, {
-    token: vendedor.access, method: 'PATCH', body: { decision: 'approve' },
-  });
-  for (const [estado, token] of [
-    ['confirmed', vendedor.access], ['shipped', vendedor.access], ['delivered', comprador.access],
-  ]) {
-    await api(`/orders/${orden}/status`, { token, method: 'PATCH', body: { status: estado } });
-  }
-  await api('/cart', { token: comprador.access, method: 'DELETE' });
-  return orden;
-}
-
-const ordenSinCalificar = await fabricarOrdenRecibida();
+/* El selector de estrellas no existe sin una compra recibida. La fabricación
+   vive en `lib/superficies.mjs`, junto a la lista: la superficie es una sola y
+   las dos puertas llegan por el mismo camino. */
+const ordenSinCalificar = await ordenRecibidaSinCalificar(API, {
+  comprador: comprador.access,
+  vendedor: vendedor.access,
+});
 console.log(`  · orden recibida y sin calificar para el selector: ${ordenSinCalificar}`);
 
 /* Texto sobre foto: el medidor no puede resolver el fondo. Lo acoto sustituyendo
@@ -420,11 +346,36 @@ for (const medida of MEDIDAS) {
     const page = await ctx.newPage();
     await page.goto(WEB, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Ingresar' }).first().click();
+    await revisar(page, `${medida.n} ingreso`,
+      page.getByRole('heading', { name: 'Iniciar Sesión' }));
+
     await page.getByRole('button', { name: /Registrate ac[áa]/i }).first().click();
+    await revisar(page, `${medida.n} registro`,
+      page.getByRole('heading', { name: 'Crear Cuenta' }));
+
     await page.getByRole('checkbox', { name: /Quiero registrarme como transportista/ })
       .check();
-    await revisar(page, `${medida.n} alta de transportista`,
+    await revisar(page, `${medida.n} registro: alta de transportista`,
       page.locator('input[name="carrierPlate"]'));
+
+    // Se destilda para que el alta que sigue sea la común: con la casilla puesta
+    // el formulario pide localidad base y no se podría enviar.
+    await page.getByRole('checkbox', { name: /Quiero registrarme como transportista/ })
+      .uncheck();
+    await page.locator('input[name="carrierPlate"]')
+      .waitFor({ state: 'detached', timeout: ESPERA });
+
+    // El aviso de «revisá tu correo» es una pantalla propia y se llega dando de
+    // alta una cuenta de verdad. El correo lleva la medida para que las dos
+    // corridas no choquen entre sí.
+    await page.locator('input[name="name"]').fill('Contraste Pendiente');
+    await page.locator('input[name="email"]')
+      .fill(`contraste.${medida.n}.${Date.now()}@example.com`);
+    await page.locator('input[name="password"]').fill('contraste123456');
+    await page.locator('form input[type="password"]').nth(1).fill('contraste123456');
+    await page.getByRole('button', { name: 'Crear cuenta' }).click();
+    await revisar(page, `${medida.n} registro: correo pendiente`,
+      page.getByRole('button', { name: 'Reenviar el correo' }));
     await ctx.close();
   }
 
@@ -434,20 +385,20 @@ for (const medida of MEDIDAS) {
 
     const portada = page.getByRole('heading', { name: /seguir produciendo/ });
     await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-    await revisar(page, `${medida.n} portada`, portada);
+    await revisar(page, `${medida.n} inicio`, portada);
 
-    await extremosDeFoto(page, `${medida.n} portada`, null, portada);
+    await extremosDeFoto(page, `${medida.n} inicio`, null, portada);
 
     const equipo = page.getByRole('heading', { name: 'Nuestro equipo' });
     for (const [seccion, titulo, marca] of [
-      ['Quiénes somos', 'about', equipo],
-      ['Servicios', 'services', page.getByRole('heading', { name: /resuelve el trabajo/, level: 1 })],
-      ['Contacto', 'contact', page.getByRole('heading', { name: 'Contacto', level: 1 })],
+      ['Quiénes somos', 'quienes somos', equipo],
+      ['Servicios', 'servicios', page.getByRole('heading', { name: /resuelve el trabajo/, level: 1 })],
+      ['Contacto', 'contacto', page.getByRole('heading', { name: 'Contacto', level: 1 })],
     ]) {
       await page.getByRole('button', { name: seccion, exact: true }).first().click();
       await revisar(page, `${medida.n} ${titulo}`, marca);
     }
-    await extremosDeFoto(page, `${medida.n} about`, 'Quiénes somos', equipo);
+    await extremosDeFoto(page, `${medida.n} quienes somos`, 'Quiénes somos', equipo);
 
     // La vista del enlace de confirmación, en su estado de rechazo: es el que
     // trae el texto de error y el formulario de reenvío. El de éxito consume
@@ -479,7 +430,7 @@ for (const medida of MEDIDAS) {
     // se declaraba medida sin haberse abierto nunca.
     const vendidoPor = page.getByRole('dialog');
     await page.locator('[class*="_card_"]').first().click();
-    await revisar(page, `${medida.n} detalle`, vendidoPor);
+    await revisar(page, `${medida.n} detalle de producto`, vendidoPor);
 
     await page.getByRole('button', { name: 'Cerrar' }).first().click();
     await vendidoPor.waitFor({ state: 'hidden', timeout: ESPERA });
@@ -496,7 +447,7 @@ for (const medida of MEDIDAS) {
     await revisar(page, `${medida.n} carrito`, page.getByRole('heading', { name: /Mi carrito/i }));
 
     await page.getByRole('button', { name: 'Continuar compra' }).click();
-    await revisar(page, `${medida.n} checkout envío`,
+    await revisar(page, `${medida.n} checkout: envío`,
       page.getByRole('heading', { name: /Datos de env/i }));
 
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
@@ -508,31 +459,42 @@ for (const medida of MEDIDAS) {
     await traslado.getByRole('radio', { name: /Necesito flete/ }).first()
       .waitFor({ state: 'visible', timeout: ESPERA });
     await traslado.getByRole('radio', { name: /Necesito flete/ }).first().check();
-    await revisar(page, `${medida.n} checkout traslado`,
+    await revisar(page, `${medida.n} checkout: traslado del pedido`,
       page.getByRole('heading', { name: 'Cómo se traslada cada pedido' }));
 
     await traslado.getByRole('button', { name: /^Seleccionar a / }).first().click();
-    await revisar(page, `${medida.n} checkout transportista elegido`,
+    await revisar(page, `${medida.n} checkout: transportista elegido`,
       traslado.getByText('Transportista elegido'));
 
     await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 220');
     await page.getByPlaceholder('2000').fill('2700');
     await page.locator('form:has(h2) button[type="submit"]').click();
-    await revisar(page, `${medida.n} checkout pago`,
+    await revisar(page, `${medida.n} checkout: pago`,
       page.getByRole('heading', { name: /Medio de pago/i }));
+
+    await page.goto(WEB, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
+    await revisar(page, `${medida.n} panel del comprador`,
+      page.getByRole('heading', { name: 'Mi Perfil' }));
+
+    // El modo edición es otra pantalla: sus controles sólo existen ahí.
+    await page.getByRole('button', { name: 'Editar' }).click();
+    await revisar(page, `${medida.n} panel: edición de perfil`,
+      page.locator('#perfil-nombre'));
+    await page.getByRole('button', { name: 'Cancelar' }).click();
+    await page.locator('#perfil-nombre').waitFor({ state: 'detached', timeout: ESPERA });
+
+    await page.getByRole('button', { name: /^Mis Compras/ }).first().click();
+    await revisar(page, `${medida.n} panel: mis compras`,
+      page.getByRole('heading', { name: 'Mis Compras' }));
 
     // El selector de estrellas, con las cinco elegidas: el formulario abre en 5
     // y `.elegida` pinta la elegida y todas las anteriores, así que abrirlo ya
     // deja el estado que hay que medir.
-    await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
-    await page.getByRole('heading', { name: 'Mi Perfil' })
-      .waitFor({ state: 'visible', timeout: ESPERA });
-    await page.getByRole('button', { name: /^Mis Compras/ }).first().click();
     const calificar = page.getByRole('button', { name: /Calificar Vendedor/i }).first();
     await calificar.waitFor({ state: 'visible', timeout: ESPERA });
     await calificar.click();
-    await revisar(page, `${medida.n} calificación (estrellas elegidas)`,
+    await revisar(page, `${medida.n} panel: calificación (estrellas elegidas)`,
       page.getByRole('heading', { name: /^Calificar a / }));
 
     await ctx.close();
@@ -543,7 +505,7 @@ for (const medida of MEDIDAS) {
     const page = await ctx.newPage();
     await page.goto(WEB, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
-    await revisar(page, `${medida.n} perfil vendedor`,
+    await revisar(page, `${medida.n} panel del vendedor`,
       page.getByRole('heading', { name: 'Mi Perfil' }));
 
     // Con el formulario abierto: la sección cerrada no muestra las etiquetas
@@ -551,13 +513,17 @@ for (const medida of MEDIDAS) {
     await page.getByRole('button', {
       name: /Presentar documentación|Reemplazar documentación/,
     }).click();
-    await revisar(page, `${medida.n} documentación fiscal`,
+    await revisar(page, `${medida.n} panel: documentación fiscal`,
       page.locator('#doc-archivo'));
     await page.getByRole('button', { name: 'Cancelar' }).last().click();
 
     await page.getByRole('button', { name: 'Mis Ventas' }).click();
-    await revisar(page, `${medida.n} mis ventas`,
+    await revisar(page, `${medida.n} panel: mis ventas`,
       page.getByRole('heading', { name: 'Mis Ventas' }));
+
+    await page.getByRole('button', { name: 'Mis publicaciones' }).click();
+    await revisar(page, `${medida.n} panel: mis productos`,
+      page.getByRole('heading', { name: 'Mis publicaciones' }));
     await ctx.close();
   }
 
@@ -569,12 +535,19 @@ for (const medida of MEDIDAS) {
     const page = await ctx.newPage();
     await page.goto(WEB, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
-    await revisar(page, `${medida.n} perfil transportista`,
+    await revisar(page, `${medida.n} panel del transportista`,
       page.getByRole('heading', { name: 'Datos de transportista' }));
 
     await page.getByRole('button', { name: 'Editar' }).click();
-    await revisar(page, `${medida.n} perfil transportista (edición)`,
+    await revisar(page, `${medida.n} panel: edición de transportista`,
       page.locator('#perfil-localidad-base'));
+
+    await page.getByRole('button', { name: 'Cancelar' }).click();
+    await page.locator('#perfil-localidad-base').waitFor({ state: 'detached', timeout: ESPERA });
+
+    await page.getByRole('button', { name: 'Mis Operaciones' }).click();
+    await revisar(page, `${medida.n} panel: operaciones del transportista`,
+      page.getByRole('heading', { name: 'Mis Operaciones' }));
     await ctx.close();
   }
 
@@ -586,10 +559,21 @@ for (const medida of MEDIDAS) {
     await revisar(page, `${medida.n} administración`,
       page.getByRole('heading', { name: 'Panel de Administración' }));
 
-    await page.locator('[class*="_tabs_"]').first()
-      .getByRole('button', { name: /Documentaci.n/i }).first().click();
-    await revisar(page, `${medida.n} administración documentación`,
-      page.locator('[class*="_documentacionSection_"]'));
+    for (const [pestania, superficie, marcador] of [
+      ['Usuarios', 'administración: usuarios', null],
+      ['Productos', 'administración: productos', null],
+      ['Órdenes', 'administración: órdenes', null],
+      ['Documentaci.n', 'administración: documentación',
+        page.locator('[class*="_documentacionSection_"]')],
+    ]) {
+      // Acotado a la barra de pestañas: fuera de ella hay botones con el mismo
+      // texto en la página que queda detrás.
+      await page.locator('[class*="_tabs_"]').first()
+        .getByRole('button', { name: new RegExp(pestania, 'i') }).first().click();
+      await revisar(page, `${medida.n} ${superficie}`, marcador
+        || page.locator('[class*="_tabs_"] button[class*="_active_"]')
+          .filter({ hasText: new RegExp(pestania, 'i') }));
+    }
     await ctx.close();
   }
 }
