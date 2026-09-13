@@ -39,3 +39,6 @@ infra/nginx/logs/*.log
 *.njsproj
 *.sln
 *.sw?
+
+# Artefactos de respaldo y destinos de prueba: no se versionan.
+respaldos/
