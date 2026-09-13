@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Bundles locales de backup/restore (pueden contener datos)
+backups/
+
 # Archivos de entorno - NO COMMITEAR (contienen secretos)
 # Solo se versionan los archivos *.example como plantillas
 .env
