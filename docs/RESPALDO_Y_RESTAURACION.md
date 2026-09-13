@@ -46,11 +46,14 @@ remotos y quedan fuera de esta pieza por decisión de la tarea.
 - `tar`, `gzip` y **`sha256sum` o `shasum -a 256`**: se usa el que haya, así que
   funciona igual en Linux y en macOS. Nada de `find -printf`, `stat -c` ni
   `xargs -r`, que son de GNU.
-- Con Docker: el demonio en marcha y los contenedores del lanzador oficial. Las
-  herramientas de PostgreSQL salen de los contenedores; en el anfitrión no hace
-  falta ninguna. **Esta ruta no descarga ninguna imagen**: el destino se levanta
-  con la misma imagen que ya está sirviendo el origen, leída del contenedor
-  real, y los archivos se copian con `docker cp`, sin imagen auxiliar.
+- Con Docker: el demonio en marcha y los contenedores del lanzador oficial. **En
+  el anfitrión no hace falta ninguna herramienta de PostgreSQL**, y la pieza no
+  usa las que haya: `pg_dump`, `pg_restore` —incluido el índice del volcado— y
+  `psql` corren siempre dentro del contenedor que hizo la copia. Leer un volcado
+  nuevo con un `pg_restore` viejo del anfitrión da «unsupported version in file
+  header» y no es un problema del volcado. **Esta ruta tampoco descarga ninguna
+  imagen**: el destino se levanta con la misma imagen que ya está sirviendo el
+  origen, leída del contenedor real, y los archivos se copian con `docker cp`.
 - Sin Docker: PostgreSQL nativo con `pg_dump`, `pg_restore` y `psql`, y
   `sudo -u postgres` para crear la base de destino y su extensión PostGIS —el
   rol `topgreen` no es superusuario—.
@@ -122,8 +125,16 @@ El destino se crea siempre nuevo, y **fuera del origen**:
 - sin Docker, la base `topgreen_restore_<AAAAMMDD_HHMMSS>`, nunca `topgreen`;
 - en los dos casos, los tres árboles de archivos en `respaldos/destino-<sello>/`.
 
+Antes de restaurar, la pieza espera el **servidor definitivo**. La imagen de
+PostgreSQL levanta uno provisorio durante `initdb` para correr sus guiones de
+arranque, y contra ese servidor `pg_isready` ya contesta que sí: restaurar ahí
+sería restaurar sobre algo que el entrypoint va a apagar. El definitivo se
+reconoce porque el PID 1 del contenedor pasa a ser `postgres`.
+
 Si la restauración se cae a la mitad, lo que alcanzó a crear se retira solo: no
-quedan contenedores ni volúmenes colgados esperando al próximo intento.
+quedan contenedores ni volúmenes colgados esperando al próximo intento. Ese
+rescate también comprueba las etiquetas antes de borrar: si una creación falló
+justo antes de etiquetar, o el recurso es de otro, se deja como está y se avisa.
 
 **El nombre no prueba propiedad.** Cualquiera puede crear una base o una carpeta
 que se llame igual, y borrar por patrón es borrar lo que otro dejó ahí. Por eso
@@ -135,8 +146,10 @@ cada destino queda firmado, al restaurarlo, con un identificador de ejecución:
 - con Docker, además, **el contenedor y el volumen llevan etiquetas**:
   `topgreen.respaldo=pieza` y `topgreen.respaldo.ejecucion=<id>`.
 
-`limpiar` exige las firmas y que coincidan entre sí; con Docker comprueba la
-etiqueta de **cada** recurso antes de borrarlo. Si falta una, si están
+`limpiar` exige las firmas y que coincidan entre sí; con Docker comprueba **las
+dos etiquetas** —la de la pieza y la de la ejecución— en **cada** recurso antes
+de borrarlo. Con una sola no alcanza: un recurso marcado por otra cosa con el
+mismo identificador pasaría. Si falta una, si están
 vacías o si la base no lleva la ejecución que dice el directorio, **frena sin
 borrar nada**. Y antes de eso sigue exigiendo que el sello tenga la forma
 exacta. Un destino ajeno con el nombre correcto sobrevive: comprobado, con y sin

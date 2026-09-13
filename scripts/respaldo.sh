@@ -60,8 +60,26 @@ ARCHIVO_MARCA=".propiedad"
 # Etiquetas de los recursos Docker que crea la pieza. Van en el contenedor y en
 # el volumen de destino, y `limpiar` las exige antes de cada borrado: un nombre
 # que coincide no prueba nada, una etiqueta puesta por esta ejecución sí.
-ETIQUETA_PIEZA="topgreen.respaldo=pieza"
-ETIQUETA_EJECUCION="topgreen.respaldo.ejecucion"
+CLAVE_PIEZA="topgreen.respaldo"
+VALOR_PIEZA="pieza"
+CLAVE_EJECUCION="topgreen.respaldo.ejecucion"
+
+# ¿Este recurso lo creó esta pieza, en esta ejecución? Se exigen LAS DOS
+# etiquetas. Con una sola, un recurso marcado por cualquier otra cosa con el
+# mismo id pasaría; y haber anotado el nombre no alcanza si la creación falló a
+# la mitad o hubo una carrera. Devuelve 0 sólo si las dos coinciden.
+propiedad_docker() {  # propiedad_docker <contenedor|volumen> <nombre> <ejecucion>
+  local que="$1" nombre="$2" ejecucion="$3" pieza id
+  if [ "$que" = contenedor ]; then
+    pieza="$(docker inspect -f "{{index .Config.Labels \"$CLAVE_PIEZA\"}}" "$nombre" 2>/dev/null || true)"
+    id="$(docker inspect -f "{{index .Config.Labels \"$CLAVE_EJECUCION\"}}" "$nombre" 2>/dev/null || true)"
+  else
+    pieza="$(docker volume inspect -f "{{index .Labels \"$CLAVE_PIEZA\"}}" "$nombre" 2>/dev/null || true)"
+    id="$(docker volume inspect -f "{{index .Labels \"$CLAVE_EJECUCION\"}}" "$nombre" 2>/dev/null || true)"
+  fi
+  MOTIVO_PROPIEDAD="$CLAVE_PIEZA=«${pieza:-nada}» $CLAVE_EJECUCION=«${id:-nada}»"
+  [ "$pieza" = "$VALOR_PIEZA" ] && [ "$id" = "$ejecucion" ]
+}
 
 # El origen, que nunca se toca.
 BASE_ORIGEN="${TOPGREEN_DB_NOMBRE:-topgreen}"
@@ -159,15 +177,28 @@ fi
 # acaba de crear, anotado por ella misma.
 TMP_HUELLA="$(mktemp -u)"
 DESTINO_INCOMPLETO=""
+EJECUCION_EN_CURSO=""
+MOTIVO_PROPIEDAD=""
 limpiar_temporales() {
   rm -f "$TMP_HUELLA".* 2>/dev/null || true
   [ -n "$DESTINO_INCOMPLETO" ] || return 0
   local sello="$DESTINO_INCOMPLETO"; DESTINO_INCOMPLETO=""
+  local ejecucion="$EJECUCION_EN_CURSO"
   printf 'AVISO: la restauración quedó a medias; se retira lo que había creado (%s)\n' \
     "$sello" >&2
   if [ "$ENTORNO" = docker ]; then
-    docker rm -f "$(contenedor_de "$sello")" >/dev/null 2>&1 || true
-    docker volume rm "$(volumen_de "$sello")" >/dev/null 2>&1 || true
+    # También acá se exigen las dos etiquetas. Anotar el nombre no prueba
+    # propiedad: la creación pudo fallar justo antes de etiquetar, o el recurso
+    # podría ser de otro. Lo que no lleve la marca se deja y se avisa.
+    local c v; c="$(contenedor_de "$sello")"; v="$(volumen_de "$sello")"
+    if docker inspect "$c" >/dev/null 2>&1; then
+      if propiedad_docker contenedor "$c" "$ejecucion"; then docker rm -f "$c" >/dev/null 2>&1 || true
+      else printf 'AVISO: %s no lleva las etiquetas de esta ejecución (%s); se deja como está\n' "$c" "$MOTIVO_PROPIEDAD" >&2; fi
+    fi
+    if docker volume inspect "$v" >/dev/null 2>&1; then
+      if propiedad_docker volumen "$v" "$ejecucion"; then docker volume rm "$v" >/dev/null 2>&1 || true
+      else printf 'AVISO: %s no lleva las etiquetas de esta ejecución (%s); se deja como está\n' "$v" "$MOTIVO_PROPIEDAD" >&2; fi
+    fi
   else
     sudo -u postgres psql -tAc \
       "DROP DATABASE IF EXISTS \"${PREFIJO_BASE}${sello}\"" >/dev/null 2>&1 || true
@@ -200,8 +231,24 @@ sql() {  # sql <base> <consulta> [contenedor]
   fi
 }
 
-# 2. El volcado lógico. `-Fc` para poder restaurar selectivamente y para que
-#    `pg_restore` valide el formato en vez de ejecutar SQL a ciegas.
+# 2. El volcado lógico y sus herramientas.
+#
+#    Con Docker, `pg_dump` y `pg_restore` son SIEMPRE los del contenedor que
+#    hizo el volcado. Leer el índice con el `pg_restore` del anfitrión rompió la
+#    corrida de la PM: su Mac tiene 14.20 y el contenedor 16.4, y un volcado
+#    nuevo leído con una herramienta vieja da «unsupported version (1.15) in
+#    file header». No es que el volcado esté mal: es que lo lee quien no puede.
+#    En esta rama el anfitrión no necesita ninguna herramienta de PostgreSQL.
+herramienta_pg() {  # herramienta_pg <programa> [argumentos...]
+  if [ "$ENTORNO" = docker ]; then
+    docker exec -i "$CONTENEDOR_DB" "$@"
+  else
+    "$@"
+  fi
+}
+version_de_pg_dump() {
+  herramienta_pg pg_dump --version 2>/dev/null | awk '{print $3}'
+}
 volcar_la_base() {  # volcar_la_base <archivo>
   if [ "$ENTORNO" = docker ]; then
     docker exec -i "$CONTENEDOR_DB" \
@@ -314,8 +361,9 @@ comando_respaldar() {
   # Que `pg_restore` pueda LEER el índice del volcado es la prueba barata de
   # que el archivo es un volcado y no medio archivo: un tar cortado a la mitad
   # también pesa.
-  pg_restore --list "$bundle/base.dump" > "$bundle/base.indice.txt" \
+  herramienta_pg pg_restore --list < "$bundle/base.dump" > "$bundle/base.indice.txt" \
     || fatal "el volcado no es un archivo de pg_restore válido"
+  [ -s "$bundle/base.indice.txt" ] || fatal "el índice del volcado salió vacío"
 
   copiar_el_almacenamiento "$bundle/datos"
   huella_de_la_base "$BASE_ORIGEN" > "$bundle/huella-base.tsv"
@@ -342,7 +390,7 @@ comando_respaldar() {
     "tablas": $(grep -c '^tabla' "$bundle/huella-base.tsv")
   },
   "almacenamiento": { "archivos": $archivos, "bytes": $bytes },
-  "herramientas": { "pg_dump": "$(pg_dump --version | awk "{print \$3}")" }
+  "herramientas": { "pg_dump": "$(version_de_pg_dump)" }
 }
 FIN
 
@@ -383,6 +431,7 @@ comando_restaurar() {
   # La firma de esta ejecución. Se genera acá porque en Docker también etiqueta
   # el contenedor y el volumen que se crean.
   local ejecucion; ejecucion="$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  EJECUCION_EN_CURSO="$ejecucion"
 
   if [ "$ENTORNO" = docker ]; then
     # Otro contenedor y otro volumen. NO se toca el clúster de origen: crear la
@@ -400,24 +449,36 @@ comando_restaurar() {
     local clave_efimera; clave_efimera="$(head -c 18 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 
     DESTINO_INCOMPLETO="$sello"
-    docker volume create --label "$ETIQUETA_PIEZA" \
-      --label "$ETIQUETA_EJECUCION=$ejecucion" "$volumen_destino" >/dev/null \
+    docker volume create --label "$CLAVE_PIEZA=$VALOR_PIEZA" \
+      --label "$CLAVE_EJECUCION=$ejecucion" "$volumen_destino" >/dev/null \
       || fatal "no pude crear el volumen de destino"
     # La imagen es la MISMA que sirve el origen, leída del contenedor real: ya
     # está en la máquina, así que esto no dispara ninguna descarga.
     docker run -d --name "$contenedor_destino" \
-      --label "$ETIQUETA_PIEZA" --label "$ETIQUETA_EJECUCION=$ejecucion" \
+      --label "$CLAVE_PIEZA=$VALOR_PIEZA" --label "$CLAVE_EJECUCION=$ejecucion" \
       -e POSTGRES_USER="$USUARIO_ORIGEN" -e POSTGRES_DB="$BASE_ORIGEN" \
       -e POSTGRES_PASSWORD="$clave_efimera" \
       -v "$volumen_destino":/var/lib/postgresql/data \
       "$IMAGEN_DESTINO" >/dev/null \
       || fatal "no pude levantar el contenedor de destino con $IMAGEN_DESTINO"
 
-    local intento=0
-    until docker exec "$contenedor_destino" \
-        pg_isready -U "$USUARIO_ORIGEN" -d "$BASE_ORIGEN" >/dev/null 2>&1; do
+    # Esperar el servidor DEFINITIVO, no el temporal.
+    #
+    # La imagen de PostgreSQL levanta un servidor provisorio durante `initdb`
+    # para correr los guiones de arranque, y contra ese servidor `pg_isready` ya
+    # dice que sí. Restaurar ahí es restaurar sobre algo que el entrypoint va a
+    # apagar. El servidor definitivo se reconoce porque el entrypoint termina
+    # haciéndole `exec`: recién entonces el PID 1 del contenedor es `postgres`.
+    local intento=0 pid1=""
+    while :; do
+      pid1="$(docker exec "$contenedor_destino" cat /proc/1/comm 2>/dev/null | tr -d '\r\n')"
+      if [ "$pid1" = postgres ] \
+         && docker exec "$contenedor_destino" \
+              pg_isready -U "$USUARIO_ORIGEN" -d "$BASE_ORIGEN" >/dev/null 2>&1; then
+        break
+      fi
       intento=$((intento + 1))
-      [ "$intento" -gt 60 ] && fatal "el contenedor de destino no llegó a estar listo"
+      [ "$intento" -gt 90 ] && fatal "el contenedor de destino no llegó a servidor definitivo (PID 1 = «${pid1:-nada}»)"
       sleep 1
     done
 
@@ -565,18 +626,13 @@ comando_limpiar() {
     # Cada recurso se borra sólo si LLEVA LA ETIQUETA de esta ejecución. Un
     # contenedor o un volumen homónimo que la pieza no creó no la tiene, y ahí
     # se frena: el nombre no prueba propiedad.
-    local contenedor_destino volumen_destino etiqueta
+    local contenedor_destino volumen_destino
     contenedor_destino="$(contenedor_de "$sello")"; volumen_destino="$(volumen_de "$sello")"
 
-    etiqueta="$(docker inspect -f "{{index .Config.Labels \"$ETIQUETA_EJECUCION\"}}" \
-      "$contenedor_destino" 2>/dev/null || true)"
-    [ "$etiqueta" = "$ejecucion" ] \
-      || fatal "el contenedor $contenedor_destino no lleva la etiqueta $ETIQUETA_EJECUCION=$ejecucion (dice «${etiqueta:-nada}»). No se borra nada."
-
-    etiqueta="$(docker volume inspect -f "{{index .Labels \"$ETIQUETA_EJECUCION\"}}" \
-      "$volumen_destino" 2>/dev/null || true)"
-    [ "$etiqueta" = "$ejecucion" ] \
-      || fatal "el volumen $volumen_destino no lleva la etiqueta $ETIQUETA_EJECUCION=$ejecucion (dice «${etiqueta:-nada}»). No se borra nada."
+    propiedad_docker contenedor "$contenedor_destino" "$ejecucion" \
+      || fatal "el contenedor $contenedor_destino no es de esta pieza y esta ejecución ($MOTIVO_PROPIEDAD). No se borra nada."
+    propiedad_docker volumen "$volumen_destino" "$ejecucion" \
+      || fatal "el volumen $volumen_destino no es de esta pieza y esta ejecución ($MOTIVO_PROPIEDAD). No se borra nada."
 
     docker rm -f "$contenedor_destino" >/dev/null
     docker volume rm "$volumen_destino" >/dev/null
