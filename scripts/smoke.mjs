@@ -28016,6 +28016,278 @@ await runCase(171, 'El Mercado pagina en el servidor: total, orden y filtros del
   return `con ${TOTAL} publicaciones fabricadas y retiradas al final: ${medidos.join('; ')}`;
 });
 
+// ---------------------------------------------------------------------------
+// 172. El listado del Mercado no consulta las imágenes una vez por tarjeta.
+//
+// El inventario midió 24 publicaciones produciendo 26 consultas, 24 de ellas a
+// `product_images`. La raíz: la consulta del listado ya unía con la imagen
+// primaria pero no seleccionaba su URL, y después preguntaba de nuevo por cada
+// tarjeta. Es el borde de volumen que queda después de la paginación: el número
+// de consultas no puede crecer con el tamaño de página.
+//
+// Cómo se cuenta, y por qué así. Contar sentencias desde adentro exigiría
+// instrumentar la aplicación, y `pg_stat_statements` exige precargarlo y
+// reiniciar el servidor: sería agregarle a la suite una dependencia de entorno
+// para poder medir. En cambio `pg_stat_user_tables` ya lleva, sin configurar
+// nada, cuántas veces se recorrió CADA tabla. Es una medida más fuerte que
+// contar sentencias: una consulta por tarjeta son N recorridos, y también los
+// serían N recorridos escondidos dentro de una sola sentencia.
+//
+// Las estadísticas se vuelcan a memoria compartida como mucho una vez por
+// segundo, así que se espera a una condición observable —que el contador supere
+// el piso y después se quede quieto—, nunca a un tiempo fijo. Y el caso se
+// comprueba a sí mismo: mide un tramo SIN petición y exige que dé cero, que es
+// la prueba de que su propio SQL de fabricación e inspección no se cuenta.
+// ---------------------------------------------------------------------------
+await runCase(172, 'El listado del Mercado no consulta las imágenes una vez por tarjeta', async () => {
+  const medidos = [];
+  const marca = Date.now();
+  const MARCADOR = `Smoke img172 ${marca}`;
+  const CHICA = 6;
+  const GRANDE = 24;
+  // Reparto determinista, pensado para que cada caso de imagen esté presente
+  // en la página grande y para que el N+1 tenga de dónde crecer:
+  const CON_PRIMARIA = 10;   // 0..9    → sale su URL
+  const SIN_IMAGEN = 8;      // 10..17  → primary_image null
+  const SOLO_SECUNDARIA = 8; // 18..25  → null también: tener imagen no es tener primaria
+  const DOS_PRIMARIAS = 4;   // 26..29  → una sola tarjeta y una sola URL
+  const TOTAL = CON_PRIMARIA + SIN_IMAGEN + SOLO_SECUNDARIA + DOS_PRIMARIAS;
+
+  const nombreDe = (i) => `${MARCADOR}-${String(i).padStart(3, '0')}`;
+  const urlDe = (i, cual) => `/uploads/products/${MARCADOR.replace(/\s/g, '_')}-${i}-${cual}.png`;
+
+  const limpiar = () => {
+    try {
+      querySql(`DELETE FROM product_images WHERE product_id IN (
+        SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+    } catch (error) {
+      console.log(`  · no se pudieron retirar las publicaciones del caso 172: ${error.message}`);
+    }
+  };
+
+  try {
+    // === Fabricación ======================================================
+    const vendedor = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+    })).data;
+    const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+    const [laCategoria] = queryRows(`
+      SELECT c.id, c.name FROM categories c
+      WHERE c.is_service = false AND c.is_active = true ORDER BY c.name LIMIT 1`);
+    assert(laCategoria, 'no hay una categoría de productos activa');
+
+    const idsPorNombre = new Map();
+    for (let i = 0; i < TOTAL; i += 1) {
+      const alta = await apiRequest('/products', {
+        method: 'POST', token: vendedor.access_token,
+        body: {
+          name: nombreDe(i),
+          description: 'Publicación fabricada para medir las consultas de imagen del listado.',
+          category_id: laCategoria[0],
+          price: 1000 + i,
+          stock: 5,
+          unit: 'unidad',
+          locality_id: localidad,
+          publication_type: 'producto',
+          operation_kind: 'insumo',
+        },
+      });
+      assert(alta.status === 201 || alta.status === 200,
+        `la publicación ${i} respondió HTTP ${alta.status}: ${JSON.stringify(alta.data).slice(0, 200)}`);
+      idsPorNombre.set(nombreDe(i), alta.data.id);
+    }
+
+    // Las filas de imagen se fabrican en la base descartable: subir archivos
+    // de verdad sería tocar carga y almacenamiento, que están fuera de alcance.
+    const ponerImagen = (nombre, url, primaria, orden) => querySql(`
+      INSERT INTO product_images (id, product_id, url, filename, is_primary, display_order, created_at)
+      VALUES (gen_random_uuid()::text, ${sqlLiteral(idsPorNombre.get(nombre))},
+              ${sqlLiteral(url)}, ${sqlLiteral(url.split('/').pop())},
+              ${primaria ? 'true' : 'false'}, ${orden}, NOW())`);
+
+    for (let i = 0; i < CON_PRIMARIA; i += 1) {
+      ponerImagen(nombreDe(i), urlDe(i, 'primaria'), true, 0);
+      // Una secundaria al lado, para que elegir la primaria no sea elegir «la única».
+      ponerImagen(nombreDe(i), urlDe(i, 'secundaria'), false, 1);
+    }
+    for (let i = CON_PRIMARIA + SIN_IMAGEN; i < CON_PRIMARIA + SIN_IMAGEN + SOLO_SECUNDARIA; i += 1) {
+      ponerImagen(nombreDe(i), urlDe(i, 'secundaria'), false, 0);
+    }
+    // Dos primarias para la misma publicación. La base NO lo impide —no hay
+    // índice único— y el `outerjoin` vigente multiplica la fila en cuanto la
+    // URL entra en el SELECT. La que tiene que salir es la de menor
+    // `display_order`, y la tarjeta tiene que salir UNA sola vez.
+    const desdeDos = CON_PRIMARIA + SIN_IMAGEN + SOLO_SECUNDARIA;
+    for (let i = desdeDos; i < TOTAL; i += 1) {
+      ponerImagen(nombreDe(i), urlDe(i, 'primaria'), true, 0);
+      ponerImagen(nombreDe(i), urlDe(i, 'segunda-primaria'), true, 5);
+    }
+
+    const [fabricadas] = queryRows(`
+      SELECT COUNT(*)::text, 'fin' FROM products
+      WHERE status = 'ACTIVE' AND name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+    assert(Number(fabricadas[0]) === TOTAL,
+      `quedaron ${fabricadas[0]} publicaciones del conjunto y tienen que ser ${TOTAL}`);
+    assert(TOTAL > GRANDE,
+      'el conjunto tiene que pasar del tamaño de página grande para que el N+1 crezca');
+
+    // === El instrumento ===================================================
+    const recorridosDe = (tabla) => {
+      const [fila] = queryRows(`
+        SELECT (COALESCE(seq_scan, 0) + COALESCE(idx_scan, 0))::text, 'fin'
+        FROM pg_stat_user_tables WHERE relname = ${sqlLiteral(tabla)}`);
+      assert(fila, `pg_stat_user_tables no conoce la tabla ${tabla}`);
+      return Number(fila[0]);
+    };
+    // Espera a una condición observable, no a un tiempo fijo: que el contador
+    // haya superado el piso que se sabe que tiene que superar, y después se
+    // quede quieto. Con piso −1 sólo se espera que esté quieto.
+    const asentado = async (tabla, piso) => {
+      let previo = recorridosDe(tabla);
+      let quieto = 0;
+      for (let intento = 0; intento < 80; intento += 1) {
+        await new Promise((seguir) => { setTimeout(seguir, 250); });
+        const ahora = recorridosDe(tabla);
+        if (previo > piso) {
+          quieto = ahora === previo ? quieto + 1 : 0;
+          if (quieto >= 4) return previo;
+        }
+        previo = ahora;
+      }
+      throw new Error(`las estadísticas de ${tabla} no se asentaron por encima de ${piso}`);
+    };
+
+    // El control que vuelve honesto al instrumento: un tramo sin petición
+    // ninguna, con SQL propio en el medio, tiene que dar cero.
+    const antesDelControl = await asentado('product_images', -1);
+    queryRows(`SELECT COUNT(*)::text, 'fin' FROM products
+      WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+    const despuesDelControl = await asentado('product_images', -1);
+    assert(despuesDelControl === antesDelControl,
+      `el tramo de control movió el contador en ${despuesDelControl - antesDelControl}: `
+      + 'el instrumento estaría contando el SQL del propio caso y no el de la petición');
+
+    const listar = async (tam) => {
+      const antes = await asentado('product_images', -1);
+      const respuesta = await apiRequest(
+        `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page=1&page_size=${tam}`);
+      assert(respuesta.status === 200,
+        `el catálogo respondió HTTP ${respuesta.status} para page_size=${tam}`);
+      // Después tiene que haber subido: el listado toca la tabla al menos una vez.
+      const despues = await asentado('product_images', antes);
+      return { datos: respuesta.data, recorridos: despues - antes };
+    };
+
+    // === A. El número de consultas no crece con las tarjetas ==============
+    const chica = await listar(CHICA);
+    const grande = await listar(GRANDE);
+
+    // El conteo va PRIMERO, y no es un detalle de orden: contra la base la
+    // página además sale corta —las filas duplicadas por las dos primarias se
+    // colapsan—, y si esa comprobación fuera antes, el caso se pondría rojo por
+    // la cardinalidad y nunca llegaría a informar el N+1, que es el defecto que
+    // esta tarea viene a retirar.
+    assert(grande.recorridos === chica.recorridos,
+      `el listado recorrió «product_images» ${chica.recorridos} veces con ${CHICA} tarjetas y `
+      + `${grande.recorridos} veces con ${GRANDE}: el número de consultas crece con el tamaño `
+      + 'de página, que es exactamente el N+1 —una consulta por tarjeta— que esta tarea retira');
+    // Y acotado: que no crezca no alcanza si creciera de 100 a 100.
+    assert(grande.recorridos <= 4,
+      `el listado recorrió «product_images» ${grande.recorridos} veces para una página: `
+      + 'tiene que alcanzar con la consulta del listado y la del conteo');
+    medidos.push(`la tabla de imágenes se recorre ${chica.recorridos} vez/veces con ${CHICA} `
+      + `tarjetas y ${grande.recorridos} con ${GRANDE}: no crece con el tamaño de página`);
+
+    assert(chica.datos.items.length === CHICA && grande.datos.items.length === GRANDE,
+      `las páginas trajeron ${chica.datos.items.length} y ${grande.datos.items.length} tarjetas `
+      + `y tenían que traer ${CHICA} y ${GRANDE}: la página sale corta porque la unión con las `
+      + 'imágenes duplica filas y las duplicadas se colapsan después de paginar');
+
+    // === B. Y las imágenes son las que la base dice, no sólo un conteo ====
+    // Lo esperado se calcula contra la base, con la misma regla determinista:
+    // la primaria de menor `display_order`, o null si no hay ninguna.
+    const esperado = new Map(queryRows(`
+      SELECT p.name,
+             COALESCE((SELECT i.url FROM product_images i
+                       WHERE i.product_id = p.id AND i.is_primary = true
+                       ORDER BY i.display_order, i.id LIMIT 1), '')
+      FROM products p
+      WHERE p.name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`)
+      .map(([nombre, url]) => [nombre, url === '' ? null : url]));
+    assert(esperado.size === TOTAL,
+      `la base describe ${esperado.size} publicaciones del conjunto y son ${TOTAL}`);
+    assert([...esperado.values()].filter((url) => url === null).length
+      === SIN_IMAGEN + SOLO_SECUNDARIA,
+      'el escenario no tiene las publicaciones sin imagen primaria que dice tener');
+
+    const dibujadas = grande.datos.items;
+    for (const item of dibujadas) {
+      assert(esperado.has(item.name),
+        `la página trajo «${item.name}», que no es del conjunto fabricado`);
+      const debeSer = esperado.get(item.name);
+      assert((item.primary_image ?? null) === debeSer,
+        `«${item.name}» salió con primary_image ${JSON.stringify(item.primary_image ?? null)} `
+        + `y la base dice ${JSON.stringify(debeSer)}`);
+    }
+    const nulos = dibujadas.filter((item) => (item.primary_image ?? null) === null).length;
+    assert(nulos > 0 && nulos < dibujadas.length,
+      `de las ${dibujadas.length} tarjetas, ${nulos} vinieron sin imagen: el caso no estaría `
+      + 'distinguiendo la URL del null si fueran todas iguales');
+    medidos.push(`las ${dibujadas.length} tarjetas traen la URL que dice la base, con ${nulos} `
+      + 'en null: tener imagen no es tener imagen primaria');
+
+    // === C. Una publicación es una tarjeta, aunque tenga dos primarias ====
+    const veces = new Map();
+    for (const item of dibujadas) veces.set(item.id, (veces.get(item.id) ?? 0) + 1);
+    const repetidas = [...veces.entries()].filter(([, cuantas]) => cuantas > 1);
+    assert(repetidas.length === 0,
+      `${repetidas.length} publicación(es) salieron más de una vez en la misma página: `
+      + 'la unión con las imágenes está multiplicando la fila');
+    assert(grande.datos.total === TOTAL,
+      `el total dice ${grande.datos.total} y el conjunto tiene ${TOTAL} publicaciones: `
+      + 'la unión con las imágenes está inflando el conteo');
+    for (let i = desdeDos; i < TOTAL; i += 1) {
+      const item = dibujadas.find((candidata) => candidata.name === nombreDe(i));
+      if (!item) continue;
+      assert(item.primary_image === urlDe(i, 'primaria'),
+        `«${nombreDe(i)}» tiene dos imágenes primarias y salió con `
+        + `${JSON.stringify(item.primary_image)}: tiene que salir siempre la de menor orden`);
+    }
+    medidos.push(`con ${DOS_PRIMARIAS} publicaciones de DOS imágenes primarias —la base no lo `
+      + `impide— el total sigue siendo ${TOTAL}, ninguna tarjeta se repite y sale siempre la `
+      + 'imagen de menor orden');
+
+    // === D. Total, ids y orden, sin cambios ===============================
+    const porPrecio = await apiRequest(
+      `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page=1&page_size=${GRANDE}`
+      + '&sort_by=price&sort_order=asc');
+    assert(porPrecio.status === 200, `el catálogo ordenado respondió HTTP ${porPrecio.status}`);
+    const precios = porPrecio.data.items.map((item) => item.price);
+    assert(precios.every((precio, i) => i === 0 || precio >= precios[i - 1]),
+      `ordenando por precio ascendente salió ${JSON.stringify(precios.slice(0, 5))}`);
+    assert(porPrecio.data.total === TOTAL && porPrecio.data.pages === Math.ceil(TOTAL / GRANDE),
+      `ordenando, el total dice ${porPrecio.data.total} y las páginas ${porPrecio.data.pages}`);
+    const segunda = await apiRequest(
+      `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page=2&page_size=${GRANDE}`);
+    assert(segunda.data.items.length === TOTAL - GRANDE,
+      `la segunda página trajo ${segunda.data.items.length} y tenía que traer ${TOTAL - GRANDE}`);
+    const todos = new Set([...dibujadas, ...segunda.data.items].map((item) => item.id));
+    assert(todos.size === TOTAL,
+      `recorriendo las dos páginas se vieron ${todos.size} publicaciones distintas y hay ${TOTAL}`);
+    medidos.push('total, páginas, orden por precio y las dos páginas del conjunto, sin cambios');
+  } finally {
+    limpiar();
+  }
+
+  const [quedan] = queryRows(`
+    SELECT COUNT(*)::text, 'fin' FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+  assert(quedan[0] === '0',
+    `el caso dejó ${quedan[0]} publicaciones fabricadas sin retirar`);
+
+  return `con ${TOTAL} publicaciones fabricadas y retiradas al final: ${medidos.join('; ')}`;
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

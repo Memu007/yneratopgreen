@@ -247,6 +247,39 @@ def get_products(
     - sort_by: created_at (recientes), price (precio), sales (más vendidos), views (más vistos)
     - sort_order: asc (ascendente), desc (descendente)
     """
+    # Una imagen primaria por publicacion, y una sola.
+    #
+    # La URL viajaba en una consulta aparte por cada tarjeta: 24 tarjetas
+    # eran 24 consultas mas a `product_images`, y con el tamano de pagina
+    # crecia el numero de consultas. Medido sobre la base: 8, 26 y 50
+    # accesos a la tabla para 6, 24 y 48 tarjetas.
+    #
+    # No alcanza con seleccionar la URL del `outerjoin` que ya estaba. La
+    # base NO impide dos imagenes primarias para la misma publicacion -no
+    # hay indice unico- y ese join, en cuanto la URL entra en el SELECT,
+    # multiplica la fila: medido, la publicacion pasaba a salir DOS veces
+    # en la misma pagina. Hoy no se ve porque las filas duplicadas son
+    # identicas y se colapsan, pero el `total` ya sale inflado igual.
+    #
+    # Asi que se une contra una subconsulta que elige una sola: la de
+    # menor `display_order`, y a igualdad de orden la misma siempre. Es
+    # una sentencia, no una por tarjeta, y no puede cambiar la cardinalidad
+    # del listado pase lo que pase con los datos.
+    imagen_primaria = (
+        db.query(
+            ProductImage.product_id.label("product_id"),
+            ProductImage.url.label("url"),
+        )
+        .filter(ProductImage.is_primary == True)
+        .distinct(ProductImage.product_id)
+        .order_by(
+            ProductImage.product_id,
+            ProductImage.display_order,
+            ProductImage.id,
+        )
+        .subquery()
+    )
+
     # Query base - incluir información del vendedor y subcategoría
     query = db.query(
         Product,
@@ -270,7 +303,8 @@ def get_products(
         # que sin esto el bloque del vendedor nunca lo vería. La grilla no lo
         # dibuja. Sale de un `outerjoin` acotado a la aprobada, que no
         # multiplica filas porque hay una documentación por usuario.
-        DocumentacionDeVendedor.id.isnot(None).label("seller_documentacion_revisada")
+        DocumentacionDeVendedor.id.isnot(None).label("seller_documentacion_revisada"),
+        imagen_primaria.c.url.label("primary_image_url")
     ).join(
         Category, Product.category_id == Category.id
     ).outerjoin(
@@ -286,8 +320,7 @@ def get_products(
     ).outerjoin(
         Locality, Product.locality_id == Locality.id
     ).outerjoin(
-        ProductImage,
-        and_(ProductImage.product_id == Product.id, ProductImage.is_primary == True)
+        imagen_primaria, imagen_primaria.c.product_id == Product.id
     ).filter(
         Product.status == ProductStatus.ACTIVE
     )
@@ -410,13 +443,7 @@ def get_products(
          seller_id, seller_name, seller_location,
          publicacion_locality_id, publicacion_localidad, publicacion_provincia,
          seller_rating_avg, seller_rating_count,
-         seller_documentacion_revisada) in results:
-        # Obtener imagen primaria
-        primary_image = db.query(ProductImage.url).filter(
-            ProductImage.product_id == product.id,
-            ProductImage.is_primary == True
-        ).first()
-        
+         seller_documentacion_revisada, primary_image_url) in results:
         # Construir info del vendedor
         seller_info = SellerBasicInfo(
             id=seller_id,
@@ -466,7 +493,7 @@ def get_products(
             "response_time": product.response_time,
             "coverage_zones": product.coverage_zones or None,
             "publication_location": ubicacion_de_la_publicacion,
-            "primary_image": primary_image[0] if primary_image else None,
+            "primary_image": primary_image_url,
             "seller": seller_info,
             "views_count": product.views_count,
             "likes_count": product.likes_count,
