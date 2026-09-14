@@ -379,6 +379,20 @@ function App() {
     setSelectedLocalityId,
   ]);
 
+  // La subcategoría se elige por nombre y viaja por id, igual que la
+  // categoría: el nombre es del control y el id es del contrato.
+  const subcategoriaElegida = useMemo(() => {
+    if (selectedSubcategory === 'Todas') return undefined;
+    return categories
+      .find((categoria) => categoria.name === selectedCategory)
+      ?.subcategories?.find((sub) => sub.name === selectedSubcategory);
+  }, [categories, selectedCategory, selectedSubcategory]);
+
+  const ordenPedido = useMemo(
+    () => ORDENES.find((opcion) => opcion.valor === orden) ?? ORDENES[0],
+    [orden],
+  );
+
   /**
    * Qué consulta describe lo que se está mirando, y cuál fue la última que
    * volvió con respuesta. Mientras no coinciden, la grilla espera.
@@ -394,9 +408,18 @@ function App() {
    * contestada. Cualquier hueco nuevo entre las dos es espera por
    * construcción, sin que nadie se acuerde de agregarlo.
    *
-   * La subcategoría y la calificación mínima no entran en la firma a
-   * propósito: no viajan a la consulta, así que la respuesta que hay sigue
-   * siendo la respuesta a lo que se pidió.
+   * La regla es una sola y no admite excepciones: en la firma entra TODO lo
+   * que viaja a la consulta. Mientras la subcategoría y la calificación
+   * mínima se resolvían en el navegador podían quedar afuera, porque no
+   * cambiaban lo que se le pedía al servidor. Desde que viajan —y con ellas
+   * el orden y la página— dejarlas afuera es declarar contestada una
+   * pregunta distinta de la que se hizo.
+   *
+   * Medido: entre mover el control y arrancar el efecto pasan unos 30 ms en
+   * los que el paginador ya dice «Página 2» sobre las tarjetas de la 1 y sin
+   * estado de carga, porque los efectos corren DESPUÉS de dibujar. El caso
+   * 171 lo mide con la respuesta demorada a propósito, mirando cada cuadro
+   * pintado y cada commit del DOM.
    */
   const consultaVigente = JSON.stringify([
     searchQuery,
@@ -408,6 +431,14 @@ function App() {
     priceMin,
     priceMax,
     inStockOnly,
+    // Los valores, no los objetos: lo que describe la consulta es el id que
+    // viaja y el orden que se pide, no la identidad del objeto que los
+    // envuelve. Dos objetos distintos con el mismo id piden lo mismo.
+    subcategoriaElegida?.id ?? null,
+    minRating,
+    ordenPedido.sortBy,
+    ordenPedido.sortOrder,
+    pagina,
     productsRevision,
   ]);
   const [consultaContestada, setConsultaContestada] = useState<string | null>(null);
@@ -432,20 +463,6 @@ function App() {
     }
     setProductsRevision((intento) => intento + 1);
   };
-
-  // La subcategoría se elige por nombre y viaja por id, igual que la
-  // categoría: el nombre es del control y el id es del contrato.
-  const subcategoriaElegida = useMemo(() => {
-    if (selectedSubcategory === 'Todas') return undefined;
-    return categories
-      .find((categoria) => categoria.name === selectedCategory)
-      ?.subcategories?.find((sub) => sub.name === selectedSubcategory);
-  }, [categories, selectedCategory, selectedSubcategory]);
-
-  const ordenPedido = useMemo(
-    () => ORDENES.find((opcion) => opcion.valor === orden) ?? ORDENES[0],
-    [orden],
-  );
 
   // Filtrar en la API para usar la ubicación real de la publicación.
   useEffect(() => {

@@ -27810,6 +27810,198 @@ await runCase(171, 'El Mercado pagina en el servidor: total, orden y filtros del
     medidos.push(`pedir «page=99» cae en la última página (${PAGINAS}) y la barra se corrige, `
       + 'sin afirmar un mercado vacío');
 
+    // B11. Mientras la respuesta no vuelve, la página anterior no se presenta
+    //      como si fuera la nueva.
+    //
+    //      `consultaVigente` existe para eso: mientras la consulta que
+    //      describe lo que se está mirando no coincide con la última
+    //      contestada, la grilla espera. Si una dimensión que VIAJA a la
+    //      consulta queda afuera de esa firma, el control la anuncia en el
+    //      acto y la respuesta vieja pasa por contestada hasta que arranca el
+    //      efecto —los efectos corren DESPUÉS de dibujar—. Es el mismo agujero
+    //      que encontró el caso 167 al soltar un filtro, con otras cuatro
+    //      dimensiones: subcategoría, calificación mínima, orden y página.
+    //
+    //      Se mira por dos instrumentos a la vez, porque ninguno solo alcanza:
+    //
+    //      · `requestAnimationFrame` corre en el ciclo del cuadro, justo ANTES
+    //        de pintar. Así que no aproxima lo que se ve: es lo que se ve. Es
+    //        el único que sirve cuando lo que cambia es el valor de un
+    //        `<select>` —el orden, la subcategoría, la calificación—, porque
+    //        eso lo pinta el navegador sin que mute el DOM.
+    //      · Un `MutationObserver` ve cada commit del DOM, se pinte o no. Es
+    //        el que hace la medición independiente del cuadro cuando la
+    //        transición sí muta el DOM, como el rótulo del paginador.
+    //
+    //      Medida acá, la ventana dura entre 16 y 38 ms: por eso NO se
+    //      muestrea con `setTimeout`, que en Chromium queda detrás del
+    //      MessageChannel con el que React vacía los efectos y no cae nunca
+    //      adentro de la ventana —640 muestras, cero—.
+    //
+    //      La demora de la respuesta es lo que vuelve la lectura inequívoca:
+    //      sin ella, lo viejo y lo nuevo se pisan en decenas de milisegundos y
+    //      no se puede afirmar cuál era cuál.
+    const DEMORA = 1200;
+    let demorarElCatalogo = 0;
+    await page.route('**/api/catalog/products*', async (ruta) => {
+      if (demorarElCatalogo > 0) {
+        await new Promise((resolver) => { setTimeout(resolver, demorarElCatalogo); });
+      }
+      await ruta.continue();
+    });
+
+    // Cada cuadro pintado y cada commit del DOM quedan anotados con lo que
+    // ANUNCIAN los controles, si algo dice estar cargando, y qué publicaciones
+    // hay dibujadas.
+    const mirarLaEspera = () => page.evaluate(() => {
+      const estado = (via) => ({
+        via,
+        pagina: document.querySelector('[class*="_paginaActual_"]')?.textContent?.trim() ?? null,
+        orden: document.querySelector('#catalog-sort')?.value ?? null,
+        subcategoria: document.querySelector('#catalog-subcategory')?.value ?? null,
+        calificacion: document.querySelector('#catalog-rating')?.value ?? null,
+        ocupado: document.querySelectorAll('[aria-busy="true"]').length > 0,
+        nombres: [...document.querySelectorAll('article[class*="card"] h3')]
+          .map((titulo) => titulo.textContent.trim()),
+      });
+      window.__miradaDelMercado?.cortar();
+      const anotadas = [];
+      const observador = new MutationObserver(() => anotadas.push(estado('commit')));
+      observador.observe(document.body, {
+        subtree: true, childList: true, characterData: true, attributes: true,
+      });
+      let cuadro = requestAnimationFrame(function pintar() {
+        anotadas.push(estado('cuadro'));
+        cuadro = requestAnimationFrame(pintar);
+      });
+      window.__miradaDelMercado = {
+        anotadas,
+        cortar: () => { observador.disconnect(); cancelAnimationFrame(cuadro); },
+      };
+    });
+    const loMirado = () => page.evaluate(() => {
+      window.__miradaDelMercado.cortar();
+      return window.__miradaDelMercado.anotadas;
+    });
+
+    // `dimension` es qué control anuncia el cambio y `anuncia` el valor que
+    // muestra apenas se lo mueve. La violación es un estado donde ese control
+    // YA dice lo nuevo, la grilla NO dice estar cargando, y lo dibujado sigue
+    // siendo exactamente lo anterior.
+    const sinPresentarLoViejo = async ({ comoSeLlama, dimension, anuncia, mover, despues }) => {
+      const antes = await nombresEnPantalla();
+      assert(antes.length > 0,
+        `${comoSeLlama}: no había nada dibujado antes de mover el control`);
+      await mirarLaEspera();
+      demorarElCatalogo = DEMORA;
+      try {
+        await mover();
+        await despues();
+      } finally {
+        demorarElCatalogo = 0;
+      }
+      const mirados = await loMirado();
+      const loViejo = JSON.stringify(antes);
+      const presentadas = mirados.filter((estado) => estado[dimension] === anuncia
+        && !estado.ocupado
+        && JSON.stringify(estado.nombres) === loViejo);
+      assert(presentadas.length === 0,
+        `${comoSeLlama}: en ${presentadas.length} estado(s) `
+        + `(${[...new Set(presentadas.map((estado) => estado.via))].join(', ')}) el control ya `
+        + `decía «${anuncia}» y la grilla seguía mostrando las ${antes.length} publicaciones `
+        + 'anteriores sin ningún estado de carga. Con la respuesta demorada a propósito, esa '
+        + 'página vieja se estaba presentando como la contestada: la dimensión no entra en la '
+        + 'firma de la consulta vigente');
+      // Sin esto el negativo podría estar verde por no haber mirado nada.
+      assert(mirados.some((estado) => estado.ocupado),
+        `${comoSeLlama}: ningún estado observado marcó la espera, así que la transición no se `
+        + 'vio y este negativo no estaría midiendo nada');
+      assert(mirados.some((estado) => estado.via === 'cuadro')
+        && mirados.some((estado) => estado.via === 'commit'),
+        `${comoSeLlama}: faltó uno de los dos instrumentos `
+        + `(${[...new Set(mirados.map((estado) => estado.via))].join(', ')})`);
+      return `${comoSeLlama}: ${mirados.length} estados observados entre cuadros pintados y `
+        + 'commits del DOM, ninguno presentó lo anterior como contestado';
+    };
+
+    await page.goto(
+      `${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(MARCADOR)}`,
+      { waitUntil: 'domcontentloaded' });
+    await esperarLaPagina(1, 'el Mercado no arrancó en la página 1 para medir la espera');
+    await esperarLaGrilla(POR_PAGINA, null, 'la página 1 no dibujó sus tarjetas');
+
+    // Cada dimensión se mueve donde es lo ÚNICO que cambia en la consulta.
+    // Esto no es un detalle de orden de los bloques: cambiar el orden, la
+    // subcategoría o la calificación desde una página interior vuelve a la
+    // página 1, y entonces la página —que sí está en la firma— cambia sola y
+    // tapa el defecto. Medido: con el orden afuera de la firma y la medición
+    // hecha desde la página 2, el caso daba verde. Por eso las tres primeras
+    // se miden desde la página 1, y la página se mide al final.
+    const carreras = [];
+
+    // El orden: el selector muestra lo elegido en el acto.
+    carreras.push(await sinPresentarLoViejo({
+      comoSeLlama: 'cambiar el orden con la respuesta demorada',
+      dimension: 'orden',
+      anuncia: 'price-asc',
+      mover: () => page.locator('#catalog-sort').selectOption('price-asc'),
+      despues: () => esperarLaGrilla(POR_PAGINA, null,
+        'la primera página del orden por precio no llegó a dibujarse'),
+    }));
+
+    // La subcategoría y la calificación mínima viven en la barra lateral, que
+    // no se desmonta: el control anuncia lo nuevo y la grilla es la que tiene
+    // que decir que está esperando.
+    await page.locator('#catalog-sort').selectOption('newest');
+    await esperarLaGrilla(POR_PAGINA, null, 'volver al orden por omisión no llegó a dibujarse');
+    await page.locator('#catalog-category').selectOption(laCategoria[1]);
+    await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
+      'elegir la categoría del conjunto cambió el total antes de medir la espera', 25_000);
+
+    carreras.push(await sinPresentarLoViejo({
+      comoSeLlama: 'elegir una subcategoría con la respuesta demorada',
+      dimension: 'subcategoria',
+      anuncia: laSubcategoria[1],
+      mover: () => page.locator('#catalog-subcategory').selectOption(laSubcategoria[1]),
+      despues: () => esperarA(async () => (await conteo.innerText()).includes(String(CON_SUBCATEGORIA)),
+        'con la subcategoría puesta el conteo no llegó al subconjunto', 25_000),
+    }));
+
+    await page.locator('#catalog-subcategory').selectOption('Todas');
+    await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
+      'sacar la subcategoría no devolvió el total antes de medir la espera', 25_000);
+
+    carreras.push(await sinPresentarLoViejo({
+      comoSeLlama: 'poner calificación mínima con la respuesta demorada',
+      dimension: 'calificacion',
+      anuncia: '4',
+      mover: () => page.locator('#catalog-rating').selectOption('4'),
+      despues: () => esperarA(async () => (await conteo.innerText()).includes(String(CALIFICADAS)),
+        'con calificación mínima el conteo no llegó al subconjunto', 25_000),
+    }));
+
+    await page.locator('#catalog-rating').selectOption('0');
+    await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
+      'sacar la calificación mínima no devolvió el total antes de medir la espera', 25_000);
+    await esperarLaPagina(1, 'antes de medir la página, el Mercado no estaba en la 1');
+
+    // La página, al final: «Siguiente» anuncia «Página 2 de 5» en el acto y no
+    // mueve ninguna otra dimensión de la consulta.
+    carreras.push(await sinPresentarLoViejo({
+      comoSeLlama: 'avanzar de página con la respuesta demorada',
+      dimension: 'pagina',
+      anuncia: `Página 2 de ${PAGINAS}`,
+      mover: () => siguiente.click(),
+      despues: () => esperarLaGrilla(POR_PAGINA, null, 'la página 2 no llegó a dibujarse'),
+    }));
+
+    await page.unroute('**/api/catalog/products*');
+    medidos.push('con la respuesta del catálogo demorada 1200 ms a propósito, ninguna de las '
+      + 'cuatro dimensiones que viajan a la consulta —orden, subcategoría, calificación mínima '
+      + 'y página— presentó la respuesta anterior como si fuera la nueva: '
+      + `${carreras.length} transiciones miradas cuadro a cuadro y commit a commit, cada una `
+      + 'donde esa dimensión es lo único que cambia');
+
     await contexto.close();
   } finally {
     await browser.close();
