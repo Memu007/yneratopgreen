@@ -18,8 +18,11 @@ cat docs/pm/PARA-DEV.md
 
 ## 2026-09-14 — CAT-PAGE-1
 
-**Condición de entrada:** no empieces hasta que `origin/main` contenga el merge
-aceptado `c973c6f`. Si no aparece, frená: la publicación depende de Emi.
+**Base excepcional autorizada por PM:** Emi postergó la publicación de `main`
+para no disparar Railway. Continuá en `claude/dev-role-repo-3l0kp3` después de
+traer el relevo PM que contiene esta tarea; ese relevo incorpora el merge
+aceptado `c973c6f`. No vuelvas a basarte en el `origin/main` viejo ni publiques
+producto. Registrá el SHA exacto de este relevo como base antes de editar.
 
 ### Problema reproducido
 

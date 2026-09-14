@@ -10,7 +10,7 @@ Actualizado: 2026-09-14.
 - **`main` local:** contiene `POST-INTEGRATION-CLEAR-1` mediante `c973c6f`. `origin/main` continúa en `2d8ecfd`; el cambio no fue publicado ni desplegado.
 - **Rama Dev:** `claude/dev-role-repo-3l0kp3`; producto `eb62d3d`, arnés final `a7ed544` e informe `48bae67`, integrados sólo localmente mediante `c973c6f`.
 - **Última decisión PM:** `POST-INTEGRATION-CLEAR-1` **ACEPTADA E INTEGRADA LOCALMENTE**. Falta autorización explícita de Emi para empujar producto a `main`, porque Railway conserva auto-deploy.
-- **Próxima tarea:** `CAT-PAGE-1`, preparada para Dev. Empieza únicamente cuando `origin/main` contenga la integración aceptada.
+- **Tarea activa:** `CAT-PAGE-1`, responsable Dev. Continúa sobre su rama remota, que recibe la integración aceptada y el relevo PM sin publicar `main` ni disparar Railway.
 
 ## Última aceptación PM — POST-INTEGRATION-CLEAR-1
 
@@ -142,8 +142,8 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Emi autoriza o rechaza publicar `c973c6f`; el push tocaría producto y activaría el auto-deploy de Railway.
-2. Una vez visible la integración en `origin/main`, Dev ejecuta `CAT-PAGE-1`.
+1. Dev ejecuta `CAT-PAGE-1` sobre `claude/dev-role-repo-3l0kp3`, desde el relevo PM posterior a `c973c6f`.
+2. Emi autoriza más adelante la publicación controlada a `main`; ese push tocará producto y activará el auto-deploy de Railway.
 3. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
 4. Separar de forma controlada integración y producción; cualquier cambio de producto exige nueva aceptación antes de publicar.
 5. Mercado Pago, SMTP, red-team y producción aceptada permanecen al final de la secuencia acordada, sin esperar artificialmente a una fecha si las dependencias ya están listas.

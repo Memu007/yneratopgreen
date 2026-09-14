@@ -46,6 +46,7 @@ locales y Emi no autorizó borrar esos datos. La corrida completa Dev, la
 evidencia PM anterior del caso 131 y los focales PM sobre todos los deltas
 cubren los 170 casos sin declarar una corrida verde inexistente.
 
-Resultado: **ACEPTADA** e integrada sólo en `main` local mediante `c973c6f`.
-Publicar ese merge sigue pendiente de autorización explícita de Emi porque
-Railway observa `main` y el cambio toca producto.
+Resultado: **ACEPTADA** e integrada en `main` local mediante `c973c6f`. El
+relevo se publica únicamente en la rama Dev para permitir la tarea siguiente;
+publicar `main` sigue pendiente de autorización explícita de Emi porque
+Railway observa esa rama y el cambio toca producto.
