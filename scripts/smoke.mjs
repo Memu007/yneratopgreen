@@ -28207,19 +28207,34 @@ await runCase(172, 'El listado del Mercado no consulta las imágenes una vez por
     // === B. Y las imágenes son las que la base dice, no sólo un conteo ====
     // Lo esperado se calcula contra la base, con la misma regla determinista:
     // la primaria de menor `display_order`, o null si no hay ninguna.
+    // El «sin imagen» viaja como una marca y no como columna vacía, y la
+    // consulta lleva `ORDER BY`. Las dos cosas por el mismo motivo, encontrado
+    // midiendo: `querySql` hace `.trim()` sobre TODA la salida, así que si la
+    // última fila termina en una columna vacía se le come el tabulador final y
+    // esa fila vuelve con un campo menos. Sin `ORDER BY`, que la última fila
+    // fuera o no una sin imagen dependía del orden incidental de Postgres, y el
+    // caso pasaba o fallaba según eso.
+    const SIN_PRIMARIA = '(sin imagen primaria)';
     const esperado = new Map(queryRows(`
       SELECT p.name,
              COALESCE((SELECT i.url FROM product_images i
                        WHERE i.product_id = p.id AND i.is_primary = true
-                       ORDER BY i.display_order, i.id LIMIT 1), '')
+                       ORDER BY i.display_order, i.id LIMIT 1), ${sqlLiteral(SIN_PRIMARIA)})
       FROM products p
-      WHERE p.name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`)
-      .map(([nombre, url]) => [nombre, url === '' ? null : url]));
+      WHERE p.name LIKE ${sqlLiteral(`${MARCADOR}-%`)}
+      ORDER BY p.name`)
+      .map(([nombre, url]) => [nombre, url === SIN_PRIMARIA ? null : url]));
     assert(esperado.size === TOTAL,
       `la base describe ${esperado.size} publicaciones del conjunto y son ${TOTAL}`);
-    assert([...esperado.values()].filter((url) => url === null).length
-      === SIN_IMAGEN + SOLO_SECUNDARIA,
-      'el escenario no tiene las publicaciones sin imagen primaria que dice tener');
+    assert([...esperado.values()].every((url) => url === null || url.startsWith('/uploads/')),
+      `la base devolvió URLs que no se pueden leer: `
+      + JSON.stringify([...esperado.values()].filter((url) => url !== null
+        && !url.startsWith('/uploads/')).slice(0, 3)));
+    const nulasEnBase = [...esperado.values()].filter((url) => url === null).length;
+    assert(nulasEnBase === SIN_IMAGEN + SOLO_SECUNDARIA,
+      `el escenario tiene ${nulasEnBase} publicaciones sin imagen primaria y tiene que tener `
+      + `${SIN_IMAGEN + SOLO_SECUNDARIA} (${SIN_IMAGEN} sin ninguna imagen y `
+      + `${SOLO_SECUNDARIA} con una no primaria)`);
 
     const dibujadas = grande.datos.items;
     for (const item of dibujadas) {
