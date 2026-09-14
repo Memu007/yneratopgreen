@@ -2,175 +2,185 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## POST-INTEGRATION-CLEAR-1
+## CAT-PAGE-1
 
 | | |
 | --- | --- |
 | **Rama** | `claude/dev-role-repo-3l0kp3` |
-| **SHA base** | `2d8ecfd` (`origin/main`, con `fbd6caf` adentro) |
-| **SHA candidato** | `eb62d3d` — producto y regresión |
-| **SHA probado** | `a7ed544` — el candidato más un commit de arnés que sólo toca `scripts/smoke.mjs`; es el SHA sobre el que corrió la suite completa |
-| **Diff desde `2d8ecfd`** | `src/components/Header/Header.tsx`, `src/components/Pages/ContactPage.tsx`, `scripts/smoke.mjs`, `scripts/a11y.mjs`, `scripts/contraste.mjs`, `scripts/lib/superficies.mjs` y este canal |
-| **Estado** | en mi rama. No integré, no desplegué, no toqué Railway, datos remotos, pagos ni secretos. No empecé `CAT-PAGE-1` |
+| **SHA base** | `b2826d1` — el relevo PM que trajiste a la rama, con `c973c6f` adentro. No me basé en el `origin/main` viejo |
+| **SHA candidato** | `a521631` |
+| **SHA probado** | `a521631` — el informe es el commit siguiente y no toca producto ni pruebas |
+| **Diff desde `b2826d1`** | `backend/app/api/catalog.py`, `src/App.tsx`, `src/hooks/useProductFilters.ts`, `src/utils/catalogService.ts`, `src/components/ProductGrid/ProductGrid.tsx` y su hoja, `scripts/smoke.mjs`, `scripts/a11y.mjs`, `scripts/contraste.mjs`, `scripts/lib/superficies.mjs` y este canal |
+| **Estado** | en mi rama. No integré, no desplegué, no toqué Railway, datos remotos, pagos, imágenes, taxonomía ni seed. No empecé `QUERY-IMG-1` |
 
 ---
 
-### La premisa, comprobada antes de tocar nada
+### La premisa, medida antes de tocar nada
 
-Las cuatro afirmaciones se sostienen. La primera la había dejado escrita yo
-mismo al pie del caso 167, cuando cerré el callejón del Checkout: «la rama sin
-sesión de `CartModal.handleCheckout` sigue sin alcanzarse, porque sin sesión la
-cabecera ni siquiera dibuja la celda del carrito».
+Las tres que describís se sostienen, y la cuarta la encontré midiendo.
 
-- `sesionInvalidada()` tira las credenciales y baja al usuario, y **no** pasa
-  por `logout()`: no despacha `user-logout` ni borra `agromarket_cart`. El
-  carrito queda.
-- `Header.tsx` dibujaba `CartButton` sólo dentro de la rama `isAuthenticated`.
-- `logout()` sí borra la clave y despacha el evento. Esa regla no la toqué.
-- Mercado Pago **es por vendedor**: `medios_de`, en
-  `backend/app/services/checkout.py`, sólo lo agrega si `MP_CHECKOUT_HABILITADO`
-  y ese vendedor está `CONECTADO`. Por eso la respuesta de la FAQ lleva la
-  condición: nombrarlo sin ella sería prometerle a todo el mundo un medio que
-  la mitad de los vendedores no tiene.
+- `GET /api/catalog/products` ya devolvía `total`, `page`, `pages`, `has_next` y
+  `has_prev`, y el Mercado pedía `page: 1, page_size: 100`.
+- **`subcategory` y `min_rating` no existían en la API.** Medido: con
+  `?subcategory=algo` inventado y con `?min_rating=5`, el total seguía siendo
+  195 —el del catálogo entero—, porque FastAPI descarta lo que no declara. Los
+  aplicaba el navegador sobre la página descargada.
+- **`sort_by=rating` no existía**: daba 422. «Mejor calificados» ordenaba el
+  arreglo que la grilla tenía en la mano.
+- **Y el orden no tenía desempate.** Esto no estaba en la tarea y se mide solo:
+  con `sort_by=price&sort_order=asc&page_size=24` sobre la base de entonces, la
+  publicación `7044791a` era **el último ítem de la página 1 y el primero de la
+  página 2**. Sin desempate determinista el corte de página cae adentro de un
+  empate, y la misma fila sale dos veces mientras otra desaparece. Paginar sin
+  eso es paginar mal.
 
-### El caso 170, y por qué distingue
+### El caso 171, y los dos rojos
 
-`SMOKE_CASOS=170`. Recorre la pantalla; no lee el fuente.
+Fabrica **115 publicaciones** —más de cien, y no múltiplo de 24, así que la
+última página queda corta— y las retira al terminar. Treinta comparten precio a
+propósito: sin empate, el desempate no tiene qué desempatar. Treinta llevan
+subcategoría y cuarenta y cinco son de un vendedor sin calificación. Las
+reputaciones que necesita las fija en la base descartable y las devuelve como
+estaban, así que mide lo mismo corrido solo que dentro de la suite.
 
-Contra la base da **rojo en el primer punto de la tarea**:
+Contra la base (`b2826d1`) da **dos rojos distintos**, cada uno con su defecto:
 
 ```
-en escritorio, sin sesión y con 1 ítem(s) guardado(s), la cabecera no ofrece
-«Carrito»: lo elegido queda detrás de una puerta que dejó de dibujarse.
-La cabecera dice ["AgroBoeda","Ingresar","Inicio","Mercado","Servicios",
-"Quiénes somos","Contacto","Buscar"]
+con toda la base:
+   ordenando por precio, 1 publicación(es) aparecen en dos páginas:
+   ["f901be0f-…"]. Sin desempate determinista el corte de página cae
+   adentro del empate y la misma fila sale dos veces
+con la API ya corregida y la pantalla vieja:
+   la página dibujó 100 tarjetas y tiene que dibujar 24
 ```
 
-Con la corrección, verde. Y para que no sea un verde de una sola dirección,
-saboteé cada mitad por separado:
+Y si se arregla el tamaño de página pero no se agrega el control, el siguiente
+rojo es «no hay paginador en el Mercado: con más de una página, la 101 no se
+alcanza».
 
-| Sabotaje | Qué dijo el caso |
-| --- | --- |
-| sólo la FAQ vuelta a la de `main` | «la respuesta de pago sigue sin nombrar Mercado Pago, que el producto cobra» — y **todo el bloque de la cabecera pasó**: las dos mitades se miden solas |
-| la celda dibujada siempre (`itemCount >= 0`) | «sin sesión y con cero ítems la cabecera ofrece un carrito vacío: […,"Carrito",…]» |
-| `logout()` sin borrar `agromarket_cart` | «la salida explícita no vació el carrito: quedó ["9e2d1e40-…x1"]» |
+Lo que mide, en API y en pantalla:
 
-Lo que mide, en los **dos anchos** (1440×900 y 390×844):
+- total 115 y páginas 5 exactas, con la última de 19 y `has_next`/`has_prev`
+  correctos;
+- recorriendo **todas** las páginas por precio ascendente no se repite ni se
+  pierde ninguna de las 115;
+- las cinco páginas recorridas con «Siguiente» muestran las 115 sin repetir, y
+  **la número 101 está entre ellas**, en la posición 101;
+- «Anterior» deshabilitado en la primera, «Siguiente» en la última, y el
+  recorrido se hace **con el teclado** —foco y Enter—;
+- la vista Lista, elegida antes de moverse, **sobrevive** el cambio de página;
+- «Más relevantes» ya no está y las otras cuatro sí;
+- cambiar el orden vuelve a la página 1 y ordena el **conjunto**: por «Menor
+  precio» la primera página trae veinticuatro de las treinta más baratas, que
+  con el orden por omisión estaban en la última página; por «Mejor calificados»
+  sólo trae las del vendedor calificado;
+- subcategoría y calificación mínima dan total y páginas del subconjunto —30 y
+  2, 70 y 3— y al sacarlos vuelve el conjunto entero;
+- `page` y `sort` están en la barra, y Atrás los restaura con sus filtros y sus
+  mismas publicaciones;
+- cambiar la búsqueda desde la página 4 vuelve a la 1;
+- pedir `page=99` cae en la última página y la barra se corrige, sin afirmar un
+  mercado vacío.
 
-- carrito con ítems + sesión confirmada inválida → la cabecera deja de decir
-  «Salir» y dice «Ingresar», y el Checkout no se abre;
-- cerrar el Login → vuelve el carrito, con los mismos ítems guardados **y**
-  dibujados;
-- **cerrar el carrito → la celda «Carrito» está, se ve, mide 44 px de alto, se
-  llega por teclado y abre el mismo carrito conservado**; también después de
-  recargar, que es donde se ve que el estado sale de lo guardado y no de un
-  recuerdo de la pestaña;
-- la banda no se deforma: marca, las cinco secciones y cero desborde
-  horizontal;
-- sin sesión y con cero ítems, **no** hay celda;
-- sin sesión, «Continuar compra» abre el Login de siempre y **no** el Checkout;
-  con la credencial buena se sigue por el flujo vigente, con los mismos ítems;
-- salida explícita → carrito vacío y sin celda;
-- la FAQ nombra transferencia directa y Mercado Pago con su condición, y no
-  nombra comisiones, planes, suscripciones, custodia ni cuotas.
+### Qué cambié
 
-El caso deja la cuenta de demostración como estaba: abrir el Checkout
-sincroniza el carrito contra el servidor, así que al terminar lo vacía.
+**En la API** (`backend/app/api/catalog.py`), cuatro cosas y ninguna más:
 
-### Qué cambié del producto
+1. `subcategory` y `min_rating` como filtros, aplicados **antes** del conteo;
+2. `sort_by=rating`, sobre `coalesce(rating_average, 0)` —sin el `coalesce`, un
+   NULL se va al principio en `desc` y «mejor calificados» empezaría por quien
+   no tiene ninguna—;
+3. el desempate determinista: la columna pedida, después `created_at` y al final
+   `products.id`, que es única por definición;
+4. nada más. El contrato de la respuesta no cambió.
 
-Dos cosas, y nada más.
+**En la pantalla**: el orden y la página dejan de vivir en la grilla y pasan a
+`useProductFilters`, con los filtros, porque son parte de lo que se le pide al
+servidor: viajan a la consulta, se escriben en la barra y vuelven cuando la
+barra manda. La grilla dibuja lo que le dan y conserva **sólo** la vista
+Cuadrícula/Lista, que no cambia qué se pide sino cómo se ve.
 
-1. `Header.tsx` lee `itemCount` del **mismo** contexto que ya usa `CartButton`
-   —no hay un segundo carrito ni un espejo que se quede viejo— y, sin sesión,
-   dibuja la celda sólo si hay algo adentro. Es el mismo `onCartClick` de la
-   rama con sesión: abre el carrito conservado, no uno nuevo. Sin ruta nueva,
-   sin estado paralelo, sin dependencias, sin backend y sin CSS: la clase es la
-   misma `celda` de «Ingresar», y la banda ya sabía envolver con cuatro o cinco.
-2. La respuesta de la FAQ:
+El filtrado del navegador se retiró entero: ya no descarta ninguna fila, así que
+el total de la API describe siempre lo que se está mirando.
 
-   > Podés pagar por transferencia bancaria directa al vendedor y, cuando ese
-   > vendedor lo tenga habilitado, también con Mercado Pago.
+Volver a la página 1 se hace **envolviendo los setters** y no con un efecto que
+vigile los filtros: ese efecto también correría cuando la barra manda —volver a
+una entrada repone todos los filtros de golpe— y ahí la página que hay que
+respetar es la de la entrada. Con un efecto, Atrás volvería siempre a la
+primera página.
 
-No toqué la regla de vaciado al salir, ni el Login, ni el carrito, ni el
-checkout, ni el diseño de la cabecera o de Contacto.
+Sin routing nuevo, sin dependencias, sin caché paralela y sin una segunda fuente
+de filtros.
+
+### Una decisión que conviene que mires
+
+`page` y `sort` se escriben con `replaceState`, igual que el resto de los
+filtros del Mercado: la navegación tiene un solo dueño —`navegacion.ts`— y no le
+agregué un segundo escritor del historial. Eso significa que **Atrás no
+retrocede de página en página**: restaura la página, el orden y los filtros de
+la entrada a la que vuelve, que es lo que mide el caso. Si querés que cada
+página sea una entrada propia del historial, es otra decisión de producto y te
+la dejo a vos: se hace, pero cambia cómo se sale del Mercado.
 
 ### Dos cosas que agregué y no me pediste
 
-**1. Una superficie en las puertas de accesibilidad.** Las dos recorren un
-inventario común (`scripts/lib/superficies.mjs`). La cabecera **sin sesión y
-con carrito** no la alcanzaba ninguna superficie: sin sesión el catálogo no
-deja agregar nada —la tarjeta ofrece ingresar— y con sesión la celda ya estaba.
-Correr `a11y` y `contraste` sin agregarla habría dado verde **sin haber mirado
-lo que cambié**. La superficie se llama `cabecera sin sesión con carrito` y se
-llega por el camino real; no se escribe un carrito a mano en el almacenamiento.
-
-**2. Dos rojos intermitentes del arnés** (commit `a7ed544`, sólo `smoke.mjs`).
-Aparecieron en la primera corrida completa de esta tarea y no en las anteriores.
-Ninguno es del producto, y los dos los dejo diagnosticados y no tapados:
-
-- **Caso 114.** El escenario de fletes elegía la publicación por `stock > 0`, y
-  disponible es `stock - stock_reservado`, que es lo que mira la vitrina. El
-  caso 90 deja a propósito una con stock 1 y ese uno reservado —la orden
-  ganadora todavía sin pagar—; como el desempate es por `p.id` y los id son
-  UUID, esa publicación caía primera de su vendedor **de vez en cuando**.
-  Medido con una publicación reservada fabricada con un id que ordena primero:
-  con la regla vieja el caso dice «la tarjeta de «Smoke negativo 114 reservada»
-  no ofrece agregar ni contratar; sus botones son ["Sin stock","Ver detalle"]»
-  —el mismo mensaje de la corrida—, y con la regla nueva pasa.
-- **Caso 169.** Afirmaba que la API seguía en pie con un `/health` de un solo
-  disparo, justo después de escenarios que sondean el puerto y matan procesos
-  alrededor. Ahora espera la condición, con límite: si de verdad se la llevaron
-  puesta, no vuelve y el caso falla igual.
-
-Si preferís cualquiera de las dos cosas afuera, se retiran sin tocar el
-producto; decímelo.
+1. **Una superficie en las dos puertas de accesibilidad**, `catálogo:
+   paginador`, cuyo marcador es el propio control. Si el catálogo dejara de
+   tener más de una página, la puerta falla en vez de medir un catálogo sin
+   paginador y declararlo revisado. Es como pediste el paginador en a11y y
+   contraste, pero durable.
+2. **El acote de una página que no existe** (`page=99`). Los filtros vuelven a
+   la 1 solos, así que a una página de más se llega por la barra: un enlace
+   compartido, o una entrada del historial cuyo conjunto encogió. Sin el acote
+   la pantalla decía «No hay operaciones con estos filtros» habiendo
+   publicaciones.
 
 ### Compuertas
 
 | Puerta | Resultado |
 | --- | --- |
-| caso 170 contra base limpia | **verde**; rojo contra la base, con el mensaje de arriba |
-| suite completa desde base limpia, sobre `a7ed544` | **169/170**; el único rojo es el 131 |
+| caso 171 contra base limpia | **verde** |
+| rojo discriminante contra `b2826d1` | los dos de arriba |
+| suite completa desde base limpia | **170/171**; el único rojo es el 131 |
 | `npm run build` | verde |
 | `npm run lint` · `npx tsc --noEmit` · `node --check` | verdes, 0 avisos |
-| `git -c core.whitespace=cr-at-eol diff --check` contra la base | sin avisos |
-| `npm run a11y -- --todas` | **70/70** pantallas, 0 bloqueantes, 0 menores |
-| `npm run contraste` | **78/78** mediciones, 22 294 textos, **0 incumplimientos** |
-| cabecera sin sesión, escritorio y celular | revisada, abajo |
+| `git -c core.whitespace=cr-at-eol diff --check` | sin avisos |
+| `npm run a11y -- --todas` | **72/72** pantallas, 0 bloqueantes, 0 menores |
+| `npm run contraste` | **80/80** mediciones, 10 312 textos, **0 incumplimientos** |
+| revisión visual 1440×900 y 390×844 | abajo |
 
-`a11y` y `contraste` corrieron sobre el contenido de `eb62d3d`; el commit
-siguiente sólo toca `scripts/smoke.mjs`, que esas puertas no leen.
+### La revisión visual
 
-**El 131 es el rojo de entorno que vengo informando**: acá no hay demonio de
-Docker, el puente sólo traduce `docker exec`, y el caso necesita
-`docker run --rm` con `alpine:3`. En tu Mac corre. Es el mismo y único rojo de
-todas las corridas limpias anteriores.
-
-### La cabecera sin sesión, mirada
-
-En 1440 y en 390 la banda queda así:
+En los dos anchos, con el seed (30 publicaciones, 2 páginas):
 
 ```
-AgroBoeda | Inicio Mercado Servicios Quiénes somos Contacto | Carrito (1) | Ingresar
+escritorio  «Anterior  Página 1 de 2  Siguiente» — Anterior apagado
+            «Anterior  Página 2 de 2  Siguiente» — Siguiente apagado
+celular     idéntico, centrado, sin desborde horizontal (0 px)
 ```
 
-La celda entra a la izquierda de «Ingresar», con el mismo filete, el mismo alto
-y la misma tipografía que las demás. En 390 las dos acciones entran en el mismo
-renglón, la marca no se corre y las cinco secciones siguen en sus dos filas. No
-hay scroll horizontal en ninguno de los dos —lo mide el caso y lo mide
-`contraste`—. El foco es el del resto de la banda, porque es la misma clase, y
-el recorrido de teclado llega a la celda nueva antes que a las secciones, que es
-donde está en el documento.
+El paginador va centrado al pie de la grilla, con los mismos tokens que el del
+panel de administración: botones de 44 px de alto, apagados —no invisibles— en
+los extremos. La banda de arriba quedó con las cuatro opciones de orden y sin
+«Más relevantes».
 
-### Los dos pendientes que venía repitiendo
+### Lo que no corrí
 
-Los dos eran justo esto, y quedan cerrados con esta entrega:
+Nada de lo exigido quedó sin correr. El **131** es el rojo de entorno que vengo
+informando en cada entrega: acá no hay demonio de Docker, el puente sólo traduce
+`docker exec`, y el caso necesita `docker run --rm` con `alpine:3`. En tu Mac
+corre. Es el mismo y único rojo de las corridas limpias anteriores.
 
-- **el carrito sin sesión** — ahora tiene puerta, y la puerta desaparece cuando
-  no hay nada adentro;
-- **la FAQ de Contacto**, que decía sólo transferencias mientras el producto
-  también cobra por Mercado Pago.
+**Un rojo que sí era mío y ya está arreglado**: el caso 155 elegía «relevance»
+a mano, la opción que esta tarea manda retirar, y se cayó pidiendo algo que el
+producto ya no ofrece. Ahora recorre los órdenes que el control realmente tiene,
+así que mide lo mismo —que ordenar no cambia la vista elegida— y no envejece
+cuando los órdenes cambien. Que sean los correctos lo mide el caso 171.
 
-No abrí ninguna tarea nueva: `CAT-PAGE-1` sigue sin empezar. Freno acá para tu
-revisión.
+### Lo que queda anotado
+
+`docs/pm/ux2c/DEUDA-PAGINACION.md` describe esta deuda como abierta. No lo toqué
+—es un documento tuyo y la tarea no lo pedía—, pero con esta entrega queda
+saldado lo que ese archivo pedía: la forma la decidiste vos, el backend ya no
+hizo falta tocarlo salvo por los filtros y el orden que faltaban, la página es
+dependencia del efecto, y la regresión que pedía existe.
