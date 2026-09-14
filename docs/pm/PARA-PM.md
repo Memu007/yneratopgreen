@@ -2,86 +2,106 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## INTEGRATION-CANDIDATE-1 R3 — el caso 169 en los dos entornos
+## BACKUP-RESTORE-1 R4
 
 | | |
 | --- | --- |
 | **Rama** | `claude/dev-role-repo-3l0kp3` |
-| **HEAD de este informe** | el commit que trae este archivo, o sea la punta de la rama |
-| **SHA candidato — producto y arnés** | `c565e6e` |
-| **SHA efectivamente probado** | `c565e6e` (focal 169; el resto lo conserva tu corrida sobre `e0cdfe9`) |
-| **Resultado** | focal **169 verde** en los dos entornos: API nativa y contenedor emulado. Y rojo con el comando anterior en los dos |
-| **Delta desde `e0cdfe9`** | un solo hunk, dentro del caso 169: `git diff e0cdfe9 c565e6e -- . ':!docs/'` toca sólo `scripts/smoke.mjs` y sólo ese caso. Después de `c565e6e`, sólo este documento |
-| **Base** | `main` en `7a898ef`, ya incorporado |
-| **Estado** | en mi rama. No integré, no desplegué, no toqué Railway, datos remotos, secretos ni pagos. No empecé otra tarea |
+| **SHA base** | `24dcca8`; `origin/main` (`0f89e78`) incorporado por merge |
+| **SHA candidato** | `52ba294` |
+| **SHA anteriores, intactos** | `79af761`/`2ffb08a` · `b9d0036`/`6f02c32` · `f3e9d54`/`5e84385` |
+| **Diff total desde `24dcca8`** | `scripts/respaldo.sh`, `docs/RESPALDO_Y_RESTAURACION.md`, tres líneas de `.gitignore` y este canal. **No toca producto** |
+| **Estado** | en mi rama. No integré, no desplegué, no toqué Railway ni datos remotos. No abrí otra tarea |
 
-Como pediste, **no repetí la suite completa, ni `a11y`, ni `contraste`**: el
-delta es el caso 169 y este informe.
+Gracias por la corrida real: encontró en el primer paso algo que mi doble no
+podía encontrar.
 
 ---
 
-### Qué estaba mal
+### El defecto que te rompió la corrida
 
-El caso exigía una API nativa en marcha —«este caso necesita una API nativa en
-marcha para comprobar que no la tocan»— antes de armar sus dos escenarios de la
-rama nativa. Con el lanzador oficial la API vive en un contenedor y no hay
-ningún uvicorn de anfitrión, así que el caso se caía en esa línea sin llegar a
-probar nada. El error es mío y es del mismo tipo que los otros tres de esta
-tarea: el caso heredaba una condición del entorno en vez de fabricarla.
+Era mío y de la misma familia que los otros: **leía el índice del volcado con el
+`pg_restore` del anfitrión**. Tu Mac tiene 14.20 y el contenedor 16.4, así que
+un volcado nuevo leído por una herramienta vieja da «unsupported version (1.15)
+in file header». El volcado estaba bien; lo estaba leyendo quien no podía.
 
-### Qué hace ahora
+Ahora, en modo Docker, **`pg_dump`, `pg_restore` —índice incluido— y `psql`
+corren siempre dentro del contenedor que hizo la copia**, y la versión del
+manifiesto sale de ahí. En el anfitrión no se usa ninguna herramienta de
+PostgreSQL.
 
-El escenario lo fijan los dobles, no la máquina:
+**Cómo lo probé, ya que no tengo Docker.** Puse en el PATH un `pg_dump`,
+`pg_restore`, `psql` y `pg_isready` que **fallan a propósito** —«el guión llamó
+a X del anfitrión en modo Docker»— y corrí el ciclo Docker entero contra ellos:
 
-1. **Contenedor que contesta y no se reinicia** — ya era independiente del
-   entorno: el doble de `docker` informa una identidad fija, `restart` dice que
-   sí, y el comando tiene que ver que `Pid`/`StartedAt` no se movieron.
-2. **Nadie identificable** — el doble de `docker` ahora dice **que no hay
-   contenedor**, así el comando toma su rama nativa corra donde corra, y el
-   doble de `ps` le esconde cualquier uvicorn.
-3. **El puerto lo atiende otro** — mismo doble de `docker`, y el de `ps` le
-   presenta un proceso descartable como si fuera la API. El comando lo mata, el
-   puerto sigue contestando, y eso es el rojo.
-4. **El reinicio real**, con el entorno tal cual es: tiene que **cambiar la
-   identidad de quien sirva la API** —`Pid` y `StartedAt` si es contenedor, los
-   PID si es uvicorn nativo—.
+```
+con el código anterior (f3e9d54):
+   NEGATIVO: el guión llamó a pg_restore del anfitrión en modo Docker
+   ERROR: el volcado no es un archivo de pg_restore válido      ← tu síntoma exacto
+con el código nuevo (52ba294):
+   bundle creado, índice legible, "pg_dump": "16.13" en el manifiesto
+```
 
-«No tocó nada» también se mide así ahora: contra quien sirva la API, y no contra
-una lista de PID que en Docker está vacía por definición.
+Es un negativo discriminante: si vuelve a colarse una herramienta del anfitrión,
+esto lo caza sin necesidad de una Mac.
 
-Dos detalles de portabilidad que estaban mal para tu máquina: el doble de `ps`
-**agrega** su línea mientras el descartable siga vivo y no sea zombi, en vez de
-reescribir una línea del `ps` real —así no depende de que `ps` liste un proceso
-sin terminal—, y las lecturas piden `-Ao` y no `-eo`, porque en BSD `-e` no
-significa «todos los procesos».
+### Las dos guardas que faltaban
 
-### Lo medido
+**1. El servidor definitivo, no el temporal.** La imagen levanta un PostgreSQL
+provisorio durante `initdb` y `pg_isready` ya contesta que sí; restaurar ahí es
+restaurar sobre algo que el entrypoint va a apagar. Ahora se exige además que el
+**PID 1 del contenedor sea `postgres`**. Medido en los dos sentidos:
 
-| Entorno | Comando nuevo | Comando anterior |
-| --- | --- | --- |
-| API nativa | **verde**; el reinicio real pasó de `[647]` a `[1116]` | **rojo**: «salió con 0 y anunció éxito» |
-| Contenedor (emulado) | **verde**; informa «con la API en contenedor topgreen-api» y ve la identidad pasar de `[true 1000 …]` a `[true 1001 …]` | **rojo**: mismo síntoma |
+```
+PID 1 nunca llega a postgres → ERROR: no llegó a servidor definitivo (PID 1 = «bash»)
+                                y el rescate no deja nada colgado
+PID 1 pasa a postgres a los 4 s → espera, restaura y verifica verde
+```
 
-**Qué es «emulado» y qué no prueba.** Acá no hay demonio de Docker, así que puse
-en el PATH un `docker` que responde `inspect` y `restart` como un contenedor real
-—la identidad cambia sólo cuando se lo reinicia— y delega todo lo demás en el
-puente del repositorio. Eso prueba que el caso **se ejecuta y discrimina** cuando
-quien sirve la API es un contenedor, que es lo que se rompía. **No** prueba que
-`docker restart topgreen-api` mueva `Pid` y `StartedAt` de verdad: eso ya lo
-demostró tu corrida sobre `e0cdfe9`, con `65908 → 89335`.
+**2. Las dos etiquetas, en los dos borrados.** `limpiar` y el rescate exigen
+ahora `topgreen.respaldo=pieza` **y** `topgreen.respaldo.ejecucion=<id>`, en el
+contenedor y en el volumen:
+
+| Sabotaje | Resultado |
+| --- | --- |
+| contenedor con la etiqueta de ejecución pero **sin** la de la pieza | `limpiar` frena: «no es de esta pieza y esta ejecución (`topgreen.respaldo=«nada»` …)». Sobrevive |
+| volumen sin ninguna etiqueta | frena igual, y sobrevive |
+| **rescate** de una restauración a medias con recursos sin etiquetar | «no lleva las etiquetas de esta ejecución; se deja como está». Sobrevive |
+| con las dos etiquetas puestas | limpia el contenedor, el volumen y el directorio, y nada más |
+
+### El ciclo Docker completo, contra el doble
+
+Con las herramientas del anfitrión escondidas: respaldo → restauración →
+verificación verde con las seis comprobaciones —incluida «`topgreen-db` no tiene
+ninguna base de restauración adentro»— → los tres marcadores del otro lado
+(`uploads`, `documentos`, `outbox`) → negativo de integridad rojo con ruta y
+sha256 → los tres negativos de propiedad → limpieza.
+
+**Lo que el doble sigue sin poder probar** es la semántica real de Docker:
+`docker cp -a` contra tu versión, los tiempos del `postgis/postgis` real, el
+formato exacto de `docker inspect -f`. Eso lo ve tu corrida, no la mía. Lo que
+sí puedo decir es que la clase de defecto que te rompió esta vez —depender de
+una herramienta del anfitrión— ahora tiene su propio negativo automático.
 
 ### Compuertas
 
 | Puerta | Resultado |
 | --- | --- |
-| Focal 169, API nativa | verde |
-| Focal 169, contenedor emulado | verde |
-| Focal 169 contra el comando anterior, en los dos | rojo, con el síntoma exacto |
-| `node --check scripts/smoke.mjs` · `diff-check` | verdes |
-| Suite completa, `a11y`, `contraste` | **no las repetí**, por tu instrucción; valen las de `e0cdfe9` |
+| `bash -n` · `diff-check` sobre el HEAD final | verdes |
+| Ciclo Docker contra el doble, sin herramientas del anfitrión | verde, con los cuatro negativos |
+| Negativo del `pg_restore` del anfitrión | rojo con el código anterior, verde con el nuevo |
+| Ruta nativa y suite funcional | **no repetidas**, como pediste: la corrección no las toca |
+| Entorno al terminar | una sola base, `topgreen`; API en 200; sin bundles ni destinos |
 
-### Lo que queda dicho
+### Lo que sigue en pie
 
-- La FAQ de Contacto dice «Aceptamos transferencias bancarias directas al
-  vendedor» y el producto también cobra por Mercado Pago. Sigue sin tocar.
-- Sigue esperando tu palabra lo del carrito sin sesión.
+La corrida Docker real es tuya: yo no tengo demonio. Sigue abierta la pregunta
+de R3 —si preferís, dame un entorno con Docker y la corro yo—, pero con este
+negativo automático la ruta ya no depende de que yo adivine bien.
+
+### Lo que sigue esperando tu palabra
+
+- el carrito sin sesión;
+- la FAQ de Contacto dice «Aceptamos transferencias bancarias directas al
+  vendedor» y el producto también cobra por Mercado Pago
+  (`src/components/Pages/ContactPage.tsx:305`).
