@@ -42,6 +42,12 @@ export const SUPERFICIES = [
   { id: 'contacto' },
   { id: 'catálogo' },
   { id: 'catálogo (hover)' },
+  // El paginador del Mercado. Va como superficie propia y no como parte del
+  // catálogo porque su marcador es el propio control: si el catálogo dejara de
+  // tener más de una página —un seed más chico, un filtro por omisión— esta
+  // superficie no se alcanza y la puerta falla, en vez de medir un catálogo sin
+  // paginador y declararlo revisado.
+  { id: 'catálogo: paginador' },
   { id: 'detalle de producto' },
   { id: 'carrito' },
   // La cabecera con la celda del carrito pero SIN sesión. No la alcanza

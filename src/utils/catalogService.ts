@@ -173,6 +173,10 @@ export const getLocalities = async (provinceId: string): Promise<LocalityRespons
 export const getProducts = async (params: {
   search?: string;
   category?: string;
+  /** Subcategoría, por id. Viaja a la consulta como la categoría: filtrarla
+      acá sería filtrar la página que bajó, y el total dejaría de describir
+      lo que se está mirando. */
+  subcategory?: string;
   province?: string;
   locality_id?: string;
   min_price?: number;
@@ -183,7 +187,10 @@ export const getProducts = async (params: {
       página del catálogo entero y filtrarla acá, que sólo funciona mientras el
       catálogo entre en una página. */
   publication_type?: 'producto' | 'servicio';
-  sort_by?: 'created_at' | 'price' | 'sales' | 'views';
+  /** Calificación mínima del vendedor, 0 a 5. Mismo motivo que la
+      subcategoría. */
+  min_rating?: number;
+  sort_by?: 'created_at' | 'price' | 'sales' | 'views' | 'rating';
   sort_order?: 'asc' | 'desc';
   page?: number;
   page_size?: number;

@@ -20908,8 +20908,19 @@ await runCase(155, 'El Mercado tiene dos vistas elegibles y ninguna geometría a
         assert((await vistaActual(page)) === 'Lista',
           `${donde}: ${queHice} cambió la vista elegida`);
       };
+      // Los órdenes se leen de la pantalla y no de una lista escrita acá.
+      //
+      // Acá había cinco valores a mano, y uno —«relevance»— dejó de existir al
+      // pasar el orden al servidor: este caso se cayó pidiendo una opción que el
+      // producto ya no ofrece. Recorrer lo que el control realmente tiene mide
+      // lo mismo —que ordenar no cambia la vista elegida— y no envejece cuando
+      // los órdenes cambian. Que sean LOS correctos lo mide el caso 171.
       const orden = page.locator('#catalog-sort');
-      for (const valor of ['price-asc', 'price-desc', 'newest', 'rating', 'relevance']) {
+      const ordenes = await orden.locator('option').evaluateAll(
+        (opciones) => opciones.map((opcion) => opcion.value));
+      assert(ordenes.length >= 2,
+        `${donde}: el selector de orden ofrece ${ordenes.length} opción(es)`);
+      for (const valor of ordenes) {
         await orden.selectOption(valor);
         await sigueEnLista(`ordenar por «${valor}»`);
       }
@@ -27354,6 +27365,463 @@ await runCase(170, 'Sin sesión, el carrito con ítems se reabre desde la cabece
   }
 
   return `el carrito sobrevive a la sesión y ahora tiene por dónde volver a abrirse: ${medidos.join('; ')}`;
+});
+
+// ---------------------------------------------------------------------------
+// 171. El Mercado pagina en el servidor: el total, el orden y los filtros son
+// los del conjunto entero y no los de la página descargada.
+//
+// La deuda estaba registrada desde el 2026-08-24 en
+// `docs/pm/ux2c/DEUDA-PAGINACION.md`: el endpoint paginaba y el Mercado pedía
+// siempre `page=1&page_size=100`, así que la publicación 101 no era
+// alcanzable. Y había dos cosas más, del mismo tamaño y menos visibles:
+// ordenar reordenaba SÓLO la página descargada, y subcategoría y calificación
+// mínima filtraban en el navegador DESPUÉS de paginar. Las tres hacen lo mismo:
+// convierten una respuesta parcial en una afirmación sobre el conjunto.
+//
+// Y una cuarta, que se medía sola contra la base: sin desempate determinista,
+// la misma publicación podía aparecer al final de una página y al principio de
+// la siguiente. Medido contra `c973c6f`, ordenando por precio ascendente:
+// `7044791a` era el último ítem de la página 1 y el primero de la página 2.
+//
+// El escenario no se hereda del seed ni del navegador: se fabrica acá, con
+// precios EMPATADOS a propósito para que el desempate tenga qué desempatar, y
+// se retira al terminar.
+// ---------------------------------------------------------------------------
+await runCase(171, 'El Mercado pagina en el servidor: total, orden y filtros del conjunto entero', async () => {
+  const medidos = [];
+  const marca = Date.now();
+  const MARCADOR = `Smoke pag171 ${marca}`;
+  const POR_PAGINA = 24;
+  // 115 no es múltiplo de 24: la última página queda corta a propósito, que es
+  // donde un cálculo de páginas se equivoca.
+  const CALIFICADAS = 70;      // vendedor@ejemplo.com, con calificación
+  const SIN_CALIFICAR = 45;    // admin@topgreen.com, sin calificación
+  const TOTAL = CALIFICADAS + SIN_CALIFICAR;
+  const PAGINAS = Math.ceil(TOTAL / POR_PAGINA);   // 5
+  // Las primeras treinta comparten precio: sin desempate determinista, el
+  // corte de página cae justo adentro de ese empate.
+  const EMPATADAS = 30;
+  const PRECIO_EMPATADO = 1000;
+  // Y un tercio lleva subcategoría, para que ese filtro tenga un subconjunto
+  // propio más grande que una página.
+  const CON_SUBCATEGORIA = 30;
+
+  const nombreDe = (i) => `${MARCADOR}-${String(i).padStart(3, '0')}`;
+  const precioDe = (i) => (i < EMPATADAS ? PRECIO_EMPATADO : 2000 + i);
+
+  // El filtro y el orden por calificación leen `users.rating_average`, que es un
+  // agregado derivado. El seed no califica a nadie y lo que dejan otros casos no
+  // es una premisa: este caso fija las dos reputaciones que necesita en la base
+  // descartable y las devuelve como estaban. Corrido solo o en la suite, mide lo
+  // mismo.
+  const CON_CALIFICACION = 'vendedor@ejemplo.com';
+  const SIN_CALIFICACION = 'admin@topgreen.com';
+  const reputacionDe = (correo) => queryRows(`
+    SELECT COALESCE(rating_average, 0)::text, COALESCE(rating_count, 0)::text
+    FROM users WHERE email = ${sqlLiteral(correo)}`)[0];
+  const fijarReputacion = (correo, promedio, cuantas) => querySql(`
+    UPDATE users SET rating_average = ${promedio}, rating_count = ${cuantas}
+    WHERE email = ${sqlLiteral(correo)}`);
+  const reputacionPrevia = {
+    [CON_CALIFICACION]: reputacionDe(CON_CALIFICACION),
+    [SIN_CALIFICACION]: reputacionDe(SIN_CALIFICACION),
+  };
+
+  const limpiar = () => {
+    try {
+      querySql(`DELETE FROM product_images WHERE product_id IN (
+        SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+      for (const [correo, previa] of Object.entries(reputacionPrevia)) {
+        fijarReputacion(correo, previa[0], previa[1]);
+      }
+    } catch (error) {
+      console.log(`  · no se pudieron retirar las publicaciones del caso 171: ${error.message}`);
+    }
+  };
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    // === Fabricación ======================================================
+    fijarReputacion(CON_CALIFICACION, 5, 3);
+    fijarReputacion(SIN_CALIFICACION, 0, 0);
+    assert(Number(reputacionDe(CON_CALIFICACION)[0]) >= 4
+      && Number(reputacionDe(SIN_CALIFICACION)[0]) === 0,
+    `las reputaciones quedaron en ${JSON.stringify([reputacionDe(CON_CALIFICACION),
+      reputacionDe(SIN_CALIFICACION)])}: el filtro por calificación no distinguiría nada`);
+
+    const califica = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: CON_CALIFICACION, password: 'vendedor123' },
+    })).data;
+    const sinCalificar = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: SIN_CALIFICACION, password: 'admin123' },
+    })).data;
+
+    const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+    const [laCategoria] = queryRows(`
+      SELECT c.id, c.name FROM categories c
+      WHERE c.is_service = false AND c.is_active = true
+        AND EXISTS (SELECT 1 FROM subcategories s WHERE s.category_id = c.id AND s.is_active = true)
+      ORDER BY c.name LIMIT 1`);
+    assert(laCategoria, 'no hay una categoría de productos con subcategorías activas');
+    const [laSubcategoria] = queryRows(`
+      SELECT s.id, s.name FROM subcategories s
+      WHERE s.category_id = ${sqlLiteral(laCategoria[0])} AND s.is_active = true
+      ORDER BY s.name LIMIT 1`);
+    assert(laSubcategoria, 'la categoría elegida no tiene subcategorías activas');
+
+    for (let i = 0; i < TOTAL; i += 1) {
+      const deQuien = i < CALIFICADAS ? califica : sinCalificar;
+      const alta = await apiRequest('/products', {
+        method: 'POST', token: deQuien.access_token,
+        body: {
+          name: nombreDe(i),
+          description: 'Publicación fabricada para medir la paginación del Mercado.',
+          category_id: laCategoria[0],
+          subcategory_id: i < CON_SUBCATEGORIA ? laSubcategoria[0] : undefined,
+          price: precioDe(i),
+          stock: 5,
+          unit: 'unidad',
+          locality_id: localidad,
+          publication_type: 'producto',
+          operation_kind: 'insumo',
+        },
+      });
+      assert(alta.status === 201 || alta.status === 200,
+        `la publicación ${i} respondió HTTP ${alta.status}: ${JSON.stringify(alta.data).slice(0, 200)}`);
+    }
+
+    const [enBase] = queryRows(`
+      SELECT COUNT(*)::text, 'fin' FROM products
+      WHERE status = 'ACTIVE' AND name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+    assert(Number(enBase[0]) === TOTAL,
+      `quedaron ${enBase[0]} publicaciones del conjunto y tienen que ser ${TOTAL}`);
+    assert(TOTAL > 100, 'el conjunto tiene que pasar de cien para que la 101 sea el punto');
+    medidos.push(`conjunto fabricado: ${TOTAL} publicaciones, ${EMPATADAS} con el mismo precio, `
+      + `${CON_SUBCATEGORIA} con subcategoría y ${SIN_CALIFICAR} de un vendedor sin calificación`);
+
+    // === A. La API: el conjunto entero, no la página ======================
+    const pedir = async (extra) => {
+      const respuesta = await apiRequest(
+        `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page_size=${POR_PAGINA}&${extra}`);
+      assert(respuesta.status === 200,
+        `el catálogo respondió HTTP ${respuesta.status} para «${extra}»`);
+      return respuesta.data;
+    };
+
+    const primera = await pedir('page=1');
+    assert(primera.total === TOTAL,
+      `la API dice ${primera.total} para el conjunto y hay ${TOTAL}`);
+    assert(primera.pages === PAGINAS, `la API dice ${primera.pages} páginas y son ${PAGINAS}`);
+    assert(primera.items.length === POR_PAGINA,
+      `la primera página trajo ${primera.items.length} y tiene que traer ${POR_PAGINA}`);
+
+    const ultima = await pedir(`page=${PAGINAS}`);
+    assert(ultima.items.length === TOTAL - POR_PAGINA * (PAGINAS - 1),
+      `la última página trajo ${ultima.items.length} y tiene que traer `
+      + `${TOTAL - POR_PAGINA * (PAGINAS - 1)}`);
+    assert(ultima.has_next === false && ultima.has_prev === true,
+      `la última página dice has_next=${ultima.has_next} has_prev=${ultima.has_prev}`);
+
+    // Ni repetidas ni perdidas, recorriendo TODAS las páginas.
+    const recorrerLaApi = async (extra) => {
+      const vistas = [];
+      let pagina = 1;
+      let paginas = 1;
+      do {
+        const datos = await pedir(`page=${pagina}&${extra}`);
+        paginas = datos.pages;
+        for (const item of datos.items) vistas.push(item.id);
+        pagina += 1;
+      } while (pagina <= paginas);
+      return vistas;
+    };
+
+    // Por precio ascendente, que es donde el empate parte una página al medio.
+    const porPrecio = await recorrerLaApi('sort_by=price&sort_order=asc');
+    assert(porPrecio.length === TOTAL,
+      `recorriendo por precio se vieron ${porPrecio.length} publicaciones y hay ${TOTAL}`);
+    const repetidas = porPrecio.filter((id, i) => porPrecio.indexOf(id) !== i);
+    assert(repetidas.length === 0,
+      `ordenando por precio, ${repetidas.length} publicación(es) aparecen en dos páginas: `
+      + `${JSON.stringify([...new Set(repetidas)].slice(0, 3))}. Sin desempate determinista el `
+      + 'corte de página cae adentro del empate y la misma fila sale dos veces');
+    assert(new Set(porPrecio).size === TOTAL,
+      `recorriendo por precio se vieron ${new Set(porPrecio).size} distintas y hay ${TOTAL}`);
+
+    // El orden es del conjunto: los treinta empatados van primero, y recién
+    // después los de precio único, de menor a mayor.
+    const preciosPrimeraPorPrecio = (await pedir('page=1&sort_by=price&sort_order=asc'))
+      .items.map((item) => item.price);
+    assert(preciosPrimeraPorPrecio.every((precio) => precio === PRECIO_EMPATADO),
+      `la primera página por precio trae precios ${JSON.stringify([...new Set(preciosPrimeraPorPrecio)])} `
+      + `y los ${EMPATADAS} más baratos valen ${PRECIO_EMPATADO}`);
+
+    // Calificación: el orden y el filtro existen en la API.
+    const porCalificacion = await pedir('page=1&sort_by=rating&sort_order=desc');
+    assert(porCalificacion.items.every((item) => (item.seller?.rating_average ?? 0) >= 4),
+      'ordenando por calificación, la primera página trae vendedores sin calificación: '
+      + JSON.stringify(porCalificacion.items.map((item) => item.seller?.rating_average).slice(0, 5)));
+
+    const califican = await pedir('page=1&min_rating=4');
+    assert(califican.total === CALIFICADAS,
+      `filtrando por calificación mínima la API dice ${califican.total} y tienen que ser `
+      + `${CALIFICADAS}: si el filtro no viaja, el total sigue siendo el del conjunto entero`);
+
+    const conSub = await pedir(`page=1&subcategory=${laSubcategoria[0]}`);
+    assert(conSub.total === CON_SUBCATEGORIA,
+      `filtrando por subcategoría la API dice ${conSub.total} y tienen que ser ${CON_SUBCATEGORIA}`);
+    assert(conSub.pages === Math.ceil(CON_SUBCATEGORIA / POR_PAGINA),
+      `con subcategoría la API dice ${conSub.pages} páginas y son `
+      + `${Math.ceil(CON_SUBCATEGORIA / POR_PAGINA)}`);
+    medidos.push('la API cuenta, ordena y filtra el conjunto entero: total y páginas exactos, '
+      + 'sin repetir ni perder al paginar sobre precios empatados, y con subcategoría, '
+      + 'calificación mínima y orden por calificación aplicados antes de paginar');
+
+    // === B. La pantalla ===================================================
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+
+    const conteo = page.locator('[class*="_conteo_"]').first();
+    const tarjetas = () => page.locator('article[class*="card"]').count();
+    const nombresEnPantalla = () => page.locator('article[class*="card"] h3').allInnerTexts();
+    const paginador = page.getByRole('navigation', { name: /Paginación/i });
+    // El nombre accesible del botón es «Página anterior de operaciones»: se
+    // busca sin distinguir mayúsculas para no atarse a la mayúscula inicial.
+    const anterior = paginador.getByRole('button', { name: /anterior/i });
+    const siguiente = paginador.getByRole('button', { name: /siguiente/i });
+    const cual = async () => (await paginador.getByText(/Página \d+ de \d+/).innerText())
+      .replace(/\s+/g, ' ').trim();
+    const esperarLaPagina = async (numero, porQue) => {
+      await esperarA(async () => (await cual()) === `Página ${numero} de ${PAGINAS}`,
+        `${porQue}: el paginador dice «${await cual().catch(() => '(no está)')}»`, 25_000);
+    };
+    // El rótulo del paginador cambia en el acto —es estado local— y las
+    // tarjetas llegan después. Leer apenas cambia el rótulo es leer la página
+    // anterior, así que se espera a que la grilla deje de estar ocupada Y a que
+    // lo dibujado sea distinto de lo que había: los nombres del conjunto son
+    // únicos, así que dos páginas nunca coinciden.
+    const esperarLaGrilla = async (cuantas, distintaDe, porQue) => {
+      await esperarA(async () => {
+        if ((await page.locator('[aria-busy="true"]').count()) > 0) return false;
+        const nombres = await nombresEnPantalla();
+        if (nombres.length !== cuantas) return false;
+        return distintaDe === null || JSON.stringify(nombres) !== JSON.stringify(distintaDe);
+      }, porQue, 25_000);
+    };
+    const buscarElConjunto = async () => {
+      const buscador = page.getByLabel('Buscar en el mercado');
+      await buscador.fill(MARCADOR);
+      await buscador.press('Enter');
+      await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
+        `el Mercado no llegó a contar las ${TOTAL} del conjunto; dice `
+        + `«${(await conteo.innerText()).replace(/\s+/g, ' ').trim()}»`, 25_000);
+    };
+
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 25_000 });
+    await buscarElConjunto();
+
+    // B1. El total es el del conjunto y la página trae 24, no 100.
+    const dibujadas = await tarjetas();
+    assert(dibujadas === POR_PAGINA,
+      `la página dibujó ${dibujadas} tarjetas y tiene que dibujar ${POR_PAGINA}`);
+    assert(await paginador.count() === 1,
+      'no hay paginador en el Mercado: con más de una página, la 101 no se alcanza');
+    await esperarLaPagina(1, 'el Mercado no arrancó en la página 1');
+
+    // B2. «Más relevantes» no está: no existe un ranking que lo sostenga.
+    const opciones = await page.locator('#catalog-sort option').allInnerTexts();
+    assert(!opciones.some((texto) => /relevante/i.test(texto)),
+      `el orden sigue ofreciendo «Más relevantes»: ${JSON.stringify(opciones)}`);
+    for (const esperada of ['Más recientes', 'Menor precio', 'Mayor precio', 'Mejor calificados']) {
+      assert(opciones.some((texto) => texto.trim() === esperada),
+        `falta la opción de orden «${esperada}»: ${JSON.stringify(opciones)}`);
+    }
+
+    // B3. En los extremos los controles se deshabilitan, y se operan con teclado.
+    assert(await anterior.isDisabled(), 'en la página 1 «Anterior» no está deshabilitado');
+    assert(await siguiente.isEnabled(), 'en la página 1 «Siguiente» está deshabilitado');
+
+    // B4. Recorrer todas las páginas con «Siguiente»: ni repetidas ni perdidas.
+    //     Y la vista Lista, elegida antes de moverse, sobrevive el cambio.
+    // Se elige como elige una persona: haciendo clic en el rótulo visible. El
+    // radio está a la vista del teclado pero no del ratón.
+    const enLista = page.getByRole('radio', { name: 'Lista', exact: true });
+    await page.getByText('Lista', { exact: true }).click();
+    await esperarA(() => enLista.isChecked(), 'no se pudo elegir la vista Lista', 20_000);
+    const vistas = [];
+    let anteriores = null;
+    for (let pagina = 1; pagina <= PAGINAS; pagina += 1) {
+      await esperarLaPagina(pagina, `no se llegó a la página ${pagina}`);
+      const esperadas = pagina < PAGINAS ? POR_PAGINA : TOTAL - POR_PAGINA * (PAGINAS - 1);
+      await esperarLaGrilla(esperadas, anteriores,
+        `la página ${pagina} no llegó a dibujar sus ${esperadas} tarjetas`);
+      const nombres = await nombresEnPantalla();
+      anteriores = nombres;
+      assert(nombres.every((nombre) => nombre.startsWith(MARCADOR)),
+        `la página ${pagina} trajo publicaciones de afuera del conjunto: `
+        + JSON.stringify(nombres.filter((nombre) => !nombre.startsWith(MARCADOR)).slice(0, 3)));
+      vistas.push(...nombres);
+      if (pagina < PAGINAS) {
+        // Con teclado: enfocar y Enter. Una puerta que sólo abre el puntero no
+        // es una puerta para todos.
+        await siguiente.focus();
+        await page.keyboard.press('Enter');
+      }
+    }
+    assert(await siguiente.isDisabled(),
+      `en la última página «Siguiente» sigue habilitado; el paginador dice «${await cual()}»`);
+    assert(await anterior.isEnabled(), 'en la última página «Anterior» está deshabilitado');
+    assert(await enLista.isChecked(),
+      'cambiar de página reinició la vista Cuadrícula/Lista, que es una preferencia local');
+
+    const repetidasEnPantalla = vistas.filter((nombre, i) => vistas.indexOf(nombre) !== i);
+    assert(repetidasEnPantalla.length === 0,
+      `recorriendo las páginas se repitieron ${JSON.stringify([...new Set(repetidasEnPantalla)].slice(0, 3))}`);
+    assert(vistas.length === TOTAL && new Set(vistas).size === TOTAL,
+      `recorriendo las ${PAGINAS} páginas se vieron ${new Set(vistas).size} publicaciones `
+      + `distintas y hay ${TOTAL}`);
+
+    // B5. Y la 101 está entre ellas: es el punto de toda la tarea.
+    //     Con el orden por omisión —más recientes— la posición 101 es la
+    //     publicación creada 101ª desde el final.
+    const laCentoUna = nombreDe(TOTAL - 101);
+    assert(vistas.includes(laCentoUna),
+      `la publicación número 101 del conjunto («${laCentoUna}») no se alcanzó desde los controles`);
+    const posicion = vistas.indexOf(laCentoUna) + 1;
+    assert(posicion === 101,
+      `«${laCentoUna}» apareció en la posición ${posicion} y el orden por omisión la pone 101ª`);
+    medidos.push(`las ${PAGINAS} páginas recorridas con «Siguiente» muestran las ${TOTAL} `
+      + `publicaciones sin repetir ni perder, la número 101 («${laCentoUna}») entre ellas, con `
+      + 'los controles deshabilitados en los extremos, operados con teclado y la vista Lista intacta');
+
+    // B6. Cambiar el orden vuelve a la página 1 y ordena el conjunto entero.
+    // Las treinta más baratas del conjunto comparten precio y son las creadas
+    // primero, así que con el orden por omisión caen en la ÚLTIMA página. Si
+    // sólo se ordenara la página descargada, la primera página por «Menor
+    // precio» seguiría trayendo las más nuevas; ordenando el conjunto, trae
+    // veinticuatro de esas treinta.
+    const indiceDe = (nombre) => Number(nombre.slice(-3));
+    await page.locator('#catalog-sort').selectOption('price-asc');
+    await esperarLaPagina(1, 'cambiar el orden no volvió a la página 1');
+    await esperarA(async () => {
+      if ((await page.locator('[aria-busy="true"]').count()) > 0) return false;
+      const nombres = await nombresEnPantalla();
+      return nombres.length === POR_PAGINA
+        && nombres.every((nombre) => indiceDe(nombre) < EMPATADAS);
+    }, 'ordenando por menor precio, la primera página no trae las más baratas del conjunto: '
+      + 'se ordenó la página descargada y no el conjunto', 25_000);
+
+    await page.locator('#catalog-sort').selectOption('rating');
+    await esperarLaPagina(1, 'cambiar a «Mejor calificados» no volvió a la página 1');
+    await esperarA(async () => {
+      if ((await page.locator('[aria-busy="true"]').count()) > 0) return false;
+      const nombres = await nombresEnPantalla();
+      return nombres.length === POR_PAGINA
+        && nombres.every((nombre) => indiceDe(nombre) < CALIFICADAS);
+    }, 'ordenando por calificación, la primera página trae publicaciones del vendedor sin '
+      + 'calificación: se ordenó la página y no el conjunto', 25_000);
+    medidos.push('cambiar el orden vuelve a la página 1 y ordena el conjunto entero: por precio '
+      + 'aparece la más barata de las 115, por calificación sólo las del vendedor calificado');
+
+    // B7. Subcategoría y calificación mínima: total y páginas coherentes.
+    await page.locator('#catalog-sort').selectOption('newest');
+    await page.locator('#catalog-category').selectOption(laCategoria[1]);
+    await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
+      'elegir la categoría del conjunto cambió el total', 25_000);
+    await page.locator('#catalog-subcategory').selectOption(laSubcategoria[1]);
+    await esperarA(async () => (await conteo.innerText()).includes(String(CON_SUBCATEGORIA)),
+      `con la subcategoría puesta el conteo dice «${(await conteo.innerText()).replace(/\s+/g, ' ').trim()}» `
+      + `y el conjunto con subcategoría tiene ${CON_SUBCATEGORIA}`, 25_000);
+    const paginasDeSub = Math.ceil(CON_SUBCATEGORIA / POR_PAGINA);
+    await esperarA(async () => (await cual()) === `Página 1 de ${paginasDeSub}`,
+      `con la subcategoría puesta el paginador dice «${await cual()}» y tiene que decir `
+      + `«Página 1 de ${paginasDeSub}»`, 25_000);
+
+    await page.locator('#catalog-subcategory').selectOption('Todas');
+    await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
+      'sacar la subcategoría no devolvió el total del conjunto', 25_000);
+    await page.locator('#catalog-rating').selectOption('4');
+    await esperarA(async () => (await conteo.innerText()).includes(String(CALIFICADAS)),
+      `con calificación mínima 4 el conteo dice «${(await conteo.innerText()).replace(/\s+/g, ' ').trim()}» `
+      + `y tienen que ser ${CALIFICADAS}`, 25_000);
+    const paginasCalificadas = Math.ceil(CALIFICADAS / POR_PAGINA);
+    await esperarA(async () => (await cual()) === `Página 1 de ${paginasCalificadas}`,
+      `con calificación mínima el paginador dice «${await cual()}»`, 25_000);
+    await page.locator('#catalog-rating').selectOption('0');
+    await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
+      'sacar la calificación mínima no devolvió el total del conjunto', 25_000);
+    medidos.push('subcategoría y calificación mínima viajan a la consulta: el total y la cantidad '
+      + 'de páginas son los del subconjunto, y sacarlos devuelve el conjunto entero');
+
+    // B8. Cambiar de página se escribe en la barra, y Atrás lo restaura junto
+    //     con el orden y los filtros.
+    await page.locator('#catalog-sort').selectOption('price-desc');
+    await esperarLaPagina(1, 'cambiar el orden no volvió a la página 1');
+    await siguiente.click();
+    await siguiente.click();
+    await esperarLaPagina(3, 'no se llegó a la página 3');
+    const enLaBarra = new URL(page.url());
+    assert(enLaBarra.searchParams.get('page') === '3',
+      `la barra dice page=${enLaBarra.searchParams.get('page')} estando en la página 3`);
+    assert(enLaBarra.searchParams.get('sort') === 'price-desc',
+      `la barra dice sort=${enLaBarra.searchParams.get('sort')} con «Mayor precio» elegido`);
+    const nombresDeLaTres = await nombresEnPantalla();
+
+    await page.locator('header').getByRole('button', { name: 'Contacto', exact: true }).click();
+    await page.getByRole('heading', { name: 'Contacto', level: 1 })
+      .waitFor({ state: 'visible', timeout: 25_000 });
+    await page.goBack({ waitUntil: 'domcontentloaded' });
+    await esperarLaPagina(3, 'volver con Atrás no restauró la página');
+    assert(await page.locator('#catalog-sort').inputValue() === 'price-desc',
+      `volver con Atrás dejó el orden en «${await page.locator('#catalog-sort').inputValue()}»`);
+    await esperarA(async () => {
+      const ahora = await nombresEnPantalla();
+      return JSON.stringify(ahora) === JSON.stringify(nombresDeLaTres);
+    }, 'volver con Atrás restauró la página y el orden pero no las mismas publicaciones', 25_000);
+    medidos.push('la página y el orden viven en la barra, y Atrás los restaura con sus filtros y '
+      + 'sus mismas publicaciones');
+
+    // B9. Cambiar la búsqueda desde una página interior vuelve a la página 1.
+    await siguiente.click();
+    await esperarLaPagina(4, 'no se llegó a la página 4');
+    await buscarElConjunto();
+    await esperarLaPagina(1, 'cambiar la búsqueda desde la página 4 no volvió a la página 1');
+    medidos.push('cambiar la búsqueda desde una página interior vuelve a la página 1');
+
+    // B10. Una página que no existe se corrige con lo que dice el servidor.
+    //      Los filtros vuelven a la 1 solos, así que acá se llega por la barra:
+    //      un enlace compartido, o una entrada del historial cuyo conjunto ya
+    //      no da para tanto. Lo que NO puede pasar es afirmar un vacío.
+    await page.goto(
+      `${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(MARCADOR)}&page=99`,
+      { waitUntil: 'domcontentloaded' });
+    await esperarLaPagina(PAGINAS, 'pedir una página que no existe no cayó en la última');
+    const ultimasEnPantalla = TOTAL - POR_PAGINA * (PAGINAS - 1);
+    await esperarLaGrilla(ultimasEnPantalla, null,
+      `pidiendo page=99 la última página no dibujó sus ${ultimasEnPantalla} tarjetas`);
+    assert(await page.getByRole('heading', { name: /No hay operaciones/ }).count() === 0,
+      'pidiendo una página de más, la pantalla afirmó que no hay operaciones habiéndolas');
+    assert(new URL(page.url()).searchParams.get('page') === String(PAGINAS),
+      `la barra quedó en page=${new URL(page.url()).searchParams.get('page')} y tenía que `
+      + `corregirse a ${PAGINAS}`);
+    medidos.push(`pedir «page=99» cae en la última página (${PAGINAS}) y la barra se corrige, `
+      + 'sin afirmar un mercado vacío');
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+    limpiar();
+  }
+
+  const [quedan] = queryRows(`
+    SELECT COUNT(*)::text, 'fin' FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+  assert(quedan[0] === '0',
+    `el caso dejó ${quedan[0]} publicaciones fabricadas sin retirar`);
+
+  return `con ${TOTAL} publicaciones fabricadas y retiradas al final: ${medidos.join('; ')}`;
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del

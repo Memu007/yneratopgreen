@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import styles from './ProductGrid.module.css';
 import { Product, CotizacionPedida } from '../../types';
 import { ProductCard } from '../ProductCard/ProductCard';
+import { ORDENES, type OrdenDelMercado } from '../../hooks/useProductFilters';
 
 interface ProductGridProps {
   products: Product[];
@@ -9,6 +10,15 @@ interface ProductGridProps {
       dibuja como máximo la página descargada, así que contar las tarjetas
       dibujadas sería contar la página y no el mercado. */
   total?: number;
+  /** Cómo se ordena, y quién lo cambia. El orden NO vive acá: viaja a la
+      consulta, se escribe en la barra y ordena el conjunto entero. Ordenarlo
+      acá era ordenar la página descargada. */
+  orden: OrdenDelMercado;
+  onOrdenChange: (orden: OrdenDelMercado) => void;
+  /** En qué página estamos, cuántas hay y cómo moverse. Mismo motivo. */
+  pagina: number;
+  paginas: number;
+  onPagina: (destino: number) => void;
   isLoading?: boolean;
   /** El mercado no cargó. Es distinto de que no haya resultados, y por eso no
       comparte cartel: acá no sabemos qué hay. */
@@ -25,8 +35,6 @@ interface ProductGridProps {
   onSolicitarIngreso?: (alVolver: () => void) => void;
 }
 
-type SortOption = 'relevance' | 'price-asc' | 'price-desc' | 'newest' | 'rating';
-
 /** Las dos presentaciones del Mercado, y no hay una tercera. El «destacado»
  *  implícito —el activo que se quedaba con la fila entera— dejó de existir:
  *  la geometría la elige quien mira, no la anatomía de lo que está mirando. */
@@ -40,36 +48,23 @@ const VISTAS: { valor: Vista; rotulo: string }[] = [
 export const ProductGrid: React.FC<ProductGridProps> = ({
   products,
   total,
+  orden,
+  onOrdenChange,
+  pagina,
+  paginas,
+  onPagina,
   isLoading = false,
   error = null,
   onReintentar,
   onSolicitarCotizacion,
   onSolicitarIngreso,
 }) => {
-  const [sortBy, setSortBy] = useState<SortOption>('relevance');
-  // La vista vive acá y sólo acá: ordenar, buscar, filtrar o abrir un detalle
-  // no la tocan, porque ninguno de esos desmonta esta grilla. Salir del Mercado
-  // sí la reinicia, y está bien: es una preferencia de la visita, no del perfil.
+  // La vista vive acá y sólo acá: ordenar, buscar, filtrar, cambiar de página o
+  // abrir un detalle no la tocan, porque ninguno de esos desmonta esta grilla.
+  // Salir del Mercado sí la reinicia, y está bien: es una preferencia de la
+  // visita, no del perfil. Y no viaja a la consulta: no cambia qué se pide,
+  // sólo cómo se dibuja lo que vino.
   const [vista, setVista] = useState<Vista>('cuadricula');
-
-  const sortedProducts = useMemo(() => {
-    const sorted = [...products];
-
-    switch (sortBy) {
-      case 'price-asc':
-        return sorted.sort((a, b) => a.price - b.price);
-      case 'price-desc':
-        return sorted.sort((a, b) => b.price - a.price);
-      case 'newest':
-        return sorted.sort((a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-      case 'rating':
-        return sorted.sort((a, b) => b.seller.rating - a.seller.rating);
-      default:
-        return sorted;
-    }
-  }, [products, sortBy]);
 
   if (isLoading) {
     return (
@@ -116,8 +111,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
   // El total de la API cuando llegó; si no llegó, lo que hay en pantalla.
   const disponibles = total ?? dibujadas;
   // Y cuando el mercado tiene más de lo que entró en la página, se dice: no se
-  // esconde el total verdadero ni se lo confunde con la página cargada. La
-  // paginación sigue siendo deuda abierta y está registrada aparte.
+  // esconde el total verdadero ni se lo confunde con la página cargada.
   const parcial = disponibles > dibujadas;
 
   return (
@@ -136,16 +130,18 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
         <div className={styles.controles}>
           <div className={`tg-field ${styles.orden}`}>
             <label htmlFor="catalog-sort">Ordenar por</label>
+            {/* Las opciones salen de la misma tabla que traduce cada orden a la
+                consulta: no hay una lista acá y otra allá que puedan quedar
+                distintas. «Más relevantes» se retiró de esa tabla —no existe un
+                ranking que sostenga la promesa— y con eso desapareció de acá. */}
             <select
               id="catalog-sort"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              value={orden}
+              onChange={(e) => onOrdenChange(e.target.value as OrdenDelMercado)}
             >
-              <option value="relevance">Más relevantes</option>
-              <option value="price-asc">Menor precio</option>
-              <option value="price-desc">Mayor precio</option>
-              <option value="newest">Más recientes</option>
-              <option value="rating">Mejor calificados</option>
+              {ORDENES.map(({ valor, rotulo }) => (
+                <option key={valor} value={valor}>{rotulo}</option>
+              ))}
             </select>
           </div>
 
@@ -184,7 +180,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
         </div>
       ) : (
         <div className={vista === 'lista' ? styles.renglones : styles.grilla}>
-          {sortedProducts.map((product) => (
+          {products.map((product) => (
             <ProductCard
               key={product.id}
               product={product}
@@ -194,6 +190,39 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
             />
           ))}
         </div>
+      )}
+
+      {/* El paginador. Es el mismo control que el panel de administración —dos
+          botones y el lugar donde estás— y por el mismo motivo: dice qué hace,
+          se opera con el teclado y se deshabilita en los extremos en vez de
+          pedir una página que no existe.
+
+          Con una sola página no se dibuja: un paginador de «Página 1 de 1» es
+          un control que no lleva a ningún lado. */}
+      {paginas > 1 && (
+        <nav className={styles.paginador} aria-label="Paginación del mercado">
+          <button
+            type="button"
+            className={styles.paginaBtn}
+            onClick={() => onPagina(pagina - 1)}
+            disabled={pagina <= 1}
+            aria-label="Página anterior de operaciones"
+          >
+            Anterior
+          </button>
+          <span className={styles.paginaActual} aria-live="polite">
+            Página {pagina} de {paginas}
+          </span>
+          <button
+            type="button"
+            className={styles.paginaBtn}
+            onClick={() => onPagina(pagina + 1)}
+            disabled={pagina >= paginas}
+            aria-label="Página siguiente de operaciones"
+          >
+            Siguiente
+          </button>
+        </nav>
       )}
     </div>
   );
