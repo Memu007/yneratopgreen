@@ -1,35 +1,39 @@
 # Estado actual
 
-Actualizado: 2026-09-13.
+Actualizado: 2026-09-14.
 
 `NOW.md` contiene sólo estado vigente, restricciones vivas, bloqueos y próxima acción. La historia anterior permanece en Git; la instantánea previa a esta poda está en `ab4165fc`.
 
 ## Resumen ejecutivo
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 4. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
-- **`main`:** contiene `BACKUP-RESTORE-1` mediante `fbd6caf`; el producto sigue en `b8447a3`, sin cambios de producto posteriores. Incluye también el `AGENTS.md` consolidado.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, candidata pendiente `eb62d3d` para `POST-INTEGRATION-CLEAR-1`, basada directamente en `2d8ecfd`. Todavía no tiene informe vigente en `PARA-PM.md`.
-- **Última decisión PM:** `BACKUP-RESTORE-1` R4 **ACEPTADA E INTEGRADA**. PM reprodujo backup, restore, verificación, negativos de integridad/propiedad y limpieza contra Docker real; el origen conservó identidad y salud.
-- **Tarea activa:** `POST-INTEGRATION-CLEAR-1`, responsable Dev, devolución R1. El arreglo focal es correcto; faltan el informe de entrega y la suite smoke completa desde base limpia antes de aceptar.
+- **`main` local:** contiene `POST-INTEGRATION-CLEAR-1` mediante `c973c6f`. `origin/main` continúa en `2d8ecfd`; el cambio no fue publicado ni desplegado.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; producto `eb62d3d`, arnés final `a7ed544` e informe `48bae67`, integrados sólo localmente mediante `c973c6f`.
+- **Última decisión PM:** `POST-INTEGRATION-CLEAR-1` **ACEPTADA E INTEGRADA LOCALMENTE**. Falta autorización explícita de Emi para empujar producto a `main`, porque Railway conserva auto-deploy.
+- **Próxima tarea:** `CAT-PAGE-1`, preparada para Dev. Empieza únicamente cuando `origin/main` contenga la integración aceptada.
 
-## Revisión pendiente — POST-INTEGRATION-CLEAR-1
+## Última aceptación PM — POST-INTEGRATION-CLEAR-1
 
-La candidata `eb62d3d` mantiene el alcance mínimo y PM comprobó de forma
-independiente:
+La candidata de producto `eb62d3d`, con ajuste de arnés `a7ed544` e informe
+`48bae67`, mantiene el alcance mínimo. PM comprobó de forma independiente:
 
 - caso 170 sobre la candidata: **1/1**;
 - el mismo caso sobre la base `2d8ecfd`: **0/1**, rojo exacto por carrito
   guardado sin acceso desde la cabecera;
+- caso 169 sobre `a7ed544`: **1/1**, con reinicio real de `topgreen-api` y
+  cambio de identidad del contenedor;
 - build, lint y `git diff --check`: verdes;
 - accesibilidad: **70/70** superficies, sin violaciones bloqueantes;
 - contraste: **78/78** mediciones, sin incumplimientos.
 
-No se acepta todavía. `PARA-PM.md` en la rama sigue describiendo
-`BACKUP-RESTORE-1 R4` y no existe evidencia entregada de la suite smoke
-completa desde base limpia. PM no ejecutó esa limpieza porque el lanzador
-elimina volúmenes Docker locales y no hay autorización de Emi para borrar esos
-datos. Dev debe cerrar ambas faltas sin cambiar producto salvo que la suite
-descubra una regresión.
+Dev ejecutó la suite completa desde base limpia sobre `a7ed544`: **169/170**,
+con único rojo ambiental en el caso 131. Ese caso no cambió y ya había pasado
+en la corrida Docker real anterior de PM; el delta nuevo queda cubierto por
+los focales y puertas anteriores. PM no repitió el borrado completo porque el
+lanzador elimina volúmenes Docker locales y Emi no autorizó esa destrucción.
+
+La pieza queda aceptada e integrada localmente mediante `c973c6f`. Evidencia
+durable: `REPRODUCCION-POST-INTEGRATION-CLEAR-1-2026-09-14.md`.
 
 ## Última aceptación PM relevante
 
@@ -66,13 +70,8 @@ resuelve backups, SMTP, secretos, pagos o recuperación.
 
 - **Relevo:** cerrado en `b8447a3`; `main` contiene el disparador consolidado y
   la regla local de eficiencia de chats.
-- **Carrito conservado:** si una sesión inválida deja ítems locales, la persona
-  debe poder reabrir el carrito sin sesión; continuar compra abre el Login y
-  conserva la intención. Decisión registrada en `DECISIONS.md` y ejecución en
-  `POST-INTEGRATION-CLEAR-1`, después de integrar la candidata.
-- **FAQ de pagos:** «¿Cuáles son las formas de pago?» debe mencionar
-  transferencia directa y Mercado Pago cuando el vendedor lo tenga habilitado.
-  Se corrige en la misma pieza posterior, sin reabrir `c565e6e`.
+- **Carrito conservado y FAQ de pagos:** cerrados en `eb62d3d`/`a7ed544`,
+  integración local `c973c6f`. La publicación permanece pendiente de Emi.
 - **Backup/restauración local:** `BACKUP-RESTORE-1` quedó aceptada en
   `52ba294`/`b8223b1` e integrada por `fbd6caf`. El ensayo Docker real recuperó
   base, `uploads`, `documentos` y `outbox` en un destino aislado; una alteración
@@ -143,8 +142,8 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev completa la devolución R1 de `POST-INTEGRATION-CLEAR-1`: informe vigente y suite smoke completa desde base limpia; PM acepta antes de integrar.
-2. Después se abre `CAT-PAGE-1` para continuar el roadmap contractual.
+1. Emi autoriza o rechaza publicar `c973c6f`; el push tocaría producto y activaría el auto-deploy de Railway.
+2. Una vez visible la integración en `origin/main`, Dev ejecuta `CAT-PAGE-1`.
 3. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
 4. Separar de forma controlada integración y producción; cualquier cambio de producto exige nueva aceptación antes de publicar.
 5. Mercado Pago, SMTP, red-team y producción aceptada permanecen al final de la secuencia acordada, sin esperar artificialmente a una fecha si las dependencias ya están listas.

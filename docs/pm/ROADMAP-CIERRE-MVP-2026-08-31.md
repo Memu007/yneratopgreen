@@ -1,6 +1,6 @@
 # Roadmap operativo para cerrar el MVP
 
-Actualizado: 2026-09-06.
+Actualizado: 2026-09-14.
 Fuentes: `CRONOGRAMA.md`, `ALCANCE-Y-LIMITES.md`, `NOW.md` y
 `AUDITORIAS-UX-CLAUDE-2026-08-30.md`.
 
@@ -163,7 +163,7 @@ anatomías ni el detalle. Su contrato completo y la evidencia de raíz están en
 | 18I | **INTEGRATION-CANDIDATE-1 — integrada** | Composición de todo el trabajo aceptado | `c565e6e`/`ad914a3`, merge `b8447a3`. PM obtuvo 168/169 sobre `e0cdfe9` y 169 en 1/1 sobre el único delta de `c565e6e`; los 169 casos quedan cubiertos. A11y, contraste, diff-check y build verdes. Emi autorizó el despliegue automático antes del backup, sin aceptar todavía producción. |
 | 18D | **AGENTS-CONSOLIDATION-1 — cerrada** | Deuda de relevo detectada al cerrar integración | `b8447a3` llevó a `main` el disparador consolidado y preservó la regla local de eficiencia de chats. |
 | 18O | **BACKUP-RESTORE-1 — cerrada localmente** | Puerta operativa local | `52ba294`/`b8223b1`, merge `fbd6caf`. PM reprodujo en Docker real backup, restore aislado, comparación, negativo de integridad, rechazo de recursos ajenos y limpieza. La copia externa/administrada y su gasto siguen pendientes de Emi. |
-| 18P | **POST-INTEGRATION-CLEAR-1 — activa** | Pendientes de continuidad/copy de Dev | Mantener reabrible el carrito conservado sin sesión y enumerar transferencia + Mercado Pago condicional en la FAQ, sin checkout anónimo ni activación de pagos. |
+| 18P | **POST-INTEGRATION-CLEAR-1 — aceptada, integración local** | Pendientes de continuidad/copy de Dev | `eb62d3d` + arnés `a7ed544` + informe `48bae67`; merge local `c973c6f`. PM: 170 verde/rojo discriminante, 169 verde y puertas visuales completas. Publicación pendiente de Emi. |
 
 Son mejoras de claridad, no autorización para mensajería, planes, suscripciones
 o un rediseño nuevo.
@@ -172,7 +172,7 @@ o un rediseño nuevo.
 
 | Orden | Pieza | Fuente | Condición de entrada |
 |---:|---|---|---|
-| 19 | **CAT-PAGE-1** | deuda UX-2C y ADM-2 como patrón | Probar más de 100 publicaciones; conteo, orden y navegación deben representar al servidor completo. |
+| 19 | **CAT-PAGE-1 — preparada** | deuda UX-2C y ADM-2 como patrón | Probar más de 100 publicaciones; conteo, orden y navegación deben representar al servidor completo. Empieza cuando `c973c6f` esté publicado en `origin/main`. |
 | 20 | **QUERY-IMG-1** | C2 | Medir primero el N+1 de imágenes; optimizar sólo con evidencia y conservar respuestas. |
 | 21 | **RISK-REC-1** | R1, R4 y R5 | Reproducir concurrencia de stock, señal frágil de reenvío y grupo sin medio de pago; promover únicamente defectos reales. |
 
