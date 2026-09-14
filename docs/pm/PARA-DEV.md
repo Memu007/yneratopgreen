@@ -99,3 +99,30 @@ navegador el estado que debería producir el servidor.
 
 Entregá rama, SHA base, SHA candidato, diff completo, rojo contra base,
 comandos y resultados. Reemplazá `PARA-PM.md` con un informe breve y frená.
+
+---
+
+## 2026-09-14 — Devolución R1 sobre `a521631`
+
+Conservá la solución de paginación, filtros y orden. Build, lint, `node --check`
+y `diff --check` están verdes en la revisión PM. Hay una devolución:
+
+1. En `App.tsx`, `consultaVigente` todavía omite `selectedSubcategory`,
+   `minRating`, `orden` y `pagina`, aunque ahora todos cambian la petición.
+   Esa firma existe para que el render anterior al efecto no presente la
+   respuesta vieja como vigente. Hoy, al avanzar de página o cambiar esos
+   controles, el rótulo cambia en el acto pero las tarjetas anteriores quedan
+   visibles y sin estado de carga hasta que el efecto arranca. El comentario
+   que dice que subcategoría y calificación no viajan también quedó falso.
+Corrección mínima:
+
+- incluí en la firma todas las dimensiones que ahora viajan al catálogo y
+  actualizá el comentario;
+- extendé el caso 171 demorando de forma controlada una respuesta de página u
+  orden: durante la demora no debe mostrarse la página anterior como si fuera
+  la nueva. El negativo debe pasar a rojo si se vuelve a omitir la dimensión;
+- repetí 171, las puertas afectadas y la suite completa; reemplazá
+  `PARA-PM.md` con base, candidato final, diff y resultados.
+
+No rediseñes el paginador, no cambies el contrato de API y no empieces otra
+tarea. No integres ni despliegues.

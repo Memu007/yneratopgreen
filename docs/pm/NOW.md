@@ -10,7 +10,24 @@ Actualizado: 2026-09-14.
 - **`main` local:** contiene `POST-INTEGRATION-CLEAR-1` mediante `c973c6f`. `origin/main` continúa en `2d8ecfd`; el cambio no fue publicado ni desplegado.
 - **Rama Dev:** `claude/dev-role-repo-3l0kp3`; producto `eb62d3d`, arnés final `a7ed544` e informe `48bae67`, integrados sólo localmente mediante `c973c6f`.
 - **Última decisión PM:** `POST-INTEGRATION-CLEAR-1` **ACEPTADA E INTEGRADA LOCALMENTE**. Falta autorización explícita de Emi para empujar producto a `main`, porque Railway conserva auto-deploy.
-- **Tarea activa:** `CAT-PAGE-1`, responsable Dev. Continúa sobre su rama remota, que recibe la integración aceptada y el relevo PM sin publicar `main` ni disparar Railway.
+- **Rama Dev:** candidata `a521631` e informe `473ae19` para `CAT-PAGE-1`, basados en `b2826d1`.
+- **Tarea activa:** `CAT-PAGE-1`, responsable Dev, devolución R1. La paginación queda; falta cerrar una carrera de estado.
+
+## Revisión pendiente — CAT-PAGE-1 R1
+
+La API y el paginador de `a521631` mantienen el alcance pedido, y las puertas
+estáticas pasan. La candidata no se acepta todavía:
+
+- `consultaVigente` sigue omitiendo subcategoría, calificación mínima, orden y
+  página aunque ahora los cuatro cambian la consulta al servidor;
+- por eso, en el render anterior al efecto, el control ya anuncia la página u
+  orden nuevos mientras la grilla anterior se presenta como contestada;
+- el comentario que justifica omitir subcategoría/calificación quedó falso;
+- el caso 171 no demora una respuesta para discriminar esa carrera;
+
+Dev debe corregir la firma de consulta, agregar un negativo con respuesta
+demorada y actualizar su informe con la R1. No se reabre el diseño de
+paginación.
 
 ## Última aceptación PM — POST-INTEGRATION-CLEAR-1
 
