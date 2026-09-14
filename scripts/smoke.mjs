@@ -28288,6 +28288,328 @@ await runCase(172, 'El listado del Mercado no consulta las imágenes una vez por
   return `con ${TOTAL} publicaciones fabricadas y retiradas al final: ${medidos.join('; ')}`;
 });
 
+// ---------------------------------------------------------------------------
+// 173. La condición —nuevo o usado— filtra el conjunto entero.
+//
+// El campo existía en la base y el alta ya lo pedía, pero no viajaba a la
+// consulta: medido contra la base, `?condition=nuevo` devolvía el catálogo
+// entero —195— igual que `?condition=inventado`, porque FastAPI descarta lo que
+// no declara.
+//
+// La condición sólo la tienen los activos, y ahí es opcional a propósito: en
+// «Bienes y Ganado» y «Tierras y parcelas» un ternero o un campo no son ni
+// nuevos ni usados. Por eso el filtro ACOTA y nunca completa, y este caso lo
+// mide: las publicaciones sin condición no entran en «Nuevo» NI en «Usado».
+// ---------------------------------------------------------------------------
+await runCase(173, 'La condición filtra el conjunto entero y nunca completa lo que nadie declaró', async () => {
+  const medidos = [];
+  const marca = Date.now();
+  const MARCADOR = `Smoke cond173 ${marca}`;
+  const POR_PAGINA = 24;
+  // Más de una página de nuevos: si el filtro se aplicara después de paginar,
+  // el total y la cantidad de páginas serían los del catálogo y no los del
+  // subconjunto.
+  const NUEVOS = 30;
+  const USADOS = 5;
+  const SIN_DECLARAR = 4;
+  const TOTAL = NUEVOS + USADOS + SIN_DECLARAR;
+  const PAGINAS_NUEVOS = Math.ceil(NUEVOS / POR_PAGINA);
+  const PAGINAS_TOTAL = Math.ceil(TOTAL / POR_PAGINA);
+
+  const nombreDe = (i) => `${MARCADOR}-${String(i).padStart(3, '0')}`;
+  const condicionDe = (i) => (i < NUEVOS ? 'nuevo' : i < NUEVOS + USADOS ? 'usado' : undefined);
+
+  const limpiar = () => {
+    try {
+      querySql(`DELETE FROM product_images WHERE product_id IN (
+        SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+    } catch (error) {
+      console.log(`  · no se pudieron retirar las publicaciones del caso 173: ${error.message}`);
+    }
+  };
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    // === Fabricación ======================================================
+    const vendedor = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+    })).data;
+    const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+    // Una categoría que admita ACTIVO: la condición sólo existe ahí.
+    const [laCategoria] = queryRows(`
+      SELECT c.id, c.name FROM categories c
+      WHERE c.name = 'Maquinaria agrícola' AND c.is_active = true`);
+    assert(laCategoria, 'no está la categoría «Maquinaria agrícola» para fabricar activos');
+
+    for (let i = 0; i < TOTAL; i += 1) {
+      const alta = await apiRequest('/products', {
+        method: 'POST', token: vendedor.access_token,
+        body: {
+          name: nombreDe(i),
+          description: 'Publicación fabricada para medir el filtro de condición.',
+          category_id: laCategoria[0],
+          price: 100000 + i,
+          stock: 2,
+          unit: 'unidad',
+          locality_id: localidad,
+          publication_type: 'producto',
+          operation_kind: 'activo',
+          condition: condicionDe(i),
+        },
+      });
+      assert(alta.status === 201 || alta.status === 200,
+        `la publicación ${i} respondió HTTP ${alta.status}: ${JSON.stringify(alta.data).slice(0, 200)}`);
+    }
+
+    // La fabricación se comprueba contra la BASE y no contra la respuesta del
+    // alta: medido, esa respuesta no devuelve `condition` —lo guarda, pero no
+    // lo echa—, así que creerle sería creerle a quien no lo dice.
+    const enBase = Object.fromEntries(queryRows(`
+      SELECT COALESCE(condition, 'sin declarar'), COUNT(*)::text
+      FROM products WHERE status = 'ACTIVE' AND name LIKE ${sqlLiteral(`${MARCADOR}-%`)}
+      GROUP BY condition`));
+    assert(Number(enBase.nuevo) === NUEVOS && Number(enBase.usado) === USADOS
+      && Number(enBase['sin declarar']) === SIN_DECLARAR,
+    `el escenario quedó como ${JSON.stringify(enBase)} y tenía que ser `
+      + `${JSON.stringify({ nuevo: NUEVOS, usado: USADOS, 'sin declarar': SIN_DECLARAR })}`);
+    medidos.push(`conjunto fabricado: ${NUEVOS} nuevos, ${USADOS} usados y ${SIN_DECLARAR} `
+      + 'sin condición declarada, todos activos');
+
+    // === A. La API ========================================================
+    const pedir = async (extra) => {
+      const respuesta = await apiRequest(
+        `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page_size=${POR_PAGINA}&${extra}`);
+      return respuesta;
+    };
+    const pedirOk = async (extra) => {
+      const respuesta = await pedir(extra);
+      assert(respuesta.status === 200,
+        `el catálogo respondió HTTP ${respuesta.status} para «${extra}»`);
+      return respuesta.data;
+    };
+
+    const todo = await pedirOk('page=1');
+    assert(todo.total === TOTAL, `sin filtro la API dice ${todo.total} y el conjunto tiene ${TOTAL}`);
+
+    const nuevos = await pedirOk('page=1&condition=nuevo');
+    assert(nuevos.total === NUEVOS,
+      `filtrando «nuevo» la API dice ${nuevos.total} y son ${NUEVOS}: si el filtro no viaja, `
+      + `el total sigue siendo el del conjunto entero (${TOTAL})`);
+    assert(nuevos.pages === PAGINAS_NUEVOS,
+      `filtrando «nuevo» la API dice ${nuevos.pages} páginas y son ${PAGINAS_NUEVOS}: el filtro `
+      + 'tiene que aplicarse ANTES de contar y paginar');
+    assert(nuevos.items.every((item) => item.condition === 'nuevo'),
+      `filtrando «nuevo» volvieron condiciones ${JSON.stringify([...new Set(nuevos.items.map((i) => i.condition))])}`);
+
+    const usados = await pedirOk('page=1&condition=usado');
+    assert(usados.total === USADOS,
+      `filtrando «usado» la API dice ${usados.total} y son ${USADOS}`);
+
+    // Acota y no completa: los que nadie declaró no entran en ninguno de los dos.
+    assert(nuevos.total + usados.total === TOTAL - SIN_DECLARAR,
+      `«nuevo» más «usado» suman ${nuevos.total + usados.total} y tienen que sumar `
+      + `${TOTAL - SIN_DECLARAR}: las ${SIN_DECLARAR} sin condición declarada no pueden entrar `
+      + 'en ninguno de los dos, porque incluirlas sería afirmar un dato que nadie cargó');
+
+    // Un valor que no existe no se descarta en silencio. `apiRequest` lanza en
+    // todo lo que no sea 2xx, así que el 422 se comprueba sobre lo que lanza.
+    let loQueDijo = 'no falló';
+    try {
+      const inventado = await pedir('page=1&condition=inventado');
+      loQueDijo = `HTTP ${inventado.status} con total ${inventado.data?.total}`;
+    } catch (error) {
+      loQueDijo = error.message;
+    }
+    assert(/HTTP 422/.test(loQueDijo),
+      `pidiendo una condición inventada la API contestó «${loQueDijo.slice(0, 160)}» y tiene que `
+      + 'responder 422: un filtro que se descarta en silencio miente sobre lo que devuelve');
+    medidos.push(`la API acota al subconjunto —${NUEVOS} nuevos en ${PAGINAS_NUEVOS} páginas y `
+      + `${USADOS} usados—, deja afuera las ${SIN_DECLARAR} sin declarar y rechaza con 422 un `
+      + 'valor que no existe');
+
+    // === B. La pantalla ===================================================
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    const conteo = page.locator('[class*="_conteo_"]').first();
+    const control = page.locator('#catalog-condition');
+    const paginador = page.getByRole('navigation', { name: /Paginación/i });
+    const cual = async () => (await paginador.getByText(/Página \d+ de \d+/).innerText())
+      .replace(/\s+/g, ' ').trim();
+    const nombresEnPantalla = () => page.locator('article[class*="card"] h3').allInnerTexts();
+    // El mensaje se arma DESPUÉS de fallar, con lo que la pantalla decía en ese
+    // momento: armarlo antes contaría lo que había al empezar a esperar.
+    const esperarElConteo = async (cuantas, porQue) => {
+      try {
+        await esperarA(async () => (await conteo.innerText()).includes(String(cuantas)),
+          porQue, 25_000);
+      } catch (error) {
+        const visto = await conteo.innerText().catch(() => '(no está)');
+        throw new Error(`${porQue}; el conteo dice «${visto.replace(/\s+/g, ' ').trim()}» y `
+          + `tenía que contar ${cuantas}`);
+      }
+    };
+
+    await page.goto(
+      `${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(MARCADOR)}`,
+      { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 25_000 });
+    await esperarElConteo(TOTAL, 'el Mercado no llegó a contar el conjunto');
+
+    assert(await control.count() === 1,
+      'no hay control de condición en la barra de filtros del Mercado');
+    const opciones = await control.locator('option').allInnerTexts();
+    assert(['Cualquiera', 'Nuevo', 'Usado'].every((r) => opciones.some((t) => t.trim() === r)),
+      `el control de condición ofrece ${JSON.stringify(opciones)}`);
+
+    await control.selectOption('nuevo');
+    await esperarElConteo(NUEVOS, 'elegir «Nuevo» no acotó el conteo al subconjunto');
+    await esperarA(async () => (await cual()) === `Página 1 de ${PAGINAS_NUEVOS}`,
+      `con «Nuevo» puesto el paginador dice «${await cual().catch(() => '(no está)')}» y tiene `
+      + `que decir «Página 1 de ${PAGINAS_NUEVOS}»`, 25_000);
+    assert(new URL(page.url()).searchParams.get('condition') === 'nuevo',
+      `la barra dice condition=${new URL(page.url()).searchParams.get('condition')}`);
+
+    // Desde una página interior, cambiar la condición vuelve a la 1.
+    //
+    // La transición se elige entre dos subconjuntos que TIENEN dos páginas —los
+    // nuevos y el conjunto entero—, y no hacia uno de una sola. Medido: yendo a
+    // un subconjunto de una página, el acote de «page» inexistente corrige a la
+    // primera igual, y el caso daba verde aunque el reinicio no existiera. Acá
+    // la página 2 sigue siendo válida después de cambiar, así que volver a la 1
+    // sólo puede ser el reinicio.
+    await paginador.getByRole('button', { name: /siguiente/i }).click();
+    await esperarA(async () => (await cual()) === `Página 2 de ${PAGINAS_NUEVOS}`,
+      'no se llegó a la página 2 de los nuevos', 25_000);
+    await control.selectOption('');
+    await esperarElConteo(TOTAL, 'sacar la condición no devolvió el conjunto entero');
+    await esperarA(async () => (await cual()) === `Página 1 de ${PAGINAS_TOTAL}`,
+      `cambiar la condición desde la página 2 dejó el paginador en `
+      + `«${await cual().catch(() => '(no está)')}»: tenía que volver a la primera, y la `
+      + 'página 2 sigue existiendo en este conjunto, así que no la corrigió el acote', 25_000);
+    assert(new URL(page.url()).searchParams.get('page') === null,
+      `y la barra quedó en page=${new URL(page.url()).searchParams.get('page')}`);
+
+    // Un subconjunto de una sola página no dibuja paginador.
+    await control.selectOption('usado');
+    await esperarElConteo(USADOS, 'elegir «Usado» no acotó el conteo');
+    assert(await paginador.count() === 0,
+      `con ${USADOS} usados el paginador no tiene que dibujarse: hay una sola página`);
+    const nombresUsados = await nombresEnPantalla();
+    assert(nombresUsados.length === USADOS,
+      `con «Usado» se dibujaron ${nombresUsados.length} tarjetas y son ${USADOS}`);
+
+    // Atrás restaura la condición anterior con sus publicaciones.
+    await page.locator('header').getByRole('button', { name: 'Contacto', exact: true }).click();
+    await page.getByRole('heading', { name: 'Contacto', level: 1 })
+      .waitFor({ state: 'visible', timeout: 25_000 });
+    await page.goBack({ waitUntil: 'domcontentloaded' });
+    await esperarA(async () => (await control.inputValue()) === 'usado',
+      `volver con Atrás dejó la condición en «${await control.inputValue().catch(() => '(no está)')}»`,
+      25_000);
+    await esperarElConteo(USADOS, 'volver con Atrás no restauró el subconjunto');
+
+    // Limpiar filtros la limpia: es un filtro, no un orden.
+    await page.getByRole('button', { name: /Limpiar filtros/i }).click();
+    await esperarA(async () => (await control.inputValue()) === '',
+      'limpiar filtros no limpió la condición', 25_000);
+    medidos.push('en pantalla: el control acota el conteo y las páginas, se escribe en la barra, '
+      + 'vuelve a la página 1 desde una interior, Atrás lo restaura y «Limpiar filtros» lo limpia');
+
+    // === C. Mientras la respuesta no vuelve, no se presenta lo anterior ====
+    // Misma regla que dejó la devolución R1 de CAT-PAGE-1: en la firma de la
+    // consulta vigente entra TODO lo que viaja. Si la condición quedara afuera,
+    // el control diría «Nuevo» sobre las tarjetas de antes y sin estado de
+    // carga. Se mira cuadro a cuadro —`rAF` corre justo antes de pintar, y es
+    // el único que ve cambiar el valor de un `<select>`— y commit a commit.
+    const DEMORA = 1200;
+    let demorar = 0;
+    await page.route('**/api/catalog/products*', async (ruta) => {
+      if (demorar > 0) await new Promise((seguir) => { setTimeout(seguir, demorar); });
+      await ruta.continue();
+    });
+    // «Limpiar filtros» también limpia la búsqueda —es un filtro más—, así que
+    // el marcador hay que volver a ponerlo para medir sobre el conjunto propio.
+    const buscador = page.getByLabel('Buscar en el mercado');
+    await buscador.fill(MARCADOR);
+    await buscador.press('Enter');
+    await esperarElConteo(TOTAL, 'volver a buscar el marcador no devolvió el conjunto entero');
+    const antesDeMover = await nombresEnPantalla();
+    assert(antesDeMover.length > 0, 'no había nada dibujado antes de mover el control');
+
+    await page.evaluate(() => {
+      const estado = (via) => ({
+        via,
+        condicion: document.querySelector('#catalog-condition')?.value ?? null,
+        ocupado: document.querySelectorAll('[aria-busy="true"]').length > 0,
+        nombres: [...document.querySelectorAll('article[class*="card"] h3')]
+          .map((titulo) => titulo.textContent.trim()),
+      });
+      const anotadas = [];
+      const observador = new MutationObserver(() => anotadas.push(estado('commit')));
+      observador.observe(document.body, {
+        subtree: true, childList: true, characterData: true, attributes: true,
+      });
+      let cuadro = requestAnimationFrame(function pintar() {
+        anotadas.push(estado('cuadro'));
+        cuadro = requestAnimationFrame(pintar);
+      });
+      window.__miradaDeLaCondicion = {
+        anotadas,
+        cortar: () => { observador.disconnect(); cancelAnimationFrame(cuadro); },
+      };
+    });
+
+    // La ventana entre mover el control y arrancar el efecto dura un cuadro, y
+    // muestrearla tal cual sale intermitente: medido, una corrida de cada varias
+    // la pierde, y un negativo intermitente da falsa confianza. Se frena la CPU
+    // seis veces mientras dura la transición. No es un truco para forzar el
+    // rojo: es el dispositivo real donde el defecto se ve, porque en un teléfono
+    // lento esos treinta milisegundos son trescientos y los ve una persona.
+    const cdp = await contexto.newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+    demorar = DEMORA;
+    try {
+      await control.selectOption('nuevo');
+      await esperarElConteo(NUEVOS, 'con la respuesta demorada, «Nuevo» no llegó a acotar');
+    } finally {
+      demorar = 0;
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+      await cdp.detach();
+    }
+    const mirados = await page.evaluate(() => {
+      window.__miradaDeLaCondicion.cortar();
+      return window.__miradaDeLaCondicion.anotadas;
+    });
+    const loViejo = JSON.stringify(antesDeMover);
+    const presentadas = mirados.filter((estado) => estado.condicion === 'nuevo'
+      && !estado.ocupado && JSON.stringify(estado.nombres) === loViejo);
+    assert(presentadas.length === 0,
+      `en ${presentadas.length} estado(s) `
+      + `(${[...new Set(presentadas.map((e) => e.via))].join(', ')}) el control ya decía «Nuevo» `
+      + `y la grilla seguía mostrando las ${antesDeMover.length} publicaciones anteriores sin `
+      + 'ningún estado de carga: la condición no entra en la firma de la consulta vigente');
+    assert(mirados.some((estado) => estado.ocupado),
+      'ningún estado observado marcó la espera: la transición no se vio y este negativo no '
+      + 'estaría midiendo nada');
+    await page.unroute('**/api/catalog/products*');
+    medidos.push(`con la respuesta demorada ${DEMORA} ms, ninguno de los ${mirados.length} `
+      + 'estados observados presentó la respuesta anterior como si fuera la nueva');
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+    limpiar();
+  }
+
+  const [quedan] = queryRows(`
+    SELECT COUNT(*)::text, 'fin' FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+  assert(quedan[0] === '0',
+    `el caso dejó ${quedan[0]} publicaciones fabricadas sin retirar`);
+
+  return `con ${TOTAL} publicaciones fabricadas y retiradas al final: ${medidos.join('; ')}`;
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

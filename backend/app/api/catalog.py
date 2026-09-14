@@ -225,6 +225,11 @@ def get_products(
         None, ge=0, le=5,
         description="Calificación mínima del vendedor (0 a 5)",
     ),
+    condition: Optional[str] = Query(
+        None,
+        pattern="^(nuevo|usado)$",
+        description="Condicion del activo: nuevo o usado",
+    ),
     sort_by: str = Query("created_at", pattern="^(created_at|price|sales|views|rating)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
@@ -397,6 +402,18 @@ def get_products(
             func.coalesce(User.rating_average, 0) >= min_rating
         )
     
+    # La condicion la tienen solo los activos, y ahi es opcional a proposito:
+    # en «Bienes y Ganado» y «Tierras y parcelas» un ternero o un campo no son
+    # ni nuevos ni usados (ver `anatomia.usa_condicion`). Por eso el filtro
+    # ACOTA y nunca completa: pedir «nuevo» devuelve los declarados nuevos, no
+    # los nuevos mas los que no lo dicen. Incluir los nulos seria afirmar un
+    # dato que nadie cargo.
+    #
+    # Se aplica ANTES del conteo, como todos los demas: si se aplicara despues,
+    # el total describiria el catalogo y no lo que se esta mirando.
+    if condition:
+        query = query.filter(Product.condition == condition)
+
     # Contar total antes de paginar
     total = query.count()
     

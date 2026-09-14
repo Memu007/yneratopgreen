@@ -5,6 +5,7 @@ import type {
   LocalityResponse,
   ProvinceResponse,
 } from '../../utils/catalogService';
+import { CONDICIONES, type CondicionDelMercado } from '../../hooks/useProductFilters';
 
 interface FilterSidebarProps {
   categories: CategoryResponse[];
@@ -20,6 +21,7 @@ interface FilterSidebarProps {
   priceMax: number;
   inStockOnly: boolean;
   minRating: number;
+  condicion: CondicionDelMercado;
   onTypeChange: (type: 'todos' | 'productos' | 'servicios') => void;
   onCategoryChange: (category: string) => void;
   onSubcategoryChange: (subcategory: string) => void;
@@ -29,6 +31,7 @@ interface FilterSidebarProps {
   onPriceMaxChange: (price: number) => void;
   onInStockChange: (inStock: boolean) => void;
   onMinRatingChange: (rating: number) => void;
+  onCondicionChange: (condicion: CondicionDelMercado) => void;
   onResetFilters: () => void;
   /** Cuántas operaciones quedan con los filtros puestos. En celular el
       panel termina con «Ver N resultados»: sin el número, cerrar el panel
@@ -50,6 +53,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   priceMax,
   inStockOnly,
   minRating,
+  condicion,
   onTypeChange,
   onCategoryChange,
   onSubcategoryChange,
@@ -59,6 +63,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   onPriceMaxChange,
   onInStockChange,
   onMinRatingChange,
+  onCondicionChange,
   onResetFilters,
   cantidadDeResultados,
 }) => {
@@ -257,6 +262,28 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                 <option key={estrellas} value={estrellas}>
                   {estrellas} de 5 o más
                 </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Condición del activo.
+              Sólo la tienen los activos —una semilla no es «usada»— y ahí es
+              opcional a propósito, así que el filtro ACOTA y nunca completa:
+              «Nuevo» trae los declarados nuevos, no los nuevos más los que no
+              lo dicen. Las opciones salen de la misma tabla que valida la API,
+              para que no haya una lista acá y otra allá. */}
+          <div className={styles.filterSection}>
+            <label className={styles.filterLabel} htmlFor="catalog-condition">
+              Condición
+            </label>
+            <select
+              id="catalog-condition"
+              className={styles.select}
+              value={condicion}
+              onChange={(e) => onCondicionChange(e.target.value as CondicionDelMercado)}
+            >
+              {CONDICIONES.map(({ valor, rotulo }) => (
+                <option key={valor || 'cualquiera'} value={valor}>{rotulo}</option>
               ))}
             </select>
           </div>

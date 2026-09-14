@@ -190,6 +190,9 @@ export const getProducts = async (params: {
   /** Calificación mínima del vendedor, 0 a 5. Mismo motivo que la
       subcategoría. */
   min_rating?: number;
+  /** Nuevo o usado. La API la valida contra esos dos valores: un tercero
+      responde 422 en vez de descartarse en silencio. */
+  condition?: 'nuevo' | 'usado';
   sort_by?: 'created_at' | 'price' | 'sales' | 'views' | 'rating';
   sort_order?: 'asc' | 'desc';
   page?: number;

@@ -124,6 +124,7 @@ function App() {
     priceMax,
     inStockOnly,
     minRating,
+    condicion,
     setTextoBuscado,
     aplicarBusqueda,
     setSelectedType,
@@ -135,6 +136,7 @@ function App() {
     setPriceMax,
     setInStockOnly,
     setMinRating,
+    setCondicion,
     orden,
     pagina,
     setOrden,
@@ -436,6 +438,7 @@ function App() {
     // envuelve. Dos objetos distintos con el mismo id piden lo mismo.
     subcategoriaElegida?.id ?? null,
     minRating,
+    condicion,
     ordenPedido.sortBy,
     ordenPedido.sortOrder,
     pagina,
@@ -487,6 +490,8 @@ function App() {
         // cayeron en otra página no existían.
         subcategory: subcategoriaElegida?.id,
         min_rating: minRating > 0 ? minRating : undefined,
+        // Nuevo o usado. Vacío es «cualquiera» y no viaja.
+        condition: condicion || undefined,
         province:
           selectedProvince === 'Todas las provincias' ? undefined : selectedProvince,
         locality_id: selectedLocalityId || undefined,
@@ -573,6 +578,7 @@ function App() {
     // pedir nada y la pantalla mostraba el conjunto anterior.
     subcategoriaElegida,
     minRating,
+    condicion,
     ordenPedido,
     pagina,
     irALaPagina,
@@ -745,6 +751,7 @@ function App() {
                 priceMax={priceMax}
                 inStockOnly={inStockOnly}
                 minRating={minRating}
+                condicion={condicion}
                 onTypeChange={setSelectedType}
                 onCategoryChange={setSelectedCategory}
                 onSubcategoryChange={setSelectedSubcategory}
@@ -754,6 +761,7 @@ function App() {
                 onPriceMaxChange={setPriceMax}
                 onInStockChange={setInStockOnly}
                 onMinRatingChange={setMinRating}
+                onCondicionChange={setCondicion}
                 onResetFilters={resetFilters}
                 cantidadDeResultados={totalDeResultados}
               />

@@ -26,6 +26,30 @@ export const ORDENES: {
   { valor: 'rating', rotulo: 'Mejor calificados', sortBy: 'rating', sortOrder: 'desc' },
 ];
 
+/**
+ * Nuevo o usado, y nada más.
+ *
+ * Los valores son los que declara `anatomia.py` y los que acepta la API: no
+ * hay una lista acá y otra allá que puedan quedar distintas. La cadena vacía
+ * es «cualquiera» y no viaja a la consulta.
+ *
+ * El filtro ACOTA y nunca completa. La condición sólo la tienen los activos y
+ * ahí es opcional a propósito —en «Bienes y Ganado» y «Tierras y parcelas» un
+ * ternero o un campo no son ni nuevos ni usados—, así que pedir «Nuevo»
+ * devuelve los declarados nuevos. Sumarle los que no lo dicen sería afirmar un
+ * dato que nadie cargó.
+ */
+export type CondicionDelMercado = '' | 'nuevo' | 'usado';
+
+export const CONDICIONES: { valor: CondicionDelMercado; rotulo: string }[] = [
+  { valor: '', rotulo: 'Cualquiera' },
+  { valor: 'nuevo', rotulo: 'Nuevo' },
+  { valor: 'usado', rotulo: 'Usado' },
+];
+
+const condicionDeLaBarra = (valor: string | null): CondicionDelMercado =>
+  (CONDICIONES.some((opcion) => opcion.valor === valor) ? valor : '') as CondicionDelMercado;
+
 /** Cuántas tarjetas trae una página. La decide el Mercado y viaja a la
  *  consulta: la grilla dibuja lo que le dan. */
 export const POR_PAGINA = 24;
@@ -109,6 +133,8 @@ export const useProductFilters = ({
   );
   const [inStockOnly, setInStockOnly] = useState(initialParams.get('in_stock') === 'true');
   const [minRating, setMinRating] = useState(() => initialNumber('min_rating', 0));
+  const [condicion, setCondicion] = useState<CondicionDelMercado>(() =>
+    condicionDeLaBarra(initialParams.get('condition')));
   /**
    * Cómo se ordena y en qué página estamos.
    *
@@ -138,6 +164,7 @@ export const useProductFilters = ({
     setPriceMax(numeroDeLaBarra(params, 'max_price', Number.MAX_SAFE_INTEGER));
     setInStockOnly(params.get('in_stock') === 'true');
     setMinRating(numeroDeLaBarra(params, 'min_rating', 0));
+    setCondicion(condicionDeLaBarra(params.get('condition')));
     setOrden(ordenDeLaBarra(params.get('sort')));
     setPagina(paginaDeLaBarra(params));
   }, [versionDeLaBarra]);
@@ -169,6 +196,7 @@ export const useProductFilters = ({
     );
     updateParam('in_stock', inStockOnly ? 'true' : null);
     updateParam('min_rating', minRating > 0 ? String(minRating) : null);
+    updateParam('condition', condicion || null);
     updateParam('sort', orden === 'newest' ? null : orden);
     updateParam('page', pagina > 1 ? String(pagina) : null);
 
@@ -186,6 +214,7 @@ export const useProductFilters = ({
     priceMax,
     inStockOnly,
     minRating,
+    condicion,
     orden,
     pagina,
     escribeEnLaBarra,
@@ -217,6 +246,7 @@ export const useProductFilters = ({
       setPriceMax: envolver(setPriceMax),
       setInStockOnly: envolver(setInStockOnly),
       setMinRating: envolver(setMinRating),
+      setCondicion: envolver(setCondicion),
       setOrden: envolver(setOrden),
     };
   }, []);
@@ -256,6 +286,7 @@ export const useProductFilters = ({
     setPriceMax(Number.MAX_SAFE_INTEGER);
     setInStockOnly(false);
     setMinRating(0);
+    setCondicion('');
   };
 
   return {
@@ -271,6 +302,7 @@ export const useProductFilters = ({
     priceMax,
     inStockOnly,
     minRating,
+    condicion,
     orden,
     pagina,
     // Setters. Los que cambian lo que se pide vuelven a la página 1.
