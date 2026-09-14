@@ -291,6 +291,45 @@ async function comprador(page, medida) {
     .getByRole('button', { name: 'Cerrar' }).click();
 }
 
+/**
+ * La cabecera sin sesión pero con carrito.
+ *
+ * Se llega como se llega de verdad: con sesión se elige algo, la credencial se
+ * confirma inválida mientras la persona lo mira, la identidad baja y el
+ * carrito queda. No se escribe un carrito a mano en el almacenamiento: una
+ * puerta que fabrica su propio estado mide el estado que fabricó, no el que
+ * produce el producto.
+ *
+ * Entra con la cuenta del comprador porque sin sesión no hay forma de llenar
+ * el carrito —la tarjeta ofrece ingresar en vez de agregar—, y sale sin ella.
+ */
+async function carritoSinSesion(page, medida) {
+  await page.goto(`${WEB}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: /^Agregar/ }).first().click();
+  await page.getByRole('button', { name: /^Carrito/ }).click();
+  const elCarrito = page.getByRole('dialog', { name: 'Mi carrito' });
+  await elCarrito.waitFor({ state: 'visible', timeout: ESPERA });
+
+  // Vencer las dos credenciales es lo que hace el tiempo: con las dos rotas el
+  // servidor contesta que no, y ahí la sesión está confirmada inválida.
+  await page.evaluate(() => {
+    window.localStorage.setItem('access_token', 'este.token.ya.no.vale');
+    window.localStorage.setItem('refresh_token', 'este.tampoco.vale');
+  });
+  await elCarrito.getByRole('button', { name: 'Continuar compra' }).click();
+  const ingreso = page.getByRole('dialog', { name: 'Ingresar' });
+  await ingreso.waitFor({ state: 'visible', timeout: ESPERA });
+  await ingreso.getByRole('button', { name: 'Cerrar' }).click();
+
+  // Cancelar devuelve al carrito; cerrarlo deja la cabecera sola, que es la
+  // pantalla que se mide.
+  await elCarrito.waitFor({ state: 'visible', timeout: ESPERA });
+  await elCarrito.getByRole('button', { name: 'Cerrar' }).click();
+  await elCarrito.waitFor({ state: 'hidden', timeout: ESPERA });
+  await revisar(page, 'cabecera sin sesión con carrito', medida,
+    page.locator('header').getByRole('button', { name: /^Carrito/ }));
+}
+
 async function vendedor(page, medida) {
   await page.goto(WEB, { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
@@ -386,6 +425,7 @@ try {
     for (const [tokens, recorrido] of [
       [null, publicas],
       [cuentas.comprador, comprador],
+      [cuentas.comprador, carritoSinSesion],
       [cuentas.vendedor, vendedor],
       [cuentas.transportista, transportista],
       [cuentas.admin, administracion],

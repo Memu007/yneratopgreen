@@ -27028,6 +27028,319 @@ await runCase(169, 'El reinicio de la API prueba que cambió el proceso, o falla
     + `con que /api/health conteste, con la API en ${servicio.donde}: ${medidos.join('; ')}`;
 });
 
+// ---------------------------------------------------------------------------
+// 170. El carrito que sobrevive a la sesión tiene por dónde volver a abrirse,
+// y la FAQ nombra los dos medios de pago que el producto tiene.
+//
+// Lo primero es lo que quedó abierto al cerrar el callejón del Checkout, y lo
+// dejé escrito al pie del caso 167: cuando la sesión se confirma inválida se
+// baja la identidad y el carrito NO se toca —lo que hay adentro lo eligió una
+// persona—, pero la celda «Carrito» sólo se dibujaba con sesión. Así que los
+// ítems seguían guardados y sin puerta: cancelar el ingreso devolvía al
+// carrito una vez, y al cerrarlo desaparecía la única forma de volver a verlo.
+// La compra no se pierde por una decisión de quien compra: se pierde porque la
+// cabecera dejó de dibujar un botón.
+//
+// Lo segundo es una promesa incompleta: la FAQ decía que se paga por
+// transferencia y nada más, con el producto cobrando también por Mercado Pago
+// cuando el vendedor lo tiene vinculado. Prometer de menos es tan inexacto
+// como prometer de más, y acá la corrección tampoco puede pasarse: Mercado
+// Pago no está para todos los vendedores, así que la respuesta lleva su
+// condición.
+//
+// Las dos cosas se miden recorriendo la pantalla, no leyendo el fuente: la
+// puerta se abre y se cierra, y la respuesta de la FAQ se lee del documento
+// que el navegador dibujó.
+// ---------------------------------------------------------------------------
+await runCase(170, 'Sin sesión, el carrito con ítems se reabre desde la cabecera; salir explícito lo sigue vaciando', async () => {
+  const medidos = [];
+  const browser = await chromium.launch({ headless: true });
+
+  const login = (p) => p.getByRole('dialog', { name: 'Ingresar' });
+  const carrito = (p) => p.getByRole('dialog', { name: 'Mi carrito' });
+  const checkout = (p) => p.getByRole('dialog', { name: 'Checkout' });
+  const capasAbiertas = async (p) => {
+    const nombres = [];
+    for (const capa of await p.getByRole('dialog').all()) {
+      nombres.push((await capa.getAttribute('aria-label')) ?? '(sin nombre)');
+    }
+    return nombres;
+  };
+  const cabecera = (p) => p.locator('header');
+  const celdaDelCarrito = (p) => cabecera(p).getByRole('button', { name: /Carrito/ });
+  const laCabeceraDice = async (p) => (await cabecera(p).locator('button').allInnerTexts())
+    .map((texto) => texto.replace(/\s+/g, ' ').trim());
+  // Lo GUARDADO, que es lo que tiene que sobrevivir, y no lo dibujado. Si el
+  // carrito se midiera por lo que hay en pantalla, un carrito abierto encima de
+  // una copia local vacía pasaría igual.
+  const guardado = (p) => p.evaluate(() => {
+    try {
+      const crudo = JSON.parse(localStorage.getItem('agromarket_cart') || 'null');
+      if (!Array.isArray(crudo)) return [];
+      return crudo.map((item) => `${item?.product?.id}x${item?.quantity}`).sort();
+    } catch { return []; }
+  });
+  const enLaVista = (p) => carrito(p).getByRole('button', { name: /^Quitar/ }).count();
+  const esperarLaCapa = async (p, cual, porQue) => {
+    await esperarA(async () => (await cual(p).count()) === 1,
+      `${porQue}; lo que hay abierto es ${JSON.stringify(await capasAbiertas(p))}`, 25_000);
+  };
+
+  const conSesion = async (p) => {
+    await p.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await cabecera(p).getByRole('button', { name: 'Ingresar', exact: true })
+      .click({ timeout: 25_000 });
+    await login(p).getByLabel(/^Email/).fill('cliente@ejemplo.com');
+    await login(p).getByLabel(/^Contraseña/).fill('cliente123');
+    await login(p).getByRole('button', { name: 'Ingresar', exact: true }).click();
+    await celdaDelCarrito(p).waitFor({ state: 'visible', timeout: 25_000 });
+  };
+  const conAlgoEnElCarrito = async (p) => {
+    await p.locator('article[class*="card"]')
+      .getByRole('button', { name: 'Agregar al carrito' }).first().click({ timeout: 25_000 });
+    await esperarA(async () => (await guardado(p)).length > 0,
+      'no se pudo dejar nada en el carrito', 20_000);
+    return guardado(p);
+  };
+  // Vencer las dos credenciales es lo que hace el tiempo. Con las dos rotas el
+  // servidor contesta que no, y ahí la sesión está CONFIRMADA inválida: no es
+  // una caída, y por eso —y sólo por eso— baja la identidad.
+  const vencerLaSesion = (p) => p.evaluate(() => {
+    localStorage.setItem('access_token', 'este.token.ya.no.vale');
+    localStorage.setItem('refresh_token', 'este.tampoco.vale');
+  });
+
+  try {
+    // === A. La sesión cae, el carrito queda, y queda con puerta ============
+    //
+    // Se mide en los dos anchos del contrato. No es ceremonia: la celda nueva
+    // entra en la banda de acciones, que en celular envuelve, y lo que hay que
+    // ver es que entre sin empujar la marca ni las secciones ni estrenar un
+    // scroll horizontal.
+    for (const pantalla of [
+      { como: 'escritorio', viewport: { width: 1440, height: 900 } },
+      { como: 'celular', viewport: { width: 390, height: 844 } },
+    ]) {
+      const contexto = await browser.newContext({ viewport: pantalla.viewport });
+      const page = await contexto.newPage();
+      try {
+        await conSesion(page);
+        const antes = await conAlgoEnElCarrito(page);
+        assert(antes.length > 0, 'el caso no puede medir nada sin un carrito con algo adentro');
+
+        await vencerLaSesion(page);
+        await celdaDelCarrito(page).click();
+        await esperarLaCapa(page, carrito, `en ${pantalla.como} no se pudo abrir el carrito`);
+        await carrito(page).getByRole('button', { name: 'Continuar compra' }).click();
+        await esperarLaCapa(page, login,
+          `en ${pantalla.como}, con la sesión vencida no se ofreció ingresar`);
+        assert(await checkout(page).count() === 0,
+          `en ${pantalla.como} se abrió el Checkout con la sesión vencida`);
+
+        // La identidad se fue: es la mitad de la premisa de la tarea.
+        const cabeceraCaida = (await laCabeceraDice(page)).join(' | ');
+        assert(/Ingresar/.test(cabeceraCaida) && !/Salir/.test(cabeceraCaida),
+          `en ${pantalla.como} la cabecera sigue afirmando una sesión que ya no existe: `
+          + JSON.stringify(cabeceraCaida));
+
+        // Cerrar el Login devuelve al carrito con lo mismo. Esto ya andaba: se
+        // mide igual, porque la corrección no puede llevárselo puesto.
+        await login(page).getByRole('button', { name: 'Cerrar' }).click();
+        await esperarLaCapa(page, carrito,
+          `en ${pantalla.como}, cerrar el Login no devolvió al carrito`);
+        assert(JSON.stringify(await guardado(page)) === JSON.stringify(antes),
+          `en ${pantalla.como}, cerrar el Login cambió lo guardado: `
+          + `${JSON.stringify(antes)} -> ${JSON.stringify(await guardado(page))}`);
+        assert(await enLaVista(page) === antes.length,
+          `en ${pantalla.como} el carrito volvió vacío a la vista aunque lo guardado siga ahí`);
+
+        // Y acá está el defecto. Se cierra el carrito —que es lo que hace
+        // cualquiera— y hasta ahora no había por dónde volver a abrirlo.
+        await carrito(page).getByRole('button', { name: 'Cerrar' }).click();
+        await esperarA(async () => (await carrito(page).count()) === 0,
+          `en ${pantalla.como} el carrito no se cerró`, 20_000);
+        assert(await celdaDelCarrito(page).count() === 1,
+          `en ${pantalla.como}, sin sesión y con ${antes.length} ítem(s) guardado(s), la cabecera `
+          + 'no ofrece «Carrito»: lo elegido queda detrás de una puerta que dejó de dibujarse. '
+          + `La cabecera dice ${JSON.stringify(await laCabeceraDice(page))}`);
+        assert(await celdaDelCarrito(page).isVisible(),
+          `en ${pantalla.como} la celda «Carrito» está en el documento pero no se ve`);
+
+        // Que exista no alcanza: tiene que abrir el MISMO carrito conservado.
+        await celdaDelCarrito(page).click();
+        await esperarLaCapa(page, carrito,
+          `en ${pantalla.como}, la celda «Carrito» sin sesión no abrió nada`);
+        assert(JSON.stringify(await guardado(page)) === JSON.stringify(antes),
+          `en ${pantalla.como}, reabrir desde la cabecera cambió lo guardado`);
+        assert(await enLaVista(page) === antes.length,
+          `en ${pantalla.como}, el carrito reabierto desde la cabecera está vacío a la vista`);
+        await carrito(page).getByRole('button', { name: 'Cerrar' }).click();
+        await esperarA(async () => (await carrito(page).count()) === 0,
+          `en ${pantalla.como} el carrito no se cerró la segunda vez`, 20_000);
+
+        // Y en una carga nueva también: el estado se lee de lo guardado, no de
+        // un recuerdo de esta pestaña.
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await cabecera(page).getByRole('button', { name: 'Ingresar', exact: true })
+          .waitFor({ state: 'visible', timeout: 25_000 });
+        assert(await celdaDelCarrito(page).count() === 1,
+          `en ${pantalla.como}, recargar sin sesión y con carrito perdió la celda «Carrito»; `
+          + `la cabecera dice ${JSON.stringify(await laCabeceraDice(page))}`);
+
+        // La banda no se deforma por la celda de más: la marca sigue, las cinco
+        // secciones siguen, y no aparece un scroll horizontal.
+        assert(await cabecera(page).getByRole('button', { name: /AgroBoeda/ }).count() === 1,
+          `en ${pantalla.como} la marca no está en la cabecera`);
+        for (const seccion of ['Inicio', 'Mercado', 'Servicios', 'Quiénes somos', 'Contacto']) {
+          assert(await cabecera(page).getByRole('button', { name: seccion, exact: true })
+            .count() === 1, `en ${pantalla.como} falta la sección «${seccion}» en la cabecera`);
+        }
+        const desborde = await page.evaluate(() => ({
+          documento: document.documentElement.scrollWidth,
+          ventana: document.documentElement.clientWidth,
+        }));
+        assert(desborde.documento <= desborde.ventana + 1,
+          `en ${pantalla.como} la cabecera con la celda nueva estrenó scroll horizontal: `
+          + `${desborde.documento} px de documento en ${desborde.ventana} px de ventana`);
+        // El blanco de toque del contrato: 44 px. La celda nueva usa la misma
+        // clase que las otras, y esto lo comprueba en vez de suponerlo.
+        const caja = await celdaDelCarrito(page).boundingBox();
+        assert(caja && caja.height >= 44,
+          `en ${pantalla.como} la celda «Carrito» mide ${caja?.height} px de alto`);
+        // Y se llega por teclado: una puerta que sólo abre el puntero no es una
+        // puerta para todos.
+        const recorrido = [];
+        let alcanzada = false;
+        for (let salto = 0; salto < 30 && !alcanzada; salto += 1) {
+          await page.keyboard.press('Tab');
+          const enFoco = await page.evaluate(() => {
+            const activo = document.activeElement;
+            return activo ? (activo.textContent || '').replace(/\s+/g, ' ').trim() : '';
+          });
+          recorrido.push(enFoco);
+          if (/^Carrito/.test(enFoco)) alcanzada = true;
+        }
+        assert(alcanzada, `en ${pantalla.como} no se llegó por teclado a la celda «Carrito»; `
+          + `el recorrido fue ${JSON.stringify(recorrido)}`);
+
+        medidos.push(`en ${pantalla.como}, con la sesión confirmada inválida la identidad baja, `
+          + `el carrito conserva sus ${antes.length} ítem(s), cerrar el Login lo devuelve y la `
+          + 'cabecera lo vuelve a ofrecer —también al recargar—, sin deformar marca ni secciones '
+          + 'y alcanzable por teclado');
+      } finally {
+        await contexto.close();
+      }
+    }
+
+    // === B. Sin sesión no hay checkout anónimo, y salir sigue vaciando =====
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    try {
+      // B0. Sin sesión y sin nada adentro, no se dibuja un carrito vacío.
+      await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+      await cabecera(page).getByRole('button', { name: 'Ingresar', exact: true })
+        .waitFor({ state: 'visible', timeout: 25_000 });
+      assert((await guardado(page)).length === 0,
+        'la pestaña nueva arrancó con algo en el carrito: el caso no puede medir el vacío');
+      assert(await celdaDelCarrito(page).count() === 0,
+        'sin sesión y con cero ítems la cabecera ofrece un carrito vacío: '
+        + JSON.stringify(await laCabeceraDice(page)));
+      medidos.push('sin sesión y con cero ítems no hay celda de carrito');
+
+      // B1. La puerta sin sesión sigue siendo el Login de siempre, y del otro
+      //     lado se sigue por el flujo vigente. No hay compra anónima.
+      await conSesion(page);
+      const antes = await conAlgoEnElCarrito(page);
+      await vencerLaSesion(page);
+      await celdaDelCarrito(page).click();
+      await esperarLaCapa(page, carrito, 'no se pudo abrir el carrito con la sesión vencida');
+      await carrito(page).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarLaCapa(page, login, 'con la sesión vencida no se ofreció ingresar');
+      await login(page).getByRole('button', { name: 'Cerrar' }).click();
+      await esperarLaCapa(page, carrito, 'cerrar el Login no devolvió al carrito');
+      await carrito(page).getByRole('button', { name: 'Cerrar' }).click();
+      await esperarA(async () => (await carrito(page).count()) === 0,
+        'el carrito no se cerró', 20_000);
+
+      // Ahora sí: se entra por la celda nueva, ya sin ninguna credencial.
+      await celdaDelCarrito(page).click();
+      await esperarLaCapa(page, carrito, 'la celda «Carrito» sin sesión no abrió nada');
+      await carrito(page).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarLaCapa(page, login,
+        'sin sesión, «Continuar compra» no abrió el Login existente');
+      assert(await checkout(page).count() === 0,
+        'sin sesión se abrió el Checkout: no existe checkout anónimo');
+      await login(page).getByLabel(/^Email/).fill('cliente@ejemplo.com');
+      await login(page).getByLabel(/^Contraseña/).fill('cliente123');
+      await login(page).getByRole('button', { name: 'Ingresar', exact: true }).click();
+      await esperarLaCapa(page, checkout,
+        'autenticarse desde el carrito sin sesión no continuó por el flujo vigente');
+      assert(JSON.stringify(await guardado(page)) === JSON.stringify(antes),
+        `ingresar desde el carrito sin sesión cambió lo guardado: ${JSON.stringify(antes)} -> `
+        + JSON.stringify(await guardado(page)));
+      medidos.push('sin sesión, «Continuar compra» abre el Login de siempre, no abre el Checkout, '
+        + 'y con la credencial buena se continúa por el flujo vigente con los mismos ítems');
+
+      // B2. La salida explícita conserva su regla: vacía el carrito. Y con el
+      //     carrito vacío y sin sesión, no queda una celda ofreciendo nada.
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      const salir = cabecera(page).getByRole('button', { name: 'Salir', exact: true });
+      await salir.waitFor({ state: 'visible', timeout: 25_000 });
+      assert(JSON.stringify(await guardado(page)) === JSON.stringify(antes),
+        'recargar con la sesión buena cambió el carrito');
+      await salir.click();
+      await esperarA(async () => (await cabecera(page)
+        .getByRole('button', { name: 'Ingresar', exact: true }).count()) === 1,
+      'la salida explícita no bajó la sesión', 25_000);
+      await esperarA(async () => (await guardado(page)).length === 0,
+        `la salida explícita no vació el carrito: quedó ${JSON.stringify(await guardado(page))}`,
+        20_000);
+      assert(await celdaDelCarrito(page).count() === 0,
+        'después de salir, con el carrito vacío, la cabecera sigue ofreciendo «Carrito»: '
+        + JSON.stringify(await laCabeceraDice(page)));
+      medidos.push('la salida explícita sigue vaciando el carrito, y con cero ítems la celda '
+        + 'no queda ofreciendo un carrito vacío');
+
+      // === C. La FAQ dice los dos medios, con su condición ==================
+      await page.goto(`${FRONTEND_URL}/?section=contact`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: 'Preguntas Frecuentes' })
+        .waitFor({ timeout: 25_000 });
+      const pregunta = page.getByRole('heading', { name: '¿Cuáles son las formas de pago?' });
+      assert(await pregunta.count() === 1, 'la FAQ ya no trae la pregunta de formas de pago');
+      const respuesta = (await pregunta.locator('xpath=following-sibling::p[1]').innerText())
+        .replace(/\s+/g, ' ').trim();
+      assert(/transferencia/i.test(respuesta),
+        `la respuesta de pago dejó de nombrar la transferencia: ${JSON.stringify(respuesta)}`);
+      assert(/mercado\s*pago/i.test(respuesta),
+        'la respuesta de pago sigue sin nombrar Mercado Pago, que el producto cobra: '
+        + JSON.stringify(respuesta));
+      // La condición no es un adorno: `medios_de` sólo ofrece Mercado Pago si
+      // ESE vendedor lo tiene vinculado. Nombrarlo sin la condición sería
+      // prometerle a todo el mundo un medio que la mitad no tiene.
+      assert(/habilitad|vinculad/i.test(respuesta),
+        'la respuesta nombra Mercado Pago sin decir que depende de cada vendedor: '
+        + JSON.stringify(respuesta));
+      for (const invento of [/comisi/i, /plan(es)?\b/i, /suscripci/i, /custodia/i, /cuota/i]) {
+        assert(!invento.test(respuesta),
+          `la respuesta de pago promete algo que esta tarea no habilita (${invento}): `
+          + JSON.stringify(respuesta));
+      }
+      medidos.push('la FAQ de formas de pago nombra transferencia directa y Mercado Pago con su '
+        + 'condición por vendedor, sin comisiones, planes ni custodia');
+    } finally {
+      await contexto.close();
+    }
+  } finally {
+    await browser.close();
+    // Abrir el Checkout sincroniza el carrito contra el servidor, así que este
+    // caso deja una fila donde no había ninguna. Se retira: la cuenta de
+    // demostración queda como estaba.
+    vaciarCarritosDe('cliente@ejemplo.com');
+  }
+
+  return `el carrito sobrevive a la sesión y ahora tiene por dónde volver a abrirse: ${medidos.join('; ')}`;
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

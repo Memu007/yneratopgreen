@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import styles from './Header.module.css';
 import { useAuth } from '../../hooks/useAuth';
+import { useCart } from '../../hooks/useCart';
 import { CartButton } from '../Cart/CartModal';
 import { useNavegacionActual } from '../../navegacion/navegacion';
 import type { Seccion } from '../../navegacion/politica';
@@ -74,6 +75,12 @@ export const Header: React.FC<HeaderProps> = ({
   onNavigate,
 }) => {
   const { user, isAuthenticated, logout } = useAuth();
+  // El carrito sobrevive a la sesión: cuando la credencial se confirma
+  // inválida se baja la identidad y lo elegido NO se toca. La cabecera tiene
+  // que saberlo, porque es la única que dibuja la puerta para volver a verlo.
+  // Es el mismo estado que ya usa `CartButton`, leído del mismo contexto: no
+  // hay un segundo carrito ni un espejo que se pueda quedar viejo.
+  const { itemCount } = useCart();
   const { showToast } = useToast();
   // Salir de la sesión no es ir a una sección, pero es una salida igual: pasa
   // por la misma guardia que la cabecera y el pie.
@@ -210,9 +217,25 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             </>
           ) : (
-            <button className={styles.celda} onClick={onLoginClick}>
-              Ingresar
-            </button>
+            <>
+              {/* Sin sesión la celda aparece SÓLO si hay algo adentro. Un
+                  carrito vacío no es una puerta: es un botón que promete algo
+                  que no está, en la banda donde cada celda dice qué hace.
+
+                  Con algo adentro sí, y no es una comodidad: la sesión se
+                  puede confirmar inválida mientras la persona mira lo que
+                  eligió, y ahí la identidad baja pero el carrito queda. Sin
+                  esta celda quedaba guardado y sin ninguna forma de volver a
+                  abrirlo —cancelar el ingreso lo devolvía una vez, y al
+                  cerrarlo desaparecía—. Abre el MISMO carrito conservado: es
+                  el mismo `onCartClick` de la rama con sesión. */}
+              {itemCount > 0 && (
+                <CartButton onClick={onCartClick} className={styles.celda} />
+              )}
+              <button className={styles.celda} onClick={onLoginClick}>
+                Ingresar
+              </button>
+            </>
           )}
         </div>
 

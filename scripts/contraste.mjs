@@ -501,6 +501,38 @@ for (const medida of MEDIDAS) {
   }
 
   {
+    // La cabecera sin sesión pero con carrito. No la alcanza ninguna otra
+    // superficie: sin sesión el catálogo no deja agregar nada —la tarjeta
+    // ofrece ingresar— y con sesión la celda ya estaba. Se llega como se llega
+    // de verdad: se elige algo, la credencial se confirma inválida mientras la
+    // persona lo mira, la identidad baja y el carrito queda. Entra con la
+    // cuenta del comprador y sale sin ella.
+    const ctx = await sesion({ viewport }, comprador);
+    const page = await ctx.newPage();
+    await page.goto(`${WEB}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: /^Agregar/ }).first().click();
+    await page.getByRole('button', { name: /^Carrito/ }).click();
+    const elCarrito = page.getByRole('dialog', { name: 'Mi carrito' });
+    await elCarrito.waitFor({ state: 'visible', timeout: ESPERA });
+
+    await page.evaluate(() => {
+      window.localStorage.setItem('access_token', 'este.token.ya.no.vale');
+      window.localStorage.setItem('refresh_token', 'este.tampoco.vale');
+    });
+    await elCarrito.getByRole('button', { name: 'Continuar compra' }).click();
+    const ingreso = page.getByRole('dialog', { name: 'Ingresar' });
+    await ingreso.waitFor({ state: 'visible', timeout: ESPERA });
+    await ingreso.getByRole('button', { name: 'Cerrar' }).click();
+    await elCarrito.waitFor({ state: 'visible', timeout: ESPERA });
+    await elCarrito.getByRole('button', { name: 'Cerrar' }).click();
+    await elCarrito.waitFor({ state: 'hidden', timeout: ESPERA });
+    await revisar(page, `${medida.n} cabecera sin sesión con carrito`,
+      page.locator('header').getByRole('button', { name: /^Carrito/ }));
+
+    await ctx.close();
+  }
+
+  {
     const ctx = await sesion({ viewport }, vendedor);
     const page = await ctx.newPage();
     await page.goto(WEB, { waitUntil: 'domcontentloaded' });
