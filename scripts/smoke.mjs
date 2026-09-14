@@ -5297,9 +5297,18 @@ async function prepararEscenarioDeFletes() {
   const aCordoba = km(destino, origenB);
   assert(aCordoba > aRosario, 'las distancias del padrón no son las esperadas');
 
+  // Disponible es `stock - stock_reservado`, que es lo que mira la vitrina, y
+  // no `stock` a secas. El caso 90 deja a propósito una publicación con stock 1
+  // y ese uno reservado —la orden ganadora todavía sin pagar—: para la base
+  // tiene stock, para quien compra dice «Sin stock». Como el desempate es por
+  // `p.id` y los id son UUID, esa publicación caía primera de su vendedor de
+  // vez en cuando, y ahí el caso 114 se encontraba una tarjeta que no ofrecía
+  // agregar. Un rojo cada tantas corridas y por azar del identificador; medido:
+  // `Smoke última bolsa …` con stock 1 y `stock_reservado` 1.
   const publicaciones = queryRows(`
     SELECT p.id, p.seller_id, p.name, p.stock FROM products p
-    WHERE p.status = 'ACTIVE' AND p.stock > 0 AND p.publication_type <> 'servicio'
+    WHERE p.status = 'ACTIVE' AND p.publication_type <> 'servicio'
+      AND p.stock > p.stock_reservado
     ORDER BY p.seller_id, p.id
   `);
   const primeraDeCada = new Map();
@@ -26914,6 +26923,12 @@ await runCase(169, 'El reinicio de la API prueba que cambió el proceso, o falla
     const respuesta = await fetch(`${API_URL}/health`).catch(() => null);
     return respuesta?.ok === true;
   };
+  // Que siga en pie se comprueba esperando la condición, no con un disparo
+  // único. Estos escenarios sondean el puerto y matan procesos alrededor de la
+  // API; que un `/health` suelto no llegue a tiempo no es que la API se haya
+  // caído, y afirmarlo con una sola lectura convierte una corrida cargada en un
+  // rojo. Si de verdad se la llevaron puesta, no vuelve y esto igual falla.
+  const exigirQueLaApiSiga = (porQue) => esperarA(laApiContesta, porQue, 20_000);
 
   const SIN_CONTENEDOR = [
     '#!/usr/bin/env bash',
@@ -26926,7 +26941,7 @@ await runCase(169, 'El reinicio de la API prueba que cambió el proceso, o falla
   assert(servicio.donde !== 'nadie identificable',
     'no encontré quién sirve la API: ni contenedor `topgreen-api` ni uvicorn nativo. '
     + 'Sin eso no hay reinicio real que comprobar');
-  assert(await laApiContesta(), 'la API no contesta antes de empezar');
+  await exigirQueLaApiSiga('la API no contesta antes de empezar');
 
   const medidos = [];
   let fantasma = null;
@@ -26999,7 +27014,7 @@ await runCase(169, 'El reinicio de la API prueba que cambió el proceso, o falla
       `el rojo no dice que el puerto lo atiende otro servicio:\n${suplantado.stderr}`);
     assert(!vivoDeVerdad(fantasma.pid),
       'el comando ni siquiera mató lo que creía que era la API: el escenario no probó nada');
-    assert(await laApiContesta(), 'el escenario del suplantado se llevó puesta la API de verdad');
+    await exigirQueLaApiSiga('el escenario del suplantado se llevó puesta la API de verdad');
     medidos.push('si el puerto sigue vivo después de matar lo que creía la API, da rojo');
 
     // 4. Y el camino bueno, con el entorno tal cual es: la identidad de quien
@@ -27016,7 +27031,7 @@ await runCase(169, 'El reinicio de la API prueba que cambió el proceso, o falla
       `antes la API la servía ${antes.donde} y después ${despues.donde}`);
     assert(despues.quien && despues.quien !== antes.quien,
       `el reinicio dejó la misma identidad: [${antes.quien}]`);
-    assert(await laApiContesta(), 'la API no contesta después del reinicio real');
+    await exigirQueLaApiSiga('la API no contesta después del reinicio real');
     medidos.push(`el reinicio real cambió el ${antes.donde}: [${antes.quien}] → `
       + `[${despues.quien}]`);
   } finally {
