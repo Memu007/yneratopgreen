@@ -44,6 +44,13 @@ export const SUPERFICIES = [
   { id: 'catálogo (hover)' },
   { id: 'detalle de producto' },
   { id: 'carrito' },
+  // La cabecera con la celda del carrito pero SIN sesión. No la alcanza
+  // ninguna otra: sin sesión el catálogo no deja agregar nada —la tarjeta
+  // ofrece ingresar—, y con sesión la celda ya estaba desde siempre. Existe
+  // desde que el carrito sobrevive a una credencial que se confirmó inválida,
+  // y una celda que sólo aparece en ese estado es exactamente la que nadie
+  // revisa a mano.
+  { id: 'cabecera sin sesión con carrito' },
   { id: 'checkout: envío' },
   { id: 'checkout: traslado del pedido' },
   { id: 'checkout: transportista elegido' },

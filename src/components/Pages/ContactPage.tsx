@@ -302,7 +302,17 @@ export const ContactPage: React.FC<ContactPageProps> = ({ cotizacion = null }) =
             </div>
             <div className={styles.faqCard}>
               <h3>¿Cuáles son las formas de pago?</h3>
-              <p>Aceptamos transferencias bancarias directas al vendedor.</p>
+              {/* Decía sólo «transferencias bancarias directas al
+                  vendedor», y el producto también cobra por Mercado Pago:
+                  `medios_de` lo ofrece cuando ESE vendedor lo tiene
+                  vinculado. Prometer de menos es tan inexacto como
+                  prometer de más, así que se nombran los dos —y la
+                  condición va con el segundo, porque no todos los
+                  vendedores lo tienen—. */}
+              <p>
+                Podés pagar por transferencia bancaria directa al vendedor y, cuando ese
+                vendedor lo tenga habilitado, también con Mercado Pago.
+              </p>
             </div>
             <div className={styles.faqCard}>
               <h3>¿Realizan envíos a todo el país?</h3>
