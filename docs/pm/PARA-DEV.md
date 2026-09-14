@@ -4,125 +4,83 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 `docs/pm/PARA-PM.md` y no edita este archivo.
 
 Este archivo contiene únicamente la tarea activa y su hilo de devoluciones
-hasta el cierre. La historia anterior permanece en Git; la instantánea previa
-a esta poda está en `0f89e78`.
-
-Antes de empezar:
-
-```bash
-git pull origin main
-cat docs/pm/PARA-DEV.md
-```
+hasta el cierre. La historia anterior permanece en Git; el cierre de
+`CAT-PAGE-1` está en `REPRODUCCION-CAT-PAGE-1-2026-09-14.md`.
 
 ---
 
-## 2026-09-14 — CAT-PAGE-1
+## 2026-09-14 — QUERY-IMG-1
 
 **Base excepcional autorizada por PM:** Emi postergó la publicación de `main`
 para no disparar Railway. Continuá en `claude/dev-role-repo-3l0kp3` después de
-traer el relevo PM que contiene esta tarea; ese relevo incorpora el merge
-aceptado `c973c6f`. No vuelvas a basarte en el `origin/main` viejo ni publiques
-producto. Registrá el SHA exacto de este relevo como base antes de editar.
+traer este relevo, que contiene el merge local aceptado `fafa5cb`. No te bases
+en `origin/main`, que sigue viejo. Registrá el SHA exacto del relevo como base.
 
-### Problema reproducido
+### Problema confirmado y prioridad
 
-`GET /api/catalog/products` ya devuelve `total`, `page`, `pages`, `has_next` y
-`has_prev`, pero el Mercado pide siempre `page=1&page_size=100`. Con más de cien
-resultados, la publicación 101 es inaccesible.
+El inventario `acbf3b6` midió el listado del Mercado: 24 publicaciones producen
+26 consultas SQL, 24 de ellas a `product_images`. El código vigente confirma la
+raíz: `backend/app/api/catalog.py` ya hace un `outerjoin` con la imagen primaria,
+pero no selecciona su URL y vuelve a consultar una vez por cada tarjeta.
 
-Además, ordenar hoy reordena sólo la página descargada, y subcategoría y
-calificación mínima se filtran en el navegador después de paginar. Por eso el
-conteo, el orden y los filtros dejan de representar el conjunto completo.
+Después de cerrar la paginación, este es el siguiente borde de volumen: la
+cantidad de consultas no debe crecer con el tamaño de página.
 
-Leé `docs/pm/ux2c/DEUDA-PAGINACION.md`, el patrón ya aceptado de paginación en
-`AdminPanel.tsx` y el caso que agregues; no abras una investigación nueva.
+### Alcance mínimo
 
-### Decisión PM y alcance mínimo
-
-1. Usá paginación simple de servidor: **Anterior**, **Página X de Y** y
-   **Siguiente**, con 24 resultados por página. No scroll infinito ni “ver más”
-   acumulativo.
-2. Conservá `page` y `sort` en la URL del Mercado. Atrás/Adelante debe restaurar
-   página, orden y filtros sin carreras. Cambiar búsqueda, filtro u orden vuelve
-   a la página 1.
-3. El total visible sale del servidor y describe todo el conjunto filtrado, no
-   sólo las tarjetas de la página.
-4. Todos los filtros visibles deben aplicarse en la API antes de contar y
-   paginar. En particular, subcategoría y calificación mínima dejan de filtrar
-   una página parcial en el navegador.
-5. Todo orden visible se aplica en la API antes de paginar, con desempate
-   determinista para que una publicación no salte entre páginas. Conservá:
-   Más recientes, Menor precio, Mayor precio y Mejor calificados. Retirá “Más
-   relevantes”: hoy no existe un ranking que sostenga esa promesa.
-6. La vista Cuadrícula/Lista sigue siendo una preferencia visual local y no se
-   reinicia al cambiar de página.
-
-Reutilizá el contrato y estado existentes. No agregues dependencia, librería de
-routing, caché paralela ni una segunda fuente de filtros.
+1. Medí primero el número de consultas SQL reales de
+   `GET /api/catalog/products` con dos tamaños de página, incluido 24, y
+   conservá ese rojo contra la base.
+2. Hacé que la URL de la imagen primaria viaje en la consulta del listado que
+   ya trae producto, vendedor y ubicación. Eliminá sólo la consulta por tarjeta.
+3. Conservá exactamente el contrato y la semántica actuales: misma
+   `primary_image` para una publicación con imagen primaria, `null` cuando no
+   hay, mismo total, orden, filtros y paginación.
+4. No cargues la colección completa de imágenes para resolver una URL y no
+   agregues caché, dependencia ni una segunda consulta masiva si el join vigente
+   alcanza.
 
 ### Regresión exigida
 
-Agregá el caso 171. Debe fabricar de forma determinista y retirar al final más
-de 100 publicaciones activas de un mismo conjunto, y comprobar en UI + API:
+Agregá el caso 172. Debe fabricar o identificar de forma determinista un
+conjunto con publicaciones con imagen primaria y sin imagen, llamar al endpoint
+real y contar sentencias SQL durante la petición.
 
-- total completo correcto y 24 tarjetas como máximo por página;
-- una publicación posterior a la 100 es alcanzable desde los controles;
-- páginas consecutivas no repiten ni pierden publicaciones;
-- precio, fecha y calificación ordenan el conjunto completo, no cada página;
-- subcategoría y calificación mínima producen total y páginas coherentes;
-- cambiar filtro/orden vuelve a página 1 y Atrás/Adelante restaura el estado;
-- los controles extremos quedan deshabilitados y son operables por teclado.
+Debe demostrar:
 
-El caso debe dar rojo contra la base publicada que contiene `c973c6f` y verde
-contra la candidata. No lo hagas pasar leyendo fuente ni fabricando en el
-navegador el estado que debería producir el servidor.
+- rojo contra la base porque las consultas a `product_images` crecen con las
+  tarjetas;
+- verde en la candidata con un número acotado que no crece al pasar del tamaño
+  chico a 24;
+- URLs de imagen y `null` idénticos a los esperados por base, no sólo un conteo
+  de consultas;
+- total, IDs y orden de la respuesta sin cambios;
+- la medición no cuenta el SQL con el que el propio caso fabrica o inspecciona
+  datos.
 
 ### Compuertas
 
-- caso 171 focal desde base limpia y su rojo discriminante;
+- caso 172 focal y rojo discriminante contra la base;
+- casos 171 y 172 juntos;
 - suite smoke completa desde base limpia;
-- build, lint, `tsc --noEmit`, `node --check` y `git diff --check`;
-- a11y y contraste, incluyendo paginador en escritorio y celular;
-- revisión visual explícita 1440×900 y 390×844.
+- build, lint, `tsc --noEmit`, `node --check`, `compileall`, `pip check` y
+  `git diff --check`;
+- a11y y contraste sólo si el alcance se desvía y cambia una superficie visible.
 
-### Fuera de alcance
+### Fuera de alcance y freno
 
-- No tocar imágenes ni resolver `QUERY-IMG-1`.
-- No cambiar taxonomía, seed canónico, búsqueda geográfica, carrito, checkout,
-  pagos, Railway ni datos remotos.
-- No agregar carga automática, scroll infinito, selector de tamaño de página o
-  números para saltar a cualquier página.
-- No empezar `QUERY-IMG-1` ni otra tarea.
-- No integrar ni desplegar.
+- No optimices carrito, órdenes, administración, detalle ni otros posibles
+  N+1: registralos aparte si los medís, sin tocarlos.
+- No cambies archivos de imagen, carga/almacenamiento, Cloudinary, UI, fotos del
+  seed, esquema, migraciones, filtros, orden, paginación, Railway ni datos
+  remotos.
+- Frená y consultá si la base permite varias imágenes primarias por producto y
+  resolverlo sin cambiar cardinalidad exige una restricción/migración, o si la
+  medición contradice el N+1 confirmado.
+- No empieces `RISK-REC-1`, no integres y no despliegues.
 
 ### Entrega
 
-Entregá rama, SHA base, SHA candidato, diff completo, rojo contra base,
-comandos y resultados. Reemplazá `PARA-PM.md` con un informe breve y frená.
-
----
-
-## 2026-09-14 — Devolución R1 sobre `a521631`
-
-Conservá la solución de paginación, filtros y orden. Build, lint, `node --check`
-y `diff --check` están verdes en la revisión PM. Hay una devolución:
-
-1. En `App.tsx`, `consultaVigente` todavía omite `selectedSubcategory`,
-   `minRating`, `orden` y `pagina`, aunque ahora todos cambian la petición.
-   Esa firma existe para que el render anterior al efecto no presente la
-   respuesta vieja como vigente. Hoy, al avanzar de página o cambiar esos
-   controles, el rótulo cambia en el acto pero las tarjetas anteriores quedan
-   visibles y sin estado de carga hasta que el efecto arranca. El comentario
-   que dice que subcategoría y calificación no viajan también quedó falso.
-Corrección mínima:
-
-- incluí en la firma todas las dimensiones que ahora viajan al catálogo y
-  actualizá el comentario;
-- extendé el caso 171 demorando de forma controlada una respuesta de página u
-  orden: durante la demora no debe mostrarse la página anterior como si fuera
-  la nueva. El negativo debe pasar a rojo si se vuelve a omitir la dimensión;
-- repetí 171, las puertas afectadas y la suite completa; reemplazá
-  `PARA-PM.md` con base, candidato final, diff y resultados.
-
-No rediseñes el paginador, no cambies el contrato de API y no empieces otra
-tarea. No integres ni despliegues.
+Reemplazá `docs/pm/PARA-PM.md` con rama, SHA base, SHA candidato, diff completo,
+conteos SQL antes/después, rojo/verde, pruebas, riesgos y cualquier hallazgo
+adyacente no implementado. Frená después de entregar.

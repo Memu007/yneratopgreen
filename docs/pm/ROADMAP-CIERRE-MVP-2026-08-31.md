@@ -172,8 +172,8 @@ o un rediseño nuevo.
 
 | Orden | Pieza | Fuente | Condición de entrada |
 |---:|---|---|---|
-| 19 | **CAT-PAGE-1 — activa, devolución R1** | deuda UX-2C y ADM-2 como patrón | `a521631`/`473ae19`: paginación y filtros preservados; falta incluir toda dimensión remota en `consultaVigente` y medir la transición con respuesta demorada. |
-| 20 | **QUERY-IMG-1** | C2 | Medir primero el N+1 de imágenes; optimizar sólo con evidencia y conservar respuestas. |
+| 19 | **CAT-PAGE-1 — aceptada, integración local** | deuda UX-2C y ADM-2 como patrón | `a521631` + R1 `575f757` + informe `b1cc77f`; merge local `fafa5cb`. PM reprodujo 171 verde, rojo al omitir `pagina` de la firma y verde tras restaurar. Sin publicación. |
+| 20 | **QUERY-IMG-1 — activa** | C2 | Medir primero el N+1 de imagen principal del listado; optimizar sólo con evidencia y conservar exactamente las respuestas. |
 | 21 | **RISK-REC-1** | R1, R4 y R5 | Reproducir concurrencia de stock, señal frágil de reenvío y grupo sin medio de pago; promover únicamente defectos reales. |
 
 Cinco mil visitas mensuales no justifican reescribir la arquitectura. Esta

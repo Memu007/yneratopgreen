@@ -17,6 +17,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Perfil | ✅ | `GET /auth/me` y `PATCH /auth/me` responden `200` |
 | Buscador con filtro por **categoría** | ✅ | Smoke test `200`, filtros de categoría, precio y stock aplicados |
 | Buscador con filtro por **ubicación** | ✅ | Verificacion completa del 2026-08-05: 13/13 localidades y 32/32 publicaciones coincidieron entre interfaz y SQL; selectores encadenados y `locality_id` en URL. Ver `EVIDENCIA-FILTROS-UBICACION.md` |
+| Paginación, orden y total del catálogo | ✅ | Caso 171 sobre 115 publicaciones: 24 por página, la 101 accesible, total/filtros/órdenes aplicados en servidor y navegación sin presentar resultados viejos como vigentes. Producto `575f757`, reproducción PM en `REPRODUCCION-CAT-PAGE-1-2026-09-14.md` |
 | Carrito de compras | ✅ | Smoke 170: una sesión confirmada inválida conserva los ítems y la cabecera permite reabrirlos; el Login no habilita checkout anónimo y el logout explícito vacía el carrito |
 | Historial de pedidos | ✅ | Smoke test "mis compras": `200`, 3 compras |
 
@@ -87,7 +88,7 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 
 | Requisito | Estado |
 |-----------|--------|
-| Pruebas integrales | ✅ `POST-INTEGRATION-CLEAR-1`: producto `eb62d3d`, arnés `a7ed544`, informe `48bae67`, merge local `c973c6f`. Dev 169/170 con único rojo ambiental 131; ese caso no cambió y ya estaba verde en PM. PM reprodujo 170 verde y rojo contra base, 169 verde, a11y 70/70 y contraste 78/78. Publicación pendiente. |
+| Pruebas integrales | ✅ `CAT-PAGE-1`: producto final `575f757`, informe `b1cc77f`, merge local `fafa5cb`. Dev 170/171 con único rojo ambiental 131; PM reprodujo 171 verde, su negativo discriminante y el verde restaurado. A11y 72/72 y contraste 80/80 por Dev. Publicación pendiente. |
 | Carga inicial de datos | ✅ Seed idempotente con 30 publicaciones en 12 categorías y 9 provincias, más 4.028 localidades. Verificado corriéndolo dos veces sin duplicar |
 | Despliegue en producción | ❌ |
 | Capacitación del panel de administración | ❌ |

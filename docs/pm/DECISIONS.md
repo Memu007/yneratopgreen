@@ -5,6 +5,19 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-09-14 — Página y orden del Mercado describen la entrada, no crean una por clic
+
+`page` y `sort` quedan en la URL y se restauran junto con los filtros al volver
+a una entrada del historial, pero los cambios dentro del Mercado usan
+`replaceState`, igual que los filtros existentes. Por lo tanto, **Atrás no
+recorre una por una las páginas visitadas**: vuelve a la entrada anterior y
+restaura el estado completo que esa entrada tenía.
+
+Es la política mínima y coherente con `NAV-URL-1`: evita llenar el historial por
+cada ajuste del catálogo y conserva enlaces compartibles y recarga. Convertir
+cada página en una entrada propia sería otro comportamiento de producto y no
+forma parte de `CAT-PAGE-1`.
+
 ## 2026-09-13 — Integrar y desplegar la candidata aceptada antes del backup
 
 Emi autorizó expresamente publicar en `main` la composición ya aceptada

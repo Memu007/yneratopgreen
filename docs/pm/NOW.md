@@ -7,27 +7,26 @@ Actualizado: 2026-09-14.
 ## Resumen ejecutivo
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 4. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
-- **`main` local:** contiene `POST-INTEGRATION-CLEAR-1` mediante `c973c6f`. `origin/main` continúa en `2d8ecfd`; el cambio no fue publicado ni desplegado.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; producto `eb62d3d`, arnés final `a7ed544` e informe `48bae67`, integrados sólo localmente mediante `c973c6f`.
-- **Última decisión PM:** `POST-INTEGRATION-CLEAR-1` **ACEPTADA E INTEGRADA LOCALMENTE**. Falta autorización explícita de Emi para empujar producto a `main`, porque Railway conserva auto-deploy.
-- **Rama Dev:** candidata `a521631` e informe `473ae19` para `CAT-PAGE-1`, basados en `b2826d1`.
-- **Tarea activa:** `CAT-PAGE-1`, responsable Dev, devolución R1. La paginación queda; falta cerrar una carrera de estado.
+- **`main` local:** contiene `CAT-PAGE-1` mediante `fafa5cb`. `origin/main` continúa en `2d8ecfd`; esta composición no fue publicada ni desplegada.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; producto final `575f757` e informe `b1cc77f`, integrados sólo localmente mediante `fafa5cb`.
+- **Última decisión PM:** `CAT-PAGE-1` **ACEPTADA E INTEGRADA LOCALMENTE**. Falta autorización explícita de Emi para empujar producto a `main`, porque Railway conserva auto-deploy.
+- **Tarea activa:** `QUERY-IMG-1`, responsable Dev. Debe medir y eliminar únicamente el N+1 de imagen principal del listado del Mercado.
 
-## Revisión pendiente — CAT-PAGE-1 R1
+## Última aceptación PM — CAT-PAGE-1
 
-La API y el paginador de `a521631` mantienen el alcance pedido, y las puertas
-estáticas pasan. La candidata no se acepta todavía:
+Producto inicial `a521631`, corrección R1 `575f757`, informe final `b1cc77f` e
+integración local `fafa5cb`. La PM comprobó de forma independiente:
 
-- `consultaVigente` sigue omitiendo subcategoría, calificación mínima, orden y
-  página aunque ahora los cuatro cambian la consulta al servidor;
-- por eso, en el render anterior al efecto, el control ya anuncia la página u
-  orden nuevos mientras la grilla anterior se presenta como contestada;
-- el comentario que justifica omitir subcategoría/calificación quedó falso;
-- el caso 171 no demora una respuesta para discriminar esa carrera;
+- caso 171 sobre la candidata, con 115 publicaciones y cinco páginas: **1/1**;
+- sabotaje temporal omitiendo `pagina` de `consultaVigente`: **0/1**, con la
+  página anterior presentada bajo «Página 2 de 5» y sin estado de carga;
+- candidata restaurada y limpia: caso 171 nuevamente **1/1**;
+- build, lint, `tsc --noEmit`, sintaxis del arnés y `diff-check`: verdes.
 
-Dev debe corregir la firma de consulta, agregar un negativo con respuesta
-demorada y actualizar su informe con la R1. No se reabre el diseño de
-paginación.
+Dev obtuvo 170/171 en la suite completa desde base limpia; el único rojo fue el
+caso 131 ambiental, heredado y sin relación con esta pieza. También obtuvo
+a11y 72/72 y contraste 80/80. Evidencia durable:
+`REPRODUCCION-CAT-PAGE-1-2026-09-14.md`.
 
 ## Última aceptación PM — POST-INTEGRATION-CLEAR-1
 
@@ -159,7 +158,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev ejecuta `CAT-PAGE-1` sobre `claude/dev-role-repo-3l0kp3`, desde el relevo PM posterior a `c973c6f`.
+1. Dev ejecuta `QUERY-IMG-1` sobre `claude/dev-role-repo-3l0kp3`, desde el relevo PM posterior a `fafa5cb`.
 2. Emi autoriza más adelante la publicación controlada a `main`; ese push tocará producto y activará el auto-deploy de Railway.
 3. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
 4. Separar de forma controlada integración y producción; cualquier cambio de producto exige nueva aceptación antes de publicar.
