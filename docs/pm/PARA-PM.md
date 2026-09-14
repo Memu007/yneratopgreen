@@ -2,149 +2,177 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## CAT-PAGE-1 — R1
+## QUERY-IMG-1
 
 | | |
 | --- | --- |
 | **Rama** | `claude/dev-role-repo-3l0kp3` |
-| **SHA base** | `617a71b` — tu relevo con la devolución R1, que ya contiene `a521631` y `473ae19` |
-| **SHA candidato** | `575f757` |
-| **SHA probado** | `575f757` — este informe es el commit siguiente y no toca producto ni pruebas |
-| **Diff desde `617a71b`** | `src/App.tsx` (+34/−17) y `scripts/smoke.mjs` (+192). Nada más |
-| **Estado** | en mi rama. No integré, no desplegué, no rediseñé el paginador, no cambié el contrato de la API, ni toqué Railway, datos remotos, pagos, imágenes, taxonomía ni seed. No empecé `QUERY-IMG-1` |
+| **SHA base** | `5410bef` — tu relevo, que contiene el merge local aceptado `fafa5cb` |
+| **SHA candidato** | `6e498fd` |
+| **SHA probado** | `6e498fd` — este informe es el commit siguiente y no toca producto ni pruebas |
+| **Diff desde `5410bef`** | `backend/app/api/catalog.py` (+38/−11) y `scripts/smoke.mjs` (+272). Nada más |
+| **Estado** | en mi rama. No integré, no desplegué, no toqué imágenes, carga, Cloudinary, UI, seed, esquema, migraciones, filtros, orden, paginación, Railway ni datos remotos. No empecé `RISK-REC-1` |
 
 ---
 
-### Tenías razón, y se ve peor midiéndolo que leyéndolo
+### 1. La medición, antes de tocar nada
 
-`consultaVigente` omitía las cuatro dimensiones que `a521631` hizo viajar al
-servidor. El comentario que justificaba dejar afuera dos de ellas —«no viajan a
-la consulta»— describía el código anterior a mi propia tarea: lo dejé sin
-actualizar cuando las hice viajar.
+Confirmada, y cuantificada. Cuento **recorridos de `product_images`** con
+`pg_stat_user_tables`, alrededor de la petición real:
 
-Lo reproduje antes de escribir la corrección, con la respuesta del catálogo
-demorada a propósito y muestreando el DOM cuadro a cuadro. Hacer clic en
-«Siguiente»:
+| `page_size` | tarjetas | recorridos de `product_images` |
+| --- | --- | --- |
+| 6 | 6 | **8** |
+| 24 | 24 | **26** |
+| 48 | 48 | **50** |
+
+Es exactamente `n + 2`: el conteo, el listado, y una consulta por tarjeta.
+`products` se queda fijo en 12 en los tres casos. Con la candidata: **1, 1 y 1**.
+
+**Por qué cuento recorridos y no sentencias.** Contar sentencias desde adentro
+exigiría instrumentar la aplicación, y `pg_stat_statements` exige precargarlo en
+`shared_preload_libraries` y reiniciar el servidor: sería agregarle a la suite
+una dependencia de entorno sólo para poder medir. `pg_stat_user_tables` ya lleva
+la cuenta sin configurar nada, y es una medida **más fuerte**: una consulta por
+tarjeta son N recorridos, y también lo serían N recorridos escondidos dentro de
+una sola sentencia —por ejemplo una subconsulta correlacionada, que pasaría un
+conteo de sentencias sin arreglar nada—.
+
+### 2. Lo que encontré midiendo, y que toca tu condición de freno
+
+La corrección mínima que describís —seleccionar la URL del `outerjoin` que ya
+estaba— **no era segura**. Tres mediciones, en este orden:
+
+1. **La base no impide dos imágenes primarias** para la misma publicación. No
+   hay índice único sobre `(product_id, is_primary)`: sólo la clave primaria y
+   un índice por `product_id`.
+2. **El join vigente ya infla el conteo hoy.** Fabriqué una segunda primaria
+   sobre una publicación real: el `total` pasó de 1 a 2 con **un solo ítem** en
+   la respuesta. Hoy no se nota porque las filas duplicadas son idénticas y se
+   colapsan, pero el total ya está mal.
+3. **Con la corrección mínima, la tarjeta sale dos veces.** Apliqué sólo
+   `ProductImage.url` al SELECT y medí: `total=2, aparece 2 veces`, con las dos
+   URLs. Al entrar la URL, las filas dejan de ser idénticas y ya no se colapsan.
+
+Y hay un cuarto efecto que el caso destapó solo: como el colapso ocurre
+**después** de paginar, la página de la base **sale corta**. Con 4 publicaciones
+de dos primarias en el conjunto, `page_size=6` devolvía 3 tarjetas y
+`page_size=24` devolvía 20.
+
+Tu freno decía: consultá **si** resolverlo sin cambiar cardinalidad exige una
+restricción o migración. **No la exige**, y por eso seguí en vez de frenar. La
+unión pasa a ser contra una subconsulta que elige **una** imagen por
+publicación: la de menor `display_order`, y a igualdad de orden siempre la
+misma. Es una sentencia dentro de la misma consulta —no una segunda ida a la
+base, no una colección de imágenes cargada entera, sin caché y sin dependencia—
+y no puede cambiar la cardinalidad del listado pase lo que pase con los datos.
+
+Medido con la candidata y dos primarias: `total=1`, una sola tarjeta, y la
+imagen de menor orden.
+
+**Lo que NO hice y te dejo a vos:** un índice único parcial que impida dos
+primarias de entrada. Eso sí es migración y está fuera de alcance. Con esta
+entrega el listado ya no depende de que ese índice exista, pero el dato sigue
+pudiendo ensuciarse desde cualquier otro lado.
+
+### 3. El contrato, comprobado fila por fila
+
+Volqué la respuesta de **doce consultas** —páginas 1, 2 y 9; `page_size` 6, 24,
+48 y 100; los cuatro órdenes; `in_stock`; `search`; `min_price`— contra la base
+y contra la candidata, comparando `total`, `page`, `pages`, `has_next`,
+`has_prev`, y la lista de `[id, primary_image]` **en orden**.
 
 ```
-  +   0ms  Página 1 de 9   ocupado=false  24 tarjetas  Smoke calificacion…
-  +  92ms  Página 2 de 9   ocupado=false  24 tarjetas  Smoke calificacion…  ← acá
-  + 119ms  (sin paginador) ocupado=true    0 tarjetas
-  +1709ms  Página 2 de 9   ocupado=false  24 tarjetas  Pag145… publicacion 17
+12 consultas; 22 tarjetas con imagen, 327 sin imagen (null)
+IDÉNTICAS: total, páginas, ids, orden y primary_image coinciden en las 12 consultas
 ```
 
-La ventana dura entre **16 y 38 ms** —cinco corridas—: el rótulo ya dice «Página
-2» sobre las veinticuatro tarjetas de la 1, sin ningún estado de carga. No es un
-cuadro suelto, es todo lo que se pinta hasta que arranca el efecto, porque los
-efectos corren después de dibujar. Es el mismo agujero que encontró el caso 167
-al soltar un filtro, con otras cuatro dimensiones.
+### 4. El caso 172
 
-### La corrección
+Fabrica **30 publicaciones** y las retira al final, repartidas a propósito:
 
-Mínima y sin nada alrededor:
+- 10 con imagen primaria **y** una secundaria al lado, para que elegir la
+  primaria no sea elegir «la única»;
+- 8 sin ninguna imagen → `primary_image` null;
+- 8 con **sólo** una imagen no primaria → null también: tener imagen no es tener
+  imagen primaria, y un join mal acotado las confundiría;
+- 4 con **dos** imágenes primarias.
 
-1. En la firma entra ahora todo lo que viaja: `subcategoriaElegida?.id`,
-   `minRating`, `ordenPedido.sortBy`, `ordenPedido.sortOrder` y `pagina`.
-   Entran los **valores**, no los objetos: lo que describe la consulta es el id
-   que viaja, no la identidad del objeto que lo envuelve.
-2. Los dos memos que derivan esos valores suben por encima de la firma, porque
-   la firma los necesita. No les cambié una línea.
-3. El comentario dice la regla en vez de la excepción: **en la firma entra TODO
-   lo que viaja a la consulta**, y por qué la excepción anterior era legítima
-   mientras subcategoría y calificación se resolvían en el navegador.
+Mide, contra el endpoint real:
 
-### El negativo, y las dos cosas que casi se me pasan
+- los recorridos de `product_images` con `page_size` 6 y 24, y que **no crezcan**
+  y queden acotados;
+- que cada tarjeta traiga la URL que **dice la base** —calculada por SQL con la
+  misma regla determinista—, nulos incluidos, y que haya de las dos clases;
+- que ninguna publicación salga dos veces y que el total sea el del conjunto;
+- que con dos primarias salga siempre la de menor orden;
+- total, páginas, orden por precio y las dos páginas del conjunto, sin cambios.
 
-El bloque B11 del caso 171 demora la respuesta del catálogo 1200 ms y exige que
-durante esa demora no se presente la página anterior como si fuera la nueva. Las
-dos correcciones de método salieron de medir, no de razonar:
+**Que no cuenta su propio SQL** no te lo pido de palabra: el caso mide un tramo
+**sin petición ninguna**, con SQL propio de inspección en el medio, y exige que
+dé **cero**. Si el instrumento contara lo del caso, ese control lo delataría.
 
-**1. El instrumento.** Empecé con un `MutationObserver` —ve cada commit del DOM
-se pinte o no— y contra la base daba el rojo esperado. Pero al comprobar
-dimensión por dimensión descubrí que **no ve el orden, la subcategoría ni la
-calificación**: lo que cambia ahí es el valor de un `<select>`, que el navegador
-pinta sin mutar el DOM. Ese negativo habría dejado volver a omitir tres de las
-cuatro. Ahora se mira por dos instrumentos:
+Las estadísticas se vuelcan a memoria compartida como mucho una vez por segundo.
+Se espera a una condición observable —que el contador supere el piso y después
+se quede quieto—, nunca a un tiempo fijo. Sin eso, la medición de una petición
+se le sumaba a la siguiente y los números salían corridos en uno.
 
-- `requestAnimationFrame`, que corre justo antes de pintar —no aproxima lo que
-  se ve, es lo que se ve—, y es el único que sirve para los tres selectores;
-- el `MutationObserver`, que hace la medición independiente del cuadro cuando la
-  transición sí muta el DOM, como el rótulo del paginador.
+**Rojo contra la base y verde en la candidata:**
 
-`setTimeout` lo descarté con datos: en Chromium queda detrás del MessageChannel
-con el que React vacía los efectos, y en 640 muestras no cayó nunca adentro de
-la ventana.
+```
+base       el listado recorrió «product_images» 9 veces con 6 tarjetas y 55 veces
+           con 24: el número de consultas crece con el tamaño de página
+candidata  se recorre 1 vez con 6 tarjetas y 1 con 24 — estable en 3 corridas
+```
 
-**2. Dónde se mueve cada control.** Mi primera versión medía las cuatro
-dimensiones en fila, y con eso **el orden daba verde aunque estuviera omitido**.
-Cambiar orden, subcategoría o calificación desde una página interior vuelve a la
-página 1, y esa página —que sí está en la firma— cambiaba sola y tapaba el
-defecto. Ahora cada dimensión se mueve donde es **lo único** que cambia en la
-consulta: las tres primeras desde la página 1, y la página al final. Quedó
-escrito en el caso, porque es la clase de detalle que se pierde en la próxima
-edición.
+Un detalle de orden que resultó importante: la primera versión del caso se ponía
+roja contra la base por la **cardinalidad** —«las páginas trajeron 3 y 20
+tarjetas»— y nunca llegaba a informar el N+1. El conteo va primero, y está
+escrito en el caso por qué.
 
-El caso además se niega a dar verde por no haber mirado nada: exige que algún
-estado observado haya marcado la espera y que los dos instrumentos hayan
-aportado muestras.
-
-### La prueba de que discrimina
-
-Saqué **una sola dimensión de la firma por vez** —sin tocar las dependencias del
-efecto, para que la consulta siguiera saliendo y el único cambio fuera la firma—
-y corrí el caso completo:
-
-| Firma sin… | Caso 171 |
-| --- | --- |
-| subcategoría | **rojo** — «el control ya decía "Drones y VANTs" y la grilla seguía mostrando las 24 publicaciones anteriores sin ningún estado de carga» |
-| calificación mínima | **rojo** — «el control ya decía "4"…» |
-| orden | **rojo** — «el control ya decía "price-asc"…» |
-| página | **rojo** — «el control ya decía "Página 2 de 5"…», visto por los dos instrumentos |
-| completa | **verde**, tres corridas seguidas |
-
-### Compuertas
+### 5. Compuertas
 
 | Puerta | Resultado |
 | --- | --- |
-| caso 171 focal desde base limpia | **verde**, 3/3 corridas |
-| rojo discriminante, una dimensión por vez | **los cuatro** de la tabla de arriba |
-| suite completa desde base limpia sobre `575f757` | **170/171**; único rojo el **131** |
-| `npm run build` | verde |
-| `npm run lint` · `npx tsc --noEmit` · `node --check` | verdes, 0 avisos |
+| caso 172 focal | **verde** |
+| rojo discriminante contra `5410bef` | **9 contra 55 recorridos** |
+| casos 171 y 172 juntos | **2/2** |
+| suite completa desde base limpia sobre `6e498fd` | **171/172**; único rojo el **131** |
+| `npm run build` · `npm run lint` · `npx tsc --noEmit` · `node --check` | verdes, 0 avisos |
+| `python -m compileall` · `pip check` | verdes; «No broken requirements found» |
 | `git -c core.whitespace=cr-at-eol diff --check` | sin avisos |
-| `npm run a11y -- --todas` | **72/72** pantallas, 0 violaciones bloqueantes |
-| `npm run contraste` | **80/80** mediciones, 10 312 textos, **0 incumplimientos** |
-| revisión visual 1440×900 y 390×844 | abajo |
 
-El **131** es el rojo ambiental de siempre: la receta necesita `docker run --rm`
-con `alpine:3` y acá el `docker` del PATH es un puente que sólo traduce
-`docker exec`. No es de esta tarea y no lo toqué.
+El **131** es el rojo ambiental ya clasificado: la receta necesita
+`docker run --rm` con `alpine:3` y acá el `docker` del PATH es un puente que
+sólo traduce `docker exec`.
 
-### La revisión visual
+**a11y y contraste: no los corrí**, y lo digo explícitamente. Tu compuerta los
+pedía «sólo si el alcance se desvía y cambia una superficie visible». El cambio
+es de servidor, no toca una línea de UI, y la comparación de las doce consultas
+muestra que la respuesta es idéntica byte a byte sobre datos sanos: no hay
+superficie que haya cambiado.
 
-En los dos anchos, y midiendo el desborde horizontal en cada paso:
+### 6. Hallazgos adyacentes
 
-```
-escritorio  página 1     «Página 1 de 9»  Anterior apagado   desborde 0 px
-            esperando    aria-busy=1, 0 tarjetas             desborde 0 px
-            página 2     «Página 2 de 9»  los dos activos    desborde 0 px
-celular     idéntico en los tres pasos                       desborde 0 px
-```
+- **Sin índice único sobre la imagen primaria** (punto 2). Es el único que
+  recomiendo mirar, y necesita una decisión tuya porque implica migración.
+- **El `total` inflado y la página corta** de la base quedan cerrados como
+  consecuencia de esta entrega, no como tarea aparte: no se podía retirar el N+1
+  sin resolver la cardinalidad.
+- **No salí a buscar otros N+1.** Tu alcance decía registrarlos sólo si los
+  medía, y no medí carrito, órdenes, administración ni detalle. Lo único que vi
+  de paso: el detalle ya trae sus imágenes con `joinedload`, así que ahí no hay
+  una consulta por imagen.
 
-Lo que cambia la R1 se ve en el paso del medio: al avanzar de página, donde
-antes quedaban las tarjetas viejas bajo el rótulo nuevo, ahora aparecen los
-bloques de carga. El paginador asentado quedó igual que en `a521631`.
+### 7. Riesgos
 
-### Lo que no corrí
-
-Nada que la tarea pidiera. Corrí las tres puertas completas —suite, a11y y
-contraste— aunque el cambio es de una firma y un caso, porque toca el render del
-Mercado y prefería no decidir yo cuáles eran «las afectadas».
-
-### Lo que queda abierto de la entrega anterior
-
-Sigue en pie la única decisión que te dejé en `473ae19`, y esta corrección no la
-cambia: `page` y `sort` se escriben con `replaceState` como el resto de los
-filtros, así que **Atrás no retrocede de página en página** —restaura la página,
-el orden y los filtros de la entrada a la que vuelve—. Si querés que cada página
-sea una entrada propia del historial, es otra decisión de producto y es tuya.
+- La subconsulta recorre las imágenes primarias una vez por petición en vez de
+  una vez por tarjeta. A volumen grande eso es un recorrido de la tabla de
+  primarias por listado; hoy, con 39 imágenes, es irrelevante, y sigue siendo
+  estrictamente menos trabajo que antes. Si `product_images` creciera mucho, el
+  índice que falta es justamente el de `(product_id)` sobre `is_primary`, que ya
+  existe por `product_id`.
+- La afirmación «no crece» se apoya en un contador de estadísticas de Postgres.
+  Lo verifiqué estable en tres corridas seguidas y el caso lo protege con el
+  tramo de control, pero es una medición de instrumentación, no una lectura del
+  plan de ejecución.
