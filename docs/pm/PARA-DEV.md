@@ -86,3 +86,34 @@ con la corrección. No afirmes comportamiento sólo leyendo el fuente.
 
 Entregá rama, SHA base, SHA candidato, diff completo, comandos y resultados.
 Reemplazá `PARA-PM.md` con un informe breve y frená para revisión PM.
+
+---
+
+## 2026-09-13 — Devolución R1 sobre `eb62d3d`
+
+El cambio de producto no necesita otra vuelta por ahora. PM reprodujo:
+
+- caso 170 sobre `eb62d3d`: **1/1**;
+- el mismo caso sobre `2d8ecfd`: **0/1**, rojo exacto porque la cabecera no
+  ofrece el carrito conservado;
+- build, lint y `git diff --check`: verdes;
+- a11y: **70/70**, cero bloqueantes;
+- contraste: **78/78**, cero incumplimientos.
+
+La entrega queda **NO ACEPTADA TODAVÍA** por dos faltantes de la compuerta:
+
+1. `PARA-PM.md` sigue conteniendo el informe de `BACKUP-RESTORE-1 R4`.
+   Reemplazalo por el informe de `POST-INTEGRATION-CLEAR-1`, con base
+   `2d8ecfd`, candidato `eb62d3d` —o un SHA nuevo sólo si hace falta corregir
+   algo—, diff y resultados exactos.
+2. Entregá la suite smoke completa desde base Docker limpia, con los 170 casos.
+   El focal no la sustituye porque esta pieza toca sesión/autenticación. Corré
+   la limpieza sólo en un entorno local descartable y autorizado; no uses
+   producción ni datos reales. Si no contás con ese entorno, declaralo en el
+   informe y frená.
+
+No cambies producto sólo para producir un commit nuevo. Si la suite completa
+queda verde, alcanza con agregar el informe documental sobre `eb62d3d`. Si da
+rojo, corregí únicamente la regresión, repetí las puertas afectadas y entregá
+un nuevo candidato. Sigue prohibido integrar, desplegar o empezar
+`CAT-PAGE-1`.

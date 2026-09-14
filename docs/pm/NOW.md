@@ -8,9 +8,28 @@ Actualizado: 2026-09-13.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 4. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
 - **`main`:** contiene `BACKUP-RESTORE-1` mediante `fbd6caf`; el producto sigue en `b8447a3`, sin cambios de producto posteriores. Incluye también el `AGENTS.md` consolidado.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, candidata R4 `52ba294`, informe `b8223b1`; ambos integrados mediante `fbd6caf`. La rama paralela `codex/backup-restore-1` queda descartada por duplicación.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, candidata pendiente `eb62d3d` para `POST-INTEGRATION-CLEAR-1`, basada directamente en `2d8ecfd`. Todavía no tiene informe vigente en `PARA-PM.md`.
 - **Última decisión PM:** `BACKUP-RESTORE-1` R4 **ACEPTADA E INTEGRADA**. PM reprodujo backup, restore, verificación, negativos de integridad/propiedad y limpieza contra Docker real; el origen conservó identidad y salud.
-- **Tarea activa:** `POST-INTEGRATION-CLEAR-1`, responsable Dev. Debe mantener accesible el carrito conservado cuando una sesión inválida desaparece y corregir la FAQ de medios de pago, sin habilitar checkout anónimo ni Mercado Pago.
+- **Tarea activa:** `POST-INTEGRATION-CLEAR-1`, responsable Dev, devolución R1. El arreglo focal es correcto; faltan el informe de entrega y la suite smoke completa desde base limpia antes de aceptar.
+
+## Revisión pendiente — POST-INTEGRATION-CLEAR-1
+
+La candidata `eb62d3d` mantiene el alcance mínimo y PM comprobó de forma
+independiente:
+
+- caso 170 sobre la candidata: **1/1**;
+- el mismo caso sobre la base `2d8ecfd`: **0/1**, rojo exacto por carrito
+  guardado sin acceso desde la cabecera;
+- build, lint y `git diff --check`: verdes;
+- accesibilidad: **70/70** superficies, sin violaciones bloqueantes;
+- contraste: **78/78** mediciones, sin incumplimientos.
+
+No se acepta todavía. `PARA-PM.md` en la rama sigue describiendo
+`BACKUP-RESTORE-1 R4` y no existe evidencia entregada de la suite smoke
+completa desde base limpia. PM no ejecutó esa limpieza porque el lanzador
+elimina volúmenes Docker locales y no hay autorización de Emi para borrar esos
+datos. Dev debe cerrar ambas faltas sin cambiar producto salvo que la suite
+descubra una regresión.
 
 ## Última aceptación PM relevante
 
@@ -124,7 +143,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev ejecuta `POST-INTEGRATION-CLEAR-1` sobre `main`; PM reproduce y acepta antes de integrar.
+1. Dev completa la devolución R1 de `POST-INTEGRATION-CLEAR-1`: informe vigente y suite smoke completa desde base limpia; PM acepta antes de integrar.
 2. Después se abre `CAT-PAGE-1` para continuar el roadmap contractual.
 3. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
 4. Separar de forma controlada integración y producción; cualquier cambio de producto exige nueva aceptación antes de publicar.
