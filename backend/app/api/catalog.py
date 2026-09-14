@@ -209,6 +209,7 @@ def get_products(
     db: Session = Depends(get_db),
     search: Optional[str] = Query(None, description="Buscar en nombre y descripción"),
     category: Optional[str] = Query(None, description="Filtrar por categoría"),
+    subcategory: Optional[str] = Query(None, description="Filtrar por subcategoría (UUID)"),
     min_price: Optional[float] = Query(None, ge=0, description="Precio mínimo"),
     max_price: Optional[float] = Query(None, ge=0, description="Precio máximo"),
     in_stock: Optional[bool] = Query(None, description="Solo productos con stock"),
@@ -220,7 +221,11 @@ def get_products(
     ),
     province: Optional[str] = Query(None, description="Filtrar por provincia (nombre canónico del padrón Georef)"),
     locality_id: Optional[str] = Query(None, description="Filtrar por localidad (ID del padrón Georef)"),
-    sort_by: str = Query("created_at", pattern="^(created_at|price|sales|views)$"),
+    min_rating: Optional[float] = Query(
+        None, ge=0, le=5,
+        description="Calificación mínima del vendedor (0 a 5)",
+    ),
+    sort_by: str = Query("created_at", pattern="^(created_at|price|sales|views|rating)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(24, ge=1, le=100)
@@ -299,6 +304,13 @@ def get_products(
     
     if category:
         query = query.filter(Product.category_id == category)
+
+    # Subcategoría: viaja a la consulta como la categoría, y por el mismo
+    # motivo. Filtrarla en el navegador significa filtrar la página que bajó:
+    # el total deja de describir el conjunto y las publicaciones que la
+    # cumplen pero cayeron en otra página no existen para quien mira.
+    if subcategory:
+        query = query.filter(Product.subcategory_id == subcategory)
     
     if min_price is not None:
         query = query.filter(Product.price >= min_price)
@@ -343,22 +355,47 @@ def get_products(
     # Filtro por localidad — directo sobre la FK
     if locality_id:
         query = query.filter(Product.locality_id == locality_id)
+
+    # Calificación mínima del vendedor. Sin calificar es cero y no "todavía
+    # no se sabe": pedir 4 o más deja afuera a quien no tiene ninguna, que es
+    # lo que el control promete.
+    if min_rating is not None and min_rating > 0:
+        query = query.filter(
+            func.coalesce(User.rating_average, 0) >= min_rating
+        )
     
     # Contar total antes de paginar
     total = query.count()
     
     # Aplicar ordenamiento
+    #
+    # `rating` ordena por la calificación del vendedor, con los sin calificar
+    # como cero: sin el `coalesce`, un NULL se va al principio en `desc` y
+    # "mejor calificados" empezaría por quien no tiene ninguna.
     sort_column = {
         "created_at": Product.created_at,
         "price": Product.price,
         "sales": Product.sales_count,
-        "views": Product.views_count
+        "views": Product.views_count,
+        "rating": func.coalesce(User.rating_average, 0),
     }.get(sort_by, Product.created_at)
-    
-    if sort_order == "desc":
-        query = query.order_by(sort_column.desc())
-    else:
-        query = query.order_by(sort_column.asc())
+
+    # Y un desempate DETERMINISTA, que no es un detalle de prolijidad.
+    #
+    # Sin él, `ORDER BY price` deja a las filas empatadas en el orden que el
+    # motor tenga a mano, y ese orden puede cambiar entre dos consultas. Con
+    # paginación eso significa que el corte de página cae adentro del empate y
+    # la misma publicación sale al final de una página y al principio de la
+    # siguiente, mientras otra desaparece. Medido contra `c973c6f`: ordenando
+    # por precio ascendente, seis publicaciones de treinta empatadas
+    # aparecieron dos veces al recorrer las páginas.
+    #
+    # El desempate final es la clave primaria, que es única por definición.
+    orden = [sort_column.desc() if sort_order == "desc" else sort_column.asc()]
+    if sort_by != "created_at":
+        orden.append(Product.created_at.desc())
+    orden.append(Product.id.asc())
+    query = query.order_by(*orden)
     
     # Aplicar paginación
     offset = (page - 1) * page_size

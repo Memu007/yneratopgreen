@@ -1,16 +1,36 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Product } from '../types';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-// Función para normalizar texto (quita acentos y convierte a minúsculas)
-const normalizeText = (text: string): string => {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-};
+/**
+ * Los cuatro órdenes que el Mercado ofrece, y cómo se traduce cada uno a la
+ * consulta del catálogo.
+ *
+ * Ordenar es del servidor, no de la grilla. Antes la grilla reordenaba el
+ * arreglo que tenía en la mano —la página descargada—, así que «Menor precio»
+ * devolvía la más barata DE ESA PÁGINA y no del conjunto. Con paginación esa
+ * diferencia deja de ser teórica.
+ *
+ * «Más relevantes» se retiró: no existe un ranking que sostenga esa promesa, y
+ * un orden que no ordena nada es un control que miente.
+ */
+export type OrdenDelMercado = 'newest' | 'price-asc' | 'price-desc' | 'rating';
+
+export const ORDENES: {
+  valor: OrdenDelMercado;
+  rotulo: string;
+  sortBy: 'created_at' | 'price' | 'rating';
+  sortOrder: 'asc' | 'desc';
+}[] = [
+  { valor: 'newest', rotulo: 'Más recientes', sortBy: 'created_at', sortOrder: 'desc' },
+  { valor: 'price-asc', rotulo: 'Menor precio', sortBy: 'price', sortOrder: 'asc' },
+  { valor: 'price-desc', rotulo: 'Mayor precio', sortBy: 'price', sortOrder: 'desc' },
+  { valor: 'rating', rotulo: 'Mejor calificados', sortBy: 'rating', sortOrder: 'desc' },
+];
+
+/** Cuántas tarjetas trae una página. La decide el Mercado y viaja a la
+ *  consulta: la grilla dibuja lo que le dan. */
+export const POR_PAGINA = 24;
 
 interface UseProductFiltersProps {
-  products: Product[];
   /** Sólo el Mercado escribe sus filtros en la barra: en las otras cuatro
       secciones estos parámetros no significan nada. */
   escribeEnLaBarra: boolean;
@@ -30,8 +50,18 @@ const numeroDeLaBarra = (parametros: URLSearchParams, clave: string, porOmision:
 const tipoDeLaBarra = (valor: string | null): 'todos' | 'productos' | 'servicios' =>
   (valor === 'productos' || valor === 'servicios' ? valor : 'todos');
 
+const ordenDeLaBarra = (valor: string | null): OrdenDelMercado =>
+  (ORDENES.some((opcion) => opcion.valor === valor) ? (valor as OrdenDelMercado) : 'newest');
+
+/** Una página es un entero de 1 para arriba. Cualquier otra cosa en la barra
+ *  —«0», «abc», «-3»— es la página 1, que es la que siempre existe. */
+const paginaDeLaBarra = (parametros: URLSearchParams): number => {
+  const crudo = Number(parametros.get('page'));
+  if (!Number.isFinite(crudo)) return 1;
+  return Math.max(1, Math.trunc(crudo));
+};
+
 export const useProductFilters = ({
-  products,
   escribeEnLaBarra,
   versionDeLaBarra,
 }: UseProductFiltersProps) => {
@@ -79,6 +109,17 @@ export const useProductFilters = ({
   );
   const [inStockOnly, setInStockOnly] = useState(initialParams.get('in_stock') === 'true');
   const [minRating, setMinRating] = useState(() => initialNumber('min_rating', 0));
+  /**
+   * Cómo se ordena y en qué página estamos.
+   *
+   * Viven acá, con los filtros, y no en la grilla. Son parte de lo que se le
+   * pide al servidor: viajan a la consulta, se escriben en la barra y vuelven
+   * cuando la barra manda. La vista Cuadrícula/Lista no: esa sí es de la
+   * grilla, porque no cambia lo que se pide sino cómo se dibuja.
+   */
+  const [orden, setOrden] = useState<OrdenDelMercado>(() =>
+    ordenDeLaBarra(initialParams.get('sort')));
+  const [pagina, setPagina] = useState(() => paginaDeLaBarra(initialParams));
 
   // Volver a una entrada del Mercado tiene que devolver sus filtros. El estado
   // se leyó una sola vez, al montar; desde que Atrás y Adelante existen de
@@ -97,6 +138,8 @@ export const useProductFilters = ({
     setPriceMax(numeroDeLaBarra(params, 'max_price', Number.MAX_SAFE_INTEGER));
     setInStockOnly(params.get('in_stock') === 'true');
     setMinRating(numeroDeLaBarra(params, 'min_rating', 0));
+    setOrden(ordenDeLaBarra(params.get('sort')));
+    setPagina(paginaDeLaBarra(params));
   }, [versionDeLaBarra]);
 
   useEffect(() => {
@@ -126,6 +169,8 @@ export const useProductFilters = ({
     );
     updateParam('in_stock', inStockOnly ? 'true' : null);
     updateParam('min_rating', minRating > 0 ? String(minRating) : null);
+    updateParam('sort', orden === 'newest' ? null : orden);
+    updateParam('page', pagina > 1 ? String(pagina) : null);
 
     const query = params.toString();
     const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`;
@@ -141,45 +186,50 @@ export const useProductFilters = ({
     priceMax,
     inStockOnly,
     minRating,
+    orden,
+    pagina,
     escribeEnLaBarra,
   ]);
 
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      // Filtro de búsqueda (insensible a acentos)
-      const normalizedQuery = normalizeText(searchQuery);
-      const matchesSearch = searchQuery === '' || 
-        normalizeText(product.name).includes(normalizedQuery) ||
-        normalizeText(product.description).includes(normalizedQuery) ||
-        product.tags.some(tag => normalizeText(tag).includes(normalizedQuery));
+  /**
+   * Cambiar lo que se pide vuelve a la página 1.
+   *
+   * La página 7 de un conjunto no significa nada en otro: con otro filtro
+   * puede no existir, y si existe no muestra lo que la persona venía mirando.
+   *
+   * Se hace envolviendo los setters y NO con un efecto que vigile los filtros.
+   * Ese efecto también correría cuando la barra manda —volver a una entrada
+   * repone todos los filtros de golpe— y ahí la página que hay que respetar es
+   * la de la entrada, no la 1: Atrás volvería siempre a la primera página.
+   */
+  const desdeLaPrimera = useMemo(() => {
+    const envolver = <T,>(fijar: (valor: T) => void) => (valor: T) => {
+      setPagina(1);
+      fijar(valor);
+    };
+    return {
+      setSelectedType: envolver(setSelectedType),
+      setSelectedCategory: envolver(setSelectedCategory),
+      setSelectedSubcategory: envolver(setSelectedSubcategory),
+      setSelectedProvince: envolver(setSelectedProvince),
+      setSelectedLocalityId: envolver(setSelectedLocalityId),
+      setPriceMin: envolver(setPriceMin),
+      setPriceMax: envolver(setPriceMax),
+      setInStockOnly: envolver(setInStockOnly),
+      setMinRating: envolver(setMinRating),
+      setOrden: envolver(setOrden),
+    };
+  }, []);
 
-      // Filtro de tipo (producto/servicio)
-      const matchesType = selectedType === 'todos' || 
-        (selectedType === 'productos' && !product.isService) ||
-        (selectedType === 'servicios' && product.isService);
-
-      // Filtro de categoría
-      const matchesCategory = selectedCategory === 'Todas las categorías' || 
-        product.category === selectedCategory;
-
-      // Filtro de subcategoría
-      const matchesSubcategory = selectedSubcategory === 'Todas' || 
-        product.subcategory === selectedSubcategory;
-
-      // Filtro de precio
-      const matchesPrice = product.price >= priceMin && product.price <= priceMax;
-
-      // Filtro de stock
-      const matchesStock = !inStockOnly || product.stock > 0;
-
-      // Filtro de rating
-      const matchesRating = product.seller.rating >= minRating;
-
-      return matchesSearch && matchesType && matchesCategory && matchesSubcategory &&
-             matchesPrice && matchesStock && matchesRating;
-    });
-  }, [products, searchQuery, selectedType, selectedCategory, selectedSubcategory,
-      priceMin, priceMax, inStockOnly, minRating]);
+  /** Ir a otra página. Se acota acá y no en el control: una barra con
+   *  `page=99` en un conjunto de dos páginas no puede pedir la 99.
+   *
+   *  Memorizada porque el efecto que consulta el catálogo la usa para
+   *  corregir una página de más: sin identidad estable, declararla como
+   *  dependencia volvería a disparar la consulta en cada render. */
+  const irALaPagina = useCallback((destino: number, paginas: number) => {
+    setPagina(Math.min(Math.max(1, Math.trunc(destino)), Math.max(1, paginas)));
+  }, []);
 
   /** Aplicar lo que hay escrito. Vacío limpia el filtro, que es lo mismo que
       aplicar «nada»: `q` desaparece de la barra y la consulta deja de llevar
@@ -188,9 +238,13 @@ export const useProductFilters = ({
     const recortado = textoBuscado.trim();
     setTextoBuscado(recortado);
     setSearchQuery(recortado);
+    setPagina(1);
   };
 
+  // Limpiar filtros no cambia el orden: ordenar no es filtrar, y quien eligió
+  // «Menor precio» no pidió volver a «Más recientes».
   const resetFilters = () => {
+    setPagina(1);
     setSearchQuery('');
     setTextoBuscado('');
     setSelectedType('todos');
@@ -217,20 +271,13 @@ export const useProductFilters = ({
     priceMax,
     inStockOnly,
     minRating,
-    // Setters
+    orden,
+    pagina,
+    // Setters. Los que cambian lo que se pide vuelven a la página 1.
     setTextoBuscado,
     aplicarBusqueda,
-    setSelectedType,
-    setSelectedCategory,
-    setSelectedSubcategory,
-    setSelectedProvince,
-    setSelectedLocalityId,
-    setPriceMin,
-    setPriceMax,
-    setInStockOnly,
-    setMinRating,
-    // Resultados
-    filteredProducts,
+    ...desdeLaPrimera,
+    irALaPagina,
     resetFilters,
   };
 };

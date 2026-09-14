@@ -425,6 +425,13 @@ for (const medida of MEDIDAS) {
     await enlace.hover();
     await revisar(page, `${medida.n} catálogo (hover)`, page.locator('#catalog-category'));
 
+    // El paginador, al pie de la grilla. Superficie propia para que su ausencia
+    // sea un rojo y no una medición de menos.
+    const paginador = page.getByRole('navigation', { name: 'Paginación del mercado' });
+    await paginador.scrollIntoViewIfNeeded({ timeout: ESPERA });
+    await revisar(page, `${medida.n} catálogo: paginador`, paginador);
+    await page.evaluate(() => window.scrollTo(0, 0));
+
     // el detalle se abre haciendo clic en la tarjeta, no en un boton: no existe
     // ningun "Ver detalle". Antes esto lo tapaba un catch vacio y esta pantalla
     // se declaraba medida sin haberse abierto nunca.

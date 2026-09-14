@@ -172,7 +172,7 @@ o un rediseño nuevo.
 
 | Orden | Pieza | Fuente | Condición de entrada |
 |---:|---|---|---|
-| 19 | **CAT-PAGE-1 — activa en rama Dev** | deuda UX-2C y ADM-2 como patrón | Probar más de 100 publicaciones; conteo, orden y navegación deben representar al servidor completo. Parte del relevo PM posterior a `c973c6f`, sin publicar `main`. |
+| 19 | **CAT-PAGE-1 — activa, devolución R1** | deuda UX-2C y ADM-2 como patrón | `a521631`/`473ae19`: paginación y filtros preservados; falta incluir toda dimensión remota en `consultaVigente` y medir la transición con respuesta demorada. |
 | 20 | **QUERY-IMG-1** | C2 | Medir primero el N+1 de imágenes; optimizar sólo con evidencia y conservar respuestas. |
 | 21 | **RISK-REC-1** | R1, R4 y R5 | Reproducir concurrencia de stock, señal frágil de reenvío y grupo sin medio de pago; promover únicamente defectos reales. |
 

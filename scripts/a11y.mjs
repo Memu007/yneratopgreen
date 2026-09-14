@@ -201,6 +201,14 @@ async function comprador(page, medida) {
   await enlace.hover();
   await revisar(page, 'catálogo (hover)', medida, page.locator('#catalog-category'));
 
+  // El paginador, que vive al pie de la grilla y sólo existe con más de una
+  // página. Se lo trae a la vista antes de medir: axe mira el documento, pero
+  // el estado de foco y el blanco de toque se leen donde el control está.
+  const paginador = page.getByRole('navigation', { name: 'Paginación del mercado' });
+  await paginador.scrollIntoViewIfNeeded({ timeout: ESPERA });
+  await revisar(page, 'catálogo: paginador', medida, paginador);
+  await page.evaluate(() => window.scrollTo(0, 0));
+
   // el detalle se abre haciendo clic en la tarjeta, no en un boton: no existe
   // ningun "Ver detalle". Antes esto lo tapaba un catch vacio y esta pantalla
   // se declaraba medida sin haberse abierto nunca.
