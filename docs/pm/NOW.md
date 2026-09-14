@@ -7,10 +7,10 @@ Actualizado: 2026-09-13.
 ## Resumen ejecutivo
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 4. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
-- **`main`:** `24dcca8`; producto integrado en `b8447a3` y cierre PM documental posterior. Incluye el `AGENTS.md` consolidado y preserva la regla local de eficiencia de chats.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, informe R3 `5e84385`; candidata `f3e9d54`, devuelta y no integrada. La rama paralela `codex/backup-restore-1` queda descartada por duplicación.
-- **Última decisión PM:** `BACKUP-RESTORE-1` R3 **DEVUELTA**. La arquitectura Docker ya aísla el destino, pero la corrida real falla porque valida un dump PostgreSQL 16 con `pg_restore` 14 del anfitrión; faltan además las guardas finales de servidor definitivo y etiquetas en todo borrado.
-- **Tarea activa:** `BACKUP-RESTORE-1` R4, responsable Dev. Debe cerrar compatibilidad PostgreSQL y guardas de limpieza, y dejar lista la misma ruta para reproducción Docker real, sin tocar Railway ni datos remotos.
+- **`main`:** contiene `BACKUP-RESTORE-1` mediante `fbd6caf`; el producto sigue en `b8447a3`, sin cambios de producto posteriores. Incluye también el `AGENTS.md` consolidado.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, candidata R4 `52ba294`, informe `b8223b1`; ambos integrados mediante `fbd6caf`. La rama paralela `codex/backup-restore-1` queda descartada por duplicación.
+- **Última decisión PM:** `BACKUP-RESTORE-1` R4 **ACEPTADA E INTEGRADA**. PM reprodujo backup, restore, verificación, negativos de integridad/propiedad y limpieza contra Docker real; el origen conservó identidad y salud.
+- **Tarea activa:** `POST-INTEGRATION-CLEAR-1`, responsable Dev. Debe mantener accesible el carrito conservado cuando una sesión inválida desaparece y corregir la FAQ de medios de pago, sin habilitar checkout anónimo ni Mercado Pago.
 
 ## Última aceptación PM relevante
 
@@ -54,8 +54,13 @@ resuelve backups, SMTP, secretos, pagos o recuperación.
 - **FAQ de pagos:** «¿Cuáles son las formas de pago?» debe mencionar
   transferencia directa y Mercado Pago cuando el vendedor lo tenga habilitado.
   Se corrige en la misma pieza posterior, sin reabrir `c565e6e`.
-- **Backup/restauración:** `BACKUP-RESTORE-1` es la tarea activa. La publicación
-  autorizada no reduce esta deuda ni habilita migraciones riesgosas.
+- **Backup/restauración local:** `BACKUP-RESTORE-1` quedó aceptada en
+  `52ba294`/`b8223b1` e integrada por `fbd6caf`. El ensayo Docker real recuperó
+  base, `uploads`, `documentos` y `outbox` en un destino aislado; una alteración
+  fue detectada y recursos homónimos sin las dos etiquetas sobrevivieron. Esto
+  cierra el procedimiento local, no crea todavía una copia administrada o
+  externa de producción ni habilita migraciones riesgosas.
+  Evidencia: `REPRODUCCION-BACKUP-RESTORE-1-2026-09-13.md`.
 
 ## Railway — inventario actualizado 2026-09-13 y deuda viva
 
@@ -69,7 +74,7 @@ Inventario de sólo lectura del proyecto `strong-playfulness`, entorno `producti
 - CORS contiene el dominio histórico y el dominio público actual, pero `FRONTEND_URL` todavía apunta al dominio histórico `ynerav.up.railway.app`; queda como deuda de configuración, sin corregir en este inventario;
 - Backend usa almacenamiento local con volumen `backend-volume` de 5 GB montado en `/data`; `UPLOAD_DIR=/data/uploads` y `EMAIL_OUTBOX_DIR=/data/outbox` quedan persistentes allí;
 - PostGIS tiene `postgis-volume` de 5 GB montado en `/var/lib/postgresql/data`;
-- no hay backups/PITR activos ni restauración ejercitada. Railway los presenta como función de plan superior; esto bloquea tratar el entorno como producción aceptada y cualquier migración riesgosa;
+- no hay backups/PITR activos sobre la base productiva. La restauración local ya fue ejercitada con datos sintéticos mediante `BACKUP-RESTORE-1`; falta elegir y activar una copia externa o administrada antes de tratar el entorno como producción aceptada o hacer una migración riesgosa;
 - `MP_CHECKOUT_HABILITADO=false`, verificado sin exponer secretos.
 
 El 2026-09-11 se corrigió el incidente CORS que producía `Failed to fetch`; el inventario confirma que el dominio actual sigue permitido. No se cambió Railway, código, datos ni pagos durante esta revisión.
@@ -97,7 +102,7 @@ Adquirir las cuentas/credenciales de prueba es dependencia humana. No enlazar OA
 De la puerta contractual completa, hoy siguen vivos estos bloqueos:
 
 - política de ramas/deploy que separe integración aceptada de producción;
-- backups con restauración ensayada; la persistencia ya existe pero no sustituye backup;
+- una copia externa o administrada de producción y su política de retención; el procedimiento de restauración local ya fue ensayado, pero persistencia y un script sin copias programadas no sustituyen backup;
 - SMTP real para el flujo de validación por correo; `outbox` no satisface producción;
 - configuración y secretos revisados sin exponer valores;
 - homologación Mercado Pago con cuentas de prueba correctas;
@@ -119,8 +124,8 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev entrega `BACKUP-RESTORE-1`; PM reproduce una restauración local completa y clasifica cualquier dependencia externa.
-2. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
-3. Ejecutar `POST-INTEGRATION-CLEAR-1` sobre `main` y después abrir `CAT-PAGE-1` para continuar el roadmap contractual.
+1. Dev ejecuta `POST-INTEGRATION-CLEAR-1` sobre `main`; PM reproduce y acepta antes de integrar.
+2. Después se abre `CAT-PAGE-1` para continuar el roadmap contractual.
+3. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
 4. Separar de forma controlada integración y producción; cualquier cambio de producto exige nueva aceptación antes de publicar.
 5. Mercado Pago, SMTP, red-team y producción aceptada permanecen al final de la secuencia acordada, sin esperar artificialmente a una fecha si las dependencias ya están listas.

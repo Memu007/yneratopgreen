@@ -162,8 +162,8 @@ anatomías ni el detalle. Su contrato completo y la evidencia de raíz están en
 | 18 | **COPY-CLEAR-1 — cerrada en rama** | A7, A10, F4 y F12; deuda ADMIN-STATE-1 | `9f25d59`/`ee166b4`. PM revisó diff, reprodujo focales 3/3 + 3/3 + 2/2 y separó los rojos heredados de a11y, caducidad y rate-limit sin debilitar seguridad. |
 | 18I | **INTEGRATION-CANDIDATE-1 — integrada** | Composición de todo el trabajo aceptado | `c565e6e`/`ad914a3`, merge `b8447a3`. PM obtuvo 168/169 sobre `e0cdfe9` y 169 en 1/1 sobre el único delta de `c565e6e`; los 169 casos quedan cubiertos. A11y, contraste, diff-check y build verdes. Emi autorizó el despliegue automático antes del backup, sin aceptar todavía producción. |
 | 18D | **AGENTS-CONSOLIDATION-1 — cerrada** | Deuda de relevo detectada al cerrar integración | `b8447a3` llevó a `main` el disparador consolidado y preservó la regla local de eficiencia de chats. |
-| 18O | **BACKUP-RESTORE-1 — activa** | Puerta operativa pendiente | Backup lógico de PostGIS y copia de los datos persistentes, restaurados y comparados en un destino local limpio. Sin tocar Railway; la activación administrada y el gasto requieren decisión de Emi. |
-| 18P | **POST-INTEGRATION-CLEAR-1 — en cola** | Pendientes de continuidad/copy de Dev | Mantener reabrible el carrito conservado sin sesión y enumerar transferencia + Mercado Pago condicional en la FAQ. Ya está cumplida su condición de entrada por integración. |
+| 18O | **BACKUP-RESTORE-1 — cerrada localmente** | Puerta operativa local | `52ba294`/`b8223b1`, merge `fbd6caf`. PM reprodujo en Docker real backup, restore aislado, comparación, negativo de integridad, rechazo de recursos ajenos y limpieza. La copia externa/administrada y su gasto siguen pendientes de Emi. |
+| 18P | **POST-INTEGRATION-CLEAR-1 — activa** | Pendientes de continuidad/copy de Dev | Mantener reabrible el carrito conservado sin sesión y enumerar transferencia + Mercado Pago condicional en la FAQ, sin checkout anónimo ni activación de pagos. |
 
 Son mejoras de claridad, no autorización para mensajería, planes, suscripciones
 o un rediseño nuevo.

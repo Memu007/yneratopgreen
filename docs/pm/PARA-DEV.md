@@ -1,8 +1,11 @@
 # PM → Dev
 
-Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en `docs/pm/PARA-PM.md` y no edita este archivo.
+Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
+`docs/pm/PARA-PM.md` y no edita este archivo.
 
-Este archivo contiene únicamente la tarea activa y su hilo de devoluciones hasta el cierre. La historia anterior permanece en Git; la instantánea previa a esta poda está en `ab4165fc`.
+Este archivo contiene únicamente la tarea activa y su hilo de devoluciones
+hasta el cierre. La historia anterior permanece en Git; la instantánea previa
+a esta poda está en `0f89e78`.
 
 Antes de empezar:
 
@@ -13,240 +16,73 @@ cat docs/pm/PARA-DEV.md
 
 ---
 
-## 2026-09-13 — BACKUP-RESTORE-1
+## 2026-09-13 — POST-INTEGRATION-CLEAR-1
 
-`INTEGRATION-CANDIDATE-1` y `AGENTS-CONSOLIDATION-1` quedaron integradas en
-`b8447a3`. Emi autorizó expresamente el despliegue automático aun sin backup
-ensayado; esa excepción no levanta la puerta operativa. Ésta es ahora la única
-tarea activa.
+`BACKUP-RESTORE-1` quedó aceptada en `52ba294`/`b8223b1` e integrada en
+`fbd6caf`. PM reprodujo el ciclo y los negativos con Docker real. Ésta es ahora
+la única tarea activa.
 
-### Problema
+### Problema reproducido
 
-PostGIS y el volumen persistente `/data` conservan estado, pero persistencia no
-es backup. Hoy no existe un procedimiento reproducible que copie ambos, los
-restaure en un destino limpio y demuestre que la recuperación conserva datos y
-archivos. No se puede aceptar producción ni hacer una migración riesgosa con
-esa incertidumbre.
+Cuando `handleCheckout` confirma que la sesión ya no vale, conserva el carrito
+local y baja la identidad correctamente. Sin embargo, `Header.tsx` sólo muestra
+el botón **Carrito** dentro de la rama autenticada. Si la persona cancela el
+Login, los ítems siguen guardados pero ya no tiene cómo reabrirlos desde la
+cabecera.
 
-### Alcance
+Además, la FAQ «¿Cuáles son las formas de pago?» sólo nombra transferencias,
+aunque el producto también contempla Mercado Pago de forma opcional por
+vendedor.
 
-Construí la pieza mínima, repetible y documentada para entorno local Docker:
+### Alcance mínimo
 
-1. generar un bundle de backup con un dump lógico restaurable de PostgreSQL /
-   PostGIS y una copia de los datos persistentes equivalentes a `/data`;
-2. incluir manifiesto, fecha, versión/formato y checksums sin copiar secretos;
-3. restaurar el bundle en contenedores y volúmenes locales **nuevos y
-   aislados**, sin reemplazar ni modificar `topgreen-db`, `topgreen-api` ni sus
-   volúmenes de origen;
-4. comparar de forma automática el origen y el destino: esquema/extensión
-   PostGIS, tablas y cantidades relevantes, más rutas, tamaños y checksums de
-   archivos;
-5. dejar un único procedimiento claro de backup, restore, verificación y
-   limpieza segura del destino de prueba.
+1. Si el carrito tiene contenido, la cabecera debe ofrecer **Carrito** aunque
+   no haya sesión. Ese control abre el mismo carrito conservado.
+2. Continuar compra sin sesión sigue abriendo el Login existente. Cancelarlo
+   vuelve al carrito con los mismos ítems; autenticarse permite continuar por
+   el flujo vigente. No existe checkout anónimo.
+3. Una salida explícita conserva la regla actual: vacía el carrito. Con cero
+   ítems y sin sesión, no agregues un botón de carrito vacío.
+4. En Contacto, la respuesta de la FAQ debe decir que se puede pagar por
+   transferencia directa al vendedor y por Mercado Pago **cuando ese vendedor
+   lo tenga habilitado**. No prometas ambos medios para todos ni agregues
+   comisiones, planes o custodia de fondos.
 
-Podés agregar scripts acotados y documentación operativa. Reutilizá Docker,
-`pg_dump`/`pg_restore` y utilidades estándar disponibles antes de sumar una
-dependencia. Los artefactos de backup y datos de prueba no se versionan.
+Reutilizá el estado y los flujos existentes; no agregues routing, estado
+paralelo, dependencias ni cambios de backend para resolver dos condiciones de
+interfaz.
 
-### Evidencia exigida
+### Regresión exigida
 
-- Sembrá marcadores no sensibles en base y almacenamiento locales, tomá el
-  backup y restauralo en el destino aislado.
-- Demostrá que los marcadores y los fingerprints coinciden después del restore.
-- Demostrá el negativo: un archivo alterado o ausente, o una base que no
-  coincide, debe hacer fallar la verificación.
-- Probá que el origen conserva antes y después la misma identidad/fingerprint y
-  que los contenedores vigentes siguen saludables.
-- Corré `diff-check` y las verificaciones focales de la pieza. No hace falta la
-  suite funcional completa si el diff no toca producto; declaralo.
+Agregá el siguiente caso disponible del smoke para medir, como mínimo:
+
+- carrito con ítems + sesión confirmada inválida → identidad fuera y carrito
+  todavía accesible desde cabecera;
+- cerrar el Login → mismos ítems y carrito reabierto;
+- salida explícita → carrito vacío;
+- la FAQ nombra transferencia y Mercado Pago con su condición por vendedor.
+
+El caso debe fallar contra `fbd6caf` por el acceso perdido al carrito y pasar
+con la corrección. No afirmes comportamiento sólo leyendo el fuente.
+
+### Compuertas
+
+- caso focal nuevo contra base limpia;
+- suite smoke completa desde base limpia;
+- build, lint, `diff-check`, a11y y contraste;
+- revisión explícita en escritorio y celular de la cabecera sin sesión, sin
+  deformar marca, navegación ni foco.
 
 ### Fuera de alcance
 
-- No acceder ni cambiar Railway, GitHub settings, ramas de despliegue, datos
-  remotos, secretos, dominios, SMTP o Mercado Pago.
-- No comprar ni activar backups administrados; esa decisión y el gasto son de
-  Emi.
-- No descargar una copia de producción ni usar datos personales reales.
-- No empezar `POST-INTEGRATION-CLEAR-1` ni `CAT-PAGE-1`.
-- No borrar ni sobrescribir volúmenes o contenedores existentes. Toda limpieza
-  queda limitada a recursos de destino creados por esta pieza e identificados
-  de forma inequívoca.
-
-### Criterios de aceptación
-
-1. Desde un origen Docker local saludable se obtiene un bundle autocontenido
-   para base y almacenamiento persistente, con manifiesto y checksums.
-2. Un destino local limpio recupera el estado sin depender del origen durante
-   la restauración.
-3. La comparación automática queda verde para una copia íntegra y roja ante
-   una alteración discriminante.
-4. El origen no cambia, los destinos no colisionan con los nombres actuales y
-   una falla corta sin borrar recursos ajenos.
-5. El procedimiento documenta requisitos, comandos, ubicación de artefactos,
-   verificación y limpieza, sin valores secretos ni pasos remotos implícitos.
-
-### Frená y consultá si
-
-- la única forma de avanzar toca Railway o datos remotos;
-- necesitás elegir un servicio pago, una política de retención o un destino
-  externo;
-- no podés aislar el restore de los contenedores/volúmenes actuales;
-- el inventario real de `/data` contradice `NOW.md` o exige decidir qué dato es
-  recuperable.
+- No habilitar ni homologar Mercado Pago, no tocar credenciales, Railway,
+  datos remotos, backups ni configuración productiva.
+- No cambiar la regla de vaciado en logout explícito.
+- No rediseñar cabecera, Login, carrito, checkout o Contacto.
+- No empezar `CAT-PAGE-1` ni otra tarea.
+- No integrar ni desplegar.
 
 ### Entrega
 
-Entregá rama, SHA base, SHA candidato, diff completo, comandos exactos y
-resultados del positivo y del negativo. Reemplazá `PARA-PM.md` con un informe
-breve. No integres ni despliegues; frená para revisión PM.
-
----
-
-## Revisión PM R1 — DEVOLVER
-
-Revisé la candidata `5ae5572` y el informe `4636b23`. La sintaxis y el
-`diff-check` quedan verdes, pero la pieza no se acepta todavía. Corregí sólo
-estas dos raíces sobre la misma rama:
-
-1. **El bundle omite una raíz persistente.** `NOW.md` registra el volumen de
-   producción montado en `/data` y `EMAIL_OUTBOX_DIR=/data/outbox`. La candidata
-   fija `data_roots=uploads,documentos` y archiva únicamente esas dos carpetas.
-   Incluí `outbox` en backup, restore, inventario, fingerprints, manifiesto,
-   documentación y positivo discriminante. Adaptá el doble local de forma
-   explícita si hoy monta el outbox en `/app/outbox`; no cambies producto ni
-   Docker/Railway para acomodar la prueba.
-2. **`cleanup` puede borrar recursos ajenos por nombre.** PM creó un volumen
-   descartable sin etiquetas llamado `topgreen-restore-pm-unowned-db`; ejecutar
-   `cleanup topgreen-restore-pm-unowned` lo eliminó con exit 0. El prefijo no
-   demuestra propiedad. Marcá todos los contenedores y volúmenes creados por la
-   pieza con una etiqueta estable más un identificador de ejecución, y antes de
-   cada `rm` exigí que esas etiquetas coincidan. Si falta o difiere, frená sin
-   borrar nada. No alcanza con ampliar o endurecer el patrón del nombre.
-
-### Evidencia R2 exigida
-
-- positivo completo con marcador DB y un marcador en cada raíz persistente,
-  incluido `outbox`;
-- negativo de integridad ya existente;
-- negativo de propiedad: un contenedor o volumen sin etiqueta y con nombre que
-  coincida debe sobrevivir, `cleanup` debe fallar y la prueba debe retirarlo
-  luego por un comando explícito limitado al recurso que ella misma creó;
-- origen con mismas identidades, fingerprints y salud antes/después;
-- `sh -n`, `diff-check` y diff total desde `24dcca8`.
-
-No corras suite funcional completa. No integres, no despliegues y no abras otra
-tarea. Entregá nuevos SHA de producto/arnés e informe; no reescribas los SHA R1.
-
----
-
-## Revisión PM R2 — DEVOLVER
-
-Tomo como candidata canónica la rama histórica
-`claude/dev-role-repo-3l0kp3`: `b9d0036`, informe `6f02c32`. La entrega paralela
-`codex/backup-restore-1` fue un error de coordinación PM y queda descartada; no
-mezcles código de esa rama.
-
-Quedan **aceptadas dentro de la pieza**, sin pedir otra reescritura por sí
-solas, la inclusión de `outbox`, la portabilidad macOS/Linux, los negativos de
-integridad y el principio de comprobar propiedad antes de limpiar.
-
-La ruta Docker sigue bloqueada y no se acepta por inspección reproducible:
-
-1. `VOLUMENES_DOCKER=(uploads_data ... documentos_data ...)` no identifica los
-   volúmenes reales. PM verificó que esos nombres no existen; los montajes de
-   `topgreen-api` llevan el prefijo del proyecto Compose. Ejecutar el código
-   actual crearía volúmenes vacíos con esos nombres y los respaldaría como si
-   fueran el origen.
-2. `restaurar` crea `topgreen_restore_*` **dentro de `topgreen-db`**. Eso
-   modifica el clúster y volumen de origen y contradice el criterio explícito de
-   contenedor y volumen nuevos y aislados. `limpiar` luego vuelve a operar sobre
-   ese mismo origen.
-3. La ruta usa `psql -U postgres`, pero PM comprobó que el contenedor real tiene
-   `POSTGRES_USER=topgreen` y que el rol `postgres` no existe. La restauración
-   falla antes de poder verificarse.
-4. `alpine:3` no es una dependencia necesaria y puede provocar un pull. Usá
-   `docker exec`/`docker cp`/`tar` o las imágenes locales ya presentes; no
-   descargues una imagen auxiliar.
-
-### Corrección R3
-
-- Incorporá `origin/main` sin reescribir los SHA anteriores y preservá completo
-  este canal PM.
-- En modo Docker descubrí el origen desde los contenedores/montajes reales o
-  copiá las tres raíces por el contenedor; no adivines nombres de volumen.
-- Restaurá PostgreSQL/PostGIS en **otro contenedor con otro volumen** y los tres
-  árboles en recursos de destino separados del origen. Tomá imagen, usuario y
-  nombre de base del contenedor real; la credencial del destino debe ser local
-  y efímera, no escrita en bundle ni informe.
-- Etiquetá cada contenedor/volumen creado con una marca estable de la pieza y un
-  id de ejecución. `limpiar` debe validar esas etiquetas antes de cada borrado.
-- Corregí requisitos/documentación para reflejar las herramientas realmente
-  admitidas (`shasum` o `sha256sum`) y que la ruta no hace pulls.
-
-### Evidencia R3 exigida
-
-1. `bash -n` y `diff-check` verdes.
-2. Corrida Docker completa sobre los contenedores actuales: backup, restore,
-   verify, negativo de integridad y cleanup.
-3. Los tres marcadores (`uploads`, `documentos`, `outbox`) aparecen restaurados.
-4. Un recurso homónimo sin etiquetas sobrevive y `cleanup` falla sin borrar
-   ningún recurso.
-5. IDs, montajes/fingerprint y salud de `topgreen-db` y `topgreen-api` coinciden
-   antes/después; no queda ninguna base extra dentro de `topgreen-db` ni ningún
-   destino de prueba.
-
-No repitas la suite funcional ni la ruta nativa salvo que la corrección comparta
-lógica y la rompa. No integres, no despliegues y no abras otra tarea.
-
----
-
-## Revisión PM R3 — DEVOLVER
-
-Revisé `f3e9d54` y el informe `5e84385`. Quedan aceptados dentro de la pieza el
-descubrimiento de rutas/usuario/imagen desde los contenedores, la copia de las
-tres raíces sin adivinar volúmenes, el contenedor y volumen de destino aislados,
-la eliminación de `alpine` y la incorporación de `origin/main` sin reescribir
-los SHA anteriores.
-
-La corrida con Docker real falló en el primer paso:
-
-```text
-Respaldo desde el origen (docker)
-pg_restore: error: unsupported version (1.15) in file header
-ERROR: el volcado no es un archivo de pg_restore válido
-```
-
-PM verificó la raíz: el dump sale de PostgreSQL/`pg_restore` **16.4** dentro de
-`topgreen-db`, pero `pg_restore --list` se ejecuta con la versión **14.20** del
-Mac. En modo Docker, tanto la lectura del índice como la versión declarada en
-el manifiesto deben ejecutarse con las herramientas del contenedor que creó el
-dump; no dependas de `pg_dump`/`pg_restore` del anfitrión.
-
-Antes de la R4 cerrá además estas dos guardas ya exigidas:
-
-1. La espera del destino no puede aceptar el PostgreSQL temporal del entrypoint.
-   Exigí servidor definitivo —PID 1 `postgres`— además de `pg_isready` antes de
-   crear extensiones o restaurar.
-2. `limpiar` valida sólo `topgreen.respaldo.ejecucion`; debe validar también
-   `topgreen.respaldo=pieza` en contenedor y volumen. El rescate de una
-   restauración incompleta también ejecuta `docker rm`/`docker volume rm`: antes
-   de cada borrado debe comprobar ambas etiquetas. Haber anotado el nombre no
-   sustituye la propiedad si una creación falló o hubo una carrera.
-
-La reproducción PM dejó `topgreen-db` y `topgreen-api` con los mismos IDs y
-salud `healthy`; no creó bases, contenedores ni volúmenes de restore y retiró
-los marcadores sembrados. El bundle incompleto se retirará junto con el
-worktree temporal de revisión.
-
-### Evidencia R4
-
-- `bash -n` y `diff-check` del HEAD final;
-- Docker real completo: marcadores DB + `uploads` + `documentos` + `outbox`,
-  backup, restore, verify, negativo de integridad y cleanup;
-- negativo homónimo sin etiquetas y negativo de rescate sin etiquetas: ambos
-  sobreviven y el comando falla sin borrar;
-- origen con IDs, salud y fingerprint iguales; sin base extra en
-  `topgreen-db` y sin recursos de prueba al terminar.
-
-No repitas ruta nativa ni suite funcional salvo regresión compartida. No
-integres, no despliegues y no abras otra tarea.
+Entregá rama, SHA base, SHA candidato, diff completo, comandos y resultados.
+Reemplazá `PARA-PM.md` con un informe breve y frená para revisión PM.
