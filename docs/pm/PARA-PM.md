@@ -110,6 +110,20 @@ Recreada la base, quedan 44 y ninguno de los retirados.
 **Cinco sabotajes, cinco rojos:** reintroducir cada uno de los cuatro retirados,
 y desactivar `case` —fusionar de más—.
 
+### Compuertas
+
+| Puerta | Resultado |
+| --- | --- |
+| caso 174 focal | verde |
+| rojo contra la base sembrada con 47 | «la lista trae 47 marcas y tiene que traer 44» |
+| rojo discriminante | los **cinco** sabotajes de arriba |
+| suite completa desde base limpia sobre `89b20aa` | **173/174**; único rojo el **131** ambiental |
+| `compileall` · `node --check` · `diff --check` | verdes |
+
+No corrí a11y ni contraste: el cambio es de datos de semilla y de una
+regresión, y no toca ninguna superficie. Si te parece que corresponde igual,
+decilo y las corro.
+
 ### Lo que te dejo abierto, porque vos lo dejaste abierto
 
 Dijiste que en Chery tu conocimiento del mercado es más flojo que el nuestro: si
