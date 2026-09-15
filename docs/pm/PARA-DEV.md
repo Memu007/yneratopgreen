@@ -215,3 +215,102 @@ escrita. Si el pedido vino de Emi en tu sesión, se anota como de Emi.
 3. **La etapa 3 no arranca todavía**, y cuando arranque no arranca sobre 47
    marcas: la faceta con conteo se construiría sobre tres slugs que están por
    salir.
+
+---
+
+## 2026-09-15 — Revisión independiente de las etapas 1 y 2: la mitad estática
+
+Emi autorizó seguir y ofreció su Docker. Esto es lo que pude revisar sin base;
+la otra mitad necesita la corrida y va más abajo con los comandos exactos.
+
+**Esto no es una devolución.** No encontré nada que te pida cambiar el
+comportamiento. Encontré dos cosas que decir, las dos en la etapa 2.
+
+### Lo que revisé y está limpio
+
+**Etapa 1 — condición.** El parámetro es cerrado en la firma
+(`pattern="^(nuevo|usado)$"`), así que un valor inventado responde 422 en vez de
+descartarse en silencio, que era el defecto medido. El filtro entra en
+`catalog.py:415`, o sea **antes** de `total = query.count()` en la 419: el total
+describe el subconjunto. Y los valores cierran de punta a punta: la columna es
+`String(20)`, `anatomia` declara `nuevo`/`usado`, y el alta y la edición los
+aceptan por `Literal["nuevo","usado"]` en el esquema, así que el 422 protege
+también la escritura. Un filtro que acota y nunca completa es la lectura
+correcta de un campo opcional a propósito.
+
+**Etapa 2 — marca.** La validación rechaza con 400 lo que no está en la lista
+**activa**; donde la categoría no la ofrece se descarta en silencio, igual que la
+condición. El `update_data` sale de `model_dump(exclude_unset=True)`, así que una
+edición parcial que no manda `brand` **no** la borra —lo comprobé porque si
+saliera de un volcado completo, editar el precio de una publicación le vaciaría
+la marca—. Mover a una categoría sin marca sí la suelta, que es lo declarado. La
+migración crea las dos columnas y el índice, rellena `usa_marca` sólo para
+`maquinaria-agricola` con `is_service = false`, apaga las de servicio, y la
+vuelta atrás es simétrica. `usa_marca` es `nullable=False` con
+`server_default`, y ningún alta de categoría la manda explícitamente, así que no
+hay inserción que pueda dejarla nula.
+
+### Hallazgo 1 — la clienta **no** puede editar `usa_marca` desde el panel
+
+`marcas.py` dice, en su propio encabezado: «Lo que manda en caliente es
+`categories.usa_marca`, que la clienta edita desde el panel». **Eso hoy no
+existe.** `usa_marca` viaja **sólo de salida**: está en
+`schemas/catalog.py:32` y en `catalog.py:112`, que es de donde la lee el alta.
+En el panel no está: ni `CategoryCreateRequest` ni `CategoryUpdateRequest`
+(`admin.py:465` y `475`) la declaran, y la respuesta del panel tampoco la
+devuelve. O sea que **ampliar la marca a otra categoría no es una acción de la
+clienta: hoy es SQL o una migración.**
+
+No es un defecto de comportamiento —nada se rompe, nada se ensucia—, pero es una
+capacidad documentada que no está, y decide si ese trámite es de la clienta o
+nuestro. Corregí el rumbo eligiendo lo barato: **por ahora, el encabezado dice lo
+que no es y hay que arreglar el texto**, no agregar el campo. Agregarlo al panel
+es una tarea propia y la decido cuando haga falta ampliar a una segunda
+categoría, que hoy no hace falta porque no hay otra lista cargada.
+
+### Hallazgo 2 — el interruptor de servicio no apaga la marca
+
+Es el mismo hallazgo visto del otro lado, y es el que no podías ver revisándote
+a vos misma, porque escribiste la guarda y el texto que la describe.
+
+`marcas.usa_marca_por_categoria` se protege de que una categoría de servicio
+ofrezca marca, y el comentario dice que se comprueba «porque la lista se edita y
+un error ahí no puede convertir un servicio en una máquina». Pero esa función
+**sólo corre en la semilla**. En caliente, el único camino que puede editar eso
+es el panel, que **sí** deja cambiar `is_service` y **no** toca `usa_marca`. Si
+alguien marcara «Maquinaria agrícola» como servicio, quedaría
+`is_service = true` con `usa_marca = true`, y `products.py:55` mira sólo
+`usa_marca`: el alta ofrecería marcas de tractor en una categoría de servicio.
+
+Probabilidad baja —hoy hay una sola categoría con marca y nadie la va a volver
+servicio—, consecuencia chica, y por eso **no es un bloqueo ni te pido que lo
+toques ahora**. Queda registrado: la guarda es de semilla y el texto la describe
+como si fuera de runtime.
+
+### Lo que falta, y es la corrida
+
+Esto no lo puedo hacer: sin PostGIS no levanto el esquema. Queda para la Docker
+de Emi, **en este orden y de menos a más invasivo**:
+
+**Tramo A — sin tocar nada, con el entorno como está.** Los cuatro comandos
+tuyos —los tres `psql` y `alembic check`—, que cierran la lista de 44 y
+confirman que el esquema no se separó del modelo.
+
+**Tramo B — focales, sin borrar volúmenes.** Con la pila ya levantada,
+`SMOKE_CASOS=172,173,174 node scripts/smoke.mjs`. Los casos fabrican y retiran
+sus propios datos. Lo que tiene que salir: los tres verdes, y el 172 con
+«1 recorrido» en los dos tamaños de página.
+
+**Tramo C — los rojos discriminantes.** El 172 contra `5410bef` tiene que dar
+**9 contra 55**, y los sabotajes que declaraste: los cinco del 173, los cinco del
+174 y los cinco de la lista de 44. Ese tramo es el que convierte tus verdes en
+independientes, y es el único motivo por el que esto sigue abierto.
+
+**Tramo D — la suite completa desde base limpia.** `bash scripts/smoke.sh`
+**borra los volúmenes locales de Docker**; su propia cabecera lo advierte, y
+`NOW.md` ya registra que Emi no autorizó esa destrucción antes. **No lo corras
+sin que lo diga él**, y si lo dice, que sea sobre el SHA que se entrega.
+
+Hasta que A, B y C estén, **la etapa 3 sigue cerrada y no integramos a `main`**
+—que además necesita la autorización de Emi por el auto-deploy—. No hay nada que
+te pida ahora: el trabajo pendiente es mío y de la corrida.
