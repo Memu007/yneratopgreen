@@ -28656,11 +28656,11 @@ await runCase(174, 'La marca es un dato de la publicación, y sólo donde signif
     ['jhon-deere', '«John Deere» mal escrito: dos etiquetas para el mismo tractor'],
     ['fiat-someca', 'Someca era el brazo francés de Fiat; la máquina es un Fiat'],
     ['someca', 'ídem: tres etiquetas para una familia'],
-    ['chery', 'Bylion es la línea de tractores de Chery; queda «chery-bylion»'],
+    ['chery-bylion', 'Bylion es la línea de tractores de Chery; en el mercado se la nombra «Chery»'],
   ];
   // Y los que tienen que SEGUIR, para que «retirar» no se lea como «fusionar
   // todo». Case/Case IH y Deutz/Deutz-Fahr quedan separadas a propósito.
-  const SOBREVIVEN = ['case', 'case-ih', 'deutz', 'deutz-fahr', 'fiat', 'chery-bylion', 'john-deere'];
+  const SOBREVIVEN = ['case', 'case-ih', 'deutz', 'deutz-fahr', 'fiat', 'chery', 'john-deere'];
 
   const limpiar = () => {
     try {

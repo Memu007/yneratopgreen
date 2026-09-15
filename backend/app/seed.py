@@ -523,9 +523,11 @@ def create_seed_data():
             #                        frances de Fiat y la maquina que esta en el
             #                        campo es un Fiat. Tres etiquetas para una
             #                        familia es «Jhon Deere» bien escrito.
-            #   Chery / Chery Bylion queda «chery-bylion»: Bylion es la linea de
-            #                        tractores de Chery, no otro fabricante, y la
-            #                        etiqueta larga distingue del auto.
+            #   Chery / Chery Bylion queda «chery» a secas: Bylion es la linea
+            #                        de tractores de Chery, no otro fabricante, y
+            #                        en el mercado se la nombra «Chery». La PM
+            #                        habia elegido la etiqueta larga y Emi la
+            #                        corrigio: el conocimiento del mercado es suyo.
             #
             # Se decidio AHORA y no despues a proposito: `products.brand` esta
             # vacia y sin desplegar, asi que cambiar la lista no deja ninguna
@@ -543,7 +545,7 @@ def create_seed_data():
                 ("bronco", "Bronco"),
                 ("case", "Case"),
                 ("case-ih", "Case IH"),
-                ("chery-bylion", "Chery Bylion"),
+                ("chery", "Chery"),
                 ("claas", "Claas"),
                 ("deutz", "Deutz"),
                 ("deutz-fahr", "Deutz-Fahr"),
