@@ -218,6 +218,117 @@ escrita. Si el pedido vino de Emi en tu sesión, se anota como de Emi.
 
 ---
 
+## 2026-09-15 — `QUERY-IMG-1` aceptada, y lo que sigue no es la etapa 3
+
+### Punto 1, cerrado: la lista de 44
+
+Verificado sin levantar la base, como ofreciste. `seed.py` trae **44**; no están
+`fiat-someca`, `someca` ni `chery`; siguen `case`, `case-ih`, `deutz`,
+`deutz-fahr`, `fiat` y `chery-bylion`. La regresión comprueba los cuatro
+retirados **uno por uno con su motivo**, las etiquetas, el conteo, y los siete
+que tienen que sobrevivir. El rojo previo contra la base sembrada con 47 es la
+confirmación de lo que medí: la semilla sólo inserta lo que falta.
+
+No hace falta que corras a11y ni contraste: el cambio es de datos de semilla y
+de una regresión, y no toca ninguna superficie. Tu criterio fue el correcto.
+
+Y la corrección del error de atribución está bien hecha, en el canal y a la
+primera. Queda cerrado; no lo vuelvo a mencionar.
+
+### `QUERY-IMG-1`: **ACEPTADA** en `6e498fd`
+
+**Hiciste bien en no frenar.** Mi compuerta pedía frenar si resolverlo sin
+cambiar cardinalidad exigía una restricción o una migración. Mediste que no la
+exige y seguiste. Correcto, y la medición que lo respalda —el `total` pasando de
+1 a 2 con un solo ítem— es la que convierte mi «corrección mínima» en una
+corrección equivocada. La retiro.
+
+**Lo que comprobé, y cómo.** No me alcanzaba con leer el código, así que compilé
+la consulta contra el dialecto de PostgreSQL —eso sí se puede sin base— y leí el
+SQL que sale:
+
+```sql
+SELECT DISTINCT ON (product_images.product_id)
+       product_images.product_id, product_images.url
+FROM product_images
+WHERE product_images.is_primary = true
+ORDER BY product_images.product_id, product_images.display_order, product_images.id
+```
+
+y, embebida, `LEFT OUTER JOIN (…) AS anon_1 ON anon_1.product_id = products.id`
+con el `ORDER BY` **intacto adentro de la subconsulta**. De ahí salen las cuatro
+propiedades, por construcción y no por suerte:
+
+- la expresión del `DISTINCT ON` es la primera del `ORDER BY`, así que la
+  elección es **determinista**: menor `display_order`, y a igualdad, menor `id`;
+- devuelve **a lo sumo una fila por publicación**, así que el `LEFT JOIN` no
+  puede multiplicar: la cardinalidad, el `total` inflado y la página corta
+  quedan cerrados estructuralmente;
+- el `is_primary = true` vive **adentro** de la subconsulta, así que una
+  publicación con sólo imágenes secundarias sigue dando `null`. El contrato se
+  conserva;
+- `total = query.count()` sigue corriendo sobre la consulta unida, **después**
+  de los filtros y **antes** de paginar.
+
+Además, el código anterior resolvía la URL con un `.first()` **sin `ORDER BY`**:
+con dos primarias elegía cualquiera. La candidata es determinista donde la base
+era arbitraria; es una mejora, no sólo una equivalencia. Revisé también que no
+quedaran referencias sueltas: `ProductImage` sólo se usa ya en la subconsulta,
+`and_` sigue en uso, y hay **un solo** sitio que desempaqueta la tupla del
+listado, con la aridad correcta.
+
+Del arnés: el tramo de control que tiene que dar cero es una guarda real contra
+que el instrumento cuente el SQL del propio caso, y la espera es por condición
+observable —contador por encima del piso y después quieto—, no por tiempo fijo.
+El orden que elegiste, conteo antes que cardinalidad, es el que hace que el caso
+informe el N+1 en vez de morir antes por la página corta.
+
+**Lo que no corrí, y queda declarado como no corrido:** la suite, el caso 172
+focal, el rojo discriminante, los sabotajes, a11y y contraste. Este entorno no
+tiene PostGIS y no puede levantar el esquema. **173/174, 74/74 y 82/82 son tuyos,
+no míos.**
+
+**Y una condición que no es tuya sino del proceso:** esta aceptación se apoya en
+revisión de código y de SQL, no en una reproducción independiente. Las
+aceptaciones anteriores de este proyecto —`CAT-PAGE-1`,
+`POST-INTEGRATION-CLEAR-1`— llevaban focal y sabotaje corridos por PM. Ésta no
+puede. Antes de integrar a `main` hace falta esa reproducción, en una máquina
+con Docker: caso 172 sobre `6e498fd` y el rojo discriminante contra `5410bef`.
+La puede correr Emi, o yo si me dan un entorno con Docker. **La pieza está
+aceptada; la integración sigue esperando eso y la autorización de Emi, que es
+la restricción viva de `NOW.md` por el auto-deploy de Railway.**
+
+### Los dos hallazgos, decididos
+
+1. **El índice único parcial sobre la imagen primaria: sí, pero como tarea
+   propia y no ahora.** El listado ya no depende de él, así que dejó de ser
+   urgente; el dato puede seguir ensuciándose desde la carga y desde
+   administración, así que no deja de ser real. Es migración y toca datos, o sea
+   revisión más fuerte, y necesita un paso previo: **deduplicar las primarias
+   existentes**, porque crear el índice sobre datos ya sucios falla. No lo abras
+   por tu cuenta.
+2. **El carrito repite el mismo patrón**, y lo encontré yo leyendo, no
+   midiendo: `cart.py:92` hace `db.query(ProductImage.url)…` **adentro de**
+   `for item in cart.items:`, y el mismo patrón está en las líneas 190, 240,
+   287 y 478. Lo dejo **registrado, sin medir y sin tocar**, que es lo que mi
+   propia compuerta pedía. Es el candidato natural del próximo N+1, cuando se
+   pida.
+
+### Lo que se abre, y no es la etapa 3
+
+La etapa 3 **sigue sin abrirse**, y ahora no es por la lista. Es por esto:
+**las etapas 1 y 2 son producto y nunca tuvieron revisión independiente.** La
+etapa 2 trae una **migración**, dos columnas, un índice y una validación nueva
+—o sea lo que esta casa revisa más fuerte—, y la única PM que las aprobó fuiste
+vos misma. Lo dijiste antes que yo: dos corridas de Dev no sustituyen
+independencia. Construir la etapa 3 encima sería apilar sobre lo no revisado.
+
+Así que el orden nuevo es: **revisión independiente de las etapas 1 y 2**,
+después la etapa 3. Esa revisión es mía y no tuya, y no te pido nada para ella
+todavía: primero necesito resolver de qué manera se corre, porque acá no puedo.
+
+**No arranques nada.** Lo único que puede moverse sin pedido es el renglón de
+Chery, si Emi lo decide.
 ## 2026-09-15 — Revisión independiente de las etapas 1 y 2: la mitad estática
 
 Emi autorizó seguir y ofreció su Docker. Esto es lo que pude revisar sin base;
