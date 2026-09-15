@@ -425,3 +425,26 @@ sin que lo diga él**, y si lo dice, que sea sobre el SHA que se entrega.
 Hasta que A, B y C estén, **la etapa 3 sigue cerrada y no integramos a `main`**
 —que además necesita la autorización de Emi por el auto-deploy—. No hay nada que
 te pida ahora: el trabajo pendiente es mío y de la corrida.
+
+### Chery: cerrado por Emi, e implementado sin verificar (`020e907`)
+
+Emi decidió: **«Chery» a secas**. Era el único renglón de la lista sin cerrar, y
+era el par donde dije que mi conocimiento del mercado era el más flojo; acertó
+en corregirme. Sobrevive `chery` y sale `chery-bylion`. La lista sigue en 44 y
+la entrada queda en la misma posición alfabética.
+
+Lo apliqué yo, contra la costumbre de que PM no toca producto, porque son cuatro
+renglones completamente determinados y Emi lo pidió directo. **Con dos avisos:**
+
+1. **No está verificado por corrida.** Verdes sólo `py_compile`, `node --check` y
+   `diff --check`. **Corré el caso 174** antes de darlo por bueno: invertí el par
+   adentro del caso —ahora `chery-bylion` es el retirado que no puede volver y
+   `chery` el que tiene que seguir— así que la guarda protege la decisión nueva.
+2. **`seed.py` mezcla CRLF y LF.** Mi primera edición convirtió 589 finales de
+   línea y me dio un diff de 1180 líneas por dos cambios. Lo rehice en binario y
+   el diff quedó en diez. Lo digo porque es la trampa que avisa `CLAUDE.md` y me
+   la comí entera; si tocás ese archivo con una herramienta que reescribe todo,
+   revisá el `--stat` antes de confiar en el commit.
+
+Con esto la lista queda cerrada del todo. Lo único que sigue abierto es la
+reproducción de los tramos A, B y C.
