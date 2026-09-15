@@ -507,12 +507,31 @@ def create_seed_data():
                 ("temporada", "Solo en temporada"),
             ],
             # Marcas de maquinaria. La lista vino del buscador que armo la
-            # clienta, curada en una sola cosa: se retiro «Jhon Deere», que es
-            # «John Deere» mal escrito y estaba las dos veces. Quedan pares que
-            # conviene mirar —Case/Case IH, Fiat/Fiat Someca/Someca,
-            # Chery/Chery Bylion, Deutz/Deutz-Fahr—: son marcas distintas de
-            # verdad, asi que no se fusionan sin decision; si sobra alguna se
-            # desactiva desde el panel, sin migracion.
+            # clienta y la curo la PM, en dos pasos.
+            #
+            # Primero se retiro «Jhon Deere», que es «John Deere» mal escrito y
+            # estaba junto a el: dos etiquetas para el mismo tractor parten los
+            # resultados en dos.
+            #
+            # Despues se decidieron los cuatro pares, y NO en bloque:
+            #
+            #   Deutz / Deutz-Fahr   quedan los dos: en el usado argentino «Deutz»
+            #                        es Deutz Argentina y «Deutz-Fahr» la moderna.
+            #   Case / Case IH       quedan los dos: Case IH existe desde la
+            #                        fusion de 1985, y se distinguen desde la chapa.
+            #   Fiat / Fiat Someca / Someca  queda «fiat» sola: Someca era el brazo
+            #                        frances de Fiat y la maquina que esta en el
+            #                        campo es un Fiat. Tres etiquetas para una
+            #                        familia es «Jhon Deere» bien escrito.
+            #   Chery / Chery Bylion queda «chery-bylion»: Bylion es la linea de
+            #                        tractores de Chery, no otro fabricante, y la
+            #                        etiqueta larga distingue del auto.
+            #
+            # Se decidio AHORA y no despues a proposito: `products.brand` esta
+            # vacia y sin desplegar, asi que cambiar la lista no deja ninguna
+            # publicacion con una marca que ya no se ofrece. Desactivar desde el
+            # panel mas adelante SI la dejaria, porque la semilla solo inserta lo
+            # que falta y la validacion corre solo al escribir.
             #
             # El valor es un slug y la etiqueta es el nombre: el slug es lo que
             # va a viajar el dia que esto sea un filtro.
@@ -524,7 +543,6 @@ def create_seed_data():
                 ("bronco", "Bronco"),
                 ("case", "Case"),
                 ("case-ih", "Case IH"),
-                ("chery", "Chery"),
                 ("chery-bylion", "Chery Bylion"),
                 ("claas", "Claas"),
                 ("deutz", "Deutz"),
@@ -534,7 +552,6 @@ def create_seed_data():
                 ("farmtrac", "Farmtrac"),
                 ("ferrari", "Ferrari"),
                 ("fiat", "Fiat"),
-                ("fiat-someca", "Fiat Someca"),
                 ("foton", "Foton"),
                 ("grosspal", "Grosspal"),
                 ("hanomag", "Hanomag"),
@@ -555,7 +572,6 @@ def create_seed_data():
                 ("roland-h", "Roland H"),
                 ("same", "SAME"),
                 ("shibaura", "Shibaura"),
-                ("someca", "Someca"),
                 ("sonalika", "Sonalika"),
                 ("universal", "Universal"),
                 ("valpadana", "Valpadana"),

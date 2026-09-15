@@ -28646,6 +28646,21 @@ await runCase(174, 'La marca es un dato de la publicación, y sólo donde signif
   const marca = Date.now();
   const MARCADOR = `Smoke marca174 ${marca}`;
   const UNA_MARCA = 'john-deere';
+  // Cuántas marcas tiene que haber. No es decoración: si alguien vuelve a
+  // cargar la lista entera del buscador original, este número lo dice.
+  const CUANTAS_MARCAS = 44;
+  // Los slugs retirados por decisión de la PM, con el motivo al lado. Se
+  // comprueban uno por uno y no por el total, porque un total correcto con una
+  // sustitución adentro pasaría igual.
+  const RETIRADOS = [
+    ['jhon-deere', '«John Deere» mal escrito: dos etiquetas para el mismo tractor'],
+    ['fiat-someca', 'Someca era el brazo francés de Fiat; la máquina es un Fiat'],
+    ['someca', 'ídem: tres etiquetas para una familia'],
+    ['chery', 'Bylion es la línea de tractores de Chery; queda «chery-bylion»'],
+  ];
+  // Y los que tienen que SEGUIR, para que «retirar» no se lea como «fusionar
+  // todo». Case/Case IH y Deutz/Deutz-Fahr quedan separadas a propósito.
+  const SOBREVIVEN = ['case', 'case-ih', 'deutz', 'deutz-fahr', 'fiat', 'chery-bylion', 'john-deere'];
 
   const limpiar = () => {
     try {
@@ -28674,12 +28689,32 @@ await runCase(174, 'La marca es un dato de la publicación, y sólo donde signif
 
     assert(new Set(valores).size === valores.length,
       `la lista de marcas tiene valores repetidos: ${JSON.stringify(valores.filter((v, i) => valores.indexOf(v) !== i))}`);
-    // El typo. Es el motivo por el que la lista se curó, y si alguien la vuelve
-    // a cargar entera este caso lo dice.
+    assert(opciones.length === CUANTAS_MARCAS,
+      `la lista trae ${opciones.length} marcas y tiene que traer ${CUANTAS_MARCAS}: `
+      + 'la lista la curó la PM y volver a cargar la original las reintroduce');
+
+    // Los retirados, uno por uno y con su motivo. El primero es «Jhon Deere»,
+    // que es de donde salió esta guarda; los otros tres los decidió la PM
+    // antes de desplegar, que es la última ventana en la que cambiar la lista
+    // no deja publicaciones con una marca que ya no se ofrece.
+    for (const [slug, porQue] of RETIRADOS) {
+      assert(!valores.includes(slug),
+        `la lista de marcas trae «${slug}», que se retiró: ${porQue}. Con las dos cargadas, `
+        + 'la misma máquina se publica de dos formas y el día que esto filtre parte los '
+        + 'resultados');
+    }
+    // Y la etiqueta, no sólo el slug: «Jhon Deere» con otro valor sería lo mismo.
     assert(!etiquetas.some((e) => /jhon/i.test(e)),
-      `la lista de marcas trae «${etiquetas.find((e) => /jhon/i.test(e))}», que es «John Deere» `
-      + 'mal escrito: con las dos cargadas, el mismo tractor se publica de dos formas y el día '
-      + 'que esto filtre, parte los resultados');
+      `la lista de marcas trae la etiqueta «${etiquetas.find((e) => /jhon/i.test(e))}»`);
+    assert(!etiquetas.some((e) => /someca/i.test(e)),
+      `la lista de marcas trae la etiqueta «${etiquetas.find((e) => /someca/i.test(e))}»`);
+
+    // Retirar no es fusionar: estos tienen que seguir estando.
+    for (const slug of SOBREVIVEN) {
+      assert(valores.includes(slug),
+        `falta «${slug}» en la lista de marcas. Case/Case IH y Deutz/Deutz-Fahr quedan `
+        + 'separadas a propósito: son marcas distintas y el vendedor sabe cuál tiene');
+    }
     assert(etiquetas.some((e) => e === 'John Deere'),
       'la lista de marcas no trae «John Deere»');
     // Los valores son slugs: son los que van a viajar el día que esto filtre.
@@ -28687,7 +28722,8 @@ await runCase(174, 'La marca es un dato de la publicación, y sólo donde signif
       `hay valores que no son slugs: ${JSON.stringify(valores.filter((v) => !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(v)).slice(0, 3))}`);
     assert(valores.includes(UNA_MARCA), `la lista no trae «${UNA_MARCA}»`);
     medidos.push(`la lista trae ${opciones.length} marcas, todas con valor único en forma de `
-      + 'slug, sin «Jhon Deere» y con «John Deere»');
+      + `slug; los ${RETIRADOS.length} retirados no están y los ${SOBREVIVEN.length} que `
+      + 'quedan separados a propósito sí');
 
     // === B. Qué categorías la ofrecen ======================================
     const categorias = (await apiRequest('/catalog/categories')).data;

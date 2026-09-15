@@ -68,6 +68,58 @@ marca que devuelve cero resultados—.
 
 ---
 
+## Un error mío, y la lista de 44
+
+### El error, primero
+
+Escribí en este canal que `QUERY-IMG-1` quedaba **aceptada en `6e498fd`**. Es
+falso y la corrección es tuya: `6e498fd` es **mi propio commit candidato**, no un
+commit de PM. Lo tomé de un relato en el chat y lo anoté como decisión del canal,
+que es exactamente lo que este canal existe para evitar.
+
+Lo mismo con las otras dos que cité: «no fusionar las marcas» era **mi
+propuesta**, no tu decisión —y hoy quedó decidida al revés para dos de los cuatro
+grupos—; y sobre superficies el canal sólo tenía la compuerta que pedía a11y y
+contraste si el alcance se desviaba.
+
+`QUERY-IMG-1` sigue **sin aceptar** y sigue siendo la tarea activa. La revisión
+es tuya.
+
+### La lista de 44
+
+Hecho lo que pediste, y en el orden que fijaste.
+
+**En `seed.py`** se retiran `fiat-someca`, `someca` y `chery`. Quedan **44**.
+Case/Case IH y Deutz/Deutz-Fahr **quedan separadas**, y no armé sinónimos ni
+agrupaciones: dijiste que eso es alcance nuevo y no lo pediste.
+
+**El rojo primero, y confirma tu medición.** Contra la base ya sembrada con 47,
+el caso dio rojo: «la lista trae 47 marcas y tiene que traer 44». Los tres
+seguían ahí porque, como mediste, la semilla **sólo inserta lo que falta**.
+Recreada la base, quedan 44 y ninguno de los retirados.
+
+**La regresión** ya no mira sólo «Jhon Deere»:
+
+- el **conteo** afirma 44;
+- los **cuatro** slugs retirados se comprueban **uno por uno, con su motivo**, y
+  no por el total: un total correcto con una sustitución adentro pasaría igual;
+- las **etiquetas** también —«Jhon Deere» con otro valor sería lo mismo—;
+- y los **siete que tienen que sobrevivir** se comprueban explícitamente, para
+  que «retirar» no se lea mañana como «fusionar todo».
+
+**Cinco sabotajes, cinco rojos:** reintroducir cada uno de los cuatro retirados,
+y desactivar `case` —fusionar de más—.
+
+### Lo que te dejo abierto, porque vos lo dejaste abierto
+
+Dijiste que en Chery tu conocimiento del mercado es más flojo que el nuestro: si
+allá «Chery» a secas es lo que se usa, tiene que sobrevivir `chery` y salir
+`chery-bylion`. **Implementé lo que decidiste** —queda `chery-bylion`—, y el
+cambio es un renglón en `seed.py` más un renglón en el caso. Queda anotado como
+lo único de la lista sin cerrar antes de desplegar.
+
+---
+
 ## Microtarea hecha: el alta entra al inventario de superficies (`cd29007`)
 
 Lo que pediste al aceptar `QUERY-IMG-1`, antes de la etapa 3. Tenías razón en el
