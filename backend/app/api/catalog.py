@@ -109,6 +109,7 @@ def get_categories(
                 "display_order": int(category.display_order) if category.display_order else 0,
                 "is_service": category.is_service,
                 "default_operation_kind": category.default_operation_kind,
+                "usa_marca": category.usa_marca,
                 "product_count": count,
                 "subcategories": subcategory_list,
                 "created_at": category.created_at
@@ -503,6 +504,7 @@ def get_products(
             "operation_kind": product.operation_kind,
             # Nuevo o usado, o nada. Sólo el activo la trae con valor.
             "condition": product.condition,
+            "brand": product.brand,
             # Cobertura y modalidad: la tarjeta de servicio no se puede
             # dibujar sin ellas, y estaban guardadas sin salir nunca.
             "pricing_type": product.pricing_type,
@@ -605,6 +607,7 @@ def get_product_detail(
         "is_service": product.category.is_service,
         "operation_kind": product.operation_kind,
         "condition": product.condition,
+        "brand": product.brand,
         "pricing_type": product.pricing_type,
         "availability": product.availability,
         "response_time": product.response_time,

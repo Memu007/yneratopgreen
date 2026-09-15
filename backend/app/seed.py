@@ -17,7 +17,7 @@ from app.models.locality import Locality
 from app.core.config import settings
 from app.core.security import hash_password
 from app.seed_localities import seed_localities
-from app.services import anatomia
+from app.services import anatomia, marcas
 from datetime import datetime
 
 
@@ -438,6 +438,12 @@ def create_seed_data():
                 category_values["slug"],
                 bool(category_values.get("is_service", False)),
             )
+            # Y si ofrece marca. Mismo criterio: sale del catalogo de dominio
+            # y no de una clave repetida doce veces.
+            category_values["usa_marca"] = marcas.usa_marca_por_categoria(
+                category_values["slug"],
+                bool(category_values.get("is_service", False)),
+            )
             existing_cat = db.query(Category).filter(
                 Category.slug == category_values["slug"]
             ).first()
@@ -499,6 +505,65 @@ def create_seed_data():
                 ("inmediata", "Disponibilidad inmediata"),
                 ("programar", "A programar"),
                 ("temporada", "Solo en temporada"),
+            ],
+            # Marcas de maquinaria. La lista vino del buscador que armo la
+            # clienta, curada en una sola cosa: se retiro «Jhon Deere», que es
+            # «John Deere» mal escrito y estaba las dos veces. Quedan pares que
+            # conviene mirar —Case/Case IH, Fiat/Fiat Someca/Someca,
+            # Chery/Chery Bylion, Deutz/Deutz-Fahr—: son marcas distintas de
+            # verdad, asi que no se fusionan sin decision; si sobra alguna se
+            # desactiva desde el panel, sin migracion.
+            #
+            # El valor es un slug y la etiqueta es el nombre: el slug es lo que
+            # va a viajar el dia que esto sea un filtro.
+            "brand": [
+                ("agrinar", "Agrinar"),
+                ("antonio-carraro", "Antonio Carraro"),
+                ("apache", "Apache"),
+                ("belarus", "Belarus"),
+                ("bronco", "Bronco"),
+                ("case", "Case"),
+                ("case-ih", "Case IH"),
+                ("chery", "Chery"),
+                ("chery-bylion", "Chery Bylion"),
+                ("claas", "Claas"),
+                ("deutz", "Deutz"),
+                ("deutz-fahr", "Deutz-Fahr"),
+                ("dongfeng", "Dongfeng"),
+                ("eisen", "Eisen"),
+                ("farmtrac", "Farmtrac"),
+                ("ferrari", "Ferrari"),
+                ("fiat", "Fiat"),
+                ("fiat-someca", "Fiat Someca"),
+                ("foton", "Foton"),
+                ("grosspal", "Grosspal"),
+                ("hanomag", "Hanomag"),
+                ("husqvarna", "Husqvarna"),
+                ("jinma", "Jinma"),
+                ("john-deere", "John Deere"),
+                ("kioti", "Kioti"),
+                ("kubota", "Kubota"),
+                ("lamborghini-trattori", "Lamborghini Trattori"),
+                ("landini", "Landini"),
+                ("lovol", "Lovol"),
+                ("mahindra", "Mahindra"),
+                ("massey-ferguson", "Massey Ferguson"),
+                ("mccormick", "McCormick"),
+                ("new-holland", "New Holland"),
+                ("pasquali", "Pasquali"),
+                ("pauny", "Pauny"),
+                ("roland-h", "Roland H"),
+                ("same", "SAME"),
+                ("shibaura", "Shibaura"),
+                ("someca", "Someca"),
+                ("sonalika", "Sonalika"),
+                ("universal", "Universal"),
+                ("valpadana", "Valpadana"),
+                ("valtra", "Valtra"),
+                ("yanmar", "Yanmar"),
+                ("yard-machines", "Yard Machines"),
+                ("zanello", "Zanello"),
+                ("zoomlion", "Zoomlion"),
             ],
             "response_time": [
                 ("inmediato", "Inmediato"),

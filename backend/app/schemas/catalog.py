@@ -27,6 +27,9 @@ class CategoryBase(BaseModel):
     # La anatomia que traen por omision las publicaciones de esta categoria.
     # El alta la usa para preseleccionar y para saber que opciones ofrecer.
     default_operation_kind: str = "insumo"
+    # Si las publicaciones de esta categoria declaran marca. El alta lo lee
+    # para ofrecer el control o no ofrecerlo: no se deduce de la anatomia.
+    usa_marca: bool = False
 
 class CategoryResponse(CategoryBase):
     id: str
@@ -117,6 +120,7 @@ class ProductCardResponse(ProductBase):
     # modelo la descarta: Pydantic ignora lo que no declara.
     operation_kind: str = "insumo"
     condition: Optional[str] = None
+    brand: Optional[str] = None
     # Lo que la anatomia de servicio pide obligatorio —cobertura y
     # modalidad— y ya estaba en la base sin salir a la superficie.
     pricing_type: Optional[str] = None
@@ -144,6 +148,7 @@ class ProductDetailResponse(ProductBase):
     is_service: bool = False
     operation_kind: str = "insumo"
     condition: Optional[str] = None
+    brand: Optional[str] = None
     pricing_type: Optional[str] = None
     availability: Optional[str] = None
     response_time: Optional[str] = None

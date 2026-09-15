@@ -45,6 +45,15 @@ class Product(Base):
     # usan. Nula en los registros anteriores a la columna: nadie puede
     # saber hoy si aquel tractor era usado sin adivinarle la descripcion.
     condition = Column(String(20), nullable=True)
+
+    # La marca declarada. Quien ofrece la categoria la decide: no toda
+    # publicacion tiene marca, y no se decide por anatomia. La anatomia
+    # `activo` incluye «Tierras y parcelas» y «Bienes y Ganado», y un campo
+    # no tiene marca. Lo dice `categories.usa_marca`.
+    #
+    # Nula en los registros anteriores a la columna: escribir una marca por
+    # omision seria afirmar algo que el vendedor no dijo.
+    brand = Column(String(60), nullable=True, index=True)
     
     # Clasificación
     category_id = Column(String(36), ForeignKey("categories.id"), nullable=False, index=True)

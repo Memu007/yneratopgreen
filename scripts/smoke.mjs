@@ -28625,6 +28625,238 @@ await runCase(173, 'La condición filtra el conjunto entero y nunca completa lo 
   return `con ${TOTAL} publicaciones fabricadas y retiradas al final: ${medidos.join('; ')}`;
 });
 
+// ---------------------------------------------------------------------------
+// 174. La marca es un dato de la publicación, y sólo donde significa algo.
+//
+// El buscador que trajo la clienta ofrece elegir MARCA. No existía: ni columna,
+// ni tabla, ni opción de formulario. Vivía suelta adentro del título, donde no
+// se puede contar ni filtrar.
+//
+// Lo que este caso protege no es que la marca se guarde —eso es lo fácil— sino
+// DÓNDE se ofrece. La anatomía `activo` incluye «Tierras y parcelas» y «Bienes
+// y Ganado»: decidirlo por anatomía pondría una lista de marcas de tractor
+// sobre un campo y sobre un ternero. Lo decide `categories.usa_marca`.
+//
+// Y protege la lista: la que vino traía «Jhon Deere» junto a «John Deere» —el
+// mismo tractor escrito de dos formas—, que el día que esto sea un filtro
+// parte los resultados en dos. Se retiró.
+// ---------------------------------------------------------------------------
+await runCase(174, 'La marca es un dato de la publicación, y sólo donde significa algo', async () => {
+  const medidos = [];
+  const marca = Date.now();
+  const MARCADOR = `Smoke marca174 ${marca}`;
+  const UNA_MARCA = 'john-deere';
+
+  const limpiar = () => {
+    try {
+      querySql(`DELETE FROM product_images WHERE product_id IN (
+        SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}%`)})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}%`)}`);
+    } catch (error) {
+      console.log(`  · no se pudieron retirar las publicaciones del caso 174: ${error.message}`);
+    }
+  };
+
+  // `contador` numera los intentos y `publicadas` guarda las que la API
+  // aceptó: una de las pruebas es justamente que rechace una marca inventada,
+  // y comparar el total del listado contra los intentos haría fallar el caso
+  // por su propia prueba.
+  let contador = 0;
+  const publicadas = [];
+
+  try {
+    // === A. La lista de marcas =============================================
+    const opciones = (await apiRequest('/catalog/form-options?option_type=brand')).data;
+    assert(Array.isArray(opciones) && opciones.length > 0,
+      `el catálogo de marcas devolvió ${JSON.stringify(opciones).slice(0, 120)}`);
+    const valores = opciones.map((o) => o.value);
+    const etiquetas = opciones.map((o) => o.label);
+
+    assert(new Set(valores).size === valores.length,
+      `la lista de marcas tiene valores repetidos: ${JSON.stringify(valores.filter((v, i) => valores.indexOf(v) !== i))}`);
+    // El typo. Es el motivo por el que la lista se curó, y si alguien la vuelve
+    // a cargar entera este caso lo dice.
+    assert(!etiquetas.some((e) => /jhon/i.test(e)),
+      `la lista de marcas trae «${etiquetas.find((e) => /jhon/i.test(e))}», que es «John Deere» `
+      + 'mal escrito: con las dos cargadas, el mismo tractor se publica de dos formas y el día '
+      + 'que esto filtre, parte los resultados');
+    assert(etiquetas.some((e) => e === 'John Deere'),
+      'la lista de marcas no trae «John Deere»');
+    // Los valores son slugs: son los que van a viajar el día que esto filtre.
+    assert(valores.every((v) => /^[a-z0-9]+(-[a-z0-9]+)*$/.test(v)),
+      `hay valores que no son slugs: ${JSON.stringify(valores.filter((v) => !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(v)).slice(0, 3))}`);
+    assert(valores.includes(UNA_MARCA), `la lista no trae «${UNA_MARCA}»`);
+    medidos.push(`la lista trae ${opciones.length} marcas, todas con valor único en forma de `
+      + 'slug, sin «Jhon Deere» y con «John Deere»');
+
+    // === B. Qué categorías la ofrecen ======================================
+    const categorias = (await apiRequest('/catalog/categories')).data;
+    const conMarca = categorias.filter((c) => c.usa_marca === true);
+    const sinMarca = categorias.filter((c) => c.usa_marca !== true);
+    assert(conMarca.length > 0,
+      'ninguna categoría declara `usa_marca`: el control no se ofrecería nunca');
+    assert(conMarca.every((c) => c.is_service === false),
+      `una categoría de servicio declara marca: ${JSON.stringify(conMarca.filter((c) => c.is_service).map((c) => c.name))}`);
+    // Lo que este caso viene a impedir: que se decida por anatomía.
+    for (const nombre of ['Tierras y parcelas', 'Bienes y Ganado']) {
+      const cual = categorias.find((c) => c.name === nombre);
+      if (!cual) continue;
+      assert(cual.usa_marca !== true,
+        `«${nombre}» declara marca. Es una categoría de anatomía «activo», así que decidir la `
+        + 'marca por anatomía ofrecería marcas de tractor para un campo o para un ternero');
+    }
+    medidos.push(`${conMarca.length} categoría(s) declaran marca —${conMarca.map((c) => c.name).join(', ')}— `
+      + `y ${sinMarca.length} no, entre ellas «Tierras y parcelas» y «Bienes y Ganado»`);
+
+    const laQueOfrece = conMarca[0];
+    const laQueNo = sinMarca.find((c) => c.is_service === false);
+    assert(laQueNo, 'no hay una categoría de producto que NO declare marca para contrastar');
+
+    // === C. El alta ========================================================
+    const vendedor = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+    })).data;
+    const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+    const publicar = async (categoria, anatomia, cuerpoExtra) => {
+      contador += 1;
+      const nombre = `${MARCADOR}-${String(contador).padStart(2, '0')}`;
+      const respuesta = await apiRequest('/products', {
+        method: 'POST', token: vendedor.access_token,
+        body: {
+          name: nombre,
+          description: 'Publicación fabricada para medir la marca de la publicación.',
+          category_id: categoria.id,
+          price: 500000 + contador,
+          stock: 1,
+          unit: 'unidad',
+          locality_id: localidad,
+          publication_type: 'producto',
+          operation_kind: anatomia,
+          ...cuerpoExtra,
+        },
+      });
+      publicadas.push(nombre);
+      return { nombre, id: respuesta.data.id };
+    };
+    // La marca se comprueba contra la BASE: `ProductResponse` es un acuse
+    // mínimo y no la devuelve, igual que no devuelve la condición.
+    const marcaEnBase = (nombre) => {
+      const [fila] = queryRows(`
+        SELECT COALESCE(brand, '(sin marca)'), 'fin' FROM products
+        WHERE name = ${sqlLiteral(nombre)}`);
+      assert(fila, `no quedó en la base la publicación «${nombre}»`);
+      return fila[0] === '(sin marca)' ? null : fila[0];
+    };
+
+    const conLaMarca = await publicar(laQueOfrece, 'activo', { brand: UNA_MARCA });
+    assert(marcaEnBase(conLaMarca.nombre) === UNA_MARCA,
+      `publicando en «${laQueOfrece.name}» con marca «${UNA_MARCA}», la base guardó `
+      + `${JSON.stringify(marcaEnBase(conLaMarca.nombre))}`);
+
+    const sinLaMarca = await publicar(laQueOfrece, 'activo', {});
+    assert(marcaEnBase(sinLaMarca.nombre) === null,
+      'publicar sin marca guardó una marca: la marca es opcional, y no se completa sola');
+
+    // En una categoría que no la ofrece, se descarta en silencio: guardar un
+    // dato que ninguna pantalla muestra es dejarlo listo para que una edición
+    // futura lo resucite.
+    const descartada = await publicar(laQueNo, 'insumo', { brand: UNA_MARCA });
+    assert(marcaEnBase(descartada.nombre) === null,
+      `publicando en «${laQueNo.name}», que no declara marca, la base guardó `
+      + `${JSON.stringify(marcaEnBase(descartada.nombre))}: la marca tenía que descartarse`);
+
+    // Una marca que no está en la lista se rechaza. Si se aceptara texto libre,
+    // «John Deere», «john deere» y «Jhon Deere» serían tres marcas distintas.
+    let loQueDijo = 'no falló';
+    try {
+      await publicar(laQueOfrece, 'activo', { brand: 'tractores-de-la-esquina' });
+      loQueDijo = 'aceptó una marca que no existe';
+    } catch (error) {
+      loQueDijo = error.message;
+    }
+    assert(/HTTP 400/.test(loQueDijo),
+      `publicando con una marca inventada la API contestó «${loQueDijo.slice(0, 160)}» y tiene `
+      + 'que rechazarla: aceptar texto libre vuelve incontable cualquier filtro futuro');
+    medidos.push('el alta guarda la marca donde la categoría la declara, la descarta donde no, '
+      + 'la deja vacía si no se elige y rechaza una que no está en la lista');
+
+    // === D. Sale en el listado y en el detalle =============================
+    const listado = (await apiRequest(
+      `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page_size=24`)).data;
+    assert(listado.total === publicadas.length,
+      `el listado dice ${listado.total} y se publicaron ${publicadas.length}`);
+    const enListado = listado.items.find((i) => i.name === conLaMarca.nombre);
+    assert(enListado && enListado.brand === UNA_MARCA,
+      `en el listado la publicación con marca salió con brand=${JSON.stringify(enListado?.brand)}`);
+    const otraEnListado = listado.items.find((i) => i.name === descartada.nombre);
+    assert(otraEnListado && (otraEnListado.brand ?? null) === null,
+      `la publicación de la categoría sin marca salió con brand=${JSON.stringify(otraEnListado?.brand)}`);
+
+    const detalle = (await apiRequest(`/catalog/products/${conLaMarca.id}`)).data;
+    assert(detalle.brand === UNA_MARCA,
+      `el detalle devolvió brand=${JSON.stringify(detalle.brand)}`);
+    medidos.push('la marca sale en la tarjeta y en el detalle, y en null donde no corresponde');
+
+    // === E. Editar: mudarse a una categoría sin marca la suelta ============
+    const edicion = await apiRequest(`/products/${conLaMarca.id}`, {
+      method: 'PATCH', token: vendedor.access_token,
+      body: { category_id: laQueNo.id, operation_kind: 'insumo' },
+    });
+    assert(edicion.status === 200, `la edición respondió HTTP ${edicion.status}`);
+    assert(marcaEnBase(conLaMarca.nombre) === null,
+      `mudando la publicación a «${laQueNo.name}», que no declara marca, quedó `
+      + `brand=${JSON.stringify(marcaEnBase(conLaMarca.nombre))}: la marca tenía que soltarse, `
+      + 'porque esa categoría no la muestra y una edición futura la resucitaría');
+    medidos.push('mudar una publicación a una categoría que no declara marca suelta la marca');
+
+    // === F. En pantalla: el control aparece sólo donde corresponde =========
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const page = await contexto.newPage();
+      await page.goto(`${FRONTEND_URL}/`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Ingresar' }).first().click();
+      await page.getByLabel(/correo|email/i).first().fill('vendedor@ejemplo.com');
+      await page.getByLabel(/contraseña/i).first().fill('vendedor123');
+      await page.getByRole('button', { name: /ingresar/i }).last().click();
+      await esperarA(async () => (await page.getByRole('button', { name: 'Ingresar' }).count()) === 0,
+        'no se pudo ingresar para abrir el alta', 25_000);
+
+      await page.getByRole('button', { name: /publicar|vender/i }).first().click();
+      const categoriaEnElAlta = page.locator('select[name="category"], #category').first();
+      await categoriaEnElAlta.waitFor({ state: 'visible', timeout: 25_000 });
+
+      const controlDeMarca = page.locator('#brand');
+      await categoriaEnElAlta.selectOption({ label: laQueOfrece.name });
+      await esperarA(async () => (await controlDeMarca.count()) === 1,
+        `eligiendo «${laQueOfrece.name}», que declara marca, el alta no ofreció el control`, 20_000);
+      const cuantasOpciones = await controlDeMarca.locator('option').count();
+      assert(cuantasOpciones === opciones.length + 1,
+        `el control ofrece ${cuantasOpciones} opciones y tienen que ser ${opciones.length + 1} `
+        + '(las marcas más «Sin declarar»)');
+
+      await categoriaEnElAlta.selectOption({ label: laQueNo.name });
+      await esperarA(async () => (await controlDeMarca.count()) === 0,
+        `eligiendo «${laQueNo.name}», que NO declara marca, el alta siguió ofreciendo el control`,
+        20_000);
+      medidos.push(`en el alta el control aparece en «${laQueOfrece.name}» con `
+        + `${cuantasOpciones} opciones y desaparece en «${laQueNo.name}»`);
+      await contexto.close();
+    } finally {
+      await browser.close();
+    }
+  } finally {
+    limpiar();
+  }
+
+  const [quedan] = queryRows(`
+    SELECT COUNT(*)::text, 'fin' FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}%`)}`);
+  assert(quedan[0] === '0', `el caso dejó ${quedan[0]} publicaciones fabricadas sin retirar`);
+
+  return `con ${publicadas.length} publicaciones fabricadas y retiradas al final: `
+    + medidos.join('; ');
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

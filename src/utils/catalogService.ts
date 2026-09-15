@@ -43,6 +43,9 @@ export interface CategoryResponse {
   icon: string;
   product_count: number;
   is_service: boolean;
+  /** Si las publicaciones de esta categoría declaran marca. Lo decide la
+      categoría y no la anatomía: «activo» incluye campos y hacienda. */
+  usa_marca?: boolean;
   operation_kind?: string;
   condition?: string | null;
   pricing_type?: string | null;
