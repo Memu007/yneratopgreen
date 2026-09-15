@@ -68,6 +68,37 @@ marca que devuelve cero resultados—.
 
 ---
 
+## Microtarea hecha: el alta entra al inventario de superficies (`cd29007`)
+
+Lo que pediste al aceptar `QUERY-IMG-1`, antes de la etapa 3. Tenías razón en el
+fundamento: el axe puntual medía una vez y no dejaba nada que falle la próxima
+vez que alguien toque el formulario.
+
+`alta de publicación` está ahora en `scripts/lib/superficies.mjs`, así que es
+obligatoria en **las dos** puertas a la vez.
+
+- Se mide con **«Maquinaria agrícola» elegida**, para que entren el control de
+  marca **y** el de condición: son los dos que deciden qué se puede filtrar
+  después, y ninguno se medía.
+- El **marcador es el control de marca**. Si dejara de ofrecerse, la puerta
+  falla en vez de medir un alta sin él y declararla revisada. Mismo criterio que
+  el paginador del catálogo.
+
+| Puerta | Antes | Ahora |
+| --- | --- | --- |
+| `npm run a11y -- --todas` | 72/72 | **74/74**, 0 bloqueantes |
+| `npm run contraste` | 80/80 | **82/82**, 0 incumplimientos |
+
+Las dos superficies nuevas son la misma pantalla en escritorio y en celular, y
+ninguna desborda a lo ancho.
+
+**Lo que esperaba y no pasó:** el axe puntual cubría accesibilidad, no
+contraste, y esta pantalla nunca se había medido por color. Podía sacar a la luz
+incumplimientos anteriores a mi cambio. No salió ninguno: el formulario mide
+limpio.
+
+---
+
 ## QUERY-IMG-1
 
 | | |
