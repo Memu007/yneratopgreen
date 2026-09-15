@@ -282,3 +282,100 @@ el catálogo, así que ese número no prueba cobertura y no lo uso como prueba.
 
 Etapa 2: la marca como dato, con su alta. Recién después la marca como filtro
 y faceta. No arranca sin que Emi lo pida.
+
+---
+
+# Etapa 2 — entregada (2026-09-15)
+
+| | |
+| --- | --- |
+| **SHA base** | `339a45e` |
+| **SHA candidato** | `4bdfc71` (producto y regresión en `ed3e39f`, índice de la migración en `4bdfc71`) |
+| **Diff** | migración nueva, `marcas.py` nuevo, `catalog.py`, `products.py`, los dos modelos, los dos esquemas, `seed.py`, `AddProductModal.tsx`, `catalogService.ts`, `smoke.mjs` |
+
+## La decisión de diseño cambió, y la cambió una medición
+
+Tenía decidido espejar la condición: ofrecer marca donde la anatomía es
+`activo`. **Está mal.** `anatomia.DEFAULT_POR_CATEGORIA` pone en `activo` a
+«Tierras y parcelas» y a «Bienes y Ganado». Decidirlo por anatomía habría puesto
+una lista de marcas de tractor sobre un campo y sobre un ternero: exactamente el
+defecto que este documento le señaló al buscador de la clienta en el punto 2.4.
+
+Lo decide la **categoría**: `categories.usa_marca`. Arranca en verdadero sólo
+para «Maquinaria agrícola», que es la única con lista cargada. Ofrecer marcas de
+tractor dentro de «Insumos agrícolas» sería el mismo defecto al revés —un
+herbicida tiene marca, pero no es ninguna de éstas—, así que ampliarla es cargar
+la lista de esa categoría, y es otra decisión.
+
+Esto **matiza la decisión 1**: sigue habiendo una sola lista y ninguna tabla
+puente, pero la lista se **ofrece por categoría**. Es más débil que
+«marca-por-categoría» y más fuerte que «una lista para todos».
+
+## La lista
+
+47 marcas. Se retiró **«Jhon Deere»**, que es «John Deere» mal escrito y estaba
+junto a él: con las dos, el mismo tractor se publica de dos formas y el día que
+esto filtre parte los resultados.
+
+**No fusioné** los pares que son marcas distintas de verdad —Case/Case IH,
+Fiat/Fiat Someca/Someca, Chery/Chery Bylion, Deutz/Deutz-Fahr—. Si sobra alguna
+se desactiva desde el panel, sin migración. Es la decisión que más se beneficia
+de conocer el mercado, y ahí Emi sabe más que yo.
+
+El valor es un slug y la etiqueta el nombre: el slug es lo que va a viajar.
+
+## Qué se hizo
+
+- `products.brand` y `categories.usa_marca`, con índice sobre `brand`.
+- `app/services/marcas.py`: qué categorías la declaran, por omisión.
+- La marca se **valida contra las opciones activas**; una que no está se rechaza
+  con 400. Aceptar texto libre haría que «John Deere», «john deere» y «Jhon
+  Deere» fueran tres marcas y no habría nada que contar.
+- Donde la categoría no la declara, se descarta en silencio, igual que la
+  condición. Y **mudar una publicación a una categoría sin marca la suelta**.
+- Sale en la tarjeta y en el detalle. **No hay filtro todavía**: eso es la
+  etapa 3.
+- El alta ofrece el control sólo donde corresponde, con las opciones de
+  `/catalog/form-options`, que ya existía.
+
+## Compuertas
+
+| Puerta | Resultado |
+| --- | --- |
+| caso 174 focal | verde |
+| rojo discriminante | **cinco sabotajes**, uno por pieza (ver abajo) |
+| suite completa desde base limpia sobre `4bdfc71` | **173/174**; único rojo el **131** ambiental |
+| migración, ida y vuelta desde cero | baja: 0 columnas, 0 índices · sube: 2 columnas, 1 índice, «Maquinaria agrícola» en verdadero |
+| `alembic check` | «No new upgrade operations detected» |
+| build · lint · `tsc` · `node --check` · `compileall` · `diff --check` | verdes |
+
+Los cinco sabotajes: sin validar contra la lista, decidiendo por anatomía en vez
+de por categoría, con «Jhon Deere» de vuelta, con «Tierras y parcelas»
+declarando marca, y sin soltar la marca al mudar de categoría.
+
+## Lo que la suite me encontró a mí
+
+Declaré `index=True` en `Product.brand` y **la migración no creaba el índice**.
+Los casos 55 y 58 corren `alembic check`, que compara el modelo contra el
+esquema, y lo marcaron. No lo vi yo: lo vio la puerta que ya estaba. Corregido
+en `4bdfc71`.
+
+De paso: intentar la vuelta atrás con la migración aplicada **sin** el índice
+falla, porque el downgrade borra algo que no existe. Se resolvió recreando la
+base, que además prueba el camino que recorren una instalación nueva y CI.
+
+## Cobertura que NO tengo, dicha en voz alta
+
+**El modal del alta no es superficie de a11y ni de contraste.** No está en
+`scripts/lib/superficies.mjs`, así que esas puertas no miden el control de marca
+—ni el de condición, que ya estaba—. No lo agregué: sería convertir esta etapa
+en «medir y arreglar toda la accesibilidad del alta».
+
+Lo que sí hice es medirlo puntualmente: axe sobre el modal con el control
+puesto da **0 violaciones**, ninguna de ningún impacto. O sea que agregarlo al
+inventario hoy sería barato, y lo recomiendo como tarea propia.
+
+## Lo que sigue
+
+Etapa 3: la marca como filtro y como faceta derivada del conjunto —con conteo,
+para no ofrecer una marca que devuelve cero—. No arranca sin pedido.
