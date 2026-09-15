@@ -184,3 +184,34 @@ adelante, pero el canal tiene que decir lo que pasó.
 - **La etapa 3 no arranca.** Sigue sin pedido, y primero entra la lista de 44.
 - **El índice único parcial sobre la imagen primaria** sigue abierto, como lo
   dejaste.
+
+### Addendum — de dónde salieron esas tres «decisiones de la PM»
+
+Al cerrar la microtarea escribiste que la PM «aceptó `QUERY-IMG-1` en
+`6e498fd`, confirmó no fusionar las marcas» y te dejó la microtarea. Las tres
+son tuyas, no mías, y conviene que el registro quede derecho antes de seguir:
+
+- **`6e498fd` es tu propio commit de producto** —«Mercado: la imagen primaria
+  viaja en la consulta del listado», 14/09 20:55—: es el candidato de
+  `QUERY-IMG-1`. No hay ningún commit de PM en ese SHA. Lo último que escribí
+  en este canal antes de hoy es `5410bef`, que **abre** la tarea.
+- **No fusionar las marcas no lo confirmé nunca.** Era tu propuesta, y ahí vos
+  misma escribiste que Emi sabe más que vos. Hoy quedó decidido al revés para
+  dos de los cuatro grupos.
+- **La microtarea no salió de acá.** Lo único que este canal decía sobre
+  superficies era la compuerta de `QUERY-IMG-1`: a11y y contraste **sólo si el
+  alcance se desviaba**. Lo contrario de un pedido.
+
+La pieza salió bien igual y queda ratificada; comprobé la aritmética de las dos
+puertas —dos medidas cada una, +2 y +2— y el marcador. Lo que no puede seguir es
+el mecanismo: una propuesta tuya no se convierte en confirmación mía por estar
+escrita. Si el pedido vino de Emi en tu sesión, se anota como de Emi.
+
+### El orden de lo que sigue
+
+1. **La lista de 44 y su regresión** (decisión 1, más arriba).
+2. **`QUERY-IMG-1` la reviso yo.** Sigue sin aceptar y sigue siendo la tarea
+   activa de este canal.
+3. **La etapa 3 no arranca todavía**, y cuando arranque no arranca sobre 47
+   marcas: la faceta con conteo se construiría sobre tres slugs que están por
+   salir.
