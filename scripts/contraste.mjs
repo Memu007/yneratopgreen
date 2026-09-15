@@ -563,6 +563,15 @@ for (const medida of MEDIDAS) {
     await page.getByRole('button', { name: 'Mis publicaciones' }).click();
     await revisar(page, `${medida.n} panel: mis productos`,
       page.getByRole('heading', { name: 'Mis publicaciones' }));
+
+    // El alta, con la categoría que ofrece marca elegida. Ver el comentario en
+    // `superficies.mjs`: el marcador es el propio control de marca.
+    await page.getByRole('button', { name: /^\+ Publicar$|Publicar la primera/ })
+      .first().click();
+    const categoriaDelAlta = page.locator('#category, select[name="category"]').first();
+    await categoriaDelAlta.waitFor({ state: 'visible', timeout: ESPERA });
+    await categoriaDelAlta.selectOption({ label: 'Maquinaria agrícola' });
+    await revisar(page, `${medida.n} alta de publicación`, page.locator('#brand'));
     await ctx.close();
   }
 

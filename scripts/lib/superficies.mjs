@@ -69,6 +69,14 @@ export const SUPERFICIES = [
   { id: 'panel: documentación fiscal' },
   { id: 'panel: mis ventas' },
   { id: 'panel: mis productos' },
+  // El formulario de alta, con «Maquinaria agrícola» elegida. Es la pantalla
+  // donde el vendedor carga TODO lo que después se filtra, y hasta ahora
+  // ninguna puerta la abría: los controles de condición y de marca vivían sin
+  // medir. Se mide con esa categoría a propósito, porque es la única que hoy
+  // ofrece marca, y su marcador es el propio control de marca: si dejara de
+  // ofrecerse, la puerta falla en vez de medir un alta sin él y declararla
+  // revisada. Mismo criterio que el paginador del catálogo.
+  { id: 'alta de publicación' },
   { id: 'panel del transportista' },
   { id: 'panel: edición de transportista' },
   { id: 'panel: operaciones del transportista' },

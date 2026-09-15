@@ -362,6 +362,16 @@ async function vendedor(page, medida) {
   await page.getByRole('button', { name: 'Mis publicaciones' }).click();
   await revisar(page, 'panel: mis productos', medida,
     page.getByRole('heading', { name: 'Mis publicaciones' }));
+
+  // El alta, con la categoría que ofrece marca elegida: así entran en la
+  // medición el control de marca y el de condición, que son los dos que
+  // deciden qué se puede filtrar después.
+  await page.getByRole('button', { name: /^\+ Publicar$|Publicar la primera/ })
+    .first().click();
+  const categoriaDelAlta = page.locator('#category, select[name="category"]').first();
+  await categoriaDelAlta.waitFor({ state: 'visible', timeout: ESPERA });
+  await categoriaDelAlta.selectOption({ label: 'Maquinaria agrícola' });
+  await revisar(page, 'alta de publicación', medida, page.locator('#brand'));
 }
 
 /**
