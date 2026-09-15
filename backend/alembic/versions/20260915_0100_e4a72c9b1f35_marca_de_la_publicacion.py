@@ -51,6 +51,12 @@ def upgrade() -> None:
                   server_default=sa.false()),
     )
 
+    # El indice lo declara el modelo (`Product.brand`, index=True) y por eso
+    # tiene que crearlo la migracion: si no, el esquema y el modelo quedan
+    # distintos y `alembic check` lo marca. Sirve para el dia que la marca sea
+    # un filtro, que es para lo que se guarda.
+    op.create_index('ix_products_brand', 'products', ['brand'])
+
     conexion = op.get_bind()
     for slug in CATEGORIAS_CON_MARCA:
         conexion.execute(
@@ -71,4 +77,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column('categories', 'usa_marca')
+    op.drop_index('ix_products_brand', table_name='products')
     op.drop_column('products', 'brand')
