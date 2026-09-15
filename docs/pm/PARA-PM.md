@@ -2,6 +2,72 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## Aviso: hay una operación nueva y la está dirigiendo la Dev
+
+Emi delegó una operación —marcas y filtros en la búsqueda— y me pidió que yo
+hiciera de PM ahí para no gastarte a vos. **No toqué `PARA-DEV.md`**: ese canal
+sigue siendo tuyo. Las decisiones que tomé están firmadas en
+`docs/pm/PROPUESTA-BUSQUEDA-FACETADA.md`, que es de la Dev.
+
+**Lo que NO hice:** auto-aceptarme `QUERY-IMG-1`. Sigue abajo en este mismo
+archivo, entregado y esperando tu revisión. Esa sigue siendo tuya.
+
+### Qué se entregó, en dos renglones
+
+- **Etapa 1** (`e798c85`): el filtro **Condición** (nuevo/usado) en el Mercado.
+  El campo ya existía; no viajaba a la consulta.
+- **Etapa 2** (`4bdfc71`): la **marca** como dato —columna, lista y alta—, sin
+  filtro todavía. Un filtro sobre una columna vacía es peor que no tenerlo.
+
+Suite completa **173/174** sobre el candidato, único rojo el 131 ambiental de
+siempre.
+
+### Cómo mirar la base, sin pedirle nada a nadie
+
+Cuatro comandos. Copiar y pegar:
+
+```bash
+# 1. Qué categorías ofrecen marca. Tiene que ser SOLO «Maquinaria agrícola».
+docker exec topgreen-db psql -U topgreen -d topgreen -c \
+  "SELECT name, usa_marca FROM categories WHERE usa_marca;"
+
+# 2. La lista de marcas (47). El valor es el slug que va a viajar el día que filtre.
+docker exec topgreen-db psql -U topgreen -d topgreen -c \
+  "SELECT value, label FROM form_options WHERE option_type='brand' ORDER BY display_order;"
+
+# 3. Cobertura de la condición, que es lo que filtra la etapa 1.
+docker exec topgreen-db psql -U topgreen -d topgreen -c \
+  "SELECT COALESCE(condition,'(sin declarar)') AS condicion, COUNT(*)
+   FROM products WHERE operation_kind='activo' GROUP BY 1;"
+
+# 4. Que el esquema y los modelos no se separaron.
+cd backend && ./.venv/bin/python -m alembic check
+```
+
+El 4 tiene que decir «No new upgrade operations detected». Si dice otra cosa,
+el modelo declara algo que la migración no creó —me pasó, y lo cazaron los
+casos 55 y 58—.
+
+### Las dos cosas que conviene que mires vos
+
+1. **La lista de marcas tiene pares que NO fusioné**: Case/Case IH,
+   Fiat/Fiat Someca/Someca, Chery/Chery Bylion, Deutz/Deutz-Fahr. Son marcas
+   distintas de verdad, así que no las junté sin decisión. Si alguna sobra, se
+   desactiva desde el panel de administración, sin migración. (Sí retiré
+   «Jhon Deere», que era «John Deere» mal escrito.)
+2. **El modal del alta no es superficie de a11y ni de contraste.** No está en
+   `scripts/lib/superficies.mjs`, así que esas puertas no miden ni el control
+   de marca ni el de condición. Lo medí puntualmente con axe: **0 violaciones**.
+   O sea que agregarlo al inventario hoy es barato, y creo que corresponde como
+   tarea propia.
+
+### Lo que falta y no arranca sin pedido
+
+Etapa 3: la marca como filtro, y como faceta con conteo —para no ofrecer una
+marca que devuelve cero resultados—.
+
+---
+
 ## QUERY-IMG-1
 
 | | |
