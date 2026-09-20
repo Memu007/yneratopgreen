@@ -2,106 +2,81 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## BACKUP-RESTORE-1 R4
+## Fuera de ciclo — 2026-09-20 — dos documentos nuevos, para que no gastes en leer un `.docx`
 
-| | |
-| --- | --- |
-| **Rama** | `claude/dev-role-repo-3l0kp3` |
-| **SHA base** | `24dcca8`; `origin/main` (`0f89e78`) incorporado por merge |
-| **SHA candidato** | `52ba294` |
-| **SHA anteriores, intactos** | `79af761`/`2ffb08a` · `b9d0036`/`6f02c32` · `f3e9d54`/`5e84385` |
-| **Diff total desde `24dcca8`** | `scripts/respaldo.sh`, `docs/RESPALDO_Y_RESTAURACION.md`, tres líneas de `.gitignore` y este canal. **No toca producto** |
-| **Estado** | en mi rama. No integré, no desplegué, no toqué Railway ni datos remotos. No abrí otra tarea |
+No es un informe de tarea y no reemplaza ninguno: `BACKUP-RESTORE-1` R4 ya
+quedó aceptada e integrada, y el informe de la tarea activa va a pisar este
+texto cuando llegue. Esto es material que dejó Emi y que conviene que esté en
+el repositorio, no en un chat.
 
-Gracias por la corrida real: encontró en el primer paso algo que mi doble no
-podía encontrar.
+### 1. `DEVOLUCION-CLIENTA-REVISION-01-2026-09-20.md`
 
----
+La clienta mandó su devolución de la revisión 01 en un `.docx` de 5,5 MB con
+capturas. **Está transcripta entera en ese `.md`, para que no tengas que abrir
+el original**; el `.docx` queda versionado en `originales/` con su SHA-256.
 
-### El defecto que te rompió la corrida
+Son **15 observaciones**, clasificadas por tipo y tamaño, cada una con lo que
+dice la clienta y con el estado real de hoy verificado contra el repositorio.
+Lo que importa antes de planificar:
 
-Era mío y de la misma familia que los otros: **leía el índice del volcado con el
-`pg_restore` del anfitrión**. Tu Mac tiene 14.20 y el contenedor 16.4, así que
-un volcado nuevo leído por una herramienta vieja da «unsupported version (1.15)
-in file header». El volcado estaba bien; lo estaba leyendo quien no podía.
+- **No pudo registrarse.** Nunca le llegó el correo, así que **no vio
+  registro, publicación, compra, administración ni pago**. Toda su devolución
+  es sobre pantallas públicas. Antes de pedirle una segunda revisión, esto hay
+  que resolverlo, y es operación, no Dev: SMTP del entorno desplegado, que ya
+  figura en los pendientes de `NOW.md`.
+- **Dos afirmaciones suyas chocan con reglas vigentes del proyecto**: quiere
+  que seamos *agentes de retención* —retener el pago hasta la doble
+  conformidad— y dice que AgroBoeda **sí** cobra comisión. Lo primero es
+  exactamente lo que el proyecto tiene prohibido —no recibir, no retener y no
+  administrar fondos de terceros— y ella misma dice que lo tiene que hablar con
+  Laura. Lo segundo contradice lo que está construido: hoy no se manda
+  `marketplace_fee` a Mercado Pago, ni un porcentaje ni un cero. **Son
+  decisiones, no tareas.** No toqué nada de eso.
+- **Tres decisiones conceptuales** que no son de Dev y que condicionan todo el
+  copy: qué es Inicio, si Servicios sigue siendo una pestaña aparte —lo objeta
+  tres veces— y que AgroMarket se lea como un módulo dentro de un ecosistema
+  más amplio.
+- **La pieza más grande**: campos por rubro —marca, modelo, año, potencia— que
+  se carguen en el alta y alimenten el filtro. Avisa que le va a pasar a Marian
+  los datos de filtrado. Conviene esperarlos antes de diseñar: hacerlo dos
+  veces cuesta más.
 
-Ahora, en modo Docker, **`pg_dump`, `pg_restore` —índice incluido— y `psql`
-corren siempre dentro del contenedor que hizo la copia**, y la versión del
-manifiesto sale de ahí. En el anfitrión no se usa ninguna herramienta de
-PostgreSQL.
+**Nada de esto lo empecé.** Emi fue explícita: es para sumar, no para ahora.
 
-**Cómo lo probé, ya que no tengo Docker.** Puse en el PATH un `pg_dump`,
-`pg_restore`, `psql` y `pg_isready` que **fallan a propósito** —«el guión llamó
-a X del anfitrión en modo Docker»— y corrí el ciclo Docker entero contra ellos:
+### 2. `ESTADO-DATOS-Y-FILTROS-2026-09-20.md`
 
-```
-con el código anterior (f3e9d54):
-   NEGATIVO: el guión llamó a pg_restore del anfitrión en modo Docker
-   ERROR: el volcado no es un archivo de pg_restore válido      ← tu síntoma exacto
-con el código nuevo (52ba294):
-   bundle creado, índice legible, "pg_dump": "16.13" en el manifiesto
-```
+El estado real de la base y de los filtros, medido sobre fuentes versionadas
+—el padrón, el seed, los modelos, las migraciones y el código—, no sobre una
+base levantada para la ocasión. Está para que esto no se vuelva a discutir de
+memoria:
 
-Es un negativo discriminante: si vuelve a colarse una herramienta del anfitrión,
-esto lo caza sin necesidad de una Mac.
+- la base existe y se migra: 19 modelos, 17 migraciones, PostGIS en uso real
+  para el radio de los fletes;
+- el padrón es una copia versionada de **Georef v2** con SHA verificado antes
+  de sembrar: **4.028 localidades, 24 provincias**;
+- los filtros existen de los dos lados: la API filtra por texto, categoría,
+  tipo, provincia, localidad, precio, stock, vendedor y orden; la barra lateral
+  ofrece tipo, categoría, subcategoría, provincia, localidad, precio, stock y
+  calificación. Y **viven en la URL**: un resultado filtrado se comparte y
+  volver atrás devuelve los controles;
+- lo que **no** existe todavía es ningún atributo por rubro, que es justamente
+  lo que pide la clienta.
 
-### Las dos guardas que faltaban
+Y una medición que te ahorra una discusión: **las «localidades repetidas» que
+vio la clienta son dos cosas distintas.** De los 154 pares repetidos,
 
-**1. El servidor definitivo, no el temporal.** La imagen levanta un PostgreSQL
-provisorio durante `initdb` y `pg_isready` ya contesta que sí; restaurar ahí es
-restaurar sobre algo que el entrypoint va a apagar. Ahora se exige además que el
-**PID 1 del contenedor sea `postgres`**. Medido en los dos sentidos:
+- **105 sobran de verdad**: Georef lista la localidad y una entidad adentro con
+  el mismo nombre —«Mar del Plata» `06357110` y `0635711003`—, y 96 de esas 105
+  están a menos de un kilómetro. Se filtran por condición, no a mano;
+- **49 no sobran**: son lugares distintos que se llaman igual en departamentos
+  distintos. Ahí no falta borrar: falta **mostrar el departamento** para poder
+  elegir.
 
-```
-PID 1 nunca llega a postgres → ERROR: no llegó a servidor definitivo (PID 1 = «bash»)
-                                y el rescate no deja nada colgado
-PID 1 pasa a postgres a los 4 s → espera, restaura y verifica verde
-```
+O sea: es una pieza chica y medida, no una limpieza de datos.
 
-**2. Las dos etiquetas, en los dos borrados.** `limpiar` y el rescate exigen
-ahora `topgreen.respaldo=pieza` **y** `topgreen.respaldo.ejecucion=<id>`, en el
-contenedor y en el volumen:
+### Lo que hice y lo que no
 
-| Sabotaje | Resultado |
-| --- | --- |
-| contenedor con la etiqueta de ejecución pero **sin** la de la pieza | `limpiar` frena: «no es de esta pieza y esta ejecución (`topgreen.respaldo=«nada»` …)». Sobrevive |
-| volumen sin ninguna etiqueta | frena igual, y sobrevive |
-| **rescate** de una restauración a medias con recursos sin etiquetar | «no lleva las etiquetas de esta ejecución; se deja como está». Sobrevive |
-| con las dos etiquetas puestas | limpia el contenedor, el volumen y el directorio, y nada más |
-
-### El ciclo Docker completo, contra el doble
-
-Con las herramientas del anfitrión escondidas: respaldo → restauración →
-verificación verde con las seis comprobaciones —incluida «`topgreen-db` no tiene
-ninguna base de restauración adentro»— → los tres marcadores del otro lado
-(`uploads`, `documentos`, `outbox`) → negativo de integridad rojo con ruta y
-sha256 → los tres negativos de propiedad → limpieza.
-
-**Lo que el doble sigue sin poder probar** es la semántica real de Docker:
-`docker cp -a` contra tu versión, los tiempos del `postgis/postgis` real, el
-formato exacto de `docker inspect -f`. Eso lo ve tu corrida, no la mía. Lo que
-sí puedo decir es que la clase de defecto que te rompió esta vez —depender de
-una herramienta del anfitrión— ahora tiene su propio negativo automático.
-
-### Compuertas
-
-| Puerta | Resultado |
-| --- | --- |
-| `bash -n` · `diff-check` sobre el HEAD final | verdes |
-| Ciclo Docker contra el doble, sin herramientas del anfitrión | verde, con los cuatro negativos |
-| Negativo del `pg_restore` del anfitrión | rojo con el código anterior, verde con el nuevo |
-| Ruta nativa y suite funcional | **no repetidas**, como pediste: la corrección no las toca |
-| Entorno al terminar | una sola base, `topgreen`; API en 200; sin bundles ni destinos |
-
-### Lo que sigue en pie
-
-La corrida Docker real es tuya: yo no tengo demonio. Sigue abierta la pregunta
-de R3 —si preferís, dame un entorno con Docker y la corro yo—, pero con este
-negativo automático la ruta ya no depende de que yo adivine bien.
-
-### Lo que sigue esperando tu palabra
-
-- el carrito sin sesión;
-- la FAQ de Contacto dice «Aceptamos transferencias bancarias directas al
-  vendedor» y el producto también cobra por Mercado Pago
-  (`src/components/Pages/ContactPage.tsx:305`).
+Escribí dos documentos, guardé el original de la clienta en `originales/` con
+su SHA y lo anoté en el README de esa carpeta. **No toqué producto, ni arnés,
+ni la tarea activa. No desplegué. No cambié datos remotos, pagos, secretos ni
+la configuración externa de Mercado Pago.**

@@ -12,6 +12,7 @@ fue recibido directamente de Emi el 07/09. Ninguno se sirve hoy tal como está:
 | `cosecha-01.jpg` | 291 KB | Sin uso desde que la portada dejó de tener fotografía de relleno. |
 | `video-servicios.mp4` | 20,9 MB | El video con overlay que UX-2C retiró de Servicios. |
 | `AGROBOEDA-LOGO-FUENTE.png` | 1,2 MB | Fuente oficial recibida para la marca AgroBoeda. Monograma AB, 1536 × 1024, RGB sin transparencia; no es todavía un activo optimizado de cabecera. |
+| `DEVOLUCION-CLIENTA-REVISION-01-2026-09-20.docx` | 5,5 MB | Devolución de la clienta sobre la revisión 01, con capturas anotadas. **Para leerla está `../DEVOLUCION-CLIENTA-REVISION-01-2026-09-20.md`**, que la transcribe entera; el `.docx` queda como original. |
 
 Se mueven, no se borran: son material de la clienta y siguen siendo la fuente
 de los derivados aprobados. Acá quedan versionados y trazables, pero no se
@@ -29,4 +30,10 @@ Integridad del logo fuente:
 
 ```text
 5606077c429b20edecb62986d6b7500c7142c6a6230c006fdfb33c4978b206cf  AGROBOEDA-LOGO-FUENTE.png
+```
+
+Integridad de la devolución de la clienta:
+
+```text
+e8be233a54907eaaf60b045cdec1f14701a9bb54d09a9522cddab54fa9321f02  DEVOLUCION-CLIENTA-REVISION-01-2026-09-20.docx
 ```
