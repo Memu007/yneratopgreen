@@ -302,7 +302,19 @@ export const ContactPage: React.FC<ContactPageProps> = ({ cotizacion = null }) =
             </div>
             <div className={styles.faqCard}>
               <h3>¿Cuáles son las formas de pago?</h3>
-              <p>Aceptamos transferencias bancarias directas al vendedor.</p>
+              {/* Decía «Aceptamos transferencias bancarias directas al vendedor» y
+                  nada más, cuando el producto resuelve el medio POR VENDEDOR:
+                  `medios_disponibles` ofrece transferencia si ese vendedor cargó CBU o
+                  alias, y Mercado Pago si además lo tiene vinculado y andando. Decir
+                  sólo «transferencia» escondía la mitad; decir «los dos» prometería
+                  algo que no todos los vendedores tienen. Por eso la condición está en
+                  la respuesta y no en una nota al pie. */}
+              <p>
+                Se le paga directo al vendedor: por transferencia bancaria a su CBU o
+                alias, y con Mercado Pago cuando ese vendedor lo tiene habilitado. Cada
+                vendedor decide con qué cobra, así que al finalizar la compra vas a ver
+                los medios que acepta el tuyo.
+              </p>
             </div>
             <div className={styles.faqCard}>
               <h3>¿Realizan envíos a todo el país?</h3>

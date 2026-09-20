@@ -26354,11 +26354,11 @@ await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o com
     await browser.close();
   }
 
-  // Queda una puerta sin usar y vale decirlo acá: la rama sin sesión de
-  // `CartModal.handleCheckout` —la que avisa y no ofrece nada— sigue sin
-  // alcanzarse, porque sin sesión la cabecera ni siquiera dibuja la celda del
-  // carrito. No se toca: no hay rojo que lo justifique, y ahora tampoco hay
-  // callejón que dependa de ella.
+  // Lo que este caso dejó anotado como puerta sin usar —la rama sin sesión de
+  // `CartModal.handleCheckout`, inalcanzable porque sin sesión la cabecera ni
+  // siquiera dibujaba la celda del carrito— dejó de ser cierto. Esa celda se
+  // dibuja ahora cuando hay algo elegido, justamente para que lo conservado no
+  // quede sin puerta, y el recorrido entero lo mide el caso 170.
 
   return 'una categoría o una provincia inexistente en la URL se descartan solas, sin llevarse '
     + 'los filtros válidos, sin quedarse en la barra y sin afirmar un mercado vacío; el catálogo '
@@ -27026,6 +27026,334 @@ await runCase(169, 'El reinicio de la API prueba que cambió el proceso, o falla
 
   return `el reinicio que aísla el presupuesto de intentos verifica identidad y no se conforma `
     + `con que /api/health conteste, con la API en ${servicio.donde}: ${medidos.join('; ')}`;
+});
+
+// ---------------------------------------------------------------------------
+// 170. Lo ya elegido no queda sin puerta, y la FAQ nombra los dos medios.
+//
+// Dos promesas incumplidas que no tienen nada que ver entre sí.
+//
+//  - La primera es un callejón, y lo abrió la corrección anterior. Con la
+//    sesión CONFIRMADA inválida se baja la identidad y el carrito se conserva
+//    a propósito: lo que hay adentro lo eligió una persona y el vencimiento no
+//    lo decidió ella. Pero la celda «Carrito» de la cabecera se dibuja sólo
+//    dentro de la rama autenticada, así que al cancelar el ingreso y cerrar el
+//    carrito, lo elegido queda guardado y sin ninguna forma de volver a verlo.
+//    El botón de la tarjeta tampoco sirve: sin sesión dice «Ingresar para
+//    continuar», y aunque sirviera agregaría otra vez lo mismo en vez de abrir
+//    lo que ya está.
+//  - La segunda es una respuesta a medias. La FAQ decía que se paga por
+//    transferencia y nada más, cuando el producto resuelve el medio POR
+//    VENDEDOR: hay vendedores a los que también se les puede pagar con Mercado
+//    Pago, y la pantalla no lo decía.
+//
+// El caso no lee el fuente para ninguna de las dos: recorre la pantalla. El
+// estado de «sesión vencida» se fabrica como lo fabrica el tiempo —escribiendo
+// encima de las credenciales—, no llamando a una función interna.
+// ---------------------------------------------------------------------------
+await runCase(170, 'El carrito conservado sigue al alcance sin sesión, y la FAQ nombra los dos medios', async () => {
+  // Las capturas de la cabecera sin sesión van a una carpeta temporal salvo
+  // que se pida otra cosa: una corrida por defecto no escribe sobre archivos
+  // rastreados.
+  const CAPTURAS = process.env.SMOKE_CAPTURAS
+    || mkdtempSync(`${tmpdir()}/topgreen-carrito-sin-sesion-`);
+  mkdirSync(CAPTURAS, { recursive: true });
+  const capturas = [];
+  const medidos = [];
+
+  const login = (pagina) => pagina.getByRole('dialog', { name: 'Ingresar' });
+  const carrito = (pagina) => pagina.getByRole('dialog', { name: 'Mi carrito' });
+  const checkout = (pagina) => pagina.getByRole('dialog', { name: 'Checkout' });
+  const celdaDelCarrito = (pagina) => pagina.locator('header')
+    .getByRole('button', { name: /Carrito/ });
+  const laCabeceraDice = (pagina) => pagina.locator('header button').allInnerTexts();
+
+  // Cuántos ítems hay GUARDADOS. Se lee de la copia local y no de la pantalla
+  // porque lo que se está midiendo es justamente que sobreviva a que la
+  // pantalla deje de mostrarlo.
+  const guardado = (pagina) => pagina.evaluate(() => {
+    try {
+      const leido = JSON.parse(localStorage.getItem('agromarket_cart') || '[]');
+      return Array.isArray(leido) ? leido.length : 0;
+    } catch { return 0; }
+  });
+
+  const conSesion = async (pagina) => {
+    await pagina.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await pagina.locator('header').getByRole('button', { name: 'Ingresar', exact: true }).click();
+    await login(pagina).getByLabel(/^Email/).fill('cliente@ejemplo.com');
+    await login(pagina).getByLabel(/^Contraseña/).fill('cliente123');
+    await login(pagina).getByRole('button', { name: 'Ingresar', exact: true }).click();
+    await celdaDelCarrito(pagina).waitFor({ state: 'visible', timeout: 25_000 });
+  };
+
+  const conAlgoElegido = async (pagina) => {
+    await pagina.locator('article[class*="card"]')
+      .getByRole('button', { name: 'Agregar al carrito' }).first().click({ timeout: 25_000 });
+    await esperarA(async () => (await guardado(pagina)) > 0,
+      'no se pudo dejar nada en el carrito', 20_000);
+  };
+
+  // Vencer la sesión es escribirle encima a las credenciales, que es lo que
+  // hace el tiempo. Se rompen las dos para que el servidor confirme que no
+  // vale: con el refresh bueno se renovaría sola y no habría nada que medir.
+  const vencerLaSesion = (pagina) => pagina.evaluate(() => {
+    localStorage.setItem('access_token', 'este.token.ya.no.vale');
+    localStorage.setItem('refresh_token', 'este.tampoco.vale');
+  });
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    // === A. Sesión confirmada inválida: la identidad baja, lo elegido queda =
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const pagina = await contexto.newPage();
+    await conSesion(pagina);
+    await conAlgoElegido(pagina);
+    const elegidos = await guardado(pagina);
+    assert(elegidos > 0, 'el caso no puede medir nada con el carrito vacío');
+
+    await celdaDelCarrito(pagina).click();
+    await carrito(pagina).waitFor({ state: 'visible', timeout: 20_000 });
+    await vencerLaSesion(pagina);
+    await carrito(pagina).getByRole('button', { name: 'Continuar compra' }).click();
+    await login(pagina).waitFor({ state: 'visible', timeout: 25_000 });
+    assert(await checkout(pagina).count() === 0,
+      'con la sesión confirmada inválida se abrió el Checkout igual');
+
+    // Cancelar el ingreso devuelve al carrito con lo mismo. Eso ya estaba: se
+    // mide para que siga estando.
+    await login(pagina).getByRole('button', { name: 'Cerrar' }).click();
+    await carrito(pagina).waitFor({ state: 'visible', timeout: 20_000 });
+    assert(await guardado(pagina) === elegidos,
+      `cancelar el ingreso dejó ${await guardado(pagina)} ítems guardados y había ${elegidos}`);
+    assert(await carrito(pagina).getByRole('button', { name: /^Quitar/ }).count() === elegidos,
+      'el carrito volvió vacío a la vista aunque lo guardado siga ahí');
+    const cabeceraSinSesion = (await laCabeceraDice(pagina)).join(' | ');
+    assert(/Ingresar/.test(cabeceraSinSesion) && !/Salir/.test(cabeceraSinSesion),
+      'la cabecera sigue afirmando una sesión que ya se sabe inválida: '
+      + JSON.stringify(cabeceraSinSesion));
+
+    // Y acá está el callejón: cerrar el carrito y no tener cómo volver.
+    await carrito(pagina).getByRole('button', { name: 'Cerrar' }).click();
+    await esperarA(async () => (await carrito(pagina).count()) === 0,
+      'el carrito no se cerró', 15_000);
+    assert(await guardado(pagina) === elegidos, 'cerrar el carrito se llevó lo elegido');
+    await esperarA(async () => (await celdaDelCarrito(pagina).count()) === 1,
+      'con lo elegido guardado y sin sesión la cabecera no ofrece «Carrito»: lo que la persona '
+      + 'eligió quedó sin puerta, y el botón de la tarjeta dice «Ingresar para continuar». La '
+      + `cabecera dice ${JSON.stringify(await laCabeceraDice(pagina))}`,
+      15_000);
+
+    // Y esa celda abre el MISMO carrito conservado, no uno nuevo ni vacío.
+    await celdaDelCarrito(pagina).click();
+    await carrito(pagina).waitFor({ state: 'visible', timeout: 20_000 });
+    assert(await carrito(pagina).getByRole('button', { name: /^Quitar/ }).count() === elegidos,
+      'la celda sin sesión abrió un carrito que no es el que estaba guardado');
+    medidos.push('con la sesión confirmada inválida la identidad baja, el carrito se conserva y '
+      + 'la cabecera lo sigue ofreciendo: cerrarlo ya no lo deja sin puerta');
+
+    // === B. Y sobrevive a la recarga, que es la prueba de que no hay un =====
+    // estado paralelo: lo que reabre la cabecera es la misma copia local de
+    // siempre, no algo que quedó vivo en memoria desde el tropiezo.
+    await carrito(pagina).getByRole('button', { name: 'Cerrar' }).click();
+    await pagina.reload({ waitUntil: 'domcontentloaded' });
+    await esperarA(async () => (await celdaDelCarrito(pagina).count()) === 1,
+      'después de recargar sin sesión la celda del carrito no está; la cabecera dice '
+      + `${JSON.stringify(await laCabeceraDice(pagina))}`, 25_000);
+    assert(await guardado(pagina) === elegidos, 'recargar cambió lo elegido');
+    medidos.push('recargar sin sesión conserva lo elegido y la celda que lo abre');
+
+    // === C. La cabecera sin sesión, en los dos anchos =======================
+    //
+    // Una celda más no puede deformar lo que ya estaba. Se mide sobre el mismo
+    // documento cambiando el ancho, que es lo que hace un teléfono al rotar y
+    // lo que hace cualquiera al angostar la ventana.
+    for (const medida of [
+      { n: 'escritorio', width: 1440, height: 900 },
+      { n: 'movil', width: 390, height: 844 },
+    ]) {
+      await pagina.setViewportSize({ width: medida.width, height: medida.height });
+      const donde = `${medida.n} ${medida.width}x${medida.height}`;
+      await celdaDelCarrito(pagina).waitFor({ state: 'visible', timeout: 20_000 });
+
+      const geometria = await pagina.evaluate(() => {
+        const cabecera = document.querySelector('header');
+        const monograma = cabecera.querySelector('img');
+        const visibles = [...cabecera.querySelectorAll('button')].filter((boton) => {
+          const caja = boton.getBoundingClientRect();
+          return caja.width > 0 && caja.height > 0;
+        });
+        return {
+          anchoDelDocumento: document.documentElement.scrollWidth,
+          anchoDeLaVentana: window.innerWidth,
+          desbordados: visibles
+            .filter((boton) => boton.getBoundingClientRect().right > window.innerWidth + 1
+              || boton.getBoundingClientRect().left < -1)
+            .map((boton) => boton.innerText.trim() || '(sin texto)'),
+          textos: visibles.map((boton) => boton.innerText.trim()),
+          marca: monograma ? {
+            natural: monograma.naturalWidth / monograma.naturalHeight,
+            dibujado: monograma.getBoundingClientRect().width
+              / monograma.getBoundingClientRect().height,
+            ancho: monograma.getBoundingClientRect().width,
+          } : null,
+        };
+      });
+
+      assert(geometria.anchoDelDocumento <= geometria.anchoDeLaVentana + 1,
+        `${donde}: la cabecera sin sesión desborda a lo ancho —documento de `
+        + `${geometria.anchoDelDocumento}px en una ventana de ${geometria.anchoDeLaVentana}px`);
+      assert(geometria.desbordados.length === 0,
+        `${donde}: quedaron celdas fuera de la ventana: ${JSON.stringify(geometria.desbordados)}`);
+      for (const seccion of ['Inicio', 'Mercado', 'Servicios', 'Quiénes somos', 'Contacto']) {
+        assert(geometria.textos.includes(seccion),
+          `${donde}: la navegación perdió «${seccion}»: ${JSON.stringify(geometria.textos)}`);
+      }
+      assert(geometria.textos.some((texto) => /^Carrito/.test(texto)),
+        `${donde}: no está la celda del carrito: ${JSON.stringify(geometria.textos)}`);
+      assert(geometria.textos.includes('Ingresar'),
+        `${donde}: se perdió «Ingresar»: ${JSON.stringify(geometria.textos)}`);
+      assert(geometria.marca && geometria.marca.ancho > 0,
+        `${donde}: el monograma de la marca no se dibuja`);
+      assert(Math.abs(geometria.marca.dibujado - geometria.marca.natural)
+        / geometria.marca.natural < 0.02,
+      `${donde}: el monograma quedó deformado —dibujado ${geometria.marca.dibujado.toFixed(3)} `
+        + `contra ${geometria.marca.natural.toFixed(3)} de la imagen`);
+
+      // El foco se llega por teclado, no llamando a `focus()`: lo que hay que
+      // ver es el anillo de `:focus-visible`, y ése sólo aparece cuando el
+      // navegador entiende que quien se movió fue una persona con el teclado.
+      //
+      // Se arranca desde la marca, que es el primer control del documento, y
+      // no clickeando el fondo ni soltando el foco. Las dos cosas se probaron
+      // y las dos mienten: la cabecera ocupa la esquina superior izquierda, así
+      // que un clic ahí le pega a la marca y NAVEGA —esta medición decía «a 1
+      // tabulación» por eso—; y `blur()` suelta el foco pero no reinicia el
+      // punto desde el que Chromium sigue tabulando, así que la segunda vuelta
+      // arrancaba en medio de la barra de filtros y no llegaba nunca.
+      await pagina.locator('header button').first().focus();
+      let pasos = 0;
+      let llegado = false;
+      while (pasos < 40 && !llegado) {
+        await pagina.keyboard.press('Tab');
+        pasos += 1;
+        llegado = await pagina.evaluate(() =>
+          /^Carrito/.test((document.activeElement?.innerText || '').trim())
+          && document.activeElement.closest('header') !== null);
+      }
+      assert(llegado, `${donde}: la celda del carrito no se alcanza con el teclado en 40 tabulaciones`);
+      const anillo = await pagina.evaluate(() => {
+        const estilo = getComputedStyle(document.activeElement);
+        return {
+          contorno: estilo.outlineStyle,
+          ancho: parseFloat(estilo.outlineWidth) || 0,
+          sombra: estilo.boxShadow,
+        };
+      });
+      assert((anillo.contorno !== 'none' && anillo.ancho > 0)
+        || (anillo.sombra && anillo.sombra !== 'none'),
+      `${donde}: la celda del carrito recibe el foco sin mostrarlo: ${JSON.stringify(anillo)}`);
+
+      const ruta = `${CAPTURAS}/cabecera-sin-sesion-${medida.width}x${medida.height}.png`;
+      await pagina.locator('header').screenshot({ path: ruta });
+      capturas.push(`${ruta} (${donde})`);
+      medidos.push(`${donde}: la cabecera sin sesión suma la celda del carrito sin desbordar, sin `
+        + `deformar la marca (${geometria.marca.dibujado.toFixed(3)}), con las cinco secciones y `
+        + `con el foco visible a ${pasos} tabulaciones`);
+    }
+    await pagina.setViewportSize({ width: 1440, height: 900 });
+    // Medir la cabecera no puede haber movido la pantalla: si tabular o mirar
+    // geometría cambiara de sección, lo que sigue mediría otra cosa.
+    assert(/section=marketplace/.test(pagina.url()),
+      `medir la cabecera cambió de pantalla: ${pagina.url()}`);
+
+    // === D. Sin sesión se sigue por el Login de siempre, y no hay compra ====
+    // anónima: cancelar vuelve al carrito con lo mismo, y autenticarse
+    // continúa por el flujo vigente sin volver a apretar «Continuar compra».
+    await celdaDelCarrito(pagina).click();
+    await carrito(pagina).waitFor({ state: 'visible', timeout: 20_000 });
+    await carrito(pagina).getByRole('button', { name: 'Continuar compra' }).click();
+    await login(pagina).waitFor({ state: 'visible', timeout: 25_000 });
+    assert(await checkout(pagina).count() === 0,
+      'sin sesión se abrió el Checkout: no existe checkout anónimo');
+    await login(pagina).getByRole('button', { name: 'Cerrar' }).click();
+    await carrito(pagina).waitFor({ state: 'visible', timeout: 20_000 });
+    assert(await guardado(pagina) === elegidos,
+      'cancelar el ingreso desde el carrito sin sesión se llevó lo elegido');
+
+    await carrito(pagina).getByRole('button', { name: 'Continuar compra' }).click();
+    await login(pagina).waitFor({ state: 'visible', timeout: 25_000 });
+    await login(pagina).getByLabel(/^Email/).fill('cliente@ejemplo.com');
+    await login(pagina).getByLabel(/^Contraseña/).fill('cliente123');
+    await login(pagina).getByRole('button', { name: 'Ingresar', exact: true }).click();
+    await checkout(pagina).waitFor({ state: 'visible', timeout: 25_000 });
+    assert(await checkout(pagina).count() === 1,
+      `el Checkout se abrió ${await checkout(pagina).count()} veces`);
+    assert(await login(pagina).count() === 0, 'el ingreso quedó apilado debajo del Checkout');
+    assert(await guardado(pagina) === elegidos, 'reanudar la compra cambió lo elegido');
+    medidos.push('sin sesión «Continuar compra» abre el Login de siempre y no el Checkout; '
+      + 'cancelar vuelve al carrito con lo mismo y autenticarse reanuda la compra');
+
+    // === E. La salida explícita sí vacía, y entonces no hay celda ===========
+    //
+    // La regla no cambia: irse es irse. Y con cero ítems y sin sesión no se
+    // agrega un botón que abriría un carrito vacío.
+    await checkout(pagina).getByRole('button', { name: 'Cerrar' }).first().click();
+    await esperarA(async () => (await checkout(pagina).count()) === 0,
+      'el Checkout no se cerró', 15_000);
+    await pagina.locator('header').getByRole('button', { name: 'Salir', exact: true }).click();
+    await esperarA(async () => (await guardado(pagina)) === 0,
+      `la salida explícita dejó ${await guardado(pagina)} ítems guardados`, 20_000);
+    await esperarA(async () => (await celdaDelCarrito(pagina).count()) === 0,
+      'con el carrito vacío y sin sesión la cabecera ofrece un carrito vacío; dice '
+      + `${JSON.stringify(await laCabeceraDice(pagina))}`, 20_000);
+    medidos.push('la salida explícita vacía el carrito y con cero ítems la cabecera no ofrece '
+      + 'una celda que abriría un carrito vacío');
+    await contexto.close();
+
+    // === F. Y quien nunca eligió nada tampoco la ve ==========================
+    const reciente = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const paginaReciente = await reciente.newPage();
+    await paginaReciente.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await paginaReciente.locator('article[class*="card"]').first()
+      .waitFor({ state: 'visible', timeout: 25_000 });
+    assert(await celdaDelCarrito(paginaReciente).count() === 0,
+      'una visita sin sesión y sin carrito ya ve una celda de carrito: '
+      + JSON.stringify(await laCabeceraDice(paginaReciente)));
+
+    // === G. La FAQ dice con qué se paga, y con la condición que es cierta ===
+    await paginaReciente.locator('header')
+      .getByRole('button', { name: 'Contacto', exact: true }).click();
+    await paginaReciente.getByRole('heading', { name: 'Preguntas Frecuentes' })
+      .waitFor({ timeout: 20_000 });
+    const respuesta = (await paginaReciente
+      .getByRole('heading', { name: '¿Cuáles son las formas de pago?' })
+      .locator('xpath=following-sibling::p[1]').innerText()).trim();
+
+    assert(/transferencia/i.test(respuesta),
+      `la FAQ de formas de pago ya no nombra la transferencia: ${JSON.stringify(respuesta)}`);
+    assert(/Mercado Pago/.test(respuesta),
+      'la FAQ de formas de pago no nombra Mercado Pago, que el producto resuelve por vendedor: '
+      + JSON.stringify(respuesta));
+    assert(/habilitad/i.test(respuesta) || /cuando ese vendedor/i.test(respuesta),
+      'la FAQ ofrece Mercado Pago sin decir que depende de cada vendedor: '
+      + JSON.stringify(respuesta));
+    for (const promesa of [/comisi/i, /custodi/i, /reten/i, /garantiz/i, /plan/i, /suscrip/i]) {
+      assert(!promesa.test(respuesta),
+        `la FAQ de formas de pago promete algo que el producto no hace (${promesa}): `
+        + JSON.stringify(respuesta));
+    }
+    await reciente.close();
+    medidos.push('la FAQ de Contacto nombra transferencia directa al vendedor y Mercado Pago con '
+      + 'su condición por vendedor, y no promete comisiones, planes ni custodia de fondos');
+  } finally {
+    await browser.close();
+  }
+
+  return 'lo que alguien eligió no queda sin puerta cuando la sesión se confirma inválida: la '
+    + 'cabecera ofrece el carrito conservado también sin sesión, y sólo si hay algo adentro; '
+    + 'continuar sigue pidiendo ingresar, salir sigue vaciando y la FAQ dice los dos medios de '
+    + `pago con su condición. ${medidos.join('; ')}. Capturas: ${capturas.join(', ')}`;
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
