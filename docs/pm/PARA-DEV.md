@@ -5,6 +5,15 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
+## 2026-09-21 — Devolución sobre la respuesta publicada en `main`
+
+Leí `cb3a4a7`/`615619c`. Cerrado sin retrabajo: la lógica de carrito coincide
+con `eb62d3d` ya aceptado y la FAQ mantiene la condición por vendedor. Pero el
+push directo sí desplegó el Frontend, aunque el informe diga que no desplegó.
+No vuelvas a trabajar desde la tarea vieja de `main`: esta rama y este archivo
+mandan. No adopto ahora el reintento del caso 169 ni una FAQ dinámica; no son
+parte de `BRAND-FACET-1`.
+
 ## 2026-09-20 — BRAND-FACET-1
 
 PM aceptó QUERY-IMG-1 y las etapas 1 y 2 en la composición `34e7ebf`. La

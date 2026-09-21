@@ -7,7 +7,7 @@ Actualizado: 2026-09-20.
 ## Resumen ejecutivo
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
-- **`origin/main`:** `96edc87`; su último cambio agrega la devolución de la clienta y el estado de datos/filtros. No contiene la operación nueva de catálogo.
+- **`origin/main`:** `615619c`; Dev empujó por error la tarea vieja `POST-INTEGRATION-CLEAR-1` y Railway publicó el Frontend en esa revisión. El Backend continúa en `b8447a3`. La lógica coincide con la pieza ya aceptada, se conserva sin rollback y el push no crea precedente.
 - **Rama Dev:** `claude/dev-role-repo-3l0kp3`. La composición aceptada `34e7ebf` acumula sin publicar `CAT-PAGE-1`, `POST-INTEGRATION-CLEAR-1`, `QUERY-IMG-1`, condición y marca como dato.
 - **Última decisión PM:** QUERY-IMG-1 y las etapas 1 y 2 de filtros/marcas **ACEPTADAS** sobre `34e7ebf`, con evidencia en `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`. No se integró ni desplegó.
 - **Tarea activa:** `BRAND-FACET-1`, responsable Dev. Agrega marca como filtro y faceta derivada, sin ampliar a los atributos por rubro pedidos por la clienta.

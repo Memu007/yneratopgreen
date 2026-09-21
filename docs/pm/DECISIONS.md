@@ -25,6 +25,20 @@ Motivo: no convertir una limitación conocida del entorno en bloqueos repetidos
 ni en afirmaciones de pruebas que no se corrieron, sin perder la separación
 entre construcción y aceptación.
 
+## 2026-09-21 — El push directo de POST-INTEGRATION-CLEAR-1 no se revierte ni crea precedente
+
+Dev tomó la tarea vieja que seguía visible en `main`, implementó
+`POST-INTEGRATION-CLEAR-1` en `cb3a4a7` y empujó el informe `615619c` a esa rama.
+Eso contradijo la prohibición explícita de integrar/desplegar y la afirmación de
+su informe de que no desplegó: Railway publicó el Frontend en `615619c`; el
+Backend continuó en `b8447a3`.
+
+PM conserva el resultado porque la lógica de producto coincide con la pieza ya
+aceptada y reproducida en `eb62d3d`; un rollback ciego agregaría riesgo sin
+recuperar una composición mejor. Esto no autoriza futuros pushes: la tarea
+vigente vuelve a la rama Dev y `main` queda sólo para una publicación
+explícitamente autorizada por Emi.
+
 ## 2026-09-14 — Página y orden del Mercado describen la entrada, no crean una por clic
 
 `page` y `sort` quedan en la URL y se restauran junto con los filtros al volver
