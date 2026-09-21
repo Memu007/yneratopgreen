@@ -392,18 +392,17 @@ def decide_transfer_receipt(
         # Disponible, no existente: por transferencia el stock se descuenta
         # recién acá, así que hay que respetar lo que otras compras tienen
         # reservado y todavía no pagaron.
-        for item in order.items:
-            if item.product and not stock.hay_para(item.product, item.quantity):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Stock insuficiente para {item.product.name}",
-                )
-        for item in order.items:
-            product = item.product
-            is_service = product.category.is_service if product and product.category else False
-            if product and not is_service:
-                product.stock = (product.stock or 0) - item.quantity
-                product.sales_count = (product.sales_count or 0) + item.quantity
+        #
+        # Acá había dos pasos —leer si alcanzaba y después restar en Python— y
+        # el bloqueo de fila de arriba no los cubre: serializa decisiones sobre
+        # ESTA orden, y dos compradores por la última unidad tienen dos órdenes.
+        # Medido: las dos quedaban pagadas. Ahora la comprobación y el descuento
+        # son una sola sentencia que la base serializa. Ver `stock.vender`.
+        try:
+            stock.vender(db, order)
+        except HTTPException:
+            db.rollback()
+            raise
         order.status = OrderStatus.PAID
         order.cancellation_reason = None
 

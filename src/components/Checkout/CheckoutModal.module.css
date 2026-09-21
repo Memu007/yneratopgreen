@@ -393,6 +393,33 @@
   color: var(--tg-color-brand);
 }
 
+/* El verbo que le faltaba al resumen. Va con el color de retirar, el mismo
+   que «Quitar del pedido» del transportista, y no compite con la acción
+   primaria del paso: es un borde, no el camino. */
+.summaryItemQuitar {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 4px 10px;
+  background: var(--tg-color-surface);
+  color: var(--tg-color-error);
+  border: 1px solid var(--tg-color-error);
+  border-radius: var(--tg-radius-lg);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.summaryItemQuitar:hover {
+  background: var(--tg-color-error-bg);
+}
+
+.summaryVacio {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--tg-color-text-secondary);
+}
+
 .summaryTotal {
   display: flex;
   flex-direction: column;

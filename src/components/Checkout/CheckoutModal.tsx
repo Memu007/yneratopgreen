@@ -127,7 +127,9 @@ interface OrdenCreada {
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
-  const { items, totalAmount, clearCart, sincronizarConServidor } = useCart();
+  const {
+    items, totalAmount, clearCart, removeItem, sincronizarConServidor,
+  } = useCart();
   const { user } = useAuth();
 
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('shipping');
@@ -347,15 +349,42 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     }];
   });
 
+  /**
+   * Saca una línea del carrito sin salir del checkout.
+   *
+   * Las dos paredes del recorrido terminaban en la misma instrucción
+   * —«sacalo del carrito»— y en ningún lugar donde hacerlo: un grupo cuyo
+   * vendedor no puede cobrar, y una publicación que se agotó entre dos
+   * sesiones. La única salida era cerrar, y cerrar con datos escritos
+   * pregunta si se descartan: para retirar lo que sobraba había que tirar
+   * también el destino, el traslado y los grupos que sí se podían comprar.
+   *
+   * No se adivina QUÉ sacar leyendo el mensaje del servidor. El resumen ya
+   * lista lo que se está comprando; lo único que le faltaba era el verbo.
+   *
+   * Vuelve al paso de envío a propósito. Cambiar el carrito ya invalida las
+   * decisiones de traslado —son de otro viaje— y ahí es donde se vuelven a
+   * tomar. Quedarse en el pago dejaría confirmar con decisiones vacías, que
+   * el servidor rechaza por nombre. Lo escrito no se pierde.
+   */
+  const quitarDelCarrito = (productId: string) => {
+    removeItem(productId);
+    setError('');
+    setCurrentStep('shipping');
+  };
+
   const handleShippingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!trasladoResuelto) {
+      // Y si el traslado no se resolvió porque la sincronización falló, el
+      // motivo es ése y no otro: decirle «elegí el destino» a quien ya lo
+      // eligió manda a buscar el problema donde no está.
       setError(
         fletes
           ? `Falta decidir cómo se traslada ${pedidosSinResolver.length === 1
               ? 'un pedido'
               : `${pedidosSinResolver.length} pedidos`}.`
-          : 'Elegí el destino para poder resolver el traslado.',
+          : fletesError || 'Elegí el destino para poder resolver el traslado.',
       );
       return;
     }
@@ -863,6 +892,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
 
       {renderFletes()}
 
+      {/* El motivo vivía sólo en el estado: `handleShippingSubmit` lo escribía
+          y ninguna rama lo dibujaba, así que «Continuar al pago» sin traslado
+          resuelto no hacía nada y tampoco decía por qué. Medido: cero
+          elementos con role="alert" antes y después del clic.
+
+          Va pegado al botón y no arriba del formulario: este paso es largo
+          —datos, destino y el traslado de cada pedido—, así que la respuesta a
+          un clic que se da abajo tiene que aparecer abajo. El texto ya
+          existía; le faltaba el lugar. */}
+      {error && (
+        <div className={styles.errorMessage} role="alert">
+          {error}
+        </div>
+      )}
+
       <button type="submit" className={styles.nextButton}>
         Continuar al pago
       </button>
@@ -1105,10 +1149,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
               <div className={styles.summaryItemName}>{item.product.name}</div>
               <div className={styles.summaryItemQuantity}>Cantidad: {item.quantity}</div>
               <div className={styles.summaryItemPrice}>{formatPrice(item.product.price * item.quantity)}</div>
+              <button
+                type="button"
+                className={styles.summaryItemQuitar}
+                onClick={() => quitarDelCarrito(item.product.id)}
+              >
+                Quitar del carrito
+              </button>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Un carrito vacío no es un checkout: sin esto, quitar la última
+          línea dejaba un formulario que no lleva a ninguna parte. */}
+      {items.length === 0 && (
+        <p className={styles.summaryVacio}>
+          Tu carrito quedó vacío. Cerrá el checkout y elegí qué comprar.
+        </p>
+      )}
 
       <div className={styles.summaryTotal}>
         <div className={styles.summaryRow}>

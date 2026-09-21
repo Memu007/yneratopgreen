@@ -30,12 +30,20 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   // el reenvío: sin eso la persona queda sin salida.
   const [faltaConfirmar, setFaltaConfirmar] = useState(false);
   const [avisoDeReenvio, setAvisoDeReenvio] = useState('');
+  // Y si ese aviso es un resultado o un fallo. Sin esto, el fallo del
+  // reenvío se dibujaba en la caja verde: medido, con la petición cortada
+  // la pantalla mostraba «No pudimos conectarnos» con el color del éxito
+  // y con `role="status"`, así que un lector de pantalla tampoco lo
+  // anunciaba como un problema. La persona se quedaba esperando un correo
+  // que nadie mandó.
+  const [elReenvioFallo, setElReenvioFallo] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setFaltaConfirmar(false);
     setAvisoDeReenvio('');
+    setElReenvioFallo(false);
     setIsLoading(true);
 
     try {
@@ -56,10 +64,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
   const handleReenviar = async () => {
     setAvisoDeReenvio('');
+    setElReenvioFallo(false);
     setIsLoading(true);
     try {
       setAvisoDeReenvio(await reenviarVerificacion(email));
     } catch (err) {
+      // El servidor contesta lo mismo exista o no la cuenta, así que
+      // distinguir acá entre salió y no salió no delata ninguna: lo que
+      // falló es el pedido, no la cuenta.
+      setElReenvioFallo(true);
       setAvisoDeReenvio(
         err instanceof Error ? err.message : 'No se pudo reenviar el correo.',
       );
@@ -107,7 +120,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             </button>
           )}
           {avisoDeReenvio && (
-            <div className={styles.success} role="status">
+            <div
+              className={elReenvioFallo ? styles.error : styles.success}
+              role={elReenvioFallo ? 'alert' : 'status'}
+            >
               {avisoDeReenvio}
             </div>
           )}

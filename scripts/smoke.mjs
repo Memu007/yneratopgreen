@@ -29367,6 +29367,720 @@ await runCase(175, 'La marca filtra el conjunto entero y la faceta ofrece sólo 
     + `sólo donde hay marcas, vive en la URL y se limpia. ${medidos.join('; ')}`;
 });
 
+await runCase(176, 'Dos sesiones por la última unidad: manda el Backend, y el checkout se corrige sin tirarlo', async () => {
+  // R1 del registro: «el stock visible puede quedar viejo entre dos sesiones».
+  // Lo que se mide no es que la pantalla adivine —no puede saber lo que pasó en
+  // otra sesión—, sino las tres cosas que sí dependen de nosotros: que la
+  // autoridad la conserve el servidor, que no se venda una unidad que no
+  // existe, y que la persona pueda corregir sin tirar lo que ya escribió.
+  //
+  // El camino que se ejercita es el de TRANSFERENCIA. Es el único medio que
+  // existe con el cobro apagado —así está la bandera en producción— y es el que
+  // NO reserva: por Mercado Pago la reserva ya la mide el caso 90. Por
+  // transferencia el stock se descuenta cuando el vendedor acepta, así que la
+  // carrera vive ahí y no en el checkout.
+  const medidos = [];
+  const sello = Date.now();
+  const MARCADOR = `Smoke r1-176 ${sello}`;
+
+  const limpiar = () => {
+    try {
+      // Sólo lo que no dejó rastro en una orden: borrar una publicación
+      // comprada sería reescribir la historia de una compra.
+      const fabricadas = `SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}%`)}
+        AND id NOT IN (SELECT product_id FROM order_items WHERE product_id IS NOT NULL)`;
+      querySql(`DELETE FROM cart_items WHERE product_id IN (${fabricadas})`);
+      querySql(`DELETE FROM product_images WHERE product_id IN (${fabricadas})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}%`)}
+        AND id NOT IN (SELECT product_id FROM order_items WHERE product_id IS NOT NULL)`);
+    } catch (error) {
+      console.log(`  · no se pudieron retirar las publicaciones del caso 176: ${error.message}`);
+    }
+  };
+
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const [categoria] = queryRows(`
+    SELECT id FROM categories
+    WHERE is_active = true AND is_service = false ORDER BY name LIMIT 1`);
+  assert(categoria, 'no hay categoría de productos donde publicar');
+
+  const publicar = async (nombre, stock) => {
+    const alta = await apiRequest('/products', {
+      method: 'POST', token: vendedor.token,
+      body: {
+        name: nombre,
+        description: 'Publicación fabricada para medir la autoridad del stock.',
+        category_id: categoria[0], price: 1000, stock, unit: 'unidad',
+        locality_id: localidad, publication_type: 'producto',
+      },
+    });
+    assert(alta.status === 201 || alta.status === 200,
+      `«${nombre}» respondió HTTP ${alta.status}: ${JSON.stringify(alta.data).slice(0, 200)}`);
+    return alta.data.id;
+  };
+
+  const numeros = (producto) => {
+    const [fila] = queryRows(`
+      SELECT COALESCE(stock, 0)::text, COALESCE(stock_reservado, 0)::text,
+             COALESCE(sales_count, 0)::text
+      FROM products WHERE id = ${sqlLiteral(producto)}`);
+    return { stock: Number(fila[0]), reservado: Number(fila[1]), ventas: Number(fila[2]) };
+  };
+
+  // Tres cuentas de compra: dos para la carrera y una para la pantalla.
+  const nuevaCuenta = async (etiqueta) => {
+    const email = `r1-176.${etiqueta}.${sello}@example.com`;
+    await registrarYVerificar({
+      email, password: 'smoke123', full_name: `Compra ${etiqueta} 176`,
+      phone: '+54 11 5555 0176', role: 'user',
+    });
+    const { data } = await apiRequest('/auth/login', {
+      method: 'POST', body: { email, password: 'smoke123' },
+    });
+    return { email, clave: 'smoke123', token: data.access_token, id: data.user.id };
+  };
+
+  const comprarPorTransferencia = async (quien, producto) => {
+    await apiRequest('/cart', { method: 'DELETE', token: quien.token });
+    await apiRequest('/cart/sync', {
+      method: 'POST', token: quien.token, body: { items: [{ product_id: producto, quantity: 1 }] },
+    });
+    const { data } = await apiRequest('/orders/checkout/transfer', {
+      method: 'POST', token: quien.token,
+      body: {
+        shipping_address: 'Ruta 8 km 220',
+        shipping_locality_id: localidad,
+        shipping_postal_code: '2700',
+        shipping_decisions: trasladoPropio(quien.id),
+      },
+    });
+    return data.orders[0];
+  };
+
+  const aceptar = (orden) => apiRequest(`/orders/${orden.order_id}/transfer-receipt`, {
+    method: 'PATCH', token: vendedor.token, body: { decision: 'approve' },
+  }).then(
+    (respuesta) => ({ ok: true, estado: respuesta.data.status }),
+    (error) => ({ ok: false, mensaje: String(error.message) }),
+  );
+
+  limpiar();
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const primera = await nuevaCuenta('a');
+    const segunda = await nuevaCuenta('b');
+
+    // === A. Dos órdenes por la misma última unidad =========================
+    const enFila = await publicar(`${MARCADOR} en fila`, 1);
+    assert(numeros(enFila).stock === 1, `la publicación nació con ${numeros(enFila).stock}`);
+
+    const ordenA = await comprarPorTransferencia(primera, enFila);
+    const ordenB = await comprarPorTransferencia(segunda, enFila);
+    assert(ordenA.order_id !== ordenB.order_id, 'las dos compras devolvieron la misma orden');
+
+    // Que las dos entren es el diseño, no un descuido: por transferencia no hay
+    // reserva, y quien decide es el vendedor cuando ve la acreditación. Lo que
+    // NO puede pasar es que el stock se haya movido por confirmar.
+    const trasComprar = numeros(enFila);
+    assert(trasComprar.stock === 1 && trasComprar.reservado === 0 && trasComprar.ventas === 0,
+      `confirmar dos compras por transferencia movió el stock: ${JSON.stringify(trasComprar)}`);
+    medidos.push('dos órdenes por transferencia sobre la última unidad no mueven el stock: '
+      + 'quedan 1 disponible, 0 reservadas y 0 ventas');
+
+    // === B. El vendedor acepta las dos: una vende, la otra no ==============
+    const aceptaA = await aceptar(ordenA);
+    assert(aceptaA.ok && aceptaA.estado === 'paid',
+      `la primera aceptación no pagó la orden: ${JSON.stringify(aceptaA)}`);
+    const trasLaPrimera = numeros(enFila);
+    assert(trasLaPrimera.stock === 0 && trasLaPrimera.ventas === 1,
+      `la primera aceptación dejó ${JSON.stringify(trasLaPrimera)}`);
+
+    const aceptaB = await aceptar(ordenB);
+    assert(!aceptaB.ok && /HTTP 400/.test(aceptaB.mensaje),
+      `la segunda aceptación no fue rechazada con 400: ${JSON.stringify(aceptaB)}`);
+    assert(/[Ss]tock/.test(aceptaB.mensaje),
+      `la segunda aceptación se rechazó sin decir que es por stock: ${aceptaB.mensaje}`);
+
+    const trasLaSegunda = numeros(enFila);
+    assert(trasLaSegunda.stock === 0 && trasLaSegunda.ventas === 1,
+      `la segunda aceptación tocó los números: ${JSON.stringify(trasLaSegunda)}`);
+    assert(estadoDeOrden(ordenB.order_id).toUpperCase() !== 'PAID',
+      'la orden rechazada por falta de stock quedó igual marcada como pagada');
+    medidos.push('el vendedor acepta las dos: la primera vende y la segunda recibe HTTP 400; '
+      + 'stock 0, ventas 1 y la orden que perdió no queda pagada');
+
+    // === C. Y a la vez, de verdad, sobre otra última unidad ================
+    //
+    // El caso 26 ya mide dos aprobaciones simultáneas de LA MISMA orden, que el
+    // bloqueo de fila serializa. Esto es lo otro y no estaba cubierto: dos
+    // órdenes DISTINTAS, de dos compradores distintos, por la misma unidad,
+    // decididas al mismo tiempo. Son dos filas, así que ese bloqueo no las toca.
+    //
+    // Se corre tres veces a propósito. La ventana entre leer si alcanza y
+    // escribir el descuento es angosta y no siempre se cruza: con el defecto
+    // puesto, medido, 11 de 12 rondas terminaban con dos órdenes pagadas por
+    // una sola unidad. Tres rondas dejan el rojo prácticamente seguro sin
+    // volver el caso lento, y la afirmación no se debilita: TODA ronda tiene
+    // que terminar con un solo ganador.
+    const RONDAS = 3;
+    for (let ronda = 1; ronda <= RONDAS; ronda += 1) {
+      const aLaVez = await publicar(`${MARCADOR} a la vez ${ronda}`, 1);
+      const simultaneaA = await comprarPorTransferencia(primera, aLaVez);
+      const simultaneaB = await comprarPorTransferencia(segunda, aLaVez);
+      const [unaU, otraU] = await Promise.all([aceptar(simultaneaA), aceptar(simultaneaB)]);
+      const ganadoras = [unaU, otraU].filter((r) => r.ok).length;
+      assert(ganadoras === 1,
+        `ronda ${ronda}: dos aceptaciones simultáneas de órdenes distintas por 1 unidad `
+        + `terminaron con ${ganadoras} ganadoras; dos personas transfirieron por la misma bolsa`);
+      const trasLaCarrera = numeros(aLaVez);
+      assert(trasLaCarrera.stock === 0 && trasLaCarrera.ventas === 1,
+        `ronda ${ronda}: la carrera dejó ${JSON.stringify(trasLaCarrera)}`);
+      const pagadas = queryCount(`
+        SELECT COUNT(*) FROM orders
+        WHERE id IN (${sqlLiteral(simultaneaA.order_id)}, ${sqlLiteral(simultaneaB.order_id)})
+          AND status = 'PAID'`);
+      assert(pagadas === 1,
+        `ronda ${ronda}: quedaron ${pagadas} órdenes pagadas por una sola unidad`);
+    }
+    medidos.push(`${RONDAS} rondas de dos aceptaciones simultáneas de órdenes distintas por la `
+      + 'misma unidad: en todas vende una sola, la otra rebota, y queda stock 0 con ventas 1');
+
+    // === D. Lo agotado no vuelve a entrar a un carrito =====================
+    const antesDelIntento = (await apiRequest('/cart', { token: primera.token })).data.items || [];
+    const rebote = await apiRequest('/cart/items', {
+      method: 'POST', token: primera.token, body: { product_id: enFila, quantity: 1 },
+    }).then(() => null, (error) => String(error.message));
+    assert(rebote && /HTTP 4\d\d/.test(rebote),
+      `el carrito aceptó una publicación agotada: ${rebote}`);
+    const despuesDelIntento = (await apiRequest('/cart', { token: primera.token })).data.items || [];
+    assert(despuesDelIntento.length === antesDelIntento.length,
+      'el carrito del servidor cambió cuando el alta agotada fue rechazada');
+    medidos.push('lo agotado no vuelve a entrar al carrito del servidor: 4xx y el carrito intacto');
+
+    // === E. La pantalla: el carrito viejo se corrige sin abandonar =========
+    const paraLaPantalla = await nuevaCuenta('c');
+    const agotable = await publicar(`${MARCADOR} pantalla agotable`, 1);
+    const sano = await publicar(`${MARCADOR} pantalla sano`, 5);
+
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
+    await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    await page.getByPlaceholder('tu@email.com').fill(paraLaPantalla.email);
+    await page.getByPlaceholder('••••••••').fill(paraLaPantalla.clave);
+    await page.locator('[class*="_submitButton_"][type="submit"]').click();
+    await page.getByRole('button', { name: 'Salir' }).waitFor({ timeout: 20_000 });
+
+    const agregarDesdeLaPantalla = async (nombre) => {
+      await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(nombre)}`,
+        { waitUntil: 'domcontentloaded' });
+      const tarjeta = page.locator('article[class*="card"]').filter({ hasText: nombre }).first();
+      await tarjeta.waitFor({ state: 'visible', timeout: 25_000 });
+      await tarjeta.getByRole('button', { name: /Agregar al carrito|^Agregar$|Contratar/ })
+        .first().click();
+    };
+    await agregarDesdeLaPantalla(`${MARCADOR} pantalla agotable`);
+    await agregarDesdeLaPantalla(`${MARCADOR} pantalla sano`);
+    await esperarA(async () => /Carrito\s*\(2\)/.test(
+      (await page.getByRole('button', { name: /Carrito/ }).first().textContent()) || ''),
+    'las dos publicaciones no entraron al carrito de la pantalla', 20_000);
+
+    // Y ahora la otra sesión se lleva la última unidad. No se toca la base: se
+    // compra y se acepta por la API, que es lo que pasaría de verdad.
+    const seLaLleva = await comprarPorTransferencia(segunda, agotable);
+    const cerrada = await aceptar(seLaLleva);
+    assert(cerrada.ok, `la otra sesión no pudo comprar la última unidad: ${JSON.stringify(cerrada)}`);
+    assert(numeros(agotable).stock === 0, 'la otra sesión no agotó la publicación');
+
+    // La persona sigue donde estaba, con el carrito de antes.
+    await page.getByRole('button', { name: /Carrito/ }).first().click();
+    await page.getByRole('button', { name: 'Continuar compra' }).click();
+    await page.getByRole('heading', { name: /Datos de env/i }).waitFor({ timeout: 20_000 });
+
+    await page.locator('input[placeholder="Juan Pérez"]').fill('Compradora 176');
+    await page.locator('input[type="tel"]').fill('+54 11 5555 0176');
+    await elegirDestino(page, 'Pergamino');
+    await page.locator('input[placeholder*="San Martín"]').fill('Ruta 8 km 220');
+    await page.locator('input[placeholder="2000"]').fill('2700');
+
+    // El motivo real aparece, y es el del servidor: no una pantalla que
+    // adivina, ni un listado de fletes que describe un carrito que ya no vale.
+    await esperarA(async () => (await page.locator('[role="alert"]').allTextContents())
+      .some((texto) => /sin stock/i.test(texto)),
+    'el checkout no dijo que la publicación se había agotado', 25_000);
+
+    // Y el paso no deja seguir, pero tampoco se queda mudo: apretar la acción
+    // primaria y no recibir NADA era el estado anterior. Se cuenta antes y
+    // después, porque el motivo del traslado ya está en pantalla por su cuenta:
+    // lo que se mide acá es que el clic conteste algo.
+    const avisosAntesDelClic = await page.locator('[role="alert"]').count();
+    await page.getByRole('button', { name: 'Continuar al pago' }).click();
+    await page.waitForTimeout(600);
+    assert(await page.getByRole('heading', { name: /Datos de env/i }).count() > 0,
+      'el checkout avanzó al pago con una publicación agotada adentro');
+    const alIntentar = await page.locator('[role="alert"]').allTextContents();
+    assert(alIntentar.length > avisosAntesDelClic,
+      `apretar «Continuar al pago» no cambió nada en pantalla: seguía habiendo `
+      + `${avisosAntesDelClic} aviso(s) y la persona no sabe si el botón hizo algo`);
+    assert(alIntentar.some((texto) => /sin stock/i.test(texto)),
+      `apretar «Continuar al pago» no dijo por qué no se puede: ${JSON.stringify(alIntentar)}`);
+    medidos.push('con la publicación agotada, el checkout no avanza y contesta el motivo del '
+      + 'servidor en vez de quedarse mudo');
+
+    // La instrucción dice «quitala del carrito». Ahora hay dónde.
+    const lineaAgotada = page.locator('[class*="_summaryItem_"]')
+      .filter({ hasText: `${MARCADOR} pantalla agotable` });
+    await lineaAgotada.first().waitFor({ state: 'visible', timeout: 15_000 });
+    const quitar = lineaAgotada.getByRole('button', { name: /Quitar del carrito/ });
+    assert(await quitar.count() === 1,
+      'el resumen del checkout no ofrece quitar la línea que impide comprar: la única salida '
+      + 'sigue siendo cerrar y descartar lo escrito');
+    await quitar.click();
+
+    // No preguntó si se descartan los cambios, y no se perdió lo escrito.
+    await page.waitForTimeout(800);
+    assert(await page.getByRole('button', { name: 'Descartar cambios' }).count() === 0,
+      'quitar una línea preguntó por los cambios sin guardar: retirar lo que sobra no es irse');
+    assert(await page.getByRole('heading', { name: /Datos de env/i }).count() > 0,
+      'quitar una línea sacó a la persona del checkout');
+    assert(await page.locator('input[placeholder*="San Martín"]').inputValue() === 'Ruta 8 km 220',
+      'quitar una línea borró la dirección escrita');
+    assert(await page.locator('#checkout-localidad').inputValue() === localidad,
+      'quitar una línea borró el destino elegido');
+
+    // Y el camino se reabre: los fletes vuelven a resolverse sobre el carrito
+    // que sí se puede comprar.
+    const propio = page.getByRole('radio', { name: /Coordino el traslado/ });
+    await propio.first().waitFor({ timeout: 25_000 });
+
+    // Antes de decidir el traslado, el caso común de la acción muda: con el
+    // carrito sano y ningún motivo en pantalla, apretar no hacía nada y no
+    // decía nada. Medido: cero avisos antes y cero después.
+    const sinAvisos = await page.locator('[role="alert"]').count();
+    await page.getByRole('button', { name: 'Continuar al pago' }).click();
+    await page.waitForTimeout(600);
+    const alApretarSinDecidir = await page.locator('[role="alert"]').allTextContents();
+    assert(alApretarSinDecidir.some((texto) => /Falta decidir/i.test(texto)),
+      `apretar «Continuar al pago» sin resolver el traslado no dijo nada: había ${sinAvisos} `
+      + `aviso(s) y quedaron ${JSON.stringify(alApretarSinDecidir)}`);
+    assert(await page.getByRole('heading', { name: /Datos de env/i }).count() > 0,
+      'el checkout avanzó al pago sin que nadie decidiera cómo se traslada');
+    medidos.push('sin el traslado resuelto, la acción primaria contesta «falta decidir» en vez '
+      + 'de no hacer nada');
+    assert(await propio.count() === 1,
+      `quedaron ${await propio.count()} grupos de traslado y el carrito tiene una sola línea`);
+    await propio.first().check();
+    await page.getByRole('button', { name: 'Continuar al pago' }).click();
+    await page.getByRole('heading', { name: 'Medio de pago' }).waitFor({ timeout: 25_000 });
+    await page.getByRole('radio', { name: /Transferencia/ }).first()
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    await page.getByRole('radio', { name: /Transferencia/ }).first().check();
+    await page.getByRole('button', { name: /Confirmar y crear/ }).click();
+    await page.getByRole('heading', { name: 'Tus órdenes' }).waitFor({ timeout: 30_000 });
+
+    const ordenesDeLaPantalla = queryRows(`
+      SELECT o.id, oi.product_id
+      FROM orders o JOIN order_items oi ON oi.order_id = o.id
+      WHERE o.buyer_id = ${sqlLiteral(paraLaPantalla.id)}`);
+    assert(ordenesDeLaPantalla.length === 1,
+      `la compra corregida dejó ${ordenesDeLaPantalla.length} líneas de orden y esperaba 1`);
+    assert(ordenesDeLaPantalla[0][1] === sano,
+      'la orden que se creó no es la de la publicación que sí tenía stock');
+    assert(numeros(agotable).stock === 0 && numeros(agotable).ventas === 1,
+      `la publicación agotada terminó en ${JSON.stringify(numeros(agotable))}`);
+    medidos.push('la línea que impedía comprar se retira desde el resumen, sin descartar lo '
+      + 'escrito, y la compra se completa con el resto del carrito');
+
+    await contexto.close();
+
+    return `el stock lo decide el Backend en los dos tiempos del camino por transferencia, y el `
+      + `checkout se puede corregir sin abandonarlo. ${medidos.join('; ')}`;
+  } finally {
+    await browser.close();
+    limpiar();
+  }
+});
+
+await runCase(177, 'El reenvío de confirmación se ofrece cuando hace falta, y su fallo no se disfraza de éxito', async () => {
+  // R4 del registro: «el reenvío de verificación depende del texto de error».
+  // Acá se mide lo que se ve, no lo que dice el fuente:
+  //
+  //  1. que con la cuenta sin confirmar la pantalla ofrezca el reenvío, y que
+  //     lo que muestre sea EXACTAMENTE el motivo que devuelve la API —si
+  //     alguien reescribe ese texto, este caso se pone rojo antes de que una
+  //     persona se quede sin la salida—;
+  //  2. que el reenvío que NO salió se vea como un fallo y no con el color y el
+  //     papel del éxito;
+  //  3. que la respuesta del reenvío no cambie según la cuenta;
+  //  4. que un enlace vencido siga ofreciendo pedir uno nuevo sin depender de
+  //     ninguna frase.
+  const medidos = [];
+  const sello = Date.now();
+  const clave = 'smoke123';
+  const sinConfirmar = `r4-177.pendiente.${sello}@example.com`;
+  const confirmada = `r4-177.confirmada.${sello}@example.com`;
+  const inexistente = `r4-177.nadie.${sello}@example.com`;
+
+  await apiRequest('/auth/register', {
+    method: 'POST',
+    body: { email: sinConfirmar, password: clave, full_name: 'Pendiente 177', role: 'user' },
+  });
+  await registrarYVerificar({
+    email: confirmada, password: clave, full_name: 'Confirmada 177', role: 'user',
+  });
+
+  // El motivo que devuelve la API, leído de la API. La pantalla no puede tener
+  // su propia copia de este texto y este caso tampoco.
+  const motivo = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: sinConfirmar, password: clave },
+  }).then(
+    () => { throw new Error('una cuenta sin confirmar abrió sesión'); },
+    (error) => String(error.message),
+  );
+  assert(/HTTP 403/.test(motivo), `el rechazo por falta de confirmación no fue 403: ${motivo}`);
+  const textoDelMotivo = motivo.split('HTTP 403: ')[1];
+  assert(textoDelMotivo, `no se pudo leer el motivo del 403: ${motivo}`);
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+
+    const abrirElIngreso = async () => {
+      await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
+      await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+    };
+    const intentarIngresar = async (correo) => {
+      await page.getByPlaceholder('tu@email.com').fill(correo);
+      await page.getByPlaceholder('••••••••').fill(clave);
+      await page.locator('[class*="_submitButton_"][type="submit"]').click();
+    };
+
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await abrirElIngreso();
+    await intentarIngresar(sinConfirmar);
+
+    // 1. El motivo que se ve es el que devolvió la API, y con él viene la salida.
+    await esperarA(async () => (await page.locator('[role="alert"]').allTextContents())
+      .some((texto) => texto.trim() === textoDelMotivo),
+    `el ingreso no mostró el motivo que devuelve la API («${textoDelMotivo}»)`, 20_000);
+    const reenviar = page.getByRole('button', { name: /Reenviame el correo/ });
+    assert(await reenviar.count() === 1,
+      'con la cuenta sin confirmar el ingreso no ofrece pedir un enlace nuevo, y sin eso la '
+      + 'persona se queda sin salida');
+    medidos.push('el ingreso de una cuenta sin confirmar muestra el motivo de la API y ofrece '
+      + 'pedir un enlace nuevo');
+
+    // 2. El reenvío que no salió. Se corta la petición, que es lo que pasa con
+    //    la red caída o el servidor sin contestar.
+    await page.route('**/auth/resend-verification', (ruta) => ruta.abort('failed'));
+    await reenviar.click();
+    const avisoRoto = page.locator('[class*="_error_"], [class*="_success_"]')
+      .filter({ hasText: /reenviar|conect|correo/i });
+    await esperarA(async () => (await avisoRoto.count()) > 0,
+      'el reenvío cortado no dijo nada', 20_000);
+    const papelDelFallo = await page.locator('[role="alert"], [role="status"]')
+      .filter({ hasText: /No pudimos conectarnos|No se pudo reenviar/ }).first()
+      .getAttribute('role');
+    const claseDelFallo = await page.locator('[role="alert"], [role="status"]')
+      .filter({ hasText: /No pudimos conectarnos|No se pudo reenviar/ }).first()
+      .getAttribute('class');
+    assert(papelDelFallo === 'alert',
+      `el reenvío que falló se anuncia como «${papelDelFallo}» y no como un problema: quien usa `
+      + 'un lector de pantalla no se entera de que no salió nada');
+    assert(/_error_/.test(claseDelFallo || ''),
+      `el reenvío que falló se dibuja con «${claseDelFallo}»: es la caja del éxito, así que se `
+      + 'queda esperando un correo que nadie mandó');
+    medidos.push('el reenvío que no salió se anuncia con role="alert" y con el color del error, '
+      + 'no con el del éxito');
+
+    // 3. Y el que sí sale no delata qué cuentas existen, desde la pantalla.
+    await page.unroute('**/auth/resend-verification');
+    await reenviar.click();
+    const avisoBueno = page.locator('[role="status"]').filter({ hasText: /casilla|enlace/i });
+    await esperarA(async () => (await avisoBueno.count()) > 0,
+      'el reenvío no confirmó nada al volver la conexión', 20_000);
+    const textoPendiente = (await avisoBueno.first().textContent()).trim();
+    assert(/_success_/.test((await avisoBueno.first().getAttribute('class')) || ''),
+      'el reenvío que salió no se dibuja como un resultado');
+
+    const respuestaDe = async (correo) => {
+      const { data } = await apiRequest('/auth/resend-verification', {
+        method: 'POST', body: { email: correo },
+      });
+      return data.message;
+    };
+    const deLaConfirmada = await respuestaDe(confirmada);
+    const deLaQueNoExiste = await respuestaDe(inexistente);
+    assert(textoPendiente === deLaConfirmada && deLaConfirmada === deLaQueNoExiste,
+      'la respuesta del reenvío cambia según la cuenta: «' + textoPendiente + '» vs «'
+      + deLaConfirmada + '» vs «' + deLaQueNoExiste + '»');
+    medidos.push('la respuesta del reenvío es la misma para una cuenta pendiente, una '
+      + 'confirmada y una que no existe');
+
+    // 4. El enlace vencido. La pantalla de confirmación ofrece pedir uno nuevo
+    //    por el ESTADO de la respuesta, sin leerle el texto a nadie.
+    const vencido = `r4-177.vencido.${sello}@example.com`;
+    await apiRequest('/auth/register', {
+      method: 'POST',
+      body: { email: vencido, password: clave, full_name: 'Vencido 177', role: 'user' },
+    });
+    const enlace = tokenDeVerificacion();
+    querySql(`
+      UPDATE email_verification_tokens
+      SET created_at = created_at - interval '24 hours 1 second',
+          expires_at = expires_at - interval '24 hours 1 second'
+      WHERE user_id = (SELECT id FROM users WHERE email = ${sqlLiteral(vencido)})`);
+
+    await page.goto(`${FRONTEND_URL}/verificar-correo#token=${enlace}`,
+      { waitUntil: 'domcontentloaded' });
+    await esperarA(async () => (await page.locator('#correo-reenvio').count()) > 0,
+      'la pantalla de confirmación no ofrece pedir un enlace nuevo cuando el que llegó venció',
+      25_000);
+    const dicho = (await page.locator('[role="status"]').first().textContent()) || '';
+    assert(/venc/i.test(dicho),
+      `la pantalla no dice que el enlace venció: «${dicho.trim()}»`);
+    medidos.push('un enlace vencido deja la pantalla de confirmación con el formulario para '
+      + 'pedir uno nuevo, sin depender de ninguna frase');
+
+    await contexto.close();
+
+    return `la salida del ingreso sin confirmar existe, está atada al motivo que devuelve la `
+      + `API y su fallo se ve como un fallo. ${medidos.join('; ')}`;
+  } finally {
+    await browser.close();
+  }
+});
+
+await runCase(178, 'Un vendedor que no puede cobrar se retira desde el checkout, sin tirar el resto', async () => {
+  // R5 del registro: «un grupo de checkout sin medio de pago exige salir para
+  // poder retirarlo». Medido en el navegador: el paso de pago lo identificaba y
+  // decía «sacá sus productos del carrito», y en toda la capa había tres
+  // botones —cerrar, volver y confirmar—. Cerrar con datos escritos pregunta si
+  // se descartan, así que retirar un grupo costaba el destino, el traslado y
+  // los grupos que sí se podían comprar.
+  const medidos = [];
+  const sello = Date.now();
+  const MARCADOR = `Smoke r5-178 ${sello}`;
+  const clave = 'smoke123';
+
+  const limpiar = () => {
+    try {
+      const fabricadas = `SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}%`)}
+        AND id NOT IN (SELECT product_id FROM order_items WHERE product_id IS NOT NULL)`;
+      querySql(`DELETE FROM cart_items WHERE product_id IN (${fabricadas})`);
+      querySql(`DELETE FROM product_images WHERE product_id IN (${fabricadas})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}%`)}
+        AND id NOT IN (SELECT product_id FROM order_items WHERE product_id IS NOT NULL)`);
+    } catch (error) {
+      console.log(`  · no se pudieron retirar las publicaciones del caso 178: ${error.message}`);
+    }
+  };
+
+  const cobra = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const [banco] = queryRows(`
+    SELECT COALESCE(cbu, ''), COALESCE(alias_bancario, ''), 'fin'
+    FROM users WHERE id = ${sqlLiteral(cobra.id)}`);
+  assert(banco[0] || banco[1],
+    'el vendedor del seed no tiene CBU ni alias: sin eso no hay grupo pagable con qué comparar');
+
+  // El que no puede cobrar nace acá y no se le rompe nada a nadie: cuenta nueva,
+  // sin datos bancarios y sin vínculo de Mercado Pago.
+  const correoSinMedio = `r5-178.sinmedio.${sello}@example.com`;
+  await registrarYVerificar({
+    email: correoSinMedio, password: clave, full_name: `Sin Medio ${sello}`,
+    phone: '+54 11 5555 0178', role: 'user',
+  });
+  const sinMedio = await ingresarVendedor(correoSinMedio, clave);
+  assert(queryCount(`
+    SELECT COUNT(*) FROM users
+    WHERE id = ${sqlLiteral(sinMedio.id)} AND cbu IS NULL AND alias_bancario IS NULL`) === 1,
+  'la cuenta nueva nació con datos bancarios y no sirve para este caso');
+
+  const correoComprador = `r5-178.compra.${sello}@example.com`;
+  await registrarYVerificar({
+    email: correoComprador, password: clave, full_name: `Compra 178 ${sello}`,
+    phone: '+54 11 5555 0179', role: 'user',
+  });
+  const comprador = await ingresarVendedor(correoComprador, clave);
+
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const [categoria] = queryRows(`
+    SELECT id FROM categories
+    WHERE is_active = true AND is_service = false ORDER BY name LIMIT 1`);
+
+  const publicar = async (quien, nombre, precio) => {
+    const alta = await apiRequest('/products', {
+      method: 'POST', token: quien.token,
+      body: {
+        name: nombre,
+        description: 'Publicación fabricada para medir el grupo sin medio de pago.',
+        category_id: categoria[0], price: precio, stock: 5, unit: 'unidad',
+        locality_id: localidad, publication_type: 'producto',
+      },
+    });
+    assert(alta.status === 201 || alta.status === 200,
+      `«${nombre}» respondió HTTP ${alta.status}: ${JSON.stringify(alta.data).slice(0, 200)}`);
+    return alta.data.id;
+  };
+
+  limpiar();
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const NOMBRE_PAGABLE = `${MARCADOR} pagable`;
+    const NOMBRE_SIN_MEDIO = `${MARCADOR} sin medio`;
+    const pagable = await publicar(cobra, NOMBRE_PAGABLE, 2000);
+    await publicar(sinMedio, NOMBRE_SIN_MEDIO, 3000);
+
+    // Antes de la pantalla: el servidor ya identifica el grupo y dice por qué.
+    await apiRequest('/cart', { method: 'DELETE', token: comprador.token });
+    await apiRequest('/cart/sync', {
+      method: 'POST', token: comprador.token,
+      body: { items: [{ product_id: pagable, quantity: 1 }] },
+    });
+    const { data: opciones } = await apiRequest('/orders/payment-options', {
+      token: comprador.token,
+    });
+    assert(opciones.length === 1 && opciones[0].methods.includes('transfer'),
+      `el grupo pagable no ofrece transferencia: ${JSON.stringify(opciones)}`);
+
+    // Dos anchos: el resumen del checkout es una columna al costado en
+    // escritorio y una banda debajo en celular, así que el control que retira
+    // tiene que existir en los dos.
+    for (const medida of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+      const donde = `${medida.width}x${medida.height}`;
+      const contexto = await browser.newContext({ viewport: medida });
+      const page = await contexto.newPage();
+      try {
+        await apiRequest('/cart', { method: 'DELETE', token: comprador.token });
+        const ordenesAntes = queryCount(
+          `SELECT COUNT(*) FROM orders WHERE buyer_id = ${sqlLiteral(comprador.id)}`);
+
+        await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+        await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
+        await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+        await page.getByPlaceholder('tu@email.com').fill(correoComprador);
+        await page.getByPlaceholder('••••••••').fill(clave);
+        await page.locator('[class*="_submitButton_"][type="submit"]').click();
+        await page.getByRole('button', { name: /Salir|Cuenta/ }).first()
+          .waitFor({ timeout: 20_000 });
+
+        for (const nombre of [NOMBRE_PAGABLE, NOMBRE_SIN_MEDIO]) {
+          await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(nombre)}`,
+            { waitUntil: 'domcontentloaded' });
+          const tarjeta = page.locator('article[class*="card"]')
+            .filter({ hasText: nombre }).first();
+          await tarjeta.waitFor({ state: 'visible', timeout: 25_000 });
+          await tarjeta.getByRole('button', { name: /Agregar al carrito|^Agregar$|Contratar/ })
+            .first().click();
+        }
+        await esperarA(async () => /\(2\)/.test(
+          (await page.getByRole('button', { name: /Carrito/ }).first().textContent()) || ''),
+        `${donde}: las dos publicaciones no entraron al carrito`, 20_000);
+
+        await page.getByRole('button', { name: /Carrito/ }).first().click();
+        await page.getByRole('button', { name: 'Continuar compra' }).click();
+        await page.getByRole('heading', { name: /Datos de env/i }).waitFor({ timeout: 20_000 });
+
+        await page.locator('input[placeholder="Juan Pérez"]').fill('Compradora 178');
+        await page.locator('input[type="tel"]').fill('+54 11 5555 0179');
+        await elegirDestino(page, 'Pergamino');
+        await page.locator('input[placeholder*="San Martín"]').fill('Ruta 8 km 220');
+        await page.locator('input[placeholder="2000"]').fill('2700');
+
+        const propio = page.getByRole('radio', { name: /Coordino el traslado/ });
+        await propio.first().waitFor({ timeout: 25_000 });
+        await esperarA(async () => (await propio.count()) === 2,
+          `${donde}: el checkout no derivó los dos grupos del carrito`, 20_000);
+        for (let i = 0; i < 2; i += 1) await propio.nth(i).check();
+
+        await page.getByRole('button', { name: 'Continuar al pago' }).click();
+        await page.getByRole('heading', { name: 'Medio de pago' }).waitFor({ timeout: 25_000 });
+
+        // Lo identifica, con nombre y motivo.
+        await esperarA(async () => (await page.locator('[role="alert"]').allTextContents())
+          .some((texto) => texto.includes(`Sin Medio ${sello}`)),
+        `${donde}: el paso de pago no identifica al vendedor que no puede cobrar`, 25_000);
+
+        // Y no deja confirmar, ni escribe nada.
+        await page.getByRole('button', { name: /Confirmar y crear/ }).click();
+        await page.waitForTimeout(900);
+        assert(await page.getByRole('heading', { name: 'Medio de pago' }).count() > 0,
+          `${donde}: el checkout avanzó con un grupo que nadie puede pagar`);
+        assert(queryCount(
+          `SELECT COUNT(*) FROM orders WHERE buyer_id = ${sqlLiteral(comprador.id)}`)
+          === ordenesAntes,
+        `${donde}: se escribió una orden con un grupo sin medio de pago`);
+
+        // La instrucción es «sacá sus productos del carrito». Acá hay dónde.
+        const lineaSinMedio = page.locator('[class*="_summaryItem_"]')
+          .filter({ hasText: NOMBRE_SIN_MEDIO });
+        const quitar = lineaSinMedio.getByRole('button', { name: /Quitar del carrito/ });
+        await lineaSinMedio.first().scrollIntoViewIfNeeded();
+        assert(await quitar.count() === 1,
+          `${donde}: el checkout dice que hay que sacar esos productos del carrito y no ofrece `
+          + 'ninguna forma de hacerlo sin cerrar y descartar lo escrito');
+        await quitar.click();
+        await page.waitForTimeout(900);
+
+        // Nadie preguntó si se descartan los cambios, y no se perdió nada.
+        assert(await page.getByRole('button', { name: 'Descartar cambios' }).count() === 0,
+          `${donde}: retirar un grupo preguntó por los cambios sin guardar`);
+        assert(await page.getByRole('heading', { name: /Datos de env/i }).count() > 0,
+          `${donde}: retirar un grupo sacó a la persona del checkout`);
+        assert(await page.locator('input[placeholder*="San Martín"]').inputValue()
+          === 'Ruta 8 km 220', `${donde}: retirar un grupo borró la dirección escrita`);
+        assert(await page.locator('#checkout-localidad').inputValue() === localidad,
+          `${donde}: retirar un grupo borró el destino elegido`);
+        await esperarA(async () => (await page.locator('[class*="_summaryItem_"]').count()) === 1,
+          `${donde}: el resumen no quedó con la única línea que se puede comprar`, 20_000);
+
+        // Y la compra se completa con el grupo que sí se podía pagar.
+        await esperarA(async () => (await propio.count()) === 1,
+          `${donde}: quedó más de un grupo de traslado después de retirar uno`, 25_000);
+        await propio.first().check();
+        await page.getByRole('button', { name: 'Continuar al pago' }).click();
+        await page.getByRole('heading', { name: 'Medio de pago' }).waitFor({ timeout: 25_000 });
+        const transferencia = page.getByRole('radio', { name: /Transferencia/ });
+        await transferencia.first().waitFor({ state: 'visible', timeout: 20_000 });
+        await transferencia.first().check();
+        await page.getByRole('button', { name: /Confirmar y crear/ }).click();
+
+        await esperarA(async () => queryCount(
+          `SELECT COUNT(*) FROM orders WHERE buyer_id = ${sqlLiteral(comprador.id)}`)
+          === ordenesAntes + 1,
+        `${donde}: la compra corregida no creó exactamente una orden`, 30_000);
+        const ultima = queryRows(`
+          SELECT o.seller_id, oi.product_id
+          FROM orders o JOIN order_items oi ON oi.order_id = o.id
+          WHERE o.buyer_id = ${sqlLiteral(comprador.id)}
+          ORDER BY o.created_at DESC LIMIT 1`)[0];
+        assert(ultima[0] === cobra.id && ultima[1] === pagable,
+          `${donde}: la orden creada no es la del vendedor que sí puede cobrar: `
+          + JSON.stringify(ultima));
+        assert(queryCount(`
+          SELECT COUNT(*) FROM orders WHERE seller_id = ${sqlLiteral(sinMedio.id)}`) === 0,
+        `${donde}: se creó una orden para el vendedor que no puede cobrar`);
+        medidos.push(`${donde}: el grupo sin medio se identifica, no deja confirmar, se retira `
+          + 'desde el resumen sin descartar lo escrito y la compra sigue con el resto');
+      } finally {
+        await contexto.close();
+      }
+    }
+
+    return `el grupo que nadie puede pagar se retira sin abandonar el checkout. ${medidos.join('; ')}`;
+  } finally {
+    await browser.close();
+    limpiar();
+    try {
+      await apiRequest('/cart', { method: 'DELETE', token: comprador.token });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

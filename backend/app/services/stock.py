@@ -43,6 +43,9 @@ LIBERADA = "liberada"                # la compra murió: las unidades volvieron
 CIERRE_PENDIENTE = "cierre_pendiente"
 
 SIN_STOCK = "«{nombre}» se quedó sin stock mientras confirmabas. Sacalo del carrito o bajá la cantidad."
+# El mismo motivo, dicho para el vendedor que está aceptando un comprobante:
+# el que lee esto no es quien compró.
+SIN_STOCK_AL_ACEPTAR = "Stock insuficiente para {nombre}"
 
 
 def es_servicio(producto: Product) -> bool:
@@ -128,6 +131,47 @@ def reservar(db: Session, orden: Order, items: Iterable) -> None:
 
     orden.stock_reserva = RESERVADA
     db.add(orden)
+
+
+def vender(db: Session, orden: Order) -> None:
+    """Descuenta las unidades de una venta que se cobró fuera de la plataforma.
+
+    Es el camino de la transferencia: ahí no hay reserva —el dinero fue de
+    cuenta a cuenta y quien decide es el vendedor cuando ve la acreditación en
+    su banco—, así que comprobar que alcanza y descontar son el mismo acto.
+
+    Y tienen que serlo. Antes eran dos: se leía `hay_para` y después se escribía
+    `producto.stock - cantidad` en Python. Dos aceptaciones simultáneas de
+    órdenes **distintas** por la misma última unidad leían las dos que
+    alcanzaba, y las dos escribían el mismo número. Medido: 11 de 12 rondas
+    terminaban con las dos órdenes en `PAID` por una sola unidad, y con
+    `sales_count` perdiendo un incremento por el camino. El bloqueo de fila de la orden no alcanza para
+    esto: son dos filas distintas, y lo que se disputa es el producto.
+
+    Acá es un `UPDATE ... WHERE` condicional, igual que la reserva: la base
+    bloquea la fila del producto y decide. El que la pierde encuentra cero
+    filas y se lleva su 400, sin haber descontado nada.
+
+    Lo que se puede vender es `stock - stock_reservado`, no `stock`: las
+    unidades que otra compra dejó comprometidas esperando su pago tienen dueño.
+    """
+    for producto, cantidad in _unidades(orden.items):
+        vendidas = db.execute(
+            update(Product)
+            .where(
+                Product.id == producto.id,
+                func.coalesce(Product.stock, 0) - Product.stock_reservado >= cantidad,
+            )
+            .values(
+                stock=func.coalesce(Product.stock, 0) - cantidad,
+                sales_count=Product.sales_count + cantidad,
+            )
+        ).rowcount
+        if not vendidas:
+            raise HTTPException(
+                status_code=400, detail=SIN_STOCK_AL_ACEPTAR.format(nombre=producto.name)
+            )
+        db.expire(producto, ["stock", "sales_count"])
 
 
 def consolidar(db: Session, orden: Order) -> bool:
