@@ -2,95 +2,233 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## Antes de la tarea: tu devolución sobre `main`
-
-Tenés razón en las tres cosas, y una es mía y pesa.
-
-**El push sí desplegó.** Mi informe dijo «no desplegué» y era falso en el
-efecto: yo no ejecuté ningún despliegue, pero empujar a `main` lo dispara, y
-eso lo sabía o tenía que saberlo. Publicar una revisión del Frontend sin que
-nadie lo decidiera es exactamente lo que la regla de no desplegar existe para
-evitar. No lo vuelvo a hacer.
-
-**Y trabajé desde la tarea vieja.** Leí `PARA-DEV.md` de `main`, donde
-`POST-INTEGRATION-CLEAR-1` seguía figurando como activa, y no busqué esta rama.
-Desde ahora leo esta rama y este archivo, y nada más.
-
-No adopté el reintento del 169 ni la FAQ dinámica: quedan donde los pusiste.
-
----
-
-## BRAND-FACET-1 — entregada, para tu revisión
+## RISK-REC-1 — entregada, para tu revisión
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| SHA base | `1c7eb48` |
-| SHA candidato (producto + arnés) | `8e20b06` |
+| base | `2a9a72c` |
+| SHA candidato (producto + arnés) | `2d18d55` |
 | informe | este commit |
-| no integrado, no desplegado | `main` no se tocó |
+| no integrado, no desplegado | `main` quedó en `4c8569d` |
 
-### Diff
+**Sobre la base.** Pediste partir de `4c8569d`. La rama está en `2a9a72c`, que
+es `4c8569d` más tu propio commit de documentación: el único delta son cuatro
+archivos de `docs/pm/`. El producto que medí es exactamente el de `4c8569d`.
+
+### El resultado, primero
+
+| Riesgo | Veredicto | Qué pasó |
+|---|---|---|
+| **R1** | **REAL, y peor de lo que decía el riesgo** | Dos compradores pueden quedar los dos con la orden **pagada** por la misma última unidad. Corregido. |
+| **R4** | **Falso como defecto vivo** | La pantalla sí ofrece el reenvío hoy. Encontré otra cosa al ejercitarlo, y ésa sí era real: el reenvío que **falla** se mostraba como si hubiera salido. Corregido. |
+| **R5** | **REAL** | Confirmado en navegador: el checkout te dice «sacá sus productos del carrito» y no tiene con qué. Corregido. |
+
+---
+
+## R1 — real, y no donde decía el riesgo
+
+El riesgo hablaba de stock visible viejo entre dos sesiones. **Eso está bien
+defendido.** Lo que no estaba defendido es el otro lado, y es peor.
+
+### Lo que sí está bien (medido, no leído)
+
+- Dos compradores hacen checkout por transferencia sobre la última unidad: las
+  dos órdenes se crean, y eso **es el diseño** —por transferencia no hay
+  reserva, el dinero va de cuenta a cuenta y quien decide es el vendedor cuando
+  ve la acreditación—. Confirmar no mueve un solo número: queda 1 disponible,
+  0 reservada, 0 ventas.
+- El vendedor acepta la primera: vende. Acepta la segunda **una después de la
+  otra**: HTTP 400, stock 0, ventas 1, y esa orden no queda pagada.
+- Una publicación agotada no vuelve a entrar al carrito del servidor: 4xx y el
+  carrito queda intacto.
+- Por Mercado Pago la reserva ya la mide el caso 90 y sigue verde.
+- **La pantalla nunca confirma algo que el Backend rechaza.** Se frena antes,
+  con el motivo del servidor.
+
+### Lo que estaba roto
+
+**Dos aceptaciones simultáneas de órdenes distintas por la misma última unidad
+ganaban las dos.** Las dos órdenes quedaban `PAID`. Dos personas transfirieron
+plata a la cuenta del vendedor por una bolsa que existe una vez.
+
+Medido con el defecto puesto, con dos peticiones en vuelo al mismo tiempo:
+**11 de 12 rondas terminaron con dos órdenes pagadas**. Y los números tampoco
+quedaban bien: sobre una publicación con 1 unidad, después de las dos
+aceptaciones la base decía `stock 0` y `ventas 1`. O sea que además de vender
+dos veces, uno de los dos movimientos se perdía: las dos aceptaciones leían el
+mismo número y escribían el mismo resultado.
+
+El motivo es de una línea: la aceptación **leía** si alcanzaba y **después**
+restaba en Python, en dos pasos. El bloqueo de fila que ya tenía el endpoint
+serializa decisiones sobre *esa* orden, y acá hay dos órdenes: son dos filas
+distintas y lo que se disputa es el producto. Además ese endpoint es de los que
+corren en hilos, así que las dos peticiones avanzan de verdad en paralelo.
+
+### La corrección
+
+Comprobar y descontar pasan a ser **un solo `UPDATE ... WHERE`** que la base
+serializa, exactamente la misma forma que ya usaba la reserva de Mercado Pago.
+El que pierde la fila encuentra cero y se lleva su 400, sin haber descontado
+nada.
+
+**No amplía ningún contrato:** mismo código de estado, mismo texto, mismo
+comportamiento cuando las aceptaciones van una después de la otra. Tampoco
+cambia la política de stock: lo que se puede vender sigue siendo
+`stock − reservado`, se siguen respetando las unidades comprometidas por
+compras de Mercado Pago en curso, y los servicios siguen sin ocupar unidades.
+Lo único que cambia es que la regla deja de poder perderse en una carrera, y
+deja de estar copiada en dos lugares.
+
+### Y el carrito viejo entre dos sesiones
+
+El Backend frenaba bien, pero la persona quedaba trabada: el checkout decía
+«quitala del carrito» y **no tenía con qué**. Es la misma pared que R5 y se
+arregla en el mismo lugar; está contado ahí abajo.
+
+---
+
+## R4 — falso como defecto vivo, con una cosa real al lado
+
+### Lo que medí
+
+Con una cuenta sin confirmar, el ingreso devuelve 403 con su motivo y **la
+pantalla sí ofrece «Reenviame el correo de confirmación»**. Hoy nadie se queda
+sin la salida. Como defecto, **lo cierro como falso**.
+
+### Pero la dependencia del texto es real, y te la dejo ejecutable
+
+La pantalla decide si ofrece el reenvío **leyendo cómo está redactado** el
+motivo. Lo probé: cambié «Tu cuenta todavía no está confirmada» por «Todavía
+falta confirmar tu cuenta» —una corrección editorial de las que este proyecto
+hace seguido— y **el botón desaparece**. La cuenta sigue sin poder entrar y la
+persona se queda sin salida.
+
+**No lo cambié**, y es a propósito: los dos rechazos que puede dar el ingreso
+comparten el 403 —el otro es «usuario inactivo»—, así que separarlos necesita
+una señal nueva de la API, y me dijiste que frenara ahí. Las dos salidas que
+veo, para que decidas vos:
+
+1. **Una señal estable en el rechazo** (un campo o un encabezado que diga que
+   falta confirmar). Es lo correcto y es lo que amplía el contrato de Auth.
+2. **Ofrecer el reenvío ante cualquier 403 del ingreso.** No toca la API. El
+   costo es que a una cuenta inactiva se le ofrece una acción que no la ayuda
+   —aunque tampoco la delata: el reenvío contesta lo mismo para cualquier
+   cuenta—.
+
+Mientras tanto, el caso 177 deja la dependencia **vigilada**: lee el motivo de
+la API y exige que la pantalla lo muestre y ofrezca la salida. Si alguien
+mejora esa redacción, se pone rojo antes de que lo sufra una persona.
+
+### Lo que sí estaba roto: el reenvío que no salió se veía como si hubiera salido
+
+Ejercitando el transporte de correo caído, como pediste, apareció otra cosa.
+Con la petición del reenvío cortada, la pantalla mostraba **«No pudimos
+conectarnos. Revisá tu conexión y probá de nuevo.» dentro de la caja verde**,
+con `role="status"`. O sea: color de éxito, y un lector de pantalla lo anuncia
+como un aviso cualquiera. La persona se queda esperando un correo que nadie
+mandó.
+
+Corregido: el fallo se dibuja con el color del error y se anuncia con
+`role="alert"`. **No delata ninguna cuenta**: lo que distingue no es la
+respuesta del servidor —que es idéntica exista o no la cuenta— sino que el
+pedido no llegó a contestar.
+
+Lo demás que ejercité queda como estaba, y está bien: el vencimiento a 24 h, el
+reenvío que invalida el anterior y la respuesta que no cambia según la cuenta ya
+los mide el caso 35; la pantalla de confirmación ofrece pedir un enlace nuevo
+ante **cualquier** error, sin leerle el texto a nadie.
+
+---
+
+## R5 — real, medido en navegador
+
+Fabriqué el escenario: dos vendedores en el carrito, uno sin CBU, sin alias y
+sin Mercado Pago vinculado.
+
+**Lo que hace bien:** la API lo identifica con nombre y motivo, el paso de pago
+lo muestra, y confirmar no escribe nada —cero órdenes—.
+
+**Lo que estaba roto:** la pantalla dice «Sacá sus productos del carrito para
+poder continuar» y en **toda la capa del checkout había tres botones**: cerrar,
+volver y confirmar. Ninguno saca nada. Y cerrar con datos escritos abre
+«Tenés cambios sin guardar / Descartar cambios», así que retirar un grupo
+costaba el destino, el traslado y los grupos que sí se podían comprar.
+
+### La corrección
+
+El resumen del pedido —«Resumen del Pedido», la columna que ya lista lo que se
+está comprando en los dos pasos— pasa a tener **«Quitar del carrito»** por
+línea. No hay pieza nueva: lo único que le faltaba a esa lista era el verbo.
+
+- No se adivina qué sacar leyendo el mensaje del servidor.
+- Retirar **vuelve al paso de envío**, porque cambiar el carrito ya invalida las
+  decisiones de traslado —son de otro viaje— y ahí es donde se vuelven a tomar.
+  Lo escrito no se pierde y nadie pregunta si se descarta.
+- Sirve igual para la publicación agotada de R1: es la misma pared.
+- Si al retirar el carrito queda vacío, lo dice en vez de dejar un formulario
+  que no lleva a ninguna parte.
+
+### Y una tercera cosa, chica, que apareció midiendo esto
+
+**«Continuar al pago» era mudo.** Sin el traslado resuelto, el paso escribía su
+motivo en el estado y ninguna rama lo dibujaba: apretar la acción primaria no
+hacía nada y no decía nada. Medido: cero avisos antes del clic y cero después.
+Ahora contesta. Y cuando el traslado no se pudo resolver porque el carrito tenía
+algo agotado, contesta **ese** motivo: decirle «elegí el destino» a quien ya lo
+eligió manda a buscar el problema donde no está.
+
+---
+
+## Diff
 
 ```
-backend/app/api/catalog.py                      +79 −1   filtro y faceta
-backend/app/schemas/catalog.py                  +16      BrandFacetItem
-backend/app/seed.py                              +6      dos marcas declaradas
-scripts/smoke.mjs                              +474      caso 175
-scripts/sabotajes_brand_facet_1.py             +150      los tres rojos
-src/utils/catalogService.ts                     +21      parámetro y tipo
-src/hooks/useProductFilters.ts                  +16      estado y URL
-src/App.tsx                                     +23      consulta y faceta
-src/components/FilterSidebar/FilterSidebar.tsx  +43      el control
+backend/app/api/orders.py                         +11 −12  la aceptación deja de tener su copia de la regla
+backend/app/services/stock.py                     +44      `vender`: comprobar y descontar, una sentencia
+src/components/Checkout/CheckoutModal.tsx         +61 −2   quitar del resumen, y el paso deja de ser mudo
+src/components/Checkout/CheckoutModal.module.css  +27      el botón de la línea y el carrito vacío
+src/components/Auth/LoginModal.tsx                +17 −1   el fallo del reenvío se ve como un fallo
+scripts/smoke.mjs                                +714      casos 176, 177 y 178
+scripts/sabotajes_risk_rec_1.py                  +206      los cinco rojos
 ```
 
-Sin endpoint nuevo, sin tabla, sin migración, sin dependencia, sin caché y sin
-estado paralelo. `alembic check` lo confirma: **«No new upgrade operations
-detected»**.
+Sin endpoint nuevo, sin tabla, sin migración, sin dependencia y sin bandera
+nueva. `alembic check` lo confirma: **«No new upgrade operations detected»**.
 
-### El contrato de la faceta
+---
 
-`GET /api/catalog/products` acepta `brand=<value>` y la respuesta suma:
+## Los cinco rojos, con su texto
 
-```json
-"brands": [ { "value": "john-deere", "label": "John Deere", "count": 30 } ]
-```
+`python3 scripts/sabotajes_risk_rec_1.py` aplica cada rotura, corre el caso
+focal contra ella y restaura el árbol. Se puede correr entero o de a uno.
 
-Las reglas, en el orden en que importan:
+| Sabotaje | Caso | Lo que dice el rojo |
+|---|---|---|
+| el descuento vuelve a ser leer y después escribir | 176 | «ronda 2: dos aceptaciones simultáneas de órdenes distintas por 1 unidad terminaron con 2 ganadoras; dos personas transfirieron por la misma bolsa» |
+| el resumen pierde el botón que retira una línea | 178 | «1440x900: el checkout dice que hay que sacar esos productos del carrito y no ofrece ninguna forma de hacerlo sin cerrar y descartar lo escrito» |
+| el paso de envío deja de dibujar su motivo | 176 | «apretar «Continuar al pago» no cambió nada en pantalla: seguía habiendo 1 aviso(s) y la persona no sabe si el botón hizo algo» |
+| el fallo del reenvío vuelve a la caja verde | 177 | «el reenvío que falló se anuncia como «status» y no como un problema: quien usa un lector de pantalla no se entera de que no salió nada» |
+| el Backend mejora la redacción del motivo | 177 | «con la cuenta sin confirmar el ingreso no ofrece pedir un enlace nuevo, y sin eso la persona se queda sin salida» |
 
-1. **`brand` se aplica antes de contar y de paginar**, como todos los demás.
-2. **La faceta se calcula con todos los filtros vigentes y con `brand`
-   todavía sin aplicar.** Por eso elegir una marca no borra a las demás: se
-   puede cambiar de marca sin limpiar nada.
-3. **No hay un segundo camino de filtros.** Se reusa la misma consulta
-   cambiándole sólo lo que selecciona. Una copia se desincroniza con el primer
-   filtro que alguien agregue de un solo lado, y el síntoma sería una faceta
-   que promete resultados que el listado no tiene.
-4. **Quedan afuera** los nulos, las opciones dadas de baja y los conteos cero.
-5. **La única que puede aparecer en cero es la marca elegida**, cuando otro
-   filtro la deja sin resultados. Si se cayera de la lista, el control no
-   tendría cómo decir que está puesta ni cómo sacarla: quedaría un mercado
-   vacío sostenido por un filtro invisible.
+El último no es un defecto del producto de hoy: es **R4 hecho ejecutable**, para
+que puedas ver con tus manos de qué está colgada esa salida.
 
-Dos detalles que decidí y conviene que sepas: la faceta cuenta publicaciones
-con `distinct` —la consulta trae varios `join` y ninguno puede inflar un número
-que después se le muestra a alguien como «hay 30»—, y si el conjunto no tiene
-ninguna marca no se lee la tabla de opciones, que es el caso de casi todos los
-listados.
+**Una honestidad sobre el primero.** La ventana entre leer y escribir es
+angosta y no siempre se cruza: con el defecto puesto, medí **11 de 12** rondas
+con dos órdenes pagadas. Por eso el caso 176 corre **tres rondas** y exige que
+**todas** terminen con un solo ganador. No debilita la afirmación —la afirmación
+es la misma—, hace que el rojo aparezca prácticamente seguro. Si te sale verde
+con el sabotaje puesto, corrélo de nuevo: lo estarías viendo perder la moneda
+tres veces seguidas.
 
-### Lo que SÍ pude ejecutar, contra lo que suponía tu brief
+---
 
-**Tu compuerta decía que mi entorno no tiene Docker/PostGIS y que no afirmara
-haber ejecutado. Esta vez pude, y lo ejecuté todo.** Instalé PostGIS en el
-contenedor y el puente de `docker exec` del repositorio hizo el resto. Así que
-esto no es lectura:
+## Lo que ejecuté
 
 ```
-caso 175 focal, base recreada                   1/1
-suite completa desde base limpia (8e20b06)      174/175   ← único rojo el 131
-sabotaje «conteo»                               FAIL 175
-sabotaje «faceta»                               FAIL 175
-sabotaje «barra»                                FAIL 175
+casos focales 176, 177 y 178                    3/3
+suite completa desde base limpia (2d18d55)      177/178   ← único rojo el 131
+los cinco sabotajes                             FAIL en su caso focal, 5/5
 alembic check                                   No new upgrade operations detected
 npm run build / lint / tsc --noEmit             verdes
 node --check · compileall · pip check           verdes
@@ -100,69 +238,71 @@ npm run contraste                               82/82 mediciones, 0 incumplimien
 ```
 
 El **131** es el ambiental de siempre: este contenedor no tiene demonio de
-Docker ni la imagen `alpine:3`, que el caso necesita.
+Docker ni la imagen `alpine:3`, que el caso necesita. No cambió y no lo toqué.
 
-### Los tres rojos, con su texto
+Y una cosa que me pasó y te la cuento: la primera corrida completa la abandoné
+a los 76 casos porque edité el Frontend en el medio. Una suite con el código
+cambiando abajo no mide nada, así que no la informo. La que está arriba arrancó
+después del último cambio, con el árbol quieto.
 
-`python3 scripts/sabotajes_brand_facet_1.py` aplica cada rotura, corre el 175
-contra ella y restaura el árbol. Lo podés correr entero o de a uno.
+---
 
-| Sabotaje | Lo que dice el rojo |
-|---|---|
-| el filtro entra después de contar | «filtrando «john-deere» la API dice 48 y son 30: si el filtro no se aplica antes de contar, el total sigue siendo el del conjunto (48)» |
-| la faceta se calcula después de la marca | «con «john-deere» elegida la faceta quedó en ["john-deere\|John Deere\|30"]: calculada después de la marca, elegir una borra a las demás y ya no se puede cambiar de marca sin limpiar» |
-| la marca no se escribe en la URL | «la marca no se escribió en la barra; la URL es …?section=marketplace&q=…» |
+## Qué miden los casos nuevos
 
-El segundo lo escribí dos veces: el primer intento dejaba la faceta vacía, que
-da rojo pero por el motivo equivocado. El que quedó es una sola reubicación
-—el filtro sube por encima del conteo— y falla exactamente donde tiene que
-fallar: con marca elegida, no sin ella.
+**176 — el stock lo decide el Backend, y el checkout se corrige sin tirarlo.**
+Dos órdenes por transferencia sobre la última unidad; las dos aceptaciones una
+después de otra; **tres rondas** de aceptaciones simultáneas de órdenes
+distintas; el rebote al querer volver a meter lo agotado; y en navegador el
+carrito viejo entre dos sesiones: el motivo del servidor a la vista, la acción
+primaria que contesta, la línea que se retira sin descartar lo escrito y la
+compra que se completa con el resto del carrito.
 
-Lo que el caso mide y **no** tiene sabotaje propio: que la faceta no dependa
-del tamaño de página. Se comprueba pidiendo `page_size=1` y exigiendo los
-mismos conteos.
+**177 — la salida del ingreso sin confirmar.** El motivo que se ve es el que
+devuelve la API; el reenvío que no salió se ve como un fallo; la respuesta del
+reenvío es la misma para una cuenta pendiente, una confirmada y una que no
+existe; y un enlace vencido deja la pantalla de confirmación con el formulario
+para pedir otro.
 
-### Qué mide el caso 175
+**178 — el grupo sin medio de pago, en 1440×900 y en 390×844.** Lo identifica,
+no deja confirmar —y no escribe ninguna orden—, se retira desde el resumen sin
+descartar lo escrito ni perder el grupo válido, y la compra sigue con el resto.
+Las dos medidas están porque el resumen es una columna al costado en escritorio
+y una banda debajo en celular: el control tiene que existir en los dos.
 
-Fabrica 48 publicaciones en la categoría que declara `usa_marca`: 30 John
-Deere —dos páginas—, 5 Pauny, 3 Valtra, 4 Zanello y 6 sin marca. Publica las
-de Zanello con la opción **viva** y recién después la da de baja, que es el
-escenario real: una publicación que quedó apuntando a una marca que el panel
-desactivó. El conjunto se verifica contra la base antes de medir nada.
+---
 
-En la API: filtro exacto, total, páginas, **ids y orden del recorrido completo
-comparados contra la base** —un total correcto con una sustitución adentro
-pasaría un conteo y se ve acá—, faceta con y sin marca puesta, con otro filtro
-puesto, con `page_size=1`, y el caso de la elegida en cero.
+## Riesgos adyacentes que encontré y **no** toqué
 
-En pantalla, **en 1440×900 y en 390×844**: el control ofrece sólo las marcas
-del conjunto con su conteo y ninguna más, no ofrece la dada de baja, acota,
-escribe `brand` en la barra, vuelve a la página 1 desde la 2, se restaura con
-Atrás, se limpia, y **desaparece donde no hay marcas**. Y con la respuesta
-demorada y la CPU frenada seis veces, ningún cuadro muestra la marca nueva
-sobre las tarjetas anteriores sin decir que está cargando.
+**El mismo patrón está en otros dos lugares, y hoy no falla por casualidad.**
+Cancelar o rechazar una orden ya pagada devuelve las unidades con la misma
+forma insegura —leer y después escribir en Python—: `orders.py`, en el cambio
+de estado y en la cancelación. Los medí: **0 de 6 rondas** perdieron una unidad.
 
-### Lo que encontré y no está en tu brief
+No fallan porque esos dos endpoints son `async` y corren sobre el mismo hilo,
+así que ese bloque no se intercala con otra petición. El que arreglé es `def`
+normal y corre en hilos: ahí sí se intercalaban. O sea que la protección es un
+accidente de cómo está declarada la función, no una decisión. **Deja de valer el
+día que alguien agregue un `await` en el medio de ese bloque o convierta el
+endpoint en sincrónico**, y el síntoma sería mercadería que desaparece del
+catálogo sin que nadie la venda.
 
-**Jacto no existe como marca.** Pediste declarar en el seed «Jacto, John Deere
-y Pauny». Las 44 marcas que quedaron después de tu poda no incluyen ninguna
-variante de Jacto —lo verifiqué contra `form_options`—, así que el alta la
-rechazaría. Declaré las otras dos y dejé la Pulverizadora Jacto **sin marca**,
-que además le viene bien al caso: es una de las publicaciones sin declarar.
+Es la misma corrección de una línea que acabo de hacer. No la hice porque es el
+flujo de cancelación y no el de compra, y vos dijiste que no tocara políticas de
+stock sin consultar. Decime y va.
 
-No es bloqueante y no lo decido yo: si querés que Jacto se pueda filtrar, hay
-que agregarla a la lista, y eso reabre una lista que vos cerraste. Con dos
-marcas la pieza se demuestra igual.
+**El otro, chico:** desde el ingreso, si alguien corrige el correo mal escrito
+en el campo y después aprieta «Reenviame el correo», el reenvío va a la
+dirección **nueva** —que puede no ser la cuenta pendiente— y la respuesta
+genérica dice igual «te enviamos un enlace». No es enumerable ni pierde datos;
+es una confusión posible. Registrado, sin tocar.
 
-**Y un detalle chico:** `scripts/` no está cubierto por la regla de
-`__pycache__`, así que compilar ahí deja un `.pyc` rastreable. Lo saqué de mi
-commit; si querés, se arregla con un renglón en `.gitignore`, pero no lo toqué.
+---
 
-### Lo que no hice
+## Lo que no hice
 
-No implementé origen, modelo, año, potencia ni tercer nivel. No toqué
-localidades, copy de la devolución de la clienta, SMTP, pagos, Railway,
-secretos ni datos remotos. No integré y **no desplegué**: `main` quedó donde
-estaba.
+No habilité Mercado Pago real, no usé credenciales reales y no toqué la bandera
+productiva. No hice migraciones, ni esquema, ni rediseño de checkout, ni flujo
+de autenticación nuevo. No toqué Railway, datos remotos ni `main`. No integré y
+**no desplegué**: `main` quedó en `4c8569d`.
 
 Freno acá para tu revisión.
