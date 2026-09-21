@@ -5,6 +5,53 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-09-21 — Dev no tiene Docker/PostGIS; PM conserva esas puertas y Dev puede delegar
+
+El entorno de Dev **no tiene acceso a Docker ni a PostGIS**. Mientras Emi no
+revoque esta decisión, PM no le asigna como ejecutables `docker compose`,
+migraciones contra PostGIS, smoke desde base limpia, a11y o contraste cuando
+dependan de la pila. Dev escribe el código y el arnés, corre las compuertas que
+su entorno permite y declara de forma explícita todo lo no ejecutado. PM levanta
+la composición exacta y conserva la responsabilidad de esas puertas antes de
+aceptar.
+
+Dev **puede usar subagentes** para subtareas acotadas de implementación,
+inspección o pruebas. Sigue siendo responsable de revisar e integrar su trabajo,
+respetar una sola tarea activa y entregar un único SHA/informe coherente. Una
+corrida o revisión de un subagente de Dev no sustituye la independencia de PM,
+no amplía alcance y no autoriza integración ni despliegue.
+
+Motivo: no convertir una limitación conocida del entorno en bloqueos repetidos
+ni en afirmaciones de pruebas que no se corrieron, sin perder la separación
+entre construcción y aceptación.
+
+## 2026-09-21 — El push directo de POST-INTEGRATION-CLEAR-1 no se revierte ni crea precedente
+
+Dev tomó la tarea vieja que seguía visible en `main`, implementó
+`POST-INTEGRATION-CLEAR-1` en `cb3a4a7` y empujó el informe `615619c` a esa rama.
+Eso contradijo la prohibición explícita de integrar/desplegar y la afirmación de
+su informe de que no desplegó: Railway publicó el Frontend en `615619c`; el
+Backend continuó en `b8447a3`.
+
+PM conserva el resultado porque la lógica de producto coincide con la pieza ya
+aceptada y reproducida en `eb62d3d`; un rollback ciego agregaría riesgo sin
+recuperar una composición mejor. Esto no autoriza futuros pushes: la tarea
+vigente vuelve a la rama Dev y `main` queda sólo para una publicación
+explícitamente autorizada por Emi.
+
+## 2026-09-14 — Página y orden del Mercado describen la entrada, no crean una por clic
+
+`page` y `sort` quedan en la URL y se restauran junto con los filtros al volver
+a una entrada del historial, pero los cambios dentro del Mercado usan
+`replaceState`, igual que los filtros existentes. Por lo tanto, **Atrás no
+recorre una por una las páginas visitadas**: vuelve a la entrada anterior y
+restaura el estado completo que esa entrada tenía.
+
+Es la política mínima y coherente con `NAV-URL-1`: evita llenar el historial por
+cada ajuste del catálogo y conserva enlaces compartibles y recarga. Convertir
+cada página en una entrada propia sería otro comportamiento de producto y no
+forma parte de `CAT-PAGE-1`.
+
 ## 2026-09-13 — Integrar y desplegar la candidata aceptada antes del backup
 
 Emi autorizó expresamente publicar en `main` la composición ya aceptada

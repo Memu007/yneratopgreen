@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import styles from './App.module.css';
 import { Header } from './components/Header/Header';
 import { Footer } from './components/Footer/Footer';
@@ -18,7 +18,7 @@ import { ServicesPage } from './components/Pages/ServicesPage';
 import { ContactPage } from './components/Pages/ContactPage';
 import { PaymentResultPage } from './components/Pages/PaymentResultPage';
 import { VerifyEmailPage } from './components/Pages/VerifyEmailPage';
-import { useProductFilters } from './hooks/useProductFilters';
+import { ORDENES, POR_PAGINA, useProductFilters } from './hooks/useProductFilters';
 import { useVistaPrevia } from './hooks/useVistaPrevia';
 import {
   getProducts,
@@ -34,6 +34,7 @@ import type { NewProductData, Product, CotizacionPedida } from './types';
 import type {
   CategoryResponse,
   LocalityResponse,
+  MarcaDelMercado,
   ProvinceResponse,
 } from './utils/catalogService';
 
@@ -90,6 +91,15 @@ function App() {
   // mismo que cuántas bajaron: la página trae como máximo cien, y contar las
   // que llegaron es contar la página, no el mercado.
   const [totalDeCatalogo, setTotalDeCatalogo] = useState<number | null>(null);
+  /**
+   * Las marcas que ofrece el conjunto que se está mirando.
+   *
+   * Las cuenta el servidor y llegan con el listado. No se derivan de las
+   * tarjetas: la página trae 24 y la faceta describe el conjunto entero, así
+   * que derivarlas acá ofrecería sólo las de la página y el control
+   * cambiaría de opciones al pasar de página.
+   */
+  const [marcasDelMercado, setMarcasDelMercado] = useState<MarcaDelMercado[]>([]);
   // Qué decir cuando el mercado no carga. Sin esto, una falla de red terminaba
   // en la lista vacía y el cartel «No hay operaciones con estos filtros», que
   // es mentira: no es que no haya, es que no pudimos preguntar.
@@ -124,6 +134,8 @@ function App() {
     priceMax,
     inStockOnly,
     minRating,
+    condicion,
+    marca,
     setTextoBuscado,
     aplicarBusqueda,
     setSelectedType,
@@ -135,10 +147,14 @@ function App() {
     setPriceMax,
     setInStockOnly,
     setMinRating,
-    filteredProducts,
+    setCondicion,
+    setMarca,
+    orden,
+    pagina,
+    setOrden,
+    irALaPagina,
     resetFilters,
   } = useProductFilters({
-    products,
     escribeEnLaBarra: currentSection === 'marketplace',
     versionDeLaBarra: navegacion.version,
   });
@@ -377,6 +393,20 @@ function App() {
     setSelectedLocalityId,
   ]);
 
+  // La subcategoría se elige por nombre y viaja por id, igual que la
+  // categoría: el nombre es del control y el id es del contrato.
+  const subcategoriaElegida = useMemo(() => {
+    if (selectedSubcategory === 'Todas') return undefined;
+    return categories
+      .find((categoria) => categoria.name === selectedCategory)
+      ?.subcategories?.find((sub) => sub.name === selectedSubcategory);
+  }, [categories, selectedCategory, selectedSubcategory]);
+
+  const ordenPedido = useMemo(
+    () => ORDENES.find((opcion) => opcion.valor === orden) ?? ORDENES[0],
+    [orden],
+  );
+
   /**
    * Qué consulta describe lo que se está mirando, y cuál fue la última que
    * volvió con respuesta. Mientras no coinciden, la grilla espera.
@@ -392,9 +422,18 @@ function App() {
    * contestada. Cualquier hueco nuevo entre las dos es espera por
    * construcción, sin que nadie se acuerde de agregarlo.
    *
-   * La subcategoría y la calificación mínima no entran en la firma a
-   * propósito: no viajan a la consulta, así que la respuesta que hay sigue
-   * siendo la respuesta a lo que se pidió.
+   * La regla es una sola y no admite excepciones: en la firma entra TODO lo
+   * que viaja a la consulta. Mientras la subcategoría y la calificación
+   * mínima se resolvían en el navegador podían quedar afuera, porque no
+   * cambiaban lo que se le pedía al servidor. Desde que viajan —y con ellas
+   * el orden y la página— dejarlas afuera es declarar contestada una
+   * pregunta distinta de la que se hizo.
+   *
+   * Medido: entre mover el control y arrancar el efecto pasan unos 30 ms en
+   * los que el paginador ya dice «Página 2» sobre las tarjetas de la 1 y sin
+   * estado de carga, porque los efectos corren DESPUÉS de dibujar. El caso
+   * 171 lo mide con la respuesta demorada a propósito, mirando cada cuadro
+   * pintado y cada commit del DOM.
    */
   const consultaVigente = JSON.stringify([
     searchQuery,
@@ -406,6 +445,16 @@ function App() {
     priceMin,
     priceMax,
     inStockOnly,
+    // Los valores, no los objetos: lo que describe la consulta es el id que
+    // viaja y el orden que se pide, no la identidad del objeto que los
+    // envuelve. Dos objetos distintos con el mismo id piden lo mismo.
+    subcategoriaElegida?.id ?? null,
+    minRating,
+    condicion,
+    marca,
+    ordenPedido.sortBy,
+    ordenPedido.sortOrder,
+    pagina,
     productsRevision,
   ]);
   const [consultaContestada, setConsultaContestada] = useState<string | null>(null);
@@ -448,6 +497,16 @@ function App() {
     getProducts({
         search: searchQuery || undefined,
         category: categories.find((category) => category.name === selectedCategory)?.id,
+        // Subcategoría y calificación mínima también viajan. Se filtraban
+        // acá, sobre la página descargada: el total dejaba de describir lo
+        // que se estaba mirando y las publicaciones que las cumplen pero
+        // cayeron en otra página no existían.
+        subcategory: subcategoriaElegida?.id,
+        min_rating: minRating > 0 ? minRating : undefined,
+        // Nuevo o usado. Vacío es «cualquiera» y no viaja.
+        condition: condicion || undefined,
+        // La marca elegida. Vacío es «todas» y no viaja.
+        brand: marca || undefined,
         province:
           selectedProvince === 'Todas las provincias' ? undefined : selectedProvince,
         locality_id: selectedLocalityId || undefined,
@@ -465,21 +524,37 @@ function App() {
           selectedType === 'productos' ? 'producto'
             : selectedType === 'servicios' ? 'servicio'
               : undefined,
-        page: 1,
-        page_size: 100,
-        sort_by: 'created_at',
-        sort_order: 'desc',
+        page: pagina,
+        page_size: POR_PAGINA,
+        sort_by: ordenPedido.sortBy,
+        sort_order: ordenPedido.sortOrder,
       })
       .then((response) => {
         if (cancelled) return;
+        // Una página que no existe se corrige con lo que dice el servidor.
+        //
+        // Los filtros vuelven a la página 1 solos, así que a una página de
+        // más se llega por la barra: un enlace compartido con `page=9` sobre
+        // un mercado que encogió, o una entrada del historial cuyo conjunto
+        // ya no da para tanto. Sin esto la pantalla decía «No hay
+        // operaciones con estos filtros» habiendo publicaciones, que es
+        // afirmar un vacío que nadie midió.
+        if (response.pages > 0 && response.page > response.pages) {
+          irALaPagina(response.pages, response.pages);
+          return;
+        }
         setProducts(response.items.map(convertBackendProductToFrontend));
         setTotalDeCatalogo(response.total);
+        // La faceta viene calculada SIN la marca puesta, así que elegir una
+        // no vacía la lista: las demás siguen ahí, con sus conteos.
+        setMarcasDelMercado(response.brands ?? []);
       })
       .catch((error) => {
         if (cancelled) return;
         console.error('Error al cargar productos:', error);
         setProducts([]);
         setTotalDeCatalogo(null);
+        setMarcasDelMercado([]);
         // Dos fallas distintas, y conviene no confundirlas: quedarse sin red es
         // algo que la persona puede resolver, y que se lo cuenten es lo que le
         // permite hacerlo. Que el servidor falle no es asunto suyo. El resto de
@@ -517,6 +592,16 @@ function App() {
     priceMin,
     priceMax,
     inStockOnly,
+    // Los tres que antes se resolvían del lado del navegador y ahora viajan:
+    // sin declararlos, cambiar subcategoría, calificación u orden no volvía a
+    // pedir nada y la pantalla mostraba el conjunto anterior.
+    subcategoriaElegida,
+    minRating,
+    condicion,
+    marca,
+    ordenPedido,
+    pagina,
+    irALaPagina,
     categories,
     catalogosAuxiliares,
     categoriaInvalida,
@@ -525,17 +610,12 @@ function App() {
     consultaVigente,
   ]);
 
-  // El conteo visible sale del total de la API. Dos filtros no viajan a la
-  // consulta —subcategoría y calificación mínima del vendedor— y los aplica
-  // el navegador sobre la página descargada; mientras no descarten ninguna
-  // fila, el total de la API sigue describiendo lo que se está mirando. En
-  // cuanto descartan alguna, deja de describirlo y lo honesto es contar lo
-  // que quedó. La deuda de paginación mayor a cien sigue abierta y está en
-  // `docs/pm/ux2c/DEUDA-PAGINACION.md`.
-  const elNavegadorDescarto = filteredProducts.length !== products.length;
-  const totalDeResultados = totalDeCatalogo !== null && !elNavegadorDescarto
-    ? totalDeCatalogo
-    : filteredProducts.length;
+  // El conteo visible sale del total de la API, y ahora sin reservas: el
+  // navegador ya no descarta ninguna fila, porque los filtros que se
+  // aplicaban acá —subcategoría y calificación mínima— viajan a la consulta.
+  // Mientras la API no conteste, se cuenta lo que hay dibujado.
+  const totalDeResultados = totalDeCatalogo ?? products.length;
+  const paginasDelMercado = Math.max(1, Math.ceil(totalDeResultados / POR_PAGINA));
 
   /**
    * Buscar es una acción, no cada tecla.
@@ -691,6 +771,9 @@ function App() {
                 priceMax={priceMax}
                 inStockOnly={inStockOnly}
                 minRating={minRating}
+                condicion={condicion}
+                marca={marca}
+                marcasDisponibles={marcasDelMercado}
                 onTypeChange={setSelectedType}
                 onCategoryChange={setSelectedCategory}
                 onSubcategoryChange={setSelectedSubcategory}
@@ -700,12 +783,19 @@ function App() {
                 onPriceMaxChange={setPriceMax}
                 onInStockChange={setInStockOnly}
                 onMinRatingChange={setMinRating}
+                onCondicionChange={setCondicion}
+                onMarcaChange={setMarca}
                 onResetFilters={resetFilters}
-                cantidadDeResultados={filteredProducts.length}
+                cantidadDeResultados={totalDeResultados}
               />
               <ProductGrid
-                products={filteredProducts}
+                products={products}
                 total={totalDeResultados}
+                orden={orden}
+                onOrdenChange={setOrden}
+                pagina={pagina}
+                paginas={paginasDelMercado}
+                onPagina={(destino) => irALaPagina(destino, paginasDelMercado)}
                 isLoading={loadingProducts || laPantallaEspera}
                 error={errorDeLaPantalla}
                 onReintentar={reintentarElMercado}

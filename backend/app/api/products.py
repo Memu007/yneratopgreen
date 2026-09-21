@@ -20,6 +20,7 @@ from app.models.user import User, UserRole
 from app.schemas.products import ProductCreateRequest, ProductUpdateRequest, ProductResponse
 from app.core.config import settings
 from app.services.storage import get_storage
+from app.models.form_option import FormOption
 from app.services import anatomia
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -32,6 +33,44 @@ def slugify(text: str) -> str:
     text = re.sub(r'[^\w\s-]', '', text)
     text = re.sub(r'[-\s]+', '-', text)
     return text.strip('-')
+
+
+def marca_declarada(db: Session, category: Category, pedida: Optional[str]) -> Optional[str]:
+    """La marca que se guarda, o nada.
+
+    Dos condiciones, y las dos importan:
+
+    1. **La categoría tiene que ofrecerla.** No se deduce de la anatomía: la
+       anatomía `activo` incluye «Tierras y parcelas» y «Bienes y Ganado», y ni
+       un campo ni un ternero tienen marca. Lo declara `categories.usa_marca`.
+    2. **El valor tiene que existir en la lista.** Si se aceptara texto libre,
+       «John Deere», «john deere» y «Jhon Deere» serían tres marcas distintas y
+       el día que esto sea un filtro no habría nada que contar. Una marca que
+       no está cargada se rechaza; no se guarda a medias.
+
+    Donde la categoría no ofrece marca, lo que venga se descarta en silencio,
+    igual que la condición: guardar un dato que ninguna pantalla muestra es
+    dejarlo listo para que una edición futura lo resucite.
+    """
+    if not getattr(category, "usa_marca", False):
+        return None
+    if not pedida:
+        return None
+
+    existe = db.query(FormOption).filter(
+        FormOption.option_type == "brand",
+        FormOption.value == pedida,
+        FormOption.is_active == True,
+    ).first()
+    if not existe:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"La marca «{pedida}» no está en la lista de marcas. "
+                "Elegí una de las disponibles."
+            ),
+        )
+    return existe.value
 
 
 @router.post("", response_model=ProductResponse)
@@ -125,6 +164,13 @@ async def create_product(
         product_data.condition if anatomia.usa_condicion(operation_kind) else None
     )
 
+    # La marca la decide la CATEGORÍA, no la anatomía. `activo` incluye
+    # «Tierras y parcelas» y «Bienes y Ganado», y ni un campo ni un ternero
+    # tienen marca: decidirlo por anatomía pondría una lista de marcas de
+    # tractor sobre los dos. Donde la categoría no la ofrece, se descarta si
+    # viene, igual que la condición.
+    brand = marca_declarada(db, category, product_data.brand)
+
     # Crear producto/servicio
     new_product = Product(
         name=product_data.name,
@@ -142,6 +188,7 @@ async def create_product(
         publication_type=pub_type,
         operation_kind=operation_kind,
         condition=condition,
+        brand=brand,
         # Campos de servicio
         pricing_type=product_data.pricing_type if is_service else None,
         availability=product_data.availability if is_service else None,
@@ -427,6 +474,19 @@ async def update_product(
         if not anatomia.usa_condicion(propuesta):
             update_data["condition"] = None
 
+    # La marca depende de la CATEGORÍA, no de la anatomía, así que se resuelve
+    # aparte y siempre: mover una publicación a una categoría que no ofrece
+    # marca tiene que soltar la que traía, aunque la anatomía no haya cambiado.
+    categoria_final = db.query(Category).filter(
+        Category.id == update_data.get("category_id", product.category_id)
+    ).first()
+    if categoria_final is not None:
+        if "brand" in update_data:
+            update_data["brand"] = marca_declarada(
+                db, categoria_final, update_data["brand"])
+        elif not getattr(categoria_final, "usa_marca", False):
+            update_data["brand"] = None
+
     for field, value in update_data.items():
         setattr(product, field, value)
     
@@ -579,6 +639,7 @@ async def get_my_products(
             "publication_type": product.publication_type or "producto",
             "operation_kind": product.operation_kind,
             "condition": product.condition,
+            "brand": product.brand,
             "category_id": str(product.category_id) if product.category_id else None,
             "category": {
                 "id": str(product.category.id),

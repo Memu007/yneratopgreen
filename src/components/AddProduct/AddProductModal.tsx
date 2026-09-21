@@ -53,6 +53,8 @@ interface CategoryFromBackend {
   name: string;
   is_service: boolean;
   default_operation_kind: OperationKind;
+  // Si esta categoría declara marca. No se deduce de la anatomía.
+  usa_marca?: boolean;
   subcategories: Subcategory[];
 }
 
@@ -64,6 +66,7 @@ interface FormOptionItem {
 
 interface FormOptionsData {
   unit: FormOptionItem[];
+  brand: FormOptionItem[];
   pricing_type: FormOptionItem[];
   availability: FormOptionItem[];
   response_time: FormOptionItem[];
@@ -139,6 +142,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   const [localitiesLoading, setLocalitiesLoading] = useState(false);
   const [formOptions, setFormOptions] = useState<FormOptionsData>({
     unit: [],
+    brand: [],
     pricing_type: [],
     availability: [],
     response_time: []
@@ -154,6 +158,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   // sin declarar: en hacienda y campos el par no significa nada, y obligar a
   // elegir uno haría que el vendedor conteste cualquier cosa para publicar.
   const [condition, setCondition] = useState<Condition | ''>('');
+
+  // La marca, cuando la categoría la ofrece. Vacía es «sin declarar» y no
+  // viaja: la lista no puede tener todas las marcas que existen, y obligar
+  // a elegir una haría que el vendedor conteste cualquiera para publicar.
+  const [brand, setBrand] = useState('');
   
   const [formData, setFormData] = useState<NewProductData>(FORMULARIO_VACIO);
 
@@ -268,6 +277,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   const currentCategories = backendCategories.map(cat => ({
     value: cat.name,
     anatomiaPorOmision: cat.default_operation_kind,
+    // Lo dice la categoría y no la anatomía: «activo» incluye campos y
+    // hacienda, y ni un campo ni un ternero tienen marca.
+    usaMarca: cat.usa_marca === true,
     subcategories: cat.subcategories?.map((s: Subcategory) => s.name) || []
   }));
   
@@ -582,6 +594,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
         publication_type: publicationType,
         operation_kind: operationKind,
         condition: operationKind === 'activo' && condition ? condition : undefined,
+        brand: selectedCategory?.usaMarca && brand ? brand : undefined,
       };
 
       // Campos específicos según tipo
@@ -772,6 +785,31 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                   Es lo primero que mira quien compra una máquina. Dejala sin
                   declarar sólo si no aplica —hacienda, campos—: no la completes
                   con una respuesta que no sea cierta.
+                </p>
+              </div>
+            )}
+
+            {/* La marca. La ofrece la CATEGORÍA, no la anatomía: «activo»
+                incluye campos y hacienda, y ni un campo ni un ternero tienen
+                marca. Por eso no cuelga de `operationKind`. */}
+            {selectedCategory?.usaMarca && (
+              <div className={styles.formGroup}>
+                <label htmlFor="brand">Marca</label>
+                <select
+                  id="brand"
+                  name="brand"
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                >
+                  <option value="">Sin declarar</option>
+                  {formOptions.brand.map(opcion => (
+                    <option key={opcion.value} value={opcion.value}>{opcion.label}</option>
+                  ))}
+                </select>
+                <p className={styles.helpText}>
+                  Elegila de la lista para que quien busque por marca te encuentre.
+                  Si la tuya no está, dejala sin declarar: escribirla en el título
+                  no la vuelve buscable.
                 </p>
               </div>
             )}

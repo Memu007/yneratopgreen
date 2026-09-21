@@ -1,16 +1,55 @@
 # Estado actual
 
-Actualizado: 2026-09-13.
+Actualizado: 2026-09-21.
 
 `NOW.md` contiene sólo estado vigente, restricciones vivas, bloqueos y próxima acción. La historia anterior permanece en Git; la instantánea previa a esta poda está en `ab4165fc`.
 
 ## Resumen ejecutivo
 
-- **Fase contractual:** Fase 2 — Desarrollo base, semana 4. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
-- **`main`:** contiene `BACKUP-RESTORE-1` mediante `fbd6caf`; el producto sigue en `b8447a3`, sin cambios de producto posteriores. Incluye también el `AGENTS.md` consolidado.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, candidata R4 `52ba294`, informe `b8223b1`; ambos integrados mediante `fbd6caf`. La rama paralela `codex/backup-restore-1` queda descartada por duplicación.
-- **Última decisión PM:** `BACKUP-RESTORE-1` R4 **ACEPTADA E INTEGRADA**. PM reprodujo backup, restore, verificación, negativos de integridad/propiedad y limpieza contra Docker real; el origen conservó identidad y salud.
-- **Tarea activa:** `POST-INTEGRATION-CLEAR-1`, responsable Dev. Debe mantener accesible el carrito conservado cuando una sesión inválida desaparece y corregir la FAQ de medios de pago, sin habilitar checkout anónimo ni Mercado Pago.
+- **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
+- **`origin/main`:** `615619c`; Dev empujó por error la tarea vieja `POST-INTEGRATION-CLEAR-1` y Railway publicó el Frontend en esa revisión. El Backend continúa en `b8447a3`. La lógica coincide con la pieza ya aceptada, se conserva sin rollback y el push no crea precedente.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. La candidata `8e20b06` acumula sin publicar `CAT-PAGE-1`, `POST-INTEGRATION-CLEAR-1`, `QUERY-IMG-1`, condición, marca como dato y `BRAND-FACET-1`.
+- **Última decisión PM:** `BRAND-FACET-1` **ACEPTADA** en `8e20b06`; informe `761a371`. PM reprodujo el caso 175 en 1/1 y sus tres sabotajes en rojo discriminante. Evidencia en `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`. No se integró ni desplegó.
+- **Tarea activa:** ninguna. Próxima acción: Emi decide cuándo autoriza integrar/publicar la composición; `main` conserva auto-deploy.
+
+## Última aceptación PM — CAT-PAGE-1
+
+Producto inicial `a521631`, corrección R1 `575f757`, informe final `b1cc77f` e
+integración local `fafa5cb`. La PM comprobó de forma independiente:
+
+- caso 171 sobre la candidata, con 115 publicaciones y cinco páginas: **1/1**;
+- sabotaje temporal omitiendo `pagina` de `consultaVigente`: **0/1**, con la
+  página anterior presentada bajo «Página 2 de 5» y sin estado de carga;
+- candidata restaurada y limpia: caso 171 nuevamente **1/1**;
+- build, lint, `tsc --noEmit`, sintaxis del arnés y `diff-check`: verdes.
+
+Dev obtuvo 170/171 en la suite completa desde base limpia; el único rojo fue el
+caso 131 ambiental, heredado y sin relación con esta pieza. También obtuvo
+a11y 72/72 y contraste 80/80. Evidencia durable:
+`REPRODUCCION-CAT-PAGE-1-2026-09-14.md`.
+
+## Última aceptación PM — POST-INTEGRATION-CLEAR-1
+
+La candidata de producto `eb62d3d`, con ajuste de arnés `a7ed544` e informe
+`48bae67`, mantiene el alcance mínimo. PM comprobó de forma independiente:
+
+- caso 170 sobre la candidata: **1/1**;
+- el mismo caso sobre la base `2d8ecfd`: **0/1**, rojo exacto por carrito
+  guardado sin acceso desde la cabecera;
+- caso 169 sobre `a7ed544`: **1/1**, con reinicio real de `topgreen-api` y
+  cambio de identidad del contenedor;
+- build, lint y `git diff --check`: verdes;
+- accesibilidad: **70/70** superficies, sin violaciones bloqueantes;
+- contraste: **78/78** mediciones, sin incumplimientos.
+
+Dev ejecutó la suite completa desde base limpia sobre `a7ed544`: **169/170**,
+con único rojo ambiental en el caso 131. Ese caso no cambió y ya había pasado
+en la corrida Docker real anterior de PM; el delta nuevo queda cubierto por
+los focales y puertas anteriores. PM no repitió el borrado completo porque el
+lanzador elimina volúmenes Docker locales y Emi no autorizó esa destrucción.
+
+La pieza queda aceptada e integrada localmente mediante `c973c6f`. Evidencia
+durable: `REPRODUCCION-POST-INTEGRATION-CLEAR-1-2026-09-14.md`.
 
 ## Última aceptación PM relevante
 
@@ -43,17 +82,28 @@ migración recomendada a `main = integración aceptada` / `release = producción
 sigue pendiente: publicar no equivale a aceptar la operación productiva ni
 resuelve backups, SMTP, secretos, pagos o recuperación.
 
+## Operación de marcas y filtros — estado
+
+Las decisiones están firmadas en `PROPUESTA-BUSQUEDA-FACETADA.md`. PM reprodujo
+la composición `34e7ebf` en Docker y cerró la revisión independiente:
+
+- **Etapa 1** (condición nuevo/usado): `da69fe4`/`e798c85`, **aceptada**.
+- **Etapa 2** (la marca como dato, con migración): `ed3e39f`/`4bdfc71`,
+  **aceptada**.
+- **Lista de marcas:** decidida por PM en 44. Se fusionan Fiat/Fiat
+  Someca/Someca y Chery/Chery Bylion; Case/Case IH y Deutz/Deutz-Fahr quedan
+  separadas. `chery` es el superviviente decidido por Emi. Implementada en
+  `89b20aa`/`020e907` y aceptada.
+- **Etapa 3** (la marca como filtro y faceta): aceptada en `8e20b06`; caso 175 PM **1/1** y tres negativos discriminantes rojos. Jacto no se agregó porque no existe entre las 44 marcas decididas; el seed declara sólo John Deere y Pauny.
+
+Evidencia: `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
+
 ## Pendientes canónicos adoptados
 
 - **Relevo:** cerrado en `b8447a3`; `main` contiene el disparador consolidado y
   la regla local de eficiencia de chats.
-- **Carrito conservado:** si una sesión inválida deja ítems locales, la persona
-  debe poder reabrir el carrito sin sesión; continuar compra abre el Login y
-  conserva la intención. Decisión registrada en `DECISIONS.md` y ejecución en
-  `POST-INTEGRATION-CLEAR-1`, después de integrar la candidata.
-- **FAQ de pagos:** «¿Cuáles son las formas de pago?» debe mencionar
-  transferencia directa y Mercado Pago cuando el vendedor lo tenga habilitado.
-  Se corrige en la misma pieza posterior, sin reabrir `c565e6e`.
+- **Carrito conservado y FAQ de pagos:** cerrados en `eb62d3d`/`a7ed544`,
+  integración local `c973c6f`. La publicación permanece pendiente de Emi.
 - **Backup/restauración local:** `BACKUP-RESTORE-1` quedó aceptada en
   `52ba294`/`b8223b1` e integrada por `fbd6caf`. El ensayo Docker real recuperó
   base, `uploads`, `documentos` y `outbox` en un destino aislado; una alteración
@@ -61,6 +111,19 @@ resuelve backups, SMTP, secretos, pagos o recuperación.
   cierra el procedimiento local, no crea todavía una copia administrada o
   externa de producción ni habilita migraciones riesgosas.
   Evidencia: `REPRODUCCION-BACKUP-RESTORE-1-2026-09-13.md`.
+- **Índice único parcial sobre la imagen primaria:** decidido que va, como tarea
+  propia y con deduplicación previa de las primarias existentes, porque crearlo
+  sobre datos ya sucios falla. El listado dejó de depender de él con
+  `QUERY-IMG-1`; el dato sigue pudiendo ensuciarse desde la carga y desde
+  administración.
+- **N+1 del carrito:** `cart.py` consulta la imagen dentro de
+  `for item in cart.items:` (líneas 92, 190, 240, 287 y 478). Registrado por
+  lectura, **no medido** y sin tocar. Es el próximo N+1 natural cuando se pida.
+- **`categories.usa_marca` no se edita desde el panel:** viaja sólo de salida.
+  Ampliar la marca a otra categoría es hoy SQL o migración, no una acción de la
+  clienta, y el encabezado de `marcas.py` afirma lo contrario. Además el panel
+  deja cambiar `is_service` sin apagar `usa_marca`, y la guarda que lo impide
+  es de semilla, no de runtime. Sin bloqueo; queda registrado.
 
 ## Railway — inventario actualizado 2026-09-13 y deuda viva
 
@@ -124,8 +187,9 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev ejecuta `POST-INTEGRATION-CLEAR-1` sobre `main`; PM reproduce y acepta antes de integrar.
-2. Después se abre `CAT-PAGE-1` para continuar el roadmap contractual.
-3. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
-4. Separar de forma controlada integración y producción; cualquier cambio de producto exige nueva aceptación antes de publicar.
-5. Mercado Pago, SMTP, red-team y producción aceptada permanecen al final de la secuencia acordada, sin esperar artificialmente a una fecha si las dependencias ya están listas.
+1. Emi autoriza más adelante la integración/publicación controlada de la candidata `8e20b06`; ese push tocará producto y activará el auto-deploy de Railway.
+2. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
+3. No abrir otra tarea Dev hasta que PM/Emi definan la siguiente prioridad.
+4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
+5. Los atributos por rubro esperan los datos prometidos por la clienta; Inicio, Servicios y la identidad de AgroMarket esperan decisión de producto.
+6. Mercado Pago, SMTP, red-team y producción aceptada permanecen en la secuencia acordada; no se habilitan por esta tarea.

@@ -5297,9 +5297,18 @@ async function prepararEscenarioDeFletes() {
   const aCordoba = km(destino, origenB);
   assert(aCordoba > aRosario, 'las distancias del padrón no son las esperadas');
 
+  // Disponible es `stock - stock_reservado`, que es lo que mira la vitrina, y
+  // no `stock` a secas. El caso 90 deja a propósito una publicación con stock 1
+  // y ese uno reservado —la orden ganadora todavía sin pagar—: para la base
+  // tiene stock, para quien compra dice «Sin stock». Como el desempate es por
+  // `p.id` y los id son UUID, esa publicación caía primera de su vendedor de
+  // vez en cuando, y ahí el caso 114 se encontraba una tarjeta que no ofrecía
+  // agregar. Un rojo cada tantas corridas y por azar del identificador; medido:
+  // `Smoke última bolsa …` con stock 1 y `stock_reservado` 1.
   const publicaciones = queryRows(`
     SELECT p.id, p.seller_id, p.name, p.stock FROM products p
-    WHERE p.status = 'ACTIVE' AND p.stock > 0 AND p.publication_type <> 'servicio'
+    WHERE p.status = 'ACTIVE' AND p.publication_type <> 'servicio'
+      AND p.stock > p.stock_reservado
     ORDER BY p.seller_id, p.id
   `);
   const primeraDeCada = new Map();
@@ -20899,8 +20908,19 @@ await runCase(155, 'El Mercado tiene dos vistas elegibles y ninguna geometría a
         assert((await vistaActual(page)) === 'Lista',
           `${donde}: ${queHice} cambió la vista elegida`);
       };
+      // Los órdenes se leen de la pantalla y no de una lista escrita acá.
+      //
+      // Acá había cinco valores a mano, y uno —«relevance»— dejó de existir al
+      // pasar el orden al servidor: este caso se cayó pidiendo una opción que el
+      // producto ya no ofrece. Recorrer lo que el control realmente tiene mide
+      // lo mismo —que ordenar no cambia la vista elegida— y no envejece cuando
+      // los órdenes cambian. Que sean LOS correctos lo mide el caso 171.
       const orden = page.locator('#catalog-sort');
-      for (const valor of ['price-asc', 'price-desc', 'newest', 'rating', 'relevance']) {
+      const ordenes = await orden.locator('option').evaluateAll(
+        (opciones) => opciones.map((opcion) => opcion.value));
+      assert(ordenes.length >= 2,
+        `${donde}: el selector de orden ofrece ${ordenes.length} opción(es)`);
+      for (const valor of ordenes) {
         await orden.selectOption(valor);
         await sigueEnLista(`ordenar por «${valor}»`);
       }
@@ -26354,11 +26374,11 @@ await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o com
     await browser.close();
   }
 
-  // Lo que este caso dejó anotado como puerta sin usar —la rama sin sesión de
-  // `CartModal.handleCheckout`, inalcanzable porque sin sesión la cabecera ni
-  // siquiera dibujaba la celda del carrito— dejó de ser cierto. Esa celda se
-  // dibuja ahora cuando hay algo elegido, justamente para que lo conservado no
-  // quede sin puerta, y el recorrido entero lo mide el caso 170.
+  // Queda una puerta sin usar y vale decirlo acá: la rama sin sesión de
+  // `CartModal.handleCheckout` —la que avisa y no ofrece nada— sigue sin
+  // alcanzarse, porque sin sesión la cabecera ni siquiera dibuja la celda del
+  // carrito. No se toca: no hay rojo que lo justifique, y ahora tampoco hay
+  // callejón que dependa de ella.
 
   return 'una categoría o una provincia inexistente en la URL se descartan solas, sin llevarse '
     + 'los filtros válidos, sin quedarse en la barra y sin afirmar un mercado vacío; el catálogo '
@@ -26914,6 +26934,12 @@ await runCase(169, 'El reinicio de la API prueba que cambió el proceso, o falla
     const respuesta = await fetch(`${API_URL}/health`).catch(() => null);
     return respuesta?.ok === true;
   };
+  // Que siga en pie se comprueba esperando la condición, no con un disparo
+  // único. Estos escenarios sondean el puerto y matan procesos alrededor de la
+  // API; que un `/health` suelto no llegue a tiempo no es que la API se haya
+  // caído, y afirmarlo con una sola lectura convierte una corrida cargada en un
+  // rojo. Si de verdad se la llevaron puesta, no vuelve y esto igual falla.
+  const exigirQueLaApiSiga = (porQue) => esperarA(laApiContesta, porQue, 20_000);
 
   const SIN_CONTENEDOR = [
     '#!/usr/bin/env bash',
@@ -26926,7 +26952,7 @@ await runCase(169, 'El reinicio de la API prueba que cambió el proceso, o falla
   assert(servicio.donde !== 'nadie identificable',
     'no encontré quién sirve la API: ni contenedor `topgreen-api` ni uvicorn nativo. '
     + 'Sin eso no hay reinicio real que comprobar');
-  assert(await laApiContesta(), 'la API no contesta antes de empezar');
+  await exigirQueLaApiSiga('la API no contesta antes de empezar');
 
   const medidos = [];
   let fantasma = null;
@@ -26999,7 +27025,7 @@ await runCase(169, 'El reinicio de la API prueba que cambió el proceso, o falla
       `el rojo no dice que el puerto lo atiende otro servicio:\n${suplantado.stderr}`);
     assert(!vivoDeVerdad(fantasma.pid),
       'el comando ni siquiera mató lo que creía que era la API: el escenario no probó nada');
-    assert(await laApiContesta(), 'el escenario del suplantado se llevó puesta la API de verdad');
+    await exigirQueLaApiSiga('el escenario del suplantado se llevó puesta la API de verdad');
     medidos.push('si el puerto sigue vivo después de matar lo que creía la API, da rojo');
 
     // 4. Y el camino bueno, con el entorno tal cual es: la identidad de quien
@@ -27016,7 +27042,7 @@ await runCase(169, 'El reinicio de la API prueba que cambió el proceso, o falla
       `antes la API la servía ${antes.donde} y después ${despues.donde}`);
     assert(despues.quien && despues.quien !== antes.quien,
       `el reinicio dejó la misma identidad: [${antes.quien}]`);
-    assert(await laApiContesta(), 'la API no contesta después del reinicio real');
+    await exigirQueLaApiSiga('la API no contesta después del reinicio real');
     medidos.push(`el reinicio real cambió el ${antes.donde}: [${antes.quien}] → `
       + `[${despues.quien}]`);
   } finally {
@@ -27029,331 +27055,2316 @@ await runCase(169, 'El reinicio de la API prueba que cambió el proceso, o falla
 });
 
 // ---------------------------------------------------------------------------
-// 170. Lo ya elegido no queda sin puerta, y la FAQ nombra los dos medios.
+// 170. El carrito que sobrevive a la sesión tiene por dónde volver a abrirse,
+// y la FAQ nombra los dos medios de pago que el producto tiene.
 //
-// Dos promesas incumplidas que no tienen nada que ver entre sí.
+// Lo primero es lo que quedó abierto al cerrar el callejón del Checkout, y lo
+// dejé escrito al pie del caso 167: cuando la sesión se confirma inválida se
+// baja la identidad y el carrito NO se toca —lo que hay adentro lo eligió una
+// persona—, pero la celda «Carrito» sólo se dibujaba con sesión. Así que los
+// ítems seguían guardados y sin puerta: cancelar el ingreso devolvía al
+// carrito una vez, y al cerrarlo desaparecía la única forma de volver a verlo.
+// La compra no se pierde por una decisión de quien compra: se pierde porque la
+// cabecera dejó de dibujar un botón.
 //
-//  - La primera es un callejón, y lo abrió la corrección anterior. Con la
-//    sesión CONFIRMADA inválida se baja la identidad y el carrito se conserva
-//    a propósito: lo que hay adentro lo eligió una persona y el vencimiento no
-//    lo decidió ella. Pero la celda «Carrito» de la cabecera se dibuja sólo
-//    dentro de la rama autenticada, así que al cancelar el ingreso y cerrar el
-//    carrito, lo elegido queda guardado y sin ninguna forma de volver a verlo.
-//    El botón de la tarjeta tampoco sirve: sin sesión dice «Ingresar para
-//    continuar», y aunque sirviera agregaría otra vez lo mismo en vez de abrir
-//    lo que ya está.
-//  - La segunda es una respuesta a medias. La FAQ decía que se paga por
-//    transferencia y nada más, cuando el producto resuelve el medio POR
-//    VENDEDOR: hay vendedores a los que también se les puede pagar con Mercado
-//    Pago, y la pantalla no lo decía.
+// Lo segundo es una promesa incompleta: la FAQ decía que se paga por
+// transferencia y nada más, con el producto cobrando también por Mercado Pago
+// cuando el vendedor lo tiene vinculado. Prometer de menos es tan inexacto
+// como prometer de más, y acá la corrección tampoco puede pasarse: Mercado
+// Pago no está para todos los vendedores, así que la respuesta lleva su
+// condición.
 //
-// El caso no lee el fuente para ninguna de las dos: recorre la pantalla. El
-// estado de «sesión vencida» se fabrica como lo fabrica el tiempo —escribiendo
-// encima de las credenciales—, no llamando a una función interna.
+// Las dos cosas se miden recorriendo la pantalla, no leyendo el fuente: la
+// puerta se abre y se cierra, y la respuesta de la FAQ se lee del documento
+// que el navegador dibujó.
 // ---------------------------------------------------------------------------
-await runCase(170, 'El carrito conservado sigue al alcance sin sesión, y la FAQ nombra los dos medios', async () => {
-  // Las capturas de la cabecera sin sesión van a una carpeta temporal salvo
-  // que se pida otra cosa: una corrida por defecto no escribe sobre archivos
-  // rastreados.
-  const CAPTURAS = process.env.SMOKE_CAPTURAS
-    || mkdtempSync(`${tmpdir()}/topgreen-carrito-sin-sesion-`);
-  mkdirSync(CAPTURAS, { recursive: true });
-  const capturas = [];
+await runCase(170, 'Sin sesión, el carrito con ítems se reabre desde la cabecera; salir explícito lo sigue vaciando', async () => {
   const medidos = [];
+  const browser = await chromium.launch({ headless: true });
 
-  const login = (pagina) => pagina.getByRole('dialog', { name: 'Ingresar' });
-  const carrito = (pagina) => pagina.getByRole('dialog', { name: 'Mi carrito' });
-  const checkout = (pagina) => pagina.getByRole('dialog', { name: 'Checkout' });
-  const celdaDelCarrito = (pagina) => pagina.locator('header')
-    .getByRole('button', { name: /Carrito/ });
-  const laCabeceraDice = (pagina) => pagina.locator('header button').allInnerTexts();
-
-  // Cuántos ítems hay GUARDADOS. Se lee de la copia local y no de la pantalla
-  // porque lo que se está midiendo es justamente que sobreviva a que la
-  // pantalla deje de mostrarlo.
-  const guardado = (pagina) => pagina.evaluate(() => {
+  const login = (p) => p.getByRole('dialog', { name: 'Ingresar' });
+  const carrito = (p) => p.getByRole('dialog', { name: 'Mi carrito' });
+  const checkout = (p) => p.getByRole('dialog', { name: 'Checkout' });
+  const capasAbiertas = async (p) => {
+    const nombres = [];
+    for (const capa of await p.getByRole('dialog').all()) {
+      nombres.push((await capa.getAttribute('aria-label')) ?? '(sin nombre)');
+    }
+    return nombres;
+  };
+  const cabecera = (p) => p.locator('header');
+  const celdaDelCarrito = (p) => cabecera(p).getByRole('button', { name: /Carrito/ });
+  const laCabeceraDice = async (p) => (await cabecera(p).locator('button').allInnerTexts())
+    .map((texto) => texto.replace(/\s+/g, ' ').trim());
+  // Lo GUARDADO, que es lo que tiene que sobrevivir, y no lo dibujado. Si el
+  // carrito se midiera por lo que hay en pantalla, un carrito abierto encima de
+  // una copia local vacía pasaría igual.
+  const guardado = (p) => p.evaluate(() => {
     try {
-      const leido = JSON.parse(localStorage.getItem('agromarket_cart') || '[]');
-      return Array.isArray(leido) ? leido.length : 0;
-    } catch { return 0; }
+      const crudo = JSON.parse(localStorage.getItem('agromarket_cart') || 'null');
+      if (!Array.isArray(crudo)) return [];
+      return crudo.map((item) => `${item?.product?.id}x${item?.quantity}`).sort();
+    } catch { return []; }
   });
-
-  const conSesion = async (pagina) => {
-    await pagina.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
-    await pagina.locator('header').getByRole('button', { name: 'Ingresar', exact: true }).click();
-    await login(pagina).getByLabel(/^Email/).fill('cliente@ejemplo.com');
-    await login(pagina).getByLabel(/^Contraseña/).fill('cliente123');
-    await login(pagina).getByRole('button', { name: 'Ingresar', exact: true }).click();
-    await celdaDelCarrito(pagina).waitFor({ state: 'visible', timeout: 25_000 });
+  const enLaVista = (p) => carrito(p).getByRole('button', { name: /^Quitar/ }).count();
+  const esperarLaCapa = async (p, cual, porQue) => {
+    await esperarA(async () => (await cual(p).count()) === 1,
+      `${porQue}; lo que hay abierto es ${JSON.stringify(await capasAbiertas(p))}`, 25_000);
   };
 
-  const conAlgoElegido = async (pagina) => {
-    await pagina.locator('article[class*="card"]')
+  const conSesion = async (p) => {
+    await p.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await cabecera(p).getByRole('button', { name: 'Ingresar', exact: true })
+      .click({ timeout: 25_000 });
+    await login(p).getByLabel(/^Email/).fill('cliente@ejemplo.com');
+    await login(p).getByLabel(/^Contraseña/).fill('cliente123');
+    await login(p).getByRole('button', { name: 'Ingresar', exact: true }).click();
+    await celdaDelCarrito(p).waitFor({ state: 'visible', timeout: 25_000 });
+  };
+  const conAlgoEnElCarrito = async (p) => {
+    await p.locator('article[class*="card"]')
       .getByRole('button', { name: 'Agregar al carrito' }).first().click({ timeout: 25_000 });
-    await esperarA(async () => (await guardado(pagina)) > 0,
+    await esperarA(async () => (await guardado(p)).length > 0,
       'no se pudo dejar nada en el carrito', 20_000);
+    return guardado(p);
   };
-
-  // Vencer la sesión es escribirle encima a las credenciales, que es lo que
-  // hace el tiempo. Se rompen las dos para que el servidor confirme que no
-  // vale: con el refresh bueno se renovaría sola y no habría nada que medir.
-  const vencerLaSesion = (pagina) => pagina.evaluate(() => {
+  // Vencer las dos credenciales es lo que hace el tiempo. Con las dos rotas el
+  // servidor contesta que no, y ahí la sesión está CONFIRMADA inválida: no es
+  // una caída, y por eso —y sólo por eso— baja la identidad.
+  const vencerLaSesion = (p) => p.evaluate(() => {
     localStorage.setItem('access_token', 'este.token.ya.no.vale');
     localStorage.setItem('refresh_token', 'este.tampoco.vale');
   });
 
+  try {
+    // === A. La sesión cae, el carrito queda, y queda con puerta ============
+    //
+    // Se mide en los dos anchos del contrato. No es ceremonia: la celda nueva
+    // entra en la banda de acciones, que en celular envuelve, y lo que hay que
+    // ver es que entre sin empujar la marca ni las secciones ni estrenar un
+    // scroll horizontal.
+    for (const pantalla of [
+      { como: 'escritorio', viewport: { width: 1440, height: 900 } },
+      { como: 'celular', viewport: { width: 390, height: 844 } },
+    ]) {
+      const contexto = await browser.newContext({ viewport: pantalla.viewport });
+      const page = await contexto.newPage();
+      try {
+        await conSesion(page);
+        const antes = await conAlgoEnElCarrito(page);
+        assert(antes.length > 0, 'el caso no puede medir nada sin un carrito con algo adentro');
+
+        await vencerLaSesion(page);
+        await celdaDelCarrito(page).click();
+        await esperarLaCapa(page, carrito, `en ${pantalla.como} no se pudo abrir el carrito`);
+        await carrito(page).getByRole('button', { name: 'Continuar compra' }).click();
+        await esperarLaCapa(page, login,
+          `en ${pantalla.como}, con la sesión vencida no se ofreció ingresar`);
+        assert(await checkout(page).count() === 0,
+          `en ${pantalla.como} se abrió el Checkout con la sesión vencida`);
+
+        // La identidad se fue: es la mitad de la premisa de la tarea.
+        const cabeceraCaida = (await laCabeceraDice(page)).join(' | ');
+        assert(/Ingresar/.test(cabeceraCaida) && !/Salir/.test(cabeceraCaida),
+          `en ${pantalla.como} la cabecera sigue afirmando una sesión que ya no existe: `
+          + JSON.stringify(cabeceraCaida));
+
+        // Cerrar el Login devuelve al carrito con lo mismo. Esto ya andaba: se
+        // mide igual, porque la corrección no puede llevárselo puesto.
+        await login(page).getByRole('button', { name: 'Cerrar' }).click();
+        await esperarLaCapa(page, carrito,
+          `en ${pantalla.como}, cerrar el Login no devolvió al carrito`);
+        assert(JSON.stringify(await guardado(page)) === JSON.stringify(antes),
+          `en ${pantalla.como}, cerrar el Login cambió lo guardado: `
+          + `${JSON.stringify(antes)} -> ${JSON.stringify(await guardado(page))}`);
+        assert(await enLaVista(page) === antes.length,
+          `en ${pantalla.como} el carrito volvió vacío a la vista aunque lo guardado siga ahí`);
+
+        // Y acá está el defecto. Se cierra el carrito —que es lo que hace
+        // cualquiera— y hasta ahora no había por dónde volver a abrirlo.
+        await carrito(page).getByRole('button', { name: 'Cerrar' }).click();
+        await esperarA(async () => (await carrito(page).count()) === 0,
+          `en ${pantalla.como} el carrito no se cerró`, 20_000);
+        assert(await celdaDelCarrito(page).count() === 1,
+          `en ${pantalla.como}, sin sesión y con ${antes.length} ítem(s) guardado(s), la cabecera `
+          + 'no ofrece «Carrito»: lo elegido queda detrás de una puerta que dejó de dibujarse. '
+          + `La cabecera dice ${JSON.stringify(await laCabeceraDice(page))}`);
+        assert(await celdaDelCarrito(page).isVisible(),
+          `en ${pantalla.como} la celda «Carrito» está en el documento pero no se ve`);
+
+        // Que exista no alcanza: tiene que abrir el MISMO carrito conservado.
+        await celdaDelCarrito(page).click();
+        await esperarLaCapa(page, carrito,
+          `en ${pantalla.como}, la celda «Carrito» sin sesión no abrió nada`);
+        assert(JSON.stringify(await guardado(page)) === JSON.stringify(antes),
+          `en ${pantalla.como}, reabrir desde la cabecera cambió lo guardado`);
+        assert(await enLaVista(page) === antes.length,
+          `en ${pantalla.como}, el carrito reabierto desde la cabecera está vacío a la vista`);
+        await carrito(page).getByRole('button', { name: 'Cerrar' }).click();
+        await esperarA(async () => (await carrito(page).count()) === 0,
+          `en ${pantalla.como} el carrito no se cerró la segunda vez`, 20_000);
+
+        // Y en una carga nueva también: el estado se lee de lo guardado, no de
+        // un recuerdo de esta pestaña.
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await cabecera(page).getByRole('button', { name: 'Ingresar', exact: true })
+          .waitFor({ state: 'visible', timeout: 25_000 });
+        assert(await celdaDelCarrito(page).count() === 1,
+          `en ${pantalla.como}, recargar sin sesión y con carrito perdió la celda «Carrito»; `
+          + `la cabecera dice ${JSON.stringify(await laCabeceraDice(page))}`);
+
+        // La banda no se deforma por la celda de más: la marca sigue, las cinco
+        // secciones siguen, y no aparece un scroll horizontal.
+        assert(await cabecera(page).getByRole('button', { name: /AgroBoeda/ }).count() === 1,
+          `en ${pantalla.como} la marca no está en la cabecera`);
+        for (const seccion of ['Inicio', 'Mercado', 'Servicios', 'Quiénes somos', 'Contacto']) {
+          assert(await cabecera(page).getByRole('button', { name: seccion, exact: true })
+            .count() === 1, `en ${pantalla.como} falta la sección «${seccion}» en la cabecera`);
+        }
+        const desborde = await page.evaluate(() => ({
+          documento: document.documentElement.scrollWidth,
+          ventana: document.documentElement.clientWidth,
+        }));
+        assert(desborde.documento <= desborde.ventana + 1,
+          `en ${pantalla.como} la cabecera con la celda nueva estrenó scroll horizontal: `
+          + `${desborde.documento} px de documento en ${desborde.ventana} px de ventana`);
+        // El blanco de toque del contrato: 44 px. La celda nueva usa la misma
+        // clase que las otras, y esto lo comprueba en vez de suponerlo.
+        const caja = await celdaDelCarrito(page).boundingBox();
+        assert(caja && caja.height >= 44,
+          `en ${pantalla.como} la celda «Carrito» mide ${caja?.height} px de alto`);
+        // Y se llega por teclado: una puerta que sólo abre el puntero no es una
+        // puerta para todos.
+        const recorrido = [];
+        let alcanzada = false;
+        for (let salto = 0; salto < 30 && !alcanzada; salto += 1) {
+          await page.keyboard.press('Tab');
+          const enFoco = await page.evaluate(() => {
+            const activo = document.activeElement;
+            return activo ? (activo.textContent || '').replace(/\s+/g, ' ').trim() : '';
+          });
+          recorrido.push(enFoco);
+          if (/^Carrito/.test(enFoco)) alcanzada = true;
+        }
+        assert(alcanzada, `en ${pantalla.como} no se llegó por teclado a la celda «Carrito»; `
+          + `el recorrido fue ${JSON.stringify(recorrido)}`);
+
+        medidos.push(`en ${pantalla.como}, con la sesión confirmada inválida la identidad baja, `
+          + `el carrito conserva sus ${antes.length} ítem(s), cerrar el Login lo devuelve y la `
+          + 'cabecera lo vuelve a ofrecer —también al recargar—, sin deformar marca ni secciones '
+          + 'y alcanzable por teclado');
+      } finally {
+        await contexto.close();
+      }
+    }
+
+    // === B. Sin sesión no hay checkout anónimo, y salir sigue vaciando =====
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    try {
+      // B0. Sin sesión y sin nada adentro, no se dibuja un carrito vacío.
+      await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+      await cabecera(page).getByRole('button', { name: 'Ingresar', exact: true })
+        .waitFor({ state: 'visible', timeout: 25_000 });
+      assert((await guardado(page)).length === 0,
+        'la pestaña nueva arrancó con algo en el carrito: el caso no puede medir el vacío');
+      assert(await celdaDelCarrito(page).count() === 0,
+        'sin sesión y con cero ítems la cabecera ofrece un carrito vacío: '
+        + JSON.stringify(await laCabeceraDice(page)));
+      medidos.push('sin sesión y con cero ítems no hay celda de carrito');
+
+      // B1. La puerta sin sesión sigue siendo el Login de siempre, y del otro
+      //     lado se sigue por el flujo vigente. No hay compra anónima.
+      await conSesion(page);
+      const antes = await conAlgoEnElCarrito(page);
+      await vencerLaSesion(page);
+      await celdaDelCarrito(page).click();
+      await esperarLaCapa(page, carrito, 'no se pudo abrir el carrito con la sesión vencida');
+      await carrito(page).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarLaCapa(page, login, 'con la sesión vencida no se ofreció ingresar');
+      await login(page).getByRole('button', { name: 'Cerrar' }).click();
+      await esperarLaCapa(page, carrito, 'cerrar el Login no devolvió al carrito');
+      await carrito(page).getByRole('button', { name: 'Cerrar' }).click();
+      await esperarA(async () => (await carrito(page).count()) === 0,
+        'el carrito no se cerró', 20_000);
+
+      // Ahora sí: se entra por la celda nueva, ya sin ninguna credencial.
+      await celdaDelCarrito(page).click();
+      await esperarLaCapa(page, carrito, 'la celda «Carrito» sin sesión no abrió nada');
+      await carrito(page).getByRole('button', { name: 'Continuar compra' }).click();
+      await esperarLaCapa(page, login,
+        'sin sesión, «Continuar compra» no abrió el Login existente');
+      assert(await checkout(page).count() === 0,
+        'sin sesión se abrió el Checkout: no existe checkout anónimo');
+      await login(page).getByLabel(/^Email/).fill('cliente@ejemplo.com');
+      await login(page).getByLabel(/^Contraseña/).fill('cliente123');
+      await login(page).getByRole('button', { name: 'Ingresar', exact: true }).click();
+      await esperarLaCapa(page, checkout,
+        'autenticarse desde el carrito sin sesión no continuó por el flujo vigente');
+      assert(JSON.stringify(await guardado(page)) === JSON.stringify(antes),
+        `ingresar desde el carrito sin sesión cambió lo guardado: ${JSON.stringify(antes)} -> `
+        + JSON.stringify(await guardado(page)));
+      medidos.push('sin sesión, «Continuar compra» abre el Login de siempre, no abre el Checkout, '
+        + 'y con la credencial buena se continúa por el flujo vigente con los mismos ítems');
+
+      // B2. La salida explícita conserva su regla: vacía el carrito. Y con el
+      //     carrito vacío y sin sesión, no queda una celda ofreciendo nada.
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      const salir = cabecera(page).getByRole('button', { name: 'Salir', exact: true });
+      await salir.waitFor({ state: 'visible', timeout: 25_000 });
+      assert(JSON.stringify(await guardado(page)) === JSON.stringify(antes),
+        'recargar con la sesión buena cambió el carrito');
+      await salir.click();
+      await esperarA(async () => (await cabecera(page)
+        .getByRole('button', { name: 'Ingresar', exact: true }).count()) === 1,
+      'la salida explícita no bajó la sesión', 25_000);
+      await esperarA(async () => (await guardado(page)).length === 0,
+        `la salida explícita no vació el carrito: quedó ${JSON.stringify(await guardado(page))}`,
+        20_000);
+      assert(await celdaDelCarrito(page).count() === 0,
+        'después de salir, con el carrito vacío, la cabecera sigue ofreciendo «Carrito»: '
+        + JSON.stringify(await laCabeceraDice(page)));
+      medidos.push('la salida explícita sigue vaciando el carrito, y con cero ítems la celda '
+        + 'no queda ofreciendo un carrito vacío');
+
+      // === C. La FAQ dice los dos medios, con su condición ==================
+      await page.goto(`${FRONTEND_URL}/?section=contact`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: 'Preguntas Frecuentes' })
+        .waitFor({ timeout: 25_000 });
+      const pregunta = page.getByRole('heading', { name: '¿Cuáles son las formas de pago?' });
+      assert(await pregunta.count() === 1, 'la FAQ ya no trae la pregunta de formas de pago');
+      const respuesta = (await pregunta.locator('xpath=following-sibling::p[1]').innerText())
+        .replace(/\s+/g, ' ').trim();
+      assert(/transferencia/i.test(respuesta),
+        `la respuesta de pago dejó de nombrar la transferencia: ${JSON.stringify(respuesta)}`);
+      assert(/mercado\s*pago/i.test(respuesta),
+        'la respuesta de pago sigue sin nombrar Mercado Pago, que el producto cobra: '
+        + JSON.stringify(respuesta));
+      // La condición no es un adorno: `medios_de` sólo ofrece Mercado Pago si
+      // ESE vendedor lo tiene vinculado. Nombrarlo sin la condición sería
+      // prometerle a todo el mundo un medio que la mitad no tiene.
+      assert(/habilitad|vinculad/i.test(respuesta),
+        'la respuesta nombra Mercado Pago sin decir que depende de cada vendedor: '
+        + JSON.stringify(respuesta));
+      for (const invento of [/comisi/i, /plan(es)?\b/i, /suscripci/i, /custodia/i, /cuota/i]) {
+        assert(!invento.test(respuesta),
+          `la respuesta de pago promete algo que esta tarea no habilita (${invento}): `
+          + JSON.stringify(respuesta));
+      }
+      medidos.push('la FAQ de formas de pago nombra transferencia directa y Mercado Pago con su '
+        + 'condición por vendedor, sin comisiones, planes ni custodia');
+    } finally {
+      await contexto.close();
+    }
+  } finally {
+    await browser.close();
+    // Abrir el Checkout sincroniza el carrito contra el servidor, así que este
+    // caso deja una fila donde no había ninguna. Se retira: la cuenta de
+    // demostración queda como estaba.
+    vaciarCarritosDe('cliente@ejemplo.com');
+  }
+
+  return `el carrito sobrevive a la sesión y ahora tiene por dónde volver a abrirse: ${medidos.join('; ')}`;
+});
+
+// ---------------------------------------------------------------------------
+// 171. El Mercado pagina en el servidor: el total, el orden y los filtros son
+// los del conjunto entero y no los de la página descargada.
+//
+// La deuda estaba registrada desde el 2026-08-24 en
+// `docs/pm/ux2c/DEUDA-PAGINACION.md`: el endpoint paginaba y el Mercado pedía
+// siempre `page=1&page_size=100`, así que la publicación 101 no era
+// alcanzable. Y había dos cosas más, del mismo tamaño y menos visibles:
+// ordenar reordenaba SÓLO la página descargada, y subcategoría y calificación
+// mínima filtraban en el navegador DESPUÉS de paginar. Las tres hacen lo mismo:
+// convierten una respuesta parcial en una afirmación sobre el conjunto.
+//
+// Y una cuarta, que se medía sola contra la base: sin desempate determinista,
+// la misma publicación podía aparecer al final de una página y al principio de
+// la siguiente. Medido contra `c973c6f`, ordenando por precio ascendente:
+// `7044791a` era el último ítem de la página 1 y el primero de la página 2.
+//
+// El escenario no se hereda del seed ni del navegador: se fabrica acá, con
+// precios EMPATADOS a propósito para que el desempate tenga qué desempatar, y
+// se retira al terminar.
+// ---------------------------------------------------------------------------
+await runCase(171, 'El Mercado pagina en el servidor: total, orden y filtros del conjunto entero', async () => {
+  const medidos = [];
+  const marca = Date.now();
+  const MARCADOR = `Smoke pag171 ${marca}`;
+  const POR_PAGINA = 24;
+  // 115 no es múltiplo de 24: la última página queda corta a propósito, que es
+  // donde un cálculo de páginas se equivoca.
+  const CALIFICADAS = 70;      // vendedor@ejemplo.com, con calificación
+  const SIN_CALIFICAR = 45;    // admin@topgreen.com, sin calificación
+  const TOTAL = CALIFICADAS + SIN_CALIFICAR;
+  const PAGINAS = Math.ceil(TOTAL / POR_PAGINA);   // 5
+  // Las primeras treinta comparten precio: sin desempate determinista, el
+  // corte de página cae justo adentro de ese empate.
+  const EMPATADAS = 30;
+  const PRECIO_EMPATADO = 1000;
+  // Y un tercio lleva subcategoría, para que ese filtro tenga un subconjunto
+  // propio más grande que una página.
+  const CON_SUBCATEGORIA = 30;
+
+  const nombreDe = (i) => `${MARCADOR}-${String(i).padStart(3, '0')}`;
+  const precioDe = (i) => (i < EMPATADAS ? PRECIO_EMPATADO : 2000 + i);
+
+  // El filtro y el orden por calificación leen `users.rating_average`, que es un
+  // agregado derivado. El seed no califica a nadie y lo que dejan otros casos no
+  // es una premisa: este caso fija las dos reputaciones que necesita en la base
+  // descartable y las devuelve como estaban. Corrido solo o en la suite, mide lo
+  // mismo.
+  const CON_CALIFICACION = 'vendedor@ejemplo.com';
+  const SIN_CALIFICACION = 'admin@topgreen.com';
+  const reputacionDe = (correo) => queryRows(`
+    SELECT COALESCE(rating_average, 0)::text, COALESCE(rating_count, 0)::text
+    FROM users WHERE email = ${sqlLiteral(correo)}`)[0];
+  const fijarReputacion = (correo, promedio, cuantas) => querySql(`
+    UPDATE users SET rating_average = ${promedio}, rating_count = ${cuantas}
+    WHERE email = ${sqlLiteral(correo)}`);
+  const reputacionPrevia = {
+    [CON_CALIFICACION]: reputacionDe(CON_CALIFICACION),
+    [SIN_CALIFICACION]: reputacionDe(SIN_CALIFICACION),
+  };
+
+  const limpiar = () => {
+    try {
+      querySql(`DELETE FROM product_images WHERE product_id IN (
+        SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+      for (const [correo, previa] of Object.entries(reputacionPrevia)) {
+        fijarReputacion(correo, previa[0], previa[1]);
+      }
+    } catch (error) {
+      console.log(`  · no se pudieron retirar las publicaciones del caso 171: ${error.message}`);
+    }
+  };
+
   const browser = await chromium.launch({ headless: true });
   try {
-    // === A. Sesión confirmada inválida: la identidad baja, lo elegido queda =
+    // === Fabricación ======================================================
+    fijarReputacion(CON_CALIFICACION, 5, 3);
+    fijarReputacion(SIN_CALIFICACION, 0, 0);
+    assert(Number(reputacionDe(CON_CALIFICACION)[0]) >= 4
+      && Number(reputacionDe(SIN_CALIFICACION)[0]) === 0,
+    `las reputaciones quedaron en ${JSON.stringify([reputacionDe(CON_CALIFICACION),
+      reputacionDe(SIN_CALIFICACION)])}: el filtro por calificación no distinguiría nada`);
+
+    const califica = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: CON_CALIFICACION, password: 'vendedor123' },
+    })).data;
+    const sinCalificar = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: SIN_CALIFICACION, password: 'admin123' },
+    })).data;
+
+    const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+    const [laCategoria] = queryRows(`
+      SELECT c.id, c.name FROM categories c
+      WHERE c.is_service = false AND c.is_active = true
+        AND EXISTS (SELECT 1 FROM subcategories s WHERE s.category_id = c.id AND s.is_active = true)
+      ORDER BY c.name LIMIT 1`);
+    assert(laCategoria, 'no hay una categoría de productos con subcategorías activas');
+    const [laSubcategoria] = queryRows(`
+      SELECT s.id, s.name FROM subcategories s
+      WHERE s.category_id = ${sqlLiteral(laCategoria[0])} AND s.is_active = true
+      ORDER BY s.name LIMIT 1`);
+    assert(laSubcategoria, 'la categoría elegida no tiene subcategorías activas');
+
+    for (let i = 0; i < TOTAL; i += 1) {
+      const deQuien = i < CALIFICADAS ? califica : sinCalificar;
+      const alta = await apiRequest('/products', {
+        method: 'POST', token: deQuien.access_token,
+        body: {
+          name: nombreDe(i),
+          description: 'Publicación fabricada para medir la paginación del Mercado.',
+          category_id: laCategoria[0],
+          subcategory_id: i < CON_SUBCATEGORIA ? laSubcategoria[0] : undefined,
+          price: precioDe(i),
+          stock: 5,
+          unit: 'unidad',
+          locality_id: localidad,
+          publication_type: 'producto',
+          operation_kind: 'insumo',
+        },
+      });
+      assert(alta.status === 201 || alta.status === 200,
+        `la publicación ${i} respondió HTTP ${alta.status}: ${JSON.stringify(alta.data).slice(0, 200)}`);
+    }
+
+    const [enBase] = queryRows(`
+      SELECT COUNT(*)::text, 'fin' FROM products
+      WHERE status = 'ACTIVE' AND name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+    assert(Number(enBase[0]) === TOTAL,
+      `quedaron ${enBase[0]} publicaciones del conjunto y tienen que ser ${TOTAL}`);
+    assert(TOTAL > 100, 'el conjunto tiene que pasar de cien para que la 101 sea el punto');
+    medidos.push(`conjunto fabricado: ${TOTAL} publicaciones, ${EMPATADAS} con el mismo precio, `
+      + `${CON_SUBCATEGORIA} con subcategoría y ${SIN_CALIFICAR} de un vendedor sin calificación`);
+
+    // === A. La API: el conjunto entero, no la página ======================
+    const pedir = async (extra) => {
+      const respuesta = await apiRequest(
+        `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page_size=${POR_PAGINA}&${extra}`);
+      assert(respuesta.status === 200,
+        `el catálogo respondió HTTP ${respuesta.status} para «${extra}»`);
+      return respuesta.data;
+    };
+
+    const primera = await pedir('page=1');
+    assert(primera.total === TOTAL,
+      `la API dice ${primera.total} para el conjunto y hay ${TOTAL}`);
+    assert(primera.pages === PAGINAS, `la API dice ${primera.pages} páginas y son ${PAGINAS}`);
+    assert(primera.items.length === POR_PAGINA,
+      `la primera página trajo ${primera.items.length} y tiene que traer ${POR_PAGINA}`);
+
+    const ultima = await pedir(`page=${PAGINAS}`);
+    assert(ultima.items.length === TOTAL - POR_PAGINA * (PAGINAS - 1),
+      `la última página trajo ${ultima.items.length} y tiene que traer `
+      + `${TOTAL - POR_PAGINA * (PAGINAS - 1)}`);
+    assert(ultima.has_next === false && ultima.has_prev === true,
+      `la última página dice has_next=${ultima.has_next} has_prev=${ultima.has_prev}`);
+
+    // Ni repetidas ni perdidas, recorriendo TODAS las páginas.
+    const recorrerLaApi = async (extra) => {
+      const vistas = [];
+      let pagina = 1;
+      let paginas = 1;
+      do {
+        const datos = await pedir(`page=${pagina}&${extra}`);
+        paginas = datos.pages;
+        for (const item of datos.items) vistas.push(item.id);
+        pagina += 1;
+      } while (pagina <= paginas);
+      return vistas;
+    };
+
+    // Por precio ascendente, que es donde el empate parte una página al medio.
+    const porPrecio = await recorrerLaApi('sort_by=price&sort_order=asc');
+    assert(porPrecio.length === TOTAL,
+      `recorriendo por precio se vieron ${porPrecio.length} publicaciones y hay ${TOTAL}`);
+    const repetidas = porPrecio.filter((id, i) => porPrecio.indexOf(id) !== i);
+    assert(repetidas.length === 0,
+      `ordenando por precio, ${repetidas.length} publicación(es) aparecen en dos páginas: `
+      + `${JSON.stringify([...new Set(repetidas)].slice(0, 3))}. Sin desempate determinista el `
+      + 'corte de página cae adentro del empate y la misma fila sale dos veces');
+    assert(new Set(porPrecio).size === TOTAL,
+      `recorriendo por precio se vieron ${new Set(porPrecio).size} distintas y hay ${TOTAL}`);
+
+    // El orden es del conjunto: los treinta empatados van primero, y recién
+    // después los de precio único, de menor a mayor.
+    const preciosPrimeraPorPrecio = (await pedir('page=1&sort_by=price&sort_order=asc'))
+      .items.map((item) => item.price);
+    assert(preciosPrimeraPorPrecio.every((precio) => precio === PRECIO_EMPATADO),
+      `la primera página por precio trae precios ${JSON.stringify([...new Set(preciosPrimeraPorPrecio)])} `
+      + `y los ${EMPATADAS} más baratos valen ${PRECIO_EMPATADO}`);
+
+    // Calificación: el orden y el filtro existen en la API.
+    const porCalificacion = await pedir('page=1&sort_by=rating&sort_order=desc');
+    assert(porCalificacion.items.every((item) => (item.seller?.rating_average ?? 0) >= 4),
+      'ordenando por calificación, la primera página trae vendedores sin calificación: '
+      + JSON.stringify(porCalificacion.items.map((item) => item.seller?.rating_average).slice(0, 5)));
+
+    const califican = await pedir('page=1&min_rating=4');
+    assert(califican.total === CALIFICADAS,
+      `filtrando por calificación mínima la API dice ${califican.total} y tienen que ser `
+      + `${CALIFICADAS}: si el filtro no viaja, el total sigue siendo el del conjunto entero`);
+
+    const conSub = await pedir(`page=1&subcategory=${laSubcategoria[0]}`);
+    assert(conSub.total === CON_SUBCATEGORIA,
+      `filtrando por subcategoría la API dice ${conSub.total} y tienen que ser ${CON_SUBCATEGORIA}`);
+    assert(conSub.pages === Math.ceil(CON_SUBCATEGORIA / POR_PAGINA),
+      `con subcategoría la API dice ${conSub.pages} páginas y son `
+      + `${Math.ceil(CON_SUBCATEGORIA / POR_PAGINA)}`);
+    medidos.push('la API cuenta, ordena y filtra el conjunto entero: total y páginas exactos, '
+      + 'sin repetir ni perder al paginar sobre precios empatados, y con subcategoría, '
+      + 'calificación mínima y orden por calificación aplicados antes de paginar');
+
+    // === B. La pantalla ===================================================
     const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-    const pagina = await contexto.newPage();
-    await conSesion(pagina);
-    await conAlgoElegido(pagina);
-    const elegidos = await guardado(pagina);
-    assert(elegidos > 0, 'el caso no puede medir nada con el carrito vacío');
+    const page = await contexto.newPage();
 
-    await celdaDelCarrito(pagina).click();
-    await carrito(pagina).waitFor({ state: 'visible', timeout: 20_000 });
-    await vencerLaSesion(pagina);
-    await carrito(pagina).getByRole('button', { name: 'Continuar compra' }).click();
-    await login(pagina).waitFor({ state: 'visible', timeout: 25_000 });
-    assert(await checkout(pagina).count() === 0,
-      'con la sesión confirmada inválida se abrió el Checkout igual');
+    const conteo = page.locator('[class*="_conteo_"]').first();
+    const tarjetas = () => page.locator('article[class*="card"]').count();
+    const nombresEnPantalla = () => page.locator('article[class*="card"] h3').allInnerTexts();
+    const paginador = page.getByRole('navigation', { name: /Paginación/i });
+    // El nombre accesible del botón es «Página anterior de operaciones»: se
+    // busca sin distinguir mayúsculas para no atarse a la mayúscula inicial.
+    const anterior = paginador.getByRole('button', { name: /anterior/i });
+    const siguiente = paginador.getByRole('button', { name: /siguiente/i });
+    const cual = async () => (await paginador.getByText(/Página \d+ de \d+/).innerText())
+      .replace(/\s+/g, ' ').trim();
+    const esperarLaPagina = async (numero, porQue) => {
+      await esperarA(async () => (await cual()) === `Página ${numero} de ${PAGINAS}`,
+        `${porQue}: el paginador dice «${await cual().catch(() => '(no está)')}»`, 25_000);
+    };
+    // El rótulo del paginador cambia en el acto —es estado local— y las
+    // tarjetas llegan después. Leer apenas cambia el rótulo es leer la página
+    // anterior, así que se espera a que la grilla deje de estar ocupada Y a que
+    // lo dibujado sea distinto de lo que había: los nombres del conjunto son
+    // únicos, así que dos páginas nunca coinciden.
+    const esperarLaGrilla = async (cuantas, distintaDe, porQue) => {
+      await esperarA(async () => {
+        if ((await page.locator('[aria-busy="true"]').count()) > 0) return false;
+        const nombres = await nombresEnPantalla();
+        if (nombres.length !== cuantas) return false;
+        return distintaDe === null || JSON.stringify(nombres) !== JSON.stringify(distintaDe);
+      }, porQue, 25_000);
+    };
+    const buscarElConjunto = async () => {
+      const buscador = page.getByLabel('Buscar en el mercado');
+      await buscador.fill(MARCADOR);
+      await buscador.press('Enter');
+      await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
+        `el Mercado no llegó a contar las ${TOTAL} del conjunto; dice `
+        + `«${(await conteo.innerText()).replace(/\s+/g, ' ').trim()}»`, 25_000);
+    };
 
-    // Cancelar el ingreso devuelve al carrito con lo mismo. Eso ya estaba: se
-    // mide para que siga estando.
-    await login(pagina).getByRole('button', { name: 'Cerrar' }).click();
-    await carrito(pagina).waitFor({ state: 'visible', timeout: 20_000 });
-    assert(await guardado(pagina) === elegidos,
-      `cancelar el ingreso dejó ${await guardado(pagina)} ítems guardados y había ${elegidos}`);
-    assert(await carrito(pagina).getByRole('button', { name: /^Quitar/ }).count() === elegidos,
-      'el carrito volvió vacío a la vista aunque lo guardado siga ahí');
-    const cabeceraSinSesion = (await laCabeceraDice(pagina)).join(' | ');
-    assert(/Ingresar/.test(cabeceraSinSesion) && !/Salir/.test(cabeceraSinSesion),
-      'la cabecera sigue afirmando una sesión que ya se sabe inválida: '
-      + JSON.stringify(cabeceraSinSesion));
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 25_000 });
+    await buscarElConjunto();
 
-    // Y acá está el callejón: cerrar el carrito y no tener cómo volver.
-    await carrito(pagina).getByRole('button', { name: 'Cerrar' }).click();
-    await esperarA(async () => (await carrito(pagina).count()) === 0,
-      'el carrito no se cerró', 15_000);
-    assert(await guardado(pagina) === elegidos, 'cerrar el carrito se llevó lo elegido');
-    await esperarA(async () => (await celdaDelCarrito(pagina).count()) === 1,
-      'con lo elegido guardado y sin sesión la cabecera no ofrece «Carrito»: lo que la persona '
-      + 'eligió quedó sin puerta, y el botón de la tarjeta dice «Ingresar para continuar». La '
-      + `cabecera dice ${JSON.stringify(await laCabeceraDice(pagina))}`,
-      15_000);
+    // B1. El total es el del conjunto y la página trae 24, no 100.
+    const dibujadas = await tarjetas();
+    assert(dibujadas === POR_PAGINA,
+      `la página dibujó ${dibujadas} tarjetas y tiene que dibujar ${POR_PAGINA}`);
+    assert(await paginador.count() === 1,
+      'no hay paginador en el Mercado: con más de una página, la 101 no se alcanza');
+    await esperarLaPagina(1, 'el Mercado no arrancó en la página 1');
 
-    // Y esa celda abre el MISMO carrito conservado, no uno nuevo ni vacío.
-    await celdaDelCarrito(pagina).click();
-    await carrito(pagina).waitFor({ state: 'visible', timeout: 20_000 });
-    assert(await carrito(pagina).getByRole('button', { name: /^Quitar/ }).count() === elegidos,
-      'la celda sin sesión abrió un carrito que no es el que estaba guardado');
-    medidos.push('con la sesión confirmada inválida la identidad baja, el carrito se conserva y '
-      + 'la cabecera lo sigue ofreciendo: cerrarlo ya no lo deja sin puerta');
+    // B2. «Más relevantes» no está: no existe un ranking que lo sostenga.
+    const opciones = await page.locator('#catalog-sort option').allInnerTexts();
+    assert(!opciones.some((texto) => /relevante/i.test(texto)),
+      `el orden sigue ofreciendo «Más relevantes»: ${JSON.stringify(opciones)}`);
+    for (const esperada of ['Más recientes', 'Menor precio', 'Mayor precio', 'Mejor calificados']) {
+      assert(opciones.some((texto) => texto.trim() === esperada),
+        `falta la opción de orden «${esperada}»: ${JSON.stringify(opciones)}`);
+    }
 
-    // === B. Y sobrevive a la recarga, que es la prueba de que no hay un =====
-    // estado paralelo: lo que reabre la cabecera es la misma copia local de
-    // siempre, no algo que quedó vivo en memoria desde el tropiezo.
-    await carrito(pagina).getByRole('button', { name: 'Cerrar' }).click();
-    await pagina.reload({ waitUntil: 'domcontentloaded' });
-    await esperarA(async () => (await celdaDelCarrito(pagina).count()) === 1,
-      'después de recargar sin sesión la celda del carrito no está; la cabecera dice '
-      + `${JSON.stringify(await laCabeceraDice(pagina))}`, 25_000);
-    assert(await guardado(pagina) === elegidos, 'recargar cambió lo elegido');
-    medidos.push('recargar sin sesión conserva lo elegido y la celda que lo abre');
+    // B3. En los extremos los controles se deshabilitan, y se operan con teclado.
+    assert(await anterior.isDisabled(), 'en la página 1 «Anterior» no está deshabilitado');
+    assert(await siguiente.isEnabled(), 'en la página 1 «Siguiente» está deshabilitado');
 
-    // === C. La cabecera sin sesión, en los dos anchos =======================
+    // B4. Recorrer todas las páginas con «Siguiente»: ni repetidas ni perdidas.
+    //     Y la vista Lista, elegida antes de moverse, sobrevive el cambio.
+    // Se elige como elige una persona: haciendo clic en el rótulo visible. El
+    // radio está a la vista del teclado pero no del ratón.
+    const enLista = page.getByRole('radio', { name: 'Lista', exact: true });
+    await page.getByText('Lista', { exact: true }).click();
+    await esperarA(() => enLista.isChecked(), 'no se pudo elegir la vista Lista', 20_000);
+    const vistas = [];
+    let anteriores = null;
+    for (let pagina = 1; pagina <= PAGINAS; pagina += 1) {
+      await esperarLaPagina(pagina, `no se llegó a la página ${pagina}`);
+      const esperadas = pagina < PAGINAS ? POR_PAGINA : TOTAL - POR_PAGINA * (PAGINAS - 1);
+      await esperarLaGrilla(esperadas, anteriores,
+        `la página ${pagina} no llegó a dibujar sus ${esperadas} tarjetas`);
+      const nombres = await nombresEnPantalla();
+      anteriores = nombres;
+      assert(nombres.every((nombre) => nombre.startsWith(MARCADOR)),
+        `la página ${pagina} trajo publicaciones de afuera del conjunto: `
+        + JSON.stringify(nombres.filter((nombre) => !nombre.startsWith(MARCADOR)).slice(0, 3)));
+      vistas.push(...nombres);
+      if (pagina < PAGINAS) {
+        // Con teclado: enfocar y Enter. Una puerta que sólo abre el puntero no
+        // es una puerta para todos.
+        await siguiente.focus();
+        await page.keyboard.press('Enter');
+      }
+    }
+    assert(await siguiente.isDisabled(),
+      `en la última página «Siguiente» sigue habilitado; el paginador dice «${await cual()}»`);
+    assert(await anterior.isEnabled(), 'en la última página «Anterior» está deshabilitado');
+    assert(await enLista.isChecked(),
+      'cambiar de página reinició la vista Cuadrícula/Lista, que es una preferencia local');
+
+    const repetidasEnPantalla = vistas.filter((nombre, i) => vistas.indexOf(nombre) !== i);
+    assert(repetidasEnPantalla.length === 0,
+      `recorriendo las páginas se repitieron ${JSON.stringify([...new Set(repetidasEnPantalla)].slice(0, 3))}`);
+    assert(vistas.length === TOTAL && new Set(vistas).size === TOTAL,
+      `recorriendo las ${PAGINAS} páginas se vieron ${new Set(vistas).size} publicaciones `
+      + `distintas y hay ${TOTAL}`);
+
+    // B5. Y la 101 está entre ellas: es el punto de toda la tarea.
+    //     Con el orden por omisión —más recientes— la posición 101 es la
+    //     publicación creada 101ª desde el final.
+    const laCentoUna = nombreDe(TOTAL - 101);
+    assert(vistas.includes(laCentoUna),
+      `la publicación número 101 del conjunto («${laCentoUna}») no se alcanzó desde los controles`);
+    const posicion = vistas.indexOf(laCentoUna) + 1;
+    assert(posicion === 101,
+      `«${laCentoUna}» apareció en la posición ${posicion} y el orden por omisión la pone 101ª`);
+    medidos.push(`las ${PAGINAS} páginas recorridas con «Siguiente» muestran las ${TOTAL} `
+      + `publicaciones sin repetir ni perder, la número 101 («${laCentoUna}») entre ellas, con `
+      + 'los controles deshabilitados en los extremos, operados con teclado y la vista Lista intacta');
+
+    // B6. Cambiar el orden vuelve a la página 1 y ordena el conjunto entero.
+    // Las treinta más baratas del conjunto comparten precio y son las creadas
+    // primero, así que con el orden por omisión caen en la ÚLTIMA página. Si
+    // sólo se ordenara la página descargada, la primera página por «Menor
+    // precio» seguiría trayendo las más nuevas; ordenando el conjunto, trae
+    // veinticuatro de esas treinta.
+    const indiceDe = (nombre) => Number(nombre.slice(-3));
+    await page.locator('#catalog-sort').selectOption('price-asc');
+    await esperarLaPagina(1, 'cambiar el orden no volvió a la página 1');
+    await esperarA(async () => {
+      if ((await page.locator('[aria-busy="true"]').count()) > 0) return false;
+      const nombres = await nombresEnPantalla();
+      return nombres.length === POR_PAGINA
+        && nombres.every((nombre) => indiceDe(nombre) < EMPATADAS);
+    }, 'ordenando por menor precio, la primera página no trae las más baratas del conjunto: '
+      + 'se ordenó la página descargada y no el conjunto', 25_000);
+
+    await page.locator('#catalog-sort').selectOption('rating');
+    await esperarLaPagina(1, 'cambiar a «Mejor calificados» no volvió a la página 1');
+    await esperarA(async () => {
+      if ((await page.locator('[aria-busy="true"]').count()) > 0) return false;
+      const nombres = await nombresEnPantalla();
+      return nombres.length === POR_PAGINA
+        && nombres.every((nombre) => indiceDe(nombre) < CALIFICADAS);
+    }, 'ordenando por calificación, la primera página trae publicaciones del vendedor sin '
+      + 'calificación: se ordenó la página y no el conjunto', 25_000);
+    medidos.push('cambiar el orden vuelve a la página 1 y ordena el conjunto entero: por precio '
+      + 'aparece la más barata de las 115, por calificación sólo las del vendedor calificado');
+
+    // B7. Subcategoría y calificación mínima: total y páginas coherentes.
+    await page.locator('#catalog-sort').selectOption('newest');
+    await page.locator('#catalog-category').selectOption(laCategoria[1]);
+    await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
+      'elegir la categoría del conjunto cambió el total', 25_000);
+    await page.locator('#catalog-subcategory').selectOption(laSubcategoria[1]);
+    await esperarA(async () => (await conteo.innerText()).includes(String(CON_SUBCATEGORIA)),
+      `con la subcategoría puesta el conteo dice «${(await conteo.innerText()).replace(/\s+/g, ' ').trim()}» `
+      + `y el conjunto con subcategoría tiene ${CON_SUBCATEGORIA}`, 25_000);
+    const paginasDeSub = Math.ceil(CON_SUBCATEGORIA / POR_PAGINA);
+    await esperarA(async () => (await cual()) === `Página 1 de ${paginasDeSub}`,
+      `con la subcategoría puesta el paginador dice «${await cual()}» y tiene que decir `
+      + `«Página 1 de ${paginasDeSub}»`, 25_000);
+
+    await page.locator('#catalog-subcategory').selectOption('Todas');
+    await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
+      'sacar la subcategoría no devolvió el total del conjunto', 25_000);
+    await page.locator('#catalog-rating').selectOption('4');
+    await esperarA(async () => (await conteo.innerText()).includes(String(CALIFICADAS)),
+      `con calificación mínima 4 el conteo dice «${(await conteo.innerText()).replace(/\s+/g, ' ').trim()}» `
+      + `y tienen que ser ${CALIFICADAS}`, 25_000);
+    const paginasCalificadas = Math.ceil(CALIFICADAS / POR_PAGINA);
+    await esperarA(async () => (await cual()) === `Página 1 de ${paginasCalificadas}`,
+      `con calificación mínima el paginador dice «${await cual()}»`, 25_000);
+    await page.locator('#catalog-rating').selectOption('0');
+    await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
+      'sacar la calificación mínima no devolvió el total del conjunto', 25_000);
+    medidos.push('subcategoría y calificación mínima viajan a la consulta: el total y la cantidad '
+      + 'de páginas son los del subconjunto, y sacarlos devuelve el conjunto entero');
+
+    // B8. Cambiar de página se escribe en la barra, y Atrás lo restaura junto
+    //     con el orden y los filtros.
+    await page.locator('#catalog-sort').selectOption('price-desc');
+    await esperarLaPagina(1, 'cambiar el orden no volvió a la página 1');
+    await siguiente.click();
+    await siguiente.click();
+    await esperarLaPagina(3, 'no se llegó a la página 3');
+    const enLaBarra = new URL(page.url());
+    assert(enLaBarra.searchParams.get('page') === '3',
+      `la barra dice page=${enLaBarra.searchParams.get('page')} estando en la página 3`);
+    assert(enLaBarra.searchParams.get('sort') === 'price-desc',
+      `la barra dice sort=${enLaBarra.searchParams.get('sort')} con «Mayor precio» elegido`);
+    const nombresDeLaTres = await nombresEnPantalla();
+
+    await page.locator('header').getByRole('button', { name: 'Contacto', exact: true }).click();
+    await page.getByRole('heading', { name: 'Contacto', level: 1 })
+      .waitFor({ state: 'visible', timeout: 25_000 });
+    await page.goBack({ waitUntil: 'domcontentloaded' });
+    await esperarLaPagina(3, 'volver con Atrás no restauró la página');
+    assert(await page.locator('#catalog-sort').inputValue() === 'price-desc',
+      `volver con Atrás dejó el orden en «${await page.locator('#catalog-sort').inputValue()}»`);
+    await esperarA(async () => {
+      const ahora = await nombresEnPantalla();
+      return JSON.stringify(ahora) === JSON.stringify(nombresDeLaTres);
+    }, 'volver con Atrás restauró la página y el orden pero no las mismas publicaciones', 25_000);
+    medidos.push('la página y el orden viven en la barra, y Atrás los restaura con sus filtros y '
+      + 'sus mismas publicaciones');
+
+    // B9. Cambiar la búsqueda desde una página interior vuelve a la página 1.
+    await siguiente.click();
+    await esperarLaPagina(4, 'no se llegó a la página 4');
+    await buscarElConjunto();
+    await esperarLaPagina(1, 'cambiar la búsqueda desde la página 4 no volvió a la página 1');
+    medidos.push('cambiar la búsqueda desde una página interior vuelve a la página 1');
+
+    // B10. Una página que no existe se corrige con lo que dice el servidor.
+    //      Los filtros vuelven a la 1 solos, así que acá se llega por la barra:
+    //      un enlace compartido, o una entrada del historial cuyo conjunto ya
+    //      no da para tanto. Lo que NO puede pasar es afirmar un vacío.
+    await page.goto(
+      `${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(MARCADOR)}&page=99`,
+      { waitUntil: 'domcontentloaded' });
+    await esperarLaPagina(PAGINAS, 'pedir una página que no existe no cayó en la última');
+    const ultimasEnPantalla = TOTAL - POR_PAGINA * (PAGINAS - 1);
+    await esperarLaGrilla(ultimasEnPantalla, null,
+      `pidiendo page=99 la última página no dibujó sus ${ultimasEnPantalla} tarjetas`);
+    assert(await page.getByRole('heading', { name: /No hay operaciones/ }).count() === 0,
+      'pidiendo una página de más, la pantalla afirmó que no hay operaciones habiéndolas');
+    assert(new URL(page.url()).searchParams.get('page') === String(PAGINAS),
+      `la barra quedó en page=${new URL(page.url()).searchParams.get('page')} y tenía que `
+      + `corregirse a ${PAGINAS}`);
+    medidos.push(`pedir «page=99» cae en la última página (${PAGINAS}) y la barra se corrige, `
+      + 'sin afirmar un mercado vacío');
+
+    // B11. Mientras la respuesta no vuelve, la página anterior no se presenta
+    //      como si fuera la nueva.
     //
-    // Una celda más no puede deformar lo que ya estaba. Se mide sobre el mismo
-    // documento cambiando el ancho, que es lo que hace un teléfono al rotar y
-    // lo que hace cualquiera al angostar la ventana.
+    //      `consultaVigente` existe para eso: mientras la consulta que
+    //      describe lo que se está mirando no coincide con la última
+    //      contestada, la grilla espera. Si una dimensión que VIAJA a la
+    //      consulta queda afuera de esa firma, el control la anuncia en el
+    //      acto y la respuesta vieja pasa por contestada hasta que arranca el
+    //      efecto —los efectos corren DESPUÉS de dibujar—. Es el mismo agujero
+    //      que encontró el caso 167 al soltar un filtro, con otras cuatro
+    //      dimensiones: subcategoría, calificación mínima, orden y página.
+    //
+    //      Se mira por dos instrumentos a la vez, porque ninguno solo alcanza:
+    //
+    //      · `requestAnimationFrame` corre en el ciclo del cuadro, justo ANTES
+    //        de pintar. Así que no aproxima lo que se ve: es lo que se ve. Es
+    //        el único que sirve cuando lo que cambia es el valor de un
+    //        `<select>` —el orden, la subcategoría, la calificación—, porque
+    //        eso lo pinta el navegador sin que mute el DOM.
+    //      · Un `MutationObserver` ve cada commit del DOM, se pinte o no. Es
+    //        el que hace la medición independiente del cuadro cuando la
+    //        transición sí muta el DOM, como el rótulo del paginador.
+    //
+    //      Medida acá, la ventana dura entre 16 y 38 ms: por eso NO se
+    //      muestrea con `setTimeout`, que en Chromium queda detrás del
+    //      MessageChannel con el que React vacía los efectos y no cae nunca
+    //      adentro de la ventana —640 muestras, cero—.
+    //
+    //      La demora de la respuesta es lo que vuelve la lectura inequívoca:
+    //      sin ella, lo viejo y lo nuevo se pisan en decenas de milisegundos y
+    //      no se puede afirmar cuál era cuál.
+    const DEMORA = 1200;
+    let demorarElCatalogo = 0;
+    await page.route('**/api/catalog/products*', async (ruta) => {
+      if (demorarElCatalogo > 0) {
+        await new Promise((resolver) => { setTimeout(resolver, demorarElCatalogo); });
+      }
+      await ruta.continue();
+    });
+
+    // Cada cuadro pintado y cada commit del DOM quedan anotados con lo que
+    // ANUNCIAN los controles, si algo dice estar cargando, y qué publicaciones
+    // hay dibujadas.
+    const mirarLaEspera = () => page.evaluate(() => {
+      const estado = (via) => ({
+        via,
+        pagina: document.querySelector('[class*="_paginaActual_"]')?.textContent?.trim() ?? null,
+        orden: document.querySelector('#catalog-sort')?.value ?? null,
+        subcategoria: document.querySelector('#catalog-subcategory')?.value ?? null,
+        calificacion: document.querySelector('#catalog-rating')?.value ?? null,
+        ocupado: document.querySelectorAll('[aria-busy="true"]').length > 0,
+        nombres: [...document.querySelectorAll('article[class*="card"] h3')]
+          .map((titulo) => titulo.textContent.trim()),
+      });
+      window.__miradaDelMercado?.cortar();
+      const anotadas = [];
+      const observador = new MutationObserver(() => anotadas.push(estado('commit')));
+      observador.observe(document.body, {
+        subtree: true, childList: true, characterData: true, attributes: true,
+      });
+      let cuadro = requestAnimationFrame(function pintar() {
+        anotadas.push(estado('cuadro'));
+        cuadro = requestAnimationFrame(pintar);
+      });
+      window.__miradaDelMercado = {
+        anotadas,
+        cortar: () => { observador.disconnect(); cancelAnimationFrame(cuadro); },
+      };
+    });
+    const loMirado = () => page.evaluate(() => {
+      window.__miradaDelMercado.cortar();
+      return window.__miradaDelMercado.anotadas;
+    });
+
+    // `dimension` es qué control anuncia el cambio y `anuncia` el valor que
+    // muestra apenas se lo mueve. La violación es un estado donde ese control
+    // YA dice lo nuevo, la grilla NO dice estar cargando, y lo dibujado sigue
+    // siendo exactamente lo anterior.
+    const sinPresentarLoViejo = async ({ comoSeLlama, dimension, anuncia, mover, despues }) => {
+      const antes = await nombresEnPantalla();
+      assert(antes.length > 0,
+        `${comoSeLlama}: no había nada dibujado antes de mover el control`);
+      await mirarLaEspera();
+      demorarElCatalogo = DEMORA;
+      try {
+        await mover();
+        await despues();
+      } finally {
+        demorarElCatalogo = 0;
+      }
+      const mirados = await loMirado();
+      const loViejo = JSON.stringify(antes);
+      const presentadas = mirados.filter((estado) => estado[dimension] === anuncia
+        && !estado.ocupado
+        && JSON.stringify(estado.nombres) === loViejo);
+      assert(presentadas.length === 0,
+        `${comoSeLlama}: en ${presentadas.length} estado(s) `
+        + `(${[...new Set(presentadas.map((estado) => estado.via))].join(', ')}) el control ya `
+        + `decía «${anuncia}» y la grilla seguía mostrando las ${antes.length} publicaciones `
+        + 'anteriores sin ningún estado de carga. Con la respuesta demorada a propósito, esa '
+        + 'página vieja se estaba presentando como la contestada: la dimensión no entra en la '
+        + 'firma de la consulta vigente');
+      // Sin esto el negativo podría estar verde por no haber mirado nada.
+      assert(mirados.some((estado) => estado.ocupado),
+        `${comoSeLlama}: ningún estado observado marcó la espera, así que la transición no se `
+        + 'vio y este negativo no estaría midiendo nada');
+      assert(mirados.some((estado) => estado.via === 'cuadro')
+        && mirados.some((estado) => estado.via === 'commit'),
+        `${comoSeLlama}: faltó uno de los dos instrumentos `
+        + `(${[...new Set(mirados.map((estado) => estado.via))].join(', ')})`);
+      return `${comoSeLlama}: ${mirados.length} estados observados entre cuadros pintados y `
+        + 'commits del DOM, ninguno presentó lo anterior como contestado';
+    };
+
+    await page.goto(
+      `${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(MARCADOR)}`,
+      { waitUntil: 'domcontentloaded' });
+    await esperarLaPagina(1, 'el Mercado no arrancó en la página 1 para medir la espera');
+    await esperarLaGrilla(POR_PAGINA, null, 'la página 1 no dibujó sus tarjetas');
+
+    // Cada dimensión se mueve donde es lo ÚNICO que cambia en la consulta.
+    // Esto no es un detalle de orden de los bloques: cambiar el orden, la
+    // subcategoría o la calificación desde una página interior vuelve a la
+    // página 1, y entonces la página —que sí está en la firma— cambia sola y
+    // tapa el defecto. Medido: con el orden afuera de la firma y la medición
+    // hecha desde la página 2, el caso daba verde. Por eso las tres primeras
+    // se miden desde la página 1, y la página se mide al final.
+    const carreras = [];
+
+    // El orden: el selector muestra lo elegido en el acto.
+    carreras.push(await sinPresentarLoViejo({
+      comoSeLlama: 'cambiar el orden con la respuesta demorada',
+      dimension: 'orden',
+      anuncia: 'price-asc',
+      mover: () => page.locator('#catalog-sort').selectOption('price-asc'),
+      despues: () => esperarLaGrilla(POR_PAGINA, null,
+        'la primera página del orden por precio no llegó a dibujarse'),
+    }));
+
+    // La subcategoría y la calificación mínima viven en la barra lateral, que
+    // no se desmonta: el control anuncia lo nuevo y la grilla es la que tiene
+    // que decir que está esperando.
+    await page.locator('#catalog-sort').selectOption('newest');
+    await esperarLaGrilla(POR_PAGINA, null, 'volver al orden por omisión no llegó a dibujarse');
+    await page.locator('#catalog-category').selectOption(laCategoria[1]);
+    await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
+      'elegir la categoría del conjunto cambió el total antes de medir la espera', 25_000);
+
+    carreras.push(await sinPresentarLoViejo({
+      comoSeLlama: 'elegir una subcategoría con la respuesta demorada',
+      dimension: 'subcategoria',
+      anuncia: laSubcategoria[1],
+      mover: () => page.locator('#catalog-subcategory').selectOption(laSubcategoria[1]),
+      despues: () => esperarA(async () => (await conteo.innerText()).includes(String(CON_SUBCATEGORIA)),
+        'con la subcategoría puesta el conteo no llegó al subconjunto', 25_000),
+    }));
+
+    await page.locator('#catalog-subcategory').selectOption('Todas');
+    await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
+      'sacar la subcategoría no devolvió el total antes de medir la espera', 25_000);
+
+    carreras.push(await sinPresentarLoViejo({
+      comoSeLlama: 'poner calificación mínima con la respuesta demorada',
+      dimension: 'calificacion',
+      anuncia: '4',
+      mover: () => page.locator('#catalog-rating').selectOption('4'),
+      despues: () => esperarA(async () => (await conteo.innerText()).includes(String(CALIFICADAS)),
+        'con calificación mínima el conteo no llegó al subconjunto', 25_000),
+    }));
+
+    await page.locator('#catalog-rating').selectOption('0');
+    await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
+      'sacar la calificación mínima no devolvió el total antes de medir la espera', 25_000);
+    await esperarLaPagina(1, 'antes de medir la página, el Mercado no estaba en la 1');
+
+    // La página, al final: «Siguiente» anuncia «Página 2 de 5» en el acto y no
+    // mueve ninguna otra dimensión de la consulta.
+    carreras.push(await sinPresentarLoViejo({
+      comoSeLlama: 'avanzar de página con la respuesta demorada',
+      dimension: 'pagina',
+      anuncia: `Página 2 de ${PAGINAS}`,
+      mover: () => siguiente.click(),
+      despues: () => esperarLaGrilla(POR_PAGINA, null, 'la página 2 no llegó a dibujarse'),
+    }));
+
+    await page.unroute('**/api/catalog/products*');
+    medidos.push('con la respuesta del catálogo demorada 1200 ms a propósito, ninguna de las '
+      + 'cuatro dimensiones que viajan a la consulta —orden, subcategoría, calificación mínima '
+      + 'y página— presentó la respuesta anterior como si fuera la nueva: '
+      + `${carreras.length} transiciones miradas cuadro a cuadro y commit a commit, cada una `
+      + 'donde esa dimensión es lo único que cambia');
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+    limpiar();
+  }
+
+  const [quedan] = queryRows(`
+    SELECT COUNT(*)::text, 'fin' FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+  assert(quedan[0] === '0',
+    `el caso dejó ${quedan[0]} publicaciones fabricadas sin retirar`);
+
+  return `con ${TOTAL} publicaciones fabricadas y retiradas al final: ${medidos.join('; ')}`;
+});
+
+// ---------------------------------------------------------------------------
+// 172. El listado del Mercado no consulta las imágenes una vez por tarjeta.
+//
+// El inventario midió 24 publicaciones produciendo 26 consultas, 24 de ellas a
+// `product_images`. La raíz: la consulta del listado ya unía con la imagen
+// primaria pero no seleccionaba su URL, y después preguntaba de nuevo por cada
+// tarjeta. Es el borde de volumen que queda después de la paginación: el número
+// de consultas no puede crecer con el tamaño de página.
+//
+// Cómo se cuenta, y por qué así. Contar sentencias desde adentro exigiría
+// instrumentar la aplicación, y `pg_stat_statements` exige precargarlo y
+// reiniciar el servidor: sería agregarle a la suite una dependencia de entorno
+// para poder medir. En cambio `pg_stat_user_tables` ya lleva, sin configurar
+// nada, cuántas veces se recorrió CADA tabla. Es una medida más fuerte que
+// contar sentencias: una consulta por tarjeta son N recorridos, y también los
+// serían N recorridos escondidos dentro de una sola sentencia.
+//
+// Las estadísticas se vuelcan a memoria compartida como mucho una vez por
+// segundo, así que se espera a una condición observable —que el contador supere
+// el piso y después se quede quieto—, nunca a un tiempo fijo. Y el caso se
+// comprueba a sí mismo: mide un tramo SIN petición y exige que dé cero, que es
+// la prueba de que su propio SQL de fabricación e inspección no se cuenta.
+// ---------------------------------------------------------------------------
+await runCase(172, 'El listado del Mercado no consulta las imágenes una vez por tarjeta', async () => {
+  const medidos = [];
+  const marca = Date.now();
+  const MARCADOR = `Smoke img172 ${marca}`;
+  const CHICA = 6;
+  const GRANDE = 24;
+  // Reparto determinista, pensado para que cada caso de imagen esté presente
+  // en la página grande y para que el N+1 tenga de dónde crecer:
+  const CON_PRIMARIA = 10;   // 0..9    → sale su URL
+  const SIN_IMAGEN = 8;      // 10..17  → primary_image null
+  const SOLO_SECUNDARIA = 8; // 18..25  → null también: tener imagen no es tener primaria
+  const DOS_PRIMARIAS = 4;   // 26..29  → una sola tarjeta y una sola URL
+  const TOTAL = CON_PRIMARIA + SIN_IMAGEN + SOLO_SECUNDARIA + DOS_PRIMARIAS;
+
+  const nombreDe = (i) => `${MARCADOR}-${String(i).padStart(3, '0')}`;
+  const urlDe = (i, cual) => `/uploads/products/${MARCADOR.replace(/\s/g, '_')}-${i}-${cual}.png`;
+
+  const limpiar = () => {
+    try {
+      querySql(`DELETE FROM product_images WHERE product_id IN (
+        SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+    } catch (error) {
+      console.log(`  · no se pudieron retirar las publicaciones del caso 172: ${error.message}`);
+    }
+  };
+
+  try {
+    // === Fabricación ======================================================
+    const vendedor = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+    })).data;
+    const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+    const [laCategoria] = queryRows(`
+      SELECT c.id, c.name FROM categories c
+      WHERE c.is_service = false AND c.is_active = true ORDER BY c.name LIMIT 1`);
+    assert(laCategoria, 'no hay una categoría de productos activa');
+
+    const idsPorNombre = new Map();
+    for (let i = 0; i < TOTAL; i += 1) {
+      const alta = await apiRequest('/products', {
+        method: 'POST', token: vendedor.access_token,
+        body: {
+          name: nombreDe(i),
+          description: 'Publicación fabricada para medir las consultas de imagen del listado.',
+          category_id: laCategoria[0],
+          price: 1000 + i,
+          stock: 5,
+          unit: 'unidad',
+          locality_id: localidad,
+          publication_type: 'producto',
+          operation_kind: 'insumo',
+        },
+      });
+      assert(alta.status === 201 || alta.status === 200,
+        `la publicación ${i} respondió HTTP ${alta.status}: ${JSON.stringify(alta.data).slice(0, 200)}`);
+      idsPorNombre.set(nombreDe(i), alta.data.id);
+    }
+
+    // Las filas de imagen se fabrican en la base descartable: subir archivos
+    // de verdad sería tocar carga y almacenamiento, que están fuera de alcance.
+    const ponerImagen = (nombre, url, primaria, orden) => querySql(`
+      INSERT INTO product_images (id, product_id, url, filename, is_primary, display_order, created_at)
+      VALUES (gen_random_uuid()::text, ${sqlLiteral(idsPorNombre.get(nombre))},
+              ${sqlLiteral(url)}, ${sqlLiteral(url.split('/').pop())},
+              ${primaria ? 'true' : 'false'}, ${orden}, NOW())`);
+
+    for (let i = 0; i < CON_PRIMARIA; i += 1) {
+      ponerImagen(nombreDe(i), urlDe(i, 'primaria'), true, 0);
+      // Una secundaria al lado, para que elegir la primaria no sea elegir «la única».
+      ponerImagen(nombreDe(i), urlDe(i, 'secundaria'), false, 1);
+    }
+    for (let i = CON_PRIMARIA + SIN_IMAGEN; i < CON_PRIMARIA + SIN_IMAGEN + SOLO_SECUNDARIA; i += 1) {
+      ponerImagen(nombreDe(i), urlDe(i, 'secundaria'), false, 0);
+    }
+    // Dos primarias para la misma publicación. La base NO lo impide —no hay
+    // índice único— y el `outerjoin` vigente multiplica la fila en cuanto la
+    // URL entra en el SELECT. La que tiene que salir es la de menor
+    // `display_order`, y la tarjeta tiene que salir UNA sola vez.
+    const desdeDos = CON_PRIMARIA + SIN_IMAGEN + SOLO_SECUNDARIA;
+    for (let i = desdeDos; i < TOTAL; i += 1) {
+      ponerImagen(nombreDe(i), urlDe(i, 'primaria'), true, 0);
+      ponerImagen(nombreDe(i), urlDe(i, 'segunda-primaria'), true, 5);
+    }
+
+    const [fabricadas] = queryRows(`
+      SELECT COUNT(*)::text, 'fin' FROM products
+      WHERE status = 'ACTIVE' AND name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+    assert(Number(fabricadas[0]) === TOTAL,
+      `quedaron ${fabricadas[0]} publicaciones del conjunto y tienen que ser ${TOTAL}`);
+    assert(TOTAL > GRANDE,
+      'el conjunto tiene que pasar del tamaño de página grande para que el N+1 crezca');
+
+    // === El instrumento ===================================================
+    const recorridosDe = (tabla) => {
+      const [fila] = queryRows(`
+        SELECT (COALESCE(seq_scan, 0) + COALESCE(idx_scan, 0))::text, 'fin'
+        FROM pg_stat_user_tables WHERE relname = ${sqlLiteral(tabla)}`);
+      assert(fila, `pg_stat_user_tables no conoce la tabla ${tabla}`);
+      return Number(fila[0]);
+    };
+    // Espera a una condición observable, no a un tiempo fijo: que el contador
+    // haya superado el piso que se sabe que tiene que superar, y después se
+    // quede quieto. Con piso −1 sólo se espera que esté quieto.
+    const asentado = async (tabla, piso) => {
+      let previo = recorridosDe(tabla);
+      let quieto = 0;
+      for (let intento = 0; intento < 80; intento += 1) {
+        await new Promise((seguir) => { setTimeout(seguir, 250); });
+        const ahora = recorridosDe(tabla);
+        if (previo > piso) {
+          quieto = ahora === previo ? quieto + 1 : 0;
+          if (quieto >= 4) return previo;
+        }
+        previo = ahora;
+      }
+      throw new Error(`las estadísticas de ${tabla} no se asentaron por encima de ${piso}`);
+    };
+
+    // El control que vuelve honesto al instrumento: un tramo sin petición
+    // ninguna, con SQL propio en el medio, tiene que dar cero.
+    const antesDelControl = await asentado('product_images', -1);
+    queryRows(`SELECT COUNT(*)::text, 'fin' FROM products
+      WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+    const despuesDelControl = await asentado('product_images', -1);
+    assert(despuesDelControl === antesDelControl,
+      `el tramo de control movió el contador en ${despuesDelControl - antesDelControl}: `
+      + 'el instrumento estaría contando el SQL del propio caso y no el de la petición');
+
+    const listar = async (tam) => {
+      const antes = await asentado('product_images', -1);
+      const respuesta = await apiRequest(
+        `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page=1&page_size=${tam}`);
+      assert(respuesta.status === 200,
+        `el catálogo respondió HTTP ${respuesta.status} para page_size=${tam}`);
+      // Después tiene que haber subido: el listado toca la tabla al menos una vez.
+      const despues = await asentado('product_images', antes);
+      return { datos: respuesta.data, recorridos: despues - antes };
+    };
+
+    // === A. El número de consultas no crece con las tarjetas ==============
+    const chica = await listar(CHICA);
+    const grande = await listar(GRANDE);
+
+    // El conteo va PRIMERO, y no es un detalle de orden: contra la base la
+    // página además sale corta —las filas duplicadas por las dos primarias se
+    // colapsan—, y si esa comprobación fuera antes, el caso se pondría rojo por
+    // la cardinalidad y nunca llegaría a informar el N+1, que es el defecto que
+    // esta tarea viene a retirar.
+    assert(grande.recorridos === chica.recorridos,
+      `el listado recorrió «product_images» ${chica.recorridos} veces con ${CHICA} tarjetas y `
+      + `${grande.recorridos} veces con ${GRANDE}: el número de consultas crece con el tamaño `
+      + 'de página, que es exactamente el N+1 —una consulta por tarjeta— que esta tarea retira');
+    // Y acotado: que no crezca no alcanza si creciera de 100 a 100.
+    assert(grande.recorridos <= 4,
+      `el listado recorrió «product_images» ${grande.recorridos} veces para una página: `
+      + 'tiene que alcanzar con la consulta del listado y la del conteo');
+    medidos.push(`la tabla de imágenes se recorre ${chica.recorridos} vez/veces con ${CHICA} `
+      + `tarjetas y ${grande.recorridos} con ${GRANDE}: no crece con el tamaño de página`);
+
+    assert(chica.datos.items.length === CHICA && grande.datos.items.length === GRANDE,
+      `las páginas trajeron ${chica.datos.items.length} y ${grande.datos.items.length} tarjetas `
+      + `y tenían que traer ${CHICA} y ${GRANDE}: la página sale corta porque la unión con las `
+      + 'imágenes duplica filas y las duplicadas se colapsan después de paginar');
+
+    // === B. Y las imágenes son las que la base dice, no sólo un conteo ====
+    // Lo esperado se calcula contra la base, con la misma regla determinista:
+    // la primaria de menor `display_order`, o null si no hay ninguna.
+    // El «sin imagen» viaja como una marca y no como columna vacía, y la
+    // consulta lleva `ORDER BY`. Las dos cosas por el mismo motivo, encontrado
+    // midiendo: `querySql` hace `.trim()` sobre TODA la salida, así que si la
+    // última fila termina en una columna vacía se le come el tabulador final y
+    // esa fila vuelve con un campo menos. Sin `ORDER BY`, que la última fila
+    // fuera o no una sin imagen dependía del orden incidental de Postgres, y el
+    // caso pasaba o fallaba según eso.
+    const SIN_PRIMARIA = '(sin imagen primaria)';
+    const esperado = new Map(queryRows(`
+      SELECT p.name,
+             COALESCE((SELECT i.url FROM product_images i
+                       WHERE i.product_id = p.id AND i.is_primary = true
+                       ORDER BY i.display_order, i.id LIMIT 1), ${sqlLiteral(SIN_PRIMARIA)})
+      FROM products p
+      WHERE p.name LIKE ${sqlLiteral(`${MARCADOR}-%`)}
+      ORDER BY p.name`)
+      .map(([nombre, url]) => [nombre, url === SIN_PRIMARIA ? null : url]));
+    assert(esperado.size === TOTAL,
+      `la base describe ${esperado.size} publicaciones del conjunto y son ${TOTAL}`);
+    assert([...esperado.values()].every((url) => url === null || url.startsWith('/uploads/')),
+      `la base devolvió URLs que no se pueden leer: `
+      + JSON.stringify([...esperado.values()].filter((url) => url !== null
+        && !url.startsWith('/uploads/')).slice(0, 3)));
+    const nulasEnBase = [...esperado.values()].filter((url) => url === null).length;
+    assert(nulasEnBase === SIN_IMAGEN + SOLO_SECUNDARIA,
+      `el escenario tiene ${nulasEnBase} publicaciones sin imagen primaria y tiene que tener `
+      + `${SIN_IMAGEN + SOLO_SECUNDARIA} (${SIN_IMAGEN} sin ninguna imagen y `
+      + `${SOLO_SECUNDARIA} con una no primaria)`);
+
+    const dibujadas = grande.datos.items;
+    for (const item of dibujadas) {
+      assert(esperado.has(item.name),
+        `la página trajo «${item.name}», que no es del conjunto fabricado`);
+      const debeSer = esperado.get(item.name);
+      assert((item.primary_image ?? null) === debeSer,
+        `«${item.name}» salió con primary_image ${JSON.stringify(item.primary_image ?? null)} `
+        + `y la base dice ${JSON.stringify(debeSer)}`);
+    }
+    const nulos = dibujadas.filter((item) => (item.primary_image ?? null) === null).length;
+    assert(nulos > 0 && nulos < dibujadas.length,
+      `de las ${dibujadas.length} tarjetas, ${nulos} vinieron sin imagen: el caso no estaría `
+      + 'distinguiendo la URL del null si fueran todas iguales');
+    medidos.push(`las ${dibujadas.length} tarjetas traen la URL que dice la base, con ${nulos} `
+      + 'en null: tener imagen no es tener imagen primaria');
+
+    // === C. Una publicación es una tarjeta, aunque tenga dos primarias ====
+    const veces = new Map();
+    for (const item of dibujadas) veces.set(item.id, (veces.get(item.id) ?? 0) + 1);
+    const repetidas = [...veces.entries()].filter(([, cuantas]) => cuantas > 1);
+    assert(repetidas.length === 0,
+      `${repetidas.length} publicación(es) salieron más de una vez en la misma página: `
+      + 'la unión con las imágenes está multiplicando la fila');
+    assert(grande.datos.total === TOTAL,
+      `el total dice ${grande.datos.total} y el conjunto tiene ${TOTAL} publicaciones: `
+      + 'la unión con las imágenes está inflando el conteo');
+    for (let i = desdeDos; i < TOTAL; i += 1) {
+      const item = dibujadas.find((candidata) => candidata.name === nombreDe(i));
+      if (!item) continue;
+      assert(item.primary_image === urlDe(i, 'primaria'),
+        `«${nombreDe(i)}» tiene dos imágenes primarias y salió con `
+        + `${JSON.stringify(item.primary_image)}: tiene que salir siempre la de menor orden`);
+    }
+    medidos.push(`con ${DOS_PRIMARIAS} publicaciones de DOS imágenes primarias —la base no lo `
+      + `impide— el total sigue siendo ${TOTAL}, ninguna tarjeta se repite y sale siempre la `
+      + 'imagen de menor orden');
+
+    // === D. Total, ids y orden, sin cambios ===============================
+    const porPrecio = await apiRequest(
+      `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page=1&page_size=${GRANDE}`
+      + '&sort_by=price&sort_order=asc');
+    assert(porPrecio.status === 200, `el catálogo ordenado respondió HTTP ${porPrecio.status}`);
+    const precios = porPrecio.data.items.map((item) => item.price);
+    assert(precios.every((precio, i) => i === 0 || precio >= precios[i - 1]),
+      `ordenando por precio ascendente salió ${JSON.stringify(precios.slice(0, 5))}`);
+    assert(porPrecio.data.total === TOTAL && porPrecio.data.pages === Math.ceil(TOTAL / GRANDE),
+      `ordenando, el total dice ${porPrecio.data.total} y las páginas ${porPrecio.data.pages}`);
+    const segunda = await apiRequest(
+      `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page=2&page_size=${GRANDE}`);
+    assert(segunda.data.items.length === TOTAL - GRANDE,
+      `la segunda página trajo ${segunda.data.items.length} y tenía que traer ${TOTAL - GRANDE}`);
+    const todos = new Set([...dibujadas, ...segunda.data.items].map((item) => item.id));
+    assert(todos.size === TOTAL,
+      `recorriendo las dos páginas se vieron ${todos.size} publicaciones distintas y hay ${TOTAL}`);
+    medidos.push('total, páginas, orden por precio y las dos páginas del conjunto, sin cambios');
+  } finally {
+    limpiar();
+  }
+
+  const [quedan] = queryRows(`
+    SELECT COUNT(*)::text, 'fin' FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+  assert(quedan[0] === '0',
+    `el caso dejó ${quedan[0]} publicaciones fabricadas sin retirar`);
+
+  return `con ${TOTAL} publicaciones fabricadas y retiradas al final: ${medidos.join('; ')}`;
+});
+
+// ---------------------------------------------------------------------------
+// 173. La condición —nuevo o usado— filtra el conjunto entero.
+//
+// El campo existía en la base y el alta ya lo pedía, pero no viajaba a la
+// consulta: medido contra la base, `?condition=nuevo` devolvía el catálogo
+// entero —195— igual que `?condition=inventado`, porque FastAPI descarta lo que
+// no declara.
+//
+// La condición sólo la tienen los activos, y ahí es opcional a propósito: en
+// «Bienes y Ganado» y «Tierras y parcelas» un ternero o un campo no son ni
+// nuevos ni usados. Por eso el filtro ACOTA y nunca completa, y este caso lo
+// mide: las publicaciones sin condición no entran en «Nuevo» NI en «Usado».
+// ---------------------------------------------------------------------------
+await runCase(173, 'La condición filtra el conjunto entero y nunca completa lo que nadie declaró', async () => {
+  const medidos = [];
+  const marca = Date.now();
+  const MARCADOR = `Smoke cond173 ${marca}`;
+  const POR_PAGINA = 24;
+  // Más de una página de nuevos: si el filtro se aplicara después de paginar,
+  // el total y la cantidad de páginas serían los del catálogo y no los del
+  // subconjunto.
+  const NUEVOS = 30;
+  const USADOS = 5;
+  const SIN_DECLARAR = 4;
+  const TOTAL = NUEVOS + USADOS + SIN_DECLARAR;
+  const PAGINAS_NUEVOS = Math.ceil(NUEVOS / POR_PAGINA);
+  const PAGINAS_TOTAL = Math.ceil(TOTAL / POR_PAGINA);
+
+  const nombreDe = (i) => `${MARCADOR}-${String(i).padStart(3, '0')}`;
+  const condicionDe = (i) => (i < NUEVOS ? 'nuevo' : i < NUEVOS + USADOS ? 'usado' : undefined);
+
+  const limpiar = () => {
+    try {
+      querySql(`DELETE FROM product_images WHERE product_id IN (
+        SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+    } catch (error) {
+      console.log(`  · no se pudieron retirar las publicaciones del caso 173: ${error.message}`);
+    }
+  };
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    // === Fabricación ======================================================
+    const vendedor = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+    })).data;
+    const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+    // Una categoría que admita ACTIVO: la condición sólo existe ahí.
+    const [laCategoria] = queryRows(`
+      SELECT c.id, c.name FROM categories c
+      WHERE c.name = 'Maquinaria agrícola' AND c.is_active = true`);
+    assert(laCategoria, 'no está la categoría «Maquinaria agrícola» para fabricar activos');
+
+    for (let i = 0; i < TOTAL; i += 1) {
+      const alta = await apiRequest('/products', {
+        method: 'POST', token: vendedor.access_token,
+        body: {
+          name: nombreDe(i),
+          description: 'Publicación fabricada para medir el filtro de condición.',
+          category_id: laCategoria[0],
+          price: 100000 + i,
+          stock: 2,
+          unit: 'unidad',
+          locality_id: localidad,
+          publication_type: 'producto',
+          operation_kind: 'activo',
+          condition: condicionDe(i),
+        },
+      });
+      assert(alta.status === 201 || alta.status === 200,
+        `la publicación ${i} respondió HTTP ${alta.status}: ${JSON.stringify(alta.data).slice(0, 200)}`);
+    }
+
+    // La fabricación se comprueba contra la BASE y no contra la respuesta del
+    // alta: medido, esa respuesta no devuelve `condition` —lo guarda, pero no
+    // lo echa—, así que creerle sería creerle a quien no lo dice.
+    const enBase = Object.fromEntries(queryRows(`
+      SELECT COALESCE(condition, 'sin declarar'), COUNT(*)::text
+      FROM products WHERE status = 'ACTIVE' AND name LIKE ${sqlLiteral(`${MARCADOR}-%`)}
+      GROUP BY condition`));
+    assert(Number(enBase.nuevo) === NUEVOS && Number(enBase.usado) === USADOS
+      && Number(enBase['sin declarar']) === SIN_DECLARAR,
+    `el escenario quedó como ${JSON.stringify(enBase)} y tenía que ser `
+      + `${JSON.stringify({ nuevo: NUEVOS, usado: USADOS, 'sin declarar': SIN_DECLARAR })}`);
+    medidos.push(`conjunto fabricado: ${NUEVOS} nuevos, ${USADOS} usados y ${SIN_DECLARAR} `
+      + 'sin condición declarada, todos activos');
+
+    // === A. La API ========================================================
+    const pedir = async (extra) => {
+      const respuesta = await apiRequest(
+        `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page_size=${POR_PAGINA}&${extra}`);
+      return respuesta;
+    };
+    const pedirOk = async (extra) => {
+      const respuesta = await pedir(extra);
+      assert(respuesta.status === 200,
+        `el catálogo respondió HTTP ${respuesta.status} para «${extra}»`);
+      return respuesta.data;
+    };
+
+    const todo = await pedirOk('page=1');
+    assert(todo.total === TOTAL, `sin filtro la API dice ${todo.total} y el conjunto tiene ${TOTAL}`);
+
+    const nuevos = await pedirOk('page=1&condition=nuevo');
+    assert(nuevos.total === NUEVOS,
+      `filtrando «nuevo» la API dice ${nuevos.total} y son ${NUEVOS}: si el filtro no viaja, `
+      + `el total sigue siendo el del conjunto entero (${TOTAL})`);
+    assert(nuevos.pages === PAGINAS_NUEVOS,
+      `filtrando «nuevo» la API dice ${nuevos.pages} páginas y son ${PAGINAS_NUEVOS}: el filtro `
+      + 'tiene que aplicarse ANTES de contar y paginar');
+    assert(nuevos.items.every((item) => item.condition === 'nuevo'),
+      `filtrando «nuevo» volvieron condiciones ${JSON.stringify([...new Set(nuevos.items.map((i) => i.condition))])}`);
+
+    const usados = await pedirOk('page=1&condition=usado');
+    assert(usados.total === USADOS,
+      `filtrando «usado» la API dice ${usados.total} y son ${USADOS}`);
+
+    // Acota y no completa: los que nadie declaró no entran en ninguno de los dos.
+    assert(nuevos.total + usados.total === TOTAL - SIN_DECLARAR,
+      `«nuevo» más «usado» suman ${nuevos.total + usados.total} y tienen que sumar `
+      + `${TOTAL - SIN_DECLARAR}: las ${SIN_DECLARAR} sin condición declarada no pueden entrar `
+      + 'en ninguno de los dos, porque incluirlas sería afirmar un dato que nadie cargó');
+
+    // Un valor que no existe no se descarta en silencio. `apiRequest` lanza en
+    // todo lo que no sea 2xx, así que el 422 se comprueba sobre lo que lanza.
+    let loQueDijo = 'no falló';
+    try {
+      const inventado = await pedir('page=1&condition=inventado');
+      loQueDijo = `HTTP ${inventado.status} con total ${inventado.data?.total}`;
+    } catch (error) {
+      loQueDijo = error.message;
+    }
+    assert(/HTTP 422/.test(loQueDijo),
+      `pidiendo una condición inventada la API contestó «${loQueDijo.slice(0, 160)}» y tiene que `
+      + 'responder 422: un filtro que se descarta en silencio miente sobre lo que devuelve');
+    medidos.push(`la API acota al subconjunto —${NUEVOS} nuevos en ${PAGINAS_NUEVOS} páginas y `
+      + `${USADOS} usados—, deja afuera las ${SIN_DECLARAR} sin declarar y rechaza con 422 un `
+      + 'valor que no existe');
+
+    // === B. La pantalla ===================================================
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    const conteo = page.locator('[class*="_conteo_"]').first();
+    const control = page.locator('#catalog-condition');
+    const paginador = page.getByRole('navigation', { name: /Paginación/i });
+    const cual = async () => (await paginador.getByText(/Página \d+ de \d+/).innerText())
+      .replace(/\s+/g, ' ').trim();
+    const nombresEnPantalla = () => page.locator('article[class*="card"] h3').allInnerTexts();
+    // El mensaje se arma DESPUÉS de fallar, con lo que la pantalla decía en ese
+    // momento: armarlo antes contaría lo que había al empezar a esperar.
+    const esperarElConteo = async (cuantas, porQue) => {
+      try {
+        await esperarA(async () => (await conteo.innerText()).includes(String(cuantas)),
+          porQue, 25_000);
+      } catch (error) {
+        const visto = await conteo.innerText().catch(() => '(no está)');
+        throw new Error(`${porQue}; el conteo dice «${visto.replace(/\s+/g, ' ').trim()}» y `
+          + `tenía que contar ${cuantas}`);
+      }
+    };
+
+    await page.goto(
+      `${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(MARCADOR)}`,
+      { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 25_000 });
+    await esperarElConteo(TOTAL, 'el Mercado no llegó a contar el conjunto');
+
+    assert(await control.count() === 1,
+      'no hay control de condición en la barra de filtros del Mercado');
+    const opciones = await control.locator('option').allInnerTexts();
+    assert(['Cualquiera', 'Nuevo', 'Usado'].every((r) => opciones.some((t) => t.trim() === r)),
+      `el control de condición ofrece ${JSON.stringify(opciones)}`);
+
+    await control.selectOption('nuevo');
+    await esperarElConteo(NUEVOS, 'elegir «Nuevo» no acotó el conteo al subconjunto');
+    await esperarA(async () => (await cual()) === `Página 1 de ${PAGINAS_NUEVOS}`,
+      `con «Nuevo» puesto el paginador dice «${await cual().catch(() => '(no está)')}» y tiene `
+      + `que decir «Página 1 de ${PAGINAS_NUEVOS}»`, 25_000);
+    assert(new URL(page.url()).searchParams.get('condition') === 'nuevo',
+      `la barra dice condition=${new URL(page.url()).searchParams.get('condition')}`);
+
+    // Desde una página interior, cambiar la condición vuelve a la 1.
+    //
+    // La transición se elige entre dos subconjuntos que TIENEN dos páginas —los
+    // nuevos y el conjunto entero—, y no hacia uno de una sola. Medido: yendo a
+    // un subconjunto de una página, el acote de «page» inexistente corrige a la
+    // primera igual, y el caso daba verde aunque el reinicio no existiera. Acá
+    // la página 2 sigue siendo válida después de cambiar, así que volver a la 1
+    // sólo puede ser el reinicio.
+    await paginador.getByRole('button', { name: /siguiente/i }).click();
+    await esperarA(async () => (await cual()) === `Página 2 de ${PAGINAS_NUEVOS}`,
+      'no se llegó a la página 2 de los nuevos', 25_000);
+    await control.selectOption('');
+    await esperarElConteo(TOTAL, 'sacar la condición no devolvió el conjunto entero');
+    await esperarA(async () => (await cual()) === `Página 1 de ${PAGINAS_TOTAL}`,
+      `cambiar la condición desde la página 2 dejó el paginador en `
+      + `«${await cual().catch(() => '(no está)')}»: tenía que volver a la primera, y la `
+      + 'página 2 sigue existiendo en este conjunto, así que no la corrigió el acote', 25_000);
+    assert(new URL(page.url()).searchParams.get('page') === null,
+      `y la barra quedó en page=${new URL(page.url()).searchParams.get('page')}`);
+
+    // Un subconjunto de una sola página no dibuja paginador.
+    await control.selectOption('usado');
+    await esperarElConteo(USADOS, 'elegir «Usado» no acotó el conteo');
+    assert(await paginador.count() === 0,
+      `con ${USADOS} usados el paginador no tiene que dibujarse: hay una sola página`);
+    const nombresUsados = await nombresEnPantalla();
+    assert(nombresUsados.length === USADOS,
+      `con «Usado» se dibujaron ${nombresUsados.length} tarjetas y son ${USADOS}`);
+
+    // Atrás restaura la condición anterior con sus publicaciones.
+    await page.locator('header').getByRole('button', { name: 'Contacto', exact: true }).click();
+    await page.getByRole('heading', { name: 'Contacto', level: 1 })
+      .waitFor({ state: 'visible', timeout: 25_000 });
+    await page.goBack({ waitUntil: 'domcontentloaded' });
+    await esperarA(async () => (await control.inputValue()) === 'usado',
+      `volver con Atrás dejó la condición en «${await control.inputValue().catch(() => '(no está)')}»`,
+      25_000);
+    await esperarElConteo(USADOS, 'volver con Atrás no restauró el subconjunto');
+
+    // Limpiar filtros la limpia: es un filtro, no un orden.
+    await page.getByRole('button', { name: /Limpiar filtros/i }).click();
+    await esperarA(async () => (await control.inputValue()) === '',
+      'limpiar filtros no limpió la condición', 25_000);
+    medidos.push('en pantalla: el control acota el conteo y las páginas, se escribe en la barra, '
+      + 'vuelve a la página 1 desde una interior, Atrás lo restaura y «Limpiar filtros» lo limpia');
+
+    // === C. Mientras la respuesta no vuelve, no se presenta lo anterior ====
+    // Misma regla que dejó la devolución R1 de CAT-PAGE-1: en la firma de la
+    // consulta vigente entra TODO lo que viaja. Si la condición quedara afuera,
+    // el control diría «Nuevo» sobre las tarjetas de antes y sin estado de
+    // carga. Se mira cuadro a cuadro —`rAF` corre justo antes de pintar, y es
+    // el único que ve cambiar el valor de un `<select>`— y commit a commit.
+    const DEMORA = 1200;
+    let demorar = 0;
+    await page.route('**/api/catalog/products*', async (ruta) => {
+      if (demorar > 0) await new Promise((seguir) => { setTimeout(seguir, demorar); });
+      await ruta.continue();
+    });
+    // «Limpiar filtros» también limpia la búsqueda —es un filtro más—, así que
+    // el marcador hay que volver a ponerlo para medir sobre el conjunto propio.
+    const buscador = page.getByLabel('Buscar en el mercado');
+    await buscador.fill(MARCADOR);
+    await buscador.press('Enter');
+    await esperarElConteo(TOTAL, 'volver a buscar el marcador no devolvió el conjunto entero');
+    const antesDeMover = await nombresEnPantalla();
+    assert(antesDeMover.length > 0, 'no había nada dibujado antes de mover el control');
+
+    await page.evaluate(() => {
+      const estado = (via) => ({
+        via,
+        condicion: document.querySelector('#catalog-condition')?.value ?? null,
+        ocupado: document.querySelectorAll('[aria-busy="true"]').length > 0,
+        nombres: [...document.querySelectorAll('article[class*="card"] h3')]
+          .map((titulo) => titulo.textContent.trim()),
+      });
+      const anotadas = [];
+      const observador = new MutationObserver(() => anotadas.push(estado('commit')));
+      observador.observe(document.body, {
+        subtree: true, childList: true, characterData: true, attributes: true,
+      });
+      let cuadro = requestAnimationFrame(function pintar() {
+        anotadas.push(estado('cuadro'));
+        cuadro = requestAnimationFrame(pintar);
+      });
+      window.__miradaDeLaCondicion = {
+        anotadas,
+        cortar: () => { observador.disconnect(); cancelAnimationFrame(cuadro); },
+      };
+    });
+
+    // La ventana entre mover el control y arrancar el efecto dura un cuadro, y
+    // muestrearla tal cual sale intermitente: medido, una corrida de cada varias
+    // la pierde, y un negativo intermitente da falsa confianza. Se frena la CPU
+    // seis veces mientras dura la transición. No es un truco para forzar el
+    // rojo: es el dispositivo real donde el defecto se ve, porque en un teléfono
+    // lento esos treinta milisegundos son trescientos y los ve una persona.
+    const cdp = await contexto.newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+    demorar = DEMORA;
+    try {
+      await control.selectOption('nuevo');
+      await esperarElConteo(NUEVOS, 'con la respuesta demorada, «Nuevo» no llegó a acotar');
+    } finally {
+      demorar = 0;
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+      await cdp.detach();
+    }
+    const mirados = await page.evaluate(() => {
+      window.__miradaDeLaCondicion.cortar();
+      return window.__miradaDeLaCondicion.anotadas;
+    });
+    const loViejo = JSON.stringify(antesDeMover);
+    const presentadas = mirados.filter((estado) => estado.condicion === 'nuevo'
+      && !estado.ocupado && JSON.stringify(estado.nombres) === loViejo);
+    assert(presentadas.length === 0,
+      `en ${presentadas.length} estado(s) `
+      + `(${[...new Set(presentadas.map((e) => e.via))].join(', ')}) el control ya decía «Nuevo» `
+      + `y la grilla seguía mostrando las ${antesDeMover.length} publicaciones anteriores sin `
+      + 'ningún estado de carga: la condición no entra en la firma de la consulta vigente');
+    assert(mirados.some((estado) => estado.ocupado),
+      'ningún estado observado marcó la espera: la transición no se vio y este negativo no '
+      + 'estaría midiendo nada');
+    await page.unroute('**/api/catalog/products*');
+    medidos.push(`con la respuesta demorada ${DEMORA} ms, ninguno de los ${mirados.length} `
+      + 'estados observados presentó la respuesta anterior como si fuera la nueva');
+
+    await contexto.close();
+  } finally {
+    await browser.close();
+    limpiar();
+  }
+
+  const [quedan] = queryRows(`
+    SELECT COUNT(*)::text, 'fin' FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+  assert(quedan[0] === '0',
+    `el caso dejó ${quedan[0]} publicaciones fabricadas sin retirar`);
+
+  return `con ${TOTAL} publicaciones fabricadas y retiradas al final: ${medidos.join('; ')}`;
+});
+
+// ---------------------------------------------------------------------------
+// 174. La marca es un dato de la publicación, y sólo donde significa algo.
+//
+// El buscador que trajo la clienta ofrece elegir MARCA. No existía: ni columna,
+// ni tabla, ni opción de formulario. Vivía suelta adentro del título, donde no
+// se puede contar ni filtrar.
+//
+// Lo que este caso protege no es que la marca se guarde —eso es lo fácil— sino
+// DÓNDE se ofrece. La anatomía `activo` incluye «Tierras y parcelas» y «Bienes
+// y Ganado»: decidirlo por anatomía pondría una lista de marcas de tractor
+// sobre un campo y sobre un ternero. Lo decide `categories.usa_marca`.
+//
+// Y protege la lista: la que vino traía «Jhon Deere» junto a «John Deere» —el
+// mismo tractor escrito de dos formas—, que el día que esto sea un filtro
+// parte los resultados en dos. Se retiró.
+// ---------------------------------------------------------------------------
+await runCase(174, 'La marca es un dato de la publicación, y sólo donde significa algo', async () => {
+  const medidos = [];
+  const marca = Date.now();
+  const MARCADOR = `Smoke marca174 ${marca}`;
+  const UNA_MARCA = 'john-deere';
+  // Cuántas marcas tiene que haber. No es decoración: si alguien vuelve a
+  // cargar la lista entera del buscador original, este número lo dice.
+  const CUANTAS_MARCAS = 44;
+  // Los slugs retirados por decisión de la PM, con el motivo al lado. Se
+  // comprueban uno por uno y no por el total, porque un total correcto con una
+  // sustitución adentro pasaría igual.
+  const RETIRADOS = [
+    ['jhon-deere', '«John Deere» mal escrito: dos etiquetas para el mismo tractor'],
+    ['fiat-someca', 'Someca era el brazo francés de Fiat; la máquina es un Fiat'],
+    ['someca', 'ídem: tres etiquetas para una familia'],
+    ['chery-bylion', 'Bylion es la línea de tractores de Chery; en el mercado se la nombra «Chery»'],
+  ];
+  // Y los que tienen que SEGUIR, para que «retirar» no se lea como «fusionar
+  // todo». Case/Case IH y Deutz/Deutz-Fahr quedan separadas a propósito.
+  const SOBREVIVEN = ['case', 'case-ih', 'deutz', 'deutz-fahr', 'fiat', 'chery', 'john-deere'];
+
+  const limpiar = () => {
+    try {
+      querySql(`DELETE FROM product_images WHERE product_id IN (
+        SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}%`)})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}%`)}`);
+    } catch (error) {
+      console.log(`  · no se pudieron retirar las publicaciones del caso 174: ${error.message}`);
+    }
+  };
+
+  // `contador` numera los intentos y `publicadas` guarda las que la API
+  // aceptó: una de las pruebas es justamente que rechace una marca inventada,
+  // y comparar el total del listado contra los intentos haría fallar el caso
+  // por su propia prueba.
+  let contador = 0;
+  const publicadas = [];
+
+  try {
+    // === A. La lista de marcas =============================================
+    const opciones = (await apiRequest('/catalog/form-options?option_type=brand')).data;
+    assert(Array.isArray(opciones) && opciones.length > 0,
+      `el catálogo de marcas devolvió ${JSON.stringify(opciones).slice(0, 120)}`);
+    const valores = opciones.map((o) => o.value);
+    const etiquetas = opciones.map((o) => o.label);
+
+    assert(new Set(valores).size === valores.length,
+      `la lista de marcas tiene valores repetidos: ${JSON.stringify(valores.filter((v, i) => valores.indexOf(v) !== i))}`);
+    assert(opciones.length === CUANTAS_MARCAS,
+      `la lista trae ${opciones.length} marcas y tiene que traer ${CUANTAS_MARCAS}: `
+      + 'la lista la curó la PM y volver a cargar la original las reintroduce');
+
+    // Los retirados, uno por uno y con su motivo. El primero es «Jhon Deere»,
+    // que es de donde salió esta guarda; los otros tres los decidió la PM
+    // antes de desplegar, que es la última ventana en la que cambiar la lista
+    // no deja publicaciones con una marca que ya no se ofrece.
+    for (const [slug, porQue] of RETIRADOS) {
+      assert(!valores.includes(slug),
+        `la lista de marcas trae «${slug}», que se retiró: ${porQue}. Con las dos cargadas, `
+        + 'la misma máquina se publica de dos formas y el día que esto filtre parte los '
+        + 'resultados');
+    }
+    // Y la etiqueta, no sólo el slug: «Jhon Deere» con otro valor sería lo mismo.
+    assert(!etiquetas.some((e) => /jhon/i.test(e)),
+      `la lista de marcas trae la etiqueta «${etiquetas.find((e) => /jhon/i.test(e))}»`);
+    assert(!etiquetas.some((e) => /someca/i.test(e)),
+      `la lista de marcas trae la etiqueta «${etiquetas.find((e) => /someca/i.test(e))}»`);
+
+    // Retirar no es fusionar: estos tienen que seguir estando.
+    for (const slug of SOBREVIVEN) {
+      assert(valores.includes(slug),
+        `falta «${slug}» en la lista de marcas. Case/Case IH y Deutz/Deutz-Fahr quedan `
+        + 'separadas a propósito: son marcas distintas y el vendedor sabe cuál tiene');
+    }
+    assert(etiquetas.some((e) => e === 'John Deere'),
+      'la lista de marcas no trae «John Deere»');
+    // Los valores son slugs: son los que van a viajar el día que esto filtre.
+    assert(valores.every((v) => /^[a-z0-9]+(-[a-z0-9]+)*$/.test(v)),
+      `hay valores que no son slugs: ${JSON.stringify(valores.filter((v) => !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(v)).slice(0, 3))}`);
+    assert(valores.includes(UNA_MARCA), `la lista no trae «${UNA_MARCA}»`);
+    medidos.push(`la lista trae ${opciones.length} marcas, todas con valor único en forma de `
+      + `slug; los ${RETIRADOS.length} retirados no están y los ${SOBREVIVEN.length} que `
+      + 'quedan separados a propósito sí');
+
+    // === B. Qué categorías la ofrecen ======================================
+    const categorias = (await apiRequest('/catalog/categories')).data;
+    const conMarca = categorias.filter((c) => c.usa_marca === true);
+    const sinMarca = categorias.filter((c) => c.usa_marca !== true);
+    assert(conMarca.length > 0,
+      'ninguna categoría declara `usa_marca`: el control no se ofrecería nunca');
+    assert(conMarca.every((c) => c.is_service === false),
+      `una categoría de servicio declara marca: ${JSON.stringify(conMarca.filter((c) => c.is_service).map((c) => c.name))}`);
+    // Lo que este caso viene a impedir: que se decida por anatomía.
+    for (const nombre of ['Tierras y parcelas', 'Bienes y Ganado']) {
+      const cual = categorias.find((c) => c.name === nombre);
+      if (!cual) continue;
+      assert(cual.usa_marca !== true,
+        `«${nombre}» declara marca. Es una categoría de anatomía «activo», así que decidir la `
+        + 'marca por anatomía ofrecería marcas de tractor para un campo o para un ternero');
+    }
+    medidos.push(`${conMarca.length} categoría(s) declaran marca —${conMarca.map((c) => c.name).join(', ')}— `
+      + `y ${sinMarca.length} no, entre ellas «Tierras y parcelas» y «Bienes y Ganado»`);
+
+    const laQueOfrece = conMarca[0];
+    const laQueNo = sinMarca.find((c) => c.is_service === false);
+    assert(laQueNo, 'no hay una categoría de producto que NO declare marca para contrastar');
+
+    // === C. El alta ========================================================
+    const vendedor = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+    })).data;
+    const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+    const publicar = async (categoria, anatomia, cuerpoExtra) => {
+      contador += 1;
+      const nombre = `${MARCADOR}-${String(contador).padStart(2, '0')}`;
+      const respuesta = await apiRequest('/products', {
+        method: 'POST', token: vendedor.access_token,
+        body: {
+          name: nombre,
+          description: 'Publicación fabricada para medir la marca de la publicación.',
+          category_id: categoria.id,
+          price: 500000 + contador,
+          stock: 1,
+          unit: 'unidad',
+          locality_id: localidad,
+          publication_type: 'producto',
+          operation_kind: anatomia,
+          ...cuerpoExtra,
+        },
+      });
+      publicadas.push(nombre);
+      return { nombre, id: respuesta.data.id };
+    };
+    // La marca se comprueba contra la BASE: `ProductResponse` es un acuse
+    // mínimo y no la devuelve, igual que no devuelve la condición.
+    const marcaEnBase = (nombre) => {
+      const [fila] = queryRows(`
+        SELECT COALESCE(brand, '(sin marca)'), 'fin' FROM products
+        WHERE name = ${sqlLiteral(nombre)}`);
+      assert(fila, `no quedó en la base la publicación «${nombre}»`);
+      return fila[0] === '(sin marca)' ? null : fila[0];
+    };
+
+    const conLaMarca = await publicar(laQueOfrece, 'activo', { brand: UNA_MARCA });
+    assert(marcaEnBase(conLaMarca.nombre) === UNA_MARCA,
+      `publicando en «${laQueOfrece.name}» con marca «${UNA_MARCA}», la base guardó `
+      + `${JSON.stringify(marcaEnBase(conLaMarca.nombre))}`);
+
+    const sinLaMarca = await publicar(laQueOfrece, 'activo', {});
+    assert(marcaEnBase(sinLaMarca.nombre) === null,
+      'publicar sin marca guardó una marca: la marca es opcional, y no se completa sola');
+
+    // En una categoría que no la ofrece, se descarta en silencio: guardar un
+    // dato que ninguna pantalla muestra es dejarlo listo para que una edición
+    // futura lo resucite.
+    const descartada = await publicar(laQueNo, 'insumo', { brand: UNA_MARCA });
+    assert(marcaEnBase(descartada.nombre) === null,
+      `publicando en «${laQueNo.name}», que no declara marca, la base guardó `
+      + `${JSON.stringify(marcaEnBase(descartada.nombre))}: la marca tenía que descartarse`);
+
+    // Una marca que no está en la lista se rechaza. Si se aceptara texto libre,
+    // «John Deere», «john deere» y «Jhon Deere» serían tres marcas distintas.
+    let loQueDijo = 'no falló';
+    try {
+      await publicar(laQueOfrece, 'activo', { brand: 'tractores-de-la-esquina' });
+      loQueDijo = 'aceptó una marca que no existe';
+    } catch (error) {
+      loQueDijo = error.message;
+    }
+    assert(/HTTP 400/.test(loQueDijo),
+      `publicando con una marca inventada la API contestó «${loQueDijo.slice(0, 160)}» y tiene `
+      + 'que rechazarla: aceptar texto libre vuelve incontable cualquier filtro futuro');
+    medidos.push('el alta guarda la marca donde la categoría la declara, la descarta donde no, '
+      + 'la deja vacía si no se elige y rechaza una que no está en la lista');
+
+    // === D. Sale en el listado y en el detalle =============================
+    const listado = (await apiRequest(
+      `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page_size=24`)).data;
+    assert(listado.total === publicadas.length,
+      `el listado dice ${listado.total} y se publicaron ${publicadas.length}`);
+    const enListado = listado.items.find((i) => i.name === conLaMarca.nombre);
+    assert(enListado && enListado.brand === UNA_MARCA,
+      `en el listado la publicación con marca salió con brand=${JSON.stringify(enListado?.brand)}`);
+    const otraEnListado = listado.items.find((i) => i.name === descartada.nombre);
+    assert(otraEnListado && (otraEnListado.brand ?? null) === null,
+      `la publicación de la categoría sin marca salió con brand=${JSON.stringify(otraEnListado?.brand)}`);
+
+    const detalle = (await apiRequest(`/catalog/products/${conLaMarca.id}`)).data;
+    assert(detalle.brand === UNA_MARCA,
+      `el detalle devolvió brand=${JSON.stringify(detalle.brand)}`);
+    medidos.push('la marca sale en la tarjeta y en el detalle, y en null donde no corresponde');
+
+    // === E. Editar: mudarse a una categoría sin marca la suelta ============
+    const edicion = await apiRequest(`/products/${conLaMarca.id}`, {
+      method: 'PATCH', token: vendedor.access_token,
+      body: { category_id: laQueNo.id, operation_kind: 'insumo' },
+    });
+    assert(edicion.status === 200, `la edición respondió HTTP ${edicion.status}`);
+    assert(marcaEnBase(conLaMarca.nombre) === null,
+      `mudando la publicación a «${laQueNo.name}», que no declara marca, quedó `
+      + `brand=${JSON.stringify(marcaEnBase(conLaMarca.nombre))}: la marca tenía que soltarse, `
+      + 'porque esa categoría no la muestra y una edición futura la resucitaría');
+    medidos.push('mudar una publicación a una categoría que no declara marca suelta la marca');
+
+    // === F. En pantalla: el control aparece sólo donde corresponde =========
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const page = await contexto.newPage();
+      await page.goto(`${FRONTEND_URL}/`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Ingresar' }).first().click();
+      await page.getByLabel(/correo|email/i).first().fill('vendedor@ejemplo.com');
+      await page.getByLabel(/contraseña/i).first().fill('vendedor123');
+      await page.getByRole('button', { name: /ingresar/i }).last().click();
+      await esperarA(async () => (await page.getByRole('button', { name: 'Ingresar' }).count()) === 0,
+        'no se pudo ingresar para abrir el alta', 25_000);
+
+      await page.getByRole('button', { name: /publicar|vender/i }).first().click();
+      const categoriaEnElAlta = page.locator('select[name="category"], #category').first();
+      await categoriaEnElAlta.waitFor({ state: 'visible', timeout: 25_000 });
+
+      const controlDeMarca = page.locator('#brand');
+      await categoriaEnElAlta.selectOption({ label: laQueOfrece.name });
+      await esperarA(async () => (await controlDeMarca.count()) === 1,
+        `eligiendo «${laQueOfrece.name}», que declara marca, el alta no ofreció el control`, 20_000);
+      const cuantasOpciones = await controlDeMarca.locator('option').count();
+      assert(cuantasOpciones === opciones.length + 1,
+        `el control ofrece ${cuantasOpciones} opciones y tienen que ser ${opciones.length + 1} `
+        + '(las marcas más «Sin declarar»)');
+
+      await categoriaEnElAlta.selectOption({ label: laQueNo.name });
+      await esperarA(async () => (await controlDeMarca.count()) === 0,
+        `eligiendo «${laQueNo.name}», que NO declara marca, el alta siguió ofreciendo el control`,
+        20_000);
+      medidos.push(`en el alta el control aparece en «${laQueOfrece.name}» con `
+        + `${cuantasOpciones} opciones y desaparece en «${laQueNo.name}»`);
+      await contexto.close();
+    } finally {
+      await browser.close();
+    }
+  } finally {
+    limpiar();
+  }
+
+  const [quedan] = queryRows(`
+    SELECT COUNT(*)::text, 'fin' FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}%`)}`);
+  assert(quedan[0] === '0', `el caso dejó ${quedan[0]} publicaciones fabricadas sin retirar`);
+
+  return `con ${publicadas.length} publicaciones fabricadas y retiradas al final: `
+    + medidos.join('; ');
+});
+
+// ---------------------------------------------------------------------------
+// 175. La marca filtra el conjunto entero, y la faceta dice qué se puede pedir.
+//
+// La etapa 2 dejó la marca guardada y validada; esto la hace buscable. Son dos
+// piezas y se miden por separado porque fallan distinto:
+//
+//  - el FILTRO tiene que aplicarse antes de contar y de paginar. Aplicado
+//    después, el total y las páginas siguen siendo las del catálogo y la
+//    pantalla afirma un conjunto que no está mirando;
+//  - la FACETA tiene que calcularse con todos los filtros vigentes y SIN la
+//    marca. Calculada después de la marca, elegir una borra a las demás de la
+//    lista y ya no se puede cambiar de marca sin limpiar; calculada sobre la
+//    página, cuenta 24 y llama a eso «el mercado».
+//
+// Y una regla que no es de eficiencia sino de honestidad: no se ofrece una
+// marca que devuelve cero. La única que puede aparecer en cero es la que ya
+// está elegida, cuando otro filtro la dejó sin resultados: si se cayera de la
+// lista, el control no tendría cómo decir que está puesta ni cómo sacarla.
+//
+// El conjunto se fabrica acá —cinco grupos, uno por marca más uno sin marca,
+// repartidos en más de una página— y se verifica contra la BASE antes de medir
+// nada: una prueba que se cree el eco del alta no sabe qué está midiendo.
+// ---------------------------------------------------------------------------
+await runCase(175, 'La marca filtra el conjunto entero y la faceta ofrece sólo lo que existe', async () => {
+  const medidos = [];
+  const sello = Date.now();
+  const MARCADOR = `Smoke marca175 ${sello}`;
+  const POR_PAGINA = 24;
+
+  // Cinco grupos. `john-deere` pasa de una página a propósito: es lo que
+  // distingue un filtro que viaja de uno que recorta la página bajada.
+  //
+  // Los precios separan los grupos en bandas para poder dejar una marca sin
+  // resultados sin tocar su propia columna: es el escenario del punto 4 —otro
+  // filtro deja en cero a la marca elegida—.
+  const GRUPOS = [
+    { marca: 'john-deere', etiqueta: 'John Deere', cuantas: 30, precio: 1_000_000 },
+    { marca: 'pauny', etiqueta: 'Pauny', cuantas: 5, precio: 2_000_000 },
+    { marca: 'valtra', etiqueta: 'Valtra', cuantas: 3, precio: 3_000_000 },
+    // Se publica con la opción VIVA y recién después se la da de baja: así el
+    // escenario es el real —una publicación que quedó apuntando a una marca
+    // que el panel desactivó— y no un dato imposible escrito a mano.
+    { marca: 'zanello', etiqueta: 'Zanello', cuantas: 4, precio: 4_000_000, seDesactiva: true },
+    { marca: null, etiqueta: '(sin marca)', cuantas: 6, precio: 5_000_000 },
+  ];
+  const TOTAL = GRUPOS.reduce((suma, grupo) => suma + grupo.cuantas, 0);
+  const CON_MARCA_VIVA = GRUPOS.filter((g) => g.marca && !g.seDesactiva);
+  const TECHO_SOLO_JD = 1_900_000;
+
+  const nombreDe = (i) => `${MARCADOR}-${String(i).padStart(3, '0')}`;
+
+  const limpiar = () => {
+    try {
+      querySql(`DELETE FROM product_images WHERE product_id IN (
+        SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+      querySql(`UPDATE form_options SET is_active = true
+        WHERE option_type = 'brand' AND value = 'zanello'`);
+    } catch (error) {
+      console.log(`  · no se pudieron retirar los datos del caso 175: ${error.message}`);
+    }
+  };
+
+  limpiar();
+  const browser = await chromium.launch({ headless: true });
+  try {
+    // === A. Fabricación, verificada contra la base ==========================
+    const vendedor = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+    })).data;
+    const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+    // La marca sólo existe donde significa algo, y hoy eso es una sola
+    // categoría. Se lee de la base y no se escribe acá: si mañana son dos, esto
+    // sigue midiendo la que las tiene.
+    const [laCategoria] = queryRows(`
+      SELECT c.id, c.name FROM categories c
+      WHERE c.usa_marca = true AND c.is_active = true ORDER BY c.name LIMIT 1`);
+    assert(laCategoria, 'ninguna categoría declara `usa_marca`: no hay dónde fabricar el conjunto');
+
+    let indice = 0;
+    for (const grupo of GRUPOS) {
+      for (let i = 0; i < grupo.cuantas; i += 1, indice += 1) {
+        const alta = await apiRequest('/products', {
+          method: 'POST', token: vendedor.access_token,
+          body: {
+            name: nombreDe(indice),
+            description: 'Publicación fabricada para medir el filtro y la faceta de marca.',
+            category_id: laCategoria[0],
+            price: grupo.precio + i,
+            stock: 2,
+            unit: 'unidad',
+            locality_id: localidad,
+            publication_type: 'producto',
+            operation_kind: 'activo',
+            condition: 'usado',
+            brand: grupo.marca ?? undefined,
+          },
+        });
+        assert(alta.status === 201 || alta.status === 200,
+          `la publicación ${indice} (${grupo.etiqueta}) respondió HTTP ${alta.status}: `
+          + JSON.stringify(alta.data).slice(0, 200));
+      }
+    }
+
+    // Contra la BASE, no contra el eco del alta.
+    const enBase = Object.fromEntries(queryRows(`
+      SELECT COALESCE(brand, '(sin marca)'), COUNT(*)::text
+      FROM products WHERE status = 'ACTIVE' AND name LIKE ${sqlLiteral(`${MARCADOR}-%`)}
+      GROUP BY brand`));
+    for (const grupo of GRUPOS) {
+      const clave = grupo.marca ?? '(sin marca)';
+      assert(Number(enBase[clave]) === grupo.cuantas,
+        `el escenario quedó con ${enBase[clave]} de «${clave}» y tenía que tener `
+        + `${grupo.cuantas}; la base dice ${JSON.stringify(enBase)}`);
+    }
+
+    // Y recién ahora se da de baja la opción: lo publicado no se toca.
+    querySql(`UPDATE form_options SET is_active = false
+      WHERE option_type = 'brand' AND value = 'zanello'`);
+    const [bajaHecha] = queryRows(`SELECT is_active::text, 'fin' FROM form_options
+      WHERE option_type = 'brand' AND value = 'zanello'`);
+    assert(bajaHecha && bajaHecha[0] === 'false',
+      'no se pudo dar de baja la marca que el caso necesita ver excluida');
+    medidos.push(`conjunto fabricado: ${GRUPOS.map((g) => `${g.cuantas} ${g.etiqueta}`).join(', ')}`
+      + `, ${TOTAL} en total, con «Zanello» dada de baja después de publicar`);
+
+    // === B. La API ==========================================================
+    const pedirOk = async (extra) => {
+      const respuesta = await apiRequest(
+        `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page_size=${POR_PAGINA}&${extra}`);
+      assert(respuesta.status === 200,
+        `el catálogo respondió HTTP ${respuesta.status} para «${extra}»`);
+      return respuesta.data;
+    };
+    const facetaDe = (data) => (data.brands ?? [])
+      .map(({ value, label, count }) => `${value}|${label}|${count}`).sort();
+    const esperadaCompleta = CON_MARCA_VIVA
+      .map((g) => `${g.marca}|${g.etiqueta}|${g.cuantas}`).sort();
+
+    // B1. Sin filtro de marca: la faceta describe el conjunto entero.
+    const todo = await pedirOk('page=1');
+    assert(todo.total === TOTAL, `sin filtro la API dice ${todo.total} y el conjunto tiene ${TOTAL}`);
+    assert(JSON.stringify(facetaDe(todo)) === JSON.stringify(esperadaCompleta),
+      `la faceta trajo ${JSON.stringify(facetaDe(todo))} y tenía que traer `
+      + JSON.stringify(esperadaCompleta));
+    assert(!(todo.brands ?? []).some((m) => m.value === 'zanello'),
+      'la faceta ofrece «zanello», que está dada de baja: el catálogo estaría resucitando '
+      + 'lo que el alta ya no deja elegir');
+    assert(!(todo.brands ?? []).some((m) => m.count === 0),
+      `la faceta ofrece marcas en cero: ${JSON.stringify(todo.brands)}`);
+    assert(!(todo.brands ?? []).some((m) => !m.value || !m.label),
+      `la faceta trae una entrada sin valor o sin etiqueta: ${JSON.stringify(todo.brands)}`);
+
+    // B2. El filtro acota el CONJUNTO: total, páginas, ids y orden.
+    //
+    // Se recorren las dos páginas y se compara el recorrido completo contra lo
+    // que dice la base, ordenado igual. Un total correcto con una sustitución
+    // adentro —o una fila repetida entre páginas— pasaría una comprobación de
+    // cantidades y se ve acá.
+    const ELEGIDA = CON_MARCA_VIVA[0];
+    const paginas = Math.ceil(ELEGIDA.cuantas / POR_PAGINA);
+    const primera = await pedirOk(`page=1&brand=${ELEGIDA.marca}&sort_by=price&sort_order=asc`);
+    assert(primera.total === ELEGIDA.cuantas,
+      `filtrando «${ELEGIDA.marca}» la API dice ${primera.total} y son ${ELEGIDA.cuantas}: si el `
+      + `filtro no se aplica antes de contar, el total sigue siendo el del conjunto (${TOTAL})`);
+    assert(primera.pages === paginas,
+      `filtrando «${ELEGIDA.marca}» la API dice ${primera.pages} páginas y son ${paginas}: el `
+      + 'filtro tiene que aplicarse ANTES de contar y paginar');
+
+    const recorridas = [];
+    for (let p = 1; p <= paginas; p += 1) {
+      const pagina = await pedirOk(`page=${p}&brand=${ELEGIDA.marca}&sort_by=price&sort_order=asc`);
+      assert(pagina.items.every((item) => item.brand === ELEGIDA.marca),
+        `en la página ${p} volvieron marcas ${JSON.stringify([...new Set(pagina.items.map((i) => i.brand))])}`);
+      recorridas.push(...pagina.items.map((item) => item.id));
+    }
+    assert(new Set(recorridas).size === recorridas.length,
+      'recorrer las páginas del filtro devolvió la misma publicación dos veces');
+    const enLaBase = queryRows(`
+      SELECT id FROM products
+      WHERE status = 'ACTIVE' AND name LIKE ${sqlLiteral(`${MARCADOR}-%`)}
+        AND brand = ${sqlLiteral(ELEGIDA.marca)}
+      ORDER BY price ASC, created_at DESC, id ASC`).map(([id]) => id);
+    assert(JSON.stringify(recorridas) === JSON.stringify(enLaBase),
+      `el recorrido del filtro no coincide con la base: la API devolvió ${recorridas.length} ids `
+      + `y la base tiene ${enLaBase.length}, y el orden ${recorridas.slice(0, 3)} contra `
+      + `${enLaBase.slice(0, 3)}`);
+
+    // B3. Con la marca puesta, la faceta NO cambia: se calcula antes que ella.
+    assert(JSON.stringify(facetaDe(primera)) === JSON.stringify(esperadaCompleta),
+      `con «${ELEGIDA.marca}» elegida la faceta quedó en ${JSON.stringify(facetaDe(primera))}: `
+      + 'calculada después de la marca, elegir una borra a las demás y ya no se puede cambiar '
+      + 'de marca sin limpiar el filtro');
+
+    // B4. Y tampoco depende del tamaño de página: se cuenta antes de paginar.
+    const deAUna = await apiRequest(
+      `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page_size=1&page=1`);
+    assert(deAUna.status === 200, `page_size=1 respondió HTTP ${deAUna.status}`);
+    assert(JSON.stringify(facetaDe(deAUna.data)) === JSON.stringify(esperadaCompleta),
+      `con page_size=1 la faceta dice ${JSON.stringify(facetaDe(deAUna.data))}: está contando la `
+      + 'página y no el conjunto');
+
+    // B5. Con otro filtro puesto, la faceta lo respeta.
+    const soloBarato = await pedirOk(`page=1&max_price=${TECHO_SOLO_JD}`);
+    assert(JSON.stringify(facetaDe(soloBarato))
+      === JSON.stringify([`${ELEGIDA.marca}|${ELEGIDA.etiqueta}|${ELEGIDA.cuantas}`]),
+    `acotando el precio la faceta trajo ${JSON.stringify(facetaDe(soloBarato))}: tenía que traer `
+      + `sólo «${ELEGIDA.marca}», que es la única banda que entra bajo ${TECHO_SOLO_JD}`);
+
+    // B6. La elegida sigue en la lista aunque quede en cero; las otras no.
+    const SIN_RESULTADOS = CON_MARCA_VIVA[1];
+    const enCero = await pedirOk(
+      `page=1&max_price=${TECHO_SOLO_JD}&brand=${SIN_RESULTADOS.marca}`);
+    assert(enCero.total === 0,
+      `el escenario del punto 4 no quedó en cero: la API devolvió ${enCero.total}`);
+    const laElegida = (enCero.brands ?? []).find((m) => m.value === SIN_RESULTADOS.marca);
+    assert(laElegida && laElegida.count === 0,
+      `con «${SIN_RESULTADOS.marca}» elegida y sin resultados, la faceta trajo `
+      + `${JSON.stringify(enCero.brands)}: si se cae de la lista, el control no puede decir que `
+      + 'está puesta ni sacarla, y queda un mercado vacío sostenido por un filtro invisible');
+    assert(!(enCero.brands ?? []).some((m) => m.count === 0 && m.value !== SIN_RESULTADOS.marca),
+      `además de la elegida, la faceta ofrece otras en cero: ${JSON.stringify(enCero.brands)}`);
+    medidos.push('la API acota el conjunto entero por marca —total, páginas, ids y orden—, y la '
+      + 'faceta se calcula con los demás filtros, sin la marca, antes de paginar, sin nulos, sin '
+      + 'la opción dada de baja y sin conteos cero salvo el de la marca elegida');
+
+    // === C. La pantalla, en los dos anchos ==================================
     for (const medida of [
       { n: 'escritorio', width: 1440, height: 900 },
       { n: 'movil', width: 390, height: 844 },
     ]) {
-      await pagina.setViewportSize({ width: medida.width, height: medida.height });
+      const contexto = await browser.newContext({
+        viewport: { width: medida.width, height: medida.height },
+      });
+      const page = await contexto.newPage();
       const donde = `${medida.n} ${medida.width}x${medida.height}`;
-      await celdaDelCarrito(pagina).waitFor({ state: 'visible', timeout: 20_000 });
-
-      const geometria = await pagina.evaluate(() => {
-        const cabecera = document.querySelector('header');
-        const monograma = cabecera.querySelector('img');
-        const visibles = [...cabecera.querySelectorAll('button')].filter((boton) => {
-          const caja = boton.getBoundingClientRect();
-          return caja.width > 0 && caja.height > 0;
-        });
-        return {
-          anchoDelDocumento: document.documentElement.scrollWidth,
-          anchoDeLaVentana: window.innerWidth,
-          desbordados: visibles
-            .filter((boton) => boton.getBoundingClientRect().right > window.innerWidth + 1
-              || boton.getBoundingClientRect().left < -1)
-            .map((boton) => boton.innerText.trim() || '(sin texto)'),
-          textos: visibles.map((boton) => boton.innerText.trim()),
-          marca: monograma ? {
-            natural: monograma.naturalWidth / monograma.naturalHeight,
-            dibujado: monograma.getBoundingClientRect().width
-              / monograma.getBoundingClientRect().height,
-            ancho: monograma.getBoundingClientRect().width,
-          } : null,
-        };
-      });
-
-      assert(geometria.anchoDelDocumento <= geometria.anchoDeLaVentana + 1,
-        `${donde}: la cabecera sin sesión desborda a lo ancho —documento de `
-        + `${geometria.anchoDelDocumento}px en una ventana de ${geometria.anchoDeLaVentana}px`);
-      assert(geometria.desbordados.length === 0,
-        `${donde}: quedaron celdas fuera de la ventana: ${JSON.stringify(geometria.desbordados)}`);
-      for (const seccion of ['Inicio', 'Mercado', 'Servicios', 'Quiénes somos', 'Contacto']) {
-        assert(geometria.textos.includes(seccion),
-          `${donde}: la navegación perdió «${seccion}»: ${JSON.stringify(geometria.textos)}`);
-      }
-      assert(geometria.textos.some((texto) => /^Carrito/.test(texto)),
-        `${donde}: no está la celda del carrito: ${JSON.stringify(geometria.textos)}`);
-      assert(geometria.textos.includes('Ingresar'),
-        `${donde}: se perdió «Ingresar»: ${JSON.stringify(geometria.textos)}`);
-      assert(geometria.marca && geometria.marca.ancho > 0,
-        `${donde}: el monograma de la marca no se dibuja`);
-      assert(Math.abs(geometria.marca.dibujado - geometria.marca.natural)
-        / geometria.marca.natural < 0.02,
-      `${donde}: el monograma quedó deformado —dibujado ${geometria.marca.dibujado.toFixed(3)} `
-        + `contra ${geometria.marca.natural.toFixed(3)} de la imagen`);
-
-      // El foco se llega por teclado, no llamando a `focus()`: lo que hay que
-      // ver es el anillo de `:focus-visible`, y ése sólo aparece cuando el
-      // navegador entiende que quien se movió fue una persona con el teclado.
+      const control = page.locator('#catalog-brand');
+      const conteo = page.locator('[class*="_conteo_"]').first();
+      const esperarElConteo = async (cuantas, porQue) => {
+        try {
+          await esperarA(async () => (await conteo.innerText()).includes(String(cuantas)),
+            porQue, 25_000);
+        } catch {
+          const visto = await conteo.innerText().catch(() => '(no está)');
+          throw new Error(`${donde}: ${porQue}; el conteo dice `
+            + `«${visto.replace(/\s+/g, ' ').trim()}» y tenía que contar ${cuantas}`);
+        }
+      };
+      // En celular la barra de filtros vive detrás de un botón: el control no
+      // está «ausente», está guardado. Abrirlo es parte de usarlo.
       //
-      // Se arranca desde la marca, que es el primer control del documento, y
-      // no clickeando el fondo ni soltando el foco. Las dos cosas se probaron
-      // y las dos mienten: la cabecera ocupa la esquina superior izquierda, así
-      // que un clic ahí le pega a la marca y NAVEGA —esta medición decía «a 1
-      // tabulación» por eso—; y `blur()` suelta el foco pero no reinicia el
-      // punto desde el que Chromium sigue tabulando, así que la segunda vuelta
-      // arrancaba en medio de la barra de filtros y no llegaba nunca.
-      await pagina.locator('header button').first().focus();
-      let pasos = 0;
-      let llegado = false;
-      while (pasos < 40 && !llegado) {
-        await pagina.keyboard.press('Tab');
-        pasos += 1;
-        llegado = await pagina.evaluate(() =>
-          /^Carrito/.test((document.activeElement?.innerText || '').trim())
-          && document.activeElement.closest('header') !== null);
+      // Es idempotente a propósito, y no por prolijidad: ese botón ALTERNA, así
+      // que llamarlo dos veces cerraba el panel.
+      //
+      // Y el estado se lee de `aria-expanded`, no de si los controles «se ven».
+      // Plegado, el panel es `max-height: 0` con recorte: sus controles
+      // conservan caja, así que un `isVisible()` dice que sí y el clic va a
+      // parar al envoltorio del contenido, que es lo que está de verdad
+      // adelante. Con el atributo, lo que se mira es lo que el panel declara.
+      const plegador = page.getByRole('button', { name: /^Filtros/ });
+      const panelPlegado = async () => (await plegador.count()) > 0
+        && (await plegador.isVisible())
+        && (await plegador.getAttribute('aria-expanded')) !== 'true';
+      const abrirLosFiltros = async () => {
+        if (!(await panelPlegado())) return;
+        await plegador.click();
+        await esperarA(async () => !(await panelPlegado()),
+          `${donde}: el panel de filtros no se abrió`, 20_000);
+      };
+
+      await page.goto(
+        `${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(MARCADOR)}`,
+        { waitUntil: 'domcontentloaded' });
+      await esperarElConteo(TOTAL, 'el Mercado no llegó a contar el conjunto fabricado');
+      await abrirLosFiltros();
+      await control.waitFor({ state: 'visible', timeout: 25_000 });
+
+      // Las opciones son las de la faceta, con su conteo, y ninguna más.
+      const opciones = (await control.locator('option').allInnerTexts()).map((t) => t.trim());
+      assert(opciones[0] === 'Todas las marcas',
+        `${donde}: la primera opción es «${opciones[0]}» y tiene que poder no filtrar`);
+      for (const grupo of CON_MARCA_VIVA) {
+        assert(opciones.includes(`${grupo.etiqueta} (${grupo.cuantas})`),
+          `${donde}: falta «${grupo.etiqueta} (${grupo.cuantas})» en ${JSON.stringify(opciones)}`);
       }
-      assert(llegado, `${donde}: la celda del carrito no se alcanza con el teclado en 40 tabulaciones`);
-      const anillo = await pagina.evaluate(() => {
-        const estilo = getComputedStyle(document.activeElement);
-        return {
-          contorno: estilo.outlineStyle,
-          ancho: parseFloat(estilo.outlineWidth) || 0,
-          sombra: estilo.boxShadow,
-        };
-      });
-      assert((anillo.contorno !== 'none' && anillo.ancho > 0)
-        || (anillo.sombra && anillo.sombra !== 'none'),
-      `${donde}: la celda del carrito recibe el foco sin mostrarlo: ${JSON.stringify(anillo)}`);
+      assert(!opciones.some((t) => /Zanello/i.test(t)),
+        `${donde}: el control ofrece una marca dada de baja: ${JSON.stringify(opciones)}`);
+      assert(opciones.length === CON_MARCA_VIVA.length + 1,
+        `${donde}: el control ofrece ${opciones.length} opciones y tenía que ofrecer `
+        + `${CON_MARCA_VIVA.length + 1}: ${JSON.stringify(opciones)}`);
 
-      const ruta = `${CAPTURAS}/cabecera-sin-sesion-${medida.width}x${medida.height}.png`;
-      await pagina.locator('header').screenshot({ path: ruta });
-      capturas.push(`${ruta} (${donde})`);
-      medidos.push(`${donde}: la cabecera sin sesión suma la celda del carrito sin desbordar, sin `
-        + `deformar la marca (${geometria.marca.dibujado.toFixed(3)}), con las cinco secciones y `
-        + `con el foco visible a ${pasos} tabulaciones`);
+      // Elegir acota, y se escribe en la barra.
+      await control.selectOption(ELEGIDA.marca);
+      await esperarElConteo(ELEGIDA.cuantas,
+        `elegir «${ELEGIDA.etiqueta}» no acotó el conteo`);
+      await esperarA(async () =>
+        new URL(page.url()).searchParams.get('brand') === ELEGIDA.marca,
+      `${donde}: la marca no se escribió en la barra; la URL es ${page.url()}`, 20_000);
+
+      // Desde una página interior, cambiar de marca vuelve a la primera.
+      const paginador = page.getByRole('navigation', { name: /Paginación/i });
+      if (await paginador.count() > 0) {
+        await paginador.getByRole('button', { name: /siguiente/i }).first().click();
+        await esperarA(async () => new URL(page.url()).searchParams.get('page') === '2',
+          `${donde}: no se pudo ir a la página 2 del subconjunto`, 20_000);
+        await abrirLosFiltros();
+        await control.selectOption(CON_MARCA_VIVA[1].marca);
+        await esperarElConteo(CON_MARCA_VIVA[1].cuantas,
+          'cambiar de marca desde la página 2 no acotó el conteo');
+        assert(new URL(page.url()).searchParams.get('page') === null,
+          `${donde}: cambiar de marca dejó la barra en page=`
+          + `${new URL(page.url()).searchParams.get('page')}: la página 7 de un conjunto no `
+          + 'significa nada en otro');
+        await abrirLosFiltros();
+        await control.selectOption(ELEGIDA.marca);
+        await esperarElConteo(ELEGIDA.cuantas, 'volver a la primera marca no acotó el conteo');
+      }
+
+      // Atrás devuelve el filtro, no sólo la dirección.
+      await page.locator('header').getByRole('button', { name: 'Contacto', exact: true }).click();
+      await page.getByRole('heading', { name: 'Preguntas Frecuentes' })
+        .waitFor({ state: 'visible', timeout: 25_000 });
+      await page.goBack({ waitUntil: 'domcontentloaded' });
+      await abrirLosFiltros();
+      await esperarA(async () => (await control.inputValue()) === ELEGIDA.marca,
+        `${donde}: volver con Atrás dejó la marca en `
+        + `«${await control.inputValue().catch(() => '(no está)')}»`, 25_000);
+      await esperarElConteo(ELEGIDA.cuantas, 'volver con Atrás no restauró el subconjunto');
+
+      // Y «Limpiar filtros» la limpia: es un filtro, no un orden.
+      //
+      // En 390 px el panel abierto es más alto que la pantalla y este botón
+      // queda debajo del pliegue —medido: y=930 en una ventana de 844—, así que
+      // hay que bajar hasta él como bajaría cualquiera.
+      //
+      // Y primero hay que dejar que la pantalla se quede quieta: volver de otra
+      // sección dispara un desplazamiento SUAVE, y bajar al botón mientras la
+      // página todavía se mueve hace que el clic aterrice donde el botón ya no
+      // está. El síntoma era «el envoltorio del contenido intercepta el clic».
+      await abrirLosFiltros();
+      await esperarA(async () => {
+        const antes = await page.evaluate(() => window.scrollY);
+        await page.waitForTimeout(120);
+        return (await page.evaluate(() => window.scrollY)) === antes;
+      }, `${donde}: la pantalla no dejó de desplazarse`, 15_000);
+      const limpiarFiltros = page.getByRole('button', { name: /Limpiar filtros/i });
+      await limpiarFiltros.scrollIntoViewIfNeeded();
+      try {
+        await limpiarFiltros.click({ timeout: 10_000 });
+      } catch (error) {
+        // Un tiempo agotado dice «se venció» y nada más. Lo que hace falta
+        // saber cuando un clic no entra es QUÉ hay en ese punto.
+        const estorbo = await page.evaluate(() => {
+          const boton = [...document.querySelectorAll('button')]
+            .find((b) => /Limpiar filtros/i.test(b.textContent || ''));
+          if (!boton) return 'el botón no está en el documento';
+          const r = boton.getBoundingClientRect();
+          return {
+            caja: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
+            ventana: { w: window.innerWidth, h: window.innerHeight },
+            scrollY: Math.round(window.scrollY),
+            pila: document.elementsFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+              .slice(0, 4).map((e) => `${e.tagName}.${e.className}`),
+          };
+        });
+        throw new Error(`${donde}: no se pudo apretar «Limpiar filtros»: `
+          + `${JSON.stringify(estorbo)}`);
+      }
+      await esperarA(async () => (await control.count()) === 0
+        || (await control.inputValue()) === '',
+      `${donde}: limpiar filtros no limpió la marca`, 25_000);
+      assert(new URL(page.url()).searchParams.get('brand') === null,
+        `${donde}: limpiar filtros dejó brand= en la barra: ${page.url()}`);
+
+      // Un conjunto sin marcas no dibuja el control. Una lista fija lo
+      // dibujaría igual, ofreciendo 44 marcas sobre un mercado que no tiene
+      // ninguna.
+      await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent('Herbicida')}`,
+        { waitUntil: 'domcontentloaded' });
+      await page.locator('article[class*="card"]').first()
+        .waitFor({ state: 'visible', timeout: 25_000 });
+      await abrirLosFiltros();
+      await esperarA(async () => (await control.count()) === 0,
+        `${donde}: sobre un conjunto sin marcas el control se dibuja igual, y eso es ofrecer `
+        + 'opciones que no existen', 20_000);
+
+      await contexto.close();
+      medidos.push(`${donde}: el control ofrece sólo las marcas del conjunto con su conteo, sin `
+        + 'la dada de baja; acota, se escribe en la barra, vuelve a la página 1, se restaura con '
+        + 'Atrás, se limpia, y desaparece donde no hay marcas');
     }
-    await pagina.setViewportSize({ width: 1440, height: 900 });
-    // Medir la cabecera no puede haber movido la pantalla: si tabular o mirar
-    // geometría cambiara de sección, lo que sigue mediría otra cosa.
-    assert(/section=marketplace/.test(pagina.url()),
-      `medir la cabecera cambió de pantalla: ${pagina.url()}`);
 
-    // === D. Sin sesión se sigue por el Login de siempre, y no hay compra ====
-    // anónima: cancelar vuelve al carrito con lo mismo, y autenticarse
-    // continúa por el flujo vigente sin volver a apretar «Continuar compra».
-    await celdaDelCarrito(pagina).click();
-    await carrito(pagina).waitFor({ state: 'visible', timeout: 20_000 });
-    await carrito(pagina).getByRole('button', { name: 'Continuar compra' }).click();
-    await login(pagina).waitFor({ state: 'visible', timeout: 25_000 });
-    assert(await checkout(pagina).count() === 0,
-      'sin sesión se abrió el Checkout: no existe checkout anónimo');
-    await login(pagina).getByRole('button', { name: 'Cerrar' }).click();
-    await carrito(pagina).waitFor({ state: 'visible', timeout: 20_000 });
-    assert(await guardado(pagina) === elegidos,
-      'cancelar el ingreso desde el carrito sin sesión se llevó lo elegido');
-
-    await carrito(pagina).getByRole('button', { name: 'Continuar compra' }).click();
-    await login(pagina).waitFor({ state: 'visible', timeout: 25_000 });
-    await login(pagina).getByLabel(/^Email/).fill('cliente@ejemplo.com');
-    await login(pagina).getByLabel(/^Contraseña/).fill('cliente123');
-    await login(pagina).getByRole('button', { name: 'Ingresar', exact: true }).click();
-    await checkout(pagina).waitFor({ state: 'visible', timeout: 25_000 });
-    assert(await checkout(pagina).count() === 1,
-      `el Checkout se abrió ${await checkout(pagina).count()} veces`);
-    assert(await login(pagina).count() === 0, 'el ingreso quedó apilado debajo del Checkout');
-    assert(await guardado(pagina) === elegidos, 'reanudar la compra cambió lo elegido');
-    medidos.push('sin sesión «Continuar compra» abre el Login de siempre y no el Checkout; '
-      + 'cancelar vuelve al carrito con lo mismo y autenticarse reanuda la compra');
-
-    // === E. La salida explícita sí vacía, y entonces no hay celda ===========
+    // === D. Mientras la respuesta no vuelve, no se presenta lo anterior =====
     //
-    // La regla no cambia: irse es irse. Y con cero ítems y sin sesión no se
-    // agrega un botón que abriría un carrito vacío.
-    await checkout(pagina).getByRole('button', { name: 'Cerrar' }).first().click();
-    await esperarA(async () => (await checkout(pagina).count()) === 0,
-      'el Checkout no se cerró', 15_000);
-    await pagina.locator('header').getByRole('button', { name: 'Salir', exact: true }).click();
-    await esperarA(async () => (await guardado(pagina)) === 0,
-      `la salida explícita dejó ${await guardado(pagina)} ítems guardados`, 20_000);
-    await esperarA(async () => (await celdaDelCarrito(pagina).count()) === 0,
-      'con el carrito vacío y sin sesión la cabecera ofrece un carrito vacío; dice '
-      + `${JSON.stringify(await laCabeceraDice(pagina))}`, 20_000);
-    medidos.push('la salida explícita vacía el carrito y con cero ítems la cabecera no ofrece '
-      + 'una celda que abriría un carrito vacío');
-    await contexto.close();
+    // La marca entra en la firma de la consulta vigente. Si quedara afuera, el
+    // control diría «John Deere» sobre las tarjetas de antes y sin estado de
+    // carga: una respuesta vieja presentada como nueva.
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    const control = page.locator('#catalog-brand');
+    let demorar = 0;
+    await page.route('**/api/catalog/products*', async (ruta) => {
+      if (demorar > 0) await new Promise((seguir) => { setTimeout(seguir, demorar); });
+      await ruta.continue();
+    });
+    await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(MARCADOR)}`,
+      { waitUntil: 'domcontentloaded' });
+    await control.waitFor({ state: 'visible', timeout: 25_000 });
+    const antesDeMover = await page.locator('article[class*="card"] h3').allInnerTexts();
+    assert(antesDeMover.length > 0, 'no había nada dibujado antes de mover el control');
 
-    // === F. Y quien nunca eligió nada tampoco la ve ==========================
-    const reciente = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-    const paginaReciente = await reciente.newPage();
-    await paginaReciente.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
-    await paginaReciente.locator('article[class*="card"]').first()
-      .waitFor({ state: 'visible', timeout: 25_000 });
-    assert(await celdaDelCarrito(paginaReciente).count() === 0,
-      'una visita sin sesión y sin carrito ya ve una celda de carrito: '
-      + JSON.stringify(await laCabeceraDice(paginaReciente)));
+    await page.evaluate(() => {
+      const estado = () => ({
+        marca: document.querySelector('#catalog-brand')?.value ?? null,
+        ocupado: document.querySelectorAll('[aria-busy="true"]').length > 0,
+        nombres: [...document.querySelectorAll('article[class*="card"] h3')]
+          .map((titulo) => titulo.textContent.trim()),
+      });
+      const anotadas = [];
+      const observador = new MutationObserver(() => anotadas.push(estado()));
+      observador.observe(document.body, {
+        subtree: true, childList: true, characterData: true, attributes: true,
+      });
+      let cuadro = requestAnimationFrame(function pintar() {
+        anotadas.push(estado());
+        cuadro = requestAnimationFrame(pintar);
+      });
+      window.__miradaDeLaMarca = {
+        anotadas,
+        cortar: () => { observador.disconnect(); cancelAnimationFrame(cuadro); },
+      };
+    });
 
-    // === G. La FAQ dice con qué se paga, y con la condición que es cierta ===
-    await paginaReciente.locator('header')
-      .getByRole('button', { name: 'Contacto', exact: true }).click();
-    await paginaReciente.getByRole('heading', { name: 'Preguntas Frecuentes' })
-      .waitFor({ timeout: 20_000 });
-    const respuesta = (await paginaReciente
-      .getByRole('heading', { name: '¿Cuáles son las formas de pago?' })
-      .locator('xpath=following-sibling::p[1]').innerText()).trim();
-
-    assert(/transferencia/i.test(respuesta),
-      `la FAQ de formas de pago ya no nombra la transferencia: ${JSON.stringify(respuesta)}`);
-    assert(/Mercado Pago/.test(respuesta),
-      'la FAQ de formas de pago no nombra Mercado Pago, que el producto resuelve por vendedor: '
-      + JSON.stringify(respuesta));
-    assert(/habilitad/i.test(respuesta) || /cuando ese vendedor/i.test(respuesta),
-      'la FAQ ofrece Mercado Pago sin decir que depende de cada vendedor: '
-      + JSON.stringify(respuesta));
-    for (const promesa of [/comisi/i, /custodi/i, /reten/i, /garantiz/i, /plan/i, /suscrip/i]) {
-      assert(!promesa.test(respuesta),
-        `la FAQ de formas de pago promete algo que el producto no hace (${promesa}): `
-        + JSON.stringify(respuesta));
+    // La ventana entre mover el control y arrancar el efecto dura un cuadro.
+    // Se frena la CPU para que sea observable sin intermitencia: no es un truco
+    // para forzar el rojo, es el teléfono lento donde esa ventana la ve una
+    // persona.
+    const cdp = await contexto.newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+    demorar = 1200;
+    try {
+      await control.selectOption(ELEGIDA.marca);
+      await esperarA(async () => (await page.locator('article[class*="card"] h3')
+        .allInnerTexts()).length === Math.min(ELEGIDA.cuantas, POR_PAGINA),
+      'con la respuesta demorada, elegir la marca no llegó a acotar la grilla', 30_000);
+    } finally {
+      demorar = 0;
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+      await cdp.detach();
     }
-    await reciente.close();
-    medidos.push('la FAQ de Contacto nombra transferencia directa al vendedor y Mercado Pago con '
-      + 'su condición por vendedor, y no promete comisiones, planes ni custodia de fondos');
+    const mirados = await page.evaluate(() => {
+      window.__miradaDeLaMarca.cortar();
+      return window.__miradaDeLaMarca.anotadas;
+    });
+    const loViejo = JSON.stringify(antesDeMover);
+    const presentadas = mirados.filter((estado) => estado.marca === ELEGIDA.marca
+      && !estado.ocupado && JSON.stringify(estado.nombres) === loViejo);
+    assert(presentadas.length === 0,
+      `hubo ${presentadas.length} cuadros con «${ELEGIDA.etiqueta}» puesto, sin estado de carga `
+      + 'y con las tarjetas de antes: eso es presentar una respuesta vieja como nueva');
+    await contexto.close();
+    medidos.push('con la respuesta demorada y la CPU frenada, ningún cuadro muestra la marca '
+      + 'nueva sobre las tarjetas anteriores sin decir que está cargando');
   } finally {
+    limpiar();
     await browser.close();
   }
 
-  return 'lo que alguien eligió no queda sin puerta cuando la sesión se confirma inválida: la '
-    + 'cabecera ofrece el carrito conservado también sin sesión, y sólo si hay algo adentro; '
-    + 'continuar sigue pidiendo ingresar, salir sigue vaciando y la FAQ dice los dos medios de '
-    + `pago con su condición. ${medidos.join('; ')}. Capturas: ${capturas.join(', ')}`;
+  return 'la marca acota el conjunto entero —total, páginas, ids y orden— y la faceta dice qué se '
+    + 'puede pedir: se calcula con los demás filtros y sin la marca, antes de paginar, sin nulos, '
+    + 'sin opciones dadas de baja y sin conteos cero salvo el de la elegida; el control existe '
+    + `sólo donde hay marcas, vive en la URL y se limpia. ${medidos.join('; ')}`;
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del

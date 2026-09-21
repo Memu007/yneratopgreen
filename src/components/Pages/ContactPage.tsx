@@ -302,18 +302,16 @@ export const ContactPage: React.FC<ContactPageProps> = ({ cotizacion = null }) =
             </div>
             <div className={styles.faqCard}>
               <h3>¿Cuáles son las formas de pago?</h3>
-              {/* Decía «Aceptamos transferencias bancarias directas al vendedor» y
-                  nada más, cuando el producto resuelve el medio POR VENDEDOR:
-                  `medios_disponibles` ofrece transferencia si ese vendedor cargó CBU o
-                  alias, y Mercado Pago si además lo tiene vinculado y andando. Decir
-                  sólo «transferencia» escondía la mitad; decir «los dos» prometería
-                  algo que no todos los vendedores tienen. Por eso la condición está en
-                  la respuesta y no en una nota al pie. */}
+              {/* Decía sólo «transferencias bancarias directas al
+                  vendedor», y el producto también cobra por Mercado Pago:
+                  `medios_de` lo ofrece cuando ESE vendedor lo tiene
+                  vinculado. Prometer de menos es tan inexacto como
+                  prometer de más, así que se nombran los dos —y la
+                  condición va con el segundo, porque no todos los
+                  vendedores lo tienen—. */}
               <p>
-                Se le paga directo al vendedor: por transferencia bancaria a su CBU o
-                alias, y con Mercado Pago cuando ese vendedor lo tiene habilitado. Cada
-                vendedor decide con qué cobra, así que al finalizar la compra vas a ver
-                los medios que acepta el tuyo.
+                Podés pagar por transferencia bancaria directa al vendedor y, cuando ese
+                vendedor lo tenga habilitado, también con Mercado Pago.
               </p>
             </div>
             <div className={styles.faqCard}>

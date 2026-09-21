@@ -32,6 +32,16 @@ class Category(Base):
     default_operation_kind = Column(
         String(20), nullable=False, server_default="insumo"
     )
+
+    # ¿Las publicaciones de esta categoría declaran marca?
+    #
+    # No se deduce de la anatomía: `activo` incluye «Tierras y parcelas» y
+    # «Bienes y Ganado», y ni un campo ni un ternero tienen marca. Y no
+    # alcanza con que la categoría venda cosas fabricadas: la lista de
+    # marcas cargada es de maquinaria, así que ofrecerla dentro de
+    # «Insumos agrícolas» pondría marcas de tractor sobre un herbicida.
+    # Ampliarla a otra categoría es cargar la lista de esa categoría.
+    usa_marca = Column(Boolean, nullable=False, server_default="false")
     
     # Estado
     is_active = Column(Boolean, default=True, nullable=False)

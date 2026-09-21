@@ -3,86 +3,35 @@
 Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 `docs/pm/PARA-PM.md` y no edita este archivo.
 
-Este archivo contiene únicamente la tarea activa y su hilo de devoluciones
-hasta el cierre. La historia anterior permanece en Git; la instantánea previa
-a esta poda está en `0f89e78`.
-
-Antes de empezar:
-
-```bash
-git pull origin main
-cat docs/pm/PARA-DEV.md
-```
-
 ---
 
-## 2026-09-13 — POST-INTEGRATION-CLEAR-1
+## 2026-09-21 — BRAND-FACET-1 aceptada
 
-`BACKUP-RESTORE-1` quedó aceptada en `52ba294`/`b8223b1` e integrada en
-`fbd6caf`. PM reprodujo el ciclo y los negativos con Docker real. Ésta es ahora
-la única tarea activa.
+Acepto el producto/arnés `8e20b06`; el informe es `761a371` y la base declarada
+`1c7eb48` coincide con Git. La implementación respeta el contrato: `brand` se
+aplica antes de total/paginación, la faceta reutiliza la consulta con los demás
+filtros y sin `brand`, excluye nulos/inactivas/cero salvo la seleccionada, y el
+control conserva URL, historial, limpieza, página y carrera en ambas medidas.
 
-### Problema reproducido
+Tu objeción sobre Jacto es correcta: no existe entre las 44 opciones decididas.
+No corresponde inventarla ni reabrir esa lista dentro de esta tarea. El seed
+declara sólo John Deere y Pauny.
 
-Cuando `handleCheckout` confirma que la sesión ya no vale, conserva el carrito
-local y baja la identidad correctamente. Sin embargo, `Header.tsx` sólo muestra
-el botón **Carrito** dentro de la rama autenticada. Si la persona cancela el
-Login, los ítems siguen guardados pero ya no tiene cómo reabrirlos desde la
-cabecera.
+### Reproducción PM independiente
 
-Además, la FAQ «¿Cuáles son las formas de pago?» sólo nombra transferencias,
-aunque el producto también contempla Mercado Pago de forma opcional por
-vendedor.
+- base Docker descartable creada desde cero, migraciones y seed: verdes;
+- build de producción: verde;
+- caso 175: **1/1**;
+- sabotaje `conteo`: rojo porque informó 48 en vez de 30;
+- sabotaje `faceta`: rojo porque quedó sólo John Deere;
+- sabotaje `barra`: rojo porque `brand` no apareció en la URL;
+- candidato restaurado sin cambios; recursos Docker temporales retirados.
 
-### Alcance mínimo
+El primer intento de sabotajes no emitió veredicto porque `smoke.sh` había
+retirado los `.env` temporales. Repuse el entorno y los tres negativos fallaron
+por la razón prevista; no es defecto del producto. No repetí la suite completa,
+a11y ni contraste: Dev ya informó 174/175 con único rojo ambiental 131, 74/74 y
+82/82, y PM reprodujo el único delta con sus tres discriminantes.
 
-1. Si el carrito tiene contenido, la cabecera debe ofrecer **Carrito** aunque
-   no haya sesión. Ese control abre el mismo carrito conservado.
-2. Continuar compra sin sesión sigue abriendo el Login existente. Cancelarlo
-   vuelve al carrito con los mismos ítems; autenticarse permite continuar por
-   el flujo vigente. No existe checkout anónimo.
-3. Una salida explícita conserva la regla actual: vacía el carrito. Con cero
-   ítems y sin sesión, no agregues un botón de carrito vacío.
-4. En Contacto, la respuesta de la FAQ debe decir que se puede pagar por
-   transferencia directa al vendedor y por Mercado Pago **cuando ese vendedor
-   lo tenga habilitado**. No prometas ambos medios para todos ni agregues
-   comisiones, planes o custodia de fondos.
-
-Reutilizá el estado y los flujos existentes; no agregues routing, estado
-paralelo, dependencias ni cambios de backend para resolver dos condiciones de
-interfaz.
-
-### Regresión exigida
-
-Agregá el siguiente caso disponible del smoke para medir, como mínimo:
-
-- carrito con ítems + sesión confirmada inválida → identidad fuera y carrito
-  todavía accesible desde cabecera;
-- cerrar el Login → mismos ítems y carrito reabierto;
-- salida explícita → carrito vacío;
-- la FAQ nombra transferencia y Mercado Pago con su condición por vendedor.
-
-El caso debe fallar contra `fbd6caf` por el acceso perdido al carrito y pasar
-con la corrección. No afirmes comportamiento sólo leyendo el fuente.
-
-### Compuertas
-
-- caso focal nuevo contra base limpia;
-- suite smoke completa desde base limpia;
-- build, lint, `diff-check`, a11y y contraste;
-- revisión explícita en escritorio y celular de la cabecera sin sesión, sin
-  deformar marca, navegación ni foco.
-
-### Fuera de alcance
-
-- No habilitar ni homologar Mercado Pago, no tocar credenciales, Railway,
-  datos remotos, backups ni configuración productiva.
-- No cambiar la regla de vaciado en logout explícito.
-- No rediseñar cabecera, Login, carrito, checkout o Contacto.
-- No empezar `CAT-PAGE-1` ni otra tarea.
-- No integrar ni desplegar.
-
-### Entrega
-
-Entregá rama, SHA base, SHA candidato, diff completo, comandos y resultados.
-Reemplazá `PARA-PM.md` con un informe breve y frená para revisión PM.
+No integres ni despliegues. `main` tiene auto-deploy y la publicación requiere
+autorización explícita de Emi. No hay una tarea Dev nueva abierta.

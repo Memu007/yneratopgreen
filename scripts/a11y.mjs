@@ -201,6 +201,14 @@ async function comprador(page, medida) {
   await enlace.hover();
   await revisar(page, 'catálogo (hover)', medida, page.locator('#catalog-category'));
 
+  // El paginador, que vive al pie de la grilla y sólo existe con más de una
+  // página. Se lo trae a la vista antes de medir: axe mira el documento, pero
+  // el estado de foco y el blanco de toque se leen donde el control está.
+  const paginador = page.getByRole('navigation', { name: 'Paginación del mercado' });
+  await paginador.scrollIntoViewIfNeeded({ timeout: ESPERA });
+  await revisar(page, 'catálogo: paginador', medida, paginador);
+  await page.evaluate(() => window.scrollTo(0, 0));
+
   // el detalle se abre haciendo clic en la tarjeta, no en un boton: no existe
   // ningun "Ver detalle". Antes esto lo tapaba un catch vacio y esta pantalla
   // se declaraba medida sin haberse abierto nunca.
@@ -291,6 +299,45 @@ async function comprador(page, medida) {
     .getByRole('button', { name: 'Cerrar' }).click();
 }
 
+/**
+ * La cabecera sin sesión pero con carrito.
+ *
+ * Se llega como se llega de verdad: con sesión se elige algo, la credencial se
+ * confirma inválida mientras la persona lo mira, la identidad baja y el
+ * carrito queda. No se escribe un carrito a mano en el almacenamiento: una
+ * puerta que fabrica su propio estado mide el estado que fabricó, no el que
+ * produce el producto.
+ *
+ * Entra con la cuenta del comprador porque sin sesión no hay forma de llenar
+ * el carrito —la tarjeta ofrece ingresar en vez de agregar—, y sale sin ella.
+ */
+async function carritoSinSesion(page, medida) {
+  await page.goto(`${WEB}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: /^Agregar/ }).first().click();
+  await page.getByRole('button', { name: /^Carrito/ }).click();
+  const elCarrito = page.getByRole('dialog', { name: 'Mi carrito' });
+  await elCarrito.waitFor({ state: 'visible', timeout: ESPERA });
+
+  // Vencer las dos credenciales es lo que hace el tiempo: con las dos rotas el
+  // servidor contesta que no, y ahí la sesión está confirmada inválida.
+  await page.evaluate(() => {
+    window.localStorage.setItem('access_token', 'este.token.ya.no.vale');
+    window.localStorage.setItem('refresh_token', 'este.tampoco.vale');
+  });
+  await elCarrito.getByRole('button', { name: 'Continuar compra' }).click();
+  const ingreso = page.getByRole('dialog', { name: 'Ingresar' });
+  await ingreso.waitFor({ state: 'visible', timeout: ESPERA });
+  await ingreso.getByRole('button', { name: 'Cerrar' }).click();
+
+  // Cancelar devuelve al carrito; cerrarlo deja la cabecera sola, que es la
+  // pantalla que se mide.
+  await elCarrito.waitFor({ state: 'visible', timeout: ESPERA });
+  await elCarrito.getByRole('button', { name: 'Cerrar' }).click();
+  await elCarrito.waitFor({ state: 'hidden', timeout: ESPERA });
+  await revisar(page, 'cabecera sin sesión con carrito', medida,
+    page.locator('header').getByRole('button', { name: /^Carrito/ }));
+}
+
 async function vendedor(page, medida) {
   await page.goto(WEB, { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
@@ -315,6 +362,16 @@ async function vendedor(page, medida) {
   await page.getByRole('button', { name: 'Mis publicaciones' }).click();
   await revisar(page, 'panel: mis productos', medida,
     page.getByRole('heading', { name: 'Mis publicaciones' }));
+
+  // El alta, con la categoría que ofrece marca elegida: así entran en la
+  // medición el control de marca y el de condición, que son los dos que
+  // deciden qué se puede filtrar después.
+  await page.getByRole('button', { name: /^\+ Publicar$|Publicar la primera/ })
+    .first().click();
+  const categoriaDelAlta = page.locator('#category, select[name="category"]').first();
+  await categoriaDelAlta.waitFor({ state: 'visible', timeout: ESPERA });
+  await categoriaDelAlta.selectOption({ label: 'Maquinaria agrícola' });
+  await revisar(page, 'alta de publicación', medida, page.locator('#brand'));
 }
 
 /**
@@ -386,6 +443,7 @@ try {
     for (const [tokens, recorrido] of [
       [null, publicas],
       [cuentas.comprador, comprador],
+      [cuentas.comprador, carritoSinSesion],
       [cuentas.vendedor, vendedor],
       [cuentas.transportista, transportista],
       [cuentas.admin, administracion],

@@ -26,6 +26,7 @@ from app.schemas.catalog import (
     SellerInfo,
     SellerBasicInfo,
     UbicacionDePublicacion,
+    BrandFacetItem,
 )
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
@@ -109,6 +110,7 @@ def get_categories(
                 "display_order": int(category.display_order) if category.display_order else 0,
                 "is_service": category.is_service,
                 "default_operation_kind": category.default_operation_kind,
+                "usa_marca": category.usa_marca,
                 "product_count": count,
                 "subcategories": subcategory_list,
                 "created_at": category.created_at
@@ -209,6 +211,7 @@ def get_products(
     db: Session = Depends(get_db),
     search: Optional[str] = Query(None, description="Buscar en nombre y descripción"),
     category: Optional[str] = Query(None, description="Filtrar por categoría"),
+    subcategory: Optional[str] = Query(None, description="Filtrar por subcategoría (UUID)"),
     min_price: Optional[float] = Query(None, ge=0, description="Precio mínimo"),
     max_price: Optional[float] = Query(None, ge=0, description="Precio máximo"),
     in_stock: Optional[bool] = Query(None, description="Solo productos con stock"),
@@ -220,7 +223,21 @@ def get_products(
     ),
     province: Optional[str] = Query(None, description="Filtrar por provincia (nombre canónico del padrón Georef)"),
     locality_id: Optional[str] = Query(None, description="Filtrar por localidad (ID del padrón Georef)"),
-    sort_by: str = Query("created_at", pattern="^(created_at|price|sales|views)$"),
+    min_rating: Optional[float] = Query(
+        None, ge=0, le=5,
+        description="Calificación mínima del vendedor (0 a 5)",
+    ),
+    condition: Optional[str] = Query(
+        None,
+        pattern="^(nuevo|usado)$",
+        description="Condicion del activo: nuevo o usado",
+    ),
+    brand: Optional[str] = Query(
+        None,
+        max_length=100,
+        description="Filtrar por marca: el `value` de la opcion, no la etiqueta",
+    ),
+    sort_by: str = Query("created_at", pattern="^(created_at|price|sales|views|rating)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(24, ge=1, le=100)
@@ -242,6 +259,39 @@ def get_products(
     - sort_by: created_at (recientes), price (precio), sales (más vendidos), views (más vistos)
     - sort_order: asc (ascendente), desc (descendente)
     """
+    # Una imagen primaria por publicacion, y una sola.
+    #
+    # La URL viajaba en una consulta aparte por cada tarjeta: 24 tarjetas
+    # eran 24 consultas mas a `product_images`, y con el tamano de pagina
+    # crecia el numero de consultas. Medido sobre la base: 8, 26 y 50
+    # accesos a la tabla para 6, 24 y 48 tarjetas.
+    #
+    # No alcanza con seleccionar la URL del `outerjoin` que ya estaba. La
+    # base NO impide dos imagenes primarias para la misma publicacion -no
+    # hay indice unico- y ese join, en cuanto la URL entra en el SELECT,
+    # multiplica la fila: medido, la publicacion pasaba a salir DOS veces
+    # en la misma pagina. Hoy no se ve porque las filas duplicadas son
+    # identicas y se colapsan, pero el `total` ya sale inflado igual.
+    #
+    # Asi que se une contra una subconsulta que elige una sola: la de
+    # menor `display_order`, y a igualdad de orden la misma siempre. Es
+    # una sentencia, no una por tarjeta, y no puede cambiar la cardinalidad
+    # del listado pase lo que pase con los datos.
+    imagen_primaria = (
+        db.query(
+            ProductImage.product_id.label("product_id"),
+            ProductImage.url.label("url"),
+        )
+        .filter(ProductImage.is_primary == True)
+        .distinct(ProductImage.product_id)
+        .order_by(
+            ProductImage.product_id,
+            ProductImage.display_order,
+            ProductImage.id,
+        )
+        .subquery()
+    )
+
     # Query base - incluir información del vendedor y subcategoría
     query = db.query(
         Product,
@@ -265,7 +315,8 @@ def get_products(
         # que sin esto el bloque del vendedor nunca lo vería. La grilla no lo
         # dibuja. Sale de un `outerjoin` acotado a la aprobada, que no
         # multiplica filas porque hay una documentación por usuario.
-        DocumentacionDeVendedor.id.isnot(None).label("seller_documentacion_revisada")
+        DocumentacionDeVendedor.id.isnot(None).label("seller_documentacion_revisada"),
+        imagen_primaria.c.url.label("primary_image_url")
     ).join(
         Category, Product.category_id == Category.id
     ).outerjoin(
@@ -281,8 +332,7 @@ def get_products(
     ).outerjoin(
         Locality, Product.locality_id == Locality.id
     ).outerjoin(
-        ProductImage,
-        and_(ProductImage.product_id == Product.id, ProductImage.is_primary == True)
+        imagen_primaria, imagen_primaria.c.product_id == Product.id
     ).filter(
         Product.status == ProductStatus.ACTIVE
     )
@@ -299,6 +349,13 @@ def get_products(
     
     if category:
         query = query.filter(Product.category_id == category)
+
+    # Subcategoría: viaja a la consulta como la categoría, y por el mismo
+    # motivo. Filtrarla en el navegador significa filtrar la página que bajó:
+    # el total deja de describir el conjunto y las publicaciones que la
+    # cumplen pero cayeron en otra página no existen para quien mira.
+    if subcategory:
+        query = query.filter(Product.subcategory_id == subcategory)
     
     if min_price is not None:
         query = query.filter(Product.price >= min_price)
@@ -343,22 +400,129 @@ def get_products(
     # Filtro por localidad — directo sobre la FK
     if locality_id:
         query = query.filter(Product.locality_id == locality_id)
+
+    # Calificación mínima del vendedor. Sin calificar es cero y no "todavía
+    # no se sabe": pedir 4 o más deja afuera a quien no tiene ninguna, que es
+    # lo que el control promete.
+    if min_rating is not None and min_rating > 0:
+        query = query.filter(
+            func.coalesce(User.rating_average, 0) >= min_rating
+        )
     
+    # La condicion la tienen solo los activos, y ahi es opcional a proposito:
+    # en «Bienes y Ganado» y «Tierras y parcelas» un ternero o un campo no son
+    # ni nuevos ni usados (ver `anatomia.usa_condicion`). Por eso el filtro
+    # ACOTA y nunca completa: pedir «nuevo» devuelve los declarados nuevos, no
+    # los nuevos mas los que no lo dicen. Incluir los nulos seria afirmar un
+    # dato que nadie cargo.
+    #
+    # Se aplica ANTES del conteo, como todos los demas: si se aplicara despues,
+    # el total describiria el catalogo y no lo que se esta mirando.
+    if condition:
+        query = query.filter(Product.condition == condition)
+
+    # === La faceta de marcas ===============================================
+    #
+    # Se calcula ACA, y el lugar es la mitad de la pieza: con todos los
+    # filtros vigentes ya aplicados y `brand` TODAVIA NO. Por eso elegir una
+    # marca no borra a las demas de la lista -que es lo que pasaria contando
+    # despues- y por eso los numeros describen el conjunto que se esta
+    # mirando y no el catalogo entero.
+    #
+    # Y no hay una segunda consulta con los filtros copiados: se reusa ESTA,
+    # cambiandole unicamente lo que selecciona. Una copia se desincroniza al
+    # primer filtro nuevo que alguien agregue de un solo lado, y el sintoma
+    # seria una faceta que promete resultados que el listado no tiene.
+    #
+    # Se cuenta antes de ordenar y de paginar: una faceta calculada sobre la
+    # pagina contaria 24 publicaciones y llamaria a eso "el mercado".
+    marcas_contadas = dict(
+        # `distinct` porque lo que se cuenta son publicaciones, no filas: la
+        # consulta trae varios `outerjoin` y ninguno tiene que poder inflar
+        # un numero que despues se le muestra a alguien como "hay 30".
+        query.with_entities(Product.brand, func.count(func.distinct(Product.id)))
+        .filter(Product.brand.isnot(None))
+        .group_by(Product.brand)
+        .all()
+    )
+
+    # La etiqueta y el estado salen de la misma tabla que valida el alta, no
+    # de una lista escrita acá: una marca dada de baja deja de ofrecerse sin
+    # que haya que tocar el catálogo.
+    # Y si el conjunto no tiene ninguna marca -que es el caso de la mayoría
+    # de los listados- no se lee nada: no hay etiquetas que buscar.
+    opciones_de_marca = {}
+    if marcas_contadas or brand:
+        opciones_de_marca = {
+            opcion.value: opcion
+            for opcion in db.query(FormOption).filter(
+                FormOption.option_type == "brand"
+            ).all()
+        }
+
+    facetas_de_marca = []
+    for valor, cantidad in marcas_contadas.items():
+        opcion = opciones_de_marca.get(valor)
+        # Sin opción viva no se ofrece. Una publicación vieja puede quedar
+        # apuntando a una marca que el panel desactivó; ofrecerla seria
+        # resucitar desde el catalogo lo que se dio de baja en el alta.
+        if opcion is None or not opcion.is_active:
+            continue
+        facetas_de_marca.append((opcion, cantidad))
+
+    # La marca ELEGIDA no se cae de la lista aunque otro filtro la deje en
+    # cero. Si se cayera, el control no tendria como decir que esta puesta ni
+    # como sacarla: quedaria un mercado vacio y un filtro invisible
+    # sosteniendolo. Es la unica que puede aparecer con cero; las demas no.
+    if brand and brand not in marcas_contadas:
+        elegida = opciones_de_marca.get(brand)
+        if elegida is not None and elegida.is_active:
+            facetas_de_marca.append((elegida, 0))
+
+    # En el mismo orden en que las ofrece el alta.
+    facetas_de_marca.sort(key=lambda par: (par[0].display_order or 0, par[0].label))
+    marcas = [
+        BrandFacetItem(value=opcion.value, label=opcion.label, count=cantidad)
+        for opcion, cantidad in facetas_de_marca
+    ]
+
+    # Y RECIEN AHORA la marca entra al listado, antes de contar y paginar,
+    # como todos los demas filtros.
+    if brand:
+        query = query.filter(Product.brand == brand)
+
     # Contar total antes de paginar
     total = query.count()
     
     # Aplicar ordenamiento
+    #
+    # `rating` ordena por la calificación del vendedor, con los sin calificar
+    # como cero: sin el `coalesce`, un NULL se va al principio en `desc` y
+    # "mejor calificados" empezaría por quien no tiene ninguna.
     sort_column = {
         "created_at": Product.created_at,
         "price": Product.price,
         "sales": Product.sales_count,
-        "views": Product.views_count
+        "views": Product.views_count,
+        "rating": func.coalesce(User.rating_average, 0),
     }.get(sort_by, Product.created_at)
-    
-    if sort_order == "desc":
-        query = query.order_by(sort_column.desc())
-    else:
-        query = query.order_by(sort_column.asc())
+
+    # Y un desempate DETERMINISTA, que no es un detalle de prolijidad.
+    #
+    # Sin él, `ORDER BY price` deja a las filas empatadas en el orden que el
+    # motor tenga a mano, y ese orden puede cambiar entre dos consultas. Con
+    # paginación eso significa que el corte de página cae adentro del empate y
+    # la misma publicación sale al final de una página y al principio de la
+    # siguiente, mientras otra desaparece. Medido contra `c973c6f`: ordenando
+    # por precio ascendente, seis publicaciones de treinta empatadas
+    # aparecieron dos veces al recorrer las páginas.
+    #
+    # El desempate final es la clave primaria, que es única por definición.
+    orden = [sort_column.desc() if sort_order == "desc" else sort_column.asc()]
+    if sort_by != "created_at":
+        orden.append(Product.created_at.desc())
+    orden.append(Product.id.asc())
+    query = query.order_by(*orden)
     
     # Aplicar paginación
     offset = (page - 1) * page_size
@@ -373,13 +537,7 @@ def get_products(
          seller_id, seller_name, seller_location,
          publicacion_locality_id, publicacion_localidad, publicacion_provincia,
          seller_rating_avg, seller_rating_count,
-         seller_documentacion_revisada) in results:
-        # Obtener imagen primaria
-        primary_image = db.query(ProductImage.url).filter(
-            ProductImage.product_id == product.id,
-            ProductImage.is_primary == True
-        ).first()
-        
+         seller_documentacion_revisada, primary_image_url) in results:
         # Construir info del vendedor
         seller_info = SellerBasicInfo(
             id=seller_id,
@@ -422,6 +580,7 @@ def get_products(
             "operation_kind": product.operation_kind,
             # Nuevo o usado, o nada. Sólo el activo la trae con valor.
             "condition": product.condition,
+            "brand": product.brand,
             # Cobertura y modalidad: la tarjeta de servicio no se puede
             # dibujar sin ellas, y estaban guardadas sin salir nunca.
             "pricing_type": product.pricing_type,
@@ -429,7 +588,7 @@ def get_products(
             "response_time": product.response_time,
             "coverage_zones": product.coverage_zones or None,
             "publication_location": ubicacion_de_la_publicacion,
-            "primary_image": primary_image[0] if primary_image else None,
+            "primary_image": primary_image_url,
             "seller": seller_info,
             "views_count": product.views_count,
             "likes_count": product.likes_count,
@@ -449,7 +608,8 @@ def get_products(
         page_size=page_size,
         pages=pages,
         has_next=page < pages,
-        has_prev=page > 1
+        has_prev=page > 1,
+        brands=marcas,
     )
 
 
@@ -524,6 +684,7 @@ def get_product_detail(
         "is_service": product.category.is_service,
         "operation_kind": product.operation_kind,
         "condition": product.condition,
+        "brand": product.brand,
         "pricing_type": product.pricing_type,
         "availability": product.availability,
         "response_time": product.response_time,

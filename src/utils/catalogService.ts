@@ -43,6 +43,9 @@ export interface CategoryResponse {
   icon: string;
   product_count: number;
   is_service: boolean;
+  /** Si las publicaciones de esta categoría declaran marca. Lo decide la
+      categoría y no la anatomía: «activo» incluye campos y hacienda. */
+  usa_marca?: boolean;
   operation_kind?: string;
   condition?: string | null;
   pricing_type?: string | null;
@@ -140,6 +143,19 @@ export interface ProductDetailFromBackend extends ProductFromBackend {
   published_at?: string;
 }
 
+/**
+ * Una marca ofrecible en el Mercado, con cuántas publicaciones tiene HOY.
+ *
+ * La lista la arma el servidor sobre el conjunto filtrado, no el navegador
+ * sobre la página que bajó: con paginación, contar acá contaría 24
+ * publicaciones y llamaría a eso «el mercado».
+ */
+export interface MarcaDelMercado {
+  value: string;
+  label: string;
+  count: number;
+}
+
 export interface ProductListResponse {
   items: ProductFromBackend[];
   total: number;
@@ -148,6 +164,10 @@ export interface ProductListResponse {
   pages: number;
   has_next: boolean;
   has_prev: boolean;
+  /** Las marcas que tiene el conjunto filtrado, con cuántas publicaciones
+      tiene cada una. Viene en la misma respuesta que el listado: pedirla
+      aparte podría contestar sobre un conjunto distinto del dibujado. */
+  brands: MarcaDelMercado[];
 }
 
 /**
@@ -173,6 +193,10 @@ export const getLocalities = async (provinceId: string): Promise<LocalityRespons
 export const getProducts = async (params: {
   search?: string;
   category?: string;
+  /** Subcategoría, por id. Viaja a la consulta como la categoría: filtrarla
+      acá sería filtrar la página que bajó, y el total dejaría de describir
+      lo que se está mirando. */
+  subcategory?: string;
   province?: string;
   locality_id?: string;
   min_price?: number;
@@ -183,7 +207,17 @@ export const getProducts = async (params: {
       página del catálogo entero y filtrarla acá, que sólo funciona mientras el
       catálogo entre en una página. */
   publication_type?: 'producto' | 'servicio';
-  sort_by?: 'created_at' | 'price' | 'sales' | 'views';
+  /** Calificación mínima del vendedor, 0 a 5. Mismo motivo que la
+      subcategoría. */
+  min_rating?: number;
+  /** Nuevo o usado. La API la valida contra esos dos valores: un tercero
+      responde 422 en vez de descartarse en silencio. */
+  condition?: 'nuevo' | 'usado';
+  /** Marca, por `value` de la opción y no por etiqueta. Se ofrece sólo lo
+      que la faceta de la respuesta anterior trajo, así que una marca sin
+      resultados no llega a pedirse. */
+  brand?: string;
+  sort_by?: 'created_at' | 'price' | 'sales' | 'views' | 'rating';
   sort_order?: 'asc' | 'desc';
   page?: number;
   page_size?: number;

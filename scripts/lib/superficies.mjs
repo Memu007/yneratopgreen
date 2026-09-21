@@ -42,8 +42,21 @@ export const SUPERFICIES = [
   { id: 'contacto' },
   { id: 'catálogo' },
   { id: 'catálogo (hover)' },
+  // El paginador del Mercado. Va como superficie propia y no como parte del
+  // catálogo porque su marcador es el propio control: si el catálogo dejara de
+  // tener más de una página —un seed más chico, un filtro por omisión— esta
+  // superficie no se alcanza y la puerta falla, en vez de medir un catálogo sin
+  // paginador y declararlo revisado.
+  { id: 'catálogo: paginador' },
   { id: 'detalle de producto' },
   { id: 'carrito' },
+  // La cabecera con la celda del carrito pero SIN sesión. No la alcanza
+  // ninguna otra: sin sesión el catálogo no deja agregar nada —la tarjeta
+  // ofrece ingresar—, y con sesión la celda ya estaba desde siempre. Existe
+  // desde que el carrito sobrevive a una credencial que se confirmó inválida,
+  // y una celda que sólo aparece en ese estado es exactamente la que nadie
+  // revisa a mano.
+  { id: 'cabecera sin sesión con carrito' },
   { id: 'checkout: envío' },
   { id: 'checkout: traslado del pedido' },
   { id: 'checkout: transportista elegido' },
@@ -56,6 +69,14 @@ export const SUPERFICIES = [
   { id: 'panel: documentación fiscal' },
   { id: 'panel: mis ventas' },
   { id: 'panel: mis productos' },
+  // El formulario de alta, con «Maquinaria agrícola» elegida. Es la pantalla
+  // donde el vendedor carga TODO lo que después se filtra, y hasta ahora
+  // ninguna puerta la abría: los controles de condición y de marca vivían sin
+  // medir. Se mide con esa categoría a propósito, porque es la única que hoy
+  // ofrece marca, y su marcador es el propio control de marca: si dejara de
+  // ofrecerse, la puerta falla en vez de medir un alta sin él y declararla
+  // revisada. Mismo criterio que el paginador del catálogo.
+  { id: 'alta de publicación' },
   { id: 'panel del transportista' },
   { id: 'panel: edición de transportista' },
   { id: 'panel: operaciones del transportista' },

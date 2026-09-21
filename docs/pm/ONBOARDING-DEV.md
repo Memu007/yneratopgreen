@@ -32,6 +32,10 @@ Luego:
 
 La guía canónica es `README_LOCAL_SETUP.md`.
 
+Las capacidades y responsabilidades del entorno están fijadas en la decisión
+«Dev no tiene Docker/PostGIS; PM conserva esas puertas y Dev puede delegar» de
+`DECISIONS.md`. Consultala antes de prometer una compuerta o delegar trabajo.
+
 Stack actual:
 
 | Capa | Tecnología |

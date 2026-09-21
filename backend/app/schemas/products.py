@@ -25,6 +25,11 @@ class ProductCreateRequest(BaseModel):
     operation_kind: Optional[Literal["activo", "insumo", "servicio", "logistica"]] = None
     # Obligatoria cuando la anatomia es `activo`; ignorada en las otras.
     condition: Optional[Literal["nuevo", "usado"]] = None
+    # La marca declarada. Se acepta solo si la CATEGORIA la ofrece, y se
+    # valida contra las opciones activas: una marca que no esta en la lista
+    # se rechaza en vez de guardarse como texto libre, que es lo que vuelve
+    # incontable un filtro.
+    brand: Optional[str] = Field(None, max_length=60)
     
     # Campos específicos para servicios
     pricing_type: Optional[str] = Field(None, max_length=50)  # por_hora, por_hectarea, por_trabajo, a_convenir
@@ -47,6 +52,7 @@ class ProductUpdateRequest(BaseModel):
     status: Optional[Literal["active", "paused"]] = None  # Para pausar/activar producto
     operation_kind: Optional[Literal["activo", "insumo", "servicio", "logistica"]] = None
     condition: Optional[Literal["nuevo", "usado"]] = None
+    brand: Optional[str] = Field(None, max_length=60)
     
     # Campos específicos para servicios
     pricing_type: Optional[str] = Field(None, max_length=50)

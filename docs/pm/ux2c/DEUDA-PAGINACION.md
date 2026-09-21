@@ -3,7 +3,18 @@
 Fecha: 2026-08-24. La registra Dev a pedido de PM, en el ciclo del borde de
 escala de UX-2C.
 
-## Qué queda abierto
+## Cierre — 2026-09-14
+
+**Cerrada por `CAT-PAGE-1`.** Producto `a521631`, corrección R1 `575f757`,
+informe `b1cc77f` e integración local `fafa5cb`. El Mercado pagina en servidor
+de a 24, muestra el total real, conserva página y orden en la URL y aplica
+filtros y órdenes antes de contar y paginar. El caso 171 fabrica 115
+publicaciones y alcanza la posterior a la 100 sin repetir ni perder filas.
+
+La historia que sigue describe el defecto que originó la pieza y se conserva
+como contexto; ya no es un pendiente operativo.
+
+## Qué estaba abierto
 
 `GET /api/catalog/products` pagina con un tope de `page_size = 100`, y el
 mercado pide **una** página: `page: 1, page_size: 100`. Con el filtro por tipo
@@ -24,7 +35,7 @@ La orden de PM lo excluye por escrito: «No agregues paginación UI general en
 este ciclo; registrá por separado que el Mercado continúa mostrando como máximo
 100 resultados por consulta».
 
-## Qué haría falta
+## Qué hacía falta
 
 - Decidir la forma: paginado con números, «ver más» acumulativo o scroll
   infinito. No es una decisión de Dev: cambia cómo se lee el catálogo.

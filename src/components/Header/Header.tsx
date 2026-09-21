@@ -75,9 +75,11 @@ export const Header: React.FC<HeaderProps> = ({
   onNavigate,
 }) => {
   const { user, isAuthenticated, logout } = useAuth();
-  // El carrito se lee acá y no sólo adentro de `CartButton` porque la cabecera
-  // tiene que decidir SI dibuja la celda, y eso depende de si hay algo
-  // elegido. Es el mismo estado de siempre, no uno paralelo.
+  // El carrito sobrevive a la sesión: cuando la credencial se confirma
+  // inválida se baja la identidad y lo elegido NO se toca. La cabecera tiene
+  // que saberlo, porque es la única que dibuja la puerta para volver a verlo.
+  // Es el mismo estado que ya usa `CartButton`, leído del mismo contexto: no
+  // hay un segundo carrito ni un espejo que se pueda quedar viejo.
   const { itemCount } = useCart();
   const { showToast } = useToast();
   // Salir de la sesión no es ir a una sección, pero es una salida igual: pasa
@@ -216,22 +218,17 @@ export const Header: React.FC<HeaderProps> = ({
             </>
           ) : (
             <>
-              {/* Sin sesión la celda del carrito aparece SÓLO si hay algo
-                  adentro, y no es una excepción: es el mismo botón, con el
-                  mismo estado, para el único caso en que tiene qué abrir.
+              {/* Sin sesión la celda aparece SÓLO si hay algo adentro. Un
+                  carrito vacío no es una puerta: es un botón que promete algo
+                  que no está, en la banda donde cada celda dice qué hace.
 
-                  Existe porque la corrección anterior dejó un callejón. Cuando
-                  la sesión se confirma inválida se baja la identidad y el
-                  carrito se conserva a propósito —lo que hay adentro lo eligió
-                  una persona, y el vencimiento no lo decidió ella—; pero al
-                  cancelar el ingreso y cerrar el carrito ya no quedaba ninguna
-                  forma de volver a verlo: la tarjeta de la publicación, sin
-                  sesión, dice «Ingresar para continuar».
-
-                  Con cero ítems no se dibuja nada. Un botón que abre un
-                  carrito vacío es un control que promete algo que no tiene, y
-                  la salida explícita —que sí vacía— vuelve a dejar la cabecera
-                  como estaba. */}
+                  Con algo adentro sí, y no es una comodidad: la sesión se
+                  puede confirmar inválida mientras la persona mira lo que
+                  eligió, y ahí la identidad baja pero el carrito queda. Sin
+                  esta celda quedaba guardado y sin ninguna forma de volver a
+                  abrirlo —cancelar el ingreso lo devolvía una vez, y al
+                  cerrarlo desaparecía—. Abre el MISMO carrito conservado: es
+                  el mismo `onCartClick` de la rama con sesión. */}
               {itemCount > 0 && (
                 <CartButton onClick={onCartClick} className={styles.celda} />
               )}

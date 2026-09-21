@@ -425,6 +425,13 @@ for (const medida of MEDIDAS) {
     await enlace.hover();
     await revisar(page, `${medida.n} catálogo (hover)`, page.locator('#catalog-category'));
 
+    // El paginador, al pie de la grilla. Superficie propia para que su ausencia
+    // sea un rojo y no una medición de menos.
+    const paginador = page.getByRole('navigation', { name: 'Paginación del mercado' });
+    await paginador.scrollIntoViewIfNeeded({ timeout: ESPERA });
+    await revisar(page, `${medida.n} catálogo: paginador`, paginador);
+    await page.evaluate(() => window.scrollTo(0, 0));
+
     // el detalle se abre haciendo clic en la tarjeta, no en un boton: no existe
     // ningun "Ver detalle". Antes esto lo tapaba un catch vacio y esta pantalla
     // se declaraba medida sin haberse abierto nunca.
@@ -501,6 +508,38 @@ for (const medida of MEDIDAS) {
   }
 
   {
+    // La cabecera sin sesión pero con carrito. No la alcanza ninguna otra
+    // superficie: sin sesión el catálogo no deja agregar nada —la tarjeta
+    // ofrece ingresar— y con sesión la celda ya estaba. Se llega como se llega
+    // de verdad: se elige algo, la credencial se confirma inválida mientras la
+    // persona lo mira, la identidad baja y el carrito queda. Entra con la
+    // cuenta del comprador y sale sin ella.
+    const ctx = await sesion({ viewport }, comprador);
+    const page = await ctx.newPage();
+    await page.goto(`${WEB}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: /^Agregar/ }).first().click();
+    await page.getByRole('button', { name: /^Carrito/ }).click();
+    const elCarrito = page.getByRole('dialog', { name: 'Mi carrito' });
+    await elCarrito.waitFor({ state: 'visible', timeout: ESPERA });
+
+    await page.evaluate(() => {
+      window.localStorage.setItem('access_token', 'este.token.ya.no.vale');
+      window.localStorage.setItem('refresh_token', 'este.tampoco.vale');
+    });
+    await elCarrito.getByRole('button', { name: 'Continuar compra' }).click();
+    const ingreso = page.getByRole('dialog', { name: 'Ingresar' });
+    await ingreso.waitFor({ state: 'visible', timeout: ESPERA });
+    await ingreso.getByRole('button', { name: 'Cerrar' }).click();
+    await elCarrito.waitFor({ state: 'visible', timeout: ESPERA });
+    await elCarrito.getByRole('button', { name: 'Cerrar' }).click();
+    await elCarrito.waitFor({ state: 'hidden', timeout: ESPERA });
+    await revisar(page, `${medida.n} cabecera sin sesión con carrito`,
+      page.locator('header').getByRole('button', { name: /^Carrito/ }));
+
+    await ctx.close();
+  }
+
+  {
     const ctx = await sesion({ viewport }, vendedor);
     const page = await ctx.newPage();
     await page.goto(WEB, { waitUntil: 'domcontentloaded' });
@@ -524,6 +563,15 @@ for (const medida of MEDIDAS) {
     await page.getByRole('button', { name: 'Mis publicaciones' }).click();
     await revisar(page, `${medida.n} panel: mis productos`,
       page.getByRole('heading', { name: 'Mis publicaciones' }));
+
+    // El alta, con la categoría que ofrece marca elegida. Ver el comentario en
+    // `superficies.mjs`: el marcador es el propio control de marca.
+    await page.getByRole('button', { name: /^\+ Publicar$|Publicar la primera/ })
+      .first().click();
+    const categoriaDelAlta = page.locator('#category, select[name="category"]').first();
+    await categoriaDelAlta.waitFor({ state: 'visible', timeout: ESPERA });
+    await categoriaDelAlta.selectOption({ label: 'Maquinaria agrícola' });
+    await revisar(page, `${medida.n} alta de publicación`, page.locator('#brand'));
     await ctx.close();
   }
 

@@ -84,6 +84,10 @@ Una sola tarea activa. Preferir bloques verticales demostrables; separar dinero,
 
 ## Revisión y aceptación
 
+Antes de asignar compuertas, aplicá la decisión «Dev no tiene Docker/PostGIS;
+PM conserva esas puertas y Dev puede delegar» de `DECISIONS.md`: la falta de
+Docker en Dev no elimina la puerta, la traslada a PM.
+
 La PM no acepta por cortesía ni porque el informe diga “verde”. Revisa diff, evidencia y comportamiento.
 
 - Dev conserva un rojo discriminante cuando corresponde, corre focales y puertas proporcionales y entrega SHA exacto.

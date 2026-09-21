@@ -27,6 +27,9 @@ class CategoryBase(BaseModel):
     # La anatomia que traen por omision las publicaciones de esta categoria.
     # El alta la usa para preseleccionar y para saber que opciones ofrecer.
     default_operation_kind: str = "insumo"
+    # Si las publicaciones de esta categoria declaran marca. El alta lo lee
+    # para ofrecer el control o no ofrecerlo: no se deduce de la anatomia.
+    usa_marca: bool = False
 
 class CategoryResponse(CategoryBase):
     id: str
@@ -117,6 +120,7 @@ class ProductCardResponse(ProductBase):
     # modelo la descarta: Pydantic ignora lo que no declara.
     operation_kind: str = "insumo"
     condition: Optional[str] = None
+    brand: Optional[str] = None
     # Lo que la anatomia de servicio pide obligatorio —cobertura y
     # modalidad— y ya estaba en la base sin salir a la superficie.
     pricing_type: Optional[str] = None
@@ -144,6 +148,7 @@ class ProductDetailResponse(ProductBase):
     is_service: bool = False
     operation_kind: str = "insumo"
     condition: Optional[str] = None
+    brand: Optional[str] = None
     pricing_type: Optional[str] = None
     availability: Optional[str] = None
     response_time: Optional[str] = None
@@ -162,6 +167,17 @@ class ProductDetailResponse(ProductBase):
     
     model_config = ConfigDict(from_attributes=True)
 
+class BrandFacetItem(BaseModel):
+    """Una marca ofrecible, con cuántas publicaciones tiene HOY.
+
+    `count` no es adorno: es lo que permite no ofrecer una marca que
+    devolvería cero resultados. Se cuenta sobre el conjunto que se está
+    mirando —con los demás filtros puestos— y no sobre el catálogo entero.
+    """
+    value: str
+    label: str
+    count: int
+
 class ProductListResponse(BaseModel):
     """Response con paginación para listado de productos"""
     items: List[ProductCardResponse]
@@ -171,6 +187,11 @@ class ProductListResponse(BaseModel):
     pages: int
     has_next: bool
     has_prev: bool
+    # Las marcas que tiene el conjunto filtrado, para que el Mercado pueda
+    # ofrecer un control sin inventar opciones. Viaja en la MISMA respuesta
+    # que el listado a propósito: una llamada aparte podría contestar sobre
+    # un conjunto distinto del que se está dibujando.
+    brands: List[BrandFacetItem] = []
 
 
 # ============= Filter & Search Schemas =============
