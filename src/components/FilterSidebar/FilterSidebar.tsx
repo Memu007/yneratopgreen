@@ -3,6 +3,7 @@ import styles from './FilterSidebar.module.css';
 import type {
   CategoryResponse,
   LocalityResponse,
+  MarcaDelMercado,
   ProvinceResponse,
 } from '../../utils/catalogService';
 import { CONDICIONES, type CondicionDelMercado } from '../../hooks/useProductFilters';
@@ -22,6 +23,13 @@ interface FilterSidebarProps {
   inStockOnly: boolean;
   minRating: number;
   condicion: CondicionDelMercado;
+  /** La marca elegida, por `value`. Vacío es «todas». */
+  marca: string;
+  /** Las marcas que el conjunto filtrado tiene HOY, con sus conteos. Las
+      cuenta el servidor sobre el conjunto entero. Vacío quiere decir que
+      acá no hay nada que elegir, y entonces el control no se dibuja: un
+      selector con una sola opción que no filtra nada es ruido. */
+  marcasDisponibles: MarcaDelMercado[];
   onTypeChange: (type: 'todos' | 'productos' | 'servicios') => void;
   onCategoryChange: (category: string) => void;
   onSubcategoryChange: (subcategory: string) => void;
@@ -32,6 +40,7 @@ interface FilterSidebarProps {
   onInStockChange: (inStock: boolean) => void;
   onMinRatingChange: (rating: number) => void;
   onCondicionChange: (condicion: CondicionDelMercado) => void;
+  onMarcaChange: (marca: string) => void;
   onResetFilters: () => void;
   /** Cuántas operaciones quedan con los filtros puestos. En celular el
       panel termina con «Ver N resultados»: sin el número, cerrar el panel
@@ -54,6 +63,8 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   inStockOnly,
   minRating,
   condicion,
+  marca,
+  marcasDisponibles,
   onTypeChange,
   onCategoryChange,
   onSubcategoryChange,
@@ -64,6 +75,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   onInStockChange,
   onMinRatingChange,
   onCondicionChange,
+  onMarcaChange,
   onResetFilters,
   cantidadDeResultados,
 }) => {
@@ -287,6 +299,37 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               ))}
             </select>
           </div>
+
+          {/* Marca.
+
+              Sólo se dibuja si el conjunto que se está mirando tiene marcas:
+              la lista no es fija, la trae la respuesta junto con el listado.
+              Una lista fija ofrecería 44 marcas sobre un mercado que tiene
+              dos, y elegir cualquiera de las otras 42 daría un vacío que el
+              propio control prometió que no existía.
+
+              Cada opción dice cuántas publicaciones tiene, y por eso ninguna
+              de las ofrecidas puede dar cero. La única que puede aparecer en
+              cero es la que ya está elegida, cuando otro filtro la dejó sin
+              resultados: se queda para poder sacarla. */}
+          {marcasDisponibles.length > 0 && (
+            <div className={styles.filterSection}>
+              <label className={styles.filterLabel} htmlFor="catalog-brand">
+                Marca
+              </label>
+              <select
+                id="catalog-brand"
+                className={styles.select}
+                value={marca}
+                onChange={(e) => onMarcaChange(e.target.value)}
+              >
+                <option value="">Todas las marcas</option>
+                {marcasDisponibles.map(({ value, label, count }) => (
+                  <option key={value} value={value}>{`${label} (${count})`}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <button className={styles.limpiar} onClick={onResetFilters}>
             Limpiar filtros

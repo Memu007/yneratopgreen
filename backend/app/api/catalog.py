@@ -26,6 +26,7 @@ from app.schemas.catalog import (
     SellerInfo,
     SellerBasicInfo,
     UbicacionDePublicacion,
+    BrandFacetItem,
 )
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
@@ -231,6 +232,11 @@ def get_products(
         pattern="^(nuevo|usado)$",
         description="Condicion del activo: nuevo o usado",
     ),
+    brand: Optional[str] = Query(
+        None,
+        max_length=100,
+        description="Filtrar por marca: el `value` de la opcion, no la etiqueta",
+    ),
     sort_by: str = Query("created_at", pattern="^(created_at|price|sales|views|rating)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
@@ -415,6 +421,76 @@ def get_products(
     if condition:
         query = query.filter(Product.condition == condition)
 
+    # === La faceta de marcas ===============================================
+    #
+    # Se calcula ACA, y el lugar es la mitad de la pieza: con todos los
+    # filtros vigentes ya aplicados y `brand` TODAVIA NO. Por eso elegir una
+    # marca no borra a las demas de la lista -que es lo que pasaria contando
+    # despues- y por eso los numeros describen el conjunto que se esta
+    # mirando y no el catalogo entero.
+    #
+    # Y no hay una segunda consulta con los filtros copiados: se reusa ESTA,
+    # cambiandole unicamente lo que selecciona. Una copia se desincroniza al
+    # primer filtro nuevo que alguien agregue de un solo lado, y el sintoma
+    # seria una faceta que promete resultados que el listado no tiene.
+    #
+    # Se cuenta antes de ordenar y de paginar: una faceta calculada sobre la
+    # pagina contaria 24 publicaciones y llamaria a eso "el mercado".
+    marcas_contadas = dict(
+        # `distinct` porque lo que se cuenta son publicaciones, no filas: la
+        # consulta trae varios `outerjoin` y ninguno tiene que poder inflar
+        # un numero que despues se le muestra a alguien como "hay 30".
+        query.with_entities(Product.brand, func.count(func.distinct(Product.id)))
+        .filter(Product.brand.isnot(None))
+        .group_by(Product.brand)
+        .all()
+    )
+
+    # La etiqueta y el estado salen de la misma tabla que valida el alta, no
+    # de una lista escrita acá: una marca dada de baja deja de ofrecerse sin
+    # que haya que tocar el catálogo.
+    # Y si el conjunto no tiene ninguna marca -que es el caso de la mayoría
+    # de los listados- no se lee nada: no hay etiquetas que buscar.
+    opciones_de_marca = {}
+    if marcas_contadas or brand:
+        opciones_de_marca = {
+            opcion.value: opcion
+            for opcion in db.query(FormOption).filter(
+                FormOption.option_type == "brand"
+            ).all()
+        }
+
+    facetas_de_marca = []
+    for valor, cantidad in marcas_contadas.items():
+        opcion = opciones_de_marca.get(valor)
+        # Sin opción viva no se ofrece. Una publicación vieja puede quedar
+        # apuntando a una marca que el panel desactivó; ofrecerla seria
+        # resucitar desde el catalogo lo que se dio de baja en el alta.
+        if opcion is None or not opcion.is_active:
+            continue
+        facetas_de_marca.append((opcion, cantidad))
+
+    # La marca ELEGIDA no se cae de la lista aunque otro filtro la deje en
+    # cero. Si se cayera, el control no tendria como decir que esta puesta ni
+    # como sacarla: quedaria un mercado vacio y un filtro invisible
+    # sosteniendolo. Es la unica que puede aparecer con cero; las demas no.
+    if brand and brand not in marcas_contadas:
+        elegida = opciones_de_marca.get(brand)
+        if elegida is not None and elegida.is_active:
+            facetas_de_marca.append((elegida, 0))
+
+    # En el mismo orden en que las ofrece el alta.
+    facetas_de_marca.sort(key=lambda par: (par[0].display_order or 0, par[0].label))
+    marcas = [
+        BrandFacetItem(value=opcion.value, label=opcion.label, count=cantidad)
+        for opcion, cantidad in facetas_de_marca
+    ]
+
+    # Y RECIEN AHORA la marca entra al listado, antes de contar y paginar,
+    # como todos los demas filtros.
+    if brand:
+        query = query.filter(Product.brand == brand)
+
     # Contar total antes de paginar
     total = query.count()
     
@@ -532,7 +608,8 @@ def get_products(
         page_size=page_size,
         pages=pages,
         has_next=page < pages,
-        has_prev=page > 1
+        has_prev=page > 1,
+        brands=marcas,
     )
 
 

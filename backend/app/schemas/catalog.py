@@ -167,6 +167,17 @@ class ProductDetailResponse(ProductBase):
     
     model_config = ConfigDict(from_attributes=True)
 
+class BrandFacetItem(BaseModel):
+    """Una marca ofrecible, con cuántas publicaciones tiene HOY.
+
+    `count` no es adorno: es lo que permite no ofrecer una marca que
+    devolvería cero resultados. Se cuenta sobre el conjunto que se está
+    mirando —con los demás filtros puestos— y no sobre el catálogo entero.
+    """
+    value: str
+    label: str
+    count: int
+
 class ProductListResponse(BaseModel):
     """Response con paginación para listado de productos"""
     items: List[ProductCardResponse]
@@ -176,6 +187,11 @@ class ProductListResponse(BaseModel):
     pages: int
     has_next: bool
     has_prev: bool
+    # Las marcas que tiene el conjunto filtrado, para que el Mercado pueda
+    # ofrecer un control sin inventar opciones. Viaja en la MISMA respuesta
+    # que el listado a propósito: una llamada aparte podría contestar sobre
+    # un conjunto distinto del que se está dibujando.
+    brands: List[BrandFacetItem] = []
 
 
 # ============= Filter & Search Schemas =============

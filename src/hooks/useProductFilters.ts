@@ -136,6 +136,16 @@ export const useProductFilters = ({
   const [condicion, setCondicion] = useState<CondicionDelMercado>(() =>
     condicionDeLaBarra(initialParams.get('condition')));
   /**
+   * La marca elegida, por `value` de la opción. Vacío es «todas».
+   *
+   * A diferencia de la condición NO se valida contra una lista escrita acá:
+   * las marcas viven en la base y el administrador las da de alta y de baja.
+   * Lo que llega de la barra viaja tal cual y el servidor decide; una marca
+   * que no existe devuelve cero, y la faceta sigue ofreciendo las que sí,
+   * así que siempre hay por dónde salir.
+   */
+  const [marca, setMarca] = useState(() => initialParams.get('brand') || '');
+  /**
    * Cómo se ordena y en qué página estamos.
    *
    * Viven acá, con los filtros, y no en la grilla. Son parte de lo que se le
@@ -165,6 +175,7 @@ export const useProductFilters = ({
     setInStockOnly(params.get('in_stock') === 'true');
     setMinRating(numeroDeLaBarra(params, 'min_rating', 0));
     setCondicion(condicionDeLaBarra(params.get('condition')));
+    setMarca(params.get('brand') || '');
     setOrden(ordenDeLaBarra(params.get('sort')));
     setPagina(paginaDeLaBarra(params));
   }, [versionDeLaBarra]);
@@ -197,6 +208,7 @@ export const useProductFilters = ({
     updateParam('in_stock', inStockOnly ? 'true' : null);
     updateParam('min_rating', minRating > 0 ? String(minRating) : null);
     updateParam('condition', condicion || null);
+    updateParam('brand', marca || null);
     updateParam('sort', orden === 'newest' ? null : orden);
     updateParam('page', pagina > 1 ? String(pagina) : null);
 
@@ -215,6 +227,7 @@ export const useProductFilters = ({
     inStockOnly,
     minRating,
     condicion,
+    marca,
     orden,
     pagina,
     escribeEnLaBarra,
@@ -247,6 +260,7 @@ export const useProductFilters = ({
       setInStockOnly: envolver(setInStockOnly),
       setMinRating: envolver(setMinRating),
       setCondicion: envolver(setCondicion),
+      setMarca: envolver(setMarca),
       setOrden: envolver(setOrden),
     };
   }, []);
@@ -287,6 +301,7 @@ export const useProductFilters = ({
     setInStockOnly(false);
     setMinRating(0);
     setCondicion('');
+    setMarca('');
   };
 
   return {
@@ -303,6 +318,7 @@ export const useProductFilters = ({
     inStockOnly,
     minRating,
     condicion,
+    marca,
     orden,
     pagina,
     // Setters. Los que cambian lo que se pide vuelven a la página 1.

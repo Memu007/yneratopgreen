@@ -720,6 +720,11 @@ def create_seed_data():
             {
                 "name": "Cosechadora John Deere 9750",
                 "slug": "cosechadora-john-deere-9750",
+                # La marca ya esta escrita en el nombre, asi que declararla no
+                # adivina nada: la hace filtrable. El valor es el `value` de la
+                # opcion -no la etiqueta-, que es lo que valida el alta y lo que
+                # viaja en la consulta.
+                "brand": "john-deere",
                 # Condicion declarada segun lo que dice su propia ficha: «ano 2018, 1200 horas de uso».
                 "condition": "usado",
                 "description": "Cosechadora John Deere 9750 STS, año 2018. 1200 horas de uso. Motor 6090H de 350HP. Cabezal maicero y plataforma draper incluidos. Service al día.",
@@ -873,6 +878,7 @@ def create_seed_data():
             {
                 "name": "Tractor Pauny 280A Doble Tracción",
                 "slug": "tractor-pauny-280a-doble-traccion",
+                "brand": "pauny",
                 # Condicion declarada segun lo que dice su propia ficha: «ano 2019 y 3.400 horas».
                 "condition": "usado",
                 "description": "Tractor Pauny 280A de 180 HP, doble tracción, año 2019 y 3.400 horas. Cubiertas al 70%, hidráulico y toma de fuerza operativos.",

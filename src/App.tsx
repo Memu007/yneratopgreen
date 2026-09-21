@@ -34,6 +34,7 @@ import type { NewProductData, Product, CotizacionPedida } from './types';
 import type {
   CategoryResponse,
   LocalityResponse,
+  MarcaDelMercado,
   ProvinceResponse,
 } from './utils/catalogService';
 
@@ -90,6 +91,15 @@ function App() {
   // mismo que cuántas bajaron: la página trae como máximo cien, y contar las
   // que llegaron es contar la página, no el mercado.
   const [totalDeCatalogo, setTotalDeCatalogo] = useState<number | null>(null);
+  /**
+   * Las marcas que ofrece el conjunto que se está mirando.
+   *
+   * Las cuenta el servidor y llegan con el listado. No se derivan de las
+   * tarjetas: la página trae 24 y la faceta describe el conjunto entero, así
+   * que derivarlas acá ofrecería sólo las de la página y el control
+   * cambiaría de opciones al pasar de página.
+   */
+  const [marcasDelMercado, setMarcasDelMercado] = useState<MarcaDelMercado[]>([]);
   // Qué decir cuando el mercado no carga. Sin esto, una falla de red terminaba
   // en la lista vacía y el cartel «No hay operaciones con estos filtros», que
   // es mentira: no es que no haya, es que no pudimos preguntar.
@@ -125,6 +135,7 @@ function App() {
     inStockOnly,
     minRating,
     condicion,
+    marca,
     setTextoBuscado,
     aplicarBusqueda,
     setSelectedType,
@@ -137,6 +148,7 @@ function App() {
     setInStockOnly,
     setMinRating,
     setCondicion,
+    setMarca,
     orden,
     pagina,
     setOrden,
@@ -439,6 +451,7 @@ function App() {
     subcategoriaElegida?.id ?? null,
     minRating,
     condicion,
+    marca,
     ordenPedido.sortBy,
     ordenPedido.sortOrder,
     pagina,
@@ -492,6 +505,8 @@ function App() {
         min_rating: minRating > 0 ? minRating : undefined,
         // Nuevo o usado. Vacío es «cualquiera» y no viaja.
         condition: condicion || undefined,
+        // La marca elegida. Vacío es «todas» y no viaja.
+        brand: marca || undefined,
         province:
           selectedProvince === 'Todas las provincias' ? undefined : selectedProvince,
         locality_id: selectedLocalityId || undefined,
@@ -530,12 +545,16 @@ function App() {
         }
         setProducts(response.items.map(convertBackendProductToFrontend));
         setTotalDeCatalogo(response.total);
+        // La faceta viene calculada SIN la marca puesta, así que elegir una
+        // no vacía la lista: las demás siguen ahí, con sus conteos.
+        setMarcasDelMercado(response.brands ?? []);
       })
       .catch((error) => {
         if (cancelled) return;
         console.error('Error al cargar productos:', error);
         setProducts([]);
         setTotalDeCatalogo(null);
+        setMarcasDelMercado([]);
         // Dos fallas distintas, y conviene no confundirlas: quedarse sin red es
         // algo que la persona puede resolver, y que se lo cuenten es lo que le
         // permite hacerlo. Que el servidor falle no es asunto suyo. El resto de
@@ -579,6 +598,7 @@ function App() {
     subcategoriaElegida,
     minRating,
     condicion,
+    marca,
     ordenPedido,
     pagina,
     irALaPagina,
@@ -752,6 +772,8 @@ function App() {
                 inStockOnly={inStockOnly}
                 minRating={minRating}
                 condicion={condicion}
+                marca={marca}
+                marcasDisponibles={marcasDelMercado}
                 onTypeChange={setSelectedType}
                 onCategoryChange={setSelectedCategory}
                 onSubcategoryChange={setSelectedSubcategory}
@@ -762,6 +784,7 @@ function App() {
                 onInStockChange={setInStockOnly}
                 onMinRatingChange={setMinRating}
                 onCondicionChange={setCondicion}
+                onMarcaChange={setMarca}
                 onResetFilters={resetFilters}
                 cantidadDeResultados={totalDeResultados}
               />

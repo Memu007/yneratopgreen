@@ -28893,6 +28893,480 @@ await runCase(174, 'La marca es un dato de la publicación, y sólo donde signif
     + medidos.join('; ');
 });
 
+// ---------------------------------------------------------------------------
+// 175. La marca filtra el conjunto entero, y la faceta dice qué se puede pedir.
+//
+// La etapa 2 dejó la marca guardada y validada; esto la hace buscable. Son dos
+// piezas y se miden por separado porque fallan distinto:
+//
+//  - el FILTRO tiene que aplicarse antes de contar y de paginar. Aplicado
+//    después, el total y las páginas siguen siendo las del catálogo y la
+//    pantalla afirma un conjunto que no está mirando;
+//  - la FACETA tiene que calcularse con todos los filtros vigentes y SIN la
+//    marca. Calculada después de la marca, elegir una borra a las demás de la
+//    lista y ya no se puede cambiar de marca sin limpiar; calculada sobre la
+//    página, cuenta 24 y llama a eso «el mercado».
+//
+// Y una regla que no es de eficiencia sino de honestidad: no se ofrece una
+// marca que devuelve cero. La única que puede aparecer en cero es la que ya
+// está elegida, cuando otro filtro la dejó sin resultados: si se cayera de la
+// lista, el control no tendría cómo decir que está puesta ni cómo sacarla.
+//
+// El conjunto se fabrica acá —cinco grupos, uno por marca más uno sin marca,
+// repartidos en más de una página— y se verifica contra la BASE antes de medir
+// nada: una prueba que se cree el eco del alta no sabe qué está midiendo.
+// ---------------------------------------------------------------------------
+await runCase(175, 'La marca filtra el conjunto entero y la faceta ofrece sólo lo que existe', async () => {
+  const medidos = [];
+  const sello = Date.now();
+  const MARCADOR = `Smoke marca175 ${sello}`;
+  const POR_PAGINA = 24;
+
+  // Cinco grupos. `john-deere` pasa de una página a propósito: es lo que
+  // distingue un filtro que viaja de uno que recorta la página bajada.
+  //
+  // Los precios separan los grupos en bandas para poder dejar una marca sin
+  // resultados sin tocar su propia columna: es el escenario del punto 4 —otro
+  // filtro deja en cero a la marca elegida—.
+  const GRUPOS = [
+    { marca: 'john-deere', etiqueta: 'John Deere', cuantas: 30, precio: 1_000_000 },
+    { marca: 'pauny', etiqueta: 'Pauny', cuantas: 5, precio: 2_000_000 },
+    { marca: 'valtra', etiqueta: 'Valtra', cuantas: 3, precio: 3_000_000 },
+    // Se publica con la opción VIVA y recién después se la da de baja: así el
+    // escenario es el real —una publicación que quedó apuntando a una marca
+    // que el panel desactivó— y no un dato imposible escrito a mano.
+    { marca: 'zanello', etiqueta: 'Zanello', cuantas: 4, precio: 4_000_000, seDesactiva: true },
+    { marca: null, etiqueta: '(sin marca)', cuantas: 6, precio: 5_000_000 },
+  ];
+  const TOTAL = GRUPOS.reduce((suma, grupo) => suma + grupo.cuantas, 0);
+  const CON_MARCA_VIVA = GRUPOS.filter((g) => g.marca && !g.seDesactiva);
+  const TECHO_SOLO_JD = 1_900_000;
+
+  const nombreDe = (i) => `${MARCADOR}-${String(i).padStart(3, '0')}`;
+
+  const limpiar = () => {
+    try {
+      querySql(`DELETE FROM product_images WHERE product_id IN (
+        SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+      querySql(`UPDATE form_options SET is_active = true
+        WHERE option_type = 'brand' AND value = 'zanello'`);
+    } catch (error) {
+      console.log(`  · no se pudieron retirar los datos del caso 175: ${error.message}`);
+    }
+  };
+
+  limpiar();
+  const browser = await chromium.launch({ headless: true });
+  try {
+    // === A. Fabricación, verificada contra la base ==========================
+    const vendedor = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+    })).data;
+    const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+    // La marca sólo existe donde significa algo, y hoy eso es una sola
+    // categoría. Se lee de la base y no se escribe acá: si mañana son dos, esto
+    // sigue midiendo la que las tiene.
+    const [laCategoria] = queryRows(`
+      SELECT c.id, c.name FROM categories c
+      WHERE c.usa_marca = true AND c.is_active = true ORDER BY c.name LIMIT 1`);
+    assert(laCategoria, 'ninguna categoría declara `usa_marca`: no hay dónde fabricar el conjunto');
+
+    let indice = 0;
+    for (const grupo of GRUPOS) {
+      for (let i = 0; i < grupo.cuantas; i += 1, indice += 1) {
+        const alta = await apiRequest('/products', {
+          method: 'POST', token: vendedor.access_token,
+          body: {
+            name: nombreDe(indice),
+            description: 'Publicación fabricada para medir el filtro y la faceta de marca.',
+            category_id: laCategoria[0],
+            price: grupo.precio + i,
+            stock: 2,
+            unit: 'unidad',
+            locality_id: localidad,
+            publication_type: 'producto',
+            operation_kind: 'activo',
+            condition: 'usado',
+            brand: grupo.marca ?? undefined,
+          },
+        });
+        assert(alta.status === 201 || alta.status === 200,
+          `la publicación ${indice} (${grupo.etiqueta}) respondió HTTP ${alta.status}: `
+          + JSON.stringify(alta.data).slice(0, 200));
+      }
+    }
+
+    // Contra la BASE, no contra el eco del alta.
+    const enBase = Object.fromEntries(queryRows(`
+      SELECT COALESCE(brand, '(sin marca)'), COUNT(*)::text
+      FROM products WHERE status = 'ACTIVE' AND name LIKE ${sqlLiteral(`${MARCADOR}-%`)}
+      GROUP BY brand`));
+    for (const grupo of GRUPOS) {
+      const clave = grupo.marca ?? '(sin marca)';
+      assert(Number(enBase[clave]) === grupo.cuantas,
+        `el escenario quedó con ${enBase[clave]} de «${clave}» y tenía que tener `
+        + `${grupo.cuantas}; la base dice ${JSON.stringify(enBase)}`);
+    }
+
+    // Y recién ahora se da de baja la opción: lo publicado no se toca.
+    querySql(`UPDATE form_options SET is_active = false
+      WHERE option_type = 'brand' AND value = 'zanello'`);
+    const [bajaHecha] = queryRows(`SELECT is_active::text, 'fin' FROM form_options
+      WHERE option_type = 'brand' AND value = 'zanello'`);
+    assert(bajaHecha && bajaHecha[0] === 'false',
+      'no se pudo dar de baja la marca que el caso necesita ver excluida');
+    medidos.push(`conjunto fabricado: ${GRUPOS.map((g) => `${g.cuantas} ${g.etiqueta}`).join(', ')}`
+      + `, ${TOTAL} en total, con «Zanello» dada de baja después de publicar`);
+
+    // === B. La API ==========================================================
+    const pedirOk = async (extra) => {
+      const respuesta = await apiRequest(
+        `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page_size=${POR_PAGINA}&${extra}`);
+      assert(respuesta.status === 200,
+        `el catálogo respondió HTTP ${respuesta.status} para «${extra}»`);
+      return respuesta.data;
+    };
+    const facetaDe = (data) => (data.brands ?? [])
+      .map(({ value, label, count }) => `${value}|${label}|${count}`).sort();
+    const esperadaCompleta = CON_MARCA_VIVA
+      .map((g) => `${g.marca}|${g.etiqueta}|${g.cuantas}`).sort();
+
+    // B1. Sin filtro de marca: la faceta describe el conjunto entero.
+    const todo = await pedirOk('page=1');
+    assert(todo.total === TOTAL, `sin filtro la API dice ${todo.total} y el conjunto tiene ${TOTAL}`);
+    assert(JSON.stringify(facetaDe(todo)) === JSON.stringify(esperadaCompleta),
+      `la faceta trajo ${JSON.stringify(facetaDe(todo))} y tenía que traer `
+      + JSON.stringify(esperadaCompleta));
+    assert(!(todo.brands ?? []).some((m) => m.value === 'zanello'),
+      'la faceta ofrece «zanello», que está dada de baja: el catálogo estaría resucitando '
+      + 'lo que el alta ya no deja elegir');
+    assert(!(todo.brands ?? []).some((m) => m.count === 0),
+      `la faceta ofrece marcas en cero: ${JSON.stringify(todo.brands)}`);
+    assert(!(todo.brands ?? []).some((m) => !m.value || !m.label),
+      `la faceta trae una entrada sin valor o sin etiqueta: ${JSON.stringify(todo.brands)}`);
+
+    // B2. El filtro acota el CONJUNTO: total, páginas, ids y orden.
+    //
+    // Se recorren las dos páginas y se compara el recorrido completo contra lo
+    // que dice la base, ordenado igual. Un total correcto con una sustitución
+    // adentro —o una fila repetida entre páginas— pasaría una comprobación de
+    // cantidades y se ve acá.
+    const ELEGIDA = CON_MARCA_VIVA[0];
+    const paginas = Math.ceil(ELEGIDA.cuantas / POR_PAGINA);
+    const primera = await pedirOk(`page=1&brand=${ELEGIDA.marca}&sort_by=price&sort_order=asc`);
+    assert(primera.total === ELEGIDA.cuantas,
+      `filtrando «${ELEGIDA.marca}» la API dice ${primera.total} y son ${ELEGIDA.cuantas}: si el `
+      + `filtro no se aplica antes de contar, el total sigue siendo el del conjunto (${TOTAL})`);
+    assert(primera.pages === paginas,
+      `filtrando «${ELEGIDA.marca}» la API dice ${primera.pages} páginas y son ${paginas}: el `
+      + 'filtro tiene que aplicarse ANTES de contar y paginar');
+
+    const recorridas = [];
+    for (let p = 1; p <= paginas; p += 1) {
+      const pagina = await pedirOk(`page=${p}&brand=${ELEGIDA.marca}&sort_by=price&sort_order=asc`);
+      assert(pagina.items.every((item) => item.brand === ELEGIDA.marca),
+        `en la página ${p} volvieron marcas ${JSON.stringify([...new Set(pagina.items.map((i) => i.brand))])}`);
+      recorridas.push(...pagina.items.map((item) => item.id));
+    }
+    assert(new Set(recorridas).size === recorridas.length,
+      'recorrer las páginas del filtro devolvió la misma publicación dos veces');
+    const enLaBase = queryRows(`
+      SELECT id FROM products
+      WHERE status = 'ACTIVE' AND name LIKE ${sqlLiteral(`${MARCADOR}-%`)}
+        AND brand = ${sqlLiteral(ELEGIDA.marca)}
+      ORDER BY price ASC, created_at DESC, id ASC`).map(([id]) => id);
+    assert(JSON.stringify(recorridas) === JSON.stringify(enLaBase),
+      `el recorrido del filtro no coincide con la base: la API devolvió ${recorridas.length} ids `
+      + `y la base tiene ${enLaBase.length}, y el orden ${recorridas.slice(0, 3)} contra `
+      + `${enLaBase.slice(0, 3)}`);
+
+    // B3. Con la marca puesta, la faceta NO cambia: se calcula antes que ella.
+    assert(JSON.stringify(facetaDe(primera)) === JSON.stringify(esperadaCompleta),
+      `con «${ELEGIDA.marca}» elegida la faceta quedó en ${JSON.stringify(facetaDe(primera))}: `
+      + 'calculada después de la marca, elegir una borra a las demás y ya no se puede cambiar '
+      + 'de marca sin limpiar el filtro');
+
+    // B4. Y tampoco depende del tamaño de página: se cuenta antes de paginar.
+    const deAUna = await apiRequest(
+      `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page_size=1&page=1`);
+    assert(deAUna.status === 200, `page_size=1 respondió HTTP ${deAUna.status}`);
+    assert(JSON.stringify(facetaDe(deAUna.data)) === JSON.stringify(esperadaCompleta),
+      `con page_size=1 la faceta dice ${JSON.stringify(facetaDe(deAUna.data))}: está contando la `
+      + 'página y no el conjunto');
+
+    // B5. Con otro filtro puesto, la faceta lo respeta.
+    const soloBarato = await pedirOk(`page=1&max_price=${TECHO_SOLO_JD}`);
+    assert(JSON.stringify(facetaDe(soloBarato))
+      === JSON.stringify([`${ELEGIDA.marca}|${ELEGIDA.etiqueta}|${ELEGIDA.cuantas}`]),
+    `acotando el precio la faceta trajo ${JSON.stringify(facetaDe(soloBarato))}: tenía que traer `
+      + `sólo «${ELEGIDA.marca}», que es la única banda que entra bajo ${TECHO_SOLO_JD}`);
+
+    // B6. La elegida sigue en la lista aunque quede en cero; las otras no.
+    const SIN_RESULTADOS = CON_MARCA_VIVA[1];
+    const enCero = await pedirOk(
+      `page=1&max_price=${TECHO_SOLO_JD}&brand=${SIN_RESULTADOS.marca}`);
+    assert(enCero.total === 0,
+      `el escenario del punto 4 no quedó en cero: la API devolvió ${enCero.total}`);
+    const laElegida = (enCero.brands ?? []).find((m) => m.value === SIN_RESULTADOS.marca);
+    assert(laElegida && laElegida.count === 0,
+      `con «${SIN_RESULTADOS.marca}» elegida y sin resultados, la faceta trajo `
+      + `${JSON.stringify(enCero.brands)}: si se cae de la lista, el control no puede decir que `
+      + 'está puesta ni sacarla, y queda un mercado vacío sostenido por un filtro invisible');
+    assert(!(enCero.brands ?? []).some((m) => m.count === 0 && m.value !== SIN_RESULTADOS.marca),
+      `además de la elegida, la faceta ofrece otras en cero: ${JSON.stringify(enCero.brands)}`);
+    medidos.push('la API acota el conjunto entero por marca —total, páginas, ids y orden—, y la '
+      + 'faceta se calcula con los demás filtros, sin la marca, antes de paginar, sin nulos, sin '
+      + 'la opción dada de baja y sin conteos cero salvo el de la marca elegida');
+
+    // === C. La pantalla, en los dos anchos ==================================
+    for (const medida of [
+      { n: 'escritorio', width: 1440, height: 900 },
+      { n: 'movil', width: 390, height: 844 },
+    ]) {
+      const contexto = await browser.newContext({
+        viewport: { width: medida.width, height: medida.height },
+      });
+      const page = await contexto.newPage();
+      const donde = `${medida.n} ${medida.width}x${medida.height}`;
+      const control = page.locator('#catalog-brand');
+      const conteo = page.locator('[class*="_conteo_"]').first();
+      const esperarElConteo = async (cuantas, porQue) => {
+        try {
+          await esperarA(async () => (await conteo.innerText()).includes(String(cuantas)),
+            porQue, 25_000);
+        } catch {
+          const visto = await conteo.innerText().catch(() => '(no está)');
+          throw new Error(`${donde}: ${porQue}; el conteo dice `
+            + `«${visto.replace(/\s+/g, ' ').trim()}» y tenía que contar ${cuantas}`);
+        }
+      };
+      // En celular la barra de filtros vive detrás de un botón: el control no
+      // está «ausente», está guardado. Abrirlo es parte de usarlo.
+      //
+      // Es idempotente a propósito, y no por prolijidad: ese botón ALTERNA, así
+      // que llamarlo dos veces cerraba el panel.
+      //
+      // Y el estado se lee de `aria-expanded`, no de si los controles «se ven».
+      // Plegado, el panel es `max-height: 0` con recorte: sus controles
+      // conservan caja, así que un `isVisible()` dice que sí y el clic va a
+      // parar al envoltorio del contenido, que es lo que está de verdad
+      // adelante. Con el atributo, lo que se mira es lo que el panel declara.
+      const plegador = page.getByRole('button', { name: /^Filtros/ });
+      const panelPlegado = async () => (await plegador.count()) > 0
+        && (await plegador.isVisible())
+        && (await plegador.getAttribute('aria-expanded')) !== 'true';
+      const abrirLosFiltros = async () => {
+        if (!(await panelPlegado())) return;
+        await plegador.click();
+        await esperarA(async () => !(await panelPlegado()),
+          `${donde}: el panel de filtros no se abrió`, 20_000);
+      };
+
+      await page.goto(
+        `${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(MARCADOR)}`,
+        { waitUntil: 'domcontentloaded' });
+      await esperarElConteo(TOTAL, 'el Mercado no llegó a contar el conjunto fabricado');
+      await abrirLosFiltros();
+      await control.waitFor({ state: 'visible', timeout: 25_000 });
+
+      // Las opciones son las de la faceta, con su conteo, y ninguna más.
+      const opciones = (await control.locator('option').allInnerTexts()).map((t) => t.trim());
+      assert(opciones[0] === 'Todas las marcas',
+        `${donde}: la primera opción es «${opciones[0]}» y tiene que poder no filtrar`);
+      for (const grupo of CON_MARCA_VIVA) {
+        assert(opciones.includes(`${grupo.etiqueta} (${grupo.cuantas})`),
+          `${donde}: falta «${grupo.etiqueta} (${grupo.cuantas})» en ${JSON.stringify(opciones)}`);
+      }
+      assert(!opciones.some((t) => /Zanello/i.test(t)),
+        `${donde}: el control ofrece una marca dada de baja: ${JSON.stringify(opciones)}`);
+      assert(opciones.length === CON_MARCA_VIVA.length + 1,
+        `${donde}: el control ofrece ${opciones.length} opciones y tenía que ofrecer `
+        + `${CON_MARCA_VIVA.length + 1}: ${JSON.stringify(opciones)}`);
+
+      // Elegir acota, y se escribe en la barra.
+      await control.selectOption(ELEGIDA.marca);
+      await esperarElConteo(ELEGIDA.cuantas,
+        `elegir «${ELEGIDA.etiqueta}» no acotó el conteo`);
+      await esperarA(async () =>
+        new URL(page.url()).searchParams.get('brand') === ELEGIDA.marca,
+      `${donde}: la marca no se escribió en la barra; la URL es ${page.url()}`, 20_000);
+
+      // Desde una página interior, cambiar de marca vuelve a la primera.
+      const paginador = page.getByRole('navigation', { name: /Paginación/i });
+      if (await paginador.count() > 0) {
+        await paginador.getByRole('button', { name: /siguiente/i }).first().click();
+        await esperarA(async () => new URL(page.url()).searchParams.get('page') === '2',
+          `${donde}: no se pudo ir a la página 2 del subconjunto`, 20_000);
+        await abrirLosFiltros();
+        await control.selectOption(CON_MARCA_VIVA[1].marca);
+        await esperarElConteo(CON_MARCA_VIVA[1].cuantas,
+          'cambiar de marca desde la página 2 no acotó el conteo');
+        assert(new URL(page.url()).searchParams.get('page') === null,
+          `${donde}: cambiar de marca dejó la barra en page=`
+          + `${new URL(page.url()).searchParams.get('page')}: la página 7 de un conjunto no `
+          + 'significa nada en otro');
+        await abrirLosFiltros();
+        await control.selectOption(ELEGIDA.marca);
+        await esperarElConteo(ELEGIDA.cuantas, 'volver a la primera marca no acotó el conteo');
+      }
+
+      // Atrás devuelve el filtro, no sólo la dirección.
+      await page.locator('header').getByRole('button', { name: 'Contacto', exact: true }).click();
+      await page.getByRole('heading', { name: 'Preguntas Frecuentes' })
+        .waitFor({ state: 'visible', timeout: 25_000 });
+      await page.goBack({ waitUntil: 'domcontentloaded' });
+      await abrirLosFiltros();
+      await esperarA(async () => (await control.inputValue()) === ELEGIDA.marca,
+        `${donde}: volver con Atrás dejó la marca en `
+        + `«${await control.inputValue().catch(() => '(no está)')}»`, 25_000);
+      await esperarElConteo(ELEGIDA.cuantas, 'volver con Atrás no restauró el subconjunto');
+
+      // Y «Limpiar filtros» la limpia: es un filtro, no un orden.
+      //
+      // En 390 px el panel abierto es más alto que la pantalla y este botón
+      // queda debajo del pliegue —medido: y=930 en una ventana de 844—, así que
+      // hay que bajar hasta él como bajaría cualquiera.
+      //
+      // Y primero hay que dejar que la pantalla se quede quieta: volver de otra
+      // sección dispara un desplazamiento SUAVE, y bajar al botón mientras la
+      // página todavía se mueve hace que el clic aterrice donde el botón ya no
+      // está. El síntoma era «el envoltorio del contenido intercepta el clic».
+      await abrirLosFiltros();
+      await esperarA(async () => {
+        const antes = await page.evaluate(() => window.scrollY);
+        await page.waitForTimeout(120);
+        return (await page.evaluate(() => window.scrollY)) === antes;
+      }, `${donde}: la pantalla no dejó de desplazarse`, 15_000);
+      const limpiarFiltros = page.getByRole('button', { name: /Limpiar filtros/i });
+      await limpiarFiltros.scrollIntoViewIfNeeded();
+      try {
+        await limpiarFiltros.click({ timeout: 10_000 });
+      } catch (error) {
+        // Un tiempo agotado dice «se venció» y nada más. Lo que hace falta
+        // saber cuando un clic no entra es QUÉ hay en ese punto.
+        const estorbo = await page.evaluate(() => {
+          const boton = [...document.querySelectorAll('button')]
+            .find((b) => /Limpiar filtros/i.test(b.textContent || ''));
+          if (!boton) return 'el botón no está en el documento';
+          const r = boton.getBoundingClientRect();
+          return {
+            caja: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
+            ventana: { w: window.innerWidth, h: window.innerHeight },
+            scrollY: Math.round(window.scrollY),
+            pila: document.elementsFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+              .slice(0, 4).map((e) => `${e.tagName}.${e.className}`),
+          };
+        });
+        throw new Error(`${donde}: no se pudo apretar «Limpiar filtros»: `
+          + `${JSON.stringify(estorbo)}`);
+      }
+      await esperarA(async () => (await control.count()) === 0
+        || (await control.inputValue()) === '',
+      `${donde}: limpiar filtros no limpió la marca`, 25_000);
+      assert(new URL(page.url()).searchParams.get('brand') === null,
+        `${donde}: limpiar filtros dejó brand= en la barra: ${page.url()}`);
+
+      // Un conjunto sin marcas no dibuja el control. Una lista fija lo
+      // dibujaría igual, ofreciendo 44 marcas sobre un mercado que no tiene
+      // ninguna.
+      await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent('Herbicida')}`,
+        { waitUntil: 'domcontentloaded' });
+      await page.locator('article[class*="card"]').first()
+        .waitFor({ state: 'visible', timeout: 25_000 });
+      await abrirLosFiltros();
+      await esperarA(async () => (await control.count()) === 0,
+        `${donde}: sobre un conjunto sin marcas el control se dibuja igual, y eso es ofrecer `
+        + 'opciones que no existen', 20_000);
+
+      await contexto.close();
+      medidos.push(`${donde}: el control ofrece sólo las marcas del conjunto con su conteo, sin `
+        + 'la dada de baja; acota, se escribe en la barra, vuelve a la página 1, se restaura con '
+        + 'Atrás, se limpia, y desaparece donde no hay marcas');
+    }
+
+    // === D. Mientras la respuesta no vuelve, no se presenta lo anterior =====
+    //
+    // La marca entra en la firma de la consulta vigente. Si quedara afuera, el
+    // control diría «John Deere» sobre las tarjetas de antes y sin estado de
+    // carga: una respuesta vieja presentada como nueva.
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    const control = page.locator('#catalog-brand');
+    let demorar = 0;
+    await page.route('**/api/catalog/products*', async (ruta) => {
+      if (demorar > 0) await new Promise((seguir) => { setTimeout(seguir, demorar); });
+      await ruta.continue();
+    });
+    await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(MARCADOR)}`,
+      { waitUntil: 'domcontentloaded' });
+    await control.waitFor({ state: 'visible', timeout: 25_000 });
+    const antesDeMover = await page.locator('article[class*="card"] h3').allInnerTexts();
+    assert(antesDeMover.length > 0, 'no había nada dibujado antes de mover el control');
+
+    await page.evaluate(() => {
+      const estado = () => ({
+        marca: document.querySelector('#catalog-brand')?.value ?? null,
+        ocupado: document.querySelectorAll('[aria-busy="true"]').length > 0,
+        nombres: [...document.querySelectorAll('article[class*="card"] h3')]
+          .map((titulo) => titulo.textContent.trim()),
+      });
+      const anotadas = [];
+      const observador = new MutationObserver(() => anotadas.push(estado()));
+      observador.observe(document.body, {
+        subtree: true, childList: true, characterData: true, attributes: true,
+      });
+      let cuadro = requestAnimationFrame(function pintar() {
+        anotadas.push(estado());
+        cuadro = requestAnimationFrame(pintar);
+      });
+      window.__miradaDeLaMarca = {
+        anotadas,
+        cortar: () => { observador.disconnect(); cancelAnimationFrame(cuadro); },
+      };
+    });
+
+    // La ventana entre mover el control y arrancar el efecto dura un cuadro.
+    // Se frena la CPU para que sea observable sin intermitencia: no es un truco
+    // para forzar el rojo, es el teléfono lento donde esa ventana la ve una
+    // persona.
+    const cdp = await contexto.newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+    demorar = 1200;
+    try {
+      await control.selectOption(ELEGIDA.marca);
+      await esperarA(async () => (await page.locator('article[class*="card"] h3')
+        .allInnerTexts()).length === Math.min(ELEGIDA.cuantas, POR_PAGINA),
+      'con la respuesta demorada, elegir la marca no llegó a acotar la grilla', 30_000);
+    } finally {
+      demorar = 0;
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+      await cdp.detach();
+    }
+    const mirados = await page.evaluate(() => {
+      window.__miradaDeLaMarca.cortar();
+      return window.__miradaDeLaMarca.anotadas;
+    });
+    const loViejo = JSON.stringify(antesDeMover);
+    const presentadas = mirados.filter((estado) => estado.marca === ELEGIDA.marca
+      && !estado.ocupado && JSON.stringify(estado.nombres) === loViejo);
+    assert(presentadas.length === 0,
+      `hubo ${presentadas.length} cuadros con «${ELEGIDA.etiqueta}» puesto, sin estado de carga `
+      + 'y con las tarjetas de antes: eso es presentar una respuesta vieja como nueva');
+    await contexto.close();
+    medidos.push('con la respuesta demorada y la CPU frenada, ningún cuadro muestra la marca '
+      + 'nueva sobre las tarjetas anteriores sin decir que está cargando');
+  } finally {
+    limpiar();
+    await browser.close();
+  }
+
+  return 'la marca acota el conjunto entero —total, páginas, ids y orden— y la faceta dice qué se '
+    + 'puede pedir: se calcula con los demás filtros y sin la marca, antes de paginar, sin nulos, '
+    + 'sin opciones dadas de baja y sin conteos cero salvo el de la elegida; el control existe '
+    + `sólo donde hay marcas, vive en la URL y se limpia. ${medidos.join('; ')}`;
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un
