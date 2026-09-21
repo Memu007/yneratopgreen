@@ -174,7 +174,7 @@ o un rediseño nuevo.
 |---:|---|---|---|
 | 19 | **CAT-PAGE-1 — aceptada e integrada** | deuda UX-2C y ADM-2 como patrón | `a521631` + R1 `575f757` + informe `b1cc77f`; incluida en `4c8569d`. PM reprodujo 171 verde, rojo al omitir `pagina` de la firma y verde tras restaurar. Runtime posterior al push pendiente. |
 | 20 | **QUERY-IMG-1 + filtros/marcas — aceptadas e integradas** | C2 y operación de búsqueda | Composición previa `34e7ebf`; `BRAND-FACET-1` aceptada en `8e20b06`, informe `761a371`; incluida en `4c8569d`. PM reprodujo 172–174 previamente y 175 final en 1/1 con tres sabotajes rojos. Runtime posterior al push pendiente. |
-| 21 | **RISK-REC-1** | R1, R4 y R5 | Reproducir concurrencia de stock, señal frágil de reenvío y grupo sin medio de pago; promover únicamente defectos reales. |
+| 21 | **RISK-REC-1 — aceptada en rama** | R1, R4 y R5 | Producto/arnés `2d18d55`, informe `d518f40`. PM: focales 176–178 en 3/3, rojo discriminante de doble venta, suite limpia 178/178, a11y 74/74 y contraste 82/82. R1 y R5 reales y cerrados; R4 falso en vivo, con dependencia de texto vigilada. Integración/publicación pendiente de Emi. |
 
 Cinco mil visitas mensuales no justifican reescribir la arquitectura. Esta
 puerta cierra primero paginación, consultas y recorridos medidos; capacidad y

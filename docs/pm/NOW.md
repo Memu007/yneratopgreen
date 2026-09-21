@@ -8,9 +8,31 @@ Actualizado: 2026-09-21.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
 - **`main`:** `4c8569d`; merge autorizado de la candidata aceptada `8e20b06` con `main` `615619c`. El push activó el auto-deploy de Railway; la verificación runtime posterior al push queda **PENDIENTE**.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; la candidata `8e20b06` y su informe `761a371` quedaron integrados mediante `4c8569d`.
-- **Última decisión PM:** `BRAND-FACET-1` **ACEPTADA** en `8e20b06`. PM reprodujo el caso 175 en 1/1 y sus tres sabotajes en rojo discriminante. Evidencia en `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
-- **Tarea activa:** `RISK-REC-1`, responsable Dev. Debe reproducir tres riesgos y promover únicamente defectos confirmados.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; candidata pendiente de integración `2d18d55`, informe final `d518f40`.
+- **Última decisión PM:** `RISK-REC-1` **ACEPTADA** en `2d18d55`. PM obtuvo 178/178 desde base limpia y reprodujo el rojo de doble venta al restaurar el defecto. Evidencia en `REPRODUCCION-RISK-REC-1-2026-09-21.md`.
+- **Tarea activa:** ninguna. La pieza aceptada no se integra ni publica sin autorización explícita de Emi porque `main` conserva auto-deploy.
+
+## Última aceptación PM — RISK-REC-1
+
+Producto y arnés `2d18d55`; informe final `d518f40`. PM comprobó de forma
+independiente:
+
+- casos 176, 177 y 178 juntos: **3/3**;
+- sabotaje de la venta atómica: caso 176 **rojo** en la ronda 2, con dos
+  órdenes pagadas por una sola unidad;
+- candidata restaurada y suite completa desde base Docker limpia: **178/178**,
+  incluido el caso 131;
+- a11y: **74/74** superficies, sin violaciones bloqueantes;
+- contraste: **82/82** mediciones, sin incumplimientos;
+- build, lint, `tsc --noEmit`, `node --check`, `compileall`, `pip check`,
+  `alembic check` y `diff-check` compatibles con CRLF: verdes.
+
+R1 y R5 quedan cerrados como defectos reales. R4 queda cerrado como falso para
+el comportamiento vigente: el reenvío sí se ofrece. La dependencia de la frase
+del rechazo no se corrige en esta pieza porque separar cuenta inactiva de cuenta
+sin confirmar requiere una señal estable nueva de Auth; permanece vigilada por
+el caso 177 y su sabotaje. La devolución concurrente de stock en cancelación o
+rechazo queda registrada como riesgo adyacente, no como defecto reproducido.
 
 ## Última aceptación PM — CAT-PAGE-1
 
@@ -127,6 +149,14 @@ Evidencia: `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
   clienta, y el encabezado de `marcas.py` afirma lo contrario. Además el panel
   deja cambiar `is_service` sin apagar `usa_marca`, y la guarda que lo impide
   es de semilla, no de runtime. Sin bloqueo; queda registrado.
+- **Señal estable de cuenta sin confirmar:** el Login ofrece el reenvío hoy,
+  pero reconoce una frase del rechazo. No se amplía Auth dentro de
+  `RISK-REC-1`; el caso 177 vigila la dependencia hasta que se abra una decisión
+  propia.
+- **Devolución concurrente de stock:** cancelar o rechazar una orden pagada aún
+  usa lectura y escritura en Python. Dev no reprodujo pérdida en 6 rondas porque
+  esos endpoints hoy se ejecutan sin intercalarse; queda como riesgo de diseño,
+  no como bug confirmado ni tarea abierta.
 
 ## Railway — inventario actualizado 2026-09-13 y deuda viva
 
@@ -190,8 +220,8 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev ejecuta `RISK-REC-1` desde la composición `4c8569d`; PM reproduce y decide qué defecto, si alguno, entra al MVP.
-2. Verificar el runtime post-push sin tratarlo todavía como producción aceptada.
+1. Emi decide cuándo integrar/publicar `RISK-REC-1`; `main` sigue en `4c8569d` y el push dispararía Railway.
+2. Verificar el runtime post-push de `4c8569d` sin tratarlo todavía como producción aceptada.
 3. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
 5. Los atributos por rubro esperan los datos prometidos por la clienta; Inicio, Servicios y la identidad de AgroMarket esperan decisión de producto.

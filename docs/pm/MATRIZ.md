@@ -61,7 +61,7 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 | Transferencia: los datos bancarios no cambian bajo el comprador | ✅ | Smoke 14: se crea la orden, se cambian CBU y alias en el perfil del vendedor, y el comprador sigue viendo los originales. API contrastada contra SQL |
 | Transferencia: mostrar CBU/Alias del vendedor | ✅ | Smoke 13 y 14: sin datos bancarios la API rechaza con `400`; con datos, el CBU devuelto coincide con la consulta SQL |
 | Transferencia: adjuntar comprobante | ✅ | Smoke 15: archivo inválido `400` sin cambiar estado; válido `200` con la URL contrastada contra SQL. Sólo el comprador, `403` para el resto |
-| Transferencia: validación manual del vendedor | ✅ | Smoke 16, 17, 23 y 25: **vendedor ajeno `403`**; puede decidir con o sin comprobante; el rechazo exige motivo; dos aprobaciones simultaneas descuentan una sola vez |
+| Transferencia: validación manual del vendedor | ✅ | Smoke 16, 17, 23, 25, 26 y 176: **vendedor ajeno `403`**; puede decidir con o sin comprobante; el rechazo exige motivo; dos decisiones simultáneas sobre la misma orden y sobre órdenes distintas por la última unidad dejan un único ganador. Producto `2d18d55`; reproducción PM en `REPRODUCCION-RISK-REC-1-2026-09-21.md` |
 | Transferencia: cancelacion y salida de estados | ✅ | Smoke 22 y 24: comprador y vendedor cancelan antes del comprobante; despues de enviarlo solo el vendedor cancela; usuario ajeno `403`; stock intacto |
 | Transferencia, recorrido completo en navegador | ✅ | Smoke 18: Chromium real, catálogo → carrito → checkout → transferencia → comprobante; muestra el numero de orden y explica usarlo como concepto |
 
@@ -89,7 +89,7 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 
 | Requisito | Estado |
 |-----------|--------|
-| Pruebas integrales | ✅ `CAT-PAGE-1`: producto final `575f757`, informe `b1cc77f`, incluida en `4c8569d`. Dev 170/171 con único rojo ambiental 131; PM reprodujo 171 verde, su negativo discriminante y el verde restaurado. A11y 72/72 y contraste 80/80 por Dev. Runtime posterior al push pendiente. |
+| Pruebas integrales | ✅ `RISK-REC-1`: producto/arnés `2d18d55`, informe `d518f40`. PM obtuvo 178/178 desde base limpia, reprodujo el rojo discriminante de doble venta, a11y 74/74 y contraste 82/82. Aceptada en rama; integración y runtime pendientes. |
 | Carga inicial de datos | ✅ Seed idempotente con 30 publicaciones en 12 categorías y 9 provincias, más 4.028 localidades. Verificado corriéndolo dos veces sin duplicar |
 | Despliegue en producción | ❌ |
 | Capacitación del panel de administración | ❌ |
