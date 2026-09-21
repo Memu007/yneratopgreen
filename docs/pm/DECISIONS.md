@@ -5,6 +5,26 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+## 2026-09-21 — Dev no tiene Docker/PostGIS; PM conserva esas puertas y Dev puede delegar
+
+El entorno de Dev **no tiene acceso a Docker ni a PostGIS**. Mientras Emi no
+revoque esta decisión, PM no le asigna como ejecutables `docker compose`,
+migraciones contra PostGIS, smoke desde base limpia, a11y o contraste cuando
+dependan de la pila. Dev escribe el código y el arnés, corre las compuertas que
+su entorno permite y declara de forma explícita todo lo no ejecutado. PM levanta
+la composición exacta y conserva la responsabilidad de esas puertas antes de
+aceptar.
+
+Dev **puede usar subagentes** para subtareas acotadas de implementación,
+inspección o pruebas. Sigue siendo responsable de revisar e integrar su trabajo,
+respetar una sola tarea activa y entregar un único SHA/informe coherente. Una
+corrida o revisión de un subagente de Dev no sustituye la independencia de PM,
+no amplía alcance y no autoriza integración ni despliegue.
+
+Motivo: no convertir una limitación conocida del entorno en bloqueos repetidos
+ni en afirmaciones de pruebas que no se corrieron, sin perder la separación
+entre construcción y aceptación.
+
 ## 2026-09-14 — Página y orden del Mercado describen la entrada, no crean una por clic
 
 `page` y `sort` quedan en la URL y se restauran junto con los filtros al volver
