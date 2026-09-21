@@ -2,6 +2,40 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## R1 de revisión PM — compuerta de whitespace
+
+La observación reproduce, pero no prueba whitespace agregado. Los tres archivos
+señalados ya usan CRLF en `4c8569d`; `LoginModal.tsx` y
+`CheckoutModal.module.css` siguen siendo CRLF completos en `2d18d55`, y
+`CheckoutModal.tsx` ya era mixto en la base. Esto coincide con la regla estable
+de `CLAUDE.md`: conservar terminadores y, en estas zonas, usar
+`git -c core.whitespace=cr-at-eol diff --check`.
+
+Reproducción exacta sobre `4c8569d..2d18d55`:
+
+```text
+git diff --check                                      exit 2
+  LoginModal.tsx:33: trailing whitespace.             primer diagnóstico
+git -c core.whitespace=cr-at-eol diff --check         exit 0, sin salida
+git show 4c8569d:.../LoginModal.tsx | file -           CRLF
+file src/components/Auth/LoginModal.tsx                CRLF
+git show 4c8569d:.../CheckoutModal.module.css | file - CRLF
+file src/components/Checkout/CheckoutModal.module.css  CRLF
+```
+
+No convertí sólo las líneas nuevas a LF porque mezclaría terminadores dentro de
+archivos CRLF; tampoco convertí archivos enteros porque haría pasar el comando
+plano a costa de reescribir cientos de líneas fuera de alcance. La compuerta
+correcta para este repositorio queda verde y el candidato de producto/arnés
+sigue siendo **`2d18d55`**, sin cambio funcional.
+
+Volví a ejecutar sobre ese SHA: build, lint, `tsc --noEmit`, `node --check`,
+`compileall` y `pip check`, todos verdes. No repetí los focales, sabotajes,
+suite, a11y ni contraste: no cambió producto ni arnés. Este commit modifica
+únicamente `docs/pm/PARA-PM.md`. No integré, no toqué `main` ni Railway.
+
+---
+
 ## RISK-REC-1 — entregada, para tu revisión
 
 | | |
