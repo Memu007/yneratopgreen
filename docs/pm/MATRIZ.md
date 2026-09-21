@@ -1,7 +1,8 @@
 # Matriz requisito contractual → evidencia → estado
 
-Contrastada contra `CONTRATO.md`. Actualizada el 2026-09-14 después de aceptar
-`POST-INTEGRATION-CLEAR-1` localmente; su publicación sigue pendiente.
+Contrastada contra `CONTRATO.md`. Actualizada el 2026-09-21 después de integrar
+la candidata aceptada en `4c8569d`; la verificación runtime posterior al push
+sigue pendiente.
 
 **Estados:** ✅ verificado con evidencia de ejecución · 🟡 existe en
 código, sin verificar · ⚪ parcial · ❌ inexistente
@@ -88,7 +89,7 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 
 | Requisito | Estado |
 |-----------|--------|
-| Pruebas integrales | ✅ `CAT-PAGE-1`: producto final `575f757`, informe `b1cc77f`, merge local `fafa5cb`. Dev 170/171 con único rojo ambiental 131; PM reprodujo 171 verde, su negativo discriminante y el verde restaurado. A11y 72/72 y contraste 80/80 por Dev. Publicación pendiente. |
+| Pruebas integrales | ✅ `CAT-PAGE-1`: producto final `575f757`, informe `b1cc77f`, incluida en `4c8569d`. Dev 170/171 con único rojo ambiental 131; PM reprodujo 171 verde, su negativo discriminante y el verde restaurado. A11y 72/72 y contraste 80/80 por Dev. Runtime posterior al push pendiente. |
 | Carga inicial de datos | ✅ Seed idempotente con 30 publicaciones en 12 categorías y 9 provincias, más 4.028 localidades. Verificado corriéndolo dos veces sin duplicar |
 | Despliegue en producción | ❌ |
 | Capacitación del panel de administración | ❌ |

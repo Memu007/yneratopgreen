@@ -7,15 +7,15 @@ Actualizado: 2026-09-21.
 ## Resumen ejecutivo
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
-- **`origin/main`:** `615619c`; Dev empujó por error la tarea vieja `POST-INTEGRATION-CLEAR-1` y Railway publicó el Frontend en esa revisión. El Backend continúa en `b8447a3`. La lógica coincide con la pieza ya aceptada, se conserva sin rollback y el push no crea precedente.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. La candidata `8e20b06` acumula sin publicar `CAT-PAGE-1`, `POST-INTEGRATION-CLEAR-1`, `QUERY-IMG-1`, condición, marca como dato y `BRAND-FACET-1`.
-- **Última decisión PM:** `BRAND-FACET-1` **ACEPTADA** en `8e20b06`; informe `761a371`. PM reprodujo el caso 175 en 1/1 y sus tres sabotajes en rojo discriminante. Evidencia en `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`. No se integró ni desplegó.
-- **Tarea activa:** ninguna. Próxima acción: Emi decide cuándo autoriza integrar/publicar la composición; `main` conserva auto-deploy.
+- **`main`:** `4c8569d`; merge autorizado de la candidata aceptada `8e20b06` con `main` `615619c`. El push activó el auto-deploy de Railway; la verificación runtime posterior al push queda **PENDIENTE**.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; la candidata `8e20b06` y su informe `761a371` quedaron integrados mediante `4c8569d`.
+- **Última decisión PM:** `BRAND-FACET-1` **ACEPTADA** en `8e20b06`. PM reprodujo el caso 175 en 1/1 y sus tres sabotajes en rojo discriminante. Evidencia en `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
+- **Tarea activa:** `RISK-REC-1`, responsable Dev. Debe reproducir tres riesgos y promover únicamente defectos confirmados.
 
 ## Última aceptación PM — CAT-PAGE-1
 
 Producto inicial `a521631`, corrección R1 `575f757`, informe final `b1cc77f` e
-integración local `fafa5cb`. La PM comprobó de forma independiente:
+integración local `fafa5cb`; quedó incluida en `4c8569d`. La PM comprobó de forma independiente:
 
 - caso 171 sobre la candidata, con 115 publicaciones y cinco páginas: **1/1**;
 - sabotaje temporal omitiendo `pagina` de `consultaVigente`: **0/1**, con la
@@ -48,7 +48,8 @@ en la corrida Docker real anterior de PM; el delta nuevo queda cubierto por
 los focales y puertas anteriores. PM no repitió el borrado completo porque el
 lanzador elimina volúmenes Docker locales y Emi no autorizó esa destrucción.
 
-La pieza queda aceptada e integrada localmente mediante `c973c6f`. Evidencia
+La pieza quedó aceptada e incluida en la composición publicada `4c8569d`; la
+verificación runtime posterior al push queda pendiente. Evidencia
 durable: `REPRODUCCION-POST-INTEGRATION-CLEAR-1-2026-09-14.md`.
 
 ## Última aceptación PM relevante
@@ -72,15 +73,16 @@ casos** de la candidata final. La evidencia durable son los SHA, resultados y
 negativos anteriores; los logs locales fueron apoyo de revisión y no son una
 dependencia recuperable del cierre.
 
-La deuda de composición quedó cerrada: `c565e6e` incorpora el trabajo aceptado y
-`b8447a3` lo combina con la documentación PM vigente sin cambiar ese producto.
-El `diff-check` y el build de producción quedaron verdes antes del push.
+La composición aceptada quedó cerrada en `4c8569d`, que combina `main` `615619c`
+con la candidata `8e20b06` sin abrir alcance nuevo. El `diff-check` y el build de
+producción quedaron verdes antes del push.
 
 `main` continúa conectado al auto-deploy de ambos servicios sin esperar CI. Emi
-autorizó esta publicación como excepción consciente aun sin backup ensayado. La
-migración recomendada a `main = integración aceptada` / `release = producción`
-sigue pendiente: publicar no equivale a aceptar la operación productiva ni
-resuelve backups, SMTP, secretos, pagos o recuperación.
+autorizó esta publicación el 2026-09-21; todavía no se acepta la operación
+productiva ni se afirma convergencia runtime posterior al push. La migración
+recomendada a `main = integración aceptada` / `release = producción` sigue
+pendiente: publicar no equivale a aceptar producción ni resuelve backups, SMTP,
+secretos, pagos o recuperación.
 
 ## Operación de marcas y filtros — estado
 
@@ -103,7 +105,8 @@ Evidencia: `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
 - **Relevo:** cerrado en `b8447a3`; `main` contiene el disparador consolidado y
   la regla local de eficiencia de chats.
 - **Carrito conservado y FAQ de pagos:** cerrados en `eb62d3d`/`a7ed544`,
-  integración local `c973c6f`. La publicación permanece pendiente de Emi.
+  integración local `c973c6f` e incluidos en `4c8569d`. Runtime posterior al
+  push pendiente.
 - **Backup/restauración local:** `BACKUP-RESTORE-1` quedó aceptada en
   `52ba294`/`b8223b1` e integrada por `fbd6caf`. El ensayo Docker real recuperó
   base, `uploads`, `documentos` y `outbox` en un destino aislado; una alteración
@@ -131,7 +134,7 @@ Inventario de sólo lectura del proyecto `strong-playfulness`, entorno `producti
 
 - servicios en línea: Frontend `yneratopgreen`, Backend `Backend` y base `PostGIS`;
 - Frontend y Backend toman `Memu007/yneratopgreen`, rama `main`, con auto-deploy activo y `Wait for CI` apagado;
-- Frontend público `https://yneratopgreen-production.up.railway.app` y Backend público `https://backend-production-ba84.up.railway.app` convergen en `b8447a3`; se verificaron el metadato HTML y `/api/health` después del despliegue;
+- Frontend público `https://yneratopgreen-production.up.railway.app` y Backend público `https://backend-production-ba84.up.railway.app` convergían en `b8447a3` en la última verificación del 2026-09-13; la convergencia runtime posterior al push de `4c8569d` queda **PENDIENTE**;
 - los watch paths siguen separados (`src/public/...` para Frontend y `backend/**` para Backend), por lo que Railway puede publicar composiciones parciales en cambios futuros aunque esta publicación haya convergido;
 - `VITE_API_URL` y `VITE_IMAGES_URL` apuntan al Backend vigente;
 - CORS contiene el dominio histórico y el dominio público actual, pero `FRONTEND_URL` todavía apunta al dominio histórico `ynerav.up.railway.app`; queda como deuda de configuración, sin corregir en este inventario;
@@ -187,9 +190,9 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Emi autoriza más adelante la integración/publicación controlada de la candidata `8e20b06`; ese push tocará producto y activará el auto-deploy de Railway.
-2. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
-3. No abrir otra tarea Dev hasta que PM/Emi definan la siguiente prioridad.
+1. Dev ejecuta `RISK-REC-1` desde la composición `4c8569d`; PM reproduce y decide qué defecto, si alguno, entra al MVP.
+2. Verificar el runtime post-push sin tratarlo todavía como producción aceptada.
+3. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
 5. Los atributos por rubro esperan los datos prometidos por la clienta; Inicio, Servicios y la identidad de AgroMarket esperan decisión de producto.
-6. Mercado Pago, SMTP, red-team y producción aceptada permanecen en la secuencia acordada; no se habilitan por esta tarea.
+6. Mercado Pago, red-team y producción aceptada permanecen en la secuencia acordada; no se habilitan por esta tarea.
