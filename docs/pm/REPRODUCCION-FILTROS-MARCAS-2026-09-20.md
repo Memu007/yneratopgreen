@@ -57,3 +57,30 @@ y contraste. Dev había informado antes 173/174 sobre esta composición, con
 Con lectura de esquema, focales, negativos y la excepción explícita de Emi para
 la suite larga, PM **acepta QUERY-IMG-1 y las etapas 1 y 2**. La etapa 3 queda
 habilitada. Esto no integra ni publica: `main` conserva auto-deploy.
+
+## Etapa 3 — BRAND-FACET-1 — 2026-09-21
+
+- Base declarada: `1c7eb48`.
+- Producto y arnés revisados: `8e20b06`.
+- Informe Dev: `761a371`; el delta posterior al producto es sólo documental.
+- Build de producción sobre la candidata: verde.
+- Base Docker descartable desde cero, migraciones y seed: verdes.
+- Caso 175 PM: **1/1**. Verificó API, total, páginas, IDs y orden; faceta con
+  filtros y antes de marca/paginación; nulos/inactivas/cero; escritorio
+  1440×900, celular 390×844, URL, Atrás, limpieza y carrera de respuesta.
+- Negativo de conteo: **rojo**, 48 informadas contra 30 John Deere.
+- Negativo de faceta: **rojo**, la selección dejó sólo John Deere.
+- Negativo de URL: **rojo**, `brand` no apareció en la barra.
+- El arnés restauró la candidata y PM retiró sus contenedores y volúmenes.
+
+El primer lanzamiento de los sabotajes no dio veredicto porque el wrapper de
+la suite había retirado sus `.env` temporales; no fue un verde ni un rojo de
+producto. Con el entorno requerido repuesto, los tres discriminantes fallaron
+por la razón exacta declarada.
+
+PM no repitió suite completa, a11y ni contraste: Dev informó **174/175** con
+único rojo ambiental 131, **74/74** superficies y **82/82** mediciones, y la
+revisión independiente cubrió el único comportamiento nuevo y sus tres
+mutaciones. Se acepta `BRAND-FACET-1` en `8e20b06`. Jacto queda sin declarar:
+no existe entre las 44 opciones cerradas y esta tarea no autoriza reabrirlas.
+Esto no integra ni publica; `main` conserva auto-deploy.

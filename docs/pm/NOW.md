@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-09-20.
+Actualizado: 2026-09-21.
 
 `NOW.md` contiene sólo estado vigente, restricciones vivas, bloqueos y próxima acción. La historia anterior permanece en Git; la instantánea previa a esta poda está en `ab4165fc`.
 
@@ -8,9 +8,9 @@ Actualizado: 2026-09-20.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
 - **`origin/main`:** `615619c`; Dev empujó por error la tarea vieja `POST-INTEGRATION-CLEAR-1` y Railway publicó el Frontend en esa revisión. El Backend continúa en `b8447a3`. La lógica coincide con la pieza ya aceptada, se conserva sin rollback y el push no crea precedente.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. La composición aceptada `34e7ebf` acumula sin publicar `CAT-PAGE-1`, `POST-INTEGRATION-CLEAR-1`, `QUERY-IMG-1`, condición y marca como dato.
-- **Última decisión PM:** QUERY-IMG-1 y las etapas 1 y 2 de filtros/marcas **ACEPTADAS** sobre `34e7ebf`, con evidencia en `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`. No se integró ni desplegó.
-- **Tarea activa:** `BRAND-FACET-1`, responsable Dev. Agrega marca como filtro y faceta derivada, sin ampliar a los atributos por rubro pedidos por la clienta.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. La candidata `8e20b06` acumula sin publicar `CAT-PAGE-1`, `POST-INTEGRATION-CLEAR-1`, `QUERY-IMG-1`, condición, marca como dato y `BRAND-FACET-1`.
+- **Última decisión PM:** `BRAND-FACET-1` **ACEPTADA** en `8e20b06`; informe `761a371`. PM reprodujo el caso 175 en 1/1 y sus tres sabotajes en rojo discriminante. Evidencia en `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`. No se integró ni desplegó.
+- **Tarea activa:** ninguna. Próxima acción: Emi decide cuándo autoriza integrar/publicar la composición; `main` conserva auto-deploy.
 
 ## Última aceptación PM — CAT-PAGE-1
 
@@ -94,7 +94,7 @@ la composición `34e7ebf` en Docker y cerró la revisión independiente:
   Someca/Someca y Chery/Chery Bylion; Case/Case IH y Deutz/Deutz-Fahr quedan
   separadas. `chery` es el superviviente decidido por Emi. Implementada en
   `89b20aa`/`020e907` y aceptada.
-- **Etapa 3** (la marca como filtro y faceta): abierta como `BRAND-FACET-1`.
+- **Etapa 3** (la marca como filtro y faceta): aceptada en `8e20b06`; caso 175 PM **1/1** y tres negativos discriminantes rojos. Jacto no se agregó porque no existe entre las 44 marcas decididas; el seed declara sólo John Deere y Pauny.
 
 Evidencia: `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
 
@@ -187,9 +187,9 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev implementa `BRAND-FACET-1` y entrega las compuertas sin Docker. PM corre focales, migración, suite completa, a11y y contraste porque el entorno Dev no tiene Docker/PostGIS.
+1. Emi autoriza más adelante la integración/publicación controlada de la candidata `8e20b06`; ese push tocará producto y activará el auto-deploy de Railway.
 2. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
-3. Emi autoriza más adelante la publicación controlada a `main`; ese push tocará producto y activará el auto-deploy de Railway.
+3. No abrir otra tarea Dev hasta que PM/Emi definan la siguiente prioridad.
 4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
 5. Los atributos por rubro esperan los datos prometidos por la clienta; Inicio, Servicios y la identidad de AgroMarket esperan decisión de producto.
 6. Mercado Pago, SMTP, red-team y producción aceptada permanecen en la secuencia acordada; no se habilitan por esta tarea.

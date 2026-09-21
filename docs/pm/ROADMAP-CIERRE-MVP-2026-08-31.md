@@ -173,7 +173,7 @@ o un rediseño nuevo.
 | Orden | Pieza | Fuente | Condición de entrada |
 |---:|---|---|---|
 | 19 | **CAT-PAGE-1 — aceptada, integración local** | deuda UX-2C y ADM-2 como patrón | `a521631` + R1 `575f757` + informe `b1cc77f`; merge local `fafa5cb`. PM reprodujo 171 verde, rojo al omitir `pagina` de la firma y verde tras restaurar. Sin publicación. |
-| 20 | **QUERY-IMG-1 — activa** | C2 | Medir primero el N+1 de imagen principal del listado; optimizar sólo con evidencia y conservar exactamente las respuestas. |
+| 20 | **QUERY-IMG-1 + filtros/marcas — aceptadas en rama** | C2 y operación de búsqueda | Composición previa `34e7ebf`; `BRAND-FACET-1` aceptada en `8e20b06`, informe `761a371`. PM reprodujo 172–174 previamente y 175 final en 1/1 con tres sabotajes rojos. Sin integración ni publicación. |
 | 21 | **RISK-REC-1** | R1, R4 y R5 | Reproducir concurrencia de stock, señal frágil de reenvío y grupo sin medio de pago; promover únicamente defectos reales. |
 
 Cinco mil visitas mensuales no justifican reescribir la arquitectura. Esta
