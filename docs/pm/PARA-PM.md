@@ -2,341 +2,266 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## R1 de revisión PM — compuerta de whitespace
-
-La observación reproduce, pero no prueba whitespace agregado. Los tres archivos
-señalados ya usan CRLF en `4c8569d`; `LoginModal.tsx` y
-`CheckoutModal.module.css` siguen siendo CRLF completos en `2d18d55`, y
-`CheckoutModal.tsx` ya era mixto en la base. Esto coincide con la regla estable
-de `CLAUDE.md`: conservar terminadores y, en estas zonas, usar
-`git -c core.whitespace=cr-at-eol diff --check`.
-
-Reproducción exacta sobre `4c8569d..2d18d55`:
-
-```text
-git diff --check                                      exit 2
-  LoginModal.tsx:33: trailing whitespace.             primer diagnóstico
-git -c core.whitespace=cr-at-eol diff --check         exit 0, sin salida
-git show 4c8569d:.../LoginModal.tsx | file -           CRLF
-file src/components/Auth/LoginModal.tsx                CRLF
-git show 4c8569d:.../CheckoutModal.module.css | file - CRLF
-file src/components/Checkout/CheckoutModal.module.css  CRLF
-```
-
-No convertí sólo las líneas nuevas a LF porque mezclaría terminadores dentro de
-archivos CRLF; tampoco convertí archivos enteros porque haría pasar el comando
-plano a costa de reescribir cientos de líneas fuera de alcance. La compuerta
-correcta para este repositorio queda verde y el candidato de producto/arnés
-sigue siendo **`2d18d55`**, sin cambio funcional.
-
-Volví a ejecutar sobre ese SHA: build, lint, `tsc --noEmit`, `node --check`,
-`compileall` y `pip check`, todos verdes. No repetí los focales, sabotajes,
-suite, a11y ni contraste: no cambió producto ni arnés. Este commit modifica
-únicamente `docs/pm/PARA-PM.md`. No integré, no toqué `main` ni Railway.
-
----
-
-## RISK-REC-1 — entregada, para tu revisión
+## PRIMARY-IMAGE-INTEGRITY-1 — entregada, para tu revisión
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `2a9a72c` |
-| SHA candidato (producto + arnés) | `2d18d55` |
+| base | `1e2b751` |
+| SHA candidato (producto + migración + regresión) | `cfeff88` |
 | informe | este commit |
 | no integrado, no desplegado | `main` quedó en `4c8569d` |
 
-**Sobre la base.** Pediste partir de `4c8569d`. La rama está en `2a9a72c`, que
-es `4c8569d` más tu propio commit de documentación: el único delta son cuatro
-archivos de `docs/pm/`. El producto que medí es exactamente el de `4c8569d`.
+**Sobre la base.** Pediste partir de `0bd7fbc`. La rama está en `1e2b751`, que
+es `0bd7fbc` más tu commit de documentación: el único delta son cuatro archivos
+de `docs/pm/`. El producto que medí es exactamente el de `0bd7fbc`.
 
-### El resultado, primero
+### Lo primero, porque te toca decidir
 
-| Riesgo | Veredicto | Qué pasó |
-|---|---|---|
-| **R1** | **REAL, y peor de lo que decía el riesgo** | Dos compradores pueden quedar los dos con la orden **pagada** por la misma última unidad. Corregido. |
-| **R4** | **Falso como defecto vivo** | La pantalla sí ofrece el reenvío hoy. Encontré otra cosa al ejercitarlo, y ésa sí era real: el reenvío que **falla** se mostraba como si hubiera salido. Corregido. |
-| **R5** | **REAL** | Confirmado en navegador: el checkout te dice «sacá sus productos del carrito» y no tiene con qué. Corregido. |
-
----
-
-## R1 — real, y no donde decía el riesgo
-
-El riesgo hablaba de stock visible viejo entre dos sesiones. **Eso está bien
-defendido.** Lo que no estaba defendido es el otro lado, y es peor.
-
-### Lo que sí está bien (medido, no leído)
-
-- Dos compradores hacen checkout por transferencia sobre la última unidad: las
-  dos órdenes se crean, y eso **es el diseño** —por transferencia no hay
-  reserva, el dinero va de cuenta a cuenta y quien decide es el vendedor cuando
-  ve la acreditación—. Confirmar no mueve un solo número: queda 1 disponible,
-  0 reservada, 0 ventas.
-- El vendedor acepta la primera: vende. Acepta la segunda **una después de la
-  otra**: HTTP 400, stock 0, ventas 1, y esa orden no queda pagada.
-- Una publicación agotada no vuelve a entrar al carrito del servidor: 4xx y el
-  carrito queda intacto.
-- Por Mercado Pago la reserva ya la mide el caso 90 y sigue verde.
-- **La pantalla nunca confirma algo que el Backend rechaza.** Se frena antes,
-  con el motivo del servidor.
-
-### Lo que estaba roto
-
-**Dos aceptaciones simultáneas de órdenes distintas por la misma última unidad
-ganaban las dos.** Las dos órdenes quedaban `PAID`. Dos personas transfirieron
-plata a la cuenta del vendedor por una bolsa que existe una vez.
-
-Medido con el defecto puesto, con dos peticiones en vuelo al mismo tiempo:
-**11 de 12 rondas terminaron con dos órdenes pagadas**. Y los números tampoco
-quedaban bien: sobre una publicación con 1 unidad, después de las dos
-aceptaciones la base decía `stock 0` y `ventas 1`. O sea que además de vender
-dos veces, uno de los dos movimientos se perdía: las dos aceptaciones leían el
-mismo número y escribían el mismo resultado.
-
-El motivo es de una línea: la aceptación **leía** si alcanzaba y **después**
-restaba en Python, en dos pasos. El bloqueo de fila que ya tenía el endpoint
-serializa decisiones sobre *esa* orden, y acá hay dos órdenes: son dos filas
-distintas y lo que se disputa es el producto. Además ese endpoint es de los que
-corren en hilos, así que las dos peticiones avanzan de verdad en paralelo.
-
-### La corrección
-
-Comprobar y descontar pasan a ser **un solo `UPDATE ... WHERE`** que la base
-serializa, exactamente la misma forma que ya usaba la reserva de Mercado Pago.
-El que pierde la fila encuentra cero y se lleva su 400, sin haber descontado
-nada.
-
-**No amplía ningún contrato:** mismo código de estado, mismo texto, mismo
-comportamiento cuando las aceptaciones van una después de la otra. Tampoco
-cambia la política de stock: lo que se puede vender sigue siendo
-`stock − reservado`, se siguen respetando las unidades comprometidas por
-compras de Mercado Pago en curso, y los servicios siguen sin ocupar unidades.
-Lo único que cambia es que la regla deja de poder perderse en una carrera, y
-deja de estar copiada en dos lugares.
-
-### Y el carrito viejo entre dos sesiones
-
-El Backend frenaba bien, pero la persona quedaba trabada: el checkout decía
-«quitala del carrito» y **no tenía con qué**. Es la misma pared que R5 y se
-arregla en el mismo lugar; está contado ahí abajo.
+Para cerrar esto tuve que **tocar el caso 172**, que estaba en tu lista de «no
+se toca». Te explico abajo en detalle, pero el resumen es: el caso fabricaba
+una segunda imagen principal por SQL directo, y eso es exactamente lo que esta
+tarea vuelve imposible. No cambié lo que el caso mide; moví la parte que ya no
+se puede construir al único lugar donde todavía se puede.
 
 ---
 
-## R4 — falso como defecto vivo, con una cosa real al lado
+## Lo que medí antes de tocar nada
 
-### Lo que medí
+```
+duplicadas en la base sembrada                  0
+índice único parcial sobre product_images       no existe
+una segunda principal por SQL directo           la base la acepta
+dos primeras cargas simultáneas                 1 principal (ver abajo)
+borrar la principal, con órdenes desordenados   promovió la de orden 9
+                                                teniendo al lado la de orden 5
+```
 
-Con una cuenta sin confirmar, el ingreso devuelve 403 con su motivo y **la
-pantalla sí ofrece «Reenviame el correo de confirmación»**. Hoy nadie se queda
-sin la salida. Como defecto, **lo cierro como falso**.
+Dos cosas que conviene que sepas, porque cambian cómo leer el trabajo:
 
-### Pero la dependencia del texto es real, y te la dejo ejecutable
+**La base sembrada no tiene duplicados hoy.** Los que aparecieron mientras
+medía los había creado yo. Así que la limpieza de la migración no está
+arreglando un desastre existente: está dejando el camino listo para que la
+restricción se pueda crear sobre cualquier base, incluida la de producción,
+que no miré.
 
-La pantalla decide si ofrece el reenvío **leyendo cómo está redactado** el
-motivo. Lo probé: cambié «Tu cuenta todavía no está confirmada» por «Todavía
-falta confirmar tu cuenta» —una corrección editorial de las que este proyecto
-hace seguido— y **el botón desaparece**. La cuenta sigue sin poder entrar y la
-persona se queda sin salida.
-
-**No lo cambié**, y es a propósito: los dos rechazos que puede dar el ingreso
-comparten el 403 —el otro es «usuario inactivo»—, así que separarlos necesita
-una señal nueva de la API, y me dijiste que frenara ahí. Las dos salidas que
-veo, para que decidas vos:
-
-1. **Una señal estable en el rechazo** (un campo o un encabezado que diga que
-   falta confirmar). Es lo correcto y es lo que amplía el contrato de Auth.
-2. **Ofrecer el reenvío ante cualquier 403 del ingreso.** No toca la API. El
-   costo es que a una cuenta inactiva se le ofrece una acción que no la ayuda
-   —aunque tampoco la delata: el reenvío contesta lo mismo para cualquier
-   cuenta—.
-
-Mientras tanto, el caso 177 deja la dependencia **vigilada**: lee el motivo de
-la API y exige que la pantalla lo muestre y ofrezca la salida. Si alguien
-mejora esa redacción, se pone rojo antes de que lo sufra una persona.
-
-### Lo que sí estaba roto: el reenvío que no salió se veía como si hubiera salido
-
-Ejercitando el transporte de correo caído, como pediste, apareció otra cosa.
-Con la petición del reenvío cortada, la pantalla mostraba **«No pudimos
-conectarnos. Revisá tu conexión y probá de nuevo.» dentro de la caja verde**,
-con `role="status"`. O sea: color de éxito, y un lector de pantalla lo anuncia
-como un aviso cualquiera. La persona se queda esperando un correo que nadie
-mandó.
-
-Corregido: el fallo se dibuja con el color del error y se anuncia con
-`role="alert"`. **No delata ninguna cuenta**: lo que distingue no es la
-respuesta del servidor —que es idéntica exista o no la cuenta— sino que el
-pedido no llegó a contestar.
-
-Lo demás que ejercité queda como estaba, y está bien: el vencimiento a 24 h, el
-reenvío que invalida el anterior y la respuesta que no cambia según la cuenta ya
-los mide el caso 35; la pantalla de confirmación ofrece pedir un enlace nuevo
-ante **cualquier** error, sin leerle el texto a nadie.
+**Las dos cargas simultáneas ya daban una sola principal, pero por accidente.**
+El endpoint decide leyendo un conteo y escribiendo después; entre las dos
+cosas no hay ningún `await`, así que el bucle de eventos no le da paso a la
+otra petición justo ahí. Es la misma protección accidental que te informé como
+riesgo adyacente en `RISK-REC-1`: **deja de valer el día que alguien agregue un
+`await` en el medio**. Ahora no depende de eso.
 
 ---
 
-## R5 — real, medido en navegador
+## Lo que hice
 
-Fabriqué el escenario: dos vendedores en el carrito, uno sin CBU, sin alias y
-sin Mercado Pago vinculado.
+### 1. La migración `b6d3f12a8e94`
 
-**Lo que hace bien:** la API lo identifica con nombre y motivo, el paso de pago
-lo muestra, y confirmar no escribe nada —cero órdenes—.
+Dos pasos, y el orden es el punto:
 
-**Lo que estaba roto:** la pantalla dice «Sacá sus productos del carrito para
-poder continuar» y en **toda la capa del checkout había tres botones**: cerrar,
-volver y confirmar. Ninguno saca nada. Y cerrar con datos escritos abre
-«Tenés cambios sin guardar / Descartar cambios», así que retirar un grupo
-costaba el destino, el traslado y los grupos que sí se podían comprar.
+1. de cada publicación con más de una principal sobrevive **una**: la de menor
+   `display_order` y, a igualdad, la de menor `id`;
+2. recién entonces se crea el **índice único parcial** sobre
+   `product_images(product_id)` `WHERE is_primary`.
 
-### La corrección
+Al revés no funciona, y no es teoría: el sabotaje `dedupe` lo demuestra —
+`alembic upgrade head` falla sobre datos con duplicados.
 
-El resumen del pedido —«Resumen del Pedido», la columna que ya lista lo que se
-está comprando en los dos pasos— pasa a tener **«Quitar del carrito»** por
-línea. No hay pieza nueva: lo único que le faltaba a esa lista era el verbo.
+El criterio de cuál sobrevive **no lo elegí yo**: es el mismo con el que el
+catálogo viene eligiendo desde `QUERY-IMG-1`. Así, una publicación que hoy
+tenga duplicados no cambia la foto que ya se le ve. Elegir cualquier otra sería
+cambiarle la tapa a una publicación sin que nadie lo pidiera.
 
-- No se adivina qué sacar leyendo el mensaje del servidor.
-- Retirar **vuelve al paso de envío**, porque cambiar el carrito ya invalida las
-  decisiones de traslado —son de otro viaje— y ahí es donde se vuelven a tomar.
-  Lo escrito no se pierde y nadie pregunta si se descarta.
-- Sirve igual para la publicación agotada de R1: es la misma pared.
-- Si al retirar el carrito queda vacío, lo dice en vez de dejar un formulario
-  que no lleva a ninguna parte.
+**No se borra ninguna imagen.** Las que dejan de ser principales siguen en la
+galería, con su orden.
 
-### Y una tercera cosa, chica, que apareció midiendo esto
+La vuelta atrás retira la restricción y nada más: no reconstruye duplicados
+—no se puede saber cuáles eran, y tampoco haría falta— y no toca una fila.
 
-**«Continuar al pago» era mudo.** Sin el traslado resuelto, el paso escribía su
-motivo en el estado y ninguna rama lo dibujaba: apretar la acción primaria no
-hacía nada y no decía nada. Medido: cero avisos antes del clic y cero después.
-Ahora contesta. Y cuando el traslado no se pudo resolver porque el carrito tenía
-algo agotado, contesta **ese** motivo: decirle «elegí el destino» a quien ya lo
-eligió manda a buscar el problema donde no está.
+El índice va también declarado en el modelo. No es una copia de más: si
+estuviera sólo en la migración, el esquema y el modelo no coincidirían y
+`alembic check` lo marcaría en cada corrida.
+
+### 2. La carga
+
+Estaba mezclada: leía el archivo, lo subía al almacenamiento y decidía si era
+principal, todo en el mismo bucle. Cada `await` de ese bucle le da paso a otra
+petición, así que la decisión quedaba tomada sobre un conteo que podía cambiar
+antes de escribirse.
+
+Ahora son dos tramos: primero se guardan los archivos, después se escribe la
+base, y ese segundo tramo no tiene ninguna espera adentro. Además **toma la
+fila de la publicación** antes de mirar sus imágenes, para que la regla no
+dependa de que ese tramo siga sin esperas. El índice es la última palabra; esto
+evita que la última palabra sea un 500 en la cara de quien sube una foto.
+
+Y cambié **qué** decide: antes miraba si había imágenes, ahora mira si hay
+**principal**. Una publicación con fotos y sin principal existe —dato viejo, o
+un borrado que no llegó a promover— y no se ve en el catálogo; la próxima carga
+la deja sana en vez de dejarla como estaba. Si ya hay principal, no se la toca.
+
+### 3. El borrado
+
+Promovía «la primera fila que devuelva la base», sin orden ninguno. Medido
+sobre tres imágenes con los órdenes cambiados a mano: **promovió la de orden 9
+teniendo al lado la de orden 5**. La tapa de la publicación quedaba a criterio
+del planificador de consultas.
+
+Ahora promueve siempre la misma —menor `display_order`, y por `id` a igualdad—
+y lo hace en la **misma transacción** que el borrado. Con dos commits quedaba
+una ventana en la que la publicación tenía fotos y ninguna principal, y en esa
+ventana el catálogo la muestra sin foto.
+
+---
+
+## El caso 172, que sí toqué
+
+El caso fabricaba cuatro publicaciones **con dos imágenes principales** por
+`INSERT` directo, para medir que el listado las tolerara: una sola tarjeta, una
+sola URL y el total sin inflar. Era la defensa que dejó `QUERY-IMG-1`.
+
+Ese `INSERT` ahora lo rechaza la base. El caso se pone rojo, y no por un
+defecto: por el arreglo.
+
+Lo resolví sin perder nada de lo que medía:
+
+- **En el 172**, ese grupo pasa a medir que la base **rechace** la segunda
+  principal, y sigue quedando con dos filas por publicación —la segunda entra
+  como secundaria— para que el `outerjoin` siga teniendo de dónde multiplicar
+  la fila si alguien le sacara la subconsulta determinista al listado. Todo lo
+  demás del caso —el N+1, el total, las URLs, el orden— no se tocó.
+- **En el 179**, con la migración abajo y el duplicado existiendo de verdad, se
+  comprueba que el listado siga sacando **una sola tarjeta** y **la imagen de
+  menor orden**. Es la misma afirmación de antes, medida en la única ventana en
+  la que ese dato puede existir.
+
+Tolerar el duplicado y no dejar que se cree son dos defensas distintas, y las
+dos siguen puestas. **No toqué `catalog.py`**: la subconsulta determinista de
+`QUERY-IMG-1` quedó igual.
+
+Si preferís que el 172 quede exactamente como estaba, la única forma es que
+baje y suba la migración él mismo para fabricar su escenario, y eso deja la
+suite corriendo un rato sin la restricción. Me pareció peor. Decidilo vos.
 
 ---
 
 ## Diff
 
 ```
-backend/app/api/orders.py                         +11 −12  la aceptación deja de tener su copia de la regla
-backend/app/services/stock.py                     +44      `vender`: comprobar y descontar, una sentencia
-src/components/Checkout/CheckoutModal.tsx         +61 −2   quitar del resumen, y el paso deja de ser mudo
-src/components/Checkout/CheckoutModal.module.css  +27      el botón de la línea y el carrito vacío
-src/components/Auth/LoginModal.tsx                +17 −1   el fallo del reenvío se ve como un fallo
-scripts/smoke.mjs                                +714      casos 176, 177 y 178
-scripts/sabotajes_risk_rec_1.py                  +206      los cinco rojos
+backend/alembic/versions/…_una_sola_imagen_principal.py   +80      dedupe y el índice
+backend/app/models/product_image.py                       +21 −1   el índice, declarado
+backend/app/api/products.py                               +71 −24  carga y borrado
+scripts/smoke.mjs                                        +385 −18  caso 179 y el 172
+scripts/sabotajes_primary_image_1.py                     +227      los cuatro rojos
 ```
 
-Sin endpoint nuevo, sin tabla, sin migración, sin dependencia y sin bandera
-nueva. `alembic check` lo confirma: **«No new upgrade operations detected»**.
+Sin endpoint nuevo, sin tabla nueva, sin dependencia, sin cambio de contrato de
+respuesta y sin tocar la UI.
 
 ---
 
-## Los cinco rojos, con su texto
+## Los cuatro rojos, con su texto
 
-`python3 scripts/sabotajes_risk_rec_1.py` aplica cada rotura, corre el caso
-focal contra ella y restaura el árbol. Se puede correr entero o de a uno.
+`python3 scripts/sabotajes_primary_image_1.py` aplica cada rotura, corre el
+caso 179 contra ella y deja el árbol **y la base** como estaban.
 
-| Sabotaje | Caso | Lo que dice el rojo |
-|---|---|---|
-| el descuento vuelve a ser leer y después escribir | 176 | «ronda 2: dos aceptaciones simultáneas de órdenes distintas por 1 unidad terminaron con 2 ganadoras; dos personas transfirieron por la misma bolsa» |
-| el resumen pierde el botón que retira una línea | 178 | «1440x900: el checkout dice que hay que sacar esos productos del carrito y no ofrece ninguna forma de hacerlo sin cerrar y descartar lo escrito» |
-| el paso de envío deja de dibujar su motivo | 176 | «apretar «Continuar al pago» no cambió nada en pantalla: seguía habiendo 1 aviso(s) y la persona no sabe si el botón hizo algo» |
-| el fallo del reenvío vuelve a la caja verde | 177 | «el reenvío que falló se anuncia como «status» y no como un problema: quien usa un lector de pantalla no se entera de que no salió nada» |
-| el Backend mejora la redacción del motivo | 177 | «con la cuenta sin confirmar el ingreso no ofrece pedir un enlace nuevo, y sin eso la persona se queda sin salida» |
+| Sabotaje | Lo que dice el rojo |
+|---|---|
+| la migración no crea el índice | «no existe el índice «uq_product_images_primaria_unica» sobre product_images: sin él la regla vuelve a depender de que ningún camino se olvide» |
+| la migración crea el índice sin limpiar antes | `alembic upgrade head` falla: es el motivo por el que los dos pasos van en ese orden |
+| borrar la principal promueve cualquiera | «borrar la principal promovió la imagen equivocada: la tapa de la publicación quedó a criterio del planificador de consultas y no de una regla» |
+| toda imagen subida se declara principal | «no se pudieron dejar dos imágenes: HTTP 200 y 500» |
 
-El último no es un defecto del producto de hoy: es **R4 hecho ejecutable**, para
-que puedas ver con tus manos de qué está colgada esa salida.
+El primero es el negativo que pediste: sin la restricción, el caso se pone rojo
+al admitir dos principales; restaurada la candidata, vuelve a verde.
 
-**Una honestidad sobre el primero.** La ventana entre leer y escribir es
-angosta y no siempre se cruza: con el defecto puesto, medí **11 de 12** rondas
-con dos órdenes pagadas. Por eso el caso 176 corre **tres rondas** y exige que
-**todas** terminen con un solo ganador. No debilita la afirmación —la afirmación
-es la misma—, hace que el rojo aparezca prácticamente seguro. Si te sale verde
-con el sabotaje puesto, corrélo de nuevo: lo estarías viendo perder la moneda
-tres veces seguidas.
+**Una advertencia sobre el script.** Restaurar la base no es «bajar y volver a
+subir»: la versión saboteada `indice` deja la base marcada como migrada y sin
+índice, así que el `downgrade` falla al retirar algo que no está y no se
+recrea nada. Medido: los tres sabotajes siguientes corrían sin índice y daban
+todos el mismo rojo, que es un falso verde disfrazado de rojo. El script ahora
+lleva la base a un estado conocido —retira el índice exista o no, deduplica, y
+marca la versión anterior sin ejecutar DDL— y recién entonces sube.
 
 ---
 
 ## Lo que ejecuté
 
 ```
-casos focales 176, 177 y 178                    3/3
-suite completa desde base limpia (2d18d55)      177/178   ← único rojo el 131
-los cinco sabotajes                             FAIL en su caso focal, 5/5
+caso 179 focal                                  1/1
+casos 20, 162 y 172                             3/3, verdes en la suite completa
+suite completa desde base limpia (cfeff88)      178/179   ← único rojo el 131
+los cuatro sabotajes                            FAIL en el caso 179, 4/4
+alembic upgrade head desde base vacía           verde, deja el índice
+alembic downgrade -1 y upgrade head             verdes, sin perder imágenes
 alembic check                                   No new upgrade operations detected
 npm run build / lint / tsc --noEmit             verdes
 node --check · compileall · pip check           verdes
 git -c core.whitespace=cr-at-eol diff --check   sin avisos
-npm run a11y -- --todas                         74/74 pantallas, 0 bloqueantes
-npm run contraste                               82/82 mediciones, 0 incumplimientos
 ```
 
-El **131** es el ambiental de siempre: este contenedor no tiene demonio de
-Docker ni la imagen `alpine:3`, que el caso necesita. No cambió y no lo toqué.
+**No corrí a11y ni contraste**, y no es un olvido: esta pieza no cambia ninguna
+superficie visible. No toca un componente, una hoja de estilos ni un texto de
+pantalla. Si querés que las corra igual, las corro.
 
-Y una cosa que me pasó y te la cuento: la primera corrida completa la abandoné
-a los 76 casos porque edité el Frontend en el medio. Una suite con el código
-cambiando abajo no mide nada, así que no la informo. La que está arriba arrancó
-después del último cambio, con el árbol quieto.
-
----
-
-## Qué miden los casos nuevos
-
-**176 — el stock lo decide el Backend, y el checkout se corrige sin tirarlo.**
-Dos órdenes por transferencia sobre la última unidad; las dos aceptaciones una
-después de otra; **tres rondas** de aceptaciones simultáneas de órdenes
-distintas; el rebote al querer volver a meter lo agotado; y en navegador el
-carrito viejo entre dos sesiones: el motivo del servidor a la vista, la acción
-primaria que contesta, la línea que se retira sin descartar lo escrito y la
-compra que se completa con el resto del carrito.
-
-**177 — la salida del ingreso sin confirmar.** El motivo que se ve es el que
-devuelve la API; el reenvío que no salió se ve como un fallo; la respuesta del
-reenvío es la misma para una cuenta pendiente, una confirmada y una que no
-existe; y un enlace vencido deja la pantalla de confirmación con el formulario
-para pedir otro.
-
-**178 — el grupo sin medio de pago, en 1440×900 y en 390×844.** Lo identifica,
-no deja confirmar —y no escribe ninguna orden—, se retira desde el resumen sin
-descartar lo escrito ni perder el grupo válido, y la compra sigue con el resto.
-Las dos medidas están porque el resumen es una columna al costado en escritorio
-y una banda debajo en celular: el control tiene que existir en los dos.
+Docker y PostGIS **sí** están disponibles en mi entorno y ejecuté todo lo de
+arriba. El caso 131 sigue siendo el único ambiental: necesita demonio de Docker
+y la imagen `alpine:3`, que este contenedor no tiene.
 
 ---
 
-## Riesgos adyacentes que encontré y **no** toqué
+## Qué mide el caso 179
 
-**El mismo patrón está en otros dos lugares, y hoy no falla por casualidad.**
-Cancelar o rechazar una orden ya pagada devuelve las unidades con la misma
-forma insegura —leer y después escribir en Python—: `orders.py`, en el cambio
-de estado y en la cancelación. Los medí: **0 de 6 rondas** perdieron una unidad.
+**A. La restricción existe y es de PostgreSQL.** Lee `pg_indexes` y exige que
+sea único, sobre `(product_id)` y con `WHERE is_primary`. Después escribe una
+segunda principal **desde la base**, sin pasar por la aplicación, y exige el
+rechazo. Una secundaria más sigue entrando.
 
-No fallan porque esos dos endpoints son `async` y corren sobre el mismo hilo,
-así que ese bloque no se intercala con otra petición. El que arreglé es `def`
-normal y corre en hilos: ahí sí se intercalaban. O sea que la protección es un
-accidente de cómo está declarada la función, no una decisión. **Deja de valer el
-día que alguien agregue un `await` en el medio de ese bloque o convierta el
-endpoint en sincrónico**, y el síntoma sería mercadería que desaparece del
-catálogo sin que nadie la venda.
+**B. La migración limpia lo que ya estaba sucio.** El dato sucio no se puede
+fabricar con la restricción puesta, así que el caso **baja la migración**, deja
+una publicación con tres principales y otra con dos del mismo
+`display_order` —ahí el desempate por `id` es lo único que decide—, comprueba
+que bajar no tocó ninguna fila, y **vuelve a subirla**. Exige: una sola
+principal en cada una, la correcta, sin perder ninguna imagen. Y con el
+duplicado todavía existiendo, que el listado siga sacando una tarjeta y la
+imagen de menor orden.
 
-Es la misma corrección de una línea que acabo de hacer. No la hice porque es el
-flujo de cancelación y no el de compra, y vos dijiste que no tocara políticas de
-stock sin consultar. Decime y va.
+**C. Los recorridos.** Primera carga deja una principal; las posteriores no se
+la cambian y no se declaran principales; los órdenes no se repiten; borrar la
+principal promueve la de menor orden; borrar las que quedan deja cero, que es
+válido.
 
-**El otro, chico:** desde el ingreso, si alguien corrige el correo mal escrito
-en el campo y después aprieta «Reenviame el correo», el reenvío va a la
-dirección **nueva** —que puede no ser la cuenta pendiente— y la respuesta
-genérica dice igual «te enviamos un enlace». No es enumerable ni pierde datos;
-es una confusión posible. Registrado, sin tocar.
+**D. Dos primeras cargas a la vez.** Tres rondas: sin 5xx, las dos imágenes
+conservadas y una sola principal.
+
+**E. Los límites de antes.** Vendedor ajeno en 403, el tope de tres imágenes y
+el filtro de formato siguen rechazando, y la publicación al tope conserva una
+sola principal.
+
+---
+
+## Lo que encontré y **no** toqué
+
+**El orden de exhibición puede repetirse.** La carga asigna
+`display_order = cuántas hay + posición`. Si antes se borró una imagen del
+medio, el número nuevo puede coincidir con uno existente. No rompe nada —tanto
+la promoción como el catálogo desempatan por `id`, así que la elección sigue
+siendo determinista— pero el número deja de ser un orden estricto. Se arregla
+con `máximo + 1`. No lo hice porque ningún criterio tuyo lo pide y no quería
+meter un cambio de comportamiento más en esta pieza.
+
+**El borrado sigue tocando el almacenamiento antes que la base.** Si la
+escritura fallara después de borrar el archivo, la fila queda apuntando a algo
+que no está. Es como estaba y no lo toqué: cambiar ese orden es otra decisión.
 
 ---
 
 ## Lo que no hice
 
-No habilité Mercado Pago real, no usé credenciales reales y no toqué la bandera
-productiva. No hice migraciones, ni esquema, ni rediseño de checkout, ni flujo
-de autenticación nuevo. No toqué Railway, datos remotos ni `main`. No integré y
-**no desplegué**: `main` quedó en `4c8569d`.
+No cambié `QUERY-IMG-1`, paginación, contratos de respuesta ni la UI. No
+rediseñé la galería, no agregué reordenamiento manual ni un endpoint para
+elegir la principal. No toqué el N+1 del carrito. No toqué Railway, datos
+remotos ni `main`, y **no desplegué**. La migración queda en rama.
 
 Freno acá para tu revisión.
