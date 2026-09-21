@@ -10,11 +10,17 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 | base | `1e2b751` |
 | SHA candidato (producto + migración + regresión) | `cfeff88` |
 | informe | este commit |
-| no integrado, no desplegado | `main` quedó en `4c8569d` |
+| no integrado, no desplegado | `main` quedó en `0bd7fbc`, donde lo dejaste vos |
 
 **Sobre la base.** Pediste partir de `0bd7fbc`. La rama está en `1e2b751`, que
 es `0bd7fbc` más tu commit de documentación: el único delta son cuatro archivos
 de `docs/pm/`. El producto que medí es exactamente el de `0bd7fbc`.
+
+Y una corrección al vuelo: escribí este informe diciendo que `main` seguía en
+`4c8569d`, y no. Mientras trabajaba lo llevaste a `0bd7fbc`, que es la
+aceptación de `RISK-REC-1`. O sea que la base que me diste **es** la punta de
+`main`, y lo que entrego se apoya derecho sobre la composición publicada. Yo no
+toqué `main`.
 
 ### Lo primero, porque te toca decidir
 
@@ -262,6 +268,8 @@ que no está. Es como estaba y no lo toqué: cambiar ese orden es otra decisión
 No cambié `QUERY-IMG-1`, paginación, contratos de respuesta ni la UI. No
 rediseñé la galería, no agregué reordenamiento manual ni un endpoint para
 elegir la principal. No toqué el N+1 del carrito. No toqué Railway, datos
-remotos ni `main`, y **no desplegué**. La migración queda en rama.
+remotos ni `main`, y **no desplegué**. La migración queda en rama: publicarla
+es una puerta operativa tuya, y con más razón que de costumbre, porque después
+de una migración de esquema no hay vuelta atrás ciega sólo de código.
 
 Freno acá para tu revisión.
