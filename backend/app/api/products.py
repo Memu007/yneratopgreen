@@ -260,8 +260,16 @@ async def upload_product_images(
     allowed_extensions = {'.jpg', '.jpeg', '.png', '.webp'}
     max_file_size = 5 * 1024 * 1024  # 5MB
     
-    uploaded_images = []
-    
+    # Primero el archivo, despues la base, y no mezclados.
+    #
+    # Cada `await` de este tramo le devuelve el paso al bucle de eventos, asi
+    # que otra carga de la misma publicacion puede correr en el medio. Decidir
+    # ahi cual es la principal es decidirlo sobre un conteo que puede cambiar
+    # antes de escribirlo. Aca arriba solo se leen y se guardan archivos; la
+    # decision vive abajo, en un tramo sin ninguna espera.
+    storage = get_storage()
+    subidas = []
+
     for file in files:
         # Validar extensión
         file_ext = os.path.splitext(file.filename)[1].lower()
@@ -283,7 +291,6 @@ async def upload_product_images(
         await file.seek(0)
         
         # Subir archivo usando el servicio de storage (local/S3/Cloudinary)
-        storage = get_storage()
         file_url = await storage.upload(
             file=BytesIO(content),
             filename=file.filename,
@@ -291,29 +298,50 @@ async def upload_product_images(
             content_type=file.content_type
         )
         
-        # Extraer nombre del archivo de la URL
-        unique_filename = file_url.split('/')[-1]
-        
-        # Determinar si es la primera imagen (será la principal)
-        is_first = len(uploaded_images) == 0
-        existing_images = db.query(ProductImage).filter(
-            ProductImage.product_id == product_id
-        ).count()
-        is_primary = existing_images == 0 and is_first
+        subidas.append({
+            "nombre_original": file.filename,
+            "url": file_url,
+            # Extraer nombre del archivo de la URL
+            "filename": file_url.split('/')[-1],
+            "file_size": len(content),
+        })
+
+    # La fila de la publicacion se toma antes de mirar sus imagenes. Es lo que
+    # hace que «cero o una principal» no dependa de que este tramo no tenga
+    # esperas: si manana alguien agrega una, la regla sigue en pie. El indice
+    # unico parcial es la ultima palabra; esto evita que la ultima palabra sea
+    # un 500 en la cara de quien sube una foto.
+    db.query(Product).filter(Product.id == product_id).with_for_update().first()
+
+    ya_hay = db.query(ProductImage).filter(
+        ProductImage.product_id == product_id
+    ).count()
+    # Lo que decide no es si hay imagenes: es si hay PRINCIPAL. Una publicacion
+    # con fotos y sin principal existe —dato viejo, o un borrado que no llego a
+    # promover— y no se ve en el catalogo. La proxima carga la deja sana en vez
+    # de dejarla como estaba.
+    falta_principal = db.query(ProductImage).filter(
+        ProductImage.product_id == product_id,
+        ProductImage.is_primary.is_(True),
+    ).count() == 0
+
+    uploaded_images = []
+    for posicion, subida in enumerate(subidas):
+        is_primary = falta_principal and posicion == 0
         
         # Crear registro en base de datos
         product_image = ProductImage(
             product_id=product_id,
-            url=file_url,  # URL del storage (local o cloud)
-            filename=unique_filename,
-            file_size=len(content),
+            url=subida["url"],  # URL del storage (local o cloud)
+            filename=subida["filename"],
+            file_size=subida["file_size"],
             is_primary=is_primary,
-            display_order=existing_images + len(uploaded_images)
+            display_order=ya_hay + posicion
         )
         
         db.add(product_image)
         uploaded_images.append({
-            "filename": file.filename,
+            "filename": subida["nombre_original"],
             "url": product_image.url,
             "is_primary": is_primary
         })
@@ -566,19 +594,38 @@ async def delete_product_image(
     
     # Si era la imagen principal, asignar otra como principal
     was_primary = image.is_primary
-    
+
+    # Misma fila tomada que en la carga, y por lo mismo: borrar y promover son
+    # un solo acto sobre las imagenes de esta publicacion.
+    db.query(Product).filter(Product.id == product_id).with_for_update().first()
+
     # Eliminar de la base de datos
     db.delete(image)
-    db.commit()
+    db.flush()
     
-    # Si era principal, asignar la primera imagen disponible como nueva principal
+    # Si era principal, promover otra: SIEMPRE la misma, la de menor
+    # `display_order` y, a igualdad de orden, la de menor `id`. Es el criterio
+    # con el que el catalogo viene eligiendo desde `QUERY-IMG-1`.
+    #
+    # Antes se tomaba la primera fila que devolviera la base, sin ningun orden.
+    # Medido sobre tres imagenes desordenadas a mano: promovio la de
+    # `display_order` 9 y no la de 5. La tapa de la publicacion quedaba a
+    # criterio del planificador de consultas.
+    #
+    # Y va en la MISMA transaccion que el borrado. Con dos commits queda una
+    # ventana en la que la publicacion tiene fotos y ninguna principal, y en
+    # esa ventana el catalogo la muestra sin foto.
     if was_primary:
-        first_image = db.query(ProductImage).filter(
+        siguiente = db.query(ProductImage).filter(
             ProductImage.product_id == product_id
+        ).order_by(
+            ProductImage.display_order,
+            ProductImage.id,
         ).first()
-        if first_image:
-            first_image.is_primary = True
-            db.commit()
+        if siguiente:
+            siguiente.is_primary = True
+
+    db.commit()
     
     return {"message": "Imagen eliminada exitosamente"}
 

@@ -1,7 +1,9 @@
 """
 Modelo de Imagen de Producto - Múltiples imágenes por producto
 """
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey
+from sqlalchemy import (
+    Column, String, Boolean, DateTime, Integer, ForeignKey, Index, text,
+)
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -11,6 +13,24 @@ from app.db.base import Base
 
 class ProductImage(Base):
     __tablename__ = "product_images"
+
+    # Cero o una principal por publicacion, y lo decide la base.
+    #
+    # Es un indice unico PARCIAL: la unicidad vale solo entre las filas con
+    # `is_primary`. Una publicacion puede tener varias secundarias, y puede no
+    # tener ninguna principal; lo que no puede tener es dos.
+    #
+    # Va tambien en la migracion `b6d3f12a8e94`. Declararlo en los dos lados no
+    # es una copia de mas: si estuviera solo en la migracion, el modelo y el
+    # esquema no coincidirian y `alembic check` lo marcaria en cada corrida.
+    __table_args__ = (
+        Index(
+            "uq_product_images_primaria_unica",
+            "product_id",
+            unique=True,
+            postgresql_where=text("is_primary"),
+        ),
+    )
 
     # Identificación
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))

@@ -28050,8 +28050,14 @@ await runCase(172, 'El listado del Mercado no consulta las imágenes una vez por
   const CON_PRIMARIA = 10;   // 0..9    → sale su URL
   const SIN_IMAGEN = 8;      // 10..17  → primary_image null
   const SOLO_SECUNDARIA = 8; // 18..25  → null también: tener imagen no es tener primaria
-  const DOS_PRIMARIAS = 4;   // 26..29  → una sola tarjeta y una sola URL
-  const TOTAL = CON_PRIMARIA + SIN_IMAGEN + SOLO_SECUNDARIA + DOS_PRIMARIAS;
+  // 26..29 → acá el caso fabricaba una SEGUNDA primaria, y podía: la base no
+  // lo impedía. Desde `PRIMARY-IMAGE-INTEGRITY-1` hay un índice único parcial
+  // y ese dato ya no se puede escribir, así que lo que se mide en este grupo
+  // es el rechazo. Que el listado TOLERE el duplicado —una sola tarjeta, una
+  // sola URL— sigue medido donde ese dato todavía puede existir: el caso 179,
+  // con la migración abajo.
+  const PRIMARIA_RECHAZADA = 4;
+  const TOTAL = CON_PRIMARIA + SIN_IMAGEN + SOLO_SECUNDARIA + PRIMARIA_RECHAZADA;
 
   const nombreDe = (i) => `${MARCADOR}-${String(i).padStart(3, '0')}`;
   const urlDe = (i, cual) => `/uploads/products/${MARCADOR.replace(/\s/g, '_')}-${i}-${cual}.png`;
@@ -28114,14 +28120,22 @@ await runCase(172, 'El listado del Mercado no consulta las imágenes una vez por
     for (let i = CON_PRIMARIA + SIN_IMAGEN; i < CON_PRIMARIA + SIN_IMAGEN + SOLO_SECUNDARIA; i += 1) {
       ponerImagen(nombreDe(i), urlDe(i, 'secundaria'), false, 0);
     }
-    // Dos primarias para la misma publicación. La base NO lo impide —no hay
-    // índice único— y el `outerjoin` vigente multiplica la fila en cuanto la
-    // URL entra en el SELECT. La que tiene que salir es la de menor
-    // `display_order`, y la tarjeta tiene que salir UNA sola vez.
+    // Una primaria y el intento de una segunda, que la base tiene que
+    // rechazar. Queda con dos filas igual —la segunda entra como secundaria—
+    // para que el `outerjoin` siga teniendo de dónde multiplicar la fila si
+    // alguien le sacara la subconsulta determinista al listado.
     const desdeDos = CON_PRIMARIA + SIN_IMAGEN + SOLO_SECUNDARIA;
     for (let i = desdeDos; i < TOTAL; i += 1) {
       ponerImagen(nombreDe(i), urlDe(i, 'primaria'), true, 0);
-      ponerImagen(nombreDe(i), urlDe(i, 'segunda-primaria'), true, 5);
+      let rechazo = null;
+      try {
+        ponerImagen(nombreDe(i), urlDe(i, 'segunda'), true, 5);
+      } catch (error) {
+        rechazo = String(error.message);
+      }
+      assert(rechazo && /uq_product_images_primaria_unica/.test(rechazo),
+        `la base aceptó una segunda imagen principal para «${nombreDe(i)}»`);
+      ponerImagen(nombreDe(i), urlDe(i, 'segunda'), false, 5);
     }
 
     const [fabricadas] = queryRows(`
@@ -28183,11 +28197,10 @@ await runCase(172, 'El listado del Mercado no consulta las imágenes una vez por
     const chica = await listar(CHICA);
     const grande = await listar(GRANDE);
 
-    // El conteo va PRIMERO, y no es un detalle de orden: contra la base la
-    // página además sale corta —las filas duplicadas por las dos primarias se
-    // colapsan—, y si esa comprobación fuera antes, el caso se pondría rojo por
-    // la cardinalidad y nunca llegaría a informar el N+1, que es el defecto que
-    // esta tarea viene a retirar.
+    // El conteo va PRIMERO, y no es un detalle de orden: si la unión con las
+    // imágenes multiplicara la fila, la página saldría corta y el caso se
+    // pondría rojo por la cardinalidad sin llegar nunca a informar el N+1, que
+    // es el defecto que este caso vigila.
     assert(grande.recorridos === chica.recorridos,
       `el listado recorrió «product_images» ${chica.recorridos} veces con ${CHICA} tarjetas y `
       + `${grande.recorridos} veces con ${GRANDE}: el número de consultas crece con el tamaño `
@@ -28252,7 +28265,7 @@ await runCase(172, 'El listado del Mercado no consulta las imágenes una vez por
     medidos.push(`las ${dibujadas.length} tarjetas traen la URL que dice la base, con ${nulos} `
       + 'en null: tener imagen no es tener imagen primaria');
 
-    // === C. Una publicación es una tarjeta, aunque tenga dos primarias ====
+    // === C. Una publicación es una tarjeta, y una sola =====================
     const veces = new Map();
     for (const item of dibujadas) veces.set(item.id, (veces.get(item.id) ?? 0) + 1);
     const repetidas = [...veces.entries()].filter(([, cuantas]) => cuantas > 1);
@@ -28266,12 +28279,12 @@ await runCase(172, 'El listado del Mercado no consulta las imágenes una vez por
       const item = dibujadas.find((candidata) => candidata.name === nombreDe(i));
       if (!item) continue;
       assert(item.primary_image === urlDe(i, 'primaria'),
-        `«${nombreDe(i)}» tiene dos imágenes primarias y salió con `
-        + `${JSON.stringify(item.primary_image)}: tiene que salir siempre la de menor orden`);
+        `«${nombreDe(i)}» salió con ${JSON.stringify(item.primary_image)}: tiene que salir `
+        + 'siempre su primaria, la de menor orden');
     }
-    medidos.push(`con ${DOS_PRIMARIAS} publicaciones de DOS imágenes primarias —la base no lo `
-      + `impide— el total sigue siendo ${TOTAL}, ninguna tarjeta se repite y sale siempre la `
-      + 'imagen de menor orden');
+    medidos.push(`en ${PRIMARIA_RECHAZADA} publicaciones la base rechazó la segunda imagen `
+      + `principal; el total sigue siendo ${TOTAL}, ninguna tarjeta se repite y sale siempre `
+      + 'la imagen de menor orden');
 
     // === D. Total, ids y orden, sin cambios ===============================
     const porPrecio = await apiRequest(
@@ -30078,6 +30091,360 @@ await runCase(178, 'Un vendedor que no puede cobrar se retira desde el checkout,
     try {
       await apiRequest('/cart', { method: 'DELETE', token: comprador.token });
     } catch { /* la limpieza no tapa el motivo real */ }
+  }
+});
+
+await runCase(179, 'Una publicación tiene cero o una imagen principal, y quien lo sostiene es la base', async () => {
+  // La regla no es nueva: siempre fue cero o una. Lo que era nuevo es quién la
+  // sostiene. La sostenían, de a ratos, la carga y el borrado; ahora la
+  // sostiene un índice único parcial, que es el único lugar donde no se puede
+  // olvidar.
+  //
+  // El caso mide las tres cosas, y ninguna por lectura del fuente: que la
+  // restricción exista de verdad en PostgreSQL y rechace, que la migración
+  // limpie lo que ya estaba sucio eligiendo siempre la misma, y que los dos
+  // recorridos que tocan imágenes —cargar y borrar— terminen sanos.
+  const medidos = [];
+  const sello = Date.now();
+  const MARCADOR = `Smoke img179 ${sello}`;
+  const INDICE = 'uq_product_images_primaria_unica';
+
+  const limpiar = () => {
+    try {
+      querySql(`DELETE FROM product_images WHERE product_id IN (
+        SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}%`)})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}%`)}`);
+    } catch (error) {
+      console.log(`  · no se pudieron retirar las publicaciones del caso 179: ${error.message}`);
+    }
+  };
+
+  // Alembic vive donde vive la aplicación, igual que la base: se lo invoca por
+  // el mismo puente que usa todo el arnés.
+  const alembic = (...argumentos) => {
+    const salida = execFileSync(
+      'docker', ['exec', 'topgreen-api', 'alembic', ...argumentos],
+      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
+    );
+    return salida.trim();
+  };
+
+  const definicionDelIndice = () => {
+    const [fila] = queryRows(`
+      SELECT indexdef FROM pg_indexes
+      WHERE tablename = 'product_images' AND indexname = ${sqlLiteral(INDICE)}`);
+    return fila ? fila[0] : null;
+  };
+
+  const imagenesDe = (producto) => queryRows(`
+    SELECT id, filename, is_primary::text, display_order::text, url
+    FROM product_images WHERE product_id = ${sqlLiteral(producto)}
+    ORDER BY display_order, id`).map(([id, nombre, principal, orden, url]) => ({
+    id, nombre, principal: principal === 'true', orden: Number(orden), url,
+  }));
+
+  const principalesDe = (producto) => imagenesDe(producto).filter((i) => i.principal);
+
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const [categoria] = queryRows(`
+    SELECT id FROM categories
+    WHERE is_active = true AND is_service = false ORDER BY name LIMIT 1`);
+  assert(categoria, 'no hay categoría de productos donde publicar');
+
+  const publicar = async (sufijo) => {
+    const alta = await apiRequest('/products', {
+      method: 'POST', token: vendedor.token,
+      body: {
+        name: `${MARCADOR} ${sufijo}`,
+        description: 'Publicación fabricada para medir la integridad de la imagen principal.',
+        category_id: categoria[0], price: 1000, stock: 5, unit: 'unidad',
+        locality_id: localidad, publication_type: 'producto',
+      },
+    });
+    assert(alta.status === 201 || alta.status === 200,
+      `«${sufijo}» respondió HTTP ${alta.status}: ${JSON.stringify(alta.data).slice(0, 200)}`);
+    return alta.data.id;
+  };
+
+  // `POST /products/{id}/images` recibe una LISTA en el campo `files`.
+  const subir = async (producto, nombres, token = vendedor.token) => {
+    const sobre = new FormData();
+    for (const nombre of nombres) {
+      sobre.append('files', new Blob([RECIBO_PNG], { type: 'image/png' }), nombre);
+    }
+    const respuesta = await fetch(`${API_URL}/products/${producto}/images`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: sobre,
+    });
+    const crudo = await respuesta.text();
+    let datos = null;
+    if (crudo) { try { datos = JSON.parse(crudo); } catch { datos = crudo; } }
+    return { status: respuesta.status, datos };
+  };
+
+  const borrarImagen = (producto, imagen, token = vendedor.token) => apiRequest(
+    `/products/${producto}/images/${imagen}`, { method: 'DELETE', token },
+  ).then((r) => ({ status: r.status }), (error) => ({ error: String(error.message) }));
+
+  limpiar();
+  let migracionAbajo = false;
+  try {
+    // === A. La restricción existe, y es de PostgreSQL ======================
+    const definicion = definicionDelIndice();
+    assert(definicion, `no existe el índice «${INDICE}» sobre product_images: sin él la regla `
+      + 'vuelve a depender de que ningún camino se olvide');
+    assert(/UNIQUE/i.test(definicion) && /\(product_id\)/.test(definicion)
+      && /WHERE is_primary/i.test(definicion),
+    `el índice existe pero no es el que hace falta: ${definicion}`);
+
+    const conDos = await publicar('rechazo');
+    const primera = await subir(conDos, ['a1.png']);
+    const segunda = await subir(conDos, ['a2.png']);
+    assert(primera.status === 200 && segunda.status === 200,
+      `no se pudieron dejar dos imágenes: HTTP ${primera.status} y ${segunda.status}`);
+    const dos = imagenesDe(conDos);
+    assert(dos.length === 2 && dos.filter((i) => i.principal).length === 1,
+      `la publicación no quedó con dos imágenes y una principal: ${JSON.stringify(dos)}`);
+
+    // La segunda principal la intenta la BASE, sin pasar por la aplicación:
+    // así se mide la restricción y no la cortesía de un endpoint.
+    const laSecundaria = dos.find((i) => !i.principal);
+    let rechazo = null;
+    try {
+      querySql(`UPDATE product_images SET is_primary = true
+        WHERE id = ${sqlLiteral(laSecundaria.id)}`);
+    } catch (error) {
+      rechazo = String(error.message);
+    }
+    assert(rechazo, 'PostgreSQL aceptó una segunda imagen principal para la misma publicación');
+    assert(new RegExp(INDICE).test(rechazo),
+      `la base rechazó, pero no por el índice de la principal: ${rechazo.slice(0, 200)}`);
+    assert(principalesDe(conDos).length === 1,
+      'el rechazo dejó la publicación con una cantidad de principales distinta de una');
+
+    // Y una SECUNDARIA más sigue permitida: lo único que no se puede repetir
+    // es la principal.
+    const tercera = await subir(conDos, ['a3.png']);
+    assert(tercera.status === 200, `no se pudo agregar una tercera imagen: HTTP ${tercera.status}`);
+    assert(imagenesDe(conDos).length === 3 && principalesDe(conDos).length === 1,
+      `con tres imágenes la publicación quedó en ${JSON.stringify(imagenesDe(conDos))}`);
+    medidos.push('el índice único parcial existe sobre product_images(product_id) con '
+      + '`WHERE is_primary`; PostgreSQL rechaza una segunda principal y deja pasar secundarias');
+
+    // === B. La migración limpia lo que ya estaba sucio =====================
+    //
+    // No se puede fabricar el dato sucio con la restricción puesta: eso es
+    // justamente lo que impide. Así que se baja la migración, se ensucia, y se
+    // vuelve a subir. Lo que se mide es lo que hace la migración de verdad, no
+    // una consulta que se le parezca.
+    const sucia = await publicar('sucia');
+    const empatada = await publicar('empatada');
+    assert((await subir(sucia, ['b1.png'])).status === 200, 'no se pudo preparar la sucia');
+    assert((await subir(sucia, ['b2.png'])).status === 200, 'no se pudo preparar la sucia');
+    assert((await subir(sucia, ['b3.png'])).status === 200, 'no se pudo preparar la sucia');
+    assert((await subir(empatada, ['c1.png'])).status === 200, 'no se pudo preparar la empatada');
+    assert((await subir(empatada, ['c2.png'])).status === 200, 'no se pudo preparar la empatada');
+
+    const filasAntesDeBajar = queryCount('SELECT COUNT(*) FROM product_images');
+    alembic('downgrade', '-1');
+    migracionAbajo = true;
+    assert(definicionDelIndice() === null,
+      'bajar la migración no retiró el índice, así que lo que viene no mide nada');
+    // Bajar retira la restricción y NADA más: ni toca filas ni intenta
+    // reconstruir los duplicados que hubiera habido.
+    assert(queryCount('SELECT COUNT(*) FROM product_images') === filasAntesDeBajar,
+      'bajar la migración cambió la cantidad de imágenes');
+    assert(queryCount(`
+      SELECT COUNT(*) FROM (
+        SELECT product_id FROM product_images WHERE is_primary
+        GROUP BY product_id HAVING COUNT(*) > 1
+      ) duplicadas`) === 0,
+    'bajar la migración dejó duplicados que antes no estaban');
+
+    // La sucia: las tres principales, con el orden al revés del alta para que
+    // «la primera que aparezca» y «la de menor display_order» no coincidan.
+    const antesSucia = imagenesDe(sucia);
+    querySql(`UPDATE product_images SET is_primary = true
+      WHERE product_id = ${sqlLiteral(sucia)}`);
+    querySql(`UPDATE product_images SET display_order = 30
+      WHERE id = ${sqlLiteral(antesSucia[0].id)}`);
+    querySql(`UPDATE product_images SET display_order = 20
+      WHERE id = ${sqlLiteral(antesSucia[1].id)}`);
+    querySql(`UPDATE product_images SET display_order = 10
+      WHERE id = ${sqlLiteral(antesSucia[2].id)}`);
+    const debeQuedarSucia = antesSucia[2].id;
+
+    // La empatada: las dos principales y con el MISMO display_order, que es
+    // donde el desempate por `id` es lo único que decide.
+    const antesEmpatada = imagenesDe(empatada);
+    querySql(`UPDATE product_images SET is_primary = true, display_order = 7
+      WHERE product_id = ${sqlLiteral(empatada)}`);
+    const debeQuedarEmpatada = [...antesEmpatada].sort(
+      (a, b) => (a.id < b.id ? -1 : 1))[0].id;
+
+    assert(principalesDe(sucia).length === 3 && principalesDe(empatada).length === 2,
+      'no se pudo ensuciar la base con la migración abajo');
+    const filasAntes = queryCount('SELECT COUNT(*) FROM product_images');
+
+    // Con el dato sucio EXISTIENDO, el listado tiene que seguir mostrando una
+    // sola tarjeta por publicación y una sola URL. Es la propiedad que dejó
+    // `QUERY-IMG-1` y que el caso 172 medía fabricando un duplicado; ahora el
+    // índice se lo impide, así que se mide acá, que es la única ventana en la
+    // que ese dato puede existir. Tolerar el duplicado y no dejar que se cree
+    // son dos defensas distintas y las dos siguen puestas.
+    const listado = await apiRequest(
+      `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page=1&page_size=24`);
+    assert(listado.status === 200, `el catálogo respondió HTTP ${listado.status}`);
+    const conDuplicado = listado.data.items.filter((item) => item.name.includes('sucia'));
+    assert(conDuplicado.length === 1,
+      `la publicación con tres primarias salió ${conDuplicado.length} veces en la misma `
+      + 'página: la unión con las imágenes está multiplicando la fila');
+    const laDeMenorOrden = imagenesDe(sucia)
+      .filter((i) => i.principal)
+      .sort((a, b) => a.orden - b.orden || (a.id < b.id ? -1 : 1))[0];
+    assert(conDuplicado[0].primary_image === laDeMenorOrden.url,
+      `con tres primarias el listado mostró ${JSON.stringify(conDuplicado[0].primary_image)} y `
+      + `tenía que mostrar la de menor orden (${laDeMenorOrden.url})`);
+    medidos.push('con el duplicado existiendo, el listado sigue sacando una sola tarjeta por '
+      + 'publicación y la imagen de menor orden');
+
+    alembic('upgrade', 'head');
+    migracionAbajo = false;
+
+    assert(definicionDelIndice(), 'subir la migración no dejó el índice');
+    assert(queryCount('SELECT COUNT(*) FROM product_images') === filasAntes,
+      `la migración borró filas: ${filasAntes} → `
+      + `${queryCount('SELECT COUNT(*) FROM product_images')}`);
+    assert(queryCount(`
+      SELECT COUNT(*) FROM (
+        SELECT product_id FROM product_images WHERE is_primary
+        GROUP BY product_id HAVING COUNT(*) > 1
+      ) duplicadas`) === 0,
+    'después de migrar sigue habiendo publicaciones con más de una principal');
+
+    const quedoSucia = principalesDe(sucia);
+    assert(quedoSucia.length === 1 && quedoSucia[0].id === debeQuedarSucia,
+      `la migración conservó ${JSON.stringify(quedoSucia.map((i) => i.nombre))} y tenía que `
+      + 'conservar la de menor display_order');
+    assert(imagenesDe(sucia).length === 3,
+      'la migración se llevó puesta alguna imagen de la publicación sucia');
+
+    const quedoEmpatada = principalesDe(empatada);
+    assert(quedoEmpatada.length === 1 && quedoEmpatada[0].id === debeQuedarEmpatada,
+      `con el mismo display_order la migración conservó ${quedoEmpatada[0]?.id} y el desempate `
+      + `por id manda ${debeQuedarEmpatada}`);
+    medidos.push('con la migración abajo se fabricaron 3 y 2 principales; al subirla quedó una '
+      + 'sola en cada una —la de menor display_order, y por id a igualdad— sin perder ninguna '
+      + 'imagen');
+
+    // === C. Los recorridos: cargar y borrar ================================
+    const recorrido = await publicar('recorrido');
+    const alta1 = await subir(recorrido, ['d1.png']);
+    assert(alta1.status === 200 && alta1.datos.images[0].is_primary === true,
+      `la primera carga no dejó una principal: ${JSON.stringify(alta1.datos)}`);
+    assert(principalesDe(recorrido).length === 1, 'la primera carga no dejó exactamente una');
+
+    // Carga múltiple posterior: ninguna de las dos toca la principal que ya está.
+    const laPrimeraDeTodas = principalesDe(recorrido)[0].id;
+    const alta2 = await subir(recorrido, ['d2.png', 'd3.png']);
+    assert(alta2.status === 200 && alta2.datos.images.every((i) => i.is_primary === false),
+      `una carga posterior se declaró principal: ${JSON.stringify(alta2.datos)}`);
+    assert(imagenesDe(recorrido).length === 3, 'la carga múltiple no dejó las tres imágenes');
+    const trasCargar = principalesDe(recorrido);
+    assert(trasCargar.length === 1 && trasCargar[0].id === laPrimeraDeTodas,
+      'una carga posterior cambió cuál es la principal');
+
+    // Y el orden de exhibición no se repite: sin eso, «la de menor orden» no
+    // alcanza para elegir siempre la misma.
+    const ordenes = imagenesDe(recorrido).map((i) => i.orden);
+    assert(new Set(ordenes).size === ordenes.length,
+      `las tres imágenes quedaron con órdenes repetidos: ${JSON.stringify(ordenes)}`);
+
+    // Borrar la principal promueve UNA, y siempre la misma.
+    const paraBorrar = imagenesDe(recorrido);
+    querySql(`UPDATE product_images SET display_order = 40 WHERE id = ${sqlLiteral(paraBorrar[1].id)}`);
+    querySql(`UPDATE product_images SET display_order = 15 WHERE id = ${sqlLiteral(paraBorrar[2].id)}`);
+    const deberiaSubir = paraBorrar[2].id;
+    const borrado = await borrarImagen(recorrido, laPrimeraDeTodas);
+    assert(borrado.status === 200, `borrar la principal falló: ${JSON.stringify(borrado)}`);
+    const promovidas = principalesDe(recorrido);
+    assert(promovidas.length === 1,
+      `borrar la principal dejó ${promovidas.length} principales`);
+    assert(promovidas[0].id === deberiaSubir,
+      'borrar la principal promovió la imagen equivocada: la tapa de la publicación quedó a '
+      + 'criterio del planificador de consultas y no de una regla');
+
+    // Borrar las que quedan deja cero, y eso es válido.
+    for (const imagen of imagenesDe(recorrido)) {
+      const r = await borrarImagen(recorrido, imagen.id);
+      assert(r.status === 200, `no se pudo borrar ${imagen.nombre}: ${JSON.stringify(r)}`);
+    }
+    assert(imagenesDe(recorrido).length === 0, 'quedaron imágenes después de borrarlas todas');
+    medidos.push('primera carga deja una principal, las posteriores no se la cambian, borrarla '
+      + 'promueve la de menor display_order y borrar la última deja cero');
+
+    // === D. Dos primeras cargas a la vez ===================================
+    for (let ronda = 1; ronda <= 3; ronda += 1) {
+      const aLaVez = await publicar(`concurrente ${ronda}`);
+      const [una, otra] = await Promise.all([
+        subir(aLaVez, [`e${ronda}a.png`]), subir(aLaVez, [`e${ronda}b.png`]),
+      ]);
+      assert(una.status < 500 && otra.status < 500,
+        `ronda ${ronda}: dos cargas simultáneas terminaron en HTTP ${una.status} y `
+        + `${otra.status}; una carrera evitable no se le devuelve a la persona como un 5xx`);
+      assert(una.status === 200 && otra.status === 200,
+        `ronda ${ronda}: alguna carga admisible fue rechazada: HTTP ${una.status} y `
+        + `${otra.status}`);
+      const quedaron = imagenesDe(aLaVez);
+      assert(quedaron.length === 2,
+        `ronda ${ronda}: quedaron ${quedaron.length} imágenes de las dos aceptadas`);
+      assert(quedaron.filter((i) => i.principal).length === 1,
+        `ronda ${ronda}: quedaron ${quedaron.filter((i) => i.principal).length} principales`);
+    }
+    medidos.push('3 rondas de dos primeras cargas simultáneas: sin 5xx, las dos imágenes '
+      + 'conservadas y una sola principal');
+
+    // === E. Los límites de antes no se debilitaron =========================
+    const ajena = await publicar('ajena');
+    const intruso = await apiRequest('/auth/login', {
+      method: 'POST', body: { email: 'cliente@ejemplo.com', password: 'cliente123' },
+    });
+    const deOtro = await subir(ajena, ['f1.png'], intruso.data.access_token);
+    assert(deOtro.status === 403,
+      `un vendedor ajeno pudo subir una imagen: HTTP ${deOtro.status}`);
+
+    const tope = await publicar('tope');
+    assert((await subir(tope, ['g1.png', 'g2.png', 'g3.png'])).status === 200,
+      'no se pudieron subir las tres imágenes del tope');
+    const cuarta = await subir(tope, ['g4.png']);
+    assert(cuarta.status === 400,
+      `la cuarta imagen entró igual: HTTP ${cuarta.status} ${JSON.stringify(cuarta.datos)}`);
+    assert(imagenesDe(tope).length === 3 && principalesDe(tope).length === 1,
+      `la publicación al tope quedó en ${JSON.stringify(imagenesDe(tope))}`);
+
+    const formato = await subir(await publicar('formato'), ['h1.txt']);
+    assert(formato.status === 400,
+      `un archivo .txt entró como imagen: HTTP ${formato.status}`);
+    medidos.push('vendedor ajeno sigue en 403, el tope de 3 imágenes y el filtro de formato '
+      + 'siguen rechazando, y la publicación al tope conserva una sola principal');
+
+    return `la regla «cero o una principal» la sostiene ahora un índice único parcial de `
+      + `PostgreSQL, y los dos caminos que tocan imágenes la respetan. ${medidos.join('; ')}`;
+  } finally {
+    // Se limpia PRIMERO y se sube la migración después, en ese orden. Si el
+    // caso se cortó con la migración abajo, lo que queda en la base es el dato
+    // sucio que fabricó; subir la migración con ese dato adentro es
+    // exactamente lo que la migración sabe resolver, pero sólo si la versión
+    // que está en el árbol lo resuelve. Retirando primero lo del caso, volver
+    // a subirla no depende de eso.
+    limpiar();
+    if (migracionAbajo) {
+      try {
+        alembic('upgrade', 'head');
+      } catch (error) {
+        console.log(`  · no se pudo volver a subir la migración: ${error.message}`);
+      }
+    }
   }
 });
 
