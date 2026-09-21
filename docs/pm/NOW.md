@@ -7,10 +7,10 @@ Actualizado: 2026-09-21.
 ## Resumen ejecutivo
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
-- **`main`:** `4c8569d`; merge autorizado de la candidata aceptada `8e20b06` con `main` `615619c`. El push activó el auto-deploy de Railway; la verificación runtime posterior al push queda **PENDIENTE**.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; candidata pendiente de integración `2d18d55`, informe final `d518f40`.
-- **Última decisión PM:** `RISK-REC-1` **ACEPTADA** en `2d18d55`. PM obtuvo 178/178 desde base limpia y reprodujo el rojo de doble venta al restaurar el defecto. Evidencia en `REPRODUCCION-RISK-REC-1-2026-09-21.md`.
-- **Tarea activa:** ninguna. La pieza aceptada no se integra ni publica sin autorización explícita de Emi porque `main` conserva auto-deploy.
+- **`main`:** `0bd7fbc`; `RISK-REC-1` integrada y publicada con autorización de Emi. GitHub, Frontend y Backend convergieron en ese SHA y los dos servicios quedaron saludables. El entorno `strong-playfulness` sigue siendo demostrativo y no equivale al despliegue productivo contractual.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, base `0bd7fbc`.
+- **Última decisión PM:** `RISK-REC-1` **ACEPTADA, INTEGRADA Y PUBLICADA**. La aceptación del despliegue quedó marcada por `production-accepted-2026-09-21`; evidencia funcional en `REPRODUCCION-RISK-REC-1-2026-09-21.md`.
+- **Tarea activa:** `PRIMARY-IMAGE-INTEGRITY-1`. Debe deduplicar primarias existentes, imponer una única imagen principal por publicación en PostgreSQL y cerrar los caminos de carga/borrado sin desplegar.
 
 ## Última aceptación PM — RISK-REC-1
 
@@ -70,9 +70,9 @@ en la corrida Docker real anterior de PM; el delta nuevo queda cubierto por
 los focales y puertas anteriores. PM no repitió el borrado completo porque el
 lanzador elimina volúmenes Docker locales y Emi no autorizó esa destrucción.
 
-La pieza quedó aceptada e incluida en la composición publicada `4c8569d`; la
-verificación runtime posterior al push queda pendiente. Evidencia
-durable: `REPRODUCCION-POST-INTEGRATION-CLEAR-1-2026-09-14.md`.
+La pieza quedó aceptada e incluida en la composición publicada `4c8569d` y en
+el runtime convergente `0bd7fbc`. Evidencia durable:
+`REPRODUCCION-POST-INTEGRATION-CLEAR-1-2026-09-14.md`.
 
 ## Última aceptación PM relevante
 
@@ -100,11 +100,11 @@ con la candidata `8e20b06` sin abrir alcance nuevo. El `diff-check` y el build d
 producción quedaron verdes antes del push.
 
 `main` continúa conectado al auto-deploy de ambos servicios sin esperar CI. Emi
-autorizó esta publicación el 2026-09-21; todavía no se acepta la operación
-productiva ni se afirma convergencia runtime posterior al push. La migración
-recomendada a `main = integración aceptada` / `release = producción` sigue
-pendiente: publicar no equivale a aceptar producción ni resuelve backups, SMTP,
-secretos, pagos o recuperación.
+autorizó la publicación de `0bd7fbc` el 2026-09-21 y Frontend/Backend
+convergieron saludables en esa revisión. Esto acepta el despliegue demostrativo,
+no el lanzamiento contractual: siguen pendientes la separación
+`main = integración aceptada` / `release = producción`, backups, SMTP,
+secretos, pagos y recuperación.
 
 ## Operación de marcas y filtros — estado
 
@@ -127,8 +127,8 @@ Evidencia: `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
 - **Relevo:** cerrado en `b8447a3`; `main` contiene el disparador consolidado y
   la regla local de eficiencia de chats.
 - **Carrito conservado y FAQ de pagos:** cerrados en `eb62d3d`/`a7ed544`,
-  integración local `c973c6f` e incluidos en `4c8569d`. Runtime posterior al
-  push pendiente.
+  integración local `c973c6f`, incluidos en `4c8569d` y presentes en el runtime
+  convergente `0bd7fbc`.
 - **Backup/restauración local:** `BACKUP-RESTORE-1` quedó aceptada en
   `52ba294`/`b8223b1` e integrada por `fbd6caf`. El ensayo Docker real recuperó
   base, `uploads`, `documentos` y `outbox` en un destino aislado; una alteración
@@ -136,11 +136,10 @@ Evidencia: `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
   cierra el procedimiento local, no crea todavía una copia administrada o
   externa de producción ni habilita migraciones riesgosas.
   Evidencia: `REPRODUCCION-BACKUP-RESTORE-1-2026-09-13.md`.
-- **Índice único parcial sobre la imagen primaria:** decidido que va, como tarea
-  propia y con deduplicación previa de las primarias existentes, porque crearlo
-  sobre datos ya sucios falla. El listado dejó de depender de él con
-  `QUERY-IMG-1`; el dato sigue pudiendo ensuciarse desde la carga y desde
-  administración.
+- **Índice único parcial sobre la imagen primaria:** tarea activa
+  `PRIMARY-IMAGE-INTEGRITY-1`, con deduplicación determinista previa. El listado
+  ya dejó de depender de datos limpios con `QUERY-IMG-1`; esta pieza impide que
+  carga o administración vuelvan a crear dos primarias.
 - **N+1 del carrito:** `cart.py` consulta la imagen dentro de
   `for item in cart.items:` (líneas 92, 190, 240, 287 y 478). Registrado por
   lectura, **no medido** y sin tocar. Es el próximo N+1 natural cuando se pida.
@@ -164,7 +163,7 @@ Inventario de sólo lectura del proyecto `strong-playfulness`, entorno `producti
 
 - servicios en línea: Frontend `yneratopgreen`, Backend `Backend` y base `PostGIS`;
 - Frontend y Backend toman `Memu007/yneratopgreen`, rama `main`, con auto-deploy activo y `Wait for CI` apagado;
-- Frontend público `https://yneratopgreen-production.up.railway.app` y Backend público `https://backend-production-ba84.up.railway.app` convergían en `b8447a3` en la última verificación del 2026-09-13; la convergencia runtime posterior al push de `4c8569d` queda **PENDIENTE**;
+- Frontend público `https://yneratopgreen-production.up.railway.app` y Backend público `https://backend-production-ba84.up.railway.app` convergieron en `0bd7fbc` el 2026-09-21; ambos respondieron saludables después del recambio;
 - los watch paths siguen separados (`src/public/...` para Frontend y `backend/**` para Backend), por lo que Railway puede publicar composiciones parciales en cambios futuros aunque esta publicación haya convergido;
 - `VITE_API_URL` y `VITE_IMAGES_URL` apuntan al Backend vigente;
 - CORS contiene el dominio histórico y el dominio público actual, pero `FRONTEND_URL` todavía apunta al dominio histórico `ynerav.up.railway.app`; queda como deuda de configuración, sin corregir en este inventario;
@@ -220,9 +219,9 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Emi decide cuándo integrar/publicar `RISK-REC-1`; `main` sigue en `4c8569d` y el push dispararía Railway.
-2. Verificar el runtime post-push de `4c8569d` sin tratarlo todavía como producción aceptada.
+1. Dev implementa y entrega `PRIMARY-IMAGE-INTEGRITY-1` en rama, sin deploy.
+2. PM reproduce migración, negativo discriminante, caso 179 y suite desde base limpia antes de aceptar.
 3. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
 5. Los atributos por rubro esperan los datos prometidos por la clienta; Inicio, Servicios y la identidad de AgroMarket esperan decisión de producto.
-6. Mercado Pago, red-team y producción aceptada permanecen en la secuencia acordada; no se habilitan por esta tarea.
+6. Mercado Pago, red-team y producción contractual permanecen en la secuencia acordada; no se habilitan por esta tarea.

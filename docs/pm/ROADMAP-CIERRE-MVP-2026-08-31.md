@@ -163,7 +163,7 @@ anatomías ni el detalle. Su contrato completo y la evidencia de raíz están en
 | 18I | **INTEGRATION-CANDIDATE-1 — integrada** | Composición de todo el trabajo aceptado | `c565e6e`/`ad914a3`, merge `b8447a3`. PM obtuvo 168/169 sobre `e0cdfe9` y 169 en 1/1 sobre el único delta de `c565e6e`; los 169 casos quedan cubiertos. A11y, contraste, diff-check y build verdes. Emi autorizó el despliegue automático antes del backup, sin aceptar todavía producción. |
 | 18D | **AGENTS-CONSOLIDATION-1 — cerrada** | Deuda de relevo detectada al cerrar integración | `b8447a3` llevó a `main` el disparador consolidado y preservó la regla local de eficiencia de chats. |
 | 18O | **BACKUP-RESTORE-1 — cerrada localmente** | Puerta operativa local | `52ba294`/`b8223b1`, merge `fbd6caf`. PM reprodujo en Docker real backup, restore aislado, comparación, negativo de integridad, rechazo de recursos ajenos y limpieza. La copia externa/administrada y su gasto siguen pendientes de Emi. |
-| 18P | **POST-INTEGRATION-CLEAR-1 — aceptada e integrada** | Pendientes de continuidad/copy de Dev | `eb62d3d` + arnés `a7ed544` + informe `48bae67`; incluida en la composición publicada `4c8569d`. PM: 170 verde/rojo discriminante, 169 verde y puertas visuales completas. Runtime posterior al push pendiente. |
+| 18P | **POST-INTEGRATION-CLEAR-1 — aceptada e integrada** | Pendientes de continuidad/copy de Dev | `eb62d3d` + arnés `a7ed544` + informe `48bae67`; incluida en `4c8569d` y en el runtime convergente `0bd7fbc`. PM: 170 verde/rojo discriminante, 169 verde y puertas visuales completas. |
 
 Son mejoras de claridad, no autorización para mensajería, planes, suscripciones
 o un rediseño nuevo.
@@ -172,9 +172,10 @@ o un rediseño nuevo.
 
 | Orden | Pieza | Fuente | Condición de entrada |
 |---:|---|---|---|
-| 19 | **CAT-PAGE-1 — aceptada e integrada** | deuda UX-2C y ADM-2 como patrón | `a521631` + R1 `575f757` + informe `b1cc77f`; incluida en `4c8569d`. PM reprodujo 171 verde, rojo al omitir `pagina` de la firma y verde tras restaurar. Runtime posterior al push pendiente. |
-| 20 | **QUERY-IMG-1 + filtros/marcas — aceptadas e integradas** | C2 y operación de búsqueda | Composición previa `34e7ebf`; `BRAND-FACET-1` aceptada en `8e20b06`, informe `761a371`; incluida en `4c8569d`. PM reprodujo 172–174 previamente y 175 final en 1/1 con tres sabotajes rojos. Runtime posterior al push pendiente. |
-| 21 | **RISK-REC-1 — aceptada en rama** | R1, R4 y R5 | Producto/arnés `2d18d55`, informe `d518f40`. PM: focales 176–178 en 3/3, rojo discriminante de doble venta, suite limpia 178/178, a11y 74/74 y contraste 82/82. R1 y R5 reales y cerrados; R4 falso en vivo, con dependencia de texto vigilada. Integración/publicación pendiente de Emi. |
+| 19 | **CAT-PAGE-1 — aceptada e integrada** | deuda UX-2C y ADM-2 como patrón | `a521631` + R1 `575f757` + informe `b1cc77f`; incluida en `4c8569d` y en el runtime convergente `0bd7fbc`. PM reprodujo 171 verde, rojo al omitir `pagina` de la firma y verde tras restaurar. |
+| 20 | **QUERY-IMG-1 + filtros/marcas — aceptadas e integradas** | C2 y operación de búsqueda | Composición previa `34e7ebf`; `BRAND-FACET-1` aceptada en `8e20b06`, informe `761a371`; incluida en `4c8569d` y en el runtime convergente `0bd7fbc`. PM reprodujo 172–174 previamente y 175 final en 1/1 con tres sabotajes rojos. |
+| 21 | **RISK-REC-1 — aceptada, integrada y publicada** | R1, R4 y R5 | Producto/arnés `2d18d55`, informe `d518f40`, aceptación PM `0bd7fbc`. PM: focales 176–178 en 3/3, rojo discriminante de doble venta, suite limpia 178/178, a11y 74/74 y contraste 82/82. GitHub, Frontend y Backend convergieron en `0bd7fbc`; tag `production-accepted-2026-09-21`. |
+| 22 | **PRIMARY-IMAGE-INTEGRITY-1 — activa** | deuda de integridad hallada por QUERY-IMG-1 | Deduplicar primarias existentes de forma determinista, crear índice único parcial por `product_id`, cerrar carreras de carga/borrado y agregar caso 179 con negativo discriminante. Sin deploy: la migración queda en rama hasta aceptación y puerta operativa. |
 
 Cinco mil visitas mensuales no justifican reescribir la arquitectura. Esta
 puerta cierra primero paginación, consultas y recorridos medidos; capacidad y

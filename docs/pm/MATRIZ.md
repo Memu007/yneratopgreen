@@ -1,8 +1,9 @@
 # Matriz requisito contractual → evidencia → estado
 
 Contrastada contra `CONTRATO.md`. Actualizada el 2026-09-21 después de integrar
-la candidata aceptada en `4c8569d`; la verificación runtime posterior al push
-sigue pendiente.
+y publicar `RISK-REC-1` en `0bd7fbc`; GitHub, Frontend y Backend convergieron
+en esa revisión. El entorno Railway sigue siendo demostrativo, no el
+despliegue productivo contractual.
 
 **Estados:** ✅ verificado con evidencia de ejecución · 🟡 existe en
 código, sin verificar · ⚪ parcial · ❌ inexistente
@@ -89,7 +90,7 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 
 | Requisito | Estado |
 |-----------|--------|
-| Pruebas integrales | ✅ `RISK-REC-1`: producto/arnés `2d18d55`, informe `d518f40`. PM obtuvo 178/178 desde base limpia, reprodujo el rojo discriminante de doble venta, a11y 74/74 y contraste 82/82. Aceptada en rama; integración y runtime pendientes. |
+| Pruebas integrales | ✅ `RISK-REC-1`: producto/arnés `2d18d55`, informe `d518f40`, aceptación e integración `0bd7fbc`. PM obtuvo 178/178 desde base limpia, reprodujo el rojo discriminante de doble venta, a11y 74/74 y contraste 82/82. Frontend y Backend convergieron en `0bd7fbc`. |
 | Carga inicial de datos | ✅ Seed idempotente con 30 publicaciones en 12 categorías y 9 provincias, más 4.028 localidades. Verificado corriéndolo dos veces sin duplicar |
 | Despliegue en producción | ❌ |
 | Capacitación del panel de administración | ❌ |
