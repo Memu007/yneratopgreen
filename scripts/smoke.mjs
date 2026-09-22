@@ -30448,6 +30448,309 @@ await runCase(179, 'Una publicación tiene cero o una imagen principal, y quien 
   }
 });
 
+// ---------------------------------------------------------------------------
+// 180. El carrito lee las portadas una vez por petición, no una vez por ítem.
+//
+// `GET /cart` y `POST /cart/sync` buscaban la imagen principal dentro del
+// bucle de ítems: medido sobre la base, 1, 3 y 6 lecturas de `product_images`
+// para carritos de 1, 3 y 6 publicaciones. El mismo acceso estaba copiado en
+// las tres altas y actualizaciones de un solo ítem. Ahora hay un único camino
+// que trae todas las portadas de una petición en una sola consulta.
+//
+// Cómo se cuenta, y por qué no como el 172. `pg_stat_user_tables` cuenta
+// búsquedas en índice, no sentencias: medido en PostgreSQL 16, UNA sentencia
+// que pide ocho portadas por el índice suma ocho. Con ese instrumento la
+// consulta agrupada parecería crecer o no según el plan que eligiera la base
+// ese día. Lo que la tarea pide son sentencias, así que se cuentan donde se
+// emiten: la aplicación corre en su propio proceso, con un oyente de
+// SQLAlchemy que anota cada sentencia —el mismo instrumento del caso 137—.
+// No se agrega nada al producto.
+//
+// El oyente se controla a sí mismo antes de medir: una petición que no toca
+// imágenes tiene que dar cero, y cualquier petición tiene que dar más de cero
+// sentencias en total. Un filtro ciego o uno que contara todo no pasaría.
+// ---------------------------------------------------------------------------
+await runCase(180, 'El carrito lee las portadas una vez por petición, no una vez por ítem', async () => {
+  const medidos = [];
+  const sello = Date.now();
+  const MARCADOR = `Smoke cart180 ${sello}`;
+  const clave = 'smoke123';
+  const correoComprador = `cart180.${sello}@example.com`;
+
+  const limpiar = () => {
+    try {
+      const fabricadas = `SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`;
+      querySql(`DELETE FROM cart_items WHERE product_id IN (${fabricadas})`);
+      querySql(`DELETE FROM product_images WHERE product_id IN (${fabricadas})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+    } catch (error) {
+      console.log(`  · no se pudieron retirar las publicaciones del caso 180: ${error.message}`);
+    }
+  };
+
+  // Cada publicación es un caso de portada distinto, y el orden importa: la 3
+  // tiene una secundaria ANTES que su principal, así que elegir «la primera
+  // imagen» en vez de «la principal» da otra URL.
+  const ESCENARIOS = [
+    { que: 'principal y secundaria', imagenes: [['p', true, 0], ['s', false, 1]] },
+    { que: 'sin imagen', imagenes: [] },
+    { que: 'sólo secundaria', imagenes: [['s', false, 0]] },
+    { que: 'principal detrás de una secundaria', imagenes: [['s', false, 0], ['p', true, 2]] },
+    { que: 'sólo principal', imagenes: [['p', true, 0]] },
+    { que: 'principal y dos secundarias', imagenes: [['p', true, 0], ['s1', false, 1], ['s2', false, 2]] },
+  ];
+  // Precios con centavos: el subtotal y el total se comparan en centavos.
+  const PRECIOS = ['1234.50', '999.99', '15000.00', '87.25', '4321.10', '250.05'];
+  const TAMANOS = [1, 3, ESCENARIOS.length];
+
+  try {
+    // === Fabricación ======================================================
+    const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+    await registrarYVerificar({
+      email: correoComprador, password: clave, full_name: `Compra 180 ${sello}`,
+      phone: '+54 11 5555 0180', role: 'user',
+    });
+    const comprador = await ingresarVendedor(correoComprador, clave);
+    assert(comprador.token, 'la cuenta compradora del caso no pudo ingresar');
+
+    const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+    const [categoria] = queryRows(`
+      SELECT id FROM categories
+      WHERE is_active = true AND is_service = false ORDER BY name LIMIT 1`);
+    assert(categoria, 'no hay una categoría de productos activa');
+
+    const ids = [];
+    for (let i = 0; i < ESCENARIOS.length; i += 1) {
+      const alta = await apiRequest('/products', {
+        method: 'POST', token: vendedor.token,
+        body: {
+          name: `${MARCADOR}-${i}`,
+          description: 'Publicación fabricada para medir las lecturas de portada del carrito.',
+          category_id: categoria[0], price: Number(PRECIOS[i]), stock: 9, unit: 'unidad',
+          locality_id: localidad, publication_type: 'producto',
+        },
+      });
+      assert(alta.status === 201 || alta.status === 200,
+        `la publicación ${i} respondió HTTP ${alta.status}: ${JSON.stringify(alta.data).slice(0, 200)}`);
+      ids.push(alta.data.id);
+    }
+    // Las filas de imagen se escriben en la base descartable, como en el 172:
+    // subir archivos de verdad sería medir la carga, que no es esta pieza.
+    ESCENARIOS.forEach(({ imagenes }, i) => {
+      for (const [cual, principal, orden] of imagenes) {
+        const url = `/uploads/products/${MARCADOR.replace(/\s/g, '_')}-${i}-${cual}.png`;
+        querySql(`
+          INSERT INTO product_images (id, product_id, url, filename, is_primary, display_order, created_at)
+          VALUES (gen_random_uuid()::text, ${sqlLiteral(ids[i])}, ${sqlLiteral(url)},
+                  ${sqlLiteral(url.split('/').pop())}, ${principal ? 'true' : 'false'}, ${orden}, NOW())`);
+      }
+    });
+
+    // Lo esperado sale de la base, no del escenario: la principal o null. El
+    // «sin imagen» viaja como marca por el mismo motivo que en el 172.
+    const SIN_PORTADA = '(sin imagen principal)';
+    const portadaEnLaBase = new Map(queryRows(`
+      SELECT p.id,
+             COALESCE((SELECT i.url FROM product_images i
+                       WHERE i.product_id = p.id AND i.is_primary), ${sqlLiteral(SIN_PORTADA)})
+      FROM products p WHERE p.name LIKE ${sqlLiteral(`${MARCADOR}-%`)} ORDER BY p.id`)
+      .map(([id, url]) => [id, url === SIN_PORTADA ? null : url]));
+    const precioEnLaBase = new Map(queryRows(`
+      SELECT id, price::text FROM products
+      WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)} ORDER BY id`));
+    assert(portadaEnLaBase.size === ESCENARIOS.length && precioEnLaBase.size === ESCENARIOS.length,
+      `la base describe ${portadaEnLaBase.size} publicaciones del caso y son ${ESCENARIOS.length}`);
+    assert(portadaEnLaBase.get(ids[1]) === null && portadaEnLaBase.get(ids[2]) === null,
+      'la base les da portada a publicaciones sin imagen principal: el escenario no es el pensado');
+    assert(/-3-p\.png$/.test(portadaEnLaBase.get(ids[3]) || ''),
+      'la publicación 3 no tiene su principal detrás de la secundaria: el escenario no discrimina');
+
+    const cantidadDe = (i) => 1 + (i % 3);
+
+    // === El instrumento, en el proceso de la aplicación ===================
+    const guion = `
+import json, sys
+from sqlalchemy import event
+from starlette.testclient import TestClient
+from app.db.base import engine
+from app.main import app
+
+datos = json.loads(sys.stdin.read())
+ids = datos["ids"]
+sentencias = []
+event.listen(engine, "before_cursor_execute", lambda *a, **k: sentencias.append(a[2].lower()))
+
+def medir(respuesta):
+    return {
+        "status": respuesta.status_code,
+        "cuerpo": respuesta.json(),
+        "imagenes": sum(1 for s in sentencias if "product_images" in s),
+        "publicaciones": sum(1 for s in sentencias if "from products" in s),
+        "total": len(sentencias),
+    }
+
+h = {"Authorization": "Bearer " + datos["token"]}
+salida = {"sync": {}, "get": {}, "unitarios": {}}
+with TestClient(app) as c:
+    sentencias.clear()
+    salida["control"] = medir(c.delete("/api/cart", headers=h))
+
+    sentencias.clear()
+    alta = c.post("/api/cart/items", json={"product_id": ids[3], "quantity": 1}, headers=h)
+    salida["unitarios"]["alta"] = medir(alta)
+    sentencias.clear()
+    salida["unitarios"]["por_publicacion"] = medir(
+        c.put("/api/cart/items/" + ids[3], json={"quantity": 2}, headers=h))
+    sentencias.clear()
+    salida["unitarios"]["por_item"] = medir(
+        c.patch("/api/cart/items/" + alta.json()["id"], json={"quantity": 3}, headers=h))
+    sentencias.clear()
+    salida["unitarios"]["sin_principal"] = medir(
+        c.post("/api/cart/items", json={"product_id": ids[2], "quantity": 1}, headers=h))
+
+    for k in datos["tamanos"]:
+        items = [{"product_id": p, "quantity": 1 + i % 3} for i, p in enumerate(ids[:k])]
+        sentencias.clear()
+        salida["sync"][str(k)] = medir(c.post("/api/cart/sync", json={"items": items}, headers=h))
+        sentencias.clear()
+        salida["get"][str(k)] = medir(c.get("/api/cart", headers=h))
+print(json.dumps(salida))
+`;
+    const medido = JSON.parse(execFileSync(
+      'docker', ['exec', '-i', 'topgreen-api', 'python', '-c', guion],
+      {
+        encoding: 'utf8',
+        input: JSON.stringify({ token: comprador.token, ids, tamanos: TAMANOS }),
+        stdio: ['pipe', 'pipe', 'pipe'],
+      },
+    ).trim().split(/\r?\n/).at(-1));
+
+    // El control va antes que cualquier conclusión.
+    const { control } = medido;
+    assert(control.status === 200, `vaciar el carrito respondió HTTP ${control.status}`);
+    assert(control.total > 0,
+      'el oyente no vio ninguna sentencia al vaciar el carrito: el instrumento estaría ciego');
+    assert(control.imagenes === 0,
+      `vaciar el carrito «leyó» product_images ${control.imagenes} vez/veces: el filtro estaría `
+      + 'contando sentencias que no son de imágenes');
+
+    // === A. Las lecturas de portadas no crecen con los ítems ==============
+    const conteos = (endpoint) => TAMANOS.map((k) => medido[endpoint][String(k)]);
+    for (const endpoint of ['sync', 'get']) {
+      for (const [n, m] of conteos(endpoint).entries()) {
+        assert(m.status === 200,
+          `${endpoint} con ${TAMANOS[n]} ítem(s) respondió HTTP ${m.status}: `
+          + JSON.stringify(m.cuerpo).slice(0, 200));
+        assert(m.cuerpo.items.length === TAMANOS[n],
+          `${endpoint} con ${TAMANOS[n]} ítem(s) devolvió ${m.cuerpo.items.length}`);
+      }
+    }
+    const describir = (endpoint) => conteos(endpoint)
+      .map((m, n) => `${m.imagenes} con ${TAMANOS[n]}`).join(', ');
+    for (const [endpoint, ruta] of [['get', 'GET /cart'], ['sync', 'POST /cart/sync']]) {
+      const lecturas = conteos(endpoint).map((m) => m.imagenes);
+      assert(lecturas.every((n) => n === lecturas[0]),
+        `${ruta} leyó product_images ${describir(endpoint)} ítem(s): las lecturas crecen con el `
+        + 'carrito, que es exactamente la consulta por ítem que esta tarea retira');
+      assert(lecturas[0] <= 1,
+        `${ruta} leyó product_images ${lecturas[0]} veces por petición: no crece, pero tiene que `
+        + 'alcanzar con una sola consulta');
+      medidos.push(`${ruta} lee product_images ${describir(endpoint)} ítem(s)`);
+    }
+    // Lo que la medición ve y esta pieza no toca, dicho y no afirmado: las
+    // publicaciones del carrito se siguen leyendo una por ítem.
+    for (const [endpoint, ruta] of [['get', 'GET /cart'], ['sync', 'POST /cart/sync']]) {
+      medidos.push(`fuera de alcance, ${ruta} lee products `
+        + conteos(endpoint).map((m, n) => `${m.publicaciones} con ${TAMANOS[n]}`).join(', ')
+        + ` (sentencias totales ${conteos(endpoint).map((m) => m.total).join('/')})`);
+    }
+
+    // === B. La respuesta es la de siempre, contrastada con la base ========
+    // Lo que midió el oyente es el mismo carrito que sirve la API corriendo: se
+    // pide por HTTP y tiene que ser idéntico, identificadores incluidos.
+    const porHttp = await apiRequest('/cart', { token: comprador.token });
+    assert(porHttp.status === 200, `GET /cart por HTTP respondió ${porHttp.status}`);
+    const enProceso = medido.get[String(ESCENARIOS.length)].cuerpo;
+    assert(JSON.stringify(porHttp.data) === JSON.stringify(enProceso),
+      'el carrito que sirve la API corriendo no es el que midió el oyente:\n'
+      + `  HTTP     ${JSON.stringify(porHttp.data).slice(0, 300)}\n`
+      + `  proceso  ${JSON.stringify(enProceso).slice(0, 300)}`);
+
+    const centavos = (valor) => Math.round(Number(valor) * 100);
+    const contrastar = (cuerpo, donde) => {
+      const vistos = new Set();
+      let totalEsperado = 0;
+      for (const item of cuerpo.items) {
+        const i = ids.indexOf(item.product_id);
+        assert(i >= 0, `${donde}: apareció «${item.product_id}», que no es del caso`);
+        assert(!vistos.has(item.product_id), `${donde}: «${item.product_name}» aparece dos veces`);
+        vistos.add(item.product_id);
+        assert(item.product_image === portadaEnLaBase.get(item.product_id),
+          `${donde}: «${ESCENARIOS[i].que}» salió con portada ${JSON.stringify(item.product_image)} `
+          + `y la base dice ${JSON.stringify(portadaEnLaBase.get(item.product_id))}`);
+        assert(item.quantity === cantidadDe(i),
+          `${donde}: «${ESCENARIOS[i].que}» salió con cantidad ${item.quantity} y se pidió ${cantidadDe(i)}`);
+        assert(centavos(item.product_price) === centavos(precioEnLaBase.get(item.product_id)),
+          `${donde}: «${ESCENARIOS[i].que}» salió a ${item.product_price} y la base dice `
+          + `${precioEnLaBase.get(item.product_id)}`);
+        const subtotal = centavos(precioEnLaBase.get(item.product_id)) * cantidadDe(i);
+        assert(centavos(item.subtotal) === subtotal,
+          `${donde}: el subtotal de «${ESCENARIOS[i].que}» es ${item.subtotal} y tiene que ser ${subtotal / 100}`);
+        totalEsperado += subtotal;
+      }
+      assert(cuerpo.total_items === cuerpo.items.length,
+        `${donde}: total_items dice ${cuerpo.total_items} y hay ${cuerpo.items.length} ítems`);
+      assert(centavos(cuerpo.total_amount) === totalEsperado,
+        `${donde}: el total es ${cuerpo.total_amount} y tiene que ser ${totalEsperado / 100}`);
+      return vistos.size;
+    };
+    for (const k of TAMANOS) {
+      const cuerpoSync = medido.sync[String(k)].cuerpo;
+      const cuerpoGet = medido.get[String(k)].cuerpo;
+      assert(contrastar(cuerpoSync, `sync con ${k}`) === k, `sync con ${k} no devolvió los ${k} pedidos`);
+      assert(contrastar(cuerpoGet, `GET con ${k}`) === k, `GET con ${k} no devolvió los ${k} pedidos`);
+    }
+    const final = porHttp.data.items;
+    const conUrl = final.filter((item) => item.product_image !== null).length;
+    assert(conUrl > 0 && conUrl < final.length,
+      `de ${final.length} ítems, ${conUrl} vinieron con portada: el caso no distinguiría la URL del null`);
+    medidos.push(`${final.length} ítems contrastados con la base: ${conUrl} con su principal, `
+      + `${final.length - conUrl} en null —sin imagen y sólo secundaria—, cantidades, `
+      + 'subtotales y total en centavos iguales, sin duplicados');
+
+    // === C. Los caminos de un solo ítem siguen dando la misma portada =====
+    const { unitarios } = medido;
+    const principalDe3 = portadaEnLaBase.get(ids[3]);
+    for (const [nombre, esperado] of [
+      ['alta', principalDe3], ['por_publicacion', principalDe3], ['por_item', principalDe3],
+      ['sin_principal', null],
+    ]) {
+      const m = unitarios[nombre];
+      assert(m.status === 200,
+        `el camino «${nombre}» respondió HTTP ${m.status}: ${JSON.stringify(m.cuerpo).slice(0, 200)}`);
+      assert(m.cuerpo.product_image === esperado,
+        `el camino «${nombre}» devolvió portada ${JSON.stringify(m.cuerpo.product_image)} `
+        + `y la base dice ${JSON.stringify(esperado)}`);
+      assert(m.imagenes <= 1,
+        `el camino «${nombre}» leyó product_images ${m.imagenes} veces para un solo ítem`);
+    }
+    assert(unitarios.alta.cuerpo.quantity === 1 && unitarios.por_publicacion.cuerpo.quantity === 2
+      && unitarios.por_item.cuerpo.quantity === 3,
+    'las cantidades de alta, actualización por publicación y por ítem no son 1, 2 y 3');
+    medidos.push('alta, actualización por publicación y por ítem devuelven la principal aunque '
+      + 'haya una secundaria antes, y null sin principal, con una lectura cada una');
+
+    return `las portadas del carrito se leen una vez por petición. ${medidos.join('; ')}`;
+  } finally {
+    limpiar();
+    try {
+      vaciarCarritosDe(correoComprador);
+    } catch (error) {
+      console.log(`  · no se pudo retirar el carrito del caso 180: ${error.message}`);
+    }
+  }
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

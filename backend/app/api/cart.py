@@ -75,6 +75,32 @@ def validar_total_prospectivo(cart: Cart, producto, cantidad_final: int,
     validar_total(total, "El total del carrito para este vendedor")
 
 
+def portadas_de(db: Session, product_ids) -> dict:
+    """URL de la imagen principal de cada publicación, en UNA sola consulta.
+
+    `GET /cart` y `POST /cart/sync` preguntaban por la portada dentro de su
+    bucle: una consulta por ítem, así que un carrito de diez publicaciones
+    hacía diez. Ahora las lecturas de `product_images` no dependen de cuántos
+    ítems haya, y la regla vive en un solo lugar en vez de cinco copias.
+
+    La regla no cambia: la imagen marcada principal, o ninguna. Una publicación
+    sin principal no entra en el diccionario y su línea sale con `null`; una
+    secundaria nunca pasa a ser portada. Dos principales no pueden existir
+    (`uq_product_images_primaria_unica`); el orden por `display_order, id` es
+    el del catálogo y sólo decide si esa restricción faltara.
+    """
+    ids = set(product_ids)
+    if not ids:
+        return {}
+    portadas = {}
+    for product_id, url in db.query(ProductImage.product_id, ProductImage.url).filter(
+        ProductImage.product_id.in_(ids),
+        ProductImage.is_primary == True,
+    ).order_by(ProductImage.display_order, ProductImage.id):
+        portadas.setdefault(product_id, url)
+    return portadas
+
+
 @router.get("", response_model=CartResponse)
 def get_cart(
     db: Session = Depends(get_db),
@@ -87,13 +113,9 @@ def get_cart(
     items_response = []
     total_amount = Decimal("0")
     
+    portadas = portadas_de(db, [item.product_id for item in cart.items])
+
     for item in cart.items:
-        # Obtener imagen primaria del producto
-        primary_image = db.query(ProductImage.url).filter(
-            ProductImage.product_id == item.product_id,
-            ProductImage.is_primary == True
-        ).first()
-        
         subtotal = importe_de_linea(item.product.price, item.quantity)
         total_amount += subtotal
         
@@ -102,7 +124,7 @@ def get_cart(
             product_id=item.product_id,
             product_name=item.product.name,
             product_price=item.product.price,
-            product_image=primary_image[0] if primary_image else None,
+            product_image=portadas.get(item.product_id),
             quantity=item.quantity,
             subtotal=subtotal
         ))
@@ -186,18 +208,14 @@ def add_to_cart(
         db.commit()
         db.refresh(cart_item)
     
-    # Obtener imagen primaria
-    primary_image = db.query(ProductImage.url).filter(
-        ProductImage.product_id == item_data.product_id,
-        ProductImage.is_primary == True
-    ).first()
+    portada = portadas_de(db, [item_data.product_id]).get(item_data.product_id)
     
     return CartItemResponse(
         id=cart_item.id,
         product_id=cart_item.product_id,
         product_name=product.name,
         product_price=product.price,
-        product_image=primary_image[0] if primary_image else None,
+        product_image=portada,
         quantity=cart_item.quantity,
         subtotal=importe_de_linea(product.price, cart_item.quantity)
     )
@@ -236,18 +254,14 @@ def update_cart_item_by_product(
     db.commit()
     db.refresh(cart_item)
     
-    # Obtener imagen primaria
-    primary_image = db.query(ProductImage.url).filter(
-        ProductImage.product_id == cart_item.product_id,
-        ProductImage.is_primary == True
-    ).first()
+    portada = portadas_de(db, [cart_item.product_id]).get(cart_item.product_id)
     
     return CartItemResponse(
         id=cart_item.id,
         product_id=cart_item.product_id,
         product_name=cart_item.product.name,
         product_price=cart_item.product.price,
-        product_image=primary_image[0] if primary_image else None,
+        product_image=portada,
         quantity=cart_item.quantity,
         subtotal=importe_de_linea(cart_item.product.price, cart_item.quantity)
     )
@@ -283,18 +297,14 @@ def update_cart_item(
     db.commit()
     db.refresh(cart_item)
     
-    # Obtener imagen primaria
-    primary_image = db.query(ProductImage.url).filter(
-        ProductImage.product_id == cart_item.product_id,
-        ProductImage.is_primary == True
-    ).first()
+    portada = portadas_de(db, [cart_item.product_id]).get(cart_item.product_id)
     
     return CartItemResponse(
         id=cart_item.id,
         product_id=cart_item.product_id,
         product_name=cart_item.product.name,
         product_price=cart_item.product.price,
-        product_image=primary_image[0] if primary_image else None,
+        product_image=portada,
         quantity=cart_item.quantity,
         subtotal=importe_de_linea(cart_item.product.price, cart_item.quantity)
     )
@@ -458,6 +468,7 @@ def sync_cart(
 
     db.query(CartItem).filter(CartItem.cart_id == cart.id).delete()
 
+    portadas = portadas_de(db, orden)
     items_response = []
     total_amount = Decimal("0")
 
@@ -474,12 +485,6 @@ def sync_cart(
         db.add(cart_item)
         db.flush()
 
-        # Obtener imagen primaria
-        primary_image = db.query(ProductImage.url).filter(
-            ProductImage.product_id == product.id,
-            ProductImage.is_primary == True
-        ).first()
-
         subtotal = importe_de_linea(product.price, quantity)
         total_amount += subtotal
 
@@ -488,7 +493,7 @@ def sync_cart(
             product_id=product.id,
             product_name=product.name,
             product_price=product.price,
-            product_image=primary_image[0] if primary_image else None,
+            product_image=portadas.get(product.id),
             quantity=quantity,
             subtotal=subtotal
         ))
