@@ -8,9 +8,26 @@ Actualizado: 2026-09-22.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
 - **`main`:** `0bd7fbc`; `RISK-REC-1` integrada y publicada con autorización de Emi. GitHub, Frontend y Backend convergieron en ese SHA y los dos servicios quedaron saludables. El entorno `strong-playfulness` sigue siendo demostrativo y no equivale al despliegue productivo contractual.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, entrega aceptada en `6b91aa8`, sobre base `0bd7fbc`.
-- **Última decisión PM:** `CART-IMG-QUERY-1` **ACEPTADA EN RAMA, NO INTEGRADA NI DESPLEGADA**. Producto/regresión `112eee0`; evidencia en `REPRODUCCION-CART-IMG-QUERY-1-2026-09-22.md`.
-- **Tarea activa:** `CART-PRODUCT-QUERY-1`. Debe eliminar el crecimiento 1/3/6 de las lecturas de publicaciones en GET/sync del carrito, sin cambiar semántica ni contrato.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, producto aceptado `1e4a63c` e informe `e0fd76b`, sobre base `6e64c19`.
+- **Última decisión PM:** `CART-PRODUCT-QUERY-1` **ACEPTADA EN RAMA, NO INTEGRADA NI DESPLEGADA**. Evidencia en `REPRODUCCION-CART-PRODUCT-QUERY-1-2026-09-22.md`.
+- **Tarea activa:** ninguna. Dev frena hasta una nueva asignación PM.
+
+## Última aceptación PM — CART-PRODUCT-QUERY-1
+
+Producto, caso 181 y tres sabotajes `1e4a63c`; informe `e0fd76b`. PM reprodujo
+el caso 181 en **1/1**: GET, sync con carrito y sync que lo crea leen `products`
+1/1/1 veces con 1/3/6 ítems. Los tres sabotajes dieron rojo por crecimiento.
+La suite completa desde base Docker limpia terminó **180/181**: el único rojo
+fue el caso 157 porque la copia temporal no tenía metadatos Git. Repetido con
+Git disponible, el 157 pasó **1/1**; los 181 casos quedan cubiertos, sin
+atribuir 181/181 a una sola corrida. Build, lint, tipos, sintaxis, dependencias,
+migraciones y diff-check quedaron verdes.
+
+PM acepta que el sync de un carrito nuevo guarde el nombre y precio recién
+validados antes del commit que crea el carrito. Evita guardar, ante una edición
+concurrente, un precio posterior que no pasó por el control de importes; coincide
+con el camino donde el carrito ya existía. No modifica el contrato observable
+fuera de esa carrera. La pieza no habilita integración ni despliegue.
 
 ## Última aceptación PM — CART-IMG-QUERY-1
 
@@ -166,9 +183,9 @@ Evidencia: `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
   duplicados de forma determinista y PostgreSQL impide recrearlos.
 - **N+1 de imágenes del carrito:** aceptado en rama con
   `CART-IMG-QUERY-1`; GET y sync leen `product_images` una vez por petición.
-- **N+1 de publicaciones del carrito:** tarea activa
-  `CART-PRODUCT-QUERY-1`. El caso 180 midió 1/3/6 lecturas de `products` con
-  1/3/6 ítems en GET y sync; debe quedar acotado sin alterar validaciones.
+- **N+1 de publicaciones del carrito:** `CART-PRODUCT-QUERY-1` aceptada en
+  rama; el caso 181 comprueba una lectura de `products` por petición en GET,
+  sync con carrito y sync que lo crea. No integrada ni desplegada.
 - **`categories.usa_marca` no se edita desde el panel:** viaja sólo de salida.
   Ampliar la marca a otra categoría es hoy SQL o migración, no una acción de la
   clienta, y el encabezado de `marcas.py` afirma lo contrario. Además el panel
@@ -245,10 +262,9 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev implementa y entrega `CART-PRODUCT-QUERY-1` en rama, sin deploy.
-2. PM reproduce la medición, los dos negativos, el caso 181 y la suite desde base limpia antes de aceptar.
-3. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración.
-4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
-5. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
-6. Los atributos por rubro esperan los datos prometidos por la clienta; Inicio, Servicios y la identidad de AgroMarket esperan decisión de producto.
-7. Mercado Pago, red-team y producción contractual permanecen en la secuencia acordada; no se habilitan por esta tarea.
+1. Sin tarea Dev activa. Las tres piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
+2. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración.
+3. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
+4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
+5. Los atributos por rubro esperan los datos prometidos por la clienta; Inicio, Servicios y la identidad de AgroMarket esperan decisión de producto.
+6. Mercado Pago, red-team y producción contractual permanecen en la secuencia acordada; no se habilitan por esta tarea.

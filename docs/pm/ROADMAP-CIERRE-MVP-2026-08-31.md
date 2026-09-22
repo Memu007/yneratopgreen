@@ -1,6 +1,6 @@
 # Roadmap operativo para cerrar el MVP
 
-Actualizado: 2026-09-21.
+Actualizado: 2026-09-22.
 Fuentes: `CRONOGRAMA.md`, `ALCANCE-Y-LIMITES.md`, `NOW.md` y
 `AUDITORIAS-UX-CLAUDE-2026-08-30.md`.
 
@@ -177,7 +177,7 @@ o un rediseño nuevo.
 | 21 | **RISK-REC-1 — aceptada, integrada y publicada** | R1, R4 y R5 | Producto/arnés `2d18d55`, informe `d518f40`, aceptación PM `0bd7fbc`. PM: focales 176–178 en 3/3, rojo discriminante de doble venta, suite limpia 178/178, a11y 74/74 y contraste 82/82. GitHub, Frontend y Backend convergieron en `0bd7fbc`; tag `production-accepted-2026-09-21`. |
 | 22 | **PRIMARY-IMAGE-INTEGRITY-1 — aceptada en rama** | deuda de integridad hallada por QUERY-IMG-1 | Producto/migración/regresión `cfeff88`; informe `19e6327` + corrección `6a6e36e`. PM cubrió 179/179 entre suite limpia y repetición del único caso ambiental, reprodujo cuatro sabotajes rojos y verificó migración/índice. No integrada ni desplegada: espera puerta operativa explícita. |
 | 23 | **CART-IMG-QUERY-1 — aceptada en rama** | N+1 registrado en `cart.py` | Producto/caso/sabotajes `112eee0`, informe `6b91aa8`. PM reprodujo caso 180, tres sabotajes rojos y suite limpia 180/180: GET y sync leen imágenes 1/1/1 con 1/3/6 ítems. No integrada ni desplegada. |
-| 24 | **CART-PRODUCT-QUERY-1 — activa** | N+1 medido por el caso 180 | Acotar por petición las lecturas 1/3/6 de `products` en GET y sync, preservar validaciones/atomicidad y agregar caso 181 con negativos discriminantes. Sin deploy. |
+| 24 | **CART-PRODUCT-QUERY-1 — aceptada en rama** | N+1 medido por el caso 180 | Producto/caso/sabotajes `1e4a63c`, informe `e0fd76b`. PM reprodujo el caso 181 y tres sabotajes rojos: GET y los dos caminos de sync leen `products` 1/1/1 con 1/3/6 ítems. Suite Docker limpia 180/181 por falta de `.git` en la copia temporal; caso 157 repetido con Git 1/1. Los 181 casos quedan cubiertos. Sin integración ni despliegue. |
 
 Cinco mil visitas mensuales no justifican reescribir la arquitectura. Esta
 puerta cierra primero paginación, consultas y recorridos medidos; capacidad y

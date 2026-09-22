@@ -1,9 +1,9 @@
 # Matriz requisito contractual → evidencia → estado
 
-Contrastada contra `CONTRATO.md`. Actualizada el 2026-09-21 después de integrar
-y publicar `RISK-REC-1` en `0bd7fbc`; GitHub, Frontend y Backend convergieron
-en esa revisión. El entorno Railway sigue siendo demostrativo, no el
-despliegue productivo contractual.
+Contrastada contra `CONTRATO.md`. Actualizada el 2026-09-22 después de aceptar
+`CART-PRODUCT-QUERY-1` en rama. `main` sigue en `0bd7fbc`; GitHub, Frontend y
+Backend convergieron en esa revisión. El entorno Railway sigue siendo
+demostrativo, no el despliegue productivo contractual.
 
 **Estados:** ✅ verificado con evidencia de ejecución · 🟡 existe en
 código, sin verificar · ⚪ parcial · ❌ inexistente
@@ -20,7 +20,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Buscador con filtro por **categoría** | ✅ | Smoke test `200`, filtros de categoría, precio y stock aplicados |
 | Buscador con filtro por **ubicación** | ✅ | Verificacion completa del 2026-08-05: 13/13 localidades y 32/32 publicaciones coincidieron entre interfaz y SQL; selectores encadenados y `locality_id` en URL. Ver `EVIDENCIA-FILTROS-UBICACION.md` |
 | Paginación, orden y total del catálogo | ✅ | Caso 171 sobre 115 publicaciones: 24 por página, la 101 accesible, total/filtros/órdenes aplicados en servidor y navegación sin presentar resultados viejos como vigentes. Producto `575f757`, reproducción PM en `REPRODUCCION-CAT-PAGE-1-2026-09-14.md` |
-| Carrito de compras | ✅ | Smoke 170: una sesión confirmada inválida conserva los ítems y la cabecera permite reabrirlos; caso 180: las portadas se leen una vez por petición y conservan principal o `null`; el Login no habilita checkout anónimo y el logout explícito vacía el carrito |
+| Carrito de compras | ✅; optimizaciones en rama | Smoke 170: una sesión confirmada inválida conserva los ítems y la cabecera permite reabrirlos. Casos 180–181 aceptados en rama: imágenes y publicaciones se leen una vez por petición, con principal o `null`, orden, importes y rechazos conservados; aún no integrados ni desplegados. El Login no habilita checkout anónimo y el logout explícito vacía el carrito |
 | Historial de pedidos | ✅ | Smoke test "mis compras": `200`, 3 compras |
 
 ## 3.1 Rol Vendedor
@@ -91,7 +91,7 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 
 | Requisito | Estado |
 |-----------|--------|
-| Pruebas integrales | ✅ `RISK-REC-1`: producto/arnés `2d18d55`, informe `d518f40`, aceptación e integración `0bd7fbc`. PM obtuvo 178/178 desde base limpia, reprodujo el rojo discriminante de doble venta, a11y 74/74 y contraste 82/82. Frontend y Backend convergieron en `0bd7fbc`. |
+| Pruebas integrales | ✅ La composición publicada `0bd7fbc` pasó 178/178 desde base limpia, a11y 74/74 y contraste 82/82; Frontend y Backend convergieron. La candidata posterior en rama `1e4a63c` cubrió los 181 casos: suite Docker limpia 180/181 por falta de Git en el entorno temporal y caso 157 repetido 1/1 con Git. No equivale al QA final ni al lanzamiento. |
 | Carga inicial de datos | ✅ Seed idempotente con 30 publicaciones en 12 categorías y 9 provincias, más 4.028 localidades. Verificado corriéndolo dos veces sin duplicar |
 | Despliegue en producción | ❌ |
 | Capacitación del panel de administración | ❌ |
