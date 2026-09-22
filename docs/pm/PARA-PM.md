@@ -2,116 +2,121 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## CART-IMG-QUERY-1 — entregada, para tu revisión
+## CART-PRODUCT-QUERY-1 — entregada, para tu revisión
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `c4f1a42` |
-| candidato (producto + caso 180 + negativo) | `112eee0` |
+| base | `6e64c19` |
+| candidato (producto + caso 181 + negativos) | `1e4a63c` |
 | no integrado, no desplegado | `main` sigue en `0bd7fbc` |
-| regla nueva en `CLAUDE.md`, pedida por Emi | `a050be3`: dejarte lo mínimo para verificar |
 
-**Resultado.** `GET /cart` y `POST /cart/sync` leían `product_images` una vez
-por ítem —1, 3 y 6 lecturas con 1, 3 y 6 ítems—. Ahora leen **una** por
-petición, con cualquier cantidad. La respuesta no cambia. Nada tuyo que
-decidir para aceptarla.
+**Resultado.** `GET /cart` y `POST /cart/sync` leen `products` **una** vez por
+petición, con 1, 3 o 6 ítems. Antes, 1/3/6. Encontré y cerré además un tercer
+camino que el 180 no medía: el sync de alguien que todavía no tiene carrito
+leía el **doble**, 2/6/12. Mismas respuestas, mismos errores, mismo orden.
+
+**Una sola cosa para que decidas, y no bloquea:** en ese tercer camino, el
+nombre y el precio que se guardan ahora son los que se validaron, no una
+relectura posterior (detalle abajo). Si preferís la relectura, se hace en una
+consulta más: ese camino quedaría en dos lecturas, constantes, en vez de una.
 
 ## Para verificar, lo mínimo
 
 ```
-SMOKE_CASOS=180 node scripts/smoke.mjs
-  → 1/1, y en la línea del PASS: «GET /cart lee product_images 1 con 1,
-    1 con 3, 1 con 6 ítem(s); POST /cart/sync lee product_images 1 con 1,
-    1 con 3, 1 con 6 ítem(s)»
+SMOKE_CASOS=181 node scripts/smoke.mjs
+  → 1/1, y en la línea del PASS: «GET /cart lee products 1 con 1, 1 con 3,
+    1 con 6 ítem(s); POST /cart/sync con carrito lee products 1 con 1, 1 con
+    3, 1 con 6 ítem(s); POST /cart/sync que crea el carrito lee products 1
+    con 1, 1 con 3, 1 con 6 ítem(s)»
 
-python3 scripts/sabotajes_cart_img_query_1.py lectura
-  → [FAIL] «GET /cart leyó product_images 1 con 1, 3 con 3, 6 con 6
-    ítem(s): las lecturas crecen con el carrito…» y deja el árbol como estaba
+python3 scripts/sabotajes_cart_product_query_1.py lectura sync
+  → dos [FAIL]: «GET /cart leyó products 1 con 1, 3 con 3, 6 con 6 ítem(s)…»
+    y «POST /cart/sync con carrito leyó products 1 con 1, 3 con 3, 6 con 6
+    ítem(s)…»; deja el árbol como estaba
 ```
 
-El segundo es el negativo que pediste. El script es del mismo tipo que los
-de las piezas anteriores: rompe, reinicia la API, corre el caso y restaura.
-
-Lo demás ya lo corrí yo sobre `112eee0` exacto; las salidas están abajo por si
-querés contrastar sin repetir. Qué reproducís lo decidís vos.
-
-## Una decisión técnica que conviene que sepas
-
-El 180 **no** usa el contador del 172. `pg_stat_user_tables` suma búsquedas en
-índice, no sentencias: lo medí, **una** sentencia que pide ocho portadas por
-índice suma **ocho**. Con ese contador la consulta agrupada podría pasar o
-fallar según el plan de PostgreSQL. El 180 cuenta sentencias en el proceso de
-la aplicación con un oyente de SQLAlchemy —el mismo instrumento del caso
-137—, sin tocar el producto. Se controla a sí mismo antes de medir: vaciar el
-carrito tiene que dar cero lecturas de imágenes y más de cero sentencias.
+Son los dos negativos que pediste, cada uno reponiendo la lectura por ítem.
+El script trae un tercero, `creacion`, para el camino nuevo. Lo demás ya lo
+corrí sobre `1e4a63c`; las salidas van abajo.
 
 ## Antes y después
 
 ```
-lecturas de product_images    1 ítem   3 ítems   6 ítems
-GET /cart          antes         1        3         6
-                   después       1        1         1
-POST /cart/sync    antes         1        3         6
-                   después       1        1         1
+lecturas de products                  1 ítem   3 ítems   6 ítems
+GET /cart                  antes         1        3         6
+                           después       1        1         1
+sync con carrito           antes         1        3         6
+                           después       1        1         1
+sync que crea el carrito   antes         2        6        12
+                           después       1        1         1
 ```
 
-El «antes» es el mismo caso 180 corrido sobre la base sin cambios: da rojo con
-el texto del sabotaje `lectura`. Sentencias totales por petición, con la
-misma sonda sobre la base y sobre la candidata:
+Sentencias totales, después: GET 5/5/5; sync con carrito 8/10/13; sync que
+crea el carrito 10/12/15. Lo que sigue creciendo en el sync son las
+escrituras de ítems, de a una. `product_images` sigue en 1 por petición y en 0
+con el carrito vacío.
 
-```
-sentencias totales            1 ítem   3 ítems   6 ítems
-GET /cart          antes         5        9        15
-                   después       5        7        10
-POST /cart/sync    antes         8       14        23
-                   después       8       12        18
-```
-
-Lo que sigue creciendo es `products`, que no es de esta pieza (abajo).
+El «antes» de GET es el propio 181 sobre la base: rojo «GET /cart leyó
+products 1 con 1, 3 con 3, 6 con 6 ítem(s)». Los otros dos «antes» son de la
+sonda con el mismo oyente.
 
 ## Qué cambió
 
-`backend/app/api/cart.py` (+37 −32): una función, `portadas_de`, trae las
-portadas de toda la petición en una sentencia; las cinco copias de la
-consulta —lectura, sync, alta y las dos actualizaciones— la usan. La regla es
-la misma: la principal o `null`; una secundaria nunca es portada. Carrito
-vacío: cero lecturas. Sin migración, sin contrato nuevo, sin UI. La migración
-y la regla de `PRIMARY-IMAGE-INTEGRITY-1` quedaron intactas.
+`backend/app/api/cart.py` (+38 −16), nada fuera de ese archivo:
 
-El caso 180 fabrica seis publicaciones —entre ellas una con la principal
-**detrás** de una secundaria y una con sólo secundaria—, mide 1, 3 y 6 ítems,
-compara el carrito medido con el que sirve la API por HTTP (idéntico) y cada
-ítem contra la base: portada, cantidad, precio, subtotal y total en centavos.
-También los tres caminos de un solo ítem.
+- **GET** pide los ítems con la misma consulta que hacía `cart.items` y carga
+  sus publicaciones con `selectinload`, el cargador del ORM. Sin abstracción
+  nueva.
+- **Sync, primera pasada:** lee las publicaciones pedidas en una consulta y
+  valida recorriendo el pedido en su orden, así que el primer error que se
+  informa es el de siempre.
+- **Sync, segunda pasada:** si el carrito no existía, `get_or_create_cart` lo
+  crea con un commit, y el commit vence todo lo leído; tocar después cada
+  publicación la releía, una por una. Ahora nombre y precio se toman **antes**
+  de crear el carrito.
 
-## Lo que corrí, sobre `112eee0`
+Eso último es lo que te marco arriba. Antes, en ese camino, lo guardado era una
+relectura posterior a la validación: si el precio cambiaba justo en medio del
+pedido, se guardaba un precio que no se había validado contra el tope. Ahora
+se guarda lo validado, igual que ya pasaba cuando el carrito existía. Sólo
+difiere si alguien edita el precio durante esa misma petición.
+
+## Lo que corrí, sobre `1e4a63c`
 
 ```
-suite completa desde base limpia                179/180; único rojo el 131 (sin Docker aquí)
-caso 180                                        1/1
-caso 180 sobre la base sin cambios              0/1 (el «antes»)
-sabotajes lectura / sync / secundaria           3/3 rojos; árbol intacto después
+suite completa desde base limpia                180/181; único rojo el 131 (sin Docker aquí)
+caso 181                                        1/1
+caso 181 sobre la base sin cambios              0/1 (el «antes» de GET)
+sabotajes lectura / sync / creacion             3/3 rojos: 1/3/6, 1/3/6, 2/4/7
+1–7, 29, 45, 59–61, 75, 140, 170, 176, 179–181  19/19, desde base limpia
 build · lint · tsc --noEmit · node --check      verdes
 compileall · pip check                          verdes
 alembic check                                   No new upgrade operations detected
 diff-check compatible con CRLF                  sin avisos
 ```
 
-`secundaria` quita el filtro por principal: las lecturas no cambian y lo caza
-sólo el contraste con la base («sync con 3: «sólo secundaria» salió con
-portada "…-2-s.png" y la base dice null»). A11y y contraste no corridos: no
-cambia UI. Si corrés sueltos el 7, 45 o 59–61, necesitan 1–6 delante por
-estado compartido; no es de esta pieza.
+`creacion` da 2/4/7 y no 2/6/12 porque la primera pasada ya lee de a una sola
+consulta; lo que repone es la relectura por ítem después del commit.
+
+Qué más mide el 181, además del conteo: orden de sync igual al del pedido y
+de GET igual al de la tabla, con los identificadores de línea; un producto
+repetido sigue siendo una línea con la suma; siete rechazos —inexistente,
+inactiva, propia, sin stock, cantidad de más— con su código y su texto
+exactos, **el primero en el orden del pedido** (van en pares invertidos) y sin
+tocar el carrito; y un rechazo no le crea carrito a quien no tenía.
+
+Un aviso para que no te cueste una corrida: el caso 2 registra un correo fijo,
+así que correr 1–7 sobre una base ya usada da rojos en cadena que no son de
+esta pieza. Desde base limpia pasan.
 
 ## Visto y no tocado
 
-- `products` también se lee una vez por ítem en `GET /cart` y en el sync
-  (medido: 1, 3 y 6). Mismo N+1, otra tabla. Cerrarlo es chico y no toca
-  contrato; si lo querés, es otra tarea.
-- Alta y actualizaciones cargan todas las publicaciones del carrito para
+- La primera pasada del sync lee `categories` una vez por categoría distinta
+  (para saber si es servicio). Con la categoría única del caso, 1; con
+  varias, crece por categoría, no por ítem. Leído en el código.
+- Alta y actualizaciones siguen cargando las publicaciones del carrito para
   validar el tope del vendedor. Leído en el código, no medido.
-- Que el 172 llegue a dar un rojo falso con más datos es **hipótesis**: sólo
-  medí que el contador suma una búsqueda por clave.
 
-No toqué `main`, Railway ni datos remotos, y no desplegué. Freno acá.
+No toqué `main`, Railway, datos remotos, modelos ni migraciones, y no
+desplegué. Freno acá.
