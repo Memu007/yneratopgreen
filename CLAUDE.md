@@ -40,8 +40,10 @@ Dinero, autenticación, permisos, órdenes, stock, migraciones, datos y segurida
 - Cuando corresponde suite completa, correrla desde base limpia y sobre el SHA que se entrega.
 - Auto-revisar el diff completo contra la base y retirar cambios fuera de alcance.
 - Informar SHA, pruebas, resultado, rojos, qué no se corrió y riesgos.
+- La revisión de PM es cara: cada informe le deja lo mínimo para verificar. Arriba, el resultado y lo que decide ella; después, un solo bloque corto de comandos copiables con lo que cada uno tiene que mostrar. Lo ya corrido va con su salida exacta, para que no tenga que repetirlo para enterarse.
+- No pedirle pasos que un script pueda hacer. Si algo depende del estado de otros casos o del entorno, se avisa antes de que lo descubra corriéndolo.
 
-La revisión independiente la hace PM/QA sobre la misma composición cuando corresponda. Dos corridas de Dev no sustituyen independencia.
+La revisión independiente la hace PM/QA sobre la misma composición cuando corresponda. Dos corridas de Dev no sustituyen independencia. Abaratarle la verificación no es reemplazarla: qué reproduce lo decide ella.
 
 ## 5. Detalles del repositorio
 
