@@ -8,9 +8,21 @@ Actualizado: 2026-09-22.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
 - **`main`:** `0bd7fbc`; `RISK-REC-1` integrada y publicada con autorización de Emi. GitHub, Frontend y Backend convergieron en ese SHA y los dos servicios quedaron saludables. El entorno `strong-playfulness` sigue siendo demostrativo y no equivale al despliegue productivo contractual.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, candidata aceptada en `6a6e36e`, sobre base `0bd7fbc`.
-- **Última decisión PM:** `PRIMARY-IMAGE-INTEGRITY-1` **ACEPTADA EN RAMA, NO INTEGRADA NI DESPLEGADA**. Producto/migración/regresión `cfeff88`; evidencia en `REPRODUCCION-PRIMARY-IMAGE-INTEGRITY-1-2026-09-22.md`.
-- **Tarea activa:** `CART-IMG-QUERY-1`. Debe medir y eliminar el crecimiento por ítem de las consultas de imágenes del carrito, sin cambiar contrato ni UI.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, entrega aceptada en `6b91aa8`, sobre base `0bd7fbc`.
+- **Última decisión PM:** `CART-IMG-QUERY-1` **ACEPTADA EN RAMA, NO INTEGRADA NI DESPLEGADA**. Producto/regresión `112eee0`; evidencia en `REPRODUCCION-CART-IMG-QUERY-1-2026-09-22.md`.
+- **Tarea activa:** `CART-PRODUCT-QUERY-1`. Debe eliminar el crecimiento 1/3/6 de las lecturas de publicaciones en GET/sync del carrito, sin cambiar semántica ni contrato.
+
+## Última aceptación PM — CART-IMG-QUERY-1
+
+Producto, caso 180 y sabotajes `112eee0`; informe `6b91aa8`. PM reprodujo el
+focal en 1/1: GET y sync leen `product_images` 1/1/1 veces con 1/3/6 ítems y
+conservan principal o `null`. Los tres sabotajes dieron rojo —N+1 en cada
+endpoint y secundaria usada como portada—. La suite completa desde base Docker
+limpia terminó **180/180**; build, lint, tipos, sintaxis, dependencias,
+migraciones y diff-check quedaron verdes.
+
+La medición reveló que `products` todavía crece 1/3/6 en ambos endpoints. Ese
+hallazgo no reabre la pieza aceptada: pasa a `CART-PRODUCT-QUERY-1`.
 
 ## Última aceptación PM — PRIMARY-IMAGE-INTEGRITY-1
 
@@ -152,10 +164,11 @@ Evidencia: `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
 - **Índice único parcial sobre la imagen primaria:** aceptado en rama con
   `PRIMARY-IMAGE-INTEGRITY-1`; no integrado ni desplegado. La migración limpia
   duplicados de forma determinista y PostgreSQL impide recrearlos.
-- **N+1 del carrito:** tarea activa `CART-IMG-QUERY-1`. `cart.py` consulta la
-  imagen dentro de `for item in cart.items:` y repite la selección en cinco
-  caminos. Dev debe medir uno frente a varios ítems y dejar las lecturas de
-  `product_images` acotadas por petición.
+- **N+1 de imágenes del carrito:** aceptado en rama con
+  `CART-IMG-QUERY-1`; GET y sync leen `product_images` una vez por petición.
+- **N+1 de publicaciones del carrito:** tarea activa
+  `CART-PRODUCT-QUERY-1`. El caso 180 midió 1/3/6 lecturas de `products` con
+  1/3/6 ítems en GET y sync; debe quedar acotado sin alterar validaciones.
 - **`categories.usa_marca` no se edita desde el panel:** viaja sólo de salida.
   Ampliar la marca a otra categoría es hoy SQL o migración, no una acción de la
   clienta, y el encabezado de `marcas.py` afirma lo contrario. Además el panel
@@ -232,8 +245,8 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev implementa y entrega `CART-IMG-QUERY-1` en rama, sin deploy.
-2. PM reproduce la medición, el negativo discriminante, el caso 180 y la suite desde base limpia antes de aceptar.
+1. Dev implementa y entrega `CART-PRODUCT-QUERY-1` en rama, sin deploy.
+2. PM reproduce la medición, los dos negativos, el caso 181 y la suite desde base limpia antes de aceptar.
 3. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 5. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.

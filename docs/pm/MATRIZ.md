@@ -20,7 +20,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Buscador con filtro por **categoría** | ✅ | Smoke test `200`, filtros de categoría, precio y stock aplicados |
 | Buscador con filtro por **ubicación** | ✅ | Verificacion completa del 2026-08-05: 13/13 localidades y 32/32 publicaciones coincidieron entre interfaz y SQL; selectores encadenados y `locality_id` en URL. Ver `EVIDENCIA-FILTROS-UBICACION.md` |
 | Paginación, orden y total del catálogo | ✅ | Caso 171 sobre 115 publicaciones: 24 por página, la 101 accesible, total/filtros/órdenes aplicados en servidor y navegación sin presentar resultados viejos como vigentes. Producto `575f757`, reproducción PM en `REPRODUCCION-CAT-PAGE-1-2026-09-14.md` |
-| Carrito de compras | ✅ | Smoke 170: una sesión confirmada inválida conserva los ítems y la cabecera permite reabrirlos; el Login no habilita checkout anónimo y el logout explícito vacía el carrito |
+| Carrito de compras | ✅ | Smoke 170: una sesión confirmada inválida conserva los ítems y la cabecera permite reabrirlos; caso 180: las portadas se leen una vez por petición y conservan principal o `null`; el Login no habilita checkout anónimo y el logout explícito vacía el carrito |
 | Historial de pedidos | ✅ | Smoke test "mis compras": `200`, 3 compras |
 
 ## 3.1 Rol Vendedor
