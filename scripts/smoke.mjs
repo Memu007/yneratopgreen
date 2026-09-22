@@ -30751,6 +30751,394 @@ print(json.dumps(salida))
   }
 });
 
+// ---------------------------------------------------------------------------
+// 181. El carrito lee sus publicaciones una vez por petición, no una por ítem.
+//
+// El caso 180 lo dejó medido: `GET /cart` y `POST /cart/sync` leían `products`
+// 1, 3 y 6 veces con 1, 3 y 6 ítems. La lectura tocaba `item.product` ítem por
+// ítem, y el sync validaba cada línea con su propia consulta. Había además un
+// tercer camino que el 180 no miraba: el sync de alguien que todavía no tiene
+// carrito. Ahí `get_or_create_cart` crea el carrito con un commit, el commit
+// vence lo ya leído y cada publicación se volvía a leer: 2, 6 y 12.
+//
+// Se cuenta con el oyente del 180 —sentencias, en el proceso de la aplicación—
+// y se mide cada camino con 1, 3 y 6 ítems. Después se contrasta con la base lo
+// que el cambio podría romper sin que el conteo lo note: el orden, los
+// duplicados, qué error se informa cuando hay varios, y que un rechazo no toque
+// el carrito.
+// ---------------------------------------------------------------------------
+await runCase(181, 'El carrito lee sus publicaciones una vez por petición, no una por ítem', async () => {
+  const medidos = [];
+  const sello = Date.now();
+  const MARCADOR = `Smoke cart181 ${sello}`;
+  const clave = 'smoke123';
+  const correoComprador = `cart181.${sello}@example.com`;
+  const INEXISTENTE = '00000000-0000-0000-0000-000000000000';
+
+  const limpiar = () => {
+    try {
+      const fabricadas = `SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`;
+      querySql(`DELETE FROM cart_items WHERE product_id IN (${fabricadas})`);
+      querySql(`DELETE FROM product_images WHERE product_id IN (${fabricadas})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)}`);
+    } catch (error) {
+      console.log(`  · no se pudieron retirar las publicaciones del caso 181: ${error.message}`);
+    }
+  };
+
+  // Las portadas del 180, para que el contraste siga incluyendo principal,
+  // secundaria y null. Precios con centavos.
+  const ESCENARIOS = [
+    { que: 'principal y secundaria', imagenes: [['p', true, 0], ['s', false, 1]] },
+    { que: 'sin imagen', imagenes: [] },
+    { que: 'sólo secundaria', imagenes: [['s', false, 0]] },
+    { que: 'principal detrás de una secundaria', imagenes: [['s', false, 0], ['p', true, 2]] },
+    { que: 'sólo principal', imagenes: [['p', true, 0]] },
+    { que: 'principal y dos secundarias', imagenes: [['p', true, 0], ['s1', false, 1], ['s2', false, 2]] },
+  ];
+  const PRECIOS = ['1234.50', '999.99', '15000.00', '87.25', '4321.10', '250.05'];
+  const STOCK = 9;
+  const TAMANOS = [1, 3, ESCENARIOS.length];
+
+  try {
+    // === Fabricación ======================================================
+    const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+    await registrarYVerificar({
+      email: correoComprador, password: clave, full_name: `Compra 181 ${sello}`,
+      phone: '+54 11 5555 0181', role: 'user',
+    });
+    const comprador = await ingresarVendedor(correoComprador, clave);
+    assert(comprador.token, 'la cuenta compradora del caso no pudo ingresar');
+
+    const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+    const [categoria] = queryRows(`
+      SELECT id FROM categories
+      WHERE is_active = true AND is_service = false ORDER BY name LIMIT 1`);
+    assert(categoria, 'no hay una categoría de productos activa');
+
+    const publicar = async (quien, sufijo, precio, stock) => {
+      const alta = await apiRequest('/products', {
+        method: 'POST', token: quien.token,
+        body: {
+          name: `${MARCADOR}-${sufijo}`,
+          description: 'Publicación fabricada para medir las lecturas de publicaciones del carrito.',
+          category_id: categoria[0], price: Number(precio), stock, unit: 'unidad',
+          locality_id: localidad, publication_type: 'producto',
+        },
+      });
+      assert(alta.status === 201 || alta.status === 200,
+        `«${sufijo}» respondió HTTP ${alta.status}: ${JSON.stringify(alta.data).slice(0, 200)}`);
+      return alta.data.id;
+    };
+
+    const ids = [];
+    for (let i = 0; i < ESCENARIOS.length; i += 1) {
+      ids.push(await publicar(vendedor, String(i), PRECIOS[i], STOCK));
+    }
+    ESCENARIOS.forEach(({ imagenes }, i) => {
+      for (const [cual, principal, orden] of imagenes) {
+        const url = `/uploads/products/${MARCADOR.replace(/\s/g, '_')}-${i}-${cual}.png`;
+        querySql(`
+          INSERT INTO product_images (id, product_id, url, filename, is_primary, display_order, created_at)
+          VALUES (gen_random_uuid()::text, ${sqlLiteral(ids[i])}, ${sqlLiteral(url)},
+                  ${sqlLiteral(url.split('/').pop())}, ${principal ? 'true' : 'false'}, ${orden}, NOW())`);
+      }
+    });
+
+    // Las que tienen que ser rechazadas, cada una por su motivo.
+    const inactiva = await publicar(vendedor, 'inactiva', '500.00', STOCK);
+    await apiRequest(`/products/${inactiva}`, {
+      method: 'PATCH', token: vendedor.token, body: { status: 'paused' },
+    });
+    const sinStock = await publicar(vendedor, 'sin stock', '500.00', 5);
+    querySql(`UPDATE products SET stock = 0 WHERE id = ${sqlLiteral(sinStock)}`);
+    const propia = await publicar(comprador, 'propia', '500.00', STOCK);
+
+    const SIN_PORTADA = '(sin imagen principal)';
+    const portadaEnLaBase = new Map(queryRows(`
+      SELECT p.id,
+             COALESCE((SELECT i.url FROM product_images i
+                       WHERE i.product_id = p.id AND i.is_primary), ${sqlLiteral(SIN_PORTADA)})
+      FROM products p WHERE p.name LIKE ${sqlLiteral(`${MARCADOR}-%`)} ORDER BY p.id`)
+      .map(([id, url]) => [id, url === SIN_PORTADA ? null : url]));
+    const precioEnLaBase = new Map(queryRows(`
+      SELECT id, price::text FROM products
+      WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)} ORDER BY id`));
+    const nombreEnLaBase = new Map(queryRows(`
+      SELECT id, name FROM products
+      WHERE name LIKE ${sqlLiteral(`${MARCADOR}-%`)} ORDER BY id`));
+    const nombreDe = (id) => nombreEnLaBase.get(id);
+    assert(ESCENARIOS.every((_, i) => portadaEnLaBase.has(ids[i]) && precioEnLaBase.has(ids[i])
+        && nombreEnLaBase.has(ids[i])),
+      'la base no describe todas las publicaciones fabricadas');
+    assert([inactiva, sinStock, propia].every((id) => nombreEnLaBase.has(id)),
+      'la base no describe las publicaciones que tienen que ser rechazadas');
+
+    const cantidadDe = (i) => 1 + (i % 3);
+    const DUPLICADOS = [
+      { product_id: ids[0], quantity: 1 },
+      { product_id: ids[3], quantity: 2 },
+      { product_id: ids[0], quantity: 2 },
+    ];
+
+    // === El instrumento, el del 180 =======================================
+    const guion = `
+import json, sys
+from sqlalchemy import event
+from starlette.testclient import TestClient
+from app.db.base import engine, SessionLocal
+from app.models.cart import Cart, CartItem
+from app.main import app
+
+datos = json.loads(sys.stdin.read())
+ids = datos["ids"]
+sentencias = []
+event.listen(engine, "before_cursor_execute", lambda *a, **k: sentencias.append(a[2].lower()))
+
+def medir(respuesta):
+    return {
+        "status": respuesta.status_code,
+        "cuerpo": respuesta.json(),
+        "publicaciones": sum(1 for s in sentencias if "from products" in s),
+        "imagenes": sum(1 for s in sentencias if "product_images" in s),
+        "total": len(sentencias),
+    }
+
+def sin_carrito():
+    # Lo que ve alguien que nunca tuvo carrito en el servidor: ninguna fila.
+    db = SessionLocal()
+    try:
+        for carrito in db.query(Cart).filter(Cart.user_id == datos["usuario"]).all():
+            db.query(CartItem).filter(CartItem.cart_id == carrito.id).delete()
+            db.delete(carrito)
+        db.commit()
+    finally:
+        db.close()
+
+h = {"Authorization": "Bearer " + datos["token"]}
+salida = {"sync": {}, "get": {}, "sync_creando": {}}
+with TestClient(app) as c:
+    sentencias.clear()
+    salida["control"] = medir(c.delete("/api/cart", headers=h))
+    sentencias.clear()
+    salida["vacio"] = medir(c.get("/api/cart", headers=h))
+
+    for k in datos["tamanos"]:
+        items = [{"product_id": p, "quantity": 1 + i % 3} for i, p in enumerate(ids[:k])]
+        sentencias.clear()
+        salida["sync"][str(k)] = medir(c.post("/api/cart/sync", json={"items": items}, headers=h))
+        sentencias.clear()
+        salida["get"][str(k)] = medir(c.get("/api/cart", headers=h))
+        sin_carrito()
+        sentencias.clear()
+        salida["sync_creando"][str(k)] = medir(
+            c.post("/api/cart/sync", json={"items": items}, headers=h))
+
+    sentencias.clear()
+    salida["duplicados"] = medir(
+        c.post("/api/cart/sync", json={"items": datos["duplicados"]}, headers=h))
+    sentencias.clear()
+    salida["get_duplicados"] = medir(c.get("/api/cart", headers=h))
+print(json.dumps(salida))
+`;
+    const medido = JSON.parse(execFileSync(
+      'docker', ['exec', '-i', 'topgreen-api', 'python', '-c', guion],
+      {
+        encoding: 'utf8',
+        input: JSON.stringify({
+          token: comprador.token, usuario: comprador.id, ids, tamanos: TAMANOS, duplicados: DUPLICADOS,
+        }),
+        stdio: ['pipe', 'pipe', 'pipe'],
+      },
+    ).trim().split(/\r?\n/).at(-1));
+
+    const { control, vacio } = medido;
+    assert(control.status === 200 && control.total > 0,
+      'el oyente no vio ninguna sentencia al vaciar el carrito: el instrumento estaría ciego');
+    assert(control.publicaciones === 0 && control.imagenes === 0,
+      `vaciar el carrito «leyó» products ${control.publicaciones} y product_images `
+      + `${control.imagenes} vez/veces: el filtro estaría contando lo que no es`);
+    assert(vacio.status === 200 && vacio.cuerpo.items.length === 0,
+      `el carrito vacío respondió HTTP ${vacio.status} con ${JSON.stringify(vacio.cuerpo).slice(0, 200)}`);
+    assert(vacio.publicaciones === 0 && vacio.imagenes === 0,
+      `el carrito vacío leyó products ${vacio.publicaciones} y product_images ${vacio.imagenes} `
+      + 'veces: sin ítems no hay nada que leer');
+
+    // === A. Las lecturas de publicaciones no crecen con los ítems ==========
+    const CAMINOS = [
+      ['get', 'GET /cart'],
+      ['sync', 'POST /cart/sync con carrito'],
+      ['sync_creando', 'POST /cart/sync que crea el carrito'],
+    ];
+    const conteos = (camino, campo) => TAMANOS.map((k) => medido[camino][String(k)][campo]);
+    const describir = (camino, campo) => conteos(camino, campo)
+      .map((n, j) => `${n} con ${TAMANOS[j]}`).join(', ');
+    for (const [camino, ruta] of CAMINOS) {
+      TAMANOS.forEach((k) => {
+        const m = medido[camino][String(k)];
+        assert(m.status === 200,
+          `${ruta} con ${k} ítem(s) respondió HTTP ${m.status}: ${JSON.stringify(m.cuerpo).slice(0, 200)}`);
+      });
+      const lecturas = conteos(camino, 'publicaciones');
+      assert(lecturas.every((n) => n === lecturas[0]),
+        `${ruta} leyó products ${describir(camino, 'publicaciones')} ítem(s): las lecturas crecen `
+        + 'con el carrito, que es exactamente la lectura por ítem que esta tarea retira');
+      assert(lecturas[0] <= 1,
+        `${ruta} leyó products ${lecturas[0]} veces por petición: tiene que alcanzar con una`);
+      // Y el cierre del 180 sigue puesto.
+      const portadas = conteos(camino, 'imagenes');
+      assert(portadas.every((n) => n === portadas[0]) && portadas[0] <= 1,
+        `${ruta} leyó product_images ${describir(camino, 'imagenes')} ítem(s): se perdió el cierre del 180`);
+      medidos.push(`${ruta} lee products ${describir(camino, 'publicaciones')} ítem(s)`);
+    }
+    for (const [camino, ruta] of CAMINOS) {
+      medidos.push(`${ruta}, sentencias totales ${conteos(camino, 'total').join('/')}`);
+    }
+
+    // === B. La respuesta es la de siempre, contrastada con la base ========
+    const centavos = (valor) => Math.round(Number(valor) * 100);
+    const contrastar = (cuerpo, esperado, donde) => {
+      // `esperado`: [product_id, cantidad] en el orden en que tienen que salir.
+      assert(cuerpo.items.length === esperado.length,
+        `${donde}: salieron ${cuerpo.items.length} ítems y tenían que ser ${esperado.length}`);
+      let total = 0;
+      cuerpo.items.forEach((item, j) => {
+        const [productId, cantidad] = esperado[j];
+        assert(item.product_id === productId,
+          `${donde}: en la posición ${j} salió «${item.product_name}» y tenía que salir `
+          + `«${nombreDe(productId)}»`);
+        assert(item.quantity === cantidad,
+          `${donde}: «${item.product_name}» salió con cantidad ${item.quantity} y es ${cantidad}`);
+        assert(item.product_name === nombreDe(productId),
+          `${donde}: el nombre salió «${item.product_name}» y la base dice «${nombreDe(productId)}»`);
+        assert(centavos(item.product_price) === centavos(precioEnLaBase.get(productId)),
+          `${donde}: «${item.product_name}» salió a ${item.product_price} y la base dice `
+          + `${precioEnLaBase.get(productId)}`);
+        const subtotal = centavos(precioEnLaBase.get(productId)) * cantidad;
+        assert(centavos(item.subtotal) === subtotal,
+          `${donde}: el subtotal de «${item.product_name}» es ${item.subtotal} y es ${subtotal / 100}`);
+        assert(item.product_image === portadaEnLaBase.get(productId),
+          `${donde}: «${item.product_name}» salió con portada ${JSON.stringify(item.product_image)} `
+          + `y la base dice ${JSON.stringify(portadaEnLaBase.get(productId))}`);
+        total += subtotal;
+      });
+      assert(cuerpo.total_items === esperado.length,
+        `${donde}: total_items dice ${cuerpo.total_items} y son ${esperado.length}`);
+      assert(centavos(cuerpo.total_amount) === total,
+        `${donde}: el total es ${cuerpo.total_amount} y tiene que ser ${total / 100}`);
+    };
+    // El sync responde en el orden del pedido. La lectura no tiene ORDER BY
+    // —nunca lo tuvo—: sale en el orden que da esa misma consulta sobre la
+    // tabla, y eso es lo que se compara.
+    const filasEnLaBase = () => {
+      const [carrito] = queryRows(`
+        SELECT id, 'fin' FROM carts
+        WHERE user_id = ${sqlLiteral(comprador.id)} AND status = 'ACTIVE'`);
+      if (!carrito) return [];
+      return queryRows(`
+        SELECT id, product_id, quantity::text FROM cart_items
+        WHERE cart_id = ${sqlLiteral(carrito[0])}`);
+    };
+    const ordenEnLaBase = () => filasEnLaBase().map(([, id, cantidad]) => [id, Number(cantidad)]);
+
+    for (const k of TAMANOS) {
+      const pedido = ids.slice(0, k).map((id, i) => [id, cantidadDe(i)]);
+      contrastar(medido.sync[String(k)].cuerpo, pedido, `sync con ${k}`);
+      contrastar(medido.sync_creando[String(k)].cuerpo, pedido, `sync que crea el carrito con ${k}`);
+      const leido = medido.get[String(k)].cuerpo;
+      assert(JSON.stringify(leido.items.map((i) => i.product_id).sort())
+          === JSON.stringify(ids.slice(0, k).sort()),
+      `GET con ${k}: no trajo los ${k} ítems sincronizados`);
+      contrastar(leido,
+        leido.items.map((i) => [i.product_id, cantidadDe(ids.indexOf(i.product_id))]),
+        `GET con ${k}`);
+    }
+    // Lo último que dejó el proceso es el sync que creó el carrito con 6; ahora
+    // la API corriendo, por HTTP, tiene que leer ese carrito en el orden de la
+    // tabla.
+    const porHttp = await apiRequest('/cart', { token: comprador.token });
+    contrastar(porHttp.data, ordenEnLaBase(), 'GET por HTTP');
+    assert(JSON.stringify(porHttp.data.items.map((i) => i.id))
+        === JSON.stringify(filasEnLaBase().map(([id]) => id)),
+    'GET por HTTP: los identificadores de las líneas no son los de la base, en su orden');
+
+    // Un mismo producto dos veces es una sola línea, con las cantidades sumadas
+    // y en el lugar de su primera aparición.
+    const esperadoDuplicados = [[ids[0], 3], [ids[3], 2]];
+    assert(medido.duplicados.status === 200,
+      `el sync con duplicados respondió HTTP ${medido.duplicados.status}`);
+    contrastar(medido.duplicados.cuerpo, esperadoDuplicados, 'sync con duplicados');
+    assert(medido.duplicados.publicaciones <= 1,
+      `el sync con duplicados leyó products ${medido.duplicados.publicaciones} veces`);
+    medidos.push('las respuestas coinciden con la base en ids, orden, cantidades, precios, subtotales, '
+      + 'total y portada; un producto repetido sigue siendo una línea con la suma');
+
+    // === C. Los rechazos: mismo código, mismo motivo, carrito intacto ======
+    await apiRequest('/cart/sync', {
+      method: 'POST', token: comprador.token,
+      body: { items: [{ product_id: ids[0], quantity: 1 }, { product_id: ids[4], quantity: 2 }] },
+    });
+    const antes = JSON.stringify(ordenEnLaBase());
+    const RECHAZOS = [
+      // Varios problemas en el mismo pedido: se informa el primero EN EL ORDEN
+      // DEL PEDIDO, no el que la base devuelva primero. Por eso van de a pares
+      // invertidos.
+      ['válida e inexistente', [ids[0], INEXISTENTE], 400,
+        'Una de las publicaciones de tu carrito ya no existe. Quitala del carrito para continuar.'],
+      ['inactiva antes que inexistente', [inactiva, INEXISTENTE], 400,
+        `«${nombreDe(inactiva)}» ya no está disponible. Quitala del carrito para continuar.`],
+      ['inexistente antes que inactiva', [INEXISTENTE, inactiva], 400,
+        'Una de las publicaciones de tu carrito ya no existe. Quitala del carrito para continuar.'],
+      ['propia antes que sin stock', [propia, sinStock], 409,
+        `«${nombreDe(propia)}» es tu propia publicación: no podés comprarla. Quitala del carrito para continuar.`],
+      // El stock se mira DESPUÉS de haber resuelto todo el pedido: aunque la sin
+      // stock venga primero, la propia se informa antes.
+      ['sin stock antes que propia', [sinStock, propia], 409,
+        `«${nombreDe(propia)}» es tu propia publicación: no podés comprarla. Quitala del carrito para continuar.`],
+      ['sólo sin stock', [sinStock], 400,
+        `«${nombreDe(sinStock)}» se quedó sin stock. Quitala del carrito para continuar.`],
+    ];
+    for (const [que, pedido, codigo, motivo] of RECHAZOS) {
+      const error = await expectApiError(codigo, () => apiRequest('/cart/sync', {
+        method: 'POST', token: comprador.token,
+        body: { items: pedido.map((id) => ({ product_id: id, quantity: 1 })) },
+      }));
+      assert(error === `POST /cart/sync respondió HTTP ${codigo}: ${motivo}`,
+        `${que}: se esperaba «HTTP ${codigo}: ${motivo}» y llegó «${error}»`);
+      assert(JSON.stringify(ordenEnLaBase()) === antes,
+        `${que}: el rechazo tocó el carrito: ${antes} → ${JSON.stringify(ordenEnLaBase())}`);
+    }
+    const demasiado = await expectApiError(400, () => apiRequest('/cart/sync', {
+      method: 'POST', token: comprador.token,
+      body: { items: [{ product_id: ids[0], quantity: 99 }] },
+    }));
+    assert(demasiado === `POST /cart/sync respondió HTTP 400: «${nombreDe(ids[0])}»: pediste 99 y `
+      + `quedan ${STOCK}. Ajustá la cantidad para continuar.`,
+    `cantidad sobre el stock: llegó «${demasiado}»`);
+    assert(JSON.stringify(ordenEnLaBase()) === antes, 'pedir de más tocó el carrito');
+
+    // Y quien no tiene carrito sigue sin tenerlo después de un rechazo.
+    vaciarCarritosDe(correoComprador);
+    await expectApiError(400, () => apiRequest('/cart/sync', {
+      method: 'POST', token: comprador.token,
+      body: { items: [{ product_id: ids[0], quantity: 1 }, { product_id: INEXISTENTE, quantity: 1 }] },
+    }));
+    assert(queryCount(`SELECT COUNT(*) FROM carts WHERE user_id = ${sqlLiteral(comprador.id)}`) === 0,
+      'un sync rechazado le creó un carrito a quien no tenía');
+    medidos.push(`${RECHAZOS.length + 1} rechazos con su código y su motivo de siempre, el primero en el `
+      + 'orden del pedido, sin tocar el carrito; y un rechazo no crea carrito');
+
+    return `las publicaciones del carrito se leen una vez por petición. ${medidos.join('; ')}`;
+  } finally {
+    limpiar();
+    try {
+      vaciarCarritosDe(correoComprador);
+    } catch (error) {
+      console.log(`  · no se pudo retirar el carrito del caso 181: ${error.message}`);
+    }
+  }
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

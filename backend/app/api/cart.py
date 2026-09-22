@@ -2,7 +2,7 @@
 API Router para carrito de compras
 """
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from decimal import Decimal
 
 from app.db.base import get_db
@@ -113,9 +113,15 @@ def get_cart(
     items_response = []
     total_amount = Decimal("0")
     
-    portadas = portadas_de(db, [item.product_id for item in cart.items])
+    # Las publicaciones del carrito se cargan juntas, en una sola consulta, y no
+    # una por ítem al tocar `item.product`. Los ítems se piden con la misma
+    # consulta que hacía `cart.items` —mismo filtro, sin orden explícito—.
+    items = db.query(CartItem).options(selectinload(CartItem.product)).filter(
+        CartItem.cart_id == cart.id
+    ).all()
+    portadas = portadas_de(db, [item.product_id for item in items])
 
-    for item in cart.items:
+    for item in items:
         subtotal = importe_de_linea(item.product.price, item.quantity)
         total_amount += subtotal
         
@@ -391,8 +397,17 @@ def sync_cart(
     efectivos: dict = {}   # product_id -> {"producto", "cantidad"}
     orden: list = []       # conserva el orden de llegada del payload
 
+    # Las publicaciones pedidas se leen juntas, en una sola consulta, y no una
+    # por línea. Las validaciones siguen recorriendo el pedido en su orden, así
+    # que el primer problema que se informa es el mismo de siempre.
+    pedidas = {item_data.product_id for item_data in sync_data.items}
+    publicaciones = {
+        producto.id: producto
+        for producto in db.query(Product).filter(Product.id.in_(pedidas))
+    } if pedidas else {}
+
     for item_data in sync_data.items:
-        product = db.query(Product).filter(Product.id == item_data.product_id).first()
+        product = publicaciones.get(item_data.product_id)
 
         # Nada se saltea en silencio: si el carrito local trae algo que ya no se
         # puede comprar, el usuario tiene que enterarse y decidir. Antes esto se
@@ -464,6 +479,16 @@ def sync_cart(
     # ahora hay algo que guardar. Un sync válido y vacío sigue representando un
     # carrito vacío, como hasta hoy: lo que cambia es que un sync RECHAZADO no
     # crea nada.
+    #
+    # Lo que esta pasada necesita de cada publicación se toma ANTES de obtener
+    # el carrito: si no existía, `get_or_create_cart` lo crea con un commit, el
+    # commit vence todo lo leído, y tocar después cada publicación la volvería
+    # a leer, una por una. Son los mismos valores que se acaban de validar.
+    lineas = [
+        (product_id, efectivos[product_id]["producto"].name,
+         efectivos[product_id]["producto"].price, efectivos[product_id]["cantidad"])
+        for product_id in orden
+    ]
     cart = get_or_create_cart(db, current_user.id)
 
     db.query(CartItem).filter(CartItem.cart_id == cart.id).delete()
@@ -472,28 +497,25 @@ def sync_cart(
     items_response = []
     total_amount = Decimal("0")
 
-    for product_id in orden:
-        product = efectivos[product_id]["producto"]
-        quantity = efectivos[product_id]["cantidad"]
-
+    for product_id, nombre, precio, quantity in lineas:
         cart_item = CartItem(
             cart_id=cart.id,
-            product_id=product.id,
+            product_id=product_id,
             quantity=quantity,
-            unit_price_snapshot=product.price
+            unit_price_snapshot=precio
         )
         db.add(cart_item)
         db.flush()
 
-        subtotal = importe_de_linea(product.price, quantity)
+        subtotal = importe_de_linea(precio, quantity)
         total_amount += subtotal
 
         items_response.append(CartItemResponse(
             id=cart_item.id,
-            product_id=product.id,
-            product_name=product.name,
-            product_price=product.price,
-            product_image=portadas.get(product.id),
+            product_id=product_id,
+            product_name=nombre,
+            product_price=precio,
+            product_image=portadas.get(product_id),
             quantity=quantity,
             subtotal=subtotal
         ))
