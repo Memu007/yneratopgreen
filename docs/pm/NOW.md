@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-09-21.
+Actualizado: 2026-09-22.
 
 `NOW.md` contiene sólo estado vigente, restricciones vivas, bloqueos y próxima acción. La historia anterior permanece en Git; la instantánea previa a esta poda está en `ab4165fc`.
 
@@ -8,9 +8,22 @@ Actualizado: 2026-09-21.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
 - **`main`:** `0bd7fbc`; `RISK-REC-1` integrada y publicada con autorización de Emi. GitHub, Frontend y Backend convergieron en ese SHA y los dos servicios quedaron saludables. El entorno `strong-playfulness` sigue siendo demostrativo y no equivale al despliegue productivo contractual.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, base `0bd7fbc`.
-- **Última decisión PM:** `RISK-REC-1` **ACEPTADA, INTEGRADA Y PUBLICADA**. La aceptación del despliegue quedó marcada por `production-accepted-2026-09-21`; evidencia funcional en `REPRODUCCION-RISK-REC-1-2026-09-21.md`.
-- **Tarea activa:** `PRIMARY-IMAGE-INTEGRITY-1`. Debe deduplicar primarias existentes, imponer una única imagen principal por publicación en PostgreSQL y cerrar los caminos de carga/borrado sin desplegar.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, candidata aceptada en `6a6e36e`, sobre base `0bd7fbc`.
+- **Última decisión PM:** `PRIMARY-IMAGE-INTEGRITY-1` **ACEPTADA EN RAMA, NO INTEGRADA NI DESPLEGADA**. Producto/migración/regresión `cfeff88`; evidencia en `REPRODUCCION-PRIMARY-IMAGE-INTEGRITY-1-2026-09-22.md`.
+- **Tarea activa:** `CART-IMG-QUERY-1`. Debe medir y eliminar el crecimiento por ítem de las consultas de imágenes del carrito, sin cambiar contrato ni UI.
+
+## Última aceptación PM — PRIMARY-IMAGE-INTEGRITY-1
+
+Producto, migración y regresión `cfeff88`; informe `19e6327`, corregido por
+`6a6e36e`. PM comprobó independientemente el caso 179, cuatro sabotajes rojos,
+la limpieza previa al índice, el rechazo real de una segunda principal y los
+recorridos concurrentes. La suite limpia dio 178/179 porque el host no tenía
+`npx`; repetido el único caso afectado con el lanzador disponible, el 136 pasó
+1/1. Los 179 casos quedan cubiertos y el caso 131 pasó. Build, análisis
+estático, dependencias, migraciones y diff-check quedaron verdes.
+
+La pieza no se integra ni despliega todavía: contiene una migración y requiere
+una puerta operativa explícita antes de tocar `main`/Railway.
 
 ## Última aceptación PM — RISK-REC-1
 
@@ -136,13 +149,13 @@ Evidencia: `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
   cierra el procedimiento local, no crea todavía una copia administrada o
   externa de producción ni habilita migraciones riesgosas.
   Evidencia: `REPRODUCCION-BACKUP-RESTORE-1-2026-09-13.md`.
-- **Índice único parcial sobre la imagen primaria:** tarea activa
-  `PRIMARY-IMAGE-INTEGRITY-1`, con deduplicación determinista previa. El listado
-  ya dejó de depender de datos limpios con `QUERY-IMG-1`; esta pieza impide que
-  carga o administración vuelvan a crear dos primarias.
-- **N+1 del carrito:** `cart.py` consulta la imagen dentro de
-  `for item in cart.items:` (líneas 92, 190, 240, 287 y 478). Registrado por
-  lectura, **no medido** y sin tocar. Es el próximo N+1 natural cuando se pida.
+- **Índice único parcial sobre la imagen primaria:** aceptado en rama con
+  `PRIMARY-IMAGE-INTEGRITY-1`; no integrado ni desplegado. La migración limpia
+  duplicados de forma determinista y PostgreSQL impide recrearlos.
+- **N+1 del carrito:** tarea activa `CART-IMG-QUERY-1`. `cart.py` consulta la
+  imagen dentro de `for item in cart.items:` y repite la selección en cinco
+  caminos. Dev debe medir uno frente a varios ítems y dejar las lecturas de
+  `product_images` acotadas por petición.
 - **`categories.usa_marca` no se edita desde el panel:** viaja sólo de salida.
   Ampliar la marca a otra categoría es hoy SQL o migración, no una acción de la
   clienta, y el encabezado de `marcas.py` afirma lo contrario. Además el panel
@@ -219,9 +232,10 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev implementa y entrega `PRIMARY-IMAGE-INTEGRITY-1` en rama, sin deploy.
-2. PM reproduce migración, negativo discriminante, caso 179 y suite desde base limpia antes de aceptar.
-3. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
-4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
-5. Los atributos por rubro esperan los datos prometidos por la clienta; Inicio, Servicios y la identidad de AgroMarket esperan decisión de producto.
-6. Mercado Pago, red-team y producción contractual permanecen en la secuencia acordada; no se habilitan por esta tarea.
+1. Dev implementa y entrega `CART-IMG-QUERY-1` en rama, sin deploy.
+2. PM reproduce la medición, el negativo discriminante, el caso 180 y la suite desde base limpia antes de aceptar.
+3. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración.
+4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
+5. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
+6. Los atributos por rubro esperan los datos prometidos por la clienta; Inicio, Servicios y la identidad de AgroMarket esperan decisión de producto.
+7. Mercado Pago, red-team y producción contractual permanecen en la secuencia acordada; no se habilitan por esta tarea.

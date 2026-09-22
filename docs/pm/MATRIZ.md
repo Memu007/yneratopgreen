@@ -30,6 +30,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Registro con validación | ✅ | Mismo flujo confirmado de correo; una cuenta sin verificar no abre sesión |
 | Panel de control básico | ✅ | Carga perfil, ventas y productos en UI, con el contador de ventas ya corregido |
 | Publicación desde la UI | ✅ | Producto completo publicado con imagen, verificado en la suite en interfaz, API y base. Cubre también el caso de imagen fallida |
+| Integridad de imagen principal | ✅ en rama | `PRIMARY-IMAGE-INTEGRITY-1` (`cfeff88`): migración deduplica por `display_order, id`, índice único parcial impide dos principales y el caso 179 cubre carga, concurrencia y borrado. PM reprodujo cuatro sabotajes; aún no integrado ni desplegado |
 | Publicación con **ubicación** | ✅ | `locality_id` obligatorio contra el padrón oficial. Verificado: Balcarce `06063010` guardado en base |
 | Gestión de stock | ✅ | Filtro de stock aplicado en catálogo, verificado en UI |
 | Gestión de ventas recibidas | ✅ | "Mis Ventas" lista 2 pedidos en UI |
