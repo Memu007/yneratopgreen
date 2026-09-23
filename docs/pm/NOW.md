@@ -215,6 +215,13 @@ Inventario de sólo lectura del proyecto `strong-playfulness`, entorno `producti
 - no hay backups/PITR activos sobre la base productiva. La restauración local ya fue ejercitada con datos sintéticos mediante `BACKUP-RESTORE-1`; falta elegir y activar una copia externa o administrada antes de tratar el entorno como producción aceptada o hacer una migración riesgosa;
 - `MP_CHECKOUT_HABILITADO=false`, verificado sin exponer secretos.
 
+Este inventario de configuración es del 13/09; el runtime se verificó por
+última vez el 21/09. El 23/09, el CLI de Railway respondió `Unauthorized`, así
+que los backups y ajustes actuales requieren una nueva lectura autenticada.
+La propuesta PM para la migración aceptada está en
+`PROPUESTA-RECUPERACION-PRE-MIGRACION-2026-09-23.md`, pendiente de decisión de
+Emi. No se infiere el costo real desde el tamaño nominal de los volúmenes.
+
 El 2026-09-11 se corrigió el incidente CORS que producía `Failed to fetch`; el inventario confirma que el dominio actual sigue permitido. No se cambió Railway, código, datos ni pagos durante esta revisión.
 
 Runtime no es sólo SHA: CORS, SMTP, dominios y variables pueden romper una composición correcta. Todo cambio operativo debe quedar registrado sin secretos.
@@ -263,7 +270,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 ## Próxima secuencia
 
 1. Sin tarea Dev activa. Las tres piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
-2. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración.
+2. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración. La propuesta de recuperación pre-migración espera decisión de Emi y verificación autenticada de Railway.
 3. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
 5. Los atributos por rubro esperan los datos prometidos por la clienta; Inicio, Servicios y la identidad de AgroMarket esperan decisión de producto.
