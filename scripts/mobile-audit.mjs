@@ -1,19 +1,131 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+// Auditoría móvil: recorre el sitio en 360, 390 y 768 px como lo haría una
+// persona y mide cada pantalla a la que llega.
+//
+// La salida separa dos cosas que no se pueden confundir:
+//   - hallazgos de UI: lo medido en las pantallas —desborde, blancos táctiles,
+//     texto recortado, consola, red— y los controles que se ven pero no
+//     reciben el toque porque otra cosa se les pone encima;
+//   - recorridos que el script no completó: dónde se cortó y por qué. No
+//     cuentan como hallazgo; si el script intentó operar algo que la persona
+//     no ve, lo dice como falla del script. Un vencimiento sin más no prueba
+//     de quién es la culpa: el motivo dice qué se esperaba, y ahí se mira.
+// Sale con 2 si algún recorrido no se completó, con 1 si hay desbordes o
+// controles tapados, y con 0 si no.
+//
+// Cada corrida deja su evidencia en una carpeta nueva y se niega a escribir en
+// una que ya tenga archivos: las capturas versionadas son el registro de lo
+// que se vio en su fecha. MOBILE_AUDIT_EVIDENCE_DIR elige la carpeta.
+import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 
 const API_URL = process.env.MOBILE_AUDIT_API_URL || 'http://localhost:8000/api';
 const FRONTEND_URL = process.env.MOBILE_AUDIT_FRONTEND_URL || 'http://localhost:5173';
-const EVIDENCE_DIR = path.resolve('docs/pm/evidence/mobile-2026-07-26');
+const EVIDENCE_DIR = path.resolve(process.env.MOBILE_AUDIT_EVIDENCE_DIR
+  || `docs/pm/evidence/mobile-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}`);
 const viewports = [
   { name: '360x800', width: 360, height: 800, isMobile: true, deviceScaleFactor: 2 },
   { name: '390x844', width: 390, height: 844, isMobile: true, deviceScaleFactor: 2 },
   { name: '768x1024', width: 768, height: 1024, isMobile: false, deviceScaleFactor: 1 },
 ];
-const results = { generatedAt: new Date().toISOString(), viewports: [], console: [], network: [] };
+const results = {
+  generatedAt: new Date().toISOString(),
+  evidencia: EVIDENCE_DIR,
+  recorridos: [],
+  viewports: [],
+  controlesTapados: [],
+  console: [],
+  network: [],
+};
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+/** Un control que la persona ve y no puede tocar: es un hallazgo de UI. */
+class ControlTapado extends Error {}
+
+/**
+ * Deja el control a la vista y confirma que una persona puede tocarlo.
+ *
+ * Si el control está dentro del panel de filtros plegado, la persona no lo ve:
+ * la falla es del script, que tenía que abrirlo. Si se ve y en su centro hay
+ * otra cosa, el toque de la persona no le llega: es un hallazgo de UI.
+ */
+async function alcanzar(locator, nombre) {
+  await locator.waitFor({ state: 'attached', timeout: 15_000 });
+  const plegado = await locator.evaluate((element) => {
+    const resumen = document.querySelector('button[aria-controls="panel-de-filtros"]');
+    return Boolean(element.closest('#panel-de-filtros')
+      && resumen
+      && getComputedStyle(resumen).display !== 'none'
+      && resumen.getAttribute('aria-expanded') !== 'true');
+  });
+  assert(!plegado,
+    `falla del script: quiso operar «${nombre}» con el panel de filtros plegado; tenía que abrirlo con «Filtros»`);
+  await locator.waitFor({ state: 'visible', timeout: 15_000 });
+  const encima = await locator.evaluate((element) => {
+    element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+    // Un enlace que ocupa dos renglones no tiene nada en el centro de su caja:
+    // se toca sobre el texto, así que se mira el centro del primer renglón.
+    const rect = element.getClientRects()[0] || element.getBoundingClientRect();
+    const punto = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    if (punto && (punto === element || element.contains(punto))) return null;
+    if (!punto) return '(nada: queda fuera de la pantalla)';
+    const clase = typeof punto.className === 'string' && punto.className.trim()
+      ? `.${punto.className.trim().split(/\s+/)[0]}` : '';
+    return `<${punto.tagName.toLowerCase()}${clase}> «${(punto.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 60)}»`;
+  });
+  if (encima) {
+    throw new ControlTapado(`«${nombre}» se ve pero no recibe el toque: en su centro está ${encima}`);
+  }
+}
+
+async function tocar(locator, nombre) {
+  await alcanzar(locator, nombre);
+  await locator.click();
+}
+
+async function elegir(locator, nombre, opcion) {
+  await alcanzar(locator, nombre);
+  await locator.selectOption(opcion);
+}
+
+const resumenDeFiltros = (page) => page.locator('button[aria-controls="panel-de-filtros"]');
+
+/** En celular y tablet el panel de filtros está plegado: una persona lo abre
+    con «Filtros» antes de tocar sus controles. En escritorio no hay resumen y
+    el panel está siempre abierto. */
+async function abrirFiltros(page) {
+  const resumen = resumenDeFiltros(page);
+  if (!(await resumen.isVisible())) return;
+  if ((await resumen.getAttribute('aria-expanded')) !== 'true') await tocar(resumen, 'Filtros');
+  await page.waitForFunction(() => document
+    .querySelector('button[aria-controls="panel-de-filtros"]')?.getAttribute('aria-expanded') === 'true');
+}
+
+/** El panel abierto termina en «Ver N resultados», que lo pliega y devuelve a
+    la lista: es como vuelve una persona a los resultados. */
+async function verResultados(page) {
+  const resumen = resumenDeFiltros(page);
+  if (!(await resumen.isVisible())) return;
+  await tocar(page.getByRole('button', { name: /^Ver \d+ resultados?$/ }), 'Ver resultados');
+  await page.waitForFunction(() => document
+    .querySelector('button[aria-controls="panel-de-filtros"]')?.getAttribute('aria-expanded') === 'false');
+}
+
+/** Una carpeta de evidencia vacía o nueva; nunca una con capturas de otra corrida. */
+async function prepararEvidencia() {
+  const archivos = await readdir(EVIDENCE_DIR).catch((error) => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  });
+  if (archivos.length > 0) {
+    console.error(`La carpeta de evidencia ya tiene ${archivos.length} archivo(s) y no se sobrescribe: ${EVIDENCE_DIR}`);
+    console.error('Elegí otra con MOBILE_AUDIT_EVIDENCE_DIR, o no la pases y se crea una nueva.');
+    process.exit(2);
+  }
+  await mkdir(EVIDENCE_DIR, { recursive: true });
 }
 
 async function apiRequest(endpoint, options = {}) {
@@ -37,7 +149,7 @@ async function login(email, password) {
   return { accessToken: data.access_token, refreshToken: data.refresh_token };
 }
 
-async function createPage(browser, viewport, tokens) {
+async function createPage(browser, viewport, tokens, state) {
   const context = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
     isMobile: viewport.isMobile,
@@ -52,7 +164,6 @@ async function createPage(browser, viewport, tokens) {
   }
 
   const page = await context.newPage();
-  const state = { screen: 'inicio' };
   page.on('pageerror', (error) => {
     results.console.push({
       viewport: viewport.name,
@@ -81,7 +192,7 @@ async function createPage(browser, viewport, tokens) {
     });
   });
 
-  return { context, page, state };
+  return { context, page };
 }
 
 async function inspect(page, state, viewport, screen, screenshotName = screen) {
@@ -154,13 +265,15 @@ async function inspect(page, state, viewport, screen, screenshotName = screen) {
 }
 
 async function waitForCatalog(page) {
-  await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: 15_000 });
+  // El selector de categoría existe aunque el panel esté plegado: se espera a
+  // que tenga sus opciones, no a que se vea.
+  await page.locator('#catalog-category').waitFor({ state: 'attached', timeout: 15_000 });
   await page.waitForFunction(() => document.querySelectorAll('#catalog-category option').length > 1);
   await page.waitForFunction(() => document.querySelectorAll('main h3').length > 0);
 }
 
-async function exercisePublicCatalog(browser, viewport) {
-  const { context, page, state } = await createPage(browser, viewport);
+async function exercisePublicCatalog(browser, viewport, state) {
+  const { context, page } = await createPage(browser, viewport, null, state);
   try {
     state.screen = '01-home';
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
@@ -168,35 +281,51 @@ async function exercisePublicCatalog(browser, viewport) {
     await inspect(page, state, viewport, '01-home');
 
     state.screen = '02-filters';
-    await page.getByRole('button', { name: /Explorar operaciones/i }).click();
+    await tocar(page.getByRole('button', { name: /Explorar operaciones/i }), 'Explorar operaciones');
     await waitForCatalog(page);
-    await page.locator('#catalog-category').selectOption({ index: 1 });
-    await page.locator('#catalog-province').selectOption({ index: 1 });
+    await abrirFiltros(page);
+    await elegir(page.locator('#catalog-category'), 'Categoría', { index: 1 });
+    await elegir(page.locator('#catalog-province'), 'Provincia', { index: 1 });
     await page.waitForFunction(() => document.querySelectorAll('#catalog-locality option').length > 1);
-    await page.locator('#catalog-locality').selectOption({ index: 1 });
+    await elegir(page.locator('#catalog-locality'), 'Localidad', { index: 1 });
     await inspect(page, state, viewport, '02-filters');
 
-    await page.getByRole('button', { name: 'Limpiar filtros' }).click();
+    state.screen = '03-catalog';
+    await tocar(page.getByRole('button', { name: 'Limpiar filtros' }), 'Limpiar filtros');
+    // Limpiar tiene que dejar los tres en «todas»: si no, lo que sigue mediría
+    // un catálogo filtrado creyendo que es el completo.
+    await page.waitForFunction(() =>
+      document.querySelector('#catalog-category')?.value === 'Todas las categorías'
+      && document.querySelector('#catalog-province')?.value === ''
+      && document.querySelector('#catalog-locality')?.value === '');
+    await verResultados(page);
     await page.waitForFunction(() => document.querySelectorAll('main h3').length > 0);
     await inspect(page, state, viewport, '03-catalog');
 
     state.screen = '04-detail';
-    await page.locator('main h3').first().click();
+    const titulo = page.locator('main h3 a[data-ficha]').first();
+    const id = await titulo.getAttribute('data-ficha');
+    await tocar(titulo, 'título de la primera publicación');
     // La ficha es una página: se espera a que termine de cargar su título.
     await page.locator('main[aria-busy="false"] #detalle-titulo').waitFor({ state: 'visible' });
+    const barra = new URL(page.url()).searchParams;
+    assert(barra.get('section') === 'product' && barra.get('id') === id,
+      `la ficha de ${id} se abrió sin su URL propia: la barra dice ${page.url()}`);
     await inspect(page, state, viewport, '04-detail');
   } finally {
     await context.close();
   }
 }
 
-async function exerciseCheckout(browser, viewport, buyerTokens) {
-  const { context, page, state } = await createPage(browser, viewport, buyerTokens);
+async function exerciseCheckout(browser, viewport, state, buyerTokens) {
+  const { context, page } = await createPage(browser, viewport, buyerTokens, state);
   try {
     state.screen = '05-cart';
     await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await waitForCatalog(page);
-    await page.locator('#catalog-type').selectOption('productos');
+    await abrirFiltros(page);
+    await elegir(page.locator('#catalog-type'), 'Tipo', 'productos');
+    await verResultados(page);
     const addButton = page.getByRole('button', { name: /Agregar/ }).first();
     await addButton.waitFor({ state: 'visible' });
     await addButton.click();
@@ -204,6 +333,7 @@ async function exerciseCheckout(browser, viewport, buyerTokens) {
     await page.getByRole('heading', { name: /Mi carrito/i }).waitFor();
     await inspect(page, state, viewport, '05-cart');
 
+    state.screen = '05-checkout-payment';
     await page.getByRole('button', { name: 'Continuar compra' }).click();
     await page.getByRole('heading', { name: /Datos de env/i }).waitFor();
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
@@ -221,10 +351,10 @@ async function exerciseCheckout(browser, viewport, buyerTokens) {
   }
 }
 
-async function exerciseSeller(browser, viewport, sellerTokens) {
-  const publication = await createPage(browser, viewport, sellerTokens);
+async function exerciseSeller(browser, viewport, state, sellerTokens) {
+  const publication = await createPage(browser, viewport, sellerTokens, state);
   try {
-    publication.state.screen = '06-publication';
+    state.screen = '06-publication';
     await publication.page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await publication.page.getByRole('button', { name: /Vender/ }).click();
     await publication.page.getByRole('heading', { name: /Publicar un producto/i }).waitFor();
@@ -234,13 +364,13 @@ async function exerciseSeller(browser, viewport, sellerTokens) {
     await publication.page.locator('#province').selectOption({ index: 1 });
     await publication.page.waitForFunction(() => document.querySelectorAll('#locality option').length > 1);
     await publication.page.locator('#locality').selectOption({ index: 1 });
-    await inspect(publication.page, publication.state, viewport, '06-publication', '06-publication-top');
+    await inspect(publication.page, state, viewport, '06-publication', '06-publication-top');
     await publication.page.locator('form').evaluate((form) => {
       form.parentElement.scrollTo(0, form.parentElement.scrollHeight);
     });
     await inspect(
       publication.page,
-      publication.state,
+      state,
       viewport,
       '06-publication-bottom',
       '06-publication-bottom',
@@ -249,23 +379,23 @@ async function exerciseSeller(browser, viewport, sellerTokens) {
     await publication.context.close();
   }
 
-  const dashboard = await createPage(browser, viewport, sellerTokens);
+  const dashboard = await createPage(browser, viewport, sellerTokens, state);
   try {
-    dashboard.state.screen = '07-seller-panel';
+    state.screen = '07-seller-panel';
     await dashboard.page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await dashboard.page.getByRole('button', { name: 'Mi cuenta' }).first().click();
     await dashboard.page.getByRole('heading', { name: 'Mi Perfil' }).waitFor();
-    await inspect(dashboard.page, dashboard.state, viewport, '07-seller-panel');
+    await inspect(dashboard.page, state, viewport, '07-seller-panel');
     await dashboard.page.getByRole('button', { name: 'Mis publicaciones' }).click();
     await dashboard.page.getByRole('heading', { name: 'Mis publicaciones' }).waitFor();
-    await inspect(dashboard.page, dashboard.state, viewport, '07-seller-products');
+    await inspect(dashboard.page, state, viewport, '07-seller-products');
   } finally {
     await dashboard.context.close();
   }
 }
 
-async function exerciseAdmin(browser, viewport, adminTokens) {
-  const { context, page, state } = await createPage(browser, viewport, adminTokens);
+async function exerciseAdmin(browser, viewport, state, adminTokens) {
+  const { context, page } = await createPage(browser, viewport, adminTokens, state);
   try {
     state.screen = '07-admin-panel';
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
@@ -280,21 +410,48 @@ async function exerciseAdmin(browser, viewport, adminTokens) {
   }
 }
 
-await mkdir(EVIDENCE_DIR, { recursive: true });
+await prepararEvidencia();
 await apiRequest('/health');
 const [buyerTokens, sellerTokens, adminTokens] = await Promise.all([
   login('cliente@ejemplo.com', 'cliente123'),
   login('vendedor@ejemplo.com', 'vendedor123'),
   login('admin@topgreen.com', 'admin123'),
 ]);
+const recorridos = [
+  ['catálogo público', exercisePublicCatalog, null],
+  ['compra', exerciseCheckout, buyerTokens],
+  ['vendedor', exerciseSeller, sellerTokens],
+  ['administración', exerciseAdmin, adminTokens],
+];
 const browser = await chromium.launch({ headless: true });
 
+// Un recorrido que se corta no detiene los demás: cada uno queda anotado con
+// la pantalla en la que estaba, y lo que sí se midió sigue valiendo.
 try {
   for (const viewport of viewports) {
-    await exercisePublicCatalog(browser, viewport);
-    await exerciseCheckout(browser, viewport, buyerTokens);
-    await exerciseSeller(browser, viewport, sellerTokens);
-    await exerciseAdmin(browser, viewport, adminTokens);
+    for (const [nombre, recorrer, tokens] of recorridos) {
+      const state = { screen: 'inicio' };
+      const anotado = { viewport: viewport.name, recorrido: nombre, completo: true };
+      try {
+        await recorrer(browser, viewport, state, tokens);
+      } catch (error) {
+        // La primera línea de un vencimiento no dice qué se esperaba; la
+        // llamada que lo esperaba sí.
+        const lineas = error.message.split('\n');
+        const esperaba = lineas.find((linea) => linea.includes('waiting for'));
+        const motivo = esperaba
+          ? `${lineas[0]} (${esperaba.replace(/\x1b\[[0-9;]*m/g, '').trim()})`
+          : lineas[0];
+        anotado.completo = false;
+        anotado.cortadoEn = state.screen;
+        anotado.motivo = motivo;
+        anotado.tapado = error instanceof ControlTapado;
+        if (anotado.tapado) {
+          results.controlesTapados.push({ viewport: viewport.name, screen: state.screen, motivo });
+        }
+      }
+      results.recorridos.push(anotado);
+    }
   }
 } finally {
   await browser.close();
@@ -306,9 +463,22 @@ await writeFile(
 );
 
 const overflow = results.viewports.filter((entry) => entry.horizontalOverflow);
+const cortados = results.recorridos.filter((entry) => !entry.completo);
+const deScript = cortados.filter((entry) => !entry.tapado);
+console.log(`Recorridos completos: ${results.recorridos.length - cortados.length} de ${results.recorridos.length}`);
 console.log(`Pantallas verificadas: ${results.viewports.length}`);
-console.log(`Desbordes horizontales: ${overflow.length}`);
-console.log(`Errores/advertencias de consola: ${results.console.length}`);
-console.log(`Respuestas 4xx/5xx: ${results.network.length}`);
+console.log('Hallazgos de UI:');
+console.log(`  Desbordes horizontales: ${overflow.length}`);
+console.log(`  Controles que se ven y no reciben el toque: ${results.controlesTapados.length}`);
+for (const tapado of results.controlesTapados) {
+  console.log(`    - ${tapado.viewport} ${tapado.screen}: ${tapado.motivo}`);
+}
+console.log(`  Errores/advertencias de consola: ${results.console.length}`);
+console.log(`  Respuestas 4xx/5xx: ${results.network.length}`);
+console.log(`Recorridos que el script no completó (no cuentan como hallazgo de UI; el motivo dice dónde mirar): ${deScript.length}`);
+for (const cortado of deScript) {
+  console.log(`    - ${cortado.viewport} ${cortado.recorrido}, en ${cortado.cortadoEn}: ${cortado.motivo}`);
+}
 console.log(`Resultado: ${path.join(EVIDENCE_DIR, 'audit-results.json')}`);
-if (overflow.length > 0) process.exitCode = 1;
+if (overflow.length > 0 || results.controlesTapados.length > 0) process.exitCode = 1;
+if (deScript.length > 0) process.exitCode = 2;
