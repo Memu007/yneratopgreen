@@ -32121,6 +32121,183 @@ await runCase(185, 'La ficha entra en el celular: ni la cifra más larga ni un t
     + `corto sigue a 40 px en celular (documento/pantalla): ${medidos.join('; ')}`;
 });
 
+await runCase(186, 'Volver de una ficha recargada devuelve la búsqueda y sus resultados, sin un solo cuadro sin ella', async () => {
+  // Búsqueda → ficha → recarga → Atrás, en el mismo recorrido y muchas veces.
+  // No alcanza con mirar el final: el defecto era un cuadro —la barra sin
+  // `q`, el buscador vacío y el Mercado entero— que se corregía solo al
+  // siguiente. Se mira cada escritura en la barra y cada cuadro dibujado
+  // después de volver.
+  const CAMPO = 'Campo Agrícola de 120 Hectáreas';
+  const VUELTAS = 10;
+  const [campo] = queryRows(`SELECT id, status FROM products WHERE name = ${sqlLiteral(CAMPO)}`);
+  assert(campo && campo[1] === 'ACTIVE',
+    `la publicación demo «${CAMPO}» no está activa en la base: ${JSON.stringify(campo || null)}`);
+  const idDelCampo = campo[0];
+
+  const browser = await chromium.launch({ headless: true });
+  const erroresDeJs = [];
+  const nuevaPagina = async () => {
+    const contexto = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    // Cada escritura en la barra, también después de recargar.
+    await contexto.addInitScript(() => {
+      window.__escrituras = [];
+      for (const k of ['replaceState', 'pushState']) {
+        const original = history[k].bind(history);
+        history[k] = (estado, titulo, url) => {
+          window.__escrituras.push(String(url));
+          return original(estado, titulo, url);
+        };
+      }
+    });
+    const page = await contexto.newPage();
+    page.on('pageerror', (error) => erroresDeJs.push(error.message));
+    return { contexto, page };
+  };
+  // Desde justo antes de volver: cada escritura y cada cuadro del Mercado
+  // durante 2,5 s.
+  const empezarAMirar = (page) => page.evaluate(() => {
+    window.__escrituras = [];
+    window.__cuadros = [];
+    const inicio = performance.now();
+    const mirar = () => {
+      const params = new URLSearchParams(location.search);
+      if (params.get('section') === 'marketplace') {
+        window.__cuadros.push({
+          barra: location.search,
+          texto: document.querySelector('#buscar-mercado')?.value ?? null,
+          tarjetas: [...document.querySelectorAll('main article h3')].map((h) => h.textContent.trim()),
+        });
+      }
+      if (performance.now() - inicio < 2500) requestAnimationFrame(mirar);
+    };
+    requestAnimationFrame(mirar);
+  });
+  const loVisto = async (page) => {
+    await page.waitForTimeout(2700);
+    return page.evaluate(() => ({ escrituras: window.__escrituras, cuadros: window.__cuadros }));
+  };
+  const fichaCargadaEn = async (page) => {
+    await page.locator('main[aria-busy="false"] #detalle-titulo').waitFor({ timeout: 20_000 });
+  };
+
+  // Una vuelta: el Mercado con `busqueda`, la primera tarjeta, recarga y
+  // Atrás. Devuelve lo que salió mal, o nada.
+  const unaVuelta = async ({ busqueda, pide, esDeLaBusqueda, volverCon, adelante = false }) => {
+    const { contexto, page } = await nuevaPagina();
+    try {
+      await page.goto(`${FRONTEND_URL}/?${new URLSearchParams({ section: 'marketplace', ...busqueda })}`,
+        { waitUntil: 'domcontentloaded' });
+      await esperarA(async () => {
+        const titulos = await page.locator('main article h3').allInnerTexts();
+        return titulos.length > 0 && titulos.every(esDeLaBusqueda);
+      }, `el Mercado con ${JSON.stringify(busqueda)} no mostró sólo sus publicaciones`, 20_000);
+      await page.locator('main article h3 a').first().click();
+      await fichaCargadaEn(page);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await fichaCargadaEn(page);
+
+      await empezarAMirar(page);
+      if (volverCon === 'boton') await page.getByRole('button', { name: 'Volver al Mercado' }).click();
+      else await page.goBack();
+      const { escrituras, cuadros } = await loVisto(page);
+
+      const faltas = [];
+      const dice = (barra) => new URLSearchParams(barra.includes('?') ? barra.split('?')[1] : barra);
+      const sinLoPedido = (barra) => Object.entries(pide).filter(([clave, valor]) => dice(barra).get(clave) !== valor)
+        .map(([clave]) => clave);
+      const escrituraMala = escrituras.find((url) => sinLoPedido(url).length);
+      if (escrituraMala) faltas.push(`la barra se escribió como «${escrituraMala}»`);
+      const cuadroMalo = cuadros.findIndex((cuadro) => sinLoPedido(cuadro.barra).length
+        || cuadro.texto !== pide.q
+        || cuadro.tarjetas.some((titulo) => !esDeLaBusqueda(titulo)));
+      if (cuadroMalo >= 0) {
+        const c = cuadros[cuadroMalo];
+        faltas.push(`el cuadro ${cuadroMalo + 1} de ${cuadros.length} tenía la barra «${c.barra}», el buscador `
+          + `«${c.texto}» y ${c.tarjetas.length} tarjetas, ${c.tarjetas.filter((t) => !esDeLaBusqueda(t)).length} ajenas`);
+      }
+      const ultimo = cuadros.at(-1);
+      if (!ultimo || !ultimo.tarjetas.length) faltas.push('al final el Mercado no mostró la búsqueda');
+      if (!faltas.length && adelante) {
+        // Y Adelante vuelve a la ficha, y Atrás otra vez a la búsqueda.
+        await page.goForward();
+        await fichaCargadaEn(page);
+        await page.goBack();
+        await esperarA(async () => (await page.locator('#buscar-mercado').inputValue().catch(() => '')) === pide.q,
+          'Adelante y Atrás otra vez no devolvieron la búsqueda', 20_000);
+        if (dice(page.url()).get('q') !== pide.q) faltas.push(`Adelante y Atrás dejaron la barra en ${page.url()}`);
+      }
+      return { faltas, cuadros: cuadros.length };
+    } finally {
+      await contexto.close();
+    }
+  };
+
+  const informe = [];
+  try {
+    // A. La búsqueda de la publicación demo, diez veces: la mitad con el botón
+    //    de la ficha y la mitad con el Atrás del navegador.
+    const fallidas = [];
+    let cuadrosMirados = 0;
+    for (let i = 1; i <= VUELTAS; i += 1) {
+      const volverCon = i % 2 ? 'boton' : 'navegador';
+      const { faltas, cuadros } = await unaVuelta({
+        busqueda: { q: CAMPO }, pide: { q: CAMPO },
+        esDeLaBusqueda: (titulo) => titulo === CAMPO, volverCon, adelante: i === 1,
+      });
+      cuadrosMirados += cuadros;
+      if (faltas.length) fallidas.push(`vuelta ${i} (${volverCon}): ${faltas.join('; ')}`);
+    }
+    assert(fallidas.length === 0,
+      `${fallidas.length} de ${VUELTAS} vueltas perdieron la búsqueda al volver de la ficha recargada. `
+      + `La primera: ${fallidas[0]}`);
+    informe.push(`${VUELTAS} vueltas con «${CAMPO}» (5 con «Volver al Mercado», 5 con el Atrás del `
+      + `navegador), ${cuadrosMirados} cuadros mirados: ninguna escritura ni cuadro sin \`q\`, el `
+      + 'buscador siempre con la búsqueda y ninguna tarjeta ajena; Adelante y Atrás otra vez, también');
+
+    // B. Otros filtros en la misma barra: tipo y orden viajan con la búsqueda.
+    for (const volverCon of ['boton', 'navegador']) {
+      const pide = { q: 'Semillas', type: 'productos', sort: 'price-asc' };
+      const { faltas } = await unaVuelta({
+        busqueda: pide, pide, esDeLaBusqueda: (titulo) => /semillas/i.test(titulo), volverCon,
+      });
+      assert(faltas.length === 0, `con búsqueda, tipo y orden (${volverCon}): ${faltas.join('; ')}`);
+    }
+    informe.push('con «Semillas», tipo productos y orden por precio, las dos formas de volver conservan los tres');
+
+    // C. Entrada directa a la ficha: no hay búsqueda que devolver, y el
+    //    Mercado no se la inventa.
+    {
+      const { contexto, page } = await nuevaPagina();
+      try {
+        await page.goto(`${FRONTEND_URL}/?section=product&id=${idDelCampo}`, { waitUntil: 'domcontentloaded' });
+        await fichaCargadaEn(page);
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await fichaCargadaEn(page);
+        assert(await page.getByRole('button', { name: 'Volver al Mercado' }).count() === 0,
+          'por enlace directo la ficha ofrece «Volver al Mercado», como si viniera de una búsqueda');
+        await empezarAMirar(page);
+        await page.getByRole('link', { name: 'Ir al Mercado' }).click();
+        const { escrituras, cuadros } = await loVisto(page);
+        const conBusqueda = [...escrituras, ...cuadros.map((c) => c.barra)]
+          .filter((barra) => new URLSearchParams(barra.split('?')[1] || barra).get('q'));
+        assert(conBusqueda.length === 0, `el Mercado se inventó una búsqueda: ${conBusqueda[0]}`);
+        const ultimo = cuadros.at(-1);
+        assert(ultimo && ultimo.texto === '' && ultimo.tarjetas.length > 1,
+          `por enlace directo el Mercado quedó con el buscador «${ultimo?.texto}» y `
+          + `${ultimo?.tarjetas.length} tarjetas`);
+        informe.push(`por enlace directo y recargada, «Ir al Mercado» abre el Mercado sin búsqueda `
+          + `(${ultimo.tarjetas.length} tarjetas, buscador vacío)`);
+      } finally {
+        await contexto.close();
+      }
+    }
+    assert(erroresDeJs.length === 0, `errores de JS: ${erroresDeJs.join(' | ')}`);
+  } finally {
+    await browser.close();
+  }
+  return informe.join('. ');
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

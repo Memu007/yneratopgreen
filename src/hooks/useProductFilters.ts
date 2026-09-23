@@ -161,30 +161,40 @@ export const useProductFilters = ({
   // Volver a una entrada del Mercado tiene que devolver sus filtros. El estado
   // se leyó una sola vez, al montar; desde que Atrás y Adelante existen de
   // verdad, la barra puede cambiar sin que esta pantalla se vuelva a montar.
-  useEffect(() => {
-    if (versionDeLaBarra === 0) return;
+  //
+  // Se relee al dibujar, no en un efecto. Con un efecto, el commit de la
+  // versión nueva corría después la escritura de la barra con los filtros de
+  // antes. Al volver de una ficha recargada, cuyo estado arrancó vacío porque
+  // su barra no tiene filtros, la barra quedaba un cuadro sin `q` y el Mercado
+  // se dibujaba sin la búsqueda y con todas las publicaciones. Medido: un
+  // cuadro con 24 tarjetas en vez de 1, seis veces de seis. Ajustado al
+  // dibujar, el commit ya sale con los filtros de la barra.
+  const [versionLeida, setVersionLeida] = useState(versionDeLaBarra);
+  if (versionLeida !== versionDeLaBarra) {
+    setVersionLeida(versionDeLaBarra);
     // La ficha de una publicación no lleva filtros en su URL, y no por eso el
     // Mercado de atrás dejó de tenerlos: releer ahí los borraría, y al volver
     // el Mercado se pediría de nuevo desde cero y arriba de todo. Se relee al
     // volver al Mercado, que es donde están.
-    if (seccionDeLaBarra(window.location.pathname, window.location.search) === 'product') return;
-    const params = new URLSearchParams(window.location.search);
-    setSearchQuery(params.get('q') || '');
-    setTextoBuscado(params.get('q') || '');
-    setSelectedType(tipoDeLaBarra(params.get('type')));
-    setSelectedCategory(params.get('category') || 'Todas las categorías');
-    setSelectedSubcategory(params.get('subcategory') || 'Todas');
-    setSelectedProvince(params.get('province') || 'Todas las provincias');
-    setSelectedLocalityId(params.get('locality_id') || '');
-    setPriceMin(numeroDeLaBarra(params, 'min_price', 0));
-    setPriceMax(numeroDeLaBarra(params, 'max_price', Number.MAX_SAFE_INTEGER));
-    setInStockOnly(params.get('in_stock') === 'true');
-    setMinRating(numeroDeLaBarra(params, 'min_rating', 0));
-    setCondicion(condicionDeLaBarra(params.get('condition')));
-    setMarca(params.get('brand') || '');
-    setOrden(ordenDeLaBarra(params.get('sort')));
-    setPagina(paginaDeLaBarra(params));
-  }, [versionDeLaBarra]);
+    if (seccionDeLaBarra(window.location.pathname, window.location.search) !== 'product') {
+      const params = new URLSearchParams(window.location.search);
+      setSearchQuery(params.get('q') || '');
+      setTextoBuscado(params.get('q') || '');
+      setSelectedType(tipoDeLaBarra(params.get('type')));
+      setSelectedCategory(params.get('category') || 'Todas las categorías');
+      setSelectedSubcategory(params.get('subcategory') || 'Todas');
+      setSelectedProvince(params.get('province') || 'Todas las provincias');
+      setSelectedLocalityId(params.get('locality_id') || '');
+      setPriceMin(numeroDeLaBarra(params, 'min_price', 0));
+      setPriceMax(numeroDeLaBarra(params, 'max_price', Number.MAX_SAFE_INTEGER));
+      setInStockOnly(params.get('in_stock') === 'true');
+      setMinRating(numeroDeLaBarra(params, 'min_rating', 0));
+      setCondicion(condicionDeLaBarra(params.get('condition')));
+      setMarca(params.get('brand') || '');
+      setOrden(ordenDeLaBarra(params.get('sort')));
+      setPagina(paginaDeLaBarra(params));
+    }
+  }
 
   useEffect(() => {
     if (!escribeEnLaBarra) return;
