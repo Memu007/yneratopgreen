@@ -10,8 +10,8 @@ import {
 } from '../../utils/anatomia';
 import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
-import { ProductDetailModal } from '../ProductDetail/ProductDetailModal';
 import { useNavegacionActual } from '../../navegacion/navegacion';
+import { urlDe } from '../../navegacion/politica';
 import { ProductImage } from '../ProductImage/ProductImage';
 
 interface ProductCardProps {
@@ -31,10 +31,8 @@ interface ProductCardProps {
       la persona con el selector—, nunca la anatomía de la publicación. */
   variante?: 'catalogo' | 'compacta' | 'lista';
   /** Abre el Login de la aplicación y avisa cuando se cierra —se complete o se
-      cancele—. La tarjeta lo usa para el detalle: cierra el detalle mientras el
-      Login está arriba y lo vuelve a abrir después, con la misma publicación.
-      Se hace así, y no apilando dos diálogos, porque los dos son modales con su
-      propia trampa de foco: superpuestos, el teclado queda entre dos. */
+      cancele—. La tarjeta lo usa cuando se quiere comprar sin sesión: se
+      vuelve a esta misma tarjeta, sin agregar nada. */
   onSolicitarIngreso?: (alVolver: () => void) => void;
 }
 
@@ -56,12 +54,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const { addItem } = useCart();
   const { isAuthenticated, user } = useAuth();
-  // El detalle no es estado privado de la tarjeta: es una capa sobre la
-  // sección, con su propia entrada en el historial. Abrirlo y cerrarlo pasa por
-  // la única política de navegación, así el primer Atrás lo cierra y cerrarlo
-  // con la interfaz no deja una entrada colgada.
-  const { capa, abrirCapa, cerrarCapa } = useNavegacionActual();
-  const showDetail = capa === product.id;
+  // La ficha es una página con URL propia y se abre por la única política de
+  // navegación: una entrada nueva en el historial, que Atrás deshace.
+  const { abrirPublicacion } = useNavegacionActual();
   const [cantidad, setCantidad] = useState(1);
 
   const anatomia = normalizarAnatomia(product.operationKind);
@@ -77,7 +72,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     .filter(Boolean)
     .join(', ');
 
-  const abrirDetalle = () => abrirCapa(product.id);
+  const abrirDetalle = () => abrirPublicacion(product.id);
+  const urlDeLaFicha = urlDe('product', null, product.id);
+
+  // Los enlaces a la ficha son enlaces de verdad: se pueden copiar, abrir en
+  // otra pestaña y recorrer con el teclado. Con un modificador el navegador
+  // hace lo suyo; sin él, se navega sin recargar la página.
+  const irALaFicha = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.stopPropagation();
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    abrirDetalle();
+  };
 
   // La tarjeta y el detalle hacen lo mismo, así que sin sesión tienen que hacer
   // lo mismo. Antes la tarjeta agregaba al carrito en silencio —ni siquiera
@@ -113,7 +119,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const cobertura = product.coverageZones?.length ? product.coverageZones.join(', ') : '';
 
   return (
-    <>
       <article
         className={[
           styles.card,
@@ -147,7 +152,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             )}
           </div>
 
-          <h3 className={styles.titulo}>{product.name}</h3>
+          {/* El título es el enlace a la ficha: la tarjeta entera responde al
+              clic, pero sólo un enlace llega con el teclado —y el insumo que
+              se compra desde la tarjeta no tiene «Ver detalle»—. */}
+          <h3 className={styles.titulo}>
+            <a
+              href={urlDeLaFicha}
+              data-ficha={product.id}
+              data-ficha-enlace="titulo"
+              onClick={irALaFicha}
+            >
+              {product.name}
+            </a>
+          </h3>
 
           {ubicacion && <p className={styles.ubicacion}>{ubicacion}</p>}
 
@@ -221,35 +238,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               >
                 {rotuloDelCta}
               </button>
-              <button
+              <a
                 className="tg-button tg-button--secondary"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  abrirDetalle();
-                }}
+                href={urlDeLaFicha}
+                data-ficha={product.id}
+                data-ficha-enlace="detalle"
+                onClick={irALaFicha}
               >
                 Ver detalle
-              </button>
+              </a>
             </div>
           )}
         </div>
       </article>
-
-      {showDetail && (
-        <ProductDetailModal
-          product={product}
-          onClose={cerrarCapa}
-          onSolicitarCotizacion={onSolicitarCotizacion}
-          onRequiereIngreso={
-            onSolicitarIngreso
-              ? () => {
-                  cerrarCapa();
-                  onSolicitarIngreso(() => abrirCapa(product.id));
-                }
-              : undefined
-          }
-        />
-      )}
-    </>
   );
 };

@@ -209,17 +209,20 @@ async function comprador(page, medida) {
   await revisar(page, 'catálogo: paginador', medida, paginador);
   await page.evaluate(() => window.scrollTo(0, 0));
 
-  // el detalle se abre haciendo clic en la tarjeta, no en un boton: no existe
-  // ningun "Ver detalle". Antes esto lo tapaba un catch vacio y esta pantalla
-  // se declaraba medida sin haberse abierto nunca.
+  // La ficha de una publicación se abre haciendo clic en la tarjeta. Desde
+  // PRODUCT-DETAIL-PAGE-1 es una página con URL propia y no una capa: se mide
+  // cuando terminó de cargar —antes el título dice que está buscando— y se deja
+  // con Atrás. Antes esto lo tapaba un catch vacio y esta pantalla se declaraba
+  // medida sin haberse abierto nunca.
   await page.locator('[class*="_card_"]').first().click();
-  await revisar(page, 'detalle de producto', medida,
-    page.getByRole('dialog'));
+  const ficha = page.locator('main[aria-busy="false"]:has(#detalle-titulo)');
+  await ficha.waitFor({ state: 'visible', timeout: ESPERA });
+  await revisar(page, 'detalle de producto', medida, ficha);
 
-  // cerrar de verdad y comprobarlo: si el detalle queda abierto, el "Agregar"
-  // siguiente sería el del modal y no el de la grilla
-  await page.getByRole('button', { name: 'Cerrar' }).first().click();
-  await page.getByRole('dialog').waitFor({ state: 'hidden', timeout: ESPERA });
+  // volver de verdad y comprobarlo: si la ficha sigue a la vista, el "Agregar"
+  // siguiente sería el de la ficha y no el de la grilla
+  await page.goBack();
+  await page.locator('#detalle-titulo').waitFor({ state: 'detached', timeout: ESPERA });
 
   // Una publicación del seed cuya localidad de origen entra en el radio del
   // transportista demo: sin eso no habría a quién elegir y las dos pantallas

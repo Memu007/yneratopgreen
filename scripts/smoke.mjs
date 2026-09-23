@@ -1001,6 +1001,22 @@ async function runCase(number, name, callback) {
  * Sin sesión el rótulo es otro —«Ingresar para continuar»—, porque la acción
  * también es otra: se ofrece entrar en vez de agregar en silencio.
  */
+/*
+ * La ficha de una publicación.
+ *
+ * Desde PRODUCT-DETAIL-PAGE-1 no es una capa sobre el listado sino una página
+ * con URL propia (`?section=product&id=…`): se comparte, se recarga y se deja
+ * con Atrás. Su título es el h1 de la página y conserva `#detalle-titulo`.
+ * Mientras busca la publicación, la página está `aria-busy` y el título dice
+ * que está cargando: leerlo antes sería leer el cartel y no la publicación.
+ */
+const laFicha = (page) => page.locator('main').filter({ has: page.locator('#detalle-titulo') });
+const fichaCargada = (page) => page.locator('main[aria-busy="false"] #detalle-titulo');
+/** Salir de la ficha por su propia interfaz: «Volver a…» si se abrió desde el
+ *  sitio, «Ir al Mercado» si se llegó por un enlace directo. */
+const salidaDeLaFicha = (page) => laFicha(page)
+  .getByRole('navigation', { name: 'Ficha de la publicación' }).locator('button, a').first();
+
 function accionDeLaTarjeta(page, nombre) {
   const titulo = page.getByRole('heading', { name: nombre, exact: true, level: 3 });
   const tarjeta = titulo.locator('xpath=ancestor::*[contains(@class,"card")]');
@@ -2162,16 +2178,18 @@ await runCase(21, 'Una foto de relleno no se pide, y una rota no rompe el recorr
     const productCard = productHeading.locator('xpath=ancestor::*[contains(@class,\"card\")]');
     const addButton = productCard.getByRole('button', { name: /Agregar/ });
 
+    // La ficha es una página desde PRODUCT-DETAIL-PAGE-1: su título es el h1,
+    // y se deja con Atrás para volver a la tarjeta.
     await productHeading.click();
     const detailHeading = buyerPage.getByRole('heading', {
       name: productName,
       exact: true,
-      level: 2,
+      level: 1,
     });
     await detailHeading.waitFor({ state: 'visible' });
-    const detailModal = detailHeading.locator('xpath=ancestor::div[contains(@class,\"modal\")]');
-    await sinFoto(detailModal).waitFor();
-    await detailModal.getByRole('button', { name: 'Cerrar' }).click();
+    await sinFoto(laFicha(buyerPage)).waitFor();
+    await buyerPage.goBack();
+    await productHeading.waitFor({ state: 'visible' });
 
     await addButton.click();
     await buyerPage.getByRole('button', { name: /Carrito/ }).click();
@@ -10945,9 +10963,10 @@ await runCase(108, 'Documentación: presentar, revisar y ver el distintivo en el
     const titulo = pp.getByRole('heading', { name: nombreProducto, exact: true, level: 3 });
     await titulo.waitFor({ state: 'visible', timeout: 15_000 });
     await titulo.click();
-    const detalle = pp.getByRole('heading', { name: nombreProducto, exact: true, level: 2 })
-      .locator('xpath=ancestor::div[contains(@class,"modal")]');
-    await detalle.waitFor({ state: 'visible', timeout: 15_000 });
+    // La ficha es una página desde PRODUCT-DETAIL-PAGE-1: su título es el h1.
+    await pp.getByRole('heading', { name: nombreProducto, exact: true, level: 1 })
+      .waitFor({ state: 'visible', timeout: 15_000 });
+    const detalle = laFicha(pp);
     const distintivo = detalle.getByText('Documentación revisada');
     await distintivo.waitFor({ state: 'visible', timeout: 15_000 });
     observado.distintivoVisible = true;
@@ -12562,7 +12581,9 @@ await runCase(121, 'Se puede publicar sin fotografía, y el sistema lo dice en v
 
     // 4. Y la ficha también, con el mismo rótulo y sin dibujo de relleno.
     await titulo.click();
-    const ficha = publica.getByRole('dialog');
+    // La ficha es una página desde PRODUCT-DETAIL-PAGE-1, no un diálogo: se
+    // espera a que termine de buscar la publicación.
+    const ficha = publica.locator('main[aria-busy="false"]:has(#detalle-titulo)');
     await ficha.waitFor({ timeout: 20_000 });
     const placaFicha = ficha.getByRole('img', { name: /^Sin registro fotográfico\./ }).first();
     await placaFicha.waitFor({ state: 'visible' });
@@ -12730,11 +12751,13 @@ await runCase(123, 'Al 200 % de zoom las cinco pantallas siguen siendo usables',
     await publica.locator('article').first().waitFor({ timeout: 20_000 });
     await medir(publica, 'catálogo', publica.getByRole('button', { name: /Agregar|Agregar al carrito|Contratar|Solicitar cotización|Sin stock|Ingresar para continuar/ }));
 
+    // La ficha es una página desde PRODUCT-DETAIL-PAGE-1, no un diálogo: se
+    // mide cuando terminó de buscar la publicación y se deja con Atrás.
     await publica.locator('article').first().click();
-    const ficha = publica.getByRole('dialog');
+    const ficha = publica.locator('main[aria-busy="false"]:has(#detalle-titulo)');
     await ficha.waitFor({ timeout: 20_000 });
     await medir(publica, 'detalle', ficha.getByRole('button', { name: /Agregar|Agregar al carrito|Contratar|Solicitar cotización|Sin stock|Ingresar para continuar/ }));
-    await publica.keyboard.press('Escape');
+    await publica.goBack();
     await ficha.waitFor({ state: 'hidden', timeout: 20_000 });
 
     await publica.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
@@ -15363,38 +15386,38 @@ await runCase(138, 'Sin sesion, el detalle ofrece ingresar y vuelve a la misma p
     await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
     await page.locator('article[class*="card"] h3').first().click();
-    await page.locator('#detalle-titulo').waitFor({ timeout: 20_000 });
+    await fichaCargada(page).waitFor({ timeout: 20_000 });
     const publicacion = (await tituloDelDetalle()).trim();
 
     // El rotulo dice cual es el paso siguiente.
-    const cta = page.getByRole('dialog')
+    const cta = laFicha(page)
       .getByRole('button', { name: /Ingresar para continuar/ }).first();
     assert(await cta.count(),
       'sin sesion el detalle no ofrece ingresar: los botones son '
-      + JSON.stringify(await page.getByRole('dialog').getByRole('button').allInnerTexts()));
+      + JSON.stringify(await laFicha(page).getByRole('button').allInnerTexts()));
 
     // --- Se cancela ---------------------------------------------------------
     await cta.click();
     await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
     assert(await enElCarrito() === 0, 'abrir el Login agrego algo al carrito');
-    // Un solo dialogo: el detalle se aparta en vez de quedar debajo con su
+    // Un solo dialogo: la ficha es la pagina de abajo, no otra capa con su
     // propia trampa de foco peleando contra la del Login.
     assert(await page.getByRole('dialog').count() === 1,
       `con el Login abierto hay ${await page.getByRole('dialog').count()} dialogos superpuestos`);
     await page.getByRole('button', { name: 'Cerrar' }).first().click();
-    await page.locator('#detalle-titulo').waitFor({ timeout: 20_000 });
+    await fichaCargada(page).waitFor({ timeout: 20_000 });
     assert((await tituloDelDetalle()).trim() === publicacion,
       `tras cancelar se volvio a «${(await tituloDelDetalle()).trim()}» y no a «${publicacion}»`);
     assert(await enElCarrito() === 0, 'cancelar el Login dejo algo en el carrito');
 
     // --- Se completa --------------------------------------------------------
-    await page.getByRole('dialog').getByRole('button', { name: /Ingresar para continuar/ })
+    await laFicha(page).getByRole('button', { name: /Ingresar para continuar/ })
       .first().click();
     await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
     await page.getByPlaceholder('tu@email.com').fill('cliente@ejemplo.com');
     await page.getByPlaceholder('••••••••').fill('cliente123');
     await page.locator('[class*="_submitButton_"][type="submit"]').click();
-    await page.locator('#detalle-titulo').waitFor({ timeout: 25_000 });
+    await fichaCargada(page).waitFor({ timeout: 25_000 });
     assert((await tituloDelDetalle()).trim() === publicacion,
       `tras ingresar se volvio a «${(await tituloDelDetalle()).trim()}» y no a «${publicacion}»`);
     await page.getByRole('button', { name: 'Mi cuenta' }).first()
@@ -15402,7 +15425,7 @@ await runCase(138, 'Sin sesion, el detalle ofrece ingresar y vuelve a la misma p
 
     // Con sesion el boton vuelve a decir lo que hace, y sigue sin haber pasado
     // nada por su cuenta: ni carrito, ni orden, ni reserva.
-    const rotuloConSesion = (await page.getByRole('dialog').getByRole('button')
+    const rotuloConSesion = (await laFicha(page).getByRole('button')
       .filter({ hasText: /Ingresar|Iniciar operaci|Agregar|Contratar/ }).first().innerText()).trim();
     assert(!/Ingresar para continuar/.test(rotuloConSesion),
       `ya con sesion el boton sigue diciendo «${rotuloConSesion}»`);
@@ -15594,11 +15617,11 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
 
         // Desde el DETALLE de esa misma publicacion.
         await laTarjeta.locator('h3').click();
-        await page.locator('#detalle-titulo').waitFor({ timeout: 20_000 });
+        await fichaCargada(page).waitFor({ timeout: 20_000 });
         const publicacion = (await page.locator('#detalle-titulo').innerText()).trim();
         assert(publicacion === nombre,
           `en ${seccion} el detalle abrio «${publicacion}» y no «${nombre}»`);
-        const enElDetalle = page.getByRole('dialog')
+        const enElDetalle = laFicha(page)
           .getByRole('button', { name: 'Ingresar para continuar' }).first();
         assert(await enElDetalle.count(),
           `en ${seccion}, el detalle de «${publicacion}» no ofrece ingresar`);
@@ -15625,14 +15648,14 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
         await page.getByPlaceholder('tu@email.com').fill('cliente@ejemplo.com');
         await page.getByPlaceholder('••••••••').fill('cliente123');
         await page.locator('[class*="_submitButton_"][type="submit"]').click();
-        await page.locator('#detalle-titulo').waitFor({ timeout: 25_000 });
+        await fichaCargada(page).waitFor({ timeout: 25_000 });
         assert((await page.locator('#detalle-titulo').innerText()).trim() === nombre,
           `en ${seccion} se volvio a otra publicacion`);
         assert(await enElCarrito(page) === 0,
           `en ${seccion} ingresar agrego la publicacion al carrito sin pedirlo`);
 
         // Y recien ahora, con un clic nuevo, la accion ocurre.
-        const yaConSesion = page.getByRole('dialog').getByRole('button')
+        const yaConSesion = laFicha(page).getByRole('button')
           .filter({ hasText: /Agregar al carrito|Agregar|Contratar/ }).first();
         const rotulo = (await yaConSesion.innerText()).trim();
         assert(!/Ingresar para continuar/.test(rotulo),
@@ -16183,16 +16206,16 @@ await runCase(140, 'Nadie compra su propia publicacion, ni por la API ni por la 
         .filter({ has: page.getByRole('button', { name: 'Tu publicación' }) }).first();
       if (!await propia.count()) return false;
       await propia.locator('h3').click();
-      await page.locator('#detalle-titulo').waitFor({ timeout: 20_000 });
+      await fichaCargada(page).waitFor({ timeout: 20_000 });
       const publicacion = (await page.locator('#detalle-titulo').innerText()).trim();
-      const boton = page.getByRole('dialog')
+      const boton = laFicha(page)
         .getByRole('button', { name: 'Tu publicación' }).first();
       assert(await boton.count(),
         `en ${donde}, el detalle de «${publicacion}» no dice «Tu publicación»: `
-        + JSON.stringify(await page.getByRole('dialog').getByRole('button').allInnerTexts()));
+        + JSON.stringify(await laFicha(page).getByRole('button').allInnerTexts()));
       assert(await boton.isDisabled(),
         `en ${donde}, el detalle de «${publicacion}» deja apretar «Tu publicación»`);
-      await page.getByRole('button', { name: 'Cerrar' }).first().click();
+      await salidaDeLaFicha(page).click();
       await page.locator('article[class*="card"]').first().waitFor({ timeout: 20_000 });
       detallesRevisados.push(donde);
       return true;
@@ -17941,6 +17964,8 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
   // colaba en la URL de otra seccion y no volvia con Atras, salir de
   // /payment/* o de /verificar-correo por la cabecera dejaba el `pathname`
   // puesto —recargar revivia la pantalla— y el detalle no tenia entrada propia.
+  // Desde PRODUCT-DETAIL-PAGE-1 el detalle es una ficha con URL propia: la parte
+  // E lo recorre como la ubicacion que es.
   //
   // Este caso recorre las cinco secciones por la interfaz y contrasta AL MISMO
   // TIEMPO lo que dice la barra, lo que marca la cabecera y lo que hay dibujado.
@@ -18133,16 +18158,31 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
       await enLaSeccion('home', '/', `recargar despues de salir de ${ruta}`);
     }
 
-    // --- E. el detalle es una capa, no una ubicacion ------------------------
-    const detalleAbierto = async () => (await page.locator('#detalle-titulo').count()) > 0;
-    const tituloDelDetalle = async () => (await page.locator('#detalle-titulo').innerText()
-      .catch(() => '(cerrado)')).trim();
-    const abrirDetalleDe = async (nombre) => {
+    // --- E. la ficha es una ubicacion, con su URL -------------------------
+    // Hasta PRODUCT-DETAIL-PAGE-1 el detalle era una capa sobre la misma URL: no
+    // se podia compartir ni recargar. Ahora es una ubicacion como las demas —su
+    // barra es `?section=product&id=…` y la cabecera no marca ninguna seccion—,
+    // y Atras la deja para volver al origen con su URL, sus filtros y su lista.
+    const idDe = {
+      [publicacion]: altaDelProducto.data.id,
+      [servicio]: altaDelServicio.data.id,
+    };
+    const urlDeLaFicha = (nombre) => `/?section=product&id=${idDe[nombre]}`;
+    const tituloDeLaFicha = async () => (await fichaCargada(page).innerText()
+      .catch(() => '(sin ficha)')).trim();
+    const enLaFicha = async (nombre, momento) => {
+      await esperarA(async () => (await tituloDeLaFicha()) === nombre,
+        `${momento}: no se ve la ficha de «${nombre}» sino «${await tituloDeLaFicha()}»`, 20_000);
+      assert(barra() === urlDeLaFicha(nombre),
+        `${momento}: la ficha de «${nombre}» tiene la barra en «${barra()}» y no en su URL`);
+      assert((await celdaMarcada()).length === 0,
+        `${momento}: la ficha marca ${JSON.stringify(await celdaMarcada())} en la cabecera`);
+    };
+    const abrirLaFichaDe = async (nombre, momento) => {
       const tarjeta = page.locator('article').filter({ hasText: nombre }).first();
       await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
-      await tarjeta.click();
-      await esperarA(async () => (await tituloDelDetalle()) === nombre,
-        `no se abrio el detalle de «${nombre}»: ${await tituloDelDetalle()}`, 20_000);
+      await tarjeta.getByRole('link', { name: nombre, exact: true }).click();
+      await enLaFicha(nombre, momento);
     };
 
     // Desde Inicio y desde Servicios, sobre las vistas previas.
@@ -18151,43 +18191,38 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
       ['services', '/?section=services', servicio],
     ]) {
       await page.goto(`${FRONTEND_URL}${url}`, { waitUntil: 'domcontentloaded' });
-      await enLaSeccion(seccion, url, `${seccion} antes del detalle`);
-      await abrirDetalleDe(nombre);
-      assert(barra() === url,
-        `abrir el detalle en ${seccion} cambio la barra a «${barra()}»`);
+      await enLaSeccion(seccion, url, `${seccion} antes de la ficha`);
+      await abrirLaFichaDe(nombre, `ficha abierta desde ${seccion}`);
       await page.goBack();
-      await esperarA(async () => !(await detalleAbierto()),
-        `en ${seccion}, el primer Atras no cerro el detalle`, 20_000);
-      await enLaSeccion(seccion, url, `${seccion} despues de cerrar con Atras`);
+      await enLaSeccion(seccion, url, `${seccion} despues de volver con Atras`);
+      await page.goForward();
+      await enLaFicha(nombre, `Adelante hasta la ficha desde ${seccion}`);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await enLaFicha(nombre, `recarga de la ficha abierta desde ${seccion}`);
     }
 
-    // Desde el Mercado filtrado: el primer Atras cierra el detalle y deja
-    // intactos filtros y listado.
+    // Desde el Mercado filtrado: Atras vuelve con filtros y listado intactos.
     await page.goto(`${FRONTEND_URL}${conFiltros}`, { waitUntil: 'domcontentloaded' });
-    await enLaSeccion('marketplace', conFiltros, 'Mercado filtrado antes del detalle');
-    await abrirDetalleDe(publicacion);
+    await enLaSeccion('marketplace', conFiltros, 'Mercado filtrado antes de la ficha');
+    await abrirLaFichaDe(publicacion, 'ficha abierta desde el Mercado filtrado');
     await page.goBack();
-    await esperarA(async () => !(await detalleAbierto()),
-      'en el Mercado, el primer Atras no cerro el detalle', 20_000);
-    await enLaSeccion('marketplace', conFiltros, 'Mercado despues de cerrar con Atras');
+    await enLaSeccion('marketplace', conFiltros, 'Mercado despues de volver con Atras');
     assert((await buscador.inputValue()) === publicacion,
-      `cerrar el detalle con Atras perdio el filtro: «${await buscador.inputValue()}»`);
-    const trasElDetalle = await titulosDeLasTarjetas();
-    assert(trasElDetalle.length === 1 && trasElDetalle[0] === publicacion,
-      `cerrar el detalle con Atras cambio el listado: ${JSON.stringify(trasElDetalle)}`);
+      `volver de la ficha con Atras perdio el filtro: «${await buscador.inputValue()}»`);
+    const trasLaFicha = await titulosDeLasTarjetas();
+    assert(trasLaFicha.length === 1 && trasLaFicha[0] === publicacion,
+      `volver de la ficha con Atras cambio el listado: ${JSON.stringify(trasLaFicha)}`);
 
-    // Y cerrar con la propia interfaz no deja una entrada fantasma: despues de
-    // cerrar con Escape, UN Atras tiene que llevar a la seccion anterior.
+    // Y salir con la propia interfaz no deja una entrada fantasma: despues de
+    // «Volver al Mercado», UN Atras tiene que llevar a la seccion anterior.
     await irA('services', '/?section=services', 'ir a Servicios para el fantasma');
     await irA('marketplace', conFiltros, 'volver al Mercado para el fantasma');
-    await abrirDetalleDe(publicacion);
-    await page.keyboard.press('Escape');
-    await esperarA(async () => !(await detalleAbierto()),
-      'el detalle no se cerro con Escape', 20_000);
-    await enLaSeccion('marketplace', conFiltros, 'Mercado despues de cerrar con Escape');
+    await abrirLaFichaDe(publicacion, 'ficha para el fantasma');
+    await salidaDeLaFicha(page).click();
+    await enLaSeccion('marketplace', conFiltros, 'Mercado despues de «Volver al Mercado»');
     await page.goBack();
     await enLaSeccion('services', '/?section=services',
-      'un Atras despues de cerrar con la interfaz');
+      'un Atras despues de salir con la interfaz');
 
     await contexto.close();
     return 'las cinco secciones publicas se dicen en la barra —«/» y «?section=…»—, el '
@@ -18196,9 +18231,10 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
       + 'ninguna, las cinco URL canonicas abren y recargan en su seccion, el Mercado '
       + `filtrado vuelve con Atras a «${conFiltros}» con el buscador, el tipo y su unico `
       + 'resultado, las cuatro pantallas de llegada normalizan el pathname al salir y no '
-      + 'reviven al recargar, y el detalle abierto desde Inicio, Servicios y el Mercado se '
-      + 'cierra con el primer Atras sin perder seccion ni filtros, sin dejar entrada '
-      + 'fantasma cuando se cierra con Escape';
+      + 'reviven al recargar, y la ficha abierta desde Inicio, Servicios y el Mercado tiene '
+      + 'su propia URL, sin celda marcada, vuelve con Adelante y con recarga, y Atras la deja '
+      + 'sin perder seccion ni filtros, sin dejar entrada fantasma cuando se sale con '
+      + '«Volver al Mercado»';
   } finally {
     await browser.close();
   }
@@ -18209,7 +18245,9 @@ await runCase(148, 'Cada capa se cierra sola y devuelve el foco a su disparador'
   //
   // C1 —el foco vuelve al disparador del detalle— ya lo cerraba `useCapaModal`
   // cuando se escribio ese hook; se mide igual, porque una regresion que no
-  // cubre lo que ya anda no avisa el dia que se rompe.
+  // cubre lo que ya anda no avisa el dia que se rompe. Desde
+  // PRODUCT-DETAIL-PAGE-1 el detalle es una pagina y no una capa: lo que se
+  // mide es que volver de ella devuelva el foco a su disparador.
   //
   // ADM-8 estaba abierto: el detalle de una orden era un `div` suelto, sin
   // `role="dialog"` y fuera de la pila de capas. Medido contra `bcdd448`: con
@@ -18349,39 +18387,42 @@ await runCase(148, 'Cada capa se cierra sola y devuelve el foco a su disparador'
       return `<${activo.tagName.toLowerCase()}> «${nombre}»`;
     });
 
-    // --- A. C1: el detalle devuelve el foco a SU disparador -----------------
-    // El disparador se identifica por publicacion —la tarjeta que lo dibuja—,
-    // no por «el primer boton que aparezca».
+    // --- A. C1: volver de la ficha devuelve el foco a SU disparador --------
+    // Desde PRODUCT-DETAIL-PAGE-1 el detalle no es una capa: es una página con
+    // URL propia, así que no se cierra con Escape ni con un fondo, se deja con
+    // Atrás o con «Volver a…». Lo que C1 exige sigue igual: al volver, el foco
+    // está en el enlace que la abrió —el «Ver detalle» de ESA tarjeta—, y no en
+    // el documento. Se abre con el teclado, que es a quien le importa.
     const cerradas = [];
     const revisarElDetalle = async (pantalla, url, nombre) => {
-      for (const forma of ['Escape', 'X', 'fondo']) {
+      for (const forma of ['Atras', 'Volver']) {
         await page.goto(`${FRONTEND_URL}${url}`, { waitUntil: 'domcontentloaded' });
         const tarjeta = page.locator('article').filter({ hasText: nombre }).first();
         await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
-        const disparador = tarjeta.getByRole('button', { name: 'Ver detalle' });
+        const disparador = tarjeta.getByRole('link', { name: 'Ver detalle' });
         // Se espera a que la tarjeta termine de dibujarse: en el Mercado la
         // grilla se rehace cuando llega la respuesta filtrada, y entre un
-        // dibujo y el otro el boton no esta.
+        // dibujo y el otro el enlace no esta.
         await esperarA(async () => (await disparador.count()) === 1,
           `${pantalla}: la tarjeta de «${nombre}» no dibuja «Ver detalle»`, 20_000);
 
-        await disparador.click();
-        await esperarA(async () => (await page.locator('#detalle-titulo').count()) === 1,
-          `${pantalla}: no se abrio el detalle de «${nombre}»`, 20_000);
-        const capa = page.locator('[role="dialog"]').first();
-        assert(await dialogos() === 1,
-          `${pantalla}: con el detalle abierto hay ${await dialogos()} dialogos`);
-        assert(await focoDentroDe(capa),
-          `${pantalla}: el foco no entro en la capa, esta en ${await dondeEstaElFoco()}`);
+        await disparador.focus();
+        await page.keyboard.press('Enter');
+        await esperarA(async () => (await fichaCargada(page).innerText()
+          .catch(() => '')).trim() === nombre,
+        `${pantalla}: no se abrio la ficha de «${nombre}»`, 20_000);
+        assert(await dialogos() === 0,
+          `${pantalla}: la ficha dibuja ${await dialogos()} dialogos y es una pagina`);
+        assert(await focoEn(page.locator('#detalle-titulo')),
+          `${pantalla}: al abrir la ficha el foco quedo en ${await dondeEstaElFoco()} y no en su titulo`);
 
-        if (forma === 'Escape') await page.keyboard.press('Escape');
-        else if (forma === 'X') await capa.getByRole('button', { name: 'Cerrar' }).click();
-        else await page.mouse.click(5, 5);
+        if (forma === 'Atras') await page.goBack();
+        else await salidaDeLaFicha(page).click();
 
-        await esperarA(async () => (await dialogos()) === 0,
-          `${pantalla}: cerrar con ${forma} no cerro la capa`, 20_000);
+        await esperarA(async () => (await page.locator('#detalle-titulo').count()) === 0,
+          `${pantalla}: salir con ${forma} no dejo la ficha`, 20_000);
         await esperarA(() => focoEn(disparador),
-          `${pantalla}: cerrar con ${forma} dejo el foco en ${await dondeEstaElFoco()} y no en el `
+          `${pantalla}: salir con ${forma} dejo el foco en ${await dondeEstaElFoco()} y no en el `
           + `«Ver detalle» de «${nombre}»`, 20_000);
         cerradas.push(`${pantalla}/${forma}`);
       }
@@ -18390,34 +18431,36 @@ await runCase(148, 'Cada capa se cierra sola y devuelve el foco a su disparador'
     await revisarElDetalle('Mercado', `/?section=marketplace&q=${encodeURIComponent(activo)}`, activo);
     await revisarElDetalle('Servicios', '/?section=services', servicio);
 
-    // --- B. la pila: detalle -> perfil del vendedor -------------------------
-    // Control de lo que ya existia: un Escape cierra UN nivel, y el foco vuelve
-    // nivel por nivel.
+    // --- B. la pila: ficha -> perfil del vendedor ---------------------------
+    // El perfil sí es una capa, sobre la ficha: un Escape la cierra y el foco
+    // vuelve a «Ver perfil del vendedor». Un segundo Escape ya no tiene capa
+    // que cerrar y no saca de la página: salir de una página es Atrás.
     await page.goto(`${FRONTEND_URL}/?section=services`, { waitUntil: 'domcontentloaded' });
     const tarjetaDelServicio = page.locator('article').filter({ hasText: servicio }).first();
     await tarjetaDelServicio.waitFor({ state: 'visible', timeout: 20_000 });
-    const verDetalle = tarjetaDelServicio.getByRole('button', { name: 'Ver detalle' });
+    const verDetalle = tarjetaDelServicio.getByRole('link', { name: 'Ver detalle' });
     await verDetalle.click();
-    await esperarA(async () => (await page.locator('#detalle-titulo').count()) === 1,
-      'no se abrio el detalle para la pila', 20_000);
+    await esperarA(async () => (await fichaCargada(page).count()) === 1,
+      'no se abrio la ficha para la pila', 20_000);
     const verPerfil = page.getByRole('button', { name: 'Ver perfil del vendedor' });
-    assert(await verPerfil.count() === 1, 'el detalle no ofrece el perfil del vendedor');
+    assert(await verPerfil.count() === 1, 'la ficha no ofrece el perfil del vendedor');
     await verPerfil.click();
-    await esperarA(async () => (await dialogos()) === 2,
-      `con el perfil abierto hay ${await dialogos()} dialogos y tendria que haber 2`, 20_000);
+    await esperarA(async () => (await dialogos()) === 1,
+      `con el perfil abierto hay ${await dialogos()} dialogos y tendria que haber 1`, 20_000);
     const capaDelPerfil = page.locator('[role="dialog"]').last();
     assert(await focoDentroDe(capaDelPerfil),
       `el foco no entro en el perfil, esta en ${await dondeEstaElFoco()}`);
     await page.keyboard.press('Escape');
-    await esperarA(async () => (await dialogos()) === 1,
-      'el primer Escape no cerro solo el perfil', 20_000);
+    await esperarA(async () => (await dialogos()) === 0,
+      'el primer Escape no cerro el perfil', 20_000);
     await esperarA(() => focoEn(verPerfil),
       `cerrar el perfil dejo el foco en ${await dondeEstaElFoco()}`, 20_000);
     await page.keyboard.press('Escape');
-    await esperarA(async () => (await dialogos()) === 0,
-      'el segundo Escape no cerro el detalle', 20_000);
+    assert(await fichaCargada(page).count() === 1,
+      'un Escape sin capa encima saco de la ficha: una pagina se deja con Atras');
+    await page.goBack();
     await esperarA(() => focoEn(verDetalle),
-      `cerrar el detalle dejo el foco en ${await dondeEstaElFoco()}`, 20_000);
+      `volver de la ficha dejo el foco en ${await dondeEstaElFoco()}`, 20_000);
 
     // --- C. ADM-8: el detalle de orden es una capa y no atraviesa nada ------
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
@@ -18541,10 +18584,11 @@ await runCase(148, 'Cada capa se cierra sola y devuelve el foco a su disparador'
       `cerrar Administracion dejo el foco en ${await dondeEstaElFoco()}`, 20_000);
 
     await contexto.close();
-    return `el detalle de una publicacion devuelve el foco a SU «Ver detalle» en las `
-      + `${cerradas.length} combinaciones de pantalla y forma de cerrar (${cerradas.join(', ')}); `
-      + 'la pila del perfil del vendedor cierra un nivel por Escape y devuelve el foco nivel por '
-      + `nivel; y el detalle de la orden ${laOrden} es la segunda capa —con nombre accesible, `
+    return `la ficha de una publicacion, abierta con el teclado, recibe el foco en su titulo y `
+      + `al dejarla lo devuelve a SU «Ver detalle» en las ${cerradas.length} combinaciones de `
+      + `pantalla y forma de salir (${cerradas.join(', ')}); el perfil del vendedor es una capa `
+      + 'sobre la ficha que Escape cierra devolviendo el foco, y un Escape sin capa no saca de la '
+      + `pagina; y el detalle de la orden ${laOrden} es la segunda capa —con nombre accesible, `
       + 'foco adentro y Tab/Shift+Tab que no se escapan—, se cierra sola con Escape, X y fondo '
       + `dejando Administracion abierta en «${antes.pestana}» con el filtro «${antes.filtro}», `
       + `«${antes.pagina}», scroll ${antes.scroll} y las mismas ${antes.numeros.length} filas, y `
@@ -19777,14 +19821,13 @@ await runCase(152, 'La ubicación publicada tiene una sola verdad: el padrón', 
     await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
     await esperarA(async () => (await tarjeta.innerText()).includes(rosario.nombre),
       `la tarjeta del Mercado no dice ${rosario.nombre}`, 20_000);
-    await tarjeta.getByRole('button', { name: 'Ver detalle' }).click();
-    await esperarA(async () => (await page.locator('#detalle-titulo').count()) === 1,
-      'no se abrio el detalle de la publicacion', 20_000);
-    const textoDelDetalle = (await page.locator('[role="dialog"]').first().innerText())
-      .replace(/\s+/g, ' ');
+    await tarjeta.getByRole('link', { name: 'Ver detalle' }).click();
+    await esperarA(async () => (await fichaCargada(page).count()) === 1,
+      'no se abrio la ficha de la publicacion', 20_000);
+    const textoDelDetalle = (await laFicha(page).innerText()).replace(/\s+/g, ' ');
     assert(textoDelDetalle.includes(rosario.nombre) && textoDelDetalle.includes(rosario.provincia),
-      `el detalle no describe ${rosario.nombre}, ${rosario.provincia}`);
-    await page.keyboard.press('Escape');
+      `la ficha no describe ${rosario.nombre}, ${rosario.provincia}`);
+    await page.goBack();
 
     // El filtro nuevo la incluye y el anterior la excluye.
     const filtro = page.locator('#catalog-province');
@@ -20949,13 +20992,15 @@ await runCase(155, 'El Mercado tiene dos vistas elegibles y ninguna geometría a
       // ofrece ese botón —lleva el selector de cantidad—, así que buscarlo
       // dependería de qué anatomía quedó primera.
       await page.locator('article[class*="card"]').first().scrollIntoViewIfNeeded();
+      // La ficha es una página: abrirla desmonta la grilla, y volver con Atrás
+      // tiene que encontrar la vista que se había elegido.
       await page.locator('article[class*="card"]').first().locator('h3').click();
-      await page.locator('#detalle-titulo').waitFor({ state: 'visible', timeout: 20_000 });
-      await page.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).first().click();
+      await fichaCargada(page).waitFor({ state: 'visible', timeout: 20_000 });
+      await page.goBack();
       await page.locator('#detalle-titulo').waitFor({ state: 'detached', timeout: 20_000 });
-      await sigueEnLista('abrir y cerrar un detalle');
+      await sigueEnLista('abrir una ficha y volver con Atrás');
       medidos.push(`${donde}: los cinco órdenes, la búsqueda, el filtro con limpieza y `
-        + 'el detalle conservan la vista elegida');
+        + 'la ida y vuelta a una ficha conservan la vista elegida');
 
       // --- F. orden de teclado -----------------------------------------------
       await elegirVista(page, 'Cuadrícula');
@@ -21001,10 +21046,10 @@ await runCase(155, 'El Mercado tiene dos vistas elegibles y ninguna geometría a
       const laLarga = page.locator('article[class*="card"]')
         .filter({ hasText: tituloLargo.slice(0, 60) }).first();
       await laLarga.locator('h3').click();
-      await page.locator('#detalle-titulo').waitFor({ state: 'visible', timeout: 20_000 });
+      await fichaCargada(page).waitFor({ state: 'visible', timeout: 20_000 });
       assert((await page.locator('#detalle-titulo').innerText()).trim() === tituloLargo,
-        'el detalle perdió el título completo que la tarjeta recorta');
-      await page.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).first().click();
+        'la ficha perdió el título completo que la tarjeta recorta');
+      await page.goBack();
       await page.locator('#detalle-titulo').waitFor({ state: 'detached', timeout: 20_000 });
 
       // Y la foto rota: se rompe donde de verdad se rompe, en la respuesta.
@@ -23577,8 +23622,8 @@ await runCase(162, 'El catálogo demostrativo resuelve la foto del aviso, con cr
     const abrirDetalle = async (texto, slugEsperado) => {
       await buscarEn(page, texto);
       await page.locator('article').first().click();
-      await esperarA(async () => (await page.locator('#detalle-titulo').count()) > 0,
-        `no abrió el detalle de «${texto}»`, 20_000);
+      await esperarA(async () => (await fichaCargada(page).count()) > 0,
+        `no abrió la ficha de «${texto}»`, 20_000);
       const imagen = page.locator('[class*="_imagenPrincipal_"] img');
       await esperarA(async () => (await imagen.count()) === 1,
         `el detalle de «${texto}» no dibujó imagen`, 20_000);
@@ -23607,15 +23652,16 @@ await runCase(162, 'El catálogo demostrativo resuelve la foto del aviso, con cr
     await sinDesborde(page, 'escritorio/detalle de artículo');
     capturas.push('detalle-articulo-1440x900.png');
     await page.screenshot({ path: `${CAPTURAS}/detalle-articulo-1440x900.png` });
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(400);
+    // La ficha es una página: se deja con Atrás, no con Escape.
+    await page.goBack();
+    await page.locator('#detalle-titulo').waitFor({ state: 'detached', timeout: 20_000 });
 
     await abrirDetalle('Recepción, Secado', 'recepcion-secado-acopio-granos');
     await sinDesborde(page, 'escritorio/detalle de servicio');
     capturas.push('detalle-servicio-1440x900.png');
     await page.screenshot({ path: `${CAPTURAS}/detalle-servicio-1440x900.png` });
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(400);
+    await page.goBack();
+    await page.locator('#detalle-titulo').waitFor({ state: 'detached', timeout: 20_000 });
     medidos.push('el detalle resuelve la foto del artículo y la del servicio, y las dos '
       + 'llevan obra, autor, licencia enlazada y la adaptación');
 
@@ -23652,8 +23698,8 @@ await runCase(162, 'El catálogo demostrativo resuelve la foto del aviso, con cr
     assert(enBusqueda.some((t) => /Recepci/i.test(t.titulo)),
       `la búsqueda del servicio en móvil trajo ${enBusqueda.map((t) => t.titulo).join(' | ')}`);
     await chico.locator('article').first().click();
-    await esperarA(async () => (await chico.locator('#detalle-titulo').count()) > 0,
-      'no abrió el detalle del servicio en móvil', 20_000);
+    await esperarA(async () => (await fichaCargada(chico).count()) > 0,
+      'no abrió la ficha del servicio en móvil', 20_000);
     await esperarA(async () => (await chico.locator('[class*="_credito_"]').count()) === 1,
       'en móvil el detalle del servicio no acredita la foto', 20_000);
     await chico.waitForTimeout(500);
@@ -25239,13 +25285,11 @@ await runCase(166, 'La cotización llega a Contacto con su publicación, y prepa
     await irAlMercado();
     await buscar(aCotizar[0]);
     await page.getByRole('heading', { name: aCotizar[0], exact: true, level: 3 }).first().click();
-    const detalle = page.getByRole('heading', { name: aCotizar[0], exact: true, level: 2 });
+    // La ficha es una página desde PRODUCT-DETAIL-PAGE-1: su título es el h1.
+    const detalle = page.getByRole('heading', { name: aCotizar[0], exact: true, level: 1 });
     await detalle.waitFor({ state: 'visible', timeout: 20_000 });
-    // Acotado al detalle: la tarjeta que quedó DEBAJO tiene su propio botón con
-    // el mismo nombre, y «el primero» encontraba ése —tapado por la capa, así
-    // que el clic no llegaba nunca—.
-    const capaDelDetalle = detalle.locator('xpath=ancestor::div[contains(@class,"modal")]');
-    await capaDelDetalle.getByRole('button', { name: 'Solicitar cotización' }).click();
+    // Acotado a la ficha: el botón de la ficha y no otro con el mismo nombre.
+    await laFicha(page).getByRole('button', { name: 'Solicitar cotización' }).click();
     await enContacto();
     const desdeElDetalle = await mensaje();
     assert(desdeElDetalle.includes(aCotizar[0]) && desdeElDetalle.includes(aCotizar[1]),
@@ -31341,6 +31385,420 @@ await runCase(182, 'El panel de administración entra en un celular: siete secci
       + 'y el detalle de una orden devuelve sección, filtro y posición';
   } finally {
     await browser.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 183. La ficha de una publicación es una página: URL propia, recarga, enlace
+// directo y Atrás que devuelve el origen como estaba.
+//
+// Hasta PRODUCT-DETAIL-PAGE-1 el detalle era una capa sobre la misma URL: no se
+// podía compartir ni recargar, y existía sólo mientras la tarjeta estaba a la
+// vista. Ahora es `?section=product&id=…`, se busca por su identificador y
+// Atrás vuelve al Mercado con sus filtros, su orden, su página, su vista y el
+// punto hasta donde se había bajado, con el foco en el enlace que la abrió.
+//
+// El caso recorre lo que haría una persona y mira lo que se ve —la barra, el
+// título, dónde está el foco, cuánto se bajó—, no el código.
+// ---------------------------------------------------------------------------
+await runCase(183, 'La ficha de una publicación es una página con URL propia, y Atrás devuelve el origen como estaba', async () => {
+  const medidos = [];
+  const sello = Date.now();
+  const MARCADOR = `Ficha183 ${sello}`;
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const [nombreDelVendedor] = queryRows(`
+    SELECT full_name, 'fin' FROM users WHERE email = 'vendedor@ejemplo.com'`)[0];
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const [categoriaDeInsumos] = queryRows(`
+    SELECT id, 'fin' FROM categories
+    WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
+  const [categoriaDeServicio] = queryRows(`
+    SELECT id, 'fin' FROM categories WHERE slug = 'acopio'`);
+  const [categoriaDeActivos] = queryRows(`
+    SELECT id, 'fin' FROM categories WHERE slug = 'maquinaria-agricola'`);
+  assert(categoriaDeInsumos && categoriaDeServicio && categoriaDeActivos,
+    'faltan las categorías de insumos, servicio y maquinaria para armar el caso');
+
+  const limpiar = () => {
+    try {
+      const fabricadas = `SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}%`)}`;
+      querySql(`DELETE FROM cart_items WHERE product_id IN (${fabricadas})`);
+      querySql(`DELETE FROM product_images WHERE product_id IN (${fabricadas})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}%`)}`);
+    } catch (error) {
+      console.log(`  · no se pudieron retirar las publicaciones del caso 183: ${error.message}`);
+    }
+  };
+
+  const publicar = async (cuerpo) => {
+    const { status, data } = await apiRequest('/products', {
+      method: 'POST', token: vendedor.token,
+      body: { locality_id: localidad, ...cuerpo },
+    });
+    assert(status < 400, `no se pudo publicar «${cuerpo.name}»: HTTP ${status}`);
+    return data.id;
+  };
+
+  // Cuarenta insumos de precios distintos: con 24 por página, el Mercado
+  // filtrado por el marcador tiene dos páginas y la segunda da para bajar.
+  // Después el servicio y, al final, el activo: así los dos encabezan las
+  // vistas previas de Servicios e Inicio, que dibujan las tres más nuevas.
+  const TOTAL_DE_INSUMOS = 40;
+  const insumos = [];
+  for (let i = 1; i <= TOTAL_DE_INSUMOS; i += 1) {
+    const nombre = `${MARCADOR} insumo ${String(i).padStart(2, '0')}`;
+    insumos.push({
+      nombre,
+      id: await publicar({
+        name: nombre,
+        description: 'Insumo del caso 183, para recorrer la ficha desde el Mercado paginado.',
+        category_id: categoriaDeInsumos[0], price: 1000 + i * 7, stock: 9, unit: 'kg',
+        publication_type: 'producto', operation_kind: 'insumo',
+      }),
+    });
+  }
+  const servicio = `${MARCADOR} servicio`;
+  const idDelServicio = await publicar({
+    name: servicio,
+    description: 'Servicio a convenir del caso 183, para pedir cotización desde su ficha.',
+    category_id: categoriaDeServicio[0], price: 0, unit: 'servicio',
+    publication_type: 'servicio', operation_kind: 'servicio', pricing_type: 'a_convenir',
+  });
+  const activo = `${MARCADOR} activo`;
+  const idDelActivo = await publicar({
+    name: activo,
+    description: 'Activo del caso 183, para comprar desde su ficha con y sin sesión.',
+    category_id: categoriaDeActivos[0], price: 14800, stock: 2, unit: 'unidad',
+    publication_type: 'producto', operation_kind: 'activo',
+  });
+
+  const urlDeLaFicha = (id) => `/?section=product&id=${id}`;
+  const mercado = `/?${new URLSearchParams({
+    section: 'marketplace', q: MARCADOR, sort: 'price-asc', page: '2',
+  }).toString()}`;
+
+  const browser = await chromium.launch({ headless: true });
+  const erroresDeJs = [];
+  const nuevaPagina = async (viewport = { width: 1440, height: 900 }) => {
+    const contexto = await browser.newContext({ viewport, hasTouch: viewport.width < 800 });
+    const page = await contexto.newPage();
+    const consola = [];
+    page.on('pageerror', (e) => erroresDeJs.push(e.message));
+    page.on('console', (m) => { if (m.type() === 'error') consola.push(m.text()); });
+    return { contexto, page, consola };
+  };
+  const barra = (page) => {
+    const u = new URL(page.url());
+    return `${u.pathname}${u.search}`;
+  };
+  const tituloDeLaFicha = async (page) => (await fichaCargada(page).innerText()
+    .catch(() => '(sin ficha)')).trim();
+  // Se espera el título con el nombre —sea página o capa— y recién después se
+  // mira la barra: así, contra el detalle anterior, el rojo dice lo que le
+  // falta, que es la URL.
+  const tituloVisible = async (page) => (await page.locator('#detalle-titulo').first()
+    .innerText().catch(() => '(sin título)')).trim();
+  const enLaFicha = async (page, nombre, id, momento) => {
+    await esperarA(async () => (await tituloVisible(page)) === nombre,
+      `${momento}: se esperaba la ficha de «${nombre}» y se ve «${await tituloVisible(page)}» `
+      + `con la barra en «${barra(page)}»`, 20_000);
+    assert(barra(page) === urlDeLaFicha(id),
+      `${momento}: la ficha de «${nombre}» tiene la barra en «${barra(page)}» y no en su URL `
+      + `«${urlDeLaFicha(id)}»: no se puede compartir ni recargar`);
+    assert(await page.locator('[role="dialog"]').count() === 0,
+      `${momento}: la ficha abrió ${await page.locator('[role="dialog"]').count()} diálogos y es una página`);
+  };
+  const focoEn = (page) => page.evaluate(() => {
+    const el = document.activeElement;
+    if (!el || el === document.body) return '(el documento)';
+    return el.getAttribute('data-ficha')
+      ? `enlace:${el.getAttribute('data-ficha-enlace')}:${el.getAttribute('data-ficha')}`
+      : `<${el.tagName.toLowerCase()}> ${(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 50)}`;
+  });
+  const enElCarrito = (page) => page.evaluate(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem('agromarket_cart') || '[]')
+        .map((i) => ({ id: i.product?.id, cantidad: i.quantity }));
+    } catch { return []; }
+  });
+  const tarjetaDe = (page, nombre) => page.locator('article')
+    .filter({ has: page.getByRole('heading', { name: nombre, exact: true, level: 3 }) }).first();
+  // Si la tarjeta no aparece, el rojo dice qué se ve en su lugar: un «Timeout»
+  // pelado no distingue una pantalla rota de una que dibujó otra cosa.
+  const esperarLaTarjeta = async (page, donde, nombre) => {
+    const tarjeta = tarjetaDe(page, nombre);
+    try {
+      await tarjeta.waitFor({ state: 'visible', timeout: 25_000 });
+    } catch {
+      const titulos = await page.locator('article h3').allInnerTexts();
+      throw new Error(`en ${donde} no se dibujó «${nombre}»; las tarjetas a la vista son `
+        + JSON.stringify(titulos));
+    }
+    return tarjeta;
+  };
+
+  try {
+    // === A. Desde el Mercado paginado, y de vuelta con Atrás ===============
+    {
+      const { contexto, page, consola } = await nuevaPagina();
+      await page.goto(`${FRONTEND_URL}${mercado}`, { waitUntil: 'domcontentloaded' });
+      // El marcador trae los cuarenta insumos, el servicio y el activo: 42, y
+      // la página 2 tiene las 18 que no entran en la primera.
+      const enLaPagina2 = TOTAL_DE_INSUMOS + 2 - 24;
+      await esperarA(async () => (await page.locator('article h3').count()) === enLaPagina2,
+        `el Mercado filtrado no llegó a la página 2 con ${enLaPagina2} tarjetas: hay `
+        + `${await page.locator('article h3').count()}`, 25_000);
+      await page.getByText('Lista', { exact: true }).click();
+      await esperarA(() => page.getByRole('radio', { name: 'Lista', exact: true }).isChecked(),
+        'no se pudo elegir la vista Lista');
+      const paginaDelMercado = async () => (await page.getByText(/Página \d+ de \d+/).first()
+        .innerText().catch(() => '')).trim();
+      assert(/Página 2 de 2/.test(await paginaDelMercado()),
+        `el Mercado dice «${await paginaDelMercado()}» y tenía que estar en la página 2`);
+      const antes = barra(page);
+
+      // Se baja hasta una tarjeta del medio de la página 2 y se la abre.
+      const elegido = insumos[24 + 10];
+      // Se abre por el título, como abre una persona: con la capa anterior
+      // también abría así, y el caso tiene que poder decir qué le faltaba.
+      const enlace = tarjetaDe(page, elegido.nombre).locator('h3');
+      await enlace.scrollIntoViewIfNeeded();
+      await page.mouse.wheel(0, 120);
+      // El documento se desplaza con animación: se espera a que se quede quieto
+      // antes de anotar el punto, no un tiempo fijo.
+      let bajado = -1;
+      await esperarA(async () => {
+        const ahora = await page.evaluate(() => window.scrollY);
+        const quieto = ahora === bajado;
+        bajado = ahora;
+        return quieto && ahora > 300;
+      }, 'la página 2 no da para bajar: el caso no mediría el regreso al punto');
+      await enlace.click();
+      await enLaFicha(page, elegido.nombre, elegido.id, 'ficha abierta desde el Mercado');
+      assert((await page.evaluate(() => window.scrollY)) === 0,
+        'la ficha no empieza arriba: es otra página');
+      assert(await page.locator('#detalle-titulo').evaluate((el) => el === document.activeElement),
+        `al abrir la ficha el foco quedó en ${await focoEn(page)} y no en su título`);
+      const salida = salidaDeLaFicha(page);
+      assert((await salida.innerText()).trim() === 'Volver al Mercado',
+        `desde el Mercado la ficha ofrece «${(await salida.innerText()).trim()}»`);
+
+      // Atrás: la barra, la página, el orden, la búsqueda, la vista, el punto
+      // y el foco, todos como estaban.
+      await page.goBack();
+      await esperarA(async () => barra(page) === antes,
+        `Atrás dejó la barra en «${barra(page)}» y no en «${antes}»`, 20_000);
+      await esperarA(async () => (await page.locator('#detalle-titulo').count()) === 0,
+        'Atrás no dejó la ficha', 20_000);
+      await esperarA(async () => /Página 2 de 2/.test(await paginaDelMercado()),
+        `al volver el Mercado dice «${await paginaDelMercado()}»`, 20_000);
+      assert((await page.locator('#catalog-sort').inputValue()) === 'price-asc',
+        `al volver «Ordenar por» dice «${await page.locator('#catalog-sort').inputValue()}»`);
+      assert((await page.getByLabel('Buscar en el mercado').inputValue()) === MARCADOR,
+        `al volver la búsqueda dice «${await page.getByLabel('Buscar en el mercado').inputValue()}»`);
+      assert(await page.getByRole('radio', { name: 'Lista', exact: true }).isChecked(),
+        'al volver la vista dejó de ser Lista');
+      await esperarA(async () => Math.abs((await page.evaluate(() => window.scrollY)) - bajado) <= 2,
+        `al volver la vista quedó en ${await page.evaluate(() => window.scrollY)} px y se había `
+        + `bajado hasta ${bajado}`, 10_000);
+      await esperarA(async () => (await focoEn(page)) === `enlace:titulo:${elegido.id}`,
+        `al volver el foco está en ${await focoEn(page)} y no en el enlace que abrió la ficha`,
+        10_000);
+      medidos.push(`Mercado página 2, orden por precio, búsqueda y vista Lista: la ficha tiene `
+        + `su URL, y Atrás vuelve a «${antes}» a ${bajado} px con el foco en el enlace`);
+
+      // Adelante vuelve a la ficha; recargarla la conserva, con su salida.
+      await page.goForward();
+      await enLaFicha(page, elegido.nombre, elegido.id, 'Adelante');
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await enLaFicha(page, elegido.nombre, elegido.id, 'recarga de la ficha');
+      assert((await salidaDeLaFicha(page).innerText()).trim() === 'Volver al Mercado',
+        'recargada, la ficha perdió su salida al Mercado');
+      await salidaDeLaFicha(page).click();
+      await esperarA(async () => barra(page) === antes,
+        `«Volver al Mercado» después de recargar dejó la barra en «${barra(page)}»`, 20_000);
+      await esperarA(async () => /Página 2 de 2/.test(await paginaDelMercado()),
+        `«Volver al Mercado» después de recargar dejó «${await paginaDelMercado()}»`, 20_000);
+      assert(consola.length === 0, `el recorrido del Mercado dejó errores de consola: ${consola[0]}`);
+      medidos.push('Adelante y recarga conservan la ficha y su «Volver al Mercado»');
+      await contexto.close();
+    }
+
+    // === B. Desde Inicio y desde Servicios; cotización y perfil ============
+    {
+      const { contexto, page, consola } = await nuevaPagina();
+      await page.goto(`${FRONTEND_URL}/`, { waitUntil: 'domcontentloaded' });
+      const verDetalle = (await esperarLaTarjeta(page, 'Inicio', activo))
+        .getByRole('link', { name: 'Ver detalle' });
+      await verDetalle.click();
+      await enLaFicha(page, activo, idDelActivo, 'ficha abierta desde Inicio');
+      assert((await salidaDeLaFicha(page).innerText()).trim() === 'Volver a Inicio',
+        `desde Inicio la ficha ofrece «${(await salidaDeLaFicha(page).innerText()).trim()}»`);
+      await salidaDeLaFicha(page).click();
+      await esperarA(async () => barra(page) === '/', `«Volver a Inicio» dejó «${barra(page)}»`, 20_000);
+      await esperarA(async () => (await focoEn(page)) === `enlace:detalle:${idDelActivo}`,
+        `volviendo a Inicio el foco está en ${await focoEn(page)} y no en su «Ver detalle»`, 10_000);
+
+      await page.goto(`${FRONTEND_URL}/?section=services`, { waitUntil: 'domcontentloaded' });
+      const delServicio = (await esperarLaTarjeta(page, 'Servicios', servicio)).locator('h3 a');
+      await delServicio.click();
+      await enLaFicha(page, servicio, idDelServicio, 'ficha abierta desde Servicios');
+      assert((await salidaDeLaFicha(page).innerText()).trim() === 'Volver a Servicios',
+        'desde Servicios la ficha no ofrece volver a Servicios');
+
+      // El perfil del vendedor es una capa sobre la ficha.
+      const verPerfil = laFicha(page).getByRole('button', { name: 'Ver perfil del vendedor' });
+      await verPerfil.click();
+      const perfil = page.getByRole('dialog', { name: 'Perfil del vendedor' });
+      await perfil.first().waitFor({ state: 'visible', timeout: 20_000 });
+      await esperarA(async () => (await perfil.first().innerText()).includes(nombreDelVendedor),
+        `el perfil no nombra a «${nombreDelVendedor}»`, 20_000);
+      await page.keyboard.press('Escape');
+      await esperarA(async () => (await page.getByRole('dialog').count()) === 0,
+        'Escape no cerró el perfil del vendedor', 20_000);
+      assert(await verPerfil.evaluate((el) => el === document.activeElement),
+        `cerrar el perfil dejó el foco en ${await focoEn(page)}`);
+
+      // La cotización lleva a Contacto con la publicación, y Atrás vuelve a ella.
+      await laFicha(page).getByRole('button', { name: 'Solicitar cotización' }).click();
+      await esperarA(async () => barra(page) === '/?section=contact',
+        `pedir cotización dejó la barra en «${barra(page)}»`, 20_000);
+      await esperarA(async () => (await page.locator('textarea').first().inputValue()
+        .catch(() => '')).includes(servicio),
+      'Contacto no trae la publicación de la que se pide cotización', 20_000);
+      await page.goBack();
+      await enLaFicha(page, servicio, idDelServicio, 'Atrás desde Contacto');
+      await page.goBack();
+      await esperarA(async () => barra(page) === '/?section=services',
+        `Atrás desde la ficha dejó «${barra(page)}» y no Servicios`, 20_000);
+      assert(consola.length === 0, `Inicio y Servicios dejaron errores de consola: ${consola[0]}`);
+      medidos.push('Inicio y Servicios abren la ficha y vuelven con el foco en su enlace; el perfil '
+        + 'es una capa que Escape cierra; la cotización va a Contacto con la publicación y Atrás '
+        + 'vuelve a la ficha');
+      await contexto.close();
+    }
+
+    // === C. Enlace directo, 404, no visible y sin red ======================
+    {
+      const { contexto, page } = await nuevaPagina();
+      await page.goto(`${FRONTEND_URL}${urlDeLaFicha(idDelActivo)}`, { waitUntil: 'domcontentloaded' });
+      await enLaFicha(page, activo, idDelActivo, 'enlace directo en una pestaña nueva');
+      const alMercado = laFicha(page).getByRole('link', { name: 'Ir al Mercado' });
+      assert(await alMercado.count() >= 1,
+        'por enlace directo la ficha no ofrece un enlace al Mercado');
+      await alMercado.first().click();
+      await esperarA(async () => barra(page).startsWith('/?section=marketplace'),
+        `«Ir al Mercado» dejó la barra en «${barra(page)}»`, 20_000);
+
+      await page.goto(`${FRONTEND_URL}${urlDeLaFicha('00000000-0000-0000-0000-000000000000')}`,
+        { waitUntil: 'domcontentloaded' });
+      await esperarA(async () => /no está disponible/.test(await tituloDeLaFicha(page)),
+        `una publicación inexistente dice «${await tituloDeLaFicha(page)}»`, 20_000);
+      assert(await laFicha(page).getByRole('link', { name: 'Ir al Mercado' }).count() >= 1,
+        'la ficha inexistente no ofrece salida al Mercado');
+
+      // No visible: la tarjeta la muestra, pero cuando se abre ya la pausaron.
+      // La ficha no puede presentarla como vigente con lo que dijo la tarjeta.
+      const pausada = insumos[0];
+      await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(pausada.nombre)}`,
+        { waitUntil: 'domcontentloaded' });
+      await esperarLaTarjeta(page, 'el Mercado de la pausada', pausada.nombre);
+      await apiRequest(`/products/${pausada.id}`, {
+        method: 'PATCH', token: vendedor.token, body: { status: 'paused' },
+      });
+      await tarjetaDe(page, pausada.nombre).locator('h3 a').click();
+      await esperarA(async () => /no está disponible/.test(await tituloDeLaFicha(page)),
+        `la publicación pausada se abre como «${await tituloDeLaFicha(page)}»`, 20_000);
+      const loQueSeVe = await laFicha(page).innerText();
+      assert(!loQueSeVe.includes(pausada.nombre) && !/Agregar/.test(loQueSeVe),
+        'la ficha de una publicación pausada muestra sus datos viejos o una acción de compra');
+      assert(barra(page) === urlDeLaFicha(pausada.id),
+        `la ficha no disponible no tiene su URL: «${barra(page)}»`);
+
+      // Sin red: se dice, se ofrece reintentar, y reintentar funciona.
+      const rutaDelActivo = `**/api/catalog/products/${idDelActivo}`;
+      await page.route(rutaDelActivo, (ruta) => ruta.abort());
+      await page.goto(`${FRONTEND_URL}${urlDeLaFicha(idDelActivo)}`, { waitUntil: 'domcontentloaded' });
+      await esperarA(async () => /No pudimos cargar/.test(await tituloDeLaFicha(page)),
+        `sin red la ficha dice «${await tituloDeLaFicha(page)}»`, 20_000);
+      assert(await laFicha(page).getByRole('alert').count() === 1,
+        'la falla de red no se anuncia');
+      await page.unroute(rutaDelActivo);
+      await laFicha(page).getByRole('button', { name: 'Reintentar' }).click();
+      await enLaFicha(page, activo, idDelActivo, 'reintentar con la red de vuelta');
+      medidos.push('enlace directo con «Ir al Mercado», inexistente y pausada como «no está '
+        + 'disponible» sin datos viejos, y sin red con aviso y reintento que funciona');
+      await contexto.close();
+    }
+
+    // === D. Comprar: sin sesión, ingresar sin perder la ficha; con sesión ==
+    {
+      const { contexto, page, consola } = await nuevaPagina();
+      await page.goto(`${FRONTEND_URL}${urlDeLaFicha(idDelActivo)}`, { waitUntil: 'domcontentloaded' });
+      await enLaFicha(page, activo, idDelActivo, 'ficha del activo sin sesión');
+      await laFicha(page).getByRole('button', { name: 'Ingresar para continuar' }).click();
+      await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+      await page.getByPlaceholder('tu@email.com').fill('cliente@ejemplo.com');
+      await page.getByPlaceholder('••••••••').fill('cliente123');
+      await page.locator('[class*="_submitButton_"][type="submit"]').click();
+      await page.getByRole('button', { name: 'Mi cuenta' }).first().waitFor({ timeout: 25_000 });
+      await enLaFicha(page, activo, idDelActivo, 'después de ingresar');
+      assert((await enElCarrito(page)).length === 0,
+        'ingresar desde la ficha agregó la publicación al carrito sin pedirlo');
+      await laFicha(page).getByRole('button', { name: 'Agregar al carrito' }).click();
+      await esperarA(async () => (await enElCarrito(page)).some((i) => i.id === idDelActivo),
+        'con la sesión abierta «Agregar al carrito» no agregó nada', 20_000);
+      assert(barra(page) === urlDeLaFicha(idDelActivo), 'agregar al carrito sacó de la ficha');
+
+      // Un insumo, con cantidad.
+      const conCantidad = insumos[5];
+      await page.goto(`${FRONTEND_URL}${urlDeLaFicha(conCantidad.id)}`, { waitUntil: 'domcontentloaded' });
+      await enLaFicha(page, conCantidad.nombre, conCantidad.id, 'ficha del insumo con sesión');
+      await laFicha(page).getByLabel('Cantidad').fill('3');
+      await laFicha(page).getByRole('button', { name: 'Agregar', exact: true }).click();
+      await esperarA(async () => (await enElCarrito(page))
+        .some((i) => i.id === conCantidad.id && i.cantidad === 3),
+      `el insumo no entró al carrito con 3: ${JSON.stringify(await enElCarrito(page))}`, 20_000);
+      assert(consola.length === 0, `la compra dejó errores de consola: ${consola[0]}`);
+      medidos.push('sin sesión la ficha ofrece ingresar y, al completar, sigue en la misma '
+        + 'publicación sin agregar nada; con sesión agrega el activo y el insumo con su cantidad');
+      await contexto.close();
+    }
+
+    // === E. En el celular, con el teclado ==================================
+    {
+      const { contexto, page, consola } = await nuevaPagina({ width: 390, height: 844 });
+      // Por más recientes, el último insumo publicado está en la primera página.
+      await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(MARCADOR)}`,
+        { waitUntil: 'domcontentloaded' });
+      const enlace = (await esperarLaTarjeta(page, 'el Mercado en 390 px', insumos[TOTAL_DE_INSUMOS - 1].nombre))
+        .locator('h3 a');
+      await enlace.focus();
+      await page.keyboard.press('Enter');
+      await enLaFicha(page, insumos[TOTAL_DE_INSUMOS - 1].nombre, insumos[TOTAL_DE_INSUMOS - 1].id, 'ficha abierta con Enter en 390 px');
+      assert(await page.locator('#detalle-titulo').evaluate((el) => el === document.activeElement),
+        `con el teclado el foco quedó en ${await focoEn(page)} y no en el título`);
+      const desborde = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      assert(desborde <= 0, `en 390 px la ficha desborda ${desborde} px a lo ancho`);
+      await page.keyboard.press('Shift+Tab');
+      assert(/Volver al Mercado/.test(await focoEn(page)),
+        `antes del título el teclado encuentra ${await focoEn(page)} y no «Volver al Mercado»`);
+      await page.keyboard.press('Enter');
+      await esperarA(async () => (await page.locator('#detalle-titulo').count()) === 0,
+        '«Volver al Mercado» con Enter no dejó la ficha', 20_000);
+      await esperarA(async () => (await focoEn(page)) === `enlace:titulo:${insumos[TOTAL_DE_INSUMOS - 1].id}`,
+        `en 390 px el foco volvió a ${await focoEn(page)}`, 10_000);
+      assert(consola.length === 0, `en 390 px hubo errores de consola: ${consola[0]}`);
+      medidos.push('en 390 px: Enter abre la ficha con el foco en el título, sin desborde, y '
+        + '«Volver al Mercado» con el teclado devuelve el foco a la tarjeta');
+      await contexto.close();
+    }
+
+    assert(erroresDeJs.length === 0, `el recorrido dejó errores de JavaScript: ${erroresDeJs[0]}`);
+    return `la ficha es una página con URL propia. ${medidos.join('; ')}`;
+  } finally {
+    await browser.close();
+    limpiar();
   }
 });
 

@@ -15,6 +15,7 @@ export type Seccion =
   | 'about'
   | 'contact'
   | 'account'
+  | 'product'
   | 'payment-success'
   | 'payment-failure'
   | 'payment-pending'
@@ -37,6 +38,7 @@ const NOMBRE_EN_LA_BARRA: Partial<Record<Seccion, string>> = {
   about: 'about',
   contact: 'contact',
   account: 'account',
+  product: 'product',
 };
 
 const SECCION_DEL_NOMBRE: Record<string, Seccion> = {
@@ -45,6 +47,7 @@ const SECCION_DEL_NOMBRE: Record<string, Seccion> = {
   about: 'about',
   contact: 'contact',
   account: 'account',
+  product: 'product',
 };
 
 /**
@@ -84,12 +87,25 @@ export const PARAMETROS_DEL_MERCADO = [
   'min_rating',
 ];
 
+/**
+ * Qué publicación pide la barra. Sólo significa algo en su propia sección: la
+ * ficha de una publicación es la única ubicación que lleva un identificador,
+ * y lo lleva en la URL para que se pueda compartir y recargar.
+ */
+export function publicacionDeLaBarra(busqueda: string): string | null {
+  const id = (new URLSearchParams(busqueda).get('id') || '').trim();
+  return id || null;
+}
+
 /** Qué sección declara la barra. Es la única lectura autorizada. */
 export function seccionDeLaBarra(pathname: string, busqueda: string): Seccion {
   const llegada = RUTAS_DE_LLEGADA[pathname];
   if (llegada) return llegada;
   const pedida = new URLSearchParams(busqueda).get('section') || '';
-  return SECCION_DEL_NOMBRE[pedida] || 'home';
+  const seccion = SECCION_DEL_NOMBRE[pedida] || 'home';
+  // Una ficha sin publicación no es un lugar: no hay nada que buscar.
+  if (seccion === 'product' && !publicacionDeLaBarra(busqueda)) return 'home';
+  return seccion;
 }
 
 /** Los filtros que hay en la barra, sin nada más. */
@@ -111,10 +127,15 @@ export function filtrosDeLaBarra(busqueda: string): URLSearchParams {
  * Una pantalla de llegada no tiene URL propia acá a propósito: no se navega
  * hacia ella, se llega.
  */
-export function urlDe(seccion: Seccion, filtros?: URLSearchParams | null): string {
+export function urlDe(
+  seccion: Seccion,
+  filtros?: URLSearchParams | null,
+  publicacion?: string | null,
+): string {
   const parametros = new URLSearchParams();
   const nombre = NOMBRE_EN_LA_BARRA[seccion];
   if (nombre) parametros.set('section', nombre);
+  if (seccion === 'product' && publicacion) parametros.set('id', publicacion);
   if (seccion === 'marketplace' && filtros) {
     for (const clave of PARAMETROS_DEL_MERCADO) {
       const valor = filtros.get(clave);

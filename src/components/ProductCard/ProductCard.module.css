@@ -122,6 +122,19 @@
   overflow-wrap: anywhere;
 }
 
+/* El título es el enlace a la ficha y se lee como el título que es. */
+.titulo a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.titulo a:hover { text-decoration: underline; }
+
+/* El recorte a dos renglones cortaría el anillo de foco del enlace, que se
+   dibuja por fuera. Se dibuja hacia adentro: es el mismo anillo del sitio, en
+   el propio enlace, y el recorte no lo toca. */
+.titulo a:focus-visible { outline-offset: -3px; }
+
 .ubicacion {
   color: var(--tg-color-text-secondary);
   font-size: 13px;

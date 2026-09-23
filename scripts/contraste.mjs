@@ -432,15 +432,17 @@ for (const medida of MEDIDAS) {
     await revisar(page, `${medida.n} catálogo: paginador`, paginador);
     await page.evaluate(() => window.scrollTo(0, 0));
 
-    // el detalle se abre haciendo clic en la tarjeta, no en un boton: no existe
-    // ningun "Ver detalle". Antes esto lo tapaba un catch vacio y esta pantalla
-    // se declaraba medida sin haberse abierto nunca.
-    const vendidoPor = page.getByRole('dialog');
+    // La ficha de una publicación se abre haciendo clic en la tarjeta. Desde
+    // PRODUCT-DETAIL-PAGE-1 es una página y no una capa: se mide cuando terminó
+    // de cargar y se deja con Atrás. Antes esto lo tapaba un catch vacio y esta
+    // pantalla se declaraba medida sin haberse abierto nunca.
+    const vendidoPor = page.locator('main[aria-busy="false"]:has(#detalle-titulo)');
     await page.locator('[class*="_card_"]').first().click();
+    await vendidoPor.waitFor({ state: 'visible', timeout: ESPERA });
     await revisar(page, `${medida.n} detalle de producto`, vendidoPor);
 
-    await page.getByRole('button', { name: 'Cerrar' }).first().click();
-    await vendidoPor.waitFor({ state: 'hidden', timeout: ESPERA });
+    await page.goBack();
+    await page.locator('#detalle-titulo').waitFor({ state: 'detached', timeout: ESPERA });
 
     // Una publicación con origen dentro del radio del transportista demo: sin
     // eso no hay a quién elegir y las pantallas del traslado no existirían.

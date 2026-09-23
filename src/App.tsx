@@ -5,7 +5,7 @@ import { Footer } from './components/Footer/Footer';
 import { UserDashboard } from './components/UserDashboard/UserDashboard';
 import { useAuth } from './hooks/useAuth';
 import { FilterSidebar } from './components/FilterSidebar/FilterSidebar';
-import { ProductGrid } from './components/ProductGrid/ProductGrid';
+import { ProductGrid, type Vista } from './components/ProductGrid/ProductGrid';
 import { LoginModal } from './components/Auth/LoginModal';
 import { RegisterModal } from './components/Auth/RegisterModal';
 import { CartModal } from './components/Cart/CartModal';
@@ -16,6 +16,7 @@ import { HomePage } from './components/Pages/HomePage';
 import { AboutPage } from './components/Pages/AboutPage';
 import { ServicesPage } from './components/Pages/ServicesPage';
 import { ContactPage } from './components/Pages/ContactPage';
+import { ProductDetailPage } from './components/ProductDetail/ProductDetailPage';
 import { PaymentResultPage } from './components/Pages/PaymentResultPage';
 import { VerifyEmailPage } from './components/Pages/VerifyEmailPage';
 import { ORDENES, POR_PAGINA, useProductFilters } from './hooks/useProductFilters';
@@ -49,6 +50,22 @@ function App() {
   // hay abierta encima y cómo se escribe el historial. Nadie más lo toca.
   const navegacion = useNavegacion();
   const currentSection = navegacion.seccion;
+  // La pantalla cuyas cargas siguen vivas. Una ficha abierta desde el Mercado,
+  // Inicio o Servicios no abandona esa pantalla: mientras la ficha está
+  // arriba, sus datos se conservan y no se vuelven a pedir, así que Atrás la
+  // encuentra como la dejó —mismas tarjetas, misma altura— y la vista y el
+  // foco pueden volver adonde estaban. Lo que se dibuja y lo que se escribe
+  // en la barra sigue siendo de `currentSection`.
+  const pantallaDeTrabajo: Seccion = currentSection === 'product' && navegacion.origenDeLaFicha
+    ? navegacion.origenDeLaFicha
+    : currentSection;
+  // Cuadrícula o lista. Vive acá y no en la grilla porque la ficha desmonta la
+  // grilla, y volver con Atrás tiene que encontrar la vista elegida. Salir del
+  // Mercado la reinicia, como siempre: es una preferencia de la visita.
+  const [vistaDelMercado, setVistaDelMercado] = useState<Vista>('cuadricula');
+  useEffect(() => {
+    if (pantallaDeTrabajo !== 'marketplace') setVistaDelMercado('cuadricula');
+  }, [pantallaDeTrabajo]);
   /**
    * La cotización que se está pidiendo, si se llegó a Contacto desde una
    * publicación.
@@ -284,18 +301,18 @@ function App() {
   // vista. Viven aca y no adentro de cada pagina para no competir con la carga
   // del mercado ni duplicar el estado de red.
   const vistaPreviaDeInicio = useVistaPrevia({
-    activa: currentSection === 'home',
+    activa: pantallaDeTrabajo === 'home',
     mensajeDeError: 'No pudimos cargar las operaciones.',
   });
   const vistaPreviaDeServicios = useVistaPrevia({
-    activa: currentSection === 'services',
+    activa: pantallaDeTrabajo === 'services',
     soloServicios: true,
     mensajeDeError: 'No pudimos cargar los servicios.',
   });
 
   // Cargar catálogos auxiliares al entrar al marketplace.
   useEffect(() => {
-    if (currentSection !== 'marketplace') return;
+    if (pantallaDeTrabajo !== 'marketplace') return;
 
     let cancelled = false;
     setCatalogosAuxiliares('pendiente');
@@ -321,11 +338,11 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [currentSection, revisionDeCatalogos]);
+  }, [pantallaDeTrabajo, revisionDeCatalogos]);
 
   // Cargar las localidades con el ID corto de provincia.
   useEffect(() => {
-    if (currentSection !== 'marketplace' || !selectedProvinceId) {
+    if (pantallaDeTrabajo !== 'marketplace' || !selectedProvinceId) {
       setLocalities([]);
       setIsLoadingLocalities(false);
       return;
@@ -350,7 +367,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [currentSection, selectedProvinceId]);
+  }, [pantallaDeTrabajo, selectedProvinceId]);
 
   // Qué filtros de la URL no existen. Sólo se sabe con los catálogos en la
   // mano: mientras están en camino `false` no significa «es válido» sino
@@ -482,7 +499,7 @@ function App() {
 
   // Filtrar en la API para usar la ubicación real de la publicación.
   useEffect(() => {
-    if (currentSection !== 'marketplace') return;
+    if (pantallaDeTrabajo !== 'marketplace') return;
     // Sin catálogos no se consulta, y no porque falte un dato de la
     // consulta: es que todavía no se sabe si lo que pide la URL existe. Con
     // un filtro inválido tampoco, porque el descarte ya está en camino y
@@ -580,7 +597,7 @@ function App() {
       cancelled = true;
     };
   }, [
-    currentSection,
+    pantallaDeTrabajo,
     searchQuery,
     // `selectedType` es dependencia de verdad desde que viaja a la consulta:
     // sin esto, cambiar de productos a servicios no volvia a pedir nada.
@@ -801,10 +818,27 @@ function App() {
                 onReintentar={reintentarElMercado}
                 onSolicitarCotizacion={pedirCotizacion}
                 onSolicitarIngreso={abrirLoginYVolver}
+                vista={vistaDelMercado}
+                onVistaChange={setVistaDelMercado}
               />
             </div>
           </main>
         );
+      case 'product':
+        // La ficha de una publicación es una página con URL propia. Se busca
+        // por su identificador —con un enlace directo no hay tarjeta de la que
+        // tomar nada— y la `key` hace de cada publicación una página nueva.
+        return navegacion.publicacion ? (
+          <ProductDetailPage
+            key={navegacion.publicacion}
+            id={navegacion.publicacion}
+            origen={navegacion.origenDeLaFicha}
+            onVolver={navegacion.volverDeLaFicha}
+            onIrAlMercado={() => handleNavigate('marketplace')}
+            onSolicitarCotizacion={pedirCotizacion}
+            onRequiereIngreso={abrirLogin}
+          />
+        ) : null;
       case 'about':
         return (
           <AboutPage 

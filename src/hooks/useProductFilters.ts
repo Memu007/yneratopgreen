@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { seccionDeLaBarra } from '../navegacion/politica';
 
 /**
  * Los cuatro órdenes que el Mercado ofrece, y cómo se traduce cada uno a la
@@ -162,6 +163,11 @@ export const useProductFilters = ({
   // verdad, la barra puede cambiar sin que esta pantalla se vuelva a montar.
   useEffect(() => {
     if (versionDeLaBarra === 0) return;
+    // La ficha de una publicación no lleva filtros en su URL, y no por eso el
+    // Mercado de atrás dejó de tenerlos: releer ahí los borraría, y al volver
+    // el Mercado se pediría de nuevo desde cero y arriba de todo. Se relee al
+    // volver al Mercado, que es donde están.
+    if (seccionDeLaBarra(window.location.pathname, window.location.search) === 'product') return;
     const params = new URLSearchParams(window.location.search);
     setSearchQuery(params.get('q') || '');
     setTextoBuscado(params.get('q') || '');

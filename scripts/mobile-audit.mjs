@@ -182,7 +182,8 @@ async function exercisePublicCatalog(browser, viewport) {
 
     state.screen = '04-detail';
     await page.locator('main h3').first().click();
-    await page.locator('div[role="dialog"], h2').first().waitFor({ state: 'visible' });
+    // La ficha es una página: se espera a que termine de cargar su título.
+    await page.locator('main[aria-busy="false"] #detalle-titulo').waitFor({ state: 'visible' });
     await inspect(page, state, viewport, '04-detail');
   } finally {
     await context.close();

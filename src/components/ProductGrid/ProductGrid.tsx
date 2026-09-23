@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import styles from './ProductGrid.module.css';
 import { Product, CotizacionPedida } from '../../types';
 import { ProductCard } from '../ProductCard/ProductCard';
@@ -30,15 +30,19 @@ interface ProductGridProps {
       prometer una solicitud que no existe. */
   onSolicitarCotizacion?: (pedido: CotizacionPedida) => void;
   /** Se pasa hacia abajo igual que la cotización: la tarjeta la necesita para
-      que el detalle, sin sesión, ofrezca ingresar en vez de un aviso sin
-      salida. */
+      que, sin sesión, ofrezca ingresar en vez de un aviso sin salida. */
   onSolicitarIngreso?: (alVolver: () => void) => void;
+  /** Cuadrícula o lista. La elige quien mira y la guarda App: abrir la ficha
+      de una publicación desmonta esta grilla, y volver con Atrás tiene que
+      encontrar la vista que se había elegido. */
+  vista: Vista;
+  onVistaChange: (vista: Vista) => void;
 }
 
 /** Las dos presentaciones del Mercado, y no hay una tercera. El «destacado»
  *  implícito —el activo que se quedaba con la fila entera— dejó de existir:
  *  la geometría la elige quien mira, no la anatomía de lo que está mirando. */
-type Vista = 'cuadricula' | 'lista';
+export type Vista = 'cuadricula' | 'lista';
 
 const VISTAS: { valor: Vista; rotulo: string }[] = [
   { valor: 'cuadricula', rotulo: 'Cuadrícula' },
@@ -58,13 +62,13 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
   onReintentar,
   onSolicitarCotizacion,
   onSolicitarIngreso,
+  vista,
+  onVistaChange: setVista,
 }) => {
-  // La vista vive acá y sólo acá: ordenar, buscar, filtrar, cambiar de página o
-  // abrir un detalle no la tocan, porque ninguno de esos desmonta esta grilla.
-  // Salir del Mercado sí la reinicia, y está bien: es una preferencia de la
-  // visita, no del perfil. Y no viaja a la consulta: no cambia qué se pide,
+  // Ordenar, buscar, filtrar, cambiar de página o abrir una ficha no tocan la
+  // vista. Salir del Mercado sí la reinicia, y está bien: es una preferencia de
+  // la visita, no del perfil. Y no viaja a la consulta: no cambia qué se pide,
   // sólo cómo se dibuja lo que vino.
-  const [vista, setVista] = useState<Vista>('cuadricula');
 
   if (isLoading) {
     return (

@@ -9,11 +9,12 @@
  * 2. Salir de una pantalla de llegada —el correo, la vuelta de Mercado Pago—
  *    REEMPLAZA su entrada: es un resultado que ya se leyó, y volver a él con
  *    Atrás o recargando anuncia de nuevo algo que ya pasó.
- * 3. Una capa visible —el detalle de una publicación— no es una ubicación: es
- *    una entrada más sobre la misma URL, marcada en el estado de la entrada.
- *    Así el primer Atrás cierra el detalle y deja intacto lo de atrás, y
- *    cerrarlo con la propia interfaz consume esa entrada en vez de dejarla
- *    colgada.
+ * 3. La ficha de una publicación es una ubicación con URL propia
+ *    (`?section=product&id=…`): se comparte, se recarga y entra al historial
+ *    como cualquier otra. Antes era una capa sobre la misma URL, y por eso no
+ *    se podía mandar ni recargar. Al abrirla, la entrada de la que se sale
+ *    anota hasta dónde se había bajado; Atrás vuelve a esa entrada, y la
+ *    vista vuelve a ese punto cuando el contenido ya está dibujado.
  *
  * Y una guardia, que llegó con Mi cuenta.
  *
@@ -37,13 +38,29 @@ import {
 import {
   esPantallaDeLlegada,
   filtrosDeLaBarra,
+  publicacionDeLaBarra,
   seccionDeLaBarra,
   urlDe,
   type Seccion,
 } from './politica';
 
+/**
+ * Lo que la navegación anota en cada entrada del historial. Sólo lo lee y lo
+ * escribe este archivo; el resto del estado de la entrada —si lo hubiera— se
+ * conserva al reescribirla.
+ */
 interface EstadoDeLaEntrada {
-  capa: string | null;
+  /** Desde qué sección se abrió esta ficha. Sin él, la ficha llegó por un
+   *  enlace directo y no hay adónde volver con Atrás. */
+  origen?: Seccion;
+  /** Hasta dónde se había bajado en esta entrada cuando se abrió una ficha. */
+  desplazamiento?: number;
+  /** Qué ficha se abrió desde esta entrada: al volver, el foco vuelve a su
+   *  tarjeta. */
+  fichaAbierta?: string;
+  /** Con qué enlace de la tarjeta se abrió —el título o «Ver detalle»—: el
+   *  foco vuelve a ese mismo. */
+  enlaceDeLaFicha?: string;
 }
 
 /**
@@ -61,8 +78,10 @@ export interface GuardiaDeSalida {
 export interface Navegacion {
   /** La sección que declara la barra. */
   seccion: Seccion;
-  /** La publicación abierta sobre esa sección, si hay alguna. */
-  capa: string | null;
+  /** La publicación de la ficha, si la sección es una ficha. */
+  publicacion: string | null;
+  /** Desde qué sección se abrió la ficha, si se abrió desde el sitio. */
+  origenDeLaFicha: Seccion | null;
   /**
    * Cuántas veces movió la barra el historial. Lo que guarda estado leído de
    * la URL —los filtros del Mercado— lo relee cuando esto cambia: sin eso,
@@ -70,8 +89,12 @@ export interface Navegacion {
    */
   version: number;
   navegar: (destino: Seccion) => void;
-  abrirCapa: (id: string) => void;
-  cerrarCapa: () => void;
+  /** Ir a la ficha de una publicación: una entrada nueva, con su URL. */
+  abrirPublicacion: (id: string) => void;
+  /** Salir de la ficha. Si se abrió desde el sitio es Atrás —la entrada de
+   *  origen ya tiene sus filtros, su página y su desplazamiento—; si llegó
+   *  por un enlace directo no hay atrás propio y se va al Mercado. */
+  volverDeLaFicha: () => void;
   /**
    * Una salida que no es una sección —Salir de la sesión— pasando por la misma
    * guardia. Sin esto, cerrar sesión con un perfil a medio editar se llevaría
@@ -85,29 +108,79 @@ export interface Navegacion {
 
 const barraActual = () => `${window.location.pathname}${window.location.search}`;
 
-const capaDeLaEntrada = (): string | null => {
-  const estado = window.history.state as EstadoDeLaEntrada | null;
-  return typeof estado?.capa === 'string' ? estado.capa : null;
-};
+const estadoDeLaEntrada = (): EstadoDeLaEntrada =>
+  (window.history.state as EstadoDeLaEntrada | null) || {};
 
 const seccionActual = () =>
   seccionDeLaBarra(window.location.pathname, window.location.search);
 
+const publicacionActual = () =>
+  (seccionActual() === 'product' ? publicacionDeLaBarra(window.location.search) : null);
+
+const origenDeLaEntrada = (): Seccion | null =>
+  (seccionActual() === 'product' ? estadoDeLaEntrada().origen || null : null);
+
+/** La ubicación que se está mirando, tal como la dejó el último movimiento. */
+const ubicacionDeAhora = () => ({
+  barra: barraActual(),
+  estado: window.history.state as EstadoDeLaEntrada | null,
+  seccion: seccionActual(),
+});
+
+/**
+ * Vuelve la vista al punto anotado cuando el contenido ya lo alcanza. Al volver
+ * de una ficha, la pantalla de origen puede tardar un cuadro —o una respuesta,
+ * si su vista previa se vuelve a pedir— en tener la altura de antes y en tener
+ * dibujada la tarjeta; bajar antes de eso deja la vista más arriba. Se espera
+ * a las dos cosas, con un tope, y recién ahí se devuelve el foco a la tarjeta
+ * de la ficha que se cerró.
+ */
+function volverAlPunto(desplazamiento: number, ficha: string | null, enlace: string | null) {
+  const limite = performance.now() + 3000;
+  const tarjeta = () => {
+    if (!ficha) return null;
+    const deLaFicha = `[data-ficha="${CSS.escape(ficha)}"]`;
+    return (enlace && document.querySelector<HTMLElement>(
+      `${deLaFicha}[data-ficha-enlace="${CSS.escape(enlace)}"]`,
+    )) || document.querySelector<HTMLElement>(deLaFicha);
+  };
+  const paso = () => {
+    const alcanza = document.documentElement.scrollHeight - window.innerHeight >= desplazamiento - 1;
+    const dibujada = !ficha || tarjeta() !== null;
+    if (!(alcanza && dibujada) && performance.now() < limite) {
+      window.requestAnimationFrame(paso);
+      return;
+    }
+    // Sin animación: volver no es desplazarse, es reaparecer donde se estaba.
+    window.scrollTo({ top: desplazamiento, behavior: 'instant' });
+    tarjeta()?.focus({ preventScroll: true });
+  };
+  window.requestAnimationFrame(paso);
+}
+
 export function useNavegacion(): Navegacion {
   const [seccion, setSeccion] = useState<Seccion>(seccionActual);
-  const [capa, setCapa] = useState<string | null>(capaDeLaEntrada);
+  const [publicacion, setPublicacion] = useState<string | null>(publicacionActual);
+  const [origenDeLaFicha, setOrigenDeLaFicha] = useState<Seccion | null>(origenDeLaEntrada);
   const [version, setVersion] = useState(0);
 
   const guardia = useRef<GuardiaDeSalida | null>(null);
   // Dónde estábamos antes del último movimiento. Hace falta para deshacer un
   // Atrás: cuando llega `popstate` la barra ya cambió, y esto es lo único que
   // recuerda qué decía.
-  const ubicacionMirada = useRef({ barra: '', estado: null as EstadoDeLaEntrada | null });
+  const ubicacionMirada = useRef({
+    barra: '', estado: null as EstadoDeLaEntrada | null, seccion: 'home' as Seccion,
+  });
   // Un Atrás ya consentido no se vuelve a preguntar.
   const salidaConsentida = useRef(false);
+  // El regreso de una ficha que falta aplicar. Se anota al llegar `popstate` y
+  // se aplica después de dibujar: antes, la pantalla de origen todavía no está.
+  const regresoPendiente = useRef<{
+    desplazamiento: number; ficha: string | null; enlace: string | null;
+  } | null>(null);
 
   useEffect(() => {
-    ubicacionMirada.current = { barra: barraActual(), estado: window.history.state };
+    ubicacionMirada.current = ubicacionDeAhora();
   }, []);
 
   const registrarGuardia = useCallback((nueva: GuardiaDeSalida) => {
@@ -142,42 +215,62 @@ export function useNavegacion(): Navegacion {
         return;
       }
       salidaConsentida.current = false;
-      ubicacionMirada.current = { barra: barraActual(), estado: window.history.state };
+      const veniaDeUnaFicha = ubicacionMirada.current.seccion === 'product';
+      ubicacionMirada.current = ubicacionDeAhora();
       setSeccion(seccionActual());
-      setCapa(capaDeLaEntrada());
+      setPublicacion(publicacionActual());
+      setOrigenDeLaFicha(origenDeLaEntrada());
       setVersion((cuantas) => cuantas + 1);
+
+      // Volver de una ficha a la entrada desde la que se abrió: la vista va al
+      // punto que esa entrada anotó, una vez dibujada. Cualquier otro
+      // movimiento sigue como siempre, con lo que haga el navegador.
+      const { desplazamiento, fichaAbierta, enlaceDeLaFicha } = estadoDeLaEntrada();
+      if (veniaDeUnaFicha && seccionActual() !== 'product' && typeof desplazamiento === 'number') {
+        regresoPendiente.current = {
+          desplazamiento, ficha: fichaAbierta || null, enlace: enlaceDeLaFicha || null,
+        };
+      } else if (seccionActual() === 'product') {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
     };
     window.addEventListener('popstate', alMoverElHistorial);
     return () => window.removeEventListener('popstate', alMoverElHistorial);
   }, []);
 
+  // Después de dibujar la entrada a la que se volvió.
+  useEffect(() => {
+    const regreso = regresoPendiente.current;
+    if (!regreso) return;
+    regresoPendiente.current = null;
+    volverAlPunto(regreso.desplazamiento, regreso.ficha, regreso.enlace);
+  }, [version]);
+
   const navegarDeVerdad = useCallback((destino: Seccion) => {
     const desde = seccionActual();
     const filtros = filtrosDeLaBarra(window.location.search);
 
-    // La capa no sobrevive a una navegación deliberada, y su entrada tampoco:
-    // se reescribe sin ella —misma URL, otro estado— para que Atrás no traiga
-    // de vuelta un detalle que la persona dejó al irse.
-    if (capaDeLaEntrada() !== null) {
-      window.history.replaceState({ capa: null }, '', barraActual());
-    }
-
     const url = urlDe(destino, destino === 'marketplace' ? filtros : null);
-    const aqui = urlDe(desde, desde === 'marketplace' ? filtros : null);
+    const aqui = urlDe(
+      desde,
+      desde === 'marketplace' ? filtros : null,
+      publicacionDeLaBarra(window.location.search),
+    );
     if (esPantallaDeLlegada(desde)) {
       // Sale del `pathname` de llegada sin dejarlo atrás.
-      window.history.replaceState({ capa: null }, '', url);
+      window.history.replaceState({}, '', url);
     } else if (url !== aqui) {
-      window.history.pushState({ capa: null }, '', url);
+      window.history.pushState({}, '', url);
     } else if (url !== barraActual()) {
       // Es la ubicación que ya estaba, escrita de otra manera: se ordena la
       // barra sin agregar una entrada repetida.
-      window.history.replaceState({ capa: null }, '', url);
+      window.history.replaceState(window.history.state, '', url);
     }
 
-    ubicacionMirada.current = { barra: barraActual(), estado: window.history.state };
+    ubicacionMirada.current = ubicacionDeAhora();
     setSeccion(destino);
-    setCapa(null);
+    setPublicacion(null);
+    setOrigenDeLaFicha(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
@@ -193,37 +286,63 @@ export function useNavegacion(): Navegacion {
     [conGuardia],
   );
 
-  const abrirCapa = useCallback((id: string) => {
-    window.history.pushState({ capa: id }, '', barraActual());
-    ubicacionMirada.current = { barra: barraActual(), estado: window.history.state };
-    setCapa(id);
-  }, []);
+  // Abrir una ficha es irse de la pantalla, así que pasa por la guardia como
+  // cualquier otra salida.
+  const abrirPublicacion = useCallback((id: string) => conGuardia(() => {
+    const desde = seccionActual();
+    if (desde === 'product' && publicacionActual() === id) return;
+    // La entrada de la que se sale anota hasta dónde se había bajado, qué
+    // ficha se abrió y con qué enlace: es lo que Atrás necesita para devolver
+    // la vista y el foco.
+    const disparador = document.activeElement?.getAttribute('data-ficha-enlace') || undefined;
+    window.history.replaceState(
+      {
+        ...estadoDeLaEntrada(),
+        desplazamiento: window.scrollY,
+        fichaAbierta: id,
+        enlaceDeLaFicha: disparador,
+      },
+      '',
+      barraActual(),
+    );
+    window.history.pushState({ origen: desde }, '', urlDe('product', null, id));
+    ubicacionMirada.current = ubicacionDeAhora();
+    setSeccion('product');
+    setPublicacion(id);
+    setOrigenDeLaFicha(desde);
+    // La ficha empieza arriba, sin animación: es otra página.
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }), [conGuardia]);
 
-  const cerrarCapa = useCallback(() => {
-    // Se cierra volviendo atrás, que es lo que consume la entrada. Cerrar sin
-    // volver dejaría una entrada fantasma: el primer Atrás no haría nada
-    // visible y el segundo sacaría del sitio.
-    //
-    // Este Atrás lo pide la propia interfaz, así que no lo filtra la guardia:
-    // cerrar el detalle de una publicación no es salir de la pantalla.
-    if (capaDeLaEntrada() !== null) {
-      salidaConsentida.current = true;
-      window.history.back();
-    } else setCapa(null);
-  }, []);
+  const volverDeLaFicha = useCallback(() => {
+    // Con origen, volver es Atrás: consume la entrada de la ficha en vez de
+    // apilar otra, y la entrada de origen trae sus filtros, su página y su
+    // punto. Sin origen —enlace directo, pestaña nueva— Atrás sacaría del
+    // sitio, así que se va al Mercado.
+    if (origenDeLaEntrada()) window.history.back();
+    else navegar('marketplace');
+  }, [navegar]);
 
   return useMemo(
     () => ({
-      seccion, capa, version, navegar, abrirCapa, cerrarCapa, pedirSalida, registrarGuardia,
+      seccion,
+      publicacion,
+      origenDeLaFicha,
+      version,
+      navegar,
+      abrirPublicacion,
+      volverDeLaFicha,
+      pedirSalida,
+      registrarGuardia,
     }),
-    [seccion, capa, version, navegar, abrirCapa, cerrarCapa, pedirSalida, registrarGuardia],
+    [seccion, publicacion, origenDeLaFicha, version, navegar, abrirPublicacion,
+      volverDeLaFicha, pedirSalida, registrarGuardia],
   );
 }
 
 /**
  * La navegación viva, para lo que está lejos de `App`. La tarjeta de una
- * publicación la usa para abrir y cerrar su detalle; no escucha nada por su
- * cuenta.
+ * publicación la usa para abrir su ficha; no escucha nada por su cuenta.
  */
 export const ContextoDeNavegacion = createContext<Navegacion | null>(null);
 
