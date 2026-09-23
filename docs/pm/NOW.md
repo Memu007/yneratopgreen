@@ -8,9 +8,25 @@ Actualizado: 2026-09-23.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. Su puerta funcional quedó verificada el 23/09 sobre la composición aceptada `1e4a63c`; la evidencia está en `REPRODUCCION-FASE-2-2026-09-23.md`. Las fechas y las puertas posteriores no cambian.
 - **`main`:** `0bd7fbc`; `RISK-REC-1` integrada y publicada con autorización de Emi. GitHub, Frontend y Backend convergieron en ese SHA y los dos servicios quedaron saludables. El entorno `strong-playfulness` sigue siendo demostrativo y no equivale al despliegue productivo contractual.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; producto `PRODUCT-DETAIL-PAGE-1` en `087fa2c`, informe `9110bcc`. PM lo verificó y aceptó en rama; aún no integrado ni desplegado.
-- **Última decisión PM:** `PRODUCT-DETAIL-PAGE-1` **ACEPTADA EN RAMA, NO INTEGRADA NI DESPLEGADA**. Evidencia en `REPRODUCCION-PRODUCT-DETAIL-PAGE-1-2026-09-23.md`.
-- **Tarea activa:** `MOBILE-AUDIT-FLOW-1`, asignada a Dev en `PARA-DEV.md`: hacer que la auditoría móvil abra el panel de filtros antes de operarlo y complete sus recorridos.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `MOBILE-AUDIT-FLOW-1` en `8e4f7c6`, informe final `69779b0`. PM aceptó el arnés en rama; aún no integrado ni desplegado.
+- **Última decisión PM:** `MOBILE-AUDIT-FLOW-1` **ACEPTADA EN RAMA** para el recorrido público y la clasificación de cortes. La auditoría total sigue en **9/12** y reveló defectos de producto. Evidencia en `REPRODUCCION-MOBILE-AUDIT-FLOW-1-2026-09-23.md`.
+- **Tarea activa:** `MOBILE-CHECKOUT-1`, asignada a Dev en `PARA-DEV.md`: completar el recorrido móvil de checkout y corregir el contenido recortado, si se reproduce.
+
+## Última aceptación PM — MOBILE-AUDIT-FLOW-1
+
+PM ejecutó la auditoría en base aislada sobre `8e4f7c6`: el recorrido público
+alcanzó la ficha con URL propia en **360, 390 y 768 px**; el total fue **9/12**
+porque los tres recorridos de compra esperan el pago sin elegir traslado.
+El arnés anterior falló en «Limpiar filtros» antes de la ficha, rojo esperado.
+Las capturas históricas quedaron intactas. El arnés se acepta por el alcance
+asignado; no se declara cerrado el QA responsive.
+
+La misma corrida encontró **un desborde horizontal real en la ficha a 360 px**
+con «Campo Agrícola de 120 Hectáreas» (368 px de contenido en 360). PM confirmó
+además que Tab desde «Filtros» cerrado entra en cuatro controles invisibles.
+Dev reportó checkout recortado a 360/390 px, pendiente de reproducción focal
+en `MOBILE-CHECKOUT-1`. Los tres defectos de producto quedan abiertos y
+se priorizan por separado.
 
 ## Última aceptación PM — PRODUCT-DETAIL-PAGE-1
 
@@ -296,7 +312,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev corrige `MOBILE-AUDIT-FLOW-1`; PM ejecuta la auditoría móvil completa sobre la composición aislada. Las cinco piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
+1. Dev trabaja `MOBILE-CHECKOUT-1`; PM verifica el recorrido de pago y la geometría de envío. Luego se atacan el desborde de la ficha a 360 px y el foco en filtros cerrados. Las seis piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
 2. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración. La propuesta de recuperación pre-migración espera decisión de Emi y verificación autenticada de Railway.
 3. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.

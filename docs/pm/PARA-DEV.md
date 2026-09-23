@@ -5,47 +5,55 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Tarea activa — MOBILE-AUDIT-FLOW-1
+## Tarea activa — MOBILE-CHECKOUT-1
 
-**Prioridad y problema.** Para cerrar el QA responsive del MVP necesitamos
-que `scripts/mobile-audit.mjs` recorra la ficha nueva. Hoy se corta antes:
-en 360 px el script usa selectores del panel «Filtros» sin abrirlo y después
-intenta pulsar «Limpiar filtros», que está oculto. PM reprodujo el timeout
-con eventos interceptados y comprobó con clic real que, al abrir el panel,
-seleccionar una categoría y limpiar funciona. Es un defecto del recorrido
-de auditoría; no hay un bug de producto demostrado en ese botón.
+**Prioridad y problema.** La auditoría móvil del MVP completa 9/12
+recorridos: las tres compras se cortan porque el script espera «Medio de
+pago» sin elegir antes cómo se traslada cada pedido. Dev observó además
+que en «Datos de envío» el contenido del checkout mide 400 px, queda
+recortado a 360 y 390 px y corta rótulos y campos. PM aún debe reproducir
+ese segundo hallazgo de forma focal. La compra móvil es prioritaria.
 
-**Alcance.** Ajustá sólo el flujo de la auditoría para operar el panel
-plegable como una persona en 360, 390 y 768 px: abrirlo por «Filtros»,
-usar los controles visibles, limpiar, volver a resultados y llegar a la
-ficha con su URL propia. Conservá las mediciones de desborde, blancos
-táctiles, texto, consola y red. Evitá sobrescribir capturas históricas
-versionadas: cada corrida debe dejar su evidencia en una ruta nueva o
-configurable. No cambies el producto para hacer pasar el script.
+**Alcance.** Primero reproducí y medí el recorte del checkout a 360 y
+390 px con un producto demo y el flujo real. Si se confirma, corregí la
+geometría local del checkout para que campos, rótulos y opciones de traslado
+sean legibles y operables sin recorte; verificá también 768 px. Después
+actualizá sólo el recorrido de compra de `scripts/mobile-audit.mjs` para
+elegir explícitamente «Coordino el traslado por mi cuenta», como haría la
+persona, y llegar a «Medio de pago». Medí la pantalla de envío y la de
+pago antes de seguir. La auditoría debe detectar recorte **dentro** de la
+capa de checkout aunque el documento completo no desborde. Limitá esa
+medición al checkout para no marcar como defecto la tabla de administración,
+que se desplaza horizontalmente dentro de su marco a propósito. Conservá
+la distinción del arnés entre corte del script y defecto de UI, y la carpeta
+nueva de evidencia.
 
-**Fuera de alcance.** Backend, datos, migraciones, rediseño de filtros,
-corrección de controles que esta auditoría aún no midió, integración y
-despliegue.
+**Fuera de alcance.** Cambios de pagos, backend, datos, permisos, migraciones,
+otros modales, rediseño global, integración y despliegue. Los defectos de
+ancho de la ficha a 360 px y foco en filtros cerrados están registrados
+en cola; no los mezcles con esta pieza.
 
-**Aceptación verificable.** En 360 × 800, 390 × 844 y 768 × 1024, el
-recorrido público debe abrir el panel si está plegado, seleccionar filtros
-de forma visible, pulsar «Limpiar filtros» sin intercepción y llegar a la
-ficha cargada de una publicación. La salida debe distinguir una falla del
-script de un hallazgo real de UI y conservar las capturas existentes.
-El recorrido anterior sirve como negativo: falla antes de la ficha por
-operar el panel cerrado; el corregido debe pasar ese punto.
+**Aceptación verificable.** A 360 × 800, 390 × 844 y 768 × 1024, el
+checkout permite completar «Datos de envío», elegir traslado por cuenta
+propia y llegar al paso de medio de pago. En 360/390, ningún rótulo, campo
+ni opción queda fuera del marco visible o recortado; no alcanza que la
+página no tenga barra horizontal. La auditoría debe completar los tres
+recorridos de compra y medir envío y pago. Añadí un negativo que falle
+con el recorte original, si se reproduce; y otro que demuestre que el
+recorrido anterior se corta por no decidir el traslado. Conservá las
+pruebas existentes de checkout.
 
-**Pruebas y evidencia.** Corré `node --check` y las puertas estáticas que
-tu entorno permita. No tenés Docker/PostGIS según `DECISIONS.md`: PM hará
-la corrida completa de la auditoría con la composición aislada, y clasificará
-los hallazgos que aparezcan. Si el flujo corregido revela un defecto real
-de producto o exige ampliar alcance, frená y describilo; no lo arregles
-dentro de esta pieza. No repitas la suite smoke completa: `087fa2c` ya
-pasó 183/183 en la revisión PM y aquí sólo cambia el arnés móvil.
+**Pruebas y evidencia.** Corré build, lint, tipos, el focal y las pruebas
+que tu entorno permita. PM levantará Docker y repetirá la auditoría y los
+focales sobre la candidata exacta. No repitas la suite smoke completa sin
+un cambio fuera de este alcance o un rojo inesperado. Si el recorte no se
+reproduce, o corregirlo exige rediseño transversal o reglas de pago,
+frená y respondé con medidas antes de editar producto.
 
-**Leé antes:** `REPRODUCCION-PRODUCT-DETAIL-PAGE-1-2026-09-23.md`,
-`scripts/mobile-audit.mjs`, `FilterSidebar` y su CSS responsive.
+**Leé antes:** `REPRODUCCION-MOBILE-AUDIT-FLOW-1-2026-09-23.md`,
+`scripts/mobile-audit.mjs`, el paso de envío del checkout y los casos
+de compra móvil ya existentes.
 
-**Entrega.** Respondé en `PARA-PM.md` con SHA exacto, cambio del flujo,
-pruebas ejecutadas y no ejecutadas, ruta de evidencia y cualquier hallazgo
-de UI. No integres ni despliegues.
+**Entrega.** Respondé en `PARA-PM.md` con SHA, medidas y capturas
+antes/después, recorrido y negativos, pruebas exactas y riesgos. No
+integres ni despliegues.

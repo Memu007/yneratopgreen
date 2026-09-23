@@ -91,7 +91,7 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 | React / Next.js | ✅ | React 18 + Vite, `npm run build` en 2,05 s, 78 módulos |
 | Python FastAPI / Django o Node | ✅ | FastAPI operativo, `/api/health` `200` |
 | **PostgreSQL + PostGIS** | ✅ | PostGIS 3.4.3 sobre PostgreSQL 16, 16 tablas. **PostGIS en uso real**: `Geography(POINT,4326)` con índice GIST; `ST_Distance` Balcarce–Tandil = 96,75 km, contrastado de forma independiente contra 96,67 km por haversine |
-| Responsive móvil y escritorio | ⚪ | Relevamiento de 36 pantallas del 26/07: sin desbordes horizontales de página ni errores de consola. `ADMIN-MOBILE-ACCESS-1` aceptada en rama: siete secciones y Cerrar con blancos de al menos 44 × 44 px en móvil. La ficha nueva pasó 390 px y zoom al 200 % en la suite PM. El script de auditoría móvil heredado opera filtros con el panel cerrado y se detiene antes de la ficha; PM confirmó que abrirlo permite «Limpiar filtros». Falta corregir ese recorrido y completar el QA, además de otros controles táctiles pequeños. Sin integración ni despliegue. |
+| Responsive móvil y escritorio | ⚪ | `ADMIN-MOBILE-ACCESS-1` aceptada en rama: siete secciones y Cerrar con blancos de al menos 44 × 44 px. `MOBILE-AUDIT-FLOW-1` aceptada en rama: llega a la ficha en 360/390/768; auditoría PM 9/12, con tres compras cortadas por el traslado no elegido. PM midió un desborde de 8 px en ficha a 360 y confirmó foco de teclado en filtros invisibles con el panel cerrado. Dev reportó checkout recortado a 360/390, pendiente de reproducción focal. QA responsive incompleto; sin integración ni despliegue. |
 | AWS / Supabase / Render | ⚪ | Railway aprobado y preparado, sin despliegue real ni verificación de producción |
 
 ## 5. Cierre y entrega
