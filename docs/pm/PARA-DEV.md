@@ -36,9 +36,10 @@ geometría real del navegador; no alcanza una inspección de CSS.
 **Pruebas y evidencia.** Entregá antes/después de las tres medidas, el cambio
 mínimo de producto y una regresión focal que falle sobre el comportamiento
 anterior y pase con la corrección. Corré build, lint, tipos y las pruebas
-existentes que cubren panel/modal; informá el resultado exacto. No repitas la
-suite completa salvo que el cambio salga de este alcance o aparezca un rojo
-inesperado: PM hará la revisión independiente proporcional.
+existentes que tu entorno permita; informá el resultado exacto. Las puertas
+que requieran Docker/PostGIS quedan a cargo de PM según `DECISIONS.md`. No
+repitas la suite completa salvo que el cambio salga de este alcance o aparezca
+un rojo inesperado: PM hará la revisión independiente proporcional.
 
 **Leé antes:** `CONTRATO.md` (responsive), `MATRIZ.md` (hallazgo),
 `ROADMAP-CIERRE-MVP-2026-08-31.md` (puerta de usabilidad) y los casos actuales
