@@ -2,7 +2,7 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## MOBILE-AUDIT-FLOW-1 — entregada, para tu revisión
+## MOBILE-AUDIT-FLOW-1 — entregada, con tres objeciones
 
 | | |
 |---|---|
@@ -18,21 +18,49 @@ intercepción. Comprueba que los tres filtros volvieron a «todas», vuelve con
 Completa 9 de 12 recorridos. Los 3 que no completa son el de compra, uno por
 ancho, y no es por el panel.
 
-**Dos cosas para que decidas. Ninguna bloquea esta pieza.**
+**Tres objeciones a tu planteo, con evidencia.** La pieza está hecha dentro
+del alcance que diste. Pero ese alcance deja la auditoría en rojo y con un
+punto ciego, y el diagnóstico del panel quedó corto.
 
-1. **El recorrido de compra está desactualizado.** El checkout pide elegir
-   «Cómo se traslada cada pedido», y el script no elige. La pantalla responde
-   «Falta decidir cómo se traslada un pedido.» y el pago nunca aparece. Es un
-   defecto del script, no del producto. No lo arreglé porque pediste frenar
-   si había que ampliar el alcance. Recomiendo una pieza chica para que elija
-   «Coordino el traslado por mi cuenta» y siga.
-2. **En celular, el checkout se sale por la derecha.** En «Datos de envío» el
-   contenido mide 400 px: pasa 60 px el borde a 360 y 30 px a 390. La capa lo
-   recorta, así que no aparece barra horizontal y la auditoría no lo cuenta
-   como desborde. Se cortan rótulos, campos y el texto de las opciones de
-   traslado. Lo medí con una sonda aparte, porque la auditoría no llega a esa
-   pantalla. Parece un defecto real del producto y no lo toqué. Recomiendo
-   verlo en la misma pieza que el punto 1, así la auditoría lo mide.
+1. **El panel sí tiene un defecto de producto, aunque el botón no.** Tenés
+   razón en que «Limpiar filtros» funciona con el panel abierto. Pero plegar
+   con `max-height: 0` deja los controles en el orden del teclado. A 390 px,
+   con el panel cerrado, Tab desde «Filtros» recorre Tipo, Categoría,
+   Provincia y Precio, y ninguno se ve: el panel mide 0 px de alto. Por la
+   regla del CSS pasa en todo ancho menor a 1024 px, incluido el escritorio
+   con zoom al 200 %. Para reproducirlo: Mercado a 390 px, foco en «Filtros»
+   sin abrir, Tab cuatro veces; el foco desaparece las cuatro. Recomiendo
+   una pieza de producto propia; es chica.
+2. **Con este alcance, «complete sus recorridos» no se cumple.** Eso dice
+   `NOW.md`. Pero la compra se corta en otro lado, sin relación con el panel:
+   el checkout pide elegir «Cómo se traslada cada pedido», el script no
+   elige, y la pantalla responde «Falta decidir cómo se traslada un
+   pedido.». Como pediste frenar ahí, la auditoría termina 9 de 12 y sale
+   con 2. O ampliás esta pieza, o la aceptás con la auditoría en rojo y abrís
+   otra. Recomiendo ampliarla: es el mismo archivo y es poco —elegir
+   «Coordino el traslado por mi cuenta»; lo probé con una sonda y llega a
+   «Medio de pago»—, y sin eso la auditoría no llega a la pantalla del
+   punto 3.
+3. **La medición de desborde que pediste conservar no ve un desborde dentro
+   de una capa.** Sólo compara el ancho del documento. En el checkout,
+   «Datos de envío» mide 400 px dentro de una capa de 320 a 360 px, y la capa
+   se desplaza de costado: 432 px de contenido para 320 de ancho. A la
+   vista, rótulos, campos y opciones de traslado quedan cortados a la
+   derecha, 60 px pasado el borde a 360 y 30 px a 390. El documento sigue
+   midiendo 360 y 390, así que la auditoría daría «Desbordes horizontales:
+   0». Lo medí con una sonda aparte, con el mismo cálculo que usa la
+   auditoría. Recomiendo contar también los contenedores que se desplazan de
+   costado. La tabla del panel de administración hace lo mismo, pero a
+   propósito: hay que nombrarla como excepción, porque por el CSS no se
+   distingue de la capa del checkout. Iría con el punto 2. El checkout
+   parece un defecto real del producto y no lo toqué.
+
+**Y una premisa que no es cierta: `DECISIONS.md` dice que no tengo PostGIS.**
+Tengo PostgreSQL con PostGIS 3.4.2 nativo: `select postgis_lib_version()`
+responde `3.4.2`. Corrí la suite completa desde base limpia en la pieza
+anterior, que aceptaste, y ahora la auditoría completa. Lo único que no
+tengo es Docker, y sólo lo pide el caso 131. Esa premisa hace que cargues
+corridas que no hacen falta. La decisión es de Emi.
 
 ## Para verificar, lo mínimo
 
@@ -102,24 +130,13 @@ No corrí la suite smoke, como pediste, ni el build, porque `src/` no
 cambió. Mis corridas dejaron la evidencia fuera del repositorio y no se
 versiona.
 
-Un dato para `DECISIONS.md`: dice que no tengo PostGIS. Tengo PostgreSQL
-con PostGIS 3.4.2 nativo, sin Docker, y por eso pude correr la auditoría
-completa. Lo único que me falta es Docker, que sólo pide el caso 131. La
-decisión es de Emi; te lo aviso para que no planifiques sobre eso.
-
 ## Visto y no tocado
 
-- **Con el teclado, el foco pasa por filtros que no se ven.** A 390 px, con
-  el panel cerrado, Tab desde «Filtros» recorre Tipo, Categoría, Provincia y
-  Precio, que no se ven porque el panel mide 0 px de alto. Por la regla del
-  CSS pasa en cualquier ancho menor a 1024 px, incluido el escritorio con
-  zoom al 200 %.
-  Es un defecto de accesibilidad del producto que esta auditoría no mide.
 - **En la ficha a 360 px, el rótulo de la placa se corta.** «Sin registro
   fotográfico» queda cortado abajo. La proporción del marco es la misma
   regla que tenía el modal, así que no viene de la página nueva.
-- La tabla de productos del panel de administración se pasa del ancho a
-  propósito y se desplaza dentro de su marco. Por eso no agregué un conteo de
-  «elementos fuera del ancho»: la marcaría como hallazgo.
+- No agregué en esta pieza el conteo del punto 3: sin la excepción de la
+  tabla de administración, marcaría como hallazgo algo que es a propósito,
+  y decidir qué desplazamiento lateral se acepta te toca a vos.
 
 No toqué `main`, Railway, producto ni datos, y no desplegué. Freno acá.
