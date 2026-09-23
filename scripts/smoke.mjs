@@ -31928,6 +31928,199 @@ await runCase(184, 'El checkout en celular no deja nada fuera de su capa, y la c
     + 'ningún paso del progreso, y no se creó ninguna orden';
 });
 
+await runCase(185, 'La ficha entra en el celular: ni la cifra más larga ni un texto sin cortes la ensanchan', async () => {
+  // La publicación que desbordaba es de la siembra demo: «Campo Agrícola de
+  // 120 Hectáreas», $ 950.000.000. A su lado, una fabricada con todo lo largo
+  // a la vez —título, enlace sin cortes en la descripción, $ 1.500.000.000— y
+  // sin foto, y una de precio corto, que tiene que seguir a 40 px en celular.
+  const CAMPO = 'Campo Agrícola de 120 Hectáreas';
+  const CORTO = 'Fertilizante Triple 15 - NPK';
+  const MARCADOR = `Ficha185 ${Date.now()}`;
+  const LARGA = `${MARCADOR} sembradora neumática de precisión con dosificación variable y 16 surcos a 52,5 cm`;
+  const idDe = (nombre) => {
+    const [fila] = queryRows(`SELECT id, status FROM products WHERE name = ${sqlLiteral(nombre)}`);
+    assert(fila && fila[1] === 'ACTIVE',
+      `la publicación «${nombre}» no está activa en la base: ${JSON.stringify(fila || null)}`);
+    return fila[0];
+  };
+  const idDelCampo = idDe(CAMPO);
+  const idDelCorto = idDe(CORTO);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const [categoria] = queryRows(`SELECT id, 'fin' FROM categories WHERE slug = 'maquinaria-agricola'`);
+  assert(categoria, 'falta la categoría de maquinaria para armar la publicación larga');
+  const limpiar = () => {
+    try {
+      const fabricadas = `SELECT id FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}%`)}`;
+      querySql(`DELETE FROM cart_items WHERE product_id IN (${fabricadas})`);
+      querySql(`DELETE FROM product_images WHERE product_id IN (${fabricadas})`);
+      querySql(`DELETE FROM products WHERE name LIKE ${sqlLiteral(`${MARCADOR}%`)}`);
+    } catch (error) {
+      console.log(`  · no se pudo retirar la publicación del caso 185: ${error.message}`);
+    }
+  };
+  const { status, data } = await apiRequest('/products', {
+    method: 'POST', token: vendedor.token,
+    body: {
+      name: LARGA,
+      // Un enlace se parte en «/» y en «-»; un código pegado, no. Es el
+      // texto que de verdad no tiene dónde partirse.
+      description: 'Ficha técnica en https://www.ejemplo-agro-maquinaria-muy-larga.com.ar/catalogo/'
+        + 'sembradoras/tx-mega-16-surcos-52cm/ficha-tecnica-completa.pdf y código de fábrica '
+        + 'SEMBRADORATXMEGA16S525CMDOSIFICACIONVARIABLE2024.',
+      category_id: categoria[0], price: 1500000000, stock: 1, unit: 'unidad',
+      publication_type: 'producto', operation_kind: 'activo', condition: 'usado',
+      locality_id: localidadDelPadron('Pergamino', 'Buenos Aires'),
+    },
+  });
+  assert(status < 400, `no se pudo publicar la publicación larga: HTTP ${status}`);
+  const idDeLaLarga = data.id;
+
+  // Lo que la ficha deja afuera: el documento más ancho que la pantalla, algo
+  // de la ficha fuera de su caja o de su zona —galería, resumen, detalle—, un
+  // texto cortado dentro de su elemento, la cifra más ancha que su bloque o la
+  // placa sin foto más alta que su marco. La zona importa: una cifra que se
+  // sale del resumen puede no salirse de la ficha.
+  const medir = (page) => page.evaluate(() => {
+    const vw = document.documentElement.clientWidth;
+    const ficha = document.querySelector('main article');
+    const caja = ficha.getBoundingClientRect();
+    const visibles = [...ficha.querySelectorAll('*')].filter((e) => {
+      const r = e.getBoundingClientRect();
+      const s = getComputedStyle(e);
+      return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none';
+    });
+    const nombre = (e) => `${e.tagName.toLowerCase()} «${(e.textContent || e.getAttribute('aria-label') || '')
+      .trim().replace(/\s+/g, ' ').slice(0, 30)}»`;
+    const fuera = visibles.filter((e) => {
+      const r = e.getBoundingClientRect();
+      return r.left < caja.left - 1 || r.right > caja.right + 1;
+    }).map((e) => `${nombre(e)} ${Math.round(e.getBoundingClientRect().left)}→${Math.round(e.getBoundingClientRect().right)}`);
+    const zonas = [['galería', '[class*="_galeria_"]'], ['resumen', 'aside'], ['detalle', '[class*="_detalle_"]']]
+      .flatMap(([zona, selector]) => {
+        const area = ficha.querySelector(selector);
+        if (!area) return [];
+        const borde = area.getBoundingClientRect();
+        return [...area.querySelectorAll('*')].filter((e) => visibles.includes(e)).filter((e) => {
+          const r = e.getBoundingClientRect();
+          return r.left < borde.left - 1 || r.right > borde.right + 1;
+        }).map((e) => `${zona}: ${nombre(e)} ${Math.round(e.getBoundingClientRect().right)}>${Math.round(borde.right)}`);
+      });
+    const cortados = visibles
+      .filter((e) => e.children.length === 0 && e.textContent.trim() && e.scrollWidth > e.clientWidth + 1
+        && getComputedStyle(e).display !== 'inline')
+      .map(nombre);
+    const cifra = document.querySelector('[class*="_cifra_"]');
+    const rango = document.createRange();
+    rango.selectNodeContents(cifra);
+    const placa = ficha.querySelector('[data-estado="sin-foto"]');
+    return {
+      documento: document.documentElement.scrollWidth, vw,
+      fuera: fuera.slice(0, 5), zonas: zonas.slice(0, 5), cortados: cortados.slice(0, 5),
+      // Contra el bloque del precio y no contra la cifra: la cifra es un
+      // elemento en línea y su caja mide siempre lo mismo que su texto.
+      cifra: { texto: Math.round(rango.getBoundingClientRect().width),
+        caja: Math.round(cifra.parentElement.getBoundingClientRect().width),
+        fuente: parseFloat(getComputedStyle(cifra).fontSize) },
+      placa: placa ? { alto: Math.round(placa.getBoundingClientRect().height),
+        marco: Math.round(placa.parentElement.getBoundingClientRect().height) } : null,
+    };
+  });
+  const entra = (medida, donde) => {
+    assert(medida.documento <= medida.vw + 1,
+      `${donde}: el documento mide ${medida.documento} px en una pantalla de ${medida.vw}; `
+      + `fuera de la ficha: ${medida.fuera.join(', ') || '(nada)'}`);
+    assert(medida.fuera.length === 0, `${donde}: quedan fuera de la ficha ${medida.fuera.join(', ')}`);
+    assert(medida.zonas.length === 0, `${donde}: quedan fuera de su zona ${medida.zonas.join(', ')}`);
+    assert(medida.cortados.length === 0, `${donde}: textos cortados dentro de su elemento: ${medida.cortados.join(', ')}`);
+    assert(medida.cifra.texto <= medida.cifra.caja + 1,
+      `${donde}: la cifra mide ${medida.cifra.texto} px en un bloque de ${medida.cifra.caja}`);
+    assert(!medida.placa || medida.placa.alto <= medida.placa.marco + 1,
+      `${donde}: la placa sin foto mide ${medida.placa?.alto} px en un marco de ${medida.placa?.marco}: `
+      + 'se corta la leyenda');
+  };
+
+  const browser = await chromium.launch({ headless: true });
+  const erroresDeJs = [];
+  const medidos = [];
+  const pagina = async (ancho, alto) => {
+    const contexto = await browser.newContext({
+      viewport: { width: ancho, height: alto }, isMobile: ancho < 768, hasTouch: true,
+    });
+    const page = await contexto.newPage();
+    page.on('pageerror', (error) => erroresDeJs.push(`${ancho}: ${error.message}`));
+    return { contexto, page };
+  };
+  try {
+    // A. El recorrido de la persona sobre la publicación que desbordaba, a
+    //    360 px: desde el Mercado, vuelta al catálogo con su búsqueda, Adelante
+    //    y recarga. Recargar y DESPUÉS volver no se combina acá: medido, esa
+    //    vuelta a veces pierde la búsqueda —2 de 8—, y es un defecto de los
+    //    filtros, no del ancho; está informado aparte.
+    {
+      const { contexto, page } = await pagina(360, 800);
+      try {
+        const busqueda = `/?section=marketplace&q=${encodeURIComponent(CAMPO)}`;
+        await page.goto(`${FRONTEND_URL}${busqueda}`, { waitUntil: 'domcontentloaded' });
+        await page.getByRole('heading', { name: CAMPO, exact: true, level: 3 }).getByRole('link').click();
+        await page.locator('main[aria-busy="false"] #detalle-titulo').waitFor({ timeout: 20_000 });
+        const barra = new URL(page.url());
+        assert(barra.searchParams.get('section') === 'product' && barra.searchParams.get('id') === idDelCampo,
+          `la ficha de «${CAMPO}» se abrió con la barra en ${page.url()}`);
+        entra(await medir(page), `360x800 «${CAMPO}» desde el Mercado`);
+        await page.goBack();
+        await page.getByRole('heading', { name: CAMPO, exact: true, level: 3 }).waitFor({ timeout: 20_000 });
+        assert(new URL(page.url()).searchParams.get('q') === CAMPO,
+          `Atrás no volvió a la búsqueda del Mercado: la barra dice ${page.url()}`);
+        await page.goForward();
+        await page.locator('main[aria-busy="false"] #detalle-titulo').waitFor({ timeout: 20_000 });
+        entra(await medir(page), `360x800 «${CAMPO}» con Adelante`);
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.locator('main[aria-busy="false"] #detalle-titulo').waitFor({ timeout: 20_000 });
+        assert(new URL(page.url()).searchParams.get('id') === idDelCampo,
+          `la recarga dejó la barra en ${page.url()}`);
+        entra(await medir(page), `360x800 «${CAMPO}» recargada`);
+      } finally {
+        await contexto.close();
+      }
+    }
+
+    // B. Las tres publicaciones por enlace directo, en los tres anchos.
+    for (const [ancho, alto] of [[360, 800], [390, 844], [768, 1024]]) {
+      for (const [nombre, id] of [[CAMPO, idDelCampo], ['la larga sin foto', idDeLaLarga], [CORTO, idDelCorto]]) {
+        const { contexto, page } = await pagina(ancho, alto);
+        try {
+          await page.goto(`${FRONTEND_URL}/?section=product&id=${id}`, { waitUntil: 'domcontentloaded' });
+          await page.locator('main[aria-busy="false"] #detalle-titulo').waitFor({ timeout: 20_000 });
+          const medida = await medir(page);
+          entra(medida, `${ancho}x${alto} «${nombre}»`);
+          if (id === idDelCorto && ancho < 600) {
+            assert(medida.cifra.fuente === 40,
+              `${ancho}x${alto}: el precio corto de «${CORTO}» bajó a ${medida.cifra.fuente} px; `
+              + 'sólo tiene que achicarse la cifra que no entra');
+          }
+          if (id === idDeLaLarga) {
+            assert(medida.placa, `${ancho}x${alto}: la publicación sin foto no dibujó su placa`);
+          }
+          medidos.push(`${ancho} ${nombre === CAMPO ? 'campo' : nombre === CORTO ? 'corto' : 'larga'} `
+            + `${medida.documento}/${medida.vw} cifra ${Math.round(medida.cifra.fuente)} px`);
+        } finally {
+          await contexto.close();
+        }
+      }
+    }
+    assert(erroresDeJs.length === 0, `errores de JS: ${erroresDeJs.join(' | ')}`);
+  } finally {
+    await browser.close();
+    limpiar();
+  }
+  return `La ficha de «${CAMPO}» entra en 360 px abierta desde el Mercado, con Adelante y `
+    + 'recargada, y Atrás vuelve a su búsqueda. Por enlace directo, la demo, una larga sin foto '
+    + `con $ 1.500.000.000 y un código pegado en la descripción, y «${CORTO}» entran en 360, 390 `
+    + 'y 768: nada fuera de la ficha ni de su zona ni cortado, la cifra entera en su bloque y la '
+    + 'placa sin foto dentro de su marco. El precio '
+    + `corto sigue a 40 px en celular (documento/pantalla): ${medidos.join('; ')}`;
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

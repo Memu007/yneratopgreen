@@ -344,7 +344,14 @@ const Ficha: React.FC<FichaProps> = ({
           se puede hacer. Es lo que decide, y por eso va junto y arriba. */}
       <aside className={styles.resumen}>
         <div className={styles.precio}>
-          <strong className={`tg-price ${styles.cifra}`}>{precioVisible(product)}</strong>
+          {/* Cuántos caracteres tiene la cifra: en celular el cuerpo baja lo
+              justo para que entre entera, sin partirla. */}
+          <strong
+            className={`tg-price ${styles.cifra}`}
+            style={{ '--cifras': String(precioVisible(product).length) } as React.CSSProperties}
+          >
+            {precioVisible(product)}
+          </strong>
           {Number(product.price) > 0 && product.unit && <span>por {product.unit}</span>}
         </div>
 

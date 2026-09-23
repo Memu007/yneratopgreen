@@ -98,6 +98,13 @@
    tamaño del hueco es parte de lo que se está diciendo. */
 .imagenPrincipal:has(> [data-estado='sin-foto']) {
   aspect-ratio: 800 / 220;
+  /* Y nunca más bajo que la placa: la placa mide al menos 88 px, y con menos
+     de 320 px de ancho la proporción daba un marco más bajo que recortaba la
+     leyenda, que va abajo. Medido: 78 px de marco a 360. Y con una proporción,
+     el navegador saca el ancho de esa altura mínima —88 × 800 / 220 = 320 px—
+     aunque la galería mida 286: el tope de ancho lo deja dentro de la ficha. */
+  min-height: 88px;
+  max-width: 100%;
 }
 
 .imagenPrincipal img,
@@ -194,6 +201,9 @@
   max-width: 74ch;
   font-size: 18px;
   line-height: 1.7;
+  /* Un enlace o una referencia larga que pega el vendedor no tiene dónde
+     partirse, y ensanchaba la ficha entera. */
+  overflow-wrap: anywhere;
 }
 
 .vendedor { display: grid; gap: var(--tg-space-2); }
@@ -248,8 +258,10 @@
 @media (max-width: 1023px) {
   /* El resumen deja de estar al costado: en una sola columna, quedarse pegado
      produce saltos y se superpone con el cuerpo al hacer scroll. */
+  /* `minmax(0, 1fr)` y no `1fr`: una columna `1fr` toma el ancho mínimo de lo
+     que tiene adentro, y la cifra más larga ensanchaba toda la ficha. */
   .cuerpo {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas: 'galeria' 'resumen' 'detalle';
   }
 }
@@ -261,7 +273,15 @@
   .aviso { padding: var(--tg-space-5); }
   .cuerpo { gap: var(--tg-space-6); padding: var(--tg-space-5); }
   .resumen { padding: var(--tg-space-5); }
-  .cifra { font-size: 40px; }
+  /* El precio baja de cuerpo lo justo para entrar, como en escritorio. Tiene
+     un espacio duro entre «$» y el número para no partirse, así que
+     «$ 950.000.000» a 40 px pedía 286 px con 244 disponibles a 360, y
+     ensanchaba el resumen y la ficha. Ahora son 40 px mientras la cifra
+     entre, y menos sólo si es larga. Medido: 0,55 em por carácter; 0,6 deja
+     margen para otra fuente. Sin unidades de contenedor, vale la regla de
+     escritorio, que también entra. */
+  .precio { container-type: inline-size; }
+  .cifra { font-size: min(40px, calc(100cqi / (var(--cifras, 10) * 0.6))); }
   .descripcion { font-size: 16px; }
 
   /* La tabla se vuelve pares rótulo/valor: una tabla de dos columnas con
