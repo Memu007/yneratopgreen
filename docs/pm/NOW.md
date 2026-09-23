@@ -8,9 +8,19 @@ Actualizado: 2026-09-23.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. Su puerta funcional quedó verificada el 23/09 sobre la composición aceptada `1e4a63c`; la evidencia está en `REPRODUCCION-FASE-2-2026-09-23.md`. Las fechas y las puertas posteriores no cambian.
 - **`main`:** `0bd7fbc`; `RISK-REC-1` integrada y publicada con autorización de Emi. GitHub, Frontend y Backend convergieron en ese SHA y los dos servicios quedaron saludables. El entorno `strong-playfulness` sigue siendo demostrativo y no equivale al despliegue productivo contractual.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `MOBILE-AUDIT-FLOW-1` en `8e4f7c6`, informe final `69779b0`. PM aceptó el arnés en rama; aún no integrado ni desplegado.
-- **Última decisión PM:** `MOBILE-AUDIT-FLOW-1` **ACEPTADA EN RAMA** para el recorrido público y la clasificación de cortes. La auditoría total sigue en **9/12** y reveló defectos de producto. Evidencia en `REPRODUCCION-MOBILE-AUDIT-FLOW-1-2026-09-23.md`.
-- **Tarea activa:** `MOBILE-CHECKOUT-1`, asignada a Dev en `PARA-DEV.md`: completar el recorrido móvil de checkout y corregir el contenido recortado, si se reproduce.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `MOBILE-CHECKOUT-1` en `f820146`, informe `e6fdc6d`. PM aceptó la pieza en rama; aún no integrada ni desplegada.
+- **Última decisión PM:** `MOBILE-CHECKOUT-1` **ACEPTADA EN RAMA**. PM reprodujo el caso 184 en 1/1, el negativo rojo y la auditoría en **12/12** recorridos con cero recortes del checkout. Persiste un desborde de ficha a 360 px. Evidencia en `REPRODUCCION-MOBILE-CHECKOUT-1-2026-09-23.md`.
+- **Tarea activa:** `FICHA-MOBILE-WIDTH-1`, asignada a Dev en `PARA-DEV.md`: corregir el desborde de la ficha a 360 px sobre la base demo limpia.
+
+## Última aceptación PM — MOBILE-CHECKOUT-1
+
+PM verificó la candidata `f820146` sobre base aislada. El caso 184 pasó en
+360/390/768 px: envío y pago caben exactamente en la capa y la compra llega
+al medio de pago sin crear orden. El negativo con el CSS original dio rojo
+específico por recorte. La auditoría completó 12/12 recorridos, 39 pantallas,
+sin recortes del checkout ni cortes del arnés. Salió con 1 por la ficha de
+«Campo Agrícola de 120 Hectáreas» a 360 px: 368 px de documento. El QA
+responsive sigue abierto; `FICHA-MOBILE-WIDTH-1` es la siguiente pieza.
 
 ## Última aceptación PM — MOBILE-AUDIT-FLOW-1
 
@@ -24,9 +34,9 @@ asignado; no se declara cerrado el QA responsive.
 La misma corrida encontró **un desborde horizontal real en la ficha a 360 px**
 con «Campo Agrícola de 120 Hectáreas» (368 px de contenido en 360). PM confirmó
 además que Tab desde «Filtros» cerrado entra en cuatro controles invisibles.
-Dev reportó checkout recortado a 360/390 px, pendiente de reproducción focal
-en `MOBILE-CHECKOUT-1`. Los tres defectos de producto quedan abiertos y
-se priorizan por separado.
+El recorte del checkout quedó corregido y aceptado en rama en
+`MOBILE-CHECKOUT-1`. Siguen abiertos la ficha a 360 px y el foco de filtros
+cerrados; se priorizan por separado.
 
 ## Última aceptación PM — PRODUCT-DETAIL-PAGE-1
 
@@ -312,7 +322,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev trabaja `MOBILE-CHECKOUT-1`; PM verifica el recorrido de pago y la geometría de envío. Luego se atacan el desborde de la ficha a 360 px y el foco en filtros cerrados. Las seis piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
+1. Dev trabaja `FICHA-MOBILE-WIDTH-1`; PM verificará la ficha problemática a 360 px y el 12/12 con cero desbordes. Después se ataca el foco en filtros cerrados. Las siete piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
 2. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración. La propuesta de recuperación pre-migración espera decisión de Emi y verificación autenticada de Railway.
 3. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
