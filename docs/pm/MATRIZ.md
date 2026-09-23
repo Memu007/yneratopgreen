@@ -1,9 +1,15 @@
 # Matriz requisito contractual → evidencia → estado
 
-Contrastada contra `CONTRATO.md`. Actualizada el 2026-09-22 después de aceptar
-`CART-PRODUCT-QUERY-1` en rama. `main` sigue en `0bd7fbc`; GitHub, Frontend y
+Contrastada contra `CONTRATO.md`. Actualizada el 2026-09-23 después de verificar
+la puerta funcional de Fase 2. `main` sigue en `0bd7fbc`; GitHub, Frontend y
 Backend convergieron en esa revisión. El entorno Railway sigue siendo
 demostrativo, no el despliegue productivo contractual.
+
+La puerta funcional contractual de **Fase 2** quedó verificada el 2026-09-23
+sobre `1e4a63c`: arquitectura/migraciones/seed, registro con validación por
+correo, perfiles editables y perfil del transportista. Evidencia en
+`REPRODUCCION-FASE-2-2026-09-23.md`; SMTP y operación productiva siguen
+pendientes de Fase 5.
 
 **Estados:** ✅ verificado con evidencia de ejecución · 🟡 existe en
 código, sin verificar · ⚪ parcial · ❌ inexistente

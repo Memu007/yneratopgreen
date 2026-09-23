@@ -1,15 +1,15 @@
 # Estado actual
 
-Actualizado: 2026-09-22.
+Actualizado: 2026-09-23.
 
 `NOW.md` contiene sólo estado vigente, restricciones vivas, bloqueos y próxima acción. La historia anterior permanece en Git; la instantánea previa a esta poda está en `ab4165fc`.
 
 ## Resumen ejecutivo
 
-- **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. El proyecto está funcionalmente adelantado en varias áreas; las fechas son ventanas/puertas contractuales, no una prohibición de terminar piezas antes.
+- **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. Su puerta funcional quedó verificada el 23/09 sobre la composición aceptada `1e4a63c`; la evidencia está en `REPRODUCCION-FASE-2-2026-09-23.md`. Las fechas y las puertas posteriores no cambian.
 - **`main`:** `0bd7fbc`; `RISK-REC-1` integrada y publicada con autorización de Emi. GitHub, Frontend y Backend convergieron en ese SHA y los dos servicios quedaron saludables. El entorno `strong-playfulness` sigue siendo demostrativo y no equivale al despliegue productivo contractual.
 - **Rama Dev:** `claude/dev-role-repo-3l0kp3`, producto aceptado `1e4a63c` e informe `e0fd76b`, sobre base `6e64c19`.
-- **Última decisión PM:** `CART-PRODUCT-QUERY-1` **ACEPTADA EN RAMA, NO INTEGRADA NI DESPLEGADA**. Evidencia en `REPRODUCCION-CART-PRODUCT-QUERY-1-2026-09-22.md`.
+- **Última decisión PM:** puerta funcional de Fase 2 **CUMPLIDA**; `CART-PRODUCT-QUERY-1` **ACEPTADA EN RAMA, NO INTEGRADA NI DESPLEGADA**. Evidencia en `REPRODUCCION-FASE-2-2026-09-23.md` y `REPRODUCCION-CART-PRODUCT-QUERY-1-2026-09-22.md`.
 - **Tarea activa:** ninguna. Dev frena hasta una nueva asignación PM.
 
 ## Última aceptación PM — CART-PRODUCT-QUERY-1
