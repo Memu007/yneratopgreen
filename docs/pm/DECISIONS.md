@@ -14,9 +14,10 @@ de compraventa. La página debe abrir en la misma pestaña, tener enlace directo
 recargable y usar el historial normal del navegador. No se copia diseño de
 otro marketplace ni se abre alcance de SEO, recomendaciones o atributos nuevos.
 
-La pieza `PRODUCT-DETAIL-PAGE-1` quedó **asignada** después de aceptar
-`ADMIN-MOBILE-ACCESS-1`; la entrega ejecutable está en `PARA-DEV.md`.
-Se conserva una sola tarea activa.
+La pieza `PRODUCT-DETAIL-PAGE-1` quedó **aceptada en rama** en `087fa2c`
+después de la revisión PM; no está integrada ni desplegada. Abrir o recargar
+la ficha consulta el detalle y suma una vista en `views_count`, tal como hace
+la API existente. Se acepta que esa métrica cuente aperturas y recargas.
 
 Motivo: el detalle vigente es un `ProductDetailModal` ligado al estado de la
 tarjeta y al historial sin URL distinta. Una página permite compartir y
@@ -1158,6 +1159,7 @@ Ordenadas por cuánto bloquean.
    subcategorías, form options): completar, ocultar o remover. Están
    entrelazados en migraciones, modelos y UI; no se apagan con un flag.
 3. **URLs por producto:** decidido por Emi el 2026-09-23; ver la entrada
-   `PRODUCT-DETAIL-PAGE-1` arriba. Pendiente de implementación.
+   `PRODUCT-DETAIL-PAGE-1` arriba. Implementada y aceptada en rama; aún sin
+   integrar ni desplegar.
 4. **Alcance del rol transportista** en el MVP: selección directa,
    cotización, o ambas.

@@ -25,6 +25,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Perfil | ✅ | `GET /auth/me` y `PATCH /auth/me` responden `200` |
 | Buscador con filtro por **categoría** | ✅ | Smoke test `200`, filtros de categoría, precio y stock aplicados |
 | Buscador con filtro por **ubicación** | ✅ | Verificacion completa del 2026-08-05: 13/13 localidades y 32/32 publicaciones coincidieron entre interfaz y SQL; selectores encadenados y `locality_id` en URL. Ver `EVIDENCIA-FILTROS-UBICACION.md` |
+| Ficha de publicación con URL propia | ✅ en rama | `PRODUCT-DETAIL-PAGE-1` (`087fa2c`): enlace directo, recarga, Atrás/Adelante, compra y cotización verificados en la suite PM 183/183; caso 183 rojo con el modal anterior y verde restaurado. Aún no integrada ni desplegada |
 | Paginación, orden y total del catálogo | ✅ | Caso 171 sobre 115 publicaciones: 24 por página, la 101 accesible, total/filtros/órdenes aplicados en servidor y navegación sin presentar resultados viejos como vigentes. Producto `575f757`, reproducción PM en `REPRODUCCION-CAT-PAGE-1-2026-09-14.md` |
 | Carrito de compras | ✅; optimizaciones en rama | Smoke 170: una sesión confirmada inválida conserva los ítems y la cabecera permite reabrirlos. Casos 180–181 aceptados en rama: imágenes y publicaciones se leen una vez por petición, con principal o `null`, orden, importes y rechazos conservados; aún no integrados ni desplegados. El Login no habilita checkout anónimo y el logout explícito vacía el carrito |
 | Historial de pedidos | ✅ | Smoke test "mis compras": `200`, 3 compras |
@@ -90,7 +91,7 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 | React / Next.js | ✅ | React 18 + Vite, `npm run build` en 2,05 s, 78 módulos |
 | Python FastAPI / Django o Node | ✅ | FastAPI operativo, `/api/health` `200` |
 | **PostgreSQL + PostGIS** | ✅ | PostGIS 3.4.3 sobre PostgreSQL 16, 16 tablas. **PostGIS en uso real**: `Geography(POINT,4326)` con índice GIST; `ST_Distance` Balcarce–Tandil = 96,75 km, contrastado de forma independiente contra 96,67 km por haversine |
-| Responsive móvil y escritorio | ⚪ | Relevamiento de 36 pantallas del 26/07: sin desbordes horizontales de página ni errores de consola. `ADMIN-MOBILE-ACCESS-1` aceptada en rama: las siete secciones admin son visibles y sus blancos, junto a Cerrar, miden al menos 44 × 44 px en móvil; caso 182 PM verde y sabotaje rojo. Siguen pendientes otros controles táctiles pequeños y la revisión final; pieza sin integrar ni desplegar. |
+| Responsive móvil y escritorio | ⚪ | Relevamiento de 36 pantallas del 26/07: sin desbordes horizontales de página ni errores de consola. `ADMIN-MOBILE-ACCESS-1` aceptada en rama: siete secciones y Cerrar con blancos de al menos 44 × 44 px en móvil. La ficha nueva pasó 390 px y zoom al 200 % en la suite PM. El script de auditoría móvil heredado opera filtros con el panel cerrado y se detiene antes de la ficha; PM confirmó que abrirlo permite «Limpiar filtros». Falta corregir ese recorrido y completar el QA, además de otros controles táctiles pequeños. Sin integración ni despliegue. |
 | AWS / Supabase / Render | ⚪ | Railway aprobado y preparado, sin despliegue real ni verificación de producción |
 
 ## 5. Cierre y entrega

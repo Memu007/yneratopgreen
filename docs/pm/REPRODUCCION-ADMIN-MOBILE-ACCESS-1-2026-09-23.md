@@ -46,7 +46,7 @@ todos los controles de Configuración u otros paneles midan 44 px: los botones
 de tipo de opción de 26 px observados por Dev y el QA responsive general
 siguen pendientes.
 
-El push de Dev partió de `d4ce965` y omitió la decisión PM previa
-`44d5d5d` sobre la página de producto. PM la reaplicó sobre el informe Dev
-como `7b45ea1`, sin modificar código de producto. La tarea siguiente queda
-registrada en `PARA-DEV.md`.
+El primer push de Dev partió de `d4ce965` y omitió la decisión PM previa
+`44d5d5d` sobre la página de producto. Dev incorporó ese commit por el merge
+`aab4e62`; el cherry-pick local PM `7b45ea1` tenía el mismo contenido y
+**no** quedó en la historia remota. El cierre PM siguió sobre `aab4e62`.

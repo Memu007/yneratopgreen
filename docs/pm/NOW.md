@@ -8,9 +8,25 @@ Actualizado: 2026-09-23.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. Su puerta funcional quedó verificada el 23/09 sobre la composición aceptada `1e4a63c`; la evidencia está en `REPRODUCCION-FASE-2-2026-09-23.md`. Las fechas y las puertas posteriores no cambian.
 - **`main`:** `0bd7fbc`; `RISK-REC-1` integrada y publicada con autorización de Emi. GitHub, Frontend y Backend convergieron en ese SHA y los dos servicios quedaron saludables. El entorno `strong-playfulness` sigue siendo demostrativo y no equivale al despliegue productivo contractual.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; entrega reciente de `ADMIN-MOBILE-ACCESS-1` en `b2a3ba4`, informe `a11b52a`. PM la verificó y aceptó en rama; aún no integrada ni desplegada.
-- **Última decisión PM:** `ADMIN-MOBILE-ACCESS-1` **ACEPTADA EN RAMA, NO INTEGRADA NI DESPLEGADA**. Evidencia en `REPRODUCCION-ADMIN-MOBILE-ACCESS-1-2026-09-23.md`.
-- **Tarea activa:** `PRODUCT-DETAIL-PAGE-1`, asignada a Dev en `PARA-DEV.md`: el detalle de una publicación pasa del modal a una página con URL propia.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; producto `PRODUCT-DETAIL-PAGE-1` en `087fa2c`, informe `9110bcc`. PM lo verificó y aceptó en rama; aún no integrado ni desplegado.
+- **Última decisión PM:** `PRODUCT-DETAIL-PAGE-1` **ACEPTADA EN RAMA, NO INTEGRADA NI DESPLEGADA**. Evidencia en `REPRODUCCION-PRODUCT-DETAIL-PAGE-1-2026-09-23.md`.
+- **Tarea activa:** `MOBILE-AUDIT-FLOW-1`, asignada a Dev en `PARA-DEV.md`: hacer que la auditoría móvil abra el panel de filtros antes de operarlo y complete sus recorridos.
+
+## Última aceptación PM — PRODUCT-DETAIL-PAGE-1
+
+Producto y caso 183 `087fa2c`; informe `9110bcc`. PM corrió la suite completa
+sobre base aislada: **183/183**, incluidos 123, 131, 147, 148, 155 y 183.
+El sabotaje que devuelve el modal dio rojo por falta de URL propia; restaurada
+la candidata, el caso 183 pasó **1/1**. Build, lint, tipos y diff-check verdes.
+Dev informó a11y **74/74** y contraste **82/82**. La nueva consulta del
+detalle suma una vista en `views_count` por apertura o recarga; se acepta ese
+efecto de la API existente. Sin integración ni despliegue.
+
+La auditoría móvil heredada se corta en «Limpiar filtros»: el script opera
+selectores dentro del panel aún plegado y después intenta pulsar un control
+oculto. PM reprodujo el rojo y confirmó con clic real en 360 px que abrir
+«Filtros» permite limpiar normalmente. Se asigna corregir el recorrido del
+arnés, no un cambio de producto sin defecto demostrado.
 
 ## Última aceptación PM — ADMIN-MOBILE-ACCESS-1
 
@@ -280,7 +296,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev implementa `PRODUCT-DETAIL-PAGE-1`; PM revisa la página, el acceso directo y el regreso al catálogo. Las cuatro piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
+1. Dev corrige `MOBILE-AUDIT-FLOW-1`; PM ejecuta la auditoría móvil completa sobre la composición aislada. Las cinco piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
 2. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración. La propuesta de recuperación pre-migración espera decisión de Emi y verificación autenticada de Railway.
 3. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
