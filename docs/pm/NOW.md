@@ -8,9 +8,24 @@ Actualizado: 2026-09-23.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. Su puerta funcional quedó verificada el 23/09 sobre la composición aceptada `1e4a63c`; la evidencia está en `REPRODUCCION-FASE-2-2026-09-23.md`. Las fechas y las puertas posteriores no cambian.
 - **`main`:** `0bd7fbc`; `RISK-REC-1` integrada y publicada con autorización de Emi. GitHub, Frontend y Backend convergieron en ese SHA y los dos servicios quedaron saludables. El entorno `strong-playfulness` sigue siendo demostrativo y no equivale al despliegue productivo contractual.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `MOBILE-CHECKOUT-1` en `f820146`, informe `e6fdc6d`. PM aceptó la pieza en rama; aún no integrada ni desplegada.
-- **Última decisión PM:** `MOBILE-CHECKOUT-1` **ACEPTADA EN RAMA**. PM reprodujo el caso 184 en 1/1, el negativo rojo y la auditoría en **12/12** recorridos con cero recortes del checkout. Persiste un desborde de ficha a 360 px. Evidencia en `REPRODUCCION-MOBILE-CHECKOUT-1-2026-09-23.md`.
-- **Tarea activa:** `FICHA-MOBILE-WIDTH-1`, asignada a Dev en `PARA-DEV.md`: corregir el desborde de la ficha a 360 px sobre la base demo limpia.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `FICHA-MOBILE-WIDTH-1` en `78b682b`, informe `4a0dca2`. PM aceptó la pieza en rama; aún no integrada ni desplegada.
+- **Última decisión PM:** `FICHA-MOBILE-WIDTH-1` **ACEPTADA EN RAMA**. PM reprodujo el caso 185 en 1/1, el negativo rojo y la auditoría en **12/12** recorridos sin desbordes. Evidencia en `REPRODUCCION-FICHA-MOBILE-WIDTH-1-2026-09-23.md`.
+- **Tarea activa:** `PRODUCT-DETAIL-BACK-SEARCH-1`, asignada a Dev en `PARA-DEV.md`: conservar la búsqueda tras abrir y recargar una ficha y usar «Atrás».
+
+## Última aceptación PM — FICHA-MOBILE-WIDTH-1
+
+PM verificó la candidata `78b682b` sobre base aislada: caso 185 **1/1** en
+360/390/768 px, sin contenido fuera de la ficha. El negativo que repone la
+geometría anterior dio rojo específico por desborde a 360 px. La auditoría
+móvil completó **12/12** recorridos y 39 pantallas con cero desbordes, cero
+recortes del checkout y salida 0. Build, lint, tipos y diff-check verdes. El
+QA responsive de geometría queda verde en rama; sigue pendiente el foco de
+teclado en filtros cerrados.
+
+Dev informó además una pérdida intermitente de `q` al volver desde una ficha
+recargada (8/20 intentos suyos). PM no la reprodujo durante esta revisión; se
+asigna `PRODUCT-DETAIL-BACK-SEARCH-1` para reproducirla y resolverla antes
+del foco de filtros. Sin integración ni despliegue.
 
 ## Última aceptación PM — MOBILE-CHECKOUT-1
 
@@ -322,7 +337,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev trabaja `FICHA-MOBILE-WIDTH-1`; PM verificará la ficha problemática a 360 px y el 12/12 con cero desbordes. Después se ataca el foco en filtros cerrados. Las siete piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
+1. Dev trabaja `PRODUCT-DETAIL-BACK-SEARCH-1`; PM verificará el mismo recorrido búsqueda → ficha → recarga → Atrás, con negativo discriminante. Luego sigue `FILTER-COLLAPSE-FOCUS-1`. Las ocho piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
 2. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración. La propuesta de recuperación pre-migración espera decisión de Emi y verificación autenticada de Railway.
 3. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.

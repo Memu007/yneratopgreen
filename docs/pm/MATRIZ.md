@@ -25,7 +25,7 @@ código, sin verificar · ⚪ parcial · ❌ inexistente
 | Perfil | ✅ | `GET /auth/me` y `PATCH /auth/me` responden `200` |
 | Buscador con filtro por **categoría** | ✅ | Smoke test `200`, filtros de categoría, precio y stock aplicados |
 | Buscador con filtro por **ubicación** | ✅ | Verificacion completa del 2026-08-05: 13/13 localidades y 32/32 publicaciones coincidieron entre interfaz y SQL; selectores encadenados y `locality_id` en URL. Ver `EVIDENCIA-FILTROS-UBICACION.md` |
-| Ficha de publicación con URL propia | ✅ en rama | `PRODUCT-DETAIL-PAGE-1` (`087fa2c`): enlace directo, recarga, Atrás/Adelante, compra y cotización verificados en la suite PM 183/183; caso 183 rojo con el modal anterior y verde restaurado. Aún no integrada ni desplegada |
+| Ficha de publicación con URL propia | ⚪ en rama | `PRODUCT-DETAIL-PAGE-1` (`087fa2c`): enlace directo, recarga, Atrás/Adelante, compra y cotización verificados en la suite PM 183/183; caso 183 rojo con el modal anterior y verde restaurado. Dev informó una regresión intermitente al encadenar búsqueda → ficha → recarga → Atrás: se pierde `q` (8/20). `PRODUCT-DETAIL-BACK-SEARCH-1` asignada. Aún no integrada ni desplegada |
 | Paginación, orden y total del catálogo | ✅ | Caso 171 sobre 115 publicaciones: 24 por página, la 101 accesible, total/filtros/órdenes aplicados en servidor y navegación sin presentar resultados viejos como vigentes. Producto `575f757`, reproducción PM en `REPRODUCCION-CAT-PAGE-1-2026-09-14.md` |
 | Carrito de compras | ✅; optimizaciones en rama | Smoke 170: una sesión confirmada inválida conserva los ítems y la cabecera permite reabrirlos. Casos 180–181 aceptados en rama: imágenes y publicaciones se leen una vez por petición, con principal o `null`, orden, importes y rechazos conservados; aún no integrados ni desplegados. El Login no habilita checkout anónimo y el logout explícito vacía el carrito |
 | Historial de pedidos | ✅ | Smoke test "mis compras": `200`, 3 compras |
@@ -91,7 +91,7 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 | React / Next.js | ✅ | React 18 + Vite, `npm run build` en 2,05 s, 78 módulos |
 | Python FastAPI / Django o Node | ✅ | FastAPI operativo, `/api/health` `200` |
 | **PostgreSQL + PostGIS** | ✅ | PostGIS 3.4.3 sobre PostgreSQL 16, 16 tablas. **PostGIS en uso real**: `Geography(POINT,4326)` con índice GIST; `ST_Distance` Balcarce–Tandil = 96,75 km, contrastado de forma independiente contra 96,67 km por haversine |
-| Responsive móvil y escritorio | ⚪ | `ADMIN-MOBILE-ACCESS-1`, `MOBILE-AUDIT-FLOW-1` y `MOBILE-CHECKOUT-1` aceptadas en rama. Auditoría PM: 12/12 recorridos en 360/390/768, 39 pantallas, cero recortes del checkout; persiste un desborde de ficha de 8 px a 360 con «Campo Agrícola de 120 Hectáreas» y foco de teclado en filtros invisibles con el panel cerrado. `FICHA-MOBILE-WIDTH-1` activa; QA responsive incompleto, sin integración ni despliegue. |
+| Responsive móvil y escritorio | ⚪ | `ADMIN-MOBILE-ACCESS-1`, `MOBILE-AUDIT-FLOW-1`, `MOBILE-CHECKOUT-1` y `FICHA-MOBILE-WIDTH-1` aceptadas en rama. Auditoría PM: 12/12 recorridos en 360/390/768, 39 pantallas, cero desbordes y cero recortes del checkout. Persiste foco de teclado en controles de filtros invisibles con el panel cerrado; `FILTER-COLLAPSE-FOCUS-1` en cola. Sin integración ni despliegue. |
 | AWS / Supabase / Render | ⚪ | Railway aprobado y preparado, sin despliegue real ni verificación de producción |
 
 ## 5. Cierre y entrega

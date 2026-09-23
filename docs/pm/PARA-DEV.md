@@ -5,42 +5,45 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Tarea activa — FICHA-MOBILE-WIDTH-1
+## Tarea activa — PRODUCT-DETAIL-BACK-SEARCH-1
 
-**Prioridad y problema.** El QA móvil del MVP ya completa los 12 recorridos,
-pero la ficha de «Campo Agrícola de 120 Hectáreas» desborda a 360 px: el
-documento mide 368 px. La galería, el resumen y varias secciones llegan a
-`right=368`. La ficha es parte del recorrido público y tiene URL propia.
+**Prioridad y problema.** La ficha con URL propia ya está aceptada en rama,
+pero Dev observó que, tras abrirla desde una búsqueda y recargarla, «Atrás»
+puede volver al Mercado sin la consulta `q` (8/20 intentos). La persona pierde
+el resultado que estaba viendo. Esta regresión de navegación se atiende antes
+de `FILTER-COLLAPSE-FOCUS-1`.
 
-**Alcance.** Reproducí el defecto con la base demo limpia, esa publicación y
-el viewport 360 × 800. Identificá el elemento que impone el ancho y corregí
-la geometría local de la ficha para que galería, texto, precio, acciones y
-secciones entren en la pantalla. Verificá también 390 × 844 y 768 × 1024,
-con una publicación sin foto y otra con textos o precio largos. Conservá URL,
-recarga y regreso al catálogo.
+**Alcance.** Reproducí el defecto desde el Mercado con
+`?q=Campo%20Agr%C3%ADcola%20de%20120%20Hect%C3%A1reas`: abrir la ficha,
+recargarla y usar «Atrás» de la interfaz. Investigá la sincronización entre
+URL y estado de filtros y corregí sólo lo necesario para conservar la consulta
+y los resultados al volver. Cubrí también la visita directa a la URL de una
+ficha, donde no hay búsqueda previa que restaurar. Conservá recarga, enlace
+compartible, Atrás/Adelante, paginación y otros filtros existentes.
 
-**Fuera de alcance.** Rediseño global, checkout, filtros, datos, backend,
-permisos, pagos, integración y despliegue. El foco de teclado que entra en
-filtros cerrados sigue en la tarea separada `FILTER-COLLAPSE-FOCUS-1`.
+**Fuera de alcance.** Rediseño de filtros, nueva librería de rutas, backend,
+datos, checkout, pagos, integración y despliegue. El foco de teclado en filtros
+cerrados sigue en `FILTER-COLLAPSE-FOCUS-1`.
 
-**Aceptación verificable.** En la ficha a 360, 390 y 768 px, el documento no
-desborda horizontalmente y ningún contenido o control de la ficha queda
-recortado. El caso debe medir la publicación problemática de la base limpia;
-un caso que sólo use otra tarjeta no cubre el defecto. La auditoría móvil debe
-completar 12/12 con cero desbordes y cero recortes del checkout. Añadí un
-negativo que reponga la geometría anterior y falle específicamente por el
-desborde de la ficha. Conservá el caso 183 y las pruebas existentes.
+**Aceptación verificable.** Agregá un caso que encadene *en el mismo recorrido*
+búsqueda → ficha → recarga → Atrás y compruebe tanto el `q` de la URL como el
+texto y las publicaciones filtradas que se muestran. Repetí el ciclo lo
+suficiente para detectar la intermitencia observada; documentá cuántas veces.
+El caso debe dar rojo con el comportamiento anterior por pérdida de `q`, y
+verde con la corrección. Una entrada directa a la ficha debe volver al
+Mercado sin inventar búsqueda. Los casos existentes de URL, filtros y ficha
+siguen verdes.
 
-**Pruebas y evidencia.** Corré build, lint, tipos, focales, negativo y puertas
-proporcionales. PM repetirá el focal y la auditoría sobre la candidata exacta
-en una base aislada. Adjuntá medidas y capturas antes/después de 360 y 390 px.
-No repitas la suite completa sin cambio de riesgo o rojo inesperado.
+**Pruebas y evidencia.** Corré el caso nuevo, 147, 183 y 185, build, lint,
+tipos y las puertas proporcionales al diff. PM repetirá el recorrido y el
+negativo sobre la candidata exacta. No repitas pruebas sin un cambio de riesgo
+o un rojo que haya que clasificar.
 
-**Leé antes:** `REPRODUCCION-MOBILE-CHECKOUT-1-2026-09-23.md`,
-`REPRODUCCION-MOBILE-AUDIT-FLOW-1-2026-09-23.md`, `scripts/mobile-audit.mjs`,
-el caso 183 y la ficha actual.
+**Leé antes:** tu hallazgo en `PARA-PM.md` para `FICHA-MOBILE-WIDTH-1`, el caso
+183, `src/hooks/useProductFilters.ts`, la navegación de la ficha y
+`REPRODUCCION-FICHA-MOBILE-WIDTH-1-2026-09-23.md`.
 
-**Frená y respondé con evidencia** si el arreglo exige una regla global que
-altere otras vistas o un cambio de datos. Entregá en `PARA-PM.md` SHA,
-causa, medidas, capturas, focal/negativo, pruebas exactas y riesgos. No
-integres ni despliegues.
+**Frená y respondé con evidencia** si conservar la búsqueda exige cambiar la
+semántica de URLs compartidas o de filtros fuera de este recorrido. Entregá en
+`PARA-PM.md` SHA, causa, recorridos y repeticiones, rojo/verde, pruebas exactas
+y riesgos. No integres ni despliegues.

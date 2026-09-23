@@ -1,6 +1,6 @@
 # Roadmap operativo para cerrar el MVP
 
-Actualizado: 2026-09-22.
+Actualizado: 2026-09-23.
 Fuentes: `CRONOGRAMA.md`, `ALCANCE-Y-LIMITES.md`, `NOW.md` y
 `AUDITORIAS-UX-CLAUDE-2026-08-30.md`.
 
@@ -182,8 +182,9 @@ o un rediseño nuevo.
 | 26 | **PRODUCT-DETAIL-PAGE-1 — aceptada en rama** | Ajuste de usabilidad pedido por Emi el 23/09 | Producto/caso 183 `087fa2c`, informe `9110bcc`. PM obtuvo 183/183 desde base limpia, sabotaje del modal rojo y focal restaurado 1/1. URL compartible, recarga y regreso al catálogo verificados. Evidencia en `REPRODUCCION-PRODUCT-DETAIL-PAGE-1-2026-09-23.md`. Sin integración ni despliegue. |
 | 27 | **MOBILE-AUDIT-FLOW-1 — aceptada en rama** | QA responsive del MVP | Arnés `8e4f7c6`, informe final `69779b0`. PM comprobó ficha en 360/390/768, 9/12 recorridos totales, negativo del arnés anterior rojo y capturas históricas intactas. QA completo pendiente: tres compras cortadas y un desborde de ficha a 360. Evidencia en `REPRODUCCION-MOBILE-AUDIT-FLOW-1-2026-09-23.md`. |
 | 28 | **MOBILE-CHECKOUT-1 — aceptada en rama** | Compra móvil del MVP | Producto/caso 184/auditoría/negativos `f820146`, informe `e6fdc6d`. PM: 184 en 1/1, CSS original rojo y auditoría 12/12 con cero recortes del checkout. Un desborde ajeno de ficha a 360 px mantiene abierto el QA responsive. Evidencia en `REPRODUCCION-MOBILE-CHECKOUT-1-2026-09-23.md`; sin integración ni despliegue. |
-| 29 | **FICHA-MOBILE-WIDTH-1 — asignada** | Ficha móvil | PM midió 368 px de documento en pantalla de 360 con «Campo Agrícola de 120 Hectáreas» en base demo limpia. Tarea activa única en `PARA-DEV.md`. |
-| 30 | **FILTER-COLLAPSE-FOCUS-1 — en cola** | Accesibilidad móvil | PM confirmó que Tab entra en controles de filtros invisibles con el panel cerrado a 390 px. Resolver después de la ficha. |
+| 29 | **FICHA-MOBILE-WIDTH-1 — aceptada en rama** | Ficha móvil | Producto/caso 185/negativos `78b682b`, informe `4a0dca2`. PM: focal 1/1, geometría anterior roja, auditoría 12/12 sin desbordes, build/lint/tipos verdes. Evidencia en `REPRODUCCION-FICHA-MOBILE-WIDTH-1-2026-09-23.md`; sin integración ni despliegue. |
+| 30 | **PRODUCT-DETAIL-BACK-SEARCH-1 — asignada** | Navegación de ficha | Dev observó pérdida intermitente de `q` después de búsqueda → ficha → recarga → Atrás (8/20). Tarea activa única en `PARA-DEV.md`: reproducir y corregir con caso encadenado y negativo. |
+| 31 | **FILTER-COLLAPSE-FOCUS-1 — en cola** | Accesibilidad móvil | PM confirmó que Tab entra en controles de filtros invisibles con el panel cerrado a 390 px. Resolver después de la navegación de ficha. |
 
 Cinco mil visitas mensuales no justifican reescribir la arquitectura. Esta
 puerta cierra primero paginación, consultas y recorridos medidos; capacidad y
