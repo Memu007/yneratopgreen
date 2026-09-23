@@ -31139,6 +31139,211 @@ print(json.dumps(salida))
   }
 });
 
+// ---------------------------------------------------------------------------
+// 182. El panel de administración entra en un celular: las siete secciones a
+// la vista y cada una alcanzable con el dedo.
+//
+// Medido antes del cambio, en 360 × 800 y 390 × 844: la barra medía 655 px y
+// escondía Categorías, Documentación y Configuración detrás de un
+// desplazamiento horizontal que hay que descubrir; las siete secciones medían
+// 38 px de alto y Cerrar 35 × 35. En 768 × 1024 entraban, pero en 43 px y 40.
+//
+// Se mide la geometría real del navegador, no el CSS: dónde cae cada botón,
+// cuánto mide y si la barra necesita desplazarse. Después se usa: cada sección
+// con el dedo y con el teclado, y el detalle de una orden, que tiene que
+// devolver el panel como estaba.
+// ---------------------------------------------------------------------------
+await runCase(182, 'El panel de administración entra en un celular: siete secciones a la vista y alcanzables', async () => {
+  const medidos = [];
+  const MINIMO = 44;
+  // Cada sección con algo que sólo ella muestra: activarla tiene que traerlo.
+  const SECCIONES = [
+    ['Dashboard', (d) => d.getByText('Total de usuarios', { exact: true })],
+    ['Usuarios', (d) => d.getByRole('searchbox', { name: 'Buscar usuarios por nombre o email' })],
+    ['Productos', (d) => d.getByRole('combobox', { name: 'Filtrar publicaciones por estado' })],
+    ['Órdenes', (d) => d.getByRole('combobox', { name: 'Filtrar órdenes por estado' })],
+    ['Categorías', (d) => d.getByRole('heading', { name: 'Gestión de Categorías y Subcategorías' })],
+    ['Documentación', (d) => d.getByRole('combobox', { name: 'Filtrar documentación por estado' })],
+    ['Configuración', (d) => d.getByRole('heading', { name: 'Configuración de Formularios' })],
+  ];
+
+  const admin = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'admin@topgreen.com', password: 'admin123' },
+  });
+  const [estadoConOrdenes] = queryRows(`
+    SELECT lower(status::text), 'fin' FROM orders WHERE status <> 'DRAFT'
+    GROUP BY 1 ORDER BY count(*) DESC, 1 LIMIT 1`);
+  assert(estadoConOrdenes, 'no hay órdenes con las que abrir un detalle');
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [ancho, alto, celular] of [[360, 800, true], [390, 844, true], [768, 1024, false]]) {
+      const medida = `${ancho} × ${alto}`;
+      const contexto = await browser.newContext({ viewport: { width: ancho, height: alto }, hasTouch: true });
+      await contexto.addInitScript(({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+      }, { a: admin.data.access_token, r: admin.data.refresh_token });
+      const page = await contexto.newPage();
+      const errores = [];
+      page.on('console', (m) => { if (m.type() === 'error') errores.push(m.text()); });
+      page.on('pageerror', (e) => errores.push(String(e)));
+      try {
+        await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+        await page.getByRole('button', { name: 'Admin' }).first().click();
+        const panel = page.getByRole('dialog', { name: 'Administración' });
+        await panel.getByRole('heading', { name: 'Panel de Administración' }).waitFor({ timeout: 20_000 });
+        const seccion = (nombre) => panel.getByRole('button', { name: nombre, exact: true });
+
+        // === A. La geometría, medida ======================================
+        const geometria = await panel.evaluate((dialogo, nombres) => {
+          const botones = [...dialogo.querySelectorAll('button')];
+          const pestanas = nombres.map((n) => botones.find((b) => b.textContent.trim() === n));
+          const barra = pestanas[0].parentElement.getBoundingClientRect();
+          const cerrar = dialogo.querySelector('button[aria-label="Cerrar"]').getBoundingClientRect();
+          const contenedor = pestanas[0].parentElement;
+          return {
+            desborde: contenedor.scrollWidth - contenedor.clientWidth,
+            pagina: document.documentElement.scrollWidth - window.innerWidth,
+            cerrar: [Math.round(cerrar.width), Math.round(cerrar.height)],
+            pestanas: pestanas.map((t, i) => {
+              const r = t.getBoundingClientRect();
+              return {
+                nombre: nombres[i], ancho: Math.round(r.width), alto: Math.round(r.height),
+                afuera: r.left < barra.left - 0.5 || r.right > barra.right + 0.5
+                  || r.left < -0.5 || r.right > window.innerWidth + 0.5,
+              };
+            }),
+          };
+        }, SECCIONES.map(([nombre]) => nombre));
+
+        const afuera = geometria.pestanas.filter((p) => p.afuera).map((p) => p.nombre);
+        assert(afuera.length === 0 && geometria.desborde <= 0,
+          `${medida}: la barra desborda ${geometria.desborde} px y deja fuera de la vista `
+          + `${JSON.stringify(afuera)}: esas secciones sólo se alcanzan descubriendo un `
+          + 'desplazamiento horizontal');
+        const chicas = geometria.pestanas.filter((p) => p.ancho < MINIMO || p.alto < MINIMO)
+          .map((p) => `${p.nombre} ${p.ancho}×${p.alto}`);
+        assert(chicas.length === 0,
+          `${medida}: secciones con un blanco táctil menor a ${MINIMO} × ${MINIMO}: ${chicas.join(', ')}`);
+        assert(geometria.cerrar[0] >= MINIMO && geometria.cerrar[1] >= MINIMO,
+          `${medida}: Cerrar mide ${geometria.cerrar.join(' × ')} y tiene que medir al menos `
+          + `${MINIMO} × ${MINIMO}`);
+        assert(geometria.pagina <= 0,
+          `${medida}: la página desborda ${geometria.pagina} px a lo ancho`);
+
+        // === B. Cada sección, con el dedo y con el teclado ================
+        const activa = () => panel.evaluate((dialogo, nombres) => {
+          const botones = [...dialogo.querySelectorAll('button')];
+          // La marca de la sección activa es su subrayado: el único con color.
+          return nombres.filter((n) => {
+            const b = botones.find((x) => x.textContent.trim() === n);
+            const color = getComputedStyle(b).borderBottomColor;
+            return color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent';
+          });
+        }, SECCIONES.map(([nombre]) => nombre));
+        // El subrayado cambia con una transición de 0,2 s: al principio todavía
+        // está marcada la anterior. Se espera a que la única marcada sea la
+        // recién activada, con un tope, no a un tiempo fijo.
+        const presenta = async (nombre, marca, como) => {
+          await marca(panel).first().waitFor({ state: 'visible', timeout: 15_000 });
+          let activas = await activa();
+          const esLaEsperada = () => activas.length === 1 && activas[0] === nombre;
+          for (let intento = 0; intento < 20 && !esLaEsperada(); intento += 1) {
+            await page.waitForTimeout(100);
+            activas = await activa();
+          }
+          assert(activas.length === 1 && activas[0] === nombre,
+            `${medida}, ${como}: después de activar «${nombre}» la marcada como activa es `
+            + `${JSON.stringify(activas)}`);
+        };
+
+        for (const [nombre, marca] of SECCIONES) {
+          if (celular) await seccion(nombre).tap();
+          else await seccion(nombre).click();
+          await presenta(nombre, marca, celular ? 'con el dedo' : 'con el puntero');
+        }
+
+        // Con el teclado: desde Cerrar, Tab lleva por las secciones en orden.
+        for (const [i, [nombre, marca]] of SECCIONES.entries()) {
+          await panel.getByRole('button', { name: 'Cerrar' }).first().focus();
+          for (let pasos = 0; pasos <= i; pasos += 1) await page.keyboard.press('Tab');
+          // El anillo también entra con la transición de la pestaña: de 0 a 3 px
+          // en 0,2 s. Se espera a que asiente, con un tope.
+          await page.waitForFunction(() => parseFloat(getComputedStyle(document.activeElement)
+            .outlineWidth) >= 2, null, { timeout: 2_000 }).catch(() => {});
+          const foco = await page.evaluate(() => {
+            const el = document.activeElement;
+            const estilo = getComputedStyle(el);
+            return {
+              texto: el.textContent.trim(),
+              visible: el.matches(':focus-visible') && estilo.outlineStyle !== 'none'
+                && parseFloat(estilo.outlineWidth) >= 2,
+            };
+          });
+          assert(foco.texto === nombre,
+            `${medida}: ${i + 1} Tab desde Cerrar llevan a «${foco.texto}» y no a «${nombre}»`);
+          assert(foco.visible, `${medida}: «${nombre}» tiene el foco pero no se ve`);
+          await page.keyboard.press('Enter');
+          await presenta(nombre, marca, 'con el teclado');
+        }
+
+        // === C. El detalle de una orden devuelve el panel como estaba =====
+        await seccion('Órdenes').click();
+        const filtro = panel.getByRole('combobox', { name: 'Filtrar órdenes por estado' });
+        // La lista se vuelve a pedir con el filtro: se elige una orden recién
+        // cuando llegó esa respuesta, no de la lista anterior.
+        const filtrada = page.waitForResponse((r) => r.url().includes('/admin/orders?')
+          && r.url().includes(`status=${estadoConOrdenes[0]}`), { timeout: 15_000 });
+        await filtro.selectOption(estadoConOrdenes[0]);
+        await filtrada;
+        const ver = panel.getByRole('button', { name: /^Ver la orden / });
+        await ver.first().waitFor({ state: 'visible', timeout: 15_000 });
+        const disparador = ver.nth(Math.min(3, (await ver.count()) - 1));
+        await disparador.scrollIntoViewIfNeeded();
+        const posicion = () => panel.evaluate((dialogo) => {
+          const tabla = dialogo.querySelector('table');
+          const region = tabla && tabla.closest('[role="region"]');
+          const contenido = [...dialogo.querySelectorAll('div')]
+            .find((d) => d.scrollHeight > d.clientHeight && getComputedStyle(d).overflowY === 'auto');
+          return [contenido ? Math.round(contenido.scrollTop) : 0, region ? Math.round(region.scrollLeft) : 0];
+        });
+        const antes = await posicion();
+        const nombreDeLaOrden = (await disparador.getAttribute('aria-label')).replace('Ver la orden ', '');
+        if (celular) await disparador.tap(); else await disparador.click();
+        const detalle = page.getByRole('dialog', { name: `Orden ${nombreDeLaOrden}` });
+        await detalle.waitFor({ timeout: 15_000 });
+        // El detalle entra con una escala de 0,95 a 1: se mide cuando terminó.
+        await detalle.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+        const cerrarDetalle = detalle.getByRole('button', { name: 'Cerrar' });
+        const cajaCerrar = await cerrarDetalle.boundingBox();
+        assert(cajaCerrar && cajaCerrar.width >= MINIMO && cajaCerrar.height >= MINIMO
+          && cajaCerrar.x >= 0 && cajaCerrar.x + cajaCerrar.width <= ancho,
+        `${medida}: el Cerrar del detalle mide ${JSON.stringify(cajaCerrar)}`);
+        if (celular) await cerrarDetalle.tap(); else await cerrarDetalle.click();
+        await detalle.waitFor({ state: 'detached', timeout: 10_000 });
+        assert(JSON.stringify(await activa()) === JSON.stringify(['Órdenes']),
+          `${medida}: al cerrar el detalle la sección activa es ${JSON.stringify(await activa())}`);
+        assert(await filtro.inputValue() === estadoConOrdenes[0],
+          `${medida}: al cerrar el detalle el filtro pasó de «${estadoConOrdenes[0]}» a «${await filtro.inputValue()}»`);
+        const despues = await posicion();
+        assert(JSON.stringify(despues) === JSON.stringify(antes),
+          `${medida}: el detalle movió la lista de ${JSON.stringify(antes)} a ${JSON.stringify(despues)}`);
+
+        assert(errores.length === 0, `${medida}: errores de consola: ${errores.slice(0, 3).join(' | ')}`);
+        medidos.push(`${medida}: 7/7 a la vista, secciones de ${Math.min(...geometria.pestanas.map((p) => p.alto))} px `
+          + `de alto como mínimo, Cerrar ${geometria.cerrar.join('×')}`);
+      } finally {
+        await contexto.close();
+      }
+    }
+    return `${medidos.join('; ')}; cada sección se activa con el dedo y con el teclado, con foco visible, `
+      + 'y el detalle de una orden devuelve sección, filtro y posición';
+  } finally {
+    await browser.close();
+  }
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

@@ -490,16 +490,28 @@
     font-size: 1.2rem;
   }
   
+  /* Las siete secciones a la vista: la barra pasa a otro renglón en vez de
+     esconder las últimas detrás de un desplazamiento que hay que descubrir.
+     Y cada una con un blanco táctil de 44 px de alto como mínimo. */
   .tabs {
-    overflow-x: auto;
+    flex-wrap: wrap;
     padding: 0 10px;
-    -webkit-overflow-scrolling: touch;
   }
   
   .tab {
+    flex: 1 1 auto;
+    min-height: 44px;
     padding: 12px 15px;
     font-size: 0.85rem;
     white-space: nowrap;
+  }
+
+  /* Cerrar tampoco baja de 44: ni por tamaño ni porque un título largo al lado
+     lo apriete, como pasaba en el detalle de una orden. */
+  .closeButton {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
   }
   
   .content {
@@ -542,8 +554,6 @@
   }
   
   .closeButton {
-    width: 35px;
-    height: 35px;
     font-size: 1.2rem;
   }
   
