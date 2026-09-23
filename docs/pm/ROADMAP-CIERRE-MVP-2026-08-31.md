@@ -178,6 +178,7 @@ o un rediseño nuevo.
 | 22 | **PRIMARY-IMAGE-INTEGRITY-1 — aceptada en rama** | deuda de integridad hallada por QUERY-IMG-1 | Producto/migración/regresión `cfeff88`; informe `19e6327` + corrección `6a6e36e`. PM cubrió 179/179 entre suite limpia y repetición del único caso ambiental, reprodujo cuatro sabotajes rojos y verificó migración/índice. No integrada ni desplegada: espera puerta operativa explícita. |
 | 23 | **CART-IMG-QUERY-1 — aceptada en rama** | N+1 registrado en `cart.py` | Producto/caso/sabotajes `112eee0`, informe `6b91aa8`. PM reprodujo caso 180, tres sabotajes rojos y suite limpia 180/180: GET y sync leen imágenes 1/1/1 con 1/3/6 ítems. No integrada ni desplegada. |
 | 24 | **CART-PRODUCT-QUERY-1 — aceptada en rama** | N+1 medido por el caso 180 | Producto/caso/sabotajes `1e4a63c`, informe `e0fd76b`. PM reprodujo el caso 181 y tres sabotajes rojos: GET y los dos caminos de sync leen `products` 1/1/1 con 1/3/6 ítems. Suite Docker limpia 180/181 por falta de `.git` en la copia temporal; caso 157 repetido con Git 1/1. Los 181 casos quedan cubiertos. Sin integración ni despliegue. |
+| 25 | **ADMIN-MOBILE-ACCESS-1 — asignada** | Responsive y usabilidad final | Panel admin: siete secciones alcanzables y blancos táctiles de al menos 44 × 44 px en móvil. Dev reproduce antes; PM revisa la entrega. Sin integración ni despliegue. |
 
 Cinco mil visitas mensuales no justifican reescribir la arquitectura. Esta
 puerta cierra primero paginación, consultas y recorridos medidos; capacidad y
