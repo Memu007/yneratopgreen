@@ -179,6 +179,7 @@ o un rediseño nuevo.
 | 23 | **CART-IMG-QUERY-1 — aceptada en rama** | N+1 registrado en `cart.py` | Producto/caso/sabotajes `112eee0`, informe `6b91aa8`. PM reprodujo caso 180, tres sabotajes rojos y suite limpia 180/180: GET y sync leen imágenes 1/1/1 con 1/3/6 ítems. No integrada ni desplegada. |
 | 24 | **CART-PRODUCT-QUERY-1 — aceptada en rama** | N+1 medido por el caso 180 | Producto/caso/sabotajes `1e4a63c`, informe `e0fd76b`. PM reprodujo el caso 181 y tres sabotajes rojos: GET y los dos caminos de sync leen `products` 1/1/1 con 1/3/6 ítems. Suite Docker limpia 180/181 por falta de `.git` en la copia temporal; caso 157 repetido con Git 1/1. Los 181 casos quedan cubiertos. Sin integración ni despliegue. |
 | 25 | **ADMIN-MOBILE-ACCESS-1 — asignada** | Responsive y usabilidad final | Panel admin: siete secciones alcanzables y blancos táctiles de al menos 44 × 44 px en móvil. Dev reproduce antes; PM revisa la entrega. Sin integración ni despliegue. |
+| 26 | **PRODUCT-DETAIL-PAGE-1 — en cola** | Ajuste de usabilidad pedido por Emi el 23/09 | Reemplazar el modal de detalle por página con URL propia, acceso directo y recarga; Atrás vuelve al catálogo conservando su estado. Sin copiar otro sitio ni añadir funciones comerciales. Se asigna tras cerrar la tarea 25. |
 
 Cinco mil visitas mensuales no justifican reescribir la arquitectura. Esta
 puerta cierra primero paginación, consultas y recorridos medidos; capacidad y

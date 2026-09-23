@@ -269,7 +269,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev reproduce y entrega `ADMIN-MOBILE-ACCESS-1`; PM revisa de forma independiente. Las tres piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
+1. Dev reproduce y entrega `ADMIN-MOBILE-ACCESS-1`; PM revisa de forma independiente. Después se asigna `PRODUCT-DETAIL-PAGE-1`, pedido por Emi y en cola. Las tres piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
 2. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración. La propuesta de recuperación pre-migración espera decisión de Emi y verificación autenticada de Railway.
 3. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
