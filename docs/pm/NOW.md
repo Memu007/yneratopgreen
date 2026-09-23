@@ -8,9 +8,20 @@ Actualizado: 2026-09-23.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. Su puerta funcional quedó verificada el 23/09 sobre la composición aceptada `1e4a63c`; la evidencia está en `REPRODUCCION-FASE-2-2026-09-23.md`. Las fechas y las puertas posteriores no cambian.
 - **`main`:** `0bd7fbc`; `RISK-REC-1` integrada y publicada con autorización de Emi. GitHub, Frontend y Backend convergieron en ese SHA y los dos servicios quedaron saludables. El entorno `strong-playfulness` sigue siendo demostrativo y no equivale al despliegue productivo contractual.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`, producto aceptado `1e4a63c` e informe `e0fd76b`, sobre base `6e64c19`.
-- **Última decisión PM:** puerta funcional de Fase 2 **CUMPLIDA**; `CART-PRODUCT-QUERY-1` **ACEPTADA EN RAMA, NO INTEGRADA NI DESPLEGADA**. Evidencia en `REPRODUCCION-FASE-2-2026-09-23.md` y `REPRODUCCION-CART-PRODUCT-QUERY-1-2026-09-22.md`.
-- **Tarea activa:** `ADMIN-MOBILE-ACCESS-1`, asignada a Dev en `PARA-DEV.md`: navegación y blanco táctil de Cerrar del panel admin móvil. PM verifica la entrega; sin integración ni despliegue.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; entrega reciente de `ADMIN-MOBILE-ACCESS-1` en `b2a3ba4`, informe `a11b52a`. PM la verificó y aceptó en rama; aún no integrada ni desplegada.
+- **Última decisión PM:** `ADMIN-MOBILE-ACCESS-1` **ACEPTADA EN RAMA, NO INTEGRADA NI DESPLEGADA**. Evidencia en `REPRODUCCION-ADMIN-MOBILE-ACCESS-1-2026-09-23.md`.
+- **Tarea activa:** `PRODUCT-DETAIL-PAGE-1`, asignada a Dev en `PARA-DEV.md`: el detalle de una publicación pasa del modal a una página con URL propia.
+
+## Última aceptación PM — ADMIN-MOBILE-ACCESS-1
+
+Producto, caso 182 y sabotajes `b2a3ba4`; informe `a11b52a`. PM reprodujo
+14/14 casos focales y relacionados desde una base aislada; el caso 182 pasó
+en 360, 390 y 768 px. Al reponer el desplazamiento horizontal anterior, el
+caso 182 falló con tres secciones fuera de vista; restaurado el candidato,
+pasó 1/1. Build, lint, tipos y diff-check verdes. Dev informó cuatro sabotajes
+rojos, a11y 74/74 y contraste 82/82. La aceptación cubre la navegación de
+siete secciones y Cerrar del panel admin; otros controles pequeños siguen
+pendientes del QA general. No se integró ni desplegó.
 
 ## Última aceptación PM — CART-PRODUCT-QUERY-1
 
@@ -269,7 +280,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev reproduce y entrega `ADMIN-MOBILE-ACCESS-1`; PM revisa de forma independiente. Después se asigna `PRODUCT-DETAIL-PAGE-1`, pedido por Emi y en cola. Las tres piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
+1. Dev implementa `PRODUCT-DETAIL-PAGE-1`; PM revisa la página, el acceso directo y el regreso al catálogo. Las cuatro piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
 2. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración. La propuesta de recuperación pre-migración espera decisión de Emi y verificación autenticada de Railway.
 3. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.

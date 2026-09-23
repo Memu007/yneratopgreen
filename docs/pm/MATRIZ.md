@@ -90,7 +90,7 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 | React / Next.js | ✅ | React 18 + Vite, `npm run build` en 2,05 s, 78 módulos |
 | Python FastAPI / Django o Node | ✅ | FastAPI operativo, `/api/health` `200` |
 | **PostgreSQL + PostGIS** | ✅ | PostGIS 3.4.3 sobre PostgreSQL 16, 16 tablas. **PostGIS en uso real**: `Geography(POINT,4326)` con índice GIST; `ST_Distance` Balcarce–Tandil = 96,75 km, contrastado de forma independiente contra 96,67 km por haversine |
-| Responsive móvil y escritorio | ⚪ | **Relevado el 2026-07-26** con `scripts/mobile-audit.mjs`: 36 pantallas en 360×800, 390×844 y 768×1024. **Cero desbordes horizontales, cero errores de consola, cero respuestas 4xx/5xx.** Nada impide completar los recorridos. Quedan pendientes de corregir, al final: controles táctiles por debajo de 44 px y barras de pestañas que requieren desplazamiento horizontal |
+| Responsive móvil y escritorio | ⚪ | Relevamiento de 36 pantallas del 26/07: sin desbordes horizontales de página ni errores de consola. `ADMIN-MOBILE-ACCESS-1` aceptada en rama: las siete secciones admin son visibles y sus blancos, junto a Cerrar, miden al menos 44 × 44 px en móvil; caso 182 PM verde y sabotaje rojo. Siguen pendientes otros controles táctiles pequeños y la revisión final; pieza sin integrar ni desplegar. |
 | AWS / Supabase / Render | ⚪ | Railway aprobado y preparado, sin despliegue real ni verificación de producción |
 
 ## 5. Cierre y entrega

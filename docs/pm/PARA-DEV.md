@@ -5,48 +5,64 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Tarea activa — ADMIN-MOBILE-ACCESS-1
+## Tarea activa — PRODUCT-DETAIL-PAGE-1
 
-**Prioridad y problema.** El contrato exige interfaz responsive. En la rama
-actual, el panel de administración tiene siete secciones y, a ancho móvil,
-`AdminPanel.module.css` deja la navegación con `overflow-x: auto` y reduce el
-botón Cerrar a 35 × 35 px. El relevamiento de `MATRIZ.md` ya marcaba pestañas
-ocultas por desplazamiento horizontal y blancos táctiles menores a 44 px.
-Esta pieza cierra sólo ese borde del panel admin antes del QA final.
+**Prioridad y problema.** Emi pidió que al abrir una publicación se llegue a
+una página, como destino propio del catálogo. Hoy el detalle es un modal
+controlado por `ProductCard`: no tiene URL distinta, no se puede compartir
+ni recargar como publicación. Esta pieza mejora la presentación existente
+antes del QA final del MVP.
 
-**Alcance.** Reproducí primero el estado actual en el panel real con 360 × 800
-y 390 × 844. Si se confirma, hacé visibles y alcanzables las siete secciones
-sin depender de descubrir un desplazamiento horizontal, y llevá el blanco
-táctil de Cerrar a por lo menos 44 × 44 px. Conservá los nombres, la sección
-activa, el contenido, la jerarquía modal y la navegación por teclado. Usá la
-solución más pequeña coherente con el diseño existente.
+**Alcance.** Convertí el detalle actual en una página de la misma pestaña con
+URL estable que incluya el ID de la publicación. El clic en la tarjeta desde
+Mercado, Inicio o Servicios debe navegar allí. Un enlace pegado en una pestaña
+nueva o recargado debe buscar la publicación por ID con la API existente y
+mostrar el mismo contenido, sin depender del listado previo. Integralo con
+la política única de navegación de `src/navegacion/`; Atrás/Adelante deben
+seguir el historial normal, sin entradas fantasma ni un segundo oyente de
+`popstate`.
 
-**Fuera de alcance.** Otros paneles, rediseño global, cambio de tokens,
-backend, datos, permisos, integración y despliegue.
+**Contenido y acciones.** Conservá la información, imagen/crédito, precio o
+modalidad, vendedor y acciones que hoy ofrece el detalle. Compra, cantidad,
+stock, cotización, perfil del vendedor e ingreso requerido deben mantener
+su comportamiento y sus guardas. Después de ingresar, la persona debe volver
+a la misma publicación; no agregues productos al carrito automáticamente.
+Mostrá carga y una salida clara cuando la API devuelva 404, la publicación
+no sea visible o falle la consulta. No presentes como vigente una publicación
+inexistente usando datos viejos de la tarjeta.
 
-**Aceptación verificable.** En 360 × 800 y 390 × 844, las siete secciones
-deben verse sin corte ni desplazamiento horizontal de la barra; cada botón
-de navegación y Cerrar debe tener un blanco medido de al menos 44 × 44 px.
-En 768 × 1024 el panel sigue utilizable. Al activar cada sección con tacto y
-teclado se presenta su contenido y el estado activo correcto; foco visible,
-sin desborde horizontal de la página ni errores de consola. Abrir/cerrar un
-detalle de orden conserva sección, filtros y posición como antes. Medí
-geometría real del navegador; no alcanza una inspección de CSS.
+**Regreso y experiencia.** Atrás desde la ficha debe volver al origen con
+filtros, orden, página y posición de desplazamiento conservados en el Mercado.
+Si se abrió la ficha por URL directa, ofrecé un enlace visible al catálogo.
+La página debe ser usable en móvil y escritorio, con título claro, foco
+coherente al navegar, enlace/acción accesible por teclado y sin desborde
+horizontal ni errores de consola. Podés adaptar la disposición del contenido
+actual a una página, sin copiar diseño de otro sitio.
 
-**Pruebas y evidencia.** Entregá antes/después de las tres medidas, el cambio
-mínimo de producto y una regresión focal que falle sobre el comportamiento
-anterior y pase con la corrección. Corré build, lint, tipos y las pruebas
-existentes que tu entorno permita; informá el resultado exacto. Las puertas
-que requieran Docker/PostGIS quedan a cargo de PM según `DECISIONS.md`. No
-repitas la suite completa salvo que el cambio salga de este alcance o aparezca
-un rojo inesperado: PM hará la revisión independiente proporcional.
+**Fuera de alcance.** Atributos por rubro aún no entregados por la clienta,
+SEO, recomendaciones, nuevos campos, pagos, permisos nuevos, backend o
+migraciones, rediseño global, integración y despliegue.
 
-**Leé antes:** `CONTRATO.md` (responsive), `MATRIZ.md` (hallazgo),
-`ROADMAP-CIERRE-MVP-2026-08-31.md` (puerta de usabilidad) y los casos actuales
-de panel/modal. Si el problema no se reproduce, o resolverlo exige alterar
-permisos, jerarquía modal o diseño global, frená y respondé con evidencia antes
-de editar más.
+**Aceptación verificable.** Una prueba de navegador debe cubrir apertura
+desde cada una de las tres superficies, URL distinta y estable, recarga y
+enlace directo; Atrás/Adelante y regreso al Mercado con filtros, orden,
+página y scroll; 404/no visible y error de red; compra con y sin sesión,
+cotización y perfil del vendedor; móvil/teclado. Agregá al menos un negativo
+discriminante que falle con el modal anterior y pase con la página real.
+Revisá los casos existentes que asumían que el detalle era una capa.
+
+**Pruebas y evidencia.** Corré build, lint, tipos y las pruebas que tu entorno
+permita. Prepará regresión focal y reportá resultados exactos; Docker/PostGIS,
+smoke con pila real, a11y y contraste dependientes de ella quedan a cargo de
+PM según `DECISIONS.md`. No hagas una suite completa en tu entorno sólo por
+volumen: PM definirá la puerta independiente según el alcance efectivo.
+
+**Leé antes:** decisión del 23/09 en `DECISIONS.md`, navegación actual,
+`ProductCard`, `ProductDetailModal`, API `getProductDetail` y casos de
+catálogo/retorno del historial. Si el enlace directo exige cambiar backend,
+permisos o la política central de navegación de forma incompatible con los
+recorridos actuales, frená y respondé con evidencia antes de ampliar alcance.
 
 **Entrega.** Respondé en `PARA-PM.md` con SHA exacto, archivos cambiados,
-medidas y capturas o trazas antes/después, pruebas y rojos discriminantes,
-riesgos restantes. No integres ni despliegues.
+recorridos antes/después, pruebas y negativo discriminante, lo que no pudiste
+ejecutar y riesgos restantes. No integres ni despliegues.

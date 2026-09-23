@@ -14,9 +14,9 @@ de compraventa. La página debe abrir en la misma pestaña, tener enlace directo
 recargable y usar el historial normal del navegador. No se copia diseño de
 otro marketplace ni se abre alcance de SEO, recomendaciones o atributos nuevos.
 
-La pieza `PRODUCT-DETAIL-PAGE-1` queda **en cola**, después de la tarea activa
-`ADMIN-MOBILE-ACCESS-1`. PM definirá su entrega ejecutable en `PARA-DEV.md`
-cuando cierre esa tarea; se conserva una sola tarea activa.
+La pieza `PRODUCT-DETAIL-PAGE-1` quedó **asignada** después de aceptar
+`ADMIN-MOBILE-ACCESS-1`; la entrega ejecutable está en `PARA-DEV.md`.
+Se conserva una sola tarea activa.
 
 Motivo: el detalle vigente es un `ProductDetailModal` ligado al estado de la
 tarjeta y al historial sin URL distinta. Una página permite compartir y
