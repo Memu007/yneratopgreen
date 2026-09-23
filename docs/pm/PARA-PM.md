@@ -2,113 +2,151 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ADMIN-MOBILE-ACCESS-1 — entregada, para tu revisión
+## PRODUCT-DETAIL-PAGE-1 — entregada, para tu revisión
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `d4ce965` |
-| candidato (CSS + caso 182 + negativos) | `b2a3ba4` |
+| base | `3508d48` |
+| candidato (producto + caso 183 + negativos + casos adaptados) | `087fa2c` |
 | no integrado, no desplegado | `main` sigue en `0bd7fbc` |
 
-**Resultado.** Se reproducía. En 360 y 390 de ancho, Categorías, Documentación
-y Configuración quedaban detrás de un desplazamiento horizontal; las siete
-secciones medían 38 px de alto y Cerrar 35 × 35. Ahora las siete se ven, en
-dos renglones, con 44 px de alto como mínimo, y Cerrar mide 44 × 44. El cambio
-es sólo CSS del panel, hasta 768 px; escritorio queda igual.
+**Resultado.** La ficha de una publicación es una página:
+`/?section=product&id=ID`. Se abre desde el Mercado, Inicio y Servicios con
+enlaces de verdad; recargada o pegada en otra pestaña, se busca por su ID con
+la API existente. Atrás y Adelante la recorren como cualquier otra página, y
+volver deja el origen como estaba: filtros, orden, página, vista Cuadrícula o
+Lista y el punto hasta donde se había bajado, con el foco en el enlace que la
+abrió. Por enlace directo ofrece «Ir al Mercado». Compra, cantidad, stock,
+cotización, perfil del vendedor e ingreso hacen lo mismo que antes; ingresar
+deja a la persona en la misma ficha y no agrega nada solo.
 
-**Nada tuyo que decidir para aceptarla.** Una cosa para que sepas: el Cerrar
-del **detalle de una orden** usa la misma clase y, además, un título largo lo
-apretaba a 37,7 px de ancho. Lo incluí —es una línea, `flex-shrink: 0`—
-porque es un Cerrar del mismo panel y tu criterio pide que Cerrar no baje de 44.
+**Una cosa para que decidas, no bloquea.** Abrir la ficha ahora consulta la
+API, y el endpoint de detalle suma una vista (`views_count`) en cada consulta;
+el vendedor ve ese número en Mi cuenta. Con el modal no se consultaba y no se
+sumaba nada. Ahora cuentan las aperturas reales —también recargar y volver
+con Adelante—. Recomiendo dejarlo así: el número pasa a significar algo. Si
+preferís no contar recargas, es otra pieza y toca backend.
 
 ## Para verificar, lo mínimo
 
 ```
-SMOKE_CASOS=182 node scripts/smoke.mjs
-  → 1/1: «360 × 800: 7/7 a la vista, secciones de 44 px de alto como mínimo,
-    Cerrar 44×44; 390 × 844: …; 768 × 1024: …; cada sección se activa con el
-    dedo y con el teclado, con foco visible, y el detalle de una orden devuelve
-    sección, filtro y posición»
+SMOKE_CASOS=183 node scripts/smoke.mjs
+  → 1/1: «la ficha es una página con URL propia. Mercado página 2, orden por
+    precio, búsqueda y vista Lista: la ficha tiene su URL, y Atrás vuelve a
+    «/?section=marketplace&q=…&sort=price-asc&page=2» a N px con el foco en
+    el enlace; …»
 
-python3 scripts/sabotajes_admin_mobile_access_1.py desplazamiento
-  → [FAIL] «360 × 800: la barra desborda 295 px y deja fuera de la vista
-    ["Categorías","Documentación","Configuración"]…»; deja el árbol como estaba
+python3 scripts/sabotajes_product_detail_page_1.py modal
+  → [FAIL] «ficha abierta desde el Mercado: la ficha de «…insumo 35» tiene la
+    barra en «/?section=marketplace&…» y no en su URL «/?section=product&id=…»:
+    no se puede compartir ni recargar»; deja el árbol como estaba
 ```
 
-El segundo repone el comportamiento de antes en la barra. El script no toca
-la base ni la API: espera a que el frontend de desarrollo sirva el CSS roto
-—una condición, no un tiempo— y corre el caso. Trae otros tres negativos
-(abajo). Lo demás ya lo corrí sobre `b2a3ba4`.
-
-## Antes y después, medido en el navegador
-
-```
-                     antes                                  después (b2a3ba4)
-360 × 800    barra 655 px en 360; 3 fuera de la vista      barra 360 en 360; 0 fuera
-             secciones 38 de alto; Cerrar 35 × 35           secciones 44; Cerrar 44 × 44
-390 × 844    barra 655 px en 390; 3 fuera de la vista      barra 390 en 390; 0 fuera
-             secciones 38 de alto; Cerrar 35 × 35           secciones 44; Cerrar 44 × 44
-768 × 1024   7 a la vista; secciones 43; Cerrar 40 × 40     7 a la vista; secciones 44; Cerrar 44 × 44
-1440 × 900   secciones 52; Cerrar 40 × 40                   igual, sin cambio
-```
-
-En las cuatro medidas: la página no desborda a lo ancho y cero errores de
-consola, antes y después. Las capturas quedaron en mi entorno; las trazas de
-arriba son las del navegador, no del CSS.
-
-El costo: en 360 y 390 la barra pasa de un renglón a dos, unos 50 px más de
-alto. En 768 sigue entrando en uno.
+El segundo es el negativo que pediste: pone todo `src/` como estaba en la base
+—el detalle como capa— y el 183 da rojo por la URL. Necesita el frontend de
+desarrollo en 5173, como el de la pieza anterior: espera a que sirva el
+cambio antes de correr. Lo demás ya lo corrí; abajo, con su resultado.
 
 ## Qué cambió
 
-`src/components/AdminPanel/AdminPanel.module.css` (+14 −4), dentro de la
-regla de hasta 768 px:
+- **Política y navegación** (`src/navegacion/`): `product` es una sección más,
+  con el ID en la URL; sin ID es Inicio. Abrirla anota en la entrada de
+  origen el punto y el enlace, y agrega una sola entrada. Sigue habiendo un
+  único oyente de `popstate`. La capa se retiró: nada más la usaba.
+- **La página** (`ProductDetail/ProductDetailPage.tsx`, antes el modal): el
+  mismo contenido y las mismas acciones, con título h1 y foco en él al
+  llegar. Mientras busca, lo dice; con 404 —no existe o no está activa— dice
+  que no está disponible; sin respuesta, lo anuncia y ofrece reintentar. Nunca
+  muestra lo que decía la tarjeta.
+- **La tarjeta**: el título y «Ver detalle» son enlaces con `href`, así se
+  pueden abrir en otra pestaña y el insumo comprable —que no tiene «Ver
+  detalle»— también se abre con el teclado. El anillo de foco del título se
+  dibuja hacia adentro del enlace: el recorte a dos renglones cortaba el de
+  afuera.
+- **App**: mientras la ficha está arriba, la pantalla de origen sigue activa
+  para sus cargas. Así, al volver, el Mercado no se pide de nuevo ni rehace
+  sus tarjetas —que es lo que perdía el foco—. La vista Cuadrícula/Lista pasó
+  de la grilla a App para sobrevivir a la ficha; salir del Mercado la sigue
+  reiniciando.
 
-- la barra pasa a otro renglón (`flex-wrap`) en vez de desplazarse de costado;
-- cada sección ocupa el ancho que le toca en su renglón y mide al menos 44 de
-  alto;
-- Cerrar mide 44 × 44 y no se encoge; se quitó la regla de 480 px que lo
-  achicaba a 35.
+Sin backend, sin migración, sin dependencia, sin permisos nuevos.
 
-Nombres, orden, sección activa, contenido, capas, permisos y teclado no se
-tocaron. Sin cambios de TSX, de tokens ni de otros paneles.
+## Casos que asumían la capa
 
-## Lo que corrí, sobre el árbol de `b2a3ba4`
+Adapté trece y las tres auditorías. Donde cambió el contrato y no sólo el
+selector, te lo digo:
 
-Todo corrió sobre ese mismo contenido: entre las corridas y el commit no cambió
-ningún archivo. La traza de «después» es sobre el commit ya hecho.
+- **147, parte E**: exigía «el detalle es una capa, no una ubicación». Ahora
+  exige lo contrario: URL propia, sin celda marcada en la cabecera, Adelante
+  y recarga, y Atrás o «Volver al Mercado» sin entrada fantasma.
+- **148, partes A y B**: Escape, X y fondo ya no cierran la ficha —es una
+  página—. Lo que se mide es lo mismo que pedía: al volver, el foco está en
+  SU «Ver detalle». El perfil del vendedor sigue siendo una capa sobre la
+  ficha, y un Escape sin capa no saca de la página.
+- 138–140, 152, 155 y 162: la ficha se busca como página y se deja con Atrás.
+  El 155 sigue exigiendo que volver conserve la vista Lista, y la conserva.
+- 21, 108, 121 y 166: buscaban el título de nivel 2 o el diálogo; ahora, el
+  h1 de la página. Se me habían pasado en la revisión y los encontró la
+  primera suite completa.
+- **123 me marcó un defecto.** Exige que el elemento enfocado tenga su
+  anillo, y yo lo había pasado a la tarjeta. Lo devolví al enlace en vez de
+  aflojar esa exigencia. Lo único que cambié del caso es su paso por la
+  ficha, que esperaba el diálogo: ahora espera la página y sale con Atrás.
+  Mide lo mismo.
+- a11y, contraste y auditoría móvil miden la ficha cuando terminó de cargar.
+
+## Lo que corrí
 
 ```
-caso 182                                               1/1
-caso 182 con el CSS anterior                           0/1: «la barra desborda 295 px…»
-sabotajes desplazamiento / altura / cerrar / apretado  4/4 rojos, uno por cada parte
-1–6, 21, 108, 144, 145, 146, 148, 160, 182             14/14, desde base limpia
-a11y --todas                                           74/74, sin violaciones
-contraste                                              82/82 mediciones, sin fallas
-build · lint · tsc --noEmit · node --check             verdes
-diff-check compatible con CRLF                         sin avisos
+suite completa desde base limpia, sobre cca660c   181/183
+  rojos: 123 —su paso por la ficha esperaba el diálogo; lo corrige
+  087fa2c, que sólo cambia eso— y 131 —ambiental: pide Docker, acá no hay—
+123 y 183, sobre 087fa2c                          2/2
+183 antes                                         1/1, cinco corridas
+sabotajes modal / sin-url / sin-regreso /
+  recarga-del-origen, sobre 087fa2c               4/4 rojos, árbol intacto después
+a11y --todas                                      74/74 pantallas, 0 serious o
+                                                  critical, 0 minor o moderate
+contraste                                         82/82 mediciones, TODO OK
+build · lint · tsc --noEmit · node --check        verdes
+diff-check compatible con CRLF                    sin avisos
 ```
 
-Los cuatro rojos: `altura` → «secciones con un blanco táctil menor a 44 × 44:
-Dashboard 95×38, …»; `cerrar` → «Cerrar mide 40 × 40»; `apretado` → «el
-Cerrar del detalle mide … "width":37.7». Suite completa no corrida: el cambio
-no sale del alcance y no apareció ningún rojo inesperado.
+La primera suite completa, sobre el commit anterior del candidato, dio
+176/183. Encontró los cuatro casos que se me habían pasado, el defecto del
+123 y el 46, que cayó en cascada del 21 y volvió a verde solo.
 
-Dos cosas que el caso espera, y por qué: el subrayado de la sección activa y
-el anillo de foco entran con una transición de 0,2 s (`transition: all` que
-ya tenía la pestaña), y el detalle de una orden entra con una escala de 0,95.
-El caso espera a que terminen —condición con tope— antes de medir; sin eso
-medía a mitad de camino.
+Los otros tres rojos: `sin-url` → el mismo texto de la URL; `sin-regreso` →
+«al volver el foco está en (el documento) y no en el enlace que abrió la
+ficha»; `recarga-del-origen` → «al volver la vista dejó de ser Lista».
+
+Corrí la suite completa aunque pediste no hacerlo sólo por volumen: el
+cambio toca la navegación de todo el sitio, los efectos de carga de App y
+cada tarjeta. Encontró cinco cosas que la revisión no.
+
+**Un rojo de arnés que medí y corregí.** Con dos escrituras seguidas sobre el
+mismo archivo, el vigilante del frontend de desarrollo puede perder la
+segunda: quedó sirviendo la versión saboteada con el archivo ya restaurado, y
+el 183 sobre la candidata dio el rojo exacto de `sin-regreso`. No era el
+producto. El script ahora vuelve a escribir el archivo si en 5 s no se sirve el
+cambio, y espera a que deje de servirse la versión rota antes de seguir.
 
 ## Visto y no tocado
 
-- Dentro de Configuración, la barra de tipos de opción entra entera, pero sus
-  cuatro botones miden 26 px de alto. No es la navegación de las siete
-  secciones; si lo querés, es la misma solución.
-- En escritorio Cerrar sigue en 40 × 40, con puntero. Llevarlo a 44 es una
-  línea.
-- Otros controles del panel —selects, «Ver» de cada orden, paginación— no los
-  medí todos.
+- El navegador también restaura el punto por su cuenta; por eso el negativo
+  que discrimina el regreso es el del foco, no el del punto.
+- **La auditoría móvil no llega a la ficha, y ya no llegaba antes.** Se
+  corta antes, en el Mercado: el clic en «Limpiar filtros» lo tapa el panel
+  plegable de filtros. Con `src/` y el script de la base `3508d48` se corta
+  en el mismo clic, así que no es de esta pieza y no la toqué. La ficha en
+  celular la cubren el 183, parte E, y a11y en celular. Además, al correr
+  pisa dos capturas versionadas en `docs/pm/evidence/`; las devolví a como
+  estaban.
+- La cabecera no marca ninguna sección en la ficha.
+- El título de la pestaña no cambia en la ficha; ninguna pantalla lo cambia hoy.
+- Un dato para tu registro: en tu reproducción de ADMIN-MOBILE-ACCESS-1 dice
+  que mi push omitió `44d5d5d` y que lo reaplicaste como `7b45ea1`. En la rama
+  `44d5d5d` entró por el merge `aab4e62`, y `7b45ea1` no está en la historia.
 
-No toqué `main`, Railway ni datos, y no desplegué. Freno acá.
+No toqué `main`, Railway, backend ni datos, y no desplegué. Freno acá.
