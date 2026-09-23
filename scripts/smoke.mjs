@@ -31802,6 +31802,132 @@ await runCase(183, 'La ficha de una publicación es una página con URL propia, 
   }
 });
 
+await runCase(184, 'El checkout en celular no deja nada fuera de su capa, y la compra llega al medio de pago', async () => {
+  // Con una publicación demo y el recorrido de una persona: ingresar, agregar,
+  // completar el envío, elegir cómo se traslada y llegar al pago. En cada paso
+  // se mide la capa del checkout y no la página: la capa se desplaza de
+  // costado dentro de sí misma, así que un contenido más ancho que ella no le
+  // da barra horizontal al documento y la medición de la página no lo ve.
+  const DEMO = 'Fertilizante Triple 15 - NPK';
+  const correo = 'cliente@ejemplo.com';
+  const clave = 'cliente123';
+  const comprador = await ingresarVendedor(correo, clave);
+  const [demo] = queryRows(`SELECT id, status FROM products WHERE name = ${sqlLiteral(DEMO)}`);
+  assert(demo && demo[1] === 'ACTIVE',
+    `la publicación demo «${DEMO}» no está activa en la base: ${JSON.stringify(demo || null)}`);
+  const ordenesAntes = queryCount(
+    `SELECT COUNT(*) FROM orders WHERE buyer_id = ${sqlLiteral(comprador.id)}`);
+
+  // Lo que queda fuera de la parte visible de la capa, y cuánto tapa la cruz
+  // de cerrar a cada paso del progreso.
+  const medirLaCapa = (page) => page.evaluate(() => {
+    const capa = document.querySelector('[role="dialog"][aria-label="Checkout"]');
+    const marco = capa.getBoundingClientRect();
+    const derecha = marco.left + capa.clientWidth;
+    const fuera = [...capa.querySelectorAll('h2, h3, h4, legend, label, p, input, select, textarea, button, a')]
+      .map((e) => ({ e, r: e.getBoundingClientRect() }))
+      .filter(({ r }) => r.width > 0 && r.height > 0 && (r.left < marco.left - 1 || r.right > derecha + 1))
+      .map(({ e, r }) => `${e.tagName.toLowerCase()} «${(e.textContent || e.getAttribute('placeholder') || e.id || '')
+        .trim().replace(/\s+/g, ' ').slice(0, 40)}» ${Math.round(r.left)}→${Math.round(r.right)}`);
+    const cruz = capa.querySelector('button[aria-label="Cerrar"]').getBoundingClientRect();
+    const tapados = [...capa.querySelectorAll('[class*="_progressStep_"]')]
+      .map((paso) => {
+        const r = paso.getBoundingClientRect();
+        const x = Math.min(r.right, cruz.right) - Math.max(r.left, cruz.left);
+        const y = Math.min(r.bottom, cruz.bottom) - Math.max(r.top, cruz.top);
+        return { paso: paso.textContent.trim(), px: x > 0 && y > 0 ? Math.round(x) : 0 };
+      })
+      .filter(({ px }) => px > 0);
+    return { ancho: capa.clientWidth, contenido: capa.scrollWidth, fuera, tapados };
+  });
+  const sinRecorte = (medida, donde, paso) => {
+    assert(medida.contenido <= medida.ancho + 1 && medida.fuera.length === 0,
+      `${donde}, ${paso}: la capa del checkout mide ${medida.ancho} px y su contenido `
+      + `${medida.contenido}; quedan fuera de la vista ${medida.fuera.length}: `
+      + `${medida.fuera.slice(0, 4).join(', ')}`);
+    assert(medida.tapados.length === 0,
+      `${donde}, ${paso}: la cruz de cerrar tapa ${medida.tapados
+        .map(({ paso: nombre, px }) => `${px} px de «${nombre}»`).join(', ')}`);
+  };
+
+  const browser = await chromium.launch({ headless: true });
+  const erroresDeJs = [];
+  const medidos = [];
+  try {
+    for (const [ancho, alto] of [[360, 800], [390, 844], [768, 1024]]) {
+      const donde = `${ancho}x${alto}`;
+      await apiRequest('/cart', { method: 'DELETE', token: comprador.token });
+      const contexto = await browser.newContext({
+        viewport: { width: ancho, height: alto }, isMobile: ancho < 768, hasTouch: true,
+      });
+      const page = await contexto.newPage();
+      page.on('pageerror', (error) => erroresDeJs.push(`${donde}: ${error.message}`));
+      try {
+        await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+        await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+        await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+        await page.getByPlaceholder('tu@email.com').fill(correo);
+        await page.getByPlaceholder('••••••••').fill(clave);
+        await page.locator('[class*="_submitButton_"][type="submit"]').click();
+        await page.getByRole('button', { name: /Salir|Cuenta/ }).first().waitFor({ timeout: 20_000 });
+
+        await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(DEMO)}`,
+          { waitUntil: 'domcontentloaded' });
+        const tarjeta = page.locator('article')
+          .filter({ has: page.getByRole('heading', { name: DEMO, exact: true, level: 3 }) }).first();
+        await tarjeta.waitFor({ state: 'visible', timeout: 25_000 });
+        await tarjeta.getByRole('button', { name: /Agregar/ }).click();
+        await esperarA(async () => /\(1\)/.test(
+          (await page.getByRole('button', { name: /Carrito/ }).first().textContent()) || ''),
+        `${donde}: «${DEMO}» no entró al carrito`, 20_000);
+        await page.getByRole('button', { name: /Carrito/ }).first().click();
+        await page.getByRole('button', { name: 'Continuar compra' }).click();
+        await page.getByRole('heading', { name: 'Datos de envío' }).waitFor({ timeout: 20_000 });
+
+        await page.locator('input[placeholder="Juan Pérez"]').fill('Compradora 184');
+        await page.locator('input[type="tel"]').fill('+54 11 5555 0184');
+        await elegirDestino(page, 'Pergamino');
+        await page.locator('input[placeholder*="San Martín"]').fill('Ruta 8 km 220');
+        await page.locator('input[placeholder="2000"]').fill('2700');
+        const propio = page.getByRole('radio', { name: /Coordino el traslado por mi cuenta/ });
+        await propio.first().waitFor({ timeout: 25_000 });
+        await page.locator('label').filter({ hasText: 'Coordino el traslado por mi cuenta' }).first().click();
+        assert(await propio.first().isChecked(),
+          `${donde}: tocar «Coordino el traslado por mi cuenta» no la dejó elegida`);
+        const envio = await medirLaCapa(page);
+        sinRecorte(envio, donde, 'Datos de envío');
+
+        await page.getByRole('button', { name: 'Continuar al pago' }).click();
+        await page.getByRole('heading', { name: 'Medio de pago' }).waitFor({ timeout: 25_000 });
+        // Con transferencia elegida aparecen el CBU y el alias, que son los
+        // renglones más largos del paso.
+        const transferencia = page.getByRole('radio', { name: /Transferencia/ });
+        if (await transferencia.count()) {
+          await page.locator('label').filter({ has: transferencia }).first().click();
+        }
+        const conCbu = await page.getByText('CBU:', { exact: true }).first()
+          .waitFor({ timeout: 5_000 }).then(() => true, () => false);
+        const pago = await medirLaCapa(page);
+        sinRecorte(pago, donde, 'Medio de pago');
+        medidos.push(`${donde}: envío ${envio.contenido}/${envio.ancho}, `
+          + `pago ${pago.contenido}/${pago.ancho}${conCbu ? ' con CBU' : ''}`);
+      } finally {
+        await contexto.close();
+      }
+    }
+    assert(queryCount(`SELECT COUNT(*) FROM orders WHERE buyer_id = ${sqlLiteral(comprador.id)}`)
+      === ordenesAntes, 'medir el checkout creó órdenes; sólo tenía que llegar al pago');
+    assert(erroresDeJs.length === 0, `errores de JS: ${erroresDeJs.join(' | ')}`);
+  } finally {
+    await browser.close();
+    await apiRequest('/cart', { method: 'DELETE', token: comprador.token }).catch(() => {});
+  }
+  return `Con «${DEMO}» y traslado por cuenta propia, la compra llega a «Medio de pago» `
+    + `en los tres anchos y la capa del checkout no deja nada fuera de la vista `
+    + `(contenido/ancho de la capa): ${medidos.join('; ')}. La cruz de cerrar no tapa `
+    + 'ningún paso del progreso, y no se creó ninguna orden';
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

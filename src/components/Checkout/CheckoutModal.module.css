@@ -673,6 +673,42 @@
   background: var(--tg-color-text);
 }
 
+/* El ancho del contenido.
+   Una columna de grid y un fieldset toman por omisión el ancho mínimo de lo
+   que tienen adentro. El select de provincia necesita 400 px para «Tierra del
+   Fuego, Antártida e Islas del Atlántico Sur», y en el pago el CBU de 22
+   dígitos no se parte: en celular ensanchaban cada paso a 400 y 459 px dentro
+   de una capa de 320, que se desplazaba de costado. Rótulos, campos, el
+   botón de confirmar y el total quedaban fuera de la vista. Sin ese mínimo,
+   cada bloque toma el ancho que hay. */
+.main,
+.sidebar,
+.formGroup,
+.formGroupFull,
+.grupoDePago {
+  min-width: 0;
+}
+
+.formGroup input,
+.formGroup select,
+.formGroupFull input,
+.formGroupFull textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Un alias o un CBU que no entra ni solo en su renglón se parte antes que
+   ensanchar la capa. */
+.datosBancarios p {
+  overflow-wrap: anywhere;
+}
+
+/* «Envío:» y «A coordinar con el vendedor» se tocaban cuando el valor baja
+   de renglón. */
+.summaryRow {
+  gap: 12px;
+}
+
 /* Responsive */
 @media (max-width: 968px) {
   .content {
@@ -707,6 +743,47 @@
 
   .progressStep span {
     font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* La cruz de cerrar ocupa la esquina derecha: el progreso le deja ese lugar
+     en vez de pasar por debajo. Medido: tapaba 23 px del paso 3 a 360 y 8 px
+     a 390. */
+  .progressBar {
+    padding: 30px 64px 20px 12px;
+  }
+
+  .progressLine {
+    width: 24px;
+    margin: 0 8px 24px;
+  }
+
+  /* «Transferencia» y «Mercado Pago» van en cuerpo grande al lado de su
+     descripción, y en 320 px no entran: se apilan. */
+  .paymentOption {
+    padding: 14px;
+  }
+
+  .paymentContent {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .paymentIcon {
+    font-size: 22px;
+  }
+
+  /* El CBU entero en un renglón, debajo de su rótulo: partido en dos se
+     copia mal. */
+  .datosBancarios strong {
+    display: block;
+  }
+
+  /* Volver y confirmar siguen lado a lado; con 32 px de relleno por lado no
+     entraban. */
+  .formActions button {
+    padding-inline: 16px;
   }
 }
 

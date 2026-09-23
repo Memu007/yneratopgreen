@@ -3,14 +3,15 @@
 //
 // La salida separa dos cosas que no se pueden confundir:
 //   - hallazgos de UI: lo medido en las pantallas —desborde, blancos táctiles,
-//     texto recortado, consola, red— y los controles que se ven pero no
-//     reciben el toque porque otra cosa se les pone encima;
+//     texto recortado, consola, red—, lo que la capa de checkout deja fuera
+//     de la vista y los controles que se ven pero no reciben el toque porque
+//     otra cosa se les pone encima;
 //   - recorridos que el script no completó: dónde se cortó y por qué. No
 //     cuentan como hallazgo; si el script intentó operar algo que la persona
 //     no ve, lo dice como falla del script. Un vencimiento sin más no prueba
 //     de quién es la culpa: el motivo dice qué se esperaba, y ahí se mira.
-// Sale con 2 si algún recorrido no se completó, con 1 si hay desbordes o
-// controles tapados, y con 0 si no.
+// Sale con 2 si algún recorrido no se completó, con 1 si hay desbordes,
+// recortes en la capa de checkout o controles tapados, y con 0 si no.
 //
 // Cada corrida deja su evidencia en una carpeta nueva y se niega a escribir en
 // una que ya tenga archivos: las capturas versionadas son el registro de lo
@@ -34,6 +35,7 @@ const results = {
   recorridos: [],
   viewports: [],
   controlesTapados: [],
+  capaDeCheckout: [],
   console: [],
   network: [],
 };
@@ -89,6 +91,52 @@ async function tocar(locator, nombre) {
 async function elegir(locator, nombre, opcion) {
   await alcanzar(locator, nombre);
   await locator.selectOption(opcion);
+}
+
+/**
+ * Lo que la capa de checkout deja fuera de la vista.
+ *
+ * El desborde de la página no lo ve: la capa se desplaza de costado dentro de
+ * sí misma y el documento sigue midiendo lo mismo que la pantalla. Se mide
+ * sólo en el checkout, porque la tabla del panel de administración también se
+ * desplaza de costado, pero a propósito.
+ */
+async function medirLaCapaDeCheckout(page, viewport, screen) {
+  const medida = await page.evaluate(() => {
+    const capa = document.querySelector('[role="dialog"][aria-label="Checkout"]');
+    if (!capa) return null;
+    const marco = capa.getBoundingClientRect();
+    const derecha = marco.left + capa.clientWidth;
+    const fuera = [...capa.querySelectorAll('h2, h3, h4, legend, label, p, input, select, textarea, button, a')]
+      .map((element) => ({ element, rect: element.getBoundingClientRect() }))
+      .filter(({ rect }) => rect.width > 0 && rect.height > 0
+        && (rect.left < marco.left - 1 || rect.right > derecha + 1))
+      .slice(0, 20)
+      .map(({ element, rect }) => ({
+        tag: element.tagName.toLowerCase(),
+        label: (element.getAttribute('aria-label') || element.textContent
+          || element.getAttribute('placeholder') || element.id || '')
+          .trim().replace(/\s+/g, ' ').slice(0, 60),
+        left: Math.round(rect.left),
+        right: Math.round(rect.right),
+      }));
+    return { ancho: capa.clientWidth, contenido: capa.scrollWidth, fuera };
+  });
+  assert(medida, `falla del script: en ${screen} no está la capa de checkout que iba a medir`);
+  results.capaDeCheckout.push({
+    viewport: viewport.name,
+    screen,
+    ...medida,
+    recortada: medida.contenido > medida.ancho + 1 || medida.fuera.length > 0,
+  });
+}
+
+/** Lo que la pantalla dice cuando el recorrido se corta: un aviso con
+    role="alert" suele ser la razón, y sin él el vencimiento no la dice. */
+async function avisosEnPantalla(page) {
+  const avisos = await page.getByRole('alert').allTextContents().catch(() => []);
+  const textos = avisos.map((texto) => texto.trim().replace(/\s+/g, ' ')).filter(Boolean);
+  return textos.length ? `la pantalla dice: ${textos.map((texto) => `«${texto}»`).join(', ')}` : '';
 }
 
 const resumenDeFiltros = (page) => page.locator('button[aria-controls="panel-de-filtros"]');
@@ -333,8 +381,8 @@ async function exerciseCheckout(browser, viewport, state, buyerTokens) {
     await page.getByRole('heading', { name: /Mi carrito/i }).waitFor();
     await inspect(page, state, viewport, '05-cart');
 
-    state.screen = '05-checkout-payment';
-    await page.getByRole('button', { name: 'Continuar compra' }).click();
+    state.screen = '05-checkout-shipping';
+    await tocar(page.getByRole('button', { name: 'Continuar compra' }), 'Continuar compra');
     await page.getByRole('heading', { name: /Datos de env/i }).waitFor();
     await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0101');
     await page.locator('#checkout-provincia').selectOption('06');
@@ -343,9 +391,28 @@ async function exerciseCheckout(browser, viewport, state, buyerTokens) {
     await page.locator('#checkout-localidad').selectOption({ label: 'Pergamino' });
     await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Av. Prueba 123');
     await page.getByPlaceholder('2000').fill('2000');
-    await page.locator('form:has(h2) button[type="submit"]').click();
+    // Cada pedido dice cómo se traslada antes de pagar. La persona elige, y la
+    // auditoría también: coordinar por su cuenta, que no depende de que haya
+    // transportistas para ese tramo.
+    await page.getByRole('heading', { name: 'Cómo se traslada cada pedido' }).waitFor();
+    const porMiCuenta = page.locator('label').filter({ hasText: 'Coordino el traslado por mi cuenta' });
+    await porMiCuenta.first().waitFor();
+    for (const opcion of await porMiCuenta.all()) {
+      await tocar(opcion, 'Coordino el traslado por mi cuenta');
+      assert(await opcion.locator('input[type="radio"]').isChecked(),
+        'tocar «Coordino el traslado por mi cuenta» no dejó elegida la opción');
+    }
+    await inspect(page, state, viewport, '05-checkout-shipping');
+    await medirLaCapaDeCheckout(page, viewport, '05-checkout-shipping');
+
+    state.screen = '05-checkout-payment';
+    await tocar(page.getByRole('button', { name: 'Continuar al pago' }), 'Continuar al pago');
     await page.getByRole('heading', { name: /Medio de pago/i }).waitFor();
     await inspect(page, state, viewport, '05-checkout-payment');
+    await medirLaCapaDeCheckout(page, viewport, '05-checkout-payment');
+  } catch (error) {
+    error.avisos = await avisosEnPantalla(page);
+    throw error;
   } finally {
     await context.close();
   }
@@ -439,9 +506,10 @@ try {
         // llamada que lo esperaba sí.
         const lineas = error.message.split('\n');
         const esperaba = lineas.find((linea) => linea.includes('waiting for'));
-        const motivo = esperaba
-          ? `${lineas[0]} (${esperaba.replace(/\x1b\[[0-9;]*m/g, '').trim()})`
-          : lineas[0];
+        const motivo = [
+          esperaba ? `${lineas[0]} (${esperaba.replace(/\x1b\[[0-9;]*m/g, '').trim()})` : lineas[0],
+          error.avisos,
+        ].filter(Boolean).join('; ');
         anotado.completo = false;
         anotado.cortadoEn = state.screen;
         anotado.motivo = motivo;
@@ -463,12 +531,18 @@ await writeFile(
 );
 
 const overflow = results.viewports.filter((entry) => entry.horizontalOverflow);
+const recortes = results.capaDeCheckout.filter((entry) => entry.recortada);
 const cortados = results.recorridos.filter((entry) => !entry.completo);
 const deScript = cortados.filter((entry) => !entry.tapado);
 console.log(`Recorridos completos: ${results.recorridos.length - cortados.length} de ${results.recorridos.length}`);
 console.log(`Pantallas verificadas: ${results.viewports.length}`);
 console.log('Hallazgos de UI:');
 console.log(`  Desbordes horizontales: ${overflow.length}`);
+console.log(`  Recortes dentro de la capa de checkout: ${recortes.length} de ${results.capaDeCheckout.length} pantallas medidas`);
+for (const recorte of recortes) {
+  const ejemplos = recorte.fuera.slice(0, 3).map((fuera) => `${fuera.tag} «${fuera.label}» ${fuera.left}→${fuera.right}`);
+  console.log(`    - ${recorte.viewport} ${recorte.screen}: la capa mide ${recorte.ancho} px y su contenido ${recorte.contenido}; fuera de la vista: ${ejemplos.join(', ') || '(sólo el desplazamiento)'}`);
+}
 console.log(`  Controles que se ven y no reciben el toque: ${results.controlesTapados.length}`);
 for (const tapado of results.controlesTapados) {
   console.log(`    - ${tapado.viewport} ${tapado.screen}: ${tapado.motivo}`);
@@ -480,5 +554,5 @@ for (const cortado of deScript) {
   console.log(`    - ${cortado.viewport} ${cortado.recorrido}, en ${cortado.cortadoEn}: ${cortado.motivo}`);
 }
 console.log(`Resultado: ${path.join(EVIDENCE_DIR, 'audit-results.json')}`);
-if (overflow.length > 0 || results.controlesTapados.length > 0) process.exitCode = 1;
+if (overflow.length > 0 || recortes.length > 0 || results.controlesTapados.length > 0) process.exitCode = 1;
 if (deScript.length > 0) process.exitCode = 2;
