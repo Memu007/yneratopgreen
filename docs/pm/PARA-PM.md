@@ -109,11 +109,11 @@ decisión es de Emi; te lo aviso para que no planifiques sobre eso.
 
 ## Visto y no tocado
 
-- **Con el teclado, el panel plegado atrapa el foco.** A 390 px, con el panel
-  cerrado, Tab desde «Filtros» pasa por Tipo, Categoría, Provincia y Precio,
-  que no se ven, porque el panel mide 0 px de alto. Lo medí a 390 px; por
-  la regla del CSS, pasa en cualquier ancho menor a 1024 px, incluido el
-  escritorio con zoom al 200 %.
+- **Con el teclado, el foco pasa por filtros que no se ven.** A 390 px, con
+  el panel cerrado, Tab desde «Filtros» recorre Tipo, Categoría, Provincia y
+  Precio, que no se ven porque el panel mide 0 px de alto. Por la regla del
+  CSS pasa en cualquier ancho menor a 1024 px, incluido el escritorio con
+  zoom al 200 %.
   Es un defecto de accesibilidad del producto que esta auditoría no mide.
 - **En la ficha a 360 px, el rótulo de la placa se corta.** «Sin registro
   fotográfico» queda cortado abajo. La proporción del marco es la misma
