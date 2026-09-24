@@ -34,7 +34,7 @@ from app.schemas.logistics import (
     TipoDeCarga,
     TiposDeCargaResponse,
 )
-from app.services import cargas
+from app.services import cargas, padron
 from app.services.logistica import (
     CANDIDATOS_COMPATIBLES,
     DISTANCIAS_A_ORIGENES,
@@ -48,11 +48,12 @@ from app.services.logistica import (
 router = APIRouter(prefix="/logistics", tags=["logistics"])
 
 
-def _breve(locality: Locality) -> LocalityBrief:
+def _breve(locality: Locality, rotulos: dict) -> LocalityBrief:
     return LocalityBrief(
         id=locality.id,
         name=locality.name,
         province_name=locality.province_name,
+        label=rotulos.get(locality.id, locality.name),
     )
 
 
@@ -72,6 +73,7 @@ def _candidatos(db: Session, destino: Locality, grupo) -> List[CarrierCandidate]
         {"bases": bases, "origenes": ids_origen},
     ).mappings().all():
         por_base.setdefault(d["base_id"], []).append(d)
+    rotulos = padron.rotulos(db, [*bases, *ids_origen])
 
     return [
         CarrierCandidate(
@@ -79,6 +81,7 @@ def _candidatos(db: Session, destino: Locality, grupo) -> List[CarrierCandidate]
             full_name=fila["full_name"],
             base_locality_name=fila["base_locality_name"],
             base_province_name=fila["base_province_name"],
+            base_locality_label=rotulos.get(fila["base_locality_id"], fila["base_locality_name"]),
             transport=fila["carrier_transport"],
             certification_detail=fila["carrier_certification_detail"],
             certification_declared_at=fila["carrier_certification_declared_at"],
@@ -94,6 +97,7 @@ def _candidatos(db: Session, destino: Locality, grupo) -> List[CarrierCandidate]
                     locality_id=d["origen_id"],
                     name=d["name"],
                     province_name=d["province_name"],
+                    label=rotulos.get(d["origen_id"], d["name"]),
                     distance_km=round(float(d["km"]), 1),
                 )
                 for d in por_base.get(fila["base_locality_id"], [])
@@ -131,18 +135,20 @@ def compatible_carriers(
     destino = resolver_destino(db, destination_locality_id)
     grupos = grupos_del_carrito(carrito_activo(db, current_user))
 
+    rotulos = padron.rotulos(db, [
+        destino.id, *(o.id for grupo in grupos.values() for o in grupo.origenes.values())])
     salida: List[CarrierGroup] = []
     for grupo in grupos.values():
         origenes = list(grupo.origenes.values())
         salida.append(CarrierGroup(
             seller_id=grupo.vendedor.id,
             seller_name=grupo.vendedor.full_name,
-            origins=[_breve(o) for o in origenes],
+            origins=[_breve(o, rotulos) for o in origenes],
             origin_missing=not grupo.medible,
             carriers=[] if not grupo.medible else _candidatos(db, destino, grupo),
         ))
 
-    return CompatibleCarriersResponse(destination=_breve(destino), groups=salida)
+    return CompatibleCarriersResponse(destination=_breve(destino, rotulos), groups=salida)
 
 
 @router.post("/select-carrier", response_model=SelectCarrierResponse)
@@ -184,7 +190,7 @@ def select_carrier(
     return SelectCarrierResponse(
         seller_id=grupo.vendedor.id,
         seller_name=grupo.vendedor.full_name,
-        destination=_breve(destino),
+        destination=_breve(destino, padron.rotulos(db, [destino.id])),
         carrier=SelectedCarrier(
             **candidato.model_dump(),
             email=transportista.email,
@@ -195,7 +201,15 @@ def select_carrier(
     )
 
 
-def _operacion(order: Order) -> CarrierOperation:
+def _rotulos_de(db: Session, ordenes) -> dict:
+    """Los rótulos de los orígenes y destinos de estas órdenes, de una vez."""
+    return padron.rotulos(db, [
+        *(item.origin_locality_id for order in ordenes for item in order.items),
+        *(order.shipping_locality_id for order in ordenes),
+    ])
+
+
+def _operacion(order: Order, rotulos: dict) -> CarrierOperation:
     # El origen sale del snapshot del ítem, no de la publicación: si se leyera
     # la localidad actual, el vendedor podría cambiarle el punto de retiro al
     # transportista después de la compra. Un ítem sin snapshot —anterior a esta
@@ -208,6 +222,8 @@ def _operacion(order: Order) -> CarrierOperation:
             id=item.origin_locality_id,
             name=item.origin_locality_name or '',
             province_name=item.origin_province_name or '',
+            # El rótulo sale del id del snapshot, no de la publicación de hoy.
+            label=rotulos.get(item.origin_locality_id, item.origin_locality_name or ''),
         )
     destino = order.shipping_locality if order.shipping_locality_id else None
     return CarrierOperation(
@@ -216,7 +232,7 @@ def _operacion(order: Order) -> CarrierOperation:
         created_at=order.created_at,
         seller_name=order.seller.full_name,
         origins=list(origenes.values()),
-        destination=_breve(destino) if destino else None,
+        destination=_breve(destino, rotulos) if destino else None,
         items=[
             CarrierOperationItem(
                 product_name=item.product_name_snapshot,
@@ -242,8 +258,9 @@ def my_operations(
         Order.carrier_id == current_user.id,
         Order.shipping_mode == MODO_TRANSPORTISTA,
     ).order_by(Order.created_at.desc()).all()
+    rotulos = _rotulos_de(db, ordenes)
     return CarrierOperationsResponse(
-        operations=[_operacion(order) for order in ordenes]
+        operations=[_operacion(order, rotulos) for order in ordenes]
     )
 
 
@@ -263,4 +280,4 @@ def my_operation_detail(
         # 404 y no 403: a quien no le corresponde tampoco le corresponde saber
         # que la operación existe.
         raise HTTPException(status_code=404, detail="Operación no encontrada")
-    return _operacion(order)
+    return _operacion(order, _rotulos_de(db, [order]))

@@ -22,6 +22,7 @@ interface DistanciaOrigen {
   locality_id: string;
   name: string;
   province_name: string;
+  label: string;
   distance_km: number;
 }
 
@@ -29,6 +30,7 @@ interface TransportistaCompatible {
   id: string;
   full_name: string;
   base_locality_name: string;
+  base_locality_label: string;
   base_province_name: string;
   transport: string;
   // Marca y modelo, y lo que declara transportar: se muestran para comparar
@@ -47,13 +49,13 @@ interface TransportistaCompatible {
 interface GrupoDeFletes {
   seller_id: string;
   seller_name: string;
-  origins: { id: string; name: string; province_name: string }[];
+  origins: { id: string; name: string; province_name: string; label: string }[];
   origin_missing: boolean;
   carriers: TransportistaCompatible[];
 }
 
 interface FletesCompatibles {
-  destination: { id: string; name: string; province_name: string };
+  destination: { id: string; name: string; province_name: string; label: string };
   groups: GrupoDeFletes[];
 }
 
@@ -581,7 +583,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
     <li key={carrier.id} className={styles.fleteTarjeta}>
       <p className={styles.fleteNombre}>{carrier.full_name}</p>
       <p className={styles.fleteDato}>
-        Base: {carrier.base_locality_name}, {carrier.base_province_name}
+        Base: {carrier.base_locality_label}, {carrier.base_province_name}
         {' · '}radio declarado {carrier.coverage_radius_km} km
       </p>
       <p className={styles.fleteDato}>
@@ -599,7 +601,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
       <p className={styles.fleteDato}>
         A {carrier.distance_to_destination_km} km del destino
         {carrier.distances_to_origins.map((d) => (
-          <span key={d.locality_id}> · a {d.distance_km} km de {d.name}</span>
+          <span key={d.locality_id}> · a {d.distance_km} km de {d.label}</span>
         ))}
       </p>
       <p className={styles.fleteDeclaracion}>
@@ -630,7 +632,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
       <p className={styles.fleteEtiqueta}>Transportista elegido</p>
       <p className={styles.fleteNombre}>{elegido.full_name}</p>
       <p className={styles.fleteDato}>
-        Base: {elegido.base_locality_name}, {elegido.base_province_name}
+        Base: {elegido.base_locality_label}, {elegido.base_province_name}
         {' · '}{elegido.transport}
         {elegido.vehicle_model ? ` · ${elegido.vehicle_model}` : ''}
       </p>
@@ -702,7 +704,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
                 Envío de {grupo.seller_name}
                 {grupo.origins.length > 0 && (
                   <span className={styles.fleteOrigenes}>
-                    {' '}desde {grupo.origins.map((o) => `${o.name}, ${o.province_name}`).join(' y ')}
+                    {' '}desde {grupo.origins.map((o) => `${o.label}, ${o.province_name}`).join(' y ')}
                   </span>
                 )}
               </h4>

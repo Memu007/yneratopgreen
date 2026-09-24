@@ -534,6 +534,8 @@ def get_products(
     results = query.all()
     
     # Construir response
+    # Los rótulos de las localidades de la página, de una vez.
+    rotulos = padron.rotulos(db, (fila[8] for fila in results))
     items = []
     for (product, category_name, is_service, subcategory_id, subcategory_name,
          seller_id, seller_name, seller_location,
@@ -557,6 +559,7 @@ def get_products(
                 locality_id=publicacion_locality_id,
                 locality=publicacion_localidad,
                 province=publicacion_provincia,
+                locality_label=rotulos.get(publicacion_locality_id, publicacion_localidad),
             )
             if publicacion_locality_id
             else None
@@ -665,6 +668,8 @@ def get_product_detail(
             locality_id=product.locality.id,
             locality=product.locality.name,
             province=product.locality.province_name,
+            locality_label=padron.rotulos(db, [product.locality.id]).get(
+                product.locality.id, product.locality.name),
         )
         if product.locality
         else None

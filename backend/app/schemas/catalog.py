@@ -89,12 +89,16 @@ class UbicacionDePublicacion(BaseModel):
     libre del perfil— bajo el rótulo de ubicación: filtrando Buenos Aires
     aparecía una tarjeta que decía Córdoba.
 
-    Va localidad y provincia, nada más. Ni domicilio, ni coordenadas, ni
-    departamento: para ubicar una operación alcanza con eso.
+    Va localidad y provincia, nada más. Ni domicilio ni coordenadas: para
+    ubicar una operación alcanza con eso. El departamento, sólo cuando hace
+    falta: en `locality_label`, y sólo si el nombre se repite en la provincia
+    —hay cuatro «San Pedro» en Santiago del Estero—. Es la misma regla del
+    selector (`app.services.padron`).
     """
     locality_id: str
     locality: str
     province: str
+    locality_label: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

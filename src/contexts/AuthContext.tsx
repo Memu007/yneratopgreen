@@ -23,6 +23,7 @@ interface BackendUser {
   is_carrier?: boolean;
   carrier_base_locality_id?: string;
   carrier_base_locality_name?: string;
+  carrier_base_locality_label?: string;
   carrier_base_province_id?: string;
   carrier_base_province_name?: string;
   carrier_transport?: string;
@@ -84,6 +85,7 @@ const mapBackendUserToFrontend = (backendUser: BackendUser): User => {
     isCarrier: backendUser.is_carrier,
     carrierBaseLocalityId: backendUser.carrier_base_locality_id,
     carrierBaseLocalityName: backendUser.carrier_base_locality_name,
+    carrierBaseLocalityLabel: backendUser.carrier_base_locality_label,
     carrierBaseProvinceId: backendUser.carrier_base_province_id,
     carrierBaseProvinceName: backendUser.carrier_base_province_name,
     carrierTransport: backendUser.carrier_transport,

@@ -23,12 +23,16 @@ class LocalityBrief(BaseModel):
     id: str
     name: str
     province_name: str
+    # Lo que se muestra: el nombre, con el departamento si el nombre se repite
+    # en la provincia. Misma regla que el selector (`app.services.padron`).
+    label: str
 
 
 class DistanceToOrigin(BaseModel):
     locality_id: str
     name: str
     province_name: str
+    label: str
     # Distancia en línea recta, no por caminos: es la misma medida con la que
     # se decide la compatibilidad.
     distance_km: float
@@ -39,6 +43,8 @@ class CarrierCandidate(BaseModel):
     full_name: str
     base_locality_name: str
     base_province_name: str
+    # La base como se muestra, con el departamento si hace falta.
+    base_locality_label: str
     transport: str
     # Marca y modelo del vehículo. Público: es de lo que se compara antes de
     # elegir. Opcional, porque un perfil viejo no lo tiene cargado.
@@ -140,6 +146,8 @@ class OrderShipping(BaseModel):
     mode: Optional[Literal["carrier", "self"]] = None
     carrier_name: Optional[str] = None
     carrier_base: Optional[str] = None
+    # La misma base, con el departamento si la localidad es homónima.
+    carrier_base_label: Optional[str] = None
     carrier_transport: Optional[str] = None
     carrier_vehicle_model: Optional[str] = None
     carrier_cargo_declared: List[str] = []

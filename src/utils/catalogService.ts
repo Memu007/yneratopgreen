@@ -84,6 +84,9 @@ export interface LocalityResponse {
 export interface UbicacionDePublicacion {
   locality_id: string;
   locality: string;
+  /** Lo que se muestra: el nombre, con el departamento si se repite en la
+      provincia. Misma regla que el selector. */
+  locality_label?: string;
   province: string;
 }
 
@@ -305,7 +308,7 @@ export const convertBackendProductToFrontend = (backendProduct: ProductFromBacke
     )?.archivo ?? getImageUrl(primaryImageUrl),
     location: {
       province: ubicacion?.province || '',
-      city: ubicacion?.locality || '',
+      city: ubicacion?.locality_label || ubicacion?.locality || '',
     },
     seller: {
       id: seller?.id || '',

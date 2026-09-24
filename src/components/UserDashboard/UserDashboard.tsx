@@ -71,6 +71,7 @@ interface TrasladoDeLaOrden {
   mode?: 'carrier' | 'self' | null;
   carrier_name?: string;
   carrier_base?: string;
+  carrier_base_label?: string;
   carrier_transport?: string;
   carrier_vehicle_model?: string;
   carrier_cargo_declared?: string[];
@@ -90,8 +91,8 @@ interface OperacionAsignada {
   order_number: string;
   created_at: string;
   seller_name: string;
-  origins: { id: string; name: string; province_name: string }[];
-  destination?: { id: string; name: string; province_name: string } | null;
+  origins: { id: string; name: string; province_name: string; label: string }[];
+  destination?: { id: string; name: string; province_name: string; label: string } | null;
   items: { product_name: string; quantity: number }[];
 }
 
@@ -2212,7 +2213,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                       ))}
                     </select>
                   ) : (
-                    <p>{user?.carrierBaseLocalityName || 'No especificada'}</p>
+                    <p>{user?.carrierBaseLocalityLabel || user?.carrierBaseLocalityName || 'No especificada'}</p>
                   )}
                 </div>
               </div>
@@ -2739,7 +2740,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
         <div className={styles.trasladoTitulo}> Transportista</div>
         <p className={styles.trasladoTexto}><strong>{traslado?.carrier_name}</strong></p>
         {traslado?.carrier_base && (
-          <p className={styles.trasladoTexto}>Base: {traslado.carrier_base}</p>
+          <p className={styles.trasladoTexto}>Base: {traslado.carrier_base_label || traslado.carrier_base}</p>
         )}
         {traslado?.carrier_transport && (
           <p className={styles.trasladoTexto}>
@@ -2821,10 +2822,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                 <div className={styles.trasladoTitulo}> Recorrido</div>
                 <p className={styles.trasladoTexto}>
                   Retiro en {operacion.origins.length > 0
-                    ? operacion.origins.map((o) => `${o.name}, ${o.province_name}`).join(' y ')
+                    ? operacion.origins.map((o) => `${o.label}, ${o.province_name}`).join(' y ')
                     : 'origen no informado'}
                   {' '}— entrega en {operacion.destination
-                    ? `${operacion.destination.name}, ${operacion.destination.province_name}`
+                    ? `${operacion.destination.label}, ${operacion.destination.province_name}`
                     : 'destino no informado'}
                 </p>
                 <p className={styles.trasladoTexto}>Entrega {operacion.seller_name}</p>

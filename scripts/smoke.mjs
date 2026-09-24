@@ -15213,7 +15213,10 @@ await runCase(137, 'La ubicacion que muestra una publicacion es la suya, no la d
   }
 
   // --- C. Privacidad: sale el lugar, no la puerta --------------------------
-  const permitidas = ['locality_id', 'locality', 'province'];
+  // `locality_label` es el mismo lugar como se muestra: el nombre, y el
+  // departamento sólo si el nombre se repite en la provincia
+  // (LOCALITY-LABEL-DISPLAY-1). Sigue siendo el lugar, no la puerta.
+  const permitidas = ['locality_id', 'locality', 'province', 'locality_label'];
   assert(JSON.stringify(Object.keys(publicacion.publication_location).sort())
       === JSON.stringify(permitidas.sort()),
     `la ubicacion expone ${JSON.stringify(Object.keys(publicacion.publication_location))}`);
@@ -32796,6 +32799,241 @@ await runCase(188, 'Cada localidad se ofrece una vez, y lo guardado sobre una en
     await browser.close();
     if (idDeLaPublicacion) {
       await apiRequest(`/products/${idDeLaPublicacion}`, { method: 'DELETE', token: vendedor.access_token });
+    }
+  }
+  return informe.join('. ');
+});
+
+await runCase(189, 'Una localidad homónima muestra su departamento donde se la ve, no sólo donde se la elige', async () => {
+  // Santiago del Estero tiene cuatro «San Pedro». Desde LOCALITY-DEDUP-1 el
+  // selector las distingue, pero la tarjeta, la ficha y la base del
+  // transportista decían «San Pedro, Santiago del Estero»: quien compra no
+  // sabía cuál. Se mira cada lugar con una publicación y un transportista
+  // propios; una localidad no homónima tiene que verse como antes.
+  const informe = [];
+  const sello = Date.now();
+  const localidad = (nombre, provincia, departamento) => {
+    const filas = queryRows(`
+      SELECT id FROM localities WHERE name = ${sqlLiteral(nombre)}
+        AND province_name = ${sqlLiteral(provincia)}
+        ${departamento ? `AND department_name = ${sqlLiteral(departamento)}` : ''}`);
+    assert(filas.length === 1, `el padrón tiene ${filas.length} «${nombre}» en ${provincia} ${departamento || ''}`);
+    return filas[0][0];
+  };
+  const CHOYA = localidad('San Pedro', 'Santiago del Estero', 'Choya');
+  const CAPITAL = localidad('San Pedro', 'Santiago del Estero', 'Capital');
+  const PERGAMINO = localidad('Pergamino', 'Buenos Aires');
+  // El rótulo más largo del padrón: 55 caracteres con la provincia.
+  // En ese departamento está también su entidad anidada, con el mismo nombre:
+  // se toma la localidad por su id.
+  const MALVINAS = '06515010';
+  assert(queryRows(`SELECT name FROM localities WHERE id = '${MALVINAS}'`)[0]?.[0] === 'Malvinas Argentinas',
+    `${MALVINAS} no es «Malvinas Argentinas» en el padrón`);
+  const MAS_LARGO = 'Malvinas Argentinas (Malvinas Argentinas), Buenos Aires';
+  const EN_CHOYA = 'San Pedro (Choya), Santiago del Estero';
+  const SIN_DEPTO = 'San Pedro, Santiago del Estero';
+
+  const entrar = async (email, password) => {
+    const r = await apiRequest('/auth/login', { method: 'POST', body: { email, password } });
+    assert(r.data?.access_token, `no se pudo entrar como ${email}: HTTP ${r.status}`);
+    return r.data;
+  };
+  const vendedor = await entrar('vendedor@ejemplo.com', 'vendedor123');
+  const comprador = await entrar('cliente@ejemplo.com', 'cliente123');
+  // Un transportista propio con base en otra «San Pedro»: 90 km de la de
+  // Choya y 99 de la de Guasayán, adentro de su radio.
+  const correoDelTransportista = `homonima.189.${sello}@example.com`;
+  const nombreDelTransportista = `Fletes Homónima ${sello}`;
+  await registrarYVerificar({
+    email: correoDelTransportista, password: 'smoke189', full_name: nombreDelTransportista,
+    is_carrier: true, carrier_base_locality_id: CAPITAL,
+    carrier_transport: 'Camión playo', carrier_transport_certified: true,
+    carrier_certification_detail: 'RUTA, cargas generales, caso 189',
+    carrier_coverage_radius_km: 150,
+  });
+  const transportista = await entrar(correoDelTransportista, 'smoke189');
+
+  const [categoria] = queryRows(`
+    SELECT id FROM categories WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
+  const publicar = async (nombre, localityId) => {
+    const alta = await apiRequest('/products', {
+      method: 'POST', token: vendedor.access_token,
+      body: {
+        name: nombre, description: 'Publicación efímera del caso 189.',
+        category_id: categoria[0], price: 1890, stock: 5, unit: 'kg',
+        locality_id: localityId, publication_type: 'producto', operation_kind: 'insumo',
+      },
+    });
+    assert(alta.status < 400 && alta.data?.id, `no se pudo publicar «${nombre}»: HTTP ${alta.status}`);
+    return alta.data.id;
+  };
+  const enChoya = `Homonima189 Choya ${sello}`;
+  const enPergamino = `Homonima189 Pergamino ${sello}`;
+  const enMalvinas = `Homonima189 Malvinas ${sello}`;
+  const ids = [];
+  const vaciarElCarrito = () => apiRequest('/cart', { method: 'DELETE', token: comprador.access_token });
+
+  const browser = await chromium.launch({ headless: true });
+  const erroresDeJs = [];
+  try {
+    ids.push(await publicar(enChoya, CHOYA), await publicar(enPergamino, PERGAMINO),
+      await publicar(enMalvinas, MALVINAS));
+    await vaciarElCarrito();
+    const contextoCon = async (sesion) => {
+      const contexto = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+      await contexto.addInitScript(({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+      }, { a: sesion.access_token, r: sesion.refresh_token });
+      return contexto;
+    };
+    const contexto = await contextoCon(comprador);
+    const page = await contexto.newPage();
+    page.on('pageerror', (error) => erroresDeJs.push(error.message));
+
+    // 1. La tarjeta del Mercado.
+    const tarjetaDe = async (nombre) => {
+      await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(nombre)}`,
+        { waitUntil: 'domcontentloaded' });
+      const titulo = page.getByRole('heading', { name: nombre, exact: true, level: 3 });
+      await titulo.waitFor({ state: 'visible', timeout: 20_000 });
+      return (await titulo.locator('xpath=ancestor::article[1]').innerText()).replace(/\s+/g, ' ');
+    };
+    const tarjetaChoya = await tarjetaDe(enChoya);
+    assert(tarjetaChoya.includes(EN_CHOYA),
+      `la tarjeta de «${enChoya}» no dice «${EN_CHOYA}»`
+      + `${tarjetaChoya.includes(SIN_DEPTO) ? `: dice «${SIN_DEPTO}», falta el departamento` : ''}`);
+    const tarjetaPergamino = await tarjetaDe(enPergamino);
+    assert(tarjetaPergamino.includes('Pergamino, Buenos Aires') && !tarjetaPergamino.includes('Pergamino ('),
+      `la tarjeta de una localidad no homónima cambió: ${tarjetaPergamino.slice(0, 200)}`);
+
+    // 2. La ficha.
+    const fichaDe = async (id) => {
+      await page.goto(`${FRONTEND_URL}/?section=product&id=${id}`, { waitUntil: 'domcontentloaded' });
+      await page.locator('main[aria-busy="false"]:has(#detalle-titulo)').waitFor({ timeout: 20_000 });
+      return (await page.locator('main').innerText()).replace(/\s+/g, ' ');
+    };
+    const fichaChoya = await fichaDe(ids[0]);
+    assert(fichaChoya.includes(EN_CHOYA),
+      `la ficha de «${enChoya}» no dice «${EN_CHOYA}»`
+      + `${fichaChoya.includes(SIN_DEPTO) ? `: dice «${SIN_DEPTO}», falta el departamento` : ''}`);
+    const fichaPergamino = await fichaDe(ids[1]);
+    assert(fichaPergamino.includes('Pergamino, Buenos Aires') && !fichaPergamino.includes('Pergamino ('),
+      'la ficha de una localidad no homónima cambió');
+    informe.push(`tarjeta y ficha dicen «${EN_CHOYA}»; la de Pergamino sigue «Pergamino, Buenos Aires»`);
+
+    // 3. La base del transportista en el checkout, con destino en otra «San Pedro».
+    await tarjetaDe(enChoya);
+    await accionDeLaTarjeta(page, enChoya).click();
+    await page.getByRole('button', { name: /Carrito/ }).click();
+    await page.getByRole('button', { name: 'Continuar compra' }).click();
+    await page.getByRole('heading', { name: /Datos de env/i }).waitFor({ timeout: 15_000 });
+    await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 385 555-0189');
+    await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 64 km 12');
+    await page.getByPlaceholder('2000').fill('4000');
+    await elegirDestino(page, 'San Pedro (Guasayán)', '86');
+    const grupo = page.locator('[class*="_fletes_"] [class*="_fleteGrupo_"]').first();
+    await grupo.getByRole('radio', { name: /Necesito flete/ }).check();
+    const seleccionar = grupo.getByRole('button', { name: new RegExp(`Seleccionar a ${nombreDelTransportista}`) });
+    await seleccionar.waitFor({ state: 'visible', timeout: 20_000 });
+    const candidato = (await seleccionar.locator('xpath=ancestor::*[.//*[starts-with(normalize-space(.), "Base:")]][1]')
+      .innerText()).replace(/\s+/g, ' ');
+    const BASE = 'Base: San Pedro (Capital), Santiago del Estero';
+    assert(candidato.includes(BASE),
+      `la base del transportista en el checkout no dice «${BASE}»`
+      + `${candidato.includes('Base: San Pedro, ') ? ': dice «Base: San Pedro, Santiago del Estero», falta el departamento' : ''}`);
+    const distancia = candidato.match(/a ([\d.,]+) km de San Pedro \(Choya\)/);
+    assert(distancia, `la distancia al origen no nombra «San Pedro (Choya)»: ${candidato.slice(0, 300)}`);
+    const textoDelGrupo = (await grupo.innerText()).replace(/\s+/g, ' ');
+    assert(textoDelGrupo.includes(`desde ${EN_CHOYA}`),
+      `el grupo no dice desde dónde sale: ${textoDelGrupo.slice(0, 300)}`);
+    informe.push('en el checkout, «Base: San Pedro (Capital), Santiago del Estero», '
+      + `«${distancia[0]}» y «desde ${EN_CHOYA}»`);
+
+    // La compra termina, y el traslado de la orden nombra la base igual, en
+    // la API y en «Mis compras».
+    await seleccionar.click();
+    await grupo.getByText('Transportista elegido').waitFor({ state: 'visible', timeout: 20_000 });
+    await page.locator('form:has(h2) button[type="submit"]').click();
+    await elegirTransferencia(page);
+    await page.getByRole('button', { name: /Confirmar y crear las órdenes/ }).click();
+    await page.getByRole('heading', { name: /Tus órdenes/ }).waitFor({ timeout: 20_000 });
+    const compras = (await apiRequest('/orders/my?as_role=buyer', { token: comprador.access_token })).data || [];
+    const orden = compras.find((o) => (o.items || []).some((i) => i.product_name_snapshot === enChoya));
+    const BASE_DE_LA_ORDEN = 'San Pedro (Capital), Santiago del Estero';
+    assert(orden?.shipping?.carrier_base_label === BASE_DE_LA_ORDEN,
+      `el traslado de la orden dice ${JSON.stringify(orden?.shipping?.carrier_base_label ?? orden?.shipping?.carrier_base)}`);
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Mi cuenta' }).first().click();
+    await page.getByRole('button', { name: /Mis Compras/i }).click();
+    await page.getByText(orden.order_number).first().waitFor({ state: 'visible', timeout: 20_000 });
+    const misCompras = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
+    assert(misCompras.includes(`Base: ${BASE_DE_LA_ORDEN}`),
+      `«Mis compras» no dice «Base: ${BASE_DE_LA_ORDEN}» en la orden ${orden.order_number}`
+      + `${misCompras.includes('Base: San Pedro, Santiago del Estero') ? ': falta el departamento' : ''}`);
+    informe.push(`la orden ${orden.order_number} dice «Base: ${BASE_DE_LA_ORDEN}» en «Mis compras»`);
+    await contexto.close();
+
+    // 4. El rótulo más largo no ensancha la tarjeta ni la ficha a 360 px, y
+    // se lee entero: se parte en renglones, no se recorta.
+    const movil = await browser.newContext({ viewport: { width: 360, height: 800 } });
+    const enElCelular = await movil.newPage();
+    enElCelular.on('pageerror', (error) => erroresDeJs.push(error.message));
+    const medirElRotulo = (donde, caja) => enElCelular.evaluate(({ texto, caja: selector }) => {
+      const p = [...document.querySelectorAll('p')].find((e) => e.textContent.trim() === texto);
+      if (!p) return null;
+      const r = p.getBoundingClientRect();
+      const c = p.closest(selector).getBoundingClientRect();
+      return {
+        documento: document.documentElement.scrollWidth,
+        fuera: r.right > c.right + 0.5 || r.left < c.left - 0.5,
+        recortado: p.scrollWidth > p.clientWidth + 1,
+      };
+    }, { texto: MAS_LARGO, caja }).then((m) => {
+      assert(m, `${donde} a 360 px no muestra «${MAS_LARGO}»`);
+      assert(m.documento <= 360, `${donde} a 360 px ensancha el documento a ${m.documento} px`);
+      assert(!m.fuera, `${donde} a 360 px: «${MAS_LARGO}» se sale de su caja`);
+      assert(!m.recortado, `${donde} a 360 px: «${MAS_LARGO}» queda recortado`);
+    });
+    await enElCelular.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(enMalvinas)}`,
+      { waitUntil: 'domcontentloaded' });
+    await enElCelular.getByRole('heading', { name: enMalvinas, exact: true, level: 3 })
+      .waitFor({ state: 'visible', timeout: 20_000 });
+    await medirElRotulo('la tarjeta', 'article');
+    await enElCelular.goto(`${FRONTEND_URL}/?section=product&id=${ids[2]}`, { waitUntil: 'domcontentloaded' });
+    await enElCelular.locator('main[aria-busy="false"]:has(#detalle-titulo)').waitFor({ timeout: 20_000 });
+    await medirElRotulo('la ficha', 'main');
+    await movil.close();
+    informe.push(`a 360 px, «${MAS_LARGO}» entra entero en la tarjeta y en la ficha, sin ensanchar el documento`);
+
+    // 5. El transportista ve su propia base igual.
+    const suContexto = await contextoCon(transportista);
+    const suPagina = await suContexto.newPage();
+    suPagina.on('pageerror', (error) => erroresDeJs.push(error.message));
+    await suPagina.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await suPagina.getByRole('button', { name: 'Mi cuenta' }).first().click();
+    // El rótulo del campo va en mayúsculas por estilo: se compara sin distinguirlas.
+    await esperarA(async () => /Localidad base/i.test(await suPagina.locator('body').innerText()),
+      'el panel del transportista no muestra su localidad base', 20_000);
+    const suPanel = (await suPagina.locator('body').innerText()).replace(/\s+/g, ' ');
+    assert(/Localidad base San Pedro \(Capital\)/i.test(suPanel),
+      'el panel del transportista no dice «San Pedro (Capital)» en su localidad base');
+    // Y en sus operaciones, desde dónde retira y adónde entrega.
+    await suPagina.getByRole('button', { name: /Operaciones/ }).first().click();
+    await suPagina.getByText(orden.order_number).first().waitFor({ state: 'visible', timeout: 20_000 });
+    const susOperaciones = (await suPagina.locator('body').innerText()).replace(/\s+/g, ' ');
+    const RECORRIDO = `Retiro en ${EN_CHOYA} — entrega en San Pedro (Guasayán), Santiago del Estero`;
+    assert(susOperaciones.includes(RECORRIDO),
+      `las operaciones del transportista no dicen «${RECORRIDO}»`);
+    informe.push('el transportista ve su base como «San Pedro (Capital)» y la operación como '
+      + `«${RECORRIDO}»`);
+    await suContexto.close();
+    assert(erroresDeJs.length === 0, `errores de JS: ${erroresDeJs.join(' | ')}`);
+  } finally {
+    await browser.close();
+    await vaciarElCarrito();
+    for (const id of ids) {
+      await apiRequest(`/products/${id}`, { method: 'DELETE', token: vendedor.access_token });
     }
   }
   return informe.join('. ');

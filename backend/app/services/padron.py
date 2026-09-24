@@ -22,12 +22,13 @@ un paraje— y se siguen ofreciendo como lugares propios.
 Lo que queda repetido son homónimas de verdad, lugares distintos en
 departamentos distintos, como «San Pedro» en cuatro departamentos de Santiago
 del Estero. Esas se ofrecen todas, con el departamento en el rótulo para
-poder elegir.
+poder elegir, y se muestran con él donde aparezcan —tarjeta, ficha, base del
+transportista—: lo que se eligió se tiene que poder reconocer después.
 """
 from collections import Counter
-from typing import Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional
 
-from sqlalchemy import func
+from sqlalchemy import func, tuple_
 from sqlalchemy.orm import Session
 
 from app.models.locality import Locality
@@ -46,6 +47,13 @@ def contenedora(locality_id: str, nombre: str, nombres_por_id: dict) -> Optional
         return None
     madre = locality_id[:_LARGO_DE_LOCALIDAD]
     return madre if nombres_por_id.get(madre) == nombre else None
+
+
+def _rotulo(fila: Locality, homonima: bool) -> str:
+    """El nombre, con el departamento sólo si el nombre se repite en la
+    provincia. Es la regla del selector y la de todo lugar donde se muestra
+    una localidad: lo que se eligió se tiene que poder reconocer después."""
+    return f"{fila.name} ({fila.department_name or fila.id})" if homonima else fila.name
 
 
 def para_el_selector(filas: Iterable[Locality]) -> List[dict]:
@@ -71,10 +79,7 @@ def para_el_selector(filas: Iterable[Locality]) -> List[dict]:
         {
             "id": fila.id,
             "name": fila.name,
-            "label": (
-                f"{fila.name} ({fila.department_name or fila.id})"
-                if repetidos[fila.name] > 1 else fila.name
-            ),
+            "label": _rotulo(fila, repetidos[fila.name] > 1),
             "nested_ids": sorted(absorbidas.get(fila.id, [])),
             "province_id": fila.province_id,
             "province_name": fila.province_name,
@@ -83,6 +88,40 @@ def para_el_selector(filas: Iterable[Locality]) -> List[dict]:
         }
         for fila in visibles
     ]
+
+
+def rotulos(db: Session, ids: Iterable[Optional[str]]) -> Dict[str, str]:
+    """El rótulo de cada localidad pedida, con la misma regla del selector.
+
+    Una entidad anidada lleva el rótulo de su localidad: es el mismo lugar.
+    Se mira sólo lo necesario, las localidades que comparten provincia y
+    nombre con las pedidas. Un id que no está en el padrón no aparece en la
+    respuesta, y quien llama muestra lo que tenía.
+    """
+    pedidos = {i for i in ids if i}
+    if not pedidos:
+        return {}
+    filas = db.query(Locality).filter(Locality.id.in_(pedidos)).all()
+    if not filas:
+        return {}
+    pares = {(fila.province_id, fila.name) for fila in filas}
+    vecinas = db.query(Locality).filter(
+        tuple_(Locality.province_id, Locality.name).in_(list(pares))
+    ).all()
+    # La contenedora de una anidada comparte provincia y nombre: está entre
+    # las vecinas.
+    nombres_por_id = {fila.id: fila.name for fila in vecinas}
+    por_id = {fila.id: fila for fila in vecinas}
+    cuantas = Counter(
+        (fila.province_id, fila.name) for fila in vecinas
+        if not contenedora(fila.id, fila.name, nombres_por_id)
+    )
+    salida = {}
+    for fila in filas:
+        madre = contenedora(fila.id, fila.name, nombres_por_id)
+        cabeza = por_id[madre] if madre else fila
+        salida[fila.id] = _rotulo(cabeza, cuantas[(fila.province_id, fila.name)] > 1)
+    return salida
 
 
 def ids_del_filtro(db: Session, locality_id: str) -> List[str]:

@@ -119,6 +119,8 @@ class UserResponse(BaseModel):
     # Derivados del padrón: la interfaz necesita el nombre para mostrarlo y la
     # provincia para poder abrir el selector en la localidad guardada.
     carrier_base_locality_name: Optional[str] = None
+    # El nombre con el departamento si se repite en la provincia.
+    carrier_base_locality_label: Optional[str] = None
     carrier_base_province_id: Optional[str] = None
     carrier_base_province_name: Optional[str] = None
     carrier_transport: Optional[str]

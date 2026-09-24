@@ -106,6 +106,8 @@ export interface User {
   // Derivados del padrón, de sólo lectura: sirven para mostrar la localidad
   // base y para abrir el selector en la provincia que ya está guardada.
   carrierBaseLocalityName?: string;
+  // El nombre con el departamento si se repite en la provincia.
+  carrierBaseLocalityLabel?: string;
   carrierBaseProvinceId?: string;
   carrierBaseProvinceName?: string;
   carrierTransport?: string;

@@ -465,6 +465,10 @@ def traslado_de(order: Order) -> OrderShipping:
         carrier_base=(
             f"{base.name}, {base.province_name}" if base is not None else None
         ),
+        carrier_base_label=(
+            f"{carrier.carrier_base_locality_label}, {base.province_name}"
+            if base is not None else None
+        ),
         carrier_transport=carrier.carrier_transport,
         carrier_vehicle_model=carrier.carrier_vehicle_model,
         carrier_cargo_declared=cargas.declaradas(carrier),

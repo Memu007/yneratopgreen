@@ -2,7 +2,7 @@
 Modelo de Usuario - Sistema de autenticación y perfiles
 """
 from sqlalchemy import Boolean, Column, DateTime, Enum as SQLEnum, ForeignKey, Integer, JSON, Numeric, String, Text, false
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import object_session, relationship
 from datetime import datetime
 import uuid
 import enum
@@ -128,11 +128,24 @@ class User(Base):
     )
 
     # La API devuelve el identificador de la localidad base, que no se puede
-    # mostrar en pantalla. Estos tres derivados vienen del padrón por la
+    # mostrar en pantalla. Estos derivados vienen del padrón por la
     # relación de arriba: son de sólo lectura y no agregan columnas.
     @property
     def carrier_base_locality_name(self):
         return self.carrier_base_locality.name if self.carrier_base_locality else None
+
+    # La base como se muestra: con el departamento si el nombre se repite en
+    # la provincia, la misma regla del selector.
+    @property
+    def carrier_base_locality_label(self):
+        localidad = self.carrier_base_locality
+        if not localidad:
+            return None
+        from app.services import padron  # acá adentro, para no importar en círculo
+        sesion = object_session(self)
+        if sesion is None:
+            return localidad.name
+        return padron.rotulos(sesion, [localidad.id]).get(localidad.id, localidad.name)
 
     @property
     def carrier_base_province_id(self):
