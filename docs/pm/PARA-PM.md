@@ -2,168 +2,175 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## LOCALITY-DEDUP-1 — entregada, para tu revisión
+## LOCALITY-LABEL-DISPLAY-1 — entregada, para tu revisión
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `c6e0f4a` |
-| candidato (padrón + selectores + caso 188 + negativos) | `34bab15` |
+| base | `d6c19f4` |
+| candidato (backend + pantallas + caso 189 + negativos) | `0830ac2` |
 | no integrado, no desplegado | `main` sigue en `0bd7fbc` |
 
-**Resultado.**
+**Resultado.** Una publicación en «San Pedro» de Choya dice «San Pedro
+(Choya), Santiago del Estero» en:
 
-- Ningún selector de localidad ofrece dos veces lo mismo. Las 24 provincias
-  ofrecen 3923 localidades de las 4028 del padrón: exactamente sin las 105
-  entidades anidadas.
-- Las homónimas llevan el departamento en el rótulo: «San Pedro (Capital)»,
-  «San Pedro (Choya)», etc.
-- Buenos Aires ofrece una sola «Mar del Plata», medido en el filtro del
-  Mercado y en el alta.
-- Una publicación guardada en la «Mar del Plata» anidada (`0635711003`):
-  - aparece al filtrar por Mar del Plata (`06357110`);
-  - su ficha dice «Mar del Plata, Buenos Aires»;
-  - el editor la muestra en Mar del Plata, y editarle el precio conserva
-    `0635711003`.
-- **Sin migración ni datos tocados.** La regla sale del identificador y del
-  nombre.
+- la tarjeta y la ficha;
+- el checkout;
+- el traslado de la orden;
+- las operaciones del transportista.
 
-**Una corrección a tu premisa: son 51 pares homónimos, no 49.** Tu medición
-de 154 pares y 105 anidadas es correcta. La cuenta del resto:
+Los transportistas con base homónima la muestran igual. Las no homónimas se
+ven como antes: «Pergamino, Buenos Aires». El rótulo más largo del padrón
+entra entero en la tarjeta y en la ficha a 360 px, sin ensanchar el
+documento: «Malvinas Argentinas (Malvinas Argentinas), Buenos Aires», 55
+caracteres. No hay migración, datos reescritos ni campos cambiados; la API
+sólo agrega campos.
 
-- 105 de los 154 pares tienen una entidad anidada, y 49 no.
-- Pero 2 de esos 105 tienen además una homónima en otro departamento:
-  «Malvinas Argentinas» en Buenos Aires y «San José» en Catamarca.
-- Al sacar las anidadas quedan **51 pares repetidos (108 localidades)**,
-  todos distinguibles por departamento. Ninguno comparte departamento.
-
-El caso exige 51. Si en tus documentos queda 49, conviene corregirlo.
-
-**Lo que decidís vos (no bloquea).** Filtrar por el identificador de una
-anidada, que sólo puede llegar por un enlace viejo porque ningún selector lo
-ofrece, ahora cuenta como su localidad y trae todo Mar del Plata. Antes traía
-sólo lo guardado en ese identificador. **Recomiendo dejarlo así:** es el
-mismo lugar, y es lo que el selector va a mostrar elegido. La alternativa es
-filtrarlo tal cual; es una línea en `app/services/padron.py`.
+**Lo que decidís vos (no bloquea): el caso 137.** Exige que la ubicación
+pública de una publicación tenga exactamente tres campos, y ahora tiene
+`locality_label`. Lo actualicé para aceptarlo, con el motivo al lado: es el
+mismo lugar, con el departamento sólo en las homónimas. Siguen prohibidos,
+sin cambios, las coordenadas, el domicilio y la clave `department`. Si
+preferís que el 137 no cambie, la alternativa es no mandar el rótulo y
+armarlo en la pantalla, pero eso duplica la regla. **Recomiendo dejarlo
+así.**
 
 ## Para verificar, lo mínimo
 
 ```
-SMOKE_CASOS=188 node scripts/smoke.mjs
-  → [PASS] 188 … 24 provincias: 3923 localidades ofrecidas de las 4028 del
-    padrón, sin las 105 anidadas; 51 nombres homónimos (108 localidades), cada
-    una con su departamento; ningún rótulo repetido. en el filtro del Mercado
-    y en el alta, Buenos Aires ofrece una «Mar del Plata» y Santiago del
-    Estero San Pedro (Capital), San Pedro (Choya), San Pedro (Guasayán), San
-    Pedro (Jiménez). la publicación guardada en 0635711003 aparece al filtrar
-    por Mar del Plata (06357110), su ficha dice «Mar del Plata, Buenos Aires»,
-    el editor la muestra en Mar del Plata y editar el precio conserva 0635711003
+SMOKE_CASOS=189 node scripts/smoke.mjs
+  → [PASS] 189 … tarjeta y ficha dicen «San Pedro (Choya), Santiago del
+    Estero»; la de Pergamino sigue «Pergamino, Buenos Aires». en el checkout,
+    «Base: San Pedro (Capital), Santiago del Estero», «a 90 km de San Pedro
+    (Choya)» y «desde San Pedro (Choya), Santiago del Estero». la orden ORD-…
+    dice «Base: San Pedro (Capital), Santiago del Estero» en «Mis compras». a
+    360 px, «Malvinas Argentinas (Malvinas Argentinas), Buenos Aires» entra
+    entero en la tarjeta y en la ficha, sin ensanchar el documento. el
+    transportista ve su base como «San Pedro (Capital)» y la operación como
+    «Retiro en San Pedro (Choya), Santiago del Estero — entrega en San Pedro
+    (Guasayán), Santiago del Estero»
 
-python3 scripts/sabotajes_locality_dedup_1.py codigo-de-la-base
-  → [ROJO ESPERADO] [FAIL] 188 … 154 localidades se ofrecen repetidas sin nada
-    que las distinga: «Mar del Plata» (Buenos Aires) aparece 2 veces;
-    «Avellaneda» (Buenos Aires) aparece 2 veces; «Bahía Blanca» …
+python3 scripts/sabotajes_locality_label_display_1.py codigo-de-la-base
+  → [ROJO ESPERADO] [FAIL] 189 … la tarjeta de «Homonima189 Choya …» no dice
+    «San Pedro (Choya), Santiago del Estero»: dice «San Pedro, Santiago del
+    Estero», falta el departamento
     src y backend despues: como estaban
 ```
 
 **Antes de correrlos:**
 
 - Los dos necesitan la API en 8000, el frontend de desarrollo en 5173 y la
-  siembra demo, con la cuenta `vendedor@ejemplo.com`.
-- La parte de lo ya guardado la cubre el propio 188: crea la publicación
-  sobre `0635711003` por la API, que acepta cualquier id del padrón, y la
-  retira al final.
+  siembra demo, con `vendedor@ejemplo.com` y `cliente@ejemplo.com`.
+- Cada corrida del 189 deja cosas creadas:
+  - registra un transportista nuevo;
+  - crea una orden por transferencia del cliente demo; no mueve stock.
+
+  Al final borra sus tres publicaciones y vacía el carrito.
 - **El negativo toca el backend.** Reinicia la API con
   `./scripts/entorno_nativo.sh --reiniciar-api` antes y después. Si tu API
-  no la levanta ese script, reiniciala vos después de cada negativo que
-  toque `catalog.py`: `codigo-de-la-base` y `filtro-sin-anidadas`.
-- El caso tarda unos 5 s.
+  no la levanta ese script, reiniciala vos después de `codigo-de-la-base` y
+  de `ficha-sin-rotulo`.
+- El caso tarda unos 6 s.
 
-## Causa y corrección
+## Inventario: dónde se muestra una localidad del padrón
 
-Georef lista algunas localidades dos veces: la localidad y, adentro, una
-entidad con el mismo nombre. `/catalog/localities` devolvía las dos, y los
-seis selectores las mostraban tal cual.
+| lugar | aplicado | medido por el 189 |
+|---|---|---|
+| Tarjeta del Mercado | sí | sí, también a 360 px |
+| Ficha | sí | sí, también a 360 px |
+| Checkout: base del transportista candidato | sí | sí |
+| Checkout: «a N km de» el origen, y «desde» los orígenes | sí | sí |
+| Checkout: base del transportista ya elegido | sí | no, es la misma línea que el candidato |
+| Traslado de la orden en «Mis compras» | sí, campo nuevo `carrier_base_label` | sí, API y pantalla |
+| Traslado de la orden en «Mis ventas» | sí, el mismo bloque que «Mis compras» | no |
+| Panel del transportista: su localidad base | sí | sí |
+| Panel del transportista: retiro y entrega de sus operaciones | sí | sí |
+| Tarjetas de Inicio y Servicios | sí, la misma tarjeta y la misma respuesta | no |
+| Selectores | ya estaba, `LOCALITY-DEDUP-1` | — |
 
-- **La regla.** Está en `backend/app/services/padron.py`, sin columna
-  nueva. Una entidad anidada:
-  - tiene diez dígitos;
-  - sus ocho primeros son una localidad presente;
-  - repite su nombre.
+**Dónde no lo apliqué, y por qué:**
 
-  Da exactamente las 105. Todas están a 2,3 km o menos de su localidad (96 a
-  menos de 1 km), medido con PostGIS.
-- **`/localities`.**
-  - No las ofrece.
-  - Agrega `label`: el nombre, con el departamento sólo si el nombre se
-    repite en la provincia.
-  - Agrega `nested_ids`: las anidadas que absorbe cada localidad.
-  - Los campos anteriores no cambian.
-- **El filtro `locality_id`** cubre la localidad y sus anidadas. La faceta
-  de marcas sale de la misma consulta.
-- **Los selectores:** filtro del Mercado, alta y edición de publicación,
-  registro, perfil de transportista y destino del checkout.
-  - Muestran `label`.
-  - Los tres que abren con un valor guardado (edición, perfil de
-    transportista y filtro del Mercado) muestran la localidad que lo absorbe
-    sin cambiar lo guardado; lo guardado cambia sólo si se elige otra.
-- **El panel admin** no tiene selector de localidad, sólo de provincia. No
-  había nada que cambiar.
-- No cambió ningún `locality_id` guardado ni ninguna fila del padrón.
+- **El texto `location` guardado en cada publicación** («San Pedro, Santiago
+  del Estero»). Ninguna pantalla lo muestra; lo busqué. Reescribirlo sería
+  tocar datos guardados.
+- **El origen congelado en cada ítem de orden** (`origin_locality_name`). No
+  se reescribe. Al mostrarlo en las operaciones, el rótulo sale del id del
+  mismo snapshot, no de la publicación de hoy.
+- **El domicilio del vendedor, la ubicación del perfil y la dirección de
+  envío.** Son texto libre, no vienen del padrón.
+- **El panel de administración.** No muestra localidades del padrón; sólo
+  filtra por provincia.
+- **Los correos.** Ninguno nombra una localidad.
 
-En la base demo no hay publicaciones ni transportistas sobre una anidada:
-por eso el 188 crea la suya. En Railway no lo pude medir.
+## Cómo
+
+- **`app/services/padron.py`.**
+  - Nueva `rotulos(db, ids)`: calcula el rótulo con la misma regla del
+    selector, que ahora vive en una sola función.
+  - Una anidada lleva el rótulo de su localidad.
+  - Mira sólo las localidades que comparten provincia y nombre con las
+    pedidas: dos consultas por página del Mercado, dos para la ficha y dos
+    por grupo de fletes.
+- **Campos agregados:**
+  - `locality_label` en la ubicación de la publicación;
+  - `label` en `LocalityBrief` y en `DistanceToOrigin`;
+  - `base_locality_label` en el candidato;
+  - `carrier_base_label` en el traslado de la orden;
+  - `carrier_base_locality_label` en el perfil.
+
+  Ningún campo existente cambió de valor.
+- **El frontend muestra el rótulo.** Si falta, muestra el nombre.
+- **El 137** se ajustó como dije arriba.
 
 ## Los negativos
 
-`python3 scripts/sabotajes_locality_dedup_1.py` corre los cuatro:
+`python3 scripts/sabotajes_locality_label_display_1.py` corre los cuatro:
 
 | negativo | qué rompe | rojo |
 |---|---|---|
-| `codigo-de-la-base` | catálogo y los seis archivos de `src` de `c6e0f4a` | «Mar del Plata» (Buenos Aires) aparece 2 veces; 154 repetidas |
-| `filtro-sin-anidadas` | el filtro vuelve a `==` | filtrar por Mar del Plata no trae lo guardado en `0635711003` |
-| `editor-sin-absorber` | el editor busca lo guardado sólo entre las opciones | el editor muestra «Seleccionar...» para una publicación que tiene localidad |
-| `rotulo-sin-departamento` | el filtro del Mercado muestra `name` | las cuatro «San Pedro» sin departamento |
-
-El tercero muestra lo que habría pasado sin absorber: el editor decía
-«Seleccionar...» aunque guardar conservaba la localidad.
+| `codigo-de-la-base` | backend y pantallas de `d6c19f4` | la tarjeta dice «San Pedro, Santiago del Estero», falta el departamento |
+| `ficha-sin-rotulo` | la ficha deja de recibir el rótulo | la ficha, falta el departamento |
+| `checkout-con-el-nombre` | el checkout muestra `base_locality_name` | «Base: San Pedro, Santiago del Estero», falta el departamento |
+| `rotulo-sin-cortes` | la ubicación de la tarjeta con `white-space: nowrap` | a 360 px el rótulo más largo queda recortado |
 
 ## Lo que corrí
 
 ```
-sobre 34bab15
-  caso 188                                          1/1
+sobre 0830ac2
+  caso 189                                          1/1
   negativos, los cuatro                             rojo esperado, src y backend como estaban
-sobre el mismo producto, antes del commit, base limpia
-  61 casos (lista abajo)                            61/61
+sobre el mismo producto, base limpia
+  63 casos (lista abajo)                            62/63: falló el 137 por la clave nueva
+  137 y 189 después de ajustar el 137               2/2
   a11y --todas                                      76/76, 0 violaciones
   contraste                                         84/84
+  auditoría móvil                                   12/12 recorridos, 39 pantallas, 0 hallazgos, exit 0
 build · lint · tsc --noEmit · py_compile · node --check · diff-check   verdes
 ```
 
-**Los 61 casos y por qué:**
+**Los 63 casos:**
 
-- 1–22: los prerequisitos de estado. Además, 9 y 10 publican eligiendo
-  localidad y 22 registra un transportista.
-- Localidad en la pantalla o en el filtro: 39, 43, 46, 52, 57, 58, 110, 121,
-  133, 137, 151, 152, 154, 157, 164, 167, 176, 178.
-- Transportista y fletes: 41, 42, 50, 51, 53, 54, 55, 56, 111–115, 132,
-  140, 149, 156.
-- PostGIS: 43 y 50.
-- Filtros y paginación del Mercado sobre la misma consulta: 171, 175 y 186.
-- El 188.
+- 1–22, los prerequisitos.
+- Transportista y fletes: 39, 41–43, 46, 50–58, 110–115, 132, 133, 140,
+  149, 151, 154, 156, 157, 164.
+- La ubicación en la tarjeta y la ficha: 121, 137, 152, 155.
+- Checkout: 176, 178, 184.
+- Ficha y localidades: 183, 185, 186, 188.
+- El 189.
 
-Los elegí buscando en el arnés las rutas de localidades, los selectores de
-localidad, transportista y `ST_Distance`.
+**Sobre la auditoría móvil:** la siembra demo no tiene localidades
+homónimas, así que no ejercita un rótulo más largo. Eso lo mide el 189 a
+360 px con el rótulo más largo del padrón, y lo prueba el negativo
+`rotulo-sin-cortes`.
 
-Los finales de línea de los ocho archivos quedaron como estaban: el diff con
-y sin `--ignore-cr-at-eol` da lo mismo.
+Los finales de línea de los quince archivos quedaron como estaban: el diff
+con y sin `--ignore-cr-at-eol` da lo mismo.
 
-## Visto y no tocado
+## Riesgos
 
-- **La ficha y la tarjeta** muestran «San Pedro, Santiago del Estero» sin
-  departamento. Quien compra no distingue cuál de las cuatro es. Está fuera
-  de alcance, porque la tarea es sobre los selectores.
-- **La cuenta de 51 homónimas** está arriba; corrige la premisa.
+- El perfil calcula el rótulo de la base al serializarse, con una o dos
+  consultas chicas por pedido de `/auth/me` o de ingreso.
+- Si se reimportara el padrón con otras homónimas, los rótulos cambiarían
+  solos. No se guardan en ningún lado.
 
 No toqué `main`, Railway, datos ni el padrón, y no desplegué. Freno acá.
