@@ -45,6 +45,11 @@ Las 105 son exactamente las filas de categoría `Entidad` cuyo identificador
 cuelga de una localidad ya presente **y** repiten su nombre. Filtrarlas es una
 condición, no un trabajo de limpieza manual.
 
+**Corrección 2026-09-24 (medida por Dev y PM en SQL):** después de sacar las
+105 anidadas quedan **51** pares homónimos (108 localidades), no 49: dos de los
+pares con anidada tienen además una homónima en otro departamento. Resuelto en
+rama por `LOCALITY-DEDUP-1`.
+
 **Traducción para la tarea futura**: sacar 105 filas del selector y agregar el
 departamento al rótulo resuelve lo que la clienta vio. Los identificadores del
 padrón se conservan: las publicaciones ya creadas apuntan a ellos.
