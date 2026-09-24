@@ -2,194 +2,253 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ADMIN-GUIDE-1 — entregada, para tu revisión
+## ADMIN-GUIDE-1, ronda 1 — corregida, para tu revisión
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `238e6f7` |
-| candidato | `81f40dd` |
-| guía | `docs/GUIA-PANEL-ADMIN.md` |
-| imágenes | `docs/guia-panel-admin/` (14 PNG, 1,3 MB) |
+| base de la tarea | `238e6f7` |
+| candidato devuelto | `81f40dd` |
+| candidato nuevo | `091e846` |
 | cambios en `src/` y `backend/` | ninguno |
+| imágenes | sin cambios: el panel no cambió |
 | no integrado, no desplegado | `main` sigue en `0bd7fbc` |
 
-**Resultado.** La guía cubre las siete pestañas del panel en 26 pasos. Para
-cada acción dice qué hacer, qué no se puede y qué pasa después, incluido
-qué ve quien vende. Abre con los límites de la plataforma.
+**Resultado.** Tu hallazgo era correcto y está corregido.
 
-`scripts/guia-admin.mjs` la recorre en el navegador, en escritorio y en
-celular, sobre la base demo, y comprueba tres cosas:
+- Tus tres afirmaciones falsas, juntas, ahora dan rojo y nombran los pasos
+  3, 5 y 10.
+- La del paso 10 sola da rojo y nombra el paso 10.
+- La guía pasa 26/26 en escritorio y en celular.
 
-- **Textos:** los 237 textos entre «» aparecen en la pantalla en su paso.
-- **Resultados:** lo que el paso dice que pasa, pasa. Por ejemplo:
-  - la cuenta desactivada no entra y se le corta la sesión;
-  - la publicación pausada sale del Mercado;
-  - quien vende la puede reactivar.
-- **Inventario:** ningún control de las pestañas queda sin nombrar en la
-  guía.
+**Lo que decidís vos (no bloquea esta pieza): la severidad de un defecto
+nuevo.** Quien vende puede volver a activar una publicación que el
+administrador eliminó:
 
-Con `--capturas` rehace las imágenes. `USER_MANUAL.md` ahora enlaza la guía
-en vez de su sección de administración.
+- `PATCH /api/products/{id}` con `{"status":"active"}`, con la sesión de
+  quien vende, responde 200 y la publicación vuelve al Mercado.
+- La edición sólo mira que la publicación sea suya; no mira en qué estado la
+  dejó el administrador (`backend/app/api/products.py`, `update_product`).
+- Lo reproduje en local y el recorrido lo comprueba en cada corrida (paso
+  13).
 
-**Lo que decidís vos (no bloquea): suscripciones y teléfono.** Tu tarea pide
-decir que «el teléfono de contacto sólo sale con suscripción activa». Hoy
-eso no es lo que hace la plataforma:
+Lo propongo **P2**: el administrador la puede volver a eliminar. Pero si la
+clienta va a usar «Eliminada» para sacar publicaciones fraudulentas, es
+**P1**, porque se deshace sin que nadie se entere. La guía lo advierte en el
+paso 13 y el script falla cuando se corrija.
 
-- `DECISIONS.md` pasa «los candados de contacto por plan» a la Fase 6.
-- No existe ninguna suscripción, ni un control en el panel para activarla.
-- La decisión del 26/07 decía que el administrador la activaba a mano; no
-  está construido.
+## Cómo quedó el vínculo entre frase y comprobación
 
-La guía dice lo que pasa hoy:
+Cada comprobación va dentro de `v.afirma(frase, …)`, con la frase exacta de
+la guía que describe lo que comprueba. Por ejemplo, en el paso 10:
 
-- en el Mercado y en las fichas no aparece el teléfono de nadie;
-- quien compra y quien vende ven el del otro en su orden;
-- quien compra ve el del transportista después de elegirlo;
-- el transportista no recibe el contacto de quien compra.
+```js
+await v.afirma('La publicación deja de verse en el Mercado, en las búsquedas y en su enlace directo.', async () => {
+  exigir(!(await enElMercado(c.producto.nombre)), 'pausada, sigue en el Mercado');
+  exigir(!(await suEnlaceAbre(c.producto.id)), 'pausada, su enlace directo sigue abriendo');
+});
+```
 
-Y marca **suscripciones y planes: PENDIENTE**. Si la regla vigente es otra,
-se cambia ese párrafo. Conviene que Emi resuelva la contradicción entre las
-dos decisiones.
+El script busca la frase en el texto de su paso, sin mirar negritas, cortes
+de línea ni mayúsculas. Falla de dos maneras, y las dos nombran el paso:
+
+- **La frase ya no está:** `[FALLA] Paso 10. Pausar una publicación: la guía
+  ya no dice “La publicación deja de verse en el Mercado, …”, que este paso
+  comprueba`.
+- **Lo que dice no pasa:** `… la guía dice “…” y no pasa: pausada, sigue en
+  el Mercado`.
+
+Las frases de «Antes de empezar» se atan desde el paso que las comprueba:
+
+| frase | paso | cómo |
+|---|---|---|
+| «Nadie recibe un aviso…» | 5 y 10 | ningún correo nuevo a esa dirección en `backend/outbox` |
+| los teléfonos no se publican | 11 | el listado y la ficha del Mercado no traen el de quien vende |
+| cada parte ve el teléfono de la otra en su orden | 14 | `/orders/my` de cada una |
+| órdenes de sólo lectura, pagos sin aprobar | 14 | la fila y el detalle no tienen controles |
+| la cuenta propia | 8 | la base no cambia |
+| las marcas no están en «Configuración» | 22 | las listas son exactamente cuatro |
+
+La guía no lleva marcas visibles. Cada paso imprime cuántas frases ata:
+`[OK] Paso 10. Pausar una publicación (7 frases de resultado)`.
+
+**Comprobaciones nuevas.** Las frases que antes no se comprobaban y se
+podían comprobar ahora se comprueban. Entre otras:
+
+- **Veinte cuentas por página.** El panel pide `page_size=20`, la primera
+  página muestra 20 o el total si es menor, y dice «Página 1 de N». Con la
+  base limpia hay menos de 20 cuentas, así que el 20 sale del pedido. El
+  negativo `cincuenta-por-pagina` lo prueba del lado del panel.
+- **Números contra SQL:**
+  - los ocho números del resumen;
+  - los totales de usuarios, publicaciones y órdenes;
+  - las constancias pendientes;
+  - las opciones de cada lista.
+- **Filtros:**
+  - «Solo activos»;
+  - el estado de las órdenes;
+  - la búsqueda por una parte del nombre;
+  - «Reintentar», que vuelve a pedir lo mismo con los mismos filtros.
+- **Lo que pasa después:**
+  - la cuenta desactivada conserva su publicación en el Mercado;
+  - la contraseña nueva no queda a la vista;
+  - la publicación pausada no se borra;
+  - el servidor no deja cambiar el valor interno de una opción;
+  - la opción eliminada deja de ofrecerse.
+- **Las advertencias de los defectos:**
+  - subtotal y envío en $ 0 en el detalle de la orden;
+  - el motivo de la cuenta propia: el servidor lo manda y el panel no lo
+    muestra.
+
+**Corrijo una comprobación mía que no podía fallar.** Para el filtro
+«Activa» y los cambios de estado, el script buscaba el texto en la fila, y
+ese texto incluye todas las opciones del selector:
+`"Tractor\t\nPausada\nActiva"`. Ahora lee el valor del selector.
+
+## Qué cambió en la guía
+
+Sólo lo necesario para atar frases verdaderas:
+
+- **Paso 7.** Decía que la cuenta puede «cambiar los datos de todas las
+  cuentas, publicaciones y órdenes». Es falso: las órdenes no se cambian.
+  Ahora dice «Esa cuenta puede hacer todo lo que explica esta guía.». Se
+  comprueba con su sesión: lee las siete pestañas y cambia una publicación.
+- **Paso 14.** Decía que los estados de una orden los mueven quien compra y
+  quien vende. Le faltaba el pago por Mercado Pago, que la pasa a pagada
+  sola (`cobro.py`).
+- **Paso 5.** Decía «Sus publicaciones y sus órdenes quedan como estaban».
+  Ahora dice «Sus publicaciones siguen en el Mercado», que se comprueba, y
+  «sus órdenes quedan como estaban», que está declarada.
+- **Paso 13.** Tiene la advertencia del defecto nuevo.
+- **Al final:**
+  - «Cómo se comprueba esta guía» dice las tres cosas que se comprueban;
+  - se agrega «Lo que el programa no comprueba»;
+  - la introducción avisa que eso está al final.
+
+## Lo que no se comprueba
+
+Está al final de la guía, con cada frase entre “ ” y su fuente. Son 23
+frases:
+
+| dónde | qué dice | de dónde sale |
+|---|---|---|
+| Antes de empezar, paso 2 | la plataforma no cobra ni recibe el dinero; se paga directo a quien vende | decisión del 12/08 |
+| Antes de empezar | las transferencias las confirma quien vende | código: `orders.py`, sólo quien vende revisa el comprobante |
+| Antes de empezar, paso 20 | la documentación es informativa: no habilita ni bloquea publicar, vender ni cobrar | caso 107 del smoke |
+| Antes de empezar | no certifica la identidad | decisión del 14/08 |
+| Antes de empezar | quien compra ve el teléfono del transportista; el transportista no ve el de quien compra | decisión del 05/08; casos 52 y 54 |
+| Antes de empezar | suscripciones: no existen, no se activan, no están definidas | decisión del 05/08 (Fase 6) |
+| Antes de empezar, paso 8 | lo tiene que hacer otra persona administradora | código: `admin.py` sólo rechaza la cuenta propia |
+| paso 5 | sus órdenes quedan como estaban | código: `toggle-active` sólo cambia el estado |
+| paso 6 | la contraseña nueva no vence | código: `reset-password` no pone vencimiento |
+| paso 14 | quién mueve los estados de una orden | código: `orders.py` y `cobro.py` |
+| sección 7 | quien vende presenta la constancia desde su cuenta | caso 108 del smoke |
+| sección 8 | las listas son las unidades y las opciones de los servicios | código: `AddProductModal.tsx` |
+| pasos 24 y 25 | las publicaciones que ya eligieron una opción no cambian | código: la opción se guarda como texto (`models/product.py`) |
+
+Tampoco se comprueban los consejos y las notas: para qué sirve un paso, con
+quién compartir una contraseña, cuántas cuentas de administración tener y
+qué está anotado para corregir. La guía lo dice. Una frase que se agregue
+después no se comprueba hasta atarla o sumarla a la lista, y la guía también
+lo dice.
+
+**La lista se controla sola.** Antes de abrir el navegador, el script mira
+que cada frase declarada siga escrita donde dice la lista. Si una cambia,
+falla y nombra el paso (negativo `frase-declarada`).
 
 ## Para verificar, lo mínimo
 
 ```
 node scripts/guia-admin.mjs
-  → [OK] Paso 1. Abrir el panel … [OK] Paso 26. Volver a pedirla   (26 por ancho)
+  → Guía: docs/GUIA-PANEL-ADMIN.md, 26 pasos, 237 textos citados, 23 frases declaradas sin comprobar
+    [OK] Paso 1. Abrir el panel (5 frases de resultado) … [OK] Paso 26. Volver a pedirla (2 frases de resultado)
     LA GUÍA Y EL PANEL COINCIDEN: 26 pasos en escritorio y celular
 
-python3 scripts/sabotajes_admin_guide_1.py
-  → [ROJO ESPERADO] salida 1
-      [FALLA] Paso 5. Desactivar y volver a activar una cuenta: la guía nombra
-      «Suspender cuenta» y el panel no lo mostró en este paso
+python3 scripts/sabotajes_admin_guide_1.py paso-10-al-reves tres-de-la-pm
+  → === paso-10-al-reves … ===
     [ROJO ESPERADO] salida 1
-      [FALLA] Paso 6. Restablecer una contraseña: el panel no muestra
-      «Restablecer contraseña», que el recorrido tenía que tocar
-      [FALLA] inventario: la pestaña «Usuarios» muestra «Nueva contraseña» y
-      su sección de la guía no lo nombra
+      [FALLA] Paso 10. Pausar una publicación: la guía ya no dice “La publicación deja
+      de verse en el Mercado, en las búsquedas y en su enlace directo.”, que este paso comprueba
+    === tres-de-la-pm … ===
+    [ROJO ESPERADO] salida 1
+      [FALLA] Paso 3. …: la guía ya no dice “Muestra veinte cuentas por página.”, …
+      [FALLA] Paso 5. …: la sección «Antes de empezar» ya no dice “Nadie recibe un aviso
+      de lo que se cambia desde el panel.”, …
+      [FALLA] Paso 10. …: la guía ya no dice “La publicación deja de verse …”, …; la
+      sección «Antes de empezar» ya no dice “Nadie recibe un aviso …”, …
     src y guía despues: como estaban
+    todos dieron el rojo esperado
 ```
 
 **Antes de correrlos:**
 
-- Los dos necesitan la API en 8000, el frontend de desarrollo en 5173 y la
-  siembra demo, con `admin@topgreen.com`.
-- Para los conteos del resumen usan el mismo `docker exec topgreen-db psql`
-  que el smoke.
-- La guía tarda unos 4 min en los dos anchos. Los negativos, unos 3 min:
-  corren sólo en escritorio.
-- **Cada corrida deja cosas creadas:**
-  - cuatro cuentas;
-  - dos publicaciones, que termina eliminando;
+- Sigue haciendo falta lo mismo que antes: la API en 8000, el frontend de
+  desarrollo en 5173 y la siembra demo.
+- Además, el correo tiene que ir a `backend/outbox`
+  (`EMAIL_TRANSPORT=outbox`, lo mismo que pide el smoke). Si no existe la
+  carpeta, fallan los pasos 5 y 10 y lo dicen.
+- La guía tarda unos 5 min en los dos anchos. Cada negativo, unos 2,5 min, y
+  los siete, unos 17 min. Los dos del comando de arriba son los que pediste.
+- **Cada corrida deja cosas creadas, por ancho:**
+  - cuatro cuentas, con teléfonos inventados;
+  - tres publicaciones, de las que elimina dos;
   - una orden por transferencia;
-  - dos presentaciones de documentación.
+  - dos constancias pendientes.
 
-  La categoría y la opción que crea las elimina el propio recorrido. Anda
-  sobre una base limpia o con restos: lo corrí de las dos formas.
-- `boton-inventado` usa una copia de la guía en una carpeta temporal.
-  `panel-cambiado` toca `AdminPanel.tsx` y lo restituye.
-
-## Defectos encontrados, sin corregir
-
-Cada uno tiene su reproducción. La guía recorre los cuatro tal como están
-hoy, con una advertencia, así que si se corrigen el script falla y avisa que
-hay que actualizar la guía.
-
-1. **«Agotada» no hace lo que dice su confirmación.** El cuadro dice «Sigue
-   visible pero no se puede comprar.», pero la publicación sale del Mercado
-   y su enlace da 404: el catálogo y la ficha sólo muestran las activas.
-   Reproducción: `PATCH /api/admin/products/{id}/status` con
-   `{"status":"sold_out"}`; después `GET /api/catalog/products?search=…`
-   da 0 y `GET /api/catalog/products/{id}` da 404. Es el paso 12.
-2. **Quien vende ve «Activo» una publicación «Agotada» con stock.** «Mis
-   publicaciones» sólo reconoce pausada, o agotada por stock en cero
-   (`UserDashboard.tsx`, alrededor de la línea 372). Es el paso 12.
-3. **El detalle de una orden en el panel sale incompleto.**
-   - Dice «No hay detalles de items disponibles».
-   - El correo y la dirección de quien compra aparecen con un guion.
-   - El subtotal y el envío aparecen en $ 0, con el total correcto.
-
-   La causa es que `GET /api/admin/orders` no devuelve `items`,
-   `buyer_email`, `shipping_address`, `subtotal` ni `shipping_cost`
-   (`backend/app/api/admin.py:349-390`). Es el paso 14; la imagen
-   `ordenes-celular.png` lo muestra.
-4. **Desactivar tu propia cuenta no dice por qué no se puede.** El panel
-   muestra «Error al cambiar estado del usuario». El backend manda «No
-   puedes desactivar tu propia cuenta», pero `handleToggleUserActive` lo
-   descarta (`AdminPanel.tsx:855-863`). Con el rol propio sí muestra el
-   motivo. Es el paso 8.
-
-## Inventario: el panel contra la guía
-
-| pestaña | controles, según el código | pasos |
-|---|---|---|
-| — | abrir con «Admin», cerrar con «×» o Escape | 1 |
-| Dashboard | ocho números, cada uno comparado con un conteo propio en SQL | 2 |
-| Usuarios | búsqueda, filtros por rol y estado, paginador; «+ Crear Usuario» (campos, rol, errores); por fila: rol, «Desactivar»/«Activar», «Restablecer contraseña»; lista vacía | 3–8 |
-| Productos | filtro por estado, paginador; por fila: los cuatro estados | 9–13 |
-| Órdenes | filtro con los nueve estados, paginador, «Ver» y el detalle, que es de sólo lectura | 14 |
-| Categorías | filtro, «+ Nueva Categoría»; por categoría: mostrar u ocultar subcategorías, «Editar», «Eliminar»; subcategoría: agregar y eliminar | 15–18 |
-| Documentación | filtro, constancia, «Aprobar», «Rechazar» con motivo | 19–21 |
-| Configuración | cuatro listas, «+ Nueva Opción»/«Cerrar»; por opción: «Editar» (etiqueta, orden, estado), «Eliminar» | 22–25 |
-| todas | el aviso de carga fallida con «Reintentar» | 26 |
-
-**Del código, sin paso, y por qué:**
-
-- **Provincias** en Configuración: el panel las retiró de la pantalla
-  (`TIPOS_RETIRADOS`).
-- **Activar o desactivar una categoría:** el panel dejó de ofrecerlo.
-- **Editar una subcategoría y borrar una publicación del todo:** existen en
-  la API, pero la pantalla no los ofrece.
-- **Marcas:** no se administran desde el panel. La guía lo dice. Quién las
-  carga en producción queda abierto.
-
-**Del manual viejo, que eran falsos y la guía no repite:**
-
-- sincronizar pagos por endpoint;
-- cancelar órdenes;
-- filtros de productos por categoría o vendedor;
-- «ver perfil completo» de un usuario.
-
-En «Atajos útiles» también saqué el botón de tema oscuro y la campana, que
-no existen, y cambié «Avatar → Cerrar sesión» por **Salir**. Las secciones
-de comprador y vendedor no las toqué: van en otra pieza.
+  **Corrijo mi informe anterior:** decía que las dos publicaciones se
+  eliminaban, pero «Guía documentada …» queda activa en el Mercado.
 
 ## Lo que corrí
 
+Todo sobre `091e846`, con la base local que ya tenía restos de corridas
+anteriores (72 publicaciones, más de 20 cuentas).
+
 ```
-sobre 81f40dd, base limpia
-  node scripts/guia-admin.mjs                 26/26 en escritorio y 26/26 en celular
-  python3 scripts/sabotajes_admin_guide_1.py  los dos en rojo esperado, src y guía como estaban
-antes, con el mismo producto y la misma guía
-  --capturas sobre base limpia                26/26 y 26/26, 14 imágenes
-build · node --check · py_compile · diff-check   verdes
-git diff 238e6f7 81f40dd -- src backend          vacío
+node scripts/guia-admin.mjs                    salida 0
+  26/26 en escritorio y 26/26 en celular, 126 frases atadas por ancho
+  (las del paso 14 y del 22 se cuentan más de una vez)
+
+python3 scripts/sabotajes_admin_guide_1.py     salida 0, los siete en rojo esperado
+  boton-inventado       [FALLA] Paso 5. …: la guía nombra «Suspender cuenta» y el panel no lo mostró en este paso
+  paso-10-al-reves      [FALLA] Paso 10. …: la guía ya no dice “La publicación deja de verse en el Mercado,
+                        en las búsquedas y en su enlace directo.”, que este paso comprueba
+  sesion-que-sigue      [FALLA] Paso 5. …: la guía ya no dice “Si tenía la sesión abierta, se le corta.”, …
+  tres-de-la-pm         [FALLA] Paso 3, Paso 5 y Paso 10, cada uno por su frase (arriba)
+  frase-declarada       [FALLA] Paso 6. …: la lista de lo que no se comprueba cita “La nueva no vence
+                        sola: queda hasta que se restablezca otra vez.” y ahí ya no lo dice
+  panel-cambiado        [FALLA] Paso 6. …: el panel no muestra «Restablecer contraseña», que el recorrido tenía que tocar
+                        [FALLA] inventario: la pestaña «Usuarios» muestra «Nueva contraseña» y su sección de la guía no lo nombra
+  cincuenta-por-pagina  [FALLA] Paso 3. …: la guía dice “Muestra veinte cuentas por página.” y no pasa:
+                        el panel pide 50 cuentas por página
+                        [FALLA] Paso 9. …: la guía dice “dice el total y la página” y no pasa:
+                        con 72 publicaciones no dice «Página 1 de 4»
+  src y guía despues: como estaban
+
+build · node --check · py_compile · diff-check con cr-at-eol   verdes
+git diff 238e6f7 091e846 -- src backend                         vacío
 ```
 
-- Las imágenes salen de la corrida anterior al último ajuste del script,
-  que sólo cambió cómo se escribe el motivo de una falla.
-- En las capturas, los avisos de pasos anteriores se ocultan sólo en la
-  imagen; la aplicación no se toca.
-- La contraseña temporal del paso 6 no se captura.
+Después, sobre una base recién creada (`entorno_nativo.sh --recrear`: 5
+cuentas y 30 publicaciones de la siembra):
 
-**Credenciales y términos comerciales:**
-
-- La única cuenta que aparece es la demo de administración, marcada como
-  pública y a cambiar antes de producción.
-- El alias de cobro de la vendedora del script es inventado, y los CUIT son
-  los de prueba del arnés.
-- La guía no nombra montos, porcentajes ni comisiones. Los importes de las
-  imágenes son de la base demo.
+```
+node scripts/guia-admin.mjs                                  salida 0, 26/26 y 26/26
+python3 scripts/sabotajes_admin_guide_1.py cincuenta-por-pagina
+  con 13 cuentas: [ROJO ESPERADO] salida 1
+  [FALLA] Paso 3. …: la guía dice “Muestra veinte cuentas por página.” y no pasa: el panel pide 50 cuentas por página
+  [FALLA] Paso 9. …: la guía dice “dice el total y la página” y no pasa: con 39 publicaciones no dice «Página 1 de 2»
+```
 
 ## Riesgos
 
-- El script reconoce partes del panel por fragmentos de nombres de clase
-  (`categoryCard`, `statCard`, `_toastContainer_`) y por sus textos. Si se
-  renombran, falla y lo dice. Es lo buscado, pero puede pedir ajustar el
-  script además de la guía.
-- Las imágenes quedan en el repositorio y no se rehacen solas: hay que
-  correr `--capturas` cuando el panel cambie.
+- **Una frase atada es exacta.** Reescribir una oración aunque diga lo mismo
+  hace fallar el paso. Es lo buscado, porque obliga a mirar la comprobación,
+  pero cambiar la guía pide tocar el script.
+- **Algunos límites se comprueban en un paso que no es el suyo.** Por
+  ejemplo, el teléfono en el paso 11, que es cuando la publicación está a la
+  vista. Si fallan, el mensaje cita la frase de «Antes de empezar».
+- **Las pruebas de correo dependen del outbox.** Con SMTP no se pueden
+  mirar, y el script lo dice.
 
 No toqué `main`, Railway, `src/`, `backend/` ni datos, y no desplegué. Freno
 acá.
