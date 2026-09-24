@@ -846,7 +846,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose }) => {
           >
             <option value="">Seleccionar localidad</option>
             {localidades.map((localidad) => (
-              <option key={localidad.id} value={localidad.id}>{localidad.name}</option>
+              <option key={localidad.id} value={localidad.id}>{localidad.label}</option>
             ))}
           </select>
         </div>

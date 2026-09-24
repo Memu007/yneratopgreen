@@ -373,7 +373,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                 >
                   <option value="">Seleccionar localidad</option>
                   {localities.map((locality) => (
-                    <option key={locality.id} value={locality.id}>{locality.name}</option>
+                    <option key={locality.id} value={locality.id}>{locality.label}</option>
                   ))}
                 </select>
               </div>

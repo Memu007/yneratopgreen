@@ -32572,6 +32572,235 @@ await runCase(187, 'Con el panel de filtros plegado, el teclado no entra en cont
   return informe.join('. ');
 });
 
+await runCase(188, 'Cada localidad se ofrece una vez, y lo guardado sobre una entidad anidada sigue valiendo', async () => {
+  // Georef lista algunas localidades dos veces: la localidad y, adentro, una
+  // entidad con el mismo nombre —«Mar del Plata» es 06357110 y 0635711003—.
+  // La clienta las vio repetidas (#8 de su devolución). Los selectores ya no
+  // ofrecen esas entidades, y las homónimas de verdad —lugares distintos que
+  // se llaman igual— llevan su departamento. Lo guardado sobre una entidad
+  // anidada sigue valiendo y aparece al filtrar por su localidad.
+  const informe = [];
+  const MDP = '06357110';
+  const MDP_ANIDADA = '0635711003';
+
+  // --- A. Por API, en todas las provincias ---------------------------------
+  const totalDelPadron = queryCount('SELECT count(*) FROM localities');
+  // La regla medida sobre el padrón, independiente del código: diez dígitos,
+  // los ocho primeros son una localidad presente y repite su nombre.
+  const anidadas = new Map(queryRows(`
+    SELECT e.id, p.id FROM localities e JOIN localities p ON p.id = left(e.id, 8)
+    WHERE length(e.id) = 10 AND p.name = e.name`));
+  const departamentos = new Map(queryRows(
+    "SELECT id, COALESCE(department_name, '') FROM localities"));
+  const provincias = (await apiRequest('/catalog/localities/provinces')).data;
+  assert(Array.isArray(provincias) && provincias.length > 0, 'no llegaron las provincias del padrón');
+  const filas = [];
+  for (const provincia of provincias) {
+    const respuesta = await apiRequest(`/catalog/localities?province_id=${provincia.id}`);
+    assert(respuesta.status === 200 && Array.isArray(respuesta.data),
+      `las localidades de ${provincia.name} respondieron HTTP ${respuesta.status}`);
+    for (const fila of respuesta.data) filas.push({ ...fila, provincia: provincia.name });
+  }
+  const rotulo = (fila) => fila.label ?? fila.name;
+
+  // 1. Nada se ofrece dos veces sin algo visible que lo distinga.
+  const porRotulo = new Map();
+  for (const fila of filas) {
+    const clave = `«${rotulo(fila)}» (${fila.provincia})`;
+    porRotulo.set(clave, (porRotulo.get(clave) || 0) + 1);
+  }
+  const repetidas = [...porRotulo].filter(([, veces]) => veces > 1);
+  const mdpRepetida = repetidas.find(([clave]) => clave === '«Mar del Plata» (Buenos Aires)');
+  assert(repetidas.length === 0,
+    `${repetidas.length} localidades se ofrecen repetidas sin nada que las distinga: `
+    + `${(mdpRepetida ? [mdpRepetida] : []).concat(repetidas.filter((r) => r !== mdpRepetida)).slice(0, 3)
+      .map(([clave, veces]) => `${clave} aparece ${veces} veces`).join('; ')}`);
+
+  // 2. El total baja exactamente en las entidades anidadas, y ninguna se
+  // ofrece.
+  assert(anidadas.size === 105,
+    `el padrón tiene ${anidadas.size} entidades anidadas con el nombre de su localidad; se midieron 105`);
+  const ofrecidas = new Set(filas.map((fila) => fila.id));
+  const anidadasOfrecidas = [...anidadas.keys()].filter((id) => ofrecidas.has(id));
+  assert(anidadasOfrecidas.length === 0,
+    `se ofrecen ${anidadasOfrecidas.length} entidades anidadas, entre ellas ${anidadasOfrecidas.slice(0, 3).join(', ')}`);
+  assert(filas.length === totalDelPadron - anidadas.size,
+    `se ofrecen ${filas.length} localidades; el padrón tiene ${totalDelPadron} y sin las `
+    + `${anidadas.size} anidadas son ${totalDelPadron - anidadas.size}`);
+  // Cada anidada la absorbe su localidad, para que un formulario la muestre.
+  const absorbe = new Map(filas.map((fila) => [fila.id, fila.nested_ids || []]));
+  const huerfanas = [...anidadas].filter(([id, madre]) => !absorbe.get(madre)?.includes(id));
+  assert(huerfanas.length === 0,
+    `${huerfanas.length} anidadas no figuran en su localidad; la primera, ${huerfanas[0]?.join(' en ')}`);
+
+  // 3. Las homónimas llevan el departamento; las demás, sólo el nombre.
+  const porNombre = new Map();
+  for (const fila of filas) {
+    const clave = `${fila.provincia}|${fila.name}`;
+    porNombre.set(clave, [...(porNombre.get(clave) || []), fila]);
+  }
+  const homonimas = [...porNombre.values()].filter((grupo) => grupo.length > 1);
+  const malRotuladas = homonimas.flat()
+    .filter((fila) => rotulo(fila) !== `${fila.name} (${departamentos.get(fila.id)})`);
+  assert(malRotuladas.length === 0,
+    `${malRotuladas.length} homónimas no dicen su departamento; la primera, «${rotulo(malRotuladas[0] || {})}»`);
+  const conDeMas = [...porNombre.values()].filter((grupo) => grupo.length === 1)
+    .flat().filter((fila) => rotulo(fila) !== fila.name);
+  assert(conDeMas.length === 0,
+    `${conDeMas.length} localidades sin homónima llevan algo más que el nombre; la primera, «${rotulo(conDeMas[0] || {})}»`);
+  informe.push(`${provincias.length} provincias: ${filas.length} localidades ofrecidas de las `
+    + `${totalDelPadron} del padrón, sin las ${anidadas.size} anidadas; ${homonimas.length} nombres `
+    + `homónimos (${homonimas.flat().length} localidades), cada una con su departamento; ningún rótulo repetido`);
+
+  // --- B y C. En el navegador, y lo guardado sobre una entidad anidada -----
+  const ingreso = await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  });
+  const vendedor = ingreso.data;
+  assert(vendedor?.access_token, `no se pudo entrar como el vendedor demo: HTTP ${ingreso.status}`);
+  const [categoria] = queryRows(`
+    SELECT id FROM categories WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
+  const nombre = `Localidad188 anidada ${Date.now()}`;
+  let idDeLaPublicacion = null;
+  const browser = await chromium.launch({ headless: true });
+  const erroresDeJs = [];
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await contexto.addInitScript(({ a, r }) => {
+      window.localStorage.setItem('access_token', a);
+      window.localStorage.setItem('refresh_token', r);
+    }, { a: vendedor.access_token, r: vendedor.refresh_token });
+    const nuevaPagina = async () => {
+      const page = await contexto.newPage();
+      page.on('pageerror', (error) => erroresDeJs.push(error.message));
+      return page;
+    };
+    const textos = async (select) => (await select.locator('option').allTextContents()).map((t) => t.trim());
+    // Elige la provincia y espera sus localidades: la lista vieja no cuenta.
+    const elegirProvincia = async (provincia, localidad, nombreDeLaProvincia, senal) => {
+      await provincia.selectOption({ label: nombreDeLaProvincia });
+      await esperarA(async () => (await textos(localidad)).some((t) => senal.test(t)),
+        `no llegaron las localidades de ${nombreDeLaProvincia}`, 20_000);
+    };
+    const mirarLosSelectores = async (donde, provincia, localidad) => {
+      await elegirProvincia(provincia, localidad, 'Buenos Aires', /^Mar del Plata/);
+      const mdp = (await textos(localidad)).filter((t) => t === 'Mar del Plata');
+      assert(mdp.length === 1, `${donde}: Buenos Aires ofrece ${mdp.length} «Mar del Plata»`);
+      await elegirProvincia(provincia, localidad, 'Santiago del Estero', /^San Pedro/);
+      const sanPedro = (await textos(localidad)).filter((t) => /^San Pedro\b/.test(t));
+      assert(sanPedro.length === 4 && new Set(sanPedro).size === 4
+        && sanPedro.every((t) => /^San Pedro \(.+\)$/.test(t)),
+      `${donde}: Santiago del Estero ofrece ${JSON.stringify(sanPedro)}; son cuatro, cada una con su departamento`);
+      return sanPedro;
+    };
+
+    // B1. El filtro del Mercado.
+    const mercado = await nuevaPagina();
+    await mercado.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await mercado.locator('#catalog-province option').nth(1).waitFor({ state: 'attached', timeout: 20_000 });
+    const sanPedro = await mirarLosSelectores('el filtro del Mercado',
+      mercado.locator('#catalog-province'), mercado.locator('#catalog-locality'));
+    await mercado.close();
+
+    // B2. El alta de publicación.
+    const alta = await nuevaPagina();
+    await alta.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await alta.getByRole('button', { name: /Vender/ }).first().click();
+    await alta.getByRole('heading', { name: /Publicar un producto/i }).waitFor({ state: 'visible', timeout: 20_000 });
+    await alta.locator('#province option').nth(1).waitFor({ state: 'attached', timeout: 20_000 });
+    await mirarLosSelectores('el alta de publicación', alta.locator('#province'), alta.locator('#locality'));
+    await alta.close();
+    informe.push(`en el filtro del Mercado y en el alta, Buenos Aires ofrece una «Mar del Plata» y `
+      + `Santiago del Estero ${sanPedro.join(', ')}`);
+
+    // C. Una publicación guardada sobre la «Mar del Plata» anidada, como
+    // pudo quedar antes de este cambio: por la API, que acepta cualquier
+    // localidad del padrón.
+    const creada = await apiRequest('/products', {
+      method: 'POST', token: vendedor.access_token,
+      body: {
+        name: nombre,
+        description: 'Publicación efímera del caso 188, guardada sobre una entidad anidada.',
+        category_id: categoria[0], price: 1880, stock: 3, unit: 'kg',
+        locality_id: MDP_ANIDADA, publication_type: 'producto', operation_kind: 'insumo',
+      },
+    });
+    assert(creada.status < 400 && creada.data?.id, `no se pudo publicar sobre ${MDP_ANIDADA}: HTTP ${creada.status}`);
+    idDeLaPublicacion = creada.data.id;
+    const guardada = () => queryRows(`
+      SELECT locality_id, price FROM products WHERE id = ${sqlLiteral(idDeLaPublicacion)}`)[0];
+    assert(guardada()[0] === MDP_ANIDADA, `la publicación quedó en ${guardada()[0]}`);
+
+    // C1. Aparece al filtrar por su localidad contenedora, por API y en el Mercado.
+    const porApi = await apiRequest(
+      `/catalog/products?locality_id=${MDP}&search=${encodeURIComponent(nombre)}`);
+    assert((porApi.data?.items || []).some((p) => p.id === idDeLaPublicacion),
+      `filtrar por Mar del Plata (${MDP}) no trae la publicación guardada en ${MDP_ANIDADA}`);
+    const filtrado = await nuevaPagina();
+    await filtrado.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(nombre)}`,
+      { waitUntil: 'domcontentloaded' });
+    const provincia = filtrado.locator('#catalog-province');
+    const localidad = filtrado.locator('#catalog-locality');
+    await filtrado.locator('#catalog-province option').nth(1).waitFor({ state: 'attached', timeout: 20_000 });
+    await elegirProvincia(provincia, localidad, 'Buenos Aires', /^Mar del Plata/);
+    await localidad.selectOption({ label: 'Mar del Plata' });
+    await esperarA(async () => new URL(filtrado.url()).searchParams.get('locality_id') === MDP,
+      'el Mercado no filtró por Mar del Plata', 10_000);
+    await filtrado.locator('main article h3').filter({ hasText: nombre }).first()
+      .waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {
+        throw new Error(`el Mercado filtrado por Mar del Plata no muestra «${nombre}», guardada en ${MDP_ANIDADA}`);
+      });
+    await filtrado.close();
+
+    // C2. Su ficha dice la localidad.
+    const ficha = await nuevaPagina();
+    await ficha.goto(`${FRONTEND_URL}/?section=product&id=${idDeLaPublicacion}`, { waitUntil: 'domcontentloaded' });
+    await ficha.locator('main[aria-busy="false"]:has(#detalle-titulo)').waitFor({ timeout: 20_000 });
+    const textoDeLaFicha = await ficha.locator('main').innerText();
+    assert(/Mar del Plata, Buenos Aires/.test(textoDeLaFicha),
+      'la ficha de la publicación guardada en la entidad anidada no dice «Mar del Plata, Buenos Aires»');
+    await ficha.close();
+
+    // C3. Editarla sin tocar la ubicación: el editor muestra Mar del Plata y
+    // lo guardado no cambia.
+    const panel = await nuevaPagina();
+    await panel.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await panel.getByRole('button', { name: 'Mi cuenta' }).click();
+    await panel.getByRole('heading', { name: 'Mi cuenta' }).waitFor({ timeout: 20_000 });
+    await panel.getByRole('button', { name: /publicaciones/i }).first().click();
+    const tarjeta = panel.locator('[class*="productCard"], [class*="publicacion"]')
+      .filter({ hasText: nombre }).first();
+    await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
+    await tarjeta.getByRole('button', { name: /editar/i }).first().click();
+    const editLocalidad = panel.locator('#edit-localidad');
+    await esperarA(async () => (await editLocalidad.locator('option').count()) > 1,
+      'el editor no cargó las localidades de Buenos Aires', 20_000);
+    const mostrada = await editLocalidad.evaluate((select) => ({
+      valor: select.value, texto: select.selectedOptions[0]?.textContent?.trim() ?? '',
+    }));
+    assert(mostrada.valor === MDP && mostrada.texto === 'Mar del Plata',
+      `el editor muestra la localidad «${mostrada.texto}» (${mostrada.valor || 'ninguna'}) `
+      + `para una publicación guardada en ${MDP_ANIDADA}`);
+    await panel.locator('#edit-precio').fill('1999');
+    await panel.getByRole('button', { name: /^Guardar/i }).first().click();
+    await esperarA(async () => Number(guardada()[1]) === 1999,
+      'la edición no guardó el precio nuevo', 20_000);
+    assert(guardada()[0] === MDP_ANIDADA,
+      `editar sin tocar la ubicación cambió la localidad guardada de ${MDP_ANIDADA} a ${guardada()[0]}`);
+    await panel.close();
+    informe.push(`la publicación guardada en ${MDP_ANIDADA} aparece al filtrar por Mar del Plata `
+      + `(${MDP}), su ficha dice «Mar del Plata, Buenos Aires», el editor la muestra en Mar del Plata `
+      + `y editar el precio conserva ${MDP_ANIDADA}`);
+    assert(erroresDeJs.length === 0, `errores de JS: ${erroresDeJs.join(' | ')}`);
+  } finally {
+    await browser.close();
+    if (idDeLaPublicacion) {
+      await apiRequest(`/products/${idDeLaPublicacion}`, { method: 'DELETE', token: vendedor.access_token });
+    }
+  }
+  return informe.join('. ');
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

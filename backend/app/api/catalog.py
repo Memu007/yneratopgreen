@@ -16,7 +16,7 @@ from app.models.product_image import ProductImage
 from app.models.locality import Locality
 from app.models.user import User
 from app.models.documentacion import DocumentacionDeVendedor, EstadoDeDocumentacion
-from app.services import stock
+from app.services import padron, stock
 from app.schemas.catalog import (
     CategoryResponse,
     SubcategoryBase,
@@ -40,6 +40,12 @@ class ProvinceResponse(BaseModel):
 class LocalityResponse(BaseModel):
     id: str
     name: str
+    # Lo que muestra el selector: el nombre, con el departamento cuando el
+    # nombre se repite en la provincia.
+    label: str
+    # Las entidades anidadas que esta localidad absorbe y el selector no
+    # ofrece. Ver `app.services.padron`.
+    nested_ids: List[str]
     province_id: str
     province_name: str
     latitude: float
@@ -187,21 +193,15 @@ def get_localities(
     province_id: str = Query(..., min_length=2, max_length=2),
     db: Session = Depends(get_db),
 ):
-    """Localidades de una provincia, ordenadas por nombre."""
+    """Localidades de una provincia para elegir, ordenadas por nombre.
+
+    Sin las entidades anidadas que repiten su localidad, y con el departamento
+    en el rótulo de las homónimas. Ver `app.services.padron`.
+    """
     rows = db.query(Locality).filter(
         Locality.province_id == province_id
-    ).order_by(Locality.name).all()
-    return [
-        {
-            "id": row.id,
-            "name": row.name,
-            "province_id": row.province_id,
-            "province_name": row.province_name,
-            "latitude": float(row.latitude),
-            "longitude": float(row.longitude),
-        }
-        for row in rows
-    ]
+    ).order_by(Locality.name, Locality.department_name, Locality.id).all()
+    return padron.para_el_selector(rows)
 
 
 # ============= Products =============
@@ -397,9 +397,11 @@ def get_products(
             )
         )
     
-    # Filtro por localidad — directo sobre la FK
+    # Filtro por localidad: la localidad y las entidades anidadas que el
+    # selector no ofrece por separado. Lo guardado sobre una de ellas aparece
+    # al filtrar por su localidad.
     if locality_id:
-        query = query.filter(Product.locality_id == locality_id)
+        query = query.filter(Product.locality_id.in_(padron.ids_del_filtro(db, locality_id)))
 
     # Calificación mínima del vendedor. Sin calificar es cero y no "todavía
     # no se sabe": pedir 4 o más deja afuera a quien no tiene ninguna, que es

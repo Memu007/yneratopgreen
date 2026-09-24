@@ -80,6 +80,8 @@ interface ProvinceOption {
 interface LocalityOption {
   id: string;
   name: string;
+  /** El nombre, con el departamento si se repite en la provincia. */
+  label: string;
   province_id: string;
   province_name: string;
   latitude: number;
@@ -1164,7 +1166,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                     {localitiesLoading ? 'Cargando localidades...' : 'Seleccionar...'}
                   </option>
                   {localities.map(locality => (
-                    <option key={locality.id} value={locality.id}>{locality.name}</option>
+                    <option key={locality.id} value={locality.id}>{locality.label}</option>
                   ))}
                 </select>
               </div>

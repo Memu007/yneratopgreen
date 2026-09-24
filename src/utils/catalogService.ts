@@ -64,6 +64,13 @@ export interface ProvinceResponse {
 export interface LocalityResponse {
   id: string;
   name: string;
+  /** Lo que muestra el selector: el nombre, y el departamento cuando el
+      nombre se repite en la provincia. */
+  label: string;
+  /** Las entidades anidadas de Georef que esta localidad absorbe: repiten su
+      nombre, el selector no las ofrece y lo guardado sobre ellas sigue
+      valiendo. */
+  nested_ids: string[];
   province_id: string;
   province_name: string;
   latitude: number;
@@ -186,6 +193,16 @@ export const getLocalities = async (provinceId: string): Promise<LocalityRespons
     `/catalog/localities?province_id=${encodeURIComponent(provinceId)}`
   );
 };
+
+/** La opción del selector que representa una localidad guardada.
+
+    Lo guardado puede ser una entidad anidada que el selector ya no ofrece:
+    entonces se muestra la localidad que la absorbe. Sólo cambia lo que se
+    ve; lo guardado cambia recién cuando se elige otra. */
+export const opcionDeLocalidad = (
+  localidades: Pick<LocalityResponse, 'id' | 'nested_ids'>[],
+  id: string,
+): string => localidades.find((l) => l.id === id || l.nested_ids.includes(id))?.id ?? id;
 
 /**
  * Obtener listado de productos con filtros

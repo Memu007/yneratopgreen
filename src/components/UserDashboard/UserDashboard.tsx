@@ -17,6 +17,7 @@ import {
   getLocalities,
   getProvinces,
   LocalityResponse,
+  opcionDeLocalidad,
   ProvinceResponse,
 } from '../../utils/catalogService';
 import {
@@ -2198,7 +2199,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                   {isEditing ? (
                     <select
                       id="perfil-localidad-base"
-                      value={editForm.carrierBaseLocalityId}
+                      value={opcionDeLocalidad(carrierLocalities, editForm.carrierBaseLocalityId)}
                       onChange={(e) => setEditForm({
                         ...editForm,
                         carrierBaseLocalityId: e.target.value,
@@ -2207,7 +2208,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                     >
                       <option value="">Seleccionar localidad</option>
                       {carrierLocalities.map((locality) => (
-                        <option key={locality.id} value={locality.id}>{locality.name}</option>
+                        <option key={locality.id} value={locality.id}>{locality.label}</option>
                       ))}
                     </select>
                   ) : (
@@ -4054,7 +4055,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                     id="edit-localidad"
                     ref={localidadDeLaEdicion}
                     aria-invalid={ubicacionIncompleta || undefined}
-                    value={editingProduct.locality_id}
+                    value={opcionDeLocalidad(localidadesDeLaEdicion, editingProduct.locality_id)}
                     onChange={(e) => {
                       setUbicacionIncompleta(false);
                       setEditingProduct({
@@ -4066,7 +4067,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                   >
                     <option value="">Seleccionar...</option>
                     {localidadesDeLaEdicion.map((localidad) => (
-                      <option key={localidad.id} value={localidad.id}>{localidad.name}</option>
+                      <option key={localidad.id} value={localidad.id}>{localidad.label}</option>
                     ))}
                   </select>
                 </div>

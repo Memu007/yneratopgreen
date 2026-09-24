@@ -6,6 +6,7 @@ import type {
   MarcaDelMercado,
   ProvinceResponse,
 } from '../../utils/catalogService';
+import { opcionDeLocalidad } from '../../utils/catalogService';
 import { CONDICIONES, type CondicionDelMercado } from '../../hooks/useProductFilters';
 
 interface FilterSidebarProps {
@@ -200,7 +201,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             <select
               id="catalog-locality"
               className={styles.select}
-              value={selectedLocalityId}
+              value={opcionDeLocalidad(localities, selectedLocalityId)}
               onChange={(e) => onLocalityChange(e.target.value)}
               disabled={!selectedProvinceId || isLoadingLocalities}
             >
@@ -209,7 +210,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               </option>
               {localities.map((locality) => (
                 <option key={locality.id} value={locality.id}>
-                  {locality.name}
+                  {locality.label}
                 </option>
               ))}
             </select>
