@@ -73,7 +73,7 @@ vigente. No se agrega un informe nuevo arriba de los anteriores.
 
 ### Una tarea PM → Dev debe contener
 
-1. problema y motivo de prioridad;
+1. rama y SHA base, y problema y motivo de prioridad;
 2. alcance y fuera de alcance;
 3. criterios de aceptación ejecutables;
 4. evidencia o decisiones que hay que leer;
@@ -140,14 +140,41 @@ se verifica la configuración vigente.
 
 Después de una migración de esquema no se hace rollback ciego sólo de código. La recuperación normal es forward-fix; un downgrade de esquema requiere procedimiento probado y backup recuperable.
 
-## Seguridad y límites
+## Límites que no se negocian
 
-- No guardar secretos, contraseñas, tokens o credenciales reales.
-- No copiar código, textos, marca o diseño distintivo de terceros.
-- No usar `docs/PROJECT_STATUS.md` como estado: es sólo un tombstone histórico.
-- No inventar hechos faltantes: marcar `PENDIENTE`.
-- No cambiar una decisión cerrada sin identificar quién tiene autoridad para hacerlo.
-- No iniciar una tarea nueva sólo por haber terminado el onboarding.
+Son reglas de Emi. Valen para PM y Dev, y esta es su única copia: los demás
+documentos remiten acá.
+
+- `PRE_FIRMA.md` nunca llega a `main`: el repositorio se le entrega a la
+  clienta al final del proyecto.
+- Montos, porcentajes y reparto de ingresos no se versionan; viven en el PDF
+  original, fuera del repositorio.
+- Ningún secreto en el repositorio ni en los informes, tampoco credenciales
+  reales de Mercado Pago o SMTP. Los `.env` locales llevan valores
+  inventados.
+- No se copia código, texto, marca ni diseño de Agrofy ni de ningún tercero.
+- No se rodea la política de seguridad de ningún entorno. Si bloquea algo, se
+  informa.
+- La plataforma no recibe, retiene ni administra fondos de terceros. La única
+  excepción es el cobro de suscripciones (`ALCANCE-Y-LIMITES.md`,
+  `DECISIONS.md` del 26/07).
+- **Teléfono de contacto: PENDIENTE de Emi.** La regla dada fue que no sale
+  de la API sin una suscripción activa, y que se hace cumplir en el backend,
+  no ocultándolo en la pantalla. Choca con `DECISIONS.md` del 05/08, que
+  pasó suscripciones y candados por plan a la Fase 6. Hoy el teléfono no
+  aparece en el Mercado ni en las fichas. Lo ven las dos partes de una orden
+  y quien compra, después de elegir transportista. El transportista no recibe
+  el de quien compra.
+- La auditoría de seguridad completa va al final, antes del despliegue. Lo
+  que aparezca antes se corrige cuando aparece.
+- Toda reproducción ofensiva es local y acotada. Nunca contra Railway.
+- El chat no es fuente de verdad. Lo son Git, el contrato, las decisiones y
+  la evidencia reproducible. `docs/PROJECT_STATUS.md` es sólo un tombstone
+  histórico.
+- No se inventan hechos faltantes: se marcan `PENDIENTE`.
+- Una decisión cerrada no se cambia sin identificar quién tiene autoridad
+  para hacerlo.
+- Terminar el onboarding no habilita a iniciar una tarea nueva.
 
 ## Mapa de documentos
 

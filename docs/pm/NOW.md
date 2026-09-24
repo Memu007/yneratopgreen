@@ -23,227 +23,29 @@ negativos rojos, **62/62** relacionados, a11y 76/76, contraste 84/84 y
 auditoría 12/12. El caso 137 admite el rótulo nuevo sin debilitar la
 privacidad. Sin integración ni despliegue.
 
-## Aceptación anterior — LOCALITY-DEDUP-1
+## Aceptaciones anteriores
 
-Contrato 3.1 y devolución de la clienta #8. Los selectores dejan de ofrecer
-las 105 entidades anidadas de Georef que repetían su localidad. Las 51
-homónimas muestran el departamento. No hay migración ni datos tocados. Lo
-guardado sobre una anidada aparece al filtrar por su localidad y se conserva
-al editar. PM midió en SQL 105/51/108 de forma independiente y reprodujo el
-caso 188 en **1/1**. Los cuatro negativos dieron rojo por su causa. Hubo
-**45/45** casos de localidad, transportista, fletes y PostGIS, a11y 76/76,
-contraste 84/84 y auditoría 12/12. PM aceptó que filtrar por el id de una
-anidada cuente como su localidad. Sin integración ni despliegue.
+Cada pieza tiene su evidencia en `docs/pm/REPRODUCCION-<PIEZA>-<fecha>.md` y
+su fila en `ROADMAP-CIERRE-MVP-2026-08-31.md`. No se transcriben acá. Los
+riesgos que dejaron abiertos están en «Pendientes canónicos adoptados».
 
-## Aceptación anterior — FILTER-COLLAPSE-FOCUS-1
-
-PM verificó la candidata `4fa8809` sobre una base PostGIS Docker recién
-creada. Caso 187 en **1/1**: a 360, 390 y 768 px, con el panel cerrado, Tab
-va de «Filtros» a «Ordenar» y los controles no están en el árbol de
-accesibilidad. Abierto, se recorren en orden y filtran. «Ver N resultados»
-deja el foco en «Filtros» a la vista. Los tres negativos dieron rojo por su
-causa. Casos 148, 155, 171, 175, 183, 185 y 186 en **7/7**; a11y **76/76**;
-contraste **84/84**; auditoría móvil **12/12** sin hallazgos. Build, lint,
-tipos y diff-check verdes.
-
-Decisión PM de experiencia: se acepta que «Ver N resultados» vuelva al
-principio del Mercado con «Filtros» visible. La primera tarjeta queda a
-451 px, igual que al entrar. El giro de tablet con el foco dentro del panel
-queda como P3, sin tarea. Sin integración ni despliegue.
-
-## Aceptación anterior — PRODUCT-DETAIL-BACK-SEARCH-1
-
-PM verificó la candidata `ce0380e` sobre una base PostGIS Docker recién
-creada, con API nativa y frontend de desarrollo. El caso 186 pasó **1/1**:
-10 vueltas búsqueda → ficha → recarga → Atrás, mitad con «Volver al Mercado»
-y mitad con el Atrás del navegador, sin ninguna escritura ni cuadro sin `q`.
-El negativo que repone el hook de la base dio rojo en **10 de 10** vueltas,
-con la barra escrita como `/?section=marketplace` y 24 tarjetas. Casos 147,
-148, 183 y 185 en **4/4**; build, lint, tipos y diff-check verdes.
-
-Dev corrigió su propia medición: no era una pérdida de la búsqueda sino un
-cuadro de unos 16 ms sin ella. PM lo acepta. Una sonda propia descartó un
-falso «No hay operaciones» en el hueco de carga que queda al volver (P3,
-registrado sin tarea). Chromium del entorno PM distinto del fijado por
-Playwright; declarado en la reproducción. Sin integración ni despliegue.
-
-## Última aceptación PM — FICHA-MOBILE-WIDTH-1
-
-PM verificó la candidata `78b682b` sobre base aislada: caso 185 **1/1** en
-360/390/768 px, sin contenido fuera de la ficha. El negativo que repone la
-geometría anterior dio rojo específico por desborde a 360 px. La auditoría
-móvil completó **12/12** recorridos y 39 pantallas con cero desbordes, cero
-recortes del checkout y salida 0. Build, lint, tipos y diff-check verdes. El
-QA responsive de geometría queda verde en rama; sigue pendiente el foco de
-teclado en filtros cerrados.
-
-Dev informó además una pérdida intermitente de `q` al volver desde una ficha
-recargada (8/20 intentos suyos). PM no la reprodujo durante esta revisión; se
-asigna `PRODUCT-DETAIL-BACK-SEARCH-1` para reproducirla y resolverla antes
-del foco de filtros. Sin integración ni despliegue.
-
-## Última aceptación PM — MOBILE-CHECKOUT-1
-
-PM verificó la candidata `f820146` sobre base aislada. El caso 184 pasó en
-360/390/768 px: envío y pago caben exactamente en la capa y la compra llega
-al medio de pago sin crear orden. El negativo con el CSS original dio rojo
-específico por recorte. La auditoría completó 12/12 recorridos, 39 pantallas,
-sin recortes del checkout ni cortes del arnés. Salió con 1 por la ficha de
-«Campo Agrícola de 120 Hectáreas» a 360 px: 368 px de documento. El QA
-responsive sigue abierto; `FICHA-MOBILE-WIDTH-1` es la siguiente pieza.
-
-## Última aceptación PM — MOBILE-AUDIT-FLOW-1
-
-PM ejecutó la auditoría en base aislada sobre `8e4f7c6`: el recorrido público
-alcanzó la ficha con URL propia en **360, 390 y 768 px**; el total fue **9/12**
-porque los tres recorridos de compra esperan el pago sin elegir traslado.
-El arnés anterior falló en «Limpiar filtros» antes de la ficha, rojo esperado.
-Las capturas históricas quedaron intactas. El arnés se acepta por el alcance
-asignado; no se declara cerrado el QA responsive.
-
-La misma corrida encontró **un desborde horizontal real en la ficha a 360 px**
-con «Campo Agrícola de 120 Hectáreas» (368 px de contenido en 360). PM confirmó
-además que Tab desde «Filtros» cerrado entra en cuatro controles invisibles.
-El recorte del checkout quedó corregido y aceptado en rama en
-`MOBILE-CHECKOUT-1`. Siguen abiertos la ficha a 360 px y el foco de filtros
-cerrados; se priorizan por separado.
-
-## Última aceptación PM — PRODUCT-DETAIL-PAGE-1
-
-Producto y caso 183 `087fa2c`; informe `9110bcc`. PM corrió la suite completa
-sobre base aislada: **183/183**, incluidos 123, 131, 147, 148, 155 y 183.
-El sabotaje que devuelve el modal dio rojo por falta de URL propia; restaurada
-la candidata, el caso 183 pasó **1/1**. Build, lint, tipos y diff-check verdes.
-Dev informó a11y **74/74** y contraste **82/82**. La nueva consulta del
-detalle suma una vista en `views_count` por apertura o recarga; se acepta ese
-efecto de la API existente. Sin integración ni despliegue.
-
-La auditoría móvil heredada se corta en «Limpiar filtros»: el script opera
-selectores dentro del panel aún plegado y después intenta pulsar un control
-oculto. PM reprodujo el rojo y confirmó con clic real en 360 px que abrir
-«Filtros» permite limpiar normalmente. Se asigna corregir el recorrido del
-arnés, no un cambio de producto sin defecto demostrado.
-
-## Última aceptación PM — ADMIN-MOBILE-ACCESS-1
-
-Producto, caso 182 y sabotajes `b2a3ba4`; informe `a11b52a`. PM reprodujo
-14/14 casos focales y relacionados desde una base aislada; el caso 182 pasó
-en 360, 390 y 768 px. Al reponer el desplazamiento horizontal anterior, el
-caso 182 falló con tres secciones fuera de vista; restaurado el candidato,
-pasó 1/1. Build, lint, tipos y diff-check verdes. Dev informó cuatro sabotajes
-rojos, a11y 74/74 y contraste 82/82. La aceptación cubre la navegación de
-siete secciones y Cerrar del panel admin; otros controles pequeños siguen
-pendientes del QA general. No se integró ni desplegó.
-
-## Última aceptación PM — CART-PRODUCT-QUERY-1
-
-Producto, caso 181 y tres sabotajes `1e4a63c`; informe `e0fd76b`. PM reprodujo
-el caso 181 en **1/1**: GET, sync con carrito y sync que lo crea leen `products`
-1/1/1 veces con 1/3/6 ítems. Los tres sabotajes dieron rojo por crecimiento.
-La suite completa desde base Docker limpia terminó **180/181**: el único rojo
-fue el caso 157 porque la copia temporal no tenía metadatos Git. Repetido con
-Git disponible, el 157 pasó **1/1**; los 181 casos quedan cubiertos, sin
-atribuir 181/181 a una sola corrida. Build, lint, tipos, sintaxis, dependencias,
-migraciones y diff-check quedaron verdes.
-
-PM acepta que el sync de un carrito nuevo guarde el nombre y precio recién
-validados antes del commit que crea el carrito. Evita guardar, ante una edición
-concurrente, un precio posterior que no pasó por el control de importes; coincide
-con el camino donde el carrito ya existía. No modifica el contrato observable
-fuera de esa carrera. La pieza no habilita integración ni despliegue.
-
-## Última aceptación PM — CART-IMG-QUERY-1
-
-Producto, caso 180 y sabotajes `112eee0`; informe `6b91aa8`. PM reprodujo el
-focal en 1/1: GET y sync leen `product_images` 1/1/1 veces con 1/3/6 ítems y
-conservan principal o `null`. Los tres sabotajes dieron rojo —N+1 en cada
-endpoint y secundaria usada como portada—. La suite completa desde base Docker
-limpia terminó **180/180**; build, lint, tipos, sintaxis, dependencias,
-migraciones y diff-check quedaron verdes.
-
-La medición reveló que `products` todavía crece 1/3/6 en ambos endpoints. Ese
-hallazgo no reabre la pieza aceptada: pasa a `CART-PRODUCT-QUERY-1`.
-
-## Última aceptación PM — PRIMARY-IMAGE-INTEGRITY-1
-
-Producto, migración y regresión `cfeff88`; informe `19e6327`, corregido por
-`6a6e36e`. PM comprobó independientemente el caso 179, cuatro sabotajes rojos,
-la limpieza previa al índice, el rechazo real de una segunda principal y los
-recorridos concurrentes. La suite limpia dio 178/179 porque el host no tenía
-`npx`; repetido el único caso afectado con el lanzador disponible, el 136 pasó
-1/1. Los 179 casos quedan cubiertos y el caso 131 pasó. Build, análisis
-estático, dependencias, migraciones y diff-check quedaron verdes.
-
-La pieza no se integra ni despliega todavía: contiene una migración y requiere
-una puerta operativa explícita antes de tocar `main`/Railway.
-
-## Última aceptación PM — RISK-REC-1
-
-Producto y arnés `2d18d55`; informe final `d518f40`. PM comprobó de forma
-independiente:
-
-- casos 176, 177 y 178 juntos: **3/3**;
-- sabotaje de la venta atómica: caso 176 **rojo** en la ronda 2, con dos
-  órdenes pagadas por una sola unidad;
-- candidata restaurada y suite completa desde base Docker limpia: **178/178**,
-  incluido el caso 131;
-- a11y: **74/74** superficies, sin violaciones bloqueantes;
-- contraste: **82/82** mediciones, sin incumplimientos;
-- build, lint, `tsc --noEmit`, `node --check`, `compileall`, `pip check`,
-  `alembic check` y `diff-check` compatibles con CRLF: verdes.
-
-R1 y R5 quedan cerrados como defectos reales. R4 queda cerrado como falso para
-el comportamiento vigente: el reenvío sí se ofrece. La dependencia de la frase
-del rechazo no se corrige en esta pieza porque separar cuenta inactiva de cuenta
-sin confirmar requiere una señal estable nueva de Auth; permanece vigilada por
-el caso 177 y su sabotaje. La devolución concurrente de stock en cancelación o
-rechazo queda registrada como riesgo adyacente, no como defecto reproducido.
-
-## Última aceptación PM — CAT-PAGE-1
-
-Producto inicial `a521631`, corrección R1 `575f757`, informe final `b1cc77f` e
-integración local `fafa5cb`; quedó incluida en `4c8569d`. La PM comprobó de forma independiente:
-
-- caso 171 sobre la candidata, con 115 publicaciones y cinco páginas: **1/1**;
-- sabotaje temporal omitiendo `pagina` de `consultaVigente`: **0/1**, con la
-  página anterior presentada bajo «Página 2 de 5» y sin estado de carga;
-- candidata restaurada y limpia: caso 171 nuevamente **1/1**;
-- build, lint, `tsc --noEmit`, sintaxis del arnés y `diff-check`: verdes.
-
-Dev obtuvo 170/171 en la suite completa desde base limpia; el único rojo fue el
-caso 131 ambiental, heredado y sin relación con esta pieza. También obtuvo
-a11y 72/72 y contraste 80/80. Evidencia durable:
-`REPRODUCCION-CAT-PAGE-1-2026-09-14.md`.
-
-## Última aceptación PM — POST-INTEGRATION-CLEAR-1
-
-La candidata de producto `eb62d3d`, con ajuste de arnés `a7ed544` e informe
-`48bae67`, mantiene el alcance mínimo. PM comprobó de forma independiente:
-
-- caso 170 sobre la candidata: **1/1**;
-- el mismo caso sobre la base `2d8ecfd`: **0/1**, rojo exacto por carrito
-  guardado sin acceso desde la cabecera;
-- caso 169 sobre `a7ed544`: **1/1**, con reinicio real de `topgreen-api` y
-  cambio de identidad del contenedor;
-- build, lint y `git diff --check`: verdes;
-- accesibilidad: **70/70** superficies, sin violaciones bloqueantes;
-- contraste: **78/78** mediciones, sin incumplimientos.
-
-Dev ejecutó la suite completa desde base limpia sobre `a7ed544`: **169/170**,
-con único rojo ambiental en el caso 131. Ese caso no cambió y ya había pasado
-en la corrida Docker real anterior de PM; el delta nuevo queda cubierto por
-los focales y puertas anteriores. PM no repitió el borrado completo porque el
-lanzador elimina volúmenes Docker locales y Emi no autorizó esa destrucción.
-
-La pieza quedó aceptada e incluida en la composición publicada `4c8569d` y en
-el runtime convergente `0bd7fbc`. Evidencia durable:
-`REPRODUCCION-POST-INTEGRATION-CLEAR-1-2026-09-14.md`.
-
-## Última aceptación PM relevante
-
-`INTEGRATION-CANDIDATE-1` quedó aceptada en rama Dev y se integró a `main` mediante `b8447a3`: producto/arnés `c565e6e`, informe `ad914a3`. El despliegue automático fue autorizado expresamente por Emi el 2026-09-13; Frontend y Backend ya fueron verificados en esa misma revisión.
-
-Las aceptaciones anteriores y sus reproducciones son historia consultable en Git y en los documentos de evidencia; no se vuelven a transcribir en este archivo.
+| Pieza | Estado | Evidencia |
+|---|---|---|
+| `LOCALITY-DEDUP-1` | aceptada en rama | `REPRODUCCION-LOCALITY-DEDUP-1-2026-09-24.md` |
+| `FILTER-COLLAPSE-FOCUS-1` | aceptada en rama | `REPRODUCCION-FILTER-COLLAPSE-FOCUS-1-2026-09-24.md` |
+| `PRODUCT-DETAIL-BACK-SEARCH-1` | aceptada en rama | `REPRODUCCION-PRODUCT-DETAIL-BACK-SEARCH-1-2026-09-23.md` |
+| `FICHA-MOBILE-WIDTH-1` | aceptada en rama | `REPRODUCCION-FICHA-MOBILE-WIDTH-1-2026-09-23.md` |
+| `MOBILE-CHECKOUT-1` | aceptada en rama | `REPRODUCCION-MOBILE-CHECKOUT-1-2026-09-23.md` |
+| `MOBILE-AUDIT-FLOW-1` | aceptada en rama | `REPRODUCCION-MOBILE-AUDIT-FLOW-1-2026-09-23.md` |
+| `PRODUCT-DETAIL-PAGE-1` | aceptada en rama | `REPRODUCCION-PRODUCT-DETAIL-PAGE-1-2026-09-23.md` |
+| `ADMIN-MOBILE-ACCESS-1` | aceptada en rama | `REPRODUCCION-ADMIN-MOBILE-ACCESS-1-2026-09-23.md` |
+| `CART-PRODUCT-QUERY-1` | aceptada en rama | `REPRODUCCION-CART-PRODUCT-QUERY-1-2026-09-22.md` |
+| `CART-IMG-QUERY-1` | aceptada en rama | `REPRODUCCION-CART-IMG-QUERY-1-2026-09-22.md` |
+| `PRIMARY-IMAGE-INTEGRITY-1` | aceptada en rama; trae migración, espera la puerta de recuperación | `REPRODUCCION-PRIMARY-IMAGE-INTEGRITY-1-2026-09-22.md` |
+| `RISK-REC-1` | publicada en `0bd7fbc` | `REPRODUCCION-RISK-REC-1-2026-09-21.md` |
+| `CAT-PAGE-1` | publicada | `REPRODUCCION-CAT-PAGE-1-2026-09-14.md` |
+| `POST-INTEGRATION-CLEAR-1` | publicada | `REPRODUCCION-POST-INTEGRATION-CLEAR-1-2026-09-14.md` |
+| `INTEGRATION-CANDIDATE-1` | integrada por `b8447a3` con autorización de Emi del 13/09 | la sección siguiente |
 
 ## Estado de integración
 
@@ -392,13 +194,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev trabaja `ADMIN-GUIDE-1`: capacitación básica del panel de administración (contrato, Fase 5), verificada por script. Después siguen las secciones de comprador y vendedor del manual y #1 «agropecuario». Huecos del MVP que no dependen de Emi y
-   siguen después, en orden: los ajustes chicos de la devolución de la
-   clienta que no esperan decisión (#1 «agropecuario»); después, material de
-   capacitación del panel admin y documentación técnica del despliegue
-   (Fase 5), una vez fijada la infraestructura. Los que sí dependen de Emi:
-   SMTP (la clienta no pudo registrarse), cuentas de prueba de Mercado Pago,
-   backups e integración, y las decisiones #5, #7 y #10 de la clienta.
+1. Dev corrige `ADMIN-GUIDE-1` (ronda 1 de 2). Siguen, sin depender de Emi: los cuatro defectos del panel que encontró Dev; las secciones de comprador y vendedor del manual con el ajuste #1 «agropecuario»; y la documentación del despliegue cuando la infraestructura quede fija. Dependen de Emi: la regla del teléfono, SMTP (la clienta no pudo registrarse), cuentas de prueba de Mercado Pago, backups e integración, y las decisiones #5, #7 y #10 de la clienta.
 2. Las doce piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue. Integrarlas publica la migración de imágenes. Antes, Emi decide la recuperación previa (punto 3). Después, PM corre la suite completa desde base limpia sobre el SHA exacto, incluido el caso 131 en Docker, y prepara la publicación, que requiere autorización explícita de Emi.
 3. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración. La propuesta de recuperación pre-migración espera decisión de Emi y verificación autenticada de Railway.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.

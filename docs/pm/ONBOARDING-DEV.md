@@ -15,14 +15,14 @@ Si una instrucción contradice contrato, una decisión vigente o evidencia actua
 
 ## Antes de cada tarea
 
-```bash
-git pull origin main
-cat docs/pm/PARA-DEV.md
-```
+Trabajá sobre la rama que `NOW.md` registra como «Rama Dev», no sobre
+`main`: lo aceptado y todavía sin publicar vive sólo en esa rama. Si tu sesión
+te asignó otra rama, creala a partir de la «Rama Dev» y decilo en el informe.
+Después leé la tarea en `PARA-DEV.md` desde esa misma rama.
 
 Luego:
 
-1. confirmá rama y SHA base;
+1. confirmá rama y SHA base contra lo que dice la tarea;
 2. leé sólo las rutas/decisiones citadas por la tarea;
 3. inspeccioná el flujo real antes de editar;
 4. si el árbol no está limpio, no pises cambios ajenos;
@@ -111,13 +111,11 @@ No improvises para “destrabar”.
 
 ## Reglas permanentes
 
-- Si no lo corriste, decí que no lo corriste.
+Valen siempre las reglas de `CLAUDE.md` y los «Límites que no se negocian» de
+`ONBOARDING-PM.md`. Acá va sólo lo que no está en ninguno de los dos.
+
 - Una tarea activa a la vez.
-- No agregar features no pedidas.
-- No subir secretos ni credenciales reales.
-- No copiar código, textos, marca o diseño distintivo de terceros.
 - El contrato es a precio fijo: una mejora opcional se propone, no se implementa sola.
-- `docs/PROJECT_STATUS.md` es histórico y no se usa como estado.
 - Cuando documentación y código se contradicen, reportá la discrepancia; para comportamiento técnico manda la evidencia actual, y para alcance manda el contrato/decisiones vigentes.
 - En una corrección visual, reasignar un elemento a un token existente cuya
   semántica ya corresponde es un arreglo acotado. Cambiar el valor global de un
@@ -127,8 +125,7 @@ No improvises para “destrabar”.
 
 - No hay que asumir un router tradicional: verificá la navegación real antes de tocarla.
 - Los filtros geográficos, catálogo, estados y permisos tienen contratos de datos específicos; no adivines ids/nombres/tokens: inspeccioná Backend y pruebas.
-- No debilites controles de producción para hacer pasar una prueba. Si un test contamina otro —por ejemplo rate-limit—, primero corregí aislamiento/reset del arnés.
-- Cambios de schema, dinero, autenticación, permisos, órdenes, stock, datos o seguridad necesitan revisión mayor y evidencia más fuerte.
+- Si un test contamina otro —por ejemplo rate-limit—, primero corregí el aislamiento o el reset del arnés.
 
 ## Producción y Railway
 
