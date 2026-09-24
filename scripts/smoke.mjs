@@ -33039,6 +33039,126 @@ await runCase(189, 'Una localidad homónima muestra su departamento donde se la 
   return informe.join('. ');
 });
 
+await runCase(190, 'Una publicación eliminada no vuelve por la mano de quien vende', async () => {
+  // «Eliminada» es la herramienta de moderación del panel. Antes, quien vende
+  // la volvía a activar con un `PATCH` a mano: la edición sólo miraba que la
+  // publicación fuera suya. Acá se prueba cada camino que tiene quien vende
+  // sobre una publicación ya creada, con la fila de la base antes y después.
+  await asegurarSesiones();
+  const admin = await tokenDeAdmin();
+  const vendedor = state.sellerToken;
+  const informe = [];
+  const [[categoria]] = queryRows(
+    'SELECT id FROM categories WHERE is_service = false ORDER BY name LIMIT 1');
+  const [[localidad]] = queryRows(`SELECT id FROM localities
+    WHERE name = 'Pergamino' AND province_name = 'Buenos Aires'`);
+  const PNG_DE_UN_PIXEL = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  );
+  const subirFoto = async (id, token) => {
+    const sobre = new FormData();
+    sobre.append('files', new Blob([PNG_DE_UN_PIXEL], { type: 'image/png' }), 'smoke-moderada.png');
+    const respuesta = await fetch(`${API_URL}/products/${id}/images`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: sobre,
+    });
+    return respuesta.status;
+  };
+  const publicar = async (etiqueta) => (await apiRequest('/products', {
+    method: 'POST',
+    token: vendedor,
+    body: {
+      name: `Smoke moderada ${etiqueta} ${Date.now()}`,
+      description: 'Publicación que el administrador elimina.',
+      category_id: categoria, price: 1500, stock: 6, unit: 'unidad',
+      locality_id: localidad, publication_type: 'producto',
+    },
+  })).data;
+  const ponerEstado = (id, status) => apiRequest(`/admin/products/${id}/status`,
+    { method: 'PATCH', token: admin, body: { status } });
+  // Todo lo que quien vende podría cambiar: estado, datos, fotos.
+  const fila = (id) => JSON.stringify(queryRows(`
+    SELECT p.status, p.name, p.description, p.price, p.stock, p.updated_at,
+           coalesce((SELECT string_agg(i.id, ',' ORDER BY i.id) FROM product_images i
+                     WHERE i.product_id = p.id), '')
+    FROM products p WHERE p.id = ${sqlLiteral(id)}`));
+  const enElMercado = async (p) => (await pedirCrudo(`/catalog/products/${p.id}`)).status === 200;
+  const creadas = [];
+
+  try {
+    const moderada = await publicar('por el panel');
+    creadas.push(moderada.id);
+    assert(await subirFoto(moderada.id, vendedor) === 200, 'no se pudo subir la foto de prueba');
+    const [[foto]] = queryRows(`SELECT id FROM product_images WHERE product_id = ${sqlLiteral(moderada.id)}`);
+
+    // Los caminos de quien vende sobre una publicación que ya existe.
+    const CAMINOS = [
+      ['PATCH {"status":"active"}', () => pedirCrudo(`/products/${moderada.id}`,
+        { method: 'PATCH', header: vendedor, body: { status: 'active' } })],
+      ['PATCH {"status":"paused"}', () => pedirCrudo(`/products/${moderada.id}`,
+        { method: 'PATCH', header: vendedor, body: { status: 'paused' } })],
+      ['PATCH de datos (nombre, precio, stock)', () => pedirCrudo(`/products/${moderada.id}`,
+        { method: 'PATCH', header: vendedor, body: { name: 'Smoke moderada editada', price: 9, stock: 99 } })],
+      ['DELETE /products/{id}', () => pedirCrudo(`/products/${moderada.id}`,
+        { method: 'DELETE', header: vendedor })],
+      ['POST /products/{id}/images', async () => ({ status: await subirFoto(moderada.id, vendedor) })],
+      ['DELETE /products/{id}/images/{imagen}', () => pedirCrudo(`/products/${moderada.id}/images/${foto}`,
+        { method: 'DELETE', header: vendedor })],
+      ['POST /cart/items', () => pedirCrudo('/cart/items',
+        { method: 'POST', header: vendedor, body: { product_id: moderada.id, quantity: 1 } })],
+    ];
+    const abiertos = [];
+    for (const [camino, intentar] of CAMINOS) {
+      // Cada camino parte de la publicación eliminada por el administrador.
+      await ponerEstado(moderada.id, 'deleted');
+      const antes = fila(moderada.id);
+      const { status } = await intentar();
+      const despues = fila(moderada.id);
+      if (status < 400 || antes !== despues) {
+        abiertos.push(`${camino} respondió ${status}${antes !== despues ? ' y cambió la fila' : ''}`);
+      }
+    }
+    assert(abiertos.length === 0,
+      `quien vende todavía modifica una publicación eliminada: ${abiertos.join('; ')}`);
+    informe.push(`${CAMINOS.length} caminos de quien vende rechazados sin tocar la fila`);
+
+    const suyas = await apiRequest('/products/my', { token: vendedor });
+    assert(!(suyas.data.products || []).some((p) => p.id === moderada.id),
+      'eliminada, sigue en «Mis publicaciones»');
+    assert(!(await enElMercado(moderada)), 'eliminada, su ficha abre en el Mercado');
+
+    // El administrador sí la saca de «Eliminada», y vuelve a ser de quien vende.
+    await ponerEstado(moderada.id, 'active');
+    assert(await enElMercado(moderada), 'el administrador la volvió a «Activa» y no abre en el Mercado');
+    for (const status of ['paused', 'active']) {
+      await apiRequest(`/products/${moderada.id}`, { method: 'PATCH', token: vendedor, body: { status } });
+      assert(fila(moderada.id).includes(`"${status.toUpperCase()}"`), `quien vende no la pudo pasar a ${status}`);
+    }
+    informe.push('el administrador la vuelve a «Activa» y quien vende la pausa y la activa');
+
+    // Agotada por el administrador: quien vende la sigue pudiendo activar,
+    // como antes. Sólo «Eliminada» cambió.
+    await ponerEstado(moderada.id, 'sold_out');
+    await apiRequest(`/products/${moderada.id}`, { method: 'PATCH', token: vendedor, body: { status: 'active' } });
+    assert(fila(moderada.id).includes('"ACTIVE"'), 'quien vende ya no puede activar una agotada');
+    informe.push('una agotada la sigue activando quien vende');
+
+    // La que elimina quien vende también es definitiva para ella.
+    const propia = await publicar('por quien vende');
+    creadas.push(propia.id);
+    await apiRequest(`/products/${propia.id}`, { method: 'DELETE', token: vendedor });
+    const antes = fila(propia.id);
+    const vuelta = await pedirCrudo(`/products/${propia.id}`,
+      { method: 'PATCH', header: vendedor, body: { status: 'active' } });
+    assert(vuelta.status === 409 && fila(propia.id) === antes,
+      `la que eliminó quien vende volvió con un PATCH: HTTP ${vuelta.status}`);
+    informe.push('la que elimina quien vende tampoco vuelve (409)');
+  } finally {
+    for (const id of creadas) await ponerEstado(id, 'deleted').catch(() => {});
+  }
+  return informe.join('. ');
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

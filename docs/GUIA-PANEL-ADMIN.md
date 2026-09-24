@@ -197,8 +197,7 @@ Para quitarle el acceso, cambiá «Admin» por «Usuario». El panel pregunta
 <!-- recorrido: usuarios-propia -->
 
 - Si tocás «Desactivar» en tu propia fila y confirmás, el panel responde
-  «Error al cambiar estado del usuario» y no cambia nada. El motivo es que
-  nadie puede desactivar su propia cuenta, aunque el mensaje no lo diga.
+  «No puedes desactivar tu propia cuenta» y no cambia nada.
 - Si cambiás tu propio rol y confirmás, responde «No puedes cambiar tu
   propio rol de administrador».
 
@@ -247,34 +246,31 @@ vuelve a verse en el Mercado.
 ### Paso 12. Marcarla como agotada
 <!-- recorrido: productos-agotada -->
 
-Cambiá el estado a «Agotada» y confirmá con «Pasar a Agotada».
+Cambiá el estado a «Agotada» y confirmá con «Pasar a Agotada». El panel
+avisa: «Deja de aparecer en el catálogo y su enlace no abre, igual que una
+pausada. No se borra y se puede volver a activar.»
 
-**Cuidado.** El aviso del panel dice «Sigue visible pero no se puede
-comprar.», pero hoy no es así:
+Qué pasa después:
 
-- la publicación deja de verse en el Mercado y en su enlace, igual que si la
-  pausaras;
-- quien vende la sigue viendo como «Activo» en «Mis publicaciones».
-
-Está anotado para corregir. Mientras tanto, para sacar una publicación de
-circulación usá «Pausada».
+- La publicación deja de verse en el Mercado y en su enlace, igual que si la
+  pausaras.
+- Quien vende la ve en «Mis publicaciones» como «Agotado». Si le quedan
+  unidades, tiene el botón «Activar» y la puede volver a activar sola.
 
 ### Paso 13. Eliminar una publicación
 <!-- recorrido: productos-eliminar -->
 
-Cambiá el estado a «Eliminada» y confirmá con «Pasar a Eliminada».
+Cambiá el estado a «Eliminada» y confirmá con «Pasar a Eliminada». El panel
+avisa: «Deja de aparecer en el catálogo y en las búsquedas. Quien vende ya no
+la ve ni la puede volver a activar.»
 
 Qué pasa después:
 
 - La publicación deja de verse en el Mercado y en las búsquedas.
-- Desaparece de «Mis publicaciones» de quien vende: no la ve ni tiene un
-  botón para volver a activarla.
+- Desaparece de «Mis publicaciones» de quien vende. Para quien vende es
+  definitiva: no la puede volver a activar ni editar.
 - En el panel sigue en la lista con el estado «Eliminada». No se borra: si
   hiciera falta, se puede volver a «Activa» y reaparece para todos.
-
-**Cuidado.** Hoy quien vende sí puede volver a activarla con un pedido armado
-a mano, sin pasar por la pantalla. Está anotado para corregir. Si reaparece,
-eliminala de nuevo.
 
 ---
 
@@ -294,19 +290,19 @@ eliminala de nuevo.
    «Comprador», «Vendedor», «Productos», «Subtotal:», «Envío:» y «Total:».
 4. Cerrá el detalle con «×» o con Escape.
 
+Qué muestra el detalle:
+
+- En «Comprador», el nombre, el correo y la dirección de entrega de quien
+  compra.
+- En «Productos», cada artículo con su cantidad y el precio al que se
+  compró, aunque la publicación haya cambiado de precio después.
+- El subtotal, el envío y el total de la orden.
+
+En el celular el detalle se lee de arriba abajo, sin desplazarse de costado.
+
 Las órdenes sólo se miran: no hay botones para cambiar su estado ni para
 cancelarlas. Los estados los mueven quien compra y quien vende, desde su
 cuenta, y el pago por Mercado Pago cuando se acredita.
-
-**Cuidado.** Hoy el detalle no trae todos los datos:
-
-- dice «No hay detalles de items disponibles» aunque la orden tenga
-  artículos;
-- el correo y la dirección de quien compra aparecen con un guion;
-- el subtotal y el envío aparecen en cero.
-
-El total sí es el de la orden. Está anotado para corregir. Mientras tanto, el
-detalle completo lo ven quien compra y quien vende en su cuenta.
 
 ![El detalle de una orden](guia-panel-admin/ordenes-escritorio.png)
 ![El detalle de una orden en el celular](guia-panel-admin/ordenes-celular.png)
@@ -554,7 +550,7 @@ mirar su fuente.
   (`backend/app/models/product.py`).
 
 Tampoco se comprueban los consejos y las notas: para qué sirve un paso, con
-quién compartir una contraseña, cuántas cuentas de administración tener, que
-pausar no es una sanción o qué está anotado para corregir. Una frase que se
+quién compartir una contraseña, cuántas cuentas de administración tener o
+que pausar no es una sanción. Una frase que se
 agregue después no se comprueba hasta que se la ate a una comprobación del
 programa o se la sume a esta lista.

@@ -744,6 +744,36 @@
     width: 95%;
     max-height: 90vh;
   }
+
+  /* La tabla de artículos no entraba a 360 px: se salía 55 px de su sección
+     y el detalle se desplazaba de costado. Menos relleno alrededor, columnas
+     fijas con la del producto más ancha, y sólo una palabra que no entra se
+     parte. */
+  .orderDetailContent {
+    padding: 16px;
+  }
+
+  .orderDetailSection {
+    padding: 10px;
+  }
+
+  .itemsTable {
+    table-layout: fixed;
+  }
+
+  .itemsTable th:first-child {
+    width: 36%;
+  }
+
+  .itemsTable th,
+  .itemsTable td {
+    padding: 8px 4px;
+    overflow-wrap: break-word;
+  }
+
+  .itemsTable th {
+    font-size: 0.75rem;
+  }
 }
 
 /* ==================== CATEGORÍAS ==================== */

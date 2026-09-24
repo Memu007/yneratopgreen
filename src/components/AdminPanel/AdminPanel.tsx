@@ -858,7 +858,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       loadUsers();
     } catch (error) {
       console.error('Error:', error);
-      showToast('Error al cambiar estado del usuario', 'error');
+      // El motivo lo manda el servidor —por ejemplo, que nadie desactiva su
+      // propia cuenta—; el genérico queda para cuando no mandó ninguno.
+      showToast(error instanceof Error && error.message
+        ? error.message
+        : 'Error al cambiar estado del usuario', 'error');
     }
   };
 
@@ -994,8 +998,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     const CONSECUENCIA: Record<string, string> = {
       active: 'Vuelve a aparecer en el catálogo y se puede comprar.',
       paused: 'Deja de aparecer en el catálogo. No se borra y se puede volver a activar.',
-      sold_out: 'Sigue visible pero no se puede comprar.',
-      deleted: 'Deja de aparecer en el catálogo y en las búsquedas.',
+      // Agotada sale del Mercado igual que pausada; el aviso decía que seguía
+      // visible y no era cierto.
+      sold_out: 'Deja de aparecer en el catálogo y su enlace no abre, igual que una pausada. '
+        + 'No se borra y se puede volver a activar.',
+      deleted: 'Deja de aparecer en el catálogo y en las búsquedas. '
+        + 'Quien vende ya no la ve ni la puede volver a activar.',
     };
     const antes = estadoDeProducto(producto.status);
     const despues = estadoDeProducto(nuevoEstado);

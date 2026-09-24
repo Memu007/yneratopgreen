@@ -306,10 +306,24 @@ const totalQueDice = async (panel) => Number(((await panel.innerText()).match(/T
 // Los correos que recibió una dirección, en el outbox de desarrollo. Se lee
 // sólo el encabezado `To:`, no el cuerpo.
 const CARPETA_OUTBOX = join(RAIZ, 'backend/outbox');
+// El transporte que usa la API: el del entorno, o el de `backend/.env`, o el
+// de omisión de `config.py`. De `.env` se lee sólo esa línea.
+function transporteDeCorreo() {
+  if (process.env.EMAIL_TRANSPORT) return process.env.EMAIL_TRANSPORT.trim().toLowerCase();
+  try {
+    const linea = readFileSync(join(RAIZ, 'backend/.env'), 'utf8').match(/^EMAIL_TRANSPORT=(.*)$/m);
+    if (linea) return linea[1].trim().replace(/^["']|["']$/g, '').toLowerCase();
+  } catch { /* sin .env: vale la omisión */ }
+  return 'outbox';
+}
 function correosPara(email) {
-  if (!existsSync(CARPETA_OUTBOX)) {
-    throw new Falla('no existe backend/outbox: con otro transporte de correo esto no se puede mirar');
+  const transporte = transporteDeCorreo();
+  if (transporte !== 'outbox') {
+    throw new Falla(`el correo sale por «${transporte}», no por el outbox: esto no se puede mirar`);
   }
+  // La API crea la carpeta con el primer correo. Si todavía no existe, nadie
+  // recibió ninguno.
+  if (!existsSync(CARPETA_OUTBOX)) return 0;
   const para = new RegExp(`^To: ${escapar(email)}\\s*$`, 'mi');
   return readdirSync(CARPETA_OUTBOX).filter((nombre) => nombre.endsWith('.eml'))
     .filter((nombre) => para.test(readFileSync(join(CARPETA_OUTBOX, nombre), 'utf8').split(/\r?\n\r?\n/)[0]))
@@ -711,15 +725,12 @@ const RECORRIDOS = {
     await fila.waitFor({ timeout: 15_000 });
     await fila.getByRole('button', { name: 'Desactivar' }).click();
     await confirmar(page, 'Desactivar la cuenta', 'Desactivar la cuenta', v);
-    await esperarTexto(page, 'Error al cambiar estado del usuario');
-    await v.mirar(page);
-    await v.afirma('El motivo es que nadie puede desactivar su propia cuenta, aunque el mensaje no lo diga.', async () => {
-      const r = await pedir(`/admin/users/${c.admin.user.id}/toggle-active`, { method: 'POST', token: c.admin.access_token });
-      exigir(r.status === 400 && /propia cuenta/.test(r.data?.detail || ''),
-        `el servidor responde ${r.status} ${JSON.stringify(r.data?.detail)}`);
-      exigir(!(await page.locator('body').innerText()).includes(r.data.detail),
-        'el panel ya muestra el motivo: la advertencia de la guía quedó vieja');
+    await v.afirma('el panel responde «No puedes desactivar tu propia cuenta»', async () => {
+      await esperarTexto(page, 'No puedes desactivar tu propia cuenta').catch(() => {
+        throw new Falla('el panel no dice el motivo');
+      });
     });
+    await v.mirar(page);
     await fila.getByLabel('Rol del usuario').selectOption('user');
     await confirmar(page, 'Quitar acceso de administrador', 'Pasar a Usuario', v);
     await esperarTexto(page, 'No puedes cambiar tu propio rol de administrador');
@@ -844,15 +855,21 @@ const RECORRIDOS = {
       exigir(!(await enElMercado(c.producto.nombre)), 'agotada, sigue en el Mercado');
       exigir(!(await suEnlaceAbre(c.producto.id)), 'agotada, su enlace sigue abriendo');
     });
-    await v.afirma('quien vende la sigue viendo como «Activo» en «Mis publicaciones»', async () => {
-      const { page: suya, contexto } = await misPublicaciones(c.browser, c.viewport, c.vendedora, v);
-      const tarjeta = suya.locator('[class*="productCard"], [class*="publicacion"]').filter({ hasText: c.producto.nombre }).first();
+    const { page: suya, contexto } = await misPublicaciones(c.browser, c.viewport, c.vendedora, v);
+    const tarjeta = suya.locator('[class*="productCard"], [class*="publicacion"]').filter({ hasText: c.producto.nombre }).first();
+    await v.afirma('Quien vende la ve en «Mis publicaciones» como «Agotado».', async () => {
       await tarjeta.waitFor({ timeout: 15_000 });
       const texto = await tarjeta.innerText();
-      await contexto.close();
-      exigir(/Activo/.test(texto), 'agotada, quien vende no la ve «Activo»');
+      exigir(/Agotado/.test(texto) && !/\bActivo\b/.test(texto), `quien vende no la ve «Agotado»: ${texto.slice(0, 120)}`);
     });
-    await pedir(`/admin/products/${c.producto.id}/status`, { method: 'PATCH', token: c.admin.access_token, body: { status: 'active' } });
+    await v.afirma('Si le quedan unidades, tiene el botón «Activar» y la puede volver a activar sola.', async () => {
+      await tarjeta.getByRole('button', { name: /Activar/ }).click({ timeout: 5_000 }).catch(() => {
+        throw new Falla('con unidades, quien vende no tiene el botón «Activar»');
+      });
+      await suya.getByRole('button', { name: 'Activar', exact: true }).last().click();
+      await c.esperarA(async () => enElMercado(c.producto.nombre), 'quien vende la activó y no volvió al Mercado');
+    });
+    await contexto.close();
   },
 
   async 'productos-eliminar'(c, v) {
@@ -870,7 +887,7 @@ const RECORRIDOS = {
     await v.afirma('La publicación deja de verse en el Mercado y en las búsquedas.', async () => {
       exigir(!(await enElMercado(c.producto.nombre)), 'eliminada, sigue en el Mercado');
     });
-    await v.afirma('Desaparece de «Mis publicaciones» de quien vende: no la ve ni tiene un botón para volver a activarla.', async () => {
+    await v.afirma('Desaparece de «Mis publicaciones» de quien vende.', async () => {
       const suyas = await pedir('/products/my', { token: c.vendedora.access_token });
       exigir(!(suyas.data?.products || []).some((p) => p.id === c.producto.id),
         'eliminada, sigue en «Mis publicaciones» de quien vende');
@@ -879,26 +896,32 @@ const RECORRIDOS = {
       await contexto.close();
       exigir(!laVe, 'eliminada, quien vende la sigue viendo en «Mis publicaciones»');
     });
+    await v.afirma('Para quien vende es definitiva: no la puede volver a activar ni editar.', async () => {
+      // Ni desde la pantalla, que no la muestra, ni con un pedido armado a mano.
+      for (const cambio of [{ status: 'active' }, { name: `${c.producto.nombre} editada` }]) {
+        const r = await pedir(`/products/${c.producto.id}`,
+          { method: 'PATCH', token: c.vendedora.access_token, body: cambio });
+        exigir(r.status === 409, `quien vende mandó ${JSON.stringify(cambio)} y el servidor respondió ${r.status}`);
+      }
+      exigir(!(await enElMercado(c.producto.nombre)), 'después de que quien vende lo intentó, está en el Mercado');
+    });
     await v.afirma('No se borra: si hiciera falta, se puede volver a «Activa» y reaparece para todos.', async () => {
       await fila.getByLabel('Estado del producto').selectOption('active');
       await confirmar(page, 'Cambiar el estado de la publicación', 'Pasar a Activa', v);
       await c.esperarA(async () => enElMercado(c.producto.nombre), 'vuelta a «Activa», no reapareció');
     });
     // Y queda eliminada: es de la corrida.
-    const eliminar = () => pedir(`/admin/products/${c.producto.id}/status`,
+    await pedir(`/admin/products/${c.producto.id}/status`,
       { method: 'PATCH', token: c.admin.access_token, body: { status: 'deleted' } });
-    await eliminar();
-    await v.afirma('Hoy quien vende sí puede volver a activarla con un pedido armado a mano', async () => {
-      const r = await pedir(`/products/${c.producto.id}`,
-        { method: 'PATCH', token: c.vendedora.access_token, body: { status: 'active' } });
-      const volvio = r.status === 200 && await enElMercado(c.producto.nombre);
-      await eliminar();
-      exigir(volvio, `quien vende ya no puede volver a activarla (HTTP ${r.status}): la advertencia de la guía quedó vieja`);
-    });
   },
 
   async 'ordenes-ver'(c, v) {
     const { page } = c;
+    // La publicación cambia de precio después de la compra: el detalle tiene
+    // que seguir diciendo el precio al que se compró.
+    const cambio = await pedir(`/products/${c.productoDocumentado.id}`,
+      { method: 'PATCH', token: c.vendedora.access_token, body: { price: c.orden.precioNuevo } });
+    if (cambio.status >= 400) throw new Error(`no se pudo cambiar el precio de la publicación: HTTP ${cambio.status}`);
     const panel = await pestana(page, 'Órdenes');
     await panel.locator('tbody tr').first().waitFor({ timeout: 15_000 }).catch(() => {
       throw new Falla('no hay ninguna orden para mirar: la base demo tendría que traer alguna');
@@ -943,32 +966,40 @@ const RECORRIDOS = {
       exigir(botones.every((b) => b.trim() === '×'), `el detalle de la orden ofrece acciones: ${botones.join(', ')}`);
       exigir(await detalle.locator('select, input, textarea').count() === 0, 'el detalle de la orden tiene campos para cambiarla');
     });
-    // Lo que la guía advierte que hoy falta en el detalle.
+    // Lo que muestra el detalle, contra la orden en la base.
     const texto = (await detalle.innerText()).replace(/\s+/g, ' ');
+    const monto = (rotulo) => Number((texto.match(new RegExp(`${rotulo} \\$\\s?([\\d.]+)`)) || [])[1]?.replace(/\./g, ''));
+    const [[email, subtotal, envio, totalDeLaOrden]] = queryRows(`SELECT u.email, round(o.subtotal),
+      round(o.shipping_cost), round(o.total_amount)
+      FROM orders o JOIN users u ON u.id = o.buyer_id WHERE o.order_number = '${numero}'`);
+    await v.afirma('el nombre, el correo y la dirección de entrega de quien compra', async () => {
+      exigir(texto.includes(c.compradora.user.full_name), 'el detalle no dice el nombre de quien compra');
+      exigir(texto.includes(`Email: ${email}`), 'el detalle no dice el correo de quien compra');
+      exigir(texto.includes(`Dirección: ${c.orden.direccion}`), 'el detalle no dice la dirección de entrega');
+    });
+    await v.afirma('cada artículo con su cantidad y el precio al que se compró, aunque la publicación haya cambiado de precio después', async () => {
+      const articulo = detalle.locator('tbody tr', { hasText: c.productoDocumentado.nombre });
+      exigir(await articulo.count() === 1, 'el detalle no lista el artículo de la orden');
+      const celdas = (await articulo.locator('td').allInnerTexts()).map((t) => t.trim());
+      exigir(celdas[1] === '1', `la cantidad dice ${celdas[1]}`);
+      exigir(Number(celdas[2].replace(/[^\d]/g, '')) === c.orden.precio,
+        `el precio dice ${celdas[2]}: la orden se compró a ${c.orden.precio} y la publicación hoy cuesta ${c.orden.precioNuevo}`);
+    });
+    await v.afirma('En el celular el detalle se lee de arriba abajo, sin desplazarse de costado.', async () => {
+      const { ancho, visible } = await detalle.locator('[class*="_orderDetailContent_"]')
+        .evaluate((el) => ({ ancho: el.scrollWidth, visible: el.clientWidth }));
+      exigir(ancho <= visible + 1, `con ${c.viewport.width} px el detalle mide ${ancho} px de ancho y se ven ${visible}`);
+    });
+    await v.afirma('El subtotal, el envío y el total de la orden.', async () => {
+      const vistos = [monto('Subtotal:'), monto('Envío:'), monto('Total:')];
+      const enLaBase = [subtotal, envio, totalDeLaOrden].map(Number);
+      exigir(JSON.stringify(vistos) === JSON.stringify(enLaBase),
+        `el detalle dice subtotal, envío y total ${vistos.join(', ')} y la orden tiene ${enLaBase.join(', ')}`);
+    });
     const suya = await pedir('/orders/my?as_role=buyer', { token: c.compradora.access_token });
     const deElla = (suya.data || []).find((o) => o.order_number === numero);
     const vendida = await pedir('/orders/my?as_role=seller', { token: c.vendedora.access_token });
     const deQuienVende = (vendida.data || []).find((o) => o.order_number === numero);
-    await v.afirma('aunque la orden tenga artículos', async () => {
-      exigir(/No hay detalles de items disponibles/.test(texto), 'el detalle ya muestra los artículos: la advertencia de la guía quedó vieja');
-      exigir((deElla?.items || []).length > 0, 'la orden no tiene artículos');
-    });
-    await v.afirma('el correo y la dirección de quien compra aparecen con un guion', async () => {
-      exigir(/Email: -/.test(texto) && /Dirección: -/.test(texto),
-        'el detalle ya trae el correo o la dirección de quien compra: la advertencia de la guía quedó vieja');
-    });
-    await v.afirma('el subtotal y el envío aparecen en cero', async () => {
-      exigir(/Subtotal: \$\s?0(?![\d.,])/.test(texto) && /Envío: \$\s?0(?![\d.,])/.test(texto),
-        'el detalle ya trae el subtotal o el envío: la advertencia de la guía quedó vieja');
-    });
-    await v.afirma('El total sí es el de la orden.', async () => {
-      const visto = Number((texto.match(/Total: \$\s?([\d.]+)/) || [])[1]?.replace(/\./g, ''));
-      exigir(visto === c.orden.total, `el total del detalle dice ${visto} y la orden es de ${c.orden.total}`);
-    });
-    await v.afirma('el detalle completo lo ven quien compra y quien vende en su cuenta', async () => {
-      exigir((deElla?.items || []).length > 0, 'quien compró no ve los artículos de su orden');
-      exigir((deQuienVende?.items || []).length > 0, 'quien vendió no ve los artículos de su orden');
-    });
     await v.afirma({ limites: 'quien compra y quien vende ven el del otro en su orden' }, async () => {
       exigir(deElla?.seller_phone === c.telefonos.vendedora, 'quien compró no ve el teléfono de quien vende en su orden');
       exigir(deQuienVende?.buyer_phone === c.telefonos.compradora, 'quien vendió no ve el teléfono de quien compra en su orden');
@@ -1360,14 +1391,27 @@ RECORRIDOS['sin-conexion'] = async (c, v) => {
 };
 
 // Las unidades que se ofrecen al publicar, en otra pestaña de la sesión.
+//
+// El formulario arranca con unas unidades propias y después dibuja las que
+// manda el servidor. Leer el selector apenas tiene opciones leía las
+// primeras: una unidad nueva podía faltar, y una inactiva «no estar», sin que
+// nadie hubiera mirado la lista de verdad. Se espera esa respuesta y a que el
+// selector la muestre.
 async function unidadesAlPublicar(c, v) {
   const alta = await c.contexto.newPage();
   await alta.goto(WEB, { waitUntil: 'domcontentloaded' });
+  const listas = alta.waitForResponse((r) => r.url().includes('/api/catalog/form-options')
+    && r.request().method() === 'GET', { timeout: 15_000 });
   await alta.getByRole('button', { name: /Vender/ }).first().click();
   await alta.getByRole('heading', { name: /Publicar un producto/i }).waitFor({ timeout: 15_000 });
-  await alta.locator('#unit option').nth(1).waitFor({ state: 'attached', timeout: 15_000 });
+  const delServidor = ((await (await listas).json()).unit || []).map((o) => o.label);
+  const enElSelector = async () => (await alta.locator('#unit option').allTextContents()).map((t) => t.trim());
+  await c.esperarA(async () => {
+    const vistas = await enElSelector();
+    return delServidor.every((u) => vistas.includes(u));
+  }, 'el selector «Unidad» no muestra la lista que mandó el servidor');
   await v.mirar(alta);
-  const opciones = (await alta.locator('#unit option').allTextContents()).map((t) => t.trim());
+  const opciones = await enElSelector();
   await alta.close();
   return opciones;
 }
@@ -1526,7 +1570,10 @@ async function prepararLaCorrida(browser, ancho) {
   return {
     browser, viewport, contexto, page, admin, vendedora, segunda, producto, productoDocumentado,
     compradora, telefonos, sello, publicar: (sesion, nombre) => publicar(nombre, sesion),
-    orden: { numero: orden[0], total: Number(orden[1]) },
+    orden: {
+      numero: orden[0], total: Number(orden[1]), precio: 1000, precioNuevo: 1450,
+      direccion: 'Ruta 8 km 220, Pergamino, Buenos Aires, CP 2700',
+    },
     categoriaConPublicaciones: conPublicaciones[0],
     nueva: { email: `guia.nueva.${sello}@example.com`, nombre: `Nueva Guía ${sello}`, clave: 'GuiaNueva1' },
     categoria: { nombre: `Guía categoría ${sello}`, sub: `Guía subcategoría ${sello}` },

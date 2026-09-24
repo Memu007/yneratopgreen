@@ -25,6 +25,26 @@ from app.services import anatomia
 
 router = APIRouter(prefix="/products", tags=["products"])
 
+# «Eliminada» es la herramienta de moderación del panel. Para quien vende es
+# definitiva: no la vuelve a activar, no la edita, no le cambia las imágenes.
+# Antes bastaba con que la publicación fuera suya, y un `PATCH` con
+# `{"status": "active"}` deshacía en silencio lo que había decidido el
+# administrador. Sólo un administrador la saca de «Eliminada».
+#
+# 409 y no 404: la publicación existe y es suya; lo que no se puede es
+# tocarla en el estado en que está.
+ELIMINADA_NO_SE_MODIFICA = "La publicación fue eliminada y ya no se puede modificar."
+
+
+def exigir_que_se_pueda_modificar(product: Product, user: User, verbo: str = "modificar") -> None:
+    """Quien vende modifica lo suyo mientras no esté eliminado; el administrador, todo."""
+    if user.role == UserRole.ADMIN:
+        return
+    if product.seller_id != user.id:
+        raise HTTPException(status_code=403, detail=f"No tienes permiso para {verbo} este producto")
+    if product.status == ProductStatus.DELETED:
+        raise HTTPException(status_code=409, detail=ELIMINADA_NO_SE_MODIFICA)
+
 
 def slugify(text: str) -> str:
     """Convertir texto a slug URL-friendly"""
@@ -228,14 +248,9 @@ async def upload_product_images(
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-    
-    # Verificar permisos
-    if product.seller_id != current_user.id and current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=403,
-            detail="No tienes permiso para modificar este producto"
-        )
-    
+
+    exigir_que_se_pueda_modificar(product, current_user)
+
     # Verificar límite de imágenes por producto (máximo 3)
     MAX_IMAGES_PER_PRODUCT = 3
     existing_images_count = db.query(ProductImage).filter(
@@ -377,14 +392,11 @@ async def update_product(
     ).with_for_update().first()
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-    
-    # Verificar permisos
-    if product.seller_id != current_user.id and current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=403,
-            detail="No tienes permiso para modificar este producto"
-        )
-    
+
+    # Con la fila ya bloqueada: si el administrador la eliminó antes, se ve
+    # acá; si la elimina después, espera a que esta edición termine.
+    exigir_que_se_pueda_modificar(product, current_user)
+
     # Actualizar campos
     update_data = product_data.model_dump(exclude_unset=True)
 
@@ -545,13 +557,8 @@ async def delete_product(
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     
-    # Verificar permisos
-    if product.seller_id != current_user.id and current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=403,
-            detail="No tienes permiso para eliminar este producto"
-        )
-    
+    exigir_que_se_pueda_modificar(product, current_user, "eliminar")
+
     # Soft delete
     product.status = ProductStatus.DELETED
     db.commit()
@@ -575,10 +582,8 @@ async def delete_product_image(
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     
-    # Verificar permisos
-    if product.seller_id != current_user.id and current_user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="No tienes permiso para modificar este producto")
-    
+    exigir_que_se_pueda_modificar(product, current_user)
+
     # Buscar imagen
     image = db.query(ProductImage).filter(
         ProductImage.id == image_id,

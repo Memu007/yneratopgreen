@@ -368,10 +368,15 @@ const aPublicacionDelPanel = (p: BackendProduct): UserProduct => {
   // así que una publicación en borrador no existe y esa rama no podía
   // ejecutarse nunca. Una condición muerta no es inofensiva: dice que hay un
   // estado que el producto tendría que saber dibujar, y no lo hay.
+  //
+  // Una publicación que el administrador marcó «Agotada» también se ve
+  // «Agotado», aunque le queden unidades: salió del Mercado igual que una
+  // pausada, y decir «Activo» era mentirle a quien vende.
   const usaStock = !esDeServicio(normalizarAnatomia(p.operation_kind));
   let status: UserProduct['status'] = 'active';
   if (usaStock && p.stock === 0) status = 'sold-out';
   else if (p.status === 'paused') status = 'paused';
+  else if (p.status === 'sold_out') status = 'sold-out';
 
   return {
     id: p.id,
@@ -3404,8 +3409,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                     Editar
                   </button>
 
-                  {product.status !== 'sold-out' && (
-                    <button 
+                  {/* Sin unidades no hay nada que activar. Una agotada por el
+                      panel que todavía tiene unidades se activa como una
+                      pausada, como quien vende podía hacer antes. */}
+                  {(deServicio || product.stock !== 0) && (
+                    <button
                       className={styles.toggleBtn}
                       onClick={() => handleToggleProductStatus(product.id, product.status)}
                     >

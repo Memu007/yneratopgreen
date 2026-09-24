@@ -366,18 +366,41 @@ def list_all_orders(
     total = query.count()
     orders = query.order_by(Order.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
     
+    # El detalle de la orden en el panel se arma con esta misma fila. Antes no
+    # traía artículos, correo, dirección, subtotal ni envío, y el panel mostraba
+    # «No hay detalles de items disponibles» y $ 0 aunque la orden los tuviera.
+    # Los artículos salen de la foto que guardó la orden, no de la publicación
+    # de hoy: el precio y el nombre son los que se compraron.
     result = []
     for o in orders:
+        direccion = o.shipping_address_json or {}
         result.append({
             "id": o.id,
             "order_number": o.order_number,
             "status": o.status.value,
             "total_amount": float(o.total_amount),
+            "subtotal": float(o.subtotal or 0),
+            "shipping_cost": float(o.shipping_cost or 0),
             "buyer_id": o.buyer_id,
             "buyer_name": o.buyer.full_name if o.buyer else None,
+            "buyer_email": o.buyer.email if o.buyer else None,
+            "shipping_address": ", ".join(
+                parte for parte in (
+                    direccion.get("address"), direccion.get("city"), direccion.get("province"),
+                    f"CP {direccion['postal_code']}" if direccion.get("postal_code") else None,
+                ) if parte
+            ) or None,
             "seller_id": o.seller_id,
             "seller_name": o.seller.full_name if o.seller else None,
             "items_count": len(o.items),
+            "items": [
+                {
+                    "product_name": item.product_name_snapshot,
+                    "quantity": item.quantity,
+                    "unit_price": float(item.unit_price_snapshot),
+                }
+                for item in o.items
+            ],
             "created_at": o.created_at.isoformat() if o.created_at else None
         })
     
