@@ -33164,6 +33164,148 @@ await runCase(190, 'Una publicación eliminada no vuelve por la mano de quien ve
   return informe.join('. ');
 });
 
+await runCase(191, 'Lo que el Mercado ya no ofrece no se compra desde un carrito viejo', async () => {
+  // El carrito mira el estado al agregar y al sincronizar, pero el checkout
+  // sólo miraba el stock: una publicación que el administrador eliminaba —o
+  // que se pausaba o se agotaba— estando ya en el carrito se compraba, con 200
+  // y la orden creada. Se prueba por las dos rutas y en los tres estados, con
+  // la base antes y después; y en la pantalla, a 390 px y en escritorio.
+  const admin = await tokenDeAdmin();
+  const sello = Date.now();
+  const informe = [];
+  const cuenta = async (quien) => {
+    const email = `smoke.191.${quien}.${sello}@example.com`;
+    await apiRequest('/admin/users', {
+      method: 'POST', token: admin,
+      body: { email, password: 'Smoke191!', full_name: `Smoke 191 ${quien}`, phone: '', role: 'user' },
+    });
+    const ingreso = await apiRequest('/auth/login', { method: 'POST', body: { email, password: 'Smoke191!' } });
+    return { token: ingreso.data.access_token, refresco: ingreso.data.refresh_token, id: ingreso.data.user.id };
+  };
+  const vende = await cuenta('vende');
+  const compra = await cuenta('compra');
+  await apiRequest('/auth/me', { method: 'PATCH', token: vende.token, body: { alias_bancario: 'smoke.caso.191' } });
+  const [[categoria]] = queryRows(
+    'SELECT id FROM categories WHERE is_service = false ORDER BY name LIMIT 1');
+  const publicar = async (etiqueta) => (await apiRequest('/products', {
+    method: 'POST', token: vende.token,
+    body: {
+      name: `Smoke 191 ${etiqueta} ${sello}`, description: 'Publicación del caso 191.',
+      category_id: categoria, price: 1200, stock: 8, unit: 'unidad',
+      locality_id: localidadDeEnvio(), publication_type: 'producto',
+    },
+  })).data;
+  const moderada = await publicar('moderada');
+  const otra = await publicar('otra');
+  const ponerEstado = (status) => apiRequest(`/admin/products/${moderada.id}/status`,
+    { method: 'PATCH', token: admin, body: { status } });
+  const alCarrito = async (ids) => {
+    await pedirCrudo('/cart', { method: 'DELETE', header: compra.token });
+    for (const id of ids) {
+      await apiRequest('/cart/items', { method: 'POST', token: compra.token, body: { product_id: id, quantity: 1 } });
+    }
+  };
+  const sobre = () => ({
+    shipping_address: 'Ruta 8 km 191', shipping_locality_id: localidadDeEnvio(),
+    shipping_postal_code: '2700', notes: 'Caso 191',
+    shipping_decisions: [{ seller_id: vende.id, mode: 'self' }],
+    payment_decisions: [{ seller_id: vende.id, method: 'transfer' }],
+  });
+  // Las órdenes de quien compra, y el stock y lo reservado de las dos.
+  const foto = () => JSON.stringify(queryRows(`
+    SELECT (SELECT count(*) FROM orders WHERE buyer_id = ${sqlLiteral(compra.id)}),
+           (SELECT string_agg(id || ':' || stock || ':' || stock_reservado, ',' ORDER BY id)
+              FROM products WHERE id IN (${sqlLiteral(moderada.id)}, ${sqlLiteral(otra.id)}))`));
+  const NOMBRADA = `«${moderada.name}» ya no está disponible`;
+
+  try {
+    const abiertos = [];
+    for (const estado of ['deleted', 'paused', 'sold_out']) {
+      for (const ruta of ['/orders/checkout/transfer', '/orders/checkout']) {
+        await ponerEstado('active');
+        await alCarrito([moderada.id, otra.id]);
+        await ponerEstado(estado);
+        const antes = foto();
+        const respuesta = await pedirCrudo(ruta, { method: 'POST', header: compra.token, body: sobre() });
+        const cambio = foto() !== antes;
+        const nombra = String(respuesta.datos?.detail ?? '').includes(NOMBRADA);
+        if (respuesta.status < 400 || !nombra || cambio) {
+          abiertos.push(`${estado} por ${ruta} respondió ${respuesta.status}`
+            + `${nombra ? '' : ' sin nombrar la publicación'}${cambio ? ' y creó órdenes o reservó stock' : ''}`);
+        }
+      }
+    }
+    assert(abiertos.length === 0, `el checkout dejó pasar lo que no está activo: ${abiertos.join('; ')}`);
+    informe.push('eliminada, pausada y agotada: las dos rutas responden 400 nombrando la publicación, '
+      + 'sin crear órdenes ni reservar stock');
+
+    // Sacada del carrito, el resto se compra.
+    await ponerEstado('active');
+    await alCarrito([moderada.id, otra.id]);
+    await ponerEstado('deleted');
+    const carrito = await apiRequest('/cart', { token: compra.token });
+    const renglon = carrito.data.items.find((item) => item.product_id === moderada.id);
+    await apiRequest(`/cart/items/${renglon.id}`, { method: 'DELETE', token: compra.token });
+    const sigue = await apiRequest('/orders/checkout/transfer', { method: 'POST', token: compra.token, body: sobre() });
+    assert(sigue.data.orders.length === 1, `sacada la eliminada, el checkout creó ${sigue.data.orders.length} órdenes`);
+    const [[llevo]] = queryRows(`SELECT string_agg(product_id, ',') FROM order_items
+      WHERE order_id = ${sqlLiteral(sigue.data.orders[0].order_id)}`);
+    assert(llevo === otra.id, `la orden lleva ${llevo} y tenía que llevar sólo la otra publicación`);
+    informe.push('sacada del carrito, el resto se compra: una orden, sólo con la otra');
+
+    // En la pantalla: las dos al carrito desde su ficha, el administrador
+    // elimina una y quien compra llega hasta confirmar.
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 900 }]) {
+        await ponerEstado('active');
+        await pedirCrudo('/cart', { method: 'DELETE', header: compra.token });
+        const contexto = await browser.newContext({ viewport });
+        await contexto.addInitScript(({ a, r }) => {
+          window.localStorage.setItem('access_token', a);
+          window.localStorage.setItem('refresh_token', r);
+        }, { a: compra.token, r: compra.refresco });
+        const page = await contexto.newPage();
+        for (const publicacion of [moderada, otra]) {
+          await page.goto(`${FRONTEND_URL}/?section=product&id=${publicacion.id}`, { waitUntil: 'domcontentloaded' });
+          await page.locator('main[aria-busy="false"]:has(#detalle-titulo)').waitFor({ timeout: 15_000 });
+          await page.getByRole('button', { name: /Agregar al carrito|Agregar/ }).first().click();
+        }
+        await ponerEstado('deleted');
+        const ordenesAntes = foto();
+        await page.getByRole('button', { name: /Carrito/ }).first().click();
+        await page.getByRole('button', { name: 'Continuar compra' }).click();
+        await page.getByRole('heading', { name: /Datos de env/i }).waitFor();
+        await page.getByPlaceholder('+54 9 11 1234-5678').fill('+54 9 11 5555-0191');
+        await elegirDestino(page, 'Pergamino');
+        await page.getByPlaceholder('Av. San Martín 1234, Piso 5, Depto B').fill('Ruta 8 km 191');
+        await page.getByPlaceholder('2000').fill('2700');
+        // El aviso sale donde el checkout vuelve a consultar el carrito:
+        // hoy, al calcular cómo se traslada cada pedido, antes del pago.
+        const aviso = page.getByRole('alert').filter({ hasText: NOMBRADA });
+        await aviso.first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {
+          throw new Error(`a ${viewport.width} px la pantalla no dice «${NOMBRADA}»`);
+        });
+        const caja = await aviso.first().boundingBox();
+        assert(caja && caja.x >= 0 && caja.x + caja.width <= viewport.width + 1,
+          `a ${viewport.width} px el aviso queda fuera de la pantalla`);
+        assert(foto() === ordenesAntes, `a ${viewport.width} px la pantalla creó una orden igual`);
+        await contexto.close();
+      }
+    } finally {
+      await browser.close();
+    }
+    informe.push('en la pantalla, a 390 px y en escritorio, el aviso nombra la publicación y no se crea la orden');
+  } finally {
+    await pedirCrudo('/cart', { method: 'DELETE', header: compra.token }).catch(() => {});
+    for (const publicacion of [moderada, otra]) {
+      await apiRequest(`/admin/products/${publicacion.id}/status`,
+        { method: 'PATCH', token: admin, body: { status: 'deleted' } }).catch(() => {});
+    }
+  }
+  return informe.join('. ');
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

@@ -4,7 +4,7 @@
 Cada negativo devuelve un archivo corregido a la base de la tarea y comprueba
 que falle lo que lo vigila, nombrando por qué:
 
-    python3 scripts/sabotajes_admin_panel_defects_1.py                        # los cuatro
+    python3 scripts/sabotajes_admin_panel_defects_1.py                        # los seis
     python3 scripts/sabotajes_admin_panel_defects_1.py p1-endpoint-de-la-base # uno solo
 
   p1-endpoint-de-la-base    `backend/app/api/products.py` de la base. El caso
@@ -24,6 +24,10 @@ que falle lo que lo vigila, nombrando por qué:
   tabla-de-la-base          `AdminPanel.module.css` de la base: la tabla de
                             artículos del detalle no entra en el celular. La
                             guía, en celular, tiene que fallar en el paso 14.
+  checkout-de-la-base       `backend/app/services/checkout.py` de la base: el
+                            checkout vuelve a vender lo que no está activo.
+                            El caso 191 tiene que fallar y nombrar el estado
+                            que dejó pasar.
 
 Necesita la API en 8000, el frontend de desarrollo en 5173 y la siembra demo.
 Cuando toca el backend reinicia la API, antes y después. Todo lo que cambia lo
@@ -49,7 +53,8 @@ ADMIN = RAIZ / "backend/app/api/admin.py"
 PANEL = RAIZ / "src/components/AdminPanel/AdminPanel.tsx"
 MIS_PUBLICACIONES = RAIZ / "src/components/UserDashboard/UserDashboard.tsx"
 ESTILOS = RAIZ / "src/components/AdminPanel/AdminPanel.module.css"
-BACK = {PRODUCTOS, ADMIN}
+CHECKOUT = RAIZ / "backend/app/services/checkout.py"
+BACK = {PRODUCTOS, ADMIN, CHECKOUT}
 
 PASO_8 = "Paso 8. Lo que no se puede hacer con tu propia cuenta"
 PASO_12 = "Paso 12. Marcarla como agotada"
@@ -61,10 +66,14 @@ def git(*argumentos):
     return subprocess.run(["git", *argumentos], cwd=RAIZ, capture_output=True, check=True).stdout
 
 
-def caso_190():
+def un_caso(numero):
     proceso = subprocess.run(["node", "scripts/smoke.mjs"], cwd=RAIZ, capture_output=True, text=True,
-                             env={**os.environ, "SMOKE_CASOS": "190"}, timeout=600)
+                             env={**os.environ, "SMOKE_CASOS": str(numero)}, timeout=600)
     return [linea for linea in proceso.stdout.splitlines() if linea.startswith(("[PASS]", "[FAIL]"))][:1]
+
+
+def caso_190():
+    return un_caso(190)
 
 
 def la_guia(ancho="escritorio"):
@@ -106,6 +115,12 @@ SABOTAJES = {
         ESTILOS, lambda: la_guia("celular"),
         lambda v: fallo(v, PASO_14, "“En el celular el detalle se lee de arriba abajo, sin desplazarse de costado.”"),
         "la guía, en celular, falla en el paso 14 porque el detalle se desplaza de costado",
+    ),
+    "checkout-de-la-base": (
+        CHECKOUT, lambda: un_caso(191),
+        lambda v: (bool(v) and v[0].startswith("[FAIL] 191")
+                   and "deleted por /orders/checkout/transfer respondió 200" in v[0]),
+        "el caso 191 falla y nombra el estado que el checkout dejó pasar",
     ),
 }
 

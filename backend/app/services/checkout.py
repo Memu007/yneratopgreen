@@ -37,6 +37,7 @@ from app.core.montos import SIN_CARGO, importe_de_linea, validar_total
 from app.models.cart import Cart, CartStatus
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.payment import Payment, PaymentStatus
+from app.models.product import ProductStatus
 from app.models.user import User
 from app.services import mp_preferencia, mp_vinculo, propiedad, stock
 from app.services.logistica import (
@@ -132,6 +133,24 @@ def _rechazar(detalle: str) -> None:
     raise HTTPException(status_code=400, detail=detalle)
 
 
+def exigir_publicaciones_activas(cart: Cart) -> None:
+    """Sólo se compra lo que el Mercado ofrece.
+
+    El carrito mira el estado al agregar y al sincronizar, pero no después: una
+    publicación que el administrador eliminaba —o que se pausaba o se
+    agotaba— estando ya en el carrito se seguía comprando, porque acá sólo se
+    miraba el stock. Así se deshacía la moderación del panel.
+
+    Se rechaza el carrito entero, con la publicación nombrada y la misma frase
+    que el sync, antes de escribir una sola fila. El carrito queda activo para
+    que la persona la saque y siga.
+    """
+    for item in getattr(cart, "items", []) or []:
+        if item.product.status != ProductStatus.ACTIVE:
+            _rechazar(f"«{item.product.name}» ya no está disponible. "
+                      "Quitala del carrito para continuar.")
+
+
 def resolver_medios(
     grupos: Dict[str, GrupoDelCarrito],
     decisiones: Optional[List] = None,
@@ -209,6 +228,9 @@ def preparar(
     # escribió una sola fila todavía y el carrito sigue activo, que es lo que
     # hace falta para poder corregirlo.
     propiedad.exigir_carrito_sin_publicaciones_propias(cart, user)
+
+    # Y sólo lo que está activo: ni eliminada, ni pausada, ni agotada.
+    exigir_publicaciones_activas(cart)
 
     # El destino tiene que existir en el padrón oficial.
     destino = resolver_destino(db, datos.shipping_locality_id)
