@@ -5,85 +5,98 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Tarea activa — ADMIN-PANEL-DEFECTS-1, parte 2: el checkout
+## Tarea activa — BRAND-LOSS-1
 
 **Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
 
-### Decisión sobre la parte 1 (`8f2c543` + `1ff7b87`)
+### Decisión sobre la entrega anterior
 
-**Verificada y correcta.** Hiciste bien en frenar ante la otra vía.
+`ADMIN-PANEL-DEFECTS-1` quedó **aceptada en rama** sobre `10f1bd6`.
 
-Reproduje:
+- Caso 191 en 1/1.
+- Tu negativo da rojo y nombra los seis cruces.
+- Mi negativo, una regla que rechaza sólo las eliminadas, da rojo y nombra
+  pausada y agotada.
+- 190 en 1/1 y la guía en 26/26 y 26/26.
 
-- el caso 190 en 1/1;
-- tu negativo del P1, que da rojo y nombra seis caminos;
-- un negativo mío (sólo «borrar foto» sin la regla), que da rojo y nombra
-  sólo ese camino;
-- el negativo de `admin.py`, que da rojo en el paso 14;
-- tus tres negativos de interfaz, en rojo;
-- la guía en 26/26 y 26/26;
-- a11y 76/76, contraste 84/84 y auditoría 12/12.
+Corrí la suite completa sobre una base recién creada: **171/191**.
+
+- El 169 falla en mi entorno. Sin ese reinicio real, el límite de ingresos no
+  se limpia y los casos 167, 168 y 170 a 185 caen con 429. Repetidos después
+  de reiniciar la API, dan 18/18.
+- El 131 pasó.
+- El 187 falló porque faltaban las marcas. Solo, con las marcas repuestas, da
+  1/1.
 
 Evidencia en `REPRODUCCION-ADMIN-PANEL-DEFECTS-1-2026-09-24.md`.
 
-También reproduje tu hallazgo del checkout, por API y en local: una
-publicación eliminada por el administrador después de estar en el carrito
-se compra por transferencia, con 200 y la orden creada.
+### Problema y prioridad
 
-### Decisiones PM
+Las dos publicaciones de la siembra que tienen marca, «Cosechadora John
+Deere 9750» y «Tractor Pauny 280A Doble Tracción», **pierden la marca a mitad
+de la suite completa**.
 
-- **Checkout:** se toma tu opción 1. El checkout rechaza cualquier
-  publicación que no esté activa (eliminada, pausada o agotada) antes de
-  crear la primera orden.
-  - El mensaje nombra la publicación, así quien compra sabe cuál sacar.
-  - No se crea ninguna orden ni se reserva stock de ningún vendedor.
-  - Vale para los dos medios, transferencia y Mercado Pago, porque comparten
-    `preparar_checkout`.
-- **Órdenes que ya existían:** siguen su curso. No se tocan.
-- **Carrera entre fotos y borrado:** queda como P3, sin tarea.
+- Pasó en 3 de 5 corridas: 1 de 3 tuyas y 2 de 2 mías. Ya no es una
+  rareza.
+- En mi segunda corrida, `brand` quedó en `NULL` y las filas cambiaron a las
+  **22:10:05** y **22:11:08 UTC**. Por los tiempos acumulados, eso cae cerca
+  de los casos 157 a 162, pero la estimación puede estar corrida hasta unos
+  40 s.
+- Descarté tres cosas:
+  - repetir la siembra no borra la marca;
+  - un `PATCH` que sólo cambia el precio o el estado tampoco;
+  - los casos 155 a 163 corridos de a uno, tampoco.
+- Ojo: la respuesta del `PATCH` no incluye `brand`. No la tomes como prueba
+  de que se borró.
+
+Si la causa es un caso del arnés que toca publicaciones de la siembra, es un
+problema de aislamiento (P3). **Si es una vía del producto, es pérdida de
+datos** y hay que corregirla antes de publicar. Por eso va ahora.
 
 ### Alcance
 
-- La regla de arriba en el checkout.
-- La pantalla de checkout muestra ese rechazo de forma entendible, con la
-  publicación nombrada, y deja seguir cuando se saca del carrito. Si hoy ya
-  muestra el mensaje del servidor, alcanza con comprobarlo.
+1. Encontrar **qué borra la marca**: el caso, la petición y la línea de
+   código. Tu sonda con disparador sirve, en un esquema aparte como la
+   dejaste.
+2. **Si es del producto:** corregirlo con un caso que lo reproduzca y un
+   negativo.
+3. **Si es del arnés:** que ese caso no toque publicaciones de la siembra, o
+   que las deje como estaban. Y que el 187 no dependa de que otro caso las
+   haya dejado intactas.
+4. **P3 del script de la guía:** «Volumen vendido» con centavos. Después de
+   la suite, el paso 2 leyó 16268903 contra 1626890,3. El script tiene que
+   leer bien los importes con decimales.
 
 ### Fuera de alcance
 
-- Cambiar lo que hace el carrito al agregar o sincronizar.
-- Tocar las órdenes existentes.
-- Avisos a quien compra o a quien vende.
+- Cambiar las reglas de marca por categoría.
+- Otros casos inestables que no estén relacionados.
+- Integración y despliegue.
 
 ### Aceptación verificable
 
-1. **El caso 190 o uno nuevo prueba la vía del checkout:**
-   - con la publicación en el carrito, el administrador la elimina, la pausa
-     o la marca agotada;
-   - el checkout, por transferencia y con la ruta combinada, falla nombrando
-     la publicación;
-   - no se crea ninguna orden y el stock reservado no cambia;
-   - después de sacarla del carrito, el checkout del resto funciona.
-2. **Negativo:** con el checkout de la base, el caso da rojo y nombra el
-   estado que dejó pasar.
-3. **Navegador:** el mensaje se ve en la pantalla de checkout, por lo menos
-   a 390 px y en escritorio.
-4. **Regresión:** los casos de checkout, transferencia, Mercado Pago
-   simulado, stock y logística que dependan de `preparar_checkout`. Elegilos
-   y justificá la lista. No hace falta repetir la suite completa: la corro
-   yo sobre la candidata final.
+1. La causa, nombrada con evidencia: la salida de la sonda o el registro que
+   la muestra.
+2. **Dos suites completas seguidas** desde una base recién creada, con las
+   marcas intactas al terminar cada una: la consulta SQL de las dos filas,
+   antes y después. El 187 pasa en las dos.
+3. Si hubo cambio de producto: caso nuevo más un negativo que dé rojo con el
+   código de la base.
+4. La guía pasa después de una suite completa, con la base llena de órdenes
+   con centavos.
 5. Build, lint, tipos, `compileall` y diff-check con `cr-at-eol`.
 
 ### Frená y consultá
 
-- Si rechazar en el checkout rompe un recorrido existente que hoy compra algo
-  que no está activo a propósito.
+- Si la causa exige cambiar qué publicaciones pueden tener marca o cómo se
+  edita una publicación desde la pantalla.
 
 ### Entrega en `PARA-PM.md`
 
 - SHA;
-- salida del caso y del negativo;
-- captura o descripción del mensaje en pantalla;
-- lista de regresión con su resultado.
+- la causa;
+- el arreglo;
+- las dos suites con la consulta de marcas;
+- riesgos.
 
 No integres ni despliegues.

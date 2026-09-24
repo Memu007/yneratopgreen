@@ -8,28 +8,29 @@ Actualizado: 2026-09-24.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5, último día (ventana 04/09–24/09). Su puerta funcional quedó verificada el 23/09 sobre `1e4a63c` (`REPRODUCCION-FASE-2-2026-09-23.md`). Desde el **25/09** corre la **Fase 3**, semanas 6–8, hasta el 15/10. Su puerta y el hito intermedio ya quedaron aceptados por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `0bd7fbc`; `RISK-REC-1` integrada y publicada con autorización de Emi. GitHub, Frontend y Backend convergieron en ese SHA y los dos servicios quedaron saludables. El entorno `strong-playfulness` sigue siendo demostrativo y no equivale al despliegue productivo contractual.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `ADMIN-PANEL-DEFECTS-1` parte 1 en `8f2c543` + `1ff7b87`, informe `1e0507d`. Trece piezas aceptadas en rama, sin integrar ni desplegar. La rama contiene a `main`: integrar es publicar todo lo aceptado desde `0bd7fbc`, incluida la migración de `PRIMARY-IMAGE-INTEGRITY-1`.
-- **Última decisión PM:** `ADMIN-PANEL-DEFECTS-1` parte 1 **verificada**: caso 190, negativos de backend e interfaz en rojo, guía 26/26, a11y, contraste y auditoría verdes. Queda abierta la vía del checkout, que PM reprodujo y decidió cerrar rechazando toda publicación no activa. Evidencia en `REPRODUCCION-ADMIN-PANEL-DEFECTS-1-2026-09-24.md`.
-- **Tarea activa:** `ADMIN-PANEL-DEFECTS-1` parte 2: el checkout rechaza una publicación eliminada, pausada o agotada que quedó en el carrito. Al cerrarla, PM corre la suite completa sobre la candidata final, también para buscar la inestabilidad del caso 187.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `ADMIN-PANEL-DEFECTS-1` en `10f1bd6`, informe `d483ede`. Catorce piezas aceptadas en rama, sin integrar ni desplegar. La rama contiene a `main`: integrar es publicar todo lo aceptado desde `0bd7fbc`, incluida la migración de `PRIMARY-IMAGE-INTEGRITY-1`.
+- **Última decisión PM:** `ADMIN-PANEL-DEFECTS-1` **ACEPTADA EN RAMA**. Casos 190 y 191 con negativos en rojo, guía 26/26, y suite completa PM con 190 de 191 casos cubiertos (el 169 es de entorno). Evidencia en `REPRODUCCION-ADMIN-PANEL-DEFECTS-1-2026-09-24.md`.
+- **Tarea activa:** `BRAND-LOSS-1`: encontrar por qué las dos publicaciones de la siembra con marca la pierden a mitad de la suite completa (3 de 5 corridas). Puede ser el arnés o una pérdida de datos del producto; se resuelve antes de publicar.
 - **Escalado a Emi:** la regla «el teléfono no sale de la API sin suscripción activa» choca con la decisión del 05/08, que pasó suscripciones y candados por plan a Fase 6. Hoy el teléfono no se publica en el Mercado ni en las fichas, pero sí lo ven las dos partes de una orden y quien compra al elegir transportista, sin suscripción. El transportista no recibe el de quien compra.
 
-## Última aceptación PM — ADMIN-GUIDE-1
+## Última aceptación PM — ADMIN-PANEL-DEFECTS-1
 
-Contrato: capacitación básica del panel de administración. La guía
-`docs/GUIA-PANEL-ADMIN.md` explica las siete pestañas en 26 pasos, con
-capturas en escritorio y celular. `scripts/guia-admin.mjs` la recorre en el
-navegador. Falla y nombra el paso si falta un texto de pantalla, si una
-frase de resultado cambia o no se cumple, o si el panel muestra un control
-que la guía no nombra. Lo que no se puede comprobar queda listado al final
-de la guía, con su fuente.
+La moderación del panel ya no se deshace:
 
-Límite aceptado: una frase agregada después no se controla hasta que
-alguien la ate o la declare.
+- quien vende no modifica por ningún camino una publicación eliminada (caso
+  190, 7 caminos);
+- el checkout rechaza lo eliminado, pausado o agotado que quedó en un
+  carrito, nombrándolo, sin crear órdenes (caso 191).
 
-La guía describe cuatro defectos como están hoy, con advertencia, y el
-script avisa cuando se corrijan. Esos defectos y uno nuevo P1 son la tarea
-activa. Suscripciones y teléfono quedan marcados PENDIENTE hasta que Emi
-decida. Sin integración ni despliegue.
+Además:
+
+- «Agotada» avisa lo que pasa y quien vende la ve «Agotado»;
+- el detalle de la orden en el panel está completo;
+- el panel muestra el motivo al intentar desactivar la cuenta propia.
+
+La suite completa de PM cubrió 190 de 191 casos. Encontró que las marcas de
+la siembra se pierden a mitad de la suite, con causa desconocida: pasa a
+`BRAND-LOSS-1`. Sin integración ni despliegue.
 
 ## Aceptaciones anteriores
 
@@ -39,6 +40,7 @@ riesgos que dejaron abiertos están en «Pendientes canónicos adoptados».
 
 | Pieza | Estado | Evidencia |
 |---|---|---|
+| `ADMIN-GUIDE-1` | aceptada en rama | `REPRODUCCION-ADMIN-GUIDE-1-2026-09-24.md` |
 | `LOCALITY-LABEL-DISPLAY-1` | aceptada en rama | `REPRODUCCION-LOCALITY-LABEL-DISPLAY-1-2026-09-24.md` |
 | `LOCALITY-DEDUP-1` | aceptada en rama | `REPRODUCCION-LOCALITY-DEDUP-1-2026-09-24.md` |
 | `FILTER-COLLAPSE-FOCUS-1` | aceptada en rama | `REPRODUCCION-FILTER-COLLAPSE-FOCUS-1-2026-09-24.md` |
@@ -203,8 +205,8 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev trabaja `ADMIN-PANEL-DEFECTS-1`. Siguen, sin depender de Emi: las secciones de comprador y vendedor del manual con el ajuste #1 «agropecuario», y la documentación del despliegue cuando la infraestructura quede fija. Dependen de Emi: la regla del teléfono, SMTP (la clienta no pudo registrarse), cuentas de prueba de Mercado Pago, backups e integración, y las decisiones #5, #7 y #10 de la clienta.
-2. Las trece piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue. Integrarlas publica la migración de imágenes. Antes, Emi decide la recuperación previa (punto 3). Después, PM corre la suite completa desde base limpia sobre el SHA exacto, incluido el caso 131 en Docker, y prepara la publicación, que requiere autorización explícita de Emi.
+1. Dev trabaja `BRAND-LOSS-1`. Siguen, sin depender de Emi: las secciones de comprador y vendedor del manual con el ajuste #1 «agropecuario», y la documentación del despliegue cuando la infraestructura quede fija. Dependen de Emi: la regla del teléfono, SMTP (la clienta no pudo registrarse), cuentas de prueba de Mercado Pago, backups e integración, y las decisiones #5, #7 y #10 de la clienta.
+2. Las catorce piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue. Integrarlas publica la migración de imágenes. Antes, Emi decide la recuperación previa (punto 3). Después, PM corre la suite completa desde base limpia sobre el SHA exacto, incluido el caso 131 en Docker, y prepara la publicación, que requiere autorización explícita de Emi.
 3. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración. La propuesta de recuperación pre-migración espera decisión de Emi y verificación autenticada de Railway.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 5. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
