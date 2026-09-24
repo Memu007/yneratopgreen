@@ -5,113 +5,85 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Tarea activa — ADMIN-PANEL-DEFECTS-1
+## Tarea activa — ADMIN-PANEL-DEFECTS-1, parte 2: el checkout
 
-**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM de
-esta tarea.
+**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
 
-### Decisión sobre la entrega anterior
+### Decisión sobre la parte 1 (`8f2c543` + `1ff7b87`)
 
-`ADMIN-GUIDE-1` quedó **aceptada en rama** en la ronda 2, sobre `091e846`.
+**Verificada y correcta.** Hiciste bien en frenar ante la otra vía.
 
-- La guía da 26/26 en escritorio y 26/26 en celular.
-- Mis tres afirmaciones falsas de la ronda 1 dan rojo en los pasos 3, 5 y 10.
-- Mi negativo nuevo del paso 11 da rojo.
-- Tus siete negativos dan rojo.
+Reproduje:
 
-Se acepta el límite declarado: una frase agregada después no se controla
-hasta que alguien la ate o la declare. Evidencia en
-`REPRODUCCION-ADMIN-GUIDE-1-2026-09-24.md`.
+- el caso 190 en 1/1;
+- tu negativo del P1, que da rojo y nombra seis caminos;
+- un negativo mío (sólo «borrar foto» sin la regla), que da rojo y nombra
+  sólo ese camino;
+- el negativo de `admin.py`, que da rojo en el paso 14;
+- tus tres negativos de interfaz, en rojo;
+- la guía en 26/26 y 26/26;
+- a11y 76/76, contraste 84/84 y auditoría 12/12.
 
-**Anotado para esta tarea (P3 del arnés):** en una base recién creada no
-existe `backend/outbox` hasta el primer correo. Por eso los pasos 5 y 10
-dieron rojo aunque `EMAIL_TRANSPORT=outbox` estaba configurado. Tuve que
-crear la carpeta a mano.
+Evidencia en `REPRODUCCION-ADMIN-PANEL-DEFECTS-1-2026-09-24.md`.
 
-### Problema y prioridad
-
-Son los cinco defectos que encontraste al escribir la guía. Van juntos
-porque son del mismo panel y la guía los vigila.
-
-1. **P1: quien vende puede volver a activar una publicación que el
-   administrador eliminó.** Confirmé en `products.py` (`update_product`) que
-   la edición sólo mira que la publicación sea suya. «Eliminada» es la
-   herramienta de moderación del panel, y así se deshace en silencio.
-2. **P2: «Agotada» no hace lo que dice su aviso.** El aviso dice «Sigue
-   visible pero no se puede comprar.», pero la publicación sale del Mercado y
-   su enlace no abre.
-3. **P2: quien vende ve «Activo» una publicación «Agotada»** con stock.
-4. **P2: el detalle de la orden en el panel sale incompleto.** Faltan los
-   artículos, el correo y la dirección de quien compra, y el subtotal y el
-   envío aparecen en $ 0.
-5. **P3: desactivar la cuenta propia muestra un error genérico** en vez del
-   motivo que manda el servidor.
+También reproduje tu hallazgo del checkout, por API y en local: una
+publicación eliminada por el administrador después de estar en el carrito
+se compra por transferencia, con 200 y la orden creada.
 
 ### Decisiones PM
 
-- **Eliminada:** para quien vende es definitiva. Ninguna vía de quien vende
-  (API o pantalla) la cambia de estado ni la edita. Sólo el administrador la
-  saca de «Eliminada». Pausar y volver a activar una publicación propia sigue
-  igual que hoy.
-- **Agotada:** se mantiene lo que hace hoy: sale del Mercado y su enlace no
-  abre, igual que pausada.
-  - Se corrige el aviso del panel para que diga eso.
-  - Quien vende la ve como «Agotado», no como «Activo».
-  - No se construye «visible pero no comprable».
+- **Checkout:** se toma tu opción 1. El checkout rechaza cualquier
+  publicación que no esté activa (eliminada, pausada o agotada) antes de
+  crear la primera orden.
+  - El mensaje nombra la publicación, así quien compra sabe cuál sacar.
+  - No se crea ninguna orden ni se reserva stock de ningún vendedor.
+  - Vale para los dos medios, transferencia y Mercado Pago, porque comparten
+    `preparar_checkout`.
+- **Órdenes que ya existían:** siguen su curso. No se tocan.
+- **Carrera entre fotos y borrado:** queda como P3, sin tarea.
 
 ### Alcance
 
-- **Los cinco defectos, con las decisiones de arriba.**
-  - Para el 1, hacé primero un inventario de **todos** los caminos que
-    pueden cambiar el estado o los datos de una publicación: endpoints,
-    carrito, órdenes, tareas. Cerralos todos, no sólo el `PATCH`.
-- **La guía y el script:**
-  - sacá las advertencias de los defectos que se corrigen, y atá la frase
-    nueva de cada paso a su comprobación;
-  - rehacé con `--capturas` sólo las imágenes que cambian;
-  - el script no debe depender de que `backend/outbox` exista de antes.
+- La regla de arriba en el checkout.
+- La pantalla de checkout muestra ese rechazo de forma entendible, con la
+  publicación nombrada, y deja seguir cuando se saca del carrito. Si hoy ya
+  muestra el mensaje del servidor, alcanza con comprobarlo.
 
 ### Fuera de alcance
 
-- Avisos a quien vende, motivo de la eliminación o registro de moderación.
-- Suscripciones y teléfono: siguen PENDIENTE de Emi.
-- Las secciones de comprador y vendedor del manual.
-- Integración y despliegue.
+- Cambiar lo que hace el carrito al agregar o sincronizar.
+- Tocar las órdenes existentes.
+- Avisos a quien compra o a quien vende.
 
 ### Aceptación verificable
 
-1. **Caso nuevo en el smoke para el P1:**
-   - con la sesión de quien vende, cada camino del inventario falla sobre
-     una publicación eliminada por el administrador, y la base no cambia;
-   - la publicación sigue fuera del Mercado;
-   - el administrador sí la puede volver a «Activa»;
-   - quien vende sigue pausando y activando las publicaciones suyas no
-     eliminadas.
-2. **Negativo del P1:** con el endpoint de la base, el caso nuevo da rojo y
-   nombra el camino abierto.
-3. **Los defectos 2 a 5 se ven corregidos en la guía.**
-   - `guia-admin.mjs` da 26/26 en escritorio y celular, sin las advertencias.
-   - Cada comprobación de esos pasos falla si se vuelve al código de la base.
-     Mostralo con un negativo por lo menos.
-4. **Sin regresiones:** los casos del smoke de publicaciones, estados,
-   panel admin, carrito y órdenes que toques o que dependan de lo que tocás.
-   Elegilos vos y justificá la lista.
-5. **Si cambia la interfaz:** a11y `--todas`, contraste y auditoría móvil.
-   Además build, lint, tipos, `compileall` y diff-check con `cr-at-eol`.
+1. **El caso 190 o uno nuevo prueba la vía del checkout:**
+   - con la publicación en el carrito, el administrador la elimina, la pausa
+     o la marca agotada;
+   - el checkout, por transferencia y con la ruta combinada, falla nombrando
+     la publicación;
+   - no se crea ninguna orden y el stock reservado no cambia;
+   - después de sacarla del carrito, el checkout del resto funciona.
+2. **Negativo:** con el checkout de la base, el caso da rojo y nombra el
+   estado que dejó pasar.
+3. **Navegador:** el mensaje se ve en la pantalla de checkout, por lo menos
+   a 390 px y en escritorio.
+4. **Regresión:** los casos de checkout, transferencia, Mercado Pago
+   simulado, stock y logística que dependan de `preparar_checkout`. Elegilos
+   y justificá la lista. No hace falta repetir la suite completa: la corro
+   yo sobre la candidata final.
+5. Build, lint, tipos, `compileall` y diff-check con `cr-at-eol`.
 
 ### Frená y consultá
 
-- Si cerrar el P1 obliga a cambiar lo que quien vende puede hacer con
-  publicaciones pausadas o agotadas.
-- Si hace falta migrar datos.
-- Si aparece otra vía, fuera del panel, que haga lo mismo que el defecto 1.
+- Si rechazar en el checkout rompe un recorrido existente que hoy compra algo
+  que no está activo a propósito.
 
 ### Entrega en `PARA-PM.md`
 
 - SHA;
-- el inventario de caminos del P1 y cómo quedó cerrado cada uno;
-- salida del caso nuevo y de los negativos;
-- lista de regresión con su resultado;
-- riesgos.
+- salida del caso y del negativo;
+- captura o descripción del mensaje en pantalla;
+- lista de regresión con su resultado.
 
 No integres ni despliegues.
