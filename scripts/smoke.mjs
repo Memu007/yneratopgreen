@@ -11763,11 +11763,16 @@ await runCase(116, 'La cookie sola no dispara ninguna de las cuatro mutaciones d
   // misma base; lo que cambia es que ahora sale de un conjunto donde la
   // precondicion del caso se cumple, asi que el resultado ya no depende del
   // sorteo del seed.
+  //
+  // Y que no esté eliminada. Desde ADMIN-PANEL-DEFECTS-1 una publicación
+  // eliminada no acepta fotos de quien vende (409), y los casos anteriores
+  // dejan eliminadas las suyas al limpiar: por orden de id podía tocar una.
   const conLugar = queryRows(`
     SELECT p.id, COUNT(i.id)
     FROM products p
     LEFT JOIN product_images i ON i.product_id = p.id
     WHERE p.seller_id = ${sqlLiteral(vendedor.id)}
+      AND p.status <> 'DELETED'
     GROUP BY p.id
     HAVING COUNT(i.id) < ${TOPE_DE_IMAGENES}
     ORDER BY p.id
