@@ -158,7 +158,7 @@ def main(pedidos):
         dio = esperado(veredicto)
         print(("[ROJO ESPERADO]" if dio else "[NO DISCRIMINA]"), flush=True)
         for linea in veredicto:
-            print(f"  {linea[:400]}")
+            print(f"  {linea[:1200]}")
         todos = todos and dio
     estado = git("status", "--porcelain", "--", "src", "backend").decode().strip()
     print(f"\nsrc y backend despues: {estado or 'como estaban'}")

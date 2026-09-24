@@ -33290,12 +33290,27 @@ await runCase(191, 'Lo que el Mercado ya no ofrece no se compra desde un carrito
         assert(caja && caja.x >= 0 && caja.x + caja.width <= viewport.width + 1,
           `a ${viewport.width} px el aviso queda fuera de la pantalla`);
         assert(foto() === ordenesAntes, `a ${viewport.width} px la pantalla creó una orden igual`);
+        // Y deja seguir: se saca desde el resumen y el resto se compra.
+        await page.locator('[class*="_summaryItem_"]').filter({ hasText: moderada.name })
+          .getByRole('button', { name: 'Quitar del carrito' }).click();
+        await resolverTrasladoPropio(page);
+        await page.locator('form:has(h2) button[type="submit"]').click();
+        await elegirTransferencia(page);
+        await page.getByRole('button', { name: /Confirmar y crear las órdenes/ }).click();
+        await page.getByRole('heading', { name: /Tus órdenes/ }).waitFor({ timeout: 20_000 }).catch(() => {
+          throw new Error(`a ${viewport.width} px, sacada la eliminada, la compra no terminó`);
+        });
+        const [[llevaAhora]] = queryRows(`SELECT string_agg(oi.product_id, ',') FROM order_items oi
+          WHERE oi.order_id = (SELECT id FROM orders WHERE buyer_id = ${sqlLiteral(compra.id)}
+                               ORDER BY created_at DESC LIMIT 1)`);
+        assert(llevaAhora === otra.id, `a ${viewport.width} px la orden lleva ${llevaAhora}`);
         await contexto.close();
       }
     } finally {
       await browser.close();
     }
-    informe.push('en la pantalla, a 390 px y en escritorio, el aviso nombra la publicación y no se crea la orden');
+    informe.push('en la pantalla, a 390 px y en escritorio, el aviso nombra la publicación, no se crea la '
+      + 'orden, y sacada desde el resumen, la compra del resto termina');
   } finally {
     await pedirCrudo('/cart', { method: 'DELETE', header: compra.token }).catch(() => {});
     for (const publicacion of [moderada, otra]) {
