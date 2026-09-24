@@ -2,253 +2,251 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ADMIN-GUIDE-1, ronda 1 — corregida, para tu revisión
+## ADMIN-PANEL-DEFECTS-1 — entregada, con una consulta
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base de la tarea | `238e6f7` |
-| candidato devuelto | `81f40dd` |
-| candidato nuevo | `091e846` |
-| cambios en `src/` y `backend/` | ninguno |
-| imágenes | sin cambios: el panel no cambió |
+| base | `ad5f07d` |
+| candidato | `8f2c543`, más `1ff7b87` (arreglo del caso 116 del smoke) |
+| migración o datos | ninguno |
 | no integrado, no desplegado | `main` sigue en `0bd7fbc` |
 
-**Resultado.** Tu hallazgo era correcto y está corregido.
+**Resultado.** Los cinco defectos están corregidos con tus decisiones.
 
-- Tus tres afirmaciones falsas, juntas, ahora dan rojo y nombran los pasos
-  3, 5 y 10.
-- La del paso 10 sola da rojo y nombra el paso 10.
-- La guía pasa 26/26 en escritorio y en celular.
+- **P1.** Quien vende no puede modificar una publicación eliminada por ningún
+  camino suyo: responde 409 y la fila no cambia. El caso 190 da 1/1, y su
+  negativo, con el endpoint de la base, da rojo y nombra los caminos abiertos.
+- **Guía.** Da 26/26 en escritorio y en celular, sin advertencias. Cada
+  defecto tiene un negativo que vuelve su archivo a la base y la hace fallar
+  en su paso.
+- **Sin regresiones de producto:**
+  - suite completa sobre base recreada, 188/190: sólo el 131, que es del
+    entorno, y el 74, que causó una sonda mía (sin ella, 1/1);
+  - a11y 76/76, contraste 84/84 y auditoría móvil 12/12.
 
-**Lo que decidís vos (no bloquea esta pieza): la severidad de un defecto
-nuevo.** Quien vende puede volver a activar una publicación que el
-administrador eliminó:
+  La suite encontró un caso propio, el 116, que ya corregí (abajo).
 
-- `PATCH /api/products/{id}` con `{"status":"active"}`, con la sesión de
-  quien vende, responde 200 y la publicación vuelve al Mercado.
-- La edición sólo mira que la publicación sea suya; no mira en qué estado la
-  dejó el administrador (`backend/app/api/products.py`, `update_product`).
-- Lo reproduje en local y el recorrido lo comprueba en cada corrida (paso
-  13).
+**Frené y te consulto (bloquea cerrar el P1 del todo; lo demás no).**
+Encontré otra vía, fuera del panel, que deshace la moderación: **quien tenía
+la publicación en el carrito la puede comprar después de que el
+administrador la elimina.**
 
-Lo propongo **P2**: el administrador la puede volver a eliminar. Pero si la
-clienta va a usar «Eliminada» para sacar publicaciones fraudulentas, es
-**P1**, porque se deshace sin que nadie se entere. La guía lo advierte en el
-paso 13 y el script falla cuando se corrija.
+- El checkout no mira el estado de la publicación. El carrito sí lo mira, al
+  agregar y al sincronizar (`cart.py:157` y `:421`), pero después no vuelve a
+  mirarlo. El checkout (`services/checkout.py`, `preparar`) sólo mira el
+  stock.
+- Lo reproduje en local: agregar al carrito, el administrador cambia el
+  estado, `POST /orders/checkout/transfer` responde 200 y crea la orden.
+  Pasa igual con eliminada, pausada y agotada.
+- Así se vende una publicación moderada y se le reservan unidades.
 
-## Cómo quedó el vínculo entre frase y comprobación
+Opciones:
 
-Cada comprobación va dentro de `v.afirma(frase, …)`, con la frase exacta de
-la guía que describe lo que comprueba. Por ejemplo, en el paso 10:
+1. **(Recomendada)** El checkout rechaza cualquier publicación que no esté
+   activa, antes de crear la primera orden, con un mensaje que la nombra.
+   Quien compra la saca del carrito y sigue. Cubre los tres estados, porque
+   el Mercado tampoco muestra ninguno de los tres.
+2. Rechazar sólo las eliminadas. Una pausada o agotada se seguiría pudiendo
+   comprar desde un carrito viejo.
 
-```js
-await v.afirma('La publicación deja de verse en el Mercado, en las búsquedas y en su enlace directo.', async () => {
-  exigir(!(await enElMercado(c.producto.nombre)), 'pausada, sigue en el Mercado');
-  exigir(!(await suEnlaceAbre(c.producto.id)), 'pausada, su enlace directo sigue abriendo');
-});
-```
+No lo toqué: tu tarea dice frenar ante otra vía. Es un cambio chico, con su
+caso y su negativo, y lo puedo sumar a esta pieza o hacer aparte.
 
-El script busca la frase en el texto de su paso, sin mirar negritas, cortes
-de línea ni mayúsculas. Falla de dos maneras, y las dos nombran el paso:
+## El inventario del P1 y cómo quedó cada camino
 
-- **La frase ya no está:** `[FALLA] Paso 10. Pausar una publicación: la guía
-  ya no dice “La publicación deja de verse en el Mercado, …”, que este paso
-  comprueba`.
-- **Lo que dice no pasa:** `… la guía dice “…” y no pasa: pausada, sigue en
-  el Mercado`.
+Busqué en todo `backend/app` las rutas que escriben, los lugares que cambian
+`status` o `stock` de una publicación y las tareas.
 
-Las frases de «Antes de empezar» se atan desde el paso que las comprueba:
+| camino | quién | antes, sobre una eliminada | ahora |
+|---|---|---|---|
+| `PATCH /products/{id}` con `status` | quien vende | la volvía a activar o pausar | **409**, la fila no cambia |
+| `PATCH /products/{id}` con datos | quien vende | editaba nombre, precio, stock y demás | **409**, la fila no cambia |
+| `DELETE /products/{id}` | quien vende | 200 | **409** |
+| `POST /products/{id}/images` | quien vende | subía la foto | **409**, no sube nada |
+| `DELETE /products/{id}/images/{imagen}` | quien vende | borraba la foto | **409**, no borra nada |
+| `POST /cart/items` y `/cart/sync` | cualquiera | ya exigían activa | igual; el caso lo prueba con quien vende |
+| checkout, con la publicación ya en el carrito | quien compra | la vendía | **abierto: es la consulta de arriba** |
+| órdenes que ya existían: aceptar la transferencia, pago acreditado, cancelar o rechazar | quien vende, quien compra, el aviso de pago | mueven `stock`, `stock_reservado` y ventas | sin cambio (abajo) |
+| `/admin/products/{id}/status`, `DELETE /admin/products/{id}` | administrador | todo | igual: sólo el administrador la saca de «Eliminada» |
+| calificaciones, notificaciones | — | no escriben publicaciones | — |
+| tareas programadas | — | no hay: `main.py` sólo registra el arranque, y los vencimientos de pago se resuelven al consultarlos | — |
 
-| frase | paso | cómo |
-|---|---|---|
-| «Nadie recibe un aviso…» | 5 y 10 | ningún correo nuevo a esa dirección en `backend/outbox` |
-| los teléfonos no se publican | 11 | el listado y la ficha del Mercado no traen el de quien vende |
-| cada parte ve el teléfono de la otra en su orden | 14 | `/orders/my` de cada una |
-| órdenes de sólo lectura, pagos sin aprobar | 14 | la fila y el detalle no tienen controles |
-| la cuenta propia | 8 | la base no cambia |
-| las marcas no están en «Configuración» | 22 | las listas son exactamente cuatro |
+**Cómo se cerró.** Hay una sola regla, `exigir_que_se_pueda_modificar`
+(`backend/app/api/products.py:39`), en las cuatro rutas:
 
-La guía no lleva marcas visibles. Cada paso imprime cuántas frases ata:
-`[OK] Paso 10. Pausar una publicación (7 frases de resultado)`.
+- el administrador puede todo;
+- quien no es dueño recibe 403, como antes;
+- quien es dueño, sobre una eliminada, recibe 409 «La publicación fue
+  eliminada y ya no se puede modificar.».
 
-**Comprobaciones nuevas.** Las frases que antes no se comprobaban y se
-podían comprobar ahora se comprueban. Entre otras:
+Vale también para la que eliminó quien vende: tu decisión dice que para quien
+vende es definitiva.
 
-- **Veinte cuentas por página.** El panel pide `page_size=20`, la primera
-  página muestra 20 o el total si es menor, y dice «Página 1 de N». Con la
-  base limpia hay menos de 20 cuentas, así que el 20 sale del pedido. El
-  negativo `cincuenta-por-pagina` lo prueba del lado del panel.
-- **Números contra SQL:**
-  - los ocho números del resumen;
-  - los totales de usuarios, publicaciones y órdenes;
-  - las constancias pendientes;
-  - las opciones de cada lista.
-- **Filtros:**
-  - «Solo activos»;
-  - el estado de las órdenes;
-  - la búsqueda por una parte del nombre;
-  - «Reintentar», que vuelve a pedir lo mismo con los mismos filtros.
-- **Lo que pasa después:**
-  - la cuenta desactivada conserva su publicación en el Mercado;
-  - la contraseña nueva no queda a la vista;
-  - la publicación pausada no se borra;
-  - el servidor no deja cambiar el valor interno de una opción;
-  - la opción eliminada deja de ofrecerse.
-- **Las advertencias de los defectos:**
-  - subtotal y envío en $ 0 en el detalle de la orden;
-  - el motivo de la cuenta propia: el servidor lo manda y el panel no lo
-    muestra.
+**Lo que no cerré, y por qué:** las órdenes que ya existían. Cambian
+contadores de stock, no el estado ni lo que se edita, y la publicación sigue
+fuera del Mercado. Bloquearlas dejaría varada una orden ya pagada por
+transferencia. Si querés que eliminar también congele las órdenes en curso,
+es otra decisión.
 
-**Corrijo una comprobación mía que no podía fallar.** Para el filtro
-«Activa» y los cambios de estado, el script buscaba el texto en la fila, y
-ese texto incluye todas las opciones del selector:
-`"Tractor\t\nPausada\nActiva"`. Ahora lee el valor del selector.
+**Pausadas y agotadas:** quien vende las sigue pausando y activando como
+antes. El caso 190 lo comprueba, incluida una agotada por el administrador.
 
-## Qué cambió en la guía
+## Los defectos 2 a 5
 
-Sólo lo necesario para atar frases verdaderas:
+- **2. «Agotada».** El aviso del panel dice «Deja de aparecer en el catálogo
+  y su enlace no abre, igual que una pausada. No se borra y se puede volver a
+  activar.». El de «Eliminada» ahora agrega «Quien vende ya no la ve ni la
+  puede volver a activar.».
+- **3. Lo que ve quien vende.** Una agotada por el administrador se ve
+  «Agotado». Si le quedan unidades, tiene «Activar», que es lo que antes
+  lograba pausando y activando. Sin unidades no tiene botón, como antes.
+- **4. El detalle de la orden.** `GET /api/admin/orders` agrega los
+  artículos, con el precio al que se compraron, y además correo, dirección,
+  subtotal y envío.
 
-- **Paso 7.** Decía que la cuenta puede «cambiar los datos de todas las
-  cuentas, publicaciones y órdenes». Es falso: las órdenes no se cambian.
-  Ahora dice «Esa cuenta puede hacer todo lo que explica esta guía.». Se
-  comprueba con su sesión: lee las siete pestañas y cambia una publicación.
-- **Paso 14.** Decía que los estados de una orden los mueven quien compra y
-  quien vende. Le faltaba el pago por Mercado Pago, que la pasa a pagada
-  sola (`cobro.py`).
-- **Paso 5.** Decía «Sus publicaciones y sus órdenes quedan como estaban».
-  Ahora dice «Sus publicaciones siguen en el Mercado», que se comprueba, y
-  «sus órdenes quedan como estaban», que está declarada.
-- **Paso 13.** Tiene la advertencia del defecto nuevo.
-- **Al final:**
-  - «Cómo se comprueba esta guía» dice las tres cosas que se comprueban;
-  - se agrega «Lo que el programa no comprueba»;
-  - la introducción avisa que eso está al final.
+  Al aparecer la tabla de artículos apareció otro problema: en el celular se
+  salía 55 px de su sección a 360 px, y 28 px a 390. El detalle se
+  desplazaba de costado. Lo corregí sólo para 768 px o menos: menos relleno,
+  columnas fijas, y ninguna palabra partida a 360 ni a 390.
+- **5. La cuenta propia.** El panel muestra el motivo que manda el servidor:
+  «No puedes desactivar tu propia cuenta».
 
-## Lo que no se comprueba
+**Guía y script.**
 
-Está al final de la guía, con cada frase entre “ ” y su fuente. Son 23
-frases:
+- La guía saca las cuatro advertencias.
+- Ata las frases nuevas a su comprobación, por ejemplo:
+  - la agotada se ve «Agotado» y se activa;
+  - para quien vende, la eliminada es definitiva (409 y fuera del Mercado);
+  - el detalle trae correo, dirección y montos iguales a los de la base;
+  - el precio del artículo es el de la compra, aunque la publicación cambie
+    de precio después;
+  - en el celular el detalle no se desplaza de costado.
+- Rehíce sólo `ordenes-escritorio.png` y `ordenes-celular.png`.
 
-| dónde | qué dice | de dónde sale |
-|---|---|---|
-| Antes de empezar, paso 2 | la plataforma no cobra ni recibe el dinero; se paga directo a quien vende | decisión del 12/08 |
-| Antes de empezar | las transferencias las confirma quien vende | código: `orders.py`, sólo quien vende revisa el comprobante |
-| Antes de empezar, paso 20 | la documentación es informativa: no habilita ni bloquea publicar, vender ni cobrar | caso 107 del smoke |
-| Antes de empezar | no certifica la identidad | decisión del 14/08 |
-| Antes de empezar | quien compra ve el teléfono del transportista; el transportista no ve el de quien compra | decisión del 05/08; casos 52 y 54 |
-| Antes de empezar | suscripciones: no existen, no se activan, no están definidas | decisión del 05/08 (Fase 6) |
-| Antes de empezar, paso 8 | lo tiene que hacer otra persona administradora | código: `admin.py` sólo rechaza la cuenta propia |
-| paso 5 | sus órdenes quedan como estaban | código: `toggle-active` sólo cambia el estado |
-| paso 6 | la contraseña nueva no vence | código: `reset-password` no pone vencimiento |
-| paso 14 | quién mueve los estados de una orden | código: `orders.py` y `cobro.py` |
-| sección 7 | quien vende presenta la constancia desde su cuenta | caso 108 del smoke |
-| sección 8 | las listas son las unidades y las opciones de los servicios | código: `AddProductModal.tsx` |
-| pasos 24 y 25 | las publicaciones que ya eligieron una opción no cambian | código: la opción se guarda como texto (`models/product.py`) |
+**Dos arreglos del script:**
 
-Tampoco se comprueban los consejos y las notas: para qué sirve un paso, con
-quién compartir una contraseña, cuántas cuentas de administración tener y
-qué está anotado para corregir. La guía lo dice. Una frase que se agregue
-después no se comprueba hasta atarla o sumarla a la lista, y la guía también
-lo dice.
-
-**La lista se controla sola.** Antes de abrir el navegador, el script mira
-que cada frase declarada siga escrita donde dice la lista. Si una cambia,
-falla y nombra el paso (negativo `frase-declarada`).
+- **El outbox.** Ya no hace falta que `backend/outbox` exista de antes. El
+  script mira el transporte: el del entorno, o el de `backend/.env` (sólo esa
+  línea), o el de omisión. Si es `outbox` y la carpeta no existe, nadie
+  recibió correo. Si es otro, falla y lo dice.
+- **Una comprobación que podía pasar sin mirar.** El formulario de publicar
+  arranca con unidades propias y después dibuja las del servidor. El script
+  leía las primeras, así que «inactiva, no se ofrece» (paso 24) podía pasar
+  sin mirar la lista real. En una corrida hizo fallar el paso 25. Ahora
+  espera la respuesta del servidor y que el selector la muestre.
 
 ## Para verificar, lo mínimo
 
 ```
+./scripts/entorno_nativo.sh --reiniciar-api       si la API ya corría con el código anterior
+SMOKE_CASOS=190 node scripts/smoke.mjs
+  → [PASS] 190 Una publicación eliminada no vuelve por la mano de quien vende — 7 caminos …
+python3 scripts/sabotajes_admin_panel_defects_1.py p1-endpoint-de-la-base panel-de-la-base
+  → [ROJO ESPERADO] … PATCH {"status":"active"} respondió 200 y cambió la fila; …
+    [ROJO ESPERADO] … Paso 8 … Paso 12 … Paso 13 …
+    src y backend despues: como estaban
 node scripts/guia-admin.mjs
-  → Guía: docs/GUIA-PANEL-ADMIN.md, 26 pasos, 237 textos citados, 23 frases declaradas sin comprobar
-    [OK] Paso 1. Abrir el panel (5 frases de resultado) … [OK] Paso 26. Volver a pedirla (2 frases de resultado)
-    LA GUÍA Y EL PANEL COINCIDEN: 26 pasos en escritorio y celular
-
-python3 scripts/sabotajes_admin_guide_1.py paso-10-al-reves tres-de-la-pm
-  → === paso-10-al-reves … ===
-    [ROJO ESPERADO] salida 1
-      [FALLA] Paso 10. Pausar una publicación: la guía ya no dice “La publicación deja
-      de verse en el Mercado, en las búsquedas y en su enlace directo.”, que este paso comprueba
-    === tres-de-la-pm … ===
-    [ROJO ESPERADO] salida 1
-      [FALLA] Paso 3. …: la guía ya no dice “Muestra veinte cuentas por página.”, …
-      [FALLA] Paso 5. …: la sección «Antes de empezar» ya no dice “Nadie recibe un aviso
-      de lo que se cambia desde el panel.”, …
-      [FALLA] Paso 10. …: la guía ya no dice “La publicación deja de verse …”, …; la
-      sección «Antes de empezar» ya no dice “Nadie recibe un aviso …”, …
-    src y guía despues: como estaban
-    todos dieron el rojo esperado
+  → LA GUÍA Y EL PANEL COINCIDEN: 26 pasos en escritorio y celular
 ```
 
 **Antes de correrlos:**
 
-- Sigue haciendo falta lo mismo que antes: la API en 8000, el frontend de
-  desarrollo en 5173 y la siembra demo.
-- Además, el correo tiene que ir a `backend/outbox`
-  (`EMAIL_TRANSPORT=outbox`, lo mismo que pide el smoke). Si no existe la
-  carpeta, fallan los pasos 5 y 10 y lo dicen.
-- La guía tarda unos 5 min en los dos anchos. Cada negativo, unos 2,5 min, y
-  los siete, unos 17 min. Los dos del comando de arriba son los que pediste.
-- **Cada corrida deja cosas creadas, por ancho:**
-  - cuatro cuentas, con teléfonos inventados;
-  - tres publicaciones, de las que elimina dos;
-  - una orden por transferencia;
-  - dos constancias pendientes.
+- Hace falta lo mismo de siempre: la API en 8000, el frontend de desarrollo
+  en 5173 y la siembra demo. `backend/outbox` ya no tiene que existir.
+- Los negativos del backend reinician la API antes y después.
+- Tiempos:
+  - el caso 190, unos 3 s;
+  - el negativo del P1, alrededor de 1 min;
+  - los demás negativos y la guía, entre 2 y 5 min cada uno.
 
-  **Corrijo mi informe anterior:** decía que las dos publicaciones se
-  eliminaban, pero «Guía documentada …» queda activa en el Mercado.
-
-## Lo que corrí
-
-Todo sobre `091e846`, con la base local que ya tenía restos de corridas
-anteriores (72 publicaciones, más de 20 cuentas).
+## Salidas
 
 ```
-node scripts/guia-admin.mjs                    salida 0
-  26/26 en escritorio y 26/26 en celular, 126 frases atadas por ancho
-  (las del paso 14 y del 22 se cuentan más de una vez)
+SMOKE_CASOS=190 node scripts/smoke.mjs
+  [PASS] 190 Una publicación eliminada no vuelve por la mano de quien vende — 7 caminos de
+  quien vende rechazados sin tocar la fila. el administrador la vuelve a «Activa» y quien vende
+  la pausa y la activa. una agotada la sigue activando quien vende. la que elimina quien vende
+  tampoco vuelve (409)
 
-python3 scripts/sabotajes_admin_guide_1.py     salida 0, los siete en rojo esperado
-  boton-inventado       [FALLA] Paso 5. …: la guía nombra «Suspender cuenta» y el panel no lo mostró en este paso
-  paso-10-al-reves      [FALLA] Paso 10. …: la guía ya no dice “La publicación deja de verse en el Mercado,
-                        en las búsquedas y en su enlace directo.”, que este paso comprueba
-  sesion-que-sigue      [FALLA] Paso 5. …: la guía ya no dice “Si tenía la sesión abierta, se le corta.”, …
-  tres-de-la-pm         [FALLA] Paso 3, Paso 5 y Paso 10, cada uno por su frase (arriba)
-  frase-declarada       [FALLA] Paso 6. …: la lista de lo que no se comprueba cita “La nueva no vence
-                        sola: queda hasta que se restablezca otra vez.” y ahí ya no lo dice
-  panel-cambiado        [FALLA] Paso 6. …: el panel no muestra «Restablecer contraseña», que el recorrido tenía que tocar
-                        [FALLA] inventario: la pestaña «Usuarios» muestra «Nueva contraseña» y su sección de la guía no lo nombra
-  cincuenta-por-pagina  [FALLA] Paso 3. …: la guía dice “Muestra veinte cuentas por página.” y no pasa:
-                        el panel pide 50 cuentas por página
-                        [FALLA] Paso 9. …: la guía dice “dice el total y la página” y no pasa:
-                        con 72 publicaciones no dice «Página 1 de 4»
-  src y guía despues: como estaban
+python3 scripts/sabotajes_admin_panel_defects_1.py        salida 0, los cinco en rojo esperado
+  p1-endpoint-de-la-base   [FAIL] 190 … quien vende todavía modifica una publicación eliminada:
+                           PATCH {"status":"active"} respondió 200 y cambió la fila; PATCH
+                           {"status":"paused"} respondió 200 y cambió la fila; PATCH de datos …
+                           respondió 200 y cambió la fila; DELETE /products/{id} respondió 200;
+                           POST /products/{id}/images respondió 200 y cambió la fila; …
+  detalle-de-la-base       [FALLA] Paso 14 …: la guía dice “el nombre, el correo y la dirección de
+                           entrega de quien compra” y no pasa: el detalle no dice el correo de quien compra
+  panel-de-la-base         [FALLA] Paso 8 …: … “el panel responde «No puedes desactivar tu propia
+                           cuenta»” y no pasa: el panel no dice el motivo
+                           [FALLA] Paso 12 …: la guía nombra «Deja de aparecer en el catálogo y su
+                           enlace no abre, …» y el panel no lo mostró en este paso
+                           [FALLA] Paso 13 …: la guía nombra «… Quien vende ya no la ve ni la puede
+                           volver a activar.» y el panel no lo mostró en este paso
+  mis-publicaciones-de-la-base  [FALLA] Paso 12 …: la guía dice “Quien vende la ve en «Mis
+                           publicaciones» como «Agotado».” y no pasa: quien vende no la ve «Agotado»: Activo
+  tabla-de-la-base (celular)  [FALLA] Paso 14 …: la guía dice “En el celular el detalle se lee de
+                           arriba abajo, sin desplazarse de costado.” y no pasa: con 390 px el detalle
+                           mide 375 px de ancho y se ven 371
+  src y backend despues: como estaban
 
-build · node --check · py_compile · diff-check con cr-at-eol   verdes
-git diff 238e6f7 091e846 -- src backend                         vacío
-```
-
-Después, sobre una base recién creada (`entorno_nativo.sh --recrear`: 5
-cuentas y 30 publicaciones de la siembra):
-
-```
 node scripts/guia-admin.mjs                                  salida 0, 26/26 y 26/26
-python3 scripts/sabotajes_admin_guide_1.py cincuenta-por-pagina
-  con 13 cuentas: [ROJO ESPERADO] salida 1
-  [FALLA] Paso 3. …: la guía dice “Muestra veinte cuentas por página.” y no pasa: el panel pide 50 cuentas por página
-  [FALLA] Paso 9. …: la guía dice “dice el total y la página” y no pasa: con 39 publicaciones no dice «Página 1 de 2»
+python3 scripts/sabotajes_admin_guide_1.py                   los siete de ADMIN-GUIDE-1 siguen en rojo esperado
+npm run a11y -- --todas     76 de 76 pantallas, 0 violaciones serious o critical
+npm run contraste           84 de 84 mediciones, ningún texto por debajo del mínimo
+node scripts/mobile-audit.mjs   12 de 12 recorridos, 0 desbordes, 0 recortes, 0 errores de consola
+tsc --noEmit · lint · build · compileall · node --check · py_compile · diff-check con cr-at-eol   verdes
 ```
+
+## Regresión: la suite completa, y por qué
+
+Corrí la suite entera y no una lista. El cambio toca `PATCH` y `DELETE` de
+publicaciones, y muchos casos los usan para limpiar lo que crean. Fueron tres
+corridas, cada una sobre una base recreada con `entorno_nativo.sh
+--recrear`.
+
+| corrida | código | resultado | fallas |
+|---|---|---|---|
+| 1 | `8f2c543` | 187/190 | 116, 131, 187 |
+| 2 | con el 116 corregido y una sonda en la base | 186/190 | 55, 58 y 74 (la sonda), 131 |
+| 3 | `1ff7b87`, con la sonda en un esquema aparte | **188/190** | 74 (la sonda), 131 |
+
+- **116, mío, corregido en `1ff7b87`.** El caso elegía una publicación del
+  vendedor demo para subirle una foto, y le tocó una eliminada por un caso
+  anterior: ahora da 409, por la regla nueva. Ahora elige entre las que no
+  están eliminadas. Pasa en las corridas 2 y 3.
+- **131: entorno.** El puente de docker de mi entorno no traduce `docker
+  run`. Es el mismo rojo de siempre.
+- **74, 55 y 58: mi sonda.** Usé disparadores en la base para investigar el
+  187. El 74 baja migraciones y el disparador sobre `brand` se lo impide.
+  Borrada la sonda, el 74 dio 1/1. En la corrida 2 las tablas de la sonda
+  estaban en el esquema de la aplicación, y por eso `alembic check` también
+  hizo caer el 55 y el 58.
+- **187: no se repitió.** En la corrida 1, las dos publicaciones de la
+  siembra con marca (John Deere y Pauny) la perdieron en el medio de la
+  suite. El Mercado se quedó sin marcas y el caso no encontró sus once
+  controles.
+
+  En las corridas 2 y 3 puse una sonda que registra toda publicación que
+  pierde la marca. Sólo registró la esperada del caso 174, que cambia de
+  categoría una publicación propia, y el 187 pasó las dos veces.
+
+  No encontré qué la borró en la corrida 1. La edición del backend conserva
+  la marca salvo que cambie la categoría, y mi cambio no toca ni la marca ni
+  las publicaciones activas. Lo dejo anotado como riesgo, no como causa
+  conocida.
 
 ## Riesgos
 
-- **Una frase atada es exacta.** Reescribir una oración aunque diga lo mismo
-  hace fallar el paso. Es lo buscado, porque obliga a mirar la comprobación,
-  pero cambiar la guía pide tocar el script.
-- **Algunos límites se comprueban en un paso que no es el suyo.** Por
-  ejemplo, el teléfono en el paso 11, que es cuando la publicación está a la
-  vista. Si fallan, el mensaje cita la frase de «Antes de empezar».
-- **Las pruebas de correo dependen del outbox.** Con SMTP no se pueden
-  mirar, y el script lo dice.
+- **Una carrera chica.** El `PATCH` bloquea la fila, así que un cambio del
+  administrador espera o se ve. Las rutas de fotos y el `DELETE` no la
+  bloquean, igual que antes: si el administrador elimina en el mismo instante
+  en que quien vende sube una foto, la foto puede quedar. La publicación
+  igual queda eliminada.
+- **El checkout sigue abierto** hasta que decidas la consulta.
+- **El 187 pasó dos de tres veces.** Sin causa encontrada; la sonda de
+  arriba sirve para buscarla si se repite.
+- La reproducción del checkout la hice sólo en mi base local, que después
+  recreé.
 
-No toqué `main`, Railway, `src/`, `backend/` ni datos, y no desplegué. Freno
-acá.
+No toqué `main`, Railway ni datos reales, y no desplegué.
