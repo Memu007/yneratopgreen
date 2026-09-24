@@ -8,9 +8,25 @@ Actualizado: 2026-09-23.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. Su puerta funcional quedó verificada el 23/09 sobre la composición aceptada `1e4a63c`; la evidencia está en `REPRODUCCION-FASE-2-2026-09-23.md`. Las fechas y las puertas posteriores no cambian.
 - **`main`:** `0bd7fbc`; `RISK-REC-1` integrada y publicada con autorización de Emi. GitHub, Frontend y Backend convergieron en ese SHA y los dos servicios quedaron saludables. El entorno `strong-playfulness` sigue siendo demostrativo y no equivale al despliegue productivo contractual.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `FICHA-MOBILE-WIDTH-1` en `78b682b`, informe `4a0dca2`. PM aceptó la pieza en rama; aún no integrada ni desplegada.
-- **Última decisión PM:** `FICHA-MOBILE-WIDTH-1` **ACEPTADA EN RAMA**. PM reprodujo el caso 185 en 1/1, el negativo rojo y la auditoría en **12/12** recorridos sin desbordes. Evidencia en `REPRODUCCION-FICHA-MOBILE-WIDTH-1-2026-09-23.md`.
-- **Tarea activa:** `PRODUCT-DETAIL-BACK-SEARCH-1`, asignada a Dev en `PARA-DEV.md`: conservar la búsqueda tras abrir y recargar una ficha y usar «Atrás».
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `PRODUCT-DETAIL-BACK-SEARCH-1` en `ce0380e`, informe `2c300bf`. PM aceptó la pieza en rama; aún no integrada ni desplegada.
+- **Última decisión PM:** `PRODUCT-DETAIL-BACK-SEARCH-1` **ACEPTADA EN RAMA**. PM reprodujo el caso 186 en 1/1 (10 vueltas, 1.493 cuadros), el negativo rojo en 10 de 10 vueltas y los casos 147, 148, 183 y 185 en 4/4. Evidencia en `REPRODUCCION-PRODUCT-DETAIL-BACK-SEARCH-1-2026-09-23.md`.
+- **Tarea activa:** `FILTER-COLLAPSE-FOCUS-1`, asignada a Dev en `PARA-DEV.md`: con el panel de filtros cerrado, el teclado no entra en controles invisibles.
+
+## Última aceptación PM — PRODUCT-DETAIL-BACK-SEARCH-1
+
+PM verificó la candidata `ce0380e` sobre una base PostGIS Docker recién
+creada, con API nativa y frontend de desarrollo. El caso 186 pasó **1/1**:
+10 vueltas búsqueda → ficha → recarga → Atrás, mitad con «Volver al Mercado»
+y mitad con el Atrás del navegador, sin ninguna escritura ni cuadro sin `q`.
+El negativo que repone el hook de la base dio rojo en **10 de 10** vueltas,
+con la barra escrita como `/?section=marketplace` y 24 tarjetas. Casos 147,
+148, 183 y 185 en **4/4**; build, lint, tipos y diff-check verdes.
+
+Dev corrigió su propia medición: no era una pérdida de la búsqueda sino un
+cuadro de unos 16 ms sin ella. PM lo acepta. Una sonda propia descartó un
+falso «No hay operaciones» en el hueco de carga que queda al volver (P3,
+registrado sin tarea). Chromium del entorno PM distinto del fijado por
+Playwright; declarado en la reproducción. Sin integración ni despliegue.
 
 ## Última aceptación PM — FICHA-MOBILE-WIDTH-1
 
@@ -337,7 +353,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev trabaja `PRODUCT-DETAIL-BACK-SEARCH-1`; PM verificará el mismo recorrido búsqueda → ficha → recarga → Atrás, con negativo discriminante. Luego sigue `FILTER-COLLAPSE-FOCUS-1`. Las ocho piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
+1. Dev trabaja `FILTER-COLLAPSE-FOCUS-1`; PM verificará Tab con el panel cerrado y abierto en 360/390/768 y escritorio, con negativo discriminante. Las nueve piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
 2. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración. La propuesta de recuperación pre-migración espera decisión de Emi y verificación autenticada de Railway.
 3. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
