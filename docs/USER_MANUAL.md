@@ -111,51 +111,14 @@ URL local de desarrollo: **http://localhost:5173**
 
 ## Rol: Administrador
 
-### Acceso al panel
+El panel de administración está explicado paso a paso en
+[`GUIA-PANEL-ADMIN.md`](GUIA-PANEL-ADMIN.md): cada pestaña, qué se puede
+hacer, qué no, qué pasa después de cada acción y los límites de la
+plataforma. Esa guía se comprueba contra el panel con
+`node scripts/guia-admin.mjs`.
 
-1. Login con `admin@topgreen.com` / `admin123`.
-2. El header muestra link **"Admin"**. Click.
-
-### Dashboard de stats
-
-- Conteo de usuarios, productos, órdenes activas.
-- Stats simples por categoría.
-
-### Gestión de usuarios
-
-1. Tab **"Usuarios"**.
-2. Acciones por usuario:
-   - Cambiar rol (admin / user).
-   - Activar / desactivar.
-   - Ver perfil completo.
-
-### Gestión de productos
-
-1. Tab **"Productos"**.
-2. Vista global de **todos** los productos de **todos** los vendedores.
-3. Filtros por estado, categoría, vendedor.
-4. Acciones:
-   - Ver detalle.
-   - Despublicar (forzar pause).
-   - Eliminar (en caso de violación de TOS).
-
-### Gestión de órdenes
-
-1. Tab **"Órdenes"**.
-2. Vista global de órdenes.
-3. Filtros por estado, fecha, comprador, vendedor.
-4. Acciones:
-   - Ver detalle (items, montos, payment status).
-   - Sincronizar pago manualmente (`POST /api/payments/sync-status/{order_id}`).
-   - Cancelar orden (en casos especiales).
-
-### Gestión de categorías
-
-1. Tab **"Categorías"**.
-2. CRUD completo:
-   - Crear nueva categoría con nombre, slug, descripción, icono.
-   - Editar.
-   - Eliminar (solo si no tiene productos asociados).
+Para entrar: ingresar con una cuenta de administración y tocar **Admin**
+en la cabecera.
 
 ---
 
@@ -185,7 +148,5 @@ Si todos los pasos completan sin error, el sistema está operativo.
 
 | Acción | Cómo |
 |--------|------|
-| Cambiar tema (oscuro/claro) | Botón ☀/🌙 en el header |
-| Ver notificaciones | Campana en el header (cuando hay) |
 | Volver al inicio | Click en el logo |
-| Cerrar sesión | Avatar → "Cerrar sesión" |
+| Cerrar sesión | Botón **Salir** en la cabecera |
