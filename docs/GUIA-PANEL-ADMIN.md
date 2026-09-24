@@ -6,8 +6,8 @@ pasa después de cada acción.
 
 Cada paso de esta guía se comprueba con un programa que la recorre en el
 navegador y hace lo que el paso dice. Si el panel cambia y la guía queda
-desactualizada, ese programa falla y dice en qué paso. Cómo correrlo está al
-final.
+desactualizada, ese programa falla y dice en qué paso. Cómo correrlo, y lo
+que no comprueba, está al final.
 
 Los textos entre comillas latinas, como «Usuarios», son exactamente lo que se
 ve en la pantalla: botones, pestañas, títulos y mensajes.
@@ -153,7 +153,7 @@ Qué pasa después:
 - La persona no puede entrar. Al intentarlo ve «Usuario inactivo. Contacte
   al administrador.».
 - Si tenía la sesión abierta, se le corta.
-- Sus publicaciones y sus órdenes quedan como estaban.
+- Sus publicaciones siguen en el Mercado y sus órdenes quedan como estaban.
 
 Para volver a habilitarla, tocá «Activar» y confirmá con «Activar la
 cuenta». El estado vuelve a «Activo» y entra con su contraseña de siempre.
@@ -187,8 +187,8 @@ Qué pasa después:
    de Admin».
 3. Aparece «Rol actualizado correctamente».
 
-Esa cuenta puede ver y cambiar los datos de todas las cuentas, publicaciones
-y órdenes. Desde que vuelve a entrar ve el botón «Admin».
+Esa cuenta puede hacer todo lo que explica esta guía. Desde que vuelve a
+entrar ve el botón «Admin».
 
 Para quitarle el acceso, cambiá «Admin» por «Usuario». El panel pregunta
 «Quitar acceso de administrador». Confirmá con «Pasar a Usuario».
@@ -267,10 +267,14 @@ Cambiá el estado a «Eliminada» y confirmá con «Pasar a Eliminada».
 Qué pasa después:
 
 - La publicación deja de verse en el Mercado y en las búsquedas.
-- Desaparece de «Mis publicaciones» de quien vende: no la puede ver ni
-  volver a activar.
+- Desaparece de «Mis publicaciones» de quien vende: no la ve ni tiene un
+  botón para volver a activarla.
 - En el panel sigue en la lista con el estado «Eliminada». No se borra: si
   hiciera falta, se puede volver a «Activa» y reaparece para todos.
+
+**Cuidado.** Hoy quien vende sí puede volver a activarla con un pedido armado
+a mano, sin pasar por la pantalla. Está anotado para corregir. Si reaparece,
+eliminala de nuevo.
 
 ---
 
@@ -292,7 +296,7 @@ Qué pasa después:
 
 Las órdenes sólo se miran: no hay botones para cambiar su estado ni para
 cancelarlas. Los estados los mueven quien compra y quien vende, desde su
-cuenta.
+cuenta, y el pago por Mercado Pago cuando se acredita.
 
 **Cuidado.** Hoy el detalle no trae todos los datos:
 
@@ -483,10 +487,74 @@ filtros.
 ## Cómo se comprueba esta guía
 
 Para el equipo técnico: `node scripts/guia-admin.mjs` recorre cada paso en el
-navegador, en escritorio y en celular, sobre la base de prueba. En cada paso
-hace lo que la guía dice y comprueba lo que la guía dice que pasa. Si un
-texto entre «» no aparece o un resultado no se cumple, falla y nombra el
-paso.
+navegador, en escritorio y en celular, sobre la base de prueba, y hace lo que
+el paso indica. Comprueba tres cosas, y si una no se cumple falla y nombra el
+paso:
+
+- **Los textos entre «».** Cada uno aparece en la pantalla durante su paso.
+- **Las frases de resultado.** Cada comprobación del programa lleva escrita
+  la frase de la guía que describe lo que comprueba. Falla si lo que la frase
+  dice no pasa, y también si la frase se cambia o se borra de su paso.
+- **El inventario.** Ningún control de las pestañas queda sin nombrar.
 
 Con `--capturas`, además vuelve a generar las imágenes de
 `docs/guia-panel-admin/`.
+
+### Lo que el programa no comprueba
+
+Estas frases el recorrido no las puede comprobar. Al lado de cada una dice
+de dónde salen. El programa sí comprueba que sigan escritas igual: si una
+cambia o se borra, falla y nombra dónde estaba, para que alguien vuelva a
+mirar su fuente.
+
+- Antes de empezar: “La plataforma no cobra, no recibe ni guarda dinero de
+  las ventas.”, “Quien compra le paga directamente a quien vende, por Mercado
+  Pago o por transferencia.” y “nada de ese dinero pasa por AgroBoeda”. Es
+  una decisión del proyecto (`docs/pm/DECISIONS.md`, 12/08/2026).
+- Paso 2: “Ese dinero fue de quien compró a quien vendió; la plataforma no lo
+  recibió.” La misma decisión.
+- Antes de empezar: “Las transferencias las confirma quien vende, mirando su
+  propia cuenta bancaria.” Sale del código: sólo quien vende puede revisar el
+  comprobante (`backend/app/api/orders.py`).
+- Antes de empezar: “La revisión de documentación es informativa.” y “No
+  habilita ni bloquea publicar, vender ni cobrar”, que comprueba el caso 107
+  de `scripts/smoke.mjs`, y “no certifica su identidad”, que es una decisión
+  (`DECISIONS.md`, 14/08/2026).
+- Paso 20: “Nada más cambia: podía publicar, vender y cobrar antes, y puede
+  después.” El caso 107 del smoke.
+- Antes de empezar: “quien compra ve el del transportista después de
+  elegirlo” y “el transportista no recibe el contacto de quien compra”. Es
+  una decisión (`DECISIONS.md`, 05/08/2026) y la comprueban los casos 52 y 54
+  del smoke.
+- Antes de empezar: “Todavía no existen.”, “El panel no tiene cómo activar
+  una suscripción” y “el acceso a contactos por plan no está definido para
+  esta etapa”. Es una decisión: los candados de contacto por plan pasan a la
+  Fase 6 (`DECISIONS.md`, 05/08/2026).
+- Antes de empezar: “lo tiene que hacer otra persona administradora”, y
+  Paso 8: “Para eso hace falta otra persona administradora.” Sale del código:
+  el panel sólo rechaza los cambios sobre la cuenta propia
+  (`backend/app/api/admin.py`).
+- Paso 5: “sus órdenes quedan como estaban”. Sale del código: desactivar sólo
+  cambia el estado de la cuenta (`admin.py`, `toggle-active`).
+- Paso 6: “La nueva no vence sola: queda hasta que se restablezca otra vez.”
+  Sale del código: restablecer sólo cambia la contraseña, sin fecha de
+  vencimiento (`admin.py`, `reset-password`).
+- Paso 14: “Los estados los mueven quien compra y quien vende, desde su
+  cuenta, y el pago por Mercado Pago cuando se acredita.” Sale del código
+  (`backend/app/api/orders.py` y `backend/app/services/cobro.py`).
+- Documentación de vendedores: “Quien vende puede presentar su constancia
+  fiscal desde su cuenta.” El caso 108 del smoke.
+- Configuración: “unidades de medida y las opciones de los servicios”. Sale
+  del código: el formulario de publicar lee esas listas
+  (`src/components/AddProduct/AddProductModal.tsx`). Que una unidad nueva
+  aparezca al publicar sí se comprueba, en el paso 23.
+- Paso 24: “es el que quedó guardado en las publicaciones”, y Paso 25: “Las
+  publicaciones que ya la eligieron no cambian.” Sale del código: la
+  publicación guarda la opción como texto, no como referencia a la lista
+  (`backend/app/models/product.py`).
+
+Tampoco se comprueban los consejos y las notas: para qué sirve un paso, con
+quién compartir una contraseña, cuántas cuentas de administración tener, que
+pausar no es una sanción o qué está anotado para corregir. Una frase que se
+agregue después no se comprueba hasta que se la ate a una comprobación del
+programa o se la sume a esta lista.
