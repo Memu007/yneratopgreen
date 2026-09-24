@@ -10,7 +10,7 @@ Actualizado: 2026-09-24.
 - **`main`:** `0bd7fbc`; `RISK-REC-1` integrada y publicada con autorización de Emi. GitHub, Frontend y Backend convergieron en ese SHA y los dos servicios quedaron saludables. El entorno `strong-playfulness` sigue siendo demostrativo y no equivale al despliegue productivo contractual.
 - **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `FILTER-COLLAPSE-FOCUS-1` en `4fa8809`, informe `0fd3217`. PM aceptó la pieza en rama; aún no integrada ni desplegada. La rama contiene a `main`: integrar es publicar 39 commits, que incluyen la migración de `PRIMARY-IMAGE-INTEGRITY-1`.
 - **Última decisión PM:** `FILTER-COLLAPSE-FOCUS-1` **ACEPTADA EN RAMA**. PM reprodujo el caso 187 en 1/1, tres negativos rojos, 7/7 relacionados, a11y 76/76, contraste 84/84 y auditoría móvil 12/12. Evidencia en `REPRODUCCION-FILTER-COLLAPSE-FOCUS-1-2026-09-24.md`.
-- **Tarea activa:** ninguna. El QA responsive en rama quedó sin hallazgos abiertos. El siguiente paso de valor es integrar, y eso espera la decisión de Emi sobre la recuperación previa a la migración. PM no abre una pieza de relleno.
+- **Tarea activa:** `LOCALITY-DEDUP-1`, asignada a Dev en `PARA-DEV.md`: sacar de los selectores las 105 localidades anidadas repetidas y distinguir las 49 homónimas por departamento, sin perder lo ya guardado. Es hueco del MVP (búsqueda y publicación por ubicación, contrato 3.1) observado por la clienta (#8). La PM había dejado a Dev sin tarea el 24/09; se corrigió el mismo día.
 
 ## Última aceptación PM — FILTER-COLLAPSE-FOCUS-1
 
@@ -369,9 +369,16 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Las diez piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue. Integrarlas publica la migración de imágenes. Antes, Emi decide la recuperación previa (punto 2). Después, PM corre la suite completa desde base limpia sobre el SHA exacto, incluido el caso 131 en Docker, y prepara la publicación, que requiere autorización explícita de Emi.
-2. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración. La propuesta de recuperación pre-migración espera decisión de Emi y verificación autenticada de Railway.
-3. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
-4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
-5. Los atributos por rubro esperan los datos prometidos por la clienta; Inicio, Servicios y la identidad de AgroMarket esperan decisión de producto.
-6. Mercado Pago, red-team y producción contractual permanecen en la secuencia acordada; no se habilitan por esta tarea.
+1. Dev trabaja `LOCALITY-DEDUP-1`. Huecos del MVP que no dependen de Emi y
+   siguen después, en orden: los ajustes chicos de la devolución de la
+   clienta que no esperan decisión (#1 «agropecuario»); después, material de
+   capacitación del panel admin y documentación técnica del despliegue
+   (Fase 5), una vez fijada la infraestructura. Los que sí dependen de Emi:
+   SMTP (la clienta no pudo registrarse), cuentas de prueba de Mercado Pago,
+   backups e integración, y las decisiones #5, #7 y #10 de la clienta.
+2. Las diez piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue. Integrarlas publica la migración de imágenes. Antes, Emi decide la recuperación previa (punto 3). Después, PM corre la suite completa desde base limpia sobre el SHA exacto, incluido el caso 131 en Docker, y prepara la publicación, que requiere autorización explícita de Emi.
+3. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración. La propuesta de recuperación pre-migración espera decisión de Emi y verificación autenticada de Railway.
+4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
+5. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
+6. Los atributos por rubro esperan los datos prometidos por la clienta; Inicio, Servicios y la identidad de AgroMarket esperan decisión de producto.
+7. Mercado Pago, red-team y producción contractual permanecen en la secuencia acordada; no se habilitan por esta tarea.
