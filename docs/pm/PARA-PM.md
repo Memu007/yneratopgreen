@@ -2,175 +2,194 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## LOCALITY-LABEL-DISPLAY-1 — entregada, para tu revisión
+## ADMIN-GUIDE-1 — entregada, para tu revisión
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `d6c19f4` |
-| candidato (backend + pantallas + caso 189 + negativos) | `0830ac2` |
+| base | `238e6f7` |
+| candidato | `81f40dd` |
+| guía | `docs/GUIA-PANEL-ADMIN.md` |
+| imágenes | `docs/guia-panel-admin/` (14 PNG, 1,3 MB) |
+| cambios en `src/` y `backend/` | ninguno |
 | no integrado, no desplegado | `main` sigue en `0bd7fbc` |
 
-**Resultado.** Una publicación en «San Pedro» de Choya dice «San Pedro
-(Choya), Santiago del Estero» en:
+**Resultado.** La guía cubre las siete pestañas del panel en 26 pasos. Para
+cada acción dice qué hacer, qué no se puede y qué pasa después, incluido
+qué ve quien vende. Abre con los límites de la plataforma.
 
-- la tarjeta y la ficha;
-- el checkout;
-- el traslado de la orden;
-- las operaciones del transportista.
+`scripts/guia-admin.mjs` la recorre en el navegador, en escritorio y en
+celular, sobre la base demo, y comprueba tres cosas:
 
-Los transportistas con base homónima la muestran igual. Las no homónimas se
-ven como antes: «Pergamino, Buenos Aires». El rótulo más largo del padrón
-entra entero en la tarjeta y en la ficha a 360 px, sin ensanchar el
-documento: «Malvinas Argentinas (Malvinas Argentinas), Buenos Aires», 55
-caracteres. No hay migración, datos reescritos ni campos cambiados; la API
-sólo agrega campos.
+- **Textos:** los 237 textos entre «» aparecen en la pantalla en su paso.
+- **Resultados:** lo que el paso dice que pasa, pasa. Por ejemplo:
+  - la cuenta desactivada no entra y se le corta la sesión;
+  - la publicación pausada sale del Mercado;
+  - quien vende la puede reactivar.
+- **Inventario:** ningún control de las pestañas queda sin nombrar en la
+  guía.
 
-**Lo que decidís vos (no bloquea): el caso 137.** Exige que la ubicación
-pública de una publicación tenga exactamente tres campos, y ahora tiene
-`locality_label`. Lo actualicé para aceptarlo, con el motivo al lado: es el
-mismo lugar, con el departamento sólo en las homónimas. Siguen prohibidos,
-sin cambios, las coordenadas, el domicilio y la clave `department`. Si
-preferís que el 137 no cambie, la alternativa es no mandar el rótulo y
-armarlo en la pantalla, pero eso duplica la regla. **Recomiendo dejarlo
-así.**
+Con `--capturas` rehace las imágenes. `USER_MANUAL.md` ahora enlaza la guía
+en vez de su sección de administración.
+
+**Lo que decidís vos (no bloquea): suscripciones y teléfono.** Tu tarea pide
+decir que «el teléfono de contacto sólo sale con suscripción activa». Hoy
+eso no es lo que hace la plataforma:
+
+- `DECISIONS.md` pasa «los candados de contacto por plan» a la Fase 6.
+- No existe ninguna suscripción, ni un control en el panel para activarla.
+- La decisión del 26/07 decía que el administrador la activaba a mano; no
+  está construido.
+
+La guía dice lo que pasa hoy:
+
+- en el Mercado y en las fichas no aparece el teléfono de nadie;
+- quien compra y quien vende ven el del otro en su orden;
+- quien compra ve el del transportista después de elegirlo;
+- el transportista no recibe el contacto de quien compra.
+
+Y marca **suscripciones y planes: PENDIENTE**. Si la regla vigente es otra,
+se cambia ese párrafo. Conviene que Emi resuelva la contradicción entre las
+dos decisiones.
 
 ## Para verificar, lo mínimo
 
 ```
-SMOKE_CASOS=189 node scripts/smoke.mjs
-  → [PASS] 189 … tarjeta y ficha dicen «San Pedro (Choya), Santiago del
-    Estero»; la de Pergamino sigue «Pergamino, Buenos Aires». en el checkout,
-    «Base: San Pedro (Capital), Santiago del Estero», «a 90 km de San Pedro
-    (Choya)» y «desde San Pedro (Choya), Santiago del Estero». la orden ORD-…
-    dice «Base: San Pedro (Capital), Santiago del Estero» en «Mis compras». a
-    360 px, «Malvinas Argentinas (Malvinas Argentinas), Buenos Aires» entra
-    entero en la tarjeta y en la ficha, sin ensanchar el documento. el
-    transportista ve su base como «San Pedro (Capital)» y la operación como
-    «Retiro en San Pedro (Choya), Santiago del Estero — entrega en San Pedro
-    (Guasayán), Santiago del Estero»
+node scripts/guia-admin.mjs
+  → [OK] Paso 1. Abrir el panel … [OK] Paso 26. Volver a pedirla   (26 por ancho)
+    LA GUÍA Y EL PANEL COINCIDEN: 26 pasos en escritorio y celular
 
-python3 scripts/sabotajes_locality_label_display_1.py codigo-de-la-base
-  → [ROJO ESPERADO] [FAIL] 189 … la tarjeta de «Homonima189 Choya …» no dice
-    «San Pedro (Choya), Santiago del Estero»: dice «San Pedro, Santiago del
-    Estero», falta el departamento
-    src y backend despues: como estaban
+python3 scripts/sabotajes_admin_guide_1.py
+  → [ROJO ESPERADO] salida 1
+      [FALLA] Paso 5. Desactivar y volver a activar una cuenta: la guía nombra
+      «Suspender cuenta» y el panel no lo mostró en este paso
+    [ROJO ESPERADO] salida 1
+      [FALLA] Paso 6. Restablecer una contraseña: el panel no muestra
+      «Restablecer contraseña», que el recorrido tenía que tocar
+      [FALLA] inventario: la pestaña «Usuarios» muestra «Nueva contraseña» y
+      su sección de la guía no lo nombra
+    src y guía despues: como estaban
 ```
 
 **Antes de correrlos:**
 
 - Los dos necesitan la API en 8000, el frontend de desarrollo en 5173 y la
-  siembra demo, con `vendedor@ejemplo.com` y `cliente@ejemplo.com`.
-- Cada corrida del 189 deja cosas creadas:
-  - registra un transportista nuevo;
-  - crea una orden por transferencia del cliente demo; no mueve stock.
+  siembra demo, con `admin@topgreen.com`.
+- Para los conteos del resumen usan el mismo `docker exec topgreen-db psql`
+  que el smoke.
+- La guía tarda unos 4 min en los dos anchos. Los negativos, unos 3 min:
+  corren sólo en escritorio.
+- **Cada corrida deja cosas creadas:**
+  - cuatro cuentas;
+  - dos publicaciones, que termina eliminando;
+  - una orden por transferencia;
+  - dos presentaciones de documentación.
 
-  Al final borra sus tres publicaciones y vacía el carrito.
-- **El negativo toca el backend.** Reinicia la API con
-  `./scripts/entorno_nativo.sh --reiniciar-api` antes y después. Si tu API
-  no la levanta ese script, reiniciala vos después de `codigo-de-la-base` y
-  de `ficha-sin-rotulo`.
-- El caso tarda unos 6 s.
+  La categoría y la opción que crea las elimina el propio recorrido. Anda
+  sobre una base limpia o con restos: lo corrí de las dos formas.
+- `boton-inventado` usa una copia de la guía en una carpeta temporal.
+  `panel-cambiado` toca `AdminPanel.tsx` y lo restituye.
 
-## Inventario: dónde se muestra una localidad del padrón
+## Defectos encontrados, sin corregir
 
-| lugar | aplicado | medido por el 189 |
+Cada uno tiene su reproducción. La guía recorre los cuatro tal como están
+hoy, con una advertencia, así que si se corrigen el script falla y avisa que
+hay que actualizar la guía.
+
+1. **«Agotada» no hace lo que dice su confirmación.** El cuadro dice «Sigue
+   visible pero no se puede comprar.», pero la publicación sale del Mercado
+   y su enlace da 404: el catálogo y la ficha sólo muestran las activas.
+   Reproducción: `PATCH /api/admin/products/{id}/status` con
+   `{"status":"sold_out"}`; después `GET /api/catalog/products?search=…`
+   da 0 y `GET /api/catalog/products/{id}` da 404. Es el paso 12.
+2. **Quien vende ve «Activo» una publicación «Agotada» con stock.** «Mis
+   publicaciones» sólo reconoce pausada, o agotada por stock en cero
+   (`UserDashboard.tsx`, alrededor de la línea 372). Es el paso 12.
+3. **El detalle de una orden en el panel sale incompleto.**
+   - Dice «No hay detalles de items disponibles».
+   - El correo y la dirección de quien compra aparecen con un guion.
+   - El subtotal y el envío aparecen en $ 0, con el total correcto.
+
+   La causa es que `GET /api/admin/orders` no devuelve `items`,
+   `buyer_email`, `shipping_address`, `subtotal` ni `shipping_cost`
+   (`backend/app/api/admin.py:349-390`). Es el paso 14; la imagen
+   `ordenes-celular.png` lo muestra.
+4. **Desactivar tu propia cuenta no dice por qué no se puede.** El panel
+   muestra «Error al cambiar estado del usuario». El backend manda «No
+   puedes desactivar tu propia cuenta», pero `handleToggleUserActive` lo
+   descarta (`AdminPanel.tsx:855-863`). Con el rol propio sí muestra el
+   motivo. Es el paso 8.
+
+## Inventario: el panel contra la guía
+
+| pestaña | controles, según el código | pasos |
 |---|---|---|
-| Tarjeta del Mercado | sí | sí, también a 360 px |
-| Ficha | sí | sí, también a 360 px |
-| Checkout: base del transportista candidato | sí | sí |
-| Checkout: «a N km de» el origen, y «desde» los orígenes | sí | sí |
-| Checkout: base del transportista ya elegido | sí | no, es la misma línea que el candidato |
-| Traslado de la orden en «Mis compras» | sí, campo nuevo `carrier_base_label` | sí, API y pantalla |
-| Traslado de la orden en «Mis ventas» | sí, el mismo bloque que «Mis compras» | no |
-| Panel del transportista: su localidad base | sí | sí |
-| Panel del transportista: retiro y entrega de sus operaciones | sí | sí |
-| Tarjetas de Inicio y Servicios | sí, la misma tarjeta y la misma respuesta | no |
-| Selectores | ya estaba, `LOCALITY-DEDUP-1` | — |
+| — | abrir con «Admin», cerrar con «×» o Escape | 1 |
+| Dashboard | ocho números, cada uno comparado con un conteo propio en SQL | 2 |
+| Usuarios | búsqueda, filtros por rol y estado, paginador; «+ Crear Usuario» (campos, rol, errores); por fila: rol, «Desactivar»/«Activar», «Restablecer contraseña»; lista vacía | 3–8 |
+| Productos | filtro por estado, paginador; por fila: los cuatro estados | 9–13 |
+| Órdenes | filtro con los nueve estados, paginador, «Ver» y el detalle, que es de sólo lectura | 14 |
+| Categorías | filtro, «+ Nueva Categoría»; por categoría: mostrar u ocultar subcategorías, «Editar», «Eliminar»; subcategoría: agregar y eliminar | 15–18 |
+| Documentación | filtro, constancia, «Aprobar», «Rechazar» con motivo | 19–21 |
+| Configuración | cuatro listas, «+ Nueva Opción»/«Cerrar»; por opción: «Editar» (etiqueta, orden, estado), «Eliminar» | 22–25 |
+| todas | el aviso de carga fallida con «Reintentar» | 26 |
 
-**Dónde no lo apliqué, y por qué:**
+**Del código, sin paso, y por qué:**
 
-- **El texto `location` guardado en cada publicación** («San Pedro, Santiago
-  del Estero»). Ninguna pantalla lo muestra; lo busqué. Reescribirlo sería
-  tocar datos guardados.
-- **El origen congelado en cada ítem de orden** (`origin_locality_name`). No
-  se reescribe. Al mostrarlo en las operaciones, el rótulo sale del id del
-  mismo snapshot, no de la publicación de hoy.
-- **El domicilio del vendedor, la ubicación del perfil y la dirección de
-  envío.** Son texto libre, no vienen del padrón.
-- **El panel de administración.** No muestra localidades del padrón; sólo
-  filtra por provincia.
-- **Los correos.** Ninguno nombra una localidad.
+- **Provincias** en Configuración: el panel las retiró de la pantalla
+  (`TIPOS_RETIRADOS`).
+- **Activar o desactivar una categoría:** el panel dejó de ofrecerlo.
+- **Editar una subcategoría y borrar una publicación del todo:** existen en
+  la API, pero la pantalla no los ofrece.
+- **Marcas:** no se administran desde el panel. La guía lo dice. Quién las
+  carga en producción queda abierto.
 
-## Cómo
+**Del manual viejo, que eran falsos y la guía no repite:**
 
-- **`app/services/padron.py`.**
-  - Nueva `rotulos(db, ids)`: calcula el rótulo con la misma regla del
-    selector, que ahora vive en una sola función.
-  - Una anidada lleva el rótulo de su localidad.
-  - Mira sólo las localidades que comparten provincia y nombre con las
-    pedidas: dos consultas por página del Mercado, dos para la ficha y dos
-    por grupo de fletes.
-- **Campos agregados:**
-  - `locality_label` en la ubicación de la publicación;
-  - `label` en `LocalityBrief` y en `DistanceToOrigin`;
-  - `base_locality_label` en el candidato;
-  - `carrier_base_label` en el traslado de la orden;
-  - `carrier_base_locality_label` en el perfil.
+- sincronizar pagos por endpoint;
+- cancelar órdenes;
+- filtros de productos por categoría o vendedor;
+- «ver perfil completo» de un usuario.
 
-  Ningún campo existente cambió de valor.
-- **El frontend muestra el rótulo.** Si falta, muestra el nombre.
-- **El 137** se ajustó como dije arriba.
-
-## Los negativos
-
-`python3 scripts/sabotajes_locality_label_display_1.py` corre los cuatro:
-
-| negativo | qué rompe | rojo |
-|---|---|---|
-| `codigo-de-la-base` | backend y pantallas de `d6c19f4` | la tarjeta dice «San Pedro, Santiago del Estero», falta el departamento |
-| `ficha-sin-rotulo` | la ficha deja de recibir el rótulo | la ficha, falta el departamento |
-| `checkout-con-el-nombre` | el checkout muestra `base_locality_name` | «Base: San Pedro, Santiago del Estero», falta el departamento |
-| `rotulo-sin-cortes` | la ubicación de la tarjeta con `white-space: nowrap` | a 360 px el rótulo más largo queda recortado |
+En «Atajos útiles» también saqué el botón de tema oscuro y la campana, que
+no existen, y cambié «Avatar → Cerrar sesión» por **Salir**. Las secciones
+de comprador y vendedor no las toqué: van en otra pieza.
 
 ## Lo que corrí
 
 ```
-sobre 0830ac2
-  caso 189                                          1/1
-  negativos, los cuatro                             rojo esperado, src y backend como estaban
-sobre el mismo producto, base limpia
-  63 casos (lista abajo)                            62/63: falló el 137 por la clave nueva
-  137 y 189 después de ajustar el 137               2/2
-  a11y --todas                                      76/76, 0 violaciones
-  contraste                                         84/84
-  auditoría móvil                                   12/12 recorridos, 39 pantallas, 0 hallazgos, exit 0
-build · lint · tsc --noEmit · py_compile · node --check · diff-check   verdes
+sobre 81f40dd, base limpia
+  node scripts/guia-admin.mjs                 26/26 en escritorio y 26/26 en celular
+  python3 scripts/sabotajes_admin_guide_1.py  los dos en rojo esperado, src y guía como estaban
+antes, con el mismo producto y la misma guía
+  --capturas sobre base limpia                26/26 y 26/26, 14 imágenes
+build · node --check · py_compile · diff-check   verdes
+git diff 238e6f7 81f40dd -- src backend          vacío
 ```
 
-**Los 63 casos:**
+- Las imágenes salen de la corrida anterior al último ajuste del script,
+  que sólo cambió cómo se escribe el motivo de una falla.
+- En las capturas, los avisos de pasos anteriores se ocultan sólo en la
+  imagen; la aplicación no se toca.
+- La contraseña temporal del paso 6 no se captura.
 
-- 1–22, los prerequisitos.
-- Transportista y fletes: 39, 41–43, 46, 50–58, 110–115, 132, 133, 140,
-  149, 151, 154, 156, 157, 164.
-- La ubicación en la tarjeta y la ficha: 121, 137, 152, 155.
-- Checkout: 176, 178, 184.
-- Ficha y localidades: 183, 185, 186, 188.
-- El 189.
+**Credenciales y términos comerciales:**
 
-**Sobre la auditoría móvil:** la siembra demo no tiene localidades
-homónimas, así que no ejercita un rótulo más largo. Eso lo mide el 189 a
-360 px con el rótulo más largo del padrón, y lo prueba el negativo
-`rotulo-sin-cortes`.
-
-Los finales de línea de los quince archivos quedaron como estaban: el diff
-con y sin `--ignore-cr-at-eol` da lo mismo.
+- La única cuenta que aparece es la demo de administración, marcada como
+  pública y a cambiar antes de producción.
+- El alias de cobro de la vendedora del script es inventado, y los CUIT son
+  los de prueba del arnés.
+- La guía no nombra montos, porcentajes ni comisiones. Los importes de las
+  imágenes son de la base demo.
 
 ## Riesgos
 
-- El perfil calcula el rótulo de la base al serializarse, con una o dos
-  consultas chicas por pedido de `/auth/me` o de ingreso.
-- Si se reimportara el padrón con otras homónimas, los rótulos cambiarían
-  solos. No se guardan en ningún lado.
+- El script reconoce partes del panel por fragmentos de nombres de clase
+  (`categoryCard`, `statCard`, `_toastContainer_`) y por sus textos. Si se
+  renombran, falla y lo dice. Es lo buscado, pero puede pedir ajustar el
+  script además de la guía.
+- Las imágenes quedan en el repositorio y no se rehacen solas: hay que
+  correr `--capturas` cuando el panel cambie.
 
-No toqué `main`, Railway, datos ni el padrón, y no desplegué. Freno acá.
+No toqué `main`, Railway, `src/`, `backend/` ni datos, y no desplegué. Freno
+acá.
