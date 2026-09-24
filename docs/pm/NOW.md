@@ -1,18 +1,34 @@
 # Estado actual
 
-Actualizado: 2026-09-23.
+Actualizado: 2026-09-24.
 
 `NOW.md` contiene sólo estado vigente, restricciones vivas, bloqueos y próxima acción. La historia anterior permanece en Git; la instantánea previa a esta poda está en `ab4165fc`.
 
 ## Resumen ejecutivo
 
-- **Fase contractual:** Fase 2 — Desarrollo base, semana 5. Ventana contractual: 04/09–24/09. Su puerta funcional quedó verificada el 23/09 sobre la composición aceptada `1e4a63c`; la evidencia está en `REPRODUCCION-FASE-2-2026-09-23.md`. Las fechas y las puertas posteriores no cambian.
+- **Fase contractual:** Fase 2 — Desarrollo base, semana 5, último día (ventana 04/09–24/09). Su puerta funcional quedó verificada el 23/09 sobre `1e4a63c` (`REPRODUCCION-FASE-2-2026-09-23.md`). Desde el **25/09** corre la **Fase 3**, semanas 6–8, hasta el 15/10. Su puerta y el hito intermedio ya quedaron aceptados por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `0bd7fbc`; `RISK-REC-1` integrada y publicada con autorización de Emi. GitHub, Frontend y Backend convergieron en ese SHA y los dos servicios quedaron saludables. El entorno `strong-playfulness` sigue siendo demostrativo y no equivale al despliegue productivo contractual.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `PRODUCT-DETAIL-BACK-SEARCH-1` en `ce0380e`, informe `2c300bf`. PM aceptó la pieza en rama; aún no integrada ni desplegada.
-- **Última decisión PM:** `PRODUCT-DETAIL-BACK-SEARCH-1` **ACEPTADA EN RAMA**. PM reprodujo el caso 186 en 1/1 (10 vueltas, 1.493 cuadros), el negativo rojo en 10 de 10 vueltas y los casos 147, 148, 183 y 185 en 4/4. Evidencia en `REPRODUCCION-PRODUCT-DETAIL-BACK-SEARCH-1-2026-09-23.md`.
-- **Tarea activa:** `FILTER-COLLAPSE-FOCUS-1`, asignada a Dev en `PARA-DEV.md`: con el panel de filtros cerrado, el teclado no entra en controles invisibles.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `FILTER-COLLAPSE-FOCUS-1` en `4fa8809`, informe `0fd3217`. PM aceptó la pieza en rama; aún no integrada ni desplegada. La rama contiene a `main`: integrar es publicar 39 commits, que incluyen la migración de `PRIMARY-IMAGE-INTEGRITY-1`.
+- **Última decisión PM:** `FILTER-COLLAPSE-FOCUS-1` **ACEPTADA EN RAMA**. PM reprodujo el caso 187 en 1/1, tres negativos rojos, 7/7 relacionados, a11y 76/76, contraste 84/84 y auditoría móvil 12/12. Evidencia en `REPRODUCCION-FILTER-COLLAPSE-FOCUS-1-2026-09-24.md`.
+- **Tarea activa:** ninguna. El QA responsive en rama quedó sin hallazgos abiertos. El siguiente paso de valor es integrar, y eso espera la decisión de Emi sobre la recuperación previa a la migración. PM no abre una pieza de relleno.
 
-## Última aceptación PM — PRODUCT-DETAIL-BACK-SEARCH-1
+## Última aceptación PM — FILTER-COLLAPSE-FOCUS-1
+
+PM verificó la candidata `4fa8809` sobre una base PostGIS Docker recién
+creada. Caso 187 en **1/1**: a 360, 390 y 768 px, con el panel cerrado, Tab
+va de «Filtros» a «Ordenar» y los controles no están en el árbol de
+accesibilidad. Abierto, se recorren en orden y filtran. «Ver N resultados»
+deja el foco en «Filtros» a la vista. Los tres negativos dieron rojo por su
+causa. Casos 148, 155, 171, 175, 183, 185 y 186 en **7/7**; a11y **76/76**;
+contraste **84/84**; auditoría móvil **12/12** sin hallazgos. Build, lint,
+tipos y diff-check verdes.
+
+Decisión PM de experiencia: se acepta que «Ver N resultados» vuelva al
+principio del Mercado con «Filtros» visible. La primera tarjeta queda a
+451 px, igual que al entrar. El giro de tablet con el foco dentro del panel
+queda como P3, sin tarea. Sin integración ni despliegue.
+
+## Aceptación anterior — PRODUCT-DETAIL-BACK-SEARCH-1
 
 PM verificó la candidata `ce0380e` sobre una base PostGIS Docker recién
 creada, con API nativa y frontend de desarrollo. El caso 186 pasó **1/1**:
@@ -353,7 +369,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev trabaja `FILTER-COLLAPSE-FOCUS-1`; PM verificará Tab con el panel cerrado y abierto en 360/390/768 y escritorio, con negativo discriminante. Las nueve piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue.
+1. Las diez piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue. Integrarlas publica la migración de imágenes. Antes, Emi decide la recuperación previa (punto 2). Después, PM corre la suite completa desde base limpia sobre el SHA exacto, incluido el caso 131 en Docker, y prepara la publicación, que requiere autorización explícita de Emi.
 2. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración. La propuesta de recuperación pre-migración espera decisión de Emi y verificación autenticada de Railway.
 3. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 4. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
