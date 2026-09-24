@@ -1,9 +1,10 @@
-# Reproducción PM — ADMIN-GUIDE-1, ronda 1
+# Reproducción PM — ADMIN-GUIDE-1
 
 Fecha: 2026-09-24. Base de la tarea `238e6f7`; guía, imágenes, script y
 negativos `81f40dd`; informe Dev `decbe3e` (sólo `docs/pm/PARA-PM.md`).
-`main` permanece en `0bd7fbc`. **Devuelta, ronda 1 de 2**, con una sola
-corrección. Sin integración ni despliegue.
+`main` permanece en `0bd7fbc`. Ronda 1: **devuelta** por una sola
+corrección. Ronda 2, candidato `091e846`, informe `d0aff46`: **aceptada en
+rama** (ver al final). Sin integración ni despliegue.
 
 ## Qué se revisó
 
@@ -94,3 +95,54 @@ están hoy y el script falla cuando se corrijan.
 
 No se tocó `main`, Railway, backend remoto ni datos reales. Contenedor,
 copia y procesos temporales se retiran al cerrar la revisión.
+
+## Ronda 2 — `091e846`, aceptada en rama
+
+La ronda verifica la corrección y lo que la rodea; no reaudita la pieza.
+
+**Qué cambió.**
+
+- Cada comprobación del recorrido lleva la frase exacta de la guía que la
+  describe (`v.afirma`). Si la frase cambia o se borra, el script falla y
+  nombra el paso.
+- Las frases que no se pueden comprobar se listan al final de la guía, con
+  su fuente. El script verifica que sigan escritas igual.
+- La guía corrigió tres afirmaciones que eran inexactas: pasos 5, 7 y 14.
+- `git diff 238e6f7 091e846 -- src backend` está vacío.
+
+**Entorno.** Es el mismo de la ronda 1, con una base recién creada.
+
+La primera corrida dio rojo en los pasos 5 y 10 porque todavía no existía
+`backend/outbox`. La API la crea recién con el primer correo, aunque
+`EMAIL_TRANSPORT=outbox` esté configurado. PM creó esa carpeta vacía, que es
+el mismo estado que deja el primer correo, y repitió todo. Queda como P3 del
+arnés.
+
+| Verificación | Resultado |
+|---|---|
+| `node scripts/guia-admin.mjs` | **26/26** en escritorio y **26/26** en celular, salida 0 |
+| Mis tres afirmaciones falsas de la ronda 1, juntas | **rojo**: pasos 3, 5 y 10, cada uno citando su frase |
+| Negativo PM nuevo: paso 11, «vuelve a verse en el Mercado» → «queda oculta del Mercado» | **rojo**: «Paso 11 … la guía ya no dice “La publicación vuelve a verse en el Mercado.”» |
+| Negativo PM: una frase falsa **agregada** («Quien vende recibe un correo que le avisa la pausa.») | **verde** |
+| Los siete negativos de Dev | **siete rojos esperados**; `src` y la guía quedaron como estaban |
+| Build, `node --check`, `py_compile`, diff-check con `cr-at-eol` | verdes |
+
+**Límite aceptado.** Una frase nueva, que no está atada a ninguna
+comprobación ni figura en la lista de las que no se comprueban, no se
+detecta hasta que alguien la ate o la declare. La guía lo dice en «Cómo se
+comprueba esta guía». No tiene arreglo automático razonable y no es P0 ni
+P1. Todo lo que la guía afirmaba al entregarse quedó atado o declarado.
+
+## Defecto nuevo informado por Dev
+
+Quien vende puede volver a activar una publicación que el administrador
+eliminó, con `PATCH /api/products/{id}` y `{"status":"active"}`.
+
+PM lo confirmó en el código (`backend/app/api/products.py`,
+`update_product`): la edición sólo verifica que la publicación sea de quien
+la edita, y el esquema acepta `active` y `paused` sin mirar el estado
+actual. Además, el paso 13 del recorrido lo reproduce en cada corrida.
+
+**Severidad PM: P1.** «Eliminada» es la herramienta de moderación del panel,
+y así se deshace en silencio. Va primero en la pieza siguiente. No se
+reprodujo contra Railway.
