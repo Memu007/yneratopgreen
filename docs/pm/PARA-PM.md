@@ -2,173 +2,168 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## FILTER-COLLAPSE-FOCUS-1 — entregada, para tu revisión
+## LOCALITY-DEDUP-1 — entregada, para tu revisión
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `d468a8b` |
-| candidato (panel + caso 187 + negativos + marcador de a11y y contraste) | `4fa8809` |
+| base | `c6e0f4a` |
+| candidato (padrón + selectores + caso 188 + negativos) | `34bab15` |
 | no integrado, no desplegado | `main` sigue en `0bd7fbc` |
 
-**Resultado.** A 360, 390 y 768 px, con el panel cerrado:
+**Resultado.**
 
-- Tab va de «Filtros» a «Ordenar» en un solo paso;
-- ninguno de los 12 controles del panel está en el árbol de accesibilidad
-  (los 11 alcanzables más «Localidad», que está deshabilitada).
+- Ningún selector de localidad ofrece dos veces lo mismo. Las 24 provincias
+  ofrecen 3923 localidades de las 4028 del padrón: exactamente sin las 105
+  entidades anidadas.
+- Las homónimas llevan el departamento en el rótulo: «San Pedro (Capital)»,
+  «San Pedro (Choya)», etc.
+- Buenos Aires ofrece una sola «Mar del Plata», medido en el filtro del
+  Mercado y en el alta.
+- Una publicación guardada en la «Mar del Plata» anidada (`0635711003`):
+  - aparece al filtrar por Mar del Plata (`06357110`);
+  - su ficha dice «Mar del Plata, Buenos Aires»;
+  - el editor la muestra en Mar del Plata, y editarle el precio conserva
+    `0635711003`.
+- **Sin migración ni datos tocados.** La regla sale del identificador y del
+  nombre.
 
-Con el panel abierto:
+**Una corrección a tu premisa: son 51 pares homónimos, no 49.** Tu medición
+de 154 pares y 105 anidadas es correcta. La cuenta del resto:
 
-- Tab recorre los 11 controles en su orden;
-- escribir un precio mínimo con el teclado filtra;
-- «Ver N resultados» cierra el panel y deja el foco en «Filtros», a la vista.
+- 105 de los 154 pares tienen una entidad anidada, y 49 no.
+- Pero 2 de esos 105 tienen además una homónima en otro departamento:
+  «Malvinas Argentinas» en Buenos Aires y «San José» en Catamarca.
+- Al sacar las anidadas quedan **51 pares repetidos (108 localidades)**,
+  todos distinguibles por departamento. Ninguno comparte departamento.
 
-A 1280 px, los 10 controles del panel siguen en el recorrido de Tab. Con el
-componente de la base, el 187 da rojo y nombra los 11 controles invisibles.
+El caso exige 51. Si en tus documentos queda 49, conviene corregirlo.
 
-**Lo que decidís vos (no bloquea).** Tu criterio pide «Filtros» visible
-después de «Ver N resultados», y eso mueve la página. Medido con el dedo,
-después de bajar hasta el botón:
-
-| a 360 px | base | ahora |
-|---|---|---|
-| «Filtros» | fuera de la pantalla (−75 px) | a la vista (218 px) |
-| foco | en «Ver 35 resultados», que ya no se ve | en «Filtros» |
-| primera tarjeta | a 158 px | a 451 px |
-
-A 768 px, la primera tarjeta pasa de 110 a 362 px. **Recomiendo dejarlo
-así.** La alternativa es pegar «Filtros» al borde de arriba; por cuenta, no
-medido, la primera tarjeta subiría unos 218 px. Entre 600 y 1023 px la
-cabecera queda fija arriba, así que esa opción necesita un margen distinto
-según el ancho.
-
-**Para que no te sorprenda: a11y y contraste suman dos pantallas.** Pasan
-de 74 a 76 y de 82 a 84, por una superficie nueva, «catálogo: filtros
-abiertos».
-
-- El marcador del catálogo era `#catalog-category`, un control del panel.
-- En celular contaba como «visible» aunque estaba recortado. Ahora está
-  oculto de verdad, y los dos scripts no llegaban al catálogo.
-- El marcador pasa a ser «Ordenar».
-- La superficie nueva abre el panel en celular para medir sus controles
-  donde se ven. En escritorio es la misma pantalla que el catálogo.
+**Lo que decidís vos (no bloquea).** Filtrar por el identificador de una
+anidada, que sólo puede llegar por un enlace viejo porque ningún selector lo
+ofrece, ahora cuenta como su localidad y trae todo Mar del Plata. Antes traía
+sólo lo guardado en ese identificador. **Recomiendo dejarlo así:** es el
+mismo lugar, y es lo que el selector va a mostrar elegido. La alternativa es
+filtrarlo tal cual; es una línea en `app/services/padron.py`.
 
 ## Para verificar, lo mínimo
 
 ```
-SMOKE_CASOS=187 node scripts/smoke.mjs
-  → [PASS] 187 … 360px: cerrado, «Filtros» → «Ordenar» en 1 Tab y 12
-    controles fuera del árbol; abierto, 11 controles en orden; precio mínimo
-    30 → 10; «Ver 10 resultados» deja el foco en «Filtros». 390px … 768px …
-    1280px: los 10 controles del panel siguen en el recorrido de Tab, a la vista
+SMOKE_CASOS=188 node scripts/smoke.mjs
+  → [PASS] 188 … 24 provincias: 3923 localidades ofrecidas de las 4028 del
+    padrón, sin las 105 anidadas; 51 nombres homónimos (108 localidades), cada
+    una con su departamento; ningún rótulo repetido. en el filtro del Mercado
+    y en el alta, Buenos Aires ofrece una «Mar del Plata» y Santiago del
+    Estero San Pedro (Capital), San Pedro (Choya), San Pedro (Guasayán), San
+    Pedro (Jiménez). la publicación guardada en 0635711003 aparece al filtrar
+    por Mar del Plata (06357110), su ficha dice «Mar del Plata, Buenos Aires»,
+    el editor la muestra en Mar del Plata y editar el precio conserva 0635711003
 
-python3 scripts/sabotajes_filter_collapse_focus_1.py componente-de-la-base
-  → [ROJO ESPERADO] [FAIL] 187 … a 360px, con «Filtros» cerrado, Tab cayó en
-    11 controles que no se ven antes de «Ordenar»: «Tipo» (#catalog-type),
-    «Categoría» (#catalog-category), «Provincia» (#catalog-province), «Precio
-    mínimo» (#catalog-price-min), «Precio máximo» (#catalog-price-max), «Solo
-    con stock disponible», «Calificación mínima del vendedor» (#catalog-rating),
-    «Condición» (#catalog-condition), «Marca» (#catalog-brand), «Limpiar
-    filtros», «Ver 30 resultados»
-    src despues: como estaba
+python3 scripts/sabotajes_locality_dedup_1.py codigo-de-la-base
+  → [ROJO ESPERADO] [FAIL] 188 … 154 localidades se ofrecen repetidas sin nada
+    que las distinga: «Mar del Plata» (Buenos Aires) aparece 2 veces;
+    «Avellaneda» (Buenos Aires) aparece 2 veces; «Bahía Blanca» …
+    src y backend despues: como estaban
 ```
 
 **Antes de correrlos:**
 
 - Los dos necesitan la API en 8000, el frontend de desarrollo en 5173 y la
-  siembra demo.
-- El 11 incluye «Marca», que sólo aparece si el Mercado tiene marcas; la
-  siembra demo las tiene.
-- Sobre la base demo limpia salen 30 publicaciones, y el precio mínimo las
-  baja a 10. Si antes corrieron otros casos, el 30 cambia; en mi corrida
-  eran 35.
-- El caso tarda unos 6 s y cada negativo, unos pocos segundos.
+  siembra demo, con la cuenta `vendedor@ejemplo.com`.
+- La parte de lo ya guardado la cubre el propio 188: crea la publicación
+  sobre `0635711003` por la API, que acepta cualquier id del padrón, y la
+  retira al final.
+- **El negativo toca el backend.** Reinicia la API con
+  `./scripts/entorno_nativo.sh --reiniciar-api` antes y después. Si tu API
+  no la levanta ese script, reiniciala vos después de cada negativo que
+  toque `catalog.py`: `codigo-de-la-base` y `filtro-sin-anidadas`.
+- El caso tarda unos 5 s.
 
-**Sobre tu Chromium 141.** El negativo `desplazamiento-sin-cortar` depende
-de en qué cuadro llega Enter. Mide si el desplazamiento suave que trae el
-botón se corta a tiempo.
+## Causa y corrección
 
-- En 5 de 5 corridas dio rojo en alguno de los tres anchos, pero no siempre
-  en el mismo.
-- Con otro Chromium puede cambiar el ancho. Si da verde, avisame con la
-  salida.
-- Los otros dos negativos no dependen del tiempo.
+Georef lista algunas localidades dos veces: la localidad y, adentro, una
+entidad con el mismo nombre. `/catalog/localities` devolvía las dos, y los
+seis selectores las mostraban tal cual.
 
-## Causa
+- **La regla.** Está en `backend/app/services/padron.py`, sin columna
+  nueva. Una entidad anidada:
+  - tiene diez dígitos;
+  - sus ocho primeros son una localidad presente;
+  - repite su nombre.
 
-- **El foco en controles invisibles.** Por debajo de 1024 px, el panel se
-  plegaba sólo con `max-height: 0` y `overflow: hidden`. Eso recorta lo que
-  se ve, pero no saca los controles del recorrido de Tab ni del árbol de
-  accesibilidad. Ahora el panel plegado lleva además `visibility: hidden`, y
-  al abrirse vuelve a `visible`.
-  - El nodo sigue siendo el mismo y el plegado sigue siendo por altura, así
-    que el motivo documentado en el CSS se mantiene.
-  - La regla está dentro de `@media (max-width: 1023px)`, así que el
-    escritorio no cambia.
-- **«Ver N resultados».** Al plegarse, el botón quedaba oculto con el foco
-  encima y Chrome devolvía el foco al documento. Ahora el foco pasa a
-  «Filtros».
-- **Encontrado en el camino: el desplazamiento suave.** Viene de
-  `scroll-behavior: smooth` en `index.css`.
-  - Si Enter llega antes de que termine el desplazamiento que Tab usó para
-    traer «Ver N resultados», ese desplazamiento seguía después de plegar y
-    dejaba «Filtros» 475 px por encima de la pantalla.
-  - `scrollIntoView` no lo corta cuando no tiene nada que mover; un
-    `scrollTo` a la posición actual sí.
-  - Medido con Enter a 0, 16, 50, 100, 200, 400 y 800 ms del Tab, en los
-    tres anchos: sin el corte quedaron 3 de 21 fuera de la pantalla, todos
-    los de 0 ms; con el corte, ninguno.
-  - «Filtros» se centra en vez de subirse al borde, porque entre 600 y
-    1023 px la cabecera fija lo taparía. Como está cerca del principio de
-    la página, centrarlo en la práctica lleva la página arriba de todo.
+  Da exactamente las 105. Todas están a 2,3 km o menos de su localidad (96 a
+  menos de 1 km), medido con PostGIS.
+- **`/localities`.**
+  - No las ofrece.
+  - Agrega `label`: el nombre, con el departamento sólo si el nombre se
+    repite en la provincia.
+  - Agrega `nested_ids`: las anidadas que absorbe cada localidad.
+  - Los campos anteriores no cambian.
+- **El filtro `locality_id`** cubre la localidad y sus anidadas. La faceta
+  de marcas sale de la misma consulta.
+- **Los selectores:** filtro del Mercado, alta y edición de publicación,
+  registro, perfil de transportista y destino del checkout.
+  - Muestran `label`.
+  - Los tres que abren con un valor guardado (edición, perfil de
+    transportista y filtro del Mercado) muestran la localidad que lo absorbe
+    sin cambiar lo guardado; lo guardado cambia sólo si se elige otra.
+- **El panel admin** no tiene selector de localidad, sólo de provincia. No
+  había nada que cambiar.
+- No cambió ningún `locality_id` guardado ni ninguna fila del padrón.
 
-Cambios de producto: `FilterSidebar.module.css` (+9) y `FilterSidebar.tsx`
-(+24 −3).
+En la base demo no hay publicaciones ni transportistas sobre una anidada:
+por eso el 188 crea la suya. En Railway no lo pude medir.
 
 ## Los negativos
 
-`python3 scripts/sabotajes_filter_collapse_focus_1.py` corre los tres:
+`python3 scripts/sabotajes_locality_dedup_1.py` corre los cuatro:
 
 | negativo | qué rompe | rojo |
 |---|---|---|
-| `componente-de-la-base` | componente y CSS de `d468a8b` | Tab cae en los 11 controles invisibles, nombrados |
-| `foco-sin-volver` | «Ver N resultados» sólo pliega | el foco quedó en «ningún control: el foco volvió al documento» |
-| `desplazamiento-sin-cortar` | sin el `scrollTo` que corta | «Filtros» con el foco pero a −475 px |
+| `codigo-de-la-base` | catálogo y los seis archivos de `src` de `c6e0f4a` | «Mar del Plata» (Buenos Aires) aparece 2 veces; 154 repetidas |
+| `filtro-sin-anidadas` | el filtro vuelve a `==` | filtrar por Mar del Plata no trae lo guardado en `0635711003` |
+| `editor-sin-absorber` | el editor busca lo guardado sólo entre las opciones | el editor muestra «Seleccionar...» para una publicación que tiene localidad |
+| `rotulo-sin-departamento` | el filtro del Mercado muestra `name` | las cuatro «San Pedro» sin departamento |
+
+El tercero muestra lo que habría pasado sin absorber: el editor decía
+«Seleccionar...» aunque guardar conservaba la localidad.
 
 ## Lo que corrí
 
 ```
-sobre 4fa8809
-  negativos, los tres                     rojo esperado, src como estaba
-  desplazamiento-sin-cortar               rojo en 5 de 5 corridas
-  a11y --todas                            76/76, 0 violaciones
-  contraste                               84/84, 0 por debajo del mínimo
-  auditoría móvil                         12/12 recorridos, 39 pantallas,
-                                          0 hallazgos, exit 0
-  panel-cerrado de MOBILE-AUDIT-FLOW-1    sigue dando su rojo
-  build · lint · tsc --noEmit · node --check · py_compile · diff-check
-                                          verdes
-smoke, base limpia
-  1–6, 147, 148, 155, 171, 175, 183, 185, 186, 187       15/15
+sobre 34bab15
+  caso 188                                          1/1
+  negativos, los cuatro                             rojo esperado, src y backend como estaban
+sobre el mismo producto, antes del commit, base limpia
+  61 casos (lista abajo)                            61/61
+  a11y --todas                                      76/76, 0 violaciones
+  contraste                                         84/84
+build · lint · tsc --noEmit · py_compile · node --check · diff-check   verdes
 ```
 
-- El smoke corrió antes del último ajuste del commit, que cambió sólo una
-  comprobación del negativo (tres líneas). Producto y caso son los mismos.
-- Sumé 155 y 175 a los que pediste porque son los que operan el panel en
-  celular.
-- Al editar, el componente había perdido sus finales de línea mixtos. Los
-  restituí: el diff muestra sólo el cambio.
+**Los 61 casos y por qué:**
+
+- 1–22: los prerequisitos de estado. Además, 9 y 10 publican eligiendo
+  localidad y 22 registra un transportista.
+- Localidad en la pantalla o en el filtro: 39, 43, 46, 52, 57, 58, 110, 121,
+  133, 137, 151, 152, 154, 157, 164, 167, 176, 178.
+- Transportista y fletes: 41, 42, 50, 51, 53, 54, 55, 56, 111–115, 132,
+  140, 149, 156.
+- PostGIS: 43 y 50.
+- Filtros y paginación del Mercado sobre la misma consulta: 171, 175 y 186.
+- El 188.
+
+Los elegí buscando en el arnés las rutas de localidades, los selectores de
+localidad, transportista y `ST_Distance`.
+
+Los finales de línea de los ocho archivos quedaron como estaban: el diff con
+y sin `--ignore-cr-at-eol` da lo mismo.
 
 ## Visto y no tocado
 
-- **Pasar de escritorio a menos de 1024 px con el foco adentro del panel**,
-  por ejemplo al girar una tablet: el panel se pliega con el foco adentro y
-  el foco vuelve al documento. No hay un «cerrar» que lo provoque, así que
-  excede la pieza.
-- **Las fechas de fase.** `NOW.md` dice Fase 2, con ventana 04/09–24/09,
-  es decir hoy. `CRONOGRAMA.md` pone la Fase 3 (buscador, catálogo y
-  geolocalización de fletes) del 25/09 al 15/10, y la próxima secuencia de
-  `NOW.md` no dice nada del cambio de fase. Es tuyo y de Emi; te lo marco
-  para que no quede colgado.
+- **La ficha y la tarjeta** muestran «San Pedro, Santiago del Estero» sin
+  departamento. Quien compra no distingue cuál de las cuatro es. Está fuera
+  de alcance, porque la tarea es sobre los selectores.
+- **La cuenta de 51 homónimas** está arriba; corrige la premisa.
 
-No toqué `main`, Railway, backend ni datos, y no desplegué. Freno acá.
+No toqué `main`, Railway, datos ni el padrón, y no desplegué. Freno acá.
