@@ -101,7 +101,7 @@ transportista; producto inicial `1e8822d`, cierre `3580faa` e informe `803e8e9`.
 | Pruebas integrales | ✅ La composición publicada `0bd7fbc` pasó 178/178 desde base limpia, a11y 74/74 y contraste 82/82; Frontend y Backend convergieron. La candidata posterior en rama `1e4a63c` cubrió los 181 casos: suite Docker limpia 180/181 por falta de Git en el entorno temporal y caso 157 repetido 1/1 con Git. No equivale al QA final ni al lanzamiento. |
 | Carga inicial de datos | ✅ Seed idempotente con 30 publicaciones en 12 categorías y 9 provincias, más 4.028 localidades. Verificado corriéndolo dos veces sin duplicar |
 | Despliegue en producción | ❌ |
-| Capacitación del panel de administración | ❌ |
+| Capacitación del panel de administración | ❌ `ADMIN-GUIDE-1` asignada: guía verificada por script; `USER_MANUAL.md` §Administrador describe un panel que no es el actual |
 | Documentación técnica del despliegue | ⚪ `README.md` y `README_LOCAL_SETUP.md` corregidos al stack real. `PROJECT_STATUS.md` sigue con ocho afirmaciones verificadas como falsas |
 | Garantía de 90 días | No aplica hasta el lanzamiento |
 

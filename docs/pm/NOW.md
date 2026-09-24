@@ -8,11 +8,21 @@ Actualizado: 2026-09-24.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5, último día (ventana 04/09–24/09). Su puerta funcional quedó verificada el 23/09 sobre `1e4a63c` (`REPRODUCCION-FASE-2-2026-09-23.md`). Desde el **25/09** corre la **Fase 3**, semanas 6–8, hasta el 15/10. Su puerta y el hito intermedio ya quedaron aceptados por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `0bd7fbc`; `RISK-REC-1` integrada y publicada con autorización de Emi. GitHub, Frontend y Backend convergieron en ese SHA y los dos servicios quedaron saludables. El entorno `strong-playfulness` sigue siendo demostrativo y no equivale al despliegue productivo contractual.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `LOCALITY-DEDUP-1` en `34bab15`, informe `fc246c0`. PM aceptó la pieza en rama; aún no integrada ni desplegada. La rama contiene a `main`: integrar es publicar todo lo aceptado desde `0bd7fbc`, incluida la migración de `PRIMARY-IMAGE-INTEGRITY-1`.
-- **Última decisión PM:** `LOCALITY-DEDUP-1` **ACEPTADA EN RAMA**. PM midió en SQL 105 anidadas y 51 homónimas, reprodujo el caso 188 en 1/1, cuatro negativos rojos, 45/45 relacionados, a11y 76/76, contraste 84/84 y auditoría 12/12. Evidencia en `REPRODUCCION-LOCALITY-DEDUP-1-2026-09-24.md`.
-- **Tarea activa:** `LOCALITY-LABEL-DISPLAY-1`, asignada a Dev en `PARA-DEV.md`: tarjeta, ficha y base del transportista muestran el departamento de las localidades homónimas.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `LOCALITY-LABEL-DISPLAY-1` en `0830ac2`, informe `8e64f82`. PM aceptó la pieza en rama; aún no integrada ni desplegada. La rama contiene a `main`: integrar es publicar todo lo aceptado desde `0bd7fbc`, incluida la migración de `PRIMARY-IMAGE-INTEGRITY-1`.
+- **Última decisión PM:** `LOCALITY-LABEL-DISPLAY-1` **ACEPTADA EN RAMA**. PM reprodujo el caso 189 en 1/1, cuatro negativos rojos, 62/62 relacionados (incluido el 137 ajustado, sin debilitar privacidad), a11y 76/76, contraste 84/84 y auditoría 12/12. Evidencia en `REPRODUCCION-LOCALITY-LABEL-DISPLAY-1-2026-09-24.md`.
+- **Tarea activa:** `ADMIN-GUIDE-1`, asignada a Dev en `PARA-DEV.md`: guía del panel de administración para la clienta, verificada por script contra el panel real. Es la capacitación básica del contrato.
 
-## Última aceptación PM — LOCALITY-DEDUP-1
+## Última aceptación PM — LOCALITY-LABEL-DISPLAY-1
+
+Contrato 3.1, ubicación visible. Las localidades homónimas muestran el
+departamento en tarjeta, ficha, checkout, traslado de la orden y panel del
+transportista, con la misma regla del selector. La API sólo agrega campos y
+no hay datos reescritos. PM reprodujo el caso 189 en **1/1**, cuatro
+negativos rojos, **62/62** relacionados, a11y 76/76, contraste 84/84 y
+auditoría 12/12. El caso 137 admite el rótulo nuevo sin debilitar la
+privacidad. Sin integración ni despliegue.
+
+## Aceptación anterior — LOCALITY-DEDUP-1
 
 Contrato 3.1 y devolución de la clienta #8. Los selectores dejan de ofrecer
 las 105 entidades anidadas de Georef que repetían su localidad. Las 51
@@ -381,14 +391,14 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev trabaja `LOCALITY-LABEL-DISPLAY-1`, que completa la ubicación visible después de `LOCALITY-DEDUP-1`. Huecos del MVP que no dependen de Emi y
+1. Dev trabaja `ADMIN-GUIDE-1`: capacitación básica del panel de administración (contrato, Fase 5), verificada por script. Después siguen las secciones de comprador y vendedor del manual y #1 «agropecuario». Huecos del MVP que no dependen de Emi y
    siguen después, en orden: los ajustes chicos de la devolución de la
    clienta que no esperan decisión (#1 «agropecuario»); después, material de
    capacitación del panel admin y documentación técnica del despliegue
    (Fase 5), una vez fijada la infraestructura. Los que sí dependen de Emi:
    SMTP (la clienta no pudo registrarse), cuentas de prueba de Mercado Pago,
    backups e integración, y las decisiones #5, #7 y #10 de la clienta.
-2. Las once piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue. Integrarlas publica la migración de imágenes. Antes, Emi decide la recuperación previa (punto 3). Después, PM corre la suite completa desde base limpia sobre el SHA exacto, incluido el caso 131 en Docker, y prepara la publicación, que requiere autorización explícita de Emi.
+2. Las doce piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue. Integrarlas publica la migración de imágenes. Antes, Emi decide la recuperación previa (punto 3). Después, PM corre la suite completa desde base limpia sobre el SHA exacto, incluido el caso 131 en Docker, y prepara la publicación, que requiere autorización explícita de Emi.
 3. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración. La propuesta de recuperación pre-migración espera decisión de Emi y verificación autenticada de Railway.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 5. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
