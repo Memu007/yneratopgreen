@@ -42,6 +42,13 @@ export const SUPERFICIES = [
   { id: 'contacto' },
   { id: 'catálogo' },
   { id: 'catálogo (hover)' },
+  // Los filtros del Mercado, a la vista. Por debajo de 1024 px el panel
+  // arranca plegado y, desde FILTER-COLLAPSE-FOCUS-1, sus controles plegados
+  // no se ven ni están en el árbol de accesibilidad. Antes el catálogo los
+  // medía igual —recortados, sin que nadie pudiera verlos— y ahora se abre el
+  // panel para medirlos donde la persona los usa. En escritorio el panel está
+  // siempre abierto y es la misma pantalla que el catálogo.
+  { id: 'catálogo: filtros abiertos' },
   // El paginador del Mercado. Va como superficie propia y no como parte del
   // catálogo porque su marcador es el propio control: si el catálogo dejara de
   // tener más de una página —un seed más chico, un filtro por omisión— esta

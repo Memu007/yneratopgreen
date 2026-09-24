@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import styles from './FilterSidebar.module.css';
 import type {
   CategoryResponse,
@@ -80,6 +80,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   cantidadDeResultados,
 }) => {
   const [abierto, setAbierto] = useState(false);
+  const resumen = useRef<HTMLButtonElement>(null);
   // Filtrar categorías según el tipo seleccionado
   const filteredCategories = useMemo(() => {
     if (selectedType === 'todos') return categories;
@@ -98,6 +99,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     <aside className={styles.panel}>
       <div className={styles.plegable}>
         <button
+          ref={resumen}
           type="button"
           className={styles.resumen}
           aria-expanded={abierto}
@@ -337,9 +339,28 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
           {/* En celular el panel es parte del flujo y termina devolviendo
               a los resultados con el número puesto. En escritorio esta fila
-              no se dibuja: el panel nunca está tapando nada. */}
+              no se dibuja: el panel nunca está tapando nada.
+
+              Al plegarse, el panel deja de verse y este botón con él. El
+              foco pasa a «Filtros», que queda justo encima de los
+              resultados; si no, se quedaría en un control que ya no está.
+
+              Y se lo trae a la vista. Si Tab acaba de traer este botón con
+              desplazamiento suave y se lo activa antes de que termine, ese
+              desplazamiento seguiría después de plegar y se llevaría
+              «Filtros» fuera de la pantalla: primero se lo corta donde está.
+              `scrollIntoView` no lo corta si ya no tiene que moverse, un
+              `scrollTo` sí. Después se centra «Filtros», y no arriba, porque
+              entre 600 y 1023 px la cabecera queda pegada arriba y lo
+              taparía; como «Filtros» está cerca del principio de la página,
+              centrarlo es en la práctica volver arriba de todo. */}
           <button className={`tg-button tg-button--primary ${styles.verResultados}`}
-                  onClick={() => setAbierto(false)}>
+                  onClick={() => {
+                    setAbierto(false);
+                    window.scrollTo({ top: window.scrollY, behavior: 'instant' });
+                    resumen.current?.focus({ preventScroll: true });
+                    resumen.current?.scrollIntoView({ block: 'center' });
+                  }}>
             {cantidadDeResultados === 1 ? 'Ver 1 resultado' : `Ver ${cantidadDeResultados} resultados`}
           </button>
         </div>

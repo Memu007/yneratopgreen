@@ -32298,6 +32298,280 @@ await runCase(186, 'Volver de una ficha recargada devuelve la búsqueda y sus re
   return informe.join('. ');
 });
 
+await runCase(187, 'Con el panel de filtros plegado, el teclado no entra en controles que no se ven', async () => {
+  // Por debajo de 1024 px el panel se pliega con altura. Eso recortaba lo que
+  // se veía, pero los controles seguían en el recorrido de Tab y en el árbol
+  // de accesibilidad: desde «Filtros» cerrado, Tab caía en once controles
+  // invisibles antes de «Ordenar». Se mira con el teclado, control por
+  // control, y se mira el árbol que recibe un lector de pantalla.
+  const CONTROLES = '#panel-de-filtros select, #panel-de-filtros input, #panel-de-filtros button';
+  const browser = await chromium.launch({ headless: true });
+  const informe = [];
+  const erroresDeJs = [];
+
+  const nuevaPagina = async (width, height) => {
+    const contexto = await browser.newContext({ viewport: { width, height } });
+    await contexto.addInitScript(() => {
+      window.__nombreDe = (el) => (el.getAttribute('aria-label')
+        || el.labels?.[0]?.textContent || el.textContent || el.tagName.toLowerCase())
+        .trim().replace(/\s+/g, ' ');
+      // Cuánto de la caja del control se ve: se recorta con cada ancestro que
+      // recorta su contenido, que es lo que hace el panel plegado.
+      window.__comoSeVe = (el) => {
+        const r = el.getBoundingClientRect();
+        let arriba = r.top; let abajo = r.bottom; let izq = r.left; let der = r.right;
+        for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+          const s = getComputedStyle(a);
+          if (s.overflowX === 'visible' && s.overflowY === 'visible') continue;
+          const q = a.getBoundingClientRect();
+          arriba = Math.max(arriba, q.top); abajo = Math.min(abajo, q.bottom);
+          izq = Math.max(izq, q.left); der = Math.min(der, q.right);
+        }
+        const total = r.width * r.height;
+        const visto = Math.max(0, abajo - arriba) * Math.max(0, der - izq);
+        const seVe = getComputedStyle(el).visibility === 'visible' && total > 0 && visto > 0;
+        // En pantalla y sin nada encima: entre 600 y 1023 px la cabecera
+        // queda pegada arriba y puede taparlo.
+        const punto = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return {
+          nombre: el === document.body
+            ? 'ningún control: el foco volvió al documento' : window.__nombreDe(el),
+          id: el.id,
+          enElPanel: Boolean(el.closest('#panel-de-filtros')),
+          esElResumen: el.getAttribute('aria-controls') === 'panel-de-filtros',
+          esOrdenar: el.id === 'catalog-sort',
+          seVe,
+          entero: seVe && visto >= total - 1,
+          aLaVista: r.top >= 0 && r.bottom <= window.innerHeight
+            && Boolean(punto && (punto === el || el.contains(punto))),
+          y: Math.round(r.top),
+        };
+      };
+    });
+    const page = await contexto.newPage();
+    page.on('pageerror', (error) => erroresDeJs.push(error.message));
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-sort').waitFor({ state: 'visible', timeout: 30_000 });
+    // La marca se dibuja cuando llega la respuesta del Mercado.
+    await page.locator('#catalog-brand').waitFor({ state: 'attached', timeout: 30_000 }).catch(() => {
+      throw new Error('el Mercado no ofrece marcas: el caso cuenta los 11 controles de la base demo');
+    });
+    return { contexto, page, cdp: await contexto.newCDPSession(page) };
+  };
+  const enfocado = (page) => page.evaluate(() => window.__comoSeVe(document.activeElement));
+  // La página tiene desplazamiento suave: se espera a que quede quieta.
+  const quieta = (page) => page.evaluate(() => new Promise((listo) => {
+    let y = window.scrollY; let iguales = 0;
+    const mirar = () => {
+      if (window.scrollY === y) iguales += 1; else { iguales = 0; y = window.scrollY; }
+      if (iguales >= 15) listo(); else requestAnimationFrame(mirar);
+    };
+    requestAnimationFrame(mirar);
+  }));
+  const describir = (f) => (f.id ? `«${f.nombre}» (#${f.id})` : `«${f.nombre}»`);
+  // Los controles del panel que el árbol de accesibilidad expone, por nombre.
+  const expuestos = async (page, cdp) => {
+    const nombres = await page.evaluate(
+      (selector) => [...document.querySelectorAll(selector)].map((el) => window.__nombreDe(el)), CONTROLES);
+    const { root } = await cdp.send('DOM.getDocument', { depth: -1 });
+    const { nodeIds } = await cdp.send('DOM.querySelectorAll', { nodeId: root.nodeId, selector: CONTROLES });
+    assert(nodeIds.length === nombres.length && nombres.length > 0,
+      `el panel tiene ${nombres.length} controles y el árbol devolvió ${nodeIds.length} nodos`);
+    const vistos = [];
+    for (const [i, nodeId] of nodeIds.entries()) {
+      const { nodes } = await cdp.send('Accessibility.getPartialAXTree', { nodeId, fetchRelatives: false });
+      if (!nodes[0]?.ignored) vistos.push(nombres[i]);
+    }
+    return { vistos, todos: nombres };
+  };
+  const resumenDe = (page) => page.locator('button[aria-controls="panel-de-filtros"]');
+  const expandido = (page) => resumenDe(page).getAttribute('aria-expanded');
+  const esperarExpandido = (page, valor) => page.waitForFunction(
+    (v) => document.querySelector('button[aria-controls="panel-de-filtros"]')?.getAttribute('aria-expanded') === v,
+    valor, { timeout: 5_000 });
+  // Tab hasta salir del panel o hasta «Ordenar»; devuelve cada parada.
+  const tabHasta = async (page, parar, tope = 30) => {
+    const paradas = [];
+    for (let i = 0; i < tope; i += 1) {
+      await page.keyboard.press('Tab');
+      const f = await enfocado(page);
+      paradas.push(f);
+      if (parar(f)) return paradas;
+    }
+    throw new Error(`${tope} veces Tab sin llegar: ${paradas.map(describir).join(' → ')}`);
+  };
+  // El total del encabezado de resultados: «24 de 30 operaciones» es 30.
+  const conteo = (page) => page.evaluate(() => {
+    const t = [...document.querySelectorAll('h2')].map((h) => h.textContent).find((x) => /operaci/.test(x));
+    return Number(t?.match(/(\d+)\s*operaci/)?.[1] ?? NaN);
+  });
+  const verN = (page) => page.getByRole('button', { name: /^Ver \d+ resultados?$/ });
+
+  try {
+    for (const ancho of [360, 390, 768]) {
+      const { contexto, page, cdp } = await nuevaPagina(ancho, 844);
+      try {
+        const resumen = resumenDe(page);
+        assert(await resumen.isVisible(), `a ${ancho}px no se ve el botón «Filtros»`);
+        assert(await expandido(page) === 'false', `a ${ancho}px el panel no arranca cerrado`);
+
+        // 1. Cerrado: Tab va de «Filtros» a «Ordenar» y el árbol no expone
+        // los controles del panel.
+        await resumen.focus();
+        const alCerrar = await tabHasta(page, (f) => f.esOrdenar || (f.seVe && !f.enElPanel));
+        const invisibles = alCerrar.filter((f) => !f.entero);
+        assert(invisibles.length === 0,
+          `a ${ancho}px, con «Filtros» cerrado, Tab cayó en ${invisibles.length} `
+          + `${invisibles.length === 1 ? 'control que no se ve' : 'controles que no se ven'} antes de «Ordenar»: `
+          + `${invisibles.map((f) => (f.seVe ? `${describir(f)} recortado` : describir(f))).join(', ')}`);
+        assert(alCerrar.length === 1 && alCerrar[0].esOrdenar,
+          `a ${ancho}px, desde «Filtros» cerrado, Tab fue a ${alCerrar.map(describir).join(' → ')} y no a «Ordenar»`);
+        const cerrado = await expuestos(page, cdp);
+        assert(cerrado.vistos.length === 0,
+          `a ${ancho}px, con el panel cerrado, el árbol de accesibilidad expone `
+          + `${cerrado.vistos.length} de sus ${cerrado.todos.length} controles: ${cerrado.vistos.join(', ')}`);
+
+        // 2. Abierto: Tab recorre los controles del panel en su orden, todos a
+        // la vista, y sale a «Ordenar».
+        await resumen.focus();
+        await page.keyboard.press('Enter');
+        await esperarExpandido(page, 'true');
+        const abierto = await expuestos(page, cdp);
+        assert(abierto.vistos.length === abierto.todos.length,
+          `a ${ancho}px, con el panel abierto, el árbol oculta `
+          + `${abierto.todos.filter((n) => !abierto.vistos.includes(n)).join(', ')}`);
+        const enOrden = await page.evaluate((selector) => [...document.querySelectorAll(selector)]
+          .filter((el) => !el.disabled).map((el) => window.__nombreDe(el)), CONTROLES);
+        const alAbrir = await tabHasta(page, (f) => !f.enElPanel);
+        const salida = alAbrir.pop();
+        const recorridos = alAbrir.map((f) => f.nombre);
+        assert(JSON.stringify(recorridos) === JSON.stringify(enOrden),
+          `a ${ancho}px, con el panel abierto, Tab recorrió ${recorridos.length} controles `
+          + `(${recorridos.join(', ')}) y el panel tiene ${enOrden.length} (${enOrden.join(', ')})`);
+        assert(enOrden.length === 11,
+          `a ${ancho}px el panel abierto tiene ${enOrden.length} controles alcanzables `
+          + `(${enOrden.join(', ')}); con la base demo son 11`);
+        const tapados = alAbrir.filter((f) => !f.entero);
+        assert(tapados.length === 0,
+          `a ${ancho}px, con el panel abierto, Tab llegó a controles que no se ven enteros: `
+          + `${tapados.map(describir).join(', ')}`);
+        assert(salida.esOrdenar, `a ${ancho}px, al salir del panel abierto Tab fue a ${describir(salida)}`);
+
+        // 3. Cambiar un filtro con el teclado filtra. Se escribe el precio
+        // mínimo: escribir en un campo es igual en todas las plataformas.
+        // Desde «Ordenar», hacia atrás.
+        const antes = await conteo(page);
+        for (let i = 0; i < 15 && (await enfocado(page)).id !== 'catalog-price-min'; i += 1) {
+          await page.keyboard.press('Shift+Tab');
+        }
+        assert((await enfocado(page)).id === 'catalog-price-min',
+          `a ${ancho}px no se llegó con el teclado al precio mínimo`);
+        // Cada tecla pide al servidor; se espera la respuesta del valor entero.
+        const respuesta = page.waitForResponse(
+          (r) => new URL(r.url()).searchParams.get('min_price') === '1000000', { timeout: 15_000 });
+        await page.keyboard.type('1000000');
+        await respuesta;
+        await page.waitForFunction((n) => {
+          const t = [...document.querySelectorAll('h2')].map((h) => h.textContent).find((x) => /operaci/.test(x));
+          const m = t?.match(/(\d+)\s*operaci/);
+          return m && Number(m[1]) !== n
+            && new URLSearchParams(location.search).get('min_price') === '1000000';
+        }, antes, { timeout: 10_000 });
+        const despues = await conteo(page);
+        assert(despues < antes, `a ${ancho}px el precio mínimo dejó ${despues} operaciones de ${antes}`);
+        const rotulo = (await verN(page).textContent()).trim();
+        assert(rotulo === (despues === 1 ? 'Ver 1 resultado' : `Ver ${despues} resultados`),
+          `a ${ancho}px el botón dice «${rotulo}» y hay ${despues} operaciones`);
+
+        // 4. «Ver N resultados» cierra y deja el foco en «Filtros», a la vista.
+        // Se mide el caso difícil: la página arriba de todo, Tab trae el botón
+        // con desplazamiento suave y Enter llega en el mismo cuadro, antes de
+        // que la página se mueva. Si ese desplazamiento no se corta, termina
+        // después de plegar y se lleva «Filtros» fuera de la pantalla.
+        const fueraDeVista = await page.evaluate(() => {
+          window.scrollTo({ top: 0, behavior: 'instant' });
+          const botones = [...document.querySelectorAll('#panel-de-filtros button')];
+          botones.find((b) => b.textContent.trim() === 'Limpiar filtros').focus({ preventScroll: true });
+          const ver = botones.find((b) => /^Ver \d+ resultados?$/.test(b.textContent.trim()));
+          return ver.getBoundingClientRect().top > window.innerHeight;
+        });
+        assert(fueraDeVista, `a ${ancho}px «${rotulo}» ya se veía con la página arriba: no es el caso difícil`);
+        await page.keyboard.press('Tab');
+        await page.keyboard.press('Enter');
+        await esperarExpandido(page, 'false').catch(() => {
+          throw new Error(`a ${ancho}px, Tab desde «Limpiar filtros» y Enter no cerraron el panel con «${rotulo}»`);
+        });
+        assert(await conteo(page) === despues,
+          `a ${ancho}px, Enter no fue sobre «${rotulo}»: el Mercado pasó de ${despues} a ${await conteo(page)} operaciones`);
+        await quieta(page);
+        const trasVer = await enfocado(page);
+        assert(trasVer.esElResumen,
+          `a ${ancho}px, «${rotulo}» cerró el panel y el foco quedó en ${describir(trasVer)}, no en «Filtros»`);
+        assert(trasVer.entero && trasVer.aLaVista,
+          `a ${ancho}px, después de «${rotulo}» el foco está en «Filtros» pero no se ve: `
+          + `su borde de arriba quedó en ${trasVer.y} px de una pantalla de 844`);
+        const otraVez = await expuestos(page, cdp);
+        assert(otraVez.vistos.length === 0,
+          `a ${ancho}px, cerrado con «${rotulo}», el árbol sigue exponiendo ${otraVez.vistos.join(', ')}`);
+        const trasCerrar = await tabHasta(page, (f) => f.esOrdenar || (f.seVe && !f.enElPanel));
+        assert(trasCerrar.length === 1 && trasCerrar[0].esOrdenar,
+          `a ${ancho}px, cerrado con «${rotulo}», Tab fue a ${trasCerrar.map(describir).join(' → ')}`);
+
+        // 5. Abrir, entrar, volver a «Filtros» y cerrar con él.
+        await resumen.focus();
+        await page.keyboard.press('Enter');
+        await esperarExpandido(page, 'true');
+        await page.keyboard.press('Tab');
+        assert((await enfocado(page)).id === 'catalog-type',
+          `a ${ancho}px, al reabrir, Tab no entró en «Tipo»`);
+        await page.keyboard.press('Shift+Tab');
+        await page.keyboard.press('Enter');
+        await esperarExpandido(page, 'false');
+        await quieta(page);
+        const trasFiltros = await enfocado(page);
+        assert(trasFiltros.esElResumen && trasFiltros.entero && trasFiltros.aLaVista,
+          `a ${ancho}px, cerrado con «Filtros», el foco quedó en ${describir(trasFiltros)}`);
+        const ultimo = await tabHasta(page, (f) => f.esOrdenar || (f.seVe && !f.enElPanel));
+        assert(ultimo.length === 1 && ultimo[0].esOrdenar,
+          `a ${ancho}px, cerrado con «Filtros», Tab fue a ${ultimo.map(describir).join(' → ')}`);
+
+        informe.push(`${ancho}px: cerrado, «Filtros» → «Ordenar» en 1 Tab y ${cerrado.todos.length} controles `
+          + `fuera del árbol; abierto, ${recorridos.length} controles en orden; `
+          + `precio mínimo ${antes} → ${despues}; «${rotulo}» deja el foco en «Filtros»`);
+      } finally {
+        await contexto.close();
+      }
+    }
+
+    // Escritorio: el panel está siempre abierto, sin «Filtros» ni «Ver N».
+    const { contexto, page, cdp } = await nuevaPagina(1280, 900);
+    try {
+      assert(!(await resumenDe(page).isVisible()), 'a 1280px se dibuja el botón «Filtros»');
+      const enOrden = await page.evaluate((selector) => [...document.querySelectorAll(selector)]
+        .filter((el) => !el.disabled && el.getClientRects().length > 0)
+        .map((el) => window.__nombreDe(el)), CONTROLES);
+      const { vistos } = await expuestos(page, cdp);
+      const ocultos = enOrden.filter((n) => !vistos.includes(n));
+      assert(ocultos.length === 0, `a 1280px el árbol oculta ${ocultos.join(', ')}`);
+      await page.locator('#buscar-mercado').focus();
+      const camino = await tabHasta(page, (f) => f.esOrdenar);
+      const delPanel = camino.filter((f) => f.enElPanel);
+      assert(JSON.stringify(delPanel.map((f) => f.nombre)) === JSON.stringify(enOrden),
+        `a 1280px Tab recorrió ${delPanel.map((f) => f.nombre).join(', ')} y el panel tiene ${enOrden.join(', ')}`);
+      assert(enOrden.length === 10, `a 1280px el panel tiene ${enOrden.length} controles: ${enOrden.join(', ')}`);
+      const tapados = delPanel.filter((f) => !f.entero);
+      assert(tapados.length === 0, `a 1280px Tab llegó a controles que no se ven: ${tapados.map(describir).join(', ')}`);
+      informe.push(`1280px: los ${delPanel.length} controles del panel siguen en el recorrido de Tab, a la vista`);
+    } finally {
+      await contexto.close();
+    }
+    assert(erroresDeJs.length === 0, `errores de JS: ${erroresDeJs.join(' | ')}`);
+  } finally {
+    await browser.close();
+  }
+  return informe.join('. ');
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

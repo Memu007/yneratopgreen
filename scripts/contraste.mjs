@@ -417,13 +417,23 @@ for (const medida of MEDIDAS) {
       page.getByRole('button', { name: 'Ir al marketplace' }));
 
     await page.goto(`${WEB}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
-    await revisar(page, `${medida.n} catálogo`, page.locator('#catalog-category'));
+    // «Ordenar» y no un filtro: en celular el panel arranca plegado y sus
+    // controles no se ven.
+    await revisar(page, `${medida.n} catálogo`, page.locator('#catalog-sort'));
 
     // hover sobre un enlace, para medir tambien ese estado
     const enlace = page.locator('a').first();
     await enlace.waitFor({ state: 'visible', timeout: ESPERA });
     await enlace.hover();
-    await revisar(page, `${medida.n} catálogo (hover)`, page.locator('#catalog-category'));
+    await revisar(page, `${medida.n} catálogo (hover)`, page.locator('#catalog-sort'));
+
+    // Los filtros, a la vista: en celular se abre el panel y después se lo
+    // vuelve a plegar, para que lo que sigue se mida como estaba.
+    const filtros = page.locator('button[aria-controls="panel-de-filtros"]');
+    const plegable = await filtros.isVisible();
+    if (plegable) await filtros.click();
+    await revisar(page, `${medida.n} catálogo: filtros abiertos`, page.locator('#catalog-category'));
+    if (plegable) await filtros.click();
 
     // El paginador, al pie de la grilla. Superficie propia para que su ausencia
     // sea un rojo y no una medición de menos.

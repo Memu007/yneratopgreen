@@ -134,10 +134,16 @@
 @media (max-width: 1023px) {
   /* Plegado por omisión: el panel es parte del flujo y no tapa resultados.
      Se colapsa con altura y no con `display: none` para que el estado siga
-     siendo el mismo nodo y el foco no salte al abrirlo. */
+     siendo el mismo nodo y el foco no salte al abrirlo.
+
+     La altura sola sólo recorta lo que se ve: los controles seguían en el
+     recorrido de Tab y en el árbol de accesibilidad, y el teclado caía en
+     once controles que no se veían. `visibility` los saca de los dos sin
+     tocar el nodo ni la altura. */
   .cuerpo {
     max-height: 0;
     overflow: hidden;
+    visibility: hidden;
     padding-block: 0;
     background-color: var(--tg-color-surface);
     border: 1px solid var(--tg-color-border);
@@ -148,6 +154,7 @@
   .abierto {
     max-height: none;
     overflow: visible;
+    visibility: visible;
     padding: var(--tg-space-4);
     border-bottom-width: 1px;
   }

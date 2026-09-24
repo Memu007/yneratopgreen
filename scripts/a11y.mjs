@@ -192,14 +192,24 @@ async function publicas(page, medida) {
 
 async function comprador(page, medida) {
   await page.goto(`${WEB}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
-  await revisar(page, 'catálogo', medida, page.locator('#catalog-category'));
+  // «Ordenar» y no un filtro: en celular el panel arranca plegado y sus
+  // controles no se ven.
+  await revisar(page, 'catálogo', medida, page.locator('#catalog-sort'));
 
   // Con el puntero encima: el estado de hover es el que nadie revisa a mano y
   // el que ya escondió una inversión de colores en la banda de navegación.
   const enlace = page.locator('a').first();
   await enlace.waitFor({ state: 'visible', timeout: ESPERA });
   await enlace.hover();
-  await revisar(page, 'catálogo (hover)', medida, page.locator('#catalog-category'));
+  await revisar(page, 'catálogo (hover)', medida, page.locator('#catalog-sort'));
+
+  // Los filtros, a la vista: en celular se abre el panel y después se lo
+  // vuelve a plegar, para que lo que sigue se mida como estaba.
+  const filtros = page.locator('button[aria-controls="panel-de-filtros"]');
+  const plegable = await filtros.isVisible();
+  if (plegable) await filtros.click();
+  await revisar(page, 'catálogo: filtros abiertos', medida, page.locator('#catalog-category'));
+  if (plegable) await filtros.click();
 
   // El paginador, que vive al pie de la grilla y sólo existe con más de una
   // página. Se lo trae a la vista antes de medir: axe mira el documento, pero
