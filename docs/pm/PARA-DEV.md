@@ -5,81 +5,123 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Tarea activa — COPY-AGRO-1
+## Tarea activa — USER-GUIDE-1
 
 **Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
 
 ### Decisión sobre la entrega anterior
 
-`BRAND-LOSS-1` quedó **aceptada en rama** sobre `43f3b20`. Buen hallazgo, y
-corrige mi hipótesis de las horas.
+`COPY-AGRO-1` quedó **aceptada en rama** sobre `2b92988`.
 
-Reproduje:
+- 192 en 1/1.
+- Tus tres negativos dan rojo. El mío, un `aria-label` con «AGRO» en
+  mayúsculas en el pie, también.
+- 24/24 relacionados; auditoría móvil, a11y y contraste verdes.
 
-- el 74 de la base deja las dos marcas en `NULL`;
-- el 74 nuevo las deja intactas y borra la copia;
-- el 187 da 1/1 sin las marcas de la siembra;
-- la suite completa dio 172/191, con las marcas intactas y 74, 187, 190 y
-  191 en verde;
-- los 18 casos que caen en cadena por el 169 de mi entorno dan 18/18;
-- la guía da 26/26 después de la suite, con 51 órdenes con centavos.
+**Bajada de la portada:** Emi decidió que quede en dos renglones en los
+celulares angostos, como lo pidió la clienta. El tuteo de Quiénes somos
+queda como P3, junto al #14. Evidencia en
+`REPRODUCCION-COPY-AGRO-1-2026-09-25.md`.
 
-Evidencia en `REPRODUCCION-BRAND-LOSS-1-2026-09-25.md`. El P3 de los casos
-55 y 58 queda registrado, sin tarea.
+**Publicación:** el 25/09 subió a `main` `e9cf4c6`, con todo hasta
+`BRAND-LOSS-1`, y Emi verificó el sitio. `COPY-AGRO-1` sale en la próxima
+tanda.
 
 ### Problema y prioridad
 
-Es el punto #1 de la devolución de la clienta
-(`DEVOLUCION-CLIENTA-REVISION-01-2026-09-20.md`): quiere que diga
-**«agropecuario»** donde se nombra el sector. Hoy el sitio dice «agro» y
-«Mercado agro», por ejemplo:
-
-- en la portada, «Mercado agro · Argentina», dos veces;
-- en el pie, «Mercado agro: productos, servicios y logística.»;
-- en Servicios, «¿Prestás un servicio para el agro?».
-
-Va antes de las guías de comprador y vendedor, para que sus capturas salgan
-con el texto final. No depende de ninguna decisión pendiente.
+El contrato incluye la capacitación y la documentación de uso. El panel de
+administración ya tiene su guía verificada. Quienes compran, venden y
+transportan todavía dependen de las secciones de `docs/USER_MANUAL.md`, que
+no se comprueban contra la aplicación y tienen afirmaciones viejas. No
+depende de Emi ni de la clienta.
 
 ### Alcance
 
-- Hacé el inventario de todo texto **visible** que nombre el sector con
-  «agro»: pantallas, pie, títulos, `<title>`, metadatos de `index.html`,
-  avisos y correos que salgan de la plataforma. Reemplazalo por
-  «agropecuario» o por la forma que corresponda gramaticalmente, por
-  ejemplo «Mercado agropecuario · Argentina» o «un servicio para el sector
-  agropecuario».
-- **No se tocan:**
-  - la marca «AgroBoeda»;
-  - «AgroMarket», que espera la decisión #10;
-  - los identificadores internos del código;
-  - los nombres de categorías que vienen de la taxonomía de la clienta.
-- Actualizá las pruebas que afirman el texto viejo.
+Una guía de uso en español llano, con la misma técnica que
+`GUIA-PANEL-ADMIN.md`:
+
+- pasos con textos de pantalla entre «»;
+- frases de resultado atadas a su comprobación;
+- una lista declarada de lo que no se comprueba, con su fuente;
+- capturas generadas por script en escritorio y celular.
+
+Tres secciones:
+
+- **Quien compra:**
+  - registrarse y confirmar el correo;
+  - buscar y filtrar por categoría, ubicación y el resto de los filtros;
+  - la página de la publicación;
+  - carrito y checkout;
+  - elegir cómo se traslada: transportista o por cuenta propia;
+  - pagar por transferencia y subir el comprobante;
+  - «Mis compras»;
+  - cancelar.
+- **Quien vende:**
+  - publicar: categoría, ubicación, fotos y marca donde corresponda;
+  - editar, pausar, activar y eliminar;
+  - stock;
+  - datos bancarios;
+  - revisar el comprobante: aprobar o rechazar con motivo;
+  - el estado de envío;
+  - presentar la constancia fiscal.
+- **Quien transporta:**
+  - activar el perfil de transportista: base, radio, capacidad y
+    habilitación declarada;
+  - qué ve cuando lo eligen;
+  - cómo se contactan.
+
+Además:
+
+- **Los límites** van al principio, con la misma redacción que la guía del
+  panel: la plataforma no maneja fondos de terceros, la transferencia la
+  valida quien vende, y el teléfono y las suscripciones figuran como
+  **PENDIENTE**.
+- **Mercado Pago** figura como **PENDIENTE de homologación**. No se documenta
+  como si funcionara con cuentas reales.
+- **La confirmación por correo** se documenta como funciona. Agregá una nota:
+  en el sitio demostrativo todavía falta el correo real.
+- **`USER_MANUAL.md`:** sus secciones de comprador y vendedor se reemplazan
+  por un enlace a la guía, sin dejar afirmaciones falsas. Proponé la ruta
+  del archivo.
+
+**Si es demasiado para una sola entrega**, proponé en `PARA-PM.md` cómo
+partirla, por ejemplo quien compra primero, **antes** de construir.
 
 ### Fuera de alcance
 
-- Otros puntos de la devolución: #3 «Operaciones», #13 «Nuestro equipo», #14
-  y los que esperan decisión.
-- Cambios de diseño o de diagramación. Si un texto más largo no entra en el
-  celular, frená y consultá antes de achicar letras o reordenar.
+- Cambios en `src/` o `backend/`. Los defectos que encuentres se informan con
+  reproducción y no se corrigen.
+- La guía del panel de administración.
+- La documentación del despliegue.
+- Suscripciones, planes y mensajería.
 
 ### Aceptación verificable
 
-1. El inventario: cada aparición, con archivo, texto anterior y texto nuevo.
-   Incluí las que dejás a propósito y por qué.
-2. **Una comprobación automática** que falle si vuelve a aparecer «agro»
-   visible sin ser parte de «AgroBoeda» o «AgroMarket». Mostrá su negativo.
-3. **Sin desbordes:** auditoría móvil 12/12, a11y `--todas` y contraste. Las
-   cabeceras que cambian de largo, miradas a 360 px.
-4. **Sin regresiones:** los casos del smoke que verifican textos públicos,
-   por ejemplo 156 y 168. Elegilos vos y justificá la lista.
-5. Build, lint, tipos y diff-check con `cr-at-eol`.
+1. El script recorre la guía en el navegador, sobre la base demo, en los dos
+   anchos. Falla y nombra el paso si falta un texto, si una frase de
+   resultado cambia o no se cumple, o si se cambia una frase declarada.
+2. **Negativos:**
+   - un texto de pantalla falso;
+   - una frase de resultado invertida;
+   - un cambio en la aplicación que la guía debería detectar.
+3. La lista de lo que no se comprueba, con su fuente.
+4. Sin credenciales reales ni términos comerciales. Las cuentas demo, si
+   aparecen, van marcadas como públicas.
+5. `git diff` vacío en `src/` y `backend/`. Build y diff-check con
+   `cr-at-eol` verdes.
+
+### Frená y consultá
+
+- Si documentar algo exige afirmar un comportamiento que no está decidido.
+  Marcalo `PENDIENTE` y seguí con el resto.
 
 ### Entrega en `PARA-PM.md`
 
 - SHA;
-- el inventario;
-- la comprobación y su negativo;
-- las puertas.
+- la ruta de la guía;
+- la salida del script y de los negativos;
+- la lista declarada;
+- los defectos encontrados;
+- riesgos.
 
 No integres ni despliegues.

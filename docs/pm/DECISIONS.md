@@ -6,6 +6,13 @@ Formato: fecha, decisión, motivo.
 ---
 
 
+
+## 2026-09-25 — La bajada de la portada queda en dos renglones en celulares angostos
+
+Con «Mercado agropecuario · Argentina», la bajada pasa a dos renglones a 320 y
+360 px, sin desbordes. Emi decidió que quede como lo pidió la clienta, con la
+palabra «agropecuario» y sin redacción alternativa.
+
 ## 2026-09-25 — Publicar en el entorno demostrativo sin backup previo
 
 Decisión de Emi. Railway es hoy un entorno de demostración, sin clientes ni

@@ -7,24 +7,20 @@ Actualizado: 2026-09-24.
 ## Resumen ejecutivo
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5, último día (ventana 04/09–24/09). Su puerta funcional quedó verificada el 23/09 sobre `1e4a63c` (`REPRODUCCION-FASE-2-2026-09-23.md`). Desde el **25/09** corre la **Fase 3**, semanas 6–8, hasta el 15/10. Su puerta y el hito intermedio ya quedaron aceptados por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
-- **`main`:** `e9cf4c6`, publicado el 25/09 con autorización de Emi: incluye las quince piezas aceptadas hasta `BRAND-LOSS-1` y la migración `b6d3f12a8e94`. La convergencia de Frontend y Backend en Railway no está verificada todavía.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `BRAND-LOSS-1` en `43f3b20`, informe `fe2572b`. Quince piezas aceptadas en rama, sin integrar ni desplegar. La rama contiene a `main`: integrar es publicar todo lo aceptado desde `0bd7fbc`, incluida la migración de `PRIMARY-IMAGE-INTEGRITY-1`.
-- **Última decisión PM:** `BRAND-LOSS-1` **ACEPTADA EN RAMA**. La marca la borraba el caso 74 del arnés al bajar migraciones sobre la base compartida; no fue el producto. Ahora trabaja sobre una copia. PM reprodujo la causa y el arreglo, y corrió la suite completa con las marcas intactas. Evidencia en `REPRODUCCION-BRAND-LOSS-1-2026-09-25.md`.
-- **Publicación 25/09:** con autorización explícita de Emi y sin backup previo (decisión del 25/09 para el entorno demostrativo), PM subió `e9cf4c6` a `main` por fast-forward desde `0bd7fbc`. La verificación previa fue desde base recién creada: 190 de 191 casos cubiertos (el 169 es de entorno); a11y 76/76, contraste 84/84, auditoría 12/12, guía 26/26, build, tipos, lint y `alembic check` verdes; sin secretos ni archivos prohibidos. Railway corre `alembic upgrade head` como `preDeployCommand`. **No se verificó desde la sesión de PM** que Railway haya convergido, porque la red del entorno bloquea `railway.app`: la verificación visual queda a cargo de Emi. `COPY-AGRO-1` no está incluida.
-- **Tarea activa:** `COPY-AGRO-1`: «agropecuario» donde el sitio nombra el sector (devolución de la clienta #1), con una comprobación automática. Después siguen las guías de comprador, vendedor y transportista.
+- **`main`:** `e9cf4c6`, publicado el 25/09 con autorización de Emi: incluye las quince piezas aceptadas hasta `BRAND-LOSS-1` y la migración `b6d3f12a8e94`. Emi verificó a ojo el sitio publicado el 25/09.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `COPY-AGRO-1` en `2b92988`, informe `71fc9fa`, aceptada en rama y todavía no publicada. Todo lo anterior ya está en `main` (`e9cf4c6`).
+- **Última decisión PM:** `COPY-AGRO-1` **ACEPTADA EN RAMA**: «agropecuario» en las once apariciones. Caso 192 y cuatro negativos en rojo, 24/24 relacionados, auditoría móvil, a11y y contraste verdes. Evidencia en `REPRODUCCION-COPY-AGRO-1-2026-09-25.md`.
+- **Publicación 25/09:** con autorización explícita de Emi y sin backup previo (decisión del 25/09 para el entorno demostrativo), PM subió `e9cf4c6` a `main` por fast-forward desde `0bd7fbc`. La verificación previa fue desde base recién creada: 190 de 191 casos cubiertos (el 169 es de entorno); a11y 76/76, contraste 84/84, auditoría 12/12, guía 26/26, build, tipos, lint y `alembic check` verdes; sin secretos ni archivos prohibidos. Railway corre `alembic upgrade head` como `preDeployCommand`. La red del entorno de PM bloquea `railway.app`, así que la verificación la hizo Emi: el 25/09 revisó el sitio publicado y **se ve bien**. `COPY-AGRO-1` no está incluida.
+- **Tarea activa:** `USER-GUIDE-1`: guía para comprador, vendedor y transportista, verificada por script como la del panel, que reemplaza esas secciones de `USER_MANUAL.md`.
 - **Escalado a Emi:** la regla «el teléfono no sale de la API sin suscripción activa» choca con la decisión del 05/08, que pasó suscripciones y candados por plan a Fase 6. Hoy el teléfono no se publica en el Mercado ni en las fichas, pero sí lo ven las dos partes de una orden y quien compra al elegir transportista, sin suscripción. El transportista no recibe el de quien compra.
 
-## Última aceptación PM — BRAND-LOSS-1
+## Última aceptación PM — COPY-AGRO-1
 
-La pérdida de marcas en la suite era del arnés. El caso 74 bajaba
-migraciones sobre la base compartida y vaciaba columnas: la marca, las
-reservas, el medio de pago y otras. Ahora lo hace sobre una copia que borra
-al terminar. El 187 ya no depende de la siembra, y la guía lee importes con
-centavos.
-
-Ningún dato real se vio afectado. Sin cambios de producto, sin integración
-ni despliegue. La suite previa a publicar tiene que correrse sobre este
-candidato o uno posterior.
+Devolución de la clienta #1. El sitio nombra el sector «agropecuario» en la
+portada, el pie, Servicios, Quiénes somos y los metadatos. El caso 192 impide
+que vuelva «agro» suelto, en la fuente y en la pantalla. En celulares
+angostos, la bajada de la portada ocupa dos renglones; Emi decidió dejarla
+así. Sin publicar todavía.
 
 ## Aceptaciones anteriores
 
@@ -34,6 +30,7 @@ riesgos que dejaron abiertos están en «Pendientes canónicos adoptados».
 
 | Pieza | Estado | Evidencia |
 |---|---|---|
+| `BRAND-LOSS-1` | publicada en `e9cf4c6` | `REPRODUCCION-BRAND-LOSS-1-2026-09-25.md` |
 | `ADMIN-PANEL-DEFECTS-1` | aceptada en rama | `REPRODUCCION-ADMIN-PANEL-DEFECTS-1-2026-09-24.md` |
 | `ADMIN-GUIDE-1` | aceptada en rama | `REPRODUCCION-ADMIN-GUIDE-1-2026-09-24.md` |
 | `LOCALITY-LABEL-DISPLAY-1` | aceptada en rama | `REPRODUCCION-LOCALITY-LABEL-DISPLAY-1-2026-09-24.md` |
@@ -200,10 +197,10 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev trabaja `COPY-AGRO-1` (#1 «agropecuario»). Siguen, sin depender de Emi: las guías de comprador, vendedor y transportista, verificadas por script, y la documentación del despliegue cuando la infraestructura quede fija. Dependen de Emi: la regla del teléfono, SMTP (la clienta no pudo registrarse), cuentas de prueba de Mercado Pago, backups e integración, y las decisiones #5, #7 y #10 de la clienta.
-2. Las quince piezas aceptadas en rama desde `0bd7fbc` siguen sin integración ni despliegue. Integrarlas publica la migración de imágenes. Antes, Emi decide la recuperación previa (punto 3). Después, PM corre la suite completa desde base limpia sobre el SHA exacto, incluido el caso 131 en Docker, y prepara la publicación, que requiere autorización explícita de Emi.
-3. `PRIMARY-IMAGE-INTEGRITY-1` permanece fuera de `main` hasta una puerta operativa explícita para su migración. La propuesta de recuperación pre-migración espera decisión de Emi y verificación autenticada de Railway.
+1. Dev trabaja `USER-GUIDE-1`, las guías de comprador, vendedor y transportista, verificadas por script. Sigue, sin depender de Emi, la documentación del despliegue cuando la infraestructura quede fija. Dependen de Emi: la regla del teléfono, SMTP (la clienta no pudo registrarse), cuentas de prueba de Mercado Pago, backups e integración, y las decisiones #5, #7 y #10 de la clienta.
+2. Las quince piezas aceptadas hasta `BRAND-LOSS-1` están publicadas en `main` (`e9cf4c6`, 25/09), incluida la migración de imágenes, y Emi verificó el sitio. `COPY-AGRO-1` y lo que venga se publican juntos en la próxima tanda. Antes, PM corre la suite completa desde una base limpia sobre el SHA exacto, y Emi autoriza explícitamente la publicación.
+3. Backup: no se exige mientras Railway sea demostrativo (decisión del 25/09). Es condición del lanzamiento real.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
-5. Emi decide la opción de backup administrado/costo antes de cualquier operación remota; no se usan datos reales nuevos sin recuperación demostrada.
+5. Antes de cargar datos reales o de lanzar, Emi elige el backup administrado y su costo.
 6. Los atributos por rubro esperan los datos prometidos por la clienta; Inicio, Servicios y la identidad de AgroMarket esperan decisión de producto.
 7. Mercado Pago, red-team y producción contractual permanecen en la secuencia acordada; no se habilitan por esta tarea.
