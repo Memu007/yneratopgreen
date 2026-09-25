@@ -30286,6 +30286,9 @@ await runCase(179, 'Una publicación tiene cero o una imagen principal, y quien 
   const sello = Date.now();
   const MARCADOR = `Smoke img179 ${sello}`;
   const INDICE = 'uq_product_images_primaria_unica';
+  // La migración del índice y la que la precede.
+  const REVISION = 'b6d3f12a8e94';
+  const ANTERIOR = 'e4a72c9b1f35';
 
   const limpiar = () => {
     try {
@@ -30297,27 +30300,17 @@ await runCase(179, 'Una publicación tiene cero o una imagen principal, y quien 
     }
   };
 
-  // Alembic vive donde vive la aplicación, igual que la base: se lo invoca por
-  // el mismo puente que usa todo el arnés.
-  const alembic = (...argumentos) => {
-    const salida = execFileSync(
-      'docker', ['exec', 'topgreen-api', 'alembic', ...argumentos],
-      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
-    );
-    return salida.trim();
-  };
-
-  const definicionDelIndice = () => {
+  const definicionDelIndice = (opciones) => {
     const [fila] = queryRows(`
       SELECT indexdef FROM pg_indexes
-      WHERE tablename = 'product_images' AND indexname = ${sqlLiteral(INDICE)}`);
+      WHERE tablename = 'product_images' AND indexname = ${sqlLiteral(INDICE)}`, opciones);
     return fila ? fila[0] : null;
   };
 
-  const imagenesDe = (producto) => queryRows(`
+  const imagenesDe = (producto, opciones) => queryRows(`
     SELECT id, filename, is_primary::text, display_order::text, url
     FROM product_images WHERE product_id = ${sqlLiteral(producto)}
-    ORDER BY display_order, id`).map(([id, nombre, principal, orden, url]) => ({
+    ORDER BY display_order, id`, opciones).map(([id, nombre, principal, orden, url]) => ({
     id, nombre, principal: principal === 'true', orden: Number(orden), url,
   }));
 
@@ -30365,7 +30358,8 @@ await runCase(179, 'Una publicación tiene cero o una imagen principal, y quien 
   ).then((r) => ({ status: r.status }), (error) => ({ error: String(error.message) }));
 
   limpiar();
-  let migracionAbajo = false;
+  // La definición del índice mientras está retirado de la base compartida.
+  let indiceRetirado = null;
   try {
     // === A. La restricción existe, y es de PostgreSQL ======================
     const definicion = definicionDelIndice();
@@ -30415,6 +30409,12 @@ await runCase(179, 'Una publicación tiene cero o una imagen principal, y quien 
     // justamente lo que impide. Así que se baja la migración, se ensucia, y se
     // vuelve a subir. Lo que se mide es lo que hace la migración de verdad, no
     // una consulta que se le parezca.
+    //
+    // Se hace en una COPIA de la base. Bajar hasta la revisión anterior a esta
+    // también baja todas las que vinieron después, y sus `downgrade` borran
+    // datos: en la base compartida, el `downgrade -1` de antes dejó de bajar
+    // esta migración cuando llegó la del tipo y la potencia, y se llevaba las
+    // listas del tercer nivel de toda la suite.
     const sucia = await publicar('sucia');
     const empatada = await publicar('empatada');
     assert((await subir(sucia, ['b1.png'])).status === 200, 'no se pudo preparar la sucia');
@@ -30423,46 +30423,82 @@ await runCase(179, 'Una publicación tiene cero o una imagen principal, y quien 
     assert((await subir(empatada, ['c1.png'])).status === 200, 'no se pudo preparar la empatada');
     assert((await subir(empatada, ['c2.png'])).status === 200, 'no se pudo preparar la empatada');
 
-    const filasAntesDeBajar = queryCount('SELECT COUNT(*) FROM product_images');
-    alembic('downgrade', '-1');
-    migracionAbajo = true;
-    assert(definicionDelIndice() === null,
-      'bajar la migración no retiró el índice, así que lo que viene no mide nada');
-    // Bajar retira la restricción y NADA más: ni toca filas ni intenta
-    // reconstruir los duplicados que hubiera habido.
-    assert(queryCount('SELECT COUNT(*) FROM product_images') === filasAntesDeBajar,
-      'bajar la migración cambió la cantidad de imágenes');
-    assert(queryCount(`
+    const duplicadas = (opciones) => queryCount(`
       SELECT COUNT(*) FROM (
         SELECT product_id FROM product_images WHERE is_primary
         GROUP BY product_id HAVING COUNT(*) > 1
-      ) duplicadas`) === 0,
-    'bajar la migración dejó duplicados que antes no estaban');
+      ) duplicadas`, opciones);
 
-    // La sucia: las tres principales, con el orden al revés del alta para que
-    // «la primera que aparezca» y «la de menor display_order» no coincidan.
-    const antesSucia = imagenesDe(sucia);
-    querySql(`UPDATE product_images SET is_primary = true
-      WHERE product_id = ${sqlLiteral(sucia)}`);
-    querySql(`UPDATE product_images SET display_order = 30
-      WHERE id = ${sqlLiteral(antesSucia[0].id)}`);
-    querySql(`UPDATE product_images SET display_order = 20
-      WHERE id = ${sqlLiteral(antesSucia[1].id)}`);
-    querySql(`UPDATE product_images SET display_order = 10
-      WHERE id = ${sqlLiteral(antesSucia[2].id)}`);
-    const debeQuedarSucia = antesSucia[2].id;
+    // Ensucia una publicación: todas sus imágenes principales, con el orden
+    // al revés del alta para que «la primera que aparezca» y «la de menor
+    // display_order» no coincidan. Devuelve la que tiene que quedar.
+    const ensuciarAlReves = (producto, opciones) => {
+      const antes = imagenesDe(producto, opciones);
+      querySql(`UPDATE product_images SET is_primary = true
+        WHERE product_id = ${sqlLiteral(producto)}`, opciones);
+      querySql(`UPDATE product_images SET display_order = 30
+        WHERE id = ${sqlLiteral(antes[0].id)}`, opciones);
+      querySql(`UPDATE product_images SET display_order = 20
+        WHERE id = ${sqlLiteral(antes[1].id)}`, opciones);
+      querySql(`UPDATE product_images SET display_order = 10
+        WHERE id = ${sqlLiteral(antes[2].id)}`, opciones);
+      return antes[2].id;
+    };
 
-    // La empatada: las dos principales y con el MISMO display_order, que es
-    // donde el desempate por `id` es lo único que decide.
-    const antesEmpatada = imagenesDe(empatada);
-    querySql(`UPDATE product_images SET is_primary = true, display_order = 7
-      WHERE product_id = ${sqlLiteral(empatada)}`);
-    const debeQuedarEmpatada = [...antesEmpatada].sort(
-      (a, b) => (a.id < b.id ? -1 : 1))[0].id;
+    await conUnaCopiaDeLaBase('img179', async ({ opciones, alembic: alembicEnLaCopia }) => {
+      const filasAntesDeBajar = queryCount('SELECT COUNT(*) FROM product_images', opciones);
+      const bajada = alembicEnLaCopia(`downgrade ${ANTERIOR}`);
+      assert(new RegExp(`Running downgrade ${REVISION} -> ${ANTERIOR}`).test(bajada),
+        `el downgrade de la imagen principal no corrió: ${bajada.slice(-300)}`);
+      assert(definicionDelIndice(opciones) === null,
+        'bajar la migración no retiró el índice, así que lo que viene no mide nada');
+      // Bajar retira la restricción y NADA más: ni toca filas ni intenta
+      // reconstruir los duplicados que hubiera habido.
+      assert(queryCount('SELECT COUNT(*) FROM product_images', opciones) === filasAntesDeBajar,
+        'bajar la migración cambió la cantidad de imágenes');
+      assert(duplicadas(opciones) === 0, 'bajar la migración dejó duplicados que antes no estaban');
 
-    assert(principalesDe(sucia).length === 3 && principalesDe(empatada).length === 2,
-      'no se pudo ensuciar la base con la migración abajo');
-    const filasAntes = queryCount('SELECT COUNT(*) FROM product_images');
+      // La sucia: las tres principales, al revés del alta.
+      const debeQuedarSucia = ensuciarAlReves(sucia, opciones);
+
+      // La empatada: las dos principales y con el MISMO display_order, que es
+      // donde el desempate por `id` es lo único que decide.
+      const antesEmpatada = imagenesDe(empatada, opciones);
+      querySql(`UPDATE product_images SET is_primary = true, display_order = 7
+        WHERE product_id = ${sqlLiteral(empatada)}`, opciones);
+      const debeQuedarEmpatada = [...antesEmpatada].sort(
+        (a, b) => (a.id < b.id ? -1 : 1))[0].id;
+
+      const principales = (producto) => imagenesDe(producto, opciones).filter((i) => i.principal);
+      assert(principales(sucia).length === 3 && principales(empatada).length === 2,
+        'no se pudo ensuciar la copia con la migración abajo');
+      const filasAntes = queryCount('SELECT COUNT(*) FROM product_images', opciones);
+
+      const subida = alembicEnLaCopia('upgrade head');
+      assert(new RegExp(`Running upgrade ${ANTERIOR} -> ${REVISION}`).test(subida),
+        `la migración de la imagen principal no volvió a subir: ${subida.slice(-300)}`);
+
+      assert(definicionDelIndice(opciones), 'subir la migración no dejó el índice');
+      const filasDespues = queryCount('SELECT COUNT(*) FROM product_images', opciones);
+      assert(filasDespues === filasAntes, `la migración borró filas: ${filasAntes} → ${filasDespues}`);
+      assert(duplicadas(opciones) === 0,
+        'después de migrar sigue habiendo publicaciones con más de una principal');
+
+      const quedoSucia = principales(sucia);
+      assert(quedoSucia.length === 1 && quedoSucia[0].id === debeQuedarSucia,
+        `la migración conservó ${JSON.stringify(quedoSucia.map((i) => i.nombre))} y tenía que `
+        + 'conservar la de menor display_order');
+      assert(imagenesDe(sucia, opciones).length === 3,
+        'la migración se llevó puesta alguna imagen de la publicación sucia');
+
+      const quedoEmpatada = principales(empatada);
+      assert(quedoEmpatada.length === 1 && quedoEmpatada[0].id === debeQuedarEmpatada,
+        `con el mismo display_order la migración conservó ${quedoEmpatada[0]?.id} y el desempate `
+        + `por id manda ${debeQuedarEmpatada}`);
+    });
+    medidos.push('en una copia de la base, con la migración abajo se fabricaron 3 y 2 principales; '
+      + 'al subirla quedó una sola en cada una —la de menor display_order, y por id a igualdad— '
+      + 'sin perder ninguna imagen');
 
     // Con el dato sucio EXISTIENDO, el listado tiene que seguir mostrando una
     // sola tarjeta por publicación y una sola URL. Es la propiedad que dejó
@@ -30470,6 +30506,17 @@ await runCase(179, 'Una publicación tiene cero o una imagen principal, y quien 
     // índice se lo impide, así que se mide acá, que es la única ventana en la
     // que ese dato puede existir. Tolerar el duplicado y no dejar que se cree
     // son dos defensas distintas y las dos siguen puestas.
+    //
+    // Esto necesita la API, que lee la base compartida. Ahí no se baja la
+    // migración: se retira el índice con la misma sentencia que corre su
+    // `downgrade`, y después se lo repone con su definición exacta.
+    const definicionOriginal = definicionDelIndice();
+    querySql(`DROP INDEX ${INDICE}`);
+    indiceRetirado = definicionOriginal;
+    assert(definicionDelIndice() === null, 'no se pudo retirar el índice de la base compartida');
+    ensuciarAlReves(sucia);
+    assert(principalesDe(sucia).length === 3, 'no se pudo ensuciar la base compartida');
+
     const listado = await apiRequest(
       `/catalog/products?search=${encodeURIComponent(MARCADOR)}&page=1&page_size=24`);
     assert(listado.status === 200, `el catálogo respondió HTTP ${listado.status}`);
@@ -30483,37 +30530,17 @@ await runCase(179, 'Una publicación tiene cero o una imagen principal, y quien 
     assert(conDuplicado[0].primary_image === laDeMenorOrden.url,
       `con tres primarias el listado mostró ${JSON.stringify(conDuplicado[0].primary_image)} y `
       + `tenía que mostrar la de menor orden (${laDeMenorOrden.url})`);
+
+    // Se deja la sucia con la principal que la migración habría conservado y
+    // se repone el índice tal como estaba.
+    querySql(`UPDATE product_images SET is_primary = (id = ${sqlLiteral(laDeMenorOrden.id)})
+      WHERE product_id = ${sqlLiteral(sucia)}`);
+    querySql(definicionOriginal);
+    indiceRetirado = null;
+    assert(definicionDelIndice() === definicionOriginal,
+      `el índice repuesto no es el que estaba: ${definicionDelIndice()}`);
     medidos.push('con el duplicado existiendo, el listado sigue sacando una sola tarjeta por '
       + 'publicación y la imagen de menor orden');
-
-    alembic('upgrade', 'head');
-    migracionAbajo = false;
-
-    assert(definicionDelIndice(), 'subir la migración no dejó el índice');
-    assert(queryCount('SELECT COUNT(*) FROM product_images') === filasAntes,
-      `la migración borró filas: ${filasAntes} → `
-      + `${queryCount('SELECT COUNT(*) FROM product_images')}`);
-    assert(queryCount(`
-      SELECT COUNT(*) FROM (
-        SELECT product_id FROM product_images WHERE is_primary
-        GROUP BY product_id HAVING COUNT(*) > 1
-      ) duplicadas`) === 0,
-    'después de migrar sigue habiendo publicaciones con más de una principal');
-
-    const quedoSucia = principalesDe(sucia);
-    assert(quedoSucia.length === 1 && quedoSucia[0].id === debeQuedarSucia,
-      `la migración conservó ${JSON.stringify(quedoSucia.map((i) => i.nombre))} y tenía que `
-      + 'conservar la de menor display_order');
-    assert(imagenesDe(sucia).length === 3,
-      'la migración se llevó puesta alguna imagen de la publicación sucia');
-
-    const quedoEmpatada = principalesDe(empatada);
-    assert(quedoEmpatada.length === 1 && quedoEmpatada[0].id === debeQuedarEmpatada,
-      `con el mismo display_order la migración conservó ${quedoEmpatada[0]?.id} y el desempate `
-      + `por id manda ${debeQuedarEmpatada}`);
-    medidos.push('con la migración abajo se fabricaron 3 y 2 principales; al subirla quedó una '
-      + 'sola en cada una —la de menor display_order, y por id a igualdad— sin perder ninguna '
-      + 'imagen');
 
     // === C. Los recorridos: cargar y borrar ================================
     const recorrido = await publicar('recorrido');
@@ -30609,18 +30636,15 @@ await runCase(179, 'Una publicación tiene cero o una imagen principal, y quien 
     return `la regla «cero o una principal» la sostiene ahora un índice único parcial de `
       + `PostgreSQL, y los dos caminos que tocan imágenes la respetan. ${medidos.join('; ')}`;
   } finally {
-    // Se limpia PRIMERO y se sube la migración después, en ese orden. Si el
-    // caso se cortó con la migración abajo, lo que queda en la base es el dato
-    // sucio que fabricó; subir la migración con ese dato adentro es
-    // exactamente lo que la migración sabe resolver, pero sólo si la versión
-    // que está en el árbol lo resuelve. Retirando primero lo del caso, volver
-    // a subirla no depende de eso.
+    // Se limpia PRIMERO y se repone el índice después, en ese orden. Si el
+    // caso se cortó con el índice retirado, lo que queda en la base es el dato
+    // sucio que fabricó, y con él adentro el índice no se puede crear.
     limpiar();
-    if (migracionAbajo) {
+    if (indiceRetirado) {
       try {
-        alembic('upgrade', 'head');
+        querySql(indiceRetirado);
       } catch (error) {
-        console.log(`  · no se pudo volver a subir la migración: ${error.message}`);
+        console.log(`  · no se pudo reponer el índice de la imagen principal: ${error.message}`);
       }
     }
   }
