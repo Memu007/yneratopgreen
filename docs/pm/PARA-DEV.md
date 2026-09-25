@@ -56,6 +56,18 @@ producción. Lo corrijo en mi método.
    producción), la migración deja las 44 iguales a las de la siembra.
    Correrla dos veces no duplica nada.
 
+4. **Agregado por decisión de Emi (25/09, `DECISIONS.md`):** el filtro
+   «Marca» del Mercado aparece **siempre** que la categoría elegida use marca
+   (hoy, Maquinaria agrícola). Muestra las 44 marcas activas, cada una con su
+   cantidad, **también las que tienen cero**.
+   - El conteo sigue siendo del servidor, con los demás filtros aplicados,
+     como la faceta de hoy.
+   - Elegir una marca sin publicaciones muestra el vacío habitual del
+     Mercado, sin error.
+   - Actualizá los casos de la faceta que esperaban que el filtro se ocultara
+     y la guía si lo menciona.
+   - Negativo: ocultar las marcas en cero da rojo.
+
 ### Aceptación
 
 - el caso nuevo más un negativo (la migración sin la carga da rojo);

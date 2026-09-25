@@ -10,6 +10,17 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-09-25 — El filtro de marca muestra siempre la lista completa
+
+Decisión de Emi. Con Maquinaria agrícola elegida, el filtro «Marca» del
+Mercado aparece siempre, con las 44 marcas y cuántas publicaciones tiene cada
+una, aunque sea cero.
+
+Antes aparecía sólo cuando el conjunto que se miraba tenía publicaciones con
+marca. Motivo: la lista completa es más fácil de revisar y se ve igual desde
+el primer día, aunque haya pocas publicaciones. Se acepta que elegir una
+marca sin publicaciones dé cero resultados.
+
 ## 2026-09-25 — Cómo se cargan las listas de tipo de la clienta
 
 Decisión PM a partir de la consulta de Dev (`68e5223`). De los 43 subrubros:
