@@ -2,139 +2,256 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ATRIBUTOS-RUBRO-1 — consulta antes de construir la parte 1
+## ATRIBUTOS-RUBRO-1, parte 1: entregada en rama
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `10e0008` |
-| entregado | `2a0c461`: el P3 del caso 191 |
-| parte 1 | **sin construir**: freno, como pide la tarea |
+| base | `86fc0da` (tu decisión) |
+| código | `e624831`: tipo y potencia en alta, edición, ficha, filtro y siembra |
+| arnés | `8dce24b`: casos 194 a 196, negativos, y 55 y 58 en copia de la base |
+| auditorías | `3594363`: a11y y contraste miden los filtros nuevos |
+| arreglo | `4eac0f7`: el caso 179 baja su migración en una copia |
 | no integrado, no desplegado | `main` sigue en `0bd7fbc` |
 
-**Resultado.** Cotejé las 43 listas de `TAXONOMIA-CLIENTE.md` con los 43
-subrubros de la base, que coinciden uno a uno.
+**Resultado.**
 
-- 29 tienen una lista clara, y tractores va por potencia.
-- **13 caen en tu «frená y consultá»:**
-  - 4 mezclan dos cosas distintas en la misma lista;
-  - 4 «Mejoras» no son tipos;
-  - 5 tienen una sola opción.
+- **Listas:** 33 listas con 122 tipos, más la potencia de Tractores.
+- **Casos y negativos:** 194, 195 y 196 en verde. Los tres negativos dan
+  rojo, cada uno por su motivo.
+- **Suite completa desde una base nueva:** 195 de 196. El único rojo es el
+  131, de entorno.
+- **Auditorías:**
+  - a11y: 78 de 78.
+  - Contraste: 86 de 86.
+  - Auditoría móvil: 12 de 12 recorridos, sin hallazgos.
+  - Guía del panel: los 26 pasos coinciden, en escritorio y en celular.
 
-Abajo va la propuesta para cada caso. El P3 del 191 ya está corregido.
+**Para decidir vos (ninguna es bloqueante).**
 
-**Para decidir vos (bloqueante para cargar las listas).**
+1. **Dos nombres completos que no aprobaste.** Hice con Cosecha y con Cercas
+   lo que aprobaste en Fertilización.
+   - Cosecha: «cosechadoras de granos, forrajes…» quedó «Cosechadoras de
+     granos», «Cosechadoras de forrajes»…
+   - Cercas y bebederos: «eléctricas, portátiles» quedó «Cercas eléctricas»,
+     «Cercas portátiles».
 
-1. **Cargar la tabla de abajo.** Es lo que recomiendo.
-   - En las 4 listas mezcladas queda una sola dimensión.
-   - Las 4 «Mejoras» y las 5 de una sola opción quedan sin tipo.
-2. **Cargar todo tal cual lo escribió la clienta.** Como una publicación
-   elige un solo tipo, las superposiciones rompen el filtro. Por ejemplo,
-   una sembradora neumática de precisión para maíz entra en tres opciones:
-   si se carga como «de granos gruesos», quien filtra «neumáticas» no la
-   encuentra.
+   Solas, «Forrajes» o «Portátiles» no dicen qué se vende. **Recomiendo
+   dejarlo así.** Si no, se cambia en `tipos.py` sin migración.
+2. **Dos defectos que ya estaban, fuera del alcance.** Recomiendo
+   corregirlos en la parte 2 (ver abajo, «Visto de paso»).
 
-El corte en dos partes me sirve; no propongo otro.
+## Qué se cargó por subrubro
 
-## Las 13 que hay que decidir
+Vive en `backend/app/services/tipos.py`, y la siembra lo carga. Sin tipo
+quedan las 4 «Mejoras» de Tierras, las 5 de una sola opción y Tractores, que
+va por potencia.
 
-### Mezclan dos cosas en la misma lista (4)
+| rubro | subrubro | tipos |
+|---|---|---|
+| Maquinaria agrícola | Preparación del suelo | Arados · Rastras · Cultivadores · Subsoladores · Otros |
+|  | Siembra y plantación | Sembradoras de granos gruesos · Sembradoras de granos finos · Sembradoras de hortalizas · Otras |
+|  | Fertilización y protección | Pulverizadoras autopropulsadas · Pulverizadoras de arrastre · Fertilizadoras centrífugas · Fertilizadoras de disco · Aviones · Drones · Otros |
+|  | Cosecha | Cosechadoras de granos · Cosechadoras de forrajes · Cosechadoras de algodón · Cosechadoras de caña · Cosechadoras de café · Cosechadoras de frutales · Cosechadoras de hortalizas · Otros |
+|  | Postcosecha | Limpiadoras · Secadoras · Ensacadoras · Silos · Otros |
+|  | Forrajes y ganadería | Picadoras · Embolsadoras · Enfardadoras · Mezcladoras · Otros |
+| Riego y drenaje | Riego por aspersión | Pivotes · Cañones · Laterales |
+|  | Riego localizado | Goteo · Microaspersión · Cintas |
+|  | Riego superficial y subterráneo | Superficial · Subterráneo |
+|  | Bombas, motobombas y accesorios hidráulicos | Bombas centrífugas · Motobombas · Accesorios hidráulicos |
+|  | Drenaje y control hídrico | Drenaje subsuperficial · Canales · Control de nivel |
+| Insumos agrícolas | Semillas y plántulas | Cultivos extensivos · Hortícolas · Forrajeras · Forestales |
+|  | Fertilizantes | Orgánicos · Minerales |
+|  | Correctivos | Cal · Yeso · Enmiendas |
+|  | Agroinsumos biológicos | Biofertilizantes · Biocontroladores · Microorganismos |
+|  | Agroquímicos | Herbicidas · Insecticidas · Fungicidas · Acaricidas |
+|  | Sustratos y coberturas | Sustratos · Mulch · Mallas · Films |
+| Ganadería y forrajes | Cercas y bebederos | Cercas eléctricas · Cercas portátiles · Hidrantes · Bebederos |
+|  | Manejo animal | Corrales · Mangas · Balanzas · Caravanas |
+|  | Ordeño y sanidad | Ordeñadoras mecánicas · Tanques de leche · Equipos de baño |
+|  | Suplementación | Comederos · Tolvas · Silos de grano |
+| Repuestos y mantenimiento | Neumáticos y cámaras | Neumáticos agrícolas · Cámaras |
+|  | Filtros, correas, cuchillas, cadenas | Filtros · Correas · Cuchillas · Cadenas |
+|  | Sistemas hidráulicos | Mangueras · Racores · Bombas hidráulicas |
+|  | Sistemas electrónicos y sensores | Monitores · GPS · Piloto automático |
+|  | Lubricantes y baterías | Lubricantes · Baterías |
+| Agricultura de precisión y tecnología | Sistemas de guiado y GNSS | Antenas · Pantallas · Corrección por señal |
+|  | Sensores de cultivo | Clorofila · Humedad · Temperatura |
+|  | Drones y VANTs | Multiespectrales · Térmicos · Aplicadores |
+|  | Software y plataformas | Gestión de flota · Prescripción variable · Rendimiento |
+| Tierras y parcelas | Compra-venta definitiva | Campo agrícola · Campo ganadero · Parcela hortícola/frutícola · Campo mixto · Otros |
+|  | Alquiler por campaña (1-12 meses) | Siembra directa · Siembra convencional · Otros |
+|  | Alquiler por uso transitorio | Pastoreo rotativo · Ensayos agrícolas · Producción estacional · Agricultura regenerativa · Agricultura experimental · Otros |
 
-| subrubro | lista de la clienta | propuesta | qué queda afuera y por qué |
-|---|---|---|---|
-| Siembra y plantación | sembradoras de precisión, neumáticas, hortalizas, granos gruesos/finos, otros | sembradoras de granos gruesos · de granos finos · de hortalizas · otras | «de precisión» y «neumáticas»: dicen cómo dosifica la máquina, no para qué cultivo es |
-| Fertilizantes | orgánicos, minerales, líquidos, liberación controlada | orgánicos · minerales | «líquidos» y «de liberación controlada»: dicen la forma del producto, no su origen. Un mineral líquido entraba en dos |
-| Compra-venta definitiva (Tierras) | campo agrícola (secano/riego), campo ganadero (pasturas naturales/mejoradas), parcela hortícola/frutícola, campo mixto, otros | campo agrícola · campo ganadero · parcela hortícola/frutícola · campo mixto · otros | los paréntesis: son una segunda característica del campo |
-| Alquiler por campaña (Tierras) | siembra directa, siembra convencional, con/sin mejora de suelos, otros | siembra directa · siembra convencional · otros | «con/sin mejora de suelos»: es otra característica, y además son dos opciones en una |
+**Tractores:** la potencia en HP va de 1 a 1000. El filtro ofrece tres
+rangos: compacto hasta 59, estándar de 60 a 120 y alta desde 121. Los bordes
+60 y 120 caen en estándar.
 
-### No son tipos (4)
+**Siembra de ejemplo:** 14 publicaciones demo con tipo, y el tractor Pauny
+con 180 HP, porque su descripción ya lo dice. El kit de filtros queda sin
+tipo a propósito, para probar el nulo.
 
-Son los cuatro subrubros de Tierras que empiezan con «Mejoras»: compra,
-alquiler, alquiler transitorio y leasing. Sus listas —alambrados, aguadas,
-electrificación, molinos, monte…— describen el campo que se ofrece. Un
-mismo campo tiene varias a la vez.
+## Casos
 
-- **Propuesta: sin tipo.**
-- Tratarlas bien pide elegir varias, y eso es otra pieza.
-- Además, si Tierras entra en esta etapa sigue siendo una pregunta abierta
-  desde julio.
+Salida de la suite completa.
 
-### Tienen una sola opción (5)
-
-| subrubro | la única opción |
-|---|---|
-| Otros (Riego) | accesorios para riego |
-| Otros (Insumos) | otros insumos |
-| Otros (Ganadería) | equipos varios |
-| Otros (Repuestos) | accesorios generales |
-| Alquiler con opción a compra (Tierras) | leasing de tierra |
-
-**Propuesta: sin tipo.** Un filtro con una sola opción no separa nada.
-
-## Las 29 claras: se cargan tal cual
-
-Las opciones, en el orden de la clienta:
-
-| rubro | subrubros |
-|---|---|
-| Maquinaria agrícola | Preparación del suelo · Fertilización y protección · Cosecha · Postcosecha · Forrajes y ganadería |
-| Riego y drenaje | Riego por aspersión · Riego localizado · Riego superficial y subterráneo · Bombas, motobombas y accesorios hidráulicos · Drenaje y control hídrico |
-| Insumos agrícolas | Semillas y plántulas · Correctivos · Agroinsumos biológicos · Agroquímicos · Sustratos y coberturas |
-| Ganadería y forrajes | Cercas y bebederos · Manejo animal · Ordeño y sanidad · Suplementación |
-| Repuestos y mantenimiento | los cinco que no son «Otros» |
-| Agricultura de precisión y tecnología | los cuatro |
-| Tierras y parcelas | Alquiler por uso transitorio |
-
-**Tres notas, que no cambian nada si no decís lo contrario:**
-
-- **Fertilización y protección.** Escribo completos los nombres que la
-  clienta abrevia: «pulverizadoras autopropulsadas», «pulverizadoras de
-  arrastre», «fertilizadoras centrífugas», «fertilizadoras de disco». Los
-  drones siguen en dos lugares, como la pregunta abierta de julio.
-- **Cercas y bebederos.** No tiene una opción para bebederos, y **Sustratos y
-  coberturas** no la tiene para sustratos. No invento ninguna: quien publique
-  eso deja el tipo vacío, que es válido. Si querés, se le pregunta a la
-  clienta.
-- **Tractores.** No lleva lista: quien publica carga la potencia en HP, y el
-  filtro ofrece los tres rangos de la clienta, como decidiste.
-
-## El P3 del 191 (`2a0c461`)
-
-**La causa.** `tokenDeAdmin` comprobaba que el token guardado sirviera al
-*empezar* el caso, pero el caso lo usa durante toda su corrida. El token local
-dura 15 minutos: uno que pasaba la comprobación con segundos de vida vencía
-en el medio del 191.
-
-**Cómo lo reproduje.** Fabriqué un token de administrador que vence a los
-nueve segundos, con el propio `create_access_token` de la API, y lo inyecté
-en una copia descartable del smoke:
+- **194, alta y edición.**
+  - Rechaza 8 altas inválidas sin guardar ninguna fila:
+    - un tipo de otro subrubro, uno inventado, uno sin subrubro, y uno en un
+      subrubro sin lista;
+    - una potencia negativa, una de 0, una de 1001 HP, y una fuera de
+      Tractores.
+  - En la pantalla, el formulario ofrece la lista del subrubro y la suelta al
+    cambiarlo. Guarda «Arados», y en Tractores 95 HP.
+  - La ficha dice «Tipo: Arados» y «Potencia: 95 HP».
+  - La edición lo cambia a «Subsoladores» y 130.
+  - Por la API, un tipo ajeno se rechaza sin tocar la fila, cambiar de
+    subrubro suelta el tipo, y `null` lo quita.
+- **195, filtro.**
+  - Con 14 arados sembrados (5 compactos, 11 estándar, 9 de alta), la API y
+    la pantalla cuentan lo mismo que la base.
+  - Lo que no declaró el dato no entra.
+  - Cambiar un filtro vuelve a la página 1.
+  - La barra lleva `subtype` y `power`, y Atrás desde la ficha y desde Inicio
+    los devuelve.
+  - Un tipo ajeno al subrubro se descarta.
+  - «neumática», escrita en una descripción, se encuentra con el buscador.
+- **196, migración.**
+  - En una copia de la base: baja y sube, y las publicaciones quedan
+    idénticas.
+  - La tabla nace vacía y las columnas nacen nulas.
+  - La base rechaza una potencia de -1, y `alembic check` queda limpio.
 
 ```
-smoke de 10e0008:  [FAIL] 191 … PATCH /admin/products/…/status respondió HTTP 401: Token inválido o expirado
-smoke de 2a0c461:  [PASS] 191 … eliminada, pausada y agotada: las dos rutas responden 400 …
+[PASS] 194 El tipo y la potencia se declaran al publicar, se validan, se ven en la ficha y se editan — 8 altas inválidas rechazadas con su motivo y ninguna fila guardada (tipo de otro subrubro, inventado, sin subrubro, en un subrubro sin lista; potencia -5, 0, 1001 y fuera de Tractores); el formulario de alta ofrece la lista del subrubro, la suelta al cambiarlo y guarda «arados»; en Tractores ofrece sólo la potencia y guarda 95 HP; la ficha dice «Tipo: Arados» y «Potencia: 95 HP», y sin dato no dibuja la fila; el panel abre la edición con el tipo y la potencia guardados y los cambia: «subsoladores» y 130 HP; por la API, un tipo ajeno se rechaza sin tocar la fila, cambiar de subrubro suelta el tipo y la potencia que ya no corresponden, y null los quita (6225 ms)
+[PASS] 195 Filtrar por tipo y por potencia cuenta en el servidor, deja afuera lo no declarado y vive en la URL — la API cuenta en el servidor —14 arados; 5 compacto, 11 estandar, 9 alta— y el total y las páginas coinciden con la base; 60 y 120 HP son estándar; las 10 sin tipo y el tractor sin potencia no entran en ningún filtro; «neumática» se encuentra con el buscador; en la pantalla, elegir tipo o potencia vuelve a la página 1, el conteo es el de la base, no se cuela ninguna sin tipo, Atrás desde la ficha y desde Inicio devuelve el filtro, cambiar de subrubro lo suelta, lo ajeno se descarta de la barra, sin subrubro no hay filtro, y «neumática» se encuentra con el buscador (4645 ms)
+[PASS] 196 La migración del tipo y la potencia es aditiva, vuelve atrás y deja intactas las publicaciones — bajar a b6d3f12a8e94 borra la tabla y las dos columnas y deja las 294 publicaciones iguales (huella 5e3ca104c60f…); subir crea la tabla vacía y las dos columnas en nulo para todas: no le inventa un dato a nadie, y el resto de cada fila queda igual; la base rechaza una potencia negativa aunque se escriba por fuera de la API; `alembic check` no encuentra diferencias entre el modelo y el esquema. Todo en una copia de la base (3751 ms)
 ```
 
-**El arreglo.** Ahora también lee el vencimiento del token y lo renueva si le
-quedan menos de diez minutos. Vale para los nueve lugares del smoke que lo
-piden.
+## Negativos
 
-## Para verificar el P3, lo mínimo
+`python3 scripts/sabotajes_atributos_rubro_1.py` rompe el catálogo de tres
+maneras y comprueba que el 195 falle por la que corresponde. Al terminar deja
+`src` y `backend` como estaban.
+
+| negativo | qué rompe | el 195 dice |
+|---|---|---|
+| `despues-de-contar` | el servidor filtra después de contar | 12 problemas; por ejemplo, «API, tipo «arados»: el total dice 27 y en la base hay 14» |
+| `en-el-navegador` | el servidor ignora el filtro y el Mercado filtra la página que bajó | 17 problemas, entre ellos «pantalla, con «Arados»: dice 27 operaciones y en la base hay 14» |
+| `acepta-nulos` | el servidor suma lo que no declaró el dato | 15 problemas; por ejemplo, «API, tipo «arados»: trajo 10 que no declararon el dato o no corresponden» y «pantalla: con «Arados» se ven 10 sin tipo» |
+
+Los tres dieron `[ROJO ESPERADO]`, y cierran con «src y backend después:
+como estaban».
+
+## Migración
+
+`c8e41f2a7d90`, que viene después de `b6d3f12a8e94`. Es aditiva:
+
+- **La tabla `subcategory_types`** nace vacía y la llena la siembra.
+- **`products.subcategory_type_id`** nace nula y no se rellena. Si se borra
+  un tipo, la publicación queda sin tipo.
+- **`products.power_hp`** nace nula, y la base sólo acepta valores
+  positivos.
+
+La bajada borra la tabla y las dos columnas. La probé en una copia (caso
+196), no en la base compartida. Ninguna fila existente cambia de valor.
+
+**Lo que destapó en el arnés.** Tres casos bajaban su migración en la base
+compartida. Al llegar esta migración, esas bajadas borraban las listas de
+tipos de toda la suite.
+
+- **55 y 58:** bajan en una copia y por revisión nombrada. Es el P3 que
+  habías registrado.
+- **179:** su `downgrade -1` en la base compartida dejó de bajar su propia
+  migración y pasó a bajar esta. En la primera suite completa dejó en rojo
+  el 179, el 194, el 195 y el 196.
+  - Ahora baja y sube en una copia.
+  - Lo único que necesita la API, el listado con la imagen duplicada, se mide
+    en la base compartida. Para eso el caso retira el índice con la misma
+    sentencia de su `downgrade`, y después lo repone con su definición
+    exacta.
+  - Negativo: con la migración de la imagen alterada para conservar la
+    principal equivocada, el 179 da `[FAIL] 179 … la migración conservó
+    [...] y tenía que conservar la de menor display_order`.
+
+## Puertas
+
+| puerta | resultado |
+|---|---|
+| tipos, lint, build | verdes (`built in 2.00s`) |
+| `compileall` backend y alembic, `node --check`, `py_compile` | verdes |
+| diff-check con `cr-at-eol` | limpio |
+| a11y `--todas` | 78 de 78 (antes 76: suma la superficie de los filtros del subrubro) |
+| contraste | 86 de 86 (antes 84) |
+| auditoría móvil | 12 de 12 recorridos, 39 pantallas: 0 desbordes, 0 recortes, 0 errores de consola, 0 respuestas 4xx/5xx |
+| `guia-admin.mjs` | «LA GUÍA Y EL PANEL COINCIDEN: 26 pasos en escritorio y celular» |
+| suite completa desde base nueva | «195/196 pasaron; 1 fallaron»: el 131, de entorno |
+
+## Riesgos
+
+- **Producción.** Las listas llegan con la siembra, como las categorías y
+  las marcas, y la migración crea la tabla vacía. Pero correr la siembra en
+  producción también crea usuarios y publicaciones demo. Se decide al
+  desplegar, con Emi.
+- **La tarjeta no muestra el tipo;** sólo lo muestra la ficha. No lo
+  pediste, y la tarjeta ya está justa a 360 px.
+- **Tierras sigue abierta.** Tiene tres listas cargadas, pero si entra en
+  esta etapa sigue sin decidirse.
+
+## Visto de paso (fuera del alcance, no lo toqué)
+
+1. **La marca sigue cargada en la publicación siguiente.** Al publicar o al
+   cerrar el formulario, `limpiarFormulario` suelta el tipo y la potencia,
+   pero no suelta la marca (`AddProductModal.tsx:212`). Si alguien publica
+   un John Deere y después otra máquina, el selector ya aparece en John
+   Deere, y se guarda así si no lo cambia. Lo confirmé en el código; en el
+   navegador no lo reproduje.
+2. **«Mercado» dentro del Mercado saca de la barra la condición, el orden y
+   la marca.** Es así porque `PARAMETROS_DEL_MERCADO` (`politica.ts:74`) no
+   los incluye. La pantalla sigue filtrando, pero la barra ya no lo dice, y
+   al recargar el filtro se pierde. El tipo y la potencia sí sobreviven.
+   Medido en el navegador:
+
+   ```
+   al abrir:        barra=…&subtype=arados&condition=usado  tipo=arados  condición=usado
+   tras «Mercado»:  barra=…&subtype=arados                  tipo=arados  condición=usado
+   tras recargar:   barra=…&subtype=arados                  tipo=arados  condición=
+   ```
+
+   Con `condition=nuevo&sort=price-asc`, «Mercado» deja la barra en
+   `?section=marketplace`, y al recargar vuelven «Cualquiera» y «Más
+   recientes».
+
+Los dos son P2: el problema es recuperable y ninguno pierde una publicación.
+**Recomiendo corregirlos en la parte 2**, cada uno con su caso y su
+negativo. Es poco trabajo, y la parte 2 toca el mismo formulario y los
+mismos filtros.
+
+## Para verificar, lo mínimo
 
 ```
 ./scripts/entorno_nativo.sh --recrear
-INYECTAR='s/^const state = {};$/const state = {}; if (process.env.SONDA_TOKEN_ADMIN) state.docAdminToken = process.env.SONDA_TOKEN_ADMIN;/'
-ADMIN=$(docker exec topgreen-db psql -U topgreen -d topgreen -At -c "SELECT id FROM users WHERE email='admin@topgreen.com'")
-corto() { docker exec topgreen-api python -c "from datetime import timedelta; from app.core.security import create_access_token; print(create_access_token({'sub': '$ADMIN'}, timedelta(seconds=9)))"; }
-git show 10e0008:scripts/smoke.mjs | sed "$INYECTAR" > scripts/.sonda-vieja.mjs
-sed "$INYECTAR" scripts/smoke.mjs > scripts/.sonda-nueva.mjs
-SONDA_TOKEN_ADMIN=$(corto) SMOKE_CASOS=191 node scripts/.sonda-vieja.mjs   → [FAIL] 191 … HTTP 401: Token inválido o expirado
-SONDA_TOKEN_ADMIN=$(corto) SMOKE_CASOS=191 node scripts/.sonda-nueva.mjs   → [PASS] 191 …
-rm scripts/.sonda-vieja.mjs scripts/.sonda-nueva.mjs
+SMOKE_CASOS=179,194,195,196 node scripts/smoke.mjs   → 4/4 pasaron; 0 fallaron
+python3 scripts/sabotajes_atributos_rubro_1.py       → tres [ROJO ESPERADO] y «todos dieron el rojo esperado»
 ```
 
-Estos comandos los corrí tal cual y dieron eso.
+El negativo del 179:
 
-**Puertas del arreglo:** `node --check` y diff-check con `cr-at-eol`, verdes.
-No toca `src/` ni `backend/`.
+```
+M=backend/alembic/versions/20260921_0100_b6d3f12a8e94_una_sola_imagen_principal.py
+sed -i 's/ORDER BY product_id, display_order, id/ORDER BY product_id, display_order DESC, id/' $M
+SMOKE_CASOS=179 node scripts/smoke.mjs   → [FAIL] 179 … la migración conservó [...] y tenía que conservar la de menor display_order
+git checkout -- $M
+```
+
+**Advertencias del entorno:**
+
+- El entorno se cae cuando queda inactivo; se levanta con
+  `./scripts/entorno_nativo.sh`.
+- El 131 falla siempre acá, porque el puente de Docker no traduce
+  `docker run`.
+- El script de negativos reinicia la API.
+
+Estos comandos los corrí tal cual y dieron eso.
 
 No toqué `main`, Railway ni datos reales, y no desplegué.
