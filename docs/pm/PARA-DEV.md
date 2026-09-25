@@ -5,80 +5,130 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Tarea activa — MERCADO-UNICO-1
+## Tarea activa — ATRIBUTOS-RUBRO-1
 
 **Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
 
-**Cambio de prioridad.** Esta tarea reemplaza a `USER-GUIDE-1`, que queda
-para después: las guías tienen que mostrar el sitio ya sin la pestaña
-Servicios. Si ya empezaste la guía, guardá lo hecho en un commit aparte, sin
-entregarlo, y seguí con esta.
+### Decisión sobre la entrega anterior
 
-`COPY-AGRO-1` quedó **aceptada en rama** (`2b92988`). La evidencia está en
-`REPRODUCCION-COPY-AGRO-1-2026-09-25.md`.
+`MERCADO-UNICO-1` quedó **aceptada en rama** sobre `2b71709`.
 
-### Decisión de Emi
+- 193 en 1/1.
+- Tus tres negativos dan rojo, y también los míos:
+  - la reescritura hecha con `pushState`;
+  - quitar la reescritura al volver por el historial.
+- Suite completa en 191/193; a11y, contraste, auditoría móvil y guía del
+  panel verdes.
 
-Es el punto #7 de la devolución de la clienta
-(`DEVOLUCION-CLIENTA-REVISION-01-2026-09-20.md`), que ella repitió tres
-veces: **Servicios no va como pestaña aparte. Queda un solo Mercado.** Los
-servicios se encuentran ahí, con el filtro por tipo que ya existe.
+Acepto tus dos recomendaciones:
 
-### Decisiones PM de experiencia
+- no se agrega ningún aviso nuevo;
+- la cabecera queda en 2+2 en celular.
 
-- **La cabecera** deja de ofrecer «Servicios». Quedan Inicio, Mercado, Quiénes
-  somos y Contacto, más las acciones de la sesión.
-- **Los enlaces viejos a Servicios** (URL propia, historial, enlaces de Inicio
-  y del pie) llevan al Mercado con el filtro de servicios ya puesto. No
-  terminan en una pantalla vacía ni en error.
-- **Todo lo que hoy lista la página Servicios tiene que poder encontrarse en
-  el Mercado**, incluidas las publicaciones de logística si hoy salen ahí.
-  Hacé el inventario antes de sacar nada.
-- **El contenido propio de la página Servicios** («Qué mirar antes de
-  cotizar», «¿Prestás un servicio…?», video, textos): hacé el inventario y
-  proponé qué se pierde.
-  - Si algo es una advertencia o un límite de responsabilidad, por ejemplo
-    que la plataforma no verifica a quien presta el servicio, tiene que
-    seguir visible donde se ven los servicios.
-  - El resto se saca sin reemplazo.
-  - Frená y consultá si creés que algo más merece mudarse.
-- **Inicio no se rediseña.** Espera la decisión #5. Sólo se corrigen sus
-  enlaces a Servicios.
+Las fotos sin uso se conservan. Evidencia en
+`REPRODUCCION-MERCADO-UNICO-1-2026-09-25.md`.
+
+### Problema y prioridad
+
+Es la devolución de la clienta #9 más la taxonomía que mandó el 25/07 y
+reenvió el 25/09. **Emi decidió absorberlo** (`DECISIONS.md`, 25/09).
+
+La clienta quiere que quien publica cargue lo que identifica su producto, y
+que eso alimente los filtros: «cuantos más datos aporta el vendedor mayor
+probabilidad de aparecer al filtrar». Hoy el Mercado filtra por categoría y
+subcategoría, pero no por el tercer nivel de su listado. Tampoco hay
+potencia, modelo, año ni origen.
+
+**La fuente de los datos** es `docs/pm/TAXONOMIA-CLIENTE.md`, que tiene
+transcripto el tercer nivel de los 43 subrubros. No se usa el HTML de la
+clienta: tomamos los datos, no el código.
+
+### Decisiones PM
+
+1. **El tercer nivel es un atributo de la publicación, no un nivel más de
+   categorías.** Así lo decidimos el 15/09. Cada subrubro tiene su lista
+   cerrada de «tipo», por ejemplo:
+   - Preparación del suelo: arados, rastras…;
+   - Riego por aspersión: pivotes, cañones, laterales.
+
+   Al publicar se elige uno de la lista del subrubro. Es opcional: una
+   publicación vieja sin tipo sigue siendo válida.
+2. **Tractores:** su tercer nivel son rangos de potencia. Quien publica carga
+   la potencia en HP como número, y el filtro ofrece los tres rangos de la
+   clienta: compacto (<60), estándar (60–120) y alta (>120).
+3. **Maquinaria agrícola:** además de la marca, que ya existe, suma modelo
+   (texto) y año (número entre 1950 y el año próximo). El filtro de año es
+   un rango, desde y hasta. El modelo no es un filtro propio: se encuentra
+   con el buscador de texto.
+4. **Origen** («Agencia / Concesionaria» o «Dueño directo»):
+   - es opcional y sólo para productos, no para servicios;
+   - se muestra siempre rotulado «declarado por quien vende», en la tarjeta,
+     en la ficha y en el filtro;
+   - nunca tiene el aspecto del distintivo de documentación revisada.
+5. **El nulo no entra en un filtro positivo**, como la condición: pedir
+   «arados» no trae publicaciones sin tipo.
+6. **Los filtros nuevos siguen el contrato de los que ya existen:** se
+   aplican en el servidor antes de contar y paginar, viajan en la URL,
+   vuelven con Atrás y Adelante, y cambiarlos vuelve a la página 1. El
+   filtro de tipo aparece cuando hay un subrubro elegido y ofrece sólo sus
+   opciones.
+
+### Dos partes, entregas separadas
+
+- **Parte 1:** tipo (tercer nivel) en los siete rubros y potencia de
+  tractores, con alta, edición, filtro, ficha y siembra de ejemplo.
+- **Parte 2:** modelo y año en maquinaria, y origen declarado.
+
+Cada parte se entrega y se revisa por separado. Si ves un corte mejor,
+proponelo en `PARA-PM.md` antes de construir.
+
+### Además, P3 del arnés
+
+En mi suite completa, el 191 cayó con 401 «Token inválido o expirado» en
+`PATCH /admin/products/…/status`. Solo, pasa. Algún camino del 191 usa un
+token guardado sin renovar. Corregilo en la parte 1.
 
 ### Fuera de alcance
 
-- #5 (qué es Inicio), #6 (el bloque repetido), #10 (AgroMarket) y #9
-  (atributos por rubro).
-- Renombrar en el código lo que internamente se llama «servicio».
-- Cambiar cómo se publica un servicio.
+- Editar las listas de tipo desde el panel: salen de la siembra. Si la guía
+  del panel las muestra en Configuración, se documentan.
+- «Inversores».
+- Cambiar la marca a otros rubros.
+- El rediseño de Inicio.
 - Integración y despliegue.
 
-### Aceptación verificable
+### Aceptación verificable (en cada parte)
 
-1. **Caso nuevo en el smoke:**
-   - la cabecera no ofrece Servicios, en escritorio y celular;
-   - la URL vieja y los enlaces de Inicio y del pie llevan al Mercado con el
-     filtro de servicios, y muestran los mismos servicios que mostraba la
-     página;
-   - Atrás y Adelante funcionan.
-2. **Negativo:** con la cabecera o el enlace viejo de la base, el caso da
-   rojo.
-3. **El inventario:** qué se sacó, qué se mudó y dónde quedaron las
-   advertencias.
-4. **Regresión:** los casos del smoke que recorren Servicios, la navegación y
-   el filtro por tipo. Actualizá los que afirmaban la pestaña y justificá la
-   lista. También `guia-admin.mjs`.
-5. a11y `--todas`, contraste y auditoría móvil. Van a cambiar las
-   superficies: si se reduce la cobertura, explicá por qué.
-6. Build, lint, tipos y diff-check con `cr-at-eol`.
+1. **Casos nuevos en el smoke:**
+   - alta y edición guardan y muestran cada atributo;
+   - la validación rechaza lo inválido (un tipo que no es del subrubro, una
+     potencia negativa, un año fuera de rango);
+   - el filtro trae lo que corresponde y cuenta en el servidor;
+   - el nulo no entra;
+   - la URL y el historial funcionan;
+   - cambiar un filtro vuelve a la página 1.
+2. **Negativos:** el filtro aplicado después de contar, en el navegador o
+   aceptando nulos. Cada uno da rojo por su motivo.
+3. **Migración** aditiva, con `downgrade` probado en una copia de la base,
+   como el caso 74. Las publicaciones existentes quedan intactas.
+4. **Sin regresiones:** suite completa desde una base recién creada, a11y
+   `--todas`, contraste, auditoría móvil y `guia-admin.mjs`.
+5. Build, lint, tipos, `compileall` y diff-check con `cr-at-eol`.
 
-### Entrega en `PARA-PM.md`
+### Frená y consultá
+
+- Si un subrubro del listado no tiene tercer nivel claro, o si el del
+  listado mezcla cosas que no son tipos. Proponé cómo tratarlo.
+- Si el origen necesita algo más que un campo declarado.
+
+### Entrega en `PARA-PM.md`, por parte
 
 - SHA;
-- el inventario;
-- la salida del caso y del negativo;
-- la regresión;
-- lo que consultás, si hay algo.
+- qué se cargó por subrubro;
+- los casos y los negativos;
+- la migración;
+- las puertas;
+- los riesgos.
 
 No integres ni despliegues.
 
@@ -86,9 +136,5 @@ No integres ni despliegues.
 
 ## Después (no empezar todavía)
 
-1. **Atributos por rubro** (#9, decisión de Emi del 25/09). Tercer nivel de la
-   taxonomía de la clienta (`TAXONOMIA-CLIENTE.md`) como atributo filtrable en
-   los siete rubros; potencia de tractores; modelo y año en maquinaria; y
-   origen, declarado por quien vende y rotulado así. «Inversores» no se carga.
-   Se asigna completa al cerrar `MERCADO-UNICO-1`.
-2. **`USER-GUIDE-1`**, las guías de uso, después de los atributos.
+**`USER-GUIDE-1`**, las guías de uso de quien compra, vende y transporta,
+cuando los atributos estén cerrados.

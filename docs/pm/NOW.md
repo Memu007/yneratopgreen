@@ -8,20 +8,19 @@ Actualizado: 2026-09-24.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5, último día (ventana 04/09–24/09). Su puerta funcional quedó verificada el 23/09 sobre `1e4a63c` (`REPRODUCCION-FASE-2-2026-09-23.md`). Desde el **25/09** corre la **Fase 3**, semanas 6–8, hasta el 15/10. Su puerta y el hito intermedio ya quedaron aceptados por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `e9cf4c6`, publicado el 25/09 con autorización de Emi: incluye las quince piezas aceptadas hasta `BRAND-LOSS-1` y la migración `b6d3f12a8e94`. Emi verificó a ojo el sitio publicado el 25/09.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `COPY-AGRO-1` en `2b92988`, informe `71fc9fa`, aceptada en rama y todavía no publicada. Todo lo anterior ya está en `main` (`e9cf4c6`).
-- **Última decisión PM:** `COPY-AGRO-1` **ACEPTADA EN RAMA**: «agropecuario» en las once apariciones. Caso 192 y cuatro negativos en rojo, 24/24 relacionados, auditoría móvil, a11y y contraste verdes. Evidencia en `REPRODUCCION-COPY-AGRO-1-2026-09-25.md`.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `MERCADO-UNICO-1` en `2b71709`, informe `0aeb0b6`. Aceptadas en rama y sin publicar: `COPY-AGRO-1` y `MERCADO-UNICO-1`. Lo anterior ya está en `main` (`e9cf4c6`).
+- **Última decisión PM:** `MERCADO-UNICO-1` **ACEPTADA EN RAMA**: un solo Mercado, sin pestaña Servicios, y los enlaces viejos llevan al Mercado filtrado. 193 en 1/1, cinco negativos en rojo (dos de PM), suite completa 191/193 y puertas verdes. Evidencia en `REPRODUCCION-MERCADO-UNICO-1-2026-09-25.md`.
 - **Publicación 25/09:** con autorización explícita de Emi y sin backup previo (decisión del 25/09 para el entorno demostrativo), PM subió `e9cf4c6` a `main` por fast-forward desde `0bd7fbc`. La verificación previa fue desde base recién creada: 190 de 191 casos cubiertos (el 169 es de entorno); a11y 76/76, contraste 84/84, auditoría 12/12, guía 26/26, build, tipos, lint y `alembic check` verdes; sin secretos ni archivos prohibidos. Railway corre `alembic upgrade head` como `preDeployCommand`. La red del entorno de PM bloquea `railway.app`, así que la verificación la hizo Emi: el 25/09 revisó el sitio publicado y **se ve bien**. `COPY-AGRO-1` no está incluida.
-- **Tarea activa:** `MERCADO-UNICO-1`: sacar la pestaña Servicios y dejar un solo Mercado (devolución de la clienta #7, decidido por Emi el 25/09). `USER-GUIDE-1` queda para después, para que las guías muestren el sitio final.
+- **Tarea activa:** `ATRIBUTOS-RUBRO-1`, en dos partes. Parte 1: el tercer nivel de la taxonomía de la clienta como «tipo» filtrable en los siete rubros, más la potencia de tractores. Parte 2: modelo y año en maquinaria, y origen declarado. Después vienen las guías de uso.
 - **#9, atributos por rubro: absorbido (decisión de Emi, 25/09).** Tercer nivel de la taxonomía de la clienta como filtro en todos los rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. «Inversores» queda afuera. Va después de `MERCADO-UNICO-1` y antes de las guías de uso.
 - **Escalado a Emi:** la regla «el teléfono no sale de la API sin suscripción activa» choca con la decisión del 05/08, que pasó suscripciones y candados por plan a Fase 6. Hoy el teléfono no se publica en el Mercado ni en las fichas, pero sí lo ven las dos partes de una orden y quien compra al elegir transportista, sin suscripción. El transportista no recibe el de quien compra.
 
-## Última aceptación PM — COPY-AGRO-1
+## Última aceptación PM — MERCADO-UNICO-1
 
-Devolución de la clienta #1. El sitio nombra el sector «agropecuario» en la
-portada, el pie, Servicios, Quiénes somos y los metadatos. El caso 192 impide
-que vuelva «agro» suelto, en la fuente y en la pantalla. En celulares
-angostos, la bajada de la portada ocupa dos renglones; Emi decidió dejarla
-así. Sin publicar todavía.
+Devolución de la clienta #7. Servicios deja de ser una pestaña: los servicios
+se encuentran en el Mercado con el filtro por tipo, y los enlaces viejos
+llevan ahí sin agregar entradas al historial. La página no tenía avisos de
+responsabilidad que mudar. Sin publicar todavía.
 
 ## Aceptaciones anteriores
 
@@ -31,6 +30,7 @@ riesgos que dejaron abiertos están en «Pendientes canónicos adoptados».
 
 | Pieza | Estado | Evidencia |
 |---|---|---|
+| `COPY-AGRO-1` | aceptada en rama | `REPRODUCCION-COPY-AGRO-1-2026-09-25.md` |
 | `BRAND-LOSS-1` | publicada en `e9cf4c6` | `REPRODUCCION-BRAND-LOSS-1-2026-09-25.md` |
 | `ADMIN-PANEL-DEFECTS-1` | aceptada en rama | `REPRODUCCION-ADMIN-PANEL-DEFECTS-1-2026-09-24.md` |
 | `ADMIN-GUIDE-1` | aceptada en rama | `REPRODUCCION-ADMIN-GUIDE-1-2026-09-24.md` |
@@ -198,7 +198,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev trabaja `MERCADO-UNICO-1` (#7). Después: los atributos por rubro (#9, absorbidos) y recién entonces `USER-GUIDE-1`, las guías de comprador, vendedor y transportista. Sigue, sin depender de Emi, la documentación del despliegue cuando la infraestructura quede fija. Dependen de Emi: la regla del teléfono, SMTP (la clienta no pudo registrarse), cuentas de prueba de Mercado Pago, backups e integración, y las decisiones #5, #7 y #10 de la clienta.
+1. Dev trabaja `ATRIBUTOS-RUBRO-1` (#9, absorbido), en dos partes. Después: `USER-GUIDE-1`, las guías de comprador, vendedor y transportista. Sigue, sin depender de Emi, la documentación del despliegue cuando la infraestructura quede fija. Dependen de Emi: la regla del teléfono, SMTP (la clienta no pudo registrarse), cuentas de prueba de Mercado Pago, backups e integración, y las decisiones #5, #7 y #10 de la clienta.
 2. Las quince piezas aceptadas hasta `BRAND-LOSS-1` están publicadas en `main` (`e9cf4c6`, 25/09), incluida la migración de imágenes, y Emi verificó el sitio. `COPY-AGRO-1` y lo que venga se publican juntos en la próxima tanda. Antes, PM corre la suite completa desde una base limpia sobre el SHA exacto, y Emi autoriza explícitamente la publicación.
 3. Backup: no se exige mientras Railway sea demostrativo (decisión del 25/09). Es condición del lanzamiento real.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
