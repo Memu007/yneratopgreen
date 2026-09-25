@@ -5399,6 +5399,46 @@ function nombreDeUsuario(id) {
 // Alembic donde vive la aplicación, igual que el seed y las consultas. Sus
 // avisos salen por stderr, así que se juntan las dos salidas: si sólo se
 // mirara stdout, una migración correcta parecería no haber corrido.
+// Una copia exacta de la base de la aplicación, para ir y volver migraciones
+// sin tocar la que comparte la suite. Bajar una migración corre su
+// `downgrade`, que borra columnas y tablas con datos: en la base compartida
+// eso le borró la marca a la siembra (BRAND-LOSS-1), y con el tipo y la
+// potencia le borraría las listas del tercer nivel. La copia se borra al
+// terminar, pase lo que pase.
+//
+// La plantilla no admite otras conexiones: se cortan las de la API, que
+// vuelve a conectarse sola en el pedido siguiente, y se reintenta si alguien
+// entró justo en el medio.
+async function conUnaCopiaDeLaBase(sufijo, trabajo) {
+  const COPIA = `${BASE_DE_LA_APLICACION}_${sufijo}`;
+  const enElServidor = { base: 'postgres' };
+  const urlDeLaAplicacion = spawnSync('docker', ['exec', 'topgreen-api', 'python', '-c',
+    'from app.core.config import settings; print(settings.DATABASE_URL)'], { encoding: 'utf8' })
+    .stdout.trim();
+  assert(/\/[^/?]+(\?.*)?$/.test(urlDeLaAplicacion), 'no se pudo leer a qué base se conecta la aplicación');
+  const aLaCopia = [`DATABASE_URL=${urlDeLaAplicacion.replace(/\/[^/?]+(\?.*)?$/, `/${COPIA}$1`)}`];
+
+  querySql(`DROP DATABASE IF EXISTS ${COPIA}`, enElServidor);
+  for (let intento = 1; ; intento += 1) {
+    querySql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+      WHERE datname = ${sqlLiteral(BASE_DE_LA_APLICACION)} AND pid <> pg_backend_pid()`, enElServidor);
+    try {
+      querySql(`CREATE DATABASE ${COPIA} TEMPLATE ${BASE_DE_LA_APLICACION}`, enElServidor);
+      break;
+    } catch (error) {
+      if (intento === 5) throw error;
+    }
+  }
+  try {
+    return await trabajo({
+      opciones: { base: COPIA },
+      alembic: (comando, variables = []) => correrAlembic(comando, [...aLaCopia, ...variables]),
+    });
+  } finally {
+    querySql(`DROP DATABASE IF EXISTS ${COPIA}`, enElServidor);
+  }
+}
+
 function correrAlembic(comando, variables = []) {
   // Las variables viajan con `-e`, que es como docker exec las mete adentro
   // del contenedor, y además en el entorno del proceso para que funcione
@@ -5893,22 +5933,33 @@ await runCase(55, 'Una orden anterior a la logística sigue legible y la migraci
   assert(enListado && !enListado.shipping?.mode,
     'en el listado, la orden sin decisión no se lee igual');
 
-  // La migración va y vuelve, con datos adentro. El upgrade corre sí o sí:
-  // dejar la base a mitad de camino rompería todo lo que venga después.
-  const bajada = correrAlembic('downgrade -1');
-  const subida = correrAlembic('upgrade head');
-  assert(/Running downgrade/.test(bajada), `el downgrade no corrió: ${bajada.slice(-200)}`);
-  assert(/Running upgrade/.test(subida), `el upgrade no corrió: ${subida.slice(-200)}`);
-  const limpio = correrAlembic('check');
-  assert(/No new upgrade operations detected/.test(limpio),
-    `alembic check encontró diferencias: ${limpio.slice(-200)}`);
-
-  const trasVolver = (await apiRequest(`/orders/${idAntigua}`, { token: state.buyerToken })).data;
-  assert(trasVolver.order_number === detalle.order_number,
-    'la orden dejó de leerse después de ir y volver la migración');
+  // La migración de la logística va y vuelve, con datos adentro, en una COPIA
+  // de la base. Se baja por nombre hasta la revisión anterior a
+  // `b2f7a04d9c31` (traslado de la orden): con «-1» el caso medía la última
+  // migración, fuera cual fuera, y en la base compartida su `downgrade`
+  // borraba datos de la suite.
+  await conUnaCopiaDeLaBase('caso55', async ({ opciones, alembic }) => {
+    const bajada = alembic('downgrade e5b8c31d0af4');
+    const subida = alembic('upgrade head');
+    assert(/Running downgrade b2f7a04d9c31 -> e5b8c31d0af4/.test(bajada),
+      `el downgrade de la logística no corrió: ${bajada.slice(-200)}`);
+    assert(/Running upgrade e5b8c31d0af4 -> b2f7a04d9c31/.test(subida),
+      `el upgrade de la logística no corrió: ${subida.slice(-200)}`);
+    const limpio = alembic('check');
+    assert(/No new upgrade operations detected/.test(limpio),
+      `alembic check encontró diferencias: ${limpio.slice(-200)}`);
+    const [trasVolver] = queryRows(`
+      SELECT order_number, coalesce(shipping_mode::text, 'sin decisión'), coalesce(carrier_id, 'sin transportista')
+      FROM orders WHERE id = ${sqlLiteral(idAntigua)}`, opciones);
+    assert(trasVolver && trasVolver[0] === detalle.order_number,
+      'la orden no sobrevivió a ir y volver la migración');
+    assert(trasVolver[1] === 'sin decisión' && trasVolver[2] === 'sin transportista',
+      `después de ir y volver, la orden sin decisión dice ${trasVolver[1]} / ${trasVolver[2]}`);
+  });
 
   return 'orden sin decisión legible en detalle y listado, sin reinterpretarse como cuenta '
-    + 'propia; downgrade y upgrade con datos adentro y `alembic check` sin diferencias';
+    + 'propia; la migración de la logística baja y sube con datos adentro, en una copia de la base, '
+    + 'la orden sigue sin decisión y `alembic check` no encuentra diferencias';
 });
 
 await runCase(56, 'Una selección tardía no revive una decisión ya descartada', async () => {
@@ -6166,24 +6217,33 @@ await runCase(58, 'Un ítem sin origen guardado no inventa uno, ni antes ni desp
     assert(enLista && enLista.origins.length === 0,
       'en el listado, la operación sin origen guardado no se lee igual');
 
-    // La migración va y vuelve, con datos adentro. El upgrade corre sí o sí.
-    const bajada = correrAlembic('downgrade -1');
-    const subida = correrAlembic('upgrade head');
-    assert(/Running downgrade/.test(bajada), `el downgrade no corrió: ${bajada.slice(-200)}`);
-    assert(/Running upgrade/.test(subida), `el upgrade no corrió: ${subida.slice(-200)}`);
-    const limpio = correrAlembic('check');
-    assert(/No new upgrade operations detected/.test(limpio),
-      `alembic check encontró diferencias: ${limpio.slice(-200)}`);
-
-    const trasVolver = (await apiRequest(`/logistics/my-operations/${ordenId}`,
-      { token: transportistas.amplio.token })).data;
-    assert(trasVolver.order_number === operacion.order_number,
-      'la operación dejó de leerse después de ir y volver la migración');
-    assert(trasVolver.origins.length === 0,
-      'después de la migración apareció un origen que nadie guardó');
+    // La migración del origen va y vuelve, con datos adentro, en una COPIA de
+    // la base. Se baja por nombre hasta la revisión anterior a `c4a91e37d5b8`
+    // (origen del ítem): con «-1» el caso medía la última migración, y en la
+    // base compartida su `downgrade` borraba datos de la suite.
+    await conUnaCopiaDeLaBase('caso58', async ({ opciones, alembic }) => {
+      const bajada = alembic('downgrade b2f7a04d9c31');
+      const subida = alembic('upgrade head');
+      assert(/Running downgrade c4a91e37d5b8 -> b2f7a04d9c31/.test(bajada),
+        `el downgrade del origen no corrió: ${bajada.slice(-200)}`);
+      assert(/Running upgrade b2f7a04d9c31 -> c4a91e37d5b8/.test(subida),
+        `el upgrade del origen no corrió: ${subida.slice(-200)}`);
+      const limpio = alembic('check');
+      assert(/No new upgrade operations detected/.test(limpio),
+        `alembic check encontró diferencias: ${limpio.slice(-200)}`);
+      const [[numero, items, conOrigen]] = queryRows(`
+        SELECT o.order_number, COUNT(i.id)::text, COUNT(i.origin_locality_id)::text
+        FROM orders o JOIN order_items i ON i.order_id = o.id
+        WHERE o.id = ${sqlLiteral(ordenId)} GROUP BY o.order_number`, opciones);
+      assert(numero === operacion.order_number && Number(items) > 0,
+        'la operación no sobrevivió a ir y volver la migración');
+      assert(conOrigen === '0',
+        `después de la migración ${conOrigen} ítem(s) tienen un origen que nadie guardó`);
+    });
 
     return 'ítem sin origen guardado: la operación se lee, no muestra origen y no adopta '
-      + 'el de la publicación; downgrade, upgrade y `alembic check` limpios';
+      + 'el de la publicación; la migración del origen baja y sube en una copia de la base sin '
+      + 'inventar un origen, y `alembic check` no encuentra diferencias';
   } finally {
     await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
     escenario.restaurar();
@@ -33892,6 +33952,531 @@ await runCase(193, 'Un solo Mercado: la cabecera no ofrece Servicios y los enlac
     }
   }
   return `un solo Mercado (${medidos.join('; ')}); capturas: ${capturas.join(', ')}`;
+});
+
+// ---------------------------------------------------------------------------
+// ATRIBUTOS-RUBRO-1, parte 1: el tipo (tercer nivel) y la potencia de Tractores.
+//
+// El tercer nivel de la taxonomía de la clienta es un atributo de la
+// publicación: una lista cerrada por subrubro (`backend/app/services/tipos.py`).
+// Tractores no lleva lista: lleva los HP, y el filtro ofrece tres rangos.
+// ---------------------------------------------------------------------------
+
+// Lo que los tres casos necesitan saber del catálogo.
+function subrubroDe(categoria, subrubro) {
+  const [fila] = queryRows(`
+    SELECT s.id, s.name, c.id, c.name FROM subcategories s JOIN categories c ON c.id = s.category_id
+    WHERE c.slug = ${sqlLiteral(categoria)} AND s.slug = ${sqlLiteral(subrubro)}`);
+  assert(fila, `no existe el subrubro ${categoria}/${subrubro}`);
+  return { id: fila[0], nombre: fila[1], categoriaId: fila[2], categoria: fila[3] };
+}
+
+// 194. Se declaran, se validan, se ven y se editan.
+await runCase(194, 'El tipo y la potencia se declaran al publicar, se validan, se ven en la ficha y se editan', async () => {
+  const medidos = [];
+  const sello = Date.now();
+  const MARCA = `Tipo194 ${sello}`;
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const preparacion = subrubroDe('maquinaria-agricola', 'preparacion-suelo');
+  const cosecha = subrubroDe('maquinaria-agricola', 'cosecha');
+  const tractores = subrubroDe('maquinaria-agricola', 'tractores');
+  const otrosDeRiego = subrubroDe('riego-drenaje', 'otros');
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const [[provincia]] = queryRows(`SELECT province_id FROM localities WHERE id = ${sqlLiteral(localidad)}`);
+  const base = (subrubro, extra = {}) => ({
+    name: `${MARCA} ${extra.nombre || 'rechazada'}`,
+    description: 'Publicación del caso 194 sobre el tipo y la potencia.',
+    category_id: subrubro.categoriaId, subcategory_id: subrubro.id,
+    price: 1940, stock: 1, unit: 'unidad', locality_id: localidad,
+    publication_type: 'producto', operation_kind: 'activo', condition: 'usado',
+    ...extra.cuerpo,
+  });
+  const detalleDe = (respuesta) => (typeof respuesta.datos?.detail === 'string'
+    ? respuesta.datos.detail : JSON.stringify(respuesta.datos?.detail ?? respuesta.datos));
+  const fila = (id) => queryRows(`
+    SELECT coalesce(t.slug, '(sin tipo)'), coalesce(p.power_hp::text, '(sin potencia)')
+    FROM products p LEFT JOIN subcategory_types t ON t.id = p.subcategory_type_id
+    WHERE p.id = ${sqlLiteral(id)}`)[0];
+  const fabricadas = [];
+
+  try {
+    // --- A. La validación rechaza lo inválido, y no deja nada guardado -----
+    const RECHAZOS = [
+      ['un tipo de otro subrubro', base(preparacion, { cuerpo: { subcategory_type: 'cosechadoras-de-granos' } }),
+        400, /no es de «Preparación del suelo».*Arados, Rastras, Cultivadores, Subsoladores, Otros/],
+      ['un tipo inventado', base(preparacion, { cuerpo: { subcategory_type: 'arado-magico' } }),
+        400, /no es de «Preparación del suelo»/],
+      ['un tipo sin subrubro', { ...base(preparacion, { cuerpo: { subcategory_type: 'arados' } }), subcategory_id: null },
+        400, /elegí primero el subrubro/],
+      ['un tipo en un subrubro sin lista', base(otrosDeRiego, { cuerpo: { subcategory_type: 'accesorios-para-riego' } }),
+        400, /no tiene lista de tipos/],
+      ['una potencia negativa', base(tractores, { cuerpo: { power_hp: -5 } }), 422, /power_hp/],
+      ['una potencia cero', base(tractores, { cuerpo: { power_hp: 0 } }), 422, /power_hp/],
+      ['una potencia de 1001 HP', base(tractores, { cuerpo: { power_hp: 1001 } }), 422, /power_hp/],
+      ['una potencia fuera de Tractores', base(preparacion, { cuerpo: { power_hp: 90 } }),
+        400, /sólo en Tractores, no en «Preparación del suelo»/],
+    ];
+    for (const [que, cuerpo, codigo, dice] of RECHAZOS) {
+      const respuesta = await pedirCrudo('/products', { method: 'POST', header: vendedor.token, body: cuerpo });
+      assert(respuesta.status === codigo && dice.test(detalleDe(respuesta)),
+        `${que}: el alta respondió ${respuesta.status} «${detalleDe(respuesta).slice(0, 200)}» y tenía que `
+        + `ser ${codigo} y decir ${dice}`);
+    }
+    assert(queryCount(`SELECT COUNT(*) FROM products WHERE name LIKE ${sqlLiteral(`${MARCA}%`)}`) === 0,
+      'algún alta rechazada dejó una fila guardada');
+    medidos.push(`${RECHAZOS.length} altas inválidas rechazadas con su motivo y ninguna fila guardada `
+      + '(tipo de otro subrubro, inventado, sin subrubro, en un subrubro sin lista; potencia -5, 0, '
+      + '1001 y fuera de Tractores)');
+
+    // --- B. El alta por el formulario real --------------------------------
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const acceso = (await apiRequest('/auth/login', {
+        method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+      })).data;
+      await contexto.addInitScript(({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+      }, { a: acceso.access_token, r: acceso.refresh_token });
+      const page = await contexto.newPage();
+
+      const publicarPorElFormulario = async (nombre, subrubro, completar) => {
+        await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+        await page.getByRole('button', { name: /Vender/ }).first().click();
+        await page.getByRole('heading', { name: /Publicar un producto/i })
+          .waitFor({ state: 'visible', timeout: 20_000 });
+        await page.locator('#name').fill(nombre);
+        await page.locator('#category option').filter({ hasText: subrubro.categoria })
+          .first().waitFor({ state: 'attached', timeout: 10_000 });
+        await page.locator('#category').selectOption({ label: subrubro.categoria });
+        await page.locator('#subcategory').selectOption({ label: subrubro.nombre });
+        await completar();
+        await page.locator('#description').fill('Publicada por el formulario real en el caso 194.');
+        await page.locator('#price').fill('19400');
+        await page.locator('#stock').fill('1');
+        await page.locator('#province').selectOption(provincia);
+        await esperarA(async () => (await page.locator('#locality option').count()) > 1,
+          'el alta no cargó las localidades', 20_000);
+        await page.locator('#locality').selectOption(localidad);
+        const [respuesta] = await Promise.all([
+          page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/products')
+            && r.request().method() === 'POST', { timeout: 30_000 }),
+          page.locator('form button[type="submit"]').click(),
+        ]);
+        assert(respuesta.ok(), `el alta de «${nombre}» respondió ${respuesta.status()}: `
+          + `${(await respuesta.text()).slice(0, 200)}`);
+        const { id } = await respuesta.json();
+        fabricadas.push(id);
+        await page.getByText(/publicado exitosamente!/i).waitFor({ state: 'visible', timeout: 20_000 });
+        return { id, enviado: JSON.parse(respuesta.request().postData() || '{}') };
+      };
+
+      // B1. Preparación del suelo: el tipo, de SU lista; cambiar de subrubro
+      //     lo suelta.
+      const conTipo = `${MARCA} arado`;
+      const altaConTipo = await publicarPorElFormulario(conTipo, preparacion, async () => {
+        const tipo = page.locator('#subcategory-type');
+        await tipo.waitFor({ state: 'visible', timeout: 10_000 });
+        const ofrecidas = (await tipo.locator('option').allInnerTexts()).map((o) => o.trim());
+        assert(JSON.stringify(ofrecidas)
+          === JSON.stringify(['Sin declarar', 'Arados', 'Rastras', 'Cultivadores', 'Subsoladores', 'Otros']),
+        `el alta ofrece ${JSON.stringify(ofrecidas)} en Preparación del suelo`);
+        assert((await page.locator('#power-hp').count()) === 0, 'el alta ofrece potencia fuera de Tractores');
+        await tipo.selectOption('arados');
+        await page.locator('#subcategory').selectOption({ label: cosecha.nombre });
+        assert((await tipo.inputValue()) === '',
+          `cambiar a Cosecha dejó el tipo en «${await tipo.inputValue()}»`);
+        assert(await tipo.locator('option[value="cosechadoras-de-granos"]').count() === 1,
+          'en Cosecha el alta no ofrece la lista de Cosecha');
+        await page.locator('#subcategory').selectOption({ label: preparacion.nombre });
+        await tipo.selectOption('arados');
+      });
+      assert(altaConTipo.enviado.subcategory_type === 'arados' && !('power_hp' in altaConTipo.enviado),
+        `el formulario mandó ${JSON.stringify({ tipo: altaConTipo.enviado.subcategory_type, potencia: altaConTipo.enviado.power_hp })}`);
+      assert(JSON.stringify(fila(altaConTipo.id)) === JSON.stringify(['arados', '(sin potencia)']),
+        `la base guardó ${JSON.stringify(fila(altaConTipo.id))}`);
+
+      // B2. Tractores: potencia, y ningún tipo.
+      const tractor = `${MARCA} tractor`;
+      const altaTractor = await publicarPorElFormulario(tractor, tractores, async () => {
+        await page.locator('#power-hp').waitFor({ state: 'visible', timeout: 10_000 });
+        assert((await page.locator('#subcategory-type').count()) === 0, 'Tractores ofrece una lista de tipos');
+        await page.locator('#power-hp').fill('95');
+      });
+      assert(altaTractor.enviado.power_hp === 95, `el formulario mandó potencia ${altaTractor.enviado.power_hp}`);
+      assert(JSON.stringify(fila(altaTractor.id)) === JSON.stringify(['(sin tipo)', '95']),
+        `la base guardó ${JSON.stringify(fila(altaTractor.id))}`);
+      medidos.push('el formulario de alta ofrece la lista del subrubro, la suelta al cambiarlo y guarda '
+        + '«arados»; en Tractores ofrece sólo la potencia y guarda 95 HP');
+
+      // --- C. Se ven en la ficha ------------------------------------------
+      const enLaFicha = async (id) => {
+        await page.goto(`${FRONTEND_URL}/?section=product&id=${id}`, { waitUntil: 'domcontentloaded' });
+        await page.locator('main[aria-busy="false"]:has(#detalle-titulo)').waitFor({ timeout: 20_000 });
+        return (await page.locator('main dl').first().innerText()).replace(/\s+/g, ' ');
+      };
+      const fichaConTipo = await enLaFicha(altaConTipo.id);
+      assert(/Tipo Arados/i.test(fichaConTipo) && !/Potencia/i.test(fichaConTipo),
+        `la ficha del arado dice «${fichaConTipo}»`);
+      const fichaTractor = await enLaFicha(altaTractor.id);
+      assert(/Potencia 95 HP/i.test(fichaTractor) && !/Tipo/i.test(fichaTractor),
+        `la ficha del tractor dice «${fichaTractor}»`);
+      const detalle = await apiRequest(`/catalog/products/${altaConTipo.id}`);
+      assert(detalle.data.subcategory_type?.value === 'arados' && detalle.data.subcategory_type?.label === 'Arados',
+        `el detalle de la API trae ${JSON.stringify(detalle.data.subcategory_type)}`);
+      medidos.push('la ficha dice «Tipo: Arados» y «Potencia: 95 HP», y sin dato no dibuja la fila');
+
+      // --- D. La edición por el panel -------------------------------------
+      const abrirLaEdicion = async (nombre) => {
+        await page.goto(`${FRONTEND_URL}/?section=account`, { waitUntil: 'domcontentloaded' });
+        await page.getByRole('button', { name: /publicaciones/i }).first().click();
+        const tarjeta = page.locator('[class*="productCard"], [class*="publicacion"]')
+          .filter({ hasText: nombre }).first();
+        await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
+        await tarjeta.getByRole('button', { name: /editar/i }).first().click();
+        await page.locator('#edit-nombre').waitFor({ state: 'visible', timeout: 20_000 });
+      };
+      const guardar = async (id) => {
+        const [respuesta] = await Promise.all([
+          page.waitForResponse((r) => r.url().includes(`/products/${id}`) && r.request().method() === 'PATCH',
+            { timeout: 20_000 }),
+          page.getByRole('button', { name: /^Guardar/i }).first().click(),
+        ]);
+        assert(respuesta.ok(), `guardar respondió ${respuesta.status()}: ${(await respuesta.text()).slice(0, 200)}`);
+      };
+      await abrirLaEdicion(conTipo);
+      assert((await page.locator('#edit-tipo').inputValue()) === 'arados',
+        `la edición abrió con el tipo «${await page.locator('#edit-tipo').inputValue()}»`);
+      await page.locator('#edit-tipo').selectOption('subsoladores');
+      await guardar(altaConTipo.id);
+      assert(fila(altaConTipo.id)[0] === 'subsoladores', `editar guardó «${fila(altaConTipo.id)[0]}»`);
+
+      await abrirLaEdicion(tractor);
+      assert((await page.locator('#edit-potencia').inputValue()) === '95',
+        `la edición abrió con la potencia «${await page.locator('#edit-potencia').inputValue()}»`);
+      await page.locator('#edit-potencia').fill('130');
+      await guardar(altaTractor.id);
+      assert(fila(altaTractor.id)[1] === '130', `editar guardó la potencia «${fila(altaTractor.id)[1]}»`);
+      await contexto.close();
+    } finally {
+      await browser.close();
+    }
+    medidos.push('el panel abre la edición con el tipo y la potencia guardados y los cambia: '
+      + '«subsoladores» y 130 HP');
+
+    // E. Y por la API: cambiar de subrubro suelta lo que ya no corresponde,
+    //    un tipo ajeno se rechaza sin tocar la fila, y `null` los quita.
+    const [conTipoId, tractorId] = fabricadas;
+    const rechazo = await pedirCrudo(`/products/${conTipoId}`, {
+      method: 'PATCH', header: vendedor.token, body: { subcategory_type: 'cosechadoras-de-granos' } });
+    assert(rechazo.status === 400 && fila(conTipoId)[0] === 'subsoladores',
+      `editar con un tipo ajeno respondió ${rechazo.status} y la fila quedó en «${fila(conTipoId)[0]}»`);
+    await apiRequest(`/products/${conTipoId}`, {
+      method: 'PATCH', token: vendedor.token, body: { subcategory_id: cosecha.id } });
+    assert(fila(conTipoId)[0] === '(sin tipo)',
+      `pasar a Cosecha dejó el tipo «${fila(conTipoId)[0]}»`);
+    await apiRequest(`/products/${conTipoId}`, {
+      method: 'PATCH', token: vendedor.token, body: { subcategory_type: 'cosechadoras-de-granos' } });
+    assert(fila(conTipoId)[0] === 'cosechadoras-de-granos', 'no se pudo declarar el tipo de Cosecha');
+    await apiRequest(`/products/${conTipoId}`, {
+      method: 'PATCH', token: vendedor.token, body: { subcategory_type: null } });
+    assert(fila(conTipoId)[0] === '(sin tipo)', `quitar el tipo dejó «${fila(conTipoId)[0]}»`);
+    await apiRequest(`/products/${tractorId}`, {
+      method: 'PATCH', token: vendedor.token, body: { subcategory_id: preparacion.id } });
+    assert(fila(tractorId)[1] === '(sin potencia)',
+      `pasar el tractor a Preparación del suelo dejó la potencia ${fila(tractorId)[1]}`);
+    medidos.push('por la API, un tipo ajeno se rechaza sin tocar la fila, cambiar de subrubro suelta el '
+      + 'tipo y la potencia que ya no corresponden, y null los quita');
+  } finally {
+    for (const id of fabricadas) {
+      await pedirCrudo(`/products/${id}`, { method: 'DELETE', header: vendedor.token }).catch(() => {});
+    }
+  }
+  return medidos.join('; ');
+});
+
+// 195. El filtro de tipo y el de potencia: en el servidor, sin nulos, en la
+//      URL y el historial, y desde la página 1.
+//
+// Los hallazgos se juntan y el caso falla al final con todos: así un negativo
+// muestra qué lado lo vio —la API, la pantalla— y no sólo el primero.
+await runCase(195, 'Filtrar por tipo y por potencia cuenta en el servidor, deja afuera lo no declarado y vive en la URL', async () => {
+  const medidos = [];
+  const problemas = [];
+  const sello = Date.now();
+  const MARCA = `Tipo195 ${sello}`;
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const preparacion = subrubroDe('maquinaria-agricola', 'preparacion-suelo');
+  const tractores = subrubroDe('maquinaria-agricola', 'tractores');
+  const siembra = subrubroDe('maquinaria-agricola', 'siembra-plantacion');
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const fabricadas = [];
+  const publicar = async (subrubro, nombre, extra = {}, descripcion = 'Publicación del caso 195.') => {
+    const alta = await apiRequest('/products', {
+      method: 'POST', token: vendedor.token,
+      body: {
+        name: `${MARCA} ${nombre}`, description: descripcion,
+        category_id: subrubro.categoriaId, subcategory_id: subrubro.id,
+        price: 1950, stock: 1, unit: 'unidad', locality_id: localidad,
+        publication_type: 'producto', operation_kind: 'activo', condition: 'usado', ...extra,
+      },
+    });
+    fabricadas.push(alta.data.id);
+    return alta.data.id;
+  };
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    // Más de una página en los dos subrubros, para poder probar que cambiar
+    // el filtro vuelve a la primera.
+    const arados = [];
+    for (let i = 0; i < 14; i += 1) arados.push(await publicar(preparacion, `arado ${i}`, { subcategory_type: 'arados' }));
+    for (let i = 0; i < 2; i += 1) await publicar(preparacion, `rastra ${i}`, { subcategory_type: 'rastras' });
+    const sinTipo = [];
+    for (let i = 0; i < 10; i += 1) sinTipo.push(await publicar(preparacion, `sin tipo ${i}`));
+    const HP = [59, 60, 120, 121, 30, 45, 58, 61, 75, 90, 100, 110, 119, 122, 150, 200, 40, 70, 80, 95, 130,
+      140, 160, 300];
+    const tractorDe = {};
+    for (const hp of HP) tractorDe[hp] = await publicar(tractores, `tractor ${hp} HP`, { power_hp: hp });
+    const tractorSinPotencia = await publicar(tractores, 'tractor sin potencia');
+    const sembradora = await publicar(siembra, 'sembradora', { subcategory_type: 'sembradoras-de-granos-gruesos' },
+      'Sembradora neumática de precisión para maíz, del caso 195.');
+
+    const enLaBase = (condicion, subrubro) => queryCount(`
+      SELECT COUNT(*) FROM products p LEFT JOIN subcategory_types t ON t.id = p.subcategory_type_id
+      WHERE p.status = 'ACTIVE' AND p.subcategory_id = ${sqlLiteral(subrubro.id)} AND ${condicion}`);
+    const RANGOS = {
+      compacto: ['p.power_hp < 60', [59, 30, 45, 58, 40]],
+      estandar: ['p.power_hp BETWEEN 60 AND 120', [60, 120, 61, 75, 90, 100, 110, 119, 70, 80, 95]],
+      alta: ['p.power_hp > 120', [121, 122, 150, 200, 130, 140, 160, 300]],
+    };
+
+    // --- A. La API: filtra antes de contar, y el nulo no entra -------------
+    const todosLosIds = async (consulta) => {
+      const ids = [];
+      for (let pagina = 1; ; pagina += 1) {
+        const r = await apiRequest(`/catalog/products?${consulta}&page=${pagina}&page_size=100`);
+        ids.push(...r.data.items.map((item) => item.id));
+        if (!r.data.has_next) return { ids, items: r.data.items };
+      }
+    };
+    const revisar = async (que, consulta, esperado, deben, noDeben) => {
+      const chica = await apiRequest(`/catalog/products?${consulta}&page_size=5`);
+      if (chica.data.total !== esperado) {
+        problemas.push(`API, ${que}: el total dice ${chica.data.total} y en la base hay ${esperado}`);
+      }
+      if (chica.data.pages !== Math.ceil(esperado / 5)) {
+        problemas.push(`API, ${que}: dice ${chica.data.pages} páginas de 5 y son ${Math.ceil(esperado / 5)}`);
+      }
+      const { ids } = await todosLosIds(consulta);
+      const faltan = deben.filter((id) => !ids.includes(id));
+      const sobran = noDeben.filter((id) => ids.includes(id));
+      if (faltan.length) problemas.push(`API, ${que}: faltan ${faltan.length} que corresponden`);
+      if (sobran.length) problemas.push(`API, ${que}: trajo ${sobran.length} que no declararon el dato o no corresponden`);
+    };
+    await revisar('tipo «arados»', `subcategory=${preparacion.id}&subcategory_type=arados`,
+      enLaBase("t.slug = 'arados'", preparacion), arados, sinTipo);
+    for (const [rango, [condicion, valores]] of Object.entries(RANGOS)) {
+      const otros = HP.filter((hp) => !valores.includes(hp)).map((hp) => tractorDe[hp]);
+      await revisar(`potencia «${rango}»`, `subcategory=${tractores.id}&power_range=${rango}`,
+        enLaBase(condicion, tractores), valores.map((hp) => tractorDe[hp]), [...otros, tractorSinPotencia]);
+    }
+    const bordes = (await todosLosIds(`subcategory=${tractores.id}&power_range=estandar`)).ids;
+    if (!bordes.includes(tractorDe[60]) || !bordes.includes(tractorDe[120])
+      || bordes.includes(tractorDe[59]) || bordes.includes(tractorDe[121])) {
+      problemas.push('API: los bordes no quedan donde dice la clienta (60 y 120 son estándar; 59 y 121, no)');
+    }
+    const neumatica = await apiRequest(`/catalog/products?subcategory=${siembra.id}&search=${encodeURIComponent('neumática')}`);
+    if (!neumatica.data.items.some((item) => item.id === sembradora)) {
+      problemas.push('API: buscar «neumática» en Siembra y plantación no encuentra la sembradora que lo dice');
+    }
+    medidos.push(`la API cuenta en el servidor —${enLaBase("t.slug = 'arados'", preparacion)} arados; `
+      + `${Object.keys(RANGOS).map((r) => `${enLaBase(RANGOS[r][0], tractores)} ${r}`).join(', ')}— y el `
+      + 'total y las páginas coinciden con la base; 60 y 120 HP son estándar; las 10 sin tipo y el tractor sin '
+      + 'potencia no entran en ningún filtro; «neumática» se encuentra con el buscador');
+
+    // --- B. La pantalla --------------------------------------------------
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    const barra = () => new URL(page.url()).searchParams;
+    const conteo = async () => {
+      const texto = await page.locator('[class*="_conteo_"]').first().innerText();
+      const numeros = (texto.match(/\d+/g) || []).map(Number);
+      return numeros[numeros.length - 1];
+    };
+    const titulos = async () => (await page.locator('article[class*="card"] h3').allInnerTexts())
+      .map((t) => t.trim());
+    const MERCADO = `${FRONTEND_URL}/?section=marketplace&category=${encodeURIComponent('Maquinaria agrícola')}`;
+    const dePreparacion = `${MERCADO}&subcategory=${encodeURIComponent(preparacion.nombre)}`;
+    const deTractores = `${MERCADO}&subcategory=${encodeURIComponent(tractores.nombre)}`;
+    const esperarElConteo = async (esperado, momento) => {
+      try {
+        await esperarA(async () => (await conteo()) === esperado, momento, 20_000);
+      } catch {
+        problemas.push(`pantalla, ${momento}: dice ${await conteo().catch(() => '?')} operaciones y en la base hay ${esperado}`);
+      }
+    };
+    const nombresSinTipo = new Set(queryRows(`SELECT name FROM products WHERE id IN (${
+      sinTipo.map(sqlLiteral).join(',')})`).map(([n]) => n));
+
+    // B1. Página 2 del subrubro; elegir un tipo vuelve a la 1.
+    await page.goto(`${dePreparacion}&page=2`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-subtype').waitFor({ state: 'visible', timeout: 25_000 });
+    await esperarA(async () => barra().get('page') === '2', 'no se llegó a la página 2 de Preparación del suelo', 20_000);
+    const ofrecidas = (await page.locator('#catalog-subtype option').allInnerTexts()).map((o) => o.trim());
+    if (JSON.stringify(ofrecidas) !== JSON.stringify(['Todos', 'Arados', 'Rastras', 'Cultivadores', 'Subsoladores', 'Otros'])) {
+      problemas.push(`pantalla: el filtro de tipo ofrece ${JSON.stringify(ofrecidas)}`);
+    }
+    await page.locator('#catalog-subtype').selectOption('arados');
+    await esperarA(async () => barra().get('subtype') === 'arados', 'elegir «Arados» no llegó a la barra', 20_000);
+    if (barra().get('page')) problemas.push(`pantalla: elegir un tipo dejó la página ${barra().get('page')}`);
+    const aradosEnLaBase = enLaBase("t.slug = 'arados'", preparacion);
+    await esperarElConteo(aradosEnLaBase, 'con «Arados»');
+    const colados = (await titulos()).filter((t) => nombresSinTipo.has(t));
+    if (colados.length) problemas.push(`pantalla: con «Arados» se ven ${colados.length} sin tipo`);
+
+    // B2. Atrás y Adelante, pasando por una ficha y por otra sección.
+    await page.locator('article[class*="card"] h3 a').first().click();
+    await page.locator('#detalle-titulo').waitFor({ timeout: 20_000 });
+    await page.goBack();
+    await esperarA(async () => barra().get('subtype') === 'arados'
+      && (await page.locator('#catalog-subtype').inputValue().catch(() => '')) === 'arados',
+    'volver de la ficha con Atrás perdió el tipo', 20_000).catch((e) => problemas.push(`pantalla: ${e.message}`));
+    await esperarElConteo(aradosEnLaBase, 'volviendo de la ficha');
+    await page.goForward();
+    await page.locator('#detalle-titulo').waitFor({ timeout: 20_000 });
+    await page.goBack();
+    await page.locator('header').getByRole('button', { name: 'Inicio', exact: true }).click();
+    await page.getByRole('heading', { name: /seguir produciendo/, level: 1 }).waitFor({ timeout: 20_000 });
+    await page.goBack();
+    await esperarA(async () => barra().get('subtype') === 'arados'
+      && (await page.locator('#catalog-subtype').inputValue().catch(() => '')) === 'arados',
+    'volver de Inicio con Atrás perdió el tipo', 20_000).catch((e) => problemas.push(`pantalla: ${e.message}`));
+    await esperarElConteo(aradosEnLaBase, 'volviendo de Inicio');
+
+    // B3. La potencia: página 2 de Tractores, elegir un rango vuelve a la 1.
+    await page.goto(`${deTractores}&page=2`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-power').waitFor({ state: 'visible', timeout: 25_000 });
+    await esperarA(async () => barra().get('page') === '2', 'no se llegó a la página 2 de Tractores', 20_000);
+    if ((await page.locator('#catalog-subtype').count()) !== 0) problemas.push('pantalla: Tractores ofrece un filtro de tipo');
+    await page.locator('#catalog-power').selectOption('estandar');
+    await esperarA(async () => barra().get('power') === 'estandar', 'elegir «Estándar» no llegó a la barra', 20_000);
+    if (barra().get('page')) problemas.push(`pantalla: elegir una potencia dejó la página ${barra().get('page')}`);
+    await esperarElConteo(enLaBase(RANGOS.estandar[0], tractores), 'con potencia «Estándar»');
+
+    // B4. Cambiar de subrubro suelta el tipo; lo que no es del subrubro se
+    //     descarta de la barra; sin subrubro no hay filtro de tipo.
+    await page.goto(`${dePreparacion}&subtype=arados`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-subtype').waitFor({ state: 'visible', timeout: 25_000 });
+    await page.locator('#catalog-subcategory').selectOption({ label: tractores.nombre });
+    await esperarA(async () => !barra().get('subtype'), 'cambiar de subrubro no soltó el tipo', 20_000)
+      .catch((e) => problemas.push(`pantalla: ${e.message}`));
+    await page.goto(`${dePreparacion}&subtype=cosechadoras-de-granos&power=alta`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-subtype').waitFor({ state: 'visible', timeout: 25_000 });
+    await esperarA(async () => !barra().get('subtype') && !barra().get('power'),
+      `el tipo y la potencia ajenos siguen en la barra: ${page.url()}`, 20_000)
+      .catch((e) => problemas.push(`pantalla: ${e.message}`));
+    await esperarElConteo(enLaBase('true', preparacion), 'tras descartar el tipo ajeno');
+    await page.goto(MERCADO, { waitUntil: 'domcontentloaded' });
+    await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+    if ((await page.locator('#catalog-subtype, #catalog-power').count()) !== 0) {
+      problemas.push('pantalla: sin subrubro elegido se ofrece un filtro de tipo o de potencia');
+    }
+
+    // B5. Lo que salió del filtro se encuentra con el buscador.
+    await page.goto(`${MERCADO}&subcategory=${encodeURIComponent(siembra.nombre)}`, { waitUntil: 'domcontentloaded' });
+    await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
+    await page.getByLabel('Buscar en el mercado').fill('neumática');
+    await page.getByLabel('Buscar en el mercado').press('Enter');
+    await esperarA(async () => (await titulos()).includes(`${MARCA} sembradora`),
+      'buscar «neumática» no encontró la sembradora en la pantalla', 20_000)
+      .catch((e) => problemas.push(`pantalla: ${e.message}`));
+    await contexto.close();
+    medidos.push('en la pantalla, elegir tipo o potencia vuelve a la página 1, el conteo es el de la base, no '
+      + 'se cuela ninguna sin tipo, Atrás desde la ficha y desde Inicio devuelve el filtro, cambiar de '
+      + 'subrubro lo suelta, lo ajeno se descarta de la barra, sin subrubro no hay filtro, y «neumática» '
+      + 'se encuentra con el buscador');
+  } finally {
+    await browser.close();
+    for (const id of fabricadas) {
+      await pedirCrudo(`/products/${id}`, { method: 'DELETE', header: vendedor.token }).catch(() => {});
+    }
+  }
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return medidos.join('; ');
+});
+
+// 196. La migración es aditiva y vuelve atrás sin tocar lo que había.
+//
+// Se prueba en una COPIA de la base, como el 74: bajar deshace la migración y
+// su `downgrade` borra columnas, y eso no puede pasar en la base compartida.
+await runCase(196, 'La migración del tipo y la potencia es aditiva, vuelve atrás y deja intactas las publicaciones', async () => {
+  const REVISION = 'c8e41f2a7d90';
+  const ANTERIOR = 'b6d3f12a8e94';
+  return conUnaCopiaDeLaBase('caso196', async ({ opciones: enLaCopia, alembic: alembicEnLaCopia }) => {
+    // Todo lo que las publicaciones tenían antes de la migración, en una huella:
+    // cada fila entera menos las dos columnas nuevas, en orden.
+    const huella = () => queryRows(`
+    SELECT COUNT(*)::text, md5(coalesce(string_agg(
+      (to_jsonb(p) - 'subcategory_type_id' - 'power_hp')::text, '|' ORDER BY p.id), ''))
+    FROM products p`, enLaCopia)[0].join(' ');
+    const columnas = () => queryRows(`
+    SELECT 'columnas:' || coalesce(string_agg(column_name, ',' ORDER BY column_name), '')
+    FROM information_schema.columns
+    WHERE table_name = 'products' AND column_name IN ('subcategory_type_id', 'power_hp')`, enLaCopia)[0][0]
+    .replace(/^columnas:/, '');
+    const tabla = () => queryCount(`SELECT COUNT(*) FROM information_schema.tables
+    WHERE table_name = 'subcategory_types'`, enLaCopia);
+    const medidos = [];
+
+    const [publicaciones, conDato] = queryRows(`
+      SELECT COUNT(*)::text, COUNT(*) FILTER (WHERE subcategory_type_id IS NOT NULL OR power_hp IS NOT NULL)::text
+      FROM products`, enLaCopia)[0];
+    assert(Number(conDato) > 0, 'la copia no tiene ninguna publicación con tipo o potencia: la bajada no probaría nada');
+    const antes = huella();
+
+    // --- Bajar --------------------------------------------------------------
+    const bajada = alembicEnLaCopia(`downgrade ${ANTERIOR}`);
+    assert(new RegExp(`Running downgrade ${REVISION} -> ${ANTERIOR}`).test(bajada),
+      `el downgrade no corrió: ${bajada.slice(-300)}`);
+    assert(tabla() === 0 && columnas() === '', `tras bajar quedan la tabla (${tabla()}) o las columnas (${columnas()})`);
+    const bajado = huella();
+    assert(bajado === antes, `bajar cambió las publicaciones: ${antes} → ${bajado}`);
+    medidos.push(`bajar a ${ANTERIOR} borra la tabla y las dos columnas y deja las ${publicaciones} publicaciones `
+      + `iguales (huella ${antes.split(' ')[1].slice(0, 12)}…)`);
+
+    // --- Subir sobre una base que nunca tuvo el dato ------------------------
+    const subida = alembicEnLaCopia('upgrade head');
+    assert(new RegExp(`Running upgrade ${ANTERIOR} -> ${REVISION}`).test(subida),
+      `el upgrade no corrió: ${subida.slice(-300)}`);
+    assert(tabla() === 1 && columnas() === 'power_hp,subcategory_type_id',
+      `tras subir, tabla ${tabla()} y columnas «${columnas()}»`);
+    assert(huella() === antes, `subir cambió las publicaciones: ${antes} → ${huella()}`);
+    const [[conValor, tipos]] = queryRows(`
+      SELECT (SELECT COUNT(*) FROM products WHERE subcategory_type_id IS NOT NULL OR power_hp IS NOT NULL)::text,
+             (SELECT COUNT(*) FROM subcategory_types)::text`, enLaCopia);
+    assert(conValor === '0', `subir le inventó tipo o potencia a ${conValor} publicación(es)`);
+    assert(tipos === '0', `la migración cargó ${tipos} tipos y las listas las carga la siembra`);
+    medidos.push('subir crea la tabla vacía y las dos columnas en nulo para todas: no le inventa un dato a '
+      + 'nadie, y el resto de cada fila queda igual');
+
+    // --- La base sostiene lo que valida la API ------------------------------
+    let rechazada = false;
+    try {
+      querySql("UPDATE products SET power_hp = -1 WHERE id = (SELECT id FROM products LIMIT 1)", enLaCopia);
+    } catch {
+      rechazada = true;
+    }
+    assert(rechazada, 'la base aceptó una potencia negativa');
+    medidos.push('la base rechaza una potencia negativa aunque se escriba por fuera de la API');
+
+    const repetida = alembicEnLaCopia('check');
+    assert(/No new upgrade operations detected/.test(repetida),
+      `el modelo y el esquema no coinciden: ${repetida.slice(-300)}`);
+    medidos.push('`alembic check` no encuentra diferencias entre el modelo y el esquema');
+    return `${medidos.join('; ')}. Todo en una copia de la base`;
+  });
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
