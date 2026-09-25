@@ -30,6 +30,11 @@ class ProductCreateRequest(BaseModel):
     # se rechaza en vez de guardarse como texto libre, que es lo que vuelve
     # incontable un filtro.
     brand: Optional[str] = Field(None, max_length=60)
+    # El tipo: el slug de uno de la lista del SUBRUBRO elegido. Opcional; si
+    # viene y no es de esa lista, el alta se rechaza.
+    subcategory_type: Optional[str] = Field(None, max_length=80)
+    # La potencia en HP, sólo donde el subrubro la lleva (Tractores).
+    power_hp: Optional[int] = Field(None, ge=1, le=1000)
     
     # Campos específicos para servicios
     pricing_type: Optional[str] = Field(None, max_length=50)  # por_hora, por_hectarea, por_trabajo, a_convenir
@@ -53,6 +58,9 @@ class ProductUpdateRequest(BaseModel):
     operation_kind: Optional[Literal["activo", "insumo", "servicio", "logistica"]] = None
     condition: Optional[Literal["nuevo", "usado"]] = None
     brand: Optional[str] = Field(None, max_length=60)
+    # `null` explícito quita el tipo o la potencia; no mandarlos los deja.
+    subcategory_type: Optional[str] = Field(None, max_length=80)
+    power_hp: Optional[int] = Field(None, ge=1, le=1000)
     
     # Campos específicos para servicios
     pricing_type: Optional[str] = Field(None, max_length=50)

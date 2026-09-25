@@ -8,11 +8,23 @@ from pydantic import BaseModel, ConfigDict
 
 # ============= Category Schemas =============
 
+class TipoDeSubrubro(BaseModel):
+    """Un valor del tercer nivel: lo que viaja (`value`, el slug) y lo que
+    se lee (`label`). Ver `services/tipos.py`."""
+    value: str
+    label: str
+
+
 class SubcategoryBase(BaseModel):
     id: str
     name: str
     slug: str
     is_active: bool = True
+    # La lista cerrada de tipos del subrubro, en orden. Vacía si no tiene: el
+    # alta no ofrece el campo y el Mercado no ofrece el filtro.
+    tipos: List[TipoDeSubrubro] = []
+    # Si el subrubro lleva potencia en HP (hoy, sólo Tractores).
+    usa_potencia: bool = False
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -125,6 +137,9 @@ class ProductCardResponse(ProductBase):
     operation_kind: str = "insumo"
     condition: Optional[str] = None
     brand: Optional[str] = None
+    # El tercer nivel declarado y la potencia, o nada.
+    subcategory_type: Optional[TipoDeSubrubro] = None
+    power_hp: Optional[int] = None
     # Lo que la anatomia de servicio pide obligatorio —cobertura y
     # modalidad— y ya estaba en la base sin salir a la superficie.
     pricing_type: Optional[str] = None
@@ -153,6 +168,8 @@ class ProductDetailResponse(ProductBase):
     operation_kind: str = "insumo"
     condition: Optional[str] = None
     brand: Optional[str] = None
+    subcategory_type: Optional[TipoDeSubrubro] = None
+    power_hp: Optional[int] = None
     pricing_type: Optional[str] = None
     availability: Optional[str] = None
     response_time: Optional[str] = None

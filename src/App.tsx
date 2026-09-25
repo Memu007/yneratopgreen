@@ -152,6 +152,8 @@ function App() {
     minRating,
     condicion,
     marca,
+    tipo,
+    potencia,
     setTextoBuscado,
     aplicarBusqueda,
     setSelectedType,
@@ -165,6 +167,8 @@ function App() {
     setMinRating,
     setCondicion,
     setMarca,
+    setTipo,
+    setPotencia,
     orden,
     pagina,
     setOrden,
@@ -413,6 +417,19 @@ function App() {
       ?.subcategories?.find((sub) => sub.name === selectedSubcategory);
   }, [categories, selectedCategory, selectedSubcategory]);
 
+  // El tipo y la potencia que no son del subrubro elegido se sueltan, igual
+  // que una categoría que no existe: un enlace con `subtype=arados` sobre
+  // Cosecha, o sin subrubro, no puede filtrar por algo que el panel no
+  // ofrece ni deja sacar. Sólo se sabe con los catálogos en la mano.
+  const tipoInvalido = catalogosAuxiliares === 'listos' && tipo !== ''
+    && !(subcategoriaElegida?.tipos ?? []).some((opcion) => opcion.value === tipo);
+  const potenciaInvalida = catalogosAuxiliares === 'listos' && potencia !== ''
+    && !subcategoriaElegida?.usa_potencia;
+  useEffect(() => {
+    if (tipoInvalido) setTipo('');
+    if (potenciaInvalida) setPotencia('');
+  }, [tipoInvalido, potenciaInvalida, setTipo, setPotencia]);
+
   const ordenPedido = useMemo(
     () => ORDENES.find((opcion) => opcion.valor === orden) ?? ORDENES[0],
     [orden],
@@ -463,6 +480,8 @@ function App() {
     minRating,
     condicion,
     marca,
+    tipo,
+    potencia,
     ordenPedido.sortBy,
     ordenPedido.sortOrder,
     pagina,
@@ -500,7 +519,7 @@ function App() {
     // preguntar acá sería preguntar por algo que se acaba de soltar. Las dos
     // esperas se ven como espera y no como catálogo vacío.
     if (catalogosAuxiliares !== 'listos') return;
-    if (categoriaInvalida || provinciaInvalida) return;
+    if (categoriaInvalida || provinciaInvalida || tipoInvalido || potenciaInvalida) return;
 
     let cancelled = false;
     setLoadingProducts(true);
@@ -518,6 +537,10 @@ function App() {
         condition: condicion || undefined,
         // La marca elegida. Vacío es «todas» y no viaja.
         brand: marca || undefined,
+        // El tipo del subrubro y el rango de potencia: se filtran en la base,
+        // antes de contar y de paginar, como todos los demás.
+        subcategory_type: tipo || undefined,
+        power_range: potencia || undefined,
         province:
           selectedProvince === 'Todas las provincias' ? undefined : selectedProvince,
         locality_id: selectedLocalityId || undefined,
@@ -610,6 +633,8 @@ function App() {
     minRating,
     condicion,
     marca,
+    tipo,
+    potencia,
     ordenPedido,
     pagina,
     irALaPagina,
@@ -617,6 +642,8 @@ function App() {
     catalogosAuxiliares,
     categoriaInvalida,
     provinciaInvalida,
+    tipoInvalido,
+    potenciaInvalida,
     productsRevision,
     consultaVigente,
   ]);
@@ -791,6 +818,10 @@ function App() {
                 condicion={condicion}
                 marca={marca}
                 marcasDisponibles={marcasDelMercado}
+                tipo={tipo}
+                potencia={potencia}
+                onTipoChange={setTipo}
+                onPotenciaChange={setPotencia}
                 onTypeChange={setSelectedType}
                 onCategoryChange={setSelectedCategory}
                 onSubcategoryChange={setSelectedSubcategory}

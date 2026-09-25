@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { seccionDeLaBarra } from '../navegacion/politica';
+import { RANGOS_DE_POTENCIA, type RangoDePotencia } from '../utils/catalogService';
 
 /**
  * Los cuatro órdenes que el Mercado ofrece, y cómo se traduce cada uno a la
@@ -50,6 +51,10 @@ export const CONDICIONES: { valor: CondicionDelMercado; rotulo: string }[] = [
 
 const condicionDeLaBarra = (valor: string | null): CondicionDelMercado =>
   (CONDICIONES.some((opcion) => opcion.valor === valor) ? valor : '') as CondicionDelMercado;
+
+/** Un rango de potencia de la barra, o ninguno si no es uno de los tres. */
+const potenciaDeLaBarra = (valor: string | null): RangoDePotencia | '' =>
+  (RANGOS_DE_POTENCIA.some((rango) => rango.valor === valor) ? valor as RangoDePotencia : '');
 
 /** Cuántas tarjetas trae una página. La decide el Mercado y viaja a la
  *  consulta: la grilla dibuja lo que le dan. */
@@ -147,6 +152,18 @@ export const useProductFilters = ({
    */
   const [marca, setMarca] = useState(() => initialParams.get('brand') || '');
   /**
+   * El tipo del subrubro —el tercer nivel—, por slug, y el rango de potencia
+   * de Tractores. Viajan en la barra como `subtype` y `power`.
+   *
+   * Dependen del SUBRUBRO: cambiar de rubro o de subrubro los suelta (ver
+   * `desdeLaPrimera`), porque «Arados» no significa nada en Cosecha. Lo que
+   * la barra traiga y no sea del subrubro lo descarta el Mercado cuando ya
+   * conoce las listas, como una categoría que no existe.
+   */
+  const [tipo, setTipo] = useState(() => initialParams.get('subtype') || '');
+  const [potencia, setPotencia] = useState<RangoDePotencia | ''>(() =>
+    potenciaDeLaBarra(initialParams.get('power')));
+  /**
    * Cómo se ordena y en qué página estamos.
    *
    * Viven acá, con los filtros, y no en la grilla. Son parte de lo que se le
@@ -191,6 +208,8 @@ export const useProductFilters = ({
       setMinRating(numeroDeLaBarra(params, 'min_rating', 0));
       setCondicion(condicionDeLaBarra(params.get('condition')));
       setMarca(params.get('brand') || '');
+      setTipo(params.get('subtype') || '');
+      setPotencia(potenciaDeLaBarra(params.get('power')));
       setOrden(ordenDeLaBarra(params.get('sort')));
       setPagina(paginaDeLaBarra(params));
     }
@@ -225,6 +244,8 @@ export const useProductFilters = ({
     updateParam('min_rating', minRating > 0 ? String(minRating) : null);
     updateParam('condition', condicion || null);
     updateParam('brand', marca || null);
+    updateParam('subtype', tipo || null);
+    updateParam('power', potencia || null);
     updateParam('sort', orden === 'newest' ? null : orden);
     updateParam('page', pagina > 1 ? String(pagina) : null);
 
@@ -244,6 +265,8 @@ export const useProductFilters = ({
     minRating,
     condicion,
     marca,
+    tipo,
+    potencia,
     orden,
     pagina,
     escribeEnLaBarra,
@@ -265,10 +288,17 @@ export const useProductFilters = ({
       setPagina(1);
       fijar(valor);
     };
+    // El tipo y la potencia cuelgan del subrubro: cambiar el rubro o el
+    // subrubro los suelta en el mismo paso.
+    const soltandoElTercerNivel = <T,>(fijar: (valor: T) => void) => (valor: T) => {
+      setTipo('');
+      setPotencia('');
+      fijar(valor);
+    };
     return {
       setSelectedType: envolver(setSelectedType),
-      setSelectedCategory: envolver(setSelectedCategory),
-      setSelectedSubcategory: envolver(setSelectedSubcategory),
+      setSelectedCategory: envolver(soltandoElTercerNivel(setSelectedCategory)),
+      setSelectedSubcategory: envolver(soltandoElTercerNivel(setSelectedSubcategory)),
       setSelectedProvince: envolver(setSelectedProvince),
       setSelectedLocalityId: envolver(setSelectedLocalityId),
       setPriceMin: envolver(setPriceMin),
@@ -277,6 +307,8 @@ export const useProductFilters = ({
       setMinRating: envolver(setMinRating),
       setCondicion: envolver(setCondicion),
       setMarca: envolver(setMarca),
+      setTipo: envolver(setTipo),
+      setPotencia: envolver(setPotencia),
       setOrden: envolver(setOrden),
     };
   }, []);
@@ -318,6 +350,8 @@ export const useProductFilters = ({
     setMinRating(0);
     setCondicion('');
     setMarca('');
+    setTipo('');
+    setPotencia('');
   };
 
   return {
@@ -335,6 +369,8 @@ export const useProductFilters = ({
     minRating,
     condicion,
     marca,
+    tipo,
+    potencia,
     orden,
     pagina,
     // Setters. Los que cambian lo que se pide vuelven a la página 1.

@@ -244,6 +244,10 @@ interface Subcategory {
   name: string;
   slug: string;
   is_active: boolean;
+  /** La lista cerrada de tipos del subrubro: el tercer nivel. */
+  tipos?: { value: string; label: string }[];
+  /** Si el subrubro lleva potencia en HP (Tractores). */
+  usa_potencia?: boolean;
 }
 
 // Interfaz para categorías del backend
@@ -286,6 +290,8 @@ interface BackendProduct {
   publication_type?: string;
   operation_kind?: string;
   condition?: string | null;
+  subcategory_type?: { value: string; label: string } | null;
+  power_hp?: number | null;
   // Campos de servicio
   pricing_type?: string;
   availability?: string;
@@ -322,6 +328,10 @@ interface EditFormData {
   // lo que publicó es una máquina única o un insumo con stock.
   operation_kind: OperationKind;
   condition: Condition | '';
+  /** El tipo del subrubro, por slug. Vacío es «sin declarar». */
+  subcategory_type: string;
+  /** La potencia en HP, como se escribe. Vacía es «sin declarar». */
+  power_hp: string;
   // Campos de servicio
   pricing_type?: string;
   availability?: string;
@@ -1696,6 +1706,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
       publication_type: isService ? 'servicio' : 'producto',
       operation_kind: normalizarAnatomia(product.operation_kind),
       condition: normalizarCondicion(product.condition) || '',
+      subcategory_type: product.subcategory_type?.value || '',
+      power_hp: product.power_hp != null ? String(product.power_hp) : '',
       // Campos de servicio
       pricing_type: product.pricing_type || 'por_hora',
       availability: product.availability || 'inmediata',
@@ -1730,6 +1742,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
     }
     if (!isService && stock < 0) {
       showToast('El stock no puede ser negativo', 'warning');
+      return;
+    }
+    // La potencia, si se escribió, es un entero de HP razonable: lo mismo que
+    // exige el servidor, dicho acá antes de mandar nada.
+    const potenciaEscrita = editingProduct.power_hp.trim();
+    if (potenciaEscrita && !(/^\d+$/.test(potenciaEscrita)
+      && Number(potenciaEscrita) >= 1 && Number(potenciaEscrita) <= 1000)) {
+      showToast('La potencia va en HP: un número entero entre 1 y 1000.', 'warning');
       return;
     }
     
@@ -1768,6 +1788,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
       if (editingProduct.subcategory_id) {
         payload.subcategory_id = editingProduct.subcategory_id;
       }
+
+      // El tipo y la potencia viajan siempre: vacío es `null`, que los quita.
+      // El servidor los valida contra el subrubro final.
+      payload.subcategory_type = editingProduct.subcategory_type || null;
+      payload.power_hp = editingProduct.power_hp ? parseInt(editingProduct.power_hp, 10) : null;
       
       // Campos específicos según tipo
       if (isService) {
@@ -3824,7 +3849,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                       setEditingProduct({
                         ...editingProduct,
                         subcategory_id: e.target.value,
-                        subcategory_name: selectedSubcat?.name || ''
+                        subcategory_name: selectedSubcat?.name || '',
+                        // Otro subrubro, otra lista: se sueltan.
+                        subcategory_type: '',
+                        power_hp: '',
                       });
                     }}
                   >
@@ -3839,6 +3867,55 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                   </select>
                 </div>
               </div>
+
+              {/* El tipo y la potencia, del subrubro elegido. */}
+              {(() => {
+                const subrubro = categories
+                  .find(c => c.id === editingProduct.category_id)
+                  ?.subcategories?.find(s => s.id === editingProduct.subcategory_id);
+                const lista = subrubro?.tipos ?? [];
+                if (lista.length === 0 && !subrubro?.usa_potencia) return null;
+                return (
+                  <div className={styles.editFormRow}>
+                    {lista.length > 0 && (
+                      <div className={styles.editFormGroup}>
+                        <label htmlFor="edit-tipo">Tipo</label>
+                        <select
+                          id="edit-tipo"
+                          value={editingProduct.subcategory_type}
+                          onChange={(e) => setEditingProduct({
+                            ...editingProduct,
+                            subcategory_type: e.target.value,
+                          })}
+                        >
+                          <option value="">Sin declarar</option>
+                          {lista.map(opcion => (
+                            <option key={opcion.value} value={opcion.value}>{opcion.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {subrubro?.usa_potencia && (
+                      <div className={styles.editFormGroup}>
+                        <label htmlFor="edit-potencia">Potencia (HP)</label>
+                        <input
+                          id="edit-potencia"
+                          type="number"
+                          min={1}
+                          max={1000}
+                          step={1}
+                          inputMode="numeric"
+                          value={editingProduct.power_hp}
+                          onChange={(e) => setEditingProduct({
+                            ...editingProduct,
+                            power_hp: e.target.value,
+                          })}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               
               {/* Clase de publicación: la que decide qué muestra la tarjeta y
                   qué acción ofrece. Se puede corregir acá porque los avisos

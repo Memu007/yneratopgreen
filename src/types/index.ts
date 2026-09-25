@@ -25,6 +25,11 @@ export interface Product {
       que es como se comportaba todo antes de que la columna existiera. */
   operationKind?: OperationKind;
   condition?: Condition;
+  /** El tercer nivel de la taxonomía que declaró quien publica —«Rastras»,
+      «Goteo»—, o nada: es opcional y lo anterior a la columna no lo tiene. */
+  subcategoryType?: { value: string; label: string };
+  /** La potencia en HP, sólo en Tractores. */
+  powerHp?: number;
   /** Lo que declara una publicación de servicio o logística. Vive en la base
       desde siempre; hasta ahora no salía en la respuesta pública, y sin
       cobertura ni modalidad la tarjeta de servicio no se puede dibujar. */

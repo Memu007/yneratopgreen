@@ -82,6 +82,8 @@ export const PARAMETROS_DEL_MERCADO = [
   'max_price',
   'in_stock',
   'min_rating',
+  'subtype',
+  'power',
 ];
 
 /**

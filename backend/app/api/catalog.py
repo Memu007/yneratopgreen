@@ -11,12 +11,13 @@ from pydantic import BaseModel
 from app.db.base import get_db
 from app.models.category import Category
 from app.models.subcategory import Subcategory
+from app.models.subcategory_type import SubcategoryType
 from app.models.product import Product, ProductStatus
 from app.models.product_image import ProductImage
 from app.models.locality import Locality
 from app.models.user import User
 from app.models.documentacion import DocumentacionDeVendedor, EstadoDeDocumentacion
-from app.services import padron, stock
+from app.services import padron, stock, tipos
 from app.schemas.catalog import (
     CategoryResponse,
     SubcategoryBase,
@@ -27,6 +28,7 @@ from app.schemas.catalog import (
     SellerBasicInfo,
     UbicacionDePublicacion,
     BrandFacetItem,
+    TipoDeSubrubro,
 )
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
@@ -88,6 +90,15 @@ def get_categories(
     ).order_by(Category.display_order, Category.name)
     
     results = query.all()
+
+    # Los tipos de todos los subrubros, en una consulta y no en una por
+    # subrubro: son la lista que el alta ofrece y el filtro del Mercado.
+    tipos_por_subrubro = {}
+    for tipo in db.query(SubcategoryType).filter(
+        SubcategoryType.is_active == True
+    ).order_by(SubcategoryType.display_order, SubcategoryType.name).all():
+        tipos_por_subrubro.setdefault(tipo.subcategory_id, []).append(
+            TipoDeSubrubro(value=tipo.slug, label=tipo.name))
     
     categories = []
     for category, count in results:
@@ -103,7 +114,9 @@ def get_categories(
                     id=sub.id,
                     name=sub.name,
                     slug=sub.slug,
-                    is_active=sub.is_active
+                    is_active=sub.is_active,
+                    tipos=tipos_por_subrubro.get(sub.id, []),
+                    usa_potencia=tipos.usa_potencia(category.slug, sub.slug),
                 ) for sub in subcategories
             ]
             
@@ -237,6 +250,16 @@ def get_products(
         max_length=100,
         description="Filtrar por marca: el `value` de la opcion, no la etiqueta",
     ),
+    subcategory_type: Optional[str] = Query(
+        None,
+        max_length=80,
+        description="Filtrar por tipo del subrubro: su slug. Con `subcategory`, el de ese subrubro",
+    ),
+    power_range: Optional[str] = Query(
+        None,
+        pattern="^(compacto|estandar|alta)$",
+        description="Rango de potencia: compacto (<60 HP), estandar (60-120 HP) o alta (>120 HP)",
+    ),
     sort_by: str = Query("created_at", pattern="^(created_at|price|sales|views|rating)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
@@ -316,7 +339,11 @@ def get_products(
         # dibuja. Sale de un `outerjoin` acotado a la aprobada, que no
         # multiplica filas porque hay una documentación por usuario.
         DocumentacionDeVendedor.id.isnot(None).label("seller_documentacion_revisada"),
-        imagen_primaria.c.url.label("primary_image_url")
+        imagen_primaria.c.url.label("primary_image_url"),
+        # El tipo declarado, en la misma consulta: un tipo por publicación, así
+        # que el `outerjoin` no multiplica filas.
+        SubcategoryType.slug.label("tipo_slug"),
+        SubcategoryType.name.label("tipo_nombre"),
     ).join(
         Category, Product.category_id == Category.id
     ).outerjoin(
@@ -333,6 +360,8 @@ def get_products(
         Locality, Product.locality_id == Locality.id
     ).outerjoin(
         imagen_primaria, imagen_primaria.c.product_id == Product.id
+    ).outerjoin(
+        SubcategoryType, Product.subcategory_type_id == SubcategoryType.id
     ).filter(
         Product.status == ProductStatus.ACTIVE
     )
@@ -422,6 +451,31 @@ def get_products(
     # el total describiria el catalogo y no lo que se esta mirando.
     if condition:
         query = query.filter(Product.condition == condition)
+
+    # El tipo y la potencia, con la misma regla que la condición: ACOTAN y no
+    # completan. Pedir «Arados» devuelve los declarados arados y no los que no
+    # dicen qué son; pedir potencia «alta» deja afuera al tractor que no la
+    # declaró. Un nulo no entra en un filtro positivo: `IN` y las comparaciones
+    # no lo dejan pasar, y no se agrega ningún `OR ... IS NULL`.
+    #
+    # El slug del tipo se repite entre subrubros —hay «otros» en muchos—, así
+    # que con subrubro se busca el de ESE subrubro.
+    #
+    # Y van acá, antes de la faceta y del conteo, como todos los demás.
+    if subcategory_type:
+        tipos_pedidos = db.query(SubcategoryType.id).filter(
+            SubcategoryType.slug == subcategory_type
+        )
+        if subcategory:
+            tipos_pedidos = tipos_pedidos.filter(SubcategoryType.subcategory_id == subcategory)
+        query = query.filter(Product.subcategory_type_id.in_(tipos_pedidos))
+
+    if power_range:
+        desde, hasta = tipos.rango(power_range)
+        if desde is not None:
+            query = query.filter(Product.power_hp >= desde)
+        if hasta is not None:
+            query = query.filter(Product.power_hp <= hasta)
 
     # === La faceta de marcas ===============================================
     #
@@ -541,7 +595,8 @@ def get_products(
          seller_id, seller_name, seller_location,
          publicacion_locality_id, publicacion_localidad, publicacion_provincia,
          seller_rating_avg, seller_rating_count,
-         seller_documentacion_revisada, primary_image_url) in results:
+         seller_documentacion_revisada, primary_image_url,
+         tipo_slug, tipo_nombre) in results:
         # Construir info del vendedor
         seller_info = SellerBasicInfo(
             id=seller_id,
@@ -586,6 +641,10 @@ def get_products(
             # Nuevo o usado, o nada. Sólo el activo la trae con valor.
             "condition": product.condition,
             "brand": product.brand,
+            "subcategory_type": (
+                TipoDeSubrubro(value=tipo_slug, label=tipo_nombre) if tipo_slug else None
+            ),
+            "power_hp": product.power_hp,
             # Cobertura y modalidad: la tarjeta de servicio no se puede
             # dibujar sin ellas, y estaban guardadas sin salir nunca.
             "pricing_type": product.pricing_type,
@@ -634,6 +693,7 @@ def get_product_detail(
         # distintivo: pedirla aparte sería una consulta más por cada detalle.
         joinedload(Product.seller).joinedload(User.documentacion),
         joinedload(Product.category),
+        joinedload(Product.subcategory_type),
         # La localidad de la publicacion, en la misma consulta.
         joinedload(Product.locality),
         joinedload(Product.images)
@@ -692,6 +752,11 @@ def get_product_detail(
         "operation_kind": product.operation_kind,
         "condition": product.condition,
         "brand": product.brand,
+        "subcategory_type": (
+            TipoDeSubrubro(value=product.subcategory_type.slug, label=product.subcategory_type.name)
+            if product.subcategory_type else None
+        ),
+        "power_hp": product.power_hp,
         "pricing_type": product.pricing_type,
         "availability": product.availability,
         "response_time": product.response_time,

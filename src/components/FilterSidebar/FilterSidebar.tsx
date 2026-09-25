@@ -5,8 +5,9 @@ import type {
   LocalityResponse,
   MarcaDelMercado,
   ProvinceResponse,
+  RangoDePotencia,
 } from '../../utils/catalogService';
-import { opcionDeLocalidad } from '../../utils/catalogService';
+import { opcionDeLocalidad, RANGOS_DE_POTENCIA } from '../../utils/catalogService';
 import { CONDICIONES, type CondicionDelMercado } from '../../hooks/useProductFilters';
 
 interface FilterSidebarProps {
@@ -31,6 +32,10 @@ interface FilterSidebarProps {
       acá no hay nada que elegir, y entonces el control no se dibuja: un
       selector con una sola opción que no filtra nada es ruido. */
   marcasDisponibles: MarcaDelMercado[];
+  /** El tipo del subrubro elegido, por slug. Vacío es «todos». */
+  tipo: string;
+  /** El rango de potencia de Tractores. Vacío es «cualquiera». */
+  potencia: RangoDePotencia | '';
   onTypeChange: (type: 'todos' | 'productos' | 'servicios') => void;
   onCategoryChange: (category: string) => void;
   onSubcategoryChange: (subcategory: string) => void;
@@ -42,6 +47,8 @@ interface FilterSidebarProps {
   onMinRatingChange: (rating: number) => void;
   onCondicionChange: (condicion: CondicionDelMercado) => void;
   onMarcaChange: (marca: string) => void;
+  onTipoChange: (tipo: string) => void;
+  onPotenciaChange: (potencia: RangoDePotencia | '') => void;
   onResetFilters: () => void;
   /** Cuántas operaciones quedan con los filtros puestos. En celular el
       panel termina con «Ver N resultados»: sin el número, cerrar el panel
@@ -66,6 +73,8 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   condicion,
   marca,
   marcasDisponibles,
+  tipo,
+  potencia,
   onTypeChange,
   onCategoryChange,
   onSubcategoryChange,
@@ -77,6 +86,8 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   onMinRatingChange,
   onCondicionChange,
   onMarcaChange,
+  onTipoChange,
+  onPotenciaChange,
   onResetFilters,
   cantidadDeResultados,
 }) => {
@@ -95,6 +106,13 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     const category = categories.find(c => c.name === selectedCategory);
     return category?.subcategories?.filter(s => s.is_active) || [];
   }, [categories, selectedCategory]);
+
+  // El subrubro elegido, del que cuelgan el tipo y la potencia.
+  const subrubroElegido = useMemo(
+    () => currentSubcategories.find((subcategory) => subcategory.name === selectedSubcategory),
+    [currentSubcategories, selectedSubcategory],
+  );
+  const tiposDelSubrubro = subrubroElegido?.tipos ?? [];
 
   return (
     <aside className={styles.panel}>
@@ -173,6 +191,45 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                   <option key={subcategory.id} value={subcategory.name}>
                     {subcategory.name}
                   </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Tipo: el tercer nivel. Aparece con un subrubro elegido que tiene
+              lista, y ofrece sólo esa lista. Acota y no completa: las
+              publicaciones que no declararon tipo no entran. */}
+          {tiposDelSubrubro.length > 0 && (
+            <div className={styles.filterSection}>
+              <label className={styles.filterLabel} htmlFor="catalog-subtype">Tipo</label>
+              <select
+                id="catalog-subtype"
+                className={styles.select}
+                value={tipo}
+                onChange={(e) => onTipoChange(e.target.value)}
+              >
+                <option value="">Todos</option>
+                {tiposDelSubrubro.map(({ value, label }) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Potencia: el tercer nivel de Tractores son rangos. Quien vende
+              cargó los HP; el rango lo calcula el servidor. */}
+          {subrubroElegido?.usa_potencia && (
+            <div className={styles.filterSection}>
+              <label className={styles.filterLabel} htmlFor="catalog-power">Potencia</label>
+              <select
+                id="catalog-power"
+                className={styles.select}
+                value={potencia}
+                onChange={(e) => onPotenciaChange(e.target.value as RangoDePotencia | '')}
+              >
+                <option value="">Cualquiera</option>
+                {RANGOS_DE_POTENCIA.map(({ valor, rotulo }) => (
+                  <option key={valor} value={valor}>{rotulo}</option>
                 ))}
               </select>
             </div>

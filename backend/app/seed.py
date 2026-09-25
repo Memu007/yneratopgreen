@@ -12,12 +12,13 @@ from app.db.base import SessionLocal
 from app.models.user import User, UserRole
 from app.models.category import Category
 from app.models.subcategory import Subcategory
+from app.models.subcategory_type import SubcategoryType
 from app.models.form_option import FormOption
 from app.models.locality import Locality
 from app.core.config import settings
 from app.core.security import hash_password
 from app.seed_localities import seed_localities
-from app.services import anatomia, marcas
+from app.services import anatomia, marcas, tipos
 from datetime import datetime
 
 
@@ -480,6 +481,39 @@ def create_seed_data():
                     existing_subcategory.is_active = True
         
         db.commit()
+
+        # === EL TERCER NIVEL: LOS TIPOS DE CADA SUBRUBRO === #
+        # La lista sale de `services/tipos.py`. Se agrega o se actualiza por
+        # (subrubro, slug), y lo que un subrubro ya no ofrece se da de baja sin
+        # borrarse: una publicación que lo declaró no pierde el dato.
+        print("\n🏷️  Cargando los tipos de cada subrubro...")
+        subrubros_con_tipos = 0
+        for subrubro in db.query(Subcategory).join(Category).all():
+            lista = tipos.tipos_de(subrubro.category.slug, subrubro.slug)
+            vigentes = set()
+            for orden, (slug, nombre) in enumerate(lista, start=1):
+                vigentes.add(slug)
+                tipo = db.query(SubcategoryType).filter(
+                    SubcategoryType.subcategory_id == subrubro.id,
+                    SubcategoryType.slug == slug,
+                ).first()
+                if tipo is None:
+                    db.add(SubcategoryType(
+                        subcategory_id=subrubro.id, slug=slug, name=nombre,
+                        display_order=orden, is_active=True,
+                    ))
+                else:
+                    tipo.name = nombre
+                    tipo.display_order = orden
+                    tipo.is_active = True
+            for sobrante in db.query(SubcategoryType).filter(
+                SubcategoryType.subcategory_id == subrubro.id,
+            ).all():
+                if sobrante.slug not in vigentes:
+                    sobrante.is_active = False
+            subrubros_con_tipos += bool(lista)
+        db.commit()
+        print(f"  ✅ {subrubros_con_tipos} subrubros con lista de tipos")
 
         # === OPCIONES DE FORMULARIO === #
         # Las provincias/localidades se siembran desde Georef, no se duplican aquí.
@@ -1258,6 +1292,30 @@ def create_seed_data():
             "campo-agricola-120-hectareas": ("tierras-parcelas", "compra-venta-definitiva"),
         }
 
+        # El tipo de las publicaciones de ejemplo, de la lista de su subrubro.
+        # El kit de filtros y correas queda sin tipo a propósito: es las dos
+        # cosas, y una publicación sin tipo también tiene que verse.
+        product_tipos = {
+            "semillas-maiz-dk-premium": "cultivos-extensivos",
+            "fertilizante-triple-15": "minerales",
+            "pulverizadora-jacto-600": "pulverizadoras-de-arrastre",
+            "semillas-soja-rr-intacta": "cultivos-extensivos",
+            "cosechadora-john-deere-9750": "cosechadoras-de-granos",
+            "herbicida-glifosato-20l": "herbicidas",
+            "rastra-discos-24-platos": "rastras",
+            "dron-pulverizador-agricola-20l": "aplicadores",
+            "sensores-humedad-suelo-iot": "humedad",
+            "urea-granulada-46-nitrogeno": "minerales",
+            "insecticida-lambda-cihalotrina-1l": "insecticidas",
+            "equipo-riego-goteo-10-hectareas": "goteo",
+            "manga-ganadera-balanza-electronica": "mangas",
+            "campo-agricola-120-hectareas": "campo-agricola",
+        }
+        # La potencia, la que dice su propia descripción.
+        product_potencias = {
+            "tractor-pauny-280a-doble-traccion": 180,
+        }
+
         product_localities = {
             "semillas-maiz-dk-premium": ("14014010", "Córdoba, Córdoba"),
             "fertilizante-triple-15": ("06623100", "Pergamino, Buenos Aires"),
@@ -1304,6 +1362,19 @@ def create_seed_data():
             )
             product_values["locality_id"] = locality_id
             product_values["location"] = location
+            tipo_slug = product_tipos.get(product_values["slug"])
+            product_values["subcategory_type_id"] = (
+                db.query(SubcategoryType.id).filter(
+                    SubcategoryType.subcategory_id == product_values["subcategory_id"],
+                    SubcategoryType.slug == tipo_slug,
+                ).scalar()
+                if tipo_slug
+                else None
+            )
+            if tipo_slug and product_values["subcategory_type_id"] is None:
+                raise ValueError(
+                    f"{product_values['slug']}: el tipo «{tipo_slug}» no es de su subrubro")
+            product_values["power_hp"] = product_potencias.get(product_values["slug"])
             # La anatomia: la que declara la publicacion, o la de su
             # categoria. Las dos que la declaran son kits estandarizados con
             # stock real dentro de una categoria de equipos; verlas como
@@ -1345,6 +1416,8 @@ def create_seed_data():
                 # y el seed es quien sabe cual declara cada publicacion.
                 existing_prod.operation_kind = product_values["operation_kind"]
                 existing_prod.condition = product_values.get("condition")
+                existing_prod.subcategory_type_id = product_values["subcategory_type_id"]
+                existing_prod.power_hp = product_values["power_hp"]
                 existing_prod.locality_id = locality_id
                 existing_prod.location = location
                 print(f"  ⏭️  Producto '{product_values['name']}' ya existe")

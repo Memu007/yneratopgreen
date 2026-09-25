@@ -28,11 +28,23 @@ function getImageUrl(url: string | undefined): string {
   return `${IMAGES_BASE_URL}${url}`;
 }
 
+/** Un valor del tercer nivel de la taxonomía: el slug que viaja y el rótulo
+    que se lee. */
+export interface TipoDeSubrubro {
+  value: string;
+  label: string;
+}
+
 export interface SubcategoryResponse {
   id: string;
   name: string;
   slug: string;
   is_active: boolean;
+  /** La lista cerrada de tipos del subrubro. Vacía si no tiene: el alta no
+      ofrece el campo y el Mercado no ofrece el filtro. */
+  tipos?: TipoDeSubrubro[];
+  /** Si el subrubro lleva potencia en HP (Tractores). */
+  usa_potencia?: boolean;
 }
 
 export interface CategoryResponse {
@@ -55,6 +67,15 @@ export interface CategoryResponse {
   subcategories: SubcategoryResponse[];
   created_at: string;
 }
+
+/** Los tres rangos de potencia de la clienta. Los bordes son de «estándar»:
+    60 y 120 HP son estándar. Los calcula el servidor; acá sólo se nombran. */
+export type RangoDePotencia = 'compacto' | 'estandar' | 'alta';
+export const RANGOS_DE_POTENCIA: { valor: RangoDePotencia; rotulo: string }[] = [
+  { valor: 'compacto', rotulo: 'Compacto (menos de 60 HP)' },
+  { valor: 'estandar', rotulo: 'Estándar (60 a 120 HP)' },
+  { valor: 'alta', rotulo: 'Alta (más de 120 HP)' },
+];
 
 export interface ProvinceResponse {
   id: string;
@@ -134,6 +155,9 @@ export interface ProductFromBackend {
   is_service?: boolean;
   operation_kind?: string;
   condition?: string | null;
+  /** El tercer nivel declarado y la potencia en HP, o nada. */
+  subcategory_type?: TipoDeSubrubro | null;
+  power_hp?: number | null;
   pricing_type?: string | null;
   availability?: string | null;
   response_time?: string | null;
@@ -237,6 +261,11 @@ export const getProducts = async (params: {
       que la faceta de la respuesta anterior trajo, así que una marca sin
       resultados no llega a pedirse. */
   brand?: string;
+  /** El tipo del subrubro, por slug. Se pide junto con `subcategory`: el
+      slug se repite entre subrubros («otros»). */
+  subcategory_type?: string;
+  /** Rango de potencia de Tractores. */
+  power_range?: RangoDePotencia;
   sort_by?: 'created_at' | 'price' | 'sales' | 'views' | 'rating';
   sort_order?: 'asc' | 'desc';
   page?: number;
@@ -335,6 +364,8 @@ export const convertBackendProductToFrontend = (backendProduct: ProductFromBacke
     isService: backendProduct.is_service || false,
     operationKind: normalizarAnatomia(backendProduct.operation_kind),
     condition: normalizarCondicion(backendProduct.condition),
+    subcategoryType: backendProduct.subcategory_type || undefined,
+    powerHp: backendProduct.power_hp ?? undefined,
     pricingType: backendProduct.pricing_type || undefined,
     availability: backendProduct.availability || undefined,
     responseTime: backendProduct.response_time || undefined,

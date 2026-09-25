@@ -357,6 +357,20 @@ const Ficha: React.FC<FichaProps> = ({
         {ubicacion && <p className={styles.ubicacion}>{ubicacion}</p>}
 
         <dl className={styles.datos}>
+          {/* El tercer nivel y la potencia, como los declaró quien publica.
+              Sin dato, no hay fila: no se inventa un tipo. */}
+          {product.subcategoryType && (
+            <div>
+              <dt>Tipo</dt>
+              <dd>{product.subcategoryType.label}</dd>
+            </div>
+          )}
+          {product.powerHp != null && (
+            <div>
+              <dt>Potencia</dt>
+              <dd>{`${product.powerHp} HP`}</dd>
+            </div>
+          )}
           {product.condition && (
             <div>
               <dt>Condición</dt>

@@ -6,6 +6,7 @@ from app.models.user import User, UserRole
 from app.models.email_verification import EmailVerificationToken
 from app.models.category import Category
 from app.models.subcategory import Subcategory
+from app.models.subcategory_type import SubcategoryType
 from app.models.locality import Locality
 from app.models.product import Product, ProductStatus
 from app.models.product_image import ProductImage
@@ -27,6 +28,7 @@ __all__ = [
     "EmailVerificationToken",
     "Category",
     "Subcategory",
+    "SubcategoryType",
     "Locality",
     "Product",
     "ProductStatus",

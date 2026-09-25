@@ -13,6 +13,8 @@ from app.db.base import get_db
 from app.models.product import Product, ProductStatus
 from app.models.product_image import ProductImage
 from app.models.category import Category
+from app.models.subcategory import Subcategory
+from app.models.subcategory_type import SubcategoryType
 from app.models.locality import Locality
 from app.core.dependencies import get_current_user
 from app.core.montos import validar_precio_unitario
@@ -21,7 +23,7 @@ from app.schemas.products import ProductCreateRequest, ProductUpdateRequest, Pro
 from app.core.config import settings
 from app.services.storage import get_storage
 from app.models.form_option import FormOption
-from app.services import anatomia
+from app.services import anatomia, tipos
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -91,6 +93,64 @@ def marca_declarada(db: Session, category: Category, pedida: Optional[str]) -> O
             ),
         )
     return existe.value
+
+
+def subrubro_de(db: Session, subcategory_id: Optional[str]) -> Optional[Subcategory]:
+    """El subrubro de la publicación, o nada."""
+    if not subcategory_id:
+        return None
+    return db.query(Subcategory).filter(Subcategory.id == subcategory_id).first()
+
+
+def tipo_declarado(db: Session, subrubro: Optional[Subcategory], pedido: Optional[str]) -> Optional[str]:
+    """El id del tipo que se guarda, o nada.
+
+    El tipo es el tercer nivel de la taxonomía: uno de la lista cerrada DEL
+    SUBRUBRO. Uno que no es de esa lista se rechaza, y no se guarda como
+    texto: un «arado» dentro de Cosecha, o un valor inventado, no se puede
+    filtrar ni contar. Sin subrubro no hay lista de dónde elegir.
+    """
+    if not pedido:
+        return None
+    if subrubro is None:
+        raise HTTPException(
+            status_code=400,
+            detail="El tipo se elige dentro de un subrubro: elegí primero el subrubro de la publicación.",
+        )
+    vigentes = db.query(SubcategoryType).filter(
+        SubcategoryType.subcategory_id == subrubro.id,
+        SubcategoryType.is_active == True,
+    ).order_by(SubcategoryType.display_order).all()
+    for tipo in vigentes:
+        if tipo.slug == pedido:
+            return tipo.id
+    opciones = (
+        f"Opciones: {', '.join(tipo.name for tipo in vigentes)}."
+        if vigentes else "Este subrubro no tiene lista de tipos."
+    )
+    raise HTTPException(
+        status_code=400,
+        detail=f"El tipo «{pedido}» no es de «{subrubro.name}». {opciones}",
+    )
+
+
+def potencia_declarada(subrubro: Optional[Subcategory], pedida: Optional[int]) -> Optional[int]:
+    """La potencia que se guarda, o nada.
+
+    Sólo la lleva el subrubro cuyo tercer nivel son rangos de potencia
+    (Tractores). En otro, se rechaza: guardarla sería dejar un dato que
+    ninguna pantalla muestra y que una edición futura resucita. Que sea
+    positiva y razonable lo valida el esquema.
+    """
+    if pedida is None:
+        return None
+    if subrubro is None or not tipos.usa_potencia(subrubro.category.slug, subrubro.slug):
+        donde = f"«{subrubro.name}»" if subrubro is not None else "una publicación sin subrubro"
+        raise HTTPException(
+            status_code=400,
+            detail=f"La potencia en HP se declara sólo en Tractores, no en {donde}.",
+        )
+    return pedida
 
 
 @router.post("", response_model=ProductResponse)
@@ -191,6 +251,11 @@ async def create_product(
     # viene, igual que la condición.
     brand = marca_declarada(db, category, product_data.brand)
 
+    # El tipo y la potencia los decide el SUBRUBRO, que es donde vive la lista.
+    subrubro = subrubro_de(db, product_data.subcategory_id)
+    subcategory_type_id = tipo_declarado(db, subrubro, product_data.subcategory_type)
+    power_hp = potencia_declarada(subrubro, product_data.power_hp)
+
     # Crear producto/servicio
     new_product = Product(
         name=product_data.name,
@@ -209,6 +274,8 @@ async def create_product(
         operation_kind=operation_kind,
         condition=condition,
         brand=brand,
+        subcategory_type_id=subcategory_type_id,
+        power_hp=power_hp,
         # Campos de servicio
         pricing_type=product_data.pricing_type if is_service else None,
         availability=product_data.availability if is_service else None,
@@ -527,6 +594,32 @@ async def update_product(
         elif not getattr(categoria_final, "usa_marca", False):
             update_data["brand"] = None
 
+    # El tipo y la potencia dependen del SUBRUBRO final. Se validan si vienen;
+    # si no vienen pero el subrubro cambió, lo que traía se suelta cuando ya no
+    # corresponde: un «Arados» no sigue siendo verdad en Cosecha, ni una
+    # potencia fuera de Tractores.
+    cambia_el_subrubro = (
+        "subcategory_id" in update_data and update_data["subcategory_id"] != product.subcategory_id
+    )
+    subrubro_final = subrubro_de(db, update_data.get("subcategory_id", product.subcategory_id))
+    if "subcategory_type" in update_data:
+        update_data["subcategory_type_id"] = tipo_declarado(
+            db, subrubro_final, update_data.pop("subcategory_type"))
+    elif cambia_el_subrubro and product.subcategory_type_id:
+        sigue = subrubro_final is not None and db.query(SubcategoryType).filter(
+            SubcategoryType.id == product.subcategory_type_id,
+            SubcategoryType.subcategory_id == subrubro_final.id,
+        ).first() is not None
+        if not sigue:
+            update_data["subcategory_type_id"] = None
+    if "power_hp" in update_data:
+        update_data["power_hp"] = potencia_declarada(subrubro_final, update_data["power_hp"])
+    elif cambia_el_subrubro and product.power_hp is not None and not (
+        subrubro_final is not None
+        and tipos.usa_potencia(subrubro_final.category.slug, subrubro_final.slug)
+    ):
+        update_data["power_hp"] = None
+
     for field, value in update_data.items():
         setattr(product, field, value)
     
@@ -650,6 +743,7 @@ async def get_my_products(
         joinedload(Product.images),
         joinedload(Product.category),
         joinedload(Product.subcategory),
+        joinedload(Product.subcategory_type),
         # La localidad viaja con la publicacion: sin esto el panel tendria que
         # partir el texto de `location` por comas para adivinar de donde es, y
         # ese texto es un derivado de compatibilidad, no la fuente.
@@ -692,6 +786,11 @@ async def get_my_products(
             "operation_kind": product.operation_kind,
             "condition": product.condition,
             "brand": product.brand,
+            "subcategory_type": {
+                "value": product.subcategory_type.slug,
+                "label": product.subcategory_type.name,
+            } if product.subcategory_type else None,
+            "power_hp": product.power_hp,
             "category_id": str(product.category_id) if product.category_id else None,
             "category": {
                 "id": str(product.category.id),

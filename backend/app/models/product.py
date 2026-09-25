@@ -1,7 +1,7 @@
 """
 Modelo de Producto - Productos y Servicios publicados por usuarios
 """
-from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer, Numeric, ForeignKey, Enum as SQLEnum, JSON
+from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer, Numeric, ForeignKey, Enum as SQLEnum, JSON, CheckConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -20,6 +20,11 @@ class ProductStatus(str, enum.Enum):
 
 class Product(Base):
     __tablename__ = "products"
+    # Una potencia se declara positiva o no se declara. La API ya lo valida;
+    # la base lo sostiene aunque alguien escriba por otro camino.
+    __table_args__ = (
+        CheckConstraint("power_hp IS NULL OR power_hp > 0", name="ck_products_power_hp_positiva"),
+    )
 
     # Identificación
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -58,6 +63,21 @@ class Product(Base):
     # Clasificación
     category_id = Column(String(36), ForeignKey("categories.id"), nullable=False, index=True)
     subcategory_id = Column(String(36), ForeignKey("subcategories.id"), nullable=True, index=True)
+
+    # El tipo: el tercer nivel de la taxonomía, de la lista del subrubro (ver
+    # `services/tipos.py`). Opcional, y nulo en todo lo publicado antes de la
+    # columna: nadie puede saber hoy si aquella máquina era un arado o una
+    # rastra sin adivinarle el título. Si el tipo se da de baja, la
+    # publicación no se pierde: queda sin tipo.
+    subcategory_type_id = Column(
+        String(36), ForeignKey("subcategory_types.id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+
+    # La potencia en HP. Sólo la lleva Tractores, cuyo tercer nivel son rangos
+    # de potencia: se guarda el número que declara quien vende y el rango lo
+    # calcula el filtro. Nula en lo anterior a la columna, por lo mismo.
+    power_hp = Column(Integer, nullable=True, index=True)
     sku = Column(String(100), unique=True, nullable=True)  # Código de producto
     
     # Precio y stock (para productos)
@@ -108,6 +128,7 @@ class Product(Base):
     # Relaciones
     category = relationship("Category", back_populates="products")
     subcategory = relationship("Subcategory", backref="products")
+    subcategory_type = relationship("SubcategoryType")
     locality = relationship("Locality", back_populates="products")
     seller = relationship("User", back_populates="products")
     images = relationship("ProductImage", back_populates="product", cascade="all, delete-orphan")

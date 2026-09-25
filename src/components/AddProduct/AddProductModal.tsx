@@ -46,6 +46,10 @@ interface Subcategory {
   name: string;
   slug: string;
   is_active: boolean;
+  /** La lista cerrada de tipos del subrubro: el tercer nivel. */
+  tipos?: { value: string; label: string }[];
+  /** Si el subrubro lleva potencia en HP (Tractores). */
+  usa_potencia?: boolean;
 }
 
 interface CategoryFromBackend {
@@ -165,6 +169,13 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   // viaja: la lista no puede tener todas las marcas que existen, y obligar
   // a elegir una haría que el vendedor conteste cualquiera para publicar.
   const [brand, setBrand] = useState('');
+
+  // El tipo —el tercer nivel— y la potencia. Cuelgan del SUBRUBRO: se
+  // ofrecen si el subrubro elegido los tiene, se sueltan al cambiarlo y son
+  // opcionales, porque obligar a elegir haría que quien vende conteste
+  // cualquiera para poder publicar.
+  const [tipo, setTipo] = useState('');
+  const [potencia, setPotencia] = useState('');
   
   const [formData, setFormData] = useState<NewProductData>(FORMULARIO_VACIO);
 
@@ -204,6 +215,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     setPublicationType('producto');
     setOperationKind('insumo');
     setCondition('');
+    setTipo('');
+    setPotencia('');
     setSelectedProvinceId('');
     setLocalities([]);
     setImages([]);
@@ -287,6 +300,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   
   // Obtener subcategorías de la categoría seleccionada
   const selectedCategory = currentCategories.find(cat => cat.value === formData.category);
+  // Y el subrubro elegido, con su lista de tipos y si lleva potencia.
+  const subrubroElegido = backendCategories
+    .find(cat => cat.name === formData.category)
+    ?.subcategories?.find((s: Subcategory) => s.name === formData.subcategory);
+  const tiposDelSubrubro = subrubroElegido?.tipos ?? [];
 
   // Funciones para manejo de zonas de cobertura (servicios)
   const addCoverageZone = (zone?: string) => {
@@ -311,6 +329,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   const handleTypeChange = (type: 'producto' | 'servicio') => {
     setOperationKind(type === 'servicio' ? 'servicio' : 'insumo');
     setPublicationType(type);
+    setTipo('');
+    setPotencia('');
     setFormData(prev => ({
       ...prev,
       category: '',
@@ -332,6 +352,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
       }));
     } else if (name === 'price' || name === 'stock') {
       setFormData(prev => ({ ...prev, [name]: parseFloat(value) || 0 }));
+    } else if (name === 'subcategory') {
+      // Otro subrubro, otra lista: el tipo y la potencia de antes se sueltan.
+      setTipo('');
+      setPotencia('');
+      setFormData(prev => ({ ...prev, subcategory: value }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
@@ -342,6 +367,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     // elegir la anatomía a ciegas en cada alta.
     const elegida = currentCategories.find(cat => cat.value === e.target.value);
     if (elegida) setOperationKind(elegida.anatomiaPorOmision);
+    setTipo('');
+    setPotencia('');
     setFormData(prev => ({
       ...prev,
       category: e.target.value,
@@ -597,6 +624,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
         operation_kind: operationKind,
         condition: operationKind === 'activo' && condition ? condition : undefined,
         brand: selectedCategory?.usaMarca && brand ? brand : undefined,
+        subcategory_type: tiposDelSubrubro.length > 0 && tipo ? tipo : undefined,
+        power_hp: subrubroElegido?.usa_potencia && potencia ? Number(potencia) : undefined,
       };
 
       // Campos específicos según tipo
@@ -745,6 +774,51 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                 </select>
               </div>
             </div>
+
+            {/* El tipo: el tercer nivel, de la lista del subrubro. */}
+            {tiposDelSubrubro.length > 0 && (
+              <div className={styles.formGroup}>
+                <label htmlFor="subcategory-type">Tipo</label>
+                <select
+                  id="subcategory-type"
+                  name="subcategory-type"
+                  value={tipo}
+                  onChange={(e) => setTipo(e.target.value)}
+                >
+                  <option value="">Sin declarar</option>
+                  {tiposDelSubrubro.map(opcion => (
+                    <option key={opcion.value} value={opcion.value}>{opcion.label}</option>
+                  ))}
+                </select>
+                <p className={styles.helpText}>
+                  Quien busca en el Mercado puede filtrar por tipo: si no lo
+                  declarás, tu publicación no aparece en ese filtro.
+                </p>
+              </div>
+            )}
+
+            {/* La potencia: en Tractores, el tercer nivel son rangos, y lo que
+                se carga es el número. */}
+            {subrubroElegido?.usa_potencia && (
+              <div className={styles.formGroup}>
+                <label htmlFor="power-hp">Potencia (HP)</label>
+                <input
+                  type="number"
+                  id="power-hp"
+                  name="power-hp"
+                  value={potencia}
+                  onChange={(e) => setPotencia(e.target.value)}
+                  min={1}
+                  max={1000}
+                  step={1}
+                  inputMode="numeric"
+                />
+                <p className={styles.helpText}>
+                  El Mercado la agrupa en compacto (menos de 60 HP), estándar
+                  (60 a 120) y alta (más de 120).
+                </p>
+              </div>
+            )}
 
             <div className={styles.formGroup}>
               <label htmlFor="operation-kind">Clase de publicación *</label>
