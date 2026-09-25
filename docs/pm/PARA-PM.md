@@ -2,192 +2,266 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## BRAND-LOSS-1 — entregada
+## COPY-AGRO-1 — entregada
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `78ad03d` |
-| candidato | `95180a1` (el arreglo) y `43f3b20` (token de administración vencido en el smoke). El mensaje de `95180a1` dice «once migraciones»: son nueve |
-| cambios de producto | ninguno: `src/` y `backend/` no cambian |
+| base | `e9cf4c6` |
+| candidato | `a1b4acd` (el texto, más el título que afirmaba el caso 156) y `2b92988` (caso 192 y negativos) |
 | no integrado, no desplegado | `main` sigue en `0bd7fbc` |
 
-**Resultado.** La marca la borraba **el arnés, no el producto**: el caso 74
-del smoke. Es un problema de aislamiento (P3), no una pérdida de datos del
-producto. Ya está corregido. **No hay nada que decidir.**
+**Resultado.**
 
-## La causa
+- El sitio dice «agropecuario» en las **once** apariciones de «agro» que
+  tenía, repartidas en cinco archivos.
+- El caso 192 del smoke falla si vuelve a aparecer «agro» como palabra suelta,
+  tanto en la fuente como en la pantalla. Tiene tres negativos.
+- Nada desborda a 360 px.
 
-El caso 74 prueba el freno que protege el descarte de credenciales de
-Mercado Pago.
-
-- **Qué hace.** Para eso baja la base a la revisión `c4a91e37d5b8` y la
-  vuelve a subir (`smoke.mjs`, caso 74, `correrAlembic('downgrade
-  c4a91e37d5b8')`).
-- **Qué deshace.** Bajar a esa revisión deshace las nueve migraciones
-  posteriores, y el `downgrade` de `e4a72c9b1f35_marca_de_la_publicacion`
-  hace `op.drop_column('products', 'brand')` (línea 81).
-- **Qué queda.** Al volver a subir, la columna nace vacía. Y todo pasaba en
-  la base compartida por la suite.
-
-**Evidencia.** Sobre una base recién creada, corrí sólo el caso 74 del smoke
-de la base:
+**Para decidir vos (no bloqueante).** La bajada de la portada cambia a 320 y
+360 px: pasa de un renglón a dos, y el «·» queda al final del primero. Desde
+390 px entra en un renglón, como antes, y en ningún ancho desborda. Así se ve
+a 360 px:
 
 ```
-marcas antes del 74 de la base:   Cosechadora John Deere 9750 = john-deere | Tractor Pauny 280A Doble Tracción = pauny
-[PASS] 74 El descarte de credenciales en claro sólo lo autoriza un 1 — …
-marcas después del 74 de la base: Cosechadora John Deere 9750 = NULL | Tractor Pauny 280A Doble Tracción = NULL
+— MERCADO AGROPECUARIO ·
+  ARGENTINA
 ```
 
-**Por qué parecía salir en 3 de 5 corridas.** En realidad sale siempre que
-el 74 corre.
-
-- En dos de mis tres corridas anteriores, la sonda que yo había puesto
-  dependía de la columna `brand`. Eso le impidió al `downgrade` borrarla: el
-  74 falló y las marcas sobrevivieron.
-- Tus dos corridas no tenían sonda, y las dos las perdieron.
-
-**Por qué las horas apuntaban a los casos 157 a 162.** Borrar una columna no
-toca `updated_at`. Lo que viste a esas horas fue otro caso editando esas
-filas, cuando la marca ya se había ido en el 74.
-
-**No era sólo la marca.** Esas nueve bajadas también borran:
-
-- la tabla de documentación de los vendedores;
-- las reservas de stock (`products.stock_reservado`, `orders.stock_reserva`);
-- el medio de pago de cada orden;
-- la condición y la anatomía de las publicaciones;
-- los datos del transportista;
-- las tablas de Mercado Pago.
-
-Todo lo que corría después del 74 lo hacía sobre una base a medio vaciar.
-Ningún dato real se tocó nunca: es la base local de la suite.
-
-## El arreglo
-
-- **El caso 74 trabaja sobre una copia.**
-  - Crea `<base>_caso74` con `CREATE DATABASE … TEMPLATE <base>`.
-  - Corre ahí Alembic, con el `DATABASE_URL` de la copia, y sus consultas.
-  - La borra al terminar. La base de la aplicación no se toca.
-  - La plantilla no admite otras conexiones: el caso corta las de la API,
-    que se reconecta sola en el pedido siguiente (`pool_pre_ping`), y
-    reintenta hasta cinco veces.
-- **`scripts/lib/sql.mjs`.** `querySql`, `queryRows` y `queryCount` aceptan
-  `{ base }` para hablar con otra base del mismo servidor. Sin eso, siguen
-  como antes.
-- **El caso 187 ya no depende de la siembra.** Publica su propia publicación
-  con marca y la retira al terminar.
-- **El caso 74 ya no borra la marca.** Con el arreglo, sobre una base
-  recién creada:
-
-  ```
-  antes:          Cosechadora John Deere 9750 = john-deere | Tractor Pauny 280A Doble Tracción = pauny
-  [PASS] 74 … Todo en una copia de la base
-  después del 74: Cosechadora John Deere 9750 = john-deere | Tractor Pauny 280A Doble Tracción = pauny
-  bases que quedan: topgreen          (la copia se borró)
-  ```
-
-- **El 187 pasa sin las marcas de la siembra.** Les puse `brand = NULL` a mano
-  a las dos, sin ninguna publicación activa con marca, y corrí el 187 solo:
-  **1/1**. Al terminar no quedó ninguna publicación con marca, porque la suya
-  la retira.
-
-**Los centavos en el script de la guía (P3).** `guia-admin.mjs` lee todos
-los importes del panel en centavos. «$ 1.646.783,3» son 164678330 centavos,
-y la base se compara con `round(x * 100)`. Pasa en el «Volumen vendido» del
-paso 2 y en los montos y el precio del detalle de la orden.
-
-Reproducción, sobre la base que dejaron dos suites, con una orden pagada con
-30 centavos:
-
-```
-script de la base:  [FALLA] Paso 2. Leer el resumen: … «Volumen vendido» dice 16467833 y la suma de las
-                    pagadas, enviadas y entregadas es 1646783
-script nuevo:       [OK] Paso 2. Leer el resumen (10 frases de resultado)
-                    LA GUÍA Y EL PANEL COINCIDEN: 26 pasos en escritorio
-```
-
-**Un arreglo más del smoke, mío.** En la suite completa, los casos 190 y
-191, de la pieza anterior, cayeron con 401 «Token inválido o expirado».
-`tokenDeAdmin` guardaba el token del primer caso que lo pedía, y a esa
-altura ya había vencido. Ahora prueba el guardado y, si no sirve, vuelve a
-ingresar (`43f3b20`).
-
-## Las dos suites
-
-Corrí dos suites sobre `43f3b20`. Antes de cada una recreé la base con
-`entorno_nativo.sh --recrear`, porque la suite la pide limpia. Hice la
-consulta de marcas antes y después de cada una:
-
-```
-suite 1   antes:   Cosechadora John Deere 9750 = john-deere | Tractor Pauny 280A Doble Tracción = pauny
-          190/191; sólo falla el 131 (entorno: el puente de docker no traduce `docker run`)
-          después: Cosechadora John Deere 9750 = john-deere | Tractor Pauny 280A Doble Tracción = pauny
-suite 2   antes:   Cosechadora John Deere 9750 = john-deere | Tractor Pauny 280A Doble Tracción = pauny
-          190/191; sólo falla el 131
-          después: Cosechadora John Deere 9750 = john-deere | Tractor Pauny 280A Doble Tracción = pauny
-```
-
-El 187 pasó en las dos. El 74 y el 190 también.
-
-**La guía, después de la segunda suite.** Quedaron 51 órdenes con centavos
-de 124, y un volumen pagado de $ 1.631.891,50:
-
-```
-node scripts/guia-admin.mjs   salida 0, 26/26 en escritorio y 26/26 en celular
-                              [OK] Paso 2. Leer el resumen (10 frases de resultado), en los dos anchos
-```
-
-**Antes, sobre `95180a1`, corrí dos suites seguidas sin recrear la base
-entre una y otra.** Así probaba otra lectura de «seguidas».
-
-- En las dos, las marcas quedaron intactas y el 187 pasó.
-- La primera dio 188/191: el 131, y el 190 y el 191 por el token vencido
-  que corregí después.
-- La segunda dio 164/191. Los 27 rojos se encadenan desde el caso 2, que
-  registra un correo fijo que ya existía. La suite no está hecha para correr
-  dos veces sobre la misma base.
-
-**Puertas sobre el candidato:** tipos, lint, build, `compileall`,
-`node --check` y diff-check con `cr-at-eol`, verdes.
+1. **Dejarla así.** Es lo que recomiendo: no toca el diseño y sólo pasa en
+   los celulares más angostos.
+2. **Pedir otra redacción**, por ejemplo «Mercado agropecuario argentino»,
+   sin el punto medio. Es un cambio de texto que la clienta no pidió.
 
 ## Para verificar, lo mínimo
 
 ```
 ./scripts/entorno_nativo.sh --recrear
-psql: select name, brand from products where name in ('Cosechadora John Deere 9750', 'Tractor Pauny 280A Doble Tracción')
-  → john-deere y pauny
-SMOKE_CASOS=74 node scripts/smoke.mjs
-  → [PASS] 74 … Todo en una copia de la base
-la misma consulta
-  → john-deere y pauny otra vez
+SMOKE_CASOS=192 node scripts/smoke.mjs
+  → [PASS] 192 El sitio nombra el sector «agropecuario», … — ninguna «agro» suelta (183 archivos …)
+python3 scripts/sabotajes_copy_agro_1.py
+  → tres [ROJO ESPERADO]
+  → src, backend e index.html después: como estaban
+  → todos dieron el rojo esperado
 ```
 
-Para ver la causa, corré el 74 de la base:
+**Antes de correrlo:**
+
+- Los negativos modifican cinco archivos del frontend mientras el servidor de
+  desarrollo los sirve, y los restauran al final.
+- No los corras en paralelo con otra corrida del smoke.
+- El 192 guarda seis capturas en `SMOKE_CAPTURAS`; si no lo definís, van a
+  una carpeta temporal nueva.
+
+## El inventario
+
+| # | archivo:línea | dónde se ve | antes | ahora |
+|---|---|---|---|---|
+| 1 | `src/components/Pages/HomePage.tsx:83` | Inicio, margen vertical (desde 1024 px) | Mercado agro · Argentina | Mercado agropecuario · Argentina |
+| 2 | `HomePage.tsx:86` | Inicio, bajada sobre el título | Mercado agro · Argentina | Mercado agropecuario · Argentina |
+| 3 | `src/components/Footer/Footer.tsx:45` | el pie, en todas las páginas | Mercado agro: productos, servicios y logística. | Mercado agropecuario: productos, servicios y logística. |
+| 4 | `src/components/Pages/ServicesPage.tsx:189` | Servicios, título del cierre | ¿Prestás un servicio para el agro? | ¿Prestás un servicio para el sector agropecuario? |
+| 5 | `src/components/Pages/AboutPage.tsx:148` | Quiénes somos, texto del cierre | …soluciones tecnológicas para el agro | …soluciones tecnológicas para el sector agropecuario |
+| 6 | `index.html:16` | título de la pestaña | AgroBoeda — Mercado agro | AgroBoeda — Mercado agropecuario |
+| 7–8 | `index.html:24` y `:29` | título al compartir (`og:title`, `twitter:title`) | AgroBoeda — Mercado agro | AgroBoeda — Mercado agropecuario |
+| 9–11 | `index.html:14`, `:25` y `:30` | descripción para buscadores y al compartir | AgroBoeda, mercado agro argentino: … | AgroBoeda, mercado agropecuario argentino: … |
+
+**Dónde más busqué, sin encontrar «agro».** No aparece en:
+
+- ningún correo, aviso ni notificación;
+- los datos que siembra el backend;
+- las migraciones.
+
+**El 5 está dentro del bloque del punto #14.**
+
+- Es el bloque de «¿Listo para transformar tu producción?».
+- Cambié sólo la palabra: el título y la promesa quedan para cuando se
+  resuelva el #14.
+- Si preferís no tocar ese bloque hasta entonces, alcanza con revertir una
+  línea, pero el caso 192 necesitaría una excepción.
+
+**Lo que queda a propósito.** En ninguna de estas apariciones «agro» es una
+palabra suelta:
+
+| texto | dónde | por qué queda |
+|---|---|---|
+| AgroBoeda | cabecera, pie, correos, avisos | es la marca |
+| AgroMarket | no aparece en ningún texto visible; sólo en el nombre del paquete (`agromarket`) | espera la decisión #10, y además no se ve |
+| Agroquímicos, Agroinsumos biológicos | subcategorías de Insumos agrícolas (`backend/app/seed.py:321-322`) | taxonomía de la clienta |
+| Agroquímicos | tipo de carga que declara quien transporta (`backend/app/services/cargas.py:22`) | nombra un producto, no el sector |
+| agropecuaria, Agropecuaria | Quiénes somos, líneas 51, 90, 101 y 130 | ya es la palabra pedida |
+| agronómico, agronómica | descripciones de publicaciones demo (`seed.py:397`, `:1024` y `:1112`) | es otra palabra, y es correcta |
+| Agronomist… | crédito de una foto demo, que se ve en la ficha (`src/utils/fotosDemo.ts:227`) | es el título original de la obra, en inglés; una atribución no se traduce |
+| Agronomía, Almagro | localidades del padrón | son nombres propios |
+| `agroquimicos`, `cat_agroquimicos` | identificadores del código | no se ven |
+
+## La comprobación: caso 192
+
+**Qué busca.**
+
+- La palabra «agro» suelta, sin distinguir mayúsculas.
+- No la disparan otras palabras que la contienen: «AgroBoeda», «AgroMarket»,
+  «agropecuario», «agronómico», «Agroquímicos» y «Almagro».
+- Pegada a un guion sí la dispara: «agro-industria».
+- Antes de empezar, el caso prueba la regla contra doce formas: las que tiene
+  que marcar y las que tiene que dejar pasar.
+
+**Dónde mira.** En dos lados, porque cada uno ve lo que el otro no:
+
+- **En la fuente.**
+  - Lee 183 archivos: `src`, `backend/app`, `backend/alembic`, `public`,
+    `index.html` y las plantillas de entorno.
+  - Eso cubre correos, avisos y pantallas a las que el navegador del caso no
+    llega.
+  - Lee también los comentarios: un comentario que diga «agro» hace fallar
+    el caso, y se reescribe.
+- **En la pantalla**, a 1440 y a 360 px.
+  - Lee el texto tal como lo dibuja el navegador, más los atributos que se
+    leen o se anuncian, como `placeholder`, `aria-label`, `alt` y `title`.
+  - Recorre la pestaña, los metadatos, Inicio, Mercado, Servicios, Quiénes
+    somos, Contacto, Ingresar y Registro.
+  - Deja afuera las tarjetas de publicaciones: lo que escribe quien publica
+    no es texto de la plataforma.
+
+**Qué mide.**
+
+- A 360 px, que los cuatro textos que se alargaron no salgan de la pantalla
+  ni la ensanchen.
+- Que el margen vertical de la portada entre en su alto a 1024 y a 1440 px:
+  ocupa 300 de 560 px.
+
+**Un arreglo del propio caso.** La primera versión leía el texto nodo por
+nodo. El negativo de la pantalla mostró que así no ve una palabra armada en
+pedazos: React la parte en «Mercado | agro | :». Ahora lee el texto como lo
+dibuja el navegador.
+
+## Los negativos
+
+`python3 scripts/sabotajes_copy_agro_1.py`, sobre `2b92988`. Salida:
 
 ```
-git show 78ad03d:scripts/smoke.mjs > scripts/.smoke-de-la-base.mjs
-SMOKE_CASOS=74 node scripts/.smoke-de-la-base.mjs
+=== textos-de-la-base: el 192 nombra las once del inventario en la fuente y las ve en la pantalla ===
+[ROJO ESPERADO]
+  [FAIL] 192 … — «agro» suelta, 40 vez/veces:
+    fuente, src/components/Footer/Footer.tsx:45: «<p className={styles.bajada}>Mercado agro: productos, servicios y logística.</p>»
+    fuente, src/components/Pages/AboutPage.tsx:148: «mejores soluciones tecnológicas para el agro</p>»
+    fuente, src/components/Pages/HomePage.tsx:83: «<span>Mercado agro · Argentina</span>»
+    fuente, src/components/Pages/HomePage.tsx:86: «<p className="tg-eyebrow">Mercado agro · Argentina</p>»
+    fuente, src/components/Pages/ServicesPage.tsx:189: «o-ofrecer">¿Prestás un servicio para el agro?</h2>»
+    fuente, index.html:14 / :16 / :24 / :25 / :29 / :30   (una línea cada una)
+    pantalla, escritorio 1440 px, Inicio: «… | MERCADO AGRO · ARGENTINA | MERCADO AGRO · ARGENTINA | Equipos, insumos y servic»
+    pantalla, escritorio 1440 px, pestaña: «AgroBoeda — Mercado agro»
+    pantalla, escritorio 1440 px, meta description / og:title / og:description / twitter:title / twitter:description
+    pantalla, escritorio 1440 px, Servicios: «n datos. | ¿Prestás un servicio para el agro? | Indicá cobertura, modalidad y respon»
+    pantalla, escritorio 1440 px, Quiénes somos: «mejores soluciones tecnológicas para el agro | Comenzar a Vender | Explorar Producto»
+    pantalla, … el pie en Inicio, Mercado, Servicios, Quiénes somos y Contacto, y todo lo anterior también a 360 px
+  y además:
+    … la pestaña dice «AgroBoeda — Mercado agro»; faltan los cuatro textos nuevos a 360 px y el margen nuevo a 1024 y 1440
+
+=== solo-en-la-pantalla: el 192 la ve en la pantalla aunque la fuente no la escriba ===
+[ROJO ESPERADO]
+  [FAIL] 192 … — «agro» suelta, 10 vez/veces:
+    pantalla, escritorio 1440 px, Inicio: «| Ver el mercado | AgroBoeda | Mercado agro: productos, servicios y logística. | Me»
+    … las cinco páginas en los dos anchos; ninguna línea «fuente,»
+
+=== solo-en-el-correo: el 192 la ve en la fuente de un correo que ninguna pantalla muestra ===
+[ROJO ESPERADO]
+  [FAIL] 192 … — «agro» suelta, 1 vez/veces:
+    fuente, backend/app/services/verificacion.py:105: «tu correo en AgroBoeda, el mercado del agro",»
+
+src, backend e index.html después: como estaban
+todos dieron el rojo esperado
 ```
 
-Las dos marcas quedan en `NULL`. Borrá el archivo después.
+Los tres negativos:
 
-**Antes de correrlo:** el caso crea y borra la base `<DB_NAME>_caso74`, así
-que el usuario de la base necesita permiso para crear bases. El local lo
-tiene (`rolcreatedb`), y en la imagen `postgis/postgis` el usuario de
-`POSTGRES_USER` es superusuario. Para copiar, corta una vez las conexiones de
-la API a la base, y la API se reconecta sola.
+- **`textos-de-la-base`** devuelve los cinco archivos a como estaban en la
+  base. Exige ver las once apariciones en la fuente y cada texto en la
+  pantalla, en los dos anchos.
+- **`solo-en-la-pantalla`** arma la palabra en el pie con
+  `{'ag' + 'ro'}`. Exige que la vea la pantalla y que la fuente **no** la
+  nombre.
+- **`solo-en-el-correo`** pone «agro» en el asunto del correo de
+  verificación. Exige que la vea la fuente y que la pantalla **no**. No hace
+  falta reiniciar la API, porque el caso lee el archivo.
 
-## Riesgos
+## Sin desbordes
 
-- **La copia corta las conexiones de la API** una vez, en el medio de la
-  suite. En ese momento no corre nada más, y la API se reconecta sola en el
-  pedido siguiente. Si en tu entorno el usuario no puede cortar conexiones ni crear
-  bases, el caso 74 falla y lo dice; no toca la base compartida.
-- **Los casos 55 y 58 hacen `downgrade -1`.** Hoy eso sólo deshace la última
-  migración, `b6d3f12a8e94`, cuyo `downgrade` sólo borra un índice, así que
-  no pierden datos. Pero tampoco
-  miden lo que decían medir cuando se escribieron, porque desde entonces se
-  sumaron migraciones. No lo toqué: está fuera del alcance.
+```
+npm run a11y -- --todas     76 de 76 pantallas exigidas; 0 violaciones serious o critical;
+                            SIN VIOLACIONES BLOQUEANTES, COBERTURA COMPLETA
+npm run contraste           ✓ las 84 mediciones exigidas se hicieron; TODO OK, COBERTURA COMPLETA
+mobile-audit.mjs            12 de 12 recorridos completos; 39 pantallas a 360, 390 y 768 px,
+                            0 con desborde de página; 0 controles tapados; 0 errores de consola; 0 respuestas 4xx/5xx
+```
 
-No toqué `main`, Railway, `src/`, `backend/` ni datos reales, y no desplegué.
+En las 39 pantallas, la única tabla que se desplaza a lo ancho es la de
+publicaciones del panel de administración. Lo hace dentro de su propia caja,
+como ya estaba clasificado, y no la toqué.
+
+**Los textos que cambian de largo.** Contrasté el texto viejo y el nuevo
+sobre la misma página, en cada ancho. Los números son renglones, antes →
+ahora:
+
+```
+ancho  portada  pie   servicios  quiénes somos
+ 320    1→2     2→2     2→3        4→5
+ 360    1→2     1→2     2→2        3→4
+ 390    1→1     1→2     2→2        3→3
+ 412    1→1     1→1     2→2        3→3
+ 768    1→1     1→2     2→3        1→2
+1024    1→1     2→2     1→2        1→1
+1440    1→1     1→1     1→1        1→1
+```
+
+- En ningún ancho hay desborde.
+- Los títulos y los párrafos que ganan un renglón lo hacen con el corte
+  normal del texto.
+- La única que cambia de forma es la bajada de la portada: es lo que tenés
+  que decidir arriba.
+- Miré las capturas a 360 px: bajada de la portada, pie, cierre de
+  Servicios y cierre de Quiénes somos. También el margen a 1024 y 1440 px.
+
+## Sin regresiones
+
+Elegí los casos del smoke que recorren Inicio, Servicios o Quiénes somos, el
+pie o `index.html`. Los encontré buscando esas secciones y sus selectores en
+el archivo. Eran 25; saqué el 131, que en mi entorno falla por el puente de
+Docker (`docker run`), como en informes anteriores.
+
+El único que afirmaba un texto que cambió es el 156: el título de la pestaña.
+Lo actualicé en `a1b4acd`.
+
+```
+SMOKE_CASOS=122,123,124,125,126,128,136,139,140,147,148,155,156,158,159,161,163,166,167,168,170,183,191,192
+24/24 pasaron; 0 fallaron
+```
+
+No corrí la suite completa porque el cambio es de texto: la tarea pide los
+casos que verifican textos públicos. Tampoco corrí la guía del panel admin,
+porque no cambió ningún texto del panel.
+
+## Puertas
+
+Sobre el candidato:
+
+```
+npx tsc --noEmit                                  sin salida (verde)
+npm run lint                                      sin advertencias (--max-warnings 0)
+npm run build                                     ✓ built in 1.84s
+node --check scripts/smoke.mjs                    verde
+python3 -m py_compile sabotajes_copy_agro_1.py    verde
+git -c core.whitespace=cr-at-eol diff --check     verde
+```
+
+`AboutPage.tsx` tiene finales de línea mezclados, CRLF y LF. Los conservé:
+`git diff --stat` da lo mismo con `--ignore-cr-at-eol` que sin esa opción.
+
+## Fuera del alcance, visto de paso
+
+- **Tuteo en Quiénes somos (P3).** La misma línea 148 tutea: «Únete a
+  AgroBoeda y accede…», en un sitio que vosea. El caso 168 no la tiene en su
+  lista. Es del bloque del #14 y no la toqué.
+
+No toqué `main`, Railway ni datos reales, y no desplegué.
