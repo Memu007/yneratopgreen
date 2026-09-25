@@ -2,291 +2,180 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ATRIBUTOS-RUBRO-1, parte 1: entregada en rama
+## PROD-LISTS-1: entregada en rama
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `86fc0da` (tu decisión) |
-| código | `e624831`: tipo y potencia en alta, edición, ficha, filtro y siembra |
-| arnés | `8dce24b`: casos 194 a 196, negativos, y 55 y 58 en copia de la base |
-| auditorías | `3594363`: a11y y contraste miden los filtros nuevos |
-| arreglo | `4eac0f7`: el caso 179 baja su migración en una copia |
-| producción | `7177b2d`: la migración trae las listas, porque en producción la siembra no corre |
-| no integrado, no desplegado | `main` sigue en `e9cf4c6` |
+| base | `e2e3733`, más tu `4c483e1` integrado en `61cb354` |
+| código | `2b2a0c3`: la migración `01ff14043124`, más una nota en la siembra y en `RAILWAY.md` |
+| arnés | `2cac546`: caso 197 y tres negativos |
+| filtro de marca (tu agregado 4) | `996ffb2`: código; `7f045a6`: caso 198 y su negativo |
+| no integrado, no desplegado | `main` sigue en `792d709` |
+| parte 2 | sin empezar |
 
 **Resultado.**
 
-- **Listas:** 33 listas con 122 tipos, más la potencia de Tractores.
-- **Producción:** las listas llegan con la migración. Al revisar el
-  despliegue vi que, tal como estaba, la tabla quedaba vacía en producción y
-  no se iba a ver ningún filtro de tipo: allá la siembra no corre y el panel
-  no edita estas listas. Lo corregí en `7177b2d`.
-- **Casos y negativos:** 194, 195 y 196 en verde. Los tres negativos dan
-  rojo, cada uno por su motivo.
-- **Suite completa desde una base nueva, sobre `7177b2d`:** 195 de 196. El
-  único rojo es el 131, de entorno.
-- **Auditorías:**
-  - a11y: 78 de 78.
-  - Contraste: 86 de 86.
-  - Auditoría móvil: 12 de 12 recorridos, sin hallazgos.
-  - Guía del panel: los 26 pasos coinciden, en escritorio y en celular.
+- **Qué trae la migración:** las 44 marcas y las 4028 localidades de Georef.
+  Inserta sólo lo que falta y no pisa lo que se editó desde el panel.
+- **Filtro de marca:** con Maquinaria agrícola elegida, ofrece las 44 marcas
+  activas con su cantidad, también las que están en cero.
+- **Casos 197 y 198:** en verde. Los cuatro negativos dan rojo, cada uno por
+  su motivo.
+- **Suite completa desde una base nueva:** «197/198 pasaron; 1 fallaron»: el 131, de entorno.
+- **`alembic check`:** limpio en la base y en la copia del 197.
 
-**Para decidir vos (ninguna es bloqueante).**
+**Para decidir vos (no bloqueante).**
 
-1. **Dos nombres completos que no aprobaste.** Hice con Cosecha y con Cercas
-   lo que aprobaste en Fertilización.
-   - Cosecha: «cosechadoras de granos, forrajes…» quedó «Cosechadoras de
-     granos», «Cosechadoras de forrajes»…
-   - Cercas y bebederos: «eléctricas, portátiles» quedó «Cercas eléctricas»,
-     «Cercas portátiles».
+**Las categorías y los subrubros no entran en la migración,** aunque hacen
+falta para publicar. Discrepo con «lo que el producto necesita para publicar
+entra en la misma migración», por esto:
 
-   Solas, «Forrajes» o «Portátiles» no dicen qué se vende. **Recomiendo
-   dejarlo así.** Si no, se cambia en `tipos.py` sin migración.
-2. **Dos defectos que ya estaban, fuera del alcance.** Recomiendo
-   corregirlos en la parte 2 (ver abajo, «Visto de paso»).
+- **Producción ya los tiene.** Emi vio Maquinaria agrícola, y
+  `c8e41f2a7d90` encontró por nombre corto a Preparación del suelo y a Riego
+  por aspersión.
+- **El panel cambia el nombre corto al renombrar** (`api/admin.py:687` para
+  las categorías, `:851` para los subrubros). Si la clienta renombró una, una
+  migración que inserte «las que faltan» la duplicaría en el Mercado.
+- **El único caso sin categorías es una base de producción nueva.**
+  Recomiendo cargarlas en ese momento con una carga explícita y no
+  automática, cuando se decida el lanzamiento real. Lo dejé escrito en
+  `RAILWAY.md`.
 
-## Qué se cargó por subrubro
+## La migración `01ff14043124`
 
-Vive en `backend/app/services/tipos.py`. En local la carga la siembra; en
-producción, donde la siembra no corre, la trae la migración. Sin tipo
-quedan las 4 «Mejoras» de Tierras, las 5 de una sola opción y Tractores, que
-va por potencia.
+Viene después de `c8e41f2a7d90`. No cambia el esquema: sólo carga datos.
 
-| rubro | subrubro | tipos |
-|---|---|---|
-| Maquinaria agrícola | Preparación del suelo | Arados · Rastras · Cultivadores · Subsoladores · Otros |
-|  | Siembra y plantación | Sembradoras de granos gruesos · Sembradoras de granos finos · Sembradoras de hortalizas · Otras |
-|  | Fertilización y protección | Pulverizadoras autopropulsadas · Pulverizadoras de arrastre · Fertilizadoras centrífugas · Fertilizadoras de disco · Aviones · Drones · Otros |
-|  | Cosecha | Cosechadoras de granos · Cosechadoras de forrajes · Cosechadoras de algodón · Cosechadoras de caña · Cosechadoras de café · Cosechadoras de frutales · Cosechadoras de hortalizas · Otros |
-|  | Postcosecha | Limpiadoras · Secadoras · Ensacadoras · Silos · Otros |
-|  | Forrajes y ganadería | Picadoras · Embolsadoras · Enfardadoras · Mezcladoras · Otros |
-| Riego y drenaje | Riego por aspersión | Pivotes · Cañones · Laterales |
-|  | Riego localizado | Goteo · Microaspersión · Cintas |
-|  | Riego superficial y subterráneo | Superficial · Subterráneo |
-|  | Bombas, motobombas y accesorios hidráulicos | Bombas centrífugas · Motobombas · Accesorios hidráulicos |
-|  | Drenaje y control hídrico | Drenaje subsuperficial · Canales · Control de nivel |
-| Insumos agrícolas | Semillas y plántulas | Cultivos extensivos · Hortícolas · Forrajeras · Forestales |
-|  | Fertilizantes | Orgánicos · Minerales |
-|  | Correctivos | Cal · Yeso · Enmiendas |
-|  | Agroinsumos biológicos | Biofertilizantes · Biocontroladores · Microorganismos |
-|  | Agroquímicos | Herbicidas · Insecticidas · Fungicidas · Acaricidas |
-|  | Sustratos y coberturas | Sustratos · Mulch · Mallas · Films |
-| Ganadería y forrajes | Cercas y bebederos | Cercas eléctricas · Cercas portátiles · Hidrantes · Bebederos |
-|  | Manejo animal | Corrales · Mangas · Balanzas · Caravanas |
-|  | Ordeño y sanidad | Ordeñadoras mecánicas · Tanques de leche · Equipos de baño |
-|  | Suplementación | Comederos · Tolvas · Silos de grano |
-| Repuestos y mantenimiento | Neumáticos y cámaras | Neumáticos agrícolas · Cámaras |
-|  | Filtros, correas, cuchillas, cadenas | Filtros · Correas · Cuchillas · Cadenas |
-|  | Sistemas hidráulicos | Mangueras · Racores · Bombas hidráulicas |
-|  | Sistemas electrónicos y sensores | Monitores · GPS · Piloto automático |
-|  | Lubricantes y baterías | Lubricantes · Baterías |
-| Agricultura de precisión y tecnología | Sistemas de guiado y GNSS | Antenas · Pantallas · Corrección por señal |
-|  | Sensores de cultivo | Clorofila · Humedad · Temperatura |
-|  | Drones y VANTs | Multiespectrales · Térmicos · Aplicadores |
-|  | Software y plataformas | Gestión de flota · Prescripción variable · Rendimiento |
-| Tierras y parcelas | Compra-venta definitiva | Campo agrícola · Campo ganadero · Parcela hortícola/frutícola · Campo mixto · Otros |
-|  | Alquiler por campaña (1-12 meses) | Siembra directa · Siembra convencional · Otros |
-|  | Alquiler por uso transitorio | Pastoreo rotativo · Ensayos agrícolas · Producción estacional · Agricultura regenerativa · Agricultura experimental · Otros |
+- **Marcas:** inserta cada una que falte, por tipo de opción y valor. Salen
+  de una copia congelada de la lista de la siembra, con el mismo orden, el
+  mismo rótulo y activas. Si una ya existe, no la toca: una desactivada o
+  renombrada desde el panel queda como estaba. Una borrada desde el panel
+  vuelve, porque falta.
+- **Localidades:** inserta cada una que falte, por su id de Georef. Salen de la
+  copia versionada que usa `app.seed_localities`, con la misma comprobación
+  de integridad (sha256). Las sumé porque la localidad es obligatoria para
+  publicar (la API rechaza una que no existe). No pude confirmar si
+  producción las tiene: si ya están, la migración no hace nada.
+- **Bajada:** no hace nada, y es a propósito.
+  - No se puede distinguir una fila que puso esta migración de una igual que
+    puso la siembra o el panel.
+  - Borrar una marca deja a las publicaciones que la declararon con un valor
+    que la edición ya no acepta.
+  - Una localidad en uso no se puede borrar.
+  - La revisión anterior funciona igual con estas filas adentro.
 
-**Tractores:** la potencia en HP va de 1 a 1000. El filtro ofrece tres
-rangos: compacto hasta 59, estándar de 60 a 120 y alta desde 121. Los bordes
-60 y 120 caen en estándar.
+## El filtro de marca (agregado 4)
 
-**Siembra de ejemplo:** 14 publicaciones demo con tipo, y el tractor Pauny
-con 180 HP, porque su descripción ya lo dice. El kit de filtros queda sin
-tipo a propósito, para probar el nulo.
+- **Con una categoría que usa marca elegida** (hoy, Maquinaria agrícola), la
+  API devuelve todas las marcas activas en el orden del alta, cada una con
+  su cantidad, aunque sea cero. El Mercado ya dibujaba lo que llegaba, así
+  que en el frontend sólo cambió el comentario.
+- **Los conteos** siguen saliendo del servidor, con los demás filtros puestos
+  y sin la marca, como la faceta de antes.
+- **Sin categoría, o con una que no usa marca,** sigue la regla del 175:
+  sólo las marcas que el conjunto tiene. Tu decisión habla de la categoría
+  elegida, así que no la extendí. El 175 queda igual; sólo le anoté en el
+  encabezado que su regla vale sin esa categoría.
+- **Ninguna guía** menciona el filtro, así que no hubo que ajustar ninguna.
 
-## Casos
+## Inventario: lo que trae la siembra y cómo llega a producción
 
-Salida de la suite completa.
+| lo que carga la siembra | ¿lo trae una migración? | si falta en producción | cómo llega allá |
+|---|---|---|---|
+| 4028 localidades de Georef | **sí, desde ahora** (`01ff14043124`) | nadie puede publicar, y no hay provincias ni localidades para filtrar | la migración, o `python -m app.seed_localities` |
+| 44 marcas | **sí, desde ahora** (`01ff14043124`) | la marca ofrece sólo «Sin declarar», y el filtro y la faceta quedan vacíos (lo que vio Emi) | la migración |
+| 122 tipos en 33 subrubros | sí (`c8e41f2a7d90`) | no hay filtro de tipo | la migración; Emi lo vio llegar |
+| qué categoría ofrece marca (`usa_marca`) | sí (`e4a72c9b1f35`) | Maquinaria no pide marca | la migración |
+| la anatomía por omisión de cada categoría | sí (`a91c47e2b6d8`) | el alta no sabe qué datos pedir por omisión | la migración |
+| 12 categorías y 44 subrubros | **no** | nadie puede publicar y el Mercado no tiene rubros | producción ya los tiene; una base nueva, ver arriba |
+| unidades (7), tipo de cobro (4), disponibilidad (3) y tiempo de respuesta (4) | no | no se rompe nada: el alta trae su propia lista con los mismos valores y la API no los valida. Se ve «kg» en lugar de «Kilogramo», y en Configuración del panel esas listas salen vacías | no hace falta. Si se quieren los nombres completos, es otra migración |
+| usuarios, cuenta de prueba, datos bancarios y publicaciones demo | no, y no tiene que haberla | nada | nunca: tienen contraseñas escritas en el repositorio |
 
-- **194, alta y edición.**
-  - Rechaza 8 altas inválidas sin guardar ninguna fila:
-    - un tipo de otro subrubro, uno inventado, uno sin subrubro, y uno en un
-      subrubro sin lista;
-    - una potencia negativa, una de 0, una de 1001 HP, y una fuera de
-      Tractores.
-  - En la pantalla, el formulario ofrece la lista del subrubro y la suelta al
-    cambiarlo. Guarda «Arados», y en Tractores 95 HP.
-  - La ficha dice «Tipo: Arados» y «Potencia: 95 HP».
-  - La edición lo cambia a «Subsoladores» y 130.
-  - Por la API, un tipo ajeno se rechaza sin tocar la fila, cambiar de
-    subrubro suelta el tipo, y `null` lo quita.
-- **195, filtro.**
-  - Con 14 arados sembrados (5 compactos, 11 estándar, 9 de alta), la API y
-    la pantalla cuentan lo mismo que la base.
-  - Lo que no declaró el dato no entra.
-  - Cambiar un filtro vuelve a la página 1.
-  - La barra lleva `subtype` y `power`, y Atrás desde la ficha y desde Inicio
-    los devuelve.
-  - Un tipo ajeno al subrubro se descarta.
-  - «neumática», escrita en una descripción, se encuentra con el buscador.
-- **196, migración.**
-  - En una copia de la base: baja y sube, y las publicaciones quedan
-    idénticas.
-  - Subir sobre una base que ya tiene subrubros, que es lo que va a pasar en
-    producción, carga los 122 tipos en 33 subrubros. Son los mismos, tipo por
-    tipo, que carga la siembra.
-  - Las dos columnas nacen nulas.
-  - La base rechaza una potencia de -1, y `alembic check` queda limpio.
+**No pude mirar producción.** Intenté leer el catálogo público del backend
+publicado (tres `GET` sin credenciales), pero la red de este entorno rechaza
+`railway.app` por política de la organización. No la esquivé. Por eso las
+localidades van en la migración igual: si ya están, no cambia nada.
+
+## Caso 197
+
+En una copia de la base que queda como producción: con categorías, sin marcas
+y sólo con las localidades que alguna fila usa.
+
+1. **Primera vez:** la migración deja las 44 marcas iguales a las de la
+   siembra (valor, rótulo, orden y activa), y las 4028 localidades iguales,
+   fila por fila, coordenadas incluidas.
+2. **Segunda vez:** no duplica ni cambia nada.
+3. **Con cambios del panel:** «pauny» desactivada, «case» renombrada y
+   «kubota» borrada. La migración deja «pauny» desactivada y el rótulo de
+   «case» sin tocar, y vuelve a traer «kubota».
+4. **`alembic check`:** limpio.
 
 ```
-[PASS] 194 El tipo y la potencia se declaran al publicar, se validan, se ven en la ficha y se editan — 8 altas inválidas rechazadas con su motivo y ninguna fila guardada (tipo de otro subrubro, inventado, sin subrubro, en un subrubro sin lista; potencia -5, 0, 1001 y fuera de Tractores); el formulario de alta ofrece la lista del subrubro, la suelta al cambiarlo y guarda «arados»; en Tractores ofrece sólo la potencia y guarda 95 HP; la ficha dice «Tipo: Arados» y «Potencia: 95 HP», y sin dato no dibuja la fila; el panel abre la edición con el tipo y la potencia guardados y los cambia: «subsoladores» y 130 HP; por la API, un tipo ajeno se rechaza sin tocar la fila, cambiar de subrubro suelta el tipo y la potencia que ya no corresponden, y null los quita (6231 ms)
-[PASS] 195 Filtrar por tipo y por potencia cuenta en el servidor, deja afuera lo no declarado y vive en la URL — la API cuenta en el servidor —14 arados; 5 compacto, 11 estandar, 9 alta— y el total y las páginas coinciden con la base; 60 y 120 HP son estándar; las 10 sin tipo y el tractor sin potencia no entran en ningún filtro; «neumática» se encuentra con el buscador; en la pantalla, elegir tipo o potencia vuelve a la página 1, el conteo es el de la base, no se cuela ninguna sin tipo, Atrás desde la ficha y desde Inicio devuelve el filtro, cambiar de subrubro lo suelta, lo ajeno se descarta de la barra, sin subrubro no hay filtro, y «neumática» se encuentra con el buscador (4605 ms)
-[PASS] 196 La migración del tipo y la potencia es aditiva, vuelve atrás y deja intactas las publicaciones — bajar a b6d3f12a8e94 borra la tabla y las dos columnas y deja las 294 publicaciones iguales (huella c966ed16deea…); subir sobre una base con subrubros y sin la tabla —lo que pasa en producción, donde la siembra no corre— carga 122 tipos en 33 subrubros, los mismos que la siembra saca de tipos.py, y deja las dos columnas en nulo para todas: no le inventa un dato a nadie, y el resto de cada fila queda igual; la base rechaza una potencia negativa aunque se escriba por fuera de la API; `alembic check` no encuentra diferencias entre el modelo y el esquema. Todo en una copia de la base (3793 ms)
+[PASS] 197 Las marcas y las localidades llegan a producción con la migración, sin la siembra — sobre una copia con categorías, sin marcas y con 21 localidades en uso —como producción—, la migración deja las 44 marcas iguales a las de la siembra (valor, rótulo, orden y activa) y las 4028 localidades de Georef iguales, fila por fila; correrla otra vez no duplica ni cambia nada; una marca desactivada sigue desactivada, un rótulo cambiado no se pisa, y la que falta vuelve; `alembic check` no encuentra diferencias entre el modelo y el esquema. Todo en una copia de la base (7312 ms)
+```
+
+## Caso 198
+
+- **En la API:**
+  - las 44 marcas activas, en el orden del alta;
+  - cada cantidad es el total que da el servidor al elegirla, también con
+    «usado» puesto;
+  - una marca dada de baja no se ofrece;
+  - elegir una en cero da total 0, y la lista sigue entera;
+  - sin categoría, o con una que no usa marca, no se ofrece ninguna en cero.
+- **En la pantalla** (1440 y 390 px):
+  - el filtro muestra «Todas las marcas» y las mismas 44 con su conteo;
+  - elegir una en cero la escribe en la barra y muestra «No hay operaciones
+    con estos filtros.», sin error.
+
+```
+[PASS] 198 Con una categoría que usa marca, el filtro ofrece todas las marcas activas, también las que están en cero — en «Maquinaria agrícola» la API ofrece las 44 marcas activas en el orden del alta, 42 en cero, y cada conteo es el total que da el servidor al elegirla, también con otro filtro puesto (2 con publicaciones usadas); una marca dada de baja no se ofrece; elegir una en cero da total 0 con la lista entera; sin categoría, o con una que no usa marca, no se ofrece ninguna en cero; en escritorio y en celular el filtro muestra «Todas las marcas» y las mismas marcas con su conteo, las en cero incluidas; elegir una en cero la escribe en la barra y muestra «No hay operaciones con estos filtros.», sin error (3095 ms)
 ```
 
 ## Negativos
 
-`python3 scripts/sabotajes_atributos_rubro_1.py` rompe el catálogo de tres
-maneras y comprueba que el 195 falle por la que corresponde. Al terminar deja
-`src` y `backend` como estaban.
+`python3 scripts/sabotajes_prod_lists_1.py` rompe cada pieza y comprueba que
+su caso falle por el motivo que corresponde.
 
-| negativo | qué rompe | el 195 dice |
+- **Los tres de la migración** no reinician la API.
+- **El del filtro** la reinicia. El comando se cambia con la variable
+  `REINICIAR_API`, que es lo que pediste en tu P3.
+
+| negativo | qué rompe | el caso dice |
 |---|---|---|
-| `despues-de-contar` | el servidor filtra después de contar | 12 problemas; por ejemplo, «API, tipo «arados»: el total dice 27 y en la base hay 14» |
-| `en-el-navegador` | el servidor ignora el filtro y el Mercado filtra la página que bajó | 17 problemas, entre ellos «pantalla, con «Arados»: dice 27 operaciones y en la base hay 14» |
-| `acepta-nulos` | el servidor suma lo que no declaró el dato | 15 problemas; por ejemplo, «API, tipo «arados»: trajo 10 que no declararon el dato o no corresponden» y «pantalla: con «Arados» se ven 10 sin tipo» |
+| `sin-marcas` | la migración no carga las marcas | `[FAIL] 197 … tras subir: faltan 44 marcas […], sobran 0 [], 0 repetidas` |
+| `sin-localidades` | la migración no carga las localidades | `[FAIL] 197 … las localidades no quedaron como las de la siembra: 4028 51a97e47… → 13 0e605765…` |
+| `pisa-el-panel` | la migración reescribe las marcas que ya existen | `[FAIL] 197 … la migración reactivó «pauny», que el panel había desactivado (true)` |
+| `oculta-las-cero` | el servidor ofrece sólo las marcas con publicaciones | `[FAIL] 198 … 6 problema(s)`: en la API «ofrece 2 marcas y hay 44 activas», y en las dos pantallas «el filtro ofrece 2 marcas y tenía que ofrecer 44» |
 
-Los tres dieron `[ROJO ESPERADO]`, y cierran con «src y backend después:
-como estaban».
-
-## Migración
-
-`c8e41f2a7d90`, que viene después de `b6d3f12a8e94`. Es aditiva:
-
-- **La tabla `subcategory_types`** se crea y se carga con las listas, pero
-  sólo para los subrubros que ya existen.
-  - En producción los subrubros ya existen, así que llegan las 122.
-  - En una base nueva todavía no hay subrubros: no carga nada y la siembra
-    hace el resto.
-  - La migración lleva una copia congelada de `tipos.py`, como la migración
-    de la marca repite su lista.
-- **`products.subcategory_type_id`** nace nula y no se rellena. Si se borra
-  un tipo, la publicación queda sin tipo.
-- **`products.power_hp`** nace nula, y la base sólo acepta valores
-  positivos.
-
-La bajada borra la tabla y las dos columnas. La probé en una copia (caso
-196), no en la base compartida. Ninguna fila existente cambia de valor.
-
-**Negativos del 196.**
-
-| negativo | el 196 dice |
-|---|---|
-| la migración no carga las listas | «faltan 122» |
-| la migración cambia un rótulo | `faltan 1 ["riego-drenaje/riego-aspersion/pivotes=Pivotes#1"], sobran 1 ["…=Pivotes centrales#1"]` |
-
-**Lo que destapó en el arnés.** Tres casos bajaban su migración en la base
-compartida. Al llegar esta migración, esas bajadas borraban las listas de
-tipos de toda la suite.
-
-- **55 y 58:** bajan en una copia y por revisión nombrada. Es el P3 que
-  habías registrado.
-- **179:** su `downgrade -1` en la base compartida dejó de bajar su propia
-  migración y pasó a bajar esta. En la primera suite completa dejó en rojo
-  el 179, el 194, el 195 y el 196.
-  - Ahora baja y sube en una copia.
-  - Lo único que necesita la API, el listado con la imagen duplicada, se mide
-    en la base compartida. Para eso el caso retira el índice con la misma
-    sentencia de su `downgrade`, y después lo repone con su definición
-    exacta.
-  - Negativo: con la migración de la imagen alterada para conservar la
-    principal equivocada, el 179 da `[FAIL] 179 … la migración conservó
-    [...] y tenía que conservar la de menor display_order`.
+Los cuatro dieron `[ROJO ESPERADO]`, y el script cierra con «la migración y
+el catálogo después: como estaban».
 
 ## Puertas
 
 | puerta | resultado |
 |---|---|
-| tipos, lint, build | verdes (`built in 2.00s`) |
+| suite completa desde base nueva, sobre `7f045a6` | «197/198 pasaron; 1 fallaron»: el 131, de entorno |
+| `alembic check` en la base | `No new upgrade operations detected.` |
 | `compileall` backend y alembic, `node --check`, `py_compile` | verdes |
 | diff-check con `cr-at-eol` | limpio |
-| a11y `--todas` | 78 de 78 (antes 76: suma la superficie de los filtros del subrubro) |
-| contraste | 86 de 86 (antes 84) |
+| tipos, lint, build | verdes (`built in 1.76s`) |
+| a11y `--todas` | 78 de 78, sin violaciones bloqueantes |
+| contraste | 86 de 86 |
 | auditoría móvil | 12 de 12 recorridos, 39 pantallas: 0 desbordes, 0 recortes, 0 errores de consola, 0 respuestas 4xx/5xx |
 | `guia-admin.mjs` | «LA GUÍA Y EL PANEL COINCIDEN: 26 pasos en escritorio y celular» |
-| suite completa desde base nueva, sobre `7177b2d` | «195/196 pasaron; 1 fallaron»: el 131, de entorno |
-
-## Riesgos
-
-- **Producción: cómo se reconoce en qué subrubro no llegó la lista.** La
-  migración encuentra cada subrubro por los nombres cortos del rubro y del
-  subrubro, que son los de la siembra. No puedo ver Railway.
-  - Si allá un subrubro tiene otro nombre corto, se queda sin lista y no da
-    ningún error.
-  - Después de publicar, alcanza con elegir un subrubro por rubro en el
-    Mercado y ver si ofrece «Tipo».
-- **Cambiar una lista más adelante pide una migración.** Con la siembra
-  alcanza sólo en local.
-- **La tarjeta no muestra el tipo;** sólo lo muestra la ficha. No lo
-  pediste, y la tarjeta ya está justa a 360 px.
-- **Tierras sigue abierta.** Tiene tres listas cargadas, pero si entra en
-  esta etapa sigue sin decidirse.
-
-## Visto de paso (fuera del alcance, no lo toqué)
-
-1. **La marca sigue cargada en la publicación siguiente.** Al publicar o al
-   cerrar el formulario, `limpiarFormulario` suelta el tipo y la potencia,
-   pero no suelta la marca (`AddProductModal.tsx:212`). Si alguien publica
-   un John Deere y después otra máquina, el selector ya aparece en John
-   Deere, y se guarda así si no lo cambia. Lo confirmé en el código; en el
-   navegador no lo reproduje.
-2. **«Mercado» dentro del Mercado saca de la barra la condición, el orden y
-   la marca.** Es así porque `PARAMETROS_DEL_MERCADO` (`politica.ts:74`) no
-   los incluye. La pantalla sigue filtrando, pero la barra ya no lo dice, y
-   al recargar el filtro se pierde. El tipo y la potencia sí sobreviven.
-   Medido en el navegador:
-
-   ```
-   al abrir:        barra=…&subtype=arados&condition=usado  tipo=arados  condición=usado
-   tras «Mercado»:  barra=…&subtype=arados                  tipo=arados  condición=usado
-   tras recargar:   barra=…&subtype=arados                  tipo=arados  condición=
-   ```
-
-   Con `condition=nuevo&sort=price-asc`, «Mercado» deja la barra en
-   `?section=marketplace`, y al recargar vuelven «Cualquiera» y «Más
-   recientes».
-
-Los dos son P2: el problema es recuperable y ninguno pierde una publicación.
-**Recomiendo corregirlos en la parte 2**, cada uno con su caso y su
-negativo. Es poco trabajo, y la parte 2 toca el mismo formulario y los
-mismos filtros.
 
 ## Para verificar, lo mínimo
 
 ```
 ./scripts/entorno_nativo.sh --recrear
-SMOKE_CASOS=179,194,195,196 node scripts/smoke.mjs   → 4/4 pasaron; 0 fallaron
-python3 scripts/sabotajes_atributos_rubro_1.py       → tres [ROJO ESPERADO] y «todos dieron el rojo esperado»
+SMOKE_CASOS=175,197,198 node scripts/smoke.mjs → 3/3 pasaron; 0 fallaron
+python3 scripts/sabotajes_prod_lists_1.py      → cuatro [ROJO ESPERADO], «la migración y el catálogo después: como estaban» y «todos dieron el rojo esperado»
+docker exec topgreen-api alembic check         → No new upgrade operations detected.
 ```
 
-El negativo del 179:
-
-```
-M=backend/alembic/versions/20260921_0100_b6d3f12a8e94_una_sola_imagen_principal.py
-sed -i 's/ORDER BY product_id, display_order, id/ORDER BY product_id, display_order DESC, id/' $M
-SMOKE_CASOS=179 node scripts/smoke.mjs   → [FAIL] 179 … la migración conservó [...] y tenía que conservar la de menor display_order
-git checkout -- $M
-```
-
-El negativo del 196:
-
-```
-M=backend/alembic/versions/20260925_0200_c8e41f2a7d90_tipo_y_potencia_de_la_publicacion.py
-sed -i "s/('pivotes', 'Pivotes'),/('pivotes', 'Pivotes centrales'),/" $M
-SMOKE_CASOS=196 node scripts/smoke.mjs   → [FAIL] 196 … faltan 1 […pivotes=Pivotes#1], sobran 1 […pivotes=Pivotes centrales#1]
-git checkout -- $M
-```
-
-**Advertencias del entorno:**
-
-- El entorno se cae cuando queda inactivo; se levanta con
-  `./scripts/entorno_nativo.sh`.
-- El 131 falla siempre acá, porque el puente de Docker no traduce
-  `docker run`.
-- El script de negativos reinicia la API.
+Advertencia del entorno: el 131 falla siempre acá, porque el puente de
+Docker no traduce `docker run`.
 
 Estos comandos los corrí tal cual y dieron eso.
 
