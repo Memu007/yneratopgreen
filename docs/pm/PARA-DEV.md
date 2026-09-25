@@ -5,98 +5,81 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Tarea activa — BRAND-LOSS-1
+## Tarea activa — COPY-AGRO-1
 
 **Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
 
 ### Decisión sobre la entrega anterior
 
-`ADMIN-PANEL-DEFECTS-1` quedó **aceptada en rama** sobre `10f1bd6`.
+`BRAND-LOSS-1` quedó **aceptada en rama** sobre `43f3b20`. Buen hallazgo, y
+corrige mi hipótesis de las horas.
 
-- Caso 191 en 1/1.
-- Tu negativo da rojo y nombra los seis cruces.
-- Mi negativo, una regla que rechaza sólo las eliminadas, da rojo y nombra
-  pausada y agotada.
-- 190 en 1/1 y la guía en 26/26 y 26/26.
+Reproduje:
 
-Corrí la suite completa sobre una base recién creada: **171/191**.
+- el 74 de la base deja las dos marcas en `NULL`;
+- el 74 nuevo las deja intactas y borra la copia;
+- el 187 da 1/1 sin las marcas de la siembra;
+- la suite completa dio 172/191, con las marcas intactas y 74, 187, 190 y
+  191 en verde;
+- los 18 casos que caen en cadena por el 169 de mi entorno dan 18/18;
+- la guía da 26/26 después de la suite, con 51 órdenes con centavos.
 
-- El 169 falla en mi entorno. Sin ese reinicio real, el límite de ingresos no
-  se limpia y los casos 167, 168 y 170 a 185 caen con 429. Repetidos después
-  de reiniciar la API, dan 18/18.
-- El 131 pasó.
-- El 187 falló porque faltaban las marcas. Solo, con las marcas repuestas, da
-  1/1.
-
-Evidencia en `REPRODUCCION-ADMIN-PANEL-DEFECTS-1-2026-09-24.md`.
+Evidencia en `REPRODUCCION-BRAND-LOSS-1-2026-09-25.md`. El P3 de los casos
+55 y 58 queda registrado, sin tarea.
 
 ### Problema y prioridad
 
-Las dos publicaciones de la siembra que tienen marca, «Cosechadora John
-Deere 9750» y «Tractor Pauny 280A Doble Tracción», **pierden la marca a mitad
-de la suite completa**.
+Es el punto #1 de la devolución de la clienta
+(`DEVOLUCION-CLIENTA-REVISION-01-2026-09-20.md`): quiere que diga
+**«agropecuario»** donde se nombra el sector. Hoy el sitio dice «agro» y
+«Mercado agro», por ejemplo:
 
-- Pasó en 3 de 5 corridas: 1 de 3 tuyas y 2 de 2 mías. Ya no es una
-  rareza.
-- En mi segunda corrida, `brand` quedó en `NULL` y las filas cambiaron a las
-  **22:10:05** y **22:11:08 UTC**. Por los tiempos acumulados, eso cae cerca
-  de los casos 157 a 162, pero la estimación puede estar corrida hasta unos
-  40 s.
-- Descarté tres cosas:
-  - repetir la siembra no borra la marca;
-  - un `PATCH` que sólo cambia el precio o el estado tampoco;
-  - los casos 155 a 163 corridos de a uno, tampoco.
-- Ojo: la respuesta del `PATCH` no incluye `brand`. No la tomes como prueba
-  de que se borró.
+- en la portada, «Mercado agro · Argentina», dos veces;
+- en el pie, «Mercado agro: productos, servicios y logística.»;
+- en Servicios, «¿Prestás un servicio para el agro?».
 
-Si la causa es un caso del arnés que toca publicaciones de la siembra, es un
-problema de aislamiento (P3). **Si es una vía del producto, es pérdida de
-datos** y hay que corregirla antes de publicar. Por eso va ahora.
+Va antes de las guías de comprador y vendedor, para que sus capturas salgan
+con el texto final. No depende de ninguna decisión pendiente.
 
 ### Alcance
 
-1. Encontrar **qué borra la marca**: el caso, la petición y la línea de
-   código. Tu sonda con disparador sirve, en un esquema aparte como la
-   dejaste.
-2. **Si es del producto:** corregirlo con un caso que lo reproduzca y un
-   negativo.
-3. **Si es del arnés:** que ese caso no toque publicaciones de la siembra, o
-   que las deje como estaban. Y que el 187 no dependa de que otro caso las
-   haya dejado intactas.
-4. **P3 del script de la guía:** «Volumen vendido» con centavos. Después de
-   la suite, el paso 2 leyó 16268903 contra 1626890,3. El script tiene que
-   leer bien los importes con decimales.
+- Hacé el inventario de todo texto **visible** que nombre el sector con
+  «agro»: pantallas, pie, títulos, `<title>`, metadatos de `index.html`,
+  avisos y correos que salgan de la plataforma. Reemplazalo por
+  «agropecuario» o por la forma que corresponda gramaticalmente, por
+  ejemplo «Mercado agropecuario · Argentina» o «un servicio para el sector
+  agropecuario».
+- **No se tocan:**
+  - la marca «AgroBoeda»;
+  - «AgroMarket», que espera la decisión #10;
+  - los identificadores internos del código;
+  - los nombres de categorías que vienen de la taxonomía de la clienta.
+- Actualizá las pruebas que afirman el texto viejo.
 
 ### Fuera de alcance
 
-- Cambiar las reglas de marca por categoría.
-- Otros casos inestables que no estén relacionados.
-- Integración y despliegue.
+- Otros puntos de la devolución: #3 «Operaciones», #13 «Nuestro equipo», #14
+  y los que esperan decisión.
+- Cambios de diseño o de diagramación. Si un texto más largo no entra en el
+  celular, frená y consultá antes de achicar letras o reordenar.
 
 ### Aceptación verificable
 
-1. La causa, nombrada con evidencia: la salida de la sonda o el registro que
-   la muestra.
-2. **Dos suites completas seguidas** desde una base recién creada, con las
-   marcas intactas al terminar cada una: la consulta SQL de las dos filas,
-   antes y después. El 187 pasa en las dos.
-3. Si hubo cambio de producto: caso nuevo más un negativo que dé rojo con el
-   código de la base.
-4. La guía pasa después de una suite completa, con la base llena de órdenes
-   con centavos.
-5. Build, lint, tipos, `compileall` y diff-check con `cr-at-eol`.
-
-### Frená y consultá
-
-- Si la causa exige cambiar qué publicaciones pueden tener marca o cómo se
-  edita una publicación desde la pantalla.
+1. El inventario: cada aparición, con archivo, texto anterior y texto nuevo.
+   Incluí las que dejás a propósito y por qué.
+2. **Una comprobación automática** que falle si vuelve a aparecer «agro»
+   visible sin ser parte de «AgroBoeda» o «AgroMarket». Mostrá su negativo.
+3. **Sin desbordes:** auditoría móvil 12/12, a11y `--todas` y contraste. Las
+   cabeceras que cambian de largo, miradas a 360 px.
+4. **Sin regresiones:** los casos del smoke que verifican textos públicos,
+   por ejemplo 156 y 168. Elegilos vos y justificá la lista.
+5. Build, lint, tipos y diff-check con `cr-at-eol`.
 
 ### Entrega en `PARA-PM.md`
 
 - SHA;
-- la causa;
-- el arreglo;
-- las dos suites con la consulta de marcas;
-- riesgos.
+- el inventario;
+- la comprobación y su negativo;
+- las puertas.
 
 No integres ni despliegues.
