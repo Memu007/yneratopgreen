@@ -181,9 +181,11 @@ async function publicas(page, medida) {
   await revisar(page, 'quienes somos', medida,
     page.getByRole('heading', { name: 'Nuestro equipo' }));
 
-  await page.getByRole('button', { name: 'Servicios', exact: true }).first().click();
-  await revisar(page, 'servicios', medida,
-    page.getByRole('heading', { name: /resuelve el trabajo/, level: 1 }));
+  // Los servicios ya no son una página: son el Mercado filtrado, al que lleva
+  // «Servicios» del pie. Se mide cuando la grilla ya es la de servicios.
+  await page.locator('footer').getByRole('link', { name: 'Servicios', exact: true }).click();
+  await revisar(page, 'catálogo: servicios', medida,
+    page.locator('article[class*="card"]').filter({ hasText: /Servicio|Logística/ }).first());
 
   await page.getByRole('button', { name: 'Contacto', exact: true }).first().click();
   await revisar(page, 'contacto', medida,

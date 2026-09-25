@@ -8,11 +8,12 @@ nombrándola:
     python3 scripts/sabotajes_copy_agro_1.py                   # los tres
     python3 scripts/sabotajes_copy_agro_1.py textos-de-la-base # uno solo
 
-  textos-de-la-base   Los cinco archivos que cambiaron, como estaban en la
-                      base. El caso 192 tiene que nombrar las once
-                      apariciones del inventario en la fuente, y verlas en la
-                      pantalla: pestaña y metadatos, Inicio, el pie,
-                      Servicios y Quiénes somos, en escritorio y en celular.
+  textos-de-la-base   Los archivos que cambiaron, como estaban en la base. El
+                      caso 192 tiene que nombrar las diez apariciones del
+                      inventario en la fuente, y verlas en la pantalla:
+                      pestaña y metadatos, Inicio, el pie y Quiénes somos, en
+                      escritorio y en celular. La undécima estaba en la página
+                      Servicios, que se retiró con MERCADO-UNICO-1.
   solo-en-la-pantalla El pie arma «agro» en tiempo de ejecución, así que la
                       fuente no la escribe. Tiene que verla la pantalla.
   solo-en-el-correo   El asunto del correo de verificación dice «agro». No hay
@@ -39,15 +40,14 @@ RAIZ = Path(__file__).resolve().parent.parent
 BASE = "e9cf4c6"
 PORTADA = RAIZ / "src/components/Pages/HomePage.tsx"
 PIE = RAIZ / "src/components/Footer/Footer.tsx"
-SERVICIOS = RAIZ / "src/components/Pages/ServicesPage.tsx"
 NOSOTROS = RAIZ / "src/components/Pages/AboutPage.tsx"
 CABECERA = RAIZ / "index.html"
 CORREO = RAIZ / "backend/app/services/verificacion.py"
 
-# Las once del inventario, como las nombra la fuente.
+# Las diez del inventario que siguen existiendo, como las nombra la fuente.
 EN_LA_FUENTE = [(f"fuente, {lugar}", "agro") for lugar in (
     "src/components/Pages/HomePage.tsx:83", "src/components/Pages/HomePage.tsx:86",
-    "src/components/Footer/Footer.tsx:45", "src/components/Pages/ServicesPage.tsx:189",
+    "src/components/Footer/Footer.tsx:45",
     "src/components/Pages/AboutPage.tsx:148", "index.html:14", "index.html:16",
     "index.html:24", "index.html:25", "index.html:29", "index.html:30")]
 # Y como las ve el navegador, en los dos anchos. En escritorio, Inicio las
@@ -64,7 +64,6 @@ EN_LA_PANTALLA = [
         ("meta twitter:description", "mercado agro argentino"),
         ("Inicio", "Mercado agro · Argentina"),
         ("Inicio", "Mercado agro: productos, servicios y logística."),
-        ("Servicios", "¿Prestás un servicio para el agro?"),
         ("Quiénes somos", "soluciones tecnológicas para el agro"),
     )
 ] + [("pantalla, escritorio 1440 px, Inicio", "Mercado agro · Argentina | Mercado agro · Argentina")]
@@ -110,9 +109,9 @@ def fallo_nombrando(veredicto, esperados, prohibido=None):
 
 SABOTAJES = {
     "textos-de-la-base": (
-        lambda: {ruta: de_la_base(ruta) for ruta in (PORTADA, PIE, SERVICIOS, NOSOTROS, CABECERA)},
+        lambda: {ruta: de_la_base(ruta) for ruta in (PORTADA, PIE, NOSOTROS, CABECERA)},
         lambda v: fallo_nombrando(v, EN_LA_FUENTE + EN_LA_PANTALLA),
-        "el 192 nombra las once del inventario en la fuente y las ve en la pantalla",
+        "el 192 nombra las diez del inventario en la fuente y las ve en la pantalla",
     ),
     "solo-en-la-pantalla": (
         lambda: {PIE: reemplazar(PIE, "Mercado agropecuario: productos",
@@ -120,7 +119,7 @@ SABOTAJES = {
         lambda v: fallo_nombrando(v, [
             (f"pantalla, {ancho}, {lugar}", "Mercado agro: productos, servicios y logística.")
             for ancho in ("escritorio 1440 px", "celular 360 px")
-            for lugar in ("Inicio", "Mercado", "Servicios", "Quiénes somos", "Contacto")],
+            for lugar in ("Inicio", "Mercado", "Quiénes somos", "Contacto")],
             prohibido="fuente,"),
         "el 192 la ve en la pantalla aunque la fuente no la escriba",
     ),

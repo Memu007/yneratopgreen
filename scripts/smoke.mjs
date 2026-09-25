@@ -7556,6 +7556,21 @@ async function esperarA(condicion, mensaje, limite = 20_000) {
   throw new Error(`no pasó a tiempo: ${mensaje}`);
 }
 
+// Los servicios ya no son una página: son el Mercado con el filtro por tipo, y
+// se llega desde «Servicios» en el pie (MERCADO-UNICO-1). Se espera a que la
+// grilla sea la filtrada y no la de antes: si ya se estaba en el Mercado, las
+// tarjetas viejas siguen un instante a la vista.
+async function irAlMercadoDeServicios(page) {
+  await page.locator('footer').getByRole('link', { name: 'Servicios', exact: true }).click();
+  await esperarA(async () => new URL(page.url()).searchParams.get('type') === 'servicios'
+    && await page.locator('#catalog-type').inputValue().catch(() => '') === 'servicios',
+  'el enlace «Servicios» del pie no dejó el Mercado filtrado por servicios', 25_000);
+  await esperarA(async () => {
+    const rotulos = await page.locator('article[class*="card"] .tg-eyebrow').allInnerTexts();
+    return rotulos.length > 0 && rotulos.every((rotulo) => /servicio|logística/i.test(rotulo));
+  }, 'la grilla del Mercado de servicios no terminó de dibujarse con servicios', 25_000);
+}
+
 // ¿La fila de esta orden está bloqueada por otra transacción? Se pregunta con
 // NOWAIT: si no se puede tomar el candado al instante, es que alguien lo tiene.
 function ordenBloqueada(ordenId) {
@@ -12790,9 +12805,10 @@ await runCase(123, 'Al 200 % de zoom las cinco pantallas siguen siendo usables',
     await publica.getByRole('heading', { name: /seguir produciendo/, level: 1 }).waitFor({ timeout: 20_000 });
     await medir(publica, 'inicio', publica.getByRole('button', { name: 'Explorar operaciones' }));
 
-    await publica.getByRole('button', { name: 'Servicios', exact: true }).first().click();
-    await publica.getByRole('heading', { name: /resuelve el trabajo/, level: 1 }).waitFor({ timeout: 20_000 });
-    await medir(publica, 'servicios', publica.getByRole('button', { name: 'Ver servicios publicados' }));
+    // Servicios ya no es una página: es el Mercado con el filtro de servicios,
+    // y se llega desde el pie. Se mide ahí, con la acción de una tarjeta.
+    await irAlMercadoDeServicios(publica);
+    await medir(publica, 'servicios', publica.getByRole('button', { name: /Contratar|Solicitar cotización|Ingresar para continuar/ }));
 
     await publica.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await publica.locator('article').first().waitFor({ timeout: 20_000 });
@@ -12859,7 +12875,7 @@ await runCase(123, 'Al 200 % de zoom las cinco pantallas siguen siendo usables',
     await browser.close();
   }
 
-  return `640x360 —equivalente a 1280x720 al 200 %— en inicio, servicios, catálogo, `
+  return `640x360 —equivalente a 1280x720 al 200 %— en inicio, servicios (el Mercado filtrado), catálogo, `
     + `detalle, ingreso, carrito, checkout y panel: sin corte horizontal (${medidas.join('; ')}), `
     + 'acción principal visible, habilitada y dentro del ancho, y foco de teclado visible';
 });
@@ -13022,10 +13038,12 @@ await runCase(124, 'Inicio muestra operaciones reales, con el total de la API y 
     + 'y un título de 140 caracteres no desborda ni se corta con puntos suspensivos';
 });
 
-await runCase(125, 'Servicios muestra publicaciones reales de servicio y logística, sin video ni claims', async () => {
-  // La página describía una consultora: video con overlay índigo, cinco
-  // servicios escritos a mano y promesas de inteligencia artificial,
-  // satélites, IoT, sustentabilidad y alianzas.
+await runCase(125, 'Los servicios se ven en el Mercado filtrado: publicaciones reales de servicio y logística, sin claims', async () => {
+  // La página de Servicios describía una consultora: video con overlay
+  // índigo, cinco servicios escritos a mano y promesas de inteligencia
+  // artificial, satélites, IoT, sustentabilidad y alianzas. Desde
+  // MERCADO-UNICO-1 esa página no existe: los servicios se ven en el Mercado
+  // con el filtro por tipo, y es ahí donde se sigue exigiendo lo mismo.
   const CLAIMS = [
     /inteligencia artificial/i,
     /satélit/i,
@@ -13041,29 +13059,24 @@ await runCase(125, 'Servicios muestra publicaciones reales de servicio y logíst
     const page = await contexto.newPage();
     const pedidos = [];
     page.on('request', (r) => pedidos.push(r.url()));
+    // 1. «Servicios», desde el pie, deja el filtro puesto y no sólo la URL.
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: 'Servicios', exact: true }).first().click();
-    await page.getByRole('heading', { name: /resuelve el trabajo/, level: 1 }).waitFor({ timeout: 20_000 });
+    await irAlMercadoDeServicios(page);
+    await page.getByRole('heading', { name: 'Operaciones disponibles', level: 1 }).waitFor({ timeout: 20_000 });
 
+    const tarjetas = page.locator('article[class*="card"]');
+    await tarjetas.first().waitFor({ state: 'visible', timeout: 20_000 });
     const texto = await page.locator('main, body').first().innerText();
     for (const claim of CLAIMS) {
-      assert(!claim.test(texto), `Servicios sigue prometiendo ${claim}`);
+      assert(!claim.test(texto), `el Mercado de servicios promete ${claim}`);
     }
-    assert(await page.locator('video').count() === 0, 'sigue habiendo un video en Servicios');
-
-    // 1. El hero es el derivado interino autorizado, sin ampliarlo y sin nada
-    //    encima.
-    const heroe = await page.locator('img[src*="/media/comercial/"]').first().getAttribute('src');
-    assert(/servicios-relevamiento-hero-960(-4x3)?\.webp$/.test(heroe || ''),
-      `el hero de Servicios no usa un derivado autorizado: ${heroe}`);
+    assert(await page.locator('video').count() === 0, 'hay un video en el Mercado de servicios');
     const concepto = pedidos.filter((u) => /-concepto\.webp/.test(u));
     assert(concepto.length === 0, `se pidieron imágenes conceptuales: ${concepto.join(', ')}`);
 
     // 2. Las publicaciones son de verdad, y son de servicio o de logística.
-    const tarjetas = page.locator('article[class*="card"]');
-    await tarjetas.first().waitFor({ state: 'visible', timeout: 20_000 });
     const cuantas = await tarjetas.count();
-    assert(cuantas > 0 && cuantas <= 3, `Servicios muestra ${cuantas} publicaciones`);
+    assert(cuantas > 0, 'el Mercado filtrado por servicios no muestra ninguna publicación');
     for (let i = 0; i < cuantas; i += 1) {
       const tarjeta = tarjetas.nth(i);
       const titulo = (await tarjeta.getByRole('heading', { level: 3 }).innerText()).trim();
@@ -13098,12 +13111,7 @@ await runCase(125, 'Servicios muestra publicaciones reales de servicio y logíst
       }
     }
 
-    // 3. «Ver servicios publicados» deja el filtro puesto, no sólo la URL.
-    await page.getByRole('button', { name: 'Ver servicios publicados' }).click();
-    await page.getByRole('heading', { name: 'Operaciones disponibles', level: 1 }).waitFor({ timeout: 20_000 });
-    await page.waitForTimeout(1200);
-    const tipo = await page.locator('#catalog-type').inputValue();
-    assert(tipo === 'servicios', `el filtro de tipo quedó en «${tipo}»`);
+    // 3. Y el rótulo de cada tarjeta lo dice.
     const rotulos = await page.locator('article[class*="card"] .tg-eyebrow').allInnerTexts();
     assert(rotulos.length > 0, 'el mercado filtrado no muestra ninguna operación');
     for (const rotulo of rotulos) {
@@ -13111,33 +13119,21 @@ await runCase(125, 'Servicios muestra publicaciones reales de servicio y logíst
         `el mercado filtrado por servicios muestra «${rotulo}»`);
     }
 
-    // 4. El error de Servicios tiene su propio texto.
-    await page.route('**/api/catalog/products*', (route) => route.fulfill({
-      status: 500, contentType: 'application/json', body: JSON.stringify({ detail: 'caída controlada' }),
-    }));
-    await page.getByRole('button', { name: 'Servicios', exact: true }).first().click();
-    const aviso = page.getByRole('alert');
-    await aviso.waitFor({ state: 'visible', timeout: 20_000 });
-    const textoDelError = await aviso.innerText();
-    assert(/No pudimos cargar los servicios/.test(textoDelError),
-      `el error de Servicios no se explica: ${JSON.stringify(textoDelError)}`);
-
     await contexto.close();
   } finally {
     await browser.close();
   }
 
-  return 'Servicios no tiene video, ni lista escrita a mano, ni claims de IA, satélites, IoT o '
-    + 'sustentabilidad; el hero usa el derivado interino autorizado; las publicaciones son '
-    + 'servicios o logística de la base y usan foto local del catálogo o el respaldo honesto, '
-    + 'sin imágenes externas ni al azar; «Ver servicios publicados» deja el '
-    + 'filtro puesto y el error tiene su propio texto';
+  return '«Servicios» del pie deja puesto el filtro del Mercado; lo que se ve no tiene video ni '
+    + 'claims de IA, satélites, IoT o sustentabilidad; las publicaciones son servicios o '
+    + 'logística de la base y usan foto local del catálogo o el respaldo honesto, sin imágenes '
+    + 'externas ni al azar';
 });
 
 await runCase(126, 'Con más de cien publicaciones nuevas encima, los servicios siguen apareciendo', async () => {
-  // El borde que encontró PM leyendo el código: la vista previa de Servicios y
-  // el filtro del Mercado bajaban una página de cien publicaciones y filtraban
-  // del lado del navegador. Con treinta filas anda; con mil miente. Este caso
+  // El borde que encontró PM leyendo el código: la vista previa de Servicios
+  // —que ya no existe— y el filtro del Mercado bajaban una página de cien
+  // publicaciones y filtraban del lado del navegador. Con treinta filas anda; con mil miente. Este caso
   // fabrica el escenario que el seed no puede: un servicio tapado por ciento
   // una publicaciones más nuevas.
   const vendedor = (await apiRequest('/auth/login', {
@@ -13233,16 +13229,9 @@ await runCase(126, 'Con más de cien publicaciones nuevas encima, los servicios 
     const contexto = await browser.newContext();
     const page = await contexto.newPage();
 
-    // 3. La vista previa de Servicios lo encuentra, tapado y todo.
-    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: 'Servicios', exact: true }).first().click();
-    await page.getByRole('heading', { name: /resuelve el trabajo/, level: 1 }).waitFor({ timeout: 20_000 });
-    await page.locator('article[class*="card"]').first().waitFor({ timeout: 20_000 });
-    await page.getByRole('heading', { name: servicioTapado, exact: true, level: 3 })
-      .waitFor({ state: 'visible', timeout: 20_000 });
-
-    // 4. Y el Mercado filtrado por servicios, también.
-    await page.getByRole('button', { name: /Ver servicios publicados/ }).first().click();
+    // 3. El Mercado filtrado por servicios lo encuentra, tapado y todo. Se
+    //    entra por el enlace viejo de Servicios, que lleva ahí.
+    await page.goto(`${FRONTEND_URL}/?section=services`, { waitUntil: 'domcontentloaded' });
     await page.locator('#catalog-type').waitFor({ state: 'attached', timeout: 25_000 });
     const tipo = await page.locator('#catalog-type').inputValue();
     assert(tipo === 'servicios', `el filtro del mercado quedó en «${tipo}»`);
@@ -13261,8 +13250,8 @@ await runCase(126, 'Con más de cien publicaciones nuevas encima, los servicios 
 
   return `con ${posicion[0]} publicaciones más nuevas encima, el endpoint filtrado devuelve `
     + `sólo servicios y cuenta ${filtrado.data.total} de ${todas[0]} publicaciones activas; `
-    + 'un tipo inválido da 422; y tanto la vista previa de Servicios como el Mercado '
-    + 'filtrado encuentran el servicio tapado';
+    + 'un tipo inválido da 422; y el Mercado filtrado, al que lleva el enlace viejo de '
+    + 'Servicios, encuentra el servicio tapado';
 });
 await runCase(127, 'El conteo del Mercado sale del total de la API y no de la página descargada', async () => {
   // La corrección que devolvió PM: la API venía diciendo cuántas publicaciones
@@ -13365,11 +13354,11 @@ await runCase(127, 'El conteo del Mercado sale del total de la API y no de la p�
     + `a las ${queryRows("SELECT COUNT(*)::text, 'fin' FROM products WHERE status = 'ACTIVE' AND publication_type = 'servicio'")[0][0]} que hay en la base`;
 });
 
-await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Servicios, y sólo el Mercado suma la banda de búsqueda', async () => {
+await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Quiénes somos, y sólo el Mercado suma la banda de búsqueda', async () => {
   // Dos propiedades en un caso, porque son la misma cabecera.
   //
   // La primera: la banda de identidad no cambia de sección a sección. Al entrar
-  // al Mercado, el buscador se metía en esa banda y empujaba las cinco
+  // al Mercado, el buscador se metía en esa banda y empujaba las
   // secciones a una barra blanca aparte, así que la cabecera se transformaba
   // justo cuando uno pasaba de mirar a operar. Ahora la banda de arriba es
   // idéntica y el Mercado agrega una segunda banda con el buscador, DEBAJO.
@@ -13389,7 +13378,8 @@ await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Servicios, y s�
     ['tablet', 768, 1024],
     ['celular', 390, 844],
   ];
-  const SECCIONES = ['Inicio', 'Mercado', 'Servicios', 'Quiénes somos', 'Contacto'];
+  // Servicios dejó de ser una sección con MERCADO-UNICO-1: son cuatro.
+  const SECCIONES = ['Inicio', 'Mercado', 'Quiénes somos', 'Contacto'];
 
   // Lo que describe a la banda de identidad: dónde está, cuánto mide, con qué
   // marca y con qué celdas, en ese orden. Si dos secciones devuelven lo mismo,
@@ -13420,7 +13410,7 @@ await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Servicios, y s�
   const revisados = [];
   const paridades = [];
   try {
-    // --- A. La banda de identidad es la misma en las tres secciones -------
+    // --- A. La banda de identidad es la misma en tres secciones -----------
     for (const [nombreAncho, width, height] of ANCHOS) {
       const contexto = await browser.newContext({ viewport: { width, height } });
       const page = await contexto.newPage();
@@ -13436,9 +13426,9 @@ await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Servicios, y s�
 
       const inicio = await retratar('Inicio');
       const mercado = await retratar('Mercado');
-      const servicios = await retratar('Servicios');
+      const nosotros = await retratar('Quiénes somos');
 
-      for (const [nombre, retrato] of [['Inicio', inicio], ['Mercado', mercado], ['Servicios', servicios]]) {
+      for (const [nombre, retrato] of [['Inicio', inicio], ['Mercado', mercado], ['Quiénes somos', nosotros]]) {
         assert(JSON.stringify(retrato) === JSON.stringify(inicio),
           `${nombreAncho}: la banda de identidad de ${nombre} no es la de Inicio\n`
           + `  Inicio:  ${JSON.stringify(inicio)}\n`
@@ -13448,13 +13438,13 @@ await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Servicios, y s�
         assert(retrato.celdas.length >= 6,
           `${nombreAncho}/${nombre}: la banda tiene ${retrato.celdas.length} celdas y faltan destinos`);
         // El orden de lectura es el mismo en los tres anchos: la marca, después
-        // la sesión, después los cinco destinos. Se comprueba en el documento,
+        // la sesión, después los cuatro destinos. Se comprueba en el documento,
         // que es lo que recorren el teclado y un lector de pantalla, y no en la
         // posición dibujada, que cambia con el ancho.
         assert(retrato.celdas[0] === 'AgroBoeda',
           `${nombreAncho}/${nombre}: la banda no arranca por la marca: ${retrato.celdas[0]}`);
-        assert(JSON.stringify(retrato.celdas.slice(-5)) === JSON.stringify(SECCIONES),
-          `${nombreAncho}/${nombre}: los cinco destinos no cierran la banda en orden: `
+        assert(JSON.stringify(retrato.celdas.slice(-SECCIONES.length)) === JSON.stringify(SECCIONES),
+          `${nombreAncho}/${nombre}: los cuatro destinos no cierran la banda en orden: `
           + JSON.stringify(retrato.celdas));
       }
 
@@ -13478,8 +13468,8 @@ await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Servicios, y s�
 
       assert(await dondeEstaElBuscador('Inicio') === null,
         `${nombreAncho}: Inicio dibuja un buscador que no filtra nada`);
-      assert(await dondeEstaElBuscador('Servicios') === null,
-        `${nombreAncho}: Servicios dibuja un buscador que no filtra nada`);
+      assert(await dondeEstaElBuscador('Quiénes somos') === null,
+        `${nombreAncho}: Quiénes somos dibuja un buscador que no filtra nada`);
 
       const enMercado = await dondeEstaElBuscador('Mercado');
       assert(enMercado, `${nombreAncho}: el Mercado se quedó sin buscador`);
@@ -13537,7 +13527,7 @@ await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Servicios, y s�
         await cabecera.waitFor({ state: 'visible', timeout: 20_000 });
         await page.getByLabel('Buscar en el mercado').waitFor({ state: 'visible', timeout: 20_000 });
 
-        // 1. Los cinco destinos siguen ahí y se ven: ni escondidos con
+        // 1. Los cuatro destinos siguen ahí y se ven: ni escondidos con
         //    `display: none` ni empujados a un scroll horizontal.
         for (const seccion of SECCIONES) {
           const destino = cabecera.getByRole('button', { name: seccion, exact: true }).first();
@@ -13591,10 +13581,10 @@ await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Servicios, y s�
     await browser.close();
   }
 
-  return `banda de identidad idéntica en Inicio, Mercado y Servicios en ${paridades.length} anchos `
+  return `banda de identidad idéntica en Inicio, Mercado y Quiénes somos en ${paridades.length} anchos `
     + '—misma posición, mismo alto, misma marca y las mismas celdas en el mismo orden—, con el '
     + 'buscador sólo en el Mercado, debajo de esa banda, filtrando el catálogo desde ahí; y '
-    + `${revisados.length} combinaciones de rol y ancho con los cinco destinos visibles, todas `
+    + `${revisados.length} combinaciones de rol y ancho con los cuatro destinos visibles, todas `
     + 'las acciones del rol con 44 px de alto —«Salir» incluido—, el nombre real en escritorio '
     + 'y «Cuenta» en celular, el buscador con su texto por ancho y cero desborde horizontal';
 });
@@ -15498,7 +15488,7 @@ await runCase(138, 'Sin sesion, el detalle ofrece ingresar y vuelve a la misma p
 });
 
 
-await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan tarjetas', async () => {
+await runCase(139, 'La misma puerta de ingreso en Inicio, en el Mercado y en el Mercado de servicios', async () => {
   // El detalle ya ofrecia ingresar, pero solo en el Mercado y solo desde el
   // detalle: la TARJETA agregaba al carrito en silencio —ni un aviso—, y las
   // vistas previas de Inicio y Servicios no tenian por donde abrir el Login.
@@ -15519,6 +15509,10 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
   // cotización","Ver detalle", …]» y el producto estaba intacto. Los casos
   // 120, 147, 148 y 166 publican servicios a convenir, asi que el residuo
   // aparece solo con correr la suite dos veces sobre la misma base.
+  //
+  // Desde MERCADO-UNICO-1 la pagina de Servicios no existe: los servicios se
+  // ven en el Mercado con el filtro por tipo, adonde lleva «Servicios» en el
+  // pie. El recorrido del servicio sigue, por ahi.
 
   const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
   const [categoriaDeServicio] = queryRows(
@@ -15566,13 +15560,18 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
     publication_type: 'producto',
     operation_kind: 'activo',
   });
-  // Cual de las dos recorre cada pantalla. Servicios solo dibuja servicios, y
-  // las otras dos dibujan el catalogo entero.
+  // Cual de las dos recorre cada pantalla. El Mercado de servicios solo
+  // dibuja servicios, y las otras dos dibujan el catalogo entero.
   const laPublicacionDe = {
     Inicio: nombreDelActivo,
     Mercado: nombreDelActivo,
     Servicios: nombreDelServicio,
   };
+  // Inicio y el Mercado estan en la cabecera; los servicios, en el pie.
+  const irA = (page, seccion) => (seccion === 'Servicios'
+    ? irAlMercadoDeServicios(page)
+    : page.locator('header').first()
+      .getByRole('button', { name: seccion, exact: true }).first().click());
 
   const browser = await chromium.launch({ headless: true });
   const enElCarrito = (page) => page.evaluate(() => {
@@ -15638,8 +15637,7 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
       const page = await context.newPage();
       try {
         await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-        await page.locator('header').first()
-          .getByRole('button', { name: seccion, exact: true }).first().click();
+        await irA(page, seccion);
         const laTarjeta = await esperarLaTarjeta(page, seccion, nombre);
         const tarjetasAlPrincipio = await page.locator('article[class*="card"]').count();
 
@@ -15787,18 +15785,17 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
     .sort();
   const cubiertas = [
     'src/components/Pages/HomePage.tsx',
-    'src/components/Pages/ServicesPage.tsx',
     'src/components/ProductGrid/ProductGrid.tsx',
   ];
   assert(JSON.stringify(dondeSeDibujanTarjetas) === JSON.stringify(cubiertas),
     `ProductCard se dibuja en ${JSON.stringify(dondeSeDibujanTarjetas)} y esta prueba `
     + `recorre ${JSON.stringify(cubiertas)}`);
 
-  // Y las tres reciben la MISMA funcion de App: un solo Login, no tres.
+  // Y las dos reciben la MISMA funcion de App: un solo Login, no dos.
   const app = readFileSync('src/App.tsx', 'utf8');
   const veces = (app.match(/onSolicitarIngreso=\{abrirLoginYVolver\}/g) || []).length;
-  assert(veces >= 3,
-    `App pasa la continuidad ${veces} veces y hacen falta tres pantallas`);
+  assert(veces >= 2,
+    `App pasa la continuidad ${veces} veces y hacen falta dos pantallas`);
 
   const acciones = readFileSync('src/utils/anatomia.ts', 'utf8');
   assert(!/etiqueta: 'Iniciar operación'/.test(acciones),
@@ -15811,9 +15808,10 @@ await runCase(139, 'La misma puerta de ingreso en las tres paginas que dibujan t
   }
 
 
-  return `ProductCard se dibuja en ${dondeSeDibujanTarjetas.length} pantallas y las tres reciben la `
+  return `ProductCard se dibuja en ${dondeSeDibujanTarjetas.length} pantallas y las dos reciben la `
     + 'misma continuidad de App. Sobre dos publicaciones propias del caso '
-    + `(«${nombreDelActivo}» en Inicio y Mercado, «${nombreDelServicio}» en Servicios, `
+    + `(«${nombreDelActivo}» en Inicio y Mercado, «${nombreDelServicio}» en el Mercado de `
+    + 'servicios, '
     + 'buscadas por titulo exacto y no por posicion), sin sesion tanto la tarjeta como '
     + 'el detalle ofrecen «Ingresar para continuar» y abren el Login real con un solo dialogo a la '
     + 'vez; cancelar deja la pagina como estaba y completar vuelve a la misma publicacion, siempre '
@@ -16162,7 +16160,7 @@ await runCase(140, 'Nadie compra su propia publicacion, ni por la API ni por la 
   // --- E. La pantalla, en las tres que dibujan tarjetas -------------------
   // Dos comprobaciones distintas y a proposito:
   //
-  // 1. EXHAUSTIVA y sin dirigir: en Inicio, Mercado y Servicios se mira TODA
+  // 1. EXHAUSTIVA y sin dirigir: en Inicio, Mercado y el Mercado de servicios se mira TODA
   //    tarjeta dibujada y se exige que el rotulo coincida con de quien es la
   //    publicacion. Es mas fuerte que «hay al menos una»: no hay tarjeta que se
   //    escape.
@@ -16280,10 +16278,15 @@ await runCase(140, 'Nadie compra su propia publicacion, ni por la API ni por la 
       await page.locator('[class*="_submitButton_"][type="submit"]').click();
       await page.getByRole('button', { name: 'Mi cuenta' }).first().waitFor({ timeout: 25_000 });
 
-      // 1. Las tres pantallas, enteras, tal como quedan.
+      // 1. Las tres pantallas, enteras, tal como quedan. Los servicios son el
+      //    Mercado filtrado, y se llega desde el pie (MERCADO-UNICO-1).
       for (const seccion of ['Inicio', 'Mercado', 'Servicios']) {
-        await page.locator('header').first()
-          .getByRole('button', { name: seccion, exact: true }).first().click();
+        if (seccion === 'Servicios') {
+          await irAlMercadoDeServicios(page);
+        } else {
+          await page.locator('header').first()
+            .getByRole('button', { name: seccion, exact: true }).first().click();
+        }
         await page.locator('article[class*="card"]').first().waitFor({ timeout: 25_000 });
         const { propias, ajenas, sinPrecio } = await revisarLoQueSeVe(seccion);
         propiasTotales += propias;
@@ -18017,8 +18020,10 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
   // Desde PRODUCT-DETAIL-PAGE-1 el detalle es una ficha con URL propia: la parte
   // E lo recorre como la ubicacion que es.
   //
-  // Este caso recorre las cinco secciones por la interfaz y contrasta AL MISMO
+  // Este caso recorre las secciones por la interfaz y contrasta AL MISMO
   // TIEMPO lo que dice la barra, lo que marca la cabecera y lo que hay dibujado.
+  // Desde MERCADO-UNICO-1 son cuatro: Servicios es el Mercado con el filtro de
+  // servicios, y el enlace viejo lo prueba el caso 193.
 
   const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
   const sello = Date.now();
@@ -18030,8 +18035,8 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
     SELECT id, 'fin' FROM categories
     WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
 
-  // Dos publicaciones propias: la de servicio encabeza la vista previa de
-  // Servicios y la de producto —creada ultima— encabeza la de Inicio y es el
+  // Dos publicaciones propias: la de servicio encabeza el Mercado de servicios
+  // y la de producto —creada ultima— encabeza la vista previa de Inicio y es el
   // unico resultado de su propia busqueda en el Mercado.
   const servicio = `Nav147 servicio ${sello}`;
   const publicacion = `Nav147 publicacion ${sello}`;
@@ -18039,7 +18044,7 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
     method: 'POST', token: vendedor.token,
     body: {
       name: servicio,
-      description: 'Servicio efimero del caso 147, para abrir su detalle desde Servicios.',
+      description: 'Servicio efimero del caso 147, para abrir su detalle desde el Mercado de servicios.',
       category_id: categoriaDeServicio[0],
       price: 0,
       unit: 'servicio',
@@ -18069,14 +18074,12 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
   const TITULO_DE = {
     home: /Equipos, insumos y servicios/,
     marketplace: /Operaciones disponibles/,
-    services: /Encontrá quién resuelve/,
     about: /Información/,
     contact: /^Contacto$/,
   };
   const CELDA_DE = {
     home: 'Inicio',
     marketplace: 'Mercado',
-    services: 'Servicios',
     about: 'Quiénes somos',
     contact: 'Contacto',
   };
@@ -18114,12 +18117,11 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
       await enLaSeccion(seccion, url, momento);
     };
 
-    // --- A. las cinco secciones, ida y vuelta -----------------------------
+    // --- A. las cuatro secciones, ida y vuelta ----------------------------
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await enLaSeccion('home', '/', 'al entrar');
     const RECORRIDO = [
       ['marketplace', '/?section=marketplace'],
-      ['services', '/?section=services'],
       ['about', '/?section=about'],
       ['contact', '/?section=contact'],
     ];
@@ -18130,7 +18132,6 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
     await irA('contact', '/?section=contact', 'Contacto de nuevo');
     const vuelta = [
       ['about', '/?section=about'],
-      ['services', '/?section=services'],
       ['marketplace', '/?section=marketplace'],
       ['home', '/'],
     ];
@@ -18141,7 +18142,7 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
     await page.goForward();
     await enLaSeccion('marketplace', '/?section=marketplace', 'Adelante');
 
-    // --- B. las cinco URL canonicas, abiertas y recargadas -----------------
+    // --- B. las cuatro URL canonicas, abiertas y recargadas ----------------
     for (const [seccion, url] of [['home', '/'], ...RECORRIDO]) {
       await page.goto(`${FRONTEND_URL}${url}`, { waitUntil: 'domcontentloaded' });
       await enLaSeccion(seccion, url, `enlace directo a ${url}`);
@@ -18172,7 +18173,7 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
     }, `el filtro no dejo sola a «${publicacion}»: ${JSON.stringify(await titulosDeLasTarjetas())}`,
     20_000);
 
-    await irA('services', '/?section=services', 'salir del Mercado filtrado');
+    await irA('about', '/?section=about', 'salir del Mercado filtrado');
     await page.goBack();
     await enLaSeccion('marketplace', conFiltros, 'volver al Mercado filtrado');
     // No alcanza con la direccion: los controles y los resultados tambien.
@@ -18235,10 +18236,10 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
       await enLaFicha(nombre, momento);
     };
 
-    // Desde Inicio y desde Servicios, sobre las vistas previas.
+    // Desde Inicio, sobre la vista previa, y desde el Mercado de servicios.
     for (const [seccion, url, nombre] of [
       ['home', '/', publicacion],
-      ['services', '/?section=services', servicio],
+      ['marketplace', '/?section=marketplace&type=servicios', servicio],
     ]) {
       await page.goto(`${FRONTEND_URL}${url}`, { waitUntil: 'domcontentloaded' });
       await enLaSeccion(seccion, url, `${seccion} antes de la ficha`);
@@ -18265,23 +18266,24 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
 
     // Y salir con la propia interfaz no deja una entrada fantasma: despues de
     // «Volver al Mercado», UN Atras tiene que llevar a la seccion anterior.
-    await irA('services', '/?section=services', 'ir a Servicios para el fantasma');
+    await irA('about', '/?section=about', 'ir a Quiénes somos para el fantasma');
     await irA('marketplace', conFiltros, 'volver al Mercado para el fantasma');
     await abrirLaFichaDe(publicacion, 'ficha para el fantasma');
     await salidaDeLaFicha(page).click();
     await enLaSeccion('marketplace', conFiltros, 'Mercado despues de «Volver al Mercado»');
     await page.goBack();
-    await enLaSeccion('services', '/?section=services',
+    await enLaSeccion('about', '/?section=about',
       'un Atras despues de salir con la interfaz');
 
     await contexto.close();
-    return 'las cinco secciones publicas se dicen en la barra —«/» y «?section=…»—, el '
-      + 'recorrido por la cabecera deja cuatro entradas de verdad que Atras y Adelante '
+    return 'las cuatro secciones publicas se dicen en la barra —«/» y «?section=…»—, el '
+      + 'recorrido por la cabecera deja tres entradas de verdad que Atras y Adelante '
       + 'recorren con la pantalla y la celda marcada, elegir la seccion activa no agrega '
-      + 'ninguna, las cinco URL canonicas abren y recargan en su seccion, el Mercado '
+      + 'ninguna, las cuatro URL canonicas abren y recargan en su seccion, el Mercado '
       + `filtrado vuelve con Atras a «${conFiltros}» con el buscador, el tipo y su unico `
       + 'resultado, las cuatro pantallas de llegada normalizan el pathname al salir y no '
-      + 'reviven al recargar, y la ficha abierta desde Inicio, Servicios y el Mercado tiene '
+      + 'reviven al recargar, y la ficha abierta desde Inicio, el Mercado de servicios y el '
+      + 'Mercado filtrado tiene '
       + 'su propia URL, sin celda marcada, vuelve con Adelante y con recarga, y Atras la deja '
       + 'sin perder seccion ni filtros, sin dejar entrada fantasma cuando se sale con '
       + '«Volver al Mercado»';
@@ -18320,7 +18322,8 @@ await runCase(148, 'Cada capa se cierra sola y devuelve el foco a su disparador'
 
   // Un servicio y un activo propios: los dos dibujan el boton «Ver detalle» en
   // su tarjeta —un insumo a la venta no lo dibuja—, y creados en este orden el
-  // activo encabeza la vista previa de Inicio y el servicio la de Servicios.
+  // activo encabeza la vista previa de Inicio y el servicio, el Mercado de
+  // servicios: la página de Servicios dejó de existir con MERCADO-UNICO-1.
   const [categoriaDeServicio] = queryRows(`
     SELECT id, 'fin' FROM categories
     WHERE is_service = true AND is_active = true ORDER BY name LIMIT 1`);
@@ -18337,7 +18340,7 @@ await runCase(148, 'Cada capa se cierra sola y devuelve el foco a su disparador'
     method: 'POST', token: vendedor.token,
     body: {
       name: servicio,
-      description: 'Servicio efimero del caso 148, para abrir su detalle desde Servicios.',
+      description: 'Servicio efimero del caso 148, para abrir su detalle desde el Mercado de servicios.',
       category_id: categoriaDeServicio[0],
       price: 0,
       unit: 'servicio',
@@ -18479,13 +18482,13 @@ await runCase(148, 'Cada capa se cierra sola y devuelve el foco a su disparador'
     };
     await revisarElDetalle('Inicio', '/', activo);
     await revisarElDetalle('Mercado', `/?section=marketplace&q=${encodeURIComponent(activo)}`, activo);
-    await revisarElDetalle('Servicios', '/?section=services', servicio);
+    await revisarElDetalle('Mercado de servicios', '/?section=marketplace&type=servicios', servicio);
 
     // --- B. la pila: ficha -> perfil del vendedor ---------------------------
     // El perfil sí es una capa, sobre la ficha: un Escape la cierra y el foco
     // vuelve a «Ver perfil del vendedor». Un segundo Escape ya no tiene capa
     // que cerrar y no saca de la página: salir de una página es Atrás.
-    await page.goto(`${FRONTEND_URL}/?section=services`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`${FRONTEND_URL}/?section=marketplace&type=servicios`, { waitUntil: 'domcontentloaded' });
     const tarjetaDelServicio = page.locator('article').filter({ hasText: servicio }).first();
     await tarjetaDelServicio.waitFor({ state: 'visible', timeout: 20_000 });
     const verDetalle = tarjetaDelServicio.getByRole('link', { name: 'Ver detalle' });
@@ -21127,12 +21130,14 @@ await runCase(155, 'El Mercado tiene dos vistas elegibles y ninguna geometría a
       await contexto.close();
     }
 
-    // --- H. Inicio y Servicios siguen con su previa ------------------------
+    // --- H. Inicio sigue con su previa -------------------------------------
+    // Acá también se visitaba Servicios, pero por `/services`: una ruta que la
+    // barra nunca reconoció, así que se dibujaba Inicio y se medía dos veces.
+    // Desde MERCADO-UNICO-1 esa página no existe: queda Inicio.
     {
       const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       const page = await contexto.newPage();
-      for (const [seccion, url] of [['Inicio', `${FRONTEND_URL}/`],
-        ['Servicios', `${FRONTEND_URL}/services`]]) {
+      for (const [seccion, url] of [['Inicio', `${FRONTEND_URL}/`]]) {
         await page.goto(url, { waitUntil: 'domcontentloaded' });
         await page.locator('article[class*="card"]').first()
           .waitFor({ state: 'visible', timeout: 25_000 });
@@ -21530,7 +21535,7 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
       await esperarA(async () => (await page.getByRole('heading', { name: /seguir produciendo/ })
         .count()) > 0, `${donde}: la marca no lleva a Inicio con el teclado`, 20_000);
 
-      for (const seccion of ['Mercado', 'Servicios', 'Quiénes somos', 'Contacto']) {
+      for (const seccion of ['Mercado', 'Quiénes somos', 'Contacto']) {
         const destino = page.getByRole('button', { name: seccion, exact: true }).first();
         await destino.click();
         // La sección llegó cuando su celda queda marcada como la actual: es el
@@ -21557,7 +21562,7 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
       capturas.push(`${rutaAuth} (${medida.width}x${medida.height})`);
 
       await contexto.close();
-      medidos.push(`${donde}: barra, pie, cuatro públicas y autenticación sin nombre viejo`);
+      medidos.push(`${donde}: barra, pie, las páginas públicas y autenticación sin nombre viejo`);
     }
 
     // --- F. los paneles: vendedor y administración --------------------------
@@ -24095,11 +24100,11 @@ await runCase(163, 'Mi cuenta es una página del sitio: URL propia, historial, s
     // Y con un destino de otra sección, el destino también es exacto.
     await ensuciarElPerfil('Para descartar a otra sección');
     await page.locator('header').first()
-      .getByRole('button', { name: 'Servicios', exact: true }).click();
+      .getByRole('button', { name: 'Quiénes somos', exact: true }).click();
     await esperarA(async () => (await pregunta(page).count()) === 1,
-      'la salida a Servicios no preguntó', 20_000);
+      'la salida a Quiénes somos no preguntó', 20_000);
     await page.getByRole('button', { name: 'Descartar cambios' }).click();
-    await esperarA(async () => seccionDe(page) === 'services',
+    await esperarA(async () => seccionDe(page) === 'about',
       `descartar no fue al destino pedido: quedó en ${seccionDe(page)}`, 20_000);
     await irALaCuenta(page);
     medidos.push('descartar va al destino pedido —pestaña o sección— y suelta el trabajo local');
@@ -25574,7 +25579,7 @@ await runCase(166, 'La cotización llega a Contacto con su publicación, y prepa
 // barra, que los válidos queden, que salga una consulta y que la grilla
 // dibuje su respuesta; que un catálogo auxiliar caído se diga y se pueda
 // reintentar en vez de atribuirle al mercado un cero que nadie midió; y que
-// cada CTA de publicación de Inicio y Servicios abra el Login real y retome el
+// cada CTA de publicación de Inicio y Quiénes somos abra el Login real y retome el
 // formulario si —y sólo si— la persona entra, sin escribir nada por el camino.
 //
 // R6 SÍ está acá, y la primera versión de este caso no lo tenía por un error
@@ -25899,7 +25904,9 @@ await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o com
 
     for (const pantalla of [
       { seccion: 'home', cta: 'Publicar una oferta', aviso: 'Iniciá sesión para publicar una oferta' },
-      { seccion: 'services', cta: 'Publicar un servicio', aviso: 'Iniciá sesión para publicar un servicio' },
+      // Servicios tenía su CTA «Publicar un servicio»; la página dejó de
+      // existir con MERCADO-UNICO-1.
+      //
       // Quiénes somos entró después: era la pantalla que había quedado con el
       // Login sin continuidad —y sin aviso— cuando las otras dos ya lo habían
       // dejado. Está en la lista para que no vuelva a quedarse atrás sola.
@@ -27307,11 +27314,11 @@ await runCase(170, 'Sin sesión, el carrito con ítems se reabre desde la cabece
           `en ${pantalla.como}, recargar sin sesión y con carrito perdió la celda «Carrito»; `
           + `la cabecera dice ${JSON.stringify(await laCabeceraDice(page))}`);
 
-        // La banda no se deforma por la celda de más: la marca sigue, las cinco
+        // La banda no se deforma por la celda de más: la marca sigue, las cuatro
         // secciones siguen, y no aparece un scroll horizontal.
         assert(await cabecera(page).getByRole('button', { name: /AgroBoeda/ }).count() === 1,
           `en ${pantalla.como} la marca no está en la cabecera`);
-        for (const seccion of ['Inicio', 'Mercado', 'Servicios', 'Quiénes somos', 'Contacto']) {
+        for (const seccion of ['Inicio', 'Mercado', 'Quiénes somos', 'Contacto']) {
           assert(await cabecera(page).getByRole('button', { name: seccion, exact: true })
             .count() === 1, `en ${pantalla.como} falta la sección «${seccion}» en la cabecera`);
         }
@@ -31491,8 +31498,9 @@ await runCase(183, 'La ficha de una publicación es una página con URL propia, 
 
   // Cuarenta insumos de precios distintos: con 24 por página, el Mercado
   // filtrado por el marcador tiene dos páginas y la segunda da para bajar.
-  // Después el servicio y, al final, el activo: así los dos encabezan las
-  // vistas previas de Servicios e Inicio, que dibujan las tres más nuevas.
+  // Después el servicio y, al final, el activo: así el activo encabeza la
+  // vista previa de Inicio, que dibuja las tres más nuevas, y el servicio el
+  // Mercado de servicios, que reemplazó a la página de Servicios.
   const TOTAL_DE_INSUMOS = 40;
   const insumos = [];
   for (let i = 1; i <= TOTAL_DE_INSUMOS; i += 1) {
@@ -31674,7 +31682,7 @@ await runCase(183, 'La ficha de una publicación es una página con URL propia, 
       await contexto.close();
     }
 
-    // === B. Desde Inicio y desde Servicios; cotización y perfil ============
+    // === B. Desde Inicio y desde el Mercado de servicios; cotización y perfil
     {
       const { contexto, page, consola } = await nuevaPagina();
       await page.goto(`${FRONTEND_URL}/`, { waitUntil: 'domcontentloaded' });
@@ -31689,12 +31697,14 @@ await runCase(183, 'La ficha de una publicación es una página con URL propia, 
       await esperarA(async () => (await focoEn(page)) === `enlace:detalle:${idDelActivo}`,
         `volviendo a Inicio el foco está en ${await focoEn(page)} y no en su «Ver detalle»`, 10_000);
 
-      await page.goto(`${FRONTEND_URL}/?section=services`, { waitUntil: 'domcontentloaded' });
-      const delServicio = (await esperarLaTarjeta(page, 'Servicios', servicio)).locator('h3 a');
+      const DE_SERVICIOS = '/?section=marketplace&type=servicios';
+      await page.goto(`${FRONTEND_URL}${DE_SERVICIOS}`, { waitUntil: 'domcontentloaded' });
+      const delServicio = (await esperarLaTarjeta(page, 'el Mercado de servicios', servicio))
+        .locator('h3 a');
       await delServicio.click();
-      await enLaFicha(page, servicio, idDelServicio, 'ficha abierta desde Servicios');
-      assert((await salidaDeLaFicha(page).innerText()).trim() === 'Volver a Servicios',
-        'desde Servicios la ficha no ofrece volver a Servicios');
+      await enLaFicha(page, servicio, idDelServicio, 'ficha abierta desde el Mercado de servicios');
+      assert((await salidaDeLaFicha(page).innerText()).trim() === 'Volver al Mercado',
+        'desde el Mercado de servicios la ficha no ofrece volver al Mercado');
 
       // El perfil del vendedor es una capa sobre la ficha.
       const verPerfil = laFicha(page).getByRole('button', { name: 'Ver perfil del vendedor' });
@@ -31719,10 +31729,12 @@ await runCase(183, 'La ficha de una publicación es una página con URL propia, 
       await page.goBack();
       await enLaFicha(page, servicio, idDelServicio, 'Atrás desde Contacto');
       await page.goBack();
-      await esperarA(async () => barra(page) === '/?section=services',
-        `Atrás desde la ficha dejó «${barra(page)}» y no Servicios`, 20_000);
-      assert(consola.length === 0, `Inicio y Servicios dejaron errores de consola: ${consola[0]}`);
-      medidos.push('Inicio y Servicios abren la ficha y vuelven con el foco en su enlace; el perfil '
+      await esperarA(async () => barra(page) === DE_SERVICIOS,
+        `Atrás desde la ficha dejó «${barra(page)}» y no el Mercado de servicios`, 20_000);
+      assert(consola.length === 0,
+        `Inicio y el Mercado de servicios dejaron errores de consola: ${consola[0]}`);
+      medidos.push('Inicio y el Mercado de servicios abren la ficha y vuelven; Inicio, con el foco '
+        + 'en su enlace; el perfil '
         + 'es una capa que Escape cierra; la cotización va a Contacto con la publicación y Atrás '
         + 'vuelve a la ficha');
       await contexto.close();
@@ -33480,7 +33492,6 @@ await runCase(192, 'El sitio nombra el sector «agropecuario», y los textos má
   const PAGINAS = [
     ['Inicio', 'home', (page) => page.locator('#titulo-inicio')],
     ['Mercado', 'marketplace', (page) => page.locator('article').first()],
-    ['Servicios', 'services', (page) => page.locator('#titulo-ofrecer')],
     ['Quiénes somos', 'about', (page) => page.getByRole('heading', { name: /Listo para transformar/ })],
     ['Contacto', 'contact', (page) => page.getByRole('heading', { name: 'Contacto', level: 1 })],
   ];
@@ -33488,8 +33499,6 @@ await runCase(192, 'El sitio nombra el sector «agropecuario», y los textos má
   const ALARGADOS = [
     ['home', 'la bajada de la portada', 'p.tg-eyebrow', 'Mercado agropecuario · Argentina'],
     ['home', 'la bajada del pie', 'footer p', 'Mercado agropecuario: productos, servicios y logística.'],
-    ['services', 'el título del cierre de Servicios', '#titulo-ofrecer',
-      '¿Prestás un servicio para el sector agropecuario?'],
     ['about', 'el cierre de Quiénes somos', 'p',
       'soluciones tecnológicas para el sector agropecuario'],
   ];
@@ -33582,7 +33591,7 @@ await runCase(192, 'El sitio nombra el sector «agropecuario», y los textos má
       if (registro.coinciden !== 1) problemas.push(`${donde}: Registro abrió ${registro.coinciden} diálogos`);
       anotar(`pantalla, ${donde}, Registro`, registro.texto);
       await contexto.close();
-      medidos.push(`${donde}: pestaña, metadatos, cinco páginas públicas, Ingresar y Registro `
+      medidos.push(`${donde}: pestaña, metadatos, ${PAGINAS.length} páginas públicas, Ingresar y Registro `
         + `leídos, con ${tarjetas} tarjetas de publicaciones afuera`);
     }
 
@@ -33627,6 +33636,245 @@ await runCase(192, 'El sitio nombra el sector «agropecuario», y los textos má
     + (problemas.length ? `\ny además:\n  ${problemas.join('\n  ')}` : ''));
   assert(problemas.length === 0, `sin «agro» suelta, pero:\n  ${problemas.join('\n  ')}`);
   return `ninguna «agro» suelta (${medidos.join('; ')}); capturas: ${capturas.join(', ')}`;
+});
+
+// ---------------------------------------------------------------------------
+// 193. MERCADO-UNICO-1 — un solo Mercado.
+//
+// La clienta lo pidió tres veces (devolución 01, punto 7) y Emi lo decidió:
+// Servicios no va como pestaña aparte. Los servicios se buscan en el Mercado,
+// con el filtro por tipo que ya existía. Se mide:
+//  A. la cabecera no ofrece Servicios, en escritorio, tablet y celular, y sus
+//     cuatro destinos entran sin desplazarse de costado;
+//  B. la URL vieja, `?section=services`, abre el Mercado con el filtro de
+//     servicios —la barra, el selector, la celda marcada y la grilla dicen lo
+//     mismo—, y muestra lo que mostraba la página: los tres servicios más
+//     nuevos encabezan la grilla, y el total es el de todos los servicios
+//     activos, logística incluida;
+//  C. «Servicios» del pie lleva al mismo lugar, desde Inicio y desde un
+//     Mercado con otra búsqueda puesta; en Inicio no hay otro control con ese
+//     nombre;
+//  D. Atrás y Adelante: el pie y la URL vieja dejan entradas que se recorren
+//     sin volver a pasar por el nombre viejo, y una entrada vieja del
+//     historial —escrita antes de este cambio— también lleva al Mercado.
+//
+// El caso publica un servicio y una logística propios, que quedan entre los
+// tres más nuevos, y los retira al terminar.
+// ---------------------------------------------------------------------------
+await runCase(193, 'Un solo Mercado: la cabecera no ofrece Servicios y los enlaces viejos llevan al Mercado con el filtro', async () => {
+  const medidos = [];
+  const sello = Date.now();
+  const URL_NUEVA = '/?section=marketplace&type=servicios';
+  const DESTINOS = ['Inicio', 'Mercado', 'Quiénes somos', 'Contacto'];
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const [categoriaDeServicios] = queryRows(`
+    SELECT id, 'fin' FROM categories
+    WHERE is_service = true AND is_active = true ORDER BY name LIMIT 1`);
+  assert(categoriaDeServicios, 'no hay una categoría de servicios activa para armar el caso');
+
+  const fabricadas = [];
+  const publicar = async (cuerpo) => {
+    const alta = await apiRequest('/products', {
+      method: 'POST', token: vendedor.token, body: { locality_id: localidad, ...cuerpo },
+    });
+    assert(alta.data?.id, `no se pudo publicar «${cuerpo.name}»: HTTP ${alta.status}`);
+    fabricadas.push(alta.data.id);
+    return alta.data;
+  };
+  const CAPTURAS = process.env.SMOKE_CAPTURAS || mkdtempSync(`${tmpdir()}/topgreen-mercado-`);
+  mkdirSync(CAPTURAS, { recursive: true });
+  const capturas = [];
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    await publicar({
+      name: `Unico193 servicio ${sello}`,
+      description: 'Servicio del caso 193: tiene que verse en el Mercado de servicios.',
+      category_id: categoriaDeServicios[0], price: 75000, stock: 0,
+      publication_type: 'servicio', operation_kind: 'servicio',
+      pricing_type: 'por_hectarea', availability: 'inmediata',
+    });
+    await publicar({
+      name: `Unico193 flete ${sello}`,
+      description: 'Logística del caso 193: tiene que verse en el Mercado de servicios.',
+      category_id: categoriaDeServicios[0], price: 48000, stock: 0,
+      publication_type: 'servicio', operation_kind: 'logistica',
+      pricing_type: 'por_km', availability: 'inmediata',
+    });
+
+    // Lo que mostraba la página de Servicios, pedido como lo pedía ella: las
+    // tres más nuevas de tipo servicio, quedándose con las de servicio o
+    // logística (`useVistaPrevia` de la base, con `soloServicios`).
+    const pagina = await apiRequest('/catalog/products?page=1&page_size=3'
+      + '&publication_type=servicio&sort_by=created_at&sort_order=desc');
+    const mostraba = pagina.data.items
+      .filter((item) => ['servicio', 'logistica'].includes(item.operation_kind))
+      .map((item) => item.name);
+    assert(mostraba.length === 3, `la página habría mostrado ${mostraba.length} servicios`);
+    assert(mostraba.includes(`Unico193 flete ${sello}`),
+      `la logística del caso no está entre las tres que mostraba la página: ${JSON.stringify(mostraba)}`);
+    const [[activos, deLogistica]] = queryRows(`
+      SELECT COUNT(*)::text, COUNT(*) FILTER (WHERE operation_kind = 'logistica')::text
+      FROM products WHERE status = 'ACTIVE' AND publication_type = 'servicio'`);
+    assert(Number(deLogistica) > 0, 'no hay logística activa: el caso no probaría que se ve');
+
+    const barra = (page) => {
+      const u = new URL(page.url());
+      return `${u.pathname}${u.search}`;
+    };
+    const celdaMarcada = async (page) => (await page
+      .locator('nav[aria-label="Secciones del sitio"] [aria-current="page"]').allInnerTexts())
+      .map((texto) => texto.trim());
+    // La barra, el selector, la celda marcada y la grilla, juntos.
+    const enElMercadoDeServicios = async (page, momento) => {
+      await esperarA(async () => barra(page) === URL_NUEVA,
+        `${momento}: la barra dice «${barra(page)}» y no «${URL_NUEVA}»`, 20_000);
+      await esperarA(async () => (await page.locator('#catalog-type').inputValue()
+        .catch(() => '')) === 'servicios',
+      `${momento}: el filtro de tipo no quedó en «Servicios»`, 20_000);
+      let primeros = [];
+      await esperarA(async () => {
+        primeros = (await page.locator('article[class*="card"] h3').allInnerTexts())
+          .slice(0, 3).map((titulo) => titulo.trim());
+        return JSON.stringify(primeros) === JSON.stringify(mostraba);
+      }, `${momento}: la grilla empieza por ${JSON.stringify(primeros)} y la página mostraba `
+        + `${JSON.stringify(mostraba)}`, 20_000);
+      const conteo = await page.locator('[class*="_conteo_"]').first().innerText();
+      const numeros = (conteo.match(/\d+/g) || []).map(Number);
+      assert(numeros[numeros.length - 1] === Number(activos),
+        `${momento}: el Mercado dice «${conteo.replace(/\s+/g, ' ')}» y hay ${activos} `
+        + 'servicios activos, logística incluida');
+      const rotulos = await page.locator('article[class*="card"] .tg-eyebrow').allInnerTexts();
+      assert(rotulos.length > 0 && rotulos.every((rotulo) => /servicio|logística/i.test(rotulo)),
+        `${momento}: la grilla mezcla otras operaciones: ${JSON.stringify(rotulos)}`);
+      assert(JSON.stringify(await celdaMarcada(page)) === JSON.stringify(['Mercado']),
+        `${momento}: la cabecera marca ${JSON.stringify(await celdaMarcada(page))}`);
+    };
+    const enInicio = async (page, momento) => {
+      await esperarA(async () => barra(page) === '/'
+        && (await page.getByRole('heading', { name: /seguir produciendo/, level: 1 }).count()) === 1,
+      `${momento}: se esperaba Inicio y la barra dice «${barra(page)}»`, 20_000);
+    };
+    const alPie = (page) => page.locator('footer')
+      .getByRole('link', { name: 'Servicios', exact: true }).click();
+
+    // --- A. la cabecera, en tres anchos -----------------------------------
+    for (const [nombre, width, height] of [['escritorio', 1440, 900], ['tablet', 768, 1024],
+      ['celular', 360, 800]]) {
+      const contexto = await browser.newContext({ viewport: { width, height } });
+      const page = await contexto.newPage();
+      await page.goto(`${FRONTEND_URL}/`, { waitUntil: 'domcontentloaded' });
+      await enInicio(page, `${nombre}, al entrar`);
+      const cabecera = page.locator('header').first();
+      const destinos = await cabecera.locator('nav[aria-label="Secciones del sitio"] button')
+        .allInnerTexts();
+      assert(JSON.stringify(destinos.map((d) => d.trim())) === JSON.stringify(DESTINOS),
+        `${nombre}: la cabecera ofrece ${JSON.stringify(destinos)}`);
+      const conEseNombre = await cabecera.getByRole('button', { name: /^Servicios$/ }).count()
+        + await cabecera.getByRole('link', { name: /^Servicios$/ }).count();
+      assert(conEseNombre === 0, `${nombre}: la cabecera tiene ${conEseNombre} control(es) «Servicios»`);
+      const celdas = await cabecera.locator('nav[aria-label="Secciones del sitio"] button')
+        .evaluateAll((botones) => botones.map((boton) => {
+          const r = boton.getBoundingClientRect();
+          return { izquierda: r.left, derecha: r.right, arriba: Math.round(r.top), alto: r.height };
+        }));
+      const vista = await page.evaluate(() => ({
+        ancho: document.documentElement.clientWidth, pagina: document.documentElement.scrollWidth,
+      }));
+      assert(celdas.every((c) => c.izquierda >= 0 && c.derecha <= vista.ancho + 0.5 && c.alto >= 44),
+        `${nombre}: alguna celda de la cabecera sale de la pantalla o mide menos de 44 px: `
+        + JSON.stringify(celdas));
+      assert(vista.pagina <= vista.ancho,
+        `${nombre}: la página desborda ${vista.pagina - vista.ancho} px a lo ancho`);
+      const renglones = new Set(celdas.map((c) => c.arriba)).size;
+      const ruta = `${CAPTURAS}/cabecera-${width}.png`;
+      await cabecera.screenshot({ path: ruta });
+      capturas.push(ruta);
+      medidos.push(`${nombre} ${width} px: la cabecera ofrece ${DESTINOS.join(', ')} en `
+        + `${renglones} renglón(es), sin Servicios ni desborde`);
+      await contexto.close();
+    }
+
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+
+    // --- B. la URL vieja ----------------------------------------------------
+    await page.goto(`${FRONTEND_URL}/?section=services`, { waitUntil: 'domcontentloaded' });
+    await enElMercadoDeServicios(page, 'la URL vieja');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await enElMercadoDeServicios(page, 'la URL vieja, recargada');
+    medidos.push(`«?section=services» abre «${URL_NUEVA}» con el selector en Servicios, la celda `
+      + `Mercado marcada, ${JSON.stringify(mostraba)} al frente como en la página, y el total de `
+      + `${activos} servicios activos (${deLogistica} de logística)`);
+
+    // --- C. el pie ----------------------------------------------------------
+    await page.goto(`${FRONTEND_URL}/`, { waitUntil: 'domcontentloaded' });
+    await enInicio(page, 'Inicio para el pie');
+    const enInicioConEseNombre = await page.getByRole('button', { name: /^Servicios$/ }).count()
+      + await page.getByRole('link', { name: /^Servicios$/ }).count();
+    assert(enInicioConEseNombre === 1,
+      `Inicio tiene ${enInicioConEseNombre} controles «Servicios» y el único tiene que ser el del pie`);
+    await alPie(page);
+    await enElMercadoDeServicios(page, '«Servicios» del pie, desde Inicio');
+    await page.goto(`${FRONTEND_URL}/?section=marketplace&q=zzz193&type=productos`,
+      { waitUntil: 'domcontentloaded' });
+    await esperarA(async () => (await page.locator('#catalog-type').inputValue()) === 'productos',
+      'no se pudo dejar el Mercado con otra búsqueda antes del pie', 20_000);
+    await alPie(page);
+    await enElMercadoDeServicios(page, '«Servicios» del pie, desde un Mercado con otra búsqueda');
+    medidos.push('«Servicios» del pie lleva ahí desde Inicio y desde un Mercado con otra búsqueda, '
+      + 'que se limpia; en Inicio es el único control con ese nombre');
+
+    // --- D. Atrás y Adelante --------------------------------------------------
+    // D1. Desde Inicio por el pie.
+    await page.goto(`${FRONTEND_URL}/`, { waitUntil: 'domcontentloaded' });
+    await enInicio(page, 'D1, al entrar');
+    await alPie(page);
+    await enElMercadoDeServicios(page, 'D1, después del pie');
+    await page.goBack();
+    await enInicio(page, 'D1, Atrás');
+    await page.goForward();
+    await enElMercadoDeServicios(page, 'D1, Adelante');
+
+    // D2. La URL vieja, escrita a mano después de Inicio: su entrada queda
+    //     reescrita, así que Adelante no vuelve a pasar por el nombre viejo.
+    await page.goto(`${FRONTEND_URL}/`, { waitUntil: 'domcontentloaded' });
+    await enInicio(page, 'D2, al entrar');
+    await page.goto(`${FRONTEND_URL}/?section=services`, { waitUntil: 'domcontentloaded' });
+    await enElMercadoDeServicios(page, 'D2, la URL vieja');
+    await page.goBack();
+    await enInicio(page, 'D2, Atrás');
+    await page.goForward();
+    await enElMercadoDeServicios(page, 'D2, Adelante');
+
+    // D3. Una entrada vieja del historial de la misma pestaña, como la que
+    //     dejó una versión anterior del sitio: se llega a ella con Atrás.
+    await page.goto(`${FRONTEND_URL}/`, { waitUntil: 'domcontentloaded' });
+    await enInicio(page, 'D3, al entrar');
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/?section=services');
+      window.history.pushState({}, '', '/?section=about');
+    });
+    await page.goBack();
+    await enElMercadoDeServicios(page, 'D3, Atrás hasta la entrada vieja');
+    await page.goBack();
+    await enInicio(page, 'D3, Atrás hasta Inicio');
+    await page.goForward();
+    await enElMercadoDeServicios(page, 'D3, Adelante hasta la entrada vieja, ya reescrita');
+    medidos.push('Atrás y Adelante recorren Inicio y el Mercado de servicios desde el pie, desde la '
+      + 'URL vieja y desde una entrada vieja del historial, sin volver a pasar por '
+      + '«?section=services»');
+    await contexto.close();
+  } finally {
+    await browser.close();
+    for (const id of fabricadas) {
+      try {
+        await apiRequest(`/products/${id}`, { method: 'DELETE', token: vendedor.token });
+      } catch { /* la limpieza no tapa el motivo real */ }
+    }
+  }
+  return `un solo Mercado (${medidos.join('; ')}); capturas: ${capturas.join(', ')}`;
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del

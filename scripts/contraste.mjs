@@ -392,12 +392,16 @@ for (const medida of MEDIDAS) {
     const equipo = page.getByRole('heading', { name: 'Nuestro equipo' });
     for (const [seccion, titulo, marca] of [
       ['Quiénes somos', 'quienes somos', equipo],
-      ['Servicios', 'servicios', page.getByRole('heading', { name: /resuelve el trabajo/, level: 1 })],
       ['Contacto', 'contacto', page.getByRole('heading', { name: 'Contacto', level: 1 })],
     ]) {
       await page.getByRole('button', { name: seccion, exact: true }).first().click();
       await revisar(page, `${medida.n} ${titulo}`, marca);
     }
+    // Los servicios ya no son una página: son el Mercado filtrado, al que lleva
+    // «Servicios» del pie. Se mide cuando la grilla ya es la de servicios.
+    await page.locator('footer').getByRole('link', { name: 'Servicios', exact: true }).click();
+    await revisar(page, `${medida.n} catálogo: servicios`,
+      page.locator('article[class*="card"]').filter({ hasText: /Servicio|Logística/ }).first());
     await extremosDeFoto(page, `${medida.n} quienes somos`, 'Quiénes somos', equipo);
 
     // La vista del enlace de confirmación, en su estado de rechazo: es el que

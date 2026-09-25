@@ -38,10 +38,14 @@ export const SUPERFICIES = [
   { id: 'quienes somos' },
   { id: 'quienes somos (foto blanca)', puertas: ['contraste'], porque: 'ídem inicio' },
   { id: 'quienes somos (foto negra)', puertas: ['contraste'], porque: 'ídem inicio' },
-  { id: 'servicios' },
   { id: 'contacto' },
   { id: 'catálogo' },
   { id: 'catálogo (hover)' },
+  // Los servicios, donde se ven desde MERCADO-UNICO-1: el Mercado con el
+  // filtro de servicios, al que lleva «Servicios» del pie. Reemplaza a la
+  // página de Servicios, que dejó de existir; sus tarjetas son las de
+  // servicio y logística, que no traen stock ni foto por omisión.
+  { id: 'catálogo: servicios' },
   // Los filtros del Mercado, a la vista. Por debajo de 1024 px el panel
   // arranca plegado y, desde FILTER-COLLAPSE-FOCUS-1, sus controles plegados
   // no se ven ni están en el árbol de accesibilidad. Antes el catálogo los
