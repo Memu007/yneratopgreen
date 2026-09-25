@@ -74,6 +74,14 @@ que no tengas que buscarlas.
    y la potencia.
    - Negativo: sacar uno de `PARAMETROS_DEL_MERCADO` da rojo y lo nombra.
 
+8. **P2 visto por PM después de aceptar — dos filtros se llaman «Tipo».**
+   El de productos y servicios (`catalog-type`) y el del tercer nivel
+   (`catalog-subtype`) tienen el mismo rótulo en el mismo panel. El primero
+   pasa a llamarse «Productos o servicios»; el del tercer nivel sigue siendo
+   «Tipo».
+   - Ajustá los casos y la guía que lean el rótulo viejo.
+   - a11y: los dos rótulos tienen que ser distintos.
+
 La siembra de ejemplo suma modelo, año y origen a algunas máquinas, y deja
 otras sin esos datos a propósito, para probar el nulo.
 
