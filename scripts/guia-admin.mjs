@@ -302,6 +302,13 @@ const enElMercado = async (nombre) => {
 const suEnlaceAbre = async (id) => (await pedir(`/catalog/products/${id}`)).status === 200;
 const contar = (sql) => Number(queryRows(sql)[0][0]);
 const totalQueDice = async (panel) => Number(((await panel.innerText()).match(/Total: (\d+)/) || [])[1]);
+// Un importe como lo escribe el panel, «$ 1.626.890,3»: el punto separa miles
+// y la coma, los centavos. Se compara en centavos: leerlo como entero juntaba
+// los centavos con los pesos, y redondear en la base los perdía.
+const centavosDe = (texto) => {
+  const [pesos, centavos = ''] = String(texto).replace(/[^\d,]/g, '').split(',');
+  return Number(pesos || 0) * 100 + Number(centavos.padEnd(2, '0').slice(0, 2));
+};
 
 // Los correos que recibió una dirección, en el outbox de desarrollo. Se lee
 // sólo el encabezado `To:`, no el cuerpo.
@@ -428,11 +435,11 @@ const RECORRIDOS = {
       });
     }
     await v.afirma('la suma de las órdenes pagadas, enviadas o entregadas', async () => {
-      const volumen = Number(queryRows(`SELECT COALESCE(round(sum(total_amount)), 0) FROM orders
+      const volumen = Number(queryRows(`SELECT COALESCE(round(sum(total_amount) * 100), 0) FROM orders
         WHERE status IN ('PAID','SHIPPED','DELIVERED')`)[0][0]);
-      const vistoVolumen = Number((await valorDe('Volumen vendido')).replace(/[^\d]/g, ''));
-      exigir(vistoVolumen === volumen,
-        `«Volumen vendido» dice ${vistoVolumen} y la suma de las pagadas, enviadas y entregadas es ${volumen}`);
+      const leido = await valorDe('Volumen vendido');
+      exigir(centavosDe(leido) === volumen,
+        `«Volumen vendido» dice ${leido} y la suma de las pagadas, enviadas y entregadas es ${volumen / 100}`);
     });
   },
 
@@ -968,9 +975,9 @@ const RECORRIDOS = {
     });
     // Lo que muestra el detalle, contra la orden en la base.
     const texto = (await detalle.innerText()).replace(/\s+/g, ' ');
-    const monto = (rotulo) => Number((texto.match(new RegExp(`${rotulo} \\$\\s?([\\d.]+)`)) || [])[1]?.replace(/\./g, ''));
-    const [[email, subtotal, envio, totalDeLaOrden]] = queryRows(`SELECT u.email, round(o.subtotal),
-      round(o.shipping_cost), round(o.total_amount)
+    const monto = (rotulo) => centavosDe((texto.match(new RegExp(`${rotulo} \\$\\s?([\\d.,]+)`)) || [])[1]);
+    const [[email, subtotal, envio, totalDeLaOrden]] = queryRows(`SELECT u.email, round(o.subtotal * 100),
+      round(o.shipping_cost * 100), round(o.total_amount * 100)
       FROM orders o JOIN users u ON u.id = o.buyer_id WHERE o.order_number = '${numero}'`);
     await v.afirma('el nombre, el correo y la dirección de entrega de quien compra', async () => {
       exigir(texto.includes(c.compradora.user.full_name), 'el detalle no dice el nombre de quien compra');
@@ -982,7 +989,7 @@ const RECORRIDOS = {
       exigir(await articulo.count() === 1, 'el detalle no lista el artículo de la orden');
       const celdas = (await articulo.locator('td').allInnerTexts()).map((t) => t.trim());
       exigir(celdas[1] === '1', `la cantidad dice ${celdas[1]}`);
-      exigir(Number(celdas[2].replace(/[^\d]/g, '')) === c.orden.precio,
+      exigir(centavosDe(celdas[2]) === c.orden.precio * 100,
         `el precio dice ${celdas[2]}: la orden se compró a ${c.orden.precio} y la publicación hoy cuesta ${c.orden.precioNuevo}`);
     });
     await v.afirma('En el celular el detalle se lee de arriba abajo, sin desplazarse de costado.', async () => {
@@ -994,7 +1001,8 @@ const RECORRIDOS = {
       const vistos = [monto('Subtotal:'), monto('Envío:'), monto('Total:')];
       const enLaBase = [subtotal, envio, totalDeLaOrden].map(Number);
       exigir(JSON.stringify(vistos) === JSON.stringify(enLaBase),
-        `el detalle dice subtotal, envío y total ${vistos.join(', ')} y la orden tiene ${enLaBase.join(', ')}`);
+        `el detalle dice subtotal, envío y total ${vistos.map((x) => x / 100).join(', ')} `
+        + `y la orden tiene ${enLaBase.map((x) => x / 100).join(', ')}`);
     });
     const suya = await pedir('/orders/my?as_role=buyer', { token: c.compradora.access_token });
     const deElla = (suya.data || []).find((o) => o.order_number === numero);

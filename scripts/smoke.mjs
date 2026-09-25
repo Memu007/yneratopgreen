@@ -10,7 +10,9 @@ import {
   CUENTA_INCOMPLETA, CUENTA_LENTA, CUENTA_RECHAZA, DETALLE_CRUDO, SECRETO_DE_ACCESO,
   SECRETO_DE_REFRESCO, firmaDeAviso, levantarDoble,
 } from './lib/mp-doble.mjs';
-import { queryCount, queryRows, querySql, sqlLiteral } from './lib/sql.mjs';
+import {
+  BASE_DE_LA_APLICACION, queryCount, queryRows, querySql, sqlLiteral,
+} from './lib/sql.mjs';
 
 const API_URL = process.env.SMOKE_API_URL || 'http://localhost:8000/api';
 const FRONTEND_URL = process.env.SMOKE_FRONTEND_URL || 'http://localhost:5173';
@@ -7169,19 +7171,52 @@ await runCase(74, 'El descarte de credenciales en claro sólo lo autoriza un 1',
   // Se baja hasta la revisión ANTERIOR a la del cifrado, por nombre y no por
   // «-1»: el freno es de esa migración, y contarlo desde la punta haría que
   // cada migración nueva mida otra cosa.
-  const bajada = correrAlembic('downgrade c4a91e37d5b8');
-  assert(/Running downgrade/.test(bajada), `el downgrade no corrió: ${bajada.slice(-200)}`);
+  //
+  // Y se baja en una COPIA de la base, no en la de la aplicación. Bajar a esa
+  // revisión deshace todas las migraciones posteriores, y sus `downgrade`
+  // borran columnas con datos: la marca de las publicaciones, su condición,
+  // la documentación de los vendedores, las reservas de stock. Al volver a
+  // subir, las columnas nacen vacías. En la base compartida eso le borraba la
+  // marca a las publicaciones de la siembra a mitad de la suite, y el caso 187
+  // fallaba mucho después sin relación a la vista (BRAND-LOSS-1).
+  const COPIA = `${BASE_DE_LA_APLICACION}_caso74`;
+  const enLaCopia = { base: COPIA };
+  const enElServidor = { base: 'postgres' };
+  const urlDeLaAplicacion = spawnSync('docker', ['exec', 'topgreen-api', 'python', '-c',
+    'from app.core.config import settings; print(settings.DATABASE_URL)'], { encoding: 'utf8' })
+    .stdout.trim();
+  assert(/\/[^/?]+(\?.*)?$/.test(urlDeLaAplicacion), 'no se pudo leer a qué base se conecta la aplicación');
+  const aLaCopia = [`DATABASE_URL=${urlDeLaAplicacion.replace(/\/[^/?]+(\?.*)?$/, `/${COPIA}$1`)}`];
+  const alembicEnLaCopia = (comando, variables = []) => correrAlembic(comando, [...aLaCopia, ...variables]);
+
+  querySql(`DROP DATABASE IF EXISTS ${COPIA}`, enElServidor);
+  // Una copia exacta. La plantilla no admite otras conexiones: se cortan las
+  // de la aplicación, que vuelve a conectarse sola en el pedido siguiente
+  // (`pool_pre_ping`), y se reintenta si alguien entró justo en el medio.
+  for (let intento = 1; ; intento += 1) {
+    querySql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+      WHERE datname = ${sqlLiteral(BASE_DE_LA_APLICACION)} AND pid <> pg_backend_pid()`, enElServidor);
+    try {
+      querySql(`CREATE DATABASE ${COPIA} TEMPLATE ${BASE_DE_LA_APLICACION}`, enElServidor);
+      break;
+    } catch (error) {
+      if (intento === 5) throw error;
+    }
+  }
 
   const enClaro = () => queryCount(
-    "SELECT COUNT(*) FROM users WHERE mp_access_token IS NOT NULL");
+    "SELECT COUNT(*) FROM users WHERE mp_access_token IS NOT NULL", enLaCopia);
   const columnasViejas = () => queryCount(`SELECT COUNT(*) FROM information_schema.columns
-    WHERE table_name = 'users' AND column_name IN ('mp_access_token', 'mp_refresh_token')`);
+    WHERE table_name = 'users' AND column_name IN ('mp_access_token', 'mp_refresh_token')`, enLaCopia);
 
   try {
+    const bajada = alembicEnLaCopia('downgrade c4a91e37d5b8');
+    assert(/Running downgrade/.test(bajada), `el downgrade no corrió: ${bajada.slice(-200)}`);
+
     // Un token como el que dejaba `manual-link`, que es el caso que el freno
     // existe para atajar.
     querySql(`UPDATE users SET mp_access_token = 'APP_USR-de-prueba-en-claro'
-      WHERE email = ${sqlLiteral('vendedor@ejemplo.com')}`);
+      WHERE email = ${sqlLiteral('vendedor@ejemplo.com')}`, enLaCopia);
     assert(enClaro() === 1, 'no se pudo fabricar el escenario del freno');
 
     const negados = [
@@ -7193,7 +7228,7 @@ await runCase(74, 'El descarte de credenciales en claro sólo lo autoriza un 1',
     ];
 
     for (const [variables, comoLoLlamamos] of negados) {
-      const salida = correrAlembic('upgrade head', variables);
+      const salida = alembicEnLaCopia('upgrade head', variables);
       assert(/credenciales de Mercado Pago/.test(salida),
         `con la variable ${comoLoLlamamos} la migración no frenó: ${salida.slice(-250)}`);
       assert(enClaro() === 1,
@@ -7203,22 +7238,22 @@ await runCase(74, 'El descarte de credenciales en claro sólo lo autoriza un 1',
     }
 
     // El mensaje dice cuántos hay, nunca cuáles ni de quién.
-    const frenada = correrAlembic('upgrade head');
+    const frenada = alembicEnLaCopia('upgrade head');
     assert(/Hay 1 usuario/.test(frenada), `el mensaje no dice cuántos: ${frenada.slice(-250)}`);
     assert(!/vendedor@ejemplo\.com|APP_USR/.test(frenada),
       'el mensaje del freno filtra de quién es la credencial');
 
-    const autorizada = correrAlembic('upgrade head', ['MP_MIGRACION_DESCARTAR_TOKENS=1']);
+    const autorizada = alembicEnLaCopia('upgrade head', ['MP_MIGRACION_DESCARTAR_TOKENS=1']);
     assert(/Running upgrade/.test(autorizada),
       `con 1 la migración no avanzó: ${autorizada.slice(-250)}`);
     assert(columnasViejas() === 0, 'las columnas en claro siguen existiendo');
 
     return 'cinco valores que no son «1» -sin definir, vacía, 0, false y 11- frenan la '
       + 'migración sin tocar la credencial; el mensaje dice cuántas hay y no de quién; '
-      + 'sólo con 1 avanza y las columnas en claro desaparecen';
+      + 'sólo con 1 avanza y las columnas en claro desaparecen. Todo en una copia de la base';
   } finally {
-    // Pase lo que pase, la base queda en head para lo que venga después.
-    correrAlembic('upgrade head', ['MP_MIGRACION_DESCARTAR_TOKENS=1']);
+    // La copia se descarta; la base de la aplicación no se tocó.
+    querySql(`DROP DATABASE IF EXISTS ${COPIA}`, enElServidor);
   }
 });
 
@@ -32313,6 +32348,21 @@ await runCase(187, 'Con el panel de filtros plegado, el teclado no entra en cont
   // invisibles antes de «Ordenar». Se mira con el teclado, control por
   // control, y se mira el árbol que recibe un lector de pantalla.
   const CONTROLES = '#panel-de-filtros select, #panel-de-filtros input, #panel-de-filtros button';
+  // El filtro de marca sólo aparece si hay alguna publicación activa con
+  // marca. No se depende de que la siembra conserve las suyas: otro caso que
+  // las tocara hacía fallar este por una razón ajena (BRAND-LOSS-1). El caso
+  // publica una propia y la retira al terminar.
+  await asegurarSesiones();
+  const [[categoriaConMarca]] = queryRows(
+    'SELECT id FROM categories WHERE usa_marca AND NOT is_service AND is_active ORDER BY name LIMIT 1');
+  const conMarca = (await apiRequest('/products', {
+    method: 'POST', token: state.sellerToken,
+    body: {
+      name: `Smoke 187 con marca ${Date.now()}`, description: 'Publicación que hace aparecer el filtro de marca.',
+      category_id: categoriaConMarca, price: 1000, stock: 1, unit: 'unidad', locality_id: localidadDeEnvio(),
+      publication_type: 'producto', operation_kind: 'activo', brand: 'john-deere',
+    },
+  })).data;
   const browser = await chromium.launch({ headless: true });
   const informe = [];
   const erroresDeJs = [];
@@ -32576,6 +32626,7 @@ await runCase(187, 'Con el panel de filtros plegado, el teclado no entra en cont
     assert(erroresDeJs.length === 0, `errores de JS: ${erroresDeJs.join(' | ')}`);
   } finally {
     await browser.close();
+    await apiRequest(`/products/${conMarca.id}`, { method: 'DELETE', token: state.sellerToken }).catch(() => {});
   }
   return informe.join('. ');
 });

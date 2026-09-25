@@ -37,7 +37,12 @@ export function sqlLiteral(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
 }
 
-export function querySql(sql) {
+export const BASE_DE_LA_APLICACION = DB_NAME;
+
+// `base` es para el caso raro que necesita otra base del mismo servidor: una
+// copia descartable, o `postgres` para crear o borrar esa copia. Sin ella, se
+// habla con la base de la aplicación, como siempre.
+export function querySql(sql, { base = DB_NAME } = {}) {
   return execFileSync(
     'docker',
     [
@@ -47,7 +52,7 @@ export function querySql(sql) {
       '-U',
       DB_USER,
       '-d',
-      DB_NAME,
+      base,
       '-tA',
       '-F',
       '\t',
@@ -60,14 +65,14 @@ export function querySql(sql) {
   ).trim();
 }
 
-export function queryRows(sql) {
-  const output = querySql(sql);
+export function queryRows(sql, opciones) {
+  const output = querySql(sql, opciones);
   if (!output) return [];
   return output.split(/\r?\n/).map((line) => line.split('\t'));
 }
 
-export function queryCount(sql) {
-  const value = Number.parseInt(querySql(sql), 10);
+export function queryCount(sql, opciones) {
+  const value = Number.parseInt(querySql(sql, opciones), 10);
   if (!Number.isInteger(value)) {
     throw new Error(`La consulta SQL no devolvió un entero: ${sql}`);
   }
