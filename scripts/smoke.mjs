@@ -10433,12 +10433,29 @@ async function decidirDocumentacion(admin, documentacionId, decision, motivo) {
   });
 }
 
+// Los minutos que le quedan a un token de acceso, leídos de su `exp`. Un token
+// que no se puede leer no tiene vida: se pide otro.
+function minutosDeVida(token) {
+  try {
+    const { exp } = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+    return (exp * 1000 - Date.now()) / 60_000;
+  } catch {
+    return 0;
+  }
+}
+
 async function tokenDeAdmin() {
   // El token guardado puede haber vencido: lo usan casos que corren muchos
   // minutos después del primero que lo pidió (en la suite completa, los 190 y
   // 191 caían con 401 «Token inválido o expirado»). Se prueba y, si ya no
   // sirve, se vuelve a ingresar.
-  if (state.docAdminToken
+  //
+  // Y no alcanza con que sirva ahora: el caso lo usa durante toda su corrida.
+  // Un token que pasaba `/auth/me` al empezar el 191 vencía en el medio, y su
+  // `PATCH /admin/products/…/status` volvía con 401 (la suite de la PM, sobre
+  // `2b71709`). Por eso se renueva si le quedan menos de diez minutos: ningún
+  // caso que lo pide dura tanto.
+  if (state.docAdminToken && minutosDeVida(state.docAdminToken) > 10
     && (await pedirCrudo('/auth/me', { header: state.docAdminToken })).status === 200) {
     return state.docAdminToken;
   }
