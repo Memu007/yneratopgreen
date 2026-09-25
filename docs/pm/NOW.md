@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-09-24.
+Actualizado: 2026-09-25.
 
 `NOW.md` contiene sólo estado vigente, restricciones vivas, bloqueos y próxima acción. La historia anterior permanece en Git; la instantánea previa a esta poda está en `ab4165fc`.
 
@@ -8,19 +8,21 @@ Actualizado: 2026-09-24.
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5, último día (ventana 04/09–24/09). Su puerta funcional quedó verificada el 23/09 sobre `1e4a63c` (`REPRODUCCION-FASE-2-2026-09-23.md`). Desde el **25/09** corre la **Fase 3**, semanas 6–8, hasta el 15/10. Su puerta y el hito intermedio ya quedaron aceptados por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `e9cf4c6`, publicado el 25/09 con autorización de Emi: incluye las quince piezas aceptadas hasta `BRAND-LOSS-1` y la migración `b6d3f12a8e94`. Emi verificó a ojo el sitio publicado el 25/09.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `MERCADO-UNICO-1` en `2b71709`, informe `0aeb0b6`. Aceptadas en rama y sin publicar: `COPY-AGRO-1` y `MERCADO-UNICO-1`. Lo anterior ya está en `main` (`e9cf4c6`).
-- **Última decisión PM:** `MERCADO-UNICO-1` **ACEPTADA EN RAMA**: un solo Mercado, sin pestaña Servicios, y los enlaces viejos llevan al Mercado filtrado. 193 en 1/1, cinco negativos en rojo (dos de PM), suite completa 191/193 y puertas verdes. Evidencia en `REPRODUCCION-MERCADO-UNICO-1-2026-09-25.md`.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; parte 1 de `ATRIBUTOS-RUBRO-1` en `d283cac`, informe `ba18f76`. Aceptadas en rama y sin publicar: `COPY-AGRO-1`, `MERCADO-UNICO-1` y la parte 1 de `ATRIBUTOS-RUBRO-1`. Lo anterior ya está en `main` (`e9cf4c6`).
+- **Última decisión PM:** `ATRIBUTOS-RUBRO-1` parte 1 **ACEPTADA EN RAMA**: tipo (tercer nivel) en 33 subrubros con 122 opciones y potencia de Tractores, con alta, edición, ficha y filtro en el servidor. 179/194/195/196 en 4/4, seis negativos en rojo (tres de PM), suite completa 195/196 (el 169 es de entorno), puertas verdes. Evidencia en `REPRODUCCION-ATRIBUTOS-RUBRO-1-P1-2026-09-25.md`.
 - **Publicación 25/09:** con autorización explícita de Emi y sin backup previo (decisión del 25/09 para el entorno demostrativo), PM subió `e9cf4c6` a `main` por fast-forward desde `0bd7fbc`. La verificación previa fue desde base recién creada: 190 de 191 casos cubiertos (el 169 es de entorno); a11y 76/76, contraste 84/84, auditoría 12/12, guía 26/26, build, tipos, lint y `alembic check` verdes; sin secretos ni archivos prohibidos. Railway corre `alembic upgrade head` como `preDeployCommand`. La red del entorno de PM bloquea `railway.app`, así que la verificación la hizo Emi: el 25/09 revisó el sitio publicado y **se ve bien**. `COPY-AGRO-1` no está incluida.
-- **Tarea activa:** `ATRIBUTOS-RUBRO-1`, en dos partes. Parte 1: el tercer nivel de la taxonomía de la clienta como «tipo» filtrable en los siete rubros, más la potencia de tractores. Parte 2: modelo y año en maquinaria, y origen declarado. Después vienen las guías de uso.
+- **Tarea activa:** `ATRIBUTOS-RUBRO-1`, parte 2: modelo y año en maquinaria, origen declarado y dos P2 vistos por la Dev (la marca queda cargada en el alta siguiente; «Mercado» saca filtros de la barra). Después vienen las guías de uso.
 - **#9, atributos por rubro: absorbido (decisión de Emi, 25/09).** Tercer nivel de la taxonomía de la clienta como filtro en todos los rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. «Inversores» queda afuera. Va después de `MERCADO-UNICO-1` y antes de las guías de uso.
 - **Escalado a Emi:** la regla «el teléfono no sale de la API sin suscripción activa» choca con la decisión del 05/08, que pasó suscripciones y candados por plan a Fase 6. Hoy el teléfono no se publica en el Mercado ni en las fichas, pero sí lo ven las dos partes de una orden y quien compra al elegir transportista, sin suscripción. El transportista no recibe el de quien compra.
 
-## Última aceptación PM — MERCADO-UNICO-1
+## Última aceptación PM — ATRIBUTOS-RUBRO-1, parte 1
 
-Devolución de la clienta #7. Servicios deja de ser una pestaña: los servicios
-se encuentran en el Mercado con el filtro por tipo, y los enlaces viejos
-llevan ahí sin agregar entradas al historial. La página no tenía avisos de
-responsabilidad que mudar. Sin publicar todavía.
+Devolución de la clienta #9. Quien publica elige el tipo de la lista de su
+subrubro, y en Tractores carga la potencia en HP. El Mercado filtra por los
+dos en el servidor, y lo no declarado no entra. En producción las listas
+llegan con la migración `c8e41f2a7d90`, porque la siembra no corre. **Control
+después de publicar:** un subrubro por rubro tiene que ofrecer «Tipo», y
+Tractores, «Potencia». Sin publicar todavía.
 
 ## Aceptaciones anteriores
 
@@ -30,6 +32,7 @@ riesgos que dejaron abiertos están en «Pendientes canónicos adoptados».
 
 | Pieza | Estado | Evidencia |
 |---|---|---|
+| `MERCADO-UNICO-1` | aceptada en rama | `REPRODUCCION-MERCADO-UNICO-1-2026-09-25.md` |
 | `COPY-AGRO-1` | aceptada en rama | `REPRODUCCION-COPY-AGRO-1-2026-09-25.md` |
 | `BRAND-LOSS-1` | publicada en `e9cf4c6` | `REPRODUCCION-BRAND-LOSS-1-2026-09-25.md` |
 | `ADMIN-PANEL-DEFECTS-1` | aceptada en rama | `REPRODUCCION-ADMIN-PANEL-DEFECTS-1-2026-09-24.md` |

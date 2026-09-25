@@ -5,158 +5,123 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Tarea activa — ATRIBUTOS-RUBRO-1
+## Tarea activa — ATRIBUTOS-RUBRO-1, parte 2
 
 **Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
 
-### Decisión sobre tu consulta del 25/09 (`68e5223`) — seguí con la parte 1
+### Decisión sobre la parte 1
 
-Frenaste en el momento justo. **Se toma tu opción 1**, con dos agregados.
+**Aceptada en rama** sobre `d283cac`. Evidencia en
+`REPRODUCCION-ATRIBUTOS-RUBRO-1-P1-2026-09-25.md`.
 
-- **Las 29 listas claras** se cargan como propusiste, con los nombres
-  completos en Fertilización y protección. Los drones quedan en los dos
-  lugares.
-- **Las 4 listas mezcladas** quedan con una sola dimensión, como propusiste:
-  - Siembra y plantación: granos gruesos, granos finos, hortalizas y otras;
-  - Fertilizantes: orgánicos y minerales;
-  - Compra-venta definitiva, sin los paréntesis;
-  - Alquiler por campaña: siembra directa, siembra convencional y otros.
+- **Casos:** 179, 194, 195 y 196 en 4/4.
+- **Negativos:** los tres tuyos dan rojo, y también los tres míos:
+  - bordes corridos, con 60 HP en compacto;
+  - un tipo de cualquier subrubro;
+  - cambiar de subrubro sin soltar el tipo.
+- **Suite completa desde base nueva:** 195/196. Sólo cae el 169, de entorno.
+  El 191 queda verde, así que el P3 del token está cerrado.
+- **Auditorías:** a11y 78/78, contraste 86/86, móvil 12/12 y la guía
+  coincide.
 
-  Lo que sale del filtro («de precisión», «neumáticas», «líquidos», «de
-  liberación controlada», «secano/riego», «con/sin mejora de suelos») se
-  sigue encontrando con el buscador de texto si quien publica lo escribe. El
-  caso tiene que comprobarlo con una publicación que diga «neumática» en su
-  descripción.
-- **Las 4 «Mejoras» de Tierras** y **las 5 listas de una sola opción**
-  quedan sin tipo. Si más adelante se quiere elegir varias mejoras, es otra
-  pieza.
-- **Agregado 1:** «Cercas y bebederos» suma la opción «bebederos», y
-  «Sustratos y coberturas» suma «sustratos». No es inventar: el nombre del
-  subrubro los nombra, y sin eso quien vende un bebedero no tendría tipo. Se
-  lo informo a la clienta.
-- **Agregado 2:** en `TAXONOMIA-CLIENTE.md` no se toca nada. Dejá la tabla
-  final, lista por lista, en un archivo de datos del código o en la siembra,
-  y en tu informe, así se la puedo mostrar a Emi.
+Muy bien visto lo de las listas en producción: sin `7177b2d`, el filtro no
+habría aparecido en el sitio.
 
-**P3 del 191 (`2a0c461`):** el arreglo se ve bien. Lo verifico con la suite
-de la parte 1.
+**Sobre tus consultas:**
 
-### Decisión sobre la entrega anterior
+- Los nombres completos en Cosecha y en Cercas se aceptan.
+- La tarjeta sigue sin el tipo.
+- Tierras no cambia.
+- Los dos P2 entran en esta parte (ver abajo).
 
-`MERCADO-UNICO-1` quedó **aceptada en rama** sobre `2b71709`.
+**Para tu próximo script de negativos (P3, sin tarea):** hoy depende de
+`entorno_nativo.sh --reiniciar-api`. En mi entorno tuve que reemplazar ese
+paso. Si podés, que el reinicio se pueda pasar por una variable.
 
-- 193 en 1/1.
-- Tus tres negativos dan rojo, y también los míos:
-  - la reescritura hecha con `pushState`;
-  - quitar la reescritura al volver por el historial.
-- Suite completa en 191/193; a11y, contraste, auditoría móvil y guía del
-  panel verdes.
+### Qué entra en la parte 2
 
-Acepto tus dos recomendaciones:
+Las decisiones PM 3 a 6 de la parte 1 siguen vigentes. Se repiten acá para
+que no tengas que buscarlas.
 
-- no se agrega ningún aviso nuevo;
-- la cabecera queda en 2+2 en celular.
-
-Las fotos sin uso se conservan. Evidencia en
-`REPRODUCCION-MERCADO-UNICO-1-2026-09-25.md`.
-
-### Problema y prioridad
-
-Es la devolución de la clienta #9 más la taxonomía que mandó el 25/07 y
-reenvió el 25/09. **Emi decidió absorberlo** (`DECISIONS.md`, 25/09).
-
-La clienta quiere que quien publica cargue lo que identifica su producto, y
-que eso alimente los filtros: «cuantos más datos aporta el vendedor mayor
-probabilidad de aparecer al filtrar». Hoy el Mercado filtra por categoría y
-subcategoría, pero no por el tercer nivel de su listado. Tampoco hay
-potencia, modelo, año ni origen.
-
-**La fuente de los datos** es `docs/pm/TAXONOMIA-CLIENTE.md`, que tiene
-transcripto el tercer nivel de los 43 subrubros. No se usa el HTML de la
-clienta: tomamos los datos, no el código.
-
-### Decisiones PM
-
-1. **El tercer nivel es un atributo de la publicación, no un nivel más de
-   categorías.** Así lo decidimos el 15/09. Cada subrubro tiene su lista
-   cerrada de «tipo», por ejemplo:
-   - Preparación del suelo: arados, rastras…;
-   - Riego por aspersión: pivotes, cañones, laterales.
-
-   Al publicar se elige uno de la lista del subrubro. Es opcional: una
-   publicación vieja sin tipo sigue siendo válida.
-2. **Tractores:** su tercer nivel son rangos de potencia. Quien publica carga
-   la potencia en HP como número, y el filtro ofrece los tres rangos de la
-   clienta: compacto (<60), estándar (60–120) y alta (>120).
-3. **Maquinaria agrícola:** además de la marca, que ya existe, suma modelo
-   (texto) y año (número entre 1950 y el año próximo). El filtro de año es
-   un rango, desde y hasta. El modelo no es un filtro propio: se encuentra
-   con el buscador de texto.
-4. **Origen** («Agencia / Concesionaria» o «Dueño directo»):
+1. **Modelo** (sólo Maquinaria agrícola). Es texto opcional y se ve en la
+   ficha.
+   - No es un filtro propio: se encuentra con el buscador de texto.
+2. **Año** (sólo Maquinaria agrícola). Es un número opcional entre 1950 y el
+   año próximo.
+   - El filtro es un rango, «desde» y «hasta», y cualquiera de los dos puede
+     ir solo.
+3. **Origen**, «Agencia / Concesionaria» o «Dueño directo»:
    - es opcional y sólo para productos, no para servicios;
    - se muestra siempre rotulado «declarado por quien vende», en la tarjeta,
      en la ficha y en el filtro;
    - nunca tiene el aspecto del distintivo de documentación revisada.
-5. **El nulo no entra en un filtro positivo**, como la condición: pedir
-   «arados» no trae publicaciones sin tipo.
-6. **Los filtros nuevos siguen el contrato de los que ya existen:** se
-   aplican en el servidor antes de contar y paginar, viajan en la URL,
-   vuelven con Atrás y Adelante, y cambiarlos vuelve a la página 1. El
-   filtro de tipo aparece cuando hay un subrubro elegido y ofrece sólo sus
-   opciones.
+4. **El nulo no entra en un filtro positivo.** Pedir años desde 2015 no trae
+   publicaciones sin año, y pedir «Dueño directo» no trae las que no
+   declararon origen.
+5. **Los filtros siguen el contrato de los que ya existen:**
+   - se aplican en el servidor antes de contar y paginar;
+   - viajan en la URL y vuelven con Atrás y Adelante;
+   - cambiarlos vuelve a la página 1.
+6. **P2 — la marca queda cargada en la publicación siguiente**
+   (`AddProductModal.tsx:212`). `limpiarFormulario` tiene que soltar la
+   marca, y también el modelo, el año y el origen nuevos.
+   - Caso: publicar un John Deere y abrir otra alta; el selector aparece
+     vacío.
+   - Negativo: sin limpiar la marca, el caso da rojo.
+7. **P2 — «Mercado» dentro del Mercado saca filtros de la barra**
+   (`politica.ts:74`). La condición, el orden, la marca, el año y el origen
+   tienen que sobrevivir a «Mercado» y a recargar, como ya sobreviven el tipo
+   y la potencia.
+   - Negativo: sacar uno de `PARAMETROS_DEL_MERCADO` da rojo y lo nombra.
 
-### Dos partes, entregas separadas
-
-- **Parte 1:** tipo (tercer nivel) en los siete rubros y potencia de
-  tractores, con alta, edición, filtro, ficha y siembra de ejemplo.
-- **Parte 2:** modelo y año en maquinaria, y origen declarado.
-
-Cada parte se entrega y se revisa por separado. Si ves un corte mejor,
-proponelo en `PARA-PM.md` antes de construir.
-
-### Además, P3 del arnés
-
-En mi suite completa, el 191 cayó con 401 «Token inválido o expirado» en
-`PATCH /admin/products/…/status`. Solo, pasa. Algún camino del 191 usa un
-token guardado sin renovar. Corregilo en la parte 1.
+La siembra de ejemplo suma modelo, año y origen a algunas máquinas, y deja
+otras sin esos datos a propósito, para probar el nulo.
 
 ### Fuera de alcance
 
-- Editar las listas de tipo desde el panel: salen de la siembra. Si la guía
-  del panel las muestra en Configuración, se documentan.
+- Filtro propio de modelo.
+- Origen en servicios.
+- Editar listas desde el panel.
+- Marca en otros rubros.
+- Mostrar el tipo en la tarjeta.
 - «Inversores».
-- Cambiar la marca a otros rubros.
-- El rediseño de Inicio.
-- Integración y despliegue.
+- Rediseño de Inicio.
+- Integración y despliegue. No avances a `USER-GUIDE-1`.
 
-### Aceptación verificable (en cada parte)
+### Aceptación verificable
 
 1. **Casos nuevos en el smoke:**
-   - alta y edición guardan y muestran cada atributo;
-   - la validación rechaza lo inválido (un tipo que no es del subrubro, una
-     potencia negativa, un año fuera de rango);
-   - el filtro trae lo que corresponde y cuenta en el servidor;
-   - el nulo no entra;
-   - la URL y el historial funcionan;
-   - cambiar un filtro vuelve a la página 1.
+   - alta y edición guardan y muestran modelo, año y origen;
+   - la validación rechaza:
+     - un año de 1949 y uno de dos años adelante;
+     - un origen inventado;
+     - un origen en un servicio;
+     - modelo o año fuera de Maquinaria;
+   - el filtro de año y el de origen cuentan en el servidor, y el nulo no
+     entra;
+   - «desde» mayor que «hasta» no rompe: devuelve cero o se rechaza, y el
+     informe dice cuál;
+   - URL, historial y vuelta a la página 1;
+   - el rótulo «declarado por quien vende» se ve en la tarjeta, la ficha y el
+     filtro, sin el aspecto del distintivo;
+   - los dos P2, cada uno con su caso.
 2. **Negativos:** el filtro aplicado después de contar, en el navegador o
-   aceptando nulos. Cada uno da rojo por su motivo.
-3. **Migración** aditiva, con `downgrade` probado en una copia de la base,
-   como el caso 74. Las publicaciones existentes quedan intactas.
+   aceptando nulos, y uno por cada P2. Cada uno da rojo por su motivo.
+3. **Migración** aditiva, con `downgrade` probado en una copia de la base.
+   Las publicaciones existentes, con su tipo y su potencia, quedan intactas.
 4. **Sin regresiones:** suite completa desde una base recién creada, a11y
    `--todas`, contraste, auditoría móvil y `guia-admin.mjs`.
-5. Build, lint, tipos, `compileall` y diff-check con `cr-at-eol`.
+5. Build, lint, tipos, `compileall`, `alembic check` y diff-check con
+   `cr-at-eol`.
 
 ### Frená y consultá
 
-- Si un subrubro del listado no tiene tercer nivel claro, o si el del
-  listado mezcla cosas que no son tipos. Proponé cómo tratarlo.
 - Si el origen necesita algo más que un campo declarado.
+- Si el rango de año choca con publicaciones que ya existen.
 
-### Entrega en `PARA-PM.md`, por parte
+### Entrega en `PARA-PM.md`
 
 - SHA;
-- qué se cargó por subrubro;
 - los casos y los negativos;
 - la migración;
 - las puertas;
