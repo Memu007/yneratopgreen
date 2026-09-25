@@ -362,16 +362,17 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
           {/* Marca.
 
-              Sólo se dibuja si el conjunto que se está mirando tiene marcas:
-              la lista no es fija, la trae la respuesta junto con el listado.
-              Una lista fija ofrecería 44 marcas sobre un mercado que tiene
-              dos, y elegir cualquiera de las otras 42 daría un vacío que el
-              propio control prometió que no existía.
+              La lista la trae la respuesta junto con el listado, y cada
+              opción dice cuántas publicaciones tiene con los demás filtros
+              puestos.
 
-              Cada opción dice cuántas publicaciones tiene, y por eso ninguna
-              de las ofrecidas puede dar cero. La única que puede aparecer en
-              cero es la que ya está elegida, cuando otro filtro la dejó sin
-              resultados: se queda para poder sacarla. */}
+              Con una categoría que usa marca elegida llegan TODAS las marcas
+              activas, también las que están en cero (decisión de Emi, 25/09):
+              se revisa más fácil y se ve igual desde el primer día. Elegir
+              una en cero da el vacío de siempre.
+
+              Sin esa categoría llegan sólo las marcas que el conjunto tiene, y
+              si no tiene ninguna el control no se dibuja. */}
           {marcasDisponibles.length > 0 && (
             <div className={styles.filterSection}>
               <label className={styles.filterLabel} htmlFor="catalog-brand">

@@ -502,13 +502,24 @@ def get_products(
         .all()
     )
 
+    # Con una categoria que usa marca elegida, se ofrece la lista COMPLETA:
+    # todas las marcas activas, cada una con su cantidad, tambien las que
+    # estan en cero (decision de Emi, 25/09). Es mas facil de revisar y se ve
+    # igual desde el primer dia. Elegir una en cero da el vacio de siempre.
+    # Sin categoria, o con una que no usa marca, sigue la regla de antes: se
+    # ofrecen solo las marcas que el conjunto tiene.
+    lista_completa = False
+    if category:
+        categoria_elegida = db.query(Category.usa_marca).filter(Category.id == category).first()
+        lista_completa = bool(categoria_elegida and categoria_elegida.usa_marca)
+
     # La etiqueta y el estado salen de la misma tabla que valida el alta, no
     # de una lista escrita acá: una marca dada de baja deja de ofrecerse sin
     # que haya que tocar el catálogo.
     # Y si el conjunto no tiene ninguna marca -que es el caso de la mayoría
     # de los listados- no se lee nada: no hay etiquetas que buscar.
     opciones_de_marca = {}
-    if marcas_contadas or brand:
+    if marcas_contadas or brand or lista_completa:
         opciones_de_marca = {
             opcion.value: opcion
             for opcion in db.query(FormOption).filter(
@@ -534,6 +545,15 @@ def get_products(
         elegida = opciones_de_marca.get(brand)
         if elegida is not None and elegida.is_active:
             facetas_de_marca.append((elegida, 0))
+
+    # Con la lista completa, las marcas activas que el conjunto no tiene
+    # entran tambien, en cero.
+    if lista_completa:
+        ofrecidas = {opcion.value for opcion, _ in facetas_de_marca}
+        facetas_de_marca += [
+            (opcion, 0) for opcion in opciones_de_marca.values()
+            if opcion.is_active and opcion.value not in ofrecidas
+        ]
 
     # En el mismo orden en que las ofrece el alta.
     facetas_de_marca.sort(key=lambda par: (par[0].display_order or 0, par[0].label))
