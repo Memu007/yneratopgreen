@@ -5,6 +5,19 @@ Formato: fecha, decisión, motivo.
 
 ---
 
+
+## 2026-09-25 — Publicar en el entorno demostrativo sin backup previo
+
+Decisión de Emi. Railway es hoy un entorno de demostración, sin clientes ni
+datos reales. Si la migración `b6d3f12a8e94` fallara, la base se recrea con
+migraciones y siembra. La migración sólo deja una imagen principal por
+publicación y no borra imágenes, y Railway la corre antes de desplegar: si
+falla, sigue sirviendo la versión anterior.
+
+El backup administrado sigue siendo condición del lanzamiento real (Fase 5).
+Esta decisión reemplaza, sólo para el entorno demostrativo, la puerta de
+recuperación de `PROPUESTA-RECUPERACION-PRE-MIGRACION-2026-09-23.md`.
+
 ## 2026-09-23 — El detalle de una publicación será una página con URL propia
 
 Emi pidió que al abrir una publicación se vea una página, en lugar del modal
