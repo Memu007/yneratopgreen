@@ -7,8 +7,8 @@ Actualizado: 2026-09-25.
 ## Resumen ejecutivo
 
 - **Fase contractual:** Fase 2 — Desarrollo base, semana 5, último día (ventana 04/09–24/09). Su puerta funcional quedó verificada el 23/09 sobre `1e4a63c` (`REPRODUCCION-FASE-2-2026-09-23.md`). Desde el **25/09** corre la **Fase 3**, semanas 6–8, hasta el 15/10. Su puerta y el hito intermedio ya quedaron aceptados por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
-- **`main`:** `e9cf4c6`, publicado el 25/09 con autorización de Emi: incluye las quince piezas aceptadas hasta `BRAND-LOSS-1` y la migración `b6d3f12a8e94`. Emi verificó a ojo el sitio publicado el 25/09.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`; parte 1 de `ATRIBUTOS-RUBRO-1` en `d283cac`, informe `ba18f76`. Aceptadas en rama y sin publicar: `COPY-AGRO-1`, `MERCADO-UNICO-1` y la parte 1 de `ATRIBUTOS-RUBRO-1`. Lo anterior ya está en `main` (`e9cf4c6`).
+- **`main`:** `792d709`, publicado el 25/09 con autorización explícita de Emi, por fast-forward desde `e9cf4c6`. Suma `COPY-AGRO-1`, `MERCADO-UNICO-1` y la parte 1 de `ATRIBUTOS-RUBRO-1`, con la migración `c8e41f2a7d90`. Verificación previa sobre el mismo código (`d283cac`, que difiere sólo en `docs/pm`): suite desde base limpia 195/196 (el 169 es de entorno), a11y 78/78, contraste 86/86, móvil 12/12, guía 26, build, tipos, lint y `alembic check` verdes; sin secretos ni archivos prohibidos. **Pendiente: Emi verifica el sitio**, y que un subrubro por rubro ofrezca «Tipo» y Tractores «Potencia».
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. Todo lo aceptado hasta la parte 1 de `ATRIBUTOS-RUBRO-1` está en `main` (`792d709`); la parte 2 está en curso.
 - **Última decisión PM:** `ATRIBUTOS-RUBRO-1` parte 1 **ACEPTADA EN RAMA**: tipo (tercer nivel) en 33 subrubros con 122 opciones y potencia de Tractores, con alta, edición, ficha y filtro en el servidor. 179/194/195/196 en 4/4, seis negativos en rojo (tres de PM), suite completa 195/196 (el 169 es de entorno), puertas verdes. Evidencia en `REPRODUCCION-ATRIBUTOS-RUBRO-1-P1-2026-09-25.md`.
 - **Publicación 25/09:** con autorización explícita de Emi y sin backup previo (decisión del 25/09 para el entorno demostrativo), PM subió `e9cf4c6` a `main` por fast-forward desde `0bd7fbc`. La verificación previa fue desde base recién creada: 190 de 191 casos cubiertos (el 169 es de entorno); a11y 76/76, contraste 84/84, auditoría 12/12, guía 26/26, build, tipos, lint y `alembic check` verdes; sin secretos ni archivos prohibidos. Railway corre `alembic upgrade head` como `preDeployCommand`. La red del entorno de PM bloquea `railway.app`, así que la verificación la hizo Emi: el 25/09 revisó el sitio publicado y **se ve bien**. `COPY-AGRO-1` no está incluida.
 - **Tarea activa:** `ATRIBUTOS-RUBRO-1`, parte 2: modelo y año en maquinaria, origen declarado y dos P2 vistos por la Dev (la marca queda cargada en el alta siguiente; «Mercado» saca filtros de la barra). Después vienen las guías de uso.
@@ -22,7 +22,7 @@ subrubro, y en Tractores carga la potencia en HP. El Mercado filtra por los
 dos en el servidor, y lo no declarado no entra. En producción las listas
 llegan con la migración `c8e41f2a7d90`, porque la siembra no corre. **Control
 después de publicar:** un subrubro por rubro tiene que ofrecer «Tipo», y
-Tractores, «Potencia». Sin publicar todavía.
+Tractores, «Potencia». Publicada en `792d709`.
 
 ## Aceptaciones anteriores
 
@@ -202,7 +202,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 ## Próxima secuencia
 
 1. Dev trabaja `ATRIBUTOS-RUBRO-1` (#9, absorbido), en dos partes. Después: `USER-GUIDE-1`, las guías de comprador, vendedor y transportista. Sigue, sin depender de Emi, la documentación del despliegue cuando la infraestructura quede fija. Dependen de Emi: la regla del teléfono, SMTP (la clienta no pudo registrarse), cuentas de prueba de Mercado Pago, backups e integración, y las decisiones #5, #7 y #10 de la clienta.
-2. Las quince piezas aceptadas hasta `BRAND-LOSS-1` están publicadas en `main` (`e9cf4c6`, 25/09), incluida la migración de imágenes, y Emi verificó el sitio. `COPY-AGRO-1`, `MERCADO-UNICO-1` y la parte 1 de `ATRIBUTOS-RUBRO-1` se publican juntos cuando PM acepte esa parte (Emi, 25/09: la clienta quiere probar el sitio, y se espera a la parte 1 para que vea los filtros nuevos). Después de publicar, Emi carga tres publicaciones de prueba (dos tractores de marcas distintas y una máquina sin marca, con fotos propias o genéricas y rotuladas «publicación de prueba»). Antes, PM corre la suite completa desde una base limpia sobre el SHA exacto, y Emi autoriza explícitamente la publicación.
+2. `main` está en `792d709` (25/09): todo lo aceptado hasta la parte 1 de `ATRIBUTOS-RUBRO-1`. Lo que venga se publica en la próxima tanda, con suite completa desde base limpia sobre el SHA exacto y autorización explícita de Emi. Después de publicar, Emi carga tres publicaciones de prueba (dos tractores de marcas distintas, con HP, y una máquina sin marca; fotos propias o genéricas, rotuladas «publicación de prueba»).
 3. Backup: no se exige mientras Railway sea demostrativo (decisión del 25/09). Es condición del lanzamiento real.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 5. Antes de cargar datos reales o de lanzar, Emi elige el backup administrado y su costo.
