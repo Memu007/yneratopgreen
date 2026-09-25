@@ -11,7 +11,8 @@ Actualizado: 2026-09-24.
 - **Rama Dev:** `claude/dev-role-repo-3l0kp3`; `COPY-AGRO-1` en `2b92988`, informe `71fc9fa`, aceptada en rama y todavía no publicada. Todo lo anterior ya está en `main` (`e9cf4c6`).
 - **Última decisión PM:** `COPY-AGRO-1` **ACEPTADA EN RAMA**: «agropecuario» en las once apariciones. Caso 192 y cuatro negativos en rojo, 24/24 relacionados, auditoría móvil, a11y y contraste verdes. Evidencia en `REPRODUCCION-COPY-AGRO-1-2026-09-25.md`.
 - **Publicación 25/09:** con autorización explícita de Emi y sin backup previo (decisión del 25/09 para el entorno demostrativo), PM subió `e9cf4c6` a `main` por fast-forward desde `0bd7fbc`. La verificación previa fue desde base recién creada: 190 de 191 casos cubiertos (el 169 es de entorno); a11y 76/76, contraste 84/84, auditoría 12/12, guía 26/26, build, tipos, lint y `alembic check` verdes; sin secretos ni archivos prohibidos. Railway corre `alembic upgrade head` como `preDeployCommand`. La red del entorno de PM bloquea `railway.app`, así que la verificación la hizo Emi: el 25/09 revisó el sitio publicado y **se ve bien**. `COPY-AGRO-1` no está incluida.
-- **Tarea activa:** `USER-GUIDE-1`: guía para comprador, vendedor y transportista, verificada por script como la del panel, que reemplaza esas secciones de `USER_MANUAL.md`.
+- **Tarea activa:** `MERCADO-UNICO-1`: sacar la pestaña Servicios y dejar un solo Mercado (devolución de la clienta #7, decidido por Emi el 25/09). `USER-GUIDE-1` queda para después, para que las guías muestren el sitio final.
+- **#9, atributos por rubro (marca, modelo, año, potencia):** Emi dice que la clienta ya mandó sus datos. PM no los encuentra en el repositorio ni en el entorno y se los pidió a Emi. Es alcance nuevo sobre precio cerrado: absorberlo o cotizarlo aparte es decisión comercial de Emi. Hoy la marca existe sólo para «Maquinaria agrícola», con 44 marcas para elegir al publicar, y el filtro muestra sólo las que tienen publicaciones.
 - **Escalado a Emi:** la regla «el teléfono no sale de la API sin suscripción activa» choca con la decisión del 05/08, que pasó suscripciones y candados por plan a Fase 6. Hoy el teléfono no se publica en el Mercado ni en las fichas, pero sí lo ven las dos partes de una orden y quien compra al elegir transportista, sin suscripción. El transportista no recibe el de quien compra.
 
 ## Última aceptación PM — COPY-AGRO-1
@@ -197,10 +198,10 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. Dev trabaja `USER-GUIDE-1`, las guías de comprador, vendedor y transportista, verificadas por script. Sigue, sin depender de Emi, la documentación del despliegue cuando la infraestructura quede fija. Dependen de Emi: la regla del teléfono, SMTP (la clienta no pudo registrarse), cuentas de prueba de Mercado Pago, backups e integración, y las decisiones #5, #7 y #10 de la clienta.
+1. Dev trabaja `MERCADO-UNICO-1` (#7). Después: `USER-GUIDE-1`, las guías de comprador, vendedor y transportista. Sigue, sin depender de Emi, la documentación del despliegue cuando la infraestructura quede fija. Dependen de Emi: la regla del teléfono, SMTP (la clienta no pudo registrarse), cuentas de prueba de Mercado Pago, backups e integración, y las decisiones #5, #7 y #10 de la clienta.
 2. Las quince piezas aceptadas hasta `BRAND-LOSS-1` están publicadas en `main` (`e9cf4c6`, 25/09), incluida la migración de imágenes, y Emi verificó el sitio. `COPY-AGRO-1` y lo que venga se publican juntos en la próxima tanda. Antes, PM corre la suite completa desde una base limpia sobre el SHA exacto, y Emi autoriza explícitamente la publicación.
 3. Backup: no se exige mientras Railway sea demostrativo (decisión del 25/09). Es condición del lanzamiento real.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 5. Antes de cargar datos reales o de lanzar, Emi elige el backup administrado y su costo.
-6. Los atributos por rubro esperan los datos prometidos por la clienta; Inicio, Servicios y la identidad de AgroMarket esperan decisión de producto.
+6. Los atributos por rubro esperan los datos prometidos por la clienta; Inicio (#5) y la identidad de AgroMarket (#10) esperan decisión de producto; Servicios (#7) quedó decidido el 25/09.
 7. Mercado Pago, red-team y producción contractual permanecen en la secuencia acordada; no se habilitan por esta tarea.

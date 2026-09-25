@@ -7,6 +7,16 @@ Formato: fecha, decisión, motivo.
 
 
 
+
+## 2026-09-25 — Un solo Mercado: Servicios deja de ser una pestaña aparte
+
+Decisión de Emi sobre la devolución de la clienta #7, que ella pidió tres
+veces. Los servicios se encuentran en el Mercado con el filtro por tipo. Los
+enlaces viejos llevan al Mercado filtrado. Las advertencias de
+responsabilidad siguen visibles donde se ven los servicios. Inicio (#5) no se
+rediseña en esta pieza. Se hace antes de las guías de uso, para que sus
+capturas muestren el sitio final.
+
 ## 2026-09-25 — La bajada de la portada queda en dos renglones en celulares angostos
 
 Con «Mercado agropecuario · Argentina», la bajada pasa a dos renglones a 320 y
