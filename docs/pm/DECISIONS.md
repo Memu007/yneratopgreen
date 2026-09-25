@@ -9,6 +9,26 @@ Formato: fecha, decisión, motivo.
 
 
 
+
+## 2026-09-25 — Cómo se cargan las listas de tipo de la clienta
+
+Decisión PM a partir de la consulta de Dev (`68e5223`). De los 43 subrubros:
+
+- 29 tienen una lista clara y se cargan tal cual;
+- Tractores va por potencia;
+- 4 listas mezclan dos características y quedan con una sola dimensión
+  (Siembra, Fertilizantes, Compra-venta y Alquiler por campaña), porque cada
+  publicación elige un solo tipo;
+- las 4 «Mejoras» de Tierras y las 5 listas de una sola opción quedan sin
+  tipo.
+
+Lo que sale del filtro sigue encontrándose con el buscador de texto. Se
+agregan «bebederos» y «sustratos», que nombran los propios subrubros.
+
+El tipo es de elección única a propósito: con elección múltiple, quien vende
+marcaría todo para aparecer en todos los filtros. Las mejoras de un campo,
+que sí son varias a la vez, quedan para una pieza propia.
+
 ## 2026-09-25 — Los atributos por rubro se absorben; «Inversores» afuera; el origen, declarado
 
 Decisiones de Emi sobre la devolución de la clienta #9 y la taxonomía del

@@ -9,6 +9,38 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 **Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
 
+### Decisión sobre tu consulta del 25/09 (`68e5223`) — seguí con la parte 1
+
+Frenaste en el momento justo. **Se toma tu opción 1**, con dos agregados.
+
+- **Las 29 listas claras** se cargan como propusiste, con los nombres
+  completos en Fertilización y protección. Los drones quedan en los dos
+  lugares.
+- **Las 4 listas mezcladas** quedan con una sola dimensión, como propusiste:
+  - Siembra y plantación: granos gruesos, granos finos, hortalizas y otras;
+  - Fertilizantes: orgánicos y minerales;
+  - Compra-venta definitiva, sin los paréntesis;
+  - Alquiler por campaña: siembra directa, siembra convencional y otros.
+
+  Lo que sale del filtro («de precisión», «neumáticas», «líquidos», «de
+  liberación controlada», «secano/riego», «con/sin mejora de suelos») se
+  sigue encontrando con el buscador de texto si quien publica lo escribe. El
+  caso tiene que comprobarlo con una publicación que diga «neumática» en su
+  descripción.
+- **Las 4 «Mejoras» de Tierras** y **las 5 listas de una sola opción**
+  quedan sin tipo. Si más adelante se quiere elegir varias mejoras, es otra
+  pieza.
+- **Agregado 1:** «Cercas y bebederos» suma la opción «bebederos», y
+  «Sustratos y coberturas» suma «sustratos». No es inventar: el nombre del
+  subrubro los nombra, y sin eso quien vende un bebedero no tendría tipo. Se
+  lo informo a la clienta.
+- **Agregado 2:** en `TAXONOMIA-CLIENTE.md` no se toca nada. Dejá la tabla
+  final, lista por lista, en un archivo de datos del código o en la siembra,
+  y en tu informe, así se la puedo mostrar a Emi.
+
+**P3 del 191 (`2a0c461`):** el arreglo se ve bien. Lo verifico con la suite
+de la parte 1.
+
 ### Decisión sobre la entrega anterior
 
 `MERCADO-UNICO-1` quedó **aceptada en rama** sobre `2b71709`.
