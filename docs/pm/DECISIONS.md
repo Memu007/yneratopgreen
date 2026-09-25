@@ -8,6 +8,32 @@ Formato: fecha, decisión, motivo.
 
 
 
+
+## 2026-09-25 — Los atributos por rubro se absorben; «Inversores» afuera; el origen, declarado
+
+Decisiones de Emi sobre la devolución de la clienta #9 y la taxonomía del
+25/07, que ella volvió a mandar el 25/09 sin cambios: 7 rubros, 43
+subrubros, unos 200 ítems de tercer nivel, 48 marcas y 5 servicios.
+
+1. **Se absorbe, sin cotizar aparte**, y se limita a su listado:
+   - el tercer nivel como atributo filtrable en todos los rubros;
+   - la potencia de los tractores;
+   - modelo y año en maquinaria.
+
+   Motivo: la taxonomía llegó antes de la firma, así que la clienta puede
+   leer el tercer nivel como parte de la «búsqueda por categoría»
+   contratada. Lo nuevo, modelo y año, es chico. El cronograma tiene margen.
+2. **«Inversores» no se carga.** Es una idea a futuro, mezclada con el
+   manifiesto del proyecto.
+3. **El origen (agencia o dueño directo) entra como dato declarado por quien
+   vende.** Se muestra siempre rotulado «declarado por quien vende» y nunca
+   con el aspecto del distintivo de documentación revisada. Reemplaza el
+   punto 3 de las decisiones del 15/09 en `PROPUESTA-BUSQUEDA-FACETADA.md`.
+
+Orden: primero `MERCADO-UNICO-1`, después los atributos por rubro y después
+las guías de uso, para que sus capturas muestren el alta y los filtros
+finales.
+
 ## 2026-09-25 — Un solo Mercado: Servicios deja de ser una pestaña aparte
 
 Decisión de Emi sobre la devolución de la clienta #7, que ella pidió tres

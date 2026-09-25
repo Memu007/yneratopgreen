@@ -84,7 +84,11 @@ No integres ni despliegues.
 
 ---
 
-## Después — USER-GUIDE-1 (no empezar todavía)
+## Después (no empezar todavía)
 
-Guía de uso para quien compra, vende y transporta, verificada por script como
-`GUIA-PANEL-ADMIN.md`. Se asigna completa cuando cierre `MERCADO-UNICO-1`.
+1. **Atributos por rubro** (#9, decisión de Emi del 25/09). Tercer nivel de la
+   taxonomía de la clienta (`TAXONOMIA-CLIENTE.md`) como atributo filtrable en
+   los siete rubros; potencia de tractores; modelo y año en maquinaria; y
+   origen, declarado por quien vende y rotulado así. «Inversores» no se carga.
+   Se asigna completa al cerrar `MERCADO-UNICO-1`.
+2. **`USER-GUIDE-1`**, las guías de uso, después de los atributos.

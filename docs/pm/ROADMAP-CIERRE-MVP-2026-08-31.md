@@ -192,7 +192,8 @@ o un rediseño nuevo.
 | 36 | **BRAND-LOSS-1 — aceptada en rama** | Integridad de la suite | Causa: el caso 74 bajaba migraciones sobre la base compartida y vaciaba columnas, incluida la marca. Arreglo `95180a1`/`43f3b20`, sólo arnés: copia de la base, 187 independiente, centavos en la guía. PM reprodujo la causa y el arreglo; suite 172/191 con marcas intactas, más 18/18 en cadena. Evidencia en `REPRODUCCION-BRAND-LOSS-1-2026-09-25.md`. |
 | 37 | **COPY-AGRO-1 — aceptada en rama** | Devolución de la clienta #1 | `a1b4acd`/`2b92988`: once apariciones pasan a «agropecuario»; el caso 192 lo vigila en la fuente y en la pantalla. PM: 192 en 1/1, cuatro negativos en rojo, 24/24 relacionados, auditoría, a11y y contraste verdes. Evidencia en `REPRODUCCION-COPY-AGRO-1-2026-09-25.md`. |
 | 38 | **MERCADO-UNICO-1 — asignada** | Devolución de la clienta #7 (decisión de Emi, 25/09) | Sin pestaña Servicios: un solo Mercado con filtro por tipo; enlaces viejos redirigen. Tarea activa en `PARA-DEV.md`. |
-| 39 | **USER-GUIDE-1 — en espera** | Contrato: capacitación y documentación de uso | Guía de comprador, vendedor y transportista verificada por script; se asigna al cerrar la fila 38. |
+| 39 | **Atributos por rubro — en espera** | Devolución de la clienta #9, absorbida (Emi, 25/09) | Tercer nivel filtrable en los 7 rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. Sin «Inversores». Se asigna al cerrar la fila 38. |
+| 40 | **USER-GUIDE-1 — en espera** | Contrato: capacitación y documentación de uso | Guía de comprador, vendedor y transportista verificada por script; va después de la fila 39. |
 
 Cinco mil visitas mensuales no justifican reescribir la arquitectura. Esta
 puerta cierra primero paginación, consultas y recorridos medidos; capacidad y
