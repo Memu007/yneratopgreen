@@ -34435,6 +34435,11 @@ await runCase(195, 'Filtrar por tipo y por potencia cuenta en el servidor, deja 
 //
 // Se prueba en una COPIA de la base, como el 74: bajar deshace la migración y
 // su `downgrade` borra columnas, y eso no puede pasar en la base compartida.
+//
+// Subir sobre la copia es lo que va a pasar en producción: una base con
+// subrubros y sin la tabla, donde la siembra no corre. Las listas que deja la
+// migración tienen que ser, tipo por tipo, las que la siembra carga desde
+// `services/tipos.py`.
 await runCase(196, 'La migración del tipo y la potencia es aditiva, vuelve atrás y deja intactas las publicaciones', async () => {
   const REVISION = 'c8e41f2a7d90';
   const ANTERIOR = 'b6d3f12a8e94';
@@ -34452,6 +34457,15 @@ await runCase(196, 'La migración del tipo y la potencia es aditiva, vuelve atr�
     .replace(/^columnas:/, '');
     const tabla = () => queryCount(`SELECT COUNT(*) FROM information_schema.tables
     WHERE table_name = 'subcategory_types'`, enLaCopia);
+    // Cada tipo vigente como «rubro/subrubro/tipo=Rótulo#orden».
+    const listas = () => queryRows(`
+    SELECT 'listas:' || coalesce(string_agg(
+      c.slug || '/' || s.slug || '/' || t.slug || '=' || t.name || '#' || t.display_order,
+      '|' ORDER BY c.slug, s.slug, t.display_order, t.slug), '')
+    FROM subcategory_types t
+    JOIN subcategories s ON s.id = t.subcategory_id
+    JOIN categories c ON c.id = s.category_id
+    WHERE t.is_active`, enLaCopia)[0][0].replace(/^listas:/, '').split('|').filter(Boolean);
     const medidos = [];
 
     const [publicaciones, conDato] = queryRows(`
@@ -34459,6 +34473,8 @@ await runCase(196, 'La migración del tipo y la potencia es aditiva, vuelve atr�
       FROM products`, enLaCopia)[0];
     assert(Number(conDato) > 0, 'la copia no tiene ninguna publicación con tipo o potencia: la bajada no probaría nada');
     const antes = huella();
+    const sembradas = listas();
+    assert(sembradas.length > 0, 'la copia no tiene listas de tipos sembradas: no habría con qué comparar');
 
     // --- Bajar --------------------------------------------------------------
     const bajada = alembicEnLaCopia(`downgrade ${ANTERIOR}`);
@@ -34481,9 +34497,17 @@ await runCase(196, 'La migración del tipo y la potencia es aditiva, vuelve atr�
       SELECT (SELECT COUNT(*) FROM products WHERE subcategory_type_id IS NOT NULL OR power_hp IS NOT NULL)::text,
              (SELECT COUNT(*) FROM subcategory_types)::text`, enLaCopia);
     assert(conValor === '0', `subir le inventó tipo o potencia a ${conValor} publicación(es)`);
-    assert(tipos === '0', `la migración cargó ${tipos} tipos y las listas las carga la siembra`);
-    medidos.push('subir crea la tabla vacía y las dos columnas en nulo para todas: no le inventa un dato a '
-      + 'nadie, y el resto de cada fila queda igual');
+    const cargadas = listas();
+    const faltan = sembradas.filter((t) => !cargadas.includes(t));
+    const sobran = cargadas.filter((t) => !sembradas.includes(t));
+    assert(faltan.length === 0 && sobran.length === 0 && Number(tipos) === cargadas.length,
+      `la migración no cargó las listas de la siembra: faltan ${faltan.length} ${JSON.stringify(faltan.slice(0, 3))}, `
+      + `sobran ${sobran.length} ${JSON.stringify(sobran.slice(0, 3))}, ${Number(tipos) - cargadas.length} inactivos`);
+    const subrubros = new Set(cargadas.map((t) => t.split('/').slice(0, 2).join('/'))).size;
+    medidos.push(`subir sobre una base con subrubros y sin la tabla —lo que pasa en producción, donde la siembra `
+      + `no corre— carga ${cargadas.length} tipos en ${subrubros} subrubros, los mismos que la siembra saca de `
+      + 'tipos.py, y deja las dos columnas en nulo para todas: no le inventa un dato a nadie, y el resto de '
+      + 'cada fila queda igual');
 
     // --- La base sostiene lo que valida la API ------------------------------
     let rechazada = false;

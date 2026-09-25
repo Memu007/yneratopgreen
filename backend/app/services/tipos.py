@@ -11,6 +11,11 @@ devuelve las que no dicen qué son.
 que las categorías: se agrega, se renombra o se da de baja acá y se vuelve a
 sembrar. No se edita desde el panel.
 
+En producción la siembra no corre. Ahí las listas las trae la migración
+`c8e41f2a7d90`, con una copia congelada de esta tabla, así que cambiar una
+lista después también pide una migración. El caso 196 compara las dos cargas
+tipo por tipo.
+
 Lo que decidió la PM el 25/09 sobre la transcripción (`PARA-DEV.md`):
 
 - 29 listas claras se cargan como las escribió la clienta, con los nombres
