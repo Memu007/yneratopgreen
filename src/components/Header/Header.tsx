@@ -30,10 +30,12 @@ interface HeaderProps {
 // nueva en la barra pero no es un destino nuevo: antes la única forma de volver
 // al catálogo era hacer clic en la marca. Desde que ese destino tiene su propia
 // celda, la marca hace lo que hace en cualquier sitio: vuelve a Inicio.
+//
+// Servicios ya no es una celda: queda un solo Mercado, y los servicios se
+// encuentran ahí con el filtro por tipo.
 const SECCIONES: [PageSection, string][] = [
   ['home', 'Inicio'],
   ['marketplace', 'Mercado'],
-  ['services', 'Servicios'],
   ['about', 'Quiénes somos'],
   ['contact', 'Contacto'],
 ];
@@ -126,8 +128,8 @@ export const Header: React.FC<HeaderProps> = ({
     onSearchSubmit();
   };
 
-  // Una sola cabecera y una sola primera banda: marca, las cinco secciones y
-  // las acciones de la sesion, iguales en Inicio, en Servicios y en el Mercado.
+  // Una sola cabecera y una sola primera banda: marca, las cuatro secciones y
+  // las acciones de la sesion, iguales en todas las paginas.
   // Lo unico que cambia al entrar al Mercado es que aparece una segunda banda
   // con el buscador, debajo. La identidad de arriba no se mueve.
   const enMercado = currentSection === 'marketplace';

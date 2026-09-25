@@ -14,7 +14,6 @@ import { AddProductModal } from './components/AddProduct/AddProductModal';
 import { AdminPanel } from './components/AdminPanel/AdminPanel';
 import { HomePage } from './components/Pages/HomePage';
 import { AboutPage } from './components/Pages/AboutPage';
-import { ServicesPage } from './components/Pages/ServicesPage';
 import { ContactPage } from './components/Pages/ContactPage';
 import { ProductDetailPage } from './components/ProductDetail/ProductDetailPage';
 import { PaymentResultPage } from './components/Pages/PaymentResultPage';
@@ -50,8 +49,8 @@ function App() {
   // hay abierta encima y cómo se escribe el historial. Nadie más lo toca.
   const navegacion = useNavegacion();
   const currentSection = navegacion.seccion;
-  // La pantalla cuyas cargas siguen vivas. Una ficha abierta desde el Mercado,
-  // Inicio o Servicios no abandona esa pantalla: mientras la ficha está
+  // La pantalla cuyas cargas siguen vivas. Una ficha abierta desde el Mercado
+  // o Inicio no abandona esa pantalla: mientras la ficha está
   // arriba, sus datos se conservan y no se vuelven a pedir, así que Atrás la
   // encuentra como la dejó —mismas tarjetas, misma altura— y la vista y el
   // foco pueden volver adonde estaban. Lo que se dibuja y lo que se escribe
@@ -296,18 +295,13 @@ function App() {
   const selectedProvinceId =
     provinces.find((province) => province.name === selectedProvince)?.id || '';
 
-  // Las vistas previas de Inicio y de Servicios salen del mismo catalogo que el
-  // mercado, con el mismo orden, y se piden solo cuando su pantalla esta a la
-  // vista. Viven aca y no adentro de cada pagina para no competir con la carga
-  // del mercado ni duplicar el estado de red.
+  // La vista previa de Inicio sale del mismo catalogo que el mercado, con el
+  // mismo orden, y se pide solo cuando Inicio esta a la vista. Vive aca y no
+  // adentro de la pagina para no competir con la carga del mercado ni duplicar
+  // el estado de red.
   const vistaPreviaDeInicio = useVistaPrevia({
     activa: pantallaDeTrabajo === 'home',
     mensajeDeError: 'No pudimos cargar las operaciones.',
-  });
-  const vistaPreviaDeServicios = useVistaPrevia({
-    activa: pantallaDeTrabajo === 'services',
-    soloServicios: true,
-    mensajeDeError: 'No pudimos cargar los servicios.',
   });
 
   // Cargar catálogos auxiliares al entrar al marketplace.
@@ -727,12 +721,19 @@ function App() {
     setProductsRevision((revision) => revision + 1);
   };
 
-  // Ir al mercado con el filtro de servicios puesto.
+  // Ir al mercado con el filtro de servicios puesto, y sólo ese.
+  //
+  // Es adonde lleva «Servicios» desde que no es una sección, y tiene que dar lo
+  // mismo que el enlace viejo `?section=services`: los servicios, los más
+  // recientes primero, desde la página 1. Por eso se limpian los demás
+  // filtros y el orden; si no, una búsqueda de antes dejaría ver una parte.
   //
   // Escribir `type=servicios` en la URL no alcanza: el hook de filtros ya esta
   // montado y lee su estado, no la barra de direcciones. Se fija el estado y
   // recien despues se navega.
-  const verServiciosPublicados = () => {
+  const verServicios = () => {
+    resetFilters();
+    setOrden('newest');
     setSelectedType('servicios');
     handleNavigate('marketplace');
   };
@@ -749,7 +750,6 @@ function App() {
         return <HomePage 
           onNavigateToMarketplace={() => handleNavigate('marketplace')} 
           onSolicitarCotizacion={pedirCotizacion}
-          onNavigateToServices={() => handleNavigate('services')}
           onSolicitarPublicar={pedirPublicar}
           onSolicitarIngreso={abrirLoginYVolver}
           vistaPrevia={vistaPreviaDeInicio}
@@ -847,16 +847,6 @@ function App() {
             onSolicitarPublicar={pedirPublicar}
             />
         );
-      case 'services':
-        return (
-          <ServicesPage
-              onSolicitarCotizacion={pedirCotizacion}
-            onVerServiciosPublicados={verServiciosPublicados}
-            onSolicitarPublicar={pedirPublicar}
-            onSolicitarIngreso={abrirLoginYVolver}
-            vistaPrevia={vistaPreviaDeServicios}
-          />
-        );
       case 'account':
         // Mi cuenta es una página del sitio, no una capa sobre él.
         // Quien entra sin sesión no ve nada: el efecto de más abajo
@@ -939,7 +929,10 @@ function App() {
 
         {renderContent()}
 
-        <Footer onNavigate={(section) => handleNavigate(section as PageSection)} />
+        <Footer
+          onNavigate={(section) => handleNavigate(section as PageSection)}
+          onVerServicios={verServicios}
+        />
 
         {/* Modales de autenticación */}
         {authModal === 'login' && (

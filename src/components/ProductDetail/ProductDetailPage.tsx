@@ -42,7 +42,6 @@ interface ProductDetailPageProps {
 const VOLVER_A: Partial<Record<Seccion, string>> = {
   marketplace: 'Volver al Mercado',
   home: 'Volver a Inicio',
-  services: 'Volver a Servicios',
 };
 
 /** Una fila de la tabla técnica. Se omite entera si el dato no está: una fila

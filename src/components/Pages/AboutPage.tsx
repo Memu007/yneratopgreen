@@ -11,8 +11,8 @@ interface AboutPageProps {
       Una sola función y no el par «abrí el formulario» / «abrí el Login»: quién
       de los dos corresponde lo decide la sesión, no la página. Sin sesión abre
       el ingreso y retoma el formulario recién si la persona entra; cancelar o
-      fallar no abre nada. Es la MISMA puerta que usan Inicio, Servicios y una
-      tarjeta sin sesión.
+      fallar no abre nada. Es la MISMA puerta que usan Inicio y una tarjeta
+      sin sesión.
 
       Acá llegó último: esta pantalla conservaba el ingreso sin continuidad —y
       sin decir por qué aparecía— cuando las otras dos ya lo habían dejado. */

@@ -11,7 +11,6 @@ interface HomePageProps {
   /** Pedir una cotización desde una tarjeta de esta pantalla. Lleva qué se
       cotiza y a quién: sin eso, Contacto empieza en blanco. */
   onSolicitarCotizacion?: (pedido: CotizacionPedida) => void;
-  onNavigateToServices?: () => void;
   /** Publicar desde esta pantalla.
    *
       Es una sola función y no el par «abrí el formulario» / «abrí el Login»,

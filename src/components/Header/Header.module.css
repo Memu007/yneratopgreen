@@ -1,7 +1,7 @@
 /* La cabecera: quién es el sitio, a dónde se va y qué se puede hacer.
 
    Una sola banda de identidad, igual en todas las secciones públicas: la marca,
-   las cinco secciones y las acciones de la sesión, cada una en su celda con su
+   las cuatro secciones y las acciones de la sesión, cada una en su celda con su
    propio filete. Es lo que deja que un rol sume «Admin» o «Vender» sin
    rediseñar nada: entra una celda más.
 
@@ -125,7 +125,7 @@
    más. La celda blanca dice «estás acá» sin agregar una forma nueva.
  *
  * Mi cuenta entra en la misma regla y no en una copia suya. Es una sección del
- * sitio desde `ACCOUNT-PAGE-1`, así que se marca igual que las otras cinco;
+ * sitio desde `ACCOUNT-PAGE-1`, así que se marca igual que las otras cuatro;
  * que viva entre las acciones de la sesión es dónde se dibuja, no qué es. Y
  * compartir el selector es lo que evita que las dos marcas se separen: no hay
  * un segundo lugar donde el fondo, el color o el peso puedan quedar viejos. */
@@ -262,9 +262,9 @@
 }
 
 /* --- Tablet: 600–1023 -----------------------------------------------------
-   Cinco secciones al lado de la marca y de las acciones no entran en 768 px.
-   Bajan a su propio renglón de la MISMA banda, en cinco columnas iguales: es
-   la misma cabecera con una fila más, no otra identidad. */
+   Las secciones al lado de la marca y de las acciones no entran en 768 px.
+   Bajan a su propio renglón de la MISMA banda, en columnas iguales, una por
+   sección: es la misma cabecera con una fila más, no otra identidad. */
 @media (max-width: 1023px) {
   .marca {
     padding-left: var(--tg-gutter-tablet);
@@ -280,7 +280,7 @@
     order: 3;
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     border-top: 1px solid var(--celda-filete);
   }
 
@@ -351,33 +351,27 @@
     display: inline;
   }
 
-  /* Cinco secciones no entran en una línea de 358 px útiles: van en tres y
-     dos, que es leerlas, y no en un scroll horizontal ni en un
-     `display: none`, que es esconderlas. */
+  /* Las cuatro secciones no entran en una línea de 358 px útiles: van en dos
+     y dos, que es leerlas, y no en un scroll horizontal ni en un
+     `display: none`, que es esconderlas. Eran cinco, en tres y dos: la
+     cabecera conserva sus dos renglones. */
   .navInterior {
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .navLink {
-    grid-column: span 2;
     min-height: 44px;
     font-size: 13px;
     text-align: center;
     white-space: normal;
   }
 
-  .navLink:nth-child(3) {
+  .navLink:nth-child(2n) {
     border-right: 0;
   }
 
-  .navLink:nth-child(4),
-  .navLink:nth-child(5) {
-    grid-column: span 3;
+  .navLink:nth-child(n + 3) {
     border-top: 1px solid var(--celda-filete);
-  }
-
-  .navLink:nth-child(5) {
-    border-right: 0;
   }
 
   .bandaDeBusqueda {

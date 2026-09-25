@@ -36,6 +36,7 @@ import {
 } from 'react';
 
 import {
+  barraSinNombresRetirados,
   esPantallaDeLlegada,
   filtrosDeLaBarra,
   publicacionDeLaBarra,
@@ -107,6 +108,19 @@ export interface Navegacion {
 }
 
 const barraActual = () => `${window.location.pathname}${window.location.search}`;
+
+/**
+ * Si la barra dice un nombre de sección retirado, se reescribe con el que lo
+ * reemplaza, conservando el estado de la entrada. Corre antes de que nadie la
+ * lea: al cargar la página —abajo, al importar este módulo, antes del primer
+ * dibujo— y cada vez que el historial la mueve.
+ */
+function reescribirNombresRetirados() {
+  const reemplazo = barraSinNombresRetirados(window.location.search);
+  if (reemplazo) window.history.replaceState(window.history.state, '', reemplazo);
+}
+
+if (typeof window !== 'undefined') reescribirNombresRetirados();
 
 const estadoDeLaEntrada = (): EstadoDeLaEntrada =>
   (window.history.state as EstadoDeLaEntrada | null) || {};
@@ -215,6 +229,8 @@ export function useNavegacion(): Navegacion {
         return;
       }
       salidaConsentida.current = false;
+      // Una entrada vieja del historial puede decir un nombre retirado.
+      reescribirNombresRetirados();
       const veniaDeUnaFicha = ubicacionMirada.current.seccion === 'product';
       ubicacionMirada.current = ubicacionDeAhora();
       setSeccion(seccionActual());

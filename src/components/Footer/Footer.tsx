@@ -1,19 +1,30 @@
 import React from 'react';
 import styles from './Footer.module.css';
 
+type Seccion = 'home' | 'marketplace' | 'about' | 'contact';
+
 interface FooterProps {
-  onNavigate?: (section: 'home' | 'marketplace' | 'services' | 'about' | 'contact') => void;
+  onNavigate?: (section: Seccion) => void;
+  /** «Servicios» ya no es una sección: lleva al Mercado con el filtro de
+      servicios puesto. */
+  onVerServicios?: () => void;
 }
 
-type Seccion = 'home' | 'marketplace' | 'services' | 'about' | 'contact';
-
-export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
+export const Footer: React.FC<FooterProps> = ({ onNavigate, onVerServicios }) => {
   const currentYear = new Date().getFullYear();
 
   const handleNavigate = (section: Seccion) => (e: React.MouseEvent) => {
     e.preventDefault();
     if (onNavigate) {
       onNavigate(section);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const verServicios = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (onVerServicios) {
+      onVerServicios();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -49,7 +60,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           <div className={styles.titulo}>Mercado</div>
           <ul className={styles.lista}>
             <li><a href="#" onClick={handleNavigate('marketplace')}>Publicaciones</a></li>
-            <li><a href="#" onClick={handleNavigate('services')}>Servicios</a></li>
+            <li><a href="#" onClick={verServicios}>Servicios</a></li>
           </ul>
         </div>
 
@@ -87,7 +98,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
             Y la columna de «Servicios» ya no lista tres nombres sueltos:
             eran títulos que no correspondían a ninguna publicación ni a
-            ninguna ancla de la página de Servicios. */}
+            ninguna ancla de la página de Servicios, que tampoco existe ya. */}
       </div>
 
       <div className={`tg-container ${styles.legal}`}>

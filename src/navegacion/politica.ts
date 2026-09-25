@@ -11,7 +11,6 @@
 export type Seccion =
   | 'home'
   | 'marketplace'
-  | 'services'
   | 'about'
   | 'contact'
   | 'account'
@@ -34,7 +33,6 @@ export type Seccion =
  */
 const NOMBRE_EN_LA_BARRA: Partial<Record<Seccion, string>> = {
   marketplace: 'marketplace',
-  services: 'services',
   about: 'about',
   contact: 'contact',
   account: 'account',
@@ -43,7 +41,6 @@ const NOMBRE_EN_LA_BARRA: Partial<Record<Seccion, string>> = {
 
 const SECCION_DEL_NOMBRE: Record<string, Seccion> = {
   marketplace: 'marketplace',
-  services: 'services',
   about: 'about',
   contact: 'contact',
   account: 'account',
@@ -68,7 +65,7 @@ export const esPantallaDeLlegada = (seccion: Seccion) => LLEGADAS.includes(secci
 
 /**
  * Los parámetros que describen QUÉ se está mirando en el Mercado. Viajan sólo
- * con el Mercado: en las otras cuatro secciones no significan nada, y dejarlos
+ * con el Mercado: en las otras tres secciones no significan nada, y dejarlos
  * convierte `/` en un enlace que promete un filtro que nadie aplicó.
  *
  * El orden es el de esta lista y no el de escritura: así la misma búsqueda da
@@ -95,6 +92,31 @@ export const PARAMETROS_DEL_MERCADO = [
 export function publicacionDeLaBarra(busqueda: string): string | null {
   const id = (new URLSearchParams(busqueda).get('id') || '').trim();
   return id || null;
+}
+
+/**
+ * Los nombres que la barra ya no usa, con la ubicación que los reemplaza.
+ *
+ * Servicios fue una sección con URL propia hasta que quedó un solo Mercado:
+ * los servicios se buscan ahí, con el filtro por tipo. Un enlace guardado, una
+ * entrada del historial o un marcador que diga `?section=services` no tiene
+ * que terminar en Inicio ni en una pantalla vacía: lleva al Mercado con ese
+ * filtro puesto. La barra se reescribe —no se agrega una entrada—, así que
+ * Atrás no vuelve a pasar por el nombre viejo.
+ */
+const NOMBRES_RETIRADOS: Record<string, () => string> = {
+  services: () => urlDe('marketplace', new URLSearchParams({ type: 'servicios' })),
+};
+
+/**
+ * La URL que tendría que decir la barra si dice un nombre retirado, o `null`
+ * si ya dice uno vigente. Sólo mira la sección: una URL vieja no traía
+ * filtros, porque la barra nunca los escribió fuera del Mercado.
+ */
+export function barraSinNombresRetirados(busqueda: string): string | null {
+  const pedida = new URLSearchParams(busqueda).get('section') || '';
+  const reemplazo = NOMBRES_RETIRADOS[pedida];
+  return reemplazo ? reemplazo() : null;
 }
 
 /** Qué sección declara la barra. Es la única lectura autorizada. */

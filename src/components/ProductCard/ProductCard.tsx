@@ -25,7 +25,7 @@ interface ProductCardProps {
   onSolicitarCotizacion?: (pedido: CotizacionPedida) => void;
   /** Cómo se PRESENTA esta misma tarjeta. `catalogo` es la cuadrícula del
       Mercado, `lista` es la misma operación en un renglón horizontal y
-      `compacta` es la vista previa de Inicio y de Servicios. No son cuatro
+      `compacta` es la vista previa de Inicio. No son cuatro
       tarjetas ni cuatro componentes: mismos datos, misma anatomía, misma
       acción. Y la presentación la elige quien dibuja la grilla —en el Mercado,
       la persona con el selector—, nunca la anatomía de la publicación. */
