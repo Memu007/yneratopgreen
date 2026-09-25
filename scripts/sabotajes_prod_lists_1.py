@@ -1,93 +1,150 @@
 #!/usr/bin/env python3
 """Los rojos discriminantes de PROD-LISTS-1.
 
-Cada negativo rompe la migración `01ff14043124` de una manera y comprueba que
-el caso 197 falle por ESE motivo:
+Cada negativo rompe una pieza de una manera y comprueba que su caso falle por
+ESE motivo:
 
-    python3 scripts/sabotajes_prod_lists_1.py                   # los tres
+    python3 scripts/sabotajes_prod_lists_1.py                   # los cuatro
     python3 scripts/sabotajes_prod_lists_1.py sin-marcas        # uno solo
 
-  sin-marcas        La migración no carga las marcas: producción sigue
-                    ofreciendo sólo «Sin declarar».
-  sin-localidades   La migración no carga las localidades: en producción nadie
-                    podría publicar.
-  pisa-el-panel     La migración vuelve a escribir las marcas que ya existen,
-                    activas y con el rótulo de la siembra: deshace lo que la
-                    clienta cambió desde el panel.
+La migración `01ff14043124` (caso 197):
 
-Necesita la API y la base locales con la siembra demo. No reinicia la API: el
-caso corre la migración con alembic sobre una copia de la base. Deja la
-migración como estaba.
+  sin-marcas        No carga las marcas: producción sigue ofreciendo sólo
+                    «Sin declarar».
+  sin-localidades   No carga las localidades: en producción nadie podría
+                    publicar.
+  pisa-el-panel     Vuelve a escribir las marcas que ya existen, activas y con
+                    el rótulo de la siembra: deshace lo que la clienta cambió
+                    desde el panel.
+
+El filtro de marca con una categoría que usa marca (caso 198):
+
+  oculta-las-cero   El servidor ofrece sólo las marcas que tienen
+                    publicaciones, como antes de la decisión de Emi.
+
+Los de la migración no reinician la API: el caso corre la migración con
+alembic sobre una copia de la base. El del filtro sí, antes y después. El
+reinicio se hace con `./scripts/entorno_nativo.sh --reiniciar-api`, y se
+cambia con la variable REINICIAR_API (por ejemplo, REINICIAR_API="docker
+restart topgreen-api"). Todo lo que cambia lo deja como estaba.
 """
 import os
+import shlex
 import subprocess
 import sys
+import time
+import urllib.request
 from pathlib import Path
 
 sys.dont_write_bytecode = True
 
 RAIZ = Path(__file__).resolve().parent.parent
 MIGRACION = RAIZ / "backend/alembic/versions/20260925_0300_01ff14043124_listas_que_produccion_necesita.py"
+CATALOGO = RAIZ / "backend/app/api/catalog.py"
+REINICIAR_API = os.environ.get("REINICIAR_API", "./scripts/entorno_nativo.sh --reiniciar-api")
+SALUD = os.environ.get("API_SALUD", "http://localhost:8000/api/health")
 
 
-def reemplazar(pares):
-    datos = MIGRACION.read_text(encoding="utf-8")
+def reemplazar(ruta, pares):
+    """Aplica los reemplazos respetando el final de línea del archivo."""
+    datos = ruta.read_bytes().decode("utf-8")
     for viejo, nuevo in pares:
-        assert datos.count(viejo) == 1, f"no encontré «{viejo[:60]}»"
-        datos = datos.replace(viejo, nuevo)
-    return datos
+        for fin in ("\r\n", "\n"):
+            v, n = viejo.replace("\n", fin), nuevo.replace("\n", fin)
+            if datos.count(v) == 1:
+                datos = datos.replace(v, n)
+                break
+        else:
+            raise AssertionError(f"{ruta.name}: no encontré «{viejo[:60]}»")
+    return datos.encode("utf-8")
 
 
 SABOTAJES = {
     "sin-marcas": (
-        lambda: reemplazar([("    cargar_marcas(conexion)\n", "    pass\n")]),
+        MIGRACION, 197,
+        lambda: reemplazar(MIGRACION, [("    cargar_marcas(conexion)\n", "    pass\n")]),
         ["tras subir: faltan 44 marcas"],
         "el 197 dice que faltan las 44 marcas",
     ),
     "sin-localidades": (
-        lambda: reemplazar([("    cargar_localidades(conexion)\n", "    pass\n")]),
+        MIGRACION, 197,
+        lambda: reemplazar(MIGRACION, [("    cargar_localidades(conexion)\n", "    pass\n")]),
         ["las localidades no quedaron como las de la siembra"],
         "el 197 dice que faltan localidades",
     ),
     "pisa-el-panel": (
-        lambda: reemplazar([
-            ("    existentes = {\n", "    conexion.execute(sa.text(\"DELETE FROM form_options WHERE option_type = 'brand'\"))\n"
-                                   "    existentes = {\n"),
-        ]),
+        MIGRACION, 197,
+        lambda: reemplazar(MIGRACION, [(
+            "    existentes = {\n",
+            "    conexion.execute(sa.text(\"DELETE FROM form_options WHERE option_type = 'brand'\"))\n"
+            "    existentes = {\n",
+        )]),
         ["la migración reactivó «pauny»"],
         "el 197 dice que la migración deshizo lo que se cambió en el panel",
+    ),
+    "oculta-las-cero": (
+        CATALOGO, 198,
+        lambda: reemplazar(CATALOGO, [("    if lista_completa:\n        ofrecidas = ",
+                                       "    if False:\n        ofrecidas = ")]),
+        ["ofrece 2 marcas y hay 44 activas", "tenía que ofrecer 44"],
+        "el 198 dice que faltan las marcas en cero, en la API y en la pantalla",
     ),
 }
 
 
-def caso_197():
+def reiniciar_la_api():
+    subprocess.run(shlex.split(REINICIAR_API), cwd=RAIZ, capture_output=True, text=True, check=True)
+    for _ in range(60):
+        try:
+            with urllib.request.urlopen(SALUD, timeout=2) as respuesta:
+                if respuesta.status == 200:
+                    return
+        except OSError:
+            pass
+        time.sleep(1)
+    raise RuntimeError(f"la API no respondió en {SALUD} después de reiniciarla")
+
+
+def correr_el_caso(numero):
     proceso = subprocess.run(["node", "scripts/smoke.mjs"], cwd=RAIZ, capture_output=True, text=True,
-                             env={**os.environ, "SMOKE_CASOS": "197"}, timeout=900)
-    lineas = [l for l in proceso.stdout.splitlines() if l.startswith(("[PASS] 197", "[FAIL] 197"))]
-    return lineas[0] if lineas else "(el caso no imprimió su veredicto)"
+                             env={**os.environ, "SMOKE_CASOS": str(numero)}, timeout=900)
+    lineas = proceso.stdout.splitlines()
+    desde = next((i for i, l in enumerate(lineas)
+                  if l.startswith((f"[PASS] {numero}", f"[FAIL] {numero}"))), None)
+    if desde is None:
+        return "(el caso no imprimió su veredicto)"
+    hasta = next((i for i in range(desde + 1, len(lineas))
+                  if lineas[i].startswith(("[PASS]", "[FAIL]", "Resumen smoke"))), len(lineas))
+    return "\n".join(l for l in lineas[desde:hasta] if l.strip())
 
 
 def main(pedidos):
-    original = MIGRACION.read_bytes()
+    originales = {ruta: ruta.read_bytes() for ruta in (MIGRACION, CATALOGO)}
     todos = True
     for nombre in pedidos:
-        aplicar, deben, que = SABOTAJES[nombre]
+        ruta, numero, aplicar, deben, que = SABOTAJES[nombre]
         print(f"\n=== {nombre}: {que} ===", flush=True)
+        del_backend = ruta != MIGRACION
         try:
-            MIGRACION.write_text(aplicar(), encoding="utf-8")
-            veredicto = caso_197()
+            ruta.write_bytes(aplicar())
+            if del_backend:
+                reiniciar_la_api()
+            veredicto = correr_el_caso(numero)
         finally:
-            MIGRACION.write_bytes(original)
+            ruta.write_bytes(originales[ruta])
+            if del_backend:
+                reiniciar_la_api()
         faltan = [t for t in deben if t not in veredicto]
-        dio = veredicto.startswith("[FAIL] 197") and not faltan
+        dio = veredicto.startswith(f"[FAIL] {numero}") and not faltan
         print("[ROJO ESPERADO]" if dio else "[NO DISCRIMINA]", flush=True)
         if faltan:
             print(f"  no dijo: {faltan}")
-        print(f"  {veredicto[:400]}")
+        for linea in veredicto.splitlines():
+            print(f"  {linea[:300]}")
         todos = todos and dio
-    igual = MIGRACION.read_bytes() == original
-    print(f"\nla migración después: {'como estaba' if igual else 'CAMBIADA'}")
-    todos = todos and igual
+    iguales = all(ruta.read_bytes() == datos for ruta, datos in originales.items())
+    print(f"\nla migración y el catálogo después: {'como estaban' if iguales else 'CAMBIADOS'}")
+    todos = todos and iguales
     print("todos dieron el rojo esperado" if todos else "ATENCION: alguno no discriminó")
     return 0 if todos else 1
 

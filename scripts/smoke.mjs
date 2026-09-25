@@ -29102,6 +29102,9 @@ await runCase(174, 'La marca es un dato de la publicación, y sólo donde signif
 // marca que devuelve cero. La única que puede aparecer en cero es la que ya
 // está elegida, cuando otro filtro la dejó sin resultados: si se cayera de la
 // lista, el control no tendría cómo decir que está puesta ni cómo sacarla.
+// Esta regla vale sin una categoría que use marca, que es lo que mide este
+// caso. Con ella elegida, Emi decidió (25/09) ofrecer la lista completa, con
+// las que están en cero: lo mide el 198.
 //
 // El conjunto se fabrica acá —cinco grupos, uno por marca más uno sin marca,
 // repartidos en más de una página— y se verifica contra la BASE antes de medir
@@ -34633,6 +34636,153 @@ await runCase(197, 'Las marcas y las localidades llegan a producción con la mig
     medidos.push('`alembic check` no encuentra diferencias entre el modelo y el esquema');
     return `${medidos.join('; ')}. Todo en una copia de la base`;
   });
+});
+
+// 198. Con una categoría que usa marca, el filtro ofrece TODAS las marcas.
+//
+// Decisión de Emi (25/09): con Maquinaria agrícola elegida, «Marca» aparece
+// siempre, con las marcas activas y cuántas publicaciones tiene cada una,
+// también las que están en cero. Los conteos siguen siendo del servidor, con
+// los demás filtros puestos. Elegir una en cero da el vacío de siempre, sin
+// error. Sin esa categoría sigue la regla del 175: sólo lo que el conjunto
+// tiene.
+await runCase(198, 'Con una categoría que usa marca, el filtro ofrece todas las marcas activas, también las que están en cero', async () => {
+  const medidos = [];
+  const problemas = [];
+  const [[idCategoria, nombreCategoria]] = queryRows(`
+    SELECT id, name FROM categories WHERE usa_marca = true AND is_active = true ORDER BY name LIMIT 1`);
+  const activas = () => queryRows(`
+    SELECT value || '|' || label, 'fin' FROM form_options
+    WHERE option_type = 'brand' AND is_active ORDER BY display_order, label`).map(([m]) => m);
+  const pedir = async (extra = '') => {
+    const respuesta = await apiRequest(
+      `/catalog/products?category=${idCategoria}&page_size=1&page=1${extra}`);
+    assert(respuesta.status === 200, `el catálogo respondió HTTP ${respuesta.status} para «${extra}»`);
+    return respuesta.data;
+  };
+  const DESACTIVADA = 'zoomlion';
+
+  // --- A. La API ------------------------------------------------------------
+  // A1. Todas las activas, en el orden del alta, cada una con su cantidad.
+  //
+  // Lo esperado NO sale de la lista que se está midiendo: las marcas salen de
+  // la base, y cada cantidad es el total que da el servidor al elegirla.
+  const revisarLista = async (extra, donde) => {
+    const esperadas = [];
+    for (const marca of activas()) {
+      const [valor, rotulo] = marca.split('|');
+      esperadas.push({ value: valor, label: rotulo, count: (await pedir(`${extra}&brand=${valor}`)).total });
+    }
+    const clave = (m) => `${m.value}|${m.label}|${m.count}`;
+    const ofrecidas = ((await pedir(extra)).brands ?? []).map(clave);
+    if (JSON.stringify(ofrecidas) !== JSON.stringify(esperadas.map(clave))) {
+      const faltan = esperadas.map(clave).filter((m) => !ofrecidas.includes(m));
+      problemas.push(`API, ${donde}: ofrece ${ofrecidas.length} marcas y hay ${esperadas.length} activas; `
+        + `faltan o no cuentan lo que da el servidor ${JSON.stringify(faltan.slice(0, 4))}`
+        + `${faltan.length > 4 ? '…' : ''}`);
+    }
+    return esperadas;
+  };
+  const todas = await revisarLista('', 'la categoría sola');
+  const enCero = todas.filter((m) => m.count === 0);
+  assert(enCero.length > 0 && todas.some((m) => m.count > 0),
+    `la base demo no tiene marcas con y sin publicaciones: ${JSON.stringify(todas.map((m) => m.count))}`);
+  const conOtro = await revisarLista('&condition=usado', 'con «usado»');
+  medidos.push(`en «${nombreCategoria}» la API ofrece las ${todas.length} marcas activas en el orden del alta, `
+    + `${enCero.length} en cero, y cada conteo es el total que da el servidor al elegirla, también con `
+    + `otro filtro puesto (${conOtro.filter((m) => m.count > 0).length} con publicaciones usadas)`);
+
+  // A2. Una marca dada de baja no se ofrece.
+  try {
+    querySql(`UPDATE form_options SET is_active = false
+      WHERE option_type = 'brand' AND value = ${sqlLiteral(DESACTIVADA)}`);
+    const sinElla = (await pedir()).brands ?? [];
+    if (sinElla.some((m) => m.value === DESACTIVADA) || sinElla.length !== todas.length - 1) {
+      problemas.push(`API: con «${DESACTIVADA}» dada de baja ofrece ${sinElla.length} marcas, ella incluida: `
+        + `${sinElla.some((m) => m.value === DESACTIVADA)}`);
+    }
+  } finally {
+    querySql(`UPDATE form_options SET is_active = true
+      WHERE option_type = 'brand' AND value = ${sqlLiteral(DESACTIVADA)}`);
+  }
+
+  // A3. Elegir una en cero: vacío, sin error, y la lista entera sigue.
+  const laVacia = enCero[0];
+  const vacio = await pedir(`&brand=${laVacia.value}`);
+  if (vacio.total !== 0 || (vacio.brands ?? []).length !== todas.length) {
+    problemas.push(`API: eligiendo «${laVacia.value}» el total es ${vacio.total} y la lista trae `
+      + `${(vacio.brands ?? []).length} marcas`);
+  }
+
+  // A4. Sin esa categoría, la regla de antes: nada en cero.
+  const sinCategoria = await apiRequest('/catalog/products?page_size=1&page=1');
+  if ((sinCategoria.data.brands ?? []).some((m) => m.count === 0)) {
+    problemas.push('API: sin categoría la lista ofrece marcas en cero');
+  }
+  const [[otraCategoria]] = queryRows(`
+    SELECT id, 'fin' FROM categories WHERE usa_marca = false AND is_active = true ORDER BY name LIMIT 1`);
+  const otra = await apiRequest(`/catalog/products?category=${otraCategoria}&page_size=1&page=1`);
+  if ((otra.data.brands ?? []).some((m) => m.count === 0)) {
+    problemas.push('API: una categoría que no usa marca ofrece marcas en cero');
+  }
+  medidos.push('una marca dada de baja no se ofrece; elegir una en cero da total 0 con la lista entera; sin '
+    + 'categoría, o con una que no usa marca, no se ofrece ninguna en cero');
+
+  // --- B. La pantalla -------------------------------------------------------
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const medida of [{ n: 'escritorio', width: 1440, height: 900 }, { n: 'celular', width: 390, height: 844 }]) {
+      const contexto = await browser.newContext({ viewport: { width: medida.width, height: medida.height } });
+      const page = await contexto.newPage();
+      const donde = `pantalla ${medida.n}`;
+      const control = page.locator('#catalog-brand');
+      const plegador = page.getByRole('button', { name: /^Filtros/ });
+      const abrirLosFiltros = async () => {
+        const plegado = (await plegador.count()) > 0 && (await plegador.isVisible())
+          && (await plegador.getAttribute('aria-expanded')) !== 'true';
+        if (plegado) await plegador.click();
+      };
+      await page.goto(`${FRONTEND_URL}/?section=marketplace&category=${encodeURIComponent(nombreCategoria)}`,
+        { waitUntil: 'domcontentloaded' });
+      await page.locator('article[class*="card"]').first().waitFor({ state: 'visible', timeout: 25_000 });
+      await abrirLosFiltros();
+      try {
+        await control.waitFor({ state: 'visible', timeout: 20_000 });
+      } catch {
+        problemas.push(`${donde}: con «${nombreCategoria}» no se ve el filtro de marca`);
+        await contexto.close();
+        continue;
+      }
+      const textos = (await control.locator('option').allInnerTexts()).map((t) => t.trim());
+      const esperados = ['Todas las marcas', ...todas.map((m) => `${m.label} (${m.count})`)];
+      if (JSON.stringify(textos) !== JSON.stringify(esperados)) {
+        problemas.push(`${donde}: el filtro ofrece ${textos.length - 1} marcas y tenía que ofrecer `
+          + `${esperados.length - 1}; la primera en cero, «${laVacia.label} (0)», `
+          + `${textos.includes(`${laVacia.label} (0)`) ? 'está' : 'no está'}`);
+      }
+      if (textos.includes(`${laVacia.label} (0)`)) {
+        await control.selectOption(laVacia.value);
+        await esperarA(async () => new URL(page.url()).searchParams.get('brand') === laVacia.value,
+          `${donde}: la marca en cero no se escribió en la barra`, 20_000)
+          .catch((e) => problemas.push(e.message));
+        await page.getByRole('heading', { name: 'No hay operaciones con estos filtros.' })
+          .waitFor({ state: 'visible', timeout: 20_000 })
+          .catch(() => problemas.push(`${donde}: eligiendo «${laVacia.label}» no aparece el vacío de siempre`));
+        if (await page.locator('[role="alert"]').count() > 0) {
+          problemas.push(`${donde}: eligiendo una marca en cero aparece un error`);
+        }
+      }
+      await contexto.close();
+    }
+  } finally {
+    await browser.close();
+  }
+  medidos.push('en escritorio y en celular el filtro muestra «Todas las marcas» y las mismas marcas con su '
+    + 'conteo, las en cero incluidas; elegir una en cero la escribe en la barra y muestra «No hay '
+    + 'operaciones con estos filtros.», sin error');
+
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return medidos.join('; ');
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
