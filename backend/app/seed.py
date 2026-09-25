@@ -571,6 +571,10 @@ def create_seed_data():
             #
             # El valor es un slug y la etiqueta es el nombre: el slug es lo que
             # va a viajar el dia que esto sea un filtro.
+            #
+            # En produccion la siembra no corre: ahi las trae la migracion
+            # `01ff14043124`, con una copia congelada de esta lista. Cambiar la
+            # lista despues tambien pide una migracion.
             "brand": [
                 ("agrinar", "Agrinar"),
                 ("antonio-carraro", "Antonio Carraro"),

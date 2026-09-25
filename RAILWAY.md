@@ -94,10 +94,18 @@ una de esas se enciende «un momentito» y queda encendida. Si hace falta una ba
 con datos de demostración, se siembra donde los datos son descartables —una base
 local con `ENV=local`— y no acá.
 
-Un despliegue con datos reales no necesita ese seed: las migraciones crean el
-esquema y la primera cuenta se registra desde la aplicación. El padrón oficial
-de localidades, que no trae ninguna credencial, sigue disponible aparte con
-`python -m app.seed_localities`.
+Un despliegue con datos reales no necesita ese seed. Las migraciones crean el
+esquema y además traen las listas que el producto necesita para publicar y
+filtrar y que antes sólo cargaba el seed: las localidades de Georef y las 44
+marcas (`01ff14043124`), y los tipos de cada subrubro existente
+(`c8e41f2a7d90`). Insertan sólo lo que falta y no pisan lo editado desde el
+panel. La primera cuenta se registra desde la aplicación.
+
+**Las categorías y los subrubros no los trae ninguna migración.** La base
+publicada ya los tiene. Una base de producción nueva los necesita antes de que
+alguien pueda publicar, y los tipos sólo se cargan para los subrubros que
+existen cuando corre `c8e41f2a7d90`. El padrón de localidades sigue disponible
+aparte con `python -m app.seed_localities`.
 
 ## 3. Frontend
 
