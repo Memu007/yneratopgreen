@@ -80,10 +80,10 @@ export const HomePage: React.FC<HomePageProps> = ({
             Es ornamento del sistema y no información nueva, así que no se
             anuncia dos veces y desaparece en celular. */}
         <div className={styles.margen} aria-hidden="true">
-          <span>Mercado agro · Argentina</span>
+          <span>Mercado agropecuario · Argentina</span>
         </div>
         <div className={styles.heroCopy}>
-          <p className="tg-eyebrow">Mercado agro · Argentina</p>
+          <p className="tg-eyebrow">Mercado agropecuario · Argentina</p>
           <h1 id="titulo-inicio" className={styles.heroTitulo}>
             Equipos, insumos y servicios para seguir produciendo.
           </h1>

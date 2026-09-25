@@ -145,7 +145,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({
       <section className={styles.ctaSection}>
         <div className={styles.container}>
           <h2>¿Listo para transformar tu producción?</h2>
-          <p>Únete a AgroBoeda y accede a las mejores soluciones tecnológicas para el agro</p>
+          <p>Únete a AgroBoeda y accede a las mejores soluciones tecnológicas para el sector agropecuario</p>
           <div className={styles.ctaButtons}>
             <button className={styles.ctaPrimary} onClick={handleStartSelling}>
               Comenzar a Vender

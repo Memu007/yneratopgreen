@@ -186,7 +186,7 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({
       <section className={`tg-container ${styles.cta}`} aria-labelledby="titulo-ofrecer">
         <div className={styles.ctaInterior}>
           <div>
-            <h2 id="titulo-ofrecer">¿Prestás un servicio para el agro?</h2>
+            <h2 id="titulo-ofrecer">¿Prestás un servicio para el sector agropecuario?</h2>
             <p>
               Indicá cobertura, modalidad y responsable para que la propuesta pueda compararse.
             </p>

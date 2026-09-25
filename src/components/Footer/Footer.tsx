@@ -42,7 +42,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             />
             <span className={styles.nombre}>AgroBoeda</span>
           </button>
-          <p className={styles.bajada}>Mercado agro: productos, servicios y logística.</p>
+          <p className={styles.bajada}>Mercado agropecuario: productos, servicios y logística.</p>
         </div>
 
         <div>

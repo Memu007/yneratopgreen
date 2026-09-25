@@ -21286,7 +21286,7 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
   }
   const cabeceraHtml = readFileSync('index.html', 'utf8');
   for (const esperado of [
-    '<title>AgroBoeda — Mercado agro</title>',
+    '<title>AgroBoeda — Mercado agropecuario</title>',
     'href="/marca/agroboeda-favicon.png"',
     'property="og:site_name" content="AgroBoeda"',
     'content="/marca/agroboeda-monograma.png"',
