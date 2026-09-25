@@ -10419,7 +10419,14 @@ async function decidirDocumentacion(admin, documentacionId, decision, motivo) {
 }
 
 async function tokenDeAdmin() {
-  if (state.docAdminToken) return state.docAdminToken;
+  // El token guardado puede haber vencido: lo usan casos que corren muchos
+  // minutos después del primero que lo pidió (en la suite completa, los 190 y
+  // 191 caían con 401 «Token inválido o expirado»). Se prueba y, si ya no
+  // sirve, se vuelve a ingresar.
+  if (state.docAdminToken
+    && (await pedirCrudo('/auth/me', { header: state.docAdminToken })).status === 200) {
+    return state.docAdminToken;
+  }
   const ingreso = await apiRequest('/auth/login', {
     method: 'POST',
     body: { email: 'admin@topgreen.com', password: 'admin123' },
