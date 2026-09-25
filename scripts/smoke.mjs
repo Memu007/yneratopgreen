@@ -34527,6 +34527,114 @@ await runCase(196, 'La migración del tipo y la potencia es aditiva, vuelve atr�
   });
 });
 
+// 197. Lo que producción necesita y sólo traía la siembra llega con la migración.
+//
+// En producción la siembra no corre: el único paso automático es `alembic
+// upgrade head`. Las 44 marcas eran filas que cargaba sólo la siembra, y en el
+// sitio publicado la marca ofrecía sólo «Sin declarar». Las localidades
+// tampoco las cargaba ninguna migración, y sin ellas nadie puede publicar.
+//
+// Se prueba en una COPIA de la base que se deja como producción: con
+// categorías, sin marcas y sólo con las localidades que alguna fila usa. Lo que
+// deja la migración tiene que ser, fila por fila, lo que carga la siembra.
+await runCase(197, 'Las marcas y las localidades llegan a producción con la migración, sin la siembra', async () => {
+  const REVISION = '01ff14043124';
+  const ANTERIOR = 'c8e41f2a7d90';
+  return conUnaCopiaDeLaBase('caso197', async ({ opciones: enLaCopia, alembic: alembicEnLaCopia }) => {
+    const medidos = [];
+    // Cada marca como «valor=Rótulo#orden:activa».
+    const marcas = () => queryRows(`
+      SELECT 'marcas:' || coalesce(string_agg(
+        value || '=' || label || '#' || display_order || ':' || is_active::text,
+        '|' ORDER BY display_order, value), '')
+      FROM form_options WHERE option_type = 'brand'`, enLaCopia)[0][0]
+      .replace(/^marcas:/, '').split('|').filter(Boolean);
+    const repetidas = () => queryCount(`SELECT COUNT(*) FROM (
+      SELECT value FROM form_options WHERE option_type = 'brand'
+      GROUP BY value HAVING COUNT(*) > 1) r`, enLaCopia);
+    const localidades = () => queryRows(`
+      SELECT COUNT(*)::text || ' ' || md5(coalesce(string_agg(
+        concat_ws(';', id, name, province_id, province_name, department_id, department_name, source,
+          latitude, longitude, ST_AsText(coordinates::geometry)), '|' ORDER BY id), ''))
+      FROM localities`, enLaCopia)[0][0];
+    const pasarPorLaMigracion = () => {
+      const bajada = alembicEnLaCopia(`downgrade ${ANTERIOR}`);
+      assert(new RegExp(`Running downgrade ${REVISION} -> ${ANTERIOR}`).test(bajada),
+        `el downgrade no corrió: ${bajada.slice(-300)}`);
+      const subida = alembicEnLaCopia('upgrade head');
+      assert(new RegExp(`Running upgrade ${ANTERIOR} -> ${REVISION}`).test(subida),
+        `la migración no corrió: ${subida.slice(-300)}`);
+    };
+    const compararMarcas = (esperadas, donde) => {
+      const quedaron = marcas();
+      const faltan = esperadas.filter((m) => !quedaron.includes(m));
+      const sobran = quedaron.filter((m) => !esperadas.includes(m));
+      assert(faltan.length === 0 && sobran.length === 0 && repetidas() === 0,
+        `${donde}: faltan ${faltan.length} marcas ${JSON.stringify(faltan.slice(0, 3))}, sobran `
+        + `${sobran.length} ${JSON.stringify(sobran.slice(0, 3))}, ${repetidas()} repetidas`);
+    };
+
+    // Lo que carga la siembra, antes de tocar nada.
+    const sembradas = marcas();
+    assert(sembradas.length === 44, `la siembra dejó ${sembradas.length} marcas y se esperaban 44`);
+    const todas = localidades();
+
+    // --- La copia queda como producción ------------------------------------
+    querySql("DELETE FROM form_options WHERE option_type = 'brand'", enLaCopia);
+    querySql(`DELETE FROM localities l
+      WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.locality_id = l.id)
+        AND NOT EXISTS (SELECT 1 FROM users u WHERE u.carrier_base_locality_id = l.id)
+        AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.shipping_locality_id = l.id)
+        AND NOT EXISTS (SELECT 1 FROM order_items i WHERE i.origin_locality_id = l.id)`, enLaCopia);
+    const enUso = Number(localidades().split(' ')[0]);
+    assert(marcas().length === 0 && enUso < Number(todas.split(' ')[0]),
+      'la copia no quedó sin marcas y con menos localidades: la migración no probaría nada');
+    assert(queryCount('SELECT COUNT(*) FROM categories', enLaCopia) > 0,
+      'la copia no tiene categorías: no se parece a producción');
+
+    // --- Subir -------------------------------------------------------------
+    pasarPorLaMigracion();
+    compararMarcas(sembradas, 'tras subir');
+    const cargadas = localidades();
+    assert(cargadas === todas,
+      `las localidades no quedaron como las de la siembra: ${todas} → ${cargadas}`);
+    medidos.push(`sobre una copia con categorías, sin marcas y con ${enUso} localidades en uso —como `
+      + `producción—, la migración deja las 44 marcas iguales a las de la siembra (valor, rótulo, orden y `
+      + `activa) y las ${todas.split(' ')[0]} localidades de Georef iguales, fila por fila`);
+
+    // --- Otra vez: no duplica ----------------------------------------------
+    pasarPorLaMigracion();
+    compararMarcas(sembradas, 'la segunda vez');
+    assert(localidades() === todas, `la segunda vez cambió las localidades: ${todas} → ${localidades()}`);
+    medidos.push('correrla otra vez no duplica ni cambia nada');
+
+    // --- Lo que el panel cambió se respeta ---------------------------------
+    querySql(`UPDATE form_options SET is_active = false
+      WHERE option_type = 'brand' AND value = 'pauny'`, enLaCopia);
+    querySql(`UPDATE form_options SET label = 'Case (editada en el panel)'
+      WHERE option_type = 'brand' AND value = 'case'`, enLaCopia);
+    querySql("DELETE FROM form_options WHERE option_type = 'brand' AND value = 'kubota'", enLaCopia);
+    pasarPorLaMigracion();
+    const [[pauny, caseRotulo, kubota]] = queryRows(`
+      SELECT (SELECT is_active::text FROM form_options WHERE option_type = 'brand' AND value = 'pauny'),
+             (SELECT label FROM form_options WHERE option_type = 'brand' AND value = 'case'),
+             (SELECT COUNT(*)::text FROM form_options WHERE option_type = 'brand' AND value = 'kubota')`,
+    enLaCopia);
+    assert(pauny === 'false', `la migración reactivó «pauny», que el panel había desactivado (${pauny})`);
+    assert(caseRotulo === 'Case (editada en el panel)',
+      `la migración pisó el rótulo que el panel le puso a «case»: «${caseRotulo}»`);
+    assert(kubota === '1', `«kubota», que faltaba, quedó ${kubota} vez/veces`);
+    assert(repetidas() === 0 && marcas().length === 44, `quedaron ${marcas().length} marcas y ${repetidas()} repetidas`);
+    medidos.push('una marca desactivada sigue desactivada, un rótulo cambiado no se pisa, y la que falta vuelve');
+
+    const chequeo = alembicEnLaCopia('check');
+    assert(/No new upgrade operations detected/.test(chequeo),
+      `el modelo y el esquema no coinciden: ${chequeo.slice(-300)}`);
+    medidos.push('`alembic check` no encuentra diferencias entre el modelo y el esquema');
+    return `${medidos.join('; ')}. Todo en una copia de la base`;
+  });
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un
