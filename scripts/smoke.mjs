@@ -33379,6 +33379,256 @@ await runCase(191, 'Lo que el Mercado ya no ofrece no se compra desde un carrito
   return informe.join('. ');
 });
 
+// ---------------------------------------------------------------------------
+// 192. COPY-AGRO-1 — el sector se nombra «agropecuario».
+//
+// La clienta pidió que el sitio diga «agropecuario» donde nombra el sector
+// (devolución 01, punto 1). Lo que se busca es la PALABRA suelta: «AgroBoeda»
+// y «AgroMarket» son marca, y «agropecuario», «agronómico» o «Agroquímicos»
+// —una categoría de la taxonomía de la clienta— son otras palabras. Pegada a
+// un guion sí cuenta: «agro-algo» la escribe.
+//
+// Se mira en dos lados, porque cada uno ve lo que el otro no:
+//  - la fuente de lo que la plataforma dice —pantallas, correos, avisos, la
+//    cabecera de `index.html`, los datos que siembra—, incluidas las pantallas
+//    a las que este caso no llega. Se lee el archivo entero, comentarios
+//    incluidos: un comentario que la diga se reescribe, y eso es más barato
+//    que separar comentario de texto en cuatro lenguajes;
+//  - lo que el navegador dibuja: la pestaña, los metadatos y el texto visible
+//    de las páginas públicas, con los atributos que se leen o se anuncian. Lo
+//    que escribe quien publica —las tarjetas— no es texto de la plataforma y
+//    queda afuera.
+// Los dos juntan lo que encuentran y el caso falla al final con todo, para
+// que se vea qué lado lo vio. Las medidas también se juntan y se informan
+// después: si un texto vuelve a decir «agro», que el rojo lo diga primero, y
+// no que falta el texto nuevo.
+//
+// Y los textos que se alargaron se miden donde son más angostos: a 360 px, y
+// el margen vertical de la portada a 1024, el ancho más chico que lo muestra.
+// ---------------------------------------------------------------------------
+await runCase(192, 'El sitio nombra el sector «agropecuario», y los textos más largos entran a 360 px', async () => {
+  const LETRA = '[\\p{L}\\p{N}_]';
+  const SUELTA = new RegExp(`(?<!${LETRA})agro(?!${LETRA})`, 'iu');
+  // La regla, contra lo que tiene que marcar y lo que tiene que dejar pasar.
+  for (const [texto, marca] of [
+    ['Mercado agro · Argentina', true], ['un servicio para el agro?', true], ['AGRO', true],
+    ['agro-industria', true], ['AgroBoeda', false], ['AgroMarket', false],
+    ['Mercado agropecuario', false], ['Agroquímicos', false], ['Agroinsumos biológicos', false],
+    ['agronómico', false], ['Almagro', false], ['Agronomía', false],
+  ]) {
+    assert(SUELTA.test(texto) === marca, `la regla ${marca ? 'deja pasar' : 'marca'} «${texto}»`);
+  }
+  const hallazgos = [];
+  const problemas = [];
+  const medidos = [];
+  // Cada aparición con su contexto, y no sólo la primera de cada lugar.
+  const anotar = (lugar, texto) => {
+    const cadena = String(texto);
+    for (const vista of cadena.matchAll(new RegExp(SUELTA.source, 'giu'))) {
+      const contexto = cadena.slice(Math.max(0, vista.index - 40), vista.index + 44).trim();
+      hallazgos.push(`${lugar}: «${contexto}»`);
+    }
+  };
+
+  // --- A. la fuente --------------------------------------------------------
+  const archivos = [];
+  const recorrer = (carpeta) => {
+    for (const entrada of readdirSync(carpeta, { withFileTypes: true })) {
+      const ruta = `${carpeta}/${entrada.name}`;
+      if (entrada.isDirectory()) recorrer(ruta);
+      else archivos.push(ruta);
+    }
+  };
+  for (const carpeta of ['src', 'backend/app', 'backend/alembic', 'public']) recorrer(carpeta);
+  // El remitente del correo sale de las plantillas de entorno.
+  archivos.push('index.html', '.env.example', 'backend/.env.example',
+    'backend/.env.production.example');
+  const deTexto = archivos
+    .filter((r) => /\.(tsx?|css|py|html|json|csv|svg|txt)$/.test(r) || r.endsWith('.example'));
+  assert(deTexto.length > 100, `sólo se encontraron ${deTexto.length} archivos para leer`);
+  for (const ruta of deTexto) {
+    for (const [numero, linea] of readFileSync(ruta, 'utf8').split('\n').entries()) {
+      anotar(`fuente, ${ruta}:${numero + 1}`, linea);
+    }
+  }
+  medidos.push(`${deTexto.length} archivos de src, backend/app, backend/alembic, public, `
+    + 'index.html y las plantillas de entorno');
+
+  // --- B. la pantalla ------------------------------------------------------
+  // El texto como el navegador lo dibuja (`innerText`), con las tarjetas
+  // escondidas un instante; y los atributos que se leen o se anuncian de los
+  // elementos visibles. Nodo por nodo no sirve: React parte el texto en varios
+  // nodos, y una palabra armada en pedazos no se vería.
+  const leerLaPantalla = (page, raiz = 'body') => page.evaluate((selector) => {
+    const coinciden = document.querySelectorAll(selector);
+    if (coinciden.length !== 1) return { texto: '', tarjetas: 0, coinciden: coinciden.length };
+    const [donde] = coinciden;
+    const tarjetas = document.querySelectorAll('article').length;
+    const sinTarjetas = document.createElement('style');
+    sinTarjetas.textContent = 'article { display: none !important; }';
+    document.head.append(sinTarjetas);
+    const renglones = donde.innerText.split(/\n+/).map((r) => r.trim()).filter(Boolean);
+    sinTarjetas.remove();
+    for (const el of donde.querySelectorAll('[placeholder], [aria-label], [alt], [title]')) {
+      if (el.closest('article') || !el.checkVisibility()) continue;
+      for (const atributo of ['placeholder', 'aria-label', 'alt', 'title']) {
+        if (el.getAttribute(atributo)) renglones.push(el.getAttribute(atributo));
+      }
+    }
+    return { texto: renglones.join(' | '), tarjetas, coinciden: 1 };
+  }, raiz);
+  const PAGINAS = [
+    ['Inicio', 'home', (page) => page.locator('#titulo-inicio')],
+    ['Mercado', 'marketplace', (page) => page.locator('article').first()],
+    ['Servicios', 'services', (page) => page.locator('#titulo-ofrecer')],
+    ['Quiénes somos', 'about', (page) => page.getByRole('heading', { name: /Listo para transformar/ })],
+    ['Contacto', 'contact', (page) => page.getByRole('heading', { name: 'Contacto', level: 1 })],
+  ];
+  // Los textos que se alargaron, donde están.
+  const ALARGADOS = [
+    ['home', 'la bajada de la portada', 'p.tg-eyebrow', 'Mercado agropecuario · Argentina'],
+    ['home', 'la bajada del pie', 'footer p', 'Mercado agropecuario: productos, servicios y logística.'],
+    ['services', 'el título del cierre de Servicios', '#titulo-ofrecer',
+      '¿Prestás un servicio para el sector agropecuario?'],
+    ['about', 'el cierre de Quiénes somos', 'p',
+      'soluciones tecnológicas para el sector agropecuario'],
+  ];
+  const CAPTURAS = process.env.SMOKE_CAPTURAS || mkdtempSync(`${tmpdir()}/topgreen-agro-`);
+  mkdirSync(CAPTURAS, { recursive: true });
+  const capturas = [];
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const medida of [{ n: 'escritorio', width: 1440, height: 900 },
+      { n: 'celular', width: 360, height: 800 }]) {
+      const contexto = await browser.newContext({
+        viewport: { width: medida.width, height: medida.height },
+      });
+      const page = await contexto.newPage();
+      const donde = `${medida.n} ${medida.width} px`;
+      let tarjetas = 0;
+      for (const [nombre, seccion, listo] of PAGINAS) {
+        await page.goto(`${FRONTEND_URL}/?section=${seccion}`, { waitUntil: 'domcontentloaded' });
+        await listo(page).waitFor({ state: 'visible', timeout: 25_000 });
+        await page.locator('footer').waitFor({ state: 'visible', timeout: 25_000 });
+        const leido = await leerLaPantalla(page);
+        tarjetas += leido.tarjetas;
+        anotar(`pantalla, ${donde}, ${nombre}`, leido.texto);
+
+        if (seccion === 'home') {
+          const cabecera = await page.evaluate(() => [
+            ['pestaña', document.title],
+            ...[...document.querySelectorAll('meta[content]')].map((m) => [
+              `meta ${m.getAttribute('name') || m.getAttribute('property')}`,
+              m.getAttribute('content')]),
+          ]);
+          for (const [cual, valor] of cabecera) anotar(`pantalla, ${donde}, ${cual}`, valor);
+          if (cabecera[0][1] !== 'AgroBoeda — Mercado agropecuario') {
+            problemas.push(`${donde}: la pestaña dice «${cabecera[0][1]}»`);
+          }
+        }
+
+        // A 360 px, lo que se alargó no ensancha la página ni se corta.
+        for (const [enSeccion, que, selector, texto] of ALARGADOS) {
+          if (enSeccion !== seccion || medida.width !== 360) continue;
+          const elemento = page.locator(selector).filter({ hasText: texto });
+          if ((await elemento.count()) !== 1) {
+            problemas.push(`${donde}: hay ${await elemento.count()} elementos con ${que} («${texto}») `
+              + 'y tenía que haber uno');
+            continue;
+          }
+          await elemento.scrollIntoViewIfNeeded();
+          const caja = await elemento.evaluate((el) => {
+            const r = el.getBoundingClientRect();
+            const estilo = getComputedStyle(el);
+            return {
+              izquierda: r.left, derecha: r.right, alto: r.height,
+              linea: parseFloat(estilo.lineHeight) || parseFloat(estilo.fontSize) * 1.2,
+              visible: el.clientWidth, contenido: el.scrollWidth,
+              vista: document.documentElement.clientWidth,
+              pagina: document.documentElement.scrollWidth,
+            };
+          });
+          if (caja.izquierda < 0 || caja.derecha > caja.vista + 0.5) {
+            problemas.push(`${donde}: ${que} sale de la pantalla (${caja.izquierda.toFixed(1)} a `
+              + `${caja.derecha.toFixed(1)} en ${caja.vista})`);
+          }
+          if (caja.contenido > caja.visible + 1) {
+            problemas.push(`${donde}: ${que} no entra en su caja (${caja.contenido} de contenido `
+              + `en ${caja.visible})`);
+          }
+          if (caja.pagina > caja.vista) {
+            problemas.push(`${donde}: con ${que}, la página desborda ${caja.pagina - caja.vista} px `
+              + 'a lo ancho');
+          }
+          const ruta = `${CAPTURAS}/${enSeccion}-${que.replace(/\s+/g, '-')}-360.png`;
+          await elemento.locator('xpath=ancestor-or-self::*[self::section or self::footer][1]')
+            .screenshot({ path: ruta });
+          capturas.push(ruta);
+          medidos.push(`a 360 px, ${que} ocupa ${Math.round(caja.alto / caja.linea)} renglón(es)`);
+        }
+      }
+
+      // Ingresar y Registro, que se abren encima de la página.
+      await page.goto(`${FRONTEND_URL}/?section=home`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+      await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
+      const ingresar = await leerLaPantalla(page, '[role="dialog"]');
+      if (ingresar.coinciden !== 1) problemas.push(`${donde}: Ingresar abrió ${ingresar.coinciden} diálogos`);
+      anotar(`pantalla, ${donde}, Ingresar`, ingresar.texto);
+      await page.getByRole('button', { name: /Registrate ac[áa]/i }).first().click();
+      await page.getByRole('heading', { name: /Crear cuenta/i }).waitFor({ timeout: 20_000 });
+      const registro = await leerLaPantalla(page, '[role="dialog"]');
+      if (registro.coinciden !== 1) problemas.push(`${donde}: Registro abrió ${registro.coinciden} diálogos`);
+      anotar(`pantalla, ${donde}, Registro`, registro.texto);
+      await contexto.close();
+      medidos.push(`${donde}: pestaña, metadatos, cinco páginas públicas, Ingresar y Registro `
+        + `leídos, con ${tarjetas} tarjetas de publicaciones afuera`);
+    }
+
+    // El margen vertical de la portada se ve desde 1024 px: el texto, que se
+    // alargó, tiene que caber en el alto del margen.
+    for (const ancho of [1024, 1440]) {
+      const contexto = await browser.newContext({ viewport: { width: ancho, height: 900 } });
+      const page = await contexto.newPage();
+      await page.goto(`${FRONTEND_URL}/?section=home`, { waitUntil: 'domcontentloaded' });
+      await page.locator('#titulo-inicio').waitFor({ timeout: 25_000 });
+      const margen = page.locator('[aria-hidden="true"] > span', { hasText: 'Mercado agropecuario · Argentina' });
+      if ((await margen.count()) !== 1) {
+        problemas.push(`a ${ancho} px no hay un margen vertical que diga «Mercado agropecuario · Argentina»`);
+        await contexto.close();
+        continue;
+      }
+      const cabe = await margen.evaluate((el) => {
+        const texto = el.getBoundingClientRect();
+        const caja = el.parentElement.getBoundingClientRect();
+        return {
+          visible: el.checkVisibility(), arriba: texto.top - caja.top,
+          abajo: caja.bottom - texto.bottom, alto: texto.height, disponible: caja.height,
+        };
+      });
+      if (!cabe.visible || cabe.arriba < 0 || cabe.abajo < 0) {
+        problemas.push(`a ${ancho} px el margen vertical no entra: ${cabe.alto.toFixed(0)} px de `
+          + `texto en ${cabe.disponible.toFixed(0)} de alto`);
+      }
+      const ruta = `${CAPTURAS}/margen-de-la-portada-${ancho}.png`;
+      await page.locator('#titulo-inicio').locator('xpath=ancestor::section[1]').screenshot({ path: ruta });
+      capturas.push(ruta);
+      medidos.push(`a ${ancho} px el margen vertical ocupa ${cabe.alto.toFixed(0)} de `
+        + `${cabe.disponible.toFixed(0)} px de alto`);
+      await contexto.close();
+    }
+  } finally {
+    await browser.close();
+  }
+
+  assert(hallazgos.length === 0,
+    `«agro» suelta, ${hallazgos.length} vez/veces:\n  ${hallazgos.join('\n  ')}`
+    + (problemas.length ? `\ny además:\n  ${problemas.join('\n  ')}` : ''));
+  assert(problemas.length === 0, `sin «agro» suelta, pero:\n  ${problemas.join('\n  ')}`);
+  return `ninguna «agro» suelta (${medidos.join('; ')}); capturas: ${capturas.join(', ')}`;
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un
