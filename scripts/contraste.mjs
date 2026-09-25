@@ -439,6 +439,18 @@ for (const medida of MEDIDAS) {
     await revisar(page, `${medida.n} catálogo: filtros abiertos`, page.locator('#catalog-category'));
     if (plegable) await filtros.click();
 
+    // Los filtros del subrubro: el tipo aparece cuando hay un subrubro elegido
+    // que tiene lista (ATRIBUTOS-RUBRO-1). Se mide con el panel a la vista y se
+    // vuelve al Mercado sin filtros, que es donde sigue el recorrido.
+    await page.goto(`${WEB}/?section=marketplace&category=${encodeURIComponent('Maquinaria agrícola')}`
+      + `&subcategory=${encodeURIComponent('Preparación del suelo')}`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-sort').waitFor({ state: 'visible', timeout: ESPERA });
+    if (plegable) await filtros.click();
+    await revisar(page, `${medida.n} catálogo: filtros del subrubro`, page.locator('#catalog-subtype'));
+    if (plegable) await filtros.click();
+    await page.goto(`${WEB}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-sort').waitFor({ state: 'visible', timeout: ESPERA });
+
     // El paginador, al pie de la grilla. Superficie propia para que su ausencia
     // sea un rojo y no una medición de menos.
     const paginador = page.getByRole('navigation', { name: 'Paginación del mercado' });

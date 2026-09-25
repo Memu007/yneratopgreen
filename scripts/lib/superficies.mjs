@@ -53,6 +53,9 @@ export const SUPERFICIES = [
   // panel para medirlos donde la persona los usa. En escritorio el panel está
   // siempre abierto y es la misma pantalla que el catálogo.
   { id: 'catálogo: filtros abiertos' },
+  // Los filtros que aparecen con un subrubro elegido: el tipo del tercer
+  // nivel (ATRIBUTOS-RUBRO-1). Mismo panel, con controles que antes no había.
+  { id: 'catálogo: filtros del subrubro' },
   // El paginador del Mercado. Va como superficie propia y no como parte del
   // catálogo porque su marcador es el propio control: si el catálogo dejara de
   // tener más de una página —un seed más chico, un filtro por omisión— esta

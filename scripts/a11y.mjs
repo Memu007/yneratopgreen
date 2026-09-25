@@ -213,6 +213,18 @@ async function comprador(page, medida) {
   await revisar(page, 'catálogo: filtros abiertos', medida, page.locator('#catalog-category'));
   if (plegable) await filtros.click();
 
+  // Los filtros del subrubro: el tipo aparece cuando hay un subrubro elegido
+  // que tiene lista (ATRIBUTOS-RUBRO-1). Se mide con el panel a la vista y se
+  // vuelve al Mercado sin filtros, que es donde sigue el recorrido.
+  await page.goto(`${WEB}/?section=marketplace&category=${encodeURIComponent('Maquinaria agrícola')}`
+    + `&subcategory=${encodeURIComponent('Preparación del suelo')}`, { waitUntil: 'domcontentloaded' });
+  await page.locator('#catalog-sort').waitFor({ state: 'visible', timeout: ESPERA });
+  if (plegable) await filtros.click();
+  await revisar(page, 'catálogo: filtros del subrubro', medida, page.locator('#catalog-subtype'));
+  if (plegable) await filtros.click();
+  await page.goto(`${WEB}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+  await page.locator('#catalog-sort').waitFor({ state: 'visible', timeout: ESPERA });
+
   // El paginador, que vive al pie de la grilla y sólo existe con más de una
   // página. Se lo trae a la vista antes de medir: axe mira el documento, pero
   // el estado de foco y el blanco de toque se leen donde el control está.
