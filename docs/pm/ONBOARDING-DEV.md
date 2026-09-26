@@ -138,6 +138,17 @@ la configuración actual y esperá autorización explícita.
 
 Runtime no es sólo código: CORS, SMTP, variables y dominios pueden romper una composición con SHA correcto. No copies valores secretos a documentación.
 
+**En producción la siembra no corre** (`RAILWAY.md`): el único paso automático
+es `alembic upgrade head`. Toda lista o catálogo que el producto necesita
+(marcas, tipos, localidades…) llega por una migración idempotente que inserta
+sólo lo que falta y no pisa lo editado en el panel. El informe dice cómo llega
+a producción, y un caso lo prueba sobre una base sin siembra, como el 196 y el
+197. Las categorías y los subrubros son la excepción (`DECISIONS.md`,
+26/09). Así se escapó la marca el 25/09: la lista estaba sólo en la siembra.
+
+Los scripts de negativos que reinician la API aceptan el comando por la
+variable `REINICIAR_API`, para que PM los corra en su entorno sin editarlos.
+
 Después de una migración de esquema no se hace rollback ciego sólo de código; un downgrade requiere procedimiento probado y backup recuperable.
 
 ## Alcance y fuentes

@@ -1,29 +1,31 @@
 # Estado actual
 
-Actualizado: 2026-09-25.
+Actualizado: 2026-09-26.
 
 `NOW.md` contiene sólo estado vigente, restricciones vivas, bloqueos y próxima acción. La historia anterior permanece en Git; la instantánea previa a esta poda está en `ab4165fc`.
 
 ## Resumen ejecutivo
 
-- **Fase contractual:** Fase 2 — Desarrollo base, semana 5, último día (ventana 04/09–24/09). Su puerta funcional quedó verificada el 23/09 sobre `1e4a63c` (`REPRODUCCION-FASE-2-2026-09-23.md`). Desde el **25/09** corre la **Fase 3**, semanas 6–8, hasta el 15/10. Su puerta y el hito intermedio ya quedaron aceptados por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
-- **`main`:** `238d113`, publicado el 26/09 con autorización explícita de Emi, por fast-forward desde `792d709`. Suma `PROD-LISTS-1`: la migración `01ff14043124` carga las 44 marcas y las localidades, y el filtro de marca completo. Verificación previa sobre el mismo código (`cdda2d9`, que difiere sólo en `docs/pm`): suite desde base limpia 197/198 (el 169 es de entorno), migración probada en modo producción, puertas verdes, sin secretos ni archivos prohibidos. **Pendiente: Emi verifica que la marca ofrezca la lista en el alta y en el Mercado.** Antes, el 25/09, se publicó `792d709` y Emi verificó Mercado único, «Tipo» y «Potencia».
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. Todo lo aceptado hasta la parte 1 de `ATRIBUTOS-RUBRO-1` está en `main` (`792d709`); la parte 2 está en curso.
+- **Fase contractual:** Fase 3 — Buscador y catálogo, semanas 6–8 (25/09–15/10). La puerta de la Fase 2 quedó verificada el 23/09 (`REPRODUCCION-FASE-2-2026-09-23.md`). La puerta de la Fase 3 y el hito intermedio ya se aceptaron por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
+- **`main`:** `238d113`, publicado el 26/09 con autorización explícita de Emi. Contiene todo lo aceptado hasta `PROD-LISTS-1`: Mercado único, copy agropecuario, tipo y potencia, 44 marcas y localidades por migración, y el filtro de marca completo. **Emi verificó en el sitio:** sin pestaña Servicios, «Tipo» en Preparación del suelo y en Riego por aspersión, «Potencia» en Tractores y las marcas en el filtro. Publicaciones anteriores: `792d709` y `e9cf4c6` (25/09).
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. Todo lo aceptado está en `main`. La parte 2 de `ATRIBUTOS-RUBRO-1` está en curso.
 - **Última decisión PM:** `PROD-LISTS-1` **ACEPTADA EN RAMA** (`cdda2d9`): la migración `01ff14043124` trae a producción las 44 marcas y las 4028 localidades, y el filtro de marca ofrece las 44 con Maquinaria elegida (decisión de Emi). 3/3 focales, seis negativos en rojo, migración probada en modo producción, suite 197/198 (169 de entorno), puertas verdes. Evidencia en `REPRODUCCION-PROD-LISTS-1-2026-09-26.md`. Publicada en `238d113`.
-- **Publicación 25/09:** con autorización explícita de Emi y sin backup previo (decisión del 25/09 para el entorno demostrativo), PM subió `e9cf4c6` a `main` por fast-forward desde `0bd7fbc`. La verificación previa fue desde base recién creada: 190 de 191 casos cubiertos (el 169 es de entorno); a11y 76/76, contraste 84/84, auditoría 12/12, guía 26/26, build, tipos, lint y `alembic check` verdes; sin secretos ni archivos prohibidos. Railway corre `alembic upgrade head` como `preDeployCommand`. La red del entorno de PM bloquea `railway.app`, así que la verificación la hizo Emi: el 25/09 revisó el sitio publicado y **se ve bien**. `COPY-AGRO-1` no está incluida.
-- **Tarea activa:** `ATRIBUTOS-RUBRO-1` parte 2: modelo y año en maquinaria, origen declarado y tres P2 (la marca queda cargada en el alta siguiente; «Mercado» saca filtros de la barra; dos filtros se llaman «Tipo»). Después, `USER-GUIDE-1`.
+- **Tarea activa:** `ATRIBUTOS-RUBRO-1` parte 2:
+  - modelo y año en maquinaria, y origen declarado;
+  - tres P2: la marca queda cargada en el alta siguiente, «Mercado» saca filtros de la barra, y hay dos filtros llamados «Tipo»;
+  - **el orden del panel de filtros:** Emi lo delegó en PM y Dev (`DECISIONS.md`, 26/09). La Dev ataca la propuesta PM antes de construir.
+
+  Después, `USER-GUIDE-1`.
 - **Corrección de método PM (25/09):** las aceptaciones de la marca no verificaron la carga de datos en producción. Desde ahora, toda pieza que agrega una lista o un catálogo tiene que decir cómo llega a producción, y PM lo comprueba con un caso sobre una base sin siembra.
 - **#9, atributos por rubro: absorbido (decisión de Emi, 25/09).** Tercer nivel de la taxonomía de la clienta como filtro en todos los rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. «Inversores» queda afuera. Va después de `MERCADO-UNICO-1` y antes de las guías de uso.
 - **Escalado a Emi:** la regla «el teléfono no sale de la API sin suscripción activa» choca con la decisión del 05/08, que pasó suscripciones y candados por plan a Fase 6. Hoy el teléfono no se publica en el Mercado ni en las fichas, pero sí lo ven las dos partes de una orden y quien compra al elegir transportista, sin suscripción. El transportista no recibe el de quien compra.
 
-## Última aceptación PM — ATRIBUTOS-RUBRO-1, parte 1
+## Última aceptación PM — PROD-LISTS-1
 
-Devolución de la clienta #9. Quien publica elige el tipo de la lista de su
-subrubro, y en Tractores carga la potencia en HP. El Mercado filtra por los
-dos en el servidor, y lo no declarado no entra. En producción las listas
-llegan con la migración `c8e41f2a7d90`, porque la siembra no corre. **Control
-después de publicar:** un subrubro por rubro tiene que ofrecer «Tipo», y
-Tractores, «Potencia». Publicada en `792d709`.
+Las 44 marcas y las localidades llegan a producción por la migración
+`01ff14043124`, porque la siembra no corre allá. El filtro de marca ofrece las
+44 con Maquinaria elegida (decisión de Emi). Publicada en `238d113` y
+verificada por Emi.
 
 ## Aceptaciones anteriores
 
@@ -205,7 +207,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 ## Próxima secuencia
 
 1. Dev trabaja `ATRIBUTOS-RUBRO-1` (#9, absorbido), en dos partes. Después: `USER-GUIDE-1`, las guías de comprador, vendedor y transportista. Sigue, sin depender de Emi, la documentación del despliegue cuando la infraestructura quede fija. Dependen de Emi: la regla del teléfono, SMTP (la clienta no pudo registrarse), cuentas de prueba de Mercado Pago, backups e integración, y las decisiones #5, #7 y #10 de la clienta.
-2. `main` está en `792d709` (25/09): todo lo aceptado hasta la parte 1 de `ATRIBUTOS-RUBRO-1`. Lo que venga se publica en la próxima tanda, con suite completa desde base limpia sobre el SHA exacto y autorización explícita de Emi. Después de publicar, Emi carga tres publicaciones de prueba (dos tractores de marcas distintas, con HP, y una máquina sin marca; fotos propias o genéricas, rotuladas «publicación de prueba»).
+2. `main` está en `238d113` (26/09): todo lo aceptado hasta `PROD-LISTS-1`. Lo que venga se publica en la próxima tanda, con suite completa desde base limpia sobre el SHA exacto y autorización explícita de Emi. Después de publicar, Emi carga tres publicaciones de prueba (dos tractores de marcas distintas, con HP, y una máquina sin marca; fotos propias o genéricas, rotuladas «publicación de prueba»).
 3. Backup: no se exige mientras Railway sea demostrativo (decisión del 25/09). Es condición del lanzamiento real.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 5. Antes de cargar datos reales o de lanzar, Emi elige el backup administrado y su costo.
