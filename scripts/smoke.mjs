@@ -35520,6 +35520,67 @@ await runCase(204, 'El panel de filtros va en el orden acordado, «Más filtros�
   return medidos.join('; ');
 });
 
+// 205. El modelo se encuentra con el buscador de texto.
+//
+// El modelo no tiene filtro propio (decisión PM): se encuentra buscándolo.
+// La publicación del caso NO dice su modelo ni en el nombre ni en la
+// descripción, así que si el buscador no mirara la columna del modelo, no la
+// encontraría. Lo vio la PM: sacar el modelo del buscador dejaba al 199 y al
+// 200 en verde.
+await runCase(205, 'El modelo se encuentra con el buscador de texto aunque no esté en el nombre ni en la descripción', async () => {
+  const sello = Date.now();
+  const MODELO = `ZX${String(sello).slice(-6)}`;
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const tractores = subrubroDe('maquinaria-agricola', 'tractores');
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const nombre = `Tractor del caso 205 ${sello}`;
+  let id = null;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const alta = await apiRequest('/products', {
+      method: 'POST', token: vendedor.token,
+      body: {
+        name: nombre, description: 'Tractor publicado para medir el buscador, sin nombrar su modelo.',
+        category_id: tractores.categoriaId, subcategory_id: tractores.id, price: 2050, stock: 1,
+        unit: 'unidad', locality_id: localidad, publication_type: 'producto', operation_kind: 'activo',
+        condition: 'usado', model: MODELO,
+      },
+    });
+    id = alta.data.id;
+    const [[enNombreODescripcion, modeloGuardado]] = queryRows(`
+      SELECT ((name || ' ' || description) ILIKE ${sqlLiteral(`%${MODELO}%`)})::text, coalesce(model, '(sin modelo)')
+      FROM products WHERE id = ${sqlLiteral(id)}`);
+    assert(enNombreODescripcion === 'false' && modeloGuardado === MODELO,
+      `el escenario no sirve: el modelo «${modeloGuardado}» ${enNombreODescripcion === 'true' ? 'está' : 'no está'} en el nombre o la descripción`);
+
+    // A. La API.
+    for (const buscado of [MODELO, MODELO.toLowerCase()]) {
+      const r = await apiRequest(`/catalog/products?search=${encodeURIComponent(buscado)}`);
+      const ids = r.data.items.map((item) => item.id);
+      assert(ids.includes(id) && r.data.total === 1,
+        `buscar «${buscado}» en la API trajo ${r.data.total} publicaciones y ${ids.includes(id) ? '' : 'no '}la del modelo`);
+    }
+
+    // B. La pantalla: el buscador de la cabecera.
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+    await page.locator('article[class*="card"]').first().waitFor({ state: 'visible', timeout: 25_000 });
+    await page.getByLabel('Buscar en el mercado').fill(MODELO);
+    await page.getByLabel('Buscar en el mercado').press('Enter');
+    await esperarA(async () => {
+      const titulos = (await page.locator('article[class*="card"] h3').allInnerTexts()).map((t) => t.trim());
+      return titulos.length === 1 && titulos[0] === nombre;
+    }, `buscar «${MODELO}» en el Mercado no mostró sólo la publicación de ese modelo`, 20_000);
+    await contexto.close();
+  } finally {
+    await browser.close();
+    if (id) await pedirCrudo(`/products/${id}`, { method: 'DELETE', header: vendedor.token }).catch(() => {});
+  }
+  return `una publicación con modelo «${MODELO}», que no está ni en su nombre ni en su descripción, se encuentra `
+    + 'buscándolo en la API —en mayúsculas y en minúsculas— y en el buscador del Mercado, y es la única';
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un
