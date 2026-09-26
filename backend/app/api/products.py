@@ -23,7 +23,7 @@ from app.schemas.products import ProductCreateRequest, ProductUpdateRequest, Pro
 from app.core.config import settings
 from app.services.storage import get_storage
 from app.models.form_option import FormOption
-from app.services import anatomia, tipos
+from app.services import anatomia, atributos, tipos
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -153,6 +153,47 @@ def potencia_declarada(subrubro: Optional[Subcategory], pedida: Optional[int]) -
     return pedida
 
 
+def modelo_declarado(category: Category, pedido: Optional[str]) -> Optional[str]:
+    """El modelo que se guarda, o nada.
+
+    Va donde la categoría pide marca; en otra, se rechaza en vez de guardarse
+    un dato que ninguna pantalla muestra. Sin espacios de más, y vacío es nada.
+    """
+    modelo = (pedido or "").strip()
+    if not modelo:
+        return None
+    if not atributos.usa_modelo_y_anio(category):
+        raise HTTPException(
+            status_code=400,
+            detail=f"El modelo se declara sólo en maquinaria, no en «{category.name}».",
+        )
+    return modelo
+
+
+def anio_declarado(category: Category, pedido: Optional[int]) -> Optional[int]:
+    """El año que se guarda, o nada. El rango lo valida el esquema."""
+    if pedido is None:
+        return None
+    if not atributos.usa_modelo_y_anio(category):
+        raise HTTPException(
+            status_code=400,
+            detail=f"El año se declara sólo en maquinaria, no en «{category.name}».",
+        )
+    return pedido
+
+
+def origen_declarado(es_servicio: bool, pedido: Optional[str]) -> Optional[str]:
+    """El origen que se guarda, o nada. Un servicio no lo lleva."""
+    if pedido is None:
+        return None
+    if es_servicio:
+        raise HTTPException(
+            status_code=400,
+            detail="El origen se declara sólo en productos: un servicio no tiene concesionaria.",
+        )
+    return pedido
+
+
 @router.post("", response_model=ProductResponse)
 async def create_product(
     product_data: ProductCreateRequest,
@@ -256,6 +297,11 @@ async def create_product(
     subcategory_type_id = tipo_declarado(db, subrubro, product_data.subcategory_type)
     power_hp = potencia_declarada(subrubro, product_data.power_hp)
 
+    # Modelo y año donde la categoría pide marca; origen en cualquier producto.
+    modelo = modelo_declarado(category, product_data.model)
+    anio = anio_declarado(category, product_data.year)
+    origen = origen_declarado(is_service, product_data.origin)
+
     # Crear producto/servicio
     new_product = Product(
         name=product_data.name,
@@ -276,6 +322,9 @@ async def create_product(
         brand=brand,
         subcategory_type_id=subcategory_type_id,
         power_hp=power_hp,
+        model=modelo,
+        year=anio,
+        origin=origen,
         # Campos de servicio
         pricing_type=product_data.pricing_type if is_service else None,
         availability=product_data.availability if is_service else None,
@@ -594,6 +643,23 @@ async def update_product(
         elif not getattr(categoria_final, "usa_marca", False):
             update_data["brand"] = None
 
+        # El modelo y el año, igual: se validan si vienen, y si la publicación
+        # se mueve a una categoría que no los pide, se sueltan.
+        if "model" in update_data:
+            update_data["model"] = modelo_declarado(categoria_final, update_data["model"])
+        elif not atributos.usa_modelo_y_anio(categoria_final):
+            update_data["model"] = None
+        if "year" in update_data:
+            update_data["year"] = anio_declarado(categoria_final, update_data["year"])
+        elif not atributos.usa_modelo_y_anio(categoria_final):
+            update_data["year"] = None
+
+    # El tipo de publicación no se edita, así que el origen sólo se valida.
+    if "origin" in update_data:
+        update_data["origin"] = origen_declarado(
+            (product.publication_type or anatomia.PRODUCTO) == anatomia.SERVICIO_PUBLICADO,
+            update_data["origin"])
+
     # El tipo y la potencia dependen del SUBRUBRO final. Se validan si vienen;
     # si no vienen pero el subrubro cambió, lo que traía se suelta cuando ya no
     # corresponde: un «Arados» no sigue siendo verdad en Cosecha, ni una
@@ -791,6 +857,9 @@ async def get_my_products(
                 "label": product.subcategory_type.name,
             } if product.subcategory_type else None,
             "power_hp": product.power_hp,
+            "model": product.model,
+            "year": product.year,
+            "origin": product.origin,
             "category_id": str(product.category_id) if product.category_id else None,
             "category": {
                 "id": str(product.category.id),

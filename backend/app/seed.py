@@ -1320,6 +1320,20 @@ def create_seed_data():
             "tractor-pauny-280a-doble-traccion": 180,
         }
 
+        # Modelo y año, los que dice su propia descripción; y el origen. Las
+        # demás máquinas quedan sin estos datos a propósito: el filtro no tiene
+        # que traer a quien no los declaró.
+        product_modelos_y_anios = {
+            "cosechadora-john-deere-9750": ("9750 STS", 2018),
+            "tractor-pauny-280a-doble-traccion": ("280A", 2019),
+        }
+        product_origenes = {
+            "cosechadora-john-deere-9750": "concesionaria",
+            "rastra-discos-24-platos": "concesionaria",
+            "tractor-pauny-280a-doble-traccion": "dueno_directo",
+            "pulverizadora-jacto-600": "dueno_directo",
+        }
+
         product_localities = {
             "semillas-maiz-dk-premium": ("14014010", "Córdoba, Córdoba"),
             "fertilizante-triple-15": ("06623100", "Pergamino, Buenos Aires"),
@@ -1379,6 +1393,9 @@ def create_seed_data():
                 raise ValueError(
                     f"{product_values['slug']}: el tipo «{tipo_slug}» no es de su subrubro")
             product_values["power_hp"] = product_potencias.get(product_values["slug"])
+            product_values["model"], product_values["year"] = product_modelos_y_anios.get(
+                product_values["slug"], (None, None))
+            product_values["origin"] = product_origenes.get(product_values["slug"])
             # La anatomia: la que declara la publicacion, o la de su
             # categoria. Las dos que la declaran son kits estandarizados con
             # stock real dentro de una categoria de equipos; verlas como
@@ -1422,6 +1439,9 @@ def create_seed_data():
                 existing_prod.condition = product_values.get("condition")
                 existing_prod.subcategory_type_id = product_values["subcategory_type_id"]
                 existing_prod.power_hp = product_values["power_hp"]
+                existing_prod.model = product_values["model"]
+                existing_prod.year = product_values["year"]
+                existing_prod.origin = product_values["origin"]
                 existing_prod.locality_id = locality_id
                 existing_prod.location = location
                 print(f"  ⏭️  Producto '{product_values['name']}' ya existe")

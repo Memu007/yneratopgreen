@@ -260,6 +260,13 @@ def get_products(
         pattern="^(compacto|estandar|alta)$",
         description="Rango de potencia: compacto (<60 HP), estandar (60-120 HP) o alta (>120 HP)",
     ),
+    year_from: Optional[int] = Query(None, ge=0, le=9999, description="Año desde (incluido)"),
+    year_to: Optional[int] = Query(None, ge=0, le=9999, description="Año hasta (incluido)"),
+    origin: Optional[str] = Query(
+        None,
+        pattern="^(concesionaria|dueno_directo)$",
+        description="Origen declarado por quien vende: concesionaria o dueno_directo",
+    ),
     sort_by: str = Query("created_at", pattern="^(created_at|price|sales|views|rating)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
@@ -372,7 +379,9 @@ def get_products(
         query = query.filter(
             or_(
                 Product.name.ilike(search_filter),
-                Product.description.ilike(search_filter)
+                Product.description.ilike(search_filter),
+                # El modelo no tiene filtro propio: se encuentra buscándolo.
+                Product.model.ilike(search_filter),
             )
         )
     
@@ -476,6 +485,18 @@ def get_products(
             query = query.filter(Product.power_hp >= desde)
         if hasta is not None:
             query = query.filter(Product.power_hp <= hasta)
+
+    # El año es un rango y cualquiera de los dos extremos puede ir solo. Con
+    # «desde» mayor que «hasta» no hay año que cumpla los dos, y el resultado
+    # es el vacío de siempre: no se rechaza ni se dan vuelta. Como el tipo, un
+    # nulo no entra, y el origen tampoco: pedir «Dueño directo» no trae a los
+    # que no lo declararon.
+    if year_from is not None:
+        query = query.filter(Product.year >= year_from)
+    if year_to is not None:
+        query = query.filter(Product.year <= year_to)
+    if origin:
+        query = query.filter(Product.origin == origin)
 
     # === La faceta de marcas ===============================================
     #
@@ -665,6 +686,7 @@ def get_products(
                 TipoDeSubrubro(value=tipo_slug, label=tipo_nombre) if tipo_slug else None
             ),
             "power_hp": product.power_hp,
+            "origin": product.origin,
             # Cobertura y modalidad: la tarjeta de servicio no se puede
             # dibujar sin ellas, y estaban guardadas sin salir nunca.
             "pricing_type": product.pricing_type,
@@ -777,6 +799,9 @@ def get_product_detail(
             if product.subcategory_type else None
         ),
         "power_hp": product.power_hp,
+        "model": product.model,
+        "year": product.year,
+        "origin": product.origin,
         "pricing_type": product.pricing_type,
         "availability": product.availability,
         "response_time": product.response_time,

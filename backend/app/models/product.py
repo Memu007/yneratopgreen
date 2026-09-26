@@ -24,6 +24,13 @@ class Product(Base):
     # la base lo sostiene aunque alguien escriba por otro camino.
     __table_args__ = (
         CheckConstraint("power_hp IS NULL OR power_hp > 0", name="ck_products_power_hp_positiva"),
+        # El año tiene piso fijo; el techo -el año próximo- corre con el
+        # calendario y lo valida la API.
+        CheckConstraint("year IS NULL OR year >= 1950", name="ck_products_year_desde_1950"),
+        CheckConstraint(
+            "origin IS NULL OR origin IN ('concesionaria', 'dueno_directo')",
+            name="ck_products_origin_valido",
+        ),
     )
 
     # Identificación
@@ -78,6 +85,14 @@ class Product(Base):
     # de potencia: se guarda el número que declara quien vende y el rango lo
     # calcula el filtro. Nula en lo anterior a la columna, por lo mismo.
     power_hp = Column(Integer, nullable=True, index=True)
+
+    # Modelo y año de la máquina, donde la categoría pide marca, y el origen
+    # que declara quien vende, en cualquier producto (ver
+    # `services/atributos.py`). Nulos en todo lo publicado antes de las
+    # columnas: nadie puede saberlos hoy sin adivinarle la descripción.
+    model = Column(String(80), nullable=True)
+    year = Column(Integer, nullable=True, index=True)
+    origin = Column(String(20), nullable=True, index=True)
     sku = Column(String(100), unique=True, nullable=True)  # Código de producto
     
     # Precio y stock (para productos)

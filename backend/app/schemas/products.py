@@ -2,8 +2,10 @@
 Schemas para gestión de productos y servicios (crear, editar)
 """
 from typing import Optional, List, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from uuid import UUID
+
+from app.services import atributos
 
 
 class ProductCreateRequest(BaseModel):
@@ -35,6 +37,17 @@ class ProductCreateRequest(BaseModel):
     subcategory_type: Optional[str] = Field(None, max_length=80)
     # La potencia en HP, sólo donde el subrubro la lleva (Tractores).
     power_hp: Optional[int] = Field(None, ge=1, le=1000)
+    # Modelo y año, sólo donde la categoría pide marca (ver
+    # `services/atributos.py`); fuera de ahí, el alta se rechaza.
+    model: Optional[str] = Field(None, max_length=atributos.LARGO_DEL_MODELO)
+    year: Optional[int] = None
+    # El origen que declara quien vende. Sólo en productos.
+    origin: Optional[Literal["concesionaria", "dueno_directo"]] = None
+
+    @field_validator("year")
+    @classmethod
+    def anio_en_rango(cls, anio: Optional[int]) -> Optional[int]:
+        return atributos.validar_anio(anio)
     
     # Campos específicos para servicios
     pricing_type: Optional[str] = Field(None, max_length=50)  # por_hora, por_hectarea, por_trabajo, a_convenir
@@ -61,6 +74,15 @@ class ProductUpdateRequest(BaseModel):
     # `null` explícito quita el tipo o la potencia; no mandarlos los deja.
     subcategory_type: Optional[str] = Field(None, max_length=80)
     power_hp: Optional[int] = Field(None, ge=1, le=1000)
+    # Lo mismo para el modelo, el año y el origen.
+    model: Optional[str] = Field(None, max_length=atributos.LARGO_DEL_MODELO)
+    year: Optional[int] = None
+    origin: Optional[Literal["concesionaria", "dueno_directo"]] = None
+
+    @field_validator("year")
+    @classmethod
+    def anio_en_rango(cls, anio: Optional[int]) -> Optional[int]:
+        return atributos.validar_anio(anio)
     
     # Campos específicos para servicios
     pricing_type: Optional[str] = Field(None, max_length=50)

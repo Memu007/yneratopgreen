@@ -140,6 +140,8 @@ class ProductCardResponse(ProductBase):
     # El tercer nivel declarado y la potencia, o nada.
     subcategory_type: Optional[TipoDeSubrubro] = None
     power_hp: Optional[int] = None
+    # El origen que declara quien vende: la tarjeta lo muestra rotulado así.
+    origin: Optional[str] = None
     # Lo que la anatomia de servicio pide obligatorio —cobertura y
     # modalidad— y ya estaba en la base sin salir a la superficie.
     pricing_type: Optional[str] = None
@@ -170,6 +172,9 @@ class ProductDetailResponse(ProductBase):
     brand: Optional[str] = None
     subcategory_type: Optional[TipoDeSubrubro] = None
     power_hp: Optional[int] = None
+    model: Optional[str] = None
+    year: Optional[int] = None
+    origin: Optional[str] = None
     pricing_type: Optional[str] = None
     availability: Optional[str] = None
     response_time: Optional[str] = None
