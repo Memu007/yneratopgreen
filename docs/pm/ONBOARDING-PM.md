@@ -162,6 +162,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
   sobre una copia de base armada como la publicada. Correrlas dos veces.
   Dentro de `docker build`, `pip` no llega a PyPI: no se fuerza, se declara el
   límite.
+- **Las dos guías** (`guia-admin.mjs` y `guia-usuario.mjs`) se corren después de la suite. Un negativo útil rompe el producto sin tocar la guía, para ver que el programa controla lo que la guía afirma y no sólo el texto.
 - **Toda lista nueva** tiene que decir cómo llega a producción. Ver la regla
   en `ONBOARDING-DEV.md`, «Producción y Railway».
 
