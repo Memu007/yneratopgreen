@@ -180,6 +180,15 @@
 
 .datos dd { margin: 4px 0 0; font-weight: 620; }
 
+/* «declarado por quien vende», debajo del origen: texto secundario, sin
+   fondo, sin borde y sin ícono. */
+.declarado {
+  display: block;
+  color: var(--tg-color-text-secondary);
+  font-size: 12px;
+  font-weight: 450;
+}
+
 .acciones { display: grid; gap: var(--tg-space-3); }
 
 .detalle {

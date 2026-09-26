@@ -70,6 +70,11 @@ export const esPantallaDeLlegada = (seccion: Seccion) => LLEGADAS.includes(secci
  *
  * El orden es el de esta lista y no el de escritura: así la misma búsqueda da
  * siempre la misma URL.
+ *
+ * Tiene que tener TODO lo que el Mercado escribe en la barra. Lo que falte se
+ * pierde al tocar «Mercado» estando en el Mercado: la pantalla sigue
+ * filtrando, la barra ya no lo dice, y al recargar el filtro desaparece. Así
+ * se perdían la condición, la marca, el orden y la página.
  */
 export const PARAMETROS_DEL_MERCADO = [
   'q',
@@ -82,8 +87,15 @@ export const PARAMETROS_DEL_MERCADO = [
   'max_price',
   'in_stock',
   'min_rating',
+  'condition',
+  'brand',
   'subtype',
   'power',
+  'year_from',
+  'year_to',
+  'origin',
+  'sort',
+  'page',
 ];
 
 /**

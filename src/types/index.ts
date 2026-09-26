@@ -30,6 +30,11 @@ export interface Product {
   subcategoryType?: { value: string; label: string };
   /** La potencia en HP, sólo en Tractores. */
   powerHp?: number;
+  /** Modelo y año de la máquina, y el origen que declara quien vende. Todos
+      opcionales: lo anterior a las columnas no los tiene. */
+  model?: string;
+  year?: number;
+  origin?: 'concesionaria' | 'dueno_directo';
   /** Lo que declara una publicación de servicio o logística. Vive en la base
       desde siempre; hasta ahora no salía en la respuesta pública, y sin
       cobertura ni modalidad la tarjeta de servicio no se puede dibujar. */

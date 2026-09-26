@@ -8,6 +8,13 @@ import {
   fraseDeImagenesFallidas,
   subirImagenDePublicacion,
 } from '../../publicaciones/imagenes';
+import {
+  ANIO_MINIMO,
+  anioMaximo,
+  ORIGENES,
+  ROTULO_DEL_ORIGEN,
+  type OrigenDeclarado,
+} from '../../utils/catalogService';
 import styles from './AddProductModal.module.css';
 import { ProductImage } from '../ProductImage/ProductImage';
 import { Condition, OperationKind, ETIQUETA_DE_ANATOMIA, ETIQUETA_DE_CONDICION } from '../../utils/anatomia';
@@ -176,6 +183,12 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   // cualquiera para poder publicar.
   const [tipo, setTipo] = useState('');
   const [potencia, setPotencia] = useState('');
+
+  // Modelo y año, donde la categoría pide marca, y el origen, en cualquier
+  // producto. Opcionales por lo mismo que la marca.
+  const [modelo, setModelo] = useState('');
+  const [anio, setAnio] = useState('');
+  const [origen, setOrigen] = useState<OrigenDeclarado | ''>('');
   
   const [formData, setFormData] = useState<NewProductData>(FORMULARIO_VACIO);
 
@@ -215,8 +228,14 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     setPublicationType('producto');
     setOperationKind('insumo');
     setCondition('');
+    // Todo lo declarado se suelta: la marca se quedaba, y el alta siguiente
+    // se abría con la marca de la publicación anterior ya elegida.
+    setBrand('');
     setTipo('');
     setPotencia('');
+    setModelo('');
+    setAnio('');
+    setOrigen('');
     setSelectedProvinceId('');
     setLocalities([]);
     setImages([]);
@@ -331,6 +350,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     setPublicationType(type);
     setTipo('');
     setPotencia('');
+    setModelo('');
+    setAnio('');
+    if (type === 'servicio') setOrigen('');
     setFormData(prev => ({
       ...prev,
       category: '',
@@ -369,6 +391,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     if (elegida) setOperationKind(elegida.anatomiaPorOmision);
     setTipo('');
     setPotencia('');
+    // El modelo y el año son de maquinaria: otra categoría los suelta.
+    setModelo('');
+    setAnio('');
     setFormData(prev => ({
       ...prev,
       category: e.target.value,
@@ -563,6 +588,14 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
       }
     }
 
+    // El año, si se declara, va de 1950 al año próximo. La API valida lo
+    // mismo; acá se dice antes de mandar.
+    if (selectedCategory?.usaMarca && anio
+      && !(Number(anio) >= ANIO_MINIMO && Number(anio) <= anioMaximo())) {
+      showToast(`El año tiene que estar entre ${ANIO_MINIMO} y ${anioMaximo()}.`, 'warning');
+      return;
+    }
+
     // El precio lo decide una sola regla, la misma que aplica la edición: si
     // no es «a convenir», tiene que estar y ser mayor a cero.
     const problemaDelPrecio = revisarElPrecio(formData.price, {
@@ -626,6 +659,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
         brand: selectedCategory?.usaMarca && brand ? brand : undefined,
         subcategory_type: tiposDelSubrubro.length > 0 && tipo ? tipo : undefined,
         power_hp: subrubroElegido?.usa_potencia && potencia ? Number(potencia) : undefined,
+        model: selectedCategory?.usaMarca && modelo.trim() ? modelo.trim() : undefined,
+        year: selectedCategory?.usaMarca && anio ? Number(anio) : undefined,
+        origin: publicationType === 'producto' && origen ? origen : undefined,
       };
 
       // Campos específicos según tipo
@@ -886,6 +922,60 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                   Elegila de la lista para que quien busque por marca te encuentre.
                   Si la tuya no está, dejala sin declarar: escribirla en el título
                   no la vuelve buscable.
+                </p>
+              </div>
+            )}
+
+            {/* Modelo y año: van con la marca, donde la categoría la pide. */}
+            {selectedCategory?.usaMarca && (
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="model">Modelo</label>
+                  <input
+                    id="model"
+                    name="model"
+                    type="text"
+                    maxLength={80}
+                    value={modelo}
+                    onChange={(e) => setModelo(e.target.value)}
+                    placeholder="Ej.: 280A, 9750 STS"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label htmlFor="year">Año</label>
+                  <input
+                    id="year"
+                    name="year"
+                    type="number"
+                    inputMode="numeric"
+                    min={ANIO_MINIMO}
+                    max={anioMaximo()}
+                    value={anio}
+                    onChange={(e) => setAnio(e.target.value)}
+                    placeholder={`${ANIO_MINIMO} a ${anioMaximo()}`}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* El origen: lo declara quien vende, y así se lo muestra. */}
+            {publicationType === 'producto' && (
+              <div className={styles.formGroup}>
+                <label htmlFor="origin">Origen</label>
+                <select
+                  id="origin"
+                  name="origin"
+                  value={origen}
+                  onChange={(e) => setOrigen(e.target.value as OrigenDeclarado | '')}
+                >
+                  <option value="">Sin declarar</option>
+                  {ORIGENES.map(({ valor, rotulo }) => (
+                    <option key={valor} value={valor}>{rotulo}</option>
+                  ))}
+                </select>
+                <p className={styles.helpText}>
+                  Quien compra lo ve rotulado «{ROTULO_DEL_ORIGEN}»: es lo que
+                  vos decís, no algo que la plataforma haya comprobado.
                 </p>
               </div>
             )}

@@ -12,6 +12,7 @@ import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavegacionActual } from '../../navegacion/navegacion';
 import { urlDe } from '../../navegacion/politica';
+import { ROTULO_DEL_ORIGEN, rotuloDeOrigen } from '../../utils/catalogService';
 import { ProductImage } from '../ProductImage/ProductImage';
 
 interface ProductCardProps {
@@ -167,6 +168,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </h3>
 
           {ubicacion && <p className={styles.ubicacion}>{ubicacion}</p>}
+
+          {/* El origen, rotulado como lo que es: una declaración de quien
+              vende. Texto común, sin fondo ni ícono, para que no se confunda
+              con el distintivo de documentación revisada. */}
+          {!esServicio && rotuloDeOrigen(product.origin) && (
+            <p className={styles.origen}>
+              {rotuloDeOrigen(product.origin)}
+              <span className={styles.origenAclaracion}> · {ROTULO_DEL_ORIGEN}</span>
+            </p>
+          )}
 
           {esServicio && (
             <dl className={styles.datosDeServicio}>

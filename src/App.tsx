@@ -154,6 +154,9 @@ function App() {
     marca,
     tipo,
     potencia,
+    anioDesde,
+    anioHasta,
+    origen,
     setTextoBuscado,
     aplicarBusqueda,
     setSelectedType,
@@ -169,6 +172,9 @@ function App() {
     setMarca,
     setTipo,
     setPotencia,
+    setAnioDesde,
+    setAnioHasta,
+    setOrigen,
     orden,
     pagina,
     setOrden,
@@ -482,6 +488,9 @@ function App() {
     marca,
     tipo,
     potencia,
+    anioDesde,
+    anioHasta,
+    origen,
     ordenPedido.sortBy,
     ordenPedido.sortOrder,
     pagina,
@@ -541,6 +550,10 @@ function App() {
         // antes de contar y de paginar, como todos los demás.
         subcategory_type: tipo || undefined,
         power_range: potencia || undefined,
+        // El año de la máquina y el origen declarado, con el mismo contrato.
+        year_from: anioDesde ?? undefined,
+        year_to: anioHasta ?? undefined,
+        origin: origen || undefined,
         province:
           selectedProvince === 'Todas las provincias' ? undefined : selectedProvince,
         locality_id: selectedLocalityId || undefined,
@@ -635,6 +648,9 @@ function App() {
     marca,
     tipo,
     potencia,
+    anioDesde,
+    anioHasta,
+    origen,
     ordenPedido,
     pagina,
     irALaPagina,
@@ -820,8 +836,14 @@ function App() {
                 marcasDisponibles={marcasDelMercado}
                 tipo={tipo}
                 potencia={potencia}
+                anioDesde={anioDesde}
+                anioHasta={anioHasta}
+                origen={origen}
                 onTipoChange={setTipo}
                 onPotenciaChange={setPotencia}
+                onAnioDesdeChange={setAnioDesde}
+                onAnioHastaChange={setAnioHasta}
+                onOrigenChange={setOrigen}
                 onTypeChange={setSelectedType}
                 onCategoryChange={setSelectedCategory}
                 onSubcategoryChange={setSelectedSubcategory}

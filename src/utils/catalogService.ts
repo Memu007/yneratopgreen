@@ -77,6 +77,22 @@ export const RANGOS_DE_POTENCIA: { valor: RangoDePotencia; rotulo: string }[] = 
   { valor: 'alta', rotulo: 'Alta (más de 120 HP)' },
 ];
 
+/** El origen que declara quien vende. Es lo que ELLA dice, no algo que la
+    plataforma comprobó: toda pantalla lo rotula «declarado por quien vende»
+    y nunca con el aspecto del distintivo de documentación revisada. */
+export type OrigenDeclarado = 'concesionaria' | 'dueno_directo';
+export const ORIGENES: { valor: OrigenDeclarado; rotulo: string }[] = [
+  { valor: 'concesionaria', rotulo: 'Agencia / Concesionaria' },
+  { valor: 'dueno_directo', rotulo: 'Dueño directo' },
+];
+export const ROTULO_DEL_ORIGEN = 'declarado por quien vende';
+export const rotuloDeOrigen = (valor?: string | null): string | undefined =>
+  ORIGENES.find((origen) => origen.valor === valor)?.rotulo;
+
+/** El año de una máquina: de 1950 al año próximo. La API valida lo mismo. */
+export const ANIO_MINIMO = 1950;
+export const anioMaximo = (): number => new Date().getFullYear() + 1;
+
 export interface ProvinceResponse {
   id: string;
   name: string;
@@ -158,6 +174,10 @@ export interface ProductFromBackend {
   /** El tercer nivel declarado y la potencia en HP, o nada. */
   subcategory_type?: TipoDeSubrubro | null;
   power_hp?: number | null;
+  /** El origen declarado, o nada. El modelo y el año vienen en el detalle. */
+  origin?: OrigenDeclarado | null;
+  model?: string | null;
+  year?: number | null;
   pricing_type?: string | null;
   availability?: string | null;
   response_time?: string | null;
@@ -266,6 +286,11 @@ export const getProducts = async (params: {
   subcategory_type?: string;
   /** Rango de potencia de Tractores. */
   power_range?: RangoDePotencia;
+  /** El año, desde y hasta, incluidos. Cualquiera puede ir solo. */
+  year_from?: number;
+  year_to?: number;
+  /** El origen declarado. */
+  origin?: OrigenDeclarado;
   sort_by?: 'created_at' | 'price' | 'sales' | 'views' | 'rating';
   sort_order?: 'asc' | 'desc';
   page?: number;
@@ -366,6 +391,9 @@ export const convertBackendProductToFrontend = (backendProduct: ProductFromBacke
     condition: normalizarCondicion(backendProduct.condition),
     subcategoryType: backendProduct.subcategory_type || undefined,
     powerHp: backendProduct.power_hp ?? undefined,
+    model: backendProduct.model || undefined,
+    year: backendProduct.year ?? undefined,
+    origin: backendProduct.origin || undefined,
     pricingType: backendProduct.pricing_type || undefined,
     availability: backendProduct.availability || undefined,
     responseTime: backendProduct.response_time || undefined,

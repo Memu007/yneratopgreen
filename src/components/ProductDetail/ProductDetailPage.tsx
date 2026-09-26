@@ -15,7 +15,12 @@ import {
   ETIQUETA_DE_ANATOMIA,
   ETIQUETA_DE_CONDICION,
 } from '../../utils/anatomia';
-import { convertBackendProductToFrontend, getProductDetail } from '../../utils/catalogService';
+import {
+  convertBackendProductToFrontend,
+  getProductDetail,
+  ROTULO_DEL_ORIGEN,
+  rotuloDeOrigen,
+} from '../../utils/catalogService';
 import { ErrorDeLaApi } from '../../utils/api';
 import { urlDe, type Seccion } from '../../navegacion/politica';
 import { SellerProfileModal } from '../SellerProfile/SellerProfileModal';
@@ -369,6 +374,30 @@ const Ficha: React.FC<FichaProps> = ({
             <div>
               <dt>Potencia</dt>
               <dd>{`${product.powerHp} HP`}</dd>
+            </div>
+          )}
+          {product.model && (
+            <div>
+              <dt>Modelo</dt>
+              <dd>{product.model}</dd>
+            </div>
+          )}
+          {product.year != null && (
+            <div>
+              <dt>Año</dt>
+              <dd>{product.year}</dd>
+            </div>
+          )}
+          {/* El origen es lo que DECLARA quien vende, y la fila lo dice. Es
+              texto común, como las demás: no se parece al distintivo de
+              documentación revisada, que sí comprobó la plataforma. */}
+          {rotuloDeOrigen(product.origin) && (
+            <div>
+              <dt>Origen</dt>
+              <dd>
+                {rotuloDeOrigen(product.origin)}
+                <span className={styles.declarado}>{ROTULO_DEL_ORIGEN}</span>
+              </dd>
             </div>
           )}
           {product.condition && (

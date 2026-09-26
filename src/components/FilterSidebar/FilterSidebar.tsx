@@ -7,7 +7,15 @@ import type {
   ProvinceResponse,
   RangoDePotencia,
 } from '../../utils/catalogService';
-import { opcionDeLocalidad, RANGOS_DE_POTENCIA } from '../../utils/catalogService';
+import {
+  ANIO_MINIMO,
+  anioMaximo,
+  opcionDeLocalidad,
+  ORIGENES,
+  RANGOS_DE_POTENCIA,
+  ROTULO_DEL_ORIGEN,
+  type OrigenDeclarado,
+} from '../../utils/catalogService';
 import { CONDICIONES, type CondicionDelMercado } from '../../hooks/useProductFilters';
 
 interface FilterSidebarProps {
@@ -36,6 +44,11 @@ interface FilterSidebarProps {
   tipo: string;
   /** El rango de potencia de Tractores. Vacío es «cualquiera». */
   potencia: RangoDePotencia | '';
+  /** El año de la máquina, desde y hasta. `null` es «sin límite». */
+  anioDesde: number | null;
+  anioHasta: number | null;
+  /** El origen declarado por quien vende. Vacío es «cualquiera». */
+  origen: OrigenDeclarado | '';
   onTypeChange: (type: 'todos' | 'productos' | 'servicios') => void;
   onCategoryChange: (category: string) => void;
   onSubcategoryChange: (subcategory: string) => void;
@@ -49,6 +62,9 @@ interface FilterSidebarProps {
   onMarcaChange: (marca: string) => void;
   onTipoChange: (tipo: string) => void;
   onPotenciaChange: (potencia: RangoDePotencia | '') => void;
+  onAnioDesdeChange: (anio: number | null) => void;
+  onAnioHastaChange: (anio: number | null) => void;
+  onOrigenChange: (origen: OrigenDeclarado | '') => void;
   onResetFilters: () => void;
   /** Cuántas operaciones quedan con los filtros puestos. En celular el
       panel termina con «Ver N resultados»: sin el número, cerrar el panel
@@ -75,6 +91,9 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   marcasDisponibles,
   tipo,
   potencia,
+  anioDesde,
+  anioHasta,
+  origen,
   onTypeChange,
   onCategoryChange,
   onSubcategoryChange,
@@ -88,6 +107,9 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   onMarcaChange,
   onTipoChange,
   onPotenciaChange,
+  onAnioDesdeChange,
+  onAnioHastaChange,
+  onOrigenChange,
   onResetFilters,
   cantidadDeResultados,
 }) => {
@@ -114,6 +136,32 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   );
   const tiposDelSubrubro = subrubroElegido?.tipos ?? [];
 
+  // Lo que describe una MÁQUINA o un PRODUCTO no aplica a un servicio: un
+  // asesoramiento no es nuevo ni usado, no tiene año ni concesionaria. Esos
+  // controles no se dibujan para servicios, salvo que ya tengan algo puesto:
+  // un filtro aplicado nunca queda invisible.
+  const categoriaElegida = categories.find((category) => category.name === selectedCategory);
+  const esDeServicios = selectedType === 'servicios' || Boolean(categoriaElegida?.is_service);
+  const usaAnio = Boolean(categoriaElegida?.usa_marca) && !esDeServicios;
+  const verAnio = usaAnio || anioDesde !== null || anioHasta !== null;
+  const verCondicion = !esDeServicios || condicion !== '';
+  const verOrigen = !esDeServicios || origen !== '';
+
+  // Pasar a servicios suelta lo que sólo aplica a productos.
+  const soltarLoDeProductos = () => {
+    if (condicion) onCondicionChange('');
+    if (origen) onOrigenChange('');
+  };
+
+  // «Más filtros»: lo que se usa poco va plegado. Si tiene algo puesto, el
+  // botón dice cuántos, y arranca abierto: un filtro aplicado no puede quedar
+  // escondido.
+  const activosEnMas = (inStockOnly ? 1 : 0) + (minRating > 0 ? 1 : 0);
+  const [masAbierto, setMasAbierto] = useState(activosEnMas > 0);
+
+  const anioDelCampo = (texto: string): number | null =>
+    (/^\d{1,4}$/.test(texto) ? Number(texto) : null);
+
   return (
     <aside className={styles.panel}>
       <div className={styles.plegable}>
@@ -136,17 +184,28 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             <h2 className={styles.titulo}>Filtrar</h2>
           </div>
 
-          {/* Tipo: Producto/Servicio */}
+          {/* El orden del panel (PM, 26/09): primero lo que describe lo que
+              se busca, y cada filtro que depende de otro justo debajo de él;
+              después dónde, después el precio, y al final, plegado, lo que se
+              usa poco. Cada grupo es un `fieldset`: el lector de pantalla
+              anuncia en qué grupo está cada control. */}
+          <fieldset className={styles.grupo}>
+          <legend className={styles.grupoTitulo}>Qué buscás</legend>
+
+          {/* Productos o servicios. Se llamaba «Tipo», igual que el tercer
+              nivel del subrubro, y los dos quedaban en el mismo panel. */}
           <div className={styles.filterSection}>
-            <label className={styles.filterLabel} htmlFor="catalog-type">Tipo</label>
+            <label className={styles.filterLabel} htmlFor="catalog-type">Productos o servicios</label>
             <select
               id="catalog-type"
               className={styles.select}
               value={selectedType}
               onChange={(e) => {
-                onTypeChange(e.target.value as 'todos' | 'productos' | 'servicios');
+                const elegido = e.target.value as 'todos' | 'productos' | 'servicios';
+                onTypeChange(elegido);
                 onCategoryChange('Todas las categorías');
                 onSubcategoryChange('Todas');
+                if (elegido === 'servicios') soltarLoDeProductos();
               }}
             >
               <option value="todos">Todos</option>
@@ -165,6 +224,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               onChange={(e) => {
                 onCategoryChange(e.target.value);
                 onSubcategoryChange('Todas');
+                if (categories.find((c) => c.name === e.target.value)?.is_service) soltarLoDeProductos();
               }}
             >
               <option value="Todas las categorías">Todas las categorías</option>
@@ -235,6 +295,123 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             </div>
           )}
 
+          {/* Marca.
+
+              La lista la trae la respuesta junto con el listado, y cada
+              opción dice cuántas publicaciones tiene con los demás filtros
+              puestos.
+
+              Con una categoría que usa marca elegida llegan TODAS las marcas
+              activas, también las que están en cero (decisión de Emi, 25/09):
+              se revisa más fácil y se ve igual desde el primer día. Elegir
+              una en cero da el vacío de siempre.
+
+              Sin esa categoría llegan sólo las marcas que el conjunto tiene, y
+              si no tiene ninguna el control no se dibuja. */}
+          {marcasDisponibles.length > 0 && (
+            <div className={styles.filterSection}>
+              <label className={styles.filterLabel} htmlFor="catalog-brand">
+                Marca
+              </label>
+              <select
+                id="catalog-brand"
+                className={styles.select}
+                value={marca}
+                onChange={(e) => onMarcaChange(e.target.value)}
+              >
+                <option value="">Todas las marcas</option>
+                {marcasDisponibles.map(({ value, label, count }) => (
+                  <option key={value} value={value}>{`${label} (${count})`}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Año de la máquina: un rango, y cualquiera de los dos extremos
+              puede ir solo. Aparece donde la categoría pide marca, que es
+              donde quien vende lo declara. */}
+          {verAnio && (
+            <div className={styles.filterSection} role="group" aria-labelledby="catalog-year">
+              <span className={styles.filterLabel} id="catalog-year">Año</span>
+              <div className={styles.priceInputs}>
+                <input
+                  id="catalog-year-from"
+                  type="number"
+                  inputMode="numeric"
+                  aria-label="Año desde"
+                  className={styles.priceInput}
+                  placeholder="Desde"
+                  min={ANIO_MINIMO}
+                  max={anioMaximo()}
+                  value={anioDesde ?? ''}
+                  onChange={(e) => onAnioDesdeChange(anioDelCampo(e.target.value))}
+                />
+                <input
+                  id="catalog-year-to"
+                  type="number"
+                  inputMode="numeric"
+                  aria-label="Año hasta"
+                  className={styles.priceInput}
+                  placeholder="Hasta"
+                  min={ANIO_MINIMO}
+                  max={anioMaximo()}
+                  value={anioHasta ?? ''}
+                  onChange={(e) => onAnioHastaChange(anioDelCampo(e.target.value))}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Condición del activo.
+              Sólo la tienen los activos —una semilla no es «usada»— y ahí es
+              opcional a propósito, así que el filtro ACOTA y nunca completa:
+              «Nuevo» trae los declarados nuevos, no los nuevos más los que no
+              lo dicen. Las opciones salen de la misma tabla que valida la API,
+              para que no haya una lista acá y otra allá. */}
+          {verCondicion && (
+          <div className={styles.filterSection}>
+            <label className={styles.filterLabel} htmlFor="catalog-condition">
+              Condición
+            </label>
+            <select
+              id="catalog-condition"
+              className={styles.select}
+              value={condicion}
+              onChange={(e) => onCondicionChange(e.target.value as CondicionDelMercado)}
+            >
+              {CONDICIONES.map(({ valor, rotulo }) => (
+                <option key={valor || 'cualquiera'} value={valor}>{rotulo}</option>
+              ))}
+            </select>
+          </div>
+          )}
+
+          {/* Origen: lo que DECLARA quien vende, y el rótulo lo dice. No es
+              algo que la plataforma haya comprobado, así que no se parece al
+              distintivo de documentación revisada. */}
+          {verOrigen && (
+            <div className={styles.filterSection}>
+              <label className={styles.filterLabel} htmlFor="catalog-origin">
+                Origen <span className={styles.aclaracion}>· {ROTULO_DEL_ORIGEN}</span>
+              </label>
+              <select
+                id="catalog-origin"
+                className={styles.select}
+                value={origen}
+                onChange={(e) => onOrigenChange(e.target.value as OrigenDeclarado | '')}
+              >
+                <option value="">Cualquiera</option>
+                {ORIGENES.map(({ valor, rotulo }) => (
+                  <option key={valor} value={valor}>{rotulo}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          </fieldset>
+
+          <fieldset className={styles.grupo}>
+          <legend className={styles.grupoTitulo}>Dónde</legend>
+
           {/* Ubicación oficial de la publicación */}
           <div className={styles.filterSection}>
             <label className={styles.filterLabel} htmlFor="catalog-province">Provincia</label>
@@ -273,9 +450,12 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             </select>
           </div>
 
-          {/* Precio */}
+          </fieldset>
+
+          {/* Precio. El título del grupo lo nombra; cada campo dice cuál es. */}
+          <fieldset className={styles.grupo}>
+          <legend className={styles.grupoTitulo}>Precio</legend>
           <div className={styles.filterSection}>
-            <label className={styles.filterLabel} htmlFor="catalog-price-min">Precio</label>
             <div className={styles.priceInputs}>
               <input
                 id="catalog-price-min"
@@ -298,6 +478,29 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             </div>
           </div>
 
+          </fieldset>
+
+          {/* Más filtros: lo que se usa poco, plegado de entrada. Plegado con
+              `hidden`, así que sus controles salen del recorrido de Tab y del
+              árbol de accesibilidad. Si tiene algo puesto, el botón lo dice y
+              arranca abierto: un filtro aplicado no queda escondido. */}
+          <div className={styles.mas}>
+            <button
+              type="button"
+              className={styles.masBoton}
+              aria-expanded={masAbierto}
+              aria-controls="mas-filtros"
+              onClick={() => setMasAbierto((previo) => !previo)}
+            >
+              <span aria-hidden="true" className={styles.masMarca}>{masAbierto ? '▾' : '▸'}</span>
+              Más filtros
+              {activosEnMas > 0 && (
+                <span className={styles.masActivos}>
+                  {activosEnMas === 1 ? '(1 activo)' : `(${activosEnMas} activos)`}
+                </span>
+              )}
+            </button>
+            <div id="mas-filtros" className={styles.masCuerpo} hidden={!masAbierto}>
           {/* Disponibilidad */}
           <div className={styles.filterSection}>
             <span className={styles.filterLabel} id="catalog-availability">Disponibilidad</span>
@@ -337,60 +540,8 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               ))}
             </select>
           </div>
-
-          {/* Condición del activo.
-              Sólo la tienen los activos —una semilla no es «usada»— y ahí es
-              opcional a propósito, así que el filtro ACOTA y nunca completa:
-              «Nuevo» trae los declarados nuevos, no los nuevos más los que no
-              lo dicen. Las opciones salen de la misma tabla que valida la API,
-              para que no haya una lista acá y otra allá. */}
-          <div className={styles.filterSection}>
-            <label className={styles.filterLabel} htmlFor="catalog-condition">
-              Condición
-            </label>
-            <select
-              id="catalog-condition"
-              className={styles.select}
-              value={condicion}
-              onChange={(e) => onCondicionChange(e.target.value as CondicionDelMercado)}
-            >
-              {CONDICIONES.map(({ valor, rotulo }) => (
-                <option key={valor || 'cualquiera'} value={valor}>{rotulo}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Marca.
-
-              La lista la trae la respuesta junto con el listado, y cada
-              opción dice cuántas publicaciones tiene con los demás filtros
-              puestos.
-
-              Con una categoría que usa marca elegida llegan TODAS las marcas
-              activas, también las que están en cero (decisión de Emi, 25/09):
-              se revisa más fácil y se ve igual desde el primer día. Elegir
-              una en cero da el vacío de siempre.
-
-              Sin esa categoría llegan sólo las marcas que el conjunto tiene, y
-              si no tiene ninguna el control no se dibuja. */}
-          {marcasDisponibles.length > 0 && (
-            <div className={styles.filterSection}>
-              <label className={styles.filterLabel} htmlFor="catalog-brand">
-                Marca
-              </label>
-              <select
-                id="catalog-brand"
-                className={styles.select}
-                value={marca}
-                onChange={(e) => onMarcaChange(e.target.value)}
-              >
-                <option value="">Todas las marcas</option>
-                {marcasDisponibles.map(({ value, label, count }) => (
-                  <option key={value} value={value}>{`${label} (${count})`}</option>
-                ))}
-              </select>
             </div>
-          )}
+          </div>
 
           <button className={styles.limpiar} onClick={onResetFilters}>
             Limpiar filtros

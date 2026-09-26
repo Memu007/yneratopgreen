@@ -35,6 +35,75 @@
   gap: var(--tg-space-2);
 }
 
+/* Los grupos del panel: qué se busca, dónde, precio. Un `fieldset` sin su
+   marco de navegador; lo separa una regla arriba, no una caja. */
+.grupo {
+  display: grid;
+  gap: var(--tg-space-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.grupo + .grupo,
+.grupo + .mas {
+  padding-top: var(--tg-space-4);
+  border-top: 1px solid var(--tg-color-border);
+}
+
+/* El título del grupo es más fuerte que el rótulo de cada control: se lee
+   primero, y ordena lo que viene debajo. */
+.grupoTitulo {
+  padding: 0 var(--tg-space-2) var(--tg-space-2) 0;
+  color: var(--tg-color-text);
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* «declarado por quien vende» acompaña al rótulo sin gritar: texto común,
+   sin mayúsculas, sin fondo ni ícono. No es un distintivo. */
+.aclaracion {
+  color: var(--tg-color-text-secondary);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.mas { display: grid; gap: var(--tg-space-4); }
+
+.masBoton {
+  justify-self: stretch;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-2);
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--tg-color-text);
+  font-size: 13.5px;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+
+.masBoton:hover { color: var(--tg-color-brand); }
+
+.masMarca { inline-size: 1em; }
+
+.masActivos {
+  color: var(--tg-color-text-secondary);
+  font-weight: 570;
+}
+
+.masCuerpo { display: grid; gap: var(--tg-space-5); }
+
+.masCuerpo[hidden] { display: none; }
+
 /* Los rótulos del panel son micro-rótulos de registro: dicen de qué es el
    control sin competir con la opción elegida, que es lo que hay que leer. */
 .filterLabel {

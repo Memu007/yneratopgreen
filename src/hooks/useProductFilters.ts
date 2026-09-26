@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { seccionDeLaBarra } from '../navegacion/politica';
-import { RANGOS_DE_POTENCIA, type RangoDePotencia } from '../utils/catalogService';
+import {
+  ORIGENES,
+  RANGOS_DE_POTENCIA,
+  type OrigenDeclarado,
+  type RangoDePotencia,
+} from '../utils/catalogService';
 
 /**
  * Los cuatro órdenes que el Mercado ofrece, y cómo se traduce cada uno a la
@@ -55,6 +60,14 @@ const condicionDeLaBarra = (valor: string | null): CondicionDelMercado =>
 /** Un rango de potencia de la barra, o ninguno si no es uno de los tres. */
 const potenciaDeLaBarra = (valor: string | null): RangoDePotencia | '' =>
   (RANGOS_DE_POTENCIA.some((rango) => rango.valor === valor) ? valor as RangoDePotencia : '');
+
+/** Un año de la barra: un entero de hasta cuatro cifras, o ninguno. */
+const anioDeLaBarra = (valor: string | null): number | null =>
+  (valor !== null && /^\d{1,4}$/.test(valor) ? Number(valor) : null);
+
+/** Un origen de la barra, o ninguno si no es uno de los dos. */
+const origenDeLaBarra = (valor: string | null): OrigenDeclarado | '' =>
+  (ORIGENES.some((origen) => origen.valor === valor) ? valor as OrigenDeclarado : '');
 
 /** Cuántas tarjetas trae una página. La decide el Mercado y viaja a la
  *  consulta: la grilla dibuja lo que le dan. */
@@ -164,6 +177,18 @@ export const useProductFilters = ({
   const [potencia, setPotencia] = useState<RangoDePotencia | ''>(() =>
     potenciaDeLaBarra(initialParams.get('power')));
   /**
+   * El año de la máquina, desde y hasta, y el origen que declara quien vende.
+   * Viajan como `year_from`, `year_to` y `origin`. El año cuelga de la
+   * CATEGORÍA —sólo maquinaria lo declara—, así que cambiar de rubro o de
+   * tipo de publicación lo suelta; el origen es de cualquier producto.
+   */
+  const [anioDesde, setAnioDesde] = useState<number | null>(() =>
+    anioDeLaBarra(initialParams.get('year_from')));
+  const [anioHasta, setAnioHasta] = useState<number | null>(() =>
+    anioDeLaBarra(initialParams.get('year_to')));
+  const [origen, setOrigen] = useState<OrigenDeclarado | ''>(() =>
+    origenDeLaBarra(initialParams.get('origin')));
+  /**
    * Cómo se ordena y en qué página estamos.
    *
    * Viven acá, con los filtros, y no en la grilla. Son parte de lo que se le
@@ -210,6 +235,9 @@ export const useProductFilters = ({
       setMarca(params.get('brand') || '');
       setTipo(params.get('subtype') || '');
       setPotencia(potenciaDeLaBarra(params.get('power')));
+      setAnioDesde(anioDeLaBarra(params.get('year_from')));
+      setAnioHasta(anioDeLaBarra(params.get('year_to')));
+      setOrigen(origenDeLaBarra(params.get('origin')));
       setOrden(ordenDeLaBarra(params.get('sort')));
       setPagina(paginaDeLaBarra(params));
     }
@@ -246,6 +274,9 @@ export const useProductFilters = ({
     updateParam('brand', marca || null);
     updateParam('subtype', tipo || null);
     updateParam('power', potencia || null);
+    updateParam('year_from', anioDesde === null ? null : String(anioDesde));
+    updateParam('year_to', anioHasta === null ? null : String(anioHasta));
+    updateParam('origin', origen || null);
     updateParam('sort', orden === 'newest' ? null : orden);
     updateParam('page', pagina > 1 ? String(pagina) : null);
 
@@ -267,6 +298,9 @@ export const useProductFilters = ({
     marca,
     tipo,
     potencia,
+    anioDesde,
+    anioHasta,
+    origen,
     orden,
     pagina,
     escribeEnLaBarra,
@@ -295,9 +329,16 @@ export const useProductFilters = ({
       setPotencia('');
       fijar(valor);
     };
+    // El año cuelga de la categoría: cambiar de rubro, o de productos a
+    // servicios, lo suelta. Cambiar de subrubro dentro de maquinaria, no.
+    const soltandoElAnio = <T,>(fijar: (valor: T) => void) => (valor: T) => {
+      setAnioDesde(null);
+      setAnioHasta(null);
+      fijar(valor);
+    };
     return {
-      setSelectedType: envolver(setSelectedType),
-      setSelectedCategory: envolver(soltandoElTercerNivel(setSelectedCategory)),
+      setSelectedType: envolver(soltandoElAnio(setSelectedType)),
+      setSelectedCategory: envolver(soltandoElAnio(soltandoElTercerNivel(setSelectedCategory))),
       setSelectedSubcategory: envolver(soltandoElTercerNivel(setSelectedSubcategory)),
       setSelectedProvince: envolver(setSelectedProvince),
       setSelectedLocalityId: envolver(setSelectedLocalityId),
@@ -309,6 +350,9 @@ export const useProductFilters = ({
       setMarca: envolver(setMarca),
       setTipo: envolver(setTipo),
       setPotencia: envolver(setPotencia),
+      setAnioDesde: envolver(setAnioDesde),
+      setAnioHasta: envolver(setAnioHasta),
+      setOrigen: envolver(setOrigen),
       setOrden: envolver(setOrden),
     };
   }, []);
@@ -352,6 +396,9 @@ export const useProductFilters = ({
     setMarca('');
     setTipo('');
     setPotencia('');
+    setAnioDesde(null);
+    setAnioHasta(null);
+    setOrigen('');
   };
 
   return {
@@ -371,6 +418,9 @@ export const useProductFilters = ({
     marca,
     tipo,
     potencia,
+    anioDesde,
+    anioHasta,
+    origen,
     orden,
     pagina,
     // Setters. Los que cambian lo que se pide vuelven a la página 1.

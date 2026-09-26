@@ -14,10 +14,13 @@ import { type TipoDeCarga } from '../../utils/logistica';
 import { ProductImage } from '../ProductImage/ProductImage';
 import { User } from '../../types';
 import {
+  ANIO_MINIMO,
+  anioMaximo,
   getLocalities,
   getProvinces,
   LocalityResponse,
   opcionDeLocalidad,
+  ORIGENES,
   ProvinceResponse,
 } from '../../utils/catalogService';
 import {
@@ -255,6 +258,8 @@ interface CategoryFromBackend {
   id: string;
   name: string;
   is_service: boolean;
+  /** Si pide marca; donde la pide, pide también modelo y año. */
+  usa_marca?: boolean;
   subcategories: Subcategory[];
 }
 
@@ -292,6 +297,9 @@ interface BackendProduct {
   condition?: string | null;
   subcategory_type?: { value: string; label: string } | null;
   power_hp?: number | null;
+  model?: string | null;
+  year?: number | null;
+  origin?: string | null;
   // Campos de servicio
   pricing_type?: string;
   availability?: string;
@@ -332,6 +340,10 @@ interface EditFormData {
   subcategory_type: string;
   /** La potencia en HP, como se escribe. Vacía es «sin declarar». */
   power_hp: string;
+  /** Modelo y año, como se escriben, y el origen. Vacío es «sin declarar». */
+  modelo: string;
+  anio: string;
+  origen: string;
   // Campos de servicio
   pricing_type?: string;
   availability?: string;
@@ -1708,6 +1720,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
       condition: normalizarCondicion(product.condition) || '',
       subcategory_type: product.subcategory_type?.value || '',
       power_hp: product.power_hp != null ? String(product.power_hp) : '',
+      modelo: product.model || '',
+      anio: product.year != null ? String(product.year) : '',
+      origen: product.origin || '',
       // Campos de servicio
       pricing_type: product.pricing_type || 'por_hora',
       availability: product.availability || 'inmediata',
@@ -1752,6 +1767,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
       showToast('La potencia va en HP: un número entero entre 1 y 1000.', 'warning');
       return;
     }
+    const anioEscrito = editingProduct.anio.trim();
+    if (anioEscrito && !(/^\d{4}$/.test(anioEscrito)
+      && Number(anioEscrito) >= ANIO_MINIMO && Number(anioEscrito) <= anioMaximo())) {
+      showToast(`El año tiene que estar entre ${ANIO_MINIMO} y ${anioMaximo()}.`, 'warning');
+      return;
+    }
     
     // La ubicación se elige entera o no se toca. Cambiar de provincia vacía
     // la localidad, y guardar así omitía `locality_id`: el PATCH respondía
@@ -1793,6 +1814,16 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
       // El servidor los valida contra el subrubro final.
       payload.subcategory_type = editingProduct.subcategory_type || null;
       payload.power_hp = editingProduct.power_hp ? parseInt(editingProduct.power_hp, 10) : null;
+
+      // Modelo y año, donde la categoría los pide; el origen, en productos.
+      // Igual que el tipo: vacío es `null`, que los quita.
+      if (categories.find(c => c.id === editingProduct.category_id)?.usa_marca) {
+        payload.model = editingProduct.modelo.trim() || null;
+        payload.year = editingProduct.anio.trim() ? parseInt(editingProduct.anio, 10) : null;
+      }
+      if (!isService) {
+        payload.origin = editingProduct.origen || null;
+      }
       
       // Campos específicos según tipo
       if (isService) {
@@ -3916,6 +3947,50 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                   </div>
                 );
               })()}
+
+              {/* Modelo y año, donde la categoría pide marca; y el origen, que
+                  declara quien vende en cualquier producto. */}
+              {categories.find(c => c.id === editingProduct.category_id)?.usa_marca && (
+                <div className={styles.editFormRow}>
+                  <div className={styles.editFormGroup}>
+                    <label htmlFor="edit-modelo">Modelo</label>
+                    <input
+                      id="edit-modelo"
+                      type="text"
+                      maxLength={80}
+                      value={editingProduct.modelo}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, modelo: e.target.value })}
+                    />
+                  </div>
+                  <div className={styles.editFormGroup}>
+                    <label htmlFor="edit-anio">Año</label>
+                    <input
+                      id="edit-anio"
+                      type="number"
+                      min={ANIO_MINIMO}
+                      max={anioMaximo()}
+                      inputMode="numeric"
+                      value={editingProduct.anio}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, anio: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+              {editingProduct.publication_type === 'producto' && (
+                <div className={styles.editFormGroup}>
+                  <label htmlFor="edit-origen">Origen (declarado por vos)</label>
+                  <select
+                    id="edit-origen"
+                    value={editingProduct.origen}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, origen: e.target.value })}
+                  >
+                    <option value="">Sin declarar</option>
+                    {ORIGENES.map(({ valor, rotulo }) => (
+                      <option key={valor} value={valor}>{rotulo}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               
               {/* Clase de publicación: la que decide qué muestra la tarjeta y
                   qué acción ofrece. Se puede corregir acá porque los avisos
