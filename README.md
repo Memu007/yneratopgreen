@@ -51,6 +51,26 @@ cp backend/.env.example backend/.env
 
 Luego seguir la guía local para Backend, Frontend, migraciones, seed y pruebas.
 
+### Cuentas de prueba
+
+La siembra demo crea estas cuentas. **Son públicas**: están escritas acá y en
+el código, y sirven sólo sobre una base local descartable. Se cambian antes de
+cualquier despliegue productivo.
+
+| Rol | Email | Contraseña |
+|---|---|---|
+| Administración | `admin@topgreen.com` | `admin123` |
+| Vende | `vendedor@ejemplo.com` | `vendedor123` |
+| Compra | `cliente@ejemplo.com` | `cliente123` |
+| Prueba (usuario) | `pruba@agroboeda.com` | `@agroboeda` |
+
+## Guías de uso
+
+- [`docs/USER_MANUAL.md`](docs/USER_MANUAL.md) — para quien compra, vende y
+  transporta. La comprueba `node scripts/guia-usuario.mjs`.
+- [`docs/GUIA-PANEL-ADMIN.md`](docs/GUIA-PANEL-ADMIN.md) — para quien
+  administra. La comprueba `node scripts/guia-admin.mjs`.
+
 ## Documentación técnica bajo demanda
 
 Según la tarea pueden ser relevantes:
