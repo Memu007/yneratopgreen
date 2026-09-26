@@ -35581,6 +35581,144 @@ await runCase(205, 'El modelo se encuentra con el buscador de texto aunque no es
     + 'buscándolo en la API —en mayúsculas y en minúsculas— y en el buscador del Mercado, y es la única';
 });
 
+// 206. Después de cada acción sobre una orden, la tarjeta sigue diciendo lo
+//      que dice la orden, sin recargar la página.
+//
+// «Mis Compras» y «Mis Ventas» armaban la orden en dos lugares: al abrir la
+// pestaña, completa, y al recargar después de una acción, con una copia a la
+// que le faltaban el traslado y los datos de la transferencia, y que no
+// preguntaba si se podía calificar. Después de aprobar un comprobante la
+// tarjeta decía «Traslado no definido.», y después de «Confirmar recepción» no
+// aparecía «Calificar Vendedor» hasta recargar. Lo encontró la guía de uso
+// (USER-GUIDE-1).
+await runCase(206, 'Después de cada acción sobre una orden, la tarjeta conserva el traslado, la transferencia y «Calificar Vendedor» sin recargar', async () => {
+  const problemas = [];
+  const sello = Date.now().toString(36).slice(-6);
+  const admin = await tokenDeAdmin();
+  const crear = async (quien) => {
+    const email = `orden206.${quien}.${sello}@example.com`;
+    const alta = await apiRequest('/admin/users', {
+      method: 'POST', token: admin,
+      body: { email, password: 'Orden2061', full_name: `${quien} 206 ${sello}`, phone: '', role: 'user' },
+    });
+    assert(alta.status === 201, `no se pudo crear la cuenta de ${quien}: HTTP ${alta.status}`);
+    const { data } = await apiRequest('/auth/login', { method: 'POST', body: { email, password: 'Orden2061' } });
+    return { token: data.access_token, refresco: data.refresh_token, id: data.user.id };
+  };
+  const vendedora = await crear('Vendedora');
+  const compradora = await crear('Compradora');
+  const ALIAS = `orden206.${sello}`;
+  await apiRequest('/auth/me', { method: 'PATCH', token: vendedora.token, body: { alias_bancario: ALIAS } });
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const [[insumos]] = queryRows("SELECT id, 'fin' FROM categories WHERE slug = 'insumos-agricolas'");
+  const { data: publicacion } = await apiRequest('/products', {
+    method: 'POST', token: vendedora.token,
+    body: {
+      name: `Semilla 206 ${sello}`, description: 'Publicación del caso 206 sobre las tarjetas de las órdenes.',
+      category_id: insumos, price: 2060, stock: 10, unit: 'kg', locality_id: localidad,
+      publication_type: 'producto', operation_kind: 'insumo',
+    },
+  });
+  const comprar = async () => {
+    await apiRequest('/cart/items', {
+      method: 'POST', token: compradora.token, body: { product_id: publicacion.id, quantity: 1 } });
+    const { data } = await apiRequest('/orders/checkout/transfer', {
+      method: 'POST', token: compradora.token,
+      body: {
+        shipping_address: 'Ruta 8 km 206', shipping_locality_id: localidad, shipping_postal_code: '2700',
+        notes: 'Orden del caso 206.',
+        shipping_decisions: [{ seller_id: vendedora.id, mode: 'self' }],
+        payment_decisions: [{ seller_id: vendedora.id, method: 'transfer' }],
+      },
+    });
+    return { id: data.orders[0].order_id, numero: data.orders[0].order_number };
+  };
+  // Dos órdenes: la que se recorre entera, y otra que queda esperando el
+  // comprobante y tiene que seguir mostrando a dónde transferir.
+  const recorrida = await comprar();
+  const pendiente = await comprar();
+  await apiUpload(`/orders/${recorrida.id}/transfer-receipt`, {
+    token: compradora.token, filename: 'comprobante.png', contentType: 'image/png',
+    content: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
+  });
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const abrir = async (sesion, pestana) => {
+      const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      await contexto.addInitScript(({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+      }, { a: sesion.token, r: sesion.refresco });
+      const page = await contexto.newPage();
+      await page.goto(`${FRONTEND_URL}/?section=account`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: new RegExp(pestana, 'i') }).first().click();
+      await page.getByRole('heading', { name: pestana }).waitFor({ timeout: 20_000 });
+      return { contexto, page };
+    };
+    const tarjeta = (page, numero) => page.locator('[class*="_orderCard_"]').filter({ hasText: numero }).first();
+    const texto = async (page, numero) => (await tarjeta(page, numero).innerText()).replace(/\s+/g, ' ');
+    const conEstado = async (page, numero, estado, momento) => {
+      try {
+        await esperarA(async () => (await texto(page, numero)).toUpperCase().includes(estado.toUpperCase()),
+          `${momento}: la tarjeta no pasó a «${estado}»`, 20_000);
+      } catch (error) {
+        problemas.push(error.message);
+      }
+    };
+    const traslado = async (page, numero, dice, momento) => {
+      const visto = await texto(page, numero);
+      if (!visto.includes(dice)) {
+        problemas.push(`${momento}, sin recargar: el traslado ${/Traslado no definido/.test(visto)
+          ? 'dice «Traslado no definido.»' : 'no dice lo de la orden'} y la orden dice «${dice}»`);
+      }
+    };
+
+    // --- Quien vende: aprobar, confirmar y marcar enviado ------------------
+    const venta = await abrir(vendedora, 'Mis Ventas');
+    await tarjeta(venta.page, recorrida.numero).waitFor({ timeout: 20_000 });
+    await traslado(venta.page, recorrida.numero, 'El comprador coordina el traslado por su cuenta.', 'al abrir «Mis Ventas»');
+    await tarjeta(venta.page, recorrida.numero).getByRole('button', { name: /Aprobar comprobante/ }).click();
+    await conEstado(venta.page, recorrida.numero, 'Pagado', 'después de «Aprobar comprobante»');
+    await traslado(venta.page, recorrida.numero, 'El comprador coordina el traslado por su cuenta.', 'después de «Aprobar comprobante»');
+    await tarjeta(venta.page, recorrida.numero).getByRole('button', { name: 'Confirmar Pedido' }).click();
+    await venta.page.getByRole('button', { name: 'Confirmar', exact: true }).click();
+    await conEstado(venta.page, recorrida.numero, 'Confirmado', 'después de «Confirmar Pedido»');
+    await traslado(venta.page, recorrida.numero, 'El comprador coordina el traslado por su cuenta.', 'después de «Confirmar Pedido»');
+    await tarjeta(venta.page, recorrida.numero).getByRole('button', { name: /Marcar como Enviado/ }).click();
+    await venta.page.getByRole('button', { name: 'Marcar enviado', exact: true }).click();
+    await conEstado(venta.page, recorrida.numero, 'En Tránsito', 'después de «Marcar como Enviado»');
+    await traslado(venta.page, recorrida.numero, 'El comprador coordina el traslado por su cuenta.', 'después de «Marcar como Enviado»');
+    await venta.contexto.close();
+
+    // --- Quien compra: confirmar la recepción ------------------------------
+    const compra = await abrir(compradora, 'Mis Compras');
+    await tarjeta(compra.page, recorrida.numero).waitFor({ timeout: 20_000 });
+    if (!(await texto(compra.page, pendiente.numero)).includes(ALIAS)) {
+      problemas.push('al abrir «Mis Compras», la orden que espera el comprobante no muestra el alias');
+    }
+    await tarjeta(compra.page, recorrida.numero).getByRole('button', { name: /Confirmar Recepción/i }).click();
+    await compra.page.getByRole('button', { name: 'Confirmar recepción', exact: true }).last().click();
+    await conEstado(compra.page, recorrida.numero, 'Entregado', 'después de «Confirmar recepción»');
+    await traslado(compra.page, recorrida.numero, 'Coordinás el traslado por tu cuenta.', 'después de «Confirmar recepción»');
+    await tarjeta(compra.page, recorrida.numero).getByRole('button', { name: 'Calificar Vendedor' })
+      .waitFor({ state: 'visible', timeout: 15_000 })
+      .catch(() => problemas.push('después de «Confirmar recepción», sin recargar, no aparece «Calificar Vendedor»'));
+    if (!(await texto(compra.page, pendiente.numero)).includes(ALIAS)) {
+      problemas.push('después de «Confirmar recepción», sin recargar, la otra orden que espera el comprobante '
+        + 'ya no muestra el alias a donde transferir');
+    }
+    await compra.contexto.close();
+  } finally {
+    await browser.close();
+  }
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return 'en «Mis Ventas», después de aprobar el comprobante, confirmar el pedido y marcarlo enviado, y en «Mis '
+    + 'Compras» después de confirmar la recepción, la tarjeta sigue diciendo el traslado de la orden, aparece '
+    + '«Calificar Vendedor» y la otra orden sigue mostrando a dónde transferir, todo sin recargar la página';
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un
