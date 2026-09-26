@@ -2,176 +2,198 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## PROD-LISTS-1: entregada en rama
+## ATRIBUTOS-RUBRO-1, parte 2: entregada en rama
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `e2e3733`, más tu `4c483e1` integrado en `61cb354` |
-| código | `2b2a0c3`: la migración `01ff14043124`, más una nota en la siembra y en `RAILWAY.md` |
-| arnés | `2cac546`: caso 197 y tres negativos |
-| filtro de marca (tu agregado 4) | `996ffb2`: código; `7f045a6`: caso 198 y su negativo |
-| no integrado, no desplegado | `main` sigue en `792d709` |
-| parte 2 | sin empezar |
+| base | `a50cddc` (tu asignación) |
+| backend | `8a72310`: modelo, año y origen: migración, validación, filtros y siembra |
+| frontend | `85650e8`: alta, edición, ficha, tarjeta, filtros, los tres P2 y el orden del panel |
+| arnés | `cd75cdf`: casos 199 a 204, seis negativos, y los casos que dependían del panel |
+| no integrado, no desplegado | `main` sigue en `238d113` |
 
 **Resultado.**
 
-- **Qué trae la migración:** las 44 marcas y las 4028 localidades de Georef.
-  Inserta sólo lo que falta y no pisa lo que se editó desde el panel.
-- **Filtro de marca:** con Maquinaria agrícola elegida, ofrece las 44 marcas
-  activas con su cantidad, también las que están en cero.
-- **Casos 197 y 198:** en verde. Los cuatro negativos dan rojo, cada uno por
-  su motivo.
-- **Suite completa desde una base nueva:** «197/198 pasaron; 1 fallaron»: el 131, de entorno.
-- **`alembic check`:** limpio en la base y en la copia del 197.
+- **Modelo, año y origen:** se declaran, se validan, se ven y se filtran. El
+  origen va rotulado «declarado por quien vende» en la tarjeta, en la ficha
+  y en el filtro, en texto común.
+- **Los tres P2:** corregidos, cada uno con su caso y su negativo.
+- **El panel:** lo ataqué y tu propuesta quedó en pie. Lo construí tal cual.
+- **Casos y negativos:** 199 a 204 en verde. Los seis negativos dan rojo, cada
+  uno por su motivo.
+- **Suite completa desde una base nueva:** 202 de 204.
+  - El 131 falla siempre en este entorno.
+  - El 170 falló una sola vez; solo pasa 3 de 3 (ver Riesgos).
+- **Auditorías:**
+  - a11y: 80 de 80.
+  - Contraste: 88 de 88.
+  - Auditoría móvil: 12 de 12 recorridos, sin hallazgos.
+  - Guía del panel: coincide en los 26 pasos.
 
-**Para decidir vos (no bloqueante).**
+**Para decidir vos (ninguna es bloqueante; ya está hecho así).**
 
-**Las categorías y los subrubros no entran en la migración,** aunque hacen
-falta para publicar. Discrepo con «lo que el producto necesita para publicar
-entra en la misma migración», por esto:
+1. **Modelo y año van donde va la marca.** Los decide la bandera `usa_marca`
+   de la categoría, hoy sólo Maquinaria agrícola. No los ato al nombre corto
+   porque el panel lo cambia al renombrar. Si mañana la marca se extiende a
+   otra categoría, modelo y año se extienden con ella. Si preferís
+   separarlos, hace falta una bandera propia en la categoría.
+2. **«Mercado» también conserva la página.** No estaba en tu lista, pero sin
+   ella la pantalla quedaba en la página 2 y la barra decía la 1.
+3. **«Desde» mayor que «hasta» da cero, sin error.** Muestra el vacío de
+   siempre, «No hay operaciones con estos filtros.».
 
-- **Producción ya los tiene.** Emi vio Maquinaria agrícola, y
-  `c8e41f2a7d90` encontró por nombre corto a Preparación del suelo y a Riego
-  por aspersión.
-- **El panel cambia el nombre corto al renombrar** (`api/admin.py:687` para
-  las categorías, `:851` para los subrubros). Si la clienta renombró una, una
-  migración que inserte «las que faltan» la duplicaría en el Mercado.
-- **El único caso sin categorías es una base de producción nueva.**
-  Recomiendo cargarlas en ese momento con una carga explícita y no
-  automática, cuando se decida el lanzamiento real. Lo dejé escrito en
-  `RAILWAY.md`.
+## El panel: qué ataqué
 
-## La migración `01ff14043124`
+| ataque | qué encontré | qué quedó |
+|---|---|---|
+| accesibilidad | cada grupo es un `fieldset` con su `legend`. «Más filtros» es un botón con `aria-expanded` y `aria-controls`, y su contenido plegado usa `hidden` | el 187 comprueba que Tab y el árbol de accesibilidad no entran a lo plegado |
+| foco al plegar y desplegar | el foco queda en el botón que se tocó, y nada lo mueve adentro de lo plegado | sin cambios |
+| celular a 360 y 390 px | el panel queda más largo con Maquinaria (ocho controles antes de «Dónde») | el 204 comprueba el orden a 390 px; auditoría móvil sin desbordes |
+| filtros activos escondidos | es el riesgo real de la propuesta | con algo puesto, «Más filtros» arranca abierto y dice «(N activos)». Plegado a mano, lo sigue diciendo. Lo prueba el 204 y lo rompe un negativo |
+| orden de tabulación | el orden del documento es el orden visual | el 187 recorre el panel con Tab, control por control |
+| guía y casos | ninguna guía describe el panel | ajusté el 171 (abre «Más filtros» antes de la calificación), el 187 (no cuenta lo plegado) y el rótulo en la auditoría móvil |
+| servicios | antes, «Condición» se ofrecía también para servicios | en servicios no se dibujan condición, origen ni año, salvo que la barra traiga uno puesto: un filtro aplicado nunca queda invisible. Pasar a servicios suelta condición y origen |
 
-Viene después de `c8e41f2a7d90`. No cambia el esquema: sólo carga datos.
+**Lo único que no tumba la propuesta:** con Maquinaria, «Provincia» queda
+después de ocho controles. Es una preferencia sin evidencia, así que no la
+cambié.
 
-- **Marcas:** inserta cada una que falte, por tipo de opción y valor. Salen
-  de una copia congelada de la lista de la siembra, con el mismo orden, el
-  mismo rótulo y activas. Si una ya existe, no la toca: una desactivada o
-  renombrada desde el panel queda como estaba. Una borrada desde el panel
-  vuelve, porque falta.
-- **Localidades:** inserta cada una que falte, por su id de Georef. Salen de la
-  copia versionada que usa `app.seed_localities`, con la misma comprobación
-  de integridad (sha256). Las sumé porque la localidad es obligatoria para
-  publicar (la API rechaza una que no existe). No pude confirmar si
-  producción las tiene: si ya están, la migración no hace nada.
-- **Bajada:** no hace nada, y es a propósito.
-  - No se puede distinguir una fila que puso esta migración de una igual que
-    puso la siembra o el panel.
-  - Borrar una marca deja a las publicaciones que la declararon con un valor
-    que la edición ya no acepta.
-  - Una localidad en uso no se puede borrar.
-  - La revisión anterior funciona igual con estas filas adentro.
+## Cómo llega a producción (tu regla nueva)
 
-## El filtro de marca (agregado 4)
+No agrega ninguna lista a la base.
 
-- **Con una categoría que usa marca elegida** (hoy, Maquinaria agrícola), la
-  API devuelve todas las marcas activas en el orden del alta, cada una con
-  su cantidad, aunque sea cero. El Mercado ya dibujaba lo que llegaba, así
-  que en el frontend sólo cambió el comentario.
-- **Los conteos** siguen saliendo del servidor, con los demás filtros puestos
-  y sin la marca, como la faceta de antes.
-- **Sin categoría, o con una que no usa marca,** sigue la regla del 175:
-  sólo las marcas que el conjunto tiene. Tu decisión habla de la categoría
-  elegida, así que no la extendí. El 175 queda igual; sólo le anoté en el
-  encabezado que su regla vale sin esa categoría.
-- **Ninguna guía** menciona el filtro, así que no hubo que ajustar ninguna.
+- **Los dos orígenes y el rango de años** viven en el código:
+  `services/atributos.py` en el backend y `catalogService.ts` en el
+  frontend. Llegan con el despliegue y no dependen de la siembra.
+- **La migración** sólo agrega las tres columnas. El 201 la corre sobre una
+  copia sin la siembra de ejemplo de estas columnas, y quedan en nulo.
 
-## Inventario: lo que trae la siembra y cómo llega a producción
+## Casos
 
-| lo que carga la siembra | ¿lo trae una migración? | si falta en producción | cómo llega allá |
-|---|---|---|---|
-| 4028 localidades de Georef | **sí, desde ahora** (`01ff14043124`) | nadie puede publicar, y no hay provincias ni localidades para filtrar | la migración, o `python -m app.seed_localities` |
-| 44 marcas | **sí, desde ahora** (`01ff14043124`) | la marca ofrece sólo «Sin declarar», y el filtro y la faceta quedan vacíos (lo que vio Emi) | la migración |
-| 122 tipos en 33 subrubros | sí (`c8e41f2a7d90`) | no hay filtro de tipo | la migración; Emi lo vio llegar |
-| qué categoría ofrece marca (`usa_marca`) | sí (`e4a72c9b1f35`) | Maquinaria no pide marca | la migración |
-| la anatomía por omisión de cada categoría | sí (`a91c47e2b6d8`) | el alta no sabe qué datos pedir por omisión | la migración |
-| 12 categorías y 44 subrubros | **no** | nadie puede publicar y el Mercado no tiene rubros | producción ya los tiene; una base nueva, ver arriba |
-| unidades (7), tipo de cobro (4), disponibilidad (3) y tiempo de respuesta (4) | no | no se rompe nada: el alta trae su propia lista con los mismos valores y la API no los valida. Se ve «kg» en lugar de «Kilogramo», y en Configuración del panel esas listas salen vacías | no hace falta. Si se quieren los nombres completos, es otra migración |
-| usuarios, cuenta de prueba, datos bancarios y publicaciones demo | no, y no tiene que haberla | nada | nunca: tienen contraseñas escritas en el repositorio |
-
-**No pude mirar producción.** Intenté leer el catálogo público del backend
-publicado (tres `GET` sin credenciales), pero la red de este entorno rechaza
-`railway.app` por política de la organización. No la esquivé. Por eso las
-localidades van en la migración igual: si ya están, no cambia nada.
-
-## Caso 197
-
-En una copia de la base que queda como producción: con categorías, sin marcas
-y sólo con las localidades que alguna fila usa.
-
-1. **Primera vez:** la migración deja las 44 marcas iguales a las de la
-   siembra (valor, rótulo, orden y activa), y las 4028 localidades iguales,
-   fila por fila, coordenadas incluidas.
-2. **Segunda vez:** no duplica ni cambia nada.
-3. **Con cambios del panel:** «pauny» desactivada, «case» renombrada y
-   «kubota» borrada. La migración deja «pauny» desactivada y el rótulo de
-   «case» sin tocar, y vuelve a traer «kubota».
-4. **`alembic check`:** limpio.
-
-```
-[PASS] 197 Las marcas y las localidades llegan a producción con la migración, sin la siembra — sobre una copia con categorías, sin marcas y con 21 localidades en uso —como producción—, la migración deja las 44 marcas iguales a las de la siembra (valor, rótulo, orden y activa) y las 4028 localidades de Georef iguales, fila por fila; correrla otra vez no duplica ni cambia nada; una marca desactivada sigue desactivada, un rótulo cambiado no se pisa, y la que falta vuelve; `alembic check` no encuentra diferencias entre el modelo y el esquema. Todo en una copia de la base (7312 ms)
-```
-
-## Caso 198
-
-- **En la API:**
-  - las 44 marcas activas, en el orden del alta;
-  - cada cantidad es el total que da el servidor al elegirla, también con
-    «usado» puesto;
-  - una marca dada de baja no se ofrece;
-  - elegir una en cero da total 0, y la lista sigue entera;
-  - sin categoría, o con una que no usa marca, no se ofrece ninguna en cero.
-- **En la pantalla** (1440 y 390 px):
-  - el filtro muestra «Todas las marcas» y las mismas 44 con su conteo;
-  - elegir una en cero la escribe en la barra y muestra «No hay operaciones
-    con estos filtros.», sin error.
+- **199, alta y edición.**
+  - Rechaza 6 altas sin guardar ninguna fila:
+    - año 1949 y año 2028;
+    - un origen inventado, y un origen en un servicio;
+    - modelo y año fuera de maquinaria.
+  - En la pantalla, el formulario guarda un tractor con modelo, año y
+    origen, y en Insumos ofrece sólo el origen.
+  - La ficha y la tarjeta dicen «declarado por quien vende», sin fondo, sin
+    borde y sin ícono.
+  - La edición del panel cambia el año y el origen.
+  - Por la API:
+    - un año fuera de rango no toca la fila;
+    - `null` quita el origen;
+    - mover a Insumos suelta el modelo y el año.
+- **200, filtros.**
+  - Con 34 máquinas, la API y la pantalla cuentan lo mismo que la base:
+    - 28 con año y 6 sin año;
+    - el origen rota entre concesionaria, dueño directo y sin origen.
+  - Lo que no declaró el dato no entra.
+  - Poner el año vuelve a la página 1.
+  - Atrás desde la ficha devuelve los dos filtros.
+  - «Desde» 2020 y «hasta» 2010 dan cero, sin error.
+- **201, migración.**
+  - En una copia, baja y sube, y las publicaciones quedan iguales, tipo y
+    potencia incluidos.
+  - La base rechaza un año de 1949 y un origen inventado.
+  - `alembic check` queda limpio.
+- **202, P2 de la marca.** Después de publicar un John Deere, el alta
+  siguiente abre con la marca, el modelo, el año y el origen vacíos.
+- **203, P2 de la barra.**
+  - La categoría, la condición, la marca, el orden, el año, el origen y la
+    página siguen en la barra y en los controles después de «Mercado» y de
+    recargar.
+- **204, P2 del rótulo y orden del panel.**
+  - A 1440 y a 390 px, el orden es el acordado.
+  - «Productos o servicios» y «Tipo» son rótulos distintos.
+  - «Más filtros» no esconde nada aplicado.
+  - En servicios no se ofrecen los filtros de producto.
 
 ```
-[PASS] 198 Con una categoría que usa marca, el filtro ofrece todas las marcas activas, también las que están en cero — en «Maquinaria agrícola» la API ofrece las 44 marcas activas en el orden del alta, 42 en cero, y cada conteo es el total que da el servidor al elegirla, también con otro filtro puesto (2 con publicaciones usadas); una marca dada de baja no se ofrece; elegir una en cero da total 0 con la lista entera; sin categoría, o con una que no usa marca, no se ofrece ninguna en cero; en escritorio y en celular el filtro muestra «Todas las marcas» y las mismas marcas con su conteo, las en cero incluidas; elegir una en cero la escribe en la barra y muestra «No hay operaciones con estos filtros.», sin error (3095 ms)
+[PASS] 199 Modelo, año y origen se declaran al publicar, se validan, se ven rotulados y se editan — 6 altas inválidas rechazadas con su motivo y ninguna fila guardada (año 1949 y 2028, origen inventado, origen en un servicio, modelo y año fuera de maquinaria); el formulario guarda modelo (sin espacios de más), año y origen en un tractor, y en «Insumos agrícolas» ofrece sólo el origen; la ficha dice «Modelo», «Año» y «Origen: Dueño directo, declarado por quien vende», y la tarjeta «Dueño directo · declarado por quien vende», las dos sin fondo, sin borde y sin ícono; el panel abre la edición con lo guardado y cambia el año a 2021 y el origen a concesionaria; por la API, un año fuera de rango se rechaza sin tocar la fila, null quita el origen, y mover la publicación a «Insumos agrícolas» suelta el modelo y el año (5953 ms)
+[PASS] 200 Filtrar por año y por origen cuenta en el servidor, deja afuera lo no declarado y vive en la URL — la API cuenta en el servidor —13 desde 2010, 11 de dueño directo, 12 de concesionaria— y el total y las páginas coinciden con la base; las 6 sin año y las 11 sin origen no entran; «desde» 2020 «hasta» 2010 da cero, sin error; en la pantalla, poner el año vuelve a la página 1, el conteo es el de la base, no se cuela ninguna sin año ni sin origen, el filtro de origen dice «declarado por quien vende», Atrás desde la ficha devuelve los dos, y «desde» mayor que «hasta» da el vacío de siempre (4371 ms)
+[PASS] 201 La migración del modelo, el año y el origen es aditiva, vuelve atrás y deja intactas las publicaciones — bajar a 01ff14043124 borra las tres columnas y deja las 330 publicaciones iguales, las 56 con tipo o potencia incluidas (huella 996e60da6e41…); subir crea las tres columnas en nulo para todas: no le inventa un dato a nadie, y el resto de cada fila queda igual; la base rechaza un año de 1949 y un origen inventado aunque se escriban por fuera de la API; `alembic check` no encuentra diferencias entre el modelo y el esquema. Todo en una copia de la base (4800 ms)
+[PASS] 202 Después de publicar, el alta siguiente abre sin la marca, el modelo, el año ni el origen de la anterior — después de publicar un John Deere 5090E 2020 de concesionaria, el alta siguiente abre con la marca, el modelo, el año y el origen vacíos (6330 ms)
+[PASS] 203 «Mercado» dentro del Mercado y recargar conservan todos los filtros de la barra — la categoría, la condición, la marca, el orden, el año desde y hasta, el origen y la página siguen en la barra y en los controles después de «Mercado» y de recargar, con las mismas publicaciones (2903 ms)
+[PASS] 204 El panel de filtros va en el orden acordado, «Más filtros» no esconde nada aplicado y los rótulos no se repiten — en 1440 y 390 px el panel va Qué buscás · Productos o servicios · Categoría · Subcategoría · Potencia · Marca · Año · Condición · Origen · Dónde · Provincia · Localidad · Precio · Más filtros; «Más filtros» arranca plegado y lo de adentro no se ve; con dos puestos, al recargar arranca abierto y dice «(2 activos)», también plegado a mano; los rótulos son «Productos o servicios» y «Tipo»; en servicios no se ofrecen condición, origen ni año, salvo que la barra traiga uno puesto (5092 ms)
 ```
 
 ## Negativos
 
-`python3 scripts/sabotajes_prod_lists_1.py` rompe cada pieza y comprueba que
-su caso falle por el motivo que corresponde.
-
-- **Los tres de la migración** no reinician la API.
-- **El del filtro** la reinicia. El comando se cambia con la variable
-  `REINICIAR_API`, que es lo que pediste en tu P3.
+`python3 scripts/sabotajes_atributos_rubro_2.py`. Los que tocan el backend
+reinician la API con `REINICIAR_API`.
 
 | negativo | qué rompe | el caso dice |
 |---|---|---|
-| `sin-marcas` | la migración no carga las marcas | `[FAIL] 197 … tras subir: faltan 44 marcas […], sobran 0 [], 0 repetidas` |
-| `sin-localidades` | la migración no carga las localidades | `[FAIL] 197 … las localidades no quedaron como las de la siembra: 4028 51a97e47… → 13 0e605765…` |
-| `pisa-el-panel` | la migración reescribe las marcas que ya existen | `[FAIL] 197 … la migración reactivó «pauny», que el panel había desactivado (true)` |
-| `oculta-las-cero` | el servidor ofrece sólo las marcas con publicaciones | `[FAIL] 198 … 6 problema(s)`: en la API «ofrece 2 marcas y hay 44 activas», y en las dos pantallas «el filtro ofrece 2 marcas y tenía que ofrecer 44» |
+| `despues-de-contar` | el servidor aplica año y origen después de contar | `[FAIL] 200 … 16 problema(s)`, entre ellos «API, año desde 2010: el total dice 34 y en la base hay 13» |
+| `en-el-navegador` | el servidor los ignora y el Mercado filtra la página | `[FAIL] 200 … 22 problema(s)`, entre ellos «pantalla, desde 2010: dice 34 operaciones y en la base hay 13» |
+| `acepta-nulos` | el servidor suma lo que no declaró el dato | `[FAIL] 200 … 25 problema(s)`, entre ellos «API, año desde 2010: trajo 6 que no declararon el dato o no corresponden» |
+| `marca-sin-limpiar` | `limpiarFormulario` no suelta la marca | `[FAIL] 202 … el alta siguiente abrió con lo de la anterior: marca «john-deere»` |
+| `falta-en-la-barra` | falta `condition` en `PARAMETROS_DEL_MERCADO` | `[FAIL] 203 … tras «Mercado»: sacó condition de la barra (quedó null)` |
+| `mas-filtros-escondido` | «Más filtros» arranca plegado y no dice cuántos tiene | `[FAIL] 204 … con dos filtros de «Más filtros» puestos, al recargar arranca plegado` y «dice «Más filtros» con dos puestos» |
 
-Los cuatro dieron `[ROJO ESPERADO]`, y el script cierra con «la migración y
-el catálogo después: como estaban».
+Los seis dieron `[ROJO ESPERADO]`, y el script cierra con «src y backend
+después: como estaban».
+
+## Migración `a47300b5554c`
+
+Viene después de `01ff14043124`, y es aditiva:
+
+- **`products.model`:** texto, nulo.
+- **`products.year`:** número, nulo; la base sostiene el piso de 1950.
+- **`products.origin`:** `concesionaria` o `dueno_directo`, o nulo.
+
+Las tres nacen nulas y no se rellenan. La bajada borra las tres columnas, y
+la probé en una copia (201).
+
+Tu primer «frená y consultá» no aplicó: las columnas nacen vacías, así que
+ninguna publicación existente choca con el rango de años. El segundo
+tampoco: el origen es sólo un campo declarado.
 
 ## Puertas
 
 | puerta | resultado |
 |---|---|
-| suite completa desde base nueva, sobre `7f045a6` | «197/198 pasaron; 1 fallaron»: el 131, de entorno |
-| `alembic check` en la base | `No new upgrade operations detected.` |
-| `compileall` backend y alembic, `node --check`, `py_compile` | verdes |
-| diff-check con `cr-at-eol` | limpio |
-| tipos, lint, build | verdes (`built in 1.76s`) |
-| a11y `--todas` | 78 de 78, sin violaciones bloqueantes |
-| contraste | 86 de 86 |
-| auditoría móvil | 12 de 12 recorridos, 39 pantallas: 0 desbordes, 0 recortes, 0 errores de consola, 0 respuestas 4xx/5xx |
+| suite completa desde base nueva, sobre `cd75cdf` | «202/204 pasaron; 2 fallaron»: el 131, de entorno, y el 170, intermitente (ver Riesgos) |
+| tipos, lint, build | verdes |
+| `compileall`, `node --check`, `py_compile` | verdes |
+| `alembic check` | `No new upgrade operations detected.` |
+| diff-check con `cr-at-eol` y finales de línea | limpios |
+| a11y `--todas` | 80 de 80 (antes 78: suma la superficie de año, origen y más filtros) |
+| contraste | 88 de 88 (antes 86) |
+| auditoría móvil | 12 de 12 recorridos, 39 pantallas, sin hallazgos |
 | `guia-admin.mjs` | «LA GUÍA Y EL PANEL COINCIDEN: 26 pasos en escritorio y celular» |
+
+## Riesgos y visto de paso
+
+- **La tarjeta suma una línea** cuando hay origen declarado. La auditoría
+  móvil no encuentra desbordes.
+- **«Más filtros» plegado** hace menos visibles la disponibilidad y la
+  calificación. Es lo que proponías; si tienen algo puesto, se ven.
+- **El año máximo se calcula en UTC.** El 31/12, desde las 21 h de
+  Argentina, ya acepta el año siguiente. Son tres horas y no importa.
+- **El 170 falló una vez en la suite completa.** Solo pasa 3 de 3, y en las
+  suites anteriores pasó.
+  - Lo que vio: después de «Salir» y con el carrito vacío, la cabecera
+    volvió a mostrar a «María Cliente» con «Salir», como si la sesión
+    hubiera vuelto.
+  - Toca la sesión y el carrito, que esta parte no cambió.
+  - Puede ser una renovación de la sesión que llega tarde y deshace la
+    salida. Si pasa en tu corrida, recomiendo una pieza propia para
+    reproducirlo.
+- **Visto de paso (P3, no lo toqué):**
+  - Cerrar el alta con sólo la marca, el modelo, el año o el origen
+    cargados no pide confirmar descartar, porque esos campos no cuentan
+    como borrador. Ya pasaba con la marca y con el tipo.
+  - El panel sigue sin editar la categoría de una publicación.
 
 ## Para verificar, lo mínimo
 
 ```
 ./scripts/entorno_nativo.sh --recrear
-SMOKE_CASOS=175,197,198 node scripts/smoke.mjs → 3/3 pasaron; 0 fallaron
-python3 scripts/sabotajes_prod_lists_1.py      → cuatro [ROJO ESPERADO], «la migración y el catálogo después: como estaban» y «todos dieron el rojo esperado»
-docker exec topgreen-api alembic check         → No new upgrade operations detected.
+SMOKE_CASOS=199,200,201,202,203,204 node scripts/smoke.mjs   → 6/6 pasaron; 0 fallaron
+python3 scripts/sabotajes_atributos_rubro_2.py               → seis [ROJO ESPERADO] y «todos dieron el rojo esperado»
 ```
 
 Advertencia del entorno: el 131 falla siempre acá, porque el puente de
