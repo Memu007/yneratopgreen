@@ -7,8 +7,8 @@ Actualizado: 2026-09-26.
 ## Resumen ejecutivo
 
 - **Fase contractual:** Fase 3 — Buscador y catálogo, semanas 6–8 (25/09–15/10). La puerta de la Fase 2 quedó verificada el 23/09 (`REPRODUCCION-FASE-2-2026-09-23.md`). La puerta de la Fase 3 y el hito intermedio ya se aceptaron por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
-- **`main`:** `238d113`, publicado el 26/09 con autorización explícita de Emi. Contiene todo lo aceptado hasta `PROD-LISTS-1`: Mercado único, copy agropecuario, tipo y potencia, 44 marcas y localidades por migración, y el filtro de marca completo. **Emi verificó en el sitio:** sin pestaña Servicios, «Tipo» en Preparación del suelo y en Riego por aspersión, «Potencia» en Tractores y las marcas en el filtro. Publicaciones anteriores: `792d709` y `e9cf4c6` (25/09).
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. Aceptadas en rama y sin publicar: la parte 2 de `ATRIBUTOS-RUBRO-1` (`2a00720`) y `USER-GUIDE-1` (`5a197bf`); lo anterior está en `main`.
+- **`main`:** `c92c0d7`, publicado el 26/09 con autorización de Emi («Dale actualizás? Así le paso a la clienta»), por fast-forward desde `238d113`. Suma la parte 2 de `ATRIBUTOS-RUBRO-1` (modelo, año, origen, el panel en tres grupos y tres P2, migración `a47300b5554c`) y `USER-GUIDE-1` (guía de uso y corrección de las órdenes). La verificación previa fue sobre el mismo código (`5a197bf`, que difiere sólo en `docs/pm`): suite 205/206 (169 de entorno), las dos guías, puertas verdes, sin secretos ni archivos prohibidos. **Pendiente: Emi verifica** modelo, año y origen en el alta y el panel nuevo. Antes: `238d113`, verificado (marcas).
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. Todo lo aceptado está en `main`. `PUBLISH-FIELDS-1` está asignada.
 - **Última decisión PM:** `USER-GUIDE-1` **ACEPTADA EN RAMA** (`5a197bf`): guía de uso de 22 pasos verificada por `guia-usuario.mjs`, corrección de las órdenes (caso 206) y modelo en el buscador (caso 205). Ocho negativos en rojo, uno de PM que rompe el producto sin tocar la guía. Suite 205/206 (169 de entorno) y puertas verdes. Evidencia en `REPRODUCCION-USER-GUIDE-1-2026-09-26.md`.
 - **Tarea activa:** `PUBLISH-FIELDS-1`: sacar del alta «Características del Producto» y «Etiquetas», que no se guardan, y mostrar y editar la marca. Los dos defectos los encontró la guía de uso.
 - **Corrección de método PM (25/09):** las aceptaciones de la marca no verificaron la carga de datos en producción. Desde ahora, toda pieza que agrega una lista o un catálogo tiene que decir cómo llega a producción, y PM lo comprueba con un caso sobre una base sin siembra.
@@ -21,7 +21,7 @@ Actualizado: 2026-09-26.
 compra, vende y transporta, sin credenciales, y `scripts/guia-usuario.mjs` la
 recorre en el navegador. Al escribirla apareció un defecto en las órdenes (se
 perdían el traslado y «Calificar Vendedor» después de cada acción), que se
-corrigió en la misma pieza. Sin publicar todavía.
+corrigió en la misma pieza. Publicada en `c92c0d7`.
 
 ## Aceptaciones anteriores
 
@@ -31,8 +31,8 @@ riesgos que dejaron abiertos están en «Pendientes canónicos adoptados».
 
 | Pieza | Estado | Evidencia |
 |---|---|---|
-| `USER-GUIDE-1` | aceptada en rama | `REPRODUCCION-USER-GUIDE-1-2026-09-26.md` |
-| `ATRIBUTOS-RUBRO-1` parte 2 | aceptada en rama | `REPRODUCCION-ATRIBUTOS-RUBRO-1-P2-2026-09-26.md` |
+| `USER-GUIDE-1` | publicada en `c92c0d7` | `REPRODUCCION-USER-GUIDE-1-2026-09-26.md` |
+| `ATRIBUTOS-RUBRO-1` parte 2 | publicada en `c92c0d7` | `REPRODUCCION-ATRIBUTOS-RUBRO-1-P2-2026-09-26.md` |
 | `PROD-LISTS-1` | publicada en `238d113` | `REPRODUCCION-PROD-LISTS-1-2026-09-26.md` |
 | `ATRIBUTOS-RUBRO-1` parte 1 | publicada en `792d709` | `REPRODUCCION-ATRIBUTOS-RUBRO-1-P1-2026-09-25.md` |
 | `MERCADO-UNICO-1` | publicada en `792d709` | `REPRODUCCION-MERCADO-UNICO-1-2026-09-25.md` |
