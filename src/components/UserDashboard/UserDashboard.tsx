@@ -456,6 +456,77 @@ interface UserDashboardProps {
   onPublishClick?: () => void;
 }
 
+// El estado de la orden, del nombre del servidor al del panel.
+const mapBackendStatus = (status: string): Order['status'] => {
+  const statusMap: Record<string, Order['status']> = {
+    'placed': 'pending',
+    'awaiting_transfer_receipt': 'awaiting-transfer-receipt',
+    'transfer_receipt_submitted': 'transfer-receipt-submitted',
+    'paid': 'paid',
+    'confirmed': 'confirmed',
+    'shipped': 'in-transit',
+    'delivered': 'delivered',
+    'cancelled': 'cancelled',
+    'rejected': 'rejected'
+  };
+  return statusMap[status.toLowerCase()] || 'pending';
+};
+
+/**
+ * Una orden como la muestra el panel, armada en UN solo lugar.
+ *
+ * La usan la apertura de «Mis Compras» y «Mis Ventas» y la recarga que sigue a
+ * cada acción. Eran dos copias, y la de la recarga no traía el traslado ni los
+ * datos de la transferencia: después de aprobar un comprobante, la tarjeta
+ * decía «Traslado no definido.» hasta recargar la página (USER-GUIDE-1).
+ *
+ * Quien compra ve a quien vende, cómo pagarle y si puede pagar en línea; quien
+ * vende ve a quien compra.
+ */
+const armarOrden = (o: BackendOrder, rol: 'buyer' | 'seller'): Order => ({
+  id: o.order_number,
+  orderId: o.id,
+  date: o.created_at,
+  status: mapBackendStatus(o.status),
+  total: o.total_amount,
+  items: o.items.map(i => ({
+    productName: i.product_name_snapshot,
+    quantity: i.quantity,
+    price: i.unit_price_snapshot
+  })),
+  paymentMethod: o.payment_method,
+  paymentState: o.payment_state,
+  transferReceiptUrl: o.transfer_receipt_url,
+  rejectionReason: o.rejection_reason,
+  shipping: o.shipping,
+  ...(rol === 'buyer'
+    ? {
+      paymentUrl: o.payment_url,
+      canPay: o.can_pay,
+      seller: o.seller_name ? {
+        name: o.seller_name,
+        phone: o.seller_phone || '',
+        whatsapp: o.seller_whatsapp || o.seller_phone || ''
+      } : undefined,
+      // Sólo para el comprador: es él quien tiene que transferir, y lo que
+      // necesita es el snapshot de la orden, no el perfil de hoy.
+      transferencia: (o.seller_cbu || o.seller_alias_bancario || o.seller_bank_holder)
+        ? {
+          cbu: o.seller_cbu,
+          alias: o.seller_alias_bancario,
+          titular: o.seller_bank_holder,
+        }
+        : undefined,
+    }
+    : {
+      buyer: o.buyer_name ? {
+        name: o.buyer_name,
+        phone: o.buyer_phone || '',
+        address: o.buyer_address || ''
+      } : undefined,
+    }),
+});
+
 export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) => {
   const { user, updateProfile } = useAuth();
   const { showToast, showConfirm } = useToast();
@@ -561,22 +632,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
   
   // Estado para categorías (para edición)
   const [categories, setCategories] = useState<CategoryFromBackend[]>([]);
-
-  // Helper para mapear status del backend al frontend
-  const mapBackendStatus = (status: string): Order['status'] => {
-    const statusMap: Record<string, Order['status']> = {
-      'placed': 'pending',
-      'awaiting_transfer_receipt': 'awaiting-transfer-receipt',
-      'transfer_receipt_submitted': 'transfer-receipt-submitted',
-      'paid': 'paid',
-      'confirmed': 'confirmed',
-      'shipped': 'in-transit',
-      'delivered': 'delivered',
-      'cancelled': 'cancelled',
-      'rejected': 'rejected'
-    };
-    return statusMap[status.toLowerCase()] || 'pending';
-  };
 
   // Preparar o recuperar el link de pago de una orden propia.
   //
@@ -750,65 +805,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
       try {
         if (activeTab === 'purchases') {
           const response = await apiGet<BackendOrder[]>('/orders/my?as_role=buyer');
-          const mappedOrders: Order[] = response.map(o => ({
-            id: o.order_number,
-            orderId: o.id,
-            date: o.created_at,
-            status: mapBackendStatus(o.status),
-            total: o.total_amount,
-            items: o.items.map(i => ({
-              productName: i.product_name_snapshot,
-              quantity: i.quantity,
-              price: i.unit_price_snapshot
-            })),
-            paymentMethod: o.payment_method,
-            paymentUrl: o.payment_url,
-            canPay: o.can_pay,
-            paymentState: o.payment_state,
-            seller: o.seller_name ? {
-              name: o.seller_name,
-              phone: o.seller_phone || '',
-              whatsapp: o.seller_whatsapp || o.seller_phone || ''
-            } : undefined,
-            transferReceiptUrl: o.transfer_receipt_url,
-            // Sólo para el comprador: es él quien tiene que transferir, y lo
-            // que necesita es el snapshot de la orden, no el perfil de hoy.
-            transferencia: (o.seller_cbu || o.seller_alias_bancario || o.seller_bank_holder)
-              ? {
-                cbu: o.seller_cbu,
-                alias: o.seller_alias_bancario,
-                titular: o.seller_bank_holder,
-              }
-              : undefined,
-            rejectionReason: o.rejection_reason,
-            shipping: o.shipping,
-          }));
+          const mappedOrders: Order[] = response.map((o) => armarOrden(o, 'buyer'));
           setPurchases(mappedOrders);
           void preguntarSiSePuedeCalificar(mappedOrders);
         } else if (activeTab === 'sales') {
           const response = await apiGet<BackendOrder[]>('/orders/my?as_role=seller');
-          const mappedOrders: Order[] = response.map(o => ({
-            id: o.order_number,
-            orderId: o.id,
-            date: o.created_at,
-            status: mapBackendStatus(o.status),
-            total: o.total_amount,
-            items: o.items.map(i => ({
-              productName: i.product_name_snapshot,
-              quantity: i.quantity,
-              price: i.unit_price_snapshot
-            })),
-            paymentMethod: o.payment_method,
-            paymentState: o.payment_state,
-            buyer: o.buyer_name ? {
-              name: o.buyer_name,
-              phone: o.buyer_phone || '',
-              address: o.buyer_address || ''
-            } : undefined,
-            transferReceiptUrl: o.transfer_receipt_url,
-            rejectionReason: o.rejection_reason,
-            shipping: o.shipping,
-          }));
+          const mappedOrders: Order[] = response.map((o) => armarOrden(o, 'seller'));
           setSales(mappedOrders);
         }
       } catch (error) {
@@ -1302,37 +1304,13 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
   const reloadOrders = async (role: 'buyer' | 'seller') => {
     try {
       const response = await apiGet<BackendOrder[]>(`/orders/my?as_role=${role}`);
-      const mappedOrders: Order[] = response.map(o => ({
-        id: o.order_number,
-        orderId: o.id,
-        date: o.created_at,
-        status: mapBackendStatus(o.status),
-        total: o.total_amount,
-        items: o.items.map(i => ({
-          productName: i.product_name_snapshot,
-          quantity: i.quantity,
-          price: i.unit_price_snapshot
-        })),
-        paymentMethod: o.payment_method,
-        paymentUrl: o.payment_url,
-        canPay: o.can_pay,
-        paymentState: o.payment_state,
-        buyer: o.buyer_name ? {
-          name: o.buyer_name,
-          phone: o.buyer_phone || '',
-          address: o.buyer_address || ''
-        } : undefined,
-        seller: o.seller_name ? {
-          name: o.seller_name,
-          phone: o.seller_phone || '',
-          whatsapp: o.seller_whatsapp || o.seller_phone || ''
-        } : undefined,
-        transferReceiptUrl: o.transfer_receipt_url,
-        rejectionReason: o.rejection_reason,
-      }));
+      const mappedOrders: Order[] = response.map((o) => armarOrden(o, role));
       
       if (role === 'buyer') {
         setPurchases(mappedOrders);
+        // Como al abrir: una orden que acaba de quedar entregada tiene que
+        // ofrecer «Calificar Vendedor» sin recargar la página.
+        void preguntarSiSePuedeCalificar(mappedOrders);
       } else {
         setSales(mappedOrders);
       }
