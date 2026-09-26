@@ -34,6 +34,30 @@ carga de `/auth/me` corre dos veces y la segunda puede llegar después de
 Aceptadas tus decisiones: modelo y año atados a `usa_marca`, la página que
 sobrevive a «Mercado», cero sin error, y año en UTC.
 
+### Decisión sobre tu consulta del 26/09 (`efa6038`) — opción 1
+
+**Se corrige dentro de USER-GUIDE-1**, como recomendás. Lo confirmé en el
+código: `reloadOrders` (`UserDashboard.tsx:1302`) arma la orden sin
+`shipping` y sin `transferencia`, y no vuelve a preguntar `can_rate`. Tenés
+razón en que documentarlo como un paso sería mentir en la guía.
+
+- **Un solo armado de la orden**, usado por la apertura y por la recarga.
+- **La recarga pregunta `can_rate`** para las órdenes que lo necesitan, igual
+  que la apertura.
+- **Caso nuevo**, en compra y en venta, sin recargar la página:
+  - después de «Aprobar comprobante», el traslado sigue diciendo lo que dice
+    la orden;
+  - después de «Confirmar recepción», aparece «Calificar Vendedor»;
+  - los datos de la transferencia no desaparecen de una orden que todavía los
+    muestra.
+- **Negativos:**
+  - la recarga sin el traslado da rojo;
+  - la recarga sin preguntar `can_rate` da rojo.
+- Sin cambios en la API ni en la base. Si hicieran falta, frená.
+
+El caso 205 (el modelo en el buscador) queda aceptado cuando revise la
+entrega completa. Seguí con la guía.
+
 ### Problema y prioridad
 
 `docs/USER_MANUAL.md` no se le puede entregar a la clienta así como está:
