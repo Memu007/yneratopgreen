@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-09-25.
+Actualizado: 2026-09-26.
 
 `NOW.md` contiene sólo estado vigente, restricciones vivas, bloqueos y próxima acción. La historia anterior permanece en Git; la instantánea previa a esta poda está en `ab4165fc`.
 
@@ -205,7 +205,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 ## Próxima secuencia
 
 1. Dev trabaja `ATRIBUTOS-RUBRO-1` (#9, absorbido), en dos partes. Después: `USER-GUIDE-1`, las guías de comprador, vendedor y transportista. Sigue, sin depender de Emi, la documentación del despliegue cuando la infraestructura quede fija. Dependen de Emi: la regla del teléfono, SMTP (la clienta no pudo registrarse), cuentas de prueba de Mercado Pago, backups e integración, y las decisiones #5, #7 y #10 de la clienta.
-2. `main` está en `792d709` (25/09): todo lo aceptado hasta la parte 1 de `ATRIBUTOS-RUBRO-1`. Lo que venga se publica en la próxima tanda, con suite completa desde base limpia sobre el SHA exacto y autorización explícita de Emi. Después de publicar, Emi carga tres publicaciones de prueba (dos tractores de marcas distintas, con HP, y una máquina sin marca; fotos propias o genéricas, rotuladas «publicación de prueba»).
+2. `main` está en `238d113` (26/09): todo lo aceptado hasta `PROD-LISTS-1`. Lo que venga se publica en la próxima tanda, con suite completa desde base limpia sobre el SHA exacto y autorización explícita de Emi. Después de publicar, Emi carga tres publicaciones de prueba (dos tractores de marcas distintas, con HP, y una máquina sin marca; fotos propias o genéricas, rotuladas «publicación de prueba»).
 3. Backup: no se exige mientras Railway sea demostrativo (decisión del 25/09). Es condición del lanzamiento real.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 5. Antes de cargar datos reales o de lanzar, Emi elige el backup administrado y su costo.
