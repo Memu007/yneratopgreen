@@ -10,6 +10,17 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-09-26 — El orden del panel de filtros lo deciden PM y Dev
+
+Emi, en el sitio publicado, sintió el panel de filtros desordenado. Delegó la
+decisión de experiencia en PM y Dev, con revisión adversarial («que sea
+adversarial y lo que decidan»).
+
+PM propuso tres bloques y un plegado para lo poco usado: qué buscás, dónde,
+precio y «Más filtros». La Dev la ataca antes de construir, dentro de la parte
+2 de los atributos. Lo que quede en pie se construye sin volver a Emi. Los
+hechos técnicos se resuelven con evidencia.
+
 ## 2026-09-26 — Las categorías no se cargan por migración; las marcas y las localidades sí
 
 Decisión PM sobre la discrepancia de la Dev en `PROD-LISTS-1`.

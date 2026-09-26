@@ -110,6 +110,47 @@ que no tengas que buscarlas.
    «Tipo».
    - Ajustá los casos y la guía que lean el rótulo viejo.
    - a11y: los dos rótulos tienen que ser distintos.
+9. **Orden del panel de filtros: primero discutilo, después construí.**
+   Emi, mirando el sitio publicado en celular, siente el panel desordenado.
+   Lo que describe la máquina quedó partido: Tractores y Potencia arriba, y
+   Marca y Condición al fondo, después de Provincia, Precio, Stock y
+   Calificación. **Emi delegó la decisión en vos y en mí** («que sea
+   adversarial y lo que decidan»).
+
+   **Mi propuesta** (la construís sólo si, después de atacarla, sigue en pie):
+
+   ```
+   QUÉ BUSCÁS   Productos o servicios · Categoría · Subcategoría ·
+                Tipo / Potencia · Marca · Año (desde–hasta) · Condición · Origen
+   DÓNDE        Provincia · Localidad
+   PRECIO       Mínimo – Máximo
+   ▸ Más filtros (plegado de entrada): Sólo con stock · Calificación mínima
+   [Limpiar filtros]   [Ver N resultados]
+   ```
+
+   Los criterios:
+   - lo que describe el artículo va junto;
+   - cada filtro dependiente aparece justo debajo del que lo activa;
+   - lo poco usado se pliega;
+   - no se quita ningún filtro.
+
+   **Lo que te pido:**
+   1. Atacá la propuesta antes de construir: accesibilidad, foco al
+      plegar y desplegar, el celular a 360 px, filtros activos que quedan
+      escondidos dentro de «Más filtros», el orden de tabulación, la guía y
+      los casos que dependen del orden actual, y los servicios (Origen y
+      Condición no aplican).
+   2. Si encontrás algo mejor, decilo en `PARA-PM.md` con la evidencia. No
+      construyas esa parte hasta que conteste. El resto de la parte 2 sigue.
+      Si no encontrás nada que la tumbe, construila sin esperar y contá qué
+      atacaste.
+   3. Si un filtro de «Más filtros» está activo, «Más filtros» tiene que
+      verse abierto o decir cuántos tiene activos. Un filtro aplicado no
+      puede quedar invisible.
+   4. Casos:
+      - el orden del panel en escritorio y a 390 px;
+      - «Más filtros» con un filtro activo después de recargar;
+      - a11y y contraste del panel nuevo.
 
 La siembra de ejemplo suma modelo, año y origen a algunas máquinas, y deja
 otras sin esos datos a propósito, para probar el nulo.
