@@ -56,6 +56,9 @@ export const SUPERFICIES = [
   // Los filtros que aparecen con un subrubro elegido: el tipo del tercer
   // nivel (ATRIBUTOS-RUBRO-1). Mismo panel, con controles que antes no había.
   { id: 'catálogo: filtros del subrubro' },
+  // El panel de la parte 2: año y origen de maquinaria, con «Más filtros»
+  // abierto porque tiene algo puesto, y la tarjeta con el origen rotulado.
+  { id: 'catálogo: año, origen y más filtros' },
   // El paginador del Mercado. Va como superficie propia y no como parte del
   // catálogo porque su marcador es el propio control: si el catálogo dejara de
   // tener más de una página —un seed más chico, un filtro por omisión— esta

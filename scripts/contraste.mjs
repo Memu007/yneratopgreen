@@ -448,6 +448,15 @@ for (const medida of MEDIDAS) {
     if (plegable) await filtros.click();
     await revisar(page, `${medida.n} catálogo: filtros del subrubro`, page.locator('#catalog-subtype'));
     if (plegable) await filtros.click();
+
+    // Año y origen, con «Más filtros» abierto porque tiene algo puesto, y la
+    // tarjeta con el origen rotulado.
+    await page.goto(`${WEB}/?section=marketplace&category=${encodeURIComponent('Maquinaria agrícola')}`
+      + '&in_stock=true&year_from=2015&origin=dueno_directo', { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-sort').waitFor({ state: 'visible', timeout: ESPERA });
+    if (plegable) await filtros.click();
+    await revisar(page, `${medida.n} catálogo: año, origen y más filtros`, page.locator('#catalog-rating'));
+    if (plegable) await filtros.click();
     await page.goto(`${WEB}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await page.locator('#catalog-sort').waitFor({ state: 'visible', timeout: ESPERA });
 

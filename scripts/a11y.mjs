@@ -222,6 +222,16 @@ async function comprador(page, medida) {
   if (plegable) await filtros.click();
   await revisar(page, 'catálogo: filtros del subrubro', medida, page.locator('#catalog-subtype'));
   if (plegable) await filtros.click();
+
+  // Año y origen, con «Más filtros» abierto porque tiene la disponibilidad
+  // puesta (ATRIBUTOS-RUBRO-1, parte 2). La tarjeta del tractor lleva el
+  // origen rotulado.
+  await page.goto(`${WEB}/?section=marketplace&category=${encodeURIComponent('Maquinaria agrícola')}`
+    + '&in_stock=true&year_from=2015&origin=dueno_directo', { waitUntil: 'domcontentloaded' });
+  await page.locator('#catalog-sort').waitFor({ state: 'visible', timeout: ESPERA });
+  if (plegable) await filtros.click();
+  await revisar(page, 'catálogo: año, origen y más filtros', medida, page.locator('#catalog-rating'));
+  if (plegable) await filtros.click();
   await page.goto(`${WEB}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
   await page.locator('#catalog-sort').waitFor({ state: 'visible', timeout: ESPERA });
 

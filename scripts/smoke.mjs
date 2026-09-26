@@ -7631,6 +7631,14 @@ async function irAlMercadoDeServicios(page) {
   }, 'la grilla del Mercado de servicios no terminó de dibujarse con servicios', 25_000);
 }
 
+// «Más filtros» va plegado de entrada, y adentro están la disponibilidad y la
+// calificación mínima. Se usan abriéndolo, como lo haría cualquiera. Abrirlo
+// dos veces no lo cierra: se mira el estado antes de tocar.
+async function abrirMasFiltros(page) {
+  const boton = page.getByRole('button', { name: /Más filtros/ });
+  if ((await boton.getAttribute('aria-expanded')) !== 'true') await boton.click();
+}
+
 // ¿La fila de esta orden está bloqueada por otra transacción? Se pregunta con
 // NOWAIT: si no se puede tomar el candado al instante, es que alguien lo tiene.
 function ordenBloqueada(ordenId) {
@@ -27921,6 +27929,7 @@ await runCase(171, 'El Mercado pagina en el servidor: total, orden y filtros del
     await page.locator('#catalog-subcategory').selectOption('Todas');
     await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
       'sacar la subcategoría no devolvió el total del conjunto', 25_000);
+    await abrirMasFiltros(page);
     await page.locator('#catalog-rating').selectOption('4');
     await esperarA(async () => (await conteo.innerText()).includes(String(CALIFICADAS)),
       `con calificación mínima 4 el conteo dice «${(await conteo.innerText()).replace(/\s+/g, ' ').trim()}» `
@@ -27928,6 +27937,7 @@ await runCase(171, 'El Mercado pagina en el servidor: total, orden y filtros del
     const paginasCalificadas = Math.ceil(CALIFICADAS / POR_PAGINA);
     await esperarA(async () => (await cual()) === `Página 1 de ${paginasCalificadas}`,
       `con calificación mínima el paginador dice «${await cual()}»`, 25_000);
+    await abrirMasFiltros(page);
     await page.locator('#catalog-rating').selectOption('0');
     await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
       'sacar la calificación mínima no devolvió el total del conjunto', 25_000);
@@ -28153,11 +28163,12 @@ await runCase(171, 'El Mercado pagina en el servidor: total, orden y filtros del
       comoSeLlama: 'poner calificación mínima con la respuesta demorada',
       dimension: 'calificacion',
       anuncia: '4',
-      mover: () => page.locator('#catalog-rating').selectOption('4'),
+      mover: async () => { await abrirMasFiltros(page); await page.locator('#catalog-rating').selectOption('4'); },
       despues: () => esperarA(async () => (await conteo.innerText()).includes(String(CALIFICADAS)),
         'con calificación mínima el conteo no llegó al subconjunto', 25_000),
     }));
 
+    await abrirMasFiltros(page);
     await page.locator('#catalog-rating').selectOption('0');
     await esperarA(async () => (await conteo.innerText()).includes(String(TOTAL)),
       'sacar la calificación mínima no devolvió el total antes de medir la espera', 25_000);
@@ -32470,7 +32481,10 @@ await runCase(187, 'Con el panel de filtros plegado, el teclado no entra en cont
   // de accesibilidad: desde «Filtros» cerrado, Tab caía en once controles
   // invisibles antes de «Ordenar». Se mira con el teclado, control por
   // control, y se mira el árbol que recibe un lector de pantalla.
-  const CONTROLES = '#panel-de-filtros select, #panel-de-filtros input, #panel-de-filtros button';
+  // Lo que está dentro de «Más filtros» plegado no cuenta: está oculto a
+  // propósito, con `hidden`, fuera del recorrido y del árbol.
+  const CONTROLES = ['select', 'input', 'button']
+    .map((control) => `#panel-de-filtros ${control}:not([hidden] *)`).join(', ');
   // El filtro de marca sólo aparece si hay alguna publicación activa con
   // marca. No se depende de que la siembra conserve las suyas: otro caso que
   // las tocara hacía fallar este por una razón ajena (BRAND-LOSS-1). El caso
@@ -32704,7 +32718,7 @@ await runCase(187, 'Con el panel de filtros plegado, el teclado no entra en cont
         await esperarExpandido(page, 'true');
         await page.keyboard.press('Tab');
         assert((await enfocado(page)).id === 'catalog-type',
-          `a ${ancho}px, al reabrir, Tab no entró en «Tipo»`);
+          `a ${ancho}px, al reabrir, Tab no entró en «Productos o servicios»`);
         await page.keyboard.press('Shift+Tab');
         await page.keyboard.press('Enter');
         await esperarExpandido(page, 'false');
@@ -34448,10 +34462,13 @@ await runCase(196, 'La migración del tipo y la potencia es aditiva, vuelve atr�
   const ANTERIOR = 'b6d3f12a8e94';
   return conUnaCopiaDeLaBase('caso196', async ({ opciones: enLaCopia, alembic: alembicEnLaCopia }) => {
     // Todo lo que las publicaciones tenían antes de la migración, en una huella:
-    // cada fila entera menos las dos columnas nuevas, en orden.
+    // cada fila entera menos las dos columnas nuevas, en orden. Bajar hasta
+    // antes de esta también baja las posteriores —modelo, año y origen—, así
+    // que esas tres tampoco entran.
     const huella = () => queryRows(`
     SELECT COUNT(*)::text, md5(coalesce(string_agg(
-      (to_jsonb(p) - 'subcategory_type_id' - 'power_hp')::text, '|' ORDER BY p.id), ''))
+      (to_jsonb(p) - 'subcategory_type_id' - 'power_hp' - 'model' - 'year' - 'origin')::text,
+      '|' ORDER BY p.id), ''))
     FROM products p`, enLaCopia)[0].join(' ');
     const columnas = () => queryRows(`
     SELECT 'columnas:' || coalesce(string_agg(column_name, ',' ORDER BY column_name), '')
@@ -34781,6 +34798,724 @@ await runCase(198, 'Con una categoría que usa marca, el filtro ofrece todas las
     + 'conteo, las en cero incluidas; elegir una en cero la escribe en la barra y muestra «No hay '
     + 'operaciones con estos filtros.», sin error');
 
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return medidos.join('; ');
+});
+
+// ---------------------------------------------------------------------------
+// ATRIBUTOS-RUBRO-1, parte 2: modelo y año en maquinaria, y el origen que
+// declara quien vende. Los casos 199 a 204.
+// ---------------------------------------------------------------------------
+
+// 199. Se declaran, se validan, se ven en la ficha y la tarjeta, y se editan.
+await runCase(199, 'Modelo, año y origen se declaran al publicar, se validan, se ven rotulados y se editan', async () => {
+  const medidos = [];
+  const sello = Date.now();
+  const MARCA = `Modelo199 ${sello}`;
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const tractores = subrubroDe('maquinaria-agricola', 'tractores');
+  const [[insumos, insumosNombre]] = queryRows(
+    "SELECT id, name FROM categories WHERE slug = 'insumos-agricolas'");
+  const [[servicio]] = queryRows(
+    "SELECT id, 'fin' FROM categories WHERE is_service = true AND is_active ORDER BY name LIMIT 1");
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const [[provincia]] = queryRows(`SELECT province_id FROM localities WHERE id = ${sqlLiteral(localidad)}`);
+  const proximo = new Date().getFullYear() + 1;
+  const maquina = (cuerpo = {}) => ({
+    name: `${MARCA} rechazada`, description: 'Publicación del caso 199 sobre modelo, año y origen.',
+    category_id: tractores.categoriaId, subcategory_id: tractores.id, price: 1990, stock: 1,
+    unit: 'unidad', locality_id: localidad, publication_type: 'producto', operation_kind: 'activo',
+    condition: 'usado', ...cuerpo,
+  });
+  const insumo = (cuerpo = {}) => ({
+    name: `${MARCA} rechazada`, description: 'Publicación del caso 199 sobre modelo, año y origen.',
+    category_id: insumos, price: 1990, stock: 5, unit: 'kg', locality_id: localidad,
+    publication_type: 'producto', ...cuerpo,
+  });
+  const deServicio = (cuerpo = {}) => ({
+    name: `${MARCA} rechazada`, description: 'Publicación del caso 199 sobre modelo, año y origen.',
+    category_id: servicio, price: 1990, locality_id: localidad, publication_type: 'servicio',
+    pricing_type: 'por_hora', availability: 'inmediata', ...cuerpo,
+  });
+  const detalleDe = (respuesta) => (typeof respuesta.datos?.detail === 'string'
+    ? respuesta.datos.detail : JSON.stringify(respuesta.datos?.detail ?? respuesta.datos));
+  const fila = (id) => queryRows(`
+    SELECT 'fila:' || coalesce(model, '(sin modelo)'), coalesce(year::text, '(sin año)'),
+           coalesce(origin, '(sin origen)')
+    FROM products WHERE id = ${sqlLiteral(id)}`)[0].map((v, i) => (i === 0 ? v.replace(/^fila:/, '') : v));
+  const fabricadas = [];
+
+  try {
+    // --- A. La validación rechaza lo inválido y no guarda nada -------------
+    const RECHAZOS = [
+      ['un año de 1949', maquina({ year: 1949 }), 422, /1950/],
+      [`un año de ${proximo + 1}`, maquina({ year: proximo + 1 }), 422, new RegExp(`entre 1950 y ${proximo}`)],
+      ['un origen inventado', maquina({ origin: 'importador' }), 422, /origin/],
+      ['un origen en un servicio', deServicio({ origin: 'dueno_directo' }), 400, /sólo en productos/],
+      [`un modelo en «${insumosNombre}»`, insumo({ model: 'X-100' }), 400, /modelo se declara sólo en maquinaria/],
+      [`un año en «${insumosNombre}»`, insumo({ year: 2020 }), 400, /año se declara sólo en maquinaria/],
+    ];
+    for (const [que, cuerpo, codigo, dice] of RECHAZOS) {
+      const respuesta = await pedirCrudo('/products', { method: 'POST', header: vendedor.token, body: cuerpo });
+      assert(respuesta.status === codigo && dice.test(detalleDe(respuesta)),
+        `${que}: el alta respondió ${respuesta.status} «${detalleDe(respuesta).slice(0, 200)}» y tenía que `
+        + `ser ${codigo} y decir ${dice}`);
+    }
+    assert(queryCount(`SELECT COUNT(*) FROM products WHERE name LIKE ${sqlLiteral(`${MARCA}%`)}`) === 0,
+      'algún alta rechazada dejó una fila guardada');
+    medidos.push(`${RECHAZOS.length} altas inválidas rechazadas con su motivo y ninguna fila guardada `
+      + `(año 1949 y ${proximo + 1}, origen inventado, origen en un servicio, modelo y año fuera de maquinaria)`);
+
+    // --- B. El alta por el formulario real ---------------------------------
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const acceso = (await apiRequest('/auth/login', {
+        method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+      })).data;
+      await contexto.addInitScript(({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+      }, { a: acceso.access_token, r: acceso.refresh_token });
+      const page = await contexto.newPage();
+
+      const publicarPorElFormulario = async (nombre, categoria, subrubro, completar) => {
+        await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+        await page.getByRole('button', { name: /Vender/ }).first().click();
+        await page.getByRole('heading', { name: /Publicar un producto/i })
+          .waitFor({ state: 'visible', timeout: 20_000 });
+        await page.locator('#name').fill(nombre);
+        await page.locator('#category option').filter({ hasText: categoria })
+          .first().waitFor({ state: 'attached', timeout: 10_000 });
+        await page.locator('#category').selectOption({ label: categoria });
+        if (subrubro) await page.locator('#subcategory').selectOption({ label: subrubro });
+        await completar();
+        await page.locator('#description').fill('Publicada por el formulario real en el caso 199.');
+        await page.locator('#price').fill('19900');
+        await page.locator('#stock').fill('1');
+        await page.locator('#province').selectOption(provincia);
+        await esperarA(async () => (await page.locator('#locality option').count()) > 1,
+          'el alta no cargó las localidades', 20_000);
+        await page.locator('#locality').selectOption(localidad);
+        const [respuesta] = await Promise.all([
+          page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/products')
+            && r.request().method() === 'POST', { timeout: 30_000 }),
+          page.locator('form button[type="submit"]').click(),
+        ]);
+        assert(respuesta.ok(), `el alta de «${nombre}» respondió ${respuesta.status()}: `
+          + `${(await respuesta.text()).slice(0, 200)}`);
+        const { id } = await respuesta.json();
+        fabricadas.push(id);
+        await page.getByText(/publicado exitosamente!/i).waitFor({ state: 'visible', timeout: 20_000 });
+        return { id, enviado: JSON.parse(respuesta.request().postData() || '{}') };
+      };
+
+      // B1. Un tractor: modelo, año y origen.
+      const tractor = `${MARCA} tractor`;
+      const altaTractor = await publicarPorElFormulario(tractor, tractores.categoria, tractores.nombre, async () => {
+        await page.locator('#model').waitFor({ state: 'visible', timeout: 10_000 });
+        const ofrecidos = (await page.locator('#origin option').allInnerTexts()).map((o) => o.trim());
+        assert(JSON.stringify(ofrecidos) === JSON.stringify(['Sin declarar', 'Agencia / Concesionaria', 'Dueño directo']),
+          `el alta ofrece los orígenes ${JSON.stringify(ofrecidos)}`);
+        await page.locator('#model').fill('  AR-199 Max  ');
+        await page.locator('#year').fill('2019');
+        await page.locator('#origin').selectOption('dueno_directo');
+      });
+      assert(JSON.stringify(fila(altaTractor.id)) === JSON.stringify(['AR-199 Max', '2019', 'dueno_directo']),
+        `la base guardó ${JSON.stringify(fila(altaTractor.id))}`);
+
+      // B2. Un insumo: no pide modelo ni año, sí origen.
+      const deInsumo = `${MARCA} insumo`;
+      const altaInsumo = await publicarPorElFormulario(deInsumo, insumosNombre, null, async () => {
+        await page.locator('#origin').waitFor({ state: 'visible', timeout: 10_000 });
+        assert((await page.locator('#model').count()) === 0 && (await page.locator('#year').count()) === 0,
+          `«${insumosNombre}» pide modelo o año`);
+        await page.locator('#origin').selectOption('concesionaria');
+      });
+      assert(!('model' in altaInsumo.enviado) && !('year' in altaInsumo.enviado),
+        `el alta del insumo mandó ${JSON.stringify({ modelo: altaInsumo.enviado.model, anio: altaInsumo.enviado.year })}`);
+      assert(JSON.stringify(fila(altaInsumo.id)) === JSON.stringify(['(sin modelo)', '(sin año)', 'concesionaria']),
+        `la base guardó ${JSON.stringify(fila(altaInsumo.id))}`);
+      medidos.push('el formulario guarda modelo (sin espacios de más), año y origen en un tractor, y en '
+        + `«${insumosNombre}» ofrece sólo el origen`);
+
+      // --- C. Rotulado en la ficha y en la tarjeta, sin aspecto de distintivo -
+      await page.goto(`${FRONTEND_URL}/?section=product&id=${altaTractor.id}`, { waitUntil: 'domcontentloaded' });
+      await page.locator('main[aria-busy="false"]:has(#detalle-titulo)').waitFor({ timeout: 20_000 });
+      const ficha = (await page.locator('main dl').first().innerText()).replace(/\s+/g, ' ');
+      assert(/Modelo AR-199 Max/i.test(ficha) && /Año 2019/i.test(ficha)
+        && /Origen Dueño directo declarado por quien vende/i.test(ficha),
+      `la ficha dice «${ficha}»`);
+      const aspecto = (locator) => locator.evaluate((el) => {
+        const s = getComputedStyle(el);
+        return { fondo: s.backgroundColor, borde: s.borderLeftWidth, dibujos: el.querySelectorAll('svg, img').length };
+      });
+      const deLaFicha = await aspecto(page.locator('main dl dd').filter({ hasText: 'declarado por quien vende' }));
+      assert(deLaFicha.fondo === 'rgba(0, 0, 0, 0)' && deLaFicha.borde === '0px' && deLaFicha.dibujos === 0,
+        `en la ficha el origen tiene aspecto de distintivo: ${JSON.stringify(deLaFicha)}`);
+
+      await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(MARCA)}`,
+        { waitUntil: 'domcontentloaded' });
+      const tarjeta = page.locator('article[class*="card"]').filter({ hasText: tractor }).first();
+      await tarjeta.waitFor({ state: 'visible', timeout: 25_000 });
+      const origenEnLaTarjeta = tarjeta.getByText('declarado por quien vende').locator('..');
+      const textoTarjeta = (await origenEnLaTarjeta.innerText()).replace(/\s+/g, ' ').trim();
+      assert(textoTarjeta === 'Dueño directo · declarado por quien vende',
+        `la tarjeta dice «${textoTarjeta}»`);
+      const deLaTarjeta = await aspecto(origenEnLaTarjeta);
+      assert(deLaTarjeta.fondo === 'rgba(0, 0, 0, 0)' && deLaTarjeta.borde === '0px' && deLaTarjeta.dibujos === 0,
+        `en la tarjeta el origen tiene aspecto de distintivo: ${JSON.stringify(deLaTarjeta)}`);
+      medidos.push('la ficha dice «Modelo», «Año» y «Origen: Dueño directo, declarado por quien vende», y la '
+        + 'tarjeta «Dueño directo · declarado por quien vende», las dos sin fondo, sin borde y sin ícono');
+
+      // --- D. La edición por el panel ----------------------------------------
+      await page.goto(`${FRONTEND_URL}/?section=account`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: /publicaciones/i }).first().click();
+      const suya = page.locator('[class*="productCard"], [class*="publicacion"]').filter({ hasText: tractor }).first();
+      await suya.waitFor({ state: 'visible', timeout: 20_000 });
+      await suya.getByRole('button', { name: /editar/i }).first().click();
+      await page.locator('#edit-nombre').waitFor({ state: 'visible', timeout: 20_000 });
+      const abiertos = [await page.locator('#edit-modelo').inputValue(), await page.locator('#edit-anio').inputValue(),
+        await page.locator('#edit-origen').inputValue()];
+      assert(JSON.stringify(abiertos) === JSON.stringify(['AR-199 Max', '2019', 'dueno_directo']),
+        `la edición abrió con ${JSON.stringify(abiertos)}`);
+      await page.locator('#edit-anio').fill('2021');
+      await page.locator('#edit-origen').selectOption('concesionaria');
+      const [guardado] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes(`/products/${altaTractor.id}`) && r.request().method() === 'PATCH',
+          { timeout: 20_000 }),
+        page.getByRole('button', { name: /^Guardar/i }).first().click(),
+      ]);
+      assert(guardado.ok(), `guardar respondió ${guardado.status()}`);
+      assert(JSON.stringify(fila(altaTractor.id)) === JSON.stringify(['AR-199 Max', '2021', 'concesionaria']),
+        `editar guardó ${JSON.stringify(fila(altaTractor.id))}`);
+      await contexto.close();
+    } finally {
+      await browser.close();
+    }
+    medidos.push('el panel abre la edición con lo guardado y cambia el año a 2021 y el origen a concesionaria');
+
+    // --- E. Por la API -------------------------------------------------------
+    const [tractorId] = fabricadas;
+    const fuera = await pedirCrudo(`/products/${tractorId}`, {
+      method: 'PATCH', header: vendedor.token, body: { year: 1949 } });
+    assert(fuera.status === 422 && fila(tractorId)[1] === '2021',
+      `editar con año 1949 respondió ${fuera.status} y la fila quedó en ${fila(tractorId)[1]}`);
+    await apiRequest(`/products/${tractorId}`, {
+      method: 'PATCH', token: vendedor.token, body: { origin: null } });
+    assert(fila(tractorId)[2] === '(sin origen)', `quitar el origen dejó «${fila(tractorId)[2]}»`);
+    await apiRequest(`/products/${tractorId}`, {
+      method: 'PATCH', token: vendedor.token, body: { category_id: insumos, subcategory_id: null, operation_kind: 'insumo' } });
+    assert(fila(tractorId)[0] === '(sin modelo)' && fila(tractorId)[1] === '(sin año)',
+      `mover el tractor a «${insumosNombre}» dejó ${JSON.stringify(fila(tractorId))}`);
+    medidos.push('por la API, un año fuera de rango se rechaza sin tocar la fila, null quita el origen, y '
+      + `mover la publicación a «${insumosNombre}» suelta el modelo y el año`);
+  } finally {
+    for (const id of fabricadas) {
+      await pedirCrudo(`/products/${id}`, { method: 'DELETE', header: vendedor.token }).catch(() => {});
+    }
+  }
+  return medidos.join('; ');
+});
+
+// 200. El filtro de año y el de origen: en el servidor, sin nulos, en la URL
+//      y el historial, y desde la página 1.
+//
+// Los hallazgos se juntan y el caso falla al final con todos, como el 195.
+await runCase(200, 'Filtrar por año y por origen cuenta en el servidor, deja afuera lo no declarado y vive en la URL', async () => {
+  const medidos = [];
+  const problemas = [];
+  const sello = Date.now();
+  const MARCA = `Anio200 ${sello}`;
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const preparacion = subrubroDe('maquinaria-agricola', 'preparacion-suelo');
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const fabricadas = [];
+  const ORIGENES_EN_ORDEN = ['concesionaria', 'dueno_directo', null];
+  // 28 con año (1995 a 2022) y 6 sin año: 34, más de una página. El origen
+  // rota entre los dos valores y ninguno.
+  const escenario = [];
+  for (let i = 0; i < 34; i += 1) {
+    escenario.push({ anio: i < 28 ? 1995 + i : null, origen: ORIGENES_EN_ORDEN[i % 3] });
+  }
+  const idsDe = {};
+  const nombreDe = (i) => `${MARCA} máquina ${String(i).padStart(2, '0')}`;
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [i, { anio, origen }] of escenario.entries()) {
+      const alta = await apiRequest('/products', {
+        method: 'POST', token: vendedor.token,
+        body: {
+          name: nombreDe(i), description: 'Publicación del caso 200 sobre el año y el origen.',
+          category_id: preparacion.categoriaId, subcategory_id: preparacion.id, price: 2000 + i, stock: 1,
+          unit: 'unidad', locality_id: localidad, publication_type: 'producto', operation_kind: 'activo',
+          condition: 'usado', ...(anio ? { year: anio } : {}), ...(origen ? { origin: origen } : {}),
+        },
+      });
+      fabricadas.push(alta.data.id);
+      idsDe[i] = alta.data.id;
+    }
+    const cumplen = (condicion) => escenario.flatMap((e, i) => (condicion(e) ? [idsDe[i]] : []));
+    const enLaBase = (condicion) => queryCount(`
+      SELECT COUNT(*) FROM products WHERE status = 'ACTIVE' AND name LIKE ${sqlLiteral(`${MARCA}%`)}
+        AND ${condicion}`);
+    const sinAnio = cumplen((e) => e.anio === null);
+    const sinOrigen = cumplen((e) => e.origen === null);
+
+    // --- A. La API ------------------------------------------------------------
+    const buscar = `search=${encodeURIComponent(MARCA)}`;
+    const todosLosIds = async (consulta) => {
+      const ids = [];
+      for (let pagina = 1; ; pagina += 1) {
+        const r = await apiRequest(`/catalog/products?${buscar}&${consulta}&page=${pagina}&page_size=100`);
+        ids.push(...r.data.items.map((item) => item.id));
+        if (!r.data.has_next) return ids;
+      }
+    };
+    const revisar = async (que, consulta, sql, deben, noDeben) => {
+      const esperado = enLaBase(sql);
+      const chica = await pedirCrudo(`/catalog/products?${buscar}&${consulta}&page_size=5`);
+      if (chica.status !== 200) {
+        problemas.push(`API, ${que}: respondió HTTP ${chica.status}`);
+        return;
+      }
+      if (chica.datos.total !== esperado) {
+        problemas.push(`API, ${que}: el total dice ${chica.datos.total} y en la base hay ${esperado}`);
+      }
+      if (chica.datos.pages !== Math.ceil(esperado / 5)) {
+        problemas.push(`API, ${que}: dice ${chica.datos.pages} páginas de 5 y son ${Math.ceil(esperado / 5)}`);
+      }
+      const ids = await todosLosIds(consulta);
+      const faltan = deben.filter((id) => !ids.includes(id));
+      const sobran = noDeben.filter((id) => ids.includes(id));
+      if (faltan.length) problemas.push(`API, ${que}: faltan ${faltan.length} que corresponden`);
+      if (sobran.length) problemas.push(`API, ${que}: trajo ${sobran.length} que no declararon el dato o no corresponden`);
+    };
+    const noCumplen = (condicion) => cumplen((e) => !condicion(e));
+    const RANGOS = [
+      ['año desde 2010', 'year_from=2010', 'year >= 2010', (e) => e.anio !== null && e.anio >= 2010],
+      ['año hasta 2004', 'year_to=2004', 'year <= 2004', (e) => e.anio !== null && e.anio <= 2004],
+      ['año de 2005 a 2012', 'year_from=2005&year_to=2012', 'year BETWEEN 2005 AND 2012',
+        (e) => e.anio !== null && e.anio >= 2005 && e.anio <= 2012],
+      ['origen «dueño directo»', 'origin=dueno_directo', "origin = 'dueno_directo'", (e) => e.origen === 'dueno_directo'],
+      ['origen «concesionaria»', 'origin=concesionaria', "origin = 'concesionaria'", (e) => e.origen === 'concesionaria'],
+      ['año desde 2010 y concesionaria', 'year_from=2010&origin=concesionaria',
+        "year >= 2010 AND origin = 'concesionaria'", (e) => e.anio !== null && e.anio >= 2010 && e.origen === 'concesionaria'],
+    ];
+    for (const [que, consulta, sql, condicion] of RANGOS) {
+      await revisar(que, consulta, sql, cumplen(condicion), noCumplen(condicion));
+    }
+    // «Desde» mayor que «hasta»: cero, sin error.
+    const alReves = await pedirCrudo(`/catalog/products?${buscar}&year_from=2020&year_to=2010`);
+    if (alReves.status !== 200 || alReves.datos.total !== 0) {
+      problemas.push(`API, desde 2020 hasta 2010: respondió ${alReves.status} con ${alReves.datos?.total} y tiene que dar cero sin error`);
+    }
+    medidos.push(`la API cuenta en el servidor —${enLaBase('year >= 2010')} desde 2010, `
+      + `${enLaBase("origin = 'dueno_directo'")} de dueño directo, ${enLaBase("origin = 'concesionaria'")} de `
+      + 'concesionaria— y el total y las páginas coinciden con la base; las '
+      + `${sinAnio.length} sin año y las ${sinOrigen.length} sin origen no entran; «desde» 2020 «hasta» 2010 da cero, sin error`);
+
+    // --- B. La pantalla -------------------------------------------------------
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    const barra = () => new URL(page.url()).searchParams;
+    const conteo = async () => {
+      const texto = await page.locator('[class*="_conteo_"]').first().innerText();
+      const numeros = (texto.match(/\d+/g) || []).map(Number);
+      return numeros[numeros.length - 1];
+    };
+    const titulos = async () => (await page.locator('article[class*="card"] h3').allInnerTexts()).map((t) => t.trim());
+    const esperarElConteo = async (esperado, momento) => {
+      try {
+        await esperarA(async () => (await conteo()) === esperado, momento, 20_000);
+      } catch {
+        problemas.push(`pantalla, ${momento}: dice ${await conteo().catch(() => '?')} operaciones y en la base hay ${esperado}`);
+      }
+    };
+    const nombresSin = (ids) => new Set(queryRows(`SELECT name, 'fin' FROM products WHERE id IN (${
+      ids.map(sqlLiteral).join(',')})`).map(([n]) => n));
+    const MERCADO = `${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(MARCA)}`
+      + `&category=${encodeURIComponent('Maquinaria agrícola')}`;
+
+    // B1. Página 2; poner «desde» vuelve a la 1, y no se cuela ninguna sin año.
+    await page.goto(`${MERCADO}&page=2`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#catalog-year-from').waitFor({ state: 'visible', timeout: 25_000 });
+    await esperarA(async () => barra().get('page') === '2', 'no se llegó a la página 2', 20_000);
+    await page.locator('#catalog-year-from').fill('2010');
+    await esperarA(async () => barra().get('year_from') === '2010', 'el año «desde» no llegó a la barra', 20_000)
+      .catch((e) => problemas.push(`pantalla: ${e.message}`));
+    if (barra().get('page')) problemas.push(`pantalla: poner el año dejó la página ${barra().get('page')}`);
+    await esperarElConteo(enLaBase('year >= 2010'), 'desde 2010');
+    const sinAnioVistas = (await titulos()).filter((t) => nombresSin(sinAnio).has(t));
+    if (sinAnioVistas.length) problemas.push(`pantalla: desde 2010 se ven ${sinAnioVistas.length} sin año`);
+
+    // B2. El origen, rotulado en el filtro, y combinado con el año.
+    const rotulo = (await page.locator('label[for="catalog-origin"]').innerText()).replace(/\s+/g, ' ').trim();
+    if (!/declarado por quien vende/i.test(rotulo)) problemas.push(`pantalla: el filtro de origen dice «${rotulo}»`);
+    await page.locator('#catalog-origin').selectOption('concesionaria');
+    await esperarA(async () => barra().get('origin') === 'concesionaria', 'el origen no llegó a la barra', 20_000)
+      .catch((e) => problemas.push(`pantalla: ${e.message}`));
+    const combinado = enLaBase("year >= 2010 AND origin = 'concesionaria'");
+    await esperarElConteo(combinado, 'desde 2010 y concesionaria');
+    const sinOrigenVistas = (await titulos()).filter((t) => nombresSin(sinOrigen).has(t));
+    if (sinOrigenVistas.length) problemas.push(`pantalla: con «concesionaria» se ven ${sinOrigenVistas.length} sin origen`);
+
+    // B3. Atrás desde la ficha devuelve los dos. Si no hay ninguna tarjeta que
+    //     abrir, es un hallazgo más y el caso sigue: lo anterior ya se vio.
+    if (await page.locator('article[class*="card"] h3 a').count() === 0) {
+      problemas.push('pantalla: con «desde 2010» y «concesionaria» no hay ninguna tarjeta para abrir la ficha');
+    } else {
+      await page.locator('article[class*="card"] h3 a').first().click();
+      await page.locator('#detalle-titulo').waitFor({ timeout: 20_000 });
+      await page.goBack();
+      await esperarA(async () => barra().get('year_from') === '2010' && barra().get('origin') === 'concesionaria'
+        && (await page.locator('#catalog-year-from').inputValue().catch(() => '')) === '2010'
+        && (await page.locator('#catalog-origin').inputValue().catch(() => '')) === 'concesionaria',
+      'volver de la ficha con Atrás perdió el año o el origen', 20_000).catch((e) => problemas.push(`pantalla: ${e.message}`));
+      await esperarElConteo(combinado, 'volviendo de la ficha');
+    }
+
+    // B4. «Hasta» menor que «desde»: el vacío de siempre, sin error.
+    await page.locator('#catalog-year-to').fill('2005');
+    await esperarA(async () => barra().get('year_to') === '2005', 'el año «hasta» no llegó a la barra', 20_000)
+      .catch((e) => problemas.push(`pantalla: ${e.message}`));
+    await page.getByRole('heading', { name: 'No hay operaciones con estos filtros.' })
+      .waitFor({ state: 'visible', timeout: 20_000 })
+      .catch(() => problemas.push('pantalla: con «desde» 2010 y «hasta» 2005 no aparece el vacío de siempre'));
+    if (await page.locator('[role="alert"]').count() > 0) problemas.push('pantalla: «desde» mayor que «hasta» muestra un error');
+    await contexto.close();
+    medidos.push('en la pantalla, poner el año vuelve a la página 1, el conteo es el de la base, no se cuela '
+      + 'ninguna sin año ni sin origen, el filtro de origen dice «declarado por quien vende», Atrás desde la '
+      + 'ficha devuelve los dos, y «desde» mayor que «hasta» da el vacío de siempre');
+  } finally {
+    await browser.close();
+    for (const id of fabricadas) {
+      await pedirCrudo(`/products/${id}`, { method: 'DELETE', header: vendedor.token }).catch(() => {});
+    }
+  }
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return medidos.join('; ');
+});
+
+// 201. La migración del modelo, el año y el origen es aditiva y vuelve atrás
+//      sin tocar lo que había, tipo y potencia incluidos. En una copia, como
+//      el 196.
+await runCase(201, 'La migración del modelo, el año y el origen es aditiva, vuelve atrás y deja intactas las publicaciones', async () => {
+  const REVISION = 'a47300b5554c';
+  const ANTERIOR = '01ff14043124';
+  const NUEVAS = ['model', 'origin', 'year'];
+  return conUnaCopiaDeLaBase('caso201', async ({ opciones: enLaCopia, alembic: alembicEnLaCopia }) => {
+    // Cada fila entera menos las tres columnas nuevas: tipo y potencia adentro.
+    const huella = () => queryRows(`
+      SELECT COUNT(*)::text, md5(coalesce(string_agg(
+        (to_jsonb(p) - 'model' - 'year' - 'origin')::text, '|' ORDER BY p.id), ''))
+      FROM products p`, enLaCopia)[0].join(' ');
+    const columnas = () => queryRows(`
+      SELECT 'columnas:' || coalesce(string_agg(column_name, ',' ORDER BY column_name), '')
+      FROM information_schema.columns
+      WHERE table_name = 'products' AND column_name IN ('model', 'year', 'origin')`, enLaCopia)[0][0]
+      .replace(/^columnas:/, '');
+    const medidos = [];
+
+    const [publicaciones, conDato, conTipoOPotencia] = queryRows(`
+      SELECT COUNT(*)::text,
+             COUNT(*) FILTER (WHERE model IS NOT NULL OR year IS NOT NULL OR origin IS NOT NULL)::text,
+             COUNT(*) FILTER (WHERE subcategory_type_id IS NOT NULL OR power_hp IS NOT NULL)::text
+      FROM products`, enLaCopia)[0];
+    assert(Number(conDato) > 0, 'la copia no tiene ninguna publicación con modelo, año u origen: la bajada no probaría nada');
+    assert(Number(conTipoOPotencia) > 0, 'la copia no tiene publicaciones con tipo o potencia que cuidar');
+    const antes = huella();
+
+    const bajada = alembicEnLaCopia(`downgrade ${ANTERIOR}`);
+    assert(new RegExp(`Running downgrade ${REVISION} -> ${ANTERIOR}`).test(bajada),
+      `el downgrade no corrió: ${bajada.slice(-300)}`);
+    assert(columnas() === '', `tras bajar quedan las columnas «${columnas()}»`);
+    assert(huella() === antes, `bajar cambió las publicaciones: ${antes} → ${huella()}`);
+    medidos.push(`bajar a ${ANTERIOR} borra las tres columnas y deja las ${publicaciones} publicaciones iguales, `
+      + `las ${conTipoOPotencia} con tipo o potencia incluidas (huella ${antes.split(' ')[1].slice(0, 12)}…)`);
+
+    const subida = alembicEnLaCopia('upgrade head');
+    assert(new RegExp(`Running upgrade ${ANTERIOR} -> ${REVISION}`).test(subida),
+      `el upgrade no corrió: ${subida.slice(-300)}`);
+    assert(columnas() === NUEVAS.join(','), `tras subir, columnas «${columnas()}»`);
+    assert(huella() === antes, `subir cambió las publicaciones: ${antes} → ${huella()}`);
+    const inventadas = queryCount(`SELECT COUNT(*) FROM products
+      WHERE model IS NOT NULL OR year IS NOT NULL OR origin IS NOT NULL`, enLaCopia);
+    assert(inventadas === 0, `subir le inventó modelo, año u origen a ${inventadas} publicación(es)`);
+    medidos.push('subir crea las tres columnas en nulo para todas: no le inventa un dato a nadie, y el resto de '
+      + 'cada fila queda igual');
+
+    const rechaza = (sql) => {
+      try {
+        querySql(sql, enLaCopia);
+        return false;
+      } catch {
+        return true;
+      }
+    };
+    assert(rechaza('UPDATE products SET year = 1949 WHERE id = (SELECT id FROM products LIMIT 1)'),
+      'la base aceptó un año de 1949');
+    assert(rechaza("UPDATE products SET origin = 'importador' WHERE id = (SELECT id FROM products LIMIT 1)"),
+      'la base aceptó un origen inventado');
+    medidos.push('la base rechaza un año de 1949 y un origen inventado aunque se escriban por fuera de la API');
+
+    const chequeo = alembicEnLaCopia('check');
+    assert(/No new upgrade operations detected/.test(chequeo),
+      `el modelo y el esquema no coinciden: ${chequeo.slice(-300)}`);
+    medidos.push('`alembic check` no encuentra diferencias entre el modelo y el esquema');
+    return `${medidos.join('; ')}. Todo en una copia de la base`;
+  });
+});
+
+// 202. P2: el alta siguiente no hereda la marca de la anterior.
+//
+// `limpiarFormulario` soltaba el tipo y la potencia y no la marca: después de
+// publicar un John Deere, el alta siguiente abría con «John Deere» ya elegido,
+// y se guardaba así si nadie lo cambiaba.
+await runCase(202, 'Después de publicar, el alta siguiente abre sin la marca, el modelo, el año ni el origen de la anterior', async () => {
+  const sello = Date.now();
+  const MARCA = `Marca202 ${sello}`;
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const tractores = subrubroDe('maquinaria-agricola', 'tractores');
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const [[provincia]] = queryRows(`SELECT province_id FROM localities WHERE id = ${sqlLiteral(localidad)}`);
+  const fabricadas = [];
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const acceso = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+    })).data;
+    await contexto.addInitScript(({ a, r }) => {
+      window.localStorage.setItem('access_token', a);
+      window.localStorage.setItem('refresh_token', r);
+    }, { a: acceso.access_token, r: acceso.refresh_token });
+    const page = await contexto.newPage();
+    const abrirElAlta = async () => {
+      await page.getByRole('button', { name: /Vender/ }).first().click();
+      await page.getByRole('heading', { name: /Publicar un producto/i }).waitFor({ state: 'visible', timeout: 20_000 });
+      await page.locator('#category option').filter({ hasText: tractores.categoria })
+        .first().waitFor({ state: 'attached', timeout: 10_000 });
+      await page.locator('#category').selectOption({ label: tractores.categoria });
+      await page.locator('#brand').waitFor({ state: 'visible', timeout: 10_000 });
+    };
+
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await abrirElAlta();
+    await page.locator('#name').fill(`${MARCA} John Deere`);
+    await page.locator('#subcategory').selectOption({ label: tractores.nombre });
+    await page.locator('#brand').selectOption('john-deere');
+    await page.locator('#model').fill('5090E');
+    await page.locator('#year').fill('2020');
+    await page.locator('#origin').selectOption('concesionaria');
+    await page.locator('#description').fill('Publicada por el formulario real en el caso 202.');
+    await page.locator('#price').fill('20200');
+    await page.locator('#stock').fill('1');
+    await page.locator('#province').selectOption(provincia);
+    await esperarA(async () => (await page.locator('#locality option').count()) > 1, 'el alta no cargó las localidades', 20_000);
+    await page.locator('#locality').selectOption(localidad);
+    const [respuesta] = await Promise.all([
+      page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/products') && r.request().method() === 'POST',
+        { timeout: 30_000 }),
+      page.locator('form button[type="submit"]').click(),
+    ]);
+    assert(respuesta.ok(), `el alta respondió ${respuesta.status()}`);
+    fabricadas.push((await respuesta.json()).id);
+    const [[marcaGuardada]] = queryRows(`SELECT brand, 'fin' FROM products WHERE id = ${sqlLiteral(fabricadas[0])}`);
+    assert(marcaGuardada === 'john-deere', `la primera publicación guardó la marca «${marcaGuardada}»`);
+    await page.getByText(/publicado exitosamente!/i).waitFor({ state: 'visible', timeout: 20_000 });
+    await page.getByRole('heading', { name: /Publicar un producto/i }).waitFor({ state: 'hidden', timeout: 20_000 })
+      .catch(() => {});
+
+    // La siguiente, en la misma página: el formulario es el mismo componente.
+    await abrirElAlta();
+    const quedaron = {
+      marca: await page.locator('#brand').inputValue(),
+      modelo: await page.locator('#model').inputValue(),
+      anio: await page.locator('#year').inputValue(),
+      origen: await page.locator('#origin').inputValue(),
+    };
+    const heredados = Object.entries(quedaron).filter(([, valor]) => valor !== '');
+    assert(heredados.length === 0,
+      `el alta siguiente abrió con lo de la anterior: ${heredados.map(([k, v]) => `${k} «${v}»`).join(', ')}`);
+    await contexto.close();
+  } finally {
+    await browser.close();
+    for (const id of fabricadas) {
+      await pedirCrudo(`/products/${id}`, { method: 'DELETE', header: vendedor.token }).catch(() => {});
+    }
+  }
+  return 'después de publicar un John Deere 5090E 2020 de concesionaria, el alta siguiente abre con la marca, '
+    + 'el modelo, el año y el origen vacíos';
+});
+
+// 203. P2: «Mercado» dentro del Mercado no saca filtros de la barra.
+//
+// La barra se rehacía con `PARAMETROS_DEL_MERCADO`, que no tenía la condición,
+// la marca, el orden ni la página: la pantalla seguía filtrando, la barra ya no
+// lo decía, y al recargar el filtro se perdía.
+await runCase(203, '«Mercado» dentro del Mercado y recargar conservan todos los filtros de la barra', async () => {
+  const problemas = [];
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    const barra = () => new URL(page.url()).searchParams;
+    const irAlMercado = () => page.locator('header').getByRole('button', { name: 'Mercado', exact: true }).click();
+
+    // A. Todos los filtros del Mercado a la vez, con un resultado.
+    const PUESTOS = {
+      category: 'Maquinaria agrícola', condition: 'usado', brand: 'pauny', sort: 'price-asc',
+      year_from: '2015', year_to: '2025', origin: 'dueno_directo',
+    };
+    const CONTROLES = {
+      condition: '#catalog-condition', brand: '#catalog-brand', sort: '#catalog-sort',
+      year_from: '#catalog-year-from', year_to: '#catalog-year-to', origin: '#catalog-origin',
+    };
+    await page.goto(`${FRONTEND_URL}/?section=marketplace&${new URLSearchParams(PUESTOS)}`, { waitUntil: 'domcontentloaded' });
+    await page.locator('article[class*="card"]').first().waitFor({ state: 'visible', timeout: 25_000 });
+    const antes = await page.locator('article[class*="card"] h3').allInnerTexts();
+    const revisar = async (momento) => {
+      for (const [clave, valor] of Object.entries(PUESTOS)) {
+        if (barra().get(clave) !== valor) problemas.push(`${momento}: sacó ${clave} de la barra (quedó ${barra().get(clave)})`);
+      }
+      for (const [clave, selector] of Object.entries(CONTROLES)) {
+        const visto = await page.locator(selector).inputValue().catch(() => '(no está)');
+        if (visto !== PUESTOS[clave]) problemas.push(`${momento}: el control de ${clave} dice «${visto}»`);
+      }
+    };
+    await irAlMercado();
+    await page.waitForTimeout(500);
+    await revisar('tras «Mercado»');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.locator('article[class*="card"]').first().waitFor({ state: 'visible', timeout: 25_000 });
+    await revisar('tras recargar');
+    const despues = await page.locator('article[class*="card"] h3').allInnerTexts();
+    if (JSON.stringify(despues) !== JSON.stringify(antes)) {
+      problemas.push(`tras recargar el Mercado muestra ${JSON.stringify(despues)} y antes ${JSON.stringify(antes)}`);
+    }
+
+    // B. La página, que también es parte de lo que se mira. Se lee cuando el
+    //    paginador ya dice «Página 2»: antes, las tarjetas pueden ser las de
+    //    la primera.
+    const enLaPagina2 = async (momento) => {
+      await page.getByRole('navigation', { name: 'Paginación del mercado' }).getByText(/Página 2 de \d+/)
+        .waitFor({ state: 'visible', timeout: 25_000 })
+        .catch(() => problemas.push(`${momento}: el Mercado no quedó en la página 2`));
+      await page.waitForFunction(() => document.querySelector('main [aria-busy="true"]') === null, null, { timeout: 25_000 })
+        .catch(() => {});
+      return page.locator('article[class*="card"] h3').allInnerTexts();
+    };
+    await page.goto(`${FRONTEND_URL}/?section=marketplace&page=2`, { waitUntil: 'domcontentloaded' });
+    await esperarA(async () => barra().get('page') === '2', 'no se llegó a la página 2 del Mercado', 25_000);
+    const pagina2 = await enLaPagina2('al abrir');
+    await irAlMercado();
+    await page.waitForTimeout(500);
+    if (barra().get('page') !== '2') problemas.push(`tras «Mercado» sacó page de la barra (quedó ${barra().get('page')})`);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    const trasRecargar = await enLaPagina2('tras recargar');
+    if (JSON.stringify(trasRecargar) !== JSON.stringify(pagina2)) problemas.push('tras recargar, la página 2 no es la misma');
+    await contexto.close();
+  } finally {
+    await browser.close();
+  }
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return 'la categoría, la condición, la marca, el orden, el año desde y hasta, el origen y la página siguen en la '
+    + 'barra y en los controles después de «Mercado» y de recargar, con las mismas publicaciones';
+});
+
+// 204. El orden del panel de filtros, «Más filtros» y los dos rótulos.
+//
+// La propuesta de la PM (26/09): primero lo que describe lo que se busca, cada
+// filtro dependiente debajo del que lo activa, después dónde y el precio, y lo
+// poco usado plegado. Un filtro aplicado nunca queda invisible.
+await runCase(204, 'El panel de filtros va en el orden acordado, «Más filtros» no esconde nada aplicado y los rótulos no se repiten', async () => {
+  const medidos = [];
+  const problemas = [];
+  const ESPERADO = ['Qué buscás', 'Productos o servicios', 'Categoría', 'Subcategoría', 'Potencia', 'Marca', 'Año',
+    'Condición', 'Origen', 'Dónde', 'Provincia', 'Localidad', 'Precio', 'Más filtros'];
+  const MAQUINARIA = `${FRONTEND_URL}/?section=marketplace&category=${encodeURIComponent('Maquinaria agrícola')}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const medida of [{ n: 'escritorio', width: 1440, height: 900 }, { n: 'celular', width: 390, height: 844 }]) {
+      const contexto = await browser.newContext({ viewport: { width: medida.width, height: medida.height } });
+      const page = await contexto.newPage();
+      const donde = `${medida.n} ${medida.width}px`;
+      const plegador = page.getByRole('button', { name: /^Filtros/ });
+      const abrirElPanel = async () => {
+        if ((await plegador.isVisible()) && (await plegador.getAttribute('aria-expanded')) !== 'true') await plegador.click();
+      };
+      const mas = page.locator('button[aria-controls="mas-filtros"]');
+      const abrir = async (url) => {
+        await page.goto(url, { waitUntil: 'domcontentloaded' });
+        await page.locator('#catalog-sort').waitFor({ state: 'visible', timeout: 25_000 });
+        await abrirElPanel();
+        await mas.waitFor({ state: 'visible', timeout: 20_000 });
+      };
+      // Lo que el panel muestra, en su orden: títulos de grupo, rótulos y el
+      // botón de «Más filtros». Lo que está dentro de «Más filtros» plegado
+      // no se ve y no cuenta.
+      const orden = () => page.evaluate(() => [...document.querySelectorAll(
+        '#panel-de-filtros legend, #panel-de-filtros label, #panel-de-filtros #catalog-year, '
+        + '#panel-de-filtros button[aria-controls="mas-filtros"]')]
+        .filter((el) => !el.closest('[hidden]') && el.getClientRects().length > 0)
+        .map((el) => el.textContent.replace(/[▸▾]/g, '').replace(/\s*·.*$/s, '').replace(/\(.*\)/, '')
+          .replace(/\s+/g, ' ').trim()));
+
+      // A. El orden, con un subrubro que activa la potencia.
+      await abrir(`${MAQUINARIA}&subcategory=${encodeURIComponent('Tractores')}`);
+      const visto = await orden();
+      if (JSON.stringify(visto) !== JSON.stringify(ESPERADO)) {
+        problemas.push(`${donde}: el panel va ${JSON.stringify(visto)} y el acordado es ${JSON.stringify(ESPERADO)}`);
+      }
+
+      // B. «Más filtros» plegado de entrada: lo de adentro no se ve ni se tabula.
+      if ((await mas.getAttribute('aria-expanded')) !== 'false' || await page.locator('#catalog-rating').isVisible()) {
+        problemas.push(`${donde}: «Más filtros» no arranca plegado`);
+      }
+      await mas.click();
+      if (!(await page.locator('#catalog-rating').isVisible())) problemas.push(`${donde}: abrir «Más filtros» no muestra la calificación`);
+      await mas.click();
+
+      // C. Con dos filtros de adentro puestos y la página recargada: abierto y
+      //    diciendo cuántos. Plegado a mano, lo sigue diciendo.
+      await abrir(`${MAQUINARIA}&in_stock=true&min_rating=4`);
+      const nombre = (await mas.innerText()).replace(/[▸▾]/g, '').replace(/\s+/g, ' ').trim();
+      if ((await mas.getAttribute('aria-expanded')) !== 'true' || !(await page.locator('#catalog-rating').isVisible())) {
+        problemas.push(`${donde}: con dos filtros de «Más filtros» puestos, al recargar arranca plegado`);
+      }
+      if (!/\(2 activos\)/.test(nombre)) problemas.push(`${donde}: «Más filtros» dice «${nombre}» con dos puestos`);
+      await mas.click();
+      const plegado = (await mas.innerText()).replace(/[▸▾]/g, '').replace(/\s+/g, ' ').trim();
+      if (!/\(2 activos\)/.test(plegado)) problemas.push(`${donde}: plegado, «Más filtros» dice «${plegado}» y esconde dos filtros`);
+
+      // D. Los dos rótulos: «Productos o servicios» y «Tipo», distintos.
+      await abrir(`${MAQUINARIA}&subcategory=${encodeURIComponent('Preparación del suelo')}`);
+      const deTipo = await page.locator('label[for="catalog-type"]').innerText();
+      const delSubtipo = await page.locator('label[for="catalog-subtype"]').innerText();
+      if (deTipo.trim().toLowerCase() !== 'productos o servicios' || delSubtipo.trim().toLowerCase() !== 'tipo') {
+        problemas.push(`${donde}: los rótulos son «${deTipo.trim()}» y «${delSubtipo.trim()}»`);
+      }
+
+      // E. En servicios no se ofrecen condición, origen ni año; si la barra
+      //    trae uno puesto, se ve para poder sacarlo.
+      await abrir(`${FRONTEND_URL}/?section=marketplace&type=servicios`);
+      const deProductos = await page.locator('#catalog-condition, #catalog-origin, #catalog-year-from').count();
+      if (deProductos !== 0) problemas.push(`${donde}: en servicios se ofrecen ${deProductos} filtros de productos`);
+      await abrir(`${FRONTEND_URL}/?section=marketplace&type=servicios&condition=nuevo`);
+      if (!(await page.locator('#catalog-condition').isVisible())) {
+        problemas.push(`${donde}: en servicios, con «nuevo» puesto desde la barra, la condición no se ve`);
+      }
+      await contexto.close();
+    }
+  } finally {
+    await browser.close();
+  }
+  medidos.push(`en 1440 y 390 px el panel va ${ESPERADO.join(' · ')}; «Más filtros» arranca plegado y lo de adentro `
+    + 'no se ve; con dos puestos, al recargar arranca abierto y dice «(2 activos)», también plegado a mano; los '
+    + 'rótulos son «Productos o servicios» y «Tipo»; en servicios no se ofrecen condición, origen ni año, salvo '
+    + 'que la barra traiga uno puesto');
   assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
   return medidos.join('; ');
 });

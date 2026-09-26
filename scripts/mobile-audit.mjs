@@ -372,7 +372,7 @@ async function exerciseCheckout(browser, viewport, state, buyerTokens) {
     await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
     await waitForCatalog(page);
     await abrirFiltros(page);
-    await elegir(page.locator('#catalog-type'), 'Tipo', 'productos');
+    await elegir(page.locator('#catalog-type'), 'Productos o servicios', 'productos');
     await verResultados(page);
     const addButton = page.getByRole('button', { name: /Agregar/ }).first();
     await addButton.waitFor({ state: 'visible' });
