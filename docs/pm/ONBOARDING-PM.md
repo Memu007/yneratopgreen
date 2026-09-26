@@ -140,6 +140,52 @@ se verifica la configuración vigente.
 
 Después de una migración de esquema no se hace rollback ciego sólo de código. La recuperación normal es forward-fix; un downgrade de esquema requiere procedimiento probado y backup recuperable.
 
+## Método de revisión que funciona (25 y 26/09)
+
+- **Entorno PM.** Worktree en el SHA exacto de la Dev, base PostGIS Docker
+  recién creada, API nativa, frontend de desarrollo y `.env` inventados. Los
+  valores inventados de Mercado Pago salen de `scripts/entorno_nativo.sh`. Sin
+  ellos caen unos 37 casos con «no configurado».
+- **Reiniciar la API por su línea de comando**, contando que quede un solo
+  proceso. El proceso lanzado en segundo plano no puede heredar la salida de
+  quien lo llama: redirigila entera. Si no, un `subprocess.run(...,
+  capture_output=True)` queda colgado. Nunca uses `pkill -f` con un patrón que
+  coincida con tu propia terminal.
+- **Negativos:** los de la Dev, más uno o dos propios que ataquen otro borde.
+  Cada uno tiene que dar rojo por su motivo, y el árbol tiene que quedar
+  limpio.
+- **Suite completa desde base nueva.** El 169, que reinicia la API de verdad,
+  falla en el entorno de PM y puede tirar en cadena del 167 al 185 con 429.
+  Se repiten después de reiniciar. El 131 depende de poder bajar `alpine:3`.
+- **Migraciones de datos:** además del caso de la Dev, correrlas con los
+  archivos que copia `backend/Dockerfile.railway` y con `ENV=production`,
+  sobre una copia de base armada como la publicada. Correrlas dos veces.
+  Dentro de `docker build`, `pip` no llega a PyPI: no se fuerza, se declara el
+  límite.
+- **Toda lista nueva** tiene que decir cómo llega a producción. Ver la regla
+  en `ONBOARDING-DEV.md`, «Producción y Railway».
+
+## Publicar
+
+1. Suite completa y puertas sobre el SHA exacto. El SHA publicado puede ser
+   un commit PM posterior, si `git diff` fuera de `docs/pm` da vacío.
+2. Comprobar que se pueda subir sin reescribir `main` (fast-forward desde el
+   `main` remoto), que no estén `PRE_FIRMA.md` ni `.env`, y que no haya
+   secretos en el diff.
+3. **Autorización explícita de Emi para esa publicación.** Recién entonces:
+   `git push origin <SHA>:refs/heads/main`.
+4. Railway tarda unos 10 minutos. La red de PM bloquea `railway.app`: verifica
+   Emi, en una pestaña de incógnito. El Mercado guarda las categorías mientras
+   la pestaña está abierta, así que una pestaña vieja muestra filtros viejos.
+   Sitio: `https://yneratopgreen-production.up.railway.app`. El dominio
+   `ynerav.up.railway.app` es histórico.
+5. Registrar en `NOW.md` qué se publicó y qué verificó Emi.
+
+**Estimaciones.** La Dev entrega una pieza en horas y la revisión PM lleva
+1 a 2 horas. Los plazos los fijan lo que depende de Emi (correo, cuentas de
+prueba de Mercado Pago, decisiones) y las pruebas contra terceros, no la
+programación.
+
 ## Límites que no se negocian
 
 Son reglas de Emi. Valen para PM y Dev, y esta es su única copia: los demás
