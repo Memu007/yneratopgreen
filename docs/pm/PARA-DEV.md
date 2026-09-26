@@ -5,203 +5,116 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Decisión sobre PROD-LISTS-1 — aceptada en rama
-
-Sobre `cdda2d9`. Evidencia en `REPRODUCCION-PROD-LISTS-1-2026-09-26.md`.
-
-- **Casos:** 175, 197 y 198 en 3/3.
-- **Negativos:** tus cuatro dan rojo, y también los dos míos:
-  - lista completa sin categoría;
-  - marcas cargadas inactivas.
-- **Suite completa desde base nueva:** 197/198. Sólo cae el 169, de
-  entorno.
-- **Auditorías:** verdes.
-- **Migración en modo producción:** la corrí con los archivos que copia la
-  imagen, sobre una base como la publicada. Carga 44 marcas y 4028
-  localidades, no toca las publicaciones, y una segunda corrida no cambia
-  nada.
-
-**Tu discrepancia sobre las categorías: tenés razón.** No entran en la
-migración, por el riesgo de duplicar una renombrada. Gracias también por
-`REINICIAR_API`.
-
-**P3 registrado, sin tarea:** en producción, las listas de Configuración del
-panel salen vacías.
-
----
-
-## Tarea activa — ATRIBUTOS-RUBRO-1, parte 2
+## Tarea activa — USER-GUIDE-1
 
 **Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
 
-**Regla nueva para esta y toda pieza:** si agrega o cambia una lista o un
-catálogo, el informe dice cómo llega a producción, y un caso lo prueba sobre
-una base sin siembra.
+### Decisión sobre la parte 2 de ATRIBUTOS-RUBRO-1
 
-### Decisión sobre la parte 1
+**Aceptada en rama** sobre `2a00720`. Evidencia en
+`REPRODUCCION-ATRIBUTOS-RUBRO-1-P2-2026-09-26.md`.
 
-**Aceptada en rama** sobre `d283cac`. Evidencia en
-`REPRODUCCION-ATRIBUTOS-RUBRO-1-P1-2026-09-25.md`.
+- **Casos:** 199 a 204 en 6/6.
+- **Negativos:** los seis tuyos dan rojo, y también dos míos:
+  - «desde» con `>`;
+  - origen en un servicio.
+- **Suite completa desde base nueva:** 203/204. Sólo cae el 169, de entorno.
+  El 170 pasó 8/8 suelto y también en la suite.
+- **Migración en modo producción:** verde.
+- **Auditorías:** 80/80, 88/88, 12/12, y la guía coincide.
 
-- **Casos:** 179, 194, 195 y 196 en 4/4.
-- **Negativos:** los tres tuyos dan rojo, y también los tres míos:
-  - bordes corridos, con 60 HP en compacto;
-  - un tipo de cualquier subrubro;
-  - cambiar de subrubro sin soltar el tipo.
-- **Suite completa desde base nueva:** 195/196. Sólo cae el 169, de entorno.
-  El 191 queda verde, así que el P3 del token está cerrado.
-- **Auditorías:** a11y 78/78, contraste 86/86, móvil 12/12 y la guía
-  coincide.
+**Un hueco que encontré:** saqué `Product.model` del buscador y el 199 y el
+200 siguieron verdes. Comprobé a mano que la búsqueda por modelo funciona,
+pero ninguna prueba la vigila. Va en esta tarea (punto 5).
 
-Muy bien visto lo de las listas en producción: sin `7177b2d`, el filtro no
-habría aparecido en el sitio.
+**El 170:** no lo reproduje. Mi hipótesis es `StrictMode` en desarrollo: la
+carga de `/auth/me` corre dos veces y la segunda puede llegar después de
+«Salir». Queda como P2 registrado, sin tarea. Si lo volvés a ver, avisame.
 
-**Sobre tus consultas:**
+Aceptadas tus decisiones: modelo y año atados a `usa_marca`, la página que
+sobrevive a «Mercado», cero sin error, y año en UTC.
 
-- Los nombres completos en Cosecha y en Cercas se aceptan.
-- La tarjeta sigue sin el tipo.
-- Tierras no cambia.
-- Los dos P2 entran en esta parte (ver abajo).
+### Problema y prioridad
 
-**Para tu próximo script de negativos (P3, sin tarea):** hoy depende de
-`entorno_nativo.sh --reiniciar-api`. En mi entorno tuve que reemplazar ese
-paso. Si podés, que el reinicio se pueda pasar por una variable.
+`docs/USER_MANUAL.md` no se le puede entregar a la clienta así como está:
 
-### Qué entra en la parte 2
+- dice «TopGreen / AgroMarket»;
+- publica las contraseñas de las cuentas demo;
+- describe un Mercado anterior, sin los filtros nuevos ni el Mercado único;
+- no tiene la parte de quien transporta.
 
-Las decisiones PM 3 a 6 de la parte 1 siguen vigentes. Se repiten acá para
-que no tengas que buscarlas.
+El repositorio se entrega al final. Lo que queda falta es la guía de uso
+para quien compra, vende y transporta, con el mismo rigor que la del panel:
+un programa la recorre y falla si miente.
 
-1. **Modelo** (sólo Maquinaria agrícola). Es texto opcional y se ve en la
-   ficha.
-   - No es un filtro propio: se encuentra con el buscador de texto.
-2. **Año** (sólo Maquinaria agrícola). Es un número opcional entre 1950 y el
-   año próximo.
-   - El filtro es un rango, «desde» y «hasta», y cualquiera de los dos puede
-     ir solo.
-3. **Origen**, «Agencia / Concesionaria» o «Dueño directo»:
-   - es opcional y sólo para productos, no para servicios;
-   - se muestra siempre rotulado «declarado por quien vende», en la tarjeta,
-     en la ficha y en el filtro;
-   - nunca tiene el aspecto del distintivo de documentación revisada.
-4. **El nulo no entra en un filtro positivo.** Pedir años desde 2015 no trae
-   publicaciones sin año, y pedir «Dueño directo» no trae las que no
-   declararon origen.
-5. **Los filtros siguen el contrato de los que ya existen:**
-   - se aplican en el servidor antes de contar y paginar;
-   - viajan en la URL y vuelven con Atrás y Adelante;
-   - cambiarlos vuelve a la página 1.
-6. **P2 — la marca queda cargada en la publicación siguiente**
-   (`AddProductModal.tsx:212`). `limpiarFormulario` tiene que soltar la
-   marca, y también el modelo, el año y el origen nuevos.
-   - Caso: publicar un John Deere y abrir otra alta; el selector aparece
-     vacío.
-   - Negativo: sin limpiar la marca, el caso da rojo.
-7. **P2 — «Mercado» dentro del Mercado saca filtros de la barra**
-   (`politica.ts:74`). La condición, el orden, la marca, el año y el origen
-   tienen que sobrevivir a «Mercado» y a recargar, como ya sobreviven el tipo
-   y la potencia.
-   - Negativo: sacar uno de `PARAMETROS_DEL_MERCADO` da rojo y lo nombra.
+### Qué entra
 
-8. **P2 visto por PM después de aceptar — dos filtros se llaman «Tipo».**
-   El de productos y servicios (`catalog-type`) y el del tercer nivel
-   (`catalog-subtype`) tienen el mismo rótulo en el mismo panel. El primero
-   pasa a llamarse «Productos o servicios»; el del tercer nivel sigue siendo
-   «Tipo».
-   - Ajustá los casos y la guía que lean el rótulo viejo.
-   - a11y: los dos rótulos tienen que ser distintos.
-9. **Orden del panel de filtros: primero discutilo, después construí.**
-   Emi, mirando el sitio publicado en celular, siente el panel desordenado.
-   Lo que describe la máquina quedó partido: Tractores y Potencia arriba, y
-   Marca y Condición al fondo, después de Provincia, Precio, Stock y
-   Calificación. **Emi delegó la decisión en vos y en mí** («que sea
-   adversarial y lo que decidan»).
-
-   **Mi propuesta** (la construís sólo si, después de atacarla, sigue en pie):
-
-   ```
-   QUÉ BUSCÁS   Productos o servicios · Categoría · Subcategoría ·
-                Tipo / Potencia · Marca · Año (desde–hasta) · Condición · Origen
-   DÓNDE        Provincia · Localidad
-   PRECIO       Mínimo – Máximo
-   ▸ Más filtros (plegado de entrada): Sólo con stock · Calificación mínima
-   [Limpiar filtros]   [Ver N resultados]
-   ```
-
-   Los criterios:
-   - lo que describe el artículo va junto;
-   - cada filtro dependiente aparece justo debajo del que lo activa;
-   - lo poco usado se pliega;
-   - no se quita ningún filtro.
-
-   **Lo que te pido:**
-   1. Atacá la propuesta antes de construir: accesibilidad, foco al
-      plegar y desplegar, el celular a 360 px, filtros activos que quedan
-      escondidos dentro de «Más filtros», el orden de tabulación, la guía y
-      los casos que dependen del orden actual, y los servicios (Origen y
-      Condición no aplican).
-   2. Si encontrás algo mejor, decilo en `PARA-PM.md` con la evidencia. No
-      construyas esa parte hasta que conteste. El resto de la parte 2 sigue.
-      Si no encontrás nada que la tumbe, construila sin esperar y contá qué
-      atacaste.
-   3. Si un filtro de «Más filtros» está activo, «Más filtros» tiene que
-      verse abierto o decir cuántos tiene activos. Un filtro aplicado no
-      puede quedar invisible.
-   4. Casos:
-      - el orden del panel en escritorio y a 390 px;
-      - «Más filtros» con un filtro activo después de recargar;
-      - a11y y contraste del panel nuevo.
-
-La siembra de ejemplo suma modelo, año y origen a algunas máquinas, y deja
-otras sin esos datos a propósito, para probar el nulo.
+1. **Reescribir `docs/USER_MANUAL.md` como la guía de uso de AgroBoeda**, en
+   español llano, para alguien que no es técnico, con tres partes:
+   - **Quien compra:** registrarse y verificar el correo; buscar y filtrar
+     (el panel nuevo: tipo, potencia, marca, año, condición, origen,
+     ubicación y precio); la ficha; el carrito; pagar por transferencia o por
+     Mercado Pago cuando el vendedor lo tiene; «Mis órdenes»; calificar.
+   - **Quien vende:** publicar, con qué pide cada rubro (tipo, potencia,
+     marca, modelo, año, condición y origen «declarado por quien vende»);
+     fotos; editar, pausar y agotado; vender por transferencia (confirmar el
+     comprobante); vincular Mercado Pago; la documentación y su distintivo.
+   - **Quien transporta:** su perfil, cobertura y cómo lo encuentra quien
+     compra.
+2. **Sin credenciales.** Ninguna contraseña ni cuenta demo en la guía. El
+   acceso local y las cuentas de prueba van en la documentación técnica que ya
+   las trata (`RAILWAY.md` o el README), no acá.
+3. **Verificada por programa**, como `scripts/guia-admin.mjs`:
+   - un recorrido por paso;
+   - cada texto entre «» aparece en la pantalla;
+   - cada afirmación de resultado está atada a una comprobación;
+   - «Lo que el programa no comprueba» al final;
+   - escritorio y celular.
+4. **Lo que el producto no hace**, dicho arriba de todo, como en la guía del
+   panel:
+   - la plataforma no cobra ni guarda el dinero de las ventas;
+   - la transferencia la confirma quien vende;
+   - el origen lo declara quien vende y no se verifica.
+5. **Caso nuevo en el smoke:** el modelo se encuentra con el buscador de
+   texto. Tiene que ser una publicación cuyo modelo no aparezca ni en el
+   nombre ni en la descripción. Negativo: sacar `Product.model` del buscador
+   da rojo.
 
 ### Fuera de alcance
 
-- Filtro propio de modelo.
-- Origen en servicios.
-- Editar listas desde el panel.
-- Marca en otros rubros.
-- Mostrar el tipo en la tarjeta.
-- «Inversores».
-- Rediseño de Inicio.
-- Integración y despliegue. No avances a `USER-GUIDE-1`.
+- Cambiar el producto para que la guía quede más linda. Si la guía encuentra
+  un defecto, frená y consultá.
+- La guía del panel de administración, que ya existe.
+- Traducciones, videos y capturas obligatorias. Las capturas se permiten
+  como en la guía del panel.
+- Suscripciones y teléfono (PENDIENTE de Emi): no se describen.
+- Integración y despliegue.
 
 ### Aceptación verificable
 
-1. **Casos nuevos en el smoke:**
-   - alta y edición guardan y muestran modelo, año y origen;
-   - la validación rechaza:
-     - un año de 1949 y uno de dos años adelante;
-     - un origen inventado;
-     - un origen en un servicio;
-     - modelo o año fuera de Maquinaria;
-   - el filtro de año y el de origen cuentan en el servidor, y el nulo no
-     entra;
-   - «desde» mayor que «hasta» no rompe: devuelve cero o se rechaza, y el
-     informe dice cuál;
-   - URL, historial y vuelta a la página 1;
-   - el rótulo «declarado por quien vende» se ve en la tarjeta, la ficha y el
-     filtro, sin el aspecto del distintivo;
-   - los dos P2, cada uno con su caso.
-2. **Negativos:** el filtro aplicado después de contar, en el navegador o
-   aceptando nulos, y uno por cada P2. Cada uno da rojo por su motivo.
-3. **Migración** aditiva, con `downgrade` probado en una copia de la base.
-   Las publicaciones existentes, con su tipo y su potencia, quedan intactas.
-4. **Sin regresiones:** suite completa desde una base recién creada, a11y
-   `--todas`, contraste, auditoría móvil y `guia-admin.mjs`.
-5. Build, lint, tipos, `compileall`, `alembic check` y diff-check con
-   `cr-at-eol`.
+1. El script nuevo pasa en escritorio y en celular.
+2. Tres negativos del script, cada uno rojo por su motivo:
+   - una frase de resultado falsa;
+   - un texto «» que no está en la pantalla;
+   - un control sin nombrar en la guía.
+3. El caso del modelo y su negativo.
+4. `grep` sin contraseñas ni cuentas demo en `docs/USER_MANUAL.md`.
+5. Suite completa desde base nueva, a11y, contraste, móvil, `guia-admin.mjs`
+   y las puertas de siempre.
 
 ### Frená y consultá
 
-- Si el origen necesita algo más que un campo declarado.
-- Si el rango de año choca con publicaciones que ya existen.
+- Si al escribir un paso encontrás que el producto hace otra cosa que lo que
+  la guía tendría que decir.
+- Si un flujo necesita correo real (SMTP) para comprobarse: en local se usa
+  el outbox, y la guía no promete lo que producción todavía no tiene.
 
 ### Entrega en `PARA-PM.md`
 
 - SHA;
-- los casos y los negativos;
-- la migración;
+- estructura de la guía;
+- el script y sus negativos;
+- el caso del modelo;
 - las puertas;
 - los riesgos.
 
@@ -211,5 +124,5 @@ No integres ni despliegues.
 
 ## Después (no empezar todavía)
 
-**`USER-GUIDE-1`**, las guías de uso de quien compra, vende y transporta,
-cuando los atributos estén cerrados.
+Lo decide la PM cuando cierre `USER-GUIDE-1`. Lo que depende de Emi (correo,
+cuentas de prueba de Mercado Pago) puede reordenar la cola.

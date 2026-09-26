@@ -8,24 +8,20 @@ Actualizado: 2026-09-26.
 
 - **Fase contractual:** Fase 3 — Buscador y catálogo, semanas 6–8 (25/09–15/10). La puerta de la Fase 2 quedó verificada el 23/09 (`REPRODUCCION-FASE-2-2026-09-23.md`). La puerta de la Fase 3 y el hito intermedio ya se aceptaron por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `238d113`, publicado el 26/09 con autorización explícita de Emi. Contiene todo lo aceptado hasta `PROD-LISTS-1`: Mercado único, copy agropecuario, tipo y potencia, 44 marcas y localidades por migración, y el filtro de marca completo. **Emi verificó en el sitio:** sin pestaña Servicios, «Tipo» en Preparación del suelo y en Riego por aspersión, «Potencia» en Tractores y las marcas en el filtro. Publicaciones anteriores: `792d709` y `e9cf4c6` (25/09).
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. Todo lo aceptado está en `main`. La parte 2 de `ATRIBUTOS-RUBRO-1` está en curso.
-- **Última decisión PM:** `PROD-LISTS-1` **ACEPTADA EN RAMA** (`cdda2d9`): la migración `01ff14043124` trae a producción las 44 marcas y las 4028 localidades, y el filtro de marca ofrece las 44 con Maquinaria elegida (decisión de Emi). 3/3 focales, seis negativos en rojo, migración probada en modo producción, suite 197/198 (169 de entorno), puertas verdes. Evidencia en `REPRODUCCION-PROD-LISTS-1-2026-09-26.md`. Publicada en `238d113`.
-- **Tarea activa:** `ATRIBUTOS-RUBRO-1` parte 2:
-  - modelo y año en maquinaria, y origen declarado;
-  - tres P2: la marca queda cargada en el alta siguiente, «Mercado» saca filtros de la barra, y hay dos filtros llamados «Tipo»;
-  - **el orden del panel de filtros:** Emi lo delegó en PM y Dev (`DECISIONS.md`, 26/09). La Dev ataca la propuesta PM antes de construir.
-
-  Después, `USER-GUIDE-1`.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. La parte 2 de `ATRIBUTOS-RUBRO-1` está aceptada en rama (`2a00720`) y sin publicar; lo anterior está en `main`.
+- **Última decisión PM:** `ATRIBUTOS-RUBRO-1` parte 2 **ACEPTADA EN RAMA** (`2a00720`): modelo, año y origen declarado, tres P2 y el panel de filtros en tres grupos, con «Más filtros». 6/6 focales, ocho negativos en rojo (dos de PM) y un hueco de cobertura: el modelo en el buscador, verificado a mano. Suite 203/204 (169 de entorno), migración en modo producción, puertas verdes. Evidencia en `REPRODUCCION-ATRIBUTOS-RUBRO-1-P2-2026-09-26.md`.
+- **Tarea activa:** `USER-GUIDE-1`: reescribir `docs/USER_MANUAL.md` como guía de uso de quien compra, vende y transporta, sin credenciales y verificada por programa. Suma el caso del modelo en el buscador.
 - **Corrección de método PM (25/09):** las aceptaciones de la marca no verificaron la carga de datos en producción. Desde ahora, toda pieza que agrega una lista o un catálogo tiene que decir cómo llega a producción, y PM lo comprueba con un caso sobre una base sin siembra.
 - **#9, atributos por rubro: absorbido (decisión de Emi, 25/09).** Tercer nivel de la taxonomía de la clienta como filtro en todos los rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. «Inversores» queda afuera. Va después de `MERCADO-UNICO-1` y antes de las guías de uso.
 - **Escalado a Emi:** la regla «el teléfono no sale de la API sin suscripción activa» choca con la decisión del 05/08, que pasó suscripciones y candados por plan a Fase 6. Hoy el teléfono no se publica en el Mercado ni en las fichas, pero sí lo ven las dos partes de una orden y quien compra al elegir transportista, sin suscripción. El transportista no recibe el de quien compra.
 
-## Última aceptación PM — PROD-LISTS-1
+## Última aceptación PM — ATRIBUTOS-RUBRO-1, parte 2
 
-Las 44 marcas y las localidades llegan a producción por la migración
-`01ff14043124`, porque la siembra no corre allá. El filtro de marca ofrece las
-44 con Maquinaria elegida (decisión de Emi). Publicada en `238d113` y
-verificada por Emi.
+Modelo y año en maquinaria y origen «declarado por quien vende». Se suman los
+tres P2 y el panel de filtros en «Qué buscás», «Dónde», «Precio» y «Más
+filtros»: la Dev atacó la propuesta PM, delegada por Emi, y quedó en pie. El
+170, que a la Dev le falló una vez, pasó 9 de 9 en PM. Queda como P2 con
+hipótesis (`StrictMode` en desarrollo). Sin publicar todavía.
 
 ## Aceptaciones anteriores
 
@@ -35,6 +31,7 @@ riesgos que dejaron abiertos están en «Pendientes canónicos adoptados».
 
 | Pieza | Estado | Evidencia |
 |---|---|---|
+| `ATRIBUTOS-RUBRO-1` parte 2 | aceptada en rama | `REPRODUCCION-ATRIBUTOS-RUBRO-1-P2-2026-09-26.md` |
 | `PROD-LISTS-1` | publicada en `238d113` | `REPRODUCCION-PROD-LISTS-1-2026-09-26.md` |
 | `ATRIBUTOS-RUBRO-1` parte 1 | publicada en `792d709` | `REPRODUCCION-ATRIBUTOS-RUBRO-1-P1-2026-09-25.md` |
 | `MERCADO-UNICO-1` | publicada en `792d709` | `REPRODUCCION-MERCADO-UNICO-1-2026-09-25.md` |
