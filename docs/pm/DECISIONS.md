@@ -10,6 +10,20 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-09-26 — Las categorías no se cargan por migración; las marcas y las localidades sí
+
+Decisión PM sobre la discrepancia de la Dev en `PROD-LISTS-1`.
+
+- **Marcas y localidades:** se cargan con una migración idempotente, que
+  inserta sólo lo que falta y no toca lo editado en el panel.
+- **Categorías y subrubros:** no se cargan así. Producción ya los tiene, y el
+  panel cambia su nombre corto al renombrar: insertar «los que faltan»
+  duplicaría uno renombrado. Una base de producción nueva los carga de forma
+  explícita (`RAILWAY.md`).
+
+Desde ahora, toda lista o catálogo nuevo dice cómo llega a producción y lo
+prueba con un caso sobre una base sin siembra.
+
 ## 2026-09-25 — El filtro de marca muestra siempre la lista completa
 
 Decisión de Emi. Con Maquinaria agrícola elegida, el filtro «Marca» del

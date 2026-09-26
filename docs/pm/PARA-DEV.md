@@ -5,84 +5,38 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Primero, urgente — PROD-LISTS-1: las marcas no llegaron a producción
+## Decisión sobre PROD-LISTS-1 — aceptada en rama
 
-**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
-Va **antes** de la parte 2 y se entrega por separado. Si ya empezaste la
-parte 2, dejala en un commit aparte y seguí después.
+Sobre `cdda2d9`. Evidencia en `REPRODUCCION-PROD-LISTS-1-2026-09-26.md`.
 
-### Qué pasa
+- **Casos:** 175, 197 y 198 en 3/3.
+- **Negativos:** tus cuatro dan rojo, y también los dos míos:
+  - lista completa sin categoría;
+  - marcas cargadas inactivas.
+- **Suite completa desde base nueva:** 197/198. Sólo cae el 169, de
+  entorno.
+- **Auditorías:** verdes.
+- **Migración en modo producción:** la corrí con los archivos que copia la
+  imagen, sobre una base como la publicada. Carga 44 marcas y 4028
+  localidades, no toca las publicaciones, y una segunda corrida no cambia
+  nada.
 
-Emi abrió «Publicar un producto» en el sitio publicado (`792d709`), en
-Maquinaria agrícola. El selector «Marca» aparece, pero ofrece sólo «Sin
-declarar».
+**Tu discrepancia sobre las categorías: tenés razón.** No entran en la
+migración, por el riesgo de duplicar una renombrada. Gracias también por
+`REINICIAR_API`.
 
-La causa está en el código:
-
-- las 44 marcas son filas de `form_options` que carga **sólo la siembra**
-  (`backend/app/seed.py`, grupo `"brand"`, desde `ed3e39f`, 15/09);
-- la migración `e4a72c9b1f35` crea la columna y marca `usa_marca`, pero no
-  carga la lista;
-- en producción la siembra no corre.
-
-Es el mismo defecto que vos encontraste y corregiste para los tipos
-(`7177b2d`). Por eso el filtro de marca y su faceta tampoco tienen nada que
-ofrecer en el sitio.
-
-Lo reviso yo: mis aceptaciones de la marca no preguntaron por la carga en
-producción. Lo corrijo en mi método.
-
-### Qué entra
-
-1. **Migración aditiva e idempotente** que cargue las 44 marcas de la
-   siembra.
-   - Inserta sólo las que falten, por `(type, value)`.
-   - No toca las que existan.
-   - No reactiva una que alguien desactivó desde el panel.
-   - `downgrade`: borra sólo lo que esa migración insertó, o no hace nada;
-     explicá cuál elegís y por qué.
-2. **Inventario de lo que producción necesita y hoy sólo trae la siembra.**
-   Recorré `seed.py` y listá cada grupo o tabla (`unit`, `pricing_type`,
-   `availability`, `response_time`, categorías, subrubros, `usa_marca`,
-   localidades…), y para cada uno:
-   - si una migración lo carga;
-   - qué se rompe en producción si falta;
-   - cómo se carga allá.
-
-   Lo que el producto necesita para publicar o filtrar entra en la misma
-   migración. Lo demás va al informe.
-3. **Caso nuevo en el smoke**, como el 196. En una copia de la base,
-   con categorías y **sin** `form_options` de marca (lo que hay en
-   producción), la migración deja las 44 iguales a las de la siembra.
-   Correrla dos veces no duplica nada.
-
-4. **Agregado por decisión de Emi (25/09, `DECISIONS.md`):** el filtro
-   «Marca» del Mercado aparece **siempre** que la categoría elegida use marca
-   (hoy, Maquinaria agrícola). Muestra las 44 marcas activas, cada una con su
-   cantidad, **también las que tienen cero**.
-   - El conteo sigue siendo del servidor, con los demás filtros aplicados,
-     como la faceta de hoy.
-   - Elegir una marca sin publicaciones muestra el vacío habitual del
-     Mercado, sin error.
-   - Actualizá los casos de la faceta que esperaban que el filtro se ocultara
-     y la guía si lo menciona.
-   - Negativo: ocultar las marcas en cero da rojo.
-
-### Aceptación
-
-- el caso nuevo más un negativo (la migración sin la carga da rojo);
-- suite completa desde base nueva;
-- `alembic check`;
-- diff-check.
-
-No integres ni despliegues: la publicación la hago yo con autorización de
-Emi.
+**P3 registrado, sin tarea:** en producción, las listas de Configuración del
+panel salen vacías.
 
 ---
 
-## Después — ATRIBUTOS-RUBRO-1, parte 2
+## Tarea activa — ATRIBUTOS-RUBRO-1, parte 2
 
-**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde PROD-LISTS-1.
+**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
+
+**Regla nueva para esta y toda pieza:** si agrega o cambia una lista o un
+catálogo, el informe dice cómo llega a producción, y un caso lo prueba sobre
+una base sin siembra.
 
 ### Decisión sobre la parte 1
 
