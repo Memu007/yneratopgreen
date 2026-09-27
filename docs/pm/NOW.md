@@ -8,9 +8,9 @@ Actualizado: 2026-09-27.
 
 - **Fase contractual:** Fase 3 — Buscador y catálogo, semanas 6–8 (25/09–15/10). La puerta de la Fase 2 quedó verificada el 23/09 (`REPRODUCCION-FASE-2-2026-09-23.md`). La puerta de la Fase 3 y el hito intermedio ya se aceptaron por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `c92c0d7`, publicado el 26/09 con autorización de Emi («Dale actualizás? Así le paso a la clienta»), por fast-forward desde `238d113`. Suma la parte 2 de `ATRIBUTOS-RUBRO-1` (modelo, año, origen, el panel en tres grupos y tres P2, migración `a47300b5554c`) y `USER-GUIDE-1` (guía de uso y corrección de las órdenes). La verificación previa fue sobre el mismo código (`5a197bf`, que difiere sólo en `docs/pm`): suite 205/206 (169 de entorno), las dos guías, puertas verdes, sin secretos ni archivos prohibidos. **Pendiente: Emi verifica** modelo, año y origen en el alta y el panel nuevo. Antes: `238d113`, verificado (marcas).
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `PUBLISH-FIELDS-1` y `REV1-PENDIENTES-1` están aceptadas en rama (`4d5e409`) y **esperan la autorización de Emi para publicarse**. `NOTIF-TEXTOS-1` está asignada.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `PUBLISH-FIELDS-1`, `REV1-PENDIENTES-1` y `NOTIF-TEXTOS-1` están aceptadas en rama (`4db386b`) y **esperan la autorización de Emi para publicarse**. `AVISOS-DE-PAGO-1` está asignada.
 - **Última decisión PM:** `PUBLISH-FIELDS-1` y `REV1-PENDIENTES-1` **ACEPTADAS EN RAMA** (`4d5e409`). Sacan del alta lo que no se guardaba, muestran y editan la marca, cambian «operaciones» por «publicaciones» y resuelven #2, #4, #6, #11a, #13 y #14 de la devolución de la clienta, sin «comisión» visible. Diez negativos en rojo, cuatro de PM. Suite 208/209 (169 de entorno) y puertas verdes. Evidencia en `REPRODUCCION-PUBLISH-FIELDS-1-Y-REV1-PENDIENTES-1-2026-09-27.md`.
-- **Tarea activa:** `NOTIF-TEXTOS-1`: las notificaciones que prometen dinero que AgroBoeda no tiene («El monto total será reembolsado.»), el «vos» en las notificaciones y el caso 79 suelto.
+- **Tarea activa:** `AVISOS-DE-PAGO-1`: avisar a quien compra y a quien vende cuando se rechaza o se aprueba un comprobante, o se acredita un pago por Mercado Pago. Antes: `NOTIF-TEXTOS-1` **ACEPTADA EN RAMA** (`4db386b`), las notificaciones sin reembolsos ni avisos falsos y en «vos»; evidencia en `REPRODUCCION-NOTIF-TEXTOS-1-2026-09-27.md`.
 - **Corrección de método PM (25/09):** las aceptaciones de la marca no verificaron la carga de datos en producción. Desde ahora, toda pieza que agrega una lista o un catálogo tiene que decir cómo llega a producción, y PM lo comprueba con un caso sobre una base sin siembra.
 - **#9, atributos por rubro: absorbido (decisión de Emi, 25/09).** Tercer nivel de la taxonomía de la clienta como filtro en todos los rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. «Inversores» queda afuera. Va después de `MERCADO-UNICO-1` y antes de las guías de uso.
 - **Devolución de la clienta del 20/09 — estado (27/09):**
@@ -44,6 +44,7 @@ riesgos que dejaron abiertos están en «Pendientes canónicos adoptados».
 
 | Pieza | Estado | Evidencia |
 |---|---|---|
+| `NOTIF-TEXTOS-1` | aceptada en rama (`4db386b`), sin publicar | `REPRODUCCION-NOTIF-TEXTOS-1-2026-09-27.md` |
 | `PUBLISH-FIELDS-1` y `REV1-PENDIENTES-1` | aceptadas en rama (`4d5e409`), sin publicar | `REPRODUCCION-PUBLISH-FIELDS-1-Y-REV1-PENDIENTES-1-2026-09-27.md` |
 | `USER-GUIDE-1` | publicada en `c92c0d7` | `REPRODUCCION-USER-GUIDE-1-2026-09-26.md` |
 | `ATRIBUTOS-RUBRO-1` parte 2 | publicada en `c92c0d7` | `REPRODUCCION-ATRIBUTOS-RUBRO-1-P2-2026-09-26.md` |

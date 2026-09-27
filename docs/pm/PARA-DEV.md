@@ -5,89 +5,91 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Tarea activa — NOTIF-TEXTOS-1
+## Tarea activa — AVISOS-DE-PAGO-1
 
 **Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
 
-### Decisión sobre PUBLISH-FIELDS-1 y REV1-PENDIENTES-1
+### Decisión sobre NOTIF-TEXTOS-1
 
-**Las dos, aceptadas en rama** sobre `4d5e409`. Evidencia en
-`REPRODUCCION-PUBLISH-FIELDS-1-Y-REV1-PENDIENTES-1-2026-09-27.md`.
+**Aceptada en rama** sobre `4db386b`. Evidencia en
+`REPRODUCCION-NOTIF-TEXTOS-1-2026-09-27.md`.
 
-- **Casos:** 207, 208 y 209 en 3/3.
-- **Negativos:** tus seis dan rojo, y los cuatro míos también. Uno de los
-  míos deja «Editar» mostrando la marca sin mandarla, y el 207 lo agarra.
-- **Suite completa desde base nueva:** 208/209. Sólo cae el 169, de entorno.
+- **Casos:** el 79 corre solo sobre una base recién creada, y el 210 pasa.
+- **Negativos:** tus cuatro dan rojo, y los dos míos también. Uno de los
+  míos saca la notificación del envío, y el 210 la echa de menos porque
+  cuenta las exactas.
+- **Suite completa desde base nueva:** 209/210. Sólo cae el 169, de entorno.
 - **Auditorías y las dos guías:** verdes.
-- **Decisiones sobre tus avisos:**
-  - «Editar» sin categoría editable: se acepta la comprobación por la API;
-  - el total en Inicio se queda;
-  - «optimizar sus operaciones» se queda hasta que se reescriba con misión y
-    visión;
-  - la corrección del 95 % se acepta, y fue una buena lectura del pedido.
+- **Tu pregunta: opción A.** La B queda atada a la decisión sobre los datos
+  de contacto, que está pendiente de Emi.
+- **Los errores de la API en «tú»:** P3, sin tarea por ahora.
+
+**Aviso de entorno:** tu script de negativos llama a
+`entorno_nativo.sh --reiniciar-api` sin mirar `REINICIAR_API`, como los dos
+anteriores. PM lo corrió con su propio reinicio. En los scripts nuevos, que
+`REINICIAR_API` mande.
 
 La publicación a `main` la decide Emi. No integres ni despliegues.
 
 ### Problema y prioridad
 
-Hay notificaciones que le dicen a la gente cosas falsas sobre su dinero. La
-peor es la del rechazo: cuando quien vende rechaza un pedido, quien compra
-lee «El monto total será reembolsado.». AgroBoeda no tiene ese dinero y no
-reembolsa nada. Es la misma clase de defecto que el 95 % que corregiste.
+Quien paga por transferencia no se entera de lo que pasa con su pago:
+
+- si quien vende rechaza el comprobante, la orden queda «Rechazado» y a
+  quien compra no le llega nada;
+- si lo aprueba, tampoco;
+- por Mercado Pago, cuando se acredita el pago, no se avisa a nadie.
+
+La notificación «Pago aprobado» existe, pero nadie la manda, y trata de «tú».
 
 ### Qué entra
 
-1. **Recorré todos los textos de `notifications.py`** que ve una persona.
-   Para cada uno, anotá qué promete y si el producto lo cumple.
-   - Corregí lo que afirme algo falso sobre dinero, reembolsos, envíos o
-     avisos que el producto no manda. La primera es «El monto total será
-     reembolsado.».
-   - El texto nuevo dice lo que pasó, sin promesas. Si hace falta un próximo
-     paso, que sea uno que exista en el producto.
-2. **Mismo tono que el resto del sitio.** Las notificaciones tratan de «tú»
-   («Tienes», «Procede», «confirma»); el sitio usa el «vos».
-   - La de bienvenida dice «marketplace» y «productos agrícolas»; la
-     devolución #1 pidió «agropecuario».
-3. **El comentario de `AboutPage.tsx`** sobre «Nuestro equipo» le atribuye a
-   la clienta un motivo que no dio. Ella dijo «por ahora». El repositorio se
-   le entrega: el comentario tiene que decir sólo eso.
-4. **El caso 79 tiene que correr solo.** Hoy, suelto, falla con «Cannot read
-   properties of undefined (reading 'localityId')», porque depende de datos
-   de casos anteriores. En la suite pasa.
+1. **Rechazar el comprobante** le avisa a quien compra. El aviso dice lo que
+   pasó y el paso que existe en Mis Compras, si existe. Por ejemplo, volver a
+   enviar el comprobante, si el producto lo permite; si no, no se promete.
+2. **Aprobar el comprobante** les avisa a quien compra y a quien vende.
+3. **Pago acreditado por Mercado Pago**, confirmado por el producto, avisa a
+   los dos. Una sola vez, aunque la confirmación llegue repetida.
+4. **«Pago aprobado» y «¡Venta confirmada!»** se reescriben:
+   - en «vos»;
+   - sin prometer envío ni plazos.
+
+   Aplican las mismas reglas que en NOTIF-TEXTOS-1.
 
 ### Fuera de alcance
 
-- Cambiar cuándo se manda cada notificación, o a quién.
-- Hablar de comisión o de retener fondos (#11b), que espera a Emi y la
-  clienta.
-- El correo (#15), que Emi ve el 28/09.
+- El correo (#15): las notificaciones son las del sitio.
+- Datos de contacto en los avisos (la opción B).
+- Cambiar qué hace el producto con la orden al aprobar o rechazar.
 - Integración y despliegue.
 
 ### Aceptación verificable
 
-1. **Caso nuevo** que dispare cada notificación que cambiaste y lea su texto
-   donde lo ve la persona:
-   - ninguna promete reembolso, devolución ni porcentaje;
-   - todas usan el «vos».
-2. **Negativo:** volver a poner «El monto total será reembolsado.» da rojo.
-3. `SMOKE_CASOS=79 node scripts/smoke.mjs` pasa sobre una base recién
-   creada.
-4. Las dos guías coinciden. Si alguna cita una notificación, se actualiza.
-5. Suite completa desde base nueva, a11y, contraste, móvil y las puertas de
-   siempre.
+1. **Caso nuevo por transferencia.**
+   - Comprobante rechazado: quien compra recibe un aviso.
+   - Comprobante aprobado: reciben uno quien compra y uno quien vende.
+   - Se leen en la API y en «Notificaciones», en los dos anchos.
+2. **Caso nuevo por Mercado Pago**, con el doble local.
+   - Pago acreditado: un aviso para cada parte.
+   - La misma confirmación repetida no suma avisos.
+3. **Negativos:**
+   - sin el aviso del rechazo da rojo;
+   - un aviso duplicado con la confirmación repetida da rojo.
+4. El 210 sigue pasando: las cuentas exactas cambian donde corresponde.
+5. Suite completa desde base nueva, a11y, contraste, móvil, las dos guías y
+   las puertas de siempre.
 
 ### Frená y consultá
 
-- Si un texto necesita una decisión de producto, por ejemplo qué pasa con
-  el dinero de un pedido rechazado ya pagado por Mercado Pago. Traé la
-  pregunta con una recomendación; no la resuelvas en el texto.
+- Si avisar cambia el orden de lo que hace la API al aprobar o al rechazar,
+  o si el aviso de Mercado Pago no tiene un solo lugar donde el pago se da
+  por confirmado.
 
 ### Entrega en `PARA-PM.md`
 
 - SHA;
-- la tabla de textos: antes, después y por qué;
-- los casos y el negativo;
-- las guías;
+- la tabla de avisos: cuándo se manda, a quién y con qué texto;
+- los casos y los negativos;
 - las puertas;
 - los riesgos.
 

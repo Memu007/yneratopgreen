@@ -197,7 +197,8 @@ o un rediseño nuevo.
 | 40 | **USER-GUIDE-1 — aceptada en rama** | Documentación de uso para la entrega | `134aa86`…`d6b21a1`, informe `5a197bf`: guía de 22 pasos verificada por `guia-usuario.mjs`, corrección de las órdenes (206) y modelo en el buscador (205). PM: ocho negativos en rojo, suite 205/206, puertas verdes. Evidencia en `REPRODUCCION-USER-GUIDE-1-2026-09-26.md`. |
 | 41 | **PUBLISH-FIELDS-1 — aceptada en rama** | Defectos del alta que encontró la guía, y #3 de la clienta | `843126b`…`c5071fc`: sin «Características» ni «Etiquetas» en el alta, marca en la ficha y en «Editar», «publicaciones» en vez de «operaciones». Casos 207 y 208. Evidencia en `REPRODUCCION-PUBLISH-FIELDS-1-Y-REV1-PENDIENTES-1-2026-09-27.md`. |
 | 42 | **REV1-PENDIENTES-1 — aceptada en rama** | Lo pendiente de la devolución del 20/09 que no espera decisiones | `74b0666`…`4d5e409`: #2, #4, #6, #11a, #13, #14 y sin «comisión» visible, más la notificación falsa del 95 %. Caso 209. PM: diez negativos en rojo, suite 208/209, puertas verdes. |
-| 43 | **NOTIF-TEXTOS-1 — asignada** | Notificaciones que prometen dinero que AgroBoeda no tiene | «El monto total será reembolsado.», el «vos» y el caso 79 suelto. Tarea activa en `PARA-DEV.md`. |
+| 43 | **NOTIF-TEXTOS-1 — aceptada en rama** | Notificaciones que prometían dinero que AgroBoeda no tiene | `3e806de`…`4db386b`: seis textos corregidos, en «vos», y el 79 suelto. Caso 210. PM: seis negativos en rojo, suite 209/210, puertas verdes. Evidencia en `REPRODUCCION-NOTIF-TEXTOS-1-2026-09-27.md`. |
+| 44 | **AVISOS-DE-PAGO-1 — asignada** | Quien paga no se entera de lo que pasó con su pago | Avisos al rechazar o aprobar un comprobante y al acreditarse un pago por Mercado Pago. Tarea activa en `PARA-DEV.md`. |
 
 Cinco mil visitas mensuales no justifican reescribir la arquitectura. Esta
 puerta cierra primero paginación, consultas y recorridos medidos; capacidad y
