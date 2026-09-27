@@ -36159,6 +36159,58 @@ await runCase(209, 'Inicio sin publicaciones, una sola invitación, sin pregunta
     + `${medidos.length} anchos (${medidos.join('; ')})`;
 });
 
+// Lo que ninguna notificación puede decir (NOTIF-TEXTOS-1). Lo usan el 210,
+// el 211 y el 212.
+const AVISO_PROMESAS = [
+  [/reembols/i, 'promete un reembolso'],
+  [/devol|devuelv|reintegr/i, 'promete una devolución'],
+  [/\d+\s?%/, 'nombra un porcentaje'],
+  [/avisaremos|te vamos a avisar/i, 'promete un aviso que no existe'],
+  [/pronto ser[aá]|en camino/i, 'afirma un envío que el producto no conoce'],
+  [/comisi[oó]n/i, 'dice «comisión»'],
+  [/marketplace|agr[ií]colas?\b/i, 'dice «marketplace» o «agrícola»'],
+];
+// Formas del «tú» que el sitio no usa. Con acento son las del «vos»
+// («confirmá», «enviá»): el límite de palabra no las toma.
+const AVISO_TUTEO = /\b(tienes|puedes|quieres|debes|procede|confirma|env[ií]a|explora|comienza|revisa|contacta|recuerda|ingresa|completa|agrega)\b/i;
+function revisarAviso(problemas, texto, donde) {
+  for (const [patron, que] of AVISO_PROMESAS) {
+    const visto = texto.match(new RegExp(`[^\\n]{0,50}${patron.source}[^\\n]{0,30}`, patron.flags));
+    if (visto) problemas.push(`${donde} ${que}: «${visto[0].trim()}»`);
+  }
+  const tuteo = texto.match(new RegExp(`[^\\n]{0,40}${AVISO_TUTEO.source}[^\\n]{0,20}`, AVISO_TUTEO.flags));
+  if (tuteo) problemas.push(`${donde} trata de «tú»: «${tuteo[0].trim()}»`);
+}
+// Un navegador con la sesión de esa cuenta ya puesta.
+async function entrarConSesion(contexto, { email, password }) {
+  const { data } = await apiRequest('/auth/login', { method: 'POST', body: { email, password } });
+  await contexto.addInitScript(({ access, refresh }) => {
+    window.localStorage.setItem('access_token', access);
+    window.localStorage.setItem('refresh_token', refresh);
+  }, { access: data.access_token, refresh: data.refresh_token });
+}
+async function abrirPestanaDeCuenta(page, pestana, titulo) {
+  await page.goto(`${FRONTEND_URL}/?section=account`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: 'Mi cuenta', exact: true }).waitFor({ timeout: 20_000 });
+  await page.getByRole('button', { name: new RegExp(`^\\s*${pestana}`) }).first().click();
+  await page.getByRole('heading', { name: titulo }).first().waitFor({ timeout: 20_000 });
+}
+// Los mensajes de la pestaña «Notificaciones» que se ven.
+async function avisosALaVista(page, mensajes, donde, problemas) {
+  const items = page.locator('main [class*="_notificationItem_"]');
+  await esperarA(async () => (await items.count()) > 0, `${donde}: la pestaña no mostró notificaciones`, 20_000)
+    .catch((e) => problemas.push(e.message));
+  for (const mensaje of mensajes) {
+    const el = page.locator('main [class*="_notificationMessage_"]').getByText(mensaje, { exact: true });
+    await el.first().waitFor({ state: 'visible', timeout: 10_000 })
+      .catch(() => problemas.push(`${donde} no lee «${mensaje}»`));
+  }
+  const textos = await items.allInnerTexts();
+  revisarAviso(problemas, textos.join('\n'), `${donde}, la pestaña`);
+  const [ancho, visible] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+  if (ancho > visible + 1) problemas.push(`${donde}: las notificaciones desbordan (${ancho} en ${visible})`);
+}
+
 // 210. NOTIF-TEXTOS-1 — lo que dicen las notificaciones, donde las lee la
 // persona.
 //
@@ -36176,27 +36228,7 @@ await runCase(210, 'Las notificaciones dicen lo que pasó, sin reembolsos ni avi
   const problemas = [];
   const medidos = [];
   const sello = Date.now();
-  // Lo que ninguna notificación puede decir.
-  const PROMESAS = [
-    [/reembols/i, 'promete un reembolso'],
-    [/devol|devuelv|reintegr/i, 'promete una devolución'],
-    [/\d+\s?%/, 'nombra un porcentaje'],
-    [/avisaremos|te vamos a avisar/i, 'promete un aviso que no existe'],
-    [/pronto ser[aá]|en camino/i, 'afirma un envío que el producto no conoce'],
-    [/comisi[oó]n/i, 'dice «comisión»'],
-    [/marketplace|agr[ií]colas?\b/i, 'dice «marketplace» o «agrícola»'],
-  ];
-  // Formas del «tú» que el sitio no usa. Con acento son las del «vos»
-  // («confirmá», «enviá»): el límite de palabra no las toma.
-  const TUTEO = /\b(tienes|puedes|quieres|debes|procede|confirma|env[ií]a|explora|comienza|revisa|contacta|recuerda|ingresa|completa|agrega)\b/i;
-  const revisar = (texto, donde) => {
-    for (const [patron, que] of PROMESAS) {
-      const visto = texto.match(new RegExp(`[^\\n]{0,50}${patron.source}[^\\n]{0,30}`, patron.flags));
-      if (visto) problemas.push(`${donde} ${que}: «${visto[0].trim()}»`);
-    }
-    const tuteo = texto.match(new RegExp(`[^\\n]{0,40}${TUTEO.source}[^\\n]{0,20}`, TUTEO.flags));
-    if (tuteo) problemas.push(`${donde} trata de «tú»: «${tuteo[0].trim()}»`);
-  };
+  const revisar = (texto, donde) => revisarAviso(problemas, texto, donde);
 
   // --- Las cuentas, la publicación y las compras ------------------------------
   const vende = { email: `notif.vende.${sello}@example.com`, password: 'notifvende123', full_name: `Vende Notif ${sello}` };
@@ -36279,6 +36311,10 @@ await runCase(210, 'Las notificaciones dicen lo que pasó, sin reembolsos ni avi
       compra: [
         bienvenida(compra.full_name),
         ...ordenes.map(pedido),
+        // Aprobar la transferencia avisa (AVISOS-DE-PAGO-1): las tres que se
+        // aprobaron, incluida la que después se rechazó.
+        ...[recibida, enviada, rechazada].map((o) => ['Pago aprobado',
+          `El vendedor aprobó la transferencia de tu pedido #${o.order_number}.`]),
         ['Pedido confirmado', `El vendedor confirmó tu pedido #${recibida.order_number}.`],
         ['Pedido confirmado', `El vendedor confirmó tu pedido #${enviada.order_number}.`],
         ['Pedido enviado', `El vendedor marcó tu pedido #${recibida.order_number} como enviado. Cuando lo recibas, confirmá la recepción en Mis Compras.`],
@@ -36290,6 +36326,8 @@ await runCase(210, 'Las notificaciones dicen lo que pasó, sin reembolsos ni avi
       vende: [
         bienvenida(vende.full_name),
         ...ordenes.map(venta),
+        ...[recibida, enviada, rechazada].map((o) => ['Venta pagada',
+          `Aprobaste la transferencia del pedido #${o.order_number}. Ya podés confirmar el pedido en Mis Ventas.`]),
         ['Entrega confirmada', `El comprador confirmó la recepción del pedido #${recibida.order_number}. ¡Venta completada!`],
         ['Pedido cancelado', `El comprador canceló el pedido #${cancelada.order_number}.`],
       ],
@@ -36308,19 +36346,8 @@ await runCase(210, 'Las notificaciones dicen lo que pasó, sin reembolsos ni avi
     }
 
     // --- 2. Donde las lee la persona, en los dos anchos ------------------------
-    const entrarComo = async (contexto, quien) => {
-      const { data } = await apiRequest('/auth/login', { method: 'POST', body: { email: quien.email, password: quien.password } });
-      await contexto.addInitScript(({ access, refresh }) => {
-        window.localStorage.setItem('access_token', access);
-        window.localStorage.setItem('refresh_token', refresh);
-      }, { access: data.access_token, refresh: data.refresh_token });
-    };
-    const abrirPestana = async (page, pestana, titulo) => {
-      await page.goto(`${FRONTEND_URL}/?section=account`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { name: 'Mi cuenta', exact: true }).waitFor({ timeout: 20_000 });
-      await page.getByRole('button', { name: new RegExp(`^\\s*${pestana}`) }).first().click();
-      await page.getByRole('heading', { name: titulo }).first().waitFor({ timeout: 20_000 });
-    };
+    const entrarComo = entrarConSesion;
+    const abrirPestana = abrirPestanaDeCuenta;
 
     for (const [ancho, viewport] of [['escritorio', { width: 1440, height: 900 }], ['celular', { width: 390, height: 844 }]]) {
       for (const [quien, datos] of [['compra', compra], ['vende', vende]]) {
@@ -36369,6 +36396,334 @@ await runCase(210, 'Las notificaciones dicen lo que pasó, sin reembolsos ni avi
     + 'que no existe, ninguna trata de «tú», y los dos pasos que nombran —cómo pagar y «Confirmar Recepción»— '
     + `están en Mis Compras. Leídas en la API y en la pestaña, en ${medidos.join('; ')}`;
 });
+
+// 211. AVISOS-DE-PAGO-1 — lo que pasa con una transferencia se avisa.
+//
+// Antes, si quien vende rechazaba el comprobante, la orden quedaba
+// «Rechazado» y a quien compra no le llegaba nada; si lo aprobaba, tampoco.
+// El caso rechaza una con comprobante y otra sin él, aprueba una, intenta
+// decidir dos veces y decide dos cosas a la vez sobre la misma orden. Lee los
+// avisos de cada orden en la API —exactos, ni uno de más ni de menos— y en la
+// pestaña «Notificaciones», en escritorio y en celular.
+await runCase(211, 'La transferencia rechazada le avisa a quien compra, y la aprobada a las dos partes', async () => {
+  const problemas = [];
+  const medidos = [];
+  const sello = Date.now();
+  const vende = { email: `pago.vende.${sello}@example.com`, password: 'pagovende123', full_name: `Vende Pago ${sello}` };
+  const compra = { email: `pago.compra.${sello}@example.com`, password: 'pagocompra123', full_name: `Compra Pago ${sello}` };
+  await registrarYVerificar({ ...vende, role: 'user' });
+  await registrarYVerificar({ ...compra, role: 'user' });
+  const vendedora = await ingresarVendedor(vende.email, vende.password);
+  const compradora = await ingresarVendedor(compra.email, compra.password);
+  let publicacion = null;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    await apiRequest('/auth/me', { method: 'PATCH', token: vendedora.token, body: { alias_bancario: `pago.${sello}` } });
+    ({ data: publicacion } = await apiRequest('/products', {
+      method: 'POST', token: vendedora.token,
+      body: {
+        name: `Semilla Pago ${sello}`, description: 'Publicación del caso 211, para decidir transferencias.',
+        category_id: queryRows("SELECT id, 'fin' FROM categories WHERE slug = 'insumos-agricolas'")[0][0],
+        price: 2110, stock: 10, unit: 'kg', locality_id: localidadDelPadron('Pergamino', 'Buenos Aires'),
+        publication_type: 'producto', operation_kind: 'insumo',
+      },
+    }));
+    const comprar = async () => {
+      await apiRequest('/cart/items', {
+        method: 'POST', token: compradora.token, body: { product_id: publicacion.id, quantity: 1 },
+      });
+      const { data } = await apiRequest('/orders/checkout/transfer', {
+        method: 'POST', token: compradora.token,
+        body: {
+          shipping_address: 'Calle del caso 211', shipping_locality_id: localidadDeEnvio(),
+          shipping_postal_code: '2700', shipping_decisions: trasladoPropio(compradora.id),
+        },
+      });
+      return data.orders[0];
+    };
+    const adjuntar = (orden) => apiUpload(`/orders/${orden.order_id}/transfer-receipt`, {
+      token: compradora.token, filename: 'comprobante-211.png', content: RECIBO_PNG, contentType: 'image/png',
+    });
+    const decidir = (orden, decision, reason) => pedirCrudo(`/orders/${orden.order_id}/transfer-receipt`, {
+      method: 'PATCH', header: vendedora.token, body: reason ? { decision, reason } : { decision },
+    });
+    const debe = (respuesta, codigo, que) => {
+      if (respuesta.status !== codigo) problemas.push(`${que}: HTTP ${respuesta.status} y no ${codigo}`);
+    };
+
+    // El comprobante que no alcanza: adjunto y rechazado, con motivo.
+    const conComprobante = await comprar();
+    await adjuntar(conComprobante);
+    debe(await decidir(conComprobante, 'reject', 'El importe no coincide'), 200, 'rechazar el comprobante');
+    // La transferencia que no llegó: rechazada sin comprobante.
+    const sinComprobante = await comprar();
+    debe(await decidir(sinComprobante, 'reject', 'No llegó la transferencia'), 200, 'rechazar la transferencia');
+    // Y la que sí: adjunto y aprobado.
+    const aprobada = await comprar();
+    await adjuntar(aprobada);
+    debe(await decidir(aprobada, 'approve'), 200, 'aprobar el comprobante');
+    // Decidir otra vez no se puede, y no suma avisos.
+    debe(await decidir(aprobada, 'approve'), 400, 'aprobar dos veces');
+    debe(await decidir(conComprobante, 'reject', 'Otra vez'), 400, 'rechazar dos veces');
+    // Aprobar y rechazar a la vez: la fila bloqueada deja pasar una sola.
+    const disputada = await comprar();
+    await adjuntar(disputada);
+    const [siA, noA] = await Promise.all([
+      decidir(disputada, 'approve'), decidir(disputada, 'reject', 'Al mismo tiempo'),
+    ]);
+    const codigos = [siA.status, noA.status].sort().join(',');
+    if (codigos !== '200,400') problemas.push(`aprobar y rechazar a la vez respondió ${codigos}`);
+    const gano = siA.status === 200 ? 'aprobada' : 'rechazada';
+
+    const estados = [conComprobante, sinComprobante, aprobada, disputada].map((o) => ordenEnLaBase(o.order_id).estado);
+    const esperados = ['rejected', 'rejected', 'paid', gano === 'aprobada' ? 'paid' : 'rejected'];
+    if (JSON.stringify(estados) !== JSON.stringify(esperados)) {
+      problemas.push(`las órdenes quedaron ${JSON.stringify(estados)} y tenían que quedar ${JSON.stringify(esperados)}`);
+    }
+
+    // --- Lo que tiene que tener cada orden, por cuenta -----------------------
+    const realizado = (o) => ['Pedido realizado',
+      `Tu pedido #${o.order_number} fue creado y está pendiente de pago. En Mis Compras tenés cómo pagarlo.`];
+    const nueva = (o) => ['Nueva venta recibida', `Tenés un nuevo pedido #${o.order_number} pendiente de pago.`];
+    const rechazo = (o) => ['Transferencia rechazada',
+      `El vendedor rechazó la transferencia de tu pedido #${o.order_number} y el pedido quedó rechazado. El motivo está en Mis Compras.`];
+    const aprobado = (o) => ['Pago aprobado', `El vendedor aprobó la transferencia de tu pedido #${o.order_number}.`];
+    const pagada = (o) => ['Venta pagada',
+      `Aprobaste la transferencia del pedido #${o.order_number}. Ya podés confirmar el pedido en Mis Ventas.`];
+    const porOrden = [
+      [conComprobante, [realizado(conComprobante), rechazo(conComprobante)], [nueva(conComprobante)]],
+      [sinComprobante, [realizado(sinComprobante), rechazo(sinComprobante)], [nueva(sinComprobante)]],
+      [aprobada, [realizado(aprobada), aprobado(aprobada)], [nueva(aprobada), pagada(aprobada)]],
+      [disputada,
+        [realizado(disputada), gano === 'aprobada' ? aprobado(disputada) : rechazo(disputada)],
+        gano === 'aprobada' ? [nueva(disputada), pagada(disputada)] : [nueva(disputada)]],
+    ];
+
+    // --- 1. En la API, orden por orden ----------------------------------------
+    const clave = ([titulo, mensaje]) => `${titulo} | ${mensaje}`;
+    const listas = {
+      compra: (await apiRequest('/notifications', { token: compradora.token })).data.notifications,
+      vende: (await apiRequest('/notifications', { token: vendedora.token })).data.notifications,
+    };
+    for (const [orden, deCompra, deVenta] of porOrden) {
+      for (const [quien, esperadas] of [['compra', deCompra], ['vende', deVenta]]) {
+        const tiene = listas[quien].filter((n) => n.order_id === orden.order_id).map((n) => clave([n.title, n.message])).sort();
+        const debia = esperadas.map(clave).sort();
+        if (JSON.stringify(tiene) !== JSON.stringify(debia)) {
+          problemas.push(`API, quien ${quien}, pedido #${orden.order_number}: tiene ${JSON.stringify(tiene)} y tenía que tener ${JSON.stringify(debia)}`);
+        }
+      }
+    }
+    for (const [quien, lista] of Object.entries(listas)) {
+      for (const n of lista) revisarAviso(problemas, `${n.title}\n${n.message}`, `API, quien ${quien}:`);
+    }
+
+    // --- 2. Donde las lee la persona, y lo que nombran ------------------------
+    for (const [ancho, viewport] of [['escritorio', { width: 1440, height: 900 }], ['celular', { width: 390, height: 844 }]]) {
+      for (const [quien, datos, indice] of [['compra', compra, 1], ['vende', vende, 2]]) {
+        const contexto = await browser.newContext({ viewport, hasTouch: viewport.width < 800 });
+        await entrarConSesion(contexto, datos);
+        const page = await contexto.newPage();
+        await abrirPestanaDeCuenta(page, 'Notificaciones', /Notificaciones/);
+        const mensajes = porOrden.flatMap((fila) => fila[indice]).map(([, mensaje]) => mensaje);
+        await avisosALaVista(page, mensajes, `${ancho}: quien ${quien}`, problemas);
+        if (quien === 'compra') {
+          // «El motivo está en Mis Compras»: está, y no se ofrece reenviar.
+          await abrirPestanaDeCuenta(page, 'Mis Compras', 'Mis Compras');
+          const tarjeta = page.locator('main [class*="_orderCard_"]')
+            .filter({ has: page.getByRole('heading', { name: `Pedido #${conComprobante.order_number}`, exact: true }) });
+          await tarjeta.getByText('El importe no coincide').first().waitFor({ state: 'visible', timeout: 20_000 })
+            .catch(() => problemas.push(`${ancho}: Mis Compras no muestra el motivo del rechazo`));
+          if (await tarjeta.getByRole('button', { name: /comprobante/i }).count() > 0) {
+            problemas.push(`${ancho}: la orden rechazada ofrece mandar el comprobante otra vez`);
+          }
+        } else {
+          // «Ya podés confirmar el pedido en Mis Ventas»: el botón está.
+          await abrirPestanaDeCuenta(page, 'Mis Ventas', 'Mis Ventas');
+          const tarjeta = page.locator('main [class*="_orderCard_"]')
+            .filter({ has: page.getByRole('heading', { name: `Venta #${aprobada.order_number}`, exact: true }) });
+          await tarjeta.getByRole('button', { name: 'Confirmar Pedido' }).waitFor({ state: 'visible', timeout: 20_000 })
+            .catch(() => problemas.push(`${ancho}: la venta pagada no ofrece «Confirmar Pedido» en Mis Ventas`));
+        }
+        await contexto.close();
+      }
+      medidos.push(ancho);
+    }
+  } finally {
+    await browser.close();
+    if (publicacion?.id) await pedirCrudo(`/products/${publicacion.id}`, { method: 'DELETE', header: vendedora.token }).catch(() => {});
+  }
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return 'el comprobante rechazado y la transferencia rechazada le avisan a quien compra, con el motivo en Mis '
+    + 'Compras y sin ofrecer reenviar; la aprobada avisa a las dos partes, con «Confirmar Pedido» en Mis Ventas; '
+    + 'decidir dos veces responde 400 sin sumar avisos, y aprobar y rechazar a la vez deja pasar una sola '
+    + `decisión con su aviso. Leído en la API y en la pestaña, en ${medidos.join(' y ')}`;
+});
+
+// 212. AVISOS-DE-PAGO-1 — el pago acreditado por Mercado Pago se avisa, una
+// vez.
+//
+// Tres entradas confirman un pago: el aviso de Mercado Pago, la vuelta de quien
+// compra y el reconciliador. Las tres terminan en `cobro.aplicar`, que es donde
+// la orden pasa a pagada, y el aviso sale de esa transición. El caso confirma
+// tres órdenes, cada una primero por una entrada distinta y después por las
+// otras —el aviso, la vuelta, el reconciliador—, y cuenta: un aviso para cada
+// parte, por orden.
+//
+// Las confirmaciones van seguidas y no a la vez: tres a la vez sobre un pago
+// recién acreditado cuelgan la API entera, desde antes de esta pieza. Ese
+// defecto está en el 213, que sólo corre si se lo pide.
+await runCase(212, 'El pago acreditado por Mercado Pago avisa a las dos partes, una sola vez', async () => {
+  const problemas = [];
+  const CUENTA = '900721';
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const browser = await chromium.launch({ headless: true });
+  try {
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, `ok:${CUENTA}`)).ok === 'vinculado', 'el vendedor no vinculó');
+    const pagar = (orden) => doble.crearPago({
+      referencia: `topgreen-${orden.order_number}`, preferencia: orden.preferencia, cuenta: CUENTA,
+      monto: orden.amount, ordenId: orden.order_id, ordenNumero: orden.order_number, estado: 'approved',
+    });
+    const volver = (orden) => pedirCrudo(`/orders/${orden.order_id}/payment-state`, {
+      method: 'POST', header: state.buyerToken, body: {},
+    });
+
+    // a) El aviso, y después el mismo aviso dos veces más y la vuelta de quien
+    //    compra otras dos.
+    const porAviso = await ordenMercadoPago(vendedor);
+    const pagoA = pagar(porAviso);
+    const primero = await avisar({ dataId: pagoA.id, cuenta: CUENTA });
+    assert(primero.status === 200 && primero.resultado === 'aplicado',
+      `el primer aviso devolvió ${primero.status} ${primero.resultado}`);
+    await avisar({ dataId: pagoA.id, cuenta: CUENTA });
+    await avisar({ dataId: pagoA.id, cuenta: CUENTA });
+    await volver(porAviso);
+    await volver(porAviso);
+
+    // b) Primero vuelve quien compra, y después llegan dos avisos.
+    const porVuelta = await ordenMercadoPago(vendedor);
+    const pagoB = pagar(porVuelta);
+    const vuelta = await volver(porVuelta);
+    if (vuelta.status !== 200) problemas.push(`la vuelta de quien compra respondió HTTP ${vuelta.status}`);
+    await avisar({ dataId: pagoB.id, cuenta: CUENTA });
+    await avisar({ dataId: pagoB.id, cuenta: CUENTA });
+
+    // c) Nadie avisó: la encuentra el reconciliador. Y después llega el aviso.
+    const porBarrido = await ordenMercadoPago(vendedor);
+    const pagoC = pagar(porBarrido);
+    vencerElLink(porBarrido.order_id);
+    const barrido = await reconciliar();
+    if (!(barrido.cobrada >= 1)) problemas.push(`el reconciliador dijo ${JSON.stringify(barrido)}`);
+    await avisar({ dataId: pagoC.id, cuenta: CUENTA });
+
+    const ordenes = [['el aviso repetido', porAviso], ['la vuelta primero', porVuelta], ['el reconciliador', porBarrido]];
+    for (const [camino, orden] of ordenes) {
+      const estado = ordenEnLaBase(orden.order_id).estado;
+      if (estado !== 'paid') problemas.push(`${camino}: la orden no quedó pagada, quedó «${estado}»`);
+    }
+
+    // --- 1. En la API: un aviso de pago por parte y por orden ------------------
+    const clave = (n) => `${n.title} | ${n.message}`;
+    const listas = {
+      compra: (await apiRequest('/notifications', { token: state.buyerToken })).data.notifications,
+      vende: (await apiRequest('/notifications', { token: vendedor.token })).data.notifications,
+    };
+    for (const [camino, orden] of ordenes) {
+      const debia = {
+        compra: [`Pedido realizado | Tu pedido #${orden.order_number} fue creado y está pendiente de pago. En Mis Compras tenés cómo pagarlo.`,
+          `Pago aprobado | Mercado Pago acreditó el pago de tu pedido #${orden.order_number}.`].sort(),
+        vende: [`Nueva venta recibida | Tenés un nuevo pedido #${orden.order_number} pendiente de pago.`,
+          `Venta pagada | Mercado Pago acreditó el pago del pedido #${orden.order_number}. Ya podés confirmar el pedido en Mis Ventas.`].sort(),
+      };
+      for (const quien of ['compra', 'vende']) {
+        const tiene = listas[quien].filter((n) => n.order_id === orden.order_id).map(clave).sort();
+        if (JSON.stringify(tiene) !== JSON.stringify(debia[quien])) {
+          problemas.push(`${camino}, quien ${quien}: tiene ${JSON.stringify(tiene)} y tenía que tener ${JSON.stringify(debia[quien])}`);
+        }
+        for (const n of listas[quien].filter((x) => x.order_id === orden.order_id)) {
+          revisarAviso(problemas, `${n.title}\n${n.message}`, `${camino}, quien ${quien}:`);
+        }
+      }
+    }
+
+    // --- 2. Donde las lee la persona, y lo que nombran ------------------------
+    for (const [ancho, viewport] of [['escritorio', { width: 1440, height: 900 }], ['celular', { width: 390, height: 844 }]]) {
+      for (const [quien, datos, mensaje] of [
+        ['compra', state.buyerCredentials, `Mercado Pago acreditó el pago de tu pedido #${porAviso.order_number}.`],
+        ['vende', { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+          `Mercado Pago acreditó el pago del pedido #${porAviso.order_number}. Ya podés confirmar el pedido en Mis Ventas.`],
+      ]) {
+        const contexto = await browser.newContext({ viewport, hasTouch: viewport.width < 800 });
+        await entrarConSesion(contexto, datos);
+        const page = await contexto.newPage();
+        await abrirPestanaDeCuenta(page, 'Notificaciones', /Notificaciones/);
+        await avisosALaVista(page, [mensaje], `${ancho}: quien ${quien}`, problemas);
+        if (quien === 'vende') {
+          await abrirPestanaDeCuenta(page, 'Mis Ventas', 'Mis Ventas');
+          const tarjeta = page.locator('main [class*="_orderCard_"]')
+            .filter({ has: page.getByRole('heading', { name: `Venta #${porAviso.order_number}`, exact: true }) });
+          await tarjeta.getByRole('button', { name: 'Confirmar Pedido' }).waitFor({ state: 'visible', timeout: 20_000 })
+            .catch(() => problemas.push(`${ancho}: la venta pagada por Mercado Pago no ofrece «Confirmar Pedido»`));
+        }
+        await contexto.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    await doble.cerrar();
+    try {
+      await desvincular(vendedor.token);
+      await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+    } catch { /* la limpieza no tapa el motivo real */ }
+  }
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return 'tres órdenes pagadas por Mercado Pago —por el aviso repetido tres veces y dos vueltas, por la vuelta '
+    + 'y dos avisos después, y por el reconciliador antes de un aviso tardío— tienen un «Pago aprobado» para quien '
+    + 'compra y un «Venta pagada» para quien vende, cada una; se leen en la pestaña en escritorio y en celular, y '
+    + '«Confirmar Pedido» está en Mis Ventas';
+});
+
+// 213. Tres confirmaciones a la vez del mismo pago no cuelgan la API.
+//
+// HOY FALLA, y desde antes de AVISOS-DE-PAGO-1: por eso no es parte de la
+// suite y corre sólo con SMOKE_CASOS=213. Al terminar, la API queda colgada y
+// hay que reiniciarla.
+//
+// Qué pasa: el webhook y la vuelta de quien compra toman la fila de la orden
+// con `FOR UPDATE` y, con la fila tomada, esperan a Mercado Pago para apagar
+// el link (`await apagar_link`). Una segunda confirmación que llega en ese
+// momento pide la misma fila con una llamada síncrona, que frena el único
+// bucle de eventos del proceso: la primera ya no puede terminar y ninguna
+// otra petición se atiende.
+if (CASOS_PEDIDOS.includes(213)) {
+  await runCase(213, 'Tres confirmaciones a la vez del mismo pago no cuelgan la API', async () => {
+    const CUENTA = '900722';
+    const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+    const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+    await comprador();
+    await desvincular(vendedor.token);
+    assert((await vincular(vendedor.token, `ok:${CUENTA}`)).ok === 'vinculado', 'el vendedor no vinculó');
+    const orden = await ordenMercadoPago(vendedor);
+    const pago = doble.crearPago({
+      referencia: `topgreen-${orden.order_number}`, preferencia: orden.preferencia, cuenta: CUENTA,
+      monto: orden.amount, ordenId: orden.order_id, ordenNumero: orden.order_number, estado: 'approved',
+    });
+    const carrera = Promise.all([
+      avisar({ dataId: pago.id, cuenta: CUENTA }),
+      avisar({ dataId: pago.id, cuenta: CUENTA }),
+      pedirCrudo(`/orders/${orden.order_id}/payment-state`, { method: 'POST', header: state.buyerToken, body: {} }),
+    ]).then(() => 'terminaron');
+    const reloj = new Promise((seguir) => { setTimeout(() => seguir('colgada'), 30_000); });
+    const resultado = await Promise.race([carrera, reloj]);
+    doble.cerrar();
+    assert(resultado === 'terminaron',
+      `las tres confirmaciones de ${orden.order_number} no terminaron en 30 s y la API dejó de responder`);
+    return `las tres confirmaciones de ${orden.order_number} terminaron`;
+  });
+}
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
