@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-09-26.
+Actualizado: 2026-09-27.
 
 `NOW.md` contiene sólo estado vigente, restricciones vivas, bloqueos y próxima acción. La historia anterior permanece en Git; la instantánea previa a esta poda está en `ab4165fc`.
 
@@ -8,27 +8,33 @@ Actualizado: 2026-09-26.
 
 - **Fase contractual:** Fase 3 — Buscador y catálogo, semanas 6–8 (25/09–15/10). La puerta de la Fase 2 quedó verificada el 23/09 (`REPRODUCCION-FASE-2-2026-09-23.md`). La puerta de la Fase 3 y el hito intermedio ya se aceptaron por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `c92c0d7`, publicado el 26/09 con autorización de Emi («Dale actualizás? Así le paso a la clienta»), por fast-forward desde `238d113`. Suma la parte 2 de `ATRIBUTOS-RUBRO-1` (modelo, año, origen, el panel en tres grupos y tres P2, migración `a47300b5554c`) y `USER-GUIDE-1` (guía de uso y corrección de las órdenes). La verificación previa fue sobre el mismo código (`5a197bf`, que difiere sólo en `docs/pm`): suite 205/206 (169 de entorno), las dos guías, puertas verdes, sin secretos ni archivos prohibidos. **Pendiente: Emi verifica** modelo, año y origen en el alta y el panel nuevo. Antes: `238d113`, verificado (marcas).
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. Todo lo aceptado está en `main`. `PUBLISH-FIELDS-1` está asignada.
-- **Última decisión PM:** `USER-GUIDE-1` **ACEPTADA EN RAMA** (`5a197bf`): guía de uso de 22 pasos verificada por `guia-usuario.mjs`, corrección de las órdenes (caso 206) y modelo en el buscador (caso 205). Ocho negativos en rojo, uno de PM que rompe el producto sin tocar la guía. Suite 205/206 (169 de entorno) y puertas verdes. Evidencia en `REPRODUCCION-USER-GUIDE-1-2026-09-26.md`.
-- **Tarea activa:** `PUBLISH-FIELDS-1`: sacar del alta «Características del Producto» y «Etiquetas», que no se guardan, y mostrar y editar la marca. Los dos defectos los encontró la guía de uso.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `PUBLISH-FIELDS-1` y `REV1-PENDIENTES-1` están aceptadas en rama (`4d5e409`) y **esperan la autorización de Emi para publicarse**. `NOTIF-TEXTOS-1` está asignada.
+- **Última decisión PM:** `PUBLISH-FIELDS-1` y `REV1-PENDIENTES-1` **ACEPTADAS EN RAMA** (`4d5e409`). Sacan del alta lo que no se guardaba, muestran y editan la marca, cambian «operaciones» por «publicaciones» y resuelven #2, #4, #6, #11a, #13 y #14 de la devolución de la clienta, sin «comisión» visible. Diez negativos en rojo, cuatro de PM. Suite 208/209 (169 de entorno) y puertas verdes. Evidencia en `REPRODUCCION-PUBLISH-FIELDS-1-Y-REV1-PENDIENTES-1-2026-09-27.md`.
+- **Tarea activa:** `NOTIF-TEXTOS-1`: las notificaciones que prometen dinero que AgroBoeda no tiene («El monto total será reembolsado.»), el «vos» en las notificaciones y el caso 79 suelto.
 - **Corrección de método PM (25/09):** las aceptaciones de la marca no verificaron la carga de datos en producción. Desde ahora, toda pieza que agrega una lista o un catálogo tiene que decir cómo llega a producción, y PM lo comprueba con un caso sobre una base sin siembra.
 - **#9, atributos por rubro: absorbido (decisión de Emi, 25/09).** Tercer nivel de la taxonomía de la clienta como filtro en todos los rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. «Inversores» queda afuera. Va después de `MERCADO-UNICO-1` y antes de las guías de uso.
 - **Devolución de la clienta del 20/09 — estado (27/09):**
-  - hechos: #1, #7, #8 y #9;
-  - asignados: #3 en `PUBLISH-FIELDS-1`, y #2, #4, #6, #11a, #13, #14 y «no cobra comisión» en `REV1-PENDIENTES-1`;
+  - hechos: #1, #7, #8 y #9; aceptados en rama y sin publicar: #2, #3, #4, #6, #11a, #13, #14 y «no cobra comisión»;
   - **esperan una charla de Emi con la clienta:** #5 (la idea de Inicio), #10 (AgroMarket como módulo), #12 (misión y visión), #11b (retener fondos y comisión, que chocan con reglas del proyecto) y la logística en los filtros;
   - **#15, el correo:** Emi lo ve el 28/09. La clienta está armando la casilla en DonWeb.
 
   El #3 quedó sin asignar entre el 20/09 y el 27/09 por un descuido de PM.
 - **Escalado a Emi:** la regla «el teléfono no sale de la API sin suscripción activa» choca con la decisión del 05/08, que pasó suscripciones y candados por plan a Fase 6. Hoy el teléfono no se publica en el Mercado ni en las fichas, pero sí lo ven las dos partes de una orden y quien compra al elegir transportista, sin suscripción. El transportista no recibe el de quien compra.
 
-## Última aceptación PM — USER-GUIDE-1
+## Última aceptación PM — PUBLISH-FIELDS-1 y REV1-PENDIENTES-1
 
-`docs/USER_MANUAL.md` pasa a ser la guía de uso de AgroBoeda para quien
-compra, vende y transporta, sin credenciales, y `scripts/guia-usuario.mjs` la
-recorre en el navegador. Al escribirla apareció un defecto en las órdenes (se
-perdían el traslado y «Calificar Vendedor» después de cada acción), que se
-corrigió en la misma pieza. Publicada en `c92c0d7`.
+El alta ya no ofrece lo que no se guardaba, y la marca se ve en la ficha y se
+cambia en «Editar». El sitio dice «publicaciones» en vez de «operaciones».
+Además, se resuelve lo que la devolución de la clienta del 20/09 pedía sin
+decisiones pendientes:
+
+- Inicio sin publicaciones;
+- «Precio y modalidad»;
+- el radio del transportista;
+- una sola invitación;
+- sin preguntas frecuentes, sin «Nuestro equipo» y sin «comisión».
+
+Aceptadas en rama sobre `4d5e409`, **sin publicar**.
 
 ## Aceptaciones anteriores
 
@@ -38,6 +44,7 @@ riesgos que dejaron abiertos están en «Pendientes canónicos adoptados».
 
 | Pieza | Estado | Evidencia |
 |---|---|---|
+| `PUBLISH-FIELDS-1` y `REV1-PENDIENTES-1` | aceptadas en rama (`4d5e409`), sin publicar | `REPRODUCCION-PUBLISH-FIELDS-1-Y-REV1-PENDIENTES-1-2026-09-27.md` |
 | `USER-GUIDE-1` | publicada en `c92c0d7` | `REPRODUCCION-USER-GUIDE-1-2026-09-26.md` |
 | `ATRIBUTOS-RUBRO-1` parte 2 | publicada en `c92c0d7` | `REPRODUCCION-ATRIBUTOS-RUBRO-1-P2-2026-09-26.md` |
 | `PROD-LISTS-1` | publicada en `238d113` | `REPRODUCCION-PROD-LISTS-1-2026-09-26.md` |
