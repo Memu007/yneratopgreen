@@ -10,7 +10,7 @@ Actualizado: 2026-09-27.
 - **`main`:** `c92c0d7`, publicado el 26/09 con autorización de Emi («Dale actualizás? Así le paso a la clienta»), por fast-forward desde `238d113`. Suma la parte 2 de `ATRIBUTOS-RUBRO-1` (modelo, año, origen, el panel en tres grupos y tres P2, migración `a47300b5554c`) y `USER-GUIDE-1` (guía de uso y corrección de las órdenes). La verificación previa fue sobre el mismo código (`5a197bf`, que difiere sólo en `docs/pm`): suite 205/206 (169 de entorno), las dos guías, puertas verdes, sin secretos ni archivos prohibidos. **Pendiente: Emi verifica** modelo, año y origen en el alta y el panel nuevo. Antes: `238d113`, verificado (marcas).
 - **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `PUBLISH-FIELDS-1`, `REV1-PENDIENTES-1`, `NOTIF-TEXTOS-1` y `AVISOS-DE-PAGO-1` están aceptadas en rama (`c6792ff`) y **esperan la autorización de Emi para publicarse**.
 - **Última decisión PM:** `AVISOS-DE-PAGO-1` **ACEPTADA EN RAMA** (`c6792ff`, producto en `a97911b`). Rechazar una transferencia avisa a quien compra; aprobarla, o que Mercado Pago acredite, avisa a las dos partes, una sola vez por orden. Seis negativos en rojo, dos de PM. Suite 211/212 (131 de entorno), puertas y guías verdes. **P1 confirmado por PM y previo a la pieza:** tres confirmaciones a la vez del mismo pago de Mercado Pago cuelgan la API. Bloquea habilitar Mercado Pago. Evidencia en `REPRODUCCION-AVISOS-DE-PAGO-1-2026-09-27.md`.
-- **Tarea activa:** ninguna. La próxima la asigna PM cuando Emi ordene la cola (ver «Próxima secuencia»).
+- **Tarea activa:** `COBRO-CONCURRENTE-1`: que confirmaciones de Mercado Pago a la vez no cuelguen la API (el P1). Asignada el 27/09 por decisión de Emi («dale 1»).
 - **Corrección de método PM (25/09):** las aceptaciones de la marca no verificaron la carga de datos en producción. Desde ahora, toda pieza que agrega una lista o un catálogo tiene que decir cómo llega a producción, y PM lo comprueba con un caso sobre una base sin siembra.
 - **#9, atributos por rubro: absorbido (decisión de Emi, 25/09).** Tercer nivel de la taxonomía de la clienta como filtro en todos los rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. «Inversores» queda afuera. Va después de `MERCADO-UNICO-1` y antes de las guías de uso.
 - **Devolución de la clienta del 20/09 — estado (27/09):**
@@ -161,10 +161,11 @@ Evidencia: `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
   API. PM lo reprodujo sobre `c6792ff` y sobre el producto de `2e86854`
   (caso 213, fuera de la suite). **Bloquea habilitar Mercado Pago.** Puede
   pasar también en «Rechazar» o «Cancelar» una orden de Mercado Pago (sin
-  reproducir). Tarea propia antes de habilitar Mercado Pago.
+  reproducir). **Tarea activa: `COBRO-CONCURRENTE-1`.**
 - **Pago que llega a una orden ya cerrada:** no avisa (decisión PM del
   27/09), porque «Pago aprobado» sería falso. Hoy sólo queda en el registro
-  del servidor y nadie se entera. Se resuelve con el P1.
+  del servidor y nadie se entera. Pieza propia después del P1, también antes
+  de habilitar Mercado Pago.
 - **Devolución concurrente de stock:** cancelar o rechazar una orden pagada aún
   usa lectura y escritura en Python. Dev no reprodujo pérdida en 6 rondas porque
   esos endpoints hoy se ejecutan sin intercalarse; queda como riesgo de diseño,

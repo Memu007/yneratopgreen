@@ -199,6 +199,7 @@ o un rediseño nuevo.
 | 42 | **REV1-PENDIENTES-1 — aceptada en rama** | Lo pendiente de la devolución del 20/09 que no espera decisiones | `74b0666`…`4d5e409`: #2, #4, #6, #11a, #13, #14 y sin «comisión» visible, más la notificación falsa del 95 %. Caso 209. PM: diez negativos en rojo, suite 208/209, puertas verdes. |
 | 43 | **NOTIF-TEXTOS-1 — aceptada en rama** | Notificaciones que prometían dinero que AgroBoeda no tiene | `3e806de`…`4db386b`: seis textos corregidos, en «vos», y el 79 suelto. Caso 210. PM: seis negativos en rojo, suite 209/210, puertas verdes. Evidencia en `REPRODUCCION-NOTIF-TEXTOS-1-2026-09-27.md`. |
 | 44 | **AVISOS-DE-PAGO-1 — aceptada en rama** | Quien paga no se entera de lo que pasó con su pago | `efb743c`…`c6792ff`: avisos al rechazar o aprobar una transferencia y al acreditarse un pago por Mercado Pago, una sola vez por orden. Casos 211 y 212. PM: seis negativos en rojo, suite 211/212, puertas y guías verdes. P1 previo confirmado (caso 213). Evidencia en `REPRODUCCION-AVISOS-DE-PAGO-1-2026-09-27.md`. |
+| 45 | **COBRO-CONCURRENTE-1 — asignada** | Tres confirmaciones a la vez del mismo pago de Mercado Pago cuelgan la API (P1 previo) | Ningún camino espera una fila tomada frenando el proceso; el 213 entra a la suite. Condición para habilitar Mercado Pago. Tarea activa en `PARA-DEV.md`. |
 
 Cinco mil visitas mensuales no justifican reescribir la arquitectura. Esta
 puerta cierra primero paginación, consultas y recorridos medidos; capacidad y
