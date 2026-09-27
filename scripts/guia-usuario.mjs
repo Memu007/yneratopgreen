@@ -942,7 +942,7 @@ const RECORRIDOS = {
       limites: 'Por eso, donde aparece, dice «declarado por quien vende».',
     }, async () => {
       const d = await datos();
-      const esperados = { Potencia: '140 HP', Modelo: c.modelo, Año: '2016', Condición: 'Usado' };
+      const esperados = { Potencia: '140 HP', Marca: 'John Deere', Modelo: c.modelo, Año: '2016', Condición: 'Usado' };
       for (const [rotulo, valor] of Object.entries(esperados)) exigir(d[rotulo] === valor, `«${rotulo}» dice «${d[rotulo]}» y tenía que decir «${valor}»`);
       exigir(/Dueño directo\s*declarado por quien vende/i.test(d['Origen'] || ''), `«Origen» dice «${d['Origen']}»`);
       const cuerpo = await page.locator('main').innerText();
@@ -1442,10 +1442,7 @@ const RECORRIDOS = {
     await formulario.locator('#category').selectOption('Maquinaria agrícola');
     await formulario.locator('#subcategory').selectOption('Cosecha');
     await formulario.locator('#subcategory-type').waitFor();
-    // Características y etiquetas no se guardan: la guía no las describe
-    // (consulta a la PM, USER-GUIDE-1).
-    const sinGuardar = { fuera: ['Características del Producto', 'Etiquetas'] };
-    await v.inventario('el formulario con «Cosecha»', formulario, null, sinGuardar);
+    await v.inventario('el formulario con «Cosecha»', formulario);
     await formulario.locator('#subcategory').selectOption('Tractores');
     await formulario.locator('#power-hp').waitFor();
     await v.afirma('Ninguno es obligatorio', async () => {
@@ -1487,7 +1484,7 @@ const RECORRIDOS = {
     await c.esperarA(async () => (await formulario.locator('#locality option').count()) > 1, 'no cargaron las localidades');
     await formulario.locator('#locality').selectOption(c.pergamino);
     await v.mirar(page);
-    await v.inventario('el formulario con «Tractores»', formulario, null, sinGuardar);
+    await v.inventario('el formulario con «Tractores»', formulario);
     await formulario.getByRole('button', { name: 'Publicar producto' }).click();
     await titulo.waitFor({ state: 'hidden', timeout: 20_000 }).catch(() => { throw new Falla('el formulario no se cerró al publicar'); });
     const [id] = queryRows(`SELECT id, 'fin' FROM products WHERE name = ${sqlLiteral(nombre)}`)[0] || [];
@@ -1502,11 +1499,11 @@ const RECORRIDOS = {
     await v.afirma(['Los datos que cargás aparecen en la página de la publicación', 'El origen se muestra con «declarado por quien vende».'], async () => {
       const d = Object.fromEntries(await page.locator('main dl[class*="_datos_"] > div').evaluateAll((filas) => filas
         .map((f) => [f.querySelector('dt')?.textContent?.trim(), f.querySelector('dd')?.innerText?.replace(/\s+/g, ' ').trim()])));
-      const esperados = { Potencia: '150 HP', Modelo: modelo, Año: '2019', Condición: 'Usado' };
+      const esperados = { Potencia: '150 HP', Marca: 'John Deere', Modelo: modelo, Año: '2019', Condición: 'Usado' };
       for (const [rotulo, valor] of Object.entries(esperados)) exigir(d[rotulo] === valor, `«${rotulo}» dice «${d[rotulo]}» y se cargó «${valor}»`);
       exigir(/Agencia \/ Concesionaria\s*declarado por quien vende/i.test(d['Origen'] || ''), `«Origen» dice «${d['Origen']}»`);
     });
-    await v.afirma('sirven para los filtros del Mercado; la marca se usa en el filtro «Marca»', async () => {
+    await v.afirma('sirven para los filtros del Mercado; la marca también se usa en el filtro «Marca»', async () => {
       const buscar = `search=${encodeURIComponent(nombre)}`;
       for (const filtro of ['brand=john-deere', 'year_from=2019', 'origin=concesionaria', 'condition=usado']) {
         const total = (await pedir(`/catalog/products?${buscar}&${filtro}`)).data.total;
@@ -1533,10 +1530,8 @@ const RECORRIDOS = {
     await edicion.locator('#edit-potencia').waitFor({ timeout: 10_000 });
     await v.inventario('«Editar Producto»', edicion);
     await v.mirar(page);
-    await v.afirma('La «Categoría» y la marca no se cambian desde acá.', async () => {
+    await v.afirma('La «Categoría» no se cambia desde acá.', async () => {
       exigir(await edicion.getByLabel('Categoría', { exact: true }).isDisabled(), 'la categoría se puede cambiar');
-      const rotulos = await edicion.locator('label').allInnerTexts();
-      exigir(!rotulos.some((r) => /^marca/i.test(r.trim())), 'la marca se puede cambiar');
     });
     await v.afirma('«Cancelar» cierra sin guardar', async () => {
       await edicion.getByLabel('Precio ($)').fill('1');
@@ -1561,6 +1556,19 @@ const RECORRIDOS = {
       await edicion.waitFor({ state: 'hidden', timeout: 15_000 });
       await c.esperarA(async () => Number(queryRows(`SELECT price, 'fin' FROM products WHERE id = ${sqlLiteral(c.publicado.id)}`)[0][0]) === 51000000,
         'el precio nuevo no quedó guardado');
+    });
+    const marcaGuardada = () => queryRows(`SELECT coalesce(brand, '(sin marca)'), 'fin' FROM products
+      WHERE id = ${sqlLiteral(c.publicado.id)}`)[0][0];
+    await v.afirma('En «Marca», «Sin declarar» la quita.', async () => {
+      for (const [opcion, esperada] of [['Case', 'case'], ['Sin declarar', '(sin marca)']]) {
+        await tarjeta(c.publicado).getByRole('button', { name: 'Editar' }).click();
+        await edicion.waitFor({ timeout: 15_000 });
+        await c.esperarA(async () => (await edicion.locator('#edit-marca option').count()) > 2, 'la edición no ofrece las marcas');
+        await edicion.getByLabel('Marca', { exact: true }).selectOption({ label: opcion });
+        await edicion.getByRole('button', { name: /Guardar Cambios/ }).click();
+        await edicion.waitFor({ state: 'hidden', timeout: 15_000 });
+        await c.esperarA(async () => marcaGuardada() === esperada, `con «${opcion}» la marca quedó «${marcaGuardada()}»`);
+      }
     });
     await v.afirma(['«Pausar» la saca del Mercado sin borrarla.', 'Una publicación pausada no se ve en el Mercado.'], async () => {
       await tarjeta(c.publicado).getByRole('button', { name: 'Pausar' }).click();

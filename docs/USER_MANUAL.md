@@ -165,8 +165,8 @@ publicación que no declaró el año, por ejemplo, no aparece al filtrar por añ
 
 En el Mercado, tocá el nombre de una publicación o «Ver detalle». Se abre su
 página, con el precio, dónde está y lo que declaró quien vende: «Tipo»,
-«Potencia», «Modelo», «Año», «Origen» y «Condición», cuando los cargó. El
-origen lleva «declarado por quien vende».
+«Potencia», «Marca», «Modelo», «Año», «Origen» y «Condición», cuando los
+cargó. El origen lleva «declarado por quien vende».
 
 El botón principal depende de la publicación:
 
@@ -340,8 +340,8 @@ Según la categoría, el formulario pide más datos. Ninguno es obligatorio:
   tipos, como «Cosecha», además «Tipo».
 
 Los datos que cargás aparecen en la página de la publicación y sirven para los
-filtros del Mercado; la marca se usa en el filtro «Marca». El origen se muestra
-con «declarado por quien vende».
+filtros del Mercado; la marca también se usa en el filtro «Marca». El origen se
+muestra con «declarado por quien vende».
 
 En «Fotografías del producto (opcional)» podés subir fotos: tocá donde dice
 «Arrastra imágenes aquí», o arrastralas ahí. Con las fotos cargadas, la
@@ -364,9 +364,10 @@ En «Mi cuenta», abrí «Mis publicaciones». Cada una muestra su estado:
 - «Editar» abre «Editar Producto». Ahí cambiás «Nombre del Producto»,
   «Descripción», «Subcategoría», «Clase de publicación», «Condición»,
   «Precio ($)», «Stock», «Unidad», «Provincia», «Localidad», las imágenes y
-  los datos declarados: «Tipo», «Potencia (HP)», «Modelo», «Año» y «Origen
-  (declarado por vos)». «Guardar Cambios» guarda y «Cancelar» cierra sin
-  guardar. La «Categoría» y la marca no se cambian desde acá.
+  los datos declarados: «Tipo», «Potencia (HP)», «Marca», «Modelo», «Año» y
+  «Origen (declarado por vos)». En «Marca», «Sin declarar» la quita.
+  «Guardar Cambios» guarda y «Cancelar» cierra sin guardar. La «Categoría» no
+  se cambia desde acá.
 - «Pausar» la saca del Mercado sin borrarla. «Activar» la vuelve a mostrar.
 - El botón de la papelera la elimina, después de confirmar con «Eliminar».
 
@@ -535,9 +536,6 @@ mirarlas.
 Además, el programa no mira:
 
 - el pie de página, que tiene el contacto de la empresa;
-- los bloques «Características del Producto» y «Etiquetas» del formulario de
-  publicar: lo que se escribe ahí no se guarda (defecto informado, PENDIENTE
-  de decisión), y la guía no los describe;
 - el contenido de «Notificaciones», «Quiénes somos» y «Contacto»;
 - las publicaciones de servicios paso a paso: las recorre sólo en el Mercado;
 - los planes y suscripciones, que todavía no existen, ni qué datos de contacto
