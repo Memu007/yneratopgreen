@@ -179,7 +179,7 @@ async function publicas(page, medida) {
   // contraste ya las cubre; sin ellas las dos puertas medirían distinto
   await page.getByRole('button', { name: 'Quiénes somos', exact: true }).first().click();
   await revisar(page, 'quienes somos', medida,
-    page.getByRole('heading', { name: 'Nuestro equipo' }));
+    page.getByRole('heading', { name: 'Publicá o buscá en el Mercado agropecuario' }));
 
   // Los servicios ya no son una página: son el Mercado filtrado, al que lleva
   // «Servicios» del pie. Se mide cuando la grilla ya es la de servicios.

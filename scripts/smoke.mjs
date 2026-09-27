@@ -12888,7 +12888,7 @@ await runCase(123, 'Al 200 % de zoom las cinco pantallas siguen siendo usables',
 
     await publica.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await publica.getByRole('heading', { name: /seguir produciendo/, level: 1 }).waitFor({ timeout: 20_000 });
-    await medir(publica, 'inicio', publica.getByRole('button', { name: 'Explorar publicaciones' }));
+    await medir(publica, 'inicio', publica.getByRole('button', { name: 'Ir al Mercado' }));
 
     // Servicios ya no es una página: es el Mercado con el filtro de servicios,
     // y se llega desde el pie. Se mide ahí, con la acción de una tarjeta.
@@ -12965,10 +12965,13 @@ await runCase(123, 'Al 200 % de zoom las cinco pantallas siguen siendo usables',
     + 'acción principal visible, habilitada y dentro del ancho, y foco de teclado visible';
 });
 
-await runCase(124, 'Inicio muestra publicaciones reales, con el total de la API y sin claims', async () => {
+await runCase(124, 'Inicio dice cuántas publicaciones hay, con el total de la API y sin claims', async () => {
   // La portada era una placa índigo con «Bienvenido a AgroBoeda», tres
   // beneficios con iconos y tres claims —inteligencia artificial, mecanización
   // y confianza respaldada por alianzas— que el producto no demuestra.
+  //
+  // Desde REV1-PENDIENTES-1 no muestra publicaciones (la clienta, 20/09): sólo
+  // el total. El 209 mira la página entera en los dos anchos.
   const CLAIMS = [
     /Bienvenido a AgroBoeda/i,
     /inteligencia artificial/i,
@@ -13004,24 +13007,16 @@ await runCase(124, 'Inicio muestra publicaciones reales, con el total de la API 
     //    exige que la cifra sea EXACTAMENTE el total de la API: que lo
     //    contenga no alcanza, porque «155» contiene «15».
     const medidor = page.locator('p', { hasText: /publicaci(ón|ones) disponibles? ahora/i }).first();
+    await medidor.waitFor({ state: 'visible', timeout: 20_000 });
     const conteo = (await medidor.innerText()).replace(/\s+/g, ' ').trim();
     assert(new RegExp(`(^|\\D)${total}(\\D|$)`).test(conteo),
       `el conteo dice «${conteo}» y la API informa ${total}`);
 
-    // 2. Hasta tres publicaciones, y son publicaciones que existen en la base.
-    //    Se espera a la primera: mientras la vista previa carga hay esqueletos,
-    //    y contar en ese momento mediria el esqueleto y no el resultado.
-    const tarjetas = page.locator('article[class*="card"]');
-    await tarjetas.first().waitFor({ state: 'visible', timeout: 20_000 });
-    const cuantas = await tarjetas.count();
-    assert(cuantas > 0 && cuantas <= 3, `la vista previa muestra ${cuantas} publicaciones`);
-    for (let i = 0; i < cuantas; i += 1) {
-      const titulo = (await tarjetas.nth(i).getByRole('heading', { level: 3 }).innerText()).trim();
-      const [fila] = queryRows(`
-        SELECT COUNT(*)::text, 'fin' FROM products WHERE name = ${sqlLiteral(titulo)} AND status = 'ACTIVE'
-      `);
-      assert(fila[0] !== '0', `«${titulo}» no es una publicación activa de la base`);
-    }
+    // 2. Para el total alcanza con una: Inicio no trae publicaciones que no
+    //    muestra.
+    const deInicio = pedidos.filter((u) => /\/api\/catalog\/products\?/.test(u));
+    assert(deInicio.length > 0 && deInicio.every((u) => new URL(u).searchParams.get('page_size') === '1'),
+      `Inicio pidió publicaciones de más: ${deInicio.join(', ')}`);
 
     // 3. La fotografía del hero es uno de los dos derivados autorizados, y no
     //    se pidió ninguna imagen conceptual ni ningún dominio externo.
@@ -13047,80 +13042,38 @@ await runCase(124, 'Inicio muestra publicaciones reales, con el total de la API 
     });
     assert(encima === 'IMG', `hay algo encima de la fotografía del hero: ${encima}`);
 
-    // 5. El servidor se cae: se dice, se puede reintentar y no se confunde con
-    //    «todavía no hay operaciones publicadas».
+    // 5. El servidor se cae: Inicio no escribe un número que no sabe —ni un
+    //    cero, que sería decir que no hay nada— y el acceso al Mercado sigue.
     await page.route('**/api/catalog/products*', (route) => route.fulfill({
       status: 500, contentType: 'application/json', body: JSON.stringify({ detail: 'caída controlada' }),
     }));
-    await page.getByRole('button', { name: 'Ver todas las publicaciones' }).click();
+    await page.getByRole('button', { name: 'Ir al Mercado', exact: true }).click();
     await page.getByRole('button', { name: 'Inicio', exact: true }).first().click();
-    const aviso = page.getByRole('alert');
-    await aviso.waitFor({ state: 'visible', timeout: 20_000 });
-    const textoDelError = await aviso.innerText();
-    assert(/No pudimos cargar las publicaciones/.test(textoDelError),
-      `el error de la portada no se explica: ${JSON.stringify(textoDelError)}`);
-    assert(!/Todavía no hay publicaciones/.test(textoDelError),
-      'la falla se confunde con un catálogo vacío');
+    await page.getByRole('heading', { name: /seguir produciendo/, level: 1 }).waitFor({ timeout: 20_000 });
+    await esperarA(async () => (await page.locator('p', { hasText: /disponibles? ahora/i }).count()) === 0,
+      'con la API caída, Inicio sigue mostrando un total', 20_000);
+    assert(await page.getByRole('button', { name: 'Ir al Mercado', exact: true }).isVisible(),
+      'con la API caída, Inicio perdió el acceso al Mercado');
 
-    // 6. Sin red: el texto acordado, y no el general.
-    await contexto.setOffline(true);
-    await page.getByRole('button', { name: 'Reintentar' }).click();
-    await page.getByText('Sin conexión. Revisá tu red e intentá de nuevo.', { exact: true })
-      .waitFor({ state: 'visible', timeout: 20_000 });
-
-    // 7. Vuelve todo y reintentar recupera las operaciones de verdad.
-    await contexto.setOffline(false);
+    // 6. Vuelve la API y, al volver a Inicio, el total es otra vez el de verdad.
     await page.unroute('**/api/catalog/products*');
-    await page.getByRole('button', { name: 'Reintentar' }).click();
-    await page.locator('article[class*="card"]').first().waitFor({ timeout: 20_000 });
-    assert(await page.getByRole('alert').count() === 0,
-      'el aviso de error quedó pegado después de recuperar las operaciones');
-
-    // 8. Un título largo no rompe la composición ni se corta con puntos
-    //    suspensivos: el nombre completo tiene que poder leerse.
-    const vendedor = (await apiRequest('/auth/login', {
-      method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
-    })).data.access_token;
-    const [categoriaLarga] = queryRows(
-      "SELECT id, 'fin' FROM categories WHERE is_service = false ORDER BY name LIMIT 1");
-    const nombreLargo = `Cabezal maicero de arrastre con sinfín reforzado, kit de cuchillas y `
-      + `repuestos originales para cosechadora de gran porte ${Date.now()}`;
-    await apiRequest('/products', {
-      method: 'POST', token: vendedor,
-      body: {
-        name: nombreLargo,
-        description: 'Publicación de prueba de texto largo en la vista previa de la portada.',
-        category_id: categoriaLarga[0],
-        price: 123456789,
-        stock: 4,
-        unit: 'unidad',
-        locality_id: localidadDelPadron('Pergamino', 'Buenos Aires'),
-        publication_type: 'producto',
-        operation_kind: 'insumo',
-      },
-    });
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    const tarjetaLarga = page
-      .getByRole('heading', { name: nombreLargo, exact: true, level: 3 });
-    await tarjetaLarga.waitFor({ state: 'visible', timeout: 20_000 });
-    const medida = await page.evaluate(() => ({
-      s: document.documentElement.scrollWidth,
-      c: document.documentElement.clientWidth,
-    }));
-    assert(medida.s <= medida.c + 1,
-      `un título largo desbordó la portada: scrollWidth=${medida.s} clientWidth=${medida.c}`);
-    const recorte = await tarjetaLarga.evaluate((el) => getComputedStyle(el).textOverflow);
-    assert(recorte !== 'ellipsis', 'el título de la operación se corta con puntos suspensivos');
+    await page.getByRole('button', { name: 'Ir al Mercado', exact: true }).click();
+    await page.getByRole('button', { name: 'Inicio', exact: true }).first().click();
+    const deVuelta = page.locator('p', { hasText: /publicaci(ón|ones) disponibles? ahora/i }).first();
+    await deVuelta.waitFor({ state: 'visible', timeout: 20_000 });
+    const recuperado = (await deVuelta.innerText()).replace(/\s+/g, ' ').trim();
+    assert(new RegExp(`(^|\\D)${total}(\\D|$)`).test(recuperado),
+      `después de recuperar, el conteo dice «${recuperado}» y la API informa ${total}`);
 
     await contexto.close();
   } finally {
     await browser.close();
   }
 
-  return `la portada no tiene claims ni «destacadas»; el conteo repite el total de la API (${total}), `
-    + 'las operaciones son publicaciones activas de la base, el hero usa un derivado autorizado '
-    + 'sin nada encima y sin pedidos externos, error, sin conexión y recuperación se distinguen, '
-    + 'y un título de 140 caracteres no desborda ni se corta con puntos suspensivos';
+  return `la portada no tiene claims ni «destacadas»; el conteo repite el total de la API (${total}) `
+    + 'y para eso pide una sola publicación; el hero usa un derivado autorizado sin nada encima y sin '
+    + 'pedidos externos; con la API caída no escribe un total y conserva «Ir al Mercado», y al '
+    + 'volver la API el total reaparece';
 });
 
 await runCase(125, 'Los servicios se ven en el Mercado filtrado: publicaciones reales de servicio y logística, sin claims', async () => {
@@ -15573,7 +15526,9 @@ await runCase(138, 'Sin sesion, el detalle ofrece ingresar y vuelve a la misma p
 });
 
 
-await runCase(139, 'La misma puerta de ingreso en Inicio, en el Mercado y en el Mercado de servicios', async () => {
+await runCase(139, 'La misma puerta de ingreso en el Mercado y en el Mercado de servicios', async () => {
+  // Inicio también estaba: dejó de dibujar tarjetas con REV1-PENDIENTES-1.
+  //
   // El detalle ya ofrecia ingresar, pero solo en el Mercado y solo desde el
   // detalle: la TARJETA agregaba al carrito en silencio —ni un aviso—, y las
   // vistas previas de Inicio y Servicios no tenian por donde abrir el Login.
@@ -15646,13 +15601,12 @@ await runCase(139, 'La misma puerta de ingreso en Inicio, en el Mercado y en el 
     operation_kind: 'activo',
   });
   // Cual de las dos recorre cada pantalla. El Mercado de servicios solo
-  // dibuja servicios, y las otras dos dibujan el catalogo entero.
+  // dibuja servicios, y el Mercado dibuja el catalogo entero.
   const laPublicacionDe = {
-    Inicio: nombreDelActivo,
     Mercado: nombreDelActivo,
     Servicios: nombreDelServicio,
   };
-  // Inicio y el Mercado estan en la cabecera; los servicios, en el pie.
+  // El Mercado esta en la cabecera; los servicios, en el pie.
   const irA = (page, seccion) => (seccion === 'Servicios'
     ? irAlMercadoDeServicios(page)
     : page.locator('header').first()
@@ -15715,8 +15669,8 @@ await runCase(139, 'La misma puerta de ingreso en Inicio, en el Mercado y en el 
   };
 
   try {
-    // --- C. Las tres pantallas, desde la tarjeta y desde el detalle ---------
-    for (const seccion of ['Inicio', 'Mercado', 'Servicios']) {
+    // --- C. Las dos pantallas, desde la tarjeta y desde el detalle ----------
+    for (const seccion of ['Mercado', 'Servicios']) {
       const nombre = laPublicacionDe[seccion];
       const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       const page = await context.newPage();
@@ -15826,14 +15780,15 @@ await runCase(139, 'La misma puerta de ingreso en Inicio, en el Mercado y en el 
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
     try {
-      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-      const laTarjeta = await esperarLaTarjeta(page, 'Inicio', nombreDelActivo);
+      await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(nombreDelActivo)}`,
+        { waitUntil: 'domcontentloaded' });
+      const laTarjeta = await esperarLaTarjeta(page, 'Mercado', nombreDelActivo);
       // Se pide ingresar desde una tarjeta y se cancela: la continuidad tiene
       // que morir ahi.
       await laTarjeta.getByRole('button', { name: 'Ingresar para continuar' }).click();
       await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
       await page.getByRole('button', { name: 'Cerrar' }).first().click();
-      await esperarLaTarjeta(page, 'Inicio despues de cancelar', nombreDelActivo);
+      await esperarLaTarjeta(page, 'Mercado despues de cancelar', nombreDelActivo);
       // Y ahora se ingresa desde la cabecera, que no viene de ninguna publicacion.
       await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
       await page.getByRole('heading', { name: 'Iniciar Sesión' }).waitFor({ timeout: 20_000 });
@@ -15868,19 +15823,19 @@ await runCase(139, 'La misma puerta de ingreso en Inicio, en el Mercado y en el 
     .trim().split('\n')
     .filter((archivo) => !archivo.endsWith('ProductCard/ProductCard.tsx'))
     .sort();
+  // Eran Inicio y la grilla; Inicio dejó de dibujarlas con REV1-PENDIENTES-1.
   const cubiertas = [
-    'src/components/Pages/HomePage.tsx',
     'src/components/ProductGrid/ProductGrid.tsx',
   ];
   assert(JSON.stringify(dondeSeDibujanTarjetas) === JSON.stringify(cubiertas),
     `ProductCard se dibuja en ${JSON.stringify(dondeSeDibujanTarjetas)} y esta prueba `
     + `recorre ${JSON.stringify(cubiertas)}`);
 
-  // Y las dos reciben la MISMA funcion de App: un solo Login, no dos.
+  // Y la grilla recibe la funcion de App: un solo Login, no dos.
   const app = readFileSync('src/App.tsx', 'utf8');
   const veces = (app.match(/onSolicitarIngreso=\{abrirLoginYVolver\}/g) || []).length;
-  assert(veces >= 2,
-    `App pasa la continuidad ${veces} veces y hacen falta dos pantallas`);
+  assert(veces >= 1,
+    `App pasa la continuidad ${veces} veces y la grilla la necesita`);
 
   const acciones = readFileSync('src/utils/anatomia.ts', 'utf8');
   assert(!/etiqueta: 'Iniciar operación'/.test(acciones),
@@ -15893,9 +15848,9 @@ await runCase(139, 'La misma puerta de ingreso en Inicio, en el Mercado y en el 
   }
 
 
-  return `ProductCard se dibuja en ${dondeSeDibujanTarjetas.length} pantallas y las dos reciben la `
-    + 'misma continuidad de App. Sobre dos publicaciones propias del caso '
-    + `(«${nombreDelActivo}» en Inicio y Mercado, «${nombreDelServicio}» en el Mercado de `
+  return `ProductCard se dibuja en ${dondeSeDibujanTarjetas.length} pantalla, que recibe la `
+    + 'continuidad de App. Sobre dos publicaciones propias del caso '
+    + `(«${nombreDelActivo}» en el Mercado, «${nombreDelServicio}» en el Mercado de `
     + 'servicios, '
     + 'buscadas por titulo exacto y no por posicion), sin sesion tanto la tarjeta como '
     + 'el detalle ofrecen «Ingresar para continuar» y abren el Login real con un solo dialogo a la '
@@ -16242,10 +16197,12 @@ await runCase(140, 'Nadie compra su propia publicacion, ni por la API ni por la 
     });
   }
 
-  // --- E. La pantalla, en las tres que dibujan tarjetas -------------------
+  // --- E. La pantalla, en las que dibujan tarjetas -------------------------
+  // Eran tres; Inicio dejó de dibujarlas con REV1-PENDIENTES-1.
+  //
   // Dos comprobaciones distintas y a proposito:
   //
-  // 1. EXHAUSTIVA y sin dirigir: en Inicio, Mercado y el Mercado de servicios se mira TODA
+  // 1. EXHAUSTIVA y sin dirigir: en el Mercado y el Mercado de servicios se mira TODA
   //    tarjeta dibujada y se exige que el rotulo coincida con de quien es la
   //    publicacion. Es mas fuerte que «hay al menos una»: no hay tarjeta que se
   //    escape.
@@ -16363,9 +16320,9 @@ await runCase(140, 'Nadie compra su propia publicacion, ni por la API ni por la 
       await page.locator('[class*="_submitButton_"][type="submit"]').click();
       await page.getByRole('button', { name: 'Mi cuenta' }).first().waitFor({ timeout: 25_000 });
 
-      // 1. Las tres pantallas, enteras, tal como quedan. Los servicios son el
+      // 1. Las dos pantallas, enteras, tal como quedan. Los servicios son el
       //    Mercado filtrado, y se llega desde el pie (MERCADO-UNICO-1).
-      for (const seccion of ['Inicio', 'Mercado', 'Servicios']) {
+      for (const seccion of ['Mercado', 'Servicios']) {
         if (seccion === 'Servicios') {
           await irAlMercadoDeServicios(page);
         } else {
@@ -18121,8 +18078,9 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
     WHERE is_service = false AND is_active = true ORDER BY name LIMIT 1`);
 
   // Dos publicaciones propias: la de servicio encabeza el Mercado de servicios
-  // y la de producto —creada ultima— encabeza la vista previa de Inicio y es el
-  // unico resultado de su propia busqueda en el Mercado.
+  // y la de producto es el unico resultado de su propia busqueda en el
+  // Mercado. (Encabezaba tambien la vista previa de Inicio, que se fue con
+  // REV1-PENDIENTES-1.)
   const servicio = `Nav147 servicio ${sello}`;
   const publicacion = `Nav147 publicacion ${sello}`;
   const altaDelServicio = await apiRequest('/products', {
@@ -18321,9 +18279,9 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
       await enLaFicha(nombre, momento);
     };
 
-    // Desde Inicio, sobre la vista previa, y desde el Mercado de servicios.
+    // Desde el Mercado de servicios. Inicio ya no tiene tarjetas desde donde
+    // abrir una ficha (REV1-PENDIENTES-1).
     for (const [seccion, url, nombre] of [
-      ['home', '/', publicacion],
       ['marketplace', '/?section=marketplace&type=servicios', servicio],
     ]) {
       await page.goto(`${FRONTEND_URL}${url}`, { waitUntil: 'domcontentloaded' });
@@ -18367,7 +18325,7 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
       + 'ninguna, las cuatro URL canonicas abren y recargan en su seccion, el Mercado '
       + `filtrado vuelve con Atras a «${conFiltros}» con el buscador, el tipo y su unico `
       + 'resultado, las cuatro pantallas de llegada normalizan el pathname al salir y no '
-      + 'reviven al recargar, y la ficha abierta desde Inicio, el Mercado de servicios y el '
+      + 'reviven al recargar, y la ficha abierta desde el Mercado de servicios y el '
       + 'Mercado filtrado tiene '
       + 'su propia URL, sin celda marcada, vuelve con Adelante y con recarga, y Atras la deja '
       + 'sin perder seccion ni filtros, sin dejar entrada fantasma cuando se sale con '
@@ -18406,9 +18364,10 @@ await runCase(148, 'Cada capa se cierra sola y devuelve el foco a su disparador'
   const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
 
   // Un servicio y un activo propios: los dos dibujan el boton «Ver detalle» en
-  // su tarjeta —un insumo a la venta no lo dibuja—, y creados en este orden el
-  // activo encabeza la vista previa de Inicio y el servicio, el Mercado de
-  // servicios: la página de Servicios dejó de existir con MERCADO-UNICO-1.
+  // su tarjeta —un insumo a la venta no lo dibuja—. El activo se busca por su
+  // nombre en el Mercado y el servicio encabeza el Mercado de servicios: la
+  // página de Servicios dejó de existir con MERCADO-UNICO-1, y la vista previa
+  // de Inicio, con REV1-PENDIENTES-1.
   const [categoriaDeServicio] = queryRows(`
     SELECT id, 'fin' FROM categories
     WHERE is_service = true AND is_active = true ORDER BY name LIMIT 1`);
@@ -18441,7 +18400,7 @@ await runCase(148, 'Cada capa se cierra sola y devuelve el foco a su disparador'
     method: 'POST', token: vendedor.token,
     body: {
       name: activo,
-      description: 'Publicacion efimera del caso 148, para abrir su detalle desde Inicio.',
+      description: 'Publicacion efimera del caso 148, para abrir su detalle desde el Mercado.',
       category_id: categoriaDeActivos[0],
       price: 14800,
       stock: 1,
@@ -18565,7 +18524,6 @@ await runCase(148, 'Cada capa se cierra sola y devuelve el foco a su disparador'
         cerradas.push(`${pantalla}/${forma}`);
       }
     };
-    await revisarElDetalle('Inicio', '/', activo);
     await revisarElDetalle('Mercado', `/?section=marketplace&q=${encodeURIComponent(activo)}`, activo);
     await revisarElDetalle('Mercado de servicios', '/?section=marketplace&type=servicios', servicio);
 
@@ -21215,34 +21173,27 @@ await runCase(155, 'El Mercado tiene dos vistas elegibles y ninguna geometría a
       await contexto.close();
     }
 
-    // --- H. Inicio sigue con su previa -------------------------------------
+    // --- H. Inicio no hereda la vista del Mercado ---------------------------
     // Acá también se visitaba Servicios, pero por `/services`: una ruta que la
     // barra nunca reconoció, así que se dibujaba Inicio y se medía dos veces.
-    // Desde MERCADO-UNICO-1 esa página no existe: queda Inicio.
+    // Desde MERCADO-UNICO-1 esa página no existe: queda Inicio. Y desde
+    // REV1-PENDIENTES-1 Inicio ya no tiene previa: no dibuja tarjetas, y
+    // tampoco los controles de vista, que son del Mercado.
     {
       const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       const page = await contexto.newPage();
       for (const [seccion, url] of [['Inicio', `${FRONTEND_URL}/`]]) {
         await page.goto(url, { waitUntil: 'domcontentloaded' });
-        await page.locator('article[class*="card"]').first()
+        await page.getByText(/publicaci(ón|ones) disponibles? ahora/i).first()
           .waitFor({ state: 'visible', timeout: 25_000 });
-        const previa = await page.evaluate(() => {
-          const tarjetas = [...document.querySelectorAll('article[class*="card"]')];
-          const tiene = (el, marca) => [...el.classList].some((c) => c.startsWith(`_${marca}_`));
-          return {
-            tarjetas: tarjetas.length,
-            compactas: tarjetas.filter((el) => tiene(el, 'compacta')).length,
-            enRenglon: tarjetas.filter((el) => tiene(el, 'lista')).length,
-            selectores: document.querySelectorAll('input[name="vista-del-mercado"]').length,
-          };
-        });
-        assert(previa.tarjetas === previa.compactas && previa.tarjetas > 0,
-          `${seccion}: ${previa.compactas} de ${previa.tarjetas} tarjetas usan la previa compacta`);
-        assert(previa.enRenglon === 0,
-          `${seccion}: ${previa.enRenglon} tarjetas tomaron la geometría de Lista`);
+        const previa = await page.evaluate(() => ({
+          tarjetas: document.querySelectorAll('article').length,
+          selectores: document.querySelectorAll('input[name="vista-del-mercado"]').length,
+        }));
+        assert(previa.tarjetas === 0, `${seccion}: dibuja ${previa.tarjetas} tarjetas`);
         assert(previa.selectores === 0,
           `${seccion}: aparecieron ${previa.selectores} controles de vista, que son del Mercado`);
-        medidos.push(`${seccion}: ${previa.tarjetas} previas compactas y ningún selector`);
+        medidos.push(`${seccion}: sin tarjetas ni selector de vista`);
       }
       await contexto.close();
     }
@@ -25995,7 +25946,9 @@ await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o com
       // Quiénes somos entró después: era la pantalla que había quedado con el
       // Login sin continuidad —y sin aviso— cuando las otras dos ya lo habían
       // dejado. Está en la lista para que no vuelva a quedarse atrás sola.
-      { seccion: 'about', cta: 'Comenzar a Vender', aviso: 'Iniciá sesión para publicar una oferta' },
+      // Su botón decía «Comenzar a Vender»; con REV1-PENDIENTES-1 dice lo
+      // mismo que el de Inicio.
+      { seccion: 'about', cta: 'Publicar una oferta', aviso: 'Iniciá sesión para publicar una oferta' },
     ]) {
       // Todos los CTA de publicación de la pantalla, no uno elegido a mano: si
       // mañana aparece otro por un camino distinto, este caso lo recorre solo.
@@ -26768,22 +26721,20 @@ await runCase(168, 'Buscar es una acción, Contacto no promete planes, el Login 
       `el buscador sigue contando por consola: ${JSON.stringify(rastro.slice(0, 3))}`);
 
     // --- B. Contacto no promete planes ------------------------------------
+    //
+    // Lo decía la FAQ. Con REV1-PENDIENTES-1 la FAQ se fue entera (la
+    // clienta, 20/09), y con ella la pregunta de comisiones: el tema no se
+    // anticipa. Queda mirar que la página no lo diga por otro lado.
     await page.locator('header').first()
       .getByRole('button', { name: 'Contacto', exact: true }).first().click();
-    await page.getByRole('heading', { name: 'Preguntas Frecuentes' }).waitFor({ timeout: 20_000 });
-    const faq = await page.locator('section').filter({
-      has: page.getByRole('heading', { name: 'Preguntas Frecuentes' }),
-    }).first().innerText();
-    assert(/¿Hay comisiones por venta\?/.test(faq),
-      `la FAQ ya no trae la pregunta de comisiones:\n${faq}`);
-    for (const promesa of [/planes/i, /suscripci/i, /competitivas/i]) {
-      assert(!promesa.test(faq),
-        `la FAQ sigue prometiendo algo que no existe (${promesa}):\n${faq}`);
+    await page.getByRole('heading', { name: 'Información de Contacto' }).waitFor({ timeout: 20_000 });
+    const contacto = await page.locator('main, body').first().innerText();
+    for (const promesa of [/planes/i, /suscripci/i, /competitivas/i, /comisi/i, /Preguntas Frecuentes/i]) {
+      assert(!promesa.test(contacto),
+        `Contacto dice algo que no existe o no se anticipa (${promesa}):\n${contacto}`);
     }
-    assert(/no cobra comisión por la venta/i.test(faq) && /el pago va al vendedor/i.test(faq),
-      `la FAQ no dice la regla vigente —sin comisión, el pago al vendedor—:\n${faq}`);
-    sinTuteo('Contacto/FAQ', faq);
-    medidos.push('la FAQ dice la regla vigente y no menciona planes ni suscripciones');
+    sinTuteo('Contacto', contacto);
+    medidos.push('Contacto no menciona planes, suscripciones ni comisión');
 
     // --- C. El Login tiene salida, y no arrastra lo que quedó atrás --------
     //
@@ -26815,7 +26766,7 @@ await runCase(168, 'Buscar es una acción, Contacto no promete planes, el Login 
     await page.getByRole('button', { name: 'Escribinos por Contacto' }).click();
     await esperarA(async () => page.url().includes('section=contact'),
       `la salida de soporte no llevó a Contacto: ${page.url()}`, 20_000);
-    await page.getByRole('heading', { name: 'Preguntas Frecuentes' }).waitFor({ timeout: 20_000 });
+    await page.getByRole('heading', { name: 'Información de Contacto' }).waitFor({ timeout: 20_000 });
     assert(await page.getByRole('dialog').count() === 0,
       `irse a Contacto dejó ${await page.getByRole('dialog').count()} capa(s) abiertas`);
     // La continuidad se descartó: no reaparece la publicación de la que venía.
@@ -27242,7 +27193,8 @@ await runCase(169, 'El reinicio de la API prueba que cambió el proceso, o falla
 
 // ---------------------------------------------------------------------------
 // 170. El carrito que sobrevive a la sesión tiene por dónde volver a abrirse,
-// y la FAQ nombra los dos medios de pago que el producto tiene.
+// y la FAQ nombraba los dos medios de pago que el producto tiene (la FAQ se
+// fue con REV1-PENDIENTES-1; queda lo del carrito).
 //
 // Lo primero es lo que quedó abierto al cerrar el callejón del Checkout, y lo
 // dejé escrito al pie del caso 167: cuando la sesión se confirma inválida se
@@ -27513,32 +27465,11 @@ await runCase(170, 'Sin sesión, el carrito con ítems se reabre desde la cabece
       medidos.push('la salida explícita sigue vaciando el carrito, y con cero ítems la celda '
         + 'no queda ofreciendo un carrito vacío');
 
-      // === C. La FAQ dice los dos medios, con su condición ==================
-      await page.goto(`${FRONTEND_URL}/?section=contact`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { name: 'Preguntas Frecuentes' })
-        .waitFor({ timeout: 25_000 });
-      const pregunta = page.getByRole('heading', { name: '¿Cuáles son las formas de pago?' });
-      assert(await pregunta.count() === 1, 'la FAQ ya no trae la pregunta de formas de pago');
-      const respuesta = (await pregunta.locator('xpath=following-sibling::p[1]').innerText())
-        .replace(/\s+/g, ' ').trim();
-      assert(/transferencia/i.test(respuesta),
-        `la respuesta de pago dejó de nombrar la transferencia: ${JSON.stringify(respuesta)}`);
-      assert(/mercado\s*pago/i.test(respuesta),
-        'la respuesta de pago sigue sin nombrar Mercado Pago, que el producto cobra: '
-        + JSON.stringify(respuesta));
-      // La condición no es un adorno: `medios_de` sólo ofrece Mercado Pago si
-      // ESE vendedor lo tiene vinculado. Nombrarlo sin la condición sería
-      // prometerle a todo el mundo un medio que la mitad no tiene.
-      assert(/habilitad|vinculad/i.test(respuesta),
-        'la respuesta nombra Mercado Pago sin decir que depende de cada vendedor: '
-        + JSON.stringify(respuesta));
-      for (const invento of [/comisi/i, /plan(es)?\b/i, /suscripci/i, /custodia/i, /cuota/i]) {
-        assert(!invento.test(respuesta),
-          `la respuesta de pago promete algo que esta tarea no habilita (${invento}): `
-          + JSON.stringify(respuesta));
-      }
-      medidos.push('la FAQ de formas de pago nombra transferencia directa y Mercado Pago con su '
-        + 'condición por vendedor, sin comisiones, planes ni custodia');
+      // === C. La FAQ de formas de pago se fue ==============================
+      //
+      // Con REV1-PENDIENTES-1 salió la FAQ entera (la clienta, 20/09). Los dos
+      // medios de pago, con la condición del de Mercado Pago, los muestra el
+      // checkout, que es donde se elige. Que la FAQ no vuelva lo mira el 209.
     } finally {
       await contexto.close();
     }
@@ -29418,7 +29349,7 @@ await runCase(175, 'La marca filtra el conjunto entero y la faceta ofrece sólo 
 
       // Atrás devuelve el filtro, no sólo la dirección.
       await page.locator('header').getByRole('button', { name: 'Contacto', exact: true }).click();
-      await page.getByRole('heading', { name: 'Preguntas Frecuentes' })
+      await page.getByRole('heading', { name: 'Información de Contacto' })
         .waitFor({ state: 'visible', timeout: 25_000 });
       await page.goBack({ waitUntil: 'domcontentloaded' });
       await abrirLosFiltros();
@@ -31613,9 +31544,9 @@ await runCase(183, 'La ficha de una publicación es una página con URL propia, 
 
   // Cuarenta insumos de precios distintos: con 24 por página, el Mercado
   // filtrado por el marcador tiene dos páginas y la segunda da para bajar.
-  // Después el servicio y, al final, el activo: así el activo encabeza la
-  // vista previa de Inicio, que dibuja las tres más nuevas, y el servicio el
-  // Mercado de servicios, que reemplazó a la página de Servicios.
+  // Después el servicio y, al final, el activo: así el servicio encabeza el
+  // Mercado de servicios, que reemplazó a la página de Servicios. (El activo
+  // encabezaba la vista previa de Inicio, que se fue con REV1-PENDIENTES-1.)
   const TOTAL_DE_INSUMOS = 40;
   const insumos = [];
   for (let i = 1; i <= TOTAL_DE_INSUMOS; i += 1) {
@@ -31797,21 +31728,11 @@ await runCase(183, 'La ficha de una publicación es una página con URL propia, 
       await contexto.close();
     }
 
-    // === B. Desde Inicio y desde el Mercado de servicios; cotización y perfil
+    // === B. Desde el Mercado de servicios; cotización y perfil =============
+    // Inicio también abría fichas desde su vista previa, que se fue con
+    // REV1-PENDIENTES-1.
     {
       const { contexto, page, consola } = await nuevaPagina();
-      await page.goto(`${FRONTEND_URL}/`, { waitUntil: 'domcontentloaded' });
-      const verDetalle = (await esperarLaTarjeta(page, 'Inicio', activo))
-        .getByRole('link', { name: 'Ver detalle' });
-      await verDetalle.click();
-      await enLaFicha(page, activo, idDelActivo, 'ficha abierta desde Inicio');
-      assert((await salidaDeLaFicha(page).innerText()).trim() === 'Volver a Inicio',
-        `desde Inicio la ficha ofrece «${(await salidaDeLaFicha(page).innerText()).trim()}»`);
-      await salidaDeLaFicha(page).click();
-      await esperarA(async () => barra(page) === '/', `«Volver a Inicio» dejó «${barra(page)}»`, 20_000);
-      await esperarA(async () => (await focoEn(page)) === `enlace:detalle:${idDelActivo}`,
-        `volviendo a Inicio el foco está en ${await focoEn(page)} y no en su «Ver detalle»`, 10_000);
-
       const DE_SERVICIOS = '/?section=marketplace&type=servicios';
       await page.goto(`${FRONTEND_URL}${DE_SERVICIOS}`, { waitUntil: 'domcontentloaded' });
       const delServicio = (await esperarLaTarjeta(page, 'el Mercado de servicios', servicio))
@@ -31847,9 +31768,8 @@ await runCase(183, 'La ficha de una publicación es una página con URL propia, 
       await esperarA(async () => barra(page) === DE_SERVICIOS,
         `Atrás desde la ficha dejó «${barra(page)}» y no el Mercado de servicios`, 20_000);
       assert(consola.length === 0,
-        `Inicio y el Mercado de servicios dejaron errores de consola: ${consola[0]}`);
-      medidos.push('Inicio y el Mercado de servicios abren la ficha y vuelven; Inicio, con el foco '
-        + 'en su enlace; el perfil '
+        `el Mercado de servicios dejó errores de consola: ${consola[0]}`);
+      medidos.push('el Mercado de servicios abre la ficha y vuelve; el perfil '
         + 'es una capa que Escape cierra; la cotización va a Contacto con la publicación y Atrás '
         + 'vuelve a la ficha');
       await contexto.close();
@@ -33610,15 +33530,16 @@ await runCase(192, 'El sitio nombra el sector «agropecuario», y los textos má
   const PAGINAS = [
     ['Inicio', 'home', (page) => page.locator('#titulo-inicio')],
     ['Mercado', 'marketplace', (page) => page.locator('article').first()],
-    ['Quiénes somos', 'about', (page) => page.getByRole('heading', { name: /Listo para transformar/ })],
+    ['Quiénes somos', 'about', (page) => page.getByRole('heading', { name: /Publicá o buscá en el Mercado/ })],
     ['Contacto', 'contact', (page) => page.getByRole('heading', { name: 'Contacto', level: 1 })],
   ];
   // Los textos que se alargaron, donde están.
   const ALARGADOS = [
     ['home', 'la bajada de la portada', 'p.tg-eyebrow', 'Mercado agropecuario · Argentina'],
     ['home', 'la bajada del pie', 'footer p', 'Mercado agropecuario: productos, servicios y logística.'],
-    ['about', 'el cierre de Quiénes somos', 'p',
-      'soluciones tecnológicas para el sector agropecuario'],
+    // Decía «… soluciones tecnológicas para el sector agropecuario»; con
+    // REV1-PENDIENTES-1 el cierre es otro, y el sector está en su título.
+    ['about', 'el cierre de Quiénes somos', 'h2', 'Publicá o buscá en el Mercado agropecuario'],
   ];
   const CAPTURAS = process.env.SMOKE_CAPTURAS || mkdtempSync(`${tmpdir()}/topgreen-agro-`);
   mkdirSync(CAPTURAS, { recursive: true });
@@ -35914,10 +35835,10 @@ await runCase(208, 'Inicio, el Mercado y la ficha dicen «publicaciones» y no �
 
       // Inicio.
       await page.goto(`${FRONTEND_URL}/?section=home`, { waitUntil: 'domcontentloaded' });
-      await espera(page.getByRole('button', { name: 'Explorar publicaciones', exact: true }), 'Inicio no ofrece «Explorar publicaciones»');
-      await espera(page.getByRole('heading', { name: 'Publicaciones disponibles', exact: true }), 'Inicio no titula «Publicaciones disponibles»');
+      // Con REV1-PENDIENTES-1 Inicio ya no muestra publicaciones: queda el
+      // medidor, y el título del bloque de datos. El resto lo mira el 209.
       await espera(page.getByText(/^Publicaci(ón|ones) disponibles? ahora$/), 'el medidor de Inicio no dice «… publicaciones disponibles ahora»');
-      await page.locator('article[class*="card"]').first().waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
+      await espera(page.getByRole('heading', { name: 'Lo que muestra cada publicación.', exact: true }), 'Inicio no titula «Lo que muestra cada publicación.»');
       await sinOperaciones(page, `${ancho}, Inicio`);
 
       // El Mercado.
@@ -35953,6 +35874,283 @@ await runCase(208, 'Inicio, el Mercado y la ficha dicen «publicaciones» y no �
   return 'en escritorio y en celular, Inicio, el Mercado (con y sin resultados) y la ficha (también la que no está) '
     + 'dicen «publicaciones», en el texto, en los nombres accesibles y en lo que sólo lee el lector de pantalla, '
     + 'y ninguno dice «operación»';
+});
+
+// 209. REV1-PENDIENTES-1 — lo que quedó de la devolución de la clienta (20/09).
+//
+// Cada punto se mira en la pantalla, en escritorio y en celular:
+//  1. Inicio no muestra publicaciones y tiene un solo acceso al Mercado (#2).
+//  2. «Lo que muestra cada publicación.»: precio y modalidad juntos, el radio
+//     del transportista nombrado, sin «honesta» y sin instructivo (#4).
+//  3. La invitación que se repetía entre Inicio y Quiénes somos queda sólo en
+//     Quiénes somos (#6), y sin promesas (#14).
+//  4. Contacto sin preguntas frecuentes (#11a).
+//  5. Nada visible dice «comisión»: ni las páginas, ni la vinculación de
+//     Mercado Pago —sin vincular y vinculada—, ni la notificación de quien
+//     cancela. Lo que sí se dice sigue: AgroBoeda no recibe el dinero.
+//  6. Quiénes somos sin «Nuestro equipo» (#13).
+// Los problemas se juntan y el caso falla al final con todos, cada uno con su
+// ancho, para que un rojo diga qué punto volvió.
+await runCase(209, 'Inicio sin publicaciones, una sola invitación, sin preguntas frecuentes, sin equipo y sin «comisión»', async () => {
+  const problemas = [];
+  const medidos = [];
+  const sello = Date.now();
+  const INVITACION = 'Publicá o buscá en el Mercado agropecuario';
+  // Lo que ya no tiene que decir ninguna de las tres páginas.
+  const RETIRADO = [
+    [/Mercado activo/i, '«Mercado activo»'],
+    [/Ver todas las publicaciones/i, '«Ver todas las publicaciones»'],
+    [/Explorar publicaciones/i, '«Explorar publicaciones»'],
+    [/¿Tenés algo para ofrecer\?/i, '«¿Tenés algo para ofrecer?»'],
+    [/Listo para transformar/i, '«¿Listo para transformar tu producción?»'],
+    [/mejores soluciones tecnológicas/i, '«las mejores soluciones tecnológicas»'],
+    [/Preguntas Frecuentes/i, '«Preguntas Frecuentes»'],
+    [/¿Cómo empiezo a vender\?|¿Cuáles son las formas de pago\?|¿Realizan envíos/i, 'una pregunta de la FAQ'],
+    [/Nuestro equipo/i, '«Nuestro equipo»'],
+    [/Mercedes Raiz/i, '«Mercedes Raiz»'],
+    [/honest/i, '«honesta»'],
+    [/precio o modalidad/i, '«precio o modalidad»'],
+    [/próximo paso/i, '«próximo paso»'],
+    [/comisi[oó]n/i, '«comisión»'],
+  ];
+  // Lo que ve y lo que oye quien usa la página: el texto, los nombres
+  // accesibles y lo escondido para el lector de pantalla.
+  const loQueDice = (page, raiz = 'body') => page.evaluate((selector) => {
+    const donde = document.querySelector(selector);
+    if (!donde) return '';
+    return [
+      donde.innerText,
+      ...[...donde.querySelectorAll('[aria-label]')].map((el) => el.getAttribute('aria-label')),
+      ...[...donde.querySelectorAll('.tg-sr-only')].map((el) => el.textContent),
+      ...[...donde.querySelectorAll('img[alt]')].map((el) => el.getAttribute('alt')),
+    ].join('\n');
+  }, raiz);
+  const nadaRetirado = (texto, donde, salvo = []) => {
+    for (const [patron, nombre] of RETIRADO) {
+      if (salvo.includes(nombre)) continue;
+      const visto = texto.match(new RegExp(`[^\\n]{0,40}${patron.source}[^\\n]{0,30}`, patron.flags));
+      if (visto) problemas.push(`${donde} dice ${nombre}: «${visto[0].trim()}»`);
+    }
+  };
+  const sinDesborde = async (page, donde) => {
+    const medida = await page.evaluate(() => ({
+      s: document.documentElement.scrollWidth, c: document.documentElement.clientWidth,
+    }));
+    if (medida.s > medida.c + 1) problemas.push(`${donde} desborda a lo ancho (${medida.s} en ${medida.c})`);
+  };
+
+  // --- Las cuentas: quien vende, sin vincular y después vinculada al doble de
+  //     Mercado Pago; y quien compra, con una orden que cancela.
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const vende = { email: `rev1.vende.${sello}@example.com`, password: 'rev1vende123' };
+  const compra = { email: `rev1.compra.${sello}@example.com`, password: 'rev1compra123' };
+  await registrarYVerificar({ ...vende, full_name: `Vende Rev1 ${sello}`, role: 'user' });
+  await registrarYVerificar({ ...compra, full_name: `Compra Rev1 ${sello}`, role: 'user' });
+  const vendedora = await ingresarVendedor(vende.email, vende.password);
+  const compradora = await ingresarVendedor(compra.email, compra.password);
+  let publicacion = null;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    await apiRequest('/auth/me', { method: 'PATCH', token: vendedora.token, body: { alias_bancario: `rev1.${sello}` } });
+    ({ data: publicacion } = await apiRequest('/products', {
+      method: 'POST', token: vendedora.token,
+      body: {
+        name: `Semilla Rev1 ${sello}`, description: 'Publicación del caso 209, para una orden que se cancela.',
+        category_id: queryRows("SELECT id, 'fin' FROM categories WHERE slug = 'insumos-agricolas'")[0][0],
+        price: 2090, stock: 5, unit: 'kg', locality_id: localidadDelPadron('Pergamino', 'Buenos Aires'),
+        publication_type: 'producto', operation_kind: 'insumo',
+      },
+    }));
+    await apiRequest('/cart/items', {
+      method: 'POST', token: compradora.token, body: { product_id: publicacion.id, quantity: 1 },
+    });
+    const { data: checkout } = await apiRequest('/orders/checkout/transfer', {
+      method: 'POST', token: compradora.token,
+      body: {
+        shipping_address: 'Calle del caso 209', shipping_locality_id: localidadDeEnvio(),
+        shipping_postal_code: '2700', shipping_decisions: trasladoPropio(compradora.id),
+      },
+    });
+    const [orden] = checkout.orders;
+    const cancelada = await pedirCrudo(`/orders/${orden.order_id}/cancel`, {
+      method: 'POST', header: compradora.token, body: { reason: 'Caso 209' },
+    });
+    assert(cancelada.status === 200, `quien compra no pudo cancelar: HTTP ${cancelada.status}`);
+
+    const entrarComo = async (contexto, quien) => {
+      const { data } = await apiRequest('/auth/login', { method: 'POST', body: quien });
+      await contexto.addInitScript(({ access, refresh }) => {
+        window.localStorage.setItem('access_token', access);
+        window.localStorage.setItem('refresh_token', refresh);
+      }, { access: data.access_token, refresh: data.refresh_token });
+    };
+    const abrirPestana = async (page, pestana, titulo) => {
+      await page.goto(`${FRONTEND_URL}/?section=account`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: 'Mi cuenta', exact: true }).waitFor({ timeout: 20_000 });
+      await page.getByRole('button', { name: new RegExp(`^\\s*${pestana}`) }).first().click();
+      await page.getByRole('heading', { name: titulo }).first().waitFor({ timeout: 20_000 });
+    };
+
+    for (const [ancho, viewport] of [['escritorio', { width: 1440, height: 900 }], ['celular', { width: 390, height: 844 }]]) {
+      const contexto = await browser.newContext({ viewport, hasTouch: viewport.width < 800 });
+      const page = await contexto.newPage();
+      const pedidos = [];
+      page.on('request', (r) => pedidos.push(r.url()));
+
+      // --- 1 y 2. Inicio ----------------------------------------------------
+      await page.goto(`${FRONTEND_URL}/?section=home`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: /seguir produciendo/, level: 1 }).waitFor({ timeout: 20_000 });
+      await page.getByText(/publicaci(ón|ones) disponibles? ahora/i).first()
+        .waitFor({ state: 'visible', timeout: 20_000 })
+        .catch(() => problemas.push(`${ancho}: Inicio no dice cuántas publicaciones hay`));
+      const tarjetas = await page.locator('article').count();
+      if (tarjetas > 0) problemas.push(`${ancho}: Inicio muestra ${tarjetas} publicación(es)`);
+      if (await page.getByRole('heading', { name: 'Publicaciones disponibles', exact: true }).count() > 0) {
+        problemas.push(`${ancho}: Inicio tiene el encabezado «Publicaciones disponibles»`);
+      }
+      // Los caminos al Mercado que ofrece la página, sin la cabecera ni el pie.
+      const alMercado = await page.evaluate(() => [...document.querySelectorAll('button, a')]
+        .filter((el) => !el.closest('header, footer') && el.checkVisibility())
+        .map((el) => (el.getAttribute('aria-label') || el.innerText).replace(/\s+/g, ' ').trim())
+        .filter((nombre) => /mercado|publicaciones|explorar/i.test(nombre)));
+      if (alMercado.length !== 1 || alMercado[0] !== 'Ir al Mercado') {
+        problemas.push(`${ancho}: Inicio lleva al Mercado por ${JSON.stringify(alMercado)} y tenía que ser sólo «Ir al Mercado»`);
+      }
+      const datos = await loQueDice(page, 'section[aria-labelledby="titulo-datos"]');
+      if (!/Lo que muestra cada publicación\./.test(datos)) {
+        problemas.push(`${ancho}: el bloque de datos no se titula «Lo que muestra cada publicación.»`);
+      }
+      if (!/Precio y modalidad/.test(datos)) problemas.push(`${ancho}: el bloque de datos no dice «Precio y modalidad»`);
+      if (!/radio de alcance[^\n]*transportista/i.test(datos)) {
+        problemas.push(`${ancho}: el bloque de datos no nombra el radio de alcance del transportista`);
+      }
+      if (!/Quién publica y qué se puede hacer/.test(datos)) {
+        problemas.push(`${ancho}: el bloque de datos no dice «Quién publica y qué se puede hacer»`);
+      }
+      if (/Antes de avanzar/i.test(datos)) problemas.push(`${ancho}: el bloque de datos sigue diciendo «Antes de avanzar»`);
+      const inicio = await loQueDice(page);
+      if (!/precio y modalidad, ubicación y quién publica/i.test(inicio)) {
+        problemas.push(`${ancho}: la bajada de Inicio no dice «precio y modalidad, ubicación y quién publica»`);
+      }
+      nadaRetirado(inicio, `${ancho}: Inicio`);
+      if (await page.getByRole('heading', { name: INVITACION }).count() > 0) {
+        problemas.push(`${ancho}: Inicio repite la invitación «${INVITACION}»`);
+      }
+      await sinDesborde(page, `${ancho}: Inicio`);
+      // Y el acceso lleva al Mercado.
+      const irDesdeInicio = page.getByRole('button', { name: 'Ir al Mercado', exact: true });
+      if (await irDesdeInicio.count() === 1) {
+        await irDesdeInicio.click();
+        await page.locator('article').first().waitFor({ state: 'visible', timeout: 20_000 })
+          .catch(() => problemas.push(`${ancho}: «Ir al Mercado» de Inicio no llegó a las publicaciones`));
+        if (new URL(page.url()).searchParams.get('section') !== 'marketplace') {
+          problemas.push(`${ancho}: «Ir al Mercado» de Inicio dejó la barra en ${page.url()}`);
+        }
+      } else {
+        await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+        await page.locator('article').first().waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
+      }
+      // En el Mercado sólo se mira la comisión: el resto de la lista es de las
+      // otras tres páginas, y las tarjetas traen texto de quien publica.
+      const mercado = await loQueDice(page);
+      if (/comisi[oó]n/i.test(mercado)) problemas.push(`${ancho}: el Mercado dice «comisión»`);
+
+      // --- 3, 6 y 7. Quiénes somos --------------------------------------------
+      await page.goto(`${FRONTEND_URL}/?section=about`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: 'Misión' }).waitFor({ timeout: 20_000 });
+      const invitaciones = await page.getByRole('heading', { name: INVITACION }).count();
+      if (invitaciones !== 1) {
+        problemas.push(`${ancho}: Quiénes somos tiene ${invitaciones} invitación(es) «${INVITACION}» y tenía que tener una`);
+      } else {
+        const bloque = page.locator('section').filter({ has: page.getByRole('heading', { name: INVITACION }) });
+        const botones = (await bloque.getByRole('button').allInnerTexts()).map((t) => t.trim());
+        if (JSON.stringify(botones) !== JSON.stringify(['Publicar una oferta', 'Ir al Mercado'])) {
+          problemas.push(`${ancho}: la invitación de Quiénes somos ofrece ${JSON.stringify(botones)}`);
+        }
+      }
+      if (await page.getByRole('heading', { name: 'Nuestro equipo' }).count() > 0) {
+        problemas.push(`${ancho}: Quiénes somos tiene «Nuestro equipo»`);
+      }
+      const fotos = pedidos.filter((u) => /MercedesRaiz/i.test(u));
+      if (fotos.length) problemas.push(`${ancho}: Quiénes somos pidió la foto del equipo (${fotos[0]})`);
+      nadaRetirado(await loQueDice(page), `${ancho}: Quiénes somos`);
+      await sinDesborde(page, `${ancho}: Quiénes somos`);
+      const irDesdeQuienes = page.locator('section').filter({ has: page.getByRole('heading', { name: INVITACION }) })
+        .getByRole('button', { name: 'Ir al Mercado', exact: true });
+      if (await irDesdeQuienes.count() === 1) {
+        await irDesdeQuienes.click();
+        await page.locator('article').first().waitFor({ state: 'visible', timeout: 20_000 })
+          .catch(() => problemas.push(`${ancho}: «Ir al Mercado» de Quiénes somos no llegó a las publicaciones`));
+      }
+
+      // --- 4. Contacto --------------------------------------------------------
+      await page.goto(`${FRONTEND_URL}/?section=contact`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: 'Envianos tu Consulta' }).waitFor({ timeout: 20_000 })
+        .catch(() => problemas.push(`${ancho}: Contacto perdió el formulario`));
+      if (await page.getByRole('heading', { name: /Preguntas Frecuentes/i }).count() > 0) {
+        problemas.push(`${ancho}: Contacto vuelve a tener «Preguntas Frecuentes»`);
+      }
+      if (await page.getByRole('heading', { name: INVITACION }).count() > 0) {
+        problemas.push(`${ancho}: Contacto repite la invitación «${INVITACION}»`);
+      }
+      nadaRetirado(await loQueDice(page), `${ancho}: Contacto`);
+      await sinDesborde(page, `${ancho}: Contacto`);
+      await contexto.close();
+
+      // --- 5. Mercado Pago en el panel de quien vende --------------------------
+      const deVenta = await browser.newContext({ viewport, hasTouch: viewport.width < 800 });
+      await entrarComo(deVenta, vende);
+      const panel = await deVenta.newPage();
+      await desvincular(vendedora.token);
+      await abrirPestana(panel, 'Mi Perfil', 'Mi Perfil');
+      const seccionMp = panel.locator('main [class*="_mpSection_"]');
+      await seccionMp.getByText('Cuenta no vinculada').waitFor({ timeout: 20_000 });
+      const sinVincular = await seccionMp.innerText();
+      if (!/AgroBoeda no recibe ni retiene ese dinero/.test(sinVincular)) {
+        problemas.push(`${ancho}: Mercado Pago sin vincular dejó de decir que AgroBoeda no recibe el dinero`);
+      }
+      nadaRetirado(sinVincular, `${ancho}: Mercado Pago sin vincular`);
+      const vinculo = await vincular(vendedora.token, `ok:9${String(sello).slice(-5)}${ancho === 'celular' ? 1 : 0}`);
+      assert(vinculo.ok === 'vinculado', `${ancho}: el doble no vinculó: ${vinculo.destino}`);
+      await abrirPestana(panel, 'Mi Perfil', 'Mi Perfil');
+      await seccionMp.getByText('Cuenta vinculada').waitFor({ timeout: 20_000 });
+      const vinculada = await seccionMp.innerText();
+      if (!/AgroBoeda no los recibe\s+ni los reparte/.test(vinculada)) {
+        problemas.push(`${ancho}: Mercado Pago vinculado dejó de decir que AgroBoeda no recibe ni reparte el dinero`);
+      }
+      nadaRetirado(vinculada, `${ancho}: Mercado Pago vinculado`);
+      await sinDesborde(panel, `${ancho}: Mi Perfil`);
+      await desvincular(vendedora.token);
+      await deVenta.close();
+
+      // --- 5. La notificación de quien canceló ----------------------------------
+      const deCompra = await browser.newContext({ viewport, hasTouch: viewport.width < 800 });
+      await entrarComo(deCompra, compra);
+      const avisos = await deCompra.newPage();
+      await abrirPestana(avisos, 'Notificaciones', /Notificaciones/);
+      const aviso = avisos.locator('main').getByText(`Tu pedido #${orden.order_number} fue cancelado`, { exact: false });
+      await aviso.first().waitFor({ state: 'visible', timeout: 20_000 })
+        .catch(() => problemas.push(`${ancho}: quien canceló no ve «Tu pedido #${orden.order_number} fue cancelado»`));
+      const notificaciones = await loQueDice(avisos, 'main');
+      nadaRetirado(notificaciones, `${ancho}: la notificación de quien canceló`);
+      if (/95\s?%|devolver[áa]/i.test(notificaciones)) {
+        problemas.push(`${ancho}: la notificación de quien canceló promete devolver dinero`);
+      }
+      await deCompra.close();
+      medidos.push(`${ancho}: Inicio, Quiénes somos, Contacto, el Mercado, Mercado Pago sin vincular y vinculado, y las notificaciones`);
+    }
+  } finally {
+    await browser.close();
+    await doble.cerrar();
+    if (publicacion?.id) await pedirCrudo(`/products/${publicacion.id}`, { method: 'DELETE', header: vendedora.token }).catch(() => {});
+  }
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return 'Inicio no muestra publicaciones, dice cuántas hay y lleva al Mercado sólo por «Ir al Mercado»; «Lo que '
+    + 'muestra cada publicación.» dice «Precio y modalidad», nombra el radio del transportista y no dice «honesta» '
+    + 'ni «próximo paso»; la invitación está sólo en Quiénes somos, sin promesas y con «Publicar una oferta» e «Ir al '
+    + 'Mercado»; Contacto no tiene preguntas frecuentes; Quiénes somos no tiene «Nuestro equipo»; nada dice '
+    + '«comisión», y Mercado Pago sigue diciendo que AgroBoeda no recibe el dinero. Mirado en '
+    + `${medidos.length} anchos (${medidos.join('; ')})`;
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del

@@ -389,9 +389,11 @@ for (const medida of MEDIDAS) {
 
     await extremosDeFoto(page, `${medida.n} inicio`, null, portada);
 
-    const equipo = page.getByRole('heading', { name: 'Nuestro equipo' });
+    // Era «Nuestro equipo», que salió con REV1-PENDIENTES-1: ahora se espera
+    // el cierre de la página.
+    const cierre = page.getByRole('heading', { name: 'Publicá o buscá en el Mercado agropecuario' });
     for (const [seccion, titulo, marca] of [
-      ['Quiénes somos', 'quienes somos', equipo],
+      ['Quiénes somos', 'quienes somos', cierre],
       ['Contacto', 'contacto', page.getByRole('heading', { name: 'Contacto', level: 1 })],
     ]) {
       await page.getByRole('button', { name: seccion, exact: true }).first().click();
@@ -402,7 +404,7 @@ for (const medida of MEDIDAS) {
     await page.locator('footer').getByRole('link', { name: 'Servicios', exact: true }).click();
     await revisar(page, `${medida.n} catálogo: servicios`,
       page.locator('article[class*="card"]').filter({ hasText: /Servicio|Logística/ }).first());
-    await extremosDeFoto(page, `${medida.n} quienes somos`, 'Quiénes somos', equipo);
+    await extremosDeFoto(page, `${medida.n} quienes somos`, 'Quiénes somos', cierre);
 
     // La vista del enlace de confirmación, en su estado de rechazo: es el que
     // trae el texto de error y el formulario de reenvío. El de éxito consume
