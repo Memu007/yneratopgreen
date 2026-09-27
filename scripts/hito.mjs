@@ -118,7 +118,7 @@ async function main() {
       await page.getByRole('button', { name: 'AgroBoeda', exact: true }).first().click();
       await page.locator('#catalog-category').waitFor({ state: 'visible', timeout: ESPERA });
 
-      // El conteo dejó de ser un número suelto: ahora es «N operaciones», que
+      // El conteo dejó de ser un número suelto: ahora es «N publicaciones», que
       // es lo que el usuario lee. Se toma el número de ahí.
       const contar = async () => Number(
         ((await page.locator('[class*="_conteo_"]').first().textContent()) || '0')

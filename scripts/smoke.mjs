@@ -12767,7 +12767,7 @@ await runCase(122, 'Sin conexión se dice sin conexión, y una caída del servid
     const contexto = await browser.newContext();
     const page = await contexto.newPage();
     await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('heading', { name: /operaciones$/ }).first().waitFor({ timeout: 20_000 });
+    await page.getByRole('heading', { name: /publicaciones$/ }).first().waitFor({ timeout: 20_000 });
 
     // 1. El servidor se cae, con red presente: mensaje general, no «sin red».
     await page.route('**/api/catalog/products*', (route) => route.fulfill({
@@ -12784,7 +12784,7 @@ await runCase(122, 'Sin conexión se dice sin conexión, y una caída del servid
       `la caída del servidor no muestra el mensaje general: ${JSON.stringify(textoDelServidor)}`);
     assert(!textoDelServidor.includes('Sin conexión'),
       `la caída del servidor se disfraza de falta de red: ${JSON.stringify(textoDelServidor)}`);
-    assert(!/No hay operaciones con estos filtros/.test(textoDelServidor),
+    assert(!/No hay publicaciones con estos filtros/.test(textoDelServidor),
       'la falla sigue confundiéndose con un catálogo vacío');
 
     // 2. Con el error a la vista, la navegación sigue viva: no se silencia nada.
@@ -12805,7 +12805,7 @@ await runCase(122, 'Sin conexión se dice sin conexión, y una caída del servid
     await contexto.setOffline(false);
     await page.unroute('**/api/catalog/products*');
     await page.getByRole('button', { name: 'Reintentar' }).click();
-    await page.getByRole('heading', { name: /operaciones$/ }).first().waitFor({ timeout: 20_000 });
+    await page.getByRole('heading', { name: /publicaciones$/ }).first().waitFor({ timeout: 20_000 });
     assert(await page.getByRole('alert').count() === 0,
       'el aviso de error quedó pegado después de que el catálogo volvió');
 
@@ -12888,7 +12888,7 @@ await runCase(123, 'Al 200 % de zoom las cinco pantallas siguen siendo usables',
 
     await publica.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await publica.getByRole('heading', { name: /seguir produciendo/, level: 1 }).waitFor({ timeout: 20_000 });
-    await medir(publica, 'inicio', publica.getByRole('button', { name: 'Explorar operaciones' }));
+    await medir(publica, 'inicio', publica.getByRole('button', { name: 'Explorar publicaciones' }));
 
     // Servicios ya no es una página: es el Mercado con el filtro de servicios,
     // y se llega desde el pie. Se mide ahí, con la acción de una tarjeta.
@@ -12965,7 +12965,7 @@ await runCase(123, 'Al 200 % de zoom las cinco pantallas siguen siendo usables',
     + 'acción principal visible, habilitada y dentro del ancho, y foco de teclado visible';
 });
 
-await runCase(124, 'Inicio muestra operaciones reales, con el total de la API y sin claims', async () => {
+await runCase(124, 'Inicio muestra publicaciones reales, con el total de la API y sin claims', async () => {
   // La portada era una placa índigo con «Bienvenido a AgroBoeda», tres
   // beneficios con iconos y tres claims —inteligencia artificial, mecanización
   // y confianza respaldada por alianzas— que el producto no demuestra.
@@ -13003,7 +13003,7 @@ await runCase(124, 'Inicio muestra operaciones reales, con el total de la API y 
     //    estilo. Se busca el párrafo entero, sin distinguir mayúsculas, y se
     //    exige que la cifra sea EXACTAMENTE el total de la API: que lo
     //    contenga no alcanza, porque «155» contiene «15».
-    const medidor = page.locator('p', { hasText: /operaci(ón|ones) disponibles? ahora/i }).first();
+    const medidor = page.locator('p', { hasText: /publicaci(ón|ones) disponibles? ahora/i }).first();
     const conteo = (await medidor.innerText()).replace(/\s+/g, ' ').trim();
     assert(new RegExp(`(^|\\D)${total}(\\D|$)`).test(conteo),
       `el conteo dice «${conteo}» y la API informa ${total}`);
@@ -13014,7 +13014,7 @@ await runCase(124, 'Inicio muestra operaciones reales, con el total de la API y 
     const tarjetas = page.locator('article[class*="card"]');
     await tarjetas.first().waitFor({ state: 'visible', timeout: 20_000 });
     const cuantas = await tarjetas.count();
-    assert(cuantas > 0 && cuantas <= 3, `la vista previa muestra ${cuantas} operaciones`);
+    assert(cuantas > 0 && cuantas <= 3, `la vista previa muestra ${cuantas} publicaciones`);
     for (let i = 0; i < cuantas; i += 1) {
       const titulo = (await tarjetas.nth(i).getByRole('heading', { level: 3 }).innerText()).trim();
       const [fila] = queryRows(`
@@ -13052,14 +13052,14 @@ await runCase(124, 'Inicio muestra operaciones reales, con el total de la API y 
     await page.route('**/api/catalog/products*', (route) => route.fulfill({
       status: 500, contentType: 'application/json', body: JSON.stringify({ detail: 'caída controlada' }),
     }));
-    await page.getByRole('button', { name: 'Ver todas las operaciones' }).click();
+    await page.getByRole('button', { name: 'Ver todas las publicaciones' }).click();
     await page.getByRole('button', { name: 'Inicio', exact: true }).first().click();
     const aviso = page.getByRole('alert');
     await aviso.waitFor({ state: 'visible', timeout: 20_000 });
     const textoDelError = await aviso.innerText();
-    assert(/No pudimos cargar las operaciones/.test(textoDelError),
+    assert(/No pudimos cargar las publicaciones/.test(textoDelError),
       `el error de la portada no se explica: ${JSON.stringify(textoDelError)}`);
-    assert(!/Todavía no hay operaciones/.test(textoDelError),
+    assert(!/Todavía no hay publicaciones/.test(textoDelError),
       'la falla se confunde con un catálogo vacío');
 
     // 6. Sin red: el texto acordado, y no el general.
@@ -13147,7 +13147,7 @@ await runCase(125, 'Los servicios se ven en el Mercado filtrado: publicaciones r
     // 1. «Servicios», desde el pie, deja el filtro puesto y no sólo la URL.
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await irAlMercadoDeServicios(page);
-    await page.getByRole('heading', { name: 'Operaciones disponibles', level: 1 }).waitFor({ timeout: 20_000 });
+    await page.getByRole('heading', { name: 'Publicaciones disponibles', level: 1 }).waitFor({ timeout: 20_000 });
 
     const tarjetas = page.locator('article[class*="card"]');
     await tarjetas.first().waitFor({ state: 'visible', timeout: 20_000 });
@@ -13405,8 +13405,8 @@ await runCase(127, 'El conteo del Mercado sale del total de la API y no de la p�
     // 2. Y no se confunde la página con el total: se dicen los dos.
     // `innerText` devuelve el texto ya pintado y el rótulo va en versalitas por
     // hoja de estilo, así que se compara sin distinguir mayúsculas.
-    assert(new RegExp(`^${dibujadas} de ${activas[0]} operaciones$`, 'i').test(texto),
-      `el conteo dice «${texto}» y tendría que decir «${dibujadas} de ${activas[0]} operaciones»`);
+    assert(new RegExp(`^${dibujadas} de ${activas[0]} publicaciones$`, 'i').test(texto),
+      `el conteo dice «${texto}» y tendría que decir «${dibujadas} de ${activas[0]} publicaciones»`);
     assert(dibujadas < Number(activas[0]),
       'la página dibujó todo el catálogo y el caso no probaría nada');
 
@@ -18158,7 +18158,7 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
 
   const TITULO_DE = {
     home: /Equipos, insumos y servicios/,
-    marketplace: /Operaciones disponibles/,
+    marketplace: /Publicaciones disponibles/,
     about: /Información/,
     contact: /^Contacto$/,
   };
@@ -21084,7 +21084,7 @@ await runCase(155, 'El Mercado tiene dos vistas elegibles y ninguna geometría a
       await elegirVista(page, 'Lista');
       const sigueEnLista = async (queHice) => {
         await esperarA(async () => (await page.locator('article[class*="card"]').count()) > 0
-          || (await page.getByText(/No hay operaciones/).count()) > 0,
+          || (await page.getByText(/No hay publicaciones/).count()) > 0,
         `${donde}: la grilla no volvió después de ${queHice}`);
         assert((await vistaActual(page)) === 'Lista',
           `${donde}: ${queHice} cambió la vista elegida`);
@@ -25677,7 +25677,7 @@ await runCase(166, 'La cotización llega a Contacto con su publicación, y prepa
 // ---------------------------------------------------------------------------
 await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o comprar retoman después de ingresar', async () => {
   const medidos = [];
-  const FRASE_DE_CERO = 'No hay operaciones con estos filtros';
+  const FRASE_DE_CERO = 'No hay publicaciones con estos filtros';
 
   // Los nombres válidos salen del MISMO catálogo que mira la aplicación: una
   // lista escrita a mano acá envejece con la base y termina probando otra cosa.
@@ -27773,7 +27773,7 @@ await runCase(171, 'El Mercado pagina en el servidor: total, orden y filtros del
     const tarjetas = () => page.locator('article[class*="card"]').count();
     const nombresEnPantalla = () => page.locator('article[class*="card"] h3').allInnerTexts();
     const paginador = page.getByRole('navigation', { name: /Paginación/i });
-    // El nombre accesible del botón es «Página anterior de operaciones»: se
+    // El nombre accesible del botón es «Página anterior de publicaciones»: se
     // busca sin distinguir mayúsculas para no atarse a la mayúscula inicial.
     const anterior = paginador.getByRole('button', { name: /anterior/i });
     const siguiente = paginador.getByRole('button', { name: /siguiente/i });
@@ -27990,8 +27990,8 @@ await runCase(171, 'El Mercado pagina en el servidor: total, orden y filtros del
     const ultimasEnPantalla = TOTAL - POR_PAGINA * (PAGINAS - 1);
     await esperarLaGrilla(ultimasEnPantalla, null,
       `pidiendo page=99 la última página no dibujó sus ${ultimasEnPantalla} tarjetas`);
-    assert(await page.getByRole('heading', { name: /No hay operaciones/ }).count() === 0,
-      'pidiendo una página de más, la pantalla afirmó que no hay operaciones habiéndolas');
+    assert(await page.getByRole('heading', { name: /No hay publicaciones/ }).count() === 0,
+      'pidiendo una página de más, la pantalla afirmó que no hay publicaciones habiéndolas');
     assert(new URL(page.url()).searchParams.get('page') === String(PAGINAS),
       `la barra quedó en page=${new URL(page.url()).searchParams.get('page')} y tenía que `
       + `corregirse a ${PAGINAS}`);
@@ -32597,8 +32597,8 @@ await runCase(187, 'Con el panel de filtros plegado, el teclado no entra en cont
   };
   // El total del encabezado de resultados: «24 de 30 operaciones» es 30.
   const conteo = (page) => page.evaluate(() => {
-    const t = [...document.querySelectorAll('h2')].map((h) => h.textContent).find((x) => /operaci/.test(x));
-    return Number(t?.match(/(\d+)\s*operaci/)?.[1] ?? NaN);
+    const t = [...document.querySelectorAll('h2')].map((h) => h.textContent).find((x) => /publicaci/.test(x));
+    return Number(t?.match(/(\d+)\s*publicaci/)?.[1] ?? NaN);
   });
   const verN = (page) => page.getByRole('button', { name: /^Ver \d+ resultados?$/ });
 
@@ -32667,8 +32667,8 @@ await runCase(187, 'Con el panel de filtros plegado, el teclado no entra en cont
         await page.keyboard.type('1000000');
         await respuesta;
         await page.waitForFunction((n) => {
-          const t = [...document.querySelectorAll('h2')].map((h) => h.textContent).find((x) => /operaci/.test(x));
-          const m = t?.match(/(\d+)\s*operaci/);
+          const t = [...document.querySelectorAll('h2')].map((h) => h.textContent).find((x) => /publicaci/.test(x));
+          const m = t?.match(/(\d+)\s*publicaci/);
           return m && Number(m[1]) !== n
             && new URLSearchParams(location.search).get('min_price') === '1000000';
         }, antes, { timeout: 10_000 });
@@ -34355,7 +34355,7 @@ await runCase(195, 'Filtrar por tipo y por potencia cuenta en el servidor, deja 
       try {
         await esperarA(async () => (await conteo()) === esperado, momento, 20_000);
       } catch {
-        problemas.push(`pantalla, ${momento}: dice ${await conteo().catch(() => '?')} operaciones y en la base hay ${esperado}`);
+        problemas.push(`pantalla, ${momento}: dice ${await conteo().catch(() => '?')} publicaciones y en la base hay ${esperado}`);
       }
     };
     const nombresSinTipo = new Set(queryRows(`SELECT name FROM products WHERE id IN (${
@@ -34782,7 +34782,7 @@ await runCase(198, 'Con una categoría que usa marca, el filtro ofrece todas las
         await esperarA(async () => new URL(page.url()).searchParams.get('brand') === laVacia.value,
           `${donde}: la marca en cero no se escribió en la barra`, 20_000)
           .catch((e) => problemas.push(e.message));
-        await page.getByRole('heading', { name: 'No hay operaciones con estos filtros.' })
+        await page.getByRole('heading', { name: 'No hay publicaciones con estos filtros.' })
           .waitFor({ state: 'visible', timeout: 20_000 })
           .catch(() => problemas.push(`${donde}: eligiendo «${laVacia.label}» no aparece el vacío de siempre`));
         if (await page.locator('[role="alert"]').count() > 0) {
@@ -34796,7 +34796,7 @@ await runCase(198, 'Con una categoría que usa marca, el filtro ofrece todas las
   }
   medidos.push('en escritorio y en celular el filtro muestra «Todas las marcas» y las mismas marcas con su '
     + 'conteo, las en cero incluidas; elegir una en cero la escribe en la barra y muestra «No hay '
-    + 'operaciones con estos filtros.», sin error');
+    + 'publicaciones con estos filtros.», sin error');
 
   assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
   return medidos.join('; ');
@@ -35130,7 +35130,7 @@ await runCase(200, 'Filtrar por año y por origen cuenta en el servidor, deja af
       try {
         await esperarA(async () => (await conteo()) === esperado, momento, 20_000);
       } catch {
-        problemas.push(`pantalla, ${momento}: dice ${await conteo().catch(() => '?')} operaciones y en la base hay ${esperado}`);
+        problemas.push(`pantalla, ${momento}: dice ${await conteo().catch(() => '?')} publicaciones y en la base hay ${esperado}`);
       }
     };
     const nombresSin = (ids) => new Set(queryRows(`SELECT name, 'fin' FROM products WHERE id IN (${
@@ -35180,7 +35180,7 @@ await runCase(200, 'Filtrar por año y por origen cuenta en el servidor, deja af
     await page.locator('#catalog-year-to').fill('2005');
     await esperarA(async () => barra().get('year_to') === '2005', 'el año «hasta» no llegó a la barra', 20_000)
       .catch((e) => problemas.push(`pantalla: ${e.message}`));
-    await page.getByRole('heading', { name: 'No hay operaciones con estos filtros.' })
+    await page.getByRole('heading', { name: 'No hay publicaciones con estos filtros.' })
       .waitFor({ state: 'visible', timeout: 20_000 })
       .catch(() => problemas.push('pantalla: con «desde» 2010 y «hasta» 2005 no aparece el vacío de siempre'));
     if (await page.locator('[role="alert"]').count() > 0) problemas.push('pantalla: «desde» mayor que «hasta» muestra un error');
@@ -35717,6 +35717,242 @@ await runCase(206, 'Después de cada acción sobre una orden, la tarjeta conserv
   return 'en «Mis Ventas», después de aprobar el comprobante, confirmar el pedido y marcarlo enviado, y en «Mis '
     + 'Compras» después de confirmar la recepción, la tarjeta sigue diciendo el traslado de la orden, aparece '
     + '«Calificar Vendedor» y la otra orden sigue mostrando a dónde transferir, todo sin recargar la página';
+});
+
+// 207. El alta ya no ofrece lo que no guarda, y la marca se ve y se edita.
+//
+// «Características del Producto» y «Etiquetas» se escribían en el alta y se
+// perdían al publicar: la API y la base no tienen dónde guardarlas. Salieron
+// del formulario. Y la marca se elegía al publicar pero nadie la veía: la
+// ficha la muestra junto al modelo y el año, y «Editar» la cambia y la quita
+// con la misma lista que el alta. Lo encontró la guía de uso (PUBLISH-FIELDS-1).
+await runCase(207, 'El alta no ofrece características ni etiquetas; la ficha muestra la marca y «Editar» la cambia y la quita', async () => {
+  const problemas = [];
+  const sello = Date.now();
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const tractores = subrubroDe('maquinaria-agricola', 'tractores');
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const [[insumos]] = queryRows("SELECT id, 'fin' FROM categories WHERE slug = 'insumos-agricolas'");
+  const creadas = [];
+  const publicar = async (nombre, extra = {}) => {
+    const { data } = await apiRequest('/products', {
+      method: 'POST', token: vendedor.token,
+      body: {
+        name: nombre, description: 'Publicación del caso 207 sobre la marca.', price: 2070, stock: 1,
+        unit: 'unidad', locality_id: localidad, publication_type: 'producto', operation_kind: 'activo',
+        category_id: tractores.categoriaId, subcategory_id: tractores.id, condition: 'usado', ...extra,
+      },
+    });
+    creadas.push(data.id);
+    return { id: data.id, nombre };
+  };
+  const conMarca = await publicar(`Tractor con marca 207 ${sello}`, { brand: 'john-deere', model: `M207${sello % 1000}` });
+  const sinMarca = await publicar(`Tractor sin marca 207 ${sello}`);
+  const marcaEnLaBase = (id) => queryRows(`SELECT coalesce(brand, '(sin marca)'), 'fin' FROM products WHERE id = ${sqlLiteral(id)}`)[0][0];
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const acceso = (await apiRequest('/auth/login', {
+      method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+    })).data;
+    await contexto.addInitScript(({ a, r }) => {
+      window.localStorage.setItem('access_token', a);
+      window.localStorage.setItem('refresh_token', r);
+    }, { a: acceso.access_token, r: acceso.refresh_token });
+    const page = await contexto.newPage();
+
+    // --- A. El alta, de producto y de servicio ------------------------------
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Vender', exact: true }).first().click();
+    const formulario = page.locator('form').filter({ has: page.locator('#operation-kind') });
+    await formulario.waitFor({ state: 'visible', timeout: 20_000 });
+    for (const tipo of ['Producto', 'Servicio']) {
+      await formulario.getByRole('button', { name: tipo, exact: true }).click();
+      await page.waitForTimeout(300);
+      const texto = await formulario.innerText();
+      const campos = await formulario.locator('input[placeholder]').evaluateAll((els) => els.map((e) => e.placeholder));
+      for (const prohibido of ['Características del', 'Etiquetas']) {
+        if (texto.includes(prohibido)) problemas.push(`el alta de ${tipo.toLowerCase()} todavía ofrece «${prohibido}…»`);
+      }
+      for (const campo of campos.filter((p) => /^Característica|^Valor \(|^Agregar etiqueta/.test(p))) {
+        problemas.push(`el alta de ${tipo.toLowerCase()} todavía tiene el campo «${campo}»`);
+      }
+    }
+    await formulario.getByRole('button', { name: 'Cancelar', exact: true }).click();
+
+    // --- B. La ficha ---------------------------------------------------------
+    const filasDeLaFicha = async (id) => {
+      await page.goto(`${FRONTEND_URL}/?section=product&id=${id}`, { waitUntil: 'domcontentloaded' });
+      await page.locator('main dl[class*="_datos_"]').waitFor({ state: 'visible', timeout: 20_000 });
+      return Object.fromEntries(await page.locator('main dl[class*="_datos_"] > div').evaluateAll((filas) => filas
+        .map((f) => [f.querySelector('dt')?.textContent?.trim(), f.querySelector('dd')?.textContent?.trim()])));
+    };
+    let filas = await filasDeLaFicha(conMarca.id);
+    if (filas.Marca !== 'John Deere') problemas.push(`la ficha con marca dice «Marca: ${filas.Marca}» y no «Marca: John Deere»`);
+    const orden = Object.keys(filas);
+    if (orden.indexOf('Marca') === -1 || orden.indexOf('Marca') + 1 !== orden.indexOf('Modelo')) {
+      problemas.push(`la marca no va junto al modelo: la ficha muestra ${orden.join(', ')}`);
+    }
+    filas = await filasDeLaFicha(sinMarca.id);
+    if ('Marca' in filas) problemas.push(`la ficha sin marca dibuja la fila «Marca: ${filas.Marca}»`);
+
+    // --- C. «Editar» -------------------------------------------------------
+    const abrirLaEdicion = async (nombre) => {
+      await page.goto(`${FRONTEND_URL}/?section=account`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: /publicaciones/i }).first().click();
+      const tarjeta = page.locator('[class*="_productCard_"]').filter({ hasText: nombre }).first();
+      await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
+      await tarjeta.getByRole('button', { name: /editar/i }).first().click();
+      await page.locator('#edit-nombre').waitFor({ state: 'visible', timeout: 20_000 });
+      // La edición dibuja lo que depende de la categoría cuando llegan las
+      // categorías: se espera a que el subrubro tenga sus opciones.
+      await page.waitForFunction(() => (document.querySelector('#edit-subcategoria')?.options.length ?? 0) > 1,
+        null, { timeout: 20_000 });
+    };
+    const guardar = async (id) => {
+      const [respuesta] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes(`/products/${id}`) && r.request().method() === 'PATCH',
+          { timeout: 20_000 }),
+        page.getByRole('button', { name: /Guardar Cambios/ }).click(),
+      ]);
+      if (!respuesta.ok()) problemas.push(`guardar respondió ${respuesta.status()}: ${(await respuesta.text()).slice(0, 200)}`);
+    };
+    await abrirLaEdicion(conMarca.nombre);
+    const selector = page.getByLabel('Marca', { exact: true });
+    if (!(await selector.isVisible().catch(() => false))) {
+      problemas.push('«Editar» no ofrece la marca');
+    } else {
+      await page.waitForFunction(() => (document.querySelector('#edit-marca')?.options.length ?? 0) > 2, null, { timeout: 15_000 });
+      const alta = (await apiRequest('/catalog/form-options')).data.brand.map((o) => o.label);
+      const opciones = (await selector.locator('option').allInnerTexts()).map((t) => t.trim());
+      if (opciones[0] !== 'Sin declarar' || JSON.stringify(opciones.slice(1)) !== JSON.stringify(alta)) {
+        problemas.push(`«Editar» ofrece otra lista que el alta: ${opciones.length - 1} marcas y el alta ${alta.length}`);
+      }
+      if (await selector.inputValue() !== 'john-deere') problemas.push(`«Editar» abre con la marca «${await selector.inputValue()}»`);
+      await selector.selectOption('case');
+      await guardar(conMarca.id);
+      if (marcaEnLaBase(conMarca.id) !== 'case') problemas.push(`cambiar a Case guardó «${marcaEnLaBase(conMarca.id)}»`);
+      filas = await filasDeLaFicha(conMarca.id);
+      if (filas.Marca !== 'Case') problemas.push(`después de cambiarla, la ficha dice «Marca: ${filas.Marca}»`);
+
+      await abrirLaEdicion(conMarca.nombre);
+      await page.getByLabel('Marca', { exact: true }).selectOption({ label: 'Sin declarar' });
+      await guardar(conMarca.id);
+      if (marcaEnLaBase(conMarca.id) !== '(sin marca)') problemas.push(`«Sin declarar» dejó «${marcaEnLaBase(conMarca.id)}»`);
+      filas = await filasDeLaFicha(conMarca.id);
+      if ('Marca' in filas) problemas.push(`después de quitarla, la ficha dice «Marca: ${filas.Marca}»`);
+    }
+
+    // --- D. Una categoría sin marca ----------------------------------------
+    // En «Editar» la categoría no se cambia (así la dejó el producto), así
+    // que pasar a Insumos se hace por la API, que es la que decide: la marca
+    // se suelta. Y la edición de un insumo no ofrece marca.
+    await apiRequest(`/products/${conMarca.id}`, { method: 'PATCH', token: vendedor.token, body: { brand: 'john-deere' } });
+    const aInsumos = await pedirCrudo(`/products/${conMarca.id}`, {
+      method: 'PATCH', header: vendedor.token,
+      body: { category_id: insumos, subcategory_id: null, operation_kind: 'insumo' },
+    });
+    if (aInsumos.status !== 200) problemas.push(`pasar a Insumos respondió ${aInsumos.status}`);
+    else if (marcaEnLaBase(conMarca.id) !== '(sin marca)') problemas.push(`en Insumos quedó la marca «${marcaEnLaBase(conMarca.id)}»`);
+    await abrirLaEdicion(conMarca.nombre);
+    if (await page.getByLabel('Marca', { exact: true }).isVisible().catch(() => false)) {
+      problemas.push('«Editar» de un insumo ofrece la marca');
+    }
+    await contexto.close();
+  } finally {
+    await browser.close();
+    for (const id of creadas) await pedirCrudo(`/products/${id}`, { method: 'DELETE', header: vendedor.token }).catch(() => {});
+  }
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return 'el alta de producto y de servicio ya no ofrece «Características» ni «Etiquetas»; la ficha dice «Marca: '
+    + 'John Deere» junto al modelo y sin marca no dibuja la fila; «Editar» ofrece la lista del alta, la cambia a '
+    + 'Case, la quita con «Sin declarar», y en Insumos la marca se suelta y no se ofrece';
+});
+
+// 208. Lo que se ofrece son publicaciones: la operación es lo que se concreta.
+//
+// La clienta, el 20/09 y otra vez el 27/09: «son publicaciones, no son
+// operaciones; la operación está hecha cuando se concreta». Inicio, el
+// Mercado y la ficha decían «operaciones» en lo que se ve y en lo que se lee
+// en voz alta. «Operación» queda sólo donde es una operación concretada,
+// como «Mis Operaciones» del transportista, que no está en estas páginas.
+await runCase(208, 'Inicio, el Mercado y la ficha dicen «publicaciones» y no «operaciones», también para el lector de pantalla', async () => {
+  const problemas = [];
+  const sello = Date.now();
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const { data: propia } = await apiRequest('/products', {
+    method: 'POST', token: vendedor.token,
+    body: {
+      name: `Semilla 208 ${sello}`, description: 'Publicación del caso 208 sobre el vocabulario.',
+      category_id: queryRows("SELECT id, 'fin' FROM categories WHERE slug = 'insumos-agricolas'")[0][0],
+      price: 2080, stock: 5, unit: 'kg', locality_id: localidadDelPadron('Pergamino', 'Buenos Aires'),
+      publication_type: 'producto', operation_kind: 'insumo',
+    },
+  });
+  // Lo que ve y lo que oye quien usa la página: el texto, los nombres
+  // accesibles y lo escondido para el lector de pantalla.
+  const loQueDice = (page) => page.evaluate(() => [
+    document.body.innerText,
+    ...[...document.querySelectorAll('[aria-label]')].map((el) => el.getAttribute('aria-label')),
+    ...[...document.querySelectorAll('.tg-sr-only')].map((el) => el.textContent),
+  ].join('\n'));
+  const sinOperaciones = async (page, donde) => {
+    const texto = await loQueDice(page);
+    const hallazgos = [...texto.matchAll(/[^\n]{0,40}operaci[oó]n(es)?[^\n]{0,20}/gi)].map((m) => m[0].trim());
+    if (hallazgos.length) problemas.push(`${donde} dice «${hallazgos.slice(0, 3).join('», «')}»`);
+  };
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [ancho, viewport] of [['escritorio', { width: 1440, height: 900 }], ['celular', { width: 390, height: 844 }]]) {
+      const contexto = await browser.newContext({ viewport });
+      const page = await contexto.newPage();
+      const espera = async (localizador, falta) => {
+        await localizador.first().waitFor({ state: 'attached', timeout: 20_000 })
+          .catch(() => problemas.push(`${ancho}: ${falta}`));
+      };
+
+      // Inicio.
+      await page.goto(`${FRONTEND_URL}/?section=home`, { waitUntil: 'domcontentloaded' });
+      await espera(page.getByRole('button', { name: 'Explorar publicaciones', exact: true }), 'Inicio no ofrece «Explorar publicaciones»');
+      await espera(page.getByRole('heading', { name: 'Publicaciones disponibles', exact: true }), 'Inicio no titula «Publicaciones disponibles»');
+      await espera(page.getByText(/^Publicaci(ón|ones) disponibles? ahora$/), 'el medidor de Inicio no dice «… publicaciones disponibles ahora»');
+      await page.locator('article[class*="card"]').first().waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
+      await sinOperaciones(page, `${ancho}, Inicio`);
+
+      // El Mercado.
+      await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
+      await page.locator('article[class*="card"]').first().waitFor({ state: 'visible', timeout: 25_000 });
+      const conteo = (await page.locator('[class*="_conteo_"]').first().innerText()).replace(/\s+/g, ' ').trim();
+      // En pantalla va en mayúsculas por estilo: se compara sin ellas.
+      if (!/^\d+( de \d+)? publicaci(ón|ones)$/i.test(conteo)) problemas.push(`${ancho}: el conteo del Mercado dice «${conteo}»`);
+      await espera(page.getByRole('heading', { name: 'Publicaciones disponibles', level: 1 }), 'el Mercado no se titula «Publicaciones disponibles» para el lector de pantalla');
+      await espera(page.getByRole('button', { name: 'Página siguiente de publicaciones' }), 'el paginador no dice «Página siguiente de publicaciones»');
+      await sinOperaciones(page, `${ancho}, el Mercado`);
+
+      // El Mercado sin resultados.
+      await page.getByLabel('Buscar en el mercado').fill(`sin-resultados-208-${sello}`);
+      await page.locator('form[role="search"]').getByRole('button', { name: 'Buscar', exact: true }).click();
+      await espera(page.getByRole('heading', { name: 'No hay publicaciones con estos filtros.' }), 'el Mercado vacío no dice «No hay publicaciones con estos filtros.»');
+      await sinOperaciones(page, `${ancho}, el Mercado sin resultados`);
+
+      // La ficha, y la de una publicación que no está.
+      await page.goto(`${FRONTEND_URL}/?section=product&id=${propia.id}`, { waitUntil: 'domcontentloaded' });
+      await page.locator('main dl[class*="_datos_"]').waitFor({ state: 'visible', timeout: 20_000 });
+      await sinOperaciones(page, `${ancho}, la ficha`);
+      await page.goto(`${FRONTEND_URL}/?section=product&id=00000000-0000-4000-8000-000000000208`, { waitUntil: 'domcontentloaded' });
+      await espera(page.getByText('Las publicaciones vigentes están en el Mercado.'), 'la ficha de una publicación que no está no manda a «las publicaciones vigentes»');
+      await sinOperaciones(page, `${ancho}, la ficha que no está`);
+      await contexto.close();
+    }
+  } finally {
+    await browser.close();
+    await pedirCrudo(`/products/${propia.id}`, { method: 'DELETE', header: vendedor.token }).catch(() => {});
+  }
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return 'en escritorio y en celular, Inicio, el Mercado (con y sin resultados) y la ficha (también la que no está) '
+    + 'dicen «publicaciones», en el texto, en los nombres accesibles y en lo que sólo lee el lector de pantalla, '
+    + 'y ninguno dice «operación»';
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del

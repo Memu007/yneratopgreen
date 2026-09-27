@@ -329,7 +329,7 @@ async function exercisePublicCatalog(browser, viewport, state) {
     await inspect(page, state, viewport, '01-home');
 
     state.screen = '02-filters';
-    await tocar(page.getByRole('button', { name: /Explorar operaciones/i }), 'Explorar operaciones');
+    await tocar(page.getByRole('button', { name: /Explorar publicaciones/i }), 'Explorar publicaciones');
     await waitForCatalog(page);
     await abrirFiltros(page);
     await elegir(page.locator('#catalog-category'), 'Categoría', { index: 1 });
