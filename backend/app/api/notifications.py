@@ -142,6 +142,11 @@ def delete_notification(
 
 
 # === Función helper para crear notificaciones ===
+#
+# Los textos dicen lo que pasó y nada más, en el «vos» del sitio. No prometen
+# lo que el producto no hace: AgroBoeda no tiene el dinero de un pedido, no
+# sabe cuándo llega un envío y no manda más avisos que los de acá. Si nombran
+# un próximo paso, es uno que la persona tiene en «Mi cuenta».
 
 def create_notification(
     db: Session,
@@ -171,7 +176,7 @@ def notify_order_placed(db: Session, order):
         user_id=order.buyer_id,
         notification_type=NotificationType.ORDER_PLACED,
         title="Pedido realizado",
-        message=f"Tu pedido #{order.order_number} fue creado exitosamente. Procede al pago para continuar.",
+        message=f"Tu pedido #{order.order_number} fue creado y está pendiente de pago. En Mis Compras tenés cómo pagarlo.",
         order_id=order.id
     )
 
@@ -183,7 +188,7 @@ def notify_order_received(db: Session, order):
         user_id=order.seller_id,
         notification_type=NotificationType.ORDER_RECEIVED,
         title="Nueva venta recibida",
-        message=f"Tienes un nuevo pedido #{order.order_number} pendiente de pago.",
+        message=f"Tenés un nuevo pedido #{order.order_number} pendiente de pago.",
         order_id=order.id
     )
 
@@ -217,7 +222,7 @@ def notify_order_confirmed(db: Session, order):
         user_id=order.buyer_id,
         notification_type=NotificationType.ORDER_CONFIRMED,
         title="Pedido confirmado",
-        message=f"El vendedor confirmó tu pedido #{order.order_number}. Pronto será enviado.",
+        message=f"El vendedor confirmó tu pedido #{order.order_number}.",
         order_id=order.id
     )
 
@@ -229,7 +234,12 @@ def notify_order_shipped(db: Session, order):
         user_id=order.buyer_id,
         notification_type=NotificationType.ORDER_SHIPPED,
         title="Pedido enviado",
-        message=f"Tu pedido #{order.order_number} está en camino. Te avisaremos cuando llegue.",
+        # La llegada no la avisa nadie: la confirma quien compra, con
+        # «Confirmar Recepción».
+        message=(
+            f"El vendedor marcó tu pedido #{order.order_number} como enviado. "
+            "Cuando lo recibas, confirmá la recepción en Mis Compras."
+        ),
         order_id=order.id
     )
 
@@ -269,9 +279,9 @@ def notify_order_cancelled(db: Session, order, cancelled_by_buyer: bool = True):
             order_id=order.id
         )
         # Y al comprador. Decía «Se te devolverá el 95% del monto (se
-        # descuenta la comisión del 5%)»: AgroBoeda no cobra esa comisión ni
-        # tiene el dinero para devolverlo, y el tema de la comisión no se
-        # anticipa (la clienta, 20/09).
+        # descuenta la comisión del 5%)»: AgroBoeda hoy no cobra esa comisión
+        # ni tiene el dinero para devolverlo, y cómo se explica la comisión
+        # está por decidir (la clienta, 20/09).
         create_notification(
             db=db,
             user_id=order.buyer_id,
@@ -281,13 +291,17 @@ def notify_order_cancelled(db: Session, order, cancelled_by_buyer: bool = True):
             order_id=order.id
         )
     else:
-        # Notificar al comprador que el vendedor rechazó
+        # Notificar al comprador que el vendedor rechazó. Decía «El monto
+        # total será reembolsado.»: AgroBoeda no tiene ese dinero y no
+        # reembolsa nada. Por Mercado Pago, una orden cobrada no se puede
+        # rechazar (409); por transferencia, lo pagado está en la cuenta del
+        # vendedor.
         create_notification(
             db=db,
             user_id=order.buyer_id,
             notification_type=NotificationType.ORDER_REJECTED,
             title="Pedido rechazado",
-            message=f"El vendedor rechazó tu pedido #{order.order_number}. El monto total será reembolsado.",
+            message=f"El vendedor rechazó tu pedido #{order.order_number}.",
             order_id=order.id
         )
 
@@ -298,6 +312,9 @@ def notify_welcome(db: Session, user_id: str, user_name: str):
         db=db,
         user_id=user_id,
         notification_type=NotificationType.WELCOME,
-        title="¡Bienvenido a AgroBoeda!",
-        message=f"Hola {user_name}, tu cuenta fue creada exitosamente. Explorá el marketplace y comenzá a comprar o vender productos agrícolas."
+        title="¡Bienvenido/a a AgroBoeda!",
+        message=(
+            f"Hola {user_name}, tu cuenta fue creada. En el Mercado podés publicar "
+            "un equipo, un insumo o un servicio, o buscar lo que necesitás."
+        )
     )

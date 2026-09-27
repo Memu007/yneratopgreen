@@ -108,14 +108,13 @@ export const AboutPage: React.FC<AboutPageProps> = ({
         </div>
       </section>
 
-      {/* «Nuestro equipo» salió, por ahora (la clienta, 20/09): no quiere
-          aparecer como el único perfil de un equipo que no está presentado. */}
+      {/* «Nuestro equipo» salió por ahora (la clienta, 20/09). */}
 
       {/* La invitación a publicar o buscar. Estaba también al final de Inicio
           —el bloque que se repetía entre pestañas (la clienta, 20/09)— y
           queda sólo acá, donde es el único camino al Mercado de la página.
-          Decía «¿Listo para transformar tu producción?» y «las mejores
-          soluciones tecnológicas»: prometía más de lo que se ofrece. */}
+          Decía «¿Listo para transformar tu producción?», que prometía de más
+          (la clienta, 20/09). */}
       <section className={styles.ctaSection}>
         <div className={styles.container}>
           <h2>Publicá o buscá en el Mercado agropecuario</h2>
