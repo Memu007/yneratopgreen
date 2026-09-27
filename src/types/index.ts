@@ -34,6 +34,10 @@ export interface Product {
       opcionales: lo anterior a las columnas no los tiene. */
   model?: string;
   year?: number;
+  /** La marca, por el `value` de la lista, y su nombre para mostrarla. El
+      nombre lo completa la ficha: el listado no lo necesita. */
+  brand?: string;
+  brandName?: string;
   origin?: 'concesionaria' | 'dueno_directo';
   /** Lo que declara una publicación de servicio o logística. Vive en la base
       desde siempre; hasta ahora no salía en la respuesta pública, y sin
@@ -252,10 +256,6 @@ export interface NewProductData {
   };
   stock: number;
   unit: string;
-  features: {
-    [key: string]: string;
-  };
-  tags: string[];
 }
 
 /**

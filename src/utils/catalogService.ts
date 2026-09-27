@@ -178,6 +178,8 @@ export interface ProductFromBackend {
   origin?: OrigenDeclarado | null;
   model?: string | null;
   year?: number | null;
+  /** La marca, por el `value` de la lista (`john-deere`), o nada. */
+  brand?: string | null;
   pricing_type?: string | null;
   availability?: string | null;
   response_time?: string | null;
@@ -308,6 +310,30 @@ export const getProducts = async (params: {
   return apiGet<ProductListResponse>(endpoint);
 };
 
+// Las marcas del formulario, `value` → nombre, pedidas una vez por carga de la
+// página. Si el pedido falla se olvida, así el siguiente vuelve a intentar.
+let marcasDelFormulario: Promise<Map<string, string>> | null = null;
+
+/**
+ * El nombre de una marca, por su `value`.
+ *
+ * La publicación guarda el valor de la lista («john-deere») y quien compra
+ * tiene que leer el nombre («John Deere»). Se busca en la misma lista que
+ * ofrece el alta. Una marca que ya no está en la lista activa se muestra por
+ * su valor: es lo que declaró quien vende, y esconderla sería peor.
+ */
+export const nombreDeMarca = async (valor: string): Promise<string> => {
+  if (!marcasDelFormulario) {
+    marcasDelFormulario = apiGet<{ brand?: { value: string; label: string }[] }>('/catalog/form-options')
+      .then((opciones) => new Map((opciones.brand ?? []).map(({ value, label }) => [value, label])))
+      .catch((error: unknown) => {
+        marcasDelFormulario = null;
+        throw error;
+      });
+  }
+  return (await marcasDelFormulario).get(valor) ?? valor;
+};
+
 /**
  * Obtener detalle de un producto
  */
@@ -393,6 +419,7 @@ export const convertBackendProductToFrontend = (backendProduct: ProductFromBacke
     powerHp: backendProduct.power_hp ?? undefined,
     model: backendProduct.model || undefined,
     year: backendProduct.year ?? undefined,
+    brand: backendProduct.brand || undefined,
     origin: backendProduct.origin || undefined,
     pricingType: backendProduct.pricing_type || undefined,
     availability: backendProduct.availability || undefined,

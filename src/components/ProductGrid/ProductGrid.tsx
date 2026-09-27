@@ -76,7 +76,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
         {/* Bloques del tamaño de las tarjetas que vienen, en vez de un reloj de
             arena centrado: la página no salta cuando llegan los resultados. */}
         <div className={styles.grilla} aria-busy="true" aria-live="polite">
-          <span className="tg-sr-only">Cargando operaciones</span>
+          <span className="tg-sr-only">Cargando publicaciones</span>
           {[0, 1, 2, 3, 4, 5].map((i) => (
             <div key={i} className={styles.esqueleto} aria-hidden="true">
               <div className={styles.esqueletoImagen} />
@@ -121,14 +121,15 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
   return (
     <div className={styles.resultados}>
       <div className={styles.barra}>
-        {/* «Operaciones» y no «productos»: el conjunto mezcla bienes,
+        {/* «Publicaciones» y no «productos»: el conjunto mezcla bienes,
             servicios y logística, y llamarlo productos deja afuera a dos
-            tercios de lo que hay. */}
+            tercios de lo que hay. Tampoco «operaciones»: la operación es lo
+            que se concreta, no lo que se ofrece (la clienta, 20/09 y 27/09). */}
         <h2 className={styles.conteo}>
           <strong className="tg-data">
             {parcial ? `${dibujadas} de ${disponibles}` : disponibles}
           </strong>
-          <span>{disponibles === 1 ? 'operación' : 'operaciones'}</span>
+          <span>{disponibles === 1 ? 'publicación' : 'publicaciones'}</span>
         </h2>
 
         <div className={styles.controles}>
@@ -179,7 +180,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
 
       {dibujadas === 0 ? (
         <div className={styles.vacio}>
-          <h3>No hay operaciones con estos filtros.</h3>
+          <h3>No hay publicaciones con estos filtros.</h3>
           <p className="tg-small">Probá con menos filtros, otra provincia u otras palabras.</p>
         </div>
       ) : (
@@ -210,7 +211,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
             className={styles.paginaBtn}
             onClick={() => onPagina(pagina - 1)}
             disabled={pagina <= 1}
-            aria-label="Página anterior de operaciones"
+            aria-label="Página anterior de publicaciones"
           >
             Anterior
           </button>
@@ -222,7 +223,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
             className={styles.paginaBtn}
             onClick={() => onPagina(pagina + 1)}
             disabled={pagina >= paginas}
-            aria-label="Página siguiente de operaciones"
+            aria-label="Página siguiente de publicaciones"
           >
             Siguiente
           </button>

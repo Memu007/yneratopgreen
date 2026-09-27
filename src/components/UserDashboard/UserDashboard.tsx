@@ -300,6 +300,8 @@ interface BackendProduct {
   model?: string | null;
   year?: number | null;
   origin?: string | null;
+  /** La marca, por el `value` de la lista, o nada. */
+  brand?: string | null;
   // Campos de servicio
   pricing_type?: string;
   availability?: string;
@@ -344,6 +346,8 @@ interface EditFormData {
   modelo: string;
   anio: string;
   origen: string;
+  /** La marca, por el `value` de la lista. Vacía es «sin declarar». */
+  marca: string;
   // Campos de servicio
   pricing_type?: string;
   availability?: string;
@@ -632,6 +636,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
   
   // Estado para categorías (para edición)
   const [categories, setCategories] = useState<CategoryFromBackend[]>([]);
+  // Las marcas que ofrece el alta: la edición ofrece la misma lista.
+  const [marcas, setMarcas] = useState<{ value: string; label: string }[]>([]);
 
   // Preparar o recuperar el link de pago de una orden propia.
   //
@@ -950,6 +956,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
     apiGet<CategoryFromBackend[]>('/catalog/categories?include_empty=true')
       .then(data => setCategories(data))
       .catch(err => console.error('Error cargando categorías:', err));
+    apiGet<{ brand?: { value: string; label: string }[] }>('/catalog/form-options')
+      .then(data => setMarcas(data.brand ?? []))
+      .catch(err => console.error('Error cargando marcas:', err));
   }, [editando]);
 
   const cargarVinculoMP = async () => {
@@ -1701,6 +1710,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
       modelo: product.model || '',
       anio: product.year != null ? String(product.year) : '',
       origen: product.origin || '',
+      marca: product.brand || '',
       // Campos de servicio
       pricing_type: product.pricing_type || 'por_hora',
       availability: product.availability || 'inmediata',
@@ -1798,6 +1808,13 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
       if (categories.find(c => c.id === editingProduct.category_id)?.usa_marca) {
         payload.model = editingProduct.modelo.trim() || null;
         payload.year = editingProduct.anio.trim() ? parseInt(editingProduct.anio, 10) : null;
+        // La marca viaja sólo si cambió: vacía es `null`, que la quita. Una
+        // marca que la administración ya sacó de la lista la API la rechaza,
+        // y reenviarla sin tocarla impediría guardar el resto.
+        const marcaGuardada = backendProducts.find(p => p.id === editingProduct.id)?.brand || '';
+        if (editingProduct.marca !== marcaGuardada) {
+          payload.brand = editingProduct.marca || null;
+        }
       }
       if (!isService) {
         payload.origin = editingProduct.origen || null;
@@ -3930,6 +3947,24 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                   declara quien vende en cualquier producto. */}
               {categories.find(c => c.id === editingProduct.category_id)?.usa_marca && (
                 <div className={styles.editFormRow}>
+                  <div className={styles.editFormGroup}>
+                    <label htmlFor="edit-marca">Marca</label>
+                    <select
+                      id="edit-marca"
+                      value={editingProduct.marca}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, marca: e.target.value })}
+                    >
+                      <option value="">Sin declarar</option>
+                      {marcas.map(opcion => (
+                        <option key={opcion.value} value={opcion.value}>{opcion.label}</option>
+                      ))}
+                      {/* La que tiene y ya no está en la lista se sigue viendo:
+                          si no, el selector diría «Sin declarar» sin serlo. */}
+                      {editingProduct.marca && !marcas.some(opcion => opcion.value === editingProduct.marca) && (
+                        <option value={editingProduct.marca}>{editingProduct.marca}</option>
+                      )}
+                    </select>
+                  </div>
                   <div className={styles.editFormGroup}>
                     <label htmlFor="edit-modelo">Modelo</label>
                     <input

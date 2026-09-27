@@ -311,7 +311,7 @@ function App() {
   // el estado de red.
   const vistaPreviaDeInicio = useVistaPrevia({
     activa: pantallaDeTrabajo === 'home',
-    mensajeDeError: 'No pudimos cargar las operaciones.',
+    mensajeDeError: 'No pudimos cargar las publicaciones.',
   });
 
   // Cargar catálogos auxiliares al entrar al marketplace.
@@ -815,7 +815,7 @@ function App() {
                 la celda activa de la cabecera y el conteo lo confirma. El
                 encabezado de nivel 1 se queda: sacarlo dejaría la pantalla sin
                 título en el árbol del documento. */}
-            <h1 className="tg-sr-only">Operaciones disponibles</h1>
+            <h1 className="tg-sr-only">Publicaciones disponibles</h1>
             <div className={styles.contentWrapper}>
               <FilterSidebar
                 categories={categories}

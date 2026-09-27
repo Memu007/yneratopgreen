@@ -376,9 +376,8 @@
   flex: 1;
 }
 
-/* Features and Tags */
-.featureInput,
-.tagInput {
+/* Zonas de cobertura de un servicio */
+.featureInput {
   display: flex;
   gap: 8px;
   margin-bottom: 12px;
@@ -390,110 +389,6 @@
   border: 1px solid var(--tg-color-border);
   border-radius: var(--tg-radius-lg);
   font-size: 14px;
-}
-
-.tagInput input {
-  flex: 1;
-  padding: 10px 12px;
-  border: 1px solid var(--tg-color-border);
-  border-radius: var(--tg-radius-lg);
-  font-size: 14px;
-}
-
-.addButton {
-  padding: 10px 20px;
-  background-color: var(--tg-color-brand);
-  color: white;
-  border: none;
-  border-radius: var(--tg-radius-lg);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  white-space: nowrap;
-}
-
-.addButton:hover {
-  background-color: var(--tg-color-brand);
-}
-
-.featureList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.featureItem {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 12px;
-  background-color: var(--tg-color-surface);
-  border-radius: var(--tg-radius-lg);
-  font-size: 14px;
-}
-
-.featureItem strong {
-  color: var(--tg-color-brand);
-  margin-right: 8px;
-}
-
-.removeButton {
-  background: none;
-  border: none;
-  color: var(--tg-color-border-control);
-  cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s;
-}
-
-.removeButton:hover {
-  background-color: var(--tg-color-error);
-  color: white;
-}
-
-.tagList {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background-color: var(--tg-color-brand);
-  color: white;
-  border-radius: var(--tg-radius-sm);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.tagRemove {
-  background: none;
-  border: none;
-  color: white;
-  cursor: pointer;
-  padding: 0;
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: background-color 0.2s;
-  font-size: 12px;
-}
-
-.tagRemove:hover {
-  background-color: rgba(255, 255, 255, 0.3);
 }
 
 /* Form Actions */
@@ -550,8 +445,7 @@
     flex-direction: column;
   }
 
-  .featureInput,
-  .tagInput {
+  .featureInput {
     flex-direction: column;
   }
 

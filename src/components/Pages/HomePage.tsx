@@ -91,7 +91,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </p>
           <div className={styles.acciones}>
             <button className="tg-button tg-button--primary" onClick={onNavigateToMarketplace}>
-              Explorar operaciones
+              Explorar publicaciones
             </button>
             <button className="tg-button tg-button--secondary" onClick={handlePublishClick}>
               Publicar una oferta
@@ -104,7 +104,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             <p className={styles.medidor}>
               <span className={`tg-data ${styles.medidorNumero}`}>{total}</span>
               <span className={styles.medidorTexto}>
-                {total === 1 ? 'Operación disponible ahora' : 'Operaciones disponibles ahora'}
+                {total === 1 ? 'Publicación disponible ahora' : 'Publicaciones disponibles ahora'}
               </span>
               <i className={styles.medidorRegla} aria-hidden="true" />
             </p>
@@ -132,7 +132,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       </section>
 
       <section className={styles.taxonomia} aria-labelledby="titulo-taxonomia">
-        <h2 id="titulo-taxonomia" className="tg-sr-only">Tipos de operación</h2>
+        <h2 id="titulo-taxonomia" className="tg-sr-only">Tipos de publicación</h2>
         <div className={styles.taxonomiaGrilla}>
           {TAXONOMIA.map(([nombre, descriptor], indice) => (
             <div key={nombre} className={styles.taxonomiaItem}>
@@ -148,16 +148,16 @@ export const HomePage: React.FC<HomePageProps> = ({
         <div className={styles.encabezadoDeSeccion}>
           <div>
             <p className="tg-eyebrow">Mercado activo</p>
-            <h2 id="titulo-operaciones">Operaciones disponibles</h2>
+            <h2 id="titulo-operaciones">Publicaciones disponibles</h2>
           </div>
           <button className="tg-button tg-button--tertiary" onClick={onNavigateToMarketplace}>
-            Ver todas las operaciones
+            Ver todas las publicaciones
           </button>
         </div>
 
         {cargando ? (
           <div className={styles.grilla} aria-busy="true" aria-live="polite">
-            <span className="tg-sr-only">Cargando operaciones</span>
+            <span className="tg-sr-only">Cargando publicaciones</span>
             {[0, 1, 2].map((i) => (
               <div key={i} className={styles.esqueleto} aria-hidden="true">
                 <div className={styles.esqueletoFoto} />
@@ -175,7 +175,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         ) : operaciones.length === 0 ? (
           <div className={styles.aviso}>
-            <p>Todavía no hay operaciones publicadas.</p>
+            <p>Todavía no hay publicaciones.</p>
             <button className="tg-button tg-button--secondary" onClick={handlePublishClick}>
               Publicar una oferta
             </button>
@@ -199,7 +199,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         <div className={`tg-container ${styles.decisionGrilla}`}>
           <div className={styles.decisionIntro}>
             <p className="tg-eyebrow">Antes de avanzar</p>
-            <h2 id="titulo-datos">Los datos que definen la operación.</h2>
+            <h2 id="titulo-datos">Los datos que definen la publicación.</h2>
           </div>
           {DECISION.map(([titulo, texto]) => (
             <div key={titulo} className={styles.decisionItem}>
@@ -214,7 +214,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         <div className={styles.ctaInterior}>
           <div>
             <h2 id="titulo-publicar">¿Tenés algo para ofrecer?</h2>
-            <p>Publicá un activo, un insumo o un servicio con los datos que necesita la operación.</p>
+            <p>Publicá un activo, un insumo o un servicio con los datos que necesita la publicación.</p>
           </div>
           <div className={styles.acciones}>
             <button className="tg-button tg-button--primary" onClick={handlePublishClick}>

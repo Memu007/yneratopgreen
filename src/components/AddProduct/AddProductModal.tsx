@@ -112,8 +112,6 @@ const FORMULARIO_VACIO = (): NewProductData => ({
   location: { province: '', city: '' },
   stock: 0,
   unit: 'kg',
-  features: {},
-  tags: [],
 });
 
 const SERVICIO_VACIO = () => ({
@@ -133,9 +131,6 @@ const RETRATO_VACIO = {
   serviceData: SERVICIO_VACIO(),
   selectedProvinceId: '',
   zoneInput: '',
-  featureKey: '',
-  featureValue: '',
-  tagInput: '',
   imagenes: [] as string[],
 };
 
@@ -196,10 +191,6 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   const [serviceData, setServiceData] = useState(SERVICIO_VACIO);
   const [zoneInput, setZoneInput] = useState('');
 
-  const [featureKey, setFeatureKey] = useState('');
-  const [featureValue, setFeatureValue] = useState('');
-  const [tagInput, setTagInput] = useState('');
-
   // El retrato de lo que hay escrito. Se compara contra el del formulario
   // recién abierto, así un valor precargado no cuenta como cambio y volver un
   // campo a su valor original deja el formulario limpio otra vez. Las imágenes
@@ -212,9 +203,6 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     serviceData,
     selectedProvinceId,
     zoneInput,
-    featureKey,
-    featureValue,
-    tagInput,
     imagenes: images.map((imagen) => imagen.file?.name ?? ''),
   });
   // El cierre protegido se dispara desde `useCapaModal`, que se queda con la
@@ -240,9 +228,6 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     setLocalities([]);
     setImages([]);
     setZoneInput('');
-    setFeatureKey('');
-    setFeatureValue('');
-    setTagInput('');
   }, []);
 
   // Un solo camino de salida para los cuatro cierres del alta: Escape, la X,
@@ -440,45 +425,6 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
         province: locality?.province_name || prev.location.province,
         city: locality?.name || '',
       },
-    }));
-  };
-
-  const addFeature = () => {
-    if (featureKey && featureValue) {
-      setFormData(prev => ({
-        ...prev,
-        features: {
-          ...prev.features,
-          [featureKey]: featureValue
-        }
-      }));
-      setFeatureKey('');
-      setFeatureValue('');
-    }
-  };
-
-  const removeFeature = (key: string) => {
-    setFormData(prev => {
-      const newFeatures = { ...prev.features };
-      delete newFeatures[key];
-      return { ...prev, features: newFeatures };
-    });
-  };
-
-  const addTag = () => {
-    if (tagInput && !formData.tags.includes(tagInput)) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, tagInput]
-      }));
-      setTagInput('');
-    }
-  };
-
-  const removeTag = (tag: string) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(t => t !== tag)
     }));
   };
 
@@ -1337,81 +1283,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
             </div>
           </div>
 
-          {/* Características */}
-          <div className={styles.section}>
-            <h3>{publicationType === 'producto' ? 'Características del Producto' : 'Características del Servicio'}</h3>
-            
-            <div className={styles.featureInput}>
-              <input
-                type="text"
-                placeholder="Característica (Ej: Marca)"
-                value={featureKey}
-                onChange={(e) => setFeatureKey(e.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="Valor (Ej: Dekalb)"
-                value={featureValue}
-                onChange={(e) => setFeatureValue(e.target.value)}
-              />
-              <button type="button" onClick={addFeature} className={styles.addButton}>
-                + Agregar
-              </button>
-            </div>
-
-            {Object.entries(formData.features).length > 0 && (
-              <div className={styles.featureList}>
-                {Object.entries(formData.features).map(([key, value]) => (
-                  <div key={key} className={styles.featureItem}>
-                    <strong>{key}:</strong> {value}
-                    <button
-                      type="button"
-                      onClick={() => removeFeature(key)}
-                      className={styles.removeButton}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Etiquetas */}
-          <div className={styles.section}>
-            <h3>Etiquetas</h3>
-            
-            <div className={styles.tagInput}>
-              <input
-                type="text"
-                placeholder="Agregar etiqueta (Ej: promoción, nuevo)"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-              />
-              <button type="button" onClick={addTag} className={styles.addButton}>
-                + Agregar
-              </button>
-            </div>
-
-            {formData.tags.length > 0 && (
-              <div className={styles.tagList}>
-                {formData.tags.map(tag => (
-                  <span key={tag} className={styles.tag}>
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      className={styles.tagRemove}
-                    >
-                      ✕
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
+          {/* «Características» y «Etiquetas» no están: la API y la base no
+              tienen dónde guardarlas, y lo que se escribía ahí se perdía al
+              publicar sin aviso (PUBLISH-FIELDS-1). */}
           <div className={styles.formActions}>
             <button type="button" onClick={pedirCierre} className={styles.cancelButton} disabled={isSubmitting}>
               Cancelar

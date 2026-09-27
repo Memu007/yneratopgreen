@@ -18,6 +18,7 @@ import {
 import {
   convertBackendProductToFrontend,
   getProductDetail,
+  nombreDeMarca,
   ROTULO_DEL_ORIGEN,
   rotuloDeOrigen,
 } from '../../utils/catalogService';
@@ -97,8 +98,14 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     setCarga({ estado: 'cargando' });
     setQuantity(1);
     getProductDetail(id)
-      .then((respuesta) => {
-        if (vigente) setCarga({ estado: 'lista', product: convertBackendProductToFrontend(respuesta) });
+      .then(async (respuesta) => {
+        const product = convertBackendProductToFrontend(respuesta);
+        // La marca se muestra por su nombre. Si la lista no llega, por su
+        // valor: la ficha no se queda sin mostrarse por eso.
+        if (product.brand) {
+          product.brandName = await nombreDeMarca(product.brand).catch(() => product.brand);
+        }
+        if (vigente) setCarga({ estado: 'lista', product });
       })
       .catch((error: unknown) => {
         if (!vigente) return;
@@ -180,7 +187,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             <div className={styles.aviso}>
               <p>
                 Puede que la hayan pausado o dado de baja, o que el enlace esté
-                incompleto. Las operaciones vigentes están en el Mercado.
+                incompleto. Las publicaciones vigentes están en el Mercado.
               </p>
               {origen && enlaceAlMercado}
             </div>
@@ -374,6 +381,13 @@ const Ficha: React.FC<FichaProps> = ({
             <div>
               <dt>Potencia</dt>
               <dd>{`${product.powerHp} HP`}</dd>
+            </div>
+          )}
+          {/* La marca, junto al modelo y al año. Sin marca, no hay fila. */}
+          {product.brandName && (
+            <div>
+              <dt>Marca</dt>
+              <dd>{product.brandName}</dd>
             </div>
           )}
           {product.model && (
