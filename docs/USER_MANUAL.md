@@ -16,7 +16,7 @@ Esta guía no incluye cuentas ni contraseñas de prueba.
 
 ## Antes de empezar: lo que AgroBoeda no hace
 
-- **AgroBoeda no cobra, no recibe ni guarda el dinero de las ventas.** Quien
+- **AgroBoeda no recibe ni guarda el dinero de las ventas.** Quien
   compra le paga directamente a quien vende, a la cuenta de quien vende. Nada
   de ese dinero pasa por AgroBoeda.
 - **La transferencia la confirma quien vende.** AgroBoeda no ve ninguna cuenta

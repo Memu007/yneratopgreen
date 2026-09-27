@@ -17,7 +17,7 @@ ve en la pantalla: botones, pestañas, títulos y mensajes.
 Hay cosas que conviene saber antes de tocar nada, porque son límites de la
 plataforma y no se cambian desde el panel.
 
-- **La plataforma no cobra, no recibe ni guarda dinero de las ventas.** Quien
+- **La plataforma no recibe ni guarda dinero de las ventas.** Quien
   compra le paga directamente a quien vende, por Mercado Pago o por
   transferencia. Los montos que muestra el panel son información: nada de
   ese dinero pasa por AgroBoeda.
@@ -503,8 +503,8 @@ de dónde salen. El programa sí comprueba que sigan escritas igual: si una
 cambia o se borra, falla y nombra dónde estaba, para que alguien vuelva a
 mirar su fuente.
 
-- Antes de empezar: “La plataforma no cobra, no recibe ni guarda dinero de
-  las ventas.”, “Quien compra le paga directamente a quien vende, por Mercado
+- Antes de empezar: “La plataforma no recibe ni guarda dinero de las
+  ventas.”, “Quien compra le paga directamente a quien vende, por Mercado
   Pago o por transferencia.” y “nada de ese dinero pasa por AgroBoeda”. Es
   una decisión del proyecto (`docs/pm/DECISIONS.md`, 12/08/2026).
 - Paso 2: “Ese dinero fue de quien compró a quien vendió; la plataforma no lo

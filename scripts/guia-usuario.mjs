@@ -1202,7 +1202,7 @@ const RECORRIDOS = {
     });
     await v.afirma({
       paso: 'La cuenta que aparece es la de quien vende: AgroBoeda no recibe ese dinero.',
-      limites: ['AgroBoeda no cobra, no recibe ni guarda el dinero de las ventas.',
+      limites: ['AgroBoeda no recibe ni guarda el dinero de las ventas.',
         'Quien compra le paga directamente a quien vende, a la cuenta de quien vende.', 'Nada de ese dinero pasa por AgroBoeda.'],
     }, async () => {
       const texto = await textoDe(deLaVendedora);
