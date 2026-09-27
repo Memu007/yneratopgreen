@@ -13,6 +13,13 @@ Actualizado: 2026-09-26.
 - **Tarea activa:** `PUBLISH-FIELDS-1`: sacar del alta «Características del Producto» y «Etiquetas», que no se guardan, y mostrar y editar la marca. Los dos defectos los encontró la guía de uso.
 - **Corrección de método PM (25/09):** las aceptaciones de la marca no verificaron la carga de datos en producción. Desde ahora, toda pieza que agrega una lista o un catálogo tiene que decir cómo llega a producción, y PM lo comprueba con un caso sobre una base sin siembra.
 - **#9, atributos por rubro: absorbido (decisión de Emi, 25/09).** Tercer nivel de la taxonomía de la clienta como filtro en todos los rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. «Inversores» queda afuera. Va después de `MERCADO-UNICO-1` y antes de las guías de uso.
+- **Devolución de la clienta del 20/09 — estado (27/09):**
+  - hechos: #1, #7, #8 y #9;
+  - asignados: #3 en `PUBLISH-FIELDS-1`, y #2, #4, #6, #11a, #13, #14 y «no cobra comisión» en `REV1-PENDIENTES-1`;
+  - **esperan una charla de Emi con la clienta:** #5 (la idea de Inicio), #10 (AgroMarket como módulo), #12 (misión y visión), #11b (retener fondos y comisión, que chocan con reglas del proyecto) y la logística en los filtros;
+  - **#15, el correo:** Emi lo ve el 28/09. La clienta está armando la casilla en DonWeb.
+
+  El #3 quedó sin asignar entre el 20/09 y el 27/09 por un descuido de PM.
 - **Escalado a Emi:** la regla «el teléfono no sale de la API sin suscripción activa» choca con la decisión del 05/08, que pasó suscripciones y candados por plan a Fase 6. Hoy el teléfono no se publica en el Mercado ni en las fichas, pero sí lo ven las dos partes de una orden y quien compra al elegir transportista, sin suscripción. El transportista no recibe el de quien compra.
 
 ## Última aceptación PM — USER-GUIDE-1

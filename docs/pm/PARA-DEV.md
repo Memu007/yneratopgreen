@@ -102,6 +102,68 @@ No integres ni despliegues.
 
 ---
 
+## Siguiente — REV1-PENDIENTES-1 (empezala apenas entregues PUBLISH-FIELDS-1)
+
+Emi pidió el 27/09 arreglar todo lo que quedó sin hacer de la devolución de
+la clienta del 20/09 (`DEVOLUCION-CLIENTA-REVISION-01-2026-09-20.md`; sus
+palabras exactas están en el `.docx` de `originales/`). Esto es lo que se
+puede hacer sin decisiones pendientes. Entregala por separado de
+PUBLISH-FIELDS-1.
+
+1. **Inicio sin publicaciones (#2).** La clienta: «si el inicio es para
+   poner en tema, no deberían aparecer publicaciones aleatorias o
+   representativas», y no entiende «Mercado activo». Sacá de Inicio la
+   sección de publicaciones y su encabezado. Dejá un único acceso claro al
+   Mercado.
+2. **Los tres ítems de «Los datos definen la operación» (#4).**
+   - Sacá «honesta»: «la honestidad debería ser axioma».
+   - Precio y modalidad no son excluyentes: «Precio y modalidad», no «o».
+   - Nombrá el radio de alcance del transportista, que ella no encontró.
+   - Que «responsable y próximo paso» se entienda como lo que la plataforma
+     muestra, no como un instructivo.
+
+   El título cambia junto con el #3. Texto corto y en el tono del resto.
+3. **El bloque que se repite entre pestañas (#6).** «Toda esta parte que se
+   repite en otras pestañas (no en todas) no creo que haga falta.» Identificá
+   qué bloque se repite entre Inicio, Quiénes somos y Contacto. Dejalo en un
+   solo lugar, el que tenga sentido, y decí en el informe cuál era y dónde
+   quedó.
+4. **Preguntas frecuentes (#11a).** La clienta prefiere esperar a las
+   preguntas reales: la primera «los trata de giles», y no quiere que se
+   anticipe el tema de comisiones. **Sacá la sección de preguntas
+   frecuentes** de Contacto.
+5. **Nada visible afirma «no cobra comisión».** La clienta: «si cobra, pero
+   hay que ver de qué manera se explica y sólo si preguntan».
+   - Sacá esa afirmación de la vinculación de Mercado Pago del panel
+     (`UserDashboard.tsx`) y de la guía de uso.
+   - **Se mantiene, porque es regla del proyecto y es verdad:** la plataforma
+     no recibe ni guarda el dinero de las ventas, y la transferencia la
+     confirma quien vende.
+   - Lo que no cambia es el comportamiento: seguimos sin mandar
+     `marketplace_fee`.
+6. **Sacar «Nuestro equipo» (#13)** de Quiénes somos, «por el momento».
+7. **«¿Listo para transformar tu producción?» (#14)** promete de más.
+   Reemplazalo por una invitación concreta y sin promesas, por ejemplo
+   publicar o buscar en el Mercado agropecuario. Si ese bloque es el que se
+   repite (#6), resolvelo una sola vez.
+
+**No toques** (esperan una decisión de Emi con la clienta):
+
+- la idea rectora de Inicio (#5), más allá de lo de arriba;
+- AgroMarket como módulo del ecosistema (#10);
+- misión y visión (#12);
+- retener fondos o cobrar comisión (#11b), que chocan con reglas del
+  proyecto;
+- la logística en los filtros.
+
+**Aceptación:**
+
+- casos que comprueben cada punto en la pantalla, en escritorio y en celular;
+- negativos para Inicio con publicaciones, para la FAQ y para «comisión»
+  visible;
+- las dos guías coinciden;
+- a11y, contraste, móvil y suite completa.
+
 ## Después (no empezar todavía)
 
 Lo decide la PM cuando cierre `USER-GUIDE-1`. Lo que depende de Emi (correo,
