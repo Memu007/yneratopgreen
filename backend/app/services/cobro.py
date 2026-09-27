@@ -39,6 +39,7 @@ from typing import List, Optional
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api.notifications import notify_payment_approved
 from app.models.mp_intento import MPIntentoDePago
 from app.models.order import Order, OrderStatus
 from app.models.payment import Payment, PaymentStatus
@@ -450,6 +451,10 @@ def aplicar(db: Session, orden: Order, pago: Payment) -> PaymentStatus:
             orden.status = OrderStatus.PAID
             orden.updated_at = datetime.utcnow()
             db.add(orden)
+            # El aviso va con la transición y no con cada noticia: cinco
+            # avisos del mismo pago pasan por acá una sola vez, porque desde
+            # la segunda la orden ya no está «colocada».
+            notify_payment_approved(db, orden)
 
     return resumen
 

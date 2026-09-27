@@ -56,7 +56,8 @@ from app.services.logistica import (
 from app.services.storage import get_storage
 from app.api.notifications import (
     notify_order_placed, notify_order_received, notify_order_confirmed,
-    notify_order_shipped, notify_order_delivered, notify_order_cancelled
+    notify_order_shipped, notify_order_delivered, notify_order_cancelled,
+    notify_transfer_approved, notify_transfer_rejected,
 )
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -409,6 +410,17 @@ def decide_transfer_receipt(
     order.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(order)
+
+    # Después de escribir la decisión, como los demás avisos: un aviso que
+    # falla no puede deshacerla.
+    try:
+        if order.status == OrderStatus.REJECTED:
+            notify_transfer_rejected(db, order)
+        else:
+            notify_transfer_approved(db, order)
+    except Exception as error:  # noqa: BLE001
+        print(f"Error enviando notificación: {error}")
+
     return BankTransferOrderResponse(
         order_id=order.id,
         order_number=order.order_number,

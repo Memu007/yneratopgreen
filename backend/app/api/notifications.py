@@ -1,6 +1,8 @@
 """
 API Router para notificaciones de usuario
 """
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -14,6 +16,8 @@ from app.core.dependencies import get_current_user
 from app.models.user import User
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
+
+logger = logging.getLogger(__name__)
 
 
 class NotificationResponse(BaseModel):
@@ -154,9 +158,14 @@ def create_notification(
     notification_type: NotificationType,
     title: str,
     message: str,
-    order_id: str = None
+    order_id: str = None,
+    confirmar: bool = True,
 ):
-    """Helper para crear una notificación"""
+    """Helper para crear una notificación.
+
+    `confirmar=False` la deja en la transacción de quien llama, sin `commit`:
+    es para el aviso que tiene que quedar escrito junto con lo que avisa.
+    """
     notification = Notification(
         user_id=user_id,
         type=notification_type.value,
@@ -165,7 +174,8 @@ def create_notification(
         order_id=order_id
     )
     db.add(notification)
-    db.commit()
+    if confirmar:
+        db.commit()
     return notification
 
 
@@ -194,23 +204,89 @@ def notify_order_received(db: Session, order):
 
 
 def notify_payment_approved(db: Session, order):
-    """Notificar pago aprobado a comprador y vendedor"""
-    # Al comprador
+    """Mercado Pago acreditó el pago de una orden: se avisa a las dos partes.
+
+    La llama `cobro.aplicar` en la transición a pagada, que pasa una sola vez
+    por orden: una confirmación repetida encuentra la orden ya pagada y no
+    llega acá.
+
+    Va dentro de la transacción de quien confirma el pago, sin `commit`: el
+    webhook y el reconciliador tienen la fila bloqueada y deciden cuándo
+    soltarla. Así el aviso queda escrito si queda escrita la transición, y
+    sólo entonces. Y va en un savepoint: si escribir el aviso falla, se pierde
+    el aviso, no el pago.
+    """
+    # Lo que ya estaba pendiente se escribe afuera del savepoint: si eso falla,
+    # no es una falla del aviso y no se la tapa.
+    db.flush()
+    try:
+        with db.begin_nested():
+            create_notification(
+                db=db,
+                user_id=order.buyer_id,
+                notification_type=NotificationType.PAYMENT_APPROVED,
+                title="Pago aprobado",
+                message=f"Mercado Pago acreditó el pago de tu pedido #{order.order_number}.",
+                order_id=order.id,
+                confirmar=False,
+            )
+            # Decía «¡Venta confirmada!» y «Por favor confirma y envía el
+            # pedido»: confirmar es un paso que falta, y enviar no aplica a un
+            # servicio ni a un retiro.
+            create_notification(
+                db=db,
+                user_id=order.seller_id,
+                notification_type=NotificationType.PRODUCT_SOLD,
+                title="Venta pagada",
+                message=(
+                    f"Mercado Pago acreditó el pago del pedido #{order.order_number}. "
+                    "Ya podés confirmar el pedido en Mis Ventas."
+                ),
+                order_id=order.id,
+                confirmar=False,
+            )
+    except Exception as error:  # noqa: BLE001
+        logger.warning("No se pudo avisar el pago de %s: %s", order.order_number, error)
+
+
+def notify_transfer_approved(db: Session, order):
+    """Quien vende aprobó la transferencia: se avisa a las dos partes."""
     create_notification(
         db=db,
         user_id=order.buyer_id,
         notification_type=NotificationType.PAYMENT_APPROVED,
         title="Pago aprobado",
-        message=f"El pago de tu pedido #{order.order_number} fue aprobado. El vendedor será notificado.",
+        message=f"El vendedor aprobó la transferencia de tu pedido #{order.order_number}.",
         order_id=order.id
     )
-    # Al vendedor
     create_notification(
         db=db,
         user_id=order.seller_id,
         notification_type=NotificationType.PRODUCT_SOLD,
-        title="¡Venta confirmada!",
-        message=f"El pago del pedido #{order.order_number} fue aprobado. Por favor confirma y envía el pedido.",
+        title="Venta pagada",
+        message=(
+            f"Aprobaste la transferencia del pedido #{order.order_number}. "
+            "Ya podés confirmar el pedido en Mis Ventas."
+        ),
+        order_id=order.id
+    )
+
+
+def notify_transfer_rejected(db: Session, order):
+    """Quien vende rechazó la transferencia: se avisa a quien compra.
+
+    La orden queda rechazada y no se puede volver a mandar el comprobante, así
+    que no se ofrece: se dice dónde está el motivo, que quien vende escribió.
+    """
+    create_notification(
+        db=db,
+        user_id=order.buyer_id,
+        notification_type=NotificationType.ORDER_REJECTED,
+        title="Transferencia rechazada",
+        message=(
+            f"El vendedor rechazó la transferencia de tu pedido #{order.order_number} "
+            "y el pedido quedó rechazado. El motivo está en Mis Compras."
+        ),
         order_id=order.id
     )
 
