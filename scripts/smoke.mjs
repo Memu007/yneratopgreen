@@ -6270,10 +6270,13 @@ async function publicarConPrecio(precio, stock, etiqueta, token = state.sellerTo
       price: precio,
       stock,
       unit: 'unidad',
-      locality_id: state.location.localityId,
+      // La del caso 5, que es la de la suite. Un caso suelto no la tiene, y
+      // acá se mide dinero, no ubicación: sirve cualquiera del padrón.
+      locality_id: state.location?.localityId ?? localidadDeEnvio(),
       publication_type: 'producto',
     },
   });
+  assert(creado.data?.id, `no se pudo publicar ${etiqueta}: HTTP ${creado.status}`);
   return creado.data.id;
 }
 
@@ -8053,7 +8056,9 @@ await runCase(79, 'Lo que viaja a Mercado Pago: el importe de la orden, sin comi
       'el vendedor no vinculó');
 
     // Un precio que en binario no existe: 3 × 0,10 da 0,30000000000000004.
-    const producto = await publicarConPrecio(0.10, 20, 'preferencia de diez centavos');
+    // Publica la misma cuenta que vinculó, con su token: suelto, este caso no
+    // tiene la sesión de vendedor que dejan los anteriores.
+    const producto = await publicarConPrecio(0.10, 20, 'preferencia de diez centavos', vendedor.token);
     await armarCarrito([{ product_id: producto, quantity: 3 }]);
 
     const creado = await apiRequest('/orders/checkout', {
@@ -26723,8 +26728,9 @@ await runCase(168, 'Buscar es una acción, Contacto no promete planes, el Login 
     // --- B. Contacto no promete planes ------------------------------------
     //
     // Lo decía la FAQ. Con REV1-PENDIENTES-1 la FAQ se fue entera (la
-    // clienta, 20/09), y con ella la pregunta de comisiones: el tema no se
-    // anticipa. Queda mirar que la página no lo diga por otro lado.
+    // clienta, 20/09), y con ella la pregunta de comisiones: cómo se explica
+    // la comisión está por decidir. Queda mirar que la página no lo diga por
+    // otro lado.
     await page.locator('header').first()
       .getByRole('button', { name: 'Contacto', exact: true }).first().click();
     await page.getByRole('heading', { name: 'Información de Contacto' }).waitFor({ timeout: 20_000 });
@@ -36151,6 +36157,217 @@ await runCase(209, 'Inicio sin publicaciones, una sola invitación, sin pregunta
     + 'Mercado»; Contacto no tiene preguntas frecuentes; Quiénes somos no tiene «Nuestro equipo»; nada dice '
     + '«comisión», y Mercado Pago sigue diciendo que AgroBoeda no recibe el dinero. Mirado en '
     + `${medidos.length} anchos (${medidos.join('; ')})`;
+});
+
+// 210. NOTIF-TEXTOS-1 — lo que dicen las notificaciones, donde las lee la
+// persona.
+//
+// Había textos que prometían cosas sobre el dinero que el producto no hace: el
+// rechazo decía «El monto total será reembolsado.» y AgroBoeda no tiene ese
+// dinero; «Te avisaremos cuando llegue» anunciaba un aviso que no existe; y
+// varios trataban de «tú» en un sitio que usa el «vos».
+//
+// El caso dispara todas las notificaciones que el producto manda —la
+// bienvenida, las cinco de una compra que llega, el rechazo de una compra ya
+// pagada y la cancelación de quien compra— y las lee en la API y en la pestaña
+// «Notificaciones», en escritorio y en celular. Y mira que los dos próximos
+// pasos que nombran existan en «Mis Compras».
+await runCase(210, 'Las notificaciones dicen lo que pasó, sin reembolsos ni avisos que no existen, y en «vos»', async () => {
+  const problemas = [];
+  const medidos = [];
+  const sello = Date.now();
+  // Lo que ninguna notificación puede decir.
+  const PROMESAS = [
+    [/reembols/i, 'promete un reembolso'],
+    [/devol|devuelv|reintegr/i, 'promete una devolución'],
+    [/\d+\s?%/, 'nombra un porcentaje'],
+    [/avisaremos|te vamos a avisar/i, 'promete un aviso que no existe'],
+    [/pronto ser[aá]|en camino/i, 'afirma un envío que el producto no conoce'],
+    [/comisi[oó]n/i, 'dice «comisión»'],
+    [/marketplace|agr[ií]colas?\b/i, 'dice «marketplace» o «agrícola»'],
+  ];
+  // Formas del «tú» que el sitio no usa. Con acento son las del «vos»
+  // («confirmá», «enviá»): el límite de palabra no las toma.
+  const TUTEO = /\b(tienes|puedes|quieres|debes|procede|confirma|env[ií]a|explora|comienza|revisa|contacta|recuerda|ingresa|completa|agrega)\b/i;
+  const revisar = (texto, donde) => {
+    for (const [patron, que] of PROMESAS) {
+      const visto = texto.match(new RegExp(`[^\\n]{0,50}${patron.source}[^\\n]{0,30}`, patron.flags));
+      if (visto) problemas.push(`${donde} ${que}: «${visto[0].trim()}»`);
+    }
+    const tuteo = texto.match(new RegExp(`[^\\n]{0,40}${TUTEO.source}[^\\n]{0,20}`, TUTEO.flags));
+    if (tuteo) problemas.push(`${donde} trata de «tú»: «${tuteo[0].trim()}»`);
+  };
+
+  // --- Las cuentas, la publicación y las compras ------------------------------
+  const vende = { email: `notif.vende.${sello}@example.com`, password: 'notifvende123', full_name: `Vende Notif ${sello}` };
+  const compra = { email: `notif.compra.${sello}@example.com`, password: 'notifcompra123', full_name: `Compra Notif ${sello}` };
+  await registrarYVerificar({ ...vende, role: 'user' });
+  await registrarYVerificar({ ...compra, role: 'user' });
+  const vendedora = await ingresarVendedor(vende.email, vende.password);
+  const compradora = await ingresarVendedor(compra.email, compra.password);
+  let publicacion = null;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    await apiRequest('/auth/me', { method: 'PATCH', token: vendedora.token, body: { alias_bancario: `notif.${sello}` } });
+    ({ data: publicacion } = await apiRequest('/products', {
+      method: 'POST', token: vendedora.token,
+      body: {
+        name: `Semilla Notif ${sello}`, description: 'Publicación del caso 210, para disparar cada notificación.',
+        category_id: queryRows("SELECT id, 'fin' FROM categories WHERE slug = 'insumos-agricolas'")[0][0],
+        price: 2100, stock: 10, unit: 'kg', locality_id: localidadDelPadron('Pergamino', 'Buenos Aires'),
+        publication_type: 'producto', operation_kind: 'insumo',
+      },
+    }));
+    const comprar = async () => {
+      await apiRequest('/cart/items', {
+        method: 'POST', token: compradora.token, body: { product_id: publicacion.id, quantity: 1 },
+      });
+      const { data } = await apiRequest('/orders/checkout/transfer', {
+        method: 'POST', token: compradora.token,
+        body: {
+          shipping_address: 'Calle del caso 210', shipping_locality_id: localidadDeEnvio(),
+          shipping_postal_code: '2700', shipping_decisions: trasladoPropio(compradora.id),
+        },
+      });
+      return data.orders[0];
+    };
+    const aprobar = (orden) => apiRequest(`/orders/${orden.order_id}/transfer-receipt`, {
+      method: 'PATCH', token: vendedora.token, body: { decision: 'approve' },
+    });
+    const pasarA = (orden, token, status) => apiRequest(`/orders/${orden.order_id}/status`, {
+      method: 'PATCH', token, body: { status },
+    });
+    const cancelar = (orden, token) => apiRequest(`/orders/${orden.order_id}/cancel`, {
+      method: 'POST', token, body: { reason: 'Caso 210' },
+    });
+
+    // Una que llega: pagada, confirmada, enviada y recibida.
+    const recibida = await comprar();
+    await aprobar(recibida);
+    await pasarA(recibida, vendedora.token, 'confirmed');
+    await pasarA(recibida, vendedora.token, 'shipped');
+    await pasarA(recibida, compradora.token, 'delivered');
+    // Una enviada que todavía no llegó: la que tiene que ofrecer «Confirmar
+    // Recepción», que es el paso que nombra el aviso de envío.
+    const enviada = await comprar();
+    await aprobar(enviada);
+    await pasarA(enviada, vendedora.token, 'confirmed');
+    await pasarA(enviada, vendedora.token, 'shipped');
+    // La que quien vende rechaza DESPUÉS de aprobar la transferencia: quien
+    // compra ya pagó, y el dinero está en la cuenta de quien vende.
+    const rechazada = await comprar();
+    await aprobar(rechazada);
+    await cancelar(rechazada, vendedora.token);
+    // La que cancela quien compra.
+    const cancelada = await comprar();
+    await cancelar(cancelada, compradora.token);
+    // Y una sin pagar: la que tiene que ofrecer cómo pagarla, que es el paso
+    // que nombra el aviso de pedido.
+    const sinPagar = await comprar();
+    const ordenes = [recibida, enviada, rechazada, cancelada, sinPagar];
+    const estados = ordenes.map((o) => ordenEnLaBase(o.order_id).estado);
+    assert(JSON.stringify(estados) === JSON.stringify(['delivered', 'shipped', 'rejected', 'cancelled', 'awaiting_transfer_receipt']),
+      `las órdenes del caso quedaron en ${JSON.stringify(estados)}`);
+
+    // --- Lo que tiene que decir cada una -------------------------------------
+    const bienvenida = (nombre) => ['¡Bienvenido/a a AgroBoeda!',
+      `Hola ${nombre}, tu cuenta fue creada. En el Mercado podés publicar un equipo, un insumo o un servicio, o buscar lo que necesitás.`];
+    const pedido = (o) => ['Pedido realizado',
+      `Tu pedido #${o.order_number} fue creado y está pendiente de pago. En Mis Compras tenés cómo pagarlo.`];
+    const venta = (o) => ['Nueva venta recibida', `Tenés un nuevo pedido #${o.order_number} pendiente de pago.`];
+    const esperadas = {
+      compra: [
+        bienvenida(compra.full_name),
+        ...ordenes.map(pedido),
+        ['Pedido confirmado', `El vendedor confirmó tu pedido #${recibida.order_number}.`],
+        ['Pedido confirmado', `El vendedor confirmó tu pedido #${enviada.order_number}.`],
+        ['Pedido enviado', `El vendedor marcó tu pedido #${recibida.order_number} como enviado. Cuando lo recibas, confirmá la recepción en Mis Compras.`],
+        ['Pedido enviado', `El vendedor marcó tu pedido #${enviada.order_number} como enviado. Cuando lo recibas, confirmá la recepción en Mis Compras.`],
+        ['Pedido entregado', `Tu pedido #${recibida.order_number} fue marcado como entregado. ¡Gracias por tu compra!`],
+        ['Pedido rechazado', `El vendedor rechazó tu pedido #${rechazada.order_number}.`],
+        ['Cancelaste tu pedido', `Tu pedido #${cancelada.order_number} fue cancelado.`],
+      ],
+      vende: [
+        bienvenida(vende.full_name),
+        ...ordenes.map(venta),
+        ['Entrega confirmada', `El comprador confirmó la recepción del pedido #${recibida.order_number}. ¡Venta completada!`],
+        ['Pedido cancelado', `El comprador canceló el pedido #${cancelada.order_number}.`],
+      ],
+    };
+
+    // --- 1. En la API: exactamente esas, y ninguna promete nada ----------------
+    for (const [quien, cuenta] of [['compra', compradora], ['vende', vendedora]]) {
+      const { data } = await apiRequest('/notifications', { token: cuenta.token });
+      const recibidas = data.notifications.map((n) => [n.title, n.message]);
+      const clave = ([titulo, mensaje]) => `${titulo} | ${mensaje}`;
+      const faltan = esperadas[quien].map(clave).filter((c) => !recibidas.map(clave).includes(c));
+      const sobran = recibidas.map(clave).filter((c) => !esperadas[quien].map(clave).includes(c));
+      for (const f of faltan) problemas.push(`API, quien ${quien}: falta «${f}»`);
+      for (const s of sobran) problemas.push(`API, quien ${quien}: sobra «${s}»`);
+      for (const [titulo, mensaje] of recibidas) revisar(`${titulo}\n${mensaje}`, `API, quien ${quien}:`);
+    }
+
+    // --- 2. Donde las lee la persona, en los dos anchos ------------------------
+    const entrarComo = async (contexto, quien) => {
+      const { data } = await apiRequest('/auth/login', { method: 'POST', body: { email: quien.email, password: quien.password } });
+      await contexto.addInitScript(({ access, refresh }) => {
+        window.localStorage.setItem('access_token', access);
+        window.localStorage.setItem('refresh_token', refresh);
+      }, { access: data.access_token, refresh: data.refresh_token });
+    };
+    const abrirPestana = async (page, pestana, titulo) => {
+      await page.goto(`${FRONTEND_URL}/?section=account`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: 'Mi cuenta', exact: true }).waitFor({ timeout: 20_000 });
+      await page.getByRole('button', { name: new RegExp(`^\\s*${pestana}`) }).first().click();
+      await page.getByRole('heading', { name: titulo }).first().waitFor({ timeout: 20_000 });
+    };
+
+    for (const [ancho, viewport] of [['escritorio', { width: 1440, height: 900 }], ['celular', { width: 390, height: 844 }]]) {
+      for (const [quien, datos] of [['compra', compra], ['vende', vende]]) {
+        const contexto = await browser.newContext({ viewport, hasTouch: viewport.width < 800 });
+        await entrarComo(contexto, datos);
+        const page = await contexto.newPage();
+        await abrirPestana(page, 'Notificaciones', /Notificaciones/);
+        const items = page.locator('main [class*="_notificationItem_"]');
+        await esperarA(async () => (await items.count()) >= esperadas[quien].length,
+          `${ancho}: quien ${quien} no llegó a ver sus ${esperadas[quien].length} notificaciones`, 20_000)
+          .catch((e) => problemas.push(e.message));
+        const textos = await items.allInnerTexts();
+        for (const [titulo, mensaje] of esperadas[quien]) {
+          const la = page.locator('main [class*="_notificationMessage_"]').getByText(mensaje, { exact: true });
+          if (await la.count() === 0) problemas.push(`${ancho}: quien ${quien} no lee «${mensaje}»`);
+          else if (!(await la.first().isVisible())) problemas.push(`${ancho}: «${mensaje}» está pero no se ve`);
+          if (!textos.some((t) => t.includes(titulo))) problemas.push(`${ancho}: quien ${quien} no ve el título «${titulo}»`);
+        }
+        revisar(textos.join('\n'), `${ancho}: la pestaña de quien ${quien}`);
+        const medida = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+        if (medida[0] > medida[1] + 1) problemas.push(`${ancho}: las notificaciones de quien ${quien} desbordan (${medida[0]} en ${medida[1]})`);
+
+        // --- 3. Los próximos pasos que nombran existen en «Mis Compras» ----------
+        if (quien === 'compra') {
+          await abrirPestana(page, 'Mis Compras', 'Mis Compras');
+          const tarjeta = (o) => page.locator('main [class*="_orderCard_"]')
+            .filter({ has: page.getByRole('heading', { name: `Pedido #${o.order_number}`, exact: true }) });
+          await tarjeta(sinPagar).getByRole('button', { name: 'Enviar comprobante' })
+            .waitFor({ state: 'visible', timeout: 20_000 })
+            .catch(() => problemas.push(`${ancho}: el pedido sin pagar no ofrece cómo pagarlo en Mis Compras`));
+          await tarjeta(enviada).getByRole('button', { name: 'Confirmar Recepción' })
+            .waitFor({ state: 'visible', timeout: 20_000 })
+            .catch(() => problemas.push(`${ancho}: el pedido enviado no ofrece «Confirmar Recepción» en Mis Compras`));
+        }
+        await contexto.close();
+      }
+      medidos.push(`${ancho}: ${esperadas.compra.length} de quien compra y ${esperadas.vende.length} de quien vende`);
+    }
+  } finally {
+    await browser.close();
+    if (publicacion?.id) await pedirCrudo(`/products/${publicacion.id}`, { method: 'DELETE', header: vendedora.token }).catch(() => {});
+  }
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return 'la bienvenida, el pedido, la venta, la confirmación, el envío, la entrega, el rechazo de una compra ya '
+    + 'pagada y la cancelación dicen lo que pasó: ninguna promete reembolso, devolución, porcentaje ni un aviso '
+    + 'que no existe, ninguna trata de «tú», y los dos pasos que nombran —cómo pagar y «Confirmar Recepción»— '
+    + `están en Mis Compras. Leídas en la API y en la pestaña, en ${medidos.join('; ')}`;
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
