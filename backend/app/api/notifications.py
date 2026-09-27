@@ -268,13 +268,16 @@ def notify_order_cancelled(db: Session, order, cancelled_by_buyer: bool = True):
             message=f"El comprador canceló el pedido #{order.order_number}.",
             order_id=order.id
         )
-        # También notificar al comprador que se le descontará la comisión
+        # Y al comprador. Decía «Se te devolverá el 95% del monto (se
+        # descuenta la comisión del 5%)»: AgroBoeda no cobra esa comisión ni
+        # tiene el dinero para devolverlo, y el tema de la comisión no se
+        # anticipa (la clienta, 20/09).
         create_notification(
             db=db,
             user_id=order.buyer_id,
             notification_type=NotificationType.ORDER_CANCELLED,
             title="Cancelaste tu pedido",
-            message=f"Tu pedido #{order.order_number} fue cancelado. Se te devolverá el 95% del monto (se descuenta la comisión del 5%).",
+            message=f"Tu pedido #{order.order_number} fue cancelado.",
             order_id=order.id
         )
     else:
