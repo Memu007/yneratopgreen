@@ -291,52 +291,8 @@ export const ContactPage: React.FC<ContactPageProps> = ({ cotizacion = null }) =
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section className={styles.faqSection}>
-        <div className={styles.container}>
-          <h2>Preguntas Frecuentes</h2>
-          <div className={styles.faqGrid}>
-            <div className={styles.faqCard}>
-              <h3>¿Cómo empiezo a vender?</h3>
-              <p>Registrate como vendedor, completá tu perfil y empezá a publicar productos.</p>
-            </div>
-            <div className={styles.faqCard}>
-              <h3>¿Cuáles son las formas de pago?</h3>
-              {/* Decía sólo «transferencias bancarias directas al
-                  vendedor», y el producto también cobra por Mercado Pago:
-                  `medios_de` lo ofrece cuando ESE vendedor lo tiene
-                  vinculado. Prometer de menos es tan inexacto como
-                  prometer de más, así que se nombran los dos —y la
-                  condición va con el segundo, porque no todos los
-                  vendedores lo tienen—. */}
-              <p>
-                Podés pagar por transferencia bancaria directa al vendedor y, cuando ese
-                vendedor lo tenga habilitado, también con Mercado Pago.
-              </p>
-            </div>
-            <div className={styles.faqCard}>
-              <h3>¿Realizan envíos a todo el país?</h3>
-              <p>Sí, trabajamos con logística nacional para llegar a todas las provincias argentinas.</p>
-            </div>
-            <div className={styles.faqCard}>
-              {/* Decía «nuestras comisiones son transparentes y competitivas,
-                  consultá nuestros planes»: dos promesas sobre algo que no
-                  existe. No hay planes, no hay suscripción y no hay comisión.
-                  Lo que sí hay está escrito en el producto —la preferencia de
-                  Mercado Pago no manda `marketplace_fee`, ni siquiera en cero,
-                  y el modelo de pago no guarda comisión— y es lo que dice
-                  ahora. Mercado Pago sí cobra lo suyo: callarlo sería la misma
-                  clase de promesa al revés. */}
-              <h3>¿Hay comisiones por venta?</h3>
-              <p>
-                AgroBoeda no cobra comisión por la venta en este MVP: el pago va al vendedor.
-                Lo que cobre el medio de pago que elijas —Mercado Pago, por ejemplo— corre por
-                cuenta de ese medio y no pasa por AgroBoeda.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Las preguntas frecuentes salieron (la clienta, 20/09): vuelven cuando
+          se conozcan las preguntas reales. */}
     </div>
   );
 };

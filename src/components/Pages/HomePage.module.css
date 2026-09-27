@@ -255,94 +255,7 @@
   line-height: 1.4;
 }
 
-/* --- Operaciones reales -------------------------------------------------- */
-.operaciones {
-  padding-block: var(--tg-space-10) var(--tg-space-16);
-}
-
-.encabezadoDeSeccion {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: var(--tg-space-6);
-  margin-bottom: var(--tg-space-6);
-}
-
-.encabezadoDeSeccion h2 {
-  margin-top: var(--tg-space-2);
-}
-
-.encabezadoDeSeccion :global(.tg-eyebrow) {
-  width: 280px;
-  max-width: 100%;
-}
-
-/* El enlace terciario lleva el subrayado cereal: es un destino, no un botón. */
-.encabezadoDeSeccion :global(.tg-button--tertiary) {
-  padding-inline: 0;
-  color: var(--tg-color-text);
-  border-bottom: 2px solid var(--tg-color-signal);
-  border-radius: 0;
-  font-size: 14px;
-}
-
-.encabezadoDeSeccion :global(.tg-button--tertiary):hover {
-  color: var(--tg-color-brand);
-  background: none;
-}
-
-.grilla {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--tg-grid-gap-desktop);
-  align-items: start;
-}
-
-.esqueleto {
-  min-height: 280px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--tg-space-3);
-  padding-bottom: var(--tg-space-5);
-  background-color: var(--tg-color-surface);
-  border: 1px solid var(--tg-color-border);
-  border-top: 3px solid var(--tg-color-border);
-}
-
-.esqueletoFoto {
-  height: 112px;
-  background-color: var(--tg-color-surface-muted);
-}
-
-.esqueletoLinea {
-  height: 14px;
-  margin-inline: 18px;
-  background-color: var(--tg-color-surface-muted);
-}
-
-.esqueletoCorta {
-  width: 55%;
-}
-
-/* Vacío y error comparten forma y no se confunden entre sí: uno dice que no
-   hay nada publicado, el otro dice que no pudimos preguntar. */
-.aviso {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--tg-space-4);
-  padding: var(--tg-space-6);
-  background-color: var(--tg-color-surface);
-  border: 1px solid var(--tg-color-border);
-  border-top: 3px solid var(--tg-color-border-control);
-}
-
-.aviso p {
-  margin: 0;
-  font-weight: 560;
-}
-
-/* --- Qué mirar antes de avanzar ------------------------------------------ */
+/* --- Lo que muestra cada publicación ------------------------------------ */
 .decision {
   padding-block: var(--tg-space-12);
   background-color: var(--tg-color-surface);
@@ -378,25 +291,6 @@
   margin: 0;
   color: var(--tg-color-text-secondary);
   font-size: 14px;
-}
-
-/* --- Cierre comercial ---------------------------------------------------- */
-.cta {
-  padding-block: var(--tg-space-16);
-}
-
-.ctaInterior {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: var(--tg-space-8);
-  padding-top: var(--tg-space-8);
-  border-top: 4px solid var(--tg-color-brand);
-}
-
-.ctaInterior p {
-  margin-top: var(--tg-space-2);
-  color: var(--tg-color-text-secondary);
 }
 
 @media (max-width: 1023px) {
@@ -442,11 +336,6 @@
   .taxonomiaItem:nth-child(2),
   .taxonomiaItem:last-child {
     padding-right: var(--tg-gutter-tablet);
-  }
-
-  .grilla {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--tg-grid-gap-tablet);
   }
 
   .decisionGrilla {
@@ -520,21 +409,6 @@
     border-top: 0;
   }
 
-  .operaciones {
-    padding-block: var(--tg-space-6) var(--tg-space-10);
-  }
-
-  .encabezadoDeSeccion {
-    flex-direction: column;
-    align-items: start;
-    gap: var(--tg-space-3);
-  }
-
-  .grilla {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--tg-grid-gap-mobile);
-  }
-
   .decision {
     padding-block: var(--tg-space-8);
   }
@@ -551,17 +425,5 @@
     padding: var(--tg-space-4) 0;
     border-left: 0;
     border-top: 1px solid var(--tg-color-border);
-  }
-
-  .cta {
-    padding-block: var(--tg-space-10);
-  }
-
-  .ctaInterior {
-    display: block;
-  }
-
-  .ctaInterior .acciones {
-    margin-top: var(--tg-space-5);
   }
 }

@@ -174,103 +174,6 @@
   color: rgba(255, 255, 255, 0.9);
 }
 
-/* ==================== TEAM SECTION ==================== */
-.teamSection {
-  background: white;
-  padding: 80px 0;
-}
-
-.teamTitle {
-  font-size: 36px;
-  font-weight: 400;
-  color: var(--tg-color-text-secondary);
-  text-align: center;
-  margin-bottom: 60px;
-  font-style: italic;
-}
-
-.teamMember {
-  display: grid;
-  grid-template-columns: 300px 1fr;
-  gap: 60px;
-  align-items: center;
-  margin-bottom: 80px;
-  max-width: 1000px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.teamMember.reverse {
-  grid-template-columns: 1fr 300px;
-}
-
-.teamMember.reverse .memberInfo {
-  text-align: right;
-}
-
-.memberPhoto {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.photoPlaceholder {
-  width: 220px;
-  height: 220px;
-  border-radius: 50%;
-  background: var(--tg-color-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: var(--tg-shadow-none);
-  overflow: hidden;
-}
-
-.photoPlaceholder svg {
-  width: 100px;
-  height: 100px;
-  color: var(--tg-color-border-control);
-}
-
-.memberImage {
-  width: 220px;
-  height: 220px;
-  border-radius: 50%;
-  object-fit: cover;
-  object-position: center 15%;
-  box-shadow: var(--tg-shadow-none);
-  border: 4px solid var(--tg-color-surface);
-}
-
-.memberInfo {
-  padding: 20px 0;
-}
-
-.memberName {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--tg-color-info);
-  margin-bottom: 8px;
-}
-
-.memberRole {
-  font-size: 16px;
-  color: var(--tg-color-info);
-  font-weight: 500;
-  margin-bottom: 20px;
-}
-
-.memberDescription {
-  font-size: 15px;
-  line-height: 1.8;
-  color: var(--tg-color-text-secondary);
-  margin-bottom: 12px;
-}
-
-.memberDescription strong {
-  color: var(--tg-color-info);
-}
-
 /* ==================== CTA SECTION ==================== */
 .ctaSection {
   background: var(--tg-color-brand);
@@ -351,34 +254,6 @@
     gap: 40px;
   }
 
-  .teamMember,
-  .teamMember.reverse {
-    grid-template-columns: 1fr;
-    gap: 30px;
-    text-align: center;
-  }
-
-  .teamMember.reverse .memberInfo {
-    text-align: center;
-  }
-
-  .teamMember.reverse {
-    direction: ltr;
-  }
-
-  .teamMember.reverse .memberPhoto {
-    order: -1;
-  }
-
-  .photoPlaceholder {
-    width: 180px;
-    height: 180px;
-  }
-
-  .memberName {
-    font-size: 24px;
-  }
-
   .ctaSection h2 {
     font-size: 28px;
   }
@@ -404,14 +279,6 @@
   .missionCard h2,
   .visionCard h2 {
     font-size: 26px;
-  }
-
-  .teamSection {
-    padding: 60px 0;
-  }
-
-  .teamTitle {
-    font-size: 28px;
   }
 
   .ctaButtons {

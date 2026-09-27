@@ -1,16 +1,11 @@
 import React from 'react';
-import type { CotizacionPedida } from '../../types';
 import styles from './HomePage.module.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
-import { ProductCard } from '../ProductCard/ProductCard';
 import type { VistaPrevia } from '../../hooks/useVistaPrevia';
 
 interface HomePageProps {
   onNavigateToMarketplace: () => void;
-  /** Pedir una cotización desde una tarjeta de esta pantalla. Lleva qué se
-      cotiza y a quién: sin eso, Contacto empieza en blanco. */
-  onSolicitarCotizacion?: (pedido: CotizacionPedida) => void;
   /** Publicar desde esta pantalla.
    *
       Es una sola función y no el par «abrí el formulario» / «abrí el Login»,
@@ -20,12 +15,8 @@ interface HomePageProps {
       persona entra; cancelar o fallar no abre nada. Es la MISMA puerta que usa
       una tarjeta sin sesión. */
   onSolicitarPublicar?: () => void;
-  /** Abre el Login de la aplicación y avisa cuando se cierra, se complete o se
-      cancele. Se pasa hasta la tarjeta: sin sesión, una acción de compra ofrece
-      ingresar en vez de agregar en silencio, y al volver se queda en esta misma
-      página. Es la MISMA función que usa el Mercado; no hay un segundo Login. */
-  onSolicitarIngreso?: (alVolver: () => void) => void;
-  /** Publicaciones reales del mismo catálogo que el mercado. */
+  /** El total del mismo catálogo que el mercado. Inicio no muestra
+      publicaciones (la clienta, 20/09): sólo cuántas hay. */
   vistaPrevia: VistaPrevia;
 }
 
@@ -45,18 +36,21 @@ const TAXONOMIA: [string, string][] = [
 /** El número de renglón del libro mayor: `01`, `02`, `03`, `04`. */
 const renglon = (indice: number) => String(indice + 1).padStart(2, '0');
 
-/** Los datos que cada publicación tiene que traer para poder compararse. */
+/** Lo que muestra cada publicación, para poder compararla con otra.
+ *
+ *  Describe lo que la plataforma muestra, no lo que hay que hacer (la
+ *  clienta, 20/09): precio y modalidad van juntos porque no se excluyen, el
+ *  radio del transportista se nombra porque no lo encontraba, y no se
+ *  anuncia como virtud lo que tiene que ser lo mínimo. */
 const DECISION: [string, string][] = [
-  ['Precio o modalidad', 'Valor publicado, unidad o indicación honesta de cotización.'],
-  ['Ubicación y alcance', 'Localidad, cobertura o radio según el tipo de publicación.'],
-  ['Responsable y próximo paso', 'Quién publica y qué acción existe realmente en el producto.'],
+  ['Precio y modalidad', 'El precio, su unidad y, en los servicios, cómo se cobra. Sin precio publicado, se pide cotización.'],
+  ['Ubicación y alcance', 'La localidad de la publicación, la cobertura de un servicio y el radio de alcance de cada transportista.'],
+  ['Quién publica y qué se puede hacer', 'El nombre y la reputación de quien publica, y la acción disponible: agregar al carrito, contratar o pedir cotización.'],
 ];
 
 export const HomePage: React.FC<HomePageProps> = ({
   onNavigateToMarketplace,
-  onSolicitarCotizacion,
   onSolicitarPublicar,
-  onSolicitarIngreso,
   vistaPrevia,
 }) => {
   const { user } = useAuth();
@@ -70,7 +64,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     onSolicitarPublicar?.();
   };
 
-  const { operaciones, total, cargando, error, reintentar } = vistaPrevia;
+  const { total } = vistaPrevia;
 
   return (
     <div className={styles.pagina}>
@@ -87,11 +81,13 @@ export const HomePage: React.FC<HomePageProps> = ({
             Equipos, insumos y servicios para seguir produciendo.
           </h1>
           <p className="tg-lead">
-            Publicaciones con precio o modalidad, ubicación, responsable y próximo paso.
+            Publicaciones con precio y modalidad, ubicación y quién publica.
           </p>
+          {/* El único acceso al Mercado de esta página (la clienta, 20/09): la
+              sección de publicaciones y la invitación del final se fueron. */}
           <div className={styles.acciones}>
             <button className="tg-button tg-button--primary" onClick={onNavigateToMarketplace}>
-              Explorar publicaciones
+              Ir al Mercado
             </button>
             <button className="tg-button tg-button--secondary" onClick={handlePublishClick}>
               Publicar una oferta
@@ -144,62 +140,11 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </section>
 
-      <section className={`tg-container ${styles.operaciones}`} aria-labelledby="titulo-operaciones">
-        <div className={styles.encabezadoDeSeccion}>
-          <div>
-            <p className="tg-eyebrow">Mercado activo</p>
-            <h2 id="titulo-operaciones">Publicaciones disponibles</h2>
-          </div>
-          <button className="tg-button tg-button--tertiary" onClick={onNavigateToMarketplace}>
-            Ver todas las publicaciones
-          </button>
-        </div>
-
-        {cargando ? (
-          <div className={styles.grilla} aria-busy="true" aria-live="polite">
-            <span className="tg-sr-only">Cargando publicaciones</span>
-            {[0, 1, 2].map((i) => (
-              <div key={i} className={styles.esqueleto} aria-hidden="true">
-                <div className={styles.esqueletoFoto} />
-                <div className={styles.esqueletoLinea} />
-                <div className={`${styles.esqueletoLinea} ${styles.esqueletoCorta}`} />
-              </div>
-            ))}
-          </div>
-        ) : error ? (
-          <div className={styles.aviso} role="alert">
-            <p>{error}</p>
-            <button className="tg-button tg-button--secondary" onClick={reintentar}>
-              Reintentar
-            </button>
-          </div>
-        ) : operaciones.length === 0 ? (
-          <div className={styles.aviso}>
-            <p>Todavía no hay publicaciones.</p>
-            <button className="tg-button tg-button--secondary" onClick={handlePublishClick}>
-              Publicar una oferta
-            </button>
-          </div>
-        ) : (
-          <div className={styles.grilla}>
-            {operaciones.map((operacion) => (
-              <ProductCard
-                key={operacion.id}
-                product={operacion}
-                variante="compacta"
-                onSolicitarCotizacion={onSolicitarCotizacion}
-                onSolicitarIngreso={onSolicitarIngreso}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-
       <section className={styles.decision} aria-labelledby="titulo-datos">
         <div className={`tg-container ${styles.decisionGrilla}`}>
           <div className={styles.decisionIntro}>
-            <p className="tg-eyebrow">Antes de avanzar</p>
-            <h2 id="titulo-datos">Los datos que definen la publicación.</h2>
+            <p className="tg-eyebrow">Para comparar</p>
+            <h2 id="titulo-datos">Lo que muestra cada publicación.</h2>
           </div>
           {DECISION.map(([titulo, texto]) => (
             <div key={titulo} className={styles.decisionItem}>
@@ -210,22 +155,6 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </section>
 
-      <section className={`tg-container ${styles.cta}`} aria-labelledby="titulo-publicar">
-        <div className={styles.ctaInterior}>
-          <div>
-            <h2 id="titulo-publicar">¿Tenés algo para ofrecer?</h2>
-            <p>Publicá un activo, un insumo o un servicio con los datos que necesita la publicación.</p>
-          </div>
-          <div className={styles.acciones}>
-            <button className="tg-button tg-button--primary" onClick={handlePublishClick}>
-              Publicar una oferta
-            </button>
-            <button className="tg-button tg-button--secondary" onClick={onNavigateToMarketplace}>
-              Ver el mercado
-            </button>
-          </div>
-        </div>
-      </section>
     </div>
   );
 };

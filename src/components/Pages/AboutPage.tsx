@@ -2,7 +2,6 @@ import React from 'react';
 import styles from './AboutPage.module.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
-import { ProductImage } from '../ProductImage/ProductImage';
 
 interface AboutPageProps {
   onNavigateToMarketplace?: () => void;
@@ -109,49 +108,24 @@ export const AboutPage: React.FC<AboutPageProps> = ({
         </div>
       </section>
 
-      {/* Nuestro Equipo Section */}
-      <section className={styles.teamSection}>
-        <div className={styles.container}>
-          <h2 className={styles.teamTitle}>Nuestro equipo</h2>
-          
-          {/* Mercedes Raiz */}
-          <div className={styles.teamMember}>
-            <div className={styles.memberPhoto}>
-              <ProductImage
-                src="/MercedesRaiz.jpg"
-                alt="Ingeniera Mercedes Raiz"
-                className={styles.memberImage}
-              />
-            </div>
-            <div className={styles.memberInfo}>
-              <h3 className={styles.memberName}>Ingeniera Mercedes Raiz</h3>
-              <p className={styles.memberRole}>Fundadora y Directora Técnica</p>
-              <p className={styles.memberDescription}>
-                Como ingeniera en Mecanización de la Producción Agropecuaria, lidero un 
-                equipo dedicado a transformar la eficiencia en cada etapa de la producción 
-                agrícola. Mi experiencia en la selección y uso de maquinaria agrícola y el 
-                asesoramiento especializado en cada etapa del ciclo productivo ayuda a 
-                nuestros clientes a maximizar el rendimiento de sus equipos, asegurando 
-                que cada tarea se realice con la máxima eficiencia y precisión con apoyo y 
-                seguimiento de inteligencia artificial que garantizan soluciones adaptadas 
-                a las necesidades específicas de cada cliente.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* «Nuestro equipo» salió, por ahora (la clienta, 20/09): no quiere
+          aparecer como el único perfil de un equipo que no está presentado. */}
 
-      {/* CTA Section */}
+      {/* La invitación a publicar o buscar. Estaba también al final de Inicio
+          —el bloque que se repetía entre pestañas (la clienta, 20/09)— y
+          queda sólo acá, donde es el único camino al Mercado de la página.
+          Decía «¿Listo para transformar tu producción?» y «las mejores
+          soluciones tecnológicas»: prometía más de lo que se ofrece. */}
       <section className={styles.ctaSection}>
         <div className={styles.container}>
-          <h2>¿Listo para transformar tu producción?</h2>
-          <p>Únete a AgroBoeda y accede a las mejores soluciones tecnológicas para el sector agropecuario</p>
+          <h2>Publicá o buscá en el Mercado agropecuario</h2>
+          <p>Publicá un equipo, un insumo o un servicio, o buscá lo que necesitás.</p>
           <div className={styles.ctaButtons}>
             <button className={styles.ctaPrimary} onClick={handleStartSelling}>
-              Comenzar a Vender
+              Publicar una oferta
             </button>
             <button className={styles.ctaSecondary} onClick={onNavigateToMarketplace}>
-              Explorar Productos
+              Ir al Mercado
             </button>
           </div>
         </div>

@@ -309,8 +309,10 @@ function App() {
   // mismo orden, y se pide solo cuando Inicio esta a la vista. Vive aca y no
   // adentro de la pagina para no competir con la carga del mercado ni duplicar
   // el estado de red.
+  // Inicio sólo usa el total: pide una publicación y lee cuántas hay.
   const vistaPreviaDeInicio = useVistaPrevia({
     activa: pantallaDeTrabajo === 'home',
+    cantidad: 1,
     mensajeDeError: 'No pudimos cargar las publicaciones.',
   });
 
@@ -792,9 +794,7 @@ function App() {
       case 'home':
         return <HomePage 
           onNavigateToMarketplace={() => handleNavigate('marketplace')} 
-          onSolicitarCotizacion={pedirCotizacion}
           onSolicitarPublicar={pedirPublicar}
-          onSolicitarIngreso={abrirLoginYVolver}
           vistaPrevia={vistaPreviaDeInicio}
         />;
       case 'verificar-correo':
@@ -956,7 +956,6 @@ function App() {
         return <HomePage 
           onNavigateToMarketplace={() => handleNavigate('marketplace')}
           onSolicitarPublicar={pedirPublicar}
-          onSolicitarIngreso={abrirLoginYVolver}
           vistaPrevia={vistaPreviaDeInicio}
         />;
     }

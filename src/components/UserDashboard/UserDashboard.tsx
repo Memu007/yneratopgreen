@@ -2505,8 +2505,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
               <p className={styles.mpInfo}>
                 Cuando el cobro con Mercado Pago esté disponible, los pagos de tus
                 ventas van a entrar directamente en tu cuenta. AgroBoeda no los recibe
-                ni los reparte, y no te cobra comisión por vender; Mercado Pago te
-                descuenta la suya, como en cualquier venta tuya.
+                ni los reparte. Mercado Pago descuenta lo que cobra por cada venta,
+                como en cualquier venta tuya.
               </p>
               {mpVinculo.conviene_renovar && (
                 <>
